@@ -17,13 +17,12 @@ export function registerCloudPublishIpcHandlers({
     try {
       const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
       return await operation({ ...request, rootPath }, event);
-    } catch (error) {
+    } catch {
       return {
         ok: false,
         state: null,
         error: {
           ...UNKNOWN_ERROR,
-          message: sanitizeMessage(error),
         },
       };
     }
@@ -32,32 +31,31 @@ export function registerCloudPublishIpcHandlers({
     try {
       const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
       return await operation({ ...request, rootPath });
-    } catch (error) {
+    } catch {
       return {
         ok: false,
         operationId: null,
         state: null,
         error: {
           ...UNKNOWN_ERROR,
-          message: sanitizeMessage(error),
         },
       };
     }
   };
 
-  ipcMain.handle("cloud-publish:get-state", withAuthorizedRoot((request) => (
+  ipcMain.handle("cloud-initialization:get-state", withAuthorizedRoot((request) => (
     cloudPublishCoordinator.getState(request)
   )));
-  ipcMain.handle("cloud-publish:start-or-resume", withAuthorizedRoot((request, event) => (
+  ipcMain.handle("cloud-initialization:start", withAuthorizedRoot((request, event) => (
     cloudPublishCoordinator.startOrResume(request, {
       onProgress: (progress) => {
         if (event.sender.isDestroyed?.()) return;
-        event.sender.send("cloud-publish:progress", progress);
+        event.sender.send("cloud-initialization:progress", progress);
       },
     })
   )));
-  ipcMain.handle("cloud-publish:abandon", withAuthorizedRoot((request) => (
-    cloudPublishCoordinator.abandon(request)
+  ipcMain.handle("cloud-initialization:cleanup", withAuthorizedRoot((request) => (
+    cloudPublishCoordinator.cleanup(request)
   )));
   if (cloudGitConnectCoordinator) {
     ipcMain.handle("cloud-git:connect-project", withAuthorizedConnectRoot((request) => (
@@ -67,10 +65,4 @@ export function registerCloudPublishIpcHandlers({
       cloudGitConnectCoordinator.abandon(request)
     )));
   }
-}
-
-function sanitizeMessage(error) {
-  return (error instanceof Error ? error.message : String(error ?? UNKNOWN_ERROR.message))
-    .replace(/pwg_[A-Za-z0-9_-]+/g, "[redacted]")
-    .slice(0, 500);
 }

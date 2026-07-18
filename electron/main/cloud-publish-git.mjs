@@ -6,12 +6,14 @@ import {
 } from "../../local-api/git/runner.mjs";
 import { getWorkspaceGitStatus } from "../../local-api/workspace.mjs";
 import {
+  CLOUD_DESTINATION_REF,
   CLOUD_DESTINATION_BRANCH,
   CLOUD_REMOTE_NAME,
   COMMIT_ID_PATTERN,
   createPublishError,
   isSimulatedCrash,
 } from "./cloud-publish-contract.mjs";
+import { resolveSourceBranchCommit } from "./cloud-initialization/attempts/source-ref.mjs";
 import {
   CLOUD_INITIAL_PUSH_TIMEOUT_MS,
   CLOUD_PUSH_RECONCILE_DELAYS_MS,
@@ -47,8 +49,8 @@ export function createCloudPublishGitService({
   }
 
   const inspectRemote = (rootPath) => inspectCloudRemote(rootPath, execGitCommand);
-  const assertIdentity = (rootPath, record) => (
-    assertExpectedRepositoryIdentity(rootPath, record, execGitCommand)
+  const assertAttemptCommit = (rootPath, record) => (
+    assertAttemptCommitExists(rootPath, record, execGitCommand)
   );
   const assertExactRemote = (rootPath, url) => (
     assertExactCanonicalRemote(rootPath, url, execGitCommand)
@@ -82,7 +84,7 @@ export function createCloudPublishGitService({
 
   async function configureRemote(rootPath, record, secret, verifyExpectedIdentity) {
     assertCredentialRecordComplete(record);
-    if (verifyExpectedIdentity) await assertIdentity(rootPath, record);
+    if (verifyExpectedIdentity) await assertAttemptCommit(rootPath, record);
     const remote = await inspectRemote(rootPath);
     if (
       remote.kind !== "missing"
@@ -120,7 +122,7 @@ export function createCloudPublishGitService({
         await injectFault("after-remote-add", record);
       }
       failureStage = "re-checking the repository identity";
-      if (verifyExpectedIdentity) await assertIdentity(rootPath, record);
+      if (verifyExpectedIdentity) await assertAttemptCommit(rootPath, record);
       failureStage = "verifying the local Cloud remote";
       await assertExactRemote(rootPath, record.canonical_remote_url);
       await injectFault("after-canonical-remote-verified", record);
@@ -150,7 +152,7 @@ export function createCloudPublishGitService({
 
   async function assertRemoteAddIntent(rootPath, record, verifyExpectedIdentity) {
     assertCredentialRecordComplete(record);
-    if (verifyExpectedIdentity) await assertIdentity(rootPath, record);
+    if (verifyExpectedIdentity) await assertAttemptCommit(rootPath, record);
     const remote = await inspectRemote(rootPath);
     if (remote.kind === "missing") return;
     throw createPublishError(
@@ -162,8 +164,9 @@ export function createCloudPublishGitService({
 
   async function pushExpectedCommit(rootPath, record, secret, onProgress = null) {
     assertCredentialRecordComplete(record);
-    await assertIdentity(rootPath, record);
+    await assertAttemptCommit(rootPath, record);
     await assertExactRemote(rootPath, record.canonical_remote_url);
+    const attemptCommitOid = record.attempt?.commit_oid;
     let approval = null;
     try {
       approval = await gitCredentialManager.approve(
@@ -176,9 +179,9 @@ export function createCloudPublishGitService({
       );
       reportCloudPublishProgress(onProgress, "checking-remote");
       let remoteHead = await readRemoteMain(rootPath, record, execGitCommand, secureArgs);
-      if (remoteHead && remoteHead !== record.expected_head_commit_id) {
+      if (remoteHead && remoteHead !== attemptCommitOid) {
         throw createPublishError(
-          "PUSH_FAILED",
+          "REMOTE_REF_CONFLICT",
           "The Cloud Project main branch already points to a different commit.",
           false,
         );
@@ -189,8 +192,9 @@ export function createCloudPublishGitService({
           reportCloudPublishProgress(onProgress, "uploading");
           await execGitCommand(rootPath, secureArgs(record, [
             "push",
+            `--force-with-lease=${CLOUD_DESTINATION_REF}:`,
             record.canonical_remote_url,
-            `${record.expected_head_commit_id}:refs/heads/${CLOUD_DESTINATION_BRANCH}`,
+            `${attemptCommitOid}:${CLOUD_DESTINATION_REF}`,
           ]), { timeout: CLOUD_INITIAL_PUSH_TIMEOUT_MS });
           await injectFault("after-push-side-effect", record);
           reportCloudPublishProgress(onProgress, "confirming");
@@ -198,21 +202,37 @@ export function createCloudPublishGitService({
           if (isSimulatedCrash(error)) throw error;
           remoteHead = await readRemoteMain(rootPath, record, execGitCommand, secureArgs).catch(() => null);
           if (
-            remoteHead !== record.expected_head_commit_id
+            remoteHead !== attemptCommitOid
             && isUncertainPushFailure(error)
           ) {
             reportCloudPublishProgress(onProgress, "confirming");
             remoteHead = await reconcileExpectedRemoteHead({
-              expectedHeadCommitId: record.expected_head_commit_id,
+              expectedHeadCommitId: attemptCommitOid,
               readRemoteHead: () => readRemoteMain(rootPath, record, execGitCommand, secureArgs),
               wait,
             });
           }
-          if (remoteHead !== record.expected_head_commit_id) throw error;
+          if (remoteHead && remoteHead !== attemptCommitOid) {
+            throw createPublishError(
+              "REMOTE_REF_CONFLICT",
+              "Cloud main changed while the initial push was in flight.",
+              false,
+              error,
+            );
+          }
+          if (remoteHead !== attemptCommitOid && isUncertainPushFailure(error)) {
+            throw createPublishError(
+              "PUSH_UNCERTAIN",
+              "The initial push result is uncertain. Reconcile Cloud main before retrying.",
+              true,
+              error,
+            );
+          }
+          if (remoteHead !== attemptCommitOid) throw error;
         }
       }
       remoteHead = remoteHead ?? await readRemoteMain(rootPath, record, execGitCommand, secureArgs);
-      if (remoteHead !== record.expected_head_commit_id) {
+      if (remoteHead !== attemptCommitOid) {
         throw createPublishError(
           "PUSH_FAILED",
           "The Cloud Project did not confirm the expected initial commit.",
@@ -222,7 +242,7 @@ export function createCloudPublishGitService({
       await injectFault("after-push-reconciled", record);
       await assertManagedCredentialConfig(rootPath, record);
       reportCloudPublishProgress(onProgress, "finalizing");
-      return finalizeUpstreamAndStatus(rootPath, record);
+      return { remoteHead };
     } catch (error) {
       if (isSimulatedCrash(error)) throw error;
       await approval?.rollback?.().catch(() => undefined);
@@ -238,21 +258,21 @@ export function createCloudPublishGitService({
 
   async function finalizeUpstreamAndStatus(rootPath, record) {
     await assertManagedCredentialConfig(rootPath, record);
-    await assertIdentity(rootPath, record);
+    await assertAttemptCommit(rootPath, record);
     await assertExactRemote(rootPath, record.canonical_remote_url);
     const remoteHead = await readRemoteMain(rootPath, record, execGitCommand, secureArgs);
-    if (remoteHead !== record.expected_head_commit_id) {
+    if (remoteHead !== record.attempt?.commit_oid) {
       throw createPublishError("PUSH_FAILED", "The Cloud main branch no longer matches the expected commit.", false);
     }
     await execGitCommand(rootPath, [
       "update-ref",
       `refs/remotes/${CLOUD_REMOTE_NAME}/${CLOUD_DESTINATION_BRANCH}`,
-      record.expected_head_commit_id,
+      record.attempt.commit_oid,
     ], { timeout: GIT_MUTATION_TIMEOUT_MS });
     await execGitCommand(rootPath, [
       "branch",
       `--set-upstream-to=${CLOUD_REMOTE_NAME}/${CLOUD_DESTINATION_BRANCH}`,
-      record.expected_branch,
+      record.selected_source_branch,
     ], { timeout: GIT_MUTATION_TIMEOUT_MS });
     await injectFault("after-upstream-configured", record);
     return getGitStatus(rootPath);
@@ -282,6 +302,25 @@ export function createCloudPublishGitService({
         timeout: GIT_MUTATION_TIMEOUT_MS,
       });
       await injectFault("after-abandon-remote-removed", record);
+    }
+  }
+
+  async function inspectRemoteHead(rootPath, record, secret, requireExactLocalRemote) {
+    assertCredentialRecordComplete(record);
+    if (requireExactLocalRemote) await assertExactRemote(rootPath, record.canonical_remote_url);
+    const approval = await gitCredentialManager.approve(
+      rootPath,
+      record.canonical_remote_url,
+      record.credential_username,
+      secret,
+      record.operation_id,
+      record.credential_config_snapshot,
+    );
+    try {
+      return await readRemoteMain(rootPath, record, execGitCommand, secureArgs);
+    } catch (error) {
+      await approval?.rollback?.().catch(() => undefined);
+      throw error;
     }
   }
 
@@ -319,6 +358,17 @@ export function createCloudPublishGitService({
     }),
     configureCanonicalRemote: (rootPath, record, secret) => configureRemote(rootPath, record, secret, true),
     configureExistingProjectRemote: (rootPath, record, secret) => configureRemote(rootPath, record, secret, false),
+    inspectCanonicalRemoteHead: (rootPath, record, secret) => (
+      inspectRemoteHead(rootPath, record, secret, true)
+    ),
+    inspectJournaledRemoteHead: (rootPath, record, secret) => (
+      inspectRemoteHead(rootPath, record, secret, false)
+    ),
+    resolveSourceCommit: (rootPath, sourceBranch) => resolveSourceBranchCommit(
+      rootPath,
+      sourceBranch,
+      execGitCommand,
+    ),
     pushExpectedCommit,
     finalizeUpstreamAndStatus,
     cleanupAfterServerAbandon,
@@ -396,16 +446,16 @@ export async function assertVersionEnginePreflight(rootPath, expectedCommitId, {
   }
 }
 
-async function assertExpectedRepositoryIdentity(rootPath, record, execGitCommand) {
-  const [branch, head] = await Promise.all([
-    execGitCommand(rootPath, ["symbolic-ref", "--quiet", "--short", "HEAD"], { optionalLocks: false })
-      .then(({ stdout }) => stdout.trim()).catch(() => ""),
-    execGitCommand(rootPath, ["rev-parse", "--verify", "HEAD^{commit}"], { optionalLocks: false })
-      .then(({ stdout }) => stdout.trim().toLowerCase()).catch(() => ""),
-  ]);
-  if (branch !== record.expected_branch || head !== record.expected_head_commit_id) {
-    throw createPublishError("IDENTITY_MISMATCH", "The local branch or HEAD changed during publish.", false);
+async function assertAttemptCommitExists(rootPath, record, execGitCommand) {
+  const commitOid = record.attempt?.commit_oid;
+  if (!COMMIT_ID_PATTERN.test(commitOid ?? "")) {
+    throw createPublishError("COMMIT_REQUIRED", "Cloud push attempt has no valid commit.", false);
   }
+  await execGitCommand(rootPath, ["cat-file", "-e", `${commitOid}^{commit}`], {
+    optionalLocks: false,
+  }).catch((error) => {
+    throw createPublishError("COMMIT_REQUIRED", "The selected push commit is no longer available locally.", false, error);
+  });
 }
 
 async function assertExactCanonicalRemote(rootPath, canonicalUrl, execGitCommand) {

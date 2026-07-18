@@ -183,7 +183,7 @@ describe("repository-context architecture", () => {
       "utf8",
     );
     const publishHookSource = readFileSync(
-      new URL("../src/features/cloud/workspace/usePuppyoneCloudBackup.ts", import.meta.url),
+      new URL("../src/features/cloud/initialization/useCloudInitialization.ts", import.meta.url),
       "utf8",
     );
     const appSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
@@ -198,7 +198,10 @@ describe("repository-context architecture", () => {
     expect(resolverSource).toContain("getCloudRepositoryContext");
     expect(resolverSource).not.toContain("remote_url");
     expect(combined).not.toMatch(/WorkspaceBinding|workspaceBinding|workspace_binding|cloudBinding|bindingId/);
-    expect(publishHookSource).toContain("startOrResumeWorkspaceCloudPublish");
+    expect(publishHookSource).toContain("startWorkspaceCloudInitialization");
+    expect(publishHookSource).toContain("pending?.selectedSourceBranch");
+    expect(publishHookSource).toContain("pending.availableActions");
+    expect(publishHookSource).not.toContain("expectedHeadCommitId");
     expect(publishHookSource).not.toContain("issueWorkspaceGitRemote");
     expect(publishHookSource).not.toContain("configureWorkspaceCloudRemote");
     expect(appSource).not.toMatch(/revokeCloudWorkspace|workspaceInstanceId/);
@@ -206,20 +209,23 @@ describe("repository-context architecture", () => {
 
   it("keeps Initialize remote mutation inside the durable main-process transaction", () => {
     const coordinatorSource = readFileSync(
-      new URL("../electron/main/cloud-publish-coordinator.mjs", import.meta.url),
+      new URL("../electron/main/cloud-initialization/coordinator.mjs", import.meta.url),
       "utf8",
     );
-    const transactionStart = coordinatorSource.indexOf("async function runPublishUnderLock");
-    const transactionEnd = coordinatorSource.indexOf("async function runAbandonUnderLock");
+    const transactionStart = coordinatorSource.indexOf("async function runInitializeUnderLock");
+    const transactionEnd = coordinatorSource.indexOf("async function runCleanupUnderLock");
     const transaction = coordinatorSource.slice(transactionStart, transactionEnd);
 
     expect(transactionStart).toBeGreaterThan(-1);
     expect(transaction).toContain("assertFreshPublishStatus(status, base)");
     expect(transaction).toContain("gitService.assertNoRemote(base.rootPath)");
+    expect(transaction).toContain("gitService.resolveSourceCommit(base.rootPath, base.sourceBranch)");
+    expect(transaction).toContain("createPushAttempt({ sequence: 1, commitOid: source.commitOid");
     expect(transaction).toContain("durableJournal.write(base.rootPath, record, { createOnly: true })");
     expect(transaction).toContain("cloudApi.createProject(record)");
     expect(transaction).toContain("cloudApi.issueCredential(record, secret.value)");
-    expect(transaction).toContain("gitService.configureCanonicalRemote(");
+    expect(transaction).toContain("configureRemote(base.rootPath, record, reportProgress)");
+    expect(coordinatorSource).toContain("gitService.configureCanonicalRemote(");
     expect(transaction).toContain("gitService.pushExpectedCommit(");
     expect(coordinatorSource).toContain("repositoryLockKey(context.identity.commonDir)");
     expect(coordinatorSource).toContain("secretVault.clear(record.secret_ref)");

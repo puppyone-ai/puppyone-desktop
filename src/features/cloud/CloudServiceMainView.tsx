@@ -191,9 +191,9 @@ export function CloudServiceMainView({
               {formatCloudMessage(cloudAction.notice, t)}
             </div>
           )}
-          {cloudPublishNotice === "abandoned" && (
+          {cloudPublishNotice === "cleanup-completed" && (
             <div className="desktop-cloud-main-alert success" role="status">
-              {t("cloud.initialize.abandoned")}
+              {t("cloud.initialize.cleanupCompleted")}
             </div>
           )}
           {cloudPublishState || cloudPublishStateLoading ? (

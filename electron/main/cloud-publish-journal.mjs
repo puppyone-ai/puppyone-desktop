@@ -2,40 +2,51 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { resolveGitRepositoryIdentity } from "../../local-api/workspace.mjs";
-import { normalizeCredentialConfigSnapshot } from "./cloud-publish-git-credentials.mjs";
+import {
+  CLOUD_INITIALIZATION_CHECKPOINTS,
+  normalizeCloudInitializationJournalRecord,
+} from "./cloud-initialization/journal/schema-v2.mjs";
 
-const JOURNAL_VERSION = 1;
-const JOURNAL_KIND = "puppyone-cloud-publish";
 const JOURNAL_DIRECTORY = "puppyone";
+// Keep the established path so installed clients can migrate in place. The
+// record inside this file is schema v2 after its first successful read.
 const JOURNAL_FILENAME = "pending-cloud-publish.v1.json";
 const MAX_JOURNAL_BYTES = 128 * 1024;
 const JOURNAL_LOCK_TIMEOUT_MS = 5_000;
 const JOURNAL_LOCK_STALE_MS = 30_000;
 const JOURNAL_LOCK_RETRY_MS = 20;
 
-export const CLOUD_PUBLISH_PHASES = Object.freeze([
-  "prepared",
-  "project-created",
-  "credential-issued",
-  "remote-configured",
-  "pushed",
-  "compensation-pending",
-  "completed",
-]);
+export const CLOUD_PUBLISH_PHASES = CLOUD_INITIALIZATION_CHECKPOINTS;
 
 /** A durable, worktree-specific write-ahead log stored in Git's own git-dir. */
 export function createCloudPublishJournal(options = {}) {
-  return createWorktreeGitOperationJournal({
+  const now = options.now ?? (() => Date.now());
+  const store = createWorktreeGitOperationJournal({
     ...options,
     filename: JOURNAL_FILENAME,
-    normalizeEntry: normalizeJournalRecord,
-    canTransition: isCloudPublishTransitionAllowed,
-    prepareEntry: (record) => ({
-      ...record,
-      version: JOURNAL_VERSION,
-      kind: JOURNAL_KIND,
-    }),
+    normalizeEntry: normalizeCloudInitializationJournalRecord,
+    canTransition: isCloudInitializationTransitionAllowed,
+    stateField: "checkpoint",
   });
+  return {
+    ...store,
+    async read(rootPath) {
+      const entry = await store.read(rootPath);
+      const record = entry.record;
+      if (!record?.migrated_from || record.migrated_from.persisted) return entry;
+      const migrated = {
+        ...record,
+        revision: record.revision + 1,
+        migrated_from: { ...record.migrated_from, persisted: true },
+        updated_at: new Date(now()).toISOString(),
+      };
+      return store.write(rootPath, migrated, {
+        expectedOperationId: record.operation_id,
+        expectedRevision: record.revision,
+        expectedState: record.checkpoint,
+      });
+    },
+  };
 }
 
 /** Shared durability primitive for every main-owned Cloud Git operation. */
@@ -44,6 +55,7 @@ export function createWorktreeGitOperationJournal({
   normalizeEntry,
   prepareEntry = (record) => record,
   canTransition = () => true,
+  stateField = "phase",
   fsApi = fs.promises,
   now = () => Date.now(),
   resolveRepositoryIdentity = resolveGitRepositoryIdentity,
@@ -78,8 +90,8 @@ export function createWorktreeGitOperationJournal({
     await ensureSafeDirectory(paths.directory, fsApi);
     return withJournalLock(paths, fsApi, async () => {
       const current = await readEntryAtPath(paths.journalPath, normalizeEntry, fsApi);
-      assertJournalCompareAndSwap(current, options);
-      assertMonotonicJournalUpdate(current, normalized, canTransition, options);
+      assertJournalCompareAndSwap(current, options, stateField);
+      assertMonotonicJournalUpdate(current, normalized, canTransition, options, stateField);
       await writeJsonAtomic(paths.journalPath, normalized, fsApi, now, {
         createOnly: options.createOnly === true,
       });
@@ -93,7 +105,7 @@ export function createWorktreeGitOperationJournal({
     await withJournalLock(paths, fsApi, async () => {
       const current = await readEntryAtPath(paths.journalPath, normalizeEntry, fsApi);
       if (!current) return;
-      assertJournalCompareAndSwap(current, options);
+      assertJournalCompareAndSwap(current, options, stateField);
       await fsApi.rm(paths.journalPath, { force: true }).catch((error) => {
         throw createJournalError("Unable to clear the Cloud Git operation journal.", "JOURNAL_IO_FAILED", error);
       });
@@ -135,73 +147,7 @@ async function readEntryAtPath(journalPath, normalizeEntry, fsApi) {
     return normalizeEntry(value);
 }
 
-export function normalizeJournalRecord(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw createJournalError("Cloud publish journal is invalid.", "JOURNAL_CORRUPT");
-  }
-  if (value.version !== JOURNAL_VERSION || value.kind !== JOURNAL_KIND) {
-    throw createJournalError("Cloud publish journal version is unsupported.", "JOURNAL_CORRUPT");
-  }
-  const phase = requireEnum(value.phase, CLOUD_PUBLISH_PHASES, "phase");
-  const operationId = requireUuid(value.operation_id, "operation_id");
-  const apiBaseUrl = requireString(value.api_base_url, "api_base_url");
-  const apiOrigin = requireString(value.api_origin, "api_origin");
-  const userId = requireString(value.user_id, "user_id");
-  const organizationId = requireString(value.organization_id, "organization_id");
-  const projectName = requireString(value.project_name, "project_name");
-  const repositoryFingerprint = requireString(value.repository_fingerprint, "repository_fingerprint");
-  const expectedHeadCommitId = requireCommitId(value.expected_head_commit_id);
-  const expectedBranch = requireString(value.expected_branch, "expected_branch");
-  if (value.destination_branch !== "main") {
-    throw createJournalError("Cloud publish destination branch is invalid.", "JOURNAL_CORRUPT");
-  }
-  const createPayload = value.create_payload;
-  if (
-    !createPayload
-    || typeof createPayload !== "object"
-    || Array.isArray(createPayload)
-    || createPayload.org_id !== organizationId
-    || createPayload.name !== projectName
-    || createPayload.description !== null
-    || Object.keys(createPayload).sort().join(",") !== "description,name,org_id"
-  ) {
-    throw createJournalError("Cloud publish create payload is invalid.", "JOURNAL_CORRUPT");
-  }
-  return {
-    version: JOURNAL_VERSION,
-    kind: JOURNAL_KIND,
-    operation_id: operationId,
-    revision: requireRevision(value.revision),
-    phase,
-    api_base_url: apiBaseUrl,
-    api_origin: apiOrigin,
-    user_id: userId,
-    organization_id: organizationId,
-    project_name: projectName,
-    create_payload: {
-      org_id: organizationId,
-      name: projectName,
-      description: null,
-    },
-    repository_fingerprint: repositoryFingerprint,
-    expected_head_commit_id: expectedHeadCommitId,
-    expected_branch: expectedBranch,
-    destination_branch: "main",
-    project_id: optionalString(value.project_id, "project_id"),
-    credential_id: optionalString(value.credential_id, "credential_id"),
-    secret_ref: optionalUuid(value.secret_ref, "secret_ref"),
-    secret_stored: value.secret_stored === true,
-    canonical_remote_url: optionalString(value.canonical_remote_url, "canonical_remote_url"),
-    credential_username: optionalString(value.credential_username, "credential_username"),
-    credential_config_snapshot: value.credential_config_snapshot == null
-      ? null
-      : normalizeCredentialConfigSnapshot(value.credential_config_snapshot),
-    remote_add_intent: value.remote_add_intent === true,
-    remote_created_by_operation: value.remote_created_by_operation === true,
-    created_at: requireIso(value.created_at, "created_at"),
-    updated_at: requireIso(value.updated_at, "updated_at"),
-  };
-}
+export const normalizeJournalRecord = normalizeCloudInitializationJournalRecord;
 
 async function ensureSafeDirectory(directory, fsApi) {
   await fsApi.mkdir(directory, { recursive: true, mode: 0o700 });
@@ -246,7 +192,7 @@ async function withJournalLock(paths, fsApi, operation) {
   }
 }
 
-function assertJournalCompareAndSwap(current, options) {
+function assertJournalCompareAndSwap(current, options, stateField) {
   if (options.createOnly === true) {
     if (!current) return;
     throw createJournalError(
@@ -260,7 +206,8 @@ function assertJournalCompareAndSwap(current, options) {
   if (
     (options.expectedOperationId && current.operation_id !== options.expectedOperationId)
     || (Number.isInteger(options.expectedRevision) && current.revision !== options.expectedRevision)
-    || (options.expectedPhase && current.phase !== options.expectedPhase)
+    || ((options.expectedState || options.expectedPhase)
+      && current[stateField] !== (options.expectedState || options.expectedPhase))
   ) {
     throw createJournalError(
       "Pending Cloud Git operation changed in another Desktop process.",
@@ -269,7 +216,7 @@ function assertJournalCompareAndSwap(current, options) {
   }
 }
 
-function assertMonotonicJournalUpdate(current, next, canTransition, options) {
+function assertMonotonicJournalUpdate(current, next, canTransition, options, stateField) {
   if (options.createOnly === true) {
     if (Number.isSafeInteger(next.revision) && next.revision !== 0) {
       throw createJournalError("New Cloud Git operation revision must start at zero.", "JOURNAL_CORRUPT");
@@ -279,7 +226,7 @@ function assertMonotonicJournalUpdate(current, next, canTransition, options) {
   if (
     next.operation_id !== current.operation_id
     || (Number.isSafeInteger(current.revision) && next.revision !== current.revision + 1)
-    || !canTransition(current.phase, next.phase)
+    || !canTransition(current[stateField], next[stateField])
   ) {
     throw createJournalError(
       "Cloud Git operation journal update is not monotonic.",
@@ -288,14 +235,16 @@ function assertMonotonicJournalUpdate(current, next, canTransition, options) {
   }
 }
 
-function isCloudPublishTransitionAllowed(from, to) {
+function isCloudInitializationTransitionAllowed(from, to) {
   const transitions = {
-    prepared: ["prepared", "project-created", "compensation-pending"],
-    "project-created": ["project-created", "credential-issued", "compensation-pending"],
-    "credential-issued": ["credential-issued", "remote-configured", "compensation-pending"],
-    "remote-configured": ["remote-configured", "pushed", "compensation-pending"],
-    "compensation-pending": ["compensation-pending", "pushed"],
-    pushed: ["pushed", "completed"],
+    prepared: ["prepared", "project-created", "cleanup-requested"],
+    "project-created": ["project-created", "credential-issued", "cleanup-requested"],
+    "credential-issued": ["credential-issued", "remote-configured", "cleanup-requested"],
+    "remote-configured": ["remote-configured", "push-attempt", "push-accepted", "cleanup-requested"],
+    "push-attempt": ["push-attempt", "push-accepted", "cleanup-requested"],
+    "push-accepted": ["push-accepted", "completed"],
+    "cleanup-requested": ["cleanup-requested", "cleanup-server-complete", "push-accepted"],
+    "cleanup-server-complete": ["cleanup-server-complete", "completed"],
     completed: ["completed"],
   };
   return transitions[from]?.includes(to) === true;
@@ -357,60 +306,6 @@ async function syncDirectoryBestEffort(directory, fsApi) {
   } finally {
     if (handle) await handle.close().catch(() => undefined);
   }
-}
-
-function requireString(value, field) {
-  if (typeof value !== "string" || !value.trim()) {
-    throw createJournalError(`Cloud publish journal field '${field}' is invalid.`, "JOURNAL_CORRUPT");
-  }
-  return value.trim();
-}
-
-function optionalString(value, field) {
-  return value === null || value === undefined ? null : requireString(value, field);
-}
-
-function requireUuid(value, field) {
-  const normalized = requireString(value, field).toLowerCase();
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(normalized)) {
-    throw createJournalError(`Cloud publish journal field '${field}' is invalid.`, "JOURNAL_CORRUPT");
-  }
-  return normalized;
-}
-
-function optionalUuid(value, field) {
-  return value === null || value === undefined ? null : requireUuid(value, field);
-}
-
-function requireCommitId(value) {
-  const normalized = requireString(value, "expected_head_commit_id").toLowerCase();
-  if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(normalized)) {
-    throw createJournalError("Cloud publish expected commit id is invalid.", "JOURNAL_CORRUPT");
-  }
-  return normalized;
-}
-
-function requireRevision(value) {
-  if (!Number.isSafeInteger(value) || value < 0) {
-    throw createJournalError("Cloud publish journal revision is invalid.", "JOURNAL_CORRUPT");
-  }
-  return value;
-}
-
-function requireIso(value, field) {
-  const normalized = requireString(value, field);
-  const parsed = new Date(normalized);
-  if (Number.isNaN(parsed.getTime())) {
-    throw createJournalError(`Cloud publish journal field '${field}' is invalid.`, "JOURNAL_CORRUPT");
-  }
-  return parsed.toISOString();
-}
-
-function requireEnum(value, allowed, field) {
-  if (!allowed.includes(value)) {
-    throw createJournalError(`Cloud publish journal field '${field}' is invalid.`, "JOURNAL_CORRUPT");
-  }
-  return value;
 }
 
 function createJournalError(message, publishCode, cause = undefined) {

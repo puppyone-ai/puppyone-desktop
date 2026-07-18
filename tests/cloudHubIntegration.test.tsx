@@ -36,7 +36,7 @@ import type {
   DesktopCloudHistory,
   DesktopCloudHistoryCommit,
 } from "../src/lib/cloudHistoryApi";
-import type { GitStatusSnapshot } from "../src/types/electron";
+import type { CloudInitializationState, GitStatusSnapshot } from "../src/types/electron";
 import { renderWithTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -186,6 +186,40 @@ function testCloudMainState(value: DesktopCloudSession | null, apiBaseUrl: strin
     cloudPublishState: null,
     cloudPublishStateLoading: false,
     onAbandonPuppyoneBackup: vi.fn(),
+  };
+}
+
+function testInitializationState(
+  overrides: Partial<CloudInitializationState> = {},
+): CloudInitializationState {
+  return {
+    operationId: "11111111-1111-4111-8111-111111111111",
+    session: "signed-in",
+    project: "empty",
+    push: "failed",
+    local: "clean",
+    cleanup: "none",
+    projectId: "proj-retry",
+    projectName: "Retry Repo",
+    organizationId: "org-1",
+    selectedSourceBranch: "main",
+    selectedSourceRef: "refs/heads/main",
+    latestSourceCommitOid: "head-1",
+    attemptId: "22222222-2222-4222-8222-222222222222",
+    attemptCommitOid: "head-1",
+    attemptCount: 1,
+    destinationBranch: "main",
+    hasUncommittedChanges: false,
+    currentBranch: "main",
+    lastError: {
+      code: "PUSH_FAILED",
+      retryable: true,
+      occurredAt: "2026-07-16T00:01:00Z",
+    },
+    availableActions: ["retry-push", "delete-empty-project"],
+    createdAt: "2026-07-16T00:00:00Z",
+    updatedAt: "2026-07-16T00:01:00Z",
+    ...overrides,
   };
 }
 
@@ -1094,27 +1128,150 @@ describe("Local-only Cloud page", () => {
         publishError={{ code: "PUSH_FAILED", retryable: true }}
         publishState={{
           operationId: "11111111-1111-4111-8111-111111111111",
-          phase: "remote-configured",
+          session: "signed-in",
+          project: "empty",
+          push: "failed",
+          local: "clean",
+          cleanup: "none",
           projectId: "proj-retry",
           projectName: "Retry Repo",
           organizationId: "org-1",
-          expectedHeadCommitId: "head-1",
-          expectedBranch: "main",
+          selectedSourceBranch: "main",
+          selectedSourceRef: "refs/heads/main",
+          latestSourceCommitOid: "head-1",
+          attemptId: "22222222-2222-4222-8222-222222222222",
+          attemptCommitOid: "head-1",
+          attemptCount: 1,
           destinationBranch: "main",
+          hasUncommittedChanges: false,
+          currentBranch: "main",
+          lastError: {
+            code: "PUSH_FAILED",
+            retryable: true,
+            occurredAt: "2026-07-16T00:01:00Z",
+          },
+          availableActions: ["retry-push", "delete-empty-project"],
           createdAt: "2026-07-16T00:00:00Z",
           updatedAt: "2026-07-16T00:01:00Z",
-          canResume: true,
-          canAbandon: true,
         }}
         onAbandonPublish={vi.fn()}
         onPublishWorkspace={onPublishWorkspace}
       />,
     ));
 
-    expect(container.textContent).toContain("Git remote configured");
+    expect(container.textContent).toContain("Cloud project ready · Push not accepted");
     const retry = container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary");
-    expect(retry?.textContent).toBe("Resume");
+    expect(retry?.textContent).toBe("Retry Push");
     act(() => retry?.click());
+    expect(onPublishWorkspace).toHaveBeenCalledOnce();
+  });
+
+  it("makes Finish cleanup the only primary recovery action once deletion intent is durable", () => {
+    const onCleanup = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <CloudLocalOnlyWorkspace
+        workspace={{ id: "local-cleanup", name: "Cleanup Repo", path: "/tmp/cleanup-repo" }}
+        accountEmail="owner@example.com"
+        branchName="other-branch"
+        totalCommits={4}
+        localChangeCount={3}
+        isGitRepository
+        hasHeadCommit
+        hasCurrentBranch
+        publishLoading={false}
+        publishError={{ code: "CLEANUP_FAILED", retryable: true }}
+        publishState={testInitializationState({
+          project: "deleting",
+          cleanup: "failed",
+          local: "branch-switched",
+          currentBranch: "other-branch",
+          availableActions: ["finish-cleanup"],
+        })}
+        onAbandonPublish={onCleanup}
+        onPublishWorkspace={vi.fn()}
+      />,
+    ));
+
+    const primaryActions = [...container.querySelectorAll<HTMLButtonElement>(".desktop-cloud-row-action.primary")];
+    expect(primaryActions).toHaveLength(1);
+    expect(primaryActions[0].textContent).toBe("Finish cleanup");
+    expect(container.textContent).not.toContain("Retry Push");
+    expect(container.textContent).not.toContain("Delete empty Cloud project");
+    act(() => primaryActions[0].click());
+    expect(onCleanup).toHaveBeenCalledOnce();
+  });
+
+  it("requires a second explicit confirmation before deleting a retained empty Project", () => {
+    const onCleanup = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <CloudLocalOnlyWorkspace
+        workspace={{ id: "local-empty", name: "Empty Repo", path: "/tmp/empty-repo" }}
+        accountEmail="owner@example.com"
+        branchName="main"
+        totalCommits={2}
+        localChangeCount={2}
+        isGitRepository
+        hasHeadCommit
+        hasCurrentBranch
+        publishLoading={false}
+        publishState={testInitializationState({ hasUncommittedChanges: true })}
+        onAbandonPublish={onCleanup}
+        onPublishWorkspace={vi.fn()}
+      />,
+    ));
+
+    expect(container.textContent).toContain("Uncommitted changes stay local and are not included in this Push.");
+    const deleteButton = container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-abandon");
+    expect(deleteButton?.textContent).toBe("Delete empty Cloud project");
+    act(() => deleteButton?.click());
+    expect(onCleanup).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="alertdialog"]')?.textContent)
+      .toContain("Delete this empty Cloud project?");
+
+    const confirm = container.querySelector<HTMLButtonElement>('[role="alertdialog"] .desktop-cloud-row-action.primary');
+    act(() => confirm?.click());
+    expect(onCleanup).toHaveBeenCalledOnce();
+  });
+
+  it("offers an explicit current-branch choice when the recorded source branch disappeared", () => {
+    const onPublishWorkspace = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <CloudLocalOnlyWorkspace
+        workspace={{ id: "local-source", name: "Source Repo", path: "/tmp/source-repo" }}
+        accountEmail="owner@example.com"
+        branchName="replacement"
+        totalCommits={2}
+        localChangeCount={0}
+        isGitRepository
+        hasHeadCommit
+        hasCurrentBranch
+        publishLoading={false}
+        publishState={testInitializationState({
+          local: "source-missing",
+          currentBranch: "replacement",
+          availableActions: ["choose-source", "delete-empty-project"],
+        })}
+        onAbandonPublish={vi.fn()}
+        onPublishWorkspace={onPublishWorkspace}
+      />,
+    ));
+
+    const primary = container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary");
+    expect(primary?.textContent).toBe("Use current branch");
+    expect(container.textContent).toContain("Source branch main no longer exists");
+    act(() => primary?.click());
     expect(onPublishWorkspace).toHaveBeenCalledOnce();
   });
 

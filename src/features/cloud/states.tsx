@@ -6,6 +6,7 @@ import {
   GitCommitHorizontal,
   RefreshCw,
 } from "lucide-react";
+import { useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
 import type {
@@ -81,6 +82,7 @@ export function CloudLocalOnlyWorkspace({
   onPublishWorkspace: (organizationId?: string) => void;
 }) {
   const { t } = useLocalization();
+  const [confirmingCleanup, setConfirmingCleanup] = useState(false);
   const publishBusy = publishLoading
     || publishStateLoading
     || (publishPending && !accountEmail);
@@ -105,8 +107,12 @@ export function CloudLocalOnlyWorkspace({
         : null;
   const readyToPush = readinessMessage === null;
   const organizationReady = organizationStatus === "signed-out" || organizationStatus === "ready";
+  const pushAction = publishState ? getPushAction(publishState.availableActions) : null;
+  const cleanupAction = publishState?.availableActions.find((action) => (
+    ["delete-empty-project", "finish-cleanup"].includes(action)
+  )) ?? null;
   const publishEnabled = publishState
-    ? publishState.canResume
+    ? Boolean(pushAction)
     : readyToPush && organizationReady;
   const showPublishSummary = Boolean(
     activeProgressStage
@@ -119,7 +125,7 @@ export function CloudLocalOnlyWorkspace({
   const cloudStatus = activeProgressStage
     ? getCloudPublishProgressLabel(activeProgressStage, t)
     : publishState
-    ? getCloudPublishPhaseLabel(publishState.phase, t)
+    ? getCloudInitializationStatusLabel(publishState, t)
     : t(waitingForSignIn
       ? "cloud.initialize.waitingForSignIn"
       : publishing
@@ -267,8 +273,11 @@ export function CloudLocalOnlyWorkspace({
               <CloudPublishProgressIndicator stage={activeProgressStage} t={t} />
             ) : publishState ? (
               <>
-                <strong>{getCloudPublishPhaseLabel(publishState.phase, t)}</strong>
-                <p>{t("cloud.initialize.resumeDescription", { project: publishState.projectName })}</p>
+                <strong>{getCloudInitializationStatusLabel(publishState, t)}</strong>
+                <p>{getCloudInitializationDescription(publishState, t)}</p>
+                {publishState.hasUncommittedChanges && (
+                  <small>{t("cloud.initialize.uncommittedChangesExcluded")}</small>
+                )}
               </>
             ) : readinessMessage ? (
               <strong>{readinessMessage}</strong>
@@ -284,49 +293,128 @@ export function CloudLocalOnlyWorkspace({
         )}
 
         <div className="desktop-cloud-publish-actions">
-          <button
-            className="desktop-cloud-row-action primary desktop-cloud-publish-primary"
-            type="button"
-            aria-busy={publishBusy || undefined}
-            disabled={publishBusy || !publishEnabled}
-            onClick={() => onPublishWorkspace(selectedOrganizationId ?? undefined)}
-          >
-            {publishing && <RefreshCw size={13} className="spin" aria-hidden="true" />}
-            <span>
-              {activeProgressStage
-                ? getCloudPublishProgressLabel(activeProgressStage, t)
-                : t(publishState
-                  ? "cloud.initialize.resume"
-                : waitingForSignIn
-                  ? "cloud.initialize.waitingForSignIn"
-                  : !accountEmail
-                    ? "cloud.initialize.signInToInitialize"
-                    : "cloud.initialize.initializeAndPush")}
-            </span>
-          </button>
-          {publishState?.canAbandon && onAbandonPublish && (
+          {cleanupAction === "finish-cleanup" && onAbandonPublish ? (
             <button
-              className="desktop-cloud-row-action desktop-cloud-publish-abandon"
+              className="desktop-cloud-row-action primary desktop-cloud-publish-primary"
               type="button"
               disabled={publishBusy}
               onClick={onAbandonPublish}
             >
-              {t(publishState.phase === "compensation-pending"
-                ? "cloud.initialize.retryAbandon"
-                : "cloud.initialize.abandon")}
+              {t("cloud.initialize.finishCleanup")}
+            </button>
+          ) : (
+            <button
+              className="desktop-cloud-row-action primary desktop-cloud-publish-primary"
+              type="button"
+              aria-busy={publishBusy || undefined}
+              disabled={publishBusy || !publishEnabled}
+              onClick={() => onPublishWorkspace(selectedOrganizationId ?? undefined)}
+            >
+              {publishing && <RefreshCw size={13} className="spin" aria-hidden="true" />}
+              <span>
+                {activeProgressStage
+                  ? getCloudPublishProgressLabel(activeProgressStage, t)
+                  : pushAction
+                    ? getCloudInitializationActionLabel(pushAction, t)
+                    : t(waitingForSignIn
+                      ? "cloud.initialize.waitingForSignIn"
+                      : !accountEmail
+                        ? "cloud.auth.signInToCloud"
+                        : "cloud.initialize.initializeAndPush")}
+              </span>
+            </button>
+          )}
+          {cleanupAction === "delete-empty-project" && onAbandonPublish && !confirmingCleanup && (
+            <button
+              className="desktop-cloud-row-action desktop-cloud-publish-abandon"
+              type="button"
+              disabled={publishBusy}
+              onClick={() => setConfirmingCleanup(true)}
+            >
+              {t("cloud.initialize.deleteEmptyProject")}
             </button>
           )}
         </div>
+        {confirmingCleanup && cleanupAction === "delete-empty-project" && onAbandonPublish && (
+          <div className="desktop-cloud-publish-summary blocked" role="alertdialog" aria-label={t("cloud.initialize.deleteEmptyProject")}>
+            <strong>{t("cloud.initialize.deleteEmptyProjectConfirmTitle")}</strong>
+            <p>{t("cloud.initialize.deleteEmptyProjectConfirmDescription", { project: publishState?.projectName ?? "" })}</p>
+            <div className="desktop-cloud-publish-actions">
+              <button type="button" className="desktop-cloud-row-action" onClick={() => setConfirmingCleanup(false)}>
+                {t("cloud.common.cancel")}
+              </button>
+              <button
+                type="button"
+                className="desktop-cloud-row-action primary"
+                disabled={publishBusy}
+                onClick={() => {
+                  setConfirmingCleanup(false);
+                  onAbandonPublish();
+                }}
+              >
+                {t("cloud.initialize.confirmDeleteEmptyProject")}
+              </button>
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );
 }
 
-function getCloudPublishPhaseLabel(
-  phase: CloudPublishState["phase"],
+function getCloudInitializationStatusLabel(
+  state: CloudPublishState,
   t: ReturnType<typeof useLocalization>["t"],
 ): string {
-  return t(`cloud.initialize.phase.${phase}`);
+  if (["requested", "deleting", "failed"].includes(state.cleanup)) {
+    return t("cloud.initialize.status.cleanupPending");
+  }
+  if (state.push === "uncertain") return t("cloud.initialize.status.pushUncertain");
+  if (state.push === "conflict") return t("cloud.initialize.status.pushConflict");
+  if (state.project === "unavailable") return t("cloud.initialize.projectUnavailable");
+  if (state.project === "empty" && state.push === "failed") return t("cloud.initialize.status.emptyPushFailed");
+  if (state.project === "empty") return t("cloud.initialize.status.empty");
+  if (state.push === "accepted" || state.project === "published") return t("cloud.initialize.status.published");
+  return t("cloud.initialize.status.preparing");
+}
+
+function getCloudInitializationDescription(
+  state: CloudPublishState,
+  t: ReturnType<typeof useLocalization>["t"],
+): string {
+  if (["requested", "deleting", "failed"].includes(state.cleanup)) {
+    return t("cloud.initialize.cleanupPendingDescription", { project: state.projectName });
+  }
+  if (state.push === "uncertain") return t("cloud.initialize.pushUncertainDescription");
+  if (state.push === "conflict") return t("cloud.initialize.pushConflictDescription");
+  if (state.project === "unavailable") return t("cloud.initialize.projectUnavailable");
+  if (state.local === "source-missing") {
+    return t("cloud.initialize.sourceMissingDescription", { branch: state.selectedSourceBranch });
+  }
+  if (state.local === "source-advanced") {
+    return t("cloud.initialize.sourceAdvancedDescription", { branch: state.selectedSourceBranch });
+  }
+  return t("cloud.initialize.emptyProjectDescription", { project: state.projectName });
+}
+
+function getCloudInitializationActionLabel(
+  action: "retry-push" | "push-latest" | "choose-source" | "reconcile",
+  t: ReturnType<typeof useLocalization>["t"],
+): string {
+  if (action === "push-latest") return t("cloud.initialize.pushLatestCommit");
+  if (action === "choose-source") return t("cloud.initialize.useCurrentBranch");
+  if (action === "reconcile") return t("cloud.initialize.checkCloudStatus");
+  return t("cloud.initialize.retryPush");
+}
+
+function getPushAction(
+  actions: CloudPublishState["availableActions"],
+): "retry-push" | "push-latest" | "choose-source" | "reconcile" | null {
+  if (actions.includes("reconcile")) return "reconcile";
+  if (actions.includes("choose-source")) return "choose-source";
+  if (actions.includes("push-latest")) return "push-latest";
+  if (actions.includes("retry-push")) return "retry-push";
+  return null;
 }
 
 const CLOUD_PUBLISH_PROGRESS_STEPS = [

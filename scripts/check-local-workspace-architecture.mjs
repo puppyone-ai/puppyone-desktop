@@ -184,15 +184,26 @@ if (/resolveLegacyCloudRepositoryRemote|remote_url|resolve-legacy-remote/.test(r
   errors.push("Cloud context APIs must accept Project targets, never local remote URLs or legacy credentials");
 }
 
-const publishCoordinator = read("electron/main/cloud-publish-coordinator.mjs");
+const publishCoordinator = read("electron/main/cloud-initialization/coordinator.mjs");
 for (const requiredModule of [
-  'from "./cloud-publish-api.mjs"',
-  'from "./cloud-publish-contract.mjs"',
-  'from "./cloud-publish-git.mjs"',
+  'from "../cloud-publish-api.mjs"',
+  'from "./contract.mjs"',
+  'from "../cloud-publish-git.mjs"',
 ]) {
   if (!publishCoordinator.includes(requiredModule)) {
     errors.push(`the publish coordinator must delegate through ${requiredModule}`);
   }
+}
+const publishStateDerivation = read("electron/main/cloud-initialization/state-derivation.mjs");
+const publishContractSource = read("electron/main/cloud-initialization/contract.mjs");
+if (
+  !publishStateDerivation.includes("availableActions")
+  || !publishStateDerivation.includes("deriveProjectState")
+  || !publishStateDerivation.includes("derivePushState")
+  || /canResume|canAbandon/.test(publishStateDerivation + publishContractSource)
+  || publishContractSource.includes("expectedHeadCommitId")
+) {
+  errors.push("Cloud initialization must derive independent state axes/actions without long-lived HEAD identity");
 }
 const publishApi = read("electron/main/cloud-publish-api.mjs");
 if (
@@ -204,7 +215,7 @@ if (
 if (/\bseed\b|template_id|template_config/.test(
   publishCoordinator
   + publishApi
-  + read("electron/main/cloud-publish-contract.mjs")
+  + publishContractSource
   + read("electron/main/cloud-publish-journal.mjs"),
 )) {
   errors.push("strict Desktop Project creation must not send seed/template fields");
