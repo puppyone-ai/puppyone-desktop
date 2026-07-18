@@ -8,7 +8,7 @@ import type { PulseGridPresetId } from "@puppyone/shared-ui";
 export type { TypographyPreferences } from "./features/typography/fontCatalog";
 
 export type ThemeMode = "system" | "light" | "dark";
-export type InterfaceStyle = "default" | "windows-xp";
+export type InterfaceStyle = "default" | "windows-xp" | "macos-tiger";
 export type LightThemePreset = "neutral" | "warm" | "graphite";
 export type DarkThemePreset = "default" | "warm" | "graphite";
 export type TextSize = "small" | "default" | "large";
@@ -338,7 +338,7 @@ export function parseThemeMode(value: string | null | undefined): ThemeMode {
 }
 
 export function parseInterfaceStyle(value: string | null | undefined): InterfaceStyle {
-  return value === "windows-xp" ? value : DEFAULT_INTERFACE_STYLE;
+  return value === "windows-xp" || value === "macos-tiger" ? value : DEFAULT_INTERFACE_STYLE;
 }
 
 export function resolveActiveThemeMode(

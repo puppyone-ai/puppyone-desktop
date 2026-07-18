@@ -4,6 +4,7 @@
   "appearance.interfaceStyle.title": "テーマ",
   "appearance.interfaceStyle.ariaLabel": "インターフェーステーマ",
   "appearance.interfaceStyle.default": "デフォルト",
+  "appearance.interfaceStyle.macosTiger": "macOS Tiger",
   "appearance.interfaceStyle.windowsXp": "Windows XP",
   "language.title": "言語",
   "language.description": "このデバイスで使用する PuppyOne のメニュー、操作項目、メッセージの言語を選択します。",

@@ -4,6 +4,7 @@
   "appearance.interfaceStyle.title": "主题",
   "appearance.interfaceStyle.ariaLabel": "界面主题",
   "appearance.interfaceStyle.default": "默认",
+  "appearance.interfaceStyle.macosTiger": "macOS Tiger",
   "appearance.interfaceStyle.windowsXp": "Windows XP",
   "language.title": "语言",
   "language.description": "选择此设备上的 PuppyOne 菜单、控件和消息所使用的语言。",
