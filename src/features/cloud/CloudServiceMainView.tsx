@@ -5,7 +5,7 @@ import {
 } from "../../lib/cloudApi";
 import type { CloudServiceMainViewProps, CloudWorkspaceSection } from "./types";
 import { getResolvedCloudProjectId } from "./context";
-import { getCloudAuthEmail, getCloudAuthSession, isCloudAuthBlocking } from "./auth";
+import { getCloudAuthEmail, getCloudAuthSession } from "./auth";
 import { useDesktopCloudData } from "./data";
 import type { CloudProjectDetailResource } from "./data/cloudProjectDetails";
 import { useCloudProjectCatalog } from "./data/useCloudProjectCatalog";
@@ -126,6 +126,42 @@ export function CloudServiceMainView({
     routedSection,
   ]);
 
+  if (cloudAuthState.status === "restoring" && !effectiveCloudSession) {
+    return (
+      <main className="desktop-cloud-main-view">
+        <div className="desktop-cloud-page-shell">
+          <CloudWorkspaceLoadingState label={t("cloud.loading.session")} />
+        </div>
+      </main>
+    );
+  }
+
+  if (!effectiveCloudSession) {
+    if (cloudAuthState.status === "signing-out") {
+      return (
+        <main className="desktop-cloud-main-view">
+          <div className="desktop-cloud-page-shell">
+            <CloudWorkspaceLoadingState label={t("cloud.loading.session")} />
+          </div>
+        </main>
+      );
+    }
+
+    return (
+      <main className="desktop-cloud-main-view desktop-cloud-auth-main-view">
+        <div className="desktop-cloud-page-shell">
+          <CloudProjectBrowserSignedOut
+            apiBaseUrl={cloudApiBaseUrl}
+            accountEmail={null}
+            onSignedIn={(session) => onCloudSessionChange(session)}
+            onSignedOut={() => onCloudSessionChange(null)}
+            onRefresh={onRefresh}
+          />
+        </div>
+      </main>
+    );
+  }
+
   if (localOnlyContext) {
     if (error) {
       return (
@@ -181,7 +217,7 @@ export function CloudServiceMainView({
               onAbandonPublish={onAbandonPuppyoneBackup}
               onPublishWorkspace={onStartPuppyoneBackup}
             />
-          ) : effectiveCloudSession ? (
+          ) : (
             <AuthenticatedCloudInitialize
               workspace={workspace}
               status={status}
@@ -198,36 +234,7 @@ export function CloudServiceMainView({
               onPublishWorkspace={onStartPuppyoneBackup}
               onAbandonPublish={onAbandonPuppyoneBackup}
             />
-          ) : (
-            <CloudLocalOnlyWorkspace
-              workspace={workspace}
-              accountEmail={accountEmail}
-              branchName={branchName}
-              totalCommits={status.totalCommits ?? 0}
-              localChangeCount={localChangeCount}
-              localChangeCountIsMinimum={status.didHitStatusLimit}
-              publishReadiness={getCloudPublishReadiness(status)}
-              isGitRepository={status.isRepo === true}
-              hasHeadCommit={Boolean(status.headCommitId)}
-              hasCurrentBranch={getCloudPublishReadiness(status) !== "branch-required"}
-              publishLoading={cloudBackupLoading}
-              publishPending={cloudBackupPending}
-              publishError={cloudPublishError}
-              publishProgress={cloudPublishProgress}
-              onPublishWorkspace={onStartPuppyoneBackup}
-              onAbandonPublish={onAbandonPuppyoneBackup}
-            />
           )}
-        </div>
-      </main>
-    );
-  }
-
-  if (cloudAuthState.status === "restoring" && !effectiveCloudSession) {
-    return (
-      <main className="desktop-cloud-main-view">
-        <div className="desktop-cloud-page-shell">
-          <CloudWorkspaceLoadingState label={t("cloud.loading.session")} />
         </div>
       </main>
     );
@@ -261,32 +268,6 @@ export function CloudServiceMainView({
       if (actionRequestRef.current === request) actionRequestRef.current = null;
     }
   };
-
-  if (isCloudAuthBlocking(cloudAuthState)) {
-    return (
-      <main className="desktop-cloud-main-view desktop-cloud-auth-main-view">
-        <div className="desktop-cloud-page-shell">
-          <CloudProjectBrowserSignedOut
-            apiBaseUrl={cloudApiBaseUrl}
-            accountEmail={accountEmail}
-            onSignedIn={(session) => onCloudSessionChange(session)}
-            onSignedOut={() => onCloudSessionChange(null)}
-            onRefresh={onRefresh}
-          />
-        </div>
-      </main>
-    );
-  }
-
-  if (!effectiveCloudSession) {
-    return (
-      <main className="desktop-cloud-main-view">
-        <div className="desktop-cloud-page-shell">
-          <CloudWorkspaceLoadingState label={t("cloud.loading.session")} />
-        </div>
-      </main>
-    );
-  }
 
   const accountConnected = Boolean(accountEmail);
   return (

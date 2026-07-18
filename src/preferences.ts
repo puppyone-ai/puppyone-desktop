@@ -3,11 +3,27 @@ import {
   parseTypographyPreferences,
   type TypographyPreferences,
 } from "./features/typography/fontCatalog";
+import {
+  DEFAULT_INTERFACE_STYLE,
+  INTERFACE_STYLE_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+  parseInterfaceStyle,
+  resolveActiveThemeMode,
+  type InterfaceStyle,
+  type ThemeMode,
+} from "./features/appearance/interfaceStyles";
 import type { PulseGridPresetId } from "@puppyone/shared-ui";
 
 export type { TypographyPreferences } from "./features/typography/fontCatalog";
+export {
+  DEFAULT_INTERFACE_STYLE,
+  INTERFACE_STYLE_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+  parseInterfaceStyle,
+  resolveActiveThemeMode,
+};
+export type { InterfaceStyle, ThemeMode };
 
-export type ThemeMode = "system" | "light" | "dark";
 export type LightThemePreset = "neutral" | "warm" | "graphite";
 export type DarkThemePreset = "default" | "warm" | "graphite";
 export type TextSize = "small" | "default" | "large";
@@ -68,7 +84,6 @@ export type ExperimentalSettings = {
   enableViewerPlugins: boolean;
 };
 
-export const THEME_STORAGE_KEY = "puppyone.desktop.theme";
 export const LEGACY_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.themePreset";
 export const LIGHT_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.lightThemePreset";
 export const DARK_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.darkThemePreset";

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import type { FileIconThemeId } from "@puppyone/shared-ui";
+import { getInterfaceStyleFirstPaint } from "../appearance/interfaceStyles";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
   DIFF_MARKERS_STORAGE_KEY,
@@ -9,6 +10,7 @@ import {
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
   GIT_DISPLAY_MODE_STORAGE_KEY,
+  INTERFACE_STYLE_STORAGE_KEY,
   DARK_THEME_PRESET_STORAGE_KEY,
   LIGHT_THEME_PRESET_STORAGE_KEY,
   LOADING_ANIMATION_CHANGE_EVENT,
@@ -25,12 +27,14 @@ import {
   getSidebarNavigationPlacement,
   parseLoadingAnimationPreset,
   parseTypography,
+  resolveActiveThemeMode,
   type ExternalAppsSettings,
   type DiffMarkers,
   type DockIcon,
   type ExperimentalSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
+  type InterfaceStyle,
   type LoadingAnimationPreset,
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
@@ -56,6 +60,7 @@ import {
   readInitialFileIconTheme,
   readInitialFilesVisibilitySettings,
   readInitialGitDisplayMode,
+  readInitialInterfaceStyle,
   readInitialRightSidebarToolsSettings,
   readInitialRightSidebarWidth,
   readInitialRightSidebarSurface,
@@ -77,6 +82,7 @@ import {
 
 export function useDesktopPreferences() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readInitialThemeMode());
+  const [interfaceStyle, setInterfaceStyle] = useState<InterfaceStyle>(() => readInitialInterfaceStyle());
   const [lightThemePreset, setLightThemePreset] = useState(() => readInitialLightThemePreset());
   const [darkThemePreset, setDarkThemePreset] = useState(() => readInitialDarkThemePreset());
   const [textSize, setTextSize] = useState<TextSize>(() => readInitialTextSize());
@@ -109,10 +115,22 @@ export function useDesktopPreferences() {
   const [agentPreferredRuntime, setAgentPreferredRuntime] = useState<string | null>(() => readInitialAgentPreferredRuntime());
   const [agentPreferredModel, setAgentPreferredModel] = useState<string | null>(() => readInitialAgentPreferredModel());
   const [systemDark, setSystemDark] = useState(() => readSystemDarkMode());
+  const activeThemeMode = resolveActiveThemeMode(interfaceStyle, themeMode);
+  const resolvedTheme = activeThemeMode === "system" ? (systemDark ? "dark" : "light") : activeThemeMode;
 
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
   }, [themeMode]);
+
+  useLayoutEffect(() => {
+    window.localStorage.setItem(INTERFACE_STYLE_STORAGE_KEY, interfaceStyle);
+    const root = document.documentElement;
+    const firstPaint = getInterfaceStyleFirstPaint(interfaceStyle, resolvedTheme);
+    root.dataset.interfaceStyle = interfaceStyle;
+    root.dataset.initialTheme = resolvedTheme;
+    root.style.setProperty("--initial-shell-background", firstPaint.background);
+    root.style.setProperty("--initial-shell-color-scheme", firstPaint.colorScheme);
+  }, [interfaceStyle, resolvedTheme]);
 
   useEffect(() => {
     window.localStorage.setItem(LIGHT_THEME_PRESET_STORAGE_KEY, lightThemePreset);
@@ -243,13 +261,13 @@ export function useDesktopPreferences() {
     return () => query.removeEventListener("change", sync);
   }, []);
 
-  const resolvedTheme = themeMode === "system" ? (systemDark ? "dark" : "light") : themeMode;
   const sidebarNavigationPlacement = getSidebarNavigationPlacement(sidebarNavigationLayout);
   const sidebarNavigationOrientation = getSidebarNavigationOrientation(sidebarNavigationLayout);
   const terminalToolEnabled = rightSidebarToolsSettings.enabled.terminal;
 
   return {
     aiEditAssistEnabled,
+    activeThemeMode,
     diffMarkers,
     dockIcon,
     explorerWidth,
@@ -258,6 +276,7 @@ export function useDesktopPreferences() {
     fileIconTheme,
     filesVisibilitySettings,
     gitDisplayMode,
+    interfaceStyle,
     resolvedTheme,
     rightSidebarOpen,
     rightSidebarToolsSettings,
@@ -289,6 +308,7 @@ export function useDesktopPreferences() {
     setFileIconTheme,
     setFilesVisibilitySettings,
     setGitDisplayMode,
+    setInterfaceStyle,
     setRightSidebarOpen,
     setRightSidebarToolsSettings,
     setRightSidebarWidth,

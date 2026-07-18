@@ -1,0 +1,502 @@
+/*
+ * Mac OS X 10.4 Tiger skin.
+ *
+ * Tiger mixed Aqua controls with unified and brushed-metal windows. This
+ * layer keeps PuppyOne's component structure intact while recreating that
+ * compact, glossy, fixed-light visual language across shells and portals.
+ */
+
+:root[data-interface-style="macos-tiger"]
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface) {
+  color-scheme: light;
+
+  --po-font-sans: "Lucida Grande", "Lucida Sans Unicode", Helvetica, Arial, sans-serif;
+  --po-font-size-chrome: 12px;
+  --po-font-weight-chrome: 600;
+  --desktop-control-radius: 5px;
+  --desktop-toolbar-action-radius: 5px;
+  --desktop-chrome-height: 40px;
+  --desktop-chrome-control-size: 28px;
+  --desktop-titlebar-control-height: 25px;
+  --desktop-titlebar-tool-action-width: 31px;
+  --desktop-sidebar-control-size: 28px;
+  --desktop-sidebar-nav-gap: 2px;
+  --desktop-sidebar-toolbar-height: 40px;
+  --desktop-sidebar-toolbar-padding-start: 12px;
+  --desktop-sidebar-toolbar-padding-end: 8px;
+  --desktop-sidebar-row-height: 27px;
+  --desktop-sidebar-row-radius: 0;
+  --desktop-sidebar-row-left-gap: 6px;
+  --desktop-sidebar-row-right-gap: 6px;
+  --desktop-sidebar-row-content-left: 5px;
+  --desktop-sidebar-row-content-right: 5px;
+  --desktop-sidebar-list-padding-block: 5px;
+  --desktop-sidebar-section-top-gap: 3px;
+  --desktop-sidebar-section-bottom-gap: 4px;
+  --desktop-utility-page-padding-top: 18px;
+  --desktop-utility-page-padding-inline: 20px;
+  --desktop-utility-page-padding-bottom: 28px;
+  --po-menu-radius: 5px;
+  --po-menu-padding: 3px;
+  --po-menu-item-radius: 3px;
+  --po-menu-item-height: 26px;
+  --po-menu-item-padding-inline: 8px;
+  --po-menu-item-gap: 7px;
+  --po-scrollbar-size: 15px;
+  --po-scrollbar-radius: 8px;
+  --po-scrollbar-transition: 0s;
+  --po-tree-row-height: 27px;
+  --po-tree-row-radius: 0;
+  --po-tree-row-left-gap: 6px;
+  --po-tree-row-right-gap: 6px;
+  --po-tree-row-content-left: 5px;
+  --po-tree-row-content-right: 5px;
+  --po-tree-row-indent: 19px;
+  --po-tree-row-icon-label-gap: 5px;
+  --po-tree-root-top-gap: 3px;
+  --po-tree-no-root-top-gap: 6px;
+  --po-tree-list-bottom-gap: 4px;
+
+  --po-surface-canvas: #f5f5f5;
+  --po-surface-chrome: #d7d7d7;
+  --po-surface-panel: #e8edf2;
+  --po-surface-panel-raised: #ffffff;
+  --po-surface-overlay: #f9f9f9;
+  --po-surface-inset: #d9d9d9;
+  --po-surface-editor: #ffffff;
+  --po-surface-terminal: #ffffff;
+
+  --po-canvas: var(--po-surface-editor);
+  --po-header: var(--po-surface-chrome);
+  --po-sidebar: var(--po-surface-panel);
+  --po-chrome: var(--po-surface-chrome);
+  --po-panel: var(--po-surface-panel);
+  --po-panel-raised: var(--po-surface-panel-raised);
+  --po-overlay: var(--po-surface-overlay);
+  --po-inset: var(--po-surface-inset);
+  --po-editor-bg: var(--po-surface-editor);
+  --po-jsoneditor-bg: var(--po-surface-editor);
+  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
+  --po-terminal-bg: var(--po-surface-terminal);
+
+  --po-text: #111111;
+  --po-text-muted: #3e3e3e;
+  --po-text-subtle: #626262;
+  --po-text-disabled: #9b9b9b;
+  --po-text-inverse: #ffffff;
+  --po-border: #929292;
+  --po-border-subtle: #c7c7c7;
+  --po-border-strong: #5f5f5f;
+  --po-divider: #aaaaaa;
+  --po-shell-divider: #797979;
+  --po-sidebar-divider: #a0a0a0;
+  --po-header-divider: #858585;
+  --po-hover: #dcecff;
+  --po-active: #70b4ed;
+  --po-selected: #278bdc;
+  --po-control: #dedede;
+  --po-control-hover: #cfcfcf;
+  --po-focus-ring: #5baef0;
+  --po-shadow: rgba(0, 0, 0, 0.34);
+  --po-backdrop: rgba(27, 33, 39, 0.26);
+  --po-backdrop-strong: rgba(27, 33, 39, 0.42);
+  --po-accent: #147bd1;
+  --po-accent-text: #075da8;
+  --po-success: #368a34;
+  --po-success-contrast: #ffffff;
+  --po-warning: #a8670d;
+  --po-danger: #bd302b;
+  --po-info: #137fa5;
+  --po-purple: #7651a5;
+  --po-switch-border-on: #1266aa;
+  --po-switch-border-off: #7f7f7f;
+  --po-switch-track-on: #1689df;
+  --po-switch-track-off: #c6c6c6;
+  --po-switch-thumb: #ffffff;
+  --po-switch-thumb-shadow: rgba(0, 0, 0, 0.32);
+  --po-tree-guide: #c4c4c4;
+  --po-tree-row-hover-bg: #dcecff;
+  --po-tree-row-selected-bg: linear-gradient(180deg, #59b7f5 0%, #1686db 48%, #0871c5 100%);
+  --po-tree-row-selected-muted-bg: linear-gradient(180deg, #bfd1e3 0%, #9fb8d0 100%);
+  --po-tree-folder-drop-bg: #b9dcf6;
+  --po-editor-line: #d8d8d8;
+  --po-menu-bg: #f8f8f8;
+  --po-menu-border: #737373;
+  --po-menu-shadow: 0 8px 20px rgba(0, 0, 0, 0.34);
+  --po-scrollbar-thumb: #45aaf0;
+  --po-scrollbar-thumb-hover: #1689df;
+  --po-terminal-fg: #222222;
+  --po-terminal-cursor: #086fc0;
+  --po-terminal-selection: rgba(43, 139, 219, 0.26);
+
+  --tiger-brushed-metal:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.18) 0,
+      rgba(255, 255, 255, 0.18) 1px,
+      rgba(59, 59, 59, 0.045) 1px,
+      rgba(59, 59, 59, 0.045) 2px
+    ),
+    linear-gradient(180deg, #eeeeee 0%, #d8d8d8 46%, #c5c5c5 100%);
+  --tiger-light-metal:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.26) 0,
+      rgba(255, 255, 255, 0.26) 1px,
+      rgba(91, 91, 91, 0.035) 1px,
+      rgba(91, 91, 91, 0.035) 2px
+    ),
+    linear-gradient(180deg, #fafafa 0%, #e2e2e2 100%);
+  --tiger-pinstripe:
+    repeating-linear-gradient(
+      0deg,
+      #f5f5f5 0,
+      #f5f5f5 1px,
+      #eeeeee 1px,
+      #eeeeee 3px
+    );
+  --tiger-aqua:
+    linear-gradient(180deg, #aee0ff 0%, #4fb5f5 43%, #0784dc 50%, #0871c5 100%);
+  --tiger-aqua-hover:
+    linear-gradient(180deg, #c2e9ff 0%, #6bc5f9 43%, #168fe2 50%, #0878ce 100%);
+  --tiger-button:
+    linear-gradient(180deg, #ffffff 0%, #f7f7f7 42%, #d8d8d8 55%, #bdbdbd 100%);
+  --tiger-button-pressed:
+    linear-gradient(180deg, #b2b2b2 0%, #d0d0d0 48%, #efefef 100%);
+  --tiger-highlight: rgba(255, 255, 255, 0.92);
+  /* Shared component contract. */
+  --interface-typography-webkit-font-smoothing: antialiased;
+  --interface-typography-moz-osx-font-smoothing: grayscale;
+  --interface-shell-box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.58),
+    inset 0 0 0 2px rgba(75, 75, 75, 0.18);
+  --interface-titlebar-context-desktop-titlebar-bg: transparent;
+  --interface-titlebar-context-desktop-titlebar-text: #171717;
+  --interface-titlebar-context-desktop-titlebar-text-muted: #353535;
+  --interface-titlebar-context-desktop-titlebar-text-disabled: #8b8b8b;
+  --interface-titlebar-context-desktop-titlebar-hover: rgba(255, 255, 255, 0.38);
+  --interface-titlebar-context-desktop-titlebar-active: rgba(113, 113, 113, 0.25);
+  --interface-titlebar-context-desktop-titlebar-focus: var(--po-focus-ring);
+  --interface-titlebar-context-desktop-titlebar-divider: rgba(83, 83, 83, 0.55);
+  --interface-titlebar-control-border: 1px solid transparent;
+  --interface-titlebar-control-border-radius: 5px;
+  --interface-titlebar-control-active-border-color: #929292;
+  --interface-titlebar-control-active-background: var(--tiger-button);
+  --interface-titlebar-control-active-color: #202020;
+  --interface-titlebar-control-active-box-shadow: inset 0 1px 0 var(--tiger-highlight),
+    0 1px 0 rgba(255, 255, 255, 0.46);
+  --interface-toolbar-border-bottom: 1px solid #989898;
+  --interface-toolbar-background: var(--tiger-light-metal);
+  --interface-toolbar-box-shadow: inset 0 1px 0 var(--tiger-highlight),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+  --interface-sidebar-surface-background: linear-gradient(90deg, #edf1f5 0%, #e3e9ee 100%);
+  --interface-row-base-border: 1px solid transparent;
+  --interface-neutral-button-hover-border-color: #666666;
+  --interface-neutral-button-hover-background: linear-gradient(180deg, #ffffff 0%, #e9f4ff 44%, #b7ddfa 100%);
+  --interface-neutral-button-hover-color: #111111;
+  --interface-icon-button-border: 1px solid transparent;
+  --interface-icon-button-border-radius: 5px;
+  --interface-icon-button-active-border-color: #8c8c8c;
+  --interface-icon-button-active-background: var(--tiger-button);
+  --interface-icon-button-active-color: #171717;
+  --interface-icon-button-active-box-shadow: inset 0 1px 0 var(--tiger-highlight);
+  --interface-menu-border: 1px solid var(--po-menu-border);
+  --interface-menu-border-radius: 5px;
+  --interface-menu-background: rgba(249, 249, 249, 0.97);
+  --interface-menu-box-shadow: var(--po-menu-shadow);
+  --interface-menu-backdrop-filter: blur(5px);
+  --interface-dialog-backdrop-backdrop-filter: blur(2px);
+  --interface-dialog-backdrop-webkit-backdrop-filter: blur(2px);
+  --interface-dialog-footer-padding: 9px 14px 12px;
+  --interface-dialog-footer-border-top: 1px solid #c2c2c2;
+  --interface-dialog-footer-background: var(--tiger-light-metal);
+  --interface-dialog-callout-border-radius: 6px;
+  --interface-settings-list-gap: 0;
+  --interface-settings-list-overflow: hidden;
+  --interface-settings-list-border: 1px solid #9b9b9b;
+  --interface-settings-list-border-radius: 8px;
+  --interface-settings-list-background: rgba(255, 255, 255, 0.86);
+  --interface-settings-list-box-shadow: 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 2px 5px rgba(0, 0, 0, 0.15);
+  --interface-settings-last-row-border-bottom: 0;
+  --interface-segmented-control-gap: 0;
+  --interface-segmented-control-padding: 1px;
+  --interface-segmented-control-border: 1px solid #888888;
+  --interface-segmented-control-border-radius: 6px;
+  --interface-segmented-control-background: linear-gradient(180deg, #cacaca, #eeeeee);
+  --interface-segmented-control-box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.24),
+    0 1px 0 #ffffff;
+  --interface-theme-choice-border-color: #9a9a9a;
+  --interface-theme-choice-border-radius: 7px;
+  --interface-theme-choice-background: rgba(255, 255, 255, 0.84);
+  --interface-theme-choice-active-border-color: #0a6aad;
+  --interface-theme-choice-active-background: linear-gradient(180deg, #f9fdff, #cbe9fc);
+  --interface-theme-choice-active-box-shadow: inset 0 1px 0 #ffffff,
+    0 0 0 2px rgba(67, 159, 224, 0.18);
+  --interface-preview-border-radius: 5px;
+  --interface-switch-width: 36px;
+  --interface-switch-height: 19px;
+  --interface-switch-track-border-color: var(--po-switch-border-off);
+  --interface-switch-track-border-radius: 10px;
+  --interface-switch-track-background: linear-gradient(180deg, #9c9c9c 0%, #c9c9c9 52%, #e5e5e5 100%);
+  --interface-switch-track-box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.34),
+    0 1px 0 #ffffff;
+  --interface-switch-track-on-border-color: #075e9f;
+  --interface-switch-track-on-background: var(--tiger-aqua);
+  --interface-switch-thumb-on-transform: translateX(17px);
+  --interface-card-border-radius: 7px;
+  --interface-card-box-shadow: inset 0 1px 0 var(--tiger-highlight),
+    0 1px 2px rgba(0, 0, 0, 0.12);
+  --interface-footer-border-color: #999999;
+  --interface-footer-background: var(--tiger-light-metal);
+  --interface-scrollbar-width: var(--po-scrollbar-size);
+  --interface-scrollbar-height: var(--po-scrollbar-size);
+  --interface-scrollbar-background: #e1e1e1;
+  --interface-scrollbar-track-border: 1px solid #b2b2b2;
+  --interface-scrollbar-track-background: repeating-linear-gradient(0deg, #e8e8e8 0 1px, #dcdcdc 1px 2px);
+  --interface-scrollbar-thumb-hover-background: linear-gradient(90deg, rgba(255, 255, 255, 0.76), transparent 42%),
+    linear-gradient(90deg, #0875c4, #74c6f6 52%, #0065ad);
+  --interface-scrollbar-thumb-hover-background-clip: padding-box;
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-titlebar {
+  padding-block: 4px 5px;
+  border-bottom: 1px solid var(--po-header-divider);
+  background: var(--tiger-brushed-metal);
+  color: #181818;
+  text-shadow: 0 1px rgba(255, 255, 255, 0.9);
+  box-shadow:
+    inset 0 1px 0 var(--tiger-highlight),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.36);
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-titlebar::after {
+  background: rgba(76, 76, 76, 0.72);
+}
+
+:root[data-interface-style="macos-tiger"]
+  :where(.po-desktop-sidebar-header, .desktop-settings-sidebar-header) {
+  border-bottom: 1px solid #929292;
+  background: var(--tiger-light-metal);
+  color: #242424;
+  text-shadow: 0 1px #ffffff;
+  box-shadow: inset 0 1px 0 var(--tiger-highlight);
+}
+
+:root[data-interface-style="macos-tiger"]
+  :where(.tree-row, .po-sidebar-row, .review-row):hover:not(:disabled) {
+  background: var(--po-tree-row-hover-bg);
+}
+
+:root[data-interface-style="macos-tiger"]
+  :where(.tree-row.selected, .tree-row.active, .po-sidebar-row.active, .review-row.active) {
+  border-color: #0870bf;
+  background: var(--po-tree-row-selected-bg);
+  color: #ffffff;
+  text-shadow: 0 1px rgba(0, 65, 121, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.46),
+    inset 0 -1px 0 rgba(0, 69, 127, 0.34);
+}
+
+:root[data-interface-style="macos-tiger"]
+  :where(.tree-row.selected, .tree-row.active, .po-sidebar-row.active, .review-row.active)
+  :where(span, svg) {
+  color: inherit;
+}
+
+:root[data-interface-style="macos-tiger"]
+  :where(
+    .po-button--neutral,
+    .desktop-dialog-button,
+    .desktop-settings-action,
+    .desktop-settings-row-action,
+    .desktop-branch-menu-action,
+    .csv-table-editor__actions button,
+    .csv-table-editor__empty button,
+    .desktop-version-control-enable-button,
+    .puppyflow-add-button
+  ) {
+  border: 1px solid #858585;
+  border-radius: 5px;
+  background: var(--tiger-button);
+  color: #202020;
+  text-shadow: 0 1px #ffffff;
+  box-shadow:
+    inset 0 1px 0 var(--tiger-highlight),
+    0 1px 1px rgba(0, 0, 0, 0.16);
+}
+
+:root[data-interface-style="macos-tiger"]
+  :where(.po-button--primary, .desktop-dialog-button.primary, .desktop-settings-action.primary) {
+  border-color: #075c9f;
+  background: var(--tiger-aqua);
+  color: #ffffff;
+  text-shadow: 0 1px rgba(0, 72, 126, 0.88);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.74),
+    0 0 0 2px rgba(90, 178, 240, 0.24),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+:root[data-interface-style="macos-tiger"]
+  :where(.po-button--primary, .desktop-dialog-button.primary, .desktop-settings-action.primary):hover:not(:disabled) {
+  background: var(--tiger-aqua-hover);
+  color: #ffffff;
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-menu-item:hover:not(:disabled),
+:root[data-interface-style="macos-tiger"] .desktop-menu-item:focus-visible:not(:disabled),
+:root[data-interface-style="macos-tiger"] .desktop-menu-item.selected {
+  border-color: #0870bf;
+  background: var(--tiger-aqua);
+  color: #ffffff;
+  text-shadow: 0 1px rgba(0, 70, 126, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.44);
+}
+
+:root[data-interface-style="macos-tiger"]
+  :where(
+    .desktop-menu-item:hover:not(:disabled),
+    .desktop-menu-item:focus-visible:not(:disabled),
+    .desktop-menu-item.selected
+  )
+  :where(.desktop-menu-item-label, .desktop-menu-item-detail, .desktop-menu-item-icon, svg) {
+  color: inherit;
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-dialog-surface {
+  overflow: hidden;
+  border: 1px solid #686868;
+  border-radius: 10px;
+  background: var(--po-overlay);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.72),
+    0 12px 28px rgba(0, 0, 0, 0.38);
+  animation-duration: 0.12s;
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-dialog-header {
+  padding: 10px 14px 9px;
+  border-bottom: 1px solid #949494;
+  background: var(--tiger-brushed-metal);
+  text-shadow: 0 1px #ffffff;
+  box-shadow: inset 0 1px 0 var(--tiger-highlight);
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-dialog-body {
+  padding: 15px 18px 17px;
+  background: #f7f7f7;
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-settings-view {
+  background: var(--tiger-pinstripe);
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-settings-section-header h2 {
+  color: #181818;
+  font-size: 15px;
+  font-weight: 700;
+  text-shadow: 0 1px #ffffff;
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-settings-section-header span {
+  color: #555555;
+  text-shadow: 0 1px rgba(255, 255, 255, 0.8);
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-settings-row {
+  border-bottom: 1px solid #d0d0d0;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.72);
+  color: #303030;
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-settings-row:nth-child(even) {
+  background: rgba(239, 244, 249, 0.72);
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-settings-row > span {
+  color: #4a4a4a;
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-theme-segment button {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #3b3b3b;
+  text-shadow: 0 1px #ffffff;
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-theme-segment button + button {
+  border-inline-start-color: rgba(104, 104, 104, 0.36);
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-theme-segment button:hover {
+  background: rgba(255, 255, 255, 0.56);
+  color: #111111;
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-theme-segment button.active {
+  border-color: #075f9f;
+  background: var(--tiger-aqua);
+  color: #ffffff;
+  text-shadow: 0 1px rgba(0, 66, 116, 0.86);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+}
+
+:root[data-interface-style="macos-tiger"] .desktop-settings-switch span::before {
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border: 1px solid #7a7a7a;
+  border-radius: 50%;
+  background: var(--tiger-button);
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-interface-style="macos-tiger"]
+  :where(.desktop-settings-select, input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+  border-color: #8d8d8d;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #171717;
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.2),
+    0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+:root[data-interface-style="macos-tiger"]
+  :where(.desktop-settings-select, input:not([type="checkbox"]):not([type="radio"]), textarea, select):focus {
+  border-color: #3c9ee3;
+  outline: 2px solid rgba(73, 166, 230, 0.34);
+  outline-offset: 0;
+}
+
+:root[data-interface-style="macos-tiger"]
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar-thumb {
+  min-width: 20px;
+  min-height: 20px;
+  border: 2px solid #dedede;
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.7), transparent 42%),
+    linear-gradient(90deg, #167cc9, #65baf1 52%, #0871bd);
+  background-clip: padding-box;
+  box-shadow: inset 0 0 0 1px rgba(4, 91, 151, 0.64);
+}
+
+:root[data-interface-style="macos-tiger"] .onboarding-shell {
+  background: var(--tiger-pinstripe);
+}
+
+:root[data-interface-style="macos-tiger"]
+  :where(.folder-drop-shell, .folder-drop-panel, .folder-drop-card, .onboarding-card) {
+  border-color: #949494;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 10px 28px rgba(0, 0, 0, 0.2);
+}

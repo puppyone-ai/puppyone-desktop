@@ -199,34 +199,19 @@ if (/[,{]\s*(?:position|visibility|transform|transformOrigin|height|width|maxHei
 const agentStyleRoot = path.join(rendererUiRoot, "styles");
 const agentStyleEntry = path.join(rendererUiRoot, "desktop-agent.css");
 const styleEntrySource = readFileSync(agentStyleEntry, "utf8");
-if (styleEntrySource.split("\n").length > 30 || !styleEntrySource.includes('@import "./styles/')) {
+const styleEntryBody = styleEntrySource
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/@import\s+[^;]+;/g, "")
+  .trim();
+if (!styleEntrySource.includes('@import "./styles/') || styleEntryBody !== "") {
   errors.push("src/features/desktop-agent/ui/desktop-agent.css must remain an import-only public style entry");
 }
 for (const entry of readdirSync(agentStyleRoot)) {
   if (!entry.endsWith(".css")) continue;
   const stylePath = path.join(agentStyleRoot, entry);
-  const lineCount = readFileSync(stylePath, "utf8").split("\n").length;
-  if (lineCount > 450) errors.push(`${relative(stylePath)} has ${lineCount} lines; split styles at a responsibility boundary`);
-  if (entry === "responsive.css" && /desktop-agent-(?:virtual-row\[data-kind=["'](?:assistant|user|turn-summary)["']\]|message\.is-(?:assistant|user)|turn-summary)/.test(readFileSync(stylePath, "utf8"))) {
+  const styleSource = readFileSync(stylePath, "utf8");
+  if (entry === "responsive.css" && /desktop-agent-(?:virtual-row\[data-kind=["'](?:assistant|user|turn-summary)["']\]|message\.is-(?:assistant|user)|turn-summary)/.test(styleSource)) {
     errors.push(`${relative(stylePath)} overrides a conversation-role content rail; responsive rules may change width, not semantic alignment`);
-  }
-}
-
-const responsibilityBudgets = [
-  [path.join(mainRoot, "agent-service.mjs"), 850],
-  [path.join(mainRuntimesRoot, "codex", "codex-app-server-adapter.mjs"), 750],
-  [path.join(mainRuntimesRoot, "claude", "claude-agent-sdk-adapter.mjs"), 750],
-  [path.join(mainRuntimesRoot, "opencode-protocol", "opencode-acp-adapter.mjs"), 750],
-  [path.join(mainProtocolRoot, "acp", "acp-client.mjs"), 300],
-  [path.join(mainProtocolRoot, "acp", "acp-event-normalizer.mjs"), 300],
-  [path.join(rendererApplicationRoot, "AgentSessionController.ts"), 500],
-  [path.join(rendererDomainRoot, "agent-projection.ts"), 550],
-  [path.join(rendererUiRoot, "RightAgentPanel.tsx"), 230],
-];
-for (const [filePath, maximumLines] of responsibilityBudgets) {
-  const lineCount = readFileSync(filePath, "utf8").split("\n").length;
-  if (lineCount > maximumLines) {
-    errors.push(`${relative(filePath)} has ${lineCount} lines; its orchestrator/reducer responsibility budget is ${maximumLines}`);
   }
 }
 

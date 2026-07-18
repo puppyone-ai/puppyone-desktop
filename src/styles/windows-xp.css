@@ -1,0 +1,377 @@
+/*
+ * Optional classic Windows skin.
+ *
+ * The selectors are rooted at the first-paint data attribute so the skin
+ * covers workspace shells, onboarding surfaces, previews, and portal-owned
+ * menus without changing their component structure or behavior.
+ */
+
+:root[data-interface-style="windows-xp"]
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface) {
+  --po-font-sans: Tahoma, "Segoe UI", Arial, sans-serif;
+  --po-font-size-chrome: 12px;
+  --po-font-weight-chrome: 600;
+  --desktop-control-radius: 2px;
+  --desktop-toolbar-action-radius: 2px;
+  --desktop-chrome-height: 40px;
+  --desktop-chrome-control-size: 28px;
+  --desktop-titlebar-control-height: 25px;
+  --desktop-titlebar-tool-action-width: 32px;
+  --desktop-sidebar-control-size: 28px;
+  --desktop-sidebar-nav-gap: 2px;
+  --desktop-sidebar-toolbar-height: 40px;
+  --desktop-sidebar-toolbar-padding-start: 12px;
+  --desktop-sidebar-toolbar-padding-end: 8px;
+  --desktop-sidebar-row-height: 27px;
+  --desktop-sidebar-row-radius: 1px;
+  --desktop-sidebar-row-left-gap: 6px;
+  --desktop-sidebar-row-right-gap: 6px;
+  --desktop-sidebar-row-content-left: 5px;
+  --desktop-sidebar-row-content-right: 5px;
+  --desktop-sidebar-list-padding-block: 5px;
+  --desktop-sidebar-section-top-gap: 3px;
+  --desktop-sidebar-section-bottom-gap: 4px;
+  --desktop-utility-page-padding-top: 18px;
+  --desktop-utility-page-padding-inline: 20px;
+  --desktop-utility-page-padding-bottom: 28px;
+  --po-menu-radius: 2px;
+  --po-menu-padding: 3px;
+  --po-menu-item-radius: 1px;
+  --po-menu-item-height: 27px;
+  --po-menu-item-padding-inline: 7px;
+  --po-menu-item-gap: 7px;
+  --po-scrollbar-size: 13px;
+  --po-scrollbar-radius: 0;
+  --po-scrollbar-transition: 0s;
+  --po-tree-row-height: 27px;
+  --po-tree-row-radius: 1px;
+  --po-tree-row-left-gap: 6px;
+  --po-tree-row-right-gap: 6px;
+  --po-tree-row-content-left: 5px;
+  --po-tree-row-content-right: 5px;
+  --po-tree-row-indent: 19px;
+  --po-tree-row-icon-label-gap: 5px;
+  --po-tree-root-top-gap: 3px;
+  --po-tree-no-root-top-gap: 6px;
+  --po-tree-list-bottom-gap: 4px;
+  /* Shared component contract. */
+  --interface-typography-webkit-font-smoothing: auto;
+  --interface-typography-moz-osx-font-smoothing: auto;
+  --interface-shell-box-shadow: inset 0 0 0 1px var(--po-border-strong);
+  --interface-titlebar-context-desktop-titlebar-bg: transparent;
+  --interface-titlebar-context-desktop-titlebar-text: var(--xp-titlebar-text);
+  --interface-titlebar-context-desktop-titlebar-text-muted: var(--xp-titlebar-muted);
+  --interface-titlebar-context-desktop-titlebar-text-disabled: color-mix(in srgb, var(--xp-titlebar-muted) 55%, transparent);
+  --interface-titlebar-context-desktop-titlebar-hover: color-mix(in srgb, var(--xp-button-hover-end) 58%, transparent);
+  --interface-titlebar-context-desktop-titlebar-active: color-mix(in srgb, var(--xp-button-active-start) 68%, transparent);
+  --interface-titlebar-context-desktop-titlebar-focus: var(--po-focus-ring);
+  --interface-titlebar-context-desktop-titlebar-divider: color-mix(in srgb, var(--po-border-strong) 62%, transparent);
+  --interface-titlebar-control-border: 1px solid transparent;
+  --interface-titlebar-control-border-radius: 2px;
+  --interface-titlebar-control-active-border-color: var(--xp-selection-border);
+  --interface-titlebar-control-active-background: linear-gradient(180deg, var(--xp-button-hover-start), var(--xp-button-hover-end));
+  --interface-titlebar-control-active-color: #263548;
+  --interface-titlebar-control-active-box-shadow: inset 0 1px 0 var(--xp-highlight);
+  --interface-toolbar-border-bottom: 1px solid var(--po-border);
+  --interface-toolbar-background: linear-gradient(180deg, var(--xp-toolbar-start), var(--xp-toolbar-end));
+  --interface-toolbar-box-shadow: inset 0 1px 0 var(--xp-highlight);
+  --interface-sidebar-surface-background: var(--po-sidebar);
+  --interface-row-base-border: 1px solid transparent;
+  --interface-neutral-button-hover-border-color: var(--po-warning);
+  --interface-neutral-button-hover-background: linear-gradient(180deg, var(--xp-button-hover-start), var(--xp-button-hover-end));
+  --interface-neutral-button-hover-color: #263548;
+  --interface-icon-button-border: 1px solid transparent;
+  --interface-icon-button-border-radius: 2px;
+  --interface-icon-button-active-border-color: var(--xp-selection-border);
+  --interface-icon-button-active-background: linear-gradient(180deg, var(--xp-button-hover-start), var(--xp-button-hover-end));
+  --interface-icon-button-active-color: #263548;
+  --interface-icon-button-active-box-shadow: inset 0 1px 0 var(--xp-highlight);
+  --interface-menu-border: 1px solid var(--po-menu-border);
+  --interface-menu-border-radius: 2px;
+  --interface-menu-background: var(--po-menu-bg);
+  --interface-menu-box-shadow: var(--po-menu-shadow);
+  --interface-menu-backdrop-filter: none;
+  --interface-dialog-backdrop-backdrop-filter: none;
+  --interface-dialog-backdrop-webkit-backdrop-filter: none;
+  --interface-dialog-footer-padding: 9px 14px 12px;
+  --interface-dialog-footer-border-top: 1px solid var(--po-border-subtle);
+  --interface-dialog-footer-background: var(--po-panel);
+  --interface-dialog-callout-border-radius: 2px;
+  --interface-settings-list-gap: 0;
+  --interface-settings-list-overflow: hidden;
+  --interface-settings-list-border: 1px solid var(--po-border);
+  --interface-settings-list-border-radius: 2px;
+  --interface-settings-list-background: var(--po-panel-raised);
+  --interface-settings-list-box-shadow: inset 0 1px 0 var(--xp-highlight);
+  --interface-settings-last-row-border-bottom: 0;
+  --interface-segmented-control-gap: 1px;
+  --interface-segmented-control-padding: 2px;
+  --interface-segmented-control-border: 1px solid var(--po-border);
+  --interface-segmented-control-border-radius: 2px;
+  --interface-segmented-control-background: var(--po-inset);
+  --interface-segmented-control-box-shadow: inset 1px 1px 2px color-mix(in srgb, var(--po-shadow) 42%, transparent);
+  --interface-theme-choice-border-color: var(--po-border);
+  --interface-theme-choice-border-radius: 2px;
+  --interface-theme-choice-background: var(--po-panel-raised);
+  --interface-theme-choice-active-border-color: var(--xp-selection-border);
+  --interface-theme-choice-active-background: linear-gradient(180deg, var(--xp-button-start), var(--xp-button-end));
+  --interface-theme-choice-active-box-shadow: inset 0 1px 0 var(--xp-highlight);
+  --interface-preview-border-radius: 2px;
+  --interface-switch-width: 34px;
+  --interface-switch-height: 18px;
+  --interface-switch-track-border-color: var(--po-switch-border-off);
+  --interface-switch-track-border-radius: 2px;
+  --interface-switch-track-background: linear-gradient(180deg, var(--xp-button-start), var(--po-switch-track-off));
+  --interface-switch-track-box-shadow: inset 1px 1px 2px color-mix(in srgb, var(--po-shadow) 44%, transparent);
+  --interface-switch-track-on-border-color: var(--po-switch-border-on);
+  --interface-switch-track-on-background: linear-gradient(180deg, color-mix(in srgb, var(--po-switch-track-on) 68%, white), var(--po-switch-track-on));
+  --interface-switch-thumb-on-transform: translateX(16px);
+  --interface-card-border-radius: 3px;
+  --interface-card-box-shadow: inset 0 1px 0 var(--xp-highlight);
+  --interface-footer-border-color: var(--po-border);
+  --interface-footer-background: linear-gradient(180deg, var(--xp-toolbar-start), var(--xp-toolbar-end));
+  --interface-scrollbar-width: var(--po-scrollbar-size);
+  --interface-scrollbar-height: var(--po-scrollbar-size);
+  --interface-scrollbar-background: var(--po-inset);
+  --interface-scrollbar-track-border: 1px solid var(--po-border-subtle);
+  --interface-scrollbar-track-background: var(--po-inset);
+  --interface-scrollbar-thumb-hover-background: linear-gradient(90deg, var(--po-scrollbar-thumb-hover), var(--xp-button-hover-end));
+  --interface-scrollbar-thumb-hover-background-clip: padding-box;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface) {
+  color-scheme: light;
+
+  --po-surface-canvas: #f7f9fc;
+  --po-surface-chrome: #dce8f5;
+  --po-surface-panel: #eef4fa;
+  --po-surface-panel-raised: #ffffff;
+  --po-surface-overlay: #ffffff;
+  --po-surface-inset: #e1e7ef;
+  --po-surface-editor: #ffffff;
+  --po-surface-terminal: #ffffff;
+
+  --po-canvas: var(--po-surface-editor);
+  --po-header: var(--po-surface-chrome);
+  --po-sidebar: var(--po-surface-panel);
+  --po-chrome: var(--po-surface-chrome);
+  --po-panel: var(--po-surface-panel);
+  --po-panel-raised: var(--po-surface-panel-raised);
+  --po-overlay: var(--po-surface-overlay);
+  --po-inset: var(--po-surface-inset);
+  --po-editor-bg: var(--po-surface-editor);
+  --po-jsoneditor-bg: var(--po-surface-editor);
+  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
+  --po-terminal-bg: var(--po-surface-terminal);
+
+  --po-text: #1d2a3b;
+  --po-text-muted: #40546d;
+  --po-text-subtle: #6d7f94;
+  --po-text-disabled: #9ca9b8;
+  --po-text-inverse: #ffffff;
+  --po-border: #9dafc3;
+  --po-border-subtle: #c3ceda;
+  --po-border-strong: #718aa7;
+  --po-divider: #b4c1cf;
+  --po-shell-divider: #879bb2;
+  --po-sidebar-divider: #b4c2d1;
+  --po-header-divider: #7d95af;
+  --po-hover: #dbeaf9;
+  --po-active: #c8ddf3;
+  --po-selected: #c7dcf2;
+  --po-control: #e6eef7;
+  --po-control-hover: #d4e3f3;
+  --po-focus-ring: #4f83bc;
+  --po-shadow: rgba(37, 56, 79, 0.24);
+  --po-backdrop: rgba(38, 54, 74, 0.28);
+  --po-backdrop-strong: rgba(38, 54, 74, 0.42);
+  --po-accent: #2f67ad;
+  --po-accent-text: #174f94;
+  --po-success: #2d7d32;
+  --po-success-contrast: #ffffff;
+  --po-warning: #a45b08;
+  --po-danger: #b5302d;
+  --po-info: #247e9a;
+  --po-purple: #76539b;
+  --po-switch-border-on: #4b78aa;
+  --po-switch-border-off: #899db3;
+  --po-switch-track-on: #5d8fc5;
+  --po-switch-track-off: #c7d2de;
+  --po-switch-thumb: #ffffff;
+  --po-switch-thumb-shadow: rgba(27, 47, 69, 0.28);
+  --po-tree-guide: #c4ced9;
+  --po-tree-row-hover-bg: #dceaf8;
+  --po-tree-row-selected-bg: linear-gradient(180deg, #f1f7fd 0%, #c7def5 100%);
+  --po-tree-row-selected-muted-bg: linear-gradient(180deg, #f5f8fb 0%, #dce7f2 100%);
+  --po-tree-folder-drop-bg: #c4dcf4;
+  --po-editor-line: #d8e0e9;
+  --po-menu-bg: #f7f9fc;
+  --po-menu-border: #718aa7;
+  --po-menu-shadow: 2px 3px 8px rgba(37, 56, 79, 0.28);
+  --po-scrollbar-thumb: #aebed0;
+  --po-scrollbar-thumb-hover: #8fa7c0;
+  --po-terminal-fg: #26384d;
+  --po-terminal-cursor: #1e5d9f;
+  --po-terminal-selection: rgba(75, 126, 181, 0.24);
+
+  --xp-titlebar-start: #f4f9ff;
+  --xp-titlebar-mid: #d9e9f9;
+  --xp-titlebar-end: #b9d2ec;
+  --xp-toolbar-start: #f9fbfe;
+  --xp-toolbar-end: #dbe7f4;
+  --xp-panel-header-start: #eef5fc;
+  --xp-panel-header-end: #cedff0;
+  --xp-button-start: #ffffff;
+  --xp-button-end: #dbe7f4;
+  --xp-button-hover-start: #fffdf0;
+  --xp-button-hover-end: #f8d88a;
+  --xp-button-active-start: #f4c765;
+  --xp-button-active-end: #fff0b6;
+  --xp-selection-border: #7899bd;
+  --xp-highlight: rgba(255, 255, 255, 0.9);
+  --xp-titlebar-text: #203b5b;
+  --xp-titlebar-muted: #4e6681;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-titlebar {
+  padding-block: 4px 5px;
+  border-bottom: 1px solid var(--po-header-divider);
+  background: linear-gradient(
+    180deg,
+    var(--xp-titlebar-start) 0%,
+    var(--xp-titlebar-mid) 48%,
+    var(--xp-titlebar-end) 100%
+  );
+  color: var(--xp-titlebar-text);
+  box-shadow:
+    inset 0 1px 0 var(--xp-highlight),
+    inset 0 -1px 0 color-mix(in srgb, var(--po-border-strong) 70%, transparent);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-titlebar::after {
+  display: none;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.po-desktop-sidebar-header, .desktop-settings-sidebar-header) {
+  border-bottom: 1px solid var(--po-sidebar-divider);
+  background: linear-gradient(180deg, var(--xp-panel-header-start), var(--xp-panel-header-end));
+  box-shadow: inset 0 1px 0 var(--xp-highlight);
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.tree-row, .po-sidebar-row, .review-row):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--xp-selection-border) 62%, transparent);
+  background: var(--po-tree-row-hover-bg);
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.tree-row.selected, .tree-row.active, .po-sidebar-row.active, .review-row.active) {
+  border-color: var(--xp-selection-border);
+  background: var(--po-tree-row-selected-bg);
+  box-shadow: inset 0 1px 0 var(--xp-highlight);
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(
+    .po-button--neutral,
+    .desktop-dialog-button,
+    .desktop-settings-action,
+    .desktop-settings-row-action,
+    .desktop-branch-menu-action,
+    .csv-table-editor__actions button,
+    .csv-table-editor__empty button,
+    .desktop-version-control-enable-button,
+    .puppyflow-add-button
+  ) {
+  border: 1px solid var(--xp-selection-border);
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--xp-button-start), var(--xp-button-end));
+  color: var(--po-text);
+  box-shadow: inset 0 1px 0 var(--xp-highlight);
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.po-button--primary, .desktop-dialog-button.primary, .desktop-settings-action.primary) {
+  border-color: color-mix(in srgb, var(--po-accent) 72%, #102c4d);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--po-accent) 72%, white),
+    var(--po-accent)
+  );
+  color: #ffffff;
+  text-shadow: 0 1px color-mix(in srgb, var(--po-accent) 62%, #000000);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-menu-item:hover:not(:disabled),
+:root[data-interface-style="windows-xp"] .desktop-menu-item:focus-visible:not(:disabled),
+:root[data-interface-style="windows-xp"] .desktop-menu-item.selected {
+  border-color: var(--xp-selection-border);
+  background: linear-gradient(180deg, var(--xp-button-start), var(--xp-button-end));
+  box-shadow: inset 0 1px 0 var(--xp-highlight);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-surface {
+  border: 1px solid var(--po-border-strong);
+  border-radius: 3px;
+  background: var(--po-overlay);
+  box-shadow:
+    0 0 0 1px var(--xp-highlight),
+    4px 6px 18px var(--po-shadow);
+  animation-duration: 0.08s;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header {
+  padding: 10px 14px 9px;
+  border-bottom: 1px solid var(--po-border);
+  background: linear-gradient(180deg, var(--xp-panel-header-start), var(--xp-panel-header-end));
+  box-shadow: inset 0 1px 0 var(--xp-highlight);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-body {
+  padding: 14px 18px 16px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-settings-row {
+  border-bottom: 1px solid var(--po-border-subtle);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--po-panel-raised) 92%, var(--po-panel) 8%);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-theme-segment button {
+  border: 1px solid transparent;
+  border-radius: 1px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-theme-segment button:hover,
+:root[data-interface-style="windows-xp"] .desktop-theme-segment button.active {
+  border-color: var(--xp-selection-border);
+  background: linear-gradient(180deg, var(--xp-button-start), var(--xp-button-end));
+  box-shadow: inset 0 1px 0 var(--xp-highlight);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-settings-switch span::before {
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--po-border-strong);
+  border-radius: 1px;
+  box-shadow: inset 0 1px 0 var(--xp-highlight);
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-settings-select, input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+  border-radius: 2px;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar-thumb {
+  min-width: 18px;
+  min-height: 18px;
+  border: 2px solid var(--po-inset);
+  border-radius: 0;
+  background: linear-gradient(90deg, var(--po-scrollbar-thumb), var(--xp-button-start));
+  background-clip: padding-box;
+}

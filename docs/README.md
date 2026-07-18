@@ -9,6 +9,10 @@ Architecture docs record durable product and frontend decisions. Start with
 directly:
 
 - [Cloud Workspace State Boundaries](architecture/cloud-workspace-state.md)
+- [Cloud Entry Authentication and Project Context UX](architecture/cloud-entry-ux.md)
+  - Act-by-act Cloud entry behavior, auth-before-initialization priority,
+    decision diagram, presentation table, copy guardrails, and regression
+    matrix.
 - [Cloud Project Publish Coordinator](architecture/cloud-publish-coordinator.md)
   - Durable `Initialize and Push`, explicit Organization ownership,
     idempotency, main-only credentials, crash recovery, and the frozen Version

@@ -4,8 +4,7 @@ import {
   type ResolvedTypography,
 } from "../typography";
 import { useLocalization } from "@puppyone/localization";
-
-const puppyoneLogoUrl = new URL("../../../public/puppyone-logo.svg", import.meta.url).href;
+import { PulseGrid } from "../../components/loading";
 
 type RestoringWorkspaceScreenProps = {
   themeMode: ThemeMode;
@@ -41,10 +40,7 @@ export function RestoringWorkspaceScreen({
       {...createTypographyRootProps(typography)}
     >
       <div className="onboarding-titlebar" aria-hidden="true" />
-      <section className="restoring-workspace-status" aria-label={t("workspace.restoring.ariaLabel")}>
-        <img src={puppyoneLogoUrl} alt="" className="restoring-workspace-logo" />
-        <span>{t("workspace.restoring.message")}</span>
-      </section>
+      <PulseGrid ariaLabel={t("workspace.restoring.ariaLabel")} size="sm" tone="neutral" />
     </main>
   );
 }

@@ -150,7 +150,7 @@ export function CloudProjectBrowserSignedOut({
         <CloudAuthCard
           view={signedIn ? "signedIn" : auth.view}
           signedInEmail={auth.signedInEmail}
-          signInLabel={t("cloud.auth.signIn")}
+          signInLabel={t("cloud.auth.signInToCloud")}
           loading={auth.loading}
           signingOut={auth.signingOut}
           error={auth.error}

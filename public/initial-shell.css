@@ -1,11 +1,8 @@
 :root {
-  background: #f1eadf;
-  color-scheme: light;
-}
-
-:root[data-initial-theme="dark"] {
-  background: #0e0e0e;
-  color-scheme: dark;
+  --initial-shell-background: #f1eadf;
+  --initial-shell-color-scheme: light;
+  background: var(--initial-shell-background);
+  color-scheme: var(--initial-shell-color-scheme);
 }
 
 html,
@@ -19,10 +16,5 @@ body,
 body,
 #root:empty {
   overflow: hidden;
-  background: #f1eadf;
-}
-
-:root[data-initial-theme="dark"] body,
-:root[data-initial-theme="dark"] #root:empty {
-  background: #0e0e0e;
+  background: var(--initial-shell-background);
 }
