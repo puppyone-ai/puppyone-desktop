@@ -587,25 +587,6 @@
   width: min(520px, 100%);
 }
 
-.restoring-workspace-status {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  gap: 9px;
-  -webkit-app-region: no-drag;
-  color: var(--po-text-subtle);
-  font-size: 12.5px;
-  font-weight: 560;
-  line-height: 1.25;
-}
-
-.restoring-workspace-logo {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 18px;
-  border-radius: 5px;
-}
-
 .onboarding-panel-compact {
   display: flex;
   width: min(420px, 100%);

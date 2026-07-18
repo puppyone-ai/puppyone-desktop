@@ -356,7 +356,7 @@ describe("CloudServiceSidebar project context", () => {
 
     act(() => renderWithTestLocalization(root,
       <CloudServiceSidebar
-        cloudAuthState={testCloudAuthState(null)}
+        cloudAuthState={testCloudAuthState(session)}
         activeSection="initialize"
         localOnlyWorkspaceContext
         onSelectSection={onSelectSection}
@@ -430,6 +430,7 @@ describe("CloudServiceSidebar project context", () => {
     const lockedRows = rows;
     expect(lockedRows).toHaveLength(8);
     expect(lockedRows.every((row) => row.getAttribute("aria-disabled") === "true")).toBe(true);
+    expect(lockedRows.every((row) => row.getAttribute("title") === "Sign in to use Cloud")).toBe(true);
     expect(container.querySelector(".desktop-cloud-sidebar-nav-lock")).toBeNull();
 
     act(() => lockedRows[3]?.click());
@@ -1197,11 +1198,15 @@ describe("Local-only Cloud page", () => {
 
   it("shows Git status loading and real failures instead of treating an unknown status as a folder", async () => {
     const onRefresh = vi.fn();
+    const localSession = {
+      ...session,
+      api_base_url: "http://localhost:9090",
+    } as DesktopCloudSession;
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
     const commonProps = {
-      ...testCloudMainState(null, "http://localhost:9090"),
+      ...testCloudMainState(localSession, "http://localhost:9090"),
       workspace: { id: "local-loading", name: "Loading Repo", path: "/tmp/loading-repo" },
       cloudApiBaseUrl: "http://localhost:9090",
       cloudSession: null,
@@ -1247,13 +1252,17 @@ describe("Local-only Cloud page", () => {
   });
 
   it.each([null, "HEAD", "detached"])("blocks initialize for detached branch marker %s", (branch) => {
+    const localSession = {
+      ...session,
+      api_base_url: "http://localhost:9090",
+    } as DesktopCloudSession;
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
 
     act(() => renderWithTestLocalization(root,
       <CloudServiceMainView
-        {...testCloudMainState(null, "http://localhost:9090")}
+        {...testCloudMainState(localSession, "http://localhost:9090")}
         workspace={{ id: "local-detached", name: "Detached Repo", path: "/tmp/detached-repo" }}
         status={{
           isRepo: true,
@@ -1369,13 +1378,14 @@ describe("Local-only Cloud page", () => {
     expect(getCloudProject).not.toHaveBeenCalled();
   });
 
-  it("stays passive while signed out, then forwards an explicit publish intent", async () => {
+  it("shows the single Cloud sign-in gate while signed out without presenting a publish intent", async () => {
     const restoreCloudSession = vi.fn().mockResolvedValue(null);
+    const startCloudOAuth = vi.fn().mockResolvedValue({ ok: true });
     const onStartPuppyoneBackup = vi.fn();
     const previousBridge = window.puppyoneDesktop;
     Object.defineProperty(window, "puppyoneDesktop", {
       configurable: true,
-      value: { restoreCloudSession },
+      value: { restoreCloudSession, startCloudOAuth },
     });
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -1422,16 +1432,24 @@ describe("Local-only Cloud page", () => {
       await flushPromises();
     });
 
-    expect(container.querySelector(".desktop-cloud-publish-hero")).not.toBeNull();
-    expect(container.textContent).toContain("Sign in to Initialize");
+    expect(container.querySelector(".desktop-cloud-project-auth-entry")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-product-mark")).not.toBeNull();
+    expect(container.textContent).toContain("PuppyOne Cloud");
+    expect(container.textContent).toContain("Sign in to PuppyOne Cloud");
+    expect(container.querySelector(".desktop-cloud-publish-hero")).toBeNull();
+    expect(container.textContent).not.toContain("New Cloud project");
+    expect(container.textContent).not.toContain("Not initialized");
+    expect(container.textContent).not.toContain("Sign in to Initialize");
     expect(container.querySelector(".desktop-cloud-main-alert")).toBeNull();
     expect(restoreCloudSession).not.toHaveBeenCalled();
     expect(getCloudProject).not.toHaveBeenCalled();
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary")?.click();
+      container.querySelector<HTMLButtonElement>(".desktop-cloud-auth-submit")?.click();
+      await Promise.resolve();
     });
-    expect(onStartPuppyoneBackup).toHaveBeenCalledOnce();
+    expect(startCloudOAuth).toHaveBeenCalledOnce();
+    expect(onStartPuppyoneBackup).not.toHaveBeenCalled();
 
     Object.defineProperty(window, "puppyoneDesktop", {
       configurable: true,

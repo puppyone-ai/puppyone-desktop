@@ -5,6 +5,9 @@ state. The canonical PuppyOne remote is the sole locator; the signed-in Cloud
 session supplies authorization. Desktop and Cloud do not maintain an identity
 record for the local folder.
 
+[Cloud Entry Authentication and Project Context UX](cloud-entry-ux.md) owns
+the first-match screen priority built from these independent state domains.
+
 ## Independent state domains
 
 ```text
@@ -100,12 +103,15 @@ an Offline banner.
 
 ## UI states
 
-- No canonical remote: show the local-only explanation and one primary
-  `Initialize and Push` action. Show `Local repository -> Push -> PuppyOne
-  Cloud`, with the destination marked `Not initialized`. Do not show an error
-  banner and do not
-  initiate a workspace-specific session restore until the user invokes that
-  action. A separately restored global account session may still be reused.
+- Restoring or signing out without an effective session: show a neutral bounded
+  transition state.
+- No effective session: show the single account-only PuppyOne Cloud sign-in
+  entry regardless of repository, route, or publish state. Do not show a local
+  repository summary, push arrow, `New Cloud project`, or `Not initialized`.
+- Authenticated with no canonical remote: show the local-only explanation and
+  one primary `Initialize and Push` action. Show `Local repository -> Push ->
+  PuppyOne Cloud`, with the destination marked `Not initialized`. Do not show
+  an error banner.
 - Resolved context: show Project content.
 - Remote missing after a previous display hint: the actual current state wins;
   show local-only.
@@ -115,21 +121,21 @@ an Offline banner.
 
 ## Mutations
 
-Initializing a local project on PuppyOne Cloud is one explicit user operation:
+After authentication, initializing a local project on PuppyOne Cloud is one
+explicit user operation:
 
 1. verify that the repository has a named branch, an existing HEAD, no remote
    conflict, and no known immutable server-policy violation;
-2. authenticate in the browser when there is no current Cloud session;
-3. choose the owning Organization explicitly (auto-select only when exactly
+2. choose the owning Organization explicitly (auto-select only when exactly
    one is available);
-4. have Electron main durably record the operation before any Cloud mutation;
-5. idempotently create the Cloud Project and operation-owned Git credential;
-6. configure the canonical `puppyone` remote add-only while holding the
+3. have Electron main durably record the operation before any Cloud mutation;
+4. idempotently create the Cloud Project and operation-owned Git credential;
+5. configure the canonical `puppyone` remote add-only while holding the
    repository mutation lock;
-7. push the captured immutable HEAD SHA to the canonical Cloud `main` branch;
-8. reconcile uncertain transport outcomes against the remote ref, configure
+6. push the captured immutable HEAD SHA to the canonical Cloud `main` branch;
+7. reconcile uncertain transport outcomes against the remote ref, configure
    upstream, and enter the new Cloud Project; and
-9. remove the journal on completion, or expose Resume/Abandon for a durable
+8. remove the journal on completion, or expose Resume/Abandon for a durable
    incomplete operation.
 
 The operation does not stage, commit, amend, stash, or discard user changes.
@@ -137,8 +143,9 @@ Only existing commits are pushed; staged, unstaged, and untracked changes stay
 local. The UI describes the first-time action as initialization plus Push, not
 as adding a remote. Project creation, credential issuance, remote configuration,
 and Git transport are implementation steps behind the single product action.
-Waiting for browser sign-in, initializing/pushing, and failure are visible
-states; a click must never degrade into a navigation no-op.
+Browser sign-in remains on the shared authentication surface.
+Initializing/pushing and failure are visible only after authentication; a click
+must never degrade into a navigation no-op.
 
 The complete phase, idempotency, credential, crash-recovery, and compensation
 contract is defined in

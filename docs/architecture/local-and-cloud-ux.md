@@ -5,6 +5,10 @@ and Cloud resources. Git remains the synchronization mechanism. A local folder
 is not registered with Cloud; the presence of one canonical PuppyOne Git remote
 determines whether the open folder has contextual Cloud content.
 
+[Cloud Entry Authentication and Project Context UX](cloud-entry-ux.md) owns
+the screen sequence and first-match presentation priority before these
+capability states are shown.
+
 ## Capability states
 
 | State | Local folder | Canonical PuppyOne remote | Authorized Cloud Project |
@@ -19,7 +23,10 @@ available only after canonical-remote resolution succeeds.
 
 ## Local Only
 
-When actual Git state contains no canonical PuppyOne remote:
+Authentication is the outer presentation gate. A signed-out user sees the
+single PuppyOne Cloud sign-in entry regardless of repository state. After an
+effective session exists, actual Git state with no canonical PuppyOne remote is
+presented as Local Only:
 
 - explain that the project is not yet published to PuppyOne Cloud (it may
   already have another Git host);
@@ -27,8 +34,6 @@ When actual Git state contains no canonical PuppyOne remote:
   one explicit `Push` flow;
 - offer one primary `Initialize and Push` action;
 - do not call repository-context APIs;
-- do not initiate a workspace-specific session restore until the user chooses
-  Initialize and Push; a separately restored global account session may be reused;
 - do not display Offline, permission, missing-Project, or repair errors;
 - ignore stale historical Cloud-shaped config because it is not authority.
 
@@ -42,9 +47,8 @@ workflow. The local repository must already have a named branch and at least
 one commit:
 
 ```text
-explicit Initialize and Push intent
+authenticated explicit Initialize and Push intent
   -> verify Git repository + named branch + existing HEAD
-  -> sign in when required
   -> select the owning Organization explicitly
   -> main process records a durable publish operation
   -> idempotently create Cloud Project + operation credential
@@ -60,11 +64,12 @@ history is pushed. A repository without a commit or a checkout without a named
 branch is stopped before any Cloud Project is created and directs the user to
 Source Control.
 
-The page shows waiting-for-sign-in, Organization selection,
-initializing/pushing, and failure states. An interrupted operation shows
-phase-specific Resume and Abandon actions after a window reload or process
-restart. Abandon is available only before Cloud accepts content and never
-deletes user commits or working-tree changes.
+The shared authentication entry owns signed-out and browser-sign-in progress.
+The initialization page appears only after authentication and shows
+Organization selection, initializing/pushing, and failure states. An
+interrupted operation shows phase-specific Resume and Abandon actions after a
+window reload or process restart. Abandon is available only before Cloud
+accepts content and never deletes user commits or working-tree changes.
 It does not expose Project creation, credential issuance, or remote setup as
 separate first-run tasks, and clicking Initialize and Push must never be
 implemented as navigation back to the page that is already open. The flow
@@ -144,9 +149,9 @@ currently exists.
 
 | Condition | Presentation |
 |---|---|
-| No canonical remote | Local-only card, no error |
+| Signed out | Account-only PuppyOne Cloud sign-in entry; no repository or publish semantics |
+| Authenticated + no canonical remote | Local-only card, no error |
 | Resolving | Bounded loading state |
-| Signed out | Sign-in guidance |
 | 403 | Current account lacks access |
 | 404 | Project or Scope no longer exists |
 | Wrong host | Remote-host repair guidance |
@@ -172,18 +177,20 @@ Internal exception strings, Electron rejection wrappers, and
 
 ## Acceptance matrix
 
-1. Open a GitHub-only repository: Local Only, zero Cloud context calls.
+1. While signed in, open a GitHub-only repository: Local Only, zero Cloud
+   context calls.
 2. Open a canonical Project-root clone while authorized: Project content opens.
 3. Open a canonical scoped clone: exact Scope context opens.
-4. Remove the PuppyOne remote: view becomes Local Only without a Cloud error.
+4. While signed in, remove the PuppyOne remote: view becomes Local Only without
+   a Cloud error.
 5. Sign in as another account without access: local files remain usable and a
    permission recovery state appears.
 6. Rotate session during resolution: request retries; no internal text appears.
 7. Configure a remote and force local setup failure: newly issued credential is
    compensated by best-effort revocation.
-8. Open a signed-out Local Only project: no passive Cloud request; click
-   Initialize and Push once, complete browser sign-in, then
-   create/configure/push automatically.
+8. Open a signed-out Local Only project: show only the PuppyOne Cloud sign-in
+   entry. After sign-in, show `Initialize and Push`; create/configure/push only
+   after that separate explicit action.
 9. Initialize a repository with dirty working-tree state: push the existing
    HEAD while leaving staged, unstaged, and untracked changes untouched.
 10. Attempt initialization without HEAD or from detached HEAD: stop before

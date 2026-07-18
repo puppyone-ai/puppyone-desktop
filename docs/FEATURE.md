@@ -9,6 +9,10 @@ single product area can evolve without turning this file into a catch-all.
 - [Cloud Workspace State Boundaries](architecture/cloud-workspace-state.md)
   - Cloud environment, auth, canonical Git locator, project data, and route-state
     boundaries.
+- [Cloud Entry Authentication and Project Context UX](architecture/cloud-entry-ux.md)
+  - The first actionable screen, auth-before-initialization priority, Project
+    resolution variants, decision diagram, copy guardrails, and acceptance
+    matrix.
 - [Local and Cloud UX](architecture/local-and-cloud-ux.md)
   - One Projects entry and one Project shell across Local Only, Local + Cloud,
     and Cloud Only, including creation, transitions, visual semantics, Files

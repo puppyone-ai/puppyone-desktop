@@ -109,7 +109,7 @@ export function CloudServiceSidebar({
                   <CloudSidebarNavItem
                     key={item.id}
                     item={item}
-                    lockedReason={localOnlyWorkspaceContext ? "initialize" : "sign-in"}
+                    lockedReason={!signedIn ? "sign-in" : "initialize"}
                     active={
                       !item.locked && signedIn && (
                         normalizedActiveSection === item.id
