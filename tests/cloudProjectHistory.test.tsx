@@ -58,6 +58,26 @@ describe("Cloud project history", () => {
     expect(buildCloudBranchGraphRows({ history })).toHaveLength(27);
   });
 
+  it("gives the initial sidebar loader the full available sidebar height", () => {
+    const container = render(
+      <CloudProjectHistorySidebar
+        rows={[]}
+        selectedCommitId={null}
+        loading
+        loadingMore={false}
+        hasMore={false}
+        error={null}
+        warning={null}
+        onSelectCommit={vi.fn()}
+        onLoadMore={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector(".desktop-cloud-history-sidebar-state-list")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-history-sidebar-state > .desktop-cloud-history-sidebar-loading"))
+      .not.toBeNull();
+  });
+
   it("selects graph commits and presents them with the canonical local History hierarchy", () => {
     const history = createHistory(2);
     const rows = buildCloudBranchGraphRows({ history });
@@ -68,10 +88,12 @@ describe("Cloud project history", () => {
     expect(container.querySelector(".desktop-cloud-history-graph-svg")).not.toBeNull();
     expect(container.querySelector(".desktop-cloud-history-sidebar-row-stat")?.textContent).toBe("+0-0");
     expect(container.querySelector(".desktop-commit-detail.desktop-cloud-commit-detail")).not.toBeNull();
-    expect(container.querySelector("h1")?.textContent).toBe("Commit 1");
+    expect(container.querySelector(".desktop-commit-summary > p")?.textContent).toBe("Commit 1");
     expect(container.textContent).toContain("Author 1");
     expect(container.querySelector(".desktop-file-diff-identity")?.getAttribute("title")).toBe("src/file-1.ts");
     expect(container.querySelector('.desktop-file-diff[data-change-kind="modified"]')).not.toBeNull();
+    expect(container.querySelector('.desktop-file-diff[data-content-mode="metadata"]')).not.toBeNull();
+    expect(container.querySelector(".desktop-format-diff")).toBeNull();
     expect(container.textContent).toContain("HEAD");
     expect(container.querySelector(".desktop-cloud-history-inline-ref")).not.toBeNull();
     expect(container.querySelector(".desktop-cloud-history-graph-continuation")).toBeNull();
@@ -87,7 +109,7 @@ describe("Cloud project history", () => {
 
     act(() => olderCommit.click());
 
-    expect(container.querySelector("h1")?.textContent).toBe("Commit 2");
+    expect(container.querySelector(".desktop-commit-summary > p")?.textContent).toBe("Commit 2");
     expect(container.textContent).toContain("Author 2");
     expect(container.querySelector(".desktop-file-diff-identity")?.getAttribute("title")).toBe("src/file-2.ts");
     expect(container.querySelector('.desktop-file-diff[data-change-kind="deleted"]')).not.toBeNull();

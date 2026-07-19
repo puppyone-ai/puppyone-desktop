@@ -115,7 +115,7 @@ if (!formatPolicy.includes("packages/shared-ui/src/core/fileFormats.json")) {
 
 const contextualCloudData = read("src/features/cloud/data/useDesktopCloudData.ts");
 const contextualCloudRouter = read("src/features/cloud/routes/CloudRouter.tsx");
-const contextualCloudStates = read("src/features/cloud/states.tsx");
+const contextualCloudStates = read("src/features/cloud/initialization/CloudInitializationView.tsx");
 const contextualCloudResolver = read("src/features/cloud/workspace/useCloudWorkspaceContext.ts");
 const contextualProjectContext = read("src/features/cloud/context/useProjectCloudContext.ts");
 const contextualWorkspaceSurface = read("src/features/app-shell/workspace-surfaces/useWorkspaceSurfaceContent.tsx");

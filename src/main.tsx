@@ -1,3 +1,8 @@
+import "./styles/cascade.css";
+import "./cloud-globals.css";
+import "@puppyone/shared-ui/shared-ui.css";
+import "./styles.css";
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { flushActiveDocumentSessions } from "@puppyone/shared-ui";
@@ -7,10 +12,6 @@ import { ScrollbarActivity } from "./components/ScrollbarActivity";
 import { FeatureFlagsProvider } from "./features/flags";
 import { TypographyCatalogProvider } from "./features/typography";
 import { bootstrapRendererLocalization } from "./localization";
-import "./styles/cascade.css";
-import "./cloud-globals.css";
-import "@puppyone/shared-ui/shared-ui.css";
-import "./styles.css";
 
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("PuppyOne renderer root is unavailable.");

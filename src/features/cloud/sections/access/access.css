@@ -1,0 +1,12 @@
+/* Access section stylesheet manifest. */
+@import "./styles/base.css" layer(features);
+@import "./styles/scope-sidebar.css" layer(features);
+@import "./styles/standalone-list.css" layer(features);
+@import "./styles/access-detail.css" layer(features);
+@import "./styles/scope-settings.css" layer(features);
+@import "./styles/service-sidebar.css" layer(features);
+@import "./styles/scope-detail.css" layer(features);
+@import "./styles/method-card.css" layer(features);
+@import "./styles/permissions.css" layer(features);
+@import "./styles/create-access-dialog.css" layer(features);
+@import "./styles/responsive.css" layer(features);

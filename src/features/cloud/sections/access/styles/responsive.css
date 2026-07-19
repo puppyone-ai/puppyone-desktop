@@ -1,0 +1,47 @@
+/* Access-owned responsive behavior. */
+@media (max-width: 860px) {
+  .desktop-cloud-access-method-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .desktop-cloud-access-method-card.remote {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .desktop-cloud-access-method-remote-button {
+    justify-self: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .desktop-cloud-access-page {
+    min-height: auto;
+  }
+
+  .desktop-cloud-access-body,
+  .desktop-cloud-access-page.rail-collapsed .desktop-cloud-access-body,
+  .desktop-cloud-access-surface-grid,
+  .desktop-cloud-access-connector-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .desktop-cloud-access-sidebar {
+    max-height: 260px;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--po-border-subtle);
+  }
+
+  .desktop-cloud-access-detail-panel {
+    padding: 16px;
+  }
+
+  .desktop-cloud-access-surface-head {
+    grid-template-columns: minmax(0, 1fr) max-content 30px;
+  }
+
+  .desktop-cloud-access-status-cell {
+    display: none;
+  }
+}
+

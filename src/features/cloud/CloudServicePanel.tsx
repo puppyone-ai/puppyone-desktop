@@ -1,6 +1,7 @@
 import { Check, Cloud, LogIn, LogOut, RefreshCw, Server, SquareTerminal, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
+import "./CloudServicePanel.css";
 import type { CloudAuthView, CloudLoginFeature, CloudLoginMethod } from "./model";
 import type { CloudServicePanelProps } from "./types";
 import { useCloudAuthController } from "./hooks/useCloudAuthController";

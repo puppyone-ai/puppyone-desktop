@@ -147,6 +147,8 @@
   "connection.openingAuthorization": "보안 승인 여는 중…",
   "connection.waiting": "연결을 기다리는 중",
   "connection.authorizationAttention": "승인을 확인해야 합니다",
+  "connection.providerUnavailable": "{provider} 연결을 아직 사용할 수 없습니다",
+  "connection.providerUnavailableDetail": "이 Cloud 배포에는 {provider} 승인이 구성되어 있지 않습니다. 다른 소스를 선택하거나 워크스페이스 관리자에게 활성화를 요청하세요.",
   "connection.finishInBrowser": "브라우저에서 {provider} 연결을 완료하세요. 이 창은 자동으로 계속됩니다.",
   "create.chooseTitle": "자동화 소스 선택",
   "create.connectTitle": "{provider} 연결",

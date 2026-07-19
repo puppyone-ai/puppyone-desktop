@@ -17,11 +17,9 @@ import {
   CloudProjectHistoryView,
   CloudServiceMainView,
   CloudServiceSidebar,
-  DesktopCloudAccessSidebar,
   DesktopCloudAccessView,
   formatCloudMessage,
   resolveCloudEnvironment,
-  isCloudAccessNavigationResource,
   resolveCloudProjectNavigationContext,
   shouldLoadDesktopCloudAccessData,
   useCloudSessionForEnvironment,
@@ -205,7 +203,6 @@ export function useWorkspaceSurfaceContent({
     apiBaseUrl: cloud.cloudApiBaseUrl,
     onCloudSessionChange: cloud.onCloudSessionChange,
   });
-  const [activeCloudAccessRowId, setActiveCloudAccessRowId] = useState<string | null>(null);
   const [activeAutomationProvider, setActiveAutomationProvider] = useState<string | null>(null);
   const [activePluginsSection, setActivePluginsSection] = useState<PluginsSection>(DEFAULT_PLUGINS_SECTION);
   const cloudHistory = useCloudHistoryController({
@@ -221,12 +218,6 @@ export function useWorkspaceSurfaceContent({
   const cloudPublishErrorMessage = cloud.publishError
     ? formatCloudPublishFailure(cloud.publishError, t)
     : null;
-
-  useEffect(() => {
-    const accessRows = cloudAccessData.accessRows.filter(isCloudAccessNavigationResource);
-    if (activeCloudAccessRowId && accessRows.some(({ id }) => id === activeCloudAccessRowId)) return;
-    setActiveCloudAccessRowId(accessRows[0]?.id ?? null);
-  }, [activeCloudAccessRowId, cloudAccessData.accessRows]);
 
   const handleOpenGitFile = useCallback((path: string) => {
     onActiveDataPathChange(path);
@@ -312,24 +303,17 @@ export function useWorkspaceSurfaceContent({
     ),
   };
   const cloudAccessSurface = {
-    sidebar: (
-      <DesktopCloudAccessSidebar
-        accessData={cloudAccessData}
-        activeAccessRowId={activeCloudAccessRowId}
-        onSelectAccessRow={setActiveCloudAccessRowId}
-      />
-    ),
+    sidebar: null,
     main: (
       <DesktopCloudAccessView
         projectId={cloud.projectId}
         cloudSession={cloud.cloudSession}
         accessData={cloudAccessData}
         activeFilter="all"
-        activeAccessRowId={activeCloudAccessRowId}
+        activeAccessRowId={null}
         sessionRestoring={cloud.sessionRestoring}
         onCloudSessionChange={cloud.onCloudSessionChange}
         onRefresh={() => undefined}
-        onSelectAccessRow={setActiveCloudAccessRowId}
       />
     ),
   };

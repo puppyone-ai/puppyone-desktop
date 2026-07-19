@@ -12,8 +12,6 @@
 @import "./styles/settings.css" layer(features);
 @import "./styles/entry-state.css";
 @import "./features/cloud/cloud-service.css" layer(features);
-@import "./features/automation/automation.css" layer(features);
-@import "./features/automation/automation-dialog.css" layer(features);
 @import "./styles/settings-controls.css" layer(features);
 @import "./features/source-control/source-control.css" layer(features);
 @import "./styles/settings-view.css" layer(features);

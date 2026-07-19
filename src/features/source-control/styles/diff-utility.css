@@ -30,6 +30,10 @@
   color: var(--po-text-muted);
 }
 
+.desktop-file-diff[data-content-mode="metadata"] .desktop-file-diff-header {
+  border-bottom: 0;
+}
+
 .desktop-file-diff-facts {
   display: inline-flex;
   min-width: 0;

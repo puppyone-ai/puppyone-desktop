@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
+import "./project-browser.css";
 import type {
   DesktopCloudProject,
   DesktopCloudSession,

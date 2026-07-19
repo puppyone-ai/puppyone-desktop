@@ -1,0 +1,31 @@
+/* Automation provider navigation and connection list. */
+.desktop-cloud-automation-nav-group {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  margin-top: 4px;
+  padding-inline-start: 18px;
+}
+
+.desktop-cloud-automation-provider-row {
+  min-height: 30px;
+  padding-inline-start: 9px;
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-automation-provider-row .desktop-cloud-sidebar-nav-icon {
+  width: 22px;
+}
+
+.desktop-cloud-automation-nav-empty {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  margin: 1px var(--desktop-sidebar-row-right-gap) 1px calc(var(--desktop-sidebar-row-left-gap) + 27px);
+  padding: 0 var(--desktop-sidebar-row-content-right) 0 9px;
+  color: var(--po-text-subtle);
+  font-size: 12px;
+  font-weight: 540;
+  line-height: 1.25;
+}
+

@@ -1,0 +1,93 @@
+.desktop-cloud-automation-dialog {
+  background: var(--po-overlay);
+}
+
+.desktop-cloud-automation-dialog-header {
+  align-items: center;
+  padding: 18px 20px 10px;
+}
+
+.desktop-cloud-automation-dialog-header .desktop-dialog-title-row h2 {
+  margin: 0;
+  color: var(--po-text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.desktop-cloud-automation-dialog-header .desktop-dialog-title-row p {
+  margin: 3px 0 0;
+  color: var(--po-text-muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.desktop-cloud-automation-dialog-body {
+  display: grid;
+  gap: 16px;
+  padding: 12px 20px 20px;
+}
+
+.desktop-cloud-automation-state {
+  display: grid;
+  min-height: 120px;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  color: var(--po-text-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.desktop-cloud-automation-node-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--po-border-subtle);
+  background: var(--po-panel);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-automation-node-icon img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.desktop-cloud-automation-dialog-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--po-border-subtle);
+}
+
+.desktop-cloud-automation-dialog-footer-row > span {
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.desktop-cloud-automation-dialog-footer-row > span.ready {
+  color: var(--po-success);
+}
+
+.desktop-cloud-automation-dialog-footer-row > span.muted {
+  color: var(--po-text-subtle);
+}
+
+.desktop-cloud-automation-actions,
+.desktop-cloud-automation-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-cloud-automation-actions .desktop-dialog-button,
+.desktop-cloud-automation-header-actions .desktop-dialog-button {
+  gap: 6px;
+}
+

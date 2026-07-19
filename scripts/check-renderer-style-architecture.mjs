@@ -20,14 +20,21 @@ const cascadeIndex = rendererEntry.indexOf('import "./styles/cascade.css";');
 const tailwindIndex = rendererEntry.indexOf('import "./cloud-globals.css";');
 const sharedIndex = rendererEntry.indexOf('import "@puppyone/shared-ui/shared-ui.css";');
 const productIndex = rendererEntry.indexOf('import "./styles.css";');
+const rendererStyleBootstrap = [
+  'import "./styles/cascade.css";',
+  'import "./cloud-globals.css";',
+  'import "@puppyone/shared-ui/shared-ui.css";',
+  'import "./styles.css";',
+].join("\n");
 if (
   cascadeIndex < 0
   || tailwindIndex < 0
   || sharedIndex < 0
   || productIndex < 0
+  || !rendererEntry.startsWith(`${rendererStyleBootstrap}\n`)
   || !(cascadeIndex < tailwindIndex && tailwindIndex < sharedIndex && sharedIndex < productIndex)
 ) {
-  errors.push("Renderer styles must load cascade registration, Tailwind utilities, Shared UI, then product styles.");
+  errors.push("Renderer styles must be the first side-effect imports and load cascade registration, Tailwind utilities, Shared UI, then product styles before application modules.");
 }
 
 if (!/corePlugins\s*:\s*\{[\s\S]*?preflight\s*:\s*false/.test(tailwindConfig)) {

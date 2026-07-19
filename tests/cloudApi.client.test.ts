@@ -24,6 +24,7 @@ import {
   quoteCloudBillingPlan,
   instantiateCloudTemplate,
   supportsCloudAutomationOauth,
+  updateCloudProject,
   updateCloudAutomationConnection,
   updateCloudAutomationTrigger,
   validateDesktopBillingCatalog,
@@ -337,6 +338,36 @@ describe("cloud API client delegation", () => {
     expect(bridge).toHaveBeenCalledWith(
       expect.objectContaining({ path: "/projects/a%2Fb", method: "GET" }),
     );
+  });
+
+  it("updates native Project settings through the secure Cloud bridge", async () => {
+    bridge.mockResolvedValue({ id: "project/1", name: "Atlas", visibility: "private" });
+
+    await expect(updateCloudProject(
+      session,
+      "project/1",
+      {
+        name: "  Atlas  ",
+        description: null,
+        bound_git_branch: "  main  ",
+        visibility: "private",
+      },
+      undefined,
+      API,
+    )).resolves.toEqual({ id: "project/1", name: "Atlas", visibility: "private" });
+
+    expect(bridge).toHaveBeenCalledWith(expect.objectContaining({
+      path: "/projects/project%2F1",
+      method: "PUT",
+      body: JSON.stringify({
+        name: "Atlas",
+        description: null,
+        bound_git_branch: "main",
+        visibility: "private",
+      }),
+    }));
+    expect(() => updateCloudProject(session, "project-1", {})).toThrow(/at least one setting/i);
+    expect(() => updateCloudProject(session, "project-1", { name: "  " })).toThrow(/name cannot be empty/i);
   });
 
   it("shapes template catalog, detail, and instantiate requests through the secure bridge", async () => {

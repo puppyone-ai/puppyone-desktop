@@ -331,7 +331,7 @@ body.desktop-history-resizing .desktop-history-panel-tree-resizer svg {
     var(--desktop-utility-page-padding-bottom);
 }
 
-.desktop-initial-repo-state.compact {
+.desktop-initial-repo-state--compact {
   width: min(100%, 720px);
   padding-top: calc(var(--desktop-utility-page-padding-top) + 8px);
 }

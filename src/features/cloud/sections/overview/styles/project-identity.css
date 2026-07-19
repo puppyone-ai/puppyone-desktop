@@ -1,0 +1,51 @@
+/* Page-level Project identity and its canonical Cloud Git remote. */
+.desktop-cloud-overview-git-remote {
+  display: flex;
+  width: min(100%, 680px);
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: var(--po-text-subtle);
+}
+
+.desktop-cloud-overview-git-remote > svg {
+  flex: 0 0 auto;
+}
+
+.desktop-cloud-overview-git-remote code {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--po-font-mono);
+  font-size: 11.5px;
+  font-weight: 430;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-overview-git-remote button {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--po-text-subtle);
+  cursor: var(--po-clickable-cursor, pointer);
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.desktop-cloud-overview-git-remote button:hover {
+  border-color: var(--po-border-strong);
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-overview-git-remote button:focus-visible {
+  outline: 2px solid var(--po-focus-ring);
+  outline-offset: 1px;
+}

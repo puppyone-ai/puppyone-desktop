@@ -1,0 +1,44 @@
+/* The third column stacks Automation above the Project storage count. */
+.desktop-cloud-overview-dashboard-side-stack {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.desktop-cloud-overview-dashboard-card--compact {
+  min-height: 0;
+  padding: 20px;
+}
+
+.desktop-cloud-overview-dashboard-card--compact .desktop-cloud-overview-dashboard-hero {
+  margin-top: 28px;
+}
+
+.desktop-cloud-overview-automation-footer {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.desktop-cloud-overview-automation-footer small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--po-text-subtle);
+  font-size: 10px;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-overview-storage-value {
+  display: grid;
+  min-width: 0;
+  flex: 0 0 auto;
+  gap: 4px;
+  margin-top: 28px;
+}

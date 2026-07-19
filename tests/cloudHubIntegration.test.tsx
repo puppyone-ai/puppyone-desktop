@@ -650,12 +650,52 @@ describe("Cloud History route", () => {
     expect(container.querySelector(".desktop-cloud-history-sidebar")).not.toBeNull();
     expect(container.querySelector(".desktop-cloud-project-history-view")).not.toBeNull();
     expect(container.querySelectorAll('button[data-commit-id]')).toHaveLength(2);
-    expect(container.querySelector("h1")?.textContent).toBe("Head commit");
+    expect(container.querySelector(".desktop-commit-summary > p")?.textContent).toBe("Head commit");
 
     const parentRow = Array.from(container.querySelectorAll<HTMLButtonElement>('button[data-commit-id]'))
       .find((row) => row.textContent?.includes("Parent commit"));
     await act(async () => parentRow?.click());
-    expect(container.querySelector("h1")?.textContent).toBe("Parent commit");
+    expect(container.querySelector(".desktop-commit-summary > p")?.textContent).toBe("Parent commit");
+  });
+
+  it("lets History fill the Cloud workspace instead of using the centered page shell", async () => {
+    getCloudHistory.mockResolvedValue(historyPage());
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      renderWithTestLocalization(root,
+        <CloudServiceMainView
+          {...testCloudMainState(session, "https://cloud.example")}
+          workspace={{ id: "local-1", name: "Demo", path: "/tmp/demo" }}
+          status={null}
+          projectContext={{
+            status: "resolved",
+            projectId: "proj-1",
+            target: { kind: "project_root", project_id: "proj-1" },
+          }}
+          onCloudSessionChange={vi.fn()}
+          activeSection="history"
+          loading={false}
+          error={null}
+          cloudBackupLoading={false}
+          cloudBackupPending={false}
+          onStartPuppyoneBackup={vi.fn()}
+          onSelectSection={vi.fn()}
+          onRefresh={vi.fn()}
+          onOpenGitSettings={vi.fn()}
+        />,
+      );
+      await flushPromises();
+    });
+
+    const main = container.querySelector(".desktop-cloud-main-view");
+    const shell = container.querySelector(".desktop-cloud-page-shell");
+    const history = container.querySelector(".desktop-cloud-history-surface");
+    expect(main?.classList.contains("desktop-cloud-history-main-view")).toBe(true);
+    expect(shell?.classList.contains("desktop-cloud-history-page-shell")).toBe(true);
+    expect(history?.parentElement).toBe(shell);
   });
 
   it("appends an older cursor page without replacing the selected graph", async () => {

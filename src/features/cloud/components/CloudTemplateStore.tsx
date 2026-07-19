@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, File, Folder, RefreshCw, Search } from "lucide-react";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import "./template-store.css";
 import {
   getCloudTemplate,
   instantiateCloudTemplate,

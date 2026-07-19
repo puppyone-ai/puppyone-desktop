@@ -798,6 +798,45 @@ export function getCloudProject(
   );
 }
 
+export type UpdateCloudProjectInput = {
+  name?: string;
+  description?: string | null;
+  visibility?: "org" | "private";
+  bound_git_branch?: string;
+};
+
+export function updateCloudProject(
+  session: DesktopCloudSession,
+  projectId: string,
+  input: UpdateCloudProjectInput,
+  onSessionChange?: MutableSessionHandler,
+  apiBaseUrl?: string | null,
+): Promise<DesktopCloudProject> {
+  const payload: UpdateCloudProjectInput = {};
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) throw new Error("Cloud Project name cannot be empty.");
+    payload.name = name;
+  }
+  if (input.description !== undefined) payload.description = input.description;
+  if (input.bound_git_branch !== undefined) {
+    const branch = input.bound_git_branch.trim();
+    if (!branch) throw new Error("Cloud Project branch cannot be empty.");
+    payload.bound_git_branch = branch;
+  }
+  if (input.visibility !== undefined) payload.visibility = input.visibility;
+  if (Object.keys(payload).length === 0) {
+    throw new Error("Cloud Project update requires at least one setting.");
+  }
+  return cloudApiRequest<DesktopCloudProject>(
+    `/projects/${encodeURIComponent(projectId)}`,
+    session,
+    onSessionChange,
+    { method: "PUT", body: JSON.stringify(payload) },
+    apiBaseUrl,
+  );
+}
+
 export function getCloudRepositoryContext(
   session: DesktopCloudSession,
   projectId: string,

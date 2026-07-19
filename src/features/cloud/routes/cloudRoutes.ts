@@ -1,9 +1,11 @@
 import { Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, LayoutTemplate, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import { getCloudAutomationWebPath } from "../../automation/automationDomain";
+import type { CloudProjectDetailResource } from "../data/cloudProjectDetails";
 import type { CloudWorkspaceSection } from "./cloudRouteIds";
 
 export type CloudRouteContext = "projects" | "project" | "account";
+export type CloudRouteSurface = "standard" | "landing" | "history" | "automation";
 
 export type CloudRouteDescriptor = {
   id: CloudWorkspaceSection;
@@ -12,10 +14,31 @@ export type CloudRouteDescriptor = {
   descriptionId: string;
   icon: typeof Cloud;
   context: CloudRouteContext;
+  surface: CloudRouteSurface;
+  resources: readonly CloudProjectDetailResource[];
   showInSidebar: boolean;
   requiredCapability?: string;
   webPath: (projectId?: string) => string;
 };
+
+const NO_PROJECT_RESOURCES = [] as const satisfies readonly CloudProjectDetailResource[];
+const OVERVIEW_PROJECT_RESOURCES = [
+  "dashboard",
+  "history",
+  "scopes",
+  "connectors",
+  "mcp-endpoints",
+  "identity",
+] as const satisfies readonly CloudProjectDetailResource[];
+const ACCESS_PROJECT_RESOURCES = [
+  "scopes",
+  "connectors",
+  "mcp-endpoints",
+  "identity",
+] as const satisfies readonly CloudProjectDetailResource[];
+const GIT_SYNC_PROJECT_RESOURCES = [
+  "identity",
+] as const satisfies readonly CloudProjectDetailResource[];
 
 export const CLOUD_ROUTES = [
   {
@@ -25,6 +48,8 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.initialize.description",
     icon: Cloud,
     context: "projects",
+    surface: "standard",
+    resources: NO_PROJECT_RESOURCES,
     showInSidebar: false,
     webPath: () => "/projects",
   },
@@ -35,6 +60,8 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.overview.description",
     icon: Cloud,
     context: "projects",
+    surface: "standard",
+    resources: NO_PROJECT_RESOURCES,
     showInSidebar: true,
     webPath: (projectId?: string) => (projectId ? `/projects/${projectId}/access` : "/projects"),
   },
@@ -45,6 +72,8 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.templates.description",
     icon: LayoutTemplate,
     context: "projects",
+    surface: "standard",
+    resources: NO_PROJECT_RESOURCES,
     showInSidebar: true,
     webPath: () => "/templates",
   },
@@ -55,6 +84,8 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.cloud-team.description",
     icon: Users,
     context: "account",
+    surface: "standard",
+    resources: NO_PROJECT_RESOURCES,
     showInSidebar: true,
     webPath: () => "/team",
   },
@@ -65,6 +96,8 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.cloud-billing.description",
     icon: CreditCard,
     context: "account",
+    surface: "standard",
+    resources: NO_PROJECT_RESOURCES,
     showInSidebar: true,
     webPath: () => "/billing",
   },
@@ -75,6 +108,8 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.contents.description",
     icon: FileText,
     context: "project",
+    surface: "landing",
+    resources: OVERVIEW_PROJECT_RESOURCES,
     showInSidebar: true,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/data`,
   },
@@ -85,6 +120,8 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.history.description",
     icon: Clock3,
     context: "project",
+    surface: "history",
+    resources: NO_PROJECT_RESOURCES,
     showInSidebar: true,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/changes`,
   },
@@ -95,6 +132,8 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.branches.description",
     icon: GitBranch,
     context: "project",
+    surface: "standard",
+    resources: NO_PROJECT_RESOURCES,
     showInSidebar: false,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/changes`,
   },
@@ -105,6 +144,8 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.automation.description",
     icon: Grid2X2,
     context: "project",
+    surface: "automation",
+    resources: ACCESS_PROJECT_RESOURCES,
     showInSidebar: true,
     webPath: (projectId?: string) => getCloudAutomationWebPath(requireProjectId(projectId)),
   },
@@ -115,6 +156,8 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.access.description",
     icon: ShieldCheck,
     context: "project",
+    surface: "landing",
+    resources: ACCESS_PROJECT_RESOURCES,
     showInSidebar: true,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
   },
@@ -125,6 +168,8 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.mcp-cli.description",
     icon: SquareTerminal,
     context: "project",
+    surface: "landing",
+    resources: ACCESS_PROJECT_RESOURCES,
     showInSidebar: false,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
   },
@@ -135,6 +180,8 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.git-sync.description",
     icon: GitBranch,
     context: "project",
+    surface: "landing",
+    resources: GIT_SYNC_PROJECT_RESOURCES,
     showInSidebar: false,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
   },
@@ -145,6 +192,8 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.team.description",
     icon: Users,
     context: "project",
+    surface: "standard",
+    resources: NO_PROJECT_RESOURCES,
     showInSidebar: false,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/settings`,
     requiredCapability: "project.settings.manage",
@@ -156,15 +205,17 @@ export const CLOUD_ROUTES = [
     descriptionId: "cloud.route.settings.description",
     icon: Settings,
     context: "project",
+    surface: "landing",
+    resources: NO_PROJECT_RESOURCES,
     showInSidebar: true,
     requiredCapability: "project.settings.manage",
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/settings`,
   },
 ] as const satisfies readonly CloudRouteDescriptor[];
 
-export const CLOUD_ROUTE_BY_ID = Object.fromEntries(
+const CLOUD_ROUTE_BY_ID = new Map<CloudWorkspaceSection, CloudRouteDescriptor>(
   CLOUD_ROUTES.map((route) => [route.id, route]),
-) as Record<CloudWorkspaceSection, CloudRouteDescriptor>;
+);
 
 export const CLOUD_ACCOUNT_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "account" && route.showInSidebar);
 export const CLOUD_PROJECT_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "project");
@@ -190,7 +241,7 @@ export function normalizeCloudSection(
 }
 
 export function getCloudRoute(section: CloudWorkspaceSection): CloudRouteDescriptor {
-  return CLOUD_ROUTE_BY_ID[section] ?? CLOUD_ROUTE_BY_ID.projects;
+  return CLOUD_ROUTE_BY_ID.get(section) ?? CLOUD_ROUTE_BY_ID.get("projects")!;
 }
 
 export function getCloudSectionDescriptor(section: CloudWorkspaceSection, t: MessageFormatter) {
@@ -208,6 +259,16 @@ export function getCloudRouteLabel(route: CloudRouteDescriptor, t: MessageFormat
 
 export function getCloudRouteWebPath(section: CloudWorkspaceSection, projectId?: string): string {
   return getCloudRoute(section).webPath(projectId);
+}
+
+export function getCloudRouteSurface(section: CloudWorkspaceSection): CloudRouteSurface {
+  return getCloudRoute(section).surface;
+}
+
+export function getCloudProjectDetailResources(
+  section: CloudWorkspaceSection,
+): readonly CloudProjectDetailResource[] {
+  return getCloudRoute(section).resources;
 }
 
 export function isCloudAccountSection(section: CloudWorkspaceSection): boolean {

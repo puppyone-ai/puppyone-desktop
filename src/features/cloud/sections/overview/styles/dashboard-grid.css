@@ -1,0 +1,148 @@
+/* Project dashboard: three equal columns with one disciplined spacing scale. */
+.desktop-cloud-overview-dashboard {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.desktop-cloud-overview-dashboard-card {
+  display: flex;
+  min-width: 0;
+  min-height: 350px;
+  box-sizing: border-box;
+  flex-direction: column;
+  padding: 20px;
+  appearance: none;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--po-panel) 68%, var(--po-canvas) 32%);
+  box-shadow: none;
+  color: var(--po-text);
+  font: inherit;
+  text-align: start;
+}
+
+button.desktop-cloud-overview-dashboard-card {
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.desktop-cloud-overview-dashboard-card--interactive {
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.desktop-cloud-overview-dashboard-card--interactive:hover {
+  border-color: var(--po-border-strong);
+  background: color-mix(in srgb, var(--po-hover) 70%, var(--po-panel) 30%);
+}
+
+.desktop-cloud-overview-dashboard-card:focus-visible {
+  outline: 2px solid var(--po-focus-ring);
+  outline-offset: 2px;
+}
+
+.desktop-cloud-overview-dashboard-card-header {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.desktop-cloud-overview-dashboard-card-header > span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-cloud-overview-dashboard-card-header i {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  align-items: center;
+  justify-content: center;
+  color: var(--po-text-muted);
+  font-style: normal;
+}
+
+.desktop-cloud-overview-dashboard-card-header strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-overview-dashboard-card-header > .po-directional-icon {
+  flex: 0 0 auto;
+  color: var(--po-text-disabled);
+  transition: color 120ms ease, transform 120ms ease;
+}
+
+.desktop-cloud-overview-dashboard-card--interactive:hover
+  .desktop-cloud-overview-dashboard-card-header > .po-directional-icon {
+  color: var(--po-text);
+  transform: translateX(2px);
+}
+
+.desktop-cloud-overview-dashboard-hero {
+  display: grid;
+  min-width: 0;
+  flex: 0 0 auto;
+  gap: 4px;
+  margin-top: 28px;
+}
+
+.desktop-cloud-overview-dashboard-hero strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 36px;
+  font-weight: 560;
+  letter-spacing: -0.045em;
+  line-height: 40px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-overview-dashboard-hero small,
+.desktop-cloud-overview-storage-value small {
+  color: var(--po-text-subtle);
+  font-size: 12px;
+  font-weight: 450;
+  line-height: 17px;
+}
+
+.desktop-cloud-overview-dashboard-hero--metric strong,
+.desktop-cloud-overview-storage-value strong {
+  font-size: 36px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 560;
+  letter-spacing: -0.05em;
+  line-height: 40px;
+}
+
+.desktop-cloud-overview-dashboard-hero--metric strong {
+  overflow: visible;
+  line-height: 40px;
+}
+
+.desktop-cloud-overview-dashboard-empty {
+  margin-top: 18px;
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+[dir="rtl"] .desktop-cloud-overview-dashboard-card--interactive:hover
+  .desktop-cloud-overview-dashboard-card-header > .po-directional-icon {
+  transform: translateX(-2px) scaleX(-1);
+}

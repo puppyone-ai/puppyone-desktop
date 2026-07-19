@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { Mail } from "lucide-react";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import "./global-pages.css";
 import {
   getCloudOrganizationEntitlements,
   getCloudOrganizationAccess,

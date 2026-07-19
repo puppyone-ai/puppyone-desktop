@@ -147,6 +147,8 @@
   "connection.openingAuthorization": "Sichere Autorisierung wird geöffnet…",
   "connection.waiting": "Warten auf Verbindung",
   "connection.authorizationAttention": "Autorisierung erfordert Aufmerksamkeit",
+  "connection.providerUnavailable": "{provider} ist noch nicht verfügbar",
+  "connection.providerUnavailableDetail": "Für diese Cloud-Bereitstellung wurde die Autorisierung für {provider} noch nicht konfiguriert. Wähle eine andere Quelle oder bitte deine Workspace-Administration, sie zu aktivieren.",
   "connection.finishInBrowser": "Schließe die Verbindung mit {provider} im Browser ab. Dieses Fenster fährt automatisch fort.",
   "create.chooseTitle": "Automatisierungsquelle auswählen",
   "create.connectTitle": "Mit {provider} verbinden",

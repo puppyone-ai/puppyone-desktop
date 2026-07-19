@@ -3,6 +3,7 @@ import { Filter, Search } from "lucide-react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { SidebarRoot, SidebarScrollArea } from "@puppyone/shared-ui";
+import "./sections/access/access.css";
 import {
   openCloudApp,
   type DesktopCloudSession,
@@ -51,8 +52,6 @@ export function DesktopCloudAccessView({
 }) {
   const { t } = useLocalization();
   const cloudApiBaseUrl = cloudSession?.api_base_url ?? null;
-  const accessNavigationRows = accessData.accessRows.filter(isCloudAccessNavigationResource);
-  const selectedAccessRowId = activeAccessRowId ?? accessNavigationRows[0]?.id ?? null;
 
   if (sessionRestoring && !cloudSession) {
     return (
@@ -106,13 +105,13 @@ export function DesktopCloudAccessView({
           mcpEndpoints={accessData.mcpEndpoints}
           mcpEndpointsByTarget={accessData.mcpEndpointsByTarget}
           filter={activeFilter}
-          activeAccessRowId={selectedAccessRowId}
+          activeAccessRowId={activeAccessRowId}
           loading={accessData.loading}
           onCloudSessionChange={onCloudSessionChange}
           onRefresh={accessData.reload}
           onSelectAccessRow={onSelectAccessRow}
           onOpenProject={handleOpenProject}
-          sidebarOwnsHeader={activeFilter === "all"}
+          sidebarOwnsHeader={false}
         />
       </div>
     </div>

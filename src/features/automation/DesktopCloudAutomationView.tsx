@@ -25,6 +25,7 @@ import {
   getCloudAutomationWebPath,
   isCloudAutomationConnector,
 } from "./automationDomain";
+import "./automation.css";
 
 export function DesktopCloudAutomationView({
   projectId,

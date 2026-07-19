@@ -1,0 +1,230 @@
+.desktop-cloud-automation-icon-action {
+  width: 30px;
+  padding: 0;
+}
+
+.desktop-cloud-automation-dialog .desktop-dialog-button.danger {
+  border-color: color-mix(in srgb, var(--po-danger) 60%, var(--po-border));
+  color: var(--po-danger);
+}
+
+.desktop-cloud-automation-delete-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--po-danger) 38%, var(--po-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-danger) 7%, transparent);
+}
+
+.desktop-cloud-automation-delete-confirm > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.desktop-cloud-automation-delete-confirm strong {
+  color: var(--po-text);
+  font-size: 13px;
+}
+
+.desktop-cloud-automation-delete-confirm span {
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.desktop-cloud-automation-success {
+  color: var(--po-success);
+  font-size: 12px;
+}
+
+.desktop-cloud-automation-detail-value {
+  display: grid;
+  gap: 2px;
+}
+
+.desktop-cloud-automation-detail-value span {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+}
+
+.desktop-cloud-automation-detail-value strong {
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-automation-detail-value strong.mono {
+  font-family: var(--po-font-mono, ui-monospace, monospace);
+}
+
+.desktop-cloud-automation-detail-value strong.ready {
+  color: var(--po-success);
+}
+
+.desktop-cloud-automation-detail-value strong.warning {
+  color: var(--po-warning);
+}
+
+.desktop-cloud-automation-schedule-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 12px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+}
+
+.desktop-cloud-automation-schedule-overview > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.desktop-cloud-automation-schedule-overview strong,
+.desktop-cloud-automation-manage-editor h3,
+.desktop-cloud-automation-run-history h3 {
+  margin: 0;
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.desktop-cloud-automation-schedule-overview span {
+  color: var(--po-text-muted);
+  font-size: 12px;
+}
+
+.desktop-cloud-automation-schedule-overview small {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.desktop-cloud-automation-manage-editor {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel-raised) 32%, transparent);
+}
+
+.desktop-cloud-automation-manage-editor > div:not(.desktop-cloud-automation-manage-editor-actions) {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 9px;
+}
+
+.desktop-cloud-automation-manage-editor-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--po-border-subtle);
+}
+
+.desktop-cloud-automation-manage-editor-actions > span {
+  margin-inline-end: auto;
+  color: var(--po-danger);
+  font-size: 12px;
+}
+
+.desktop-cloud-automation-run-history {
+  display: grid;
+  min-width: 0;
+  gap: 9px;
+  padding-top: 4px;
+}
+
+.desktop-cloud-automation-run-history > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.desktop-cloud-automation-run-history > header > span {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+}
+
+.desktop-cloud-automation-run-state {
+  padding: 10px 11px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 7px;
+  color: var(--po-text-muted);
+  font-size: 12px;
+}
+
+.desktop-cloud-automation-run-state.error {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--po-danger);
+}
+
+.desktop-cloud-automation-run-list {
+  display: grid;
+  gap: 5px;
+}
+
+.desktop-cloud-automation-run-list article {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 7px;
+}
+
+.desktop-cloud-automation-run-list article > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.desktop-cloud-automation-run-list strong {
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.desktop-cloud-automation-run-list small {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+}
+
+.desktop-cloud-automation-run-list p {
+  margin: 3px 0 0;
+  color: var(--po-danger);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: pre-wrap;
+}
+
+.desktop-cloud-automation-run-status {
+  width: max-content;
+  color: var(--po-text-muted);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.desktop-cloud-automation-run-status.success { color: var(--po-success); }
+.desktop-cloud-automation-run-status.danger { color: var(--po-danger); }
+.desktop-cloud-automation-run-status.warning { color: var(--po-warning); }
+.desktop-cloud-automation-run-status.accent { color: var(--po-accent); }

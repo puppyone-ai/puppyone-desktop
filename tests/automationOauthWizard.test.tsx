@@ -116,6 +116,47 @@ describe("Automation OAuth wizard", () => {
     expect(apiMocks.create).not.toHaveBeenCalled();
   });
 
+  it("treats missing server OAuth configuration as unavailable instead of retryable", async () => {
+    vi.useFakeTimers();
+    apiMocks.status.mockResolvedValue(oauthStatus(false));
+    apiMocks.authorize.mockRejectedValue(Object.assign(
+      new Error("Request failed (500): Google Docs OAuth is not configured. Please set the required environment variables."),
+      { status: 500 },
+    ));
+    const container = renderWizard(TEMPLATE);
+    await flushEffects();
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    const content = stripBidiIsolation(container.textContent);
+    expect(content).toContain("Google Docs is not available yet");
+    expect(content).toContain("has not configured Google Docs authorization");
+    expect(findButton(container, "Try again")).toBeUndefined();
+
+    act(() => findButton(container, "Choose another source")?.click());
+    expect(container.querySelector(".desktop-cloud-automation-chooser-grid")).not.toBeNull();
+    expect(apiMocks.authorize).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps transient authorization failures retryable and shows progress immediately", async () => {
+    vi.useFakeTimers();
+    apiMocks.status.mockResolvedValue(oauthStatus(false));
+    apiMocks.authorize
+      .mockRejectedValueOnce(new Error("Network request failed"))
+      .mockResolvedValueOnce("https://accounts.example.test/oauth");
+    const container = renderWizard(TEMPLATE);
+    await flushEffects();
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    expect(container.textContent).toContain("Authorization needs attention");
+    act(() => findButton(container, "Try again")?.click());
+    expect(container.textContent).toContain("Opening secure authorization");
+
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(apiMocks.authorize).toHaveBeenCalledTimes(2);
+    expect(apiMocks.openAuthorization).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("Waiting for connection");
+  });
+
   it("consumes the initial execution result and emits creation feedback", async () => {
     vi.useFakeTimers();
     apiMocks.status.mockResolvedValue(oauthStatus(true));

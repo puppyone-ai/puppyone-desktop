@@ -147,6 +147,8 @@
   "connection.openingAuthorization": "Opening secure authorization…",
   "connection.waiting": "Waiting for connection",
   "connection.authorizationAttention": "Authorization needs attention",
+  "connection.providerUnavailable": "{provider} is not available yet",
+  "connection.providerUnavailableDetail": "This Cloud deployment has not configured {provider} authorization. Choose another source or ask your workspace administrator to enable it.",
   "connection.finishInBrowser": "Finish connecting {provider} in your browser. This window will continue automatically.",
   "create.chooseTitle": "Choose an Automation source",
   "create.connectTitle": "Connect {provider}",

@@ -9,6 +9,7 @@ export type GitFileDiffSurfaceProps = {
   file: GitFileDiff;
   canOpenFile?: boolean;
   onOpenFile?: (path: string) => void;
+  contentMode?: "diff" | "metadata";
 };
 
 /** Canonical file-level diff chrome shared by Changes and History. */
@@ -16,6 +17,7 @@ export function GitFileDiffSurface({
   file,
   canOpenFile = false,
   onOpenFile,
+  contentMode = "diff",
 }: GitFileDiffSurfaceProps) {
   const { formatNumber, t } = useLocalization();
   const resolvedViewer = resolveDiffViewer(file);
@@ -27,7 +29,11 @@ export function GitFileDiffSurface({
   const identity = getGitFileIdentity(file);
 
   return (
-    <section className="desktop-file-diff" data-change-kind={file.status}>
+    <section
+      className="desktop-file-diff"
+      data-change-kind={file.status}
+      data-content-mode={contentMode}
+    >
       <div className="desktop-file-diff-header" data-file-format={format.id}>
         <div className="desktop-file-diff-facts">
           <span className="desktop-file-format-label" title={t("source-control.diff.formatFile", { format: bidiIsolate(formatLabel) })}>
@@ -53,12 +59,14 @@ export function GitFileDiffSurface({
         </div>
       </div>
 
-      <FormatAwareDiff
-        file={file}
-        canOpenFile={canOpenFile}
-        onOpenFile={onOpenFile}
-        resolvedViewer={resolvedViewer}
-      />
+      {contentMode === "diff" && (
+        <FormatAwareDiff
+          file={file}
+          canOpenFile={canOpenFile}
+          onOpenFile={onOpenFile}
+          resolvedViewer={resolvedViewer}
+        />
+      )}
     </section>
   );
 }

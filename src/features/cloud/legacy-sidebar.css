@@ -443,9 +443,3 @@
   background: color-mix(in srgb, var(--po-danger) 7%, var(--po-panel-raised));
   color: var(--po-danger);
 }
-
-.compact {
-  height: 30px;
-  padding: 0 10px;
-  font-size: 13px;
-}

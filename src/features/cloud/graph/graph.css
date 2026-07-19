@@ -1,0 +1,41 @@
+/* Shared branch-lane rendering used by full History and compact previews. */
+.desktop-cloud-history-graph-svg {
+  display: block;
+  overflow: visible;
+}
+
+.desktop-cloud-history-graph-segment {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.desktop-cloud-history-graph-node .halo {
+  fill: var(--cloud-history-node-bg);
+  opacity: 1;
+}
+
+.desktop-cloud-history-graph-node .node {
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.desktop-cloud-history-graph-node.current .halo {
+  fill: var(--cloud-history-node-bg);
+}
+
+.desktop-cloud-history-graph-ref rect {
+  stroke: var(--cloud-history-node-bg);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.desktop-cloud-history-graph-ref text {
+  fill: var(--po-canvas);
+  font-size: 7px;
+  font-weight: 800;
+  dominant-baseline: central;
+  text-anchor: middle;
+}

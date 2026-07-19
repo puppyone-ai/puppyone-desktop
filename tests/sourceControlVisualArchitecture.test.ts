@@ -43,7 +43,7 @@ const desktopEntryStateCss = readFileSync(
   "utf8",
 );
 const cloudProjectBrowserCss = readFileSync(
-  new URL("../src/features/cloud/styles/project-browser.css", import.meta.url),
+  new URL("../src/features/cloud/components/project-browser.css", import.meta.url),
   "utf8",
 );
 const cloudProjectBrowserSource = readFileSync(
@@ -349,9 +349,14 @@ describe("source-control visual architecture", () => {
     expect(fileDiffSurfaceSource).not.toContain("without-header");
 
     const header = compact(readCssBlock(diffCss, ".desktop-file-diff-header"));
+    const metadataHeader = compact(readCssBlock(
+      diffCss,
+      '.desktop-file-diff[data-content-mode="metadata"] .desktop-file-diff-header',
+    ));
     const format = compact(readCssBlock(diffCss, ".desktop-file-format-label"));
     const stats = compact(readCssBlock(diffCss, ".desktop-file-diff-stat"));
     expect(header).toContain("grid-template-columns: max-content minmax(0, 1fr);");
+    expect(metadataHeader).toContain("border-bottom: 0;");
     expect(format).toContain("color: var(--po-text);");
     expect(format).toContain("font-weight: 650;");
     expect(format).not.toContain("border-radius:");

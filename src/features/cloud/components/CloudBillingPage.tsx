@@ -10,6 +10,7 @@ import {
   Zap,
 } from "lucide-react";
 import { bidiIsolate } from "@puppyone/localization/core";
+import "./global-pages.css";
 import { useLocalization, type LocalizationContextValue } from "@puppyone/localization/react";
 import {
   type DesktopBillingPlan,

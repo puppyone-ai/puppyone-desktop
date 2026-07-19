@@ -1,0 +1,20 @@
+@media (max-width: 720px) {
+  .desktop-cloud-automation-catalog {
+    padding: 32px 24px 44px;
+  }
+
+  .desktop-cloud-automation-template-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 460px) {
+  .desktop-cloud-automation-landing-header {
+    gap: 16px;
+  }
+
+  .desktop-cloud-automation-landing-copy p {
+    max-width: 280px;
+  }
+}
+
