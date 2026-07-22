@@ -1,4 +1,4 @@
-import { toPublicState } from "./cloud-publish-contract.mjs";
+import { deriveCloudInitializationState } from "./cloud-initialization/state-derivation.mjs";
 
 /** Observational progress channel. Listener failures never affect the durable saga. */
 export function createCloudPublishProgressChannel({ rootPath, now, onProgress = null }) {
@@ -16,7 +16,7 @@ export function createCloudPublishProgressChannel({ rootPath, now, onProgress = 
       rootPath,
       operationId: record?.operation_id ?? null,
       stage,
-      state: record ? toPublicState(record, { identityMatches: true }) : null,
+      state: record ? deriveCloudInitializationState(record) : null,
       updatedAt: new Date(now()).toISOString(),
     };
     lastProgress = progress;

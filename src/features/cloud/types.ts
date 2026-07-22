@@ -72,7 +72,7 @@ export type CloudServiceMainViewProps = {
   cloudBackupLoading: boolean;
   cloudBackupPending: boolean;
   cloudPublishError: { code: CloudPublishErrorCode; retryable: boolean } | null;
-  cloudPublishNotice: "abandoned" | null;
+  cloudPublishNotice: "cleanup-completed" | null;
   cloudPublishProgress?: CloudPublishProgress | null;
   cloudPublishState: CloudPublishState | null;
   cloudPublishStateLoading: boolean;
@@ -82,4 +82,5 @@ export type CloudServiceMainViewProps = {
   onSelectSection: (section: CloudWorkspaceSection) => void;
   onRefresh: () => void;
   onOpenGitSettings: () => void;
+  onOpenSourceControl?: () => void;
 };

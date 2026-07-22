@@ -57,6 +57,7 @@ describe("repository detection", { timeout: 20_000 }, () => {
     expect(status.isRepo).toBe(true);
     expect(typeof status.branch).toBe("string");
     expect(status.branch.length).toBeGreaterThan(0);
+    expect(status.headCommitId).toBeNull();
     expect(status.totalCommits).toBe(0);
   });
 });

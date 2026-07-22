@@ -6,7 +6,7 @@ export type CloudPublishReadiness =
   | "commit-required"
   | "branch-required";
 
-type CloudPublishIdentity = Pick<GitStatusSnapshot, "isRepo" | "headCommitId" | "branch">;
+type CloudPublishIdentity = Pick<GitStatusSnapshot, "isRepo" | "headCommitId" | "totalCommits" | "branch">;
 
 /** Git may report a detached checkout using any of these renderer values. */
 export function isCloudPublishBranchDetached(branch: string | null): boolean {
@@ -21,7 +21,7 @@ export function isCloudPublishBranchReady(branch: string | null): branch is stri
 
 export function getCloudPublishReadiness(status: CloudPublishIdentity): CloudPublishReadiness {
   if (!status.isRepo) return "repository-required";
-  if (!status.headCommitId) return "commit-required";
+  if (!status.headCommitId || status.totalCommits < 1) return "commit-required";
   if (!isCloudPublishBranchReady(status.branch)) return "branch-required";
   return "ready";
 }

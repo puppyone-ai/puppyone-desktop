@@ -71,9 +71,12 @@ export function createCloudPublishApi({
         },
       );
     } catch (error) {
+      // Deletion is idempotent. A missing Project means the durable server
+      // portion of cleanup is already complete; local owned state can finish.
+      if (Number(error?.status) === 404) return { abandoned: true, replayed: true };
       throw mapCloudMutationError(
-        "COMPENSATION_FAILED",
-        "Unable to abandon the empty Cloud Project. Retry Abandon.",
+        "CLEANUP_FAILED",
+        "Unable to delete the empty Cloud Project. Finish cleanup to retry.",
         error,
       );
     }
@@ -96,8 +99,8 @@ export function createCloudPublishApi({
     } catch (error) {
       if (Number(error?.status) === 404) return;
       throw mapCloudMutationError(
-        "COMPENSATION_FAILED",
-        "Unable to revoke the pending Git credential.",
+        "CLEANUP_FAILED",
+        "Unable to revoke the initialization Git credential.",
         error,
       );
     }
