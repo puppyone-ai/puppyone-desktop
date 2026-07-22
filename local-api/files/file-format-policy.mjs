@@ -239,6 +239,7 @@ function resolveLocalFileFormat({ name, mimeType }) {
         label: "Text",
         category: "text",
         defaultViewer: "plain-text",
+        editable: true,
         monacoLanguage: "plaintext",
       };
     }

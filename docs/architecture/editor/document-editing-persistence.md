@@ -40,7 +40,9 @@ EditorHost + Viewer Router
 
 The responsibilities are deliberately narrow:
 
-1. The **Viewer Router** chooses a contribution.
+1. The **Viewer Router** chooses a contribution; the Host intersects Viewer
+   capability, format policy, canonical-source readiness, and persistence
+   authority into one explicit access decision.
 2. The **Editor Contribution** owns the format, UI, document model, undo/redo,
    validation, and serialization.
 3. The **DocumentEditingSession** owns dirty/save state, one serialized write
@@ -357,7 +359,10 @@ replace the editor's save lifecycle.
 ```text
 packages/shared-ui/src/editor/
   PuppyoneEditorHost.tsx           # route and attach editable boundary
+  editorAccess.ts                  # pure Host-level edit authority decision
   viewers/*                        # text/Markdown/CSV contributions
+  csv/csvDocument.ts               # CSV/TSV parse, model, and serialization
+  table/editableTableLayout.ts      # bounded column sizing shared by table UIs
   puppyflow/*                      # structured PuppyFlow contribution
 
 packages/shared-ui/src/editor/document-session/
@@ -384,6 +389,9 @@ src/App.tsx + src/main.tsx
 ## 10. Required invariants
 
 - Viewer routing is deterministic and has no persistence side effects.
+- Viewer capability, `FileFormat.editable`, canonical-source readiness, and
+  persistence availability are independent Host gates; semantic node types do
+  not duplicate format routing or decide editability.
 - A format contribution owns its model and canonical serialization.
 - An editable contribution exposes revision changes, an exact snapshot, and a
   format-aware external replacement; it does not write storage directly.

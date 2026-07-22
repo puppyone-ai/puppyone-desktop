@@ -64,7 +64,6 @@ export function useFileClipboard({
   setActiveDataPath,
   setActiveDataNode,
   workspace,
-  workspaceIsCloud,
 }: {
   dataPort: DataPort | null;
   onEnterDataView: () => void;
@@ -73,7 +72,6 @@ export function useFileClipboard({
   setActiveDataPath: Dispatch<SetStateAction<string | null>>;
   setActiveDataNode: Dispatch<SetStateAction<DataNode | null>>;
   workspace: Workspace | null;
-  workspaceIsCloud: boolean;
 }): FileClipboardController {
   const [clipboard, setClipboard] = useState<FileClipboardState | null>(null);
   const [operation, setOperation] = useState<FileClipboardOperation>(null);
@@ -196,7 +194,7 @@ export function useFileClipboard({
       }
       if (completedSourcePaths.size > 0 || result.failures.length > 0) {
         onWorkspaceContentChanged();
-        if (!workspaceIsCloud) onLocalWorkspaceContentChanged();
+        onLocalWorkspaceContentChanged();
       }
 
       const completedCount = completedSourcePaths.size;
@@ -237,7 +235,6 @@ export function useFileClipboard({
     setActiveDataNode,
     setActiveDataPath,
     workspace,
-    workspaceIsCloud,
     workspaceKey,
   ]);
 
@@ -275,7 +272,7 @@ export function useFileClipboard({
         setActiveDataNode(null);
       }
       onWorkspaceContentChanged();
-      if (!workspaceIsCloud) onLocalWorkspaceContentChanged();
+      onLocalWorkspaceContentChanged();
 
       setNotice(result.failures.length > 0 ? {
         tone: "error",
@@ -313,7 +310,6 @@ export function useFileClipboard({
     setActiveDataNode,
     setActiveDataPath,
     workspace,
-    workspaceIsCloud,
     workspaceKey,
   ]);
 

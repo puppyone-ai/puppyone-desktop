@@ -32,6 +32,7 @@ import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
 import { DocumentSessionBoundary } from "./document-session/DocumentSessionBoundary";
 import type { DocumentPersistedCommit } from "./document-session/types";
+import { resolveEditorAccess } from "./editorAccess";
 
 export type { EditorDocument, EditorDocumentKind, EditorSaveMode, MarkdownHtmlTrustMode } from "./viewerTypes";
 
@@ -139,10 +140,15 @@ export function PuppyoneEditorHost({
     ? document.content ?? ""
     : document.content ?? document.preview ?? "";
   const content = viewer.normalizeContent?.(rawContent, document) ?? rawContent;
-  const canEdit = Boolean(
-    documentPersistence
-    && viewer.isEditable?.({ document, format, resolvedExtension, content }),
-  );
+  const editorAccess = resolveEditorAccess({
+    document,
+    format,
+    resolvedExtension,
+    viewer,
+    content,
+    persistenceAvailable: Boolean(documentPersistence),
+  });
+  const canEdit = editorAccess.kind === "editable";
 
   if (viewer.source !== "resource" && loading && !content) {
     return <div className="editor-state">{t("editor.loadingFile")}</div>;

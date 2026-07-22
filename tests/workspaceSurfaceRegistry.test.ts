@@ -10,9 +10,7 @@ import {
 } from "../src/features/app-shell/workspace-surfaces";
 
 const localCapabilities: WorkspaceSurfaceCapabilities = {
-  workspaceKind: "local",
   cloudEnabled: true,
-  cloudProjectAvailable: false,
   pluginsEnabled: false,
 };
 
@@ -26,16 +24,13 @@ describe("Workspace Surface Registry", () => {
     ]);
 
     const cloudCapabilities: WorkspaceSurfaceCapabilities = {
-      workspaceKind: "cloud",
       cloudEnabled: true,
-      cloudProjectAvailable: true,
       pluginsEnabled: false,
     };
     expect(getAvailableWorkspaceSurfaces(cloudCapabilities).map(({ id }) => id)).toEqual([
       "data",
       "git",
-      "access",
-      "automation",
+      "cloud",
       "settings",
     ]);
   });
@@ -45,13 +40,13 @@ describe("Workspace Surface Registry", () => {
     const resolved = resolveWorkspaceSurface({
       capabilities: localCapabilities,
       adapters: createAdapters(content),
-      requestedId: "automation",
+      requestedId: "plugins",
     });
 
     expect(resolved.id).toBe("data");
     expect(resolved.content).toBe(content.data);
     expect(resolved.lifecycle).toEqual({ sidebar: "keep-alive", main: "keep-alive" });
-    expect(resolveWorkspaceSurfaceContribution("automation", localCapabilities).id).toBe("data");
+    expect(resolveWorkspaceSurfaceContribution("plugins", localCapabilities).id).toBe("data");
   });
 
   it("returns one resolved instance that owns both Sidebar and Main content", () => {
@@ -75,8 +70,6 @@ function createContent(): Readonly<Record<WorkspaceSurfaceId, WorkspaceSurfaceCo
     git: { sidebar: "git-sidebar", main: "git-main" },
     plugins: { sidebar: "plugins-sidebar", main: "plugins-main" },
     cloud: { sidebar: "cloud-sidebar", main: "cloud-main" },
-    access: { sidebar: "access-sidebar", main: "access-main" },
-    automation: { sidebar: "automation-sidebar", main: "automation-main" },
     settings: { sidebar: "settings-sidebar", main: "settings-main" },
   };
 }
@@ -89,8 +82,6 @@ function createAdapters(
     git: () => content.git,
     plugins: () => content.plugins,
     cloud: () => content.cloud,
-    access: () => content.access,
-    automation: () => content.automation,
     settings: () => content.settings,
   };
 }

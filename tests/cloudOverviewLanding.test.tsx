@@ -156,17 +156,27 @@ describe("CloudRepositoryOverview landing page", () => {
     expect(dashboard?.querySelectorAll(".desktop-cloud-overview-dashboard-card")).toHaveLength(4);
     expect(historyCard?.querySelector(".desktop-cloud-overview-dashboard-hero strong")?.textContent).toBe("2");
     expect(historyCard?.textContent).toContain("commits in the last 7 days");
-    expect(historyCard?.textContent).toContain("Ada");
-    expect(historyCard?.textContent).toContain("Ship the project dashboard");
-    expect(historyCard?.textContent).toContain("HEAD");
-    expect(historyCard?.textContent).toContain("main");
-    expect(historyCard?.querySelectorAll(".desktop-cloud-overview-history-preview-row")).toHaveLength(2);
-    expect(historyCard?.querySelectorAll(".desktop-cloud-history-graph-svg")).toHaveLength(2);
+    expect(historyCard?.textContent).not.toContain("Ada");
+    expect(historyCard?.querySelector(".desktop-cloud-overview-history-preview-row")).toBeNull();
     expect(accessCard?.textContent).toContain("5");
-    expect(accessCard?.querySelectorAll(".desktop-cloud-overview-access-row")).toHaveLength(5);
+    expect(accessCard?.textContent).toContain("access points");
+    expect(accessCard?.querySelector(".desktop-cloud-overview-access-row")).toBeNull();
     expect(automationCard?.textContent).toContain("1");
-    expect(automationCard?.textContent).toContain("1 connected service");
+    expect(automationCard?.textContent).toContain("active automation");
+    expect(automationCard?.querySelector(".desktop-cloud-overview-automation-footer")).toBeNull();
     expect(storageCard?.textContent).toContain("5 files");
+    expect(storageCard?.textContent).toContain("Stored in this project");
+    expect(storageCard?.textContent).toContain("3");
+    expect(storageCard?.textContent).toContain("folders");
+    expect(storageCard?.querySelectorAll(".desktop-cloud-overview-storage-preview-item")).toHaveLength(8);
+    expect(storageCard?.querySelectorAll(".desktop-cloud-overview-storage-preview-item--folder")).toHaveLength(3);
+    expect(storageCard?.querySelectorAll(".desktop-cloud-overview-storage-preview-item--file")).toHaveLength(5);
+    const dashboardCards = dashboard
+      ? Array.from(dashboard.querySelectorAll(".desktop-cloud-overview-dashboard-card"))
+      : [];
+    expect(dashboardCards[0]).toBe(storageCard);
+    expect(container.querySelector(".desktop-cloud-source-pill")).toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-landing-mark")?.getAttribute("aria-label")).toBe("Cloud source");
     expect(container.querySelector(".desktop-cloud-overview-deployment-board")).toBeNull();
     const gitRemote = container.querySelector<HTMLElement>(".desktop-cloud-overview-git-remote code");
     expect(gitRemote?.textContent).toBe("https://cloud.example/git/project-1.git");

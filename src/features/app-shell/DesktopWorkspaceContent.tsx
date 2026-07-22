@@ -24,7 +24,6 @@ import type { PuppyoneWorkspaceConfig } from "../../types/electron";
 import type { DesktopCreateEntryAnchorInput } from "../data-workspace/nodeActions";
 import { isViewerPluginsEnabled } from "../plugins";
 import type { DesktopPreferencesController } from "./useDesktopPreferences";
-import type { DesktopWorkspaceSurfaceAction } from "./navigation";
 import {
   useWorkspaceSurfaceContent,
   type DesktopWorkspaceCloudSurfaceController,
@@ -67,8 +66,6 @@ type DesktopWorkspaceContentProps = {
   settingsSection: SettingsSection;
   workspace: Workspace;
   workspaceSurfaceError?: string | null;
-  workspaceSurfaceAction?: DesktopWorkspaceSurfaceAction | null;
-  workspaceKind?: "local" | "cloud";
   workspaceKey: string;
   workspaceRefreshToken: number;
 };
@@ -101,17 +98,13 @@ export function DesktopWorkspaceContent({
   settingsSection,
   workspace,
   workspaceSurfaceError = null,
-  workspaceSurfaceAction = null,
-  workspaceKind = "local",
   workspaceKey,
   workspaceRefreshToken,
 }: DesktopWorkspaceContentProps) {
   const { t } = useLocalization();
   const fileOperationNotice = formatFileOperationNotice(fileClipboardController.notice, t);
-  const cloudWorkspace = workspaceKind === "cloud";
   const viewerPluginsEnabled = isViewerPluginsEnabled({
     settings: preferences.experimentalSettings,
-    workspaceIsCloud: cloudWorkspace,
   });
   const {
     adapter: viewerExtensionAdapter,
@@ -119,7 +112,6 @@ export function DesktopWorkspaceContent({
     refresh: refreshViewerPackSnapshot,
     snapshot: viewerPackSnapshot,
   } = useDesktopViewerPacks({
-    cloudWorkspace,
     enabled: viewerPluginsEnabled,
     workspaceKey,
     workspacePath: workspace.path,
@@ -134,7 +126,6 @@ export function DesktopWorkspaceContent({
   const {
     availableSurfaceIds,
     cloudHubNavigationEnabled,
-    cloudToolsNavigationEnabled,
     gitEnabled,
     pluginsNavigationVisible,
     resolvedActiveView,
@@ -164,8 +155,6 @@ export function DesktopWorkspaceContent({
     },
     viewerPluginsEnabled,
     workspace,
-    workspaceKind,
-    workspaceRefreshToken,
   });
 
   if (!dataPort) {
@@ -176,7 +165,6 @@ export function DesktopWorkspaceContent({
     <DesktopDataWorkspaceSurface
       activeAiEditRequest={activeAiEditRequest}
       activeDataPath={activeDataPath}
-      cloudWorkspace={cloudWorkspace}
       dataPort={dataPort}
       editorInteractionPreferences={editorInteractionPreferences}
       fileClipboardController={fileClipboardController}
@@ -185,16 +173,13 @@ export function DesktopWorkspaceContent({
       navigation={{
         activeView: resolvedActiveView,
         availableSurfaceIds,
-        cloudHistoryEnabled: cloudWorkspace,
         cloudHubEnabled: cloudHubNavigationEnabled,
-        cloudToolsEnabled: cloudToolsNavigationEnabled,
         gitEnabled,
         pluginsEnabled: pluginsNavigationVisible,
         gitIncomingCount: git.gitIncomingCount,
         gitOperationLoading: git.gitOperationLoading,
         gitStatus: git.activeGitStatus,
         workspaceChangeCount,
-        surfaceAction: workspaceSurfaceAction,
         onNavigate,
         onOpenSettings,
       }}

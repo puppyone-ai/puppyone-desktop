@@ -77,16 +77,21 @@ export function CloudRepositoryOverview({
       <main className="desktop-cloud-overview-canvas">
         <div className="desktop-cloud-overview-catalog">
           <header className="desktop-cloud-overview-landing-header">
-            <div className="desktop-cloud-overview-landing-copy">
-              <div className="desktop-cloud-overview-landing-title-row">
-                <h1 dir="auto">{projectName}</h1>
-                <span className="desktop-cloud-source-pill">
-                  <Cloud size={13} />
-                  <span>{t("cloud.common.cloudSource")}</span>
-                </span>
+            <div className="desktop-cloud-overview-landing-identity">
+              <span
+                className="desktop-cloud-overview-landing-mark"
+                aria-label={t("cloud.common.cloudSource")}
+                title={t("cloud.common.cloudSource")}
+              >
+                <Cloud size={20} />
+              </span>
+              <div className="desktop-cloud-overview-landing-copy">
+                <div className="desktop-cloud-overview-landing-title-row">
+                  <h1 dir="auto">{projectName}</h1>
+                </div>
+                {projectDescription ? <p dir="auto">{projectDescription}</p> : null}
+                {gitRemoteUrl ? <CloudOverviewGitRemote value={gitRemoteUrl} /> : null}
               </div>
-              {projectDescription ? <p dir="auto">{projectDescription}</p> : null}
-              {gitRemoteUrl ? <CloudOverviewGitRemote value={gitRemoteUrl} /> : null}
             </div>
             <button
               className="desktop-cloud-overview-refresh-button"

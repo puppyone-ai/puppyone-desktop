@@ -56,7 +56,7 @@ describe("Automation and Plugin product-domain boundary", () => {
     expect(getCloudAutomationWebPath("project/a")).toBe("/projects/project%2Fa/workflows");
   });
 
-  it("normalizes the retired route id only at the migration boundary", () => {
-    expect(normalizeCloudSection("integrations")).toBe("automation");
+  it("does not preserve retired route aliases in the production router", () => {
+    expect(normalizeCloudSection("integrations")).toBe("contents");
   });
 });

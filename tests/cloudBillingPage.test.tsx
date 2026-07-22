@@ -31,7 +31,7 @@ vi.mock("../src/lib/cloudApi", async () => {
   return { ...actual, ...api };
 });
 
-import { CloudGlobalBillingPage } from "../src/features/cloud/components/CloudBillingPage";
+import { CloudOrganizationBillingPage as CloudGlobalBillingPage } from "../src/features/cloud/organization/CloudOrganizationBillingPage";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;

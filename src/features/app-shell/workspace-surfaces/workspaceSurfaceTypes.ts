@@ -5,15 +5,12 @@ export type WorkspaceSurfaceId =
   | "git"
   | "plugins"
   | "cloud"
-  | "access"
-  | "automation"
   | "settings";
 
 export type WorkspaceSurfaceLifecycle = "keep-alive" | "on-demand";
 
 export type WorkspaceSurfaceNavigationGroup =
   | "workspace"
-  | "cloud-tools"
   | "cloud-hub"
   | "settings";
 
@@ -24,9 +21,7 @@ export type WorkspaceSurfaceNavigation = {
 };
 
 export type WorkspaceSurfaceCapabilities = {
-  workspaceKind: "local" | "cloud";
   cloudEnabled: boolean;
-  cloudProjectAvailable: boolean;
   pluginsEnabled: boolean;
 };
 

@@ -7,41 +7,35 @@ import {
 describe("desktop workspace switcher copy path", () => {
   it("copies the filesystem root for local projects", () => {
     expect(getProjectCopyPath(createItem({
-      kind: "local",
       detail: "/Users/supersayajin/Desktop/demo",
       path: "/Users/supersayajin/Desktop/demo",
     }))).toBe("/Users/supersayajin/Desktop/demo");
   });
 
-  it("skips cloud status labels that are not filesystem paths", () => {
+  it("skips an item without a filesystem root", () => {
     expect(getProjectCopyPath(createItem({
-      kind: "cloud",
-      detail: "PuppyOne Cloud",
-      path: "PuppyOne Cloud",
+      detail: "Unavailable",
+      path: "",
     }))).toBeNull();
   });
 
-  it("still copies cloud workspaces that have a real local root", () => {
+  it("copies every registered local workspace root", () => {
     expect(getProjectCopyPath(createItem({
-      kind: "cloud",
-      detail: "PuppyOne Cloud",
+      detail: "/Users/supersayajin/Library/Caches/puppyone/demo",
       path: "/Users/supersayajin/Library/Caches/puppyone/demo",
     }))).toBe("/Users/supersayajin/Library/Caches/puppyone/demo");
   });
 });
 
 function createItem({
-  kind,
   detail,
   path,
 }: {
-  kind: DesktopWorkspaceSwitcherItem["kind"];
   detail: string;
   path: string;
 }): DesktopWorkspaceSwitcherItem {
   return {
     id: "workspace-1",
-    kind,
     label: "demo",
     detail,
     title: `demo - ${detail}`,

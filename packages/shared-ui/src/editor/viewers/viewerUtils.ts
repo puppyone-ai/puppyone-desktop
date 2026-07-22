@@ -1,16 +1,4 @@
-import { isTextLikeFile } from "../../core/fileFormats";
 import type { EditorDocument } from "../viewerTypes";
-
-export function isTextPreviewKind(type: EditorDocument["type"]): boolean {
-  return type === "file" || type === "code" || type === "text";
-}
-
-export function isTextEditable(document: EditorDocument, content: string): boolean {
-  if (document.type === "markdown" || document.type === "json") return true;
-  void content;
-  if (!isTextPreviewKind(document.type)) return false;
-  return isTextLikeFile(document.name, document.type, document.mimeType);
-}
 
 export function getDelimitedTableDelimiter(document: EditorDocument): "," | "\t" {
   if (

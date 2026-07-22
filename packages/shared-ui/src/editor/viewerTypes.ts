@@ -145,6 +145,11 @@ type PresetViewerImplementationBase = Readonly<{
   match: (match: EditorViewerMatch) => boolean;
   allowPreviewContent?: boolean;
   normalizeContent?: (content: string, document: EditorDocument) => string;
+  /**
+   * Format-specific runtime veto for an edit-capable contribution. This may
+   * narrow access only; the Host separately enforces Viewer capability,
+   * FileFormat.editable, canonical-source readiness, and persistence authority.
+   */
   isEditable?: (match: EditorViewerMatch & { content: string }) => boolean;
 }>;
 

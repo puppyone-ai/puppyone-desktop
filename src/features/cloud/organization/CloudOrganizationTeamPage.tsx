@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { Mail } from "lucide-react";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
-import "./global-pages.css";
+import "./organization.css";
 import {
   getCloudOrganizationEntitlements,
   getCloudOrganizationAccess,
@@ -15,7 +15,6 @@ import {
   type DesktopCloudOrganization,
   type DesktopCloudOrganizationEntitlements,
   type DesktopCloudOrganizationSeatUsage,
-  type DesktopCloudProject,
   type DesktopCloudSession,
 } from "../../../lib/cloudApi";
 import {
@@ -24,12 +23,10 @@ import {
   type CloudMessageDescriptor,
 } from "../cloudPresentation";
 
-export type CloudGlobalPageProps = {
+export type CloudOrganizationPageProps = {
   accountEmail: string | null;
   session: DesktopCloudSession;
   apiBaseUrl: string | null;
-  /** Present only when the catalog was intentionally loaded for this route. */
-  projects?: DesktopCloudProject[];
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onOpen: () => void;
 };
@@ -58,14 +55,13 @@ type CloudOrganizationDataState = {
   error: CloudMessageDescriptor | null;
 };
 
-export function CloudGlobalTeamPage({
+export function CloudOrganizationTeamPage({
   accountEmail,
   session,
   apiBaseUrl,
-  projects,
   onSessionChange,
   onOpen,
-}: CloudGlobalPageProps) {
+}: CloudOrganizationPageProps) {
   const { t } = useLocalization();
   const orgData = useCloudOrganizationData(session, apiBaseUrl, onSessionChange);
   const organization = orgData.organization;
@@ -163,7 +159,6 @@ export function CloudGlobalTeamPage({
         )}
 
         <div className="desktop-cloud-org-card-footer">
-          {projects && <span>{t("cloud.project.sessionCount", { count: projects.length })}</span>}
           <button type="button" onClick={onOpen}>{t("cloud.team.openFullPage")}</button>
         </div>
       </div>

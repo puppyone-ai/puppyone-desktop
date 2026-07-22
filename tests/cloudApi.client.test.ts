@@ -8,9 +8,7 @@ import {
   applyCloudBillingPlanChange,
   applyCloudBillingSeatChange,
   cloudApiRequest,
-  createCloudProject,
   createCloudBillingCheckout,
-  getCloudTemplate,
   getCloudAutomationOauthAuthorizeUrl,
   getCloudAutomationOauthStatus,
   getCloudBillingCatalog,
@@ -18,11 +16,8 @@ import {
   getCloudProject,
   listCloudAutomationConnectionRuns,
   listCloudAutomationProviderResources,
-  listCloudProjects,
-  listCloudTemplates,
   openCloudBillingExternalUrl,
   quoteCloudBillingPlan,
-  instantiateCloudTemplate,
   supportsCloudAutomationOauth,
   updateCloudProject,
   updateCloudAutomationConnection,
@@ -61,39 +56,6 @@ afterEach(() => {
 });
 
 describe("cloud API client delegation", () => {
-  it("creates an unseeded Project for an explicit organization with a UUIDv4 retry key", async () => {
-    bridge.mockResolvedValueOnce({ id: "project-1", name: "Local Notes" });
-    const idempotencyKey = "123e4567-e89b-42d3-a456-426614174000";
-
-    await expect(createCloudProject(
-      session,
-      {
-        name: "  Local Notes  ",
-        description: null,
-        org_id: "  org-1  ",
-      },
-      idempotencyKey,
-      undefined,
-      API,
-    )).resolves.toEqual({ id: "project-1", name: "Local Notes" });
-
-    expect(bridge).toHaveBeenCalledWith(expect.objectContaining({
-      path: "/projects/",
-      method: "POST",
-      headers: expect.objectContaining({ "Idempotency-Key": idempotencyKey }),
-      body: JSON.stringify({
-        name: "Local Notes",
-        description: null,
-        org_id: "org-1",
-      }),
-    }));
-    expect(() => createCloudProject(
-      session,
-      { name: "Local Notes", description: null, org_id: "org-1" },
-      "not-a-uuid",
-    )).toThrow(/UUIDv4 idempotency key/);
-  });
-
   it("reads capability-derived seat usage without trusting or mis-encoding organization ids", async () => {
     bridge.mockResolvedValueOnce({ billable_seat_quantity: 2 });
 
@@ -322,16 +284,6 @@ describe("cloud API client delegation", () => {
       .rejects.toThrow(/unsafe/i);
   });
 
-  it("listCloudProjects issues GET /projects/ through the bridge and returns its result", async () => {
-    bridge.mockResolvedValue([{ id: "p1" }, { id: "p2" }]);
-    const result = await listCloudProjects(session, undefined, API);
-    expect(result).toEqual([{ id: "p1" }, { id: "p2" }]);
-    expect(bridge).toHaveBeenCalledTimes(1);
-    expect(bridge).toHaveBeenCalledWith(
-      expect.objectContaining({ apiBaseUrl: API, path: "/projects/", method: "GET" }),
-    );
-  });
-
   it("getCloudProject URL-encodes the project id in the path", async () => {
     bridge.mockResolvedValue({ id: "a/b" });
     await getCloudProject(session, "a/b", undefined, API);
@@ -368,46 +320,6 @@ describe("cloud API client delegation", () => {
     }));
     expect(() => updateCloudProject(session, "project-1", {})).toThrow(/at least one setting/i);
     expect(() => updateCloudProject(session, "project-1", { name: "  " })).toThrow(/name cannot be empty/i);
-  });
-
-  it("shapes template catalog, detail, and instantiate requests through the secure bridge", async () => {
-    bridge
-      .mockResolvedValueOnce({ registry: { source: "remote" }, templates: [] })
-      .mockResolvedValueOnce({ id: "agent/kit" })
-      .mockResolvedValueOnce({
-        template_id: "agent/kit",
-        release_id: "1.0.0",
-        project: { id: "project-1", name: "Agent Kit" },
-      });
-
-    await listCloudTemplates(
-      session,
-      { query: "agent tools", cursor: "page/2", limit: 24 },
-      undefined,
-      API,
-    );
-    await getCloudTemplate(session, "agent/kit", undefined, API);
-    await instantiateCloudTemplate(
-      session,
-      "agent/kit",
-      { release_id: "1.0.0", name: "My agents" },
-      undefined,
-      API,
-    );
-
-    expect(bridge).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      path: "/templates?q=agent+tools&cursor=page%2F2&limit=24",
-      method: "GET",
-    }));
-    expect(bridge).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      path: "/templates/agent%2Fkit",
-      method: "GET",
-    }));
-    expect(bridge).toHaveBeenNthCalledWith(3, expect.objectContaining({
-      path: "/templates/agent%2Fkit/instantiate",
-      method: "POST",
-      body: JSON.stringify({ release_id: "1.0.0", name: "My agents" }),
-    }));
   });
 
   it("keeps OAuth provider-to-slug translation inside the Automation adapter", async () => {

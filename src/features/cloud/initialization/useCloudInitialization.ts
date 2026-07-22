@@ -7,7 +7,6 @@ import {
   startWorkspaceCloudInitialization,
   subscribeWorkspaceCloudInitializationProgress,
 } from "../../../lib/localFiles";
-import { onDesktopCloudAuthError } from "../../../lib/cloudSession";
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
 import type {
   CloudInitializationAction,
@@ -42,9 +41,7 @@ export function useCloudInitialization({
   setActiveView,
   setSidebarCollapsed,
   setSwitcherOpen,
-  startCloudBrowserSignIn,
   workspace,
-  workspaceIsCloud,
 }: {
   activeCloudSession: DesktopCloudSession | null;
   applyGitStatus: (
@@ -62,9 +59,7 @@ export function useCloudInitialization({
   setActiveView: (view: DesktopView) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSwitcherOpen: (open: boolean) => void;
-  startCloudBrowserSignIn: () => Promise<boolean>;
   workspace: Workspace | null;
-  workspaceIsCloud: boolean;
 }) {
   const [state, setState] = useState<CloudInitializationState | null>(null);
   const [progress, setProgress] = useState<CloudInitializationProgress | null>(null);
@@ -72,17 +67,14 @@ export function useCloudInitialization({
   const [notice, setNotice] = useState<CloudInitializationNotice>(null);
   const [stateLoading, setStateLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [pendingSignIn, setPendingSignIn] = useState(false);
   const actionRef = useRef<symbol | null>(null);
   const stateRequestRef = useRef<symbol | null>(null);
-  const pendingIntentWorkspaceRef = useRef<string | null>(null);
 
   const identity = getInitializationIdentity({
     session: activeCloudSession,
     apiBaseUrl: desktopCloudApiBaseUrl,
     workspace,
     cloudEnabled,
-    workspaceIsCloud,
   });
   const identityKey = identity
     ? [
@@ -135,16 +127,8 @@ export function useCloudInitialization({
     setNotice(null);
     setActionLoading(false);
     if (!identity || !identityKey) {
-      if (!workspace || workspaceIsCloud || !cloudEnabled) {
-        pendingIntentWorkspaceRef.current = null;
-        setPendingSignIn(false);
-      }
       setStateLoading(false);
       return undefined;
-    }
-    if (pendingIntentWorkspaceRef.current !== identity.rootPath) {
-      pendingIntentWorkspaceRef.current = null;
-      setPendingSignIn(false);
     }
 
     const request = Symbol("load-cloud-initialization-state");
@@ -196,21 +180,9 @@ export function useCloudInitialization({
   }, [identityKey]);
 
   const start = useCallback(async (organizationId?: string) => {
-    if (!cloudEnabled || !workspace || workspaceIsCloud || actionRef.current) return;
+    if (!cloudEnabled || !workspace || actionRef.current) return;
     if (!activeCloudSession) {
-      pendingIntentWorkspaceRef.current = workspace.path;
-      setPendingSignIn(true);
-      setError(null);
-      setActiveView("cloud");
-      setActiveCloudSection("initialize");
-      setSidebarCollapsed(false);
-      setSwitcherOpen(false);
-      const started = await startCloudBrowserSignIn();
-      if (!started) {
-        pendingIntentWorkspaceRef.current = null;
-        setPendingSignIn(false);
-        setError({ code: "SESSION_REQUIRED", retryable: true });
-      }
+      setError({ code: "SESSION_REQUIRED", retryable: true });
       return;
     }
 
@@ -219,7 +191,6 @@ export function useCloudInitialization({
       apiBaseUrl: desktopCloudApiBaseUrl,
       workspace,
       cloudEnabled,
-      workspaceIsCloud,
     });
     const context = captureGitRepositoryContext(workspace.path);
     if (!currentIdentity || !context) {
@@ -285,8 +256,6 @@ export function useCloudInitialization({
         actionRef.current = null;
         setActionLoading(false);
         setProgress(null);
-        pendingIntentWorkspaceRef.current = null;
-        setPendingSignIn(false);
       }
     }
   }, [
@@ -296,14 +265,8 @@ export function useCloudInitialization({
     desktopCloudApiBaseUrl,
     finishPublished,
     isGitRepositoryContextCurrent,
-    setActiveCloudSection,
-    setActiveView,
-    setSidebarCollapsed,
-    setSwitcherOpen,
-    startCloudBrowserSignIn,
     state,
     workspace,
-    workspaceIsCloud,
   ]);
 
   const cleanup = useCallback(async () => {
@@ -355,20 +318,11 @@ export function useCloudInitialization({
     state,
   ]);
 
-  useEffect(() => {
-    if (!pendingSignIn || activeCloudSession) return undefined;
-    return onDesktopCloudAuthError(() => {
-      pendingIntentWorkspaceRef.current = null;
-      setPendingSignIn(false);
-      setError({ code: "SESSION_REQUIRED", retryable: true });
-    });
-  }, [activeCloudSession, pendingSignIn]);
-
   return {
     cloudInitializationError: error,
     cloudInitializationLoading: actionLoading,
     cloudInitializationNotice: notice,
-    cloudInitializationPending: pendingSignIn,
+    cloudInitializationPending: false,
     cloudInitializationProgress: progress,
     cloudInitializationState: state,
     cloudInitializationStateLoading: stateLoading,
@@ -382,15 +336,13 @@ function getInitializationIdentity({
   apiBaseUrl,
   workspace,
   cloudEnabled,
-  workspaceIsCloud,
 }: {
   session: DesktopCloudSession | null;
   apiBaseUrl: string | null;
   workspace: Workspace | null;
   cloudEnabled: boolean;
-  workspaceIsCloud: boolean;
 }) {
-  if (!session || !workspace || !cloudEnabled || workspaceIsCloud) return null;
+  if (!session || !workspace || !cloudEnabled) return null;
   const resolvedApiBaseUrl = (apiBaseUrl ?? session.api_base_url).trim().replace(/\/+$/, "");
   const userId = session.user_id.trim();
   if (!resolvedApiBaseUrl || !userId) return null;

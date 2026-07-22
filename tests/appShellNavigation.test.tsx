@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 describe("DesktopSidebarTopNavigation", () => {
-  it("orders Cloud project actions as Files, Assets, Automation, then Settings", () => {
+  it("keeps project-specific Cloud tools out of the local shell navigation", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -31,7 +31,6 @@ describe("DesktopSidebarTopNavigation", () => {
     act(() => renderWithTestLocalization(root,
       <DesktopSidebarTopNavigation
         activeView="data"
-        cloudToolsEnabled
         gitEnabled={false}
         pluginsEnabled={false}
         orientation="horizontal"
@@ -46,9 +45,9 @@ describe("DesktopSidebarTopNavigation", () => {
 
     expect(
       Array.from(container.querySelectorAll("button"), (button) => button.getAttribute("aria-label")),
-    ).toEqual(["Files", "Assets", "Automation", "Settings"]);
-    expect(container.querySelector('[aria-label="Assets"] [data-icon="assets-distribution"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label="Automation"] .lucide-workflow')).not.toBeNull();
+    ).toEqual(["Files", "Settings"]);
+    expect(container.querySelector('[aria-label="Assets"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Automation"]')).toBeNull();
     expect(container.querySelectorAll(".desktop-sidebar-top-navigation-group")).toHaveLength(1);
   });
 

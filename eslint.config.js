@@ -33,7 +33,7 @@ const coreBugRules = {
 export default [
   {
     ignores: [
-      "dist/**", "release/**", "node_modules/**",
+      "archive/**", "dist/**", "release/**", "node_modules/**",
       "vendor/claudian/**", "vendor/opencode/**",
       "src-tauri/**", "build/**", "public/**", "**/*.d.ts", "eslint.config.js",
     ],

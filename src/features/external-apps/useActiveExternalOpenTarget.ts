@@ -21,7 +21,6 @@ type UseActiveExternalOpenTargetOptions = {
   onError: (message: string | null) => void;
   setExternalAppsSettings: Dispatch<SetStateAction<ExternalAppsSettings>>;
   workspace: Workspace | null;
-  workspaceIsCloud: boolean;
 };
 
 export function useActiveExternalOpenTarget({
@@ -33,7 +32,6 @@ export function useActiveExternalOpenTarget({
   onError,
   setExternalAppsSettings,
   workspace,
-  workspaceIsCloud,
 }: UseActiveExternalOpenTargetOptions) {
   const [externalOpenTarget, setExternalOpenTarget] = useState<WorkspaceExternalOpenTarget | null>(null);
   const [externalOpenTargetLoading, setExternalOpenTargetLoading] = useState(false);
@@ -87,7 +85,7 @@ export function useActiveExternalOpenTarget({
   }, [setExternalAppsSettings]);
 
   useEffect(() => {
-    if (!workspace || workspaceIsCloud || !activeExternalFilePath) {
+    if (!workspace || !activeExternalFilePath) {
       setExternalOpenTarget(null);
       setExternalOpenTargetLoading(false);
       setExternalOpenTargetPath(null);
@@ -147,11 +145,10 @@ export function useActiveExternalOpenTarget({
     activeExternalFilePath,
     syncExternalAppOverrideIcon,
     workspace,
-    workspaceIsCloud,
   ]);
 
   const openActiveFileExternal = useCallback(async () => {
-    if (!workspace || workspaceIsCloud || !activeExternalFilePath) return;
+    if (!workspace || !activeExternalFilePath) return;
 
     onError(null);
     try {
@@ -173,11 +170,9 @@ export function useActiveExternalOpenTarget({
     onActionSettled,
     onError,
     workspace,
-    workspaceIsCloud,
   ]);
 
   const canOpenActiveFileExternal = activeViewIsData
-    && !workspaceIsCloud
     && activeExternalFilePath !== null
     && activeExternalFilePath === activeDataPath;
   const activeExternalOpenPath = canOpenActiveFileExternal ? activeExternalFilePath : null;

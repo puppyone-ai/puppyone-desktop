@@ -99,7 +99,6 @@ function ExternalOpenHarness({ node }: { node: DataNode }) {
     onError: () => undefined,
     setExternalAppsSettings: setSettings,
     workspace,
-    workspaceIsCloud: false,
   });
 
   return (

@@ -20,12 +20,10 @@ const LazyDesktopViewerPackFallback = lazy(() => import("./renderer").then((modu
 })));
 
 export function useDesktopViewerPacks({
-  cloudWorkspace,
   enabled,
   workspaceKey,
   workspacePath,
 }: {
-  cloudWorkspace: boolean;
   enabled: boolean;
   workspaceKey: string;
   workspacePath: string | null;
@@ -59,7 +57,7 @@ export function useDesktopViewerPacks({
 
   const renderSurface = useCallback<NonNullable<ViewerExtensionHostAdapter["renderSurface"]>>(
     ({ document, contribution }) => {
-      if (cloudWorkspace || !workspacePath) {
+      if (!workspacePath) {
         return (
           <div className="viewer-pack-surface-status viewer-pack-surface-status--error">
             {t("workspace.viewerPack.rootUnavailable")}
@@ -77,7 +75,7 @@ export function useDesktopViewerPacks({
         </Suspense>
       );
     },
-    [cloudWorkspace, refresh, t, workspacePath],
+    [refresh, t, workspacePath],
   );
   const renderInstallFallback = useCallback<NonNullable<ViewerExtensionHostAdapter["renderInstallFallback"]>>(
     ({ document }) => (

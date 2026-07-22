@@ -1,4 +1,3 @@
-import type { LucideIcon } from "lucide-react";
 import type {
   DesktopCloudConnector,
   DesktopCloudMcpEndpoint,
@@ -12,10 +11,6 @@ import {
 
 export type CloudAuthView = "main" | "signin" | "signup" | "signedIn";
 export type CloudLoginMethod = "browser" | "google" | "github" | "email" | "password";
-export type CloudLoginFeature = {
-  label: string;
-  icon: LucideIcon;
-};
 
 export type CloudAccessSurface = {
   id: string;

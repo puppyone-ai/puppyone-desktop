@@ -22,7 +22,7 @@ import { unwrapSettled } from "../utils";
 import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
 
 export type CloudProjectDetailsData = {
-  activeProject: DesktopCloudProject | null;
+  project: DesktopCloudProject | null;
   dashboard: DesktopCloudDashboard | null;
   tree: DesktopCloudTree | null;
   history: DesktopCloudHistory | null;
@@ -48,14 +48,14 @@ export type CloudProjectDetailResource = (typeof CLOUD_PROJECT_DETAIL_RESOURCES)
 export async function loadCloudProjectDetails({
   session,
   projectId,
-  projects,
+  project,
   onSessionChange,
   cloudApiBaseUrl,
   resources = CLOUD_PROJECT_DETAIL_RESOURCES,
 }: {
   session: DesktopCloudSession;
   projectId: string;
-  projects: DesktopCloudProject[];
+  project: DesktopCloudProject;
   onSessionChange: (session: DesktopCloudSession | null) => void;
   cloudApiBaseUrl: string | null;
   resources?: readonly CloudProjectDetailResource[];
@@ -94,11 +94,11 @@ export async function loadCloudProjectDetails({
   ]);
 
   const dashboard = unwrapSettled(dashboardResult);
-  const activeProject = projects.find((project) => project.id === projectId) ?? (
-    dashboard?.project
+  const resolvedProject = project.id === projectId
+    ? project
+    : dashboard?.project
       ? { id: dashboard.project.id, name: dashboard.project.name, description: dashboard.project.description ?? null }
-      : null
-  );
+      : null;
   const sectionErrors = [
     ["dashboard", dashboardResult],
     ["tree", treeResult],
@@ -111,7 +111,7 @@ export async function loadCloudProjectDetails({
     && (result as PromiseSettledResult<unknown>).status === "rejected");
 
   return {
-    activeProject,
+    project: resolvedProject,
     dashboard,
     tree: unwrapSettled(treeResult),
     history: unwrapSettled(historyResult),

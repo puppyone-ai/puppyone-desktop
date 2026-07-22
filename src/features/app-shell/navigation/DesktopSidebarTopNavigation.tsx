@@ -7,9 +7,7 @@ import type { DesktopNavigationProps } from "./types";
 export function DesktopSidebarTopNavigation({
   activeView,
   availableSurfaceIds,
-  cloudHistoryEnabled = false,
   cloudHubEnabled = false,
-  cloudToolsEnabled = false,
   gitEnabled = true,
   pluginsEnabled = false,
   orientation,
@@ -21,11 +19,9 @@ export function DesktopSidebarTopNavigation({
   onOpenSettings,
 }: DesktopNavigationProps & { orientation: SidebarNavigationOrientation }) {
   const { t } = useLocalization();
-  const { cloudHubItems, cloudItems, localItems } = resolveNavigationItems({
+  const { cloudHubItems, localItems } = resolveNavigationItems({
     availableSurfaceIds,
-    cloudHistoryEnabled,
     cloudHubEnabled,
-    cloudToolsEnabled,
     gitEnabled,
     pluginsEnabled,
   });
@@ -52,14 +48,6 @@ export function DesktopSidebarTopNavigation({
             items={localItems}
             showLabel
           />
-          {cloudItems.length > 0 && (
-            <DesktopNavigationItems
-              {...runtime}
-              buttonClassName="desktop-sidebar-top-navigation-button"
-              items={cloudItems}
-              showLabel
-            />
-          )}
           <DesktopSidebarSettingsButton
             activeView={activeView}
             buttonClassName="desktop-sidebar-top-navigation-button"

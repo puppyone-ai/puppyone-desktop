@@ -1,6 +1,11 @@
-# puppyone desktop
+# puppyone Editor
 
-Local-first desktop workspace for protected project folders.
+**A local-first editor. Built for you and your agents.**
+
+**File support** — Markdown · CSV · JSON · DOCX · XLSX · PDF · HTML · CSS · Images · Audio · Video · 3D · and more  
+**Agent support** — Codex · Claude Code · OpenCode · PuppyOne Agent  
+
+
 
 ## Development
 

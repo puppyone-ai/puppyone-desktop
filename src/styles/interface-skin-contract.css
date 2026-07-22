@@ -84,8 +84,6 @@
     .desktop-settings-action,
     .desktop-settings-row-action,
     .desktop-branch-menu-action,
-    .csv-table-editor__actions button,
-    .csv-table-editor__empty button,
     .desktop-version-control-enable-button,
     .puppyflow-add-button
   ):hover:not(:disabled) {

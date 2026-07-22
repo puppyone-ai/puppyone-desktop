@@ -1,10 +1,10 @@
-import { Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, LayoutTemplate, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
+import { Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import { getCloudAutomationWebPath } from "../../automation/automationDomain";
 import type { CloudProjectDetailResource } from "../data/cloudProjectDetails";
 import type { CloudWorkspaceSection } from "./cloudRouteIds";
 
-export type CloudRouteContext = "projects" | "project" | "account";
+export type CloudRouteContext = "initialization" | "project" | "organization";
 export type CloudRouteSurface = "standard" | "landing" | "history" | "automation";
 
 export type CloudRouteDescriptor = {
@@ -47,35 +47,11 @@ export const CLOUD_ROUTES = [
     titleId: "cloud.route.initialize.title",
     descriptionId: "cloud.route.initialize.description",
     icon: Cloud,
-    context: "projects",
+    context: "initialization",
     surface: "standard",
     resources: NO_PROJECT_RESOURCES,
     showInSidebar: false,
     webPath: () => "/projects",
-  },
-  {
-    id: "projects",
-    labelId: "cloud.route.overview.label",
-    titleId: "cloud.route.overview.title",
-    descriptionId: "cloud.route.overview.description",
-    icon: Cloud,
-    context: "projects",
-    surface: "standard",
-    resources: NO_PROJECT_RESOURCES,
-    showInSidebar: true,
-    webPath: (projectId?: string) => (projectId ? `/projects/${projectId}/access` : "/projects"),
-  },
-  {
-    id: "templates",
-    labelId: "cloud.route.templates.label",
-    titleId: "cloud.route.templates.title",
-    descriptionId: "cloud.route.templates.description",
-    icon: LayoutTemplate,
-    context: "projects",
-    surface: "standard",
-    resources: NO_PROJECT_RESOURCES,
-    showInSidebar: true,
-    webPath: () => "/templates",
   },
   {
     id: "cloud-team",
@@ -83,7 +59,7 @@ export const CLOUD_ROUTES = [
     titleId: "cloud.route.cloud-team.title",
     descriptionId: "cloud.route.cloud-team.description",
     icon: Users,
-    context: "account",
+    context: "organization",
     surface: "standard",
     resources: NO_PROJECT_RESOURCES,
     showInSidebar: true,
@@ -95,7 +71,7 @@ export const CLOUD_ROUTES = [
     titleId: "cloud.route.cloud-billing.title",
     descriptionId: "cloud.route.cloud-billing.description",
     icon: CreditCard,
-    context: "account",
+    context: "organization",
     surface: "standard",
     resources: NO_PROJECT_RESOURCES,
     showInSidebar: true,
@@ -217,31 +193,26 @@ const CLOUD_ROUTE_BY_ID = new Map<CloudWorkspaceSection, CloudRouteDescriptor>(
   CLOUD_ROUTES.map((route) => [route.id, route]),
 );
 
-export const CLOUD_ACCOUNT_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "account" && route.showInSidebar);
+export const CLOUD_ORGANIZATION_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "organization" && route.showInSidebar);
 export const CLOUD_PROJECT_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "project");
 export const CLOUD_PROJECT_SIDEBAR_ROUTES = CLOUD_PROJECT_ROUTES.filter((route) => route.showInSidebar);
-/** Repository-context Project hub: Project sections + account Team/Billing as a second group. */
+/** Stable repository-context shell: current Project sections + Organization destinations. */
 export const CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES = [
   ...CLOUD_PROJECT_SIDEBAR_ROUTES,
-  ...CLOUD_ACCOUNT_ROUTES,
-];
-export const CLOUD_PROJECTS_SIDEBAR_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "projects" && route.showInSidebar);
-export const CLOUD_GLOBAL_SIDEBAR_ROUTES = [
-  ...CLOUD_PROJECTS_SIDEBAR_ROUTES,
-  ...CLOUD_ACCOUNT_ROUTES,
+  ...CLOUD_ORGANIZATION_ROUTES,
 ];
 
 export function normalizeCloudSection(
-  section: CloudWorkspaceSection | "cloud-settings" | "integrations" | "overview",
+  section: CloudWorkspaceSection | string,
 ): CloudWorkspaceSection {
-  if (section === "cloud-settings" || section === "overview") return "projects";
-  if (section === "integrations") return "automation";
   if (section === "mcp-cli" || section === "git-sync") return "access";
-  return section;
+  return CLOUD_ROUTE_BY_ID.has(section as CloudWorkspaceSection)
+    ? section as CloudWorkspaceSection
+    : "contents";
 }
 
 export function getCloudRoute(section: CloudWorkspaceSection): CloudRouteDescriptor {
-  return CLOUD_ROUTE_BY_ID.get(section) ?? CLOUD_ROUTE_BY_ID.get("projects")!;
+  return CLOUD_ROUTE_BY_ID.get(section) ?? CLOUD_ROUTE_BY_ID.get("contents")!;
 }
 
 export function getCloudSectionDescriptor(section: CloudWorkspaceSection, t: MessageFormatter) {
@@ -271,8 +242,8 @@ export function getCloudProjectDetailResources(
   return getCloudRoute(section).resources;
 }
 
-export function isCloudAccountSection(section: CloudWorkspaceSection): boolean {
-  return getCloudRoute(section).context === "account";
+export function isCloudOrganizationSection(section: CloudWorkspaceSection): boolean {
+  return getCloudRoute(section).context === "organization";
 }
 
 export function isCloudProjectSection(section: CloudWorkspaceSection): boolean {

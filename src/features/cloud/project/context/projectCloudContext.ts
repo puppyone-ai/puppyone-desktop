@@ -1,7 +1,7 @@
-import type { CloudWorkspaceSection } from "../routes/cloudRouteIds";
-import { normalizeCloudSection } from "../routes/cloudRoutes";
-import { cloudMessage, type CloudMessageDescriptor } from "../cloudPresentation";
-import type { RepositoryTarget } from "../repositoryTarget";
+import type { CloudWorkspaceSection } from "../../routes/cloudRouteIds";
+import { normalizeCloudSection } from "../../routes/cloudRoutes";
+import { cloudMessage, type CloudMessageDescriptor } from "../../cloudPresentation";
+import type { RepositoryTarget } from "../../repositoryTarget";
 
 /** Ephemeral UI context resolved from the open repository's canonical remote. */
 export type ProjectCloudContext =
@@ -138,13 +138,6 @@ export function resolveCloudHubSectionForContext(
   return cloudContextHasProject(context) ? "contents" : "initialize";
 }
 
-export function resolveCloudProjectNavigationContext(
-  context: ProjectCloudContext,
-): { projectContext: boolean; localWorkspaceContext: boolean } {
-  const projectContext = cloudContextHasProject(context);
-  return { projectContext, localWorkspaceContext: projectContext };
-}
-
 export function resolveCloudHubSectionAfterContextChange({
   currentSection,
   hasProjectContext,
@@ -156,7 +149,7 @@ export function resolveCloudHubSectionAfterContextChange({
 }): CloudWorkspaceSection {
   if (workspaceChanged) return hasProjectContext ? "contents" : "initialize";
   if (!hasProjectContext) {
-    return isCloudGlobalSection(currentSection) ? currentSection : "initialize";
+    return isCloudOrganizationSection(currentSection) ? currentSection : "initialize";
   }
   // Initialization owns its transition to `contents` after the push succeeds.
   // A newly resolvable remote can be an interrupted, retryable attempt and must
@@ -164,10 +157,8 @@ export function resolveCloudHubSectionAfterContextChange({
   return currentSection;
 }
 
-function isCloudGlobalSection(section: CloudWorkspaceSection): boolean {
+function isCloudOrganizationSection(section: CloudWorkspaceSection): boolean {
   const normalized = normalizeCloudSection(section);
-  return normalized === "projects"
-    || normalized === "templates"
-    || normalized === "cloud-team"
+  return normalized === "cloud-team"
     || normalized === "cloud-billing";
 }

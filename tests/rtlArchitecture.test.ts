@@ -4,8 +4,9 @@ import { describe, expect, it } from "vitest";
 const logicalUiStyles = [
   "../src/features/automation/automation.css",
   "../src/features/automation/automation-dialog.css",
-  "../src/features/cloud/components/global-pages.css",
-  "../src/features/cloud/CloudServicePanel.css",
+  "../src/features/cloud/organization/organization.css",
+  "../src/features/cloud/auth/cloud-auth-card.css",
+  "../src/features/cloud/auth/cloud-sign-in.css",
   "../src/features/cloud/sections/access/styles/access-detail.css",
   "../src/features/cloud/sections/access/styles/standalone-list.css",
   "../src/features/cloud/sections/access/styles/scope-sidebar.css",

@@ -2,7 +2,7 @@ export {
   getCloudRoute,
   getCloudRouteWebPath,
   getCloudSectionDescriptor,
-  isCloudAccountSection,
+  isCloudOrganizationSection,
   isCloudProjectSection,
   normalizeCloudSection,
 } from "./routes/cloudRoutes";

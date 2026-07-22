@@ -36,7 +36,6 @@ const accessScopeCss = readCss("../src/features/cloud/sections/access/styles/sco
 const accessServiceCss = readCss("../src/features/cloud/sections/access/styles/service-sidebar.css");
 const accessLegacyCss = readCss("../src/features/cloud/sections/access/styles/access-detail.css");
 const changesCss = readCss("../src/features/changes/changes.css");
-const legacyCloudSidebarCss = readCss("../src/features/cloud/legacy-sidebar.css");
 
 describe("sidebar spacing architecture", () => {
   it("lets Cloud History use the same full workspace rectangle as local History", () => {
@@ -346,7 +345,6 @@ describe("sidebar spacing architecture", () => {
     );
     expectBlockPadding(accessLegacyCss, ".desktop-cloud-access-scope-list", "8px");
     expectBlockPadding(changesCss, ".review-list", "0");
-    expectBlockPadding(legacyCloudSidebarCss, ".cloud-nav", "6px");
   });
 });
 

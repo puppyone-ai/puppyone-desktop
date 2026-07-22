@@ -1,7 +1,7 @@
 import { CsvTableEditor } from "../CsvTableEditor";
 import type { PresetViewerRenderContext } from "../viewerTypes";
 import { TextEditorFrame } from "./TextEditorFrame";
-import { getDelimitedTableDelimiter, isTextEditable } from "./viewerUtils";
+import { getDelimitedTableDelimiter } from "./viewerUtils";
 
 type CsvViewerProps = Pick<
   PresetViewerRenderContext,
@@ -33,8 +33,4 @@ export function CsvViewer(context: CsvViewerProps) {
       )}
     />
   );
-}
-
-export function canEditCsv(context: Pick<PresetViewerRenderContext, "document" | "content">): boolean {
-  return isTextEditable(context.document, context.content);
 }

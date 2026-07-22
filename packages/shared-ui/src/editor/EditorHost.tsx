@@ -82,7 +82,9 @@ export function EditorHost({
         path: node.path,
         name: node.name,
         type: fileContent?.type ?? node.type,
-        content: fileContent?.content ?? (deferFallbackContent ? undefined : node.content),
+        content: fileContent
+          ? fileContent.content
+          : (deferFallbackContent ? undefined : node.content),
         preview: deferFallbackContent ? undefined : node.preview,
         mimeType: fileContent?.mimeType ?? node.mimeType ?? null,
         url: fileContent?.url ?? fileUrl,

@@ -496,3 +496,31 @@
   background: var(--po-control);
   color: var(--po-text-disabled);
 }
+
+/* Diff contribution actions belong to Source Control, not the Cloud shell. */
+.secondary-action,
+.danger-action {
+  display: inline-flex;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: var(--po-panel-raised);
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.secondary-action:hover:not(:disabled) {
+  background: var(--po-control-hover);
+}
+
+.danger-action {
+  border-color: color-mix(in srgb, var(--po-danger) 24%, transparent);
+  background: color-mix(in srgb, var(--po-danger) 7%, var(--po-panel-raised));
+  color: var(--po-danger);
+}

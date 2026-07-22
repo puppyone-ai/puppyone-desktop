@@ -1,18 +1,5 @@
 /* Access scope detail and surface catalog. */
 
-.desktop-cloud-access-page.list-view .desktop-cloud-access-detail {
-  width: 100%;
-  min-height: 0;
-  overflow: auto;
-  background: transparent;
-}
-
-.desktop-cloud-access-page.list-view .desktop-cloud-access-detail-panel {
-  width: 100%;
-  margin: 0;
-  padding: 24px 24px 36px;
-}
-
 .desktop-cloud-access-expanded-note {
   margin: 0;
   color: var(--po-text-muted);
@@ -48,7 +35,11 @@
 
 .desktop-cloud-access-scope-list {
   display: grid;
+  min-height: 0;
+  flex: 1;
   gap: 0;
+  overflow: auto;
+  overflow-x: hidden;
   padding-block: var(--desktop-sidebar-list-padding-block);
   padding-inline: 8px;
 }
@@ -118,6 +109,11 @@
   line-height: 16px;
 }
 
+.desktop-cloud-access-scope-meta {
+  width: 100%;
+  padding-inline-start: 14px;
+}
+
 .desktop-cloud-access-aggregate strong {
   color: var(--po-success);
   font-size: 12px;
@@ -138,10 +134,13 @@
 
 .desktop-cloud-access-scope-meta code {
   min-width: 0;
+  flex: 1;
   overflow: hidden;
   color: var(--po-text-muted);
   font-family: var(--po-font-mono);
   font-size: 12px;
+  font-weight: 500;
+  line-height: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

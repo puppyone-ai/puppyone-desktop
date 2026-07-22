@@ -2,7 +2,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
 import type { CloudServiceMainViewProps } from "../types";
-import { useCloudOrganizationData } from "../components/CloudGlobalPages";
+import { useCloudOrganizationData } from "../organization/CloudOrganizationTeamPage";
 import { CloudWorkspaceLoadingState } from "../components/shared";
 import {
   formatCloudMessage,

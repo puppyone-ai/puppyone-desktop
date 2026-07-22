@@ -10,7 +10,7 @@ import {
   Zap,
 } from "lucide-react";
 import { bidiIsolate } from "@puppyone/localization/core";
-import "./global-pages.css";
+import "./organization.css";
 import { useLocalization, type LocalizationContextValue } from "@puppyone/localization/react";
 import {
   type DesktopBillingPlan,
@@ -20,17 +20,17 @@ import { useCloudBillingController } from "../billing/useCloudBillingController"
 import {
   CloudOrganizationSelector,
   CloudOrganizationPageShell,
-  type CloudGlobalPageProps,
+  type CloudOrganizationPageProps,
   useCloudOrganizationAccess,
   useCloudOrganizationData,
-} from "./CloudGlobalPages";
+} from "./CloudOrganizationTeamPage";
 
 type CloudBillingPageProps = Pick<
-  CloudGlobalPageProps,
+  CloudOrganizationPageProps,
   "session" | "apiBaseUrl" | "onSessionChange"
 >;
 
-export function CloudGlobalBillingPage({
+export function CloudOrganizationBillingPage({
   session,
   apiBaseUrl,
   onSessionChange,

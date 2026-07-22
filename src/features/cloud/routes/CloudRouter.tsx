@@ -3,16 +3,16 @@ import type { Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
 import type { GitStatusSnapshot } from "../../../types/electron";
 import type { getCanonicalPuppyoneRemote } from "../../source-control/remotes";
-import { getResolvedCloudProjectId, isCloudContextRecovery, type ProjectCloudContext } from "../context";
+import { getResolvedCloudProjectId, isCloudContextRecovery, type ProjectCloudContext } from "../project/context";
 import type { DesktopCloudDataState } from "../data";
 import type { CloudWorkspaceSection } from "../types";
 import { CloudWorkspaceLoadingState } from "../components/shared";
 import { CloudProjectRecoveryState } from "../states/CloudProjectRecoveryState";
 import { formatCloudMessage } from "../cloudPresentation";
 import {
-  CloudGlobalRouteOutlet,
-  isCloudGlobalRouteSection,
-} from "./CloudGlobalRouteOutlet";
+  CloudOrganizationRouteOutlet,
+  isCloudOrganizationRouteSection,
+} from "../organization";
 import { CloudProjectRouteOutlet } from "./CloudProjectRouteOutlet";
 
 export function CloudRouter({
@@ -56,16 +56,14 @@ export function CloudRouter({
 }) {
   const { t } = useLocalization();
 
-  if (isCloudGlobalRouteSection(activeSection)) {
+  if (isCloudOrganizationRouteSection(activeSection)) {
     return (
-      <CloudGlobalRouteOutlet
+      <CloudOrganizationRouteOutlet
         activeSection={activeSection}
         cloudSession={cloudSession}
         cloudApiBaseUrl={cloudApiBaseUrl}
-        cloudData={cloudData}
         accountEmail={accountEmail}
         onSessionChange={onSessionChange}
-        onOpenProject={onOpenProject}
       />
     );
   }
@@ -99,7 +97,7 @@ export function CloudRouter({
 
   const projectId = getResolvedCloudProjectId(
     projectContext ?? { status: "local-only", projectId: null },
-  ) ?? cloudData.contextProjectId;
+  ) ?? cloudData.projectId;
   if (!projectId) {
     return <CloudWorkspaceLoadingState label={t("cloud.state.sectionNeedsProject")} />;
   }
@@ -114,7 +112,7 @@ export function CloudRouter({
       cloudRemote={cloudRemote}
       cloudData={cloudData}
       projectId={projectId}
-      project={cloudData.contextProject ?? cloudData.activeProject ?? { id: projectId, name: workspace.name }}
+      project={cloudData.project ?? { id: projectId, name: workspace.name }}
       loading={loading}
       accountConnected={accountConnected}
       onSessionChange={onSessionChange}

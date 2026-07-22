@@ -1,7 +1,7 @@
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
 import type { CloudAuthState } from "./cloudAuthTypes";
-import { CloudProjectBrowserSignedOut } from "../components/ProjectBrowser";
 import { CloudWorkspaceLoadingState } from "../components/shared";
+import { CloudSignInView } from "./CloudSignInView";
 
 export function CloudSignedOutRoute({
   authState,
@@ -29,12 +29,10 @@ export function CloudSignedOutRoute({
 
   return (
     <main className="desktop-cloud-main-view desktop-cloud-auth-main-view">
-      <div className="desktop-cloud-page-shell">
-        <CloudProjectBrowserSignedOut
+      <div className="desktop-cloud-auth-page-shell">
+        <CloudSignInView
           apiBaseUrl={apiBaseUrl}
-          accountEmail={null}
-          onSignedIn={onSessionChange}
-          onSignedOut={() => onSessionChange(null)}
+          onSessionChange={onSessionChange}
           onRefresh={onRefresh}
         />
       </div>

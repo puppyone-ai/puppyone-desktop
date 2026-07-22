@@ -4,11 +4,9 @@ import { AuxiliaryPanelHost } from "../features/app-shell/auxiliary";
 import type { WorkspaceSurfaceId } from "../features/app-shell/workspace-surfaces";
 
 export type DesktopView = WorkspaceSurfaceId;
-export type DesktopWorkspaceKind = "local" | "cloud";
 
 type DesktopCloudShellProps = {
   children: ReactNode;
-  workspaceKind: DesktopWorkspaceKind;
   titlebarSlot?: ReactNode;
   titlebarActions?: ReactNode;
   minimalMode?: boolean;
@@ -24,7 +22,6 @@ type DesktopCloudShellProps = {
 
 export function DesktopCloudShell({
   children,
-  workspaceKind,
   titlebarSlot,
   titlebarActions,
   minimalMode = false,
@@ -45,7 +42,7 @@ export function DesktopCloudShell({
           {minimalModeDock}
         </>
       ) : (
-        <header className="desktop-titlebar" data-workspace-kind={workspaceKind}>
+        <header className="desktop-titlebar">
           <div className="desktop-titlebar-left">
             {titlebarSlot}
           </div>

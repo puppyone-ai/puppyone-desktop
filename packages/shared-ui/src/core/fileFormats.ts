@@ -164,6 +164,7 @@ export function resolveFileFormat(input: ResolveInput): FileFormat {
         label: "Text",
         category: "text",
         defaultViewer: "plain-text",
+        editable: true,
         monacoLanguage: "plaintext",
       };
     }

@@ -8,7 +8,7 @@ const entryChunkBudgetBytes = 1_950_000;
 const heavyChunks = [
   {
     label: "Cloud Automation route",
-    chunkPattern: /^DesktopCloudAutomationView-.+\.js$/,
+    chunkPattern: /^CloudProjectAutomationView-.+\.js$/,
     entryLeakPattern: /Unable to load Automation sources/,
   },
   {

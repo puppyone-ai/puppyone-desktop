@@ -16,8 +16,8 @@ import {
   PRESET_VIEWER_MANIFEST,
 } from "./presetViewerManifest";
 import { AppPreviewViewer } from "./viewers/AppPreviewViewer";
-import { JsonViewer, TextFileViewer, canEditTextFile } from "./viewers/CodeViewer";
-import { CsvViewer, canEditCsv } from "./viewers/CsvViewer";
+import { JsonViewer, TextFileViewer } from "./viewers/CodeViewer";
+import { CsvViewer } from "./viewers/CsvViewer";
 import { DocumentPreview } from "./viewers/DocumentFallbackViewer";
 import { HtmlViewer } from "./viewers/HtmlViewer";
 import {
@@ -208,7 +208,7 @@ const PRESET_VIEWER_DEFINITIONS: PresetViewerContribution[] = [
   definePresetViewer({
     id: "csv-table",
     match: ({ format }) => format.defaultViewer === "csv-table",
-    isEditable: canEditCsv,
+    isEditable: () => true,
     render: (context) => <CsvViewer {...context} />,
   }),
   definePresetViewer({
@@ -252,7 +252,7 @@ const PRESET_VIEWER_DEFINITIONS: PresetViewerContribution[] = [
       format.defaultViewer === "plain-text" ||
       format.defaultViewer === "monaco-code"
     ),
-    isEditable: canEditTextFile,
+    isEditable: () => true,
     render: (context) => <TextFileViewer {...context} />,
   }),
 ];

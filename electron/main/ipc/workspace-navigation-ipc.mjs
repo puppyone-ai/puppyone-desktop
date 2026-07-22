@@ -6,8 +6,6 @@ export function registerWorkspaceNavigationIpcHandlers({
   showHomepageForCurrentWindow,
   openWorkspaceInCurrentWindow,
   openWorkspaceInNewWindow,
-  createCloudWorkspaceFromRequest,
-  openVirtualWorkspaceInNewWindow,
   selectWorkspaceForCurrentWindow,
   selectWorkspaceForNewWindow,
 }) {
@@ -45,11 +43,6 @@ export function registerWorkspaceNavigationIpcHandlers({
   ipcMain.handle("workspace:open-new-window", async (_event, folderPath) => {
     const persistedPath = await workspaceStateStore.requireRecentWorkspacePath(folderPath);
     return openWorkspaceInNewWindow(persistedPath);
-  });
-
-  ipcMain.handle("workspace:open-cloud-project-new-window", async (_event, request) => {
-    const workspace = createCloudWorkspaceFromRequest(request);
-    return openVirtualWorkspaceInNewWindow(workspace);
   });
 
   ipcMain.handle("workspace:select-folder", async (event) => {

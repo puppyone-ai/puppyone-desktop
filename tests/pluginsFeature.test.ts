@@ -12,19 +12,13 @@ import {
 } from "../src/features/plugins/pluginCatalog";
 
 describe("Viewer Plugins experiment", () => {
-  it("is opt-in and local-workspace only", () => {
+  it("is opt-in on the single local-workspace shell", () => {
     expect(isViewerPluginsEnabled({
       settings: DEFAULT_EXPERIMENTAL_SETTINGS,
-      workspaceIsCloud: false,
     })).toBe(false);
     expect(isViewerPluginsEnabled({
       settings: { ...DEFAULT_EXPERIMENTAL_SETTINGS, enableViewerPlugins: true },
-      workspaceIsCloud: false,
     })).toBe(true);
-    expect(isViewerPluginsEnabled({
-      settings: { ...DEFAULT_EXPERIMENTAL_SETTINGS, enableViewerPlugins: true },
-      workspaceIsCloud: true,
-    })).toBe(false);
   });
 
   it("keeps Appearance visibility separate from feature authority", () => {

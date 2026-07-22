@@ -91,7 +91,6 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   showHomepage: () => ipcRenderer.invoke("workspace:show-homepage"),
   openWorkspaceInCurrentWindow: (folderPath) => ipcRenderer.invoke("workspace:open-current", folderPath),
   openWorkspaceInNewWindow: (folderPath) => ipcRenderer.invoke("workspace:open-new-window", folderPath),
-  openCloudProjectInNewWindow: (request) => ipcRenderer.invoke("workspace:open-cloud-project-new-window", request),
   selectFolder: () => ipcRenderer.invoke("workspace:select-folder-current"),
   selectFolderInNewWindow: () => ipcRenderer.invoke("workspace:select-folder-new-window"),
   getPathForFile: (file) => webUtils.getPathForFile(file),

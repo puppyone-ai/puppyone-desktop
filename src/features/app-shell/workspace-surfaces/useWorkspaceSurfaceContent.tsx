@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import type { ViewerPackSnapshot, Workspace } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import type { DesktopView } from "../../../components/DesktopCloudShell";
@@ -13,18 +13,11 @@ import type {
   GitStatusSnapshot,
 } from "../../../types/electron";
 import {
-  CloudProjectHistorySidebar,
-  CloudProjectHistoryView,
   CloudServiceMainView,
   CloudServiceSidebar,
-  DesktopCloudAccessView,
-  formatCloudMessage,
+  cloudContextHasProject,
   resolveCloudEnvironment,
-  resolveCloudProjectNavigationContext,
-  shouldLoadDesktopCloudAccessData,
   useCloudSessionForEnvironment,
-  useCloudHistoryController,
-  useDesktopCloudAccessData,
   type CloudWorkspaceSection,
   type ProjectCloudContext,
 } from "../../cloud";
@@ -53,13 +46,6 @@ import type {
 const LazyPluginsView = lazy(() => import("../../plugins/PluginsView").then((module) => ({
   default: module.PluginsView,
 })));
-const LazyDesktopCloudAutomationSidebar = lazy(() => import("../../automation").then((module) => ({
-  default: module.DesktopCloudAutomationSidebar,
-})));
-const LazyDesktopCloudAutomationView = lazy(() => import("../../automation").then((module) => ({
-  default: module.DesktopCloudAutomationView,
-})));
-
 type DesktopUpdatesController = ReturnType<typeof useDesktopUpdates>;
 
 export type DesktopWorkspaceCloudSurfaceController = {
@@ -73,10 +59,8 @@ export type DesktopWorkspaceCloudSurfaceController = {
   publishState: CloudPublishState | null;
   publishStateLoading: boolean;
   cloudApiBaseUrl: string | null;
-  cloudSession: DesktopCloudSession | null;
   storedCloudSession: DesktopCloudSession | null;
   enabled: boolean;
-  projectId: string | null;
   sessionRestoring: boolean;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onRemoveCloudRemote?: () => Promise<void>;
@@ -89,8 +73,6 @@ export type DesktopWorkspaceCloudSurfaceController = {
 export type WorkspaceSurfaceContentResult = {
   availableSurfaceIds: readonly WorkspaceSurfaceId[];
   cloudHubNavigationEnabled: boolean;
-  cloudToolsNavigationEnabled: boolean;
-  cloudWorkspace: boolean;
   gitEnabled: boolean;
   pluginsNavigationVisible: boolean;
   resolvedActiveView: WorkspaceSurfaceId;
@@ -118,8 +100,6 @@ export function useWorkspaceSurfaceContent({
   viewerPacks,
   viewerPluginsEnabled,
   workspace,
-  workspaceKind,
-  workspaceRefreshToken,
 }: {
   activeView: DesktopView;
   cloud: DesktopWorkspaceCloudSurfaceController;
@@ -144,36 +124,29 @@ export function useWorkspaceSurfaceContent({
   };
   viewerPluginsEnabled: boolean;
   workspace: Workspace;
-  workspaceKind: "local" | "cloud";
-  workspaceRefreshToken: number;
 }): WorkspaceSurfaceContentResult {
   const { t } = useLocalization();
-  const cloudWorkspace = workspaceKind === "cloud";
   const pluginsNavigationVisible = isPluginsNavigationVisible({
     featureEnabled: viewerPluginsEnabled,
     visibility: preferences.sidebarNavigationVisibilitySettings,
   });
   const surfaceCapabilities = useMemo<WorkspaceSurfaceCapabilities>(() => ({
-    workspaceKind,
     cloudEnabled: cloud.enabled,
-    cloudProjectAvailable: Boolean(cloud.projectId),
     pluginsEnabled: pluginsNavigationVisible,
-  }), [cloud.enabled, cloud.projectId, pluginsNavigationVisible, workspaceKind]);
+  }), [cloud.enabled, pluginsNavigationVisible]);
   const resolvedActiveView = resolveWorkspaceSurfaceContribution(activeView, surfaceCapabilities).id;
   const availableSurfaceIds = useMemo(
     () => getAvailableWorkspaceSurfaces(surfaceCapabilities).map(({ id }) => id),
     [surfaceCapabilities],
   );
-  const gitEnabled = !cloudWorkspace;
+  const gitEnabled = true;
   const gitHostingMode = getGitHostingMode(git.activeGitStatus, puppyoneConfig);
   const workspaceChangeCount = gitEnabled
     ? getDesktopWorkspaceChangeCount(git.activeGitStatus, gitHostingMode === "github")
     : 0;
-  const cloudHubNavigationEnabled = cloud.enabled && !cloudWorkspace;
-  const cloudToolsNavigationEnabled = cloud.enabled && cloudWorkspace && Boolean(cloud.projectId);
+  const cloudHubNavigationEnabled = cloud.enabled;
   const projectContext = cloud.projectContext ?? { status: "local-only" as const, projectId: null };
-  const cloudNavigationContext = resolveCloudProjectNavigationContext(projectContext);
-  const localOnlyWorkspaceContext = !cloudWorkspace && (
+  const localOnlyWorkspaceContext = (
     projectContext.status === "local-only"
     || cloud.publishState !== null
     || cloud.publishStateLoading
@@ -193,28 +166,7 @@ export function useWorkspaceSurfaceContent({
     environment: cloudEnvironment,
     onCloudSessionChange: cloud.onCloudSessionChange,
   });
-  const needsCloudAccessData = shouldLoadDesktopCloudAccessData({
-    workspaceKind,
-    activeView: resolvedActiveView,
-  });
-  const cloudAccessData = useDesktopCloudAccessData({
-    projectId: needsCloudAccessData ? cloud.projectId : null,
-    cloudSession: cloud.cloudSession,
-    apiBaseUrl: cloud.cloudApiBaseUrl,
-    onCloudSessionChange: cloud.onCloudSessionChange,
-  });
-  const [activeAutomationProvider, setActiveAutomationProvider] = useState<string | null>(null);
   const [activePluginsSection, setActivePluginsSection] = useState<PluginsSection>(DEFAULT_PLUGINS_SECTION);
-  const cloudHistory = useCloudHistoryController({
-    session: cloud.cloudSession,
-    projectId: cloud.projectId,
-    apiBaseUrl: cloud.cloudApiBaseUrl,
-    enabled: cloudWorkspace && resolvedActiveView === "git",
-    revisionKey: String(workspaceRefreshToken),
-    onSessionChange: cloud.onCloudSessionChange,
-  });
-  const cloudHistoryError = cloudHistory.error ? formatCloudMessage(cloudHistory.error, t) : null;
-  const cloudHistoryWarning = cloudHistory.warning ? formatCloudMessage(cloudHistory.warning, t) : null;
   const cloudPublishErrorMessage = cloud.publishError
     ? formatCloudPublishFailure(cloud.publishError, t)
     : null;
@@ -270,77 +222,6 @@ export function useWorkspaceSurfaceContent({
       install: desktopUpdates.updateNow,
     },
   });
-  const cloudHistorySurface = {
-    sidebar: (
-      <CloudProjectHistorySidebar
-        rows={cloudHistory.rows}
-        selectedCommitId={cloudHistory.selectedCommitId}
-        loading={cloudHistory.loading}
-        loadingMore={cloudHistory.loadingMore}
-        hasMore={cloudHistory.hasMore}
-        error={cloudHistoryError}
-        warning={cloudHistoryWarning}
-        onSelectCommit={cloudHistory.selectCommit}
-        onLoadMore={cloudHistory.loadMore}
-      />
-    ),
-    main: (
-      <CloudProjectHistoryView
-        projectId={cloud.projectId}
-        projectName={workspace.name}
-        history={cloudHistory.history}
-        rows={cloudHistory.rows}
-        selectedCommitId={cloudHistory.selectedCommitId}
-        loading={cloudHistory.loading}
-        loadingMore={cloudHistory.loadingMore}
-        hasMore={cloudHistory.hasMore}
-        error={cloudHistoryError}
-        warning={cloudHistoryWarning}
-        onSelectCommit={cloudHistory.selectCommit}
-        onRefresh={cloudHistory.reload}
-        onLoadMore={cloudHistory.loadMore}
-      />
-    ),
-  };
-  const cloudAccessSurface = {
-    sidebar: null,
-    main: (
-      <DesktopCloudAccessView
-        projectId={cloud.projectId}
-        cloudSession={cloud.cloudSession}
-        accessData={cloudAccessData}
-        activeFilter="all"
-        activeAccessRowId={null}
-        sessionRestoring={cloud.sessionRestoring}
-        onCloudSessionChange={cloud.onCloudSessionChange}
-        onRefresh={() => undefined}
-      />
-    ),
-  };
-  const automationSurface = {
-    sidebar: (
-      <Suspense fallback={<DesktopRouteLoading label={t("workspace.loadingAutomation")} />}>
-        <LazyDesktopCloudAutomationSidebar
-          accessData={cloudAccessData}
-          activeProvider={activeAutomationProvider}
-          onSelectProvider={setActiveAutomationProvider}
-        />
-      </Suspense>
-    ),
-    main: (
-      <Suspense fallback={<DesktopRouteLoading label={t("workspace.loadingAutomation")} />}>
-        <LazyDesktopCloudAutomationView
-          projectId={cloud.projectId}
-          cloudSession={cloud.cloudSession}
-          accessData={cloudAccessData}
-          activeProvider={activeAutomationProvider}
-          sessionRestoring={cloud.sessionRestoring}
-          onCloudSessionChange={cloud.onCloudSessionChange}
-          onRefresh={() => undefined}
-        />
-      </Suspense>
-    ),
-  };
   const pluginsSurface = {
     sidebar: (
       <PluginsSidebar
@@ -366,9 +247,7 @@ export function useWorkspaceSurfaceContent({
       <CloudServiceSidebar
         cloudAuthState={cloudAuthState}
         activeSection={cloud.activeSection}
-        projectContext={cloudNavigationContext.projectContext}
-        localWorkspaceContext={cloudNavigationContext.localWorkspaceContext && !cloudWorkspace}
-        localOnlyWorkspaceContext={localOnlyWorkspaceContext}
+        projectAvailable={cloudContextHasProject(projectContext)}
         projectCapabilities={projectContext.status === "resolved"
           ? projectContext.capabilities ?? []
           : []}
@@ -381,7 +260,7 @@ export function useWorkspaceSurfaceContent({
         status={git.activeGitStatus}
         cloudEnvironment={cloudEnvironment}
         cloudAuthState={cloudAuthState}
-        projectContext={cloudWorkspace ? null : projectContext}
+        projectContext={projectContext}
         onCloudSessionChange={cloud.onCloudSessionChange}
         activeSection={cloud.activeSection}
         loading={git.gitStatusLoading}
@@ -404,19 +283,15 @@ export function useWorkspaceSurfaceContent({
     ),
   };
   const adapters: WorkspaceSurfaceAdapters = {
-    data: () => ({ sidebar: null, main: cloudWorkspace && !cloud.cloudSession ? cloudAccessSurface.main : null }),
-    git: () => cloudWorkspace ? cloudHistorySurface : sourceControlSurface,
+    data: () => ({ sidebar: null, main: null }),
+    git: () => sourceControlSurface,
     plugins: () => pluginsSurface,
     cloud: () => cloudServiceSurface,
-    access: () => cloudAccessSurface,
-    automation: () => automationSurface,
     settings: () => settingsSurface,
   };
   return {
     availableSurfaceIds,
     cloudHubNavigationEnabled,
-    cloudToolsNavigationEnabled,
-    cloudWorkspace,
     gitEnabled,
     pluginsNavigationVisible,
     resolvedActiveView,

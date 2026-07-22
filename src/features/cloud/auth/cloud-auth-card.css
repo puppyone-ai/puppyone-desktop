@@ -1,0 +1,144 @@
+@layer features {
+  .desktop-cloud-auth-card {
+    --desktop-cloud-body-size: var(--po-text-size-body, 13px);
+    display: grid;
+    width: 100%;
+    max-width: 380px;
+    padding: 24px;
+    box-sizing: border-box;
+  }
+
+  .desktop-cloud-auth-heading {
+    margin: 0 0 24px;
+    text-align: center;
+  }
+
+  .desktop-cloud-auth-heading h3,
+  .desktop-cloud-auth-heading p {
+    margin: 0;
+  }
+
+  .desktop-cloud-auth-heading p {
+    overflow: hidden;
+    color: var(--po-text-muted);
+    font-size: var(--desktop-cloud-body-size);
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-cloud-auth-submit,
+  .desktop-cloud-auth-secondary {
+    display: inline-flex;
+    width: 100%;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 0 16px;
+    border-radius: 6px;
+    font-size: var(--desktop-cloud-body-size);
+    font-weight: 600;
+  }
+
+  .desktop-cloud-auth-submit {
+    border: 0;
+    background: var(--po-text);
+    color: var(--po-text-inverse);
+  }
+
+  .desktop-cloud-auth-secondary {
+    margin-top: 10px;
+    border: 1px solid var(--po-divider);
+    background: var(--po-control);
+    color: var(--po-text-muted);
+    font-weight: 500;
+  }
+
+  .desktop-cloud-auth-submit:disabled,
+  .desktop-cloud-auth-secondary:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .desktop-cloud-auth-state {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid var(--po-divider);
+    border-radius: 8px;
+    background: var(--po-control);
+  }
+
+  .desktop-cloud-auth-state > span {
+    display: inline-flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    color: var(--po-success);
+  }
+
+  .desktop-cloud-auth-state strong,
+  .desktop-cloud-auth-state p,
+  .desktop-cloud-auth-terms,
+  .desktop-cloud-auth-feedback > div {
+    font-size: var(--desktop-cloud-body-size);
+    line-height: 1.35;
+  }
+
+  .desktop-cloud-auth-state p {
+    margin: 3px 0 0;
+    color: var(--po-text-muted);
+  }
+
+  .desktop-cloud-auth-terms {
+    margin: 16px 0 0;
+    color: var(--po-text-subtle);
+    text-align: center;
+  }
+
+  .desktop-cloud-auth-feedback {
+    display: grid;
+    gap: 6px;
+    margin-top: 12px;
+  }
+
+  .desktop-cloud-auth-feedback > div {
+    padding: 7px 9px;
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .desktop-cloud-auth-feedback .error {
+    background: color-mix(in srgb, var(--po-danger) 10%, transparent);
+    color: var(--po-danger);
+  }
+
+  .desktop-cloud-auth-feedback .success {
+    background: color-mix(in srgb, var(--po-success) 10%, transparent);
+    color: var(--po-success);
+  }
+
+  .desktop-cloud-login-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .desktop-cloud-product-mark {
+    width: 94px;
+    height: 68px;
+    overflow: visible;
+  }
+
+  .desktop-cloud-product-mark-cloud {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 7px;
+  }
+}

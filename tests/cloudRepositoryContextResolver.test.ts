@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   assertCloudRemoteNameAvailable,
   assertExpectedGitRepositoryState,
@@ -10,27 +10,6 @@ import {
   resolveCanonicalPuppyoneRemotes,
   resolvePuppyoneRemotes,
 } from "../src/features/source-control/remotes";
-import { shouldLoadCloudProjectCatalog } from "../src/features/cloud/workspace/cloudProjectResolution";
-
-describe("Project catalog policy", () => {
-  it("never scans the Organization catalog from an open Local workspace", () => {
-    expect(shouldLoadCloudProjectCatalog({
-      hasOpenWorkspace: true,
-      workspaceIsCloud: false,
-    })).toBe(false);
-    expect(shouldLoadCloudProjectCatalog({
-      hasOpenWorkspace: false,
-      workspaceIsCloud: false,
-      workspaceRestoring: true,
-    })).toBe(false);
-  });
-
-  it("keeps the catalog available only for global/home or Cloud-only browsing", () => {
-    expect(shouldLoadCloudProjectCatalog({ hasOpenWorkspace: false, workspaceIsCloud: false })).toBe(true);
-    expect(shouldLoadCloudProjectCatalog({ hasOpenWorkspace: true, workspaceIsCloud: false })).toBe(false);
-    expect(shouldLoadCloudProjectCatalog({ hasOpenWorkspace: true, workspaceIsCloud: true })).toBe(true);
-  });
-});
 
 describe("Initialize remote collision policy", () => {
   it("refuses to repoint an existing canonical remote", () => {
@@ -169,17 +148,17 @@ describe("canonical Git locator discovery", () => {
 });
 
 describe("repository-context architecture", () => {
-  it("keeps context resolution out of the Project catalog and removes server-side local identity", () => {
+  it("resolves one current repository Project and keeps catalogs archive-only", () => {
     const dataSource = readFileSync(
       new URL("../src/features/cloud/data/useDesktopCloudData.ts", import.meta.url),
       "utf8",
     );
     const resolverSource = readFileSync(
-      new URL("../src/features/cloud/workspace/useCloudWorkspaceContext.ts", import.meta.url),
+      new URL("../src/features/cloud/project/context/useCurrentRepositoryCloudContext.ts", import.meta.url),
       "utf8",
     );
-    const catalogSource = readFileSync(
-      new URL("../src/features/cloud/data/useCloudProjectCatalog.ts", import.meta.url),
+    const cloudApiSource = readFileSync(
+      new URL("../src/lib/cloudApi.ts", import.meta.url),
       "utf8",
     );
     const publishHookSource = readFileSync(
@@ -187,16 +166,29 @@ describe("repository-context architecture", () => {
       "utf8",
     );
     const appSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
-    const combined = `${resolverSource}\n${appSource}`;
+    const combined = `${dataSource}\n${resolverSource}\n${cloudApiSource}\n${appSource}`;
 
     expect(dataSource).not.toContain("listCloudProjects");
     expect(dataSource).not.toContain("loadProjectCatalog");
-    expect(catalogSource).toContain("listCloudProjects");
+    expect(dataSource).toContain("getCloudProject");
     expect(resolverSource).not.toContain("listCloudProjects");
     expect(appSource).not.toContain("listCloudProjects");
+    expect(cloudApiSource).not.toContain("listCloudProjects");
+    expect(cloudApiSource).not.toContain("listCloudTemplates");
+    expect(cloudApiSource).not.toContain("instantiateCloudTemplate");
     expect(resolverSource).toContain("resolveCanonicalPuppyoneRemotes");
     expect(resolverSource).toContain("getCloudRepositoryContext");
     expect(resolverSource).not.toContain("remote_url");
+    expect(combined).not.toContain("cloud://");
+    expect(combined).not.toContain("CloudTemplateStore");
+    expect(existsSync(new URL(
+      "../archive/desktop-cloud-catalog/src/features/cloud/data/useCloudProjectCatalog.ts",
+      import.meta.url,
+    ))).toBe(true);
+    expect(existsSync(new URL(
+      "../archive/desktop-cloud-catalog/src/features/cloud/components/CloudTemplateStore.tsx",
+      import.meta.url,
+    ))).toBe(true);
     expect(combined).not.toMatch(/WorkspaceBinding|workspaceBinding|workspace_binding|cloudBinding|bindingId/);
     expect(publishHookSource).toContain("startWorkspaceCloudInitialization");
     expect(publishHookSource).toContain("pending?.selectedSourceBranch");

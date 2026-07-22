@@ -428,22 +428,7 @@
   white-space: nowrap;
 }
 
-.asset-library-card-location.synced {
-  background: transparent;
-  color: color-mix(in srgb, var(--po-success) 52%, var(--po-text-subtle));
-}
-
-.asset-library-card-location.cloud {
-  background: transparent;
-  color: color-mix(in srgb, var(--po-info) 52%, var(--po-text-subtle));
-}
-
 .asset-library-card-location.local {
-  background: transparent;
-  color: var(--po-text-subtle);
-}
-
-.asset-library-card-location.linked {
   background: transparent;
   color: var(--po-text-subtle);
 }
@@ -505,23 +490,6 @@
   text-align: center;
 }
 
-.asset-library-new-project-cloud-mark {
-  position: relative;
-  display: inline-grid;
-  width: 22px;
-  height: 20px;
-  place-items: center;
-}
-
-.asset-library-new-project-cloud-mark svg:last-child {
-  position: absolute;
-  inset-inline-end: -1px;
-  bottom: -1px;
-  padding: 1px;
-  border-radius: 50%;
-  background: var(--po-canvas);
-}
-
 .asset-library-new-project-wrap.is-open {
   z-index: 40;
 }
@@ -549,21 +517,8 @@
   font-size: 13px;
 }
 
-.asset-library-home-empty span,
-.asset-library-home-cloud-status {
+.asset-library-home-empty span {
   font-size: 11px;
-}
-
-.asset-library-home-cloud-status {
-  display: inline-flex;
-  align-items: center;
-  justify-self: center;
-  gap: 6px;
-  color: var(--po-text-subtle);
-}
-
-.asset-library-home-cloud-status svg {
-  animation: asset-library-spin 1.4s linear infinite;
 }
 
 .asset-library-home-drop-overlay {
@@ -670,7 +625,4 @@
     transition: none;
   }
 
-  .asset-library-home-cloud-status svg {
-    animation: none;
-  }
 }

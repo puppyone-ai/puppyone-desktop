@@ -29,7 +29,7 @@ const automationDialogManifest = readFileSync(
 );
 const globalStyles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 const automationView = readFileSync(
-  new URL("../src/features/automation/DesktopCloudAutomationView.tsx", import.meta.url),
+  new URL("../src/features/automation/CloudProjectAutomationView.tsx", import.meta.url),
   "utf8",
 );
 

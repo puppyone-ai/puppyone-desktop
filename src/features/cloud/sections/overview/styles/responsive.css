@@ -1,12 +1,17 @@
-@media (max-width: 1100px) {
+@media (max-width: 900px) {
   .desktop-cloud-overview-dashboard {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
   }
 
-  .desktop-cloud-overview-dashboard-side-stack {
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: minmax(180px, auto);
+  .desktop-cloud-overview-dashboard-card--storage {
+    width: min(100%, 340px);
+    grid-row: auto;
+  }
+
+  .desktop-cloud-overview-dashboard-card--interactive {
+    min-height: 104px;
   }
 }
 
@@ -19,18 +24,13 @@
     gap: 14px;
   }
 
-  .desktop-cloud-overview-dashboard {
-    grid-template-columns: minmax(0, 1fr);
+  .desktop-cloud-overview-storage-body {
+    padding: 18px;
   }
 
-  .desktop-cloud-overview-dashboard-side-stack {
-    grid-column: auto;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: repeat(2, minmax(174px, auto));
-  }
-
-  .desktop-cloud-overview-dashboard-card {
-    min-height: 340px;
+  .desktop-cloud-overview-storage-preview {
+    gap: 8px;
+    margin-top: 18px;
   }
 }
 

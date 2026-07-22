@@ -21,21 +21,7 @@ const localFiles = vi.hoisted(() => ({
   subscribeWorkspaceCloudInitializationProgress: vi.fn(() => () => {}),
 }));
 
-const cloudSession = vi.hoisted(() => ({
-  authErrorListener: null as ((message: string) => void) | null,
-  onDesktopCloudAuthError: vi.fn((listener: (message: string) => void) => {
-    cloudSession.authErrorListener = listener;
-    return () => {
-      if (cloudSession.authErrorListener === listener) cloudSession.authErrorListener = null;
-    };
-  }),
-}));
-
 vi.mock("../src/lib/localFiles", () => localFiles);
-vi.mock("../src/lib/cloudSession", async () => {
-  const actual = await vi.importActual<typeof import("../src/lib/cloudSession")>("../src/lib/cloudSession");
-  return { ...actual, onDesktopCloudAuthError: cloudSession.onDesktopCloudAuthError };
-});
 
 import { useCloudInitialization } from "../src/features/cloud/initialization/useCloudInitialization";
 
@@ -116,13 +102,7 @@ const actions = {
   setSwitcherOpen: vi.fn(),
 };
 
-function InitializationHarness({
-  activeSession,
-  startCloudBrowserSignIn,
-}: {
-  activeSession: DesktopCloudSession | null;
-  startCloudBrowserSignIn: () => Promise<boolean>;
-}) {
+function InitializationHarness({ activeSession }: { activeSession: DesktopCloudSession | null }) {
   const initialization = useCloudInitialization({
     activeCloudSession: activeSession,
     applyGitStatus: actions.applyGitStatus,
@@ -136,13 +116,11 @@ function InitializationHarness({
     setActiveView: actions.setActiveView,
     setSidebarCollapsed: actions.setSidebarCollapsed,
     setSwitcherOpen: actions.setSwitcherOpen,
-    startCloudBrowserSignIn,
     workspace: {
       id: "local-notes",
       name: "Local Notes",
       path: repositoryContext.rootPath,
     },
-    workspaceIsCloud: false,
   });
 
   return (
@@ -179,7 +157,6 @@ describe("durable PuppyOne Cloud initialization renderer flow", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    cloudSession.authErrorListener = null;
     localFiles.getWorkspaceCloudInitializationState.mockResolvedValue(okResult(null));
     localFiles.getWorkspaceGitStatus.mockResolvedValue(initialStatus);
     localFiles.startWorkspaceCloudInitialization.mockResolvedValue(okResult(completedState, publishedStatus));
@@ -198,32 +175,19 @@ describe("durable PuppyOne Cloud initialization renderer flow", () => {
     container.remove();
   });
 
-  it("stays passive and preserves a signed-out initialization intent across login", async () => {
-    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
-
-    await render(<InitializationHarness activeSession={null} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
+  it("keeps signed-out initialization passive and owned by the auth state", async () => {
+    await render(<InitializationHarness activeSession={null} />);
     expect(localFiles.getWorkspaceCloudInitializationState).not.toHaveBeenCalled();
     expect(localFiles.startWorkspaceCloudInitialization).not.toHaveBeenCalled();
 
     await click("start");
-    expect(startCloudBrowserSignIn).toHaveBeenCalledOnce();
-    expect(readOutput().dataset.pending).toBe("true");
-
-    await render(<InitializationHarness activeSession={session} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
-    await flushPromises();
-
-    expect(localFiles.getWorkspaceCloudInitializationState).toHaveBeenCalledWith({
-      rootPath: repositoryContext.rootPath,
-      apiBaseUrl: session.api_base_url,
-      userId: session.user_id,
-    });
-    expect(readOutput().dataset.pending).toBe("true");
+    expect(readOutput().dataset.pending).toBe("false");
+    expect(readOutput().dataset.error).toBe("SESSION_REQUIRED");
     expect(localFiles.startWorkspaceCloudInitialization).not.toHaveBeenCalled();
   });
 
   it("starts from a named source branch without snapshotting dirty worktree state", async () => {
-    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
-    await render(<InitializationHarness activeSession={session} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
+    await render(<InitializationHarness activeSession={session} />);
     await flushPromises();
 
     await click("start");
@@ -257,8 +221,7 @@ describe("durable PuppyOne Cloud initialization renderer flow", () => {
     localFiles.startWorkspaceCloudInitialization.mockReturnValue(new Promise((resolve) => {
       finish = resolve;
     }));
-    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
-    await render(<InitializationHarness activeSession={session} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
+    await render(<InitializationHarness activeSession={session} />);
     await flushPromises();
 
     await click("start");
@@ -286,8 +249,7 @@ describe("durable PuppyOne Cloud initialization renderer flow", () => {
 
   it("retries the exact durable Project and selected source branch after a branch switch", async () => {
     localFiles.getWorkspaceCloudInitializationState.mockResolvedValue(okResult(interruptedState));
-    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
-    await render(<InitializationHarness activeSession={session} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
+    await render(<InitializationHarness activeSession={session} />);
     await flushPromises();
 
     expect(readOutput().dataset.projectState).toBe("empty");
@@ -323,8 +285,7 @@ describe("durable PuppyOne Cloud initialization renderer flow", () => {
       availableActions: ["choose-source", "delete-empty-project"],
     });
     localFiles.getWorkspaceCloudInitializationState.mockResolvedValue(okResult(sourceMissing));
-    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
-    await render(<InitializationHarness activeSession={session} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
+    await render(<InitializationHarness activeSession={session} />);
     await flushPromises();
 
     await click("retry");
@@ -355,8 +316,7 @@ describe("durable PuppyOne Cloud initialization renderer flow", () => {
       state: failedState,
       error: { code: "REMOTE_CONFIG_FAILED", retryable: true, message: "private diagnostic" },
     } satisfies CloudInitializationResult);
-    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
-    await render(<InitializationHarness activeSession={session} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
+    await render(<InitializationHarness activeSession={session} />);
     await flushPromises();
 
     await click("start");
@@ -371,8 +331,7 @@ describe("durable PuppyOne Cloud initialization renderer flow", () => {
 
   it("finishes cleanup for the exact durable operation", async () => {
     localFiles.getWorkspaceCloudInitializationState.mockResolvedValue(okResult(interruptedState));
-    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
-    await render(<InitializationHarness activeSession={session} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
+    await render(<InitializationHarness activeSession={session} />);
     await flushPromises();
 
     await click("cleanup");
@@ -394,19 +353,21 @@ describe("durable PuppyOne Cloud initialization renderer flow", () => {
     expect(readOutput().dataset.notice).toBe("cleanup-completed");
   });
 
-  it("clears a pending browser sign-in intent after an auth callback failure", async () => {
-    const startCloudBrowserSignIn = vi.fn().mockResolvedValue(true);
-    await render(<InitializationHarness activeSession={null} startCloudBrowserSignIn={startCloudBrowserSignIn} />);
+  it("clears the signed-out body error when an authenticated identity arrives", async () => {
+    await render(<InitializationHarness activeSession={null} />);
     await click("start");
-    expect(readOutput().dataset.pending).toBe("true");
+    expect(readOutput().dataset.error).toBe("SESSION_REQUIRED");
 
-    await act(async () => {
-      cloudSession.authErrorListener?.("The browser sign-in was denied.");
-      await Promise.resolve();
-    });
+    await render(<InitializationHarness activeSession={session} />);
+    await flushPromises();
 
     expect(readOutput().dataset.pending).toBe("false");
-    expect(readOutput().dataset.error).toBe("SESSION_REQUIRED");
+    expect(readOutput().dataset.error).toBe("");
+    expect(localFiles.getWorkspaceCloudInitializationState).toHaveBeenCalledWith({
+      rootPath: repositoryContext.rootPath,
+      apiBaseUrl: session.api_base_url,
+      userId: session.user_id,
+    });
   });
 
   async function render(element: React.ReactNode) {

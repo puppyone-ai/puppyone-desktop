@@ -1,4 +1,37 @@
 /* Page-level Project identity and its canonical Cloud Git remote. */
+.desktop-cloud-overview-landing-identity {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.desktop-cloud-overview-landing-mark {
+  position: relative;
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--po-accent) 24%, var(--po-border-subtle));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--po-accent) 8%, transparent);
+  color: color-mix(in srgb, var(--po-accent) 74%, var(--po-text));
+}
+
+.desktop-cloud-overview-landing-mark::after {
+  position: absolute;
+  inset-inline-end: 5px;
+  bottom: 5px;
+  width: 6px;
+  height: 6px;
+  border: 2px solid var(--po-canvas);
+  border-radius: 999px;
+  background: var(--po-success);
+  content: "";
+}
+
 .desktop-cloud-overview-git-remote {
   display: flex;
   width: min(100%, 680px);

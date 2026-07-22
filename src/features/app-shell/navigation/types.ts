@@ -9,23 +9,15 @@ export type DesktopSidebarIconComponent = (props: {
 }) => ReactNode;
 
 export type DesktopNavigationItem = {
-  view: Extract<DesktopView, "data" | "git" | "plugins" | "cloud" | "access" | "automation">;
+  view: Extract<DesktopView, "data" | "git" | "plugins" | "cloud">;
   labelId: string;
   icon: DesktopSidebarIconComponent;
   iconSize?: number;
 };
 
-export type DesktopWorkspaceSurfaceAction = {
-  kind: "switch-to-cloud" | "switch-to-local" | "open-locally";
-  disabled?: boolean;
-  onClick: () => void;
-};
-
 export type DesktopNavigationAvailability = {
   availableSurfaceIds?: readonly WorkspaceSurfaceId[];
-  cloudHistoryEnabled?: boolean;
   cloudHubEnabled?: boolean;
-  cloudToolsEnabled?: boolean;
   gitEnabled?: boolean;
   pluginsEnabled?: boolean;
 };

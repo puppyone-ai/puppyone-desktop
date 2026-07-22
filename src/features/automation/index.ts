@@ -1,8 +1,5 @@
 export { AutomationGridIcon } from "./AutomationIcon";
-export {
-  DesktopCloudAutomationSidebar,
-  DesktopCloudAutomationView,
-} from "./DesktopCloudAutomationView";
+export { CloudProjectAutomationView } from "./CloudProjectAutomationView";
 export {
   buildCloudAutomationRows,
   cloudAutomationRowMatchesProvider,

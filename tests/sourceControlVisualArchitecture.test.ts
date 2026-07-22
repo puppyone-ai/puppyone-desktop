@@ -42,12 +42,16 @@ const desktopEntryStateCss = readFileSync(
   new URL("../src/styles/entry-state.css", import.meta.url),
   "utf8",
 );
-const cloudProjectBrowserCss = readFileSync(
-  new URL("../src/features/cloud/components/project-browser.css", import.meta.url),
+const cloudSignInCss = readFileSync(
+  new URL("../src/features/cloud/auth/cloud-sign-in.css", import.meta.url),
   "utf8",
 );
-const cloudProjectBrowserSource = readFileSync(
-  new URL("../src/features/cloud/components/ProjectBrowser.tsx", import.meta.url),
+const cloudAuthCardCss = readFileSync(
+  new URL("../src/features/cloud/auth/cloud-auth-card.css", import.meta.url),
+  "utf8",
+);
+const cloudSignInSource = readFileSync(
+  new URL("../src/features/cloud/auth/CloudSignInView.tsx", import.meta.url),
   "utf8",
 );
 const titlebarContextSource = readFileSync(
@@ -280,23 +284,30 @@ describe("source-control visual architecture", () => {
     expect(versionControlSetupCss).toContain("font-size: var(--po-text-size-body);");
     expect(versionControlSetupCss).toContain("font-weight: var(--po-text-weight-semibold);");
     expect(versionControlSetupCss).toContain("font-size: var(--po-text-size-meta);");
-    expect(cloudProjectBrowserCss).toContain(
-      "--desktop-cloud-body-size: var(--po-text-size-body);",
+    expect(cloudAuthCardCss).toContain(
+      "--desktop-cloud-body-size: var(--po-text-size-body, 13px);",
     );
-    expect(cloudProjectBrowserCss).toContain("font-size: var(--po-text-size-meta);");
+    expect(cloudSignInCss).toContain("font-size: var(--po-text-size-meta);");
   });
 
   it("centers Cloud and Version Control in one full-surface coordinate system", () => {
     const root = compact(readCssBlock(desktopEntryStateCss, ".desktop-entry-state"));
     const body = compact(readCssBlock(desktopEntryStateCss, ".desktop-entry-state-body"));
-    const cloudMain = compact(readCssBlock(cloudProjectBrowserCss, ".desktop-cloud-auth-main-view"));
+    const cloudMain = compact(readCssBlock(
+      cloudSignInCss,
+      ".desktop-cloud-main-view.desktop-cloud-auth-main-view",
+    ));
     const cloudPage = compact(readCssBlock(
-      cloudProjectBrowserCss,
-      ".desktop-cloud-auth-main-view .desktop-cloud-page-shell",
+      cloudSignInCss,
+      ".desktop-cloud-auth-page-shell",
     ));
 
     expect(versionControlSetupSource).toContain("<DesktopEntryState");
-    expect(cloudProjectBrowserSource).toContain("<DesktopEntryState");
+    expect(cloudSignInSource).toContain("<DesktopEntryState");
+    expect(readFileSync(
+      new URL("../src/features/cloud/auth/CloudSignedOutRoute.tsx", import.meta.url),
+      "utf8",
+    )).toContain('className="desktop-cloud-auth-page-shell"');
     expect(desktopEntryStateSource).toContain('className="desktop-entry-state-body"');
     expect(versionControlSetupSource).not.toContain("desktop-utility-view");
     expect(root).toContain("display: grid;");
@@ -305,17 +316,23 @@ describe("source-control visual architecture", () => {
     expect(root).toContain("min-height: 0;");
     expect(body).toContain("place-items: center;");
     expect(body).toContain("height: 100%;");
+    expect(cloudMain).toContain("overflow: hidden;");
     expect(cloudMain).toContain("padding: 0;");
-    expect(cloudPage).toContain("min-height: 100%;");
+    expect(cloudPage).toContain("display: flex;");
     expect(cloudPage).toContain("flex: 1 1 auto;");
+    expect(cloudPage).toContain("width: 100%;");
+    expect(cloudPage).toContain("height: 100%;");
+    expect(cloudPage).toContain("min-width: 0;");
+    expect(cloudPage).toContain("min-height: 0;");
+    expect(cloudSignInCss).not.toContain(".desktop-cloud-auth-main-view .desktop-entry-state");
   });
 
   it("reuses the canonical navigation icon in the Cloud-sized entry footprint", () => {
     const localMark = compact(readCssBlock(versionControlSetupCss, ".desktop-version-control-mark"));
     const localFrame = compact(readCssBlock(versionControlSetupCss, ".desktop-version-control-mark-frame"));
     const cloudMark = compact(readCssBlock(
-      cloudProjectBrowserCss,
-      ".desktop-cloud-project-auth-entry .desktop-cloud-product-mark",
+      cloudSignInCss,
+      ".desktop-cloud-sign-in-entry .desktop-cloud-product-mark",
     ));
 
     expect(versionControlSetupSource).toContain(
@@ -561,15 +578,16 @@ describe("source-control visual architecture", () => {
 });
 
 function readCssBlock(css: string, selector: string): string {
-  const marker = `${selector} {`;
-  const lineMarker = `\n${marker}`;
-  const lineStart = css.indexOf(lineMarker);
-  const start = css.startsWith(marker) ? 0 : lineStart >= 0 ? lineStart + 1 : -1;
-  if (start < 0) throw new Error(`Missing CSS block for ${selector}`);
-  const bodyStart = start + marker.length;
-  const end = css.indexOf("\n}", bodyStart);
-  if (end < 0) throw new Error(`Unclosed CSS block for ${selector}`);
-  return css.slice(bodyStart, end);
+  const match = new RegExp(`(?:^|\\n)\\s*${escapeRegExp(selector)}\\s*\\{`).exec(css);
+  if (!match) throw new Error(`Missing CSS block for ${selector}`);
+  const bodyStart = match.index + match[0].length;
+  const close = /\n\s*}/.exec(css.slice(bodyStart));
+  if (!close) throw new Error(`Unclosed CSS block for ${selector}`);
+  return css.slice(bodyStart, bodyStart + close.index);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function compact(value: string): string {

@@ -194,16 +194,6 @@ export async function openWorkspaceInNewWindow(folderPath: string): Promise<Work
   return getDesktopBridge().openWorkspaceInNewWindow(folderPath);
 }
 
-export async function openCloudProjectInNewWindow({
-  projectId,
-  name,
-}: {
-  projectId: string;
-  name: string;
-}): Promise<WorkspaceOpenResult> {
-  return getDesktopBridge().openCloudProjectInNewWindow({ projectId, name });
-}
-
 export async function selectWorkspaceFolder(): Promise<WorkspaceOpenResult | null> {
   return getDesktopBridge().selectFolder();
 }

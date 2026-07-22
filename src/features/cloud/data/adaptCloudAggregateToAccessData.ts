@@ -6,7 +6,7 @@ import type {
 } from "../../../lib/cloudApi";
 import { buildDesktopCloudAccessRows } from "../sections/access/accessRows";
 import { getCloudScopeRows, scopeMatchesMcpEndpoint } from "../utils";
-import type { DesktopCloudAccessDataState } from "./useDesktopCloudAccessData";
+import type { CloudProjectAccessData } from "../project/cloudProjectAccessData";
 import type { CloudMessageDescriptor } from "../cloudPresentation";
 import { repositoryTargetKey } from "../repositoryTarget";
 
@@ -31,7 +31,7 @@ export function adaptCloudAggregateToAccessData({
   error: CloudMessageDescriptor | null;
   warning: CloudMessageDescriptor | null;
   reload: () => Promise<void>;
-}): DesktopCloudAccessDataState {
+}): CloudProjectAccessData {
   const scopeRows = getCloudScopeRows(scopes, identity);
   const connectorsByTarget = new Map<string, DesktopCloudConnector[]>();
   for (const connector of connectors) {

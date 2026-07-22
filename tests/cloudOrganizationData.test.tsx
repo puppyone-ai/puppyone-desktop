@@ -19,7 +19,7 @@ vi.mock("../src/lib/cloudApi", async () => {
   return { ...actual, ...api };
 });
 
-import { useCloudOrganizationData } from "../src/features/cloud/components/CloudGlobalPages";
+import { useCloudOrganizationData } from "../src/features/cloud/organization/CloudOrganizationTeamPage";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;

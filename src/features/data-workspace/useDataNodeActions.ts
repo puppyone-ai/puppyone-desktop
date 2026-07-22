@@ -45,7 +45,6 @@ export function useDataNodeActions({
   setActiveDataPath,
   setActiveDataNode,
   workspace,
-  workspaceIsCloud,
 }: {
   dataPort: DataPort | null;
   externalAppsSettings: ExternalAppsSettings;
@@ -55,7 +54,6 @@ export function useDataNodeActions({
   setActiveDataPath: Dispatch<SetStateAction<string | null>>;
   setActiveDataNode: Dispatch<SetStateAction<DataNode | null>>;
   workspace: Workspace | null;
-  workspaceIsCloud: boolean;
 }) {
   const { t } = useLocalization();
   const [createEntryDraft, setCreateEntryDraft] = useState<DesktopCreateEntryDraft | null>(null);
@@ -68,7 +66,6 @@ export function useDataNodeActions({
     setActiveDataNode,
     setActiveDataPath,
     workspace,
-    workspaceIsCloud,
   });
 
   const resetDataNodeActions = useCallback(() => {
@@ -170,7 +167,7 @@ export function useDataNodeActions({
       setActiveDataPath(nextPath);
       setActiveDataNode(null);
       onWorkspaceContentChanged();
-      if (!workspaceIsCloud) onLocalWorkspaceContentChanged();
+      onLocalWorkspaceContentChanged();
     } catch (error) {
       setCreateEntryDraft((current) => current ? {
         ...current,
@@ -187,7 +184,6 @@ export function useDataNodeActions({
     setActiveDataNode,
     setActiveDataPath,
     workspace,
-    workspaceIsCloud,
     t,
   ]);
 
@@ -240,7 +236,7 @@ export function useDataNodeActions({
             : current
       ));
       onWorkspaceContentChanged();
-      if (!workspaceIsCloud) onLocalWorkspaceContentChanged();
+      onLocalWorkspaceContentChanged();
     } catch (error) {
       setNodeActionMenu((current) => current ? {
         ...current,
@@ -256,7 +252,6 @@ export function useDataNodeActions({
     setActiveDataNode,
     setActiveDataPath,
     t,
-    workspaceIsCloud,
   ]);
 
   const deleteNodeFromMenu = useCallback(async () => {
@@ -292,7 +287,7 @@ export function useDataNodeActions({
         deletedNodes.some((node) => current?.path === node.path || current?.path.startsWith(`${node.path}/`)) ? null : current
       ));
       onWorkspaceContentChanged();
-      if (!workspaceIsCloud) onLocalWorkspaceContentChanged();
+      onLocalWorkspaceContentChanged();
     }
 
     if (failures.length === 0) {
@@ -322,12 +317,10 @@ export function useDataNodeActions({
     setActiveDataNode,
     setActiveDataPath,
     t,
-    workspaceIsCloud,
   ]);
 
   const revealNodeInFinderFromMenu = useCallback(async () => {
     if (!workspace || !nodeActionMenu || nodeActionMenu.operation) return;
-    if (workspaceIsCloud) return;
 
     setNodeActionMenu((current) => current ? { ...current, operation: "reveal", error: null } : current);
     try {
@@ -340,11 +333,11 @@ export function useDataNodeActions({
         error: toDesktopNodeActionError(error),
       } : current);
     }
-  }, [nodeActionMenu, workspace, workspaceIsCloud]);
+  }, [nodeActionMenu, workspace]);
 
   const openNodeInDefaultAppFromMenu = useCallback(async () => {
     if (!workspace || !nodeActionMenu || nodeActionMenu.operation) return;
-    if (workspaceIsCloud || nodeActionMenu.node.type === "folder") return;
+    if (nodeActionMenu.node.type === "folder") return;
 
     setNodeActionMenu((current) => current ? { ...current, operation: "open", error: null } : current);
     try {
@@ -368,7 +361,6 @@ export function useDataNodeActions({
     externalAppsSettings,
     nodeActionMenu,
     workspace,
-    workspaceIsCloud,
   ]);
 
   return {

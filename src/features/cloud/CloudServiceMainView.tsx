@@ -4,12 +4,10 @@ import {
   openCloudApp,
 } from "../../lib/cloudApi";
 import type { CloudServiceMainViewProps, CloudWorkspaceSection } from "./types";
-import { getResolvedCloudProjectId } from "./context";
+import { getResolvedCloudProjectId } from "./project/context";
 import { getCloudAuthEmail, getCloudAuthSession } from "./auth";
 import { CloudSignedOutRoute } from "./auth/CloudSignedOutRoute";
 import { useDesktopCloudData } from "./data";
-import { useCloudProjectCatalog } from "./data/useCloudProjectCatalog";
-import { CloudProjectBrowser } from "./components/ProjectBrowser";
 import { CloudInitializationRoute } from "./initialization/CloudInitializationRoute";
 import { CloudRouter } from "./routes/CloudRouter";
 import { CloudSurfaceFrame } from "./shell/CloudSurfaceFrame";
@@ -17,7 +15,7 @@ import {
   getCloudProjectDetailResources,
   getCloudRouteSurface,
   getCloudRouteWebPath,
-  isCloudAccountSection,
+  isCloudOrganizationSection,
   normalizeCloudSection,
 } from "./routes/cloudRoutes";
 import {
@@ -61,34 +59,24 @@ export function CloudServiceMainView({
   const cloudRemote = cloudEnvironment.cloudRemote;
   const cloudApiBaseUrl = cloudEnvironment.apiBaseUrl;
   const routedSection = normalizeCloudSection(activeSection);
-  const inCloudGlobalSection = isCloudAccountSection(routedSection)
-    || routedSection === "templates"
-    || routedSection === "projects";
-  const localOnlyContext = activeSection === "initialize"
-    && (
+  const inOrganizationSection = isCloudOrganizationSection(routedSection);
+  const localOnlyContext = !inOrganizationSection && (
       projectContext?.status === "local-only"
       || cloudPublishState !== null
       || cloudPublishStateLoading
       || (projectContext?.status === "resolving" && status === null)
-    );
+  );
   const effectiveCloudSession = getCloudAuthSession(cloudAuthState);
   const projectDetailResources = getCloudProjectDetailResources(routedSection);
   const contextProjectId = projectContext ? getResolvedCloudProjectId(projectContext) : null;
   const cloudData = useDesktopCloudData({
     session: effectiveCloudSession,
     cloudEnvironment,
-    explicitProjectId: null,
-    repositoryProjectId: inCloudGlobalSection ? null : contextProjectId,
+    projectId: inOrganizationSection ? null : contextProjectId,
     onSessionChange: onCloudSessionChange,
     workspaceRevisionKey: status?.headCommitId ?? null,
     loadProjectDetails: projectDetailResources.length > 0,
     projectDetailResources,
-  });
-  const projectCatalog = useCloudProjectCatalog({
-    enabled: routedSection === "projects",
-    session: effectiveCloudSession,
-    apiBaseUrl: cloudApiBaseUrl,
-    onSessionChange: onCloudSessionChange,
   });
   const [cloudAction, setCloudAction] = useState<CloudActionFeedback>({
     notice: null,
@@ -213,57 +201,36 @@ export function CloudServiceMainView({
             <span>{formatCloudMessage(projectContext.warning, t)}</span>
           </div>
         )}
-        {!inCloudGlobalSection && error && <div className="desktop-cloud-main-alert">{error}</div>}
-        {!inCloudGlobalSection && cloudData.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudData.error, t)}</div>}
-        {routedSection === "projects" && projectCatalog.error && (
-          <div className="desktop-cloud-main-alert">{formatCloudMessage(projectCatalog.error, t)}</div>
-        )}
-        {!inCloudGlobalSection && cloudData.warning && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudData.warning, t)}</div>}
-        {!inCloudGlobalSection && cloudPublishErrorMessage && <div className="desktop-cloud-main-alert">{cloudPublishErrorMessage}</div>}
-        {!inCloudGlobalSection && cloudAction.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudAction.error, t)}</div>}
-        {!inCloudGlobalSection && cloudAction.notice && <div className="desktop-cloud-main-alert success">{formatCloudMessage(cloudAction.notice, t)}</div>}
+        {!inOrganizationSection && error && <div className="desktop-cloud-main-alert">{error}</div>}
+        {!inOrganizationSection && cloudData.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudData.error, t)}</div>}
+        {!inOrganizationSection && cloudData.warning && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudData.warning, t)}</div>}
+        {!inOrganizationSection && cloudPublishErrorMessage && <div className="desktop-cloud-main-alert">{cloudPublishErrorMessage}</div>}
+        {!inOrganizationSection && cloudAction.error && <div className="desktop-cloud-main-alert">{formatCloudMessage(cloudAction.error, t)}</div>}
+        {!inOrganizationSection && cloudAction.notice && <div className="desktop-cloud-main-alert success">{formatCloudMessage(cloudAction.notice, t)}</div>}
 
-        {routedSection === "projects" ? (
-          <CloudProjectBrowser
-            projects={projectCatalog.projects}
-            loading={projectCatalog.loading}
-            session={effectiveCloudSession}
-            apiBaseUrl={cloudApiBaseUrl}
-            currentRepositoryProjectId={null}
-            backupLoading={false}
-            cloudAction={{ kind: null, projectId: null }}
-            onSessionChange={onCloudSessionChange}
-            onBackupWorkspace={() => undefined}
-            onSelectProject={(project) => handleOpenProject(project.id, "contents")}
-            onConfigureProjectRemote={() => undefined}
-            onOpenCloudProjects={() => openCloudApp(getCloudRouteWebPath("projects"))}
-            showRepositoryActions={false}
-          />
-        ) : (
-          <CloudRouter
-            workspace={workspace}
-            status={status}
-            cloudSession={effectiveCloudSession}
-            cloudApiBaseUrl={cloudApiBaseUrl}
-            cloudRemote={cloudRemote}
-            cloudData={cloudData}
-            projectContext={projectContext}
-            activeSection={routedSection}
-            accountEmail={accountEmail}
-            accountConnected={accountConnected}
-            loading={loading}
-            onSessionChange={onCloudSessionChange}
-            onOpenProject={handleOpenProject}
-            onOpenGitSettings={onOpenGitSettings}
-            onSelectSection={onSelectSection}
-            onRetryContext={() => {
-              void cloudData.reload();
-              onRefresh();
-            }}
-            onUseAnotherAccount={() => onCloudSessionChange(null)}
-            onRemoveCloudRemote={onRemoveCloudRemote ? () => void handleRemoveCloudRemote() : undefined}
-          />
-        )}
+        <CloudRouter
+          workspace={workspace}
+          status={status}
+          cloudSession={effectiveCloudSession}
+          cloudApiBaseUrl={cloudApiBaseUrl}
+          cloudRemote={cloudRemote}
+          cloudData={cloudData}
+          projectContext={projectContext}
+          activeSection={routedSection}
+          accountEmail={accountEmail}
+          accountConnected={accountConnected}
+          loading={loading}
+          onSessionChange={onCloudSessionChange}
+          onOpenProject={handleOpenProject}
+          onOpenGitSettings={onOpenGitSettings}
+          onSelectSection={onSelectSection}
+          onRetryContext={() => {
+            void cloudData.reload();
+            onRefresh();
+          }}
+          onUseAnotherAccount={() => onCloudSessionChange(null)}
+          onRemoveCloudRemote={onRemoveCloudRemote ? () => void handleRemoveCloudRemote() : undefined}
+        />
     </CloudSurfaceFrame>
   );
 }

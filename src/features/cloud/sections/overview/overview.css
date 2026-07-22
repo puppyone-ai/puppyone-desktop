@@ -1,8 +1,5 @@
 @import "./styles/base.css" layer(features);
 @import "./styles/project-identity.css" layer(features);
 @import "./styles/dashboard-grid.css" layer(features);
-@import "../../graph/graph.css" layer(features);
-@import "./styles/history-card.css" layer(features);
-@import "./styles/access-card.css" layer(features);
 @import "./styles/resource-cards.css" layer(features);
 @import "./styles/responsive.css" layer(features);

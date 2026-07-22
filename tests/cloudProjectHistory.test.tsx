@@ -26,14 +26,13 @@ afterEach(() => {
 });
 
 describe("Cloud project history", () => {
-  it("replaces local Changes navigation with a History clock in Cloud projects", () => {
+  it("keeps local Changes in the app shell instead of creating a Cloud workspace shell", () => {
     const onNavigate = vi.fn();
     const container = render(
       <DesktopSidebarRailNavigation
         activeView="data"
-        cloudHistoryEnabled
-        cloudToolsEnabled={false}
-        gitEnabled={false}
+        cloudHubEnabled
+        gitEnabled
         pluginsEnabled={false}
         gitIncomingCount={0}
         gitOperationLoading={null}
@@ -44,12 +43,12 @@ describe("Cloud project history", () => {
       />,
     );
 
-    const historyButton = container.querySelector<HTMLButtonElement>('button[aria-label="History"]');
-    expect(historyButton).not.toBeNull();
-    expect(historyButton?.querySelector(".lucide-clock-3")).not.toBeNull();
-    expect(container.querySelector('button[aria-label="Changes"]')).toBeNull();
+    const changesButton = container.querySelector<HTMLButtonElement>('button[aria-label="Changes"]');
+    expect(changesButton).not.toBeNull();
+    expect(container.querySelector('button[aria-label="History"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Cloud"]')).not.toBeNull();
 
-    act(() => historyButton?.click());
+    act(() => changesButton?.click());
     expect(onNavigate).toHaveBeenCalledWith("git");
   });
 
