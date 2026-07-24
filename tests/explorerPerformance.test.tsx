@@ -250,10 +250,21 @@ describe("Explorer bounded rendering", () => {
     };
 
     act(() => sourceRow.dispatchEvent(dragEvent("dragstart")));
+    act(() => targetRow.dispatchEvent(dragEvent("dragenter")));
+    act(() => targetRow.dispatchEvent(dragEvent("dragover")));
+    expect(targetRow.classList.contains("drop-target")).toBe(true);
+
+    act(() => targetRow.dispatchEvent(dragEvent("dragleave")));
+    expect(targetRow.classList.contains("drop-target")).toBe(false);
+    expect(container.querySelector(".explorer-tree-shell")?.classList.contains("is-dragging-node")).toBe(true);
+
+    act(() => targetRow.dispatchEvent(dragEvent("dragenter")));
     act(() => targetRow.dispatchEvent(dragEvent("dragover")));
     act(() => targetRow.dispatchEvent(dragEvent("drop")));
 
     expect(onMoveNode).toHaveBeenCalledWith(source, target.path);
+    expect(targetRow.classList.contains("drop-target")).toBe(false);
+    expect(container.querySelector(".explorer-tree-shell")?.classList.contains("is-dragging-node")).toBe(false);
   });
 });
 

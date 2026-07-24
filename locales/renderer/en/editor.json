@@ -43,6 +43,7 @@
   "csv.expandTableHint": "Drag outward to expand; click to choose a size",
   "csv.expandTo": "Expand to {rows, number} rows × {columns, number} columns",
   "csv.header": "Use first record as header",
+  "csv.headerToggle": "Header row",
   "csv.headerDescription": "Changes display only; CSV content is unchanged.",
   "csv.headerRecord": "Header; CSV record 1",
   "csv.rowNumber": "Data row {row, number}; CSV record {record, number}",

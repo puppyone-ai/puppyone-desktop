@@ -1,7 +1,7 @@
 import type { Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
 import { AlertTriangle, Folder, FolderOpen } from "lucide-react";
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
 import {
   createTypographyRootProps,
   type ResolvedTypography,
@@ -47,6 +47,7 @@ export type MinimalOnboardingProps = {
   pointerCursors: boolean;
   diffMarkers: DiffMarkers;
   resolvedTheme: "light" | "dark";
+  cornerSlot?: ReactNode;
 };
 
 /** Local repository entrypoint. Cloud is entered from an open repository only. */
@@ -65,6 +66,7 @@ export function MinimalOnboarding({
   pointerCursors,
   diffMarkers,
   resolvedTheme,
+  cornerSlot,
 }: MinimalOnboardingProps) {
   const { t, formatRelativeTime } = useLocalization();
   const [error, setError] = useState<string | null>(initialError);
@@ -223,6 +225,7 @@ export function MinimalOnboarding({
 
         {error && <div className="onboarding-error onboarding-homepage-error" role="alert"><AlertTriangle size={15} /><span>{error}</span></div>}
       </section>
+      {cornerSlot}
     </main>
   );
 }

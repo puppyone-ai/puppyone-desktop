@@ -4,11 +4,21 @@ import {
   FILE_ICON_THEMES,
   getFileIconThemeDefinition,
   isFileIconThemeId,
-  type FileIconRenderContext,
-} from "./fileIconThemeRegistry";
-import { getFileAccent, type FileIconThemeId, type FileVisualKind } from "./fileIconTypes";
+} from "./icon-themes/registry";
+import type { FileIconRenderContext } from "./icon-themes/iconThemeTypes";
+import {
+  FILE_VISUAL_KINDS,
+  getFileAccent,
+  type FileIconThemeId,
+  type FileVisualKind,
+} from "./fileIconTypes";
 
-export { FILE_ICON_THEMES, getFileAccent, isFileIconThemeId };
+export {
+  FILE_ICON_THEMES,
+  FILE_VISUAL_KINDS,
+  getFileAccent,
+  isFileIconThemeId,
+};
 export type { FileIconThemeId, FileVisualKind };
 
 export function getFileExtension(name: string): string | null {

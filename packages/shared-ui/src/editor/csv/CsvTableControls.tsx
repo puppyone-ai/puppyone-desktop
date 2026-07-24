@@ -31,6 +31,11 @@ type CsvTableControlsProps = Readonly<{
 
 type CsvTableDragKind = "column" | "row";
 
+// The row grip straddles the table edge by roughly nine pixels. Once the
+// remaining scroll-padding gap is narrower than that, dock the grip inside the
+// frozen record gutter so the scroll viewport never clips its hit target.
+const ROW_HANDLE_OUTER_REACH_PX = 9;
+
 export function CsvTableControls({
   columnCount,
   direction,
@@ -94,6 +99,8 @@ export function CsvTableControls({
     if (!table || !surface || !columnHandle || !rowHandle || !dropIndicator) return;
 
     let disposed = false;
+    let dockedRecordIndexCell: HTMLTableCellElement | null = null;
+    const scrollContainer = surface.closest<HTMLElement>(".csv-table-editor__scroll");
     const firstMovableRow = headerEnabled ? 1 : 0;
     const getBodyRows = () => Array.from(
       table.querySelectorAll<HTMLTableRowElement>("tbody tr[data-csv-row]"),
@@ -117,6 +124,17 @@ export function CsvTableControls({
         handle.getBoundingClientRect();
         handle.classList.add("is-visible");
       }
+    };
+    const setRowHandleDocked = (
+      recordIndexCell: HTMLTableCellElement | null,
+      docked: boolean,
+    ) => {
+      if (dockedRecordIndexCell && (dockedRecordIndexCell !== recordIndexCell || !docked)) {
+        dockedRecordIndexCell.removeAttribute("data-row-handle-docked");
+      }
+      dockedRecordIndexCell = docked ? recordIndexCell : null;
+      dockedRecordIndexCell?.setAttribute("data-row-handle-docked", "");
+      rowHandle.classList.toggle("is-inline-docked", docked);
     };
     const positionHandles = () => {
       if (disposed || !surface.isConnected) return;
@@ -145,11 +163,25 @@ export function CsvTableControls({
         const recordIndexCell = row.querySelector<HTMLTableCellElement>("[data-csv-record-index]");
         const rect = recordIndexCell?.getBoundingClientRect();
         if (!recordIndexCell || !rect) {
+          setRowHandleDocked(null, false);
           setHandleVisible(rowHandle, false);
           return;
         }
+        const scrollRect = scrollContainer?.getBoundingClientRect();
+        const remainingOuterGap = scrollRect
+          ? direction === "rtl"
+            ? scrollRect.right - rect.right
+            : rect.left - scrollRect.left
+          : Number.POSITIVE_INFINITY;
+        setRowHandleDocked(
+          recordIndexCell,
+          remainingOuterGap < ROW_HANDLE_OUTER_REACH_PX,
+        );
         rowHandle.style.removeProperty("right");
-        const rowBoundary = direction === "rtl" ? rect.left : rect.right;
+        // Anchor the row control to the outside edge of the record-index
+        // gutter. The shared handle transform then mirrors the column handle's
+        // slight overlap with the table frame without covering the row number.
+        const rowBoundary = direction === "rtl" ? rect.right : rect.left;
         showHandleAt(
           rowHandle,
           `${rowBoundary - surfaceRect.left}px`,
@@ -159,6 +191,7 @@ export function CsvTableControls({
           row: rowIndex - firstMovableRow + 1,
         }));
       } else {
+        setRowHandleDocked(null, false);
         setHandleVisible(rowHandle, false);
       }
     };
@@ -429,7 +462,6 @@ export function CsvTableControls({
     table.addEventListener("pointerover", updateHoverFromEvent);
     table.addEventListener("contextmenu", openCellMenu);
     surface.addEventListener("pointerleave", clearHover);
-    const scrollContainer = surface.closest<HTMLElement>(".csv-table-editor__scroll");
     scrollContainer?.addEventListener("scroll", positionHandles, { passive: true });
     const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(positionHandles);
     resizeObserver?.observe(table);
@@ -443,6 +475,7 @@ export function CsvTableControls({
       surface.removeEventListener("pointerleave", clearHover);
       scrollContainer?.removeEventListener("scroll", positionHandles);
       resizeObserver?.disconnect();
+      setRowHandleDocked(null, false);
       setCsvTableSourceHighlight(table, "row", menuTargetRef.current?.rowIndex ?? -1, false);
       setCsvTableSourceHighlight(table, "column", menuTargetRef.current?.columnIndex ?? -1, false);
       positionHandlesRef.current = () => undefined;

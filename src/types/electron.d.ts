@@ -728,6 +728,14 @@ declare global {
         };
       }>;
       openExternalUrl: (href: string) => Promise<{ ok: boolean }>;
+      submitFeedback: (request: {
+        message: string;
+        locale?: string;
+        screenshot?: {
+          bytes: ArrayBuffer;
+          mimeType: "image/jpeg" | "image/png" | "image/webp";
+        };
+      }) => Promise<{ ok: true }>;
       markdownWebEmbed: {
         create: (request: {
           href: string;

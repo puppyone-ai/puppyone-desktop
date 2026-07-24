@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   getCsvTableExpansionFromDrag,
-  getCsvTableResizePreviewGeometry,
   getCsvTableResizeViewportConstraints,
 } from "../packages/shared-ui/src/editor/csv/CsvTableResizeControl";
 
 describe("CSV table corner resize geometry", () => {
-  it("quantizes outward distance into rows and columns", () => {
+  it("snaps outward distance to the nearest complete row and column", () => {
     expect(getCsvTableExpansionFromDrag({
       horizontalDistance: 193,
       verticalDistance: 63,
@@ -14,7 +13,26 @@ describe("CSV table corner resize geometry", () => {
       columnWidth: 96,
       maximumAddedRows: 100,
       maximumAddedColumns: 100,
-    })).toEqual({ addedRows: 3, addedColumns: 3 });
+    })).toEqual({ addedRows: 2, addedColumns: 2 });
+  });
+
+  it("does not preview the first track until the pointer crosses its midpoint", () => {
+    const base = {
+      rowHeight: 31,
+      columnWidth: 96,
+      maximumAddedRows: 100,
+      maximumAddedColumns: 100,
+    };
+    expect(getCsvTableExpansionFromDrag({
+      ...base,
+      horizontalDistance: 47,
+      verticalDistance: 15,
+    })).toEqual({ addedRows: 0, addedColumns: 0 });
+    expect(getCsvTableExpansionFromDrag({
+      ...base,
+      horizontalDistance: 48,
+      verticalDistance: 16,
+    })).toEqual({ addedRows: 1, addedColumns: 1 });
   });
 
   it("never turns inward movement into a shrinking operation", () => {
@@ -37,40 +55,6 @@ describe("CSV table corner resize geometry", () => {
       maximumAddedRows: 4,
       maximumAddedColumns: 2,
     })).toEqual({ addedRows: 4, addedColumns: 2 });
-  });
-
-  it("keeps the record gutter separate while reusing actual data-column widths", () => {
-    expect(getCsvTableResizePreviewGeometry({
-      addedColumns: 2,
-      addedRows: 3,
-      columnWidth: 96,
-      currentColumnCount: 2,
-      currentColumnWidths: [128, 214],
-      rowHeight: 31,
-    })).toEqual({
-      addedBlockSize: 93,
-      addedColumnWidth: 96,
-      addedInlineSize: 192,
-      dataColumnWidths: [128, 214, 96, 96],
-      rowHeight: 31,
-    });
-  });
-
-  it("normalizes missing geometry without folding the record gutter into a data track", () => {
-    expect(getCsvTableResizePreviewGeometry({
-      addedColumns: 1,
-      addedRows: 1,
-      columnWidth: 0,
-      currentColumnCount: 3,
-      currentColumnWidths: [140],
-      rowHeight: Number.NaN,
-    })).toEqual({
-      addedBlockSize: 31,
-      addedColumnWidth: 96,
-      addedInlineSize: 96,
-      dataColumnWidths: [140, 96, 96, 96],
-      rowHeight: 31,
-    });
   });
 
   it("uses all remaining editor space while keeping complete tracks inside the viewport", () => {

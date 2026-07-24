@@ -9,11 +9,13 @@ import {
   normalizeRows,
   parseDelimitedText,
   stringifyDelimitedText,
-  trimRows,
 } from "./csv/csvDocument";
+import { CsvHeaderSettings } from "./csv/CsvHeaderSettings";
 import { CsvTableControls } from "./csv/CsvTableControls";
-import { CsvTableResizeControl } from "./csv/CsvTableResizeControl";
-import { CsvTableSettings } from "./csv/CsvTableSettings";
+import {
+  CsvTableResizeControl,
+  type CsvTableExpansion,
+} from "./csv/CsvTableResizeControl";
 import {
   applyCsvTableOperation,
   MAX_CSV_TABLE_DATA_ROWS,
@@ -24,7 +26,10 @@ import {
   readCsvFirstRecordAsHeaderPreference,
   writeCsvFirstRecordAsHeaderPreference,
 } from "./csv/csvViewPreferences";
-import { estimateEditableTableColumnWidths } from "./table/editableTableLayout";
+import {
+  EDITABLE_TABLE_COLUMN_MIN_WIDTH,
+  estimateEditableTableColumnWidths,
+} from "./table/editableTableLayout";
 
 export type CsvTableEditorProps = {
   documentId?: string;
@@ -54,15 +59,17 @@ export function CsvTableEditor({
   const columnCount = Math.max(1, ...matrix.map((row) => row.length));
   const dataRows = headerEnabled ? matrix.slice(1) : matrix;
   const visibleDataRows = dataRows.slice(0, MAX_CSV_TABLE_DATA_ROWS);
-  const hiddenRowCount = Math.max(0, dataRows.length - visibleDataRows.length);
   const hasCsvSource = content.length > 0;
   const dataRowCount = hasCsvSource ? dataRows.length : 0;
   const structuralDataRowCount = Math.max(0, matrix.length - (headerEnabled ? 1 : 0));
-  const visibleDataRowCount = Math.min(dataRowCount, visibleDataRows.length);
   const columnWidths = useMemo(
     () => estimateEditableTableColumnWidths(matrix, columnCount, (row) => row),
     [columnCount, matrix],
   );
+  const [resizePreview, setResizePreview] = useState<CsvTableExpansion | null>(null);
+  const previewAddedRows = resizePreview?.addedRows ?? 0;
+  const previewAddedColumns = resizePreview?.addedColumns ?? 0;
+  const previewColumnCount = columnCount + previewAddedColumns;
   const surfaceRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
   const pendingFocusRef = useRef<CsvTableFocusTarget | null>(null);
@@ -100,13 +107,15 @@ export function CsvTableEditor({
     input.select();
   }, [matrix]);
 
-  const emitMatrix = (nextMatrix: string[][], preserveShape = false) => {
-    const serializableRows = preserveShape ? nextMatrix : trimRows(nextMatrix);
+  const emitMatrix = (nextMatrix: string[][]) => {
+    // Table shape is structural state. Cell edits must not implicitly discard
+    // trailing empty rows or columns; only explicit row/column operations may
+    // shrink the matrix. Empty CSV fields and records keep that shape portable.
     onChange?.(stringifyDelimitedText(
-      serializableRows,
+      nextMatrix,
       resolvedDelimiter,
       parsed.layout,
-      { preserveTerminalEmptyRecord: preserveShape },
+      { preserveTerminalEmptyRecord: true },
     ));
   };
 
@@ -125,7 +134,7 @@ export function CsvTableEditor({
       rowIndex: headerEnabled ? Math.max(1, next.length - 1) : Math.max(0, next.length - 1),
       columnIndex: 0,
     };
-    emitMatrix(next, true);
+    emitMatrix(next);
   };
 
   const addColumn = () => {
@@ -135,13 +144,13 @@ export function CsvTableEditor({
       rowIndex: headerEnabled && next.length > 1 ? 1 : 0,
       columnIndex: columnCount,
     };
-    emitMatrix(next, true);
+    emitMatrix(next);
   };
 
   const applyStructureOperation = (operation: CsvTableStructureOperation) => {
     const result = applyCsvTableOperation(matrix, headerEnabled, operation);
     pendingFocusRef.current = result.focus;
-    emitMatrix(result.rows, true);
+    emitMatrix(result.rows);
   };
 
   const expandTable = (targetDataRowCount: number, targetColumnCount: number) => {
@@ -162,25 +171,28 @@ export function CsvTableEditor({
 
   return (
     <section className="csv-table-editor" data-readonly={readOnly ? "true" : undefined}>
-      <CsvTableSettings
-        columnCount={columnCount}
+      <CsvHeaderSettings
         direction={direction}
-        headerEnabled={headerEnabled}
-        hiddenRowCount={hiddenRowCount}
-        nodeName={nodeName || (resolvedDelimiter === "\t" ? "TSV" : "CSV")}
-        onHeaderEnabledChange={setFirstRecordAsHeader}
-        dataRowCount={dataRowCount}
+        enabled={headerEnabled}
+        onChange={setFirstRecordAsHeader}
         t={t}
-        visibleDataRowCount={visibleDataRowCount}
-        warning={parsed.warning}
       />
 
-      <div className="csv-table-editor__scroll">
+      <div
+        className="csv-table-editor__scroll"
+        onScroll={(event) => {
+          const scrollContainer = event.currentTarget;
+          const inlineScrolled = Math.abs(scrollContainer.scrollLeft) > 0.5;
+          if (scrollContainer.hasAttribute("data-inline-scrolled") === inlineScrolled) return;
+          scrollContainer.toggleAttribute("data-inline-scrolled", inlineScrolled);
+        }}
+      >
         <div className="csv-table-editor__frame">
           <div
             ref={surfaceRef}
             className="csv-table-editor__surface po-editable-table-interaction-root"
             data-header-enabled={headerEnabled ? "true" : undefined}
+            data-resize-preview={resizePreview ? "true" : undefined}
             dir={direction}
           >
             <table
@@ -194,6 +206,13 @@ export function CsvTableEditor({
                 <col className="csv-table-editor__record-index-column" />
                 {columnWidths.map((width, columnIndex) => (
                   <col key={`column-${columnIndex}`} style={{ width }} />
+                ))}
+                {Array.from({ length: previewAddedColumns }, (_, previewColumnIndex) => (
+                  <col
+                    className="csv-table-editor__expansion-column"
+                    key={`expansion-column-${previewColumnIndex}`}
+                    style={{ width: EDITABLE_TABLE_COLUMN_MIN_WIDTH }}
+                  />
                 ))}
               </colgroup>
               {headerEnabled && (
@@ -227,6 +246,13 @@ export function CsvTableEditor({
                           spellCheck={false}
                         />
                       </th>
+                    ))}
+                    {Array.from({ length: previewAddedColumns }, (_, previewColumnIndex) => (
+                      <th
+                        className="csv-table-editor__header-cell csv-table-editor__expansion-cell csv-table-editor__expansion-cell--column"
+                        key={`expansion-header-${previewColumnIndex}`}
+                        aria-hidden="true"
+                      />
                     ))}
                   </tr>
                 </thead>
@@ -280,6 +306,35 @@ export function CsvTableEditor({
                           />
                         </td>
                       ))}
+                      {Array.from({ length: previewAddedColumns }, (_, previewColumnIndex) => (
+                        <td
+                          className="csv-table-editor__body-cell csv-table-editor__expansion-cell csv-table-editor__expansion-cell--column"
+                          key={`expansion-cell-${rowIndex}-${previewColumnIndex}`}
+                          aria-hidden="true"
+                        />
+                      ))}
+                    </tr>
+                  );
+                })}
+                {Array.from({ length: previewAddedRows }, (_, previewRowIndex) => {
+                  const displayRowNumber = structuralDataRowCount + previewRowIndex + 1;
+                  return (
+                    <tr
+                      className="csv-table-editor__expansion-row"
+                      key={`expansion-row-${previewRowIndex}`}
+                      aria-hidden="true"
+                    >
+                      <th className="csv-table-editor__record-index csv-table-editor__expansion-cell csv-table-editor__expansion-record-index">
+                        <span className="csv-table-editor__record-index-label">
+                          {displayRowNumber}
+                        </span>
+                      </th>
+                      {Array.from({ length: previewColumnCount }, (_, previewColumnIndex) => (
+                        <td
+                          className="csv-table-editor__body-cell csv-table-editor__expansion-cell"
+                          key={`expansion-row-${previewRowIndex}-cell-${previewColumnIndex}`}
+                        />
+                      ))}
                     </tr>
                   );
                 })}
@@ -318,11 +373,11 @@ export function CsvTableEditor({
                   t={t}
                 />
                 <CsvTableResizeControl
-                  columnWidths={columnWidths}
                   currentColumnCount={columnCount}
                   currentDataRowCount={structuralDataRowCount}
                   direction={direction}
                   onExpand={expandTable}
+                  onPreviewChange={setResizePreview}
                   t={t}
                 />
               </>

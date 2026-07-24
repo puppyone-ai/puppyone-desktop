@@ -43,6 +43,7 @@
   "csv.expandTableHint": "向外拖动以扩展；点击以选择尺寸",
   "csv.expandTo": "扩展至 {rows, number} 行 × {columns, number} 列",
   "csv.header": "将第一条记录作为表头",
+  "csv.headerToggle": "首行表头",
   "csv.headerDescription": "仅改变显示方式，不会修改 CSV 内容。",
   "csv.headerRecord": "表头；CSV 第 1 条记录",
   "csv.rowNumber": "数据第 {row, number} 行；CSV 第 {record, number} 条记录",
