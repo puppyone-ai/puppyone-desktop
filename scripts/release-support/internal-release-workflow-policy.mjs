@@ -7,6 +7,7 @@ export function inspectInternalReleaseWorkflow(workflowSource) {
   requireSnippets(workflowSource, errors, [
     ["runs-on: macos-15", "the internal build must use the pinned arm64 macOS runner"],
     ["publish_release:", "the internal workflow must expose one atomic publish switch"],
+    ["--package-version \"${VERSION}-internal.${INTERNAL_ID}\"", "explicit internal tags must also control the Terminal package version"],
     ["Test release transaction and Terminal launcher", "the internal build must run release integration tests on macOS"],
     ["Create self-describing release bundle", "the internal build must create release metadata"],
     ["actions/attest@", "published internal binaries must receive build provenance"],
@@ -69,6 +70,7 @@ export function inspectReleasePublisherWorkflow(workflowSource) {
     ["--draft", "GitHub releases must be created as drafts"],
     ["Verify GitHub asset digests before publication", "GitHub asset digests must be checked before publication"],
     ["Publish verified GitHub Release", "the publisher must explicitly publish the verified draft"],
+    ["Verify published GitHub Release state", "the published GitHub release and tag must be reverified"],
     ["Verify every immutable R2 object by SHA-256", "every R2 versioned object must be content-verified"],
     ["Validate remote tag ownership", "an existing Git tag must resolve to the bundled commit"],
     ["Publish latest release pointer", "the latest channel must expose a machine-readable pointer"],
@@ -89,6 +91,7 @@ export function inspectReleasePublisherWorkflow(workflowSource) {
     "Create GitHub draft release with identical assets",
     "Verify GitHub asset digests before publication",
     "Publish verified GitHub Release",
+    "Verify published GitHub Release state",
     "Promote mutable R2 latest files",
     "Verify mutable latest payloads by SHA-256",
     "Publish latest release pointer",

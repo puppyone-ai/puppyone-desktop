@@ -91,11 +91,13 @@ jobs:
             --commit "${GITHUB_SHA}"
 
           MANIFEST="${BUNDLE_DIRECTORY}/release.json"
+          COMMIT="$(node -e 'const p=require("node:path"); const m=require(p.resolve(process.argv[1])); process.stdout.write(m.commitSha)' "${MANIFEST}")"
           R2_PREFIX="$(node -e 'const p=require("node:path"); const m=require(p.resolve(process.argv[1])); process.stdout.write(m.r2.prefix)' "${MANIFEST}")"
           TAG="$(node -e 'const p=require("node:path"); const m=require(p.resolve(process.argv[1])); process.stdout.write(m.tag)' "${MANIFEST}")"
           VERSION="$(node -e 'const p=require("node:path"); const m=require(p.resolve(process.argv[1])); process.stdout.write(m.version)' "${MANIFEST}")"
           LATEST_PREFIX="${R2_PREFIX%/${TAG}}/latest"
           {
+            echo "commit=${COMMIT}"
             echo "latest_prefix=${LATEST_PREFIX}"
             echo "r2_prefix=${R2_PREFIX}"
             echo "tag=${TAG}"
@@ -189,14 +191,15 @@ jobs:
       - name: Validate remote tag ownership
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           VERIFY_TAG: ${{ inputs.verify_tag }}
         shell: bash
         run: |
           set -euo pipefail
           if REMOTE_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}" --jq .sha 2>/dev/null)"; then
-            if [ "${REMOTE_SHA}" != "${GITHUB_SHA}" ]; then
-              echo "Remote tag ${RELEASE_TAG} resolves to ${REMOTE_SHA}, not ${GITHUB_SHA}." >&2
+            if [ "${REMOTE_SHA}" != "${RELEASE_COMMIT}" ]; then
+              echo "Remote tag ${RELEASE_TAG} resolves to ${REMOTE_SHA}, not ${RELEASE_COMMIT}." >&2
               exit 1
             fi
           elif [ "${VERIFY_TAG}" = "true" ]; then
@@ -213,23 +216,36 @@ jobs:
         run: |
           set -euo pipefail
           RESPONSE="${RUNNER_TEMP}/github-release.json"
-          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" > "${RESPONSE}" 2>/dev/null; then
-            node scripts/verify-github-release-assets.mjs \
-              --bundle "${BUNDLE_DIRECTORY}" \
-              --release-json "${RESPONSE}" \
-              --expect-draft "$(node -e 'const p=require("node:path"); const r=require(p.resolve(process.argv[1])); process.stdout.write(String(r.draft))' "${RESPONSE}")"
-            echo "exists=true" >> "${GITHUB_OUTPUT}"
-            echo "draft=$(node -e 'const p=require("node:path"); const r=require(p.resolve(process.argv[1])); process.stdout.write(String(r.draft))' "${RESPONSE}")" >> "${GITHUB_OUTPUT}"
-          else
+          RELEASE_IDS="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.tag_name == \"${RELEASE_TAG}\") | .id")"
+          if [ -z "${RELEASE_IDS}" ]; then
             echo "exists=false" >> "${GITHUB_OUTPUT}"
             echo "draft=false" >> "${GITHUB_OUTPUT}"
+            exit 0
           fi
+          if [[ "${RELEASE_IDS}" == *$'\n'* ]]; then
+            echo "More than one GitHub Release uses ${RELEASE_TAG}; refusing an ambiguous publication." >&2
+            exit 1
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_IDS}" > "${RESPONSE}"
+          DRAFT="$(node -e 'const p=require("node:path"); const r=require(p.resolve(process.argv[1])); process.stdout.write(String(r.draft))' "${RESPONSE}")"
+          node scripts/verify-github-release-assets.mjs \
+            --bundle "${BUNDLE_DIRECTORY}" \
+            --release-json "${RESPONSE}" \
+            --expect-draft "${DRAFT}"
+          {
+            echo "draft=${DRAFT}"
+            echo "exists=true"
+            echo "release_id=${RELEASE_IDS}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Prepare GitHub release notes
         id: notes
         env:
           GENERATE_NOTES: ${{ inputs.generate_notes }}
           GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         shell: bash
         run: |
@@ -243,7 +259,7 @@ jobs:
                 --method POST \
                 "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
                 -f "tag_name=${RELEASE_TAG}" \
-                -f "target_commitish=${GITHUB_SHA}" \
+                -f "target_commitish=${RELEASE_COMMIT}" \
                 --jq .body
             } >> "${NOTES}"
           fi
@@ -256,6 +272,7 @@ jobs:
           RELEASE_NOTES: ${{ steps.notes.outputs.path }}
           PRERELEASE: ${{ inputs.prerelease }}
           RELEASE_NAME: ${{ inputs.release_name }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           VERIFY_TAG: ${{ inputs.verify_tag }}
         shell: bash
@@ -274,11 +291,12 @@ jobs:
           if [ "${VERIFY_TAG}" = "true" ]; then
             args+=(--verify-tag)
           else
-            args+=(--target "${GITHUB_SHA}")
+            args+=(--target "${RELEASE_COMMIT}")
           fi
           gh release create "${args[@]}"
 
       - name: Verify GitHub asset digests before publication
+        id: github_verify
         if: ${{ steps.github_state.outputs.exists != 'true' || steps.github_state.outputs.draft == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -288,11 +306,23 @@ jobs:
           set -euo pipefail
           RESPONSE="${RUNNER_TEMP}/github-release.json"
           for attempt in 1 2 3 4 5; do
-            gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" > "${RESPONSE}"
+            RELEASE_IDS="$(gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+              --jq ".[] | select(.tag_name == \"${RELEASE_TAG}\") | .id")"
+            if [[ "${RELEASE_IDS}" == *$'\n'* ]]; then
+              echo "More than one GitHub Release uses ${RELEASE_TAG}; refusing an ambiguous publication." >&2
+              exit 1
+            fi
+            if [ -z "${RELEASE_IDS}" ]; then
+              sleep "$((attempt * 2))"
+              continue
+            fi
+            gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_IDS}" > "${RESPONSE}"
             if node scripts/verify-github-release-assets.mjs \
               --bundle "${BUNDLE_DIRECTORY}" \
               --release-json "${RESPONSE}" \
               --expect-draft true; then
+              echo "release_id=${RELEASE_IDS}" >> "${GITHUB_OUTPUT}"
               exit 0
             fi
             sleep "$((attempt * 2))"
@@ -305,17 +335,44 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PRERELEASE: ${{ inputs.prerelease }}
+          RELEASE_ID: ${{ steps.github_verify.outputs.release_id || steps.github_state.outputs.release_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${RELEASE_ID:?GitHub Release ID is required}"
+          if [ "${PRERELEASE}" = "true" ]; then
+            MAKE_LATEST=false
+          else
+            MAKE_LATEST=true
+          fi
+          gh api \
+            --method PATCH \
+            "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
+            -F draft=false \
+            -F "prerelease=${PRERELEASE}" \
+            -f "make_latest=${MAKE_LATEST}" >/dev/null
+
+      - name: Verify published GitHub Release state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
+          RELEASE_ID: ${{ steps.github_verify.outputs.release_id || steps.github_state.outputs.release_id }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
-          args=(--draft=false)
-          if [ "${PRERELEASE}" = "true" ]; then
-            args+=(--prerelease --latest=false)
-          else
-            args+=(--latest)
+          : "${RELEASE_ID:?GitHub Release ID is required}"
+          RESPONSE="${RUNNER_TEMP}/github-release-published.json"
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" > "${RESPONSE}"
+          node scripts/verify-github-release-assets.mjs \
+            --bundle "${BUNDLE_DIRECTORY}" \
+            --release-json "${RESPONSE}" \
+            --expect-draft false
+          REMOTE_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}" --jq .sha)"
+          if [ "${REMOTE_SHA}" != "${RELEASE_COMMIT}" ]; then
+            echo "Published tag ${RELEASE_TAG} resolves to ${REMOTE_SHA}, not ${RELEASE_COMMIT}." >&2
+            exit 1
           fi
-          gh release edit "${RELEASE_TAG}" "${args[@]}"
 
       - name: Promote mutable R2 latest files
         env:

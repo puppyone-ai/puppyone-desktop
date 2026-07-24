@@ -66,8 +66,9 @@ jobs:
           {
             echo "arch=$(node -p 'process.arch')"
             echo "artifact_name=puppyone-desktop-${TAG}"
+            echo "internal_id=${SUFFIX}"
             echo "published_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-            echo "release_name=puppyone ${VERSION} internal ${GITHUB_RUN_NUMBER}"
+            echo "release_name=puppyone ${VERSION} internal ${SUFFIX}"
             echo "tag=${TAG}"
             echo "version=${VERSION}"
           } >> "${GITHUB_OUTPUT}"
@@ -101,6 +102,7 @@ jobs:
         id: preview
         env:
           ARCH: ${{ steps.release.outputs.arch }}
+          INTERNAL_ID: ${{ steps.release.outputs.internal_id }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           VERSION: ${{ steps.release.outputs.version }}
         shell: bash
@@ -116,7 +118,7 @@ jobs:
             --arch "${ARCH}" \
             --archive "release/${ARCHIVE_NAME}" \
             --archive-url "${PUBLIC_DOWNLOAD_ORIGIN}/${R2_PREFIX}/${ARCHIVE_NAME}" \
-            --package-version "${VERSION}-internal.${GITHUB_RUN_NUMBER}" \
+            --package-version "${VERSION}-internal.${INTERNAL_ID}" \
             --release-tag "${RELEASE_TAG}"
 
           set -- artifacts/terminal-preview/*.tgz
