@@ -47,6 +47,7 @@ import { DesktopTitlebarContext } from "./features/app-shell/DesktopTitlebarCont
 import { DesktopWorkspaceContent } from "./features/app-shell/DesktopWorkspaceContent";
 import { DesktopTitlebarActions } from "./features/app-shell/DesktopTitlebarActions";
 import { DesktopOverlayPortal } from "./features/app-shell/DesktopOverlayPortal";
+import { DesktopHelpLauncher } from "./features/app-shell/DesktopHelpLauncher";
 import type { DesktopWorkspaceSwitcherItem } from "./features/app-shell/DesktopWorkspaceSwitcher";
 import { RestoringWorkspaceScreen } from "./features/app-shell/RestoringWorkspaceScreen";
 import { useDesktopPreferences } from "./features/app-shell/useDesktopPreferences";
@@ -752,6 +753,7 @@ export function App() {
         onOpenWorkspacePath={openWorkspacePath}
         recentWorkspaces={recentWorkspaceItems}
         initialError={restoreWorkspaceError}
+        cornerSlot={<DesktopHelpLauncher />}
         themeMode={activeThemeMode}
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}
@@ -968,6 +970,7 @@ export function App() {
           workspaceKey={workspaceKey}
           workspaceRefreshToken={workspaceRefreshToken}
         />
+        <DesktopHelpLauncher />
       </DesktopCloudShell>
       <DesktopOverlayPortal
         theme={resolvedTheme}

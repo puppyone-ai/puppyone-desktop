@@ -39,6 +39,7 @@ import { registerCloudPublishIpcHandlers } from "./main/ipc/cloud-publish-ipc.mj
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
 import { registerLocalizationIpcHandlers } from "./main/ipc/localization-ipc.mjs";
 import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service.mjs";
+import { registerFeedbackIpcHandlers } from "./main/ipc/feedback-ipc.mjs";
 import { registerSystemIpcHandlers } from "./main/ipc/system-ipc.mjs";
 import { registerTerminalIpcHandlers } from "./main/ipc/terminal-ipc.mjs";
 import { registerWorkspaceFileIpcHandlers } from "./main/ipc/workspace-files-ipc.mjs";
@@ -598,6 +599,10 @@ function registerIpcHandlers() {
     cloudPublishCoordinator,
   });
   registerSystemIpcHandlers({ ipcMain: trustedIpcMain, shell, setDockIcon });
+  registerFeedbackIpcHandlers({
+    ipcMain: trustedIpcMain,
+    appVersion: app.getVersion(),
+  });
   registerMarkdownWebEmbedIpcHandlers({
     ipcMain: trustedIpcMain,
     createMarkdownWebEmbedService,

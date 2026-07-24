@@ -21,6 +21,7 @@ export function AssetLibraryHome({
   pointerCursors,
   diffMarkers,
   resolvedTheme,
+  cornerSlot,
 }: MinimalOnboardingProps) {
   const { t, formatDate, formatRelativeTime } = useLocalization();
   const [error, setError] = useState<string | null>(initialError);
@@ -129,6 +130,7 @@ export function AssetLibraryHome({
       </section>
 
       {dragging && <div className="asset-library-home-drop-overlay" aria-hidden="true"><FolderOpen size={24} strokeWidth={1.6} /><strong>{t("onboarding.library.dropOverlay")}</strong></div>}
+      {cornerSlot}
     </main>
   );
 }
