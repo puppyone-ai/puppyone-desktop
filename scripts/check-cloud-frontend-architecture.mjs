@@ -48,14 +48,11 @@ const lineBudgets = new Map([
   ["src/features/cloud/auth/cloud-sign-in.css", 120],
   ["src/features/cloud/styles/primitives.css", 250],
   ["src/features/cloud/sections/overview/OverviewDashboard.tsx", 280],
-  ["src/features/cloud/sections/overview/OverviewHistoryPreview.tsx", 130],
   ["src/features/cloud/sections/overview/overview.css", 10],
   ["src/features/cloud/sections/overview/styles/base.css", 180],
-  ["src/features/cloud/sections/overview/styles/project-identity.css", 80],
+  ["src/features/cloud/sections/overview/styles/project-identity.css", 90],
   ["src/features/cloud/sections/overview/styles/dashboard-grid.css", 180],
-  ["src/features/cloud/sections/overview/styles/history-card.css", 100],
-  ["src/features/cloud/sections/overview/styles/access-card.css", 100],
-  ["src/features/cloud/sections/overview/styles/resource-cards.css", 110],
+  ["src/features/cloud/sections/overview/styles/resource-cards.css", 170],
   ["src/features/cloud/sections/overview/styles/responsive.css", 150],
 ]);
 for (const [relativePath, maximumLines] of lineBudgets) {
@@ -240,9 +237,6 @@ const expectedOverviewStyleManifest = [
   '@import "./styles/base.css" layer(features);',
   '@import "./styles/project-identity.css" layer(features);',
   '@import "./styles/dashboard-grid.css" layer(features);',
-  '@import "../../graph/graph.css" layer(features);',
-  '@import "./styles/history-card.css" layer(features);',
-  '@import "./styles/access-card.css" layer(features);',
   '@import "./styles/resource-cards.css" layer(features);',
   '@import "./styles/responsive.css" layer(features);',
 ].join("\n");
