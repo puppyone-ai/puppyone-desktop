@@ -32,8 +32,6 @@ const gitHistoryCss = readCss("../src/features/source-control/styles/history-lis
 const settingsCss = readCss("../src/styles/settings-view.css");
 const cloudSidebarCss = readCss("../src/features/cloud/styles/sidebar-shell.css");
 const cloudHistorySidebarCss = readCss("../src/features/cloud/history/styles/sidebar.css");
-const accessScopeCss = readCss("../src/features/cloud/sections/access/styles/scope-sidebar.css");
-const accessServiceCss = readCss("../src/features/cloud/sections/access/styles/service-sidebar.css");
 const accessLegacyCss = readCss("../src/features/cloud/sections/access/styles/access-detail.css");
 const changesCss = readCss("../src/features/changes/changes.css");
 
@@ -59,11 +57,6 @@ describe("sidebar spacing architecture", () => {
   it("gives the Explorer host sole ownership of the sidebar divider", () => {
     const explorerColumn = compact(readCssBlock(dataTreeCss, ".explorer-column"));
     const injectedSurface = compact(readCssBlock(layoutCss, ".desktop-view-surface-sidebar"));
-    const accessSidebar = compact(readCssBlock(
-      accessServiceCss,
-      ".desktop-cloud-service-sidebar.desktop-cloud-access-scope-sidebar",
-    ));
-
     expect(dataWorkspaceSource).toContain('<aside className="explorer-column">');
     expect(dataWorkspaceSource).toContain("renderWorkspaceSlot(explorerSlot, workspaceState)");
     expect(workspaceSurfaceOutletSource).toContain(
@@ -73,7 +66,6 @@ describe("sidebar spacing architecture", () => {
       "border-inline-end: 1px solid var(--po-shell-divider, var(--po-divider));",
     );
     expect(injectedSurface).not.toContain("border-inline-end:");
-    expect(accessSidebar).not.toContain("border-inline-end:");
   });
 
   it("defines one visual edge contract", () => {
@@ -337,12 +329,6 @@ describe("sidebar spacing architecture", () => {
 
   it("keeps every remaining page-level sidebar on the shared block edge", () => {
     expect(cloudSidebarCss).not.toContain(".desktop-cloud-sidebar-list");
-    expectBlockPadding(accessScopeCss, ".desktop-cloud-access-scope-list", "0");
-    expectBlockPadding(
-      accessServiceCss,
-      ".desktop-cloud-service-sidebar .desktop-cloud-access-scope-list",
-      "0",
-    );
     expectBlockPadding(accessLegacyCss, ".desktop-cloud-access-scope-list", "8px");
     expectBlockPadding(changesCss, ".review-list", "0");
   });

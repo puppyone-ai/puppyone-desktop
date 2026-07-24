@@ -12,6 +12,7 @@ import {
 import { normalizePackageVersion } from "../scripts/build-terminal-preview-package.mjs";
 
 const temporaryDirectories = [];
+const macIntegrationIt = process.platform === "darwin" ? it : it.skip;
 
 afterEach(async () => {
   await Promise.all(
@@ -22,7 +23,7 @@ afterEach(async () => {
 });
 
 describe("Terminal preview launcher", () => {
-  it("extracts a verified app archive and reuses the prepared cache", async () => {
+  macIntegrationIt("extracts a verified app archive and reuses the prepared cache", async () => {
     const fixture = await createPreviewFixture();
     const cacheRoot = path.join(fixture.root, "cache");
     const first = await preparePreviewApp({
@@ -43,7 +44,7 @@ describe("Terminal preview launcher", () => {
     expect(second.executablePath).toBe(first.executablePath);
   });
 
-  it("rejects archives whose digest does not match the package metadata", async () => {
+  macIntegrationIt("rejects archives whose digest does not match the package metadata", async () => {
     const fixture = await createPreviewFixture();
     await expect(preparePreviewApp({
       cacheRoot: path.join(fixture.root, "bad-cache"),
@@ -55,7 +56,7 @@ describe("Terminal preview launcher", () => {
     })).rejects.toThrow(/SHA-256 verification/i);
   });
 
-  it("accepts an HTTPS response without a Content-Length header", async () => {
+  macIntegrationIt("accepts an HTTPS response without a Content-Length header", async () => {
     const fixture = await createPreviewFixture();
     const prepared = await preparePreviewApp({
       cacheRoot: path.join(fixture.root, "https-cache"),

@@ -17,10 +17,13 @@ afterEach(() => {
   act(() => root?.unmount());
   root = null;
   document.body.innerHTML = "";
+  vi.useRealTimers();
 });
 
 describe("CloudRepositoryOverview landing page", () => {
   it("uses an in-app action dashboard without promoting the web route", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T12:00:00.000Z"));
     const onRefresh = vi.fn(async () => undefined);
     const onSelectSection = vi.fn();
     const container = document.createElement("div");

@@ -68,6 +68,13 @@ jobs:
       - name: Install locked dependencies without deployment secrets
         run: npm ci
 
+      - name: Test release transaction and Terminal launcher
+        run: >-
+          npm test --
+          tests/terminalPreviewLauncher.test.mjs
+          tests/desktopReleaseMetadata.test.mjs
+          tests/macosReleasePolicy.test.mjs
+
       - name: Stage pinned OpenCode runtime without deployment secrets
         shell: bash
         run: |

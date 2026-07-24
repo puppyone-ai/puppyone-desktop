@@ -7,6 +7,7 @@ export function inspectInternalReleaseWorkflow(workflowSource) {
   requireSnippets(workflowSource, errors, [
     ["runs-on: macos-15", "the internal build must use the pinned arm64 macOS runner"],
     ["publish_release:", "the internal workflow must expose one atomic publish switch"],
+    ["Test release transaction and Terminal launcher", "the internal build must run release integration tests on macOS"],
     ["Create self-describing release bundle", "the internal build must create release metadata"],
     ["actions/attest@", "published internal binaries must receive build provenance"],
     ["uses: ./.github/workflows/desktop-release-publish.yml", "the internal workflow must use the canonical publisher"],
@@ -29,6 +30,7 @@ export function inspectStableReleaseWorkflow(workflowSource) {
   requireSnippets(workflowSource, errors, [
     ["runs-on: macos-15", "the stable build must pin its macOS runner"],
     ["name: desktop-signing", "stable signing must use its dedicated deployment environment"],
+    ["Test release transaction and Terminal launcher", "the stable build must run release integration tests on macOS"],
     ["Prepare release application without deployment secrets", "stable application preparation must be secretless"],
     ["Sign, notarize, and verify release package", "stable packaging must sign and notarize"],
     ["Create self-describing stable release bundle", "the stable build must create release metadata"],
