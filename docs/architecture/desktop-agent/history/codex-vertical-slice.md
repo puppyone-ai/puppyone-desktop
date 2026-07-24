@@ -42,7 +42,7 @@ Copy the following prompt to the implementation agent:
 ```text
 Implement the first Codex-backed Desktop Agent Chat vertical slice in:
 
-  /Users/supersayajin/Desktop/puppyone desktop
+  /path/to/puppyone-desktop
 
 Do not stop after planning or producing a mockup. Implement the feature, add
 tests, run the relevant verification, and report remaining gaps accurately.

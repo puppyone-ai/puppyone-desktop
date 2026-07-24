@@ -7,9 +7,9 @@ import {
 describe("desktop workspace switcher copy path", () => {
   it("copies the filesystem root for local projects", () => {
     expect(getProjectCopyPath(createItem({
-      detail: "/Users/supersayajin/Desktop/demo",
-      path: "/Users/supersayajin/Desktop/demo",
-    }))).toBe("/Users/supersayajin/Desktop/demo");
+      detail: "/Users/example/Desktop/demo",
+      path: "/Users/example/Desktop/demo",
+    }))).toBe("/Users/example/Desktop/demo");
   });
 
   it("skips an item without a filesystem root", () => {
@@ -21,9 +21,9 @@ describe("desktop workspace switcher copy path", () => {
 
   it("copies every registered local workspace root", () => {
     expect(getProjectCopyPath(createItem({
-      detail: "/Users/supersayajin/Library/Caches/puppyone/demo",
-      path: "/Users/supersayajin/Library/Caches/puppyone/demo",
-    }))).toBe("/Users/supersayajin/Library/Caches/puppyone/demo");
+      detail: "/Users/example/Library/Caches/puppyone/demo",
+      path: "/Users/example/Library/Caches/puppyone/demo",
+    }))).toBe("/Users/example/Library/Caches/puppyone/demo");
   });
 });
 

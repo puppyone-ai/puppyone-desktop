@@ -21,11 +21,11 @@ describe("normalizeCloudApiBaseUrl", () => {
   });
 
   it("strips trailing slashes, hash and query", () => {
-    expect(normalizeCloudApiBaseUrl("https://qubits-try.puppyone.ai/api/v1/")).toBe(
-      "https://qubits-try.puppyone.ai/api/v1",
+    expect(normalizeCloudApiBaseUrl("https://subdomain.puppyone.ai/api/v1/")).toBe(
+      "https://subdomain.puppyone.ai/api/v1",
     );
-    expect(normalizeCloudApiBaseUrl("https://qubits-try.puppyone.ai/api/v1?x=1#frag")).toBe(
-      "https://qubits-try.puppyone.ai/api/v1",
+    expect(normalizeCloudApiBaseUrl("https://subdomain.puppyone.ai/api/v1?x=1#frag")).toBe(
+      "https://subdomain.puppyone.ai/api/v1",
     );
   });
 
@@ -44,7 +44,7 @@ describe("normalizeCloudApiBaseUrl", () => {
 
   it("SSRF guard: allows the PuppyOne host family and localhost (dev)", () => {
     expect(normalizeCloudApiBaseUrl("https://api.puppyone.ai/api/v1")).toBe("https://api.puppyone.ai/api/v1");
-    expect(normalizeCloudApiBaseUrl("https://qubits-try.puppyone.ai/api/v1")).toBe("https://qubits-try.puppyone.ai/api/v1");
+    expect(normalizeCloudApiBaseUrl("https://subdomain.puppyone.ai/api/v1")).toBe("https://subdomain.puppyone.ai/api/v1");
     expect(normalizeCloudApiBaseUrl("http://localhost:8000/api/v1")).toBe("http://localhost:8000/api/v1");
   });
 });
@@ -81,10 +81,10 @@ describe("normalizeCloudApiPath", () => {
 describe("sameCloudApiBaseUrl", () => {
   it("treats trailing-slash / scheme-normalized variants as equal", () => {
     expect(
-      sameCloudApiBaseUrl("https://qubits-try.puppyone.ai/api/v1", "https://qubits-try.puppyone.ai/api/v1/"),
+      sameCloudApiBaseUrl("https://subdomain.puppyone.ai/api/v1", "https://subdomain.puppyone.ai/api/v1/"),
     ).toBe(true);
     expect(
-      sameCloudApiBaseUrl("https://qubits-try.puppyone.ai/api/v1", "https://api.puppyone.ai/api/v1"),
+      sameCloudApiBaseUrl("https://subdomain.puppyone.ai/api/v1", "https://api.puppyone.ai/api/v1"),
     ).toBe(false);
   });
 });
