@@ -563,7 +563,7 @@ describe("session / api-base guards", () => {
   });
 
   it("rejects with 401 (without calling the bridge) when the requested api base != the session's", async () => {
-    const otherApi = "https://qubits-try.puppyone.ai/api/v1";
+    const otherApi = "https://subdomain.puppyone.ai/api/v1";
     await expect(
       cloudApiRequest("/projects/", session, undefined, {}, otherApi),
     ).rejects.toThrow(/sign in/i);

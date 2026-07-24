@@ -29,6 +29,7 @@ export function inspectStableReleaseWorkflow(workflowSource) {
   const errors = inspectSource(workflowSource, "stable release workflow");
   if (errors.length > 0) return errors;
   requireSnippets(workflowSource, errors, [
+    ["- \"!v*.*.*-*\"", "internal or other prerelease tags must not trigger the stable workflow"],
     ["runs-on: macos-15", "the stable build must pin its macOS runner"],
     ["name: desktop-signing", "stable signing must use its dedicated deployment environment"],
     ["Test release transaction and Terminal launcher", "the stable build must run release integration tests on macOS"],
