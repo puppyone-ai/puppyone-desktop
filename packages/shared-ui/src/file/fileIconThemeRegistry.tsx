@@ -6,7 +6,6 @@ import {
   FileCode,
   FileImage,
   FileJson,
-  FileSpreadsheet,
   FileText,
   FileVideo,
   Folder as LucideFolder,
@@ -305,6 +304,7 @@ const DEFAULT_GLYPH_RENDERERS: Partial<Record<FileVisualKind, FileIconRenderer<F
   html: renderDefaultCodeGlyph,
   code: renderDefaultCodeGlyph,
   json: renderDefaultJsonGlyph,
+  spreadsheet: renderDefaultSpreadsheetGlyph,
 };
 
 function renderDefaultGlyph(context: FileIconRenderContext): ReactNode {
@@ -370,6 +370,58 @@ function renderDefaultJsonGlyph({ color, size }: FileIconRenderContext): ReactNo
       <text x="9" y="12.35" textAnchor="middle" fontSize="9.5" fontWeight="800" fontFamily="var(--po-font-sans)" fill={color}>
         {"{}"}
       </text>
+    </svg>
+  );
+}
+
+function renderDefaultSpreadsheetGlyph({ color, size }: FileIconRenderContext): ReactNode {
+  return (
+    <SpreadsheetGridGlyph
+      color={color}
+      fill="color-mix(in srgb, var(--po-file-icon-body) 65%, transparent)"
+      size={size}
+    />
+  );
+}
+
+function SpreadsheetGridGlyph({
+  color,
+  fill,
+  size,
+  strokeWidth = 1.2,
+}: Readonly<{
+  color: string;
+  fill: string;
+  size: number;
+  strokeWidth?: number;
+}>) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 18 18"
+      fill="none"
+      aria-hidden
+      data-file-icon-shape="table-grid"
+      data-file-icon-grid="2x2"
+    >
+      <rect
+        x="3.5"
+        y="3.5"
+        width="11"
+        height="11"
+        rx="1.25"
+        fill={fill}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3.8 9h10.4M9 3.8v10.4"
+        stroke={color}
+        strokeWidth={strokeWidth * 0.78}
+        opacity="0.82"
+      />
     </svg>
   );
 }
@@ -516,6 +568,9 @@ function renderVsCodeGlyph(context: FileIconRenderContext): ReactNode {
   const foldFill = getVsCodeFoldFill(context.kind);
 
   if (context.kind === "folder") return <VsCodeFolderGlyph size={context.size} />;
+  if (context.kind === "spreadsheet") {
+    return <SpreadsheetGridGlyph color={color} fill={fill} size={context.size} strokeWidth={1.15} />;
+  }
 
   return (
     <svg width={context.size} height={context.size} viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -609,12 +664,6 @@ const VSCODE_SYMBOL_RENDERERS: Partial<Record<FileVisualKind, (context: SymbolCo
     <>
       <rect x="4.95" y="5.95" width="8.1" height="6.6" rx="0.85" stroke={color} strokeWidth="1" />
       <path d="m8.1 7.55 3.05 1.7-3.05 1.7v-3.4Z" fill={color} />
-    </>
-  ),
-  spreadsheet: ({ color }) => (
-    <>
-      <rect x="5" y="5.7" width="8" height="7.2" rx="0.6" stroke={color} strokeWidth="1" />
-      <path d="M5.1 8.1h7.8M5.1 10.55h7.8M7.7 5.8v7M10.3 5.8v7" stroke={color} strokeWidth="0.65" opacity="0.86" />
     </>
   ),
   archive: ({ color }) => (
@@ -744,10 +793,7 @@ function renderMaterialCodeGlyph(context: FileIconRenderContext): ReactNode {
 function renderMaterialSpreadsheetGlyph(context: FileIconRenderContext): ReactNode {
   const tint = getMaterialTint(context.color);
   return (
-    <svg width={context.size} height={context.size} viewBox="0 0 18 18" fill="none" aria-hidden>
-      <rect x="3.5" y="2.9" width="11" height="12.2" rx="1.6" fill={tint} stroke={context.color} strokeWidth="1.25" />
-      <path d="M3.6 6.8h10.8M3.6 10h10.8M7.15 3.1v11.8M10.85 3.1v11.8" stroke={context.color} strokeWidth="0.85" opacity="0.8" />
-    </svg>
+    <SpreadsheetGridGlyph color={context.color} fill={tint} size={context.size} strokeWidth={1.2} />
   );
 }
 
@@ -801,6 +847,10 @@ function getMaterialTint(color: string): string {
 }
 
 function renderMinimalGlyph(context: FileIconRenderContext): ReactNode {
+  if (context.kind === "spreadsheet") {
+    return <SpreadsheetGridGlyph color={context.color} fill="none" size={context.size} strokeWidth={1.35} />;
+  }
+
   const Icon = getMinimalLucideIcon(context.kind);
   return <Icon size={context.size} color={context.color} strokeWidth={1.85} aria-hidden="true" />;
 }
@@ -832,7 +882,6 @@ function getMinimalLucideIcon(kind: FileVisualKind): LucideIcon {
     image: FileImage,
     audio: FileAudio,
     video: FileVideo,
-    spreadsheet: FileSpreadsheet,
     archive: FileArchive,
     markdown: FileText,
     text: FileText,

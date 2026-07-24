@@ -122,7 +122,7 @@ describe("Markdown rich-block boundary affordance", () => {
     expect(markdownTableCss).toContain(
       ".cm-md-table-widget-wrap:focus-within:not(.is-doc-selected) .cm-md-table-widget",
     );
-    expect(hoverRule).toContain("box-shadow: 0 0 0 2px var(--cm-md-block-hover-ring);");
+    expect(hoverRule).toContain("box-shadow: 0 0 0 2px var(--po-editable-table-hover-ring);");
     expect(hoverRule).not.toContain("border-color:");
     expect(markdownTableCss).toContain("box-shadow: 0 0 0 2px var(--cm-md-block-selected-ring);");
   });
@@ -191,7 +191,7 @@ describe("Markdown table affordance layout", () => {
       ".markdown-codemirror-editor .cm-md-table-add-column .cm-md-table-structure-button-visual",
     );
 
-    expect(frameRule).toContain("--cm-md-table-action-gutter: 18px;");
+    expect(frameRule).toContain("--cm-md-table-action-gutter: var(--po-editable-table-action-gutter);");
     expect(addRowRule).toContain("height: var(--cm-md-table-action-gutter);");
     expect(addRowRule).toContain("bottom: calc(-1 * var(--cm-md-table-action-gutter));");
     expect(addRowVisualRule).toContain("height: 13px;");

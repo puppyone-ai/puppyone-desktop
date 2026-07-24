@@ -108,11 +108,25 @@ export function inferDelimiter(
 export function inferHeaderRow(rows: string[][]): boolean {
   if (rows.length < 2) return false;
   const firstRow = rows[0] ?? [];
-  const secondRow = rows[1] ?? [];
   if (firstRow.length === 0 || firstRow.every((cell) => !cell.trim())) return false;
-  const textLikeHeaders = firstRow.filter((cell) => cell.trim() && !looksNumeric(cell)).length;
-  const numericData = secondRow.filter((cell) => looksNumeric(cell)).length;
-  return textLikeHeaders >= Math.max(1, Math.ceil(firstRow.length / 2)) || numericData > 0;
+  const normalizedLabels = firstRow.map((cell) => cell.trim().toLocaleLowerCase());
+  const labelsAreHighConfidence = normalizedLabels.every((label) => (
+    label.length > 0
+    && label.length <= 64
+    && !label.includes("\n")
+    && !looksStructuredDataValue(label)
+  ));
+  if (!labelsAreHighConfidence || new Set(normalizedLabels).size !== normalizedLabels.length) return false;
+
+  const sampleRows = rows.slice(1, 9);
+  return firstRow.some((_, columnIndex) => {
+    const values = sampleRows
+      .map((row) => row[columnIndex]?.trim() ?? "")
+      .filter(Boolean);
+    if (values.length === 0) return false;
+    const structuredValues = values.filter(looksStructuredDataValue).length;
+    return structuredValues >= Math.max(1, Math.ceil(values.length * 0.6));
+  });
 }
 
 export function normalizeRows(rows: string[][]): string[][] {
@@ -184,4 +198,14 @@ function detectLayout(content: string): DelimitedTextLayout {
 function looksNumeric(value: string): boolean {
   const trimmed = value.trim();
   return trimmed !== "" && Number.isFinite(Number(trimmed));
+}
+
+function looksStructuredDataValue(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  return looksNumeric(trimmed)
+    || /^(?:true|false|null)$/i.test(trimmed)
+    || /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/.test(trimmed)
+    || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
+    || /^(?:https?:\/\/|www\.)\S+$/i.test(trimmed);
 }

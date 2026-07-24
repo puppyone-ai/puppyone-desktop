@@ -61,7 +61,7 @@
 }
 
 :root[data-interface-style]:not([data-interface-style="default"])
-  :where(.desktop-explorer-toolbar, .browser-toolbar, .csv-table-editor__toolbar, .file-preview-header) {
+  :where(.desktop-explorer-toolbar, .browser-toolbar, .file-preview-header) {
   border-bottom: var(--interface-toolbar-border-bottom);
   background: var(--interface-toolbar-background);
   box-shadow: var(--interface-toolbar-box-shadow);

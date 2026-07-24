@@ -63,7 +63,8 @@ describe("local CSV editor persistence", () => {
     expect(firstCell.readOnly).toBe(false);
     expect(container.querySelector(".csv-table-editor__table")).toBeInstanceOf(HTMLTableElement);
     expect(container.querySelectorAll(".csv-table-editor__structure-button")).toHaveLength(2);
-    expect(container.querySelectorAll(".csv-table-editor__actions button")).toHaveLength(0);
+    expect(container.querySelector(".csv-table-editor__settings-button")).toBeInstanceOf(HTMLButtonElement);
+    expect(container.querySelector(".csv-table-editor__toolbar")).toBeNull();
 
     act(() => {
       setInputValue(firstCell, "Updated");

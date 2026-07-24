@@ -362,7 +362,10 @@ packages/shared-ui/src/editor/
   editorAccess.ts                  # pure Host-level edit authority decision
   viewers/*                        # text/Markdown/CSV contributions
   csv/csvDocument.ts               # CSV/TSV parse, model, and serialization
+  csv/csvTableOperations.ts        # pure CSV row/column structural operations
+  csv/csvViewPreferences.ts        # bounded, non-document CSV display preferences
   table/editableTableLayout.ts      # bounded column sizing shared by table UIs
+  table/editableTableDrag.ts        # shared midpoint drop-boundary geometry
   puppyflow/*                      # structured PuppyFlow contribution
 
 packages/shared-ui/src/editor/document-session/
@@ -393,6 +396,10 @@ src/App.tsx + src/main.tsx
   persistence availability are independent Host gates; semantic node types do
   not duplicate format routing or decide editability.
 - A format contribution owns its model and canonical serialization.
+- CSV data-row indices and first-record header interpretation are view state;
+  neither may appear in the canonical serialized snapshot or mark it dirty.
+- A CSV corner expansion is one outward-only structural revision and therefore
+  produces one canonical snapshot and one persistence/undo boundary.
 - An editable contribution exposes revision changes, an exact snapshot, and a
   format-aware external replacement; it does not write storage directly.
 - `DocumentEditingSession` stays format-agnostic and small.

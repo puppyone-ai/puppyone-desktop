@@ -13,6 +13,10 @@ import {
   isActiveMarkdownTableMenu,
 } from "./tableMenuState";
 import { getMarkdownLocalization } from "../../core/editor/markdownLocalization";
+import {
+  getEditableTableColumnDropBoundary,
+  getEditableTableDropBoundary,
+} from "../../../table/editableTableDrag";
 
 export type MarkdownTableDragHandleContext = {
   alignments: readonly MarkdownTableAlignment[];
@@ -36,7 +40,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
   const localization = getMarkdownLocalization(context.view);
   const doc = context.table.ownerDocument;
   const layer = doc.createElement("div");
-  layer.className = "cm-md-table-drag-layer";
+  layer.className = "cm-md-table-drag-layer po-editable-table-drag-layer";
   if (context.view.state.readOnly) {
     return { dispose() {}, element: layer };
   }
@@ -44,15 +48,15 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
   const columnHandle = createMarkdownTableHandleElement(
     doc,
     "column",
-    localization.t("editor.markdown.table.columnHandleHint"),
+    localization.t("editor.table.columnHandleHint"),
   );
   const rowHandle = createMarkdownTableHandleElement(
     doc,
     "row",
-    localization.t("editor.markdown.table.rowHandleHint"),
+    localization.t("editor.table.rowHandleHint"),
   );
   const dropIndicator = doc.createElement("div");
-  dropIndicator.className = "cm-md-table-drop-indicator";
+  dropIndicator.className = "cm-md-table-drop-indicator po-editable-table-drop-indicator";
   dropIndicator.hidden = true;
   layer.append(columnHandle, rowHandle, dropIndicator);
 
@@ -103,7 +107,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
       showHandleAt(columnHandle, `${rect.left - surfaceRect.left + rect.width / 2}px`, "0px");
       columnHandle.setAttribute(
         "aria-label",
-        localization.t("editor.markdown.table.columnActions", {
+        localization.t("editor.table.columnActions", {
           column: hover.columnIndex + 1,
         }),
       );
@@ -125,7 +129,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
       }
       rowHandle.setAttribute(
         "aria-label",
-        localization.t("editor.markdown.table.rowActions", { row: hover.rowIndex }),
+        localization.t("editor.table.rowActions", { row: hover.rowIndex }),
       );
     } else {
       setHandleVisible(rowHandle, false);
@@ -213,6 +217,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
       if (!row) return;
       for (const cell of Array.from(row.cells)) {
         cell.classList.toggle("cm-md-table-drag-source", active);
+        cell.classList.toggle("po-editable-table-drag-source", active);
       }
       return;
     }
@@ -220,6 +225,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
       if (!(row instanceof HTMLTableRowElement)) continue;
       const cell = row.cells[sourceIndex];
       cell?.classList.toggle("cm-md-table-drag-source", active);
+      cell?.classList.toggle("po-editable-table-drag-source", active);
     }
   };
 
@@ -253,7 +259,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
         return;
       }
       dropIndicator.hidden = false;
-      dropIndicator.className = "cm-md-table-drop-indicator is-row";
+      dropIndicator.className = "cm-md-table-drop-indicator po-editable-table-drop-indicator is-row";
       dropIndicator.style.left = `${tableRect.left - surfaceRect.left}px`;
       dropIndicator.style.top = `${y - surfaceRect.top}px`;
       dropIndicator.style.width = `${tableRect.width}px`;
@@ -275,7 +281,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
         ? headerCells[boundary].getBoundingClientRect().left
         : headerCells[headerCells.length - 1].getBoundingClientRect().right;
     dropIndicator.hidden = false;
-    dropIndicator.className = "cm-md-table-drop-indicator is-column";
+    dropIndicator.className = "cm-md-table-drop-indicator po-editable-table-drop-indicator is-column";
     dropIndicator.style.left = `${x - surfaceRect.left}px`;
     dropIndicator.style.top = `${tableRect.top - surfaceRect.top}px`;
     dropIndicator.style.width = "";
@@ -319,15 +325,15 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
         beginVisualDrag();
       }
       dropBoundary = kind === "column"
-        ? getMarkdownTableColumnDropBoundary(
+        ? getEditableTableColumnDropBoundary(
           getHeaderCellElements(),
           moveEvent.clientX,
           localization.direction,
         )
-        : getMarkdownTableRowDropBoundary(getBodyRowElements().map((row) => {
+        : getEditableTableDropBoundary(getBodyRowElements().map((row) => {
           const rect = row.getBoundingClientRect();
           return {
-            bodyIndex: Number(row.dataset.mdTableRow) - 1,
+            boundary: Number(row.dataset.mdTableRow) - 1,
             start: rect.top,
             size: rect.height,
           };
@@ -448,17 +454,6 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
   };
 }
 
-function getMarkdownTableRowDropBoundary(
-  segments: Array<{ bodyIndex: number; start: number; size: number }>,
-  pointer: number,
-): number | null {
-  if (segments.length === 0) return null;
-  for (const segment of segments) {
-    if (pointer < segment.start + segment.size / 2) return segment.bodyIndex;
-  }
-  return segments[segments.length - 1].bodyIndex + 1;
-}
-
 function createMarkdownTableHandleElement(
   doc: Document,
   kind: MarkdownTableDragKind,
@@ -466,7 +461,12 @@ function createMarkdownTableHandleElement(
 ): HTMLButtonElement {
   const handle = doc.createElement("button");
   handle.type = "button";
-  handle.className = `cm-md-table-drag-handle cm-md-table-${kind}-handle`;
+  handle.className = [
+    "cm-md-table-drag-handle",
+    `cm-md-table-${kind}-handle`,
+    "po-editable-table-drag-handle",
+    `po-editable-table-${kind}-handle`,
+  ].join(" ");
   // Pointer-only affordance: it fades with hover, so keep it out of the tab
   // order (the context menu covers keyboard access to the same operations).
   handle.tabIndex = -1;
@@ -474,39 +474,8 @@ function createMarkdownTableHandleElement(
   handle.setAttribute("aria-haspopup", "menu");
   handle.title = title;
   const visual = doc.createElement("span");
-  visual.className = "cm-md-table-drag-handle-visual";
+  visual.className = "cm-md-table-drag-handle-visual po-editable-table-drag-handle-visual";
   visual.setAttribute("aria-hidden", "true");
   handle.appendChild(visual);
   return handle;
-}
-
-function getMarkdownTableColumnDropBoundary(
-  cells: readonly HTMLTableCellElement[],
-  pointer: number,
-  direction: "ltr" | "rtl",
-): number | null {
-  if (cells.length === 0) return null;
-  if (direction === "ltr") {
-    return getMarkdownTableDropBoundary(cells.map((cell) => {
-      const rect = cell.getBoundingClientRect();
-      return { start: rect.left, size: rect.width };
-    }), pointer);
-  }
-
-  for (const [index, cell] of cells.entries()) {
-    const rect = cell.getBoundingClientRect();
-    if (pointer > rect.left + rect.width / 2) return index;
-  }
-  return cells.length;
-}
-
-function getMarkdownTableDropBoundary(
-  segments: Array<{ start: number; size: number }>,
-  pointer: number,
-): number | null {
-  if (segments.length === 0) return null;
-  for (const [index, segment] of segments.entries()) {
-    if (pointer < segment.start + segment.size / 2) return index;
-  }
-  return segments.length;
 }

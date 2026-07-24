@@ -1,11 +1,19 @@
-# puppyone Editor
+# puppyone editor
 
 **A local-first editor. Built for you and your agents.**
 
-**File support** — Markdown · CSV · JSON · DOCX · XLSX · PDF · HTML · CSS · Images · Audio · Video · 3D · and more  
-**Agent support** — Codex · Claude Code · OpenCode · PuppyOne Agent  
+### File support
 
+| Category        | Formats                     |
+| ---             | ---                         |
+| Text & web      | Markdown (`.md`), HTML, CSS |
+| Structured data | CSV, JSON                   |
+| Documents       | DOCX, XLSX, PDF             |
+| Media           | Images, audio, video, 3D    |
 
+And more.
+
+**Agent support:** Codex · Claude Code · OpenCode
 
 ## Development
 

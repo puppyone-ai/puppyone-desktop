@@ -139,7 +139,7 @@
 .markdown-codemirror-editor .cm-md-table-widget th {
   background: var(--po-editable-table-header-background);
   color: var(--po-editable-table-header-color);
-  font-weight: 650;
+  font-weight: var(--po-editable-table-header-font-weight);
 }
 
 .markdown-codemirror-editor .cm-md-table-widget td {
@@ -177,7 +177,7 @@
   width: 100%;
   min-width: var(--po-editable-table-cell-min-width);
   max-width: var(--po-editable-table-cell-max-width);
-  min-height: 100%;
+  min-height: var(--po-editable-table-row-min-height);
   height: 100%;
   padding: var(--po-editable-table-cell-padding);
   outline: 0;

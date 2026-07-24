@@ -318,10 +318,29 @@ source-code extensions)
   Session, conditional persistence, and the authorized local write port. The
   structured model has focused quoting/multiline/malformed-input tests and
   preserves BOM/newline conventions after edits. CSV renders as a semantic
-  HTML table and shares only the reusable editable-table layout algorithm and
-  visual tokens with Markdown tables; parsing, selection, persistence, and
-  structural editing remain contribution-owned. The 10k-row behavior remains
-  unverified (Part 2 §9).
+  HTML table and shares the editable-table visual tokens, bounded column-width
+  estimator, midpoint drag geometry, and row/column menu vocabulary with
+  Markdown tables. Its compact settings menu replaces a permanent toolbar.
+  A narrow, sticky data-row gutter remains in the semantic HTML table for
+  alignment and accessibility, but is visually open outside the closed data
+  frame and excluded from CSV serialization. Its boundary grip opens the row
+  menu or reorders rows without hiding the row number. When the
+  first CSV record is presented as a sticky semantic header, the corner gutter
+  cell stays visually empty and body numbering restarts at `1`; the header
+  remains in the source model and exposes column actions only. Header
+  interpretation uses conservative, structured-data evidence on first open,
+  falls back to off when ambiguous, then remains a bounded file-view
+  preference. Toggling it never edits the CSV snapshot. Row-index visibility
+  is not a per-file option: it is structural editor chrome, with a future
+  presentation surface free to suppress it by mode. A transient column grip
+  handles scoped menus and drag reordering without adding a permanent A/B/C
+  coordinate row. The bottom and inline-end one-axis affordances still add one
+  row or column. Their corner intersection is an outward-only table expansion
+  control: dragging previews ghost cells and commits one atomic target-shape
+  edit on release, while clicking opens a keyboard-accessible bounded grid
+  picker. Inward movement never deletes data. CSV parsing, persistence, and
+  structural data operations remain
+  contribution-owned. The 10k-row behavior remains unverified (Part 2 §9).
 
 ### Tier 2 — preview-grade
 
