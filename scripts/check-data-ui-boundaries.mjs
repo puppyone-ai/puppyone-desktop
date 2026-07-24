@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,6 +9,8 @@ const checkedSrcDirs = [
 const desktopSrcDirs = [
   path.join(repoRoot, "src"),
 ];
+const fileIconRoot = path.join(repoRoot, "packages", "shared-ui", "src", "file");
+const fileIconThemeRoot = path.join(fileIconRoot, "icon-themes");
 
 const blockedImports = [
   { pattern: /^@\//, reason: "cloud frontend alias" },
@@ -54,6 +56,7 @@ const errors = [
   ...findDesktopSharedTreeCssErrors([
     path.join(repoRoot, "src", "styles.css"),
   ]),
+  ...findFileIconThemeArchitectureErrors(),
 ];
 
 if (errors.length > 0) {
@@ -189,4 +192,140 @@ function findDesktopWorkspaceOpeningErrors(srcDirs) {
   }
 
   return boundaryErrors;
+}
+
+function findFileIconThemeArchitectureErrors() {
+  const architectureErrors = [];
+  const requiredThemePaths = [
+    "iconThemeTypes.ts",
+    "themeFactory.tsx",
+    "registry.ts",
+    "shared/PreviewShell.tsx",
+    "shared/semanticGlyphs.tsx",
+    "default/index.ts",
+    "default/glyphs.tsx",
+    "default/previews.tsx",
+    "lines/index.tsx",
+    "vscode/index.ts",
+    "vscode/glyphs.tsx",
+    "material/index.ts",
+    "material/glyphs.tsx",
+    "minimal/index.tsx",
+  ];
+
+  for (const relativePath of requiredThemePaths) {
+    const filePath = path.join(fileIconThemeRoot, relativePath);
+    if (!existsSync(filePath)) {
+      architectureErrors.push({
+        filePath,
+        specifier: relativePath,
+        reason: "the file-icon theme architecture is incomplete",
+      });
+    }
+  }
+
+  const compatibilityEntry = path.join(fileIconRoot, "fileIconThemeRegistry.tsx");
+  if (existsSync(compatibilityEntry)) {
+    const source = readFileSync(compatibilityEntry, "utf8");
+    if (/<svg\b|function\s+render|const\s+\w+Theme\b/.test(source)) {
+      architectureErrors.push({
+        filePath: compatibilityEntry,
+        specifier: "theme implementation",
+        reason: "the compatibility entry must remain a thin re-export; theme rendering belongs in icon-themes",
+      });
+    }
+  }
+
+  const visualKindContract = path.join(fileIconRoot, "fileIconTypes.ts");
+  if (existsSync(visualKindContract)) {
+    const source = readFileSync(visualKindContract, "utf8");
+    if (!/export\s+type\s+FileVisualKind\s*=\s*FileSemanticKind\s*;/.test(source)) {
+      architectureErrors.push({
+        filePath: visualKindContract,
+        specifier: "FileVisualKind",
+        reason: "the icon layer must alias the format registry's semantic kind instead of maintaining a second union",
+      });
+    }
+  }
+
+  const requiredThemeFactories = new Map([
+    ["default/index.ts", "createCustomPreviewIconTheme"],
+    ["lines/index.tsx", "createThemeVariant"],
+    ["vscode/index.ts", "createIconTheme"],
+    ["material/index.ts", "createIconTheme"],
+    ["minimal/index.tsx", "createIconTheme"],
+  ]);
+  for (const [relativePath, factoryName] of requiredThemeFactories) {
+    const filePath = path.join(fileIconThemeRoot, relativePath);
+    if (!existsSync(filePath)) continue;
+    const source = readFileSync(filePath, "utf8");
+    const factoryCallPattern = new RegExp(`\\b${factoryName}\\s*\\(`);
+    if (!factoryCallPattern.test(source)) {
+      architectureErrors.push({
+        filePath,
+        specifier: factoryName,
+        reason: "theme definitions must use the coverage-enforcing theme factory",
+      });
+    }
+  }
+
+  for (const themeName of ["default", "lines", "vscode", "material", "minimal"]) {
+    const themeDirectory = path.join(fileIconThemeRoot, themeName);
+    if (!existsSync(themeDirectory)) continue;
+    for (const filePath of walk(themeDirectory)) {
+      if (!/\.(?:ts|tsx)$/.test(filePath)) continue;
+      const source = readFileSync(filePath, "utf8");
+      for (const specifier of collectSpecifiers(source)) {
+        if (
+          /(?:^|\/)registry$/.test(specifier)
+          || /(?:^|\/)fileIcons$/.test(specifier)
+          || /(?:^|\/)fileIconThemeRegistry$/.test(specifier)
+        ) {
+          architectureErrors.push({
+            filePath,
+            specifier,
+            reason: "theme implementations may depend on contracts/shared primitives, never the registry or public facade",
+          });
+        }
+      }
+    }
+  }
+
+  const semanticRendererFiles = [
+    "default/glyphs.tsx",
+    "default/previews.tsx",
+    "material/glyphs.tsx",
+    "vscode/glyphs.tsx",
+    "minimal/index.tsx",
+  ];
+  const hiddenSemanticFallbackPatterns = [
+    {
+      pattern: /Partial\s*<\s*Record\s*<\s*FileVisualKind\s*,\s*FileIconRenderer/,
+      specifier: "partial semantic renderer map",
+    },
+    {
+      pattern: /Partial\s*<\s*Record\s*<\s*FileVisualKind\s*,\s*LucideIcon/,
+      specifier: "partial semantic Lucide map",
+    },
+    {
+      pattern: /\?\?\s*(?:render\w*(?:Document|File|Label)\w*|LucideFile)/,
+      specifier: "implicit generic icon fallback",
+    },
+  ];
+
+  for (const relativePath of semanticRendererFiles) {
+    const filePath = path.join(fileIconThemeRoot, relativePath);
+    if (!existsSync(filePath)) continue;
+    const source = readFileSync(filePath, "utf8");
+    for (const { pattern, specifier } of hiddenSemanticFallbackPatterns) {
+      if (!pattern.test(source)) continue;
+      architectureErrors.push({
+        filePath,
+        specifier,
+        reason: "base themes must map every file semantic explicitly so omissions fail during type-checking",
+      });
+    }
+  }
+
+  return architectureErrors;
 }

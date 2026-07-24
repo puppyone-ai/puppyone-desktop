@@ -20,6 +20,7 @@ export type {
 } from "./core/fileFormats";
 export {
   FILE_FORMATS,
+  FILE_SEMANTIC_KINDS,
   UNKNOWN_FORMAT,
   getFilePreviewKind,
   getFileSemanticKind,
@@ -253,6 +254,7 @@ export type {
 export {
   FILE_ICON_THEMES,
   FILE_TYPE_ICONS,
+  FILE_VISUAL_KINDS,
   FileGlyphIcon,
   FilePreviewIcon,
   getFileAccent,

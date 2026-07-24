@@ -1,21 +1,15 @@
-export type FileVisualKind =
-  | "folder"
-  | "app"
-  | "workflow"
-  | "json"
-  | "markdown"
-  | "html"
-  | "pdf"
-  | "image"
-  | "audio"
-  | "video"
-  | "spreadsheet"
-  | "archive"
-  | "document"
-  | "binary"
-  | "code"
-  | "text"
-  | "file";
+import {
+  FILE_SEMANTIC_KINDS,
+  type FileSemanticKind,
+} from "../core/fileFormats";
+
+export const FILE_VISUAL_KINDS = FILE_SEMANTIC_KINDS;
+
+/**
+ * Compatibility name for the icon layer. File semantics are owned by the
+ * format registry so classification and theme coverage cannot drift apart.
+ */
+export type FileVisualKind = FileSemanticKind;
 
 export type FileIconThemeId = "default" | "lines" | "vscode" | "material" | "minimal";
 
@@ -23,7 +17,7 @@ export type FileIconThemeMetadata = {
   id: FileIconThemeId;
 };
 
-const KIND_ACCENT: Record<FileVisualKind, string> = {
+const KIND_ACCENT = {
   folder: "var(--po-file-accent-default)",
   app: "var(--po-accent)",
   workflow: "var(--po-accent)",
@@ -41,7 +35,7 @@ const KIND_ACCENT: Record<FileVisualKind, string> = {
   code: "var(--po-file-accent-code)",
   text: "var(--po-file-accent-default)",
   file: "var(--po-file-accent-default)",
-};
+} satisfies Record<FileVisualKind, string>;
 
 export function getFileAccent(kind: FileVisualKind): string {
   return KIND_ACCENT[kind];
