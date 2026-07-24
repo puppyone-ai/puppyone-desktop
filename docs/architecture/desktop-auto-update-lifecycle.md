@@ -292,7 +292,7 @@ Runtime controls:
 Build scripts:
 
 - `npm run dist:mac`
-  - local unsigned mac artifact build for development verification
+  - local ad-hoc signed, non-notarized mac artifact build for development verification
   - builds both DMG and zip targets
 - `npm run dist:mac:publish`
   - guarded production composition: build/verify, then explicit R2 publish

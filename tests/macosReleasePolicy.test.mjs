@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import packageMetadata from "../package.json";
+import { inspectInternalReleaseWorkflow } from "../scripts/release-support/internal-release-workflow-policy.mjs";
 import {
   getStableReleaseCoordinates,
   inspectMacReleaseReadiness,
@@ -49,7 +51,7 @@ describe("macOS stable release policy", () => {
       expect.stringMatching(/ad-hoc or disabled signing/i),
       expect.stringMatching(/hardenedRuntime/i),
       expect.stringMatching(/notarization credentials are incomplete/i),
-      expect.stringMatching(/reserved for internal unsigned builds/i),
+      expect.stringMatching(/reserved for internal ad-hoc builds/i),
     ]));
   });
 
@@ -88,5 +90,15 @@ describe("macOS stable release policy", () => {
       versionPrefix: `desktop/stable/mac/v${packageMetadata.version}`,
     });
     expect(new URL(packageMetadata.build.publish[0].url).pathname).toBe(`/${coordinates.latestPrefix}`);
+  });
+});
+
+describe("macOS internal release workflow", () => {
+  it("publishes immutable R2 objects before promoting verified latest aliases", () => {
+    const workflow = readFileSync(
+      new URL("../.github/workflows/desktop-internal-build.yml", import.meta.url),
+      "utf8",
+    );
+    expect(inspectInternalReleaseWorkflow(workflow)).toEqual([]);
   });
 });

@@ -65,6 +65,6 @@ directly:
 ## Release
 
 - [Release](RELEASE.md) documents release setup, GitHub Actions secrets,
-  internal unsigned macOS builds, and production signing.
+  internal ad-hoc macOS builds, and production signing.
 - [Desktop App Icon](DESKTOP_APP_ICON.md) documents the app icon source of
   truth, generated assets, packaging rules, and Dock icon verification.

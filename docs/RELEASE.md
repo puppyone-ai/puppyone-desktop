@@ -4,7 +4,7 @@
 
 The repository has two deliberately separate macOS paths:
 
-- `npm run dist:mac` creates an explicitly unsigned, non-notarized package for internal testing.
+- `npm run dist:mac` creates an ad-hoc signed, non-notarized package for internal testing.
 - the `Desktop Stable Release` workflow accepts an exact `v<package version>` tag, builds with Developer ID and hardened runtime, notarizes the app, verifies Gatekeeper and the stapled ticket, creates the canonical GitHub Release, and only then uploads the verified artifacts to the stable R2 feed.
 
 The stable path fails closed when signing, notarization, version/tag, updater, or R2 configuration is incomplete. Never publish artifacts from the internal path to the stable feed.
@@ -57,7 +57,7 @@ The default R2 bucket is:
 puppyone-desktop
 ```
 
-The internal unsigned build workflow uses this base R2 prefix:
+The internal ad-hoc build workflow uses this base R2 prefix:
 
 ```text
 desktop/internal/mac
@@ -78,7 +78,7 @@ https://updates.puppyone.ai/desktop/stable/mac/latest
 
 The stable release script enforces that this path receives only signed and notarized builds.
 
-## Internal Unsigned macOS Build
+## Internal ad-hoc macOS Build
 
 Run the `Desktop Internal Build` workflow manually from GitHub Actions.
 
@@ -94,6 +94,23 @@ the same files are attached to a GitHub prerelease. If `upload_r2` is enabled,
 the files are also copied to Cloudflare R2 under both the versioned release tag
 and the fixed `latest` prefix.
 
+The workflow uses the pinned `macos-15` arm64 runner and publishes in this
+order:
+
+```text
+validate inputs, R2 credentials, and unused version prefix
+→ build the ad-hoc DMG/ZIP and Terminal package
+→ upload immutable versioned R2 objects
+→ verify every R2 object size
+→ create the GitHub prerelease
+→ promote mutable latest aliases
+→ verify the public HTTPS URLs and latest package SHA-256
+```
+
+Releases sharing the same R2 prefix are serialized. A versioned prefix is never
+overwritten: if a failed run already uploaded objects, dispatch a new run and
+leave `release_tag` blank, or supply a new unique tag.
+
 The default GitHub release tag is generated from the package version and run
 number:
 
@@ -104,8 +121,47 @@ v0.1.1-internal.<run number>
 You can override it with the workflow `release_tag` input when rerunning or
 creating a named internal build.
 
-Unsigned builds are useful for team testing but are not suitable for public
+Ad-hoc signed builds are useful for team testing but are not suitable for public
 macOS auto-update.
+
+### Terminal-launched preview
+
+While Developer ID provisioning is pending, enabling `upload_r2` in the
+internal workflow also creates a small npm-compatible Terminal launcher. The
+launcher does not contain the app.
+It downloads the immutable versioned ZIP from R2, verifies the exact byte size
+and SHA-256 digest embedded in the launcher package, extracts the app into the
+current user's cache directory, and starts the packaged Electron executable in
+the foreground.
+
+The exact command is written into the GitHub prerelease notes:
+
+```bash
+npm exec --yes --package=https://downloads.puppyone.ai/desktop/internal/mac/<release-tag>/<preview-package>.tgz -- puppyone-preview
+```
+
+After a successful run, the Actions job summary also shows the exact versioned
+command and these stable aliases:
+
+```text
+https://downloads.puppyone.ai/desktop/internal/mac/latest/puppyone-latest-arm64.dmg
+https://downloads.puppyone.ai/desktop/internal/mac/latest/puppyone-latest-arm64.zip
+https://downloads.puppyone.ai/desktop/internal/mac/latest/puppyone-terminal-preview-latest-arm64.tgz
+```
+
+Run it from GitHub under **Actions → Desktop Internal Build → Run workflow**.
+For the normal preview release, keep `upload_r2` and `create_github_release`
+enabled, keep `r2_prefix` at `desktop/internal/mac`, and leave `release_tag`
+blank.
+
+If a `latest` URL was visited before its first upload and Cloudflare still
+serves a cached 404, purge that URL once or configure a cache rule that bypasses
+cache for `/desktop/internal/mac/latest/*`. Versioned files intentionally use a
+one-year immutable cache; latest aliases require revalidation on every request.
+
+This is a short-lived technical preview path, not a replacement for Developer
+ID signing or notarization. Do not promote it as the stable public installer.
+Once the signed release is available, direct users to the stable DMG instead.
 
 ## Production macOS Release
 

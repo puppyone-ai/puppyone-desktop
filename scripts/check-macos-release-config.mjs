@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { inspectInternalReleaseWorkflow } from "./release-support/internal-release-workflow-policy.mjs";
 import { inspectMacReleaseReadiness } from "./release-support/macos-release-policy.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -22,8 +23,8 @@ const errors = inspectMacReleaseReadiness({
 });
 
 const scripts = packageMetadata.scripts ?? {};
-if (!scripts["dist:mac"]?.includes("-c.mac.identity=null")) {
-  errors.push("the internal macOS build must explicitly disable signing through a command-local override");
+if (!scripts["dist:mac"]?.includes("-c.mac.identity=-")) {
+  errors.push("the internal macOS build must explicitly use ad-hoc signing through a command-local override");
 }
 if (!scripts["dist:mac"]?.includes("-c.mac.notarize=false")) {
   errors.push("the internal macOS build must explicitly disable notarization through a command-local override");
@@ -31,6 +32,12 @@ if (!scripts["dist:mac"]?.includes("-c.mac.notarize=false")) {
 if (scripts["dist:mac:publish"] !== "npm run dist:mac:release && npm run publish:mac:r2") {
   errors.push("stable publishing must verify the signed release before the explicit R2 upload step");
 }
+
+const internalWorkflow = readFileSync(
+  path.join(repoRoot, ".github", "workflows", "desktop-internal-build.yml"),
+  "utf8",
+);
+errors.push(...inspectInternalReleaseWorkflow(internalWorkflow));
 
 try {
   const { validateConfiguration } = require("app-builder-lib/out/util/config/config.js");
