@@ -1,137 +1,78 @@
-name: Desktop Internal Build
+name: Desktop Internal Release
 
 on:
   workflow_dispatch:
     inputs:
-      upload_r2:
-        description: Upload release files to Cloudflare R2
-        type: boolean
-        default: true
-      r2_prefix:
-        description: Base R2 object prefix
-        type: string
-        default: desktop/internal/mac
-      create_github_release:
-        description: Create a GitHub prerelease with the same files
+      publish_release:
+        description: Publish the verified bundle to GitHub Releases and Cloudflare R2
         type: boolean
         default: true
       release_tag:
-        description: Optional release tag. Defaults to v<package version>-internal.<run number>
+        description: Optional tag; defaults to v<version>-internal.<run number>
         type: string
         default: ""
 
 permissions:
-  contents: write
-
-concurrency:
-  group: desktop-internal-r2-${{ inputs.r2_prefix }}
-  cancel-in-progress: false
+  contents: read
 
 jobs:
-  mac:
-    name: macOS ad-hoc package
+  build:
+    name: Build ad-hoc macOS release once
     runs-on: macos-15
     timeout-minutes: 60
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    outputs:
+      artifact_name: ${{ steps.release.outputs.artifact_name }}
+      release_name: ${{ steps.release.outputs.release_name }}
+      release_tag: ${{ steps.release.outputs.tag }}
     env:
-      AWS_DEFAULT_REGION: auto
-      AWS_EC2_METADATA_DISABLED: "true"
-      AWS_PAGER: ""
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
       PUBLIC_DOWNLOAD_ORIGIN: https://downloads.puppyone.ai
-      R2_BUCKET: puppyone-desktop
       VITE_DESKTOP_CLOUD_API_URL: https://api.puppyone.ai/api/v1
       VITE_DESKTOP_CLOUD_WEB_URL: https://app.puppyone.ai
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Resolve and validate release metadata
-        id: release_meta
+      - name: Resolve immutable release identity
+        id: release
         env:
-          INPUT_R2_PREFIX: ${{ inputs.r2_prefix }}
           INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
         shell: bash
         run: |
           set -euo pipefail
           VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
-          R2_PREFIX="${INPUT_R2_PREFIX}"
           if [ -n "${INPUT_RELEASE_TAG}" ]; then
             TAG="${INPUT_RELEASE_TAG}"
           else
             TAG="v${VERSION}-internal.${GITHUB_RUN_NUMBER}"
           fi
-
-          if [[ ! "${R2_PREFIX}" =~ ^[a-z0-9][a-z0-9._/-]*$ ]] \
-            || [[ "${R2_PREFIX}" == */ ]] \
-            || [[ "${R2_PREFIX}" == *"//"* ]] \
-            || [[ "${R2_PREFIX}" == *".."* ]]; then
-            echo "Invalid R2 prefix: ${R2_PREFIX}" >&2
+          EXPECTED_PREFIX="v${VERSION}-internal."
+          SUFFIX="${TAG#"${EXPECTED_PREFIX}"}"
+          if [ "${TAG}" = "${SUFFIX}" ] || [[ ! "${SUFFIX}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            echo "Internal tags must match v${VERSION}-internal.<identifier>; received ${TAG}" >&2
             exit 1
           fi
-          if [[ ! "${TAG}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
-            || [[ "${TAG}" == *".."* ]]; then
-            echo "Invalid release tag: ${TAG}" >&2
-            exit 1
-          fi
+          {
+            echo "arch=$(node -p 'process.arch')"
+            echo "artifact_name=puppyone-desktop-${TAG}"
+            echo "published_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+            echo "release_name=puppyone ${VERSION} internal ${GITHUB_RUN_NUMBER}"
+            echo "tag=${TAG}"
+            echo "version=${VERSION}"
+          } >> "${GITHUB_OUTPUT}"
 
-          ARCH="$(node -p 'process.arch')"
-          echo "arch=${ARCH}" >> "${GITHUB_OUTPUT}"
-          echo "latest_prefix=${R2_PREFIX}/latest" >> "${GITHUB_OUTPUT}"
-          echo "name=puppyone ${VERSION} internal ${GITHUB_RUN_NUMBER}" >> "${GITHUB_OUTPUT}"
-          echo "r2_prefix=${R2_PREFIX}" >> "${GITHUB_OUTPUT}"
-          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
-          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
-          echo "version_prefix=${R2_PREFIX}/${TAG}" >> "${GITHUB_OUTPUT}"
-
-      - name: Validate R2 credentials
-        if: ${{ inputs.upload_r2 }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          : "${AWS_ACCESS_KEY_ID:?Set the R2_ACCESS_KEY_ID repository secret}"
-          : "${AWS_SECRET_ACCESS_KEY:?Set the R2_SECRET_ACCESS_KEY repository secret}"
-          : "${CLOUDFLARE_ACCOUNT_ID:?Set the CLOUDFLARE_ACCOUNT_ID repository secret}"
-
-      - name: Install AWS CLI when unavailable
-        if: ${{ inputs.upload_r2 }}
-        run: command -v aws >/dev/null 2>&1 || brew install awscli
-
-      - name: Ensure immutable R2 prefix is unused
-        if: ${{ inputs.upload_r2 }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          VERSION_PREFIX: ${{ steps.release_meta.outputs.version_prefix }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
-          EXISTING_KEY="$(aws s3api list-objects-v2 \
-            --bucket "${R2_BUCKET}" \
-            --prefix "${VERSION_PREFIX}/" \
-            --max-keys 1 \
-            --endpoint-url "${ENDPOINT}" \
-            --query 'Contents[0].Key' \
-            --output text)"
-          if [ -n "${EXISTING_KEY}" ] && [ "${EXISTING_KEY}" != "None" ]; then
-            echo "R2 version prefix already exists: ${VERSION_PREFIX}" >&2
-            echo "Use a new release_tag; versioned release objects are immutable." >&2
-            exit 1
-          fi
-
-      - name: Install dependencies
+      - name: Install locked dependencies
         run: npm ci
 
       - name: Stage pinned OpenCode runtime
@@ -149,18 +90,17 @@ jobs:
       - name: Build ad-hoc macOS package
         run: npm run dist:mac
 
-      - name: Build Terminal preview launcher
-        if: ${{ inputs.upload_r2 }}
-        id: preview_meta
+      - name: Build checksum-pinned Terminal launcher
+        id: preview
         env:
-          ARCH: ${{ steps.release_meta.outputs.arch }}
-          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
-          R2_PREFIX: ${{ steps.release_meta.outputs.r2_prefix }}
-          VERSION: ${{ steps.release_meta.outputs.version }}
+          ARCH: ${{ steps.release.outputs.arch }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
           ARCHIVE_NAME="puppyone-${VERSION}-${ARCH}-mac.zip"
+          R2_PREFIX="desktop/internal/mac/${RELEASE_TAG}"
           if [ ! -f "release/${ARCHIVE_NAME}" ]; then
             echo "Expected release/${ARCHIVE_NAME}, but it was not built." >&2
             exit 1
@@ -168,7 +108,7 @@ jobs:
           npm run package:terminal-preview -- \
             --arch "${ARCH}" \
             --archive "release/${ARCHIVE_NAME}" \
-            --archive-url "${PUBLIC_DOWNLOAD_ORIGIN}/${R2_PREFIX}/${RELEASE_TAG}/${ARCHIVE_NAME}" \
+            --archive-url "${PUBLIC_DOWNLOAD_ORIGIN}/${R2_PREFIX}/${ARCHIVE_NAME}" \
             --package-version "${VERSION}-internal.${GITHUB_RUN_NUMBER}" \
             --release-tag "${RELEASE_TAG}"
 
@@ -177,241 +117,105 @@ jobs:
             echo "Expected exactly one Terminal preview package." >&2
             exit 1
           fi
-          echo "archive_name=${ARCHIVE_NAME}" >> "${GITHUB_OUTPUT}"
           echo "package_name=$(basename "$1")" >> "${GITHUB_OUTPUT}"
 
-      - name: Upload GitHub artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: puppyone-macos-adhoc-${{ github.run_number }}
-          path: |
-            release/*.dmg
-            release/*.zip
-            release/*.yml
-            release/*.blockmap
-            artifacts/terminal-preview/*.tgz
-            artifacts/terminal-preview/terminal-preview.json
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload immutable release to R2
-        if: ${{ inputs.upload_r2 }}
+      - name: Write internal release notes
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          PREVIEW_PACKAGE: ${{ steps.preview_meta.outputs.package_name }}
-          VERSION_PREFIX: ${{ steps.release_meta.outputs.version_prefix }}
+          PREVIEW_PACKAGE: ${{ steps.preview.outputs.package_name }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
-          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
-          aws s3 sync release "s3://${R2_BUCKET}/${VERSION_PREFIX}" \
-            --endpoint-url "${ENDPOINT}" \
-            --exclude "*" \
-            --include "puppyone-*.dmg" \
-            --include "puppyone-*.zip" \
-            --include "puppyone-*.blockmap" \
-            --cache-control "public, max-age=31536000, immutable" \
-            --only-show-errors
-
-          aws s3 cp "artifacts/terminal-preview/${PREVIEW_PACKAGE}" \
-            "s3://${R2_BUCKET}/${VERSION_PREFIX}/${PREVIEW_PACKAGE}" \
-            --endpoint-url "${ENDPOINT}" \
-            --content-type "application/gzip" \
-            --cache-control "public, max-age=31536000, immutable" \
-            --only-show-errors
-
-      - name: Verify immutable R2 release
-        if: ${{ inputs.upload_r2 }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          PREVIEW_PACKAGE: ${{ steps.preview_meta.outputs.package_name }}
-          VERSION_PREFIX: ${{ steps.release_meta.outputs.version_prefix }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
-          assert_remote_size() {
-            local file="$1"
-            local key="$2"
-            local local_size
-            local remote_size
-            local_size="$(node -e 'process.stdout.write(String(require("fs").statSync(process.argv[1]).size))' "${file}")"
-            remote_size="$(aws s3api head-object \
-              --bucket "${R2_BUCKET}" \
-              --key "${key}" \
-              --endpoint-url "${ENDPOINT}" \
-              --query ContentLength \
-              --output text)"
-            if [ "${local_size}" != "${remote_size}" ]; then
-              echo "R2 size mismatch for ${key}: local=${local_size}, remote=${remote_size}" >&2
-              exit 1
-            fi
-          }
-
-          checked=0
-          for file in release/puppyone-*.dmg release/puppyone-*.zip release/puppyone-*.blockmap; do
-            [ -f "${file}" ] || continue
-            assert_remote_size "${file}" "${VERSION_PREFIX}/$(basename "${file}")"
-            checked=$((checked + 1))
-          done
-          if [ "${checked}" -lt 2 ]; then
-            echo "Expected at least the macOS DMG and ZIP artifacts." >&2
-            exit 1
-          fi
-          assert_remote_size \
-            "artifacts/terminal-preview/${PREVIEW_PACKAGE}" \
-            "${VERSION_PREFIX}/${PREVIEW_PACKAGE}"
-
-      - name: Create GitHub prerelease
-        if: ${{ inputs.create_github_release }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PREVIEW_PACKAGE: ${{ steps.preview_meta.outputs.package_name }}
-          RELEASE_NAME: ${{ steps.release_meta.outputs.name }}
-          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
-          R2_PREFIX: ${{ steps.release_meta.outputs.r2_prefix }}
-          UPLOAD_R2: ${{ inputs.upload_r2 }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          files=()
-          for pattern in release/puppyone-*.dmg release/puppyone-*.zip release/puppyone-*.blockmap artifacts/terminal-preview/*.tgz; do
-            for file in $pattern; do
-              [ -e "${file}" ] && files+=("${file}")
-            done
-          done
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No release files found."
-            exit 1
-          fi
-
-          NOTES="$(mktemp)"
+          mkdir -p artifacts
           {
             echo "Ad-hoc signed internal macOS build."
             echo
             echo "Commit: ${GITHUB_SHA}"
-            echo "R2 version prefix: ${R2_PREFIX}/${RELEASE_TAG}"
-            echo "R2 latest prefix: ${R2_PREFIX}/latest"
+            echo "R2 version prefix: desktop/internal/mac/${RELEASE_TAG}"
             echo
-            echo "This build is not Developer ID signed or notarized. Use it for internal testing only."
-            if [ "${UPLOAD_R2}" = "true" ]; then
-              echo
-              echo "Terminal preview command:"
-              echo '```bash'
-              echo "npm exec --yes --package=${PUBLIC_DOWNLOAD_ORIGIN}/${R2_PREFIX}/${RELEASE_TAG}/${PREVIEW_PACKAGE} -- puppyone-preview"
-              echo '```'
-            fi
-          } > "${NOTES}"
-          gh release create "${RELEASE_TAG}" "${files[@]}" \
-            --target "${GITHUB_SHA}" \
-            --title "${RELEASE_NAME}" \
-            --notes-file "${NOTES}" \
-            --prerelease
-
-      - name: Promote R2 latest aliases
-        if: ${{ inputs.upload_r2 }}
-        env:
-          ARCH: ${{ steps.release_meta.outputs.arch }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          LATEST_PREFIX: ${{ steps.release_meta.outputs.latest_prefix }}
-          PREVIEW_PACKAGE: ${{ steps.preview_meta.outputs.package_name }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
-
-          aws s3 sync release "s3://${R2_BUCKET}/${LATEST_PREFIX}" \
-            --endpoint-url "${ENDPOINT}" \
-            --delete \
-            --exclude "*" \
-            --include "puppyone-*.dmg" \
-            --include "puppyone-*.zip" \
-            --include "puppyone-*.blockmap" \
-            --cache-control "public, no-cache, must-revalidate" \
-            --only-show-errors
-
-          for file in release/puppyone-*.dmg release/puppyone-*.zip; do
-            [ -f "${file}" ] || continue
-            name="$(basename "${file}")"
-            ext="${name##*.}"
-            case "${ext}" in
-              dmg) content_type="application/x-apple-diskimage" ;;
-              zip) content_type="application/zip" ;;
-              *) content_type="application/octet-stream" ;;
-            esac
-            aws s3 cp "${file}" \
-              "s3://${R2_BUCKET}/${LATEST_PREFIX}/puppyone-latest-${ARCH}.${ext}" \
-              --endpoint-url "${ENDPOINT}" \
-              --content-type "${content_type}" \
-              --cache-control "public, no-cache, must-revalidate" \
-              --only-show-errors
-          done
-
-          aws s3 cp "artifacts/terminal-preview/${PREVIEW_PACKAGE}" \
-            "s3://${R2_BUCKET}/${LATEST_PREFIX}/puppyone-terminal-preview-latest-${ARCH}.tgz" \
-            --endpoint-url "${ENDPOINT}" \
-            --content-type "application/gzip" \
-            --cache-control "public, no-cache, must-revalidate" \
-            --only-show-errors
-
-      - name: Verify public R2 download contract
-        if: ${{ inputs.upload_r2 }}
-        env:
-          ARCH: ${{ steps.release_meta.outputs.arch }}
-          ARCHIVE_NAME: ${{ steps.preview_meta.outputs.archive_name }}
-          LATEST_PREFIX: ${{ steps.release_meta.outputs.latest_prefix }}
-          PREVIEW_PACKAGE: ${{ steps.preview_meta.outputs.package_name }}
-          VERSION_PREFIX: ${{ steps.release_meta.outputs.version_prefix }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSIONED_ARCHIVE_URL="${PUBLIC_DOWNLOAD_ORIGIN}/${VERSION_PREFIX}/${ARCHIVE_NAME}"
-          VERSIONED_PACKAGE_URL="${PUBLIC_DOWNLOAD_ORIGIN}/${VERSION_PREFIX}/${PREVIEW_PACKAGE}"
-          LATEST_DMG_URL="${PUBLIC_DOWNLOAD_ORIGIN}/${LATEST_PREFIX}/puppyone-latest-${ARCH}.dmg"
-          LATEST_ZIP_URL="${PUBLIC_DOWNLOAD_ORIGIN}/${LATEST_PREFIX}/puppyone-latest-${ARCH}.zip"
-          LATEST_PACKAGE_URL="${PUBLIC_DOWNLOAD_ORIGIN}/${LATEST_PREFIX}/puppyone-terminal-preview-latest-${ARCH}.tgz"
-          CURL_ARGS=(
-            --fail
-            --location
-            --retry 6
-            --retry-all-errors
-            --retry-delay 5
-            --show-error
-            --silent
-            -H "Cache-Control: no-cache"
-          )
-
-          curl "${CURL_ARGS[@]}" --head "${VERSIONED_ARCHIVE_URL}" >/dev/null
-          curl "${CURL_ARGS[@]}" --head "${VERSIONED_PACKAGE_URL}" >/dev/null
-          curl "${CURL_ARGS[@]}" --head "${LATEST_DMG_URL}" >/dev/null
-          curl "${CURL_ARGS[@]}" --head "${LATEST_ZIP_URL}" >/dev/null
-          curl "${CURL_ARGS[@]}" \
-            --output "${RUNNER_TEMP}/latest-terminal-preview.tgz" \
-            "${LATEST_PACKAGE_URL}"
-
-          LOCAL_SHA="$(shasum -a 256 "artifacts/terminal-preview/${PREVIEW_PACKAGE}" | awk '{print $1}')"
-          PUBLIC_SHA="$(shasum -a 256 "${RUNNER_TEMP}/latest-terminal-preview.tgz" | awk '{print $1}')"
-          if [ "${LOCAL_SHA}" != "${PUBLIC_SHA}" ]; then
-            echo "The public latest Terminal package does not match this release." >&2
-            exit 1
-          fi
-
-          {
-            echo "### Desktop internal release"
+            echo "This build is not Developer ID signed or notarized. Use it for technical preview testing only."
             echo
-            echo "- Versioned ZIP: ${VERSIONED_ARCHIVE_URL}"
-            echo "- Versioned Terminal package: ${VERSIONED_PACKAGE_URL}"
-            echo "- Latest DMG: ${LATEST_DMG_URL}"
-            echo "- Latest ZIP: ${LATEST_ZIP_URL}"
-            echo "- Latest Terminal package: ${LATEST_PACKAGE_URL}"
-            echo
+            echo "Terminal preview command:"
             echo '```bash'
-            echo "npm exec --yes --package=${VERSIONED_PACKAGE_URL} -- puppyone-preview"
+            echo "npm exec --yes --package=${PUBLIC_DOWNLOAD_ORIGIN}/desktop/internal/mac/${RELEASE_TAG}/${PREVIEW_PACKAGE} -- puppyone-preview"
             echo '```'
-          } >> "${GITHUB_STEP_SUMMARY}"
+          } > artifacts/release-notes.md
+
+      - name: Create self-describing release bundle
+        env:
+          ARCH: ${{ steps.release.outputs.arch }}
+          PUBLISHED_AT: ${{ steps.release.outputs.published_at }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          assets=()
+          for pattern in release/puppyone-*.dmg release/puppyone-*.zip release/puppyone-*.blockmap artifacts/terminal-preview/*.tgz; do
+            for file in $pattern; do
+              [ -f "${file}" ] && assets+=(--asset "${file}")
+            done
+          done
+          node scripts/create-desktop-release-bundle.mjs create \
+            --bundle artifacts/desktop-release-bundle \
+            --channel internal \
+            --tag "${RELEASE_TAG}" \
+            --version "${VERSION}" \
+            --commit "${GITHUB_SHA}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --r2-prefix "desktop/internal/mac/${RELEASE_TAG}" \
+            --public-origin "${PUBLIC_DOWNLOAD_ORIGIN}" \
+            --published-at "${PUBLISHED_AT}" \
+            --workflow-run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --arch "${ARCH}" \
+            --prerelease true \
+            --provenance pipeline \
+            --developer-id-signed false \
+            --notarized false \
+            --notes-file artifacts/release-notes.md \
+            "${assets[@]}"
+
+      - name: Verify release bundle before handoff
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          node scripts/create-desktop-release-bundle.mjs verify \
+            --bundle artifacts/desktop-release-bundle \
+            --channel internal \
+            --tag "${RELEASE_TAG}" \
+            --commit "${GITHUB_SHA}"
+
+      - name: Attest published binaries and checksums
+        if: ${{ inputs.publish_release }}
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-path: |
+            artifacts/desktop-release-bundle/assets/*
+            artifacts/desktop-release-bundle/release.json
+            artifacts/desktop-release-bundle/SHA256SUMS
+
+      - name: Upload build-once release bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.release.outputs.artifact_name }}
+          path: artifacts/desktop-release-bundle
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish GitHub and R2 release
+    needs: build
+    if: ${{ inputs.publish_release }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/desktop-release-publish.yml
+    with:
+      artifact_name: ${{ needs.build.outputs.artifact_name }}
+      channel: internal
+      deployment_environment: desktop-internal
+      generate_notes: false
+      prerelease: true
+      release_name: ${{ needs.build.outputs.release_name }}
+      release_tag: ${{ needs.build.outputs.release_tag }}
+      verify_tag: false
+    secrets: inherit
