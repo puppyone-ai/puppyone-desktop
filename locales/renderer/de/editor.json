@@ -43,6 +43,7 @@
   "csv.expandTableHint": "Zum Erweitern nach außen ziehen; klicken, um eine Größe auszuwählen",
   "csv.expandTo": "Auf {rows, number} Zeilen × {columns, number} Spalten erweitern",
   "csv.header": "Ersten Datensatz als Überschrift verwenden",
+  "csv.headerToggle": "Kopfzeile",
   "csv.headerDescription": "Ändert nur die Darstellung; der CSV-Inhalt bleibt unverändert.",
   "csv.headerRecord": "Kopfzeile; CSV-Datensatz 1",
   "csv.rowNumber": "Datenzeile {row, number}; CSV-Datensatz {record, number}",

@@ -43,6 +43,7 @@
   "csv.expandTableHint": "外側にドラッグして拡張、クリックしてサイズを選択",
   "csv.expandTo": "{rows, number} 行 × {columns, number} 列に拡張",
   "csv.header": "最初のレコードを見出しとして使用",
+  "csv.headerToggle": "見出し行",
   "csv.headerDescription": "表示のみが変わり、CSV の内容は変更されません。",
   "csv.headerRecord": "見出し、CSV レコード 1",
   "csv.rowNumber": "データ行 {row, number}、CSV レコード {record, number}",

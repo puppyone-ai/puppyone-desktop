@@ -63,7 +63,10 @@ describe("local CSV editor persistence", () => {
     expect(firstCell.readOnly).toBe(false);
     expect(container.querySelector(".csv-table-editor__table")).toBeInstanceOf(HTMLTableElement);
     expect(container.querySelectorAll(".csv-table-editor__structure-button")).toHaveLength(2);
-    expect(container.querySelector(".csv-table-editor__settings-button")).toBeInstanceOf(HTMLButtonElement);
+    expect(container.querySelector(".csv-table-editor__settings-button")).toBeInstanceOf(
+      HTMLButtonElement,
+    );
+    expect(container.querySelector(".csv-table-editor__settings-popover")).toBeNull();
     expect(container.querySelector(".csv-table-editor__toolbar")).toBeNull();
 
     act(() => {
@@ -96,7 +99,34 @@ describe("local CSV editor persistence", () => {
       await readFile(join(workspaceRoot, "Untitled.csv"), "utf8")
     ) === "Updated,Column 2,\n,,");
 
-    expect(container.querySelectorAll(".csv-table-editor__table tbody tr")).toHaveLength(2);
+    const resizeHandle = container.querySelector<HTMLButtonElement>(".csv-table-editor__resize-handle");
+    if (!resizeHandle) throw new Error("CSV resize handle did not mount.");
+    act(() => resizeHandle.click());
+    const expansionTarget = document.querySelector<HTMLButtonElement>(
+      ".csv-table-editor__resize-picker-cell[data-added-rows='2'][data-added-columns='2']",
+    );
+    if (!expansionTarget) throw new Error("CSV expansion target did not mount.");
+    act(() => expansionTarget.click());
+
+    const expandedSnapshot = "Updated,Column 2,,,\n,,,,\n,,,,\n,,,,";
+    await waitFor(async () => (
+      await readFile(join(workspaceRoot, "Untitled.csv"), "utf8")
+    ) === expandedSnapshot);
+
+    act(() => {
+      setInputValue(firstCell, "Persisted");
+      firstCell.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const editedExpandedSnapshot = "Persisted,Column 2,,,\n,,,,\n,,,,\n,,,,";
+    await waitFor(async () => (
+      await readFile(join(workspaceRoot, "Untitled.csv"), "utf8")
+    ) === editedExpandedSnapshot);
+
+    expect(container.querySelectorAll(".csv-table-editor__table tbody tr")).toHaveLength(4);
+    expect(container.querySelectorAll(
+      ".csv-table-editor__table tbody tr:first-child td[data-csv-column]",
+    )).toHaveLength(5);
   });
 });
 

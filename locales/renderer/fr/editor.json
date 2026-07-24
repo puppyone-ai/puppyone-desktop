@@ -43,6 +43,7 @@
   "csv.expandTableHint": "Faites glisser vers l’extérieur pour agrandir ; cliquez pour choisir une taille",
   "csv.expandTo": "Agrandir à {rows, number} lignes × {columns, number} colonnes",
   "csv.header": "Utiliser le premier enregistrement comme en-tête",
+  "csv.headerToggle": "Ligne d’en-tête",
   "csv.headerDescription": "Modifie uniquement l’affichage ; le contenu CSV reste inchangé.",
   "csv.headerRecord": "En-tête ; enregistrement CSV 1",
   "csv.rowNumber": "Ligne de données {row, number} ; enregistrement CSV {record, number}",

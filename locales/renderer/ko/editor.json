@@ -43,6 +43,7 @@
   "csv.expandTableHint": "바깥쪽으로 드래그하여 확장하고, 클릭하여 크기 선택",
   "csv.expandTo": "{rows, number}개 행 × {columns, number}개 열로 확장",
   "csv.header": "첫 번째 레코드를 머리글로 사용",
+  "csv.headerToggle": "머리글 행",
   "csv.headerDescription": "표시 방식만 바뀌며 CSV 내용은 변경되지 않습니다.",
   "csv.headerRecord": "머리글, CSV 레코드 1",
   "csv.rowNumber": "데이터 {row, number}행, CSV 레코드 {record, number}",
