@@ -77,6 +77,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   listCloudAccessPointDirectory: (request) => ipcRenderer.invoke("cloud:access-point-list-directory", request),
   getCloudAccessPointSemantics: (request) => ipcRenderer.invoke("cloud:access-point-semantics", request),
   openExternalUrl: (href) => ipcRenderer.invoke("system:open-external-url", href),
+  submitFeedback: (request) => ipcRenderer.invoke("feedback:submit", request),
   markdownWebEmbed: {
     create: (request) => ipcRenderer.invoke("markdown-web-embed:create", request),
     setBounds: (request) => ipcRenderer.invoke("markdown-web-embed:set-bounds", request),
