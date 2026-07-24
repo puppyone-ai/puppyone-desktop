@@ -43,6 +43,7 @@
   "csv.expandTableHint": "Arraste para fora para expandir; clique para escolher um tamanho",
   "csv.expandTo": "Expandir para {rows, number} linhas × {columns, number} colunas",
   "csv.header": "Usar o primeiro registro como cabeçalho",
+  "csv.headerToggle": "Linha de cabeçalho",
   "csv.headerDescription": "Altera somente a exibição; o conteúdo CSV não é modificado.",
   "csv.headerRecord": "Cabeçalho; registro CSV 1",
   "csv.rowNumber": "Linha de dados {row, number}; registro CSV {record, number}",

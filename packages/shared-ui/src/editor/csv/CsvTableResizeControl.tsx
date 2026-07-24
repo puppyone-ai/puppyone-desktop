@@ -1,31 +1,26 @@
 "use client";
 
 import type { MessageFormatter } from "@puppyone/localization/core";
+import { ArrowDownRight } from "lucide-react";
 import {
   useEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { EDITABLE_TABLE_COLUMN_MIN_WIDTH } from "../table/editableTableLayout";
 import { MAX_CSV_TABLE_COLUMNS, MAX_CSV_TABLE_DATA_ROWS } from "./csvTableOperations";
 
-const RESIZE_DRAG_ACTIVATION_DISTANCE = 4;
+const RESIZE_DRAG_ACTIVATION_DISTANCE = 8;
 const RESIZE_PICKER_ROWS = 6;
 const RESIZE_PICKER_COLUMNS = 6;
 const FALLBACK_ROW_HEIGHT = 31;
 
-type CsvTableExpansion = Readonly<{
+export type CsvTableExpansion = Readonly<{
   addedRows: number;
   addedColumns: number;
-}>;
-
-type CsvTableResizePreview = CsvTableExpansion & Readonly<{
-  rowHeight: number;
-  columnWidth: number;
 }>;
 
 type DragSession = {
@@ -38,7 +33,7 @@ type DragSession = {
   maximumAddedRows: number;
   maximumAddedColumns: number;
   pointerBounds: CsvTableResizePointerBounds | null;
-  preview: CsvTableResizePreview;
+  preview: CsvTableExpansion;
 };
 
 type CsvTableResizeRect = Readonly<{
@@ -51,20 +46,20 @@ type CsvTableResizeRect = Readonly<{
 type CsvTableResizePointerBounds = CsvTableResizeRect;
 
 type CsvTableResizeControlProps = Readonly<{
-  columnWidths: readonly number[];
   currentColumnCount: number;
   currentDataRowCount: number;
   direction: "ltr" | "rtl";
   onExpand: (targetDataRowCount: number, targetColumnCount: number) => void;
+  onPreviewChange: (preview: CsvTableExpansion | null) => void;
   t: MessageFormatter;
 }>;
 
 export function CsvTableResizeControl({
-  columnWidths,
   currentColumnCount,
   currentDataRowCount,
   direction,
   onExpand,
+  onPreviewChange,
   t,
 }: CsvTableResizeControlProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -77,13 +72,15 @@ export function CsvTableResizeControl({
     addedRows: 1,
     addedColumns: 1,
   });
-  const [dragPreview, setDragPreview] = useState<CsvTableResizePreview | null>(null);
+  const [dragPreview, setDragPreview] = useState<CsvTableExpansion | null>(null);
   const availableRows = Math.max(0, MAX_CSV_TABLE_DATA_ROWS - currentDataRowCount);
   const availableColumns = Math.max(0, MAX_CSV_TABLE_COLUMNS - currentColumnCount);
   const pickerRowCount = Math.min(RESIZE_PICKER_ROWS, availableRows);
   const pickerColumnCount = Math.min(RESIZE_PICKER_COLUMNS, availableColumns);
   const canExpand = availableRows > 0 || availableColumns > 0;
   const canOpenPicker = pickerRowCount > 0 && pickerColumnCount > 0;
+
+  useEffect(() => () => onPreviewChange(null), [onPreviewChange]);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -136,6 +133,7 @@ export function CsvTableResizeControl({
     event.stopPropagation();
     event.currentTarget.focus({ preventScroll: true });
     setPickerOpen(false);
+    onPreviewChange(null);
 
     const surface = event.currentTarget.closest<HTMLElement>(".csv-table-editor__surface");
     const referenceRow = surface?.querySelector<HTMLTableRowElement>("tbody tr:last-child, thead tr:last-child");
@@ -151,11 +149,9 @@ export function CsvTableResizeControl({
       rowHeight,
       surfaceRect: surface?.getBoundingClientRect() ?? null,
     });
-    const preview: CsvTableResizePreview = {
+    const preview: CsvTableExpansion = {
       addedRows: 0,
       addedColumns: 0,
-      rowHeight,
-      columnWidth: EDITABLE_TABLE_COLUMN_MIN_WIDTH,
     };
     dragSessionRef.current = {
       pointerId: event.pointerId,
@@ -193,19 +189,23 @@ export function CsvTableResizeControl({
     if (!session.moved && movement < RESIZE_DRAG_ACTIVATION_DISTANCE) return;
 
     session.moved = true;
-    session.preview = {
-      ...getCsvTableExpansionFromDrag({
-        horizontalDistance,
-        verticalDistance,
-        rowHeight: session.rowHeight,
-        columnWidth: session.columnWidth,
-        maximumAddedRows: session.maximumAddedRows,
-        maximumAddedColumns: session.maximumAddedColumns,
-      }),
+    session.preview = getCsvTableExpansionFromDrag({
+      horizontalDistance,
+      verticalDistance,
       rowHeight: session.rowHeight,
       columnWidth: session.columnWidth,
-    };
+      maximumAddedRows: session.maximumAddedRows,
+      maximumAddedColumns: session.maximumAddedColumns,
+    });
     setDragPreview(session.preview);
+    onPreviewChange(
+      session.preview.addedRows > 0 || session.preview.addedColumns > 0
+        ? {
+            addedRows: session.preview.addedRows,
+            addedColumns: session.preview.addedColumns,
+          }
+        : null,
+    );
     event.preventDefault();
     event.stopPropagation();
   };
@@ -215,6 +215,7 @@ export function CsvTableResizeControl({
     if (!session || session.pointerId !== event.pointerId) return;
     dragSessionRef.current = null;
     setDragPreview(null);
+    onPreviewChange(null);
     try {
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
         event.currentTarget.releasePointerCapture(event.pointerId);
@@ -273,31 +274,9 @@ export function CsvTableResizeControl({
     () => Array.from({ length: pickerColumnCount }, (_, index) => index + 1),
     [pickerColumnCount],
   );
-  const previewGeometry = dragPreview ? getCsvTableResizePreviewGeometry({
-    addedColumns: dragPreview.addedColumns,
-    addedRows: dragPreview.addedRows,
-    columnWidth: dragPreview.columnWidth,
-    currentColumnCount,
-    currentColumnWidths: columnWidths,
-    rowHeight: dragPreview.rowHeight,
-  }) : null;
-  const previewStyle = previewGeometry ? ({
-    "--csv-table-resize-added-width": `${previewGeometry.addedInlineSize}px`,
-    "--csv-table-resize-added-height": `${previewGeometry.addedBlockSize}px`,
-    "--csv-table-resize-row-height": `${previewGeometry.rowHeight}px`,
-  } as CSSProperties) : undefined;
-  const previewColumnStyle = previewGeometry && dragPreview?.addedColumns ? ({
-    gridTemplateColumns: `repeat(${dragPreview.addedColumns}, ${previewGeometry.addedColumnWidth}px)`,
-  } as CSSProperties) : undefined;
-  const previewRowStyle = previewGeometry && dragPreview?.addedRows ? ({
-    gridTemplateColumns: [
-      "var(--csv-table-record-index-width)",
-      ...previewGeometry.dataColumnWidths.map((width) => `${width}px`),
-    ].join(" "),
-  } as CSSProperties) : undefined;
   const pickerRowStyle = ({
     gridTemplateColumns: `repeat(${pickerColumnCount}, 16px)`,
-  } as CSSProperties);
+  });
   const previewDimensions = dragPreview ? {
     rows: currentDataRowCount + dragPreview.addedRows,
     columns: currentColumnCount + dragPreview.addedColumns,
@@ -306,6 +285,7 @@ export function CsvTableResizeControl({
     rows: currentDataRowCount + pickerSelection.addedRows,
     columns: currentColumnCount + pickerSelection.addedColumns,
   };
+  const pickerDimensionLabel = t("editor.csv.dimensions", pickerDimensions);
 
   return (
     <>
@@ -329,9 +309,11 @@ export function CsvTableResizeControl({
           onPointerUp={(event) => finishPointerInteraction(event, false)}
         >
           <span
-            className="csv-table-editor__resize-handle-visual po-editable-table-structure-button-visual"
+            className="csv-table-editor__resize-handle-visual"
             aria-hidden="true"
-          />
+          >
+            <ArrowDownRight />
+          </span>
         </button>
 
         {pickerOpen && (
@@ -342,7 +324,7 @@ export function CsvTableResizeControl({
             aria-label={t("editor.csv.expandTable")}
           >
             <div className="csv-table-editor__resize-picker-summary" aria-live="polite">
-              <strong>{t("editor.csv.dimensions", pickerDimensions)}</strong>
+              <strong title={pickerDimensionLabel}>{pickerDimensionLabel}</strong>
               <span>{formatExpansionDelta(pickerSelection)}</span>
             </div>
             <div
@@ -395,48 +377,6 @@ export function CsvTableResizeControl({
         )}
       </div>
 
-      {dragPreview && (dragPreview.addedRows > 0 || dragPreview.addedColumns > 0) && (
-        <div className="csv-table-editor__resize-preview" style={previewStyle} aria-hidden="true">
-          {dragPreview.addedColumns > 0 && (
-            <div className="csv-table-editor__resize-preview-columns" style={previewColumnStyle}>
-              {Array.from({ length: dragPreview.addedColumns }, (_, columnIndex) => (
-                <span
-                  className="csv-table-editor__resize-preview-track csv-table-editor__resize-preview-track--data"
-                  key={`added-column-${columnIndex}`}
-                />
-              ))}
-            </div>
-          )}
-          {dragPreview.addedRows > 0 && previewGeometry && (
-            <div className="csv-table-editor__resize-preview-rows" style={previewRowStyle}>
-              <span className="csv-table-editor__resize-preview-track csv-table-editor__resize-preview-track--record-index">
-                {Array.from({ length: dragPreview.addedRows }, (_, previewRowIndex) => (
-                  <span
-                    className="csv-table-editor__resize-preview-cell csv-table-editor__resize-preview-cell--record-index"
-                    key={`preview-record-index-${previewRowIndex}`}
-                  >
-                    {currentDataRowCount + previewRowIndex + 1}
-                  </span>
-                ))}
-              </span>
-              {previewGeometry.dataColumnWidths.map((_, columnIndex) => (
-                <span
-                  className="csv-table-editor__resize-preview-track csv-table-editor__resize-preview-track--data"
-                  key={`preview-column-${columnIndex}`}
-                >
-                  {Array.from({ length: dragPreview.addedRows }, (_, previewRowIndex) => (
-                    <span
-                      className="csv-table-editor__resize-preview-cell csv-table-editor__resize-preview-cell--data"
-                      key={`preview-cell-${previewRowIndex}-${columnIndex}`}
-                    />
-                  ))}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {previewDimensions && (dragPreview?.addedRows || dragPreview?.addedColumns) ? (
         <div className="csv-table-editor__resize-status" role="status" aria-live="polite">
           <strong>{t("editor.csv.dimensions", previewDimensions)}</strong>
@@ -463,17 +403,36 @@ export function getCsvTableExpansionFromDrag({
   maximumAddedColumns: number;
 }>): CsvTableExpansion {
   return {
-    addedRows: clampInteger(
-      Math.ceil(Math.max(0, verticalDistance) / Math.max(1, rowHeight)),
-      0,
+    addedRows: snapOutwardDistanceToTrackCount(
+      verticalDistance,
+      rowHeight,
       maximumAddedRows,
     ),
-    addedColumns: clampInteger(
-      Math.ceil(Math.max(0, horizontalDistance) / Math.max(1, columnWidth)),
-      0,
+    addedColumns: snapOutwardDistanceToTrackCount(
+      horizontalDistance,
+      columnWidth,
       maximumAddedColumns,
     ),
   };
+}
+
+/**
+ * Snap the projected table edge to the nearest complete track. Requiring the
+ * pointer to cross a track's midpoint prevents tiny outward movement from
+ * immediately creating a row or column.
+ */
+function snapOutwardDistanceToTrackCount(
+  distance: number,
+  trackSize: number,
+  maximum: number,
+): number {
+  const normalizedTrackSize = normalizePositiveDimension(trackSize, 1);
+  const outwardDistance = Math.max(0, distance);
+  return clampInteger(
+    Math.floor((outwardDistance + normalizedTrackSize / 2) / normalizedTrackSize),
+    0,
+    maximum,
+  );
 }
 
 /**
@@ -533,62 +492,6 @@ export function getCsvTableResizeViewportConstraints({
       right: editorRect.right,
       top: editorRect.top,
     },
-  } as const;
-}
-
-/**
- * Builds preview tracks from the same widths as the semantic table. The record
- * index remains a separate CSS track and is intentionally absent from this
- * data-column list.
- */
-export function getCsvTableResizePreviewGeometry({
-  addedColumns,
-  addedRows,
-  columnWidth,
-  currentColumnCount,
-  currentColumnWidths,
-  rowHeight,
-}: Readonly<{
-  addedColumns: number;
-  addedRows: number;
-  columnWidth: number;
-  currentColumnCount: number;
-  currentColumnWidths: readonly number[];
-  rowHeight: number;
-}>) {
-  const normalizedCurrentColumnCount = clampInteger(
-    currentColumnCount,
-    1,
-    MAX_CSV_TABLE_COLUMNS,
-  );
-  const normalizedAddedColumns = clampInteger(
-    addedColumns,
-    0,
-    MAX_CSV_TABLE_COLUMNS - normalizedCurrentColumnCount,
-  );
-  const normalizedAddedRows = clampInteger(addedRows, 0, MAX_CSV_TABLE_DATA_ROWS);
-  const normalizedColumnWidth = normalizePositiveDimension(
-    columnWidth,
-    EDITABLE_TABLE_COLUMN_MIN_WIDTH,
-  );
-  const normalizedRowHeight = normalizePositiveDimension(rowHeight, FALLBACK_ROW_HEIGHT);
-  const currentWidths = Array.from({ length: normalizedCurrentColumnCount }, (_, columnIndex) => (
-    normalizePositiveDimension(
-      currentColumnWidths[columnIndex],
-      EDITABLE_TABLE_COLUMN_MIN_WIDTH,
-    )
-  ));
-  const addedWidths = Array.from(
-    { length: normalizedAddedColumns },
-    () => normalizedColumnWidth,
-  );
-
-  return {
-    addedBlockSize: normalizedAddedRows * normalizedRowHeight,
-    addedColumnWidth: normalizedColumnWidth,
-    addedInlineSize: normalizedAddedColumns * normalizedColumnWidth,
-    dataColumnWidths: [...currentWidths, ...addedWidths],
-    rowHeight: normalizedRowHeight,
   } as const;
 }
 
