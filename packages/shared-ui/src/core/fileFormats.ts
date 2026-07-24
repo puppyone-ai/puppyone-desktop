@@ -54,24 +54,27 @@ export interface FileFormat {
   monacoLanguage?: string;
 }
 
-export type FileSemanticKind =
-  | "folder"
-  | "app"
-  | "workflow"
-  | "markdown"
-  | "json"
-  | "html"
-  | "image"
-  | "audio"
-  | "pdf"
-  | "video"
-  | "spreadsheet"
-  | "archive"
-  | "document"
-  | "binary"
-  | "code"
-  | "text"
-  | "file";
+export const FILE_SEMANTIC_KINDS = [
+  "folder",
+  "app",
+  "workflow",
+  "markdown",
+  "json",
+  "html",
+  "image",
+  "audio",
+  "pdf",
+  "video",
+  "spreadsheet",
+  "archive",
+  "document",
+  "binary",
+  "code",
+  "text",
+  "file",
+] as const;
+
+export type FileSemanticKind = (typeof FILE_SEMANTIC_KINDS)[number];
 
 export type FilePreviewKind =
   | "app"
@@ -104,6 +107,7 @@ const FILENAME_INDEX = new Map<string, FileFormat>();
 const EXTENSION_INDEX = new Map<string, FileFormat>();
 const MIME_INDEX = new Map<string, FileFormat>();
 const FILENAME_PATTERNS: Array<{ regex: RegExp; format: FileFormat }> = [];
+const FILE_SEMANTIC_KIND_SET = new Set<string>(FILE_SEMANTIC_KINDS);
 
 for (const format of FILE_FORMATS) {
   for (const filename of format.filenames ?? []) {
@@ -459,23 +463,5 @@ function basename(path: string): string {
 }
 
 function isFileSemanticKind(value: string | null | undefined): value is FileSemanticKind {
-  return Boolean(value && [
-    "folder",
-    "app",
-    "workflow",
-    "markdown",
-    "json",
-    "html",
-    "image",
-    "audio",
-    "pdf",
-    "video",
-    "spreadsheet",
-    "archive",
-    "document",
-    "binary",
-    "code",
-    "text",
-    "file",
-  ].includes(value));
+  return typeof value === "string" && FILE_SEMANTIC_KIND_SET.has(value);
 }
