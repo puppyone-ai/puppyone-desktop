@@ -70,7 +70,7 @@ export function CloudOverviewDashboard({
               <span
                 className={item.kind === "folder"
                   ? "desktop-cloud-overview-storage-preview-item desktop-cloud-overview-storage-preview-item--folder"
-                  : "desktop-cloud-overview-storage-preview-item"}
+                  : "desktop-cloud-overview-storage-preview-item desktop-cloud-overview-storage-preview-item--file"}
                 key={item.id}
               >
                 {item.kind === "folder" ? <Folder size={22} /> : <File size={20} />}
