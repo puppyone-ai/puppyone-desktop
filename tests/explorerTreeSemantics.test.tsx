@@ -106,6 +106,78 @@ describe("ExplorerTree interactive semantics", () => {
     });
     expect(classifyReferenceDataTransfer(transfer)).toMatchObject({ kind: "workspace-entries", typed: true });
   });
+
+  it("clears external-file drop feedback when the drag leaves the tree", () => {
+    const folder: DataNode = {
+      id: "recordings",
+      name: "recordings",
+      path: "recordings",
+      type: "folder",
+      children: [],
+    };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => renderWithTestLocalization(root,
+      <ExplorerTree
+        nodes={[folder]}
+        activePath={null}
+        expandedPaths={new Set()}
+        showRoot={false}
+        onSelectNode={vi.fn()}
+        onImportFiles={vi.fn()}
+      />,
+    ));
+
+    const row = container.querySelector<HTMLElement>(`[data-explorer-path="${folder.path}"]`)!;
+    mockRowBounds(row);
+    const transfer = fakeFileDataTransfer();
+
+    act(() => row.dispatchEvent(dragEvent("dragenter", transfer)));
+    expect(row.classList.contains("drop-target")).toBe(true);
+
+    act(() => row.dispatchEvent(dragEvent("dragleave", transfer)));
+    expect(row.classList.contains("drop-target")).toBe(false);
+  });
+
+  it("clears external-file drop feedback for global drag cancellation signals", () => {
+    const folder: DataNode = {
+      id: "recordings",
+      name: "recordings",
+      path: "recordings",
+      type: "folder",
+      children: [],
+    };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => renderWithTestLocalization(root,
+      <ExplorerTree
+        nodes={[folder]}
+        activePath={null}
+        expandedPaths={new Set()}
+        showRoot={false}
+        onSelectNode={vi.fn()}
+        onImportFiles={vi.fn()}
+      />,
+    ));
+
+    const row = container.querySelector<HTMLElement>(`[data-explorer-path="${folder.path}"]`)!;
+    mockRowBounds(row);
+    const transfer = fakeFileDataTransfer();
+    const cancellations = [
+      () => window.dispatchEvent(new Event("dragend")),
+      () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })),
+      () => window.dispatchEvent(new Event("blur")),
+    ];
+
+    for (const cancel of cancellations) {
+      act(() => row.dispatchEvent(dragEvent("dragenter", transfer)));
+      expect(row.classList.contains("drop-target")).toBe(true);
+      act(() => cancel());
+      expect(row.classList.contains("drop-target")).toBe(false);
+    }
+  });
 });
 
 function fakeDataTransfer(): DataTransfer {
@@ -126,4 +198,37 @@ function fakeDataTransfer(): DataTransfer {
     setDragImage: () => undefined,
   } as DataTransfer;
   return transfer;
+}
+
+function fakeFileDataTransfer(): DataTransfer {
+  const transfer = fakeDataTransfer();
+  (transfer.types as string[]).push("Files");
+  return transfer;
+}
+
+function dragEvent(type: string, dataTransfer: DataTransfer): MouseEvent {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    clientX: 12,
+    clientY: 5,
+  });
+  Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+  return event;
+}
+
+function mockRowBounds(row: HTMLElement) {
+  Object.defineProperty(row, "getBoundingClientRect", {
+    value: () => ({
+      top: 0,
+      bottom: 30,
+      left: 0,
+      right: 240,
+      width: 240,
+      height: 30,
+      x: 0,
+      y: 0,
+      toJSON() {},
+    }),
+  });
 }

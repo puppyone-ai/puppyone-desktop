@@ -6,7 +6,7 @@ import type {
   ReactNode,
   RefObject,
 } from "react";
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type { DataNode } from "../core/types";
@@ -108,7 +108,6 @@ type TreeDragController = {
     targetFolderPath: string | null,
     mode: "folder" | "parent",
   ) => boolean;
-  onRowDragLeave: (event: ReactDragEvent<HTMLElement>, rowPath: string | null) => void;
   onRowDrop: (event: ReactDragEvent<HTMLElement>, targetFolderPath: string | null) => void;
 };
 
@@ -158,6 +157,9 @@ export function ExplorerTree({
   const resolvedEmptyLabel = emptyLabel ?? t("shared-ui.explorer.emptyFolder");
   const resolvedLoadingLabel = loadingLabel ?? t("shared-ui.loading");
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Native dragenter/dragleave events fire for descendants too. The target is
+  // outside this tree only when the balanced depth returns to zero.
+  const dragEnterDepthRef = useRef(0);
   const [draggedNodes, setDraggedNodes] = useState<DataNode[]>([]);
   const [dropTarget, setDropTarget] = useState<TreeDropTarget>(null);
   const moveEnabled = Boolean(canMoveNodes && (onMoveNodes || onMoveNode));
@@ -255,10 +257,46 @@ export function ExplorerTree({
   const dragCallbacksRef = useRef({ onImportFiles, onMoveNode, onMoveNodes });
   dragCallbacksRef.current = { onImportFiles, onMoveNode, onMoveNodes };
 
-  const clearDragState = useCallback(() => {
-    setDraggedNodes([]);
-    setDropTarget(null);
+  const clearDropTarget = useCallback(() => {
+    dragEnterDepthRef.current = 0;
+    setDropTarget((current) => (current === null ? current : null));
   }, []);
+
+  const clearDragState = useCallback(() => {
+    clearDropTarget();
+    setDraggedNodes((current) => (current.length === 0 ? current : []));
+  }, [clearDropTarget]);
+
+  useEffect(() => {
+    // A cancelled native drag is not guaranteed to finish over this tree.
+    // Treat document/window terminal signals as idempotent session cleanup.
+    let disposed = false;
+    const clearAfterDrop = () => {
+      queueMicrotask(() => {
+        if (!disposed) clearDragState();
+      });
+    };
+    const clearOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") clearDragState();
+    };
+    const clearOnVisibilityChange = () => {
+      if (document.visibilityState === "hidden") clearDragState();
+    };
+
+    window.addEventListener("dragend", clearDragState, true);
+    window.addEventListener("drop", clearAfterDrop, true);
+    window.addEventListener("keydown", clearOnEscape, true);
+    window.addEventListener("blur", clearDragState, true);
+    document.addEventListener("visibilitychange", clearOnVisibilityChange, true);
+    return () => {
+      disposed = true;
+      window.removeEventListener("dragend", clearDragState, true);
+      window.removeEventListener("drop", clearAfterDrop, true);
+      window.removeEventListener("keydown", clearOnEscape, true);
+      window.removeEventListener("blur", clearDragState, true);
+      document.removeEventListener("visibilitychange", clearOnVisibilityChange, true);
+    };
+  }, [clearDragState]);
 
   const setNextDropTarget = useCallback((
     rowPath: string | null,
@@ -322,9 +360,21 @@ export function ExplorerTree({
     return valid;
   }, [importEnabled, moveEnabled, setNextDropTarget]);
 
-  const dragLeaveRow = useCallback((event: ReactDragEvent<HTMLElement>, rowPath: string | null) => {
-    event.stopPropagation();
-  }, []);
+  const enterTree = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
+    const transferTypes = Array.from(event.dataTransfer.types);
+    const accepted = (importEnabled && hasDataTransferFiles(event.dataTransfer))
+      || (moveEnabled && (
+        draggedNodesRef.current.length > 0
+        || transferTypes.includes(EXPLORER_TREE_NODE_DRAG_TYPE)
+      ));
+    if (!accepted) return;
+    dragEnterDepthRef.current += 1;
+  }, [importEnabled, moveEnabled]);
+
+  const leaveTree = useCallback(() => {
+    dragEnterDepthRef.current = Math.max(0, dragEnterDepthRef.current - 1);
+    if (dragEnterDepthRef.current === 0) clearDropTarget();
+  }, [clearDropTarget]);
 
   const dropOnRow = useCallback((event: ReactDragEvent<HTMLElement>, targetFolderPath: string | null) => {
     const importedFiles = getDataTransferFiles(event.dataTransfer);
@@ -356,23 +406,16 @@ export function ExplorerTree({
     });
   }, [clearDragState, importEnabled, moveEnabled]);
 
-  const leaveTree = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
-    if (!dropTarget || !didLeaveElementBounds(event)) return;
-    setDropTarget(null);
-  }, [dropTarget]);
-
   const dragController = useMemo<TreeDragController>(() => ({
     // Outbound copy/context drag is independent from in-tree move support.
     enabled: true,
     onNodeDragStart: beginNodeDrag,
     onNodeDragEnd: clearDragState,
     onRowDragOver: dragOverRow,
-    onRowDragLeave: dragLeaveRow,
     onRowDrop: dropOnRow,
   }), [
     beginNodeDrag,
     clearDragState,
-    dragLeaveRow,
     dragOverRow,
     dropOnRow,
   ]);
@@ -472,9 +515,10 @@ export function ExplorerTree({
         "--tree-edge-fade-bottom": scrollEdgeState.bottomFade.toFixed(3),
         "--tree-edge-fade-top": scrollEdgeState.topFade.toFixed(3),
       } as CSSProperties}
+      onDragEnterCapture={dropEnabled ? enterTree : undefined}
+      onDragLeaveCapture={dropEnabled ? leaveTree : undefined}
       onDragEnter={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
       onDragOver={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
-      onDragLeave={dropEnabled ? leaveTree : undefined}
       onDrop={dropEnabled ? (event) => dragController.onRowDrop(event, null) : undefined}
       onContextMenu={onRootContextMenu}
       onKeyDown={handleTreeKeyDown}
@@ -488,7 +532,6 @@ export function ExplorerTree({
               style={{ "--depth": 0 } as CSSProperties}
               onDragEnter={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
               onDragOver={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
-              onDragLeave={dropEnabled ? (event) => dragController.onRowDragLeave(event, null) : undefined}
               onDrop={dropEnabled ? (event) => dragController.onRowDrop(event, null) : undefined}
               onClick={(event) => {
                 event.stopPropagation();
@@ -507,7 +550,6 @@ export function ExplorerTree({
               style={{ "--depth": 0 } as CSSProperties}
               onDragEnter={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
               onDragOver={dropEnabled ? (event) => dragController.onRowDragOver(event, null, null, "folder") : undefined}
-              onDragLeave={dropEnabled ? (event) => dragController.onRowDragLeave(event, null) : undefined}
               onDrop={dropEnabled ? (event) => dragController.onRowDrop(event, null) : undefined}
             >
               <span className="tree-row-content">
@@ -672,6 +714,10 @@ const TreeNodeRow = memo(function TreeNodeRow({
 
   useLayoutEffect(() => clearHoverExpandTimer, [clearHoverExpandTimer]);
 
+  useLayoutEffect(() => {
+    if (!interaction.dropOver) clearHoverExpandTimer();
+  }, [clearHoverExpandTimer, interaction.dropOver]);
+
   const scheduleHoverExpand = useCallback(() => {
     if (!isFolder || isExpanded || hoverExpandTimer.current !== null) return;
     hoverExpandTimer.current = window.setTimeout(() => {
@@ -727,10 +773,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
         const validTarget = dragController.onRowDragOver(event, node.path, dropIntent.targetFolderPath, dropIntent.mode);
         if (isFolder && dropIntent.mode === "folder" && validTarget) scheduleHoverExpand();
       }}
-      onDragLeave={(event) => {
-        clearHoverExpandTimer();
-        dragController.onRowDragLeave(event, node.path);
-      }}
+      onDragLeave={clearHoverExpandTimer}
       onDrop={(event) => {
         clearHoverExpandTimer();
         const dropIntent = getDropIntent(event);
@@ -1071,16 +1114,6 @@ function isEditableEventTarget(target: EventTarget | null): boolean {
 function getParentPath(path: string): string | null {
   if (!path.includes("/")) return null;
   return path.slice(0, path.lastIndexOf("/"));
-}
-
-function didLeaveElementBounds(event: ReactDragEvent<HTMLElement>): boolean {
-  const rect = event.currentTarget.getBoundingClientRect();
-  return (
-    event.clientX < rect.left
-    || event.clientX > rect.right
-    || event.clientY < rect.top
-    || event.clientY > rect.bottom
-  );
 }
 
 function hasDataTransferFiles(dataTransfer: DataTransfer): boolean {
