@@ -1,0 +1,432 @@
+name: Desktop Release History Backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      delete_root_objects:
+        description: Delete verified 0.1.0 and 0.1.1 root objects after archival
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-publish
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    name: Backfill canonical desktop release history
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: desktop-internal
+    env:
+      AWS_DEFAULT_REGION: auto
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_PAGER: ""
+      CATALOG_KEY: desktop/catalog/releases.json
+      PUBLIC_DOWNLOAD_ORIGIN: https://downloads.puppyone.ai
+      R2_BUCKET: puppyone-desktop
+
+    steps:
+      - name: Checkout trusted archive code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Validate archive credentials and tools
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${AWS_ACCESS_KEY_ID:?Configure R2_ACCESS_KEY_ID in desktop-internal}"
+          : "${AWS_SECRET_ACCESS_KEY:?Configure R2_SECRET_ACCESS_KEY in desktop-internal}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Configure CLOUDFLARE_ACCOUNT_ID in desktop-internal}"
+          command -v aws >/dev/null
+          command -v gh >/dev/null
+
+      - name: Build verified bundles from canonical GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tags=(
+            v0.1.1-internal.1
+            v0.1.2-internal.2
+            v0.1.2-internal.4
+          )
+          for tag in "${tags[@]}"; do
+            version="${tag#v}"
+            version="${version%%-internal.*}"
+            source="artifacts/backfill-source/${tag}"
+            bundle="artifacts/backfill-${tag}"
+            response="${RUNNER_TEMP}/${tag}-release.json"
+            mkdir -p "${source}"
+            gh release download "${tag}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --dir "${source}"
+            gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" > "${response}"
+            commit="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${tag}" --jq .sha)"
+            published_at="$(node -e 'const r=require(process.argv[1]); process.stdout.write(r.published_at)' "${response}")"
+            printf 'GitHub-backed PuppyOne Desktop release backfilled into the unified R2 catalog.\n' \
+              > "artifacts/${tag}-notes.md"
+
+            assets=()
+            for file in "${source}"/*; do
+              [ -f "${file}" ] || continue
+              case "$(basename "${file}")" in
+                release.json|SHA256SUMS) continue ;;
+              esac
+              assets+=(--asset "${file}")
+            done
+            node scripts/create-desktop-release-bundle.mjs create \
+              --bundle "${bundle}" \
+              --channel internal \
+              --tag "${tag}" \
+              --version "${version}" \
+              --commit "${commit}" \
+              --repository "${GITHUB_REPOSITORY}" \
+              --r2-prefix "desktop/internal/mac/${tag}" \
+              --public-origin "${PUBLIC_DOWNLOAD_ORIGIN}" \
+              --published-at "${published_at}" \
+              --arch arm64 \
+              --prerelease true \
+              --provenance backfill \
+              --developer-id-signed false \
+              --notarized false \
+              --notes-file "artifacts/${tag}-notes.md" \
+              "${assets[@]}"
+            node scripts/verify-github-release-assets.mjs \
+              --bundle "${bundle}" \
+              --release-json "${response}" \
+              --expect-draft false \
+              --include-metadata false
+          done
+
+      - name: Download original root objects
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          mkdir -p artifacts/legacy-source
+          aws s3 cp "s3://${R2_BUCKET}/PuppyOne-0.1.0-arm64.dmg" \
+            artifacts/legacy-source/puppyone-0.1.0-arm64.dmg \
+            --endpoint-url "${ENDPOINT}" \
+            --only-show-errors
+          aws s3 cp "s3://${R2_BUCKET}/puppyone-0.1.1-arm64.dmg" \
+            artifacts/legacy-source/puppyone-0.1.1-arm64.dmg \
+            --endpoint-url "${ENDPOINT}" \
+            --only-show-errors
+          aws s3api head-object \
+            --bucket "${R2_BUCKET}" \
+            --key "PuppyOne-0.1.0-arm64.dmg" \
+            --endpoint-url "${ENDPOINT}" \
+            --query LastModified \
+            --output text > "${RUNNER_TEMP}/v0.1.0-published-at"
+          aws s3api head-object \
+            --bucket "${R2_BUCKET}" \
+            --key "puppyone-0.1.1-arm64.dmg" \
+            --endpoint-url "${ENDPOINT}" \
+            --query LastModified \
+            --output text > "${RUNNER_TEMP}/v0.1.1-published-at"
+
+      - name: Create honest legacy archive metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          for version in 0.1.0 0.1.1; do
+            tag="v${version}-legacy.0"
+            printf 'Legacy PuppyOne Desktop artifact released before the canonical GitHub/R2 pipeline. Git commit and GitHub Release provenance are unavailable.\n' \
+              > "artifacts/${tag}-notes.md"
+            node scripts/create-desktop-release-bundle.mjs create \
+              --bundle "artifacts/archive-${tag}" \
+              --channel archive \
+              --tag "${tag}" \
+              --version "${version}" \
+              --repository "${GITHUB_REPOSITORY}" \
+              --r2-prefix "desktop/archive/mac/${tag}" \
+              --public-origin "${PUBLIC_DOWNLOAD_ORIGIN}" \
+              --published-at "$(tr -d '\n' < "${RUNNER_TEMP}/v${version}-published-at")" \
+              --arch arm64 \
+              --prerelease false \
+              --provenance archive \
+              --developer-id-signed false \
+              --notarized false \
+              --notes-file "artifacts/${tag}-notes.md" \
+              --asset "artifacts/legacy-source/puppyone-${version}-arm64.dmg"
+          done
+
+      - name: Backfill immutable GitHub releases into R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          tags=(
+            v0.1.1-internal.1
+            v0.1.2-internal.2
+            v0.1.2-internal.4
+          )
+          for tag in "${tags[@]}"; do
+            bundle="artifacts/backfill-${tag}"
+            prefix="desktop/internal/mac/${tag}"
+            if aws s3api head-object \
+              --bucket "${R2_BUCKET}" \
+              --key "${prefix}/release.json" \
+              --endpoint-url "${ENDPOINT}" >/dev/null 2>&1; then
+              continue
+            fi
+
+            aws s3api list-objects-v2 \
+              --bucket "${R2_BUCKET}" \
+              --prefix "${prefix}/" \
+              --endpoint-url "${ENDPOINT}" \
+              --output json > "${RUNNER_TEMP}/${tag}-r2.json"
+            node -e '
+              const manifest=require(process.argv[1]);
+              const listing=require(process.argv[2]);
+              const prefix=`${process.argv[3]}/`;
+              const expected=new Set(manifest.assets.map((asset) => `${prefix}${asset.name}`));
+              const unexpected=(listing.Contents ?? []).map((item) => item.Key).filter((key) => !expected.has(key));
+              if (unexpected.length) {
+                console.error(`Unexpected objects in backfill prefix:\n${unexpected.join("\n")}`);
+                process.exit(1);
+              }
+            ' "${bundle}/release.json" "${RUNNER_TEMP}/${tag}-r2.json" "${prefix}"
+
+            node -e '
+              const manifest=require(process.argv[1]);
+              for (const asset of manifest.assets) process.stdout.write(`${asset.name}\n`);
+            ' "${bundle}/release.json" | while IFS= read -r name; do
+              local_file="${bundle}/assets/${name}"
+              key="${prefix}/${name}"
+              if aws s3api head-object \
+                --bucket "${R2_BUCKET}" \
+                --key "${key}" \
+                --endpoint-url "${ENDPOINT}" >/dev/null 2>&1; then
+                aws s3 cp "s3://${R2_BUCKET}/${key}" "${RUNNER_TEMP}/${tag}-${name}" \
+                  --endpoint-url "${ENDPOINT}" \
+                  --only-show-errors
+                cmp "${local_file}" "${RUNNER_TEMP}/${tag}-${name}"
+              else
+                aws s3 cp "${local_file}" "s3://${R2_BUCKET}/${key}" \
+                  --endpoint-url "${ENDPOINT}" \
+                  --cache-control "public, max-age=31536000, immutable" \
+                  --only-show-errors
+              fi
+            done
+            aws s3 cp "${bundle}/SHA256SUMS" "s3://${R2_BUCKET}/${prefix}/SHA256SUMS" \
+              --endpoint-url "${ENDPOINT}" \
+              --content-type "text/plain; charset=utf-8" \
+              --cache-control "public, max-age=31536000, immutable" \
+              --only-show-errors
+            aws s3 cp "${bundle}/release.json" "s3://${R2_BUCKET}/${prefix}/release.json" \
+              --endpoint-url "${ENDPOINT}" \
+              --content-type "application/json; charset=utf-8" \
+              --cache-control "public, max-age=31536000, immutable" \
+              --only-show-errors
+          done
+
+      - name: Upload immutable legacy archives
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          for version in 0.1.0 0.1.1; do
+            tag="v${version}-legacy.0"
+            bundle="artifacts/archive-${tag}"
+            prefix="desktop/archive/mac/${tag}"
+            if ! aws s3api head-object \
+              --bucket "${R2_BUCKET}" \
+              --key "${prefix}/release.json" \
+              --endpoint-url "${ENDPOINT}" >/dev/null 2>&1; then
+              existing="$(aws s3api list-objects-v2 \
+                --bucket "${R2_BUCKET}" \
+                --prefix "${prefix}/" \
+                --max-keys 1 \
+                --endpoint-url "${ENDPOINT}" \
+                --query 'Contents[0].Key' \
+                --output text)"
+              if [ -n "${existing}" ] && [ "${existing}" != "None" ]; then
+                echo "Archive prefix is partial and has no release.json commit marker: ${prefix}" >&2
+                exit 1
+              fi
+              aws s3 cp "${bundle}/assets/puppyone-${version}-arm64.dmg" \
+                "s3://${R2_BUCKET}/${prefix}/puppyone-${version}-arm64.dmg" \
+                --endpoint-url "${ENDPOINT}" \
+                --content-type "application/x-apple-diskimage" \
+                --cache-control "public, max-age=31536000, immutable" \
+                --only-show-errors
+              aws s3 cp "${bundle}/SHA256SUMS" "s3://${R2_BUCKET}/${prefix}/SHA256SUMS" \
+                --endpoint-url "${ENDPOINT}" \
+                --content-type "text/plain; charset=utf-8" \
+                --cache-control "public, max-age=31536000, immutable" \
+                --only-show-errors
+              aws s3 cp "${bundle}/release.json" "s3://${R2_BUCKET}/${prefix}/release.json" \
+                --endpoint-url "${ENDPOINT}" \
+                --content-type "application/json; charset=utf-8" \
+                --cache-control "public, max-age=31536000, immutable" \
+                --only-show-errors
+            fi
+          done
+
+      - name: Verify every backfilled R2 object by SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tag in v0.1.1-internal.1 v0.1.2-internal.2 v0.1.2-internal.4; do
+            node scripts/verify-desktop-release-remote.mjs \
+              --bundle "artifacts/backfill-${tag}" \
+              --url-prefix "${PUBLIC_DOWNLOAD_ORIGIN}/desktop/internal/mac/${tag}" \
+              --include-metadata true
+          done
+          for version in 0.1.0 0.1.1; do
+            tag="v${version}-legacy.0"
+            node scripts/verify-desktop-release-remote.mjs \
+              --bundle "artifacts/archive-${tag}" \
+              --url-prefix "${PUBLIC_DOWNLOAD_ORIGIN}/desktop/archive/mac/${tag}" \
+              --include-metadata true
+          done
+
+      - name: Attach and verify metadata on historical GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tag in v0.1.1-internal.1 v0.1.2-internal.2 v0.1.2-internal.4; do
+            bundle="artifacts/backfill-${tag}"
+            response="${RUNNER_TEMP}/${tag}-release-with-metadata.json"
+            gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" > "${response}"
+            has_manifest="$(node -e '
+              const r=require(process.argv[1]);
+              process.stdout.write(String(r.assets.some((asset) => asset.name === "release.json")));
+            ' "${response}")"
+            has_checksums="$(node -e '
+              const r=require(process.argv[1]);
+              process.stdout.write(String(r.assets.some((asset) => asset.name === "SHA256SUMS")));
+            ' "${response}")"
+            if [ "${has_manifest}" != "true" ] || [ "${has_checksums}" != "true" ]; then
+              if [ "${has_manifest}" != "${has_checksums}" ]; then
+                echo "GitHub release ${tag} contains only one metadata asset; refusing a partial backfill." >&2
+                exit 1
+              fi
+              gh release upload "${tag}" \
+                "${bundle}/release.json" \
+                "${bundle}/SHA256SUMS" \
+                --repo "${GITHUB_REPOSITORY}"
+              gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" > "${response}"
+            fi
+            node scripts/verify-github-release-assets.mjs \
+              --bundle "${bundle}" \
+              --release-json "${response}" \
+              --expect-draft false \
+              --include-metadata true
+          done
+
+      - name: Download current release catalog
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          if aws s3api head-object \
+            --bucket "${R2_BUCKET}" \
+            --key "${CATALOG_KEY}" \
+            --endpoint-url "${ENDPOINT}" >/dev/null 2>&1; then
+            aws s3 cp "s3://${R2_BUCKET}/${CATALOG_KEY}" "${RUNNER_TEMP}/catalog-0.json" \
+              --endpoint-url "${ENDPOINT}" \
+              --only-show-errors
+          fi
+
+      - name: Merge release history into catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/update-desktop-release-catalog.mjs \
+            --existing "${RUNNER_TEMP}/catalog-0.json" \
+            --release artifacts/archive-v0.1.0-legacy.0/release.json \
+            --output "${RUNNER_TEMP}/catalog-1.json"
+          node scripts/update-desktop-release-catalog.mjs \
+            --existing "${RUNNER_TEMP}/catalog-1.json" \
+            --release artifacts/archive-v0.1.1-legacy.0/release.json \
+            --output "${RUNNER_TEMP}/catalog-2.json"
+          index=2
+          for tag in v0.1.1-internal.1 v0.1.2-internal.2 v0.1.2-internal.4; do
+            next=$((index + 1))
+            node scripts/update-desktop-release-catalog.mjs \
+              --existing "${RUNNER_TEMP}/catalog-${index}.json" \
+              --release "artifacts/backfill-${tag}/release.json" \
+              --output "${RUNNER_TEMP}/catalog-${next}.json"
+            index="${next}"
+          done
+
+      - name: Publish and verify complete release catalog
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          aws s3 cp "${RUNNER_TEMP}/catalog-5.json" "s3://${R2_BUCKET}/${CATALOG_KEY}" \
+            --endpoint-url "${ENDPOINT}" \
+            --content-type "application/json; charset=utf-8" \
+            --cache-control "public, no-cache, must-revalidate" \
+            --only-show-errors
+          curl --fail --location --retry 5 --retry-all-errors --silent --show-error \
+            -H "Cache-Control: no-cache" \
+            --output "${RUNNER_TEMP}/catalog-public.json" \
+            "${PUBLIC_DOWNLOAD_ORIGIN}/${CATALOG_KEY}"
+          cmp "${RUNNER_TEMP}/catalog-5.json" "${RUNNER_TEMP}/catalog-public.json"
+
+      - name: Delete verified root objects
+        if: ${{ inputs.delete_root_objects }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          aws s3 rm "s3://${R2_BUCKET}/PuppyOne-0.1.0-arm64.dmg" \
+            --endpoint-url "${ENDPOINT}" \
+            --only-show-errors
+          aws s3 rm "s3://${R2_BUCKET}/puppyone-0.1.1-arm64.dmg" \
+            --endpoint-url "${ENDPOINT}" \
+            --only-show-errors
+
+      - name: Summarize release history backfill
+        shell: bash
+        run: |
+          {
+            echo "### Desktop release history"
+            echo
+            echo "- Archive v0.1.0: ${PUBLIC_DOWNLOAD_ORIGIN}/desktop/archive/mac/v0.1.0-legacy.0/release.json"
+            echo "- Archive v0.1.1: ${PUBLIC_DOWNLOAD_ORIGIN}/desktop/archive/mac/v0.1.1-legacy.0/release.json"
+            echo "- Internal v0.1.1-internal.1: ${PUBLIC_DOWNLOAD_ORIGIN}/desktop/internal/mac/v0.1.1-internal.1/release.json"
+            echo "- Internal v0.1.2-internal.2: ${PUBLIC_DOWNLOAD_ORIGIN}/desktop/internal/mac/v0.1.2-internal.2/release.json"
+            echo "- Internal v0.1.2-internal.4: ${PUBLIC_DOWNLOAD_ORIGIN}/desktop/internal/mac/v0.1.2-internal.4/release.json"
+            echo "- Catalog: ${PUBLIC_DOWNLOAD_ORIGIN}/${CATALOG_KEY}"
+            echo "- Root objects deleted: ${{ inputs.delete_root_objects }}"
+          } >> "${GITHUB_STEP_SUMMARY}"

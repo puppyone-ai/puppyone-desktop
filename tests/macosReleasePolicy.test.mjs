@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import packageMetadata from "../package.json";
-import { inspectInternalReleaseWorkflow } from "../scripts/release-support/internal-release-workflow-policy.mjs";
+import {
+  inspectInternalReleaseWorkflow,
+  inspectLegacyArchiveWorkflow,
+  inspectReleasePublisherWorkflow,
+  inspectStableReleaseWorkflow,
+} from "../scripts/release-support/internal-release-workflow-policy.mjs";
 import {
   getStableReleaseCoordinates,
   inspectMacReleaseReadiness,
@@ -94,11 +99,41 @@ describe("macOS stable release policy", () => {
 });
 
 describe("macOS internal release workflow", () => {
-  it("publishes immutable R2 objects before promoting verified latest aliases", () => {
+  it("builds once and delegates atomic publication", () => {
     const workflow = readFileSync(
       new URL("../.github/workflows/desktop-internal-build.yml", import.meta.url),
       "utf8",
     );
     expect(inspectInternalReleaseWorkflow(workflow)).toEqual([]);
+  });
+});
+
+describe("macOS stable release workflow", () => {
+  it("isolates preparation from signing and delegates atomic publication", () => {
+    const workflow = readFileSync(
+      new URL("../.github/workflows/desktop-stable-release.yml", import.meta.url),
+      "utf8",
+    );
+    expect(inspectStableReleaseWorkflow(workflow)).toEqual([]);
+  });
+});
+
+describe("desktop release publisher workflow", () => {
+  it("publishes immutable GitHub and R2 records before mutable pointers", () => {
+    const workflow = readFileSync(
+      new URL("../.github/workflows/desktop-release-publish.yml", import.meta.url),
+      "utf8",
+    );
+    expect(inspectReleasePublisherWorkflow(workflow)).toEqual([]);
+  });
+});
+
+describe("desktop legacy archive workflow", () => {
+  it("verifies archive copies and catalog state before optional deletion", () => {
+    const workflow = readFileSync(
+      new URL("../.github/workflows/desktop-legacy-archive.yml", import.meta.url),
+      "utf8",
+    );
+    expect(inspectLegacyArchiveWorkflow(workflow)).toEqual([]);
   });
 });
