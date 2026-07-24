@@ -61,7 +61,7 @@ jobs:
       AWS_DEFAULT_REGION: auto
       AWS_EC2_METADATA_DISABLED: "true"
       AWS_PAGER: ""
-      BUNDLE_DIRECTORY: artifacts/desktop-release-bundle
+      BUNDLE_DIRECTORY: ${{ github.workspace }}/artifacts/desktop-release-bundle
       CATALOG_KEY: desktop/catalog/releases.json
       PUBLIC_DOWNLOAD_ORIGIN: https://downloads.puppyone.ai
       R2_BUCKET: puppyone-desktop
@@ -91,9 +91,9 @@ jobs:
             --commit "${GITHUB_SHA}"
 
           MANIFEST="${BUNDLE_DIRECTORY}/release.json"
-          R2_PREFIX="$(node -e 'const m=require(process.argv[1]); process.stdout.write(m.r2.prefix)' "${MANIFEST}")"
-          TAG="$(node -e 'const m=require(process.argv[1]); process.stdout.write(m.tag)' "${MANIFEST}")"
-          VERSION="$(node -e 'const m=require(process.argv[1]); process.stdout.write(m.version)' "${MANIFEST}")"
+          R2_PREFIX="$(node -e 'const p=require("node:path"); const m=require(p.resolve(process.argv[1])); process.stdout.write(m.r2.prefix)' "${MANIFEST}")"
+          TAG="$(node -e 'const p=require("node:path"); const m=require(p.resolve(process.argv[1])); process.stdout.write(m.tag)' "${MANIFEST}")"
+          VERSION="$(node -e 'const p=require("node:path"); const m=require(p.resolve(process.argv[1])); process.stdout.write(m.version)' "${MANIFEST}")"
           LATEST_PREFIX="${R2_PREFIX%/${TAG}}/latest"
           {
             echo "latest_prefix=${LATEST_PREFIX}"
@@ -217,9 +217,9 @@ jobs:
             node scripts/verify-github-release-assets.mjs \
               --bundle "${BUNDLE_DIRECTORY}" \
               --release-json "${RESPONSE}" \
-              --expect-draft "$(node -e 'const r=require(process.argv[1]); process.stdout.write(String(r.draft))' "${RESPONSE}")"
+              --expect-draft "$(node -e 'const p=require("node:path"); const r=require(p.resolve(process.argv[1])); process.stdout.write(String(r.draft))' "${RESPONSE}")"
             echo "exists=true" >> "${GITHUB_OUTPUT}"
-            echo "draft=$(node -e 'const r=require(process.argv[1]); process.stdout.write(String(r.draft))' "${RESPONSE}")" >> "${GITHUB_OUTPUT}"
+            echo "draft=$(node -e 'const p=require("node:path"); const r=require(p.resolve(process.argv[1])); process.stdout.write(String(r.draft))' "${RESPONSE}")" >> "${GITHUB_OUTPUT}"
           else
             echo "exists=false" >> "${GITHUB_OUTPUT}"
             echo "draft=false" >> "${GITHUB_OUTPUT}"
@@ -330,7 +330,8 @@ jobs:
           MANIFEST="${BUNDLE_DIRECTORY}/release.json"
 
           node -e '
-            const m=require(process.argv[1]);
+            const path=require("node:path");
+            const m=require(path.resolve(process.argv[1]));
             for (const a of m.assets.filter((item) => !["updater-metadata", "terminal-preview"].includes(item.kind))) {
               process.stdout.write(`${a.name}\n`);
             }
@@ -342,7 +343,8 @@ jobs:
           done
 
           node -e '
-            const m=require(process.argv[1]);
+            const path=require("node:path");
+            const m=require(path.resolve(process.argv[1]));
             for (const a of m.assets.filter((item) => item.latestAlias)) {
               process.stdout.write(`${a.name}\t${a.latestAlias}\n`);
             }
@@ -355,7 +357,8 @@ jobs:
 
           # Updater metadata and launchers are pointers; publish them only after their payloads.
           node -e '
-            const m=require(process.argv[1]);
+            const path=require("node:path");
+            const m=require(path.resolve(process.argv[1]));
             for (const a of m.assets.filter((item) => ["updater-metadata", "terminal-preview"].includes(item.kind))) {
               process.stdout.write(`${a.name}\n`);
             }
@@ -448,7 +451,8 @@ jobs:
           cmp "${BUNDLE_DIRECTORY}/latest.json" "${RUNNER_TEMP}/latest-public.json"
           cmp "${RUNNER_TEMP}/releases-next.json" "${RUNNER_TEMP}/catalog-public.json"
           node -e '
-            const c=require(process.argv[1]);
+            const path=require("node:path");
+            const c=require(path.resolve(process.argv[1]));
             if (!c.releases.some((release) => release.tag === process.argv[2])) process.exit(1);
           ' "${RUNNER_TEMP}/catalog-public.json" "${RELEASE_TAG}"
 
@@ -468,8 +472,9 @@ jobs:
             --endpoint-url "${ENDPOINT}" \
             --output json > "${RUNNER_TEMP}/latest-objects.json"
           node -e '
-            const manifest=require(process.argv[1]);
-            const listing=require(process.argv[2]);
+            const path=require("node:path");
+            const manifest=require(path.resolve(process.argv[1]));
+            const listing=require(path.resolve(process.argv[2]));
             const prefix=`${process.argv[3]}/`;
             const keep=new Set(["latest.json"]);
             for (const asset of manifest.assets) {

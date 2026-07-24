@@ -61,6 +61,7 @@ export function inspectReleasePublisherWorkflow(workflowSource) {
   requireSnippets(workflowSource, errors, [
     ["group: desktop-release-publish", "all release channels must share one publication lock"],
     ["name: ${{ inputs.deployment_environment }}", "publishing secrets must be environment-scoped"],
+    ["BUNDLE_DIRECTORY: ${{ github.workspace }}/artifacts/desktop-release-bundle", "the publisher must use an absolute release bundle path"],
     ["Download build-once release bundle", "the publisher must consume the build-once artifact"],
     ["release.json is the commit marker", "R2 publication must use an explicit commit marker"],
     ["--cache-control \"public, max-age=31536000, immutable\"", "versioned release objects must be immutable"],

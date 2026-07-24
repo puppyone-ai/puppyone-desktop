@@ -71,7 +71,7 @@ jobs:
               --dir "${source}"
             gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" > "${response}"
             commit="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${tag}" --jq .sha)"
-            published_at="$(node -e 'const r=require(process.argv[1]); process.stdout.write(r.published_at)' "${response}")"
+            published_at="$(node -e 'const p=require("node:path"); const r=require(p.resolve(process.argv[1])); process.stdout.write(r.published_at)' "${response}")"
             printf 'GitHub-backed PuppyOne Desktop release backfilled into the unified R2 catalog.\n' \
               > "artifacts/${tag}-notes.md"
 
@@ -194,8 +194,9 @@ jobs:
               --endpoint-url "${ENDPOINT}" \
               --output json > "${RUNNER_TEMP}/${tag}-r2.json"
             node -e '
-              const manifest=require(process.argv[1]);
-              const listing=require(process.argv[2]);
+              const path=require("node:path");
+              const manifest=require(path.resolve(process.argv[1]));
+              const listing=require(path.resolve(process.argv[2]));
               const prefix=`${process.argv[3]}/`;
               const expected=new Set(manifest.assets.map((asset) => `${prefix}${asset.name}`));
               const unexpected=(listing.Contents ?? []).map((item) => item.Key).filter((key) => !expected.has(key));
@@ -206,7 +207,8 @@ jobs:
             ' "${bundle}/release.json" "${RUNNER_TEMP}/${tag}-r2.json" "${prefix}"
 
             node -e '
-              const manifest=require(process.argv[1]);
+              const path=require("node:path");
+              const manifest=require(path.resolve(process.argv[1]));
               for (const asset of manifest.assets) process.stdout.write(`${asset.name}\n`);
             ' "${bundle}/release.json" | while IFS= read -r name; do
               local_file="${bundle}/assets/${name}"
@@ -314,11 +316,13 @@ jobs:
             response="${RUNNER_TEMP}/${tag}-release-with-metadata.json"
             gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" > "${response}"
             has_manifest="$(node -e '
-              const r=require(process.argv[1]);
+              const path=require("node:path");
+              const r=require(path.resolve(process.argv[1]));
               process.stdout.write(String(r.assets.some((asset) => asset.name === "release.json")));
             ' "${response}")"
             has_checksums="$(node -e '
-              const r=require(process.argv[1]);
+              const path=require("node:path");
+              const r=require(path.resolve(process.argv[1]));
               process.stdout.write(String(r.assets.some((asset) => asset.name === "SHA256SUMS")));
             ' "${response}")"
             if [ "${has_manifest}" != "true" ] || [ "${has_checksums}" != "true" ]; then
