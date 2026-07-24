@@ -109,6 +109,7 @@ export function inspectLegacyArchiveWorkflow(workflowSource) {
   if (errors.length > 0) return errors;
   requireSnippets(workflowSource, errors, [
     ["delete_root_objects:", "root deletion must require an explicit workflow input"],
+    ["repair_partial_backfills:", "partial backfill repair must require an explicit workflow input"],
     ["default: false", "root deletion must be disabled by default"],
     ["group: desktop-release-publish", "archive catalog updates must share the global publication lock"],
     ["name: desktop-internal", "archive credentials must use a deployment environment"],
@@ -117,12 +118,16 @@ export function inspectLegacyArchiveWorkflow(workflowSource) {
     ["Verify every backfilled R2 object by SHA-256", "all historical R2 copies must be content-verified"],
     ["Attach and verify metadata on historical GitHub Releases", "GitHub history must receive the same release metadata as R2"],
     ["Merge release history into catalog", "all historical releases must appear in the website catalog"],
+    ["Repair explicitly authorized partial R2 backfills", "uncommitted historical prefixes must have an explicit repair stage"],
+    ["inputs.repair_partial_backfills", "partial backfill repair must be explicitly gated"],
+    ["Refusing to delete object outside", "partial backfill repair must enforce its prefix boundary"],
     ["if: ${{ inputs.delete_root_objects }}", "root deletion must be explicitly gated"],
   ]);
   assertOrder(workflowSource, errors, [
     "Build verified bundles from canonical GitHub Releases",
     "Download original root objects",
     "Create honest legacy archive metadata",
+    "Repair explicitly authorized partial R2 backfills",
     "Backfill immutable GitHub releases into R2",
     "Upload immutable legacy archives",
     "Verify every backfilled R2 object by SHA-256",
