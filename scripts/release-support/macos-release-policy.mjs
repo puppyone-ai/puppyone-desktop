@@ -49,7 +49,7 @@ export function inspectMacReleaseReadiness({
   }
 
   if (env.CSC_IDENTITY_AUTO_DISCOVERY === "false") {
-    errors.push("CSC_IDENTITY_AUTO_DISCOVERY=false is reserved for internal unsigned builds");
+    errors.push("CSC_IDENTITY_AUTO_DISCOVERY=false is reserved for internal ad-hoc builds");
   }
   const hasCertificateFile = hasValue(env.CSC_LINK);
   const hasKeychainIdentity = hasValue(env.CSC_NAME);

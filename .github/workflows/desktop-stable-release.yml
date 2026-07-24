@@ -6,45 +6,76 @@ on:
       - "v*.*.*"
 
 permissions:
-  contents: write
-
-concurrency:
-  group: desktop-stable-${{ github.ref }}
-  cancel-in-progress: false
+  contents: read
 
 jobs:
-  mac:
-    name: Signed and notarized macOS release
-    runs-on: macos-latest
+  build:
+    name: Build signed and notarized macOS release once
+    runs-on: macos-15
+    timeout-minutes: 90
+    environment:
+      name: desktop-signing
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    outputs:
+      artifact_name: ${{ steps.release.outputs.artifact_name }}
+      release_name: ${{ steps.release.outputs.release_name }}
+      release_tag: ${{ steps.release.outputs.tag }}
     env:
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CSC_IDENTITY_AUTO_DISCOVERY: "true"
-      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-      CSC_LINK: ${{ secrets.CSC_LINK }}
-      PUPPYONE_RELEASE_TAG: ${{ github.ref_name }}
-      R2_BUCKET: puppyone-desktop
+      PUBLIC_DOWNLOAD_ORIGIN: https://downloads.puppyone.ai
       VITE_DESKTOP_CLOUD_API_URL: https://api.puppyone.ai/api/v1
       VITE_DESKTOP_CLOUD_WEB_URL: https://app.puppyone.ai
 
     steps:
       - name: Checkout tagged source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
+      - name: Validate stable tag and package version
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
+          EXPECTED_TAG="v${VERSION}"
+          if [ "${GITHUB_REF_NAME}" != "${EXPECTED_TAG}" ]; then
+            echo "Stable tag ${GITHUB_REF_NAME} must exactly match package version ${EXPECTED_TAG}." >&2
+            exit 1
+          fi
+          TAG_COMMIT="$(git rev-parse "${GITHUB_REF_NAME}^{commit}")"
+          if [ "${TAG_COMMIT}" != "${GITHUB_SHA}" ]; then
+            echo "Release tag does not resolve to the checked-out commit." >&2
+            exit 1
+          fi
+          {
+            echo "arch=$(node -p 'process.arch')"
+            echo "artifact_name=puppyone-desktop-${GITHUB_REF_NAME}"
+            echo "published_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+            echo "release_name=puppyone ${VERSION}"
+            echo "tag=${GITHUB_REF_NAME}"
+            echo "version=${VERSION}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Install locked dependencies without deployment secrets
         run: npm ci
 
-      - name: Stage pinned OpenCode runtime
+      - name: Test release transaction and Terminal launcher
+        run: >-
+          npm test --
+          tests/terminalPreviewLauncher.test.mjs
+          tests/desktopReleaseMetadata.test.mjs
+          tests/macosReleasePolicy.test.mjs
+
+      - name: Stage pinned OpenCode runtime without deployment secrets
         shell: bash
         run: |
           set -euo pipefail
@@ -56,31 +87,113 @@ jobs:
             "https://github.com/anomalyco/opencode/releases/download/v${VERSION}/${ARCHIVE}"
           npm run stage:opencode-runtime -- "${DOWNLOAD}"
 
-      - name: Build and verify signed release
-        run: npm run dist:mac:release
+      - name: Prepare release application without deployment secrets
+        run: npm run prepare:mac:release
 
-      - name: Create canonical GitHub release
+      - name: Sign, notarize, and verify release package
         env:
-          GH_TOKEN: ${{ github.token }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_KEYCHAIN_PROFILE: ${{ secrets.APPLE_KEYCHAIN_PROFILE }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "true"
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          PUPPYONE_RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: npm run package:mac:release
+
+      - name: Write stable release preface
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
         run: |
           set -euo pipefail
-          files=()
-          for pattern in release/*.dmg release/*.zip release/*.yml release/*.blockmap; do
+          mkdir -p artifacts
+          {
+            echo "Signed and notarized PuppyOne Desktop release."
+            echo
+            echo "Commit: ${GITHUB_SHA}"
+            echo "R2 version prefix: desktop/stable/mac/${RELEASE_TAG}"
+            echo
+            echo "Every attached binary is also mirrored at downloads.puppyone.ai with matching SHA-256 metadata."
+          } > artifacts/release-notes.md
+
+      - name: Create self-describing stable release bundle
+        env:
+          ARCH: ${{ steps.release.outputs.arch }}
+          PUBLISHED_AT: ${{ steps.release.outputs.published_at }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          assets=()
+          for pattern in release/puppyone-*.dmg release/puppyone-*.zip release/puppyone-*.blockmap release/latest-mac.yml; do
             for file in $pattern; do
-              [ -e "${file}" ] && files+=("${file}")
+              [ -f "${file}" ] && assets+=(--asset "${file}")
             done
           done
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No verified release files found."
-            exit 1
-          fi
-          gh release create "${PUPPYONE_RELEASE_TAG}" "${files[@]}" \
-            --verify-tag \
-            --title "puppyone ${PUPPYONE_RELEASE_TAG#v}" \
-            --generate-notes
+          node scripts/create-desktop-release-bundle.mjs create \
+            --bundle artifacts/desktop-release-bundle \
+            --channel stable \
+            --tag "${RELEASE_TAG}" \
+            --version "${VERSION}" \
+            --commit "${GITHUB_SHA}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --r2-prefix "desktop/stable/mac/${RELEASE_TAG}" \
+            --public-origin "${PUBLIC_DOWNLOAD_ORIGIN}" \
+            --published-at "${PUBLISHED_AT}" \
+            --workflow-run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --arch "${ARCH}" \
+            --prerelease false \
+            --provenance pipeline \
+            --developer-id-signed true \
+            --notarized true \
+            --notes-file artifacts/release-notes.md \
+            "${assets[@]}"
 
-      - name: Install AWS CLI when unavailable
-        run: command -v aws >/dev/null 2>&1 || brew install awscli
+      - name: Verify stable release bundle before handoff
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          node scripts/create-desktop-release-bundle.mjs verify \
+            --bundle artifacts/desktop-release-bundle \
+            --channel stable \
+            --tag "${RELEASE_TAG}" \
+            --commit "${GITHUB_SHA}"
 
-      - name: Publish verified artifacts to stable R2 feed
-        run: npm run publish:mac:r2
+      - name: Attest stable binaries and checksums
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-path: |
+            artifacts/desktop-release-bundle/assets/*
+            artifacts/desktop-release-bundle/release.json
+            artifacts/desktop-release-bundle/SHA256SUMS
+
+      - name: Upload build-once stable release bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.release.outputs.artifact_name }}
+          path: artifacts/desktop-release-bundle
+          if-no-files-found: error
+          retention-days: 90
+
+  publish:
+    name: Publish canonical GitHub and R2 release
+    needs: build
+    permissions:
+      contents: write
+    uses: ./.github/workflows/desktop-release-publish.yml
+    with:
+      artifact_name: ${{ needs.build.outputs.artifact_name }}
+      channel: stable
+      deployment_environment: desktop-stable
+      generate_notes: true
+      prerelease: false
+      release_name: ${{ needs.build.outputs.release_name }}
+      release_tag: ${{ needs.build.outputs.release_tag }}
+      verify_tag: true
+    secrets: inherit

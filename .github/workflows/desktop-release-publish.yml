@@ -1,0 +1,569 @@
+name: Desktop Release Publisher
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: Name of the verified desktop release bundle artifact
+        required: true
+        type: string
+      channel:
+        description: Release channel recorded in release.json
+        required: true
+        type: string
+      deployment_environment:
+        description: GitHub deployment environment that owns publishing secrets
+        required: true
+        type: string
+      generate_notes:
+        description: Ask GitHub to append automatically generated release notes
+        required: true
+        type: boolean
+      prerelease:
+        description: Whether GitHub should publish this as a prerelease
+        required: true
+        type: boolean
+      release_name:
+        description: Human-readable GitHub Release title
+        required: true
+        type: string
+      release_tag:
+        description: Immutable release tag
+        required: true
+        type: string
+      verify_tag:
+        description: Require the release tag to exist before creating the draft
+        required: true
+        type: boolean
+    secrets:
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
+      R2_ACCESS_KEY_ID:
+        required: true
+      R2_SECRET_ACCESS_KEY:
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish verified release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: ${{ inputs.deployment_environment }}
+    env:
+      AWS_DEFAULT_REGION: auto
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_PAGER: ""
+      BUNDLE_DIRECTORY: ${{ github.workspace }}/artifacts/desktop-release-bundle
+      CATALOG_KEY: desktop/catalog/releases.json
+      PUBLIC_DOWNLOAD_ORIGIN: https://downloads.puppyone.ai
+      R2_BUCKET: puppyone-desktop
+
+    steps:
+      - name: Checkout trusted publishing code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Download build-once release bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ env.BUNDLE_DIRECTORY }}
+
+      - name: Validate release bundle and caller contract
+        id: release
+        env:
+          EXPECTED_CHANNEL: ${{ inputs.channel }}
+          EXPECTED_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/create-desktop-release-bundle.mjs verify \
+            --bundle "${BUNDLE_DIRECTORY}" \
+            --channel "${EXPECTED_CHANNEL}" \
+            --tag "${EXPECTED_TAG}" \
+            --commit "${GITHUB_SHA}"
+
+          MANIFEST="${BUNDLE_DIRECTORY}/release.json"
+          COMMIT="$(node -e 'const p=require("node:path"); const m=require(p.resolve(process.argv[1])); process.stdout.write(m.commitSha)' "${MANIFEST}")"
+          R2_PREFIX="$(node -e 'const p=require("node:path"); const m=require(p.resolve(process.argv[1])); process.stdout.write(m.r2.prefix)' "${MANIFEST}")"
+          TAG="$(node -e 'const p=require("node:path"); const m=require(p.resolve(process.argv[1])); process.stdout.write(m.tag)' "${MANIFEST}")"
+          VERSION="$(node -e 'const p=require("node:path"); const m=require(p.resolve(process.argv[1])); process.stdout.write(m.version)' "${MANIFEST}")"
+          LATEST_PREFIX="${R2_PREFIX%/${TAG}}/latest"
+          {
+            echo "commit=${COMMIT}"
+            echo "latest_prefix=${LATEST_PREFIX}"
+            echo "r2_prefix=${R2_PREFIX}"
+            echo "tag=${TAG}"
+            echo "version=${VERSION}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Validate publishing credentials and tools
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${AWS_ACCESS_KEY_ID:?Configure R2_ACCESS_KEY_ID in the deployment environment}"
+          : "${AWS_SECRET_ACCESS_KEY:?Configure R2_SECRET_ACCESS_KEY in the deployment environment}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Configure CLOUDFLARE_ACCOUNT_ID in the deployment environment}"
+          command -v aws >/dev/null
+          command -v gh >/dev/null
+
+      - name: Inspect immutable R2 release state
+        id: r2_state
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_PREFIX: ${{ steps.release.outputs.r2_prefix }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          if aws s3api head-object \
+            --bucket "${R2_BUCKET}" \
+            --key "${R2_PREFIX}/release.json" \
+            --endpoint-url "${ENDPOINT}" >/dev/null 2>&1; then
+            echo "committed=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          EXISTING_KEY="$(aws s3api list-objects-v2 \
+            --bucket "${R2_BUCKET}" \
+            --prefix "${R2_PREFIX}/" \
+            --max-keys 1 \
+            --endpoint-url "${ENDPOINT}" \
+            --query 'Contents[0].Key' \
+            --output text)"
+          if [ -n "${EXISTING_KEY}" ] && [ "${EXISTING_KEY}" != "None" ]; then
+            echo "The immutable prefix is incomplete and has no release.json commit marker: ${R2_PREFIX}" >&2
+            echo "Use a new release tag or explicitly clean up the partial prefix." >&2
+            exit 1
+          fi
+          echo "committed=false" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload immutable R2 release
+        if: ${{ steps.r2_state.outputs.committed != 'true' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          R2_PREFIX: ${{ steps.release.outputs.r2_prefix }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          aws s3 sync "${BUNDLE_DIRECTORY}/assets" "s3://${R2_BUCKET}/${R2_PREFIX}" \
+            --endpoint-url "${ENDPOINT}" \
+            --cache-control "public, max-age=31536000, immutable" \
+            --only-show-errors
+          aws s3 cp "${BUNDLE_DIRECTORY}/SHA256SUMS" "s3://${R2_BUCKET}/${R2_PREFIX}/SHA256SUMS" \
+            --endpoint-url "${ENDPOINT}" \
+            --content-type "text/plain; charset=utf-8" \
+            --cache-control "public, max-age=31536000, immutable" \
+            --only-show-errors
+
+          # release.json is the commit marker and is deliberately uploaded last.
+          aws s3 cp "${BUNDLE_DIRECTORY}/release.json" "s3://${R2_BUCKET}/${R2_PREFIX}/release.json" \
+            --endpoint-url "${ENDPOINT}" \
+            --content-type "application/json; charset=utf-8" \
+            --cache-control "public, max-age=31536000, immutable" \
+            --only-show-errors
+
+      - name: Verify every immutable R2 object by SHA-256
+        env:
+          R2_PREFIX: ${{ steps.release.outputs.r2_prefix }}
+        run: |
+          node scripts/verify-desktop-release-remote.mjs \
+            --bundle "${BUNDLE_DIRECTORY}" \
+            --url-prefix "${PUBLIC_DOWNLOAD_ORIGIN}/${R2_PREFIX}" \
+            --include-metadata true
+
+      - name: Validate remote tag ownership
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          VERIFY_TAG: ${{ inputs.verify_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if REMOTE_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}" --jq .sha 2>/dev/null)"; then
+            if [ "${REMOTE_SHA}" != "${RELEASE_COMMIT}" ]; then
+              echo "Remote tag ${RELEASE_TAG} resolves to ${REMOTE_SHA}, not ${RELEASE_COMMIT}." >&2
+              exit 1
+            fi
+          elif [ "${VERIFY_TAG}" = "true" ]; then
+            echo "Required remote tag does not exist: ${RELEASE_TAG}" >&2
+            exit 1
+          fi
+
+      - name: Inspect GitHub Release state
+        id: github_state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESPONSE="${RUNNER_TEMP}/github-release.json"
+          RELEASE_IDS="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.tag_name == \"${RELEASE_TAG}\") | .id")"
+          if [ -z "${RELEASE_IDS}" ]; then
+            echo "exists=false" >> "${GITHUB_OUTPUT}"
+            echo "draft=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          if [[ "${RELEASE_IDS}" == *$'\n'* ]]; then
+            echo "More than one GitHub Release uses ${RELEASE_TAG}; refusing an ambiguous publication." >&2
+            exit 1
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_IDS}" > "${RESPONSE}"
+          DRAFT="$(node -e 'const p=require("node:path"); const r=require(p.resolve(process.argv[1])); process.stdout.write(String(r.draft))' "${RESPONSE}")"
+          node scripts/verify-github-release-assets.mjs \
+            --bundle "${BUNDLE_DIRECTORY}" \
+            --release-json "${RESPONSE}" \
+            --expect-draft "${DRAFT}"
+          {
+            echo "draft=${DRAFT}"
+            echo "exists=true"
+            echo "release_id=${RELEASE_IDS}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Prepare GitHub release notes
+        id: notes
+        env:
+          GENERATE_NOTES: ${{ inputs.generate_notes }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          NOTES="${RUNNER_TEMP}/release-notes.md"
+          cp "${BUNDLE_DIRECTORY}/release-notes.md" "${NOTES}"
+          if [ "${GENERATE_NOTES}" = "true" ]; then
+            {
+              echo
+              gh api \
+                --method POST \
+                "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+                -f "tag_name=${RELEASE_TAG}" \
+                -f "target_commitish=${RELEASE_COMMIT}" \
+                --jq .body
+            } >> "${NOTES}"
+          fi
+          echo "path=${NOTES}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create GitHub draft release with identical assets
+        if: ${{ steps.github_state.outputs.exists != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES: ${{ steps.notes.outputs.path }}
+          PRERELEASE: ${{ inputs.prerelease }}
+          RELEASE_NAME: ${{ inputs.release_name }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          VERIFY_TAG: ${{ inputs.verify_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=("${BUNDLE_DIRECTORY}"/assets/* "${BUNDLE_DIRECTORY}/release.json" "${BUNDLE_DIRECTORY}/SHA256SUMS")
+          args=(
+            "${RELEASE_TAG}"
+            "${files[@]}"
+            --draft
+            --latest=false
+            --title "${RELEASE_NAME}"
+            --notes-file "${RELEASE_NOTES}"
+          )
+          if [ "${PRERELEASE}" = "true" ]; then args+=(--prerelease); fi
+          if [ "${VERIFY_TAG}" = "true" ]; then
+            args+=(--verify-tag)
+          else
+            args+=(--target "${RELEASE_COMMIT}")
+          fi
+          gh release create "${args[@]}"
+
+      - name: Verify GitHub asset digests before publication
+        id: github_verify
+        if: ${{ steps.github_state.outputs.exists != 'true' || steps.github_state.outputs.draft == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESPONSE="${RUNNER_TEMP}/github-release.json"
+          for attempt in 1 2 3 4 5; do
+            RELEASE_IDS="$(gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+              --jq ".[] | select(.tag_name == \"${RELEASE_TAG}\") | .id")"
+            if [[ "${RELEASE_IDS}" == *$'\n'* ]]; then
+              echo "More than one GitHub Release uses ${RELEASE_TAG}; refusing an ambiguous publication." >&2
+              exit 1
+            fi
+            if [ -z "${RELEASE_IDS}" ]; then
+              sleep "$((attempt * 2))"
+              continue
+            fi
+            gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_IDS}" > "${RESPONSE}"
+            if node scripts/verify-github-release-assets.mjs \
+              --bundle "${BUNDLE_DIRECTORY}" \
+              --release-json "${RESPONSE}" \
+              --expect-draft true; then
+              echo "release_id=${RELEASE_IDS}" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+            sleep "$((attempt * 2))"
+          done
+          echo "GitHub did not expose matching release asset digests." >&2
+          exit 1
+
+      - name: Publish verified GitHub Release
+        if: ${{ steps.github_state.outputs.exists != 'true' || steps.github_state.outputs.draft == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ inputs.prerelease }}
+          RELEASE_ID: ${{ steps.github_verify.outputs.release_id || steps.github_state.outputs.release_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${RELEASE_ID:?GitHub Release ID is required}"
+          if [ "${PRERELEASE}" = "true" ]; then
+            MAKE_LATEST=false
+          else
+            MAKE_LATEST=true
+          fi
+          gh api \
+            --method PATCH \
+            "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
+            -F draft=false \
+            -F "prerelease=${PRERELEASE}" \
+            -f "make_latest=${MAKE_LATEST}" >/dev/null
+
+      - name: Verify published GitHub Release state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
+          RELEASE_ID: ${{ steps.github_verify.outputs.release_id || steps.github_state.outputs.release_id }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${RELEASE_ID:?GitHub Release ID is required}"
+          RESPONSE="${RUNNER_TEMP}/github-release-published.json"
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" > "${RESPONSE}"
+          node scripts/verify-github-release-assets.mjs \
+            --bundle "${BUNDLE_DIRECTORY}" \
+            --release-json "${RESPONSE}" \
+            --expect-draft false
+          REMOTE_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}" --jq .sha)"
+          if [ "${REMOTE_SHA}" != "${RELEASE_COMMIT}" ]; then
+            echo "Published tag ${RELEASE_TAG} resolves to ${REMOTE_SHA}, not ${RELEASE_COMMIT}." >&2
+            exit 1
+          fi
+
+      - name: Promote mutable R2 latest files
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LATEST_PREFIX: ${{ steps.release.outputs.latest_prefix }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          MANIFEST="${BUNDLE_DIRECTORY}/release.json"
+
+          node -e '
+            const path=require("node:path");
+            const m=require(path.resolve(process.argv[1]));
+            for (const a of m.assets.filter((item) => !["updater-metadata", "terminal-preview"].includes(item.kind))) {
+              process.stdout.write(`${a.name}\n`);
+            }
+          ' "${MANIFEST}" | while IFS= read -r name; do
+            aws s3 cp "${BUNDLE_DIRECTORY}/assets/${name}" "s3://${R2_BUCKET}/${LATEST_PREFIX}/${name}" \
+              --endpoint-url "${ENDPOINT}" \
+              --cache-control "public, no-cache, must-revalidate" \
+              --only-show-errors
+          done
+
+          node -e '
+            const path=require("node:path");
+            const m=require(path.resolve(process.argv[1]));
+            for (const a of m.assets.filter((item) => item.latestAlias)) {
+              process.stdout.write(`${a.name}\t${a.latestAlias}\n`);
+            }
+          ' "${MANIFEST}" | while IFS=$'\t' read -r name alias; do
+            aws s3 cp "${BUNDLE_DIRECTORY}/assets/${name}" "s3://${R2_BUCKET}/${LATEST_PREFIX}/${alias}" \
+              --endpoint-url "${ENDPOINT}" \
+              --cache-control "public, no-cache, must-revalidate" \
+              --only-show-errors
+          done
+
+          # Updater metadata and launchers are pointers; publish them only after their payloads.
+          node -e '
+            const path=require("node:path");
+            const m=require(path.resolve(process.argv[1]));
+            for (const a of m.assets.filter((item) => ["updater-metadata", "terminal-preview"].includes(item.kind))) {
+              process.stdout.write(`${a.name}\n`);
+            }
+          ' "${MANIFEST}" | while IFS= read -r name; do
+            aws s3 cp "${BUNDLE_DIRECTORY}/assets/${name}" "s3://${R2_BUCKET}/${LATEST_PREFIX}/${name}" \
+              --endpoint-url "${ENDPOINT}" \
+              --cache-control "public, no-cache, must-revalidate" \
+              --only-show-errors
+          done
+
+      - name: Verify mutable latest payloads by SHA-256
+        env:
+          LATEST_PREFIX: ${{ steps.release.outputs.latest_prefix }}
+        run: |
+          node scripts/verify-desktop-release-remote.mjs \
+            --bundle "${BUNDLE_DIRECTORY}" \
+            --url-prefix "${PUBLIC_DOWNLOAD_ORIGIN}/${LATEST_PREFIX}" \
+            --include-aliases true
+
+      - name: Publish latest release pointer
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LATEST_PREFIX: ${{ steps.release.outputs.latest_prefix }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          aws s3 cp "${BUNDLE_DIRECTORY}/latest.json" "s3://${R2_BUCKET}/${LATEST_PREFIX}/latest.json" \
+            --endpoint-url "${ENDPOINT}" \
+            --content-type "application/json; charset=utf-8" \
+            --cache-control "public, no-cache, must-revalidate" \
+            --only-show-errors
+
+      - name: Download current release catalog
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          if aws s3api head-object \
+            --bucket "${R2_BUCKET}" \
+            --key "${CATALOG_KEY}" \
+            --endpoint-url "${ENDPOINT}" >/dev/null 2>&1; then
+            aws s3 cp "s3://${R2_BUCKET}/${CATALOG_KEY}" "${RUNNER_TEMP}/releases-current.json" \
+              --endpoint-url "${ENDPOINT}" \
+              --only-show-errors
+          fi
+
+      - name: Merge immutable release into catalog
+        run: |
+          node scripts/update-desktop-release-catalog.mjs \
+            --existing "${RUNNER_TEMP}/releases-current.json" \
+            --release "${BUNDLE_DIRECTORY}/release.json" \
+            --output "${RUNNER_TEMP}/releases-next.json"
+
+      - name: Publish release catalog
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          aws s3 cp "${RUNNER_TEMP}/releases-next.json" "s3://${R2_BUCKET}/${CATALOG_KEY}" \
+            --endpoint-url "${ENDPOINT}" \
+            --content-type "application/json; charset=utf-8" \
+            --cache-control "public, no-cache, must-revalidate" \
+            --only-show-errors
+
+      - name: Verify public pointers and catalog
+        env:
+          LATEST_PREFIX: ${{ steps.release.outputs.latest_prefix }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURL_ARGS=(--fail --location --retry 5 --retry-all-errors --silent --show-error -H "Cache-Control: no-cache")
+          curl "${CURL_ARGS[@]}" \
+            --output "${RUNNER_TEMP}/latest-public.json" \
+            "${PUBLIC_DOWNLOAD_ORIGIN}/${LATEST_PREFIX}/latest.json"
+          curl "${CURL_ARGS[@]}" \
+            --output "${RUNNER_TEMP}/catalog-public.json" \
+            "${PUBLIC_DOWNLOAD_ORIGIN}/${CATALOG_KEY}"
+          cmp "${BUNDLE_DIRECTORY}/latest.json" "${RUNNER_TEMP}/latest-public.json"
+          cmp "${RUNNER_TEMP}/releases-next.json" "${RUNNER_TEMP}/catalog-public.json"
+          node -e '
+            const path=require("node:path");
+            const c=require(path.resolve(process.argv[1]));
+            if (!c.releases.some((release) => release.tag === process.argv[2])) process.exit(1);
+          ' "${RUNNER_TEMP}/catalog-public.json" "${RELEASE_TAG}"
+
+      - name: Clean stale mutable release files
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LATEST_PREFIX: ${{ steps.release.outputs.latest_prefix }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          aws s3api list-objects-v2 \
+            --bucket "${R2_BUCKET}" \
+            --prefix "${LATEST_PREFIX}/" \
+            --endpoint-url "${ENDPOINT}" \
+            --output json > "${RUNNER_TEMP}/latest-objects.json"
+          node -e '
+            const path=require("node:path");
+            const manifest=require(path.resolve(process.argv[1]));
+            const listing=require(path.resolve(process.argv[2]));
+            const prefix=`${process.argv[3]}/`;
+            const keep=new Set(["latest.json"]);
+            for (const asset of manifest.assets) {
+              keep.add(asset.name);
+              if (asset.latestAlias) keep.add(asset.latestAlias);
+            }
+            for (const object of listing.Contents ?? []) {
+              const relative=object.Key.startsWith(prefix) ? object.Key.slice(prefix.length) : "";
+              if (relative && !keep.has(relative)) process.stdout.write(`${object.Key}\n`);
+            }
+          ' \
+            "${BUNDLE_DIRECTORY}/release.json" \
+            "${RUNNER_TEMP}/latest-objects.json" \
+            "${LATEST_PREFIX}" | while IFS= read -r key; do
+              aws s3api delete-object \
+                --bucket "${R2_BUCKET}" \
+                --key "${key}" \
+                --endpoint-url "${ENDPOINT}" >/dev/null
+            done
+
+      - name: Summarize published release
+        env:
+          LATEST_PREFIX: ${{ steps.release.outputs.latest_prefix }}
+          R2_PREFIX: ${{ steps.release.outputs.r2_prefix }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          {
+            echo "### Desktop release published"
+            echo
+            echo "- GitHub: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
+            echo "- Immutable R2 manifest: ${PUBLIC_DOWNLOAD_ORIGIN}/${R2_PREFIX}/release.json"
+            echo "- Latest pointer: ${PUBLIC_DOWNLOAD_ORIGIN}/${LATEST_PREFIX}/latest.json"
+            echo "- Release catalog: ${PUBLIC_DOWNLOAD_ORIGIN}/${CATALOG_KEY}"
+          } >> "${GITHUB_STEP_SUMMARY}"

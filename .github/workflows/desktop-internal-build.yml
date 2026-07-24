@@ -1,50 +1,87 @@
-name: Desktop Internal Build
+name: Desktop Internal Release
 
 on:
   workflow_dispatch:
     inputs:
-      upload_r2:
-        description: Upload release files to Cloudflare R2
-        type: boolean
-        default: true
-      r2_prefix:
-        description: Base R2 object prefix
-        type: string
-        default: desktop/internal/mac
-      create_github_release:
-        description: Create a GitHub prerelease with the same files
+      publish_release:
+        description: Publish the verified bundle to GitHub Releases and Cloudflare R2
         type: boolean
         default: true
       release_tag:
-        description: Optional release tag. Defaults to v<package version>-internal.<run number>
+        description: Optional tag; defaults to v<version>-internal.<run number>
         type: string
         default: ""
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  mac:
-    name: macOS unsigned package
-    runs-on: macos-latest
+  build:
+    name: Build ad-hoc macOS release once
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    outputs:
+      artifact_name: ${{ steps.release.outputs.artifact_name }}
+      release_name: ${{ steps.release.outputs.release_name }}
+      release_tag: ${{ steps.release.outputs.tag }}
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
-      R2_BUCKET: puppyone-desktop
+      PUBLIC_DOWNLOAD_ORIGIN: https://downloads.puppyone.ai
       VITE_DESKTOP_CLOUD_API_URL: https://api.puppyone.ai/api/v1
       VITE_DESKTOP_CLOUD_WEB_URL: https://app.puppyone.ai
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
+      - name: Resolve immutable release identity
+        id: release
+        env:
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
+          if [ -n "${INPUT_RELEASE_TAG}" ]; then
+            TAG="${INPUT_RELEASE_TAG}"
+          else
+            TAG="v${VERSION}-internal.${GITHUB_RUN_NUMBER}"
+          fi
+          EXPECTED_PREFIX="v${VERSION}-internal."
+          SUFFIX="${TAG#"${EXPECTED_PREFIX}"}"
+          if [ "${TAG}" = "${SUFFIX}" ] || [[ ! "${SUFFIX}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            echo "Internal tags must match v${VERSION}-internal.<identifier>; received ${TAG}" >&2
+            exit 1
+          fi
+          {
+            echo "arch=$(node -p 'process.arch')"
+            echo "artifact_name=puppyone-desktop-${TAG}"
+            echo "internal_id=${SUFFIX}"
+            echo "published_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+            echo "release_name=puppyone ${VERSION} internal ${SUFFIX}"
+            echo "tag=${TAG}"
+            echo "version=${VERSION}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Install locked dependencies
         run: npm ci
+
+      - name: Test release transaction and Terminal launcher
+        run: >-
+          npm test --
+          tests/terminalPreviewLauncher.test.mjs
+          tests/desktopReleaseMetadata.test.mjs
+          tests/macosReleasePolicy.test.mjs
 
       - name: Stage pinned OpenCode runtime
         shell: bash
@@ -58,138 +95,136 @@ jobs:
             "https://github.com/anomalyco/opencode/releases/download/v${VERSION}/${ARCHIVE}"
           npm run stage:opencode-runtime -- "${DOWNLOAD}"
 
-      - name: Build unsigned macOS package
+      - name: Build ad-hoc macOS package
         run: npm run dist:mac
 
-      - name: Resolve release metadata
-        id: release_meta
+      - name: Build checksum-pinned Terminal launcher
+        id: preview
         env:
-          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+          ARCH: ${{ steps.release.outputs.arch }}
+          INTERNAL_ID: ${{ steps.release.outputs.internal_id }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
         run: |
           set -euo pipefail
-          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
-          if [ -n "${INPUT_RELEASE_TAG}" ]; then
-            TAG="${INPUT_RELEASE_TAG}"
-          else
-            TAG="v${VERSION}-internal.${GITHUB_RUN_NUMBER}"
+          ARCHIVE_NAME="puppyone-${VERSION}-${ARCH}-mac.zip"
+          R2_PREFIX="desktop/internal/mac/${RELEASE_TAG}"
+          if [ ! -f "release/${ARCHIVE_NAME}" ]; then
+            echo "Expected release/${ARCHIVE_NAME}, but it was not built." >&2
+            exit 1
           fi
-          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
-          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
-          echo "name=puppyone ${VERSION} internal ${GITHUB_RUN_NUMBER}" >> "${GITHUB_OUTPUT}"
+          npm run package:terminal-preview -- \
+            --arch "${ARCH}" \
+            --archive "release/${ARCHIVE_NAME}" \
+            --archive-url "${PUBLIC_DOWNLOAD_ORIGIN}/${R2_PREFIX}/${ARCHIVE_NAME}" \
+            --package-version "${VERSION}-internal.${INTERNAL_ID}" \
+            --release-tag "${RELEASE_TAG}"
 
-      - name: Upload GitHub artifact
-        uses: actions/upload-artifact@v4
+          set -- artifacts/terminal-preview/*.tgz
+          if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+            echo "Expected exactly one Terminal preview package." >&2
+            exit 1
+          fi
+          echo "package_name=$(basename "$1")" >> "${GITHUB_OUTPUT}"
+
+      - name: Write internal release notes
+        env:
+          PREVIEW_PACKAGE: ${{ steps.preview.outputs.package_name }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          {
+            echo "Ad-hoc signed internal macOS build."
+            echo
+            echo "Commit: ${GITHUB_SHA}"
+            echo "R2 version prefix: desktop/internal/mac/${RELEASE_TAG}"
+            echo
+            echo "This build is not Developer ID signed or notarized. Use it for technical preview testing only."
+            echo
+            echo "Terminal preview command:"
+            echo '```bash'
+            echo "npm exec --yes --package=${PUBLIC_DOWNLOAD_ORIGIN}/desktop/internal/mac/${RELEASE_TAG}/${PREVIEW_PACKAGE} -- puppyone-preview"
+            echo '```'
+          } > artifacts/release-notes.md
+
+      - name: Create self-describing release bundle
+        env:
+          ARCH: ${{ steps.release.outputs.arch }}
+          PUBLISHED_AT: ${{ steps.release.outputs.published_at }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          assets=()
+          for pattern in release/puppyone-*.dmg release/puppyone-*.zip release/puppyone-*.blockmap artifacts/terminal-preview/*.tgz; do
+            for file in $pattern; do
+              [ -f "${file}" ] && assets+=(--asset "${file}")
+            done
+          done
+          node scripts/create-desktop-release-bundle.mjs create \
+            --bundle artifacts/desktop-release-bundle \
+            --channel internal \
+            --tag "${RELEASE_TAG}" \
+            --version "${VERSION}" \
+            --commit "${GITHUB_SHA}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --r2-prefix "desktop/internal/mac/${RELEASE_TAG}" \
+            --public-origin "${PUBLIC_DOWNLOAD_ORIGIN}" \
+            --published-at "${PUBLISHED_AT}" \
+            --workflow-run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --arch "${ARCH}" \
+            --prerelease true \
+            --provenance pipeline \
+            --developer-id-signed false \
+            --notarized false \
+            --notes-file artifacts/release-notes.md \
+            "${assets[@]}"
+
+      - name: Verify release bundle before handoff
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          node scripts/create-desktop-release-bundle.mjs verify \
+            --bundle artifacts/desktop-release-bundle \
+            --channel internal \
+            --tag "${RELEASE_TAG}" \
+            --commit "${GITHUB_SHA}"
+
+      - name: Attest published binaries and checksums
+        if: ${{ inputs.publish_release }}
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
         with:
-          name: puppyone-macos-unsigned-${{ github.run_number }}
-          path: |
-            release/*.dmg
-            release/*.zip
-            release/*.yml
-            release/*.blockmap
+          subject-path: |
+            artifacts/desktop-release-bundle/assets/*
+            artifacts/desktop-release-bundle/release.json
+            artifacts/desktop-release-bundle/SHA256SUMS
+
+      - name: Upload build-once release bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.release.outputs.artifact_name }}
+          path: artifacts/desktop-release-bundle
           if-no-files-found: error
           retention-days: 30
 
-      - name: Create GitHub prerelease
-        if: ${{ inputs.create_github_release }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
-          RELEASE_NAME: ${{ steps.release_meta.outputs.name }}
-          R2_PREFIX: ${{ inputs.r2_prefix }}
-        run: |
-          set -euo pipefail
-          files=()
-          for pattern in release/*.dmg release/*.zip release/*.yml release/*.blockmap; do
-            for file in $pattern; do
-              [ -e "${file}" ] && files+=("${file}")
-            done
-          done
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No release files found."
-            exit 1
-          fi
-
-          NOTES="$(mktemp)"
-          {
-            echo "Unsigned internal macOS build."
-            echo
-            echo "Commit: ${GITHUB_SHA}"
-            echo "R2 version prefix: ${R2_PREFIX}/${RELEASE_TAG}"
-            echo "R2 latest prefix: ${R2_PREFIX}/latest"
-            echo
-            echo "This build is not Developer ID signed or notarized. Use it for internal testing only."
-          } > "${NOTES}"
-          gh release create "${RELEASE_TAG}" "${files[@]}" \
-            --target "${GITHUB_SHA}" \
-            --title "${RELEASE_NAME}" \
-            --notes-file "${NOTES}" \
-            --prerelease
-
-      - name: Upload to Cloudflare R2
-        if: ${{ inputs.upload_r2 }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          R2_PREFIX: ${{ inputs.r2_prefix }}
-          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
-        run: |
-          set -euo pipefail
-          : "${AWS_ACCESS_KEY_ID:?Set the R2_ACCESS_KEY_ID repository secret}"
-          : "${AWS_SECRET_ACCESS_KEY:?Set the R2_SECRET_ACCESS_KEY repository secret}"
-          : "${CLOUDFLARE_ACCOUNT_ID:?Set the CLOUDFLARE_ACCOUNT_ID repository secret}"
-          : "${RELEASE_TAG:?Release tag is required}"
-          if ! command -v aws >/dev/null 2>&1; then
-            brew install awscli
-          fi
-
-          VERSION_PREFIX="${R2_PREFIX}/${RELEASE_TAG}"
-          LATEST_PREFIX="${R2_PREFIX}/latest"
-
-          aws s3 sync release "s3://${R2_BUCKET}/${VERSION_PREFIX}" \
-            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" \
-            --exclude "*" \
-            --include "*.dmg" \
-            --include "*.zip" \
-            --include "*.yml" \
-            --include "*.blockmap" \
-            --cache-control "public, max-age=300"
-
-          aws s3 sync release "s3://${R2_BUCKET}/${LATEST_PREFIX}" \
-            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" \
-            --delete \
-            --exclude "*" \
-            --include "*.dmg" \
-            --include "*.zip" \
-            --include "*.yml" \
-            --include "*.blockmap" \
-            --cache-control "public, max-age=300"
-
-          for file in release/*.dmg release/*.zip; do
-            [ -e "${file}" ] || continue
-            name="$(basename "${file}")"
-            ext="${name##*.}"
-            arch="mac"
-            if [[ "${name}" == *"-arm64."* ]]; then
-              arch="arm64"
-            elif [[ "${name}" == *"-x64."* ]]; then
-              arch="x64"
-            elif [[ "${name}" == *"-universal."* ]]; then
-              arch="universal"
-            fi
-            aws s3 cp "${file}" "s3://${R2_BUCKET}/${LATEST_PREFIX}/puppyone-latest-${arch}.${ext}" \
-              --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" \
-              --content-type "application/octet-stream" \
-              --cache-control "public, max-age=300"
-          done
-
-          if [ -f release/latest-mac.yml ]; then
-            aws s3 cp release/latest-mac.yml "s3://${R2_BUCKET}/${VERSION_PREFIX}/latest-mac.yml" \
-              --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" \
-              --content-type "text/yaml" \
-              --cache-control "no-cache"
-            aws s3 cp release/latest-mac.yml "s3://${R2_BUCKET}/${LATEST_PREFIX}/latest-mac.yml" \
-              --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" \
-              --content-type "text/yaml" \
-              --cache-control "no-cache"
-          fi
+  publish:
+    name: Publish GitHub and R2 release
+    needs: build
+    if: ${{ inputs.publish_release }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/desktop-release-publish.yml
+    with:
+      artifact_name: ${{ needs.build.outputs.artifact_name }}
+      channel: internal
+      deployment_environment: desktop-internal
+      generate_notes: false
+      prerelease: true
+      release_name: ${{ needs.build.outputs.release_name }}
+      release_tag: ${{ needs.build.outputs.release_tag }}
+      verify_tag: false
+    secrets: inherit

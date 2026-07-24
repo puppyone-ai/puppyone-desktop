@@ -4,6 +4,12 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  inspectInternalReleaseWorkflow,
+  inspectLegacyArchiveWorkflow,
+  inspectReleasePublisherWorkflow,
+  inspectStableReleaseWorkflow,
+} from "./release-support/internal-release-workflow-policy.mjs";
 import { inspectMacReleaseReadiness } from "./release-support/macos-release-policy.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -22,15 +28,42 @@ const errors = inspectMacReleaseReadiness({
 });
 
 const scripts = packageMetadata.scripts ?? {};
-if (!scripts["dist:mac"]?.includes("-c.mac.identity=null")) {
-  errors.push("the internal macOS build must explicitly disable signing through a command-local override");
+if (!scripts["dist:mac"]?.includes("-c.mac.identity=-")) {
+  errors.push("the internal macOS build must explicitly use ad-hoc signing through a command-local override");
 }
 if (!scripts["dist:mac"]?.includes("-c.mac.notarize=false")) {
   errors.push("the internal macOS build must explicitly disable notarization through a command-local override");
 }
-if (scripts["dist:mac:publish"] !== "npm run dist:mac:release && npm run publish:mac:r2") {
-  errors.push("stable publishing must verify the signed release before the explicit R2 upload step");
+if (scripts["publish:mac:r2"] || scripts["dist:mac:publish"]) {
+  errors.push("stable R2 publishing must only happen through the canonical GitHub Release workflow");
 }
+if (
+  scripts["prepare:mac:release"] !== "npm run check:shared-ui && npm run build && npm run check:viewer-pack-trust && npm run check:opencode-release"
+  || scripts["package:mac:release"] !== "node scripts/build-macos-stable-release.mjs --package-only"
+) {
+  errors.push("stable CI must prepare without deployment secrets before entering the signing step");
+}
+
+const internalWorkflow = readFileSync(
+  path.join(repoRoot, ".github", "workflows", "desktop-internal-build.yml"),
+  "utf8",
+);
+errors.push(...inspectInternalReleaseWorkflow(internalWorkflow));
+const stableWorkflow = readFileSync(
+  path.join(repoRoot, ".github", "workflows", "desktop-stable-release.yml"),
+  "utf8",
+);
+errors.push(...inspectStableReleaseWorkflow(stableWorkflow));
+const publisherWorkflow = readFileSync(
+  path.join(repoRoot, ".github", "workflows", "desktop-release-publish.yml"),
+  "utf8",
+);
+errors.push(...inspectReleasePublisherWorkflow(publisherWorkflow));
+const archiveWorkflow = readFileSync(
+  path.join(repoRoot, ".github", "workflows", "desktop-legacy-archive.yml"),
+  "utf8",
+);
+errors.push(...inspectLegacyArchiveWorkflow(archiveWorkflow));
 
 try {
   const { validateConfiguration } = require("app-builder-lib/out/util/config/config.js");

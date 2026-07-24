@@ -9,12 +9,19 @@ import { assertMacReleaseReadiness } from "./release-support/macos-release-polic
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const releaseDirectory = path.join(repoRoot, "release");
 const packageMetadata = JSON.parse(await fs.readFile(path.join(repoRoot, "package.json"), "utf8"));
+const packageOnly = process.argv.includes("--package-only");
+const unknownArguments = process.argv.slice(2).filter((argument) => argument !== "--package-only");
 
 try {
+  if (unknownArguments.length > 0) {
+    throw new Error(`Unknown stable release arguments: ${unknownArguments.join(", ")}`);
+  }
   assertMacReleaseReadiness({ packageMetadata, env: process.env, platform: process.platform });
-  await fs.rm(releaseDirectory, { recursive: true, force: true });
-  for (const script of ["check:shared-ui", "build", "check:viewer-pack-trust", "check:opencode-release"]) {
-    await runCommand("npm", ["run", script], { cwd: repoRoot });
+  if (!packageOnly) {
+    await fs.rm(releaseDirectory, { recursive: true, force: true });
+    for (const script of ["prepare:mac:release"]) {
+      await runCommand("npm", ["run", script], { cwd: repoRoot });
+    }
   }
   await runCommand(path.join(repoRoot, "node_modules/.bin/electron-builder"), [
     "--mac",
