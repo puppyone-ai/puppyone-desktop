@@ -7,6 +7,10 @@ on:
         description: Delete verified 0.1.0 and 0.1.1 root objects after archival
         type: boolean
         default: false
+      repair_partial_backfills:
+        description: Delete manifest-extraneous objects from uncommitted historical prefixes
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -162,6 +166,72 @@ jobs:
               --notarized false \
               --notes-file "artifacts/${tag}-notes.md" \
               --asset "artifacts/legacy-source/puppyone-${version}-arm64.dmg"
+          done
+
+      - name: Repair explicitly authorized partial R2 backfills
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          tags=(
+            v0.1.1-internal.1
+            v0.1.2-internal.2
+            v0.1.2-internal.4
+          )
+          for tag in "${tags[@]}"; do
+            bundle="artifacts/backfill-${tag}"
+            prefix="desktop/internal/mac/${tag}"
+            if aws s3api head-object \
+              --bucket "${R2_BUCKET}" \
+              --key "${prefix}/release.json" \
+              --endpoint-url "${ENDPOINT}" >/dev/null 2>&1; then
+              continue
+            fi
+
+            listing="${RUNNER_TEMP}/${tag}-repair-r2.json"
+            unexpected="${RUNNER_TEMP}/${tag}-unexpected-objects.txt"
+            aws s3api list-objects-v2 \
+              --bucket "${R2_BUCKET}" \
+              --prefix "${prefix}/" \
+              --endpoint-url "${ENDPOINT}" \
+              --output json > "${listing}"
+            node -e '
+              const path=require("node:path");
+              const manifest=require(path.resolve(process.argv[1]));
+              const listing=require(path.resolve(process.argv[2]));
+              const prefix=`${process.argv[3]}/`;
+              const expected=new Set(manifest.assets.map((asset) => `${prefix}${asset.name}`));
+              for (const item of listing.Contents ?? []) {
+                if (!expected.has(item.Key)) process.stdout.write(`${item.Key}\n`);
+              }
+            ' "${bundle}/release.json" "${listing}" "${prefix}" > "${unexpected}"
+
+            if [ ! -s "${unexpected}" ]; then
+              continue
+            fi
+            echo "Manifest-extraneous objects found in uncommitted prefix ${prefix}:"
+            sed 's/^/- /' "${unexpected}"
+            if [ "${{ inputs.repair_partial_backfills }}" != "true" ]; then
+              echo "Re-run with repair_partial_backfills enabled to delete only these uncommitted objects." >&2
+              exit 1
+            fi
+            while IFS= read -r key; do
+              case "${key}" in
+                "${prefix}/"*) ;;
+                *)
+                  echo "Refusing to delete object outside ${prefix}: ${key}" >&2
+                  exit 1
+                  ;;
+              esac
+              aws s3api delete-object \
+                --bucket "${R2_BUCKET}" \
+                --key "${key}" \
+                --endpoint-url "${ENDPOINT}"
+            done < "${unexpected}"
           done
 
       - name: Backfill immutable GitHub releases into R2
