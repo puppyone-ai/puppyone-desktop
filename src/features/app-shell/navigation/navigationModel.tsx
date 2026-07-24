@@ -1,4 +1,4 @@
-import { Blocks, Clock3, Cloud, Folder, Workflow } from "lucide-react";
+import { Blocks, Cloud, Folder } from "lucide-react";
 import type { MessageFormatter } from "@puppyone/localization";
 import type { DesktopView } from "../../../components/DesktopCloudShell";
 import type { GitStatusEntry, GitStatusSnapshot } from "../../../types/electron";
@@ -8,48 +8,11 @@ import type {
   DesktopNavigationItem,
 } from "./types";
 
-export function AssetsDistributionIcon({
-  size = 16,
-  className,
-}: {
-  size?: number;
-  className?: string;
-}) {
-  return (
-    <svg
-      className={className}
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-      data-icon="assets-distribution"
-    >
-      <rect x="3.5" y="13.5" width="7" height="7" rx="1.75" />
-      <path d="M9.5 14.5 20.5 3.5" />
-      <path d="M13.5 3.5h7v7" />
-    </svg>
-  );
-}
-
 const DESKTOP_NAV_ITEMS: readonly DesktopNavigationItem[] = [
   { view: "data", labelId: "shell.navigation.files", icon: Folder },
   { view: "git", labelId: "shell.navigation.changes", icon: VersionControlIcon, iconSize: 18 },
   { view: "plugins", labelId: "shell.navigation.plugins", icon: Blocks },
-  { view: "access", labelId: "shell.navigation.assets", icon: AssetsDistributionIcon },
-  { view: "automation", labelId: "shell.navigation.automation", icon: Workflow },
 ] as const;
-
-const CLOUD_HISTORY_ITEM: DesktopNavigationItem = {
-  view: "git",
-  labelId: "shell.navigation.history",
-  icon: Clock3,
-};
 
 const CLOUD_HUB_ITEM: DesktopNavigationItem = {
   view: "cloud",
@@ -57,41 +20,27 @@ const CLOUD_HUB_ITEM: DesktopNavigationItem = {
   icon: Cloud,
 };
 
-const LOCAL_ITEMS = DESKTOP_NAV_ITEMS.filter(
-  (item) => item.view !== "access" && item.view !== "automation",
-);
-const CLOUD_ITEMS = DESKTOP_NAV_ITEMS.filter(
-  (item) => item.view === "access" || item.view === "automation",
-);
-
 export function resolveNavigationItems({
   availableSurfaceIds,
-  cloudHistoryEnabled = false,
   cloudHubEnabled = false,
-  cloudToolsEnabled = false,
   gitEnabled = true,
   pluginsEnabled = false,
 }: DesktopNavigationAvailability) {
   if (availableSurfaceIds) {
     const available = new Set(availableSurfaceIds);
     return {
-      localItems: LOCAL_ITEMS
-        .filter(({ view }) => available.has(view))
-        .map((item) => cloudHistoryEnabled && item.view === "git" ? CLOUD_HISTORY_ITEM : item),
+      localItems: DESKTOP_NAV_ITEMS.filter(({ view }) => available.has(view)),
       cloudHubItems: available.has("cloud") ? [CLOUD_HUB_ITEM] : [],
-      cloudItems: CLOUD_ITEMS.filter(({ view }) => available.has(view)),
     };
   }
 
   return {
-    localItems: LOCAL_ITEMS
+    localItems: DESKTOP_NAV_ITEMS
       .filter((item) => (
-        (gitEnabled || cloudHistoryEnabled || item.view !== "git")
+        (gitEnabled || item.view !== "git")
         && (pluginsEnabled || item.view !== "plugins")
-      ))
-      .map((item) => cloudHistoryEnabled && item.view === "git" ? CLOUD_HISTORY_ITEM : item),
+      )),
     cloudHubItems: cloudHubEnabled ? [CLOUD_HUB_ITEM] : [],
-    cloudItems: cloudToolsEnabled ? CLOUD_ITEMS : [],
   };
 }
 

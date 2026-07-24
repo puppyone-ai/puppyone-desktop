@@ -45,7 +45,7 @@
 }
 
 .markdown-codemirror-editor .cm-md-table-frame {
-  --cm-md-table-action-gutter: 18px;
+  --cm-md-table-action-gutter: var(--po-editable-table-action-gutter);
   display: inline-block;
   min-width: max-content;
   padding-right: var(--cm-md-table-action-gutter);
@@ -66,15 +66,15 @@
   max-width: none;
   margin: 0;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 10%);
-  border-radius: 4px;
+  border: 1px solid var(--po-editable-table-border);
+  border-radius: var(--po-editable-table-radius);
   border-collapse: separate;
   border-spacing: 0;
   table-layout: auto;
-  background: color-mix(in srgb, var(--po-panel) 42%, transparent);
-  color: color-mix(in srgb, var(--po-text) 82%, var(--po-text-muted));
-  font-size: 12.5px;
-  line-height: 1.45;
+  background: var(--po-editable-table-background);
+  color: var(--po-editable-table-color);
+  font-size: var(--po-editable-table-font-size);
+  line-height: var(--po-editable-table-line-height);
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
@@ -101,7 +101,7 @@
    stays stable; only the hovered cell tints — never a whole row. */
 .markdown-codemirror-editor .cm-md-table-widget-wrap:hover:not(.is-doc-selected) .cm-md-table-widget,
 .markdown-codemirror-editor .cm-md-table-widget-wrap:focus-within:not(.is-doc-selected) .cm-md-table-widget {
-  box-shadow: 0 0 0 2px var(--cm-md-block-hover-ring);
+  box-shadow: 0 0 0 2px var(--po-editable-table-hover-ring);
 }
 
 /* Document selection sweeping over the table selects it as one block. */
@@ -124,12 +124,12 @@
   /* Classic table trick: height:1px lets the child stretch to the row's
      computed height so cell padding clicks hit the editor, not the td. */
   height: 1px;
-  min-width: 96px;
-  max-width: 280px;
+  min-width: var(--po-editable-table-cell-min-width);
+  max-width: var(--po-editable-table-cell-max-width);
   padding: 0;
   border: 0;
-  border-right: 1px solid color-mix(in srgb, var(--po-divider) 92%, var(--po-text-muted) 8%);
-  border-bottom: 1px solid color-mix(in srgb, var(--po-divider) 92%, var(--po-text-muted) 8%);
+  border-right: 1px solid var(--po-editable-table-cell-border);
+  border-bottom: 1px solid var(--po-editable-table-cell-border);
   text-align: left;
   vertical-align: top;
   white-space: normal;
@@ -137,13 +137,13 @@
 }
 
 .markdown-codemirror-editor .cm-md-table-widget th {
-  background: color-mix(in srgb, var(--po-control) 46%, transparent);
-  color: color-mix(in srgb, var(--po-text) 88%, var(--po-text-muted));
-  font-weight: 650;
+  background: var(--po-editable-table-header-background);
+  color: var(--po-editable-table-header-color);
+  font-weight: var(--po-editable-table-header-font-weight);
 }
 
 .markdown-codemirror-editor .cm-md-table-widget td {
-  color: color-mix(in srgb, var(--po-text) 72%, var(--po-text-muted));
+  color: var(--po-editable-table-body-color);
 }
 
 .markdown-codemirror-editor .cm-md-table-widget th:last-child,
@@ -156,7 +156,7 @@
 }
 
 .markdown-codemirror-editor .cm-md-table-widget tbody td:hover {
-  background: color-mix(in srgb, var(--po-hover) 48%, transparent);
+  background: var(--po-editable-table-cell-hover-background);
 }
 
 .markdown-codemirror-editor .cm-md-table-align-left {
@@ -175,11 +175,11 @@
   display: block;
   box-sizing: border-box;
   width: 100%;
-  min-width: 96px;
-  max-width: 280px;
-  min-height: 100%;
+  min-width: var(--po-editable-table-cell-min-width);
+  max-width: var(--po-editable-table-cell-max-width);
+  min-height: var(--po-editable-table-row-min-height);
   height: 100%;
-  padding: 6px 10px;
+  padding: var(--po-editable-table-cell-padding);
   outline: 0;
   overflow-wrap: anywhere;
   white-space: normal;
@@ -196,13 +196,13 @@
 .markdown-codemirror-editor .cm-md-table-widget td:focus-within {
   position: relative;
   z-index: 1;
-  background: color-mix(in srgb, var(--po-selected) 58%, transparent);
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--po-accent) 55%, transparent);
+  background: var(--po-editable-table-cell-focus-background);
+  box-shadow: inset 0 0 0 1.5px var(--po-editable-table-cell-focus-ring);
   transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 
 .markdown-codemirror-editor .cm-md-table-widget th:focus-within {
-  background: color-mix(in srgb, var(--po-selected) 52%, color-mix(in srgb, var(--po-control) 40%, transparent));
+  background: var(--po-editable-table-header-focus-background);
 }
 
 .markdown-codemirror-editor .cm-md-table-drag-layer {
@@ -377,7 +377,7 @@
   place-items: center;
   border: 1px solid transparent;
   border-radius: 7px;
-  background: color-mix(in srgb, var(--po-control) 42%, transparent);
+  background: var(--po-editable-table-structure-background);
   color: transparent;
   font-size: 12px;
   font-weight: 650;
@@ -393,9 +393,9 @@
 
 .markdown-codemirror-editor .cm-md-table-structure-button:hover .cm-md-table-structure-button-visual,
 .markdown-codemirror-editor .cm-md-table-structure-button:focus-visible .cm-md-table-structure-button-visual {
-  border-color: color-mix(in srgb, var(--po-accent) 32%, var(--po-divider));
-  background: color-mix(in srgb, var(--po-accent) 10%, var(--po-panel));
-  color: color-mix(in srgb, var(--po-accent) 78%, var(--po-text));
+  border-color: var(--po-editable-table-structure-hover-border);
+  background: var(--po-editable-table-structure-hover-background);
+  color: var(--po-editable-table-structure-hover-color);
 }
 
 .markdown-codemirror-editor .cm-md-table-structure-button:focus-visible {

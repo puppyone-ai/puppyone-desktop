@@ -8,7 +8,7 @@ import type {
 } from "../../types/electron";
 import type { CloudAuthState } from "./auth";
 import type { CloudEnvironment } from "./environment";
-import type { ProjectCloudContext } from "./context";
+import type { ProjectCloudContext } from "./project/context";
 import type { RepositoryTarget } from "./repositoryTarget";
 import type { CloudWorkspaceSection } from "./routes/cloudRouteIds";
 
@@ -33,30 +33,10 @@ export type CloudGitRemoteOptions = {
 export type CloudServiceSidebarProps = {
   cloudAuthState: CloudAuthState;
   activeSection: CloudWorkspaceSection;
-  /** True when an authorized Cloud Project context is active — never derived from route alone. */
-  projectContext?: boolean;
-  /** True when the Project context belongs to the currently open Local workspace. */
-  localWorkspaceContext?: boolean;
-  /** True when the current Local workspace has not been initialized on PuppyOne Cloud. */
-  localOnlyWorkspaceContext?: boolean;
+  /** True only when the current repository's canonical remote is authorized. */
+  projectAvailable?: boolean;
   projectCapabilities?: readonly string[];
   onSelectSection: (section: CloudWorkspaceSection) => void;
-  /** Leave an explicit global Project route and return to its parent surface. */
-  onBackToProjects?: () => void;
-};
-
-export type CloudServicePanelProps = {
-  open: boolean;
-  status: GitStatusSnapshot | null;
-  accountEmail: string | null;
-  loading: boolean;
-  error: string | null;
-  onClose: () => void;
-  onRefresh: () => void;
-  onSignedIn: (session: DesktopCloudSession) => void;
-  onSignedOut: () => void;
-  onEnterCloud: () => void;
-  onOpenGitSettings: () => void;
 };
 
 export type CloudServiceMainViewProps = {

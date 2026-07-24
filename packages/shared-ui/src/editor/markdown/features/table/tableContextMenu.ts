@@ -81,9 +81,9 @@ export function showMarkdownTableContextMenu(
     ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
   const menu = document.createElement("div");
   menu.id = `cm-md-table-menu-${++markdownTableMenuSequence}`;
-  menu.className = "desktop-menu-surface cm-md-table-context-menu";
+  menu.className = "desktop-menu-surface cm-md-table-context-menu po-editable-table-context-menu";
   menu.setAttribute("role", "menu");
-  menu.setAttribute("aria-label", localization.t("editor.markdown.table.actions"));
+  menu.setAttribute("aria-label", localization.t("editor.table.actions"));
   menu.dir = localization.direction;
   menu.setAttribute("aria-orientation", "vertical");
   menu.tabIndex = -1;
@@ -218,89 +218,89 @@ function getMarkdownTableMenuSections(
   const scope = target.scope ?? "cell";
   const currentAlignment = context.alignments[columnIndex] ?? null;
   const alignmentItems: Array<{ alignment: MarkdownTableAlignment; label: string }> = [
-    { alignment: null, label: t("editor.markdown.table.defaultAlignment") },
-    { alignment: "left", label: t("editor.markdown.table.alignLeft") },
-    { alignment: "center", label: t("editor.markdown.table.alignCenter") },
-    { alignment: "right", label: t("editor.markdown.table.alignRight") },
+    { alignment: null, label: t("editor.table.defaultAlignment") },
+    { alignment: "left", label: t("editor.table.alignLeft") },
+    { alignment: "center", label: t("editor.table.alignCenter") },
+    { alignment: "right", label: t("editor.table.alignRight") },
   ];
 
   const sections: MarkdownTableMenuSection[] = [
     {
       id: "rows",
-      label: t("editor.markdown.table.rows"),
+      label: t("editor.table.rows"),
       items: [
         {
           disabled: rowIndex === 0,
-          label: t("editor.markdown.table.insertRowAbove"),
+          label: t("editor.table.insertRowAbove"),
           operation: { type: "insert-row-above", rowIndex, columnIndex },
         },
         {
-          label: t("editor.markdown.table.insertRowBelow"),
+          label: t("editor.table.insertRowBelow"),
           operation: { type: "insert-row-below", rowIndex, columnIndex },
         },
         {
-          label: t("editor.markdown.table.duplicateRow"),
+          label: t("editor.table.duplicateRow"),
           operation: { type: "duplicate-row", rowIndex, columnIndex },
         },
         {
           disabled: rowIndex <= 1,
-          label: t("editor.markdown.table.moveRowUp"),
+          label: t("editor.table.moveRowUp"),
           operation: { type: "move-row-up", rowIndex, columnIndex },
         },
         {
           disabled: rowIndex === 0 || rowIndex >= rowCount - 1,
-          label: t("editor.markdown.table.moveRowDown"),
+          label: t("editor.table.moveRowDown"),
           operation: { type: "move-row-down", rowIndex, columnIndex },
         },
         {
           destructive: true,
           disabled: rowIndex === 0,
-          label: t("editor.markdown.table.deleteRow"),
+          label: t("editor.table.deleteRow"),
           operation: { type: "delete-row", rowIndex, columnIndex },
         },
       ],
     },
     {
       id: "columns",
-      label: t("editor.markdown.table.columns"),
+      label: t("editor.table.columns"),
       items: [
         {
           label: t(direction === "rtl"
-            ? "editor.markdown.table.insertColumnRight"
-            : "editor.markdown.table.insertColumnLeft"),
+            ? "editor.table.insertColumnRight"
+            : "editor.table.insertColumnLeft"),
           operation: { type: "insert-column-left", rowIndex, columnIndex },
         },
         {
           label: t(direction === "rtl"
-            ? "editor.markdown.table.insertColumnLeft"
-            : "editor.markdown.table.insertColumnRight"),
+            ? "editor.table.insertColumnLeft"
+            : "editor.table.insertColumnRight"),
           operation: { type: "insert-column-right", rowIndex, columnIndex },
         },
         {
           disabled: columnIndex === 0,
           label: t(direction === "rtl"
-            ? "editor.markdown.table.moveColumnRight"
-            : "editor.markdown.table.moveColumnLeft"),
+            ? "editor.table.moveColumnRight"
+            : "editor.table.moveColumnLeft"),
           operation: { type: "move-column-left", rowIndex, columnIndex },
         },
         {
           disabled: columnIndex >= columnCount - 1,
           label: t(direction === "rtl"
-            ? "editor.markdown.table.moveColumnLeft"
-            : "editor.markdown.table.moveColumnRight"),
+            ? "editor.table.moveColumnLeft"
+            : "editor.table.moveColumnRight"),
           operation: { type: "move-column-right", rowIndex, columnIndex },
         },
         {
           destructive: true,
           disabled: columnCount <= 1,
-          label: t("editor.markdown.table.deleteColumn"),
+          label: t("editor.table.deleteColumn"),
           operation: { type: "delete-column", rowIndex, columnIndex },
         },
       ],
     },
     {
       id: "alignment",
-      label: t("editor.markdown.table.alignment"),
+      label: t("editor.table.alignment"),
       items: alignmentItems.map(({ alignment, label }) => ({
         label,
         operation: {
@@ -317,7 +317,7 @@ function getMarkdownTableMenuSections(
       id: "table",
       items: [{
         destructive: true,
-        label: t("editor.markdown.table.deleteTable"),
+        label: t("editor.table.deleteTable"),
         operation: { type: "delete-table", rowIndex, columnIndex },
       }],
     },

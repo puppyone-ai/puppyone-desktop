@@ -17,6 +17,10 @@ describe("Desktop Agent preload boundary", () => {
       "archiveAgentSession",
       "deleteAgentSession",
       "closeAgentSession",
+      "stageAgentAttachments",
+      "revokeAgentAttachments",
+      "resolveAgentWorkspaceReferences",
+      "pickAgentWorkspaceReferences",
       "startAgentTurn",
       "steerAgentTurn",
       "interruptAgentTurn",
@@ -41,6 +45,10 @@ describe("Desktop Agent preload boundary", () => {
       "agent:session-archive",
       "agent:session-delete",
       "agent:session-close",
+      "agent:reference-stage",
+      "agent:reference-revoke",
+      "agent:reference-resolve-workspace",
+      "agent:reference-pick-workspace",
       "agent:turn-start",
       "agent:turn-steer",
       "agent:turn-interrupt",
@@ -58,5 +66,7 @@ describe("Desktop Agent preload boundary", () => {
     expect(source).not.toContain("agent:provider-discover");
     expect(source).not.toContain("agent:session-restore");
     expect(source).not.toMatch(/spawnAgentProcess|writeAgentStdin|agentEnvironment/);
+    expect(source).toMatch(/stageAgentAttachments:[\s\S]*webUtils\.getPathForFile\(file\)[\s\S]*sourcePaths/);
+    expect(source).not.toMatch(/agent:reference-stage[^}]*files/);
   });
 });

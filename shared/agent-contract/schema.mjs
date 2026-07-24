@@ -87,22 +87,44 @@ export function parseAgentIpcRequest(channel, value) {
         sessionId: requiredOpaqueId(input.sessionId, "sessionId"),
         removePersistence: optionalBoolean(input.removePersistence, "removePersistence"),
       });
+    case "agent:reference-stage":
+      return {
+        rootPath: requiredString(input.rootPath, "rootPath", MAX_PATH_LENGTH),
+        epoch: requiredOpaqueId(input.epoch, "epoch"),
+        sourcePaths: boundedStringArray(input.sourcePaths, "sourcePaths", MAX_REFERENCE_COUNT, MAX_PATH_LENGTH),
+      };
+    case "agent:reference-revoke":
+      return {
+        rootPath: requiredString(input.rootPath, "rootPath", MAX_PATH_LENGTH),
+        tokens: boundedOpaqueIdArray(input.tokens, "tokens", MAX_REFERENCE_COUNT),
+      };
+    case "agent:reference-resolve-workspace":
+      return {
+        rootPath: requiredString(input.rootPath, "rootPath", MAX_PATH_LENGTH),
+        paths: boundedStringArray(input.paths, "paths", MAX_REFERENCE_COUNT, MAX_PATH_LENGTH),
+      };
+    case "agent:reference-pick-workspace":
+      return { rootPath: requiredString(input.rootPath, "rootPath", MAX_PATH_LENGTH) };
     case "agent:turn-start":
       return compact({
         rootPath: requiredString(input.rootPath, "rootPath", MAX_PATH_LENGTH),
         sessionId: requiredOpaqueId(input.sessionId, "sessionId"),
-        prompt: requiredString(input.prompt, "prompt", MAX_MESSAGE_LENGTH, { preserveWhitespace: true }),
+        prompt: requiredString(input.prompt, "prompt", MAX_MESSAGE_LENGTH, { allowEmpty: true, preserveWhitespace: true }),
         model: optionalString(input.model, "model", 512),
         mode: optionalString(input.mode, "mode", 160),
+        referenceEpoch: optionalOpaqueId(input.referenceEpoch, "referenceEpoch"),
         attachments: optionalReferences(input.attachments, "attachments"),
         contextReferences: optionalReferences(input.contextReferences, "contextReferences"),
+        references: optionalDraftReferences(input.references, "references"),
       });
     case "agent:turn-steer":
       return {
         rootPath: requiredString(input.rootPath, "rootPath", MAX_PATH_LENGTH),
         sessionId: requiredOpaqueId(input.sessionId, "sessionId"),
         turnId: requiredOpaqueId(input.turnId, "turnId"),
-        message: requiredString(input.message, "message", MAX_MESSAGE_LENGTH, { preserveWhitespace: true }),
+        message: requiredString(input.message, "message", MAX_MESSAGE_LENGTH, { allowEmpty: true, preserveWhitespace: true }),
+        referenceEpoch: optionalOpaqueId(input.referenceEpoch, "referenceEpoch"),
+        references: optionalDraftReferences(input.references, "references"),
       };
     case "agent:turn-interrupt":
     case "agent:session-compact":
@@ -158,6 +180,7 @@ export function assertAgentIpcResponse(channel, value) {
     case "agent:session-archive":
     case "agent:session-delete":
     case "agent:session-close":
+    case "agent:reference-revoke":
     case "agent:turn-start":
     case "agent:turn-steer":
     case "agent:turn-interrupt":
@@ -166,6 +189,11 @@ export function assertAgentIpcResponse(channel, value) {
     case "agent:question-resolve":
       assertRecord(value, `${channel} response`);
       return value;
+    case "agent:reference-stage":
+    case "agent:reference-resolve-workspace":
+    case "agent:reference-pick-workspace":
+      return assertArray(value, `${channel} response`)
+        .map((entry, index) => sanitizeDraftReference(entry, `${channel}[${index}]`, false));
     default:
       throw new TypeError(`Unknown Agent IPC channel: ${String(channel)}`);
   }
@@ -202,6 +230,54 @@ function optionalReferences(value, label) {
       name: optionalString(reference.name, `${label}[${index}].name`, 512),
     });
   });
+}
+
+function optionalDraftReferences(value, label) {
+  if (value === undefined || value === null) return undefined;
+  const references = assertArray(value, label);
+  if (references.length > MAX_REFERENCE_COUNT) throw contractError(label, `may contain at most ${MAX_REFERENCE_COUNT} entries`);
+  return references.map((entry, index) => sanitizeDraftReference(entry, `${label}[${index}]`, true));
+}
+
+function sanitizeDraftReference(value, label, requireReady) {
+  const reference = assertRecord(value, label);
+  const kind = enumValue(reference.kind, `${label}.kind`, ["workspace-entry", "staged-attachment"]);
+  const status = enumValue(reference.status, `${label}.status`, ["resolving", "ready", "error"]);
+  if (requireReady && status !== "ready") throw contractError(`${label}.status`, "must be ready before submission");
+  const base = {
+    id: requiredOpaqueId(reference.id, `${label}.id`),
+    kind,
+    displayName: requiredString(reference.displayName, `${label}.displayName`, 512),
+    status,
+  };
+  if (kind === "workspace-entry") {
+    return {
+      ...base,
+      entryType: enumValue(reference.entryType, `${label}.entryType`, ["file", "directory"]),
+      path: requiredString(reference.path, `${label}.path`, MAX_PATH_LENGTH),
+      relativePath: requiredString(reference.relativePath, `${label}.relativePath`, MAX_PATH_LENGTH),
+      ...(reference.mime === undefined ? {} : { mime: requiredString(reference.mime, `${label}.mime`, 160) }),
+      ...(reference.size === undefined ? {} : { size: nonNegativeInteger(reference.size, `${label}.size`) }),
+    };
+  }
+  return {
+    ...base,
+    token: requiredOpaqueId(reference.token, `${label}.token`),
+    mime: requiredString(reference.mime, `${label}.mime`, 160),
+    size: nonNegativeInteger(reference.size, `${label}.size`),
+  };
+}
+
+function boundedStringArray(value, label, maximumEntries, maximumLength) {
+  const entries = assertArray(value, label);
+  if (entries.length === 0 || entries.length > maximumEntries) throw contractError(label, `must contain 1-${maximumEntries} entries`);
+  return entries.map((entry, index) => requiredString(entry, `${label}[${index}]`, maximumLength));
+}
+
+function boundedOpaqueIdArray(value, label, maximumEntries) {
+  const entries = assertArray(value, label);
+  if (entries.length > maximumEntries) throw contractError(label, `may contain at most ${maximumEntries} entries`);
+  return entries.map((entry, index) => requiredOpaqueId(entry, `${label}[${index}]`));
 }
 
 function optionalQuestionAnswer(value, label) {

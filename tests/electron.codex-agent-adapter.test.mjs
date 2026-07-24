@@ -3,10 +3,29 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
   CodexAppServerAdapter,
+  buildCodexTurnInput,
   normalizeCodexNotification,
 } from "../electron/main/agent/runtimes/codex/codex-app-server-adapter.mjs";
 
 describe("Codex app-server normalization", () => {
+  it("maps workspace mentions and staged images to the exact app-server UserInput schema", () => {
+    expect(buildCodexTurnInput("Inspect", [
+      { id: "workspace-a", kind: "workspace-entry", entryType: "file", path: "/workspace/a.md", displayName: "a.md" },
+      { id: "image-b", kind: "staged-attachment", path: "/private/staging/b.snapshot", displayName: "b.png", mime: "image/png" },
+    ])).toEqual([
+      { type: "text", text: "Inspect", text_elements: [] },
+      { type: "mention", name: "a.md", path: "/workspace/a.md" },
+      { type: "localImage", path: "/private/staging/b.snapshot" },
+    ]);
+    expect(() => buildCodexTurnInput("Inspect", [{
+      kind: "staged-attachment",
+      path: "/private/staging/report.pdf",
+      mime: "application/pdf",
+    }])).toThrow(/does not support/i);
+    expect(() => buildCodexTurnInput("Inspect", [{ kind: "workspace-entry" }]))
+      .toThrow(/invalid reference/i);
+  });
+
   it("keeps the tested Codex 0.144.1 generated-schema fixture compatible", () => {
     const fixture = JSON.parse(readFileSync(new URL(
       "./fixtures/codex-app-server/v0.144.1-notifications.json",

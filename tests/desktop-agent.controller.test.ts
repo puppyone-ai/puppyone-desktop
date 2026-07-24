@@ -161,7 +161,11 @@ describe("AgentSessionController", () => {
     await controller.initialize();
     expect(controller.getSnapshot()).toMatchObject({ selectedRuntimeId: "codex", selectedModel: "gpt-5-codex" });
 
+    await controller.stageExternalFiles([new File(["png"], "before-switch.png", { type: "image/png" })]);
+    const firstEpoch = bridge.stageAgentAttachments.mock.calls.at(-1)?.[0].epoch;
+
     await expect(controller.selectRuntime("claude")).resolves.toBe(true);
+    expect(bridge.revokeAgentAttachments).toHaveBeenCalledWith({ rootPath: "/workspace", tokens: ["stage-token"] });
     expect(bridge.closeAgentSession).toHaveBeenCalledWith({
       rootPath: "/workspace",
       sessionId: "codex-session",
@@ -174,6 +178,9 @@ describe("AgentSessionController", () => {
       selectedModel: "claude-sonnet",
       session: { id: "claude-session", runtimeId: "claude" },
     });
+    expect(controller.getSnapshot().references).toEqual([]);
+    await controller.stageExternalFiles([new File(["png"], "after-switch.png", { type: "image/png" })]);
+    expect(bridge.stageAgentAttachments.mock.calls.at(-1)?.[0].epoch).not.toBe(firstEpoch);
   });
 
   it("selects a detected runtime while keeping execution gated by its readiness", async () => {
@@ -414,6 +421,157 @@ describe("AgentSessionController", () => {
 
     expect(listener).toHaveBeenCalledTimes(1);
   });
+
+  it("captures references inside immutable queued submission intents", async () => {
+    let eventListener: ((event: AgentEvent) => void) | null = null;
+    const bridge = bridgeFixture((listener) => { eventListener = listener; }, { queue: true });
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+    eventListener?.(event(2, "turn.started", { prompt: "Long task" }, "turn-running"));
+    await new Promise((resolve) => setTimeout(resolve, 45));
+
+    await controller.addWorkspacePaths(["a.md"]);
+    await expect(controller.submit("First queued")).resolves.toBe(true);
+    await controller.addWorkspacePaths(["b.md"]);
+    await expect(controller.submit("Second queued")).resolves.toBe(true);
+    expect(controller.getSnapshot().references).toEqual([]);
+
+    eventListener?.(event(3, "turn.completed", { status: "completed" }, "turn-running"));
+    await vi.waitFor(() => expect(bridge.startAgentTurn).toHaveBeenCalledTimes(1));
+    expect(bridge.startAgentTurn.mock.calls[0][0]).toMatchObject({
+      prompt: "First queued",
+      references: [expect.objectContaining({ relativePath: "a.md" })],
+    });
+    eventListener?.(event(4, "turn.started", { prompt: "First queued" }, "turn-first"));
+    eventListener?.(event(5, "turn.completed", { status: "completed" }, "turn-first"));
+    await vi.waitFor(() => expect(bridge.startAgentTurn).toHaveBeenCalledTimes(2));
+    expect(bridge.startAgentTurn.mock.calls[1][0]).toMatchObject({
+      prompt: "Second queued",
+      references: [expect.objectContaining({ relativePath: "b.md" })],
+    });
+  });
+
+  it("restores a failed queued intent to the visible Composer instead of stranding it", async () => {
+    let eventListener: ((event: AgentEvent) => void) | null = null;
+    const bridge = bridgeFixture((listener) => { eventListener = listener; }, { queue: true });
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+    eventListener?.(event(2, "turn.started", { prompt: "Long task" }, "turn-running"));
+    await new Promise((resolve) => setTimeout(resolve, 45));
+    await controller.addWorkspacePaths(["queued.md"]);
+    await expect(controller.submit("Queued request")).resolves.toBe(true);
+    controller.setDraft("New draft");
+    bridge.startAgentTurn.mockRejectedValueOnce(new Error("queued native start failed"));
+
+    eventListener?.(event(3, "turn.completed", { status: "completed" }, "turn-running"));
+    await vi.waitFor(() => expect(bridge.startAgentTurn).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(controller.getSnapshot().pendingIntent).toBeNull());
+    expect(controller.getSnapshot()).toMatchObject({
+      draft: "Queued request\n\nNew draft",
+      references: [expect.objectContaining({ relativePath: "queued.md" })],
+    });
+  });
+
+  it("retains references when steer cannot carry them and restores the same intent after preparation failure", async () => {
+    let eventListener: ((event: AgentEvent) => void) | null = null;
+    const bridge = bridgeFixture((listener) => { eventListener = listener; }, {
+      steer: true,
+      referenceInputs: { ...referenceCapabilities(), steer: false },
+    });
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+    eventListener?.(event(2, "turn.started", { prompt: "Running" }, "turn-running"));
+    await new Promise((resolve) => setTimeout(resolve, 45));
+    await controller.addWorkspacePaths(["keep.md"]);
+    await expect(controller.submit("Do not lose this")).resolves.toBe(false);
+    expect(bridge.steerAgentTurn).not.toHaveBeenCalled();
+    expect(controller.getSnapshot().references).toEqual([expect.objectContaining({ relativePath: "keep.md" })]);
+
+    const failedBridge = bridgeFixture(() => {});
+    failedBridge.resumeAgentSession.mockResolvedValueOnce(null);
+    failedBridge.createAgentSession.mockRejectedValueOnce(new Error("cannot create"));
+    const failed = new AgentSessionController("/workspace", () => failedBridge as never);
+    await failed.initialize();
+    await failed.addWorkspacePaths(["restore.md"]);
+    failed.setDraft("Retry me");
+    await expect(failed.submit("Retry me")).resolves.toBe(false);
+    expect(failed.getSnapshot()).toMatchObject({
+      draft: "Retry me",
+      pendingIntent: null,
+      references: [expect.objectContaining({ relativePath: "restore.md" })],
+    });
+  });
+
+  it("merges a failed immutable intent with edits and references added while session preparation is pending", async () => {
+    const bridge = bridgeFixture(() => {});
+    bridge.resumeAgentSession.mockResolvedValueOnce(null);
+    let rejectPreparation: ((error: Error) => void) | null = null;
+    bridge.createAgentSession.mockImplementationOnce(() => new Promise((_resolve, reject) => {
+      rejectPreparation = reject;
+    }));
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+    await controller.addWorkspacePaths(["original.md"]);
+
+    const submission = controller.submit("Original request");
+    await vi.waitFor(() => expect(controller.getSnapshot().pendingIntent).not.toBeNull());
+    controller.setDraft("New edit while waiting");
+    await controller.addWorkspacePaths(["new.md"]);
+    rejectPreparation?.(new Error("cannot prepare"));
+
+    await expect(submission).resolves.toBe(false);
+    expect(controller.getSnapshot()).toMatchObject({
+      draft: "Original request\n\nNew edit while waiting",
+      pendingIntent: null,
+      references: [
+        expect.objectContaining({ relativePath: "original.md" }),
+        expect.objectContaining({ relativePath: "new.md" }),
+      ],
+    });
+  });
+
+  it("revokes staged grants on removal and keeps external paths outside renderer state", async () => {
+    const bridge = bridgeFixture(() => {});
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+    const file = new File(["png"], "capture.png", { type: "image/png" });
+    await expect(controller.stageExternalFiles([file])).resolves.toBe(1);
+    const [reference] = controller.getSnapshot().references;
+    expect(reference).toMatchObject({ kind: "staged-attachment", displayName: "capture.png", status: "ready" });
+    expect(reference).not.toHaveProperty("path");
+    await expect(controller.stageExternalFiles([file])).resolves.toBe(0);
+    expect(controller.getSnapshot().references).toHaveLength(1);
+    controller.removeReference(reference.id);
+    await vi.waitFor(() => expect(bridge.revokeAgentAttachments).toHaveBeenCalledWith({
+      rootPath: "/workspace",
+      tokens: ["stage-token"],
+    }));
+  });
+
+  it("keeps valid entries from a partial external-file batch and exposes retryable errors for the rest", async () => {
+    const bridge = bridgeFixture(() => {});
+    bridge.stageAgentAttachments
+      .mockResolvedValueOnce([{
+        id: "valid-image",
+        kind: "staged-attachment",
+        token: "valid-token",
+        displayName: "valid.png",
+        mime: "image/png",
+        size: 3,
+        status: "ready",
+      }])
+      .mockRejectedValueOnce(new Error("Only regular files can be attached."));
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+    await expect(controller.stageExternalFiles([
+      new File(["png"], "valid.png", { type: "image/png" }),
+      new File(["bad"], "folder", { type: "application/octet-stream" }),
+    ])).resolves.toBe(1);
+    expect(controller.getSnapshot().references).toEqual([
+      expect.objectContaining({ id: "valid-image", status: "ready" }),
+      expect.objectContaining({ displayName: "folder", status: "error" }),
+    ]);
+  });
 });
 
 function bridgeFixture(
@@ -440,6 +598,29 @@ function bridgeFixture(
     startAgentTurn: vi.fn(async () => ({ turnId: "turn-next" })),
     replayAgentSession: vi.fn(async () => snapshot("session-1", [event(4, "assistant.completed", { text: "Working" }, "turn-1", "message-1")], capabilityOverrides)),
     closeAgentSession: vi.fn(async () => ({ sessionId: "session-1", closed: true })),
+    stageAgentAttachments: vi.fn(async () => [{
+      id: "stage-reference",
+      kind: "staged-attachment",
+      token: "stage-token",
+      displayName: "capture.png",
+      mime: "image/png",
+      size: 3,
+      status: "ready",
+    }]),
+    revokeAgentAttachments: vi.fn(async ({ tokens }: { tokens: string[] }) => ({ revoked: tokens.length })),
+    resolveAgentWorkspaceReferences: vi.fn(async ({ paths }: { paths: string[] }) => paths.map((referencePath, index) => ({
+      id: `workspace-${index}-${referencePath.replace(/[^A-Za-z0-9]/g, "-")}`,
+      kind: "workspace-entry",
+      entryType: referencePath === "src" ? "directory" : "file",
+      path: referencePath,
+      relativePath: referencePath,
+      displayName: referencePath.split("/").at(-1) || referencePath,
+      mime: "text/markdown",
+      size: 4,
+      status: "ready",
+    }))),
+    pickAgentWorkspaceReferences: vi.fn(async () => []),
+    steerAgentTurn: vi.fn(async () => ({ sessionId: "session-1", turnId: "turn-running", steered: true })),
     listAgentSessions: vi.fn(async () => []),
     onAgentEvent: vi.fn((listener: (event: AgentEvent) => void) => { onEvent(listener); return () => {}; }),
     onAgentSessionExit: vi.fn(() => () => {}),
@@ -535,8 +716,12 @@ function runtimeSnapshot(
   };
 }
 
-function capabilities(overrides: Partial<Record<string, boolean>> = {}) {
-  return { streamingText: true, structuredToolEvents: true, commandOutputStreaming: true, fileChangeEvents: true, manualApprovals: true, structuredQuestions: true, resume: true, fork: true, steer: false, queue: false, attachments: true, contextReferences: true, modelSelection: true, modeSelection: true, slashCommands: true, sessionHistory: true, usage: true, accountState: true, mcp: true, skills: true, compaction: true, ...overrides };
+function capabilities(overrides: Record<string, unknown> = {}) {
+  return { streamingText: true, structuredToolEvents: true, commandOutputStreaming: true, fileChangeEvents: true, manualApprovals: true, structuredQuestions: true, resume: true, fork: true, steer: false, queue: false, attachments: true, contextReferences: true, modelSelection: true, modeSelection: true, slashCommands: true, sessionHistory: true, usage: true, accountState: true, mcp: true, skills: true, compaction: true, referenceInputs: referenceCapabilities(), ...overrides };
+}
+
+function referenceCapabilities() {
+  return { workspaceFiles: true, workspaceDirectories: true, images: "local-snapshot", genericFiles: "none", acceptedMimeTypes: ["image/png"], maxReferences: 32, maxReferenceBytes: 25 * 1024 * 1024, maxTotalReferenceBytes: 25 * 1024 * 1024, steer: false, attachmentOnly: false };
 }
 
 function event(sequence: number, type: AgentEvent["type"], payload: Record<string, unknown>, turnId: string | null = null, itemId: string | null = null, sessionId = "session-1"): AgentEvent {

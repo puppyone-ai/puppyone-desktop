@@ -22,6 +22,8 @@ export const AGENT_IPC_CHANNELS = Object.freeze([
   "agent:providers-discover", "agent:local-connections-discover", "agent:models-list", "agent:account-read",
   "agent:session-create", "agent:session-resume", "agent:session-replay", "agent:sessions-list",
   "agent:session-fork", "agent:session-archive", "agent:session-delete", "agent:session-close",
+  "agent:reference-stage", "agent:reference-revoke", "agent:reference-resolve-workspace",
+  "agent:reference-pick-workspace",
   "agent:turn-start", "agent:turn-steer", "agent:turn-interrupt", "agent:session-compact",
   "agent:approval-resolve", "agent:question-resolve",
 ]);
@@ -30,4 +32,6 @@ export const agentContractLimits = Object.freeze({
   maxPathLength: 4_096,
   maxMessageLength: 128 * 1024,
   maxReferenceCount: 32,
+  maxReferenceBytes: 25 * 1024 * 1024,
+  maxTotalReferenceBytes: 25 * 1024 * 1024,
 });

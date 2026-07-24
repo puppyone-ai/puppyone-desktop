@@ -548,7 +548,7 @@ function EmptyGitHistoryState({
 }) {
   const { t } = useLocalization();
   return (
-    <div className="desktop-initial-repo-state compact">
+    <div className="desktop-initial-repo-state desktop-initial-repo-state--compact">
       <div className="desktop-initial-repo-card">
         <div className="desktop-initial-repo-header">
           <span className="desktop-initial-repo-icon" aria-hidden>

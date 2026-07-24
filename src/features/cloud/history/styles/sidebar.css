@@ -32,6 +32,11 @@
   list-style: none;
 }
 
+.desktop-cloud-history-sidebar-state-list {
+  display: flex;
+  flex-direction: column;
+}
+
 .desktop-cloud-history-sidebar-list .po-sidebar-virtual-row,
 .desktop-cloud-history-sidebar-list .desktop-cloud-history-sidebar-item {
   width: 100%;
@@ -45,7 +50,9 @@
 }
 
 .desktop-cloud-history-sidebar-state {
-  min-height: 100%;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .desktop-cloud-history-sidebar-list::-webkit-scrollbar {
@@ -112,47 +119,6 @@
   align-self: stretch;
   flex: 0 0 auto;
   overflow: visible;
-}
-
-.desktop-cloud-history-graph-svg {
-  display: block;
-  overflow: visible;
-}
-
-.desktop-cloud-history-graph-segment {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
-}
-
-.desktop-cloud-history-graph-node .halo {
-  fill: var(--cloud-history-node-bg);
-  opacity: 1;
-}
-
-.desktop-cloud-history-graph-node .node {
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
-}
-
-.desktop-cloud-history-graph-node.current .halo {
-  fill: var(--cloud-history-node-bg);
-}
-
-.desktop-cloud-history-graph-ref rect {
-  stroke: var(--cloud-history-node-bg);
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
-}
-
-.desktop-cloud-history-graph-ref text {
-  fill: var(--po-canvas);
-  font-size: 7px;
-  font-weight: 800;
-  dominant-baseline: central;
-  text-anchor: middle;
 }
 
 .desktop-cloud-history-sidebar-row-main {
@@ -269,7 +235,8 @@
 }
 
 .desktop-cloud-history-sidebar-loading {
-  min-height: 160px;
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .desktop-cloud-history-sidebar-empty {

@@ -1,11 +1,43 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { OpenCodeAcpAdapter } from "../electron/main/agent/runtimes/opencode-protocol/opencode-acp-adapter.mjs";
+import {
+  OpenCodeAcpAdapter,
+  buildPromptBlocks,
+} from "../electron/main/agent/runtimes/opencode-protocol/opencode-acp-adapter.mjs";
 
 const NATIVE_RUNTIME = Object.freeze({ id: "opencode-native", displayName: "OpenCode", kind: "native-cli" });
 const MANAGED_RUNTIME = Object.freeze({ id: "puppyone-agent", displayName: "PuppyOne Agent", kind: "managed-harness" });
 
 describe("OpenCode ACP AgentRuntimePort adapter", () => {
+  it("maps probed image snapshots and workspace resources to exact ACP prompt blocks", () => {
+    const image = Buffer.from("image-bytes").toString("base64");
+    expect(buildPromptBlocks({
+      prompt: "Inspect",
+      instructions: "",
+      workspaceRoot: "/workspace",
+      references: [
+        { kind: "workspace-entry", path: "/workspace/src/app.ts", name: "app.ts" },
+        { kind: "staged-attachment", mime: "image/png", snapshotUrl: `data:image/png;base64,${image}` },
+      ],
+    })).toEqual([
+      { type: "text", text: "Inspect" },
+      { type: "resource_link", uri: "file:///workspace/src/app.ts", name: "app.ts", title: "app.ts" },
+      { type: "image", data: image, mimeType: "image/png" },
+    ]);
+    expect(() => buildPromptBlocks({
+      prompt: "Inspect",
+      instructions: "",
+      workspaceRoot: "/workspace",
+      references: [{ kind: "staged-attachment", mime: "image/png", snapshotUrl: "data:image/jpeg;base64,aQ==" }],
+    })).toThrow(/invalid staged image/i);
+    expect(() => buildPromptBlocks({
+      prompt: "Inspect",
+      instructions: "",
+      workspaceRoot: "/workspace",
+      references: [{ kind: "workspace-entry", path: "/outside/secret.txt" }],
+    })).toThrow(/invalid workspace reference/i);
+  });
+
   it("uses one native ACP session for model selection, streaming, approvals and follow-up turns", async () => {
     const connections = [];
     const onEvent = vi.fn();
@@ -43,10 +75,7 @@ describe("OpenCode ACP AgentRuntimePort adapter", () => {
       prompt: "Fix it",
       model: "openai/gpt-5",
       mode: "build",
-      contextReferences: [
-        { path: "/workspace/src/app.ts", name: "app.ts" },
-        { path: "/outside/secret.txt", name: "secret.txt" },
-      ],
+      contextReferences: [{ path: "/workspace/src/app.ts", name: "app.ts" }],
     });
     await vi.waitFor(() => expect(runtimeConnection.request).toHaveBeenCalledWith(
       "session/prompt",
@@ -60,9 +89,6 @@ describe("OpenCode ACP AgentRuntimePort adapter", () => {
       { timeoutMs: 0 },
     ));
     const promptRequest = runtimeConnection.request.mock.calls.find(([method]) => method === "session/prompt")[1];
-    expect(promptRequest.prompt).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ name: "secret.txt" }),
-    ]));
 
     runtimeConnection.sendUpdate({
       sessionUpdate: "agent_thought_chunk",

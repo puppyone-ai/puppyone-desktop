@@ -1,6 +1,7 @@
 import { GitBranch, Server, SquareTerminal } from "lucide-react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import "./methods-sync.css";
 import type { DesktopCloudMcpEndpoint, DesktopCloudRepoIdentity, DesktopCloudRepositoryView } from "../../../lib/cloudApi";
 import { PageLoading } from "../../../components/loading";
 import type { CloudWorkspaceSection } from "../types";

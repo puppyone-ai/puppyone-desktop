@@ -216,6 +216,29 @@ describe("Desktop Agent transcript projection", () => {
     expect(projection.activities.filter((activity) => activity.kind === "error")).toHaveLength(2);
     expect(new Set(projection.activities.map((activity) => activity.turnId))).toEqual(new Set(["turn-1", "turn-2"]));
   });
+
+  it("keeps sanitized reference display identity stable across committed projection and replay", () => {
+    const started = event(1, "turn.started", {
+      prompt: "Review these",
+      referenceDisplays: [
+        { id: "workspace-a", kind: "workspace-file", displayName: "a.md", relativePath: "docs/a.md" },
+        { id: "attachment-b", kind: "attachment", displayName: "capture.png", mime: "image/png", size: 128 },
+      ],
+    }, "turn-reference");
+    const committed = applyAgentEvent(createAgentProjection(), started);
+    const replayed = applyAgentEvents(createAgentProjection({ partialHistory: true }), [started], { partialHistory: true });
+
+    expect(committed.messages[0]).toMatchObject({
+      role: "user",
+      references: [
+        { id: "workspace-a", relativePath: "docs/a.md" },
+        { id: "attachment-b", displayName: "capture.png", size: 128 },
+      ],
+    });
+    expect(committed.parts.find((part) => part.kind === "user")).toMatchObject({ references: committed.messages[0].references });
+    expect(replayed.messages[0].references).toEqual(committed.messages[0].references);
+    expect(JSON.stringify(committed)).not.toMatch(/token|snapshotUrl|data:image|\/private\//);
+  });
 });
 
 function event(

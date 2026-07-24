@@ -161,3 +161,8 @@ model.
    and format-aware merge remain follow-up UX. Multi-agent merge, CRDT, binary
    editing, and multi-file transactions are not part of the current Editor
    contract.
+5. `editorAccess.ts` is the single Host-level edit authority decision. It
+   intersects the routed Viewer's manifest capability, the resolved format's
+   `editable` policy, complete text-source readiness, and the host persistence
+   capability. Semantic kinds such as CSV's `spreadsheet` classification are
+   presentation metadata and cannot silently make a routed editor read-only.

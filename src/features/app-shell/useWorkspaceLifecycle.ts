@@ -101,11 +101,9 @@ export function useWorkspaceLifecycle({
     onWorkspaceCleared();
   }, [onWorkspaceCleared]);
 
-  const forgetActiveWorkspace = useCallback(async ({ workspaceIsCloud }: { workspaceIsCloud: boolean }) => {
+  const forgetActiveWorkspace = useCallback(async () => {
     const currentWorkspaceId = workspace?.id ?? null;
-    if (!workspaceIsCloud) {
-      await forgetLastWorkspace();
-    }
+    await forgetLastWorkspace();
     if (currentWorkspaceId) {
       setWorkspaces((current) => current.filter((item) => item.id !== currentWorkspaceId));
       setRecentWorkspaceItems((current) => current.filter((item) => item.workspace.id !== currentWorkspaceId));

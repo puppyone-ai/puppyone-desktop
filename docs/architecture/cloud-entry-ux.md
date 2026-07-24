@@ -78,7 +78,7 @@ screen justified by authenticated Project truth.
 ### Act 3 — perform the selected task
 
 Only after Acts 1 and 2 may Desktop create a Project, push Git history, show
-Project contents, open Claude, manage Automation, or expose Access and Settings.
+Project contents, manage Automation, or expose Access and Settings.
 Task-specific routes may add their own loading and error states without
 bypassing the entry sequence.
 

@@ -1,12 +1,9 @@
 export const CLOUD_WORKSPACE_SECTIONS = [
   "initialize",
-  "projects",
-  "templates",
   "cloud-team",
   "cloud-billing",
   "contents",
   "history",
-  "claude",
   "branches",
   "access",
   "automation",

@@ -5,7 +5,13 @@ import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ExplorerTree, type DataNode } from "@puppyone/shared-ui";
+import {
+  EXPLORER_REFERENCE_DRAG_TYPE,
+  ExplorerTree,
+  classifyReferenceDataTransfer,
+  parseExplorerReferenceDrag,
+  type DataNode,
+} from "@puppyone/shared-ui";
 import { renderWithTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -63,4 +69,61 @@ describe("ExplorerTree interactive semantics", () => {
     expect(onAction).toHaveBeenCalledTimes(1);
     expect(onSelectNode).not.toHaveBeenCalled();
   });
+
+  it("keeps outbound reference drag available when in-tree move is read-only", () => {
+    const nodes: DataNode[] = [
+      { id: "readme", name: "README.md", path: "README.md", type: "markdown" },
+    ];
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => renderWithTestLocalization(root,
+      <ExplorerTree
+        nodes={nodes}
+        activePath={nodes[0].path}
+        selectedPaths={new Set(nodes.map((node) => node.path))}
+        expandedPaths={new Set()}
+        showRoot={false}
+        dragWorkspaceId="workspace-1"
+        canMoveNodes={false}
+        onSelectNode={vi.fn()}
+      />,
+    ));
+
+    const row = container.querySelector<HTMLElement>("[role='treeitem']");
+    const transfer = fakeDataTransfer();
+    const event = new Event("dragstart", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "dataTransfer", { value: transfer });
+    expect(row?.getAttribute("draggable")).toBe("true");
+    act(() => row?.dispatchEvent(event));
+
+    expect(transfer.effectAllowed).toBe("copy");
+    const payload = parseExplorerReferenceDrag(transfer.getData(EXPLORER_REFERENCE_DRAG_TYPE));
+    expect(payload).toMatchObject({
+      version: 1,
+      workspaceId: "workspace-1",
+      entries: [{ path: "README.md", entryType: "file" }],
+    });
+    expect(classifyReferenceDataTransfer(transfer)).toMatchObject({ kind: "workspace-entries", typed: true });
+  });
 });
+
+function fakeDataTransfer(): DataTransfer {
+  const values = new Map<string, string>();
+  const types: string[] = [];
+  const transfer = {
+    effectAllowed: "none",
+    dropEffect: "none",
+    files: [] as unknown as FileList,
+    items: [] as unknown as DataTransferItemList,
+    types,
+    getData: (type: string) => values.get(type) ?? "",
+    setData: (type: string, value: string) => {
+      values.set(type, value);
+      types.splice(0, types.length, ...values.keys());
+    },
+    clearData: (type?: string) => type ? values.delete(type) : values.clear(),
+    setDragImage: () => undefined,
+  } as DataTransfer;
+  return transfer;
+}

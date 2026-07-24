@@ -20,6 +20,7 @@ import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
 import { createEphemeralAgentSessionCache } from "./main/agent/cache/ephemeral-agent-session-cache.mjs";
 import { createAgentQuitCoordinator } from "./main/agent/agent-shutdown.mjs";
 import { createAgentService } from "./main/agent/agent-service.mjs";
+import { createAgentAttachmentStore } from "./main/agent/agent-attachment-store.mjs";
 import { createLocalAgentInventory } from "./main/agent/connections/local-agent-inventory.mjs";
 import { createDefaultAgentRuntimeHost } from "./main/agent/bootstrap/create-agent-runtime-host.mjs";
 import {
@@ -160,9 +161,16 @@ const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   managedOpenCodeConfigDir: path.join(app.getPath("userData"), "agent-runtime", "opencode", "config"),
   allowExternalOpenCode: !app.isPackaged && process.env.PUPPYONE_ALLOW_EXTERNAL_OPENCODE === "1",
 });
+const agentAttachmentStore = createAgentAttachmentStore({
+  rootPath: path.join(app.getPath("userData"), "agent-runtime", "attachments"),
+});
+void agentAttachmentStore.initialize().catch((error) => {
+  console.error("puppyone failed to initialize Agent attachment staging:", error);
+});
 const agentService = createAgentService({
   runtimeRegistry: agentRuntimeRegistry,
   sessionCache: agentSessionCache,
+  attachmentStore: agentAttachmentStore,
 });
 const localAgentInventory = createLocalAgentInventory({
   appVersion: app.getVersion(),
@@ -225,7 +233,6 @@ async function createWindow(options = {}) {
   const initialWorkspacePath = typeof options.initialWorkspacePath === "string"
     ? path.resolve(options.initialWorkspacePath)
     : null;
-  const initialWorkspace = normalizeVirtualWorkspace(options.initialWorkspace);
   const appIconPath = resolveAppIconPath();
   const window = new BrowserWindow({
     width: 1280,
@@ -256,7 +263,6 @@ async function createWindow(options = {}) {
   windowsById.set(webContentsId, window);
   windowStateById.set(webContentsId, {
     initialWorkspacePath,
-    initialWorkspace,
     workspace: null,
     workspacePath: null,
     lastFocusedAt: Date.now(),
@@ -581,8 +587,6 @@ function registerIpcHandlers() {
     showHomepageForCurrentWindow,
     openWorkspaceInCurrentWindow,
     openWorkspaceInNewWindow,
-    createCloudWorkspaceFromRequest,
-    openVirtualWorkspaceInNewWindow,
     selectWorkspaceForCurrentWindow,
     selectWorkspaceForNewWindow,
   });
@@ -654,6 +658,9 @@ function registerIpcHandlers() {
     agentService,
     localAgentInventory,
     authorizeWorkspaceRoot,
+    attachmentStore: agentAttachmentStore,
+    dialog,
+    getDialogOwnerWindow,
   });
 
   if (viewerPackHost && viewerPackRuntime) {
@@ -705,25 +712,6 @@ async function getInitialWorkspaceResultForWindow(sender) {
 
   const state = windowStateById.get(window.webContents.id);
   const initialPath = state?.workspacePath ?? state?.initialWorkspacePath ?? null;
-  const virtualWorkspace = getVirtualWorkspaceForState(state, initialPath);
-  if (virtualWorkspace) {
-    const existingWindow = getWorkspaceWindow(virtualWorkspace.path);
-    if (existingWindow && existingWindow !== window) {
-      revealWindow(existingWindow);
-      return {
-        path: virtualWorkspace.path,
-        workspace: null,
-        error: `${virtualWorkspace.name} is already open in another puppyone window.`,
-      };
-    }
-
-    assignWindowWorkspace(window, virtualWorkspace, virtualWorkspace.path, { cleanupPrevious: false });
-    return {
-      path: virtualWorkspace.path,
-      workspace: virtualWorkspace,
-      error: null,
-    };
-  }
   if (!initialPath) {
     return {
       path: null,
@@ -841,29 +829,6 @@ async function openWorkspaceInNewWindow(folderPath, options = {}) {
   };
 }
 
-async function openVirtualWorkspaceInNewWindow(workspace, options = {}) {
-  const canonicalPath = workspace.path;
-  const existingWindow = getWorkspaceWindow(canonicalPath);
-  if (existingWindow) {
-    revealWindow(existingWindow);
-    return {
-      status: "focused-existing",
-      path: canonicalPath,
-      workspace,
-    };
-  }
-
-  const window = await createWindow({
-    initialWorkspace: workspace,
-  });
-  assignWindowWorkspace(window, workspace, canonicalPath, { cleanupPrevious: false });
-  return {
-    status: "opened-new-window",
-    path: canonicalPath,
-    workspace,
-  };
-}
-
 function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
   if (!window || window.isDestroyed()) return;
   const webContentsId = window.webContents.id;
@@ -887,7 +852,6 @@ function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
   }
 
   state.initialWorkspacePath = canonicalPath;
-  state.initialWorkspace = isVirtualWorkspacePath(canonicalPath) ? workspace : null;
   state.workspace = workspace;
   state.workspacePath = canonicalPath;
   workspaceWindowByPath.set(canonicalPath, window);
@@ -921,7 +885,6 @@ function releaseWindowWorkspaceById(webContentsId, window = null) {
     state.workspacePath = null;
     state.initialWorkspacePath = null;
     state.workspace = null;
-    state.initialWorkspace = null;
   }
   if (window && !window.isDestroyed()) {
     window.setTitle(appName);
@@ -951,7 +914,6 @@ function getOrCreateWindowState(window) {
   if (!state) {
     state = {
       initialWorkspacePath: null,
-      initialWorkspace: null,
       workspace: null,
       workspacePath: null,
       lastFocusedAt: Date.now(),
@@ -977,51 +939,13 @@ function isOpenWorkspaceRoot(canonicalPath) {
 function getWorkspaceRootForSender(sender) {
   const state = windowStateById.get(sender.id);
   const workspacePath = state?.workspacePath ?? null;
-  return workspacePath && !isVirtualWorkspacePath(workspacePath) ? workspacePath : null;
+  return workspacePath;
 }
 
 function getDialogOwnerWindow(sender) {
   const window = BrowserWindow.fromWebContents(sender);
   if (window && !window.isDestroyed()) return window;
   return getLastFocusedWindow() ?? undefined;
-}
-
-function createCloudWorkspaceFromRequest(request) {
-  const projectId = requireNonEmptyString(request?.projectId, "Cloud project id is required.");
-  const rawName = typeof request?.name === "string" ? request.name.trim() : "";
-  return {
-    id: `cloud:${projectId}`,
-    name: rawName || "Untitled Project",
-    path: `cloud://${projectId}`,
-    status: "protected",
-    cloudState: "synced",
-  };
-}
-
-function normalizeVirtualWorkspace(workspace) {
-  if (!workspace || typeof workspace !== "object") return null;
-  const rawPath = typeof workspace.path === "string" ? workspace.path.trim() : "";
-  if (!isVirtualWorkspacePath(rawPath)) return null;
-  const projectId = rawPath.slice("cloud://".length).trim();
-  if (!projectId) return null;
-  const rawName = typeof workspace.name === "string" ? workspace.name.trim() : "";
-  return {
-    id: typeof workspace.id === "string" && workspace.id.trim() ? workspace.id.trim() : `cloud:${projectId}`,
-    name: rawName || "Untitled Project",
-    path: `cloud://${projectId}`,
-    status: typeof workspace.status === "string" && workspace.status.trim() ? workspace.status.trim() : "protected",
-    cloudState: typeof workspace.cloudState === "string" && workspace.cloudState.trim() ? workspace.cloudState.trim() : "synced",
-  };
-}
-
-function getVirtualWorkspaceForState(state, initialPath) {
-  if (!state || !isVirtualWorkspacePath(initialPath)) return null;
-  const workspace = normalizeVirtualWorkspace(state.workspace) ?? normalizeVirtualWorkspace(state.initialWorkspace);
-  return workspace?.path === initialPath ? workspace : null;
-}
-
-function isVirtualWorkspacePath(value) {
-  return typeof value === "string" && value.startsWith("cloud://");
 }
 
 async function canonicalizeWorkspacePath(folderPath) {

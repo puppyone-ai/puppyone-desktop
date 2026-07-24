@@ -28,12 +28,10 @@ function renderDock(overrides: Partial<React.ComponentProps<typeof DesktopMinima
     <DesktopMinimalModeDock
       activeView="data"
       cloudHubEnabled
-      cloudToolsEnabled={false}
       contextMenuOpen={false}
       contextSlot={<button type="button" aria-label="Project switcher">Project</button>}
       pluginsEnabled
       titlebarActions={<button type="button" aria-label="Show Agent Chat">Chat</button>}
-      workspaceKind="local"
       onExitMinimalMode={onExitMinimalMode}
       onNavigate={onNavigate}
       {...overrides}
@@ -73,17 +71,16 @@ describe("DesktopMinimalModeDock", () => {
     expect(onExitMinimalMode).toHaveBeenCalledTimes(1);
   });
 
-  it("uses History and Cloud-only tools for a Cloud workspace", () => {
+  it("keeps optional local surfaces out without changing workspace identity", () => {
     const { container } = renderDock({
       cloudHubEnabled: false,
-      cloudToolsEnabled: true,
       pluginsEnabled: false,
-      workspaceKind: "cloud",
     });
-    expect(container.querySelector('button[aria-label="History"]')).not.toBeNull();
-    expect(container.querySelector('button[aria-label="Assets"]')).not.toBeNull();
-    expect(container.querySelector('button[aria-label="Automation"]')).not.toBeNull();
-    expect(container.querySelector('button[aria-label="Changes"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Changes"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="History"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Assets"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Automation"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="Cloud"]')).toBeNull();
     expect(container.querySelector('button[aria-label="Plugins"]')).toBeNull();
   });
 });

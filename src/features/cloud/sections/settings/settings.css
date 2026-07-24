@@ -1,0 +1,595 @@
+/* Settings-owned tab, form, connection, and restricted-state styles. */
+@layer features {
+.desktop-cloud-settings-page {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--po-canvas);
+  color: var(--po-text);
+}
+
+.desktop-cloud-settings-canvas {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.desktop-cloud-settings-catalog {
+  display: grid;
+  width: min(100%, 1760px);
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 44px clamp(28px, 4.6vw, 44px) 56px;
+}
+
+.desktop-cloud-settings-landing-header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 8px;
+}
+
+.desktop-cloud-settings-landing-copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.desktop-cloud-settings-landing-copy h1,
+.desktop-cloud-settings-landing-copy p,
+.desktop-cloud-settings-panel-header h2,
+.desktop-cloud-settings-panel-header p,
+.desktop-cloud-settings-restricted h2,
+.desktop-cloud-settings-restricted p {
+  margin: 0;
+}
+
+.desktop-cloud-settings-landing-copy h1 {
+  color: var(--po-text);
+  font-size: var(--po-text-size-page-title, 20px);
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  line-height: 1.25;
+}
+
+.desktop-cloud-settings-landing-copy p {
+  max-width: 680px;
+  color: var(--po-text-muted);
+  font-size: var(--po-text-size-body-lg, 14px);
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.desktop-cloud-settings-tabs {
+  display: flex;
+  width: min(100%, 980px);
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+  margin-top: 26px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.desktop-cloud-settings-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.desktop-cloud-settings-tabs button {
+  display: inline-flex;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: var(--po-clickable-cursor, pointer);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.desktop-cloud-settings-tabs button:hover {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-settings-tabs button.active {
+  background: var(--po-active);
+  color: var(--po-text);
+}
+
+.desktop-cloud-settings-feedback {
+  width: min(100%, 980px);
+  min-width: 0;
+  box-sizing: border-box;
+  margin-top: 11px;
+  padding: 9px 12px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: var(--po-control);
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.desktop-cloud-settings-feedback.success {
+  border-color: color-mix(in srgb, var(--po-success) 24%, var(--po-border-subtle));
+  background: color-mix(in srgb, var(--po-success) 7%, transparent);
+  color: var(--po-success);
+}
+
+.desktop-cloud-settings-feedback.error {
+  border-color: color-mix(in srgb, var(--po-danger) 24%, var(--po-border-subtle));
+  background: color-mix(in srgb, var(--po-danger) 7%, transparent);
+  color: var(--po-danger);
+}
+
+.desktop-cloud-settings-panel {
+  display: grid;
+  width: min(100%, 980px);
+  min-width: 0;
+  margin-top: 11px;
+  overflow: hidden;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--po-panel) 74%, var(--po-canvas) 26%);
+}
+
+.desktop-cloud-settings-panel-header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px;
+  border-bottom: 1px solid var(--po-border-subtle);
+}
+
+.desktop-cloud-settings-panel-header > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.desktop-cloud-settings-panel-header h2 {
+  color: var(--po-text);
+  font-size: var(--po-text-size-body-lg, 14px);
+  font-weight: 500;
+  line-height: 19px;
+}
+
+.desktop-cloud-settings-panel-header p {
+  max-width: 640px;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.desktop-cloud-settings-primary-button,
+.desktop-cloud-settings-id-row button,
+.desktop-cloud-settings-remove-button,
+.desktop-cloud-settings-restricted button {
+  display: inline-flex;
+  height: 30px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid var(--po-border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--po-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: var(--po-clickable-cursor, pointer);
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.12s ease;
+}
+
+.desktop-cloud-settings-primary-button {
+  border-color: var(--po-text);
+  background: var(--po-text);
+  color: var(--po-text-inverse);
+}
+
+.desktop-cloud-settings-primary-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--po-text) 88%, var(--po-panel) 12%);
+}
+
+.desktop-cloud-settings-id-row button:hover,
+.desktop-cloud-settings-remove-button:hover,
+.desktop-cloud-settings-restricted button:hover {
+  border-color: var(--po-border-strong);
+  background: var(--po-hover);
+}
+
+.desktop-cloud-settings-primary-button:active:not(:disabled),
+.desktop-cloud-settings-id-row button:active,
+.desktop-cloud-settings-remove-button:active,
+.desktop-cloud-settings-restricted button:active {
+  transform: translateY(1px);
+}
+
+.desktop-cloud-settings-primary-button:disabled,
+.desktop-cloud-settings-remove-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.desktop-cloud-settings-form {
+  display: grid;
+  min-width: 0;
+  padding: 0 16px;
+}
+
+.desktop-cloud-settings-field,
+.desktop-cloud-settings-id-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(150px, 210px) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--po-border-subtle);
+}
+
+.desktop-cloud-settings-field > span,
+.desktop-cloud-settings-id-row > div:first-child > span {
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 17px;
+}
+
+.desktop-cloud-settings-field > small,
+.desktop-cloud-settings-id-row > div:first-child > small {
+  max-width: 210px;
+  margin-top: 2px;
+  color: var(--po-text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.desktop-cloud-settings-field > input,
+.desktop-cloud-settings-field > textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+  padding: 7px 9px;
+  border: 1px solid var(--po-border);
+  border-radius: 7px;
+  outline: none;
+  background: var(--po-control);
+  color: var(--po-text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.desktop-cloud-settings-field > input {
+  height: 32px;
+}
+
+.desktop-cloud-settings-field > textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.desktop-cloud-settings-field > input.mono {
+  font-family: var(--po-font-mono);
+}
+
+.desktop-cloud-settings-field > input:focus,
+.desktop-cloud-settings-field > textarea:focus {
+  border-color: var(--po-border-strong);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--po-focus-ring) 26%, transparent);
+}
+
+.desktop-cloud-settings-field > input:disabled,
+.desktop-cloud-settings-field > textarea:disabled {
+  opacity: 0.58;
+}
+
+.desktop-cloud-settings-id-row {
+  align-items: center;
+  border-bottom: 0;
+}
+
+.desktop-cloud-settings-id-row > div:first-child {
+  display: grid;
+  gap: 0;
+}
+
+.desktop-cloud-settings-id-row > div:last-child {
+  display: flex;
+  min-width: 0;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-cloud-settings-id-row code {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  padding: 7px 9px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 7px;
+  background: var(--po-inset);
+  color: var(--po-text-muted);
+  font-family: var(--po-font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-settings-choice-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+.desktop-cloud-settings-choice-grid > button {
+  display: grid;
+  min-width: 0;
+  min-height: 126px;
+  grid-template-columns: minmax(0, 1fr) 22px;
+  align-content: start;
+  gap: 5px 10px;
+  padding: 14px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--po-panel) 68%, var(--po-canvas) 32%);
+  color: var(--po-text);
+  font: inherit;
+  text-align: start;
+  cursor: var(--po-clickable-cursor, pointer);
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+}
+
+.desktop-cloud-settings-choice-grid > button:hover:not(:disabled) {
+  border-color: var(--po-border);
+  background: color-mix(in srgb, var(--po-panel) 84%, var(--po-canvas) 16%);
+  transform: translateY(-1px);
+}
+
+.desktop-cloud-settings-choice-grid > button.selected {
+  border-color: var(--po-border-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-border-strong) 52%, transparent);
+}
+
+.desktop-cloud-settings-choice-grid > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.desktop-cloud-settings-choice-grid strong {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.desktop-cloud-settings-choice-grid small {
+  grid-column: 1 / -1;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.desktop-cloud-settings-choice-check {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  grid-column: 2;
+  grid-row: 1;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--po-border);
+  border-radius: 999px;
+  color: var(--po-text);
+}
+
+.desktop-cloud-settings-choice-grid > button.selected .desktop-cloud-settings-choice-check {
+  border-color: var(--po-text);
+  background: var(--po-text);
+  color: var(--po-text-inverse);
+}
+
+.desktop-cloud-settings-connection-row {
+  display: flex;
+  min-width: 0;
+  min-height: 76px;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.desktop-cloud-settings-connection-icon {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--po-control);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-settings-connection-row.connected .desktop-cloud-settings-connection-icon {
+  background: color-mix(in srgb, var(--po-success) 10%, transparent);
+  color: var(--po-success);
+}
+
+.desktop-cloud-settings-connection-row > div {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 2px;
+}
+
+.desktop-cloud-settings-connection-row strong,
+.desktop-cloud-settings-connection-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-settings-connection-row strong {
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 17px;
+}
+
+.desktop-cloud-settings-connection-row small {
+  color: var(--po-text-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.desktop-cloud-settings-remove-button {
+  max-width: min(360px, 44%);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-settings-remove-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-settings-remove-button.confirm {
+  border-color: color-mix(in srgb, var(--po-danger) 42%, var(--po-border));
+  background: color-mix(in srgb, var(--po-danger) 8%, transparent);
+  color: var(--po-danger);
+}
+
+.desktop-cloud-settings-restricted {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.desktop-cloud-settings-restricted > span {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--po-control);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-settings-restricted > div {
+  display: grid;
+  gap: 2px;
+}
+
+.desktop-cloud-settings-restricted h2 {
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.desktop-cloud-settings-restricted p {
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.desktop-cloud-settings-tabs button:focus-visible,
+.desktop-cloud-settings-primary-button:focus-visible,
+.desktop-cloud-settings-id-row button:focus-visible,
+.desktop-cloud-settings-choice-grid > button:focus-visible,
+.desktop-cloud-settings-remove-button:focus-visible,
+.desktop-cloud-settings-restricted button:focus-visible {
+  outline: 2px solid var(--po-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 680px) {
+  .desktop-cloud-settings-catalog {
+    padding: 32px 24px 44px;
+  }
+
+  .desktop-cloud-settings-panel-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .desktop-cloud-settings-primary-button {
+    align-self: flex-start;
+  }
+
+  .desktop-cloud-settings-field,
+  .desktop-cloud-settings-id-row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    gap: 2px;
+  }
+
+  .desktop-cloud-settings-field > input,
+  .desktop-cloud-settings-field > textarea,
+  .desktop-cloud-settings-id-row > div:last-child {
+    grid-column: 1;
+    grid-row: auto;
+    margin-top: 8px;
+  }
+
+  .desktop-cloud-settings-choice-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .desktop-cloud-settings-connection-row {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .desktop-cloud-settings-remove-button {
+    width: 100%;
+    max-width: none;
+  }
+
+  .desktop-cloud-settings-restricted {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .desktop-cloud-settings-restricted button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+}

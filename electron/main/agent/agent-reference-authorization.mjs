@@ -1,14 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 const MAX_REFERENCES = 32;
 const MAX_REFERENCE_BYTES = 25 * 1024 * 1024;
 const MAX_TOTAL_REFERENCE_BYTES = 25 * 1024 * 1024;
 
 /**
- * Turn renderer path hints into short-lived, main-process-authorized file
- * references. The resolved target must remain inside the already-authorized
- * workspace after symlinks are resolved.
+ * Turn untrusted Renderer path hints into main-authorized live workspace
+ * references. Files and directories are re-canonicalized for every turn.
  */
 export async function authorizeAgentReferences({
   workspaceRoot,
@@ -21,14 +21,16 @@ export async function authorizeAgentReferences({
   const canonicalRoot = await fsModule.promises.realpath(path.resolve(workspaceRoot));
   const authorized = [];
   const seen = new Set();
-  let totalBytes = 0;
 
   for (const reference of references.slice(0, MAX_REFERENCES)) {
     const requestedPath = typeof reference === "string" ? reference : reference?.path;
-    if (typeof requestedPath !== "string" || !path.isAbsolute(requestedPath)) {
-      throw new Error("Agent file references must use an absolute workspace path.");
+    if (typeof requestedPath !== "string" || requestedPath.trim().length === 0) {
+      throw new Error("Agent workspace references require a valid path.");
     }
-    const canonicalPath = await fsModule.promises.realpath(path.resolve(requestedPath)).catch(() => {
+    const resolvedPath = path.isAbsolute(requestedPath)
+      ? path.resolve(requestedPath)
+      : path.resolve(canonicalRoot, requestedPath);
+    const canonicalPath = await fsModule.promises.realpath(resolvedPath).catch(() => {
       throw new Error("An Agent file reference no longer exists.");
     });
     if (!isSameOrInsidePath(canonicalRoot, canonicalPath)) {
@@ -38,41 +40,67 @@ export async function authorizeAgentReferences({
     if (budget.remainingReferences <= 0) {
       throw new Error("Agent file references exceed the 32-file safety limit.");
     }
-    const flags = fsModule.constants.O_RDONLY | (fsModule.constants.O_NOFOLLOW ?? 0);
-    const handle = await fsModule.promises.open(canonicalPath, flags).catch(() => {
-      throw new Error("An Agent file reference changed while it was being authorized.");
+    const metadata = await fsModule.promises.stat(canonicalPath).catch(() => {
+      throw new Error("An Agent workspace reference changed while it was being authorized.");
     });
-    try {
-      const metadata = await handle.stat();
-      if (!metadata.isFile()) throw new Error("Agent file references must be regular files.");
-      if (metadata.size > MAX_REFERENCE_BYTES) {
-        throw new Error("An Agent file reference exceeds the 25 MB safety limit.");
-      }
-      if (totalBytes + metadata.size > MAX_TOTAL_REFERENCE_BYTES || metadata.size > budget.remainingBytes) {
-        throw new Error("Agent file references exceed the 25 MB total safety limit.");
-      }
-      const bytes = await handle.readFile();
-      if (bytes.byteLength !== metadata.size) {
-        throw new Error("An Agent file reference changed while it was being authorized.");
-      }
-      const mime = inferMimeType(canonicalPath);
-      totalBytes += bytes.byteLength;
-      budget.remainingBytes -= bytes.byteLength;
-      budget.remainingReferences -= 1;
-      seen.add(canonicalPath);
-      authorized.push({
-        authorized: true,
-        path: canonicalPath,
-        name: path.basename(canonicalPath),
-        mime,
-        size: bytes.byteLength,
-        snapshotUrl: `data:${mime};base64,${bytes.toString("base64")}`,
-      });
-    } finally {
-      await handle.close();
+    const entryType = metadata.isDirectory() ? "directory" : metadata.isFile() ? "file" : null;
+    if (!entryType) throw new Error("Agent workspace references must be regular files or directories.");
+    if (reference?.entryType && reference.entryType !== entryType) {
+      throw new Error("An Agent workspace reference changed type.");
     }
+    if (entryType === "file") {
+      if (metadata.size > MAX_REFERENCE_BYTES) throw new Error("An Agent file reference exceeds the 25 MB safety limit.");
+      if (metadata.size > budget.remainingBytes) throw new Error("Agent file references exceed the 25 MB total safety limit.");
+      const flags = fsModule.constants.O_RDONLY | (fsModule.constants.O_NOFOLLOW ?? 0);
+      const handle = await fsModule.promises.open(canonicalPath, flags).catch(() => {
+        throw new Error("An Agent file reference changed while it was being authorized.");
+      });
+      try {
+        const opened = await handle.stat();
+        if (!opened.isFile() || opened.size !== metadata.size) {
+          throw new Error("An Agent file reference changed while it was being authorized.");
+        }
+      } finally {
+        await handle.close();
+      }
+      budget.remainingBytes -= metadata.size;
+    }
+    budget.remainingReferences -= 1;
+    seen.add(canonicalPath);
+    const requestPath = path.relative(canonicalRoot, canonicalPath) || ".";
+    const relativePath = safeRelativePath(requestPath);
+    const name = safeDisplayName(reference?.displayName || reference?.name || path.basename(canonicalPath) || path.basename(canonicalRoot));
+    authorized.push({
+      authorized: true,
+      id: workspaceReferenceId(canonicalPath, entryType),
+      kind: "workspace-entry",
+      entryType,
+      path: canonicalPath,
+      requestPath,
+      relativePath,
+      displayName: name,
+      name,
+      mime: entryType === "file" ? inferMimeType(canonicalPath) : "inode/directory",
+      size: entryType === "file" ? metadata.size : 0,
+      status: "ready",
+    });
   }
   return authorized;
+}
+
+/** Project an authorized workspace record onto the metadata-only Renderer draft DTO. */
+export function workspaceDraftReferences(references) {
+  return (Array.isArray(references) ? references : []).map((reference) => ({
+    id: reference.id,
+    kind: "workspace-entry",
+    entryType: reference.entryType,
+    path: reference.requestPath,
+    relativePath: reference.relativePath,
+    displayName: reference.displayName,
+    mime: reference.mime,
+    size: reference.size,
+    status: "ready",
+  }));
 }
 
 export function createAgentReferenceBudget() {
@@ -104,6 +132,18 @@ function isSameOrInsidePath(rootPath, candidatePath) {
 function inferMimeType(filePath) {
   const extension = path.extname(filePath).toLowerCase();
   return MIME_BY_EXTENSION.get(extension) || "application/octet-stream";
+}
+
+function workspaceReferenceId(filePath, entryType) {
+  return `workspace-${createHash("sha256").update(entryType).update("\0").update(filePath).digest("base64url").slice(0, 32)}`;
+}
+
+function safeDisplayName(value) {
+  return String(value || "workspace item").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 512) || "workspace item";
+}
+
+function safeRelativePath(value) {
+  return String(value || ".").replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 4_096) || ".";
 }
 
 const MIME_BY_EXTENSION = new Map([

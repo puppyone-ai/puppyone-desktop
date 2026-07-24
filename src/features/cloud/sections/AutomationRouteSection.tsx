@@ -4,8 +4,8 @@ import type { DesktopCloudSession } from "../../../lib/cloudApi";
 import { adaptCloudAggregateToAccessData } from "../data/adaptCloudAggregateToAccessData";
 import type { DesktopCloudDataState } from "../data/useDesktopCloudData";
 
-const LazyDesktopCloudAutomationView = lazy(() => import("../../automation/DesktopCloudAutomationView").then((module) => ({
-  default: module.DesktopCloudAutomationView,
+const LazyCloudProjectAutomationView = lazy(() => import("../../automation/CloudProjectAutomationView").then((module) => ({
+  default: module.CloudProjectAutomationView,
 })));
 
 /** Automation reuses aggregate Cloud data — no second Access fetch. */
@@ -14,14 +14,12 @@ export function CloudAutomationRouteSection({
   cloudSession,
   apiBaseUrl,
   cloudData,
-  sessionRestoring = false,
   onSessionChange,
 }: {
   projectId: string;
   cloudSession: DesktopCloudSession;
   apiBaseUrl: string | null;
   cloudData: DesktopCloudDataState;
-  sessionRestoring?: boolean;
   onSessionChange: (session: DesktopCloudSession | null) => void;
 }) {
   const { t } = useLocalization();
@@ -39,15 +37,12 @@ export function CloudAutomationRouteSection({
 
   return (
     <Suspense fallback={<div className="desktop-view-route-loading" role="status">{t("cloud.loading.automation")}</div>}>
-      <LazyDesktopCloudAutomationView
+      <LazyCloudProjectAutomationView
         projectId={projectId}
         cloudSession={cloudSession}
         accessData={accessData}
         activeProvider={null}
-        sessionRestoring={sessionRestoring}
-        embedded
         onCloudSessionChange={onSessionChange}
-        onRefresh={cloudData.reload}
       />
     </Suspense>
   );

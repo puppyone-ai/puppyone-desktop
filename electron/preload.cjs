@@ -91,7 +91,6 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   showHomepage: () => ipcRenderer.invoke("workspace:show-homepage"),
   openWorkspaceInCurrentWindow: (folderPath) => ipcRenderer.invoke("workspace:open-current", folderPath),
   openWorkspaceInNewWindow: (folderPath) => ipcRenderer.invoke("workspace:open-new-window", folderPath),
-  openCloudProjectInNewWindow: (request) => ipcRenderer.invoke("workspace:open-cloud-project-new-window", request),
   selectFolder: () => ipcRenderer.invoke("workspace:select-folder-current"),
   selectFolderInNewWindow: () => ipcRenderer.invoke("workspace:select-folder-new-window"),
   getPathForFile: (file) => webUtils.getPathForFile(file),
@@ -238,6 +237,21 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   archiveAgentSession: (request) => ipcRenderer.invoke("agent:session-archive", request),
   deleteAgentSession: (request) => ipcRenderer.invoke("agent:session-delete", request),
   closeAgentSession: (request) => ipcRenderer.invoke("agent:session-close", request),
+  stageAgentAttachments: (request) => {
+    const files = Array.isArray(request?.files) ? request.files : [];
+    const sourcePaths = files.map((file) => webUtils.getPathForFile(file));
+    if (sourcePaths.length === 0 || sourcePaths.some((sourcePath) => typeof sourcePath !== "string" || !sourcePath.trim())) {
+      return Promise.reject(new Error("One or more selected files could not be resolved."));
+    }
+    return ipcRenderer.invoke("agent:reference-stage", {
+      rootPath: request?.rootPath,
+      epoch: request?.epoch,
+      sourcePaths,
+    });
+  },
+  revokeAgentAttachments: (request) => ipcRenderer.invoke("agent:reference-revoke", request),
+  resolveAgentWorkspaceReferences: (request) => ipcRenderer.invoke("agent:reference-resolve-workspace", request),
+  pickAgentWorkspaceReferences: (request) => ipcRenderer.invoke("agent:reference-pick-workspace", request),
   startAgentTurn: (request) => ipcRenderer.invoke("agent:turn-start", request),
   steerAgentTurn: (request) => ipcRenderer.invoke("agent:turn-steer", request),
   interruptAgentTurn: (request) => ipcRenderer.invoke("agent:turn-interrupt", request),

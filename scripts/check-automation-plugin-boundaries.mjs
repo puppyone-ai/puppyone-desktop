@@ -49,20 +49,20 @@ if (/automation/i.test(viewerPackStore)) {
 }
 
 const workspaceSurfaceTypes = read("src/features/app-shell/workspace-surfaces/workspaceSurfaceTypes.ts");
-if (!/"plugins"/.test(workspaceSurfaceTypes) || !/"automation"/.test(workspaceSurfaceTypes)) {
-  errors.push("Desktop navigation must expose distinct Plugin and Automation view ids.");
+if (!/"plugins"/.test(workspaceSurfaceTypes) || !/"cloud"/.test(workspaceSurfaceTypes)) {
+  errors.push("Desktop navigation must expose local Plugins and one Cloud Hub view id.");
+}
+if (/"automation"/.test(workspaceSurfaceTypes)) {
+  errors.push("Automation must remain inside the Cloud Project router, not the app-shell surface registry.");
 }
 
 const workspaceSurfaceContent = read("src/features/app-shell/workspace-surfaces/useWorkspaceSurfaceContent.tsx");
-if (!/lazy\(\(\) => import\("\.\.\/\.\.\/automation"\)/.test(workspaceSurfaceContent)) {
-  errors.push("Cloud Automation routes must remain lazy so their provider SDK and dialogs stay outside the local-first startup chunk.");
-}
-if (/from\s+["']\.\.\/\.\.\/automation["']/.test(workspaceSurfaceContent)) {
-  errors.push("The app shell must not statically import the Cloud Automation feature barrel.");
+if (/(?:import|from)[^(\n]*["'][^"']*automation/.test(workspaceSurfaceContent)) {
+  errors.push("The local app shell must not import the Cloud Automation feature.");
 }
 const cloudAutomationRoute = read("src/features/cloud/sections/AutomationRouteSection.tsx");
-if (!/lazy\(\(\) => import\("\.\.\/\.\.\/automation\/DesktopCloudAutomationView"\)/.test(cloudAutomationRoute)) {
-  errors.push("The Cloud router must preserve the same lazy Automation route boundary as the desktop app shell.");
+if (!/lazy\(\(\) => import\("\.\.\/\.\.\/automation\/CloudProjectAutomationView"\)/.test(cloudAutomationRoute)) {
+  errors.push("The Cloud Project router must preserve a lazy Automation route boundary.");
 }
 
 const cloudAutomationApi = read("src/lib/cloud/automationApi.ts");

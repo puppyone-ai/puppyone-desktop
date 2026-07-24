@@ -64,83 +64,6 @@ export type DesktopCloudProject = {
   capabilities?: string[];
 };
 
-export type DesktopCloudTemplateRegistryStatus = {
-  mode: "disabled" | "builtin" | "remote";
-  catalog_enabled: boolean;
-  instantiation_enabled: boolean;
-  source: "disabled" | "builtin" | "remote";
-  reason?: string | null;
-};
-
-export type DesktopCloudTemplateRelease = {
-  id: string;
-  version: string;
-  bundle_sha256: string;
-  file_count: number;
-  total_bytes: number;
-  published_at?: string | null;
-  signing_key_id?: string | null;
-};
-
-export type DesktopCloudTemplatePreviewNode = {
-  name: string;
-  type: "folder" | "json" | "markdown" | "file";
-};
-
-export type DesktopCloudTemplateSummary = {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  category?: string | null;
-  cover_url?: string | null;
-  author?: string | null;
-  tags: string[];
-  preview: DesktopCloudTemplatePreviewNode[];
-  current_release: DesktopCloudTemplateRelease;
-};
-
-export type DesktopCloudTemplateDetail = DesktopCloudTemplateSummary & {
-  screenshots: string[];
-  long_description?: string | null;
-  file_tree: string[];
-  preview_document?: { path: string; content: string } | null;
-  releases: DesktopCloudTemplateRelease[];
-};
-
-export type DesktopCloudTemplateCatalog = {
-  registry: DesktopCloudTemplateRegistryStatus;
-  templates: DesktopCloudTemplateSummary[];
-  next_cursor?: string | null;
-};
-
-export type DesktopCloudTemplateInstantiation = {
-  template_id: string;
-  release_id: string;
-  project: DesktopCloudProject;
-};
-
-export type DesktopCloudProjectReadiness = {
-  project_id: string;
-  git: {
-    target: Extract<RepositoryTarget, { kind: "project_root" }>;
-    surface_exists: boolean;
-    head_exists: boolean;
-    push_accepted: boolean;
-    default_branch: string;
-    state: "git_not_created" | "awaiting_first_push" | "ready";
-  };
-  claude: {
-    ready: boolean;
-    blockers: Array<
-      | "project_git_surface_missing"
-      | "project_head_missing"
-      | "project_git_push_not_accepted"
-      | string
-    >;
-  };
-};
-
 export type DesktopCloudRepositoryContext = {
   target: RepositoryTarget;
   project: DesktopCloudProject;
@@ -796,14 +719,6 @@ function isMutationMethod(method: string | undefined) {
   return normalized !== "GET" && normalized !== "HEAD" && normalized !== "OPTIONS";
 }
 
-export function listCloudProjects(
-  session: DesktopCloudSession,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudProject[]> {
-  return cloudApiRequest<DesktopCloudProject[]>("/projects/", session, onSessionChange, {}, apiBaseUrl);
-}
-
 export function getCloudProject(
   session: DesktopCloudSession,
   projectId: string,
@@ -819,17 +734,41 @@ export function getCloudProject(
   );
 }
 
-export function getCloudProjectReadiness(
+export type UpdateCloudProjectInput = {
+  name?: string;
+  description?: string | null;
+  visibility?: "org" | "private";
+  bound_git_branch?: string;
+};
+
+export function updateCloudProject(
   session: DesktopCloudSession,
   projectId: string,
+  input: UpdateCloudProjectInput,
   onSessionChange?: MutableSessionHandler,
   apiBaseUrl?: string | null,
-): Promise<DesktopCloudProjectReadiness> {
-  return cloudApiRequest<DesktopCloudProjectReadiness>(
-    `/projects/${encodeURIComponent(projectId)}/readiness`,
+): Promise<DesktopCloudProject> {
+  const payload: UpdateCloudProjectInput = {};
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) throw new Error("Cloud Project name cannot be empty.");
+    payload.name = name;
+  }
+  if (input.description !== undefined) payload.description = input.description;
+  if (input.bound_git_branch !== undefined) {
+    const branch = input.bound_git_branch.trim();
+    if (!branch) throw new Error("Cloud Project branch cannot be empty.");
+    payload.bound_git_branch = branch;
+  }
+  if (input.visibility !== undefined) payload.visibility = input.visibility;
+  if (Object.keys(payload).length === 0) {
+    throw new Error("Cloud Project update requires at least one setting.");
+  }
+  return cloudApiRequest<DesktopCloudProject>(
+    `/projects/${encodeURIComponent(projectId)}`,
     session,
     onSessionChange,
-    {},
+    { method: "PUT", body: JSON.stringify(payload) },
     apiBaseUrl,
   );
 }
@@ -1612,99 +1551,6 @@ export async function openCloudBillingExternalUrl(href: string): Promise<void> {
   if (!opened) throw new Error("The billing page could not be opened.");
 }
 
-export type CreateCloudProjectInput = {
-  name: string;
-  description?: string | null;
-  org_id: string;
-};
-
-export function createCloudProject(
-  session: DesktopCloudSession,
-  input: CreateCloudProjectInput,
-  idempotencyKey: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudProject> {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(idempotencyKey)) {
-    throw new Error("Cloud Project create requires a canonical UUIDv4 idempotency key.");
-  }
-  const organizationId = input.org_id.trim();
-  const name = input.name.trim();
-  if (!organizationId || !name) {
-    throw new Error("Cloud Project create requires an organization and name.");
-  }
-  return cloudApiRequest<DesktopCloudProject>("/projects/", session, onSessionChange, {
-    method: "POST",
-    headers: { "Idempotency-Key": idempotencyKey },
-    body: JSON.stringify({
-      name,
-      description: input.description ?? null,
-      org_id: organizationId,
-    }),
-  }, apiBaseUrl);
-}
-
-export function listCloudTemplates(
-  session: DesktopCloudSession,
-  options: {
-    query?: string;
-    category?: string;
-    cursor?: string;
-    limit?: number;
-  } = {},
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudTemplateCatalog> {
-  const query = new URLSearchParams();
-  if (options.query) query.set("q", options.query);
-  if (options.category) query.set("category", options.category);
-  if (options.cursor) query.set("cursor", options.cursor);
-  if (options.limit) query.set("limit", String(options.limit));
-  const suffix = query.size ? `?${query.toString()}` : "";
-  return cloudApiRequest<DesktopCloudTemplateCatalog>(
-    `/templates${suffix}`,
-    session,
-    onSessionChange,
-    {},
-    apiBaseUrl,
-  );
-}
-
-export function getCloudTemplate(
-  session: DesktopCloudSession,
-  templateId: string,
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudTemplateDetail> {
-  return cloudApiRequest<DesktopCloudTemplateDetail>(
-    `/templates/${encodeURIComponent(templateId)}`,
-    session,
-    onSessionChange,
-    {},
-    apiBaseUrl,
-  );
-}
-
-export function instantiateCloudTemplate(
-  session: DesktopCloudSession,
-  templateId: string,
-  payload: {
-    org_id?: string;
-    name?: string;
-    description?: string;
-    release_id?: string;
-  } = {},
-  onSessionChange?: MutableSessionHandler,
-  apiBaseUrl?: string | null,
-): Promise<DesktopCloudTemplateInstantiation> {
-  return cloudApiRequest<DesktopCloudTemplateInstantiation>(
-    `/templates/${encodeURIComponent(templateId)}/instantiate`,
-    session,
-    onSessionChange,
-    { method: "POST", body: JSON.stringify(payload) },
-    apiBaseUrl,
-  );
-}
 
 export function getCloudDashboard(
   session: DesktopCloudSession,

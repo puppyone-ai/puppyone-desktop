@@ -159,7 +159,7 @@
       ],
       "category": "data",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "json"
     },
@@ -184,7 +184,7 @@
       ],
       "category": "data",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "yaml",
       "filenamePatterns": [
@@ -208,7 +208,7 @@
       ],
       "category": "data",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "plaintext"
     },
@@ -289,7 +289,7 @@
       ],
       "category": "data",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "xml"
     },
@@ -342,7 +342,7 @@
       ],
       "category": "data",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "protobuf"
     },
@@ -363,7 +363,7 @@
       ],
       "category": "data",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "ini"
     },
@@ -383,7 +383,7 @@
       ],
       "category": "data",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "ini",
       "filenames": [
@@ -407,7 +407,7 @@
       ],
       "category": "data",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "hcl"
     },
@@ -426,7 +426,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "typescript"
     },
@@ -447,7 +447,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "javascript",
       "filenames": [
@@ -467,7 +467,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "coffeescript"
     },
@@ -536,7 +536,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "css"
     },
@@ -554,7 +554,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "scss"
     },
@@ -570,7 +570,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "less"
     },
@@ -586,7 +586,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "pug"
     },
@@ -604,7 +604,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "handlebars"
     },
@@ -620,7 +620,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "razor"
     },
@@ -635,7 +635,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "twig"
     },
@@ -650,7 +650,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "liquid"
     },
@@ -675,7 +675,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "python",
       "filenames": [
@@ -729,7 +729,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "ruby"
     },
@@ -744,7 +744,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "rust"
     },
@@ -759,7 +759,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "go"
     },
@@ -776,7 +776,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "java"
     },
@@ -792,7 +792,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "kotlin"
     },
@@ -807,7 +807,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "swift"
     },
@@ -823,7 +823,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "objective-c"
     },
@@ -841,7 +841,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "c"
     },
@@ -879,7 +879,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "cpp"
     },
@@ -896,7 +896,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "csharp"
     },
@@ -914,7 +914,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "fsharp"
     },
@@ -933,7 +933,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "vb"
     },
@@ -950,7 +950,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "pascal"
     },
@@ -966,7 +966,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "plaintext"
     },
@@ -982,7 +982,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "plaintext"
     },
@@ -1001,7 +1001,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "elixir"
     },
@@ -1021,7 +1021,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "clojure"
     },
@@ -1037,7 +1037,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "scala"
     },
@@ -1052,7 +1052,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "dart"
     },
@@ -1067,7 +1067,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "julia"
     },
@@ -1086,7 +1086,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "r"
     },
@@ -1102,7 +1102,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "lua"
     },
@@ -1121,7 +1121,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "perl"
     },
@@ -1142,7 +1142,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "php"
     },
@@ -1185,7 +1185,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "shell",
       "filenames": [
@@ -1217,7 +1217,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "powershell"
     },
@@ -1233,7 +1233,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "bat"
     },
@@ -1248,7 +1248,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "plaintext"
     },
@@ -1267,7 +1267,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "sql"
     },
@@ -1283,7 +1283,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "graphql"
     },
@@ -1298,7 +1298,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "sol"
     },
@@ -1317,7 +1317,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "systemverilog"
     },
@@ -1337,7 +1337,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "dockerfile",
       "filenamePatterns": [
@@ -1363,7 +1363,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "plaintext"
     },
@@ -1381,7 +1381,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "plaintext"
     },
@@ -1405,7 +1405,7 @@
       ],
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "latex"
     },
@@ -1420,7 +1420,7 @@
       ],
       "category": "text",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "restructuredtext"
     },
@@ -1438,7 +1438,7 @@
       ],
       "category": "text",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "plaintext"
     },
@@ -1499,7 +1499,7 @@
       ],
       "category": "text",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "plaintext"
     },
@@ -1514,7 +1514,7 @@
       ],
       "category": "text",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "plaintext"
     },
@@ -1530,7 +1530,7 @@
       ],
       "category": "text",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "plaintext"
     },
@@ -1539,7 +1539,7 @@
       "label": "Ignore Rules",
       "category": "data",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "ignore",
       "filenamePatterns": [
@@ -1560,7 +1560,7 @@
       "label": "Git Commit Message",
       "category": "text",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "git-commit",
       "filenames": [
@@ -1573,7 +1573,7 @@
       "label": "Git Rebase Message",
       "category": "text",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "git-rebase",
       "filenames": [
@@ -1588,7 +1588,7 @@
       "label": "Groovy",
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "groovy",
       "extensions": [
@@ -1610,7 +1610,7 @@
       "label": "HLSL",
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "hlsl",
       "extensions": [
@@ -1629,7 +1629,7 @@
       "label": "Raku",
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "perl",
       "extensions": [
@@ -1648,7 +1648,7 @@
       "label": "Search Result",
       "category": "text",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "plaintext",
       "extensions": [
@@ -1660,7 +1660,7 @@
       "label": "ShaderLab",
       "category": "code",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "shaderlab",
       "extensions": [
@@ -2405,7 +2405,7 @@
       ],
       "category": "data",
       "defaultViewer": "monaco-code",
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-structured",
       "availableViewers": [
         "monaco-code"

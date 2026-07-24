@@ -1,4 +1,5 @@
-import { defineConfig, type Plugin } from "vite";
+import type { Plugin } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 
@@ -83,5 +84,8 @@ export default defineConfig({
   server: {
     strictPort: true,
     port: 5173,
+  },
+  test: {
+    exclude: ["archive/**", "node_modules/**", "dist/**", "release/**"],
   },
 });

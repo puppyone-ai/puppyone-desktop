@@ -1,6 +1,5 @@
 import { TextEditorFrame } from "./TextEditorFrame";
 import { CodeMirrorCodeEditor } from "../CodeMirrorCodeEditor";
-import { isTextEditable } from "./viewerUtils";
 import type { PresetViewerRenderContext } from "../viewerTypes";
 
 type CodeViewerProps = Pick<
@@ -76,8 +75,4 @@ export function TextFileViewer(context: CodeViewerProps) {
       )}
     />
   );
-}
-
-export function canEditTextFile(context: Pick<PresetViewerRenderContext, "document" | "content">): boolean {
-  return isTextEditable(context.document, context.content);
 }

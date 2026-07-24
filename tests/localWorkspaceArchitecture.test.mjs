@@ -19,8 +19,10 @@ describe("local file-format policy", () => {
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     );
     expect(getMimeType("backup.tar.gz")).toBe("application/gzip");
+    expect(classifyLocalFile("table.csv")).toBe("spreadsheet");
     expect(classifyLocalFile("table.xlsx")).toBe("spreadsheet");
     expect(classifyLocalFile("flow.puppyflow.json")).toBe("workflow");
+    expect(isLocalFilePreviewable("table.csv")).toBe(true);
     expect(isLocalFilePreviewable("source.ts")).toBe(true);
     expect(isLocalFilePreviewable("movie.mp4")).toBe(false);
     expect(resolveCopyNameExtension("backup.tar.gz")).toBe(".tar.gz");

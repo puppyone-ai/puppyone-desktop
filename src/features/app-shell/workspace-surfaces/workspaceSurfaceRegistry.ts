@@ -27,30 +27,14 @@ const WORKSPACE_SURFACE_CONTRIBUTIONS = [
     isAvailable: ({ pluginsEnabled }) => pluginsEnabled,
   }),
   defineWorkspaceSurface({
-    id: "access",
-    navigation: { labelId: "shell.navigation.access", group: "cloud-tools", order: 40 },
-    lifecycle: { sidebar: "on-demand", main: "on-demand" },
-    isAvailable: ({ cloudEnabled, cloudProjectAvailable, workspaceKind }) => (
-      workspaceKind === "cloud" && cloudEnabled && cloudProjectAvailable
-    ),
-  }),
-  defineWorkspaceSurface({
-    id: "automation",
-    navigation: { labelId: "shell.navigation.automation", group: "cloud-tools", order: 50 },
-    lifecycle: { sidebar: "on-demand", main: "on-demand" },
-    isAvailable: ({ cloudEnabled, cloudProjectAvailable, workspaceKind }) => (
-      workspaceKind === "cloud" && cloudEnabled && cloudProjectAvailable
-    ),
-  }),
-  defineWorkspaceSurface({
     id: "cloud",
-    navigation: { labelId: "shell.navigation.cloud", group: "cloud-hub", order: 60 },
+    navigation: { labelId: "shell.navigation.cloud", group: "cloud-hub", order: 40 },
     lifecycle: { sidebar: "on-demand", main: "on-demand" },
-    isAvailable: ({ cloudEnabled, workspaceKind }) => workspaceKind === "local" && cloudEnabled,
+    isAvailable: ({ cloudEnabled }) => cloudEnabled,
   }),
   defineWorkspaceSurface({
     id: "settings",
-    navigation: { labelId: "shell.navigation.settings", group: "settings", order: 70 },
+    navigation: { labelId: "shell.navigation.settings", group: "settings", order: 50 },
     lifecycle: { sidebar: "on-demand", main: "on-demand" },
     isAvailable: () => true,
   }),

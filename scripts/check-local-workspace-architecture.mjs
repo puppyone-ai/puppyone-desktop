@@ -115,9 +115,9 @@ if (!formatPolicy.includes("packages/shared-ui/src/core/fileFormats.json")) {
 
 const contextualCloudData = read("src/features/cloud/data/useDesktopCloudData.ts");
 const contextualCloudRouter = read("src/features/cloud/routes/CloudRouter.tsx");
-const contextualCloudStates = read("src/features/cloud/states.tsx");
-const contextualCloudResolver = read("src/features/cloud/workspace/useCloudWorkspaceContext.ts");
-const contextualProjectContext = read("src/features/cloud/context/useProjectCloudContext.ts");
+const contextualCloudStates = read("src/features/cloud/initialization/CloudInitializationView.tsx");
+const contextualCloudResolver = read("src/features/cloud/project/context/useCurrentRepositoryCloudContext.ts");
+const contextualProjectContext = read("src/features/cloud/project/context/projectCloudContext.ts");
 const contextualWorkspaceSurface = read("src/features/app-shell/workspace-surfaces/useWorkspaceSurfaceContent.tsx");
 const desktopApp = read("src/App.tsx");
 
@@ -140,8 +140,8 @@ if (
 }
 if (
   !contextualCloudResolver.includes("createWorkspaceCloudResolutionKey")
-  || !contextualProjectContext.includes("createWorkspaceCloudResolutionKey")
-  || !contextualProjectContext.includes("resolutionKey === expectedKey")
+  || !contextualCloudResolver.includes("snapshotRef")
+  || !contextualCloudResolver.includes("contextMatchesRemote")
 ) {
   errors.push("contextual Cloud results must be keyed to the active workspace/account/host/locator snapshot");
 }

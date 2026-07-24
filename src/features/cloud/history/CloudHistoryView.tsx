@@ -3,6 +3,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
+import "./history.css";
 import { PageLoading } from "../../../components/loading";
 import { CloudCommitDetail } from "./CloudCommitDetail";
 import type { CloudProjectHistoryProps } from "./types";

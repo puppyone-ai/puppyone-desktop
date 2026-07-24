@@ -760,10 +760,25 @@ declare global {
       showHomepage: () => Promise<{ ok: boolean }>;
       openWorkspaceInCurrentWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
       openWorkspaceInNewWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
-      openCloudProjectInNewWindow: (request: { projectId: string; name: string }) => Promise<WorkspaceOpenResult>;
       selectFolder: () => Promise<WorkspaceOpenResult | null>;
       selectFolderInNewWindow: () => Promise<WorkspaceOpenResult | null>;
       getPathForFile: (file: File) => string;
+      stageAgentAttachments: (request: {
+        rootPath: string;
+        epoch: string;
+        files: File[];
+      }) => Promise<import("../../shared/agent-contract/types").AgentDraftReference[]>;
+      revokeAgentAttachments: (request: {
+        rootPath: string;
+        tokens: string[];
+      }) => Promise<{ revoked: number }>;
+      resolveAgentWorkspaceReferences: (request: {
+        rootPath: string;
+        paths: string[];
+      }) => Promise<import("../../shared/agent-contract/types").AgentDraftReference[]>;
+      pickAgentWorkspaceReferences: (request: {
+        rootPath: string;
+      }) => Promise<import("../../shared/agent-contract/types").AgentDraftReference[]>;
       listFolderChildren: (request: {
         rootPath: string;
         folderPath: string | null;

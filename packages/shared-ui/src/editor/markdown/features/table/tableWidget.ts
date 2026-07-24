@@ -64,7 +64,9 @@ export class MarkdownTableWidget extends WidgetType {
     });
     const wrapper = doc.createElement("div");
     wrapper.dir = localization.direction;
-    wrapper.className = view.state.readOnly ? "cm-md-table-widget-wrap is-readonly" : "cm-md-table-widget-wrap";
+    wrapper.className = view.state.readOnly
+      ? "cm-md-table-widget-wrap po-editable-table-interaction-root is-readonly"
+      : "cm-md-table-widget-wrap po-editable-table-interaction-root";
     wrapper.dataset.mdTableFrom = String(this.from);
     wrapper.dataset.mdTableExecution = this.execution.mode;
     const rowCount = this.rows.length;
@@ -176,7 +178,7 @@ export class MarkdownTableWidget extends WidgetType {
     if (!view.state.readOnly) {
       surface.appendChild(createTableStructureButton({
         className: "cm-md-table-add-row",
-        label: localization.t("editor.markdown.table.addRow"),
+        label: localization.t("editor.table.addRow"),
         onActivate: () => {
           dispatchMarkdownTableStructureOperation({
             alignments: this.alignments,
@@ -194,7 +196,7 @@ export class MarkdownTableWidget extends WidgetType {
       }));
       surface.appendChild(createTableStructureButton({
         className: "cm-md-table-add-column",
-        label: localization.t("editor.markdown.table.addColumn"),
+        label: localization.t("editor.table.addColumn"),
         onActivate: () => {
           dispatchMarkdownTableStructureOperation({
             alignments: this.alignments,
@@ -293,11 +295,14 @@ function createTableStructureButton({
 }): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = `cm-md-table-structure-button ${className}`;
+  button.className = `cm-md-table-structure-button po-editable-table-structure-button ${className}`;
+  button.classList.add(className === "cm-md-table-add-row"
+    ? "po-editable-table-add-row"
+    : "po-editable-table-add-column");
   button.setAttribute("aria-label", label);
   button.title = label;
   const visual = document.createElement("span");
-  visual.className = "cm-md-table-structure-button-visual";
+  visual.className = "cm-md-table-structure-button-visual po-editable-table-structure-button-visual";
   visual.setAttribute("aria-hidden", "true");
   visual.textContent = "+";
   button.appendChild(visual);

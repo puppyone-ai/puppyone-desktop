@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { capabilityForCoreViewer } from "../electron/main/viewer-packs/preset-viewer-manifest.mjs";
+import { getPresetViewerDefinitionForViewerId } from "../electron/main/viewer-packs/preset-viewer-manifest.mjs";
 
 const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -13,7 +13,14 @@ const errors = [];
 
 for (const format of [...(formatRegistry.formats ?? []), formatRegistry.unknownFormat]) {
   try {
-    capabilityForCoreViewer(format?.defaultViewer ?? "");
+    const viewer = getPresetViewerDefinitionForViewerId(format?.defaultViewer ?? "");
+    if (typeof format?.editable !== "boolean") {
+      errors.push(`format ${format?.id ?? "<unknown>"}: editable must be a boolean`);
+    } else if (format.editable && viewer.capability !== "edit") {
+      errors.push(
+        `format ${format.id}: editable format routes to non-editable Viewer ${format.defaultViewer}`,
+      );
+    }
   } catch (error) {
     errors.push(`format ${format?.id ?? "<unknown>"}: ${error.message}`);
   }
@@ -22,6 +29,7 @@ for (const format of [...(formatRegistry.formats ?? []), formatRegistry.unknownF
 const presetCoreFiles = [
   path.join(repoRoot, "packages/shared-ui/src/editor/viewerRegistry.tsx"),
   path.join(repoRoot, "packages/shared-ui/src/editor/viewerTypes.ts"),
+  ...walkFiles(path.join(repoRoot, "packages/shared-ui/src/editor/csv")),
   ...walkFiles(path.join(repoRoot, "packages/shared-ui/src/editor/viewers")),
 ];
 for (const filePath of presetCoreFiles) {

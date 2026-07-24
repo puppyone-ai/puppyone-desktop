@@ -32,13 +32,30 @@ const gitHistoryCss = readCss("../src/features/source-control/styles/history-lis
 const settingsCss = readCss("../src/styles/settings-view.css");
 const cloudSidebarCss = readCss("../src/features/cloud/styles/sidebar-shell.css");
 const cloudHistorySidebarCss = readCss("../src/features/cloud/history/styles/sidebar.css");
-const accessScopeCss = readCss("../src/features/cloud/styles/access/scope-sidebar.css");
-const accessServiceCss = readCss("../src/features/cloud/styles/access/service-sidebar.css");
-const accessLegacyCss = readCss("../src/features/cloud/styles/access/legacy-detail.css");
+const accessScopeCss = readCss("../src/features/cloud/sections/access/styles/scope-sidebar.css");
+const accessServiceCss = readCss("../src/features/cloud/sections/access/styles/service-sidebar.css");
+const accessLegacyCss = readCss("../src/features/cloud/sections/access/styles/access-detail.css");
 const changesCss = readCss("../src/features/changes/changes.css");
-const legacyCloudSidebarCss = readCss("../src/features/cloud/legacy-sidebar.css");
 
 describe("sidebar spacing architecture", () => {
+  it("lets Cloud History use the same full workspace rectangle as local History", () => {
+    const main = compact(readCssBlock(
+      cloudSidebarCss,
+      ".desktop-cloud-main-view.desktop-cloud-history-main-view",
+    ));
+    const shell = compact(readCssBlock(
+      cloudSidebarCss,
+      ".desktop-cloud-history-page-shell",
+    ));
+
+    expect(main).toContain("overflow: hidden;");
+    expect(main).toContain("padding: 0;");
+    expect(shell).toContain("width: 100%;");
+    expect(shell).toContain("height: 100%;");
+    expect(shell).toContain("min-height: 0;");
+    expect(shell).toContain("margin: 0;");
+  });
+
   it("gives the Explorer host sole ownership of the sidebar divider", () => {
     const explorerColumn = compact(readCssBlock(dataTreeCss, ".explorer-column"));
     const injectedSurface = compact(readCssBlock(layoutCss, ".desktop-view-surface-sidebar"));
@@ -130,10 +147,6 @@ describe("sidebar spacing architecture", () => {
       gitResourcesCss,
       ".desktop-git-section-title span",
     ));
-    const cloudList = compact(readCssBlock(
-      cloudSidebarCss,
-      ".desktop-cloud-sidebar-list",
-    ));
     expect(semanticThemeScope).toContain(
       "--po-shell-divider: color-mix(in srgb, var(--po-text) 10%, transparent);",
     );
@@ -174,10 +187,9 @@ describe("sidebar spacing architecture", () => {
     expect(gitSectionTitleText).toContain(
       "font-size: var(--desktop-sidebar-section-title-font-size, var(--git-font-small));",
     );
-    expect(cloudList).toContain(
-      "padding-inline: var(--desktop-sidebar-row-left-gap) var(--desktop-sidebar-scroll-right-gap);",
-    );
-    expect(cloudList).not.toContain("--desktop-sidebar-row-right-gap:");
+    expect(cloudSidebarSource).toContain("<SidebarScrollArea>");
+    expect(cloudSidebarCss).not.toContain(".desktop-cloud-sidebar-list");
+    expect(cloudSidebarCss).not.toContain(".desktop-cloud-sidebar-nav-row");
     expect(cloudSidebarCss).not.toContain(".desktop-cloud-sidebar-nav-row.locked");
     expect(settingsSidebarSource).toContain("<SidebarGroup");
     expect(cloudSidebarSource).toContain("<SidebarGroup");
@@ -324,11 +336,7 @@ describe("sidebar spacing architecture", () => {
   });
 
   it("keeps every remaining page-level sidebar on the shared block edge", () => {
-    expectBlockPadding(
-      cloudSidebarCss,
-      ".desktop-cloud-sidebar-list",
-      "var(--desktop-sidebar-row-left-gap) var(--desktop-sidebar-scroll-right-gap)",
-    );
+    expect(cloudSidebarCss).not.toContain(".desktop-cloud-sidebar-list");
     expectBlockPadding(accessScopeCss, ".desktop-cloud-access-scope-list", "0");
     expectBlockPadding(
       accessServiceCss,
@@ -337,7 +345,6 @@ describe("sidebar spacing architecture", () => {
     );
     expectBlockPadding(accessLegacyCss, ".desktop-cloud-access-scope-list", "8px");
     expectBlockPadding(changesCss, ".review-list", "0");
-    expectBlockPadding(legacyCloudSidebarCss, ".cloud-nav", "6px");
   });
 });
 

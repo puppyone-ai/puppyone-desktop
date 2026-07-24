@@ -1,29 +1,23 @@
 import { DesktopNavigationItems, DesktopSidebarSettingsButton } from "./DesktopNavigationItems";
-import { DesktopWorkspaceSurfaceActionButton } from "./DesktopWorkspaceSurfaceActionButton";
 import { resolveNavigationItems } from "./navigationModel";
-import type { DesktopNavigationProps, DesktopWorkspaceSurfaceAction } from "./types";
+import type { DesktopNavigationProps } from "./types";
 
 export function DesktopSidebarFooterNavigation({
   activeView,
   availableSurfaceIds,
-  cloudHistoryEnabled = false,
   cloudHubEnabled = false,
-  cloudToolsEnabled = false,
   gitEnabled = true,
   pluginsEnabled = false,
   gitIncomingCount,
   gitOperationLoading,
   gitStatus,
   workspaceChangeCount,
-  surfaceAction,
   onNavigate,
   onOpenSettings,
-}: DesktopNavigationProps & { surfaceAction?: DesktopWorkspaceSurfaceAction | null }) {
-  const { cloudHubItems, cloudItems, localItems } = resolveNavigationItems({
+}: DesktopNavigationProps) {
+  const { cloudHubItems, localItems } = resolveNavigationItems({
     availableSurfaceIds,
-    cloudHistoryEnabled,
     cloudHubEnabled,
-    cloudToolsEnabled,
     gitEnabled,
     pluginsEnabled,
   });
@@ -44,10 +38,6 @@ export function DesktopSidebarFooterNavigation({
     >
       <div className="desktop-sidebar-footer-actions desktop-sidebar-footer-actions-left">
         <DesktopNavigationItems {...runtime} buttonClassName="desktop-sidebar-footer-button" items={localItems} />
-        {cloudItems.length > 0 && (
-          <DesktopNavigationItems {...runtime} buttonClassName="desktop-sidebar-footer-button" items={cloudItems} />
-        )}
-        {surfaceAction && <DesktopWorkspaceSurfaceActionButton action={surfaceAction} />}
         <DesktopSidebarSettingsButton
           activeView={activeView}
           buttonClassName="desktop-sidebar-footer-button"

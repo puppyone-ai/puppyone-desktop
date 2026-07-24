@@ -1,0 +1,26 @@
+import type {
+  DesktopCloudConnector,
+  DesktopCloudMcpEndpoint,
+  DesktopCloudRepoIdentity,
+  DesktopCloudRepositoryView,
+  DesktopCloudScope,
+} from "../../../lib/cloudApi";
+import type { CloudMessageDescriptor } from "../cloudPresentation";
+import type { CloudAccessSurfaceRow } from "../sections/access/accessRows";
+
+/** Route-local projection shared by the current Project Access and Automation UI. */
+export type CloudProjectAccessData = {
+  scopes: DesktopCloudScope[];
+  scopeRows: DesktopCloudRepositoryView[];
+  connectors: DesktopCloudConnector[];
+  connectorsByTarget: Map<string, DesktopCloudConnector[]>;
+  mcpEndpoints: DesktopCloudMcpEndpoint[];
+  mcpEndpointsByTarget: Map<string, DesktopCloudMcpEndpoint[]>;
+  accessRows: CloudAccessSurfaceRow[];
+  identity: DesktopCloudRepoIdentity | null;
+  loading: boolean;
+  error: CloudMessageDescriptor | null;
+  warning: CloudMessageDescriptor | null;
+  reload: () => Promise<void>;
+};
+

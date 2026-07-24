@@ -4,12 +4,13 @@ import { describe, expect, it } from "vitest";
 const logicalUiStyles = [
   "../src/features/automation/automation.css",
   "../src/features/automation/automation-dialog.css",
-  "../src/features/cloud/styles/global-pages.css",
-  "../src/features/cloud/styles/panel-auth.css",
-  "../src/features/cloud/styles/access/legacy-detail.css",
-  "../src/features/cloud/styles/access/legacy-list.css",
-  "../src/features/cloud/styles/access/scope-sidebar.css",
-  "../src/features/cloud/styles/access/service-sidebar.css",
+  "../src/features/cloud/organization/organization.css",
+  "../src/features/cloud/auth/cloud-auth-card.css",
+  "../src/features/cloud/auth/cloud-sign-in.css",
+  "../src/features/cloud/sections/access/styles/access-detail.css",
+  "../src/features/cloud/sections/access/styles/standalone-list.css",
+  "../src/features/cloud/sections/access/styles/scope-sidebar.css",
+  "../src/features/cloud/sections/access/styles/service-sidebar.css",
   "../src/features/desktop-agent/ui/styles/activities.css",
   "../src/features/desktop-agent/ui/styles/blocking.css",
   "../src/features/desktop-agent/ui/styles/composer.css",
@@ -35,7 +36,7 @@ describe("RTL architecture", () => {
   it("mirrors directional icons and binary switch motion", () => {
     const base = read("../src/styles/base.css");
     const settings = read("../src/styles/settings.css");
-    const access = read("../src/features/cloud/styles/access/create-access-dialog.css");
+    const access = read("../src/features/cloud/sections/access/styles/create-access-dialog.css");
 
     expect(base).toContain('[dir="rtl"] .po-directional-icon');
     expect(base).toContain('[dir="rtl"] .desktop-cloud-directional-icon');

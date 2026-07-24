@@ -4,6 +4,7 @@ import {
   assertRuntimeId,
   contractError,
   isOpaqueId,
+  nonNegativeInteger,
   optionalOpaqueId,
   positiveInteger,
   requiredString,
@@ -30,5 +31,38 @@ export function assertAgentEventEnvelope(value) {
   if (event.type === "question.requested" && !Array.isArray(payload.questions)) {
     throw contractError("AgentEvent(question.requested).payload.questions", "must be an array");
   }
+  if (event.type === "turn.started" && payload.referenceDisplays !== undefined) {
+    assertReferenceDisplays(payload.referenceDisplays);
+  }
   return value;
+}
+
+function assertReferenceDisplays(value) {
+  if (!Array.isArray(value) || value.length > 32) {
+    throw contractError("AgentEvent(turn.started).payload.referenceDisplays", "must contain at most 32 entries");
+  }
+  const allowedKeys = new Set(["id", "kind", "displayName", "relativePath", "mime", "size"]);
+  value.forEach((entry, index) => {
+    const label = `AgentEvent(turn.started).payload.referenceDisplays[${index}]`;
+    const reference = assertRecord(entry, label);
+    for (const key of Object.keys(reference)) {
+      if (!allowedKeys.has(key)) throw contractError(`${label}.${key}`, "is not renderer-safe reference metadata");
+    }
+    if (!isOpaqueId(reference.id)) throw contractError(`${label}.id`, "is invalid");
+    if (!["workspace-file", "workspace-directory", "attachment"].includes(reference.kind)) {
+      throw contractError(`${label}.kind`, "is invalid");
+    }
+    requiredString(reference.displayName, `${label}.displayName`, 512);
+    if (reference.relativePath !== undefined) {
+      const relativePath = requiredString(reference.relativePath, `${label}.relativePath`, 4_096);
+      if (/^(?:[/\\]|[A-Za-z]:[/\\])/.test(relativePath) || relativePath.split(/[/\\]/).includes("..")) {
+        throw contractError(`${label}.relativePath`, "must remain workspace-relative");
+      }
+    }
+    if (reference.mime !== undefined) requiredString(reference.mime, `${label}.mime`, 200);
+    if (reference.size !== undefined) {
+      const size = nonNegativeInteger(reference.size, `${label}.size`);
+      if (size > 25 * 1024 * 1024) throw contractError(`${label}.size`, "exceeds the reference display limit");
+    }
+  });
 }

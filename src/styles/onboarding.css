@@ -122,63 +122,6 @@
   transition: stroke 150ms ease-out;
 }
 
-.folder-drop-cloud-sky,
-.folder-drop-cloud-glaze {
-  opacity: 0;
-  transition: opacity 220ms ease-out;
-}
-
-.folder-drop-cloud-sky {
-  filter: grayscale(0.32) saturate(0.5) contrast(0.9) brightness(0.94);
-}
-
-.folder-drop-cloud-glaze {
-  fill: url("#onboarding-cloud-project-glaze");
-}
-
-.folder-drop-cloud-glaze-top {
-  stop-color: var(--po-panel-raised);
-  stop-opacity: 0.46;
-}
-
-.folder-drop-cloud-glaze-middle {
-  stop-color: var(--po-panel-raised);
-  stop-opacity: 0.16;
-}
-
-.folder-drop-cloud-glaze-bottom {
-  stop-color: var(--po-panel-raised);
-  stop-opacity: 0.56;
-}
-
-.folder-drop-zone.cloud-mode {
-  --onboarding-cloud-ink: var(--po-text);
-  color: var(--onboarding-cloud-ink);
-}
-
-.folder-drop-zone.cloud-mode .folder-drop-fill {
-  fill: color-mix(in srgb, var(--po-panel-raised) 90%, var(--po-info) 10%);
-}
-
-.folder-drop-zone.cloud-mode .folder-drop-cloud-sky {
-  opacity: 0.3;
-}
-
-.folder-drop-zone.cloud-mode .folder-drop-cloud-glaze {
-  opacity: 0.78;
-}
-
-.folder-drop-zone.cloud-mode .folder-drop-border {
-  stroke: color-mix(in srgb, var(--po-border-strong) 72%, transparent);
-  stroke-dasharray: none;
-  stroke-width: 1.5;
-}
-
-.folder-drop-zone.cloud-mode .folder-drop-shadow {
-  fill: var(--po-shadow);
-  opacity: 0;
-}
-
 .folder-drop-body {
   position: relative;
   z-index: 2;
@@ -203,42 +146,18 @@
 
 .folder-drop-zone:hover .folder-drop-border,
 .folder-drop-zone.dragging .folder-drop-border,
-.onboarding-shell.dragging .folder-drop-zone:not(.cloud-mode) .folder-drop-border {
+.onboarding-shell.dragging .folder-drop-zone .folder-drop-border {
   stroke: var(--po-border-strong);
 }
 
 .folder-drop-zone:hover .folder-drop-shadow,
 .folder-drop-zone.dragging .folder-drop-shadow,
-.onboarding-shell.dragging .folder-drop-zone:not(.cloud-mode) .folder-drop-shadow {
+.onboarding-shell.dragging .folder-drop-zone .folder-drop-shadow {
   opacity: 1;
 }
 
-.folder-drop-zone.cloud-mode:hover,
-.folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) {
-  color: var(--po-text);
-}
-
-.folder-drop-zone.cloud-mode:hover .folder-drop-border,
-.folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) .folder-drop-border {
-  stroke: var(--po-border-strong);
-}
-
-.folder-drop-zone.cloud-mode:hover .folder-drop-cloud-sky,
-.folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) .folder-drop-cloud-sky {
-  opacity: 0.42;
-}
-
-.folder-drop-zone.cloud-mode .folder-drop-icon {
-  color: color-mix(in srgb, var(--po-info) 62%, var(--po-text) 38%);
-}
-
-.folder-drop-zone.cloud-mode:hover .folder-drop-icon,
-.folder-drop-zone.cloud-mode:has(.folder-drop-primary-action:focus-visible) .folder-drop-icon {
-  color: color-mix(in srgb, var(--po-info) 78%, var(--po-text) 22%);
-}
-
 .folder-drop-zone.dragging,
-.onboarding-shell.dragging .folder-drop-zone:not(.cloud-mode) {
+.onboarding-shell.dragging .folder-drop-zone {
   color: var(--po-text);
   transform: translateY(-4px);
 }
@@ -296,61 +215,8 @@
 
 .folder-drop-zone:hover .folder-drop-icon,
 .folder-drop-zone.dragging .folder-drop-icon,
-.onboarding-shell.dragging .folder-drop-zone:not(.cloud-mode) .folder-drop-icon {
+.onboarding-shell.dragging .folder-drop-zone .folder-drop-icon {
   transform: translateY(-1px);
-}
-
-.onboarding-mode-switch {
-  position: absolute;
-  inset-inline-start: calc(100% + 16px);
-  inset-inline-end: auto;
-  bottom: 0;
-  z-index: 4;
-  display: inline-flex;
-  height: 22px;
-  align-items: center;
-  gap: 5px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--po-text-subtle);
-  cursor: var(--po-clickable-cursor, pointer);
-  font: inherit;
-  font-size: 11.5px;
-  font-weight: 560;
-  line-height: 1;
-  white-space: nowrap;
-  transition:
-    color 150ms ease,
-    transform 150ms ease;
-}
-
-.onboarding-mode-switch:hover:not(:disabled),
-.onboarding-mode-switch:focus-visible {
-  color: var(--po-text);
-}
-
-.onboarding-mode-switch:focus-visible {
-  outline: none;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.onboarding-mode-switch:disabled {
-  cursor: default;
-  opacity: 0.64;
-}
-
-.onboarding-mode-switch strong {
-  color: var(--po-text-muted);
-  font-size: inherit;
-  font-weight: 650;
-  transition: color 150ms ease;
-}
-
-.onboarding-mode-switch:hover:not(:disabled) strong,
-.onboarding-mode-switch:focus-visible strong {
-  color: var(--po-text);
 }
 
 .onboarding-operation-status {
@@ -481,34 +347,6 @@
   height: 24px;
   place-items: center;
   color: var(--po-text-muted);
-}
-
-.onboarding-project-row-icon.linked {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-}
-
-.onboarding-project-row-folder-mark {
-  transform: translate(-3px, -1px);
-}
-
-.onboarding-project-row-cloud-badge {
-  position: absolute;
-  inset-inline-end: 0;
-  bottom: 2px;
-  display: grid;
-  width: 15px;
-  height: 15px;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--po-canvas);
-  box-shadow: 0 0 0 1px var(--po-canvas);
-  color: var(--po-text-muted);
-}
-
-.onboarding-project-row-cloud-badge svg {
-  display: block;
 }
 
 .onboarding-project-row-main {
@@ -736,12 +574,6 @@
 
   .onboarding-folder-action-wrap {
     width: min(260px, 100%);
-  }
-
-  .onboarding-mode-switch {
-    inset-inline-start: auto;
-    inset-inline-end: 0;
-    bottom: 0;
   }
 
   .onboarding-project-row {

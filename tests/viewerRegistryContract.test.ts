@@ -150,6 +150,9 @@ describe("preset viewer contribution contract", () => {
   it("maps every canonical format viewer through the same manifest", () => {
     for (const format of [...FILE_FORMATS, UNKNOWN_FORMAT]) {
       expect(() => coreViewerCapability(format.defaultViewer)).not.toThrow();
+      if (format.editable) {
+        expect(coreViewerCapability(format.defaultViewer), format.id).toBe("edit");
+      }
     }
     expect(coreViewerCapability("markdown")).toBe("edit");
     expect(coreViewerCapability("markdown-editor")).toBe("edit");

@@ -1,0 +1,305 @@
+.desktop-cloud-automation-builder {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 220px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.desktop-cloud-automation-trigger-bridge {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel-raised) 38%, transparent);
+}
+
+.desktop-cloud-automation-trigger-bridge > svg {
+  justify-self: center;
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-automation-source-editor,
+.desktop-cloud-automation-manual-source,
+.desktop-cloud-automation-destination-editor,
+.desktop-cloud-automation-trigger-editor {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.desktop-cloud-automation-manual-source {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.desktop-cloud-automation-resource-picker {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.desktop-cloud-automation-resource-search {
+  display: flex;
+  min-width: 0;
+  height: 30px;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: var(--po-panel-raised);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-automation-resource-search:focus-within {
+  border-color: var(--po-border-strong);
+}
+
+.desktop-cloud-automation-resource-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--po-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.desktop-cloud-automation-selected-resource {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--po-success) 35%, var(--po-border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--po-success) 7%, transparent);
+}
+
+.desktop-cloud-automation-selected-resource > span {
+  color: var(--po-success);
+  font-size: 11px;
+}
+
+.desktop-cloud-automation-selected-resource strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-automation-selected-resource button,
+.desktop-cloud-automation-link-button {
+  border: 0;
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 12px;
+  text-align: start;
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.desktop-cloud-automation-link-button {
+  width: max-content;
+  max-width: 100%;
+  padding: 0;
+  color: var(--po-accent);
+}
+
+.desktop-cloud-automation-link-button:disabled {
+  color: var(--po-text-disabled);
+  cursor: not-allowed;
+}
+
+.desktop-cloud-automation-resource-list {
+  display: grid;
+  max-height: 184px;
+  gap: 4px;
+  overflow: auto;
+}
+
+.desktop-cloud-automation-resource-list > button {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 11px;
+  text-align: start;
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.desktop-cloud-automation-resource-list > button:hover:not(:disabled),
+.desktop-cloud-automation-resource-list > button.selected {
+  border-color: var(--po-border-strong);
+  background: var(--po-hover);
+}
+
+.desktop-cloud-automation-resource-list > button:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+.desktop-cloud-automation-resource-list > button > span:first-child {
+  display: grid;
+  min-width: 0;
+}
+
+.desktop-cloud-automation-resource-list strong,
+.desktop-cloud-automation-resource-list small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-automation-resource-list strong {
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.desktop-cloud-automation-resource-list small {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+}
+
+.desktop-cloud-automation-resource-state,
+.desktop-cloud-automation-folder-state {
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--po-control);
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.desktop-cloud-automation-resource-state.error,
+.desktop-cloud-automation-folder-state.error,
+.desktop-cloud-automation-inline-error {
+  color: var(--po-danger);
+}
+
+.desktop-cloud-automation-resource-state.error {
+  display: grid;
+  gap: 6px;
+}
+
+.desktop-cloud-automation-resource-state.error button {
+  width: max-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--po-accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.desktop-cloud-automation-inline-note,
+.desktop-cloud-automation-inline-error {
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.desktop-cloud-automation-trigger-editor {
+  align-content: start;
+}
+
+.desktop-cloud-automation-trigger-summary {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--po-control);
+  color: var(--po-text-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.desktop-cloud-automation-trigger-summary small {
+  color: var(--po-text-subtle);
+}
+
+.desktop-cloud-automation-folder-toggle {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 12px;
+  text-align: start;
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.desktop-cloud-automation-folder-toggle svg:last-child {
+  margin-inline-start: auto;
+}
+
+.desktop-cloud-automation-folder-tree {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding-inline-start: calc(var(--automation-folder-depth, 0) * 12px);
+}
+
+.desktop-cloud-automation-folder-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  border-radius: 5px;
+}
+
+.desktop-cloud-automation-folder-row.selected {
+  background: var(--po-active);
+}
+
+.desktop-cloud-automation-folder-row > button {
+  display: inline-flex;
+  min-width: 0;
+  height: 26px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 5px;
+  border: 0;
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.desktop-cloud-automation-folder-row > button:last-child span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-automation-action-error {
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--po-danger) 30%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--po-danger) 6%, transparent);
+}
+

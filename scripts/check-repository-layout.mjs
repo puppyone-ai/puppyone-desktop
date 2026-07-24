@@ -68,12 +68,20 @@ if (!packageMetadata.includes('"build": "node scripts/check-desktop-build-enviro
   errors.push("Production renderer builds must fail fast on missing endpoint configuration.");
 }
 
-const recentCloudContext = read("src/features/cloud/workspace/cloudProjectResolution.ts");
-if (/from\s+["']\.\.\/\.\.\/\.\.\/lib\/localFiles["']/.test(recentCloudContext)) {
-  errors.push("Recent-workspace Cloud context must not probe inactive folders through active-window IPC authority.");
+const currentRepositoryCloudContext = read(
+  "src/features/cloud/project/context/useCurrentRepositoryCloudContext.ts",
+);
+if (/from\s+["'][^"']*lib\/localFiles["']/.test(currentRepositoryCloudContext)) {
+  errors.push("Current-repository Cloud context must not probe folders through renderer filesystem IPC.");
 }
-if (!recentCloudContext.includes("item.workspace.puppyoneGitRemote")) {
-  errors.push("Recent-workspace Cloud context must consume the main-owned, secret-free Git remote hint.");
+if (!currentRepositoryCloudContext.includes("resolveCanonicalPuppyoneRemotes")) {
+  errors.push("Current-repository Cloud context must derive identity from the active canonical Git remote.");
+}
+if (!currentRepositoryCloudContext.includes("getCloudRepositoryContext")) {
+  errors.push("Current-repository Cloud context must authorize the exact remote target through the Cloud session.");
+}
+if (/recentWorkspace|puppyoneGitRemote|listCloudProjects/.test(currentRepositoryCloudContext)) {
+  errors.push("Current-repository Cloud context must not depend on recent-workspace hints or an account catalog.");
 }
 
 if (errors.length > 0) {

@@ -19,6 +19,7 @@ describe("renderer style architecture", () => {
       'import "@puppyone/shared-ui/shared-ui.css";',
       'import "./styles.css";',
     ]);
+    expect(entry).toMatch(/^import "\.\/styles\/cascade\.css";\nimport "\.\/cloud-globals\.css";\nimport "@puppyone\/shared-ui\/shared-ui\.css";\nimport "\.\/styles\.css";\n/);
     expectInOrder(styles, [
       '@import "./features/source-control/source-control.css" layer(features);',
       '@import "./features/source-control/source-control-overrides.css";',

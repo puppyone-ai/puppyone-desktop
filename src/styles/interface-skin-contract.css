@@ -61,7 +61,7 @@
 }
 
 :root[data-interface-style]:not([data-interface-style="default"])
-  :where(.desktop-explorer-toolbar, .browser-toolbar, .csv-table-editor__toolbar, .file-preview-header) {
+  :where(.desktop-explorer-toolbar, .browser-toolbar, .file-preview-header) {
   border-bottom: var(--interface-toolbar-border-bottom);
   background: var(--interface-toolbar-background);
   box-shadow: var(--interface-toolbar-box-shadow);
@@ -84,8 +84,6 @@
     .desktop-settings-action,
     .desktop-settings-row-action,
     .desktop-branch-menu-action,
-    .csv-table-editor__actions button,
-    .csv-table-editor__empty button,
     .desktop-version-control-enable-button,
     .puppyflow-add-button
   ):hover:not(:disabled) {

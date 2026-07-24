@@ -40,7 +40,42 @@ export function assertAgentRuntimeCapabilities(adapter, capabilities, runtimeId 
 
 export function normalizeCapabilitySnapshot(value = {}) {
   const source = value && typeof value === "object" ? value : {};
-  return Object.fromEntries(AGENT_RUNTIME_CAPABILITIES.map((capability) => [capability, source[capability] === true]));
+  return {
+    ...Object.fromEntries(AGENT_RUNTIME_CAPABILITIES.map((capability) => [capability, source[capability] === true])),
+    referenceInputs: normalizeReferenceInputCapabilities(source.referenceInputs, source),
+  };
+}
+
+export function normalizeReferenceInputCapabilities(value, legacy = {}) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const legacyContext = legacy?.contextReferences === true;
+  const legacyAttachments = legacy?.attachments === true;
+  const acceptedMimeTypes = Array.isArray(source.acceptedMimeTypes)
+    ? source.acceptedMimeTypes
+      .filter((entry) => typeof entry === "string" && entry.length > 0 && entry.length <= 160)
+      .slice(0, 64)
+    : undefined;
+  return {
+    workspaceFiles: source.workspaceFiles === true || (source.workspaceFiles === undefined && legacyContext),
+    workspaceDirectories: source.workspaceDirectories === true || (source.workspaceDirectories === undefined && legacyContext),
+    images: referenceTransport(source.images, legacyAttachments ? "data-url" : "none"),
+    genericFiles: referenceTransport(source.genericFiles, "none"),
+    ...(acceptedMimeTypes?.length ? { acceptedMimeTypes } : {}),
+    maxReferences: boundedPositiveInteger(source.maxReferences, 32, 32),
+    maxReferenceBytes: boundedPositiveInteger(source.maxReferenceBytes, 25 * 1024 * 1024, 25 * 1024 * 1024),
+    maxTotalReferenceBytes: boundedPositiveInteger(source.maxTotalReferenceBytes, 25 * 1024 * 1024, 25 * 1024 * 1024),
+    steer: source.steer === true,
+    attachmentOnly: source.attachmentOnly === true,
+  };
+}
+
+function referenceTransport(value, fallback) {
+  if (value === undefined || value === null) return fallback;
+  return ["none", "data-url", "local-snapshot", "resource"].includes(value) ? value : "none";
+}
+
+function boundedPositiveInteger(value, fallback, maximum) {
+  return Number.isSafeInteger(value) && value > 0 && value <= maximum ? value : fallback;
 }
 
 function assertRuntimeDescriptor(value) {

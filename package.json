@@ -10,7 +10,7 @@
   "scripts": {
     "generate:interface-styles": "node scripts/generate-interface-styles.mjs",
     "check:interface-styles": "node scripts/generate-interface-styles.mjs --check",
-    "check:boundaries": "npm run check:interface-styles && node scripts/check-repository-layout.mjs && node scripts/check-local-workspace-architecture.mjs && node scripts/check-repository-target-architecture.mjs && node scripts/check-macos-release-config.mjs && node scripts/check-localization.mjs && node scripts/check-renderer-style-architecture.mjs && node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-editor-document-session.mjs && node scripts/check-sidebar-architecture.mjs && node scripts/check-agent-architecture.mjs && node scripts/check-opencode-provenance.mjs && node scripts/check-claude-agent-sdk-provenance.mjs && node scripts/check-agent-ui-provenance.mjs && node scripts/check-automation-plugin-boundaries.mjs",
+    "check:boundaries": "npm run check:interface-styles && node scripts/check-repository-layout.mjs && node scripts/check-local-workspace-architecture.mjs && node scripts/check-cloud-frontend-architecture.mjs && node scripts/check-repository-target-architecture.mjs && node scripts/check-macos-release-config.mjs && node scripts/check-localization.mjs && node scripts/check-renderer-style-architecture.mjs && node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-editor-document-session.mjs && node scripts/check-sidebar-architecture.mjs && node scripts/check-agent-architecture.mjs && node scripts/check-opencode-provenance.mjs && node scripts/check-claude-agent-sdk-provenance.mjs && node scripts/check-agent-ui-provenance.mjs && node scripts/check-automation-plugin-boundaries.mjs",
     "check:localization": "node scripts/check-localization.mjs",
     "check:shared-ui": "node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-editor-document-session.mjs",
     "check:editor-document-session": "node scripts/check-editor-document-session.mjs",
@@ -37,6 +37,7 @@
     "smoke:local-api": "node scripts/smoke-local-api.mjs",
     "smoke:format-aware-diff": "electron scripts/smoke-format-aware-diff.mjs",
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
+    "smoke:agent-references": "electron scripts/smoke-agent-reference-ingestion.mjs",
     "smoke:viewer-pack": "electron scripts/smoke-viewer-pack.mjs",
     "audit:viewer-gpu": "electron scripts/audit-viewer-gpu.mjs",
     "smoke:renderer-performance": "npm run build && node scripts/run-renderer-performance-smoke.mjs",

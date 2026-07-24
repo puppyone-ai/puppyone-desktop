@@ -1,0 +1,27 @@
+@media (max-width: 820px) {
+  .desktop-cloud-automation-builder,
+  .desktop-cloud-automation-manage-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .desktop-cloud-automation-trigger-bridge > svg {
+    transform: rotate(90deg);
+  }
+
+  .desktop-cloud-automation-manage-editor-actions {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 620px) {
+  .desktop-cloud-automation-chooser-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .desktop-cloud-automation-delete-confirm,
+  .desktop-cloud-automation-schedule-overview {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+

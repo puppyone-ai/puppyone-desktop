@@ -21,6 +21,7 @@ for (const filePath of walkTypeScript(sharedEditorRoot)) {
 
 const contributionFiles = [
   ...walkTypeScript(path.join(sharedEditorRoot, "viewers")),
+  ...walkTypeScript(path.join(sharedEditorRoot, "csv")),
   ...walkTypeScript(path.join(sharedEditorRoot, "markdown")),
   ...walkTypeScript(path.join(sharedEditorRoot, "puppyflow")),
 ];
@@ -171,6 +172,15 @@ if (!/persists a real CodeMirror edit through DataWorkspace and the local deskto
 }
 if (!/keeps the local editor mounted when its pre-navigation save fails/.test(localMarkdownPersistenceTestSource)) {
   errors.push(`${relative(localMarkdownPersistenceTestPath)} does not cover failed local navigation drain`);
+}
+
+const localCsvPersistenceTestPath = path.join(
+  repoRoot,
+  "tests/localCsvEditorPersistence.test.tsx",
+);
+const localCsvPersistenceTestSource = readFileSync(localCsvPersistenceTestPath, "utf8");
+if (!/edits a spreadsheet-classified CSV and persists its serialized snapshot/.test(localCsvPersistenceTestSource)) {
+  errors.push(`${relative(localCsvPersistenceTestPath)} does not cover the complete local CSV write path`);
 }
 
 const closeDrainSources = [

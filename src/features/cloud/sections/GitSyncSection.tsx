@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 import { FilePreviewIcon, type Workspace } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
+import "./methods-sync.css";
 import type { DesktopCloudRepoIdentity } from "../../../lib/cloudApi";
 import type { GitStatusSnapshot } from "../../../types/electron";
 import type { getPuppyoneRemote } from "../../source-control/remotes";

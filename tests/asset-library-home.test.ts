@@ -23,50 +23,42 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("Asset Library homepage", () => {
-  it("presents Cloud and local projects as one filterable asset library", () => {
+describe("local project library", () => {
+  it("presents only repositories registered on this device", () => {
     const container = renderLibrary();
 
     expect(container.textContent).toContain("Projects");
-    expect(container.textContent).not.toContain("3 assets · 1 synced · 2 on this Mac");
     expect(container.textContent).toContain("Local Notes");
     expect(container.textContent).toContain("Brand System");
-    expect(container.textContent).toContain("Cloud Atlas");
+    expect(container.textContent).toContain("Research Atlas");
     expect(container.querySelectorAll(".asset-library-card-cover")).toHaveLength(3);
     expect(container.querySelectorAll(".asset-library-new-project")).toHaveLength(1);
-    expect(container.textContent?.indexOf("New Cloud project")).toBeGreaterThan(
-      container.textContent?.indexOf("Cloud Atlas") ?? -1,
-    );
-
-    act(() => findFilterButton(container, "Cloud").click());
-    expect(container.textContent).not.toContain("Local Notes");
-    expect(container.textContent).toContain("Brand System");
-    expect(container.textContent).toContain("Cloud Atlas");
-
-    act(() => findFilterButton(container, "On this Mac").click());
-    expect(container.textContent).toContain("Local Notes");
-    expect(container.textContent).toContain("Brand System");
-    expect(container.textContent).not.toContain("Cloud Atlas");
+    expect(container.textContent).not.toContain("New Cloud project");
+    expect(container.textContent).not.toContain("Templates");
+    expect(container.querySelector(".asset-library-home-filter-row")).toBeNull();
   });
 
-  it("opens a local asset through the existing workspace callback", async () => {
+  it("opens a repository through its filesystem path", async () => {
     const onOpenWorkspacePath = vi.fn(async () => undefined);
     const container = renderLibrary({ onOpenWorkspacePath });
     const button = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
       .find((candidate) => stripBidiIsolation(candidate.getAttribute("aria-label")) === "Open Local Notes");
-    if (!button) throw new Error("Local asset button is missing.");
+    if (!button) throw new Error("Local project button is missing.");
 
     await act(async () => button.click());
 
     expect(onOpenWorkspacePath).toHaveBeenCalledWith("/Users/example/Local Notes");
   });
 
-  it("hides Create in Cloud when cloud-only creation is unavailable", () => {
-    const container = renderLibrary({ onCreateCloudProject: undefined });
+  it("creates projects by choosing a local folder", async () => {
+    const onChooseWorkspace = vi.fn(async () => undefined);
+    const container = renderLibrary({ onChooseWorkspace });
 
-    expect(container.textContent).toContain("New project");
-    expect(container.textContent).not.toContain("New Cloud project");
-    expect(container.textContent).not.toContain("Create in Cloud");
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".asset-library-new-project")?.click();
+    });
+
+    expect(onChooseWorkspace).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -76,11 +68,8 @@ function renderLibrary(overrides: Partial<MinimalOnboardingProps> = {}) {
   root = createRoot(container);
   const props: MinimalOnboardingProps = {
     onChooseWorkspace: vi.fn(async () => undefined),
-    onCreateCloudProject: vi.fn(async () => undefined),
-    onOpenCloudProject: vi.fn(async () => undefined),
     onOpenWorkspacePath: vi.fn(async () => undefined),
     projectItems: items,
-    cloudSignedIn: true,
     themeMode: "dark",
     lightThemePreset: "neutral",
     darkThemePreset: "default",
@@ -96,35 +85,23 @@ function renderLibrary(overrides: Partial<MinimalOnboardingProps> = {}) {
   return container;
 }
 
-function findFilterButton(container: HTMLElement, label: string) {
-  const button = Array.from(container.querySelectorAll<HTMLButtonElement>(".asset-library-home-filter-row button"))
-    .find((candidate) => candidate.textContent?.trim() === label);
-  if (!button) throw new Error(`Missing ${label} filter.`);
-  return button;
-}
-
 const items: ProjectHomeItem[] = [
   {
     id: "local-notes",
-    kind: "local",
-    label: "/Users/example/Local Notes",
+    label: "Local Notes",
     localPath: "/Users/example/Local Notes",
     lastOpenedAt: "2026-07-10T10:00:00.000Z",
   },
   {
     id: "brand-system",
-    kind: "cloud-local",
-    label: "/Users/example/brand-system",
-    detail: "Brand System",
+    label: "Brand System",
     localPath: "/Users/example/brand-system",
-    cloudProjectId: "cloud-brand",
     lastOpenedAt: "2026-07-09T10:00:00.000Z",
   },
   {
-    id: "cloud-atlas",
-    kind: "cloud",
-    label: "Cloud Atlas",
-    cloudProjectId: "cloud-atlas",
-    updatedAt: "2026-07-08T10:00:00.000Z",
+    id: "research-atlas",
+    label: "Research Atlas",
+    localPath: "/Users/example/research-atlas",
+    lastOpenedAt: "2026-07-08T10:00:00.000Z",
   },
 ];

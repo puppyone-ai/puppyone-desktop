@@ -56,8 +56,8 @@ export function requireSenderId(sender) {
   return sender.id;
 }
 
-export function normalizePrompt(value) {
-  if (typeof value !== "string" || value.trim().length === 0) throw new Error("Enter a message for the Agent.");
+export function normalizePrompt(value, { allowEmpty = false } = {}) {
+  if (typeof value !== "string" || (!allowEmpty && value.trim().length === 0)) throw new Error("Enter a message for the Agent.");
   if (value.length > 128 * 1024) throw new Error("The Agent message is too large.");
   return value;
 }
@@ -81,16 +81,82 @@ export function normalizeOptionalId(value) {
 
 export function normalizeAuthorizedReferences(value) {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, 32).flatMap((entry) => {
-    if (!entry || typeof entry !== "object" || entry.authorized !== true) return [];
-    if (typeof entry.path !== "string" || entry.path.length === 0 || entry.path.length > 4_096) return [];
-    return [{
+  if (value.length > 32) throw new Error("Agent references exceed the 32-file safety limit.");
+  return value.map((entry) => {
+    if (!entry || typeof entry !== "object" || entry.authorized !== true) {
+      throw new Error("Agent references must be authorized by the main process.");
+    }
+    if (entry.kind !== "workspace-entry" && entry.kind !== "staged-attachment") {
+      throw new Error("Agent reference kind is not supported.");
+    }
+    if (typeof entry.path !== "string" || entry.path.length === 0 || entry.path.length > 4_096) {
+      throw new Error("Agent reference path is invalid.");
+    }
+    const kind = entry.kind;
+    const entryType = entry.entryType === "directory" ? "directory" : "file";
+    return {
+      id: normalizeReferenceId(entry.id, entry.path),
+      kind,
+      ...(kind === "workspace-entry" ? { entryType } : {}),
       path: entry.path,
-      name: normalizeOptionalString(entry.name),
+      name: normalizeOptionalString(entry.name ?? entry.displayName),
+      displayName: normalizeOptionalString(entry.displayName ?? entry.name) || "reference",
+      ...(kind === "workspace-entry" && typeof entry.relativePath === "string"
+        ? { relativePath: entry.relativePath.slice(0, 4_096) }
+        : {}),
       mime: normalizeOptionalString(entry.mime),
+      size: Number.isSafeInteger(entry.size) && entry.size >= 0 ? entry.size : 0,
       ...(isBoundedDataUrl(entry.snapshotUrl) ? { snapshotUrl: entry.snapshotUrl } : {}),
-    }];
+    };
   });
+}
+
+export function requireSupportedAgentReferences(capabilities, references) {
+  const input = capabilities?.referenceInputs ?? {};
+  const values = Array.isArray(references) ? references : [];
+  const totalBytes = values.reduce((sum, entry) => sum + (Number.isSafeInteger(entry?.size) ? entry.size : 0), 0);
+  if (values.length > (input.maxReferences ?? 0)) throw new Error("This Agent accepts fewer reference inputs.");
+  if (totalBytes > (input.maxTotalReferenceBytes ?? 0)) throw new Error("Reference inputs exceed this Agent's total size limit.");
+  for (const reference of values) {
+    if ((reference.size ?? 0) > (input.maxReferenceBytes ?? 0)) {
+      throw new Error("A reference exceeds this Agent's per-file size limit.");
+    }
+    if (reference.kind === "workspace-entry") {
+      if (reference.entryType === "directory" && input.workspaceDirectories !== true) {
+        throw new Error("The selected Agent does not accept workspace directories.");
+      }
+      if (reference.entryType !== "directory" && input.workspaceFiles !== true) {
+        throw new Error("The selected Agent does not accept workspace files.");
+      }
+      continue;
+    }
+    const isImage = typeof reference.mime === "string" && reference.mime.startsWith("image/");
+    const transport = isImage ? input.images : input.genericFiles;
+    if (!transport || transport === "none") {
+      throw new Error(isImage
+        ? "The selected Agent does not accept image attachments."
+        : "The selected Agent does not accept this file attachment type.");
+    }
+    if (Array.isArray(input.acceptedMimeTypes) && input.acceptedMimeTypes.length > 0
+      && !input.acceptedMimeTypes.includes(reference.mime)) {
+      throw new Error("The selected Agent does not accept this attachment MIME type.");
+    }
+  }
+}
+
+export function normalizeReferenceDisplays(references) {
+  return (Array.isArray(references) ? references : []).slice(0, 32).map((reference) => ({
+    id: normalizeReferenceId(reference.id, `${reference.kind}:${reference.path}`),
+    kind: reference.kind === "staged-attachment"
+      ? "attachment"
+      : reference.entryType === "directory" ? "workspace-directory" : "workspace-file",
+    displayName: normalizeOptionalString(reference.displayName ?? reference.name) || "reference",
+    ...(reference.kind === "workspace-entry" && typeof reference.relativePath === "string"
+      ? { relativePath: reference.relativePath.slice(0, 4_096) }
+      : {}),
+    ...(reference.kind === "staged-attachment" && reference.mime ? { mime: reference.mime } : {}),
+    ...(reference.kind === "staged-attachment" && Number.isSafeInteger(reference.size) ? { size: reference.size } : {}),
+  }));
 }
 
 export function normalizeQuestionAnswers(value, questions) {
@@ -142,4 +208,14 @@ function isBoundedDataUrl(value) {
   if (typeof value !== "string" || value.length > MAX_REFERENCE_SNAPSHOT_URL_LENGTH) return false;
   const marker = value.indexOf(";base64,");
   return value.startsWith("data:") && marker > 5 && marker < 200 && !value.slice(0, marker).includes("\n");
+}
+
+function normalizeReferenceId(value, fallback) {
+  if (typeof value === "string" && /^[A-Za-z0-9:._-]{1,256}$/.test(value)) return value;
+  let hash = 2166136261;
+  for (const character of String(fallback ?? "reference")) {
+    hash ^= character.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  return `reference-${(hash >>> 0).toString(16)}`;
 }

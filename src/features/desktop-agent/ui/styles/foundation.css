@@ -60,6 +60,26 @@
   background: var(--agent-canvas);
 }
 
+.desktop-agent-reference-drop-overlay {
+  position: absolute;
+  z-index: 100;
+  inset: 8px;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  border: 1px dashed color-mix(in srgb, var(--agent-accent) 72%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--agent-canvas) 88%, var(--agent-accent));
+  color: var(--agent-text);
+  font-weight: 500;
+  text-align: center;
+  pointer-events: none;
+}
+.desktop-agent-reference-drop-overlay.is-invalid {
+  border-color: color-mix(in srgb, var(--po-danger) 72%, transparent);
+  background: color-mix(in srgb, var(--agent-canvas) 92%, var(--po-danger));
+}
+
 .dark .desktop-agent-boundary,
 .dark .desktop-agent-overlay {
   --agent-canvas: var(--po-editor-bg);

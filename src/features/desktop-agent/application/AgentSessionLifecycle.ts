@@ -36,10 +36,10 @@ export class AgentSessionLifecycle {
         projection: createAgentProjection(),
         error: null,
         pendingPrompt: null,
+        pendingIntent: null,
         sessionPreparation: "preparing",
         submitting: false,
-        attachments: [],
-        contextReferences: [],
+        references: [],
       });
       const snapshot = await this.options.createSession();
       this.options.applySnapshot(snapshot);

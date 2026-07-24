@@ -45,6 +45,23 @@ export type AgentRuntimeCatalogEntry = {
   readiness: AgentProviderReadiness;
 };
 
+export type AgentReferenceTransport = "none" | "data-url" | "local-snapshot" | "resource";
+
+export type AgentReferenceInputCapabilities = {
+  workspaceFiles: boolean;
+  workspaceDirectories: boolean;
+  images: AgentReferenceTransport;
+  genericFiles: AgentReferenceTransport;
+  acceptedMimeTypes?: string[];
+  maxReferences: number;
+  maxReferenceBytes: number;
+  maxTotalReferenceBytes: number;
+  /** Whether the native steer operation accepts reference inputs. */
+  steer: boolean;
+  /** Whether an otherwise-empty prompt is accepted with references. */
+  attachmentOnly: boolean;
+};
+
 export type AgentCapabilities = {
   streamingText: boolean;
   structuredToolEvents: boolean;
@@ -67,6 +84,8 @@ export type AgentCapabilities = {
   mcp: boolean;
   skills: boolean;
   compaction: boolean;
+  /** Fine-grained native input support. Legacy booleans remain a migration projection. */
+  referenceInputs?: AgentReferenceInputCapabilities;
 };
 
 export type AgentAccountState = {
@@ -172,7 +191,11 @@ export type AgentEventPayloadMap = {
   "session.resumed": AgentEventPayloadBase & { title?: string; status?: string };
   "session.updated": AgentEventPayloadBase & { title?: string; status?: string };
   "session.closed": AgentEventPayloadBase & { status?: string };
-  "turn.started": AgentEventPayloadBase & { prompt?: string; status?: string };
+  "turn.started": AgentEventPayloadBase & {
+    prompt?: string;
+    status?: string;
+    referenceDisplays?: AgentReferenceDisplay[];
+  };
   "turn.completed": AgentEventPayloadBase & { status?: string; durationMs?: number };
   "turn.failed": AgentEventPayloadBase & { status?: string; message?: string; durationMs?: number };
   "turn.interrupted": AgentEventPayloadBase & { status?: string; message?: string; durationMs?: number };
@@ -352,14 +375,69 @@ export type AgentFileReference = {
   name?: string | null;
 };
 
+export type AgentReferenceStatus = "resolving" | "ready" | "error";
+
+export type AgentReferenceError = {
+  code: string;
+  message: string;
+};
+
+export type AgentWorkspaceEntryReference = {
+  id: string;
+  kind: "workspace-entry";
+  entryType: "file" | "directory";
+  path: string;
+  relativePath: string;
+  displayName: string;
+  mime?: string;
+  size?: number;
+  status: AgentReferenceStatus;
+  error?: AgentReferenceError;
+};
+
+export type AgentStagedAttachmentReference = {
+  id: string;
+  kind: "staged-attachment";
+  token?: string;
+  displayName: string;
+  mime: string;
+  size: number;
+  status: AgentReferenceStatus;
+  error?: AgentReferenceError;
+};
+
+/** Renderer draft/request representation. It never contains external paths or bytes. */
+export type AgentDraftReference = AgentWorkspaceEntryReference | AgentStagedAttachmentReference;
+
+/** Renderer-safe transcript representation. */
+export type AgentReferenceDisplay = {
+  id: string;
+  kind: "workspace-file" | "workspace-directory" | "attachment";
+  displayName: string;
+  relativePath?: string;
+  mime?: string;
+  size?: number;
+};
+
+export type AgentSubmissionIntent = {
+  id: string;
+  referenceEpoch: string;
+  prompt: string;
+  model: string | null;
+  mode: string | null;
+  references: AgentDraftReference[];
+};
+
 export type AgentTurnStartRequest = {
   rootPath: string;
   sessionId: string;
   prompt: string;
   model?: string | null;
   mode?: string | null;
+  referenceEpoch?: string;
   attachments?: AgentFileReference[];
   contextReferences?: AgentFileReference[];
+  references?: AgentDraftReference[];
 };
 
 export type AgentTurnSteerRequest = {
@@ -367,6 +445,24 @@ export type AgentTurnSteerRequest = {
   sessionId: string;
   turnId: string;
   message: string;
+  referenceEpoch?: string;
+  references?: AgentDraftReference[];
+};
+
+export type AgentReferenceStageRequest = {
+  rootPath: string;
+  epoch: string;
+  files: File[];
+};
+
+export type AgentReferenceRevokeRequest = {
+  rootPath: string;
+  tokens: string[];
+};
+
+export type AgentWorkspaceReferenceResolveRequest = {
+  rootPath: string;
+  paths: string[];
 };
 
 export type AgentTurnInterruptRequest = {
@@ -419,6 +515,10 @@ export type AgentIpcChannel =
   | "agent:session-archive"
   | "agent:session-delete"
   | "agent:session-close"
+  | "agent:reference-stage"
+  | "agent:reference-revoke"
+  | "agent:reference-resolve-workspace"
+  | "agent:reference-pick-workspace"
   | "agent:turn-start"
   | "agent:turn-steer"
   | "agent:turn-interrupt"

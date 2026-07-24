@@ -18,7 +18,7 @@ import {
   HISTORY_GRAPH_ROW_HEIGHT,
   HistoryGraphVisual,
   getHistoryGraphWidth,
-} from "./HistoryGraphVisual";
+} from "../graph/HistoryGraphVisual";
 import type { CloudProjectHistoryProps } from "./types";
 
 export function CloudProjectHistorySidebar({
@@ -73,12 +73,15 @@ export function CloudProjectHistorySidebar({
           )}
         />
       ) : (
-        <ol className="desktop-cloud-history-sidebar-list" aria-label={t("cloud.history.commitHistory")}>
+        <ol
+          className="desktop-cloud-history-sidebar-list desktop-cloud-history-sidebar-state-list"
+          aria-label={t("cloud.history.commitHistory")}
+        >
           <li className="desktop-cloud-history-sidebar-state">
             {loading ? (
-            <PageLoading variant="fill" label={t("cloud.history.loading")} className="desktop-cloud-history-sidebar-loading" />
+              <PageLoading variant="fill" label={t("cloud.history.loading")} className="desktop-cloud-history-sidebar-loading" />
             ) : (
-            <CloudHistorySidebarEmpty error={error} />
+              <CloudHistorySidebarEmpty error={error} />
             )}
           </li>
         </ol>

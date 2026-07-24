@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentTurnTerminalState } from "./agent-contract";
+import type { AgentEvent, AgentReferenceDisplay, AgentTurnTerminalState } from "./agent-contract";
 import type {
   AgentActivity,
   AgentProjection,
@@ -107,9 +107,10 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
       next.runningTurnId = event.turnId;
       next.terminalState = null;
       const prompt = readString(payload.prompt).slice(0, MAX_MESSAGE_TEXT);
+      const references = readReferenceDisplays(payload.referenceDisplays);
       const indexes = projectionIndexes(next);
       const turnMessages = event.turnId ? indexes.messagesByTurn.get(event.turnId) ?? [] : [];
-      if (prompt && !turnMessages.some((index) => next.messages[index]?.role === "user")) {
+      if ((prompt || references.length > 0) && !turnMessages.some((index) => next.messages[index]?.role === "user")) {
         const messageIndex = next.messages.length;
         next.messages.push({
           id: `user:${event.turnId ?? event.sequence}`,
@@ -117,6 +118,7 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
           turnId: event.turnId,
           itemId: null,
           text: prompt,
+          references,
           streaming: false,
           terminalState: null,
           sequence: event.sequence,
@@ -305,6 +307,26 @@ function applyLegacyAgentEvent(next: AgentProjection, event: AgentEvent): AgentP
     default:
       return next;
   }
+}
+
+function readReferenceDisplays(value: unknown): AgentReferenceDisplay[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 32).flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const candidate = entry as Record<string, unknown>;
+    if (typeof candidate.id !== "string" || !/^[A-Za-z0-9:._-]{1,256}$/.test(candidate.id)) return [];
+    if (typeof candidate.displayName !== "string" || candidate.displayName.length === 0) return [];
+    const kind = candidate.kind;
+    if (kind !== "workspace-file" && kind !== "workspace-directory" && kind !== "attachment") return [];
+    return [{
+      id: candidate.id,
+      kind,
+      displayName: candidate.displayName.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 512),
+      ...(typeof candidate.relativePath === "string" ? { relativePath: candidate.relativePath.slice(0, 4_096) } : {}),
+      ...(typeof candidate.mime === "string" ? { mime: candidate.mime.slice(0, 200) } : {}),
+      ...(Number.isSafeInteger(candidate.size) && Number(candidate.size) >= 0 ? { size: Number(candidate.size) } : {}),
+    }];
+  });
 }
 
 function upsertAssistant(

@@ -1,12 +1,13 @@
 /**
  * @vitest-environment happy-dom
  */
-import React, { useState } from "react";
+import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../src/lib/cloudApi";
+import type { ProjectCloudContext } from "../src/features/cloud/project/context";
 import type { GitStatusSnapshot } from "../src/types/electron";
 
 const cloudApi = vi.hoisted(() => ({
@@ -18,8 +19,7 @@ vi.mock("../src/lib/cloudApi", async () => {
   return { ...actual, ...cloudApi };
 });
 
-import { useCloudWorkspaceContext } from "../src/features/cloud/workspace/useCloudWorkspaceContext";
-import type { RecentWorkspaceCloudContext } from "../src/features/cloud/workspace/cloudProjectResolution";
+import { useCurrentRepositoryCloudContext } from "../src/features/cloud/project/context";
 import { shouldBlockWorkspaceCloudResolution } from "../src/features/cloud/workspace/workspaceCloudResolutionKey";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -56,25 +56,24 @@ function gitStatus(...remotes: Array<{ fetch: string; push?: string }>): GitStat
 
 function ContextHarness({
   activeCloudSession = session,
+  activeWorkspace = workspace,
   status,
 }: {
   activeCloudSession?: DesktopCloudSession | null;
+  activeWorkspace?: Workspace | null;
   status: GitStatusSnapshot;
 }) {
-  const [contexts, setContexts] = useState<Record<string, RecentWorkspaceCloudContext>>({});
   const updateCloudSession = React.useCallback(() => undefined, []);
-  useCloudWorkspaceContext({
+  const context = useCurrentRepositoryCloudContext({
     activeCloudSession,
     activeGitStatus: status,
     cloudEnabled: true,
     desktopCloudApiBaseUrl: session.api_base_url,
     resolutionInputsLoading: false,
-    setRecentWorkspaceCloudContexts: setContexts,
     updateCloudSession,
-    workspace,
-    workspaceIsCloud: false,
+    workspace: activeWorkspace,
   });
-  return <output data-context={JSON.stringify(contexts[workspace.id] ?? null)} />;
+  return <output data-context={JSON.stringify(context)} />;
 }
 
 let container: HTMLDivElement;
@@ -92,51 +91,54 @@ afterEach(async () => {
   container.remove();
 });
 
-async function render(element: React.ReactNode) {
+function readContext(): ProjectCloudContext {
+  return JSON.parse(container.querySelector("output")?.getAttribute("data-context")
+    ?? '{"status":"resolving","projectId":null}') as ProjectCloudContext;
+}
+
+async function renderUntil(
+  element: React.ReactNode,
+  accepted: ProjectCloudContext["status"][],
+): Promise<ProjectCloudContext> {
   await act(async () => {
     root.render(element);
     await Promise.resolve();
   });
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
     const context = readContext();
-    if (context) return context;
+    if (accepted.includes(context.status)) return context;
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
   }
   return readContext();
 }
 
-function readContext(): RecentWorkspaceCloudContext | null {
-  return JSON.parse(container.querySelector("output")?.getAttribute("data-context") ?? "null");
-}
-
-describe("remote-first Cloud repository context", () => {
-  it("treats a repository without a PuppyOne remote as local-only and performs no Cloud request", async () => {
-    const context = await render(<ContextHarness status={gitStatus()} />);
-    expect(context).toMatchObject({
-      projectId: null,
-      hasCloudRemote: false,
-      error: null,
-      reason: null,
-    });
+describe("current-repository Cloud context", () => {
+  it("keeps a repository without a canonical PuppyOne remote local-only", async () => {
+    const context = await renderUntil(
+      <ContextHarness status={gitStatus()} />,
+      ["local-only"],
+    );
+    expect(context).toEqual({ status: "local-only", projectId: null });
     expect(cloudApi.getCloudRepositoryContext).not.toHaveBeenCalled();
   });
 
-  it("resolves a canonical Project remote through the user session", async () => {
+  it("resolves exactly the Project identified by the current repository remote", async () => {
     cloudApi.getCloudRepositoryContext.mockResolvedValue({
       target: { kind: "project_root", project_id: "project-1" },
       project: { id: "project-1", name: "Notes", capabilities: ["content.read"] },
       scope_path: null,
     });
-    const context = await render(
+    const context = await renderUntil(
       <ContextHarness status={gitStatus({ fetch: "https://cloud.example/git/project-1.git" })} />,
+      ["resolved"],
     );
-    expect(context).toMatchObject({
+    expect(context).toEqual({
+      status: "resolved",
       projectId: "project-1",
       target: { kind: "project_root", project_id: "project-1" },
-      hasCloudRemote: true,
       capabilities: ["content.read"],
-      error: null,
     });
+    expect(cloudApi.getCloudRepositoryContext).toHaveBeenCalledTimes(1);
     expect(cloudApi.getCloudRepositoryContext).toHaveBeenCalledWith(
       session,
       "project-1",
@@ -146,98 +148,92 @@ describe("remote-first Cloud repository context", () => {
     );
   });
 
-  it("resolves an exact Scope view without changing the owning Project", async () => {
+  it("resolves an exact Scope while preserving its owning Project", async () => {
     cloudApi.getCloudRepositoryContext.mockResolvedValue({
       target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
       project: { id: "project-1", name: "Notes", capabilities: ["content.read"] },
       scope_path: "docs",
     });
-    const context = await render(
+    const context = await renderUntil(
       <ContextHarness status={gitStatus({
         fetch: "https://cloud.example/git/project-1/scopes/scope-docs.git",
       })} />,
+      ["resolved"],
     );
     expect(context).toMatchObject({
+      status: "resolved",
       projectId: "project-1",
       target: { kind: "scope", project_id: "project-1", scope_id: "scope-docs" },
       scopePath: "docs",
     });
   });
 
-  it("requires sign-in for a remote but still performs no request while signed out", async () => {
-    const context = await render(
+  it("requires a session for a canonical remote without calling the API", async () => {
+    const context = await renderUntil(
       <ContextHarness
         activeCloudSession={null}
         status={gitStatus({ fetch: "https://cloud.example/git/project-1.git" })}
       />,
+      ["wrong-account"],
     );
-    expect(context).toMatchObject({
-      projectId: null,
-      candidateProjectId: "project-1",
-      hasCloudRemote: true,
-      reason: "wrong-account",
-      error: { code: "remote-sign-in" },
-    });
+    expect(context).toMatchObject({ status: "wrong-account", projectId: "project-1" });
     expect(cloudApi.getCloudRepositoryContext).not.toHaveBeenCalled();
   });
 
-  it("fails locally on a wrong host or conflicting locators", async () => {
-    const wrongHost = await render(
+  it("rejects a wrong host and conflicting locators locally", async () => {
+    const wrongHost = await renderUntil(
       <ContextHarness status={gitStatus({ fetch: "https://other.example/git/project-1.git" })} />,
+      ["wrong-host"],
     );
-    expect(wrongHost).toMatchObject({ reason: "wrong-host", error: { code: "remote-wrong-host" } });
+    expect(wrongHost).toMatchObject({ status: "wrong-host", projectId: "project-1" });
 
-    const conflict = await render(
+    const conflict = await renderUntil(
       <ContextHarness status={gitStatus({
         fetch: "https://cloud.example/git/project-1.git",
         push: "https://cloud.example/git/project-2.git",
       })} />,
+      ["locator-conflict"],
     );
-    expect(conflict).toMatchObject({
-      reason: "locator-conflict",
-      error: { code: "remote-locator-conflict" },
-    });
+    expect(conflict.status).toBe("locator-conflict");
     expect(cloudApi.getCloudRepositoryContext).not.toHaveBeenCalled();
   });
 
-  it("treats a legacy access-key remote as local-only Cloud context without an API request", async () => {
-    const context = await render(
+  it("does not revive the retired access-key remote format", async () => {
+    const context = await renderUntil(
       <ContextHarness status={gitStatus({ fetch: "https://cloud.example/git/ap/pwg_secret.git" })} />,
+      ["local-only"],
     );
-    expect(context).toMatchObject({
-      projectId: null,
-      hasCloudRemote: false,
-      reason: null,
-      error: null,
-    });
+    expect(context).toEqual({ status: "local-only", projectId: null });
     expect(cloudApi.getCloudRepositoryContext).not.toHaveBeenCalled();
   });
 
   it.each([
-    [401, "wrong-account", "remote-sign-in"],
-    [403, "not-authorized", "remote-not-authorized"],
-    [404, "not-found", "remote-not-found"],
-    [503, "network", "remote-network-failed"],
-  ] as const)("maps HTTP %s without exposing raw transport state", async (statusCode, reason, code) => {
-    const error = Object.assign(new Error("server detail"), { status: statusCode });
-    cloudApi.getCloudRepositoryContext.mockRejectedValue(error);
-    const context = await render(
-      <ContextHarness status={gitStatus({ fetch: "https://cloud.example/git/project-1.git" })} />,
+    [401, "wrong-account"],
+    [403, "not-authorized"],
+    [404, "not-found"],
+    [503, "temporarily-unavailable"],
+  ] as const)("maps HTTP %s to the body recovery phase %s", async (statusCode, expectedStatus) => {
+    cloudApi.getCloudRepositoryContext.mockRejectedValue(
+      Object.assign(new Error("server detail"), { status: statusCode }),
     );
-    expect(context).toMatchObject({ reason, error: { code } });
+    const context = await renderUntil(
+      <ContextHarness status={gitStatus({ fetch: "https://cloud.example/git/project-1.git" })} />,
+      [expectedStatus],
+    );
+    expect(context.status).toBe(expectedStatus);
   });
 
-  it("does not render SESSION_CHANGED as a repository failure", async () => {
+  it("keeps SESSION_CHANGED in resolving until a new session key arrives", async () => {
     cloudApi.getCloudRepositoryContext.mockRejectedValue(
-      Object.assign(new Error("Cloud session changed while the request was in flight."), {
-        code: "SESSION_CHANGED",
-      }),
+      Object.assign(new Error("Cloud session changed"), { code: "SESSION_CHANGED" }),
     );
-    const context = await render(
+    const context = await renderUntil(
       <ContextHarness status={gitStatus({ fetch: "https://cloud.example/git/project-1.git" })} />,
+      ["resolving"],
     );
-    expect(context?.error).toBeNull();
-    expect(context?.resolutionPending).toBe(true);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(context.status).toBe("resolving");
+    expect(cloudApi.getCloudRepositoryContext).toHaveBeenCalledTimes(1);
   });
 });
 

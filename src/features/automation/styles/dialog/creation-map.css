@@ -1,0 +1,177 @@
+.desktop-cloud-automation-map {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 86px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 12px;
+}
+
+.desktop-cloud-automation-node {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  overflow: hidden;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel-raised) 48%, transparent);
+}
+
+.desktop-cloud-automation-node-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--po-border-subtle);
+}
+
+.desktop-cloud-automation-node-header > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-automation-node-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 7px;
+}
+
+.desktop-cloud-automation-node-body {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  padding: 12px;
+}
+
+.desktop-cloud-automation-field {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.desktop-cloud-automation-field > span {
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.desktop-cloud-automation-field input,
+.desktop-cloud-automation-field select {
+  width: 100%;
+  height: 30px;
+  box-sizing: border-box;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  outline: 0;
+  background: var(--po-panel-raised);
+  color: var(--po-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  padding: 0 9px;
+}
+
+.desktop-cloud-automation-field input:focus,
+.desktop-cloud-automation-field select:focus {
+  border-color: var(--po-border-strong);
+}
+
+.desktop-cloud-automation-field small,
+.desktop-cloud-automation-field-empty {
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.desktop-cloud-automation-field small.error {
+  color: var(--po-danger);
+}
+
+.desktop-cloud-automation-connector {
+  display: grid;
+  grid-template-rows: minmax(22px, 1fr) 28px minmax(22px, 1fr) 24px;
+  justify-items: center;
+  align-items: center;
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-automation-connector > span {
+  width: 1px;
+  height: 100%;
+  background: var(--po-border-subtle);
+}
+
+.desktop-cloud-automation-connector button {
+  display: inline-flex;
+  height: 28px;
+  max-width: 84px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid var(--po-border);
+  border-radius: 999px;
+  background: var(--po-panel);
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.desktop-cloud-automation-chooser-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.desktop-cloud-automation-chooser-grid .desktop-cloud-automation-template-card {
+  min-height: 148px;
+}
+
+.desktop-cloud-automation-connect-state {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+}
+
+.desktop-cloud-automation-connect-state > svg {
+  color: var(--po-accent);
+}
+
+.desktop-cloud-automation-connect-state h3,
+.desktop-cloud-automation-connect-state p {
+  margin: 0;
+}
+
+.desktop-cloud-automation-connect-state h3 {
+  color: var(--po-text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 21px;
+}
+
+.desktop-cloud-automation-connect-state p {
+  max-width: 520px;
+  color: var(--po-text-muted);
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.desktop-cloud-automation-connect-state .desktop-cloud-automation-actions {
+  margin-top: 8px;
+}
+

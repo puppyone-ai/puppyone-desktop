@@ -147,6 +147,8 @@
   "connection.openingAuthorization": "正在打开安全授权…",
   "connection.waiting": "正在等待连接",
   "connection.authorizationAttention": "授权需要处理",
+  "connection.providerUnavailable": "{provider} 暂不可用",
+  "connection.providerUnavailableDetail": "当前云端环境尚未配置 {provider} 授权。请选择其他来源，或联系工作区管理员启用此功能。",
   "connection.finishInBrowser": "请在浏览器中完成 {provider} 的连接，此窗口随后会自动继续。",
   "create.chooseTitle": "选择自动化来源",
   "create.connectTitle": "连接 {provider}",

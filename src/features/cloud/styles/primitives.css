@@ -1,0 +1,185 @@
+/* Shared Cloud presentation primitives. Component-specific styles live with their feature. */
+.desktop-cloud-row-action {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--po-divider);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.desktop-cloud-row-action:hover:not(:disabled) {
+  background: var(--po-control-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-row-action.primary {
+  border-color: color-mix(in srgb, var(--po-accent) 34%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-accent) 10%, transparent);
+  color: var(--po-accent);
+}
+
+.desktop-cloud-row-action.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--po-accent) 15%, transparent);
+  color: var(--po-accent);
+}
+
+.desktop-cloud-row-action:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.desktop-cloud-authority-cell {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  padding: 10px 11px;
+  background: var(--po-panel);
+}
+
+.desktop-cloud-authority-cell span {
+  overflow: hidden;
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-authority-cell strong {
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-authority-cell.mono strong {
+  font-family: var(--po-font-mono);
+  font-size: 12px;
+}
+
+.desktop-cloud-authority-cell.ready strong {
+  color: var(--po-success);
+}
+
+.desktop-cloud-authority-cell.warning strong {
+  color: var(--po-warning);
+}
+
+.desktop-cloud-main-alert {
+  align-self: start;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--po-danger) 18%, var(--po-divider));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-danger) 8%, var(--po-panel));
+  color: var(--po-danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.desktop-cloud-main-alert.warning {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-color: color-mix(in srgb, var(--po-warning) 28%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-warning) 9%, var(--po-panel));
+  color: var(--po-warning);
+}
+
+.desktop-cloud-main-alert.info {
+  border-color: color-mix(in srgb, var(--po-info) 28%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-info) 9%, var(--po-panel));
+  color: color-mix(in srgb, var(--po-info) 72%, var(--po-text));
+}
+
+.desktop-cloud-main-alert.warning > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.desktop-cloud-main-alert.warning .desktop-cloud-row-action {
+  flex: 0 0 auto;
+}
+
+.desktop-cloud-main-alert.success {
+  border-color: color-mix(in srgb, var(--po-success) 24%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-success) 8%, var(--po-panel));
+  color: var(--po-success);
+}
+
+.desktop-cloud-section-card {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--po-divider);
+  border-radius: 8px;
+  background: var(--po-panel);
+}
+
+.desktop-cloud-section-card-header {
+  display: flex;
+  min-height: 30px;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+}
+
+.desktop-cloud-section-card-header > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-cloud-section-card-header span {
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-section-card-header small {
+  display: inline-flex;
+  min-width: 20px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--po-control);
+  color: var(--po-text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.desktop-cloud-section-card-body {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+  padding: 0;
+}
+
+@media (max-width: 720px) {
+  .desktop-cloud-row-action {
+    justify-self: start;
+  }
+}

@@ -63,7 +63,7 @@ Each entry is a `FileFormat` (typed in `fileFormats.ts`):
 | `filenames`, `filenamePatterns`, `extensions`, `mimeTypes` | Match keys; extensions include compound forms (`.tar.gz`) |
 | `category` | Semantic family: `image`, `document`, `code`, `data`, … drives icons and semantic kinds |
 | `defaultViewer` | The viewer id this format renders with (`office-preview`, `markdown-editor`, `pdf-preview`, …) |
-| `editable` | Whether the format may be edited as text |
+| `editable` | Format-level policy: whether the format may be edited as text. Semantic node kinds never override it. |
 | `ingestStrategy` | Declarative ingestion hint (`raw`, `parse-text`, `parse-structured`, `ocr`); reserved for cloud ingestion, not read by the desktop preview path |
 | `monacoLanguage` | Syntax highlighting language for code viewers |
 
@@ -166,6 +166,16 @@ depending on external extension authority. The optional
 Selection/commit lifecycle
 rules for this chain live in
 [Smooth Preview Transitions](smooth-preview-transitions.md).
+
+Editing authority is resolved once at that Host boundary. Four independent
+gates must all pass: the Preset Viewer capability is `edit`, the resolved
+format has `editable: true`, a complete canonical text source (not a preview
+snippet) has loaded, and the host supplies a persistence port. A Viewer may
+then apply a narrower format-specific runtime policy. `DataNode.type` remains
+presentation/classification metadata; it neither grants nor revokes editing.
+This separation is important for CSV/TSV, whose semantic kind is
+`spreadsheet` even though their resolved formats route to the editable
+`csv-table` contribution.
 
 ### 4.1 Two-revision diff is a sibling capability
 
@@ -303,8 +313,34 @@ source-code extensions)
 - Bar: table editor by default with in-cell editing and a source-mode
   toggle; delimiter inferred from the format; must stay responsive on
   large files (target: 10k rows) or truncate with a visible note.
-- Status: met for typical files; 10k-row behavior remains unverified
-  (Part 2 §9).
+- Status: the full local route is covered from a `spreadsheet`-classified node
+  through in-cell editing, canonical CSV serialization, the shared Document
+  Session, conditional persistence, and the authorized local write port. The
+  structured model has focused quoting/multiline/malformed-input tests and
+  preserves BOM/newline conventions after edits. CSV renders as a semantic
+  HTML table and shares the editable-table visual tokens, bounded column-width
+  estimator, midpoint drag geometry, and row/column menu vocabulary with
+  Markdown tables. Its compact settings menu replaces a permanent toolbar.
+  A narrow, sticky data-row gutter remains in the semantic HTML table for
+  alignment and accessibility, but is visually open outside the closed data
+  frame and excluded from CSV serialization. Its boundary grip opens the row
+  menu or reorders rows without hiding the row number. When the
+  first CSV record is presented as a sticky semantic header, the corner gutter
+  cell stays visually empty and body numbering restarts at `1`; the header
+  remains in the source model and exposes column actions only. Header
+  interpretation uses conservative, structured-data evidence on first open,
+  falls back to off when ambiguous, then remains a bounded file-view
+  preference. Toggling it never edits the CSV snapshot. Row-index visibility
+  is not a per-file option: it is structural editor chrome, with a future
+  presentation surface free to suppress it by mode. A transient column grip
+  handles scoped menus and drag reordering without adding a permanent A/B/C
+  coordinate row. The bottom and inline-end one-axis affordances still add one
+  row or column. Their corner intersection is an outward-only table expansion
+  control: dragging previews ghost cells and commits one atomic target-shape
+  edit on release, while clicking opens a keyboard-accessible bounded grid
+  picker. Inward movement never deletes data. CSV parsing, persistence, and
+  structural data operations remain
+  contribution-owned. The 10k-row behavior remains unverified (Part 2 §9).
 
 ### Tier 2 — preview-grade
 
@@ -466,6 +502,9 @@ source-code extensions)
 - `fileFormats.json` is the only routing declaration for extensions and MIME
   types. A format-specific renderer may inspect the already-resolved extension
   to select a parser, but it must not decide whether it owns the document.
+- A resolved format's `editable` field is the only format-level editing policy.
+  The Host intersects it with Viewer capability, complete-source readiness,
+  and persistence authority; semantic node kinds are never an editing gate.
 - `presetViewerManifest.json` is the only declaration of built-in Viewer
   capability, source, runtime, and `defaultViewer` aliases. Renderer and main
   must parse the same manifest, and every `FileFormat.defaultViewer` must map to

@@ -5,6 +5,7 @@ import { useLocalization } from "@puppyone/localization/react";
 import { ArrowDown, CircleAlert, LoaderCircle } from "lucide-react";
 import { PageLoading } from "../../../components/loading";
 import type { AgentSubmissionStage } from "../application/agent-controller-state";
+import type { AgentDraftReference, AgentReferenceDisplay } from "../domain/agent-contract";
 import type { AgentPart, AgentProjection, TimelineRow } from "../domain/agent-projection-types";
 import { AgentMessagePart } from "./AgentMessagePart";
 import { AgentPartRenderer } from "./AgentPartRenderer";
@@ -18,6 +19,7 @@ type AgentTranscriptProps = {
   projection: AgentProjection;
   loading: boolean;
   pendingPrompt?: string | null;
+  pendingReferences?: AgentDraftReference[];
   submissionStage?: AgentSubmissionStage;
   working?: boolean;
   runtimeLabel?: string;
@@ -36,6 +38,7 @@ function AgentTranscriptView({
   projection,
   loading,
   pendingPrompt = null,
+  pendingReferences = [],
   submissionStage = null,
   working = false,
   runtimeLabel: runtimeLabelProp,
@@ -70,7 +73,7 @@ function AgentTranscriptView({
   const submissionStatus = agentSubmissionStatusLabel(submissionStage, runtimeLabel, t);
   const showThinking = !submissionStatus && shouldShowAgentThinking(projection, working);
   const workingStatus = submissionStatus || (showThinking ? t("agent.activity.thinking") : null);
-  const hasLiveTail = Boolean(pendingPrompt) || Boolean(workingStatus);
+  const hasLiveTail = Boolean(pendingPrompt) || pendingReferences.length > 0 || Boolean(workingStatus);
   const scrollEdgeState = useScrollEdgeState(scrollRef, {
     revision: `${timeline.rows.length}:${layout.totalHeight}:${hasLiveTail ? "live" : "settled"}`,
   });
@@ -199,12 +202,13 @@ function AgentTranscriptView({
         )}
         {hasLiveTail && (
           <div className="desktop-agent-live-tail">
-            {pendingPrompt && <AgentMessagePart part={{
+            {(pendingPrompt || pendingReferences.length > 0) && <AgentMessagePart part={{
               id: "optimistic:user",
               kind: "user",
               turnId: null,
               itemId: null,
-              text: pendingPrompt,
+              text: pendingPrompt || "",
+              references: pendingReferences.map(draftReferenceDisplay),
               streaming: false,
               terminalState: null,
               sequence: Number.MAX_SAFE_INTEGER,
@@ -245,6 +249,18 @@ function AgentTranscriptView({
       )}
     </div>
   );
+}
+
+function draftReferenceDisplay(reference: AgentDraftReference): AgentReferenceDisplay {
+  return {
+    id: reference.id,
+    kind: reference.kind === "staged-attachment"
+      ? "attachment"
+      : reference.entryType === "directory" ? "workspace-directory" : "workspace-file",
+    displayName: reference.displayName,
+    ...(reference.kind === "workspace-entry" ? { relativePath: reference.relativePath } : {}),
+    ...(reference.kind === "staged-attachment" ? { mime: reference.mime, size: reference.size } : {}),
+  };
 }
 
 export const AgentTranscript = memo(AgentTranscriptView);

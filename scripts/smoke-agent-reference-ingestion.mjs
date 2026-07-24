@@ -1,0 +1,339 @@
+#!/usr/bin/env electron
+
+import fsp from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme } from "electron";
+import { createAgentAttachmentStore } from "../electron/main/agent/agent-attachment-store.mjs";
+import { registerAgentIpcHandlers } from "../electron/main/ipc/agent-ipc.mjs";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const preloadPath = path.join(repoRoot, "electron", "preload.cjs");
+const rendererPath = path.join(repoRoot, "dist", "index.html");
+const tempRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "puppyone-agent-reference-smoke-"));
+const userDataPath = path.join(tempRoot, "user-data");
+const workspacePath = path.join(tempRoot, "workspace");
+const stagingPath = path.join(userDataPath, "agent-runtime", "attachments");
+const imagePath = path.join(tempRoot, "finder-capture.png");
+const epoch = "electron-smoke-draft";
+const originalImage = Buffer.concat([
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  Buffer.from("immutable-electron-smoke"),
+]);
+const windows = [];
+let attachmentStore = null;
+let consumedReference = null;
+
+await fsp.mkdir(userDataPath, { recursive: true });
+await fsp.mkdir(path.join(workspacePath, "src"), { recursive: true });
+await fsp.writeFile(path.join(workspacePath, "alpha.md"), "alpha");
+await fsp.writeFile(path.join(workspacePath, "beta.md"), "beta");
+await fsp.writeFile(imagePath, originalImage);
+app.setPath("userData", userDataPath);
+app.commandLine.appendSwitch("disable-gpu");
+
+async function runSmoke() {
+  console.log("agent-reference smoke: Electron ready");
+  await fsp.access(rendererPath);
+  registerLocalizationFixture();
+  attachmentStore = createAgentAttachmentStore({ rootPath: stagingPath });
+  await attachmentStore.initialize();
+  registerAgentIpcHandlers({
+    ipcMain,
+    attachmentStore,
+    dialog,
+    getDialogOwnerWindow: (sender) => BrowserWindow.fromWebContents(sender),
+    authorizeWorkspaceRoot: async (_event, requestedRoot) => {
+      if (requestedRoot !== workspacePath) throw new Error("Electron smoke workspace authorization failed closed.");
+      return workspacePath;
+    },
+    localAgentInventory: { discover: async () => ({ connections: [], scannedAt: new Date(0).toISOString(), warnings: [] }) },
+    agentService: {
+      startTurn: async (sender, request, authorizedRoot) => {
+        if (authorizedRoot !== workspacePath || sender.id <= 0) throw new Error("Electron smoke owner correlation failed.");
+        const staged = request.references.find((reference) => reference.kind === "staged-attachment");
+        if (!staged || !request.privateReferenceLease?.tokens?.length) {
+          throw new Error("Electron smoke did not receive an authorized leased snapshot.");
+        }
+        consumedReference = {
+          path: staged.path,
+          bytes: await fsp.readFile(staged.path),
+          token: request.privateReferenceLease.tokens[0],
+          ownerId: sender.id,
+          references: request.references,
+        };
+        return { sessionId: "electron-smoke-session", turnId: "electron-smoke-turn" };
+      },
+    },
+  });
+
+  const grantResult = await runNativeGrantSmoke();
+  console.log("agent-reference smoke: native grants passed");
+  const layoutResult = await runProductionLayoutSmoke();
+  console.log("agent-reference smoke: production layout passed");
+  console.log(JSON.stringify({ ok: true, ...grantResult, ...layoutResult }, null, 2));
+}
+
+function registerLocalizationFixture() {
+  const state = { preference: "en", locale: "en", direction: "ltr", systemLanguages: ["en"] };
+  ipcMain.handle("localization:get-bootstrap", async () => state);
+  ipcMain.handle("localization:set-language-preference", async () => state);
+}
+
+async function runNativeGrantSmoke() {
+  console.log("agent-reference smoke: creating native grant window");
+  const window = createWindow({ show: false, width: 760, height: 700, preload: true });
+  await window.loadURL(referenceHarnessUrl());
+  console.log("agent-reference smoke: native grant window loaded");
+  await waitForRenderer(window, "Boolean(window.puppyoneDesktop && window.puppyoneSmoke)", Boolean);
+
+  window.webContents.debugger.attach("1.3");
+  const { root } = await window.webContents.debugger.sendCommand("DOM.getDocument", { depth: 2 });
+  const { nodeId } = await window.webContents.debugger.sendCommand("DOM.querySelector", {
+    nodeId: root.nodeId,
+    selector: "#native-file-input",
+  });
+  if (!nodeId) throw new Error("Electron smoke file input was not found.");
+  await window.webContents.debugger.sendCommand("DOM.setFileInputFiles", { nodeId, files: [imagePath] });
+  try {
+    await waitForRenderer(window, "window.puppyoneSmoke.results.length", (value) => value >= 1, 1_000);
+  } catch {
+    await window.webContents.executeJavaScript(
+      "document.querySelector('#native-file-input').dispatchEvent(new Event('change', { bubbles: true }))",
+      true,
+    );
+    await waitForRenderer(window, "window.puppyoneSmoke.results.length", (value) => value >= 1);
+  }
+
+  await window.webContents.executeJavaScript("window.puppyoneSmoke.dispatchDrop()", true);
+  await waitForRenderer(window, "window.puppyoneSmoke.results.length", (value) => value >= 2);
+  await window.webContents.executeJavaScript("window.puppyoneSmoke.dispatchPaste()", true);
+  await waitForRenderer(window, "window.puppyoneSmoke.results.length", (value) => value >= 3);
+  const workspaceReferences = await window.webContents.executeJavaScript("window.puppyoneSmoke.resolveWorkspace()", true);
+  const results = await window.webContents.executeJavaScript("window.puppyoneSmoke.results", true);
+
+  const drafts = results.map((entry) => entry.references?.[0]);
+  if (results.map((entry) => entry.source).join(",") !== "picker,drop,paste") {
+    throw new Error(`Electron smoke ingestion order was unexpected: ${JSON.stringify(results)}`);
+  }
+  if (drafts.some((draft) => !draft?.token || draft.kind !== "staged-attachment" || draft.status !== "ready")) {
+    throw new Error("Electron smoke did not stage picker/drop/paste Files through production preload.");
+  }
+  if (new Set(drafts.map((draft) => draft.token)).size !== 1) {
+    throw new Error("Electron smoke did not deduplicate one OS-backed File across ingestion routes.");
+  }
+  if (JSON.stringify({ results, workspaceReferences }).includes(tempRoot)) {
+    throw new Error("Electron smoke leaked an absolute source or workspace path to Renderer metadata.");
+  }
+  if (workspaceReferences.length !== 3
+    || workspaceReferences.filter((reference) => reference.entryType === "file").length !== 2
+    || workspaceReferences.filter((reference) => reference.entryType === "directory").length !== 1) {
+    throw new Error("Electron smoke did not resolve the ordered multi-entry Explorer selection.");
+  }
+
+  await fsp.writeFile(imagePath, "source changed after staging");
+  await window.webContents.executeJavaScript("window.puppyoneSmoke.startTurn()", true);
+  if (!consumedReference || !consumedReference.bytes.equals(originalImage) || consumedReference.path === imagePath) {
+    throw new Error("Electron smoke did not consume the immutable private snapshot.");
+  }
+  const revokeWhileLeased = await window.webContents.executeJavaScript("window.puppyoneSmoke.revokeCurrent()", true);
+  if (revokeWhileLeased.revoked !== 0) throw new Error("Renderer revocation broke an active snapshot lease.");
+  await fsp.access(consumedReference.path);
+  await attachmentStore.revokeLeased({
+    ownerId: consumedReference.ownerId,
+    workspaceRoot: workspacePath,
+    tokens: [consumedReference.token],
+  });
+  await expectMissing(consumedReference.path);
+  window.webContents.debugger.detach();
+  return {
+    nativeGrantRoutes: results.map((entry) => entry.source),
+    explorerEntries: workspaceReferences.map((reference) => `${reference.entryType}:${reference.relativePath}`),
+    immutableSnapshotBytes: consumedReference.bytes.byteLength,
+  };
+}
+
+async function runProductionLayoutSmoke() {
+  const window = createWindow({ show: false, width: 760, height: 820, preload: false });
+  const matrix = [];
+  for (const theme of ["light", "dark"]) {
+    nativeTheme.themeSource = theme;
+    const url = pathToFileURL(rendererPath);
+    url.searchParams.set("theme", theme);
+    url.hash = "agent-visual-smoke";
+    await window.loadURL(url.href);
+    await waitForRenderer(window, "document.querySelectorAll('.desktop-agent-reference-chips > span').length", (value) => value === 3);
+    for (const width of [420, 560, 760]) {
+      window.setContentSize(width, 820);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const snapshot = await window.webContents.executeJavaScript(`(() => {
+        const boundary = document.querySelector('.desktop-agent-boundary');
+        const trigger = document.querySelector('.desktop-agent-reference-trigger');
+        const error = document.querySelector('.desktop-agent-reference-chips .is-error small');
+        return {
+          theme: document.querySelector('[data-smoke-theme]')?.getAttribute('data-smoke-theme'),
+          width: Math.round(boundary?.getBoundingClientRect().width || 0),
+          viewport: window.innerWidth,
+          overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+          draftChips: document.querySelectorAll('.desktop-agent-reference-chips > span').length,
+          transcriptChips: document.querySelectorAll('.desktop-agent-message-references > span').length,
+          addLabel: trigger?.getAttribute('aria-label') || '',
+          visibleError: error?.textContent || '',
+        };
+      })()`, true);
+      if (snapshot.theme !== theme || snapshot.width <= 0 || snapshot.width > snapshot.viewport
+        || snapshot.overflow || snapshot.draftChips !== 3 || snapshot.transcriptChips < 2
+        || !snapshot.addLabel || !snapshot.visibleError) {
+        throw new Error(`Production Agent reference layout smoke failed: ${JSON.stringify(snapshot)}`);
+      }
+      matrix.push(`${theme}:${width}`);
+    }
+    await window.webContents.executeJavaScript("document.querySelector('.desktop-agent-reference-trigger').click()", true);
+    await waitForRenderer(window, "Boolean(document.querySelector('[role=menu]'))", Boolean);
+    await window.webContents.executeJavaScript(
+      "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))",
+      true,
+    );
+    await waitForRenderer(window, "Boolean(document.querySelector('[role=menu]'))", (value) => !value);
+    const image = await window.capturePage();
+    if (image.isEmpty()) throw new Error(`Production Agent reference ${theme} capture was empty.`);
+  }
+  window.destroy();
+  return { productionLayoutMatrix: matrix };
+}
+
+function createWindow({ show, width, height, preload }) {
+  const window = new BrowserWindow({
+    show,
+    width,
+    height,
+    webPreferences: {
+      ...(preload ? { preload: preloadPath } : {}),
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+    },
+  });
+  windows.push(window);
+  return window;
+}
+
+function referenceHarnessUrl() {
+  const html = `<!doctype html>
+    <html><body>
+      <input id="native-file-input" type="file" accept="image/png">
+      <div id="drop-zone" tabindex="0">drop</div>
+      <textarea id="paste-zone"></textarea>
+      <script>
+        const rootPath = ${JSON.stringify(workspacePath)};
+        const epoch = ${JSON.stringify(epoch)};
+        const results = [];
+        let pickerStarted = false;
+        let workspaceReferences = [];
+        async function ingest(source, files) {
+          const references = await window.puppyoneDesktop.stageAgentAttachments({ rootPath, epoch, files });
+          results.push({ source, references });
+          return references;
+        }
+        const input = document.querySelector('#native-file-input');
+        input.addEventListener('change', () => {
+          if (pickerStarted) return;
+          pickerStarted = true;
+          void ingest('picker', Array.from(input.files));
+        });
+        const dropZone = document.querySelector('#drop-zone');
+        dropZone.addEventListener('dragover', (event) => event.preventDefault());
+        dropZone.addEventListener('drop', (event) => {
+          event.preventDefault();
+          void ingest('drop', Array.from(event.dataTransfer.files));
+        });
+        const pasteZone = document.querySelector('#paste-zone');
+        pasteZone.addEventListener('paste', (event) => {
+          event.preventDefault();
+          void ingest('paste', Array.from(event.clipboardData.files));
+        });
+        window.puppyoneSmoke = {
+          results,
+          dispatchDrop() {
+            const transfer = new DataTransfer();
+            transfer.items.add(input.files[0]);
+            dropZone.dispatchEvent(new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true }));
+          },
+          dispatchPaste() {
+            const transfer = new DataTransfer();
+            transfer.items.add(input.files[0]);
+            pasteZone.dispatchEvent(new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }));
+          },
+          async resolveWorkspace() {
+            workspaceReferences = await window.puppyoneDesktop.resolveAgentWorkspaceReferences({
+              rootPath,
+              paths: ['alpha.md', 'beta.md', 'src'],
+            });
+            return workspaceReferences;
+          },
+          startTurn() {
+            return window.puppyoneDesktop.startAgentTurn({
+              rootPath,
+              sessionId: 'electron-smoke-session',
+              prompt: 'Inspect the staged image and workspace selection.',
+              referenceEpoch: epoch,
+              references: [...workspaceReferences, results[0].references[0]],
+            });
+          },
+          revokeCurrent() {
+            return window.puppyoneDesktop.revokeAgentAttachments({
+              rootPath,
+              tokens: [results[0].references[0].token],
+            });
+          },
+        };
+      </script>
+    </body></html>`;
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+
+async function waitForRenderer(window, expression, predicate, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  let value;
+  while (Date.now() < deadline) {
+    value = await window.webContents.executeJavaScript(expression, true);
+    if (predicate(value)) return value;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`Electron smoke timed out waiting for ${expression}; last value: ${String(value)}`);
+}
+
+async function expectMissing(filename) {
+  try {
+    await fsp.access(filename);
+  } catch {
+    return;
+  }
+  throw new Error(`Expected private snapshot cleanup: ${path.basename(filename)}`);
+}
+
+async function finish() {
+  for (const window of windows) {
+    if (!window.isDestroyed()) window.destroy();
+  }
+  await attachmentStore?.close?.().catch(() => undefined);
+  await fsp.rm(tempRoot, { recursive: true, force: true }).catch(() => undefined);
+  app.quit();
+}
+
+app.whenReady().then(async () => {
+  try {
+    await runSmoke();
+  } catch (error) {
+    console.error(error);
+    process.exitCode = 1;
+  } finally {
+    await finish();
+  }
+}).catch(async (error) => {
+  console.error(error);
+  process.exitCode = 1;
+  await finish();
+});

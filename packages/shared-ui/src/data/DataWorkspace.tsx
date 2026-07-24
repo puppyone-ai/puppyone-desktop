@@ -243,9 +243,7 @@ export function DataWorkspace({
 }: DataWorkspaceProps) {
   const { direction, t } = useLocalization();
   const resolvedCapabilities = { ...defaultDataCapabilities, ...capabilities };
-  const resolvedDocumentSourceKind: DocumentSourceKind = workspace.path.startsWith("cloud://")
-    ? "cloud"
-    : "local";
+  const resolvedDocumentSourceKind: DocumentSourceKind = documentSourceKind ?? "local";
   const [tree, setTree] = useState<DataNode[]>([]);
   const [internalActivePath, setInternalActivePath] = useState<string | null>(defaultActivePath);
   const [selectedNodePaths, setSelectedNodePaths] = useState<Set<string>>(() => (
@@ -1325,6 +1323,7 @@ export function DataWorkspace({
                   >
                     <ExplorerTree
                       nodes={tree}
+                      dragWorkspaceId={workspace.id}
                       activePath={resolvedActivePath}
                       selectedPaths={selectedNodePaths}
                       cutPaths={explorerCutPaths}

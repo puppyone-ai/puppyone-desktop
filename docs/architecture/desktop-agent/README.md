@@ -1,11 +1,9 @@
 # Desktop Agent architecture
 
 Status: current architecture entry point. The multi-native runtime/session
-foundation is implemented. The complete Composer reference-acquisition path is
-a normative target in
-[Agent Composer reference ingestion](composer-reference-ingestion.md) and is
-tracked separately by `ISSUE-404`; it must not be described as implemented
-until its acquisition, staging, adapter and transcript gates pass.
+foundation and the complete Composer reference-acquisition path are
+implemented. [Agent Composer reference ingestion](composer-reference-ingestion.md)
+is the canonical cross-layer contract and verification record.
 
 PuppyOne Desktop provides one right-sidebar Chat over multiple native coding
 Agents. It is a client and safety-conscious control plane, not a universal
@@ -480,7 +478,7 @@ micro-optimizations.
 | [ADR-006](ADR-006-native-harness-adapters-and-acp.md) | accepted and implemented | native harness routes, ACP boundary, persistence and security |
 | [ADR-005](ADR-005-multi-native-agent-backends.md) | accepted and implemented | product vocabulary and multi-native product model |
 | [ADR-002](ADR-002-agent-contract-and-boundaries.md) | accepted and implemented | shared contract and dependency boundaries |
-| [Composer reference ingestion](composer-reference-ingestion.md) | normative target; implementation pending | workspace context, external staging, Composer UX, capability and transcript contract |
+| [Composer reference ingestion](composer-reference-ingestion.md) | implemented and canonical | workspace context, external staging, Composer UX, capability and transcript contract |
 | [ADR-004](ADR-004-managed-agent-engine-distribution.md) | accepted, narrow scope | managed kernel distribution for PuppyOne Agent only |
 | [ADR-001](ADR-001-opencode-sidecar.md) | retired | former HTTP/SSE sidecar choice; no longer an implementation option |
 | [ADR-003](ADR-003-opencode-only-chat-harness.md) | retired | former single-OpenCode routing choice; no longer an implementation option |

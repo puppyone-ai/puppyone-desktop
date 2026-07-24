@@ -147,6 +147,8 @@
   "connection.openingAuthorization": "Ouverture d’une autorisation sécurisée…",
   "connection.waiting": "En attente de connexion",
   "connection.authorizationAttention": "L’autorisation nécessite une attention particulière",
+  "connection.providerUnavailable": "{provider} n’est pas encore disponible",
+  "connection.providerUnavailableDetail": "L’autorisation {provider} n’est pas configurée pour ce déploiement Cloud. Choisissez une autre source ou demandez à l’administrateur de votre espace de travail de l’activer.",
   "connection.finishInBrowser": "Terminez la connexion {provider} dans votre navigateur. Cette fenêtre continuera automatiquement.",
   "create.chooseTitle": "Choisissez une source d’automatisation",
   "create.connectTitle": "Connectez-vous {provider}",

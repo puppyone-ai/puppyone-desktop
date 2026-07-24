@@ -47,4 +47,16 @@ export const OPENCODE_CAPABILITIES = Object.freeze({
   mcp: true,
   skills: true,
   compaction: true,
+  referenceInputs: Object.freeze({
+    workspaceFiles: true,
+    workspaceDirectories: true,
+    images: "data-url",
+    genericFiles: "none",
+    acceptedMimeTypes: Object.freeze(["image/png", "image/jpeg", "image/gif", "image/webp"]),
+    maxReferences: 32,
+    maxReferenceBytes: 25 * 1024 * 1024,
+    maxTotalReferenceBytes: 25 * 1024 * 1024,
+    steer: false,
+    attachmentOnly: false,
+  }),
 });

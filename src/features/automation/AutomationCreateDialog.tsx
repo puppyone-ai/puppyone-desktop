@@ -65,6 +65,10 @@ type AutomationCreateFailure = Readonly<{
   detail: string;
   providerLabel: string;
 }>;
+type OauthConnectFailure = Readonly<{
+  code: "provider-unavailable" | "retryable";
+  detail: string;
+}>;
 
 export type CloudAutomationCreationEcho = {
   connectionId: string;
@@ -113,7 +117,7 @@ export function CloudNewAutomationDialog({
   const [oauthReloadVersion, setOauthReloadVersion] = useState(0);
   const [connectAttempt, setConnectAttempt] = useState(0);
   const [connectPhase, setConnectPhase] = useState<"starting" | "waiting" | "error">("starting");
-  const [connectError, setConnectError] = useState<string | null>(null);
+  const [connectError, setConnectError] = useState<OauthConnectFailure | null>(null);
   const [targetPath, setTargetPath] = useState("");
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
   const [source, setSource] = useState<AutomationSourceSelection | null>(null);
@@ -217,7 +221,7 @@ export function CloudNewAutomationDialog({
             } catch (error) {
               if (cancelled) return;
               setConnectPhase("error");
-              setConnectError(error instanceof Error ? error.message : String(error));
+              setConnectError(toOauthConnectFailure(error));
             }
           };
           pollTimer = window.setTimeout(poll, 1_000);
@@ -225,7 +229,7 @@ export function CloudNewAutomationDialog({
         .catch((error) => {
           if (cancelled) return;
           setConnectPhase("error");
-          setConnectError(error instanceof Error ? error.message : String(error));
+          setConnectError(toOauthConnectFailure(error));
         });
     }, 0);
     return () => {
@@ -369,7 +373,11 @@ export function CloudNewAutomationDialog({
                 setStep("choose");
                 setOauthReloadVersion((current) => current + 1);
               }}
-              onRetry={() => setConnectAttempt((current) => current + 1)}
+              onRetry={() => {
+                setConnectPhase("starting");
+                setConnectError(null);
+                setConnectAttempt((current) => current + 1);
+              }}
             />
           ) : (
             <>
@@ -491,11 +499,12 @@ function ConnectionWaitingState({
 }: {
   provider: DesktopCloudAutomationProviderSpec;
   phase: "starting" | "waiting" | "error";
-  error: string | null;
+  error: OauthConnectFailure | null;
   onCancel: () => void;
   onRetry: () => void;
 }) {
   const { t } = useLocalization();
+  const providerUnavailable = phase === "error" && error?.code === "provider-unavailable";
   return (
     <div className="desktop-cloud-automation-connect-state">
       {phase === "error" ? <ExternalLink size={28} /> : <LoaderCircle className="desktop-dialog-spinner" size={28} />}
@@ -503,15 +512,21 @@ function ConnectionWaitingState({
         ? t("automation.connection.openingAuthorization")
         : phase === "waiting"
           ? t("automation.connection.waiting")
-          : t("automation.connection.authorizationAttention")}</h3>
-      <p>
+          : providerUnavailable
+            ? t("automation.connection.providerUnavailable", { provider: bidiIsolate(provider.display_name) })
+            : t("automation.connection.authorizationAttention")}</h3>
+      <p dir="auto">
         {phase === "error"
-          ? t("automation.error.detail", { detail: bidiIsolate(error) })
+          ? providerUnavailable
+            ? t("automation.connection.providerUnavailableDetail", { provider: bidiIsolate(provider.display_name) })
+            : t("automation.error.detail", { detail: bidiIsolate(error?.detail) })
           : t("automation.connection.finishInBrowser", { provider: bidiIsolate(provider.display_name) })}
       </p>
       <div className="desktop-cloud-automation-actions">
-        <button className="desktop-dialog-button" type="button" onClick={onCancel}>{t("common.action.cancel")}</button>
-        {phase === "error" && (
+        <button className={`desktop-dialog-button${providerUnavailable ? " primary" : ""}`} type="button" onClick={onCancel}>
+          {providerUnavailable ? t("automation.create.chooseAnotherSource") : t("common.action.cancel")}
+        </button>
+        {phase === "error" && !providerUnavailable && (
           <button className="desktop-dialog-button primary" type="button" onClick={onRetry}>{t("automation.action.tryAgain")}</button>
         )}
       </div>
@@ -600,6 +615,22 @@ function toAutomationCreateFailure(error: unknown, providerLabel: string): Autom
     return { code: "authorization", detail: message, providerLabel };
   }
   return { code: "generic", detail: message, providerLabel };
+}
+
+function toOauthConnectFailure(error: unknown): OauthConnectFailure {
+  const detail = error instanceof Error ? error.message : String(error);
+  const code = error && typeof error === "object" && "code" in error
+    ? String((error as { code?: unknown }).code || "").trim().toLowerCase()
+    : "";
+  const providerUnavailable = [
+    "oauth_not_configured",
+    "provider_not_configured",
+    "integration_not_configured",
+  ].includes(code) || /oauth.{0,80}(?:not configured|not available)|(?:not configured|not available).{0,80}oauth|required environment variables|missing.{0,60}(?:oauth|client (?:id|secret)|credentials?)/i.test(detail);
+  return {
+    code: providerUnavailable ? "provider-unavailable" : "retryable",
+    detail,
+  };
 }
 
 function formatAutomationCreateFailure(

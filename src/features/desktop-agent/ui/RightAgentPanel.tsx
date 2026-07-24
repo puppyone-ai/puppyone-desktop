@@ -17,8 +17,8 @@ import type { AgentSubmissionStage } from "../application/agent-controller-state
 import { listCodingAgentProviders } from "../domain/agent-backend-routing";
 import { getElectronAgentClient } from "../infrastructure/electron/electronAgentClient";
 import { useAgentSessionPreparation } from "./useAgentSessionPreparation";
+import { useAgentReferenceIngestion } from "./useAgentReferenceIngestion";
 import "./desktop-agent.css";
-
 export type RightAgentPanelHandle = { newSession: () => void };
 type RightAgentPanelProps = {
   workspace: Workspace;
@@ -32,7 +32,6 @@ type RightAgentPanelProps = {
   preferredModel?: string | null;
   onPreferredModelChange?: (model: string) => void;
 };
-
 export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanelProps>(function RightAgentPanel({
   workspace,
   active,
@@ -48,6 +47,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   const { t } = useLocalization();
   const controller = useMemo(() => getAgentSessionController(workspace.path, getElectronAgentClient), [workspace.path]);
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
+  const referenceIngestion = useAgentReferenceIngestion({ controller, workspaceId: workspace.id, capabilities: state.inspection?.capabilities?.referenceInputs });
   useEffect(() => {
     if (!active) return;
     controller.setInitialRuntimePreference(preferredRuntimeId);
@@ -111,7 +111,6 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
           : t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID);
   const sessionStatus = state.session?.terminalState;
   const statusCode = state.session ? sessionStatusCode(sessionStatus) : readinessStatusCode(readiness?.status);
-
   const hasStatus = unavailable || failed || Boolean(state.error);
   const handleViewportChange = useCallback((scrollTop: number, measurements: Record<string, number>, pinned: boolean) => {
     controller.rememberViewport(scrollTop, measurements, pinned);
@@ -129,11 +128,13 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
       if (switched && model) onPreferredModelChange?.(model);
     });
   }, [controller, onPreferredModelChange, onPreferredRuntimeChange]);
-
   return (
     <AgentPanelLayout
       ariaLabel={t("agent.panel.chat", { agent: bidiIsolate(runtimeLabel) })}
-      phase={state.phase}
+      phase={state.phase} dropActive={referenceIngestion.dropActive} dropInvalid={referenceIngestion.dropInvalid}
+      dropLabel={referenceIngestion.dropLabel} announcement={referenceIngestion.announcement}
+      onDragEnter={referenceIngestion.onDragEnter} onDragOver={referenceIngestion.onDragOver}
+      onDragLeave={referenceIngestion.onDragLeave} onDrop={referenceIngestion.onDrop}
       header={minimalMode ? null : (
         <AgentSurfaceHeader
           title={state.session?.title || t("agent.header.newChat")}
@@ -166,7 +167,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         key={sessionKey}
         projection={state.projection}
         loading={startupLoading}
-        pendingPrompt={state.pendingPrompt}
+        pendingPrompt={state.pendingPrompt} pendingReferences={state.pendingIntent?.references ?? []}
         submissionStage={submissionStage}
         working={state.submitting || Boolean(state.projection.runningTurnId)}
         runtimeLabel={runtimeLabel}
@@ -211,12 +212,13 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
           selectedModel={state.selectedModel}
           onSelectModel={handleSelectModel}
           commands={capabilities?.slashCommands ? inspection?.commands ?? [] : []}
-          attachments={state.attachments}
-          contextReferences={state.contextReferences}
+          references={state.references} referenceCapabilities={capabilities?.referenceInputs}
           steerAvailable={Boolean(capabilities?.steer)}
           queueAvailable={Boolean(capabilities?.queue)}
-          onRemoveAttachment={(path) => controller.removeAttachment(path)}
-          onRemoveContext={(path) => controller.removeContextReference(path)}
+          onRemoveReference={(id) => controller.removeReference(id)}
+          onRetryReference={(id) => controller.retryReference(id)}
+          onAddExternalFiles={referenceIngestion.addExternalFiles} onPaste={referenceIngestion.onPaste}
+          onPickWorkspaceReferences={referenceIngestion.pickWorkspaceReferences}
           onSubmit={handleSubmit}
           onStop={() => void controller.stop()}
         />

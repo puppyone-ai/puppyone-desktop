@@ -90,8 +90,13 @@ const registrySource = read(absolute("src/features/app-shell/workspace-surfaces/
 const registryTypes = read(absolute("src/features/app-shell/workspace-surfaces/workspaceSurfaceTypes.ts"));
 const workspaceContent = read(absolute("src/features/app-shell/DesktopWorkspaceContent.tsx"));
 const workspaceDataSurface = read(absolute("src/features/app-shell/DesktopDataWorkspaceSurface.tsx"));
-for (const id of ["data", "git", "plugins", "cloud", "access", "automation", "settings"]) {
+for (const id of ["data", "git", "plugins", "cloud", "settings"]) {
   if (!registrySource.includes(`id: "${id}"`)) errors.push(`Workspace Surface Registry is missing ${id}`);
+}
+for (const retiredTopLevelId of ["access", "automation"]) {
+  if (registrySource.includes(`id: "${retiredTopLevelId}"`)) {
+    errors.push(`${retiredTopLevelId} must remain a Cloud Project route, not a top-level Workspace Surface`);
+  }
 }
 for (const requiredToken of ["navigation:", "lifecycle:", "isAvailable:", "create:"]) {
   if (!registrySource.includes(requiredToken)) errors.push(`Workspace Surface Registry is missing ${requiredToken}`);

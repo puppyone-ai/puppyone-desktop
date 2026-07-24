@@ -27,7 +27,6 @@ import {
   DesktopSidebarFooterNavigation,
   DesktopSidebarRailNavigation,
   DesktopSidebarTopNavigation,
-  type DesktopWorkspaceSurfaceAction,
 } from "./navigation";
 import { WorkspaceSurfaceOutlet, type ResolvedWorkspaceSurface } from "./workspace-surfaces";
 import type { DesktopView } from "../../components/DesktopCloudShell";
@@ -37,7 +36,6 @@ type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 export type DesktopDataWorkspaceSurfaceProps = {
   activeAiEditRequest: AiEditRequest | null;
   activeDataPath: string | null;
-  cloudWorkspace: boolean;
   dataPort: NonNullable<DataWorkspaceProps["dataPort"]>;
   editorInteractionPreferences: NonNullable<DataWorkspaceProps["editorInteractionPreferences"]>;
   fileClipboardController: FileClipboardController;
@@ -46,16 +44,13 @@ export type DesktopDataWorkspaceSurfaceProps = {
   navigation: {
     activeView: DesktopView;
     availableSurfaceIds: readonly DesktopView[];
-    cloudHistoryEnabled: boolean;
     cloudHubEnabled: boolean;
-    cloudToolsEnabled: boolean;
     gitEnabled: boolean;
     pluginsEnabled: boolean;
     gitIncomingCount: number;
     gitOperationLoading: string | null;
     gitStatus: GitStatusSnapshot | null;
     workspaceChangeCount: number;
-    surfaceAction: DesktopWorkspaceSurfaceAction | null;
     onNavigate: (view: DesktopView) => void;
     onOpenSettings: () => void;
   };
@@ -79,7 +74,6 @@ export type DesktopDataWorkspaceSurfaceProps = {
 export function DesktopDataWorkspaceSurface({
   activeAiEditRequest,
   activeDataPath,
-  cloudWorkspace,
   dataPort,
   editorInteractionPreferences,
   fileClipboardController,
@@ -102,9 +96,7 @@ export function DesktopDataWorkspaceSurface({
   const navigationCommon = {
     activeView: navigation.activeView,
     availableSurfaceIds: navigation.availableSurfaceIds,
-    cloudHistoryEnabled: navigation.cloudHistoryEnabled,
     cloudHubEnabled: navigation.cloudHubEnabled,
-    cloudToolsEnabled: navigation.cloudToolsEnabled,
     gitEnabled: navigation.gitEnabled,
     pluginsEnabled: navigation.pluginsEnabled,
     gitIncomingCount: navigation.gitIncomingCount,
@@ -145,7 +137,7 @@ export function DesktopDataWorkspaceSurface({
         onActiveNodeChange={onActiveDataNodeChange}
         onOpenExternalUrl={openExternalUrl}
         viewerExtensionAdapter={viewerExtensionAdapter}
-        documentSourceKind={cloudWorkspace ? "cloud" : "local"}
+        documentSourceKind="local"
         resizableExplorer
         explorerCollapsed={false}
         explorerWidth={preferences.explorerWidth}
@@ -196,7 +188,7 @@ export function DesktopDataWorkspaceSurface({
           />
         ) : undefined}
         explorerRailSlot={!minimalMode && preferences.sidebarNavigationPlacement === "left" ? (
-          <DesktopSidebarRailNavigation {...navigationCommon} surfaceAction={navigation.surfaceAction} />
+          <DesktopSidebarRailNavigation {...navigationCommon} />
         ) : undefined}
         showPreviewHeader={false}
         hidePreviewSourceView
@@ -205,8 +197,8 @@ export function DesktopDataWorkspaceSurface({
         editorSaveMode="auto"
         htmlTrustMode="safe"
         aiEditRequest={activeAiEditRequest}
-        enableMarkdownLinkContentIndexing={!cloudWorkspace}
-        folderExpansionStrategy={cloudWorkspace ? "optimistic" : "load-before-expand"}
+        enableMarkdownLinkContentIndexing
+        folderExpansionStrategy="load-before-expand"
         refreshKey={workspaceRefreshToken}
         explorerNodeActionSlot={(state, node) => (
           <DesktopExplorerRowActions
@@ -225,7 +217,7 @@ export function DesktopDataWorkspaceSurface({
           ? undefined
           : <WorkspaceSurfaceOutlet region="sidebar" surface={resolvedSurface} />}
         explorerFooterSlot={!minimalMode && preferences.sidebarNavigationPlacement === "bottom" ? (
-          <DesktopSidebarFooterNavigation {...navigationCommon} surfaceAction={navigation.surfaceAction} />
+          <DesktopSidebarFooterNavigation {...navigationCommon} />
         ) : undefined}
         mainSlot={resolvedSurface.id === "data" || resolvedSurface.content.main == null
           ? undefined

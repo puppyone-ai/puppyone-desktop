@@ -1,4 +1,4 @@
-import type { AgentFileReference, AgentProviderInspection } from "../domain/agent-contract";
+import type { AgentDraftReference, AgentProviderInspection } from "../domain/agent-contract";
 
 export function chooseAgentMode(inspection: AgentProviderInspection | null, current: string | null) {
   const modes = inspection?.modes ?? [];
@@ -6,8 +6,10 @@ export function chooseAgentMode(inspection: AgentProviderInspection | null, curr
   return modes.find((mode) => mode.isDefault)?.id || modes[0]?.id || null;
 }
 
-export function mergeAgentReferences(current: AgentFileReference[], incoming: AgentFileReference[]) {
-  const byPath = new Map(current.map((entry) => [entry.path, entry]));
-  for (const entry of incoming) if (entry?.path) byPath.set(entry.path, entry);
-  return Array.from(byPath.values()).slice(0, 32);
+export function mergeAgentReferences(current: AgentDraftReference[], incoming: AgentDraftReference[]) {
+  const byIdentity = new Map(current.map((entry) => [entry.id, entry]));
+  for (const entry of incoming) if (entry?.id) byIdentity.set(entry.id, entry);
+  // Keep bounded error rows visible instead of silently dropping an over-limit
+  // item before the user can understand or remove it.
+  return Array.from(byIdentity.values()).slice(0, 64);
 }

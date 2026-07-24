@@ -74,7 +74,7 @@ export function CloudCommitDetail({
             )}
           </div>
         </div>
-        <h1><bdi>{commit.message || t("cloud.history.updateWorkspace")}</bdi></h1>
+        <p><bdi>{commit.message || t("cloud.history.updateWorkspace")}</bdi></p>
         <div className="desktop-commit-meta">
           <bdi>{author}</bdi>
           <span title={exactTime || undefined}>
@@ -97,6 +97,7 @@ export function CloudCommitDetail({
           {changes.map((change, index) => (
             <GitFileDiffSurface
               file={toCloudGitFileDiff(change)}
+              contentMode="metadata"
               key={`${change.path}:${getCloudHistoryChangeKind(change)}:${index}`}
             />
           ))}

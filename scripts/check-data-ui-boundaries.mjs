@@ -39,7 +39,6 @@ const sharedTreeSelectorPattern = /(^|[^A-Za-z0-9_-])\.(explorer-tree-shell|expl
 const workspaceOpeningPrivateSymbols = [
   "openWorkspaceInCurrentWindow",
   "openWorkspaceInNewWindow",
-  "openCloudProjectInNewWindow",
   "selectWorkspaceFolder",
   "selectWorkspaceFolderInNewWindow",
 ];

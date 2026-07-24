@@ -20,14 +20,11 @@ export function DesktopTitlebarContext({
   localBranches,
   remoteBranches,
   workspace,
-  workspaceKind,
-  workspaceIsCloud,
   workspaceSwitcherItems,
   workspaceSwitcherOpen,
   workspaceSwitcherRef,
   onCheckoutBranch,
   onCloseBranchSwitcher,
-  onCreateCloudProject,
   onGoHome,
   onOpenFolder,
   onOpenWorkspaceSwitcherItem,
@@ -36,7 +33,7 @@ export function DesktopTitlebarContext({
 }: DesktopTitlebarContextProps) {
   const { t } = useLocalization();
   const workspaceTitlebarLabel = workspace.name.trim() || workspace.name;
-  const branchReady = !workspaceIsCloud && activeGitStatus?.isRepo === true;
+  const branchReady = activeGitStatus?.isRepo === true;
   const branchLabel = branchReady
     ? (activeGitStatus.branch ?? t("shell.branch.detached"))
     : gitStatusLoading
@@ -52,30 +49,26 @@ export function DesktopTitlebarContext({
         refObject={workspaceSwitcherRef}
         titlebarLabel={workspaceTitlebarLabel}
         workspace={workspace}
-        workspaceKind={workspaceKind}
         items={workspaceSwitcherItems}
         onOpenFolder={onOpenFolder}
-        onCreateCloudProject={onCreateCloudProject}
         onOpenItem={onOpenWorkspaceSwitcherItem}
         onGoHome={onGoHome}
         onToggle={onToggleWorkspaceSwitcher}
       />
-      {!workspaceIsCloud && (
-        <DesktopBranchSwitcher
-          open={branchSwitcherOpen}
-          refObject={branchSwitcherRef}
-          titlebarLabel={branchTitlebarLabel}
-          branchLabel={branchLabel}
-          disabled={!branchReady}
-          loading={gitStatusLoading}
-          localBranches={localBranches}
-          remoteBranches={remoteBranches}
-          operationLoading={gitOperationLoading}
-          onCheckout={onCheckoutBranch}
-          onDone={onCloseBranchSwitcher}
-          onToggle={onToggleBranchSwitcher}
-        />
-      )}
+      <DesktopBranchSwitcher
+        open={branchSwitcherOpen}
+        refObject={branchSwitcherRef}
+        titlebarLabel={branchTitlebarLabel}
+        branchLabel={branchLabel}
+        disabled={!branchReady}
+        loading={gitStatusLoading}
+        localBranches={localBranches}
+        remoteBranches={remoteBranches}
+        operationLoading={gitOperationLoading}
+        onCheckout={onCheckoutBranch}
+        onDone={onCloseBranchSwitcher}
+        onToggle={onToggleBranchSwitcher}
+      />
     </div>
   );
 }
@@ -90,14 +83,11 @@ type DesktopTitlebarContextProps = {
   localBranches: GitBranchSummary[];
   remoteBranches: GitBranchSummary[];
   workspace: Workspace;
-  workspaceKind: DesktopWorkspaceSwitcherItem["kind"];
-  workspaceIsCloud: boolean;
   workspaceSwitcherItems: DesktopWorkspaceSwitcherItem[];
   workspaceSwitcherOpen: boolean;
   workspaceSwitcherRef: RefObject<HTMLDivElement>;
   onCheckoutBranch: (branchName: string, remote: boolean) => Promise<boolean>;
   onCloseBranchSwitcher: () => void;
-  onCreateCloudProject?: () => void | Promise<void>;
   onGoHome: () => void;
   onOpenFolder: () => void;
   onOpenWorkspaceSwitcherItem: (item: DesktopWorkspaceSwitcherItem) => void;

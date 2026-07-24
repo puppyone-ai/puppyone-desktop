@@ -9,12 +9,10 @@ export function useAiEditReviewRequest({
   aiEditAssistEnabled,
   onWorkspaceContentChanged,
   workspace,
-  workspaceIsCloud,
 }: {
   aiEditAssistEnabled: boolean;
   onWorkspaceContentChanged: () => void;
   workspace: Workspace | null;
-  workspaceIsCloud: boolean;
 }) {
   const [latestAiEditRequest, setLatestAiEditRequest] = useState<AiEditRequest | null>(null);
   const workspacePathRef = useRef<string | null>(null);
@@ -25,7 +23,7 @@ export function useAiEditReviewRequest({
   }, [workspace?.path]);
 
   useEffect(() => {
-    if (!workspace || workspaceIsCloud || !aiEditAssistEnabled) {
+    if (!workspace || !aiEditAssistEnabled) {
       setLatestAiEditRequest(null);
       return undefined;
     }
@@ -54,7 +52,7 @@ export function useAiEditReviewRequest({
       cancelled = true;
       unsubscribe();
     };
-  }, [aiEditAssistEnabled, onWorkspaceContentChanged, workspace, workspaceIsCloud]);
+  }, [aiEditAssistEnabled, onWorkspaceContentChanged, workspace]);
 
   return latestAiEditRequest;
 }

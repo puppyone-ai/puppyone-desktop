@@ -2,6 +2,8 @@ import { Check, ChevronRight, Cloud, Copy, ExternalLink, FileText, FolderOpen, G
 import { FilePreviewIcon, type Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import "./shared.css";
+import "./web-page.css";
 import { useState, type ReactNode } from "react";
 import type {
   DesktopCloudDashboard,
@@ -30,9 +32,7 @@ export function CloudWorkspaceLoadingState({ label }: { label?: string }) {
     <div className="desktop-cloud-loading-state" role="status" aria-label={resolvedLabel}>
       <PageLoading
         variant="fill"
-        tone="info"
         label={resolvedLabel}
-        style={{ width: "auto", height: "auto", minHeight: 0, gap: 8 }}
       />
     </div>
   );
@@ -412,7 +412,7 @@ export function CloudMcpEndpointCard({
     : endpoint.path || "/";
 
   return (
-    <div className={`desktop-cloud-mcp-card ${compact ? "compact" : ""}`}>
+    <div className={`desktop-cloud-mcp-card${compact ? " desktop-cloud-mcp-card--compact" : ""}`}>
       <div className="desktop-cloud-mcp-card-header">
         <span><Server size={15} /></span>
         <div>

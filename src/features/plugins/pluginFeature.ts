@@ -5,12 +5,10 @@ import type {
 
 export function isViewerPluginsEnabled({
   settings,
-  workspaceIsCloud,
 }: {
   settings: ExperimentalSettings;
-  workspaceIsCloud: boolean;
 }) {
-  return settings.enableViewerPlugins && !workspaceIsCloud;
+  return settings.enableViewerPlugins;
 }
 
 export function isPluginsNavigationVisible({

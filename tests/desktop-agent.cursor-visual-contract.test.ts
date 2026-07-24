@@ -116,7 +116,8 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(panel).toContain("loading={startupLoading}");
     expect(panel).toContain("dock={startupLoading ? null");
     expect(panel).toContain("floatingAccessory=");
-    expect(composer).not.toContain("<Plus");
+    expect(composer).toContain("<AgentReferenceMenu");
+    expect(css).toMatch(/\.desktop-agent-reference-trigger\s*\{[^}]*width:\s*var\(--agent-control-size\)[^}]*height:\s*var\(--agent-control-size\)/s);
     expect(composer).toContain('className="desktop-agent-composer-actions"');
     expect(composer).toContain("onMouseDown={handleSurfaceMouseDown}");
     expect(composer).toContain("textareaRef.current?.focus()");

@@ -147,6 +147,8 @@
   "connection.openingAuthorization": "安全な認証を開いています…",
   "connection.waiting": "接続を待っています",
   "connection.authorizationAttention": "認証を確認してください",
+  "connection.providerUnavailable": "{provider} はまだ利用できません",
+  "connection.providerUnavailableDetail": "この Cloud 環境では {provider} の認証が設定されていません。別のソースを選ぶか、ワークスペース管理者に有効化を依頼してください。",
   "connection.finishInBrowser": "ブラウザーで {provider} の接続を完了してください。このウィンドウは自動的に続行します。",
   "create.chooseTitle": "オートメーションソースを選択",
   "create.connectTitle": "{provider} に接続",

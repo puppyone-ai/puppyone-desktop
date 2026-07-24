@@ -26,6 +26,7 @@ export const CLOUD_PUBLISH_ERROR_CODES = Object.freeze([
   "PROJECT_CREATE_FAILED",
   "PROJECT_UNAVAILABLE",
   "CREDENTIAL_FAILED",
+  "SERVICE_UPGRADE_REQUIRED",
   "REMOTE_CONFIG_FAILED",
   "PUSH_FAILED",
   "PUSH_UNCERTAIN",
@@ -259,6 +260,18 @@ export function mapCloudMutationError(defaultCode, message, error) {
   }
   if (error?.code === "organization_required") {
     return createPublishError("ORGANIZATION_REQUIRED", "Select a PuppyOne organization before publishing.", false, error);
+  }
+  if ([
+    "database_schema_outdated",
+    "schema_migration_required",
+    "service_upgrade_required",
+  ].includes(error?.code)) {
+    return createPublishError(
+      "SERVICE_UPGRADE_REQUIRED",
+      "PuppyOne Cloud is being upgraded. Resume publishing shortly.",
+      true,
+      error,
+    );
   }
   const retryable = ![400, 403, 404, 409, 410, 422].includes(Number(error?.status));
   return createPublishError(defaultCode, message, retryable, error);

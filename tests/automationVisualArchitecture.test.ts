@@ -1,8 +1,35 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const automationCss = readFileSync(
+const automationStylePaths = [
+  "shell-and-catalog.css",
+  "template-card.css",
+  "existing-automations.css",
+  "responsive.css",
+  "provider-sidebar.css",
+  "connections.css",
+] as const;
+const automationDialogStylePaths = [
+  "shell.css",
+  "creation-map.css",
+  "builder-and-resources.css",
+  "management.css",
+  "responsive.css",
+] as const;
+const automationCss = automationStylePaths
+  .map((path) => readFileSync(new URL(`../src/features/automation/styles/${path}`, import.meta.url), "utf8"))
+  .join("\n");
+const automationManifest = readFileSync(
   new URL("../src/features/automation/automation.css", import.meta.url),
+  "utf8",
+);
+const automationDialogManifest = readFileSync(
+  new URL("../src/features/automation/automation-dialog.css", import.meta.url),
+  "utf8",
+);
+const globalStyles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+const automationView = readFileSync(
+  new URL("../src/features/automation/CloudProjectAutomationView.tsx", import.meta.url),
   "utf8",
 );
 
@@ -31,6 +58,50 @@ describe("Automation landing visual architecture", () => {
     expect(card).toContain("var(--po-canvas)");
     expect(card).toContain("color: var(--po-text);");
     expect(description).toContain("color: var(--po-text-muted);");
+  });
+
+  it("locks typography and controls to the original Git visual baseline", () => {
+    const title = compact(readCssBlock(automationCss, ".desktop-cloud-automation-landing-copy h1"));
+    const description = compact(readCssBlock(automationCss, ".desktop-cloud-automation-landing-copy p"));
+    const primaryAction = compact(readCssBlock(automationCss, ".desktop-cloud-automation-new-button"));
+    const categoryAction = compact(readCssBlock(automationCss, ".desktop-cloud-automation-category-tabs button"));
+    const cardTitle = compact(readCssBlock(automationCss, ".desktop-cloud-automation-template-card h2"));
+    const cardDescription = compact(readCssBlock(automationCss, ".desktop-cloud-automation-template-card p"));
+    const cardAction = compact(readCssBlock(automationCss, ".desktop-cloud-automation-template-add"));
+
+    expect(title).toContain("font-size: var(--po-text-size-page-title, 20px);");
+    expect(description).toContain("font-size: var(--po-text-size-body-lg, 14px);");
+    expect(primaryAction).toContain("height: 30px;");
+    expect(primaryAction).toContain("padding: 0 11px;");
+    expect(primaryAction).toContain("font-size: var(--po-text-size-body, 13px);");
+    expect(primaryAction).toContain("line-height: 18px;");
+    expect(categoryAction).toContain("height: 28px;");
+    expect(categoryAction).toContain("padding: 0 11px;");
+    expect(categoryAction).toContain("font-size: var(--po-text-size-body, 13px);");
+    expect(cardTitle).toContain("font-size: var(--po-text-size-body-lg, 14px);");
+    expect(cardTitle).toContain("line-height: 19px;");
+    expect(cardDescription).toContain("font-size: var(--po-text-size-body, 13px);");
+    expect(cardDescription).toContain("line-height: 18px;");
+    expect(cardAction).toContain("min-width: 42px;");
+    expect(cardAction).toContain("height: 28px;");
+    expect(cardAction).toContain("padding: 0 9px;");
+    expect(cardAction).toContain("font-size: var(--po-text-size-body, 13px);");
+  });
+
+  it("keeps Automation CSS split, ordered, layered, and owned by the feature", () => {
+    const expectedManifest = automationStylePaths
+      .map((path) => `@import "./styles/${path}" layer(features);`)
+      .concat('@import "./automation-dialog.css";')
+      .join("\n");
+    const expectedDialogManifest = automationDialogStylePaths
+      .map((path) => `@import "./styles/dialog/${path}" layer(features);`)
+      .join("\n");
+
+    expect(automationManifest.trim()).toBe(expectedManifest);
+    expect(automationDialogManifest.trim()).toBe(expectedDialogManifest);
+    expect(automationView).toContain('import "./automation.css";');
+    expect(globalStyles).not.toContain("features/automation/automation.css");
+    expect(globalStyles).not.toContain("features/automation/automation-dialog.css");
   });
 });
 

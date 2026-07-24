@@ -147,6 +147,8 @@
   "connection.openingAuthorization": "Abrindo autorização segura…",
   "connection.waiting": "Aguardando conexão",
   "connection.authorizationAttention": "A autorização requer atenção",
+  "connection.providerUnavailable": "{provider} ainda não está disponível",
+  "connection.providerUnavailableDetail": "A autorização do {provider} não está configurada nesta implantação do Cloud. Escolha outra fonte ou peça ao administrador do workspace para ativá-la.",
   "connection.finishInBrowser": "Conclua a conexão de {provider} no navegador. Esta janela continuará automaticamente.",
   "create.chooseTitle": "Escolher uma fonte de automação",
   "create.connectTitle": "Conectar {provider}",

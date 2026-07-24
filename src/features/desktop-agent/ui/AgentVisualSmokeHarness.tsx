@@ -9,7 +9,12 @@ import { AgentProviderPicker } from "./AgentProviderPicker";
 import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
 import { createAgentProjection } from "../domain/agent-projection";
-import type { AgentModel, AgentRuntimeCatalogEntry } from "../domain/agent-contract";
+import type {
+  AgentDraftReference,
+  AgentModel,
+  AgentReferenceInputCapabilities,
+  AgentRuntimeCatalogEntry,
+} from "../domain/agent-contract";
 import "./desktop-agent.css";
 
 const agentProviders: AgentRuntimeCatalogEntry[] = [
@@ -26,11 +31,56 @@ const modelsByProvider: Record<string, AgentModel[]> = {
   cursor: [model("auto", "Auto", true), model("composer-1", "Composer 1")],
 };
 
+const referenceCapabilities: AgentReferenceInputCapabilities = {
+  workspaceFiles: true,
+  workspaceDirectories: true,
+  images: "local-snapshot",
+  genericFiles: "none",
+  acceptedMimeTypes: ["image/png", "image/jpeg", "image/gif", "image/webp"],
+  maxReferences: 32,
+  maxReferenceBytes: 25 * 1024 * 1024,
+  maxTotalReferenceBytes: 25 * 1024 * 1024,
+  steer: false,
+  attachmentOnly: false,
+};
+
+const smokeReferences: AgentDraftReference[] = [
+  {
+    id: "workspace-src",
+    kind: "workspace-entry",
+    entryType: "directory",
+    path: "src",
+    relativePath: "src",
+    displayName: "src",
+    status: "ready",
+  },
+  {
+    id: "attachment-capture",
+    kind: "staged-attachment",
+    token: "visual-smoke-token",
+    displayName: "capture.png",
+    mime: "image/png",
+    size: 12_345,
+    status: "ready",
+  },
+  {
+    id: "attachment-unsupported",
+    kind: "staged-attachment",
+    displayName: "requirements.pdf",
+    mime: "application/pdf",
+    size: 42_000,
+    status: "error",
+    error: { code: "file-unsupported", message: "This Agent does not accept this file type." },
+  },
+];
+
 export function AgentVisualSmokeHarness() {
   const { t } = useLocalization();
   const [draft, setDraft] = useState("");
   const [providerId, setProviderId] = useState(agentProviders[0].descriptor.id);
   const [selectedModel, setSelectedModel] = useState(modelsByProvider[providerId][0].model);
+  const [references, setReferences] = useState(smokeReferences);
+  const theme = new URLSearchParams(window.location.search).get("theme") === "light" ? "light" : "dark";
   const startupLoading = new URLSearchParams(window.location.search).get("state") === "loading";
   const selectedProvider = agentProviders.find((entry) => entry.descriptor.id === providerId) ?? agentProviders[0];
   const models = modelsByProvider[providerId];
@@ -65,6 +115,10 @@ export function AgentVisualSmokeHarness() {
         turnId: "turn-2",
         itemId: null,
         text: "好，现在我需要你这个 md editor 的上下 padding 要和左右的 padding 相同",
+        references: [
+          { id: "workspace-src", kind: "workspace-directory", displayName: "src", relativePath: "src" },
+          { id: "attachment-capture", kind: "attachment", displayName: "capture.png", mime: "image/png", size: 12_345 },
+        ],
         streaming: false,
         terminalState: null,
         sequence: 3,
@@ -192,7 +246,7 @@ export function AgentVisualSmokeHarness() {
 
   return (
     <>
-      <main className="desktop-agent-visual-smoke dark">
+      <main className={`desktop-agent-visual-smoke${theme === "dark" ? " dark" : ""}`} data-smoke-theme={theme}>
         <AgentPanelLayout
           ariaLabel={t("agent.panel.chat", { agent: bidiIsolate(selectedProvider.descriptor.displayName) })}
           header={<AgentSurfaceHeader
@@ -229,13 +283,19 @@ export function AgentVisualSmokeHarness() {
               selectedModel={selectedModel}
               onSelectModel={setSelectedModel}
               commands={[]}
+              references={references}
+              referenceCapabilities={referenceCapabilities}
+              onRemoveReference={(id) => setReferences((current) => current.filter((reference) => reference.id !== id))}
+              onRetryReference={() => {}}
+              onAddExternalFiles={() => {}}
+              onPickWorkspaceReferences={() => {}}
               onSubmit={async () => { setDraft(""); return true; }}
               onStop={() => {}}
             />
           </>}
         />
       </main>
-      <DesktopOverlayPortal theme="dark"><></></DesktopOverlayPortal>
+      <DesktopOverlayPortal theme={theme}><></></DesktopOverlayPortal>
     </>
   );
 }
