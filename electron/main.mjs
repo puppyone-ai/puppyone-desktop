@@ -32,6 +32,10 @@ import {
   createApplicationQuitIntent,
   createDocumentSessionCloseCoordinator,
 } from "./main/document-session-close-coordinator.mjs";
+import {
+  createDesktopLaunchIntent,
+  handleSecondInstanceLaunch,
+} from "./main/desktop-launch-intent.mjs";
 import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
@@ -81,6 +85,24 @@ const projectRoot = path.resolve(__dirname, "..");
 const preloadPath = path.join(__dirname, "preload.cjs");
 const rendererDistPath = path.join(projectRoot, "dist", "index.html");
 const appName = "puppyone";
+
+app.setName(appName);
+if (process.platform === "win32") {
+  app.setAppUserModelId("ai.puppyone.desktop");
+}
+
+// Resolve only core launch data before the single-instance boundary. A
+// duplicate CLI launch must exit before optional subsystems are constructed.
+const initialLaunchIntent = createDesktopLaunchIntent({
+  argv: process.argv,
+  workingDirectory: process.cwd(),
+  isPackaged: app.isPackaged,
+});
+const gotSingleInstanceLock = app.requestSingleInstanceLock(initialLaunchIntent);
+if (!gotSingleInstanceLock) {
+  app.exit(0);
+}
+
 const devServerUrl = process.env.PUPPYONE_DESKTOP_DEV_URL;
 const rendererApplicationUrl = devServerUrl || pathToFileURL(rendererDistPath).toString();
 const viewerPackFeatureProfile = resolveViewerPackFeatureProfile({
@@ -218,16 +240,6 @@ const cloudGitConnectCoordinator = createCloudGitConnectCoordinator({
   operationLease: cloudGitOperationLease,
   secretVault: cloudPublishSecretVault,
 });
-
-app.setName(appName);
-if (process.platform === "win32") {
-  app.setAppUserModelId("ai.puppyone.desktop");
-}
-
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
-if (!gotSingleInstanceLock) {
-  app.exit(0);
-}
 
 async function createWindow(options = {}) {
   await localeService.refreshSystemLanguages();
@@ -376,16 +388,18 @@ function revealWindow(window) {
 }
 
 function revealLastFocusedWindow() {
+  void createOrRevealWindow().catch((error) => {
+    console.error("Unable to reveal the last focused puppyone window:", error);
+  });
+}
+
+async function createOrRevealWindow() {
   const window = getLastFocusedWindow();
   if (window) {
     revealWindow(window);
-    return;
+    return window;
   }
-  void createWindow();
-}
-
-function createOrRevealWindow() {
-  revealLastFocusedWindow();
+  return createWindow();
 }
 
 function getLastFocusedWindow() {
@@ -461,13 +475,16 @@ function setDockMenu() {
   app.dock.setMenu(dockMenu);
 }
 
-app.on("second-instance", (_event, argv) => {
-  const workspacePath = findWorkspacePathArg(argv);
-  if (workspacePath) {
-    void openWorkspaceInNewWindow(workspacePath);
-    return;
-  }
-  createOrRevealWindow();
+app.on("second-instance", (_event, argv, workingDirectory, launchIntent) => {
+  void handleSecondInstanceLaunch({
+    launchIntent,
+    argv,
+    workingDirectory,
+    isPackaged: app.isPackaged,
+    openWorkspaceInNewWindow,
+    revealOrCreateWindow: createOrRevealWindow,
+    reportError: (message, error) => console.error(message, error),
+  });
 });
 
 app.whenReady().then(async () => {
@@ -524,9 +541,9 @@ app.whenReady().then(async () => {
   }
   registerIpcHandlers();
   updateService.start();
-  await createWindow({
-    initialWorkspacePath: await workspaceStateStore.readLastActiveWorkspacePath(),
-  });
+  const initialWorkspacePath = initialLaunchIntent.workspacePath
+    ?? await workspaceStateStore.readLastActiveWorkspacePath();
+  await createWindow({ initialWorkspacePath });
 
   app.on("activate", () => {
     void localeService.refreshSystemLanguages().catch((error) => {
@@ -967,19 +984,4 @@ async function showHomepageForCurrentWindow(sender) {
   void agentService.closeSessionsForWindow(window.webContents.id);
   workspaceWatchService.stopForWindow(window.webContents.id);
   gitMetadataWatchService.stopForWindow(window.webContents.id);
-}
-
-function findWorkspacePathArg(argv) {
-  for (const arg of [...argv].reverse()) {
-    if (typeof arg !== "string" || arg.trim().length === 0) continue;
-    if (isCloudAuthCallbackUrl(arg)) continue;
-    if (arg.startsWith("-")) continue;
-    const candidate = path.resolve(arg);
-    try {
-      if (fs.statSync(candidate).isDirectory()) return candidate;
-    } catch {
-      // Not a local directory argument.
-    }
-  }
-  return null;
 }
