@@ -13,9 +13,7 @@
   </p>
 </div>
 
-![puppyone editor in light mode](public/puppyone-editor-light.png)
-
-![puppyone editor in dark mode](public/puppyone-editor-dark.png)
+![puppyone editor overview](public/puppyone-overview.png)
 
 ## Install
 
