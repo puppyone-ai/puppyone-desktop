@@ -60,7 +60,7 @@ async function createFixture() {
   const applicationPath = path.join(
     releaseDirectory,
     "mac-arm64",
-    `${policy.applicationName}.app`,
+    `${policy.applicationName.toLocaleLowerCase("en-US")}.app`,
   );
   const resourcesDirectory = path.join(applicationPath, "Contents", "Resources");
   const sourceDirectory = path.join(root, "asar-source");
@@ -98,7 +98,7 @@ async function createFixture() {
     "zip",
   );
   await fs.writeFile(
-    path.join(releaseDirectory, "latest-mac.yml"),
+    path.join(releaseDirectory, `${policy.updateChannel}-mac.yml`),
     `version: ${buildInfo.version}\npath: puppyone-${buildInfo.version}-arm64.zip\n`,
   );
   return { applicationPath, buildInfo, releaseDirectory };

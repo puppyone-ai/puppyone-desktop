@@ -23,9 +23,12 @@ export async function verifyPackagedDesktopBuild({
   }
 
   for (const application of applications) {
-    if (path.basename(application.path) !== `${policy.applicationName}.app`) {
+    const applicationBundleName = path.basename(application.path);
+    const expectedApplicationBundleName = `${policy.applicationName}.app`;
+    if (applicationBundleName.toLocaleLowerCase("en-US")
+      !== expectedApplicationBundleName.toLocaleLowerCase("en-US")) {
       throw new Error(
-        `Packaged app ${path.basename(application.path)} must be named ${policy.applicationName}.app.`,
+        `Packaged app ${applicationBundleName} must be named ${expectedApplicationBundleName}, ignoring case.`,
       );
     }
     const resourcesDirectory = path.join(application.path, "Contents", "Resources");
@@ -93,15 +96,20 @@ export async function verifyPackagedDesktopBuild({
     }
   }
 
+  const updaterMetadataName = policy.updateChannel
+    ? `${policy.updateChannel}-mac.yml`
+    : null;
   const updaterMetadata = entries.filter((entry) => (
-    entry.type === "file" && path.basename(entry.path) === "latest-mac.yml"
+    entry.type === "file" && path.basename(entry.path) === updaterMetadataName
   ));
   if (policy.updateFeedUrl) {
-    if (updaterMetadata.length === 0) throw new Error("No latest-mac.yml was produced for a published build.");
+    if (updaterMetadata.length === 0) {
+      throw new Error(`No ${updaterMetadataName} was produced for a published build.`);
+    }
     for (const entry of updaterMetadata) {
       const source = await fs.readFile(entry.path, "utf8");
       if (!source.includes(`version: ${identity.version}`)) {
-        throw new Error("latest-mac.yml version does not match Build Identity.");
+        throw new Error(`${updaterMetadataName} version does not match Build Identity.`);
       }
     }
   }

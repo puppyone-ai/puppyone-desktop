@@ -321,7 +321,7 @@ export function inspectDesktopReleaseManifest(manifest) {
     }
   }
   if (manifest?.channel === "stable" && !manifest.assets.some((asset) => asset.kind === "updater-metadata")) {
-    errors.push("stable release assets must include latest-mac.yml");
+    errors.push("stable release assets must include stable-mac.yml");
   }
   if (
     manifest?.channel === "internal"
@@ -501,7 +501,7 @@ export function jsonFile(value) {
 }
 
 function inferAssetKind(name) {
-  if (name === "latest-mac.yml") return "updater-metadata";
+  if (/^(?:internal|stable)-mac\.yml$/.test(name)) return "updater-metadata";
   if (name.endsWith(".dmg")) return "dmg";
   if (name.endsWith(".zip")) return "zip";
   if (name.endsWith(".blockmap")) return "blockmap";

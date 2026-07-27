@@ -57,7 +57,7 @@ desktop/
         │   └── <release assets>
         └── latest/
             ├── latest.json
-            ├── latest-mac.yml
+            ├── stable-mac.yml
             ├── puppyone-latest-arm64.dmg
             └── puppyone-latest-arm64.zip
 ```

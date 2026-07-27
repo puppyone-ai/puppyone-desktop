@@ -107,7 +107,8 @@ signature. A future signed Internal build may enable its existing Internal feed
 without adding another channel.
 
 Stable requires Developer ID signing, hardened runtime, notarization, stapling,
-Gatekeeper acceptance, a ZIP payload, and `latest-mac.yml`.
+Gatekeeper acceptance, a ZIP payload, and the channel-specific
+`stable-mac.yml` updater metadata.
 
 ## Update State Machine
 
