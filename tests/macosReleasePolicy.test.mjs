@@ -167,6 +167,20 @@ describe("desktop release publisher workflow", () => {
       "the GitHub release-state step must receive the caller's draft/public policy explicitly",
     );
   });
+
+  it("requires final GitHub verification to preserve the Internal draft policy", () => {
+    const workflow = readFileSync(
+      new URL("../.github/workflows/desktop-release-publish.yml", import.meta.url),
+      "utf8",
+    ).replace(
+      "          PUBLISH_GITHUB_RELEASE: ${{ inputs.publish_github_release }}\n          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}",
+      "          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}",
+    );
+
+    expect(inspectReleasePublisherWorkflow(workflow)).toContain(
+      "the final GitHub release verification must receive the caller's draft/public policy explicitly",
+    );
+  });
 });
 
 describe("desktop legacy archive workflow", () => {

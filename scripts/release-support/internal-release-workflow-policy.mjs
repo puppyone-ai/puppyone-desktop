@@ -149,6 +149,13 @@ export function inspectReleasePublisherWorkflow(workflowSource) {
     "PUBLISH_GITHUB_RELEASE: ${{ inputs.publish_github_release }}",
     "the GitHub release-state step must receive the caller's draft/public policy explicitly",
   );
+  requireStageSnippet(
+    workflowSource,
+    errors,
+    "Verify published GitHub Release state",
+    "PUBLISH_GITHUB_RELEASE: ${{ inputs.publish_github_release }}",
+    "the final GitHub release verification must receive the caller's draft/public policy explicitly",
+  );
   assertOrder(workflowSource, errors, [
     "Validate release bundle and caller contract",
     "Inspect immutable R2 release state",
