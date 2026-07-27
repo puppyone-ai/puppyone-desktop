@@ -388,6 +388,7 @@ jobs:
       - name: Verify published GitHub Release state
         env:
           GH_TOKEN: ${{ github.token }}
+          PUBLISH_GITHUB_RELEASE: ${{ inputs.publish_github_release }}
           RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
           RELEASE_ID: ${{ steps.github_verify.outputs.release_id || steps.github_state.outputs.release_id }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
@@ -397,14 +398,21 @@ jobs:
           : "${RELEASE_ID:?GitHub Release ID is required}"
           RESPONSE="${RUNNER_TEMP}/github-release-published.json"
           gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" > "${RESPONSE}"
+          if [ "${PUBLISH_GITHUB_RELEASE}" = "true" ]; then
+            EXPECTED_DRAFT=false
+          else
+            EXPECTED_DRAFT=true
+          fi
           node scripts/verify-github-release-assets.mjs \
             --bundle "${BUNDLE_DIRECTORY}" \
             --release-json "${RESPONSE}" \
-            --expect-draft false
-          REMOTE_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}" --jq .sha)"
-          if [ "${REMOTE_SHA}" != "${RELEASE_COMMIT}" ]; then
-            echo "Published tag ${RELEASE_TAG} resolves to ${REMOTE_SHA}, not ${RELEASE_COMMIT}." >&2
-            exit 1
+            --expect-draft "${EXPECTED_DRAFT}"
+          if [ "${PUBLISH_GITHUB_RELEASE}" = "true" ]; then
+            REMOTE_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}" --jq .sha)"
+            if [ "${REMOTE_SHA}" != "${RELEASE_COMMIT}" ]; then
+              echo "Published tag ${RELEASE_TAG} resolves to ${REMOTE_SHA}, not ${RELEASE_COMMIT}." >&2
+              exit 1
+            fi
           fi
 
       - name: Promote mutable R2 latest files
