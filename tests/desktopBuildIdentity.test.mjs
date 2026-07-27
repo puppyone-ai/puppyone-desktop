@@ -162,6 +162,7 @@ describe("desktop build identity", () => {
     expect(config).toMatchObject({
       appId: "ai.puppyone.desktop.internal",
       productName: "PuppyOne Internal",
+      executableName: "PuppyOne Internal",
       extraMetadata: { version: "1.4.0-internal.42" },
       buildVersion: "42",
       publish: [{
@@ -171,6 +172,7 @@ describe("desktop build identity", () => {
       mac: {
         bundleShortVersion: "1.4.0",
         bundleVersion: "42",
+        executableName: "PuppyOne Internal",
         hardenedRuntime: false,
         identity: "-",
         notarize: false,
