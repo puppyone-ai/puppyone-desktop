@@ -6,7 +6,6 @@
   display: flex;
   justify-content: flex-end;
   pointer-events: none;
-  -webkit-app-region: no-drag;
 }
 
 .desktop-help-launcher {

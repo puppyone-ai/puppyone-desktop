@@ -93,6 +93,7 @@ export function DesktopDialogRoot({
       ref={rootRef}
       className={`desktop-dialog-backdrop ${className}`.trim()}
       data-desktop-dialog-root="true"
+      data-window-no-drag="true"
       role="presentation"
       onPointerDown={handlePointerDown}
       onClick={handleClick}

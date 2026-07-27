@@ -221,6 +221,7 @@ export function AgentPickerPopover({
             style={agentPickerOverlayGeometry(overlayPosition)}
             data-positioned={overlayPosition ? "true" : "false"}
             data-placement={overlayPosition?.placement}
+            data-window-no-drag="true"
           >
           {searchable && (
             <label className="desktop-agent-picker-search">

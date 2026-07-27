@@ -130,7 +130,7 @@ The final desktop composition is:
 ```text
 DesktopWorkspaceShell
 |
-├── DesktopTitlebar
+├── DesktopWindowChrome
 |
 ├── WorkspaceSidebarHost
 |   ├── WorkspaceNavigation

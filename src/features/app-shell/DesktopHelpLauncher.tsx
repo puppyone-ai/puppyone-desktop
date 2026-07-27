@@ -237,6 +237,7 @@ export function DesktopHelpLauncher() {
       ref={rootRef}
       className="desktop-feedback"
       data-open={open ? "true" : undefined}
+      data-window-no-drag="true"
     >
       {open ? (
         <form

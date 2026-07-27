@@ -92,7 +92,6 @@
   transform: translateX(4px);
   cursor: col-resize;
   touch-action: none;
-  -webkit-app-region: no-drag;
 }
 
 .data-explorer-resizer::after {
@@ -126,8 +125,6 @@ body.data-sidebar-resizing * {
   padding-block: 0;
   padding-inline: var(--desktop-sidebar-toolbar-padding-start) var(--desktop-sidebar-toolbar-padding-end);
   border-bottom: 1px solid transparent;
-  -webkit-app-region: drag;
-  user-select: none;
 }
 
 .desktop-explorer-toolbar > span {
@@ -140,7 +137,6 @@ body.data-sidebar-resizing * {
   display: flex;
   align-items: center;
   gap: 2px;
-  -webkit-app-region: no-drag;
 }
 
 .desktop-explorer-actions button {
@@ -243,7 +239,6 @@ body.data-sidebar-resizing * {
   flex: 0 0 auto;
   align-items: center;
   gap: var(--desktop-sidebar-nav-gap);
-  -webkit-app-region: no-drag;
 }
 
 .desktop-sidebar-build-identity-footer {
@@ -407,7 +402,6 @@ body.data-sidebar-resizing * {
   display: flex;
   gap: var(--desktop-sidebar-nav-gap);
   border-bottom: 0;
-  -webkit-app-region: no-drag;
 }
 
 .desktop-sidebar-top-navigation.horizontal {

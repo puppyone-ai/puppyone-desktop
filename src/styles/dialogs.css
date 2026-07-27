@@ -18,7 +18,6 @@
   background: var(--po-backdrop);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
-  -webkit-app-region: no-drag;
   box-sizing: border-box;
 }
 
