@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AuxiliaryPanelHost } from "../features/app-shell/auxiliary";
+import { DesktopWindowChrome } from "./DesktopWindowChrome";
 
 import type { WorkspaceSurfaceId } from "../features/app-shell/workspace-surfaces";
 
@@ -36,24 +37,12 @@ export function DesktopCloudShell({
 }: DesktopCloudShellProps) {
   return (
     <div className={`desktop-shell ${minimalMode ? "is-minimal-mode" : ""}`}>
-      {minimalMode ? (
-        <>
-          <div className="desktop-minimal-mode-drag-region" aria-hidden="true" />
-          {minimalModeDock}
-        </>
-      ) : (
-        <header className="desktop-titlebar">
-          <div className="desktop-titlebar-left">
-            {titlebarSlot}
-          </div>
-          <div className="desktop-titlebar-drag-fill" aria-hidden="true" />
-          {titlebarActions && (
-            <div className="desktop-titlebar-actions">
-              {titlebarActions}
-            </div>
-          )}
-        </header>
-      )}
+      <DesktopWindowChrome
+        context={titlebarSlot}
+        actions={titlebarActions}
+        minimalMode={minimalMode}
+        minimalModeDock={minimalModeDock}
+      />
 
       <div className="desktop-shell-body">
         <main className="desktop-surface">

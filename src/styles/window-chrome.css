@@ -1,0 +1,28 @@
+/*
+ * Electron native hit testing has one renderer owner.
+ *
+ * `data-window-drag-region` marks app-owned chrome. Native interaction
+ * exclusions are deliberately scoped to descendants of those regions, so
+ * product surfaces and shared editors never enter the window drag map.
+ * Non-button surfaces that overlap chrome (menus, dialogs, the Minimal Mode
+ * dock) opt out explicitly with `data-window-no-drag`.
+ */
+:where([data-window-drag-region="true"]) {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+:where([data-window-drag-region="true"])
+  :where(
+    button,
+    input,
+    textarea,
+    select,
+    a[href],
+    summary,
+    [role="button"],
+    [contenteditable]:not([contenteditable="false"])
+  ),
+:where([data-window-no-drag="true"]) {
+  -webkit-app-region: no-drag;
+}

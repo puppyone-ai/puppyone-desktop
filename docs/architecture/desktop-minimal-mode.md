@@ -34,8 +34,9 @@ flag changes composition, not application state:
 
 ```text
 App
- ├─ normal mode  → DesktopCloudShell titlebar + sidebar navigation
- └─ minimal mode → DesktopMinimalModeDock + full-height workspace body
+ ├─ normal mode  → DesktopWindowChrome titlebar + sidebar navigation
+ └─ minimal mode → DesktopWindowChrome drag strip + DesktopMinimalModeDock
+                   + full-height workspace body
 
 Both branches reuse:
   workspace lifecycle
@@ -54,7 +55,10 @@ folders, right-sidebar width, the active Terminal surface, or the Agent turn.
 
 - `src/preferences.ts` owns parsing and the off-by-default experiment value.
 - `src/features/settings/SettingsView.tsx` owns the opt-in switch.
-- `src/components/DesktopCloudShell.tsx` selects normal or minimal chrome.
+- `src/components/DesktopWindowChrome.tsx` owns normal and minimal native
+  window interaction regions.
+- `src/components/DesktopCloudShell.tsx` keeps that chrome as a sibling of the
+  workspace body.
 - `src/features/app-shell/DesktopMinimalModeDock.tsx` owns only horizontal dock
   composition and its temporary expanded/pinned state.
 - `src/features/app-shell/DesktopWorkspaceContent.tsx` omits persistent sidebar

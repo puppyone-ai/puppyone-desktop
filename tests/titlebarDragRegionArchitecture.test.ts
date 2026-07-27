@@ -3,39 +3,36 @@ import { describe, expect, it } from "vitest";
 
 const baseCss = readFileSync(new URL("../src/styles/base.css", import.meta.url), "utf8");
 const titlebarCss = readFileSync(new URL("../src/styles/titlebar.css", import.meta.url), "utf8");
+const windowChromeCss = readFileSync(new URL("../src/styles/window-chrome.css", import.meta.url), "utf8");
+const windowChromeComponent = readFileSync(
+  new URL("../src/components/DesktopWindowChrome.tsx", import.meta.url),
+  "utf8",
+);
+const desktopShell = readFileSync(new URL("../src/components/DesktopCloudShell.tsx", import.meta.url), "utf8");
+const desktopMenu = readFileSync(new URL("../src/components/DesktopMenu.tsx", import.meta.url), "utf8");
+const sharedWorkspaceCss = readFileSync(
+  new URL("../packages/shared-ui/src/styles/data-workspace.css", import.meta.url),
+  "utf8",
+);
 
 describe("titlebar drag-region architecture", () => {
-  it("keeps the titlebar draggable without carving out whole control groups", () => {
-    const titlebar = readCssBlock(titlebarCss, ".desktop-titlebar");
-    const left = readCssBlock(titlebarCss, ".desktop-titlebar-left");
-    const dragFill = readCssBlock(titlebarCss, ".desktop-titlebar-drag-fill");
-    const actions = readCssBlock(titlebarCss, ".desktop-titlebar-actions");
-
-    expect(titlebar).toContain("-webkit-app-region: drag;");
-    expect(dragFill).toContain("-webkit-app-region: drag;");
-    expect(left).not.toContain("-webkit-app-region: no-drag;");
-    expect(actions).not.toContain("-webkit-app-region: no-drag;");
+  it("keeps native hit testing in the dedicated window chrome contract", () => {
+    expect(windowChromeCss).toContain('[data-window-drag-region="true"]');
+    expect(windowChromeCss).toContain("-webkit-app-region: drag;");
+    expect(windowChromeCss).toContain('[data-window-no-drag="true"]');
+    expect(windowChromeCss).toContain("-webkit-app-region: no-drag;");
+    expect(titlebarCss).not.toContain("-webkit-app-region");
+    expect(baseCss).not.toContain("-webkit-app-region");
   });
 
-  it("limits no-drag regions to interactive controls and menus", () => {
-    const interactiveControls = readCssBlock(
-      `\n${baseCss}`,
-      "button,\ninput,\ntextarea,\nselect,\na,\n[role=\"button\"]",
+  it("renders chrome as a sibling of the workbench and keeps Shared UI process-neutral", () => {
+    expect(desktopShell).toContain("<DesktopWindowChrome");
+    expect(desktopShell.indexOf("<DesktopWindowChrome")).toBeLessThan(
+      desktopShell.indexOf('<div className="desktop-shell-body">'),
     );
-    const menu = readCssBlock(titlebarCss, ".desktop-titlebar-menu");
-
-    expect(interactiveControls).toContain("-webkit-app-region: no-drag;");
-    expect(menu).toContain("-webkit-app-region: no-drag;");
+    expect(windowChromeComponent).toContain('data-window-drag-region="true"');
+    expect(desktopMenu).toContain('data-window-no-drag="true"');
+    expect(sharedWorkspaceCss).not.toContain("-webkit-app-region");
+    expect(sharedWorkspaceCss).not.toContain("data-window-drag-region");
   });
 });
-
-function readCssBlock(css: string, selector: string): string {
-  const normalizedCss = css.startsWith("\n") ? css : `\n${css}`;
-  const marker = `\n${selector} {`;
-  const start = normalizedCss.indexOf(marker);
-  if (start < 0) throw new Error(`Missing CSS block for ${selector}`);
-  const bodyStart = start + marker.length;
-  const end = normalizedCss.indexOf("\n}", bodyStart);
-  if (end < 0) throw new Error(`Unclosed CSS block for ${selector}`);
-  return normalizedCss.slice(bodyStart, end);
-}

@@ -125,7 +125,6 @@
   transform: translateX(4px);
   cursor: col-resize;
   touch-action: none;
-  -webkit-app-region: no-drag;
 }
 
 .data-explorer-resizer::after {

@@ -79,15 +79,6 @@ button {
   cursor: default;
 }
 
-button,
-input,
-textarea,
-select,
-a,
-[role="button"] {
-  -webkit-app-region: no-drag;
-}
-
 h1,
 h2,
 p {

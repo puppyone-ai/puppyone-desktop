@@ -19,8 +19,6 @@
   border-bottom: 0;
   background: var(--desktop-titlebar-bg);
   color: var(--desktop-titlebar-text);
-  -webkit-app-region: drag;
-  user-select: none;
 }
 
 /* Keep the app-owned divider out of the native window frame's edge pixels. */
@@ -105,7 +103,6 @@
   flex: 1 1 auto;
   min-width: 0;
   align-self: stretch;
-  -webkit-app-region: drag;
 }
 
 .desktop-titlebar-actions {
@@ -252,7 +249,6 @@
   color: var(--desktop-titlebar-text-muted);
   text-align: start;
   box-shadow: none;
-  -webkit-app-region: no-drag;
   outline: 0;
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
@@ -297,7 +293,6 @@
   background: transparent;
   color: var(--desktop-titlebar-text-muted);
   outline: 0;
-  -webkit-app-region: no-drag;
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
 
@@ -341,7 +336,6 @@
   border-radius: var(--po-menu-radius);
   background: var(--po-menu-bg);
   box-shadow: var(--po-menu-shadow);
-  -webkit-app-region: no-drag;
 }
 
 /* Keep the shared titlebar-menu treatment; only reverse its anchor near the window edge. */
@@ -417,7 +411,6 @@
   color: var(--desktop-titlebar-text-muted);
   text-align: start;
   outline: 0;
-  -webkit-app-region: no-drag;
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
 
