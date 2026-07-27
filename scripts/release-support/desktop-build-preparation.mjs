@@ -89,6 +89,7 @@ export function createDesktopElectronBuilderConfig({
     ...baseBuild,
     appId: policy.applicationId,
     productName: policy.applicationName,
+    executableName: policy.applicationName,
     artifactName: "puppyone-${version}-${arch}.${ext}",
     buildVersion: identity.platformBuildNumber ?? identity.baseVersion,
     extraMetadata: {
@@ -105,6 +106,7 @@ export function createDesktopElectronBuilderConfig({
       : [],
     mac: {
       ...(baseBuild.mac ?? {}),
+      executableName: policy.applicationName,
       bundleShortVersion: identity.baseVersion,
       bundleVersion: identity.platformBuildNumber ?? identity.baseVersion,
       ...(identity.channel === "stable"
