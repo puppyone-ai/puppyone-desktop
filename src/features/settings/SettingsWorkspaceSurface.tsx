@@ -1,6 +1,7 @@
 import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type {
   DarkThemePreset,
+  CreateNewMenuSettings,
   DiffMarkers,
   DockIcon,
   ExperimentalSettings,
@@ -43,6 +44,7 @@ export type SettingsPreferencesPort = {
   sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
   filesVisibilitySettings: FilesVisibilitySettings;
   externalAppsSettings: ExternalAppsSettings;
+  createNewMenuSettings: CreateNewMenuSettings;
   experimentalSettings: ExperimentalSettings;
   rightSidebarToolsSettings: RightSidebarToolsSettings;
   titlebarActionsSettings: TitlebarActionsSettings;
@@ -61,6 +63,7 @@ export type SettingsPreferencesPort = {
   setSidebarNavigationLayout: (value: SidebarNavigationLayout) => void;
   setSidebarNavigationVisibilitySettings: (value: SidebarNavigationVisibilitySettings) => void;
   setExternalAppsSettings: (value: ExternalAppsSettings) => void;
+  setCreateNewMenuSettings: (value: CreateNewMenuSettings) => void;
   setExperimentalSettings: (value: ExperimentalSettings) => void;
   setRightSidebarToolsSettings: (value: RightSidebarToolsSettings) => void;
   setTitlebarActionsSettings: (value: TitlebarActionsSettings) => void;
@@ -136,6 +139,7 @@ export function createSettingsWorkspaceSurface({
         sidebarNavigationVisibilitySettings={preferences.sidebarNavigationVisibilitySettings}
         filesVisibilitySettings={preferences.filesVisibilitySettings}
         externalAppsSettings={preferences.externalAppsSettings}
+        createNewMenuSettings={preferences.createNewMenuSettings}
         experimentalSettings={preferences.experimentalSettings}
         rightSidebarToolsSettings={preferences.rightSidebarToolsSettings}
         titlebarActionsSettings={preferences.titlebarActionsSettings}
@@ -164,6 +168,7 @@ export function createSettingsWorkspaceSurface({
         onSidebarNavigationVisibilitySettingsChange={preferences.setSidebarNavigationVisibilitySettings}
         onFilesVisibilitySettingsChange={onFilesVisibilitySettingsChange}
         onExternalAppsSettingsChange={preferences.setExternalAppsSettings}
+        onCreateNewMenuSettingsChange={preferences.setCreateNewMenuSettings}
         onExperimentalSettingsChange={preferences.setExperimentalSettings}
         onRightSidebarToolsSettingsChange={preferences.setRightSidebarToolsSettings}
         onTitlebarActionsSettingsChange={preferences.setTitlebarActionsSettings}

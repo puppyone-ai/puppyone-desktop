@@ -13,16 +13,28 @@ const csvMenuSource = readFileSync(
   new URL("../packages/shared-ui/src/editor/csv/CsvTableMenu.tsx", import.meta.url),
   "utf8",
 );
-const csvHeaderSettingsSource = readFileSync(
-  new URL("../packages/shared-ui/src/editor/csv/CsvHeaderSettings.tsx", import.meta.url),
+const csvViewSettingsSource = readFileSync(
+  new URL("../packages/shared-ui/src/editor/csv/CsvViewSettings.tsx", import.meta.url),
   "utf8",
 );
 const csvResizeSource = readFileSync(
   new URL("../packages/shared-ui/src/editor/csv/CsvTableResizeControl.tsx", import.meta.url),
   "utf8",
 );
+const csvViewerSource = readFileSync(
+  new URL("../packages/shared-ui/src/editor/viewers/CsvViewer.tsx", import.meta.url),
+  "utf8",
+);
+const textEditorFrameSource = readFileSync(
+  new URL("../packages/shared-ui/src/editor/viewers/TextEditorFrame.tsx", import.meta.url),
+  "utf8",
+);
 const editorEntryCss = readFileSync(
   new URL("../packages/shared-ui/src/styles/editor.css", import.meta.url),
+  "utf8",
+);
+const editorChromeCss = readFileSync(
+  new URL("../packages/shared-ui/src/styles/editor/editor-chrome.css", import.meta.url),
   "utf8",
 );
 const sharedTableCss = readFileSync(
@@ -71,22 +83,50 @@ describe("CSV table visual architecture", () => {
     expect(sharedTableCss).toContain("--po-editable-table-structure-hover-background");
   });
 
-  it("combines Markdown-style chrome with a CSV-specific record gutter and sticky semantic header", () => {
+  it("assigns the two-axis CSV viewport to exactly one scroll owner", () => {
+    expect(csvViewerSource).toContain('liveScrollOwner="viewer"');
+    expect(textEditorFrameSource).toContain('liveScrollOwner = "frame"');
+    expect(textEditorFrameSource.match(/data-scroll-owner=\{liveScrollOwner\}/g)).toHaveLength(2);
+    expect(editorChromeCss).toMatch(
+      /\.editor-live-surface\s*\{[^}]*overflow-x:\s*hidden[^}]*overflow-y:\s*auto/s,
+    );
+    expect(editorChromeCss).toMatch(
+      /\.editor-live-surface\[data-scroll-owner="viewer"\]\s*\{[^}]*overflow:\s*clip/s,
+    );
+    expect(csvTableCss).toMatch(
+      /\.csv-table-editor__scroll\s*\{[^}]*position:\s*relative[^}]*overflow:\s*auto/s,
+    );
+  });
+
+  it("keeps resting insets in content while sticky panes target the real viewport edges", () => {
     expect(csvTableCss).not.toContain(".csv-table-editor__toolbar");
     expect(csvTableCss).toMatch(/\.csv-table-editor\s*\{[^}]*width:\s*100%[^}]*height:\s*100%/s);
     expect(csvTableCss).toContain(".csv-table-editor__record-index");
     expect(csvTableCss).toContain("position: sticky");
     expect(csvTableCss).toContain("--csv-table-record-index-width: var(--po-editable-table-row-min-height)");
-    expect(csvTableCss).toContain("--csv-table-scroll-inline-start-padding: 26px");
+    expect(csvTableCss).toContain("--csv-table-content-inline-start-inset: 32px");
+    expect(csvTableCss).toContain("--csv-table-content-inline-end-inset: 32px");
+    expect(csvTableCss).toContain("--csv-table-content-block-start-inset: 32px");
+    expect(csvTableCss).toContain("--csv-table-content-block-end-inset: 32px");
     expect(csvEditorSource).toContain('toggleAttribute("data-inline-scrolled", inlineScrolled)');
+    const scrollRule = csvTableCss.match(/\.csv-table-editor__scroll\s*\{([^}]*)\}/s)?.[1];
+    expect(scrollRule).toBeDefined();
+    expect(scrollRule).not.toMatch(/\bpadding(?:-|:)/);
     expect(csvTableCss).toMatch(
-      /\.csv-table-editor__scroll\s*\{[^}]*padding-inline:\s*var\(--csv-table-scroll-inline-start-padding\)\s*var\(--csv-table-scroll-inline-end-padding\)/s,
+      /\.csv-table-editor__frame\s*\{[^}]*padding-block:\s*var\(--csv-table-content-block-start-inset\)[^}]*var\(--csv-table-content-block-end-inset\)[^}]*var\(--po-editable-table-action-gutter\)/s,
     );
     expect(csvTableCss).toMatch(
-      /\.csv-table-editor__table thead th\s*\{[^}]*z-index:\s*3[^}]*var\(--po-editable-table-sticky-header-background\)[^}]*var\(--po-editor-bg\)/s,
+      /\.csv-table-editor__frame\s*\{[^}]*padding-inline:\s*var\(--csv-table-content-inline-start-inset\)[^}]*var\(--csv-table-content-inline-end-inset\)[^}]*var\(--po-editable-table-action-gutter\)/s,
     );
     expect(csvTableCss).toMatch(
-      /\.csv-table-editor__table \.csv-table-editor__record-index\s*\{[^}]*z-index:\s*2[^}]*inset-inline-start:\s*calc\(-1 \* var\(--csv-table-scroll-inline-start-padding\)\)[^}]*var\(--csv-table-record-index-background\)[^}]*var\(--po-editor-bg\)/s,
+      /\.csv-table-editor__table thead th\s*\{[^}]*z-index:\s*3[^}]*inset-block-start:\s*0[^}]*var\(--po-editable-table-sticky-header-background\)[^}]*var\(--po-editor-bg\)/s,
+    );
+    expect(csvTableCss).toMatch(
+      /\.csv-table-editor__table \.csv-table-editor__record-index\s*\{[^}]*z-index:\s*2[^}]*inset-inline-start:\s*0[^}]*var\(--csv-table-record-index-background\)[^}]*var\(--po-editor-bg\)/s,
+    );
+    expect(csvTableCss).not.toMatch(/inset-(?:block|inline)-start:\s*calc\(-1/);
+    expect(csvEditorSource).toMatch(
+      /className="csv-table-editor__scroll"[\s\S]*?<CsvViewSettings[\s\S]*?className="csv-table-editor__frame"/,
     );
     expect(csvTableCss).toMatch(
       /\.csv-table-editor__scroll\[data-inline-scrolled\]\s*\.csv-table-editor__record-index\s*\{[^}]*border-inline-start:\s*1px solid var\(--po-editable-table-border\)/s,
@@ -99,13 +139,14 @@ describe("CSV table visual architecture", () => {
     expect(csvTableCss).toContain("font-size: inherit");
     expect(csvTableCss).not.toContain("font-size: 10.5px");
     expect(csvTableCss).toContain(".csv-table-editor__table td:focus-within");
-    expect(csvHeaderSettingsSource).toContain("csv-table-editor__settings-button");
-    expect(csvHeaderSettingsSource).toContain("csv-table-editor__settings-popover");
-    expect(csvHeaderSettingsSource).toContain("csv-table-editor__header-toggle-input");
-    expect(csvHeaderSettingsSource).toContain('role="switch"');
-    expect(csvHeaderSettingsSource).toContain("editor.csv.headerToggle");
-    expect(csvHeaderSettingsSource).not.toContain("editor.csv.headerDescription");
-    expect(csvHeaderSettingsSource).not.toContain("showRowIndex");
+    expect(csvViewSettingsSource).toContain("csv-table-editor__settings-button");
+    expect(csvViewSettingsSource).toContain("csv-table-editor__settings-popover");
+    expect(csvViewSettingsSource).toContain("csv-table-editor__header-toggle-input");
+    expect(csvViewSettingsSource).toContain("csv-table-editor__row-numbers-toggle-input");
+    expect(csvViewSettingsSource.match(/role="switch"/g)).toHaveLength(2);
+    expect(csvViewSettingsSource).toContain("editor.csv.headerToggle");
+    expect(csvViewSettingsSource).toContain("editor.csv.rowNumbersToggle");
+    expect(csvViewSettingsSource).not.toContain("editor.csv.headerDescription");
     expect(csvTableCss).not.toContain(".csv-table-editor__settings-menu");
     expect(csvTableCss).not.toContain(".csv-table-editor__settings-summary");
     expect(csvEditorSource).toContain("csv-table-editor__add-row");
@@ -183,8 +224,19 @@ describe("CSV table visual architecture", () => {
       /\.po-editable-table-row-handle \.po-editable-table-drag-handle-visual\s*\{[^}]*width:\s*13px[^}]*height:\s*26px/s,
     );
     expect(csvControlsSource).toContain("ROW_HANDLE_OUTER_REACH_PX = 9");
+    expect(csvControlsSource).toContain("COLUMN_HANDLE_OUTER_REACH_PX = 9");
     expect(csvControlsSource).toContain('setAttribute("data-row-handle-docked", "")');
     expect(csvControlsSource).toContain('classList.toggle("is-inline-docked", docked)');
+    expect(csvControlsSource).toContain("rowNumbersVisible ? recordIndexCell : fallbackCell");
+    expect(csvControlsSource).toContain("direction === \"rtl\" ? scrollRect.right : scrollRect.left");
+    expect(csvControlsSource).toContain('setAttribute("data-column-handle-docked", "")');
+    expect(csvControlsSource).toContain('classList.toggle("is-block-docked", docked)');
+    expect(csvTableCss).toMatch(
+      /\.csv-table-editor__column-handle\.is-block-docked\s*\{[^}]*transform:\s*translate\(-50%,\s*4px\)/s,
+    );
+    expect(csvTableCss).toMatch(
+      /\.csv-table-editor__header-cell\[data-column-handle-docked\] input\s*\{[^}]*opacity:\s*0/s,
+    );
     expect(csvTableCss).toMatch(
       /\.csv-table-editor__row-handle\.is-inline-docked\s*\{[^}]*transform:\s*translate\(4px,\s*-50%\)/s,
     );

@@ -1,7 +1,7 @@
 .markdown-codemirror-editor {
   --po-markdown-editor-text-width: 724px;
-  --po-markdown-editor-gutter-min: 64px;
-  --po-markdown-editor-content-padding-block: 64px;
+  --po-markdown-editor-gutter-min: var(--po-editor-content-edge-inset, 64px);
+  --po-markdown-editor-content-padding-block: var(--po-editor-content-edge-inset, 64px);
   --po-markdown-breakout-right-gutter: 48px;
   --po-markdown-breakout-max-width: 1180px;
   --po-markdown-editor-line-spacing: 0px;

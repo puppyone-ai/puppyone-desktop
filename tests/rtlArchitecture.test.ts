@@ -8,9 +8,6 @@ const logicalUiStyles = [
   "../src/features/cloud/auth/cloud-auth-card.css",
   "../src/features/cloud/auth/cloud-sign-in.css",
   "../src/features/cloud/sections/access/styles/access-detail.css",
-  "../src/features/cloud/sections/access/styles/standalone-list.css",
-  "../src/features/cloud/sections/access/styles/scope-sidebar.css",
-  "../src/features/cloud/sections/access/styles/service-sidebar.css",
   "../src/features/desktop-agent/ui/styles/activities.css",
   "../src/features/desktop-agent/ui/styles/blocking.css",
   "../src/features/desktop-agent/ui/styles/composer.css",
@@ -57,7 +54,7 @@ describe("RTL architecture", () => {
       .toMatch(/aria-hidden="true"\s+dir="ltr"/);
     expect(read("../src/features/settings/main/RepositorySettingsViews.tsx"))
       .toContain('<code dir="ltr" title={copyUrl ?? ""}>');
-    expect(read("../src/features/settings/main/GeneralSettingsView.tsx"))
+    expect(read("../src/features/settings/main/LocalProjectSettingsView.tsx"))
       .toContain('<strong dir="ltr" title={workspace.path}>{workspace.path}</strong>');
   });
 });

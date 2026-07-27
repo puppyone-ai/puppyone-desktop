@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  inspectContinuousIntegrationWorkflow,
   inspectInternalReleaseWorkflow,
   inspectLegacyArchiveWorkflow,
   inspectReleasePublisherWorkflow,
@@ -28,11 +29,14 @@ const errors = inspectMacReleaseReadiness({
 });
 
 const scripts = packageMetadata.scripts ?? {};
-if (!scripts["dist:mac"]?.includes("-c.mac.identity=-")) {
-  errors.push("the internal macOS build must explicitly use ad-hoc signing through a command-local override");
+if (!scripts["dist:mac"]?.includes("prepare:desktop-build:dev")) {
+  errors.push("local macOS packaging must resolve Development Build Identity before packaging");
 }
-if (!scripts["dist:mac"]?.includes("-c.mac.notarize=false")) {
-  errors.push("the internal macOS build must explicitly disable notarization through a command-local override");
+if (!scripts["dist:mac:prepared"]?.includes("--config generated/electron-builder.json")) {
+  errors.push("prepared macOS packaging must consume the generated channel-specific configuration");
+}
+if (!scripts["dist:mac:prepared"]?.includes("CSC_IDENTITY_AUTO_DISCOVERY=false")) {
+  errors.push("Development and Internal packaging must disable certificate auto-discovery");
 }
 if (scripts["publish:mac:r2"] || scripts["dist:mac:publish"]) {
   errors.push("stable R2 publishing must only happen through the canonical GitHub Release workflow");
@@ -44,6 +48,11 @@ if (
   errors.push("stable CI must prepare without deployment secrets before entering the signing step");
 }
 
+const ciWorkflow = readFileSync(
+  path.join(repoRoot, ".github", "workflows", "ci.yml"),
+  "utf8",
+);
+errors.push(...inspectContinuousIntegrationWorkflow(ciWorkflow));
 const internalWorkflow = readFileSync(
   path.join(repoRoot, ".github", "workflows", "desktop-internal-build.yml"),
   "utf8",

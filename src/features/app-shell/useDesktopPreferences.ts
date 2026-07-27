@@ -3,6 +3,7 @@ import type { FileIconThemeId } from "@puppyone/shared-ui";
 import { getInterfaceStyleFirstPaint } from "../appearance/interfaceStyles";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
+  CREATE_NEW_MENU_STORAGE_KEY,
   DIFF_MARKERS_STORAGE_KEY,
   DOCK_ICON_STORAGE_KEY,
   EXPERIMENTAL_SETTINGS_STORAGE_KEY,
@@ -26,9 +27,11 @@ import {
   getSidebarNavigationOrientation,
   getSidebarNavigationPlacement,
   parseLoadingAnimationPreset,
+  parseCreateNewMenuSettings,
   parseTypography,
   resolveActiveThemeMode,
   type ExternalAppsSettings,
+  type CreateNewMenuSettings,
   type DiffMarkers,
   type DockIcon,
   type ExperimentalSettings,
@@ -54,6 +57,7 @@ import {
   readInitialAgentPreferredModel,
   readInitialAgentPreferredRuntime,
   readInitialAiEditAssistEnabled,
+  readInitialCreateNewMenuSettings,
   readInitialExperimentalSettings,
   readInitialExplorerWidth,
   readInitialExternalAppsSettings,
@@ -103,6 +107,9 @@ export function useDesktopPreferences() {
   const [gitDisplayMode, setGitDisplayMode] = useState<GitDisplayMode>(() => readInitialGitDisplayMode());
   const [filesVisibilitySettings, setFilesVisibilitySettings] = useState<FilesVisibilitySettings>(() => readInitialFilesVisibilitySettings());
   const [externalAppsSettings, setExternalAppsSettings] = useState<ExternalAppsSettings>(() => readInitialExternalAppsSettings());
+  const [createNewMenuSettings, setCreateNewMenuSettings] = useState<CreateNewMenuSettings>(
+    () => readInitialCreateNewMenuSettings(),
+  );
   const [experimentalSettings, setExperimentalSettings] = useState<ExperimentalSettings>(() => readInitialExperimentalSettings());
   const [rightSidebarToolsSettings, setRightSidebarToolsSettings] = useState<RightSidebarToolsSettings>(() => readInitialRightSidebarToolsSettings());
   const [titlebarActionsSettings, setTitlebarActionsSettings] = useState<TitlebarActionsSettings>(() => readInitialTitlebarActionsSettings());
@@ -212,6 +219,19 @@ export function useDesktopPreferences() {
   }, [externalAppsSettings]);
 
   useEffect(() => {
+    window.localStorage.setItem(CREATE_NEW_MENU_STORAGE_KEY, JSON.stringify(createNewMenuSettings));
+  }, [createNewMenuSettings]);
+
+  useEffect(() => {
+    const syncCreateNewMenuSettings = (event: StorageEvent) => {
+      if (event.key !== CREATE_NEW_MENU_STORAGE_KEY && event.key !== null) return;
+      setCreateNewMenuSettings(parseCreateNewMenuSettings(event.key === null ? null : event.newValue));
+    };
+    window.addEventListener("storage", syncCreateNewMenuSettings);
+    return () => window.removeEventListener("storage", syncCreateNewMenuSettings);
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem(EXPERIMENTAL_SETTINGS_STORAGE_KEY, JSON.stringify(experimentalSettings));
   }, [experimentalSettings]);
 
@@ -271,6 +291,7 @@ export function useDesktopPreferences() {
     diffMarkers,
     dockIcon,
     explorerWidth,
+    createNewMenuSettings,
     externalAppsSettings,
     experimentalSettings,
     fileIconTheme,
@@ -303,6 +324,7 @@ export function useDesktopPreferences() {
     setDiffMarkers,
     setDockIcon,
     setExplorerWidth,
+    setCreateNewMenuSettings,
     setExternalAppsSettings,
     setExperimentalSettings,
     setFileIconTheme,

@@ -32,6 +32,7 @@ import {
   type DesktopCloudSession,
 } from "./lib/cloudApi";
 import {
+  getVisibleCreateNewFileTypes,
   type FilesVisibilitySettings,
 } from "./preferences";
 import type { PuppyoneWorkspaceConfig } from "./types/electron";
@@ -140,6 +141,7 @@ export function App() {
   const {
     activeThemeMode,
     aiEditAssistEnabled,
+    createNewMenuSettings,
     explorerWidth,
     experimentalSettings,
     externalAppsSettings,
@@ -179,13 +181,17 @@ export function App() {
     setSidebarNavigationLayout,
     setThemeMode,
   } = preferences;
+  const createNewFileKinds = useMemo(
+    () => getVisibleCreateNewFileTypes(createNewMenuSettings, experimentalSettings),
+    [createNewMenuSettings, experimentalSettings],
+  );
   const minimalMode = experimentalSettings.enableMinimalMode;
   const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
     available: assetLibraryHomeAvailable,
     optedIn: experimentalSettings.enableAssetLibraryHome,
   });
   const Homepage = assetLibraryHomeEnabled ? AssetLibraryHome : MinimalOnboarding;
-  const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("account");
+  const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("general");
   const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
   const [activeDataPath, setActiveDataPath] = useState<string | null>(null);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
@@ -403,7 +409,7 @@ export function App() {
   useEffect(() => {
     setGitOperationError(null);
     setGitOperationLoading(null);
-    setActiveSettingsSection("workspace");
+    setActiveSettingsSection("general");
     setBranchSwitcherOpen(false);
     setActiveDataPath(null);
     setActiveDataNode(null);
@@ -1012,17 +1018,9 @@ export function App() {
             ) : (
               <DesktopCreateEntryMenu
                 draft={createEntryDraft}
-                experimentalSettings={preferences.experimentalSettings}
+                fileKinds={createNewFileKinds}
                 fileIconTheme={fileIconTheme}
                 onCancel={() => setCreateEntryDraft(null)}
-                onPaste={() => {
-                  setCreateEntryDraft(null);
-                  void fileClipboardController.pasteNodes(createEntryDraft.parentPath);
-                }}
-                pasteDisabled={!fileClipboardController.canPasteInto(createEntryDraft.parentPath)}
-                pasteLabel={t("workspace.node.pasteItems", {
-                  count: fileClipboardController.clipboard?.nodes.length ?? 0,
-                })}
                 onSelectKind={selectCreateEntryKind}
               />
             )

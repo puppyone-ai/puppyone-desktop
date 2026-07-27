@@ -1,79 +1,40 @@
-# puppyone editor
 
-**A local-first editor. Built for you and your agents.**
+  <img src="public/logo-square-v0.1.4-dark.png" alt="puppyone Logo" width="72" height="72" />
 
-### File support
+  <h1>puppyone</h1>
 
-| Category        | Formats                     |
-| ---             | ---                         |
-| Text & web      | Markdown (`.md`), HTML, CSS |
-| Structured data | CSV, JSON                   |
-| Documents       | DOCX, XLSX, PDF             |
-| Media           | Images, audio, video, 3D    |
+A local-first editor. Built for you and your agents.
 
-And more.
+  <p>
+    <a href="https://www.puppyone.ai"><img src="https://img.shields.io/badge/Website-puppyone.ai-39BC66?style=flat-square" alt="Website" /></a>
+    <a href="https://www.puppyone.ai/doc"><img src="https://img.shields.io/badge/Docs-Read-D7F3FF?style=flat-square&logo=readthedocs&logoColor=black" alt="Documentation" /></a>
+    <a href="https://discord.gg/zwJ9Y3Uvpd"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord" /></a>
+    <a href="https://x.com/puppyone_ai"><img src="https://img.shields.io/badge/X-(Twitter)-000000?style=flat-square&logo=x&logoColor=white" alt="X" /></a>
+  </p>
 
-**Agent support:** Codex · Claude Code · OpenCode
 
-## Development
+![puppyone editor overview](public/puppyone-overview.png)
 
-```bash
-npm install
-cp .env.example .env.local
-npm run dev
-```
-
-Both renderer builds and desktop development fail fast unless the Cloud API and
-web endpoints are explicit. Adjust `.env.local` for local Cloud development;
-CI and release workflows set the public production endpoints directly.
-
-`npm run dev` starts the Vite renderer and opens the Electron shell. Use
-`npm run dev:browser` only when inspecting the renderer in a plain browser;
-local folder APIs require the Electron preload bridge.
-
-Build the renderer and run Electron against the production build:
+## Install
 
 ```bash
-npm run build
-npm run start
+npm install --global puppyone
 ```
 
-Create an unsigned macOS package for internal testing:
+## Start
 
 ```bash
-npm run dist:mac
+puppyone
 ```
 
-Build output is written to `release/`.
+## Features
 
-## Product Boundary
-
-puppyone desktop is local-first. It opens local project folders, edits files
-through the shared data workspace, and keeps Git operations local.
-
-Cloud features are opt-in and disabled by default. Users can enable Cloud from
-Settings when they want the Cloud sidebar and Cloud backup actions.
-
-GitHub is the default sync/backup service for new workspace config. puppyone
-Cloud can still be selected after Cloud is enabled.
-
-## CI/CD
-
-This repository uses GitHub Actions for checks, unsigned internal builds, and guarded stable releases.
-
-- `CI` runs `npm ci` and `npm run build`.
-- `Desktop Internal Build` creates unsigned macOS artifacts and can upload them
-  to Cloudflare R2.
-- `Desktop Stable Release` runs only for matching version tags, verifies
-  Developer ID signing and Apple notarization before creating the GitHub
-  Release, and then publishes the same artifacts to the stable R2 feed.
-
-Cloudflare R2 is used as the artifact/update file host. The stable release path
-fails closed unless Developer ID signing, hardened runtime, notarization, and
-release credentials are all present.
-
-See [docs/RELEASE.md](docs/RELEASE.md) for release setup and required GitHub
-secrets.
+- **Rich files** — Edit and preview Markdown, HTML, CSS, CSV, JSON, DOCX, XLSX, PDF, media, 3D files, and more.
+- **Local-first** — Work with local folders; files stay local unless you choose Cloud.
+- **Git** — Review changes and keep project history with local Git.
+- **Terminal & agents** — Built-in terminal with Codex, Claude Code, Cursor, and OpenCode.
+- **Puppyone Cloud (optional)** — Hosting, backup, and always-on MCP or CLI access.
+- **Cloud collaboration (optional)** — Invite teammates to hosted projects.
 
 ## License
 

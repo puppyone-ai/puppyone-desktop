@@ -390,6 +390,21 @@ export type DesktopUpdateStatus =
   | "blocked"
   | "error";
 
+export type DesktopBuildChannel = "dev" | "internal" | "stable";
+
+export type DesktopBuildInfo = {
+  readonly schemaVersion: 1;
+  readonly product: "puppyone-desktop";
+  readonly channel: DesktopBuildChannel;
+  readonly baseVersion: string;
+  readonly version: string;
+  readonly buildId: string;
+  readonly platformBuildNumber: string | null;
+  readonly commitSha: string;
+  readonly builtAt: string;
+  readonly sourceDirty: boolean;
+};
+
 export type DesktopUpdateInfo = {
   version: string | null;
   releaseName: string | null;
@@ -413,7 +428,7 @@ export type DesktopUpdateBlocker = {
 export type DesktopUpdateState = {
   status: DesktopUpdateStatus;
   currentVersion: string;
-  channel: "stable" | "beta" | "internal";
+  channel: DesktopBuildChannel;
   availableVersion: string | null;
   updateInfo: DesktopUpdateInfo;
   progress: DesktopUpdateProgress;
@@ -641,6 +656,7 @@ export type PuppyoneWorkspaceConfig = {
 declare global {
   interface Window {
     puppyoneDesktop?: {
+      getBuildInfo: () => Promise<DesktopBuildInfo>;
       getLocalizationBootstrap: () => Promise<LocaleState>;
       setLanguagePreference: (preference: AppLanguagePreference) => Promise<LocaleState>;
       onLocaleChanged: (callback: (state: LocaleState) => void) => () => void;

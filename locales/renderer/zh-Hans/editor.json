@@ -47,6 +47,8 @@
   "csv.headerDescription": "仅改变显示方式，不会修改 CSV 内容。",
   "csv.headerRecord": "表头；CSV 第 1 条记录",
   "csv.rowNumber": "数据第 {row, number} 行；CSV 第 {record, number} 条记录",
+  "csv.rowNumbers": "显示行号",
+  "csv.rowNumbersToggle": "行号",
   "csv.settings": "CSV 设置",
   "csv.visibleRows": "显示 {total, number} 行中的 {visible, number} 行",
   "csv.warning.unclosedQuote": "引号未闭合",

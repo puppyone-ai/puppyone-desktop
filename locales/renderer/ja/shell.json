@@ -63,5 +63,11 @@
   "branch.loadingBranches": "ブランチを読み込み中",
   "branch.localBranches": "ローカルブランチ",
   "branch.remoteBranches": "リモートブランチ",
-  "branch.noBranches": "ブランチがありません"
+  "branch.noBranches": "ブランチがありません",
+  "build.channel.dev": "開発版",
+  "build.channel.internal": "内部テスト版",
+  "build.channel.stable": "正式版",
+  "build.version.title": "{channel} · {version} · コミット {commit}",
+  "build.copy.action": "バージョン情報をコピー",
+  "build.copy.copied": "バージョン情報をコピーしました"
 }

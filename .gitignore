@@ -2,6 +2,7 @@ node_modules/
 dist/
 release/
 artifacts/terminal-preview/
+generated/
 .vite/
 .vite-temp/
 
@@ -18,6 +19,7 @@ yarn-error.log*
 
 *.pem
 *.key
+*.p8
 *.p12
 *.pfx
 *.mobileprovision

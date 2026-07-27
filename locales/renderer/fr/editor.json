@@ -47,6 +47,8 @@
   "csv.headerDescription": "Modifie uniquement l’affichage ; le contenu CSV reste inchangé.",
   "csv.headerRecord": "En-tête ; enregistrement CSV 1",
   "csv.rowNumber": "Ligne de données {row, number} ; enregistrement CSV {record, number}",
+  "csv.rowNumbers": "Afficher les numéros de ligne",
+  "csv.rowNumbersToggle": "Numéros de ligne",
   "csv.settings": "Réglages CSV",
   "csv.visibleRows": "Affichage de {visible, number} lignes sur {total, number}",
   "csv.warning.unclosedQuote": "Guillemet non fermé",

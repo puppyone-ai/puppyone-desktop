@@ -56,17 +56,28 @@ jobs:
             echo "Release tag does not resolve to the checked-out commit." >&2
             exit 1
           fi
-          {
-            echo "arch=$(node -p 'process.arch')"
-            echo "artifact_name=puppyone-desktop-${GITHUB_REF_NAME}"
-            echo "published_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-            echo "release_name=puppyone ${VERSION}"
-            echo "tag=${GITHUB_REF_NAME}"
-            echo "version=${VERSION}"
-          } >> "${GITHUB_OUTPUT}"
+          node scripts/prepare-desktop-build.mjs \
+            --channel stable \
+            --build-number "${GITHUB_RUN_NUMBER}" \
+            --commit "${GITHUB_SHA}" \
+            --expected-tag "${GITHUB_REF_NAME}" \
+            --github-output "${GITHUB_OUTPUT}"
 
       - name: Install locked dependencies without deployment secrets
         run: npm ci
+
+      - name: Verify exact Internal promotion source
+        id: promotion
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          PUPPYONE_INTERNAL_RELEASE_TOKEN: ${{ secrets.PUPPYONE_INTERNAL_RELEASE_TOKEN }}
+        run: |
+          node scripts/verify-stable-promotion-source.mjs \
+            --catalog-url "https://downloads.puppyone.ai/desktop/internal/catalog/releases.json" \
+            --base-version "${{ steps.release.outputs.base_version }}" \
+            --commit "${GITHUB_SHA}" \
+            --github-output "${GITHUB_OUTPUT}"
 
       - name: Stage pinned OpenCode runtime without deployment secrets
         shell: bash
@@ -85,8 +96,8 @@ jobs:
 
       - name: Sign, notarize, and verify release package
         env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -96,10 +107,21 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           PUPPYONE_RELEASE_TAG: ${{ steps.release.outputs.tag }}
-        run: npm run package:mac:release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${APPLE_API_KEY_BASE64:-}" ]; then
+            api_key_path="${RUNNER_TEMP}/AuthKey_${APPLE_API_KEY_ID}.p8"
+            umask 077
+            printf '%s' "${APPLE_API_KEY_BASE64}" | /usr/bin/base64 -D > "${api_key_path}"
+            export APPLE_API_KEY="${api_key_path}"
+            trap 'rm -f "${api_key_path}"' EXIT
+          fi
+          npm run package:mac:release
 
       - name: Write stable release preface
         env:
+          PROMOTION_SOURCE_TAG: ${{ steps.promotion.outputs.promotion_source_tag }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         shell: bash
         run: |
@@ -109,6 +131,7 @@ jobs:
             echo "Signed and notarized PuppyOne Desktop release."
             echo
             echo "Commit: ${GITHUB_SHA}"
+            echo "Promoted Internal release: ${PROMOTION_SOURCE_TAG}"
             echo "R2 version prefix: desktop/stable/mac/${RELEASE_TAG}"
             echo
             echo "Every attached binary is also mirrored at downloads.puppyone.ai with matching SHA-256 metadata."
@@ -120,6 +143,7 @@ jobs:
           PUBLISHED_AT: ${{ steps.release.outputs.published_at }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           VERSION: ${{ steps.release.outputs.version }}
+          PROMOTION_SOURCE_TAG: ${{ steps.promotion.outputs.promotion_source_tag }}
         shell: bash
         run: |
           set -euo pipefail
@@ -131,6 +155,7 @@ jobs:
           done
           node scripts/create-desktop-release-bundle.mjs create \
             --bundle artifacts/desktop-release-bundle \
+            --build-info generated/desktop-build-info.json \
             --channel stable \
             --tag "${RELEASE_TAG}" \
             --version "${VERSION}" \
@@ -139,6 +164,7 @@ jobs:
             --r2-prefix "desktop/stable/mac/${RELEASE_TAG}" \
             --public-origin "${PUBLIC_DOWNLOAD_ORIGIN}" \
             --published-at "${PUBLISHED_AT}" \
+            --promotion-source-tag "${PROMOTION_SOURCE_TAG}" \
             --workflow-run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             --arch "${ARCH}" \
             --prerelease false \
@@ -164,6 +190,7 @@ jobs:
           subject-path: |
             artifacts/desktop-release-bundle/assets/*
             artifacts/desktop-release-bundle/release.json
+            artifacts/desktop-release-bundle/build-info.json
             artifacts/desktop-release-bundle/SHA256SUMS
 
       - name: Upload build-once stable release bundle
@@ -186,6 +213,7 @@ jobs:
       deployment_environment: desktop-stable
       generate_notes: true
       prerelease: false
+      publish_github_release: true
       release_name: ${{ needs.build.outputs.release_name }}
       release_tag: ${{ needs.build.outputs.release_tag }}
       verify_tag: true

@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  createTerminalDownloadProgress,
   preparePreviewApp,
   validatePreviewMetadata,
 } from "../scripts/terminal-preview-launcher.mjs";
@@ -57,6 +58,7 @@ describe("Terminal preview launcher", () => {
 
   it("accepts an HTTPS response without a Content-Length header", async () => {
     const fixture = await createPreviewFixture();
+    const progress = [];
     const prepared = await preparePreviewApp({
       cacheRoot: path.join(fixture.root, "https-cache"),
       metadata: {
@@ -65,12 +67,75 @@ describe("Terminal preview launcher", () => {
       },
       fetchImpl: async () => new Response(fixture.archive),
       log: { info() {} },
+      onDownloadProgress: (event) => progress.push(event),
     });
 
     expect(prepared.reused).toBe(false);
     expect(await fs.promises.stat(prepared.executablePath)).toMatchObject({
       mode: expect.any(Number),
     });
+    expect(progress[0]).toEqual({
+      downloadedBytes: 0,
+      percent: 0,
+      totalBytes: fixture.archive.byteLength,
+    });
+    expect(progress.at(-1)).toEqual({
+      downloadedBytes: fixture.archive.byteLength,
+      percent: 100,
+      totalBytes: fixture.archive.byteLength,
+    });
+  });
+
+  it("renders live terminal progress and bounded milestone output", () => {
+    let terminalOutput = "";
+    const terminalProgress = createTerminalDownloadProgress({
+      label: "Downloading test…",
+      stream: {
+        isTTY: true,
+        write(value) {
+          terminalOutput += value;
+        },
+      },
+    });
+    terminalProgress.update({
+      downloadedBytes: 0,
+      percent: 0,
+      totalBytes: 100,
+    });
+    terminalProgress.update({
+      downloadedBytes: 100,
+      percent: 100,
+      totalBytes: 100,
+    });
+    terminalProgress.stop();
+
+    expect(terminalOutput).toContain("\r\u001b[2KDownloading test… 0% (0 B / 100 B)");
+    expect(terminalOutput).toContain("\r\u001b[2KDownloading test… 100% (100 B / 100 B)\n");
+
+    let logOutput = "";
+    const logProgress = createTerminalDownloadProgress({
+      label: "Downloading test…",
+      stream: {
+        isTTY: false,
+        write(value) {
+          logOutput += value;
+        },
+      },
+    });
+    for (const percent of [0, 4, 47, 49, 100]) {
+      logProgress.update({
+        downloadedBytes: percent,
+        percent,
+        totalBytes: 100,
+      });
+    }
+    logProgress.stop();
+
+    expect(logOutput).toBe(
+      "Downloading test… 0% (0 B / 100 B)\n"
+      + "Downloading test… 47% (47 B / 100 B)\n"
+      + "Downloading test… 100% (100 B / 100 B)\n",
+    );
   });
 
   it("rejects insecure URLs and paths that escape the app bundle", () => {

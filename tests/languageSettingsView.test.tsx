@@ -9,7 +9,7 @@ import {
   type LocaleClient,
 } from "@puppyone/localization/react";
 import type { LocaleState } from "@puppyone/localization/core";
-import { LanguageSettingsView } from "../src/features/settings/LanguageSetting";
+import { LanguageSettingRow } from "../src/features/settings/LanguageSetting";
 import englishCatalog from "../src/localization/catalog-loaders/en";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -40,8 +40,8 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-describe("LanguageSettingsView", () => {
-  it("renders the compact page and applies selection immediately without an action button", async () => {
+describe("LanguageSettingRow", () => {
+  it("renders the app-language control and applies selection immediately without an action button", async () => {
     const setLanguagePreference = vi.fn(async () => germanState);
     const client: LocaleClient = {
       setLanguagePreference,
@@ -63,14 +63,13 @@ describe("LanguageSettingsView", () => {
           })}
           client={client}
         >
-          <LanguageSettingsView />
+          <LanguageSettingRow />
         </LocalizationProvider>,
       );
     });
 
     const select = host.querySelector<HTMLSelectElement>(".desktop-language-setting-select");
-    expect(host.querySelector(".desktop-settings-section-header")?.textContent).toContain("Language");
-    expect(host.textContent).toContain("Choose the language used by PuppyOne");
+    expect(host.querySelector(".desktop-settings-section-header")).toBeNull();
     expect(select?.getAttribute("aria-label")).toBe("App language");
     expect(select?.value).toBe("system");
     expect(host.querySelector("button")).toBeNull();

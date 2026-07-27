@@ -59,10 +59,10 @@ describe("data workspace localization boundaries", () => {
     expect(defaultCreateName("folder", simplifiedChinese)).toBe("未命名文件夹");
 
     expect(getCreateEntryInitialContent("csv", {
-      csvHeaders: ["第 1 列", "第 2 列"],
+      csvHeaders: ["第 1 列", "第 2 列", "第 3 列"],
       puppyFlow: { title: "未命名流程", prompts: ["分析", "应用"] },
       untitledAppName: "未命名应用",
-    })).toBe("第 1 列,第 2 列\n");
+    })).toBe("第 1 列,第 2 列,第 3 列\n,,\n,,\n");
   });
 
   it("localizes known and previously unseen file type labels", () => {

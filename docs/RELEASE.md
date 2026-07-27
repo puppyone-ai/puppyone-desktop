@@ -2,10 +2,10 @@
 
 ## Contract
 
-PuppyOne Desktop uses one release transaction with two public delivery surfaces:
+PuppyOne Desktop uses one release transaction with two delivery surfaces:
 
-- GitHub Releases is the canonical open-source version record: tag, commit, notes,
-  source archives, binary assets, asset digests, and build provenance.
+- GitHub Releases is the canonical source/version record. Stable records are
+  public; Internal records remain collaborator-only drafts.
 - Cloudflare R2 is the website and updater distribution layer: branded URLs,
   immutable versioned downloads, mutable channel aliases, and a release catalog.
 
@@ -32,11 +32,14 @@ desktop/
 │           ├── SHA256SUMS
 │           └── puppyone-0.1.1-arm64.dmg
 ├── internal/
+│   ├── catalog/
+│   │   └── releases.json
 │   └── mac/
 │       ├── v0.1.1-internal.1/
 │       ├── v0.1.2-internal.2/
 │       ├── v0.1.2-internal.4/
 │       ├── <future-release-tag>/
+│       │   ├── build-info.json
 │       │   ├── release.json
 │       │   ├── SHA256SUMS
 │       │   └── <release assets>
@@ -48,6 +51,7 @@ desktop/
 └── stable/
     └── mac/
         ├── <release-tag>/
+        │   ├── build-info.json
         │   ├── release.json
         │   ├── SHA256SUMS
         │   └── <release assets>
@@ -64,7 +68,9 @@ The rules are:
 - `release.json` is uploaded last and is the R2 commit marker.
 - `latest/` is a mutable channel view and is promoted only after GitHub and the
   versioned R2 payload have matching digests.
-- `desktop/catalog/releases.json` is published last and is the website API.
+- `desktop/catalog/releases.json` is the public Stable/archive website API.
+- `desktop/internal/catalog/releases.json` is the restricted Internal
+  promotion/tester API and follows the same publish-last rule.
 - `archive/` is only for artifacts released before this pipeline existed. Future
   internal and stable version folders are already their own permanent archive.
 
@@ -72,13 +78,16 @@ The rules are:
 
 Every immutable release contains:
 
+- `build-info.json`: the exact identity embedded in the application.
 - `release.json`: version, channel, timestamp, full Git commit, GitHub Release
   URL, R2 URLs, signing state, byte lengths, and SHA-256 digests.
 - `SHA256SUMS`: conventional checksums for every downloadable asset.
 
-`release.json` also identifies provenance as `pipeline`, `backfill`, or
-`archive`. This lets the webpage distinguish modern releases from GitHub-backed
-history and provenance-free pre-pipeline artifacts.
+New Internal and Stable manifests use schema 2 and repeat the base version,
+complete version, build ID, platform build number, build time, commit, and dirty
+state from Build Identity. Stable manifests also record the exact promoted
+Internal tag. Legacy schema-1 records remain readable for backfill and archive
+history.
 
 Every active channel contains `latest/latest.json`, a small pointer from the
 channel to the immutable version. The website should fetch:
@@ -90,6 +99,12 @@ https://downloads.puppyone.ai/desktop/catalog/releases.json
 It should not list the bucket and should not query GitHub live for its primary
 release history. Each catalog entry already contains the GitHub and R2 links
 needed to render a release page.
+
+Stable promotion reads the authenticated Internal catalog instead:
+
+```text
+https://downloads.puppyone.ai/desktop/internal/catalog/releases.json
+```
 
 Archive entries may honestly use a null commit and null GitHub Release URL when
 the provenance of a pre-pipeline artifact cannot be established. Do not invent a
@@ -109,7 +124,7 @@ Both delegate publication to:
 The transaction is:
 
 ```text
-validate version and commit
+resolve and validate Build Identity
 → install locked dependencies
 → build once on a pinned macOS runner
 → sign/notarize for stable
@@ -121,7 +136,7 @@ validate version and commit
 → verify every public R2 object by SHA-256
 → create a GitHub draft release with the same files
 → verify GitHub's asset digests
-→ publish the GitHub release
+→ publish Stable GitHub release, or retain Internal as a draft
 → promote channel payloads and aliases
 → verify every mutable payload by SHA-256
 → publish latest.json
@@ -137,7 +152,7 @@ declared asset still matches. A partial R2 prefix without `release.json` fails
 closed and requires a new tag or explicit cleanup.
 
 All GitHub-owned actions are pinned to full commit SHAs. Build provenance is
-generated for binaries, `release.json`, and `SHA256SUMS`.
+generated for binaries, `build-info.json`, `release.json`, and `SHA256SUMS`.
 
 ## GitHub Repository Setup
 
@@ -151,10 +166,16 @@ Environment secrets:
 CLOUDFLARE_ACCOUNT_ID
 R2_ACCESS_KEY_ID
 R2_SECRET_ACCESS_KEY
+
+# optional until Cloudflare Access is enabled; configure one read path
+CF_ACCESS_CLIENT_ID
+CF_ACCESS_CLIENT_SECRET
+# or
+PUPPYONE_INTERNAL_RELEASE_TOKEN
 ```
 
-This environment may run without manual approval while the internal channel is
-used for technical previews.
+This environment may run without manual approval while the Internal channel is
+used by the team and invited testers.
 
 ### `desktop-signing`
 
@@ -169,7 +190,7 @@ Configure one complete notarization mode:
 
 ```text
 # App Store Connect API key
-APPLE_API_KEY
+APPLE_API_KEY_BASE64
 APPLE_API_KEY_ID
 APPLE_API_ISSUER
 
@@ -181,6 +202,18 @@ APPLE_TEAM_ID
 # or a provisioned keychain profile
 APPLE_KEYCHAIN_PROFILE
 ```
+
+`APPLE_API_KEY_BASE64` is the single-line base64 encoding of the downloaded
+team API key `.p8` file. The signing step materializes it with owner-only
+permissions under `RUNNER_TEMP`, passes that file path to `notarytool`, and
+removes it when the step exits. Do not use an Individual API key: Apple does
+not allow Individual keys to authenticate `notarytool`.
+
+Stable promotion also needs read-only access to the protected Internal
+catalog. Configure either `CF_ACCESS_CLIENT_ID` plus
+`CF_ACCESS_CLIENT_SECRET`, or `PUPPYONE_INTERNAL_RELEASE_TOKEN`, as
+repository secrets or in this protected environment. These credentials do not
+grant R2 publication access.
 
 Restrict this environment to protected `v*.*.*` tags. It should not contain R2
 credentials.
@@ -239,6 +272,7 @@ Create a one-time Cloudflare Cache Rule that bypasses edge caching for:
 
 ```text
 starts_with(http.request.uri.path, "/desktop/internal/mac/latest/")
+or starts_with(http.request.uri.path, "/desktop/internal/catalog/")
 or starts_with(http.request.uri.path, "/desktop/stable/mac/latest/")
 or starts_with(http.request.uri.path, "/desktop/catalog/")
 ```
@@ -251,6 +285,16 @@ The R2 credentials should have object read/write/list permission only for the
 `puppyone-desktop` bucket. They do not need Cloudflare account administration
 permissions.
 
+Internal distribution must sit behind Cloudflare Access, authenticated product
+download APIs, or short-lived authorized URLs. The current repository can keep
+the GitHub record private as a draft, but bucket paths and `Cache-Control` are
+not authorization. Do not describe Internal as restricted until the
+`downloads.puppyone.ai/desktop/internal/` boundary enforces access.
+
+Protect the entire `/desktop/internal/` prefix, including its catalog and
+immutable version paths. Historical Internal entries previously written to the
+public catalog should be migrated out during the access-control rollout.
+
 ## Internal Release
 
 Run **Actions → Desktop Internal Release → Run workflow**.
@@ -258,14 +302,16 @@ Run **Actions → Desktop Internal Release → Run workflow**.
 - Keep `publish_release` enabled to publish both GitHub and R2.
 - Disable it to produce a private Actions artifact without changing external
   state.
-- Normally leave `release_tag` blank. The workflow generates:
+- The workflow owns the build number and generates:
 
 ```text
 v<package-version>-internal.<run-number>
 ```
 
-The internal build is ad-hoc signed and not notarized. The GitHub Release is a
-prerelease and the R2 manifest records that security state.
+The Internal build is ad-hoc signed and not notarized. Its complete version is
+embedded in the app, artifact names, launcher package, updater metadata, and
+release manifest. Its GitHub Release remains a draft; the R2 manifest records
+the precise signing state.
 
 The stable Terminal alias is:
 
@@ -284,22 +330,23 @@ Gatekeeper, and have a valid stapled ticket. The app embeds this updater feed:
 https://updates.puppyone.ai/desktop/stable/mac/latest
 ```
 
-Prepare a stable release by updating `package.json`, committing it, and pushing
-the exact matching tag:
+Prepare a Stable release by first publishing and approving an Internal build
+for the exact commit. Then point the exact matching Stable tag at that commit:
 
 ```bash
-git tag v0.1.3
-git push origin v0.1.3
+git tag v0.1.4
+git push origin v0.1.4
 ```
 
 The tag and package version must match exactly. The stable workflow prepares the
-application before exposing signing credentials, then scopes Apple credentials
-to only the signing/notarization step.
+application before exposing signing credentials, verifies the immutable
+Internal manifest/checksums/assets for the same commit, then scopes Apple
+credentials to only the signing/notarization step.
 
 Local verification is supported:
 
 ```bash
-npm run dist:mac:release
+PUPPYONE_BUILD_NUMBER=1843 PUPPYONE_RELEASE_TAG=v0.1.4 npm run dist:mac:release
 ```
 
 Local publication is not supported. Only the tagged GitHub workflow can publish

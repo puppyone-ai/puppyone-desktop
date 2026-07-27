@@ -2,8 +2,10 @@
   --csv-table-record-index-width: var(--po-editable-table-row-min-height);
   --csv-table-record-index-background: color-mix(in srgb, var(--po-control) 38%, var(--po-editor-bg));
   --csv-table-record-index-active-background: color-mix(in srgb, var(--po-hover) 58%, var(--po-editor-bg));
-  --csv-table-scroll-inline-start-padding: 26px;
-  --csv-table-scroll-inline-end-padding: 32px;
+  --csv-table-content-inline-start-inset: 32px;
+  --csv-table-content-inline-end-inset: 32px;
+  --csv-table-content-block-start-inset: 32px;
+  --csv-table-content-block-end-inset: 32px;
   position: relative;
   display: flex;
   flex: 1;
@@ -17,12 +19,13 @@
   color: var(--po-text);
 }
 
-/* One compact settings affordance owns the one binary display preference.
-   The popover intentionally contains no duplicated file metadata or help copy. */
+/* The compact view control occupies the scrollable content inset. It leaves
+   with that inset before the semantic header reaches its sticky edge, so fixed
+   viewport chrome never obscures a frozen data cell. */
 .csv-table-editor__settings {
   position: absolute;
   z-index: 20;
-  top: 10px;
+  top: 2px;
   inset-inline-end: 14px;
 }
 
@@ -54,11 +57,11 @@
   position: absolute;
   top: 34px;
   inset-inline-end: 0;
-  width: 168px;
+  width: 196px;
   padding: 4px;
 }
 
-.csv-table-editor__header-toggle {
+.csv-table-editor__view-toggle {
   display: inline-flex;
   width: 100%;
   min-height: 36px;
@@ -74,20 +77,20 @@
   transition: background-color 120ms ease, color 120ms ease;
 }
 
-.csv-table-editor__header-toggle:hover,
-.csv-table-editor__header-toggle:has(.csv-table-editor__header-toggle-input:focus-visible) {
+.csv-table-editor__view-toggle:hover,
+.csv-table-editor__view-toggle:has(.csv-table-editor__view-toggle-input:focus-visible) {
   background: color-mix(in srgb, var(--po-accent) 9%, var(--po-panel));
   color: color-mix(in srgb, var(--po-accent) 70%, var(--po-text));
 }
 
-.csv-table-editor__header-toggle-label {
+.csv-table-editor__view-toggle-label {
   font-size: 11.5px;
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
 }
 
-.csv-table-editor__header-toggle-input {
+.csv-table-editor__view-toggle-input {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -96,7 +99,7 @@
   white-space: nowrap;
 }
 
-.csv-table-editor__header-toggle-track {
+.csv-table-editor__view-toggle-track {
   position: relative;
   width: 28px;
   height: 16px;
@@ -108,7 +111,7 @@
   transition: background-color 120ms ease, border-color 120ms ease;
 }
 
-.csv-table-editor__header-toggle-track::after {
+.csv-table-editor__view-toggle-track::after {
   position: absolute;
   top: 2px;
   inset-inline-start: 2px;
@@ -121,34 +124,31 @@
   transition: transform 140ms cubic-bezier(0.2, 0, 0, 1), background-color 120ms ease;
 }
 
-.csv-table-editor__header-toggle-input:checked + .csv-table-editor__header-toggle-track {
+.csv-table-editor__view-toggle-input:checked + .csv-table-editor__view-toggle-track {
   border-color: color-mix(in srgb, var(--po-accent) 72%, var(--po-divider));
   background: color-mix(in srgb, var(--po-accent) 82%, var(--po-control));
 }
 
-.csv-table-editor__header-toggle-input:checked + .csv-table-editor__header-toggle-track::after {
+.csv-table-editor__view-toggle-input:checked + .csv-table-editor__view-toggle-track::after {
   background: var(--po-panel);
   transform: translateX(12px);
 }
 
 .csv-table-editor__settings[dir="rtl"]
-  .csv-table-editor__header-toggle
-  .csv-table-editor__header-toggle-input:checked
-  + .csv-table-editor__header-toggle-track::after {
+  .csv-table-editor__view-toggle
+  .csv-table-editor__view-toggle-input:checked
+  + .csv-table-editor__view-toggle-track::after {
   transform: translateX(-12px);
 }
 
-.csv-table-editor__header-toggle-input:focus-visible + .csv-table-editor__header-toggle-track {
+.csv-table-editor__view-toggle-input:focus-visible + .csv-table-editor__view-toggle-track {
   box-shadow: 0 0 0 2px var(--po-editable-table-cell-focus-ring);
 }
 
 .csv-table-editor__scroll {
+  position: relative;
   flex: 1;
   min-height: 0;
-  padding-block: 28px 36px;
-  padding-inline:
-    var(--csv-table-scroll-inline-start-padding)
-    var(--csv-table-scroll-inline-end-padding);
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-color: var(--po-scrollbar-thumb) transparent;
@@ -173,9 +173,20 @@
 
 .csv-table-editor__frame {
   display: inline-block;
+  box-sizing: border-box;
   min-width: max-content;
-  padding-inline-end: var(--po-editable-table-action-gutter);
-  padding-bottom: var(--po-editable-table-action-gutter);
+  padding-block:
+    var(--csv-table-content-block-start-inset)
+    calc(
+      var(--csv-table-content-block-end-inset)
+      + var(--po-editable-table-action-gutter)
+    );
+  padding-inline:
+    var(--csv-table-content-inline-start-inset)
+    calc(
+      var(--csv-table-content-inline-end-inset)
+      + var(--po-editable-table-action-gutter)
+    );
   vertical-align: top;
 }
 
@@ -294,11 +305,13 @@
 }
 
 /* The first record remains part of the CSV. Header mode only gives it a
-   semantic/sticky presentation; it never creates a second toolbar row. */
+   semantic/sticky presentation; it never creates a second toolbar row. The
+   resting inset belongs to the scrollable content frame, not the viewport, so
+   a zero sticky inset always means the real viewport edge. */
 .csv-table-editor__table thead th {
   position: sticky;
   z-index: 3;
-  top: 0;
+  inset-block-start: 0;
   background:
     linear-gradient(
       var(--po-editable-table-sticky-header-background),
@@ -314,7 +327,7 @@
 .csv-table-editor__table .csv-table-editor__record-index {
   position: sticky;
   z-index: 2;
-  inset-inline-start: calc(-1 * var(--csv-table-scroll-inline-start-padding));
+  inset-inline-start: 0;
   width: var(--csv-table-record-index-width);
   min-width: var(--csv-table-record-index-width);
   max-width: var(--csv-table-record-index-width);
@@ -340,7 +353,6 @@
 
 .csv-table-editor__table thead .csv-table-editor__record-index {
   z-index: 4;
-  top: 0;
   cursor: default;
 }
 
@@ -439,6 +451,29 @@
 .csv-table-editor__header-cell input {
   color: var(--po-editable-table-header-color);
   font-weight: var(--po-editable-table-header-font-weight);
+  transition: opacity 100ms ease;
+}
+
+.csv-table-editor__header-cell[data-column-handle-docked] input {
+  opacity: 0;
+}
+
+.csv-table-editor__column-handle.is-block-docked {
+  /* Center the 24px hit target inside the 31px sticky header cell. */
+  transform: translate(-50%, 4px);
+}
+
+/* A docked drag affordance must not make the editable header inaccessible. */
+.csv-table-editor__header-cell[data-column-handle-docked]:focus-within input {
+  opacity: 1;
+}
+
+.csv-table-editor__surface:has(
+    .csv-table-editor__header-cell[data-column-handle-docked]:focus-within
+  )
+  .csv-table-editor__column-handle.is-block-docked {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .csv-table-editor__resize-control {
@@ -658,17 +693,15 @@
 
 @media (max-width: 640px) {
   .csv-table-editor {
-    --csv-table-scroll-inline-start-padding: 18px;
-    --csv-table-scroll-inline-end-padding: 22px;
+    --csv-table-content-inline-start-inset: 18px;
+    --csv-table-content-inline-end-inset: 22px;
+    --csv-table-content-block-start-inset: 36px;
+    --csv-table-content-block-end-inset: 30px;
   }
 
   .csv-table-editor__settings {
-    top: 8px;
+    top: 4px;
     inset-inline-end: 10px;
-  }
-
-  .csv-table-editor__scroll {
-    padding-block: 24px 30px;
   }
 }
 
@@ -677,9 +710,9 @@
   .csv-table-editor__table th,
   .csv-table-editor__table td,
   .csv-table-editor__settings-button,
-  .csv-table-editor__header-toggle,
-  .csv-table-editor__header-toggle-track,
-  .csv-table-editor__header-toggle-track::after,
+  .csv-table-editor__view-toggle,
+  .csv-table-editor__view-toggle-track,
+  .csv-table-editor__view-toggle-track::after,
   .csv-table-editor__resize-handle,
   .csv-table-editor__resize-handle-visual {
     transition: none;

@@ -17,10 +17,14 @@ afterEach(() => {
   act(() => root?.unmount());
   root = null;
   document.body.innerHTML = "";
+  vi.restoreAllMocks();
 });
 
 describe("CloudRepositoryOverview landing page", () => {
   it("uses an in-app action dashboard without promoting the web route", () => {
+    vi.spyOn(Date, "now").mockReturnValue(
+      new Date("2026-07-20T12:00:00.000Z").getTime(),
+    );
     const onRefresh = vi.fn(async () => undefined);
     const onSelectSection = vi.fn();
     const container = document.createElement("div");
@@ -170,7 +174,9 @@ describe("CloudRepositoryOverview landing page", () => {
     expect(storageCard?.textContent).toContain("folders");
     expect(storageCard?.querySelectorAll(".desktop-cloud-overview-storage-preview-item")).toHaveLength(8);
     expect(storageCard?.querySelectorAll(".desktop-cloud-overview-storage-preview-item--folder")).toHaveLength(3);
-    expect(storageCard?.querySelectorAll(".desktop-cloud-overview-storage-preview-item--file")).toHaveLength(5);
+    expect(storageCard?.querySelectorAll(
+      ".desktop-cloud-overview-storage-preview-item:not(.desktop-cloud-overview-storage-preview-item--folder)",
+    )).toHaveLength(5);
     const dashboardCards = dashboard
       ? Array.from(dashboard.querySelectorAll(".desktop-cloud-overview-dashboard-card"))
       : [];

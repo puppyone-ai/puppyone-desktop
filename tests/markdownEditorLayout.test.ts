@@ -5,6 +5,10 @@ const markdownEditorCss = readFileSync(
   new URL("../packages/shared-ui/src/styles/editor/markdown-editor.css", import.meta.url),
   "utf8",
 );
+const editorEntryCss = readFileSync(
+  new URL("../packages/shared-ui/src/styles/editor.css", import.meta.url),
+  "utf8",
+);
 const markdownTableCss = readFileSync(
   new URL("../packages/shared-ui/src/styles/editor/markdown-table-widget.css", import.meta.url),
   "utf8",
@@ -35,8 +39,9 @@ describe("Markdown editor layout", () => {
     const editorRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor");
     const contentRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor .cm-content");
 
-    expect(editorRule).toContain("--po-markdown-editor-gutter-min: 64px;");
-    expect(editorRule).toContain("--po-markdown-editor-content-padding-block: 64px;");
+    expect(editorEntryCss).toContain("--po-editor-content-edge-inset: 64px;");
+    expect(editorRule).toContain("--po-markdown-editor-gutter-min: var(--po-editor-content-edge-inset, 64px);");
+    expect(editorRule).toContain("--po-markdown-editor-content-padding-block: var(--po-editor-content-edge-inset, 64px);");
     expect(contentRule).toContain("--po-markdown-editor-content-gutter-inline: max(");
     expect(contentRule).toContain("padding-block: var(--po-markdown-editor-content-padding-block);");
     expect(contentRule).toContain("padding-inline: var(--po-markdown-editor-content-gutter-inline);");

@@ -70,6 +70,20 @@
   min-height: 42px;
 }
 
+.desktop-build-version-value {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.desktop-build-version-copy {
+  width: 28px;
+  flex: 0 0 28px;
+  padding: 0;
+}
+
 .desktop-content-font-segment {
   max-width: 50%;
   flex-wrap: wrap;
@@ -87,16 +101,6 @@
   min-height: 42px;
   padding-top: 5px;
   padding-bottom: 5px;
-}
-
-.desktop-update-settings-row {
-  align-items: flex-start;
-  padding-top: 7px;
-  padding-bottom: 7px;
-}
-
-.desktop-update-blocker {
-  color: var(--po-warning) !important;
 }
 
 .desktop-settings-tool-list {

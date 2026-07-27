@@ -3,6 +3,7 @@
 import type { MessageFormatter } from "@puppyone/localization/core";
 import { ArrowDownRight } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -80,7 +81,63 @@ export function CsvTableResizeControl({
   const canExpand = availableRows > 0 || availableColumns > 0;
   const canOpenPicker = pickerRowCount > 0 && pickerColumnCount > 0;
 
+  const clearDragSession = useCallback(() => {
+    const session = dragSessionRef.current;
+    dragSessionRef.current = null;
+    setDragPreview(null);
+    onPreviewChange(null);
+    if (!session) return;
+
+    const handle = buttonRef.current;
+    try {
+      if (handle?.hasPointerCapture(session.pointerId)) {
+        handle.releasePointerCapture(session.pointerId);
+      }
+    } catch {
+      // Pointer capture may already have been released by the platform.
+    }
+  }, [onPreviewChange]);
+
   useEffect(() => () => onPreviewChange(null), [onPreviewChange]);
+
+  useEffect(() => {
+    const handle = buttonRef.current;
+    const document = handle?.ownerDocument;
+    const ownerWindow = document?.defaultView;
+    if (!handle || !document || !ownerWindow) return undefined;
+
+    const cancelActiveDrag = () => {
+      if (!dragSessionRef.current) return;
+      clearDragSession();
+    };
+    const onPointerEndOutsideHandle = (event: PointerEvent) => {
+      const session = dragSessionRef.current;
+      if (!session || event.pointerId !== session.pointerId) return;
+      cancelActiveDrag();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !dragSessionRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      cancelActiveDrag();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") cancelActiveDrag();
+    };
+
+    ownerWindow.addEventListener("blur", cancelActiveDrag);
+    ownerWindow.addEventListener("pointerup", onPointerEndOutsideHandle);
+    ownerWindow.addEventListener("pointercancel", onPointerEndOutsideHandle);
+    document.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      ownerWindow.removeEventListener("blur", cancelActiveDrag);
+      ownerWindow.removeEventListener("pointerup", onPointerEndOutsideHandle);
+      ownerWindow.removeEventListener("pointercancel", onPointerEndOutsideHandle);
+      document.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [clearDragSession]);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -133,6 +190,8 @@ export function CsvTableResizeControl({
     event.stopPropagation();
     event.currentTarget.focus({ preventScroll: true });
     setPickerOpen(false);
+    suppressClickRef.current = false;
+    setDragPreview(null);
     onPreviewChange(null);
 
     const surface = event.currentTarget.closest<HTMLElement>(".csv-table-editor__surface");
@@ -213,16 +272,7 @@ export function CsvTableResizeControl({
   const finishPointerInteraction = (event: ReactPointerEvent<HTMLButtonElement>, cancelled: boolean) => {
     const session = dragSessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
-    dragSessionRef.current = null;
-    setDragPreview(null);
-    onPreviewChange(null);
-    try {
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
-    } catch {
-      // Some test and embedded runtimes do not expose pointer capture.
-    }
+    clearDragSession();
     if (!session.moved) return;
     suppressClickRef.current = !cancelled;
     if (!cancelled) commitExpansion(session.preview);
@@ -303,6 +353,7 @@ export function CsvTableResizeControl({
           disabled={!canExpand}
           title={t("editor.csv.expandTableHint")}
           onClick={handleClick}
+          onLostPointerCapture={(event) => finishPointerInteraction(event, true)}
           onPointerCancel={(event) => finishPointerInteraction(event, true)}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
