@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
 import { createTypographyRootProps } from "../features/typography";
 import type { MinimalOnboardingProps, ProjectHomeItem } from "./MinimalOnboarding";
+import { DesktopWindowDragRegion } from "./DesktopWindowChrome";
 import { InlineLoading } from "./loading";
 
 /** Optional visual home for local repositories; it never enumerates Cloud Projects. */
@@ -98,7 +99,7 @@ export function AssetLibraryHome({
       }}
       onDrop={(event) => void handleDrop(event)}
     >
-      <div className="asset-library-home-titlebar" aria-hidden="true" />
+      <DesktopWindowDragRegion className="asset-library-home-titlebar" />
       <section className="asset-library-home" aria-label={t("onboarding.projects.title")}>
         <header className="asset-library-home-header"><div className="asset-library-home-heading"><h1>{t("onboarding.projects.title")}</h1></div></header>
 

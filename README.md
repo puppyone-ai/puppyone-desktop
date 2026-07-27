@@ -14,7 +14,6 @@
 </div>
 
 ![puppyone editor overview](public/puppyone-overview.png)
-
 ## Install
 
 ```bash

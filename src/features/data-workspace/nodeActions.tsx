@@ -1,7 +1,6 @@
-import type { CSSProperties, Dispatch, ReactNode, SetStateAction } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
-  ChevronRight,
   ClipboardPaste,
   Copy,
   CopyPlus,
@@ -14,7 +13,6 @@ import {
   Plus,
   Scissors,
   Trash2,
-  Workflow,
 } from "lucide-react";
 import {
   createDefaultPuppyFlowDocument,
@@ -29,7 +27,7 @@ import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core"
 import { useLocalization } from "@puppyone/localization/react";
 import { DesktopDialogCloseButton, DesktopDialogRoot } from "../../components/DesktopDialog";
 import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../components/DesktopMenu";
-import type { ExperimentalSettings } from "../../preferences";
+import type { CreateNewFileTypeId, ExperimentalSettings } from "../../preferences";
 
 export type DesktopCreateEntryKind = "folder" | "markdown" | "text" | "json" | "csv" | "app" | "puppyflow";
 export type DesktopCreateEntryAnchor = {
@@ -72,7 +70,7 @@ export type DesktopNodeActionError = Readonly<
 
 const CREATE_ENTRY_MENU_MARGIN = 12;
 const CREATE_ENTRY_MENU_WIDTH = 184;
-const CREATE_ENTRY_MENU_ESTIMATED_HEIGHT = 184;
+const CREATE_ENTRY_MENU_ESTIMATED_HEIGHT = 112;
 const NODE_ACTION_MENU_WIDTH = 224;
 const NODE_ACTION_MENU_ESTIMATED_HEIGHT = 342;
 
@@ -119,9 +117,6 @@ const CREATE_ENTRY_OPTIONS = [
 }>;
 
 type CreateEntryOption = (typeof CREATE_ENTRY_OPTIONS)[number];
-const CUSTOM_CREATE_ENTRY_KINDS = new Set<DesktopCreateEntryKind>(["app", "puppyflow"]);
-const STANDARD_CREATE_ENTRY_OPTIONS = CREATE_ENTRY_OPTIONS.filter((option) => !CUSTOM_CREATE_ENTRY_KINDS.has(option.kind));
-const CUSTOM_CREATE_ENTRY_OPTIONS = CREATE_ENTRY_OPTIONS.filter((option) => CUSTOM_CREATE_ENTRY_KINDS.has(option.kind));
 
 export function DesktopExplorerRowActions({
   node,
@@ -167,32 +162,23 @@ export function DesktopExplorerRowActions({
 
 export function DesktopCreateEntryMenu({
   draft,
-  experimentalSettings,
+  fileKinds,
   fileIconTheme,
   onCancel,
-  onPaste,
-  pasteDisabled = false,
-  pasteLabel,
   onSelectKind,
 }: {
   draft: DesktopCreateEntryDraft;
-  experimentalSettings?: ExperimentalSettings | null;
+  fileKinds: readonly CreateNewFileTypeId[];
   fileIconTheme?: FileIconThemeId | null;
   onCancel: () => void;
-  onPaste?: () => void;
-  pasteDisabled?: boolean;
-  pasteLabel?: string;
   onSelectKind: (kind: DesktopCreateEntryKind) => void;
 }) {
   const { t } = useLocalization();
   const menuRef = useRef<HTMLDivElement>(null);
-  const customMenuCloseTimerRef = useRef<number | null>(null);
-  const [customMenuOpen, setCustomMenuOpen] = useState(false);
-  const customCreateEntryOptions = CUSTOM_CREATE_ENTRY_OPTIONS.filter((option) => {
-    if (option.kind === "app") return experimentalSettings?.enablePuppyoneAppFiles === true;
-    if (option.kind === "puppyflow") return experimentalSettings?.enablePuppyFlowFiles === true;
-    return false;
-  });
+  const menuOptions = [
+    getCreateEntryOption("folder"),
+    ...Array.from(new Set(fileKinds)).map((kind) => getCreateEntryOption(kind)),
+  ];
   const position = getCreateEntryMenuPosition(draft.anchor);
   const menuStyle = {
     "--node-action-menu-left": `${position.left}px`,
@@ -200,35 +186,11 @@ export function DesktopCreateEntryMenu({
     "--node-action-menu-width": `${CREATE_ENTRY_MENU_WIDTH}px`,
   } as CSSProperties;
 
-  const openCustomMenu = () => {
-    if (customMenuCloseTimerRef.current !== null) {
-      window.clearTimeout(customMenuCloseTimerRef.current);
-      customMenuCloseTimerRef.current = null;
-    }
-    setCustomMenuOpen(true);
-  };
-
-  const scheduleCloseCustomMenu = () => {
-    if (customMenuCloseTimerRef.current !== null) {
-      window.clearTimeout(customMenuCloseTimerRef.current);
-    }
-    customMenuCloseTimerRef.current = window.setTimeout(() => {
-      customMenuCloseTimerRef.current = null;
-      setCustomMenuOpen(false);
-    }, 220);
-  };
-
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       menuRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, []);
-
-  useEffect(() => () => {
-    if (customMenuCloseTimerRef.current !== null) {
-      window.clearTimeout(customMenuCloseTimerRef.current);
-    }
   }, []);
 
   useEffect(() => {
@@ -263,68 +225,16 @@ export function DesktopCreateEntryMenu({
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
-      {onPaste && (
-        <>
+      {menuOptions.map((option, index) => (
+        <Fragment key={option.kind}>
+          {index === 1 && <DesktopMenuSeparator />}
           <DesktopNodeActionMenuItem
-            icon={<ClipboardPaste size={14} />}
-            label={pasteLabel ?? t("workspace.node.paste")}
-            shortcut={getPlatformShortcut("V")}
-            disabled={pasteDisabled}
-            onClick={onPaste}
+            icon={<CreateEntryGlyph option={option} theme={fileIconTheme} />}
+            label={getCreateEntryOptionLabel(option.kind, t)}
+            onClick={() => onSelectKind(option.kind)}
           />
-          <DesktopMenuSeparator />
-        </>
-      )}
-      {STANDARD_CREATE_ENTRY_OPTIONS.map((option) => (
-        <DesktopNodeActionMenuItem
-          key={option.kind}
-          icon={<CreateEntryGlyph option={option} theme={fileIconTheme} />}
-          label={getCreateEntryOptionLabel(option.kind, t)}
-          onClick={() => onSelectKind(option.kind)}
-        />
+        </Fragment>
       ))}
-      {customCreateEntryOptions.length > 0 && (
-        <div
-          className="desktop-create-entry-submenu-wrap"
-          data-open={customMenuOpen ? "true" : "false"}
-          onPointerEnter={openCustomMenu}
-          onPointerLeave={scheduleCloseCustomMenu}
-          onFocus={openCustomMenu}
-          onBlur={(event) => {
-            const relatedTarget = event.relatedTarget;
-            if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) return;
-            scheduleCloseCustomMenu();
-          }}
-        >
-          <DesktopMenuItem
-            className="desktop-node-action-menu-item desktop-create-entry-submenu-trigger"
-            icon={<Workflow size={14} />}
-            label={t("workspace.node.customFiles")}
-            trailing={<ChevronRight className="po-directional-icon" size={14} />}
-            aria-haspopup="menu"
-            aria-expanded={customMenuOpen}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              openCustomMenu();
-            }}
-          />
-          <DesktopMenuSurface
-            className="desktop-create-entry-submenu"
-            ariaLabel={t("workspace.node.createCustomFile")}
-            role="menu"
-          >
-            {customCreateEntryOptions.map((option) => (
-              <DesktopNodeActionMenuItem
-                key={option.kind}
-                icon={<CreateEntryGlyph option={option} theme={fileIconTheme} />}
-                label={getCreateEntryOptionLabel(option.kind, t)}
-                onClick={() => onSelectKind(option.kind)}
-              />
-            ))}
-          </DesktopMenuSurface>
-        </div>
-      )}
     </DesktopMenuSurface>
   );
 }
@@ -1016,7 +926,7 @@ export function defaultCreateName(kind: DesktopCreateEntryKind, t: MessageFormat
 }
 
 export type DesktopCreateEntryTemplates = Readonly<{
-  csvHeaders: readonly [string, string];
+  csvHeaders: readonly [string, string, string];
   puppyFlow: PuppyFlowDocumentDefaults;
   untitledAppName: string;
 }>;
@@ -1026,7 +936,10 @@ export function getCreateEntryInitialContent(
   templates: DesktopCreateEntryTemplates,
 ): string {
   if (kind === "json") return "{}\n";
-  if (kind === "csv") return `${templates.csvHeaders.join(",")}\n`;
+  if (kind === "csv") {
+    const emptyRow = Array.from({ length: templates.csvHeaders.length }, () => "").join(",");
+    return `${templates.csvHeaders.join(",")}\n${emptyRow}\n${emptyRow}\n`;
+  }
   if (kind === "app") {
     return [
       "{",

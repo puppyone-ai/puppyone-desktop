@@ -7,12 +7,12 @@ export async function verifyMacReleaseArtifacts(releaseDirectory) {
   const apps = entries.filter((entryPath) => entryPath.endsWith(".app"));
   const dmgs = entries.filter((entryPath) => entryPath.endsWith(".dmg"));
   const zips = entries.filter((entryPath) => entryPath.endsWith(".zip"));
-  const updateMetadata = entries.filter((entryPath) => /latest-mac\.yml$/.test(entryPath));
+  const updateMetadata = entries.filter((entryPath) => path.basename(entryPath) === "stable-mac.yml");
 
   if (apps.length === 0) throw new Error("No packaged macOS .app was found for signature verification.");
   if (dmgs.length === 0) throw new Error("No macOS DMG release artifact was produced.");
   if (zips.length === 0) throw new Error("No macOS ZIP release artifact was produced for auto-update.");
-  if (updateMetadata.length === 0) throw new Error("No latest-mac.yml update metadata was produced.");
+  if (updateMetadata.length === 0) throw new Error("No stable-mac.yml update metadata was produced.");
 
   for (const appPath of apps) {
     await runCommand("/usr/bin/codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath]);

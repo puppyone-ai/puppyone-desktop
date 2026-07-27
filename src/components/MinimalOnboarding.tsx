@@ -14,6 +14,7 @@ import type {
   ThemeMode,
 } from "../preferences";
 import { InlineLoading } from "./loading";
+import { DesktopWindowDragRegion } from "./DesktopWindowChrome";
 
 export type RecentWorkspaceHomeItem = {
   workspace: Workspace;
@@ -157,7 +158,7 @@ export function MinimalOnboarding({
       }}
       onDrop={(event) => void handleDrop(event)}
     >
-      <div className="onboarding-titlebar" aria-hidden="true" />
+      <DesktopWindowDragRegion className="onboarding-titlebar" />
       <section className="onboarding-homepage" aria-label={t("onboarding.projects.title")}>
         <div className="onboarding-primary-area">
           <div className="onboarding-folder-action-wrap">

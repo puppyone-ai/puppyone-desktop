@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 import {
+  DEFAULT_EXPERIMENTAL_SETTINGS,
   TEXT_SIZE_PRESETS,
+  getVisibleCreateNewFileTypes,
+  parseCreateNewMenuSettings,
   parseDarkThemePreset,
   parseDiffMarkers,
   parseDockIcon,
@@ -13,6 +16,64 @@ import {
   parseSidebarNavigationVisibilitySettings,
   parseTextSize,
 } from "../src/preferences";
+
+describe("create new menu preferences", () => {
+  it("defaults to Markdown followed by CSV and preserves explicit order and visibility", () => {
+    expect(parseCreateNewMenuSettings(null)).toEqual({
+      items: [
+        { kind: "markdown", enabled: true },
+        { kind: "csv", enabled: true },
+      ],
+    });
+    expect(parseCreateNewMenuSettings(JSON.stringify({
+      items: [
+        { kind: "json", enabled: false },
+        { kind: "text", enabled: true },
+      ],
+    }))).toEqual({
+      items: [
+        { kind: "json", enabled: false },
+        { kind: "text", enabled: true },
+      ],
+    });
+  });
+
+  it("deduplicates valid file types and recovers from malformed persisted values", () => {
+    expect(parseCreateNewMenuSettings(JSON.stringify({
+      items: [
+        { kind: "json", enabled: true },
+        { kind: "json", enabled: false },
+        { kind: "not-a-file-type", enabled: true },
+      ],
+    }))).toEqual({
+      items: [{ kind: "json", enabled: true }],
+    });
+    expect(parseCreateNewMenuSettings(JSON.stringify({
+      items: [{ kind: "not-a-file-type" }],
+    }))).toEqual({
+      items: [
+        { kind: "markdown", enabled: true },
+        { kind: "csv", enabled: true },
+      ],
+    });
+    expect(parseCreateNewMenuSettings(JSON.stringify({ items: [] }))).toEqual({ items: [] });
+  });
+
+  it("shows only enabled and currently available file types", () => {
+    const settings = {
+      items: [
+        { kind: "app", enabled: true },
+        { kind: "json", enabled: false },
+        { kind: "csv", enabled: true },
+      ],
+    } as const;
+    expect(getVisibleCreateNewFileTypes(settings, DEFAULT_EXPERIMENTAL_SETTINGS)).toEqual(["csv"]);
+    expect(getVisibleCreateNewFileTypes(settings, {
+      ...DEFAULT_EXPERIMENTAL_SETTINGS,
+      enablePuppyoneAppFiles: true,
+    })).toEqual(["app", "csv"]);
+  });
+});
 
 describe("appearance preferences", () => {
   it("defines curated integer typography presets", () => {

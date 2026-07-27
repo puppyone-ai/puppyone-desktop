@@ -5,6 +5,7 @@ import {
 } from "../typography";
 import { useLocalization } from "@puppyone/localization";
 import { PulseGrid } from "../../components/loading";
+import { DesktopWindowDragRegion } from "../../components/DesktopWindowChrome";
 
 type RestoringWorkspaceScreenProps = {
   themeMode: ThemeMode;
@@ -39,7 +40,7 @@ export function RestoringWorkspaceScreen({
       data-diff-markers={diffMarkers}
       {...createTypographyRootProps(typography)}
     >
-      <div className="onboarding-titlebar" aria-hidden="true" />
+      <DesktopWindowDragRegion className="onboarding-titlebar" />
       <PulseGrid ariaLabel={t("workspace.restoring.ariaLabel")} size="sm" tone="neutral" />
     </main>
   );

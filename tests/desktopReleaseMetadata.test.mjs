@@ -11,6 +11,7 @@ import {
   mergeReleaseCatalog,
   verifyDesktopReleaseBundle,
 } from "../scripts/release-support/desktop-release-metadata.mjs";
+import { resolveDesktopBuildIdentity } from "../shared/desktop-build-identity.mjs";
 
 const temporaryDirectories = [];
 const commitSha = "a".repeat(40);
@@ -27,10 +28,16 @@ describe("desktop release metadata", () => {
     const manifest = await internalManifest(fixture.assets);
 
     expect(manifest.assets.map((asset) => asset.name)).toEqual([
-      "puppyone-0.1.2-arm64-mac.zip",
-      "puppyone-0.1.2-arm64.dmg",
+      "puppyone-0.1.2-internal.5-arm64.dmg",
+      "puppyone-0.1.2-internal.5-arm64.zip",
       "puppyone-desktop-terminal-preview-0.1.2-internal.5.tgz",
     ]);
+    expect(manifest).toMatchObject({
+      schemaVersion: 2,
+      baseVersion: "0.1.2",
+      version: "0.1.2-internal.5",
+      build: { id: "5", platformBuildNumber: "5" },
+    });
     expect(manifest.assets.find((asset) => asset.kind === "dmg")?.latestAlias)
       .toBe("puppyone-latest-arm64.dmg");
     expect(createChecksumsFile(manifest).split("\n").filter(Boolean)).toHaveLength(3);
@@ -42,12 +49,13 @@ describe("desktop release metadata", () => {
   });
 
   it("requires signed, notarized updater-ready artifacts for stable releases", async () => {
-    const fixture = await createFixture();
-    const updaterMetadata = path.join(fixture.directory, "latest-mac.yml");
+    const fixture = await createFixture("0.1.2");
+    const updaterMetadata = path.join(fixture.directory, "stable-mac.yml");
     await fs.writeFile(updaterMetadata, "version: 0.1.2\n");
     const manifest = await createDesktopReleaseManifest({
       ...baseMetadata(),
       assetPaths: [...fixture.assets.slice(0, 2), updaterMetadata],
+      buildInfo: releaseBuildInfo("stable", 6),
       channel: "stable",
       prerelease: false,
       provenance: "pipeline",
@@ -55,6 +63,8 @@ describe("desktop release metadata", () => {
       notarized: true,
       r2Prefix: "desktop/stable/mac/v0.1.2",
       tag: "v0.1.2",
+      version: "0.1.2",
+      promotionSourceTag: "v0.1.2-internal.5",
     });
     manifest.security.developerIdSigned = false;
     manifest.security.notarized = false;
@@ -63,7 +73,7 @@ describe("desktop release metadata", () => {
     expect(errors).toEqual(expect.arrayContaining([
       expect.stringMatching(/Developer ID signed/),
       expect.stringMatching(/notarized/),
-      expect.stringMatching(/latest-mac\.yml/),
+      expect.stringMatching(/stable-mac\.yml/),
     ]));
   });
 
@@ -102,6 +112,18 @@ describe("desktop release metadata", () => {
     expect(() => mergeReleaseCatalog(catalog, conflicting)).toThrow(/different immutable release/);
   });
 
+  it("rejects non-canonical timestamps and credential-bearing release URLs", async () => {
+    const fixture = await createFixture();
+    const manifest = await internalManifest(fixture.assets);
+    manifest.publishedAt = "2026-07-24 12:00:00Z";
+    manifest.assets[0].r2.url = "https://token:secret@downloads.puppyone.ai/asset";
+
+    expect(inspectDesktopReleaseManifest(manifest)).toEqual(expect.arrayContaining([
+      expect.stringMatching(/canonical UTC ISO timestamp/),
+      expect.stringMatching(/invalid R2 coordinates/),
+    ]));
+  });
+
   it("represents a pre-pipeline DMG honestly as an archive release", async () => {
     const fixture = await createFixture();
     const manifest = await createDesktopReleaseManifest({
@@ -137,6 +159,10 @@ describe("desktop release metadata", () => {
       copied.push(destination);
     }
     const manifest = await internalManifest(copied);
+    await fs.writeFile(
+      path.join(bundle, "build-info.json"),
+      jsonFile(releaseBuildInfo("internal", 5)),
+    );
     await fs.writeFile(path.join(bundle, "release.json"), jsonFile(manifest));
     await fs.writeFile(path.join(bundle, "SHA256SUMS"), createChecksumsFile(manifest));
     await fs.writeFile(path.join(bundle, "latest.json"), jsonFile(createLatestPointer(manifest)));
@@ -150,12 +176,12 @@ describe("desktop release metadata", () => {
   });
 });
 
-async function createFixture() {
+async function createFixture(version = "0.1.2-internal.5") {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "puppyone-release-metadata-"));
   temporaryDirectories.push(directory);
   const assets = [
-    path.join(directory, "puppyone-0.1.2-arm64-mac.zip"),
-    path.join(directory, "puppyone-0.1.2-arm64.dmg"),
+    path.join(directory, `puppyone-${version}-arm64.zip`),
+    path.join(directory, `puppyone-${version}-arm64.dmg`),
     path.join(directory, "puppyone-desktop-terminal-preview-0.1.2-internal.5.tgz"),
   ];
   await Promise.all(assets.map((assetPath, index) => fs.writeFile(assetPath, `asset-${index}`)));
@@ -175,14 +201,28 @@ function baseMetadata() {
 }
 
 function internalManifest(assetPaths) {
+  const buildInfo = releaseBuildInfo("internal", 5);
   return createDesktopReleaseManifest({
     ...baseMetadata(),
     assetPaths,
+    buildInfo,
     channel: "internal",
     developerIdSigned: false,
     notarized: false,
     prerelease: true,
     r2Prefix: "desktop/internal/mac/v0.1.2-internal.5",
     tag: "v0.1.2-internal.5",
+    version: buildInfo.version,
+  });
+}
+
+function releaseBuildInfo(channel, buildNumber) {
+  return resolveDesktopBuildIdentity({
+    baseVersion: "0.1.2",
+    buildNumber,
+    builtAt: "2026-07-24T11:55:00.000Z",
+    channel,
+    commitSha,
+    sourceDirty: false,
   });
 }

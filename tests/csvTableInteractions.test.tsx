@@ -41,7 +41,7 @@ afterEach(async () => {
 });
 
 describe("CSV table interactions", () => {
-  it("keeps data-row numbers inside the frame while a minimal settings popover controls header semantics", async () => {
+  it("keeps data-row numbers inside the frame while settings control header semantics", async () => {
     expect(container?.querySelector(".csv-table-editor__toolbar")).toBeNull();
     expect(container?.querySelector(".csv-table-editor__settings-button")).toBeInstanceOf(
       HTMLButtonElement,
@@ -62,10 +62,10 @@ describe("CSV table interactions", () => {
     );
     expect(headerToggle?.getAttribute("role")).toBe("switch");
     expect(headerToggle?.checked).toBe(true);
-    expect(document.querySelector(".csv-table-editor__header-toggle-label")?.textContent)
+    expect(headerToggle?.closest("label")?.querySelector(".csv-table-editor__view-toggle-label")?.textContent)
       .toBe("Header row");
-    expect(document.querySelector(".csv-table-editor__settings-popover")?.textContent?.trim())
-      .toBe("Header row");
+    expect(document.querySelector(".csv-table-editor__row-numbers-toggle-input"))
+      .toBeInstanceOf(HTMLInputElement);
     expect(document.querySelector(".csv-table-editor__settings-summary")).toBeNull();
     act(() => headerToggle?.click());
     expect(container?.querySelector(".csv-table-editor__table thead")).toBeNull();
@@ -86,6 +86,90 @@ describe("CSV table interactions", () => {
       .toBe(false);
   });
 
+  it("toggles and persists the view-only row-number gutter without changing CSV content", async () => {
+    const originalSnapshot = latestSnapshot;
+    const originalChangeCount = changeCount;
+    act(() => container?.querySelector<HTMLButtonElement>(".csv-table-editor__settings-button")?.click());
+    const rowNumbersToggle = document.querySelector<HTMLInputElement>(
+      ".csv-table-editor__row-numbers-toggle-input",
+    );
+    expect(rowNumbersToggle?.getAttribute("role")).toBe("switch");
+    expect(rowNumbersToggle?.checked).toBe(true);
+    expect(rowNumbersToggle?.closest("label")?.querySelector(".csv-table-editor__view-toggle-label")?.textContent)
+      .toBe("Row numbers");
+
+    act(() => rowNumbersToggle?.click());
+    expect(container?.querySelector(".csv-table-editor__record-index-column")).toBeNull();
+    expect(container?.querySelector(".csv-table-editor__record-index")).toBeNull();
+    expect(container?.querySelectorAll(".csv-table-editor__table colgroup col")).toHaveLength(2);
+    expect(container?.querySelectorAll(".csv-table-editor__table thead tr > *")).toHaveLength(2);
+    expect(container?.querySelectorAll(".csv-table-editor__table tbody tr:first-child > *")).toHaveLength(2);
+    expect(container?.querySelector(".csv-table-editor__table")?.getAttribute("aria-colcount")).toBe("2");
+    expect(container?.querySelector("thead th[data-csv-column='0']")?.getAttribute("aria-colindex"))
+      .toBe("1");
+    expect(container?.querySelector("tbody td[data-csv-column='0']")?.getAttribute("aria-colindex"))
+      .toBe("1");
+    expect(latestSnapshot).toBe(originalSnapshot);
+    expect(changeCount).toBe(originalChangeCount);
+
+    await act(async () => {
+      root?.unmount();
+      root = createRoot(container!);
+      root.render(withTestLocalization(<Harness />));
+      await Promise.resolve();
+    });
+    expect(container?.querySelector(".csv-table-editor__record-index")).toBeNull();
+    act(() => container?.querySelector<HTMLButtonElement>(".csv-table-editor__settings-button")?.click());
+    expect(document.querySelector<HTMLInputElement>(".csv-table-editor__row-numbers-toggle-input")?.checked)
+      .toBe(false);
+  });
+
+  it("keeps the row handle reachable from the table edge when row numbers are hidden", () => {
+    act(() => container?.querySelector<HTMLButtonElement>(".csv-table-editor__settings-button")?.click());
+    act(() => document.querySelector<HTMLInputElement>(
+      ".csv-table-editor__row-numbers-toggle-input",
+    )?.click());
+
+    const scrollContainer = container?.querySelector<HTMLElement>(".csv-table-editor__scroll");
+    const surface = container?.querySelector<HTMLElement>(".csv-table-editor__surface");
+    const firstRow = container?.querySelector<HTMLTableRowElement>("tbody tr[data-csv-row='1']");
+    const firstCell = firstRow?.querySelector<HTMLTableCellElement>("td[data-csv-column='0']");
+    const rowHandle = container?.querySelector<HTMLButtonElement>(".csv-table-editor__row-handle");
+    if (!scrollContainer || !surface || !firstRow || !firstCell || !rowHandle) {
+      throw new Error("CSV row handle fallback geometry did not mount.");
+    }
+
+    mockRect(scrollContainer, rect(80, 70, 800, 600));
+    mockRect(surface, rect(100, 100, 192, 93));
+    mockRect(firstRow, rect(100, 131, 192, 31));
+    mockRect(firstCell, rect(100, 131, 96, 31));
+    act(() => firstCell.dispatchEvent(new PointerEvent("pointerover", { bubbles: true })));
+
+    expect(rowHandle.classList.contains("is-visible")).toBe(true);
+    expect(rowHandle.classList.contains("is-inline-docked")).toBe(false);
+    expect(rowHandle.style.left).toBe("0px");
+
+    mockRect(surface, rect(40, 100, 192, 93));
+    mockRect(firstRow, rect(40, 131, 192, 31));
+    mockRect(firstCell, rect(40, 131, 96, 31));
+    act(() => scrollContainer.dispatchEvent(new Event("scroll")));
+
+    expect(rowHandle.classList.contains("is-inline-docked")).toBe(true);
+    expect(rowHandle.style.left).toBe("40px");
+
+    // A keyboard-triggered settings change does not produce pointerleave.
+    // The active handle must be recomputed against the restored gutter rather
+    // than keeping stale visibility/docking state from the old table shape.
+    act(() => document.querySelector<HTMLInputElement>(
+      ".csv-table-editor__row-numbers-toggle-input",
+    )?.click());
+    expect(container?.querySelector(".csv-table-editor__record-index")).toBeInstanceOf(
+      HTMLTableCellElement,
+    );
+    expect(rowHandle.classList.contains("is-visible")).toBe(true);
+    expect(rowHandle.classList.contains("is-inline-docked")).toBe(true);
+  });
+
   it("defaults ambiguous all-text CSV content to data rows instead of silently promoting a header", async () => {
     latestSnapshot = "Name,City\nAda,London";
     await act(async () => {
@@ -101,6 +185,26 @@ describe("CSV table interactions", () => {
     act(() => container?.querySelector<HTMLButtonElement>(".csv-table-editor__settings-button")?.click());
     expect(document.querySelector<HTMLInputElement>(".csv-table-editor__header-toggle-input")?.checked)
       .toBe(false);
+  });
+
+  it("renders a new three-by-three CSV template with a header and two editable rows", async () => {
+    latestSnapshot = "Column 1,Column 2,Column 3\n,,\n,,\n";
+    await act(async () => {
+      root?.unmount();
+      root = createRoot(container!);
+      root.render(withTestLocalization(<Harness documentId="new-grid.csv" />));
+      await Promise.resolve();
+    });
+
+    expect(container?.querySelectorAll(".csv-table-editor__header-cell")).toHaveLength(3);
+    expect(container?.querySelectorAll(".csv-table-editor__table tbody tr")).toHaveLength(2);
+    expect(container?.querySelectorAll(
+      ".csv-table-editor__table tbody tr:first-child td[data-csv-column]",
+    )).toHaveLength(3);
+    expect(container?.querySelector(".csv-table-editor__table")?.getAttribute("aria-rowcount"))
+      .toBe("3");
+    expect(latestSnapshot).toBe("Column 1,Column 2,Column 3\n,,\n,,\n");
+    expect(changeCount).toBe(0);
   });
 
   it("marks horizontal scrolling so the frozen record gutter can own the viewport edge", () => {
@@ -226,6 +330,43 @@ describe("CSV table interactions", () => {
       await Promise.resolve();
     });
     expect(latestSnapshot).toBe(expandedSnapshot);
+  });
+
+  it("clears an expansion preview when pointer capture is lost or the window blurs", async () => {
+    mockTableGeometry();
+    const resizeHandle = container?.querySelector<HTMLButtonElement>(".csv-table-editor__resize-handle");
+    if (!resizeHandle) throw new Error("CSV resize handle did not mount.");
+    makePointerCaptureSafe(resizeHandle);
+    const originalSnapshot = latestSnapshot;
+
+    await act(async () => {
+      resizeHandle.dispatchEvent(pointerEvent("pointerdown", 300, 200, 18));
+      resizeHandle.dispatchEvent(pointerEvent("pointermove", 541, 278, 18));
+      await Promise.resolve();
+    });
+    expect(container?.querySelector(".csv-table-editor__surface")
+      ?.getAttribute("data-resize-preview")).toBe("true");
+
+    await act(async () => {
+      resizeHandle.dispatchEvent(pointerEvent("lostpointercapture", 541, 278, 18));
+      await Promise.resolve();
+    });
+    expect(container?.querySelector(".csv-table-editor__surface")
+      ?.hasAttribute("data-resize-preview")).toBe(false);
+    expect(container?.querySelector(".csv-table-editor__expansion-cell")).toBeNull();
+    expect(latestSnapshot).toBe(originalSnapshot);
+
+    makePointerCaptureSafe(resizeHandle);
+    await act(async () => {
+      resizeHandle.dispatchEvent(pointerEvent("pointerdown", 300, 200, 19));
+      resizeHandle.dispatchEvent(pointerEvent("pointermove", 541, 278, 19));
+      window.dispatchEvent(new Event("blur"));
+      await Promise.resolve();
+    });
+    expect(container?.querySelector(".csv-table-editor__surface")
+      ?.hasAttribute("data-resize-preview")).toBe(false);
+    expect(container?.querySelector(".csv-table-editor__resize-status")).toBeNull();
+    expect(latestSnapshot).toBe(originalSnapshot);
   });
 
   it("aligns a downward preview to the record gutter and content-sized columns", async () => {
@@ -413,6 +554,34 @@ describe("CSV table interactions", () => {
     act(() => surface.dispatchEvent(new PointerEvent("pointerleave")));
     expect(rowHandle.classList.contains("is-inline-docked")).toBe(false);
     expect(geometry.firstRecordIndexCell.hasAttribute("data-row-handle-docked")).toBe(false);
+  });
+
+  it("docks the column handle inside a sticky header before the viewport clips it", () => {
+    const geometry = mockTableGeometry();
+    const scrollContainer = container?.querySelector<HTMLElement>(".csv-table-editor__scroll");
+    const surface = container?.querySelector<HTMLElement>(".csv-table-editor__surface");
+    const columnHandle = container?.querySelector<HTMLButtonElement>(".csv-table-editor__column-handle");
+    if (!scrollContainer || !surface || !columnHandle) {
+      throw new Error("CSV column handle geometry did not mount.");
+    }
+
+    act(() => geometry.firstBodyCell.dispatchEvent(
+      new PointerEvent("pointerover", { bubbles: true }),
+    ));
+    expect(columnHandle.classList.contains("is-visible")).toBe(true);
+    expect(columnHandle.classList.contains("is-block-docked")).toBe(false);
+    expect(geometry.firstHeaderCell.hasAttribute("data-column-handle-docked")).toBe(false);
+
+    mockRect(surface, rect(100, 0, 223, 193));
+    mockRect(geometry.firstHeaderCell, rect(131, 70, 96, 31));
+    act(() => scrollContainer.dispatchEvent(new Event("scroll")));
+
+    expect(columnHandle.classList.contains("is-block-docked")).toBe(true);
+    expect(geometry.firstHeaderCell.hasAttribute("data-column-handle-docked")).toBe(true);
+
+    act(() => surface.dispatchEvent(new PointerEvent("pointerleave")));
+    expect(columnHandle.classList.contains("is-block-docked")).toBe(false);
+    expect(geometry.firstHeaderCell.hasAttribute("data-column-handle-docked")).toBe(false);
   });
 
   it("opens the complete row and column operation set from a cell context menu", async () => {

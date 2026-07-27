@@ -150,6 +150,7 @@ export function useDataNodeActions({
           csvHeaders: [
             t("workspace.node.csvColumn", { number: 1 }),
             t("workspace.node.csvColumn", { number: 2 }),
+            t("workspace.node.csvColumn", { number: 3 }),
           ],
           puppyFlow: {
             title: t("editor.puppyflow.untitledFlow"),

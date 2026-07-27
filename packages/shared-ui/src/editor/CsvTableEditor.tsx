@@ -10,7 +10,7 @@ import {
   parseDelimitedText,
   stringifyDelimitedText,
 } from "./csv/csvDocument";
-import { CsvHeaderSettings } from "./csv/CsvHeaderSettings";
+import { CsvViewSettings } from "./csv/CsvViewSettings";
 import { CsvTableControls } from "./csv/CsvTableControls";
 import {
   CsvTableResizeControl,
@@ -24,7 +24,9 @@ import {
 } from "./csv/csvTableOperations";
 import {
   readCsvFirstRecordAsHeaderPreference,
+  readCsvShowRowNumbersPreference,
   writeCsvFirstRecordAsHeaderPreference,
+  writeCsvShowRowNumbersPreference,
 } from "./csv/csvViewPreferences";
 import {
   EDITABLE_TABLE_COLUMN_MIN_WIDTH,
@@ -54,8 +56,11 @@ export function CsvTableEditor({
   const matrix = useMemo(() => normalizeRows(parsed.rows), [parsed.rows]);
   const inferredHeaderEnabled = useMemo(() => inferHeaderRow(parsed.rows), [parsed.rows]);
   const [headerEnabled, setHeaderEnabled] = useState(inferredHeaderEnabled);
+  const [rowNumbersVisible, setRowNumbersVisible] = useState(true);
   const headerPreferenceDocumentRef = useRef(documentId);
   const headerPreferenceInitializedRef = useRef(false);
+  const rowNumbersPreferenceDocumentRef = useRef(documentId);
+  const rowNumbersPreferenceInitializedRef = useRef(false);
   const columnCount = Math.max(1, ...matrix.map((row) => row.length));
   const dataRows = headerEnabled ? matrix.slice(1) : matrix;
   const visibleDataRows = dataRows.slice(0, MAX_CSV_TABLE_DATA_ROWS);
@@ -94,6 +99,20 @@ export function CsvTableEditor({
       headerPreferenceInitializedRef.current = true;
     }
   }, [documentId, hasCsvSource, inferredHeaderEnabled]);
+
+  useLayoutEffect(() => {
+    if (rowNumbersPreferenceDocumentRef.current !== documentId) {
+      rowNumbersPreferenceDocumentRef.current = documentId;
+      rowNumbersPreferenceInitializedRef.current = false;
+    }
+    if (rowNumbersPreferenceInitializedRef.current) return;
+
+    const storedPreference = readCsvShowRowNumbersPreference(documentId);
+    setRowNumbersVisible(storedPreference ?? true);
+    if (storedPreference !== undefined || hasCsvSource) {
+      rowNumbersPreferenceInitializedRef.current = true;
+    }
+  }, [documentId, hasCsvSource]);
 
   useLayoutEffect(() => {
     const target = pendingFocusRef.current;
@@ -169,15 +188,20 @@ export function CsvTableEditor({
     writeCsvFirstRecordAsHeaderPreference(documentId, enabled);
   };
 
-  return (
-    <section className="csv-table-editor" data-readonly={readOnly ? "true" : undefined}>
-      <CsvHeaderSettings
-        direction={direction}
-        enabled={headerEnabled}
-        onChange={setFirstRecordAsHeader}
-        t={t}
-      />
+  const setShowRowNumbers = (visible: boolean) => {
+    rowNumbersPreferenceInitializedRef.current = true;
+    setRowNumbersVisible(visible);
+    writeCsvShowRowNumbersPreference(documentId, visible);
+  };
 
+  const ariaColumnOffset = rowNumbersVisible ? 2 : 1;
+
+  return (
+    <section
+      className="csv-table-editor"
+      data-readonly={readOnly ? "true" : undefined}
+      data-row-numbers-visible={rowNumbersVisible ? "true" : undefined}
+    >
       <div
         className="csv-table-editor__scroll"
         onScroll={(event) => {
@@ -187,6 +211,15 @@ export function CsvTableEditor({
           scrollContainer.toggleAttribute("data-inline-scrolled", inlineScrolled);
         }}
       >
+        <CsvViewSettings
+          direction={direction}
+          headerEnabled={headerEnabled}
+          onHeaderChange={setFirstRecordAsHeader}
+          onRowNumbersChange={setShowRowNumbers}
+          rowNumbersVisible={rowNumbersVisible}
+          t={t}
+        />
+
         <div className="csv-table-editor__frame">
           <div
             ref={surfaceRef}
@@ -199,11 +232,11 @@ export function CsvTableEditor({
               ref={tableRef}
               className="csv-table-editor__table"
               aria-label={nodeName || (resolvedDelimiter === "\t" ? "TSV" : "CSV")}
-              aria-colcount={columnCount + 1}
+              aria-colcount={columnCount + (rowNumbersVisible ? 1 : 0)}
               aria-rowcount={matrix.length}
             >
               <colgroup>
-                <col className="csv-table-editor__record-index-column" />
+                {rowNumbersVisible && <col className="csv-table-editor__record-index-column" />}
                 {columnWidths.map((width, columnIndex) => (
                   <col key={`column-${columnIndex}`} style={{ width }} />
                 ))}
@@ -218,13 +251,15 @@ export function CsvTableEditor({
               {headerEnabled && (
                 <thead>
                   <tr data-csv-row="0" aria-rowindex={1}>
-                    <th
-                      className="csv-table-editor__record-index csv-table-editor__record-index--header"
-                      scope="row"
-                      aria-colindex={1}
-                      data-csv-record-index="0"
-                      aria-label={t("editor.csv.headerRecord")}
-                    />
+                    {rowNumbersVisible && (
+                      <th
+                        className="csv-table-editor__record-index csv-table-editor__record-index--header"
+                        scope="row"
+                        aria-colindex={1}
+                        data-csv-record-index="0"
+                        aria-label={t("editor.csv.headerRecord")}
+                      />
+                    )}
                     {Array.from({ length: columnCount }, (_, columnIndex) => (
                       <th
                         className="csv-table-editor__header-cell"
@@ -232,7 +267,7 @@ export function CsvTableEditor({
                         key={`header-${columnIndex}`}
                         data-csv-row="0"
                         data-csv-column={columnIndex}
-                        aria-colindex={columnIndex + 2}
+                        aria-colindex={columnIndex + ariaColumnOffset}
                       >
                         <input
                           value={matrix[0]?.[columnIndex] ?? ""}
@@ -263,32 +298,34 @@ export function CsvTableEditor({
                   const displayRowNumber = visibleRowIndex + 1;
                   return (
                     <tr key={`row-${rowIndex}`} data-csv-row={rowIndex} aria-rowindex={rowIndex + 1}>
-                      <th
-                        className="csv-table-editor__record-index"
-                        scope="row"
-                        aria-colindex={1}
-                        data-csv-record-index={rowIndex}
-                        data-csv-display-row={displayRowNumber}
-                        aria-label={t("editor.csv.rowNumber", {
-                          row: displayRowNumber,
-                          record: rowIndex + 1,
-                        })}
-                        title={t("editor.csv.rowNumber", {
-                          row: displayRowNumber,
-                          record: rowIndex + 1,
-                        })}
-                      >
-                        <span className="csv-table-editor__record-index-label" aria-hidden="true">
-                          {displayRowNumber}
-                        </span>
-                      </th>
+                      {rowNumbersVisible && (
+                        <th
+                          className="csv-table-editor__record-index"
+                          scope="row"
+                          aria-colindex={1}
+                          data-csv-record-index={rowIndex}
+                          data-csv-display-row={displayRowNumber}
+                          aria-label={t("editor.csv.rowNumber", {
+                            row: displayRowNumber,
+                            record: rowIndex + 1,
+                          })}
+                          title={t("editor.csv.rowNumber", {
+                            row: displayRowNumber,
+                            record: rowIndex + 1,
+                          })}
+                        >
+                          <span className="csv-table-editor__record-index-label" aria-hidden="true">
+                            {displayRowNumber}
+                          </span>
+                        </th>
+                      )}
                       {Array.from({ length: columnCount }, (_, columnIndex) => (
                         <td
                           className="csv-table-editor__body-cell"
                           key={`cell-${rowIndex}-${columnIndex}`}
                           data-csv-row={rowIndex}
                           data-csv-column={columnIndex}
-                          aria-colindex={columnIndex + 2}
+                          aria-colindex={columnIndex + ariaColumnOffset}
                         >
                           <input
                             value={row[columnIndex] ?? ""}
@@ -324,11 +361,13 @@ export function CsvTableEditor({
                       key={`expansion-row-${previewRowIndex}`}
                       aria-hidden="true"
                     >
-                      <th className="csv-table-editor__record-index csv-table-editor__expansion-cell csv-table-editor__expansion-record-index">
-                        <span className="csv-table-editor__record-index-label">
-                          {displayRowNumber}
-                        </span>
-                      </th>
+                      {rowNumbersVisible && (
+                        <th className="csv-table-editor__record-index csv-table-editor__expansion-cell csv-table-editor__expansion-record-index">
+                          <span className="csv-table-editor__record-index-label">
+                            {displayRowNumber}
+                          </span>
+                        </th>
+                      )}
                       {Array.from({ length: previewColumnCount }, (_, previewColumnIndex) => (
                         <td
                           className="csv-table-editor__body-cell csv-table-editor__expansion-cell"
@@ -367,6 +406,7 @@ export function CsvTableEditor({
                   headerEnabled={headerEnabled}
                   locale={locale}
                   onOperation={applyStructureOperation}
+                  rowNumbersVisible={rowNumbersVisible}
                   rowCount={matrix.length}
                   surfaceRef={surfaceRef}
                   tableRef={tableRef}

@@ -47,6 +47,8 @@
   "csv.headerDescription": "Altera somente a exibição; o conteúdo CSV não é modificado.",
   "csv.headerRecord": "Cabeçalho; registro CSV 1",
   "csv.rowNumber": "Linha de dados {row, number}; registro CSV {record, number}",
+  "csv.rowNumbers": "Mostrar números das linhas",
+  "csv.rowNumbersToggle": "Números das linhas",
   "csv.settings": "Configurações de CSV",
   "csv.visibleRows": "Mostrando {visible, number} de {total, number} linhas",
   "csv.warning.unclosedQuote": "Aspas não fechadas",

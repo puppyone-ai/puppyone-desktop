@@ -1,18 +1,52 @@
 const PINNED_ACTION_PATTERN = /uses:\s+actions\/[A-Za-z0-9_.-]+@[a-f0-9]{40}(?:\s+#.*)?$/gm;
 const UNPINNED_ACTION_PATTERN = /uses:\s+actions\/[A-Za-z0-9_.-]+@(?![a-f0-9]{40}(?:\s|$))[^ \n]+/g;
 
+export function inspectContinuousIntegrationWorkflow(workflowSource) {
+  const errors = inspectSource(workflowSource, "continuous integration workflow");
+  if (errors.length > 0) return errors;
+  requireSnippets(workflowSource, errors, [
+    ["pull_request:", "CI must run for pull requests"],
+    ["branches:\n      - main", "CI must run for pushes to main"],
+    ["permissions:\n  contents: read", "CI must use a read-only default token"],
+    ["npm ci", "CI must install the lockfile exactly"],
+    ["npm run lint", "CI must lint source"],
+    ["npm test", "CI must run the test suite"],
+    ["npm run build", "CI must run the production build and architecture gates"],
+  ]);
+  forbidSnippets(workflowSource, errors, [
+    ["contents: write", "CI must not receive repository write permission"],
+    ["id-token: write", "CI must not receive an OIDC publication token"],
+    ["CSC_LINK", "CI must not receive Apple signing credentials"],
+    ["R2_ACCESS_KEY_ID", "CI must not receive R2 publication credentials"],
+    ["R2_SECRET_ACCESS_KEY", "CI must not receive R2 publication credentials"],
+    ["CLOUDFLARE_ACCOUNT_ID", "CI must not receive release publication credentials"],
+  ]);
+  inspectPinnedActions(workflowSource, errors);
+  return errors;
+}
+
 export function inspectInternalReleaseWorkflow(workflowSource) {
   const errors = inspectSource(workflowSource, "internal release workflow");
   if (errors.length > 0) return errors;
   requireSnippets(workflowSource, errors, [
     ["runs-on: macos-15", "the internal build must use the pinned arm64 macOS runner"],
     ["publish_release:", "the internal workflow must expose one atomic publish switch"],
-    ["--package-version \"${VERSION}-internal.${INTERNAL_ID}\"", "explicit internal tags must also control the Terminal package version"],
     ["Test release transaction and Terminal launcher", "the internal build must run release integration tests on macOS"],
+    ["actions: read", "the Internal build must have least-privilege access to verify source CI"],
+    ["Verify green main source", "the Internal workflow must reject non-main or unverified source commits"],
+    ["refs/heads/main", "the Internal workflow must require the protected main branch"],
+    ["actions/workflows/ci.yml/runs", "the Internal workflow must verify the exact commit's CI result"],
+    [".conclusion == \"success\"", "the Internal workflow must require successful CI"],
+    ["scripts/prepare-desktop-build.mjs", "the Internal workflow must use the canonical Build Identity resolver"],
+    ["--channel internal", "the Internal workflow must resolve only the Internal build channel"],
+    ["npm run dist:mac:prepared", "the Internal workflow must package the prepared identity"],
+    ["Verify packaged Internal Build Identity", "the Internal workflow must inspect packaged identity"],
+    ["--build-info generated/desktop-build-info.json", "release metadata must consume resolved Build Identity"],
     ["Create self-describing release bundle", "the internal build must create release metadata"],
     ["actions/attest@", "published internal binaries must receive build provenance"],
     ["uses: ./.github/workflows/desktop-release-publish.yml", "the internal workflow must use the canonical publisher"],
     ["deployment_environment: desktop-internal", "the internal publisher must use its deployment environment"],
+    ["publish_github_release: false", "Internal GitHub release records must remain collaborator-only drafts"],
     ["r2-prefix \"desktop/internal/mac/${RELEASE_TAG}\"", "the internal manifest must use the internal R2 channel"],
   ]);
   forbidSnippets(workflowSource, errors, [
@@ -20,7 +54,19 @@ export function inspectInternalReleaseWorkflow(workflowSource) {
     ["create_github_release:", "R2 and GitHub publication must not be independently selectable"],
     ["R2_ACCESS_KEY_ID", "the build job must not receive R2 deployment credentials"],
     ["desktop/stable/mac", "the ad-hoc internal workflow must never write to the stable channel"],
+    ["INPUT_RELEASE_TAG", "callers must not hand-compose Internal release tags"],
+    ["TAG=\"v${VERSION}-internal.", "the workflow must not construct versions independently"],
   ]);
+  assertOrder(workflowSource, errors, [
+    "Verify green main source",
+    "Resolve immutable release identity",
+    "Install locked dependencies",
+    "Build ad-hoc macOS package",
+    "Verify packaged Internal Build Identity",
+    "Create self-describing release bundle",
+    "Attest published binaries and checksums",
+    "Upload build-once release bundle",
+  ], "Internal build");
   inspectPinnedActions(workflowSource, errors);
   return errors;
 }
@@ -34,12 +80,20 @@ export function inspectStableReleaseWorkflow(workflowSource) {
     ["name: desktop-signing", "stable signing must use its dedicated deployment environment"],
     ["Test release transaction and Terminal launcher", "the stable build must run release integration tests on macOS"],
     ["Prepare release application without deployment secrets", "stable application preparation must be secretless"],
+    ["Verify exact Internal promotion source", "Stable must be promoted from verified Internal evidence"],
+    ["verify-stable-promotion-source.mjs", "Stable must use the canonical promotion verifier"],
     ["Sign, notarize, and verify release package", "stable packaging must sign and notarize"],
+    ["APPLE_API_KEY_BASE64", "stable CI must receive the App Store Connect key as base64 secret material"],
+    ["export APPLE_API_KEY=\"${api_key_path}\"", "stable CI must pass notarytool a materialized API key file path"],
+    ["trap 'rm -f \"${api_key_path}\"' EXIT", "stable CI must remove materialized notarization key material"],
     ["Create self-describing stable release bundle", "the stable build must create release metadata"],
     ["actions/attest@", "stable binaries must receive build provenance"],
     ["uses: ./.github/workflows/desktop-release-publish.yml", "stable releases must use the canonical publisher"],
     ["verify_tag: true", "stable GitHub releases must require a pre-existing tag"],
     ["generate_notes: true", "stable GitHub releases must generate release notes"],
+    ["publish_github_release: true", "Stable must publish its verified GitHub Release"],
+    ["--build-info generated/desktop-build-info.json", "Stable release metadata must consume Build Identity"],
+    ["--promotion-source-tag", "Stable release metadata must retain Internal promotion evidence"],
   ]);
   forbidSnippets(workflowSource, errors, [
     ["R2_ACCESS_KEY_ID", "the stable build workflow must not receive R2 deployment credentials"],
@@ -47,6 +101,7 @@ export function inspectStableReleaseWorkflow(workflowSource) {
   ]);
   assertOrder(workflowSource, errors, [
     "Install locked dependencies without deployment secrets",
+    "Verify exact Internal promotion source",
     "Prepare release application without deployment secrets",
     "Sign, notarize, and verify release package",
     "Create self-describing stable release bundle",
@@ -69,6 +124,8 @@ export function inspectReleasePublisherWorkflow(workflowSource) {
     ["--cache-control \"public, max-age=31536000, immutable\"", "versioned release objects must be immutable"],
     ["--cache-control \"public, no-cache, must-revalidate\"", "mutable release objects must revalidate"],
     ["--draft", "GitHub releases must be created as drafts"],
+    ["publish_github_release:", "the caller must explicitly choose whether a verified draft becomes public"],
+    ["inputs.publish_github_release", "Internal releases must be able to remain collaborator-only drafts"],
     ["Verify GitHub asset digests before publication", "GitHub asset digests must be checked before publication"],
     ["Publish verified GitHub Release", "the publisher must explicitly publish the verified draft"],
     ["Verify published GitHub Release state", "the published GitHub release and tag must be reverified"],
@@ -76,6 +133,8 @@ export function inspectReleasePublisherWorkflow(workflowSource) {
     ["Validate remote tag ownership", "an existing Git tag must resolve to the bundled commit"],
     ["Publish latest release pointer", "the latest channel must expose a machine-readable pointer"],
     ["desktop/catalog/releases.json", "the publisher must maintain the webpage release catalog"],
+    ["desktop/internal/catalog/releases.json", "Internal releases must use a separate restricted catalog"],
+    ["--max-redirs 0", "authenticated Internal verification must reject redirects"],
     ["Verify public pointers and catalog", "mutable public metadata must be verified after publication"],
     ["Clean stale mutable release files", "stale latest files must be removed only after the new release is public"],
   ]);
@@ -83,6 +142,13 @@ export function inspectReleasePublisherWorkflow(workflowSource) {
     ["--delete", "latest promotion must not delete working payloads before the new release is committed"],
     ["AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}\n      AWS_SECRET", "R2 credentials must not be job-global"],
   ]);
+  requireStageSnippet(
+    workflowSource,
+    errors,
+    "Inspect GitHub Release state",
+    "PUBLISH_GITHUB_RELEASE: ${{ inputs.publish_github_release }}",
+    "the GitHub release-state step must receive the caller's draft/public policy explicitly",
+  );
   assertOrder(workflowSource, errors, [
     "Validate release bundle and caller contract",
     "Inspect immutable R2 release state",
@@ -168,6 +234,17 @@ function assertOrder(source, errors, stages, label) {
     if (currentIndex <= previousIndex) errors.push(`the ${label} must run "${stage}" after its preceding stage`);
     previousIndex = Math.max(previousIndex, currentIndex);
   }
+}
+
+function requireStageSnippet(source, errors, stageName, snippet, error) {
+  const stageStart = source.indexOf(`- name: ${stageName}`);
+  if (stageStart < 0) {
+    errors.push(`the workflow is missing the "${stageName}" stage`);
+    return;
+  }
+  const nextStage = source.indexOf("\n      - name:", stageStart + 1);
+  const stageSource = source.slice(stageStart, nextStage < 0 ? undefined : nextStage);
+  if (!stageSource.includes(snippet)) errors.push(error);
 }
 
 function inspectPinnedActions(source, errors) {

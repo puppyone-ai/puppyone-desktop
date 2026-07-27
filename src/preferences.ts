@@ -84,6 +84,23 @@ export type ExperimentalSettings = {
   enableViewerPlugins: boolean;
 };
 
+export const CREATE_NEW_FILE_TYPE_IDS = [
+  "markdown",
+  "text",
+  "json",
+  "csv",
+  "app",
+  "puppyflow",
+] as const;
+export type CreateNewFileTypeId = typeof CREATE_NEW_FILE_TYPE_IDS[number];
+export type CreateNewMenuItem = {
+  kind: CreateNewFileTypeId;
+  enabled: boolean;
+};
+export type CreateNewMenuSettings = {
+  items: CreateNewMenuItem[];
+};
+
 export const LEGACY_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.themePreset";
 export const LIGHT_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.lightThemePreset";
 export const DARK_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.darkThemePreset";
@@ -104,6 +121,7 @@ export const TITLEBAR_ACTIONS_STORAGE_KEY = "puppyone.desktop.titlebarActions";
 export const AI_EDIT_ASSIST_STORAGE_KEY = "puppyone.desktop.aiEditAssist";
 export const GIT_DISPLAY_MODE_STORAGE_KEY = "puppyone.desktop.gitDisplayMode";
 export const EXPERIMENTAL_SETTINGS_STORAGE_KEY = "puppyone.desktop.experimental";
+export const CREATE_NEW_MENU_STORAGE_KEY = "puppyone.desktop.createNewMenu";
 
 export const DEFAULT_THEME_MODE: ThemeMode = "system";
 export const DEFAULT_LIGHT_THEME_PRESET: LightThemePreset = "neutral";
@@ -161,6 +179,12 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enablePuppyoneAppFiles: false,
   enablePuppyFlowFiles: false,
   enableViewerPlugins: false,
+};
+export const DEFAULT_CREATE_NEW_MENU_SETTINGS: CreateNewMenuSettings = {
+  items: [
+    { kind: "markdown", enabled: true },
+    { kind: "csv", enabled: true },
+  ],
 };
 
 export const SIDEBAR_NAVIGATION_LAYOUT_OPTIONS = [
@@ -538,6 +562,66 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
   } catch {
     return DEFAULT_EXPERIMENTAL_SETTINGS;
   }
+}
+
+export function parseCreateNewMenuSettings(value: string | null | undefined): CreateNewMenuSettings {
+  if (!value) return cloneDefaultCreateNewMenuSettings();
+
+  try {
+    const parsed = JSON.parse(value) as Partial<CreateNewMenuSettings> | null;
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.items)) {
+      return cloneDefaultCreateNewMenuSettings();
+    }
+
+    const items: CreateNewMenuItem[] = [];
+    const seen = new Set<CreateNewFileTypeId>();
+    for (const item of parsed.items) {
+      if (!item || typeof item !== "object") continue;
+      const kind = "kind" in item ? item.kind : null;
+      if (!isCreateNewFileTypeId(kind) || seen.has(kind)) continue;
+      seen.add(kind);
+      items.push({
+        kind,
+        enabled: !("enabled" in item) || item.enabled !== false,
+      });
+    }
+
+    if (parsed.items.length > 0 && items.length === 0) {
+      return cloneDefaultCreateNewMenuSettings();
+    }
+    return { items };
+  } catch {
+    return cloneDefaultCreateNewMenuSettings();
+  }
+}
+
+export function cloneDefaultCreateNewMenuSettings(): CreateNewMenuSettings {
+  return {
+    items: DEFAULT_CREATE_NEW_MENU_SETTINGS.items.map((item) => ({ ...item })),
+  };
+}
+
+export function isCreateNewFileTypeId(value: unknown): value is CreateNewFileTypeId {
+  return typeof value === "string"
+    && CREATE_NEW_FILE_TYPE_IDS.includes(value as CreateNewFileTypeId);
+}
+
+export function isCreateNewFileTypeAvailable(
+  kind: CreateNewFileTypeId,
+  experimentalSettings: ExperimentalSettings,
+): boolean {
+  if (kind === "app") return experimentalSettings.enablePuppyoneAppFiles;
+  if (kind === "puppyflow") return experimentalSettings.enablePuppyFlowFiles;
+  return true;
+}
+
+export function getVisibleCreateNewFileTypes(
+  settings: CreateNewMenuSettings,
+  experimentalSettings: ExperimentalSettings,
+): CreateNewFileTypeId[] {
+  return settings.items
+    .filter((item) => item.enabled && isCreateNewFileTypeAvailable(item.kind, experimentalSettings))
+    .map((item) => item.kind);
 }
 
 function normalizeExternalAppOverrides(value: unknown): ExternalAppOverride[] {

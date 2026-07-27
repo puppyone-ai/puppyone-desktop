@@ -42,3 +42,8 @@
 
 /* Conflict markers, crash/empty states, misc editor status UI */
 @import "./editor/editor-status.css";
+
+/* Markdown uses a document-sized inset; wide tabular editors own their spacing. */
+.markdown-codemirror-editor {
+  --po-editor-content-edge-inset: 64px;
+}

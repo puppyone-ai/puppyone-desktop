@@ -63,5 +63,11 @@
   "branch.loadingBranches": "Branches werden geladen",
   "branch.localBranches": "Lokale Branches",
   "branch.remoteBranches": "Remote-Branches",
-  "branch.noBranches": "Keine Branches"
+  "branch.noBranches": "Keine Branches",
+  "build.channel.dev": "Entwicklung",
+  "build.channel.internal": "Interne Testversion",
+  "build.channel.stable": "Stabile Version",
+  "build.version.title": "{channel} · {version} · Commit {commit}",
+  "build.copy.action": "Versionsinformationen kopieren",
+  "build.copy.copied": "Versionsinformationen kopiert"
 }

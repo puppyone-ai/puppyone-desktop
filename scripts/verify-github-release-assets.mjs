@@ -29,9 +29,13 @@ try {
     expectedFiles.set(asset.name, { bytes: asset.bytes, sha256: asset.sha256 });
   }
   if (includeMetadata) {
-    for (const name of ["release.json", "SHA256SUMS"]) {
+    for (const name of ["release.json", "SHA256SUMS", "build-info.json"]) {
       const filePath = path.join(bundleDirectory, name);
-      const stats = await fs.stat(filePath);
+      const stats = await fs.stat(filePath).catch((error) => {
+        if (error?.code === "ENOENT" && name === "build-info.json") return null;
+        throw error;
+      });
+      if (!stats) continue;
       expectedFiles.set(name, { bytes: stats.size, sha256: await sha256File(filePath) });
     }
   }
@@ -49,7 +53,8 @@ try {
     }
   }
   for (const name of githubAssets.keys()) {
-    const optionalBackfillMetadata = !includeMetadata && ["release.json", "SHA256SUMS"].includes(name);
+    const optionalBackfillMetadata = !includeMetadata
+      && ["release.json", "SHA256SUMS", "build-info.json"].includes(name);
     if (!expectedFiles.has(name) && !optionalBackfillMetadata) errors.push(`unexpected GitHub asset ${name}`);
   }
   if (errors.length > 0) {

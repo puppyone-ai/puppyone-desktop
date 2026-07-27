@@ -134,6 +134,7 @@ export function AgentReferenceMenu({
           style={agentPickerOverlayGeometry(overlayPosition)}
           data-positioned={overlayPosition ? "true" : "false"}
           data-placement={overlayPosition?.placement}
+          data-window-no-drag="true"
         >
           <button type="button" role="menuitem" disabled={!externalAvailable} onClick={chooseExternal} onKeyDown={onItemKeyDown}>
             <FilePlus2 size={14} aria-hidden="true" />

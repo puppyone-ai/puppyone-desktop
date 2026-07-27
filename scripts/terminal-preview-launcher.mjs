@@ -8,6 +8,8 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_REMOTE_HOST = "downloads.puppyone.ai";
+const DOWNLOAD_PROGRESS_REFRESH_MS = 100;
+const DOWNLOAD_PROGRESS_MILESTONE_PERCENT = 10;
 
 export async function preparePreviewApp({
   packageRoot,
@@ -15,6 +17,7 @@ export async function preparePreviewApp({
   metadata,
   fetchImpl = globalThis.fetch,
   log = console,
+  onDownloadProgress = null,
 } = {}) {
   const resolvedPackageRoot = packageRoot
     ? path.resolve(packageRoot)
@@ -54,12 +57,16 @@ export async function preparePreviewApp({
   const extractionRoot = path.join(temporaryRoot, "extracted");
 
   try {
-    log.info?.(`Downloading PuppyOne preview ${packageMetadata.appVersion}…`);
+    if (typeof onDownloadProgress !== "function") {
+      log.info?.(`Downloading PuppyOne preview ${packageMetadata.appVersion}…`);
+    }
     await downloadVerifiedArchive({
       archivePath,
       fetchImpl,
       metadata: packageMetadata,
+      onProgress: onDownloadProgress,
     });
+    log.info?.(`Preparing downloaded PuppyOne preview ${packageMetadata.appVersion}…`);
     await fs.promises.mkdir(extractionRoot, { recursive: true });
     await runCommand("/usr/bin/ditto", ["-x", "-k", archivePath, extractionRoot]);
 
@@ -237,7 +244,12 @@ function createReadyMarker(metadata) {
   };
 }
 
-async function downloadVerifiedArchive({ archivePath, fetchImpl, metadata }) {
+async function downloadVerifiedArchive({
+  archivePath,
+  fetchImpl,
+  metadata,
+  onProgress,
+}) {
   const archiveUrl = new URL(metadata.archiveUrl);
   if (archiveUrl.protocol === "file:") {
     await fs.promises.copyFile(fileURLToPath(archiveUrl), archivePath);
@@ -245,6 +257,7 @@ async function downloadVerifiedArchive({ archivePath, fetchImpl, metadata }) {
     if (typeof fetchImpl !== "function") {
       throw new Error("Node.js 18 or later is required to download the PuppyOne preview.");
     }
+    notifyDownloadProgress(onProgress, 0, metadata.archiveBytes);
     const response = await fetchImpl(archiveUrl, {
       headers: { "user-agent": "puppyone-terminal-preview" },
       redirect: "follow",
@@ -273,6 +286,7 @@ async function downloadVerifiedArchive({ archivePath, fetchImpl, metadata }) {
           throw new Error("PuppyOne preview download exceeded the expected size.");
         }
         await handle.write(buffer);
+        notifyDownloadProgress(onProgress, bytes, metadata.archiveBytes);
       }
     } finally {
       await handle.close();
@@ -289,6 +303,92 @@ async function downloadVerifiedArchive({ archivePath, fetchImpl, metadata }) {
   if (actualSha256 !== metadata.archiveSha256) {
     throw new Error("PuppyOne preview archive failed SHA-256 verification.");
   }
+}
+
+function notifyDownloadProgress(onProgress, downloadedBytes, totalBytes) {
+  if (typeof onProgress !== "function") return;
+  onProgress({
+    downloadedBytes,
+    percent: totalBytes > 0
+      ? Math.min(100, Math.floor((downloadedBytes / totalBytes) * 100))
+      : null,
+    totalBytes,
+  });
+}
+
+export function createTerminalDownloadProgress({ label, stream }) {
+  const interactive = stream?.isTTY === true;
+  let active = false;
+  let completed = false;
+  let lastMilestone = -1;
+  let lastRenderedAt = 0;
+
+  function update({ downloadedBytes, percent, totalBytes }) {
+    if (completed || typeof stream?.write !== "function") return;
+
+    const now = Date.now();
+    if (interactive) {
+      if (
+        active
+        && percent !== 100
+        && now - lastRenderedAt < DOWNLOAD_PROGRESS_REFRESH_MS
+      ) {
+        return;
+      }
+      stream.write(
+        `\r\u001b[2K${formatDownloadProgress(label, downloadedBytes, totalBytes, percent)}`,
+      );
+      active = true;
+      lastRenderedAt = now;
+      if (percent === 100) {
+        stream.write("\n");
+        completed = true;
+      }
+      return;
+    }
+
+    const milestone = percent === 100
+      ? 100
+      : Math.floor((percent ?? 0) / DOWNLOAD_PROGRESS_MILESTONE_PERCENT)
+        * DOWNLOAD_PROGRESS_MILESTONE_PERCENT;
+    if (milestone <= lastMilestone) return;
+    stream.write(
+      `${formatDownloadProgress(label, downloadedBytes, totalBytes, percent)}\n`,
+    );
+    active = true;
+    lastMilestone = milestone;
+    if (percent === 100) completed = true;
+  }
+
+  function stop() {
+    if (interactive && active && !completed && typeof stream?.write === "function") {
+      stream.write("\n");
+    }
+    completed = true;
+  }
+
+  return { stop, update };
+}
+
+function formatDownloadProgress(label, downloadedBytes, totalBytes, percent) {
+  const progressPercent = Number.isFinite(percent) ? `${percent}%` : "";
+  const byteCounts = totalBytes > 0
+    ? `${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)}`
+    : formatBytes(downloadedBytes);
+  return `${label} ${progressPercent} (${byteCounts})`.replace("  ", " ");
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KiB", "MiB", "GiB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  if (unitIndex === 0) return `${Math.round(value)} ${units[unitIndex]}`;
+  return `${value.toFixed(value >= 10 ? 1 : 2)} ${units[unitIndex]}`;
 }
 
 async function hashFile(filename) {
@@ -349,11 +449,21 @@ async function main() {
     await fs.promises.rm(cacheRoot, { recursive: true, force: true });
   }
 
-  const prepared = await preparePreviewApp({
-    cacheRoot,
-    metadata,
-    packageRoot,
+  const downloadProgress = createTerminalDownloadProgress({
+    label: `Downloading PuppyOne preview ${metadata.appVersion}…`,
+    stream: process.stdout,
   });
+  let prepared;
+  try {
+    prepared = await preparePreviewApp({
+      cacheRoot,
+      metadata,
+      onDownloadProgress: downloadProgress.update,
+      packageRoot,
+    });
+  } finally {
+    downloadProgress.stop();
+  }
   if (options.prepareOnly) {
     console.log(prepared.appRoot);
     return;

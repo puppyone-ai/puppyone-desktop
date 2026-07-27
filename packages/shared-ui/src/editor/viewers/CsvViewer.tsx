@@ -21,6 +21,7 @@ export function CsvViewer(context: CsvViewerProps) {
       defaultMode="live"
       canEdit={context.canEdit}
       hideSourceView={context.hideSourceView}
+      liveScrollOwner="viewer"
       renderLive={(value, controls) => (
         <CsvTableEditor
           documentId={context.document.path}

@@ -173,7 +173,9 @@ describe("CloudRepositoryOverview landing page", () => {
     expect(storageCard?.textContent).toContain("folders");
     expect(storageCard?.querySelectorAll(".desktop-cloud-overview-storage-preview-item")).toHaveLength(8);
     expect(storageCard?.querySelectorAll(".desktop-cloud-overview-storage-preview-item--folder")).toHaveLength(3);
-    expect(storageCard?.querySelectorAll(".desktop-cloud-overview-storage-preview-item--file")).toHaveLength(5);
+    expect(storageCard?.querySelectorAll(
+      ".desktop-cloud-overview-storage-preview-item:not(.desktop-cloud-overview-storage-preview-item--folder)",
+    )).toHaveLength(5);
     const dashboardCards = dashboard
       ? Array.from(dashboard.querySelectorAll(".desktop-cloud-overview-dashboard-card"))
       : [];

@@ -47,6 +47,8 @@
   "csv.headerDescription": "표시 방식만 바뀌며 CSV 내용은 변경되지 않습니다.",
   "csv.headerRecord": "머리글, CSV 레코드 1",
   "csv.rowNumber": "데이터 {row, number}행, CSV 레코드 {record, number}",
+  "csv.rowNumbers": "행 번호 표시",
+  "csv.rowNumbersToggle": "행 번호",
   "csv.settings": "CSV 설정",
   "csv.visibleRows": "전체 {total, number}개 행 중 {visible, number}개 표시",
   "csv.warning.unclosedQuote": "닫히지 않은 따옴표",

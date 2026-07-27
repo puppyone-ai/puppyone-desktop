@@ -59,6 +59,7 @@ export function DesktopMinimalModeDock({
     <div
       className="desktop-minimal-mode-dock"
       data-expanded={expanded ? "true" : undefined}
+      data-window-no-drag="true"
     >
       <button
         className="desktop-minimal-mode-logo"

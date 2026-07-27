@@ -7,10 +7,6 @@ on:
         description: Publish the verified bundle to GitHub Releases and Cloudflare R2
         type: boolean
         default: true
-      release_tag:
-        description: Optional tag; defaults to v<version>-internal.<run number>
-        type: string
-        default: ""
 
 permissions:
   contents: read
@@ -21,6 +17,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 60
     permissions:
+      actions: read
       attestations: write
       contents: read
       id-token: write
@@ -44,34 +41,41 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Resolve immutable release identity
-        id: release
+      - name: Verify green main source
         env:
-          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
-          if [ -n "${INPUT_RELEASE_TAG}" ]; then
-            TAG="${INPUT_RELEASE_TAG}"
-          else
-            TAG="v${VERSION}-internal.${GITHUB_RUN_NUMBER}"
-          fi
-          EXPECTED_PREFIX="v${VERSION}-internal."
-          SUFFIX="${TAG#"${EXPECTED_PREFIX}"}"
-          if [ "${TAG}" = "${SUFFIX}" ] || [[ ! "${SUFFIX}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-            echo "Internal tags must match v${VERSION}-internal.<identifier>; received ${TAG}" >&2
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "Internal releases must be built from the main branch." >&2
             exit 1
           fi
-          {
-            echo "arch=$(node -p 'process.arch')"
-            echo "artifact_name=puppyone-desktop-${TAG}"
-            echo "internal_id=${SUFFIX}"
-            echo "published_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-            echo "release_name=puppyone ${VERSION} internal ${SUFFIX}"
-            echo "tag=${TAG}"
-            echo "version=${VERSION}"
-          } >> "${GITHUB_OUTPUT}"
+          SUCCESSFUL_CI_RUNS="$(
+            gh api \
+              --method GET \
+              -H "Accept: application/vnd.github+json" \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
+              -f branch=main \
+              -f head_sha="${GITHUB_SHA}" \
+              -f status=completed \
+              --jq '[.workflow_runs[] | select(.event == "push" and .conclusion == "success")] | length'
+          )"
+          if [ "${SUCCESSFUL_CI_RUNS}" -lt 1 ]; then
+            echo "Internal releases require a successful CI push run for ${GITHUB_SHA} on main." >&2
+            exit 1
+          fi
+
+      - name: Resolve immutable release identity
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/prepare-desktop-build.mjs \
+            --channel internal \
+            --build-number "${GITHUB_RUN_NUMBER}" \
+            --commit "${GITHUB_SHA}" \
+            --github-output "${GITHUB_OUTPUT}"
 
       - name: Install locked dependencies
         run: npm ci
@@ -96,7 +100,10 @@ jobs:
           npm run stage:opencode-runtime -- "${DOWNLOAD}"
 
       - name: Build ad-hoc macOS package
-        run: npm run dist:mac
+        run: npm run dist:mac:prepared
+
+      - name: Verify packaged Internal Build Identity
+        run: node scripts/verify-packaged-desktop-build.mjs
 
       - name: Build checksum-pinned Terminal launcher
         id: preview
@@ -108,7 +115,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ARCHIVE_NAME="puppyone-${VERSION}-${ARCH}-mac.zip"
+          ARCHIVE_NAME="puppyone-${VERSION}-${ARCH}.zip"
           R2_PREFIX="desktop/internal/mac/${RELEASE_TAG}"
           if [ ! -f "release/${ARCHIVE_NAME}" ]; then
             echo "Expected release/${ARCHIVE_NAME}, but it was not built." >&2
@@ -118,7 +125,8 @@ jobs:
             --arch "${ARCH}" \
             --archive "release/${ARCHIVE_NAME}" \
             --archive-url "${PUBLIC_DOWNLOAD_ORIGIN}/${R2_PREFIX}/${ARCHIVE_NAME}" \
-            --package-version "${VERSION}-internal.${INTERNAL_ID}" \
+            --build-info "generated/desktop-build-info.json" \
+            --package-version "${VERSION}" \
             --release-tag "${RELEASE_TAG}"
 
           set -- artifacts/terminal-preview/*.tgz
@@ -160,13 +168,14 @@ jobs:
         run: |
           set -euo pipefail
           assets=()
-          for pattern in release/puppyone-*.dmg release/puppyone-*.zip release/puppyone-*.blockmap artifacts/terminal-preview/*.tgz; do
+          for pattern in release/puppyone-*.dmg release/puppyone-*.zip release/puppyone-*.blockmap release/internal-mac.yml artifacts/terminal-preview/*.tgz; do
             for file in $pattern; do
               [ -f "${file}" ] && assets+=(--asset "${file}")
             done
           done
           node scripts/create-desktop-release-bundle.mjs create \
             --bundle artifacts/desktop-release-bundle \
+            --build-info generated/desktop-build-info.json \
             --channel internal \
             --tag "${RELEASE_TAG}" \
             --version "${VERSION}" \
@@ -201,6 +210,7 @@ jobs:
           subject-path: |
             artifacts/desktop-release-bundle/assets/*
             artifacts/desktop-release-bundle/release.json
+            artifacts/desktop-release-bundle/build-info.json
             artifacts/desktop-release-bundle/SHA256SUMS
 
       - name: Upload build-once release bundle
@@ -224,6 +234,7 @@ jobs:
       deployment_environment: desktop-internal
       generate_notes: false
       prerelease: true
+      publish_github_release: false
       release_name: ${{ needs.build.outputs.release_name }}
       release_tag: ${{ needs.build.outputs.release_tag }}
       verify_tag: false

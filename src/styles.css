@@ -3,6 +3,7 @@
 @import "./styles/scrollbars.css";
 @import "./styles/animations.css";
 @import "./styles/shell.css";
+@import "./styles/window-chrome.css";
 @import "./styles/titlebar.css";
 @import "./styles/minimal-mode.css";
 @import "./styles/dialogs.css";
@@ -14,6 +15,7 @@
 @import "./styles/settings-controls.css" layer(features);
 @import "./features/source-control/source-control.css" layer(features);
 @import "./styles/settings-view.css" layer(features);
+@import "./styles/settings-new-menu.css" layer(features);
 @import "./styles/file-actions.css";
 @import "./styles/menus.css";
 @import "./features/data-workspace/data-shell.css" layer(features);

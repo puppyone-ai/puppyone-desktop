@@ -63,5 +63,11 @@
   "branch.loadingBranches": "브랜치 불러오는 중",
   "branch.localBranches": "로컬 브랜치",
   "branch.remoteBranches": "원격 브랜치",
-  "branch.noBranches": "브랜치 없음"
+  "branch.noBranches": "브랜치 없음",
+  "build.channel.dev": "개발 버전",
+  "build.channel.internal": "내부 테스트 버전",
+  "build.channel.stable": "정식 버전",
+  "build.version.title": "{channel} · {version} · 커밋 {commit}",
+  "build.copy.action": "버전 정보 복사",
+  "build.copy.copied": "버전 정보를 복사했습니다"
 }

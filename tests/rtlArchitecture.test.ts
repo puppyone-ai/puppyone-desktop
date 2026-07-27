@@ -54,7 +54,7 @@ describe("RTL architecture", () => {
       .toMatch(/aria-hidden="true"\s+dir="ltr"/);
     expect(read("../src/features/settings/main/RepositorySettingsViews.tsx"))
       .toContain('<code dir="ltr" title={copyUrl ?? ""}>');
-    expect(read("../src/features/settings/main/GeneralSettingsView.tsx"))
+    expect(read("../src/features/settings/main/LocalProjectSettingsView.tsx"))
       .toContain('<strong dir="ltr" title={workspace.path}>{workspace.path}</strong>');
   });
 });

@@ -6,6 +6,10 @@
   background: var(--po-editor-bg);
 }
 
+.editor-live-surface[data-scroll-owner="viewer"] {
+  overflow: clip;
+}
+
 .editor-save-overlay {
   position: absolute;
   z-index: 20;

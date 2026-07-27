@@ -66,6 +66,7 @@ describe("sidebar spacing architecture", () => {
       "border-inline-end: 1px solid var(--po-shell-divider, var(--po-divider));",
     );
     expect(injectedSurface).not.toContain("border-inline-end:");
+    expect(cloudSidebarCss).not.toContain("border-inline-end:");
   });
 
   it("defines one visual edge contract", () => {

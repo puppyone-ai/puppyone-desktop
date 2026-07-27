@@ -304,24 +304,21 @@
   overflow: hidden;
 }
 
-.desktop-data-workspace-wrap .desktop-explorer-list-end-create-row {
-  color: var(--po-text-subtle);
-  font-size: 12px;
-  opacity: 0.86;
-}
-
-.desktop-data-workspace-wrap .desktop-explorer-list-end-create-row:hover,
-.desktop-data-workspace-wrap .desktop-explorer-list-end-create-row:focus-visible {
-  color: var(--po-text-muted);
-  opacity: 1;
-}
-
 .desktop-data-workspace-wrap .desktop-explorer-list-end-create-command {
-  font-weight: 560;
+  color: color-mix(in srgb, var(--po-text-subtle) 68%, var(--po-sidebar));
+  font-size: 12px;
+  font-weight: var(--desktop-sidebar-font-weight);
+}
+
+.desktop-data-workspace-wrap .desktop-explorer-list-end-create-row:hover
+  .desktop-explorer-list-end-create-command,
+.desktop-data-workspace-wrap .desktop-explorer-list-end-create-row:focus-visible
+  .desktop-explorer-list-end-create-command {
+  color: var(--po-text-subtle);
 }
 
 .desktop-data-workspace-wrap .desktop-explorer-list-end-create-row .tree-icon-slot {
-  opacity: 0.82;
+  opacity: 0.76;
 }
 
 .app-shell.dark .desktop-data-workspace-wrap .explorer-column {

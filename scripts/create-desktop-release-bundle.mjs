@@ -10,6 +10,10 @@ import {
   jsonFile,
   verifyDesktopReleaseBundle,
 } from "./release-support/desktop-release-metadata.mjs";
+import {
+  assertDesktopBuildInfo,
+  createDesktopBuildTag,
+} from "../shared/desktop-build-identity.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -33,6 +37,12 @@ async function createBundle(args) {
   const assetPaths = arrayOption(args, "asset").map((value) => path.resolve(repoRoot, value));
   if (assetPaths.length === 0) throw new Error("At least one --asset is required");
   const notesFile = path.resolve(repoRoot, required(args, "notes-file"));
+  const buildInfoFile = option(args, "build-info");
+  const buildInfo = buildInfoFile == null
+    ? null
+    : assertDesktopBuildInfo(JSON.parse(
+        await fs.readFile(path.resolve(repoRoot, buildInfoFile), "utf8"),
+      ));
 
   await fs.rm(bundleDirectory, { recursive: true, force: true });
   await fs.mkdir(path.join(bundleDirectory, "assets"), { recursive: true });
@@ -43,23 +53,48 @@ async function createBundle(args) {
     copiedAssets.push(destinationPath);
   }
   await fs.copyFile(notesFile, path.join(bundleDirectory, "release-notes.md"));
+  if (buildInfo) {
+    await fs.writeFile(
+      path.join(bundleDirectory, "build-info.json"),
+      jsonFile(buildInfo),
+    );
+  }
 
-  const channel = required(args, "channel");
+  const channel = buildInfo?.channel ?? required(args, "channel");
+  const suppliedChannel = option(args, "channel");
+  if (suppliedChannel != null && suppliedChannel !== channel) {
+    throw new Error(`--channel ${suppliedChannel} does not match Build Identity ${channel}.`);
+  }
+  if (buildInfo) {
+    const derivedValues = {
+      commit: buildInfo.commitSha,
+      tag: createDesktopBuildTag(buildInfo),
+      version: buildInfo.version,
+    };
+    for (const [key, expected] of Object.entries(derivedValues)) {
+      const supplied = option(args, key);
+      if (supplied != null && supplied !== expected) {
+        throw new Error(`--${key} ${supplied} does not match Build Identity ${expected}.`);
+      }
+    }
+  }
   const manifest = await createDesktopReleaseManifest({
     arch: required(args, "arch"),
     assetPaths: copiedAssets,
+    buildInfo,
     channel,
-    commitSha: option(args, "commit"),
+    commitSha: buildInfo?.commitSha ?? option(args, "commit"),
     developerIdSigned: booleanOption(args, "developer-id-signed"),
     notarized: booleanOption(args, "notarized"),
     prerelease: booleanOption(args, "prerelease"),
     provenance: option(args, "provenance") ?? (channel === "archive" ? "archive" : "pipeline"),
     publicOrigin: required(args, "public-origin"),
     publishedAt: option(args, "published-at") ?? new Date().toISOString(),
+    promotionSourceTag: option(args, "promotion-source-tag"),
     repository: required(args, "repository"),
     r2Prefix: required(args, "r2-prefix"),
-    tag: required(args, "tag"),
-    version: required(args, "version"),
+    tag: buildInfo ? createDesktopBuildTag(buildInfo) : required(args, "tag"),
+    version: buildInfo?.version ?? required(args, "version"),
     workflowRunUrl: option(args, "workflow-run-url"),
   });
   await fs.writeFile(path.join(bundleDirectory, "release.json"), jsonFile(manifest));

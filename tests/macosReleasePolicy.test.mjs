@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import packageMetadata from "../package.json";
 import {
+  inspectContinuousIntegrationWorkflow,
   inspectInternalReleaseWorkflow,
   inspectLegacyArchiveWorkflow,
   inspectReleasePublisherWorkflow,
@@ -98,6 +99,21 @@ describe("macOS stable release policy", () => {
   });
 });
 
+describe("continuous integration workflow", () => {
+  it("runs source gates without release authority and pins actions", () => {
+    const workflow = readFileSync(
+      new URL("../.github/workflows/ci.yml", import.meta.url),
+      "utf8",
+    );
+    expect(inspectContinuousIntegrationWorkflow(workflow)).toEqual([]);
+    expect(inspectContinuousIntegrationWorkflow(
+      workflow.replace(/actions\/checkout@[a-f0-9]{40}/, "actions/checkout@v4"),
+    )).toEqual(expect.arrayContaining([
+      expect.stringMatching(/pinned to full commit SHAs/),
+    ]));
+  });
+});
+
 describe("macOS internal release workflow", () => {
   it("builds once and delegates atomic publication", () => {
     const workflow = readFileSync(
@@ -105,6 +121,17 @@ describe("macOS internal release workflow", () => {
       "utf8",
     );
     expect(inspectInternalReleaseWorkflow(workflow)).toEqual([]);
+  });
+
+  it("rejects an Internal workflow without the green-main source gate", () => {
+    const workflow = readFileSync(
+      new URL("../.github/workflows/desktop-internal-build.yml", import.meta.url),
+      "utf8",
+    ).replace("- name: Verify green main source", "- name: Unverified source");
+
+    expect(inspectInternalReleaseWorkflow(workflow)).toContain(
+      "the Internal workflow must reject non-main or unverified source commits",
+    );
   });
 });
 
@@ -125,6 +152,20 @@ describe("desktop release publisher workflow", () => {
       "utf8",
     );
     expect(inspectReleasePublisherWorkflow(workflow)).toEqual([]);
+  });
+
+  it("requires the existing-release check to receive the Internal draft policy", () => {
+    const workflow = readFileSync(
+      new URL("../.github/workflows/desktop-release-publish.yml", import.meta.url),
+      "utf8",
+    ).replace(
+      "          PUBLISH_GITHUB_RELEASE: ${{ inputs.publish_github_release }}\n          RELEASE_TAG: ${{ steps.release.outputs.tag }}",
+      "          RELEASE_TAG: ${{ steps.release.outputs.tag }}",
+    );
+
+    expect(inspectReleasePublisherWorkflow(workflow)).toContain(
+      "the GitHub release-state step must receive the caller's draft/public policy explicitly",
+    );
   });
 });
 
