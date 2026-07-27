@@ -86,8 +86,14 @@ describe("CSV document model", () => {
     expect(trimRows([["a", ""], ["", ""]])).toEqual([["a"]]);
     expect(inferHeaderRow([["Name", "Count"], ["Ada", "2"]])).toBe(true);
     expect(inferHeaderRow([["Name", "Email"], ["Ada", "ada@example.com"]])).toBe(true);
+    expect(inferHeaderRow([
+      ["Column 1", "Column 2", "Column 3"],
+      ["", "", ""],
+      ["", "", ""],
+    ])).toBe(true);
     expect(inferHeaderRow([["Name", "City"], ["Ada", "London"]])).toBe(false);
     expect(inferHeaderRow([["Alice", "London"], ["Bob", "Paris"]])).toBe(false);
+    expect(inferHeaderRow([["Alice", "London"], ["", ""]])).toBe(false);
     expect(inferHeaderRow([["Name", "Name"], ["Ada", "Lovelace"]])).toBe(false);
     expect(toColumnLabel(0)).toBe("A");
     expect(toColumnLabel(26)).toBe("AA");

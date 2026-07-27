@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   readCsvFirstRecordAsHeaderPreference,
+  readCsvShowRowNumbersPreference,
   writeCsvFirstRecordAsHeaderPreference,
+  writeCsvShowRowNumbersPreference,
 } from "../packages/shared-ui/src/editor/csv/csvViewPreferences";
 
 describe("CSV view preferences", () => {
@@ -16,10 +18,27 @@ describe("CSV view preferences", () => {
     expect(readCsvFirstRecordAsHeaderPreference("/vault/two.csv", storage)).toBe(false);
   });
 
+  it("keeps row-number visibility per document and preserves sibling preferences", () => {
+    const storage = createMemoryStorage();
+
+    writeCsvFirstRecordAsHeaderPreference("/vault/one.csv", true, storage);
+    writeCsvShowRowNumbersPreference("/vault/one.csv", false, storage);
+    writeCsvShowRowNumbersPreference("/vault/two.csv", true, storage);
+
+    expect(readCsvFirstRecordAsHeaderPreference("/vault/one.csv", storage)).toBe(true);
+    expect(readCsvShowRowNumbersPreference("/vault/one.csv", storage)).toBe(false);
+    expect(readCsvShowRowNumbersPreference("/vault/two.csv", storage)).toBe(true);
+    expect(readCsvFirstRecordAsHeaderPreference("/vault/two.csv", storage)).toBeUndefined();
+
+    writeCsvFirstRecordAsHeaderPreference("/vault/one.csv", false, storage);
+    expect(readCsvShowRowNumbersPreference("/vault/one.csv", storage)).toBe(false);
+  });
+
   it("fails open when preference storage is missing or malformed", () => {
     const storage = createMemoryStorage("not-json");
 
     expect(readCsvFirstRecordAsHeaderPreference("/vault/table.csv", storage)).toBeUndefined();
+    expect(readCsvShowRowNumbersPreference("/vault/table.csv", storage)).toBeUndefined();
     expect(() => writeCsvFirstRecordAsHeaderPreference(undefined, true, storage)).not.toThrow();
     expect(() => writeCsvFirstRecordAsHeaderPreference("/vault/table.csv", true, {
       getItem: () => null,
@@ -38,4 +57,3 @@ function createMemoryStorage(initialValue?: string) {
     setItem: (key: string, value: string) => values.set(key, value),
   };
 }
-

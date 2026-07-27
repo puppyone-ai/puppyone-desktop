@@ -225,7 +225,7 @@ body.data-sidebar-resizing * {
 .desktop-sidebar-footer-bar {
   display: flex;
   align-items: center;
-  justify-content: start;
+  justify-content: space-between;
   gap: var(--desktop-sidebar-nav-gap);
   min-width: 0;
 }
@@ -244,6 +244,14 @@ body.data-sidebar-resizing * {
   align-items: center;
   gap: var(--desktop-sidebar-nav-gap);
   -webkit-app-region: no-drag;
+}
+
+.desktop-sidebar-build-identity-footer {
+  display: flex;
+  min-width: 0;
+  justify-content: flex-end;
+  padding-inline: var(--desktop-sidebar-navigation-padding-inline);
+  padding-block: 3px;
 }
 
 .desktop-sidebar-footer-button {

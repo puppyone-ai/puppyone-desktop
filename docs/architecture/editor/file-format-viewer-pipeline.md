@@ -320,7 +320,13 @@ source-code extensions)
   preserves BOM/newline conventions after edits. CSV renders as a semantic
   HTML table and shares the editable-table visual tokens, bounded column-width
   estimator, midpoint drag geometry, and row/column menu vocabulary with
-  Markdown tables. Its compact settings menu replaces a permanent toolbar.
+  Markdown tables. The CSV viewport is the sole owner of both scroll axes; the
+  generic editor frame explicitly yields overflow ownership. Resting page
+  insets belong to an inner content frame, while the sticky header and record
+  gutter use zero logical offsets against the actual viewport edges. This
+  avoids nested scroll containers and padding-compensation offsets. Its compact
+  settings menu lives in the initial scrollable inset and leaves before the
+  header docks, replacing a permanent toolbar.
   A narrow, sticky data-row gutter remains in the semantic HTML table for
   alignment and accessibility, but is visually open outside the closed data
   frame and excluded from CSV serialization. Its boundary grip opens the row

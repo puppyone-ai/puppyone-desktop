@@ -2,6 +2,7 @@ import { isFileIconThemeId, type FileIconThemeId } from "@puppyone/shared-ui";
 import type { PuppyoneWorkspaceConfig } from "../../types/electron";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
+  CREATE_NEW_MENU_STORAGE_KEY,
   DIFF_MARKERS_STORAGE_KEY,
   DOCK_ICON_STORAGE_KEY,
   DEFAULT_SIDEBAR_NAVIGATION_LAYOUT,
@@ -25,6 +26,7 @@ import {
   THEME_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
   parseAiEditAssistEnabled,
+  parseCreateNewMenuSettings,
   parseDarkThemePreset,
   parseDiffMarkers,
   parseDockIcon,
@@ -44,6 +46,7 @@ import {
   parseTypography,
   parseTitlebarActionsSettings,
   type DarkThemePreset,
+  type CreateNewMenuSettings,
   type DiffMarkers,
   type DockIcon,
   type ExperimentalSettings,
@@ -161,6 +164,11 @@ export function readInitialFilesVisibilitySettings(): FilesVisibilitySettings {
 export function readInitialExternalAppsSettings(): ExternalAppsSettings {
   if (typeof window === "undefined") return parseExternalAppsSettings(null);
   return parseExternalAppsSettings(window.localStorage.getItem(EXTERNAL_APPS_STORAGE_KEY));
+}
+
+export function readInitialCreateNewMenuSettings(): CreateNewMenuSettings {
+  if (typeof window === "undefined") return parseCreateNewMenuSettings(null);
+  return parseCreateNewMenuSettings(window.localStorage.getItem(CREATE_NEW_MENU_STORAGE_KEY));
 }
 
 export function readInitialRightSidebarToolsSettings(): RightSidebarToolsSettings {

@@ -47,6 +47,8 @@
   "csv.headerDescription": "表示のみが変わり、CSV の内容は変更されません。",
   "csv.headerRecord": "見出し、CSV レコード 1",
   "csv.rowNumber": "データ行 {row, number}、CSV レコード {record, number}",
+  "csv.rowNumbers": "行番号を表示",
+  "csv.rowNumbersToggle": "行番号",
   "csv.settings": "CSV設定",
   "csv.visibleRows": "{total, number} 行中 {visible, number} 行を表示",
   "csv.warning.unclosedQuote": "引用符が閉じられていません",

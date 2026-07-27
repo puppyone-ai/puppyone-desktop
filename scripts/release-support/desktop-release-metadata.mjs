@@ -1,8 +1,13 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import {
+  assertDesktopBuildInfo,
+  createDesktopBuildTag,
+} from "../../shared/desktop-build-identity.mjs";
 
-export const DESKTOP_RELEASE_SCHEMA_VERSION = 1;
+export const DESKTOP_RELEASE_SCHEMA_VERSION = 2;
+export const DESKTOP_LEGACY_RELEASE_SCHEMA_VERSION = 1;
 export const DESKTOP_CATALOG_SCHEMA_VERSION = 1;
 export const DESKTOP_RELEASE_PRODUCT = "puppyone-desktop";
 
@@ -17,6 +22,7 @@ const ASSET_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 export async function createDesktopReleaseManifest({
   arch,
   assetPaths,
+  buildInfo = null,
   channel,
   commitSha,
   developerIdSigned,
@@ -26,6 +32,7 @@ export async function createDesktopReleaseManifest({
   provenance = channel === "archive" ? "archive" : "pipeline",
   publicOrigin,
   publishedAt,
+  promotionSourceTag = null,
   repository,
   r2Prefix,
   tag,
@@ -33,6 +40,26 @@ export async function createDesktopReleaseManifest({
   workflowRunUrl,
 }) {
   assertNonEmptyArray(assetPaths, "assetPaths");
+  const identity = buildInfo == null ? null : assertDesktopBuildInfo(buildInfo);
+  if (identity) {
+    if (identity.channel !== channel) {
+      throw new Error(`Release channel ${channel} does not match Build Identity ${identity.channel}.`);
+    }
+    if (identity.commitSha !== commitSha) {
+      throw new Error("Release commit does not match Build Identity.");
+    }
+    if (identity.version !== version) {
+      throw new Error("Release version does not match Build Identity.");
+    }
+    if (createDesktopBuildTag(identity) !== tag) {
+      throw new Error("Release tag does not match Build Identity.");
+    }
+  } else if (provenance === "pipeline" && channel !== "archive") {
+    throw new Error("New Internal and Stable pipeline releases require resolved Build Identity.");
+  }
+  if (identity?.channel === "stable" && provenance === "pipeline" && !promotionSourceTag) {
+    throw new Error("Stable pipeline releases require an Internal promotion source tag.");
+  }
   const normalizedOrigin = normalizeOrigin(publicOrigin);
   const normalizedPrefix = normalizePrefix(r2Prefix);
   const names = new Set();
@@ -68,10 +95,27 @@ export async function createDesktopReleaseManifest({
 
   assets.sort((left, right) => left.name.localeCompare(right.name));
   const manifest = {
-    schemaVersion: DESKTOP_RELEASE_SCHEMA_VERSION,
+    schemaVersion: identity
+      ? DESKTOP_RELEASE_SCHEMA_VERSION
+      : DESKTOP_LEGACY_RELEASE_SCHEMA_VERSION,
     product: DESKTOP_RELEASE_PRODUCT,
     tag,
     version,
+    ...(identity ? {
+      baseVersion: identity.baseVersion,
+      build: {
+        id: identity.buildId,
+        platformBuildNumber: identity.platformBuildNumber,
+        builtAt: identity.builtAt,
+        sourceDirty: identity.sourceDirty,
+      },
+      promotion: identity.channel === "stable"
+        ? {
+            sourceChannel: "internal",
+            sourceTag: promotionSourceTag,
+          }
+        : null,
+    } : {}),
     channel,
     provenance,
     prerelease: prerelease === true,
@@ -83,11 +127,17 @@ export async function createDesktopReleaseManifest({
     },
     github: {
       releaseUrl: githubReleaseAvailable ? githubReleaseUrl(repository, tag) : null,
+      ...(identity ? {
+        visibility: identity.channel === "internal" ? "draft" : "public",
+      } : {}),
     },
     r2: {
       prefix: normalizedPrefix,
       manifestUrl: joinPublicUrl(normalizedOrigin, `${normalizedPrefix}/release.json`),
       checksumsUrl: joinPublicUrl(normalizedOrigin, `${normalizedPrefix}/SHA256SUMS`),
+      ...(identity ? {
+        buildInfoUrl: joinPublicUrl(normalizedOrigin, `${normalizedPrefix}/build-info.json`),
+      } : {}),
     },
     security: {
       developerIdSigned: developerIdSigned === true,
@@ -107,8 +157,10 @@ export function assertDesktopReleaseManifest(manifest) {
 
 export function inspectDesktopReleaseManifest(manifest) {
   const errors = [];
-  if (manifest?.schemaVersion !== DESKTOP_RELEASE_SCHEMA_VERSION) {
-    errors.push(`schemaVersion must be ${DESKTOP_RELEASE_SCHEMA_VERSION}`);
+  if (![DESKTOP_LEGACY_RELEASE_SCHEMA_VERSION, DESKTOP_RELEASE_SCHEMA_VERSION].includes(manifest?.schemaVersion)) {
+    errors.push(
+      `schemaVersion must be ${DESKTOP_LEGACY_RELEASE_SCHEMA_VERSION} or ${DESKTOP_RELEASE_SCHEMA_VERSION}`,
+    );
   }
   if (manifest?.product !== DESKTOP_RELEASE_PRODUCT) {
     errors.push(`product must be ${DESKTOP_RELEASE_PRODUCT}`);
@@ -121,6 +173,45 @@ export function inspectDesktopReleaseManifest(manifest) {
   }
   if (!["internal", "stable", "archive"].includes(manifest?.channel)) {
     errors.push("channel must be internal, stable, or archive");
+  }
+  if (manifest?.schemaVersion === DESKTOP_RELEASE_SCHEMA_VERSION) {
+    if (!["internal", "stable"].includes(manifest?.channel)) {
+      errors.push("schemaVersion 2 is reserved for active Internal and Stable releases");
+    } else {
+      try {
+        const identity = assertDesktopBuildInfo({
+          schemaVersion: 1,
+          product: DESKTOP_RELEASE_PRODUCT,
+          channel: manifest.channel,
+          baseVersion: manifest.baseVersion,
+          version: manifest.version,
+          buildId: manifest?.build?.id,
+          platformBuildNumber: manifest?.build?.platformBuildNumber,
+          commitSha: manifest.commitSha,
+          builtAt: manifest?.build?.builtAt,
+          sourceDirty: manifest?.build?.sourceDirty,
+        });
+        if (createDesktopBuildTag(identity) !== manifest.tag) {
+          errors.push("tag must match the canonical Build Identity tag");
+        }
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : String(error));
+      }
+    }
+    if (manifest?.channel === "internal" && manifest?.promotion !== null) {
+      errors.push("Internal releases cannot declare Stable promotion evidence");
+    }
+    if (manifest?.channel === "stable") {
+      if (manifest?.promotion?.sourceChannel !== "internal") {
+        errors.push("Stable promotion sourceChannel must be internal");
+      }
+      const promotionTagPattern = new RegExp(
+        `^v${escapeRegExp(String(manifest?.baseVersion ?? ""))}-internal\\.[1-9]\\d*$`,
+      );
+      if (!promotionTagPattern.test(String(manifest?.promotion?.sourceTag ?? ""))) {
+        errors.push("Stable releases must reference a canonical Internal promotion tag");
+      }
+    }
   }
   if (!["pipeline", "backfill", "archive"].includes(manifest?.provenance)) {
     errors.push("provenance must be pipeline, backfill, or archive");
@@ -137,8 +228,8 @@ export function inspectDesktopReleaseManifest(manifest) {
   ) {
     errors.push("commitSha must be a full lowercase Git commit SHA, or null for an archive release");
   }
-  if (!Number.isFinite(Date.parse(manifest?.publishedAt))) {
-    errors.push("publishedAt must be an ISO timestamp");
+  if (!isCanonicalTimestamp(manifest?.publishedAt)) {
+    errors.push("publishedAt must be a canonical UTC ISO timestamp");
   }
   if (!REPOSITORY_PATTERN.test(String(manifest?.source?.repository ?? ""))) {
     errors.push("source.repository must use owner/repository syntax");
@@ -149,11 +240,23 @@ export function inspectDesktopReleaseManifest(manifest) {
   if (!isHttpsUrl(manifest?.github?.releaseUrl) && !(manifest?.channel === "archive" && manifest?.github?.releaseUrl == null)) {
     errors.push("github.releaseUrl must be an HTTPS URL, or null for an archive release");
   }
+  if (
+    manifest?.schemaVersion === DESKTOP_RELEASE_SCHEMA_VERSION
+    && manifest?.github?.visibility !== (manifest.channel === "internal" ? "draft" : "public")
+  ) {
+    errors.push("GitHub visibility must be draft for Internal and public for Stable");
+  }
   if (!validPrefix(manifest?.r2?.prefix) || !String(manifest?.r2?.prefix).endsWith(`/${manifest?.tag}`)) {
     errors.push("r2.prefix must be a safe immutable prefix ending in the release tag");
   }
   if (!isHttpsUrl(manifest?.r2?.manifestUrl) || !isHttpsUrl(manifest?.r2?.checksumsUrl)) {
     errors.push("R2 manifest and checksum URLs must use HTTPS");
+  }
+  if (
+    manifest?.schemaVersion === DESKTOP_RELEASE_SCHEMA_VERSION
+    && !isHttpsUrl(manifest?.r2?.buildInfoUrl)
+  ) {
+    errors.push("schemaVersion 2 releases must expose Build Identity metadata over HTTPS");
   }
   if (typeof manifest?.security?.developerIdSigned !== "boolean" || typeof manifest?.security?.notarized !== "boolean") {
     errors.push("security signing and notarization values must be boolean");
@@ -240,15 +343,23 @@ export function createLatestPointer(manifest) {
   if (manifest.channel === "archive") throw new Error("Archive releases do not have mutable latest pointers");
   const latestPrefix = `${manifest.r2.prefix.slice(0, -(manifest.tag.length))}latest`;
   return {
-    schemaVersion: DESKTOP_RELEASE_SCHEMA_VERSION,
+    schemaVersion: manifest.schemaVersion,
     product: manifest.product,
     channel: manifest.channel,
     provenance: manifest.provenance,
     tag: manifest.tag,
     version: manifest.version,
+    ...(manifest.schemaVersion === DESKTOP_RELEASE_SCHEMA_VERSION ? {
+      baseVersion: manifest.baseVersion,
+      build: structuredClone(manifest.build),
+      promotion: structuredClone(manifest.promotion),
+    } : {}),
     publishedAt: manifest.publishedAt,
     commitSha: manifest.commitSha,
     manifestUrl: manifest.r2.manifestUrl,
+    ...(manifest.schemaVersion === DESKTOP_RELEASE_SCHEMA_VERSION
+      ? { buildInfoUrl: manifest.r2.buildInfoUrl }
+      : {}),
     githubReleaseUrl: manifest.github.releaseUrl,
     assets: manifest.assets.map((asset) => ({
       name: asset.name,
@@ -298,7 +409,9 @@ export function assertDesktopReleaseCatalog(catalog) {
     errors.push(`schemaVersion must be ${DESKTOP_CATALOG_SCHEMA_VERSION}`);
   }
   if (catalog?.product !== DESKTOP_RELEASE_PRODUCT) errors.push(`product must be ${DESKTOP_RELEASE_PRODUCT}`);
-  if (!Number.isFinite(Date.parse(catalog?.generatedAt))) errors.push("generatedAt must be an ISO timestamp");
+  if (!isCanonicalTimestamp(catalog?.generatedAt)) {
+    errors.push("generatedAt must be a canonical UTC ISO timestamp");
+  }
   if (!Array.isArray(catalog?.releases)) {
     errors.push("releases must be an array");
   } else {
@@ -322,6 +435,26 @@ export async function verifyDesktopReleaseBundle(bundleDirectory, expected = {})
   const notesPath = path.join(bundleDirectory, "release-notes.md");
   const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
   assertDesktopReleaseManifest(manifest);
+  if (manifest.schemaVersion === DESKTOP_RELEASE_SCHEMA_VERSION) {
+    const buildInfo = assertDesktopBuildInfo(JSON.parse(
+      await fs.readFile(path.join(bundleDirectory, "build-info.json"), "utf8"),
+    ));
+    const manifestIdentity = {
+      schemaVersion: 1,
+      product: manifest.product,
+      channel: manifest.channel,
+      baseVersion: manifest.baseVersion,
+      version: manifest.version,
+      buildId: manifest.build.id,
+      platformBuildNumber: manifest.build.platformBuildNumber,
+      commitSha: manifest.commitSha,
+      builtAt: manifest.build.builtAt,
+      sourceDirty: manifest.build.sourceDirty,
+    };
+    if (canonicalJson(buildInfo) !== canonicalJson(manifestIdentity)) {
+      throw new Error("build-info.json does not match release.json Build Identity.");
+    }
+  }
   for (const [key, value] of Object.entries(expected)) {
     if (value != null && manifest[key] !== value) {
       throw new Error(`Release bundle ${key} mismatch: expected ${value}, received ${manifest[key]}`);
@@ -441,10 +574,17 @@ function normalizeTimestamp(value) {
 
 function isHttpsUrl(value) {
   try {
-    return new URL(value).protocol === "https:";
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
   } catch {
     return false;
   }
+}
+
+function isCanonicalTimestamp(value) {
+  if (typeof value !== "string") return false;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) && date.toISOString() === value;
 }
 
 function assertNonEmptyArray(value, label) {
@@ -457,4 +597,8 @@ function canonicalJson(value) {
     return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

@@ -2,7 +2,8 @@ const CSV_VIEW_PREFERENCES_STORAGE_KEY = "puppyone.editor.csv-view-preferences.v
 const MAX_STORED_CSV_VIEW_PREFERENCES = 200;
 
 type CsvViewPreferenceEntry = Readonly<{
-  firstRecordAsHeader: boolean;
+  firstRecordAsHeader?: boolean;
+  showRowNumbers?: boolean;
   updatedAt: number;
 }>;
 
@@ -24,13 +25,40 @@ export function writeCsvFirstRecordAsHeaderPreference(
   firstRecordAsHeader: boolean,
   storage: CsvViewPreferenceStorage | null = getBrowserStorage(),
 ) {
+  writeCsvViewPreference(documentId, { firstRecordAsHeader }, storage);
+}
+
+export function readCsvShowRowNumbersPreference(
+  documentId: string | undefined,
+  storage: CsvViewPreferenceStorage | null = getBrowserStorage(),
+): boolean | undefined {
+  const key = normalizeDocumentId(documentId);
+  if (!key || !storage) return undefined;
+  return readPreferenceStore(storage)[key]?.showRowNumbers;
+}
+
+export function writeCsvShowRowNumbersPreference(
+  documentId: string | undefined,
+  showRowNumbers: boolean,
+  storage: CsvViewPreferenceStorage | null = getBrowserStorage(),
+) {
+  writeCsvViewPreference(documentId, { showRowNumbers }, storage);
+}
+
+function writeCsvViewPreference(
+  documentId: string | undefined,
+  patch: Pick<CsvViewPreferenceEntry, "firstRecordAsHeader" | "showRowNumbers">,
+  storage: CsvViewPreferenceStorage | null,
+) {
   const key = normalizeDocumentId(documentId);
   if (!key || !storage) return;
 
+  const currentStore = readPreferenceStore(storage);
   const nextStore: CsvViewPreferenceStore = {
-    ...readPreferenceStore(storage),
+    ...currentStore,
     [key]: {
-      firstRecordAsHeader,
+      ...currentStore[key],
+      ...patch,
       updatedAt: Date.now(),
     },
   };
@@ -56,9 +84,16 @@ function readPreferenceStore(storage: CsvViewPreferenceStorage): CsvViewPreferen
     for (const [key, value] of Object.entries(parsed)) {
       if (!value || typeof value !== "object" || Array.isArray(value)) continue;
       const candidate = value as Partial<CsvViewPreferenceEntry>;
-      if (typeof candidate.firstRecordAsHeader !== "boolean") continue;
+      const firstRecordAsHeader = typeof candidate.firstRecordAsHeader === "boolean"
+        ? candidate.firstRecordAsHeader
+        : undefined;
+      const showRowNumbers = typeof candidate.showRowNumbers === "boolean"
+        ? candidate.showRowNumbers
+        : undefined;
+      if (firstRecordAsHeader === undefined && showRowNumbers === undefined) continue;
       entries[key] = {
-        firstRecordAsHeader: candidate.firstRecordAsHeader,
+        ...(firstRecordAsHeader === undefined ? {} : { firstRecordAsHeader }),
+        ...(showRowNumbers === undefined ? {} : { showRowNumbers }),
         updatedAt: typeof candidate.updatedAt === "number" && Number.isFinite(candidate.updatedAt)
           ? candidate.updatedAt
           : 0,
@@ -83,4 +118,3 @@ function normalizeDocumentId(documentId: string | undefined): string | null {
   const normalized = documentId?.trim();
   return normalized ? normalized : null;
 }
-

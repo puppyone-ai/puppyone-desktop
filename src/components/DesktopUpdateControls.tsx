@@ -5,8 +5,8 @@ import type { DesktopUpdateState, DesktopUpdateStatus } from "../types/electron"
 
 const FALLBACK_UPDATE_STATE: DesktopUpdateState = {
   status: "disabled",
-  currentVersion: "0.0.0",
-  channel: "stable",
+  currentVersion: "0.0.0-dev.local",
+  channel: "dev",
   availableVersion: null,
   updateInfo: null,
   progress: null,
@@ -116,23 +116,18 @@ export function DesktopUpdateSettingsRow({
   const { t, formatNumber } = useLocalization();
   const action = getSettingsAction(state, t, formatNumber);
   const Icon = getUpdateIcon(state.status);
-  const detail = getUpdateDetail(state, t, formatNumber);
+  const detail = state.error
+    ?? state.blockers[0]?.detail
+    ?? state.blockers[0]?.label
+    ?? getUpdateDetail(state, t, formatNumber);
 
   return (
-    <div className="desktop-settings-row desktop-settings-row-control desktop-update-settings-row">
-      <span className="desktop-settings-label-stack">
-        <strong>{t("updates.settings.title")}</strong>
-        <small>{detail}</small>
-        {state.blockers.length > 0 && (
-          <small className="desktop-update-blocker">{state.blockers[0]?.detail ?? state.blockers[0]?.label}</small>
-        )}
-        {state.error && (
-          <small className="desktop-update-blocker">{state.error}</small>
-        )}
-      </span>
+    <div className="desktop-settings-row desktop-settings-row-control">
+      <span>{t("updates.settings.title")}</span>
       <button
         className={`desktop-settings-action ${action.primary ? "primary" : ""}`}
         type="button"
+        title={detail}
         disabled={action.disabled}
         onClick={action.kind === "check" ? onCheckForUpdates : onUpdateNow}
       >

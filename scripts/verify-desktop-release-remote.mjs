@@ -14,6 +14,7 @@ try {
   const urlPrefix = stripTrailingSlash(required(args, "url-prefix"));
   const includeAliases = booleanOption(args, "include-aliases", false);
   const includeMetadata = booleanOption(args, "include-metadata", false);
+  const requestHeaders = createAuthorizationHeaders(process.env);
   const { manifest } = await verifyDesktopReleaseBundle(bundleDirectory);
   const expected = [];
 
@@ -30,9 +31,13 @@ try {
     }
   }
   if (includeMetadata) {
-    for (const name of ["release.json", "SHA256SUMS"]) {
+    for (const name of ["release.json", "SHA256SUMS", "build-info.json"]) {
       const localPath = path.join(bundleDirectory, name);
-      const stats = await fs.stat(localPath);
+      const stats = await fs.stat(localPath).catch((error) => {
+        if (error?.code === "ENOENT" && name === "build-info.json") return null;
+        throw error;
+      });
+      if (!stats) continue;
       expected.push({
         localPath,
         url: `${urlPrefix}/${name}`,
@@ -45,7 +50,7 @@ try {
   const failures = [];
   await mapWithConcurrency(expected, 3, async (entry) => {
     try {
-      const actual = await hashRemote(entry.url);
+      const actual = await hashRemote(entry.url, requestHeaders);
       if (actual.bytes !== entry.bytes || actual.sha256 !== entry.sha256) {
         throw new Error(
           `expected ${entry.bytes} bytes/${entry.sha256}, received ${actual.bytes} bytes/${actual.sha256}`,
@@ -62,15 +67,18 @@ try {
   process.exit(1);
 }
 
-async function hashRemote(url) {
+async function hashRemote(url, requestHeaders) {
   let lastError;
   for (let attempt = 1; attempt <= 5; attempt += 1) {
     try {
       const response = await fetch(url, {
-        redirect: "follow",
+        // Internal verification may carry access credentials. A redirect must
+        // fail instead of forwarding them beyond the configured origin.
+        redirect: "error",
         headers: {
           "Cache-Control": "no-cache",
           "User-Agent": "puppyone-release-verifier/1",
+          ...requestHeaders,
         },
       });
       if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
@@ -87,6 +95,18 @@ async function hashRemote(url) {
     }
   }
   throw lastError;
+}
+
+function createAuthorizationHeaders(environment) {
+  const headers = {};
+  if (environment.PUPPYONE_INTERNAL_RELEASE_TOKEN) {
+    headers.Authorization = `Bearer ${environment.PUPPYONE_INTERNAL_RELEASE_TOKEN}`;
+  }
+  if (environment.CF_ACCESS_CLIENT_ID && environment.CF_ACCESS_CLIENT_SECRET) {
+    headers["CF-Access-Client-Id"] = environment.CF_ACCESS_CLIENT_ID;
+    headers["CF-Access-Client-Secret"] = environment.CF_ACCESS_CLIENT_SECRET;
+  }
+  return headers;
 }
 
 async function mapWithConcurrency(values, concurrency, task) {
@@ -128,6 +148,14 @@ function booleanOption(args, key, fallback) {
 
 function stripTrailingSlash(value) {
   const url = new URL(value);
-  if (url.protocol !== "https:") throw new Error("--url-prefix must use HTTPS");
-  return value.replace(/\/+$/, "");
+  if (
+    url.protocol !== "https:"
+    || url.username
+    || url.password
+    || url.search
+    || url.hash
+  ) {
+    throw new Error("--url-prefix must be a credential-free HTTPS URL without query or fragment");
+  }
+  return url.href.replace(/\/+$/, "");
 }

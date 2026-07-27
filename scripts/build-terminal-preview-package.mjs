@@ -6,6 +6,11 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import {
+  assertDesktopBuildInfo,
+  createDesktopBuildTag,
+  getDesktopBuildChannelPolicy,
+} from "../shared/desktop-build-identity.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -14,6 +19,7 @@ export async function buildTerminalPreviewPackage({
   arch = process.arch,
   archivePath,
   archiveUrl,
+  buildInfoPath = path.join(root, "generated", "desktop-build-info.json"),
   packageVersion,
   releaseTag,
   outputDirectory = path.join(root, "artifacts", "terminal-preview"),
@@ -28,16 +34,24 @@ export async function buildTerminalPreviewPackage({
   const rootPackage = JSON.parse(
     await fs.promises.readFile(path.join(root, "package.json"), "utf8"),
   );
+  const buildInfo = assertDesktopBuildInfo(JSON.parse(
+    await fs.promises.readFile(path.resolve(root, buildInfoPath), "utf8"),
+  ));
+  const channelPolicy = getDesktopBuildChannelPolicy(buildInfo.channel);
+  const canonicalTag = createDesktopBuildTag(buildInfo);
+  if (releaseTag && releaseTag !== canonicalTag) {
+    throw new Error(`Terminal package release tag ${releaseTag} does not match ${canonicalTag}.`);
+  }
   const resolvedArchivePath = archivePath
     ? path.resolve(root, archivePath)
-    : await findReleaseArchive({ root, version: rootPackage.version, arch });
+    : await findReleaseArchive({ root, version: buildInfo.version, arch });
   const archiveStat = await fs.promises.stat(resolvedArchivePath).catch(() => null);
   if (!archiveStat?.isFile()) {
     throw new Error(`No macOS ZIP release archive exists at ${resolvedArchivePath}.`);
   }
 
   const resolvedPackageVersion = normalizePackageVersion(
-    packageVersion || `${rootPackage.version}-preview.0`,
+    packageVersion || buildInfo.version,
   );
   const resolvedArchiveUrl = archiveUrl || pathToFileURL(resolvedArchivePath).href;
   const archiveSha256 = await hashFile(resolvedArchivePath);
@@ -74,7 +88,10 @@ export async function buildTerminalPreviewPackage({
         "README.md",
       ],
       puppyoneTerminalPreview: {
-        appVersion: rootPackage.version,
+        appVersion: buildInfo.version,
+        buildChannel: buildInfo.channel,
+        buildId: buildInfo.buildId,
+        commitSha: buildInfo.commitSha,
         arch,
         archiveUrl: resolvedArchiveUrl,
         archiveBytes: archiveStat.size,
@@ -82,9 +99,9 @@ export async function buildTerminalPreviewPackage({
         allowedArchiveHost: new URL(resolvedArchiveUrl).protocol === "https:"
           ? new URL(resolvedArchiveUrl).hostname
           : undefined,
-        appBundleName: `${rootPackage.build?.productName || "puppyone"}.app`,
+        appBundleName: `${channelPolicy.applicationName}.app`,
         executableRelativePath: `Contents/MacOS/${rootPackage.build?.mac?.executableName || "puppyone"}`,
-        releaseTag: releaseTag || null,
+        releaseTag: releaseTag || canonicalTag,
       },
     };
     await fs.promises.writeFile(
@@ -94,7 +111,7 @@ export async function buildTerminalPreviewPackage({
     await fs.promises.writeFile(
       path.join(packageRoot, "README.md"),
       createReadme({
-        appVersion: rootPackage.version,
+        appVersion: buildInfo.version,
         arch,
         releaseTag,
       }),
@@ -121,7 +138,10 @@ export async function buildTerminalPreviewPackage({
     const artifactPath = path.join(outputDirectory, artifactName);
     const artifactStat = await fs.promises.stat(artifactPath);
     const summary = {
-      appVersion: rootPackage.version,
+      appVersion: buildInfo.version,
+      buildChannel: buildInfo.channel,
+      buildId: buildInfo.buildId,
+      commitSha: buildInfo.commitSha,
       arch,
       archivePath: resolvedArchivePath,
       archiveUrl: resolvedArchiveUrl,
@@ -130,7 +150,7 @@ export async function buildTerminalPreviewPackage({
       packageVersion: resolvedPackageVersion,
       packagePath: artifactPath,
       packageBytes: artifactStat.size,
-      releaseTag: releaseTag || null,
+      releaseTag: releaseTag || canonicalTag,
     };
     await fs.promises.writeFile(
       path.join(outputDirectory, "terminal-preview.json"),
@@ -222,6 +242,7 @@ function parseArguments(argv) {
     if (key === "arch") options.arch = value;
     else if (key === "archive") options.archivePath = value;
     else if (key === "archive-url") options.archiveUrl = value;
+    else if (key === "build-info") options.buildInfoPath = value;
     else if (key === "package-version") options.packageVersion = value;
     else if (key === "release-tag") options.releaseTag = value;
     else if (key === "output") options.outputDirectory = path.resolve(repoRoot, value);

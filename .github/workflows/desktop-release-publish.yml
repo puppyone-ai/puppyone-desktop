@@ -23,6 +23,10 @@ on:
         description: Whether GitHub should publish this as a prerelease
         required: true
         type: boolean
+      publish_github_release:
+        description: Publish the verified draft; false keeps an Internal record collaborator-only
+        required: true
+        type: boolean
       release_name:
         description: Human-readable GitHub Release title
         required: true
@@ -36,8 +40,14 @@ on:
         required: true
         type: boolean
     secrets:
+      CF_ACCESS_CLIENT_ID:
+        required: false
+      CF_ACCESS_CLIENT_SECRET:
+        required: false
       CLOUDFLARE_ACCOUNT_ID:
         required: true
+      PUPPYONE_INTERNAL_RELEASE_TOKEN:
+        required: false
       R2_ACCESS_KEY_ID:
         required: true
       R2_SECRET_ACCESS_KEY:
@@ -62,7 +72,6 @@ jobs:
       AWS_EC2_METADATA_DISABLED: "true"
       AWS_PAGER: ""
       BUNDLE_DIRECTORY: ${{ github.workspace }}/artifacts/desktop-release-bundle
-      CATALOG_KEY: desktop/catalog/releases.json
       PUBLIC_DOWNLOAD_ORIGIN: https://downloads.puppyone.ai
       R2_BUCKET: puppyone-desktop
 
@@ -96,7 +105,13 @@ jobs:
           TAG="$(node -e 'const p=require("node:path"); const m=require(p.resolve(process.argv[1])); process.stdout.write(m.tag)' "${MANIFEST}")"
           VERSION="$(node -e 'const p=require("node:path"); const m=require(p.resolve(process.argv[1])); process.stdout.write(m.version)' "${MANIFEST}")"
           LATEST_PREFIX="${R2_PREFIX%/${TAG}}/latest"
+          if [ "${EXPECTED_CHANNEL}" = "internal" ]; then
+            CATALOG_KEY="desktop/internal/catalog/releases.json"
+          else
+            CATALOG_KEY="desktop/catalog/releases.json"
+          fi
           {
+            echo "catalog_key=${CATALOG_KEY}"
             echo "commit=${COMMIT}"
             echo "latest_prefix=${LATEST_PREFIX}"
             echo "r2_prefix=${R2_PREFIX}"
@@ -171,6 +186,13 @@ jobs:
             --content-type "text/plain; charset=utf-8" \
             --cache-control "public, max-age=31536000, immutable" \
             --only-show-errors
+          if [ -f "${BUNDLE_DIRECTORY}/build-info.json" ]; then
+            aws s3 cp "${BUNDLE_DIRECTORY}/build-info.json" "s3://${R2_BUCKET}/${R2_PREFIX}/build-info.json" \
+              --endpoint-url "${ENDPOINT}" \
+              --content-type "application/json; charset=utf-8" \
+              --cache-control "public, max-age=31536000, immutable" \
+              --only-show-errors
+          fi
 
           # release.json is the commit marker and is deliberately uploaded last.
           aws s3 cp "${BUNDLE_DIRECTORY}/release.json" "s3://${R2_BUCKET}/${R2_PREFIX}/release.json" \
@@ -181,6 +203,9 @@ jobs:
 
       - name: Verify every immutable R2 object by SHA-256
         env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          PUPPYONE_INTERNAL_RELEASE_TOKEN: ${{ secrets.PUPPYONE_INTERNAL_RELEASE_TOKEN }}
           R2_PREFIX: ${{ steps.release.outputs.r2_prefix }}
         run: |
           node scripts/verify-desktop-release-remote.mjs \
@@ -211,6 +236,7 @@ jobs:
         id: github_state
         env:
           GH_TOKEN: ${{ github.token }}
+          PUBLISH_GITHUB_RELEASE: ${{ inputs.publish_github_release }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         shell: bash
         run: |
@@ -234,6 +260,10 @@ jobs:
             --bundle "${BUNDLE_DIRECTORY}" \
             --release-json "${RESPONSE}" \
             --expect-draft "${DRAFT}"
+          if [ "${PUBLISH_GITHUB_RELEASE}" != "true" ] && [ "${DRAFT}" != "true" ]; then
+            echo "Internal GitHub release ${RELEASE_TAG} is public; restricted Internal records must remain drafts." >&2
+            exit 1
+          fi
           {
             echo "draft=${DRAFT}"
             echo "exists=true"
@@ -279,6 +309,9 @@ jobs:
         run: |
           set -euo pipefail
           files=("${BUNDLE_DIRECTORY}"/assets/* "${BUNDLE_DIRECTORY}/release.json" "${BUNDLE_DIRECTORY}/SHA256SUMS")
+          if [ -f "${BUNDLE_DIRECTORY}/build-info.json" ]; then
+            files+=("${BUNDLE_DIRECTORY}/build-info.json")
+          fi
           args=(
             "${RELEASE_TAG}"
             "${files[@]}"
@@ -331,7 +364,7 @@ jobs:
           exit 1
 
       - name: Publish verified GitHub Release
-        if: ${{ steps.github_state.outputs.exists != 'true' || steps.github_state.outputs.draft == 'true' }}
+        if: ${{ inputs.publish_github_release && (steps.github_state.outputs.exists != 'true' || steps.github_state.outputs.draft == 'true') }}
         env:
           GH_TOKEN: ${{ github.token }}
           PRERELEASE: ${{ inputs.prerelease }}
@@ -428,7 +461,10 @@ jobs:
 
       - name: Verify mutable latest payloads by SHA-256
         env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           LATEST_PREFIX: ${{ steps.release.outputs.latest_prefix }}
+          PUPPYONE_INTERNAL_RELEASE_TOKEN: ${{ secrets.PUPPYONE_INTERNAL_RELEASE_TOKEN }}
         run: |
           node scripts/verify-desktop-release-remote.mjs \
             --bundle "${BUNDLE_DIRECTORY}" \
@@ -456,6 +492,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CATALOG_KEY: ${{ steps.release.outputs.catalog_key }}
         shell: bash
         run: |
           set -euo pipefail
@@ -481,6 +518,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CATALOG_KEY: ${{ steps.release.outputs.catalog_key }}
         shell: bash
         run: |
           set -euo pipefail
@@ -493,12 +531,23 @@ jobs:
 
       - name: Verify public pointers and catalog
         env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          CATALOG_KEY: ${{ steps.release.outputs.catalog_key }}
           LATEST_PREFIX: ${{ steps.release.outputs.latest_prefix }}
+          PUPPYONE_INTERNAL_RELEASE_TOKEN: ${{ secrets.PUPPYONE_INTERNAL_RELEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
-          CURL_ARGS=(--fail --location --retry 5 --retry-all-errors --silent --show-error -H "Cache-Control: no-cache")
+          CURL_ARGS=(--fail --location --max-redirs 0 --retry 5 --retry-all-errors --silent --show-error -H "Cache-Control: no-cache")
+          if [ -n "${PUPPYONE_INTERNAL_RELEASE_TOKEN}" ]; then
+            CURL_ARGS+=(-H "Authorization: Bearer ${PUPPYONE_INTERNAL_RELEASE_TOKEN}")
+          fi
+          if [ -n "${CF_ACCESS_CLIENT_ID}" ] && [ -n "${CF_ACCESS_CLIENT_SECRET}" ]; then
+            CURL_ARGS+=(-H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}")
+            CURL_ARGS+=(-H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}")
+          fi
           curl "${CURL_ARGS[@]}" \
             --output "${RUNNER_TEMP}/latest-public.json" \
             "${PUBLIC_DOWNLOAD_ORIGIN}/${LATEST_PREFIX}/latest.json"
@@ -554,6 +603,7 @@ jobs:
 
       - name: Summarize published release
         env:
+          CATALOG_KEY: ${{ steps.release.outputs.catalog_key }}
           LATEST_PREFIX: ${{ steps.release.outputs.latest_prefix }}
           R2_PREFIX: ${{ steps.release.outputs.r2_prefix }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}

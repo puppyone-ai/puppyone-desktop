@@ -2,6 +2,10 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import updaterPackage from "electron-updater";
 import log from "electron-log";
+import {
+  assertDesktopBuildInfo,
+  getDesktopBuildChannelPolicy,
+} from "../shared/desktop-build-identity.mjs";
 
 const UPDATE_STATE_CHANNEL = "updates:state";
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
@@ -16,18 +20,47 @@ const UPDATE_ACTION_STATES = new Set([
   "error",
 ]);
 
+export function resolveDesktopUpdateConfiguration({
+  buildInfo,
+  environment = {},
+  isPackaged,
+}) {
+  const identity = assertDesktopBuildInfo(buildInfo);
+  const policy = getDesktopBuildChannelPolicy(identity.channel);
+  const developmentFeedUrl = !isPackaged && identity.channel === "dev"
+    ? normalizeUpdateFeedUrl(environment.PUPPYONE_DESKTOP_DEV_UPDATE_URL)
+    : null;
+  const developmentOverrideEnabled = Boolean(developmentFeedUrl)
+    && isTruthyEnvironmentValue(environment.PUPPYONE_DESKTOP_FORCE_DEV_UPDATE_CONFIG);
+
+  return Object.freeze({
+    channel: identity.channel,
+    currentVersion: identity.version,
+    updateChannel: policy.updateChannel ?? (developmentOverrideEnabled ? "dev" : null),
+    feedUrl: policy.updateFeedUrl ?? (developmentOverrideEnabled ? developmentFeedUrl : null),
+    allowPrerelease: identity.channel !== "stable",
+    forceDevUpdateConfig: developmentOverrideEnabled,
+  });
+}
+
 export function createUpdateService({
   app,
+  buildInfo,
   ipcMain,
   getWindows,
   getRestartBlockers,
+  environment = process.env,
+  platform = process.platform,
+  autoUpdater = updaterPackage.autoUpdater,
 }) {
-  const { autoUpdater } = updaterPackage;
-  const channel = normalizeUpdateChannel(process.env.PUPPYONE_DESKTOP_UPDATE_CHANNEL);
-  const feedUrl = normalizeUpdateFeedUrl(process.env.PUPPYONE_DESKTOP_UPDATE_URL);
-  const devFeedUrl = normalizeUpdateFeedUrl(process.env.PUPPYONE_DESKTOP_DEV_UPDATE_URL);
-  const forceDevUpdateConfig = isTruthyEnv(process.env.PUPPYONE_DESKTOP_FORCE_DEV_UPDATE_CONFIG) || Boolean(devFeedUrl);
-  const disabledReason = getDisabledReason(app, forceDevUpdateConfig);
+  const configuration = resolveDesktopUpdateConfiguration({
+    buildInfo,
+    environment,
+    isPackaged: app.isPackaged,
+  });
+  const channel = configuration.channel;
+  const currentVersion = configuration.currentVersion;
+  const disabledReason = getDisabledReason(app, configuration, platform);
   const canUseUpdater = !disabledReason;
 
   let startupCheckTimer = null;
@@ -35,8 +68,8 @@ export function createUpdateService({
   let operationPromise = null;
   let latestUpdateInfo = null;
   let state = createInitialUpdateState({
-    app,
     channel,
+    currentVersion,
     disabledReason,
   });
 
@@ -80,7 +113,7 @@ export function createUpdateService({
   function configureLogger() {
     try {
       log.transports.file.level = "info";
-      log.transports.console.level = process.env.PUPPYONE_DESKTOP_UPDATE_LOG_CONSOLE === "1" ? "debug" : false;
+      log.transports.console.level = environment.PUPPYONE_DESKTOP_UPDATE_LOG_CONSOLE === "1" ? "debug" : false;
       autoUpdater.logger = log;
     } catch (error) {
       console.warn("Unable to configure updater logger:", error);
@@ -90,19 +123,19 @@ export function createUpdateService({
   function configureUpdater() {
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = false;
-    autoUpdater.channel = channel;
-    autoUpdater.allowPrerelease = channel !== "stable";
+    autoUpdater.allowPrerelease = configuration.allowPrerelease;
 
-    if (forceDevUpdateConfig) {
+    if (configuration.updateChannel) {
+      autoUpdater.channel = configuration.updateChannel;
+    }
+    if (configuration.forceDevUpdateConfig) {
       autoUpdater.forceDevUpdateConfig = true;
     }
-
-    const overrideFeedUrl = devFeedUrl ?? feedUrl;
-    if (overrideFeedUrl) {
+    if (configuration.feedUrl) {
       autoUpdater.setFeedURL({
         provider: "generic",
-        url: overrideFeedUrl,
-        channel,
+        url: configuration.feedUrl,
+        channel: configuration.updateChannel,
       });
     }
   }
@@ -343,7 +376,7 @@ export function createUpdateService({
     state = {
       ...state,
       ...patch,
-      currentVersion: app.getVersion(),
+      currentVersion,
       channel,
       updatedAt: new Date().toISOString(),
     };
@@ -366,10 +399,10 @@ export function createUpdateService({
   };
 }
 
-function createInitialUpdateState({ app, channel, disabledReason }) {
+function createInitialUpdateState({ channel, currentVersion, disabledReason }) {
   return {
     status: disabledReason ? "disabled" : "idle",
-    currentVersion: app.getVersion(),
+    currentVersion,
     channel,
     availableVersion: null,
     updateInfo: null,
@@ -389,11 +422,14 @@ function shouldCheckBeforeUpdateNow(status) {
     || status === "blocked";
 }
 
-function getDisabledReason(app, forceDevUpdateConfig) {
-  if (!app.isPackaged && !forceDevUpdateConfig) {
-    return "Auto updates are disabled in development builds.";
+function getDisabledReason(app, configuration, platform) {
+  if (configuration.channel === "dev" && !configuration.forceDevUpdateConfig) {
+    return "Auto updates are disabled for Development builds.";
   }
-  if (process.platform === "darwin" && !forceDevUpdateConfig) {
+  if (!app.isPackaged && !configuration.forceDevUpdateConfig) {
+    return "Auto updates are disabled outside a packaged release build.";
+  }
+  if (platform === "darwin" && !configuration.forceDevUpdateConfig) {
     const signatureStatus = getMacCodeSignatureStatus(app);
     if (!signatureStatus.canAutoUpdate) return signatureStatus.reason;
   }
@@ -455,19 +491,13 @@ function getMacAppBundlePath(app) {
   return appBundlePath.toLowerCase().endsWith(".app") ? appBundlePath : executablePath;
 }
 
-function normalizeUpdateChannel(value) {
-  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
-  if (normalized === "beta" || normalized === "internal") return normalized;
-  return "stable";
-}
-
 function normalizeUpdateFeedUrl(value) {
   const normalized = typeof value === "string" ? value.trim() : "";
   if (!normalized) return null;
   return normalized.replace(/\/+$/, "");
 }
 
-function isTruthyEnv(value) {
+function isTruthyEnvironmentValue(value) {
   return value === "1" || value === "true" || value === "yes";
 }
 

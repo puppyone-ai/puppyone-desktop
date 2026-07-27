@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 const externalViewerPacksEnabled = process.argv.includes("--puppyone-external-viewer-packs=1");
 
 contextBridge.exposeInMainWorld("puppyoneDesktop", {
+  getBuildInfo: () => ipcRenderer.invoke("build-info:get"),
   getLocalizationBootstrap: () => ipcRenderer.invoke("localization:get-bootstrap"),
   setLanguagePreference: (preference) => (
     ipcRenderer.invoke("localization:set-language-preference", preference)

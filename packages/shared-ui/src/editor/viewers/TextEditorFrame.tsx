@@ -33,6 +33,11 @@ export type TextEditorFrameProps = {
   defaultMode: EditorMode;
   canEdit: boolean;
   hideSourceView: boolean;
+  /**
+   * The frame scrolls ordinary document surfaces. Structured viewers that
+   * coordinate both axes and sticky panes must explicitly own their viewport.
+   */
+  liveScrollOwner?: "frame" | "viewer";
   /** Keep the editor document canonical and read full source only at save boundaries. */
   sourceSnapshotMode?: boolean;
   renderLive: (content: string, controls: TextEditorControls) => ReactNode;
@@ -47,6 +52,7 @@ export function TextEditorFrame({
   defaultMode,
   canEdit,
   hideSourceView,
+  liveScrollOwner = "frame",
   sourceSnapshotMode = false,
   renderLive,
   renderSource,
@@ -208,11 +214,11 @@ export function TextEditorFrame({
   return (
     <section className="editor-host">
       {mode === "live" ? (
-        <div className="editor-live-surface">
+        <div className="editor-live-surface" data-scroll-owner={liveScrollOwner}>
           {renderLive(sourceSnapshotMode ? editorValue : draft, controls)}
         </div>
       ) : renderSource ? (
-        <div className="editor-live-surface">
+        <div className="editor-live-surface" data-scroll-owner={liveScrollOwner}>
           {renderSource(sourceSnapshotMode ? editorValue : draft, controls)}
         </div>
       ) : (

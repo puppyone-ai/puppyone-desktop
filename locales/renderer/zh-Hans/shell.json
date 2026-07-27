@@ -63,5 +63,11 @@
   "branch.loadingBranches": "正在加载分支",
   "branch.localBranches": "本地分支",
   "branch.remoteBranches": "远程分支",
-  "branch.noBranches": "没有分支"
+  "branch.noBranches": "没有分支",
+  "build.channel.dev": "开发版",
+  "build.channel.internal": "内测版",
+  "build.channel.stable": "正式版",
+  "build.version.title": "{channel} · {version} · 提交 {commit}",
+  "build.copy.action": "复制版本信息",
+  "build.copy.copied": "版本信息已复制"
 }

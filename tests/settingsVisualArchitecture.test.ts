@@ -2,50 +2,64 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("settings visual architecture", () => {
-  it("keeps Language as a first-class Desktop App route between General and Appearance", () => {
+  it("keeps General app-scoped and moves project identity into Local Project", () => {
     const view = source("src/features/settings/SettingsView.tsx");
     const sidebarModel = source("src/features/settings/sidebar/settingsSidebarModel.ts");
     const types = source("src/features/settings/types.ts");
+    const general = source("src/features/settings/main/GeneralSettingsView.tsx");
+    const localProject = source("src/features/settings/main/LocalProjectSettingsView.tsx");
     const language = source("src/features/settings/LanguageSetting.tsx");
-    const appearanceBranch = view.slice(
-      view.indexOf('if (activeSection === "appearance")'),
-      view.indexOf("\n  return (", view.indexOf('if (activeSection === "appearance")')),
-    );
 
-    expect(types).toContain('| "language"');
-    expect(view).toContain('if (activeSection === "language")');
-    expect(appearanceBranch).not.toContain("LanguageSettingsView");
+    expect(types).toContain('"general" | "local-project"');
+    expect(types).not.toContain('| "language"');
+    expect(types).not.toContain('"workspace"');
+    expect(view).toContain('if (activeSection === "general")');
+    expect(view).toContain('if (activeSection === "local-project")');
+    expect(view).not.toContain('activeSection === "language"');
+    expect(general).toContain("<LanguageSettingRow />");
+    expect(general).toContain("<DesktopBuildVersionSettingsRow />");
+    expect(general).toContain("<DesktopUpdateSettingsRow");
+    expect(general).not.toContain("Workspace");
+    expect(general).not.toContain("onUnlinkWorkspace");
+    expect(localProject).toContain("settings.localProject.path");
+    expect(localProject).toContain("onUnlinkWorkspace");
+    expect(localProject).not.toContain("DesktopBuildVersionSettingsRow");
+    expect(localProject).not.toContain("LanguageSettingRow");
 
     const desktopAppItems = sidebarModel.slice(
       sidebarModel.indexOf('id: "desktop-app"'),
-      sidebarModel.indexOf('\n  {\n    id: "workspace"', sidebarModel.indexOf('id: "desktop-app"') + 1),
+      sidebarModel.indexOf('\n  {\n    id: "local-project"', sidebarModel.indexOf('id: "desktop-app"') + 1),
     );
     expectInOrder(desktopAppItems, [
       'labelId: "settings.sidebar.general"',
-      'labelId: "settings.sidebar.language"',
       'labelId: "settings.sidebar.appearance"',
       'labelId: "settings.sidebar.defaultApps"',
       'labelId: "settings.sidebar.editor"',
       'labelId: "settings.sidebar.experimental"',
     ]);
+    expect(desktopAppItems).not.toContain("settings.sidebar.language");
+    expect(sidebarModel).toContain('labelId: "settings.sidebar.localProject"');
+    expect(sidebarModel).toContain('labelId: "settings.sidebar.projectInfo"');
 
-    expect(language).toContain("<SettingsSectionHeader");
     expect(language).toContain("desktop-settings-select desktop-language-setting-select");
     expect(language).toContain("void changeLanguage(nextPreference)");
+    expect(language).not.toContain("<SettingsSectionHeader");
     expect(language).not.toContain("<button");
   });
 
-  it("keeps every supported locale complete for the Language route and page", () => {
+  it("keeps every supported locale complete for General and Local Project", () => {
     const manifest = JSON.parse(source("locales/manifest.json")) as {
       locales: Array<{ locale: string }>;
     };
 
     for (const { locale } of manifest.locales) {
       const catalog = JSON.parse(source(`locales/renderer/${locale}/settings.json`)) as Record<string, string>;
-      expect(catalog["sidebar.language"], locale).toBeTruthy();
+      expect(catalog["sidebar.language"], locale).toBeUndefined();
+      expect(catalog["sidebar.localProject"], locale).toBeTruthy();
+      expect(catalog["sidebar.projectInfo"], locale).toBeTruthy();
+      expect(catalog["general.title"], locale).toBeTruthy();
+      expect(catalog["general.detail"], locale).toBeTruthy();
       for (const key of [
-        "title",
-        "description",
         "selectorLabel",
         "system",
         "changing",
@@ -53,7 +67,36 @@ describe("settings visual architecture", () => {
       ]) {
         expect(catalog[`language.${key}`], `${locale}: settings.language.${key}`).toBeTruthy();
       }
+      for (const key of [
+        "title",
+        "detail",
+        "name",
+        "path",
+        "mode",
+        "modeLocal",
+        "status",
+        "protected",
+        "recentWorkspace",
+        "unlink.title",
+        "unlink.action",
+        "unlink.progress",
+        "unlink.confirm",
+      ]) {
+        expect(catalog[`localProject.${key}`], `${locale}: settings.localProject.${key}`).toBeTruthy();
+      }
     }
+  });
+
+  it("keeps version identity in Settings General and out of every Side Panel placement", () => {
+    const general = source("src/features/settings/main/GeneralSettingsView.tsx");
+    const footer = source("src/features/app-shell/navigation/DesktopSidebarFooterNavigation.tsx");
+    const surface = source("src/features/app-shell/DesktopDataWorkspaceSurface.tsx");
+    const dataShell = source("src/features/data-workspace/data-shell.css");
+
+    expect(general).toContain("<DesktopBuildVersionSettingsRow />");
+    expect(footer).not.toContain("DesktopBuildIdentity");
+    expect(surface).not.toContain("DesktopBuildIdentity");
+    expect(dataShell).not.toContain("desktop-build-identity-badge");
   });
 
   it("offers every loading animation preset from Appearance with localized labels", () => {
@@ -94,6 +137,7 @@ describe("settings visual architecture", () => {
       "EditorSettingsViews.tsx",
       "FileSettingsViews.tsx",
       "GeneralSettingsView.tsx",
+      "LocalProjectSettingsView.tsx",
       "RepositorySettingsViews.tsx",
     ].map((fileName) => source(`src/features/settings/main/${fileName}`)).join("\n");
     const settingsImplementation = `${components}\n${view}\n${workspaceConfig}\n${splitViews}`;
@@ -110,6 +154,7 @@ describe("settings visual architecture", () => {
     for (const detailId of [
       "settings.appearance.detail",
       "settings.general.detail",
+      "settings.localProject.detail",
       "settings.account.detail",
       "settings.editor.detail",
       "settings.experimental.detail",

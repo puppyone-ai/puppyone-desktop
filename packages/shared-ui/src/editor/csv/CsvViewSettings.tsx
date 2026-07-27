@@ -4,19 +4,23 @@ import type { MessageFormatter } from "@puppyone/localization/core";
 import { Settings2 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
-type CsvHeaderSettingsProps = Readonly<{
+type CsvViewSettingsProps = Readonly<{
   direction: "ltr" | "rtl";
-  enabled: boolean;
-  onChange: (enabled: boolean) => void;
+  headerEnabled: boolean;
+  onHeaderChange: (enabled: boolean) => void;
+  onRowNumbersChange: (visible: boolean) => void;
+  rowNumbersVisible: boolean;
   t: MessageFormatter;
 }>;
 
-export function CsvHeaderSettings({
+export function CsvViewSettings({
   direction,
-  enabled,
-  onChange,
+  headerEnabled,
+  onHeaderChange,
+  onRowNumbersChange,
+  rowNumbersVisible,
   t,
-}: CsvHeaderSettingsProps) {
+}: CsvViewSettingsProps) {
   const [open, setOpen] = useState(false);
   const popoverId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -76,21 +80,38 @@ export function CsvHeaderSettings({
           aria-label={t("editor.csv.settings")}
         >
           <label
-            className="csv-table-editor__header-toggle"
+            className="csv-table-editor__view-toggle"
             title={t("editor.csv.header")}
           >
-            <span className="csv-table-editor__header-toggle-label">
+            <span className="csv-table-editor__view-toggle-label">
               {t("editor.csv.headerToggle")}
             </span>
             <input
               type="checkbox"
               role="switch"
-              className="csv-table-editor__header-toggle-input"
-              checked={enabled}
+              className="csv-table-editor__view-toggle-input csv-table-editor__header-toggle-input"
+              checked={headerEnabled}
               aria-label={t("editor.csv.header")}
-              onChange={(event) => onChange(event.currentTarget.checked)}
+              onChange={(event) => onHeaderChange(event.currentTarget.checked)}
             />
-            <span className="csv-table-editor__header-toggle-track" aria-hidden="true" />
+            <span className="csv-table-editor__view-toggle-track" aria-hidden="true" />
+          </label>
+          <label
+            className="csv-table-editor__view-toggle"
+            title={t("editor.csv.rowNumbers")}
+          >
+            <span className="csv-table-editor__view-toggle-label">
+              {t("editor.csv.rowNumbersToggle")}
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              className="csv-table-editor__view-toggle-input csv-table-editor__row-numbers-toggle-input"
+              checked={rowNumbersVisible}
+              aria-label={t("editor.csv.rowNumbers")}
+              onChange={(event) => onRowNumbersChange(event.currentTarget.checked)}
+            />
+            <span className="csv-table-editor__view-toggle-track" aria-hidden="true" />
           </label>
         </div>
       )}

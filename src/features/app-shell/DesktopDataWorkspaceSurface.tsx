@@ -216,9 +216,9 @@ export function DesktopDataWorkspaceSurface({
         explorerSlot={resolvedSurface.id === "data"
           ? undefined
           : <WorkspaceSurfaceOutlet region="sidebar" surface={resolvedSurface} />}
-        explorerFooterSlot={!minimalMode && preferences.sidebarNavigationPlacement === "bottom" ? (
-          <DesktopSidebarFooterNavigation {...navigationCommon} />
-        ) : undefined}
+        explorerFooterSlot={!minimalMode && preferences.sidebarNavigationPlacement === "bottom"
+          ? <DesktopSidebarFooterNavigation {...navigationCommon} />
+          : undefined}
         mainSlot={resolvedSurface.id === "data" || resolvedSurface.content.main == null
           ? undefined
           : <WorkspaceSurfaceOutlet region="main" surface={resolvedSurface} />}

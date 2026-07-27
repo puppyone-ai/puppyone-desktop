@@ -47,6 +47,8 @@
   "csv.headerDescription": "Ändert nur die Darstellung; der CSV-Inhalt bleibt unverändert.",
   "csv.headerRecord": "Kopfzeile; CSV-Datensatz 1",
   "csv.rowNumber": "Datenzeile {row, number}; CSV-Datensatz {record, number}",
+  "csv.rowNumbers": "Zeilennummern anzeigen",
+  "csv.rowNumbersToggle": "Zeilennummern",
   "csv.settings": "CSV-Einstellungen",
   "csv.visibleRows": "{visible, number} von {total, number} Zeilen werden angezeigt",
   "csv.warning.unclosedQuote": "Nicht geschlossenes Anführungszeichen",

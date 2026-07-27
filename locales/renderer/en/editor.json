@@ -47,6 +47,8 @@
   "csv.headerDescription": "Changes display only; CSV content is unchanged.",
   "csv.headerRecord": "Header; CSV record 1",
   "csv.rowNumber": "Data row {row, number}; CSV record {record, number}",
+  "csv.rowNumbers": "Show row numbers",
+  "csv.rowNumbersToggle": "Row numbers",
   "csv.settings": "CSV settings",
   "csv.visibleRows": "Showing {visible, number} of {total, number} rows",
   "csv.warning.unclosedQuote": "Unclosed quote",

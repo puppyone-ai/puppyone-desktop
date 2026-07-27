@@ -17,6 +17,10 @@ import {
 import { initializeWorkspaceEditReview } from "../local-api/edit-review.mjs";
 import { createUpdateService } from "./update-service.mjs";
 import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
+import {
+  configureDesktopApplicationIdentity,
+  loadDesktopBuildInfo,
+} from "./main/build-info-service.mjs";
 import { createEphemeralAgentSessionCache } from "./main/agent/cache/ephemeral-agent-session-cache.mjs";
 import { createAgentQuitCoordinator } from "./main/agent/agent-shutdown.mjs";
 import { createAgentService } from "./main/agent/agent-service.mjs";
@@ -32,8 +36,13 @@ import {
   createApplicationQuitIntent,
   createDocumentSessionCloseCoordinator,
 } from "./main/document-session-close-coordinator.mjs";
+import {
+  createDesktopLaunchIntent,
+  handleSecondInstanceLaunch,
+} from "./main/desktop-launch-intent.mjs";
 import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
+import { registerBuildInfoIpcHandlers } from "./main/ipc/build-info-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
 import { registerCloudPublishIpcHandlers } from "./main/ipc/cloud-publish-ipc.mjs";
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
@@ -80,7 +89,29 @@ const packageMetadata = require("../package.json");
 const projectRoot = path.resolve(__dirname, "..");
 const preloadPath = path.join(__dirname, "preload.cjs");
 const rendererDistPath = path.join(projectRoot, "dist", "index.html");
-const appName = "puppyone";
+const desktopBuildInfo = loadDesktopBuildInfo({
+  app,
+  packageMetadata,
+  projectRoot,
+});
+const desktopApplicationIdentity = configureDesktopApplicationIdentity({
+  app,
+  buildInfo: desktopBuildInfo,
+});
+const appName = desktopApplicationIdentity.applicationName;
+
+// Resolve only core launch data before the single-instance boundary. A
+// duplicate CLI launch must exit before optional subsystems are constructed.
+const initialLaunchIntent = createDesktopLaunchIntent({
+  argv: process.argv,
+  workingDirectory: process.cwd(),
+  isPackaged: app.isPackaged,
+});
+const gotSingleInstanceLock = app.requestSingleInstanceLock(initialLaunchIntent);
+if (!gotSingleInstanceLock) {
+  app.exit(0);
+}
+
 const devServerUrl = process.env.PUPPYONE_DESKTOP_DEV_URL;
 const rendererApplicationUrl = devServerUrl || pathToFileURL(rendererDistPath).toString();
 const viewerPackFeatureProfile = resolveViewerPackFeatureProfile({
@@ -151,12 +182,12 @@ const authorizeWorkspaceRoot = createSenderWorkspaceAuthorization({
   getWorkspaceRootForSender,
 });
 const terminalService = createTerminalService({
-  appVersion: app.getVersion(),
+  appVersion: desktopBuildInfo.version,
   initializeWorkspaceEditReview,
 });
 const agentSessionCache = createEphemeralAgentSessionCache({ app });
 const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
-  appVersion: app.getVersion(),
+  appVersion: desktopBuildInfo.version,
   appPath: app.getAppPath(),
   resourcesPath: process.resourcesPath,
   managedOpenCodeConfigDir: path.join(app.getPath("userData"), "agent-runtime", "opencode", "config"),
@@ -174,7 +205,7 @@ const agentService = createAgentService({
   attachmentStore: agentAttachmentStore,
 });
 const localAgentInventory = createLocalAgentInventory({
-  appVersion: app.getVersion(),
+  appVersion: desktopBuildInfo.version,
   cacheFilePath: path.join(app.getPath("userData"), "agent-runtime-inventory.json"),
 });
 const workspaceWatchService = createWorkspaceWatchService();
@@ -218,16 +249,6 @@ const cloudGitConnectCoordinator = createCloudGitConnectCoordinator({
   operationLease: cloudGitOperationLease,
   secretVault: cloudPublishSecretVault,
 });
-
-app.setName(appName);
-if (process.platform === "win32") {
-  app.setAppUserModelId("ai.puppyone.desktop");
-}
-
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
-if (!gotSingleInstanceLock) {
-  app.exit(0);
-}
 
 async function createWindow(options = {}) {
   await localeService.refreshSystemLanguages();
@@ -376,16 +397,18 @@ function revealWindow(window) {
 }
 
 function revealLastFocusedWindow() {
+  void createOrRevealWindow().catch((error) => {
+    console.error("Unable to reveal the last focused puppyone window:", error);
+  });
+}
+
+async function createOrRevealWindow() {
   const window = getLastFocusedWindow();
   if (window) {
     revealWindow(window);
-    return;
+    return window;
   }
-  void createWindow();
-}
-
-function createOrRevealWindow() {
-  revealLastFocusedWindow();
+  return createWindow();
 }
 
 function getLastFocusedWindow() {
@@ -461,13 +484,16 @@ function setDockMenu() {
   app.dock.setMenu(dockMenu);
 }
 
-app.on("second-instance", (_event, argv) => {
-  const workspacePath = findWorkspacePathArg(argv);
-  if (workspacePath) {
-    void openWorkspaceInNewWindow(workspacePath);
-    return;
-  }
-  createOrRevealWindow();
+app.on("second-instance", (_event, argv, workingDirectory, launchIntent) => {
+  void handleSecondInstanceLaunch({
+    launchIntent,
+    argv,
+    workingDirectory,
+    isPackaged: app.isPackaged,
+    openWorkspaceInNewWindow,
+    revealOrCreateWindow: createOrRevealWindow,
+    reportError: (message, error) => console.error(message, error),
+  });
 });
 
 app.whenReady().then(async () => {
@@ -493,6 +519,7 @@ app.whenReady().then(async () => {
   });
   updateService = createUpdateService({
     app,
+    buildInfo: desktopBuildInfo,
     ipcMain: trustedIpcMain,
     getWindows: () => BrowserWindow.getAllWindows(),
     getRestartBlockers: getUpdateRestartBlockers,
@@ -513,7 +540,7 @@ app.whenReady().then(async () => {
       getOwnerWindow: (ownerWebContentsId) => windowsById.get(ownerWebContentsId) ?? null,
       getMimeType,
       userDataPath: app.getPath("userData"),
-      appVersion: app.getVersion(),
+      appVersion: desktopBuildInfo.version,
       isPackaged: app.isPackaged,
       allowTestKeys: !app.isPackaged && process.env.PUPPYONE_VIEWER_PACK_ALLOW_TEST_KEYS === "1",
       getThemeSnapshot: () => ({
@@ -524,9 +551,9 @@ app.whenReady().then(async () => {
   }
   registerIpcHandlers();
   updateService.start();
-  await createWindow({
-    initialWorkspacePath: await workspaceStateStore.readLastActiveWorkspacePath(),
-  });
+  const initialWorkspacePath = initialLaunchIntent.workspacePath
+    ?? await workspaceStateStore.readLastActiveWorkspacePath();
+  await createWindow({ initialWorkspacePath });
 
   app.on("activate", () => {
     void localeService.refreshSystemLanguages().catch((error) => {
@@ -576,6 +603,10 @@ app.on("before-quit", createAgentQuitCoordinator({
 }));
 
 function registerIpcHandlers() {
+  registerBuildInfoIpcHandlers({
+    ipcMain: trustedIpcMain,
+    buildInfo: desktopBuildInfo,
+  });
   registerLocalizationIpcHandlers({
     ipcMain: trustedIpcMain,
     localeService,
@@ -601,7 +632,7 @@ function registerIpcHandlers() {
   registerSystemIpcHandlers({ ipcMain: trustedIpcMain, shell, setDockIcon });
   registerFeedbackIpcHandlers({
     ipcMain: trustedIpcMain,
-    appVersion: app.getVersion(),
+    appVersion: desktopBuildInfo.version,
   });
   registerMarkdownWebEmbedIpcHandlers({
     ipcMain: trustedIpcMain,
@@ -967,19 +998,4 @@ async function showHomepageForCurrentWindow(sender) {
   void agentService.closeSessionsForWindow(window.webContents.id);
   workspaceWatchService.stopForWindow(window.webContents.id);
   gitMetadataWatchService.stopForWindow(window.webContents.id);
-}
-
-function findWorkspacePathArg(argv) {
-  for (const arg of [...argv].reverse()) {
-    if (typeof arg !== "string" || arg.trim().length === 0) continue;
-    if (isCloudAuthCallbackUrl(arg)) continue;
-    if (arg.startsWith("-")) continue;
-    const candidate = path.resolve(arg);
-    try {
-      if (fs.statSync(candidate).isDirectory()) return candidate;
-    } catch {
-      // Not a local directory argument.
-    }
-  }
-  return null;
 }

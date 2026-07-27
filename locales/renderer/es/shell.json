@@ -63,5 +63,11 @@
   "branch.loadingBranches": "Cargando ramas",
   "branch.localBranches": "Ramas locales",
   "branch.remoteBranches": "Ramas remotas",
-  "branch.noBranches": "No hay ramas"
+  "branch.noBranches": "No hay ramas",
+  "build.channel.dev": "Desarrollo",
+  "build.channel.internal": "Versión interna",
+  "build.channel.stable": "Versión estable",
+  "build.version.title": "{channel} · {version} · commit {commit}",
+  "build.copy.action": "Copiar información de versión",
+  "build.copy.copied": "Información de versión copiada"
 }

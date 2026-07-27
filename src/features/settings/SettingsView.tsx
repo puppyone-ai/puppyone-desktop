@@ -12,13 +12,14 @@ import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements"
 import { useFeatureFlag } from "../flags";
 import { SettingsSectionHeader } from "./components";
 import { ContentFontSetting } from "./ContentFontSetting";
-import { LanguageSettingsView } from "./LanguageSetting";
 import { AccountSettingsView } from "./main/AccountSettingsView";
 import { EditorSettingsView, ExperimentalSettingsView } from "./main/EditorSettingsViews";
 import { DefaultAppsSettingsView, FilesSettingsView } from "./main/FileSettingsViews";
 import { GeneralSettingsView } from "./main/GeneralSettingsView";
+import { LocalProjectSettingsView } from "./main/LocalProjectSettingsView";
 import { InterfacePaletteSettings } from "./main/InterfacePaletteSettings";
 import { InterfaceStyleSetting } from "./main/InterfaceStyleSetting";
+import { CreateNewSettingsView } from "./main/CreateNewSettingsView";
 import { PulseGrid } from "../../components/loading";
 import { CloudHostingSettingsView, GitSettingsView } from "./main/RepositorySettingsViews";
 import type { SettingsViewProps } from "./types";
@@ -44,6 +45,7 @@ export function SettingsView({
   sidebarNavigationVisibilitySettings,
   filesVisibilitySettings,
   externalAppsSettings,
+  createNewMenuSettings,
   experimentalSettings,
   rightSidebarToolsSettings,
   titlebarActionsSettings,
@@ -72,6 +74,7 @@ export function SettingsView({
   onSidebarNavigationVisibilitySettingsChange,
   onFilesVisibilitySettingsChange,
   onExternalAppsSettingsChange,
+  onCreateNewMenuSettingsChange,
   onExperimentalSettingsChange,
   onRightSidebarToolsSettingsChange,
   onTitlebarActionsSettingsChange,
@@ -89,6 +92,25 @@ export function SettingsView({
   const [copiedRemoteKey, setCopiedRemoteKey] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
   const orderedHeaderElements = getOrderedHeaderElementDefinitions(titlebarActionsSettings.order);
+
+  if (activeSection === "general") {
+    return (
+      <GeneralSettingsView
+        updateState={updateState}
+        onCheckForUpdates={onCheckForUpdates}
+        onUpdateNow={onUpdateNow}
+      />
+    );
+  }
+
+  if (activeSection === "local-project") {
+    return (
+      <LocalProjectSettingsView
+        workspace={workspace}
+        onUnlinkWorkspace={onUnlinkWorkspace}
+      />
+    );
+  }
 
   if (activeSection === "account") {
     return (
@@ -164,6 +186,17 @@ export function SettingsView({
     );
   }
 
+  if (activeSection === "new-menu") {
+    return (
+      <CreateNewSettingsView
+        settings={createNewMenuSettings}
+        experimentalSettings={experimentalSettings}
+        fileIconTheme={fileIconTheme}
+        onChange={onCreateNewMenuSettingsChange}
+      />
+    );
+  }
+
   if (activeSection === "experimental") {
     return (
       <ExperimentalSettingsView
@@ -184,10 +217,6 @@ export function SettingsView({
         onDiffMarkersChange={onDiffMarkersChange}
       />
     );
-  }
-
-  if (activeSection === "language") {
-    return <LanguageSettingsView />;
   }
 
   if (activeSection === "appearance") {
@@ -416,13 +445,9 @@ export function SettingsView({
     );
   }
 
-  return (
-    <GeneralSettingsView
-      workspace={workspace}
-      updateState={updateState}
-      onCheckForUpdates={onCheckForUpdates}
-      onUpdateNow={onUpdateNow}
-      onUnlinkWorkspace={onUnlinkWorkspace}
-    />
-  );
+  return assertUnreachableSettingsSection(activeSection);
+}
+
+function assertUnreachableSettingsSection(section: never): never {
+  throw new Error(`Unsupported Settings section: ${String(section)}`);
 }

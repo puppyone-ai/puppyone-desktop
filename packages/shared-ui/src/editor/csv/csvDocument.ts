@@ -119,6 +119,10 @@ export function inferHeaderRow(rows: string[][]): boolean {
   if (!labelsAreHighConfidence || new Set(normalizedLabels).size !== normalizedLabels.length) return false;
 
   const sampleRows = rows.slice(1, 9);
+  const isBlankStarterGrid = sampleRows.length >= 2
+    && sampleRows.every((row) => row.every((cell) => !cell.trim()));
+  if (isBlankStarterGrid) return true;
+
   return firstRow.some((_, columnIndex) => {
     const values = sampleRows
       .map((row) => row[columnIndex]?.trim() ?? "")
