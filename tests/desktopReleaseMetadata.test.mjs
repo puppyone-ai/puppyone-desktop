@@ -50,7 +50,7 @@ describe("desktop release metadata", () => {
 
   it("requires signed, notarized updater-ready artifacts for stable releases", async () => {
     const fixture = await createFixture("0.1.2");
-    const updaterMetadata = path.join(fixture.directory, "latest-mac.yml");
+    const updaterMetadata = path.join(fixture.directory, "stable-mac.yml");
     await fs.writeFile(updaterMetadata, "version: 0.1.2\n");
     const manifest = await createDesktopReleaseManifest({
       ...baseMetadata(),
@@ -73,7 +73,7 @@ describe("desktop release metadata", () => {
     expect(errors).toEqual(expect.arrayContaining([
       expect.stringMatching(/Developer ID signed/),
       expect.stringMatching(/notarized/),
-      expect.stringMatching(/latest-mac\.yml/),
+      expect.stringMatching(/stable-mac\.yml/),
     ]));
   });
 

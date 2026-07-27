@@ -148,7 +148,7 @@ jobs:
         run: |
           set -euo pipefail
           assets=()
-          for pattern in release/puppyone-*.dmg release/puppyone-*.zip release/puppyone-*.blockmap release/latest-mac.yml; do
+          for pattern in release/puppyone-*.dmg release/puppyone-*.zip release/puppyone-*.blockmap release/stable-mac.yml; do
             for file in $pattern; do
               [ -f "${file}" ] && assets+=(--asset "${file}")
             done
