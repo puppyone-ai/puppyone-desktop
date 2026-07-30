@@ -1,8 +1,7 @@
 {
   "title": "Terminal",
   "actions": "Ações do terminal",
-  "clear": "Limpar terminal",
-  "reset": "Redefinir terminal",
+  "restart": "Reiniciar terminal",
   "bridgeUnavailable": "A ponte do terminal não está disponível. Abra este espaço de trabalho no puppyone.",
   "processExitedSignal": "O processo foi encerrado com o sinal {signal}.",
   "processExitedCode": "O processo foi encerrado com o código {code}.",

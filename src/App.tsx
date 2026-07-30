@@ -800,7 +800,6 @@ export function App() {
 
   const titlebarActions = (
     <DesktopTitlebarActions
-      desktopUpdates={desktopUpdates}
       canOpenActiveFileExternal={activeExternalOpen.canOpen}
       activeFileExternalOpenTitle={activeExternalOpen.title}
       activeFileExternalOpenAppName={activeExternalOpen.appName}
@@ -818,17 +817,12 @@ export function App() {
         setRightSidebarOpen(!terminalIsOpen);
         setSwitcherOpen(false);
       }}
-      onClearTerminal={() => terminalPanelRef.current?.clear()}
-      onResetTerminal={() => terminalPanelRef.current?.reset()}
+      onRestartTerminal={() => terminalPanelRef.current?.restart()}
       onToggleAgentChat={() => {
         if (!desktopAgentChatEnabled) return;
         const chatIsOpen = rightSidebarOpen && rightSidebarSurface === "chat";
         setRightSidebarSurface("chat");
         setRightSidebarOpen(!chatIsOpen);
-        setSwitcherOpen(false);
-      }}
-      onUpdateNow={() => {
-        void desktopUpdates.updateNow();
         setSwitcherOpen(false);
       }}
     />

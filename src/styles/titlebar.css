@@ -201,28 +201,6 @@
   animation: spin 900ms linear infinite;
 }
 
-.desktop-update-titlebar-action.available,
-.desktop-update-titlebar-action.downloaded {
-  color: var(--po-accent);
-}
-
-.desktop-update-titlebar-action.blocked,
-.desktop-update-titlebar-action.error {
-  color: var(--po-warning);
-}
-
-.desktop-update-dot {
-  position: absolute;
-  top: 6px;
-  inset-inline-end: 6px;
-  width: 6px;
-  height: 6px;
-  border: 1px solid var(--desktop-titlebar-bg);
-  border-radius: 999px;
-  background: var(--po-accent);
-  pointer-events: none;
-}
-
 .desktop-titlebar-workspace-wrap {
   position: relative;
   display: flex;

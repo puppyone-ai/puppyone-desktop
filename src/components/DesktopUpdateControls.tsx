@@ -70,43 +70,6 @@ export function useDesktopUpdates(): DesktopUpdatesController {
   return { state, checkForUpdates, updateNow };
 }
 
-export function DesktopUpdateTitlebarButton({
-  state,
-  onUpdateNow,
-}: {
-  state: DesktopUpdateState;
-  onUpdateNow: () => void;
-}) {
-  const { t, formatNumber } = useLocalization();
-  const visible = state.status === "available"
-    || state.status === "downloading"
-    || state.status === "downloaded"
-    || state.status === "blocked"
-    || state.status === "error";
-
-  if (!visible) return null;
-
-  const Icon = getUpdateIcon(state.status);
-  const busy = state.status === "checking"
-    || state.status === "downloading"
-    || state.status === "installing";
-  const title = getUpdateTitle(state, t, formatNumber);
-
-  return (
-    <button
-      className={`desktop-titlebar-action desktop-update-titlebar-action ${state.status}`}
-      type="button"
-      title={title}
-      aria-label={title}
-      disabled={busy}
-      onClick={onUpdateNow}
-    >
-      <Icon size={15} className={busy ? "spin" : undefined} />
-      {state.status === "available" && <span className="desktop-update-dot" aria-hidden />}
-    </button>
-  );
-}
-
 export function DesktopUpdateSettingsRow({
   state,
   onCheckForUpdates,
@@ -197,29 +160,6 @@ function getSettingsAction(
     return { kind: "update", label: t("updates.action.tryAgain"), disabled: false, spinning: false, primary: false };
   }
   return { kind: "check", label: t("updates.action.check"), disabled: false, spinning: false, primary: false };
-}
-
-function getUpdateTitle(
-  state: DesktopUpdateState,
-  t: MessageFormatter,
-  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string,
-): string {
-  if (state.status === "available") {
-    return t("updates.title.available", {
-      version: state.availableVersion ?? t("updates.version.new"),
-    });
-  }
-  if (state.status === "downloaded") return t("updates.action.restart");
-  if (state.status === "downloading") {
-    return t("updates.title.downloading", {
-      progress: formatDownloadProgress(state, formatNumber),
-    });
-  }
-  if (state.status === "blocked") {
-    return state.blockers[0]?.label ?? t("updates.title.blocked");
-  }
-  if (state.status === "error") return t("updates.title.failed");
-  return t("updates.title.appUpdate");
 }
 
 function getUpdateDetail(

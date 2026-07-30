@@ -7,6 +7,7 @@ describe("titlebar external-open architecture", () => {
     const actions = source("src/features/app-shell/DesktopTitlebarActions.tsx");
     const app = source("src/App.tsx");
     const titlebarCss = source("src/styles/titlebar.css");
+    const updateControls = source("src/components/DesktopUpdateControls.tsx");
 
     expect(definition).toContain('className="desktop-titlebar-action desktop-titlebar-external-open"');
     expect(definition).toContain("onClick={externalOpen.onOpen}");
@@ -22,6 +23,9 @@ describe("titlebar external-open architecture", () => {
     expect(titlebarCss).toMatch(
       /\.desktop-titlebar-action-divider\s*\{[^}]*height:\s*18px;[^}]*margin-inline:\s*3px;[^}]*background:\s*var\(--desktop-titlebar-divider\);[^}]*\}/s,
     );
+    expect(actions).not.toMatch(/DesktopUpdate|desktopUpdates|onUpdateNow/);
+    expect(updateControls).not.toContain("DesktopUpdateTitlebarButton");
+    expect(titlebarCss).not.toMatch(/desktop-update-titlebar-action|desktop-update-dot/);
   });
 
   it("keeps application choice in Default Apps settings", () => {

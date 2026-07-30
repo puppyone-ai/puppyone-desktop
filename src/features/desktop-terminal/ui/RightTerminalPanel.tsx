@@ -30,8 +30,7 @@ type RightTerminalPanelProps = {
 };
 
 export type RightTerminalPanelHandle = {
-  clear: () => void;
-  reset: () => void;
+  restart: () => void;
 };
 
 type TerminalSize = {
@@ -59,21 +58,13 @@ function RightTerminalPanelComponent(
   const [hasStarted, setHasStarted] = useState(active);
   const [sessionGeneration, setSessionGeneration] = useState(0);
 
-  const handleClearTerminal = useCallback(() => {
-    const terminal = terminalRef.current;
-    if (!terminal) return;
-    terminal.clear();
-    terminal.focus();
-  }, []);
-
-  const handleResetTerminal = useCallback(() => {
+  const handleRestartTerminal = useCallback(() => {
     setSessionGeneration((generation) => generation + 1);
   }, []);
 
   useImperativeHandle(ref, () => ({
-    clear: handleClearTerminal,
-    reset: handleResetTerminal,
-  }), [handleClearTerminal, handleResetTerminal]);
+    restart: handleRestartTerminal,
+  }), [handleRestartTerminal]);
 
   const handleTerminalDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     if (!hasTerminalDroppablePaths(event.dataTransfer)) return;

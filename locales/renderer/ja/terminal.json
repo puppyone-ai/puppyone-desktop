@@ -1,8 +1,7 @@
 {
   "title": "ターミナル",
   "actions": "ターミナル操作",
-  "clear": "ターミナルを消去",
-  "reset": "ターミナルをリセット",
+  "restart": "ターミナルを再起動",
   "bridgeUnavailable": "ターミナルブリッジを利用できません。このワークスペースを puppyone で開いてください。",
   "processExitedSignal": "プロセスはシグナル {signal} で終了しました。",
   "processExitedCode": "プロセスはコード {code} で終了しました。",
