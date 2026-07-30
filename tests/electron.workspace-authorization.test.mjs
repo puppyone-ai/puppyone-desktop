@@ -15,6 +15,7 @@ import {
   resolveCanonicalWorkspaceDirectory,
 } from "../electron/main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "../electron/main/workspace-state-store.mjs";
+import { createSymlinkOrSkip } from "./helpers/symlink-capability.mjs";
 
 let root;
 let otherRoot;
@@ -30,10 +31,10 @@ afterEach(async () => {
 });
 
 describe("sender-bound workspace authorization", () => {
-  it("canonicalizes the assigned root, accepts only an alias of that root, and rejects no-workspace senders", async () => {
+  it("canonicalizes the assigned root, accepts only an alias of that root, and rejects no-workspace senders", async (context) => {
     const aliasParent = await mkdtemp(path.join(os.tmpdir(), "puppyone-auth-alias-"));
     const aliasPath = path.join(aliasParent, "workspace");
-    await symlink(root, aliasPath, "dir");
+    await createSymlinkOrSkip(context, { symlink }, root, aliasPath, "dir");
     try {
       const authorize = createSenderWorkspaceAuthorization({
         fsModule: fs,
@@ -52,11 +53,11 @@ describe("sender-bound workspace authorization", () => {
     }
   });
 
-  it("realpaths working directories and rejects a symlink escaping the workspace", async () => {
+  it("realpaths working directories and rejects a symlink escaping the workspace", async (context) => {
     const inside = path.join(root, "app");
     const escape = path.join(root, "escape");
     await mkdir(inside);
-    await symlink(otherRoot, escape, "dir");
+    await createSymlinkOrSkip(context, { symlink }, otherRoot, escape, "dir");
 
     await expect(resolveCanonicalWorkspaceDirectory(root, inside, {
       fsModule: fs,

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import path from "node:path";
 import {
   ClaudeAgentSdkAdapter,
   formatClaudePrompt,
@@ -15,8 +16,8 @@ describe("Claude Agent SDK runtime adapter", () => {
       "Review",
       "",
       "Authorized context files for this turn:",
-      "- /workspace/src/app.ts",
-      "- /workspace/src",
+      `- ${path.resolve("/workspace/src/app.ts")}`,
+      `- ${path.resolve("/workspace/src")}`,
     ].join("\n"));
   });
 
@@ -98,7 +99,7 @@ describe("Claude Agent SDK runtime adapter", () => {
     expect(sdk.query).toHaveBeenCalledTimes(1);
     expect(controller.query.initializationResult).toHaveBeenCalledTimes(1);
     expect(controller.query.setModel).toHaveBeenCalledWith("claude-sonnet");
-    expect(controller.messages[0].message.content).toContain("/workspace/src/app.ts");
+    expect(controller.messages[0].message.content).toContain(path.resolve("/workspace/src/app.ts"));
     expect(controller.messages[1].message.content).toBe("Second");
     await adapter.dispose();
   });

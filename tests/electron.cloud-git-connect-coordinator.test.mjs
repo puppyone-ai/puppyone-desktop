@@ -187,7 +187,7 @@ describe("main-owned canonical Cloud Git connect", () => {
     });
     expect(abandoned.ok).toBe(true);
     await expect(git(fixture.root, "remote", "get-url", "puppyone")).rejects.toBeTruthy();
-  });
+  }, 20_000);
 });
 
 async function createFixture() {

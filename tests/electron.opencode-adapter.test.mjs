@@ -1,5 +1,7 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   OpenCodeAcpAdapter,
   buildPromptBlocks,
@@ -21,7 +23,7 @@ describe("OpenCode ACP AgentRuntimePort adapter", () => {
       ],
     })).toEqual([
       { type: "text", text: "Inspect" },
-      { type: "resource_link", uri: "file:///workspace/src/app.ts", name: "app.ts", title: "app.ts" },
+      { type: "resource_link", uri: pathToFileURL(path.resolve("/workspace/src/app.ts")).href, name: "app.ts", title: "app.ts" },
       { type: "image", data: image, mimeType: "image/png" },
     ]);
     expect(() => buildPromptBlocks({
@@ -158,7 +160,7 @@ describe("OpenCode ACP AgentRuntimePort adapter", () => {
     await adapter.createSession({ model: "openai/gpt-5", mode: "build" });
     expect(connections[0].options.args).toEqual([
       "acp",
-      "--cwd=/workspace",
+      `--cwd=${path.resolve("/workspace")}`,
       "--hostname=127.0.0.1",
       "--port=0",
       "--pure",

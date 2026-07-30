@@ -6,6 +6,7 @@ import {
   acpWorkspaceFilePolicy,
   createAcpWorkspaceFileSystem,
 } from "../electron/main/agent/security/acp-workspace-files.mjs";
+import { createSymlinkOrSkip } from "./helpers/symlink-capability.mjs";
 
 const roots = [];
 
@@ -24,12 +25,12 @@ describe("ACP workspace file delegate", () => {
     await expect(fs.promises.readFile(path.join(root, "nested", "result.txt"), "utf8")).resolves.toBe("safe");
   });
 
-  it("rejects traversal and symlink escapes for reads, parents and targets", async () => {
+  it("rejects traversal and symlink escapes for reads, parents and targets", async (context) => {
     const root = await temporaryRoot();
     const outside = await temporaryRoot();
     await fs.promises.writeFile(path.join(outside, "secret.txt"), "secret", "utf8");
-    await fs.promises.symlink(path.join(outside, "secret.txt"), path.join(root, "read-link"));
-    await fs.promises.symlink(outside, path.join(root, "write-link"));
+    await createSymlinkOrSkip(context, fs.promises, path.join(outside, "secret.txt"), path.join(root, "read-link"));
+    await createSymlinkOrSkip(context, fs.promises, outside, path.join(root, "write-link"), "dir");
     const delegate = createAcpWorkspaceFileSystem({ workspaceRoot: root });
 
     await expect(delegate.readTextFile({ path: "../secret.txt" })).rejects.toThrow(/workspace/i);

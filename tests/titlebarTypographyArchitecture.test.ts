@@ -1,5 +1,9 @@
-import { readFileSync } from "node:fs";
+import { readFileSync as readRawFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+
+const readFileSync = (file: URL, encoding: "utf8") => (
+  readRawFileSync(file, encoding).replace(/\r\n?/g, "\n")
+);
 
 const titlebarCss = readFileSync(new URL("../src/styles/titlebar.css", import.meta.url), "utf8");
 const tokensCss = readFileSync(new URL("../src/styles/tokens.css", import.meta.url), "utf8");

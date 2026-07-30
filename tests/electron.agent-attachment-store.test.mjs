@@ -6,6 +6,7 @@ import {
   agentAttachmentStoreLimits,
   createAgentAttachmentStore,
 } from "../electron/main/agent/agent-attachment-store.mjs";
+import { createSymlinkOrSkip } from "./helpers/symlink-capability.mjs";
 
 const temporaryRoots = [];
 afterEach(async () => Promise.all(temporaryRoots.splice(0).map((root) => (
@@ -36,20 +37,32 @@ describe("Agent main-owned attachment staging", () => {
 
     const [authorized] = await store.authorize({ ownerId: 7, workspaceRoot: workspace, epoch: "draft-a", references: [draft] });
     expect(authorized.snapshotUrl).toBe(`data:image/png;base64,${original.toString("base64")}`);
-    expect((await fs.promises.stat(authorized.path)).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") {
+      expect((await fs.promises.stat(authorized.path)).mode & 0o777).toBe(0o600);
+    }
     await store.close();
   });
 
-  it("rejects symlinks, directories, oversized files and MIME-extension disagreement", async () => {
+  it("rejects symlinks", async (context) => {
     const root = await temporaryRoot();
     const workspace = await temporaryRoot();
     const regular = path.join(root, "plain.txt");
     const link = path.join(root, "link.txt");
+    await fs.promises.writeFile(regular, "text");
+    await createSymlinkOrSkip(context, fs.promises, regular, link);
+    const store = createAgentAttachmentStore({ rootPath: path.join(root, "staging") });
+    const stage = (sourcePath) => store.stage({ ownerId: 1, workspaceRoot: workspace, epoch: "draft", sourcePaths: [sourcePath] });
+
+    await expect(stage(link)).rejects.toThrow(/non-symbolic-link/i);
+    await store.close();
+  });
+
+  it("rejects directories and oversized files while deriving MIME from content", async () => {
+    const root = await temporaryRoot();
+    const workspace = await temporaryRoot();
     const directory = path.join(root, "folder");
     const oversized = path.join(root, "oversized.bin");
     const fakeImage = path.join(root, "fake.png");
-    await fs.promises.writeFile(regular, "text");
-    await fs.promises.symlink(regular, link);
     await fs.promises.mkdir(directory);
     await fs.promises.writeFile(oversized, "x");
     await fs.promises.truncate(oversized, agentAttachmentStoreLimits.maxReferenceBytes + 1);
@@ -57,7 +70,6 @@ describe("Agent main-owned attachment staging", () => {
     const store = createAgentAttachmentStore({ rootPath: path.join(root, "staging") });
     const stage = (sourcePath) => store.stage({ ownerId: 1, workspaceRoot: workspace, epoch: "draft", sourcePaths: [sourcePath] });
 
-    await expect(stage(link)).rejects.toThrow(/non-symbolic-link/i);
     await expect(stage(directory)).rejects.toThrow(/regular/i);
     await expect(stage(oversized)).rejects.toThrow(/25 MB/i);
     await expect(stage(fakeImage)).resolves.toEqual([expect.objectContaining({ mime: "application/octet-stream" })]);

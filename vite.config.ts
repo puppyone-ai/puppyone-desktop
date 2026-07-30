@@ -87,5 +87,9 @@ export default defineConfig({
   },
   test: {
     exclude: ["archive/**", "node_modules/**", "dist/**", "release/**"],
+    // Windows Git/DOM integration suites contend heavily on filesystem locks
+    // and process startup when Vitest fans out. Keep the default command
+    // deterministic there; Linux CI retains Vitest's normal parallelism.
+    maxWorkers: process.platform === "win32" ? 1 : undefined,
   },
 });

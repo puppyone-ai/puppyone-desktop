@@ -1,6 +1,10 @@
-import { readFileSync } from "node:fs";
+import { readFileSync as readRawFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { getSourceControlPrimaryActionSlot } from "../src/features/source-control/viewModel";
+
+const readFileSync = (file: URL, encoding: "utf8") => (
+  readRawFileSync(file, encoding).replace(/\r\n?/g, "\n")
+);
 
 const viewSource = readFileSync(
   new URL("../src/features/source-control/GitStatusView.tsx", import.meta.url),

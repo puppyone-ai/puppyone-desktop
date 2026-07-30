@@ -336,7 +336,7 @@ describe("sidebar spacing architecture", () => {
 });
 
 function readCss(relativePath: string): string {
-  return readFileSync(new URL(relativePath, import.meta.url), "utf8");
+  return readFileSync(new URL(relativePath, import.meta.url), "utf8").replace(/\r\n?/g, "\n");
 }
 
 function readCssBlock(css: string, selector: string): string {

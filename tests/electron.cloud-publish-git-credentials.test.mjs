@@ -236,7 +236,7 @@ describe("URL-scoped Cloud Git credentials", () => {
         expect(await configValues(root, `credential.${REMOTE}.useHttpPath`)).toEqual(["false", "legacy"]);
       }
     }
-  }, 30_000);
+  }, 60_000);
 });
 
 function isolatedCredentialExec(calls) {

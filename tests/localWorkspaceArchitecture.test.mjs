@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import path from "node:path";
 import {
   classifyLocalFile,
   getMimeType,
@@ -33,7 +34,7 @@ describe("local file-format policy", () => {
 describe("local path policy", () => {
   it("normalizes safe paths and rejects paths outside the workspace", () => {
     expect(normalizeRelativePath("folder/../notes.md")).toBe("notes.md");
-    expect(resolveWorkspacePath("/tmp/project", "docs/readme.md")).toBe("/tmp/project/docs/readme.md");
+    expect(resolveWorkspacePath("/tmp/project", "docs/readme.md")).toBe(path.resolve("/tmp/project/docs/readme.md"));
     expect(() => normalizeRelativePath("../secret.txt")).toThrow(/outside the selected workspace/i);
     expect(() => normalizeRelativePath("/tmp/secret.txt")).toThrow(/outside the selected workspace/i);
   });

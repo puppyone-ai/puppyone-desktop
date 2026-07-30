@@ -110,12 +110,12 @@ describe("Electron Build Identity service", () => {
     })).toEqual({
       applicationId: "ai.puppyone.desktop.internal",
       applicationName: "PuppyOne Internal",
-      userDataPath: "/Users/test/Library/Application Support/puppyone-internal",
+      userDataPath: path.win32.join("/Users/test/Library/Application Support", "puppyone-internal"),
     });
     expect(app.setName).toHaveBeenCalledWith("PuppyOne Internal");
     expect(app.setPath).toHaveBeenCalledWith(
       "userData",
-      "/Users/test/Library/Application Support/puppyone-internal",
+      path.win32.join("/Users/test/Library/Application Support", "puppyone-internal"),
     );
     expect(app.setAppUserModelId).toHaveBeenCalledWith("ai.puppyone.desktop.internal");
   });

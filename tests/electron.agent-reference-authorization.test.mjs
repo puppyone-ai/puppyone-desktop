@@ -7,6 +7,7 @@ import {
   agentReferenceLimits,
   createAgentReferenceBudget,
 } from "../electron/main/agent/agent-reference-authorization.mjs";
+import { createSymlinkOrSkip } from "./helpers/symlink-capability.mjs";
 
 const temporaryRoots = [];
 afterEach(async () => Promise.all(temporaryRoots.splice(0).map((root) => fs.promises.rm(root, { recursive: true, force: true }))));
@@ -34,13 +35,13 @@ describe("Agent attachment and context authorization", () => {
     expect(agentReferenceLimits.maxTotalReferenceBytes).toBe(25 * 1024 * 1024);
   });
 
-  it("resolves relative workspace paths but fails closed for symlinks escaping the workspace", async () => {
+  it("resolves relative workspace paths but fails closed for symlinks escaping the workspace", async (context) => {
     const root = await temporaryRoot();
     const outside = await temporaryRoot();
     const secret = path.join(outside, "secret.txt");
     const link = path.join(root, "escape.txt");
     await fs.promises.writeFile(secret, "secret");
-    await fs.promises.symlink(secret, link);
+    await createSymlinkOrSkip(context, fs.promises, secret, link);
     await fs.promises.writeFile(path.join(root, "relative.txt"), "inside");
     await expect(authorizeAgentReferences({ workspaceRoot: root, references: [{ path: "relative.txt" }] }))
       .resolves.toEqual([expect.objectContaining({ relativePath: "relative.txt", entryType: "file" })]);

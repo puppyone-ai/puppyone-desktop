@@ -8,6 +8,7 @@ import { registerWorkspaceFileIpcHandlers } from "../electron/main/ipc/workspace
 import { createLocalFileCapabilityStore } from "../electron/main/local-file-capabilities.mjs";
 import { parseLocalFileUrl } from "../electron/main/local-file-protocol.mjs";
 import { createSenderWorkspaceAuthorization } from "../electron/main/workspace-authorization.mjs";
+import { createSymlinkOrSkip } from "./helpers/symlink-capability.mjs";
 
 let root;
 let otherRoot;
@@ -53,7 +54,7 @@ describe("workspace file IPC authorization", () => {
     await expect(readFile(path.join(otherRoot, "new.txt"), "utf8")).rejects.toThrow();
   });
 
-  it("uses the sender workspace and accepts a renderer root that resolves to the same directory", async () => {
+  it("uses the sender workspace and accepts a renderer root that resolves to the same directory", async (context) => {
     const { handlers } = createHarness(() => root);
     const event = { sender: { id: 8 } };
     const notePath = path.join(root, "note.txt");
@@ -65,7 +66,7 @@ describe("workspace file IPC authorization", () => {
     const aliasParent = await mkdtemp(path.join(os.tmpdir(), "puppyone-ipc-alias-"));
     const aliasPath = path.join(aliasParent, "workspace");
     try {
-      await symlink(root, aliasPath, "dir");
+      await createSymlinkOrSkip(context, { symlink }, root, aliasPath, "dir");
       const throughAlias = await handlers.get("workspace:read-file")(event, {
         rootPath: aliasPath,
         path: "note.txt",
@@ -175,12 +176,12 @@ describe("workspace file IPC authorization", () => {
     )).rejects.toThrow(/no local workspace is assigned/i);
   });
 
-  it("rejects direct symbolic-link access before revealing or reading the target", async () => {
+  it("rejects direct symbolic-link access before revealing or reading the target", async (context) => {
     const { handlers, shell } = createHarness(() => root);
     const externalFile = path.join(otherRoot, "secret.txt");
     const linkedFile = path.join(root, "linked.txt");
     await writeFile(externalFile, "secret");
-    await symlink(externalFile, linkedFile);
+    await createSymlinkOrSkip(context, { symlink }, externalFile, linkedFile);
 
     const event = { sender: { id: 10 } };
     await expect(handlers.get("workspace:read-file")(
@@ -205,7 +206,7 @@ describe("workspace file IPC authorization", () => {
     expect(await readFile(path.join(root, "source copy.txt"), "utf8")).toBe("inside");
   });
 
-  it("cannot bypass executable confirmation and revalidates after the dialog", async () => {
+  it("cannot bypass executable confirmation and revalidates after the dialog", async (context) => {
     const executablePath = path.join(root, "run.cmd");
     const externalFile = path.join(otherRoot, "replacement.cmd");
     await writeFile(executablePath, "echo safe");
@@ -213,7 +214,7 @@ describe("workspace file IPC authorization", () => {
     const dialog = {
       showMessageBox: vi.fn(async () => {
         await rm(executablePath, { force: true });
-        await symlink(externalFile, executablePath);
+        await createSymlinkOrSkip(context, { symlink }, externalFile, executablePath);
         return { response: 0 };
       }),
     };

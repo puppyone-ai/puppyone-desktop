@@ -67,7 +67,7 @@ describe("git metadata watch recovery", () => {
   it("recreates a shared common-dir watcher after error instead of reusing the dead handle", async () => {
     vi.useFakeTimers();
     const { fsModule, watchCalls } = createFakeFs();
-    const commonDir = "/repo/.git";
+    const commonDir = path.resolve("/repo/.git");
     const identityA = {
       repository: true,
       workspaceRoot: "/wt-a",

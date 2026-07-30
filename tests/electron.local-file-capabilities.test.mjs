@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Readable } from "node:stream";
+import path from "node:path";
 import {
   buildLocalFileCapabilityUrl,
   createLocalFileCapabilityStore,
@@ -9,7 +10,7 @@ import {
   registerLocalFileProtocol,
 } from "../electron/main/local-file-protocol.mjs";
 
-const ROOT = "/workspace";
+const ROOT = path.resolve("/workspace");
 
 describe("local file capability store", () => {
   it("scopes opaque capabilities to one sender, root, and exact file path", () => {
