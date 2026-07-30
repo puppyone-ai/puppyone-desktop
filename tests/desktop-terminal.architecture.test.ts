@@ -11,7 +11,9 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(panel).not.toContain("TerminalSurfaceActions");
     expect(panel).not.toContain("TerminalSurfaceHeader");
     expect(panel).toContain("sessionGeneration");
-    expect(panel).toContain("handleResetTerminal");
+    expect(panel).toContain("handleRestartTerminal");
+    expect(panel).not.toContain("handleClearTerminal");
+    expect(panel).not.toContain("terminal.clear()");
     expect(panel).toContain("useImperativeHandle");
     expect(panel).toContain('import { WebLinksAddon } from "@xterm/addon-web-links"');
     expect(panel).toContain("linkHandler:");
@@ -20,8 +22,9 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(panel).toContain("bridge.openExternalUrl(href)");
     expect(titlebarActions).toContain('aria-haspopup="menu"');
     expect(titlebarActions).toContain('t("terminal.actions")');
-    expect(titlebarActions).toContain('t("terminal.clear")');
-    expect(titlebarActions).toContain('t("terminal.reset")');
+    expect(titlebarActions).toContain('t("terminal.restart")');
+    expect(titlebarActions).not.toContain('t("terminal.clear")');
+    expect(titlebarActions).not.toContain('t("terminal.reset")');
     expect(app).not.toContain("terminalSessionResetToken");
     expect(app).toContain("terminalPanelRef");
     expect(titlebar).not.toContain("Clear Terminal");
@@ -40,12 +43,14 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(globalLayout).not.toContain(".desktop-terminal-");
   });
 
-  it("keeps Terminal and overflow as separate titlebar controls", () => {
+  it("keeps Terminal and restart overflow as separate titlebar controls", () => {
     const titlebarActions = source("src/features/app-shell/DesktopTitlebarActions.tsx");
     const titlebarCss = source("src/styles/titlebar.css");
-    expect(titlebarActions).toContain("TerminalTitlebarActionsMenu");
-    expect(titlebarActions).toContain("onClearTerminal");
-    expect(titlebarActions).toContain("onResetTerminal");
+    expect(titlebarActions).toContain("TerminalTitlebarRestartMenu");
+    expect(titlebarActions).toContain("onRestartTerminal");
+    expect(titlebarActions).not.toContain("onClearTerminal");
+    expect(titlebarActions).not.toContain("onResetTerminal");
+    expect(titlebarActions).not.toContain("DesktopMenuSeparator");
     expect(titlebarActions).toContain("onToggleTerminal");
     expect(titlebarActions).toContain('id: "terminal-menu"');
     expect(titlebarActions).not.toContain("desktop-titlebar-terminal-cluster");

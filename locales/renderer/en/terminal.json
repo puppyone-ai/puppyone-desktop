@@ -1,8 +1,7 @@
 {
   "title": "Terminal",
   "actions": "Terminal actions",
-  "clear": "Clear terminal",
-  "reset": "Reset terminal",
+  "restart": "Restart terminal",
   "bridgeUnavailable": "Terminal bridge unavailable. Open this workspace in puppyone.",
   "processExitedSignal": "Process exited with signal {signal}.",
   "processExitedCode": "Process exited with code {code}.",

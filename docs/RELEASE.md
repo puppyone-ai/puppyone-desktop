@@ -379,8 +379,8 @@ Prepare a Stable release by first publishing and approving an Internal build
 for the exact commit. Then point the exact matching Stable tag at that commit:
 
 ```bash
-git tag v0.1.5
-git push origin v0.1.5
+git tag v0.1.6
+git push origin v0.1.6
 ```
 
 The tag and package version must match exactly. The stable workflow prepares the
@@ -391,7 +391,7 @@ credentials to only the signing/notarization step.
 Local verification is supported:
 
 ```bash
-PUPPYONE_BUILD_NUMBER=1843 PUPPYONE_RELEASE_TAG=v0.1.5 npm run dist:mac:release
+PUPPYONE_BUILD_NUMBER=1843 PUPPYONE_RELEASE_TAG=v0.1.6 npm run dist:mac:release
 ```
 
 Local publication is not supported. Only the tagged GitHub workflow can publish

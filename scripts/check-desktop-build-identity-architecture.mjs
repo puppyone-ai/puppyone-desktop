@@ -138,8 +138,16 @@ if (mainSource.includes("app.getVersion()")) {
 
 const updaterSource = await readText("electron/update-service.mjs");
 requireSource(updaterSource, "getDesktopBuildChannelPolicy", "the updater must derive its feed from channel policy");
-requireSource(updaterSource, "DESKTOP_UPDATE_CHECK_SCHEDULE", "the Stable updater must retain bounded automatic discovery");
-requireSource(updaterSource, "scheduleBackgroundCheck", "the Stable updater must schedule non-overlapping background checks");
+requireSource(
+  updaterSource,
+  'ipcMain.handle("updates:check"',
+  "the Stable updater must retain the Settings-owned manual check command",
+);
+for (const forbidden of ["DESKTOP_UPDATE_CHECK_SCHEDULE", "scheduleBackgroundCheck"]) {
+  if (updaterSource.includes(forbidden)) {
+    errors.push(`the manual-only updater must not retain background discovery through ${forbidden}`);
+  }
+}
 for (const forbidden of [
   "PUPPYONE_DESKTOP_UPDATE_CHANNEL",
   "PUPPYONE_DESKTOP_UPDATE_URL",
@@ -169,12 +177,15 @@ requireSource(
   "<DesktopBuildVersionSettingsRow />",
   "Settings General must own the user-facing Build Identity",
 );
-const titlebarActionsSource = await readText("src/features/app-shell/DesktopTitlebarActions.tsx");
 requireSource(
-  titlebarActionsSource,
-  "<DesktopUpdateTitlebarButton",
-  "actionable Desktop updates must remain visible outside Settings",
+  generalSettingsSource,
+  "<DesktopUpdateSettingsRow",
+  "Settings General must own the user-facing update workflow",
 );
+const titlebarActionsSource = await readText("src/features/app-shell/DesktopTitlebarActions.tsx");
+if (/DesktopUpdate|desktopUpdates|onUpdateNow/.test(titlebarActionsSource)) {
+  errors.push("Desktop update status and actions must not render in the Header");
+}
 const sidebarSources = [
   await readText("src/features/app-shell/DesktopDataWorkspaceSurface.tsx"),
   await readText("src/features/app-shell/navigation/DesktopSidebarFooterNavigation.tsx"),

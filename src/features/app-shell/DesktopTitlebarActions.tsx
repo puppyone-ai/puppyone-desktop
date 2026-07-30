@@ -1,22 +1,14 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
-import { Eraser, MessageSquare, MoreHorizontal, RotateCcw } from "lucide-react";
+import { MessageSquare, MoreHorizontal, RotateCcw } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
 import {
   DesktopMenuItem,
-  DesktopMenuSeparator,
   DesktopMenuSurface,
 } from "../../components/DesktopMenu";
-import {
-  DesktopUpdateTitlebarButton,
-  type useDesktopUpdates,
-} from "../../components/DesktopUpdateControls";
 import { getOrderedHeaderElementDefinitions, type HeaderElementRenderContext } from "./headerElements";
 import type { TitlebarActionsSettings } from "../../preferences";
 
-type DesktopUpdatesController = ReturnType<typeof useDesktopUpdates>;
-
 type DesktopTitlebarActionsProps = {
-  desktopUpdates: DesktopUpdatesController;
   activeFileExternalOpenTitle?: string;
   activeFileExternalOpenAppName?: string | null;
   activeFileExternalOpenIconDataUrl?: string | null;
@@ -28,15 +20,12 @@ type DesktopTitlebarActionsProps = {
   agentChatEnabled: boolean;
   agentChatSidebarOpen: boolean;
   onOpenActiveFileExternal: () => void;
-  onClearTerminal: () => void;
-  onResetTerminal: () => void;
+  onRestartTerminal: () => void;
   onToggleAgentChat: () => void;
   onToggleTerminal: () => void;
-  onUpdateNow: () => void;
 };
 
 export function DesktopTitlebarActions({
-  desktopUpdates,
   activeFileExternalOpenTitle,
   activeFileExternalOpenAppName,
   activeFileExternalOpenIconDataUrl,
@@ -48,11 +37,9 @@ export function DesktopTitlebarActions({
   agentChatEnabled,
   agentChatSidebarOpen,
   onOpenActiveFileExternal,
-  onClearTerminal,
-  onResetTerminal,
+  onRestartTerminal,
   onToggleAgentChat,
   onToggleTerminal,
-  onUpdateNow,
 }: DesktopTitlebarActionsProps) {
   const { t } = useLocalization();
 
@@ -96,9 +83,8 @@ export function DesktopTitlebarActions({
         group,
         id: "terminal-menu",
         node: (
-          <TerminalTitlebarActionsMenu
-            onClear={onClearTerminal}
-            onReset={onResetTerminal}
+          <TerminalTitlebarRestartMenu
+            onRestart={onRestartTerminal}
           />
         ),
       });
@@ -127,10 +113,6 @@ export function DesktopTitlebarActions({
 
   return (
     <>
-      <DesktopUpdateTitlebarButton
-        state={desktopUpdates.state}
-        onUpdateNow={onUpdateNow}
-      />
       {titlebarActionItems.map((item, index) => {
         const previousItem = titlebarActionItems[index - 1];
         return (
@@ -146,12 +128,10 @@ export function DesktopTitlebarActions({
   );
 }
 
-function TerminalTitlebarActionsMenu({
-  onClear,
-  onReset,
+function TerminalTitlebarRestartMenu({
+  onRestart,
 }: {
-  onClear: () => void;
-  onReset: () => void;
+  onRestart: () => void;
 }) {
   const { t } = useLocalization();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -205,15 +185,9 @@ function TerminalTitlebarActionsMenu({
           className="desktop-titlebar-menu desktop-titlebar-terminal-menu"
         >
           <DesktopMenuItem
-            icon={<Eraser size={13} strokeWidth={1.8} />}
-            label={t("terminal.clear")}
-            onClick={() => runAction(onClear)}
-          />
-          <DesktopMenuSeparator />
-          <DesktopMenuItem
             icon={<RotateCcw size={13} strokeWidth={1.8} />}
-            label={t("terminal.reset")}
-            onClick={() => runAction(onReset)}
+            label={t("terminal.restart")}
+            onClick={() => runAction(onRestart)}
           />
         </DesktopMenuSurface>
       )}

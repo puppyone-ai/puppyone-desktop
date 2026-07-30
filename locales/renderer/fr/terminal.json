@@ -1,8 +1,7 @@
 {
   "title": "Terminal",
   "actions": "Actions du terminal",
-  "clear": "Effacer le terminal",
-  "reset": "Réinitialiser le terminal",
+  "restart": "Redémarrer le terminal",
   "bridgeUnavailable": "Pont du terminal indisponible. Ouvrez cet espace de travail dans PuppyOne.",
   "processExitedSignal": "Processus terminé avec le signal {signal}.",
   "processExitedCode": "Processus terminé avec le code {code}.",

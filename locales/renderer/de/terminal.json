@@ -1,8 +1,7 @@
 {
   "title": "Terminal",
   "actions": "Terminalaktionen",
-  "clear": "Terminal leeren",
-  "reset": "Terminal zurücksetzen",
+  "restart": "Terminal neu starten",
   "bridgeUnavailable": "Die Terminal-Bridge ist nicht verfügbar. Öffne diesen Arbeitsbereich in puppyone.",
   "processExitedSignal": "Der Prozess wurde mit Signal {signal} beendet.",
   "processExitedCode": "Der Prozess wurde mit Code {code} beendet.",

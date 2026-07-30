@@ -109,7 +109,7 @@ describe("Desktop updater channel isolation", () => {
     });
   });
 
-  it("checks Stable updates after startup and on a bounded interval while retaining the Settings command", async () => {
+  it("keeps Stable update checks manual and exposes only the Settings command", async () => {
     vi.useFakeTimers();
     let service;
     try {
@@ -133,44 +133,29 @@ describe("Desktop updater channel isolation", () => {
         app: { isPackaged: true },
         autoUpdater,
         buildInfo,
-        checkSchedule: {
-          startupDelayMs: 15_000,
-          startupJitterMs: 0,
-          intervalMs: 4 * 60 * 60 * 1000,
-          intervalJitterMs: 0,
-        },
         getRestartBlockers: () => [],
         getWindows: () => [],
         ipcMain: {
           handle: (channel, handler) => handlers.set(channel, handler),
         },
         platform: "linux",
-        random: () => 0,
       });
 
       service.start();
       service.start();
-      await vi.advanceTimersByTimeAsync(14_999);
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
 
       expect(checkCount).toBe(0);
       expect(service.getState().status).toBe("idle");
-
-      await vi.advanceTimersByTimeAsync(1);
-      expect(checkCount).toBe(1);
-      expect(service.getState().status).toBe("not-available");
-
-      await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000);
-      expect(checkCount).toBe(2);
-
       const checkFromSettings = handlers.get("updates:check");
       expect(checkFromSettings).toBeTypeOf("function");
       await checkFromSettings();
 
-      expect(checkCount).toBe(3);
+      expect(checkCount).toBe(1);
       expect(service.getState().status).toBe("not-available");
       service.dispose();
-      await vi.advanceTimersByTimeAsync(8 * 60 * 60 * 1000);
-      expect(checkCount).toBe(3);
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+      expect(checkCount).toBe(1);
     } finally {
       service?.dispose();
       vi.useRealTimers();

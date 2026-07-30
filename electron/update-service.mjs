@@ -9,13 +9,6 @@ import {
 
 const UPDATE_STATE_CHANNEL = "updates:state";
 
-export const DESKTOP_UPDATE_CHECK_SCHEDULE = Object.freeze({
-  startupDelayMs: 15 * 1000,
-  startupJitterMs: 15 * 1000,
-  intervalMs: 4 * 60 * 60 * 1000,
-  intervalJitterMs: 30 * 60 * 1000,
-});
-
 const UPDATE_ACTION_STATES = new Set([
   "idle",
   "not-available",
@@ -57,8 +50,6 @@ export function createUpdateService({
   environment = process.env,
   platform = process.platform,
   autoUpdater = updaterPackage.autoUpdater,
-  checkSchedule = DESKTOP_UPDATE_CHECK_SCHEDULE,
-  random = Math.random,
 }) {
   const configuration = resolveDesktopUpdateConfiguration({
     buildInfo,
@@ -69,10 +60,7 @@ export function createUpdateService({
   const currentVersion = configuration.currentVersion;
   const disabledReason = getDisabledReason(app, configuration, platform);
   const canUseUpdater = !disabledReason;
-  const schedule = normalizeCheckSchedule(checkSchedule);
 
-  let backgroundCheckTimer = null;
-  let disposed = false;
   let started = false;
   let operationPromise = null;
   let latestUpdateInfo = null;
@@ -97,14 +85,10 @@ export function createUpdateService({
       });
       return;
     }
-
-    scheduleBackgroundCheck(schedule.startupDelayMs, schedule.startupJitterMs);
   }
 
   function dispose() {
-    disposed = true;
-    if (backgroundCheckTimer) clearTimeout(backgroundCheckTimer);
-    backgroundCheckTimer = null;
+    // Updates are manual-only, so the service owns no background timer.
   }
 
   function registerIpcHandlers() {
@@ -207,19 +191,6 @@ export function createUpdateService({
         progress: null,
       });
     });
-  }
-
-  function scheduleBackgroundCheck(baseDelayMs, jitterMs) {
-    if (disposed || !canUseUpdater) return;
-    if (backgroundCheckTimer) clearTimeout(backgroundCheckTimer);
-    const delayMs = baseDelayMs + Math.floor(normalizeRandomValue(random()) * (jitterMs + 1));
-    backgroundCheckTimer = setTimeout(() => {
-      backgroundCheckTimer = null;
-      void checkForUpdates().finally(() => {
-        scheduleBackgroundCheck(schedule.intervalMs, schedule.intervalJitterMs);
-      });
-    }, delayMs);
-    backgroundCheckTimer.unref?.();
   }
 
   async function checkForUpdates() {
@@ -516,37 +487,6 @@ function normalizeUpdateFeedUrl(value) {
 
 function isTruthyEnvironmentValue(value) {
   return value === "1" || value === "true" || value === "yes";
-}
-
-function normalizeCheckSchedule(value) {
-  const schedule = value && typeof value === "object" ? value : {};
-  return Object.freeze({
-    startupDelayMs: normalizeScheduleNumber(
-      schedule.startupDelayMs,
-      DESKTOP_UPDATE_CHECK_SCHEDULE.startupDelayMs,
-    ),
-    startupJitterMs: normalizeScheduleNumber(
-      schedule.startupJitterMs,
-      DESKTOP_UPDATE_CHECK_SCHEDULE.startupJitterMs,
-    ),
-    intervalMs: normalizeScheduleNumber(
-      schedule.intervalMs,
-      DESKTOP_UPDATE_CHECK_SCHEDULE.intervalMs,
-    ),
-    intervalJitterMs: normalizeScheduleNumber(
-      schedule.intervalJitterMs,
-      DESKTOP_UPDATE_CHECK_SCHEDULE.intervalJitterMs,
-    ),
-  });
-}
-
-function normalizeScheduleNumber(value, fallback) {
-  return Number.isSafeInteger(value) && value >= 0 ? value : fallback;
-}
-
-function normalizeRandomValue(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(0.999999999, value));
 }
 
 function normalizeUpdateInfo(info) {
