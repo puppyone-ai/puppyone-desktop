@@ -110,7 +110,7 @@
   .po-sidebar-empty.compact:not(.desktop-git-section-empty)
 )::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: var(--po-scrollbar-thumb);
+  background-color: var(--desktop-sidebar-scrollbar-thumb, var(--po-scrollbar-thumb));
 }
 
 .desktop-git-section-resizer {
@@ -166,12 +166,15 @@ body.desktop-git-sidebar-resizing {
 .desktop-git-changes-scroll::-webkit-scrollbar-thumb,
 .desktop-git-history-scroll::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: var(--po-scrollbar-thumb);
+  background-color: var(--desktop-sidebar-scrollbar-thumb, var(--po-scrollbar-thumb));
 }
 
 .desktop-git-changes-scroll::-webkit-scrollbar-thumb:hover,
 .desktop-git-history-scroll::-webkit-scrollbar-thumb:hover {
-  background: var(--po-scrollbar-thumb-hover);
+  background-color: var(
+    --desktop-sidebar-scrollbar-thumb-hover,
+    var(--po-scrollbar-thumb-hover)
+  );
 }
 
 .desktop-git-sidebar-tabs {
@@ -550,7 +553,7 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-git-remote-preview::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: var(--po-scrollbar-thumb);
+  background-color: var(--desktop-sidebar-scrollbar-thumb, var(--po-scrollbar-thumb));
 }
 
 .desktop-git-operation-error {

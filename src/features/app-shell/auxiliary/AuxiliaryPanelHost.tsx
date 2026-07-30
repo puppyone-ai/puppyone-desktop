@@ -82,6 +82,7 @@ export function AuxiliaryPanelHost({
       {resizable && open && (
         <SidebarResizeHandle
           className="desktop-right-sidebar-resizer"
+          paneEdge
           orientation="vertical"
           label={t("shell.sidebar.resizeAuxiliary")}
           min={minWidth}

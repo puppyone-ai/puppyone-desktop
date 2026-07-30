@@ -290,12 +290,12 @@
 
 .po-editable-table-context-menu.desktop-menu-surface::-webkit-scrollbar-thumb {
   border: 1px solid var(--po-menu-bg);
-  background: var(--po-scrollbar-thumb);
+  background-color: var(--po-scrollbar-thumb);
   background-clip: padding-box;
 }
 
 .po-editable-table-context-menu.desktop-menu-surface::-webkit-scrollbar-thumb:hover {
-  background: var(--po-scrollbar-thumb-hover);
+  background-color: var(--po-scrollbar-thumb-hover);
   background-clip: padding-box;
 }
 

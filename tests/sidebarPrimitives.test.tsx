@@ -52,6 +52,7 @@ describe("Sidebar primitives", () => {
       <SidebarResizeHandle
         label="Resize project sidebar"
         orientation="vertical"
+        paneEdge
         min={220}
         max={520}
         value={320}
@@ -61,6 +62,7 @@ describe("Sidebar primitives", () => {
     const handle = container.querySelector<HTMLElement>('[role="separator"]');
     expect(handle?.getAttribute("aria-valuenow")).toBe("320");
     expect(handle?.getAttribute("aria-orientation")).toBe("vertical");
+    expect(handle?.classList.contains("po-pane-edge-resize-handle")).toBe(true);
 
     act(() => handle?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
     act(() => handle?.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true })));

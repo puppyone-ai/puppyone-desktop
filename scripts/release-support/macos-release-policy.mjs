@@ -1,4 +1,7 @@
-const STABLE_UPDATE_URL = "https://updates.puppyone.ai/desktop/stable/mac/latest";
+import {
+  DESKTOP_RELEASE_BUCKET,
+  DESKTOP_STABLE_UPDATE_FEED_URL,
+} from "../../shared/desktop-distribution-contract.mjs";
 
 export function inspectMacReleaseReadiness({
   packageMetadata,
@@ -41,11 +44,11 @@ export function inspectMacReleaseReadiness({
 
   const stableProvider = publish.find((candidate) => candidate?.provider === "generic");
   if (
-    stableProvider?.url !== STABLE_UPDATE_URL
+    stableProvider?.url !== DESKTOP_STABLE_UPDATE_FEED_URL
     || stableProvider?.channel !== "stable"
     || !String(stableProvider?.url ?? "").startsWith("https://")
   ) {
-    errors.push(`the signed app must embed the stable HTTPS update feed ${STABLE_UPDATE_URL}`);
+    errors.push(`the signed app must embed the stable HTTPS update feed ${DESKTOP_STABLE_UPDATE_FEED_URL}`);
   }
 
   if (env.CSC_IDENTITY_AUTO_DISCOVERY === "false") {
@@ -115,7 +118,7 @@ export function getStableReleaseCoordinates({ packageMetadata, env = process.env
   const version = packageMetadata.version;
   const tag = env.PUPPYONE_RELEASE_TAG || `v${version}`;
   return {
-    bucket: env.R2_BUCKET || "puppyone-desktop",
+    bucket: env.R2_BUCKET || DESKTOP_RELEASE_BUCKET,
     endpoint: `https://${env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
     latestPrefix: "desktop/stable/mac/latest",
     tag,

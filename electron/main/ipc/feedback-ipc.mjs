@@ -1,4 +1,4 @@
-const DEFAULT_FEEDBACK_ENDPOINT = "https://www.puppyone.ai/api/feedback";
+const DEFAULT_FEEDBACK_ENDPOINT = "https://formspree.io/f/mlgqvydy";
 const MAX_FEEDBACK_LENGTH = 2_000;
 const MAX_LOCALE_LENGTH = 80;
 const MAX_SCREENSHOT_BYTES = 3 * 1024 * 1024;
@@ -36,15 +36,22 @@ export function registerFeedbackIpcHandlers({
       throw new Error("Feedback requires a message or screenshot.");
     }
 
+    const normalizedAppVersion = normalizeContextValue(appVersion);
     const body = new FormData();
     body.set("message", message);
-    body.set("appVersion", normalizeContextValue(appVersion));
+    body.set("appVersion", normalizedAppVersion);
     body.set("locale", locale);
     body.set("platform", normalizeContextValue(platform));
-    body.set("website", "");
+    body.set("source", "PuppyOne Desktop");
+    body.set(
+      "subject",
+      `PuppyOne Desktop Feedback · v${normalizedAppVersion || "unknown"}`,
+    );
+    body.set("timestamp", new Date().toISOString());
+    body.set("_gotcha", "");
     if (screenshot) {
       body.set(
-        "screenshot",
+        "attachment",
         new Blob([screenshot.bytes], { type: screenshot.mimeType }),
         SCREENSHOT_FILENAMES.get(screenshot.mimeType),
       );
@@ -55,6 +62,7 @@ export function registerFeedbackIpcHandlers({
       response = await fetchImpl(feedbackEndpoint, {
         method: "POST",
         headers: {
+          accept: "application/json",
           "user-agent": `puppyone-desktop/${normalizeContextValue(appVersion) || "unknown"}`,
         },
         body,
@@ -64,8 +72,7 @@ export function registerFeedbackIpcHandlers({
       throw new Error("The feedback service is unavailable.");
     }
 
-    const result = await response.json().catch(() => null);
-    if (!response.ok || result?.ok !== true) {
+    if (!response.ok) {
       throw new Error("The feedback service could not accept this message.");
     }
 

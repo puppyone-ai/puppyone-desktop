@@ -13,8 +13,8 @@
 }
 
 .desktop-cloud-access-web-detail::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: var(--po-scrollbar-size, 8px);
+  height: var(--po-scrollbar-size, 8px);
 }
 
 .desktop-cloud-access-web-detail::-webkit-scrollbar-track {
@@ -22,9 +22,9 @@
 }
 
 .desktop-cloud-access-web-detail::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: var(--po-scrollbar-thumb);
+  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
+  border-radius: var(--po-scrollbar-radius, 999px);
+  background-color: var(--po-scrollbar-thumb);
   background-clip: padding-box;
 }
 
@@ -168,4 +168,3 @@
   border-radius: 10px;
   background: var(--po-control);
 }
-

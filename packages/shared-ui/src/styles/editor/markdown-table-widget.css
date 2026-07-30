@@ -29,7 +29,7 @@
 }
 
 .markdown-codemirror-editor .cm-md-table-widget-wrap::-webkit-scrollbar {
-  height: 8px;
+  height: var(--po-scrollbar-size, 8px);
 }
 
 .markdown-codemirror-editor .cm-md-table-widget-wrap::-webkit-scrollbar-track,
@@ -38,9 +38,9 @@
 }
 
 .markdown-codemirror-editor .cm-md-table-widget-wrap::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: var(--po-scrollbar-thumb);
+  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
+  border-radius: var(--po-scrollbar-radius, 999px);
+  background-color: var(--po-scrollbar-thumb);
   background-clip: padding-box;
 }
 
@@ -458,12 +458,12 @@
 
 .cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-thumb {
   border: 1px solid var(--po-menu-bg);
-  background: var(--po-scrollbar-thumb);
+  background-color: var(--po-scrollbar-thumb);
   background-clip: padding-box;
 }
 
 .cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-thumb:hover {
-  background: var(--po-scrollbar-thumb-hover);
+  background-color: var(--po-scrollbar-thumb-hover);
   background-clip: padding-box;
 }
 

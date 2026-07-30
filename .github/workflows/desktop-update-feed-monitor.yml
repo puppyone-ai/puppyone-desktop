@@ -1,0 +1,45 @@
+name: Desktop Stable Update Feed Monitor
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-stable-update-feed-monitor
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify shipped Stable update contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout trusted verification code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Verify every shipped Stable update feed
+        id: update_feed
+        run: node scripts/verify-desktop-stable-update-feed.mjs
+
+      - name: Summarize update feed health
+        if: ${{ always() }}
+        env:
+          VERIFY_OUTCOME: ${{ steps.update_feed.outcome }}
+        run: |
+          {
+            echo "### Desktop Stable update feed"
+            echo
+            echo "- Result: ${VERIFY_OUTCOME}"
+            echo "- Machine update origin: https://updates.puppyone.ai/desktop/stable/mac/latest/stable-mac.yml"
+            echo "- Public release pointer: https://downloads.puppyone.ai/desktop/stable/mac/latest/latest.json"
+          } >> "${GITHUB_STEP_SUMMARY}"

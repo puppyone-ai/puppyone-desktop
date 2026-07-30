@@ -102,14 +102,6 @@ h2 {
   background: linear-gradient(270deg, transparent, color-mix(in srgb, var(--po-shadow) 42%, transparent));
 }
 
-[dir="rtl"] .desktop-right-sidebar-resizer {
-  transform: translateX(4px);
-}
-
-[dir="rtl"] .data-explorer-resizer {
-  transform: translateX(-4px);
-}
-
 [dir="rtl"] .po-directional-icon,
 [dir="rtl"] .desktop-cloud-directional-icon {
   transform: scaleX(-1);

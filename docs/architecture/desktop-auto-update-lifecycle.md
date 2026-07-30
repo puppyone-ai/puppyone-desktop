@@ -47,13 +47,19 @@ as `build-info.json` in packaged applications. It controls:
 
 Published workflows do not compose versions independently.
 
+Distribution coordinates are owned separately by
+`shared/desktop-distribution-contract.mjs`. That module defines one R2 bucket,
+the human download origin, the Stable machine-update origin, and an append-only
+registry of feed URLs embedded in shipped Stable builds. Build Identity consumes
+that contract; it does not redefine distribution URLs.
+
 ## Installed Isolation
 
 | Channel | Application ID | User-data owner | Feed |
 |---|---|---|---|
 | `dev` | `ai.puppyone.desktop.dev` | `puppyone-development` | none |
-| `internal` | `ai.puppyone.desktop.internal` | `puppyone-internal` | `/desktop/internal/mac/latest` |
-| `stable` | `ai.puppyone.desktop` | `puppyone` | `/desktop/stable/mac/latest` |
+| `internal` | `ai.puppyone.desktop.internal` | `puppyone-internal` | `downloads.puppyone.ai/desktop/internal/mac/latest` |
+| `stable` | `ai.puppyone.desktop` | `puppyone` | `updates.puppyone.ai/desktop/stable/mac/latest` |
 
 Application identity is configured before the single-instance lock and before
 services read `userData`. Internal and Stable can therefore be installed and
@@ -91,6 +97,25 @@ The updater receives Build Identity through dependency injection and resolves
 the feed from the fixed channel policy. Packaged builds ignore
 `PUPPYONE_DESKTOP_UPDATE_CHANNEL` and generic feed overrides.
 
+Signed Stable builds discover updates automatically but never download or
+restart automatically:
+
+1. the first check runs 15 seconds after startup plus up to 15 seconds of jitter
+2. subsequent checks run four hours after the prior check completes plus up to
+   30 minutes of jitter
+3. only one check/download/install operation may be in flight
+4. closing the application cancels the pending timer
+
+Jitter prevents all installed clients from hitting the feed at once after a
+release or common workday start. Recursive one-shot timers avoid overlapping
+checks when a network request is slow.
+
+`autoDownload` and `autoInstallOnAppQuit` remain disabled. Discovery changes
+main-process state only. An actionable update appears in the titlebar and in
+**Settings → General → App updates**; the user chooses when to download and
+restart. Settings also retains an explicit manual check. There is no forced
+download, forced restart, or system notification.
+
 The only override is an explicit unpackaged Development test:
 
 ```text
@@ -109,6 +134,11 @@ without adding another channel.
 Stable requires Developer ID signing, hardened runtime, notarization, stapling,
 Gatekeeper acceptance, a ZIP payload, and the channel-specific
 `stable-mac.yml` updater metadata.
+
+The Stable feed is a shipped API, not a replaceable website link. Every feed URL
+ever embedded in a supported Stable build remains in
+`DESKTOP_SHIPPED_STABLE_UPDATE_CONTRACTS`. New releases and the scheduled
+monitor verify all registered endpoints.
 
 ## Update State Machine
 
@@ -173,6 +203,17 @@ Stable is source promotion, not byte promotion. The workflow:
 Internal and Stable use the same canonical publisher. Immutable R2 objects and
 GitHub assets are verified before mutable latest pointers and the catalog.
 
+Stable publication additionally:
+
+1. verifies the current installed-client feed before any external write
+2. promotes each object once into the shared R2 bucket
+3. verifies mutable bytes through both the download and machine-update origins
+4. publishes `latest.json`
+5. checks metadata/pointer version equality and exact payload byte-range support
+
+`.github/workflows/desktop-update-feed-monitor.yml` repeats the read-only
+contract check every six hours, independent of release events.
+
 Internal GitHub records remain drafts in this public repository. R2 authorization
 must be enforced by Cloudflare Access or another authenticated distribution
 boundary; an obscure path or prerelease label is not access control.
@@ -193,7 +234,14 @@ npm run build
 
 Key tests cover resolver validation, application/profile/feed isolation,
 packaged metadata inspection, renderer presentation, updater feed pinning,
-release-manifest equality, and exact-commit Stable promotion.
+automatic scheduling, release-manifest equality, dual-origin publication
+gates, byte-range behavior, and exact-commit Stable promotion.
+
+The production endpoint can be checked without publishing:
+
+```bash
+node scripts/verify-desktop-stable-update-feed.mjs
+```
 
 ## Invariants
 
@@ -202,7 +250,12 @@ release-manifest equality, and exact-commit Stable promotion.
 - Development never uses a product update feed.
 - Internal never resolves the Stable feed.
 - Stable never resolves the Internal feed.
+- A feed embedded in a shipped Stable build remains a supported compatibility
+  endpoint.
+- Background discovery never downloads or restarts without a user action.
 - Packaged version, Build Identity, artifact version, release version, and tag
   agree.
+- The website latest pointer and every shipped Stable feed report the same
+  version.
 - Stable always references verified Internal evidence for the same commit.
 - Published versioned objects are immutable; recovery uses a higher version.

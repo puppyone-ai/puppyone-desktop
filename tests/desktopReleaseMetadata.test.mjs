@@ -112,6 +112,48 @@ describe("desktop release metadata", () => {
     expect(() => mergeReleaseCatalog(catalog, conflicting)).toThrow(/different immutable release/);
   });
 
+  it("enforces channel-specific catalogs and removes legacy channel pollution", async () => {
+    const fixture = await createFixture();
+    const internal = await internalManifest(fixture.assets);
+    const internalCatalog = mergeReleaseCatalog(
+      null,
+      internal,
+      "2026-07-24T12:30:00.000Z",
+      ["internal"],
+    );
+
+    const archive = await createDesktopReleaseManifest({
+      ...baseMetadata(),
+      assetPaths: [fixture.assets[1]],
+      channel: "archive",
+      commitSha: null,
+      developerIdSigned: false,
+      notarized: false,
+      prerelease: false,
+      provenance: "archive",
+      r2Prefix: "desktop/archive/mac/v0.1.0-legacy.0",
+      tag: "v0.1.0-legacy.0",
+      version: "0.1.0",
+      workflowRunUrl: null,
+    });
+    const publicCatalog = mergeReleaseCatalog(
+      internalCatalog,
+      archive,
+      "2026-07-24T12:31:00.000Z",
+      ["stable", "archive"],
+    );
+
+    expect(publicCatalog.releases.map((release) => release.tag)).toEqual([
+      "v0.1.0-legacy.0",
+    ]);
+    expect(() => mergeReleaseCatalog(
+      publicCatalog,
+      internal,
+      "2026-07-24T12:32:00.000Z",
+      ["stable", "archive"],
+    )).toThrow(/not allowed in this catalog/);
+  });
+
   it("rejects non-canonical timestamps and credential-bearing release URLs", async () => {
     const fixture = await createFixture();
     const manifest = await internalManifest(fixture.assets);

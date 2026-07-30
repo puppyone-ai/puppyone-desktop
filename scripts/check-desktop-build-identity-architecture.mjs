@@ -8,6 +8,15 @@ import {
   getDesktopBuildChannelPolicy,
   resolveDesktopBuildIdentity,
 } from "../shared/desktop-build-identity.mjs";
+import {
+  DESKTOP_INTERNAL_UPDATE_FEED_URL,
+  DESKTOP_PUBLIC_DOWNLOAD_ORIGIN,
+  DESKTOP_SHIPPED_STABLE_UPDATE_CONTRACTS,
+  DESKTOP_STABLE_LATEST_POINTER_URL,
+  DESKTOP_STABLE_UPDATE_ORIGIN,
+  DESKTOP_STABLE_UPDATE_FEED_URL,
+  DESKTOP_SUPPORTED_STABLE_UPDATE_FEED_URLS,
+} from "../shared/desktop-distribution-contract.mjs";
 import { createDesktopElectronBuilderConfig } from "./release-support/desktop-build-preparation.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -28,11 +37,51 @@ for (const field of ["applicationId", "applicationName", "userDataName"]) {
 if (getDesktopBuildChannelPolicy("dev").updateFeedUrl !== null) {
   errors.push("Development builds must not have a product update feed");
 }
-if (!getDesktopBuildChannelPolicy("internal").updateFeedUrl?.includes("/internal/")) {
-  errors.push("Internal builds must use the Internal update feed");
+if (getDesktopBuildChannelPolicy("internal").updateFeedUrl !== DESKTOP_INTERNAL_UPDATE_FEED_URL) {
+  errors.push("Internal builds must use the canonical Internal distribution feed");
 }
-if (!getDesktopBuildChannelPolicy("stable").updateFeedUrl?.includes("/stable/")) {
-  errors.push("Stable builds must use the Stable update feed");
+if (getDesktopBuildChannelPolicy("stable").updateFeedUrl !== DESKTOP_STABLE_UPDATE_FEED_URL) {
+  errors.push("Stable builds must use the permanent Stable machine update feed");
+}
+if (!DESKTOP_SUPPORTED_STABLE_UPDATE_FEED_URLS.includes(DESKTOP_STABLE_UPDATE_FEED_URL)) {
+  errors.push("the canonical Stable feed must remain in the shipped-feed compatibility registry");
+}
+if (
+  DESKTOP_PUBLIC_DOWNLOAD_ORIGIN === DESKTOP_STABLE_UPDATE_ORIGIN
+  || new URL(DESKTOP_STABLE_LATEST_POINTER_URL).origin !== DESKTOP_PUBLIC_DOWNLOAD_ORIGIN
+  || new URL(DESKTOP_STABLE_UPDATE_FEED_URL).origin !== DESKTOP_STABLE_UPDATE_ORIGIN
+) {
+  errors.push("human download and Stable machine-update origins must retain separate roles");
+}
+if (
+  new Set(DESKTOP_SUPPORTED_STABLE_UPDATE_FEED_URLS).size
+  !== DESKTOP_SUPPORTED_STABLE_UPDATE_FEED_URLS.length
+) {
+  errors.push("the shipped Stable feed compatibility registry must not contain duplicates");
+}
+for (const contract of DESKTOP_SHIPPED_STABLE_UPDATE_CONTRACTS) {
+  if (
+    !/^\d+\.\d+\.\d+$/.test(contract.introducedInVersion)
+    || new URL(contract.feedUrl).protocol !== "https:"
+  ) {
+    errors.push("every shipped Stable feed contract must declare an HTTPS URL and release version");
+  }
+}
+if (
+  !DESKTOP_SHIPPED_STABLE_UPDATE_CONTRACTS.some(({ introducedInVersion, feedUrl }) => (
+    introducedInVersion === "0.1.4" && feedUrl === DESKTOP_STABLE_UPDATE_FEED_URL
+  ))
+) {
+  errors.push("the shipped v0.1.4 Stable feed contract must remain registered");
+}
+const configuredStableProvider = packageMetadata.build?.publish?.find?.(
+  (provider) => provider?.provider === "generic",
+);
+if (
+  configuredStableProvider?.url !== DESKTOP_STABLE_UPDATE_FEED_URL
+  || configuredStableProvider?.channel !== "stable"
+) {
+  errors.push("package.json must embed the canonical Stable machine update feed");
 }
 
 const identities = {
@@ -89,6 +138,8 @@ if (mainSource.includes("app.getVersion()")) {
 
 const updaterSource = await readText("electron/update-service.mjs");
 requireSource(updaterSource, "getDesktopBuildChannelPolicy", "the updater must derive its feed from channel policy");
+requireSource(updaterSource, "DESKTOP_UPDATE_CHECK_SCHEDULE", "the Stable updater must retain bounded automatic discovery");
+requireSource(updaterSource, "scheduleBackgroundCheck", "the Stable updater must schedule non-overlapping background checks");
 for (const forbidden of [
   "PUPPYONE_DESKTOP_UPDATE_CHANNEL",
   "PUPPYONE_DESKTOP_UPDATE_URL",
@@ -117,6 +168,12 @@ requireSource(
   generalSettingsSource,
   "<DesktopBuildVersionSettingsRow />",
   "Settings General must own the user-facing Build Identity",
+);
+const titlebarActionsSource = await readText("src/features/app-shell/DesktopTitlebarActions.tsx");
+requireSource(
+  titlebarActionsSource,
+  "<DesktopUpdateTitlebarButton",
+  "actionable Desktop updates must remain visible outside Settings",
 );
 const sidebarSources = [
   await readText("src/features/app-shell/DesktopDataWorkspaceSurface.tsx"),

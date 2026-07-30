@@ -224,8 +224,10 @@ function GitHistoryPanel({
   const beginTreeResize = usePaneResizeDrag({
     bodyClassName: "desktop-history-resizing",
     onDragStart: (event) => {
-      const treeElement = event.currentTarget.parentElement;
-      const startWidth = treeElement?.getBoundingClientRect().width ?? treeWidth ?? HISTORY_TREE_DEFAULT_WIDTH;
+      const treeElement = event.currentTarget.previousElementSibling;
+      const startWidth = treeElement instanceof HTMLElement
+        ? treeElement.getBoundingClientRect().width
+        : treeWidth ?? HISTORY_TREE_DEFAULT_WIDTH;
       const startX = event.clientX;
       const maxWidth = Math.min(
         HISTORY_TREE_MAX_WIDTH,
@@ -265,10 +267,12 @@ function GitHistoryPanel({
   }
 
   return (
-    <section className="desktop-utility-view desktop-history-detail-view desktop-history-panel">
+    <section
+      className="desktop-utility-view desktop-history-detail-view desktop-history-panel"
+      style={getHistoryTreeStyle(treeWidth)}
+    >
       <aside
         className="desktop-history-panel-tree"
-        style={getHistoryTreeStyle(treeWidth)}
         aria-label={t("source-control.history.ariaLabel")}
       >
         <VirtualSidebarList
@@ -289,21 +293,22 @@ function GitHistoryPanel({
             />
           )}
         />
-        <SidebarResizeHandle
-          className="desktop-history-panel-tree-resizer"
-          label={t("source-control.history.resizeAriaLabel")}
-          orientation="vertical"
-          min={HISTORY_TREE_MIN_WIDTH}
-          max={HISTORY_TREE_MAX_WIDTH}
-          value={treeWidth ?? HISTORY_TREE_DEFAULT_WIDTH}
-          title={t("source-control.history.resizeTitle")}
-          onPointerDown={beginTreeResize}
-          onKeyboardResize={resizeTreeByKeyboard}
-          onDoubleClick={() => setTreeWidth(null)}
-        >
-          <GripVertical size={12} aria-hidden="true" />
-        </SidebarResizeHandle>
       </aside>
+      <SidebarResizeHandle
+        className="desktop-history-panel-tree-resizer"
+        paneEdge
+        label={t("source-control.history.resizeAriaLabel")}
+        orientation="vertical"
+        min={HISTORY_TREE_MIN_WIDTH}
+        max={HISTORY_TREE_MAX_WIDTH}
+        value={treeWidth ?? HISTORY_TREE_DEFAULT_WIDTH}
+        title={t("source-control.history.resizeTitle")}
+        onPointerDown={beginTreeResize}
+        onKeyboardResize={resizeTreeByKeyboard}
+        onDoubleClick={() => setTreeWidth(null)}
+      >
+        <GripVertical size={12} aria-hidden="true" />
+      </SidebarResizeHandle>
       <div className="desktop-history-panel-detail">
         <div className="desktop-history-detail-scroll">
           {selectedCommit ? (

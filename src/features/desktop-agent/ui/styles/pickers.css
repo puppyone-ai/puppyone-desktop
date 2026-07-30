@@ -121,8 +121,6 @@
   overflow-x: hidden;
   overflow-y: auto;
   padding: 6px;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
-  scrollbar-width: thin;
 }
 .desktop-agent-picker-option {
   display: grid;

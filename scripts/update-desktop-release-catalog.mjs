@@ -18,7 +18,13 @@ try {
   const existing = existingPath == null
     ? null
     : await readOptionalJson(path.resolve(existingPath));
-  const catalog = mergeReleaseCatalog(existing, manifest, option(args, "generated-at") ?? new Date().toISOString());
+  const allowedChannels = parseChannels(option(args, "channels"));
+  const catalog = mergeReleaseCatalog(
+    existing,
+    manifest,
+    option(args, "generated-at") ?? new Date().toISOString(),
+    allowedChannels,
+  );
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   await fs.writeFile(outputPath, jsonFile(catalog));
   console.log(`Catalog now contains ${catalog.releases.length} release(s); newest is ${catalog.releases[0]?.tag ?? "none"}.`);
@@ -55,4 +61,11 @@ function required(args, key) {
 
 function option(args, key) {
   return args.get(key);
+}
+
+function parseChannels(value) {
+  if (value == null) return null;
+  const channels = value.split(",").map((channel) => channel.trim()).filter(Boolean);
+  if (channels.length === 0) throw new Error("--channels must contain at least one channel");
+  return channels;
 }

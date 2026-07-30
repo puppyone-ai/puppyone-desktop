@@ -7,6 +7,7 @@ import {
   inspectLegacyArchiveWorkflow,
   inspectReleasePublisherWorkflow,
   inspectStableReleaseWorkflow,
+  inspectUpdateFeedMonitorWorkflow,
 } from "../scripts/release-support/internal-release-workflow-policy.mjs";
 import {
   getStableReleaseCoordinates,
@@ -181,6 +182,34 @@ describe("desktop release publisher workflow", () => {
       "the final GitHub release verification must receive the caller's draft/public policy explicitly",
     );
   });
+
+  it("requires every machine-origin verification stage to remain Stable-only", () => {
+    const workflow = readFileSync(
+      new URL("../.github/workflows/desktop-release-publish.yml", import.meta.url),
+      "utf8",
+    ).replace(
+      "      - name: Verify existing Stable update origin before publication\n        if: ${{ inputs.channel == 'stable' }}",
+      "      - name: Verify existing Stable update origin before publication",
+    );
+
+    expect(inspectReleasePublisherWorkflow(workflow)).toContain(
+      'the "Verify existing Stable update origin before publication" stage must run only for Stable publication',
+    );
+  });
+
+  it("keeps the distribution preflight read-only and ahead of deployment authority", () => {
+    const workflow = readFileSync(
+      new URL("../.github/workflows/desktop-release-publish.yml", import.meta.url),
+      "utf8",
+    ).replace(
+      "    permissions:\n      contents: read",
+      "    permissions:\n      contents: write",
+    );
+
+    expect(inspectReleasePublisherWorkflow(workflow)).toContain(
+      "the distribution preflight must override publication authority with a read-only token",
+    );
+  });
 });
 
 describe("desktop legacy archive workflow", () => {
@@ -190,5 +219,21 @@ describe("desktop legacy archive workflow", () => {
       "utf8",
     );
     expect(inspectLegacyArchiveWorkflow(workflow)).toEqual([]);
+  });
+});
+
+describe("desktop Stable update feed monitor workflow", () => {
+  it("checks every shipped feed on a schedule without deployment authority", () => {
+    const workflow = readFileSync(
+      new URL("../.github/workflows/desktop-update-feed-monitor.yml", import.meta.url),
+      "utf8",
+    );
+    expect(inspectUpdateFeedMonitorWorkflow(workflow)).toEqual([]);
+    expect(inspectUpdateFeedMonitorWorkflow(
+      workflow.replace("permissions:\n  contents: read", "permissions:\n  contents: write"),
+    )).toEqual(expect.arrayContaining([
+      expect.stringMatching(/read-only token/),
+      expect.stringMatching(/must not receive repository write permission/),
+    ]));
   });
 });
