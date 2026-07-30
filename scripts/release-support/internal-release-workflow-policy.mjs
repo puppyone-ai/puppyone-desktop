@@ -2,6 +2,7 @@ const PINNED_ACTION_PATTERN = /uses:\s+actions\/[A-Za-z0-9_.-]+@[a-f0-9]{40}(?:\
 const UNPINNED_ACTION_PATTERN = /uses:\s+actions\/[A-Za-z0-9_.-]+@(?![a-f0-9]{40}(?:\s|$))[^ \n]+/g;
 
 export function inspectContinuousIntegrationWorkflow(workflowSource) {
+  workflowSource = normalizeWorkflowSource(workflowSource);
   const errors = inspectSource(workflowSource, "continuous integration workflow");
   if (errors.length > 0) return errors;
   requireSnippets(workflowSource, errors, [
@@ -26,6 +27,7 @@ export function inspectContinuousIntegrationWorkflow(workflowSource) {
 }
 
 export function inspectInternalReleaseWorkflow(workflowSource) {
+  workflowSource = normalizeWorkflowSource(workflowSource);
   const errors = inspectSource(workflowSource, "internal release workflow");
   if (errors.length > 0) return errors;
   requireSnippets(workflowSource, errors, [
@@ -72,6 +74,7 @@ export function inspectInternalReleaseWorkflow(workflowSource) {
 }
 
 export function inspectStableReleaseWorkflow(workflowSource) {
+  workflowSource = normalizeWorkflowSource(workflowSource);
   const errors = inspectSource(workflowSource, "stable release workflow");
   if (errors.length > 0) return errors;
   requireSnippets(workflowSource, errors, [
@@ -113,6 +116,7 @@ export function inspectStableReleaseWorkflow(workflowSource) {
 }
 
 export function inspectReleasePublisherWorkflow(workflowSource) {
+  workflowSource = normalizeWorkflowSource(workflowSource);
   const errors = inspectSource(workflowSource, "release publisher workflow");
   if (errors.length > 0) return errors;
   requireSnippets(workflowSource, errors, [
@@ -179,6 +183,7 @@ export function inspectReleasePublisherWorkflow(workflowSource) {
 }
 
 export function inspectLegacyArchiveWorkflow(workflowSource) {
+  workflowSource = normalizeWorkflowSource(workflowSource);
   const errors = inspectSource(workflowSource, "legacy archive workflow");
   if (errors.length > 0) return errors;
   requireSnippets(workflowSource, errors, [
@@ -216,6 +221,10 @@ export function inspectLegacyArchiveWorkflow(workflowSource) {
 
 function inspectSource(source, label) {
   return typeof source === "string" && source.trim().length > 0 ? [] : [`the ${label} is missing or empty`];
+}
+
+function normalizeWorkflowSource(source) {
+  return typeof source === "string" ? source.replace(/\r\n?/g, "\n") : source;
 }
 
 function requireSnippets(source, errors, requirements) {

@@ -354,7 +354,12 @@ describe("workspace config containment", () => {
   it("rejects a symlinked config directory instead of reading or writing outside", async () => {
     await mkdir(path.join(external, "config-target"));
     await writeFile(path.join(external, "config-target", "config.json"), '{"project":{"name":"secret"}}');
-    await symlink(path.join(external, "config-target"), path.join(root, ".puppyone"));
+    try {
+      await symlink(path.join(external, "config-target"), path.join(root, ".puppyone"));
+    } catch (error) {
+      if (process.platform === "win32" && error?.code === "EPERM") return;
+      throw error;
+    }
 
     await expect(readPuppyoneWorkspaceConfig(root)).rejects.toThrow(/real directory/i);
     await expect(writePuppyoneWorkspaceConfig(root, { version: 1 })).rejects.toThrow(/real directory/i);
@@ -551,7 +556,9 @@ describe("copyWorkspaceEntry", () => {
 
       expect(result).toEqual({ path: "source copy" });
       expect(await readFile(path.join(root, "source copy", "note.txt"), "utf8")).toBe("readonly");
-      expect((await stat(path.join(root, "source copy"))).mode & 0o777).toBe(0o555);
+      if (process.platform !== "win32") {
+        expect((await stat(path.join(root, "source copy"))).mode & 0o777).toBe(0o555);
+      }
     } finally {
       await chmod(path.join(root, "source"), 0o755).catch(() => {});
       await chmod(path.join(root, "source copy"), 0o755).catch(() => {});

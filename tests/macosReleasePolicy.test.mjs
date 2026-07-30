@@ -159,7 +159,7 @@ describe("desktop release publisher workflow", () => {
       new URL("../.github/workflows/desktop-release-publish.yml", import.meta.url),
       "utf8",
     ).replace(
-      "          PUBLISH_GITHUB_RELEASE: ${{ inputs.publish_github_release }}\n          RELEASE_TAG: ${{ steps.release.outputs.tag }}",
+      /          PUBLISH_GITHUB_RELEASE: \$\{\{ inputs\.publish_github_release \}\}\r?\n          RELEASE_TAG: \$\{\{ steps\.release\.outputs\.tag \}\}/,
       "          RELEASE_TAG: ${{ steps.release.outputs.tag }}",
     );
 
@@ -173,7 +173,7 @@ describe("desktop release publisher workflow", () => {
       new URL("../.github/workflows/desktop-release-publish.yml", import.meta.url),
       "utf8",
     ).replace(
-      "          PUBLISH_GITHUB_RELEASE: ${{ inputs.publish_github_release }}\n          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}",
+      /          PUBLISH_GITHUB_RELEASE: \$\{\{ inputs\.publish_github_release \}\}\r?\n          RELEASE_COMMIT: \$\{\{ steps\.release\.outputs\.commit \}\}/,
       "          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}",
     );
 
