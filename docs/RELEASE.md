@@ -13,6 +13,26 @@ A release is built exactly once. The verified bundle from that build is uploaded
 unchanged to GitHub and R2. Independent local R2 publishing is intentionally not
 supported because it can split the GitHub, R2, catalog, and updater state.
 
+## Distribution Origins
+
+The release bucket has two public roles, not two copies of every release:
+
+| Origin | Contract | Consumers |
+|---|---|---|
+| `https://updates.puppyone.ai` | permanent Stable machine-update API | Stable apps already installed on user machines |
+| `https://downloads.puppyone.ai` | public download and release-discovery API | website, operators, manual downloads, catalogs |
+
+Both origins expose the same `puppyone-desktop` R2 object keys. The publisher
+uploads each object once, then verifies it through the origin used by each
+consumer. `updates.puppyone.ai` must be a direct custom-domain or pass-through
+mapping, not a redirect to the website origin.
+
+An update feed embedded in a shipped Stable app is a permanent compatibility
+endpoint. `shared/desktop-distribution-contract.mjs` is the source of truth for
+the bucket, origin roles, and every shipped feed contract. A future origin
+migration appends the old and new feeds to that registry and keeps both healthy
+until no supported installed version depends on the old one.
+
 ## R2 Layout
 
 The bucket is `puppyone-desktop`. Existing channel URLs remain compatible:
@@ -132,14 +152,17 @@ resolve and validate Build Identity
 → verify the local bundle
 → create GitHub build-provenance attestations
 → hand off one immutable Actions artifact
+→ verify the existing Stable update contract before any publication write
 → upload the immutable R2 version
 → verify every public R2 object by SHA-256
 → create a GitHub draft release with the same files
 → verify GitHub's asset digests
 → publish Stable GitHub release, or retain Internal as a draft
 → promote channel payloads and aliases
-→ verify every mutable payload by SHA-256
+→ verify every mutable payload through downloads.puppyone.ai by SHA-256
+→ verify Stable updater payloads through updates.puppyone.ai by SHA-256
 → publish latest.json
+→ verify Stable metadata, exact version, payload size, and HTTP byte ranges
 → merge and publish the website catalog
 → verify the public pointer and catalog bytes
 → remove stale files from the mutable latest prefix
@@ -153,6 +176,17 @@ closed and requires a new tag or explicit cleanup.
 
 All GitHub-owned actions are pinned to full commit SHAs. Build provenance is
 generated for binaries, `build-info.json`, `release.json`, and `SHA256SUMS`.
+
+`.github/workflows/desktop-update-feed-monitor.yml` runs the same Stable feed
+contract every six hours and on manual dispatch. It has a read-only GitHub token
+and no signing, R2, or Cloudflare credentials. A failed monitor is an
+operational incident: do not publish another Stable version until the existing
+installed-client path is healthy.
+
+The publisher's live-origin preflight is also a separate read-only job. It runs
+before the deployment-environment job is eligible, so operators are not asked
+to approve and expose publication secrets for a release whose existing
+installed-client path is already broken.
 
 ## GitHub Repository Setup
 
@@ -256,11 +290,17 @@ official references:
 
 ## Cloudflare Setup
 
-The custom domain is:
+Map both public origins to the same `puppyone-desktop` bucket and preserve the
+object path:
 
 ```text
-https://downloads.puppyone.ai
+downloads.puppyone.ai/<key> → puppyone-desktop/<key>
+updates.puppyone.ai/<key>   → puppyone-desktop/<key>
 ```
+
+Provision DNS and a valid TLS certificate for both names. The Stable publisher
+fails closed before changing public state when the currently shipped update
+origin, metadata, payload, or byte-range behavior is unhealthy.
 
 Versioned release paths use:
 
@@ -280,6 +320,11 @@ or starts_with(http.request.uri.path, "/desktop/catalog/")
 Those paths are mutable. Without this rule, an old alias or cached 404 may
 remain visible after R2 has accepted the new object. Versioned paths should stay
 cacheable and immutable.
+
+The Stable update origin must pass through `Range: bytes=0-0` and return `206`
+with a correct `Content-Range` total. Electron's macOS updater depends on ZIP
+range requests; a domain that returns the right file for ordinary browser
+downloads can still be unusable as an updater endpoint.
 
 The R2 credentials should have object read/write/list permission only for the
 `puppyone-desktop` bucket. They do not need Cloudflare account administration
@@ -334,8 +379,8 @@ Prepare a Stable release by first publishing and approving an Internal build
 for the exact commit. Then point the exact matching Stable tag at that commit:
 
 ```bash
-git tag v0.1.4
-git push origin v0.1.4
+git tag v0.1.5
+git push origin v0.1.5
 ```
 
 The tag and package version must match exactly. The stable workflow prepares the
@@ -346,11 +391,21 @@ credentials to only the signing/notarization step.
 Local verification is supported:
 
 ```bash
-PUPPYONE_BUILD_NUMBER=1843 PUPPYONE_RELEASE_TAG=v0.1.4 npm run dist:mac:release
+PUPPYONE_BUILD_NUMBER=1843 PUPPYONE_RELEASE_TAG=v0.1.5 npm run dist:mac:release
 ```
 
 Local publication is not supported. Only the tagged GitHub workflow can publish
 stable GitHub and R2 state.
+
+Operators can run the same read-only production check locally or from Actions:
+
+```bash
+node scripts/verify-desktop-stable-update-feed.mjs
+```
+
+During a Stable publication the workflow additionally passes the new exact
+version with `--expected-version`; this prevents a successful release from
+leaving the website pointer and installed-client feed on different versions.
 
 ## Release History Backfill
 
@@ -387,7 +442,7 @@ The workflow:
 5. Attaches the same metadata files to the three historical GitHub Releases.
 6. Archives both provenance-free root DMGs separately.
 7. Verifies every public R2 object by SHA-256.
-8. Publishes one catalog containing all five historical entries.
+8. Publishes a Stable/archive public catalog and a separate Internal catalog.
 9. Deletes the two root objects only when `delete_root_objects` is explicitly enabled.
 
 Run it first with deletion disabled. After checking the catalog and website,

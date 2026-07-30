@@ -3,6 +3,7 @@
 }
 
 .desktop-history-panel {
+  position: relative;
   display: flex;
   flex-direction: row;
 }
@@ -51,12 +52,11 @@ body.desktop-history-resizing .desktop-history-panel-tree {
 }
 
 .desktop-history-panel-tree-resizer {
-  position: absolute;
-  z-index: 3;
-  inset-block: 0;
-  inset-inline-end: -4px;
+  --po-pane-resizer-line-size: 2px;
+  --po-pane-resizer-z-index: 3;
+
+  inset-inline-start: var(--desktop-history-tree-width, clamp(260px, 28vw, 380px));
   display: flex;
-  width: 8px;
   align-items: center;
   justify-content: center;
   border: 0;
@@ -67,13 +67,7 @@ body.desktop-history-resizing .desktop-history-panel-tree {
 }
 
 .desktop-history-panel-tree-resizer::after {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: 3px;
-  width: 2px;
   border-radius: 999px;
-  background: transparent;
-  content: "";
 }
 
 .desktop-history-panel-tree-resizer svg {

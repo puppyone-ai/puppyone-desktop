@@ -473,6 +473,25 @@ describe("rename / move / delete", () => {
     expect(await readFile(path.join(root, "docs", "a.txt"), "utf8")).toBe("a");
   });
 
+  it("moves a nested file back into its parent folder", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "parent", kind: "folder" });
+    await createWorkspaceEntry(root, { parentPath: "parent", name: "child", kind: "folder" });
+    await createWorkspaceEntry(root, {
+      parentPath: "parent/child",
+      name: "nested.txt",
+      kind: "file",
+      content: "nested",
+    });
+
+    const result = await moveWorkspaceEntry(root, {
+      fromPath: "parent/child/nested.txt",
+      toPath: "parent/nested.txt",
+    });
+
+    expect(result.path).toBe("parent/nested.txt");
+    expect(await readFile(path.join(root, "parent", "nested.txt"), "utf8")).toBe("nested");
+  });
+
   it("refuses to move a folder into itself", async () => {
     await createWorkspaceEntry(root, { parentPath: null, name: "dir", kind: "folder" });
     await expect(moveWorkspaceEntry(root, { fromPath: "dir", toPath: "dir/sub" })).rejects.toThrow(/into itself/i);

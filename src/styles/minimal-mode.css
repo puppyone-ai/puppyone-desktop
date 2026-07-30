@@ -215,7 +215,6 @@
 
   .desktop-minimal-mode-controls {
     overflow-x: auto;
-    scrollbar-width: none;
   }
 
   .desktop-minimal-mode-controls::-webkit-scrollbar {

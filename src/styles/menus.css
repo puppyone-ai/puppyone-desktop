@@ -24,14 +24,14 @@
 .desktop-titlebar-menu::-webkit-scrollbar-thumb,
 .desktop-node-action-menu::-webkit-scrollbar-thumb {
   border: 1px solid var(--po-menu-bg);
-  background: var(--po-scrollbar-thumb);
+  background-color: var(--po-scrollbar-thumb);
   background-clip: padding-box;
 }
 
 .desktop-menu-surface::-webkit-scrollbar-thumb:hover,
 .desktop-titlebar-menu::-webkit-scrollbar-thumb:hover,
 .desktop-node-action-menu::-webkit-scrollbar-thumb:hover {
-  background: var(--po-scrollbar-thumb-hover);
+  background-color: var(--po-scrollbar-thumb-hover);
   background-clip: padding-box;
 }
 

@@ -101,7 +101,7 @@
 
 .markdown-codemirror-editor .cm-md-code-textarea::-webkit-scrollbar {
   width: 0;
-  height: 8px;
+  height: var(--po-scrollbar-size, 8px);
 }
 
 .markdown-codemirror-editor .cm-md-code-textarea::-webkit-scrollbar-track,
@@ -110,9 +110,9 @@
 }
 
 .markdown-codemirror-editor .cm-md-code-textarea::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: var(--po-scrollbar-thumb);
+  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
+  border-radius: var(--po-scrollbar-radius, 999px);
+  background-color: var(--po-scrollbar-thumb);
   background-clip: padding-box;
 }
 

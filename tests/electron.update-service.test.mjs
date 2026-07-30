@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { resolveDesktopUpdateConfiguration } from "../electron/update-service.mjs";
+import { EventEmitter } from "node:events";
+import { describe, expect, it, vi } from "vitest";
+import {
+  createUpdateService,
+  resolveDesktopUpdateConfiguration,
+} from "../electron/update-service.mjs";
 import { resolveDesktopBuildIdentity } from "../shared/desktop-build-identity.mjs";
 
 const commitSha = "d".repeat(40);
@@ -25,7 +29,7 @@ describe("Desktop updater channel isolation", () => {
       allowPrerelease: true,
       channel: "internal",
       currentVersion: "1.4.0-internal.72",
-      feedUrl: "https://updates.puppyone.ai/desktop/internal/mac/latest",
+      feedUrl: "https://downloads.puppyone.ai/desktop/internal/mac/latest",
       forceDevUpdateConfig: false,
       updateChannel: "internal",
     });
@@ -103,5 +107,73 @@ describe("Desktop updater channel isolation", () => {
       forceDevUpdateConfig: false,
       updateChannel: null,
     });
+  });
+
+  it("checks Stable updates after startup and on a bounded interval while retaining the Settings command", async () => {
+    vi.useFakeTimers();
+    let service;
+    try {
+      const buildInfo = resolveDesktopBuildIdentity({
+        baseVersion: "1.4.0",
+        buildNumber: 74,
+        channel: "stable",
+        commitSha,
+      });
+      const handlers = new Map();
+      const autoUpdater = new EventEmitter();
+      let checkCount = 0;
+      Object.assign(autoUpdater, {
+        checkForUpdates: async () => {
+          checkCount += 1;
+          return { updateInfo: null };
+        },
+        setFeedURL: () => {},
+      });
+      service = createUpdateService({
+        app: { isPackaged: true },
+        autoUpdater,
+        buildInfo,
+        checkSchedule: {
+          startupDelayMs: 15_000,
+          startupJitterMs: 0,
+          intervalMs: 4 * 60 * 60 * 1000,
+          intervalJitterMs: 0,
+        },
+        getRestartBlockers: () => [],
+        getWindows: () => [],
+        ipcMain: {
+          handle: (channel, handler) => handlers.set(channel, handler),
+        },
+        platform: "linux",
+        random: () => 0,
+      });
+
+      service.start();
+      service.start();
+      await vi.advanceTimersByTimeAsync(14_999);
+
+      expect(checkCount).toBe(0);
+      expect(service.getState().status).toBe("idle");
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(checkCount).toBe(1);
+      expect(service.getState().status).toBe("not-available");
+
+      await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000);
+      expect(checkCount).toBe(2);
+
+      const checkFromSettings = handlers.get("updates:check");
+      expect(checkFromSettings).toBeTypeOf("function");
+      await checkFromSettings();
+
+      expect(checkCount).toBe(3);
+      expect(service.getState().status).toBe("not-available");
+      service.dispose();
+      await vi.advanceTimersByTimeAsync(8 * 60 * 60 * 1000);
+      expect(checkCount).toBe(3);
+    } finally {
+      service?.dispose();
+      vi.useRealTimers();
+    }
   });
 });

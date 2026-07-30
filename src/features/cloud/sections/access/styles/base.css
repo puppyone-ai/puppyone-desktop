@@ -216,7 +216,6 @@
   align-items: center;
   gap: 3px;
   overflow-x: auto;
-  scrollbar-width: none;
 }
 
 .desktop-cloud-access-category-tabs::-webkit-scrollbar {

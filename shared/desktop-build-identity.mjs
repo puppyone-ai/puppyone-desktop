@@ -1,3 +1,8 @@
+import {
+  DESKTOP_INTERNAL_UPDATE_FEED_URL,
+  DESKTOP_STABLE_UPDATE_FEED_URL,
+} from "./desktop-distribution-contract.mjs";
+
 export const DESKTOP_BUILD_INFO_SCHEMA_VERSION = 1;
 export const DESKTOP_BUILD_PRODUCT = "puppyone-desktop";
 export const DESKTOP_BUILD_CHANNELS = Object.freeze(["dev", "internal", "stable"]);
@@ -39,7 +44,7 @@ const CHANNEL_POLICIES = deepFreeze({
     releaseChannel: "internal",
     releaseAudience: "restricted",
     updateChannel: "internal",
-    updateFeedUrl: "https://updates.puppyone.ai/desktop/internal/mac/latest",
+    updateFeedUrl: DESKTOP_INTERNAL_UPDATE_FEED_URL,
     published: true,
     requiresDeveloperIdSignature: false,
     requiresNotarization: false,
@@ -51,7 +56,7 @@ const CHANNEL_POLICIES = deepFreeze({
     releaseChannel: "stable",
     releaseAudience: "public",
     updateChannel: "stable",
-    updateFeedUrl: "https://updates.puppyone.ai/desktop/stable/mac/latest",
+    updateFeedUrl: DESKTOP_STABLE_UPDATE_FEED_URL,
     published: true,
     requiresDeveloperIdSignature: true,
     requiresNotarization: true,

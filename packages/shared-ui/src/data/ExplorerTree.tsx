@@ -40,6 +40,7 @@ import { useExplorerMotion } from "./explorer/useExplorerMotion";
 import {
   EXPLORER_REFERENCE_DRAG_TYPE,
   EXPLORER_TREE_NODE_DRAG_TYPE,
+  parseExplorerReferenceDrag,
   serializeExplorerReferenceDrag,
 } from "./explorer/explorerReferenceDrag";
 import {
@@ -250,10 +251,11 @@ export function ExplorerTree({
   ), []);
   const selectedPathsRef = useRef(selectedPaths);
   const selectedDragNodesRef = useRef(selectedDragNodes);
-  const draggedNodesRef = useRef(draggedNodes);
+  // This ref is the operational drag session. React state below is only its
+  // visual projection and must never overwrite the session during render.
+  const draggedNodesRef = useRef<DataNode[]>([]);
   selectedPathsRef.current = selectedPaths;
   selectedDragNodesRef.current = selectedDragNodes;
-  draggedNodesRef.current = draggedNodes;
   const dragCallbacksRef = useRef({ onImportFiles, onMoveNode, onMoveNodes });
   dragCallbacksRef.current = { onImportFiles, onMoveNode, onMoveNodes };
 
@@ -264,6 +266,7 @@ export function ExplorerTree({
 
   const clearDragState = useCallback(() => {
     clearDropTarget();
+    draggedNodesRef.current = [];
     setDraggedNodes((current) => (current.length === 0 ? current : []));
   }, [clearDropTarget]);
 
@@ -286,17 +289,20 @@ export function ExplorerTree({
     window.addEventListener("dragend", clearDragState, true);
     window.addEventListener("drop", clearAfterDrop, true);
     window.addEventListener("keydown", clearOnEscape, true);
-    window.addEventListener("blur", clearDragState, true);
+    // Window focus is not a drag terminal signal. Chromium/Electron may move
+    // focus while a native drag session is still active, so preserve the
+    // synchronous source session and clear only stale hover feedback.
+    window.addEventListener("blur", clearDropTarget, true);
     document.addEventListener("visibilitychange", clearOnVisibilityChange, true);
     return () => {
       disposed = true;
       window.removeEventListener("dragend", clearDragState, true);
       window.removeEventListener("drop", clearAfterDrop, true);
       window.removeEventListener("keydown", clearOnEscape, true);
-      window.removeEventListener("blur", clearDragState, true);
+      window.removeEventListener("blur", clearDropTarget, true);
       document.removeEventListener("visibilitychange", clearOnVisibilityChange, true);
     };
-  }, [clearDragState]);
+  }, [clearDragState, clearDropTarget]);
 
   const setNextDropTarget = useCallback((
     rowPath: string | null,
@@ -317,6 +323,20 @@ export function ExplorerTree({
     });
   }, []);
 
+  const recoverDraggedNodes = useCallback((dataTransfer: DataTransfer): DataNode[] => {
+    const payload = parseExplorerReferenceDrag(dataTransfer.getData(EXPLORER_REFERENCE_DRAG_TYPE));
+    if (!payload || !dragWorkspaceId || payload.workspaceId !== dragWorkspaceId) return [];
+
+    const recoveredNodes = payload.entries
+      .map((entry) => nodeIndex.get(entry.path) ?? null)
+      .filter((node): node is DataNode => node !== null);
+    if (recoveredNodes.length !== payload.entries.length) return [];
+
+    return recoveredNodes.filter((node) => !recoveredNodes.some((candidate) => (
+      candidate.path !== node.path && node.path.startsWith(`${candidate.path}/`)
+    )));
+  }, [dragWorkspaceId, nodeIndex]);
+
   const beginNodeDrag = useCallback((event: ReactDragEvent<HTMLDivElement>, node: DataNode) => {
     event.stopPropagation();
     event.dataTransfer.effectAllowed = moveEnabled ? "copyMove" : "copy";
@@ -331,6 +351,10 @@ export function ExplorerTree({
       );
     }
     event.dataTransfer.setData("text/plain", movingNodes.map((item) => item.path).join("\n"));
+    // Native drag events are not coupled to React's commit timing. Seed the
+    // operation ref synchronously so an immediate dragover/drop cannot observe
+    // the previous render's empty state.
+    draggedNodesRef.current = movingNodes;
     setDraggedNodes(movingNodes);
     setDropTarget(null);
   }, [dragWorkspaceId, moveEnabled]);
@@ -350,9 +374,17 @@ export function ExplorerTree({
     }
 
     const currentDraggedNodes = draggedNodesRef.current;
-    if (!moveEnabled || currentDraggedNodes.length === 0) return false;
+    const transferTypes = Array.from(event.dataTransfer.types);
+    const hasInternalTransfer = transferTypes.includes(EXPLORER_REFERENCE_DRAG_TYPE)
+      || transferTypes.includes(EXPLORER_TREE_NODE_DRAG_TYPE);
+    if (!moveEnabled || (currentDraggedNodes.length === 0 && !hasInternalTransfer)) return false;
 
-    const valid = isValidMoveTargetForNodes(currentDraggedNodes, targetFolderPath);
+    // The HTML drag data store is in protected mode during dragover, so payload
+    // data cannot be read here. A typed internal transfer is provisionally
+    // accepted and is resolved and validated during drop.
+    const valid = currentDraggedNodes.length === 0
+      ? true
+      : isValidMoveTargetForNodes(currentDraggedNodes, targetFolderPath);
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = valid ? "move" : "none";
@@ -388,7 +420,9 @@ export function ExplorerTree({
       return;
     }
 
-    const currentDraggedNodes = draggedNodesRef.current;
+    const currentDraggedNodes = draggedNodesRef.current.length > 0
+      ? draggedNodesRef.current
+      : recoverDraggedNodes(event.dataTransfer);
     if (!moveEnabled || currentDraggedNodes.length === 0) return;
 
     event.preventDefault();
@@ -404,7 +438,7 @@ export function ExplorerTree({
     void Promise.resolve(moveResult).catch((error) => {
       console.error("Unable to move explorer item:", error);
     });
-  }, [clearDragState, importEnabled, moveEnabled]);
+  }, [clearDragState, importEnabled, moveEnabled, recoverDraggedNodes]);
 
   const dragController = useMemo<TreeDragController>(() => ({
     // Outbound copy/context drag is independent from in-tree move support.
@@ -562,6 +596,12 @@ export function ExplorerTree({
               </span>
             </div>
           )}
+        </div>
+      )}
+
+      {rootError && nodes.length > 0 && (
+        <div className="explorer-tree-error-banner" role="alert" dir="auto">
+          {rootError}
         </div>
       )}
 

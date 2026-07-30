@@ -31,12 +31,18 @@ jobs:
       AWS_EC2_METADATA_DISABLED: "true"
       AWS_PAGER: ""
       CATALOG_KEY: desktop/catalog/releases.json
+      INTERNAL_CATALOG_KEY: desktop/internal/catalog/releases.json
       PUBLIC_DOWNLOAD_ORIGIN: https://downloads.puppyone.ai
       R2_BUCKET: puppyone-desktop
 
     steps:
       - name: Checkout trusted archive code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
 
       - name: Validate archive credentials and tools
         env:
@@ -413,7 +419,7 @@ jobs:
               --include-metadata true
           done
 
-      - name: Download current release catalog
+      - name: Download current release catalogs
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -426,52 +432,82 @@ jobs:
             --bucket "${R2_BUCKET}" \
             --key "${CATALOG_KEY}" \
             --endpoint-url "${ENDPOINT}" >/dev/null 2>&1; then
-            aws s3 cp "s3://${R2_BUCKET}/${CATALOG_KEY}" "${RUNNER_TEMP}/catalog-0.json" \
+            aws s3 cp "s3://${R2_BUCKET}/${CATALOG_KEY}" "${RUNNER_TEMP}/catalog-public-0.json" \
+              --endpoint-url "${ENDPOINT}" \
+              --only-show-errors
+          fi
+          if aws s3api head-object \
+            --bucket "${R2_BUCKET}" \
+            --key "${INTERNAL_CATALOG_KEY}" \
+            --endpoint-url "${ENDPOINT}" >/dev/null 2>&1; then
+            aws s3 cp "s3://${R2_BUCKET}/${INTERNAL_CATALOG_KEY}" "${RUNNER_TEMP}/catalog-internal-0.json" \
               --endpoint-url "${ENDPOINT}" \
               --only-show-errors
           fi
 
-      - name: Merge release history into catalog
+      - name: Merge release history into channel-specific catalogs
         shell: bash
         run: |
           set -euo pipefail
           node scripts/update-desktop-release-catalog.mjs \
-            --existing "${RUNNER_TEMP}/catalog-0.json" \
+            --existing "${RUNNER_TEMP}/catalog-public-0.json" \
             --release artifacts/archive-v0.1.0-legacy.0/release.json \
-            --output "${RUNNER_TEMP}/catalog-1.json"
+            --channels stable,archive \
+            --output "${RUNNER_TEMP}/catalog-public-1.json"
           node scripts/update-desktop-release-catalog.mjs \
-            --existing "${RUNNER_TEMP}/catalog-1.json" \
+            --existing "${RUNNER_TEMP}/catalog-public-1.json" \
             --release artifacts/archive-v0.1.1-legacy.0/release.json \
-            --output "${RUNNER_TEMP}/catalog-2.json"
-          index=2
+            --channels stable,archive \
+            --output "${RUNNER_TEMP}/catalog-public-2.json"
+          index=0
           for tag in v0.1.1-internal.1 v0.1.2-internal.2 v0.1.2-internal.4; do
             next=$((index + 1))
             node scripts/update-desktop-release-catalog.mjs \
-              --existing "${RUNNER_TEMP}/catalog-${index}.json" \
+              --existing "${RUNNER_TEMP}/catalog-internal-${index}.json" \
               --release "artifacts/backfill-${tag}/release.json" \
-              --output "${RUNNER_TEMP}/catalog-${next}.json"
+              --channels internal \
+              --output "${RUNNER_TEMP}/catalog-internal-${next}.json"
             index="${next}"
           done
 
-      - name: Publish and verify complete release catalog
+      - name: Publish and verify channel-specific release catalogs
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PUPPYONE_INTERNAL_RELEASE_TOKEN: ${{ secrets.PUPPYONE_INTERNAL_RELEASE_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
           ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
-          aws s3 cp "${RUNNER_TEMP}/catalog-5.json" "s3://${R2_BUCKET}/${CATALOG_KEY}" \
+          aws s3 cp "${RUNNER_TEMP}/catalog-public-2.json" "s3://${R2_BUCKET}/${CATALOG_KEY}" \
             --endpoint-url "${ENDPOINT}" \
             --content-type "application/json; charset=utf-8" \
             --cache-control "public, no-cache, must-revalidate" \
             --only-show-errors
-          curl --fail --location --retry 5 --retry-all-errors --silent --show-error \
-            -H "Cache-Control: no-cache" \
+          aws s3 cp "${RUNNER_TEMP}/catalog-internal-3.json" "s3://${R2_BUCKET}/${INTERNAL_CATALOG_KEY}" \
+            --endpoint-url "${ENDPOINT}" \
+            --content-type "application/json; charset=utf-8" \
+            --cache-control "public, no-cache, must-revalidate" \
+            --only-show-errors
+          CURL_ARGS=(--fail --location --max-redirs 0 --retry 5 --retry-all-errors --silent --show-error -H "Cache-Control: no-cache")
+          if [ -n "${PUPPYONE_INTERNAL_RELEASE_TOKEN}" ]; then
+            CURL_ARGS+=(-H "Authorization: Bearer ${PUPPYONE_INTERNAL_RELEASE_TOKEN}")
+          fi
+          if [ -n "${CF_ACCESS_CLIENT_ID}" ] && [ -n "${CF_ACCESS_CLIENT_SECRET}" ]; then
+            CURL_ARGS+=(-H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}")
+            CURL_ARGS+=(-H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}")
+          fi
+          curl "${CURL_ARGS[@]}" \
             --output "${RUNNER_TEMP}/catalog-public.json" \
             "${PUBLIC_DOWNLOAD_ORIGIN}/${CATALOG_KEY}"
-          cmp "${RUNNER_TEMP}/catalog-5.json" "${RUNNER_TEMP}/catalog-public.json"
+          curl "${CURL_ARGS[@]}" \
+            --output "${RUNNER_TEMP}/catalog-internal.json" \
+            "${PUBLIC_DOWNLOAD_ORIGIN}/${INTERNAL_CATALOG_KEY}"
+          cmp "${RUNNER_TEMP}/catalog-public-2.json" "${RUNNER_TEMP}/catalog-public.json"
+          cmp "${RUNNER_TEMP}/catalog-internal-3.json" "${RUNNER_TEMP}/catalog-internal.json"
 
       - name: Delete verified root objects
         if: ${{ inputs.delete_root_objects }}

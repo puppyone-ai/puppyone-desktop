@@ -26,6 +26,7 @@ describe("feedback IPC", () => {
     expect(request).toMatchObject({
       method: "POST",
       headers: {
+        accept: "application/json",
         "user-agent": "puppyone-desktop/0.1.2",
       },
     });
@@ -36,8 +37,12 @@ describe("feedback IPC", () => {
       appVersion: "0.1.2",
       locale: "zh-Hans",
       platform: "darwin",
-      website: "",
+      source: "PuppyOne Desktop",
+      subject: "PuppyOne Desktop Feedback · v0.1.2",
+      timestamp: expect.any(String),
+      _gotcha: "",
     });
+    expect(Number.isNaN(Date.parse(request.body.get("timestamp")))).toBe(false);
   });
 
   it("rejects empty and oversized feedback before making a network request", async () => {
@@ -72,8 +77,9 @@ describe("feedback IPC", () => {
     })).resolves.toEqual({ ok: true });
 
     const request = fetchImpl.mock.calls[0][1];
-    const screenshot = request.body.get("screenshot");
+    const screenshot = request.body.get("attachment");
     expect(request.body.get("message")).toBe("");
+    expect(request.body.get("appVersion")).toBe("0.1.2");
     expect(screenshot).toBeInstanceOf(Blob);
     expect(screenshot.type).toBe("image/png");
     expect(screenshot.name).toBe("feedback-screenshot.png");
@@ -107,12 +113,27 @@ describe("feedback IPC", () => {
       "could not accept",
     );
   });
+
+  it("uses the dedicated public Formspree feedback form by default", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ next: "/thanks" }),
+    });
+    const handler = createHandler({ fetchImpl, endpoint: null });
+
+    await expect(handler({}, { message: "A useful message" })).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(fetchImpl.mock.calls[0][0]).toBe("https://formspree.io/f/mlgqvydy");
+  });
 });
 
 function createHandler({
   fetchImpl = vi.fn(),
   appVersion = "0.1.2",
   platform = "darwin",
+  endpoint = "https://feedback.example/api",
 } = {}) {
   const handlers = new Map();
   registerFeedbackIpcHandlers({
@@ -124,7 +145,7 @@ function createHandler({
     fetchImpl,
     appVersion,
     platform,
-    endpoint: "https://feedback.example/api",
+    ...(endpoint === null ? {} : { endpoint }),
   });
   return handlers.get("feedback:submit");
 }

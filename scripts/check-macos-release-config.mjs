@@ -10,6 +10,7 @@ import {
   inspectLegacyArchiveWorkflow,
   inspectReleasePublisherWorkflow,
   inspectStableReleaseWorkflow,
+  inspectUpdateFeedMonitorWorkflow,
 } from "./release-support/internal-release-workflow-policy.mjs";
 import { inspectMacReleaseReadiness } from "./release-support/macos-release-policy.mjs";
 
@@ -73,6 +74,11 @@ const archiveWorkflow = readFileSync(
   "utf8",
 );
 errors.push(...inspectLegacyArchiveWorkflow(archiveWorkflow));
+const updateFeedMonitorWorkflow = readFileSync(
+  path.join(repoRoot, ".github", "workflows", "desktop-update-feed-monitor.yml"),
+  "utf8",
+);
+errors.push(...inspectUpdateFeedMonitorWorkflow(updateFeedMonitorWorkflow));
 
 try {
   const { validateConfiguration } = require("app-builder-lib/out/util/config/config.js");

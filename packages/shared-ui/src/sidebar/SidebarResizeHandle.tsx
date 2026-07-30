@@ -6,6 +6,7 @@ export type SidebarResizeIntent = "decrease" | "increase" | "minimum" | "maximum
 export type SidebarResizeHandleProps = Omit<HTMLAttributes<HTMLDivElement>, "onKeyDown"> & {
   label: string;
   orientation: "horizontal" | "vertical";
+  paneEdge?: boolean;
   value?: number;
   min?: number;
   max?: number;
@@ -20,6 +21,7 @@ export const SidebarResizeHandle = forwardRef<HTMLDivElement, SidebarResizeHandl
     min,
     onKeyboardResize,
     orientation,
+    paneEdge = false,
     role = "separator",
     tabIndex = 0,
     value,
@@ -44,7 +46,11 @@ export const SidebarResizeHandle = forwardRef<HTMLDivElement, SidebarResizeHandl
   return (
     <div
       ref={ref}
-      className={joinSidebarClassNames("po-sidebar-resize-handle", className)}
+      className={joinSidebarClassNames(
+        "po-sidebar-resize-handle",
+        paneEdge && "po-pane-edge-resize-handle",
+        className,
+      )}
       role={role}
       tabIndex={tabIndex}
       aria-label={label}

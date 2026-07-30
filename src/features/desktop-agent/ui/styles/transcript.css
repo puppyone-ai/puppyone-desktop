@@ -35,15 +35,16 @@
   overflow-y: auto;
   padding: 12px var(--agent-inline-inset) 24px;
   overflow-anchor: none;
-  scrollbar-color: var(--po-scrollbar-thumb) transparent;
-  scrollbar-width: thin;
 }
 
-.desktop-agent-transcript::-webkit-scrollbar { width: 8px; }
+.desktop-agent-transcript::-webkit-scrollbar {
+  width: var(--po-scrollbar-size, 8px);
+}
+
 .desktop-agent-transcript::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 8px;
-  background: var(--po-scrollbar-thumb);
+  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
+  border-radius: var(--po-scrollbar-radius, 999px);
+  background-color: var(--po-scrollbar-thumb);
   background-clip: padding-box;
 }
 

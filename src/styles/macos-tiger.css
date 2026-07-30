@@ -43,6 +43,8 @@
   --po-menu-item-padding-inline: 8px;
   --po-menu-item-gap: 7px;
   --po-scrollbar-size: 15px;
+  --po-scrollbar-thumb-size: 11px;
+  --po-scrollbar-thumb-inset: 2px;
   --po-scrollbar-radius: 8px;
   --po-scrollbar-transition: 0s;
   --po-tree-row-height: 27px;

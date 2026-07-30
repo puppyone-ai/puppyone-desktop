@@ -110,7 +110,6 @@
   gap: 3px;
   margin-top: 26px;
   overflow-x: auto;
-  scrollbar-width: none;
 }
 
 .desktop-cloud-automation-category-tabs::-webkit-scrollbar {

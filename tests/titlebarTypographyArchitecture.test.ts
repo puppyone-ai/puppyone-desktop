@@ -20,7 +20,9 @@ describe("titlebar typography architecture", () => {
       '.desktop-titlebar[data-workspace-kind="cloud"]',
     );
 
-    expect(tokensCss).toContain("--po-header: var(--po-surface-editor);");
+    expect(tokensCss).toContain(
+      "--po-header: color-mix(in srgb, var(--po-surface-chrome) 40%, var(--po-surface-editor));",
+    );
     expect(tokensCss).toContain("--po-cloud-titlebar-bg: #dbeaf1;");
     expect(tokensCss).toContain("--po-cloud-titlebar-bg: #263a45;");
     expect(titlebarRule).toContain("--desktop-titlebar-bg: var(--po-header);");

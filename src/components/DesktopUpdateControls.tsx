@@ -87,14 +87,17 @@ export function DesktopUpdateTitlebarButton({
   if (!visible) return null;
 
   const Icon = getUpdateIcon(state.status);
-  const busy = state.status === "checking" || state.status === "downloading" || state.status === "installing";
+  const busy = state.status === "checking"
+    || state.status === "downloading"
+    || state.status === "installing";
+  const title = getUpdateTitle(state, t, formatNumber);
 
   return (
     <button
       className={`desktop-titlebar-action desktop-update-titlebar-action ${state.status}`}
       type="button"
-      title={getUpdateTitle(state, t, formatNumber)}
-      aria-label={getUpdateTitle(state, t, formatNumber)}
+      title={title}
+      aria-label={title}
       disabled={busy}
       onClick={onUpdateNow}
     >
@@ -201,10 +204,20 @@ function getUpdateTitle(
   t: MessageFormatter,
   formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string,
 ): string {
-  if (state.status === "available") return t("updates.title.available", { version: state.availableVersion ?? t("updates.version.new") });
+  if (state.status === "available") {
+    return t("updates.title.available", {
+      version: state.availableVersion ?? t("updates.version.new"),
+    });
+  }
   if (state.status === "downloaded") return t("updates.action.restart");
-  if (state.status === "downloading") return t("updates.title.downloading", { progress: formatDownloadProgress(state, formatNumber) });
-  if (state.status === "blocked") return state.blockers[0]?.label ?? t("updates.title.blocked");
+  if (state.status === "downloading") {
+    return t("updates.title.downloading", {
+      progress: formatDownloadProgress(state, formatNumber),
+    });
+  }
+  if (state.status === "blocked") {
+    return state.blockers[0]?.label ?? t("updates.title.blocked");
+  }
   if (state.status === "error") return t("updates.title.failed");
   return t("updates.title.appUpdate");
 }

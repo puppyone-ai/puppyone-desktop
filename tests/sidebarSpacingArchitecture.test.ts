@@ -96,6 +96,9 @@ describe("sidebar spacing architecture", () => {
     expect(semanticThemeScope).toContain(
       "--desktop-sidebar-section-title-disabled-color: var(--po-text-disabled);",
     );
+    expect(semanticThemeScope).toContain(
+      "--po-sidebar: color-mix(in srgb, var(--po-surface-chrome) 40%, var(--po-surface-editor));",
+    );
     expect(root).toContain("--desktop-sidebar-font-weight: var(--po-text-weight-medium);");
     expect(root).toContain("--desktop-sidebar-font-weight-emphasis: 650;");
     expect(root).toContain("--desktop-sidebar-line-height: 18px;");

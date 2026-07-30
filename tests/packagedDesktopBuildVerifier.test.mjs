@@ -9,6 +9,9 @@ import {
   getDesktopBuildChannelPolicy,
   resolveDesktopBuildIdentity,
 } from "../shared/desktop-build-identity.mjs";
+import {
+  DESKTOP_STABLE_UPDATE_FEED_URL,
+} from "../shared/desktop-distribution-contract.mjs";
 
 const { createPackage } = asarPackage;
 const { build: buildPlist } = plistPackage;
@@ -35,7 +38,7 @@ describe("packaged Desktop Build Identity verification", () => {
     const fixture = await createFixture();
     await fs.writeFile(
       path.join(fixture.applicationPath, "Contents", "Resources", "app-update.yml"),
-      "provider: generic\nurl: https://updates.puppyone.ai/desktop/stable/mac/latest\nchannel: stable\n",
+      `provider: generic\nurl: ${DESKTOP_STABLE_UPDATE_FEED_URL}\nchannel: stable\n`,
     );
 
     await expect(verifyPackagedDesktopBuild({

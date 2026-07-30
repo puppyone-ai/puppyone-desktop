@@ -117,9 +117,14 @@ export function inspectReleasePublisherWorkflow(workflowSource) {
   if (errors.length > 0) return errors;
   requireSnippets(workflowSource, errors, [
     ["group: desktop-release-publish", "all release channels must share one publication lock"],
+    ["preflight:", "the publisher must expose a secretless distribution preflight job"],
+    ["needs: preflight", "publication authority must wait for the distribution preflight"],
     ["name: ${{ inputs.deployment_environment }}", "publishing secrets must be environment-scoped"],
     ["BUNDLE_DIRECTORY: ${{ github.workspace }}/artifacts/desktop-release-bundle", "the publisher must use an absolute release bundle path"],
+    ["node-version: 22", "the publisher must pin the supported Node.js runtime"],
+    ["PUBLIC_UPDATE_ORIGIN: https://updates.puppyone.ai", "Stable publication must preserve the shipped machine update origin"],
     ["Download build-once release bundle", "the publisher must consume the build-once artifact"],
+    ["Verify existing Stable update origin before publication", "Stable publication must fail before mutation when its existing update contract is unhealthy"],
     ["release.json is the commit marker", "R2 publication must use an explicit commit marker"],
     ["--cache-control \"public, max-age=31536000, immutable\"", "versioned release objects must be immutable"],
     ["--cache-control \"public, no-cache, must-revalidate\"", "mutable release objects must revalidate"],
@@ -136,6 +141,9 @@ export function inspectReleasePublisherWorkflow(workflowSource) {
     ["desktop/internal/catalog/releases.json", "Internal releases must use a separate restricted catalog"],
     ["--max-redirs 0", "authenticated Internal verification must reject redirects"],
     ["Verify public pointers and catalog", "mutable public metadata must be verified after publication"],
+    ["Verify Stable updater payloads through every shipped origin", "Stable payloads must be content-verified through the machine update origin"],
+    ["Verify promoted Stable update feed contract", "the promoted Stable feed must be checked against the release version"],
+    ["verify-desktop-stable-update-feed.mjs", "Stable publication must use the canonical update-feed verifier"],
     ["Clean stale mutable release files", "stale latest files must be removed only after the new release is public"],
   ]);
   forbidSnippets(workflowSource, errors, [
@@ -156,8 +164,44 @@ export function inspectReleasePublisherWorkflow(workflowSource) {
     "PUBLISH_GITHUB_RELEASE: ${{ inputs.publish_github_release }}",
     "the final GitHub release verification must receive the caller's draft/public policy explicitly",
   );
+  for (const stageName of [
+    "Verify existing Stable update origin before publication",
+    "Verify Stable updater payloads through every shipped origin",
+    "Verify promoted Stable update feed contract",
+  ]) {
+    requireStageSnippet(
+      workflowSource,
+      errors,
+      stageName,
+      "if: ${{ inputs.channel == 'stable' }}",
+      `the "${stageName}" stage must run only for Stable publication`,
+    );
+  }
+  requireStageSnippet(
+    workflowSource,
+    errors,
+    "Verify promoted Stable update feed contract",
+    "--expected-version \"${{ steps.release.outputs.version }}\"",
+    "the promoted Stable feed must match the exact release version",
+  );
+  requireJobSnippet(
+    workflowSource,
+    errors,
+    "preflight",
+    "permissions:\n      contents: read",
+    "the distribution preflight must override publication authority with a read-only token",
+  );
+  forbidJobSnippet(
+    workflowSource,
+    errors,
+    "preflight",
+    "${{ secrets.",
+    "the distribution preflight must not receive deployment secrets",
+  );
   assertOrder(workflowSource, errors, [
+    "Verify existing Stable update origin before publication",
     "Validate release bundle and caller contract",
+    "Validate publishing credentials and tools",
     "Inspect immutable R2 release state",
     "Upload immutable R2 release",
     "Verify every immutable R2 object by SHA-256",
@@ -168,7 +212,9 @@ export function inspectReleasePublisherWorkflow(workflowSource) {
     "Verify published GitHub Release state",
     "Promote mutable R2 latest files",
     "Verify mutable latest payloads by SHA-256",
+    "Verify Stable updater payloads through every shipped origin",
     "Publish latest release pointer",
+    "Verify promoted Stable update feed contract",
     "Merge immutable release into catalog",
     "Publish release catalog",
     "Verify public pointers and catalog",
@@ -187,11 +233,13 @@ export function inspectLegacyArchiveWorkflow(workflowSource) {
     ["default: false", "root deletion must be disabled by default"],
     ["group: desktop-release-publish", "archive catalog updates must share the global publication lock"],
     ["name: desktop-internal", "archive credentials must use a deployment environment"],
+    ["node-version: 22", "the archive workflow must pin the supported Node.js runtime"],
     ["--provenance backfill", "GitHub-backed history must be marked as a backfill"],
     ["--provenance archive", "provenance-free root artifacts must be marked as archives"],
     ["Verify every backfilled R2 object by SHA-256", "all historical R2 copies must be content-verified"],
     ["Attach and verify metadata on historical GitHub Releases", "GitHub history must receive the same release metadata as R2"],
-    ["Merge release history into catalog", "all historical releases must appear in the website catalog"],
+    ["Merge release history into channel-specific catalogs", "all historical releases must appear in their channel-appropriate catalogs"],
+    ["Publish and verify channel-specific release catalogs", "all historical catalogs must be content-verified after publication"],
     ["Repair explicitly authorized partial R2 backfills", "uncommitted historical prefixes must have an explicit repair stage"],
     ["inputs.repair_partial_backfills", "partial backfill repair must be explicitly gated"],
     ["Refusing to delete object outside", "partial backfill repair must enforce its prefix boundary"],
@@ -206,10 +254,36 @@ export function inspectLegacyArchiveWorkflow(workflowSource) {
     "Upload immutable legacy archives",
     "Verify every backfilled R2 object by SHA-256",
     "Attach and verify metadata on historical GitHub Releases",
-    "Merge release history into catalog",
-    "Publish and verify complete release catalog",
+    "Merge release history into channel-specific catalogs",
+    "Publish and verify channel-specific release catalogs",
     "Delete verified root objects",
   ], "release history backfill");
+  inspectPinnedActions(workflowSource, errors);
+  return errors;
+}
+
+export function inspectUpdateFeedMonitorWorkflow(workflowSource) {
+  const errors = inspectSource(workflowSource, "Stable update feed monitor workflow");
+  if (errors.length > 0) return errors;
+  requireSnippets(workflowSource, errors, [
+    ["schedule:", "the Stable update feed monitor must run on a schedule"],
+    ["cron: \"17 */6 * * *\"", "the Stable update feed monitor must run at least every six hours"],
+    ["workflow_dispatch:", "the Stable update feed monitor must support an operator-triggered check"],
+    ["permissions:\n  contents: read", "the Stable update feed monitor must use a read-only token"],
+    ["group: desktop-stable-update-feed-monitor", "update feed checks must use a dedicated concurrency group"],
+    ["cancel-in-progress: true", "a newer update feed check must replace a stale monitor run"],
+    ["node-version: 22", "the Stable update feed monitor must use the supported Node.js runtime"],
+    ["Verify every shipped Stable update feed", "the monitor must validate every registered compatibility endpoint"],
+    ["node scripts/verify-desktop-stable-update-feed.mjs", "the monitor must use the canonical update-feed verifier"],
+    ["if: ${{ always() }}", "the monitor must summarize both healthy and failed checks"],
+    ["https://updates.puppyone.ai/desktop/stable/mac/latest/stable-mac.yml", "the monitor summary must identify the machine update contract"],
+    ["https://downloads.puppyone.ai/desktop/stable/mac/latest/latest.json", "the monitor summary must identify the public release pointer"],
+  ]);
+  forbidSnippets(workflowSource, errors, [
+    ["contents: write", "the Stable update feed monitor must not receive repository write permission"],
+    ["id-token: write", "the Stable update feed monitor must not receive an OIDC publication token"],
+    ["${{ secrets.", "the Stable update feed monitor must not receive deployment secrets"],
+  ]);
   inspectPinnedActions(workflowSource, errors);
   return errors;
 }
@@ -252,6 +326,24 @@ function requireStageSnippet(source, errors, stageName, snippet, error) {
   const nextStage = source.indexOf("\n      - name:", stageStart + 1);
   const stageSource = source.slice(stageStart, nextStage < 0 ? undefined : nextStage);
   if (!stageSource.includes(snippet)) errors.push(error);
+}
+
+function requireJobSnippet(source, errors, jobName, snippet, error) {
+  const jobSource = getJobSource(source, jobName);
+  if (jobSource == null || !jobSource.includes(snippet)) errors.push(error);
+}
+
+function forbidJobSnippet(source, errors, jobName, snippet, error) {
+  const jobSource = getJobSource(source, jobName);
+  if (jobSource != null && jobSource.includes(snippet)) errors.push(error);
+}
+
+function getJobSource(source, jobName) {
+  const jobPattern = /^  ([A-Za-z0-9_-]+):\s*$/gm;
+  const jobs = Array.from(source.matchAll(jobPattern));
+  const jobIndex = jobs.findIndex((match) => match[1] === jobName);
+  if (jobIndex < 0) return null;
+  return source.slice(jobs[jobIndex].index, jobs[jobIndex + 1]?.index);
 }
 
 function inspectPinnedActions(source, errors) {

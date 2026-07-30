@@ -84,23 +84,14 @@
 }
 
 .data-explorer-resizer {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-end: 0;
-  z-index: 35;
-  width: 9px;
-  transform: translateX(4px);
-  cursor: col-resize;
-  touch-action: none;
+  /*
+   * The resize target belongs to the main-pane side of the boundary so it
+   * never competes with the explorer scrollbar immediately inside it.
+   */
+  inset-inline-start: var(--data-explorer-width, clamp(282px, 26vw, 360px));
 }
 
 .data-explorer-resizer::after {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: 4px;
-  width: 1px;
-  background: transparent;
-  content: "";
   transition: background 120ms ease, box-shadow 120ms ease;
 }
 

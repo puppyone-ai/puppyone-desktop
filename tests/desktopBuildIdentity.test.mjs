@@ -12,6 +12,12 @@ import {
   createDesktopElectronBuilderConfig,
   prepareDesktopBuild,
 } from "../scripts/release-support/desktop-build-preparation.mjs";
+import {
+  DESKTOP_INTERNAL_UPDATE_FEED_URL,
+  DESKTOP_SHIPPED_STABLE_UPDATE_CONTRACTS,
+  DESKTOP_STABLE_UPDATE_FEED_URL,
+  DESKTOP_SUPPORTED_STABLE_UPDATE_FEED_URLS,
+} from "../shared/desktop-distribution-contract.mjs";
 
 const commitSha = "a".repeat(40);
 const temporaryDirectories = [];
@@ -135,8 +141,13 @@ describe("desktop build identity", () => {
     expect(new Set([dev.applicationId, internal.applicationId, stable.applicationId])).toHaveLength(3);
     expect(new Set([dev.userDataName, internal.userDataName, stable.userDataName])).toHaveLength(3);
     expect(dev.updateFeedUrl).toBeNull();
-    expect(internal.updateFeedUrl).toContain("/internal/");
-    expect(stable.updateFeedUrl).toContain("/stable/");
+    expect(internal.updateFeedUrl).toBe(DESKTOP_INTERNAL_UPDATE_FEED_URL);
+    expect(stable.updateFeedUrl).toBe(DESKTOP_STABLE_UPDATE_FEED_URL);
+    expect(DESKTOP_SUPPORTED_STABLE_UPDATE_FEED_URLS).toContain(stable.updateFeedUrl);
+    expect(DESKTOP_SHIPPED_STABLE_UPDATE_CONTRACTS).toContainEqual({
+      feedUrl: DESKTOP_STABLE_UPDATE_FEED_URL,
+      introducedInVersion: "0.1.4",
+    });
   });
 
   it("derives electron-builder configuration from the same immutable identity", () => {
@@ -167,7 +178,7 @@ describe("desktop build identity", () => {
       buildVersion: "42",
       publish: [{
         channel: "internal",
-        url: "https://updates.puppyone.ai/desktop/internal/mac/latest",
+        url: DESKTOP_INTERNAL_UPDATE_FEED_URL,
       }],
       mac: {
         bundleShortVersion: "1.4.0",

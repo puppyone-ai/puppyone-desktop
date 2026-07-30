@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
@@ -45,6 +44,10 @@ import type { DocumentPersistedCommit } from "../editor/document-session/types";
 import { flushActiveDocumentSessions } from "../editor/document-session/activeDocumentSessions";
 import type { FileIconThemeId } from "../file/fileIcons";
 import { usePaneResizeDrag } from "../primitives/usePaneResizeDrag";
+import {
+  SidebarResizeHandle,
+  type SidebarResizeIntent,
+} from "../sidebar/SidebarResizeHandle";
 import { getRendererPerformanceTracker } from "../performance/rendererPerformance";
 import { FileOpenRequestCoordinator } from "./file-open/fileOpenRequestCoordinator";
 import { putBoundedFileContent } from "./file-open/fileContentCache";
@@ -1237,23 +1240,22 @@ export function DataWorkspace({
     },
   });
 
-  const nudgeExplorerWidth = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+  const resizeExplorerByKeyboard = (intent: SidebarResizeIntent, accelerated: boolean) => {
     if (!resizableExplorer) return;
 
-    const step = event.shiftKey ? 24 : 12;
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      setExplorerWidth(resolvedExplorerWidth + (direction === "rtl" ? step : -step));
-    } else if (event.key === "ArrowRight") {
-      event.preventDefault();
-      setExplorerWidth(resolvedExplorerWidth + (direction === "rtl" ? -step : step));
-    } else if (event.key === "Home") {
-      event.preventDefault();
+    if (intent === "minimum") {
       setExplorerWidth(minExplorerWidth);
-    } else if (event.key === "End") {
-      event.preventDefault();
-      setExplorerWidth(maxExplorerWidth);
+      return;
     }
+    if (intent === "maximum") {
+      setExplorerWidth(maxExplorerWidth);
+      return;
+    }
+
+    const step = accelerated ? 24 : 12;
+    const physicalDirection = intent === "decrease" ? -1 : 1;
+    const directionMultiplier = direction === "rtl" ? -1 : 1;
+    setExplorerWidth(resolvedExplorerWidth + physicalDirection * directionMultiplier * step);
   };
 
   const dataContentStyle = resizableExplorer
@@ -1375,21 +1377,21 @@ export function DataWorkspace({
               {renderWorkspaceSlot(explorerFooterSlot, workspaceState)}
             </div>
           )}
-          {resizableExplorer && !explorerCollapsed && (
-            <div
-              className="data-explorer-resizer"
-              role="separator"
-              aria-label={t("shared-ui.explorer.resizeSidebar")}
-              aria-orientation="vertical"
-              aria-valuemin={minExplorerWidth}
-              aria-valuemax={maxExplorerWidth}
-              aria-valuenow={resolvedExplorerWidth}
-              tabIndex={0}
-              onPointerDown={beginExplorerResize}
-              onKeyDown={nudgeExplorerWidth}
-            />
-          )}
         </aside>
+
+        {resizableExplorer && !explorerCollapsed && (
+          <SidebarResizeHandle
+            className="data-explorer-resizer"
+            paneEdge
+            orientation="vertical"
+            label={t("shared-ui.explorer.resizeSidebar")}
+            min={minExplorerWidth}
+            max={maxExplorerWidth}
+            value={resolvedExplorerWidth}
+            onPointerDown={beginExplorerResize}
+            onKeyboardResize={resizeExplorerByKeyboard}
+          />
+        )}
 
         {explorerCollapsed && collapsedExplorerSlot && (
           <div className="data-explorer-collapsed-slot">

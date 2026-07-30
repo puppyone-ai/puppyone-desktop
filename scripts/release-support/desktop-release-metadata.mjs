@@ -374,8 +374,19 @@ export function createLatestPointer(manifest) {
   };
 }
 
-export function mergeReleaseCatalog(existingCatalog, manifest, generatedAt = new Date().toISOString()) {
+export function mergeReleaseCatalog(
+  existingCatalog,
+  manifest,
+  generatedAt = new Date().toISOString(),
+  allowedChannels = null,
+) {
   assertDesktopReleaseManifest(manifest);
+  const channelPolicy = normalizeCatalogChannelPolicy(allowedChannels);
+  if (channelPolicy && !channelPolicy.has(manifest.channel)) {
+    throw new Error(
+      `Release channel ${manifest.channel} is not allowed in this catalog`,
+    );
+  }
   const catalog = existingCatalog == null
     ? {
         schemaVersion: DESKTOP_CATALOG_SCHEMA_VERSION,
@@ -385,6 +396,11 @@ export function mergeReleaseCatalog(existingCatalog, manifest, generatedAt = new
       }
     : structuredClone(existingCatalog);
   assertDesktopReleaseCatalog(catalog);
+  if (channelPolicy) {
+    catalog.releases = catalog.releases.filter((release) => (
+      channelPolicy.has(release.channel)
+    ));
+  }
 
   const existingIndex = catalog.releases.findIndex((release) => release.tag === manifest.tag);
   if (existingIndex >= 0) {
@@ -401,6 +417,20 @@ export function mergeReleaseCatalog(existingCatalog, manifest, generatedAt = new
   ));
   assertDesktopReleaseCatalog(catalog);
   return catalog;
+}
+
+function normalizeCatalogChannelPolicy(allowedChannels) {
+  if (allowedChannels == null) return null;
+  if (!Array.isArray(allowedChannels) || allowedChannels.length === 0) {
+    throw new Error("Catalog channel policy must contain at least one channel");
+  }
+  const channels = new Set(allowedChannels);
+  for (const channel of channels) {
+    if (!["internal", "stable", "archive"].includes(channel)) {
+      throw new Error(`Unsupported catalog channel: ${channel}`);
+    }
+  }
+  return channels;
 }
 
 export function assertDesktopReleaseCatalog(catalog) {

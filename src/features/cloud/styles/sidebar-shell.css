@@ -57,8 +57,8 @@
 }
 
 .desktop-cloud-main-view::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: var(--po-scrollbar-size, 8px);
+  height: var(--po-scrollbar-size, 8px);
 }
 
 .desktop-cloud-main-view::-webkit-scrollbar-track {
@@ -66,14 +66,14 @@
 }
 
 .desktop-cloud-main-view::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: var(--po-scrollbar-thumb);
+  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
+  border-radius: var(--po-scrollbar-radius, 999px);
+  background-color: var(--po-scrollbar-thumb);
   background-clip: padding-box;
 }
 
 .desktop-cloud-main-view::-webkit-scrollbar-thumb:hover {
-  background: var(--po-scrollbar-thumb-hover);
+  background-color: var(--po-scrollbar-thumb-hover);
   background-clip: padding-box;
 }
 

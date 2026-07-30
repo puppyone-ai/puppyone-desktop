@@ -107,6 +107,167 @@ describe("ExplorerTree interactive semantics", () => {
     expect(classifyReferenceDataTransfer(transfer)).toMatchObject({ kind: "workspace-entries", typed: true });
   });
 
+  it("keeps the internal move session across same-frame native events and window blur", () => {
+    const source: DataNode = {
+      id: "drag-me",
+      name: "drag-me.txt",
+      path: "drag-me.txt",
+      type: "text",
+    };
+    const target: DataNode = {
+      id: "target",
+      name: "target",
+      path: "target",
+      type: "folder",
+      children: [],
+    };
+    const onMoveNode = vi.fn(async () => undefined);
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => renderWithTestLocalization(root,
+      <ExplorerTree
+        nodes={[source, target]}
+        activePath={null}
+        expandedPaths={new Set()}
+        showRoot={false}
+        dragWorkspaceId="workspace-1"
+        canMoveNodes
+        onSelectNode={vi.fn()}
+        onMoveNode={onMoveNode}
+      />,
+    ));
+
+    const sourceRow = container.querySelector<HTMLElement>(`[data-explorer-path="${source.path}"]`)!;
+    const targetRow = container.querySelector<HTMLElement>(`[data-explorer-path="${target.path}"]`)!;
+    mockRowBounds(targetRow);
+    const transfer = fakeDataTransfer();
+
+    act(() => {
+      sourceRow.dispatchEvent(dragEvent("dragstart", transfer));
+      window.dispatchEvent(new Event("blur"));
+      targetRow.dispatchEvent(dragEvent("dragover", transfer));
+      targetRow.dispatchEvent(dragEvent("drop", transfer));
+    });
+
+    expect(onMoveNode).toHaveBeenCalledWith(source, target.path);
+  });
+
+  it("moves a nested file back to its parent folder through the batch callback", async () => {
+    const source: DataNode = {
+      id: "parent-child-drag-me",
+      name: "drag-me.txt",
+      path: "parent/child/drag-me.txt",
+      type: "text",
+    };
+    const child: DataNode = {
+      id: "parent-child",
+      name: "child",
+      path: "parent/child",
+      type: "folder",
+      children: [source],
+    };
+    const parent: DataNode = {
+      id: "parent",
+      name: "parent",
+      path: "parent",
+      type: "folder",
+      children: [child],
+    };
+    const onMoveNodes = vi.fn(async () => undefined);
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => renderWithTestLocalization(root,
+      <ExplorerTree
+        nodes={[parent]}
+        activePath={source.path}
+        selectedPaths={new Set([source.path])}
+        expandedPaths={new Set([parent.path, child.path])}
+        showRoot={false}
+        dragWorkspaceId="workspace-1"
+        canMoveNodes
+        onSelectNode={vi.fn()}
+        onMoveNodes={onMoveNodes}
+      />,
+    ));
+
+    const sourceRow = container.querySelector<HTMLElement>(`[data-explorer-path="${source.path}"]`)!;
+    const parentRow = container.querySelector<HTMLElement>(`[data-explorer-path="${parent.path}"]`)!;
+    mockRowBounds(parentRow);
+    const transfer = fakeDataTransfer();
+
+    await act(async () => {
+      sourceRow.dispatchEvent(dragEvent("dragstart", transfer));
+      parentRow.dispatchEvent(dragEvent("dragover", transfer));
+      parentRow.dispatchEvent(dragEvent("drop", transfer));
+      await Promise.resolve();
+    });
+
+    expect(onMoveNodes).toHaveBeenCalledWith([source], parent.path);
+  });
+
+  it("recovers an internal move from the typed native drag payload", async () => {
+    const source: DataNode = {
+      id: "payload-source",
+      name: "drag-me.txt",
+      path: "parent/child/drag-me.txt",
+      type: "text",
+    };
+    const child: DataNode = {
+      id: "payload-child",
+      name: "child",
+      path: "parent/child",
+      type: "folder",
+      children: [source],
+    };
+    const parent: DataNode = {
+      id: "payload-parent",
+      name: "parent",
+      path: "parent",
+      type: "folder",
+      children: [child],
+    };
+    const onMoveNodes = vi.fn(async () => undefined);
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => renderWithTestLocalization(root,
+      <ExplorerTree
+        nodes={[parent]}
+        activePath={source.path}
+        selectedPaths={new Set([source.path])}
+        expandedPaths={new Set([parent.path, child.path])}
+        showRoot={false}
+        dragWorkspaceId="workspace-1"
+        canMoveNodes
+        onSelectNode={vi.fn()}
+        onMoveNodes={onMoveNodes}
+      />,
+    ));
+
+    const parentRow = container.querySelector<HTMLElement>(`[data-explorer-path="${parent.path}"]`)!;
+    mockRowBounds(parentRow);
+    const transfer = fakeDataTransfer();
+    transfer.setData(EXPLORER_REFERENCE_DRAG_TYPE, JSON.stringify({
+      version: 1,
+      workspaceId: "workspace-1",
+      entries: [{
+        path: source.path,
+        name: source.name,
+        entryType: "file",
+      }],
+    }));
+
+    await act(async () => {
+      parentRow.dispatchEvent(dragEvent("dragover", transfer));
+      parentRow.dispatchEvent(dragEvent("drop", transfer));
+      await Promise.resolve();
+    });
+
+    expect(onMoveNodes).toHaveBeenCalledWith([source], parent.path);
+  });
+
   it("clears external-file drop feedback when the drag leaves the tree", () => {
     const folder: DataNode = {
       id: "recordings",
