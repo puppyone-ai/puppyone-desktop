@@ -21,7 +21,7 @@
   "detail.downloading": "正在下载 {progress}。",
   "detail.downloaded": "版本 {version} 已可安装。",
   "detail.installing": "正在重启以安装更新。",
-  "detail.blocked": "更新已下载。重启正在等待当前工作完成。",
+  "detail.blocked": "更新已下载。PuppyOne 内仍有会话，需要确认后才能重启。",
   "detail.error": "上次更新操作失败。",
   "detail.unknown": "应用更新状态未知。"
 }

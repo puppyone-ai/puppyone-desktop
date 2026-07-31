@@ -523,6 +523,7 @@ app.whenReady().then(async () => {
     ipcMain: trustedIpcMain,
     getWindows: () => BrowserWindow.getAllWindows(),
     getRestartBlockers: getUpdateRestartBlockers,
+    confirmRestartWithBlockers: confirmUpdateRestartWithBlockers,
   });
   appPreviewRuntime = createAppPreviewRuntime({
     app,
@@ -719,21 +720,66 @@ function registerIpcHandlers() {
 
 function getUpdateRestartBlockers() {
   const blockers = [];
-  if (terminalService.getSessionCount() > 0) {
+  const terminalSessionCount = terminalService.getSessionCount();
+  if (terminalSessionCount > 0) {
     blockers.push({
       id: "terminal-sessions",
-      label: localeService.t("native.update.blocker.terminal.label"),
-      detail: localeService.t("native.update.blocker.terminal.detail"),
+      label: localeService.t("native.update.blocker.terminal.label", {
+        count: terminalSessionCount,
+      }),
+      detail: localeService.t("native.update.blocker.terminal.detail", {
+        count: terminalSessionCount,
+      }),
     });
   }
-  if (agentService.getSessionCount() > 0) {
+  const agentSessionCount = agentService.getSessionCount();
+  if (agentSessionCount > 0) {
     blockers.push({
       id: "agent-sessions",
-      label: localeService.t("native.update.blocker.agent.label"),
-      detail: localeService.t("native.update.blocker.agent.detail"),
+      label: localeService.t("native.update.blocker.agent.label", {
+        count: agentSessionCount,
+      }),
+      detail: localeService.t("native.update.blocker.agent.detail", {
+        count: agentSessionCount,
+      }),
     });
   }
   return blockers;
+}
+
+async function confirmUpdateRestartWithBlockers({
+  availableVersion,
+  blockers,
+}) {
+  const version = typeof availableVersion === "string" && availableVersion.trim()
+    ? availableVersion.trim()
+    : desktopBuildInfo.version;
+  const blockerDetails = blockers
+    .map((blocker) => blocker.detail ?? blocker.label)
+    .filter(Boolean)
+    .map((detail) => `• ${detail}`)
+    .join("\n");
+  const options = {
+    type: "warning",
+    buttons: [
+      localeService.t("native.update.confirm.cancel"),
+      localeService.t("native.update.confirm.proceed"),
+    ],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+    title: localeService.t("native.update.confirm.title"),
+    message: localeService.t("native.update.confirm.message", { version }),
+    detail: [
+      localeService.t("native.update.confirm.detail"),
+      blockerDetails,
+    ].filter(Boolean).join("\n\n"),
+  };
+  const owner = getLastFocusedWindow();
+  const result = owner
+    ? await dialog.showMessageBox(owner, options)
+    : await dialog.showMessageBox(options);
+  return result.response === 1;
 }
 
 async function getInitialWorkspaceResultForWindow(sender) {

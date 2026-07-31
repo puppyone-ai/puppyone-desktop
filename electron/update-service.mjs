@@ -46,7 +46,8 @@ export function createUpdateService({
   buildInfo,
   ipcMain,
   getWindows,
-  getRestartBlockers,
+  getRestartBlockers = () => [],
+  confirmRestartWithBlockers = () => false,
   environment = process.env,
   platform = process.platform,
   autoUpdater = updaterPackage.autoUpdater,
@@ -223,7 +224,7 @@ export function createUpdateService({
   async function downloadUpdate() {
     return runExclusive(async () => {
       if (!canUseUpdater) return state;
-      if (state.status === "downloaded") return state;
+      if (state.status === "downloaded" || state.status === "blocked") return state;
 
       if (UPDATE_ACTION_STATES.has(state.status) && state.status !== "available") {
         await checkForUpdatesInternal();
@@ -328,7 +329,12 @@ export function createUpdateService({
         blockers,
         error: null,
       });
-      return;
+      const confirmed = await Promise.resolve(confirmRestartWithBlockers({
+        availableVersion: state.availableVersion,
+        blockers,
+        currentVersion,
+      }));
+      if (!confirmed) return;
     }
 
     publishState({
@@ -406,8 +412,7 @@ function createInitialUpdateState({ channel, currentVersion, disabledReason }) {
 function shouldCheckBeforeUpdateNow(status) {
   return status === "idle"
     || status === "not-available"
-    || status === "error"
-    || status === "blocked";
+    || status === "error";
 }
 
 function getDisabledReason(app, configuration, platform) {

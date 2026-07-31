@@ -21,7 +21,7 @@
   "detail.downloading": "Téléchargement de {progress}.",
   "detail.downloaded": "La version {version} est prête à être installée.",
   "detail.installing": "Redémarrage pour installer la mise à jour.",
-  "detail.blocked": "Mise à jour téléchargée. Le redémarrage attend le travail actif.",
+  "detail.blocked": "Mise à jour téléchargée. Des sessions sont ouvertes dans PuppyOne ; le redémarrage doit être confirmé.",
   "detail.error": "La dernière opération de mise à jour a échoué.",
   "detail.unknown": "L’état de la mise à jour de l’application est inconnu."
 }

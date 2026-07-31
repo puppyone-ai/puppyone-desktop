@@ -21,7 +21,7 @@
   "detail.downloading": "Downloading {progress}.",
   "detail.downloaded": "Version {version} is ready to install.",
   "detail.installing": "Restarting to install the update.",
-  "detail.blocked": "Update downloaded. Restart is waiting on active work.",
+  "detail.blocked": "Update downloaded. Restart needs confirmation because PuppyOne has open sessions.",
   "detail.error": "The last update operation failed.",
   "detail.unknown": "App update status is unknown."
 }

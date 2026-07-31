@@ -21,7 +21,7 @@
   "detail.downloading": "다운로드 중 {progress}.",
   "detail.downloaded": "버전 {version}을 설치할 수 있습니다.",
   "detail.installing": "업데이트 설치를 위해 다시 시작하고 있습니다.",
-  "detail.blocked": "업데이트를 다운로드했습니다. 진행 중인 작업이 끝날 때까지 다시 시작을 기다립니다.",
+  "detail.blocked": "업데이트를 다운로드했습니다. PuppyOne에 열린 세션이 있어 다시 시작하려면 확인이 필요합니다.",
   "detail.error": "마지막 업데이트 작업에 실패했습니다.",
   "detail.unknown": "앱 업데이트 상태를 알 수 없습니다."
 }

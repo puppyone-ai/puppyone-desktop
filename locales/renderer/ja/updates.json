@@ -21,7 +21,7 @@
   "detail.downloading": "ダウンロード中 {progress}。",
   "detail.downloaded": "バージョン {version} をインストールできます。",
   "detail.installing": "アップデートをインストールするため再起動しています。",
-  "detail.blocked": "アップデートをダウンロードしました。進行中の作業が終わるまで再起動を待機します。",
+  "detail.blocked": "アップデートをダウンロードしました。PuppyOne に開いているセッションがあるため、再起動には確認が必要です。",
   "detail.error": "前回のアップデート操作に失敗しました。",
   "detail.unknown": "アプリのアップデート状態が不明です。"
 }
