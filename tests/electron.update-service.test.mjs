@@ -162,3 +162,87 @@ describe("Desktop updater channel isolation", () => {
     }
   });
 });
+
+describe("Desktop updater restart safety", () => {
+  it("reuses a downloaded update and confirms PuppyOne-owned sessions without checking again", async () => {
+    const buildInfo = resolveDesktopBuildIdentity({
+      baseVersion: "1.4.0",
+      buildNumber: 75,
+      channel: "stable",
+      commitSha,
+    });
+    const handlers = new Map();
+    const autoUpdater = new EventEmitter();
+    const updateInfo = {
+      version: "1.4.1",
+      releaseName: "PuppyOne 1.4.1",
+      releaseDate: "2026-07-31T00:00:00.000Z",
+      releaseNotes: null,
+    };
+    const checkForUpdates = vi.fn(async () => {
+      autoUpdater.emit("update-available", updateInfo);
+      return { updateInfo };
+    });
+    const downloadUpdate = vi.fn(async () => {
+      autoUpdater.emit("update-downloaded", updateInfo);
+      return [];
+    });
+    const quitAndInstall = vi.fn();
+    const confirmRestartWithBlockers = vi.fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    Object.assign(autoUpdater, {
+      checkForUpdates,
+      downloadUpdate,
+      quitAndInstall,
+      setFeedURL: vi.fn(),
+    });
+    const blockers = [{
+      id: "terminal-sessions",
+      label: "PuppyOne terminal sessions open (4)",
+      detail: "External terminals are not affected.",
+    }];
+    const service = createUpdateService({
+      app: { isPackaged: true },
+      autoUpdater,
+      buildInfo,
+      confirmRestartWithBlockers,
+      getRestartBlockers: () => blockers,
+      getWindows: () => [],
+      ipcMain: {
+        handle: (channel, handler) => handlers.set(channel, handler),
+      },
+      platform: "linux",
+    });
+
+    service.start();
+    const updateNow = handlers.get("updates:update-now");
+    expect(updateNow).toBeTypeOf("function");
+
+    await updateNow();
+    expect(service.getState()).toMatchObject({
+      status: "blocked",
+      availableVersion: "1.4.1",
+      blockers,
+    });
+    expect(checkForUpdates).toHaveBeenCalledTimes(1);
+    expect(downloadUpdate).toHaveBeenCalledTimes(1);
+    expect(quitAndInstall).not.toHaveBeenCalled();
+    expect(confirmRestartWithBlockers).toHaveBeenLastCalledWith({
+      availableVersion: "1.4.1",
+      blockers,
+      currentVersion: "1.4.0",
+    });
+
+    await updateNow();
+    expect(service.getState()).toMatchObject({
+      status: "installing",
+      availableVersion: "1.4.1",
+      blockers: [],
+    });
+    expect(checkForUpdates).toHaveBeenCalledTimes(1);
+    expect(downloadUpdate).toHaveBeenCalledTimes(1);
+    expect(confirmRestartWithBlockers).toHaveBeenCalledTimes(2);
+    expect(quitAndInstall).toHaveBeenCalledOnce();
+  });
+});

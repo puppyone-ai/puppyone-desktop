@@ -89,7 +89,10 @@ export function DesktopUpdateSettingsRow({
 
   return (
     <div className="desktop-settings-row desktop-settings-row-control">
-      <span>{t("updates.settings.title")}</span>
+      <div className="desktop-settings-label-stack">
+        <strong>{t("updates.settings.title")}</strong>
+        <small aria-live="polite">{detail}</small>
+      </div>
       <button
         className={`desktop-settings-action ${action.primary ? "primary" : ""}`}
         type="button"
@@ -150,10 +153,10 @@ function getSettingsAction(
   if (state.status === "installing") {
     return { kind: "update", label: t("updates.action.restarting"), disabled: true, spinning: true, primary: true };
   }
-  if (state.status === "downloaded") {
+  if (state.status === "downloaded" || state.status === "blocked") {
     return { kind: "update", label: t("updates.action.restart"), disabled: false, spinning: false, primary: true };
   }
-  if (state.status === "available" || state.status === "blocked") {
+  if (state.status === "available") {
     return { kind: "update", label: t("updates.action.updateNow"), disabled: false, spinning: false, primary: true };
   }
   if (state.status === "error") {

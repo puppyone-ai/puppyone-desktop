@@ -21,7 +21,7 @@
   "detail.downloading": "Wird heruntergeladen: {progress}.",
   "detail.downloaded": "Version {version} kann installiert werden.",
   "detail.installing": "Neustart zur Installation des Updates.",
-  "detail.blocked": "Update heruntergeladen. Der Neustart wartet auf den Abschluss aktiver Arbeit.",
+  "detail.blocked": "Update heruntergeladen. Da in PuppyOne Sitzungen geöffnet sind, muss der Neustart bestätigt werden.",
   "detail.error": "Der letzte Updatevorgang ist fehlgeschlagen.",
   "detail.unknown": "Der App-Updatestatus ist unbekannt."
 }
