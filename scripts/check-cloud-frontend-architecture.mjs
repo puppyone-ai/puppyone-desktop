@@ -240,7 +240,7 @@ const expectedOverviewStyleManifest = [
   '@import "./styles/resource-cards.css" layer(features);',
   '@import "./styles/responsive.css" layer(features);',
 ].join("\n");
-if (read("src/features/cloud/sections/overview/overview.css").trim() !== expectedOverviewStyleManifest) {
+if (normalizeText(read("src/features/cloud/sections/overview/overview.css")).trim() !== expectedOverviewStyleManifest) {
   errors.push("Overview styles must keep their layered manifest in semantic render order");
 }
 
@@ -250,7 +250,7 @@ const expectedHistoryStyleManifest = [
   '@import "./styles/sidebar.css" layer(features);',
   '@import "./styles/detail.css" layer(features);',
 ].join("\n");
-if (read("src/features/cloud/history/history.css").trim() !== expectedHistoryStyleManifest) {
+if (normalizeText(read("src/features/cloud/history/history.css")).trim() !== expectedHistoryStyleManifest) {
   errors.push("History styles must keep their layered manifest in semantic render order");
 }
 
@@ -307,6 +307,10 @@ function read(relativePath) {
 
 function readAbsolute(filePath) {
   return readFileSync(filePath, "utf8");
+}
+
+function normalizeText(source) {
+  return source.replace(/\r\n/g, "\n");
 }
 
 function countLines(source) {

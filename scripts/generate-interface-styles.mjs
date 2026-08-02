@@ -35,7 +35,9 @@ const staleOutputs = [];
 for (const [outputPath, expected] of outputs) {
   if (checkOnly) {
     const current = existsSync(outputPath) ? readFileSync(outputPath, "utf8") : null;
-    if (current !== expected) staleOutputs.push(path.relative(repoRoot, outputPath));
+    if (current === null || normalizeText(current) !== normalizeText(expected)) {
+      staleOutputs.push(path.relative(repoRoot, outputPath));
+    }
     continue;
   }
   writeFileSync(outputPath, expected);
@@ -157,6 +159,10 @@ function renderStylesheetEntry(value) {
 
 function isNonEmptyString(value) {
   return typeof value === "string" && value.length > 0;
+}
+
+function normalizeText(source) {
+  return source.replace(/\r\n/g, "\n");
 }
 
 function fail(message) {

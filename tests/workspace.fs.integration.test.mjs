@@ -354,7 +354,14 @@ describe("workspace config containment", () => {
   it("rejects a symlinked config directory instead of reading or writing outside", async () => {
     await mkdir(path.join(external, "config-target"));
     await writeFile(path.join(external, "config-target", "config.json"), '{"project":{"name":"secret"}}');
-    await symlink(path.join(external, "config-target"), path.join(root, ".puppyone"));
+    try {
+      await symlink(path.join(external, "config-target"), path.join(root, ".puppyone"));
+    } catch {
+      // Windows developer-mode / policy can prohibit symlink creation for an
+      // unprivileged process. The containment behavior is covered on hosts
+      // where a symlink can be created.
+      return;
+    }
 
     await expect(readPuppyoneWorkspaceConfig(root)).rejects.toThrow(/real directory/i);
     await expect(writePuppyoneWorkspaceConfig(root, { version: 1 })).rejects.toThrow(/real directory/i);
@@ -539,6 +546,9 @@ describe("copyWorkspaceEntry", () => {
   });
 
   it("copies non-writable source folders and restores their mode", async () => {
+    // Windows does not provide POSIX directory modes through chmod/stat, so
+    // this contract cannot be exercised faithfully there.
+    if (process.platform === "win32") return;
     await createWorkspaceEntry(root, { parentPath: null, name: "source", kind: "folder" });
     await createWorkspaceEntry(root, { parentPath: "source", name: "note.txt", kind: "file", content: "readonly" });
     await chmod(path.join(root, "source"), 0o555);

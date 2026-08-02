@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const errors = [];
 const cascade = read("src/styles/cascade.css");
-const rendererEntry = read("src/main.tsx");
+const rendererEntry = normalizeText(read("src/main.tsx"));
 const productStyles = read("src/styles.css");
 const tailwindEntry = read("src/cloud-globals.css");
 const tailwindConfig = read("tailwind.config.cjs");
@@ -72,6 +72,10 @@ function read(relativePath) {
 
 function readAbsolute(filePath) {
   return readFileSync(filePath, "utf8");
+}
+
+function normalizeText(source) {
+  return source.replace(/\r\n/g, "\n");
 }
 
 function walkCss(directory) {
