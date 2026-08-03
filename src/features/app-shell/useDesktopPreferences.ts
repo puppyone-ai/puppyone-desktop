@@ -23,6 +23,7 @@ import {
   TEXT_SIZE_STORAGE_KEY,
   TYPOGRAPHY_STORAGE_KEY,
   THEME_STORAGE_KEY,
+  TERMINAL_SESSION_LAYOUT_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
   getSidebarNavigationOrientation,
   getSidebarNavigationPlacement,
@@ -44,6 +45,7 @@ import {
   type SidebarNavigationVisibilitySettings,
   type ThemeMode,
   type TextSize,
+  type TerminalSessionLayout,
   type TypographyPreferences,
   type TitlebarActionsSettings,
 } from "../../preferences";
@@ -79,6 +81,7 @@ import {
   readInitialLoadingAnimationPreset,
   readInitialPointerCursors,
   readInitialTextSize,
+  readInitialTerminalSessionLayout,
   readInitialTypographyPreferences,
   readInitialThemeMode,
   readSystemDarkMode,
@@ -113,6 +116,9 @@ export function useDesktopPreferences() {
   const [experimentalSettings, setExperimentalSettings] = useState<ExperimentalSettings>(() => readInitialExperimentalSettings());
   const [rightSidebarToolsSettings, setRightSidebarToolsSettings] = useState<RightSidebarToolsSettings>(() => readInitialRightSidebarToolsSettings());
   const [titlebarActionsSettings, setTitlebarActionsSettings] = useState<TitlebarActionsSettings>(() => readInitialTitlebarActionsSettings());
+  const [terminalSessionLayout, setTerminalSessionLayout] = useState<TerminalSessionLayout>(
+    () => readInitialTerminalSessionLayout(),
+  );
   const [aiEditAssistEnabled, setAiEditAssistEnabled] = useState(() => readInitialAiEditAssistEnabled());
   const [explorerWidth, setExplorerWidth] = useState(() => readInitialExplorerWidth());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readInitialSidebarCollapsed());
@@ -244,6 +250,10 @@ export function useDesktopPreferences() {
   }, [titlebarActionsSettings]);
 
   useEffect(() => {
+    window.localStorage.setItem(TERMINAL_SESSION_LAYOUT_STORAGE_KEY, terminalSessionLayout);
+  }, [terminalSessionLayout]);
+
+  useEffect(() => {
     window.localStorage.setItem(AI_EDIT_ASSIST_STORAGE_KEY, aiEditAssistEnabled ? "true" : "false");
   }, [aiEditAssistEnabled]);
 
@@ -311,6 +321,7 @@ export function useDesktopPreferences() {
     sidebarNavigationPlacement,
     sidebarNavigationVisibilitySettings,
     terminalToolEnabled,
+    terminalSessionLayout,
     titlebarActionsSettings,
     darkThemePreset,
     lightThemePreset,
@@ -345,6 +356,7 @@ export function useDesktopPreferences() {
     setLoadingAnimationPreset,
     setPointerCursors,
     setTextSize,
+    setTerminalSessionLayout,
     setThemeMode,
     setTypographyPreferences,
   };

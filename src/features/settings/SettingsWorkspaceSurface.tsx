@@ -14,6 +14,7 @@ import type {
   SidebarNavigationLayout,
   SidebarNavigationVisibilitySettings,
   TextSize,
+  TerminalSessionLayout,
   ThemeMode,
   TitlebarActionsSettings,
   TypographyPreferences,
@@ -48,6 +49,7 @@ export type SettingsPreferencesPort = {
   experimentalSettings: ExperimentalSettings;
   rightSidebarToolsSettings: RightSidebarToolsSettings;
   titlebarActionsSettings: TitlebarActionsSettings;
+  terminalSessionLayout: TerminalSessionLayout;
   aiEditAssistEnabled: boolean;
   setThemeMode: (value: ThemeMode) => void;
   setInterfaceStyle: (value: InterfaceStyle) => void;
@@ -67,6 +69,7 @@ export type SettingsPreferencesPort = {
   setExperimentalSettings: (value: ExperimentalSettings) => void;
   setRightSidebarToolsSettings: (value: RightSidebarToolsSettings) => void;
   setTitlebarActionsSettings: (value: TitlebarActionsSettings) => void;
+  setTerminalSessionLayout: (value: TerminalSessionLayout) => void;
   setAiEditAssistEnabled: (value: boolean) => void;
 };
 
@@ -143,6 +146,7 @@ export function createSettingsWorkspaceSurface({
         experimentalSettings={preferences.experimentalSettings}
         rightSidebarToolsSettings={preferences.rightSidebarToolsSettings}
         titlebarActionsSettings={preferences.titlebarActionsSettings}
+        terminalSessionLayout={preferences.terminalSessionLayout}
         aiEditAssistEnabled={preferences.aiEditAssistEnabled}
         cloudEnabled={cloud.enabled}
         cloudSession={cloud.session}
@@ -172,6 +176,7 @@ export function createSettingsWorkspaceSurface({
         onExperimentalSettingsChange={preferences.setExperimentalSettings}
         onRightSidebarToolsSettingsChange={preferences.setRightSidebarToolsSettings}
         onTitlebarActionsSettingsChange={preferences.setTitlebarActionsSettings}
+        onTerminalSessionLayoutChange={preferences.setTerminalSessionLayout}
         onAiEditAssistEnabledChange={preferences.setAiEditAssistEnabled}
         onCloudSessionChange={cloud.onSessionChange}
         onPuppyoneConfigChange={workspaceConfig.change}

@@ -259,7 +259,7 @@ body.data-sidebar-resizing * {
 }
 
 .desktop-sidebar-footer-button.active {
-  background: var(--po-hover);
+  background: var(--po-selected);
   color: var(--po-text);
 }
 
@@ -334,7 +334,7 @@ body.data-sidebar-resizing * {
 }
 
 .desktop-sidebar-rail-button.active {
-  background: var(--po-hover);
+  background: var(--po-selected);
   color: var(--po-text);
 }
 
@@ -515,7 +515,7 @@ body.data-sidebar-resizing * {
 }
 
 .desktop-sidebar-top-navigation-button.active {
-  background: var(--po-hover);
+  background: var(--po-selected);
   color: var(--po-text);
 }
 

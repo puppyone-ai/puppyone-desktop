@@ -333,19 +333,10 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
   top: 50%;
   inset-inline-end: 5px;
   z-index: 1;
-  display: inline-flex;
-  width: 22px;
-  height: 22px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--po-text-disabled);
   opacity: 0;
   pointer-events: none;
   transform: translateY(-50%);
-  transition: opacity 0.12s ease, background 0.1s ease, color 0.1s ease;
+  transition: opacity 0.12s ease;
 }
 
 .desktop-project-option-row:hover .desktop-project-copy-path,
@@ -353,13 +344,6 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar-inner {
 .desktop-project-copy-path.is-copied {
   opacity: 1;
   pointer-events: auto;
-}
-
-.desktop-project-copy-path:hover,
-.desktop-project-copy-path:focus-visible {
-  background: var(--po-control);
-  color: var(--po-text);
-  outline: none;
 }
 
 .desktop-project-copy-path.is-copied,

@@ -1,7 +1,7 @@
 import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import type { CreateNewMenuSettings, DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
+import type { CreateNewMenuSettings, DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TerminalSessionLayout, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
 
 export type SettingsSection = "general" | "local-project" | "appearance" | "external-apps" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
 
@@ -30,6 +30,7 @@ export type SettingsViewProps = {
   experimentalSettings: ExperimentalSettings;
   rightSidebarToolsSettings: RightSidebarToolsSettings;
   titlebarActionsSettings: TitlebarActionsSettings;
+  terminalSessionLayout: TerminalSessionLayout;
   aiEditAssistEnabled: boolean;
   cloudEnabled: boolean;
   cloudSession: DesktopCloudSession | null;
@@ -59,6 +60,7 @@ export type SettingsViewProps = {
   onExperimentalSettingsChange: (settings: ExperimentalSettings) => void;
   onRightSidebarToolsSettingsChange: (settings: RightSidebarToolsSettings) => void;
   onTitlebarActionsSettingsChange: (settings: TitlebarActionsSettings) => void;
+  onTerminalSessionLayoutChange: (layout: TerminalSessionLayout) => void;
   onAiEditAssistEnabledChange: (enabled: boolean) => void;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onPuppyoneConfigChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;

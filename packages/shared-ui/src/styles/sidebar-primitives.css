@@ -85,14 +85,15 @@
   text-align: start;
 }
 
-.po-sidebar-row:hover:not(:disabled),
-.po-sidebar-row.active {
+.po-sidebar-row:hover:not(:disabled) {
   background: var(--po-hover);
   color: var(--po-text);
 }
 
+.po-sidebar-row.active,
 .po-sidebar-row.active:hover:not(:disabled) {
   background: var(--po-selected);
+  color: var(--po-text);
 }
 
 .po-sidebar-row:disabled,

@@ -99,6 +99,7 @@
     .desktop-utility-icon-button,
     .desktop-explorer-actions button,
     .tree-row-action-button,
+    .desktop-menu-icon-button,
     .desktop-dialog-icon-button,
     .editor-mode-toggle button
   ) {
@@ -113,6 +114,7 @@
     .desktop-utility-icon-button,
     .desktop-explorer-actions button,
     .tree-row-action-button,
+    .desktop-menu-icon-button,
     .desktop-dialog-icon-button,
     .editor-mode-toggle button
   ):hover:not(:disabled),

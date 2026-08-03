@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const sharedSidebarCss = read("../packages/shared-ui/src/styles/sidebar-primitives.css");
+const dataShellCss = read("../src/features/data-workspace/data-shell.css");
 const patternCss = read("../src/styles/sidebar/patterns.css");
 const layoutCss = read("../src/styles/layout.css");
 const dataSurfaceSource = read("../src/features/app-shell/DesktopDataWorkspaceSurface.tsx");
@@ -23,6 +24,22 @@ describe("Sidebar architecture", () => {
     expect(sharedSidebarCss).toContain("padding-inline:");
     expect(sharedSidebarCss).not.toMatch(/\bleft\s*:/);
     expect(sharedSidebarCss).not.toMatch(/\bright\s*:/);
+  });
+
+  it("reserves hover for hover and uses the selected token for persistent navigation", () => {
+    expect(sharedSidebarCss).toMatch(
+      /\.po-sidebar-row:hover:not\(:disabled\)\s*\{[^}]*background:\s*var\(--po-hover\);/s,
+    );
+    expect(sharedSidebarCss).toMatch(
+      /\.po-sidebar-row\.active,[^\{]*\.po-sidebar-row\.active:hover:not\(:disabled\)\s*\{[^}]*background:\s*var\(--po-selected\);/s,
+    );
+    for (const selector of [
+      ".desktop-sidebar-footer-button.active",
+      ".desktop-sidebar-rail-button.active",
+      ".desktop-sidebar-top-navigation-button.active",
+    ]) {
+      expect(readCssBlock(dataShellCss, selector)).toContain("background: var(--po-selected);");
+    }
   });
 
   it("keeps Data alive and projects one resolved surface into both regions", () => {
@@ -89,4 +106,14 @@ describe("Sidebar architecture", () => {
 
 function read(relativePath: string) {
   return readFileSync(new URL(relativePath, import.meta.url), "utf8");
+}
+
+function readCssBlock(css: string, selector: string): string {
+  const marker = `\n${selector} {`;
+  const start = css.indexOf(marker);
+  if (start < 0) throw new Error(`Missing CSS block for ${selector}`);
+  const bodyStart = start + marker.length;
+  const end = css.indexOf("\n}", bodyStart);
+  if (end < 0) throw new Error(`Unclosed CSS block for ${selector}`);
+  return css.slice(bodyStart, end);
 }

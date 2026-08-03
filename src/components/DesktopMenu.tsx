@@ -69,6 +69,35 @@ export type DesktopMenuItemProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>,
   trailing?: ReactNode;
 };
 
+export type DesktopMenuIconButtonProps = Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "aria-label" | "children"
+> & {
+  icon: ReactNode;
+  label: string;
+};
+
+export function DesktopMenuIconButton({
+  className,
+  icon,
+  label,
+  title = label,
+  type = "button",
+  ...props
+}: DesktopMenuIconButtonProps) {
+  return (
+    <button
+      className={cx("desktop-menu-icon-button", className)}
+      type={type}
+      aria-label={label}
+      title={title}
+      {...props}
+    >
+      {icon}
+    </button>
+  );
+}
+
 export function DesktopMenuItem({
   className,
   detail,

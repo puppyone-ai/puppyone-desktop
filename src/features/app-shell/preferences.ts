@@ -24,6 +24,7 @@ import {
   TEXT_SIZE_STORAGE_KEY,
   TYPOGRAPHY_STORAGE_KEY,
   THEME_STORAGE_KEY,
+  TERMINAL_SESSION_LAYOUT_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
   parseAiEditAssistEnabled,
   parseCreateNewMenuSettings,
@@ -43,6 +44,7 @@ import {
   parseSidebarNavigationVisibilitySettings,
   parseThemeMode,
   parseTextSize,
+  parseTerminalSessionLayout,
   parseTypography,
   parseTitlebarActionsSettings,
   type DarkThemePreset,
@@ -61,6 +63,7 @@ import {
   type SidebarNavigationVisibilitySettings,
   type ThemeMode,
   type TextSize,
+  type TerminalSessionLayout,
   type TypographyPreferences,
   type TitlebarActionsSettings,
 } from "../../preferences";
@@ -179,6 +182,11 @@ export function readInitialRightSidebarToolsSettings(): RightSidebarToolsSetting
 export function readInitialTitlebarActionsSettings(): TitlebarActionsSettings {
   if (typeof window === "undefined") return parseTitlebarActionsSettings(null);
   return parseTitlebarActionsSettings(window.localStorage.getItem(TITLEBAR_ACTIONS_STORAGE_KEY));
+}
+
+export function readInitialTerminalSessionLayout(): TerminalSessionLayout {
+  if (typeof window === "undefined") return parseTerminalSessionLayout(null);
+  return parseTerminalSessionLayout(window.localStorage.getItem(TERMINAL_SESSION_LAYOUT_STORAGE_KEY));
 }
 
 export function mergePuppyoneWorkspaceConfig(

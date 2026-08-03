@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState, type MouseEvent, type RefObject } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { ArrowLeft, Check, Copy, Folder, FolderOpen } from "lucide-react";
-import { DesktopMenuItem, DesktopMenuSection, DesktopMenuSurface } from "../../components/DesktopMenu";
+import {
+  DesktopMenuIconButton,
+  DesktopMenuItem,
+  DesktopMenuSection,
+  DesktopMenuSurface,
+} from "../../components/DesktopMenu";
 import { writeClipboardText } from "../settings/utils";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
 
@@ -153,17 +158,17 @@ function DesktopProjectMenuRow({
         </span>
       </button>
       {path ? (
-        <button
+        <DesktopMenuIconButton
           className={`desktop-project-copy-path ${copied ? "is-copied" : ""}`}
-          type="button"
-          aria-label={copied
+          label={copied
             ? t("shell.workspaceSwitcher.pathCopied")
             : t("shell.workspaceSwitcher.copyPathFor", { project: bidiIsolate(item.label) })}
           title={t(copied ? "common.action.copied" : "shell.workspaceSwitcher.copyPath")}
+          icon={copied
+            ? <Check size={13} strokeWidth={2.2} aria-hidden="true" />
+            : <Copy size={13} strokeWidth={1.9} aria-hidden="true" />}
           onClick={(event) => void handleCopyPath(event)}
-        >
-          {copied ? <Check size={13} strokeWidth={2.2} /> : <Copy size={13} strokeWidth={1.9} />}
-        </button>
+        />
       ) : null}
     </div>
   );
