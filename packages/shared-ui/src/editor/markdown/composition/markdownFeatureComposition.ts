@@ -23,17 +23,20 @@ import { htmlFeature } from "../features/html/htmlFeature";
 import { imageFeature } from "../features/image/imageFeature";
 import { mediaSyntaxFeature } from "../features/media/mediaSyntaxFeature";
 import { mermaidFeature } from "../features/mermaid/mermaidFeature";
+import { createMdxComponentFeature } from "../features/mdx-component/mdxComponentFeature";
 import { createTableFeature } from "../features/table/tableFeature";
 import { videoFeature } from "../features/video/videoFeature";
 import { renderMarkdownInlineFromSharedPolicy } from "./preview/markdownInlinePlanAdapter";
+import type { MarkdownDialectId } from "../../viewerTypes";
 
 /**
  * The only built-in Markdown Feature registration point. The list is static,
  * ordered, and frozen; this is composition, not a runtime plugin registry.
  */
 const tableFeature = createTableFeature(renderMarkdownInlineFromSharedPolicy);
+const mdxComponentFeature = createMdxComponentFeature(renderMarkdownInlineFromSharedPolicy);
 
-const builtInMarkdownFeatures = Object.freeze([
+const puppyGfmFeatures = Object.freeze([
   mediaSyntaxFeature,
   codeBlockFeature,
   mermaidFeature,
@@ -43,9 +46,35 @@ const builtInMarkdownFeatures = Object.freeze([
   imageFeature,
 ] as const);
 
-export const markdownFeatureComposition = createMarkdownFeatureComposition(
-  builtInMarkdownFeatures,
+const openKnowledgeMdxFeatures = Object.freeze([
+  mediaSyntaxFeature,
+  codeBlockFeature,
+  mermaidFeature,
+  mdxComponentFeature,
+  htmlFeature,
+  tableFeature,
+  videoFeature,
+  imageFeature,
+] as const);
+
+export const puppyGfmFeatureComposition = createMarkdownFeatureComposition(
+  puppyGfmFeatures,
 );
+
+export const openKnowledgeMdxFeatureComposition = createMarkdownFeatureComposition(
+  openKnowledgeMdxFeatures,
+);
+
+/** Compatibility default for generic `.md` fixtures and public consumers. */
+export const markdownFeatureComposition = puppyGfmFeatureComposition;
+
+export function getMarkdownFeatureComposition(
+  dialect: MarkdownDialectId,
+): MarkdownFeatureComposition {
+  return dialect === "openknowledge-mdx"
+    ? openKnowledgeMdxFeatureComposition
+    : puppyGfmFeatureComposition;
+}
 
 /** Compatibility name for tests and the public CodeMirror language assembly. */
 export const puppyMarkdownParserExtensions = markdownFeatureComposition.parserExtensions;
@@ -54,11 +83,16 @@ export const puppyMarkdownParserExtensions = markdownFeatureComposition.parserEx
 export const puppyMarkdownFeatureCompositionExtension =
   markdownFeatureCompositionFacet.of(markdownFeatureComposition);
 
+export function markdownFeatureCompositionExtension(dialect: MarkdownDialectId) {
+  return markdownFeatureCompositionFacet.of(getMarkdownFeatureComposition(dialect));
+}
+
 /** Pure built-in compiler entry for fixtures and non-EditorState consumers. */
 export function compilePuppyMarkdownElementPlan(element: MarkdownElement) {
   return compileMarkdownElementPlan(element, {
     documentProfile: "normal",
     featureComposition: markdownFeatureComposition,
+    assetBrokerAvailable: false,
   });
 }
 

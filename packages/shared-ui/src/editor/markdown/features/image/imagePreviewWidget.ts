@@ -16,6 +16,8 @@ import {
 } from "../../shared/widgets/markdownWidgetMeasure";
 import { MarkdownWidgetMeasureController } from "../../platform/codemirror/layoutCoordinator";
 import { getMappedWidgetSourceRange, hasPointerMoved } from "../../shared/widgets/widgetDom";
+import { prepareBrokeredMarkdownImage } from "../media/markdownPassiveImage";
+import type { MarkdownImageDisplayMode } from "../../core/features/markdownFeatureData";
 
 /**
  * Immutable image atom descriptor. Asset resolution, measure, and listeners
@@ -32,6 +34,7 @@ export class ImagePreviewWidget extends WidgetType {
     private readonly title: string | null,
     private readonly documentPath: string,
     private readonly resolvedSource: string | null = source,
+    private readonly displayMode: MarkdownImageDisplayMode = "inline",
   ) {
     super();
     this.sourceLength = Math.max(0, to - from);
@@ -45,7 +48,8 @@ export class ImagePreviewWidget extends WidgetType {
       widget.source === this.source &&
       widget.title === this.title &&
       widget.documentPath === this.documentPath &&
-      widget.resolvedSource === this.resolvedSource
+      widget.resolvedSource === this.resolvedSource &&
+      widget.displayMode === this.displayMode
     );
   }
 
@@ -54,7 +58,8 @@ export class ImagePreviewWidget extends WidgetType {
       resolveAssetUrl: view.state.facet(markdownAssetUrlResolverFacet),
     });
     const wrapper = document.createElement("span");
-    wrapper.className = "cm-md-image-widget";
+    wrapper.className = `cm-md-image-widget is-${this.displayMode}`;
+    wrapper.dataset.displayMode = this.displayMode;
     wrapper.title = this.title ?? this.source;
     wrapper.tabIndex = 0;
     wrapper.setAttribute("role", "img");
@@ -133,7 +138,7 @@ export class ImagePreviewWidget extends WidgetType {
     const createImage = (source: string, placeholder: HTMLElement) => {
       const image = document.createElement("img");
       image.alt = this.alt;
-      image.decoding = "async";
+      prepareBrokeredMarkdownImage(image, source);
       image.hidden = true;
       image.dataset.previewState = "loading";
       image.setAttribute("aria-hidden", "true");

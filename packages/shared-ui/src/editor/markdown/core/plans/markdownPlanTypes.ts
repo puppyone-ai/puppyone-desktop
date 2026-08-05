@@ -1,6 +1,9 @@
 import type {
   MarkdownCodeSourceReference,
+  MarkdownHtmlBlockRenderProfile,
+  MarkdownImageDisplayMode,
   MarkdownMediaReferenceKind,
+  MarkdownMdxTab,
   MarkdownTableAlignment,
   MarkdownTableRow,
   MarkdownVideoModel,
@@ -54,6 +57,7 @@ export type InlineAtomModel =
       href: string;
       title: string | null;
       referenceKind: MarkdownMediaReferenceKind;
+      displayMode: MarkdownImageDisplayMode;
     }
   | { kind: "taskCheckbox"; checked: boolean }
   | { kind: "escape" };
@@ -78,7 +82,16 @@ export type BlockEmbedModel =
       renderKey: string;
     }
   | { kind: "video"; model: MarkdownVideoModel }
-  | { kind: "htmlBlock"; tagName: string | null; closed: boolean; source: string }
+  | {
+      kind: "htmlBlock";
+      tagName: string | null;
+      source: string;
+      profile: MarkdownHtmlBlockRenderProfile;
+      profileVersion: string;
+      requiresAssetBroker: boolean;
+      externalHref: string | null;
+    }
+  | { kind: "mdxComponent"; name: "Tabs"; tabs: readonly MarkdownMdxTab[]; source: string }
   | { kind: "horizontalRule" };
 
 export type VisibleSourcePlan = {

@@ -1,7 +1,8 @@
 import { EditorSelection } from "@codemirror/state";
 import { EditorView, WidgetType } from "@codemirror/view";
 import { bidiIsolate } from "@puppyone/localization/core";
-import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode } from "../../../viewerTypes";
+import type { MarkdownAssetUrlResolver } from "../../../viewerTypes";
+import type { MarkdownHtmlBlockRenderProfile } from "../../core/features/markdownFeatureData";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { disposeWidgetSessionDom } from "../../platform/codemirror/widgetSession";
 import { bindInlineHtmlDomInteractions } from "./inlineHtmlDomAdapter";
@@ -9,16 +10,14 @@ import {
   resolveMarkdownImageSrcset,
 } from "../image/markdownImageModel";
 import type { BrokeredMarkdownMediaUrlResolver } from "../media/markdownMediaReference";
+import { prepareBrokeredMarkdownImage } from "../media/markdownPassiveImage";
 import type { MarkdownHtmlBlock } from "./htmlBlockModel";
 import { createSanitizedBlockHtmlFragment } from "./sanitizeHtml";
 import type { AssetBrokerHandle } from "../../platform/brokers/assetBroker";
 import {
   createPrincipalFromView,
-  markdownWorkspaceIdFacet,
   openMarkdownHref,
 } from "../../core/editor/markdownLivePreviewContext";
-import { evaluateAuthorizationGrant, createDocumentTrustContext, type DocumentTrustContext } from "../../platform/policy/markdownTrustPolicy";
-import { workspaceIdForDocument } from "../../platform/security/capabilityPrincipal";
 import { MarkdownWidgetMeasureController } from "../../platform/codemirror/layoutCoordinator";
 import { estimateHtmlBlockLayoutHeight } from "./htmlBlockLayout";
 import {
@@ -35,12 +34,15 @@ import { getMappedWidgetSourceRange } from "../../shared/widgets/widgetDom";
 
 const HTML_MEDIA_RESOLUTION_CONCURRENCY = 6;
 
-function extractExternalHttpsEmbed(source: string): string | null {
-  const trimmed = source.trim();
-  const match = /^<iframe\b[^>]*\bsrc=["\'](https:\/\/[^"\']+)["\'][^>]*>\s*<\/iframe>$/i.exec(trimmed)
-    ?? /^<iframe\b[^>]*\bsrc=["\'](https:\/\/[^"\']+)["\'][^>]*\/>$/i.exec(trimmed);
-  return match?.[1] ?? null;
-}
+type MarkdownRenderableHtmlBlock = Omit<
+  MarkdownHtmlBlock,
+  "status" | "diagnostic"
+> & Readonly<{
+  profile: MarkdownHtmlBlockRenderProfile;
+  profileVersion: string;
+  requiresAssetBroker: boolean;
+  externalHref: string | null;
+}>;
 
 /**
  * Immutable HTML-block descriptor. Message listeners, timers, measure, asset
@@ -48,8 +50,7 @@ function extractExternalHttpsEmbed(source: string): string | null {
  */
 export class HtmlBlockWidget extends WidgetType {
   constructor(
-    private readonly block: MarkdownHtmlBlock,
-    private readonly htmlTrustMode: MarkdownHtmlTrustMode,
+    private readonly block: MarkdownRenderableHtmlBlock,
     private readonly documentPath: string,
     private readonly markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
     private readonly layoutEstimatedHeight = estimateHtmlBlockLayoutHeight(block.source),
@@ -63,11 +64,13 @@ export class HtmlBlockWidget extends WidgetType {
       widget instanceof HtmlBlockWidget &&
       widget.block.source === this.block.source &&
       widget.block.tagName === this.block.tagName &&
-      widget.block.closed === this.block.closed &&
+      widget.block.profile === this.block.profile &&
+      widget.block.profileVersion === this.block.profileVersion &&
+      widget.block.requiresAssetBroker === this.block.requiresAssetBroker &&
+      widget.block.externalHref === this.block.externalHref &&
       widget.layoutEstimatedHeight === this.layoutEstimatedHeight &&
       widget.execution.mode === this.execution.mode &&
       widget.execution.budgetVersion === this.execution.budgetVersion &&
-      widget.htmlTrustMode === this.htmlTrustMode &&
       widget.documentPath === this.documentPath &&
       widget.markdownAssetUrlResolver === this.markdownAssetUrlResolver
     );
@@ -82,13 +85,6 @@ export class HtmlBlockWidget extends WidgetType {
     const host = getMarkdownEmbedHost(view, {
       resolveAssetUrl: this.markdownAssetUrlResolver,
     });
-    const documentTrustContext = (): DocumentTrustContext =>
-      createDocumentTrustContext({
-        workspaceId: view.state.facet(markdownWorkspaceIdFacet) || workspaceIdForDocument(this.documentPath),
-        documentPath: this.documentPath,
-        provenance: "unknown",
-        explicitGrants: [],
-      });
     const shell = document.createElement("div");
     shell.className = "cm-md-html-widget";
     shell.dir = direction;
@@ -233,14 +229,6 @@ export class HtmlBlockWidget extends WidgetType {
           openMarkdownHref(href, view);
         },
       };
-      if (!this.block.closed) {
-        return createUnsupportedHtmlBlock(
-          this.block,
-          t,
-          t("editor.markdown.html.blockNotClosed"),
-        );
-      }
-
       if (!activated) {
         return createDeferredHtmlPlaceholder(() => {
           activated = true;
@@ -248,58 +236,36 @@ export class HtmlBlockWidget extends WidgetType {
         });
       }
 
-      const externalHref = extractExternalHttpsEmbed(this.block.source);
+      const externalHref = this.block.externalHref;
       if (externalHref) {
         return createWebEmbedPlaceholder(externalHref);
       }
 
-      // Active HTML (scripts/forms/srcdoc) requires an explicit, revocable
-      // local-active-html AuthorizationGrant evaluated by the trust policy.
-      // Without a grant we ALWAYS render sanitized content — never a
-      // script-capable srcdoc iframe — regardless of htmlTrustMode.
-      const activeHtmlGrant = evaluateAuthorizationGrant(
-        documentTrustContext(),
-        createPrincipalFromView(view, "web-embed"),
-        "local-active-html",
-      );
-      if ((!activeHtmlGrant || activeHtmlGrant.revoked) && this.htmlTrustMode === "localTrusted") {
-        const wrapper = createSanitizedHtmlPreviewBlock(this.block, this.block.source, t, sanitizedOptions);
-        const notice = document.createElement("div");
-        notice.className = "cm-md-html-local-trusted-notice";
-        notice.textContent = t("editor.markdown.html.trustRequired");
-        wrapper.prepend(notice);
-        return wrapper;
-      }
-
-      // Even with localTrusted mode, never mount a script-capable srcdoc
-      // iframe in the editor renderer. Active HTML requires a dedicated
-      // sandboxed surface that is not yet shipped.
-      if (activeHtmlGrant && !activeHtmlGrant.revoked) {
-        const wrapper = createSanitizedHtmlPreviewBlock(this.block, this.block.source, t, sanitizedOptions);
-        const notice = document.createElement("div");
-        notice.className = "cm-md-html-local-trusted-notice";
-        notice.textContent = t("editor.markdown.html.trustRecorded");
-        wrapper.prepend(notice);
-        return wrapper;
-      }
-
       const brokerResolver = buildBrokerAssetResolver(version);
-      if (!brokerResolver) {
+      if (this.block.profile !== "safe-block-with-media") {
         return createSanitizedHtmlPreviewBlock(this.block, this.block.source, t, sanitizedOptions);
+      }
+
+      // The plan index includes broker availability, so this can occur only if
+      // a host violates the compiled-plan contract between projection and mount.
+      if (this.block.requiresAssetBroker && !brokerResolver) {
+        return createDefensiveHtmlSourceFallback(this.block.source);
       }
 
       const wrapper = createSanitizedHtmlPreviewBlock(this.block, this.block.source, t, {
         ...sanitizedOptions,
         deferredMedia: true,
       });
-      hydrateDeferredHtmlMedia({
-        root: wrapper,
-        documentPath: this.documentPath,
-        resolver: brokerResolver,
-        signal: previewAbort.signal,
-        isCurrent: () => isPreviewVersionCurrent(version),
-        onLayoutChange: () => measure.schedule(),
-      });
+      if (brokerResolver) {
+        hydrateDeferredHtmlMedia({
+          root: wrapper,
+          documentPath: this.documentPath,
+          resolver: brokerResolver,
+          signal: previewAbort.signal,
+          isCurrent: () => isPreviewVersionCurrent(version),
+          onLayoutChange: () => measure.schedule(),
+        });
+      }
       return wrapper;
     };
 
@@ -353,7 +319,7 @@ export class HtmlBlockWidget extends WidgetType {
 }
 
 function createSanitizedHtmlPreviewBlock(
-  block: MarkdownHtmlBlock,
+  block: MarkdownRenderableHtmlBlock,
   source: string,
   t: MarkdownLocalization["t"],
   options: {
@@ -367,7 +333,7 @@ function createSanitizedHtmlPreviewBlock(
     deferredMedia: options.deferredMedia === true,
   });
   if (!result.supported) {
-    return createUnsupportedHtmlBlock(block, t, result.reasons[0]);
+    return createDefensiveHtmlSourceFallback(block.source, result.reasons[0]);
   }
 
   const wrapper = document.createElement("div");
@@ -399,8 +365,9 @@ function hydrateDeferredHtmlMedia({
     const sourceSet = image.dataset.mdAssetSrcset ?? null;
     if (!source && !sourceSet) continue;
 
-    image.loading = image.loading || "lazy";
-    image.decoding = "async";
+    image.dataset.mdAssetState = "loading";
+    let hasAuthorizedSource = false;
+    let browserLoadState: "pending" | "ready" | "failed" = "pending";
     let pendingResolutions = Number(Boolean(source)) + Number(Boolean(sourceSet));
     const finishOne = () => {
       pendingResolutions -= 1;
@@ -409,17 +376,40 @@ function hydrateDeferredHtmlMedia({
       delete image.dataset.mdAssetSrc;
       delete image.dataset.mdAssetSrcset;
       image.removeAttribute("aria-busy");
+      if (!hasAuthorizedSource) {
+        replaceUnavailableHtmlImage(image, source ?? sourceSet ?? "");
+      } else if (browserLoadState === "failed") {
+        replaceUnavailableHtmlImage(image, source ?? sourceSet ?? "");
+      } else if (browserLoadState === "ready") {
+        image.dataset.mdAssetState = "ready";
+      } else {
+        image.dataset.mdAssetState = "loading";
+      }
       onLayoutChange();
     };
-    image.addEventListener("load", onLayoutChange, { once: true });
-    image.addEventListener("error", onLayoutChange, { once: true });
+    image.addEventListener("load", () => {
+      browserLoadState = "ready";
+      image.dataset.mdAssetState = "ready";
+      onLayoutChange();
+    }, { once: true });
+    image.addEventListener("error", () => {
+      browserLoadState = "failed";
+      if (pendingResolutions <= 0 && image.isConnected) {
+        replaceUnavailableHtmlImage(image, source ?? sourceSet ?? "");
+      }
+      onLayoutChange();
+    }, { once: true });
 
     if (source) {
       tasks.push(async () => {
         try {
           const resolved = await resolver(documentPath, source, "image", signal);
           if (signal.aborted || !isCurrent() || !image.isConnected) return;
-          if (resolved && isBrokerSafeResolvedAssetUrl(resolved)) image.src = resolved;
+          if (resolved && isBrokerSafeResolvedAssetUrl(resolved)) {
+            prepareBrokeredMarkdownImage(image, resolved);
+            image.src = resolved;
+            hasAuthorizedSource = true;
+          }
         } catch {
           // The inert placeholder remains when an asset cannot be resolved.
         } finally {
@@ -438,7 +428,11 @@ function hydrateDeferredHtmlMedia({
             signal,
           );
           if (signal.aborted || !isCurrent() || !image.isConnected) return;
-          if (resolved) image.srcset = resolved;
+          if (resolved) {
+            prepareBrokeredMarkdownImage(image, resolved);
+            image.srcset = resolved;
+            hasAuthorizedSource = true;
+          }
         } catch {
           // The inert placeholder remains when an asset cannot be resolved.
         } finally {
@@ -511,6 +505,17 @@ function hydrateDeferredHtmlMedia({
     });
   }
   void runDeferredMediaTasks(tasks, signal);
+}
+
+function replaceUnavailableHtmlImage(image: HTMLImageElement, authoredSource: string) {
+  const label = image.alt.trim() || authoredSource.trim() || "Image unavailable";
+  const fallback = document.createElement("span");
+  fallback.className = "cm-md-html-image-fallback";
+  fallback.dataset.mdAssetState = "unavailable";
+  fallback.setAttribute("role", "img");
+  fallback.setAttribute("aria-label", label);
+  fallback.textContent = label;
+  image.replaceWith(fallback);
 }
 
 async function runDeferredMediaTasks(
@@ -622,35 +627,13 @@ function createHtmlSourceIcon(): SVGElement {
 }
 
 
-function createUnsupportedHtmlBlock(
-  block: MarkdownHtmlBlock,
-  t: MarkdownLocalization["t"],
-  reason?: string,
-): HTMLElement {
+function createDefensiveHtmlSourceFallback(source: string, reason?: string): HTMLElement {
   const wrapper = document.createElement("div");
-  wrapper.className = "cm-md-html-unsupported";
-
-  const title = document.createElement("strong");
-  title.textContent = t("editor.markdown.html.unsupported");
-  wrapper.appendChild(title);
-
-  const detail = document.createElement("span");
-  detail.textContent = reason
-    ? t("editor.markdown.html.unsupportedDetail", { detail: bidiIsolate(reason) })
-    : t("editor.markdown.html.tagUnsupported", {
-      tag: bidiIsolate(`<${block.tagName ?? "html"}>`),
-    });
-  wrapper.appendChild(detail);
-
-  const code = document.createElement("code");
-  code.textContent = getHtmlPreviewSnippet(block.source);
-  wrapper.appendChild(code);
+  wrapper.className = "cm-md-html-source-fallback";
+  if (reason) wrapper.dataset.reason = reason;
+  const sourceView = document.createElement("pre");
+  sourceView.textContent = source;
+  wrapper.appendChild(sourceView);
 
   return wrapper;
-}
-
-function getHtmlPreviewSnippet(source: string): string {
-  const normalized = source.trim().replace(/\s+/g, " ");
-  if (normalized.length <= 140) return normalized;
-  return `${normalized.slice(0, 137)}...`;
 }

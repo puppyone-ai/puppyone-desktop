@@ -91,7 +91,6 @@
   overflow: auto;
   cursor: text;
   font-family: var(--po-font-content, var(--po-font-sans));
-  line-height: 1.68;
 }
 
 .markdown-codemirror-editor .cm-content {
@@ -115,7 +114,7 @@
 }
 
 /*
- * Vertical rhythm: line-height (1.68) spaces wrapped lines inside a block;
+ * Vertical rhythm: the shared presentation line-height spaces wrapped lines;
  * per-line padding spaces blocks apart (the block-editor convention). The
  * token is 0 in source mode and only opens up in live preview; the editor
  * theme applies it to every .cm-line.
@@ -124,12 +123,8 @@
   --po-markdown-editor-line-spacing: 3px;
 }
 
-.markdown-codemirror-editor .cm-line {
-  min-height: 1.68em;
-}
-
 /*
- * Blank separator lines already contribute a full 1.68em box; skipping their
+ * Blank separator lines already contribute a full content-line box; skipping their
  * padding keeps paragraph gaps from compounding (empty CM lines render as a
  * lone <br>).
  */
@@ -251,46 +246,6 @@
 .markdown-codemirror-editor .cm-md-link-mark,
 .markdown-codemirror-editor .cm-md-url {
   color: var(--po-text-disabled);
-}
-
-.markdown-codemirror-editor .cm-md-syntax-heading,
-.markdown-codemirror-editor .cm-md-heading {
-  color: var(--po-text);
-  font-weight: 700;
-}
-
-.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-1 {
-  padding-bottom: 14px;
-  font-size: 28px;
-  font-weight: 720;
-  line-height: 1.22;
-}
-
-.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-2 {
-  padding-top: 18px;
-  padding-bottom: 10px;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-3 {
-  padding-top: 12px;
-  padding-bottom: 7px;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.35;
-}
-
-.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-4,
-.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-5,
-.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-6 {
-  padding-top: 8px;
-  padding-bottom: 5px;
-  color: var(--po-text);
-  font-size: var(--po-text-size-content, 14px);
-  font-weight: 700;
-  line-height: 1.4;
 }
 
 .markdown-codemirror-editor .cm-md-syntax-strong {
@@ -492,15 +447,15 @@
 /* Rich replaced blocks expose their rendered surface before selection without
    adding permanent chrome. The widget wrapper owns document rhythm; its inner
    surface owns the ring, so vertical spacing never appears inside the frame. */
-.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget, .cm-md-video-widget) {
+.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-mdx-tabs-widget, .cm-md-image-widget, .cm-md-video-widget) {
   --cm-md-block-current-ring: transparent;
 }
 
-.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget, .cm-md-video-widget):is(:hover, :focus-within):not(.is-doc-selected) {
+.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-mdx-tabs-widget, .cm-md-image-widget, .cm-md-video-widget):is(:hover, :focus-within):not(.is-doc-selected) {
   --cm-md-block-current-ring: var(--cm-md-block-hover-ring);
 }
 
-.markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-image-widget, .cm-md-video-widget) {
+.markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-mdx-tabs-panels, .cm-md-image-widget, .cm-md-video-widget) {
   border-radius: 6px;
   box-shadow: 0 0 0 2px var(--cm-md-block-current-ring);
   transition: box-shadow 140ms ease;
@@ -512,7 +467,7 @@
  * selection cannot paint replaced-widget interiors). Table styling lives in
  * markdown-table-widget.css; the other block widgets share one accent ring.
  */
-.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget, .cm-md-video-widget).is-doc-selected {
+.markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-mdx-tabs-widget, .cm-md-image-widget, .cm-md-video-widget).is-doc-selected {
   --cm-md-block-current-ring: var(--cm-md-block-selected-ring);
 }
 
@@ -621,7 +576,97 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-image-widget, .cm-md-video-widget) {
+  .markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-mdx-tabs-panels, .cm-md-image-widget, .cm-md-video-widget) {
     transition: none;
   }
+}
+
+.markdown-codemirror-editor .cm-md-mdx-tabs-widget {
+  position: relative;
+  width: 100%;
+  margin: 0;
+}
+
+.markdown-codemirror-editor .cm-md-mdx-tabs-toolbar {
+  display: flex;
+  min-height: 38px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--po-divider);
+}
+
+.markdown-codemirror-editor .cm-md-mdx-tabs-list {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  gap: 18px;
+  overflow-x: auto;
+}
+
+.markdown-codemirror-editor .cm-md-mdx-tab,
+.markdown-codemirror-editor .cm-md-mdx-source-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+}
+
+.markdown-codemirror-editor .cm-md-mdx-tab {
+  position: relative;
+  min-height: 38px;
+  padding: 0 1px 9px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.markdown-codemirror-editor .cm-md-mdx-tab::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--po-text);
+  content: "";
+  opacity: 0;
+}
+
+.markdown-codemirror-editor .cm-md-mdx-tab:is(.is-active, :hover, :focus-visible) {
+  color: var(--po-text);
+}
+
+.markdown-codemirror-editor .cm-md-mdx-tab.is-active::after {
+  opacity: 1;
+}
+
+.markdown-codemirror-editor .cm-md-mdx-tab:focus-visible,
+.markdown-codemirror-editor .cm-md-mdx-source-toggle:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--po-accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.markdown-codemirror-editor .cm-md-mdx-source-toggle {
+  flex: 0 0 auto;
+  padding: 0 2px 10px;
+  cursor: pointer;
+  font-family: var(--po-font-mono);
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.markdown-codemirror-editor .cm-md-mdx-tabs-widget:is(:hover, :focus-within) .cm-md-mdx-source-toggle {
+  opacity: 0.72;
+}
+
+.markdown-codemirror-editor .cm-md-mdx-tabs-panels {
+  min-height: 54px;
+  padding: 18px 2px 8px;
+  white-space: pre-wrap;
+}
+
+.markdown-codemirror-editor .cm-md-mdx-tab-panel[hidden] {
+  display: none;
 }

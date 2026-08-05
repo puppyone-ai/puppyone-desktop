@@ -7,6 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DesktopTitlebarActions } from "../src/features/app-shell/DesktopTitlebarActions";
 import { TerminalCloseConfirmationDialog } from "../src/features/desktop-terminal/ui/TerminalCloseConfirmationDialog";
+import type { TerminalRuntimeHandle } from "../src/features/desktop-terminal/runtime/terminalRuntime";
 import { TerminalSessionTabs } from "../src/features/desktop-terminal/ui/TerminalSessionTabs";
 import { DEFAULT_TITLEBAR_ACTIONS_SETTINGS } from "../src/preferences";
 import { withTestLocalization } from "./testLocalization";
@@ -119,6 +120,59 @@ describe("Desktop Terminal titlebar session manager", () => {
     expect(onCreate).toHaveBeenCalledOnce();
   });
 
+  it("replaces the always-on running dot with terminal-reported activity frames", () => {
+    const titleHarness = createTerminalTitleHarness();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(withTestLocalization(
+      <TerminalSessionTabs
+        sessions={[
+          { id: "terminal-a", ordinal: 1, shell: "zsh", status: "running" },
+        ]}
+        activeSessionId="terminal-a"
+        onActivate={vi.fn()}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        runtimeRegistry={{ require: () => titleHarness.runtime }}
+      />,
+    )));
+
+    const status = container.querySelector(".desktop-terminal-tab-status");
+    expect(status?.querySelector(".desktop-terminal-tab-idle-mark")).not.toBeNull();
+    expect(status?.classList.contains("is-activity")).toBe(false);
+    expect(status?.querySelectorAll(".desktop-terminal-tab-activity-dot")).toHaveLength(0);
+
+    titleHarness.setTitle("⠋ puppyone");
+    expect(status?.querySelector(".desktop-terminal-tab-idle-mark")).toBeNull();
+    expect(status?.classList.contains("is-activity")).toBe(true);
+    expect(status?.querySelectorAll(".desktop-terminal-tab-activity-dot")).toHaveLength(4);
+
+    titleHarness.setTitle("✳ puppyone");
+    expect(status?.querySelector(".desktop-terminal-tab-idle-mark")).not.toBeNull();
+    expect(status?.classList.contains("is-activity")).toBe(false);
+    expect(status?.querySelectorAll(".desktop-terminal-tab-activity-dot")).toHaveLength(0);
+
+    titleHarness.setTitle("⠙ puppyone");
+    act(() => root?.render(withTestLocalization(
+      <TerminalSessionTabs
+        sessions={[
+          { id: "terminal-a", ordinal: 1, shell: "zsh", status: "exited" },
+        ]}
+        activeSessionId="terminal-a"
+        onActivate={vi.fn()}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        runtimeRegistry={{ require: () => titleHarness.runtime }}
+      />,
+    )));
+    expect(status?.textContent).toBe("");
+    expect(status?.querySelector(".desktop-terminal-tab-idle-mark")).toBeNull();
+    expect(status?.classList.contains("is-activity")).toBe(false);
+    expect(status?.querySelectorAll(".desktop-terminal-tab-activity-dot")).toHaveLength(0);
+  });
+
   it("makes cancellation the safe default before closing a terminal", () => {
     const onCancel = vi.fn();
     const onConfirm = vi.fn();
@@ -161,4 +215,35 @@ function clickButton(container: HTMLElement, accessibleName: string) {
       .find((candidate) => candidate.textContent?.trim().startsWith(accessibleName));
   if (!button) throw new Error(`Button not found: ${accessibleName}`);
   act(() => button.click());
+}
+
+function createTerminalTitleHarness() {
+  let title = "";
+  const listeners = new Set<(nextTitle: string) => void>();
+  const runtime: TerminalRuntimeHandle = {
+    get title() {
+      return title;
+    },
+    ready: true,
+    applyAppearance: vi.fn(),
+    dispose: vi.fn(),
+    focus: vi.fn(),
+    mount: vi.fn(),
+    setActive: vi.fn(),
+    subscribeReady: vi.fn(() => () => undefined),
+    subscribeTitle: vi.fn((listener) => {
+      listeners.add(listener);
+      listener(title);
+      return () => listeners.delete(listener);
+    }),
+    write: vi.fn(),
+  };
+
+  return {
+    runtime,
+    setTitle(nextTitle: string) {
+      title = nextTitle;
+      act(() => listeners.forEach((listener) => listener(title)));
+    },
+  };
 }

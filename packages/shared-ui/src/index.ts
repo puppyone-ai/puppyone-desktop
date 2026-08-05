@@ -192,6 +192,7 @@ export type {
   EditorViewerMatch,
   MarkdownBacklink,
   MarkdownBacklinkReference,
+  MarkdownDialectId,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
   MarkdownWikiLinkResolvedTarget,

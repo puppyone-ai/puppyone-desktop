@@ -48,6 +48,35 @@ describe("workspaceFromPath", () => {
     expect(ws.cloudState).toBe("local");
     expect(ws.commitCount).toBe(0); // not a git repo yet
     expect(typeof ws.id).toBe("string");
+    expect(ws).not.toHaveProperty("markdownDialect");
+  });
+
+  it("declares the OpenKnowledge Markdown dialect from project metadata", async () => {
+    await mkdir(path.join(root, ".ok"));
+    await writeFile(path.join(root, ".ok", "config.yml"), "version: 1\n");
+
+    const ws = await workspaceFromPath(root);
+
+    expect(ws.markdownDialect).toBe("openknowledge-mdx");
+  });
+
+  it.each([
+    ["an empty .ok directory", async () => {
+      await mkdir(path.join(root, ".ok"));
+    }],
+    ["a similarly named config.yaml", async () => {
+      await mkdir(path.join(root, ".ok"));
+      await writeFile(path.join(root, ".ok", "config.yaml"), "version: 1\n");
+    }],
+    ["a config.yml directory", async () => {
+      await mkdir(path.join(root, ".ok", "config.yml"), { recursive: true });
+    }],
+  ])("does not infer the dialect from %s", async (_label, arrange) => {
+    await arrange();
+
+    const ws = await workspaceFromPath(root);
+
+    expect(ws).not.toHaveProperty("markdownDialect");
   });
 
   it("is stable: same path -> same id", async () => {

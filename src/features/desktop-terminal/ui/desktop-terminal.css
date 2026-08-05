@@ -95,22 +95,90 @@
 }
 
 .desktop-terminal-tab-status {
-  width: 5px;
-  height: 5px;
-  flex: 0 0 5px;
+  display: grid;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  place-items: center;
+  color: currentColor;
+}
+
+.desktop-terminal-tab-status::before {
+  width: 4px;
+  height: 4px;
   border-radius: 999px;
   background: var(--po-text-disabled);
+  content: "";
 }
 
-.desktop-terminal-tab[data-status="running"] .desktop-terminal-tab-status {
-  background: var(--po-success);
+.desktop-terminal-tab[data-status="running"] .desktop-terminal-tab-status::before,
+.desktop-terminal-tab-status.is-activity::before {
+  content: none;
 }
 
-.desktop-terminal-tab[data-status="starting"] .desktop-terminal-tab-status {
+.desktop-terminal-tab-idle-mark {
+  color: currentColor;
+  opacity: 0.52;
+}
+
+.desktop-terminal-tab-activity-indicator {
+  display: grid;
+  width: 8px;
+  height: 8px;
+  grid-template-columns: repeat(2, 3px);
+  grid-template-rows: repeat(2, 3px);
+  gap: 2px;
+}
+
+.desktop-terminal-tab-activity-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.22;
+  animation: desktop-terminal-tab-activity-dot 0.8s linear infinite;
+}
+
+.desktop-terminal-tab-activity-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.desktop-terminal-tab-activity-dot:nth-child(4) {
+  animation-delay: 0.4s;
+}
+
+.desktop-terminal-tab-activity-dot:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+@keyframes desktop-terminal-tab-activity-dot {
+  0%,
+  24% {
+    opacity: 1;
+  }
+
+  25%,
+  100% {
+    opacity: 0.22;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-terminal-tab-activity-dot {
+    animation: none;
+    opacity: 0.35;
+  }
+
+  .desktop-terminal-tab-activity-dot:first-child {
+    opacity: 1;
+  }
+}
+
+.desktop-terminal-tab[data-status="starting"] .desktop-terminal-tab-status::before {
   background: var(--po-accent);
 }
 
-.desktop-terminal-tab[data-status="error"] .desktop-terminal-tab-status {
+.desktop-terminal-tab[data-status="error"] .desktop-terminal-tab-status::before {
   background: var(--po-danger);
 }
 

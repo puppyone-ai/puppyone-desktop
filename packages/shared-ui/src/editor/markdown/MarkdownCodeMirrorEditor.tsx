@@ -16,7 +16,7 @@ import { getMarkdownPlanIndex } from "./core/plans/markdownPlanIndex";
 import { markdownRevealedSourceEffect } from "./core/state/revealedSource";
 import { getDocRevision } from "./platform/brokers/transactionBroker";
 import type { AiEditFile } from "../ai-edits/types";
-import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownDialectId, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
 import type {
   EditorSourceRevision,
   EditorSourceSnapshot,
@@ -25,6 +25,7 @@ import type {
 import { getRendererPerformanceTracker } from "../../performance/rendererPerformance";
 import { subscribeTypographyChanges } from "../../core/typography";
 import { markdownLocalizationExtension } from "./core/editor/markdownLocalization";
+import { resolveMarkdownDialect } from "./core/dialect/markdownDialect";
 
 const rendererPerformance = getRendererPerformanceTracker();
 
@@ -36,6 +37,7 @@ export type MarkdownCodeMirrorEditorProps = {
   aiEditFile?: AiEditFile | null;
   htmlTrustMode?: MarkdownHtmlTrustMode;
   documentPath?: string;
+  markdownDialect?: MarkdownDialectId | null;
   workspaceId?: string;
   workspaceRoot?: string | null;
   markdownLinkGraph?: MarkdownLinkGraph | null;
@@ -62,6 +64,7 @@ export function MarkdownCodeMirrorEditor({
   aiEditFile = null,
   htmlTrustMode = "safe",
   documentPath = "",
+  markdownDialect = null,
   workspaceId = "",
   workspaceRoot = null,
   markdownLinkGraph = null,
@@ -77,6 +80,10 @@ export function MarkdownCodeMirrorEditor({
   const localization = useMemo(
     () => ({ direction, formatNumber, locale, t }),
     [direction, formatNumber, locale, t],
+  );
+  const resolvedDialect = useMemo(
+    () => resolveMarkdownDialect({ documentPath, explicitDialect: markdownDialect }).dialect,
+    [documentPath, markdownDialect],
   );
   const initialLocalizationRef = useRef(localization);
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -153,7 +160,7 @@ export function MarkdownCodeMirrorEditor({
     } catch (error) {
       callbacksRef.current.onPreviewError?.(toError(error));
     }
-  }, [documentPath, livePreview]);
+  }, [documentPath, livePreview, resolvedDialect]);
 
   useEffect(() => {
     if (previewState !== "pending") {
@@ -322,7 +329,7 @@ export function MarkdownCodeMirrorEditor({
       const languageStartedAt = performance.now();
       try {
         view.dispatch({
-          effects: languageCompartmentRef.current.reconfigure(markdownCodeMirrorLanguageExtension()),
+          effects: languageCompartmentRef.current.reconfigure(markdownCodeMirrorLanguageExtension(resolvedDialect)),
         });
       } catch (error) {
         if (livePreview) failPreview(error);
@@ -379,7 +386,7 @@ export function MarkdownCodeMirrorEditor({
                   ),
                 ),
                 livePreviewCoreCompartmentRef.current.reconfigure(
-                  markdownLivePreviewCoreExtension(),
+                  markdownLivePreviewCoreExtension(resolvedDialect),
                 ),
                 blockDragCompartmentRef.current.reconfigure(
                   blockDragEnabledRef.current ? markdownBlockDragExtension() : [],
@@ -407,7 +414,7 @@ export function MarkdownCodeMirrorEditor({
       previewTask?.cancel();
       if (readyFrame !== null) window.cancelAnimationFrame(readyFrame);
     };
-  }, [documentPath, livePreview]);
+  }, [documentPath, livePreview, resolvedDialect]);
 
   useEffect(() => {
     const view = viewRef.current;

@@ -72,6 +72,7 @@ function RightTerminalPanelComponent(
           onActivate={activateSession}
           onClose={requestCloseSession}
           onCreate={createSession}
+          runtimeRegistry={runtimeRegistry}
         />
       )}
       <div className={`desktop-terminal-body ${sessions.length === 0 ? "is-empty" : ""}`}>

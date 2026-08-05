@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
@@ -16,9 +16,10 @@ const TRUST_STORE_FILENAME = "app-preview-trust.json";
 const DEFAULT_DIALOG_MESSAGES = Object.freeze({
   "native.appPreview.run.message": ({ appName }) => `Run ${appName}?`,
   "native.appPreview.run.intro": () => "PuppyOne will start a local app preview for this workspace.",
+  "native.appPreview.run.security": () => "The command runs with your user account permissions. Only run apps from workspaces you trust.",
   "native.appPreview.run.command": ({ command }) => `Command: ${command}`,
   "native.appPreview.run.workingDirectory": ({ directory }) => `Working directory: ${directory}`,
-  "native.appPreview.run.permissions": ({ permissions }) => `Permissions: ${permissions}`,
+  "native.appPreview.run.permissions": ({ permissions }) => `Manifest-declared access: ${permissions}`,
   "native.appPreview.run.confirm": () => "Run App",
   "native.appPreview.run.cancel": () => "Cancel",
 });
@@ -34,43 +35,60 @@ export function createAppPreviewRuntime({
   readWorkspaceTextFile,
   resolveWorkspacePath,
   t = defaultTranslate,
+  onStateChange = () => {},
+  spawnProcess = spawn,
+  allocateLocalPort = allocatePort,
+  fetchHealth = fetchWithTimeout,
 }) {
-  const sessions = new Map();
+  const sessionsById = new Map();
+  const runtimeIdByWorkspace = new Map();
   const trustedManifests = loadTrustedManifests(app);
 
-  async function start(sender, request, options = {}) {
+  async function start(sender, request) {
     const context = await loadAppPreviewContext(request);
-    const key = getSessionKey(context.rootPath, context.appPath);
-    const existing = sessions.get(key);
+    const key = getSessionKey(context.rootPath);
+    const existing = getWorkspaceSession(key);
+    const sameApp = existing &&
+      existing.appPath === context.appPath &&
+      existing.manifestHash === context.manifestHash;
 
-    if (existing?.status === "running" && existing.child && !existing.child.killed) {
+    if (sameApp && existing.status === "running" && existing.child && !existing.exited) {
       requireSessionOwner(existing, sender);
       return serializeSession(existing);
     }
 
-    if (existing?.status === "starting" && existing.startPromise) {
+    if (sameApp && existing.status === "starting" && existing.startPromise) {
       requireSessionOwner(existing, sender);
       return existing.startPromise;
     }
 
+    if (existing) requireSessionOwner(existing, sender);
+    await ensureTrusted(sender, context);
+
+    // Trust prompts and filesystem reads are asynchronous. If another request
+    // replaced the workspace runtime while we waited, re-evaluate against the
+    // new current session instead of overwriting it without teardown.
+    if (getWorkspaceSession(key) !== existing) return start(sender, request);
+
     if (existing) {
-      requireSessionOwner(existing, sender);
       await stopSession(existing, "restart");
-      sessions.delete(key);
+      if (getWorkspaceSession(key) !== existing) return start(sender, request);
+      releaseSession(existing);
     }
 
-    await ensureTrusted(sender, context, options.forceTrust === true);
-
     const session = createSession(context, sender);
-    sessions.set(key, session);
+    retainSession(session);
     session.startPromise = startSession(session)
       .then(() => serializeSession(session))
       .catch(async (error) => {
         const message = error instanceof Error ? error.message : String(error);
-        session.status = "error";
-        session.message = message;
-        appendLog(session, `[puppyone] ${session.message}\n`);
+        if (session.status !== "stopped") {
+          session.status = "error";
+          session.message = message;
+          appendLog(session, `[puppyone] ${session.message}\n`);
+        }
         await terminateSessionChild(session, "start failed");
+        publishSessionState(session);
         throw error;
       })
       .finally(() => {
@@ -82,30 +100,36 @@ export function createAppPreviewRuntime({
 
   async function restart(sender, request) {
     const context = await loadAppPreviewContext(request);
-    const key = getSessionKey(context.rootPath, context.appPath);
-    const existing = sessions.get(key);
+    const key = getSessionKey(context.rootPath);
+    const existing = getWorkspaceSession(key);
+    if (existing) requireSessionOwner(existing, sender);
+    await ensureTrusted(sender, context, false);
+    if (getWorkspaceSession(key) !== existing) return restart(sender, request);
     if (existing) {
-      requireSessionOwner(existing, sender);
       await stopSession(existing, "restart");
-      sessions.delete(key);
+      if (getWorkspaceSession(key) === existing) releaseSession(existing);
     }
+    // `start` re-reads the manifest. If it changed after the confirmation
+    // above, the new content hash is not trusted and prompts again.
     return start(sender, request);
   }
 
   async function stop(sender, request) {
-    const context = await loadAppPreviewContext(request);
-    const key = getSessionKey(context.rootPath, context.appPath);
-    const existing = sessions.get(key);
-    if (!existing) {
+    const rootPath = normalizeRootPath(request?.rootPath);
+    const appPath = normalizeAppPath(request?.path);
+    const key = getSessionKey(rootPath);
+    const existing = getWorkspaceSession(key);
+    if (!existing || existing.appPath !== appPath) {
       return {
-        appId: context.appId,
-        name: context.manifest.name,
+        runtimeId: null,
+        appId: `${rootPath}:${appPath}`,
+        name: path.basename(appPath, APP_PREVIEW_EXTENSION),
         status: "stopped",
-        path: context.appPath,
+        path: appPath,
         url: null,
         port: null,
-        command: context.manifest.launch.command,
-        cwd: context.cwdPath,
+        command: null,
+        cwd: null,
         message: null,
         logs: "",
       };
@@ -116,10 +140,11 @@ export function createAppPreviewRuntime({
   }
 
   async function getLogs(sender, request) {
-    const context = await loadAppPreviewContext(request);
-    const existing = sessions.get(getSessionKey(context.rootPath, context.appPath));
+    const rootPath = normalizeRootPath(request?.rootPath);
+    const appPath = normalizeAppPath(request?.path);
+    const existing = getWorkspaceSession(getSessionKey(rootPath));
     if (existing) requireSessionOwner(existing, sender);
-    return existing?.logs ?? "";
+    return existing?.appPath === appPath ? existing.logs : "";
   }
 
   async function openExternal(sender, request) {
@@ -131,22 +156,26 @@ export function createAppPreviewRuntime({
   }
 
   function closeSessionsForWindow(webContentsId) {
-    for (const [key, session] of Array.from(sessions.entries())) {
+    const closing = [];
+    for (const session of Array.from(sessionsById.values())) {
       session.ownerIds.delete(webContentsId);
       if (session.ownerIds.size === 0) {
-        void stopSession(session, "window closed").finally(() => {
-          sessions.delete(key);
-        });
+        closing.push(stopSession(session, "window closed").finally(() => {
+          releaseSession(session);
+        }));
       }
     }
+    return Promise.allSettled(closing);
   }
 
   function closeAll() {
-    for (const [key, session] of Array.from(sessions.entries())) {
-      void stopSession(session, "quit").finally(() => {
-        sessions.delete(key);
-      });
+    const closing = [];
+    for (const session of Array.from(sessionsById.values())) {
+      closing.push(stopSession(session, "quit").finally(() => {
+        releaseSession(session);
+      }));
     }
+    return Promise.allSettled(closing);
   }
 
   async function loadAppPreviewContext(request) {
@@ -176,12 +205,9 @@ export function createAppPreviewRuntime({
     };
   }
 
-  async function ensureTrusted(sender, context, forceTrust) {
+  async function ensureTrusted(sender, context) {
     const trustKey = `${context.rootPath}:${context.appPath}:${context.manifestHash}`;
-    if (forceTrust || trustedManifests.has(trustKey)) {
-      rememberTrustedManifest(app, trustedManifests, trustKey);
-      return;
-    }
+    if (trustedManifests.has(trustKey)) return;
 
     const window = BrowserWindow.fromWebContents(sender);
     const command = formatCommand(context.manifest.launch.command);
@@ -191,6 +217,7 @@ export function createAppPreviewRuntime({
       message: t("native.appPreview.run.message", { appName: context.manifest.name }),
       detail: [
         t("native.appPreview.run.intro"),
+        t("native.appPreview.run.security"),
         "",
         t("native.appPreview.run.command", { command }),
         t("native.appPreview.run.workingDirectory", { directory: context.cwdRelativePath || "." }),
@@ -217,9 +244,11 @@ export function createAppPreviewRuntime({
   function createSession(context, sender) {
     return {
       ...context,
-      key: getSessionKey(context.rootPath, context.appPath),
+      key: getSessionKey(context.rootPath),
+      runtimeId: `app-runtime-${randomUUID()}`,
       ownerIds: new Set([sender.id]),
       child: null,
+      exited: false,
       port: null,
       url: null,
       logs: "",
@@ -233,7 +262,8 @@ export function createAppPreviewRuntime({
   async function startSession(session) {
     session.status = "starting";
     session.message = null;
-    session.port = await allocatePort();
+    publishSessionState(session);
+    session.port = await allocateLocalPort();
     session.url = buildLocalUrl(session.manifest.launch.url, session.port);
     const healthUrl = buildHealthUrl(session.url, session.manifest.launch.health);
     const spawnConfig = buildSpawnConfig(session, session.port);
@@ -242,13 +272,16 @@ export function createAppPreviewRuntime({
     appendLog(session, `[puppyone] ${formatCommand(session.manifest.launch.command)}\n`);
     appendLog(session, `[puppyone] ${session.cwdPath}\n`);
 
-    const child = spawn(spawnConfig.file, spawnConfig.args, {
+    const child = spawnProcess(spawnConfig.file, spawnConfig.args, {
       cwd: session.cwdPath,
       env: spawnConfig.env,
       shell: false,
+      detached: process.platform !== "win32",
+      windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
     });
     session.child = child;
+    session.exited = false;
 
     child.stdout?.on("data", (chunk) => appendLog(session, String(chunk)));
     child.stderr?.on("data", (chunk) => appendLog(session, String(chunk)));
@@ -256,8 +289,10 @@ export function createAppPreviewRuntime({
       session.status = "error";
       session.message = error.message;
       appendLog(session, `[puppyone] Process error: ${error.message}\n`);
+      publishSessionState(session);
     });
     child.on("exit", (code, signal) => {
+      session.exited = true;
       if (session.status === "stopped" || session.ignoreNextExit) {
         session.ignoreNextExit = false;
         return;
@@ -266,50 +301,64 @@ export function createAppPreviewRuntime({
       session.status = code === 0 ? "stopped" : "error";
       session.message = message;
       appendLog(session, `[puppyone] ${message}\n`);
+      publishSessionState(session);
     });
 
-    await waitForHealth(session, healthUrl);
+    await waitForHealth(session, healthUrl, fetchHealth);
+    if (session.status !== "starting" || session.exited || getWorkspaceSession(session.key) !== session) {
+      throw new Error("App preview start was superseded.");
+    }
     session.status = "running";
     session.message = null;
     appendLog(session, `[puppyone] Ready: ${session.url}\n`);
+    publishSessionState(session);
   }
 
   async function stopSession(session, reason) {
     session.status = "stopped";
     session.message = reason ? `Stopped: ${reason}` : null;
-    if (!session.child || session.child.killed) return;
-
-    await terminateSessionChild(session, reason);
+    if (session.child && !session.exited) await terminateSessionChild(session, reason);
+    publishSessionState(session);
   }
 
   async function terminateSessionChild(session, reason) {
-    if (!session.child || session.child.killed) return;
+    if (!session.child || session.exited) return;
     const child = session.child;
     session.ignoreNextExit = true;
     appendLog(session, `[puppyone] Stopping app preview (${reason}).\n`);
-    await new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        try {
-          child.kill("SIGKILL");
-        } catch {
-          // The process may already be gone.
-        }
-        resolve();
-      }, 1200);
-
-      child.once("exit", () => {
-        clearTimeout(timeout);
-        resolve();
-      });
-
-      try {
-        child.kill("SIGTERM");
-      } catch {
-        clearTimeout(timeout);
-        resolve();
-      }
-    });
+    await terminateProcessTree(child);
+    session.exited = true;
     session.child = null;
+  }
+
+  function publishSessionState(session) {
+    if (getWorkspaceSession(session.key) !== session) return;
+    try {
+      onStateChange({
+        rootPath: session.rootPath,
+        ownerWebContentsIds: Array.from(session.ownerIds),
+        result: serializeSession(session),
+      });
+    } catch {
+      // Runtime notifications are best effort.
+    }
+  }
+
+  function getWorkspaceSession(workspaceKey) {
+    const runtimeId = runtimeIdByWorkspace.get(workspaceKey);
+    return runtimeId ? sessionsById.get(runtimeId) ?? null : null;
+  }
+
+  function retainSession(session) {
+    sessionsById.set(session.runtimeId, session);
+    runtimeIdByWorkspace.set(session.key, session.runtimeId);
+  }
+
+  function releaseSession(session) {
+    sessionsById.delete(session.runtimeId);
+    if (runtimeIdByWorkspace.get(session.key) === session.runtimeId) {
+      runtimeIdByWorkspace.delete(session.key);
+    }
   }
 
   return {
@@ -334,7 +383,14 @@ function normalizeAppPath(value) {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error("App path is required.");
   }
-  const normalized = value.replace(/\\/g, "/").replace(/^\/+/, "");
+  const portablePath = value.trim().replace(/\\/g, "/");
+  if (portablePath.includes("\0") || portablePath.startsWith("/") || /^[a-z]:\//i.test(portablePath)) {
+    throw new Error("App path must be relative to the workspace.");
+  }
+  const normalized = path.posix.normalize(portablePath).replace(/^\.\/+/, "");
+  if (normalized === ".." || normalized.startsWith("../")) {
+    throw new Error("App path must stay inside the workspace.");
+  }
   if (!normalized.toLowerCase().endsWith(APP_PREVIEW_EXTENSION)) {
     throw new Error("App Preview files must use the .puppyoneapp extension.");
   }
@@ -483,8 +539,8 @@ function normalizeOptionalString(value) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, 160) : null;
 }
 
-function getSessionKey(rootPath, appPath) {
-  return `${rootPath}\n${appPath}`;
+function getSessionKey(rootPath) {
+  return rootPath;
 }
 
 function getRelativeDir(relativePath) {
@@ -506,13 +562,16 @@ function buildLocalUrl(template, port) {
   if (url.hostname !== "127.0.0.1" && url.hostname !== "localhost") {
     throw new Error("App preview URL must bind to localhost.");
   }
+  if (url.port !== String(port) || url.username || url.password) {
+    throw new Error("App preview URL must use the allocated localhost port without credentials.");
+  }
   return url.toString();
 }
 
 function buildHealthUrl(appUrl, health) {
   const url = new URL(health.path, appUrl);
-  if (url.hostname !== "127.0.0.1" && url.hostname !== "localhost") {
-    throw new Error("App preview health URL must be localhost.");
+  if (url.origin !== new URL(appUrl).origin) {
+    throw new Error("App preview health URL must use the app preview origin.");
   }
   return {
     url: url.toString(),
@@ -523,10 +582,11 @@ function buildHealthUrl(appUrl, health) {
 function buildSpawnConfig(session, port) {
   const command = session.manifest.launch.command;
   const env = {
-    ...process.env,
+    ...sanitizeAppPreviewEnvironment(process.env),
     ...interpolateEnv(session.manifest.launch.env, port),
     HOST: "127.0.0.1",
     PORT: String(port),
+    BROWSER: "none",
     PUPPYONE_APP_PREVIEW: "1",
     PUPPYONE_WORKSPACE_ROOT: session.rootPath,
   };
@@ -574,12 +634,15 @@ async function allocatePort() {
   });
 }
 
-async function waitForHealth(session, health) {
+async function waitForHealth(session, health, fetchHealth) {
   const startedAt = Date.now();
   let lastError = null;
 
   while (Date.now() - startedAt < HEALTH_TIMEOUT_MS) {
-    if (!session.child || session.child.killed) {
+    if (session.status !== "starting") {
+      throw new Error(session.message || "App preview stopped before it became ready.");
+    }
+    if (!session.child || session.exited) {
       throw new Error(session.message || "App preview process exited before it became ready.");
     }
     if (session.status === "error") {
@@ -587,7 +650,7 @@ async function waitForHealth(session, health) {
     }
 
     try {
-      const response = await fetchWithTimeout(health.url, HEALTH_REQUEST_TIMEOUT_MS);
+      const response = await fetchHealth(health.url, HEALTH_REQUEST_TIMEOUT_MS);
       if (response.status === health.expectStatus) return;
       lastError = new Error(`Health check returned ${response.status}.`);
     } catch (error) {
@@ -606,6 +669,7 @@ async function fetchWithTimeout(url, timeoutMs) {
   try {
     return await fetch(url, {
       cache: "no-store",
+      redirect: "manual",
       signal: controller.signal,
     });
   } finally {
@@ -632,6 +696,7 @@ function appendLog(session, value) {
 
 function serializeSession(session) {
   return {
+    runtimeId: session.runtimeId,
     appId: session.appId,
     name: session.manifest.name,
     status: session.status,
@@ -643,6 +708,133 @@ function serializeSession(session) {
     message: session.message,
     logs: session.logs,
   };
+}
+
+const SAFE_INHERITED_ENVIRONMENT = new Set([
+  "PATH",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "LANG",
+  "LANGUAGE",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "TERM",
+  "TERM_PROGRAM",
+  "COLORTERM",
+  "FORCE_COLOR",
+  "XDG_CONFIG_HOME",
+  "XDG_CACHE_HOME",
+  "XDG_DATA_HOME",
+  "XDG_STATE_HOME",
+  "NVM_DIR",
+  "NVM_BIN",
+  "VOLTA_HOME",
+  "PNPM_HOME",
+  "BUN_INSTALL",
+  "ASDF_DIR",
+  "ASDF_DATA_DIR",
+  "HERMES_HOME",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "NODE_EXTRA_CA_CERTS",
+  "SYSTEMROOT",
+  "WINDIR",
+  "COMSPEC",
+  "PATHEXT",
+  "USERPROFILE",
+  "APPDATA",
+  "LOCALAPPDATA",
+]);
+
+export function sanitizeAppPreviewEnvironment(source) {
+  const sanitized = {};
+  for (const [key, value] of Object.entries(source ?? {})) {
+    if (typeof value !== "string") continue;
+    const canonicalKey = key.toUpperCase();
+    if (SAFE_INHERITED_ENVIRONMENT.has(canonicalKey) || canonicalKey.startsWith("LC_")) {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+}
+
+async function terminateProcessTree(child) {
+  if (!child || hasChildExited(child)) return;
+  const pid = Number(child.pid);
+  if (!Number.isSafeInteger(pid) || pid <= 0) {
+    try {
+      child.kill("SIGTERM");
+    } catch {
+      // Process may already be gone.
+    }
+    await waitForChildExit(child, 1200);
+    return;
+  }
+
+  if (process.platform === "win32") {
+    await runTaskkill(pid, false);
+  } else {
+    signalProcessGroup(child, pid, "SIGTERM");
+  }
+  if (await waitForChildExit(child, 1400)) return;
+
+  if (process.platform === "win32") {
+    await runTaskkill(pid, true);
+  } else {
+    signalProcessGroup(child, pid, "SIGKILL");
+  }
+  await waitForChildExit(child, 500);
+}
+
+function signalProcessGroup(child, pid, signal) {
+  try {
+    process.kill(-pid, signal);
+    return;
+  } catch {
+    // Fall back when the process group disappeared or was not created.
+  }
+  try {
+    child.kill(signal);
+  } catch {
+    // Process may already be gone.
+  }
+}
+
+async function runTaskkill(pid, force) {
+  await new Promise((resolve) => {
+    const args = ["/pid", String(pid), "/T", ...(force ? ["/F"] : [])];
+    const killer = spawn("taskkill", args, {
+      shell: false,
+      windowsHide: true,
+      stdio: "ignore",
+    });
+    killer.once("error", resolve);
+    killer.once("exit", resolve);
+  });
+}
+
+function hasChildExited(child) {
+  return child.exitCode != null || child.signalCode != null;
+}
+
+function waitForChildExit(child, timeoutMs) {
+  if (hasChildExited(child)) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (exited) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      child.removeListener?.("exit", onExit);
+      resolve(exited);
+    };
+    const onExit = () => finish(true);
+    const timeout = setTimeout(() => finish(hasChildExited(child)), timeoutMs);
+    child.once("exit", onExit);
+  });
 }
 
 function formatCommand(command) {

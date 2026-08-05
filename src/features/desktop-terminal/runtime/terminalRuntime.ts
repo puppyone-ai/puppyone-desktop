@@ -30,12 +30,14 @@ type TerminalRuntimeOptions = {
 
 export interface TerminalRuntimeHandle {
   readonly ready: boolean;
+  readonly title: string;
   applyAppearance: () => void;
   dispose: () => void;
   focus: () => void;
   mount: (container: HTMLDivElement) => void;
   setActive: (active: boolean) => void;
   subscribeReady: (listener: (ready: boolean) => void) => () => void;
+  subscribeTitle: (listener: (title: string) => void) => () => void;
   write: (data: string) => void;
 }
 
@@ -45,6 +47,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   private readonly getMessageFormatter: () => MessageFormatter;
   private readonly onStatus: TerminalRuntimeOptions["onStatus"];
   private readonly readyListeners = new Set<(ready: boolean) => void>();
+  private readonly titleListeners = new Set<(title: string) => void>();
   private readonly disposables: IDisposable[] = [];
   private terminal: Terminal | null = null;
   private fitAddon: FitAddon | null = null;
@@ -65,6 +68,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   private active = false;
   private disposed = false;
   private viewReady = false;
+  private terminalTitle = "";
 
   constructor({ sessionId, workspacePath, getMessageFormatter, onStatus }: TerminalRuntimeOptions) {
     this.sessionId = sessionId;
@@ -75,6 +79,10 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
 
   get ready() {
     return this.viewReady;
+  }
+
+  get title() {
+    return this.terminalTitle;
   }
 
   mount(container: HTMLDivElement) {
@@ -118,6 +126,12 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     return () => this.readyListeners.delete(listener);
   }
 
+  subscribeTitle(listener: (title: string) => void) {
+    this.titleListeners.add(listener);
+    listener(this.terminalTitle);
+    return () => this.titleListeners.delete(listener);
+  }
+
   applyAppearance() {
     if (this.disposed || !this.container || !this.terminal) return;
     applyTerminalAppearance(this.terminal, this.container);
@@ -132,6 +146,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     this.lastPtySize = null;
     this.setReady(false);
     this.readyListeners.clear();
+    this.titleListeners.clear();
 
     if (this.fitFrame !== null) cancelAnimationFrame(this.fitFrame);
     if (this.revealFrame !== null) cancelAnimationFrame(this.revealFrame);
@@ -200,6 +215,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     this.disposables.push(
       terminal.onRender(() => this.setReady(true)),
       terminal.onData((data) => this.write(data)),
+      terminal.onTitleChange((title) => this.setTitle(title)),
     );
     terminal.open(container);
     this.loadWebglRenderer();
@@ -385,6 +401,12 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     if (this.viewReady === ready) return;
     this.viewReady = ready;
     this.readyListeners.forEach((listener) => listener(ready));
+  }
+
+  private setTitle(title: string) {
+    if (this.terminalTitle === title) return;
+    this.terminalTitle = title;
+    this.titleListeners.forEach((listener) => listener(title));
   }
 }
 

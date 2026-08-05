@@ -245,7 +245,11 @@ describe("Markdown nested block virtualizer", () => {
         (_, index) => `| row ${index} | ${index} |`,
       ),
     ].join("\n");
-    const table = getMarkdownTableBlock(EditorState.create({ doc: source }), 1);
+    const table = getMarkdownTableBlock(
+      EditorState.create({ doc: source }),
+      1,
+      { from: 0, to: source.length },
+    );
 
     expect(table).not.toBeNull();
     expect(table?.modelComplete).toBe(false);
@@ -265,7 +269,11 @@ describe("Markdown nested block virtualizer", () => {
       `| ${columns.join(" | ")} |`,
     ].join("\n");
 
-    const table = getMarkdownTableBlock(EditorState.create({ doc: source }), 1);
+    const table = getMarkdownTableBlock(
+      EditorState.create({ doc: source }),
+      1,
+      { from: 0, to: source.length },
+    );
 
     expect(table?.modelComplete).toBe(false);
     expect(table?.rows).toHaveLength(1);
@@ -279,7 +287,11 @@ describe("Markdown nested block virtualizer", () => {
       "| --- | --- |",
       `| ${"x".repeat(MARKDOWN_TABLE_MODEL_ROW_BYTE_LIMIT)} | value |`,
     ].join("\n");
-    const oversizedRow = getMarkdownTableBlock(EditorState.create({ doc: oversizedRowSource }), 1);
+    const oversizedRow = getMarkdownTableBlock(
+      EditorState.create({ doc: oversizedRowSource }),
+      1,
+      { from: 0, to: oversizedRowSource.length },
+    );
     expect(oversizedRow?.modelComplete).toBe(false);
     expect(oversizedRow?.rows).toHaveLength(1);
 
@@ -289,7 +301,11 @@ describe("Markdown nested block virtualizer", () => {
       "| --- | --- |",
       ...Array.from({ length: 66 }, () => boundedRow),
     ].join("\n");
-    const oversizedTotal = getMarkdownTableBlock(EditorState.create({ doc: oversizedTotalSource }), 1);
+    const oversizedTotal = getMarkdownTableBlock(
+      EditorState.create({ doc: oversizedTotalSource }),
+      1,
+      { from: 0, to: oversizedTotalSource.length },
+    );
     expect(oversizedTotal?.modelComplete).toBe(false);
     expect(oversizedTotal?.rows).toHaveLength(1);
     expect(oversizedTotal?.sourceBytes).toBe(MARKDOWN_TABLE_MODEL_SOURCE_BYTE_LIMIT + 1);

@@ -37,6 +37,8 @@ export type EditorDocument = {
   mimeType?: string | null;
   url?: string | null;
   version?: string | null;
+  /** Explicit project/document Markdown grammar assignment from the Host. */
+  markdownDialect?: MarkdownDialectId | null;
   /**
    * Where the document was sourced. Plugin routing fails closed for `cloud`
    * and `unknown`; only explicit `local` documents can activate a Viewer Pack.
@@ -56,6 +58,7 @@ export const DEFAULT_EDITOR_INTERACTION_PREFERENCES: EditorInteractionPreference
 };
 export type EditorSourceRequirement = PresetViewerSource;
 export type MarkdownHtmlTrustMode = "safe" | "localTrusted";
+export type MarkdownDialectId = "puppy-gfm" | "openknowledge-mdx";
 
 export type MarkdownWikiLinkResolvedTarget = {
   exists: boolean;

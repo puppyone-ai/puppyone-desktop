@@ -58,7 +58,36 @@ export type MarkdownHtmlBlockMetrics = {
   assetCount: number;
 };
 
+export type MarkdownHtmlBlockStatus =
+  | "complete"
+  | "incomplete"
+  | "malformed"
+  | "unsupported";
+
+export type MarkdownHtmlBlockRenderProfile =
+  | "safe-block"
+  | "safe-block-with-media"
+  | "external-web-embed";
+
+export type MarkdownMdxComponentStatus = "complete" | "malformed" | "unsupported";
+
+export type MarkdownMdxTab = {
+  label: string;
+  content: string;
+};
+
+export type MarkdownMdxComponentModel = {
+  kind: "tabs" | "unknown";
+  name: string;
+  status: MarkdownMdxComponentStatus;
+  source: string;
+  tabs: readonly MarkdownMdxTab[];
+  diagnostic: string | null;
+  metrics: MarkdownHtmlBlockMetrics;
+};
+
 export type MarkdownMediaReferenceKind = "markdown-path" | "wiki-target";
+export type MarkdownImageDisplayMode = "inline" | "block";
 
 export type MarkdownVideoSource = {
   href: string;

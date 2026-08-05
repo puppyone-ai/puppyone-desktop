@@ -39,6 +39,7 @@ export function MarkdownViewer(context: MarkdownViewerProps) {
           aiEditFile={context.aiEditFile}
           htmlTrustMode={context.htmlTrustMode}
           documentPath={context.document.path}
+          markdownDialect={context.document.markdownDialect}
           workspaceId={context.workspaceId}
           workspaceRoot={context.workspaceRoot}
           markdownLinkGraph={context.markdownLinkGraph}
@@ -55,6 +56,7 @@ export function MarkdownViewer(context: MarkdownViewerProps) {
           aiEditFile={context.aiEditFile}
           htmlTrustMode={context.htmlTrustMode}
           documentPath={context.document.path}
+          markdownDialect={context.document.markdownDialect}
           workspaceId={context.workspaceId}
           workspaceRoot={context.workspaceRoot}
           markdownLinkGraph={context.markdownLinkGraph}

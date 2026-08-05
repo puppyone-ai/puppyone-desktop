@@ -128,6 +128,13 @@ export function scanMarkdownHtmlTagTokens(source: string, absoluteFrom = 0): Mar
     const tagStart = source.indexOf("<", cursor);
     if (tagStart === -1) break;
 
+    const specialEnd = findMarkdownHtmlSpecialConstructEnd(source, tagStart);
+    if (specialEnd !== null) {
+      if (specialEnd < 0) break;
+      cursor = specialEnd;
+      continue;
+    }
+
     const tagEnd = findMarkdownHtmlTagEnd(source, tagStart);
     if (tagEnd === -1) break;
 
@@ -146,6 +153,35 @@ export function scanMarkdownHtmlTagTokens(source: string, absoluteFrom = 0): Mar
   }
 
   return tokens;
+}
+
+/**
+ * Returns the first offset after a complete non-element HTML construct, `-1`
+ * when that construct is incomplete, and `null` when `start` begins a normal
+ * element candidate. Tag-looking text inside comments/CDATA/PI/declarations
+ * must never participate in authored element-stack validation.
+ */
+export function findMarkdownHtmlSpecialConstructEnd(
+  source: string,
+  start: number,
+): number | null {
+  if (source.startsWith("<!--", start)) {
+    const end = source.indexOf("-->", start + 4);
+    return end < 0 ? -1 : end + 3;
+  }
+  if (source.startsWith("<![CDATA[", start)) {
+    const end = source.indexOf("]]>", start + 9);
+    return end < 0 ? -1 : end + 3;
+  }
+  if (source.startsWith("<?", start)) {
+    const end = source.indexOf("?>", start + 2);
+    return end < 0 ? -1 : end + 2;
+  }
+  if (source.startsWith("<!", start)) {
+    const end = findMarkdownHtmlTagEnd(source, start);
+    return end < 0 ? -1 : end + 1;
+  }
+  return null;
 }
 
 export function findMarkdownHtmlTagEnd(source: string, tagStart: number): number {

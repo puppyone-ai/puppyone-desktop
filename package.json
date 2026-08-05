@@ -53,6 +53,7 @@
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
     "smoke:agent-references": "electron scripts/smoke-agent-reference-ingestion.mjs",
     "smoke:viewer-pack": "electron scripts/smoke-viewer-pack.mjs",
+    "smoke:app-preview": "electron scripts/smoke-app-preview-surface.mjs",
     "audit:viewer-gpu": "electron scripts/audit-viewer-gpu.mjs",
     "smoke:renderer-performance": "npm run build && node scripts/run-renderer-performance-smoke.mjs",
     "smoke:renderer-cold-performance": "npm run build && node scripts/run-renderer-performance-smoke.mjs --cold --visible --with-link-index",

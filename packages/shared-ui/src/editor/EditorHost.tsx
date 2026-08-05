@@ -15,6 +15,7 @@ import type {
   DocumentSourceKind,
   EditorInteractionPreferences,
   MarkdownAssetUrlResolver,
+  MarkdownDialectId,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
 } from "./viewerTypes";
@@ -39,6 +40,7 @@ export type EditorHostProps = {
   htmlTrustMode?: MarkdownHtmlTrustMode;
   workspaceId?: string;
   workspaceRoot?: string | null;
+  markdownDialect?: MarkdownDialectId | null;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
@@ -67,6 +69,7 @@ export function EditorHost({
   htmlTrustMode = "safe",
   workspaceId = "",
   workspaceRoot = null,
+  markdownDialect = null,
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
   appPreview = null,
@@ -90,6 +93,7 @@ export function EditorHost({
         url: fileContent?.url ?? fileUrl,
         version: fileContent?.version ?? null,
         sourceKind: documentSourceKind,
+        markdownDialect,
       }}
       viewerExtensionAdapter={viewerExtensionAdapter}
       loading={loading}

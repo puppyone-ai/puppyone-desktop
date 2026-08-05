@@ -1,0 +1,223 @@
+/*
+ * Markdown presentation profile v1.
+ *
+ * This is the semantic design-language authority shared by CodeMirror-native
+ * Markdown and sanitized HTML. Feature Widget styles own editing chrome and
+ * intrinsic controls; they must not redefine this type scale or block rhythm.
+ */
+.markdown-codemirror-editor {
+  --po-md-presentation-version: 1;
+  --po-md-content-font: var(--po-font-content, var(--po-font-sans));
+  --po-md-content-size: var(--po-text-size-content, 14px);
+  --po-md-content-line-height: 1.5714285714;
+  --po-md-content-color: color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted));
+  --po-md-block-gap: 16px;
+  --po-md-heading-gap-before: 24px;
+  --po-md-heading-gap-after: 16px;
+  --po-md-heading-weight: 600;
+  --po-md-heading-line-height: 1.25;
+  --po-md-heading-rule: color-mix(in srgb, var(--po-divider) 86%, transparent);
+  --po-md-h1-size: 2em;
+  --po-md-h2-size: 1.5em;
+  --po-md-h3-size: 1.25em;
+  --po-md-h4-size: 1em;
+  --po-md-h5-size: 0.875em;
+  --po-md-h6-size: 0.85em;
+}
+
+.markdown-codemirror-editor .cm-scroller {
+  line-height: var(--po-md-content-line-height);
+}
+
+.markdown-codemirror-editor .cm-line {
+  min-height: calc(var(--po-md-content-line-height) * 1em);
+}
+
+.markdown-codemirror-editor .cm-md-syntax-heading,
+.markdown-codemirror-editor .cm-md-heading {
+  color: var(--po-text);
+  font-weight: var(--po-md-heading-weight);
+  line-height: var(--po-md-heading-line-height);
+}
+
+.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-1 {
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--po-md-heading-rule);
+  font-size: var(--po-md-h1-size);
+}
+
+.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-2 {
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--po-md-heading-rule);
+  font-size: var(--po-md-h2-size);
+}
+
+.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-3 {
+  font-size: var(--po-md-h3-size);
+}
+
+.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-4 {
+  font-size: var(--po-md-h4-size);
+}
+
+.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-5 {
+  font-size: var(--po-md-h5-size);
+}
+
+.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-6 {
+  color: var(--po-text-muted);
+  font-size: var(--po-md-h6-size);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface {
+  --background-primary: var(--po-editor-bg);
+  --background-primary-alt: color-mix(in srgb, var(--po-panel) 56%, transparent);
+  --background-modifier-border: var(--po-divider);
+  --text-muted: var(--po-text-muted);
+  --text-normal: var(--po-text);
+  box-sizing: border-box;
+  contain: layout paint;
+  display: flow-root;
+  width: 100%;
+  max-width: 100%;
+  overflow: clip;
+  color: var(--po-md-content-color);
+  font-family: var(--po-md-content-font);
+  font-size: var(--po-md-content-size);
+  line-height: var(--po-md-content-line-height);
+  /* CodeMirror source lines use inherited `white-space: pre`. Sanitized HTML
+     must re-enter browser HTML whitespace semantics at this adapter boundary. */
+  white-space: normal;
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface *,
+.markdown-codemirror-editor .cm-md-html-rendered-surface *::before,
+.markdown-codemirror-editor .cm-md-html-rendered-surface *::after {
+  box-sizing: border-box;
+}
+
+.markdown-codemirror-editor .cm-md-html-block {
+  margin: 0;
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface :where(h1, h2, h3, h4, h5, h6) {
+  margin-block: var(--po-md-heading-gap-before) var(--po-md-heading-gap-after);
+  color: var(--po-text);
+  font-weight: var(--po-md-heading-weight);
+  line-height: var(--po-md-heading-line-height);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface :where(h1, h2):first-child,
+.markdown-codemirror-editor .cm-md-html-rendered-surface > :where(h1, h2):first-child {
+  margin-block-start: 0;
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface h1 {
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--po-md-heading-rule);
+  font-size: var(--po-md-h1-size);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface h2 {
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--po-md-heading-rule);
+  font-size: var(--po-md-h2-size);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface h3 {
+  font-size: var(--po-md-h3-size);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface h4 {
+  font-size: var(--po-md-h4-size);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface h5 {
+  font-size: var(--po-md-h5-size);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface h6 {
+  color: var(--po-text-muted);
+  font-size: var(--po-md-h6-size);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface :where(p, blockquote, pre, table, ul, ol, dl) {
+  margin-block: 0 var(--po-md-block-gap);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface pre {
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface :where(ul, ol) {
+  padding-inline-start: 2em;
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface blockquote {
+  padding-inline: 1em;
+  border-inline-start: 0.25em solid var(--po-divider);
+  color: var(--po-text-muted);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface hr {
+  height: 1px;
+  margin-block: var(--po-md-heading-gap-before);
+  border: 0;
+  background: var(--po-md-heading-rule);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface a {
+  color: var(--po-accent);
+  text-decoration: none;
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface a:hover {
+  text-decoration: underline;
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface details {
+  margin-block: 0 var(--po-md-block-gap);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface summary {
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface img {
+  max-width: 100%;
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface img[aria-busy="true"],
+.markdown-codemirror-editor .cm-md-html-rendered-surface img[data-md-asset-state="loading"] {
+  min-width: 1em;
+  min-height: 1em;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--po-control) 38%, transparent);
+}
+
+.markdown-codemirror-editor .cm-md-html-image-fallback {
+  display: inline-flex;
+  min-height: 1.5em;
+  align-items: center;
+  padding-inline: 0.4em;
+  border: 1px solid color-mix(in srgb, var(--po-divider) 86%, transparent);
+  border-radius: 3px;
+  color: var(--po-text-muted);
+  font-size: 0.875em;
+  line-height: 1.35;
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface video {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: min(70vh, 720px);
+  border-radius: 6px;
+  background: #000;
+}
+
+.markdown-codemirror-editor .cm-md-html-rendered-surface :where(img, video, canvas, svg) {
+  user-select: none;
+  -webkit-user-drag: none;
+}

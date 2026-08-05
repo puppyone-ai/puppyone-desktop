@@ -43,6 +43,7 @@ describe("Terminal session view lifecycle", () => {
 function createRuntime(): TerminalRuntimeHandle {
   return {
     ready: true,
+    title: "",
     applyAppearance: vi.fn(),
     dispose: vi.fn(),
     focus: vi.fn(),
@@ -50,6 +51,10 @@ function createRuntime(): TerminalRuntimeHandle {
     setActive: vi.fn(),
     subscribeReady: vi.fn((listener) => {
       listener(true);
+      return () => undefined;
+    }),
+    subscribeTitle: vi.fn((listener) => {
+      listener("");
       return () => undefined;
     }),
     write: vi.fn(),

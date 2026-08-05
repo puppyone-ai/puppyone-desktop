@@ -1,8 +1,11 @@
 import type {
   MarkdownCodeSourceReference,
+  MarkdownHtmlBlockStatus,
   MarkdownHtmlBlockMetrics,
   MarkdownInlineHtml,
+  MarkdownImageDisplayMode,
   MarkdownMediaReferenceKind,
+  MarkdownMdxComponentModel,
   MarkdownTableAlignment,
   MarkdownTableRow,
   MarkdownVideoModel,
@@ -33,7 +36,8 @@ export type MarkdownElementBlockData =
   | {
       kind: "htmlBlock";
       tagName: string | null;
-      closed: boolean;
+      status: MarkdownHtmlBlockStatus;
+      diagnostic: string | null;
       source: string;
       metrics: MarkdownHtmlBlockMetrics;
     }
@@ -45,6 +49,11 @@ export type MarkdownElementBlockData =
       cellCount: number;
       sourceBytes: number;
       modelComplete: boolean;
+      refinementValid: boolean;
+    }
+  | {
+      kind: "mdxComponent";
+      component: MarkdownMdxComponentModel;
     }
   | { kind: "task"; checked: boolean }
   | { kind: "video"; model: MarkdownVideoModel }
@@ -54,6 +63,7 @@ export type MarkdownElementBlockData =
       href: string;
       title: string | null;
       referenceKind: MarkdownMediaReferenceKind;
+      displayMode: MarkdownImageDisplayMode;
     };
 
 export type MarkdownElementKind =
@@ -68,6 +78,7 @@ export type MarkdownElementKind =
   | "inlineCode"
   | "link"
   | "list"
+  | "mdxComponent"
   | "rule"
   | "strike"
   | "strong"
@@ -78,7 +89,7 @@ export type MarkdownElementKind =
 
 type MarkdownPlainElementKind = Exclude<
   MarkdownElementKind,
-  "fence" | "htmlBlock" | "image" | "inlineHtml" | "table" | "task" | "video"
+  "fence" | "htmlBlock" | "image" | "inlineHtml" | "mdxComponent" | "table" | "task" | "video"
 >;
 
 export type MarkdownPlainElement<K extends MarkdownPlainElementKind = MarkdownPlainElementKind> =
@@ -105,6 +116,7 @@ export type MarkdownInlineHtmlElement = MarkdownElementBase & {
 export type MarkdownFenceElement = MarkdownFeatureElement<"fence">;
 export type MarkdownHtmlBlockElement = MarkdownFeatureElement<"htmlBlock">;
 export type MarkdownImageElement = MarkdownFeatureElement<"image">;
+export type MarkdownMdxComponentElement = MarkdownFeatureElement<"mdxComponent">;
 export type MarkdownTableElement = MarkdownFeatureElement<"table">;
 export type MarkdownTaskElement = MarkdownFeatureElement<"task">;
 export type MarkdownVideoElement = MarkdownFeatureElement<"video">;
@@ -115,6 +127,7 @@ export type MarkdownElement =
   | MarkdownHtmlBlockElement
   | MarkdownImageElement
   | MarkdownInlineHtmlElement
+  | MarkdownMdxComponentElement
   | MarkdownTableElement
   | MarkdownTaskElement
   | MarkdownVideoElement;

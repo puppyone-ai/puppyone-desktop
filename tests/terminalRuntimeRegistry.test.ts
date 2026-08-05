@@ -50,12 +50,14 @@ function createRegistryHarness() {
   const createRuntime: TerminalRuntimeFactory = () => {
     const runtime: TerminalRuntimeHandle = {
       ready: false,
+      title: "",
       applyAppearance: vi.fn(),
       dispose: vi.fn(),
       focus: vi.fn(),
       mount: vi.fn(),
       setActive: vi.fn(),
       subscribeReady: vi.fn(() => () => undefined),
+      subscribeTitle: vi.fn(() => () => undefined),
       write: vi.fn(),
     };
     created.push(runtime);

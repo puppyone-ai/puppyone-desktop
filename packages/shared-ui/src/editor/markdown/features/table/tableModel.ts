@@ -1,4 +1,5 @@
 import type { EditorState } from "@codemirror/state";
+import { syntaxTree } from "@codemirror/language";
 import type {
   MarkdownTableAlignment,
   MarkdownTableCell,
@@ -28,7 +29,10 @@ export type MarkdownTableBlock = {
   cellCount: number;
   sourceBytes: number;
   modelComplete: boolean;
+  refinementValid: boolean;
 };
+
+export type MarkdownTableSyntaxRange = Readonly<{ from: number; to: number }>;
 
 export type MarkdownTableFocusTarget = {
   rowIndex: number;
@@ -75,12 +79,18 @@ type MarkdownTableSerializable = {
   rows: readonly MarkdownTableSerializableRow[];
 };
 
-export function getMarkdownTableBlock(state: EditorState, lineNumber: number): MarkdownTableBlock | null {
+export function getMarkdownTableBlock(
+  state: EditorState,
+  lineNumber: number,
+  syntaxRange: MarkdownTableSyntaxRange | null = getMarkdownTableSyntaxRange(state, lineNumber),
+): MarkdownTableBlock | null {
   const doc = state.doc;
   if (lineNumber >= doc.lines) return null;
 
   const headerLine = doc.line(lineNumber);
   const delimiterLine = doc.line(lineNumber + 1);
+  if (!syntaxRange || syntaxRange.from !== headerLine.from || syntaxRange.to <= delimiterLine.from) return null;
+  const lastSyntaxLine = doc.lineAt(Math.max(syntaxRange.from, syntaxRange.to - 1));
   const headerBytes = getUtf8ByteLength(headerLine.text);
   const delimiterBytes = getUtf8ByteLength(delimiterLine.text);
   // A single unbounded row cannot benefit from row virtualization. Leave it
@@ -88,13 +98,24 @@ export function getMarkdownTableBlock(state: EditorState, lineNumber: number): M
   if (
     headerBytes > MARKDOWN_TABLE_MODEL_ROW_BYTE_LIMIT
     || delimiterBytes > MARKDOWN_TABLE_MODEL_ROW_BYTE_LIMIT
-  ) return null;
-  if (!isTableHeaderLine(headerLine.text) || !isTableDelimiterLine(delimiterLine.text)) return null;
+  ) {
+    return createUnmaterializedTableBlock(
+      state,
+      syntaxRange,
+      lineNumber,
+      lastSyntaxLine.number,
+    );
+  }
 
   const maximumCollectedCells = MARKDOWN_TABLE_MODEL_COLUMN_LIMIT + 1;
   let sourceBytes = headerBytes + delimiterBytes + 1;
   const delimiterCells = splitTableCells(delimiterLine.text, maximumCollectedCells);
   const parsedHeaderCells = splitTableCellsWithPositions(headerLine, maximumCollectedCells);
+  const refinementValid = (
+    parsedHeaderCells.length > 0
+    && delimiterCells.length > 0
+    && delimiterCells.every((cell) => /^:?-+:?$/.test(cell.trim()))
+  );
   const headerCells = parsedHeaderCells.slice(0, MARKDOWN_TABLE_MODEL_COLUMN_LIMIT);
   const rows: MarkdownTableRow[] = [{
     cells: headerCells,
@@ -110,12 +131,10 @@ export function getMarkdownTableBlock(state: EditorState, lineNumber: number): M
     && parsedHeaderCells.length <= MARKDOWN_TABLE_MODEL_COLUMN_LIMIT
     && delimiterCells.length <= MARKDOWN_TABLE_MODEL_COLUMN_LIMIT
   );
-  let lastLine = delimiterLine;
   let nextLineNumber = lineNumber + 2;
 
-  while (nextLineNumber <= doc.lines) {
+  while (nextLineNumber <= lastSyntaxLine.number) {
     const rowLine = doc.line(nextLineNumber);
-    if (!isMarkdownTableLine(rowLine.text) || isTableDelimiterLine(rowLine.text)) break;
     rowCount += 1;
     const rowBytes = getUtf8ByteLength(rowLine.text);
     sourceBytes = Math.min(
@@ -129,7 +148,6 @@ export function getMarkdownTableBlock(state: EditorState, lineNumber: number): M
       ) {
         modelComplete = false;
         rows.length = 1;
-        lastLine = rowLine;
         nextLineNumber += 1;
         continue;
       }
@@ -152,7 +170,6 @@ export function getMarkdownTableBlock(state: EditorState, lineNumber: number): M
         });
       }
     }
-    lastLine = rowLine;
     nextLineNumber += 1;
   }
 
@@ -165,7 +182,7 @@ export function getMarkdownTableBlock(state: EditorState, lineNumber: number): M
 
   return {
     from: headerLine.from,
-    to: lastLine.to,
+    to: syntaxRange.to,
     alignments: normalizeTableAlignments(
       delimiterCells.slice(0, width).map(parseTableAlignment),
       width,
@@ -176,7 +193,21 @@ export function getMarkdownTableBlock(state: EditorState, lineNumber: number): M
     cellCount,
     sourceBytes,
     modelComplete,
+    refinementValid,
   };
+}
+
+export function getMarkdownTableSyntaxRange(
+  state: EditorState,
+  lineNumber: number,
+): MarkdownTableSyntaxRange | null {
+  if (lineNumber < 1 || lineNumber > state.doc.lines) return null;
+  const line = state.doc.line(lineNumber);
+  let node = syntaxTree(state).resolve(line.from, 1);
+  while (node.name !== "Table" && node.parent) node = node.parent;
+  return node.name === "Table" && node.from === line.from
+    ? { from: node.from, to: node.to }
+    : null;
 }
 
 export function isMarkdownTableLine(text: string): boolean {
@@ -350,14 +381,37 @@ export function sanitizeMarkdownTableCell(value: string): string {
   return normalizeLineEndings(value).replace(/\n+/g, " ").replace(/\|/g, "\\|").trim();
 }
 
-function isTableHeaderLine(text: string): boolean {
-  return hasTableCellSegment(text);
-}
-
 function isTableDelimiterLine(text: string): boolean {
   if (text.length > MARKDOWN_TABLE_MODEL_ROW_BYTE_LIMIT) return false;
   const cells = splitTableCells(text, MARKDOWN_TABLE_MODEL_COLUMN_LIMIT + 1);
-  return cells.length >= 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
+  return cells.length >= 1 && cells.every((cell) => /^:?-+:?$/.test(cell.trim()));
+}
+
+function createUnmaterializedTableBlock(
+  state: EditorState,
+  syntaxRange: MarkdownTableSyntaxRange,
+  firstLineNumber: number,
+  lastLineNumber: number,
+): MarkdownTableBlock {
+  let sourceBytes = 0;
+  for (let lineNumber = firstLineNumber; lineNumber <= lastLineNumber; lineNumber += 1) {
+    sourceBytes = Math.min(
+      MARKDOWN_TABLE_MODEL_SOURCE_BYTE_LIMIT + 1,
+      sourceBytes + getUtf8ByteLength(state.doc.line(lineNumber).text) + (lineNumber > firstLineNumber ? 1 : 0),
+    );
+  }
+  return {
+    from: syntaxRange.from,
+    to: syntaxRange.to,
+    nextLineNumber: lastLineNumber + 1,
+    alignments: [],
+    rows: [],
+    rowCount: Math.max(1, lastLineNumber - firstLineNumber),
+    cellCount: MARKDOWN_TABLE_MODEL_CELL_LIMIT + 1,
+    sourceBytes,
+    modelComplete: false,
+    refinementValid: true,
+  };
 }
 
 function splitTableCells(text: string, maximumCells = Number.POSITIVE_INFINITY): string[] {

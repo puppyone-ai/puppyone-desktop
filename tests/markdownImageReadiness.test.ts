@@ -39,6 +39,51 @@ afterEach(() => {
 });
 
 describe("Markdown image readiness", () => {
+  it("applies the same brokered HTTPS privacy attributes to native Markdown images", async () => {
+    const source = "![Docs](https://img.shields.io/badge/Docs-Read-blue)";
+    const resolveAssetUrl = vi.fn(async () => "blob:https://app/should-not-be-used");
+    const editorParent = document.createElement("div");
+    document.body.appendChild(editorParent);
+    const view = new EditorView({
+      parent: editorParent,
+      state: EditorState.create({
+        doc: source,
+        extensions: [
+          markdownLivePreviewContextExtension(
+            "safe",
+            null,
+            "README.md",
+            resolveAssetUrl,
+            "workspace:test",
+            "/workspace",
+          ),
+        ],
+      }),
+    });
+    views.add(view);
+    const widget = new ImagePreviewWidget(
+      0,
+      source.length,
+      "Docs",
+      "https://img.shields.io/badge/Docs-Read-blue",
+      null,
+      "README.md",
+    );
+    const wrapper = widget.toDOM(view);
+    document.body.appendChild(wrapper);
+    mounted.push({ widget, wrapper });
+
+    await waitFor(() => wrapper.querySelector("img") !== null);
+
+    const image = wrapper.querySelector<HTMLImageElement>("img");
+    expect(resolveAssetUrl).not.toHaveBeenCalled();
+    expect(image?.getAttribute("src")).toBe("https://img.shields.io/badge/Docs-Read-blue");
+    expect(image?.referrerPolicy).toBe("no-referrer");
+    expect(image?.crossOrigin).toBe("anonymous");
+    expect(image?.loading).toBe("lazy");
+    expect(image?.decoding).toBe("async");
+  });
+
   it("promotes a standalone raw HTML image to the brokered safe-media block", async () => {
     const source = [
       "文件系统-based context workspace",

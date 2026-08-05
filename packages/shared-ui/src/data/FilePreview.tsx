@@ -14,6 +14,7 @@ import type {
   DocumentSourceKind,
   EditorInteractionPreferences,
   MarkdownAssetUrlResolver,
+  MarkdownDialectId,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
 } from "../editor/viewerTypes";
@@ -43,6 +44,7 @@ export type FilePreviewProps = {
   htmlTrustMode?: MarkdownHtmlTrustMode;
   workspaceId?: string;
   workspaceRoot?: string | null;
+  markdownDialect?: MarkdownDialectId | null;
   markdownLinkGraph?: MarkdownLinkGraph | null;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
   appPreview?: AppPreviewController | null;
@@ -73,6 +75,7 @@ export function FilePreview({
   htmlTrustMode = "safe",
   workspaceId = "",
   workspaceRoot = null,
+  markdownDialect = null,
   markdownLinkGraph = null,
   markdownAssetUrlResolver = null,
   appPreview = null,
@@ -147,6 +150,7 @@ export function FilePreview({
             htmlTrustMode={htmlTrustMode}
             workspaceId={workspaceId}
             workspaceRoot={workspaceRoot}
+            markdownDialect={markdownDialect}
             markdownLinkGraph={markdownLinkGraph}
             markdownAssetUrlResolver={markdownAssetUrlResolver}
             appPreview={appPreview}

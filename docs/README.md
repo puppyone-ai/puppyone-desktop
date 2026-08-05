@@ -54,6 +54,10 @@ directly:
     Electron/Cloud/Agent/Plugins, message and error contracts, RTL, packaging,
     testing, and staged migration.
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
+- [Desktop App Preview Runtime](architecture/desktop-app-preview-runtime.md)
+  - Workspace-owned local app processes, reusable native browser surfaces,
+    short-lived attachment leases, trust/security boundaries, and the
+    future browser-tab extension point.
 - [Desktop Agent Architecture](architecture/desktop-agent/README.md)
   - [Multi-Native Agent Backend Decision](architecture/desktop-agent/ADR-005-multi-native-agent-backends.md)
   - [Native Harness Adapter and ACP Decision](architecture/desktop-agent/ADR-006-native-harness-adapters-and-acp.md)

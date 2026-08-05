@@ -45,6 +45,8 @@ export type Workspace = {
   fsIdentity?: string;
   hydrationState?: "metadata" | "loading" | "ready" | "error";
   configError?: string;
+  /** Host-resolved Markdown grammar; never inferred from document contents. */
+  markdownDialect?: "puppy-gfm" | "openknowledge-mdx";
 };
 
 export type DataNode = {
@@ -78,6 +80,7 @@ export type FileContent = {
 export type AppPreviewStatus = "starting" | "running" | "stopped" | "error";
 
 export type AppPreviewResult = {
+  runtimeId?: string | null;
   appId: string;
   name: string;
   status: AppPreviewStatus;
@@ -90,12 +93,67 @@ export type AppPreviewResult = {
   logs?: string | null;
 };
 
+export type AppPreviewBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type AppPreviewSurfaceStatus = "loading" | "ready" | "error" | "destroyed";
+
+export type AppPreviewSurfaceState = {
+  surfaceId: string;
+  runtimeId: string;
+  appId: string;
+  path: string;
+  status: AppPreviewSurfaceStatus;
+  url?: string | null;
+  title?: string | null;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  attached: boolean;
+  message?: string | null;
+};
+
+export type AppPreviewActivationResult = {
+  runtime: AppPreviewResult;
+  surface: AppPreviewSurfaceState | null;
+};
+
+export type AppPreviewSurfaceCommand = "back" | "forward" | "reload";
+
+export type AppPreviewAttachmentRequest = {
+  path: string;
+  bounds: AppPreviewBounds;
+  attachmentId: string;
+};
+
 export type AppPreviewController = {
   start: (path: string) => Promise<AppPreviewResult>;
-  restart?: (path: string) => Promise<AppPreviewResult>;
+  activate?: (request: AppPreviewAttachmentRequest) => Promise<AppPreviewActivationResult>;
+  restart?: (
+    path: string,
+    attachment?: Pick<AppPreviewAttachmentRequest, "bounds" | "attachmentId">,
+  ) => Promise<AppPreviewResult | AppPreviewActivationResult>;
   stop?: (path: string) => Promise<AppPreviewResult>;
   getLogs?: (path: string) => Promise<string>;
   openExternal?: (path: string) => Promise<void>;
+  setSurfaceBounds?: (request: {
+    surfaceId: string;
+    attachmentId: string;
+    bounds: AppPreviewBounds;
+  }) => Promise<{ ok: boolean; visible: boolean }>;
+  detachSurface?: (request: {
+    surfaceId?: string | null;
+    attachmentId: string;
+  }) => Promise<{ ok: boolean }>;
+  runSurfaceCommand?: (request: {
+    surfaceId: string;
+    command: AppPreviewSurfaceCommand;
+  }) => Promise<{ ok: boolean }>;
+  subscribeRuntime?: (listener: (state: AppPreviewResult) => void) => () => void;
+  subscribeSurface?: (listener: (state: AppPreviewSurfaceState) => void) => () => void;
 };
 
 export type OfficeDocumentConversionResult = {

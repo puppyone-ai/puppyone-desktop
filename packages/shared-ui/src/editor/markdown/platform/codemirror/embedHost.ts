@@ -48,6 +48,10 @@ export function getMarkdownEmbedHost(
   const editSessions = createEmbeddedEditSessionStore();
   const assets = createAssetBroker(options.resolveAssetUrl ?? null, {
     workspaceRoot: options.workspaceRoot ?? null,
+    // Conventional Markdown documentation loads passive HTTPS images (for
+    // example README badges) through the broker. Video remains local-only;
+    // features cannot widen these Host-owned scheme policies per request.
+    remotePolicy: { image: "https-only", video: "deny" },
   });
   // Destroying an execution session revokes its principal-scoped asset handles
   // so a dead revision cannot keep a live handle.
