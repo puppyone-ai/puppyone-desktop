@@ -221,7 +221,6 @@ export function DesktopDataWorkspaceSurface({
           <DesktopSidebarRailNavigation {...navigationCommon} />
         ) : undefined}
         showPreviewHeader={false}
-        hidePreviewSourceView
         fileIconTheme={preferences.fileIconTheme}
         editorInteractionPreferences={editorInteractionPreferences}
         editorSaveMode="auto"
