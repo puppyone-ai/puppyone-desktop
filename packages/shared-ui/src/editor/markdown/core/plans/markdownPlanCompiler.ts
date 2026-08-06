@@ -11,11 +11,13 @@ import {
 export type MarkdownPlanCompileContext = Readonly<{
   documentProfile: MarkdownDocumentProfile;
   featureComposition: MarkdownFeatureComposition | null;
+  assetBrokerAvailable: boolean;
 }>;
 
 const DEFAULT_COMPILE_CONTEXT: MarkdownPlanCompileContext = Object.freeze({
   documentProfile: "normal",
   featureComposition: null,
+  assetBrokerAvailable: false,
 });
 
 /**
@@ -29,6 +31,7 @@ export function compileMarkdownElementPlan(
 ): MarkdownElementPlan {
   const featurePlan = context.featureComposition?.compileElement(element, {
     documentProfile: context.documentProfile,
+    assetBrokerAvailable: context.assetBrokerAvailable,
   }) ?? null;
   if (featurePlan) return featurePlan;
 

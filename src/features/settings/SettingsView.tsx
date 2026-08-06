@@ -49,6 +49,7 @@ export function SettingsView({
   experimentalSettings,
   rightSidebarToolsSettings,
   titlebarActionsSettings,
+  terminalSessionLayout,
   aiEditAssistEnabled,
   cloudEnabled,
   cloudSession,
@@ -78,6 +79,7 @@ export function SettingsView({
   onExperimentalSettingsChange,
   onRightSidebarToolsSettingsChange,
   onTitlebarActionsSettingsChange,
+  onTerminalSessionLayoutChange,
   onAiEditAssistEnabledChange,
   onCloudSessionChange,
   onPuppyoneConfigChange,
@@ -398,6 +400,26 @@ export function SettingsView({
                       </div>
                     );
                   })}
+                </div>
+              </div>
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
+                <span>{t("settings.appearance.terminalLayout.title")}</span>
+                <div
+                  className="desktop-theme-segment desktop-terminal-layout-segment"
+                  aria-label={t("settings.appearance.terminalLayout.ariaLabel")}
+                >
+                  {(["menu", "tabs"] as const).map((layout) => (
+                    <button
+                      key={layout}
+                      type="button"
+                      className={terminalSessionLayout === layout ? "active" : ""}
+                      aria-pressed={terminalSessionLayout === layout}
+                      title={t(`settings.appearance.terminalLayout.${layout}.description`)}
+                      onClick={() => onTerminalSessionLayoutChange(layout)}
+                    >
+                      <span>{t(`settings.appearance.terminalLayout.${layout}.label`)}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="desktop-settings-row desktop-settings-row-control">

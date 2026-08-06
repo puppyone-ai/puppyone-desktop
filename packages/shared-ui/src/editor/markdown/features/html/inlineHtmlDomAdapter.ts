@@ -2,6 +2,7 @@ import { compileInlineHtmlRenderPlan } from "./inlineHtmlPolicy";
 import { getSafeMarkdownHref } from "../../platform/policy/markdownUrlPolicy";
 import type { MarkdownInlineHtml } from "./inlineHtmlModel";
 import { scanMarkdownHtmlTagTokens } from "./htmlTagTokenizer";
+import { validateMarkdownHtmlBlockStructure } from "./htmlBlockStructure";
 
 export type InlineHtmlDomAdapterOptions = {
   /** LinkBroker-backed activation supplied by the preview host. */
@@ -59,20 +60,7 @@ export function createDomFromInlineHtmlSource(
  * instead of silently rendering a browser-invented structure.
  */
 export function isStructurallyCompleteInlineHtmlSource(source: string): boolean {
-  const tokens = scanMarkdownHtmlTagTokens(source.trim());
-  if (tokens.length === 0) return false;
-
-  const stack: string[] = [];
-  for (const token of tokens) {
-    if (token.selfClosing) continue;
-    if (!token.closing) {
-      stack.push(token.tagName);
-      continue;
-    }
-    if (stack[stack.length - 1] !== token.tagName) return false;
-    stack.pop();
-  }
-  return stack.length === 0;
+  return validateMarkdownHtmlBlockStructure(source.trim()).status === "complete";
 }
 
 /**

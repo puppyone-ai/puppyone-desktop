@@ -1434,6 +1434,7 @@ export function DataWorkspace({
                   htmlTrustMode={htmlTrustMode}
                   workspaceId={workspace.id}
                   workspaceRoot={workspace.path}
+                  markdownDialect={workspace.markdownDialect ?? null}
                   markdownLinkGraph={markdownLinkGraph}
                   markdownAssetUrlResolver={markdownAssetUrlResolver}
                   appPreview={dataPort.appPreview ?? null}

@@ -28,6 +28,12 @@ export function compileTableElementPlan(
       { code: "table.missing-data", message: "table block data unavailable" },
     ]);
   }
+  if (!tableData.refinementValid) {
+    return visibleSourcePlan(rangeOf(element), [{
+      code: "table.refinement-failed",
+      message: "parser-recognized table could not be refined safely",
+    }]);
+  }
 
   const assetCount = tableData.rows.reduce((total, row) => (
     total + row.cells.reduce((rowTotal, cell) => rowTotal + countImageCandidates(cell.text), 0)

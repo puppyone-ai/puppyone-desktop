@@ -1,4 +1,6 @@
+import type { EditorState } from "@codemirror/state";
 import { defineMarkdownFeature } from "../../core/features/markdownFeatureContract";
+import type { MarkdownImageDisplayMode } from "../../core/features/markdownFeatureData";
 import { getObsidianMediaEmbedNodesInRange } from "../media/markdownMediaSyntaxNode";
 import { isObsidianImageEmbedSize } from "../media/obsidianMediaEmbed";
 import { resolveMarkdownMediaReference } from "../media/markdownMediaReference";
@@ -22,15 +24,18 @@ export const imageFeature = defineMarkdownFeature({
         href: token.target,
         title: null,
         referenceKind: "wiki-target",
-      })
+      }, getImageDisplayModeFromState(state, token.from, token.to))
     ));
   },
   collectLine(line) {
-    return findStandardMarkdownImageTokens(line.text).map((token) => createImageElement({
-      ...token,
-      from: line.from + token.from,
-      to: line.from + token.to,
-    }));
+    return findStandardMarkdownImageTokens(line.text).map((token) => createImageElement(
+      {
+        ...token,
+        from: line.from + token.from,
+        to: line.from + token.to,
+      },
+      getImageDisplayModeOnLine(line.text, token.from, token.to),
+    ));
   },
   compile(element) {
     return compileImageElementPlan(element);
@@ -50,11 +55,15 @@ export const imageFeature = defineMarkdownFeature({
       plan.atom.title,
       context.documentPath,
       resolvedSource,
+      plan.atom.displayMode,
     );
   },
 });
 
-function createImageElement(token: MarkdownImageToken) {
+function createImageElement(
+  token: MarkdownImageToken,
+  displayMode: MarkdownImageDisplayMode,
+) {
   return {
     kind: "image" as const,
     from: token.from,
@@ -67,6 +76,32 @@ function createImageElement(token: MarkdownImageToken) {
       href: token.href,
       title: token.title,
       referenceKind: token.referenceKind,
+      displayMode,
     },
   };
+}
+
+function getImageDisplayModeFromState(
+  state: EditorState,
+  from: number,
+  to: number,
+): MarkdownImageDisplayMode {
+  const line = state.doc.lineAt(from);
+  if (to > line.to) return "inline";
+  return getImageDisplayModeOnLine(
+    line.text,
+    from - line.from,
+    to - line.from,
+  );
+}
+
+function getImageDisplayModeOnLine(
+  lineText: string,
+  from: number,
+  to: number,
+): MarkdownImageDisplayMode {
+  return lineText.slice(0, from).trim().length === 0
+    && lineText.slice(to).trim().length === 0
+    ? "block"
+    : "inline";
 }

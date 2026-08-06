@@ -45,6 +45,7 @@ const MARKDOWN_ELEMENT_CAPABILITIES = {
   inlineCode: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
   link: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
   list: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
+  mdxComponent: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
   rule: { inlineDecoration: false, inlineMarkerDeletion: false, inlineReveal: false },
   strike: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },
   strong: { inlineDecoration: true, inlineMarkerDeletion: true, inlineReveal: true },

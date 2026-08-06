@@ -11,6 +11,7 @@ export type MarkdownBlockFeatureId =
   | "htmlBlock"
   | "horizontalRule"
   | "mermaid"
+  | "mdxComponent"
   | "table"
   | "video";
 
@@ -107,6 +108,7 @@ const diagnostics = {
     htmlBlock: 0,
     horizontalRule: 0,
     mermaid: 0,
+    mdxComponent: 0,
     table: 0,
     video: 0,
   } satisfies Record<MarkdownBlockFeatureId, number>,
@@ -205,6 +207,11 @@ function decide(
   switch (featureId) {
     case "horizontalRule":
     case "video":
+      return rich();
+    case "mdxComponent":
+      if (complexity.sourceBytes > HTML_RICH_BYTES[profile]) return visibleSource("source-bytes");
+      if (complexity.estimatedDomNodes > HTML_RICH_NODES[profile]) return visibleSource("dom-nodes");
+      if (complexity.nestingDepth > HTML_RICH_DEPTH[profile]) return visibleSource("nesting-depth");
       return rich();
     case "table":
       if (

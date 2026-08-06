@@ -11,6 +11,7 @@ import {
 } from "../../platform/policy/markdownHtmlSanitizerPolicy";
 import { isBrokerSafeResolvedAssetUrl } from "../../platform/policy/markdownAssetPolicy";
 import type { MarkdownHtmlSanitizerCapabilities } from "../../platform/policy/markdownHtmlProfiles";
+import { normalizeMarkdownHtmlAlignment } from "../../platform/policy/markdownHtmlProfiles";
 import { getSafeMarkdownHref } from "../../platform/policy/markdownUrlPolicy";
 
 export type MarkdownTextRenderer = (target: Node, text: string) => void;
@@ -154,6 +155,13 @@ function copySafeAttributes(target: HTMLElement, source: HTMLElement, tagName: s
       } else {
         markUnsupported(context, "unsafe link URL is not supported", { fatal: true });
       }
+      continue;
+    }
+
+    if (name === "align") {
+      const alignment = normalizeMarkdownHtmlAlignment(value);
+      if (alignment) target.style.textAlign = alignment;
+      else markUnsupported(context, "align value was omitted", { fatal: false });
       continue;
     }
 

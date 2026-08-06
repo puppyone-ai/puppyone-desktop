@@ -1,5 +1,9 @@
 import { defineMarkdownFeature } from "../../core/features/markdownFeatureContract";
-import { getMarkdownTableBlock, isMarkdownTableSourceLine } from "./tableModel";
+import {
+  getMarkdownTableBlock,
+  getMarkdownTableSyntaxRange,
+  isMarkdownTableSourceLine,
+} from "./tableModel";
 import { compileTableElementPlan } from "./tablePlan";
 import { MarkdownTableWidget } from "./tableWidget";
 import { markdownTableFocusExtension } from "./tableFocus";
@@ -13,7 +17,9 @@ export function createTableFeature(renderInlinePreview: MarkdownInlinePreviewRen
     blockWidgetKinds: ["table"],
     livePreviewExtensions: [markdownTableFocusExtension],
     collectBlock(state, line) {
-      const block = getMarkdownTableBlock(state, line.number);
+      const syntaxRange = getMarkdownTableSyntaxRange(state, line.number);
+      if (!syntaxRange) return null;
+      const block = getMarkdownTableBlock(state, line.number, syntaxRange);
       if (!block || block.from !== line.from) return null;
       return {
         nextLineNumber: block.nextLineNumber,
@@ -32,6 +38,7 @@ export function createTableFeature(renderInlinePreview: MarkdownInlinePreviewRen
             cellCount: block.cellCount,
             sourceBytes: block.sourceBytes,
             modelComplete: block.modelComplete,
+            refinementValid: block.refinementValid,
           },
         },
       };

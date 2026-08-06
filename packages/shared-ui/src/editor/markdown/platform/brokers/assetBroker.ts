@@ -5,6 +5,7 @@ import {
   MARKDOWN_ASSET_MAX_IN_FLIGHT,
   type MarkdownAssetPolicyContext,
   type MarkdownAssetKind,
+  type MarkdownRemoteAssetPolicy,
 } from "../policy/markdownAssetPolicy";
 
 export type AssetBrokerRequest = {
@@ -14,7 +15,6 @@ export type AssetBrokerRequest = {
   href: string;
   signal?: AbortSignal;
   workspaceRoot?: string | null;
-  allowRemoteHttp?: boolean;
 };
 
 export type AssetBrokerHandle = {
@@ -42,6 +42,7 @@ export type AssetUrlResolver = (
 export type AssetBrokerOptions = {
   workspaceRoot?: string | null;
   resolveTimeoutMs?: number;
+  remotePolicy?: Partial<Record<MarkdownAssetKind, MarkdownRemoteAssetPolicy>>;
 };
 
 const DEFAULT_RESOLVE_TIMEOUT_MS = 15_000;
@@ -65,6 +66,10 @@ export function createAssetBroker(
     abortListener?: () => void;
   }> = [];
   const defaultWorkspaceRoot = options.workspaceRoot ?? null;
+  const remotePolicy: Readonly<Record<MarkdownAssetKind, MarkdownRemoteAssetPolicy>> = {
+    image: options.remotePolicy?.image ?? "deny",
+    video: options.remotePolicy?.video ?? "deny",
+  };
   const resolveTimeoutMs = Math.max(1, options.resolveTimeoutMs ?? DEFAULT_RESOLVE_TIMEOUT_MS);
 
   const acquire = async (signal?: AbortSignal): Promise<boolean> => {
@@ -119,7 +124,7 @@ export function createAssetBroker(
       const policyContext: MarkdownAssetPolicyContext = {
         documentPath: request.sourcePath,
         workspaceRoot: request.workspaceRoot ?? defaultWorkspaceRoot,
-        allowRemoteHttp: request.allowRemoteHttp === true,
+        remotePolicy: remotePolicy[request.kind],
       };
       const policy = evaluateMarkdownAssetHref(request.href, policyContext, request.kind);
       if (!policy.ok) return null;

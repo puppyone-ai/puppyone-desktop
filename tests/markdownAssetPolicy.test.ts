@@ -60,14 +60,18 @@ describe("markdownAssetPolicy", () => {
     expect(evaluateMarkdownAssetHref("puppyone-local://file/token/root/a.png", { documentPath: "a.md" }).ok).toBe(false);
   });
 
-  it("allows a canonical credential-free remote URL only with an explicit grant", () => {
+  it("allows canonical credential-free HTTPS only with the explicit passive-image policy", () => {
     expect(evaluateMarkdownAssetHref("https://example.com/a.png", {
       documentPath: "a.md",
-      allowRemoteHttp: true,
+      remotePolicy: "https-only",
     })).toMatchObject({ ok: true, kind: "safe-direct", url: "https://example.com/a.png" });
     expect(evaluateMarkdownAssetHref("https://user:pass@example.com/a.png", {
       documentPath: "a.md",
-      allowRemoteHttp: true,
+      remotePolicy: "https-only",
+    }).ok).toBe(false);
+    expect(evaluateMarkdownAssetHref("http://example.com/a.png", {
+      documentPath: "a.md",
+      remotePolicy: "https-only",
     }).ok).toBe(false);
   });
 
@@ -89,6 +93,42 @@ describe("markdownAssetPolicy", () => {
 });
 
 describe("AssetBroker policy gate", () => {
+  it("keeps remote scheme authority in broker configuration, not feature requests", async () => {
+    const principal = createCapabilityPrincipal({
+      editorViewId: "v1",
+      workspaceId: "ws",
+      documentPath: "README.md",
+      documentRevision: "rev-1",
+      purpose: "asset-read",
+    });
+    const denied = createAssetBroker(null);
+    const passiveImages = createAssetBroker(null, {
+      remotePolicy: { image: "https-only", video: "deny" },
+    });
+
+    expect(await denied.resolve({
+      kind: "image",
+      principal,
+      sourcePath: "README.md",
+      href: "https://img.shields.io/badge/Docs-Read-blue",
+    })).toBeNull();
+    expect(await passiveImages.resolve({
+      kind: "image",
+      principal,
+      sourcePath: "README.md",
+      href: "https://img.shields.io/badge/Docs-Read-blue",
+    })).toMatchObject({
+      kind: "image",
+      url: "https://img.shields.io/badge/Docs-Read-blue",
+    });
+    expect(await passiveImages.resolve({
+      kind: "video",
+      principal,
+      sourcePath: "README.md",
+      href: "https://example.com/demo.mp4",
+    })).toBeNull();
+  });
+
   it("does not call the host resolver for denied hrefs", async () => {
     let calls = 0;
     const broker = createAssetBroker(async () => {

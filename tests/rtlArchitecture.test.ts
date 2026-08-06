@@ -44,7 +44,7 @@ describe("RTL architecture", () => {
   });
 
   it("pins technical content to explicit LTR islands", () => {
-    expect(read("../src/features/desktop-terminal/ui/RightTerminalPanel.tsx"))
+    expect(read("../src/features/desktop-terminal/ui/TerminalSessionView.tsx"))
       .toContain('dir="ltr"');
     expect(read("../src/features/source-control/diff/contributions/text-unified/TextUnifiedDiff.tsx"))
       .toContain('dir="ltr"');

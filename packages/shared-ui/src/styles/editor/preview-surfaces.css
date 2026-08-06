@@ -242,6 +242,16 @@
   background: var(--po-panel-raised);
 }
 
+.app-preview-surface-host {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--po-panel-raised);
+}
+
 .app-preview-source {
   display: flex;
   flex: 1;
@@ -310,8 +320,12 @@
 }
 
 .app-preview-state button {
+  display: inline-flex;
   min-width: 92px;
   height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   margin-top: 4px;
   border: 1px solid var(--po-border);
   border-radius: 6px;

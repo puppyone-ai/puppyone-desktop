@@ -14,6 +14,7 @@ import {
   getMarkdownBudgetFallbackMessage,
   type MarkdownDocumentProfile,
 } from "../../core/plans/markdownBlockExecution";
+import { compileMarkdownHtmlBlockPolicy } from "./htmlBlockPolicy";
 
 export function compileInlineHtmlElementPlan(
   element: Extract<MarkdownElement, { kind: "inlineHtml" }>,
@@ -70,6 +71,7 @@ export function compileInlineHtmlElementPlan(
 export function compileHtmlBlockElementPlan(
   element: MarkdownElement,
   documentProfile: MarkdownDocumentProfile = "normal",
+  assetBrokerAvailable = false,
 ): MarkdownElementPlan {
   if (element.kind !== "htmlBlock") return visibleSourcePlan(rangeOf(element), []);
   const htmlData = element.blockData?.kind === "htmlBlock" ? element.blockData : null;
@@ -77,6 +79,18 @@ export function compileHtmlBlockElementPlan(
     return visibleSourcePlan(rangeOf(element), [
       { code: "htmlBlock.missing-data", message: "HTML block data unavailable" },
     ]);
+  }
+  const policy = compileMarkdownHtmlBlockPolicy({
+    source: htmlData.source,
+    status: htmlData.status,
+    diagnostic: htmlData.diagnostic,
+    assetBrokerAvailable,
+  });
+  if (!policy.supported) {
+    return visibleSourcePlan(rangeOf(element), [{
+      code: policy.diagnostic.code,
+      message: policy.diagnostic.message,
+    }]);
   }
 
   const complexity = createMarkdownBlockComplexity(htmlData.source, {
@@ -99,13 +113,16 @@ export function compileHtmlBlockElementPlan(
     embed: {
       kind: "htmlBlock",
       tagName: htmlData.tagName,
-      closed: htmlData.closed,
       source: htmlData.source,
+      profile: policy.profile,
+      profileVersion: policy.profileVersion,
+      requiresAssetBroker: policy.requiresAssetBroker,
+      externalHref: policy.externalHref,
     },
     complexity,
     execution,
     layout: { estimatedHeight: estimateHtmlBlockLayoutHeight(htmlData.source) },
-    diagnostics: [],
+    diagnostics: policy.diagnostics,
     capabilities: BLOCK_EMBED_CAPABILITIES,
   };
 }

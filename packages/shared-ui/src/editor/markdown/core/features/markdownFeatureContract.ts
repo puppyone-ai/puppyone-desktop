@@ -36,6 +36,7 @@ export type MarkdownFeatureBlockMatch<
 
 export type MarkdownFeatureCompileContext = Readonly<{
   documentProfile: MarkdownDocumentProfile;
+  assetBrokerAvailable: boolean;
 }>;
 
 export type MarkdownFeatureWidgetContext = Readonly<{

@@ -17,8 +17,16 @@ const markdownHtmlCss = readFileSync(
   new URL("../packages/shared-ui/src/styles/editor/markdown-html-widget.css", import.meta.url),
   "utf8",
 );
+const markdownContentCss = readFileSync(
+  new URL("../packages/shared-ui/src/styles/editor/markdown-content.css", import.meta.url),
+  "utf8",
+);
 const markdownCodeCss = readFileSync(
   new URL("../packages/shared-ui/src/styles/editor/markdown-code-widgets.css", import.meta.url),
+  "utf8",
+);
+const markdownInlineCss = readFileSync(
+  new URL("../packages/shared-ui/src/styles/editor/markdown-inline-widgets.css", import.meta.url),
   "utf8",
 );
 
@@ -80,18 +88,78 @@ describe("Markdown editor layout", () => {
 describe("Markdown HTML media layout", () => {
   it("caps raw HTML images at the reading rail without replacing authored sizing", () => {
     const imageRule = readCssRule(
-      markdownHtmlCss,
+      markdownContentCss,
       ".markdown-codemirror-editor .cm-md-html-rendered-surface img",
     );
 
     expect(imageRule).toContain("max-width: 100%;");
     expect(imageRule).not.toMatch(/(^|\n)\s*width\s*:/);
   });
+
+  it("uses one semantic presentation profile without a second HTML widget gap", () => {
+    const profileRule = readCssRule(markdownContentCss, ".markdown-codemirror-editor");
+    const nativeHeadingRule = readCssRule(
+      markdownContentCss,
+      '.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-1',
+    );
+    const htmlHeadingRule = readCssRule(
+      markdownContentCss,
+      ".markdown-codemirror-editor .cm-md-html-rendered-surface h1",
+    );
+    const htmlSurfaceRule = readCssRule(
+      markdownContentCss,
+      ".markdown-codemirror-editor .cm-md-html-rendered-surface",
+    );
+    const htmlPreRule = readCssRule(
+      markdownContentCss,
+      ".markdown-codemirror-editor .cm-md-html-rendered-surface pre",
+    );
+    const widgetRule = readCssRule(
+      markdownHtmlCss,
+      ".markdown-codemirror-editor .cm-md-html-widget",
+    );
+
+    expect(editorEntryCss).toContain('@import "./editor/markdown-content.css";');
+    expect(profileRule).toContain("--po-md-presentation-version: 1;");
+    expect(nativeHeadingRule).toContain("font-size: var(--po-md-h1-size);");
+    expect(htmlHeadingRule).toContain("font-size: var(--po-md-h1-size);");
+    expect(nativeHeadingRule).toContain("border-bottom: 1px solid var(--po-md-heading-rule);");
+    expect(htmlHeadingRule).toContain("border-bottom: 1px solid var(--po-md-heading-rule);");
+    expect(htmlSurfaceRule).toContain("white-space: normal;");
+    expect(htmlPreRule).toContain("white-space: pre-wrap;");
+    expect(widgetRule).toContain("padding: 0;");
+    expect(markdownHtmlCss).not.toContain("min-height: 80px;\n  border-radius: 5px;");
+  });
+});
+
+describe("Markdown image presentation", () => {
+  it("fills the rich content rail for block images without a product pixel cap", () => {
+    const baseImageRule = readCssRule(
+      markdownInlineCss,
+      ".markdown-codemirror-editor .cm-md-image-widget img",
+    );
+    const blockWidgetRule = readCssRule(
+      markdownInlineCss,
+      ".markdown-codemirror-editor .cm-md-image-widget.is-block",
+    );
+    const blockImageRule = readCssRule(
+      markdownInlineCss,
+      ".markdown-codemirror-editor .cm-md-image-widget.is-block img",
+    );
+
+    expect(baseImageRule).toContain("max-width: 100%;");
+    expect(baseImageRule).not.toContain("520px");
+    expect(blockWidgetRule).toContain("width: 100%;");
+    expect(blockImageRule).toContain("width: 100%;");
+    expect(blockImageRule).toContain("height: auto;");
+    expect(blockImageRule).toContain("max-height: none;");
+    expect(markdownInlineCss).not.toContain("max-width: min(100%, 520px);");
+  });
 });
 
 describe("Markdown rich-block boundary affordance", () => {
-  const richWidgetSelector = ".markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-image-widget, .cm-md-video-widget)";
-  const richSurfaceSelector = ".markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-image-widget, .cm-md-video-widget)";
+  const richWidgetSelector = ".markdown-codemirror-editor :is(.cm-md-code-widget, .cm-md-mermaid-widget, .cm-md-html-widget, .cm-md-mdx-tabs-widget, .cm-md-image-widget, .cm-md-video-widget)";
+  const richSurfaceSelector = ".markdown-codemirror-editor :is(.cm-md-code-panel, .cm-md-mermaid-body, .cm-md-html-widget-content, .cm-md-mdx-tabs-panels, .cm-md-image-widget, .cm-md-video-widget)";
 
   it("paints state on the inner surface so wrapper spacing stays outside the ring", () => {
     const editorRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor");

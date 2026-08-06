@@ -17,6 +17,8 @@ import {
 import { initializeWorkspaceEditReview } from "../local-api/edit-review.mjs";
 import { createUpdateService } from "./update-service.mjs";
 import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
+import { createAppPreviewBrowserSurfaceManager } from "./main/app-preview-browser-surface.mjs";
+import { createAppPreviewService } from "./main/app-preview-service.mjs";
 import {
   configureDesktopApplicationIdentity,
   loadDesktopBuildInfo,
@@ -343,6 +345,7 @@ async function createWindow(options = {}) {
 
   window.webContents.on("render-process-gone", (_event, details) => {
     console.error("puppyone renderer process gone:", details);
+    appPreviewRuntime?.closeSessionsForWindow(webContentsId);
   });
 
   try {
@@ -525,13 +528,44 @@ app.whenReady().then(async () => {
     getRestartBlockers: getUpdateRestartBlockers,
     confirmRestartWithBlockers: confirmUpdateRestartWithBlockers,
   });
-  appPreviewRuntime = createAppPreviewRuntime({
+  const appPreviewBrowserSurfaces = createAppPreviewBrowserSurfaceManager({
+    WebContentsView,
+    sessionFromPartition: (partition, options) => electronSession.fromPartition(partition, options),
+    getOwnerWindow: (ownerWebContentsId) => windowsById.get(ownerWebContentsId) ?? null,
+    publishState: (state, ownerWebContentsId) => {
+      const window = windowsById.get(ownerWebContentsId);
+      if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
+      window.webContents.send("app-preview:surface-state", state);
+    },
+  });
+  const appPreviewProcessRuntime = createAppPreviewRuntime({
     app,
     dialog,
     shell,
     readWorkspaceTextFile,
     resolveWorkspacePath: resolveLocalWorkspacePath,
     t: (messageId, values) => localeService.t(messageId, values),
+    onStateChange: (event) => {
+      for (const ownerWebContentsId of event.ownerWebContentsIds) {
+        const window = windowsById.get(ownerWebContentsId);
+        if (!window || window.isDestroyed() || window.webContents.isDestroyed()) continue;
+        window.webContents.send("app-preview:runtime-state", {
+          rootPath: event.rootPath,
+          ...event.result,
+        });
+      }
+      if (event.result.status === "stopped" || event.result.status === "error") {
+        appPreviewBrowserSurfaces.runtimeUnavailable({
+          rootPath: event.rootPath,
+          ownerWebContentsIds: event.ownerWebContentsIds,
+          reason: event.result.status === "error" ? "runtime-error" : "runtime-stopped",
+        });
+      }
+    },
+  });
+  appPreviewRuntime = createAppPreviewService({
+    runtime: appPreviewProcessRuntime,
+    browserSurfaces: appPreviewBrowserSurfaces,
   });
   if (viewerPackFeatureProfile.externalViewerPacks) {
     viewerPackRuntime = await loadViewerPackRuntime(true);

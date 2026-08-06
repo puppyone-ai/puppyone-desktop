@@ -31,15 +31,22 @@ import {
   trailingLineWhitespaceSelectionExtension,
 } from "./core/state/selectionBehavior";
 import {
-  markdownFeatureComposition,
-  puppyMarkdownFeatureCompositionExtension,
+  getMarkdownFeatureComposition,
+  markdownFeatureCompositionExtension,
 } from "./composition/markdownFeatureComposition";
-import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownDialectId, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
+import {
+  DEFAULT_MARKDOWN_DIALECT,
+  markdownDialectFacet,
+} from "./core/dialect/markdownDialect";
 
-export function markdownCodeMirrorBaseExtensions(readOnly: boolean): Extension[] {
+export function markdownCodeMirrorBaseExtensions(
+  readOnly: boolean,
+  dialect: MarkdownDialectId = DEFAULT_MARKDOWN_DIALECT,
+): Extension[] {
   return [
     ...markdownCodeMirrorUrgentExtensions(readOnly),
-    markdownCodeMirrorLanguageExtension(),
+    markdownCodeMirrorLanguageExtension(dialect),
   ];
 }
 
@@ -72,10 +79,14 @@ export function markdownCodeMirrorUrgentExtensions(readOnly: boolean): Extension
 }
 
 /** Language parsing and source highlighting are installed after first paint. */
-export function markdownCodeMirrorLanguageExtension(): Extension {
+export function markdownCodeMirrorLanguageExtension(
+  dialect: MarkdownDialectId = DEFAULT_MARKDOWN_DIALECT,
+): Extension {
+  const composition = getMarkdownFeatureComposition(dialect);
   return [
-    puppyMarkdownFeatureCompositionExtension,
-    markdown({ base: markdownLanguage, extensions: markdownFeatureComposition.parserExtensions }),
+    markdownDialectFacet.of(dialect),
+    markdownFeatureCompositionExtension(dialect),
+    markdown({ base: markdownLanguage, extensions: composition.parserExtensions }),
     syntaxHighlighting(puppyMarkdownHighlightStyle),
   ];
 }
@@ -87,6 +98,7 @@ export function markdownLivePreviewExtension(
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null = null,
   workspaceId = "",
   workspaceRoot: string | null = null,
+  dialect: MarkdownDialectId = DEFAULT_MARKDOWN_DIALECT,
 ): Extension {
   return [
     markdownLivePreviewContextExtension(
@@ -97,11 +109,14 @@ export function markdownLivePreviewExtension(
       workspaceId,
       workspaceRoot,
     ),
-    markdownLivePreviewCoreExtension(),
+    markdownLivePreviewCoreExtension(dialect),
   ];
 }
 
-export function markdownLivePreviewCoreExtension(): Extension {
+export function markdownLivePreviewCoreExtension(
+  dialect: MarkdownDialectId = DEFAULT_MARKDOWN_DIALECT,
+): Extension {
+  const composition = getMarkdownFeatureComposition(dialect);
   return [
     keymap.of([...markdownEditingKeymap]),
     markdownHiddenMarkerSelectionNormalizer,
@@ -109,7 +124,7 @@ export function markdownLivePreviewCoreExtension(): Extension {
     markdownInputCompositionExtension,
     markdownComposingBlockLineField,
     markdownRevealedSourceField,
-    ...markdownFeatureComposition.livePreviewExtensions,
+    ...composition.livePreviewExtensions,
     // History inversion stays in the live-preview core even when the
     // experimental interaction is disabled, so an earlier move can still
     // undo and redo embedded-session relocation safely.

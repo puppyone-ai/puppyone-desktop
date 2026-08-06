@@ -12,6 +12,7 @@ import {
   markdownFeatureCompositionFacet,
   type MarkdownFeatureComposition,
 } from "../features/markdownFeatureContract";
+import { markdownAssetUrlResolverFacet } from "../editor/markdownLivePreviewContext";
 
 export type IndexedMarkdownPlan = {
   element: MarkdownElement;
@@ -21,6 +22,7 @@ export type IndexedMarkdownPlan = {
 type MarkdownPlanIndexCacheEntry = {
   tree: ReturnType<typeof syntaxTree>;
   composition: MarkdownFeatureComposition | null;
+  assetBrokerAvailable: boolean;
   plans: readonly IndexedMarkdownPlan[] | null;
   intervals: MarkdownPlanIntervalNode | null;
   ranges: Map<string, readonly IndexedMarkdownPlan[]>;
@@ -105,11 +107,17 @@ export function getMarkdownPlanIndexDiagnostics() {
 function getOrCreateCacheEntry(state: EditorState): MarkdownPlanIndexCacheEntry {
   const tree = syntaxTree(state);
   const composition = state.facet(markdownFeatureCompositionFacet);
+  const assetBrokerAvailable = state.facet(markdownAssetUrlResolverFacet) !== null;
   const existing = markdownPlanIndexCache.get(state.doc);
-  if (existing?.tree === tree && existing.composition === composition) return existing;
+  if (
+    existing?.tree === tree
+    && existing.composition === composition
+    && existing.assetBrokerAvailable === assetBrokerAvailable
+  ) return existing;
   const created: MarkdownPlanIndexCacheEntry = {
     tree,
     composition,
+    assetBrokerAvailable,
     plans: null,
     intervals: null,
     ranges: new Map(),
@@ -132,6 +140,7 @@ function compileAndSortPlans(
       plan: compileMarkdownElementPlan(element, {
         documentProfile,
         featureComposition: state.facet(markdownFeatureCompositionFacet),
+        assetBrokerAvailable: state.facet(markdownAssetUrlResolverFacet) !== null,
       }),
     }))
     .sort((left, right) => (

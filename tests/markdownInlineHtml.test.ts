@@ -432,7 +432,7 @@ describe("Markdown HTML block classification", () => {
       to: blockSource.length,
       nextLineNumber: 4,
       tagName: "div",
-      closed: true,
+      status: "complete",
     });
     expect(getMarkdownHtmlBlock(blockState, 2)).toBeNull();
 
@@ -440,6 +440,6 @@ describe("Markdown HTML block classification", () => {
       createMarkdownState("<script>\nif (a < b) run()\n</script>"),
       1,
     );
-    expect(scriptBlock).toMatchObject({ tagName: "script", closed: true });
+    expect(scriptBlock).toMatchObject({ tagName: "script", status: "complete" });
   });
 });

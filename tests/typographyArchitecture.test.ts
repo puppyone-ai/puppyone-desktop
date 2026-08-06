@@ -99,7 +99,8 @@ describe("typography architecture", () => {
     const markdown = source("packages/shared-ui/src/styles/editor/markdown-editor.css");
     const plainText = source("packages/shared-ui/src/styles/editor/editor-chrome.css");
     const agentTranscript = source("src/features/desktop-agent/ui/styles/transcript.css");
-    const terminal = source("src/features/desktop-terminal/ui/RightTerminalPanel.tsx");
+    const terminalAppearance = source("src/features/desktop-terminal/runtime/terminalAppearance.ts");
+    const terminalAppearanceSync = source("src/features/desktop-terminal/runtime/useTerminalAppearanceSync.ts");
     const markdownEditor = source("packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor.tsx");
     const codeEditor = source("packages/shared-ui/src/editor/CodeMirrorCodeEditor.tsx");
 
@@ -112,8 +113,8 @@ describe("typography architecture", () => {
     expect(markdown).toContain("font-family: var(--po-font-content, var(--po-font-sans));");
     expect(plainText).toContain("font-family: var(--po-font-content, var(--po-font-sans));");
     expect(agentTranscript).toContain("font-family: var(--po-font-content, var(--po-font-sans));");
-    expect(terminal).toContain('getPropertyValue("--po-font-terminal")');
-    expect(terminal).toContain("subscribeTypographyChanges(document, applyTheme)");
+    expect(terminalAppearance).toContain('getPropertyValue("--po-font-terminal")');
+    expect(terminalAppearanceSync).toContain("subscribeTypographyChanges(document, applyAppearance)");
     expect(markdownEditor).toContain("subscribeTypographyChanges(host.ownerDocument");
     expect(codeEditor).toContain("subscribeTypographyChanges(host.ownerDocument");
   });

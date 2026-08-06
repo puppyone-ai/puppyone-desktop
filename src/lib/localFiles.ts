@@ -81,11 +81,30 @@ export function createLocalDataPort(rootPath: string): DataPort {
       }
     },
     appPreview: {
+      activate: ({ path, bounds, attachmentId }) => getDesktopBridge().activateAppPreview({
+        rootPath,
+        path,
+        bounds,
+        attachmentId,
+      }),
       start: (path) => getDesktopBridge().startAppPreview({ rootPath, path }),
-      restart: (path) => getDesktopBridge().restartAppPreview({ rootPath, path }),
+      restart: (path, attachment) => getDesktopBridge().restartAppPreview({
+        rootPath,
+        path,
+        ...attachment,
+      }),
       stop: (path) => getDesktopBridge().stopAppPreview({ rootPath, path }),
       getLogs: (path) => getDesktopBridge().getAppPreviewLogs({ rootPath, path }),
       openExternal: (path) => getDesktopBridge().openAppPreviewExternal({ rootPath, path }).then(() => undefined),
+      setSurfaceBounds: (request) => getDesktopBridge().setAppPreviewSurfaceBounds(request),
+      detachSurface: (request) => getDesktopBridge().detachAppPreviewSurface(request),
+      runSurfaceCommand: (request) => getDesktopBridge().runAppPreviewSurfaceCommand(request),
+      subscribeRuntime: (listener) => getDesktopBridge().onAppPreviewRuntimeState((state) => {
+        if (state.rootPath === rootPath) listener(state);
+      }),
+      subscribeSurface: (listener) => getDesktopBridge().onAppPreviewSurfaceState((state) => {
+        if (state.rootPath === rootPath) listener(state);
+      }),
     },
     documentPersistence: {
       kind: "local-fs",

@@ -14,8 +14,10 @@ import {
 import { AssetLibraryHome } from "./components/AssetLibraryHome";
 import { isDesktopAgentChatEnabled, loadRightAgentPanel } from "./features/desktop-agent/lazy";
 import {
+  createEmptyDesktopTerminalSessionSnapshot,
   isDesktopTerminalEnabled,
   RightTerminalPanel,
+  type DesktopTerminalSessionSnapshot,
   type RightTerminalPanelHandle,
 } from "./features/desktop-terminal";
 import { useDesktopUpdates } from "./components/DesktopUpdateControls";
@@ -160,6 +162,7 @@ export function App() {
     sidebarNavigationOrientation,
     sidebarNavigationPlacement,
     terminalToolEnabled,
+    terminalSessionLayout,
     titlebarActionsSettings,
     darkThemePreset,
     diffMarkers,
@@ -210,6 +213,9 @@ export function App() {
   }, []);
   const switcherRef = useRef<HTMLDivElement>(null);
   const terminalPanelRef = useRef<RightTerminalPanelHandle>(null);
+  const [terminalSnapshot, setTerminalSnapshot] = useState<DesktopTerminalSessionSnapshot>(
+    () => createEmptyDesktopTerminalSessionSnapshot(),
+  );
   const desktopTerminalEnabled = isDesktopTerminalEnabled({ terminalToolEnabled });
   const desktopAgentChatEnabled = isDesktopAgentChatEnabled({
     available: agentChatAvailable,
@@ -773,6 +779,9 @@ export function App() {
   }
 
   const workspaceSwitcherItems = getWorkspaceSwitcherItems({ workspaces });
+  const currentTerminalSnapshot = terminalSnapshot.workspacePath === workspace.path
+    ? terminalSnapshot
+    : createEmptyDesktopTerminalSessionSnapshot(workspace.path);
 
   const titlebarSlot = (
     <DesktopTitlebarContext
@@ -808,16 +817,34 @@ export function App() {
       titlebarActionsSettings={titlebarActionsSettings}
       terminalSidebarOpen={rightSidebarOpen && desktopTerminalEnabled && rightSidebarSurface === "terminal"}
       terminalToolEnabled={desktopTerminalEnabled}
+      terminalSessionLayout={terminalSessionLayout}
+      terminalSessions={currentTerminalSnapshot.sessions}
+      activeTerminalSessionId={currentTerminalSnapshot.activeSessionId}
       agentChatEnabled={desktopAgentChatEnabled}
       agentChatSidebarOpen={rightSidebarOpen && desktopAgentChatEnabled && rightSidebarSurface === "chat"}
       onOpenActiveFileExternal={() => void activeExternalOpen.openActiveFileExternal()}
+      onCreateTerminal={() => {
+        terminalPanelRef.current?.create();
+        setRightSidebarSurface("terminal");
+        setRightSidebarOpen(true);
+        setSwitcherOpen(false);
+      }}
+      onActivateTerminal={(sessionId) => {
+        terminalPanelRef.current?.activate(sessionId);
+        setRightSidebarSurface("terminal");
+        setRightSidebarOpen(true);
+        setSwitcherOpen(false);
+      }}
+      onCloseTerminal={(sessionId) => terminalPanelRef.current?.close(sessionId)}
       onToggleTerminal={() => {
         const terminalIsOpen = rightSidebarOpen && rightSidebarSurface === "terminal";
+        if (!terminalIsOpen && currentTerminalSnapshot.sessions.length === 0) {
+          terminalPanelRef.current?.create();
+        }
         setRightSidebarSurface("terminal");
         setRightSidebarOpen(!terminalIsOpen);
         setSwitcherOpen(false);
       }}
-      onRestartTerminal={() => terminalPanelRef.current?.restart()}
       onToggleAgentChat={() => {
         if (!desktopAgentChatEnabled) return;
         const chatIsOpen = rightSidebarOpen && rightSidebarSurface === "chat";
@@ -884,6 +911,8 @@ export function App() {
                   ref={terminalPanelRef}
                   workspace={workspace}
                   active={rightSidebarOpen && rightSidebarSurface === "terminal"}
+                  sessionLayout={terminalSessionLayout}
+                  onSessionsChange={setTerminalSnapshot}
                 />
               </div>
             )}

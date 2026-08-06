@@ -3,15 +3,16 @@
  * Brokers must evaluate hrefs here before calling any host resolver.
  */
 
-export const MARKDOWN_ASSET_POLICY_VERSION = "2026-07-15";
+export const MARKDOWN_ASSET_POLICY_VERSION = "2026-08-06";
 export const MARKDOWN_ASSET_MAX_DATA_URL_BYTES = 2 * 1024 * 1024;
 export const MARKDOWN_ASSET_MAX_IN_FLIGHT = 8;
 export type MarkdownAssetKind = "image" | "video";
+export type MarkdownRemoteAssetPolicy = "deny" | "https-only";
 
 export type MarkdownAssetPolicyContext = {
   documentPath: string;
   workspaceRoot?: string | null;
-  allowRemoteHttp?: boolean;
+  remotePolicy?: MarkdownRemoteAssetPolicy;
 };
 
 export type MarkdownAssetPolicyResult =
@@ -55,7 +56,7 @@ const ENCODED_CONTROL = /%(?:0[0-9a-f]|1[0-9a-f]|7f)/i;
 /**
  * Evaluate a Markdown media href for brokered resolution.
  * Markdown source never carries an ambient blob/custom-protocol capability.
- * Remote media requires an explicit policy grant. Workspace-relative paths are
+ * Remote media requires an explicit, scheme-bounded policy. Workspace-relative paths are
  * normalized lexically here and are canonicalized/revalidated by the host
  * resolver against the real workspace filesystem.
  */
@@ -82,7 +83,7 @@ export function evaluateMarkdownAssetHref(
   }
 
   if (/^https?:/i.test(trimmed)) {
-    if (context.allowRemoteHttp !== true) {
+    if (context.remotePolicy !== "https-only") {
       return { ok: false, reason: "remote-load-denied" };
     }
     const remoteUrl = parseSafeRemoteAssetUrl(trimmed);
@@ -231,7 +232,7 @@ function normalizeWorkspacePathSegments(value: string): string[] | null {
 function parseSafeRemoteAssetUrl(value: string): string | null {
   try {
     const url = new URL(value);
-    if ((url.protocol !== "http:" && url.protocol !== "https:") || !url.hostname || url.username || url.password) {
+    if (url.protocol !== "https:" || !url.hostname || url.username || url.password) {
       return null;
     }
     return url.href;

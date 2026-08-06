@@ -24,7 +24,7 @@ export const htmlFeature = defineMarkdownFeature({
   },
   collectBlock(state, line) {
     const block = getMarkdownHtmlBlock(state, line.number);
-    if (!block || block.from !== line.from) return null;
+    if (!block) return null;
     return {
       nextLineNumber: block.nextLineNumber,
       element: {
@@ -32,12 +32,13 @@ export const htmlFeature = defineMarkdownFeature({
         from: block.from,
         to: block.to,
         markerRanges: [{ from: block.from, to: block.to }],
-        lineFrom: line.from,
+        lineFrom: block.from,
         lineTo: state.doc.line(block.nextLineNumber - 1).to,
         blockData: {
           kind: "htmlBlock",
           tagName: block.tagName,
-          closed: block.closed,
+          status: block.status,
+          diagnostic: block.diagnostic,
           source: block.source,
           metrics: block.metrics,
         },
@@ -47,7 +48,11 @@ export const htmlFeature = defineMarkdownFeature({
   compile(element, context) {
     return element.kind === "inlineHtml"
       ? compileInlineHtmlElementPlan(element)
-      : compileHtmlBlockElementPlan(element, context.documentProfile);
+      : compileHtmlBlockElementPlan(
+          element,
+          context.documentProfile,
+          context.assetBrokerAvailable,
+        );
   },
   createBlockWidget(plan, context) {
     const { embed, sourceRange } = plan;
@@ -58,7 +63,10 @@ export const htmlFeature = defineMarkdownFeature({
         nextLineNumber: 0,
         source: embed.source,
         tagName: embed.tagName ?? "",
-        closed: embed.closed,
+        profile: embed.profile,
+        profileVersion: embed.profileVersion,
+        requiresAssetBroker: embed.requiresAssetBroker,
+        externalHref: embed.externalHref,
         metrics: {
           logicalItems: plan.complexity.logicalItems,
           estimatedDomNodes: plan.complexity.estimatedDomNodes,
@@ -66,7 +74,6 @@ export const htmlFeature = defineMarkdownFeature({
           assetCount: plan.complexity.assetCount,
         },
       },
-      context.htmlTrustMode,
       context.documentPath,
       context.markdownAssetUrlResolver,
       plan.layout.estimatedHeight,

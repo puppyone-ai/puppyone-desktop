@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   createMarkdownFeatureComposition,
   markdownFeatureComposition,
+  openKnowledgeMdxFeatureComposition,
   puppyMarkdownFeatureCompositionExtension,
   puppyMarkdownParserExtensions,
 } from "../packages/shared-ui/src/editor/markdown/composition/markdownFeatureComposition";
@@ -76,6 +77,21 @@ describe("static Markdown Feature Composition", () => {
     expect(inlineWidgetKinds).toEqual(["image"]);
   });
 
+  it("adds declarative MDX components only to the OpenKnowledge dialect", () => {
+    expect(markdownFeatureComposition.manifest.map((feature) => feature.id))
+      .not.toContain("mdx-component");
+    expect(openKnowledgeMdxFeatureComposition.manifest.map((feature) => feature.id))
+      .toEqual(expect.arrayContaining(["mdx-component", "html", "table"]));
+
+    const mdxEntry = openKnowledgeMdxFeatureComposition.manifest.find((feature) => (
+      feature.id === "mdx-component"
+    ));
+    expect(mdxEntry).toMatchObject({
+      semanticKinds: ["mdxComponent"],
+      blockWidgetKinds: ["mdxComponent"],
+    });
+  });
+
   it("fails fast for duplicate ids and semantic owners", () => {
     expect(() => createMarkdownFeatureComposition([imageFeature, imageFeature]))
       .toThrow(/Duplicate Markdown feature id/);
@@ -126,6 +142,7 @@ describe("static Markdown Feature Composition", () => {
       "Plan title",
       widgetContext.documentPath,
       "assets/from-plan.png",
+      "block",
     );
     expect(widget?.eq(expected)).toBe(true);
   });
@@ -146,7 +163,22 @@ describe("static Markdown Feature Composition", () => {
 
     expect(imageElements).toHaveLength(1);
     expect(imageElements[0]?.blockData).toMatchObject({ kind: "image", href });
+    expect(imageElements[0]?.blockData).toMatchObject({ displayMode: "block" });
     expect(imagePlans).toHaveLength(1);
+  });
+
+  it("classifies only a line-owning image as block media", () => {
+    const blockPlan = getMarkdownPlanIndex(createMarkdownState("  ![wide](assets/wide.png)  "))
+      .find(({ plan }) => plan.presentation === "inlineAtom" && plan.atom.kind === "image")?.plan;
+    const inlinePlan = getMarkdownPlanIndex(createMarkdownState("Before ![icon](assets/icon.png) after"))
+      .find(({ plan }) => plan.presentation === "inlineAtom" && plan.atom.kind === "image")?.plan;
+
+    expect(blockPlan?.presentation === "inlineAtom" && blockPlan.atom.kind === "image"
+      ? blockPlan.atom.displayMode
+      : null).toBe("block");
+    expect(inlinePlan?.presentation === "inlineAtom" && inlinePlan.atom.kind === "image"
+      ? inlinePlan.atom.displayMode
+      : null).toBe("inline");
   });
 
   it("passes the real trust mode through the generic inline Feature context", () => {

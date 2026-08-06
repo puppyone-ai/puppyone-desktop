@@ -2,7 +2,7 @@
  * Versioned broad-safe HTML profiles (architecture §6.4).
  * Profiles are non-escalating: a surface receives only its selected profile.
  */
-export const MARKDOWN_HTML_PROFILE_VERSION = "2026-07-15.1" as const;
+export const MARKDOWN_HTML_PROFILE_VERSION = "2026-08-06.1" as const;
 
 export type MarkdownHtmlProfileId =
   | "inline-editable"
@@ -77,6 +77,23 @@ const SAFE_BLOCK_TAGS = [
 // adapter; declaring a tag here without one would advertise ambient browser
 // loading that the product does not actually mediate.
 const SAFE_MEDIA_TAGS = ["img", "source", "video"] as const;
+
+const SAFE_BLOCK_ALIGN_TAGS = [
+  "blockquote",
+  "caption",
+  "div",
+  "figcaption",
+  "figure",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "p",
+  "td",
+  "th",
+] as const;
 
 const BLOCKED_EXECUTABLE_TAGS = [
   "base",
@@ -179,6 +196,13 @@ export const MARKDOWN_HTML_PROFILES = {
         ["td", new Set(["aria-label", "class", "colspan", "dir", "id", "lang", "rowspan", "style", "title"])],
         ["th", new Set(["aria-label", "class", "colspan", "dir", "id", "lang", "rowspan", "style", "title"])],
         ["time", new Set(["aria-label", "class", "datetime", "dir", "id", "lang", "style", "title"])],
+        ...SAFE_BLOCK_ALIGN_TAGS.map((tagName) => [
+          tagName,
+          new Set([
+            "align",
+            ...(tagName === "td" || tagName === "th" ? ["colspan", "rowspan"] : []),
+          ]),
+        ] as const),
       ]),
     },
     styleProperties: new Set<string>(BLOCK_STYLE_PROPERTIES),
@@ -229,6 +253,13 @@ export function getSafeMediaProfile() {
 
 export function isBlockedExecutableTag(tagName: string): boolean {
   return MARKDOWN_HTML_PROFILES.blocked.has(tagName);
+}
+
+export function normalizeMarkdownHtmlAlignment(value: string | null): "left" | "center" | "right" | null {
+  const normalized = value?.trim().toLowerCase() ?? "";
+  return normalized === "left" || normalized === "center" || normalized === "right"
+    ? normalized
+    : null;
 }
 
 export function getProfileForSanitizerMode(mode: "inline" | "block") {

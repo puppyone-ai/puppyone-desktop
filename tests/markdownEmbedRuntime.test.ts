@@ -239,7 +239,10 @@ describe("Markdown embedded runtime", () => {
   it("restores and explicitly rebases a table-cell draft after its range moves", () => {
     const source = "intro\n| old |\n| --- |";
     const view = createView(source);
-    const firstTable = getMarkdownTableBlock(view.state, 2)!;
+    const firstTable = getMarkdownTableBlock(view.state, 2, {
+      from: view.state.doc.line(2).from,
+      to: view.state.doc.length,
+    })!;
     const firstCell = firstTable.rows[0].cells[0];
     const firstEditor = createTableCellEditor({
       alignments: firstTable.alignments,
@@ -270,7 +273,10 @@ describe("Markdown embedded runtime", () => {
     host.editSessions.mapRanges((position) => position + 2);
     disposeTableCellEditor(firstEditor);
     wrapper.remove();
-    const movedTable = getMarkdownTableBlock(view.state, 2)!;
+    const movedTable = getMarkdownTableBlock(view.state, 2, {
+      from: view.state.doc.line(2).from,
+      to: view.state.doc.length,
+    })!;
     const movedCell = movedTable.rows[0].cells[0];
     const recoveredEditor = createTableCellEditor({
       alignments: movedTable.alignments,
@@ -303,7 +309,10 @@ describe("Markdown embedded runtime", () => {
   it("commits an escaped table cell against the exact Markdown source slice", () => {
     const source = "| a\\|b |\n| --- |";
     const view = createView(source);
-    const table = getMarkdownTableBlock(view.state, 1)!;
+    const table = getMarkdownTableBlock(view.state, 1, {
+      from: 0,
+      to: view.state.doc.length,
+    })!;
     const cell = table.rows[0].cells[0];
     const editor = createTableCellEditor({
       alignments: table.alignments,

@@ -53,6 +53,7 @@ describe("Markdown semantic-plan convergence", () => {
         href: "assets/a.png",
         title: "Architecture",
         referenceKind: "markdown-path",
+        displayMode: "block",
       });
       expect(image.plan.diagnostics).toEqual([]);
     }

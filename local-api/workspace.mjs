@@ -147,6 +147,7 @@ export async function resolveLocalWorkspaceIdentity(folderPath) {
 
 export async function workspaceFromPath(folderPath, options = {}) {
   const identity = await resolveLocalWorkspaceIdentity(folderPath);
+  const markdownDialect = await resolveWorkspaceMarkdownDialect(identity.canonicalPath);
   const includeGitMetadata = options.includeGitMetadata !== false;
   const gitMetadata = includeGitMetadata
     ? await Promise.all([
@@ -170,8 +171,18 @@ export async function workspaceFromPath(folderPath, options = {}) {
     cloudState: "local",
     workspaceInstanceId: identity.workspaceInstanceId,
     fsIdentity: identity.fsIdentity,
+    ...(markdownDialect ? { markdownDialect } : {}),
     ...(identity.configError ? { configError: identity.configError } : {}),
   };
+}
+
+async function resolveWorkspaceMarkdownDialect(rootPath) {
+  const openKnowledgeConfig = path.join(rootPath, ".ok", "config.yml");
+  const metadata = await fs.stat(openKnowledgeConfig).catch((error) => {
+    if (error?.code === "ENOENT" || error?.code === "ENOTDIR") return null;
+    throw error;
+  });
+  return metadata?.isFile() ? "openknowledge-mdx" : null;
 }
 
 async function readWorkspacePuppyoneRemoteMetadata(rootPath) {

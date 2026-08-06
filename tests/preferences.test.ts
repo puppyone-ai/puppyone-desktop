@@ -14,6 +14,7 @@ import {
   parseLoadingAnimationPreset,
   parsePointerCursors,
   parseSidebarNavigationVisibilitySettings,
+  parseTerminalSessionLayout,
   parseTextSize,
 } from "../src/preferences";
 
@@ -145,6 +146,13 @@ describe("appearance preferences", () => {
     expect(parsePointerCursors("true")).toBe(true);
     expect(parsePointerCursors("false")).toBe(false);
     expect(parsePointerCursors(null)).toBe(false);
+  });
+
+  it("keeps the titlebar menu by default and accepts the Terminal tabs layout", () => {
+    expect(parseTerminalSessionLayout(null)).toBe("menu");
+    expect(parseTerminalSessionLayout("menu")).toBe("menu");
+    expect(parseTerminalSessionLayout("tabs")).toBe("tabs");
+    expect(parseTerminalSessionLayout("floating")).toBe("menu");
   });
 
 });

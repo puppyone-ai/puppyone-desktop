@@ -72,6 +72,7 @@ export type TitlebarActionsSettings = {
   enabled: Record<TitlebarActionId, boolean>;
   order: TitlebarActionId[];
 };
+export type TerminalSessionLayout = "menu" | "tabs";
 export type ExperimentalSettings = {
   enableAgentChat: boolean;
   enableAssetLibraryHome: boolean;
@@ -118,6 +119,7 @@ export const FILES_VISIBILITY_STORAGE_KEY = "puppyone.desktop.filesVisibility";
 export const EXTERNAL_APPS_STORAGE_KEY = "puppyone.desktop.externalApps";
 export const RIGHT_SIDEBAR_TOOLS_STORAGE_KEY = "puppyone.desktop.rightSidebarTools";
 export const TITLEBAR_ACTIONS_STORAGE_KEY = "puppyone.desktop.titlebarActions";
+export const TERMINAL_SESSION_LAYOUT_STORAGE_KEY = "puppyone.desktop.terminalSessionLayout";
 export const AI_EDIT_ASSIST_STORAGE_KEY = "puppyone.desktop.aiEditAssist";
 export const GIT_DISPLAY_MODE_STORAGE_KEY = "puppyone.desktop.gitDisplayMode";
 export const EXPERIMENTAL_SETTINGS_STORAGE_KEY = "puppyone.desktop.experimental";
@@ -168,6 +170,7 @@ export const DEFAULT_TITLEBAR_ACTIONS_SETTINGS: TitlebarActionsSettings = {
   },
   order: [...TITLEBAR_ACTION_IDS],
 };
+export const DEFAULT_TERMINAL_SESSION_LAYOUT: TerminalSessionLayout = "menu";
 export const DEFAULT_AI_EDIT_ASSIST_ENABLED = false;
 export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableAgentChat: false,
@@ -532,6 +535,14 @@ export function parseTitlebarActionsSettings(value: string | null | undefined): 
   } catch {
     return DEFAULT_TITLEBAR_ACTIONS_SETTINGS;
   }
+}
+
+export function parseTerminalSessionLayout(
+  value: string | null | undefined,
+): TerminalSessionLayout {
+  return value === "tabs" || value === "menu"
+    ? value
+    : DEFAULT_TERMINAL_SESSION_LAYOUT;
 }
 
 export function parseAiEditAssistEnabled(value: string | null | undefined): boolean {

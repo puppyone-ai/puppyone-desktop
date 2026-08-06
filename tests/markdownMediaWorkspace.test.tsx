@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DataNode, DataPort } from "../packages/shared-ui/src/core/types";
 import { DataWorkspace } from "../packages/shared-ui/src/data/DataWorkspace";
 import { withTestLocalization } from "./testLocalization";
+import { CENTERED_README_DOCUMENT } from "./fixtures/markdown/centeredReadme";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -21,6 +22,66 @@ afterEach(() => {
 });
 
 describe("Markdown workspace media integration", () => {
+  it("hydrates the canonical README logo while keeping HTTPS badges out of the workspace resolver", async () => {
+    const markdownPath = "README.md";
+    const getFileUrl = vi.fn(async (path: string) => {
+      if (path === "public/logo-square-v0.1.4-dark.png") {
+        return "puppyone-local://file/token/markdown-asset/root/public/logo-square-v0.1.4-dark.png";
+      }
+      if (path === "public/puppyone-overview.png") {
+        return "puppyone-local://file/token/markdown-asset/root/public/puppyone-overview.png";
+      }
+      return null;
+    });
+    const dataPort: DataPort = {
+      listChildren: vi.fn(async () => [markdownNode(markdownPath)]),
+      readFile: vi.fn(async (path: string) => ({
+        path,
+        name: markdownPath,
+        type: "markdown",
+        content: CENTERED_README_DOCUMENT,
+        mimeType: "text/markdown",
+        size: "2 KB",
+        version: "v1",
+      })),
+      getFileUrl,
+    };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(withTestLocalization(
+        <DataWorkspace
+          workspace={{ id: "workspace", name: "puppyone", path: "/workspace", status: "recording" }}
+          dataPort={dataPort}
+          defaultActivePath={markdownPath}
+          showHeader={false}
+          showPreviewHeader={false}
+          enableMarkdownLinkContentIndexing={false}
+        />,
+      ));
+    });
+
+    await waitFor(() => container.querySelector(".cm-md-html-rendered-surface") !== null);
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 10));
+    });
+
+    // The overview is below the initial CodeMirror viewport and is resolved
+    // only when mounted. The header logo is visible immediately; remote badge
+    // URLs must not be forwarded to the workspace filesystem capability.
+    expect(getFileUrl.mock.calls).toEqual([
+      ["public/logo-square-v0.1.4-dark.png", { purpose: "markdown-asset" }],
+    ]);
+    expect(container.querySelector<HTMLImageElement>('.cm-md-html-rendered-surface img[alt="puppyone Logo"]')
+      ?.getAttribute("src")).toBe(
+        "puppyone-local://file/token/markdown-asset/root/public/logo-square-v0.1.4-dark.png",
+      );
+    expect(container.querySelectorAll('.cm-md-html-rendered-surface img[src^="https://img.shields.io/"]'))
+      .toHaveLength(4);
+  });
+
   it("resolves a standard Markdown image relative to the active document", async () => {
     const markdownPath = "Puppyone — One Pager.md";
     const imagePath = "asserts/market-unbundling-chart.png";
@@ -68,6 +129,10 @@ describe("Markdown workspace media integration", () => {
     await waitFor(() => container.querySelector(".cm-md-image-widget img") !== null);
 
     expect(getFileUrl).toHaveBeenCalledWith(imagePath, { purpose: "markdown-asset" });
+    expect(container.querySelector(".cm-md-image-widget")?.classList.contains("is-block"))
+      .toBe(true);
+    expect(container.querySelector(".cm-md-image-widget")?.getAttribute("data-display-mode"))
+      .toBe("block");
     expect(container.querySelector<HTMLImageElement>(".cm-md-image-widget img")?.src)
       .toBe("blob:https://app/market-unbundling-chart");
   });

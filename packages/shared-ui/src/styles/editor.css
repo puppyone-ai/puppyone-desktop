@@ -28,6 +28,9 @@
 /* Markdown editor base: layout, typography, lines, AI edit markers */
 @import "./editor/markdown-editor.css";
 
+/* Markdown semantic presentation profile shared by native Markdown and HTML */
+@import "./editor/markdown-content.css";
+
 /* Markdown live preview: fenced code + Mermaid widgets */
 @import "./editor/markdown-code-widgets.css";
 
