@@ -9,6 +9,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { TextEditorFrame } from "../packages/shared-ui/src/editor/viewers/TextEditorFrame";
 import { testT, withTestLocalization } from "./testLocalization";
 
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
 const editorChromeCss = read("../packages/shared-ui/src/styles/editor/editor-chrome.css");
 
 let root: Root | null = null;
