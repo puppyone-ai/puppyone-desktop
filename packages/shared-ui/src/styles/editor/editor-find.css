@@ -1,0 +1,125 @@
+.editor-find-host {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor-find-host > :not(.editor-find-widget) {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-find-widget {
+  position: absolute;
+  z-index: 32;
+  inset-block-start: 8px;
+  inset-inline-end: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  height: 34px;
+  padding: 4px;
+  border: 1px solid var(--po-border);
+  border-radius: 7px;
+  background: var(--po-overlay);
+  color: var(--po-text-subtle);
+  box-shadow: 0 8px 24px var(--po-shadow);
+}
+
+.editor-find-widget > svg {
+  flex: 0 0 auto;
+  margin-inline: 4px 1px;
+}
+
+.editor-find-widget input {
+  box-sizing: border-box;
+  width: min(220px, 28vw);
+  height: 24px;
+  padding: 0 5px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--po-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.editor-find-widget input::placeholder {
+  color: var(--po-text-disabled);
+}
+
+.editor-find-widget:focus-within {
+  border-color: color-mix(in srgb, var(--po-accent) 58%, var(--po-border));
+}
+
+.editor-find-widget__result {
+  min-width: 54px;
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.editor-find-widget button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--po-text-muted);
+}
+
+.editor-find-widget button:hover:not(:disabled) {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.editor-find-widget button:focus-visible {
+  outline: 1px solid var(--po-accent);
+  outline-offset: -1px;
+}
+
+.editor-find-widget button:disabled {
+  color: var(--po-text-disabled);
+}
+
+.cm-editor-find-match {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--po-warning) 34%, transparent);
+}
+
+.cm-editor-find-match--current {
+  outline: 1px solid color-mix(in srgb, var(--po-warning) 82%, var(--po-text));
+  background: color-mix(in srgb, var(--po-warning) 58%, transparent);
+}
+
+.csv-table-editor [data-find-match="true"] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-warning) 56%, transparent);
+}
+
+.csv-table-editor [data-find-match="true"] input {
+  background: color-mix(in srgb, var(--po-warning) 24%, transparent);
+}
+
+.csv-table-editor [data-find-current="true"] {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--po-warning) 80%, var(--po-text));
+}
+
+@media (max-width: 720px) {
+  .editor-find-widget input {
+    width: min(160px, 30vw);
+  }
+
+  .editor-find-widget__result {
+    min-width: 42px;
+  }
+}

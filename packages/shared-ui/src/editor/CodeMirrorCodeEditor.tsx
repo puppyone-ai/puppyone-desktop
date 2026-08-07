@@ -20,6 +20,8 @@ import {
 } from "@codemirror/view";
 import { useEffect, useMemo, useRef } from "react";
 import { subscribeTypographyChanges } from "../core/typography";
+import { CodeMirrorFindAdapter } from "./find/codeMirrorFindAdapter";
+import { useRegisterEditorFindAdapter } from "./find/editorFind";
 
 export type CodeMirrorCodeEditorProps = {
   content: string;
@@ -44,7 +46,10 @@ export function CodeMirrorCodeEditor({
   const readOnlyRef = useRef(readOnly);
   const applyingExternalChangeRef = useRef(false);
   const languageKey = useMemo(() => getCodeLanguageKey(language, nodeName), [language, nodeName]);
+  const findAdapter = useMemo(() => new CodeMirrorFindAdapter(), []);
   const initialEditorConfigRef = useRef({ content, languageKey, nodeName, readOnly });
+
+  useRegisterEditorFindAdapter(findAdapter);
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -70,6 +75,7 @@ export function CodeMirrorCodeEditor({
         highlightActiveLine(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         EditorView.lineWrapping,
+        findAdapter.extension,
         keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
         EditorView.updateListener.of((update) => {
           if (!update.docChanged || readOnlyRef.current || applyingExternalChangeRef.current) return;
@@ -86,16 +92,18 @@ export function CodeMirrorCodeEditor({
 
     const view = new EditorView({ state, parent: host });
     viewRef.current = view;
+    findAdapter.attach(view);
     const unsubscribeTypography = subscribeTypographyChanges(host.ownerDocument, () => {
       view.requestMeasure();
     });
 
     return () => {
       unsubscribeTypography();
+      findAdapter.dispose();
       view.destroy();
       viewRef.current = null;
     };
-  }, []);
+  }, [findAdapter]);
 
   useEffect(() => {
     const view = viewRef.current;

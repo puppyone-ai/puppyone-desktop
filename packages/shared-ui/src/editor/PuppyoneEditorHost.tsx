@@ -33,6 +33,7 @@ import type { AiEditFile } from "./ai-edits/types";
 import { DocumentSessionBoundary } from "./document-session/DocumentSessionBoundary";
 import type { DocumentPersistedCommit } from "./document-session/types";
 import { resolveEditorAccess } from "./editorAccess";
+import { EditorFindHost } from "./find/editorFind";
 
 export type { EditorDocument, EditorDocumentKind, EditorSaveMode, MarkdownHtmlTrustMode } from "./viewerTypes";
 
@@ -196,23 +197,25 @@ export function PuppyoneEditorHost({
     />
   );
 
-  if (canEdit && documentPersistence) {
-    return (
-      <DocumentSessionBoundary
-        documentId={document.path}
-        initialContent={content}
-        initialVersion={document.version}
-        saveMode={saveMode}
-        persistence={documentPersistence}
-        onPersisted={onDocumentPersisted}
-        showSaveStatus={editorInteractionPreferences.showSaveStatus}
-      >
-        {presetViewer}
-      </DocumentSessionBoundary>
-    );
-  }
+  const editor = canEdit && documentPersistence ? (
+    <DocumentSessionBoundary
+      documentId={document.path}
+      initialContent={content}
+      initialVersion={document.version}
+      saveMode={saveMode}
+      persistence={documentPersistence}
+      onPersisted={onDocumentPersisted}
+      showSaveStatus={editorInteractionPreferences.showSaveStatus}
+    >
+      {presetViewer}
+    </DocumentSessionBoundary>
+  ) : presetViewer;
 
-  return presetViewer;
+  return (
+    <EditorFindHost documentId={document.path}>
+      {editor}
+    </EditorFindHost>
+  );
 }
 
 function ExternalViewerChooser({
