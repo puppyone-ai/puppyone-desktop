@@ -205,6 +205,14 @@ export { PlainTextEditor } from "./editor/PlainTextEditor";
 export type { PlainTextEditorProps } from "./editor/PlainTextEditor";
 export { CsvTableEditor } from "./editor/CsvTableEditor";
 export type { CsvTableEditorProps } from "./editor/CsvTableEditor";
+export {
+  EditorChromeContributionProvider,
+  useEditorChromeContributionPublisher,
+} from "./editor/editorChromeContribution";
+export type {
+  CsvViewSettingsContribution,
+  EditorChromeContribution,
+} from "./editor/editorChromeContribution";
 export { EditorSaveButton as SaveStatusButton } from "./editor/EditorSaveButton";
 export type {
   EditorSaveButtonProps as SaveStatusButtonProps,

@@ -196,6 +196,37 @@ describe("desktop build identity", () => {
     });
   });
 
+  it("uses development-badged icons only for development builds", () => {
+    const build = (channel, buildNumber = null) => createDesktopElectronBuilderConfig({
+      buildInfo: resolveDesktopBuildIdentity({
+        baseVersion: "1.4.0",
+        buildNumber,
+        builtAt: "2026-07-26T10:00:00.000Z",
+        channel,
+        commitSha,
+      }),
+      packageMetadata: {
+        build: {
+          extraResources: [{ from: "public/logo-square.png", to: "logo-square.png" }],
+          mac: { icon: "build/icon.icns" },
+        },
+      },
+    });
+
+    const development = build("dev");
+    const stable = build("stable", 43);
+    expect(development.mac.icon).toBe("public/logo-square-dev.png");
+    expect(development.extraResources).toEqual(expect.arrayContaining([
+      { from: "public/logo-square-dev.png", to: "logo-square-dev.png" },
+      { from: "public/logo-square-v0.1.3-light-dev.png", to: "dock-icon-light-dev.png" },
+      { from: "public/logo-square-v0.1.3-dark-dev.png", to: "dock-icon-matte-dev.png" },
+    ]));
+    expect(stable.mac.icon).toBe("build/icon.icns");
+    expect(stable.extraResources).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ to: "logo-square-dev.png" }),
+    ]));
+  });
+
   it("writes one build-info file and validates the release tag", async () => {
     const repositoryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "puppyone-build-identity-"));
     temporaryDirectories.push(repositoryRoot);
