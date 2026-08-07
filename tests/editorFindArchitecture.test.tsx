@@ -58,6 +58,26 @@ describe("editor find architecture", () => {
     expect(editorFindStyles).not.toContain(".editor-find-host > :not(.editor-find-widget)");
   });
 
+  it("keeps the find widget compact and separates primary input from secondary controls", () => {
+    const widgetRuleStart = editorFindStyles.indexOf(".editor-find-widget {");
+    const widgetRule = editorFindStyles.slice(
+      widgetRuleStart,
+      editorFindStyles.indexOf("}", widgetRuleStart) + 1,
+    );
+    expect(widgetRule).toContain("width: min(336px, calc(100% - 24px))");
+    expect(widgetRule).toContain("height: 30px");
+    expect(widgetRule).toContain("var(--po-panel-raised)");
+    expect(widgetRule).toContain("border-radius: 6px");
+
+    const resultRuleStart = editorFindStyles.indexOf(".editor-find-widget__result {");
+    const resultRule = editorFindStyles.slice(
+      resultRuleStart,
+      editorFindStyles.indexOf("}", resultRuleStart) + 1,
+    );
+    expect(resultRule).toContain("border-inline-start: 1px solid var(--po-divider)");
+    expect(resultRule).toContain("font-variant-numeric: tabular-nums");
+  });
+
   it("does not let a stale adapter cleanup dismiss the active find session", async () => {
     const firstAdapter = createAdapter();
     const activeAdapter = createAdapter();

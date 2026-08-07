@@ -10,37 +10,40 @@
 .editor-find-widget {
   position: absolute;
   z-index: 32;
-  inset-block-start: 8px;
-  inset-inline-end: 10px;
+  inset-block-start: 10px;
+  inset-inline-end: 12px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   box-sizing: border-box;
-  height: 34px;
-  padding: 4px;
-  border: 1px solid var(--po-border);
-  border-radius: 7px;
-  background: var(--po-overlay);
+  width: min(336px, calc(100% - 24px));
+  height: 30px;
+  padding: 2px 3px;
+  border: 1px solid color-mix(in srgb, var(--po-border) 82%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--po-panel-raised) 96%, var(--po-overlay) 4%);
   color: var(--po-text-subtle);
-  box-shadow: 0 8px 24px var(--po-shadow);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--po-shadow) 72%, transparent);
 }
 
 .editor-find-widget > svg {
   flex: 0 0 auto;
-  margin-inline: 4px 1px;
+  margin-inline: 4px 2px;
+  color: var(--po-text-disabled);
 }
 
 .editor-find-widget input {
+  flex: 1;
+  min-width: 0;
   box-sizing: border-box;
-  width: min(220px, 28vw);
   height: 24px;
-  padding: 0 5px;
+  padding: 0 4px;
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--po-text);
   font: inherit;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 .editor-find-widget input::placeholder {
@@ -48,14 +51,27 @@
 }
 
 .editor-find-widget:focus-within {
-  border-color: color-mix(in srgb, var(--po-accent) 58%, var(--po-border));
+  border-color: color-mix(in srgb, var(--po-accent) 30%, var(--po-border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--po-accent) 10%, transparent),
+    0 6px 18px color-mix(in srgb, var(--po-shadow) 72%, transparent);
+}
+
+.editor-find-widget input:focus-visible {
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--po-accent) 42%, transparent);
 }
 
 .editor-find-widget__result {
-  min-width: 54px;
+  min-width: 50px;
+  max-width: 84px;
+  padding-inline: 8px 6px;
+  overflow: hidden;
+  border-inline-start: 1px solid var(--po-divider);
   color: var(--po-text-subtle);
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
   text-align: center;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -73,8 +89,12 @@
 }
 
 .editor-find-widget button:hover:not(:disabled) {
-  background: var(--po-hover);
+  background: var(--po-control-hover);
   color: var(--po-text);
+}
+
+.editor-find-widget button:active:not(:disabled) {
+  background: color-mix(in srgb, var(--po-control-hover) 86%, var(--po-text) 14%);
 }
 
 .editor-find-widget button:focus-visible {
@@ -109,11 +129,13 @@
 }
 
 @media (max-width: 720px) {
-  .editor-find-widget input {
-    width: min(160px, 30vw);
+  .editor-find-widget {
+    inset-inline: 8px;
+    width: auto;
   }
 
   .editor-find-widget__result {
-    min-width: 42px;
+    min-width: 46px;
+    padding-inline: 6px 4px;
   }
 }
