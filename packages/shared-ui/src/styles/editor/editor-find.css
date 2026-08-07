@@ -51,14 +51,7 @@
 }
 
 .editor-find-widget:focus-within {
-  border-color: color-mix(in srgb, var(--po-accent) 30%, var(--po-border));
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--po-accent) 10%, transparent),
-    0 6px 18px color-mix(in srgb, var(--po-shadow) 72%, transparent);
-}
-
-.editor-find-widget input:focus-visible {
-  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--po-accent) 42%, transparent);
+  border-color: color-mix(in srgb, var(--po-text-muted) 48%, var(--po-border));
 }
 
 .editor-find-widget__result {

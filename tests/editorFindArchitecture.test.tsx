@@ -76,6 +76,16 @@ describe("editor find architecture", () => {
     );
     expect(resultRule).toContain("border-inline-start: 1px solid var(--po-divider)");
     expect(resultRule).toContain("font-variant-numeric: tabular-nums");
+
+    const focusRuleStart = editorFindStyles.indexOf(".editor-find-widget:focus-within {");
+    const focusRule = editorFindStyles.slice(
+      focusRuleStart,
+      editorFindStyles.indexOf("}", focusRuleStart) + 1,
+    );
+    expect(focusRule).toContain("var(--po-text-muted)");
+    expect(focusRule).not.toContain("box-shadow");
+    expect(focusRule).not.toContain("var(--po-accent)");
+    expect(editorFindStyles).not.toContain(".editor-find-widget input:focus-visible");
   });
 
   it("does not let a stale adapter cleanup dismiss the active find session", async () => {
