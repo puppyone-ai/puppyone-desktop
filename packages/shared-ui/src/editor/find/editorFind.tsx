@@ -34,18 +34,25 @@ export type EditorFindCommand = Readonly<{
   open(): void;
 }>;
 
-type EditorFindRegistration = (adapter: EditorFindAdapter | null) => void;
+type EditorFindRegistration = (adapter: EditorFindAdapter) => () => void;
+type EditorFindPublisher = (command: EditorFindCommand) => () => void;
 
 const EditorFindRegistrationContext = createContext<EditorFindRegistration | null>(null);
 const EditorFindCommandContext = createContext<EditorFindCommand | null>(null);
-const EditorFindPublisherContext = createContext<((command: EditorFindCommand | null) => void) | null>(null);
+const EditorFindPublisherContext = createContext<EditorFindPublisher | null>(null);
 
 const EMPTY_RESULT: EditorFindResult = Object.freeze({ current: 0, total: 0 });
 
 export function EditorFindContributionProvider({ children }: { children: ReactNode }) {
   const [command, setCommand] = useState<EditorFindCommand | null>(null);
+  const publishCommand = useCallback<EditorFindPublisher>((nextCommand) => {
+    setCommand(nextCommand);
+    return () => {
+      setCommand((currentCommand) => currentCommand === nextCommand ? null : currentCommand);
+    };
+  }, []);
   return (
-    <EditorFindPublisherContext.Provider value={setCommand}>
+    <EditorFindPublisherContext.Provider value={publishCommand}>
       <EditorFindCommandContext.Provider value={command}>
         {children}
       </EditorFindCommandContext.Provider>
@@ -61,8 +68,7 @@ export function useRegisterEditorFindAdapter(adapter: EditorFindAdapter | null) 
   const register = useContext(EditorFindRegistrationContext);
   useEffect(() => {
     if (!register || !adapter) return undefined;
-    register(adapter);
-    return () => register(null);
+    return register(adapter);
   }, [adapter, register]);
 }
 
@@ -83,14 +89,17 @@ export function EditorFindHost({
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<EditorFindResult>(EMPTY_RESULT);
 
-  const register = useCallback((nextAdapter: EditorFindAdapter | null) => {
+  const register = useCallback<EditorFindRegistration>((nextAdapter) => {
     adapterRef.current = nextAdapter;
     setAdapter(nextAdapter);
-    if (!nextAdapter) {
+    return () => {
+      if (adapterRef.current !== nextAdapter) return;
+      adapterRef.current = null;
+      setAdapter((currentAdapter) => currentAdapter === nextAdapter ? null : currentAdapter);
       setOpen(false);
       setQuery("");
       setResult(EMPTY_RESULT);
-    }
+    };
   }, []);
 
   const openFind = useCallback(() => {
@@ -130,9 +139,8 @@ export function EditorFindHost({
   ), [adapter, documentId, openFind]);
 
   useEffect(() => {
-    if (!publishCommand) return undefined;
-    publishCommand(command);
-    return () => publishCommand(null);
+    if (!publishCommand || !command) return undefined;
+    return publishCommand(command);
   }, [command, publishCommand]);
 
   const handleKeyDown = useCallback((event: KeyboardEvent<HTMLDivElement>) => {

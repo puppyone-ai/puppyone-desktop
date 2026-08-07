@@ -4,11 +4,13 @@
 import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { CsvTableEditor } from "../packages/shared-ui/src/editor/CsvTableEditor";
 import { CodeMirrorFindAdapter } from "../packages/shared-ui/src/editor/find/codeMirrorFindAdapter";
+import { MarkdownCodeMirrorEditor } from "../packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor";
 import { DesktopTitlebarActions } from "../src/features/app-shell/DesktopTitlebarActions";
 import { DEFAULT_TITLEBAR_ACTIONS_SETTINGS } from "../src/preferences";
 import {
@@ -19,6 +21,11 @@ import {
   useRegisterEditorFindAdapter,
 } from "../packages/shared-ui/src/editor/find/editorFind";
 import { withTestLocalization } from "./testLocalization";
+
+const editorFindStyles = readFileSync(
+  "packages/shared-ui/src/styles/editor/editor-find.css",
+  "utf8",
+);
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -39,6 +46,89 @@ afterEach(async () => {
 });
 
 describe("editor find architecture", () => {
+  it("keeps the find overlay host out of the editor flex and overflow contracts", () => {
+    const ruleStart = editorFindStyles.indexOf(".editor-find-host {");
+    const hostRule = editorFindStyles.slice(ruleStart, editorFindStyles.indexOf("}", ruleStart) + 1);
+    expect(hostRule).toContain("position: relative");
+    expect(hostRule).toContain("width: 100%");
+    expect(hostRule).toContain("height: 100%");
+    expect(hostRule).toContain("overflow: visible");
+    expect(hostRule).not.toContain("display: flex");
+    expect(hostRule).not.toContain("overflow: hidden");
+    expect(editorFindStyles).not.toContain(".editor-find-host > :not(.editor-find-widget)");
+  });
+
+  it("does not let a stale adapter cleanup dismiss the active find session", async () => {
+    const firstAdapter = createAdapter();
+    const activeAdapter = createAdapter();
+    const renderAdapters = (showFirst: boolean) => withTestLocalization(
+      <EditorFindHost documentId="transitioning.md">
+        {showFirst && <AdapterViewer adapter={firstAdapter} />}
+        <AdapterViewer adapter={activeAdapter} />
+      </EditorFindHost>,
+    );
+
+    await act(async () => root.render(renderAdapters(true)));
+    const activeViewer = container.querySelectorAll<HTMLElement>("[data-test-adapter-viewer]")[1];
+    await act(async () => {
+      activeViewer.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "f",
+        metaKey: true,
+        bubbles: true,
+      }));
+    });
+    const input = container.querySelector<HTMLInputElement>(".editor-find-widget input");
+    await changeInput(input!, "puppy");
+
+    await act(async () => root.render(renderAdapters(false)));
+    expect(container.querySelector(".editor-find-widget input")).toBe(input);
+    expect(input?.value).toBe("puppy");
+    expect(activeAdapter.setQuery).toHaveBeenLastCalledWith("puppy");
+  });
+
+  it("keeps the real Markdown find widget mounted while typing and preserves its scroll owner", async () => {
+    await act(async () => {
+      root.render(withTestLocalization(
+        <EditorFindHost documentId="long-notes.md">
+          <MarkdownCodeMirrorEditor
+            value={`${"first line\n".repeat(80)}needle\n${"last line\n".repeat(80)}`}
+            readOnly={false}
+            livePreview
+            documentPath="long-notes.md"
+          />
+        </EditorFindHost>,
+      ));
+      await Promise.resolve();
+    });
+
+    const markdownEditor = container.querySelector<HTMLElement>(".markdown-codemirror-editor");
+    const scroller = container.querySelector<HTMLElement>(".markdown-codemirror-editor .cm-scroller");
+    expect(markdownEditor).toBeInstanceOf(HTMLElement);
+    expect(scroller).toBeInstanceOf(HTMLElement);
+    scroller!.scrollTop = 240;
+
+    await act(async () => {
+      markdownEditor?.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "f",
+        metaKey: true,
+        bubbles: true,
+      }));
+    });
+    const input = container.querySelector<HTMLInputElement>(".editor-find-widget input");
+    expect(input).toBeInstanceOf(HTMLInputElement);
+
+    await changeInput(input!, "needle");
+    expect(container.querySelector(".editor-find-widget input")).toBe(input);
+    expect(document.activeElement).toBe(input);
+    expect(container.querySelector(".editor-find-widget__result")?.textContent).toBe("1 of 1");
+    expect(container.querySelector(".markdown-codemirror-editor .cm-scroller")).toBe(scroller);
+    scroller!.scrollTop = 480;
+    scroller!.dispatchEvent(new Event("scroll"));
+    expect(scroller!.scrollTop).toBe(480);
+    expect(container.querySelectorAll(".markdown-codemirror-editor .cm-editor-find-match"))
+      .toHaveLength(1);
+  });
+
   it("places the discoverable search action before Open external in the product header", async () => {
     const openFind = vi.fn();
     await act(async () => {
@@ -194,7 +284,7 @@ function HeaderFindButton() {
 
 function AdapterViewer({ adapter }: { adapter: EditorFindAdapter }) {
   useRegisterEditorFindAdapter(adapter);
-  return <div tabIndex={0}>Viewer</div>;
+  return <div data-test-adapter-viewer tabIndex={0}>Viewer</div>;
 }
 
 function createAdapter() {
