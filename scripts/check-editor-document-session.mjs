@@ -45,6 +45,20 @@ if (/\bsetTimeout\s*\(/.test(textFrameSource)) {
   errors.push(`${relative(textFramePath)} owns a timer; save scheduling belongs to DocumentEditingSession`);
 }
 
+const codeViewerPath = path.join(sharedEditorRoot, "viewers/CodeViewer.tsx");
+const codeViewerSource = readFileSync(codeViewerPath, "utf8");
+if (!/\bsourceSnapshotMode\b/.test(codeViewerSource)) {
+  errors.push(`${relative(codeViewerPath)} does not keep canonical code source in CodeMirror snapshots`);
+}
+for (const callback of ["onSourceRevisionChange", "onSnapshotPortChange"]) {
+  if (!new RegExp(`\\b${callback}\\b`).test(codeViewerSource)) {
+    errors.push(`${relative(codeViewerPath)} does not connect ${callback} to the shared edit boundary`);
+  }
+}
+if (/\bonChange=\{controls\.canEdit\s*\?\s*controls\.onChange/.test(codeViewerSource)) {
+  errors.push(`${relative(codeViewerPath)} stringifies canonical code source through the compatibility callback`);
+}
+
 const sessionSource = readFileSync(sessionKernel, "utf8");
 if (/from\s+["'][^"']*(?:electron|localFiles|cloudDataPort|node:fs)[^"']*["']/.test(sessionSource)) {
   errors.push(`${relative(sessionKernel)} imports a storage implementation`);
@@ -132,6 +146,7 @@ if (!/replaceContent:\s*\(content:\s*string\)\s*=>\s*EditorSourceSnapshot/.test(
 }
 for (const relativeAdapterPath of [
   "viewers/TextEditorFrame.tsx",
+  "CodeMirrorCodeEditor.tsx",
   "markdown/MarkdownCodeMirrorEditor.tsx",
   "puppyflow/PuppyFlowViewer.tsx",
 ]) {
