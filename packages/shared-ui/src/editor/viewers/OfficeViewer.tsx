@@ -28,6 +28,7 @@ import {
   type SpreadsheetSheet,
 } from "./spreadsheetPreview";
 import { parseSpreadsheetInWorker } from "./spreadsheetPreviewClient";
+import { OfficeEditorViewer } from "./OfficeEditorViewer";
 
 type OfficeState =
   | { status: "idle" | "loading" }
@@ -105,9 +106,28 @@ type OfficeViewerProps = Pick<
   | "openExternalFile"
   | "convertOfficeDocumentToDocx"
   | "markdownLinkGraph"
+  | "canEdit"
+  | "officeEditing"
 >;
 
 export function OfficeViewer({
+  canEdit,
+  officeEditing,
+  ...previewProps
+}: OfficeViewerProps) {
+  if (canEdit && officeEditing) {
+    return (
+      <OfficeEditorViewer
+        document={previewProps.document}
+        officeEditing={officeEditing}
+        fallback={<OfficePreviewViewer {...previewProps} />}
+      />
+    );
+  }
+  return <OfficePreviewViewer {...previewProps} />;
+}
+
+function OfficePreviewViewer({
   document,
   resolvedExtension,
   fileUrl,
@@ -116,7 +136,7 @@ export function OfficeViewer({
   openExternalFile,
   convertOfficeDocumentToDocx,
   markdownLinkGraph,
-}: OfficeViewerProps) {
+}: Omit<OfficeViewerProps, "canEdit" | "officeEditing">) {
   const { t } = useLocalization();
   const [state, setState] = useState<OfficeState>({ status: "idle" });
   const [activeSheet, setActiveSheet] = useState(0);

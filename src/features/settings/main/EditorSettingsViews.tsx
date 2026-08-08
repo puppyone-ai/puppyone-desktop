@@ -78,6 +78,7 @@ export function ExperimentalSettingsView({
     messageKey: string;
     settingKey: keyof ExperimentalSettings;
   }> = [
+    { messageKey: "officeEditing", settingKey: "enableOfficeEditing" },
     { messageKey: "minimalMode", settingKey: "enableMinimalMode" },
     { messageKey: "viewerPlugins", settingKey: "enableViewerPlugins" },
     { messageKey: "editorSaveStatus", settingKey: "enableEditorSaveStatus" },

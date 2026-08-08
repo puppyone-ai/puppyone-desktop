@@ -125,6 +125,8 @@
   "editor.diffMarkers.color": "Couleur",
   "experimental.title": "Expérimental",
   "experimental.detail": "Optez pour les premières expériences de bureau. Chaque expérience est désactivée par défaut.",
+  "experimental.officeEditing.title": "Édition de documents Office",
+  "experimental.officeEditing.detail": "Modifiez les fichiers .docx, .xlsx et .pptx avec le serveur ONLYOFFICE Documents configuré. Si cette option est désactivée, les fichiers Office restent en aperçu en lecture seule.",
   "experimental.markdownBlockDrag.detail": "Activez le réarrangement anticipé des blocs d’un même document dans Markdown Live Preview.",
   "experimental.markdownBlockDrag.title": "Poignées de déplacement des blocs Markdown",
   "experimental.minimalMode.detail": "Remplacez le chrome de l’application persistante par un dock de survol centré tout en gardant les actions de projet, Git, de discussion et de terminal disponibles.",

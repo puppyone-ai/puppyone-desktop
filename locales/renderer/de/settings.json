@@ -125,6 +125,8 @@
   "editor.diffMarkers.color": "Farbe",
   "experimental.title": "Experimentell",
   "experimental.detail": "Aktiviere frühe Desktop-Funktionen. Alle Experimente sind standardmäßig deaktiviert.",
+  "experimental.officeEditing.title": "Office-Dokumentbearbeitung",
+  "experimental.officeEditing.detail": "Bearbeite .docx-, .xlsx- und .pptx-Dateien mit dem konfigurierten ONLYOFFICE Document Server. Wenn deaktiviert, bleiben Office-Dateien in der schreibgeschützten Vorschau.",
   "experimental.markdownBlockDrag.detail": "Aktiviert das experimentelle Umordnen von Blöcken innerhalb desselben Dokuments in der Markdown-Livevorschau.",
   "experimental.markdownBlockDrag.title": "Ziehpunkte für Markdown-Blöcke",
   "experimental.minimalMode.detail": "Ersetzt die dauerhaft sichtbare App-Oberfläche durch eine zentrierte schwebende Leiste; Projekt-, Git-, Chat- und Terminal-Aktionen bleiben verfügbar.",

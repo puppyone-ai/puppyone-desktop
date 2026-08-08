@@ -33,7 +33,14 @@ export type FileNode = DataNode;
 
 let gitStatusRequestSequence = 0;
 
-export function createLocalDataPort(rootPath: string): DataPort {
+export type LocalDataPortOptions = Readonly<{
+  enableOfficeEditing?: boolean;
+}>;
+
+export function createLocalDataPort(
+  rootPath: string,
+  options: LocalDataPortOptions = {},
+): DataPort {
   return {
     listChildren: (folderPath) => loadFolderChildren(rootPath, folderPath),
     // Text/content reads do not mint a browser capability URL. Resource URLs
@@ -80,6 +87,37 @@ export function createLocalDataPort(rootPath: string): DataPort {
         signal?.removeEventListener("abort", cancel);
       }
     },
+    ...(options.enableOfficeEditing ? {
+      officeEditing: {
+        getAvailability: () => getDesktopBridge().getOfficeEditingAvailability(),
+        createSession: ({ path, locale }) => getDesktopBridge().createOfficeEditingSession({
+          rootPath,
+          path,
+          locale,
+        }),
+        attachSurface: (sessionId, request) => getDesktopBridge().attachOfficeEditingSurface({
+          sessionId,
+          ...request,
+        }),
+        setSurfaceBounds: (surfaceId, request) => getDesktopBridge().setOfficeEditingSurfaceBounds({
+          surfaceId,
+          ...request,
+        }),
+        detachSurface: (surfaceId, attachmentId) => getDesktopBridge().detachOfficeEditingSurface({
+          surfaceId,
+          attachmentId,
+        }),
+        forceSave: (sessionId) => getDesktopBridge().forceSaveOfficeEditingSession({ sessionId }),
+        closeSession: (sessionId) => getDesktopBridge().closeOfficeEditingSession({ sessionId }),
+        resolveConflict: (sessionId, resolution) => getDesktopBridge().resolveOfficeEditingConflict({
+          sessionId,
+          resolution,
+        }),
+        subscribe: (listener) => getDesktopBridge().onOfficeEditingState((state) => {
+          listener(state);
+        }),
+      },
+    } : {}),
     appPreview: {
       activate: ({ path, bounds, attachmentId }) => getDesktopBridge().activateAppPreview({
         rootPath,

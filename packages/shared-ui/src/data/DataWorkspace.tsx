@@ -42,6 +42,7 @@ import { getAiEditFileForPath } from "../editor/ai-edits/diff";
 import type { AiEditRequest } from "../editor/ai-edits/types";
 import type { DocumentPersistedCommit } from "../editor/document-session/types";
 import { flushActiveDocumentSessions } from "../editor/document-session/activeDocumentSessions";
+import { flushActiveOfficeEditingSessions } from "../editor/office/activeOfficeEditingSessions";
 import type { FileIconThemeId } from "../file/fileIcons";
 import { usePaneResizeDrag } from "../primitives/usePaneResizeDrag";
 import {
@@ -597,6 +598,7 @@ export function DataWorkspace({
         // Navigation is a persistence transaction. Keep the current editor
         // mounted until every active or retiring session has durably drained.
         await flushActiveDocumentSessions("document-switch");
+        await flushActiveOfficeEditingSessions();
       }
       if (requestId !== documentNavigationRequestRef.current) return false;
 
@@ -1153,6 +1155,7 @@ export function DataWorkspace({
       if (nextActivePath !== resolvedActivePath) {
         try {
           await flushActiveDocumentSessions("document-switch");
+          await flushActiveOfficeEditingSessions();
           setDocumentNavigationError(null);
         } catch (error) {
           setDocumentNavigationError(error instanceof Error ? error.message : String(error));
@@ -1440,6 +1443,7 @@ export function DataWorkspace({
                   appPreview={dataPort.appPreview ?? null}
                   openExternalFile={dataPort.openExternalFile}
                   convertOfficeDocumentToDocx={dataPort.convertOfficeDocumentToDocx}
+                  officeEditing={dataPort.officeEditing ?? null}
                   viewerExtensionAdapter={viewerExtensionAdapter}
                   documentSourceKind={documentSourceKind ?? resolvedDocumentSourceKind}
                   emptySlot={emptySlot}
