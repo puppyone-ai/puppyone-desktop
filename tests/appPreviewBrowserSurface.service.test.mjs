@@ -248,8 +248,8 @@ describe("App Preview browser surface manager", () => {
     expect(window.children).toHaveLength(0);
   });
 
-  it("replaces a different app and blocks cross-owner mutations", async () => {
-    const { manager } = createHarness();
+  it("keeps independent app pages while attaching only the active one and blocks cross-owner mutations", async () => {
+    const { manager, window } = createHarness();
     const first = await manager.activate(DEFAULT_REQUEST);
     const second = await manager.activate({
       ...DEFAULT_REQUEST,
@@ -261,13 +261,22 @@ describe("App Preview browser surface manager", () => {
 
     expect(second.surfaceId).not.toBe(first.surfaceId);
     expect(createdViews).toHaveLength(2);
-    expect(createdViews[0].webContents.destroyed).toBe(true);
+    expect(createdViews[0].webContents.destroyed).toBe(false);
+    expect(window.children).toEqual([createdViews[1]]);
     expect(manager.setBounds({
       surfaceId: second.surfaceId,
       attachmentId: "attachment-2",
       callerWebContentsId: 99,
       bounds: DEFAULT_REQUEST.bounds,
     })).toEqual({ ok: false, visible: false });
+
+    const restored = await manager.activate({
+      ...DEFAULT_REQUEST,
+      attachmentId: "attachment-3",
+    });
+    expect(restored.surfaceId).toBe(first.surfaceId);
+    expect(createdViews).toHaveLength(2);
+    expect(window.children).toEqual([createdViews[0]]);
   });
 
   it("keeps top-level navigation on the exact local runtime origin", async () => {

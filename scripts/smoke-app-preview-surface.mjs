@@ -17,11 +17,13 @@ fs.mkdirSync(userDataPath, { recursive: true });
 fs.mkdirSync(workspacePath, { recursive: true });
 fs.writeFileSync(path.join(workspacePath, "server.mjs"), `
   import http from "node:http";
+  const portIndex = process.argv.indexOf("--port");
+  const port = Number(portIndex >= 0 ? process.argv[portIndex + 1] : process.env.PORT);
   const server = http.createServer((_request, response) => {
     response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     response.end("<!doctype html><title>Preview smoke</title><main>ready</main>");
   });
-  server.listen(Number(process.env.PORT), process.env.HOST);
+  server.listen(port, process.env.HOST);
 `, "utf8");
 fs.writeFileSync(path.join(workspacePath, manifestPath), JSON.stringify({
   type: "puppyone.app",
@@ -29,7 +31,7 @@ fs.writeFileSync(path.join(workspacePath, manifestPath), JSON.stringify({
   name: "App Preview smoke",
   launch: {
     kind: "local-server",
-    command: ["node", "server.mjs"],
+    command: ["node", "server.mjs", "--port", "${port}"],
     cwd: ".",
     env: {},
     url: "http://127.0.0.1:${port}/",

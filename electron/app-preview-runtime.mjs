@@ -4,10 +4,14 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { BrowserWindow } from "electron";
+import {
+  APP_PREVIEW_EXTENSION,
+  interpolateAppPreviewCommand,
+  interpolateAppPreviewTemplate,
+  parseAppPreviewManifest,
+} from "../shared/appPreviewManifest.js";
 import { resolveCanonicalWorkspaceDirectory } from "./main/workspace-authorization.mjs";
 
-const APP_PREVIEW_TYPE = "puppyone.app";
-const APP_PREVIEW_EXTENSION = ".puppyoneapp";
 const HEALTH_TIMEOUT_MS = 18000;
 const HEALTH_POLL_INTERVAL_MS = 300;
 const HEALTH_REQUEST_TIMEOUT_MS = 1200;
@@ -41,38 +45,39 @@ export function createAppPreviewRuntime({
   fetchHealth = fetchWithTimeout,
 }) {
   const sessionsById = new Map();
-  const runtimeIdByWorkspace = new Map();
+  const runtimeIdBySession = new Map();
   const trustedManifests = loadTrustedManifests(app);
 
   async function start(sender, request) {
     const context = await loadAppPreviewContext(request);
-    const key = getSessionKey(context.rootPath);
-    const existing = getWorkspaceSession(key);
+    const key = getSessionKey(context.rootPath, context.appPath);
+    const existing = getSession(key);
     const sameApp = existing &&
       existing.appPath === context.appPath &&
       existing.manifestHash === context.manifestHash;
 
     if (sameApp && existing.status === "running" && existing.child && !existing.exited) {
-      requireSessionOwner(existing, sender);
+      existing.ownerIds.add(sender.id);
       return serializeSession(existing);
     }
 
     if (sameApp && existing.status === "starting" && existing.startPromise) {
-      requireSessionOwner(existing, sender);
+      existing.ownerIds.add(sender.id);
       return existing.startPromise;
     }
 
-    if (existing) requireSessionOwner(existing, sender);
     await ensureTrusted(sender, context);
 
     // Trust prompts and filesystem reads are asynchronous. If another request
     // replaced the workspace runtime while we waited, re-evaluate against the
     // new current session instead of overwriting it without teardown.
-    if (getWorkspaceSession(key) !== existing) return start(sender, request);
+    if (getSession(key) !== existing) return start(sender, request);
+
+    if (existing) existing.ownerIds.add(sender.id);
 
     if (existing) {
       await stopSession(existing, "restart");
-      if (getWorkspaceSession(key) !== existing) return start(sender, request);
+      if (getSession(key) !== existing) return start(sender, request);
       releaseSession(existing);
     }
 
@@ -100,14 +105,14 @@ export function createAppPreviewRuntime({
 
   async function restart(sender, request) {
     const context = await loadAppPreviewContext(request);
-    const key = getSessionKey(context.rootPath);
-    const existing = getWorkspaceSession(key);
-    if (existing) requireSessionOwner(existing, sender);
+    const key = getSessionKey(context.rootPath, context.appPath);
+    const existing = getSession(key);
     await ensureTrusted(sender, context, false);
-    if (getWorkspaceSession(key) !== existing) return restart(sender, request);
+    if (getSession(key) !== existing) return restart(sender, request);
+    if (existing) existing.ownerIds.add(sender.id);
     if (existing) {
       await stopSession(existing, "restart");
-      if (getWorkspaceSession(key) === existing) releaseSession(existing);
+      if (getSession(key) === existing) releaseSession(existing);
     }
     // `start` re-reads the manifest. If it changed after the confirmation
     // above, the new content hash is not trusted and prompts again.
@@ -117,8 +122,8 @@ export function createAppPreviewRuntime({
   async function stop(sender, request) {
     const rootPath = normalizeRootPath(request?.rootPath);
     const appPath = normalizeAppPath(request?.path);
-    const key = getSessionKey(rootPath);
-    const existing = getWorkspaceSession(key);
+    const key = getSessionKey(rootPath, appPath);
+    const existing = getSession(key);
     if (!existing || existing.appPath !== appPath) {
       return {
         runtimeId: null,
@@ -139,10 +144,21 @@ export function createAppPreviewRuntime({
     return serializeSession(existing);
   }
 
+  async function stopForIdle(request) {
+    const rootPath = normalizeRootPath(request?.rootPath);
+    const appPath = normalizeAppPath(request?.path);
+    const existing = getSession(getSessionKey(rootPath, appPath));
+    if (!existing) return null;
+    await stopSession(existing, "idle timeout");
+    const result = serializeSession(existing);
+    releaseSession(existing);
+    return result;
+  }
+
   async function getLogs(sender, request) {
     const rootPath = normalizeRootPath(request?.rootPath);
     const appPath = normalizeAppPath(request?.path);
-    const existing = getWorkspaceSession(getSessionKey(rootPath));
+    const existing = getSession(getSessionKey(rootPath, appPath));
     if (existing) requireSessionOwner(existing, sender);
     return existing?.appPath === appPath ? existing.logs : "";
   }
@@ -182,8 +198,7 @@ export function createAppPreviewRuntime({
     const rootPath = normalizeRootPath(request?.rootPath);
     const appPath = normalizeAppPath(request?.path);
     const content = await readWorkspaceTextFile(rootPath, appPath).then((file) => file.content ?? "");
-    const manifest = normalizeManifest(JSON.parse(content), appPath);
-    const manifestHash = createHash("sha256").update(content).digest("hex");
+    const manifest = parseAppPreviewManifest(content, { appPath });
     const appDir = getRelativeDir(appPath);
     const cwdRelativePath = joinManifestRelativePath(appDir, manifest.launch.cwd ?? ".");
     const unresolvedCwdPath = resolveWorkspacePath(rootPath, cwdRelativePath);
@@ -191,6 +206,14 @@ export function createAppPreviewRuntime({
       label: "App preview cwd",
     });
     const appId = manifest.id || `${rootPath}:${appPath}`;
+    const trustFingerprint = await createTrustFingerprint({
+      appPath,
+      content,
+      cwdRelativePath,
+      manifest,
+      readWorkspaceTextFile,
+      rootPath,
+    });
 
     return {
       rootPath,
@@ -199,7 +222,7 @@ export function createAppPreviewRuntime({
       appDir,
       content,
       manifest,
-      manifestHash,
+      manifestHash: trustFingerprint,
       cwdPath,
       cwdRelativePath,
     };
@@ -244,7 +267,7 @@ export function createAppPreviewRuntime({
   function createSession(context, sender) {
     return {
       ...context,
-      key: getSessionKey(context.rootPath),
+      key: getSessionKey(context.rootPath, context.appPath),
       runtimeId: `app-runtime-${randomUUID()}`,
       ownerIds: new Set([sender.id]),
       child: null,
@@ -305,7 +328,7 @@ export function createAppPreviewRuntime({
     });
 
     await waitForHealth(session, healthUrl, fetchHealth);
-    if (session.status !== "starting" || session.exited || getWorkspaceSession(session.key) !== session) {
+    if (session.status !== "starting" || session.exited || getSession(session.key) !== session) {
       throw new Error("App preview start was superseded.");
     }
     session.status = "running";
@@ -332,7 +355,7 @@ export function createAppPreviewRuntime({
   }
 
   function publishSessionState(session) {
-    if (getWorkspaceSession(session.key) !== session) return;
+    if (getSession(session.key) !== session) return;
     try {
       onStateChange({
         rootPath: session.rootPath,
@@ -344,20 +367,20 @@ export function createAppPreviewRuntime({
     }
   }
 
-  function getWorkspaceSession(workspaceKey) {
-    const runtimeId = runtimeIdByWorkspace.get(workspaceKey);
+  function getSession(sessionKey) {
+    const runtimeId = runtimeIdBySession.get(sessionKey);
     return runtimeId ? sessionsById.get(runtimeId) ?? null : null;
   }
 
   function retainSession(session) {
     sessionsById.set(session.runtimeId, session);
-    runtimeIdByWorkspace.set(session.key, session.runtimeId);
+    runtimeIdBySession.set(session.key, session.runtimeId);
   }
 
   function releaseSession(session) {
     sessionsById.delete(session.runtimeId);
-    if (runtimeIdByWorkspace.get(session.key) === session.runtimeId) {
-      runtimeIdByWorkspace.delete(session.key);
+    if (runtimeIdBySession.get(session.key) === session.runtimeId) {
+      runtimeIdBySession.delete(session.key);
     }
   }
 
@@ -365,6 +388,7 @@ export function createAppPreviewRuntime({
     start,
     restart,
     stop,
+    stopForIdle,
     getLogs,
     openExternal,
     closeSessionsForWindow,
@@ -397,150 +421,8 @@ function normalizeAppPath(value) {
   return normalized;
 }
 
-function normalizeManifest(value, appPath) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("App manifest must be a JSON object.");
-  }
-  if (value.type !== APP_PREVIEW_TYPE) {
-    throw new Error(`App manifest type must be "${APP_PREVIEW_TYPE}".`);
-  }
-  const version = Number(value.version);
-  if (version !== 1) {
-    throw new Error("Unsupported Puppyone App manifest version.");
-  }
-
-  const launch = normalizeLaunch(value.launch);
-  return {
-    id: normalizeOptionalString(value.id),
-    name: normalizeString(value.name, path.basename(appPath, APP_PREVIEW_EXTENSION)),
-    type: APP_PREVIEW_TYPE,
-    version,
-    launch,
-    permissions: normalizePermissions(value.permissions),
-  };
-}
-
-function normalizeLaunch(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("App manifest launch config is required.");
-  }
-  if (value.kind !== "local-server") {
-    throw new Error("Only local-server app previews are supported.");
-  }
-  if (!Array.isArray(value.command) || value.command.length === 0) {
-    throw new Error("App preview command must be a non-empty array.");
-  }
-  const command = value.command.map((part) => normalizeCommandPart(part));
-  const cwd = normalizeRelativeManifestPath(value.cwd ?? ".");
-  const url = normalizeUrlTemplate(value.url);
-  const health = normalizeHealth(value.health);
-  const env = normalizeEnv(value.env);
-
-  return {
-    kind: "local-server",
-    command,
-    cwd,
-    url,
-    health,
-    env,
-  };
-}
-
-function normalizeCommandPart(value) {
-  if (typeof value !== "string" || value.trim().length === 0 || value.includes("\0")) {
-    throw new Error("App preview command contains an invalid value.");
-  }
-  return value.trim();
-}
-
-function normalizeRelativeManifestPath(value) {
-  if (typeof value !== "string" || value.trim().length === 0 || value.includes("\0")) {
-    throw new Error("App preview cwd must be a relative path.");
-  }
-  const normalized = path.posix.normalize(value.replace(/\\/g, "/"));
-  if (path.posix.isAbsolute(normalized) || normalized === ".." || normalized.startsWith("../")) {
-    throw new Error("App preview cwd must stay inside the workspace.");
-  }
-  return normalized === "." ? "." : normalized.replace(/^\.\/+/, "");
-}
-
-function normalizeUrlTemplate(value) {
-  if (typeof value !== "string" || !value.includes("${port}")) {
-    throw new Error("App preview URL must include ${port}.");
-  }
-  return value;
-}
-
-function normalizeHealth(value) {
-  if (value == null) {
-    return {
-      path: "/",
-      expectStatus: 200,
-    };
-  }
-  if (typeof value === "string") {
-    return {
-      path: normalizeHealthPath(value),
-      expectStatus: 200,
-    };
-  }
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("App preview health config is invalid.");
-  }
-  return {
-    path: normalizeHealthPath(value.path ?? "/"),
-    expectStatus: normalizeStatusCode(value.expectStatus ?? 200),
-  };
-}
-
-function normalizeHealthPath(value) {
-  if (typeof value !== "string" || !value.startsWith("/") || value.includes("\0")) {
-    throw new Error("App preview health path must start with /.");
-  }
-  return value;
-}
-
-function normalizeStatusCode(value) {
-  const status = Number(value);
-  if (!Number.isInteger(status) || status < 100 || status > 599) {
-    throw new Error("App preview expected health status is invalid.");
-  }
-  return status;
-}
-
-function normalizeEnv(value) {
-  if (value == null) return {};
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("App preview env must be an object.");
-  }
-  const env = {};
-  for (const [key, rawValue] of Object.entries(value)) {
-    if (!/^[A-Z_][A-Z0-9_]*$/i.test(key)) {
-      throw new Error(`Invalid app preview env key: ${key}`);
-    }
-    if (typeof rawValue !== "string") {
-      throw new Error(`App preview env value for ${key} must be a string.`);
-    }
-    env[key] = rawValue;
-  }
-  return env;
-}
-
-function normalizePermissions(value) {
-  if (value == null || typeof value !== "object" || Array.isArray(value)) return {};
-  return value;
-}
-
-function normalizeString(value, fallback) {
-  return typeof value === "string" && value.trim() ? value.trim().slice(0, 120) : fallback;
-}
-
-function normalizeOptionalString(value) {
-  return typeof value === "string" && value.trim() ? value.trim().slice(0, 160) : null;
-}
-
-function getSessionKey(rootPath) {
-  return rootPath;
+function getSessionKey(rootPath, appPath) {
+  return `${rootPath}\n${appPath}`;
 }
 
 function getRelativeDir(relativePath) {
@@ -553,8 +435,55 @@ function joinManifestRelativePath(base, relative) {
   return normalized === "." ? "" : normalized;
 }
 
+async function createTrustFingerprint({
+  appPath,
+  content,
+  cwdRelativePath,
+  manifest,
+  readWorkspaceTextFile,
+  rootPath,
+}) {
+  const hash = createHash("sha256")
+    .update("puppyone-app-preview-trust-v2\0")
+    .update(appPath)
+    .update("\0manifest\0")
+    .update(content);
+  const packageScript = getPackageScriptName(manifest.launch.command);
+  if (!packageScript) return hash.digest("hex");
+
+  const packagePath = joinManifestRelativePath(cwdRelativePath, "package.json");
+  let resolvedScript = "<package.json unavailable>";
+  try {
+    const packageContent = await readWorkspaceTextFile(rootPath, packagePath)
+      .then((file) => file.content ?? "");
+    const packageManifest = JSON.parse(packageContent);
+    const candidate = packageManifest?.scripts?.[packageScript];
+    resolvedScript = typeof candidate === "string" ? candidate : "<script unavailable>";
+  } catch {
+    // The process will report a concrete package-manager error later. The
+    // missing state still participates in trust so adding the script prompts.
+  }
+  return hash
+    .update("\0package-script\0")
+    .update(packageScript)
+    .update("\0")
+    .update(resolvedScript)
+    .digest("hex");
+}
+
+function getPackageScriptName(command) {
+  if (!Array.isArray(command) || command.length < 2) return null;
+  const executable = path.basename(command[0]).toLowerCase().replace(/\.cmd$/, "");
+  if (!new Set(["npm", "pnpm", "yarn", "bun"]).has(executable)) return null;
+  const runIndex = command[1] === "run" ? 2 : 1;
+  const candidate = command[runIndex];
+  return typeof candidate === "string" && candidate && !candidate.startsWith("-")
+    ? candidate
+    : null;
+}
+
 function buildLocalUrl(template, port) {
-  const rawUrl = template.replaceAll("${port}", String(port));
+  const rawUrl = interpolateAppPreviewTemplate(template, { port }, "App preview URL");
   const url = new URL(rawUrl);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("App preview URL must use http or https.");
@@ -580,7 +509,7 @@ function buildHealthUrl(appUrl, health) {
 }
 
 function buildSpawnConfig(session, port) {
-  const command = session.manifest.launch.command;
+  const command = interpolateAppPreviewCommand(session.manifest.launch.command, { port });
   const env = {
     ...sanitizeAppPreviewEnvironment(process.env),
     ...interpolateEnv(session.manifest.launch.env, port),
@@ -612,7 +541,7 @@ function buildSpawnConfig(session, port) {
 function interpolateEnv(env, port) {
   const next = {};
   for (const [key, value] of Object.entries(env)) {
-    next[key] = value.replaceAll("${port}", String(port));
+    next[key] = interpolateAppPreviewTemplate(value, { port }, `App preview env value for ${key}`);
   }
   return next;
 }

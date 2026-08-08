@@ -68,11 +68,7 @@ describe("create new menu preferences", () => {
         { kind: "csv", enabled: true },
       ],
     } as const;
-    expect(getVisibleCreateNewFileTypes(settings, DEFAULT_EXPERIMENTAL_SETTINGS)).toEqual(["csv"]);
-    expect(getVisibleCreateNewFileTypes(settings, {
-      ...DEFAULT_EXPERIMENTAL_SETTINGS,
-      enablePuppyoneAppFiles: true,
-    })).toEqual(["app", "csv"]);
+    expect(getVisibleCreateNewFileTypes(settings, DEFAULT_EXPERIMENTAL_SETTINGS)).toEqual(["app", "csv"]);
   });
 });
 
@@ -199,7 +195,6 @@ describe("experimental preferences", () => {
       enableEditorSaveStatus: false,
       enableMarkdownBlockDrag: false,
       enableMinimalMode: false,
-      enablePuppyoneAppFiles: false,
       enablePuppyFlowFiles: false,
       enableViewerPlugins: false,
     });
