@@ -80,7 +80,6 @@ export type ExperimentalSettings = {
   enableEditorSaveStatus: boolean;
   enableMarkdownBlockDrag: boolean;
   enableMinimalMode: boolean;
-  enablePuppyoneAppFiles: boolean;
   enablePuppyFlowFiles: boolean;
   enableViewerPlugins: boolean;
 };
@@ -179,7 +178,6 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableEditorSaveStatus: false,
   enableMarkdownBlockDrag: false,
   enableMinimalMode: false,
-  enablePuppyoneAppFiles: false,
   enablePuppyFlowFiles: false,
   enableViewerPlugins: false,
 };
@@ -566,7 +564,6 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
       enableEditorSaveStatus: parsed.enableEditorSaveStatus === true,
       enableMarkdownBlockDrag: parsed.enableMarkdownBlockDrag === true,
       enableMinimalMode: parsed.enableMinimalMode === true,
-      enablePuppyoneAppFiles: parsed.enablePuppyoneAppFiles === true,
       enablePuppyFlowFiles: parsed.enablePuppyFlowFiles === true,
       enableViewerPlugins: parsed.enableViewerPlugins === true,
     };
@@ -621,7 +618,6 @@ export function isCreateNewFileTypeAvailable(
   kind: CreateNewFileTypeId,
   experimentalSettings: ExperimentalSettings,
 ): boolean {
-  if (kind === "app") return experimentalSettings.enablePuppyoneAppFiles;
   if (kind === "puppyflow") return experimentalSettings.enablePuppyFlowFiles;
   return true;
 }

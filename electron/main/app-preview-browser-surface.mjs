@@ -9,7 +9,8 @@ const MAX_CANCELLED_ATTACHMENTS = 256;
  * Runtime processes deliberately outlive renderer attachments. A surface can
  * therefore be detached while a source file is open, then reattached without
  * reloading the page or losing browser state. The maps and opaque identifiers
- * are intentionally tab-ready even though V1 exposes one app per workspace.
+ * are intentionally tab-ready: every app keeps an isolated surface per owner,
+ * while only the currently attached editor is visible.
  */
 export function createAppPreviewBrowserSurfaceManager({
   WebContentsView,
@@ -29,19 +30,19 @@ export function createAppPreviewBrowserSurfaceManager({
   }
 
   const surfaces = new Map();
-  const surfaceIdsByWorkspace = new Map();
+  const surfaceIdsByApp = new Map();
   const ownerStates = new Map();
-  const pendingByWorkspace = new Map();
+  const pendingByApp = new Map();
   const cancelledAttachments = new Map();
   let disposed = false;
 
   async function activate(request) {
     assertNotDisposed();
     const normalized = normalizeActivationRequest(request);
-    return serializeWorkspaceOperation(normalized.workspaceKey, async () => {
+    return serializeAppOperation(normalized.surfaceKey, async () => {
       assertNotDisposed();
       const window = requireOwnerWindow(normalized.ownerWebContentsId);
-      let surface = getWorkspaceSurface(normalized.workspaceKey);
+      let surface = getAppSurface(normalized.surfaceKey);
 
       if (surface && (surface.appId !== normalized.appId || surface.appPath !== normalized.appPath)) {
         destroySurface(surface.surfaceId, { reason: "app-replaced" });
@@ -166,6 +167,20 @@ export function createAppPreviewBrowserSurfaceManager({
     return destroyed;
   }
 
+  function destroyApp(rootPath, appPath, ownerWebContentsId = null, reason = "app-closed") {
+    let destroyed = false;
+    for (const surface of Array.from(surfaces.values())) {
+      if (
+        surface.rootPath === rootPath &&
+        surface.appPath === appPath &&
+        (ownerWebContentsId == null || surface.ownerWebContentsId === ownerWebContentsId)
+      ) {
+        destroyed = destroySurface(surface.surfaceId, { reason }) || destroyed;
+      }
+    }
+    return destroyed;
+  }
+
   function destroyOwner(ownerWebContentsId, reason = "owner-closed") {
     for (const surface of Array.from(surfaces.values())) {
       if (surface.ownerWebContentsId === ownerWebContentsId) {
@@ -186,10 +201,16 @@ export function createAppPreviewBrowserSurfaceManager({
     cancelledAttachments.clear();
   }
 
-  function runtimeUnavailable({ rootPath, ownerWebContentsIds = [], reason = "runtime-unavailable" }) {
+  function runtimeUnavailable({
+    rootPath,
+    appPath = null,
+    ownerWebContentsIds = [],
+    reason = "runtime-unavailable",
+  }) {
     const owners = new Set(ownerWebContentsIds);
     for (const surface of Array.from(surfaces.values())) {
       if (surface.rootPath !== rootPath) continue;
+      if (appPath != null && surface.appPath !== appPath) continue;
       if (owners.size > 0 && !owners.has(surface.ownerWebContentsId)) continue;
       destroySurface(surface.surfaceId, { reason });
     }
@@ -226,7 +247,7 @@ export function createAppPreviewBrowserSurfaceManager({
     });
     const surface = {
       surfaceId,
-      workspaceKey: request.workspaceKey,
+      surfaceKey: request.surfaceKey,
       rootPath: request.rootPath,
       runtimeId: request.runtimeId,
       appId: request.appId,
@@ -247,7 +268,7 @@ export function createAppPreviewBrowserSurfaceManager({
       attached: false,
     };
     surfaces.set(surfaceId, surface);
-    surfaceIdsByWorkspace.set(request.workspaceKey, surfaceId);
+    surfaceIdsByApp.set(request.surfaceKey, surfaceId);
     ensureOwnerState(window, request.ownerWebContentsId).surfaceIds.add(surfaceId);
     installWebContentsPolicy(surface, {
       publish: () => publishSurfaceState(surface),
@@ -263,8 +284,8 @@ export function createAppPreviewBrowserSurfaceManager({
     const surface = surfaces.get(surfaceId);
     if (!surface) return false;
     surfaces.delete(surfaceId);
-    if (surfaceIdsByWorkspace.get(surface.workspaceKey) === surfaceId) {
-      surfaceIdsByWorkspace.delete(surface.workspaceKey);
+    if (surfaceIdsByApp.get(surface.surfaceKey) === surfaceId) {
+      surfaceIdsByApp.delete(surface.surfaceKey);
     }
     const ownerState = ownerStates.get(surface.ownerWebContentsId);
     ownerState?.surfaceIds.delete(surfaceId);
@@ -424,8 +445,8 @@ export function createAppPreviewBrowserSurfaceManager({
     return surface;
   }
 
-  function getWorkspaceSurface(workspaceKey) {
-    const surfaceId = surfaceIdsByWorkspace.get(workspaceKey);
+  function getAppSurface(surfaceKey) {
+    const surfaceId = surfaceIdsByApp.get(surfaceKey);
     return surfaceId ? surfaces.get(surfaceId) ?? null : null;
   }
 
@@ -438,12 +459,12 @@ export function createAppPreviewBrowserSurfaceManager({
     }
   }
 
-  function serializeWorkspaceOperation(workspaceKey, operation) {
-    const previous = pendingByWorkspace.get(workspaceKey) ?? Promise.resolve();
+  function serializeAppOperation(surfaceKey, operation) {
+    const previous = pendingByApp.get(surfaceKey) ?? Promise.resolve();
     const current = previous.catch(() => undefined).then(operation);
-    pendingByWorkspace.set(workspaceKey, current);
+    pendingByApp.set(surfaceKey, current);
     return current.finally(() => {
-      if (pendingByWorkspace.get(workspaceKey) === current) pendingByWorkspace.delete(workspaceKey);
+      if (pendingByApp.get(surfaceKey) === current) pendingByApp.delete(surfaceKey);
     });
   }
 
@@ -475,6 +496,7 @@ export function createAppPreviewBrowserSurfaceManager({
     setBounds,
     detach,
     runCommand,
+    destroyApp,
     destroyWorkspace,
     destroyOwner,
     destroyAll,
@@ -503,7 +525,7 @@ function normalizeActivationRequest(request) {
     ownerWebContentsId,
     url,
     bounds: normalizeBounds(request?.bounds, { allowHidden: false }),
-    workspaceKey: `${ownerWebContentsId}\n${rootPath}`,
+    surfaceKey: `${ownerWebContentsId}\n${rootPath}\n${appPath}`,
   };
 }
 

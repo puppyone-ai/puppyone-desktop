@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
+import { getAppPreviewManifestDisplayName } from "../../../../../shared/appPreviewManifest.js";
 import { PlainTextEditor } from "../PlainTextEditor";
 import type { PresetViewerRenderContext } from "../viewerTypes";
 import { AppPreviewStateView } from "./app-preview/AppPreviewStateView";
@@ -33,8 +34,8 @@ export function AppPreviewViewer({
   const [mode, setMode] = useState<AppPreviewMode>("preview");
   const hostRef = useRef<HTMLDivElement>(null);
   const appName = useMemo(
-    () => getManifestName(content) ?? document.name.replace(/\.puppyoneapp$/i, ""),
-    [content, document.name],
+    () => getAppPreviewManifestDisplayName(content, document.path),
+    [content, document.path],
   );
   const session = useAppPreviewSession({
     appPreview,
@@ -183,13 +184,4 @@ function ToolbarButton({
       {children}
     </button>
   );
-}
-
-function getManifestName(content: string): string | null {
-  try {
-    const parsed = JSON.parse(content) as { name?: unknown };
-    return typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim() : null;
-  } catch {
-    return null;
-  }
 }
