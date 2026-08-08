@@ -27,10 +27,10 @@ Committed preview document
 EditorHost + PresetViewerRenderer
         |
         +----> read-only Viewer Contribution
-        |        HTML / Office / image / PDF / media
+        |        HTML / image / PDF / media / Office fallback
         |
         `----> editable Editor Contribution
-                 Markdown / text / code / CSV / PuppyFlow
+                 Markdown / text / code / CSV / PuppyFlow / Office
                           |
                           | revision change + readSnapshot()
                           v
@@ -81,7 +81,10 @@ architecture documents one level above this directory.
 5. [Markdown Editor](markdown/README.md)
    - The format-specific source-first architecture and Live Preview UX contract
      for Markdown files.
-6. [Desktop Renderer Performance](../desktop-renderer-performance.md)
+6. [Office Editing Runtime](office/README.md)
+   - The engine-neutral resource editing port, Electron-owned ONLYOFFICE
+     bridge, signed sessions, binary atomic writes, and recovery semantics.
+7. [Desktop Renderer Performance](../desktop-renderer-performance.md)
    - The urgent/deferred scheduling, Explorer virtualization, Markdown
      projection, snapshot, cancellation, worker-index, and production Electron
      performance contracts shared by Explorer and the editor.
