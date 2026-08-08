@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   flushActiveDocumentSessions,
+  flushActiveOfficeEditingSessions,
   type DataNode,
   type DataWorkspaceActivePathChangeContext,
 } from "@puppyone/shared-ui";
@@ -204,6 +205,7 @@ export function App() {
   const drainWorkspaceNavigation = useCallback(async (): Promise<boolean> => {
     try {
       await flushActiveDocumentSessions("workspace-switch");
+      await flushActiveOfficeEditingSessions();
       setDocumentNavigationError(null);
       return true;
     } catch (error) {
@@ -512,6 +514,7 @@ export function App() {
       if (activeView === "data" && view !== "data" && !routesToData) {
         try {
           await flushActiveDocumentSessions("document-close");
+          await flushActiveOfficeEditingSessions();
         } catch (error) {
           if (requestId === desktopViewNavigationRequestRef.current) {
             setDocumentNavigationError(error instanceof Error ? error.message : String(error));
@@ -571,6 +574,7 @@ export function App() {
     if (path !== activeDataPath && !context?.documentSessionsDrained) {
       try {
         await flushActiveDocumentSessions("document-switch");
+        await flushActiveOfficeEditingSessions();
       } catch (error) {
         if (requestId === documentNavigationRequestRef.current) {
           setDocumentNavigationError(error instanceof Error ? error.message : String(error));

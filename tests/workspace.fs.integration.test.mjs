@@ -15,6 +15,8 @@ import {
   readWorkspaceTextFile,
   convertWorkspaceOfficeDocumentToDocx,
   writeWorkspaceTextFile,
+  readWorkspaceBinaryFileVersion,
+  writeWorkspaceBinaryFile,
   createWorkspaceEntry,
   renameWorkspaceEntry,
   resolveExistingWorkspaceDisplayPath,
@@ -211,6 +213,24 @@ describe("read / write round-trips", () => {
     }
     const winningContent = firstResult.status === "fulfilled" ? "first" : "second";
     expect(await readFile(path.join(root, "concurrent.txt"), "utf8")).toBe(winningContent);
+  });
+
+  it("uses the same conditional atomic writer for binary Office bytes", async () => {
+    const filePath = path.join(root, "book.xlsx");
+    await writeFile(filePath, Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x01]));
+    const opened = await readWorkspaceBinaryFileVersion(root, "book.xlsx");
+    const edited = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x02]);
+
+    const result = await writeWorkspaceBinaryFile(root, "book.xlsx", edited, {
+      expectedVersion: opened.version,
+    });
+
+    expect(await readFile(filePath)).toEqual(edited);
+    expect(result.version).toMatch(/^sha256:[0-9a-f]{64}$/);
+    await expect(writeWorkspaceBinaryFile(root, "book.xlsx", Buffer.from("stale"), {
+      expectedVersion: opened.version,
+    })).rejects.toMatchObject({ code: "WORKSPACE_VERSION_CONFLICT" });
+    expect(await readFile(filePath)).toEqual(edited);
   });
 
   it("preserves local file mode across atomic replacement", async () => {
