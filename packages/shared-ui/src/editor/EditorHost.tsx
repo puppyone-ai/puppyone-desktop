@@ -4,6 +4,7 @@ import type {
   DocumentPersistencePort,
   FileContent,
   OfficeDocumentConverter,
+  OfficeEditingPort,
 } from "../core/types";
 import type { FileIconThemeId } from "../file/fileIcons";
 import {
@@ -46,6 +47,7 @@ export type EditorHostProps = {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
+  officeEditing?: OfficeEditingPort | null;
   deferFallbackContent?: boolean;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   documentSourceKind?: DocumentSourceKind;
@@ -75,6 +77,7 @@ export function EditorHost({
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
+  officeEditing = null,
   deferFallbackContent = false,
   viewerExtensionAdapter = null,
   documentSourceKind = "local",
@@ -115,6 +118,7 @@ export function EditorHost({
       appPreview={appPreview}
       openExternalFile={openExternalFile}
       convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
+      officeEditing={officeEditing}
     />
   );
 }

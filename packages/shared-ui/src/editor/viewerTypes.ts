@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import type { AppPreviewController, OfficeDocumentConverter } from "../core/types";
+import type { AppPreviewController, OfficeDocumentConverter, OfficeEditingPort } from "../core/types";
 import type { FileFormat } from "../core/fileFormats";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
@@ -138,6 +138,7 @@ export type PresetViewerRenderContext = EditorViewerMatch & {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
+  officeEditing?: OfficeEditingPort | null;
 };
 
 /** @deprecated Prefer PresetViewerRenderContext. */
