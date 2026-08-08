@@ -7,7 +7,6 @@ import type {
   DocumentPersistencePort,
   FileContent,
   OfficeDocumentConverter,
-  OfficeEditingPort,
 } from "../core/types";
 import { EditorHost } from "../editor/EditorHost";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
@@ -51,7 +50,6 @@ export type FilePreviewProps = {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
-  officeEditing?: OfficeEditingPort | null;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   documentSourceKind?: DocumentSourceKind;
 };
@@ -83,7 +81,6 @@ export function FilePreview({
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
-  officeEditing = null,
   viewerExtensionAdapter = null,
   documentSourceKind = "local",
 }: FilePreviewProps) {
@@ -159,7 +156,6 @@ export function FilePreview({
             appPreview={appPreview}
             openExternalFile={openExternalFile}
             convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
-            officeEditing={officeEditing}
             deferFallbackContent={deferFallbackContent}
             viewerExtensionAdapter={viewerExtensionAdapter}
             documentSourceKind={documentSourceKind}

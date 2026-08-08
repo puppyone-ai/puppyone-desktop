@@ -19,7 +19,6 @@ export type ResolveEditorAccessInput = EditorViewerMatch & Readonly<{
   viewer: PresetViewerContribution;
   content: string;
   persistenceAvailable: boolean;
-  resourcePersistenceAvailable?: boolean;
 }>;
 
 /**
@@ -36,7 +35,6 @@ export function resolveEditorAccess({
   viewer,
   content,
   persistenceAvailable,
-  resourcePersistenceAvailable = false,
 }: ResolveEditorAccessInput): EditorAccessDecision {
   if (viewer.capability !== "edit") {
     return readOnly("viewer-capability");
@@ -44,11 +42,10 @@ export function resolveEditorAccess({
   if (!format.editable) {
     return readOnly("format-policy");
   }
-  const resourceEditor = viewer.source === "resource";
-  if (resourceEditor ? !document.url : !hasCanonicalTextSource(document)) {
+  if (!hasCanonicalTextSource(document)) {
     return readOnly("source-unavailable");
   }
-  if (resourceEditor ? !resourcePersistenceAvailable : !persistenceAvailable) {
+  if (!persistenceAvailable) {
     return readOnly("persistence-unavailable");
   }
   if (!viewer.isEditable?.({ document, format, resolvedExtension, content })) {

@@ -64,89 +64,6 @@
   color: var(--po-text);
 }
 
-.office-editor-shell {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  background: var(--color-surface, #fff);
-}
-
-.office-editor-toolbar {
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  min-height: 34px;
-  padding: 4px 10px;
-  color: var(--color-text-muted, #666);
-  border-bottom: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
-  background: var(--color-surface, #fff);
-  font-size: 12px;
-}
-
-.office-editor-toolbar button,
-.office-editor-conflict button {
-  padding: 4px 10px;
-  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.16));
-  border-radius: 6px;
-  background: var(--color-surface-raised, #fff);
-  color: inherit;
-  cursor: pointer;
-}
-
-.office-editor-toolbar button:disabled {
-  cursor: default;
-  opacity: 0.55;
-}
-
-.office-editor-host {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.office-editor-loading {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  background: var(--color-surface, #fff);
-  color: var(--color-text-muted, #666);
-}
-
-.office-editor-conflict,
-.office-editor-error {
-  position: relative;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 12px;
-  padding: 10px 12px;
-  border: 1px solid #b97900;
-  border-radius: 8px;
-  background: #fff4cf;
-  color: #573800;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
-}
-
-.office-editor-conflict span {
-  flex: 1;
-}
-
-.office-editor-error {
-  border-color: #b42318;
-  background: #fff0ed;
-  color: #7a271a;
-}
-
 .office-preview__note {
   color: var(--po-text-muted);
   font-size: 11px;
@@ -536,7 +453,7 @@
 
 .office-slide-card ul,
 .office-slide-card p {
-  margin: 8px 12px;
+  margin: 0;
   color: var(--po-text-muted);
   font-size: 13px;
   line-height: 1.55;

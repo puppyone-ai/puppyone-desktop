@@ -5,7 +5,7 @@ import "./styles.css";
 
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { flushActiveDocumentSessions, flushActiveOfficeEditingSessions } from "@puppyone/shared-ui";
+import { flushActiveDocumentSessions } from "@puppyone/shared-ui";
 import { LocalizationProvider } from "@puppyone/localization/react";
 import { App } from "./App";
 import { ScrollbarActivity } from "./components/ScrollbarActivity";
@@ -40,7 +40,6 @@ const stopDocumentSessionFlushListener = window.puppyoneDesktop
     setCloseInteractionBarrier(true);
     try {
       await flushActiveDocumentSessions();
-      await flushActiveOfficeEditingSessions();
     } catch (error) {
       if (activeCloseRequestId === requestId) {
         activeCloseRequestId = null;

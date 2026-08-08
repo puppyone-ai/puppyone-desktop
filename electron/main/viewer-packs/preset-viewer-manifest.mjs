@@ -101,8 +101,8 @@ function parseDefinition(input, index) {
   if (!RUNTIMES.has(record.runtime)) {
     throw new TypeError(`Preset viewer ${record.id} has an unsupported runtime boundary.`);
   }
-  if (record.capability === "edit" && record.source === "none") {
-    throw new TypeError(`Editable preset viewer ${record.id} must receive content or a resource.`);
+  if (record.capability === "edit" && !["content", "content-and-resource"].includes(record.source)) {
+    throw new TypeError(`Editable preset viewer ${record.id} must receive content.`);
   }
   if (record.capability === "preview" && record.source === "none") {
     throw new TypeError(`Preview preset viewer ${record.id} must declare a content or resource source.`);

@@ -77,7 +77,7 @@ describe("preset viewer contribution contract", () => {
     [document("page.html"), "html-artifact", "content-and-resource", "preview"],
     [document("photo.png"), "image-preview", "resource", "preview"],
     [document("report.pdf"), "pdf-preview", "resource", "preview"],
-    [document("report.docx"), "office-preview", "resource", "edit"],
+    [document("report.docx"), "office-preview", "resource", "preview"],
     [document("sound.mp3"), "audio-preview", "resource", "preview"],
     [document("movie.mp4"), "video-preview", "resource", "preview"],
     [document("source.ts"), "text", "content", "edit"],

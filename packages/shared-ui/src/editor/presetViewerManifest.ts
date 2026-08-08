@@ -147,8 +147,8 @@ function parseDefinition(input: unknown, index: number): PresetViewerDefinition 
 
   const capability = record.capability as CoreViewerCapability;
   const source = record.source as PresetViewerSource;
-  if (capability === "edit" && source === "none") {
-    throw new TypeError(`Editable preset viewer ${record.id} must receive content or a resource.`);
+  if (capability === "edit" && source !== "content" && source !== "content-and-resource") {
+    throw new TypeError(`Editable preset viewer ${record.id} must receive content.`);
   }
   if (capability === "preview" && source === "none") {
     throw new TypeError(`Preview preset viewer ${record.id} must declare a content or resource source.`);

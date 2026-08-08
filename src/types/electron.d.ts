@@ -7,10 +7,6 @@ import type {
   AppPreviewSurfaceState,
   DataNode,
   FileContent,
-  OfficeEditingAvailability,
-  OfficeEditingSession,
-  OfficeEditingSurfaceBounds,
-  OfficeEditingState,
   Workspace,
 } from "@puppyone/shared-ui";
 import type { AppLanguagePreference, LocaleState } from "@puppyone/localization/core";
@@ -680,33 +676,6 @@ declare global {
       onDocumentSessionCloseCancelled: (
         callback: (request: { requestId: string }) => void,
       ) => () => void;
-      getOfficeEditingAvailability: () => Promise<OfficeEditingAvailability>;
-      createOfficeEditingSession: (request: {
-        rootPath: string;
-        path: string;
-        locale?: string;
-      }) => Promise<OfficeEditingSession>;
-      attachOfficeEditingSurface: (request: {
-        sessionId: string;
-        attachmentId: string;
-        bounds: OfficeEditingSurfaceBounds;
-      }) => Promise<{ surfaceId: string; attached: boolean }>;
-      setOfficeEditingSurfaceBounds: (request: {
-        surfaceId: string;
-        attachmentId: string;
-        bounds: OfficeEditingSurfaceBounds;
-      }) => Promise<{ ok: boolean; visible: boolean }>;
-      detachOfficeEditingSurface: (request: {
-        surfaceId: string;
-        attachmentId: string;
-      }) => Promise<{ detached: boolean }>;
-      forceSaveOfficeEditingSession: (request: { sessionId: string }) => Promise<{ accepted: boolean }>;
-      closeOfficeEditingSession: (request: { sessionId: string }) => Promise<{ closed: boolean }>;
-      resolveOfficeEditingConflict: (request: {
-        sessionId: string;
-        resolution: "keep-edited" | "reload-external";
-      }) => Promise<OfficeEditingState>;
-      onOfficeEditingState: (callback: (state: OfficeEditingState) => void) => () => void;
       readCloudSession: () => Promise<DesktopStoredCloudSession | null>;
       readCloudAuthState: () => Promise<DesktopCloudAuthStateSnapshot>;
       restoreCloudSession: (request: {

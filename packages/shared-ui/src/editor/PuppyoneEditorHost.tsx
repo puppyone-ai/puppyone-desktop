@@ -27,7 +27,6 @@ import type {
   AppPreviewController,
   DocumentPersistencePort,
   OfficeDocumentConverter,
-  OfficeEditingPort,
 } from "../core/types";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
@@ -59,7 +58,6 @@ export type PuppyoneEditorHostProps = {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
-  officeEditing?: OfficeEditingPort | null;
   /**
    * Optional host composition port for external viewer extensions. The entire
    * port is absent in the default preset-only product profile.
@@ -88,7 +86,6 @@ export function PuppyoneEditorHost({
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
-  officeEditing = null,
   viewerExtensionAdapter = null,
 }: PuppyoneEditorHostProps) {
   const { t } = useLocalization();
@@ -151,7 +148,6 @@ export function PuppyoneEditorHost({
     viewer,
     content,
     persistenceAvailable: Boolean(documentPersistence),
-    resourcePersistenceAvailable: Boolean(officeEditing),
   });
   const canEdit = editorAccess.kind === "editable";
 
@@ -197,12 +193,11 @@ export function PuppyoneEditorHost({
         appPreview,
         openExternalFile,
         convertOfficeDocumentToDocx,
-        officeEditing,
       }}
     />
   );
 
-  const editor = canEdit && documentPersistence && viewer.source !== "resource" ? (
+  const editor = canEdit && documentPersistence ? (
     <DocumentSessionBoundary
       documentId={document.path}
       initialContent={content}

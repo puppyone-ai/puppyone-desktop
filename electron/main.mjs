@@ -10,14 +10,11 @@ import {
   readWorkspaceTextFile,
   readWorkspaceFile,
   statWorkspaceFile,
-  readWorkspaceBinaryFileVersion,
   resolveLocalWorkspaceIdentity,
   resolveWorkspacePath as resolveLocalWorkspacePath,
   workspaceFromPath,
-  writeWorkspaceBinaryFile,
 } from "../local-api/workspace.mjs";
 import { initializeWorkspaceEditReview } from "../local-api/edit-review.mjs";
-import { absorbWorkspaceEditReviewPath } from "../local-api/edit-review.mjs";
 import { createUpdateService } from "./update-service.mjs";
 import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
 import { createAppPreviewBrowserSurfaceManager } from "./main/app-preview-browser-surface.mjs";
@@ -51,7 +48,6 @@ import { registerBuildInfoIpcHandlers } from "./main/ipc/build-info-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
 import { registerCloudPublishIpcHandlers } from "./main/ipc/cloud-publish-ipc.mjs";
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
-import { registerOfficeEditingIpcHandlers } from "./main/ipc/office-editing-ipc.mjs";
 import { registerLocalizationIpcHandlers } from "./main/ipc/localization-ipc.mjs";
 import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service.mjs";
 import { registerFeedbackIpcHandlers } from "./main/ipc/feedback-ipc.mjs";
@@ -73,9 +69,6 @@ import { createDesktopLocaleService } from "./main/localization/desktop-locale-s
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
 import { createGitOperationCoordinator } from "./main/git-operation-coordinator.mjs";
-import { loadOfficeEngineConfiguration } from "./main/office/office-engine-config.mjs";
-import { createOfficeEditingService } from "./main/office/office-editing-service.mjs";
-import { createOfficeEditingSurfaceManager } from "./main/office/office-editing-surface.mjs";
 import { createCloudPublishCoordinator } from "./main/cloud-publish-coordinator.mjs";
 import { createCloudPublishSecretVault } from "./main/cloud-publish-secret-vault.mjs";
 import { createCloudGitConnectCoordinator } from "./main/cloud-git-connect-coordinator.mjs";
@@ -218,27 +211,6 @@ const localAgentInventory = createLocalAgentInventory({
   cacheFilePath: path.join(app.getPath("userData"), "agent-runtime-inventory.json"),
 });
 const workspaceWatchService = createWorkspaceWatchService();
-const getOwnerWindowByWebContentsId = (webContentsId) => {
-  for (const window of BrowserWindow.getAllWindows()) {
-    if (window.webContents?.id === webContentsId) return window;
-  }
-  return null;
-};
-const officeEditingSurfaceManager = createOfficeEditingSurfaceManager({
-  WebContentsView,
-  sessionFromPartition: electronSession.fromPartition.bind(electronSession),
-  getOwnerWindow: getOwnerWindowByWebContentsId,
-});
-const officeEditingService = createOfficeEditingService({
-  configuration: loadOfficeEngineConfiguration(process.env),
-  recoveryRoot: path.join(app.getPath("userData"), "office-recovery"),
-  readWorkspaceBinaryFileVersion,
-  writeWorkspaceBinaryFile,
-  absorbWorkspaceEditReviewPath,
-  workspaceWatchService,
-  getOwnerWindow: getOwnerWindowByWebContentsId,
-  surfaceManager: officeEditingSurfaceManager,
-});
 const gitMetadataWatchService = createGitMetadataWatchService();
 const workspaceStateStore = createWorkspaceStateStore({
   app,
@@ -374,7 +346,6 @@ async function createWindow(options = {}) {
   window.webContents.on("render-process-gone", (_event, details) => {
     console.error("puppyone renderer process gone:", details);
     appPreviewRuntime?.closeSessionsForWindow(webContentsId);
-    officeEditingService.closeSessionsForWindow(webContentsId);
   });
 
   try {
@@ -395,7 +366,6 @@ async function createWindow(options = {}) {
     releaseWindowWorkspaceById(webContentsId, window);
     viewerPackHost?.destroySessionsForOwner(webContentsId);
     appPreviewRuntime?.closeSessionsForWindow(webContentsId);
-    officeEditingService.closeSessionsForWindow(webContentsId);
     terminalService.closeSessionsForWindow(webContentsId);
     void agentService.closeSessionsForWindow(webContentsId);
     workspaceWatchService.stopForWindow(webContentsId);
@@ -531,7 +501,6 @@ app.on("second-instance", (_event, argv, workingDirectory, launchIntent) => {
 
 app.whenReady().then(async () => {
   await localeService.initialize();
-  await officeEditingService.initialize();
   stopLocaleNativeRefresh = localeService.onDidChange(() => {
     setDockMenu();
   });
@@ -653,7 +622,6 @@ app.on("will-quit", () => {
   updateService?.dispose();
   viewerPackHost?.destroyAllSessions();
   appPreviewRuntime?.closeAll();
-  void officeEditingService.closeAll();
   terminalService.closeAll();
   localAgentInventory.dispose();
   workspaceWatchService.closeAll();
@@ -711,11 +679,6 @@ function registerIpcHandlers() {
       }
       return null;
     },
-  });
-  registerOfficeEditingIpcHandlers({
-    ipcMain: trustedIpcMain,
-    officeEditingService,
-    authorizeWorkspaceRoot,
   });
 
   registerWorkspaceFileIpcHandlers({
