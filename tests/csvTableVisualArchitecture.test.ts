@@ -145,6 +145,9 @@ describe("CSV table visual architecture", () => {
     expect(csvTableCss).toMatch(
       /\.csv-table-editor__table \.csv-table-editor__record-index\s*\{[^}]*z-index:\s*2[^}]*inset-inline-start:\s*0[^}]*var\(--csv-table-record-index-background\)[^}]*var\(--po-editor-bg\)/s,
     );
+    expect(csvTableCss).toMatch(
+      /\.csv-table-editor__table \.csv-table-editor__record-index\s*\{[^}]*font-size:\s*var\(--po-text-size-caption, 11px\)[^}]*font-variant-numeric:\s*tabular-nums[^}]*font-weight:\s*var\(--po-text-weight-regular, 400\)/s,
+    );
     expect(csvTableCss).not.toMatch(/inset-(?:block|inline)-start:\s*calc\(-1/);
     expect(csvEditorSource).toMatch(
       /className="csv-table-editor__scroll"[\s\S]*?<CsvViewSettings[\s\S]*?className="csv-table-editor__frame"/,

@@ -338,8 +338,9 @@
     ),
     var(--po-editor-bg);
   color: var(--po-text-disabled);
+  font-size: var(--po-text-size-caption, 11px);
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
+  font-weight: var(--po-text-weight-regular, 400);
   text-align: center;
   user-select: none;
   vertical-align: middle;
