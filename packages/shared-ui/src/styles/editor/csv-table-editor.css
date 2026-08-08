@@ -494,7 +494,7 @@
   outline: 0;
   background: transparent;
   cursor: nwse-resize;
-  opacity: 1;
+  opacity: 0;
   touch-action: none;
   transition: opacity 120ms ease;
 }

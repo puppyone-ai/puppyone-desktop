@@ -94,7 +94,10 @@ describe("CSV table visual architecture", () => {
     );
     expect(structureButtonRule).toContain("opacity: 0");
     expect(csvTableCss).toMatch(
-      /\.csv-table-editor__resize-handle\s*\{[^}]*opacity:\s*1/s,
+      /\.csv-table-editor__resize-handle\s*\{[^}]*opacity:\s*0/s,
+    );
+    expect(csvTableCss).toMatch(
+      /\.csv-table-editor__surface:hover \.csv-table-editor__resize-handle,[\s\S]*?\{[^}]*opacity:\s*1/s,
     );
     expect(csvTableCss).toMatch(
       /\.csv-table-editor__resize-handle-visual\s*\{[^}]*color:\s*transparent/s,
