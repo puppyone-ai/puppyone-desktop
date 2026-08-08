@@ -588,6 +588,7 @@ app.whenReady().then(async () => {
       if (event.result.status === "stopped" || event.result.status === "error") {
         appPreviewBrowserSurfaces.runtimeUnavailable({
           rootPath: event.rootPath,
+          appPath: event.result.path,
           ownerWebContentsIds: event.ownerWebContentsIds,
           reason: event.result.status === "error" ? "runtime-error" : "runtime-stopped",
         });

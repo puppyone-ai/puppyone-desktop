@@ -34,6 +34,7 @@ import type { AiEditFile } from "./ai-edits/types";
 import { DocumentSessionBoundary } from "./document-session/DocumentSessionBoundary";
 import type { DocumentPersistedCommit } from "./document-session/types";
 import { resolveEditorAccess } from "./editorAccess";
+import { EditorFindHost } from "./find/editorFind";
 
 export type { EditorDocument, EditorDocumentKind, EditorSaveMode, MarkdownHtmlTrustMode } from "./viewerTypes";
 
@@ -215,7 +216,11 @@ export function PuppyoneEditorHost({
     </DocumentSessionBoundary>
   ) : presetViewer;
 
-  return editor;
+  return (
+    <EditorFindHost documentId={document.path}>
+      {editor}
+    </EditorFindHost>
+  );
 }
 
 function ExternalViewerChooser({

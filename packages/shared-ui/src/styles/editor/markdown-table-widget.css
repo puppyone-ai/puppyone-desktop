@@ -383,7 +383,7 @@
   font-weight: 650;
   line-height: 1;
   pointer-events: none;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
 }
 
 .markdown-codemirror-editor .cm-md-table-widget-wrap:hover .cm-md-table-structure-button,
@@ -400,6 +400,10 @@
 
 .markdown-codemirror-editor .cm-md-table-structure-button:focus-visible {
   outline: none;
+}
+
+.markdown-codemirror-editor .cm-md-table-structure-button:focus-visible .cm-md-table-structure-button-visual {
+  box-shadow: 0 0 0 1.5px var(--po-editable-table-cell-focus-ring);
 }
 
 .markdown-codemirror-editor .cm-md-table-add-row {

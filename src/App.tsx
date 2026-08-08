@@ -1,9 +1,11 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  EditorFindContributionProvider,
   flushActiveDocumentSessions,
   flushActiveOfficeEditingSessions,
   type DataNode,
   type DataWorkspaceActivePathChangeContext,
+  useEditorFindCommand,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import { DesktopCloudShell, type DesktopView } from "./components/DesktopCloudShell";
@@ -94,7 +96,16 @@ const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMi
 const RightAgentPanel = lazy(loadRightAgentPanel);
 
 export function App() {
+  return (
+    <EditorFindContributionProvider>
+      <AppContent />
+    </EditorFindContributionProvider>
+  );
+}
+
+function AppContent() {
   const { t } = useLocalization();
+  const editorFindCommand = useEditorFindCommand();
   const desktopUpdates = useDesktopUpdates();
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
@@ -815,6 +826,7 @@ export function App() {
 
   const titlebarActions = (
     <DesktopTitlebarActions
+      editorFindCommand={editorFindCommand}
       canOpenActiveFileExternal={activeExternalOpen.canOpen}
       activeFileExternalOpenTitle={activeExternalOpen.title}
       activeFileExternalOpenAppName={activeExternalOpen.appName}

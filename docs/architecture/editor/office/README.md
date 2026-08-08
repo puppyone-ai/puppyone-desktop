@@ -1,9 +1,13 @@
-# Office Editing Runtime
+# Managed Office Editing Runtime
 
-PuppyOne edits modern OOXML Word, Excel, and PowerPoint resources through the
-process-neutral `OfficeEditingPort`. The built-in Office viewer is the only
-route: it mounts the configured editing engine when the Host supplies that port
-and otherwise keeps the existing bounded preview as the mandatory fallback.
+PuppyOne edits `.docx`, `.xlsx`, and `.pptx` through the process-neutral
+`OfficeEditingPort`. The existing `office-preview` contribution remains the
+only route: it mounts the managed editor when the Experimental setting is on
+and the PuppyOne service is available, and otherwise renders the bounded local
+Preview.
+
+Desktop users do not install Docker, configure a Document Server, provide an
+engine JWT, or expose a callback listener.
 
 ## Runtime boundary
 
@@ -12,62 +16,67 @@ DataWorkspace -> EditorHost -> office-preview contribution
                                   |
                     OfficeEditingPort (no Electron imports)
                                   |
-          trusted preload IPC -> main OfficeEditingService
+          trusted preload IPC -> Electron OfficeEditingService
+                                  |
+                       PuppyOne Cloud Auth
+                                  |
+                        /api/v1/office
+                                  |
+              managed ONLYOFFICE + Redis + private S3
                                   |
                   sandboxed WebContentsView
                                   |
-             signed ONLYOFFICE config + loopback bridge
-                                  |
-                  source GET / callback POST
-                                  |
-              shared versioned atomic file writer
+              versioned atomic local file writer
 ```
 
-The trusted renderer receives only opaque session/surface identifiers and
-status. The signed editor configuration and third-party API script stay in a
-dedicated sandboxed `WebContentsView` with no preload, Node, webview, DevTools,
-or permission authority; the application CSP remains `script-src 'self'`. The
-main process authorizes the current window's workspace root, resolves the
-canonical path, serves only the capability-scoped source, validates callback
-capabilities, restricts result downloads to configured origins, and bounds
-every body and timeout.
+Electron authorizes the current window's canonical workspace root, reads the
+source bytes, and uploads only filename, bytes, and locale over the current
+authenticated PuppyOne session. An absolute Desktop path never leaves the
+machine.
+
+PuppyOne backend is the only holder of the document-server URL, JWT and
+capability secrets, callback handling, result-origin allowlist, Redis address,
+and private storage settings. Desktop receives a short-lived signed launch
+configuration but retains it in Electron Main; Shared UI sees only opaque
+session/surface identifiers and status.
 
 ## Experimental product gate
 
-Full Office editing is an opt-in experiment and is off by default. The Desktop
-Host persists `enableOfficeEditing` in the canonical `ExperimentalSettings`
-record. Only an opted-in Host exposes `DataPort.officeEditing`; when the switch
-is off, Shared UI has no resource-persistence authority and the same canonical
-Office route renders its bounded preview. This keeps the product gate outside
-the engine adapter and avoids a second routing stack.
+`ExperimentalSettings.enableOfficeEditing` is persisted by the App Host and
+defaults to `false`. Only an opted-in local Host supplies
+`DataPort.officeEditing`. The service cannot enable the experiment implicitly.
 
-## Persistence and close semantics
+An unavailable, signed-out, offline, expired, or malformed managed session
+falls back to the existing Office Preview without clearing selection. Once a
+session has edits, save errors remain visible and recoverable instead of
+silently remounting Preview.
 
-- Force-save callback status `6` and final-save status `2` use the same binary
-  writer as text Document Sessions: per-path serialization, SHA-256 base
-  version, mode-preserving temporary inode, file and directory `fsync`, a
-  second optimistic-version check, and atomic rename.
-- A status `2` callback may arrive after the React surface unmounts. Therefore
-  the main-owned session remains alive for its expiry window; unmount only
-  detaches the renderer and requests a normal editor close.
-- An external version mismatch never overwrites either side. The received
-  Office bytes are written to the app recovery directory with mode `0600` and
-  the session enters `conflict`. The user can then keep the recovered Office
-  result or the externally changed workspace file.
-- Workspace watcher attribution and edit-review absorption happen only after a
-  durable replacement succeeds.
+## Native surface isolation
 
-## Configuration
+The ONLYOFFICE API runs in a temporary-partition `WebContentsView` with sandbox
+and context isolation enabled; preload, Node, webviews, DevTools, dialogs,
+permissions, navigation, and new windows are disabled. The trusted renderer
+keeps `script-src 'self'`. Production API scripts must use HTTPS under
+`puppyone.ai` and the exact `/web-apps/apps/api/documents/api.js` path;
+loopback is allowed only for development.
 
-Set `PUPPYONE_OFFICE_DOCUMENT_SERVER_URL` and a matching
-`PUPPYONE_OFFICE_JWT_SECRET`. The bridge binds to loopback by default. If the
-Document Server runs in Docker or another network, also pin
-`PUPPYONE_OFFICE_BRIDGE_PORT` and configure
-`PUPPYONE_OFFICE_BRIDGE_PUBLIC_URL` to a URL the server can reach. Additional
-result origins must be explicitly listed in
-`PUPPYONE_OFFICE_DOWNLOAD_ORIGINS`.
+## Persistence and recovery
 
-Legacy `.doc`, `.xls`, `.ppt`, macro/binary variants, OpenDocument, and `.rtf`
-stay on the preview path. Full editing is deliberately enabled for `.docx`,
-`.xlsx`, and `.pptx`; the callback must declare that same file type before the
-result can enter the atomic writer.
+- Desktop uploads at most 100 MiB and records the exact local base version.
+- Backend stores source/result objects privately and session metadata in Redis
+  with a hard TTL.
+- Engine source and callback routes use distinct purpose-bound, expiring HMAC
+  capabilities. Callback bodies additionally require the ONLYOFFICE JWT and
+  exact document key, status, URL, and file-type match.
+- Result URLs and every redirect must remain on an exact allowlist and pass
+  timeout and byte limits.
+- Desktop polls monotonically versioned results and commits them through the
+  shared per-path, version-checked atomic binary writer.
+- An external local change preserves the managed result in mode-`0600`
+  recovery storage and requires an explicit keep-edited or keep-external
+  choice; callbacks never authorize a blind overwrite.
+- Normal close removes remote session state and temporary objects; expiry and
+  storage lifecycle are the backstop for interrupted cleanup.
+
+Legacy, macro/binary, template, slideshow, RTF, and OpenDocument variants stay
+on Preview until an explicit round-trip preservation policy is implemented.

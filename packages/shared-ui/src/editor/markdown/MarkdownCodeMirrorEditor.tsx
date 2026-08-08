@@ -26,6 +26,8 @@ import { getRendererPerformanceTracker } from "../../performance/rendererPerform
 import { subscribeTypographyChanges } from "../../core/typography";
 import { markdownLocalizationExtension } from "./core/editor/markdownLocalization";
 import { resolveMarkdownDialect } from "./core/dialect/markdownDialect";
+import { CodeMirrorFindAdapter } from "../find/codeMirrorFindAdapter";
+import { useRegisterEditorFindAdapter } from "../find/editorFind";
 
 const rendererPerformance = getRendererPerformanceTracker();
 
@@ -86,6 +88,7 @@ export function MarkdownCodeMirrorEditor({
     [documentPath, markdownDialect],
   );
   const initialLocalizationRef = useRef(localization);
+  const findAdapter = useMemo(() => new CodeMirrorFindAdapter(), []);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const externalValueRef = useRef(value);
@@ -123,6 +126,8 @@ export function MarkdownCodeMirrorEditor({
     () => livePreview ? "pending" : "source",
   );
   const [showPendingMessage, setShowPendingMessage] = useState(false);
+
+  useRegisterEditorFindAdapter(findAdapter);
   const livePreviewContextRef = useRef({
     htmlTrustMode,
     markdownLinkGraph,
@@ -195,6 +200,7 @@ export function MarkdownCodeMirrorEditor({
         doc: initialConfig.value,
         extensions: [
           ...markdownCodeMirrorUrgentExtensions(initialConfig.readOnly),
+          findAdapter.extension,
           localizationCompartmentRef.current.of(
             markdownLocalizationExtension(initialLocalizationRef.current, initialConfig.readOnly),
           ),
@@ -224,6 +230,7 @@ export function MarkdownCodeMirrorEditor({
     );
 
     viewRef.current = view;
+    findAdapter.attach(view);
     const unsubscribeTypography = subscribeTypographyChanges(host.ownerDocument, () => {
       view.requestMeasure();
     });
@@ -254,6 +261,7 @@ export function MarkdownCodeMirrorEditor({
       // snapshot while the CodeMirror document is still alive.
       callbacksRef.current.onSnapshotPortChange?.(null);
       const destroyStartedAt = performance.now();
+      findAdapter.dispose();
       view.destroy();
       rendererPerformance.recordOperation(
         "editor_destroy",
@@ -261,7 +269,7 @@ export function MarkdownCodeMirrorEditor({
       );
       viewRef.current = null;
     };
-  }, []);
+  }, [findAdapter]);
 
   useEffect(() => {
     const view = viewRef.current;

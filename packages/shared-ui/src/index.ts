@@ -82,6 +82,16 @@ export type {
 
 export { EditorHost } from "./editor/EditorHost";
 export type { EditorHostProps } from "./editor/EditorHost";
+export {
+  EditorFindContributionProvider,
+  useEditorFindCommand,
+} from "./editor/find/editorFind";
+export type {
+  EditorFindAdapter,
+  EditorFindCommand,
+  EditorFindDirection,
+  EditorFindResult,
+} from "./editor/find/editorFind";
 // The app shell may request a durability barrier, but the session object and
 // editable-source bridge remain private to the trusted Editor host.
 export { flushActiveDocumentSessions } from "./editor/document-session";

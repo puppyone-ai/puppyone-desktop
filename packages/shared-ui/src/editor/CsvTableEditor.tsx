@@ -32,6 +32,11 @@ import {
   EDITABLE_TABLE_COLUMN_MIN_WIDTH,
   estimateEditableTableColumnWidths,
 } from "./table/editableTableLayout";
+import {
+  getCsvFindMatchKey,
+  useCsvFindAdapter,
+} from "./find/useCsvFindAdapter";
+import { useRegisterEditorFindAdapter } from "./find/editorFind";
 
 export type CsvTableEditorProps = {
   documentId?: string;
@@ -78,6 +83,13 @@ export function CsvTableEditor({
   const surfaceRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
   const pendingFocusRef = useRef<CsvTableFocusTarget | null>(null);
+  const searchableMatrix = useMemo(
+    () => matrix.slice(0, MAX_CSV_TABLE_DATA_ROWS + (headerEnabled ? 1 : 0)),
+    [headerEnabled, matrix],
+  );
+  const csvFind = useCsvFindAdapter(searchableMatrix, tableRef);
+
+  useRegisterEditorFindAdapter(csvFind.adapter);
 
   useLayoutEffect(() => {
     if (headerPreferenceDocumentRef.current !== documentId) {
@@ -267,6 +279,8 @@ export function CsvTableEditor({
                         key={`header-${columnIndex}`}
                         data-csv-row="0"
                         data-csv-column={columnIndex}
+                        data-find-match={csvFind.matchKeys.has(getCsvFindMatchKey({ rowIndex: 0, columnIndex })) ? "true" : undefined}
+                        data-find-current={csvFind.currentMatch?.rowIndex === 0 && csvFind.currentMatch.columnIndex === columnIndex ? "true" : undefined}
                         aria-colindex={columnIndex + ariaColumnOffset}
                       >
                         <input
@@ -325,6 +339,8 @@ export function CsvTableEditor({
                           key={`cell-${rowIndex}-${columnIndex}`}
                           data-csv-row={rowIndex}
                           data-csv-column={columnIndex}
+                          data-find-match={csvFind.matchKeys.has(getCsvFindMatchKey({ rowIndex, columnIndex })) ? "true" : undefined}
+                          data-find-current={csvFind.currentMatch?.rowIndex === rowIndex && csvFind.currentMatch.columnIndex === columnIndex ? "true" : undefined}
                           aria-colindex={columnIndex + ariaColumnOffset}
                         >
                           <input

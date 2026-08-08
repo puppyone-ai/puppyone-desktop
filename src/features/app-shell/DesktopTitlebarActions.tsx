@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
-import { MessageSquare, MoreHorizontal, Plus, SquareTerminal, Trash2 } from "lucide-react";
+import { MessageSquare, MoreHorizontal, Plus, Search, SquareTerminal, Trash2 } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
+import type { EditorFindCommand } from "@puppyone/shared-ui";
 import {
   DesktopMenuIconButton,
   DesktopMenuItem,
@@ -25,6 +26,7 @@ const terminalStatusMessageKey = {
 } as const;
 
 type DesktopTitlebarActionsProps = {
+  editorFindCommand?: EditorFindCommand | null;
   activeFileExternalOpenTitle?: string;
   activeFileExternalOpenAppName?: string | null;
   activeFileExternalOpenIconDataUrl?: string | null;
@@ -47,6 +49,7 @@ type DesktopTitlebarActionsProps = {
 };
 
 export function DesktopTitlebarActions({
+  editorFindCommand = null,
   activeFileExternalOpenTitle,
   activeFileExternalOpenAppName,
   activeFileExternalOpenIconDataUrl,
@@ -91,6 +94,25 @@ export function DesktopTitlebarActions({
     id: string;
     node: ReactNode;
   }> = [];
+
+  if (editorFindCommand) {
+    const findLabel = t("editor.find.label");
+    titlebarActionItems.push({
+      group: "header",
+      id: "editor-find",
+      node: (
+        <button
+          className="desktop-titlebar-action desktop-titlebar-editor-find"
+          type="button"
+          title={`${findLabel} (⌘F)`}
+          aria-label={findLabel}
+          onClick={editorFindCommand.open}
+        >
+          <Search aria-hidden="true" size={15} strokeWidth={1.8} />
+        </button>
+      ),
+    });
+  }
 
   for (const definition of getOrderedHeaderElementDefinitions(titlebarActionsSettings.order)) {
     if (
