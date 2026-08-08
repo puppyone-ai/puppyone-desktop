@@ -81,6 +81,16 @@ describe("CSV table visual architecture", () => {
       expect(markdownTableCss).toContain(token);
     }
     expect(sharedTableCss).toContain("--po-editable-table-structure-hover-background");
+    const structureTokenBlock = sharedTableCss.slice(
+      sharedTableCss.indexOf("--po-editable-table-structure-background"),
+      sharedTableCss.indexOf("}", sharedTableCss.indexOf("--po-editable-table-structure-background")),
+    );
+    expect(structureTokenBlock).toContain("--po-editable-table-structure-color");
+    expect(structureTokenBlock).toContain("--po-editable-table-structure-hover-border: transparent");
+    expect(structureTokenBlock).toContain("var(--po-accent) 10%");
+    expect(sharedTableCss).toMatch(
+      /\.po-editable-table-structure-button\s*\{[^}]*opacity:\s*1/s,
+    );
   });
 
   it("assigns the two-axis CSV viewport to exactly one scroll owner", () => {
