@@ -40,7 +40,6 @@
   --po-editable-table-handle-gutter: 14px;
   --po-editable-table-action-gutter: 18px;
   --po-editable-table-structure-background: color-mix(in srgb, var(--po-control) 42%, transparent);
-  --po-editable-table-structure-color: color-mix(in srgb, var(--po-text-muted) 72%, transparent);
   --po-editable-table-structure-hover-border: transparent;
   --po-editable-table-structure-hover-background: color-mix(in srgb, var(--po-accent) 10%, var(--po-panel));
   --po-editable-table-structure-hover-color: color-mix(in srgb, var(--po-accent) 78%, var(--po-text));
@@ -204,7 +203,7 @@
   background: transparent;
   cursor: var(--po-clickable-cursor, pointer);
   font: inherit;
-  opacity: 1;
+  opacity: 0;
   transition: opacity 120ms ease;
 }
 
@@ -215,7 +214,7 @@
   border: 1px solid transparent;
   border-radius: 7px;
   background: var(--po-editable-table-structure-background);
-  color: var(--po-editable-table-structure-color);
+  color: transparent;
   font-size: 12px;
   font-weight: 650;
   line-height: 1;

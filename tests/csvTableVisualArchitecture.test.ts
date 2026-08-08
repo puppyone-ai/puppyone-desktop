@@ -85,11 +85,19 @@ describe("CSV table visual architecture", () => {
       sharedTableCss.indexOf("--po-editable-table-structure-background"),
       sharedTableCss.indexOf("}", sharedTableCss.indexOf("--po-editable-table-structure-background")),
     );
-    expect(structureTokenBlock).toContain("--po-editable-table-structure-color");
     expect(structureTokenBlock).toContain("--po-editable-table-structure-hover-border: transparent");
     expect(structureTokenBlock).toContain("var(--po-accent) 10%");
-    expect(sharedTableCss).toMatch(
-      /\.po-editable-table-structure-button\s*\{[^}]*opacity:\s*1/s,
+    const structureButtonStart = sharedTableCss.indexOf(".po-editable-table-structure-button {");
+    const structureButtonRule = sharedTableCss.slice(
+      structureButtonStart,
+      sharedTableCss.indexOf("}", structureButtonStart),
+    );
+    expect(structureButtonRule).toContain("opacity: 0");
+    expect(csvTableCss).toMatch(
+      /\.csv-table-editor__resize-handle\s*\{[^}]*opacity:\s*1/s,
+    );
+    expect(csvTableCss).toMatch(
+      /\.csv-table-editor__resize-handle-visual\s*\{[^}]*color:\s*transparent/s,
     );
   });
 
