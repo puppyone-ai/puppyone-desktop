@@ -29,8 +29,23 @@ requirePattern(
 );
 requirePattern(
   "src/lib/localFiles.ts",
-  /officeEditing:\s*\{[\s\S]*?createOfficeEditingSession[\s\S]*?resolveOfficeEditingConflict[\s\S]*?onOfficeEditingState/,
-  "does not adapt the native bridge to OfficeEditingPort",
+  /options\.enableOfficeEditing\s*\?[\s\S]*?officeEditing:\s*\{[\s\S]*?createOfficeEditingSession[\s\S]*?resolveOfficeEditingConflict[\s\S]*?onOfficeEditingState/,
+  "does not gate the native OfficeEditingPort adapter behind the Host experiment",
+);
+requirePattern(
+  "src/preferences.ts",
+  /enableOfficeEditing:\s*boolean[\s\S]*?enableOfficeEditing:\s*false[\s\S]*?parsed\.enableOfficeEditing\s*===\s*true/,
+  "does not keep the persisted Office editing experiment default-off",
+);
+requirePattern(
+  "src/features/settings/main/EditorSettingsViews.tsx",
+  /messageKey:\s*["']officeEditing["'][\s\S]*?settingKey:\s*["']enableOfficeEditing["']/,
+  "does not expose the Office editing experiment in Settings",
+);
+requirePattern(
+  "src/App.tsx",
+  /createLocalDataPort\(workspace\.path,\s*\{[\s\S]*?enableOfficeEditing:\s*experimentalSettings\.enableOfficeEditing/,
+  "does not bind the Host port to the persisted experiment",
 );
 requirePattern(
   "electron/main.mjs",

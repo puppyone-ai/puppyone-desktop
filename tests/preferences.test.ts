@@ -199,6 +199,7 @@ describe("experimental preferences", () => {
       enableEditorSaveStatus: false,
       enableMarkdownBlockDrag: false,
       enableMinimalMode: false,
+      enableOfficeEditing: false,
       enablePuppyoneAppFiles: false,
       enablePuppyFlowFiles: false,
       enableViewerPlugins: false,
@@ -244,6 +245,13 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(null).enableViewerPlugins).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableViewerPlugins: false })).enableViewerPlugins).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableViewerPlugins: true })).enableViewerPlugins).toBe(true);
+  });
+
+  it("keeps Office document editing off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableOfficeEditing).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableOfficeEditing).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableOfficeEditing: false })).enableOfficeEditing).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableOfficeEditing: true })).enableOfficeEditing).toBe(true);
   });
 });
 

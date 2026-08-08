@@ -80,6 +80,7 @@ export type ExperimentalSettings = {
   enableEditorSaveStatus: boolean;
   enableMarkdownBlockDrag: boolean;
   enableMinimalMode: boolean;
+  enableOfficeEditing: boolean;
   enablePuppyoneAppFiles: boolean;
   enablePuppyFlowFiles: boolean;
   enableViewerPlugins: boolean;
@@ -179,6 +180,7 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableEditorSaveStatus: false,
   enableMarkdownBlockDrag: false,
   enableMinimalMode: false,
+  enableOfficeEditing: false,
   enablePuppyoneAppFiles: false,
   enablePuppyFlowFiles: false,
   enableViewerPlugins: false,
@@ -566,6 +568,7 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
       enableEditorSaveStatus: parsed.enableEditorSaveStatus === true,
       enableMarkdownBlockDrag: parsed.enableMarkdownBlockDrag === true,
       enableMinimalMode: parsed.enableMinimalMode === true,
+      enableOfficeEditing: parsed.enableOfficeEditing === true,
       enablePuppyoneAppFiles: parsed.enablePuppyoneAppFiles === true,
       enablePuppyFlowFiles: parsed.enablePuppyFlowFiles === true,
       enableViewerPlugins: parsed.enableViewerPlugins === true,

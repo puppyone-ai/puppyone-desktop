@@ -32,6 +32,15 @@ canonical path, serves only the capability-scoped source, validates callback
 capabilities, restricts result downloads to configured origins, and bounds
 every body and timeout.
 
+## Experimental product gate
+
+Full Office editing is an opt-in experiment and is off by default. The Desktop
+Host persists `enableOfficeEditing` in the canonical `ExperimentalSettings`
+record. Only an opted-in Host exposes `DataPort.officeEditing`; when the switch
+is off, Shared UI has no resource-persistence authority and the same canonical
+Office route renders its bounded preview. This keeps the product gate outside
+the engine adapter and avoids a second routing stack.
+
 ## Persistence and close semantics
 
 - Force-save callback status `6` and final-save status `2` use the same binary

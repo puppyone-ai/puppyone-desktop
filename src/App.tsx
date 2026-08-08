@@ -321,8 +321,10 @@ export function App() {
     [cloudSession, desktopCloudApiBaseUrl],
   );
   const localDataPort = useMemo(
-    () => (workspace ? createLocalDataPort(workspace.path) : null),
-    [workspace],
+    () => (workspace ? createLocalDataPort(workspace.path, {
+      enableOfficeEditing: experimentalSettings.enableOfficeEditing,
+    }) : null),
+    [experimentalSettings.enableOfficeEditing, workspace],
   );
   const dataPort = useMemo(
     () => (localDataPort ? createExplorerDataPort(localDataPort, filesVisibilitySettings) : null),
