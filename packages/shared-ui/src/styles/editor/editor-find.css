@@ -16,20 +16,22 @@
   align-items: center;
   gap: 2px;
   box-sizing: border-box;
-  width: min(336px, calc(100% - 24px));
+  width: min(304px, calc(100% - 24px));
   height: 30px;
   padding: 2px 3px;
-  border: 1px solid color-mix(in srgb, var(--po-border) 82%, transparent);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--po-panel-raised) 96%, var(--po-overlay) 4%);
+  border: 1px solid color-mix(in srgb, var(--po-border-subtle) 86%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-overlay) 88%, var(--po-panel-raised) 12%);
   color: var(--po-text-subtle);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--po-shadow) 72%, transparent);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--po-shadow) 18%, transparent),
+    0 8px 24px color-mix(in srgb, var(--po-shadow) 16%, transparent);
 }
 
 .editor-find-widget > svg {
   flex: 0 0 auto;
   margin-inline: 4px 2px;
-  color: var(--po-text-disabled);
+  color: color-mix(in srgb, var(--po-accent) 42%, var(--po-text-muted));
 }
 
 .editor-find-widget input {
@@ -55,9 +57,9 @@
 }
 
 .editor-find-widget__result {
-  min-width: 50px;
-  max-width: 84px;
-  padding-inline: 8px 6px;
+  min-width: 44px;
+  max-width: 72px;
+  padding-inline: 7px 5px;
   overflow: hidden;
   border-inline-start: 1px solid var(--po-divider);
   color: var(--po-text-subtle);
@@ -66,6 +68,10 @@
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.editor-find-widget__result:empty {
+  display: none;
 }
 
 .editor-find-widget button {

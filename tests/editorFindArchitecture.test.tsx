@@ -64,10 +64,11 @@ describe("editor find architecture", () => {
       widgetRuleStart,
       editorFindStyles.indexOf("}", widgetRuleStart) + 1,
     );
-    expect(widgetRule).toContain("width: min(336px, calc(100% - 24px))");
+    expect(widgetRule).toContain("width: min(304px, calc(100% - 24px))");
     expect(widgetRule).toContain("height: 30px");
     expect(widgetRule).toContain("var(--po-panel-raised)");
-    expect(widgetRule).toContain("border-radius: 6px");
+    expect(widgetRule).toContain("var(--po-border-subtle)");
+    expect(widgetRule).toContain("border-radius: 8px");
 
     const resultRuleStart = editorFindStyles.indexOf(".editor-find-widget__result {");
     const resultRule = editorFindStyles.slice(
@@ -76,6 +77,7 @@ describe("editor find architecture", () => {
     );
     expect(resultRule).toContain("border-inline-start: 1px solid var(--po-divider)");
     expect(resultRule).toContain("font-variant-numeric: tabular-nums");
+    expect(editorFindStyles).toContain(".editor-find-widget__result:empty");
 
     const focusRuleStart = editorFindStyles.indexOf(".editor-find-widget:focus-within {");
     const focusRule = editorFindStyles.slice(
