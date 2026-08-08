@@ -47,7 +47,7 @@ describe("Office editing native surface", () => {
       ownerId: 51,
       sessionId: "session-1",
       attachmentId: "attachment-1",
-      apiScriptUrl: "https://office.example.test/web-apps/apps/api/documents/api.js",
+      apiScriptUrl: "https://office.puppyone.ai/web-apps/apps/api/documents/api.js",
       editorConfig: { token: "signed-config", document: { key: "key-1" } },
       bounds: { x: 850, y: 650, width: 200, height: 200 },
     });
@@ -61,7 +61,7 @@ describe("Office editing native surface", () => {
       devTools: false,
     });
     expect(view.webContents.loadURL).toHaveBeenCalledWith(expect.stringMatching(/^data:text\/html/));
-    expect(decodeURIComponent(view.webContents.loadURL.mock.calls[0][0])).toContain("script-src https://office.example.test");
+    expect(decodeURIComponent(view.webContents.loadURL.mock.calls[0][0])).toContain("script-src https://office.puppyone.ai");
     expect(view.webContents.executeJavaScript.mock.calls[0][0]).toContain("signed-config");
     expect(ownerWindow.contentView.addChildView).toHaveBeenCalledWith(view);
     expect(view.bounds).toEqual({ x: 850, y: 650, width: 50, height: 50 });

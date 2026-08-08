@@ -7,6 +7,28 @@ import {
 const API = "https://api.puppyone.ai/api/v1";
 
 describe("main-owned Cloud Auth Broker", () => {
+  it("adds auth without overriding the multipart boundary for managed Office uploads", async () => {
+    const fixture = createFixture();
+    fixture.requestCloudApi.mockImplementation(async (_apiBase, apiPath, init) => {
+      if (apiPath === "/auth/refresh") {
+        return authResponse({ accessToken: jwtFor("user-123") });
+      }
+      if (apiPath === "/auth/initialize") return { ok: true };
+      expect(apiPath).toBe("/office/sessions");
+      expect(init.body).toBeInstanceOf(FormData);
+      expect(init.headers.Authorization).toMatch(/^Bearer /);
+      expect(init.headers).not.toHaveProperty("Content-Type");
+      return { session_id: "session-1" };
+    });
+    const body = new FormData();
+    body.append("file", new Blob(["office"]), "report.docx");
+
+    await expect(fixture.service.requestSessionApi(API, "/office/sessions", {
+      method: "POST",
+      body,
+    })).resolves.toEqual({ session_id: "session-1" });
+  });
+
   it("coalesces twenty concurrent restore/API requests into one refresh and never exposes tokens", async () => {
     const fixture = createFixture();
     let refreshCount = 0;

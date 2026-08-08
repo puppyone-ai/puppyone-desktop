@@ -9,6 +9,27 @@ afterEach(() => {
 });
 
 describe("Electron Cloud API error transport", () => {
+  it("returns successful binary responses without attempting JSON decoding", async () => {
+    const bytes = Uint8Array.from([0, 255, 17, 42]);
+    globalThis.fetch = vi.fn(async () => new Response(bytes, {
+      status: 200,
+      headers: { "Content-Type": "application/octet-stream" },
+    }));
+
+    const result = await requestCloudApi(
+      "https://api.puppyone.ai/api/v1",
+      "/office/sessions/session-1/result?revision=1",
+      { method: "GET", responseType: "bytes" },
+    );
+
+    expect(result).toBeInstanceOf(Uint8Array);
+    expect([...result]).toEqual([...bytes]);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://api.puppyone.ai/api/v1/office/sessions/session-1/result?revision=1",
+      { method: "GET" },
+    );
+  });
+
   it("puts HTTP status in the serialized message as well as the local Error", async () => {
     globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({
       message: "Project authorization is temporarily unavailable",

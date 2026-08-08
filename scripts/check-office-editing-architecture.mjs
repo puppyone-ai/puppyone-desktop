@@ -49,8 +49,8 @@ requirePattern(
 );
 requirePattern(
   "electron/main.mjs",
-  /createOfficeEditingSurfaceManager[\s\S]*?createOfficeEditingService[\s\S]*?registerOfficeEditingIpcHandlers/,
-  "does not compose the Office service behind trusted IPC",
+  /createOfficeEditingSurfaceManager[\s\S]*?createOfficeEditingService\(\{[\s\S]*?cloudAuthService[\s\S]*?registerOfficeEditingIpcHandlers/,
+  "does not compose the managed Office service behind Cloud auth and trusted IPC",
 );
 requirePattern(
   "electron/preload.cjs",
@@ -59,13 +59,13 @@ requirePattern(
 );
 requirePattern(
   "electron/main/office/office-editing-service.mjs",
-  /status !== 2 && status !== 6[\s\S]*?writeWorkspaceBinaryFile[\s\S]*?WORKSPACE_VERSION_CONFLICT[\s\S]*?recoveryPath/,
-  "does not preserve ONLYOFFICE final/force saves with optimistic conflict recovery",
+  /\/office\/sessions[\s\S]*?responseType:\s*["']bytes["'][\s\S]*?writeWorkspaceBinaryFile[\s\S]*?WORKSPACE_VERSION_CONFLICT[\s\S]*?recoveryPath/,
+  "does not retrieve managed results and preserve them with optimistic conflict recovery",
 );
 requirePattern(
   "electron/main/office/office-editing-service.mjs",
-  /\/command\?shardkey=[\s\S]*?verifyCallbackAuthorization\(authorization, body\)[\s\S]*?filetype[\s\S]*?Office result format does not match/,
-  "does not use the current command endpoint or authenticate and format-bind callbacks",
+  /cloudAuthService\.requestSessionApi[\s\S]*?new FormData\(\)[\s\S]*?\/force-save[\s\S]*?closeRemoteSession/,
+  "does not keep upload, force-save, and cleanup behind authenticated PuppyOne APIs",
 );
 requirePattern(
   "local-api/workspace.mjs",
@@ -89,7 +89,7 @@ if (/DocsAPI|createElement\(["']script["']\)/.test(sharedUiSources)) {
 }
 requirePattern(
   "electron/main/office/office-editing-surface.mjs",
-  /WebContentsView[\s\S]*?sandbox:\s*true[\s\S]*?contextIsolation:\s*true[\s\S]*?nodeIntegration:\s*false[\s\S]*?webviewTag:\s*false/,
+  /WebContentsView[\s\S]*?sandbox:\s*true[\s\S]*?contextIsolation:\s*true[\s\S]*?nodeIntegration:\s*false[\s\S]*?webviewTag:\s*false[\s\S]*?managedHost/,
   "does not isolate the Office engine in a sandboxed native child surface",
 );
 requirePattern(
@@ -97,6 +97,23 @@ requirePattern(
   /script-src 'self'/,
   "weakens the trusted renderer CSP for the Office engine",
 );
+
+const desktopEnvironment = read(".env.example");
+if (/^PUPPYONE_OFFICE_(?:DOCUMENT_SERVER_URL|JWT_SECRET|BRIDGE|DOWNLOAD)/m.test(desktopEnvironment)) {
+  errors.push("Desktop configuration exposes managed Office infrastructure or secrets.");
+}
+for (const removedPath of [
+  "electron/main/office/office-engine-config.mjs",
+  "electron/main/office/onlyoffice-bridge-server.mjs",
+  "electron/main/office/onlyoffice-jwt.mjs",
+]) {
+  try {
+    read(removedPath);
+    errors.push(`${removedPath} restores a Desktop-owned Document Server boundary.`);
+  } catch {
+    // Expected: the Desktop owns no engine topology, listener, or signing key.
+  }
+}
 
 if (errors.length > 0) {
   console.error("Office editing architecture check failed:\n");

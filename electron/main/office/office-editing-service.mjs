@@ -1,20 +1,27 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { getMimeType } from "../../../local-api/workspace.mjs";
+import { normalizeCloudApiBaseUrl } from "../../../shared/cloudEndpoint.js";
 import { getWorkspaceFileVersion } from "../../../local-api/files/versioned-atomic-write.mjs";
-import { createOnlyOfficeBridgeServer } from "./onlyoffice-bridge-server.mjs";
-import { signOnlyOfficeJwt, verifyOnlyOfficeJwt } from "./onlyoffice-jwt.mjs";
 
-const SESSION_TTL_MS = 30 * 60 * 1000;
-const CLOSED_SESSION_TTL_MS = 2 * 60 * 1000;
 const RECOVERY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const DOWNLOAD_TIMEOUT_MS = 35_000;
+const CLOSED_SESSION_TTL_MS = 2 * 60 * 1000;
+const POLL_INTERVAL_MS = 1_000;
+const CLOSE_SAVE_TIMEOUT_MS = 25_000;
 const MAX_OFFICE_BYTES = 100 * 1024 * 1024;
 const MAX_SESSIONS_PER_OWNER = 4;
 
+/**
+ * Host-owned adapter for PuppyOne's managed Office API.
+ *
+ * The Desktop never receives a Document Server secret, starts a callback
+ * listener, or exposes a local file URL. The managed backend owns those
+ * responsibilities; this adapter owns only local file authority, native
+ * surface lifetime, authenticated transport, and atomic persistence.
+ */
 export function createOfficeEditingService({
-  configuration,
+  apiBaseUrl,
+  cloudAuthService,
   recoveryRoot,
   readWorkspaceBinaryFileVersion,
   writeWorkspaceBinaryFile,
@@ -22,26 +29,30 @@ export function createOfficeEditingService({
   workspaceWatchService = null,
   getOwnerWindow,
   surfaceManager = null,
-  fetchImpl = globalThis.fetch,
   logger = console,
 }) {
   const sessions = new Map();
   const officeSurfaces = surfaceManager ?? createUnavailableSurfaceManager();
-  const bridge = createOnlyOfficeBridgeServer({
-    bindHost: configuration.bindHost,
-    bindPort: configuration.bindPort,
-    publicUrl: configuration.publicUrl,
-    resolveSource,
-    handleCallback,
-  });
+  const managedApiBase = normalizeCloudApiBaseUrl(apiBaseUrl);
 
-  function getAvailability() {
-    return Object.freeze({
-      available: configuration.configured,
-      engine: "onlyoffice",
-      reason: configuration.reason,
-      documentServerUrl: configuration.documentServerUrl,
-    });
+  async function getAvailability() {
+    if (!managedApiBase) {
+      return unavailable("PuppyOne Cloud API is not configured.");
+    }
+    try {
+      const result = await cloudAuthService.requestSessionApi(
+        managedApiBase,
+        "/office/availability",
+        { method: "GET" },
+      );
+      return Object.freeze({
+        available: result?.available === true,
+        engine: "onlyoffice",
+        reason: typeof result?.reason === "string" ? result.reason : null,
+      });
+    } catch (error) {
+      return unavailable(toAvailabilityReason(error));
+    }
   }
 
   async function initialize() {
@@ -58,7 +69,7 @@ export function createOfficeEditingService({
   }
 
   async function createSession({ ownerId, rootPath, relativePath, locale = "en" }) {
-    requireConfigured();
+    requireManagedApi();
     const documentPath = requireDocumentPath(relativePath);
     const sameDocumentSessions = [...sessions.values()].filter((candidate) => (
       candidate.ownerId === ownerId
@@ -78,105 +89,65 @@ export function createOfficeEditingService({
     }
 
     const file = await readWorkspaceBinaryFileVersion(rootPath, documentPath);
-    const bridgeAddress = await bridge.start();
-    const sessionId = crypto.randomUUID();
-    const capability = crypto.randomBytes(32).toString("base64url");
-    const callbackCapability = crypto.randomBytes(32).toString("base64url");
+    if (file.size > MAX_OFFICE_BYTES) throw new Error("Office document is too large.");
+    const bytes = await fs.readFile(file.path);
     const extension = path.extname(documentPath).slice(1).toLowerCase();
-    const family = resolveDocumentFamily(extension);
-    if (!family) throw new Error("This file type is not supported by the Office editing engine.");
-    const expiresAt = Date.now() + SESSION_TTL_MS;
-    const key = crypto.createHash("sha256")
-      .update(`${rootPath}\0${documentPath}\0${file.version}\0${sessionId}`)
-      .digest("base64url");
-    const sourceUrl = `${bridgeAddress.publicBaseUrl}/office/sessions/${sessionId}/source/${encodeURIComponent(path.basename(documentPath))}?token=${capability}`;
-    const callbackUrl = `${bridgeAddress.publicBaseUrl}/office/sessions/${sessionId}/callback?token=${callbackCapability}`;
-    const unsignedConfig = {
-      document: {
-        fileType: extension,
-        key,
-        title: path.basename(documentPath),
-        url: sourceUrl,
-        permissions: {
-          edit: true,
-          download: true,
-          print: true,
-          review: true,
-        },
-      },
-      documentType: family,
-      editorConfig: {
-        mode: "edit",
-        callbackUrl,
-        lang: normalizeLocale(locale),
-        customization: {
-          autosave: true,
-          forcesave: true,
-        },
-        user: {
-          id: `puppyone-${ownerId}`,
-          name: "PuppyOne user",
-        },
-      },
-      height: "100%",
-      type: "desktop",
-      width: "100%",
-    };
-    const editorConfig = {
-      ...unsignedConfig,
-      token: signOnlyOfficeJwt(unsignedConfig, configuration.jwtSecret, { ttlSeconds: Math.ceil(SESSION_TTL_MS / 1000) }),
-    };
+    if (!resolveDocumentFamily(extension)) {
+      throw new Error("This file type is not supported by managed Office editing.");
+    }
+    const form = new FormData();
+    form.append("file", new Blob([bytes], { type: getOfficeMimeType(extension) }), path.basename(documentPath));
+    form.append("locale", normalizeLocale(locale));
+    const managed = await cloudAuthService.requestSessionApi(
+      managedApiBase,
+      "/office/sessions",
+      { method: "POST", body: form },
+    );
+    const normalized = normalizeManagedSession(managed);
     const session = {
-      id: sessionId,
+      id: normalized.sessionId,
       ownerId,
       rootPath,
       relativePath: documentPath,
-      filePath: file.path,
-      fileSize: file.size,
       baseVersion: file.version,
-      capability,
-      callbackCapability,
-      key,
-      apiScriptUrl: `${configuration.documentServerUrl}/web-apps/apps/api/documents/api.js`,
-      editorConfig,
-      expiresAt,
+      apiScriptUrl: normalized.apiScriptUrl,
+      editorConfig: normalized.editorConfig,
+      expiresAt: normalized.expiresAt,
+      appliedRevision: 0,
+      remoteRevision: normalized.resultRevision,
       recoveryPath: null,
       surfaceId: null,
       attachmentId: null,
-      state: createState(sessionId, documentPath, "ready", file.version),
+      state: createState(normalized.sessionId, documentPath, normalized.status, file.version),
       cleanupTimer: null,
-      saveTail: Promise.resolve(),
+      pollTimer: null,
+      pollPromise: null,
+      pollFailures: 0,
+      closed: false,
     };
-    session.cleanupTimer = scheduleCleanup(session, SESSION_TTL_MS);
-    sessions.set(sessionId, session);
+    session.cleanupTimer = scheduleCleanup(session, Math.max(1, session.expiresAt - Date.now()));
+    sessions.set(session.id, session);
     publish(session);
+    schedulePoll(session, 0);
     return toRendererSession(session);
   }
 
   async function forceSave({ ownerId, sessionId }) {
     const session = requireOwnedSession(ownerId, sessionId);
-    const command = { c: "forcesave", key: session.key };
+    if (session.state.status === "conflict") {
+      throw new Error(session.state.message ?? "Resolve the Office conflict before saving again.");
+    }
     updateState(session, "saving", { message: null });
     try {
-      const response = await fetchWithTimeout(
-        `${configuration.documentServerUrl}/command?shardkey=${encodeURIComponent(session.key)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...command,
-            token: signOnlyOfficeJwt(command, configuration.jwtSecret, { ttlSeconds: 120 }),
-          }),
-        },
+      await cloudAuthService.requestSessionApi(
+        managedApiBase,
+        `/office/sessions/${encodeURIComponent(session.id)}/force-save`,
+        { method: "POST" },
       );
-      if (!response.ok) throw new Error(`Office save command failed (${response.status}).`);
-      const result = await response.json();
-      if (Number(result?.error) !== 0) throw new Error(`Office save command was rejected (${result?.error ?? "unknown"}).`);
+      schedulePoll(session, 0);
       return { accepted: true };
     } catch (error) {
-      updateState(session, "error", {
-        message: error instanceof Error ? error.message : "Office save command failed.",
-      });
+      updateState(session, "error", { message: safeMessage(error, "Office save command failed.") });
       throw error;
     }
   }
@@ -215,9 +186,28 @@ export function createOfficeEditingService({
     if (session.surfaceId && session.attachmentId) {
       detachSurface({ ownerId, surfaceId: session.surfaceId, attachmentId: session.attachmentId });
     }
-    updateState(session, "awaiting-save", { message: null });
-    rescheduleCleanup(session, SESSION_TTL_MS);
-    return { closed: true };
+    if (session.state.status === "conflict") {
+      rescheduleCleanup(session, RECOVERY_TTL_MS);
+      return { closed: false, conflict: true };
+    }
+    if (session.state.status !== "saved") {
+      updateState(session, "awaiting-save", { message: null });
+      try {
+        await forceSave({ ownerId, sessionId });
+        await waitForSaveCompletion(session, CLOSE_SAVE_TIMEOUT_MS);
+      } catch (error) {
+        logger.warn?.("Managed Office final save remains pending:", safeMessage(error));
+        rescheduleCleanup(session, RECOVERY_TTL_MS);
+        return { closed: false };
+      }
+    }
+    if (session.state.status === "saved") {
+      await closeRemoteSession(session).catch((error) => {
+        logger.warn?.("Managed Office session cleanup was unavailable:", safeMessage(error));
+      });
+      retireSession(session, "closed");
+    }
+    return { closed: session.state.status === "closed" };
   }
 
   async function resolveConflict({ ownerId, sessionId, resolution }) {
@@ -228,8 +218,8 @@ export function createOfficeEditingService({
     if (resolution === "reload-external") {
       await fs.rm(session.recoveryPath, { force: true });
       session.recoveryPath = null;
-      updateState(session, "closed", { message: null });
-      rescheduleCleanup(session, CLOSED_SESSION_TTL_MS);
+      await closeRemoteSession(session).catch(() => undefined);
+      retireSession(session, "closed");
       return session.state;
     }
     if (resolution !== "keep-edited") throw new Error("Unknown Office conflict resolution.");
@@ -238,10 +228,11 @@ export function createOfficeEditingService({
     const result = await writeWorkspaceBinaryFile(session.rootPath, session.relativePath, bytes, {
       expectedVersion: current.version,
     });
+    session.baseVersion = result.version;
     await acknowledgeWrite(session, result.version);
     await fs.rm(session.recoveryPath, { force: true });
     session.recoveryPath = null;
-    updateState(session, "saved", { version: result.version, message: null });
+    updateState(session, "saved", { version: result.version, message: null, recoveryAvailable: false });
     return session.state;
   }
 
@@ -250,95 +241,103 @@ export function createOfficeEditingService({
     for (const session of sessions.values()) {
       if (session.ownerId !== ownerId) continue;
       session.ownerId = null;
-      rescheduleCleanup(session, SESSION_TTL_MS);
+      clearPoll(session);
+      rescheduleCleanup(session, session.recoveryPath ? RECOVERY_TTL_MS : CLOSED_SESSION_TTL_MS);
     }
   }
 
   async function closeAll() {
     officeSurfaces.destroyAll();
-    for (const session of sessions.values()) clearTimeout(session.cleanupTimer);
+    const active = [...sessions.values()];
+    for (const session of active) {
+      clearPoll(session);
+      clearTimeout(session.cleanupTimer);
+    }
+    await Promise.allSettled(active
+      .filter((session) => session.state.status === "saved")
+      .map((session) => closeRemoteSession(session)));
     sessions.clear();
-    await bridge.close();
   }
 
-  async function resolveSource({ sessionId, token }) {
-    const session = requireSessionCapability(sessionId, token, "capability");
-    const metadata = await fs.stat(session.filePath);
-    if (!metadata.isFile() || metadata.size > MAX_OFFICE_BYTES) throw new Error("Office source is unavailable.");
-    return {
-      filePath: session.filePath,
-      size: metadata.size,
-      name: path.basename(session.relativePath),
-      mimeType: getMimeType(session.filePath) ?? "application/octet-stream",
-    };
-  }
-
-  async function handleCallback({ sessionId, token, authorization, body }) {
-    const session = requireSessionCapability(sessionId, token, "callbackCapability");
-    verifyCallbackAuthorization(authorization, body);
-    if (body?.key !== session.key) throw new Error("Office callback document key is invalid.");
-    const status = Number(body?.status);
-    if (status === 1) {
-      updateState(session, "editing", { message: null });
-      return { error: 0 };
-    }
-    if (status === 4) {
-      updateState(session, "closed", { message: null });
-      rescheduleCleanup(session, CLOSED_SESSION_TTL_MS);
-      return { error: 0 };
-    }
-    if (status === 3 || status === 7) {
-      updateState(session, "error", { message: `ONLYOFFICE reported save error status ${status}.` });
-      return { error: 0 };
-    }
-    if (status !== 2 && status !== 6) return { error: 0 };
-    if (typeof body?.url !== "string") throw new Error("Office save callback did not include a download URL.");
-    if (String(body?.filetype ?? "").toLowerCase() !== path.extname(session.relativePath).slice(1).toLowerCase()) {
-      throw new Error("Office result format does not match the workspace file.");
-    }
-    return enqueueSessionSave(session, async () => {
-      updateState(session, "saving", { message: null });
+  async function pollSession(session) {
+    if (session.closed || sessions.get(session.id) !== session || session.ownerId == null) return;
+    if (session.pollPromise) return session.pollPromise;
+    session.pollPromise = (async () => {
       try {
-        const bytes = await downloadOfficeResult(body.url);
-        const resultVersion = getWorkspaceFileVersion(bytes);
-        if (resultVersion === session.baseVersion) {
-          updateState(session, "saved", { version: resultVersion, message: null });
-          if (status === 2) rescheduleCleanup(session, CLOSED_SESSION_TTL_MS);
-          return { error: 0 };
-        }
-        try {
-          const result = await writeWorkspaceBinaryFile(session.rootPath, session.relativePath, bytes, {
-            expectedVersion: session.baseVersion,
-          });
-          session.baseVersion = result.version;
-          await acknowledgeWrite(session, result.version);
-          updateState(session, "saved", { version: result.version, message: null });
-          if (status === 2) rescheduleCleanup(session, CLOSED_SESSION_TTL_MS);
-          return { error: 0 };
-        } catch (error) {
-          if (error?.code !== "WORKSPACE_VERSION_CONFLICT") throw error;
-          await fs.mkdir(recoveryRoot, { recursive: true, mode: 0o700 });
-          const recoveryPath = path.join(
-            recoveryRoot,
-            `${session.id}-${crypto.randomBytes(8).toString("hex")}.recovery`,
-          );
-          await fs.writeFile(recoveryPath, bytes, { mode: 0o600, flag: "wx" });
-          if (session.recoveryPath) await fs.rm(session.recoveryPath, { force: true });
-          session.recoveryPath = recoveryPath;
-          updateState(session, "conflict", {
-            message: "The file changed outside PuppyOne. Your Office result is preserved for conflict resolution.",
-            recoveryAvailable: true,
-          });
-          rescheduleCleanup(session, RECOVERY_TTL_MS);
-          return { error: 0 };
+        const remote = normalizeManagedState(await cloudAuthService.requestSessionApi(
+          managedApiBase,
+          `/office/sessions/${encodeURIComponent(session.id)}`,
+          { method: "GET" },
+        ));
+        session.pollFailures = 0;
+        session.remoteRevision = Math.max(session.remoteRevision, remote.resultRevision);
+        if (remote.resultRevision > session.appliedRevision) {
+          await applyRemoteResult(session, remote.resultRevision);
+        } else if (remote.status === "error") {
+          updateState(session, "error", { message: remote.message ?? "Managed Office reported an error." });
+        } else if (remote.status === "saved") {
+          updateState(session, "saved", { message: null });
+        } else if (remote.status === "saving") {
+          updateState(session, "saving", { message: null });
+        } else if (remote.status === "editing" && session.state.status !== "saving") {
+          updateState(session, "editing", { message: null });
         }
       } catch (error) {
-        updateState(session, "error", {
-          message: error instanceof Error ? error.message : "Office result could not be saved.",
-        });
-        throw error;
+        session.pollFailures += 1;
+        if (session.pollFailures >= 3 && session.state.status !== "conflict") {
+          updateState(session, "error", { message: safeMessage(error, "Managed Office is temporarily unavailable.") });
+        }
+      } finally {
+        session.pollPromise = null;
+        if (!session.closed && sessions.get(session.id) === session && session.ownerId != null) {
+          schedulePoll(session, POLL_INTERVAL_MS);
+        }
       }
-    });
+    })();
+    return session.pollPromise;
+  }
+
+  async function applyRemoteResult(session, revision) {
+    const result = await cloudAuthService.requestSessionApi(
+      managedApiBase,
+      `/office/sessions/${encodeURIComponent(session.id)}/result?revision=${revision}`,
+      { method: "GET", responseType: "bytes" },
+    );
+    const bytes = Buffer.from(result);
+    if (bytes.length === 0 || bytes.length > MAX_OFFICE_BYTES) {
+      throw new Error("Managed Office returned an invalid result size.");
+    }
+    const resultVersion = getWorkspaceFileVersion(bytes);
+    if (resultVersion === session.baseVersion) {
+      session.appliedRevision = revision;
+      updateState(session, "saved", { version: resultVersion, message: null });
+      return;
+    }
+    try {
+      const write = await writeWorkspaceBinaryFile(session.rootPath, session.relativePath, bytes, {
+        expectedVersion: session.baseVersion,
+      });
+      session.baseVersion = write.version;
+      session.appliedRevision = revision;
+      await acknowledgeWrite(session, write.version);
+      updateState(session, "saved", { version: write.version, message: null });
+    } catch (error) {
+      if (error?.code !== "WORKSPACE_VERSION_CONFLICT") throw error;
+      await fs.mkdir(recoveryRoot, { recursive: true, mode: 0o700 });
+      const recoveryPath = path.join(
+        recoveryRoot,
+        `${session.id}-${crypto.randomBytes(8).toString("hex")}.recovery`,
+      );
+      await fs.writeFile(recoveryPath, bytes, { mode: 0o600, flag: "wx" });
+      if (session.recoveryPath) await fs.rm(session.recoveryPath, { force: true });
+      session.recoveryPath = recoveryPath;
+      session.appliedRevision = revision;
+      updateState(session, "conflict", {
+        message: "The file changed outside PuppyOne. Your Office result is preserved for conflict resolution.",
+        recoveryAvailable: true,
+      });
+      rescheduleCleanup(session, RECOVERY_TTL_MS);
+    }
   }
 
   async function acknowledgeWrite(session, version) {
@@ -350,94 +349,44 @@ export function createOfficeEditingService({
         version,
       });
     } catch (error) {
-      logger.warn("Unable to attribute Office workspace write:", error);
+      logger.warn?.("Unable to attribute Office workspace write:", error);
     }
     await absorbWorkspaceEditReviewPath(session.rootPath, session.relativePath);
   }
 
-  async function downloadOfficeResult(rawUrl) {
-    let url = requireAllowedDownloadUrl(rawUrl);
-    for (let redirect = 0; redirect < 4; redirect += 1) {
-      const response = await fetchWithTimeout(url, { redirect: "manual" });
-      if ([301, 302, 303, 307, 308].includes(response.status)) {
-        const location = response.headers.get("location");
-        if (!location) throw new Error("Office download redirect has no location.");
-        url = requireAllowedDownloadUrl(new URL(location, url).toString());
-        continue;
+  async function closeRemoteSession(session) {
+    if (session.remoteClosed) return;
+    await cloudAuthService.requestSessionApi(
+      managedApiBase,
+      `/office/sessions/${encodeURIComponent(session.id)}`,
+      { method: "DELETE" },
+    );
+    session.remoteClosed = true;
+  }
+
+  async function waitForSaveCompletion(session, timeoutMs) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await pollSession(session);
+      if (session.state.status === "saved") return;
+      if (["conflict", "error"].includes(session.state.status)) {
+        throw new Error(session.state.message ?? "Office document could not be saved.");
       }
-      if (!response.ok) throw new Error(`Office result download failed (${response.status}).`);
-      const declaredLength = Number(response.headers.get("content-length") ?? 0);
-      if (declaredLength > MAX_OFFICE_BYTES) throw new Error("Office result is too large.");
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("Office result response has no body.");
-      const chunks = [];
-      let size = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        size += value.byteLength;
-        if (size > MAX_OFFICE_BYTES) {
-          await reader.cancel();
-          throw new Error("Office result is too large.");
-        }
-        chunks.push(Buffer.from(value));
-      }
-      return Buffer.concat(chunks, size);
+      await delay(250);
     }
-    throw new Error("Office result used too many redirects.");
+    throw new Error("Timed out while saving the Office document.");
   }
 
-  function requireAllowedDownloadUrl(value) {
-    let url;
-    try {
-      url = new URL(value);
-    } catch {
-      throw new Error("Office result URL is invalid.");
-    }
-    if (!configuration.downloadOrigins.has(url.origin) || url.username || url.password) {
-      throw new Error("Office result URL origin is not allowed.");
-    }
-    return url.toString();
+  function schedulePoll(session, delayMs) {
+    if (session.closed || sessions.get(session.id) !== session) return;
+    clearTimeout(session.pollTimer);
+    session.pollTimer = setTimeout(() => void pollSession(session), delayMs);
+    session.pollTimer.unref?.();
   }
 
-  async function fetchWithTimeout(url, options) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
-    timer.unref?.();
-    try {
-      return await fetchImpl(url, { ...options, signal: controller.signal });
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  function verifyCallbackAuthorization(value, body) {
-    if (!value) throw new Error("Office callback authorization is required.");
-    const match = /^Bearer\s+(.+)$/i.exec(value);
-    if (!match) throw new Error("Invalid Office callback authorization.");
-    const verified = verifyOnlyOfficeJwt(match[1], configuration.jwtSecret);
-    const signedBody = verified?.payload && typeof verified.payload === "object"
-      ? verified.payload
-      : verified;
-    if (
-      signedBody?.key !== body?.key
-      || Number(signedBody?.status) !== Number(body?.status)
-      || (body?.url !== undefined && signedBody?.url !== body.url)
-      || (body?.filetype !== undefined && signedBody?.filetype !== body.filetype)
-    ) {
-      throw new Error("Office callback token does not match its request body.");
-    }
-  }
-
-  function requireSessionCapability(sessionId, token, property) {
-    const session = sessions.get(sessionId);
-    if (!session || typeof token !== "string") throw new Error("Office session is unavailable.");
-    const expected = Buffer.from(session[property]);
-    const actual = Buffer.from(token);
-    if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) {
-      throw new Error("Office session capability is invalid.");
-    }
-    return session;
+  function clearPoll(session) {
+    clearTimeout(session.pollTimer);
+    session.pollTimer = null;
   }
 
   function requireOwnedSession(ownerId, sessionId) {
@@ -461,10 +410,9 @@ export function createOfficeEditingService({
   function scheduleCleanup(session, delay) {
     const timer = setTimeout(() => {
       if (sessions.get(session.id) !== session) return;
-      sessions.delete(session.id);
+      retireSession(session, "closed");
       if (session.recoveryPath) void fs.rm(session.recoveryPath, { force: true });
-      clearTimeout(session.cleanupTimer);
-    }, delay);
+    }, Math.max(1, delay));
     timer.unref?.();
     return timer;
   }
@@ -474,14 +422,16 @@ export function createOfficeEditingService({
     session.cleanupTimer = scheduleCleanup(session, delay);
   }
 
-  function requireConfigured() {
-    if (!configuration.configured) throw new Error(configuration.reason ?? "Office editing is unavailable.");
+  function retireSession(session, status) {
+    session.closed = true;
+    clearPoll(session);
+    clearTimeout(session.cleanupTimer);
+    updateState(session, status, { message: null });
+    sessions.delete(session.id);
   }
 
-  function enqueueSessionSave(session, operation) {
-    const result = session.saveTail.catch(() => undefined).then(operation);
-    session.saveTail = result.then(() => undefined, () => undefined);
-    return result;
+  function requireManagedApi() {
+    if (!managedApiBase) throw new Error("PuppyOne Cloud API is not configured.");
   }
 
   return Object.freeze({
@@ -519,6 +469,70 @@ function toRendererSession(session) {
   });
 }
 
+function normalizeManagedSession(value) {
+  const sessionId = requireUuid(value?.session_id, "Managed Office session");
+  const apiScriptUrl = requireManagedApiScriptUrl(value?.api_script_url);
+  if (!value?.editor_config || typeof value.editor_config !== "object" || Array.isArray(value.editor_config)) {
+    throw new Error("Managed Office editor configuration is invalid.");
+  }
+  const expiresAt = Date.parse(value?.expires_at);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    throw new Error("Managed Office session expiry is invalid.");
+  }
+  return {
+    sessionId,
+    apiScriptUrl,
+    editorConfig: value.editor_config,
+    expiresAt,
+    status: normalizeRemoteStatus(value?.status),
+    resultRevision: normalizeRevision(value?.result_revision),
+  };
+}
+
+function normalizeManagedState(value) {
+  return {
+    sessionId: requireUuid(value?.session_id, "Managed Office session"),
+    status: normalizeRemoteStatus(value?.status),
+    resultRevision: normalizeRevision(value?.result_revision),
+    message: typeof value?.message === "string" && value.message.trim() ? value.message : null,
+  };
+}
+
+function requireManagedApiScriptUrl(value) {
+  let url;
+  try { url = new URL(value); } catch { throw new Error("Managed Office API URL is invalid."); }
+  const host = url.hostname.toLowerCase();
+  const loopback = host === "localhost" || host === "127.0.0.1" || host === "::1";
+  const puppyoneHost = host === "puppyone.ai" || host.endsWith(".puppyone.ai");
+  if (
+    !["http:", "https:"].includes(url.protocol)
+    || (!loopback && (url.protocol !== "https:" || !puppyoneHost))
+    || url.username
+    || url.password
+    || url.pathname !== "/web-apps/apps/api/documents/api.js"
+  ) {
+    throw new Error("Managed Office API URL is not allowed.");
+  }
+  return url.toString();
+}
+
+function normalizeRemoteStatus(value) {
+  return ["ready", "editing", "saving", "saved", "awaiting-save", "closed", "error"].includes(value)
+    ? value
+    : "ready";
+}
+
+function normalizeRevision(value) {
+  const parsed = Number(value ?? 0);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) throw new Error("Managed Office result revision is invalid.");
+  return parsed;
+}
+
+function requireUuid(value, label) {
+  if (typeof value !== "string" || !/^[0-9a-f-]{36}$/i.test(value)) throw new Error(`${label} id is invalid.`);
+  return value;
+}
+
 function createUnavailableSurfaceManager() {
   const unavailable = async () => { throw new Error("Native Office surfaces are unavailable."); };
   return Object.freeze({
@@ -537,6 +551,13 @@ function resolveDocumentFamily(extension) {
   return null;
 }
 
+function getOfficeMimeType(extension) {
+  if (extension === "docx") return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (extension === "xlsx") return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  if (extension === "pptx") return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  return "application/octet-stream";
+}
+
 function requireDocumentPath(value) {
   if (typeof value !== "string" || !value.trim() || value.length > 4096) throw new Error("Office document path is required.");
   return value;
@@ -544,4 +565,22 @@ function requireDocumentPath(value) {
 
 function normalizeLocale(value) {
   return typeof value === "string" && /^[a-z]{2}(?:-[A-Z]{2})?$/.test(value) ? value : "en";
+}
+
+function unavailable(reason) {
+  return Object.freeze({ available: false, engine: "onlyoffice", reason });
+}
+
+function toAvailabilityReason(error) {
+  const message = safeMessage(error, "Managed Office editing is unavailable.");
+  if (/sign in|signed-out|401/i.test(message)) return "Sign in to PuppyOne to use managed Office editing.";
+  return message;
+}
+
+function safeMessage(error, fallback = "Managed Office request failed.") {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }

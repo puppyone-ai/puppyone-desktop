@@ -73,7 +73,6 @@ import { createDesktopLocaleService } from "./main/localization/desktop-locale-s
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
 import { createGitOperationCoordinator } from "./main/git-operation-coordinator.mjs";
-import { loadOfficeEngineConfiguration } from "./main/office/office-engine-config.mjs";
 import { createOfficeEditingService } from "./main/office/office-editing-service.mjs";
 import { createOfficeEditingSurfaceManager } from "./main/office/office-editing-surface.mjs";
 import { createCloudPublishCoordinator } from "./main/cloud-publish-coordinator.mjs";
@@ -229,16 +228,6 @@ const officeEditingSurfaceManager = createOfficeEditingSurfaceManager({
   sessionFromPartition: electronSession.fromPartition.bind(electronSession),
   getOwnerWindow: getOwnerWindowByWebContentsId,
 });
-const officeEditingService = createOfficeEditingService({
-  configuration: loadOfficeEngineConfiguration(process.env),
-  recoveryRoot: path.join(app.getPath("userData"), "office-recovery"),
-  readWorkspaceBinaryFileVersion,
-  writeWorkspaceBinaryFile,
-  absorbWorkspaceEditReviewPath,
-  workspaceWatchService,
-  getOwnerWindow: getOwnerWindowByWebContentsId,
-  surfaceManager: officeEditingSurfaceManager,
-});
 const gitMetadataWatchService = createGitMetadataWatchService();
 const workspaceStateStore = createWorkspaceStateStore({
   app,
@@ -256,6 +245,17 @@ const cloudAuthService = createCloudAuthService({
   localCloudWebUrl: process.env.VITE_DESKTOP_CLOUD_WEB_URL,
   getWindows: () => BrowserWindow.getAllWindows(),
   revealWindow: revealLastFocusedWindow,
+});
+const officeEditingService = createOfficeEditingService({
+  apiBaseUrl: process.env.VITE_DESKTOP_CLOUD_API_URL,
+  cloudAuthService,
+  recoveryRoot: path.join(app.getPath("userData"), "office-recovery"),
+  readWorkspaceBinaryFileVersion,
+  writeWorkspaceBinaryFile,
+  absorbWorkspaceEditReviewPath,
+  workspaceWatchService,
+  getOwnerWindow: getOwnerWindowByWebContentsId,
+  surfaceManager: officeEditingSurfaceManager,
 });
 const gitOperationCoordinator = createGitOperationCoordinator();
 const cloudPublishSecretVault = createCloudPublishSecretVault({

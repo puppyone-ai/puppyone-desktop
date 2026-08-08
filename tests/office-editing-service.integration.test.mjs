@@ -7,14 +7,13 @@ import {
   writeWorkspaceBinaryFile,
 } from "../local-api/workspace.mjs";
 import { createOfficeEditingService } from "../electron/main/office/office-editing-service.mjs";
-import { signOnlyOfficeJwt } from "../electron/main/office/onlyoffice-jwt.mjs";
 
-const TEST_JWT_SECRET = "test-secret-with-at-least-sixteen-characters";
+const API_BASE = "https://api.puppyone.ai/api/v1";
+const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 
 let root;
 let recoveryRoot;
 let services;
-const serviceCaptures = new WeakMap();
 
 beforeEach(async () => {
   root = await mkdtemp(path.join(os.tmpdir(), "puppyone-office-workspace-"));
@@ -28,86 +27,68 @@ afterEach(async () => {
   await rm(recoveryRoot, { recursive: true, force: true });
 });
 
-describe("Office editing service", () => {
-  it("serves a capability-scoped source and atomically persists a force-save callback", async () => {
+describe("managed Office editing service", () => {
+  it("uploads through authenticated PuppyOne APIs and atomically persists a force-save result", async () => {
     const original = Buffer.from("original-office-bytes");
     const edited = Buffer.from("edited-office-bytes");
     await writeFile(path.join(root, "report.docx"), original);
     const states = [];
     const noteInternalWrite = vi.fn();
-    const service = createService({ edited, states, noteInternalWrite });
+    const fixture = createService({ edited, states, noteInternalWrite });
 
-    const session = await service.createSession({
+    const session = await fixture.service.createSession({
       ownerId: 42,
       rootPath: root,
       relativePath: "report.docx",
       locale: "en",
     });
-    await attachTestSurface(service, session.sessionId, 42);
-    const editorConfig = serviceCaptures.get(service).request.editorConfig;
-    const sourceResponse = await fetch(editorConfig.document.url);
+    await attachTestSurface(fixture.service, session.sessionId, 42);
 
-    expect(sourceResponse.status).toBe(200);
-    expect(Buffer.from(await sourceResponse.arrayBuffer())).toEqual(original);
-    await expect(service.forceSave({ ownerId: 42, sessionId: session.sessionId })).resolves.toEqual({ accepted: true });
-    expect(serviceCaptures.get(service).fetchImpl).toHaveBeenCalledWith(
-      expect.stringMatching(/\/command\?shardkey=/),
-      expect.objectContaining({ method: "POST" }),
-    );
+    expect(fixture.upload).toMatchObject({ locale: "en", filename: "report.docx" });
+    expect(fixture.upload.bytes).toEqual(original);
+    expect(fixture.surfaceManager.attach).toHaveBeenCalledWith(expect.objectContaining({
+      apiScriptUrl: "https://office.puppyone.ai/web-apps/apps/api/documents/api.js",
+      editorConfig: expect.objectContaining({ token: "backend-signed-config" }),
+    }));
 
-    const callbackResponse = await postCallback(editorConfig, {
-      key: editorConfig.document.key,
-      status: 6,
-      filetype: "docx",
-      url: "http://127.0.0.1:9999/saved/report.docx",
-    });
+    await expect(fixture.service.forceSave({ ownerId: 42, sessionId: session.sessionId }))
+      .resolves.toEqual({ accepted: true });
+    await vi.waitFor(() => expect(states.at(-1)).toMatchObject({ status: "saved" }));
 
-    expect(await callbackResponse.json()).toEqual({ error: 0 });
     expect(await readFile(path.join(root, "report.docx"))).toEqual(edited);
-    expect(states.at(-1)).toMatchObject({ status: "saved", path: "report.docx" });
+    expect(fixture.requestSessionApi).toHaveBeenCalledWith(
+      API_BASE,
+      `/office/sessions/${SESSION_ID}/result?revision=1`,
+      { method: "GET", responseType: "bytes" },
+    );
     expect(noteInternalWrite).toHaveBeenCalledWith(expect.objectContaining({
       rootPath: root,
       path: "report.docx",
       senderId: 42,
     }));
-
-    const repeatedCallback = await postCallback(editorConfig, {
-      key: editorConfig.document.key,
-      status: 2,
-      filetype: "docx",
-      url: "http://127.0.0.1:9999/saved/report.docx",
-    });
-    expect(await repeatedCallback.json()).toEqual({ error: 0 });
-    expect(noteInternalWrite).toHaveBeenCalledTimes(1);
   });
 
-  it("preserves edited bytes for explicit resolution when the file changed externally", async () => {
+  it("preserves managed result bytes for explicit resolution when the local file changed", async () => {
     const edited = Buffer.from("edited-office-result");
     await writeFile(path.join(root, "book.xlsx"), Buffer.from("opened-version"));
     const states = [];
-    const service = createService({ edited, states });
-    const session = await service.createSession({
+    const fixture = createService({ edited, states });
+    const session = await fixture.service.createSession({
       ownerId: 7,
       rootPath: root,
       relativePath: "book.xlsx",
       locale: "en",
     });
-    await attachTestSurface(service, session.sessionId, 7);
-    const editorConfig = serviceCaptures.get(service).request.editorConfig;
     await writeFile(path.join(root, "book.xlsx"), Buffer.from("external-version"));
 
-    const callbackResponse = await postCallback(editorConfig, {
-      key: editorConfig.document.key,
-      status: 2,
-      filetype: "xlsx",
-      url: "http://127.0.0.1:9999/saved/book.xlsx",
-    });
+    await fixture.service.forceSave({ ownerId: 7, sessionId: session.sessionId });
+    await vi.waitFor(() => expect(states.at(-1)).toMatchObject({
+      status: "conflict",
+      recoveryAvailable: true,
+    }));
 
-    expect(await callbackResponse.json()).toEqual({ error: 0 });
     expect(await readFile(path.join(root, "book.xlsx"))).toEqual(Buffer.from("external-version"));
-    expect(states.at(-1)).toMatchObject({ status: "conflict", recoveryAvailable: true });
-
-    const resolved = await service.resolveConflict({
+    const resolved = await fixture.service.resolveConflict({
       ownerId: 7,
       sessionId: session.sessionId,
       resolution: "keep-edited",
@@ -116,62 +97,71 @@ describe("Office editing service", () => {
     expect(await readFile(path.join(root, "book.xlsx"))).toEqual(edited);
   });
 
-  it("rejects unsigned, body-tampered, and format-mismatched callbacks", async () => {
-    const original = Buffer.from("original-office-bytes");
-    await writeFile(path.join(root, "slides.pptx"), original);
-    const states = [];
-    const service = createService({ edited: Buffer.from("untrusted-office-bytes"), states });
-    const session = await service.createSession({
+  it("rejects an editor runtime outside the managed PuppyOne origin boundary", async () => {
+    await writeFile(path.join(root, "slides.pptx"), Buffer.from("slides"));
+    const fixture = createService({
+      edited: Buffer.from("edited"),
+      apiScriptUrl: "https://attacker.example/web-apps/apps/api/documents/api.js",
+    });
+
+    await expect(fixture.service.createSession({
       ownerId: 19,
       rootPath: root,
       relativePath: "slides.pptx",
       locale: "en",
-    });
-    await attachTestSurface(service, session.sessionId, 19);
-    const editorConfig = serviceCaptures.get(service).request.editorConfig;
-    const callbackBody = {
-      key: editorConfig.document.key,
-      status: 6,
-      filetype: "pptx",
-      url: "http://127.0.0.1:9999/saved/slides.pptx",
-    };
-
-    const unsignedResponse = await postRawCallback(editorConfig, callbackBody);
-    expect(unsignedResponse.status).toBe(500);
-    expect(await unsignedResponse.json()).toMatchObject({ error: 1 });
-
-    const tamperedResponse = await postRawCallback(editorConfig, callbackBody, signOnlyOfficeJwt({
-      payload: { ...callbackBody, url: "http://127.0.0.1:9999/saved/different.pptx" },
-    }, TEST_JWT_SECRET));
-    expect(tamperedResponse.status).toBe(500);
-    expect(await tamperedResponse.json()).toMatchObject({ error: 1 });
-
-    const wrongFormatBody = { ...callbackBody, filetype: "docx" };
-    const wrongFormatResponse = await postRawCallback(
-      editorConfig,
-      wrongFormatBody,
-      signOnlyOfficeJwt({ payload: wrongFormatBody }, TEST_JWT_SECRET),
-    );
-    expect(wrongFormatResponse.status).toBe(500);
-    expect(await wrongFormatResponse.json()).toMatchObject({ error: 1 });
-
-    const unavailableResultBody = {
-      ...callbackBody,
-      url: "http://127.0.0.1:9999/unavailable/slides.pptx",
-    };
-    const unavailableResultResponse = await postRawCallback(
-      editorConfig,
-      unavailableResultBody,
-      signOnlyOfficeJwt({ payload: unavailableResultBody }, TEST_JWT_SECRET),
-    );
-    expect(unavailableResultResponse.status).toBe(500);
-    expect(await unavailableResultResponse.json()).toMatchObject({ error: 1 });
-    expect(states.at(-1)).toMatchObject({ status: "error" });
-    expect(await readFile(path.join(root, "slides.pptx"))).toEqual(original);
+    })).rejects.toThrow(/not allowed/i);
+    expect(fixture.surfaceManager.attach).not.toHaveBeenCalled();
   });
 });
 
-function createService({ edited, states, noteInternalWrite = vi.fn() }) {
+function createService({
+  edited,
+  states = [],
+  noteInternalWrite = vi.fn(),
+  apiScriptUrl = "https://office.puppyone.ai/web-apps/apps/api/documents/api.js",
+}) {
+  const remote = { status: "ready", resultRevision: 0, deleted: false };
+  const upload = {};
+  const requestSessionApi = vi.fn(async (_apiBase, apiPath, init) => {
+    if (apiPath === "/office/sessions" && init.method === "POST") {
+      const uploadedFile = init.body.get("file");
+      upload.locale = init.body.get("locale");
+      upload.filename = uploadedFile.name;
+      upload.bytes = Buffer.from(await uploadedFile.arrayBuffer());
+      return {
+        session_id: SESSION_ID,
+        status: "ready",
+        result_revision: 0,
+        api_script_url: apiScriptUrl,
+        editor_config: {
+          token: "backend-signed-config",
+          document: { key: "backend-document-key" },
+        },
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      };
+    }
+    if (apiPath === `/office/sessions/${SESSION_ID}/force-save`) {
+      remote.status = "saved";
+      remote.resultRevision = 1;
+      return { accepted: true };
+    }
+    if (apiPath === `/office/sessions/${SESSION_ID}` && init.method === "GET") {
+      return {
+        session_id: SESSION_ID,
+        status: remote.status,
+        result_revision: remote.resultRevision,
+        message: null,
+      };
+    }
+    if (apiPath === `/office/sessions/${SESSION_ID}/result?revision=1`) {
+      return new Uint8Array(edited);
+    }
+    if (apiPath === `/office/sessions/${SESSION_ID}` && init.method === "DELETE") {
+      remote.deleted = true;
+      return { closed: true };
+    }
+    throw new Error(`Unexpected managed Office request: ${init.method} ${apiPath}`);
+  });
   const ownerWindow = {
     isDestroyed: () => false,
     webContents: {
@@ -179,44 +169,16 @@ function createService({ edited, states, noteInternalWrite = vi.fn() }) {
       send: (_channel, state) => states.push(state),
     },
   };
-  const capture = { request: null, fetchImpl: null };
   const surfaceManager = {
-    attach: vi.fn(async (request) => {
-      capture.request = request;
-      return { surfaceId: "test-office-surface", attached: true };
-    }),
+    attach: vi.fn(async () => ({ surfaceId: "test-office-surface", attached: true })),
     setBounds: vi.fn(() => ({ ok: true, visible: true })),
     detach: vi.fn(() => ({ detached: true })),
     destroyOwner: vi.fn(),
     destroyAll: vi.fn(),
   };
-  const fetchImpl = vi.fn(async (url) => {
-    if (String(url).includes("/command?shardkey=")) {
-      return new Response(JSON.stringify({ error: 0 }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    if (String(url).startsWith("http://127.0.0.1:9999/saved/")) {
-      return new Response(edited, {
-        status: 200,
-        headers: { "Content-Length": String(edited.byteLength) },
-      });
-    }
-    throw new Error(`Unexpected engine request: ${url}`);
-  });
-  capture.fetchImpl = fetchImpl;
   const service = createOfficeEditingService({
-    configuration: {
-      configured: true,
-      reason: null,
-      documentServerUrl: "http://127.0.0.1:9999",
-      jwtSecret: TEST_JWT_SECRET,
-      bindHost: "127.0.0.1",
-      bindPort: 0,
-      publicUrl: null,
-      downloadOrigins: new Set(["http://127.0.0.1:9999"]),
-    },
+    apiBaseUrl: API_BASE,
+    cloudAuthService: { requestSessionApi },
     recoveryRoot,
     readWorkspaceBinaryFileVersion,
     writeWorkspaceBinaryFile,
@@ -224,11 +186,10 @@ function createService({ edited, states, noteInternalWrite = vi.fn() }) {
     workspaceWatchService: { noteInternalWrite },
     getOwnerWindow: () => ownerWindow,
     surfaceManager,
-    fetchImpl,
+    logger: { warn: vi.fn() },
   });
-  serviceCaptures.set(service, capture);
   services.push(service);
-  return service;
+  return { service, requestSessionApi, surfaceManager, upload, remote };
 }
 
 async function attachTestSurface(service, sessionId, ownerId) {
@@ -237,24 +198,5 @@ async function attachTestSurface(service, sessionId, ownerId) {
     sessionId,
     attachmentId: "test-attachment",
     bounds: { x: 0, y: 0, width: 800, height: 600 },
-  });
-}
-
-async function postCallback(editorConfig, body) {
-  return postRawCallback(
-    editorConfig,
-    body,
-    signOnlyOfficeJwt({ payload: body }, TEST_JWT_SECRET),
-  );
-}
-
-async function postRawCallback(editorConfig, body, token = null) {
-  return fetch(editorConfig.editorConfig.callbackUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(body),
   });
 }

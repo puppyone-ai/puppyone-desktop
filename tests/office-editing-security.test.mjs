@@ -1,37 +1,17 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
-import { loadOfficeEngineConfiguration } from "../electron/main/office/office-engine-config.mjs";
-import { signOnlyOfficeJwt, verifyOnlyOfficeJwt } from "../electron/main/office/onlyoffice-jwt.mjs";
 import { registerOfficeEditingIpcHandlers } from "../electron/main/ipc/office-editing-ipc.mjs";
 
-describe("Office editing security boundary", () => {
-  it("fails closed until both the engine URL and a strong shared secret exist", () => {
-    expect(loadOfficeEngineConfiguration({})).toMatchObject({ configured: false });
-    expect(loadOfficeEngineConfiguration({
-      PUPPYONE_OFFICE_DOCUMENT_SERVER_URL: "https://office.example.test",
-      PUPPYONE_OFFICE_JWT_SECRET: "short",
-    })).toMatchObject({ configured: false });
-    expect(loadOfficeEngineConfiguration({
-      PUPPYONE_OFFICE_DOCUMENT_SERVER_URL: "http://office.example.test",
-      PUPPYONE_OFFICE_JWT_SECRET: "a-secret-that-is-long-enough",
-    })).toMatchObject({ configured: false });
-    const configured = loadOfficeEngineConfiguration({
-      PUPPYONE_OFFICE_DOCUMENT_SERVER_URL: "https://office.example.test",
-      PUPPYONE_OFFICE_JWT_SECRET: "a-secret-that-is-long-enough",
-    });
-    expect(configured).toMatchObject({ configured: true, documentServerUrl: "https://office.example.test" });
-    expect(configured.downloadOrigins).toEqual(new Set(["https://office.example.test"]));
+describe("managed Office editing security boundary", () => {
+  it("keeps Document Server topology, callbacks, and secrets out of Desktop configuration", async () => {
+    const example = await readFile(new URL("../.env.example", import.meta.url), "utf8");
+
+    expect(example).not.toMatch(/^PUPPYONE_OFFICE_(?:DOCUMENT_SERVER_URL|JWT_SECRET|BRIDGE|DOWNLOAD)/m);
+    expect(example).toContain("Office editing is a PuppyOne-managed Cloud capability");
+    expect(example).toContain("no Document Server URL, JWT, callback listener, or Docker configuration");
   });
 
-  it("signs HS256 session configuration and rejects any tampering", () => {
-    const secret = "test-secret-with-at-least-sixteen-characters";
-    const token = signOnlyOfficeJwt({ document: { key: "document-key" } }, secret);
-    expect(verifyOnlyOfficeJwt(token, secret)).toMatchObject({ document: { key: "document-key" } });
-    const parts = token.split(".");
-    parts[1] = Buffer.from(JSON.stringify({ document: { key: "tampered" } })).toString("base64url");
-    expect(() => verifyOnlyOfficeJwt(parts.join("."), secret)).toThrow(/signature/i);
-  });
-
-  it("authorizes the workspace root before creating a session and binds mutations to sender ownership", async () => {
+  it("authorizes the workspace root before upload and binds all mutations to sender ownership", async () => {
     const handlers = new Map();
     const service = {
       getAvailability: vi.fn(() => ({ available: true })),
@@ -65,5 +45,9 @@ describe("Office editing security boundary", () => {
       rootPath: "/canonical-workspace",
       relativePath: "book.xlsx",
     }));
+
+    const sessionId = "11111111-1111-4111-8111-111111111111";
+    await handlers.get("office-editing:force-save")(event, { sessionId });
+    expect(service.forceSave).toHaveBeenCalledWith({ ownerId: 73, sessionId });
   });
 });

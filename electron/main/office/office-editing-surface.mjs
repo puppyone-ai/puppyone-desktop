@@ -277,7 +277,16 @@ function requireId(value, label) {
 function requireHttpUrl(value) {
   let url;
   try { url = new URL(value); } catch { throw new Error("ONLYOFFICE API URL is invalid."); }
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+  const host = url.hostname.toLowerCase();
+  const loopback = host === "localhost" || host === "127.0.0.1" || host === "::1";
+  const managedHost = host === "puppyone.ai" || host.endsWith(".puppyone.ai");
+  if (
+    !["http:", "https:"].includes(url.protocol)
+    || (!loopback && (url.protocol !== "https:" || !managedHost))
+    || url.username
+    || url.password
+    || url.pathname !== "/web-apps/apps/api/documents/api.js"
+  ) {
     throw new Error("ONLYOFFICE API URL is not allowed.");
   }
   return url.toString();
