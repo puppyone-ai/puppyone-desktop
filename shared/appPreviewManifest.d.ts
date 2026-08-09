@@ -8,7 +8,7 @@ export type AppPreviewHealth = Readonly<{
   expectStatus: number;
 }>;
 
-export type AppPreviewLaunch = Readonly<{
+export type AppPreviewLocalServerLaunch = Readonly<{
   kind: "local-server";
   command: readonly string[];
   cwd: string;
@@ -17,12 +17,27 @@ export type AppPreviewLaunch = Readonly<{
   health: AppPreviewHealth;
 }>;
 
+export type AppPreviewStaticFileLaunch = Readonly<{
+  kind: "static-file";
+  path: string;
+}>;
+
+export type AppPreviewExistingUrlLaunch = Readonly<{
+  kind: "existing-url";
+  url: string;
+}>;
+
+export type AppPreviewLaunch =
+  | AppPreviewLocalServerLaunch
+  | AppPreviewStaticFileLaunch
+  | AppPreviewExistingUrlLaunch;
+
 export type AppPreviewManifest = Readonly<{
   id: string | null;
   name: string;
   type: "puppyone.app";
   version: 1;
-  launch: AppPreviewLaunch;
+  launch: AppPreviewLaunch | null;
   permissions: Readonly<{ workspace: readonly ("read" | "write")[] }>;
 }>;
 
@@ -49,3 +64,7 @@ export function interpolateAppPreviewCommand(
   variables: Readonly<Record<string, string | number>>,
 ): string[];
 export function getAppPreviewManifestDisplayName(content: string, appPath?: string): string;
+export function createUnconfiguredAppPreviewManifestContent(): string;
+export function isConfiguredAppPreviewManifest(
+  manifest: AppPreviewManifest,
+): manifest is AppPreviewManifest & Readonly<{ launch: AppPreviewLaunch }>;

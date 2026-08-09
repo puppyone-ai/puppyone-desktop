@@ -1,8 +1,6 @@
 import { Fragment, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { useEffect, useMemo, useRef } from "react";
 import {
-  ChevronDown,
-  ChevronUp,
   ClipboardPaste,
   Copy,
   CopyPlus,
@@ -10,7 +8,6 @@ import {
   FileText,
   FolderOpen,
   FolderPlus,
-  LoaderCircle,
   MoreVertical,
   Pencil,
   Plus,
@@ -31,15 +28,7 @@ import { useLocalization } from "@puppyone/localization/react";
 import { DesktopDialogCloseButton, DesktopDialogRoot } from "../../components/DesktopDialog";
 import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../components/DesktopMenu";
 import type { CreateNewFileTypeId, ExperimentalSettings } from "../../preferences";
-import {
-  createAppPreviewManifestContent,
-  createInitialAppPreviewDraft,
-  AppPreviewCreationError,
-  normalizeAppPreviewWorkingDirectory,
-  parseAppPreviewCommandLine,
-  selectAppPreviewCandidate,
-  type AppPreviewCreationDraft,
-} from "./appPreviewCreation";
+import { createUnconfiguredAppPreviewManifestContent } from "../../../shared/appPreviewManifest.js";
 
 export type DesktopCreateEntryKind = "folder" | "markdown" | "text" | "json" | "csv" | "app" | "puppyflow";
 export type DesktopCreateEntryAnchor = {
@@ -59,7 +48,6 @@ export type DesktopCreateEntryDraft = {
   creatingKind: DesktopCreateEntryKind | null;
   selectedKind: DesktopCreateEntryKind | null;
   name: string;
-  appPreview?: AppPreviewCreationDraft | null;
 };
 export type DesktopNodeActionMenuDraft = {
   node: DataNode;
@@ -77,7 +65,6 @@ export type DesktopNodeActionError = Readonly<
   | { code: "name-required" }
   | { code: "name-invalid" }
   | { code: "name-unsupported" }
-  | { code: "app-configuration-invalid"; reason: AppPreviewCreationError["code"] }
   | { code: "operation-failed"; detail: string }
   | { code: "delete-partial"; deletedCount: number; failedCount: number; detail: string }
 >;
@@ -339,15 +326,7 @@ export function DesktopCreateEntryDialog({
             />
           </label>
 
-          {selectedKind === "app" && draft.appPreview ? (
-            <AppPreviewCreationFields
-              draft={draft.appPreview}
-              disabled={draft.creatingKind !== null}
-              onChange={(appPreview) => {
-                onChange((current) => current ? { ...current, appPreview, error: null } : current);
-              }}
-            />
-          ) : extensionNote && (
+          {extensionNote && (
             <div className="desktop-dialog-note">{extensionNote}</div>
           )}
           {errorMessage && <div className="desktop-dialog-error" dir="auto">{errorMessage}</div>}
@@ -365,130 +344,13 @@ export function DesktopCreateEntryDialog({
           <button
             className="desktop-dialog-button primary file"
             type="submit"
-            disabled={
-              draft.creatingKind !== null ||
-              !draft.name.trim() ||
-              (selectedKind === "app" && draft.appPreview?.detectionStatus === "loading")
-            }
+            disabled={draft.creatingKind !== null || !draft.name.trim()}
           >
             {draft.creatingKind ? t("workspace.node.creating") : t("workspace.node.create")}
           </button>
         </footer>
       </form>
     </DesktopDialogRoot>
-  );
-}
-
-function AppPreviewCreationFields({
-  draft,
-  disabled,
-  onChange,
-}: {
-  draft: AppPreviewCreationDraft;
-  disabled: boolean;
-  onChange: (draft: AppPreviewCreationDraft) => void;
-}) {
-  const { t } = useLocalization();
-  return (
-    <div className="desktop-app-preview-wizard">
-      <p className="desktop-app-preview-wizard-intro">
-        {t("workspace.node.create.appWizard.intro")}
-      </p>
-
-      {draft.detectionStatus === "loading" ? (
-        <div className="desktop-app-preview-detection" role="status">
-          <LoaderCircle size={14} aria-hidden="true" />
-          <span>{t("workspace.node.create.appWizard.detecting")}</span>
-        </div>
-      ) : draft.candidates.length > 0 ? (
-        <fieldset className="desktop-app-preview-candidates">
-          <legend>{t("workspace.node.create.appWizard.detectedTitle")}</legend>
-          {draft.candidates.map((candidate, index) => (
-            <label
-              className="desktop-app-preview-candidate"
-              data-selected={draft.selectedCandidateId === candidate.id || undefined}
-              key={candidate.id}
-            >
-              <input
-                type="radio"
-                name="app-preview-candidate"
-                checked={draft.selectedCandidateId === candidate.id}
-                disabled={disabled}
-                onChange={() => onChange(selectAppPreviewCandidate(draft, candidate.id))}
-              />
-              <span className="desktop-app-preview-candidate-copy">
-                <span className="desktop-app-preview-candidate-title">
-                  <strong>{candidate.script}</strong>
-                  {index === 0 && (
-                    <small>{t("workspace.node.create.appWizard.recommended")}</small>
-                  )}
-                </span>
-                <span>{candidate.framework} · {candidate.directoryLabel}</span>
-                <code dir="ltr">{candidate.commandLabel}</code>
-              </span>
-            </label>
-          ))}
-        </fieldset>
-      ) : (
-        <div className="desktop-app-preview-empty" role="status">
-          <strong>{draft.detectionStatus === "error"
-            ? t("workspace.node.create.appWizard.detectionFailed")
-            : t("workspace.node.create.appWizard.noProjects")}</strong>
-          <span>{t("workspace.node.create.appWizard.noProjectsDetail")}</span>
-        </div>
-      )}
-
-      <button
-        className="desktop-app-preview-advanced-toggle"
-        type="button"
-        aria-expanded={draft.advanced}
-        disabled={disabled}
-        onClick={() => onChange({ ...draft, advanced: !draft.advanced })}
-      >
-        {draft.advanced ? <ChevronUp size={13} aria-hidden="true" /> : <ChevronDown size={13} aria-hidden="true" />}
-        <span>{draft.advanced
-          ? t("workspace.node.create.appWizard.hideAdvanced")
-          : t("workspace.node.create.appWizard.advanced")}</span>
-      </button>
-
-      {draft.advanced && (
-        <div className="desktop-app-preview-advanced-fields">
-          <label className="desktop-dialog-field">
-            <span>{t("workspace.node.create.appWizard.workingDirectory")}</span>
-            <input
-              value={draft.cwd}
-              disabled={disabled}
-              dir="ltr"
-              spellCheck={false}
-              onChange={(event) => onChange({
-                ...draft,
-                cwd: event.target.value,
-                selectedCandidateId: null,
-                configurationTouched: true,
-              })}
-            />
-          </label>
-          <label className="desktop-dialog-field">
-            <span>{t("workspace.node.create.appWizard.startCommand")}</span>
-            <input
-              value={draft.commandText}
-              disabled={disabled}
-              dir="ltr"
-              spellCheck={false}
-              onChange={(event) => onChange({
-                ...draft,
-                commandText: event.target.value,
-                selectedCandidateId: null,
-                configurationTouched: true,
-              })}
-            />
-          </label>
-          <p className="desktop-app-preview-command-hint">
-            {t("workspace.node.create.appWizard.commandHint")}
-          </p>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -1067,27 +929,18 @@ export function defaultCreateName(kind: DesktopCreateEntryKind, t: MessageFormat
 export type DesktopCreateEntryTemplates = Readonly<{
   csvHeaders: readonly [string, string, string];
   puppyFlow: PuppyFlowDocumentDefaults;
-  untitledAppName: string;
 }>;
 
 export function getCreateEntryInitialContent(
   kind: DesktopCreateEntryKind,
   templates: DesktopCreateEntryTemplates,
-  appPreview?: AppPreviewCreationDraft | null,
 ): string {
   if (kind === "json") return "{}\n";
   if (kind === "csv") {
     const emptyRow = Array.from({ length: templates.csvHeaders.length }, () => "").join(",");
     return `${templates.csvHeaders.join(",")}\n${emptyRow}\n${emptyRow}\n`;
   }
-  if (kind === "app") {
-    const configuration = appPreview ?? createInitialAppPreviewDraft();
-    return createAppPreviewManifestContent({
-      name: templates.untitledAppName,
-      cwd: normalizeAppPreviewWorkingDirectory(configuration.cwd),
-      command: parseAppPreviewCommandLine(configuration.commandText),
-    });
-  }
+  if (kind === "app") return createUnconfiguredAppPreviewManifestContent();
   if (kind === "puppyflow") {
     return serializePuppyFlowDocument(createDefaultPuppyFlowDocument(templates.puppyFlow));
   }
@@ -1146,9 +999,6 @@ function getCreateEntryDialogTitle(kind: DesktopCreateEntryKind, t: MessageForma
 
 export function toDesktopNodeActionError(error: unknown): DesktopNodeActionError {
   if (error instanceof DesktopNodeNameError) return Object.freeze({ code: error.code });
-  if (error instanceof AppPreviewCreationError) {
-    return Object.freeze({ code: "app-configuration-invalid", reason: error.code });
-  }
   return Object.freeze({
     code: "operation-failed",
     detail: error instanceof Error ? error.message : String(error),
@@ -1163,10 +1013,6 @@ function formatDesktopNodeActionError(
   if (error.code === "name-required") return t("workspace.node.error.nameRequired");
   if (error.code === "name-invalid") return t("workspace.node.error.nameInvalid");
   if (error.code === "name-unsupported") return t("workspace.node.error.nameUnsupported");
-  if (error.code === "app-configuration-invalid") {
-    const detail = t(`workspace.node.error.appConfiguration.${error.reason}`);
-    return t("workspace.node.error.appConfigurationInvalid", { detail: bidiIsolate(detail) });
-  }
   if (error.code === "delete-partial") {
     return t("workspace.node.error.deletePartial", {
       deleted: error.deletedCount,

@@ -4,7 +4,9 @@ export const APP_PREVIEW_EXTENSION = ".puppyoneapp";
 export const APP_PREVIEW_TEMPLATE_VARIABLES = Object.freeze(["port"]);
 
 const TOP_LEVEL_FIELDS = new Set(["id", "name", "type", "version", "launch", "permissions"]);
-const LAUNCH_FIELDS = new Set(["kind", "command", "cwd", "env", "url", "health"]);
+const LOCAL_SERVER_LAUNCH_FIELDS = new Set(["kind", "command", "cwd", "env", "url", "health"]);
+const STATIC_FILE_LAUNCH_FIELDS = new Set(["kind", "path"]);
+const EXISTING_URL_LAUNCH_FIELDS = new Set(["kind", "url"]);
 const HEALTH_FIELDS = new Set(["path", "expectStatus"]);
 const PERMISSION_FIELDS = new Set(["workspace"]);
 const WORKSPACE_PERMISSIONS = new Set(["read", "write"]);
@@ -44,7 +46,7 @@ export function normalizeAppPreviewManifest(value, { appPath = "app.puppyoneapp"
     name: normalizeString(value.name, basenameWithoutAppExtension(appPath), 120),
     type: APP_PREVIEW_TYPE,
     version: APP_PREVIEW_VERSION,
-    launch: normalizeLaunch(value.launch),
+    launch: value.launch == null ? null : normalizeLaunch(value.launch),
     permissions: normalizePermissions(value.permissions),
   });
 }
@@ -87,10 +89,16 @@ export function getAppPreviewManifestDisplayName(content, appPath = "app.puppyon
 
 function normalizeLaunch(value) {
   assertRecord(value, "App manifest launch config");
-  assertKnownFields(value, LAUNCH_FIELDS, "App manifest launch config");
-  if (value.kind !== "local-server") {
-    throw new AppPreviewManifestError("Only local-server app previews are supported.");
+  if (value.kind === "static-file") {
+    assertKnownFields(value, STATIC_FILE_LAUNCH_FIELDS, "App manifest static-file launch config");
+    return normalizeStaticFileLaunch(value);
   }
+  if (value.kind === "existing-url") {
+    assertKnownFields(value, EXISTING_URL_LAUNCH_FIELDS, "App manifest existing-url launch config");
+    return normalizeExistingUrlLaunch(value);
+  }
+  if (value.kind !== "local-server") throw new AppPreviewManifestError("Unsupported app preview launch kind.");
+  assertKnownFields(value, LOCAL_SERVER_LAUNCH_FIELDS, "App manifest local-server launch config");
   if (!Array.isArray(value.command) || value.command.length === 0) {
     throw new AppPreviewManifestError("App preview command must be a non-empty array.");
   }
@@ -103,6 +111,42 @@ function normalizeLaunch(value) {
   const env = normalizeEnv(value.env);
   const health = normalizeHealth(value.health);
   return Object.freeze({ kind: "local-server", command, cwd, env, url, health });
+}
+
+function normalizeStaticFileLaunch(value) {
+  const filePath = normalizePortableRelativePath(value.path, "App preview HTML file");
+  if (filePath === ".") {
+    throw new AppPreviewManifestError("App preview HTML file must point to a file.");
+  }
+  return Object.freeze({ kind: "static-file", path: filePath });
+}
+
+function normalizeExistingUrlLaunch(value) {
+  return Object.freeze({ kind: "existing-url", url: normalizeExternalUrl(value.url) });
+}
+
+function normalizeExternalUrl(value) {
+  if (typeof value !== "string" || !value.trim() || value.includes("\0")) {
+    throw new AppPreviewManifestError("App preview URL must be a valid HTTP or HTTPS URL.");
+  }
+  let parsed;
+  try {
+    parsed = new URL(value.trim());
+  } catch {
+    throw new AppPreviewManifestError("App preview URL must be a valid HTTP or HTTPS URL.");
+  }
+  if (!new Set(["http:", "https:"]).has(parsed.protocol) || parsed.username || parsed.password) {
+    throw new AppPreviewManifestError("App preview URL must be a credential-free HTTP or HTTPS URL.");
+  }
+  return parsed.href;
+}
+
+export function createUnconfiguredAppPreviewManifestContent() {
+  return `${JSON.stringify({ type: APP_PREVIEW_TYPE, version: APP_PREVIEW_VERSION }, null, 2)}\n`;
+}
+
+export function isConfiguredAppPreviewManifest(manifest) {
+  return Boolean(manifest?.launch);
 }
 
 function normalizeHealth(value) {

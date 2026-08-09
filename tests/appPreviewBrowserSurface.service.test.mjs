@@ -293,4 +293,29 @@ describe("App Preview browser surface manager", () => {
     expect(navigate("http://127.0.0.1:9999/")).toHaveBeenCalled();
     expect(navigate("https://example.com/")).toHaveBeenCalled();
   });
+
+  it("loads a credential-free remote URL while keeping navigation on its origin", async () => {
+    const { manager } = createHarness();
+    const result = await manager.activate({
+      ...DEFAULT_REQUEST,
+      url: "https://example.com/slides",
+    });
+    const webContents = createdViews[0].webContents;
+    const navigate = (url) => {
+      const event = { preventDefault: vi.fn() };
+      webContents.emit("will-navigate", event, url);
+      return event.preventDefault;
+    };
+
+    expect(result).toMatchObject({ status: "ready", url: "https://example.com/slides" });
+    expect(webContents.getURL()).toBe("https://example.com/slides");
+    expect(navigate("https://example.com/next")).not.toHaveBeenCalled();
+    expect(navigate("https://cdn.example.com/asset")).toHaveBeenCalled();
+    expect(navigate("https://user:secret@example.com/private")).toHaveBeenCalled();
+    await expect(manager.activate({
+      ...DEFAULT_REQUEST,
+      runtimeId: "runtime-with-credentials",
+      url: "https://user:secret@example.com/",
+    })).rejects.toThrow(/credential/i);
+  });
 });

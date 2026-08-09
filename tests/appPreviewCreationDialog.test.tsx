@@ -9,7 +9,6 @@ import {
   DesktopCreateEntryDialog,
   type DesktopCreateEntryDraft,
 } from "../src/features/data-workspace/nodeActions";
-import type { AppPreviewProjectCandidate } from "../src/features/data-workspace/appPreviewCreation";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -23,72 +22,24 @@ afterEach(() => {
 });
 
 describe("App Preview creation dialog", () => {
-  it("shows detected options and applies a selected command", () => {
-    const candidates = [candidate("vite", ".", "Vite"), candidate("slides", "slides", "Slidev")];
-    let currentDraft = createDraft(candidates);
-    const onChange = vi.fn((updater) => {
-      currentDraft = typeof updater === "function" ? updater(currentDraft) : updater;
-    });
+  it("asks only for a name and never exposes or detects launch configuration", () => {
+    const onCreate = vi.fn();
     const container = render(
       <DesktopCreateEntryDialog
-        draft={currentDraft}
-        onChange={onChange}
-        onCancel={vi.fn()}
-        onCreate={vi.fn()}
-      />,
-    );
-
-    expect(container.textContent).toContain("Detected start options");
-    expect(container.textContent).toContain("Recommended");
-    const radios = container.querySelectorAll<HTMLInputElement>('input[type="radio"]');
-    expect(radios).toHaveLength(2);
-    expect(radios[0]?.checked).toBe(true);
-
-    act(() => radios[1]?.click());
-    expect(currentDraft.appPreview).toMatchObject({
-      selectedCandidateId: "slides",
-      cwd: "slides",
-      commandText: "npm run dev -- --host 127.0.0.1 --port ${port}",
-    });
-  });
-
-  it("keeps creation disabled until detection completes", () => {
-    const draft = createDraft([]);
-    draft.appPreview = {
-      ...draft.appPreview!,
-      detectionStatus: "loading",
-    };
-    const container = render(
-      <DesktopCreateEntryDialog
-        draft={draft}
+        draft={createDraft()}
         onChange={vi.fn()}
         onCancel={vi.fn()}
-        onCreate={vi.fn()}
+        onCreate={onCreate}
       />,
     );
 
-    expect(container.textContent).toContain("Looking for runnable web projects");
-    expect(findButton(container, "Create")?.disabled).toBe(true);
-  });
+    expect(container.querySelectorAll("input")).toHaveLength(1);
+    expect(container.textContent).not.toContain("Detected start options");
+    expect(container.textContent).not.toContain("Start command");
+    expect(findButton(container, "Create")?.disabled).toBe(false);
 
-  it("reveals manual configuration without replacing the detected defaults", () => {
-    const draft = createDraft([candidate("vite", ".", "Vite")]);
-    let currentDraft = draft;
-    const onChange = vi.fn((updater) => {
-      currentDraft = typeof updater === "function" ? updater(currentDraft) : updater;
-    });
-    const container = render(
-      <DesktopCreateEntryDialog
-        draft={draft}
-        onChange={onChange}
-        onCancel={vi.fn()}
-        onCreate={vi.fn()}
-      />,
-    );
-
-    act(() => findButton(container, "Advanced settings")?.click());
-    expect(currentDraft.appPreview?.advanced).toBe(true);
-    expect(currentDraft.appPreview?.cwd).toBe(".");
+    act(() => findButton(container, "Create")?.click());
+    expect(onCreate).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -105,38 +56,13 @@ function findButton(container: HTMLElement, text: string) {
     .find((button) => button.textContent?.trim() === text);
 }
 
-function createDraft(candidates: readonly AppPreviewProjectCandidate[]): DesktopCreateEntryDraft {
-  const selected = candidates[0] ?? null;
+function createDraft(): DesktopCreateEntryDraft {
   return {
     parentPath: null,
     anchor: { left: 20, top: 20, right: 44, bottom: 44, width: 24, height: 24 },
     error: null,
     creatingKind: null,
     selectedKind: "app",
-    name: "Deck.puppyoneapp",
-    appPreview: {
-      detectionStatus: candidates.length ? "ready" : "empty",
-      candidates,
-      selectedCandidateId: selected?.id ?? null,
-      cwd: selected?.cwd ?? ".",
-      commandText: selected?.commandLabel ?? "npm run dev",
-      advanced: false,
-      configurationTouched: false,
-    },
-  };
-}
-
-function candidate(id: string, cwd: string, framework: AppPreviewProjectCandidate["framework"]): AppPreviewProjectCandidate {
-  const command = ["npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "${port}"];
-  return {
-    id,
-    cwd,
-    directoryLabel: cwd,
-    script: "dev",
-    packageManager: "npm",
-    framework,
-    command,
-    commandLabel: command.join(" "),
-    score: 100,
+    name: "Untitled App.puppyoneapp",
   };
 }

@@ -57,6 +57,7 @@ export function createAppPreviewBrowserSurfaceManager({
       }
 
       surface.runtimeId = normalized.runtimeId;
+      surface.generation = normalized.generation;
       surface.requestedBounds = normalized.bounds;
       surface.attachmentId = normalized.attachmentId;
       surface.message = null;
@@ -250,6 +251,7 @@ export function createAppPreviewBrowserSurfaceManager({
       surfaceKey: request.surfaceKey,
       rootPath: request.rootPath,
       runtimeId: request.runtimeId,
+      generation: request.generation,
       appId: request.appId,
       appPath: request.appPath,
       ownerWebContentsId: request.ownerWebContentsId,
@@ -266,6 +268,7 @@ export function createAppPreviewBrowserSurfaceManager({
       canGoBack: false,
       canGoForward: false,
       attached: false,
+      sequence: 0,
     };
     surfaces.set(surfaceId, surface);
     surfaceIdsByApp.set(request.surfaceKey, surfaceId);
@@ -297,6 +300,7 @@ export function createAppPreviewBrowserSurfaceManager({
     }
     cleanupPartitionSession(surface.partitionSession);
     if (ownerState?.surfaceIds.size === 0) releaseOwnerState(surface.ownerWebContentsId);
+    surface.sequence += 1;
     publishState({
       ...serializeSurface(surface),
       status: "destroyed",
@@ -452,6 +456,7 @@ export function createAppPreviewBrowserSurfaceManager({
 
   function publishSurfaceState(surface) {
     if (surfaces.get(surface.surfaceId) !== surface) return;
+    surface.sequence += 1;
     try {
       publishState(serializeSurface(surface), surface.ownerWebContentsId);
     } catch {
@@ -510,17 +515,21 @@ function normalizeActivationRequest(request) {
   const appId = requireString(request?.appId, "App id");
   const appPath = requireString(request?.appPath, "App path");
   const runtimeId = requireString(request?.runtimeId, "Runtime id");
+  const generation = Number.isSafeInteger(request?.generation) && request.generation > 0
+    ? request.generation
+    : 1;
   const attachmentId = normalizeAttachmentId(request?.attachmentId);
   const ownerWebContentsId = request?.ownerWebContentsId;
   if (!Number.isSafeInteger(ownerWebContentsId) || ownerWebContentsId <= 0) {
     throw new Error("App preview owner is invalid.");
   }
-  const url = normalizeLocalAppUrl(request?.url);
+  const url = normalizeAppUrl(request?.url);
   return {
     rootPath,
     appId,
     appPath,
     runtimeId,
+    generation,
     attachmentId,
     ownerWebContentsId,
     url,
@@ -529,16 +538,14 @@ function normalizeActivationRequest(request) {
   };
 }
 
-function normalizeLocalAppUrl(value) {
+function normalizeAppUrl(value) {
   const url = new URL(requireString(value, "App preview URL"));
   if (
     (url.protocol !== "http:" && url.protocol !== "https:") ||
-    (url.hostname !== "127.0.0.1" && url.hostname !== "localhost") ||
-    !url.port ||
     url.username ||
     url.password
   ) {
-    throw new Error("App preview browser URL must use an explicit localhost port.");
+    throw new Error("App preview browser URL must be a credential-free HTTP or HTTPS URL.");
   }
   return url.toString();
 }
@@ -674,7 +681,8 @@ function isAllowedTopLevelNavigation(href, allowedOrigin) {
     const url = new URL(href);
     return (
       (url.protocol === "http:" || url.protocol === "https:") &&
-      (url.hostname === "127.0.0.1" || url.hostname === "localhost") &&
+      !url.username &&
+      !url.password &&
       url.origin === allowedOrigin
     );
   } catch {
@@ -721,6 +729,8 @@ function serializeSurface(surface) {
     canGoForward: surface.canGoForward,
     attached: surface.attached,
     message: surface.message,
+    generation: surface.generation,
+    sequence: surface.sequence,
   };
 }
 

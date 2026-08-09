@@ -26,6 +26,11 @@ import type {
   WorkspaceOpenResult,
   WorkspaceResolveExternalOpenTargetRequest,
 } from "../types/electron";
+import {
+  createAppPreviewManifestContentFromSetup,
+  detectAppPreviewSetup,
+} from "../features/data-workspace/appPreviewCreation";
+import { parseAppPreviewManifest } from "../../shared/appPreviewManifest.js";
 
 export type { Workspace };
 export type FileKind = DataNodeKind;
@@ -119,6 +124,31 @@ export function createLocalDataPort(
       },
     } : {}),
     appPreview: {
+      detect: (path) => detectAppPreviewSetup({
+        listChildren: (folderPath) => loadFolderChildren(rootPath, folderPath),
+        readFile: async (filePath, readOptions) => {
+          readOptions?.signal?.throwIfAborted();
+          const result = await getDesktopBridge().readFile({ rootPath, path: filePath });
+          readOptions?.signal?.throwIfAborted();
+          return result;
+        },
+      }, path),
+      configure: async ({ path, name, setup, expectedContent }) => {
+        const current = await getDesktopBridge().readFile({ rootPath, path });
+        if ((current.content ?? "") !== expectedContent) {
+          throw new Error("This App changed while setup was open. Review the latest version and try again.");
+        }
+        const content = createAppPreviewManifestContentFromSetup(name, setup);
+        const manifest = parseAppPreviewManifest(content, { appPath: path });
+        if (manifest.launch) await preflightAppPreviewLaunch(rootPath, path, manifest.launch);
+        const result = await getDesktopBridge().writeFile({
+          rootPath,
+          path,
+          content,
+          expectedVersion: current.version ?? null,
+        });
+        return { content, version: result.version ?? null };
+      },
       activate: ({ path, bounds, attachmentId }) => getDesktopBridge().activateAppPreview({
         rootPath,
         path,
@@ -172,6 +202,63 @@ export function createLocalDataPort(
     }),
     deleteNode: (path) => getDesktopBridge().deleteEntry({ rootPath, path }).then(() => undefined),
   };
+}
+
+async function preflightAppPreviewLaunch(
+  rootPath: string,
+  appPath: string,
+  launch: NonNullable<ReturnType<typeof parseAppPreviewManifest>["launch"]>,
+): Promise<void> {
+  const appDirectory = getDataParentPath(appPath);
+  if (launch.kind === "existing-url") return;
+  if (launch.kind === "static-file") {
+    const htmlPath = joinDataPaths(appDirectory, launch.path);
+    await getDesktopBridge().readFile({ rootPath, path: htmlPath }).catch(() => {
+      throw new Error(`HTML file not found: ${launch.path}`);
+    });
+    return;
+  }
+
+  const workingDirectory = joinDataPaths(appDirectory, launch.cwd);
+  const children = await loadFolderChildren(rootPath, workingDirectory || null).catch(() => {
+    throw new Error(`Working folder not found: ${launch.cwd}`);
+  });
+  const packageScript = getPackageScriptFromCommand(launch.command);
+  if (!packageScript) return;
+  const packageNode = children.find((node) => node.type !== "folder" && node.name === "package.json");
+  if (!packageNode) throw new Error(`No package.json was found in ${launch.cwd}.`);
+  const packageFile = await getDesktopBridge().readFile({ rootPath, path: packageNode.path });
+  let scripts: unknown;
+  try {
+    scripts = JSON.parse(packageFile.content ?? "")?.scripts;
+  } catch {
+    throw new Error(`package.json in ${launch.cwd} is not valid JSON.`);
+  }
+  if (!scripts || typeof scripts !== "object" || Array.isArray(scripts) || typeof (scripts as Record<string, unknown>)[packageScript] !== "string") {
+    throw new Error(`Package script not found: ${packageScript}`);
+  }
+}
+
+function getPackageScriptFromCommand(command: readonly string[]): string | null {
+  const executable = command[0]?.split(/[\\/]/).at(-1)?.toLowerCase().replace(/\.cmd$/, "");
+  if (!executable || !new Set(["npm", "pnpm", "yarn", "bun"]).has(executable)) return null;
+  // Only the explicit `run` form is unambiguously a package script. Advanced
+  // commands such as `npm exec`, `pnpm dlx`, or `yarn install` must not be
+  // mistaken for script names and rejected before the runtime can execute them.
+  if (command[1] !== "run") return null;
+  const script = command[2];
+  return script && !script.startsWith("-") ? script : null;
+}
+
+function getDataParentPath(filePath: string): string | null {
+  const normalized = filePath.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  const slashIndex = normalized.lastIndexOf("/");
+  return slashIndex < 0 ? null : normalized.slice(0, slashIndex) || null;
+}
+
+function joinDataPaths(base: string | null, relative: string): string {
+  const parts = [base, relative].filter((value): value is string => Boolean(value && value !== "."));
+  return parts.join("/");
 }
 
 export async function loadFolderChildren(rootPath: string, folderPath: string | null): Promise<FileNode[]> {

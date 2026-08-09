@@ -45,7 +45,7 @@ function manifest(variant) {
   });
 }
 
-function createRuntime(onStateChange = vi.fn()) {
+function createRuntime(onStateChange = vi.fn(), overrides = {}) {
   const spawnedChildren = [];
   const dialog = { showMessageBox: vi.fn(async () => ({ response: 0 })) };
   const spawnProcess = vi.fn(() => {
@@ -65,11 +65,75 @@ function createRuntime(onStateChange = vi.fn()) {
     allocateLocalPort: vi.fn(async () => 4173),
     fetchHealth: vi.fn(async () => ({ status: 200 })),
     spawnProcess,
+    ...overrides,
   });
   return { service: runtime, spawnedChildren, spawnProcess, dialog };
 }
 
 describe("App Preview process runtime", () => {
+  it("rejects an unconfigured App without prompting or spawning", async () => {
+    const appPath = "empty.puppyoneapp";
+    await writeFile(path.join(workspaceRoot, appPath), JSON.stringify({
+      type: "puppyone.app",
+      version: 1,
+    }), "utf8");
+    const { service, dialog, spawnProcess } = createRuntime();
+
+    await expect(service.start({ id: 11 }, { rootPath: workspaceRoot, path: appPath }))
+      .rejects.toThrow(/not configured/i);
+    expect(dialog.showMessageBox).not.toHaveBeenCalled();
+    expect(spawnProcess).not.toHaveBeenCalled();
+  });
+
+  it("serves a configured HTML file without executing a command", async () => {
+    const appPath = "static.puppyoneapp";
+    await writeFile(path.join(workspaceRoot, "index.html"), "<h1>Static preview</h1>", "utf8");
+    await writeFile(path.join(workspaceRoot, appPath), JSON.stringify({
+      type: "puppyone.app",
+      version: 1,
+      name: "Static",
+      launch: { kind: "static-file", path: "index.html" },
+    }), "utf8");
+    const serveStaticFile = vi.fn(async () => ({
+      server: { close: (callback) => callback() },
+      port: 4317,
+      url: "http://127.0.0.1:4317/",
+    }));
+    const { service, dialog, spawnProcess } = createRuntime(vi.fn(), { serveStaticFile });
+
+    const result = await service.start({ id: 11 }, { rootPath: workspaceRoot, path: appPath });
+
+    expect(result.status).toBe("running");
+    expect(result.url).toBe("http://127.0.0.1:4317/");
+    expect(serveStaticFile).toHaveBeenCalledWith(expect.objectContaining({
+      staticFilePath: expect.stringMatching(/[/\\]index\.html$/),
+    }));
+    expect(dialog.showMessageBox).not.toHaveBeenCalled();
+    expect(spawnProcess).not.toHaveBeenCalled();
+  });
+
+  it("connects to an existing URL without executing a command", async () => {
+    const appPath = "connected.puppyoneapp";
+    await writeFile(path.join(workspaceRoot, appPath), JSON.stringify({
+      type: "puppyone.app",
+      version: 1,
+      name: "Connected",
+      launch: { kind: "existing-url", url: "https://example.com/slides" },
+    }), "utf8");
+    const { service, dialog, spawnProcess } = createRuntime();
+
+    const result = await service.start({ id: 11 }, { rootPath: workspaceRoot, path: appPath });
+
+    expect(result).toMatchObject({
+      status: "running",
+      url: "https://example.com/slides",
+      command: null,
+      cwd: null,
+    });
+    expect(dialog.showMessageBox).not.toHaveBeenCalled();
+    expect(spawnProcess).not.toHaveBeenCalled();
+  });
+
   it("reuses an unchanged workspace app and replaces it when the manifest changes", async () => {
     const appPath = "demo.puppyoneapp";
     const manifestPath = path.join(workspaceRoot, appPath);
