@@ -240,6 +240,7 @@ export function CsvTableEditor({
     >
       <div
         className="csv-table-editor__scroll"
+        data-po-scrollbar="content"
         onScroll={(event) => {
           const scrollContainer = event.currentTarget;
           const inlineScrolled = Math.abs(scrollContainer.scrollLeft) > 0.5;
@@ -431,7 +432,7 @@ export function CsvTableEditor({
                   title={t("editor.csv.addRow")}
                   aria-label={t("editor.csv.addRow")}
                 >
-                  <span className="csv-table-editor__structure-button-visual po-editable-table-structure-button-visual" aria-hidden="true">+</span>
+                  <span className="csv-table-editor__structure-button-visual po-editable-table-structure-button-visual" aria-hidden="true" />
                 </button>
                 <button
                   type="button"
@@ -440,7 +441,7 @@ export function CsvTableEditor({
                   title={t("editor.csv.addColumn")}
                   aria-label={t("editor.csv.addColumn")}
                 >
-                  <span className="csv-table-editor__structure-button-visual po-editable-table-structure-button-visual" aria-hidden="true">+</span>
+                  <span className="csv-table-editor__structure-button-visual po-editable-table-structure-button-visual" aria-hidden="true" />
                 </button>
                 <CsvTableControls
                   columnCount={columnCount}

@@ -110,7 +110,7 @@ export function CloudBranchesSection({
           <span>{t("cloud.route.branches.title")}</span>
           <small>{graphLoading ? t("cloud.common.loading") : formatNumber(branchCount)}</small>
         </div>
-        <div className="desktop-cloud-branches-toolbar">
+        <div className="desktop-cloud-branches-toolbar" data-po-scrollbar="hidden">
           {currentBranchName && (
             <span className="desktop-cloud-branches-token current" title={currentBranchName}>
               {currentBranchName}
@@ -139,7 +139,7 @@ export function CloudBranchesSection({
         </div>
       </header>
 
-      <div className="desktop-cloud-branches-body">
+      <div className="desktop-cloud-branches-body" data-po-scrollbar="content">
         {graphLoading ? (
           <PageLoading variant="fill" label={t("cloud.common.loading")} className="desktop-cloud-web-loading" />
         ) : branchError && graphRows.length === 0 ? (

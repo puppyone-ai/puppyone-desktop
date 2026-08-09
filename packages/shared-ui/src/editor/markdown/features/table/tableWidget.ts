@@ -67,6 +67,7 @@ export class MarkdownTableWidget extends WidgetType {
     wrapper.className = view.state.readOnly
       ? "cm-md-table-widget-wrap po-editable-table-interaction-root is-readonly"
       : "cm-md-table-widget-wrap po-editable-table-interaction-root";
+    wrapper.dataset.poScrollbar = "horizontal";
     wrapper.dataset.mdTableFrom = String(this.from);
     wrapper.dataset.mdTableExecution = this.execution.mode;
     const rowCount = this.rows.length;
@@ -304,7 +305,6 @@ function createTableStructureButton({
   const visual = document.createElement("span");
   visual.className = "cm-md-table-structure-button-visual po-editable-table-structure-button-visual";
   visual.setAttribute("aria-hidden", "true");
-  visual.textContent = "+";
   button.appendChild(visual);
   button.addEventListener("mousedown", (event) => {
     event.preventDefault();

@@ -312,7 +312,7 @@ export function CloudPromptBlock({ value }: { value: string }) {
 
   return (
     <div className="desktop-cloud-prompt-block">
-      <pre>{value}</pre>
+      <pre data-po-scrollbar="content">{value}</pre>
       <button type="button" onClick={handleCopy}>
         {copied ? <Check size={13} /> : <Copy size={13} />}
         <span>{copied ? t("cloud.common.copied") : t("cloud.common.copyPrompt")}</span>

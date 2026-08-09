@@ -22,7 +22,7 @@ export function CloudSurfaceFrame({
   ].filter(Boolean).join(" ");
 
   return (
-    <main className={mainClassName} data-cloud-surface={surface}>
+    <main className={mainClassName} data-cloud-surface={surface} data-po-scrollbar="content">
       <div className={shellClassName}>{children}</div>
     </main>
   );

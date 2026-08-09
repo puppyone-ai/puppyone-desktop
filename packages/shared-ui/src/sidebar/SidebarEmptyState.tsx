@@ -21,6 +21,7 @@ export const SidebarEmptyState = forwardRef<HTMLDivElement, SidebarEmptyStatePro
         tone === "danger" && "danger",
         className,
       )}
+      data-po-scrollbar="sidebar"
       {...props}
     >
       {children}

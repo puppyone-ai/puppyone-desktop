@@ -214,11 +214,19 @@ export function TextEditorFrame({
   return (
     <section className="editor-host">
       {mode === "live" ? (
-        <div className="editor-live-surface" data-scroll-owner={liveScrollOwner}>
+        <div
+          className="editor-live-surface"
+          data-scroll-owner={liveScrollOwner}
+          data-po-scrollbar={liveScrollOwner === "frame" ? "content" : undefined}
+        >
           {renderLive(sourceSnapshotMode ? editorValue : draft, controls)}
         </div>
       ) : renderSource ? (
-        <div className="editor-live-surface" data-scroll-owner={liveScrollOwner}>
+        <div
+          className="editor-live-surface"
+          data-scroll-owner={liveScrollOwner}
+          data-po-scrollbar={liveScrollOwner === "frame" ? "content" : undefined}
+        >
           {renderSource(sourceSnapshotMode ? editorValue : draft, controls)}
         </div>
       ) : (

@@ -35,7 +35,11 @@ export function AgentGenericActivity({ activity }: { activity: AgentActivity }) 
       icon={iconFor(tool)}
       className="desktop-agent-generic-tool"
     >
-      {detail && <pre className="desktop-agent-tool-output">{detail}</pre>}
+      {detail && (
+        <pre className="desktop-agent-tool-output" data-po-scrollbar="content">
+          {detail}
+        </pre>
+      )}
     </AgentActivityShell>
   );
 }

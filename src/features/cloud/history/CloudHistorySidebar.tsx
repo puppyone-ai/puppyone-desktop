@@ -75,6 +75,7 @@ export function CloudProjectHistorySidebar({
       ) : (
         <ol
           className="desktop-cloud-history-sidebar-list desktop-cloud-history-sidebar-state-list"
+          data-po-scrollbar="sidebar"
           aria-label={t("cloud.history.commitHistory")}
         >
           <li className="desktop-cloud-history-sidebar-state">

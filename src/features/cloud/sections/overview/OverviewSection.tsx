@@ -74,7 +74,7 @@ export function CloudRepositoryOverview({
 
   return (
     <section className="desktop-cloud-overview-page" aria-label={t("cloud.overview.ariaLabel")}>
-      <main className="desktop-cloud-overview-canvas">
+      <main className="desktop-cloud-overview-canvas" data-po-scrollbar="content">
         <div className="desktop-cloud-overview-catalog">
           <header className="desktop-cloud-overview-landing-header">
             <div className="desktop-cloud-overview-landing-identity">

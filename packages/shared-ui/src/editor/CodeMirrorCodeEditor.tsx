@@ -136,6 +136,7 @@ export function CodeMirrorCodeEditor({
     });
 
     const view = new EditorView({ state, parent: host });
+    view.scrollDOM.dataset.poScrollbar = "content";
     viewRef.current = view;
     findAdapter.attach(view);
     const unsubscribeTypography = subscribeTypographyChanges(host.ownerDocument, () => {

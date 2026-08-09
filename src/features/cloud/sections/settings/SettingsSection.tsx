@@ -143,7 +143,7 @@ export function CloudProjectSettingsSection({
 
   return (
     <section className="desktop-cloud-settings-page" aria-label={t("cloud.route.settings.title")}>
-      <main className="desktop-cloud-settings-canvas">
+      <main className="desktop-cloud-settings-canvas" data-po-scrollbar="content">
         <div className="desktop-cloud-settings-catalog">
           <header className="desktop-cloud-settings-landing-header">
             <div className="desktop-cloud-settings-landing-copy">
@@ -152,7 +152,12 @@ export function CloudProjectSettingsSection({
             </div>
           </header>
 
-          <nav className="desktop-cloud-settings-tabs" aria-label={t("cloud.settings.tabsAria")} role="tablist">
+          <nav
+            className="desktop-cloud-settings-tabs"
+            data-po-scrollbar="hidden"
+            aria-label={t("cloud.settings.tabsAria")}
+            role="tablist"
+          >
             {SETTINGS_TABS.map((tab) => (
               <button
                 className={activeTab === tab ? "active" : undefined}

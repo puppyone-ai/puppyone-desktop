@@ -58,6 +58,7 @@ export class MarkdownMdxTabsWidget extends WidgetType {
     toolbar.className = "cm-md-mdx-tabs-toolbar";
     const tabList = doc.createElement("div");
     tabList.className = "cm-md-mdx-tabs-list";
+    tabList.dataset.poScrollbar = "horizontal";
     tabList.setAttribute("role", "tablist");
     tabList.setAttribute("aria-label", "Tabs");
     const sourceButton = doc.createElement("button");

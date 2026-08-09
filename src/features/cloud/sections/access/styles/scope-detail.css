@@ -12,22 +12,6 @@
   animation: desktop-cloud-page-fade 160ms ease-out;
 }
 
-.desktop-cloud-access-web-detail::-webkit-scrollbar {
-  width: var(--po-scrollbar-size, 8px);
-  height: var(--po-scrollbar-size, 8px);
-}
-
-.desktop-cloud-access-web-detail::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.desktop-cloud-access-web-detail::-webkit-scrollbar-thumb {
-  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
-  border-radius: var(--po-scrollbar-radius, 999px);
-  background-color: var(--po-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
 .desktop-cloud-access-web-rail {
   width: min(100%, 900px);
   min-width: 0;

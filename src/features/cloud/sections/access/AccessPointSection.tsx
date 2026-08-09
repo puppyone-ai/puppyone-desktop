@@ -32,7 +32,7 @@ export function CloudAccessPointAccessSection({
       </div>
       <div className="desktop-cloud-access-body">
         <aside className="desktop-cloud-access-sidebar">
-          <div className="desktop-cloud-access-scope-list">
+          <div className="desktop-cloud-access-scope-list" data-po-scrollbar="sidebar">
             <button className="desktop-cloud-scope-row active" type="button">
               <div>
                 <span className="desktop-cloud-web-status-dot ready" aria-hidden="true" />
@@ -48,7 +48,7 @@ export function CloudAccessPointAccessSection({
             </button>
           </div>
         </aside>
-        <div className="desktop-cloud-access-detail">
+        <div className="desktop-cloud-access-detail" data-po-scrollbar="content">
           <CloudScopeDetail
             projectId=""
             scope={scope}

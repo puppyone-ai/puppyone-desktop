@@ -222,14 +222,7 @@ body.data-sidebar-resizing .data-preview-accessory {
       color-mix(in srgb, var(--po-selected) 38%, transparent) 100%
     )
   );
-  --tree-scrollbar-width: var(--po-tree-scrollbar-width, var(--po-scrollbar-size, 8px));
-  --tree-scrollbar-radius: var(--po-scrollbar-radius, 999px);
-  --tree-scrollbar-transition: var(--po-scrollbar-transition, 0.16s ease);
-  --tree-scrollbar-thumb: var(--desktop-sidebar-scrollbar-thumb, var(--po-scrollbar-thumb));
-  --tree-scrollbar-thumb-hover: var(
-    --desktop-sidebar-scrollbar-thumb-hover,
-    var(--po-scrollbar-thumb-hover)
-  );
+  --tree-scrollbar-width: var(--po-tree-scrollbar-width, var(--po-scrollbar-size, 12px));
 
   position: relative;
   display: flex;
@@ -269,30 +262,6 @@ body.data-sidebar-resizing .data-preview-accessory {
   /* Always reserve the scrollbar gutter so row width never depends on
      scroll state. The list compensates in its right padding. */
   scrollbar-gutter: stable;
-}
-
-.explorer-tree-scroll::-webkit-scrollbar {
-  width: var(--tree-scrollbar-width);
-  height: var(--tree-scrollbar-width);
-  background: transparent;
-}
-
-.explorer-tree-scroll::-webkit-scrollbar-track,
-.explorer-tree-scroll::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-.explorer-tree-scroll::-webkit-scrollbar-thumb {
-  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
-  border-radius: var(--tree-scrollbar-radius);
-  background-color: var(--tree-scrollbar-thumb);
-  background-clip: padding-box;
-  transition: background-color var(--tree-scrollbar-transition);
-}
-
-.explorer-tree-scroll::-webkit-scrollbar-thumb:hover,
-.explorer-tree-scroll.po-scrollbar-active::-webkit-scrollbar-thumb:hover {
-  background-color: var(--tree-scrollbar-thumb-hover);
 }
 
 .explorer-tree-list {

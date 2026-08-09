@@ -26,7 +26,11 @@ export function AgentCommandActivity({ activity }: { activity: AgentActivity }) 
     >
       {(command || output) && <div className="desktop-agent-command-surface">
         {command && <div className="desktop-agent-command-line"><span>$</span><code>{command}</code></div>}
-        {output && <pre className="desktop-agent-command-output">{output}</pre>}
+        {output && (
+          <pre className="desktop-agent-command-output" data-po-scrollbar="content">
+            {output}
+          </pre>
+        )}
       </div>}
     </AgentActivityShell>
   );

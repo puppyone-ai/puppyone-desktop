@@ -310,7 +310,10 @@ export function DesktopCreateEntryDialog({
           <DesktopDialogCloseButton disabled={draft.creatingKind !== null} onClick={onCancel} />
         </header>
 
-        <div className="desktop-dialog-body desktop-file-dialog-body">
+        <div
+          className="desktop-dialog-body desktop-file-dialog-body"
+          data-po-scrollbar="content"
+        >
           <label className="desktop-dialog-field">
             <span>{t("workspace.node.name")}</span>
             <input
@@ -686,7 +689,10 @@ function DesktopNodeRenameDialog({
           <DesktopDialogCloseButton disabled={draft.operation !== null} onClick={onCancel} />
         </header>
 
-        <div className="desktop-dialog-body desktop-file-dialog-body">
+        <div
+          className="desktop-dialog-body desktop-file-dialog-body"
+          data-po-scrollbar="content"
+        >
           <label className="desktop-dialog-field">
             <span>{t("workspace.node.name")}</span>
             <input

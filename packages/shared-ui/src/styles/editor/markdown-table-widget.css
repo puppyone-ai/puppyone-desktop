@@ -28,22 +28,6 @@
   }
 }
 
-.markdown-codemirror-editor .cm-md-table-widget-wrap::-webkit-scrollbar {
-  height: var(--po-scrollbar-size, 8px);
-}
-
-.markdown-codemirror-editor .cm-md-table-widget-wrap::-webkit-scrollbar-track,
-.markdown-codemirror-editor .cm-md-table-widget-wrap::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-.markdown-codemirror-editor .cm-md-table-widget-wrap::-webkit-scrollbar-thumb {
-  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
-  border-radius: var(--po-scrollbar-radius, 999px);
-  background-color: var(--po-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
 .markdown-codemirror-editor .cm-md-table-frame {
   --cm-md-table-action-gutter: var(--po-editable-table-action-gutter);
   display: inline-block;
@@ -95,13 +79,6 @@
   min-width: 0;
   max-width: none;
   line-height: 0;
-}
-
-/* Hover model: one outer ring marks the table while its structural border
-   stays stable; only the hovered cell tints — never a whole row. */
-.markdown-codemirror-editor .cm-md-table-widget-wrap:hover:not(.is-doc-selected) .cm-md-table-widget,
-.markdown-codemirror-editor .cm-md-table-widget-wrap:focus-within:not(.is-doc-selected) .cm-md-table-widget {
-  box-shadow: 0 0 0 2px var(--po-editable-table-hover-ring);
 }
 
 /* Document selection sweeping over the table selects it as one block. */
@@ -354,81 +331,9 @@
   background: color-mix(in srgb, var(--po-accent) 12%, color-mix(in srgb, var(--po-control) 42%, transparent));
 }
 
-.markdown-codemirror-editor .cm-md-table-structure-button {
-  position: absolute;
-  z-index: 2;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: var(--po-clickable-cursor, pointer);
-  font: inherit;
-  opacity: 0;
-  transition: opacity 120ms ease;
-}
-
-/* The button fills the action gutter and touches the table edge. Its visual
-   child keeps the existing 13px bar and breathing room, decoupling the hit
-   target from the chrome so the interface stays subtle without a hover gap. */
-.markdown-codemirror-editor .cm-md-table-structure-button-visual {
-  display: grid;
-  box-sizing: border-box;
-  place-items: center;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: var(--po-editable-table-structure-background);
-  color: transparent;
-  font-size: 12px;
-  font-weight: 650;
-  line-height: 1;
-  pointer-events: none;
-  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
-}
-
-.markdown-codemirror-editor .cm-md-table-widget-wrap:hover .cm-md-table-structure-button,
-.markdown-codemirror-editor .cm-md-table-structure-button:focus-visible {
-  opacity: 1;
-}
-
-.markdown-codemirror-editor .cm-md-table-structure-button:hover .cm-md-table-structure-button-visual,
-.markdown-codemirror-editor .cm-md-table-structure-button:focus-visible .cm-md-table-structure-button-visual {
-  border-color: var(--po-editable-table-structure-hover-border);
-  background: var(--po-editable-table-structure-hover-background);
-  color: var(--po-editable-table-structure-hover-color);
-}
-
-.markdown-codemirror-editor .cm-md-table-structure-button:focus-visible {
-  outline: none;
-}
-
-.markdown-codemirror-editor .cm-md-table-structure-button:focus-visible .cm-md-table-structure-button-visual {
-  box-shadow: 0 0 0 1.5px var(--po-editable-table-cell-focus-ring);
-}
-
-.markdown-codemirror-editor .cm-md-table-add-row {
-  left: 0;
-  right: 0;
-  height: var(--cm-md-table-action-gutter);
-  bottom: calc(-1 * var(--cm-md-table-action-gutter));
-}
-
-.markdown-codemirror-editor .cm-md-table-add-row .cm-md-table-structure-button-visual {
-  width: 100%;
-  height: 13px;
-}
-
-.markdown-codemirror-editor .cm-md-table-add-column {
-  top: 0;
-  bottom: 0;
-  width: var(--cm-md-table-action-gutter);
-  right: calc(-1 * var(--cm-md-table-action-gutter));
-}
-
-.markdown-codemirror-editor .cm-md-table-add-column .cm-md-table-structure-button-visual {
-  width: 13px;
-  height: 100%;
-}
+/* Markdown table structure controls use the shared editable-table primitive.
+   Keeping their geometry in one rule set prevents CSV and Markdown rails (and
+   their add glyphs) from drifting independently. */
 
 .markdown-codemirror-editor .cm-md-table-widget-wrap.is-readonly .cm-md-table-structure-button {
   display: none;
@@ -453,22 +358,6 @@
   font-family: var(--po-font-sans, inherit);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-}
-
-.cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-track,
-.cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-corner {
-  background: var(--po-menu-bg);
-}
-
-.cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-thumb {
-  border: 1px solid var(--po-menu-bg);
-  background-color: var(--po-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
-.cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-thumb:hover {
-  background-color: var(--po-scrollbar-thumb-hover);
-  background-clip: padding-box;
 }
 
 .cm-md-table-context-menu .desktop-menu-section {

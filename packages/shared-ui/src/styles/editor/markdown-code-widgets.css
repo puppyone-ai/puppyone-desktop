@@ -99,23 +99,6 @@
   tab-size: 2;
 }
 
-.markdown-codemirror-editor .cm-md-code-textarea::-webkit-scrollbar {
-  width: 0;
-  height: var(--po-scrollbar-size, 8px);
-}
-
-.markdown-codemirror-editor .cm-md-code-textarea::-webkit-scrollbar-track,
-.markdown-codemirror-editor .cm-md-code-textarea::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-.markdown-codemirror-editor .cm-md-code-textarea::-webkit-scrollbar-thumb {
-  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
-  border-radius: var(--po-scrollbar-radius, 999px);
-  background-color: var(--po-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
 .markdown-codemirror-editor .cm-md-code-textarea:focus {
   background: color-mix(in srgb, var(--po-control) 18%, transparent);
 }

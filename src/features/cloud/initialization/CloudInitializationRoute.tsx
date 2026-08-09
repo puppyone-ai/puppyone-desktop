@@ -138,7 +138,10 @@ export function CloudInitializationRoute({
 
 function CloudInitializationFrame({ children }: { children: ReactNode }) {
   return (
-    <main className="desktop-cloud-main-view desktop-cloud-initialize-main-view">
+    <main
+      className="desktop-cloud-main-view desktop-cloud-initialize-main-view"
+      data-po-scrollbar="content"
+    >
       <div className="desktop-cloud-page-shell">{children}</div>
     </main>
   );

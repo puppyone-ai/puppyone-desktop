@@ -168,7 +168,12 @@ export function AppPreviewViewer({
             }}
           />
         ) : mode === "logs" ? (
-          <div className="app-preview-logs" role="log" aria-label={t("editor.app.logsLabel")}>
+          <div
+            className="app-preview-logs"
+            data-po-scrollbar="content"
+            role="log"
+            aria-label={t("editor.app.logsLabel")}
+          >
             <pre dir="ltr">{session.logs || t("editor.app.noLogs")}</pre>
           </div>
         ) : (

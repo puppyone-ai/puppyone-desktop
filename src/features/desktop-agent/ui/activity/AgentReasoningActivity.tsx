@@ -18,7 +18,11 @@ export function AgentReasoningActivity({ activity }: { activity: AgentActivity }
       icon={<Brain size={13} />}
       className="desktop-agent-reasoning"
     >
-      {reasoning && <div className="desktop-agent-reasoning-copy">{reasoning}</div>}
+      {reasoning && (
+        <div className="desktop-agent-reasoning-copy" data-po-scrollbar="content">
+          {reasoning}
+        </div>
+      )}
     </AgentActivityShell>
   );
 }

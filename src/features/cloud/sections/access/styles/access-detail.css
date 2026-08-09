@@ -22,9 +22,11 @@
 }
 
 .desktop-cloud-access-sidebar {
+  display: flex;
   min-width: 0;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
+  flex-direction: column;
   border-inline-end: 1px solid var(--po-border-subtle);
   background: var(--po-canvas);
 }

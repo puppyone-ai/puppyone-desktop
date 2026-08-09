@@ -43,6 +43,7 @@ function ImagePreviewSurface({ url, name }: { url: string; name: string }) {
   return (
     <div
       className="native-preview native-preview-centered native-image-preview-shell"
+      data-po-scrollbar="content"
       data-preview-state={ready ? "ready" : "loading"}
       aria-busy={!ready}
     >
@@ -90,7 +91,7 @@ export function AudioResourceViewer({ document, fileUrl, fileUrlLoading, fileUrl
   return (
     <ResourcePreviewState fileUrl={fileUrl} loading={fileUrlLoading} error={fileUrlError} kind="audio">
       {(url) => (
-        <div className="native-preview native-preview-centered">
+        <div className="native-preview native-preview-centered" data-po-scrollbar="content">
           <div className="native-media-card">
             <FilePreviewIcon name={document.name} type="audio" size={54} theme={fileIconTheme} />
             <strong dir="auto">{document.name}</strong>
@@ -109,7 +110,7 @@ export function VideoResourceViewer({ document, fileUrl, fileUrlLoading, fileUrl
   return (
     <ResourcePreviewState fileUrl={fileUrl} loading={fileUrlLoading} error={fileUrlError} kind="video">
       {(url) => (
-        <div className="native-preview native-preview-centered">
+        <div className="native-preview native-preview-centered" data-po-scrollbar="content">
           <video className="native-video-preview" controls preload="metadata">
             <source src={url} type={document.mimeType ?? undefined} />
             <UnsupportedMedia kind="video" />

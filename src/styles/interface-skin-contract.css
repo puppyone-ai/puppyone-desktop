@@ -223,23 +223,27 @@
   background: var(--interface-footer-background);
 }
 
-:root[data-interface-style]:not([data-interface-style="default"])
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar {
+:root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar {
   width: var(--interface-scrollbar-width);
   height: var(--interface-scrollbar-height);
   background: var(--interface-scrollbar-background);
 }
 
-:root[data-interface-style]:not([data-interface-style="default"])
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar-track,
-:root[data-interface-style]:not([data-interface-style="default"])
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar-corner {
+:root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-track,
+:root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-corner {
   border: var(--interface-scrollbar-track-border);
   background: var(--interface-scrollbar-track-background);
 }
 
-:root[data-interface-style]:not([data-interface-style="default"])
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar-thumb:hover {
+:root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb:hover {
   background: var(--interface-scrollbar-thumb-hover-background);
   background-clip: var(--interface-scrollbar-thumb-hover-background-clip);
 }

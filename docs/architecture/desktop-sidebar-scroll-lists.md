@@ -60,14 +60,39 @@ The shared visual edge contract is:
 - `6px` internal row content inset after the row's outer edge.
 
 These are visual measurements, not a requirement that every sidebar use the
-same four-value `padding` declaration. A reserved `8px` scrollbar gutter means
-a scrolling list has only `4px` of CSS padding on the inline end while still
-producing the same effective `12px` edge. Git's outer wrapper does not scroll,
+same four-value `padding` declaration. A reserved `12px` product scrollbar
+gutter means a scrolling list has `0px` of CSS padding on the inline end while
+still producing the same effective `12px` edge. Git's outer wrapper does not scroll,
 so its section rows and nested scroll lists own the inline edge instead.
 
 ## Scrollbar Styling Rules (app-wide)
 
-1. Style scrollbars only through `::-webkit-scrollbar*` pseudo-elements.
+1. Register every scroll owner explicitly.
+
+   The actual element that owns `overflow` carries one `data-po-scrollbar`
+   variant:
+
+   - `content`: editor, page, dialog, transcript, or other ordinary content
+   - `sidebar`: stable-gutter navigation/list content
+   - `menu`: bounded menu content
+   - `horizontal`: horizontal-only editor widgets
+   - `hidden`: intentionally scrollable controls whose indicator is hidden
+
+   The product scrollbar primitive lives exclusively in
+   `src/styles/scrollbars.css`, imported into the `primitives` cascade layer.
+   Feature styles own overflow and content layout but never thumb/track paint.
+
+2. Keep system and product rendering as separate modes.
+
+   `data-po-scrollbar-mode="product"` on the document root enables the
+   deterministic PuppyOne geometry. For normal DOM scroll owners, `system`
+   mode intentionally has no author thumb, track, width, or height rules,
+   allowing Chromium/macOS to honor the user's platform scrollbar preferences.
+   xterm remains the documented exception because it renders a private slider.
+   Do not combine the two models on the same owner.
+
+3. In product mode, style scrollbars only through
+   `::-webkit-scrollbar*` pseudo-elements.
 
    Never set the standard `scrollbar-width` or `scrollbar-color` properties
    anywhere in the app, including `* { ... }` resets, third-party widget
@@ -76,37 +101,40 @@ so its section rows and nested scroll lists own the inline edge instead.
    reintroduces platform-dependent native scrollbars. To hide a scrollbar,
    use `::-webkit-scrollbar { display: none; }`, not `scrollbar-width: none`.
 
-   The global baseline lives in `src/styles/scrollbars.css`: an 8px
-   interaction track (`--po-scrollbar-size`) containing a 6px visible thumb
-   (`--po-scrollbar-thumb-size`) with a 1px transparent inset
-   (`--po-scrollbar-thumb-inset`). This middle weight is shared by sidebar
-   lists, code editors, CSV tables, and horizontal Markdown widgets. Custom
-   WebKit scrollbars are always "classic": when a container overflows, the
-   scrollbar consumes layout width. They never overlay.
+   The product baseline lives in `src/styles/scrollbars.css`: a 12px
+   interaction track (`--po-scrollbar-size`) containing a 6px idle thumb
+   (`--po-scrollbar-thumb-size`) with a 3px transparent inset. While the
+   surface is hovered, scrolling, or dragging, the thumb expands to
+   8px (`--po-scrollbar-thumb-active-size`) with a 2px inset. This geometry is
+   shared by sidebar lists, code editors, CSV tables, and horizontal Markdown
+   widgets. Custom WebKit scrollbars keep classic layout geometry even though
+   the default skin mimics the macOS overlay presentation: the reserved track
+   consumes layout width, while the thumb itself fades away when idle.
 
-2. Preserve the transparent thumb inset in every state.
+4. Preserve the transparent thumb inset in every state.
 
    Stateful thumb rules must change `background-color`, never the
    `background` shorthand. The shorthand resets `background-clip` to
    `border-box`, paints beneath the transparent border, and silently turns the
-   intended 6px thumb back into an 8px bar. The default sidebar thumb uses
-   `--desktop-sidebar-scrollbar-thumb` and its hover companion: these
-   compensate for the darker chrome material so the rendered thumb has the
-   same perceived lightness as the editor scrollbar.
+   intended 6px thumb back into an 8px bar. All default-interface scroll owners
+   use `--po-scrollbar-presentation-thumb` and its hover companion, so sidebar,
+   editor, menu, and page surfaces cannot drift independently.
 
-3. Reserve the gutter in sidebar scroll containers.
+5. Reserve the gutter in sidebar scroll containers.
 
    Every sidebar scroll container sets `scrollbar-gutter: stable`, so the
    scrollbar width (`--desktop-sidebar-scrollbar-width`) is reserved whether
    or not the list currently overflows. Row width is therefore identical in
-   short and long lists.
+   short and long lists. This contract is product-mode only; system mode
+   resets the gutter to `auto` and the compensation width to `0px` so native
+   macOS behavior owns layout as well as paint.
 
    Note `scrollbar-gutter: stable` also reserves space when `overflow` is
    `hidden`. Non-scrolling flex wrappers that share a class with scroll
    containers must opt out with `scrollbar-gutter: auto` (see
    `.desktop-git-sidebar-list`).
 
-4. Compensate the reserved gutter in the list's right padding.
+6. Compensate the reserved gutter in the list's right padding.
 
    The reserved gutter sits between the border and the padding area, so
    content would be inset by gutter + padding on the right. Lists inside a
@@ -123,9 +151,9 @@ so its section rows and nested scroll lists own the inline edge instead.
    `--desktop-sidebar-row-right-gap` (cloud sidebar) instead override that
    token to `--desktop-sidebar-scroll-right-gap` on the scroll container.
 
-5. Keep resize and scroll hit targets adjacent, never overlapping.
+7. Keep resize and scroll hit targets adjacent, never overlapping.
 
-   The explorer scrollbar owns the final 8px inside the sidebar. The shared
+   The explorer scrollbar owns the final 12px inside the sidebar. The shared
    `.po-pane-edge-resize-handle` contract owns the next 8px inside the main
    pane. Do not place the resizer inside `.explorer-column`, center it across
    the boundary, or translate it back toward the sidebar: its higher stacking
@@ -134,35 +162,49 @@ so its section rows and nested scroll lists own the inline edge instead.
 
 ## Implementation Rules
 
-1. Keep scrollbar layout in the scroll area.
+1. Keep the ownership hierarchy stable.
 
-   Scroll containers may use `is-scrollable` only for scroll-area behavior
-   such as showing a hidden thumb while the user is hovering or actively
-   scrolling (`::-webkit-scrollbar-thumb` background swaps only). Do not use
-   `is-scrollable` to reserve gutter space or to change row width, row
-   margin, or row padding.
+   ```text
+   Pane
+   ├── Header / toolbar (not scrollable)
+   ├── Scroll owner [data-po-scrollbar]
+   │   └── Content / list (owns content padding)
+   ├── Footer (not scrollable)
+   └── Resize handle (adjacent sibling, never overlapping)
+   ```
 
-2. Put horizontal gutters on the list, not on every row.
+   Do not add wrapper elements solely to paint a scrollbar. The data attribute
+   preserves semantic `main`, `nav`, `ol`, `textarea`, and CodeMirror scroll
+   nodes without creating a fake scrollbar component.
+
+2. Keep scrollbar layout in the scroll area.
+
+   `ScrollbarActivity` owns transient active-state presentation. Scroll
+   containers may still use `is-scrollable` only for non-paint scroll-area
+   behavior. Do not use `is-scrollable` to reserve gutter space or to change
+   row width, row margin, or row padding.
+
+3. Put horizontal gutters on the list, not on every row.
 
    Sidebar lists should use the product sidebar gutter tokens as
    `padding-inline`, with the right side reduced per Scrollbar Styling
-   Rule 3. Rows inside those lists should use `width: 100%` and
+   Rule 6. Rows inside those lists should use `width: 100%` and
    vertical-only margins or list gaps.
 
-3. Keep rows independent from native scrollbar width.
+4. Keep rows independent from native scrollbar width.
 
    Do not introduce variables such as `scroll-row-width`,
    `scroll-row-right-gap`, or `row-gap-minus-scrollbar` at the row level.
    Gutter compensation happens exactly once, on the scroll container or its
    list, never on rows.
 
-4. Use `ResizeObserver` only to classify scroll containers.
+5. Use `ResizeObserver` only to classify scroll containers.
 
    `useScrollableState` and `useScrollableDescendantClasses` may add
    `is-scrollable` to scroll containers. That state must remain a
    scroll-area state, not a row-layout state.
 
-5. Keep shared tokens at the sidebar level.
+6. Keep shared tokens at the sidebar level.
 
    Use `--desktop-sidebar-row-left-gap`, `--desktop-sidebar-row-right-gap`,
    `--desktop-sidebar-scroll-right-gap`,
@@ -174,7 +216,7 @@ so its section rows and nested scroll lists own the inline edge instead.
    acceptable, but they must not reintroduce row-level scrollbar compensation
    or a quieter primary-row weight than Data.
 
-6. Share visual contracts, not incidental shorthands.
+7. Share visual contracts, not incidental shorthands.
 
    Data, Git, Settings, Cloud, Access, Automation, and Changes must resolve
    to the same outer edge rhythm even though their scroll ownership differs. Use
@@ -184,21 +226,34 @@ so its section rows and nested scroll lists own the inline edge instead.
    Keep tree depth indentation and section spacing on their own tokens; they
    are content structure, not outer padding.
 
+8. Keep third-party adapters local and token-driven.
+
+   CodeMirror registers its real `view.scrollDOM` as a `content` owner. xterm
+   renders a private slider rather than a normal browser scrollbar, so its
+   adapter stays in `desktop-terminal.css` and consumes the shared geometry,
+   color, motion, and active-state tokens. No other feature may declare
+   scrollbar pseudo-elements.
+
 ## Current Code Boundaries
 
 - `src/styles/scrollbars.css`
-  - global WebKit scrollbar baseline and the ban on standard scrollbar
-    properties
+  - opt-in product scrollbar primitive, variants, transient state, reduced
+    motion, forced-colors support, and the system/product rendering boundary
+- `src/components/ScrollbarActivity.tsx`
+  - one delegated passive listener that marks registered owners active while
+    scrolling; unregistered and hidden surfaces are ignored
 - `src/styles/tokens.css`
   - `--po-scrollbar-size`, `--po-scrollbar-thumb-size`,
-    `--po-scrollbar-thumb-inset`, `--desktop-sidebar-scrollbar-width`,
-    `--desktop-sidebar-scrollbar-thumb`,
-    `--desktop-sidebar-scrollbar-thumb-hover`,
+    `--po-scrollbar-thumb-active-size`, `--po-scrollbar-thumb-inset`,
+    `--po-scrollbar-thumb-active-inset`, `--desktop-sidebar-scrollbar-width`,
+    `--po-scrollbar-presentation-thumb`,
+    `--po-scrollbar-presentation-thumb-hover`,
     `--desktop-sidebar-scroll-right-gap`, and
     `--desktop-sidebar-list-padding-block`
 - `packages/shared-ui/src/sidebar/SidebarScrollArea.tsx`,
   `SidebarList.tsx`, `SidebarRow.tsx`
-  - process-neutral semantic components for scroll/list/row ownership
+  - process-neutral semantic components for scroll/list/row ownership;
+    scroll owners register the `sidebar` variant
 - `packages/shared-ui/src/styles/sidebar-primitives.css`
   - canonical `.po-sidebar-*` root, scroll, list, row, action, resize, and
     virtual-list geometry in the `primitives` cascade layer
@@ -243,15 +298,24 @@ so its section rows and nested scroll lists own the inline edge instead.
 
 ## Invariants
 
-- No stylesheet sets `scrollbar-width` or `scrollbar-color`. Scrollbar
-  styling is WebKit-only, so geometry never depends on macOS scrollbar
-  settings.
+- No stylesheet sets `scrollbar-width` or `scrollbar-color`. Product mode is
+  WebKit-only and deterministic; system mode has no author geometry and follows
+  macOS/Chromium preferences.
+- Only the central primitive, historical interface skins, and the xterm
+  adapter may contain `::-webkit-scrollbar` selectors. Feature CSS never owns
+  scrollbar paint.
+- Every product scroll owner is explicitly registered with a supported
+  `data-po-scrollbar` variant. The global `*::-webkit-scrollbar` selector is
+  forbidden.
 - Every sidebar scroll container reserves the scrollbar gutter with
   `scrollbar-gutter: stable`; sidebar scrollbars occupy exactly
-  `--desktop-sidebar-scrollbar-width` (8px in the default skin), while the
-  visible thumb remains 6px.
-- The explorer scrollbar's 8px track and the resizer's 8px target are adjacent
+  `--desktop-sidebar-scrollbar-width` (12px in the default skin), while the
+  thumb uses 6px idle geometry while fading away at rest and expands to 8px
+  while active.
+- The explorer scrollbar's 12px track and the resizer's 8px target are adjacent
   on opposite sides of the pane boundary and never overlap.
+- Default transient visibility responds to hover, scrolling, and dragging.
+  Focus alone must not pin the indicator onscreen.
 - Scrollbar thumb state rules use `background-color`; no modern scrollbar
   thumb rule may reset `background-clip` with the `background` shorthand.
 - Sidebar rows keep the same width in short lists, long lists, and while a

@@ -76,6 +76,7 @@ export function DesktopMinimalModeDock({
       <div
         id="desktop-minimal-mode-controls"
         className="desktop-minimal-mode-controls"
+        data-po-scrollbar="hidden"
         role="toolbar"
         aria-label={t("shell.minimal.commands")}
       >

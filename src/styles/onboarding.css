@@ -268,23 +268,6 @@
   background: color-mix(in srgb, var(--po-panel-raised) 24%, transparent);
 }
 
-.onboarding-project-list::-webkit-scrollbar {
-  width: var(--po-scrollbar-size, 8px);
-}
-
-.onboarding-project-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.onboarding-project-list::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background-color: color-mix(in srgb, var(--po-text-muted) 24%, transparent);
-}
-
-.onboarding-project-list::-webkit-scrollbar-thumb:hover {
-  background-color: color-mix(in srgb, var(--po-text-muted) 38%, transparent);
-}
-
 .onboarding-project-row {
   display: grid;
   width: 100%;

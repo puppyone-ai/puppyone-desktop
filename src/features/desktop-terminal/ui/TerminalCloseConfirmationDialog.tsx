@@ -45,7 +45,7 @@ export function TerminalCloseConfirmationDialog({
           />
         </header>
 
-        <div className="desktop-dialog-body">
+        <div className="desktop-dialog-body" data-po-scrollbar="content">
           <p className="desktop-terminal-close-dialog-detail">
             {t("terminal.closeDialog.detail")}
           </p>

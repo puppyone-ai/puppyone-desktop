@@ -153,23 +153,6 @@
   overscroll-behavior: contain;
 }
 
-.csv-table-editor__scroll::-webkit-scrollbar {
-  width: var(--po-scrollbar-size, 8px);
-  height: var(--po-scrollbar-size, 8px);
-}
-
-.csv-table-editor__scroll::-webkit-scrollbar-track,
-.csv-table-editor__scroll::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-.csv-table-editor__scroll::-webkit-scrollbar-thumb {
-  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
-  border-radius: var(--po-scrollbar-radius, 999px);
-  background-color: var(--po-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
 .csv-table-editor__frame {
   display: inline-block;
   box-sizing: border-box;
@@ -234,11 +217,6 @@
   font-size: var(--po-editable-table-font-size);
   line-height: var(--po-editable-table-line-height);
   transition: border-color 140ms ease, box-shadow 140ms ease;
-}
-
-.csv-table-editor__surface:hover .csv-table-editor__table,
-.csv-table-editor__surface:focus-within .csv-table-editor__table {
-  box-shadow: 0 0 0 2px var(--po-editable-table-hover-ring);
 }
 
 .csv-table-editor__drag-layer {
