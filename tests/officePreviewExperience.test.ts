@@ -21,6 +21,10 @@ const viewerArchitecture = readFileSync(
   new URL("../docs/architecture/editor/file-format-viewer-pipeline.md", import.meta.url),
   "utf8",
 );
+const tokenSource = readFileSync(
+  new URL("../src/styles/tokens.css", import.meta.url),
+  "utf8",
+);
 
 describe("lightweight Office preview experience", () => {
   it("keeps the successful preview headerless and read-only", () => {
@@ -67,12 +71,18 @@ describe("lightweight Office preview experience", () => {
     expect(officeViewerSource).toContain("IntersectionObserver");
     expect(officeViewerSource).toContain("office-pptx-thumbnail-rail");
     expect(officeViewerSource).toContain("office-pptx-stage");
+    expect(officeViewerSource).toContain("getPresentationNavigationTarget");
     expect(officeViewerSource).not.toContain('renderMode: "list"');
     expect(officePreviewCss).toMatch(
-      /\.office-pptx-workspace\s*\{[^}]*display:\s*flex/s,
+      /\.office-pptx-workspace\s*\{[^}]*display:\s*flex[^}]*background:\s*var\(--po-editor-bg\)/s,
     );
     expect(officePreviewCss).toMatch(
       /\.office-pptx-thumbnail-rail\s*\{[^}]*overflow-y:\s*auto/s,
+    );
+    expect(officePreviewCss).toContain("--po-file-accent-presentation");
+    expect(tokenSource.match(/--po-file-accent-presentation:/g)).toHaveLength(5);
+    expect(officePreviewCss).not.toMatch(
+      /\.office-pptx-workspace\s*\{[^}]*var\(--po-inset\)/s,
     );
   });
 
@@ -83,6 +93,8 @@ describe("lightweight Office preview experience", () => {
 
     expect(officeViewerSource).toContain("<thead>");
     expect(officeViewerSource).toContain("spreadsheetColumnLabel");
+    expect(officeViewerSource).toContain('data-cell-kind={cell.kind}');
+    expect(officeViewerSource).toContain("aria-rowcount={selectedSheet.rows.length + 1}");
     expect(gridIndex).toBeGreaterThan(-1);
     expect(notesIndex).toBeGreaterThan(gridIndex);
     expect(tabsIndex).toBeGreaterThan(notesIndex);
@@ -92,5 +104,10 @@ describe("lightweight Office preview experience", () => {
     expect(officePreviewCss).toMatch(
       /\.office-spreadsheet-tabs\s*\{[^}]*border-top:/s,
     );
+    expect(officePreviewCss).toMatch(
+      /\.office-spreadsheet-preview\s*\{[^}]*--office-sheet-canvas:\s*#fff/s,
+    );
+    expect(officePreviewCss).toContain('.office-spreadsheet-grid td[data-cell-kind="number"]');
+    expect(officePreviewCss).not.toContain(".office-spreadsheet-grid tr:nth-child(even) td");
   });
 });

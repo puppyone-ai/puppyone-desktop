@@ -6,6 +6,14 @@ export const MAX_SPREADSHEET_STRING_PAYLOAD_BYTES = 12 * 1024 * 1024;
 
 export type SpreadsheetArchiveKind = "none" | "ooxml" | "ods";
 
+export type SpreadsheetCellKind =
+  | "blank"
+  | "text"
+  | "number"
+  | "date"
+  | "boolean"
+  | "error";
+
 export type SpreadsheetBudgetTruncationReason =
   | "materialized-cell-limit"
   | "string-payload-limit";
@@ -54,6 +62,7 @@ export type SpreadsheetSheet = {
 export type SpreadsheetSourceRow = {
   rowIndex: number;
   values: string[];
+  kinds: SpreadsheetCellKind[];
 };
 
 export type SpreadsheetColumn = {
@@ -67,6 +76,7 @@ export type SpreadsheetMerge = {
   startColumn: number;
   endColumn: number;
   value: string;
+  kind: SpreadsheetCellKind;
 };
 
 export type SpreadsheetRenderRow = {
@@ -76,7 +86,9 @@ export type SpreadsheetRenderRow = {
 
 export type SpreadsheetRenderCell = {
   columnIndex: number;
+  columnPosition: number;
   value: string;
+  kind: SpreadsheetCellKind;
   colSpan: number;
   rowSpan: number;
 };
@@ -113,7 +125,9 @@ export function getSpreadsheetRenderRows(
       const column = sheet.columns[columnPosition];
       cells.push({
         columnIndex: column.columnIndex,
+        columnPosition,
         value: mergeCell?.merge.value ?? row.values[columnPosition] ?? "",
+        kind: mergeCell?.merge.kind ?? row.kinds[columnPosition] ?? "blank",
         colSpan: mergeCell?.colSpan ?? 1,
         rowSpan: mergeCell?.rowSpan ?? 1,
       });

@@ -448,7 +448,10 @@ source-code extensions)
   Hidden rows, columns, and sheets are omitted rather than revealed.
 - Status: met for the lightweight grid contract. Tests cover supported
   workbook families, formulas, sheet/row/column budgets, hidden content,
-  merged cells crossing virtual-window boundaries, and cancellation.
+  merged cells crossing virtual-window boundaries, and cancellation. The
+  visual surface uses a stable light worksheet canvas, native text/number/date
+  alignment, neutral row/column chrome, bottom sheet tabs, and no decorative
+  zebra striping. Product theming remains in the surrounding shell.
 
 **PowerPoint — `.pptx`, `.ppsx`**
 
@@ -469,7 +472,9 @@ source-code extensions)
   abortable lazy media/slides, a single-slide stage, and a familiar thumbnail
   rail. The former JSZip text extraction remains a visible fallback when
   visual rendering fails and uses the same deck-shaped navigation rather than
-  imitating paginated paper.
+  imitating paginated paper. The stage and rail share the application canvas,
+  the active thumbnail uses a presentation-specific accent, and the focused
+  stage supports Arrow, Page, Home, and End navigation.
 
 **Built-in Office product boundary**
 

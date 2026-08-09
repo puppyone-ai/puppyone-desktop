@@ -42,6 +42,33 @@ Legacy `.doc` and `.rtf` may use the macOS system converter to produce a
 temporary DOCX preview. This does not depend on an installed office suite and
 does not grant editing authority.
 
+Spreadsheet preview keeps the application shell themed while presenting the
+worksheet itself on a stable light canvas, matching the familiar workbook
+metaphor without pretending to reproduce Excel's style engine. The worker
+preserves formatted display values, native cell kinds for alignment, column
+widths, merges, physical row/column labels, and sheet order. The viewport is
+keyboard-scrollable and exposes virtualized row/column counts to assistive
+technology. Original fills, fonts, borders, charts, images, and pivots remain
+an explicit lightweight-preview limit.
+
+Presentation preview uses one application-colored stage and one thumbnail
+rail around the slide's own visual surface. It does not add an imitation
+PowerPoint ribbon or a second file header. Slides fit the available stage,
+thumbnail rendering remains lazy, and arrow/Page/Home/End navigation works
+from the focused stage. A presentation-specific semantic accent marks the
+active thumbnail without reusing an unrelated HTML token.
+
+The Office shell has an Electron computed-layout regression:
+
+```bash
+npm run smoke:office-preview-layout
+```
+
+It verifies the worksheet canvas, semantic alignment, row height, sticky row
+and column headers, bottom sheet tabs, presentation canvas unification,
+responsive thumbnail-rail widths, hidden stage overflow, and navigation
+placement using Chromium's computed layout rather than source-text assertions.
+
 ## Optional editor plugin handoff
 
 An Office editor is a separate product capability. Shared UI reserves only the

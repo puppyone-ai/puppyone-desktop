@@ -11,6 +11,7 @@ import {
   type SpreadsheetArchiveKind,
   type SpreadsheetBudgetTruncationReason,
   type SpreadsheetBudgetUsage,
+  type SpreadsheetCellKind,
   type SpreadsheetMerge,
   type SpreadsheetPreviewResult,
   type SpreadsheetSheet,
@@ -372,6 +373,7 @@ function createSpreadsheetRows(
 
   for (const rowIndex of rowIndices) {
     const values: string[] = [];
+    const kinds: SpreadsheetCellKind[] = [];
     let reservedCells = 0;
     let reservedStringBytes = 0;
 
@@ -389,10 +391,11 @@ function createSpreadsheetRows(
       reservedCells += 1;
       reservedStringBytes += stringBytes;
       values.push(value);
+      kinds.push(getSpreadsheetCellKind(cell));
     }
 
     budget.consumeReserved(reservedCells, reservedStringBytes);
-    rows.push({ rowIndex, values });
+    rows.push({ rowIndex, values, kinds });
     materializedRowIndices.push(rowIndex);
   }
 
@@ -436,6 +439,7 @@ function createSpreadsheetMerges(
       startColumn,
       endColumn,
       value,
+      kind: getSpreadsheetCellKind(cell),
     });
   }
 
@@ -467,6 +471,18 @@ export function getCellDisplayValue(cell: CellObject | undefined): string {
   if (cell.v instanceof Date) return cell.v.toLocaleDateString();
   if (cell.v === null || cell.v === undefined) return cell.f ? `=${cell.f}` : "";
   return String(cell.v);
+}
+
+export function getSpreadsheetCellKind(cell: CellObject | undefined): SpreadsheetCellKind {
+  if (!cell || (cell.t === "z" && !cell.f && (cell.v === undefined || cell.v === null))) {
+    return "blank";
+  }
+  if (cell.f && (cell.t === "z" || cell.v === undefined || cell.v === null)) return "text";
+  if (cell.v instanceof Date || cell.t === "d") return "date";
+  if (cell.t === "n") return "number";
+  if (cell.t === "b") return "boolean";
+  if (cell.t === "e") return "error";
+  return "text";
 }
 
 function getCellStringPayloadBytes(cell: CellObject | undefined, displayValue: string): number {

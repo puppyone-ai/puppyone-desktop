@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as XLSX from "xlsx";
-import { parseSpreadsheetPreview } from "../packages/shared-ui/src/editor/viewers/spreadsheetParser";
+import {
+  getSpreadsheetCellKind,
+  parseSpreadsheetPreview,
+} from "../packages/shared-ui/src/editor/viewers/spreadsheetParser";
 import {
   getSpreadsheetArchiveKind,
   getSpreadsheetRenderRows,
@@ -23,6 +26,18 @@ afterEach(() => {
 });
 
 describe("spreadsheet preview parsing", () => {
+  it("preserves native cell kinds for familiar worksheet alignment", () => {
+    expect(getSpreadsheetCellKind(undefined)).toBe("blank");
+    expect(getSpreadsheetCellKind({ t: "z" })).toBe("blank");
+    expect(getSpreadsheetCellKind({ t: "s", v: "Label" })).toBe("text");
+    expect(getSpreadsheetCellKind({ t: "n", v: 42 })).toBe("number");
+    expect(getSpreadsheetCellKind({ t: "d", v: new Date("2026-08-09") })).toBe("date");
+    expect(getSpreadsheetCellKind({ t: "b", v: true })).toBe("boolean");
+    expect(getSpreadsheetCellKind({ t: "e", v: 7 })).toBe("error");
+    expect(getSpreadsheetCellKind({ t: "z", f: "SUM(A1:A2)" })).toBe("text");
+    expect(getSpreadsheetCellKind({ t: "n", f: "SUM(A1:A2)" })).toBe("text");
+  });
+
   it.each(["xls", "xlsx", "xlsm", "xlsb", "ods"] as XLSX.BookType[])(
     "parses %s files through the normalized preview path",
     async (bookType) => {
@@ -141,6 +156,7 @@ describe("spreadsheet preview parsing", () => {
     expect(rows[0].cells[0]).toMatchObject({
       columnIndex: 0,
       value: "Merged",
+      kind: "text",
       rowSpan: 3,
       colSpan: 1,
     });

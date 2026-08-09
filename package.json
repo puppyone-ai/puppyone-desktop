@@ -50,6 +50,7 @@
     "smoke:local-api": "node scripts/smoke-local-api.mjs",
     "smoke:format-aware-diff": "electron scripts/smoke-format-aware-diff.mjs",
     "smoke:csv-table-layout": "electron scripts/smoke-csv-table-sticky-layout.mjs",
+    "smoke:office-preview-layout": "electron scripts/smoke-office-preview-layout.mjs",
     "smoke:markdown-table-inline-viewport": "electron scripts/smoke-markdown-table-inline-viewport.mjs",
     "smoke:codex-agent": "node scripts/smoke-codex-app-server.mjs",
     "smoke:agent-references": "electron scripts/smoke-agent-reference-ingestion.mjs",

@@ -8,7 +8,14 @@ import {
   PencilLine,
   Plus,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from "react";
 import type { PptxViewer, SlideHandle } from "@aiden0z/pptx-renderer";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
@@ -25,6 +32,7 @@ import {
   OfficeResourceLimitError,
 } from "./officeResourceLoader";
 import { extractOfficeTextFallbackInWorker } from "./officeTextFallbackClient";
+import { getPresentationNavigationTarget } from "./presentationPreview";
 import {
   getSpreadsheetArchiveKind,
   getSpreadsheetRenderRows,
@@ -83,7 +91,7 @@ type PresentationSlide = {
   lines: string[];
 };
 
-const SPREADSHEET_ROW_HEIGHT = 30;
+const SPREADSHEET_ROW_HEIGHT = 28;
 const SPREADSHEET_OVERSCAN_ROWS = 12;
 const LEGACY_WORD_EXTENSIONS = new Set(["doc"]);
 const LEGACY_PRESENTATION_EXTENSIONS = new Set(["ppt", "pps"]);
@@ -508,7 +516,18 @@ function PresentationTextPreview({
             </button>
           ))}
         </aside>
-        <div className="office-pptx-stage">
+        <div
+          className="office-pptx-stage"
+          role="group"
+          tabIndex={0}
+          aria-label={t("editor.office.slides")}
+          onKeyDown={(event) => handlePresentationNavigationKeyDown(
+            event,
+            activeSlide,
+            slides.length,
+            setActiveSlide,
+          )}
+        >
           <article className="office-pptx-text-slide">
             <h2 dir="auto">
               {selectedSlide.title ?? t("editor.office.slideNumber", { number: selectedSlide.index })}
@@ -691,7 +710,18 @@ function PptxPresentationPreview({
             />
           ))}
         </aside>
-        <div className="office-pptx-stage">
+        <div
+          className="office-pptx-stage"
+          role="group"
+          tabIndex={0}
+          aria-label={t("editor.office.slides")}
+          onKeyDown={(event) => handlePresentationNavigationKeyDown(
+            event,
+            activeSlide,
+            viewerState?.slideCount ?? 0,
+            (index) => void viewerState?.viewer.goToSlide(index),
+          )}
+        >
           <div
             ref={hostRef}
             className="office-pptx-render-host"
@@ -817,6 +847,22 @@ function PresentationNavigation({
   );
 }
 
+function handlePresentationNavigationKeyDown(
+  event: ReactKeyboardEvent<HTMLElement>,
+  activeSlide: number,
+  slideCount: number,
+  onSelect: (index: number) => void,
+): void {
+  const target = getPresentationNavigationTarget({
+    key: event.key,
+    activeSlide,
+    slideCount,
+  });
+  if (target === null) return;
+  event.preventDefault();
+  if (target !== activeSlide) onSelect(target);
+}
+
 function SpreadsheetPreview({
   result,
   activeSheet,
@@ -837,6 +883,7 @@ function SpreadsheetPreview({
     if (!gridWrap) return undefined;
 
     gridWrap.scrollTop = 0;
+    gridWrap.scrollLeft = 0;
     const updateViewport = () => {
       setViewport({
         scrollTop: gridWrap.scrollTop,
@@ -880,14 +927,25 @@ function SpreadsheetPreview({
   };
 
   return (
-    <div className="office-spreadsheet-preview">
+    <div
+      className="office-spreadsheet-preview"
+      style={{ "--office-sheet-row-height": `${SPREADSHEET_ROW_HEIGHT}px` } as CSSProperties}
+    >
       <div
         className="office-spreadsheet-grid-wrap"
         data-po-scrollbar="content"
         ref={gridWrapRef}
+        role="region"
+        tabIndex={0}
+        aria-label={selectedSheet.name}
         onScroll={handleScroll}
       >
-        <table className="office-spreadsheet-grid">
+        <table
+          className="office-spreadsheet-grid"
+          aria-rowcount={selectedSheet.rows.length + 1}
+          aria-colcount={selectedSheet.columns.length + 1}
+        >
+          <caption className="sr-only">{selectedSheet.name}</caption>
           <colgroup>
             <col className="office-spreadsheet-grid__row-header-col" />
             {selectedSheet.columns.map((column) => (
@@ -897,11 +955,12 @@ function SpreadsheetPreview({
           <thead>
             <tr>
               <th className="office-spreadsheet-grid__corner" aria-hidden="true" />
-              {selectedSheet.columns.map((column) => (
+              {selectedSheet.columns.map((column, columnPosition) => (
                 <th
                   className="office-spreadsheet-grid__column-header"
                   key={column.columnIndex}
                   scope="col"
+                  aria-colindex={columnPosition + 2}
                 >
                   {spreadsheetColumnLabel(column.columnIndex)}
                 </th>
@@ -914,16 +973,23 @@ function SpreadsheetPreview({
                 <td colSpan={columnSpan} style={{ height: topSpacerHeight }} />
               </tr>
             )}
-            {renderedRows.map((row) => (
-              <tr key={row.rowIndex}>
-                <th className="office-spreadsheet-grid__row-header" scope="row">
+            {renderedRows.map((row, rowOffset) => (
+              <tr key={row.rowIndex} aria-rowindex={startRow + rowOffset + 2}>
+                <th
+                  className="office-spreadsheet-grid__row-header"
+                  scope="row"
+                  aria-colindex={1}
+                >
                   {formatNumber(row.rowIndex + 1)}
                 </th>
                 {row.cells.map((cell) => (
                   <td
                     key={`${row.rowIndex}-${cell.columnIndex}`}
+                    data-cell-kind={cell.kind}
+                    aria-colindex={cell.columnPosition + 2}
                     colSpan={cell.colSpan > 1 ? cell.colSpan : undefined}
                     rowSpan={cell.rowSpan > 1 ? cell.rowSpan : undefined}
+                    title={cell.value || undefined}
                   >
                     <span dir="auto">{cell.value}</span>
                   </td>
@@ -955,6 +1021,7 @@ function SpreadsheetPreview({
             type="button"
             role="tab"
             aria-selected={index === activeSheet}
+            title={sheet.name}
             onClick={() => onActiveSheetChange(index)}
           >
             <span dir="auto">{sheet.name}</span>
