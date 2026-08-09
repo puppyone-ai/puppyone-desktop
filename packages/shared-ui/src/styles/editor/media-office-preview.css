@@ -64,6 +64,96 @@
   color: var(--po-text);
 }
 
+.office-preview__header {
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 8px 5px 12px;
+  border-bottom: 1px solid var(--po-divider);
+  background: color-mix(in srgb, var(--po-panel-raised) 92%, var(--po-editor-bg));
+}
+
+.office-preview__identity,
+.office-preview__header-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.office-preview__identity {
+  gap: 7px;
+}
+
+.office-preview__identity strong {
+  max-width: min(320px, 36vw);
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.office-preview__format,
+.office-preview__mode {
+  flex: 0 0 auto;
+  color: var(--po-text-subtle);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  line-height: 18px;
+}
+
+.office-preview__format {
+  padding: 0 6px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--po-control) 72%, transparent);
+}
+
+.office-preview__mode::before {
+  margin-right: 7px;
+  color: var(--po-divider);
+  content: "·";
+}
+
+.office-preview__header-actions {
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.office-preview__header-error {
+  max-width: min(360px, 38vw);
+  overflow: hidden;
+  color: var(--po-danger);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.office-preview__toolbar-button {
+  display: inline-grid;
+  width: 28px;
+  height: 26px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--desktop-control-radius, 6px);
+  background: transparent;
+  color: var(--po-text-muted);
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.office-preview__toolbar-button:hover {
+  background: var(--po-control-hover);
+  color: var(--po-text);
+}
+
 .office-preview__note {
   color: var(--po-text-muted);
   font-size: 11px;
@@ -90,7 +180,8 @@
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 18px 18px 42px;
+  padding: 24px 24px 48px;
+  background: color-mix(in srgb, var(--po-inset) 58%, var(--po-editor-bg));
 }
 
 .office-document-preview {
@@ -98,7 +189,7 @@
   align-items: center;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 16px;
 }
 
 .office-document-preview--docx {
@@ -192,10 +283,12 @@
   min-height: 900px;
   padding: 46px 54px;
   border: 1px solid var(--po-border-subtle);
-  border-radius: 6px;
+  border-radius: 3px;
   background: var(--po-panel-raised);
   color: var(--po-text);
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--po-shadow) 10%, transparent);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--po-shadow) 12%, transparent),
+    0 12px 32px color-mix(in srgb, var(--po-shadow) 13%, transparent);
   font-size: 13px;
   line-height: 1.65;
 }
@@ -261,9 +354,9 @@
   height: var(--desktop-sidebar-nav-height, 38px);
   min-height: var(--desktop-sidebar-nav-height, 38px);
   align-items: center;
-  padding: 4px 12px;
-  background: var(--po-editor-bg);
-  box-shadow: inset 0 -1px 0 var(--po-border-subtle);
+  padding: 4px 12px 4px 48px;
+  border-top: 1px solid var(--po-border-subtle);
+  background: color-mix(in srgb, var(--po-panel) 84%, var(--po-editor-bg));
 }
 
 .office-spreadsheet-tabs button {
@@ -294,9 +387,11 @@
 }
 
 .office-spreadsheet-tabs button[aria-selected="true"] {
-  background: var(--po-control);
+  background: var(--po-panel-raised);
   color: var(--po-text);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-border) 74%, transparent);
+  box-shadow:
+    inset 0 -2px 0 var(--po-file-accent-sheet),
+    inset 0 0 0 1px color-mix(in srgb, var(--po-border) 68%, transparent);
 }
 
 .office-spreadsheet-grid-wrap {
@@ -337,7 +432,7 @@
   white-space: nowrap;
 }
 
-.office-spreadsheet-grid th {
+.office-spreadsheet-grid__row-header {
   position: sticky;
   left: 0;
   z-index: 1;
@@ -347,6 +442,26 @@
   font-size: 11px;
   font-weight: 650;
   text-align: center;
+}
+
+.office-spreadsheet-grid__column-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--po-panel);
+  color: var(--po-text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.office-spreadsheet-grid__corner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  width: 42px;
+  background: var(--po-panel);
 }
 
 .office-spreadsheet-grid td {
@@ -372,9 +487,10 @@
 }
 
 .office-presentation-preview {
-  display: grid;
-  align-content: start;
-  gap: 12px;
+  display: flex;
+  padding: 0;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .office-pptx-render-preview {
@@ -389,16 +505,102 @@
   overflow: hidden;
 }
 
+.office-pptx-workspace {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--po-inset) 74%, var(--po-editor-bg));
+}
+
+.office-pptx-thumbnail-rail {
+  box-sizing: border-box;
+  display: flex;
+  width: 172px;
+  min-width: 132px;
+  flex: 0 0 clamp(132px, 19vw, 172px);
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 10px 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-right: 1px solid var(--po-border-subtle);
+  background: color-mix(in srgb, var(--po-panel) 88%, var(--po-editor-bg));
+}
+
+.office-pptx-thumbnail {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--po-text-subtle);
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.office-pptx-thumbnail:hover {
+  background: color-mix(in srgb, var(--po-control-hover) 72%, transparent);
+  color: var(--po-text);
+}
+
+.office-pptx-thumbnail[aria-selected="true"] {
+  border-color: color-mix(in srgb, var(--po-file-accent-html) 62%, var(--po-border));
+  background: color-mix(in srgb, var(--po-file-accent-html) 9%, var(--po-panel-raised));
+  color: var(--po-text);
+}
+
+.office-pptx-thumbnail__number {
+  padding-top: 4px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: right;
+}
+
+.office-pptx-thumbnail__frame {
+  display: grid;
+  width: 100%;
+  min-height: 62px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--po-border) 78%, transparent);
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 2px 7px color-mix(in srgb, var(--po-shadow) 12%, transparent);
+}
+
+.office-pptx-stage {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 28px 62px;
+  overflow: hidden;
+}
+
 .office-pptx-render-host {
   box-sizing: border-box;
+  display: flex;
   flex: 1;
   width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
+  align-items: center;
+  justify-content: center;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 18px;
 }
 
 .office-pptx-render-host[data-rendering="true"] {
@@ -415,52 +617,156 @@
   pointer-events: none;
 }
 
-.office-slide-card {
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  gap: 12px;
-  width: min(760px, 100%);
-  padding: 14px;
-  border: 1px solid var(--po-border-subtle);
-  border-radius: 6px;
-  background: var(--po-panel-raised);
-}
-
-.office-slide-card__number {
+.office-pptx-navigation {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
   display: inline-flex;
-  width: 30px;
-  height: 24px;
+  height: 30px;
   align-items: center;
-  justify-content: center;
-  border-radius: 5px;
-  background: var(--po-control);
+  gap: 4px;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--po-divider) 84%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel-raised) 94%, transparent);
+  box-shadow: var(--po-shadow-sm);
   color: var(--po-text-muted);
-  font-size: 11px;
-  font-weight: 700;
+  transform: translateX(-50%);
 }
 
-.office-slide-card__content {
-  min-width: 0;
+.office-pptx-navigation button {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
-.office-slide-card h2 {
-  margin: 0 0 8px;
+.office-pptx-navigation button:hover:not(:disabled) {
+  background: var(--po-control-hover);
   color: var(--po-text);
-  font-size: 15px;
-  font-weight: 650;
+}
+
+.office-pptx-navigation button:disabled {
+  opacity: 0.34;
+  cursor: default;
+}
+
+.office-pptx-navigation span {
+  min-width: 58px;
+  padding: 0 3px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.office-pptx-thumbnail-rail--text {
+  gap: 6px;
+}
+
+.office-pptx-text-thumbnail {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--po-text-muted);
+  text-align: left;
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.office-pptx-text-thumbnail:hover {
+  background: var(--po-control-hover);
+}
+
+.office-pptx-text-thumbnail[aria-selected="true"] {
+  border-color: color-mix(in srgb, var(--po-file-accent-html) 58%, var(--po-border));
+  background: color-mix(in srgb, var(--po-file-accent-html) 9%, var(--po-panel-raised));
+}
+
+.office-pptx-text-thumbnail span {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.office-pptx-text-thumbnail strong {
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.office-pptx-text-slide {
+  box-sizing: border-box;
+  width: min(920px, 100%);
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  padding: clamp(24px, 5vw, 64px);
+  overflow: auto;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 14px 40px color-mix(in srgb, var(--po-shadow) 18%, transparent);
+  color: #242424;
+}
+
+.office-pptx-text-slide h2 {
+  margin: 0 0 8px;
+  color: inherit;
+  font-size: clamp(20px, 3vw, 36px);
+  font-weight: 600;
   line-height: 1.35;
 }
 
-.office-slide-card ul,
-.office-slide-card p {
+.office-pptx-text-slide ul,
+.office-pptx-text-slide p {
   margin: 0;
-  color: var(--po-text-muted);
-  font-size: 13px;
-  line-height: 1.55;
+  color: #555;
+  font-size: clamp(13px, 1.6vw, 20px);
+  line-height: 1.5;
 }
 
-.office-slide-card ul {
-  padding-left: 18px;
+.office-pptx-text-slide ul {
+  padding-left: 1.4em;
+}
+
+@media (max-width: 720px) {
+  .office-preview__mode {
+    display: none;
+  }
+
+  .office-pptx-thumbnail-rail {
+    width: 112px;
+    min-width: 96px;
+    flex-basis: 112px;
+    padding-inline: 7px;
+  }
+
+  .office-pptx-thumbnail {
+    grid-template-columns: 14px minmax(0, 1fr);
+    gap: 4px;
+    padding: 3px;
+  }
+
+  .office-pptx-thumbnail__frame {
+    min-height: 42px;
+  }
+
+  .office-pptx-stage {
+    padding: 18px 18px 56px;
+  }
 }
 
 .office-preview-empty {

@@ -457,7 +457,8 @@ source-code extensions)
   images, tables, charts, SmartArt, gradients, groups, embedded fonts;
   verified upstream against PowerPoint ground truth with 450+ visual
   regression cases. Loaded via dynamic `import()` like every heavy
-  parser; large decks use its `lazyMedia`/`lazySlides`/windowed options.
+  parser; large decks use its `lazyMedia`/`lazySlides` options and lazily
+  mounted thumbnails.
   Render failure falls back to the unsupported state with external-open.
 - Risk note (deliberate): the library is young (first published
   2026-02) but rigorously tested and actively released; as a lazy-loaded
@@ -465,8 +466,22 @@ source-code extensions)
   Keep the current text-extraction path as the fallback branch rather
   than deleting it.
 - Status: met. The visual renderer uses recommended ZIP limits,
-  abortable lazy media/slides, and a windowed list; the former JSZip text
-  extraction remains a visible fallback when visual rendering fails.
+  abortable lazy media/slides, a single-slide stage, and a familiar thumbnail
+  rail. The former JSZip text extraction remains a visible fallback when
+  visual rendering fails and uses the same deck-shaped navigation rather than
+  imitating paginated paper.
+
+**Built-in Office product boundary**
+
+- `office-preview` is deliberately a lightweight, read-only surface. Its
+  shared shell may identify the file, state that it is a preview, navigate
+  pages/sheets/slides, and open the file in the default desktop application.
+- It does not expose editing, Agent refinement, or an imitation Office ribbon.
+  Full Office editing belongs to an optional Viewer/Editor Pack installed
+  through the plugin marketplace, outside the built-in preview runtime.
+- Familiarity comes from each document metaphor inside one shell: paginated
+  paper for Word, sticky row/column headers with bottom sheet tabs for
+  spreadsheets, and thumbnail navigation plus a central stage for PowerPoint.
 
 **PowerPoint — `.ppt`, `.pps` (legacy)**
 

@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { PptxViewer, SlideHandle } from "@aiden0z/pptx-renderer";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import { FileGlyphIcon } from "../../file/fileIcons";
 import {
   assertDocxDomWithinBudget,
   CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE,
@@ -105,6 +108,7 @@ type OfficeViewerProps = Pick<
   | "openExternalFile"
   | "convertOfficeDocumentToDocx"
   | "markdownLinkGraph"
+  | "fileIconTheme"
 >;
 
 export function OfficeViewer({
@@ -116,6 +120,7 @@ export function OfficeViewer({
   openExternalFile,
   convertOfficeDocumentToDocx,
   markdownLinkGraph,
+  fileIconTheme,
 }: OfficeViewerProps) {
   const { t } = useLocalization();
   const [state, setState] = useState<OfficeState>({ status: "idle" });
@@ -124,6 +129,7 @@ export function OfficeViewer({
   const canUseNativeDocxConversion = Boolean(
     convertOfficeDocumentToDocx && NATIVE_DOCX_CONVERTIBLE_EXTENSIONS.has(extension),
   );
+  const surfaceKind = getOfficePreviewSurfaceKind(extension);
   const previewResourceUrl = canUseNativeDocxConversion ? null : fileUrl;
   const previewResourceLoading = canUseNativeDocxConversion ? false : fileUrlLoading;
 
@@ -167,8 +173,9 @@ export function OfficeViewer({
     };
   }, [canUseNativeDocxConversion, convertOfficeDocumentToDocx, document.name, document.path, extension, previewResourceLoading, previewResourceUrl]);
 
+  let previewBody: ReactNode;
   if (fileUrlError && !canUseNativeDocxConversion) {
-    return (
+    previewBody = (
       <OfficeEmptyState
         title={t("editor.office.loadFailed")}
         message={fileUrlError}
@@ -176,14 +183,14 @@ export function OfficeViewer({
         openExternalFile={openExternalFile}
       />
     );
-  }
-
-  if ((previewResourceLoading || state.status === "loading") && !previewResourceUrl && !canUseNativeDocxConversion) {
-    return <div className="editor-state">{t("editor.preview.loading")}</div>;
-  }
-
-  if (!previewResourceUrl && !canUseNativeDocxConversion && state.status !== "ready") {
-    return (
+  } else if (
+    (previewResourceLoading || state.status === "loading")
+    && !previewResourceUrl
+    && !canUseNativeDocxConversion
+  ) {
+    previewBody = <div className="editor-state">{t("editor.preview.loading")}</div>;
+  } else if (!previewResourceUrl && !canUseNativeDocxConversion && state.status !== "ready") {
+    previewBody = (
       <OfficeEmptyState
         title={t("editor.preview.unavailable")}
         message={t("editor.office.resourceUnavailable")}
@@ -191,11 +198,9 @@ export function OfficeViewer({
         openExternalFile={openExternalFile}
       />
     );
-  }
-
-  return (
-    <div className="office-preview">
-      <div className="office-preview__body">
+  } else {
+    previewBody = (
+      <>
         {state.status === "error" && (
           <OfficeEmptyState
             title={t("editor.preview.failed")}
@@ -217,8 +222,76 @@ export function OfficeViewer({
             openExternalUrl={markdownLinkGraph?.openExternalUrl}
           />
         )}
+      </>
+    );
+  }
+
+  return (
+    <div className="office-preview" data-office-kind={surfaceKind}>
+      <OfficePreviewHeader
+        documentName={document.name}
+        documentPath={document.path}
+        extension={extension}
+        fileIconTheme={fileIconTheme}
+        openExternalFile={openExternalFile}
+      />
+      <div className="office-preview__body">
+        {previewBody}
       </div>
     </div>
+  );
+}
+
+function OfficePreviewHeader({
+  documentName,
+  documentPath,
+  extension,
+  fileIconTheme,
+  openExternalFile,
+}: {
+  documentName: string;
+  documentPath: string;
+  extension: string;
+  fileIconTheme?: OfficeViewerProps["fileIconTheme"];
+  openExternalFile?: (path: string) => Promise<void>;
+}) {
+  const { t } = useLocalization();
+  const [externalOpenError, setExternalOpenError] = useState<string | null>(null);
+  const openExternally = () => {
+    if (!openExternalFile) return;
+    setExternalOpenError(null);
+    void Promise.resolve().then(() => openExternalFile(documentPath)).catch((error) => {
+      setExternalOpenError(error instanceof Error ? error.message : String(error));
+    });
+  };
+
+  return (
+    <header className="office-preview__header">
+      <div className="office-preview__identity">
+        <FileGlyphIcon name={documentName} size={16} theme={fileIconTheme} />
+        <strong dir="auto" title={documentName}>{documentName}</strong>
+        <span className="office-preview__format">{extension.toUpperCase()}</span>
+        <span className="office-preview__mode">{t("editor.office.preview")}</span>
+      </div>
+      <div className="office-preview__header-actions">
+        {externalOpenError && (
+          <span className="office-preview__header-error" role="alert" dir="auto">
+            {t("editor.office.openDesktopFailed", { detail: bidiIsolate(externalOpenError) })}
+          </span>
+        )}
+        {openExternalFile && (
+          <button
+            type="button"
+            className="office-preview__toolbar-button"
+            aria-label={t("editor.openDefaultApp")}
+            title={t("editor.openDefaultApp")}
+            onClick={openExternally}
+          >
+            <ExternalLink size={14} strokeWidth={2} />
+          </button>
+        )}
+      </div>
+    </header>
   );
 }
 
@@ -314,6 +387,12 @@ function PresentationTextPreview({
   truncatedSlideCount?: number;
 }) {
   const { formatNumber, t } = useLocalization();
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  useEffect(() => {
+    setActiveSlide(0);
+  }, [slides]);
+
   if (slides.length === 0) {
     return (
       <OfficeEmptyState
@@ -323,32 +402,61 @@ function PresentationTextPreview({
     );
   }
 
+  const selectedSlide = slides[Math.min(activeSlide, slides.length - 1)];
+
   return (
-    <div className="office-presentation-preview" data-po-scrollbar="content">
+    <div className="office-presentation-preview office-presentation-preview--text">
       {truncatedSlideCount > 0 && (
         <div className="office-preview__note">
           {t("editor.office.omittedSlidesSafety", { count: truncatedSlideCount })}
         </div>
       )}
-      {slides.map((slide) => (
-        <article className="office-slide-card" key={slide.index}>
-          <div className="office-slide-card__number">{formatNumber(slide.index)}</div>
-          <div className="office-slide-card__content">
+      <div className="office-pptx-workspace">
+        <aside
+          className="office-pptx-thumbnail-rail office-pptx-thumbnail-rail--text"
+          data-po-scrollbar="content"
+          role="tablist"
+          aria-label={t("editor.office.slides")}
+        >
+          {slides.map((slide, index) => (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={index === activeSlide}
+              aria-label={t("editor.office.slideNumber", { number: slide.index })}
+              className="office-pptx-text-thumbnail"
+              key={slide.index}
+              onClick={() => setActiveSlide(index)}
+            >
+              <span>{formatNumber(slide.index)}</span>
+              <strong dir="auto">
+                {slide.title ?? t("editor.office.slideNumber", { number: slide.index })}
+              </strong>
+            </button>
+          ))}
+        </aside>
+        <div className="office-pptx-stage">
+          <article className="office-pptx-text-slide">
             <h2 dir="auto">
-              {slide.title ?? t("editor.office.slideNumber", { number: slide.index })}
+              {selectedSlide.title ?? t("editor.office.slideNumber", { number: selectedSlide.index })}
             </h2>
-            {slide.lines.length > 0 ? (
+            {selectedSlide.lines.length > 0 ? (
               <ul>
-                {slide.lines.map((line, index) => (
+                {selectedSlide.lines.map((line, index) => (
                   <li dir="auto" key={`${line}-${index}`}>{line}</li>
                 ))}
               </ul>
             ) : (
               <p>{t("editor.office.noSlideReadableText")}</p>
             )}
-          </div>
-        </article>
-      ))}
+          </article>
+          <PresentationNavigation
+            activeSlide={activeSlide}
+            slideCount={slides.length}
+            onSelect={setActiveSlide}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -364,6 +472,8 @@ function PptxPresentationPreview({
 }) {
   const { t } = useLocalization();
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const thumbnailRailRef = useRef<HTMLElement | null>(null);
+  const [activeSlide, setActiveSlide] = useState(0);
   const [renderState, setRenderState] = useState<
     | { status: "loading" | "ready" }
     | {
@@ -374,6 +484,10 @@ function PptxPresentationPreview({
     }
     | { status: "error"; renderDetail: string; fallbackDetail: string }
   >({ status: "loading" });
+  const [viewerState, setViewerState] = useState<{
+    viewer: PptxViewer;
+    slideCount: number;
+  } | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -381,10 +495,12 @@ function PptxPresentationPreview({
 
     const abortController = new AbortController();
     let cancelled = false;
-    let viewer: { destroy: () => void } | null = null;
+    let viewer: PptxViewer | null = null;
 
     host.replaceChildren();
+    setActiveSlide(0);
     setRenderState({ status: "loading" });
+    setViewerState(null);
 
     import("@aiden0z/pptx-renderer")
       .then(({ PptxViewer, RECOMMENDED_ZIP_LIMITS }) => PptxViewer.open(arrayBuffer.slice(0), host, {
@@ -392,13 +508,11 @@ function PptxPresentationPreview({
         lazyMedia: true,
         lazySlides: true,
         pdfjs: false,
-        renderMode: "list",
+        renderMode: "slide",
         signal: abortController.signal,
         zipLimits: RECOMMENDED_ZIP_LIMITS,
-        listOptions: {
-          windowed: true,
-          initialSlides: 4,
-          batchSize: 4,
+        onSlideChange: (index) => {
+          if (!cancelled) setActiveSlide(index);
         },
       }))
       .then((nextViewer) => {
@@ -407,6 +521,8 @@ function PptxPresentationPreview({
           return;
         }
         viewer = nextViewer;
+        setActiveSlide(nextViewer.currentSlideIndex);
+        setViewerState({ viewer: nextViewer, slideCount: nextViewer.slideCount });
         setRenderState({ status: "ready" });
       })
       .catch(async (error) => {
@@ -442,6 +558,14 @@ function PptxPresentationPreview({
     };
   }, [arrayBuffer]);
 
+  useEffect(() => {
+    if (!thumbnailRailRef.current) return;
+    const activeButton = thumbnailRailRef.current.querySelector<HTMLElement>(
+      `[data-slide-index="${activeSlide}"]`,
+    );
+    activeButton?.scrollIntoView({ block: "nearest" });
+  }, [activeSlide]);
+
   if (renderState.status === "fallback") {
     return (
       <div className="office-pptx-render-preview">
@@ -472,15 +596,147 @@ function PptxPresentationPreview({
 
   return (
     <div className="office-pptx-render-preview">
-      <div
-        ref={hostRef}
-        className="office-pptx-render-host"
-        data-po-scrollbar="content"
-        data-rendering={renderState.status === "loading" ? "true" : undefined}
-      />
-      {renderState.status === "loading" && (
-        <div className="office-pptx-render-state">{t("editor.office.renderingPresentation")}</div>
-      )}
+      <div className="office-pptx-workspace">
+        <aside
+          ref={thumbnailRailRef}
+          className="office-pptx-thumbnail-rail"
+          data-po-scrollbar="content"
+          role="tablist"
+          aria-label={t("editor.office.slides")}
+        >
+          {viewerState && Array.from({ length: viewerState.slideCount }, (_, index) => (
+            <PptxThumbnail
+              key={index}
+              viewer={viewerState.viewer}
+              slideIndex={index}
+              active={index === activeSlide}
+              scrollRoot={thumbnailRailRef.current}
+              onSelect={() => void viewerState.viewer.goToSlide(index)}
+            />
+          ))}
+        </aside>
+        <div className="office-pptx-stage">
+          <div
+            ref={hostRef}
+            className="office-pptx-render-host"
+            data-po-scrollbar="content"
+            data-rendering={renderState.status === "loading" ? "true" : undefined}
+          />
+          {renderState.status === "loading" && (
+            <div className="office-pptx-render-state">{t("editor.office.renderingPresentation")}</div>
+          )}
+          {viewerState?.slideCount === 0 && (
+            <div className="office-pptx-render-state">{t("editor.office.emptyPresentation")}</div>
+          )}
+          {viewerState && viewerState.slideCount > 0 && (
+            <PresentationNavigation
+              activeSlide={activeSlide}
+              slideCount={viewerState.slideCount}
+              onSelect={(index) => void viewerState.viewer.goToSlide(index)}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PptxThumbnail({
+  viewer,
+  slideIndex,
+  active,
+  scrollRoot,
+  onSelect,
+}: {
+  viewer: PptxViewer;
+  slideIndex: number;
+  active: boolean;
+  scrollRoot: HTMLElement | null;
+  onSelect: () => void;
+}) {
+  const { formatNumber, t } = useLocalization();
+  const hostRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return undefined;
+    let handle: SlideHandle | null = null;
+    let observer: IntersectionObserver | null = null;
+    let disposed = false;
+
+    const renderThumbnail = () => {
+      if (disposed || handle) return;
+      const width = Math.max(72, host.clientWidth || 112);
+      handle = viewer.renderThumbnailToContainer(slideIndex, host, { width });
+      void handle?.ready.catch(() => undefined);
+      observer?.disconnect();
+    };
+
+    if (typeof IntersectionObserver === "undefined") {
+      renderThumbnail();
+    } else {
+      observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) renderThumbnail();
+      }, {
+        root: scrollRoot,
+        rootMargin: "240px 0px",
+      });
+      observer.observe(host);
+    }
+
+    return () => {
+      disposed = true;
+      observer?.disconnect();
+      handle?.dispose();
+      host.replaceChildren();
+    };
+  }, [scrollRoot, slideIndex, viewer]);
+
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      aria-label={t("editor.office.slideNumber", { number: slideIndex + 1 })}
+      className="office-pptx-thumbnail"
+      data-slide-index={slideIndex}
+      onClick={onSelect}
+    >
+      <span className="office-pptx-thumbnail__number">{formatNumber(slideIndex + 1)}</span>
+      <span className="office-pptx-thumbnail__frame" ref={hostRef} aria-hidden="true" />
+    </button>
+  );
+}
+
+function PresentationNavigation({
+  activeSlide,
+  slideCount,
+  onSelect,
+}: {
+  activeSlide: number;
+  slideCount: number;
+  onSelect: (index: number) => void;
+}) {
+  const { t } = useLocalization();
+  return (
+    <div className="office-pptx-navigation">
+      <button
+        type="button"
+        aria-label={t("editor.office.previousSlide")}
+        disabled={activeSlide <= 0}
+        onClick={() => onSelect(Math.max(0, activeSlide - 1))}
+      >
+        <ChevronLeft size={15} strokeWidth={2} />
+      </button>
+      <span>{t("editor.office.slidePosition", { current: activeSlide + 1, total: slideCount })}</span>
+      <button
+        type="button"
+        aria-label={t("editor.office.nextSlide")}
+        disabled={activeSlide >= slideCount - 1}
+        onClick={() => onSelect(Math.min(slideCount - 1, activeSlide + 1))}
+      >
+        <ChevronRight size={15} strokeWidth={2} />
+      </button>
     </div>
   );
 }
@@ -550,24 +806,6 @@ function SpreadsheetPreview({
   return (
     <div className="office-spreadsheet-preview">
       <div
-        className="office-spreadsheet-tabs"
-        data-po-scrollbar="horizontal"
-        role="tablist"
-        aria-label={t("editor.office.sheets")}
-      >
-        {result.sheets.map((sheet, index) => (
-          <button
-            key={sheet.name}
-            type="button"
-            role="tab"
-            aria-selected={index === activeSheet}
-            onClick={() => onActiveSheetChange(index)}
-          >
-            <span dir="auto">{sheet.name}</span>
-          </button>
-        ))}
-      </div>
-      <div
         className="office-spreadsheet-grid-wrap"
         data-po-scrollbar="content"
         ref={gridWrapRef}
@@ -580,6 +818,20 @@ function SpreadsheetPreview({
               <col key={column.columnIndex} style={{ width: column.width }} />
             ))}
           </colgroup>
+          <thead>
+            <tr>
+              <th className="office-spreadsheet-grid__corner" aria-hidden="true" />
+              {selectedSheet.columns.map((column) => (
+                <th
+                  className="office-spreadsheet-grid__column-header"
+                  key={column.columnIndex}
+                  scope="col"
+                >
+                  {spreadsheetColumnLabel(column.columnIndex)}
+                </th>
+              ))}
+            </tr>
+          </thead>
           <tbody>
             {topSpacerHeight > 0 && (
               <tr className="office-spreadsheet-grid__spacer" aria-hidden="true">
@@ -588,7 +840,9 @@ function SpreadsheetPreview({
             )}
             {renderedRows.map((row) => (
               <tr key={row.rowIndex}>
-                <th scope="row">{formatNumber(row.rowIndex + 1)}</th>
+                <th className="office-spreadsheet-grid__row-header" scope="row">
+                  {formatNumber(row.rowIndex + 1)}
+                </th>
                 {row.cells.map((cell) => (
                   <td
                     key={`${row.rowIndex}-${cell.columnIndex}`}
@@ -613,8 +867,37 @@ function SpreadsheetPreview({
           {previewNotes.join(" ")}
         </div>
       )}
+      <div
+        className="office-spreadsheet-tabs"
+        data-po-scrollbar="horizontal"
+        role="tablist"
+        aria-label={t("editor.office.sheets")}
+      >
+        {result.sheets.map((sheet, index) => (
+          <button
+            key={sheet.name}
+            type="button"
+            role="tab"
+            aria-selected={index === activeSheet}
+            onClick={() => onActiveSheetChange(index)}
+          >
+            <span dir="auto">{sheet.name}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
+}
+
+function spreadsheetColumnLabel(columnIndex: number): string {
+  let value = Math.max(0, columnIndex) + 1;
+  let label = "";
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    label = String.fromCharCode(65 + remainder) + label;
+    value = Math.floor((value - 1) / 26);
+  }
+  return label;
 }
 
 function createSpreadsheetPreviewNotes(
@@ -1089,6 +1372,17 @@ function getExtension(filename: string): string {
   return match ? match[1] : "";
 }
 
+function getOfficePreviewSurfaceKind(
+  extension: string,
+): "word" | "spreadsheet" | "presentation" | "document" {
+  if (["ppt", "pps", "pptx", "ppsx", "odp", "otp"].includes(extension)) {
+    return "presentation";
+  }
+  if (isSpreadsheetExtension(extension)) return "spreadsheet";
+  if (["doc", "docx", "rtf", "odt", "ott"].includes(extension)) return "word";
+  return "document";
+}
+
 function isWordExtension(extension: string): boolean {
   return extension === "docx";
 }
@@ -1224,8 +1518,10 @@ const DOCX_SHADOW_BASE_CSS = `
   }
 
   .office-docx-body .office-docx {
-    margin: 0 auto 18px !important;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+    margin: 0 auto 20px !important;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.13);
   }
 
   [${CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE}] {
