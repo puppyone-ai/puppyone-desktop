@@ -28,7 +28,7 @@ describe("local repository application shell", () => {
     expect(getWorkspaceSwitcherItems({ workspaces: [workspace] })).toEqual([{
       id: "local-1",
       label: "Notes",
-      detail: "/Users/example/Notes",
+      detail: "~",
       title: "Notes - /Users/example/Notes",
       workspace,
     }]);

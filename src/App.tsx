@@ -1,10 +1,12 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  EditorChromeContributionProvider,
   EditorFindContributionProvider,
   flushActiveDocumentSessions,
   flushActiveOfficeEditingSessions,
   type DataNode,
   type DataWorkspaceActivePathChangeContext,
+  type EditorChromeContribution,
   useEditorFindCommand,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
@@ -210,6 +212,7 @@ function AppContent() {
   const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
   const [activeDataPath, setActiveDataPath] = useState<string | null>(null);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
+  const [editorChromeContribution, setEditorChromeContribution] = useState<EditorChromeContribution | null>(null);
   const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
   const documentNavigationRequestRef = useRef(0);
   const desktopViewNavigationRequestRef = useRef(0);
@@ -828,6 +831,9 @@ function AppContent() {
     <DesktopTitlebarActions
       editorFindCommand={editorFindCommand}
       canOpenActiveFileExternal={activeExternalOpen.canOpen}
+      csvViewSettings={activeView === "data" && editorChromeContribution?.kind === "csv-view-settings"
+        ? editorChromeContribution
+        : null}
       activeFileExternalOpenTitle={activeExternalOpen.title}
       activeFileExternalOpenAppName={activeExternalOpen.appName}
       activeFileExternalOpenIconDataUrl={activeExternalOpen.iconDataUrl}
@@ -907,18 +913,19 @@ function AppContent() {
       data-diff-markers={diffMarkers}
       {...typographyRootProps}
     >
-      <DesktopCloudShell
-        minimalMode={minimalMode}
-        minimalModeDock={minimalModeDock}
-        titlebarSlot={titlebarSlot}
-        titlebarActions={titlebarActions}
-        rightSidebarOpen={rightSidebarOpen && desktopRightSidebarEnabled}
-        resizableRightSidebar
-        rightSidebarWidth={rightSidebarWidth}
-        minRightSidebarWidth={MIN_RIGHT_SIDEBAR_WIDTH}
-        maxRightSidebarWidth={MAX_RIGHT_SIDEBAR_WIDTH}
-        onRightSidebarWidthChange={setRightSidebarWidth}
-        rightSidebar={desktopRightSidebarEnabled ? (
+      <EditorChromeContributionProvider onContributionChange={setEditorChromeContribution}>
+        <DesktopCloudShell
+          minimalMode={minimalMode}
+          minimalModeDock={minimalModeDock}
+          titlebarSlot={titlebarSlot}
+          titlebarActions={titlebarActions}
+          rightSidebarOpen={rightSidebarOpen && desktopRightSidebarEnabled}
+          resizableRightSidebar
+          rightSidebarWidth={rightSidebarWidth}
+          minRightSidebarWidth={MIN_RIGHT_SIDEBAR_WIDTH}
+          maxRightSidebarWidth={MAX_RIGHT_SIDEBAR_WIDTH}
+          onRightSidebarWidthChange={setRightSidebarWidth}
+          rightSidebar={desktopRightSidebarEnabled ? (
           <div className="desktop-right-sidebar-stack" key={workspace.path}>
             {desktopTerminalEnabled && (
               <div
@@ -1018,7 +1025,8 @@ function AppContent() {
           workspaceRefreshToken={workspaceRefreshToken}
         />
         <DesktopHelpLauncher />
-      </DesktopCloudShell>
+        </DesktopCloudShell>
+      </EditorChromeContributionProvider>
       <DesktopOverlayPortal
         theme={resolvedTheme}
         lightThemePreset={lightThemePreset}
