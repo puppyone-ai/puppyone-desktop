@@ -69,7 +69,6 @@ export class MarkdownTableWidget extends WidgetType {
     wrapper.className = view.state.readOnly
       ? "cm-md-table-widget-wrap po-editable-table-interaction-root is-readonly"
       : "cm-md-table-widget-wrap po-editable-table-interaction-root";
-    wrapper.dataset.poScrollbar = "horizontal";
     wrapper.dataset.mdTableFrom = String(this.from);
     wrapper.dataset.mdTableExecution = this.execution.mode;
     wrapper.dataset.mdTableInlineViewport = "true";
@@ -78,6 +77,11 @@ export class MarkdownTableWidget extends WidgetType {
     // Do not rescan an oversized immutable row collection during DOM mount.
     const columnCount = Math.max(1, this.alignments.length);
 
+    const scrollport = doc.createElement("div");
+    scrollport.dir = localization.direction;
+    scrollport.className = "cm-md-table-scrollport";
+    scrollport.dataset.poScrollbar = "hidden";
+    scrollport.dataset.mdTableScrollport = "true";
     const frame = doc.createElement("div");
     frame.className = "cm-md-table-frame";
     frame.dataset.mdTableScrollTrack = "true";
@@ -223,16 +227,31 @@ export class MarkdownTableWidget extends WidgetType {
       }));
     }
     frame.appendChild(surface);
-    wrapper.appendChild(frame);
+    scrollport.appendChild(frame);
+    wrapper.appendChild(scrollport);
+    const scrollbar = doc.createElement("div");
+    scrollbar.dir = localization.direction;
+    scrollbar.className = "cm-md-table-scrollbar-rail";
+    scrollbar.dataset.poScrollbar = "horizontal";
+    scrollbar.dataset.mdTableScrollbarRail = "true";
+    scrollbar.setAttribute("aria-hidden", "true");
+    const scrollbarContent = doc.createElement("div");
+    scrollbarContent.className = "cm-md-table-scrollbar-content";
+    scrollbarContent.dataset.mdTableScrollbarContent = "true";
+    scrollbar.appendChild(scrollbarContent);
+    wrapper.appendChild(scrollbar);
     const inlineViewport = createMarkdownTableInlineViewportController({
       columnCount,
       direction: localization.direction,
       host,
+      root: wrapper,
+      scrollbar,
+      scrollbarContent,
       sourceIdentity: this.viewportKey,
       table,
       tableFrom: this.from,
       tableTo: this.to,
-      viewport: wrapper,
+      viewport: scrollport,
     });
     const dragLayer = createMarkdownTableDragLayer({
       alignments: this.alignments,

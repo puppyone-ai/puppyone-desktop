@@ -68,6 +68,7 @@ describe("Markdown editor layout", () => {
     const editorRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor");
 
     expect(editorRule).toContain("--po-markdown-breakout-right-gutter: 48px;");
+    expect(editorRule).not.toContain("--po-markdown-breakout-max-width");
   });
 
   it("keeps task checkbox visuals compact inside a reliable desktop hit target", () => {
@@ -313,9 +314,13 @@ describe("Markdown table affordance layout", () => {
   });
 
   it("splits the safe-edge scrollport from the reading-rail table track", () => {
-    const viewportRule = readCssRule(
+    const rootRule = readCssRule(
       markdownTableCss,
       ".markdown-codemirror-editor .cm-md-table-widget-wrap",
+    );
+    const viewportRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-scrollport",
     );
     const frameRule = readCssRule(
       markdownTableCss,
@@ -325,7 +330,17 @@ describe("Markdown table affordance layout", () => {
       markdownTableCss,
       ".markdown-codemirror-editor .cm-md-table-surface",
     );
+    const scrollbarRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-scrollbar-rail",
+    );
+    const scrollbarContentRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-scrollbar-content",
+    );
 
+    expect(rootRule).toContain("inline-size: 100%;");
+    expect(rootRule).toContain("overflow: visible;");
     expect(viewportRule).toContain("--cm-md-table-scroll-away-inset: 0px;");
     expect(viewportRule).toContain(
       "margin-inline-start: calc(-1 * var(--cm-md-table-scroll-away-inset));",
@@ -336,13 +351,22 @@ describe("Markdown table affordance layout", () => {
     expect(markdownTableCss).toContain(
       "calc(var(--po-markdown-editor-gutter-inline) - var(--po-markdown-editor-gutter-min))",
     );
+    expect(markdownTableCss).not.toContain("--po-markdown-breakout-max-width");
     expect(frameRule).toContain("padding-inline-start: calc(");
     expect(frameRule).toContain("var(--cm-md-table-scroll-away-inset)");
     expect(frameRule).toContain("padding-inline-end: var(--cm-md-table-action-gutter);");
     expect(surfaceRule).toContain(
       "margin-inline-start: calc(-1 * var(--cm-md-table-handle-gutter));",
     );
+    expect(scrollbarRule).toContain("inline-size: 100%;");
+    expect(scrollbarRule).toContain("overflow-x: auto;");
+    expect(scrollbarRule).toContain("block-size: var(--po-scrollbar-size, 12px);");
+    expect(scrollbarContentRule).toContain("inline-size: 1px;");
     expect(markdownTableWidgetSource).toContain('wrapper.dataset.mdTableInlineViewport = "true";');
+    expect(markdownTableWidgetSource).toContain('scrollport.dataset.poScrollbar = "hidden";');
+    expect(markdownTableWidgetSource).toContain('scrollport.dataset.mdTableScrollport = "true";');
+    expect(markdownTableWidgetSource).toContain('scrollbar.dataset.poScrollbar = "horizontal";');
+    expect(markdownTableWidgetSource).toContain('scrollbar.dataset.mdTableScrollbarRail = "true";');
     expect(markdownTableWidgetSource).toContain('frame.dataset.mdTableScrollTrack = "true";');
     expect(markdownTableWidgetSource).toContain('surface.dataset.mdTableSurface = "true";');
   });

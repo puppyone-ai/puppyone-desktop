@@ -144,12 +144,15 @@ describe("Markdown table EditorView interactions", () => {
 
   it("keeps the inline viewport session across a structural Widget replacement", async () => {
     const view = createTableView();
-    const firstViewport = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
-    const firstSessionId = firstViewport.dataset.mdInlineViewportSession;
+    const firstRoot = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
+    const firstViewport = firstRoot.querySelector<HTMLElement>(".cm-md-table-scrollport")!;
+    const firstSessionId = firstRoot.dataset.mdInlineViewportSession;
     expect(firstSessionId).toBeTruthy();
-    expect(firstViewport.dataset.mdTableInlineViewport).toBe("true");
-    expect(firstViewport.querySelector("[data-md-table-scroll-track='true']")).not.toBeNull();
-    expect(firstViewport.querySelector("[data-md-table-surface='true']")).not.toBeNull();
+    expect(firstRoot.dataset.mdTableInlineViewport).toBe("true");
+    expect(firstViewport.dataset.poScrollbar).toBe("hidden");
+    expect(firstRoot.querySelector("[data-md-table-scroll-track='true']")).not.toBeNull();
+    expect(firstRoot.querySelector("[data-md-table-surface='true']")).not.toBeNull();
+    expect(firstRoot.querySelector("[data-md-table-scrollbar-rail='true']")).not.toBeNull();
     mockHorizontalScroller(firstViewport, 240, 720);
     firstViewport.scrollLeft = 180;
     firstViewport.dispatchEvent(new Event("scroll"));
@@ -158,9 +161,9 @@ describe("Markdown table EditorView interactions", () => {
     view.dom.querySelector<HTMLButtonElement>(".cm-md-table-add-column")?.click();
     await nextAnimationFrame();
 
-    const replacementViewport = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
-    expect(replacementViewport).not.toBe(firstViewport);
-    expect(replacementViewport.dataset.mdInlineViewportSession).toBe(firstSessionId);
+    const replacementRoot = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
+    expect(replacementRoot).not.toBe(firstRoot);
+    expect(replacementRoot.dataset.mdInlineViewportSession).toBe(firstSessionId);
 
     expect(undo(view)).toBe(true);
     await nextAnimationFrame();
@@ -173,6 +176,41 @@ describe("Markdown table EditorView interactions", () => {
     expect(
       view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")?.dataset.mdInlineViewportSession,
     ).toBe(firstSessionId);
+  });
+
+  it("syncs a reading-rail scrollbar with the wider table viewport", async () => {
+    const view = createTableView();
+    const root = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
+    const viewport = root.querySelector<HTMLElement>(".cm-md-table-scrollport")!;
+    const scrollbar = root.querySelector<HTMLElement>(".cm-md-table-scrollbar-rail")!;
+    const scrollbarContent = scrollbar.querySelector<HTMLElement>(
+      ".cm-md-table-scrollbar-content",
+    )!;
+    const table = root.querySelector<HTMLTableElement>(".cm-md-table-widget")!;
+    mockHorizontalScroller(viewport, 500, 1500);
+    mockHorizontalScroller(scrollbar, 300, 1300);
+    mockRect(root, rect(100, 0, 300, 180));
+    mockRect(viewport, rect(40, 0, 900, 160));
+    mockRect(scrollbar, rect(100, 160, 300, 12));
+    mockRect(table, rect(100, 20, 1400, 120));
+    for (const row of Array.from(table.rows)) {
+      Array.from(row.cells).forEach((cell, index) => {
+        mockRect(cell, rect(100 + index * 100, 20, 100, 32));
+      });
+    }
+    await nextAnimationFrame();
+
+    expect(scrollbar.hidden).toBe(false);
+    expect(scrollbarContent.style.inlineSize).toBe("1300px");
+    scrollbar.scrollLeft = 420;
+    scrollbar.dispatchEvent(new Event("scroll"));
+    await nextAnimationFrame();
+    expect(viewport.scrollLeft).toBeCloseTo(420, 5);
+
+    viewport.scrollLeft = 730;
+    viewport.dispatchEvent(new Event("scroll"));
+    await nextAnimationFrame();
+    expect(scrollbar.scrollLeft).toBeCloseTo(730, 5);
   });
 
   it("maps viewport lineage through an unrelated edit before the table", async () => {
@@ -230,8 +268,9 @@ describe("Markdown table EditorView interactions", () => {
 
   it("reveals the focused column without scrolling the outer editor horizontally", async () => {
     const view = createTableView();
-    const viewport = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
-    const table = viewport.querySelector<HTMLTableElement>(".cm-md-table-widget")!;
+    const root = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
+    const viewport = root.querySelector<HTMLElement>(".cm-md-table-scrollport")!;
+    const table = root.querySelector<HTMLTableElement>(".cm-md-table-widget")!;
     mockHorizontalScroller(viewport, 250, 500);
     mockRect(viewport, rect(0, 0, 250, 160));
     mockRect(table, rect(80, 20, 300, 120));
@@ -242,7 +281,7 @@ describe("Markdown table EditorView interactions", () => {
     }
     const outerScrollLeft = view.scrollDOM.scrollLeft;
 
-    expect(focusMarkdownTableCell(viewport, { rowIndex: 0, columnIndex: 2 })).toBe(true);
+    expect(focusMarkdownTableCell(root, { rowIndex: 0, columnIndex: 2 })).toBe(true);
     await nextAnimationFrame();
 
     expect(viewport.scrollLeft).toBeGreaterThan(0);

@@ -1,6 +1,5 @@
 .markdown-codemirror-editor .cm-md-table-widget-wrap {
   --cm-md-table-handle-gutter: 14px;
-  --cm-md-table-scroll-away-inset: 0px;
   --po-editable-table-border: var(--po-md-rule-color);
   --po-editable-table-cell-border: var(--po-md-rule-color);
   position: relative;
@@ -9,9 +8,20 @@
   inline-size: 100%;
   max-inline-size: 100%;
   margin: 0;
-  margin-inline-start: calc(-1 * var(--cm-md-table-scroll-away-inset));
   padding-block: 14px 18px;
   padding-inline: 0;
+  overflow: visible;
+  cursor: text;
+}
+
+.markdown-codemirror-editor .cm-md-table-scrollport {
+  --cm-md-table-scroll-away-inset: 0px;
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  margin: 0;
+  margin-inline-start: calc(-1 * var(--cm-md-table-scroll-away-inset));
+  padding: 0;
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
@@ -20,7 +30,7 @@
 }
 
 @supports (width: 100cqw) {
-  .markdown-codemirror-editor .cm-md-table-widget-wrap {
+  .markdown-codemirror-editor .cm-md-table-scrollport {
     --po-markdown-editor-gutter-inline: max(
       var(--po-markdown-editor-gutter-min),
       calc((100cqw - var(--po-markdown-editor-text-width)) / 2)
@@ -29,10 +39,12 @@
       0px,
       calc(var(--po-markdown-editor-gutter-inline) - var(--po-markdown-editor-gutter-min))
     );
-    inline-size: calc(var(--cm-md-table-scroll-away-inset) + min(
-      var(--po-markdown-breakout-max-width),
-      calc(100cqw - var(--po-markdown-editor-gutter-inline) - var(--po-markdown-breakout-right-gutter))
-    ));
+    inline-size: calc(
+      var(--cm-md-table-scroll-away-inset)
+      + 100cqw
+      - var(--po-markdown-editor-gutter-inline)
+      - var(--po-markdown-breakout-right-gutter)
+    );
     max-inline-size: calc(
       var(--cm-md-table-scroll-away-inset)
       + 100cqw
@@ -40,6 +52,32 @@
       - var(--po-markdown-breakout-right-gutter)
     );
   }
+}
+
+.markdown-codemirror-editor .cm-md-table-scrollbar-rail {
+  display: block;
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  block-size: var(--po-scrollbar-size, 12px);
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  cursor: default;
+}
+
+.markdown-codemirror-editor .cm-md-table-scrollbar-rail[hidden] {
+  display: none;
+}
+
+.markdown-codemirror-editor .cm-md-table-scrollbar-content {
+  display: block;
+  inline-size: 1px;
+  block-size: 1px;
+  pointer-events: none;
 }
 
 .markdown-codemirror-editor .cm-md-table-frame {

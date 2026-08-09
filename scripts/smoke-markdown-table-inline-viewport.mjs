@@ -50,16 +50,21 @@ function tableMarkup(direction) {
   ).join("");
   return `
     <div class="cm-md-table-widget-wrap po-editable-table-interaction-root" dir="${direction}" data-md-table-inline-viewport="true">
-      <div class="cm-md-table-frame" data-md-table-scroll-track="true">
-        <div class="cm-md-table-surface" data-md-table-surface="true">
-          <table class="cm-md-table-widget is-windowed" dir="${direction}" style="width:2160px">
-            <colgroup>${columns}</colgroup>
-            <thead><tr>${cells}</tr></thead>
-          </table>
-          <button class="cm-md-table-structure-button cm-md-table-add-column po-editable-table-structure-button po-editable-table-add-column" type="button">
-            <span class="cm-md-table-structure-button-visual po-editable-table-structure-button-visual"></span>
-          </button>
+      <div class="cm-md-table-scrollport" dir="${direction}" data-po-scrollbar="hidden" data-md-table-scrollport="true">
+        <div class="cm-md-table-frame" data-md-table-scroll-track="true">
+          <div class="cm-md-table-surface" data-md-table-surface="true">
+            <table class="cm-md-table-widget is-windowed" dir="${direction}" style="width:2160px">
+              <colgroup>${columns}</colgroup>
+              <thead><tr>${cells}</tr></thead>
+            </table>
+            <button class="cm-md-table-structure-button cm-md-table-add-column po-editable-table-structure-button po-editable-table-add-column" type="button">
+              <span class="cm-md-table-structure-button-visual po-editable-table-structure-button-visual"></span>
+            </button>
+          </div>
         </div>
+      </div>
+      <div class="cm-md-table-scrollbar-rail" dir="${direction}" data-po-scrollbar="horizontal" data-md-table-scrollbar-rail="true" aria-hidden="true">
+        <div class="cm-md-table-scrollbar-content" data-md-table-scrollbar-content="true"></div>
       </div>
     </div>`;
 }
@@ -141,7 +146,10 @@ async function measureScenario(viewportWidth, direction) {
       const root = document.querySelector(".markdown-codemirror-editor");
       const outer = document.querySelector(".cm-scroller");
       const content = document.querySelector(".cm-content");
-      const viewport = document.querySelector(".cm-md-table-widget-wrap");
+      const wrapper = document.querySelector(".cm-md-table-widget-wrap");
+      const viewport = document.querySelector(".cm-md-table-scrollport");
+      const scrollbar = document.querySelector(".cm-md-table-scrollbar-rail");
+      const scrollbarContent = document.querySelector(".cm-md-table-scrollbar-content");
       const frame = document.querySelector(".cm-md-table-frame");
       const table = document.querySelector(".cm-md-table-widget");
       const heading = document.querySelector(".cm-md-heading-1");
@@ -149,9 +157,14 @@ async function measureScenario(viewportWidth, direction) {
       const thirdColumn = table.rows[0].cells[2];
       const firstColumn = table.rows[0].cells[0];
       const addColumn = document.querySelector(".cm-md-table-add-column");
+      const viewportMaximum = viewport.scrollWidth - viewport.clientWidth;
+      scrollbarContent.style.inlineSize = scrollbar.clientWidth + viewportMaximum + "px";
+      await nextFrame();
       const rootRect = root.getBoundingClientRect();
       const contentRect = content.getBoundingClientRect();
+      const wrapperRect = wrapper.getBoundingClientRect();
       const viewportRect = viewport.getBoundingClientRect();
+      const scrollbarRect = scrollbar.getBoundingClientRect();
       const tableRect = table.getBoundingClientRect();
       const leadingInset = direction === "rtl"
         ? viewportRect.right - tableRect.right
@@ -161,8 +174,14 @@ async function measureScenario(viewportWidth, direction) {
         rootRight: rootRect.right,
         contentLeft: contentRect.left,
         contentRight: contentRect.right,
+        wrapperLeft: wrapperRect.left,
+        wrapperRight: wrapperRect.right,
         viewportLeft: viewportRect.left,
         viewportRight: viewportRect.right,
+        scrollbarLeft: scrollbarRect.left,
+        scrollbarRight: scrollbarRect.right,
+        scrollbarScrollWidth: scrollbar.scrollWidth,
+        scrollbarClientWidth: scrollbar.clientWidth,
         tableLeft: tableRect.left,
         tableRight: tableRect.right,
         leadingInset,
@@ -170,6 +189,8 @@ async function measureScenario(viewportWidth, direction) {
           direction === "rtl" ? getComputedStyle(frame).paddingRight : getComputedStyle(frame).paddingLeft,
         ),
         outerScrollLeft: outer.scrollLeft,
+        outerScrollWidth: outer.scrollWidth,
+        outerClientWidth: outer.clientWidth,
         bodyScrollWidth: document.body.scrollWidth,
         viewportScrollWidth: viewport.scrollWidth,
         viewportClientWidth: viewport.clientWidth,
@@ -229,10 +250,7 @@ async function runSmoke() {
       const label = `${direction}-${actualViewportWidth}`;
       const expectedGutter = Math.max(64, (actualViewportWidth - 724) / 2);
       const expectedSafeStart = 64;
-      const expectedBreakoutEnd = expectedGutter + Math.min(
-        1180,
-        actualViewportWidth - expectedGutter - 48,
-      );
+      const expectedBreakoutEnd = actualViewportWidth - 48;
 
       assert(initial.viewportScrollWidth > initial.viewportClientWidth, `${label}: fixture is not wide`);
       assert(
@@ -256,6 +274,17 @@ async function runSmoke() {
         initial.leadingInset + 14,
         `${label}: track leading padding`,
       );
+      assertNear(initial.scrollbarLeft, expectedGutter, `${label}: scrollbar reading-rail start`);
+      assertNear(
+        initial.scrollbarRight,
+        actualViewportWidth - expectedGutter,
+        `${label}: scrollbar reading-rail end`,
+      );
+      assertNear(
+        initial.scrollbarScrollWidth - initial.scrollbarClientWidth,
+        initial.viewportScrollWidth - initial.viewportClientWidth,
+        `${label}: scrollbar logical range`,
+      );
       if (direction === "ltr") {
         assertNear(initial.viewportLeft, expectedSafeStart, `${label}: safe edge`);
         assertNear(initial.viewportRight, expectedBreakoutEnd, `${label}: breakout end`);
@@ -276,6 +305,10 @@ async function runSmoke() {
       assertNear(initial.outerScrollLeft, 0, `${label}: outer horizontal position at rest`);
       assertNear(scrolled.outerScrollLeft, 0, `${label}: outer horizontal position while scrolling`);
       assertNear(end.outerScrollLeft, 0, `${label}: outer horizontal position at end`);
+      assert(
+        initial.outerScrollWidth <= initial.outerClientWidth,
+        `${label}: table created editor-level horizontal overflow`,
+      );
       assert(
         initial.bodyScrollWidth <= actualViewportWidth,
         `${label}: table created page-level horizontal overflow`,

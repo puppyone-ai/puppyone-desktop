@@ -22,6 +22,9 @@ type TableInlineViewportContext = Readonly<{
   columnCount: number;
   direction: "ltr" | "rtl";
   host: MarkdownEmbedHost;
+  root: HTMLElement;
+  scrollbar: HTMLElement;
+  scrollbarContent: HTMLElement;
   sourceIdentity: string;
   table: HTMLTableElement;
   tableFrom: number;
@@ -33,10 +36,11 @@ type TableInlineGeometry = Readonly<{
   columnWidths: readonly number[];
   leadingInset: number;
   maxLogicalOffset: number;
+  scrollbarInlineSize: number;
   viewportInlineSize: number;
 }>;
 
-const controllerByViewport = new WeakMap<HTMLElement, MarkdownTableInlineViewportController>();
+const controllerByRoot = new WeakMap<HTMLElement, MarkdownTableInlineViewportController>();
 const rtlBehaviorByDocument = new WeakMap<Document, RtlScrollBehavior>();
 
 export function createMarkdownTableInlineViewportController(
@@ -59,12 +63,14 @@ export function createMarkdownTableInlineViewportController(
   let dragVelocity = 0;
   let dragOnScroll: (() => void) | null = null;
 
-  context.viewport.dataset.mdInlineViewportSession = session.sessionId;
-  context.viewport.dataset.mdInlineViewportMount = String(session.mountToken);
+  context.root.dataset.mdInlineViewportSession = session.sessionId;
+  context.root.dataset.mdInlineViewportMount = String(session.mountToken);
 
   const readGeometry = (): TableInlineGeometry => {
     const logicalOffset = getLogicalScrollOffset(context.viewport, context.direction);
     const viewportRect = context.viewport.getBoundingClientRect();
+    const rootRect = context.root.getBoundingClientRect();
+    const scrollbarRect = context.scrollbar.getBoundingClientRect();
     const tableRect = context.table.getBoundingClientRect();
     const measuredLeadingInset = context.direction === "rtl"
       ? viewportRect.right - tableRect.right + logicalOffset
@@ -86,12 +92,46 @@ export function createMarkdownTableInlineViewportController(
       return Number.isFinite(width) ? Math.max(0, width) : 0;
     });
     const viewportInlineSize = Math.max(0, context.viewport.clientWidth || viewportRect.width);
+    const scrollbarInlineSize = Math.max(
+      0,
+      context.scrollbar.clientWidth
+        || scrollbarRect.width
+        || context.root.clientWidth
+        || rootRect.width,
+    );
     return {
       columnWidths,
       leadingInset,
       maxLogicalOffset: Math.max(0, context.viewport.scrollWidth - context.viewport.clientWidth),
+      scrollbarInlineSize,
       viewportInlineSize,
     };
+  };
+
+  const syncScrollbarFromViewport = (geometry: TableInlineGeometry) => {
+    const scrollbarMaximum = Math.max(
+      0,
+      context.scrollbar.scrollWidth - context.scrollbar.clientWidth,
+    );
+    const viewportOffset = getLogicalScrollOffset(context.viewport, context.direction);
+    const target = mapInlineScrollOffset(
+      viewportOffset,
+      geometry.maxLogicalOffset,
+      scrollbarMaximum,
+    );
+    const current = getLogicalScrollOffset(context.scrollbar, context.direction);
+    if (Math.abs(current - target) <= INLINE_START_EPSILON_PX) return;
+    setLogicalScrollOffset(context.scrollbar, context.direction, target);
+  };
+
+  const updateScrollbarPresentation = (geometry: TableInlineGeometry) => {
+    const hasOverflow = geometry.maxLogicalOffset > INLINE_START_EPSILON_PX;
+    context.scrollbar.hidden = !hasOverflow;
+    context.scrollbarContent.style.inlineSize = `${Math.max(
+      1,
+      geometry.scrollbarInlineSize + geometry.maxLogicalOffset,
+    )}px`;
+    if (hasOverflow) syncScrollbarFromViewport(geometry);
   };
 
   const captureWithGeometry = (geometry: TableInlineGeometry) => {
@@ -104,8 +144,8 @@ export function createMarkdownTableInlineViewportController(
       session.mountToken,
       position,
     );
-    context.viewport.dataset.mdInlineViewportOffset = String(logicalOffset);
-    context.viewport.dataset.mdInlineViewportAnchor = position.kind === "start"
+    context.root.dataset.mdInlineViewportOffset = String(logicalOffset);
+    context.root.dataset.mdInlineViewportAnchor = position.kind === "start"
       ? "start"
       : String(position.itemIndex);
   };
@@ -131,7 +171,9 @@ export function createMarkdownTableInlineViewportController(
       cachedGeometry = geometry;
       const current = context.host.inlineViewports.get(session.sessionId) ?? session;
       const target = getLogicalOffsetForPosition(current.position, geometry);
+      updateScrollbarPresentation(geometry);
       setLogicalScrollOffset(context.viewport, context.direction, target);
+      syncScrollbarFromViewport(geometry);
       captureWithGeometry(geometry);
     });
   };
@@ -140,6 +182,33 @@ export function createMarkdownTableInlineViewportController(
     if (disposed) return;
     interactionRevision += 1;
     closeActiveMarkdownTableMenu();
+    if (cachedGeometry) syncScrollbarFromViewport(cachedGeometry);
+    scheduleCapture();
+  };
+
+  const onScrollbarScroll = () => {
+    if (disposed) return;
+    interactionRevision += 1;
+    closeActiveMarkdownTableMenu();
+    const geometry = cachedGeometry;
+    if (!geometry) {
+      scheduleRestore();
+      return;
+    }
+    const scrollbarMaximum = Math.max(
+      0,
+      context.scrollbar.scrollWidth - context.scrollbar.clientWidth,
+    );
+    const scrollbarOffset = getLogicalScrollOffset(context.scrollbar, context.direction);
+    const target = mapInlineScrollOffset(
+      scrollbarOffset,
+      scrollbarMaximum,
+      geometry.maxLogicalOffset,
+    );
+    const current = getLogicalScrollOffset(context.viewport, context.direction);
+    if (Math.abs(current - target) > INLINE_START_EPSILON_PX) {
+      setLogicalScrollOffset(context.viewport, context.direction, target);
+    }
     scheduleCapture();
   };
 
@@ -161,6 +230,7 @@ export function createMarkdownTableInlineViewportController(
       return;
     }
     setLogicalScrollOffset(context.viewport, context.direction, next);
+    if (cachedGeometry) syncScrollbarFromViewport(cachedGeometry);
     scheduleCapture();
     dragOnScroll?.();
     dragFrame = ownerWindow.requestAnimationFrame(runDragAutoScroll);
@@ -171,12 +241,15 @@ export function createMarkdownTableInlineViewportController(
       if (disposed) return;
       disposed = true;
       context.viewport.removeEventListener("scroll", onScroll);
-      stopObserving();
+      context.scrollbar.removeEventListener("scroll", onScrollbarScroll);
+      stopObservingViewport();
+      stopObservingRoot();
+      stopObservingTable();
       if (captureFrame !== null) ownerWindow.cancelAnimationFrame(captureFrame);
       captureFrame = null;
       stopDragAutoScroll();
       context.host.inlineViewports.detach(session.sessionId, session.mountToken);
-      controllerByViewport.delete(context.viewport);
+      controllerByRoot.delete(context.root);
     },
 
     revealColumn(columnIndex) {
@@ -198,6 +271,7 @@ export function createMarkdownTableInlineViewportController(
           context.direction,
           clamp(next, 0, geometry.maxLogicalOffset),
         );
+        syncScrollbarFromViewport(geometry);
         captureWithGeometry(geometry);
       });
     },
@@ -219,22 +293,33 @@ export function createMarkdownTableInlineViewportController(
   };
 
   context.viewport.addEventListener("scroll", onScroll, { passive: true });
-  const stopObserving = context.host.layout.observe(
+  context.scrollbar.addEventListener("scroll", onScrollbarScroll, { passive: true });
+  const stopObservingViewport = context.host.layout.observe(
     context.viewport,
     undefined,
     () => scheduleRestore(),
   );
-  controllerByViewport.set(context.viewport, controller);
+  const stopObservingRoot = context.host.layout.observe(
+    context.root,
+    undefined,
+    () => scheduleRestore(),
+  );
+  const stopObservingTable = context.host.layout.observe(
+    context.table,
+    undefined,
+    () => scheduleRestore(),
+  );
+  controllerByRoot.set(context.root, controller);
   scheduleRestore();
   return controller;
 }
 
 export function revealMarkdownTableInlineColumn(
-  viewport: HTMLElement | null,
+  root: HTMLElement | null,
   columnIndex: number,
 ): boolean {
-  if (!viewport) return false;
-  const controller = controllerByViewport.get(viewport);
+  if (!root) return false;
+  const controller = controllerByRoot.get(root);
   if (!controller) return false;
   controller.revealColumn(columnIndex);
   return true;
@@ -265,6 +350,19 @@ export function denormalizeInlineScrollOffset(
   if (rtlBehavior === "negative") return -offset;
   if (rtlBehavior === "positive-descending") return maximum - offset;
   return offset;
+}
+
+export function mapInlineScrollOffset(
+  logicalOffset: number,
+  sourceMaximum: number,
+  targetMaximum: number,
+): number {
+  if (sourceMaximum <= INLINE_START_EPSILON_PX || targetMaximum <= 0) return 0;
+  return clamp(
+    (clamp(logicalOffset, 0, sourceMaximum) / sourceMaximum) * targetMaximum,
+    0,
+    targetMaximum,
+  );
 }
 
 function getLogicalScrollOffset(

@@ -211,8 +211,11 @@ describe("scrollbar architecture", () => {
     );
     expect(readCss("packages/shared-ui/src/editor/markdown/features/code-block/codeBlockWidget.ts"))
       .toContain('codeEditor.dataset.poScrollbar = "horizontal";');
-    expect(readCss("packages/shared-ui/src/editor/markdown/features/table/tableWidget.ts"))
-      .toContain('wrapper.dataset.poScrollbar = "horizontal";');
+    const markdownTableSource = readCss(
+      "packages/shared-ui/src/editor/markdown/features/table/tableWidget.ts",
+    );
+    expect(markdownTableSource).toContain('scrollport.dataset.poScrollbar = "hidden";');
+    expect(markdownTableSource).toContain('scrollbar.dataset.poScrollbar = "horizontal";');
     expect(scrollbarsCss).toContain('[data-po-scrollbar="horizontal"]');
   });
 

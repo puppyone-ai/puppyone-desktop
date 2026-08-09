@@ -6,6 +6,7 @@ import {
 } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/embeddedInlineViewportSession";
 import {
   denormalizeInlineScrollOffset,
+  mapInlineScrollOffset,
   normalizeInlineScrollOffset,
 } from "../packages/shared-ui/src/editor/markdown/features/table/tableInlineViewportController";
 
@@ -161,5 +162,12 @@ describe("Markdown inline viewport anchor math", () => {
       }
     }
     expect(normalizeInlineScrollOffset(75, maximum, "ltr", "negative")).toBe(75);
+  });
+
+  it("maps the table offset proportionally onto a differently sized scrollbar range", () => {
+    expect(mapInlineScrollOffset(0, 1200, 800)).toBe(0);
+    expect(mapInlineScrollOffset(600, 1200, 800)).toBe(400);
+    expect(mapInlineScrollOffset(1200, 1200, 800)).toBe(800);
+    expect(mapInlineScrollOffset(200, 0, 800)).toBe(0);
   });
 });
