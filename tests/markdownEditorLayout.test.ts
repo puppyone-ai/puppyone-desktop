@@ -129,10 +129,13 @@ describe("Markdown HTML media layout", () => {
 
     expect(editorEntryCss).toContain('@import "./editor/markdown-content.css";');
     expect(profileRule).toContain("--po-md-presentation-version: 1;");
+    expect(profileRule).toContain(
+      "--po-md-rule-color: color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 4%);",
+    );
     expect(nativeHeadingRule).toContain("font-size: var(--po-md-h1-size);");
     expect(htmlHeadingRule).toContain("font-size: var(--po-md-h1-size);");
-    expect(nativeHeadingRule).toContain("border-bottom: 1px solid var(--po-md-heading-rule);");
-    expect(htmlHeadingRule).toContain("border-bottom: 1px solid var(--po-md-heading-rule);");
+    expect(nativeHeadingRule).toContain("border-bottom: 1px solid var(--po-md-rule-color);");
+    expect(htmlHeadingRule).toContain("border-bottom: 1px solid var(--po-md-rule-color);");
     expect(htmlSurfaceRule).toContain("white-space: normal;");
     expect(htmlPreRule).toContain("white-space: pre-wrap;");
     expect(widgetRule).toContain("padding: 0;");
@@ -260,6 +263,38 @@ describe("Markdown rich-block boundary affordance", () => {
 });
 
 describe("Markdown table affordance layout", () => {
+  it("uses one normal-state rule color for headings, dividers, and table lines", () => {
+    const nativeDividerRule = readCssRule(
+      markdownEditorCss,
+      ".markdown-codemirror-editor .cm-md-hr-widget::before",
+    );
+    const htmlDividerRule = readCssRule(
+      markdownContentCss,
+      ".markdown-codemirror-editor .cm-md-html-rendered-surface hr",
+    );
+    const viewportRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-widget-wrap",
+    );
+    const tableRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-widget",
+    );
+    const cellRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-widget th,\n.markdown-codemirror-editor .cm-md-table-widget td",
+    );
+
+    expect(nativeDividerRule).toContain("background: var(--po-md-rule-color);");
+    expect(htmlDividerRule).toContain("background: var(--po-md-rule-color);");
+    expect(viewportRule).toContain("--po-editable-table-border: var(--po-md-rule-color);");
+    expect(viewportRule).toContain("--po-editable-table-cell-border: var(--po-md-rule-color);");
+    expect(tableRule).toContain("border: 1px solid var(--po-editable-table-border);");
+    expect(cellRule).toContain("border-right: 1px solid var(--po-editable-table-cell-border);");
+    expect(cellRule).toContain("border-bottom: 1px solid var(--po-editable-table-cell-border);");
+    expect(markdownContentCss).not.toContain("--po-md-heading-rule");
+  });
+
   it("splits the safe-edge scrollport from the reading-rail table track", () => {
     const viewportRule = readCssRule(
       markdownTableCss,

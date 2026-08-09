@@ -1,6 +1,8 @@
 .markdown-codemirror-editor .cm-md-table-widget-wrap {
   --cm-md-table-handle-gutter: 14px;
   --cm-md-table-scroll-away-inset: 0px;
+  --po-editable-table-border: var(--po-md-rule-color);
+  --po-editable-table-cell-border: var(--po-md-rule-color);
   position: relative;
   display: block;
   box-sizing: border-box;

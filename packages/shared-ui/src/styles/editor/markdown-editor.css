@@ -485,7 +485,7 @@
 .markdown-codemirror-editor .cm-md-hr-widget::before {
   width: 100%;
   height: 1px;
-  background: var(--po-divider);
+  background: var(--po-md-rule-color);
   content: "";
 }
 

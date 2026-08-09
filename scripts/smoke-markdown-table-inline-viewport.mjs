@@ -13,9 +13,13 @@ const windows = [];
 app.setPath("userData", path.join(tempRoot, "user-data"));
 app.commandLine.appendSwitch("disable-gpu");
 
-const [markdownEditorCss, editableTableCss, markdownTableCss] = await Promise.all([
+const [markdownEditorCss, markdownContentCss, editableTableCss, markdownTableCss] = await Promise.all([
   fsp.readFile(
     path.join(repoRoot, "packages/shared-ui/src/styles/editor/markdown-editor.css"),
+    "utf8",
+  ),
+  fsp.readFile(
+    path.join(repoRoot, "packages/shared-ui/src/styles/editor/markdown-content.css"),
     "utf8",
   ),
   fsp.readFile(
@@ -90,15 +94,18 @@ function fixtureHtml(direction) {
           .cm-scroller { overflow-y: auto; overflow-x: auto; }
           .cm-line { display: block; }
           ${markdownEditorCss}
+          ${markdownContentCss}
           ${editableTableCss}
           ${markdownTableCss}
         </style>
       </head>
       <body>
-        <div id="root" class="markdown-codemirror-editor">
+        <div id="root" class="markdown-codemirror-editor" data-live-preview="true">
           <div class="cm-editor">
             <div class="cm-scroller">
               <div class="cm-content">
+                <div class="cm-line cm-md-heading cm-md-heading-1">Heading</div>
+                <div class="cm-line"><span class="cm-md-hr-widget"></span></div>
                 <div class="cm-line">${tableMarkup(direction)}</div>
               </div>
             </div>
@@ -137,7 +144,10 @@ async function measureScenario(viewportWidth, direction) {
       const viewport = document.querySelector(".cm-md-table-widget-wrap");
       const frame = document.querySelector(".cm-md-table-frame");
       const table = document.querySelector(".cm-md-table-widget");
+      const heading = document.querySelector(".cm-md-heading-1");
+      const divider = document.querySelector(".cm-md-hr-widget");
       const thirdColumn = table.rows[0].cells[2];
+      const firstColumn = table.rows[0].cells[0];
       const addColumn = document.querySelector(".cm-md-table-add-column");
       const rootRect = root.getBoundingClientRect();
       const contentRect = content.getBoundingClientRect();
@@ -163,6 +173,14 @@ async function measureScenario(viewportWidth, direction) {
         bodyScrollWidth: document.body.scrollWidth,
         viewportScrollWidth: viewport.scrollWidth,
         viewportClientWidth: viewport.clientWidth,
+        headingRuleColor: getComputedStyle(heading).borderBottomColor,
+        headingRuleWidth: getComputedStyle(heading).borderBottomWidth,
+        dividerColor: getComputedStyle(divider, "::before").backgroundColor,
+        dividerWidth: getComputedStyle(divider, "::before").height,
+        tableBorderColor: getComputedStyle(table).borderTopColor,
+        tableBorderWidth: getComputedStyle(table).borderTopWidth,
+        cellBorderColor: getComputedStyle(firstColumn).borderRightColor,
+        cellBorderWidth: getComputedStyle(firstColumn).borderRightWidth,
       };
 
       const targetLogicalOffset = leadingInset + 360;
@@ -217,6 +235,19 @@ async function runSmoke() {
       );
 
       assert(initial.viewportScrollWidth > initial.viewportClientWidth, `${label}: fixture is not wide`);
+      assert(
+        initial.headingRuleColor === initial.dividerColor
+          && initial.headingRuleColor === initial.tableBorderColor
+          && initial.headingRuleColor === initial.cellBorderColor,
+        `${label}: Markdown rule colors diverged`,
+      );
+      assert(
+        initial.headingRuleWidth === "1px"
+          && initial.dividerWidth === "1px"
+          && initial.tableBorderWidth === "1px"
+          && initial.cellBorderWidth === "1px",
+        `${label}: Markdown rule widths diverged`,
+      );
       assertNear(initial.leadingInset, expectedGutter - 64, `${label}: scroll-away inset`);
       assertNear(
         initial.framePaddingInlineStart,

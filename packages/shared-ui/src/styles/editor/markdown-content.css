@@ -16,7 +16,7 @@
   --po-md-heading-gap-after: 16px;
   --po-md-heading-weight: 600;
   --po-md-heading-line-height: 1.25;
-  --po-md-heading-rule: color-mix(in srgb, var(--po-divider) 86%, transparent);
+  --po-md-rule-color: color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 4%);
   --po-md-h1-size: 2em;
   --po-md-h2-size: 1.5em;
   --po-md-h3-size: 1.25em;
@@ -42,13 +42,13 @@
 
 .markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-1 {
   padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--po-md-heading-rule);
+  border-bottom: 1px solid var(--po-md-rule-color);
   font-size: var(--po-md-h1-size);
 }
 
 .markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-2 {
   padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--po-md-heading-rule);
+  border-bottom: 1px solid var(--po-md-rule-color);
   font-size: var(--po-md-h2-size);
 }
 
@@ -114,13 +114,13 @@
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface h1 {
   padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--po-md-heading-rule);
+  border-bottom: 1px solid var(--po-md-rule-color);
   font-size: var(--po-md-h1-size);
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface h2 {
   padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--po-md-heading-rule);
+  border-bottom: 1px solid var(--po-md-rule-color);
   font-size: var(--po-md-h2-size);
 }
 
@@ -164,7 +164,7 @@
   height: 1px;
   margin-block: var(--po-md-heading-gap-before);
   border: 0;
-  background: var(--po-md-heading-rule);
+  background: var(--po-md-rule-color);
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface a {
