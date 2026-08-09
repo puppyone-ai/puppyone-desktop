@@ -275,7 +275,6 @@ export function DesktopCreateEntryDialog({
   if (!selectedKind) return null;
 
   const selectedOption = getCreateEntryOption(selectedKind);
-  const extensionNote = getCreateEntryExtensionNote(selectedKind, t);
   const optionLabel = getCreateEntryOptionLabel(selectedKind, t);
   const errorMessage = formatDesktopNodeActionError(draft.error, t);
 
@@ -302,9 +301,6 @@ export function DesktopCreateEntryDialog({
             </span>
             <div>
               <h2 id="desktop-create-entry-title">{getCreateEntryDialogTitle(selectedKind, t)}</h2>
-              <p>{draft.parentPath
-                ? t("workspace.node.createIn", { path: bidiIsolate(draft.parentPath) })
-                : t("workspace.node.createInRoot")}</p>
             </div>
           </div>
           <DesktopDialogCloseButton disabled={draft.creatingKind !== null} onClick={onCancel} />
@@ -329,9 +325,6 @@ export function DesktopCreateEntryDialog({
             />
           </label>
 
-          {extensionNote && (
-            <div className="desktop-dialog-note">{extensionNote}</div>
-          )}
           {errorMessage && <div className="desktop-dialog-error" dir="auto">{errorMessage}</div>}
         </div>
 
@@ -988,11 +981,6 @@ export function normalizeCreateEntryName(kind: DesktopCreateEntryKind, value: st
 function ensureCreateEntryExtension(name: string, extensionPattern: RegExp, fallbackExtension: string): string {
   if (extensionPattern.test(name)) return name;
   return `${name}${fallbackExtension}`;
-}
-
-function getCreateEntryExtensionNote(kind: DesktopCreateEntryKind, t: MessageFormatter): string | null {
-  if (kind === "folder") return null;
-  return t(`workspace.node.create.kind.${kind}.extensionNote`);
 }
 
 function getCreateEntryOptionLabel(kind: DesktopCreateEntryKind, t: MessageFormatter): string {

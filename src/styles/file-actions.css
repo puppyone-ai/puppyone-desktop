@@ -6,6 +6,31 @@
   width: min(360px, calc(100vw - 32px));
 }
 
+.desktop-create-entry-dialog .desktop-dialog-header {
+  padding-block-end: 10px;
+}
+
+.desktop-create-entry-dialog .desktop-dialog-title-row {
+  align-items: center;
+}
+
+.desktop-create-entry-dialog .desktop-file-dialog-body {
+  padding-block: 8px 18px;
+}
+
+.desktop-create-entry-dialog .desktop-dialog-field {
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 16px;
+  text-transform: none;
+}
+
+.desktop-create-entry-dialog .desktop-dialog-field input {
+  margin-top: 6px;
+}
+
 .desktop-file-dialog-body {
   gap: 14px;
 }

@@ -21,7 +21,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("App Preview creation dialog", () => {
+describe("Create entry dialog", () => {
   it("asks only for a name and never exposes or detects launch configuration", () => {
     const onCreate = vi.fn();
     const container = render(
@@ -41,6 +41,27 @@ describe("App Preview creation dialog", () => {
     act(() => findButton(container, "Create")?.click());
     expect(onCreate).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    ["markdown", "Untitled.md", "Create Markdown file"],
+    ["csv", "Untitled.csv", "Create CSV file"],
+    ["folder", "Untitled folder", "Create folder"],
+  ] as const)("keeps the %s creation form concise", (selectedKind, name, title) => {
+    const container = render(
+      <DesktopCreateEntryDialog
+        draft={createDraft({ selectedKind, name })}
+        onChange={vi.fn()}
+        onCancel={vi.fn()}
+        onCreate={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector("h2")?.textContent).toBe(title);
+    expect(container.querySelector(".desktop-dialog-title-row p")).toBeNull();
+    expect(container.querySelector(".desktop-dialog-note")).toBeNull();
+    expect(container.querySelector(".desktop-dialog-field > span")?.textContent).toBe("Name");
+    expect(container.querySelectorAll("input")).toHaveLength(1);
+  });
 });
 
 function render(element: React.ReactElement) {
@@ -56,7 +77,9 @@ function findButton(container: HTMLElement, text: string) {
     .find((button) => button.textContent?.trim() === text);
 }
 
-function createDraft(): DesktopCreateEntryDraft {
+function createDraft(
+  overrides: Partial<DesktopCreateEntryDraft> = {},
+): DesktopCreateEntryDraft {
   return {
     parentPath: null,
     anchor: { left: 20, top: 20, right: 44, bottom: 44, width: 24, height: 24 },
@@ -64,5 +87,6 @@ function createDraft(): DesktopCreateEntryDraft {
     creatingKind: null,
     selectedKind: "app",
     name: "Untitled App.puppyoneapp",
+    ...overrides,
   };
 }
