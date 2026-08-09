@@ -23,6 +23,22 @@ export type DocumentSurfaceRenderControls = Readonly<{
   onSurfaceReady: () => void;
 }>;
 
+/**
+ * A non-visual readiness signal for document renderers. File transitions keep
+ * the committed surface on screen, so pending renderers must report their busy
+ * state without introducing a second, viewer-specific loading page.
+ */
+export function DocumentSurfacePending({ label }: { label: string }) {
+  return (
+    <div
+      className="document-surface-pending"
+      role="status"
+      aria-busy="true"
+      aria-label={label}
+    />
+  );
+}
+
 export type DocumentSurfaceHostProps = {
   surfaceKey: string;
   children: (controls: DocumentSurfaceRenderControls) => ReactNode;

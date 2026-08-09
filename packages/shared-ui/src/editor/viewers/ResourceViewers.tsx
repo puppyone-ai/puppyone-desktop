@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { FilePreviewIcon } from "../../file/fileIcons";
+import { DocumentSurfacePending } from "../DocumentSurfaceHost";
 import type { PresetViewerRenderContext } from "../viewerTypes";
 
 type ResourceViewerProps = Pick<
@@ -47,11 +48,7 @@ function ImagePreviewSurface({ url, name }: { url: string; name: string }) {
       data-preview-state={ready ? "ready" : "loading"}
       aria-busy={!ready}
     >
-      {!ready && (
-        <div className="native-image-preview-state" role="status">
-          {t("editor.preview.loading")}
-        </div>
-      )}
+      {!ready && <DocumentSurfacePending label={t("editor.preview.loading")} />}
       <img
         key={url}
         className="native-image-preview"
@@ -197,7 +194,7 @@ function ResourcePreviewState({
       </div>
     );
   }
-  if (loading && !fileUrl) return <div className="editor-state" aria-busy="true">{t("editor.preview.loading")}</div>;
+  if (loading && !fileUrl) return <DocumentSurfacePending label={t("editor.preview.loading")} />;
   if (!fileUrl) {
     return (
       <div className="editor-state">
@@ -273,7 +270,7 @@ function PdfPreviewFrame({ url, title }: { url: string; title: string }) {
   }
 
   if (shouldUseBlobUrl && !blobUrl) {
-    return <div className="editor-state" aria-busy="true">{t("editor.preview.loading")}</div>;
+    return <DocumentSurfacePending label={t("editor.preview.loading")} />;
   }
 
   const frameUrl = shouldUseBlobUrl ? blobUrl as string : url;

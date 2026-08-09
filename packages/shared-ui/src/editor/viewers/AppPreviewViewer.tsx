@@ -24,7 +24,10 @@ import { AppPreviewSetupView } from "./app-preview/AppPreviewSetupView";
 import { AppPreviewStateView } from "./app-preview/AppPreviewStateView";
 import type { AppPreviewMode } from "./app-preview/types";
 import { useAppPreviewSession } from "./app-preview/useAppPreviewSession";
-import { useDocumentSurfaceState } from "../DocumentSurfaceHost";
+import {
+  DocumentSurfacePending,
+  useDocumentSurfaceState,
+} from "../DocumentSurfaceHost";
 
 export function AppPreviewViewer({
   document,
@@ -66,7 +69,7 @@ export function AppPreviewViewer({
     surfaceVisible: documentSurfaceState === "committed",
   });
 
-  if (loading && !manifestContent) return <div className="editor-state" aria-busy="true">{t("editor.app.loading")}</div>;
+  if (loading && !manifestContent) return <DocumentSurfacePending label={t("editor.app.loading")} />;
   if (error && !manifestContent) return <div className="editor-state danger" dir="auto">{error}</div>;
 
   const { state } = session;

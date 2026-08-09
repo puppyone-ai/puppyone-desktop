@@ -41,6 +41,40 @@ for (const filePath of presetCoreFiles) {
   }
 }
 
+const documentSurfacePath = path.join(
+  repoRoot,
+  "packages/shared-ui/src/editor/DocumentSurfaceHost.tsx",
+);
+const documentSurfaceSource = readFileSync(documentSurfacePath, "utf8");
+if (!/export function DocumentSurfacePending[\s\S]*?role="status"[\s\S]*?aria-busy="true"[\s\S]*?aria-label=\{label\}/.test(documentSurfaceSource)) {
+  errors.push(
+    "DocumentSurfacePending no longer provides the shared non-visual busy contract",
+  );
+}
+
+const documentSurfaceConsumers = [
+  path.join(repoRoot, "packages/shared-ui/src/editor/PuppyoneEditorHost.tsx"),
+  path.join(repoRoot, "packages/shared-ui/src/editor/PresetViewerRenderer.tsx"),
+  ...walkFiles(path.join(repoRoot, "packages/shared-ui/src/editor/viewers")),
+];
+for (const filePath of documentSurfaceConsumers) {
+  const source = readFileSync(filePath, "utf8");
+  const sourceWithoutSharedPending = source.replace(
+    /<DocumentSurfacePending\b[\s\S]*?\/>/g,
+    "",
+  );
+  if (/t\(["']editor\.[^"']*(?:loading|renderingWord|renderingPresentation)[^"']*["']\)/i.test(sourceWithoutSharedPending)) {
+    errors.push(
+      `${path.relative(repoRoot, filePath)} renders document loading copy outside DocumentSurfacePending`,
+    );
+  }
+  if (/aria-busy="true"/.test(source)) {
+    errors.push(
+      `${path.relative(repoRoot, filePath)} declares an ad hoc document loading placeholder instead of DocumentSurfacePending`,
+    );
+  }
+}
+
 const mainSource = readFileSync(path.join(repoRoot, "electron/main.mjs"), "utf8");
 if (/from\s+["']\.\/main\/viewer-packs\/index\.mjs["']/.test(mainSource)) {
   errors.push("electron/main.mjs statically imports the dormant Viewer Pack runtime");

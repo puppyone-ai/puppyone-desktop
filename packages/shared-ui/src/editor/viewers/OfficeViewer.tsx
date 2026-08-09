@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { PptxViewer, SlideHandle } from "@aiden0z/pptx-renderer";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import { DocumentSurfacePending } from "../DocumentSurfaceHost";
 import { validateOfficePackageInWorker } from "../security/officePackageValidationClient";
 import {
   preflightOoxmlPackage,
@@ -197,7 +198,7 @@ export function OfficeViewer({
     && !previewResourceUrl
     && !canUseNativeDocxConversion
   ) {
-    previewBody = <div className="editor-state" aria-busy="true">{t("editor.preview.loading")}</div>;
+    previewBody = <DocumentSurfacePending label={t("editor.preview.loading")} />;
   } else if (!previewResourceUrl && !canUseNativeDocxConversion && state.status !== "ready") {
     previewBody = (
       <OfficeEmptyState
@@ -219,7 +220,7 @@ export function OfficeViewer({
           />
         )}
         {state.status === "idle" || state.status === "loading" ? (
-          <div className="editor-state">{t("editor.preview.loading")}</div>
+          <DocumentSurfacePending label={t("editor.preview.loading")} />
         ) : null}
         {state.status === "ready" && (
           <OfficePreviewContent
@@ -698,7 +699,7 @@ function PptxPresentationPreview({
             data-rendering={renderState.status === "loading" ? "true" : undefined}
           />
           {renderState.status === "loading" && (
-            <div className="office-pptx-render-state">{t("editor.office.renderingPresentation")}</div>
+            <DocumentSurfacePending label={t("editor.office.renderingPresentation")} />
           )}
           {viewerState?.slideCount === 0 && (
             <div className="office-pptx-render-state">{t("editor.office.emptyPresentation")}</div>

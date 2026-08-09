@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DocumentSurfaceHost,
+  DocumentSurfacePending,
   DocumentSurfaceReadinessBoundary,
 } from "../packages/shared-ui/src/editor/DocumentSurfaceHost";
 import { FilePreview } from "../packages/shared-ui/src/data/FilePreview";
@@ -40,6 +41,19 @@ afterEach(() => {
 });
 
 describe("DocumentSurfaceHost", () => {
+  it("keeps pending state accessible without rendering visible loading copy", async () => {
+    const container = createContainer();
+    await act(async () => root?.render(
+      <DocumentSurfacePending label="Loading file…" />,
+    ));
+
+    const pending = container.querySelector<HTMLElement>(".document-surface-pending");
+    expect(pending?.textContent).toBe("");
+    expect(pending?.getAttribute("role")).toBe("status");
+    expect(pending?.getAttribute("aria-busy")).toBe("true");
+    expect(pending?.getAttribute("aria-label")).toBe("Loading file…");
+  });
+
   it("keeps the committed document interactive until the staged document is ready", async () => {
     const ready = new Map<string, () => void>();
     const container = createContainer();
@@ -120,15 +134,17 @@ describe("DocumentSurfaceHost", () => {
       />,
     )));
 
-    const loadingState = Array.from(container.querySelectorAll<HTMLElement>(".editor-state"))
-      .find((element) => element.textContent === testT("editor.loadingFile"));
-    const loadingSlot = loadingState?.closest<HTMLElement>(".document-surface-slot");
+    const pending = container.querySelector<HTMLElement>(
+      `.document-surface-pending[aria-label="${testT("editor.loadingFile")}"]`,
+    );
+    const loadingSlot = pending?.closest<HTMLElement>(".document-surface-slot");
     const neutralSlot = container
       .querySelector<HTMLElement>('[data-testid="neutral-surface"]')
       ?.closest<HTMLElement>(".document-surface-slot");
 
     expect(loadingSlot?.dataset.surfaceState).toBe("staging");
     expect(loadingSlot?.getAttribute("aria-hidden")).toBe("true");
+    expect(pending?.textContent).toBe("");
     expect(neutralSlot?.dataset.surfaceState).toBe("committed");
   });
 });

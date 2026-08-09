@@ -14,15 +14,6 @@
   opacity: 0;
 }
 
-.native-image-preview-state {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: var(--po-text-subtle);
-  font-size: 12px;
-}
-
 .native-video-preview {
   max-width: 100%;
   max-height: 100%;
@@ -221,14 +212,6 @@
 
 .office-docx-host[data-rendering="true"] {
   min-height: 120px;
-}
-
-.office-docx-render-state {
-  display: grid;
-  min-height: 120px;
-  place-items: center;
-  color: var(--po-text-muted);
-  font-size: 12px;
 }
 
 .office-warning-note {

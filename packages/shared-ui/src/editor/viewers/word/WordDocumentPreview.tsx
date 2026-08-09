@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import { DocumentSurfacePending } from "../../DocumentSurfaceHost";
 import {
   assertDocxDomWithinBudget,
   CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE,
@@ -184,7 +185,7 @@ export function WordDocumentPreview({
       aria-busy={renderState.status === "loading"}
     >
       {renderState.status === "loading" && (
-        <div className="office-docx-render-state">{t("editor.office.renderingWord")}</div>
+        <DocumentSurfacePending label={t("editor.office.renderingWord")} />
       )}
       <div
         ref={hostRef}

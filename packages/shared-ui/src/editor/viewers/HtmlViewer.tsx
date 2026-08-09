@@ -4,6 +4,7 @@ import { Code2, Eye } from "lucide-react";
 import { useState } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import { DocumentSurfacePending } from "../DocumentSurfaceHost";
 import { getHtmlPreviewInteractionCss } from "../htmlPreviewInteraction";
 import { PlainTextEditor } from "../PlainTextEditor";
 import type { MarkdownHtmlTrustMode, PresetViewerRenderContext } from "../viewerTypes";
@@ -31,10 +32,10 @@ export function HtmlViewer({
   const { t } = useLocalization();
   const [mode, setMode] = useState<"preview" | "source">("preview");
 
-  if (loading && !content && !fileUrl) return <div className="editor-state" aria-busy="true">{t("editor.html.loading")}</div>;
+  if (loading && !content && !fileUrl) return <DocumentSurfacePending label={t("editor.html.loading")} />;
   if (error && !content && !fileUrl) return <div className="editor-state danger" dir="auto">{error}</div>;
-  if (content && fileUrlLoading && !fileUrl) return <div className="editor-state" aria-busy="true">{t("editor.preview.loading")}</div>;
-  if (fileUrlLoading && !content && !fileUrl) return <div className="editor-state" aria-busy="true">{t("editor.preview.loading")}</div>;
+  if (content && fileUrlLoading && !fileUrl) return <DocumentSurfacePending label={t("editor.preview.loading")} />;
+  if (fileUrlLoading && !content && !fileUrl) return <DocumentSurfacePending label={t("editor.preview.loading")} />;
   if (fileUrlError && !content && !fileUrl) {
     return (
       <div className="editor-state danger">

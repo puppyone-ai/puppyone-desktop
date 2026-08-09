@@ -35,7 +35,10 @@ import { DocumentSessionBoundary } from "./document-session/DocumentSessionBound
 import type { DocumentPersistedCommit } from "./document-session/types";
 import { resolveEditorAccess } from "./editorAccess";
 import { EditorFindHost } from "./find/editorFind";
-import { DocumentSurfaceReadinessBoundary } from "./DocumentSurfaceHost";
+import {
+  DocumentSurfacePending,
+  DocumentSurfaceReadinessBoundary,
+} from "./DocumentSurfaceHost";
 
 export type { EditorDocument, EditorDocumentKind, EditorSaveMode, MarkdownHtmlTrustMode } from "./viewerTypes";
 
@@ -168,7 +171,7 @@ function PuppyoneEditorSurface({
   const canEdit = editorAccess.kind === "editable";
 
   if (viewer.source !== "resource" && loading && !content) {
-    return <div className="editor-state" aria-busy="true">{t("editor.loadingFile")}</div>;
+    return <DocumentSurfacePending label={t("editor.loadingFile")} />;
   }
 
   if (viewer.source !== "resource" && error && !content) {

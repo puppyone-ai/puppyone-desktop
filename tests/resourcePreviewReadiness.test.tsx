@@ -32,9 +32,10 @@ describe("resource preview readiness", () => {
     await waitFor(() => getFileUrl.mock.calls.length === 1);
 
     expect(container.querySelector(".native-image-preview")).toBeNull();
-    const loadingState = container.querySelector<HTMLElement>(".editor-state");
-    expect(loadingState?.textContent).toBe(testT("editor.preview.loading"));
-    expect(loadingState?.closest<HTMLElement>(".document-surface-slot")?.dataset.surfaceState)
+    const pending = container.querySelector<HTMLElement>(".document-surface-pending");
+    expect(pending?.textContent).toBe("");
+    expect(pending?.getAttribute("aria-label")).toBe(testT("editor.preview.loading"));
+    expect(pending?.closest<HTMLElement>(".document-surface-slot")?.dataset.surfaceState)
       .toBe("staging");
     expect(container.querySelector('[data-surface-key="file-preview:empty"]')?.getAttribute("data-surface-state"))
       .toBe("committed");
@@ -84,7 +85,9 @@ describe("resource preview readiness", () => {
     expect(image.hidden).toBe(true);
     expect(shell.dataset.previewState).toBe("loading");
     expect(shell.getAttribute("aria-busy")).toBe("true");
-    expect(container.querySelector(".native-image-preview-state")).not.toBeNull();
+    expect(shell.querySelector(".document-surface-pending")?.textContent).toBe("");
+    expect(shell.querySelector(".document-surface-pending")?.getAttribute("aria-label"))
+      .toBe(testT("editor.preview.loading"));
 
     Object.defineProperty(image, "decode", { configurable: true, value: undefined });
     act(() => image.dispatchEvent(new Event("load")));
@@ -92,7 +95,7 @@ describe("resource preview readiness", () => {
     expect(shell.dataset.previewState).toBe("ready");
     expect(shell.getAttribute("aria-busy")).toBe("false");
     expect(image.hidden).toBe(false);
-    expect(container.querySelector(".native-image-preview-state")).toBeNull();
+    expect(shell.querySelector(".document-surface-pending")).toBeNull();
     await waitFor(() => container.querySelector(".document-surface-host")?.getAttribute("data-transitioning") === "false");
     expect(container.querySelector('[data-surface-key="notes.bin"]')).toBeNull();
     expect(container.querySelector('[data-surface-key="photo.png"]')?.getAttribute("data-surface-state")).toBe("committed");
