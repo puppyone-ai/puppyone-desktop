@@ -10,7 +10,10 @@ import type {
   OfficeEditingPort,
 } from "../core/types";
 import { EditorHost } from "../editor/EditorHost";
-import { DocumentSurfaceHost } from "../editor/DocumentSurfaceHost";
+import {
+  DocumentSurfaceHost,
+  DocumentSurfaceReadinessBoundary,
+} from "../editor/DocumentSurfaceHost";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
 import type {
   DocumentSourceKind,
@@ -89,22 +92,15 @@ export function FilePreview({
   documentSourceKind = "local",
 }: FilePreviewProps) {
   const { t } = useLocalization();
-  if (!node) {
-    if (emptySlot) return <>{emptySlot}</>;
-
-    return (
-      <div className="empty-preview">
-        <span>{t("shared-ui.preview.selectFile")}</span>
-      </div>
-    );
-  }
-
-  const actions = typeof actionSlot === "function" ? actionSlot(node) : actionSlot;
+  const surfaceKey = node?.path ?? "file-preview:empty";
+  const actions = node
+    ? typeof actionSlot === "function" ? actionSlot(node) : actionSlot
+    : null;
   const deferFallbackContent = loading && !fileContent;
 
   return (
-    <DocumentSurfaceHost surfaceKey={node.path}>
-      {({ onSurfaceReady }) => (
+    <DocumentSurfaceHost surfaceKey={surfaceKey}>
+      {({ onSurfaceReady }) => node ? (
         <div className={`file-preview-shell ${showHeader ? "" : "without-header"}`}>
           {showHeader && (
             <div className="file-preview-header">
@@ -172,6 +168,17 @@ export function FilePreview({
             </EditorPreviewBoundary>
           </div>
         </div>
+      ) : (
+        <DocumentSurfaceReadinessBoundary
+          readinessKey={surfaceKey}
+          onReady={onSurfaceReady}
+        >
+          {emptySlot ?? (
+            <div className="empty-preview">
+              <span>{t("shared-ui.preview.selectFile")}</span>
+            </div>
+          )}
+        </DocumentSurfaceReadinessBoundary>
       )}
     </DocumentSurfaceHost>
   );

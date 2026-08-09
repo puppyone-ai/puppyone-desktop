@@ -8,6 +8,8 @@ import {
   DocumentSurfaceHost,
   DocumentSurfaceReadinessBoundary,
 } from "../packages/shared-ui/src/editor/DocumentSurfaceHost";
+import { FilePreview } from "../packages/shared-ui/src/data/FilePreview";
+import { testT, withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
   .IS_REACT_ACT_ENVIRONMENT = true;
@@ -95,6 +97,39 @@ describe("DocumentSurfaceHost", () => {
     expect(surface.textContent).toBe("Second revision");
     expect(container.querySelectorAll(".document-surface-slot")).toHaveLength(1);
     expect(container.querySelector(".document-surface-host")?.getAttribute("data-transitioning")).toBe("false");
+  });
+
+  it("keeps the empty surface committed while the first selected file is still loading", async () => {
+    const container = createContainer();
+    await act(async () => root?.render(withTestLocalization(
+      <FilePreview
+        node={null}
+        emptySlot={<div data-testid="neutral-surface" />}
+      />,
+    )));
+
+    await act(async () => root?.render(withTestLocalization(
+      <FilePreview
+        node={{
+          id: "new.md",
+          path: "new.md",
+          name: "new.md",
+          type: "markdown",
+        }}
+        loading
+      />,
+    )));
+
+    const loadingState = Array.from(container.querySelectorAll<HTMLElement>(".editor-state"))
+      .find((element) => element.textContent === testT("editor.loadingFile"));
+    const loadingSlot = loadingState?.closest<HTMLElement>(".document-surface-slot");
+    const neutralSlot = container
+      .querySelector<HTMLElement>('[data-testid="neutral-surface"]')
+      ?.closest<HTMLElement>(".document-surface-slot");
+
+    expect(loadingSlot?.dataset.surfaceState).toBe("staging");
+    expect(loadingSlot?.getAttribute("aria-hidden")).toBe("true");
+    expect(neutralSlot?.dataset.surfaceState).toBe("committed");
   });
 });
 

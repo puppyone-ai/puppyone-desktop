@@ -776,6 +776,7 @@ body.data-sidebar-resizing .data-preview-accessory {
 }
 
 .document-surface-slot.is-staging {
+  opacity: 0;
   visibility: hidden;
   pointer-events: none;
 }

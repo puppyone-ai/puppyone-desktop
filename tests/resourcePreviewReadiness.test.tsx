@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 describe("resource preview readiness", () => {
-  it("shows a deliberate loading state instead of treating image metadata as a source URL", async () => {
+  it("keeps the initial neutral surface committed while the image URL loads in staging", async () => {
     const fileUrl = deferred<string>();
     const { container, getFileUrl } = await renderWorkspace({
       activePath: "photo.png",
@@ -32,8 +32,12 @@ describe("resource preview readiness", () => {
     await waitFor(() => getFileUrl.mock.calls.length === 1);
 
     expect(container.querySelector(".native-image-preview")).toBeNull();
-    expect(container.querySelector(".editor-state")?.textContent)
-      .toBe(testT("editor.preview.loading"));
+    const loadingState = container.querySelector<HTMLElement>(".editor-state");
+    expect(loadingState?.textContent).toBe(testT("editor.preview.loading"));
+    expect(loadingState?.closest<HTMLElement>(".document-surface-slot")?.dataset.surfaceState)
+      .toBe("staging");
+    expect(container.querySelector('[data-surface-key="file-preview:empty"]')?.getAttribute("data-surface-state"))
+      .toBe("committed");
     expect(container.textContent).not.toContain("PNG metadata from the explorer");
   });
 

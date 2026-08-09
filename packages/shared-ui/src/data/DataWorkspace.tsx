@@ -1385,7 +1385,9 @@ export function DataWorkspace({
                   officeEditing={dataPort.officeEditing ?? null}
                   viewerExtensionAdapter={viewerExtensionAdapter}
                   documentSourceKind={documentSourceKind ?? resolvedDocumentSourceKind}
-                  emptySlot={emptySlot}
+                  emptySlot={resolvedActivePath && !activeNode
+                    ? <div className="empty-preview" aria-busy="true" />
+                    : emptySlot}
                   actionSlot={previewActionSlot}
                   documentPersistence={dataPort.documentPersistence ?? null}
                   onDocumentPersisted={dataPort.documentPersistence && selectedFile
