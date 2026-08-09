@@ -28,7 +28,7 @@ export function AgentFileQueryActivity({ activity, onOpenFile }: { activity: Age
     >
       {output && (searchable
         ? <SearchResults lines={lines} onOpenFile={onOpenFile} />
-        : <pre className="desktop-agent-tool-output" dir="ltr">{output}</pre>)}
+        : <pre className="desktop-agent-tool-output" data-po-scrollbar="content" dir="ltr">{output}</pre>)}
     </AgentActivityShell>
   );
 }
@@ -37,7 +37,7 @@ function SearchResults({ lines, onOpenFile }: { lines: string[]; onOpenFile?: (p
   const { t, formatNumber } = useLocalization();
   const visible = lines.slice(0, MAX_VISIBLE_RESULT_LINES);
   return (
-    <div className="desktop-agent-search-results" dir="ltr">
+    <div className="desktop-agent-search-results" data-po-scrollbar="content" dir="ltr">
       {visible.length === 0 && <span className="desktop-agent-tool-empty">{t("agent.activity.noResults")}</span>}
       {visible.map((line, index) => {
         const path = resultPath(line);

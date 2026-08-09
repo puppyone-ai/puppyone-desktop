@@ -11,30 +11,6 @@
   backdrop-filter: blur(20px);
 }
 
-.desktop-menu-surface::-webkit-scrollbar-track,
-.desktop-titlebar-menu::-webkit-scrollbar-track,
-.desktop-node-action-menu::-webkit-scrollbar-track,
-.desktop-menu-surface::-webkit-scrollbar-corner,
-.desktop-titlebar-menu::-webkit-scrollbar-corner,
-.desktop-node-action-menu::-webkit-scrollbar-corner {
-  background: var(--po-menu-bg);
-}
-
-.desktop-menu-surface::-webkit-scrollbar-thumb,
-.desktop-titlebar-menu::-webkit-scrollbar-thumb,
-.desktop-node-action-menu::-webkit-scrollbar-thumb {
-  border: 1px solid var(--po-menu-bg);
-  background-color: var(--po-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
-.desktop-menu-surface::-webkit-scrollbar-thumb:hover,
-.desktop-titlebar-menu::-webkit-scrollbar-thumb:hover,
-.desktop-node-action-menu::-webkit-scrollbar-thumb:hover {
-  background-color: var(--po-scrollbar-thumb-hover);
-  background-clip: padding-box;
-}
-
 .desktop-create-entry-menu.desktop-node-action-menu {
   border-color: var(--po-menu-border);
   border-radius: var(--po-menu-radius);

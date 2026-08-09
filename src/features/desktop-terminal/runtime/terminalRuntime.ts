@@ -62,6 +62,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   private removeExitListener: (() => void) | null = null;
   private fitFrame: number | null = null;
   private revealFrame: number | null = null;
+  private scrollbarIdleTimer: number | null = null;
   private pendingPtySize: TerminalSize | null = null;
   private lastPtySize: TerminalSize | null = null;
   private ptyReady = false;
@@ -150,8 +151,11 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
 
     if (this.fitFrame !== null) cancelAnimationFrame(this.fitFrame);
     if (this.revealFrame !== null) cancelAnimationFrame(this.revealFrame);
+    if (this.scrollbarIdleTimer !== null) window.clearTimeout(this.scrollbarIdleTimer);
     this.fitFrame = null;
     this.revealFrame = null;
+    this.scrollbarIdleTimer = null;
+    this.container?.classList.remove("po-scrollbar-active");
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     if (this.terminalSidebarElement && this.sidebarTransitionEndListener) {
@@ -215,6 +219,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     this.disposables.push(
       terminal.onRender(() => this.setReady(true)),
       terminal.onData((data) => this.write(data)),
+      terminal.onScroll(() => this.markScrollbarActive()),
       terminal.onTitleChange((title) => this.setTitle(title)),
     );
     terminal.open(container);
@@ -237,6 +242,17 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     });
 
     this.startPty();
+  }
+
+  private markScrollbarActive() {
+    const container = this.container;
+    if (!container) return;
+    container.classList.add("po-scrollbar-active");
+    if (this.scrollbarIdleTimer !== null) window.clearTimeout(this.scrollbarIdleTimer);
+    this.scrollbarIdleTimer = window.setTimeout(() => {
+      this.scrollbarIdleTimer = null;
+      container.classList.remove("po-scrollbar-active");
+    }, 900);
   }
 
   private subscribeBridge() {

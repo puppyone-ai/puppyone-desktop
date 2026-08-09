@@ -19,7 +19,7 @@ export function CloudSignedOutRoute({
   const sessionTransitioning = authState.status === "restoring" || authState.status === "signing-out";
   if (sessionTransitioning) {
     return (
-      <main className="desktop-cloud-main-view">
+      <main className="desktop-cloud-main-view" data-po-scrollbar="content">
         <div className="desktop-cloud-page-shell">
           <CloudWorkspaceLoadingState label={loadingLabel} />
         </div>
@@ -28,7 +28,10 @@ export function CloudSignedOutRoute({
   }
 
   return (
-    <main className="desktop-cloud-main-view desktop-cloud-auth-main-view">
+    <main
+      className="desktop-cloud-main-view desktop-cloud-auth-main-view"
+      data-po-scrollbar="content"
+    >
       <div className="desktop-cloud-auth-page-shell">
         <CloudSignInView
           apiBaseUrl={apiBaseUrl}

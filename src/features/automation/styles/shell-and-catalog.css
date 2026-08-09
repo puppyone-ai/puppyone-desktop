@@ -112,10 +112,6 @@
   overflow-x: auto;
 }
 
-.desktop-cloud-automation-category-tabs::-webkit-scrollbar {
-  display: none;
-}
-
 .desktop-cloud-automation-category-tabs button {
   display: inline-flex;
   height: 28px;

@@ -173,7 +173,10 @@ export function DesktopCloudCreateAccessDialog({
           </div>
           <DesktopDialogCloseButton disabled={saving} onClick={onClose} />
         </header>
-        <div className="desktop-dialog-body desktop-cloud-create-access-body">
+        <div
+          className="desktop-dialog-body desktop-cloud-create-access-body"
+          data-po-scrollbar="content"
+        >
           <CreateAccessIntentPicker value={intent} onChange={setIntent} />
           <div className="desktop-cloud-create-access-grid">
             <CreateAccessFolderTree

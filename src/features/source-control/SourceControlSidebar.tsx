@@ -264,7 +264,7 @@ export function GitSidebar({
                 onSelectWorkingFile={onSelectWorkingFile}
               />
             ) : (
-              <div className="desktop-git-committed-summary">
+              <div className="desktop-git-committed-summary" data-po-scrollbar="sidebar">
                 {getCommittedSummary(committedCount, committedPrimaryAction?.label ?? syncState.pushLabel, t)}
               </div>
             )}

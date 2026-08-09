@@ -224,6 +224,7 @@ export function MarkdownCodeMirrorEditor({
         ],
       }),
     });
+    view.scrollDOM.dataset.poScrollbar = "content";
     rendererPerformance.recordOperation(
       "editor_base_create",
       performance.now() - editorCreateStartedAt,

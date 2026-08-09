@@ -249,7 +249,7 @@ function CloudAutomationResourcePicker({
       ) : resources.length === 0 ? (
         <div className="desktop-cloud-automation-resource-state">{t("automation.resource.noMatches")}</div>
       ) : (
-        <div className="desktop-cloud-automation-resource-list">
+        <div className="desktop-cloud-automation-resource-list" data-po-scrollbar="content">
           {resources.map((resource) => {
             const selected = value?.resourceId === resource.id;
             return (

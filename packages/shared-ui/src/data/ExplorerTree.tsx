@@ -608,6 +608,7 @@ export function ExplorerTree({
       <div
         ref={scrollRef}
         className={`explorer-tree-scroll ${scrollable ? "is-scrollable" : ""}`}
+        data-po-scrollbar="sidebar"
         role="tree"
         aria-multiselectable="true"
         aria-activedescendant={activeIndex !== null ? getExplorerRowDomId(activeIndex) : undefined}

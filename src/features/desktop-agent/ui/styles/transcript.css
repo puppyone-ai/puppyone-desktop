@@ -37,17 +37,6 @@
   overflow-anchor: none;
 }
 
-.desktop-agent-transcript::-webkit-scrollbar {
-  width: var(--po-scrollbar-size, 12px);
-}
-
-.desktop-agent-transcript::-webkit-scrollbar-thumb {
-  border: var(--po-scrollbar-thumb-inset, 3px) solid transparent;
-  border-radius: var(--po-scrollbar-radius, 999px);
-  background-color: var(--po-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
 .desktop-agent-virtual-canvas {
   position: relative;
   width: min(100%, var(--agent-content-max));

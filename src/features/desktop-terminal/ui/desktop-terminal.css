@@ -38,10 +38,6 @@
   scroll-behavior: auto;
 }
 
-.desktop-terminal-tabs::-webkit-scrollbar {
-  display: none;
-}
-
 .desktop-terminal-tab {
   position: relative;
   display: flex;
@@ -387,7 +383,7 @@
 }
 
 .desktop-terminal-xterm:hover .xterm-viewport::-webkit-scrollbar-thumb,
-.desktop-terminal-xterm:focus-within .xterm-viewport::-webkit-scrollbar-thumb,
+.desktop-terminal-xterm.po-scrollbar-active .xterm-viewport::-webkit-scrollbar-thumb,
 .desktop-terminal-xterm .xterm-viewport.po-scrollbar-active::-webkit-scrollbar-thumb {
   border-left-width: var(--desktop-terminal-scrollbar-thumb-active-offset);
   background-color: var(--desktop-terminal-scrollbar-thumb-color);
@@ -435,7 +431,7 @@
   .xterm-scrollable-element
   > .scrollbar.visible
   > .slider::after,
-.desktop-terminal-xterm:focus-within
+.desktop-terminal-xterm.po-scrollbar-active
   .xterm
   .xterm-scrollable-element
   > .scrollbar.visible

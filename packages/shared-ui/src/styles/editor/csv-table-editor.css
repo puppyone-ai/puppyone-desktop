@@ -153,23 +153,6 @@
   overscroll-behavior: contain;
 }
 
-.csv-table-editor__scroll::-webkit-scrollbar {
-  width: var(--po-scrollbar-size, 12px);
-  height: var(--po-scrollbar-size, 12px);
-}
-
-.csv-table-editor__scroll::-webkit-scrollbar-track,
-.csv-table-editor__scroll::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-.csv-table-editor__scroll::-webkit-scrollbar-thumb {
-  border: var(--po-scrollbar-thumb-inset, 3px) solid transparent;
-  border-radius: var(--po-scrollbar-radius, 999px);
-  background-color: var(--po-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
 .csv-table-editor__frame {
   display: inline-block;
   box-sizing: border-box;

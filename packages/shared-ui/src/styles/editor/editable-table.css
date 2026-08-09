@@ -287,22 +287,6 @@
   -webkit-backdrop-filter: blur(20px);
 }
 
-.po-editable-table-context-menu.desktop-menu-surface::-webkit-scrollbar-track,
-.po-editable-table-context-menu.desktop-menu-surface::-webkit-scrollbar-corner {
-  background: var(--po-menu-bg);
-}
-
-.po-editable-table-context-menu.desktop-menu-surface::-webkit-scrollbar-thumb {
-  border: 1px solid var(--po-menu-bg);
-  background-color: var(--po-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
-.po-editable-table-context-menu.desktop-menu-surface::-webkit-scrollbar-thumb:hover {
-  background-color: var(--po-scrollbar-thumb-hover);
-  background-clip: padding-box;
-}
-
 .po-editable-table-context-menu .desktop-menu-section {
   display: grid;
   gap: 2px;

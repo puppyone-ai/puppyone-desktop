@@ -24,7 +24,7 @@ export function PlainTextEditor({
   const isTechnicalText = technicalTextExtensions.some((extension) => lowerName.endsWith(extension));
 
   return (
-    <div className="plain-text-editor">
+    <div className="plain-text-editor" data-po-scrollbar="content">
       <ConflictMarkerBanner content={content} onResolve={readOnly ? undefined : onChange} />
       <div className="plain-text-editor__rail">
         {readOnly ? (

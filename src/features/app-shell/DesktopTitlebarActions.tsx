@@ -375,7 +375,11 @@ function TerminalTitlebarMenu({
             onClick={() => runAction(onCreate)}
           />
           {sessions.length > 0 && <DesktopMenuSeparator />}
-          <div className="desktop-titlebar-terminal-session-list" role="none">
+          <div
+            className="desktop-titlebar-terminal-session-list"
+            data-po-scrollbar="menu"
+            role="none"
+          >
             {sessions.length === 0 ? (
               <DesktopMenuItem
                 disabled

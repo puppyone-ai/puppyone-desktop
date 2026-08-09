@@ -271,7 +271,10 @@ export function CloudManageAutomationDialog({
             <DesktopDialogCloseButton disabled={busy !== null} onClick={onClose} />
           </div>
         </header>
-        <div className="desktop-dialog-body desktop-cloud-automation-dialog-body">
+        <div
+          className="desktop-dialog-body desktop-cloud-automation-dialog-body"
+          data-po-scrollbar="content"
+        >
           {error && (
             <div className="desktop-dialog-error" role="alert" dir="auto">
               {t(`automation.manage.error.${error.action}`, { detail: bidiIsolate(error.detail) })}

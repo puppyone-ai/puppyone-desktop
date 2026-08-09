@@ -290,7 +290,7 @@ function OfficePreviewContent({
   }
 
   return (
-    <div className="office-document-preview">
+    <div className="office-document-preview" data-po-scrollbar="content">
       <article className="office-document-page">
         <h1 dir="auto">{result.title}</h1>
         {result.lines.length > 0 ? (
@@ -324,7 +324,7 @@ function PresentationTextPreview({
   }
 
   return (
-    <div className="office-presentation-preview">
+    <div className="office-presentation-preview" data-po-scrollbar="content">
       {truncatedSlideCount > 0 && (
         <div className="office-preview__note">
           {t("editor.office.omittedSlidesSafety", { count: truncatedSlideCount })}
@@ -475,6 +475,7 @@ function PptxPresentationPreview({
       <div
         ref={hostRef}
         className="office-pptx-render-host"
+        data-po-scrollbar="content"
         data-rendering={renderState.status === "loading" ? "true" : undefined}
       />
       {renderState.status === "loading" && (
@@ -548,7 +549,12 @@ function SpreadsheetPreview({
 
   return (
     <div className="office-spreadsheet-preview">
-      <div className="office-spreadsheet-tabs" role="tablist" aria-label={t("editor.office.sheets")}>
+      <div
+        className="office-spreadsheet-tabs"
+        data-po-scrollbar="horizontal"
+        role="tablist"
+        aria-label={t("editor.office.sheets")}
+      >
         {result.sheets.map((sheet, index) => (
           <button
             key={sheet.name}
@@ -561,7 +567,12 @@ function SpreadsheetPreview({
           </button>
         ))}
       </div>
-      <div className="office-spreadsheet-grid-wrap" ref={gridWrapRef} onScroll={handleScroll}>
+      <div
+        className="office-spreadsheet-grid-wrap"
+        data-po-scrollbar="content"
+        ref={gridWrapRef}
+        onScroll={handleScroll}
+      >
         <table className="office-spreadsheet-grid">
           <colgroup>
             <col className="office-spreadsheet-grid__row-header-col" />
@@ -776,7 +787,10 @@ function DocxDocumentPreview({
   }
 
   return (
-    <div className="office-document-preview office-document-preview--docx">
+    <div
+      className="office-document-preview office-document-preview--docx"
+      data-po-scrollbar="content"
+    >
       {renderState.status === "loading" && (
         <div className="office-docx-render-state">{t("editor.office.renderingWord")}</div>
       )}

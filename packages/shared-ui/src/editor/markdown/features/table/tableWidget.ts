@@ -67,6 +67,7 @@ export class MarkdownTableWidget extends WidgetType {
     wrapper.className = view.state.readOnly
       ? "cm-md-table-widget-wrap po-editable-table-interaction-root is-readonly"
       : "cm-md-table-widget-wrap po-editable-table-interaction-root";
+    wrapper.dataset.poScrollbar = "horizontal";
     wrapper.dataset.mdTableFrom = String(this.from);
     wrapper.dataset.mdTableExecution = this.execution.mode;
     const rowCount = this.rows.length;

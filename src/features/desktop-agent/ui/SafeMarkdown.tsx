@@ -167,7 +167,7 @@ function CodeBlock({ language, value }: { language: string; value: string }) {
           window.setTimeout(() => setCopied(false), 1_200);
         }).catch(() => {});
       }}>{copied ? <Check size={12} /> : <Copy size={12} />} {copied ? t("common.action.copied") : t("common.action.copy")}</button></div>
-      <pre><code>{value}</code></pre>
+      <pre data-po-scrollbar="content"><code>{value}</code></pre>
     </div>
   );
 }

@@ -218,10 +218,6 @@
   overflow-x: auto;
 }
 
-.desktop-cloud-access-category-tabs::-webkit-scrollbar {
-  display: none;
-}
-
 .desktop-cloud-access-category-tabs button {
   display: inline-flex;
   height: 28px;

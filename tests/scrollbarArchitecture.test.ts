@@ -4,8 +4,11 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
+const indexHtml = readCss("index.html");
+const stylesEntry = readCss("src/styles.css");
 const tokensCss = readCss("src/styles/tokens.css");
 const scrollbarsCss = readCss("src/styles/scrollbars.css");
+const scrollbarActivitySource = readCss("src/components/ScrollbarActivity.tsx");
 const dataWorkspaceCss = readCss("packages/shared-ui/src/styles/data-workspace.css");
 const dataWorkspaceSource = readCss("packages/shared-ui/src/data/DataWorkspace.tsx");
 const desktopDataShellCss = readCss("src/features/data-workspace/data-shell.css");
@@ -20,12 +23,10 @@ const gitStatusSource = readCss("src/features/source-control/GitStatusView.tsx")
 const historyDetailCss = readCss("src/features/source-control/styles/history-detail.css");
 const layoutCss = readCss("src/styles/layout.css");
 const baseCss = readCss("src/styles/base.css");
-const csvTableCss = readCss("packages/shared-ui/src/styles/editor/csv-table-editor.css");
 const markdownEditorCss = readCss("packages/shared-ui/src/styles/editor/markdown-editor.css");
-const markdownTableCss = readCss("packages/shared-ui/src/styles/editor/markdown-table-widget.css");
 
 describe("scrollbar architecture", () => {
-  it("defines one modern track and thumb geometry", () => {
+  it("defines one opt-in product scrollbar primitive in the primitives layer", () => {
     expect(tokensCss).toContain("--po-scrollbar-size: 12px;");
     expect(tokensCss).toContain("--po-scrollbar-thumb-size: 6px;");
     expect(tokensCss).toContain("--po-scrollbar-thumb-active-size: 8px;");
@@ -38,36 +39,86 @@ describe("scrollbar architecture", () => {
       "border: var(--po-scrollbar-thumb-inset, 3px) solid transparent;",
     );
     expect(scrollbarsCss).toContain("background-clip: padding-box;");
-    expect(scrollbarsCss).toContain(':root[data-interface-style="default"]');
-    expect(scrollbarsCss).toContain(":where(:hover, :focus-within, .po-scrollbar-active)");
+    expect(indexHtml).toContain('data-po-scrollbar-mode="product"');
+    expect(stylesEntry).toContain('@import "./styles/scrollbars.css" layer(primitives);');
+    expect(scrollbarsCss).toContain(':root[data-po-scrollbar-mode="product"]');
+    expect(scrollbarsCss).toContain('[data-po-scrollbar]:not([data-po-scrollbar="hidden"])');
+    expect(scrollbarsCss).toContain('[data-po-scrollbar].po-scrollbar-active');
+    expect(scrollbarsCss).not.toContain("focus-within");
+    expect(scrollbarsCss).not.toContain("*::-webkit-scrollbar");
     expect(scrollbarsCss).toContain(
       "border-width: var(--po-scrollbar-thumb-active-inset, 2px);",
     );
-    expect(scrollbarsCss).toMatch(
-      /\*::-webkit-scrollbar-thumb\s*\{[^}]*background-color:\s*var\(--po-scrollbar-thumb\);/s,
-    );
-    expect(scrollbarsCss).toMatch(
-      /data-interface-style="default"[^{}]*\*::-webkit-scrollbar-thumb\s*\{[^}]*background-color:\s*transparent;/s,
-    );
+    expect(scrollbarsCss).toContain('@media (forced-colors: active)');
   });
 
-  it("shares the sidebar presentation color with editor scrollbars", () => {
+  it("shares one presentation color and explicit owner state across surfaces", () => {
     expect(tokensCss).toContain("--po-scrollbar-presentation-thumb: color-mix(");
     expect(tokensCss).toContain("--po-scrollbar-presentation-thumb-hover: color-mix(");
-    expect(tokensCss).toContain(
-      "--desktop-sidebar-scrollbar-thumb: var(--po-scrollbar-presentation-thumb);",
-    );
     expect(scrollbarsCss).toContain(
       "background-color: var(--po-scrollbar-presentation-thumb, var(--po-scrollbar-thumb));",
     );
-    expect(dataWorkspaceCss).toContain(
-      "border: var(--po-scrollbar-thumb-inset, 3px) solid transparent;",
+    expect(scrollbarActivitySource).toContain("MANAGED_SCROLLBAR_SELECTOR");
+    expect(scrollbarActivitySource).toContain(
+      `'[data-po-scrollbar]:not([data-po-scrollbar="hidden"])'`,
     );
-    expect(dataWorkspaceCss).toContain("background-clip: padding-box;");
-    expect(dataWorkspaceCss).toContain("background-color: var(--tree-scrollbar-thumb);");
-    expect(dataWorkspaceCss).toContain(
-      "background-color: var(--tree-scrollbar-thumb-hover);",
+    expect(scrollbarActivitySource).toContain("target.matches(MANAGED_SCROLLBAR_SELECTOR)");
+    expect(readCss("packages/shared-ui/src/sidebar/SidebarScrollArea.tsx")).toContain(
+      'data-po-scrollbar="sidebar"',
     );
+    expect(readCss("packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor.tsx"))
+      .toContain('view.scrollDOM.dataset.poScrollbar = "content";');
+    expect(readCss("packages/shared-ui/src/editor/CodeMirrorCodeEditor.tsx"))
+      .toContain('view.scrollDOM.dataset.poScrollbar = "content";');
+  });
+
+  it("restricts scrollbar pseudo-elements to the primitive, skins, and xterm adapter", () => {
+    const allowedFiles = new Set([
+      "src/features/desktop-terminal/ui/desktop-terminal.css",
+      "src/styles/interface-skin-contract.css",
+      "src/styles/macos-tiger.css",
+      "src/styles/scrollbars.css",
+      "src/styles/windows-xp.css",
+    ]);
+    const violations = [
+      ...listCssFiles(path.join(repositoryRoot, "src")),
+      ...listCssFiles(path.join(repositoryRoot, "packages/shared-ui/src")),
+    ].filter((filePath) => (
+      readFileSync(filePath, "utf8").includes("::-webkit-scrollbar")
+      && !allowedFiles.has(path.relative(repositoryRoot, filePath))
+    ));
+
+    expect(violations.map((filePath) => path.relative(repositoryRoot, filePath))).toEqual([]);
+  });
+
+  it("keeps registered owner variants inside the public contract", () => {
+    const allowedVariants = new Set(["content", "hidden", "horizontal", "menu", "sidebar"]);
+    const sourceFiles = [
+      path.join(repositoryRoot, "index.html"),
+      ...listFiles(path.join(repositoryRoot, "src"), ".ts"),
+      ...listFiles(path.join(repositoryRoot, "src"), ".tsx"),
+      ...listFiles(path.join(repositoryRoot, "packages/shared-ui/src"), ".ts"),
+      ...listFiles(path.join(repositoryRoot, "packages/shared-ui/src"), ".tsx"),
+    ];
+    const invalidVariants = sourceFiles.flatMap((filePath) => {
+      const source = readFileSync(filePath, "utf8");
+      const values = [
+        ...Array.from(source.matchAll(/data-po-scrollbar="([^"]+)"/g), (match) => match[1]),
+        ...Array.from(source.matchAll(/dataset\.poScrollbar\s*=\s*"([^"]+)"/g), (match) => match[1]),
+      ];
+      return values
+        .filter((value): value is string => Boolean(value) && !allowedVariants.has(value))
+        .map((value) => `${path.relative(repositoryRoot, filePath)}: ${value}`);
+    });
+
+    expect(invalidVariants).toEqual([]);
+    expect(scrollbarsCss).toContain(
+      ':root[data-po-scrollbar-mode="system"] {\n  --desktop-sidebar-scrollbar-width: 0px;',
+    );
+    expect(scrollbarsCss).toContain(
+      ':root[data-po-scrollbar-mode="system"] :where([data-po-scrollbar="sidebar"])',
+    );
+    expect(scrollbarsCss).toContain("scrollbar-gutter: auto !important;");
   });
 
   it("defines one collision-safe pane-edge resize lane", () => {
@@ -154,14 +205,15 @@ describe("scrollbar architecture", () => {
     expect(baseCss).not.toContain('[dir="rtl"] .desktop-right-sidebar-resizer');
   });
 
-  it("keeps CSV and Markdown table scrollbars on the shared geometry", () => {
-    for (const css of [csvTableCss, markdownTableCss]) {
-      expect(css).toContain("var(--po-scrollbar-size, 12px)");
-      expect(css).toContain(
-        "border: var(--po-scrollbar-thumb-inset, 3px) solid transparent;",
-      );
-      expect(css).toContain("border-radius: var(--po-scrollbar-radius, 999px);");
-    }
+  it("registers structured and horizontal editor scroll owners without local paint rules", () => {
+    expect(readCss("packages/shared-ui/src/editor/CsvTableEditor.tsx")).toContain(
+      'data-po-scrollbar="content"',
+    );
+    expect(readCss("packages/shared-ui/src/editor/markdown/features/code-block/codeBlockWidget.ts"))
+      .toContain('codeEditor.dataset.poScrollbar = "horizontal";');
+    expect(readCss("packages/shared-ui/src/editor/markdown/features/table/tableWidget.ts"))
+      .toContain('wrapper.dataset.poScrollbar = "horizontal";');
+    expect(scrollbarsCss).toContain('[data-po-scrollbar="horizontal"]');
   });
 
   it("does not opt any app stylesheet back into platform-native scrollbar rendering", () => {

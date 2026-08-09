@@ -70,6 +70,7 @@ describe("Desktop Terminal architecture boundaries", () => {
   it("keeps terminal presentation styles co-located with the feature", () => {
     const panel = source("src/features/desktop-terminal/ui/RightTerminalPanel.tsx");
     const css = source("src/features/desktop-terminal/ui/desktop-terminal.css");
+    const runtime = source("src/features/desktop-terminal/runtime/terminalRuntime.ts");
     const globalLayout = source("src/styles/layout.css");
     expect(css).not.toContain(".desktop-terminal-surface-actions");
     expect(css).not.toContain(".desktop-terminal-action-trigger");
@@ -115,6 +116,10 @@ describe("Desktop Terminal architecture boundaries", () => {
       "--desktop-terminal-scrollbar-thumb-color: var(",
     );
     expect(css).toContain("--po-scrollbar-presentation-thumb,");
+    expect(css).toContain(".desktop-terminal-xterm.po-scrollbar-active");
+    expect(css).not.toContain(".desktop-terminal-xterm:focus-within");
+    expect(runtime).toContain("terminal.onScroll(() => this.markScrollbarActive())");
+    expect(runtime).toContain('container.classList.add("po-scrollbar-active")');
     expect(css).toMatch(
       /\.xterm-scrollable-element > \.scrollbar > \.slider\s*\{[^}]*width:\s*var\(--desktop-terminal-scrollbar-track-size\) !important;/s,
     );

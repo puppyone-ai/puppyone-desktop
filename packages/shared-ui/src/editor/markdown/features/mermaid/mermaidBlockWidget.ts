@@ -107,6 +107,7 @@ export class MermaidBlockWidget extends WidgetType {
     body.className = "cm-md-mermaid-body";
     const preview = document.createElement("div");
     preview.className = "cm-md-mermaid-preview is-loading";
+    preview.dataset.poScrollbar = "content";
     const errorStrip = document.createElement("div");
     errorStrip.className = "cm-md-mermaid-error";
     errorStrip.hidden = true;
@@ -347,6 +348,7 @@ export class MermaidBlockWidget extends WidgetType {
         };
         textarea = document.createElement("textarea");
         textarea.className = "cm-md-mermaid-source";
+        textarea.dataset.poScrollbar = "content";
         textarea.dir = "ltr";
         textarea.value = draftCode;
         textarea.spellcheck = false;
@@ -541,6 +543,7 @@ function createMermaidSourceFallback(
 ): HTMLElement {
   const fallback = document.createElement("pre");
   fallback.className = "cm-md-mermaid-source-fallback";
+  fallback.dataset.poScrollbar = "content";
   fallback.dir = "ltr";
   const code = document.createElement("code");
   code.textContent = source || t("editor.markdown.mermaid.empty");

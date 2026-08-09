@@ -38,7 +38,7 @@ export function FilesSettingsView({
 
   return (
     <section className="desktop-utility-view desktop-settings-view">
-      <div className="desktop-utility-body desktop-settings-body">
+      <div className="desktop-utility-body desktop-settings-body" data-po-scrollbar="content">
         <div className="desktop-settings-section desktop-files-settings-section">
           <SettingsSectionHeader title={t("settings.files.title")} detail={t("settings.files.detail")} />
           <SettingsSubsection>
@@ -124,7 +124,7 @@ export function DefaultAppsSettingsView({
 
   return (
     <section className="desktop-utility-view desktop-settings-view">
-      <div className="desktop-utility-body desktop-settings-body">
+      <div className="desktop-utility-body desktop-settings-body" data-po-scrollbar="content">
         <div className="desktop-settings-section">
           <SettingsSectionHeader title={t("settings.defaultApps.title")} detail={t("settings.defaultApps.detail")} />
           <SettingsSubsection title={t("settings.defaultApps.systemDefault")}>

@@ -61,7 +61,7 @@ export function CreateAccessFolderTree({
   return (
     <section className="desktop-cloud-create-access-tree">
       <header>{t("cloud.access.create.chooseFromFiles")}</header>
-      <div className="desktop-cloud-create-access-tree-body">
+      <div className="desktop-cloud-create-access-tree-body" data-po-scrollbar="content">
         <TreeRootRow />
         <FolderChildren
           projectId={projectId}

@@ -51,7 +51,7 @@ export function CloudHostingSettingsView({
 
   return (
     <section className="desktop-utility-view desktop-settings-view">
-      <div className="desktop-utility-body desktop-settings-body">
+      <div className="desktop-utility-body desktop-settings-body" data-po-scrollbar="content">
         <div className="desktop-settings-section">
           <SettingsHeading
             title={t("settings.cloud.title")}
@@ -142,7 +142,7 @@ export function GitSettingsView({
 
   return (
     <section className="desktop-utility-view desktop-settings-view">
-      <div className="desktop-utility-body desktop-settings-body">
+      <div className="desktop-utility-body desktop-settings-body" data-po-scrollbar="content">
         <div className="desktop-settings-section">
           <SettingsHeading
             title={t("settings.git.title")}

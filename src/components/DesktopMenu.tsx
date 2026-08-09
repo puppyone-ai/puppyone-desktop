@@ -32,6 +32,7 @@ export const DesktopMenuSurface = forwardRef<HTMLDivElement, DesktopMenuSurfaceP
       className={cx("desktop-menu-surface", className)}
       role={role}
       aria-label={ariaLabel}
+      data-po-scrollbar="menu"
       data-window-no-drag="true"
       {...props}
     >

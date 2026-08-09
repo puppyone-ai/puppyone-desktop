@@ -298,7 +298,9 @@ export function GitScmSyncRow({
       )}
       {section.previewResources.length === 0 && section.fallbackSummary && (
         <GitSectionCollapse expanded={expanded}>
-          <div className="desktop-git-preview-summary">{section.fallbackSummary}</div>
+          <div className="desktop-git-preview-summary" data-po-scrollbar="sidebar">
+            {section.fallbackSummary}
+          </div>
         </GitSectionCollapse>
       )}
     </section>

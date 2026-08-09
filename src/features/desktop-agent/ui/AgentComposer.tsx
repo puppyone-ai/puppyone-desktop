@@ -109,7 +109,12 @@ export function AgentComposer({
         <div className="desktop-agent-composer-floating">{floatingAccessory}</div>
       )}
       {visibleCommands.length > 0 && (
-        <div className="desktop-agent-command-menu" role="listbox" aria-label={t("agent.composer.commands")}>
+        <div
+          className="desktop-agent-command-menu"
+          data-po-scrollbar="content"
+          role="listbox"
+          aria-label={t("agent.composer.commands")}
+        >
           {visibleCommands.map((command) => (
             <button type="button" role="option" key={`${command.source}:${command.name}`} onClick={() => onDraftChange(`/${command.name} `)}>
               <strong>/{command.name}</strong><span>{command.description}</span>
@@ -138,6 +143,7 @@ export function AgentComposer({
           <div className="desktop-agent-composer-input-row">
             <textarea
               ref={textareaRef}
+              data-po-scrollbar="content"
               value={draft}
               disabled={inputDisabled}
               rows={1}

@@ -1,57 +1,87 @@
 /*
- * Scrollbars are styled exclusively through ::-webkit-scrollbar pseudo-elements.
+ * Product scrollbar primitive.
  *
- * Do NOT set the standard `scrollbar-width` / `scrollbar-color` properties
- * anywhere in this app: since Chromium 121, setting either standard property
- * on an element makes Chromium ignore ALL ::-webkit-scrollbar styling for it
- * and fall back to native scrollbars. On macOS, native scrollbars overlay or
- * reserve space depending on System Settings > Appearance > "Show scroll
- * bars", which makes layout non-deterministic across machines.
+ * Only explicit scroll owners participate. `system` mode intentionally has
+ * no author scrollbar geometry, allowing Chromium/macOS to render the native
+ * control. `product` mode is deterministic across platforms and interface
+ * skins. Feature styles may set overflow and gutter policy, but must not
+ * declare ::-webkit-scrollbar rules of their own.
  *
  * See docs/architecture/desktop-sidebar-scroll-lists.md.
  */
 
-*::-webkit-scrollbar {
+:root[data-po-scrollbar-mode="product"]
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar {
   width: var(--po-scrollbar-size, 12px);
   height: var(--po-scrollbar-size, 12px);
 }
 
-*::-webkit-scrollbar-track {
+:root[data-po-scrollbar-mode="product"]
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-track,
+:root[data-po-scrollbar-mode="product"]
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-corner {
   background: transparent;
 }
 
-*::-webkit-scrollbar-thumb {
+:root[data-po-scrollbar-mode="product"]
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb {
   border: var(--po-scrollbar-thumb-inset, 3px) solid transparent;
+  border-radius: var(--po-scrollbar-radius, 999px);
   background-color: var(--po-scrollbar-thumb);
   background-clip: padding-box;
-  border-radius: var(--po-scrollbar-radius, 999px);
   transition:
     border-width var(--po-scrollbar-transition, 0.16s ease),
     background-color var(--po-scrollbar-transition, 0.16s ease);
 }
 
-/*
- * The default interface follows the modern macOS overlay presentation while
- * keeping a deterministic classic gutter: the whole track remains available
- * for pointer input, but the thumb fades away when the surface is idle.
- * Historical interface skins keep their own always-visible scrollbar rules.
- */
-:root[data-interface-style="default"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  *::-webkit-scrollbar-thumb {
+/* Sidebar lists reserve geometry; content and menu surfaces remain opt-in
+ * classic scroll owners without imposing gutter policy on their layout. */
+:root[data-po-scrollbar-mode="product"] :where([data-po-scrollbar="sidebar"]) {
+  scrollbar-gutter: stable;
+}
+
+/* System overlay scrollbars have no fixed gutter width. Stop product-mode
+ * padding compensation from subtracting 12px when the platform owns geometry. */
+:root[data-po-scrollbar-mode="system"] {
+  --desktop-sidebar-scrollbar-width: 0px;
+}
+
+:root[data-po-scrollbar-mode="system"] :where([data-po-scrollbar="sidebar"]) {
+  scrollbar-gutter: auto !important;
+}
+
+:root[data-po-scrollbar-mode="product"]
+  :where([data-po-scrollbar="horizontal"])::-webkit-scrollbar {
+  width: 0;
+  height: var(--po-scrollbar-size, 12px);
+}
+
+:where([data-po-scrollbar="hidden"])::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* The default interface presents a macOS-like transient thumb over a stable
+ * interaction lane. Focus alone never pins the thumb onscreen: keyboard and
+ * programmatic scrolling are detected by ScrollbarActivity like pointer
+ * scrolling, while hover preserves direct pointer discoverability. */
+:root[data-po-scrollbar-mode="product"][data-interface-style="default"]
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb {
   background-color: transparent;
 }
 
-:root[data-interface-style="default"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where(:hover, :focus-within, .po-scrollbar-active)::-webkit-scrollbar-thumb {
+:root[data-po-scrollbar-mode="product"][data-interface-style="default"]
+  :where(
+    [data-po-scrollbar]:not([data-po-scrollbar="hidden"]):hover,
+    [data-po-scrollbar].po-scrollbar-active
+  )::-webkit-scrollbar-thumb {
   border-width: var(--po-scrollbar-thumb-active-inset, 2px);
   background-color: var(--po-scrollbar-presentation-thumb, var(--po-scrollbar-thumb));
 }
 
-:root[data-interface-style="default"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  ::-webkit-scrollbar-thumb:hover {
+:root[data-po-scrollbar-mode="product"][data-interface-style="default"]
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb:hover {
   border-width: var(--po-scrollbar-thumb-active-inset, 2px);
   background-color: var(
     --po-scrollbar-presentation-thumb-hover,
@@ -59,12 +89,18 @@
   );
 }
 
-*::-webkit-scrollbar-corner {
-  background: transparent;
+@media (prefers-reduced-motion: reduce) {
+  :root[data-po-scrollbar-mode="product"]
+    :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb {
+    transition: none;
+  }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *::-webkit-scrollbar-thumb {
-    transition: none;
+@media (forced-colors: active) {
+  :root[data-po-scrollbar-mode="product"]
+    :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb {
+    border-color: Canvas !important;
+    background-color: CanvasText !important;
+    background-image: none !important;
   }
 }

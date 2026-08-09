@@ -338,8 +338,12 @@ function createSanitizedHtmlPreviewBlock(
 
   const wrapper = document.createElement("div");
   wrapper.className = "cm-md-html-rendered-surface cm-md-html-block";
+  wrapper.dataset.poScrollbar = "content";
   wrapper.dir = "auto";
   wrapper.appendChild(result.fragment);
+  for (const pre of wrapper.querySelectorAll<HTMLElement>("pre")) {
+    pre.dataset.poScrollbar = "content";
+  }
   bindInlineHtmlDomInteractions(wrapper, { openHref: options.openHref });
   return wrapper;
 }
@@ -630,8 +634,10 @@ function createHtmlSourceIcon(): SVGElement {
 function createDefensiveHtmlSourceFallback(source: string, reason?: string): HTMLElement {
   const wrapper = document.createElement("div");
   wrapper.className = "cm-md-html-source-fallback";
+  wrapper.dataset.poScrollbar = "content";
   if (reason) wrapper.dataset.reason = reason;
   const sourceView = document.createElement("pre");
+  sourceView.dataset.poScrollbar = "content";
   sourceView.textContent = source;
   wrapper.appendChild(sourceView);
 

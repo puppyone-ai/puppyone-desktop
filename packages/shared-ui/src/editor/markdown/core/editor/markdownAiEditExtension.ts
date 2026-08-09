@@ -236,6 +236,7 @@ function createDeletedContentTooltip(preview: DeletedContentPreview): Tooltip {
 
       const body = document.createElement("div");
       body.className = "cm-ai-edit-delete-preview-tooltip__body";
+      body.dataset.poScrollbar = "content";
 
       const { lines, truncated } = getDeletedPreviewLines(preview.oldText);
       for (const line of lines) {

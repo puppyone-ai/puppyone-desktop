@@ -476,8 +476,9 @@
   outline-offset: 0;
 }
 
-:root[data-interface-style="macos-tiger"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar-thumb {
+:root[data-interface-style="macos-tiger"][data-po-scrollbar-mode="product"]
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb {
   min-width: 20px;
   min-height: 20px;
   border: 2px solid #dedede;

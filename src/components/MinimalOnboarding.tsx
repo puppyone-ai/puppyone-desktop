@@ -140,6 +140,7 @@ export function MinimalOnboarding({
   return (
     <main
       className={`onboarding-shell onboarding-homepage-shell ${resolvedTheme === "dark" ? "dark" : ""} ${dragging ? "dragging" : ""}`}
+      data-po-scrollbar="content"
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
@@ -197,7 +198,7 @@ export function MinimalOnboarding({
         {items.length > 0 && (
           <div className="onboarding-recent-projects">
             <div className="onboarding-recent-heading">{t("onboarding.projects.title")}</div>
-            <div className="onboarding-project-list">
+            <div className="onboarding-project-list" data-po-scrollbar="content">
               {items.map((item) => (
                 <button
                   key={item.id}

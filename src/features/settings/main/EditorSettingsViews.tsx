@@ -16,7 +16,7 @@ export function EditorSettingsView({
   const { t } = useLocalization();
   return (
     <section className="desktop-utility-view desktop-settings-view">
-      <div className="desktop-utility-body desktop-settings-body">
+      <div className="desktop-utility-body desktop-settings-body" data-po-scrollbar="content">
         <div className="desktop-settings-section">
           <SettingsSectionHeader title={t("settings.editor.title")} detail={t("settings.editor.detail")} />
           <div className="desktop-settings-list">
@@ -94,7 +94,7 @@ export function ExperimentalSettingsView({
 
   return (
     <section className="desktop-utility-view desktop-settings-view">
-      <div className="desktop-utility-body desktop-settings-body">
+      <div className="desktop-utility-body desktop-settings-body" data-po-scrollbar="content">
         <div className="desktop-settings-section">
           <SettingsSectionHeader
             title={t("settings.experimental.title")}

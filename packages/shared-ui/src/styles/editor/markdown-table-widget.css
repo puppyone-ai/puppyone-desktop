@@ -28,22 +28,6 @@
   }
 }
 
-.markdown-codemirror-editor .cm-md-table-widget-wrap::-webkit-scrollbar {
-  height: var(--po-scrollbar-size, 12px);
-}
-
-.markdown-codemirror-editor .cm-md-table-widget-wrap::-webkit-scrollbar-track,
-.markdown-codemirror-editor .cm-md-table-widget-wrap::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-.markdown-codemirror-editor .cm-md-table-widget-wrap::-webkit-scrollbar-thumb {
-  border: var(--po-scrollbar-thumb-inset, 3px) solid transparent;
-  border-radius: var(--po-scrollbar-radius, 999px);
-  background-color: var(--po-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
 .markdown-codemirror-editor .cm-md-table-frame {
   --cm-md-table-action-gutter: var(--po-editable-table-action-gutter);
   display: inline-block;
@@ -453,22 +437,6 @@
   font-family: var(--po-font-sans, inherit);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-}
-
-.cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-track,
-.cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-corner {
-  background: var(--po-menu-bg);
-}
-
-.cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-thumb {
-  border: 1px solid var(--po-menu-bg);
-  background-color: var(--po-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
-.cm-md-table-context-menu.desktop-menu-surface::-webkit-scrollbar-thumb:hover {
-  background-color: var(--po-scrollbar-thumb-hover);
-  background-clip: padding-box;
 }
 
 .cm-md-table-context-menu .desktop-menu-section {

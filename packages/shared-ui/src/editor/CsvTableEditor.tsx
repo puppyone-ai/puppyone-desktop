@@ -240,6 +240,7 @@ export function CsvTableEditor({
     >
       <div
         className="csv-table-editor__scroll"
+        data-po-scrollbar="content"
         onScroll={(event) => {
           const scrollContainer = event.currentTarget;
           const inlineScrolled = Math.abs(scrollContainer.scrollLeft) > 0.5;

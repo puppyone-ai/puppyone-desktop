@@ -84,6 +84,7 @@ export function AssetLibraryHome({
   return (
     <main
       className={`onboarding-shell asset-library-home-shell ${resolvedTheme === "dark" ? "dark" : ""} ${dragging ? "is-dragging" : ""}`}
+      data-po-scrollbar="content"
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}

@@ -111,7 +111,7 @@ function SideColumn({
           </button>
         )}
       </div>
-      <pre dir="auto">{content || " "}</pre>
+      <pre dir="auto" data-po-scrollbar="content">{content || " "}</pre>
     </div>
   );
 }
