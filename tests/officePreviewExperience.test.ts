@@ -113,6 +113,10 @@ describe("lightweight Office preview experience", () => {
     expect(officePreviewCss).toContain('.office-spreadsheet-grid td[data-cell-kind="number"]');
     expect(officePreviewCss).toContain('.office-spreadsheet-grid td[data-selected="true"]');
     expect(officePreviewCss).toContain(".office-spreadsheet-formula-bar");
+    expect(officePreviewCss).toContain("--office-sheet-default-font-family");
+    expect(officePreviewCss).toContain("font-size: var(--office-sheet-default-font-size)");
+    expect(officeViewerSource).toContain("createSpreadsheetPresentationCssStyle(result)");
+    expect(officeViewerSource).toContain("style={{ zoom: displayScale }}");
     expect(officePreviewCss).not.toContain(".office-spreadsheet-grid tr:nth-child(even) td");
   });
 });

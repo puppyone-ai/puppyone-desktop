@@ -73,6 +73,10 @@ export type SpreadsheetPreviewResult = {
   kind: "spreadsheet";
   sheets: SpreadsheetSheet[];
   styles: SpreadsheetCellStyle[];
+  /** Workbook-level typography inherited by cells without an explicit font. */
+  defaultFontFamily: string | null;
+  /** Workbook default font size in CSS pixels (OOXML points converted at 96dpi). */
+  defaultFontSize: number | null;
   totalVisibleSheets: number;
   hiddenSheetCount: number;
   truncatedSheetCount: number;
@@ -91,6 +95,8 @@ export type SpreadsheetSheet = {
   hiddenRowCount: number;
   hiddenColumnCount: number;
   showGridLines: boolean;
+  /** The worksheet zoom saved by the author; one scale for the entire canvas. */
+  displayScale: number;
   frozenRows: number;
   frozenColumns: number;
   initialSelection: SpreadsheetCellAddress | null;

@@ -58,6 +58,7 @@ type RawCellXf = {
 
 export type SpreadsheetOoxmlSheetPresentation = {
   activeCell: string | null;
+  displayScale: number;
   frozenColumns: number;
   frozenRows: number;
   showGridLines: boolean;
@@ -65,6 +66,8 @@ export type SpreadsheetOoxmlSheetPresentation = {
 };
 
 export type SpreadsheetOoxmlPresentationReader = {
+  defaultFontFamily: string | null;
+  defaultFontSize: number | null;
   styles: SpreadsheetCellStyle[];
   readSheet: (
     sheetName: string,
@@ -103,8 +106,11 @@ export async function createSpreadsheetOoxmlPresentationReader(
 
     const theme = await readTheme(zip);
     const styles = await readStyles(zip, theme);
+    const defaultStyle = styles[0];
 
     return {
+      defaultFontFamily: defaultStyle?.fontFamily ?? null,
+      defaultFontSize: defaultStyle?.fontSize ?? null,
       styles,
       readSheet: async (sheetName, rowIndices, columnIndices) => {
         const entryName = entryBySheetName.get(sheetName);
@@ -369,6 +375,7 @@ function parseWorksheetPresentation(
 ): SpreadsheetOoxmlSheetPresentation {
   const result: SpreadsheetOoxmlSheetPresentation = {
     activeCell: null,
+    displayScale: 1,
     frozenColumns: 0,
     frozenRows: 0,
     showGridLines: true,
@@ -381,6 +388,12 @@ function parseWorksheetPresentation(
     if (name === "sheetView" && !sheetViewSeen) {
       sheetViewSeen = true;
       result.showGridLines = booleanAttribute(tag, "showGridLines", true);
+      const zoomPercent = clamp(
+        finiteNumber(attribute(tag, "zoomScale")) ?? undefined,
+        10,
+        400,
+      );
+      result.displayScale = zoomPercent === null ? 1 : zoomPercent / 100;
       return;
     }
     if (name === "pane" && result.frozenRows === 0 && result.frozenColumns === 0) {

@@ -496,6 +496,10 @@ source-code extensions)
 - Familiarity comes from each document metaphor inside one shell: paginated
   paper for Word, sticky row/column headers with bottom sheet tabs for
   spreadsheets, and thumbnail navigation plus a central stage for PowerPoint.
+- Spreadsheet typography is source-led rather than beautified: unstyled cells
+  inherit the workbook Normal-style font, explicit cell styles remain intact,
+  and a saved worksheet zoom scales the complete grid once. The viewer does
+  not classify titles/body text or maintain format-specific styling rules.
 
 **PowerPoint — `.ppt`, `.pps` (legacy)**
 

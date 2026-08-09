@@ -90,7 +90,10 @@ describe("spreadsheet preview parsing", () => {
       wrapText: true,
       borderBottom: { color: "#d9e2ec", style: "solid", width: 1 },
     });
+    expect(result.defaultFontFamily).toBe("Arial");
+    expect(result.defaultFontSize).toBe(14.7);
     expect(sheet.showGridLines).toBe(false);
+    expect(sheet.displayScale).toBe(0.85);
     expect(sheet.frozenRows).toBe(1);
     expect(sheet.initialSelection).toEqual({ rowIndex: 2, columnIndex: 1 });
     expect(sheet.rows[5].formulas[1]).toBe("SUM(B3:B5)");
@@ -438,7 +441,7 @@ async function createStyledWorkbookFixture(source: Uint8Array): Promise<ArrayBuf
     sheetXml
       .replace(
         '<sheetView workbookViewId="0"/>',
-        '<sheetView workbookViewId="0" showGridLines="0"><pane ySplit="1" topLeftCell="A2" state="frozen"/><selection activeCell="B3" sqref="B3"/></sheetView>',
+        '<sheetView workbookViewId="0" showGridLines="0" zoomScale="85"><pane ySplit="1" topLeftCell="A2" state="frozen"/><selection activeCell="B3" sqref="B3"/></sheetView>',
       )
       .replace('<c r="A1" t="str">', '<c r="A1" s="1" t="str">'),
   );

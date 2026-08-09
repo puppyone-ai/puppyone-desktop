@@ -76,7 +76,7 @@ function documentHtml(markup) {
 function spreadsheetMarkup() {
   const columns = Array.from(
     { length: 8 },
-    (_, index) => `<col style="width:${index === 0 ? 150 : 110}px">`,
+    (_, index) => `<col style="width:${index === 0 ? 180 : 130}px">`,
   ).join("");
   const headers = Array.from(
     { length: 8 },
@@ -99,14 +99,14 @@ function spreadsheetMarkup() {
   return `
     <section class="office-preview" data-office-kind="spreadsheet">
       <div class="office-preview__body">
-        <div class="office-spreadsheet-preview">
+        <div class="office-spreadsheet-preview" style="--office-sheet-default-font-family:Arial,sans-serif;--office-sheet-default-font-size:14.7px">
           <div class="office-spreadsheet-formula-bar">
             <output class="office-spreadsheet-formula-bar__name">B9</output>
             <span class="office-spreadsheet-formula-bar__fx">ƒx</span>
             <output class="office-spreadsheet-formula-bar__value">=IFERROR(B6/B5,0)</output>
           </div>
           <div class="office-spreadsheet-grid-wrap" data-po-scrollbar="content" tabindex="0">
-            <table class="office-spreadsheet-grid" data-show-grid-lines="true">
+            <table class="office-spreadsheet-grid" data-display-scale="0.85" data-show-grid-lines="true" style="zoom:0.85">
               <colgroup><col class="office-spreadsheet-grid__row-header-col">${columns}</colgroup>
               <thead><tr><th class="office-spreadsheet-grid__corner"></th>${headers}</tr></thead>
               <tbody>${rows}</tbody>
@@ -196,6 +196,8 @@ async function measureSpreadsheet() {
         formulaBarHeight: formulaBar.getBoundingClientRect().height,
         formulaValue: formulaBar.querySelector('.office-spreadsheet-formula-bar__value').textContent,
         textAlign: getComputedStyle(textCell).textAlign,
+        defaultFontFamily: getComputedStyle(textCell).fontFamily,
+        defaultFontSize: getComputedStyle(textCell).fontSize,
         numberAlign: getComputedStyle(numberCell).textAlign,
         firstRowBackground: getComputedStyle(textCell).backgroundColor,
         secondRowBackground: getComputedStyle(nextRowCell).backgroundColor,
@@ -248,12 +250,14 @@ async function run() {
     assert(spreadsheet.textAlign === "left", `text cells are not left aligned: ${spreadsheet.textAlign}`);
     assert(spreadsheet.numberAlign === "right", `number cells are not right aligned: ${spreadsheet.numberAlign}`);
     assert(spreadsheet.firstRowBackground === spreadsheet.secondRowBackground, "worksheet still uses zebra striping");
-    assertNear(spreadsheet.rowHeight, 28, "worksheet row height");
+    assert(spreadsheet.defaultFontFamily.startsWith("Arial"), "worksheet did not inherit the workbook font family");
+    assert(spreadsheet.defaultFontSize === "14.7px", "worksheet did not inherit the workbook font size");
+    assertNear(spreadsheet.rowHeight, 23.8, "worksheet saved zoom did not scale the complete row");
     assertNear(spreadsheet.headerTop, 0, "sticky column header position");
     assertNear(spreadsheet.rowHeaderLeft, 0, "sticky row header position");
     assertNear(spreadsheet.tabsBottom, 0, "sheet tabs are not anchored to the bottom");
     assert(spreadsheet.scrolled, "worksheet smoke fixture did not become scrollable");
-    assert(spreadsheet.firstCellWidth >= 145, "worksheet column widths were not preserved");
+    assert(spreadsheet.firstCellWidth >= 150, "worksheet column widths were not preserved at saved zoom");
     assert(spreadsheet.selectedCellShadow !== "none", "selected worksheet cell has no selection outline");
     assert(spreadsheet.selectedHeaderBackground === "rgb(220, 234, 251)", "selected worksheet header is not highlighted");
     assert(spreadsheet.styledCellBackground === "rgb(11, 37, 69)", "source cell fill was not preserved");

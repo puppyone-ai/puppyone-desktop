@@ -51,7 +51,10 @@ OOXML style subset: solid fills, fonts, common borders, alignment, and text
 wrapping. The read-only surface adds a formula bar and a keyboard-navigable
 selection model without granting mutation authority. Conditional formatting,
 gradients, charts, images, shapes, and pivots remain explicit lightweight-
-preview limits.
+preview limits. Typography remains source-led: cells without an explicit font
+inherit the workbook's Normal-style font instead of a second product default,
+and the renderer applies the worksheet's saved zoom once to the complete grid.
+There is no title/body classifier or per-cell aesthetic normalization.
 
 Presentation preview uses one application-colored stage and one thumbnail
 rail around the slide's own visual surface. It does not add an imitation

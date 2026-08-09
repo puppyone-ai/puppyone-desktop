@@ -340,6 +340,8 @@
   --office-sheet-grid: #dfe3e7;
   --office-sheet-grid-subtle: #edf0f2;
   --office-sheet-header: #f3f4f6;
+  --office-sheet-default-font-family: "Aptos", "Calibri", "Segoe UI", Arial, sans-serif;
+  --office-sheet-default-font-size: 12.5px;
   box-sizing: border-box;
   display: flex;
   flex: 1;
@@ -479,8 +481,8 @@
   border-spacing: 0;
   background: var(--office-sheet-canvas);
   color: var(--office-sheet-text);
-  font-family: "Aptos", "Calibri", "Segoe UI", Arial, sans-serif;
-  font-size: 12.5px;
+  font-family: var(--office-sheet-default-font-family);
+  font-size: var(--office-sheet-default-font-size);
   table-layout: fixed;
 }
 

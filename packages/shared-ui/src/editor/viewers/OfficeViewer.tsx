@@ -887,6 +887,7 @@ function SpreadsheetPreview({
   const [selection, setSelection] = useState<SpreadsheetCellPosition | null>(null);
 
   const selectedSheet = result.sheets[Math.min(activeSheet, result.sheets.length - 1)];
+  const displayScale = selectedSheet?.displayScale ?? 1;
   const rowOffsets = useMemo(
     () => getSpreadsheetRowOffsets(selectedSheet?.rows ?? []),
     [selectedSheet],
@@ -909,8 +910,8 @@ function SpreadsheetPreview({
     setSelection(findSpreadsheetCellPosition(selectedSheet, selectedSheet?.initialSelection ?? null));
     const updateViewport = () => {
       setViewport({
-        scrollTop: gridWrap.scrollTop,
-        height: gridWrap.clientHeight,
+        scrollTop: gridWrap.scrollTop / displayScale,
+        height: gridWrap.clientHeight / displayScale,
       });
     };
     const resizeObserver = new ResizeObserver(updateViewport);
@@ -919,7 +920,7 @@ function SpreadsheetPreview({
     return () => {
       resizeObserver.disconnect();
     };
-  }, [selectedSheet]);
+  }, [displayScale, selectedSheet]);
 
   if (result.sheets.length === 0 || !selectedSheet) {
     const hiddenMessage = result.hiddenSheetCount > 0
@@ -968,8 +969,8 @@ function SpreadsheetPreview({
     const gridWrap = gridWrapRef.current;
     if (!gridWrap) return;
     setViewport({
-      scrollTop: gridWrap.scrollTop,
-      height: gridWrap.clientHeight,
+      scrollTop: gridWrap.scrollTop / displayScale,
+      height: gridWrap.clientHeight / displayScale,
     });
   };
 
@@ -979,25 +980,41 @@ function SpreadsheetPreview({
     const gridWrap = gridWrapRef.current;
     if (!gridWrap) return;
 
-    const frozenHeight = rowOffsets[frozenRowCount] ?? 0;
-    const cellTop = SPREADSHEET_COLUMN_HEADER_HEIGHT + (rowOffsets[target.rowPosition] ?? 0);
-    const cellBottom = SPREADSHEET_COLUMN_HEADER_HEIGHT + (rowOffsets[target.rowPosition + 1] ?? cellTop);
-    const visibleTop = gridWrap.scrollTop + SPREADSHEET_COLUMN_HEADER_HEIGHT + frozenHeight;
+    const frozenHeight = (rowOffsets[frozenRowCount] ?? 0) * displayScale;
+    const cellTop = (
+      SPREADSHEET_COLUMN_HEADER_HEIGHT + (rowOffsets[target.rowPosition] ?? 0)
+    ) * displayScale;
+    const cellBottom = (
+      SPREADSHEET_COLUMN_HEADER_HEIGHT + (rowOffsets[target.rowPosition + 1] ?? 0)
+    ) * displayScale;
+    const visibleTop = gridWrap.scrollTop
+      + ((SPREADSHEET_COLUMN_HEADER_HEIGHT * displayScale) + frozenHeight);
     const visibleBottom = gridWrap.scrollTop + gridWrap.clientHeight;
     if (target.rowPosition >= frozenRowCount && cellTop < visibleTop) {
-      gridWrap.scrollTop = Math.max(0, cellTop - SPREADSHEET_COLUMN_HEADER_HEIGHT - frozenHeight);
+      gridWrap.scrollTop = Math.max(
+        0,
+        cellTop - (SPREADSHEET_COLUMN_HEADER_HEIGHT * displayScale) - frozenHeight,
+      );
     } else if (cellBottom > visibleBottom) {
       gridWrap.scrollTop = Math.max(0, cellBottom - gridWrap.clientHeight);
     }
 
     const frozenColumnCount = Math.min(selectedSheet.frozenColumns, selectedSheet.columns.length);
-    const frozenWidth = columnOffsets[frozenColumnCount] ?? 0;
-    const cellLeft = SPREADSHEET_ROW_HEADER_WIDTH + (columnOffsets[target.columnPosition] ?? 0);
-    const cellRight = SPREADSHEET_ROW_HEADER_WIDTH + (columnOffsets[target.columnPosition + 1] ?? cellLeft);
-    const visibleLeft = gridWrap.scrollLeft + SPREADSHEET_ROW_HEADER_WIDTH + frozenWidth;
+    const frozenWidth = (columnOffsets[frozenColumnCount] ?? 0) * displayScale;
+    const cellLeft = (
+      SPREADSHEET_ROW_HEADER_WIDTH + (columnOffsets[target.columnPosition] ?? 0)
+    ) * displayScale;
+    const cellRight = (
+      SPREADSHEET_ROW_HEADER_WIDTH + (columnOffsets[target.columnPosition + 1] ?? 0)
+    ) * displayScale;
+    const visibleLeft = gridWrap.scrollLeft
+      + ((SPREADSHEET_ROW_HEADER_WIDTH * displayScale) + frozenWidth);
     const visibleRight = gridWrap.scrollLeft + gridWrap.clientWidth;
     if (target.columnPosition >= frozenColumnCount && cellLeft < visibleLeft) {
-      gridWrap.scrollLeft = Math.max(0, cellLeft - SPREADSHEET_ROW_HEADER_WIDTH - frozenWidth);
+      gridWrap.scrollLeft = Math.max(
+        0,
+        cellLeft - (SPREADSHEET_ROW_HEADER_WIDTH * displayScale) - frozenWidth,
+      );
     } else if (cellRight > visibleRight) {
       gridWrap.scrollLeft = Math.max(0, cellRight - gridWrap.clientWidth);
     }
@@ -1077,7 +1094,10 @@ function SpreadsheetPreview({
   );
 
   return (
-    <div className="office-spreadsheet-preview">
+    <div
+      className="office-spreadsheet-preview"
+      style={createSpreadsheetPresentationCssStyle(result)}
+    >
       <div
         className="office-spreadsheet-formula-bar"
         aria-label={t("editor.office.formulaBar")}
@@ -1107,9 +1127,11 @@ function SpreadsheetPreview({
       >
         <table
           className="office-spreadsheet-grid"
+          data-display-scale={displayScale}
           data-show-grid-lines={selectedSheet.showGridLines ? "true" : "false"}
           aria-rowcount={selectedSheet.rows.length + 1}
           aria-colcount={selectedSheet.columns.length + 1}
+          style={{ zoom: displayScale }}
         >
           <caption className="sr-only">{selectedSheet.name}</caption>
           <colgroup>
@@ -1192,8 +1214,7 @@ function createSpreadsheetCellCssStyle(
   if (style?.backgroundColor) css.backgroundColor = style.backgroundColor;
   if (style?.color) css.color = style.color;
   if (style?.fontFamily) {
-    const safeFamily = style.fontFamily.replaceAll('"', "");
-    css.fontFamily = `"${safeFamily}", "Aptos", "Calibri", "Segoe UI", Arial, sans-serif`;
+    css.fontFamily = spreadsheetFontFamilyCss(style.fontFamily);
   }
   if (style?.fontSize) css.fontSize = `${style.fontSize}px`;
   if (style?.bold) css.fontWeight = 700;
@@ -1208,6 +1229,26 @@ function createSpreadsheetCellCssStyle(
   if (style?.borderLeft) css.borderLeft = spreadsheetBorderCss(style.borderLeft);
   if (frozenLeft !== null) css["--office-sheet-frozen-left"] = `${frozenLeft}px`;
   return css;
+}
+
+function createSpreadsheetPresentationCssStyle(
+  result: SpreadsheetPreviewResult,
+): CSSProperties {
+  const css: CSSProperties & Record<`--${string}`, string> = {};
+  if (result.defaultFontFamily) {
+    css["--office-sheet-default-font-family"] = spreadsheetFontFamilyCss(
+      result.defaultFontFamily,
+    );
+  }
+  if (result.defaultFontSize) {
+    css["--office-sheet-default-font-size"] = `${result.defaultFontSize}px`;
+  }
+  return css;
+}
+
+function spreadsheetFontFamilyCss(fontFamily: string): string {
+  const safeFamily = fontFamily.replaceAll('"', "");
+  return `"${safeFamily}", "Aptos", "Calibri", "Segoe UI", Arial, sans-serif`;
 }
 
 function spreadsheetBorderCss(border: SpreadsheetCellBorder): string {
