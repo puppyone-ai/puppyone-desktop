@@ -1,4 +1,4 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { DataNode, DataPort, Workspace } from "@puppyone/shared-ui";
 import {
   openWorkspaceEntryExternal,
@@ -35,6 +35,11 @@ import { collapseNestedNodes } from "./fileClipboard";
 import { useFileClipboard } from "./useFileClipboard";
 import { useLocalization } from "@puppyone/localization/react";
 import { bidiIsolate } from "@puppyone/localization/core";
+import {
+  applyAppPreviewDetection,
+  createInitialAppPreviewDraft,
+  detectAppPreviewProjects,
+} from "./appPreviewCreation";
 
 export function useDataNodeActions({
   dataPort,
@@ -58,6 +63,7 @@ export function useDataNodeActions({
   const { t } = useLocalization();
   const [createEntryDraft, setCreateEntryDraft] = useState<DesktopCreateEntryDraft | null>(null);
   const [nodeActionMenu, setNodeActionMenu] = useState<DesktopNodeActionMenuDraft | null>(null);
+  const appDetectionRequestRef = useRef(0);
   const fileClipboardController = useFileClipboard({
     dataPort,
     onEnterDataView,
@@ -69,11 +75,13 @@ export function useDataNodeActions({
   });
 
   const resetDataNodeActions = useCallback(() => {
+    appDetectionRequestRef.current += 1;
     setCreateEntryDraft(null);
     setNodeActionMenu(null);
   }, []);
 
   const openCreateEntryMenu = useCallback((parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => {
+    appDetectionRequestRef.current += 1;
     onEnterDataView();
     setNodeActionMenu(null);
     setCreateEntryDraft({
@@ -83,6 +91,7 @@ export function useDataNodeActions({
       creatingKind: null,
       selectedKind: null,
       name: "",
+      appPreview: null,
     });
   }, [onEnterDataView]);
 
@@ -107,13 +116,46 @@ export function useDataNodeActions({
   }, [onEnterDataView]);
 
   const selectCreateEntryKind = useCallback((kind: DesktopCreateEntryKind) => {
-    setCreateEntryDraft((current) => current ? {
-      ...current,
-      selectedKind: kind,
-      name: defaultCreateName(kind, t),
-      error: null,
-    } : current);
-  }, [t]);
+    if (!createEntryDraft) return;
+    const requestId = appDetectionRequestRef.current + 1;
+    appDetectionRequestRef.current = requestId;
+    const parentPath = createEntryDraft.parentPath;
+    setCreateEntryDraft((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        selectedKind: kind,
+        name: defaultCreateName(kind, t),
+        error: null,
+        appPreview: kind === "app" ? createInitialAppPreviewDraft() : null,
+      };
+    });
+    if (kind !== "app" || !dataPort) return;
+    void detectAppPreviewProjects(dataPort, parentPath)
+      .then((candidates) => {
+        if (appDetectionRequestRef.current !== requestId) return;
+        setCreateEntryDraft((current) => (
+          current?.selectedKind === "app" && current.appPreview
+            ? { ...current, appPreview: applyAppPreviewDetection(current.appPreview, candidates) }
+            : current
+        ));
+      })
+      .catch(() => {
+        if (appDetectionRequestRef.current !== requestId) return;
+        setCreateEntryDraft((current) => (
+          current?.selectedKind === "app" && current.appPreview
+            ? {
+              ...current,
+              appPreview: {
+                ...current.appPreview,
+                detectionStatus: "error",
+                advanced: true,
+              },
+            }
+            : current
+        ));
+      });
+  }, [createEntryDraft, dataPort, t]);
 
   const createEntryFromMenu = useCallback(async () => {
     if (
@@ -159,8 +201,10 @@ export function useDataNodeActions({
               t("editor.puppyflow.defaultPrompt.apply"),
             ],
           },
-          untitledAppName: t("workspace.node.untitledApp"),
-        }));
+          untitledAppName: kind === "app"
+            ? name.replace(/\.puppyoneapp$/i, "")
+            : t("workspace.node.untitledApp"),
+        }, createEntryDraft.appPreview));
       }
       setCreateEntryDraft(null);
       setNodeActionMenu(null);
