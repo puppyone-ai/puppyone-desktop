@@ -20,6 +20,10 @@ type WordRenderState = {
   message?: string;
 };
 
+const WORD_PREVIEW_CLASS_NAME = "office-docx";
+const WORD_PREVIEW_PAGE_SELECTOR = `.${WORD_PREVIEW_CLASS_NAME}`;
+const WORD_PREVIEW_WRAPPER_SELECTOR = `.${WORD_PREVIEW_CLASS_NAME}-wrapper`;
+
 export function WordDocumentPreview({
   arrayBuffer,
   documentPath,
@@ -121,7 +125,7 @@ export function WordDocumentPreview({
           useBase64URL: true,
           inWrapper: true,
           experimental: true,
-          className: "office-docx",
+          className: WORD_PREVIEW_CLASS_NAME,
         },
       ))
       .then(async () => {
@@ -238,8 +242,8 @@ function applyWordPreviewZoom(
   bodyContainer: HTMLElement,
   zoom: WordPreviewZoom,
 ): number {
-  const wrapper = bodyContainer.querySelector<HTMLElement>(".docx-wrapper") ?? bodyContainer;
-  const firstPage = bodyContainer.querySelector<HTMLElement>(".office-docx");
+  const wrapper = bodyContainer.querySelector<HTMLElement>(WORD_PREVIEW_WRAPPER_SELECTOR) ?? bodyContainer;
+  const firstPage = bodyContainer.querySelector<HTMLElement>(WORD_PREVIEW_PAGE_SELECTOR);
   if (!firstPage) return 1;
 
   wrapper.style.zoom = "1";
@@ -341,7 +345,7 @@ const WORD_PREVIEW_SHADOW_CSS = `
     text-rendering: optimizeLegibility;
   }
 
-  .office-docx-body .docx-wrapper {
+  .office-docx-body ${WORD_PREVIEW_WRAPPER_SELECTOR} {
     box-sizing: border-box;
     display: block;
     width: max-content;
@@ -352,7 +356,7 @@ const WORD_PREVIEW_SHADOW_CSS = `
     transform-origin: top center;
   }
 
-  .office-docx-body .office-docx {
+  .office-docx-body ${WORD_PREVIEW_PAGE_SELECTOR} {
     margin: 0 auto 20px !important;
     border: 1px solid rgba(15, 23, 42, 0.1);
     border-radius: 2px;

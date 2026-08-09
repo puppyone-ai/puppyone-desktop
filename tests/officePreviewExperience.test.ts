@@ -42,6 +42,12 @@ describe("lightweight Office preview experience", () => {
     expect(wordPreviewSource).toContain("await document.fonts?.ready");
     expect(wordPreviewSource).toContain("sanitizeDocxDom(fragment)");
     expect(wordPreviewSource).toContain("resolveWordPreviewScale");
+    expect(wordPreviewSource).toContain('const WORD_PREVIEW_CLASS_NAME = "office-docx"');
+    expect(wordPreviewSource).toContain(
+      "const WORD_PREVIEW_WRAPPER_SELECTOR = `.${WORD_PREVIEW_CLASS_NAME}-wrapper`;",
+    );
+    expect(wordPreviewSource).toContain("querySelector<HTMLElement>(WORD_PREVIEW_WRAPPER_SELECTOR)");
+    expect(wordPreviewSource).toContain(".office-docx-body ${WORD_PREVIEW_WRAPPER_SELECTOR}");
     expect(officePreviewCss).toContain("office-document-preview--docx");
     expect(officePreviewCss).toMatch(
       /\.office-document-preview--docx\s*\{[^}]*background:\s*var\(--po-editor-bg\)/s,
