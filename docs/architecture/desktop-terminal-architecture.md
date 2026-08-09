@@ -204,6 +204,14 @@ one at runtime requires a refit.**
 - Spawn: user's `$SHELL` (login-shell args for bash/zsh),
   `TERM=xterm-256color`, `COLORTERM=truecolor`, `TERM_PROGRAM=PuppyOne`,
   `NO_COLOR` stripped.
+- Environment boundary: an interactive Terminal is a fresh shell session, not
+  a continuation of the package-manager process that launched Desktop. npm
+  lifecycle/package metadata and prefix overrides are stripped before PTY
+  spawn. A new bash/zsh login shell also drops the parent shell's Conda
+  activation stack and its active-prefix PATH entries, allowing the shell's
+  own startup files to initialize Conda coherently. Stable user configuration
+  such as HOME, locale, proxy, registry, and tool installation roots remains
+  inherited. Non-login shells retain their Conda activation state.
 - Exit surfaces in-terminal ("Process exited with …"); window close and
   app quit kill all sessions for that window.
 - The React effect tears down symmetrically: observers, listeners,
