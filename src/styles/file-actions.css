@@ -26,17 +26,8 @@
   padding-block-end: var(--desktop-create-entry-inset);
 }
 
-.desktop-create-entry-dialog .desktop-dialog-field {
-  color: var(--po-text-muted);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0;
-  line-height: 16px;
-  text-transform: none;
-}
-
 .desktop-create-entry-dialog .desktop-dialog-field input {
-  margin-top: 6px;
+  margin-top: 0;
 }
 
 .desktop-file-dialog-body {

@@ -310,8 +310,7 @@ export function DesktopCreateEntryDialog({
           className="desktop-dialog-body desktop-file-dialog-body"
           data-po-scrollbar="content"
         >
-          <label className="desktop-dialog-field">
-            <span>{t("workspace.node.name")}</span>
+          <div className="desktop-dialog-field">
             <input
               ref={inputRef}
               value={draft.name}
@@ -323,7 +322,7 @@ export function DesktopCreateEntryDialog({
                 onChange((current) => current ? { ...current, name: value, error: null } : current);
               }}
             />
-          </label>
+          </div>
 
           {errorMessage && <div className="desktop-dialog-error" dir="auto">{errorMessage}</div>}
         </div>

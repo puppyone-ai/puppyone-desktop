@@ -43,10 +43,10 @@ describe("Create entry dialog", () => {
   });
 
   it.each([
-    ["markdown", "Untitled.md", "Create Markdown file"],
-    ["csv", "Untitled.csv", "Create CSV file"],
-    ["folder", "Untitled folder", "Create folder"],
-  ] as const)("keeps the %s creation form concise", (selectedKind, name, title) => {
+    ["markdown", "Untitled.md", "Create Markdown file", "Markdown file name"],
+    ["csv", "Untitled.csv", "Create CSV file", "CSV file name"],
+    ["folder", "Untitled folder", "Create folder", "Folder name"],
+  ] as const)("keeps the %s creation form concise", (selectedKind, name, title, accessibleName) => {
     const container = render(
       <DesktopCreateEntryDialog
         draft={createDraft({ selectedKind, name })}
@@ -59,8 +59,9 @@ describe("Create entry dialog", () => {
     expect(container.querySelector("h2")?.textContent).toBe(title);
     expect(container.querySelector(".desktop-dialog-title-row p")).toBeNull();
     expect(container.querySelector(".desktop-dialog-note")).toBeNull();
-    expect(container.querySelector(".desktop-dialog-field > span")?.textContent).toBe("Name");
+    expect(container.querySelector(".desktop-dialog-field > span")).toBeNull();
     expect(container.querySelectorAll("input")).toHaveLength(1);
+    expect(container.querySelector("input")?.getAttribute("aria-label")).toBe(accessibleName);
   });
 });
 

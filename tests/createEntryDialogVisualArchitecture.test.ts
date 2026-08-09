@@ -27,13 +27,10 @@ describe("create entry dialog visual architecture", () => {
     );
   });
 
-  it("keeps its field label sentence-cased without changing every dialog", () => {
-    const fieldRule = fileActionCss.match(
-      /\.desktop-create-entry-dialog \.desktop-dialog-field\s*\{([^}]*)\}/s,
-    )?.[1];
+  it("does not reserve label spacing above its single input", () => {
+    const inputRule = getRule(".desktop-create-entry-dialog .desktop-dialog-field input");
 
-    expect(fieldRule).toContain("letter-spacing: 0;");
-    expect(fieldRule).toContain("text-transform: none;");
+    expect(inputRule).toContain("margin-top: 0;");
   });
 });
 
