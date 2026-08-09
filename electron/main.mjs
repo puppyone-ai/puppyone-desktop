@@ -133,6 +133,11 @@ const dockIconResources = Object.freeze({
   light: "dock-icon-light.png",
   matte: "dock-icon-matte.png",
 });
+const developmentDockIconResources = Object.freeze({
+  polished: "logo-square-dev.png",
+  light: "dock-icon-light-dev.png",
+  matte: "dock-icon-matte-dev.png",
+});
 const macTitlebarOptions = process.platform === "darwin"
   ? {
       titleBarStyle: "hiddenInset",
@@ -462,10 +467,13 @@ function getLastFocusedWindow() {
 }
 
 function resolveAppIconPath() {
+  const developmentBuild = desktopBuildInfo.channel === "dev";
+  const resourceFilename = developmentBuild ? "logo-square-dev.png" : "logo-square.png";
+  const sourceFilename = developmentBuild ? "logo-square-dev.png" : "logo-square.png";
   const candidates = [
-    path.join(process.resourcesPath ?? projectRoot, "logo-square.png"),
-    path.join(projectRoot, "dist", "logo-square.png"),
-    path.join(projectRoot, "public", "logo-square.png"),
+    path.join(process.resourcesPath ?? projectRoot, resourceFilename),
+    path.join(projectRoot, "dist", sourceFilename),
+    path.join(projectRoot, "public", sourceFilename),
     path.join(process.resourcesPath ?? projectRoot, "icon.icns"),
   ];
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
@@ -473,10 +481,15 @@ function resolveAppIconPath() {
 
 function resolveDockIconPath(iconId) {
   const normalizedIconId = Object.hasOwn(dockIconResources, iconId) ? iconId : "polished";
-  const resourceFilename = dockIconResources[normalizedIconId];
+  const developmentBuild = desktopBuildInfo.channel === "dev";
+  const resourceFilename = developmentBuild
+    ? developmentDockIconResources[normalizedIconId]
+    : dockIconResources[normalizedIconId];
   const sourceFilename = normalizedIconId === "light"
-    ? "logo-square-v0.1.3-light.png"
-    : normalizedIconId === "matte" ? "logo-square-v0.1.3-dark.png" : "logo-square.png";
+    ? `logo-square-v0.1.3-light${developmentBuild ? "-dev" : ""}.png`
+    : normalizedIconId === "matte"
+      ? `logo-square-v0.1.3-dark${developmentBuild ? "-dev" : ""}.png`
+      : `logo-square${developmentBuild ? "-dev" : ""}.png`;
   const candidates = [
     path.join(process.resourcesPath ?? projectRoot, resourceFilename),
     path.join(projectRoot, "public", sourceFilename),

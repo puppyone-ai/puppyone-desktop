@@ -84,6 +84,13 @@ export function createDesktopElectronBuilderConfig({
     from: buildInfoPath,
     to: "build-info.json",
   });
+  if (identity.channel === "dev") {
+    withoutGeneratedBuildInfo.push(
+      { from: "public/logo-square-dev.png", to: "logo-square-dev.png" },
+      { from: "public/logo-square-v0.1.3-light-dev.png", to: "dock-icon-light-dev.png" },
+      { from: "public/logo-square-v0.1.3-dark-dev.png", to: "dock-icon-matte-dev.png" },
+    );
+  }
 
   const config = {
     ...baseBuild,
@@ -106,6 +113,7 @@ export function createDesktopElectronBuilderConfig({
       : [],
     mac: {
       ...(baseBuild.mac ?? {}),
+      ...(identity.channel === "dev" ? { icon: "public/logo-square-dev.png" } : {}),
       executableName: policy.applicationName,
       bundleShortVersion: identity.baseVersion,
       bundleVersion: identity.platformBuildNumber ?? identity.baseVersion,
