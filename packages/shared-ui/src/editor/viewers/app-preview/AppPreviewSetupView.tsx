@@ -1,8 +1,10 @@
 import {
   ChevronLeft,
   ChevronRight,
+  CircleAlert,
   FileCode2,
   FolderOpen,
+  FolderSearch,
   Globe2,
   Link2,
   LoaderCircle,
@@ -20,6 +22,7 @@ import type {
 } from "../../../core/types";
 
 type SetupScreen = "detecting" | "detected" | "projects" | "methods" | "html" | "url" | "advanced";
+type DetectionStatus = "detecting" | "ready" | "failed" | "unavailable";
 
 const EMPTY_DETECTION: AppPreviewDetectionResult = { projects: [], htmlFiles: [] };
 
@@ -51,6 +54,9 @@ export function AppPreviewSetupView({
   }, [appPath, content, settings]);
   const [screen, setScreen] = useState<SetupScreen>(() => getSettingsScreen(configuredLaunch, settings));
   const [detection, setDetection] = useState<AppPreviewDetectionResult>(EMPTY_DETECTION);
+  const [detectionStatus, setDetectionStatus] = useState<DetectionStatus>(
+    controller?.detect ? "detecting" : "unavailable",
+  );
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [htmlPath, setHtmlPath] = useState(configuredLaunch?.kind === "static-file" ? configuredLaunch.path : "");
   const [url, setUrl] = useState(configuredLaunch?.kind === "existing-url" ? configuredLaunch.url : "http://localhost:3000/");
@@ -63,13 +69,16 @@ export function AppPreviewSetupView({
   useEffect(() => {
     let cancelled = false;
     if (!controller?.detect) {
+      setDetectionStatus("unavailable");
       if (!settings) setScreen("methods");
       return;
     }
+    setDetectionStatus("detecting");
     if (!settings) setScreen("detecting");
     void controller.detect(appPath).then((result) => {
       if (cancelled) return;
       setDetection(result);
+      setDetectionStatus("ready");
       setSelectedProjectId(result.projects[0]?.id ?? null);
       setHtmlPath((current) => current || result.htmlFiles[0]?.path || "");
       if (settings) return;
@@ -77,7 +86,9 @@ export function AppPreviewSetupView({
         ? "detected"
         : result.projects.length > 1 ? "projects" : "methods");
     }).catch(() => {
-      if (!cancelled && !settings) setScreen("methods");
+      if (cancelled) return;
+      setDetectionStatus("failed");
+      if (!settings) setScreen("methods");
     });
     return () => {
       cancelled = true;
@@ -88,6 +99,12 @@ export function AppPreviewSetupView({
     () => detection.projects.find((candidate) => candidate.id === selectedProjectId) ?? detection.projects[0] ?? null,
     [detection.projects, selectedProjectId],
   );
+  const noDetectedProject = !settings
+    && detectionStatus === "ready"
+    && detection.projects.length === 0;
+  const detectionUnavailable = !settings
+    && (detectionStatus === "failed" || detectionStatus === "unavailable");
+  const showMethodSuggestions = noDetectedProject || detectionUnavailable;
 
   const saveAndStart = async (setup: AppPreviewSetup) => {
     if (!controller?.configure || busy) return;
@@ -115,7 +132,10 @@ export function AppPreviewSetupView({
   return (
     <div className="app-setup-scroll">
       <div className="app-setup-panel" data-screen={screen}>
-        {screen !== "detecting" && screen !== "detected" && !settings ? (
+        {screen !== "detecting"
+          && screen !== "detected"
+          && !(screen === "methods" && detection.projects.length === 0)
+          && !settings ? (
           <button className="app-setup-back" type="button" onClick={() => {
             setError(null);
             setScreen(detection.projects.length === 1 ? "detected" : "methods");
@@ -176,12 +196,29 @@ export function AppPreviewSetupView({
           </SetupHero>
         ) : screen === "methods" ? (
           <SetupHero
-            icon={<SlidersHorizontal size={22} aria-hidden="true" />}
-            title={settings ? t("editor.app.setup.settingsTitle") : t("editor.app.setup.methodsTitle")}
+            icon={noDetectedProject
+              ? <FolderSearch size={22} aria-hidden="true" />
+              : detectionUnavailable
+                ? <CircleAlert size={22} aria-hidden="true" />
+                : <SlidersHorizontal size={22} aria-hidden="true" />}
+            title={settings
+              ? t("editor.app.setup.settingsTitle")
+              : noDetectedProject
+                ? t("editor.app.setup.noProjectTitle")
+                : detectionUnavailable
+                  ? t("editor.app.setup.detectionUnavailableTitle")
+                  : t("editor.app.setup.methodsTitle")}
             detail={settings
               ? t("editor.app.setup.settingsDetail")
-              : t("editor.app.setup.methodsDetail")}
+              : noDetectedProject
+                ? t("editor.app.setup.noProjectDetail")
+                : detectionUnavailable
+                  ? t("editor.app.setup.detectionUnavailableDetail")
+                  : t("editor.app.setup.methodsDetail")}
           >
+            {showMethodSuggestions ? (
+              <span className="app-setup-suggestions-label">{t("editor.app.setup.suggestionsTitle")}</span>
+            ) : null}
             <div className="app-setup-methods">
               <MethodButton
                 icon={<FolderOpen size={18} />}

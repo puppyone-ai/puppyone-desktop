@@ -118,6 +118,63 @@ describe("App Preview onboarding", () => {
     expect(container.textContent).toContain("Connect to a running webpage");
   });
 
+  it("explains an empty detection result before suggesting alternate methods", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+    const controller = {
+      detect: vi.fn(async () => ({ projects: [], htmlFiles: [] })),
+    } as unknown as AppPreviewController;
+
+    await act(async () => {
+      root?.render(withTestLocalization(
+        <AppPreviewSetupView
+          appName="Empty workspace"
+          appPath="empty.puppyoneapp"
+          content="{}"
+          controller={controller}
+          onConfigured={vi.fn()}
+        />,
+      ));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const content = container.textContent ?? "";
+    expect(content).toContain("No runnable project detected");
+    expect(content).toContain("PuppyOne checked this workspace");
+    expect(content).toContain("Try one of these options");
+    expect(content.indexOf("No runnable project detected"))
+      .toBeLessThan(content.indexOf("Choose project folder"));
+    expect(findButton(container, "Back")).toBeUndefined();
+  });
+
+  it("distinguishes unavailable detection from a successful empty result", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+    const controller = {
+      detect: vi.fn(async () => Promise.reject(new Error("offline"))),
+    } as unknown as AppPreviewController;
+
+    await act(async () => {
+      root?.render(withTestLocalization(
+        <AppPreviewSetupView
+          appName="Unavailable"
+          appPath="unavailable.puppyoneapp"
+          content="{}"
+          controller={controller}
+          onConfigured={vi.fn()}
+        />,
+      ));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Project detection was unavailable");
+    expect(container.textContent).not.toContain("No runnable project detected");
+  });
+
   it("opens Settings on the active launch method and preserves its values", async () => {
     const container = document.createElement("div");
     document.body.append(container);
