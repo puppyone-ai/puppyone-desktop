@@ -187,6 +187,7 @@ export const DEFAULT_CREATE_NEW_MENU_SETTINGS: CreateNewMenuSettings = {
   items: [
     { kind: "markdown", enabled: true },
     { kind: "csv", enabled: true },
+    { kind: "app", enabled: true },
   ],
 };
 
@@ -598,6 +599,15 @@ export function parseCreateNewMenuSettings(value: string | null | undefined): Cr
     }
 
     if (parsed.items.length > 0 && items.length === 0) {
+      return cloneDefaultCreateNewMenuSettings();
+    }
+    if (
+      items.length === 2
+      && items[0]?.kind === "markdown"
+      && items[0].enabled
+      && items[1]?.kind === "csv"
+      && items[1].enabled
+    ) {
       return cloneDefaultCreateNewMenuSettings();
     }
     return { items };
