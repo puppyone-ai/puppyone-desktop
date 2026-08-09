@@ -51,6 +51,7 @@ export type EditorHostProps = {
   deferFallbackContent?: boolean;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   documentSourceKind?: DocumentSourceKind;
+  onSurfaceReady?: () => void;
 };
 
 export function EditorHost({
@@ -81,6 +82,7 @@ export function EditorHost({
   deferFallbackContent = false,
   viewerExtensionAdapter = null,
   documentSourceKind = "local",
+  onSurfaceReady,
 }: EditorHostProps) {
   return (
     <PuppyoneEditorHost
@@ -119,6 +121,7 @@ export function EditorHost({
       openExternalFile={openExternalFile}
       convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
       officeEditing={officeEditing}
+      onSurfaceReady={onSurfaceReady}
     />
   );
 }

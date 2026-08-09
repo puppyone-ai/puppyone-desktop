@@ -43,7 +43,7 @@ export function PresetViewerRenderer({
 
   const LazyRenderer = getLazyRenderer(viewer as LazyPresetViewerContribution);
   return (
-    <Suspense fallback={<div className="editor-state">{t("editor.loadingViewer")}</div>}>
+    <Suspense fallback={<div className="editor-state" aria-busy="true">{t("editor.loadingViewer")}</div>}>
       <LazyRenderer {...context} />
     </Suspense>
   );

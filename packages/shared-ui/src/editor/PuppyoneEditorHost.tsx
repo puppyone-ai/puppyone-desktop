@@ -35,6 +35,7 @@ import { DocumentSessionBoundary } from "./document-session/DocumentSessionBound
 import type { DocumentPersistedCommit } from "./document-session/types";
 import { resolveEditorAccess } from "./editorAccess";
 import { EditorFindHost } from "./find/editorFind";
+import { DocumentSurfaceReadinessBoundary } from "./DocumentSurfaceHost";
 
 export type { EditorDocument, EditorDocumentKind, EditorSaveMode, MarkdownHtmlTrustMode } from "./viewerTypes";
 
@@ -65,9 +66,21 @@ export type PuppyoneEditorHostProps = {
    * port is absent in the default preset-only product profile.
    */
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
+  onSurfaceReady?: () => void;
 };
 
-export function PuppyoneEditorHost({
+export function PuppyoneEditorHost(props: PuppyoneEditorHostProps) {
+  return (
+    <DocumentSurfaceReadinessBoundary
+      readinessKey={props.document.path}
+      onReady={props.onSurfaceReady}
+    >
+      <PuppyoneEditorSurface {...props} />
+    </DocumentSurfaceReadinessBoundary>
+  );
+}
+
+function PuppyoneEditorSurface({
   document,
   loading = false,
   error = null,
@@ -156,7 +169,7 @@ export function PuppyoneEditorHost({
   const canEdit = editorAccess.kind === "editable";
 
   if (viewer.source !== "resource" && loading && !content) {
-    return <div className="editor-state">{t("editor.loadingFile")}</div>;
+    return <div className="editor-state" aria-busy="true">{t("editor.loadingFile")}</div>;
   }
 
   if (viewer.source !== "resource" && error && !content) {

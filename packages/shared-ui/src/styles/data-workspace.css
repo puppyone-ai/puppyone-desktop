@@ -753,6 +753,33 @@ body.data-sidebar-resizing .data-preview-accessory {
   border-bottom: 1px solid var(--po-divider);
 }
 
+.document-surface-host {
+  position: relative;
+  display: flex;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.document-surface-slot {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.document-surface-slot.is-committed {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.document-surface-slot.is-staging {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .file-preview-shell.without-header {
   border-bottom: 0;
 }

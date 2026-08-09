@@ -10,6 +10,7 @@ import type {
   OfficeEditingPort,
 } from "../core/types";
 import { EditorHost } from "../editor/EditorHost";
+import { DocumentSurfaceHost } from "../editor/DocumentSurfaceHost";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
 import type {
   DocumentSourceKind,
@@ -102,77 +103,84 @@ export function FilePreview({
   const deferFallbackContent = loading && !fileContent;
 
   return (
-    <div className={`file-preview-shell ${showHeader ? "" : "without-header"}`}>
-      {showHeader && (
-        <div className="file-preview-header">
-          <div className="file-preview-title">
-            <FilePreviewIcon
-              name={node.name}
-              type={node.type}
-              size={36}
-              snippet={node.preview}
-              childrenCount={node.children?.length}
-              theme={fileIconTheme}
-            />
-            <div>
-              <h2 dir="auto">{node.name}</h2>
-              <span dir="ltr">{node.path}</span>
+    <DocumentSurfaceHost surfaceKey={node.path}>
+      {({ onSurfaceReady }) => (
+        <div className={`file-preview-shell ${showHeader ? "" : "without-header"}`}>
+          {showHeader && (
+            <div className="file-preview-header">
+              <div className="file-preview-title">
+                <FilePreviewIcon
+                  name={node.name}
+                  type={node.type}
+                  size={36}
+                  snippet={node.preview}
+                  childrenCount={node.children?.length}
+                  theme={fileIconTheme}
+                />
+                <div>
+                  <h2 dir="auto">{node.name}</h2>
+                  <span dir="ltr">{node.path}</span>
+                </div>
+              </div>
+              <div className="file-preview-actions">
+                {node.status && node.status !== "clean" && (
+                  <span className={`status-pill ${node.status}`}>
+                    {t(`shared-ui.status.${node.status}`, { name: bidiIsolate(node.name) })}
+                  </span>
+                )}
+                {actions}
+              </div>
             </div>
-          </div>
-          <div className="file-preview-actions">
-            {node.status && node.status !== "clean" && (
-              <span className={`status-pill ${node.status}`}>
-                {t(`shared-ui.status.${node.status}`, { name: bidiIsolate(node.name) })}
-              </span>
-            )}
-            {actions}
+          )}
+
+          <div className="file-preview-body">
+            <EditorPreviewBoundary
+              key={node.path}
+              failureTitle={t("shared-ui.preview.crashed")}
+              onSurfaceReady={onSurfaceReady}
+            >
+              <EditorHost
+                node={node}
+                fileContent={fileContent}
+                fileUrl={fileUrl}
+                fileUrlLoading={fileUrlLoading}
+                fileUrlError={fileUrlError}
+                loading={loading}
+                error={error}
+                aiEditFile={aiEditFile}
+                documentPersistence={documentPersistence}
+                onDocumentPersisted={onDocumentPersisted}
+                hideSourceView={hideSourceView}
+                fileIconTheme={fileIconTheme}
+                editorInteractionPreferences={editorInteractionPreferences}
+                saveMode={editorSaveMode}
+                htmlTrustMode={htmlTrustMode}
+                workspaceId={workspaceId}
+                workspaceRoot={workspaceRoot}
+                markdownDialect={markdownDialect}
+                markdownLinkGraph={markdownLinkGraph}
+                markdownAssetUrlResolver={markdownAssetUrlResolver}
+                appPreview={appPreview}
+                openExternalFile={openExternalFile}
+                convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
+                officeEditing={officeEditing}
+                deferFallbackContent={deferFallbackContent}
+                viewerExtensionAdapter={viewerExtensionAdapter}
+                documentSourceKind={documentSourceKind}
+                onSurfaceReady={onSurfaceReady}
+              />
+            </EditorPreviewBoundary>
           </div>
         </div>
       )}
-
-      <div className="file-preview-body">
-        <EditorPreviewBoundary
-          key={node.path}
-          failureTitle={t("shared-ui.preview.crashed")}
-        >
-          <EditorHost
-            node={node}
-            fileContent={fileContent}
-            fileUrl={fileUrl}
-            fileUrlLoading={fileUrlLoading}
-            fileUrlError={fileUrlError}
-            loading={loading}
-            error={error}
-            aiEditFile={aiEditFile}
-            documentPersistence={documentPersistence}
-            onDocumentPersisted={onDocumentPersisted}
-            hideSourceView={hideSourceView}
-            fileIconTheme={fileIconTheme}
-            editorInteractionPreferences={editorInteractionPreferences}
-            saveMode={editorSaveMode}
-            htmlTrustMode={htmlTrustMode}
-            workspaceId={workspaceId}
-            workspaceRoot={workspaceRoot}
-            markdownDialect={markdownDialect}
-            markdownLinkGraph={markdownLinkGraph}
-            markdownAssetUrlResolver={markdownAssetUrlResolver}
-            appPreview={appPreview}
-            openExternalFile={openExternalFile}
-            convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
-            officeEditing={officeEditing}
-            deferFallbackContent={deferFallbackContent}
-            viewerExtensionAdapter={viewerExtensionAdapter}
-            documentSourceKind={documentSourceKind}
-          />
-        </EditorPreviewBoundary>
-      </div>
-    </div>
+    </DocumentSurfaceHost>
   );
 }
 
 type EditorPreviewBoundaryProps = {
   children: ReactNode;
   failureTitle: string;
+  onSurfaceReady?: () => void;
 };
 
 type EditorPreviewBoundaryState = {
@@ -192,6 +200,7 @@ class EditorPreviewBoundary extends Component<EditorPreviewBoundaryProps, Editor
 
   componentDidCatch(error: unknown, info: ErrorInfo) {
     console.warn("Editor preview crashed:", error, info.componentStack);
+    this.props.onSurfaceReady?.();
   }
 
   render() {

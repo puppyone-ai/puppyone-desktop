@@ -1,0 +1,164 @@
+/**
+ * @vitest-environment happy-dom
+ */
+import React, { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  DocumentSurfaceHost,
+  DocumentSurfaceReadinessBoundary,
+} from "../packages/shared-ui/src/editor/DocumentSurfaceHost";
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
+
+let root: Root | null = null;
+let frames = new Map<number, FrameRequestCallback>();
+let nextFrameId = 1;
+
+beforeEach(() => {
+  frames = new Map();
+  nextFrameId = 1;
+  vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+    const id = nextFrameId;
+    nextFrameId += 1;
+    frames.set(id, callback);
+    return id;
+  });
+  vi.spyOn(window, "cancelAnimationFrame").mockImplementation((id) => {
+    frames.delete(id);
+  });
+});
+
+afterEach(() => {
+  act(() => root?.unmount());
+  root = null;
+  document.body.innerHTML = "";
+  vi.restoreAllMocks();
+});
+
+describe("DocumentSurfaceHost", () => {
+  it("keeps the committed document interactive until the staged document is ready", async () => {
+    const ready = new Map<string, () => void>();
+    const container = createContainer();
+
+    await renderSurface(container, "a.md", "Document A", ready);
+    const originalA = getSurface(container, "a.md");
+
+    await renderSurface(container, "b.pdf", "Document B", ready);
+
+    expect(getSurface(container, "a.md")).toBe(originalA);
+    expect(originalA.dataset.surfaceState).toBe("committed");
+    expect(originalA.getAttribute("aria-hidden")).toBeNull();
+    expect(originalA.inert).toBe(false);
+    const stagedB = getSurface(container, "b.pdf");
+    expect(stagedB.dataset.surfaceState).toBe("staging");
+    expect(stagedB.getAttribute("aria-hidden")).toBe("true");
+    expect(stagedB.inert).toBe(true);
+
+    act(() => ready.get("b.pdf")?.());
+
+    expect(container.querySelector('[data-surface-key="a.md"]')).toBeNull();
+    expect(getSurface(container, "b.pdf")).toBe(stagedB);
+    expect(stagedB.dataset.surfaceState).toBe("committed");
+    expect(stagedB.inert).toBe(false);
+  });
+
+  it("cannot commit a stale readiness signal after a newer request", async () => {
+    const ready = new Map<string, () => void>();
+    const container = createContainer();
+
+    await renderSurface(container, "a.md", "Document A", ready);
+    await renderSurface(container, "b.png", "Document B", ready);
+    const staleReady = ready.get("b.png");
+    await renderSurface(container, "c.csv", "Document C", ready);
+
+    expect(container.querySelector('[data-surface-key="b.png"]')).toBeNull();
+    act(() => staleReady?.());
+    expect(getSurface(container, "a.md").dataset.surfaceState).toBe("committed");
+    expect(getSurface(container, "c.csv").dataset.surfaceState).toBe("staging");
+
+    act(() => ready.get("c.csv")?.());
+    expect(container.querySelector('[data-surface-key="a.md"]')).toBeNull();
+    expect(getSurface(container, "c.csv").dataset.surfaceState).toBe("committed");
+  });
+
+  it("updates the current document without remounting or creating a staging slot", async () => {
+    const ready = new Map<string, () => void>();
+    const container = createContainer();
+
+    await renderSurface(container, "a.md", "First revision", ready);
+    const surface = getSurface(container, "a.md");
+    await renderSurface(container, "a.md", "Second revision", ready);
+
+    expect(getSurface(container, "a.md")).toBe(surface);
+    expect(surface.textContent).toBe("Second revision");
+    expect(container.querySelectorAll(".document-surface-slot")).toHaveLength(1);
+    expect(container.querySelector(".document-surface-host")?.getAttribute("data-transitioning")).toBe("false");
+  });
+});
+
+describe("DocumentSurfaceReadinessBoundary", () => {
+  it("waits for aria-busy to clear and for two stable animation frames", async () => {
+    const onReady = vi.fn();
+    const container = createContainer();
+    const render = (busy: boolean) => (
+      <DocumentSurfaceReadinessBoundary readinessKey="document" onReady={onReady}>
+        <div aria-busy={busy}>surface</div>
+      </DocumentSurfaceReadinessBoundary>
+    );
+
+    await act(async () => root?.render(render(true)));
+    await flushFrames();
+    expect(onReady).not.toHaveBeenCalled();
+
+    await act(async () => root?.render(render(false)));
+    await flushOneFrame();
+    expect(onReady).not.toHaveBeenCalled();
+    await flushOneFrame();
+    expect(onReady).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toBe("surface");
+  });
+});
+
+function createContainer() {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
+  return container;
+}
+
+async function renderSurface(
+  container: HTMLElement,
+  surfaceKey: string,
+  label: string,
+  ready: Map<string, () => void>,
+) {
+  await act(async () => root?.render(
+    <DocumentSurfaceHost surfaceKey={surfaceKey}>
+      {({ onSurfaceReady }) => {
+        ready.set(surfaceKey, onSurfaceReady);
+        return <button type="button">{label}</button>;
+      }}
+    </DocumentSurfaceHost>,
+  ));
+  return container;
+}
+
+function getSurface(container: HTMLElement, key: string): HTMLDivElement {
+  const surface = container.querySelector<HTMLDivElement>(`[data-surface-key="${key}"]`);
+  if (!surface) throw new Error(`Surface ${key} was not rendered.`);
+  return surface;
+}
+
+async function flushOneFrame() {
+  const callbacks = Array.from(frames.entries());
+  frames.clear();
+  await act(async () => {
+    for (const [, callback] of callbacks) callback(performance.now());
+  });
+}
+
+async function flushFrames() {
+  while (frames.size > 0) await flushOneFrame();
+}

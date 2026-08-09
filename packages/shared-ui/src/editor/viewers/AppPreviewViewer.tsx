@@ -24,6 +24,7 @@ import { AppPreviewSetupView } from "./app-preview/AppPreviewSetupView";
 import { AppPreviewStateView } from "./app-preview/AppPreviewStateView";
 import type { AppPreviewMode } from "./app-preview/types";
 import { useAppPreviewSession } from "./app-preview/useAppPreviewSession";
+import { useDocumentSurfaceState } from "../DocumentSurfaceHost";
 
 export function AppPreviewViewer({
   document,
@@ -36,8 +37,10 @@ export function AppPreviewViewer({
   "document" | "content" | "loading" | "error" | "appPreview"
 >) {
   const { t } = useLocalization();
+  const documentSurfaceState = useDocumentSurfaceState();
   const [mode, setMode] = useState<AppPreviewMode>("preview");
   const [manifestContent, setManifestContent] = useState(content);
+  const [readyFrameUrl, setReadyFrameUrl] = useState<string | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -60,9 +63,10 @@ export function AppPreviewViewer({
     mode,
     hostRef,
     enabled: configured,
+    surfaceVisible: documentSurfaceState === "committed",
   });
 
-  if (loading && !manifestContent) return <div className="editor-state">{t("editor.app.loading")}</div>;
+  if (loading && !manifestContent) return <div className="editor-state" aria-busy="true">{t("editor.app.loading")}</div>;
   if (error && !manifestContent) return <div className="editor-state danger" dir="auto">{error}</div>;
 
   const { state } = session;
@@ -78,9 +82,18 @@ export function AppPreviewViewer({
     ? "error"
     : configured ? state.status : "idle";
   const browserControlsEnabled = mode === "preview" && Boolean(state.surface?.surfaceId);
+  const previewSurfaceBusy = Boolean(
+    configured
+    && mode === "preview"
+    && state.status !== "error"
+    && state.status !== "stopped"
+    && (session.nativeSurface
+      ? state.surface?.status !== "ready" || !state.surface.attached
+      : !runningUrl || readyFrameUrl !== runningUrl),
+  );
 
   return (
-    <section className="app-preview-shell" data-mode={mode}>
+    <section className="app-preview-shell" data-mode={mode} aria-busy={previewSurfaceBusy}>
       <header className="app-preview-header">
         <div className="app-preview-title">
           <strong dir="auto">{appName}</strong>
@@ -186,6 +199,8 @@ export function AppPreviewViewer({
                 title={appName}
                 sandbox="allow-forms allow-modals allow-scripts allow-same-origin"
                 referrerPolicy="no-referrer"
+                aria-busy={readyFrameUrl !== runningUrl}
+                onLoad={() => setReadyFrameUrl(runningUrl)}
               />
             ) : state.surface?.status === "ready" && state.surface.attached ? null : (
               <AppPreviewStateView

@@ -24,12 +24,14 @@ export function useAppPreviewSession({
   mode,
   hostRef,
   enabled = true,
+  surfaceVisible = true,
 }: {
   appPreview: AppPreviewController | null | undefined;
   path: string;
   mode: AppPreviewMode;
   hostRef: RefObject<HTMLDivElement | null>;
   enabled?: boolean;
+  surfaceVisible?: boolean;
 }) {
   const [state, setState] = useState<AppPreviewViewState>({
     status: "idle",
@@ -43,6 +45,8 @@ export function useAppPreviewSession({
   const requestVersionRef = useRef(0);
   const activeAttachmentRef = useRef<string | null>(null);
   const surfaceRef = useRef<AppPreviewSurfaceState | null>(null);
+  const surfaceVisibleRef = useRef(surfaceVisible);
+  const scheduleBoundsSyncRef = useRef<() => void>(() => undefined);
   const runtimeGenerationRef = useRef(0);
   const runtimeIdRef = useRef<string | null>(null);
   const runtimeSequenceRef = useRef(new Map<string, number>());
@@ -202,7 +206,7 @@ export function useAppPreviewSession({
       animationFrame = 0;
       const element = hostRef.current;
       if (!element) return;
-      latestBounds = measureSurfaceBounds(element);
+      latestBounds = measureSurfaceBounds(element, surfaceVisibleRef.current);
       const surfaceId = surfaceRef.current?.surfaceId;
       if (!latestBounds || !surfaceId || activeAttachmentRef.current !== attachmentId) return;
       void appPreview.setSurfaceBounds?.({
@@ -215,10 +219,11 @@ export function useAppPreviewSession({
     const scheduleBoundsSync = () => {
       if (!animationFrame) animationFrame = window.requestAnimationFrame(syncBounds);
     };
+    scheduleBoundsSyncRef.current = scheduleBoundsSync;
 
     const begin = async () => {
       const element = hostRef.current;
-      const initialBounds = element ? measureSurfaceBounds(element) : null;
+      const initialBounds = element ? measureSurfaceBounds(element, surfaceVisibleRef.current) : null;
       if (!initialBounds) {
         animationFrame = window.requestAnimationFrame(() => void begin());
         return;
@@ -293,10 +298,16 @@ export function useAppPreviewSession({
       window.removeEventListener("resize", scheduleBoundsSync);
       window.removeEventListener("scroll", scheduleBoundsSync, true);
       if (animationFrame) window.cancelAnimationFrame(animationFrame);
+      scheduleBoundsSyncRef.current = () => undefined;
       if (activeAttachmentRef.current === attachmentId) activeAttachmentRef.current = null;
       detach();
     };
   }, [activationVersion, appPreview, enabled, hostRef, mode, nativeSurface, path, refreshLogs]);
+
+  useLayoutEffect(() => {
+    surfaceVisibleRef.current = surfaceVisible;
+    scheduleBoundsSyncRef.current();
+  }, [surfaceVisible]);
 
   return {
     state,
@@ -310,12 +321,12 @@ export function useAppPreviewSession({
   };
 }
 
-function measureSurfaceBounds(element: HTMLElement): AppPreviewBounds | null {
+function measureSurfaceBounds(element: HTMLElement, visible: boolean): AppPreviewBounds | null {
   const rect = element.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return null;
   return {
-    x: Math.floor(rect.left),
-    y: Math.floor(rect.top),
+    x: visible ? Math.floor(rect.left) : -100_000,
+    y: visible ? Math.floor(rect.top) : -100_000,
     width: Math.ceil(rect.width),
     height: Math.ceil(rect.height),
   };

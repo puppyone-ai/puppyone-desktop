@@ -65,6 +65,9 @@ describe("resource preview readiness", () => {
 
     expect(container.querySelector(".document-preview__name")?.textContent).toBe("notes.bin");
     expect(container.querySelector(".native-image-preview")).toBeNull();
+    expect(container.querySelector(".document-surface-host")?.getAttribute("data-transitioning")).toBe("true");
+    expect(container.querySelector('[data-surface-key="notes.bin"]')?.getAttribute("data-surface-state")).toBe("committed");
+    expect(container.querySelector('[data-surface-key="photo.png"]')?.getAttribute("data-surface-state")).toBe("staging");
 
     fileUrl.resolve("blob:photo-preview");
     await act(async () => fileUrl.promise);
@@ -86,6 +89,9 @@ describe("resource preview readiness", () => {
     expect(shell.getAttribute("aria-busy")).toBe("false");
     expect(image.hidden).toBe(false);
     expect(container.querySelector(".native-image-preview-state")).toBeNull();
+    await waitFor(() => container.querySelector(".document-surface-host")?.getAttribute("data-transitioning") === "false");
+    expect(container.querySelector('[data-surface-key="notes.bin"]')).toBeNull();
+    expect(container.querySelector('[data-surface-key="photo.png"]')?.getAttribute("data-surface-state")).toBe("committed");
   });
 });
 

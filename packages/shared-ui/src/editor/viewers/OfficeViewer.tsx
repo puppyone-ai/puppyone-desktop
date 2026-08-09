@@ -208,7 +208,7 @@ function OfficePreviewViewer({
     && !previewResourceUrl
     && !canUseNativeDocxConversion
   ) {
-    previewBody = <div className="editor-state">{t("editor.preview.loading")}</div>;
+    previewBody = <div className="editor-state" aria-busy="true">{t("editor.preview.loading")}</div>;
   } else if (!previewResourceUrl && !canUseNativeDocxConversion && state.status !== "ready") {
     previewBody = (
       <OfficeEmptyState
@@ -247,7 +247,20 @@ function OfficePreviewViewer({
   }
 
   return (
-    <div className="office-preview" data-office-kind={surfaceKind}>
+    <div
+      className="office-preview"
+      data-office-kind={surfaceKind}
+      aria-busy={Boolean(
+        !fileUrlError
+        && (
+          state.status === "loading"
+          || (
+            state.status === "idle"
+            && (previewResourceLoading || Boolean(previewResourceUrl) || canUseNativeDocxConversion)
+          )
+        )
+      )}
+    >
       <OfficePreviewHeader
         documentName={document.name}
         documentPath={document.path}
@@ -615,7 +628,10 @@ function PptxPresentationPreview({
   }
 
   return (
-    <div className="office-pptx-render-preview">
+    <div
+      className="office-pptx-render-preview"
+      aria-busy={renderState.status === "loading"}
+    >
       <div className="office-pptx-workspace">
         <aside
           ref={thumbnailRailRef}
@@ -1093,6 +1109,7 @@ function DocxDocumentPreview({
     <div
       className="office-document-preview office-document-preview--docx"
       data-po-scrollbar="content"
+      aria-busy={renderState.status === "loading"}
     >
       {renderState.status === "loading" && (
         <div className="office-docx-render-state">{t("editor.office.renderingWord")}</div>
