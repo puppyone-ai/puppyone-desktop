@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
+import http from "node:http";
 import net from "node:net";
 import path from "node:path";
 import { BrowserWindow } from "electron";
@@ -43,9 +44,11 @@ export function createAppPreviewRuntime({
   spawnProcess = spawn,
   allocateLocalPort = allocatePort,
   fetchHealth = fetchWithTimeout,
+  serveStaticFile = startStaticFileServer,
 }) {
   const sessionsById = new Map();
   const runtimeIdBySession = new Map();
+  const generationBySession = new Map();
   const trustedManifests = loadTrustedManifests(app);
 
   async function start(sender, request) {
@@ -56,7 +59,7 @@ export function createAppPreviewRuntime({
       existing.appPath === context.appPath &&
       existing.manifestHash === context.manifestHash;
 
-    if (sameApp && existing.status === "running" && existing.child && !existing.exited) {
+    if (sameApp && existing.status === "running" && !existing.exited) {
       existing.ownerIds.add(sender.id);
       return serializeSession(existing);
     }
@@ -90,9 +93,14 @@ export function createAppPreviewRuntime({
         if (session.status !== "stopped") {
           session.status = "error";
           session.message = message;
+          session.reason = session.reason ?? classifyRuntimeFailure(message);
           appendLog(session, `[puppyone] ${session.message}\n`);
         }
         await terminateSessionChild(session, "start failed");
+        if (session.staticServer) {
+          await closeHttpServer(session.staticServer);
+          session.staticServer = null;
+        }
         publishSessionState(session);
         throw error;
       })
@@ -137,6 +145,9 @@ export function createAppPreviewRuntime({
         cwd: null,
         message: null,
         logs: "",
+        sequence: 0,
+        reason: null,
+        exitCode: null,
       };
     }
     requireSessionOwner(existing, sender);
@@ -199,12 +210,30 @@ export function createAppPreviewRuntime({
     const appPath = normalizeAppPath(request?.path);
     const content = await readWorkspaceTextFile(rootPath, appPath).then((file) => file.content ?? "");
     const manifest = parseAppPreviewManifest(content, { appPath });
+    if (!manifest.launch) {
+      const error = new Error("This App is not configured yet.");
+      error.code = "manifest-unconfigured";
+      throw error;
+    }
     const appDir = getRelativeDir(appPath);
-    const cwdRelativePath = joinManifestRelativePath(appDir, manifest.launch.cwd ?? ".");
+    const cwdRelativePath = manifest.launch.kind === "local-server"
+      ? joinManifestRelativePath(appDir, manifest.launch.cwd ?? ".")
+      : appDir;
     const unresolvedCwdPath = resolveWorkspacePath(rootPath, cwdRelativePath);
-    const cwdPath = await resolveCanonicalWorkspaceDirectory(rootPath, unresolvedCwdPath, {
-      label: "App preview cwd",
-    });
+    const cwdPath = manifest.launch.kind === "existing-url"
+      ? null
+      : await resolveCanonicalWorkspaceDirectory(rootPath, unresolvedCwdPath, {
+          label: "App preview cwd",
+        });
+    let staticFilePath = null;
+    if (manifest.launch.kind === "static-file") {
+      const relativeFilePath = joinManifestRelativePath(appDir, manifest.launch.path);
+      staticFilePath = await resolveCanonicalWorkspaceFile(
+        rootPath,
+        resolveWorkspacePath(rootPath, relativeFilePath),
+        "App preview HTML file",
+      );
+    }
     const appId = manifest.id || `${rootPath}:${appPath}`;
     const trustFingerprint = await createTrustFingerprint({
       appPath,
@@ -225,10 +254,12 @@ export function createAppPreviewRuntime({
       manifestHash: trustFingerprint,
       cwdPath,
       cwdRelativePath,
+      staticFilePath,
     };
   }
 
   async function ensureTrusted(sender, context) {
+    if (context.manifest.launch.kind !== "local-server") return;
     const trustKey = `${context.rootPath}:${context.appPath}:${context.manifestHash}`;
     if (trustedManifests.has(trustKey)) return;
 
@@ -265,18 +296,26 @@ export function createAppPreviewRuntime({
   }
 
   function createSession(context, sender) {
+    const key = getSessionKey(context.rootPath, context.appPath);
+    const generation = (generationBySession.get(key) ?? 0) + 1;
+    generationBySession.set(key, generation);
     return {
       ...context,
-      key: getSessionKey(context.rootPath, context.appPath),
+      key,
+      generation,
       runtimeId: `app-runtime-${randomUUID()}`,
       ownerIds: new Set([sender.id]),
       child: null,
+      staticServer: null,
       exited: false,
       port: null,
       url: null,
       logs: "",
       status: "starting",
       message: null,
+      reason: null,
+      exitCode: null,
+      sequence: 0,
       startPromise: null,
       ignoreNextExit: false,
     };
@@ -286,6 +325,24 @@ export function createAppPreviewRuntime({
     session.status = "starting";
     session.message = null;
     publishSessionState(session);
+    if (session.manifest.launch.kind === "existing-url") {
+      session.url = session.manifest.launch.url;
+      session.status = "running";
+      appendLog(session, `[puppyone] Connected: ${session.url}\n`);
+      publishSessionState(session);
+      return;
+    }
+    if (session.manifest.launch.kind === "static-file") {
+      const result = await serveStaticFile(session);
+      session.staticServer = result.server;
+      session.port = result.port;
+      session.url = result.url;
+      session.status = "running";
+      appendLog(session, `[puppyone] Serving ${session.manifest.launch.path}\n`);
+      appendLog(session, `[puppyone] Ready: ${session.url}\n`);
+      publishSessionState(session);
+      return;
+    }
     session.port = await allocateLocalPort();
     session.url = buildLocalUrl(session.manifest.launch.url, session.port);
     const healthUrl = buildHealthUrl(session.url, session.manifest.launch.health);
@@ -311,6 +368,7 @@ export function createAppPreviewRuntime({
     child.on("error", (error) => {
       session.status = "error";
       session.message = error.message;
+      session.reason = "process-exit";
       appendLog(session, `[puppyone] Process error: ${error.message}\n`);
       publishSessionState(session);
     });
@@ -323,6 +381,8 @@ export function createAppPreviewRuntime({
       const message = `Process exited${code == null ? "" : ` with code ${code}`}${signal ? ` (${signal})` : ""}.`;
       session.status = code === 0 ? "stopped" : "error";
       session.message = message;
+      session.reason = code === 0 ? null : "process-exit";
+      session.exitCode = code;
       appendLog(session, `[puppyone] ${message}\n`);
       publishSessionState(session);
     });
@@ -341,6 +401,11 @@ export function createAppPreviewRuntime({
     session.status = "stopped";
     session.message = reason ? `Stopped: ${reason}` : null;
     if (session.child && !session.exited) await terminateSessionChild(session, reason);
+    if (session.staticServer) {
+      await closeHttpServer(session.staticServer);
+      session.staticServer = null;
+    }
+    session.exited = true;
     publishSessionState(session);
   }
 
@@ -356,6 +421,7 @@ export function createAppPreviewRuntime({
 
   function publishSessionState(session) {
     if (getSession(session.key) !== session) return;
+    session.sequence += 1;
     try {
       onStateChange({
         rootPath: session.rootPath,
@@ -448,6 +514,7 @@ async function createTrustFingerprint({
     .update(appPath)
     .update("\0manifest\0")
     .update(content);
+  if (manifest.launch.kind !== "local-server") return hash.digest("hex");
   const packageScript = getPackageScriptName(manifest.launch.command);
   if (!packageScript) return hash.digest("hex");
 
@@ -624,6 +691,7 @@ function appendLog(session, value) {
 }
 
 function serializeSession(session) {
+  const localLaunch = session.manifest.launch.kind === "local-server" ? session.manifest.launch : null;
   return {
     runtimeId: session.runtimeId,
     appId: session.appId,
@@ -632,11 +700,104 @@ function serializeSession(session) {
     path: session.appPath,
     url: session.url,
     port: session.port,
-    command: session.manifest.launch.command,
-    cwd: session.cwdPath,
+    command: localLaunch?.command ?? null,
+    cwd: session.cwdRelativePath || (localLaunch ? "." : null),
     message: session.message,
     logs: session.logs,
+    generation: session.generation,
+    sequence: session.sequence,
+    reason: session.reason,
+    exitCode: session.exitCode,
   };
+}
+
+function classifyRuntimeFailure(message) {
+  const normalized = String(message ?? "").toLowerCase();
+  if (normalized.includes("cancel")) return "cancelled";
+  if (normalized.includes("health") || normalized.includes("become ready")) return "health-timeout";
+  if (normalized.includes("exited") || normalized.includes("process")) return "process-exit";
+  if (normalized.includes("could not be found") || normalized.includes("must point") || normalized.includes("package")) {
+    return "preflight";
+  }
+  return "unknown";
+}
+
+async function resolveCanonicalWorkspaceFile(rootValue, fileValue, label) {
+  const canonicalRoot = await fs.promises.realpath(path.resolve(rootValue));
+  const canonicalFile = await fs.promises.realpath(path.resolve(fileValue)).catch((error) => {
+    throw new Error(`${label} could not be found. ${error.message}`);
+  });
+  const relative = path.relative(canonicalRoot, canonicalFile);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error(`${label} must stay inside the assigned workspace.`);
+  }
+  const metadata = await fs.promises.stat(canonicalFile);
+  if (!metadata.isFile()) throw new Error(`${label} must point to a file.`);
+  return canonicalFile;
+}
+
+async function startStaticFileServer(session) {
+  const entryFile = session.staticFilePath;
+  const staticRoot = path.dirname(entryFile);
+  const entryName = path.basename(entryFile);
+  const server = http.createServer(async (request, response) => {
+    try {
+      const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+      const requestedName = decodeURIComponent(requestUrl.pathname === "/" ? entryName : requestUrl.pathname.slice(1));
+      const unresolved = path.resolve(staticRoot, requestedName);
+      const canonical = await fs.promises.realpath(unresolved);
+      const relative = path.relative(staticRoot, canonical);
+      if (relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("outside static root");
+      const metadata = await fs.promises.stat(canonical);
+      if (!metadata.isFile()) throw new Error("not a file");
+      response.statusCode = 200;
+      response.setHeader("Content-Type", getStaticMimeType(canonical));
+      response.setHeader("Cache-Control", "no-store");
+      fs.createReadStream(canonical).pipe(response);
+    } catch {
+      response.statusCode = 404;
+      response.setHeader("Content-Type", "text/plain; charset=utf-8");
+      response.end("Not found");
+    }
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    await closeHttpServer(server);
+    throw new Error("Unable to start the local HTML preview server.");
+  }
+  return { server, port: address.port, url: `http://127.0.0.1:${address.port}/` };
+}
+
+function closeHttpServer(server) {
+  return new Promise((resolve) => server.close(() => resolve()));
+}
+
+function getStaticMimeType(filePath) {
+  const extension = path.extname(filePath).toLowerCase();
+  return ({
+    ".css": "text/css; charset=utf-8",
+    ".gif": "image/gif",
+    ".html": "text/html; charset=utf-8",
+    ".htm": "text/html; charset=utf-8",
+    ".ico": "image/x-icon",
+    ".jpeg": "image/jpeg",
+    ".jpg": "image/jpeg",
+    ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".png": "image/png",
+    ".map": "application/json; charset=utf-8",
+    ".mp4": "video/mp4",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+    ".wasm": "application/wasm",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+  })[extension] ?? "application/octet-stream";
 }
 
 const SAFE_INHERITED_ENVIRONMENT = new Set([

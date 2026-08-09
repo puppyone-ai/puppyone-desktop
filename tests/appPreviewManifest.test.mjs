@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AppPreviewManifestError,
+  createUnconfiguredAppPreviewManifestContent,
   getAppPreviewManifestDisplayName,
   interpolateAppPreviewCommand,
   normalizeAppPreviewManifest,
@@ -26,6 +27,37 @@ function manifest(overrides = {}) {
 }
 
 describe("App Preview manifest contract", () => {
+  it("treats a newly created app as a valid, unconfigured document", () => {
+    const content = createUnconfiguredAppPreviewManifestContent();
+    const parsed = parseAppPreviewManifest(content, { appPath: "Untitled App.puppyoneapp" });
+    expect(parsed.name).toBe("Untitled App");
+    expect(parsed.launch).toBeNull();
+    expect(parsed.permissions.workspace).toEqual([]);
+  });
+
+  it("normalizes static HTML and existing URL launch definitions", () => {
+    expect(normalizeAppPreviewManifest({
+      type: "puppyone.app",
+      version: 1,
+      launch: { kind: "static-file", path: "slides/index.html" },
+    }).launch).toEqual({ kind: "static-file", path: "slides/index.html" });
+    expect(normalizeAppPreviewManifest({
+      type: "puppyone.app",
+      version: 1,
+      launch: { kind: "existing-url", url: "http://localhost:4173" },
+    }).launch).toEqual({ kind: "existing-url", url: "http://localhost:4173/" });
+    expect(() => normalizeAppPreviewManifest({
+      type: "puppyone.app",
+      version: 1,
+      launch: { kind: "existing-url", url: "javascript:alert(1)" },
+    })).toThrow(/HTTP or HTTPS/i);
+    expect(() => normalizeAppPreviewManifest({
+      type: "puppyone.app",
+      version: 1,
+      launch: { kind: "existing-url", url: "https://example.com", command: ["unexpected"] },
+    })).toThrow(/unsupported fields/i);
+  });
+
   it("normalizes the versioned manifest and interpolates only declared variables", () => {
     const parsed = normalizeAppPreviewManifest(manifest(), { appPath: "decks/pitch.puppyoneapp" });
     expect(parsed.name).toBe("Deck preview");

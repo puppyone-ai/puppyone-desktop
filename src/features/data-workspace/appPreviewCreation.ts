@@ -1,4 +1,9 @@
-import type { DataNode, DataPort } from "@puppyone/shared-ui";
+import type {
+  AppPreviewDetectionResult,
+  AppPreviewSetup,
+  DataNode,
+  DataPort,
+} from "@puppyone/shared-ui";
 import { normalizeAppPreviewManifest } from "../../../shared/appPreviewManifest.js";
 
 const MAX_CHILD_DIRECTORIES = 24;
@@ -173,7 +178,45 @@ export async function detectAppPreviewProjects(
   ));
 }
 
-export function createAppPreviewManifestContent(config: AppPreviewCreationConfig): string {
+export async function detectAppPreviewSetup(
+  dataPort: Pick<DataPort, "listChildren" | "readFile">,
+  appPath: string,
+): Promise<AppPreviewDetectionResult> {
+  const parentPath = getParentPath(appPath);
+  const [projects, htmlFiles] = await Promise.all([
+    detectAppPreviewProjects(dataPort, parentPath),
+    detectHtmlFiles(dataPort, parentPath),
+  ]);
+  return { projects, htmlFiles };
+}
+
+export function createAppPreviewManifestContentFromSetup(
+  name: string,
+  setup: AppPreviewSetup,
+): string {
+  if (setup.kind === "local-server") {
+    return createAppPreviewManifestContent({
+      name,
+      cwd: normalizeAppPreviewWorkingDirectory(setup.cwd),
+      command: [...setup.command],
+    }, setup.url);
+  }
+  const manifest = normalizeAppPreviewManifest({
+    type: "puppyone.app",
+    version: 1,
+    name,
+    launch: setup.kind === "static-file"
+      ? { kind: "static-file", path: setup.path }
+      : { kind: "existing-url", url: setup.url },
+    permissions: { workspace: setup.kind === "static-file" ? ["read"] : [] },
+  });
+  return `${JSON.stringify(manifest, null, 2)}\n`;
+}
+
+export function createAppPreviewManifestContent(
+  config: AppPreviewCreationConfig,
+  url = "http://127.0.0.1:${port}/",
+): string {
   const manifest = normalizeAppPreviewManifest({
     type: "puppyone.app",
     version: 1,
@@ -186,7 +229,7 @@ export function createAppPreviewManifestContent(config: AppPreviewCreationConfig
         HOST: "127.0.0.1",
         PORT: "${port}",
       },
-      url: "http://127.0.0.1:${port}/",
+      url,
       health: {
         path: "/",
         expectStatus: 200,
@@ -197,6 +240,42 @@ export function createAppPreviewManifestContent(config: AppPreviewCreationConfig
     },
   });
   return `${JSON.stringify(manifest, null, 2)}\n`;
+}
+
+async function detectHtmlFiles(
+  dataPort: Pick<DataPort, "listChildren">,
+  parentPath: string | null,
+): Promise<Array<{ path: string; label: string }>> {
+  const rootChildren = await safeListChildren(dataPort, parentPath);
+  const direct = rootChildren
+    .filter(isHtmlFile)
+    .map((node) => ({ path: node.name, label: node.name }));
+  const nested = await Promise.all(rootChildren
+    .filter(isScannableDirectory)
+    .slice(0, MAX_CHILD_DIRECTORIES)
+    .map(async (directory) => {
+      const children = await safeListChildren(dataPort, directory.path);
+      return children
+        .filter(isHtmlFile)
+        .map((node) => ({ path: `${directory.name}/${node.name}`, label: `${directory.name}/${node.name}` }));
+    }));
+  return [...direct, ...nested.flat()]
+    .sort((left, right) => {
+      const leftIndex = /(^|\/)index\.html?$/i.test(left.path) ? 0 : 1;
+      const rightIndex = /(^|\/)index\.html?$/i.test(right.path) ? 0 : 1;
+      return leftIndex - rightIndex || left.label.localeCompare(right.label);
+    })
+    .slice(0, 32);
+}
+
+function isHtmlFile(node: DataNode): boolean {
+  return node.type !== "folder" && /\.html?$/i.test(node.name);
+}
+
+function getParentPath(filePath: string): string | null {
+  const normalized = filePath.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  const slashIndex = normalized.lastIndexOf("/");
+  return slashIndex < 0 ? null : normalized.slice(0, slashIndex) || null;
 }
 
 export function parseAppPreviewCommandLine(value: string): string[] {

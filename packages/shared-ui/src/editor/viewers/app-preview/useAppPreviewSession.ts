@@ -23,11 +23,13 @@ export function useAppPreviewSession({
   path,
   mode,
   hostRef,
+  enabled = true,
 }: {
   appPreview: AppPreviewController | null | undefined;
   path: string;
   mode: AppPreviewMode;
   hostRef: RefObject<HTMLDivElement | null>;
+  enabled?: boolean;
 }) {
   const [state, setState] = useState<AppPreviewViewState>({
     status: "idle",
@@ -41,6 +43,10 @@ export function useAppPreviewSession({
   const requestVersionRef = useRef(0);
   const activeAttachmentRef = useRef<string | null>(null);
   const surfaceRef = useRef<AppPreviewSurfaceState | null>(null);
+  const runtimeGenerationRef = useRef(0);
+  const runtimeIdRef = useRef<string | null>(null);
+  const runtimeSequenceRef = useRef(new Map<string, number>());
+  const surfaceSequenceRef = useRef(new Map<string, number>());
   const nativeSurface = Boolean(appPreview?.activate && appPreview?.detachSurface);
 
   const refreshLogs = useCallback(async () => {
@@ -48,7 +54,7 @@ export function useAppPreviewSession({
     try {
       setLogs(await appPreview.getLogs(path));
     } catch (error) {
-      setLogs(error instanceof Error ? error.message : String(error));
+      setLogs(sanitizePreviewTransportError(error instanceof Error ? error.message : String(error)));
     }
   }, [appPreview, path]);
 
@@ -84,13 +90,35 @@ export function useAppPreviewSession({
   }, [appPreview]);
 
   useEffect(() => {
-    if (mode === "logs") void refreshLogs();
-  }, [mode, refreshLogs]);
+    if (enabled && mode === "logs") void refreshLogs();
+  }, [enabled, mode, refreshLogs]);
 
   useEffect(() => {
-    if (!appPreview?.subscribeRuntime) return;
+    runtimeGenerationRef.current = 0;
+    runtimeIdRef.current = null;
+    runtimeSequenceRef.current.clear();
+    surfaceSequenceRef.current.clear();
+    surfaceRef.current = null;
+    if (!enabled) {
+      requestVersionRef.current += 1;
+      setLogs("");
+      setState({ status: "idle", runtime: null, surface: null, error: null });
+    }
+  }, [enabled, path]);
+
+  useEffect(() => {
+    if (!enabled || !appPreview?.subscribeRuntime) return;
     return appPreview.subscribeRuntime((runtime) => {
       if (runtime.path !== path) return;
+      const generation = runtime.generation ?? 0;
+      const runtimeId = runtime.runtimeId ?? `generation:${generation}`;
+      const sequence = runtime.sequence ?? 0;
+      if (generation < runtimeGenerationRef.current) return;
+      if (sequence <= (runtimeSequenceRef.current.get(runtimeId) ?? -1)) return;
+      if (generation === runtimeGenerationRef.current && runtimeIdRef.current && runtimeIdRef.current !== runtimeId) return;
+      runtimeGenerationRef.current = generation;
+      runtimeIdRef.current = runtime.runtimeId ?? null;
+      runtimeSequenceRef.current.set(runtimeId, sequence);
       setLogs(runtime.logs ?? "");
       setState((current) => ({
         ...current,
@@ -101,12 +129,18 @@ export function useAppPreviewSession({
           : null,
       }));
     });
-  }, [appPreview, path]);
+  }, [appPreview, enabled, path]);
 
   useEffect(() => {
-    if (!appPreview?.subscribeSurface) return;
+    if (!enabled || !appPreview?.subscribeSurface) return;
     return appPreview.subscribeSurface((surface) => {
       if (surface.path !== path) return;
+      const generation = surface.generation ?? 0;
+      const sequence = surface.sequence ?? 0;
+      if (generation < runtimeGenerationRef.current) return;
+      if (runtimeIdRef.current && surface.runtimeId !== runtimeIdRef.current) return;
+      if (sequence <= (surfaceSequenceRef.current.get(surface.surfaceId) ?? -1)) return;
+      surfaceSequenceRef.current.set(surface.surfaceId, sequence);
       const currentSurfaceId = surfaceRef.current?.surfaceId;
       if (currentSurfaceId && currentSurfaceId !== surface.surfaceId) return;
       if (surface.status === "destroyed") {
@@ -131,10 +165,10 @@ export function useAppPreviewSession({
           : current.error,
       }));
     });
-  }, [appPreview, path]);
+  }, [appPreview, enabled, path]);
 
   useLayoutEffect(() => {
-    if (mode !== "preview") return;
+    if (!enabled || mode !== "preview") return;
     if (!appPreview?.start) {
       setState({
         status: "error",
@@ -210,6 +244,9 @@ export function useAppPreviewSession({
             : await appPreview.start(path);
         }
         if (disposed || requestVersion !== requestVersionRef.current) return;
+        runtimeGenerationRef.current = Math.max(runtimeGenerationRef.current, runtime.generation ?? 0);
+        runtimeIdRef.current = runtime.runtimeId ?? null;
+        if (runtime.runtimeId) runtimeSequenceRef.current.set(runtime.runtimeId, runtime.sequence ?? 0);
         surfaceRef.current = surface;
         setLogs(runtime.logs ?? "");
         setState({
@@ -223,12 +260,17 @@ export function useAppPreviewSession({
         scheduleBoundsSync();
       } catch (error) {
         if (disposed || requestVersion !== requestVersionRef.current) return;
+        const detail = error instanceof Error ? error.message : String(error);
+        if (/cancel/i.test(detail)) {
+          setState((current) => ({ ...current, status: "stopped", error: null }));
+          return;
+        }
         setState((current) => ({
           ...current,
           status: "error",
           error: {
             code: "start-failed",
-            detail: error instanceof Error ? error.message : String(error),
+            detail,
           },
         }));
         void refreshLogs();
@@ -254,7 +296,7 @@ export function useAppPreviewSession({
       if (activeAttachmentRef.current === attachmentId) activeAttachmentRef.current = null;
       detach();
     };
-  }, [activationVersion, appPreview, hostRef, mode, nativeSurface, path, refreshLogs]);
+  }, [activationVersion, appPreview, enabled, hostRef, mode, nativeSurface, path, refreshLogs]);
 
   return {
     state,
@@ -290,6 +332,13 @@ function normalizeRuntimeResult(
   result: AppPreviewResult | AppPreviewActivationResult,
 ): AppPreviewResult {
   return "runtime" in result ? result.runtime : result;
+}
+
+function sanitizePreviewTransportError(value: string): string {
+  return value
+    .replace(/Error invoking remote method[^:]*:\s*/gi, "")
+    .replace(/\b(?:ipc|rpc)[\w:-]*\b/gi, "preview service")
+    .slice(0, 1_000);
 }
 
 let attachmentSequence = 0;

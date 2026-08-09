@@ -71,6 +71,7 @@ export function createAppPreviewService({
       appId: runtimeResult.appId,
       appPath: runtimeResult.path,
       runtimeId: runtimeResult.runtimeId,
+      generation: runtimeResult.generation,
       url: runtimeResult.url,
       bounds: request.bounds,
       attachmentId: request.attachmentId,
