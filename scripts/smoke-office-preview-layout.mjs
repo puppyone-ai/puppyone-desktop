@@ -195,6 +195,8 @@ async function measureSpreadsheet() {
         canvas: getComputedStyle(preview).backgroundColor,
         formulaBarHeight: formulaBar.getBoundingClientRect().height,
         formulaValue: formulaBar.querySelector('.office-spreadsheet-formula-bar__value').textContent,
+        formulaValueFontSize: getComputedStyle(formulaBar.querySelector('.office-spreadsheet-formula-bar__value')).fontSize,
+        formulaValueFontWeight: getComputedStyle(formulaBar.querySelector('.office-spreadsheet-formula-bar__value')).fontWeight,
         textAlign: getComputedStyle(textCell).textAlign,
         defaultFontFamily: getComputedStyle(textCell).fontFamily,
         defaultFontSize: getComputedStyle(textCell).fontSize,
@@ -247,6 +249,14 @@ async function run() {
     assert(spreadsheet.canvas === "rgb(255, 255, 255)", `worksheet canvas is not white: ${spreadsheet.canvas}`);
     assertNear(spreadsheet.formulaBarHeight, 42, "worksheet formula bar height");
     assert(spreadsheet.formulaValue === "=IFERROR(B6/B5,0)", "worksheet formula bar lost the source formula");
+    assert(
+      spreadsheet.formulaValueFontSize === "12px",
+      `worksheet formula text does not use the product meta size: ${spreadsheet.formulaValueFontSize}`,
+    );
+    assert(
+      spreadsheet.formulaValueFontWeight === "400",
+      `worksheet formula text is heavier than product reading text: ${spreadsheet.formulaValueFontWeight}`,
+    );
     assert(spreadsheet.textAlign === "left", `text cells are not left aligned: ${spreadsheet.textAlign}`);
     assert(spreadsheet.numberAlign === "right", `number cells are not right aligned: ${spreadsheet.numberAlign}`);
     assert(spreadsheet.firstRowBackground === spreadsheet.secondRowBackground, "worksheet still uses zebra striping");

@@ -421,7 +421,6 @@
   margin: 0;
   border: 0;
   color: inherit;
-  font: inherit;
 }
 
 .office-spreadsheet-formula-bar__name,
@@ -450,9 +449,12 @@
   align-items: center;
   padding: 0 14px;
   overflow: hidden;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 14px;
-  font-weight: 600;
+  font-family: var(
+    --po-font-mono,
+    "SFMono-Regular", Consolas, "Liberation Mono", monospace
+  );
+  font-size: var(--po-text-size-meta, 12px);
+  font-weight: var(--po-text-weight-regular, 400);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

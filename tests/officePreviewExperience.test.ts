@@ -113,6 +113,11 @@ describe("lightweight Office preview experience", () => {
     expect(officePreviewCss).toContain('.office-spreadsheet-grid td[data-cell-kind="number"]');
     expect(officePreviewCss).toContain('.office-spreadsheet-grid td[data-selected="true"]');
     expect(officePreviewCss).toContain(".office-spreadsheet-formula-bar");
+    expect(officePreviewCss).toContain("font-size: var(--po-text-size-meta, 12px)");
+    expect(officePreviewCss).toContain("font-weight: var(--po-text-weight-regular, 400)");
+    expect(officePreviewCss).not.toMatch(
+      /\.office-spreadsheet-formula-bar output\s*\{[^}]*font:\s*inherit/s,
+    );
     expect(officePreviewCss).toContain("--office-sheet-default-font-family");
     expect(officePreviewCss).toContain("font-size: var(--office-sheet-default-font-size)");
     expect(officeViewerSource).toContain("createSpreadsheetPresentationCssStyle(result)");
