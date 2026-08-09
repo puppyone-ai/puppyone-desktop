@@ -23,10 +23,11 @@ const viewerArchitecture = readFileSync(
 );
 
 describe("lightweight Office preview experience", () => {
-  it("keeps one clearly read-only shell without Agent or Office editing controls", () => {
-    expect(officeViewerSource).toContain("office-preview__header");
-    expect(officeViewerSource).toContain("editor.office.preview");
-    expect(officeViewerSource).toContain("editor.openDefaultApp");
+  it("keeps the successful preview headerless and read-only", () => {
+    expect(officeViewerSource).not.toContain("office-preview__header");
+    expect(officeViewerSource).not.toContain("OfficePreviewHeader");
+    expect(officeViewerSource).not.toContain("FileGlyphIcon");
+    expect(officeViewerSource).toContain("office-preview__floating-controls");
     expect(officeViewerSource).not.toMatch(/Ask Agent|continue editing|继续修改/i);
     expect(officeViewerSource).not.toContain("OfficeEditorViewer");
     expect(viewerArchitecture).toContain("lightweight, read-only surface");
@@ -42,6 +43,9 @@ describe("lightweight Office preview experience", () => {
     expect(wordPreviewSource).toContain("sanitizeDocxDom(fragment)");
     expect(wordPreviewSource).toContain("resolveWordPreviewScale");
     expect(officePreviewCss).toContain("office-document-preview--docx");
+    expect(officePreviewCss).toMatch(
+      /\.office-document-preview--docx\s*\{[^}]*background:\s*var\(--po-editor-bg\)/s,
+    );
   });
 
   it("reserves only an explicit host-owned Office editor action", () => {

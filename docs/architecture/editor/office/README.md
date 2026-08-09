@@ -48,7 +48,7 @@ An Office editor is a separate product capability. Shared UI reserves only the
 opaque `OfficeEditorAction` / `OfficeEditorActionResolver` boundary:
 
 ```text
-Office preview header
+content-local floating action
         |
         v
 explicit “Edit with …” action supplied by the App Host

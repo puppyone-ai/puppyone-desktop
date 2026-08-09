@@ -474,8 +474,10 @@ source-code extensions)
 **Built-in Office product boundary**
 
 - `office-preview` is deliberately a lightweight, read-only surface. Its
-  shared shell may identify the file, state that it is a preview, navigate
-  pages/sheets/slides, and open the file in the default desktop application.
+  successful state is headerless because the application shell already owns
+  file identity and global actions. It may navigate pages/sheets/slides and
+  expose compact, content-local controls such as Word zoom. External-open is a
+  fallback in error or unsupported states rather than duplicate toolbar chrome.
 - It does not expose editing, Agent refinement, or an imitation Office ribbon.
   Full Office editing belongs to an optional Viewer/Editor Pack installed
   through the plugin marketplace, outside the built-in preview runtime.

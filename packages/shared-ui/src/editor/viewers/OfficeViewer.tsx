@@ -3,7 +3,6 @@
 import {
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
   Maximize2,
   Minus,
   PencilLine,
@@ -13,7 +12,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { PptxViewer, SlideHandle } from "@aiden0z/pptx-renderer";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
-import { FileGlyphIcon } from "../../file/fileIcons";
 import { validateOfficePackageInWorker } from "../security/officePackageValidationClient";
 import {
   preflightOoxmlPackage,
@@ -116,7 +114,6 @@ type OfficeViewerProps = Pick<
   | "convertOfficeDocumentToDocx"
   | "markdownLinkGraph"
   | "officeEditorActions"
-  | "fileIconTheme"
 >;
 
 export function OfficeViewer({
@@ -129,7 +126,6 @@ export function OfficeViewer({
   convertOfficeDocumentToDocx,
   markdownLinkGraph,
   officeEditorActions = [],
-  fileIconTheme,
 }: OfficeViewerProps) {
   const { t } = useLocalization();
   const [state, setState] = useState<OfficeState>({ status: "idle" });
@@ -256,42 +252,27 @@ export function OfficeViewer({
         )
       )}
     >
-      <OfficePreviewHeader
-        documentName={document.name}
-        documentPath={document.path}
-        extension={extension}
-        fileIconTheme={fileIconTheme}
-        openExternalFile={openExternalFile}
-        officeEditorActions={officeEditorActions}
-        wordZoomControls={state.status === "ready" && state.result.kind === "word" ? {
-          scale: wordResolvedScale,
-          isFit: wordZoom === "fit",
-          onDecrease: () => setWordZoom(stepWordPreviewScale(wordResolvedScale, -1)),
-          onIncrease: () => setWordZoom(stepWordPreviewScale(wordResolvedScale, 1)),
-          onFit: () => setWordZoom("fit"),
-        } : null}
-      />
       <div className="office-preview__body">
         {previewBody}
+        <OfficePreviewControls
+          officeEditorActions={officeEditorActions}
+          wordZoomControls={state.status === "ready" && state.result.kind === "word" ? {
+            scale: wordResolvedScale,
+            isFit: wordZoom === "fit",
+            onDecrease: () => setWordZoom(stepWordPreviewScale(wordResolvedScale, -1)),
+            onIncrease: () => setWordZoom(stepWordPreviewScale(wordResolvedScale, 1)),
+            onFit: () => setWordZoom("fit"),
+          } : null}
+        />
       </div>
     </div>
   );
 }
 
-function OfficePreviewHeader({
-  documentName,
-  documentPath,
-  extension,
-  fileIconTheme,
-  openExternalFile,
+function OfficePreviewControls({
   officeEditorActions,
   wordZoomControls,
 }: {
-  documentName: string;
-  documentPath: string;
-  extension: string;
-  fileIconTheme?: OfficeViewerProps["fileIconTheme"];
-  openExternalFile?: (path: string) => Promise<void>;
   officeEditorActions: NonNullable<OfficeViewerProps["officeEditorActions"]>;
   wordZoomControls: {
     scale: number;
@@ -302,15 +283,7 @@ function OfficePreviewHeader({
   } | null;
 }) {
   const { t } = useLocalization();
-  const [externalOpenError, setExternalOpenError] = useState<string | null>(null);
   const [editorActionError, setEditorActionError] = useState<string | null>(null);
-  const openExternally = () => {
-    if (!openExternalFile) return;
-    setExternalOpenError(null);
-    void Promise.resolve().then(() => openExternalFile(documentPath)).catch((error) => {
-      setExternalOpenError(error instanceof Error ? error.message : String(error));
-    });
-  };
   const activateEditorAction = (
     action: NonNullable<OfficeViewerProps["officeEditorActions"]>[number],
   ) => {
@@ -320,22 +293,16 @@ function OfficePreviewHeader({
     });
   };
 
+  if (!wordZoomControls && officeEditorActions.length === 0 && !editorActionError) return null;
+
   return (
-    <header className="office-preview__header">
-      <div className="office-preview__identity">
-        <FileGlyphIcon name={documentName} size={16} theme={fileIconTheme} />
-        <strong dir="auto" title={documentName}>{documentName}</strong>
-        <span className="office-preview__format">{extension.toUpperCase()}</span>
-        <span className="office-preview__mode">{t("editor.office.preview")}</span>
-      </div>
-      <div className="office-preview__header-actions">
-        {(externalOpenError || editorActionError) && (
-          <span className="office-preview__header-error" role="alert" dir="auto">
-            {editorActionError ?? t("editor.office.openDesktopFailed", {
-              detail: bidiIsolate(externalOpenError ?? ""),
-            })}
-          </span>
-        )}
+    <div className="office-preview__floating-region">
+      {editorActionError && (
+        <span className="office-preview__floating-error" role="alert" dir="auto">
+          {editorActionError}
+        </span>
+      )}
+      <div className="office-preview__floating-controls">
         {wordZoomControls && (
           <div
             className="office-preview__zoom-controls"
@@ -389,19 +356,8 @@ function OfficePreviewHeader({
             <span>{action.label}</span>
           </button>
         ))}
-        {openExternalFile && (
-          <button
-            type="button"
-            className="office-preview__toolbar-button"
-            aria-label={t("editor.openDefaultApp")}
-            title={t("editor.openDefaultApp")}
-            onClick={openExternally}
-          >
-            <ExternalLink size={14} strokeWidth={2} />
-          </button>
-        )}
       </div>
-    </header>
+    </div>
   );
 }
 

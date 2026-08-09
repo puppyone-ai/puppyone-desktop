@@ -52,6 +52,7 @@
 }
 
 .office-preview {
+  position: relative;
   display: flex;
   flex: 1;
   width: 100%;
@@ -62,77 +63,6 @@
   overflow: hidden;
   background: var(--po-editor-bg);
   color: var(--po-text);
-}
-
-.office-preview__header {
-  box-sizing: border-box;
-  display: flex;
-  flex: 0 0 auto;
-  min-height: 42px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 5px 8px 5px 12px;
-  border-bottom: 1px solid var(--po-divider);
-  background: color-mix(in srgb, var(--po-panel-raised) 92%, var(--po-editor-bg));
-}
-
-.office-preview__identity,
-.office-preview__header-actions {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-}
-
-.office-preview__identity {
-  gap: 7px;
-}
-
-.office-preview__identity strong {
-  max-width: min(320px, 36vw);
-  overflow: hidden;
-  color: var(--po-text);
-  font-size: 12px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.office-preview__format,
-.office-preview__mode {
-  flex: 0 0 auto;
-  color: var(--po-text-subtle);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.035em;
-  line-height: 18px;
-}
-
-.office-preview__format {
-  padding: 0 6px;
-  border: 1px solid var(--po-border-subtle);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--po-control) 72%, transparent);
-}
-
-.office-preview__mode::before {
-  margin-right: 7px;
-  color: var(--po-divider);
-  content: "·";
-}
-
-.office-preview__header-actions {
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.office-preview__header-error {
-  max-width: min(360px, 38vw);
-  overflow: hidden;
-  color: var(--po-danger);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .office-preview__toolbar-button {
@@ -168,8 +98,6 @@
   display: inline-flex;
   align-items: center;
   gap: 1px;
-  padding-right: 5px;
-  border-right: 1px solid var(--po-divider);
 }
 
 .office-preview__zoom-value {
@@ -206,6 +134,7 @@
 }
 
 .office-preview__body {
+  position: relative;
   box-sizing: border-box;
   display: flex;
   flex: 1;
@@ -214,6 +143,46 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.office-preview__floating-region {
+  position: absolute;
+  z-index: 5;
+  top: 12px;
+  right: 18px;
+  display: grid;
+  max-width: calc(100% - 36px);
+  justify-items: end;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.office-preview__floating-controls {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 3px;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--po-border) 72%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel-raised) 94%, transparent);
+  box-shadow: var(--po-shadow-sm);
+  pointer-events: auto;
+}
+
+.office-preview__floating-error {
+  box-sizing: border-box;
+  max-width: min(360px, 100%);
+  padding: 6px 9px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--po-danger) 32%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--po-panel-raised) 96%, transparent);
+  color: var(--po-danger);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: auto;
 }
 
 .office-document-preview,
@@ -241,7 +210,7 @@
 .office-document-preview--docx {
   align-items: stretch;
   padding: 28px 28px 64px;
-  background: color-mix(in srgb, var(--po-inset) 72%, var(--po-editor-bg));
+  background: var(--po-editor-bg);
 }
 
 .office-docx-host {
@@ -791,10 +760,6 @@
 }
 
 @media (max-width: 720px) {
-  .office-preview__mode {
-    display: none;
-  }
-
   .office-pptx-thumbnail-rail {
     width: 112px;
     min-width: 96px;
