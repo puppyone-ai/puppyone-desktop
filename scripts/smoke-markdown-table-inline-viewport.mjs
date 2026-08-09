@@ -173,8 +173,8 @@ async function measureScenario(viewportWidth, direction) {
         bodyScrollWidth: document.body.scrollWidth,
         viewportScrollWidth: viewport.scrollWidth,
         viewportClientWidth: viewport.clientWidth,
-        headingRuleColor: getComputedStyle(heading).borderBottomColor,
         headingRuleWidth: getComputedStyle(heading).borderBottomWidth,
+        headingPaddingBottom: getComputedStyle(heading).paddingBottom,
         dividerColor: getComputedStyle(divider, "::before").backgroundColor,
         dividerWidth: getComputedStyle(divider, "::before").height,
         tableBorderColor: getComputedStyle(table).borderTopColor,
@@ -236,17 +236,19 @@ async function runSmoke() {
 
       assert(initial.viewportScrollWidth > initial.viewportClientWidth, `${label}: fixture is not wide`);
       assert(
-        initial.headingRuleColor === initial.dividerColor
-          && initial.headingRuleColor === initial.tableBorderColor
-          && initial.headingRuleColor === initial.cellBorderColor,
+        initial.dividerColor === initial.tableBorderColor
+          && initial.dividerColor === initial.cellBorderColor,
         `${label}: Markdown rule colors diverged`,
       );
       assert(
-        initial.headingRuleWidth === "1px"
-          && initial.dividerWidth === "1px"
+        initial.dividerWidth === "1px"
           && initial.tableBorderWidth === "1px"
           && initial.cellBorderWidth === "1px",
         `${label}: Markdown rule widths diverged`,
+      );
+      assert(
+        initial.headingRuleWidth === "0px" && initial.headingPaddingBottom === "0px",
+        `${label}: Markdown heading retained divider spacing`,
       );
       assertNear(initial.leadingInset, expectedGutter - 64, `${label}: scroll-away inset`);
       assertNear(

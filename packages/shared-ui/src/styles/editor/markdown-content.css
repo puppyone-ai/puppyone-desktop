@@ -41,14 +41,10 @@
 }
 
 .markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-1 {
-  padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--po-md-rule-color);
   font-size: var(--po-md-h1-size);
 }
 
 .markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-2 {
-  padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--po-md-rule-color);
   font-size: var(--po-md-h2-size);
 }
 
@@ -113,14 +109,10 @@
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface h1 {
-  padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--po-md-rule-color);
   font-size: var(--po-md-h1-size);
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface h2 {
-  padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--po-md-rule-color);
   font-size: var(--po-md-h2-size);
 }
 

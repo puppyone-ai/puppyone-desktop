@@ -114,6 +114,14 @@ describe("Markdown HTML media layout", () => {
       markdownContentCss,
       ".markdown-codemirror-editor .cm-md-html-rendered-surface h1",
     );
+    const nativeHeading2Rule = readCssRule(
+      markdownContentCss,
+      '.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-2',
+    );
+    const htmlHeading2Rule = readCssRule(
+      markdownContentCss,
+      ".markdown-codemirror-editor .cm-md-html-rendered-surface h2",
+    );
     const htmlSurfaceRule = readCssRule(
       markdownContentCss,
       ".markdown-codemirror-editor .cm-md-html-rendered-surface",
@@ -134,8 +142,17 @@ describe("Markdown HTML media layout", () => {
     );
     expect(nativeHeadingRule).toContain("font-size: var(--po-md-h1-size);");
     expect(htmlHeadingRule).toContain("font-size: var(--po-md-h1-size);");
-    expect(nativeHeadingRule).toContain("border-bottom: 1px solid var(--po-md-rule-color);");
-    expect(htmlHeadingRule).toContain("border-bottom: 1px solid var(--po-md-rule-color);");
+    expect(nativeHeading2Rule).toContain("font-size: var(--po-md-h2-size);");
+    expect(htmlHeading2Rule).toContain("font-size: var(--po-md-h2-size);");
+    for (const headingRule of [
+      nativeHeadingRule,
+      nativeHeading2Rule,
+      htmlHeadingRule,
+      htmlHeading2Rule,
+    ]) {
+      expect(headingRule).not.toContain("border-bottom");
+      expect(headingRule).not.toContain("padding-bottom");
+    }
     expect(htmlSurfaceRule).toContain("white-space: normal;");
     expect(htmlPreRule).toContain("white-space: pre-wrap;");
     expect(widgetRule).toContain("padding: 0;");
@@ -263,7 +280,7 @@ describe("Markdown rich-block boundary affordance", () => {
 });
 
 describe("Markdown table affordance layout", () => {
-  it("uses one normal-state rule color for headings, dividers, and table lines", () => {
+  it("uses one normal-state rule color for dividers and table lines", () => {
     const nativeDividerRule = readCssRule(
       markdownEditorCss,
       ".markdown-codemirror-editor .cm-md-hr-widget::before",
