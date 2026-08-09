@@ -231,6 +231,7 @@
   "office.zoomOut": "縮小",
   "office.emptyPresentation": "空のプレゼンテーション",
   "office.firstExtractedLines": "抽出したテキストの先頭 {count, number} 行を表示しています。",
+  "office.formulaBar": "数式バー",
   "office.hiddenColumnsOmitted": "{count, plural, other {非表示の列 # 個を省略しました。}}",
   "office.hiddenRowsOmitted": "{count, plural, other {非表示の行 # 個を省略しました。}}",
   "office.hiddenSheetsOmitted": "{count, plural, other {非表示のシート # 枚を省略しました。}}",

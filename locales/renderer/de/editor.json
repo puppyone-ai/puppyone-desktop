@@ -231,6 +231,7 @@
   "office.zoomOut": "Verkleinern",
   "office.emptyPresentation": "Leere Präsentation",
   "office.firstExtractedLines": "Die ersten {count, number} extrahierten Textzeilen werden angezeigt.",
+  "office.formulaBar": "Formelleiste",
   "office.hiddenColumnsOmitted": "{count, plural, one {# ausgeblendete Spalte wurde ausgelassen.} other {# ausgeblendete Spalten wurden ausgelassen.}}",
   "office.hiddenRowsOmitted": "{count, plural, one {# ausgeblendete Zeile wurde ausgelassen.} other {# ausgeblendete Zeilen wurden ausgelassen.}}",
   "office.hiddenSheetsOmitted": "{count, plural, one {# ausgeblendetes Blatt wurde ausgelassen.} other {# ausgeblendete Blätter wurden ausgelassen.}}",

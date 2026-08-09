@@ -231,6 +231,7 @@
   "office.zoomOut": "Alejar",
   "office.emptyPresentation": "Presentación vacía",
   "office.firstExtractedLines": "Mostrando las primeras {count, number} líneas de texto extraídas.",
+  "office.formulaBar": "Barra de fórmulas",
   "office.hiddenColumnsOmitted": "{count, plural, one {Se omitió # columna oculta.} other {Se omitieron # columnas ocultas.}}",
   "office.hiddenRowsOmitted": "{count, plural, one {Se omitió # fila oculta.} other {Se omitieron # filas ocultas.}}",
   "office.hiddenSheetsOmitted": "{count, plural, one {Se omitió # hoja oculta.} other {Se omitieron # hojas ocultas.}}",

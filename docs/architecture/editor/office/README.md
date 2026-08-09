@@ -44,12 +44,14 @@ does not grant editing authority.
 
 Spreadsheet preview keeps the application shell themed while presenting the
 worksheet itself on a stable light canvas, matching the familiar workbook
-metaphor without pretending to reproduce Excel's style engine. The worker
-preserves formatted display values, native cell kinds for alignment, column
-widths, merges, physical row/column labels, and sheet order. The viewport is
-keyboard-scrollable and exposes virtualized row/column counts to assistive
-technology. Original fills, fonts, borders, charts, images, and pivots remain
-an explicit lightweight-preview limit.
+metaphor without pretending to be an editor. The worker preserves formatted
+display values, formulas, native cell kinds, column widths, row heights,
+merges, physical row/column labels, sheet order, freeze panes, and a bounded
+OOXML style subset: solid fills, fonts, common borders, alignment, and text
+wrapping. The read-only surface adds a formula bar and a keyboard-navigable
+selection model without granting mutation authority. Conditional formatting,
+gradients, charts, images, shapes, and pivots remain explicit lightweight-
+preview limits.
 
 Presentation preview uses one application-colored stage and one thumbnail
 rail around the slide's own visual surface. It does not add an imitation
@@ -64,8 +66,9 @@ The Office shell has an Electron computed-layout regression:
 npm run smoke:office-preview-layout
 ```
 
-It verifies the worksheet canvas, semantic alignment, row height, sticky row
-and column headers, bottom sheet tabs, presentation canvas unification,
+It verifies the worksheet canvas, formula bar, source fill, selection state,
+semantic alignment, row height, sticky row and column headers, bottom sheet
+tabs, presentation canvas unification,
 responsive thumbnail-rail widths, hidden stage overflow, and navigation
 placement using Chromium's computed layout rather than source-text assertions.
 

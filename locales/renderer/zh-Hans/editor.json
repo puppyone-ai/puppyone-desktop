@@ -231,6 +231,7 @@
   "office.zoomOut": "缩小",
   "office.emptyPresentation": "空演示文稿",
   "office.firstExtractedLines": "显示提取文本的前 {count, number} 行。",
+  "office.formulaBar": "公式栏",
   "office.hiddenColumnsOmitted": "{count, plural, other {已省略 # 个隐藏列。}}",
   "office.hiddenRowsOmitted": "{count, plural, other {已省略 # 个隐藏行。}}",
   "office.hiddenSheetsOmitted": "{count, plural, other {已省略 # 个隐藏工作表。}}",

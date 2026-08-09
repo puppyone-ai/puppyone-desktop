@@ -431,7 +431,11 @@ source-code extensions)
 
 - Bar: SheetJS grid with sheet tabs, formatted values, formulas/cached
   values, merged cells (`!merges`), real column widths (`!cols`), and
-  virtualized rows. Parsing runs in a disposable Web Worker; aborting a
+  variable-height virtualized rows. Validated OOXML packages additionally
+  expose a bounded presentation layer for solid fills, fonts, common borders,
+  alignment, wrapping, freeze panes, and the saved selection. The renderer
+  supplies a read-only formula bar and keyboard cell navigation. Parsing runs
+  in a disposable Web Worker; aborting a
   selection terminates that worker. A metadata pass excludes hidden
   sheets and chooses at most 12 visible sheets before the content pass.
   Each selected sheet is capped at the first 5,000 source rows and 36
@@ -442,16 +446,19 @@ source-code extensions)
   executed or recalculated, OOXML packages pass the shared ZIP preflight,
   declared ranges must remain within Excel's row/column limits, and the
   input buffer is transferred to rather than copied into the worker.
-- Accepted fidelity limits: colors, borders, fonts, charts, images,
-  pivots, and macros are not rendered. Formula cells use cached values
-  when present and show the formula text when no cached value exists.
-  Hidden rows, columns, and sheets are omitted rather than revealed.
+- Accepted fidelity limits: conditional formatting, gradients, charts,
+  images, shapes, pivots, and macros are not rendered. Binary and OpenDocument
+  spreadsheet families receive the safe value/grid path but not the complete
+  OOXML style path. Formula cells use cached values when present and show the
+  formula text when no cached value exists. Hidden rows, columns, and sheets
+  are omitted rather than revealed.
 - Status: met for the lightweight grid contract. Tests cover supported
   workbook families, formulas, sheet/row/column budgets, hidden content,
   merged cells crossing virtual-window boundaries, and cancellation. The
   visual surface uses a stable light worksheet canvas, native text/number/date
-  alignment, neutral row/column chrome, bottom sheet tabs, and no decorative
-  zebra striping. Product theming remains in the surrounding shell.
+  alignment, source workbook styling, formula/selection chrome, neutral
+  row/column headers, bottom sheet tabs, and no decorative zebra striping.
+  Product theming remains in the surrounding shell.
 
 **PowerPoint — `.pptx`, `.ppsx`**
 
@@ -683,9 +690,11 @@ and DOM gates above.
   TOC/field codes, SmartArt, floating text boxes, and exact Word reflow
   remain approximate. Password-protected/encrypted Office files are not
   previewed.
-- The spreadsheet grid does not render cell fonts/colors/borders, charts,
-  images, pivots, or macros. It never executes VBA or recalculates formulas;
-  cached formula values are used when present. Hidden content is omitted.
+- The OOXML spreadsheet grid renders a bounded subset of cell fonts, colors,
+  borders, alignment, and wrapping. It does not render conditional formatting,
+  gradients, charts, images, shapes, pivots, or macros. It never executes VBA
+  or recalculates formulas; cached formula values are used when present.
+  Hidden content is omitted.
 - Only the first 12 visible sheets, first 5,000 source rows per selected
   sheet, and first 36 visible columns are previewed. The UI states every
   truncation and hidden-content omission.

@@ -231,6 +231,7 @@
   "office.zoomOut": "Zoom out",
   "office.emptyPresentation": "Empty presentation",
   "office.firstExtractedLines": "Showing the first {count, number} extracted text lines.",
+  "office.formulaBar": "Formula bar",
   "office.hiddenColumnsOmitted": "{count, plural, one {# hidden column omitted.} other {# hidden columns omitted.}}",
   "office.hiddenRowsOmitted": "{count, plural, one {# hidden row omitted.} other {# hidden rows omitted.}}",
   "office.hiddenSheetsOmitted": "{count, plural, one {# hidden sheet omitted.} other {# hidden sheets omitted.}}",

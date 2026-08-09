@@ -93,6 +93,9 @@ describe("lightweight Office preview experience", () => {
 
     expect(officeViewerSource).toContain("<thead>");
     expect(officeViewerSource).toContain("spreadsheetColumnLabel");
+    expect(officeViewerSource).toContain("office-spreadsheet-formula-bar");
+    expect(officeViewerSource).toContain("getSpreadsheetNavigationTarget");
+    expect(officeViewerSource).toContain("createSpreadsheetCellCssStyle");
     expect(officeViewerSource).toContain('data-cell-kind={cell.kind}');
     expect(officeViewerSource).toContain("aria-rowcount={selectedSheet.rows.length + 1}");
     expect(gridIndex).toBeGreaterThan(-1);
@@ -108,6 +111,8 @@ describe("lightweight Office preview experience", () => {
       /\.office-spreadsheet-preview\s*\{[^}]*--office-sheet-canvas:\s*#fff/s,
     );
     expect(officePreviewCss).toContain('.office-spreadsheet-grid td[data-cell-kind="number"]');
+    expect(officePreviewCss).toContain('.office-spreadsheet-grid td[data-selected="true"]');
+    expect(officePreviewCss).toContain(".office-spreadsheet-formula-bar");
     expect(officePreviewCss).not.toContain(".office-spreadsheet-grid tr:nth-child(even) td");
   });
 });

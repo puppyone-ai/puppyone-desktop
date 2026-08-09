@@ -6,17 +6,24 @@ import {
   MAX_SPREADSHEET_MATERIALIZED_CELLS,
   MAX_SPREADSHEET_ROWS,
   MAX_SPREADSHEET_SHEETS,
+  MAX_SPREADSHEET_STYLES,
   MAX_SPREADSHEET_STRING_PAYLOAD_BYTES,
   type SpreadsheetColumn,
   type SpreadsheetArchiveKind,
   type SpreadsheetBudgetTruncationReason,
   type SpreadsheetBudgetUsage,
   type SpreadsheetCellKind,
+  type SpreadsheetCellStyle,
   type SpreadsheetMerge,
   type SpreadsheetPreviewResult,
   type SpreadsheetSheet,
   type SpreadsheetSourceRow,
 } from "./spreadsheetPreview";
+import {
+  createSpreadsheetOoxmlPresentationReader,
+  type SpreadsheetOoxmlPresentationReader,
+  type SpreadsheetOoxmlSheetPresentation,
+} from "./spreadsheetOoxmlPresentation";
 
 const MAX_EXCEL_ROWS = 1_048_576;
 const MAX_EXCEL_COLUMNS = 16_384;
@@ -27,8 +34,8 @@ const SPREADSHEET_PACKAGE_DECOMPRESSION_BUDGET = Object.freeze({
 });
 
 type XlsxModule = typeof import("xlsx");
-type SheetMetadata = { name?: string; Hidden?: number };
-type RowMetadata = { hidden?: boolean };
+type SheetMetadata = { name?: string; Hidden?: number; id?: string };
+type RowMetadata = { hidden?: boolean; hpt?: number; hpx?: number };
 type ColumnMetadata = { wpx?: number; wch?: number; hidden?: boolean };
 type CellRange = { s: { r: number; c: number }; e: { r: number; c: number } };
 type BudgetSnapshot = { materializedCells: number; stringPayloadBytes: number };
@@ -109,6 +116,23 @@ class SpreadsheetNormalizationBudget {
   }
 }
 
+class SpreadsheetStyleRegistry {
+  private readonly keys = new Map<string, number>([["{}", 0]]);
+  readonly styles: SpreadsheetCellStyle[] = [{}];
+
+  intern(style: SpreadsheetCellStyle | undefined): number {
+    if (!style || Object.keys(style).length === 0) return 0;
+    const key = JSON.stringify(style);
+    const existing = this.keys.get(key);
+    if (existing !== undefined) return existing;
+    if (this.styles.length >= MAX_SPREADSHEET_STYLES) return 0;
+    const index = this.styles.length;
+    this.styles.push(style);
+    this.keys.set(key, index);
+    return index;
+  }
+}
+
 /** Parse and normalize a workbook inside the spreadsheet worker. */
 export async function parseSpreadsheetPreview(
   arrayBuffer: ArrayBuffer,
@@ -137,11 +161,13 @@ export async function parseSpreadsheetPreview(
   const visibleSheetNames = metadataWorkbook.SheetNames.filter((name) => !hiddenSheetNames.has(name));
   const selectedSheetNames = visibleSheetNames.slice(0, MAX_SPREADSHEET_SHEETS);
   const budget = new SpreadsheetNormalizationBudget();
+  const styleRegistry = new SpreadsheetStyleRegistry();
 
   if (selectedSheetNames.length === 0) {
     return {
       kind: "spreadsheet",
       sheets: [],
+      styles: styleRegistry.styles,
       totalVisibleSheets: visibleSheetNames.length,
       hiddenSheetCount: hiddenSheetNames.size,
       truncatedSheetCount: 0,
@@ -171,12 +197,29 @@ export async function parseSpreadsheetPreview(
   });
 
   const sheets: SpreadsheetSheet[] = [];
+  const presentationReader = archiveKind === "ooxml"
+    ? await createSpreadsheetOoxmlPresentationReader(
+      arrayBuffer,
+      ((workbook.Workbook?.Sheets ?? []) as SheetMetadata[])
+        .filter((sheet): sheet is SheetMetadata & { id: string; name: string } => (
+          typeof sheet.id === "string" && typeof sheet.name === "string"
+        ))
+        .map((sheet) => ({ id: sheet.id, name: sheet.name })),
+    )
+    : null;
   for (const sheetName of selectedSheetNames) {
     const sheetBudgetStart = budget.snapshot();
     const sheetReasonStart = budget.truncationReasonCount;
     if (!budget.tryConsume(0, utf16PayloadBytes(sheetName))) break;
 
-    const normalized = normalizeSpreadsheetSheet(XLSX, sheetName, workbook.Sheets[sheetName], budget);
+    const normalized = await normalizeSpreadsheetSheet(
+      XLSX,
+      sheetName,
+      workbook.Sheets[sheetName],
+      budget,
+      styleRegistry,
+      presentationReader,
+    );
     sheets.push({
       ...normalized.sheet,
       budget: budget.createUsage({
@@ -191,6 +234,7 @@ export async function parseSpreadsheetPreview(
   return {
     kind: "spreadsheet",
     sheets,
+    styles: styleRegistry.styles,
     totalVisibleSheets: visibleSheetNames.length,
     hiddenSheetCount: hiddenSheetNames.size,
     truncatedSheetCount: Math.max(0, visibleSheetNames.length - sheets.length),
@@ -220,16 +264,25 @@ async function validateSpreadsheetArchive(
   });
 }
 
-function normalizeSpreadsheetSheet(
+async function normalizeSpreadsheetSheet(
   XLSX: XlsxModule,
   sheetName: string,
   worksheet: WorkSheet | undefined,
   budget: SpreadsheetNormalizationBudget,
-): NormalizedSheet {
-  const parsedRange = decodeWorksheetRange(XLSX, worksheet?.["!ref"]);
-  const fullRange = decodeWorksheetRange(
-    XLSX,
-    (worksheet as (WorkSheet & { "!fullref"?: string }) | undefined)?.["!fullref"] ?? worksheet?.["!ref"],
+  styleRegistry: SpreadsheetStyleRegistry,
+  presentationReader: SpreadsheetOoxmlPresentationReader | null,
+): Promise<NormalizedSheet> {
+  const mergeRanges = (worksheet?.["!merges"] ?? []) as CellRange[];
+  const parsedRange = expandWorksheetRange(
+    decodeWorksheetRange(XLSX, worksheet?.["!ref"]),
+    mergeRanges,
+  );
+  const fullRange = expandWorksheetRange(
+    decodeWorksheetRange(
+      XLSX,
+      (worksheet as (WorkSheet & { "!fullref"?: string }) | undefined)?.["!fullref"] ?? worksheet?.["!ref"],
+    ),
+    mergeRanges,
   );
 
   if (!fullRange) {
@@ -245,6 +298,10 @@ function normalizeSpreadsheetSheet(
         totalVisibleColumns: 0,
         hiddenRowCount: 0,
         hiddenColumnCount: 0,
+        showGridLines: true,
+        frozenRows: 0,
+        frozenColumns: 0,
+        initialSelection: null,
         truncatedRows: false,
         truncatedColumns: false,
       },
@@ -264,15 +321,32 @@ function normalizeSpreadsheetSheet(
   const allVisibleColumnIndices = createVisibleColumnIndices(fullRange, columnMetadata);
   const visibleColumnIndices = allVisibleColumnIndices.slice(0, MAX_SPREADSHEET_COLUMNS);
   const columns = createSpreadsheetColumns(visibleColumnIndices, columnMetadata);
-  const normalizedRows = createSpreadsheetRows(worksheet, rowIndices, visibleColumnIndices, budget);
+  const presentation = await presentationReader?.readSheet(
+    sheetName,
+    rowIndices,
+    visibleColumnIndices,
+  ) ?? null;
+  const normalizedRows = createSpreadsheetRows(
+    worksheet,
+    rowIndices,
+    visibleColumnIndices,
+    rowMetadata,
+    budget,
+    styleRegistry,
+    presentation,
+    presentationReader?.styles ?? [],
+  );
   const normalizedMerges = normalizedRows.truncatedByBudget
     ? { merges: [], truncatedByBudget: false }
     : createSpreadsheetMerges(
       worksheet,
-      (worksheet?.["!merges"] ?? []) as CellRange[],
+      mergeRanges,
       normalizedRows.rowIndices,
       visibleColumnIndices,
       budget,
+      styleRegistry,
+      presentation,
+      presentationReader?.styles ?? [],
     );
 
   return {
@@ -287,6 +361,10 @@ function normalizeSpreadsheetSheet(
       totalVisibleColumns,
       hiddenRowCount,
       hiddenColumnCount,
+      showGridLines: presentation?.showGridLines ?? true,
+      frozenRows: countIndicesBefore(rowIndices, presentation?.frozenRows ?? 0),
+      frozenColumns: countIndicesBefore(visibleColumnIndices, presentation?.frozenColumns ?? 0),
+      initialSelection: decodeSpreadsheetCellReference(presentation?.activeCell),
       truncatedRows: totalVisibleRows > normalizedRows.rows.length,
       truncatedColumns: totalVisibleColumns > columns.length,
     },
@@ -318,6 +396,20 @@ function decodeWorksheetRange(XLSX: XlsxModule, reference: string | undefined): 
     throw new Error(`Spreadsheet range is outside Excel limits: ${reference}`);
   }
   return range;
+}
+
+function expandWorksheetRange(range: CellRange | null, merges: readonly CellRange[]): CellRange | null {
+  if (!range && merges.length === 0) return null;
+  const expanded: CellRange = range
+    ? { s: { ...range.s }, e: { ...range.e } }
+    : { s: { ...merges[0].s }, e: { ...merges[0].e } };
+  for (const merge of merges) {
+    expanded.s.r = Math.min(expanded.s.r, merge.s.r);
+    expanded.s.c = Math.min(expanded.s.c, merge.s.c);
+    expanded.e.r = Math.max(expanded.e.r, merge.e.r);
+    expanded.e.c = Math.max(expanded.e.c, merge.e.c);
+  }
+  return expanded;
 }
 
 function createVisibleRowIndices(range: CellRange | null, metadata: RowMetadata[]): number[] {
@@ -366,7 +458,11 @@ function createSpreadsheetRows(
   worksheet: WorkSheet | undefined,
   rowIndices: number[],
   columnIndices: number[],
+  rowMetadata: RowMetadata[],
   budget: SpreadsheetNormalizationBudget,
+  styleRegistry: SpreadsheetStyleRegistry,
+  presentation: SpreadsheetOoxmlSheetPresentation | null,
+  sourceStyles: readonly SpreadsheetCellStyle[],
 ): NormalizedRows {
   const rows: SpreadsheetSourceRow[] = [];
   const materializedRowIndices: number[] = [];
@@ -374,6 +470,8 @@ function createSpreadsheetRows(
   for (const rowIndex of rowIndices) {
     const values: string[] = [];
     const kinds: SpreadsheetCellKind[] = [];
+    const formulas: Array<string | null> = [];
+    const styleIds: number[] = [];
     let reservedCells = 0;
     let reservedStringBytes = 0;
 
@@ -392,10 +490,25 @@ function createSpreadsheetRows(
       reservedStringBytes += stringBytes;
       values.push(value);
       kinds.push(getSpreadsheetCellKind(cell));
+      formulas.push(getSpreadsheetCellFormula(cell));
+      styleIds.push(getSpreadsheetCellStyleId(
+        cell,
+        encodeSpreadsheetCell(rowIndex, columnIndex),
+        styleRegistry,
+        presentation,
+        sourceStyles,
+      ));
     }
 
     budget.consumeReserved(reservedCells, reservedStringBytes);
-    rows.push({ rowIndex, values, kinds });
+    rows.push({
+      rowIndex,
+      values,
+      kinds,
+      formulas,
+      styleIds,
+      height: normalizeSpreadsheetRowHeight(rowMetadata[rowIndex]),
+    });
     materializedRowIndices.push(rowIndex);
   }
 
@@ -412,6 +525,9 @@ function createSpreadsheetMerges(
   rowIndices: number[],
   columnIndices: number[],
   budget: SpreadsheetNormalizationBudget,
+  styleRegistry: SpreadsheetStyleRegistry,
+  presentation: SpreadsheetOoxmlSheetPresentation | null,
+  sourceStyles: readonly SpreadsheetCellStyle[],
 ): NormalizedMerges {
   const rowPositionByIndex = new Map(rowIndices.map((rowIndex, position) => [rowIndex, position]));
   const columnPositionByIndex = new Map(columnIndices.map((columnIndex, position) => [columnIndex, position]));
@@ -440,6 +556,14 @@ function createSpreadsheetMerges(
       endColumn,
       value,
       kind: getSpreadsheetCellKind(cell),
+      formula: getSpreadsheetCellFormula(cell),
+      styleId: getSpreadsheetCellStyleId(
+        cell,
+        encodeSpreadsheetCell(merge.s.r, merge.s.c),
+        styleRegistry,
+        presentation,
+        sourceStyles,
+      ),
     });
   }
 
@@ -485,6 +609,33 @@ export function getSpreadsheetCellKind(cell: CellObject | undefined): Spreadshee
   return "text";
 }
 
+function getSpreadsheetCellFormula(cell: CellObject | undefined): string | null {
+  return typeof cell?.f === "string" && cell.f ? cell.f : null;
+}
+
+function getSpreadsheetCellStyleId(
+  cell: CellObject | undefined,
+  reference: string,
+  registry: SpreadsheetStyleRegistry,
+  presentation: SpreadsheetOoxmlSheetPresentation | null,
+  sourceStyles: readonly SpreadsheetCellStyle[],
+): number {
+  const sourceStyleIndex = presentation?.styleIndexByCell.get(reference);
+  if (sourceStyleIndex !== undefined) return registry.intern(sourceStyles[sourceStyleIndex]);
+  return registry.intern(normalizeFallbackCellStyle(cell));
+}
+
+function normalizeFallbackCellStyle(cell: CellObject | undefined): SpreadsheetCellStyle | undefined {
+  const style = cell?.s as {
+    fgColor?: { rgb?: unknown };
+    patternType?: unknown;
+  } | undefined;
+  if (style?.patternType !== "solid" || typeof style.fgColor?.rgb !== "string") return undefined;
+  const raw = style.fgColor.rgb.replace(/^#/, "");
+  const rgb = /^[0-9a-f]{8}$/i.test(raw) ? raw.slice(2) : raw;
+  return /^[0-9a-f]{6}$/i.test(rgb) ? { backgroundColor: `#${rgb.toLowerCase()}` } : undefined;
+}
+
 function getCellStringPayloadBytes(cell: CellObject | undefined, displayValue: string): number {
   const formula = typeof cell?.f === "string" ? cell.f : "";
   return utf16PayloadBytes(displayValue) + utf16PayloadBytes(formula);
@@ -502,6 +653,41 @@ function normalizeSpreadsheetColumnWidth(column: ColumnMetadata | undefined): nu
     return clampSpreadsheetColumnWidth((column.wch * 7) + 12);
   }
   return 96;
+}
+
+function normalizeSpreadsheetRowHeight(row: RowMetadata | undefined): number {
+  const pixels = typeof row?.hpx === "number" && Number.isFinite(row.hpx)
+    ? row.hpx
+    : typeof row?.hpt === "number" && Number.isFinite(row.hpt)
+      ? row.hpt * (4 / 3)
+      : 28;
+  return Math.max(20, Math.min(160, Math.round(pixels)));
+}
+
+function countIndicesBefore(indices: number[], physicalIndex: number): number {
+  let count = 0;
+  for (const index of indices) {
+    if (index >= physicalIndex) break;
+    count += 1;
+  }
+  return count;
+}
+
+function decodeSpreadsheetCellReference(reference: string | null | undefined): {
+  rowIndex: number;
+  columnIndex: number;
+} | null {
+  if (!reference) return null;
+  const match = /^([A-Z]{1,3})([1-9]\d{0,6})$/.exec(reference);
+  if (!match) return null;
+  let columnIndex = 0;
+  for (const character of match[1]) {
+    columnIndex = (columnIndex * 26) + character.charCodeAt(0) - 64;
+  }
+  return {
+    rowIndex: Number.parseInt(match[2], 10) - 1,
+    columnIndex: columnIndex - 1,
+  };
 }
 
 function clampSpreadsheetColumnWidth(width: number): number {

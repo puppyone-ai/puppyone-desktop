@@ -231,6 +231,7 @@
   "office.zoomOut": "축소",
   "office.emptyPresentation": "빈 프레젠테이션",
   "office.firstExtractedLines": "추출한 텍스트의 처음 {count, number}개 행을 표시합니다.",
+  "office.formulaBar": "수식 입력줄",
   "office.hiddenColumnsOmitted": "{count, plural, other {숨겨진 열 #개를 생략했습니다.}}",
   "office.hiddenRowsOmitted": "{count, plural, other {숨겨진 행 #개를 생략했습니다.}}",
   "office.hiddenSheetsOmitted": "{count, plural, other {숨겨진 시트 #개를 생략했습니다.}}",

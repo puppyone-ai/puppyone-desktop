@@ -80,22 +80,33 @@ function spreadsheetMarkup() {
   ).join("");
   const headers = Array.from(
     { length: 8 },
-    (_, index) => `<th class="office-spreadsheet-grid__column-header">${String.fromCharCode(65 + index)}</th>`,
+    (_, index) => `<th class="office-spreadsheet-grid__column-header" ${index === 1 ? 'data-selected="true"' : ""}>${String.fromCharCode(65 + index)}</th>`,
   ).join("");
   const rows = Array.from({ length: 60 }, (_, rowIndex) => {
     const cells = Array.from({ length: 8 }, (_, columnIndex) => {
       const numeric = columnIndex > 0;
-      return `<td data-cell-kind="${numeric ? "number" : "text"}"><span>${numeric ? rowIndex * 100 + columnIndex : `Record ${rowIndex + 1}`}</span></td>`;
+      const selected = rowIndex === 8 && columnIndex === 1;
+      const styled = rowIndex === 0 && columnIndex === 0;
+      return `<td
+        data-cell-kind="${numeric ? "number" : "text"}"
+        ${selected ? 'data-selected="true"' : ""}
+        ${styled ? 'style="background:#0b2545;color:#fff;font-size:18.7px;font-weight:700"' : ""}
+      ><span>${selected ? "0.00%" : numeric ? rowIndex * 100 + columnIndex : `Record ${rowIndex + 1}`}</span></td>`;
     }).join("");
-    return `<tr><th class="office-spreadsheet-grid__row-header">${rowIndex + 1}</th>${cells}</tr>`;
+    return `<tr style="--office-sheet-row-height:28px"><th class="office-spreadsheet-grid__row-header" ${rowIndex === 8 ? 'data-selected="true"' : ""}>${rowIndex + 1}</th>${cells}</tr>`;
   }).join("");
 
   return `
     <section class="office-preview" data-office-kind="spreadsheet">
       <div class="office-preview__body">
-        <div class="office-spreadsheet-preview" style="--office-sheet-row-height:28px">
+        <div class="office-spreadsheet-preview">
+          <div class="office-spreadsheet-formula-bar">
+            <output class="office-spreadsheet-formula-bar__name">B9</output>
+            <span class="office-spreadsheet-formula-bar__fx">ƒx</span>
+            <output class="office-spreadsheet-formula-bar__value">=IFERROR(B6/B5,0)</output>
+          </div>
           <div class="office-spreadsheet-grid-wrap" data-po-scrollbar="content" tabindex="0">
-            <table class="office-spreadsheet-grid">
+            <table class="office-spreadsheet-grid" data-show-grid-lines="true">
               <colgroup><col class="office-spreadsheet-grid__row-header-col">${columns}</colgroup>
               <thead><tr><th class="office-spreadsheet-grid__corner"></th>${headers}</tr></thead>
               <tbody>${rows}</tbody>
@@ -161,13 +172,17 @@ async function measureSpreadsheet() {
       const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
       await nextFrame();
       const wrap = document.querySelector('.office-spreadsheet-grid-wrap');
+      const formulaBar = document.querySelector('.office-spreadsheet-formula-bar');
       const header = document.querySelector('.office-spreadsheet-grid__column-header');
       const rowHeader = document.querySelector('tbody .office-spreadsheet-grid__row-header');
-      const textCell = document.querySelector('tbody td[data-cell-kind="text"]');
+      const textCell = document.querySelector('tbody tr:nth-child(2) td[data-cell-kind="text"]');
       const numberCell = document.querySelector('tbody td[data-cell-kind="number"]');
-      const nextRowCell = document.querySelector('tbody tr:nth-child(2) td');
+      const nextRowCell = document.querySelector('tbody tr:nth-child(3) td');
       const tabs = document.querySelector('.office-spreadsheet-tabs');
       const preview = document.querySelector('.office-spreadsheet-preview');
+      const selectedCell = document.querySelector('td[data-selected="true"]');
+      const selectedHeader = document.querySelector('.office-spreadsheet-grid__column-header[data-selected="true"]');
+      const styledCell = document.querySelector('tbody tr:first-child td:first-of-type');
       const firstCell = textCell.getBoundingClientRect();
       const rowHeight = textCell.getBoundingClientRect().height;
 
@@ -178,6 +193,8 @@ async function measureSpreadsheet() {
 
       return {
         canvas: getComputedStyle(preview).backgroundColor,
+        formulaBarHeight: formulaBar.getBoundingClientRect().height,
+        formulaValue: formulaBar.querySelector('.office-spreadsheet-formula-bar__value').textContent,
         textAlign: getComputedStyle(textCell).textAlign,
         numberAlign: getComputedStyle(numberCell).textAlign,
         firstRowBackground: getComputedStyle(textCell).backgroundColor,
@@ -188,6 +205,9 @@ async function measureSpreadsheet() {
         tabsBottom: preview.getBoundingClientRect().bottom - tabs.getBoundingClientRect().bottom,
         scrolled: wrap.scrollTop > 0 && wrap.scrollLeft > 0,
         firstCellWidth: firstCell.width,
+        selectedCellShadow: getComputedStyle(selectedCell).boxShadow,
+        selectedHeaderBackground: getComputedStyle(selectedHeader).backgroundColor,
+        styledCellBackground: getComputedStyle(styledCell).backgroundColor,
       };
     })();
   `, true);
@@ -223,6 +243,8 @@ async function run() {
   try {
     const spreadsheet = await measureSpreadsheet();
     assert(spreadsheet.canvas === "rgb(255, 255, 255)", `worksheet canvas is not white: ${spreadsheet.canvas}`);
+    assertNear(spreadsheet.formulaBarHeight, 42, "worksheet formula bar height");
+    assert(spreadsheet.formulaValue === "=IFERROR(B6/B5,0)", "worksheet formula bar lost the source formula");
     assert(spreadsheet.textAlign === "left", `text cells are not left aligned: ${spreadsheet.textAlign}`);
     assert(spreadsheet.numberAlign === "right", `number cells are not right aligned: ${spreadsheet.numberAlign}`);
     assert(spreadsheet.firstRowBackground === spreadsheet.secondRowBackground, "worksheet still uses zebra striping");
@@ -232,6 +254,9 @@ async function run() {
     assertNear(spreadsheet.tabsBottom, 0, "sheet tabs are not anchored to the bottom");
     assert(spreadsheet.scrolled, "worksheet smoke fixture did not become scrollable");
     assert(spreadsheet.firstCellWidth >= 145, "worksheet column widths were not preserved");
+    assert(spreadsheet.selectedCellShadow !== "none", "selected worksheet cell has no selection outline");
+    assert(spreadsheet.selectedHeaderBackground === "rgb(220, 234, 251)", "selected worksheet header is not highlighted");
+    assert(spreadsheet.styledCellBackground === "rgb(11, 37, 69)", "source cell fill was not preserved");
 
     const widePresentation = await measurePresentation(900);
     assert(

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -34,8 +35,15 @@ import {
 import { extractOfficeTextFallbackInWorker } from "./officeTextFallbackClient";
 import { getPresentationNavigationTarget } from "./presentationPreview";
 import {
+  findSpreadsheetCellPosition,
   getSpreadsheetArchiveKind,
+  getSpreadsheetNavigationTarget,
   getSpreadsheetRenderRows,
+  getSpreadsheetRowOffsets,
+  getSpreadsheetVisibleRowWindow,
+  type SpreadsheetCellBorder,
+  type SpreadsheetCellPosition,
+  type SpreadsheetCellStyle,
   type SpreadsheetPreviewResult,
   type SpreadsheetSheet,
 } from "./spreadsheetPreview";
@@ -91,7 +99,8 @@ type PresentationSlide = {
   lines: string[];
 };
 
-const SPREADSHEET_ROW_HEIGHT = 28;
+const SPREADSHEET_COLUMN_HEADER_HEIGHT = 32;
+const SPREADSHEET_ROW_HEADER_WIDTH = 44;
 const SPREADSHEET_OVERSCAN_ROWS = 12;
 const LEGACY_WORD_EXTENSIONS = new Set(["doc"]);
 const LEGACY_PRESENTATION_EXTENSIONS = new Set(["ppt", "pps"]);
@@ -875,8 +884,21 @@ function SpreadsheetPreview({
   const { formatList, formatNumber, t } = useLocalization();
   const gridWrapRef = useRef<HTMLDivElement | null>(null);
   const [viewport, setViewport] = useState({ scrollTop: 0, height: 0 });
+  const [selection, setSelection] = useState<SpreadsheetCellPosition | null>(null);
 
   const selectedSheet = result.sheets[Math.min(activeSheet, result.sheets.length - 1)];
+  const rowOffsets = useMemo(
+    () => getSpreadsheetRowOffsets(selectedSheet?.rows ?? []),
+    [selectedSheet],
+  );
+  const columnOffsets = useMemo(() => {
+    const offsets = new Array<number>((selectedSheet?.columns.length ?? 0) + 1);
+    offsets[0] = 0;
+    for (let index = 0; index < (selectedSheet?.columns.length ?? 0); index += 1) {
+      offsets[index + 1] = offsets[index] + selectedSheet!.columns[index].width;
+    }
+    return offsets;
+  }, [selectedSheet]);
 
   useEffect(() => {
     const gridWrap = gridWrapRef.current;
@@ -884,6 +906,7 @@ function SpreadsheetPreview({
 
     gridWrap.scrollTop = 0;
     gridWrap.scrollLeft = 0;
+    setSelection(findSpreadsheetCellPosition(selectedSheet, selectedSheet?.initialSelection ?? null));
     const updateViewport = () => {
       setViewport({
         scrollTop: gridWrap.scrollTop,
@@ -896,7 +919,7 @@ function SpreadsheetPreview({
     return () => {
       resizeObserver.disconnect();
     };
-  }, [selectedSheet?.name]);
+  }, [selectedSheet]);
 
   if (result.sheets.length === 0 || !selectedSheet) {
     const hiddenMessage = result.hiddenSheetCount > 0
@@ -906,16 +929,40 @@ function SpreadsheetPreview({
   }
 
   const rowCount = selectedSheet.rows.length;
-  const visibleRowCount = viewport.height > 0
-    ? Math.ceil(viewport.height / SPREADSHEET_ROW_HEIGHT) + (SPREADSHEET_OVERSCAN_ROWS * 2)
-    : 60;
-  const startRow = Math.max(0, Math.floor(viewport.scrollTop / SPREADSHEET_ROW_HEIGHT) - SPREADSHEET_OVERSCAN_ROWS);
-  const endRow = Math.min(rowCount, startRow + visibleRowCount);
-  const topSpacerHeight = startRow * SPREADSHEET_ROW_HEIGHT;
-  const bottomSpacerHeight = Math.max(0, (rowCount - endRow) * SPREADSHEET_ROW_HEIGHT);
-  const renderedRows = getSpreadsheetRenderRows(selectedSheet, startRow, endRow);
+  const frozenRowCount = Math.min(selectedSheet.frozenRows, rowCount);
+  const rowWindow = getSpreadsheetVisibleRowWindow({
+    rowOffsets,
+    scrollTop: viewport.scrollTop,
+    viewportHeight: viewport.height || (28 * 60),
+    frozenRows: frozenRowCount,
+    overscanRows: SPREADSHEET_OVERSCAN_ROWS,
+  });
+  const frozenRows = getSpreadsheetRenderRows(selectedSheet, 0, frozenRowCount);
+  const renderedRows = getSpreadsheetRenderRows(
+    selectedSheet,
+    rowWindow.startRow,
+    rowWindow.endRow,
+  );
   const columnSpan = selectedSheet.columns.length + 1;
   const previewNotes = createSpreadsheetPreviewNotes(result, selectedSheet, t, formatList);
+  const effectiveSelection = selection
+    && selection.rowPosition < rowCount
+    && selection.columnPosition < selectedSheet.columns.length
+    ? selection
+    : findSpreadsheetCellPosition(selectedSheet, selectedSheet.initialSelection);
+  const selectedRow = effectiveSelection ? selectedSheet.rows[effectiveSelection.rowPosition] : null;
+  const selectedColumn = effectiveSelection
+    ? selectedSheet.columns[effectiveSelection.columnPosition]
+    : null;
+  const selectedValue = effectiveSelection && selectedRow
+    ? selectedRow.values[effectiveSelection.columnPosition] ?? ""
+    : "";
+  const selectedFormula = effectiveSelection && selectedRow
+    ? selectedRow.formulas[effectiveSelection.columnPosition]
+    : null;
+  const selectedAddress = selectedRow && selectedColumn
+    ? `${spreadsheetColumnLabel(selectedColumn.columnIndex)}${selectedRow.rowIndex + 1}`
+    : "";
 
   const handleScroll = () => {
     const gridWrap = gridWrapRef.current;
@@ -926,11 +973,128 @@ function SpreadsheetPreview({
     });
   };
 
-  return (
-    <div
-      className="office-spreadsheet-preview"
-      style={{ "--office-sheet-row-height": `${SPREADSHEET_ROW_HEIGHT}px` } as CSSProperties}
+  const selectCell = (target: SpreadsheetCellPosition, reveal: boolean) => {
+    setSelection(target);
+    if (!reveal) return;
+    const gridWrap = gridWrapRef.current;
+    if (!gridWrap) return;
+
+    const frozenHeight = rowOffsets[frozenRowCount] ?? 0;
+    const cellTop = SPREADSHEET_COLUMN_HEADER_HEIGHT + (rowOffsets[target.rowPosition] ?? 0);
+    const cellBottom = SPREADSHEET_COLUMN_HEADER_HEIGHT + (rowOffsets[target.rowPosition + 1] ?? cellTop);
+    const visibleTop = gridWrap.scrollTop + SPREADSHEET_COLUMN_HEADER_HEIGHT + frozenHeight;
+    const visibleBottom = gridWrap.scrollTop + gridWrap.clientHeight;
+    if (target.rowPosition >= frozenRowCount && cellTop < visibleTop) {
+      gridWrap.scrollTop = Math.max(0, cellTop - SPREADSHEET_COLUMN_HEADER_HEIGHT - frozenHeight);
+    } else if (cellBottom > visibleBottom) {
+      gridWrap.scrollTop = Math.max(0, cellBottom - gridWrap.clientHeight);
+    }
+
+    const frozenColumnCount = Math.min(selectedSheet.frozenColumns, selectedSheet.columns.length);
+    const frozenWidth = columnOffsets[frozenColumnCount] ?? 0;
+    const cellLeft = SPREADSHEET_ROW_HEADER_WIDTH + (columnOffsets[target.columnPosition] ?? 0);
+    const cellRight = SPREADSHEET_ROW_HEADER_WIDTH + (columnOffsets[target.columnPosition + 1] ?? cellLeft);
+    const visibleLeft = gridWrap.scrollLeft + SPREADSHEET_ROW_HEADER_WIDTH + frozenWidth;
+    const visibleRight = gridWrap.scrollLeft + gridWrap.clientWidth;
+    if (target.columnPosition >= frozenColumnCount && cellLeft < visibleLeft) {
+      gridWrap.scrollLeft = Math.max(0, cellLeft - SPREADSHEET_ROW_HEADER_WIDTH - frozenWidth);
+    } else if (cellRight > visibleRight) {
+      gridWrap.scrollLeft = Math.max(0, cellRight - gridWrap.clientWidth);
+    }
+  };
+
+  const handleGridKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!effectiveSelection) return;
+    const key = event.key === "Tab" && event.shiftKey ? "ArrowLeft" : event.key;
+    const target = getSpreadsheetNavigationTarget({
+      key,
+      selection: effectiveSelection,
+      rowCount,
+      columnCount: selectedSheet.columns.length,
+      pageRows: Math.max(1, Math.floor((viewport.height || 280) / 28)),
+      merges: selectedSheet.merges,
+    });
+    if (!target) return;
+    event.preventDefault();
+    selectCell(target, true);
+  };
+
+  const renderRow = (
+    row: ReturnType<typeof getSpreadsheetRenderRows>[number],
+    frozen: boolean,
+  ) => (
+    <tr
+      key={`${frozen ? "frozen" : "body"}-${row.rowIndex}`}
+      aria-rowindex={row.rowPosition + 2}
+      data-frozen-row={frozen ? "true" : undefined}
+      style={{
+        "--office-sheet-row-height": `${row.height}px`,
+        "--office-sheet-frozen-top": `${SPREADSHEET_COLUMN_HEADER_HEIGHT + rowOffsets[row.rowPosition]}px`,
+      } as CSSProperties}
     >
+      <th
+        className="office-spreadsheet-grid__row-header"
+        scope="row"
+        aria-colindex={1}
+        data-selected={effectiveSelection?.rowPosition === row.rowPosition ? "true" : undefined}
+      >
+        {formatNumber(row.rowIndex + 1)}
+      </th>
+      {row.cells.map((cell) => {
+        const isSelected = effectiveSelection?.rowPosition === row.rowPosition
+          && effectiveSelection.columnPosition === cell.columnPosition;
+        const frozenColumn = cell.columnPosition < selectedSheet.frozenColumns;
+        const workbookStyle = result.styles[cell.styleId];
+        return (
+          <td
+            key={`${row.rowIndex}-${cell.columnIndex}`}
+            data-cell-kind={cell.kind}
+            data-column-position={cell.columnPosition}
+            data-frozen-column={frozenColumn ? "true" : undefined}
+            data-row-position={row.rowPosition}
+            data-selected={isSelected ? "true" : undefined}
+            aria-colindex={cell.columnPosition + 2}
+            aria-selected={isSelected || undefined}
+            colSpan={cell.colSpan > 1 ? cell.colSpan : undefined}
+            rowSpan={cell.rowSpan > 1 ? cell.rowSpan : undefined}
+            style={createSpreadsheetCellCssStyle(
+              workbookStyle,
+              frozenColumn
+                ? SPREADSHEET_ROW_HEADER_WIDTH + columnOffsets[cell.columnPosition]
+                : null,
+            )}
+            title={cell.value || undefined}
+            onClick={() => {
+              selectCell({ rowPosition: row.rowPosition, columnPosition: cell.columnPosition }, false);
+              gridWrapRef.current?.focus({ preventScroll: true });
+            }}
+          >
+            <span dir="auto">{cell.value}</span>
+          </td>
+        );
+      })}
+    </tr>
+  );
+
+  return (
+    <div className="office-spreadsheet-preview">
+      <div
+        className="office-spreadsheet-formula-bar"
+        aria-label={t("editor.office.formulaBar")}
+        aria-live="polite"
+        role="group"
+      >
+        <output
+          className="office-spreadsheet-formula-bar__name"
+          aria-label={`${t("editor.office.formulaBar")}: ${selectedAddress}`}
+        >
+          {selectedAddress}
+        </output>
+        <span className="office-spreadsheet-formula-bar__fx" aria-hidden="true">{"ƒx"}</span>
+        <output className="office-spreadsheet-formula-bar__value" dir="auto">
+          {selectedFormula ? `=${selectedFormula}` : selectedValue}
+        </output>
+      </div>
       <div
         className="office-spreadsheet-grid-wrap"
         data-po-scrollbar="content"
@@ -939,9 +1103,11 @@ function SpreadsheetPreview({
         tabIndex={0}
         aria-label={selectedSheet.name}
         onScroll={handleScroll}
+        onKeyDown={handleGridKeyDown}
       >
         <table
           className="office-spreadsheet-grid"
+          data-show-grid-lines={selectedSheet.showGridLines ? "true" : "false"}
           aria-rowcount={selectedSheet.rows.length + 1}
           aria-colcount={selectedSheet.columns.length + 1}
         >
@@ -961,6 +1127,13 @@ function SpreadsheetPreview({
                   key={column.columnIndex}
                   scope="col"
                   aria-colindex={columnPosition + 2}
+                  data-frozen-column={columnPosition < selectedSheet.frozenColumns ? "true" : undefined}
+                  data-selected={effectiveSelection?.columnPosition === columnPosition ? "true" : undefined}
+                  style={columnPosition < selectedSheet.frozenColumns
+                    ? ({
+                      "--office-sheet-frozen-left": `${SPREADSHEET_ROW_HEADER_WIDTH + columnOffsets[columnPosition]}px`,
+                    } as CSSProperties)
+                    : undefined}
                 >
                   {spreadsheetColumnLabel(column.columnIndex)}
                 </th>
@@ -968,37 +1141,16 @@ function SpreadsheetPreview({
             </tr>
           </thead>
           <tbody>
-            {topSpacerHeight > 0 && (
+            {frozenRows.map((row) => renderRow(row, true))}
+            {rowWindow.topSpacerHeight > 0 && (
               <tr className="office-spreadsheet-grid__spacer" aria-hidden="true">
-                <td colSpan={columnSpan} style={{ height: topSpacerHeight }} />
+                <td colSpan={columnSpan} style={{ height: rowWindow.topSpacerHeight }} />
               </tr>
             )}
-            {renderedRows.map((row, rowOffset) => (
-              <tr key={row.rowIndex} aria-rowindex={startRow + rowOffset + 2}>
-                <th
-                  className="office-spreadsheet-grid__row-header"
-                  scope="row"
-                  aria-colindex={1}
-                >
-                  {formatNumber(row.rowIndex + 1)}
-                </th>
-                {row.cells.map((cell) => (
-                  <td
-                    key={`${row.rowIndex}-${cell.columnIndex}`}
-                    data-cell-kind={cell.kind}
-                    aria-colindex={cell.columnPosition + 2}
-                    colSpan={cell.colSpan > 1 ? cell.colSpan : undefined}
-                    rowSpan={cell.rowSpan > 1 ? cell.rowSpan : undefined}
-                    title={cell.value || undefined}
-                  >
-                    <span dir="auto">{cell.value}</span>
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {bottomSpacerHeight > 0 && (
+            {renderedRows.map((row) => renderRow(row, false))}
+            {rowWindow.bottomSpacerHeight > 0 && (
               <tr className="office-spreadsheet-grid__spacer" aria-hidden="true">
-                <td colSpan={columnSpan} style={{ height: bottomSpacerHeight }} />
+                <td colSpan={columnSpan} style={{ height: rowWindow.bottomSpacerHeight }} />
               </tr>
             )}
           </tbody>
@@ -1030,6 +1182,36 @@ function SpreadsheetPreview({
       </div>
     </div>
   );
+}
+
+function createSpreadsheetCellCssStyle(
+  style: SpreadsheetCellStyle | undefined,
+  frozenLeft: number | null,
+): CSSProperties {
+  const css: CSSProperties & Record<`--${string}`, string> = {};
+  if (style?.backgroundColor) css.backgroundColor = style.backgroundColor;
+  if (style?.color) css.color = style.color;
+  if (style?.fontFamily) {
+    const safeFamily = style.fontFamily.replaceAll('"', "");
+    css.fontFamily = `"${safeFamily}", "Aptos", "Calibri", "Segoe UI", Arial, sans-serif`;
+  }
+  if (style?.fontSize) css.fontSize = `${style.fontSize}px`;
+  if (style?.bold) css.fontWeight = 700;
+  if (style?.italic) css.fontStyle = "italic";
+  if (style?.underline) css.textDecoration = "underline";
+  if (style?.horizontalAlign) css.textAlign = style.horizontalAlign;
+  if (style?.verticalAlign) css.verticalAlign = style.verticalAlign;
+  if (style?.wrapText) css.whiteSpace = "normal";
+  if (style?.borderTop) css.borderTop = spreadsheetBorderCss(style.borderTop);
+  if (style?.borderRight) css.borderRight = spreadsheetBorderCss(style.borderRight);
+  if (style?.borderBottom) css.borderBottom = spreadsheetBorderCss(style.borderBottom);
+  if (style?.borderLeft) css.borderLeft = spreadsheetBorderCss(style.borderLeft);
+  if (frozenLeft !== null) css["--office-sheet-frozen-left"] = `${frozenLeft}px`;
+  return css;
+}
+
+function spreadsheetBorderCss(border: SpreadsheetCellBorder): string {
+  return `${border.width}px ${border.style} ${border.color}`;
 }
 
 function spreadsheetColumnLabel(columnIndex: number): string {
