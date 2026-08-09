@@ -7,6 +7,20 @@ const fileActionCss = readFileSync(
 );
 
 describe("create entry dialog visual architecture", () => {
+  it("uses one outer inset for its top, sides, and bottom", () => {
+    const dialogRule = getRule(".desktop-create-entry-dialog");
+    const headerRule = getRule(".desktop-create-entry-dialog .desktop-dialog-header");
+    const bodyRule = getRule(".desktop-create-entry-dialog .desktop-file-dialog-body");
+    const footerRule = getRule(".desktop-create-entry-dialog .desktop-dialog-footer");
+
+    expect(dialogRule).toContain("--desktop-create-entry-inset: 20px;");
+    expect(headerRule).toContain("padding-block: var(--desktop-create-entry-inset) 10px;");
+    expect(headerRule).toContain("padding-inline: var(--desktop-create-entry-inset);");
+    expect(bodyRule).toContain("padding-inline: var(--desktop-create-entry-inset);");
+    expect(footerRule).toContain("padding-inline: var(--desktop-create-entry-inset);");
+    expect(footerRule).toContain("padding-block-end: var(--desktop-create-entry-inset);");
+  });
+
   it("uses a compact single-line title treatment", () => {
     expect(fileActionCss).toMatch(
       /\.desktop-create-entry-dialog \.desktop-dialog-title-row\s*\{[^}]*align-items:\s*center;/s,
@@ -22,3 +36,8 @@ describe("create entry dialog visual architecture", () => {
     expect(fieldRule).toContain("text-transform: none;");
   });
 });
+
+function getRule(selector: string): string | undefined {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return fileActionCss.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`, "s"))?.[1];
+}

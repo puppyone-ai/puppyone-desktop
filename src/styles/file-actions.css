@@ -3,11 +3,13 @@
 }
 
 .desktop-create-entry-dialog {
+  --desktop-create-entry-inset: 20px;
   width: min(360px, calc(100vw - 32px));
 }
 
 .desktop-create-entry-dialog .desktop-dialog-header {
-  padding-block-end: 10px;
+  padding-block: var(--desktop-create-entry-inset) 10px;
+  padding-inline: var(--desktop-create-entry-inset);
 }
 
 .desktop-create-entry-dialog .desktop-dialog-title-row {
@@ -16,6 +18,12 @@
 
 .desktop-create-entry-dialog .desktop-file-dialog-body {
   padding-block: 8px 18px;
+  padding-inline: var(--desktop-create-entry-inset);
+}
+
+.desktop-create-entry-dialog .desktop-dialog-footer {
+  padding-inline: var(--desktop-create-entry-inset);
+  padding-block-end: var(--desktop-create-entry-inset);
 }
 
 .desktop-create-entry-dialog .desktop-dialog-field {
