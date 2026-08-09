@@ -102,6 +102,25 @@ describe("titlebar typography architecture", () => {
     expect(projectName).toContain("color: var(--desktop-titlebar-text-muted);");
     expect(branchButton).toContain("color: var(--desktop-titlebar-text-muted);");
   });
+
+  it("keeps branch-menu metadata quiet without introducing new type sizes", () => {
+    const sectionLabel = readCssBlock(
+      titlebarCss,
+      ".desktop-branch-menu-group > .desktop-menu-section-label",
+    );
+    const currentLabel = readCssBlock(
+      titlebarCss,
+      ".desktop-branch-menu-row .desktop-menu-item-trailing",
+    );
+
+    expect(sectionLabel).toContain("font-size: 11px;");
+    expect(sectionLabel).toContain("font-weight: 600;");
+    expect(sectionLabel).toContain("text-transform: none;");
+    expect(currentLabel).toContain("font-weight: 500;");
+    expect(currentLabel).toContain("text-transform: none;");
+    expect(currentLabel).not.toContain("font-size:");
+    expect(titlebarCss).not.toContain(".desktop-branch-menu-label {");
+  });
 });
 
 function readCssBlock(css: string, selector: string): string {

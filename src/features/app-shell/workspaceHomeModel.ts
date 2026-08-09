@@ -30,8 +30,25 @@ export function getWorkspaceSwitcherItems({
   return workspaces.map((workspace) => ({
     id: workspace.id,
     label: workspace.name,
-    detail: workspace.path,
+    detail: getWorkspaceParentPathForDisplay(workspace.path),
     title: `${workspace.name} - ${workspace.path}`,
     workspace,
   }));
+}
+
+export function getWorkspaceParentPathForDisplay(workspacePath: string): string {
+  const trimmedPath = workspacePath.trim();
+  if (!trimmedPath) return "";
+
+  const normalizedPath = trimmedPath.length > 1
+    ? trimmedPath.replace(/\/+$/, "")
+    : trimmedPath;
+  const separatorIndex = normalizedPath.lastIndexOf("/");
+  if (separatorIndex < 0) return "";
+
+  const parentPath = separatorIndex === 0
+    ? "/"
+    : normalizedPath.slice(0, separatorIndex);
+  if (/^\/Users\/[^/]+$/.test(parentPath)) return "~";
+  return parentPath.replace(/^\/Users\/[^/]+(?=\/)/, "~");
 }
