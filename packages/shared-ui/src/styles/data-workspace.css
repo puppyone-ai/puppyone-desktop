@@ -222,7 +222,7 @@ body.data-sidebar-resizing .data-preview-accessory {
       color-mix(in srgb, var(--po-selected) 38%, transparent) 100%
     )
   );
-  --tree-scrollbar-width: var(--po-tree-scrollbar-width, var(--po-scrollbar-size, 8px));
+  --tree-scrollbar-width: var(--po-tree-scrollbar-width, var(--po-scrollbar-size, 12px));
   --tree-scrollbar-radius: var(--po-scrollbar-radius, 999px);
   --tree-scrollbar-transition: var(--po-scrollbar-transition, 0.16s ease);
   --tree-scrollbar-thumb: var(--desktop-sidebar-scrollbar-thumb, var(--po-scrollbar-thumb));
@@ -283,7 +283,7 @@ body.data-sidebar-resizing .data-preview-accessory {
 }
 
 .explorer-tree-scroll::-webkit-scrollbar-thumb {
-  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
+  border: var(--po-scrollbar-thumb-inset, 3px) solid transparent;
   border-radius: var(--tree-scrollbar-radius);
   background-color: var(--tree-scrollbar-thumb);
   background-clip: padding-box;

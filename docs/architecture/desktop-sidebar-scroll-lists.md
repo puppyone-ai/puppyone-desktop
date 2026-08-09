@@ -76,13 +76,15 @@ so its section rows and nested scroll lists own the inline edge instead.
    reintroduces platform-dependent native scrollbars. To hide a scrollbar,
    use `::-webkit-scrollbar { display: none; }`, not `scrollbar-width: none`.
 
-   The global baseline lives in `src/styles/scrollbars.css`: an 8px
-   interaction track (`--po-scrollbar-size`) containing a 6px visible thumb
-   (`--po-scrollbar-thumb-size`) with a 1px transparent inset
-   (`--po-scrollbar-thumb-inset`). This middle weight is shared by sidebar
-   lists, code editors, CSV tables, and horizontal Markdown widgets. Custom
-   WebKit scrollbars are always "classic": when a container overflows, the
-   scrollbar consumes layout width. They never overlay.
+   The global baseline lives in `src/styles/scrollbars.css`: a 12px
+   interaction track (`--po-scrollbar-size`) containing a 6px idle thumb
+   (`--po-scrollbar-thumb-size`) with a 3px transparent inset. While the
+   surface is hovered, focused, scrolling, or dragging, the thumb expands to
+   8px (`--po-scrollbar-thumb-active-size`) with a 2px inset. This geometry is
+   shared by sidebar lists, code editors, CSV tables, and horizontal Markdown
+   widgets. Custom WebKit scrollbars keep classic layout geometry even though
+   the default skin mimics the macOS overlay presentation: the reserved track
+   consumes layout width, while the thumb itself fades away when idle.
 
 2. Preserve the transparent thumb inset in every state.
 
@@ -125,7 +127,7 @@ so its section rows and nested scroll lists own the inline edge instead.
 
 5. Keep resize and scroll hit targets adjacent, never overlapping.
 
-   The explorer scrollbar owns the final 8px inside the sidebar. The shared
+   The explorer scrollbar owns the final 12px inside the sidebar. The shared
    `.po-pane-edge-resize-handle` contract owns the next 8px inside the main
    pane. Do not place the resizer inside `.explorer-column`, center it across
    the boundary, or translate it back toward the sidebar: its higher stacking
@@ -191,7 +193,8 @@ so its section rows and nested scroll lists own the inline edge instead.
     properties
 - `src/styles/tokens.css`
   - `--po-scrollbar-size`, `--po-scrollbar-thumb-size`,
-    `--po-scrollbar-thumb-inset`, `--desktop-sidebar-scrollbar-width`,
+    `--po-scrollbar-thumb-active-size`, `--po-scrollbar-thumb-inset`,
+    `--po-scrollbar-thumb-active-inset`, `--desktop-sidebar-scrollbar-width`,
     `--desktop-sidebar-scrollbar-thumb`,
     `--desktop-sidebar-scrollbar-thumb-hover`,
     `--desktop-sidebar-scroll-right-gap`, and
@@ -248,9 +251,10 @@ so its section rows and nested scroll lists own the inline edge instead.
   settings.
 - Every sidebar scroll container reserves the scrollbar gutter with
   `scrollbar-gutter: stable`; sidebar scrollbars occupy exactly
-  `--desktop-sidebar-scrollbar-width` (8px in the default skin), while the
-  visible thumb remains 6px.
-- The explorer scrollbar's 8px track and the resizer's 8px target are adjacent
+  `--desktop-sidebar-scrollbar-width` (12px in the default skin), while the
+  thumb uses 6px idle geometry while fading away at rest and expands to 8px
+  while active.
+- The explorer scrollbar's 12px track and the resizer's 8px target are adjacent
   on opposite sides of the pane boundary and never overlap.
 - Scrollbar thumb state rules use `background-color`; no modern scrollbar
   thumb rule may reset `background-clip` with the `background` shorthand.

@@ -15,8 +15,9 @@ wider does not solve that ownership conflict.
 
 Every vertical pane boundary has two adjacent, non-overlapping lanes:
 
-1. The scroll pane owns its final `--po-scrollbar-size` (8px). Its visible
-   thumb remains 6px inside that track.
+1. The scroll pane owns its final `--po-scrollbar-size` (12px). Its thumb uses
+   6px idle geometry while fading away at rest, then expands to 8px while the
+   surface is active.
 2. The neighboring pane owns the next `--po-pane-resizer-hit-size` (8px).
    The resize handle starts exactly at the boundary and extends away from the
    scroll pane.

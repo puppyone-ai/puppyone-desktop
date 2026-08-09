@@ -26,23 +26,42 @@ const markdownTableCss = readCss("packages/shared-ui/src/styles/editor/markdown-
 
 describe("scrollbar architecture", () => {
   it("defines one modern track and thumb geometry", () => {
-    expect(tokensCss).toContain("--po-scrollbar-size: 8px;");
+    expect(tokensCss).toContain("--po-scrollbar-size: 12px;");
     expect(tokensCss).toContain("--po-scrollbar-thumb-size: 6px;");
-    expect(tokensCss).toContain("--po-scrollbar-thumb-inset: 1px;");
+    expect(tokensCss).toContain("--po-scrollbar-thumb-active-size: 8px;");
+    expect(tokensCss).toContain("--po-scrollbar-thumb-inset: 3px;");
+    expect(tokensCss).toContain("--po-scrollbar-thumb-active-inset: 2px;");
     expect(tokensCss).toContain("--po-scrollbar-radius: 999px;");
-    expect(scrollbarsCss).toContain("width: var(--po-scrollbar-size, 8px);");
-    expect(scrollbarsCss).toContain("height: var(--po-scrollbar-size, 8px);");
+    expect(scrollbarsCss).toContain("width: var(--po-scrollbar-size, 12px);");
+    expect(scrollbarsCss).toContain("height: var(--po-scrollbar-size, 12px);");
     expect(scrollbarsCss).toContain(
-      "border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;",
+      "border: var(--po-scrollbar-thumb-inset, 3px) solid transparent;",
     );
     expect(scrollbarsCss).toContain("background-clip: padding-box;");
+    expect(scrollbarsCss).toContain(':root[data-interface-style="default"]');
+    expect(scrollbarsCss).toContain(":where(:hover, :focus-within, .po-scrollbar-active)");
+    expect(scrollbarsCss).toContain(
+      "border-width: var(--po-scrollbar-thumb-active-inset, 2px);",
+    );
+    expect(scrollbarsCss).toMatch(
+      /\*::-webkit-scrollbar-thumb\s*\{[^}]*background-color:\s*var\(--po-scrollbar-thumb\);/s,
+    );
+    expect(scrollbarsCss).toMatch(
+      /data-interface-style="default"[^{}]*\*::-webkit-scrollbar-thumb\s*\{[^}]*background-color:\s*transparent;/s,
+    );
   });
 
-  it("keeps the sidebar thumb thin and perceptually as light as the editor thumb", () => {
-    expect(tokensCss).toContain("--desktop-sidebar-scrollbar-thumb: color-mix(");
-    expect(tokensCss).toContain("--desktop-sidebar-scrollbar-thumb-hover: color-mix(");
+  it("shares the sidebar presentation color with editor scrollbars", () => {
+    expect(tokensCss).toContain("--po-scrollbar-presentation-thumb: color-mix(");
+    expect(tokensCss).toContain("--po-scrollbar-presentation-thumb-hover: color-mix(");
+    expect(tokensCss).toContain(
+      "--desktop-sidebar-scrollbar-thumb: var(--po-scrollbar-presentation-thumb);",
+    );
+    expect(scrollbarsCss).toContain(
+      "background-color: var(--po-scrollbar-presentation-thumb, var(--po-scrollbar-thumb));",
+    );
     expect(dataWorkspaceCss).toContain(
-      "border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;",
+      "border: var(--po-scrollbar-thumb-inset, 3px) solid transparent;",
     );
     expect(dataWorkspaceCss).toContain("background-clip: padding-box;");
     expect(dataWorkspaceCss).toContain("background-color: var(--tree-scrollbar-thumb);");
@@ -137,9 +156,9 @@ describe("scrollbar architecture", () => {
 
   it("keeps CSV and Markdown table scrollbars on the shared geometry", () => {
     for (const css of [csvTableCss, markdownTableCss]) {
-      expect(css).toContain("var(--po-scrollbar-size, 8px)");
+      expect(css).toContain("var(--po-scrollbar-size, 12px)");
       expect(css).toContain(
-        "border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;",
+        "border: var(--po-scrollbar-thumb-inset, 3px) solid transparent;",
       );
       expect(css).toContain("border-radius: var(--po-scrollbar-radius, 999px);");
     }

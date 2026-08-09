@@ -269,7 +269,7 @@
 }
 
 .onboarding-project-list::-webkit-scrollbar {
-  width: var(--po-scrollbar-size, 8px);
+  width: var(--po-scrollbar-size, 12px);
 }
 
 .onboarding-project-list::-webkit-scrollbar-track {

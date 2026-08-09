@@ -106,6 +106,24 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(css).not.toContain(".desktop-terminal-subheader::after");
     expect(css).not.toMatch(/\.desktop-terminal-subheader\s*\{[^}]*border-bottom:/s);
     expect(css).toContain("text-spacing-trim: space-all");
+    expect(css).toContain("--desktop-terminal-scrollbar-track-size: 14px;");
+    expect(css).toContain(
+      "--desktop-terminal-scrollbar-thumb-active-size: var(--po-scrollbar-thumb-active-size, 8px);",
+    );
+    expect(css).toContain(':root[data-interface-style="default"] .desktop-terminal-xterm');
+    expect(css).toContain(
+      "--desktop-terminal-scrollbar-thumb-color: var(",
+    );
+    expect(css).toContain("--po-scrollbar-presentation-thumb,");
+    expect(css).toMatch(
+      /\.xterm-scrollable-element > \.scrollbar > \.slider\s*\{[^}]*width:\s*var\(--desktop-terminal-scrollbar-track-size\) !important;/s,
+    );
+    expect(css).toContain(
+      ".desktop-terminal-xterm .xterm .xterm-scrollable-element > .scrollbar > .slider::after",
+    );
+    expect(css).toMatch(
+      /\.slider::after\s*\{[^}]*width:\s*var\(--desktop-terminal-scrollbar-thumb-size\);[^}]*pointer-events:\s*none;/s,
+    );
     expect(globalLayout).not.toContain(".desktop-terminal-");
   });
 

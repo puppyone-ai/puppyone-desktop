@@ -38,11 +38,11 @@
 }
 
 .desktop-agent-transcript::-webkit-scrollbar {
-  width: var(--po-scrollbar-size, 8px);
+  width: var(--po-scrollbar-size, 12px);
 }
 
 .desktop-agent-transcript::-webkit-scrollbar-thumb {
-  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
+  border: var(--po-scrollbar-thumb-inset, 3px) solid transparent;
   border-radius: var(--po-scrollbar-radius, 999px);
   background-color: var(--po-scrollbar-thumb);
   background-clip: padding-box;
