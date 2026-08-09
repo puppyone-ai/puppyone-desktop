@@ -8,7 +8,7 @@
   inline-size: 100%;
   max-inline-size: 100%;
   margin: 0;
-  padding-block: 14px 18px;
+  padding-block: 0 18px;
   padding-inline: 0;
   overflow: visible;
   cursor: text;
@@ -21,7 +21,8 @@
   max-inline-size: 100%;
   margin: 0;
   margin-inline-start: calc(-1 * var(--cm-md-table-scroll-away-inset));
-  padding: 0;
+  padding-block: var(--cm-md-table-handle-gutter) 0;
+  padding-inline: 0;
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;

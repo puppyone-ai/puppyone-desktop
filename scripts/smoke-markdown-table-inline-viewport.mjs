@@ -60,6 +60,11 @@ function tableMarkup(direction) {
             <button class="cm-md-table-structure-button cm-md-table-add-column po-editable-table-structure-button po-editable-table-add-column" type="button">
               <span class="cm-md-table-structure-button-visual po-editable-table-structure-button-visual"></span>
             </button>
+            <div class="cm-md-table-drag-layer po-editable-table-drag-layer">
+              <button class="cm-md-table-drag-handle cm-md-table-column-handle po-editable-table-drag-handle po-editable-table-column-handle is-visible" style="left:90px;top:0" type="button">
+                <span class="cm-md-table-drag-handle-visual po-editable-table-drag-handle-visual"></span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -157,6 +162,7 @@ async function measureScenario(viewportWidth, direction) {
       const thirdColumn = table.rows[0].cells[2];
       const firstColumn = table.rows[0].cells[0];
       const addColumn = document.querySelector(".cm-md-table-add-column");
+      const columnHandle = document.querySelector(".cm-md-table-column-handle");
       const viewportMaximum = viewport.scrollWidth - viewport.clientWidth;
       scrollbarContent.style.inlineSize = scrollbar.clientWidth + viewportMaximum + "px";
       await nextFrame();
@@ -166,6 +172,7 @@ async function measureScenario(viewportWidth, direction) {
       const viewportRect = viewport.getBoundingClientRect();
       const scrollbarRect = scrollbar.getBoundingClientRect();
       const tableRect = table.getBoundingClientRect();
+      const columnHandleRect = columnHandle.getBoundingClientRect();
       const leadingInset = direction === "rtl"
         ? viewportRect.right - tableRect.right
         : tableRect.left - viewportRect.left;
@@ -178,12 +185,16 @@ async function measureScenario(viewportWidth, direction) {
         wrapperRight: wrapperRect.right,
         viewportLeft: viewportRect.left,
         viewportRight: viewportRect.right,
+        viewportTop: viewportRect.top,
         scrollbarLeft: scrollbarRect.left,
         scrollbarRight: scrollbarRect.right,
         scrollbarScrollWidth: scrollbar.scrollWidth,
         scrollbarClientWidth: scrollbar.clientWidth,
         tableLeft: tableRect.left,
         tableRight: tableRect.right,
+        tableTop: tableRect.top,
+        columnHandleTop: columnHandleRect.top,
+        columnHandleBottom: columnHandleRect.bottom,
         leadingInset,
         framePaddingInlineStart: Number.parseFloat(
           direction === "rtl" ? getComputedStyle(frame).paddingRight : getComputedStyle(frame).paddingLeft,
@@ -284,6 +295,15 @@ async function runSmoke() {
         initial.scrollbarScrollWidth - initial.scrollbarClientWidth,
         initial.viewportScrollWidth - initial.viewportClientWidth,
         `${label}: scrollbar logical range`,
+      );
+      assertNear(
+        initial.columnHandleTop,
+        initial.viewportTop,
+        `${label}: column handle top is inside the scrollport clip`,
+      );
+      assert(
+        initial.columnHandleBottom > initial.tableTop,
+        `${label}: column handle no longer straddles the table border`,
       );
       if (direction === "ltr") {
         assertNear(initial.viewportLeft, expectedSafeStart, `${label}: safe edge`);

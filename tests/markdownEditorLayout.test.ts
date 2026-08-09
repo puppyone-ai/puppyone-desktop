@@ -341,12 +341,16 @@ describe("Markdown table affordance layout", () => {
 
     expect(rootRule).toContain("inline-size: 100%;");
     expect(rootRule).toContain("overflow: visible;");
+    expect(rootRule).toContain("padding-block: 0 18px;");
     expect(viewportRule).toContain("--cm-md-table-scroll-away-inset: 0px;");
     expect(viewportRule).toContain(
       "margin-inline-start: calc(-1 * var(--cm-md-table-scroll-away-inset));",
     );
     expect(viewportRule).toContain("overflow-x: auto;");
     expect(viewportRule).toContain("overflow-y: hidden;");
+    expect(viewportRule).toContain(
+      "padding-block: var(--cm-md-table-handle-gutter) 0;",
+    );
     expect(viewportRule).toContain("touch-action: pan-x pan-y;");
     expect(markdownTableCss).toContain(
       "calc(var(--po-markdown-editor-gutter-inline) - var(--po-markdown-editor-gutter-min))",
