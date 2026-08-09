@@ -270,27 +270,25 @@
 }
 
 .po-editable-table-add-row {
-  right: 0;
-  bottom: calc(-1 * var(--po-editable-table-action-gutter));
-  left: 0;
-  height: var(--po-editable-table-action-gutter);
+  inset-inline: 0;
+  block-size: var(--po-editable-table-action-gutter);
+  inset-block-end: calc(-1 * var(--po-editable-table-action-gutter));
 }
 
 .po-editable-table-add-row .po-editable-table-structure-button-visual {
-  width: 100%;
-  height: 13px;
+  inline-size: 100%;
+  block-size: 13px;
 }
 
 .po-editable-table-add-column {
-  top: 0;
-  right: calc(-1 * var(--po-editable-table-action-gutter));
-  bottom: 0;
-  width: var(--po-editable-table-action-gutter);
+  inset-block: 0;
+  inline-size: var(--po-editable-table-action-gutter);
+  inset-inline-end: calc(-1 * var(--po-editable-table-action-gutter));
 }
 
 .po-editable-table-add-column .po-editable-table-structure-button-visual {
-  width: 13px;
-  height: 100%;
+  inline-size: 13px;
+  block-size: 100%;
 }
 
 .po-editable-table-context-menu.desktop-menu-surface {

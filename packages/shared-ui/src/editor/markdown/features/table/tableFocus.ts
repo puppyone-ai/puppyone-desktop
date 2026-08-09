@@ -8,6 +8,7 @@ import {
 } from "./tableFocusState";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { revealMarkdownTableWindowRow } from "./tableWindowController";
+import { revealMarkdownTableInlineColumn } from "./tableInlineViewportController";
 
 const MAX_FOCUS_RESTORE_ATTEMPTS = 3;
 
@@ -90,6 +91,7 @@ export function focusMarkdownTableCell(wrapper: HTMLElement | null, target: Mark
   }
   cell.focus({ preventScroll: true });
   placeCaretAtEnd(cell);
+  revealMarkdownTableInlineColumn(wrapper, target.columnIndex);
   return true;
 }
 

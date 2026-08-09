@@ -1,16 +1,19 @@
 .markdown-codemirror-editor .cm-md-table-widget-wrap {
   --cm-md-table-handle-gutter: 14px;
+  --cm-md-table-scroll-away-inset: 0px;
   position: relative;
   display: block;
   box-sizing: border-box;
-  width: calc(100% + var(--cm-md-table-handle-gutter));
-  max-width: calc(100% + var(--cm-md-table-handle-gutter));
-  margin: 0 0 0 calc(-1 * var(--cm-md-table-handle-gutter));
-  padding: 14px 0 18px;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  margin: 0;
+  margin-inline-start: calc(-1 * var(--cm-md-table-scroll-away-inset));
+  padding-block: 14px 18px;
+  padding-inline: 0;
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
-  touch-action: pan-x;
+  touch-action: pan-x pan-y;
   cursor: text;
 }
 
@@ -20,11 +23,20 @@
       var(--po-markdown-editor-gutter-min),
       calc((100cqw - var(--po-markdown-editor-text-width)) / 2)
     );
-    width: calc(min(
+    --cm-md-table-scroll-away-inset: max(
+      0px,
+      calc(var(--po-markdown-editor-gutter-inline) - var(--po-markdown-editor-gutter-min))
+    );
+    inline-size: calc(var(--cm-md-table-scroll-away-inset) + min(
       var(--po-markdown-breakout-max-width),
       calc(100cqw - var(--po-markdown-editor-gutter-inline) - var(--po-markdown-breakout-right-gutter))
-    ) + var(--cm-md-table-handle-gutter));
-    max-width: calc(100cqw - var(--po-markdown-editor-gutter-inline) - var(--po-markdown-breakout-right-gutter) + var(--cm-md-table-handle-gutter));
+    ));
+    max-inline-size: calc(
+      var(--cm-md-table-scroll-away-inset)
+      + 100cqw
+      - var(--po-markdown-editor-gutter-inline)
+      - var(--po-markdown-breakout-right-gutter)
+    );
   }
 }
 
@@ -32,15 +44,19 @@
   --cm-md-table-action-gutter: var(--po-editable-table-action-gutter);
   display: inline-block;
   min-width: max-content;
-  padding-right: var(--cm-md-table-action-gutter);
-  padding-bottom: var(--cm-md-table-action-gutter);
-  padding-left: var(--cm-md-table-handle-gutter);
+  padding-block: 0 var(--cm-md-table-action-gutter);
+  padding-inline-start: calc(
+    var(--cm-md-table-scroll-away-inset)
+    + var(--cm-md-table-handle-gutter)
+  );
+  padding-inline-end: var(--cm-md-table-action-gutter);
 }
 
 .markdown-codemirror-editor .cm-md-table-surface {
   position: relative;
   display: inline-block;
   min-width: max-content;
+  margin-inline-start: calc(-1 * var(--cm-md-table-handle-gutter));
   vertical-align: top;
 }
 

@@ -3,6 +3,7 @@
  */
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
+import { redo, undo } from "@codemirror/commands";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   markdownCodeMirrorBaseExtensions,
@@ -11,6 +12,7 @@ import {
 import { closeActiveMarkdownTableMenu } from "../packages/shared-ui/src/editor/markdown/features/table/tableMenuState";
 import { markdownLocalizationExtension } from "../packages/shared-ui/src/editor/markdown/core/editor/markdownLocalization";
 import { testT } from "./testLocalization";
+import { focusMarkdownTableCell } from "../packages/shared-ui/src/editor/markdown/features/table/tableFocus";
 
 const TABLE_SOURCE = [
   "| A | B | C |",
@@ -102,6 +104,19 @@ function makeHandleCaptureSafe(handle: HTMLElement) {
   });
 }
 
+function mockHorizontalScroller(element: HTMLElement, clientWidth: number, scrollWidth: number) {
+  let scrollLeft = 0;
+  Object.defineProperties(element, {
+    clientWidth: { configurable: true, get: () => clientWidth },
+    scrollWidth: { configurable: true, get: () => scrollWidth },
+    scrollLeft: {
+      configurable: true,
+      get: () => scrollLeft,
+      set: (value: number) => { scrollLeft = value; },
+    },
+  });
+}
+
 describe("Markdown table EditorView interactions", () => {
   it("adds rows and columns and restores logical focus after the view update", async () => {
     const view = createTableView();
@@ -125,6 +140,114 @@ describe("Markdown table EditorView interactions", () => {
     await nextAnimationFrame();
     expect((document.activeElement as HTMLElement | null)?.dataset.mdTableRow).toBe("0");
     expect((document.activeElement as HTMLElement | null)?.dataset.mdTableColumn).toBe("3");
+  });
+
+  it("keeps the inline viewport session across a structural Widget replacement", async () => {
+    const view = createTableView();
+    const firstViewport = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
+    const firstSessionId = firstViewport.dataset.mdInlineViewportSession;
+    expect(firstSessionId).toBeTruthy();
+    expect(firstViewport.dataset.mdTableInlineViewport).toBe("true");
+    expect(firstViewport.querySelector("[data-md-table-scroll-track='true']")).not.toBeNull();
+    expect(firstViewport.querySelector("[data-md-table-surface='true']")).not.toBeNull();
+    mockHorizontalScroller(firstViewport, 240, 720);
+    firstViewport.scrollLeft = 180;
+    firstViewport.dispatchEvent(new Event("scroll"));
+    await nextAnimationFrame();
+
+    view.dom.querySelector<HTMLButtonElement>(".cm-md-table-add-column")?.click();
+    await nextAnimationFrame();
+
+    const replacementViewport = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
+    expect(replacementViewport).not.toBe(firstViewport);
+    expect(replacementViewport.dataset.mdInlineViewportSession).toBe(firstSessionId);
+
+    expect(undo(view)).toBe(true);
+    await nextAnimationFrame();
+    expect(
+      view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")?.dataset.mdInlineViewportSession,
+    ).toBe(firstSessionId);
+
+    expect(redo(view)).toBe(true);
+    await nextAnimationFrame();
+    expect(
+      view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")?.dataset.mdInlineViewportSession,
+    ).toBe(firstSessionId);
+  });
+
+  it("maps viewport lineage through an unrelated edit before the table", async () => {
+    const view = createTableView();
+    const firstSessionId = view.dom.querySelector<HTMLElement>(
+      ".cm-md-table-widget-wrap",
+    )?.dataset.mdInlineViewportSession;
+
+    view.dispatch({ changes: { from: 0, insert: "intro\n" } });
+    await vi.waitFor(() => {
+      expect(
+        view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")?.dataset.mdInlineViewportSession,
+      ).toBe(firstSessionId);
+    });
+  });
+
+  it("keeps viewport lineage when a cell commit replaces the table Widget", async () => {
+    const view = createTableView();
+    const firstSessionId = view.dom.querySelector<HTMLElement>(
+      ".cm-md-table-widget-wrap",
+    )?.dataset.mdInlineViewportSession;
+    const cell = view.dom.querySelector<HTMLElement>(
+      '.cm-md-table-cell-content[data-md-table-row="1"][data-md-table-column="1"]',
+    )!;
+    cell.focus();
+    cell.textContent = "updated value";
+    cell.dispatchEvent(new InputEvent("input", { bubbles: true }));
+    cell.blur();
+    await nextAnimationFrame();
+
+    expect(source(view)).toContain("updated value");
+    expect(
+      view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")?.dataset.mdInlineViewportSession,
+    ).toBe(firstSessionId);
+  });
+
+  it("does not leak viewport state into an unrelated replacement table", async () => {
+    const view = createTableView();
+    const firstViewport = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
+    const firstSessionId = firstViewport.dataset.mdInlineViewportSession;
+    const replacement = [
+      "| X | Y |",
+      "| --- | --- |",
+      "| seven | eight |",
+    ].join("\n");
+
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: replacement } });
+    await nextAnimationFrame();
+
+    const replacementViewport = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
+    expect(replacementViewport.dataset.mdInlineViewportSession).toBeTruthy();
+    expect(replacementViewport.dataset.mdInlineViewportSession).not.toBe(firstSessionId);
+    expect(replacementViewport.dataset.mdInlineViewportAnchor).toBe("start");
+  });
+
+  it("reveals the focused column without scrolling the outer editor horizontally", async () => {
+    const view = createTableView();
+    const viewport = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
+    const table = viewport.querySelector<HTMLTableElement>(".cm-md-table-widget")!;
+    mockHorizontalScroller(viewport, 250, 500);
+    mockRect(viewport, rect(0, 0, 250, 160));
+    mockRect(table, rect(80, 20, 300, 120));
+    for (const row of Array.from(table.rows)) {
+      Array.from(row.cells).forEach((cell, index) => {
+        mockRect(cell, rect(80 + index * 100, 20, 100, 32));
+      });
+    }
+    const outerScrollLeft = view.scrollDOM.scrollLeft;
+
+    expect(focusMarkdownTableCell(viewport, { rowIndex: 0, columnIndex: 2 })).toBe(true);
+    await nextAnimationFrame();
+
+    expect(viewport.scrollLeft).toBeGreaterThan(0);
+    expect(view.scrollDOM.scrollLeft).toBe(outerScrollLeft);
+    expect((document.activeElement as HTMLElement | null)?.dataset.mdTableColumn).toBe("2");
   });
 
   it("moves a column through the cell context menu", () => {

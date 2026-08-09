@@ -67,6 +67,38 @@ export function createMarkdownTableRenderKey(
   return `${alignments.length}:${rows.length}:${sourceUnits}:${(hashA >>> 0).toString(36)}:${(hashB >>> 0).toString(36)}`;
 }
 
+/**
+ * Position-independent table identity for ephemeral viewport recovery.
+ * Transaction overlap remains the authority for invalidation, so this key
+ * intentionally excludes absolute source offsets while retaining semantics.
+ */
+export function createMarkdownTableViewportKey(
+  alignments: readonly MarkdownTableAlignment[],
+  rows: readonly MarkdownTableRow[],
+): string {
+  let hashA = 0x811c9dc5;
+  let hashB = 0x9e3779b9;
+  let sourceUnits = 0;
+  const add = (value: string) => {
+    sourceUnits += value.length;
+    for (let index = 0; index < value.length; index += 1) {
+      const unit = value.charCodeAt(index);
+      hashA = Math.imul(hashA ^ unit, 0x01000193);
+      hashB = Math.imul(hashB ^ unit, 0x85ebca6b);
+      hashB ^= hashB >>> 13;
+    }
+    hashA = Math.imul(hashA ^ 0xff, 0x01000193);
+    hashB = Math.imul(hashB ^ 0x7f, 0xc2b2ae35);
+  };
+
+  for (const alignment of alignments) add(alignment ?? "none");
+  for (const row of rows) {
+    add(row.header ? "header" : "body");
+    for (const cell of row.cells) add(cell.text);
+  }
+  return `viewport:${alignments.length}:${rows.length}:${sourceUnits}:${(hashA >>> 0).toString(36)}:${(hashB >>> 0).toString(36)}`;
+}
+
 function estimateCellVisualLines(text: string): number {
   return text.split("\n").reduce((total, line) => {
     let width = 0;

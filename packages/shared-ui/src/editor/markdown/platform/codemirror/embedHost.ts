@@ -5,6 +5,10 @@ import { createLinkBroker, type LinkBroker } from "../brokers/linkBroker";
 import { createTransactionBroker, type TransactionBroker } from "../brokers/transactionBroker";
 import { createWebEmbedBroker, type WebEmbedBroker } from "../brokers/webEmbedBroker";
 import { createEmbeddedEditSessionStore, type EmbeddedEditSessionStore } from "./embeddedEditSession";
+import {
+  createEmbeddedInlineViewportSessionStore,
+  type EmbeddedInlineViewportSessionStore,
+} from "./embeddedInlineViewportSession";
 import { createWidgetSessionRegistry, type WidgetSessionRegistry } from "./widgetSession";
 import { createExecutionSessionStore, type ExecutionSessionStore } from "../sessions/executionSession";
 import { createMarkdownLayoutCoordinator, type MarkdownLayoutCoordinator } from "./layoutCoordinator";
@@ -13,6 +17,7 @@ export type MarkdownEmbedHost = {
   viewId: string;
   sessions: WidgetSessionRegistry;
   editSessions: EmbeddedEditSessionStore;
+  inlineViewports: EmbeddedInlineViewportSessionStore;
   executionSessions: ExecutionSessionStore;
   assets: AssetBroker;
   asyncRender: AsyncRenderBroker;
@@ -46,6 +51,7 @@ export function getMarkdownEmbedHost(
 
   const sessions = createWidgetSessionRegistry();
   const editSessions = createEmbeddedEditSessionStore();
+  const inlineViewports = createEmbeddedInlineViewportSessionStore();
   const assets = createAssetBroker(options.resolveAssetUrl ?? null, {
     workspaceRoot: options.workspaceRoot ?? null,
     // Conventional Markdown documentation loads passive HTTPS images (for
@@ -72,6 +78,7 @@ export function getMarkdownEmbedHost(
     viewId: `md-view:${++viewSequence}`,
     sessions,
     editSessions,
+    inlineViewports,
     executionSessions,
     assets,
     asyncRender,
@@ -85,6 +92,7 @@ export function getMarkdownEmbedHost(
     dispose() {
       sessions.disposeAll();
       editSessions.clear();
+      inlineViewports.clear();
       executionSessions.disposeAll();
       assets.disposeAll();
       asyncRender.disposeAll();

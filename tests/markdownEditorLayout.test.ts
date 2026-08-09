@@ -260,6 +260,41 @@ describe("Markdown rich-block boundary affordance", () => {
 });
 
 describe("Markdown table affordance layout", () => {
+  it("splits the safe-edge scrollport from the reading-rail table track", () => {
+    const viewportRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-widget-wrap",
+    );
+    const frameRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-frame",
+    );
+    const surfaceRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-surface",
+    );
+
+    expect(viewportRule).toContain("--cm-md-table-scroll-away-inset: 0px;");
+    expect(viewportRule).toContain(
+      "margin-inline-start: calc(-1 * var(--cm-md-table-scroll-away-inset));",
+    );
+    expect(viewportRule).toContain("overflow-x: auto;");
+    expect(viewportRule).toContain("overflow-y: hidden;");
+    expect(viewportRule).toContain("touch-action: pan-x pan-y;");
+    expect(markdownTableCss).toContain(
+      "calc(var(--po-markdown-editor-gutter-inline) - var(--po-markdown-editor-gutter-min))",
+    );
+    expect(frameRule).toContain("padding-inline-start: calc(");
+    expect(frameRule).toContain("var(--cm-md-table-scroll-away-inset)");
+    expect(frameRule).toContain("padding-inline-end: var(--cm-md-table-action-gutter);");
+    expect(surfaceRule).toContain(
+      "margin-inline-start: calc(-1 * var(--cm-md-table-handle-gutter));",
+    );
+    expect(markdownTableWidgetSource).toContain('wrapper.dataset.mdTableInlineViewport = "true";');
+    expect(markdownTableWidgetSource).toContain('frame.dataset.mdTableScrollTrack = "true";');
+    expect(markdownTableWidgetSource).toContain('surface.dataset.mdTableSurface = "true";');
+  });
+
   it("uses one shared, pixel-centered structure control for Markdown and CSV", () => {
     const frameRule = readCssRule(markdownTableCss, ".markdown-codemirror-editor .cm-md-table-frame");
     const visualRule = readCssRule(sharedTableCss, ".po-editable-table-structure-button-visual");
@@ -299,12 +334,12 @@ describe("Markdown table affordance layout", () => {
     expect(horizontalStrokeRule).toContain("height: 1px;");
     expect(verticalStrokeRule).toContain("width: 1px;");
     expect(verticalStrokeRule).toContain("height: 7px;");
-    expect(addRowRule).toContain("height: var(--po-editable-table-action-gutter);");
-    expect(addRowRule).toContain("bottom: calc(-1 * var(--po-editable-table-action-gutter));");
-    expect(addRowVisualRule).toContain("height: 13px;");
-    expect(addColumnRule).toContain("width: var(--po-editable-table-action-gutter);");
-    expect(addColumnRule).toContain("right: calc(-1 * var(--po-editable-table-action-gutter));");
-    expect(addColumnVisualRule).toContain("width: 13px;");
+    expect(addRowRule).toContain("block-size: var(--po-editable-table-action-gutter);");
+    expect(addRowRule).toContain("inset-block-end: calc(-1 * var(--po-editable-table-action-gutter));");
+    expect(addRowVisualRule).toContain("block-size: 13px;");
+    expect(addColumnRule).toContain("inline-size: var(--po-editable-table-action-gutter);");
+    expect(addColumnRule).toContain("inset-inline-end: calc(-1 * var(--po-editable-table-action-gutter));");
+    expect(addColumnVisualRule).toContain("inline-size: 13px;");
     expect(markdownTableCss).not.toContain(
       ".markdown-codemirror-editor .cm-md-table-structure-button {",
     );
