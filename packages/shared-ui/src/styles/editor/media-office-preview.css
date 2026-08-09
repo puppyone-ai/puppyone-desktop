@@ -64,89 +64,6 @@
   color: var(--po-text);
 }
 
-.office-editor-shell {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  background: var(--color-surface, #fff);
-}
-
-.office-editor-toolbar {
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  min-height: 34px;
-  padding: 4px 10px;
-  color: var(--color-text-muted, #666);
-  border-bottom: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
-  background: var(--color-surface, #fff);
-  font-size: 12px;
-}
-
-.office-editor-toolbar button,
-.office-editor-conflict button {
-  padding: 4px 10px;
-  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.16));
-  border-radius: 6px;
-  background: var(--color-surface-raised, #fff);
-  color: inherit;
-  cursor: pointer;
-}
-
-.office-editor-toolbar button:disabled {
-  cursor: default;
-  opacity: 0.55;
-}
-
-.office-editor-host {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.office-editor-loading {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  background: var(--color-surface, #fff);
-  color: var(--color-text-muted, #666);
-}
-
-.office-editor-conflict,
-.office-editor-error {
-  position: relative;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 12px;
-  padding: 10px 12px;
-  border: 1px solid #b97900;
-  border-radius: 8px;
-  background: #fff4cf;
-  color: #573800;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
-}
-
-.office-editor-conflict span {
-  flex: 1;
-}
-
-.office-editor-error {
-  border-color: #b42318;
-  background: #fff0ed;
-  color: #7a271a;
-}
-
 .office-preview__header {
   box-sizing: border-box;
   display: flex;
@@ -237,6 +154,52 @@
   color: var(--po-text);
 }
 
+.office-preview__toolbar-button:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.office-preview__toolbar-button[data-active="true"] {
+  background: var(--po-control-selected, var(--po-control-hover));
+  color: var(--po-text);
+}
+
+.office-preview__zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding-right: 5px;
+  border-right: 1px solid var(--po-divider);
+}
+
+.office-preview__zoom-value {
+  width: 40px;
+  color: var(--po-text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.office-preview__editor-action {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: var(--desktop-control-radius, 6px);
+  background: var(--po-control);
+  color: var(--po-text);
+  cursor: var(--po-clickable-cursor, pointer);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.office-preview__editor-action:hover {
+  background: var(--po-control-hover);
+}
+
 .office-preview__note {
   color: var(--po-text-muted);
   font-size: 11px;
@@ -277,6 +240,8 @@
 
 .office-document-preview--docx {
   align-items: stretch;
+  padding: 28px 28px 64px;
+  background: color-mix(in srgb, var(--po-inset) 72%, var(--po-editor-bg));
 }
 
 .office-docx-host {

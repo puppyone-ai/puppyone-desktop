@@ -42,7 +42,7 @@ describe("editor access routing", () => {
     })).toEqual({ kind: "read-only", reason: "source-unavailable" });
   });
 
-  it("opens modern Office resources only through the Host Office persistence port", () => {
+  it("keeps modern Office resources read-only regardless of text persistence", () => {
     const document: EditorDocument = {
       path: "book.xlsx",
       name: "book.xlsx",
@@ -57,15 +57,13 @@ describe("editor access routing", () => {
       ...route,
       content: document.content ?? "",
       persistenceAvailable: true,
-      resourcePersistenceAvailable: false,
-    })).toEqual({ kind: "read-only", reason: "persistence-unavailable" });
+    })).toEqual({ kind: "read-only", reason: "viewer-capability" });
     expect(resolveEditorAccess({
       document,
       ...route,
       content: "",
       persistenceAvailable: false,
-      resourcePersistenceAvailable: true,
-    })).toEqual({ kind: "editable" });
+    })).toEqual({ kind: "read-only", reason: "viewer-capability" });
   });
 
   it("requires a host persistence capability after format and Viewer approval", () => {

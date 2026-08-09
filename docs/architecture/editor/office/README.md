@@ -1,82 +1,70 @@
-# Managed Office Editing Runtime
+# Office Preview and Editor Extension Boundary
 
-PuppyOne edits `.docx`, `.xlsx`, and `.pptx` through the process-neutral
-`OfficeEditingPort`. The existing `office-preview` contribution remains the
-only route: it mounts the managed editor when the Experimental setting is on
-and the PuppyOne service is available, and otherwise renders the bounded local
-Preview.
+PuppyOne ships one built-in Office capability: a lightweight, read-only,
+fully local preview for supported Word, spreadsheet, and presentation files.
+It does not require Microsoft Word, WPS, LibreOffice, Docker, an Office server,
+or a PuppyOne Cloud API.
 
-Desktop users do not install Docker, configure a Document Server, provide an
-engine JWT, or expose a callback listener.
-
-## Runtime boundary
+## Built-in preview path
 
 ```text
-DataWorkspace -> EditorHost -> office-preview contribution
-                                  |
-                    OfficeEditingPort (no Electron imports)
-                                  |
-          trusted preload IPC -> Electron OfficeEditingService
-                                  |
-                       PuppyOne Cloud Auth
-                                  |
-                        /api/v1/office
-                                  |
-              managed ONLYOFFICE + Redis + private S3
-                                  |
-                  sandboxed WebContentsView
-                                  |
-              versioned atomic local file writer
+local workspace file
+        |
+        v
+bounded capability URL + OOXML package validation
+        |
+        v
+office-preview contribution
+        |
+        +----> DOCX: docx-preview -> sanitized Shadow DOM -> paper surface
+        +----> XLSX: bounded worker parse -> virtualized spreadsheet grid
+        `----> PPTX: isolated slide renderer -> thumbnail rail + slide stage
 ```
 
-Electron authorizes the current window's canonical workspace root, reads the
-source bytes, and uploads only filename, bytes, and locale over the current
-authenticated PuppyOne session. An absolute Desktop path never leaves the
-machine.
+The built-in contribution has manifest capability `preview`; Office formats
+are not marked editable. The renderer receives no binary persistence port and
+does not infer editing authority from the presence of a resource URL.
 
-PuppyOne backend is the only holder of the document-server URL, JWT and
-capability secrets, callback handling, result-origin allowlist, Redis address,
-and private storage settings. Desktop receives a short-lived signed launch
-configuration but retains it in Electron Main; Shared UI sees only opaque
-session/surface identifiers and status.
+Word rendering stays in `viewers/word`. Package validation and DOM budgets run
+before a rendered document is committed. Generated markup is sanitized and
+isolated in a Shadow Root. The preview supplies local font aliases for common
+Word font names, waits for fonts before fitting, defaults to fit-to-width, and
+exposes the effective zoom instead of applying an invisible scale.
 
-## Experimental product gate
+This is a compatibility renderer, not Word's layout engine. Explicit OOXML
+page breaks, page dimensions, headers, footers, tables, images, and embedded
+fonts are preserved where `docx-preview` supports them. Pagination inferred by
+Word's proprietary line-breaking engine can still differ, especially when the
+original font is unavailable. That limitation must remain honest in product
+and test documentation.
 
-`ExperimentalSettings.enableOfficeEditing` is persisted by the App Host and
-defaults to `false`. Only an opted-in local Host supplies
-`DataPort.officeEditing`. The service cannot enable the experiment implicitly.
+Legacy `.doc` and `.rtf` may use the macOS system converter to produce a
+temporary DOCX preview. This does not depend on an installed office suite and
+does not grant editing authority.
 
-An unavailable, signed-out, offline, expired, or malformed managed session
-falls back to the existing Office Preview without clearing selection. Once a
-session has edits, save errors remain visible and recoverable instead of
-silently remounting Preview.
+## Optional editor plugin handoff
 
-## Native surface isolation
+An Office editor is a separate product capability. Shared UI reserves only the
+opaque `OfficeEditorAction` / `OfficeEditorActionResolver` boundary:
 
-The ONLYOFFICE API runs in a temporary-partition `WebContentsView` with sandbox
-and context isolation enabled; preload, Node, webviews, DevTools, dialogs,
-permissions, navigation, and new windows are disabled. The trusted renderer
-keeps `script-src 'self'`. Production API scripts must use HTTPS under
-`puppyone.ai` and the exact `/web-apps/apps/api/documents/api.js` path;
-loopback is allowed only for development.
+```text
+Office preview header
+        |
+        v
+explicit “Edit with …” action supplied by the App Host
+        |
+        v
+future trusted plugin host owns engine, session, persistence, and isolation
+```
 
-## Persistence and recovery
+With no installed provider the resolver is absent, no edit action is rendered,
+and the local preview is unchanged. A provider must be launched explicitly by
+the user; it must not silently replace the default preview. The action is a
+host-owned closure, so shared UI receives neither engine credentials nor raw
+plugin capabilities.
 
-- Desktop uploads at most 100 MiB and records the exact local base version.
-- Backend stores source/result objects privately and session metadata in Redis
-  with a hard TTL.
-- Engine source and callback routes use distinct purpose-bound, expiring HMAC
-  capabilities. Callback bodies additionally require the ONLYOFFICE JWT and
-  exact document key, status, URL, and file-type match.
-- Result URLs and every redirect must remain on an exact allowlist and pass
-  timeout and byte limits.
-- Desktop polls monotonically versioned results and commits them through the
-  shared per-path, version-checked atomic binary writer.
-- An external local change preserves the managed result in mode-`0600`
-  recovery storage and requires an explicit keep-edited or keep-external
-  choice; callbacks never authorize a blind overwrite.
-- Normal close removes remote session state and temporary objects; expiry and
-  storage lifecycle are the backstop for interrupted cleanup.
-
-Legacy, macro/binary, template, slideshow, RTF, and OpenDocument variants stay
-on Preview until an explicit round-trip preservation policy is implemented.
+This reserved handoff does not make Viewer Pack v1 editable. Viewer Pack v1
+remains read-only. Shipping an OnlyOffice or another Office editor plugin
+requires a separately reviewed editor-plugin contract covering binary atomic
+writes, conflicts, close semantics, native-surface isolation, package size,
+licensing, and trust. None of that runtime is built into the default app.

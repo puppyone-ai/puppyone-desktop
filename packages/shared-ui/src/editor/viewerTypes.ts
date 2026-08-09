@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import type { AppPreviewController, OfficeDocumentConverter, OfficeEditingPort } from "../core/types";
+import type { AppPreviewController, OfficeDocumentConverter } from "../core/types";
 import type { FileFormat } from "../core/fileFormats";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
@@ -112,6 +112,21 @@ export type MarkdownAssetUrlResolver = (
   | null
   | Promise<string | MarkdownResolvedAssetUrl | null>;
 
+/**
+ * Host-owned handoff into an optional Office editor extension. The action is
+ * deliberately opaque to shared-ui: plugins keep session, persistence, and
+ * native-surface authority outside the built-in read-only preview.
+ */
+export type OfficeEditorAction = Readonly<{
+  id: string;
+  label: string;
+  activate: () => void | Promise<void>;
+}>;
+
+export type OfficeEditorActionResolver = (
+  document: EditorDocument,
+) => readonly OfficeEditorAction[];
+
 export type EditorViewerMatch = {
   document: EditorDocument;
   format: FileFormat;
@@ -138,7 +153,7 @@ export type PresetViewerRenderContext = EditorViewerMatch & {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
-  officeEditing?: OfficeEditingPort | null;
+  officeEditorActions?: readonly OfficeEditorAction[];
 };
 
 /** @deprecated Prefer PresetViewerRenderContext. */

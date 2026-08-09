@@ -224,68 +224,6 @@ export type OfficeDocumentConverter = (
   options?: OfficeDocumentConversionOptions,
 ) => Promise<OfficeDocumentConversionResult>;
 
-export type OfficeEditingAvailability = Readonly<{
-  available: boolean;
-  engine: "onlyoffice";
-  reason?: string | null;
-  documentServerUrl?: string | null;
-}>;
-
-export type OfficeEditingStatus =
-  | "ready"
-  | "editing"
-  | "saving"
-  | "saved"
-  | "awaiting-save"
-  | "conflict"
-  | "error"
-  | "closed";
-
-export type OfficeEditingState = Readonly<{
-  sessionId: string;
-  path: string;
-  status: OfficeEditingStatus;
-  version?: string | null;
-  message?: string | null;
-  recoveryAvailable?: boolean;
-  updatedAt: number;
-}>;
-
-export type OfficeEditingSession = Readonly<{
-  sessionId: string;
-  state: OfficeEditingState;
-  expiresAt: number;
-}>;
-
-export type OfficeEditingSurfaceBounds = Readonly<{
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}>;
-
-/** Process-neutral contract. Native transports and secrets remain Host-owned. */
-export type OfficeEditingPort = {
-  getAvailability: () => Promise<OfficeEditingAvailability>;
-  createSession: (request: { path: string; locale?: string }) => Promise<OfficeEditingSession>;
-  attachSurface: (sessionId: string, request: {
-    attachmentId: string;
-    bounds: OfficeEditingSurfaceBounds;
-  }) => Promise<{ surfaceId: string; attached: boolean }>;
-  setSurfaceBounds: (surfaceId: string, request: {
-    attachmentId: string;
-    bounds: OfficeEditingSurfaceBounds;
-  }) => Promise<{ ok: boolean; visible: boolean }>;
-  detachSurface: (surfaceId: string, attachmentId: string) => Promise<{ detached: boolean }>;
-  forceSave: (sessionId: string) => Promise<{ accepted: boolean }>;
-  closeSession: (sessionId: string) => Promise<{ closed: boolean }>;
-  resolveConflict: (
-    sessionId: string,
-    resolution: "keep-edited" | "reload-external",
-  ) => Promise<OfficeEditingState>;
-  subscribe: (listener: (state: OfficeEditingState) => void) => () => void;
-};
-
 export type DataImportResult = {
   paths: string[];
 };
@@ -362,7 +300,6 @@ export type DataPort = {
   revokeFileUrl?: (url: string) => void | Promise<void>;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
-  officeEditing?: OfficeEditingPort;
   appPreview?: AppPreviewController;
   documentPersistence?: DocumentPersistencePort;
   createFolder?: (path: string) => Promise<void>;

@@ -4,7 +4,6 @@ import type {
   DocumentPersistencePort,
   FileContent,
   OfficeDocumentConverter,
-  OfficeEditingPort,
 } from "../core/types";
 import type { FileIconThemeId } from "../file/fileIcons";
 import {
@@ -19,6 +18,7 @@ import type {
   MarkdownDialectId,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
+  OfficeEditorActionResolver,
 } from "./viewerTypes";
 import type { ViewerExtensionHostAdapter } from "./viewerHostAdapters";
 import type { DocumentPersistedCommit } from "./document-session/types";
@@ -47,7 +47,7 @@ export type EditorHostProps = {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
-  officeEditing?: OfficeEditingPort | null;
+  resolveOfficeEditorActions?: OfficeEditorActionResolver | null;
   deferFallbackContent?: boolean;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   documentSourceKind?: DocumentSourceKind;
@@ -78,7 +78,7 @@ export function EditorHost({
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
-  officeEditing = null,
+  resolveOfficeEditorActions = null,
   deferFallbackContent = false,
   viewerExtensionAdapter = null,
   documentSourceKind = "local",
@@ -120,7 +120,7 @@ export function EditorHost({
       appPreview={appPreview}
       openExternalFile={openExternalFile}
       convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
-      officeEditing={officeEditing}
+      resolveOfficeEditorActions={resolveOfficeEditorActions}
       onSurfaceReady={onSurfaceReady}
     />
   );

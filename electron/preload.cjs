@@ -102,20 +102,6 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   revokeFileUrl: (request) => ipcRenderer.invoke("workspace:revoke-file-url", request),
   convertOfficeDocumentToDocx: (request) => ipcRenderer.invoke("workspace:convert-office-docx", request),
   cancelOfficeDocumentToDocxConversion: (request) => ipcRenderer.invoke("workspace:convert-office-docx-cancel", request),
-  getOfficeEditingAvailability: () => ipcRenderer.invoke("office-editing:get-availability"),
-  createOfficeEditingSession: (request) => ipcRenderer.invoke("office-editing:create-session", request),
-  attachOfficeEditingSurface: (request) => ipcRenderer.invoke("office-editing:surface-attach", request),
-  setOfficeEditingSurfaceBounds: (request) => ipcRenderer.invoke("office-editing:surface-set-bounds", request),
-  detachOfficeEditingSurface: (request) => ipcRenderer.invoke("office-editing:surface-detach", request),
-  forceSaveOfficeEditingSession: (request) => ipcRenderer.invoke("office-editing:force-save", request),
-  closeOfficeEditingSession: (request) => ipcRenderer.invoke("office-editing:close-session", request),
-  resolveOfficeEditingConflict: (request) => ipcRenderer.invoke("office-editing:resolve-conflict", request),
-  onOfficeEditingState: (callback) => {
-    if (typeof callback !== "function") return () => {};
-    const listener = (_event, state) => callback(state);
-    ipcRenderer.on("office-editing:state", listener);
-    return () => ipcRenderer.removeListener("office-editing:state", listener);
-  },
   writeFile: (request) => ipcRenderer.invoke("workspace:write-file", request),
   createEntry: (request) => ipcRenderer.invoke("workspace:create-entry", request),
   renameEntry: (request) => ipcRenderer.invoke("workspace:rename-entry", request),

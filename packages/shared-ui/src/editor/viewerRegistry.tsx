@@ -38,8 +38,6 @@ const PRESET_VIEWER_IMPLEMENTATION_KEYS = new Set([
   "render",
   "load",
 ]);
-const OFFICE_ENGINE_EDITABLE_EXTENSIONS = new Set(["docx", "xlsx", "pptx"]);
-
 const RESOLVED_PRESET_VIEWER_KEYS = new Set([
   "contractVersion",
   "id",
@@ -231,9 +229,6 @@ const PRESET_VIEWER_DEFINITIONS: PresetViewerContribution[] = [
   definePresetViewer({
     id: "office-preview",
     match: ({ format }) => format.defaultViewer === "office-preview",
-    isEditable: ({ resolvedExtension }) => (
-      resolvedExtension !== null && OFFICE_ENGINE_EDITABLE_EXTENSIONS.has(resolvedExtension)
-    ),
     load: () => import("./viewers/OfficeViewer").then(({ OfficeViewer }) => ({
       default: OfficeViewer,
     })),

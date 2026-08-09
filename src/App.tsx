@@ -3,7 +3,6 @@ import {
   EditorChromeContributionProvider,
   EditorFindContributionProvider,
   flushActiveDocumentSessions,
-  flushActiveOfficeEditingSessions,
   type DataNode,
   type DataWorkspaceActivePathChangeContext,
   type EditorChromeContribution,
@@ -219,7 +218,6 @@ function AppContent() {
   const drainWorkspaceNavigation = useCallback(async (): Promise<boolean> => {
     try {
       await flushActiveDocumentSessions("workspace-switch");
-      await flushActiveOfficeEditingSessions();
       setDocumentNavigationError(null);
       return true;
     } catch (error) {
@@ -335,10 +333,8 @@ function AppContent() {
     [cloudSession, desktopCloudApiBaseUrl],
   );
   const localDataPort = useMemo(
-    () => (workspace ? createLocalDataPort(workspace.path, {
-      enableOfficeEditing: experimentalSettings.enableOfficeEditing,
-    }) : null),
-    [experimentalSettings.enableOfficeEditing, workspace],
+    () => (workspace ? createLocalDataPort(workspace.path) : null),
+    [workspace],
   );
   const dataPort = useMemo(
     () => (localDataPort ? createExplorerDataPort(localDataPort, filesVisibilitySettings) : null),
@@ -530,7 +526,6 @@ function AppContent() {
       if (activeView === "data" && view !== "data" && !routesToData) {
         try {
           await flushActiveDocumentSessions("document-close");
-          await flushActiveOfficeEditingSessions();
         } catch (error) {
           if (requestId === desktopViewNavigationRequestRef.current) {
             setDocumentNavigationError(error instanceof Error ? error.message : String(error));
@@ -590,7 +585,6 @@ function AppContent() {
     if (path !== activeDataPath && !context?.documentSessionsDrained) {
       try {
         await flushActiveDocumentSessions("document-switch");
-        await flushActiveOfficeEditingSessions();
       } catch (error) {
         if (requestId === documentNavigationRequestRef.current) {
           setDocumentNavigationError(error instanceof Error ? error.message : String(error));

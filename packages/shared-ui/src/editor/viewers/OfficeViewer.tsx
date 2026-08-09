@@ -1,17 +1,19 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Maximize2,
+  Minus,
+  PencilLine,
+  Plus,
+} from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { PptxViewer, SlideHandle } from "@aiden0z/pptx-renderer";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { FileGlyphIcon } from "../../file/fileIcons";
-import {
-  assertDocxDomWithinBudget,
-  CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE,
-  getControlledDocxExternalHref,
-  sanitizeDocxDom,
-} from "../security/docxDomSanitizer";
 import { validateOfficePackageInWorker } from "../security/officePackageValidationClient";
 import {
   preflightOoxmlPackage,
@@ -31,7 +33,11 @@ import {
   type SpreadsheetSheet,
 } from "./spreadsheetPreview";
 import { parseSpreadsheetInWorker } from "./spreadsheetPreviewClient";
-import { OfficeEditorViewer } from "./OfficeEditorViewer";
+import { WordDocumentPreview } from "./word/WordDocumentPreview";
+import {
+  stepWordPreviewScale,
+  type WordPreviewZoom,
+} from "./word/wordPreviewLayout";
 
 type OfficeState =
   | { status: "idle" | "loading" }
@@ -109,29 +115,11 @@ type OfficeViewerProps = Pick<
   | "openExternalFile"
   | "convertOfficeDocumentToDocx"
   | "markdownLinkGraph"
-  | "canEdit"
-  | "officeEditing"
+  | "officeEditorActions"
   | "fileIconTheme"
 >;
 
 export function OfficeViewer({
-  canEdit,
-  officeEditing,
-  ...previewProps
-}: OfficeViewerProps) {
-  if (canEdit && officeEditing) {
-    return (
-      <OfficeEditorViewer
-        document={previewProps.document}
-        officeEditing={officeEditing}
-        fallback={<OfficePreviewViewer {...previewProps} />}
-      />
-    );
-  }
-  return <OfficePreviewViewer {...previewProps} />;
-}
-
-function OfficePreviewViewer({
   document,
   resolvedExtension,
   fileUrl,
@@ -140,11 +128,14 @@ function OfficePreviewViewer({
   openExternalFile,
   convertOfficeDocumentToDocx,
   markdownLinkGraph,
+  officeEditorActions = [],
   fileIconTheme,
-}: Omit<OfficeViewerProps, "canEdit" | "officeEditing">) {
+}: OfficeViewerProps) {
   const { t } = useLocalization();
   const [state, setState] = useState<OfficeState>({ status: "idle" });
   const [activeSheet, setActiveSheet] = useState(0);
+  const [wordZoom, setWordZoom] = useState<WordPreviewZoom>("fit");
+  const [wordResolvedScale, setWordResolvedScale] = useState(1);
   const extension = resolvedExtension ?? getExtension(document.name);
   const canUseNativeDocxConversion = Boolean(
     convertOfficeDocumentToDocx && NATIVE_DOCX_CONVERTIBLE_EXTENSIONS.has(extension),
@@ -155,6 +146,8 @@ function OfficePreviewViewer({
 
   useEffect(() => {
     setActiveSheet(0);
+    setWordZoom("fit");
+    setWordResolvedScale(1);
   }, [document.path]);
 
   useEffect(() => {
@@ -240,6 +233,8 @@ function OfficePreviewViewer({
             onActiveSheetChange={setActiveSheet}
             openExternalFile={openExternalFile}
             openExternalUrl={markdownLinkGraph?.openExternalUrl}
+            wordZoom={wordZoom}
+            onWordResolvedScaleChange={setWordResolvedScale}
           />
         )}
       </>
@@ -267,6 +262,14 @@ function OfficePreviewViewer({
         extension={extension}
         fileIconTheme={fileIconTheme}
         openExternalFile={openExternalFile}
+        officeEditorActions={officeEditorActions}
+        wordZoomControls={state.status === "ready" && state.result.kind === "word" ? {
+          scale: wordResolvedScale,
+          isFit: wordZoom === "fit",
+          onDecrease: () => setWordZoom(stepWordPreviewScale(wordResolvedScale, -1)),
+          onIncrease: () => setWordZoom(stepWordPreviewScale(wordResolvedScale, 1)),
+          onFit: () => setWordZoom("fit"),
+        } : null}
       />
       <div className="office-preview__body">
         {previewBody}
@@ -281,20 +284,39 @@ function OfficePreviewHeader({
   extension,
   fileIconTheme,
   openExternalFile,
+  officeEditorActions,
+  wordZoomControls,
 }: {
   documentName: string;
   documentPath: string;
   extension: string;
   fileIconTheme?: OfficeViewerProps["fileIconTheme"];
   openExternalFile?: (path: string) => Promise<void>;
+  officeEditorActions: NonNullable<OfficeViewerProps["officeEditorActions"]>;
+  wordZoomControls: {
+    scale: number;
+    isFit: boolean;
+    onDecrease: () => void;
+    onIncrease: () => void;
+    onFit: () => void;
+  } | null;
 }) {
   const { t } = useLocalization();
   const [externalOpenError, setExternalOpenError] = useState<string | null>(null);
+  const [editorActionError, setEditorActionError] = useState<string | null>(null);
   const openExternally = () => {
     if (!openExternalFile) return;
     setExternalOpenError(null);
     void Promise.resolve().then(() => openExternalFile(documentPath)).catch((error) => {
       setExternalOpenError(error instanceof Error ? error.message : String(error));
+    });
+  };
+  const activateEditorAction = (
+    action: NonNullable<OfficeViewerProps["officeEditorActions"]>[number],
+  ) => {
+    setEditorActionError(null);
+    void Promise.resolve().then(() => action.activate()).catch((error) => {
+      setEditorActionError(error instanceof Error ? error.message : String(error));
     });
   };
 
@@ -307,11 +329,66 @@ function OfficePreviewHeader({
         <span className="office-preview__mode">{t("editor.office.preview")}</span>
       </div>
       <div className="office-preview__header-actions">
-        {externalOpenError && (
+        {(externalOpenError || editorActionError) && (
           <span className="office-preview__header-error" role="alert" dir="auto">
-            {t("editor.office.openDesktopFailed", { detail: bidiIsolate(externalOpenError) })}
+            {editorActionError ?? t("editor.office.openDesktopFailed", {
+              detail: bidiIsolate(externalOpenError ?? ""),
+            })}
           </span>
         )}
+        {wordZoomControls && (
+          <div
+            className="office-preview__zoom-controls"
+            role="group"
+            aria-label={t("editor.office.wordZoom")}
+          >
+            <button
+              type="button"
+              className="office-preview__toolbar-button"
+              aria-label={t("editor.office.zoomOut")}
+              title={t("editor.office.zoomOut")}
+              disabled={wordZoomControls.scale <= 0.5}
+              onClick={wordZoomControls.onDecrease}
+            >
+              <Minus size={14} strokeWidth={2} />
+            </button>
+            <output className="office-preview__zoom-value" aria-live="polite">
+              {Math.round(wordZoomControls.scale * 100)}%
+            </output>
+            <button
+              type="button"
+              className="office-preview__toolbar-button"
+              aria-label={t("editor.office.zoomIn")}
+              title={t("editor.office.zoomIn")}
+              disabled={wordZoomControls.scale >= 2}
+              onClick={wordZoomControls.onIncrease}
+            >
+              <Plus size={14} strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              className="office-preview__toolbar-button"
+              aria-label={t("editor.office.fitWidth")}
+              title={t("editor.office.fitWidth")}
+              aria-pressed={wordZoomControls.isFit}
+              data-active={wordZoomControls.isFit ? "true" : undefined}
+              onClick={wordZoomControls.onFit}
+            >
+              <Maximize2 size={13} strokeWidth={2} />
+            </button>
+          </div>
+        )}
+        {officeEditorActions.map((action) => (
+          <button
+            type="button"
+            className="office-preview__editor-action"
+            key={action.id}
+            onClick={() => activateEditorAction(action)}
+          >
+            <PencilLine size={13} strokeWidth={2} />
+            <span>{action.label}</span>
+          </button>
+        ))}
         {openExternalFile && (
           <button
             type="button"
@@ -335,6 +412,8 @@ function OfficePreviewContent({
   onActiveSheetChange,
   openExternalFile,
   openExternalUrl,
+  wordZoom,
+  onWordResolvedScaleChange,
 }: {
   documentPath: string;
   result: OfficePreviewResult;
@@ -342,6 +421,8 @@ function OfficePreviewContent({
   onActiveSheetChange: (index: number) => void;
   openExternalFile?: (path: string) => Promise<void>;
   openExternalUrl?: (href: string) => void | Promise<void>;
+  wordZoom: WordPreviewZoom;
+  onWordResolvedScaleChange: (scale: number) => void;
 }) {
   const { t } = useLocalization();
   if (result.kind === "unsupported") {
@@ -357,11 +438,13 @@ function OfficePreviewContent({
 
   if (result.kind === "word") {
     return (
-      <DocxDocumentPreview
+      <WordDocumentPreview
         arrayBuffer={result.arrayBuffer}
         documentPath={documentPath}
         openExternalFile={openExternalFile}
         openExternalUrl={openExternalUrl}
+        zoom={wordZoom}
+        onResolvedScaleChange={onWordResolvedScaleChange}
       />
     );
   }
@@ -978,151 +1061,6 @@ function createSpreadsheetPreviewNotes(
   return notes;
 }
 
-function DocxDocumentPreview({
-  arrayBuffer,
-  documentPath,
-  openExternalFile,
-  openExternalUrl,
-}: {
-  arrayBuffer: ArrayBuffer;
-  documentPath: string;
-  openExternalFile?: (path: string) => Promise<void>;
-  openExternalUrl?: (href: string) => void | Promise<void>;
-}) {
-  const { t } = useLocalization();
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const [renderState, setRenderState] = useState<{ status: "loading" | "ready" | "error"; message?: string }>({
-    status: "loading",
-  });
-
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return undefined;
-
-    let cancelled = false;
-    let resizeObserver: ResizeObserver | null = null;
-    const shadowRoot = host.shadowRoot ?? host.attachShadow({ mode: "open" });
-    shadowRoot.replaceChildren();
-
-    const fragment = document.createDocumentFragment();
-    const baseStyle = document.createElement("style");
-    baseStyle.textContent = DOCX_SHADOW_BASE_CSS;
-    const styleContainer = document.createElement("div");
-    styleContainer.className = "office-docx-style-container";
-    const bodyContainer = document.createElement("div");
-    bodyContainer.className = "office-docx-body";
-    fragment.append(baseStyle, styleContainer, bodyContainer);
-    setRenderState({ status: "loading" });
-
-    const activateControlledLink = (event: Event) => {
-      const link = findDocxLinkInEvent(event);
-      if (!link) return;
-
-      if (event instanceof KeyboardEvent && event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      event.stopPropagation();
-
-      const internalHref = link.getAttribute("href");
-      if (internalHref?.startsWith("#")) {
-        findDocxFragmentTarget(shadowRoot, internalHref)?.scrollIntoView({ block: "start" });
-        return;
-      }
-
-      const externalHref = getControlledDocxExternalHref(link);
-      if (externalHref && openExternalUrl) {
-        void Promise.resolve().then(() => openExternalUrl(externalHref)).catch((error) => {
-          setRenderState({
-            status: "error",
-            message: error instanceof Error ? error.message : String(error),
-          });
-        });
-      }
-    };
-    shadowRoot.addEventListener("click", activateControlledLink);
-    shadowRoot.addEventListener("keydown", activateControlledLink);
-
-    import("docx-preview")
-      .then(({ renderAsync }) => renderAsync(
-        arrayBuffer.slice(0),
-        bodyContainer,
-        styleContainer,
-        {
-          renderAltChunks: false,
-          ignoreLastRenderedPageBreak: false,
-          renderHeaders: true,
-          renderFooters: true,
-          renderFootnotes: true,
-          renderEndnotes: true,
-          renderComments: false,
-          renderChanges: false,
-          breakPages: true,
-          ignoreWidth: false,
-          ignoreHeight: false,
-          ignoreFonts: false,
-          useBase64URL: true,
-          inWrapper: true,
-          className: "office-docx",
-        },
-      ))
-      .then(() => {
-        if (cancelled) return;
-        assertDocxDomWithinBudget(fragment);
-        sanitizeDocxDom(fragment);
-        shadowRoot.replaceChildren(fragment);
-        fitDocxPreviewToWidth(host, bodyContainer);
-        resizeObserver = new ResizeObserver(() => fitDocxPreviewToWidth(host, bodyContainer));
-        resizeObserver.observe(host);
-        setRenderState({ status: "ready" });
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setRenderState({
-            status: "error",
-            message: error instanceof Error ? error.message : String(error),
-          });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      resizeObserver?.disconnect();
-      shadowRoot.removeEventListener("click", activateControlledLink);
-      shadowRoot.removeEventListener("keydown", activateControlledLink);
-      shadowRoot.replaceChildren();
-    };
-  }, [arrayBuffer, openExternalUrl]);
-
-  if (renderState.status === "error") {
-    return (
-      <OfficeEmptyState
-        title={t("editor.preview.failed")}
-        message={t("editor.office.docxFailed", {
-          detail: bidiIsolate(renderState.message ?? t("editor.office.unknownError")),
-        })}
-        documentPath={documentPath}
-        openExternalFile={openExternalFile}
-      />
-    );
-  }
-
-  return (
-    <div
-      className="office-document-preview office-document-preview--docx"
-      data-po-scrollbar="content"
-      aria-busy={renderState.status === "loading"}
-    >
-      {renderState.status === "loading" && (
-        <div className="office-docx-render-state">{t("editor.office.renderingWord")}</div>
-      )}
-      <div
-        ref={hostRef}
-        className="office-docx-host"
-        data-rendering={renderState.status === "loading" ? "true" : undefined}
-      />
-    </div>
-  );
-}
-
 function OfficeEmptyState({
   title,
   message,
@@ -1455,20 +1393,6 @@ function unsupportedNativeConversionMessage(extension: string): OfficePreviewRes
   };
 }
 
-function fitDocxPreviewToWidth(host: HTMLElement, bodyContainer: HTMLElement) {
-  const wrapper = bodyContainer.querySelector<HTMLElement>(".docx-wrapper") ?? bodyContainer;
-  const firstPage = bodyContainer.querySelector<HTMLElement>(".office-docx");
-  if (!firstPage) return;
-
-  wrapper.style.zoom = "1";
-  const availableWidth = Math.max(320, host.clientWidth - 28);
-  const pageWidth = firstPage.getBoundingClientRect().width;
-  if (!Number.isFinite(pageWidth) || pageWidth <= 0) return;
-
-  const scale = Math.min(1, Math.max(0.35, availableWidth / pageWidth));
-  wrapper.style.zoom = String(scale);
-}
-
 function getOfficePackageRejection(
   extension: string,
   arrayBuffer: ArrayBuffer,
@@ -1491,29 +1415,6 @@ function getOfficePackageRejection(
   }
 }
 
-function findDocxLinkInEvent(event: Event): Element | null {
-  for (const target of event.composedPath()) {
-    if (!(target instanceof Element)) continue;
-    if (
-      target.hasAttribute(CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE)
-      || target.getAttribute("href")?.startsWith("#")
-    ) {
-      return target;
-    }
-  }
-  return null;
-}
-
-function findDocxFragmentTarget(shadowRoot: ShadowRoot, href: string): Element | null {
-  let fragmentId = href.slice(1);
-  try {
-    fragmentId = decodeURIComponent(fragmentId);
-  } catch {
-    return null;
-  }
-  return fragmentId ? shadowRoot.getElementById(fragmentId) : null;
-}
-
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException
     ? error.name === "AbortError"
@@ -1524,51 +1425,3 @@ function isZipPreflightError(error: unknown): error is Error {
   return error instanceof ZipPreflightError
     || (error instanceof Error && error.name === "ZipPreflightError");
 }
-
-const DOCX_SHADOW_BASE_CSS = `
-  :host {
-    display: block;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .office-docx-style-container {
-    display: contents;
-  }
-
-  .office-docx-body {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .office-docx-body .docx-wrapper {
-    box-sizing: border-box;
-    display: block;
-    width: max-content;
-    max-width: none;
-    min-width: 0;
-    padding: 0 !important;
-    background: transparent !important;
-    transform-origin: top center;
-  }
-
-  .office-docx-body .office-docx {
-    margin: 0 auto 20px !important;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    border-radius: 2px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.13);
-  }
-
-  [${CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE}] {
-    cursor: var(--po-clickable-cursor, pointer);
-    text-decoration: underline;
-  }
-
-  [${CONTROLLED_DOCX_EXTERNAL_HREF_ATTRIBUTE}]:focus-visible {
-    border-radius: 2px;
-    outline: 2px solid #5b8def;
-    outline-offset: 2px;
-  }
-`;

@@ -2193,7 +2193,7 @@
       },
       "category": "document",
       "defaultViewer": "office-preview",
-      "editable": true,
+      "editable": false,
       "ingestStrategy": "ocr"
     },
     {
@@ -2219,7 +2219,7 @@
       },
       "category": "document",
       "defaultViewer": "office-preview",
-      "editable": true,
+      "editable": false,
       "ingestStrategy": "ocr"
     },
     {
@@ -2244,7 +2244,7 @@
       },
       "category": "document",
       "defaultViewer": "office-preview",
-      "editable": true,
+      "editable": false,
       "ingestStrategy": "ocr"
     },
     {

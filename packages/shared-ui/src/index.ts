@@ -95,7 +95,6 @@ export type {
 // The app shell may request a durability barrier, but the session object and
 // editable-source bridge remain private to the trusted Editor host.
 export { flushActiveDocumentSessions } from "./editor/document-session";
-export { flushActiveOfficeEditingSessions } from "./editor/office/activeOfficeEditingSessions";
 export type { DocumentPersistedCommit } from "./editor/document-session";
 export {
   classifyEditorViewerCapability,
@@ -207,6 +206,8 @@ export type {
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
   MarkdownWikiLinkResolvedTarget,
+  OfficeEditorAction,
+  OfficeEditorActionResolver,
   PresetViewerContribution,
   PresetViewerImplementation,
   PresetViewerRenderContext,

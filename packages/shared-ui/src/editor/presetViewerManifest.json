@@ -61,7 +61,7 @@
     {
       "id": "office-preview",
       "formatViewerIds": [],
-      "capability": "edit",
+      "capability": "preview",
       "source": "resource",
       "runtime": "lazy"
     },

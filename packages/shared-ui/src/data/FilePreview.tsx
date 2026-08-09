@@ -7,7 +7,6 @@ import type {
   DocumentPersistencePort,
   FileContent,
   OfficeDocumentConverter,
-  OfficeEditingPort,
 } from "../core/types";
 import { EditorHost } from "../editor/EditorHost";
 import {
@@ -22,6 +21,7 @@ import type {
   MarkdownDialectId,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
+  OfficeEditorActionResolver,
 } from "../editor/viewerTypes";
 import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
 import type { AiEditFile } from "../editor/ai-edits/types";
@@ -55,7 +55,7 @@ export type FilePreviewProps = {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
-  officeEditing?: OfficeEditingPort | null;
+  resolveOfficeEditorActions?: OfficeEditorActionResolver | null;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   documentSourceKind?: DocumentSourceKind;
 };
@@ -87,7 +87,7 @@ export function FilePreview({
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
-  officeEditing = null,
+  resolveOfficeEditorActions = null,
   viewerExtensionAdapter = null,
   documentSourceKind = "local",
 }: FilePreviewProps) {
@@ -159,7 +159,7 @@ export function FilePreview({
                 appPreview={appPreview}
                 openExternalFile={openExternalFile}
                 convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
-                officeEditing={officeEditing}
+                resolveOfficeEditorActions={resolveOfficeEditorActions}
                 deferFallbackContent={deferFallbackContent}
                 viewerExtensionAdapter={viewerExtensionAdapter}
                 documentSourceKind={documentSourceKind}

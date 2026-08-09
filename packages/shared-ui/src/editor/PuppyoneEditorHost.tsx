@@ -16,6 +16,7 @@ import type {
   MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
+  OfficeEditorActionResolver,
 } from "./viewerTypes";
 import { DEFAULT_EDITOR_INTERACTION_PREFERENCES } from "./viewerTypes";
 import type {
@@ -27,7 +28,6 @@ import type {
   AppPreviewController,
   DocumentPersistencePort,
   OfficeDocumentConverter,
-  OfficeEditingPort,
 } from "../core/types";
 import type { FileIconThemeId } from "../file/fileIcons";
 import type { AiEditFile } from "./ai-edits/types";
@@ -60,7 +60,7 @@ export type PuppyoneEditorHostProps = {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
-  officeEditing?: OfficeEditingPort | null;
+  resolveOfficeEditorActions?: OfficeEditorActionResolver | null;
   /**
    * Optional host composition port for external viewer extensions. The entire
    * port is absent in the default preset-only product profile.
@@ -101,7 +101,7 @@ function PuppyoneEditorSurface({
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
-  officeEditing = null,
+  resolveOfficeEditorActions = null,
   viewerExtensionAdapter = null,
 }: PuppyoneEditorHostProps) {
   const { t } = useLocalization();
@@ -164,7 +164,6 @@ function PuppyoneEditorSurface({
     viewer,
     content,
     persistenceAvailable: Boolean(documentPersistence),
-    resourcePersistenceAvailable: Boolean(officeEditing),
   });
   const canEdit = editorAccess.kind === "editable";
 
@@ -210,12 +209,12 @@ function PuppyoneEditorSurface({
         appPreview,
         openExternalFile,
         convertOfficeDocumentToDocx,
-        officeEditing,
+        officeEditorActions: resolveOfficeEditorActions?.(document) ?? [],
       }}
     />
   );
 
-  const editor = canEdit && documentPersistence && viewer.source !== "resource" ? (
+  const editor = canEdit && documentPersistence ? (
     <DocumentSessionBoundary
       documentId={document.path}
       initialContent={content}

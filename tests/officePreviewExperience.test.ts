@@ -9,6 +9,14 @@ const officePreviewCss = readFileSync(
   new URL("../packages/shared-ui/src/styles/editor/media-office-preview.css", import.meta.url),
   "utf8",
 );
+const wordPreviewSource = readFileSync(
+  new URL("../packages/shared-ui/src/editor/viewers/word/WordDocumentPreview.tsx", import.meta.url),
+  "utf8",
+);
+const viewerTypesSource = readFileSync(
+  new URL("../packages/shared-ui/src/editor/viewerTypes.ts", import.meta.url),
+  "utf8",
+);
 const viewerArchitecture = readFileSync(
   new URL("../docs/architecture/editor/file-format-viewer-pipeline.md", import.meta.url),
   "utf8",
@@ -20,8 +28,27 @@ describe("lightweight Office preview experience", () => {
     expect(officeViewerSource).toContain("editor.office.preview");
     expect(officeViewerSource).toContain("editor.openDefaultApp");
     expect(officeViewerSource).not.toMatch(/Ask Agent|continue editing|继续修改/i);
+    expect(officeViewerSource).not.toContain("OfficeEditorViewer");
     expect(viewerArchitecture).toContain("lightweight, read-only surface");
     expect(viewerArchitecture).toContain("plugin marketplace");
+  });
+
+  it("renders Word on a stable paper surface with visible zoom and font compatibility", () => {
+    expect(officeViewerSource).toContain("office-preview__zoom-controls");
+    expect(officeViewerSource).toContain("wordResolvedScale");
+    expect(wordPreviewSource).toContain('font-family: "宋体"');
+    expect(wordPreviewSource).toContain('local("Songti SC")');
+    expect(wordPreviewSource).toContain("await document.fonts?.ready");
+    expect(wordPreviewSource).toContain("sanitizeDocxDom(fragment)");
+    expect(wordPreviewSource).toContain("resolveWordPreviewScale");
+    expect(officePreviewCss).toContain("office-document-preview--docx");
+  });
+
+  it("reserves only an explicit host-owned Office editor action", () => {
+    expect(viewerTypesSource).toContain("OfficeEditorActionResolver");
+    expect(viewerTypesSource).toContain("activate: () => void | Promise<void>");
+    expect(officeViewerSource).toContain("officeEditorActions.map");
+    expect(officeViewerSource).not.toContain("officeEditing");
   });
 
   it("presents PowerPoint as a thumbnail rail and one central slide stage", () => {
