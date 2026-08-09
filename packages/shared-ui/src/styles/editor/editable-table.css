@@ -209,17 +209,44 @@
 
 .po-editable-table-structure-button-visual {
   display: grid;
+  position: relative;
   box-sizing: border-box;
   place-items: center;
   border: 1px solid transparent;
   border-radius: 7px;
   background: var(--po-editable-table-structure-background);
   color: transparent;
-  font-size: 12px;
-  font-weight: 650;
-  line-height: 1;
+  /* Suppress legacy text glyphs in table widgets that survived a dev HMR
+     update. The pseudo-elements below are the sole visual source of "+". */
+  font-size: 0;
+  line-height: 0;
   pointer-events: none;
   transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
+}
+
+/* Draw the add glyph geometrically instead of using a font glyph. Font
+   baselines and side bearings make "+" look low/right even when its line box
+   is centered. Odd dimensions keep both 1px strokes pixel-centered inside
+   the 13px cross-axis rail shared by Markdown and CSV. */
+.po-editable-table-structure-button-visual::before,
+.po-editable-table-structure-button-visual::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 1px;
+  background: currentColor;
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.po-editable-table-structure-button-visual::before {
+  width: 7px;
+  height: 1px;
+}
+
+.po-editable-table-structure-button-visual::after {
+  width: 1px;
+  height: 7px;
 }
 
 .po-editable-table-interaction-root:hover .po-editable-table-structure-button,

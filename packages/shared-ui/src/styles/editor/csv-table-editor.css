@@ -219,11 +219,6 @@
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
-.csv-table-editor__surface:hover .csv-table-editor__table,
-.csv-table-editor__surface:focus-within .csv-table-editor__table {
-  box-shadow: 0 0 0 2px var(--po-editable-table-hover-ring);
-}
-
 .csv-table-editor__drag-layer {
   z-index: 5;
 }

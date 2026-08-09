@@ -305,7 +305,6 @@ function createTableStructureButton({
   const visual = document.createElement("span");
   visual.className = "cm-md-table-structure-button-visual po-editable-table-structure-button-visual";
   visual.setAttribute("aria-hidden", "true");
-  visual.textContent = "+";
   button.appendChild(visual);
   button.addEventListener("mousedown", (event) => {
     event.preventDefault();

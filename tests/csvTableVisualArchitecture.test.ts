@@ -93,6 +93,19 @@ describe("CSV table visual architecture", () => {
       sharedTableCss.indexOf("}", structureButtonStart),
     );
     expect(structureButtonRule).toContain("opacity: 0");
+    expect(sharedTableCss).toMatch(
+      /\.po-editable-table-structure-button-visual::before\s*\{[^}]*width:\s*7px[^}]*height:\s*1px/s,
+    );
+    expect(sharedTableCss).toMatch(
+      /\.po-editable-table-structure-button-visual::after\s*\{[^}]*width:\s*1px[^}]*height:\s*7px/s,
+    );
+    expect(csvEditorSource).not.toContain('aria-hidden="true">+</span>');
+    expect(csvTableCss).not.toContain(
+      ".csv-table-editor__surface:hover .csv-table-editor__table",
+    );
+    expect(csvTableCss).not.toContain(
+      ".csv-table-editor__surface:focus-within .csv-table-editor__table",
+    );
     expect(csvTableCss).toMatch(
       /\.csv-table-editor__resize-handle\s*\{[^}]*opacity:\s*0/s,
     );

@@ -9,8 +9,16 @@ const editorEntryCss = readFileSync(
   new URL("../packages/shared-ui/src/styles/editor.css", import.meta.url),
   "utf8",
 );
+const sharedTableCss = readFileSync(
+  new URL("../packages/shared-ui/src/styles/editor/editable-table.css", import.meta.url),
+  "utf8",
+);
 const markdownTableCss = readFileSync(
   new URL("../packages/shared-ui/src/styles/editor/markdown-table-widget.css", import.meta.url),
+  "utf8",
+);
+const markdownTableWidgetSource = readFileSync(
+  new URL("../packages/shared-ui/src/editor/markdown/features/table/tableWidget.ts", import.meta.url),
   "utf8",
 );
 const markdownHtmlCss = readFileSync(
@@ -185,19 +193,20 @@ describe("Markdown rich-block boundary affordance", () => {
     expect(surfaceRule).not.toMatch(/\bborder\s*:/);
   });
 
-  it("draws table affordance on its existing frame rather than a second wrapper", () => {
-    const hoverSelector = [
-      ".markdown-codemirror-editor .cm-md-table-widget-wrap:hover:not(.is-doc-selected) .cm-md-table-widget,",
-      ".markdown-codemirror-editor .cm-md-table-widget-wrap:focus-within:not(.is-doc-selected) .cm-md-table-widget",
-    ].join("\n");
-    const hoverRule = readCssRule(markdownTableCss, hoverSelector);
+  it("keeps the outer table frame unchanged on hover and cell focus", () => {
+    const selectedRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-widget-wrap.is-doc-selected .cm-md-table-widget",
+    );
 
-    expect(markdownTableCss).toContain(
+    expect(markdownTableCss).not.toContain(
+      ".cm-md-table-widget-wrap:hover:not(.is-doc-selected) .cm-md-table-widget",
+    );
+    expect(markdownTableCss).not.toContain(
       ".cm-md-table-widget-wrap:focus-within:not(.is-doc-selected) .cm-md-table-widget",
     );
-    expect(hoverRule).toContain("box-shadow: 0 0 0 2px var(--po-editable-table-hover-ring);");
-    expect(hoverRule).not.toContain("border-color:");
-    expect(markdownTableCss).toContain("box-shadow: 0 0 0 2px var(--cm-md-block-selected-ring);");
+    expect(selectedRule).toContain("border-color:");
+    expect(selectedRule).toContain("box-shadow: 0 0 0 2px var(--cm-md-block-selected-ring);");
   });
 
   it("keeps vertical scrolling at the document level for code blocks", () => {
@@ -251,26 +260,55 @@ describe("Markdown rich-block boundary affordance", () => {
 });
 
 describe("Markdown table affordance layout", () => {
-  it("joins structure-button hit targets to the table while preserving the compact visual bars", () => {
+  it("uses one shared, pixel-centered structure control for Markdown and CSV", () => {
     const frameRule = readCssRule(markdownTableCss, ".markdown-codemirror-editor .cm-md-table-frame");
-    const addRowRule = readCssRule(markdownTableCss, ".markdown-codemirror-editor .cm-md-table-add-row");
-    const addRowVisualRule = readCssRule(
-      markdownTableCss,
-      ".markdown-codemirror-editor .cm-md-table-add-row .cm-md-table-structure-button-visual",
+    const visualRule = readCssRule(sharedTableCss, ".po-editable-table-structure-button-visual");
+    const glyphGeometryRule = readCssRule(
+      sharedTableCss,
+      ".po-editable-table-structure-button-visual::before,\n.po-editable-table-structure-button-visual::after",
     );
-    const addColumnRule = readCssRule(markdownTableCss, ".markdown-codemirror-editor .cm-md-table-add-column");
+    const horizontalStrokeRule = readCssRule(
+      sharedTableCss,
+      ".po-editable-table-structure-button-visual::before",
+    );
+    const verticalStrokeRule = readLastCssRule(
+      sharedTableCss,
+      ".po-editable-table-structure-button-visual::after",
+    );
+    const addRowRule = readCssRule(sharedTableCss, ".po-editable-table-add-row");
+    const addRowVisualRule = readCssRule(
+      sharedTableCss,
+      ".po-editable-table-add-row .po-editable-table-structure-button-visual",
+    );
+    const addColumnRule = readCssRule(sharedTableCss, ".po-editable-table-add-column");
     const addColumnVisualRule = readCssRule(
-      markdownTableCss,
-      ".markdown-codemirror-editor .cm-md-table-add-column .cm-md-table-structure-button-visual",
+      sharedTableCss,
+      ".po-editable-table-add-column .po-editable-table-structure-button-visual",
     );
 
     expect(frameRule).toContain("--cm-md-table-action-gutter: var(--po-editable-table-action-gutter);");
-    expect(addRowRule).toContain("height: var(--cm-md-table-action-gutter);");
-    expect(addRowRule).toContain("bottom: calc(-1 * var(--cm-md-table-action-gutter));");
+    expect(visualRule).toContain("position: relative;");
+    expect(visualRule).toContain("font-size: 0;");
+    expect(visualRule).toContain("line-height: 0;");
+    expect(visualRule).not.toContain("font-weight:");
+    expect(glyphGeometryRule).toContain("top: 50%;");
+    expect(glyphGeometryRule).toContain("left: 50%;");
+    expect(glyphGeometryRule).toContain("background: currentColor;");
+    expect(glyphGeometryRule).toContain("transform: translate(-50%, -50%);");
+    expect(horizontalStrokeRule).toContain("width: 7px;");
+    expect(horizontalStrokeRule).toContain("height: 1px;");
+    expect(verticalStrokeRule).toContain("width: 1px;");
+    expect(verticalStrokeRule).toContain("height: 7px;");
+    expect(addRowRule).toContain("height: var(--po-editable-table-action-gutter);");
+    expect(addRowRule).toContain("bottom: calc(-1 * var(--po-editable-table-action-gutter));");
     expect(addRowVisualRule).toContain("height: 13px;");
-    expect(addColumnRule).toContain("width: var(--cm-md-table-action-gutter);");
-    expect(addColumnRule).toContain("right: calc(-1 * var(--cm-md-table-action-gutter));");
+    expect(addColumnRule).toContain("width: var(--po-editable-table-action-gutter);");
+    expect(addColumnRule).toContain("right: calc(-1 * var(--po-editable-table-action-gutter));");
     expect(addColumnVisualRule).toContain("width: 13px;");
+    expect(markdownTableCss).not.toContain(
+      ".markdown-codemirror-editor .cm-md-table-structure-button {",
+    );
+    expect(markdownTableWidgetSource).not.toContain('visual.textContent = "+"');
   });
 
   it("keeps compact drag grips inside larger pointer targets", () => {
@@ -304,6 +342,15 @@ describe("Markdown table affordance layout", () => {
 
 function readCssRule(css: string, selector: string): string {
   const start = css.indexOf(`${selector} {`);
+  if (start < 0) throw new Error(`Missing CSS rule for ${selector}`);
+  const bodyStart = start + selector.length + 2;
+  const end = css.indexOf("\n}", bodyStart);
+  if (end < 0) throw new Error(`Unclosed CSS rule for ${selector}`);
+  return css.slice(bodyStart, end);
+}
+
+function readLastCssRule(css: string, selector: string): string {
+  const start = css.lastIndexOf(`${selector} {`);
   if (start < 0) throw new Error(`Missing CSS rule for ${selector}`);
   const bodyStart = start + selector.length + 2;
   const end = css.indexOf("\n}", bodyStart);

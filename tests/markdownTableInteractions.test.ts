@@ -107,7 +107,11 @@ describe("Markdown table EditorView interactions", () => {
     const view = createTableView();
     const addRow = view.dom.querySelector<HTMLButtonElement>(".cm-md-table-add-row");
     expect(addRow).not.toBeNull();
-    expect(addRow?.querySelector(".cm-md-table-structure-button-visual")?.textContent).toBe("+");
+    const addRowVisual = addRow?.querySelector<HTMLElement>(".cm-md-table-structure-button-visual");
+    expect(addRowVisual).not.toBeNull();
+    expect(addRowVisual?.textContent).toBe("");
+    expect(addRowVisual?.classList.contains("po-editable-table-structure-button-visual")).toBe(true);
+    expect(addRowVisual?.getAttribute("aria-hidden")).toBe("true");
     expect(() => addRow?.click()).not.toThrow();
     expect(source(view).split("\n")).toHaveLength(5);
     await nextAnimationFrame();
