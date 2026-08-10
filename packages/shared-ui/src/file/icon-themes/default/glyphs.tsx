@@ -5,6 +5,7 @@ import type {
 } from "../iconThemeTypes";
 import {
   AppGlyph,
+  ExcelSpreadsheetGlyph,
   PresentationDocumentGlyph,
   SpreadsheetGridGlyph,
   WordDocumentGlyph,
@@ -23,6 +24,7 @@ export const defaultGlyphRenderers = {
   pdf: renderDefaultDocumentGlyph,
   video: renderDefaultVideoGlyph,
   word: renderDefaultWordGlyph,
+  excel: renderDefaultExcelGlyph,
   spreadsheet: renderDefaultSpreadsheetGlyph,
   presentation: renderDefaultPresentationGlyph,
   archive: renderDefaultDocumentGlyph,
@@ -167,6 +169,19 @@ function renderDefaultWordGlyph({
 }: FileIconRenderContext): ReactNode {
   return (
     <WordDocumentGlyph
+      color={color}
+      fill="color-mix(in srgb, var(--po-file-icon-body) 72%, transparent)"
+      size={size}
+    />
+  );
+}
+
+function renderDefaultExcelGlyph({
+  color,
+  size,
+}: FileIconRenderContext): ReactNode {
+  return (
+    <ExcelSpreadsheetGlyph
       color={color}
       fill="color-mix(in srgb, var(--po-file-icon-body) 72%, transparent)"
       size={size}

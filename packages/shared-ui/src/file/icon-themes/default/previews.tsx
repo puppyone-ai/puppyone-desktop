@@ -24,6 +24,7 @@ const DEFAULT_PREVIEW_GLYPH_RENDERERS = {
   pdf: renderDefaultDocumentPreviewGlyph,
   video: renderDefaultVideoPreviewGlyph,
   word: renderDefaultWordPreviewGlyph,
+  excel: renderDefaultExcelPreviewGlyph,
   spreadsheet: renderDefaultSpreadsheetPreviewGlyph,
   presentation: renderDefaultPresentationPreviewGlyph,
   archive: renderDefaultArchivePreviewGlyph,
@@ -189,6 +190,36 @@ function renderDefaultWordPreviewGlyph({
         strokeWidth="1.8"
         strokeLinecap="round"
         opacity="0.82"
+      />
+    </svg>
+  );
+}
+
+function renderDefaultExcelPreviewGlyph({
+  color,
+}: FileIconRenderContext): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      width="100%"
+      height="100%"
+      fill="none"
+      aria-hidden
+      data-file-icon-office="excel"
+    >
+      <rect x="7" y="5" width="21" height="22" rx="2.2" stroke={color} strokeWidth="1.8" />
+      <path
+        d="M7 11h21M7 17h21M7 23h21M14 5v22M21 5v22"
+        stroke={color}
+        strokeWidth="1.25"
+        opacity="0.76"
+      />
+      <rect x="3.5" y="9.5" width="10.5" height="15" rx="2" fill={color} />
+      <path
+        d="m6.7 14 4.1 6M10.8 14l-4.1 6"
+        stroke="#fff"
+        strokeWidth="1.55"
+        strokeLinecap="round"
       />
     </svg>
   );

@@ -20,6 +20,7 @@ import type {
 } from "../iconThemeTypes";
 import { createIconTheme } from "../themeFactory";
 import {
+  ExcelSpreadsheetGlyph,
   PresentationDocumentGlyph,
   SpreadsheetGridGlyph,
   WordDocumentGlyph,
@@ -39,6 +40,16 @@ function renderMinimalGlyph(context: FileIconRenderContext): ReactNode {
   if (context.kind === "word") {
     return (
       <WordDocumentGlyph
+        color={context.color}
+        fill="none"
+        size={context.size}
+        strokeWidth={1.25}
+      />
+    );
+  }
+  if (context.kind === "excel") {
+    return (
+      <ExcelSpreadsheetGlyph
         color={context.color}
         fill="none"
         size={context.size}
@@ -97,6 +108,7 @@ const MINIMAL_LUCIDE_ICONS = {
   pdf: FileText,
   video: FileVideo,
   word: FileText,
+  excel: LucideFile,
   spreadsheet: LucideFile,
   presentation: FileText,
   archive: FileArchive,
@@ -119,6 +131,7 @@ const minimalGlyphRenderers = {
   pdf: renderMinimalGlyph,
   video: renderMinimalGlyph,
   word: renderMinimalGlyph,
+  excel: renderMinimalGlyph,
   spreadsheet: renderMinimalGlyph,
   presentation: renderMinimalGlyph,
   archive: renderMinimalGlyph,

@@ -29,6 +29,7 @@ const KIND_ACCENT = {
   audio: "var(--po-file-accent-audio)",
   video: "var(--po-file-accent-video)",
   word: "var(--po-file-accent-word)",
+  excel: "var(--po-file-accent-sheet)",
   spreadsheet: "var(--po-file-accent-sheet)",
   presentation: "var(--po-file-accent-presentation)",
   archive: "var(--po-file-accent-pdf)",

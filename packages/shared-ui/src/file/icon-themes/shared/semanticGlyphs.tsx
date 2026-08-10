@@ -126,6 +126,59 @@ export function WordDocumentGlyph({
 }
 
 /**
+ * A compact Excel-family mark using the same badge-plus-content construction
+ * as Word and PowerPoint. CSV and OpenDocument sheets intentionally keep the
+ * neutral table glyph; only Microsoft Excel formats receive the X identity.
+ */
+export function ExcelSpreadsheetGlyph({
+  color,
+  fill,
+  size,
+  strokeWidth = 1.1,
+}: Readonly<{
+  color: string;
+  fill: string;
+  size: number;
+  strokeWidth?: number;
+}>) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 18 18"
+      fill="none"
+      aria-hidden
+      data-file-icon-office="excel"
+      data-file-icon-shape="excel-spreadsheet"
+    >
+      <rect
+        x="5.05"
+        y="3"
+        width="9.85"
+        height="12"
+        rx="1.2"
+        fill={fill}
+        stroke={color}
+        strokeWidth={strokeWidth}
+      />
+      <path
+        d="M9.55 5.85h4M9.55 8.95h4M9.55 12.05h4M10.9 4.15v9.7M12.55 4.15v9.7"
+        stroke={color}
+        strokeWidth={strokeWidth * 0.68}
+        opacity="0.72"
+      />
+      <rect x="2.1" y="5.15" width="7.25" height="8.35" rx="1.15" fill={color} />
+      <path
+        d="m4.15 7.45 3.15 3.75M7.3 7.45 4.15 11.2"
+        stroke="#fff"
+        strokeWidth=".88"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/**
  * A compact PowerPoint-family mark. The P tile, slide frame, and pie-chart
  * motif remain distinguishable when filenames are truncated in the explorer.
  */

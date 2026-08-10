@@ -3,6 +3,15 @@
 File-format detection stays outside this directory. A theme receives a semantic
 `FileIconRenderContext` and owns only its visual treatment.
 
+## Classification boundary
+
+- `core/fileFormats.json` is the source of truth for product-family identity.
+  Formats such as Word, Excel, and PowerPoint declare `semanticKind` there.
+- Common formats derive their semantic kind deterministically from viewer and
+  category. Icon themes never inspect extensions, MIME types, or filenames.
+- `file` is the explicit terminal state for an unknown format. It is not a
+  renderer fallback for a missing known kind.
+
 ## Semantic coverage invariant
 
 - `core/fileFormats.ts` owns the runtime `FILE_SEMANTIC_KINDS` tuple and its
@@ -18,7 +27,8 @@ File-format detection stays outside this directory. A theme receives a semantic
   fallback. That hides omissions and turns new or forgotten kinds into the
   wrong icon.
 - A variant may use partial overrides because every missing key delegates to an
-  already exhaustive base theme.
+  already exhaustive base theme. This is deliberate theme inheritance, not
+  unknown-file fallback.
 
 ## Dependency direction
 

@@ -109,13 +109,14 @@ function getLabel(kind: FileVisualKind, name: string): string {
 const FILE_KIND_LABELS: Partial<Record<FileVisualKind, string>> = {
   app: "APP",
   audio: "MP3",
+  excel: "XLS",
   html: "HTML",
   image: "IMG",
   json: "{}",
   markdown: "DOC",
   pdf: "PDF",
   presentation: "PPT",
-  spreadsheet: "XLS",
+  spreadsheet: "TABLE",
   word: "DOC",
   workflow: "FLOW",
 };

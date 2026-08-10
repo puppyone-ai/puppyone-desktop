@@ -6,6 +6,7 @@ import type {
 import {
   AppGlyph,
   DocumentLinesSymbol,
+  ExcelSpreadsheetGlyph,
   PresentationDocumentGlyph,
   SpreadsheetGridGlyph,
   WordDocumentGlyph,
@@ -24,6 +25,7 @@ export const materialGlyphRenderers = {
   pdf: renderMaterialPdfDocumentGlyph,
   video: renderMaterialVideoGlyph,
   word: renderMaterialWordGlyph,
+  excel: renderMaterialExcelGlyph,
   spreadsheet: renderMaterialSpreadsheetGlyph,
   presentation: renderMaterialPresentationGlyph,
   archive: renderMaterialArchiveGlyph,
@@ -146,6 +148,18 @@ function renderMaterialWordGlyph(
 ): ReactNode {
   return (
     <WordDocumentGlyph
+      color={context.color}
+      fill={getMaterialTint(context.color)}
+      size={context.size}
+    />
+  );
+}
+
+function renderMaterialExcelGlyph(
+  context: FileIconRenderContext,
+): ReactNode {
+  return (
+    <ExcelSpreadsheetGlyph
       color={context.color}
       fill={getMaterialTint(context.color)}
       size={context.size}

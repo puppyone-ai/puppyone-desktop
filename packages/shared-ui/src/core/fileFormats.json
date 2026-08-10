@@ -3,6 +3,7 @@
     {
       "id": "puppyflow",
       "label": "PuppyFlow",
+      "semanticKind": "workflow",
       "extensions": [
         ".puppyflow",
         ".puppyflow.json"
@@ -71,6 +72,7 @@
     {
       "id": "json",
       "label": "JSON",
+      "semanticKind": "json",
       "extensions": [
         ".babelrc",
         ".bowerrc",
@@ -149,6 +151,7 @@
     {
       "id": "jsonl",
       "label": "JSON Lines",
+      "semanticKind": "json",
       "extensions": [
         ".jsonl",
         ".ndjson"
@@ -2179,6 +2182,7 @@
     {
       "id": "docx",
       "label": "Word Document",
+      "semanticKind": "word",
       "extensions": [
         ".doc",
         ".docx"
@@ -2199,6 +2203,7 @@
     {
       "id": "xlsx",
       "label": "Excel Spreadsheet",
+      "semanticKind": "excel",
       "extensions": [
         ".xls",
         ".xlsb",
@@ -2225,6 +2230,7 @@
     {
       "id": "pptx",
       "label": "PowerPoint",
+      "semanticKind": "presentation",
       "extensions": [
         ".pps",
         ".ppsx",
@@ -2270,6 +2276,7 @@
     {
       "id": "ods",
       "label": "OpenDocument Spreadsheet",
+      "semanticKind": "spreadsheet",
       "extensions": [
         ".ods",
         ".ots"
@@ -2290,6 +2297,7 @@
     {
       "id": "odp",
       "label": "OpenDocument Presentation",
+      "semanticKind": "presentation",
       "extensions": [
         ".odp",
         ".otp"

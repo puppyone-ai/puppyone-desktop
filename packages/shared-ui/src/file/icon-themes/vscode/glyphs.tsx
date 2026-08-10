@@ -9,6 +9,7 @@ import type {
 } from "../iconThemeTypes";
 import {
   DocumentLinesSymbol,
+  ExcelSpreadsheetGlyph,
   PresentationDocumentGlyph,
   SpreadsheetGridGlyph,
   WordDocumentGlyph,
@@ -37,6 +38,16 @@ export function renderVsCodeGlyph(
   if (context.kind === "word") {
     return (
       <WordDocumentGlyph
+        color={color}
+        fill={fill}
+        size={context.size}
+        strokeWidth={1.05}
+      />
+    );
+  }
+  if (context.kind === "excel") {
+    return (
+      <ExcelSpreadsheetGlyph
         color={color}
         fill={fill}
         size={context.size}
@@ -80,6 +91,7 @@ export const vscodeGlyphRenderers = {
   pdf: renderVsCodeGlyph,
   video: renderVsCodeGlyph,
   word: renderVsCodeGlyph,
+  excel: renderVsCodeGlyph,
   spreadsheet: renderVsCodeGlyph,
   presentation: renderVsCodeGlyph,
   archive: renderVsCodeGlyph,
@@ -125,7 +137,7 @@ function VsCodeSymbol({
 
 type VsCodeFileKind = Exclude<
   FileVisualKind,
-  "folder" | "spreadsheet" | "word" | "presentation"
+  "folder" | "spreadsheet" | "word" | "excel" | "presentation"
 >;
 
 type SymbolContext = {
