@@ -715,7 +715,6 @@
 .office-pptx-thumbnail[aria-selected="true"] {
   border-color: transparent;
   background: var(--po-selected);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-text) 7%, transparent);
   color: var(--po-file-accent-presentation);
 }
 
@@ -737,7 +736,7 @@
 
 .office-pptx-thumbnail[aria-selected="true"] .office-pptx-thumbnail__number {
   color: var(--po-file-accent-presentation);
-  font-weight: var(--po-text-weight-bold, 700);
+  font-weight: var(--po-text-weight-semibold, 600);
 }
 
 .office-pptx-thumbnail__frame {
@@ -755,9 +754,7 @@
 
 .office-pptx-thumbnail[aria-selected="true"] .office-pptx-thumbnail__frame {
   border-color: var(--po-file-accent-presentation);
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--po-file-accent-presentation) 52%, transparent),
-    0 2px 7px color-mix(in srgb, var(--po-shadow) 12%, transparent);
+  box-shadow: 0 2px 7px color-mix(in srgb, var(--po-shadow) 12%, transparent);
 }
 
 .office-pptx-thumbnail:focus-visible .office-pptx-thumbnail__frame {
