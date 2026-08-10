@@ -10,6 +10,7 @@ import {
   getControlledDocxExternalHref,
   sanitizeDocxDom,
 } from "../../security/docxDomSanitizer";
+import { OFFICE_FONT_COMPATIBILITY_CSS } from "../officeFontCompatibility";
 import {
   resolveWordPreviewScale,
   type WordPreviewZoom,
@@ -280,49 +281,7 @@ function findWordPreviewFragmentTarget(shadowRoot: ShadowRoot, href: string): El
   return fragmentId ? shadowRoot.getElementById(fragmentId) : null;
 }
 
-const WORD_PREVIEW_SHADOW_CSS = `
-  @font-face {
-    font-family: "宋体";
-    src: local("Songti SC"), local("STSong"), local("Noto Serif CJK SC");
-    font-display: swap;
-  }
-
-  @font-face {
-    font-family: "SimSun";
-    src: local("Songti SC"), local("STSong"), local("Noto Serif CJK SC");
-    font-display: swap;
-  }
-
-  @font-face {
-    font-family: "黑体";
-    src: local("PingFang SC"), local("STHeiti"), local("Noto Sans CJK SC");
-    font-display: swap;
-  }
-
-  @font-face {
-    font-family: "SimHei";
-    src: local("PingFang SC"), local("STHeiti"), local("Noto Sans CJK SC");
-    font-display: swap;
-  }
-
-  @font-face {
-    font-family: "等线";
-    src: local("PingFang SC"), local("Microsoft YaHei"), local("Noto Sans CJK SC");
-    font-display: swap;
-  }
-
-  @font-face {
-    font-family: "Calibri";
-    src: local("Aptos"), local("Calibri"), local("Arial");
-    font-display: swap;
-  }
-
-  @font-face {
-    font-family: "Cambria";
-    src: local("Cambria"), local("Georgia"), local("Times New Roman");
-    font-display: swap;
-  }
-
+const WORD_PREVIEW_SHADOW_CSS = `${OFFICE_FONT_COMPATIBILITY_CSS}
   :host {
     display: block;
     width: 100%;

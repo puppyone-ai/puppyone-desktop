@@ -34,6 +34,10 @@ import {
 } from "./officeResourceLoader";
 import { extractOfficeTextFallbackInWorker } from "./officeTextFallbackClient";
 import {
+  applyOfficeCjkFontFallbacks,
+  ensureOfficeFontCompatibilityStyles,
+} from "./officeFontCompatibility";
+import {
   getPresentationNavigationTarget,
   settlePresentationFonts,
 } from "./presentationPreview";
@@ -602,6 +606,7 @@ function PptxPresentationPreview({
     let cancelled = false;
     let viewer: PptxViewer | null = null;
 
+    ensureOfficeFontCompatibilityStyles(document);
     host.replaceChildren();
     setActiveSlide(0);
     setRenderState({ status: "loading" });
@@ -620,8 +625,9 @@ function PptxPresentationPreview({
         onSlideChange: (index) => {
           if (!cancelled) setActiveSlide(index);
         },
-        onSlideRendered: (index) => {
+        onSlideRendered: (index, element) => {
           if (cancelled) return;
+          applyOfficeCjkFontFallbacks(element);
           setSlideErrors((current) => {
             if (!(index in current)) return current;
             const next = { ...current };
@@ -645,6 +651,7 @@ function PptxPresentationPreview({
         }
         viewer = nextViewer;
         await settlePresentationFonts(document.fonts?.ready, abortController.signal);
+        applyOfficeCjkFontFallbacks(host);
         setActiveSlide(nextViewer.currentSlideIndex);
         setViewerState({ viewer: nextViewer, slideCount: nextViewer.slideCount });
         setRenderState({ status: "ready" });
@@ -831,7 +838,10 @@ function PptxThumbnail({
         setRenderStatus("error");
       } else {
         void handle.ready.then(() => {
-          if (!disposed) setRenderStatus("ready");
+          if (!disposed) {
+            applyOfficeCjkFontFallbacks(host);
+            setRenderStatus("ready");
+          }
         }).catch(() => {
           if (!disposed) setRenderStatus("error");
         });

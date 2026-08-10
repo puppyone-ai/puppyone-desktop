@@ -13,6 +13,10 @@ const wordPreviewSource = readFileSync(
   new URL("../packages/shared-ui/src/editor/viewers/word/WordDocumentPreview.tsx", import.meta.url),
   "utf8",
 );
+const officeFontCompatibilitySource = readFileSync(
+  new URL("../packages/shared-ui/src/editor/viewers/officeFontCompatibility.ts", import.meta.url),
+  "utf8",
+);
 const viewerTypesSource = readFileSync(
   new URL("../packages/shared-ui/src/editor/viewerTypes.ts", import.meta.url),
   "utf8",
@@ -41,8 +45,9 @@ describe("lightweight Office preview experience", () => {
   it("renders Word on a stable paper surface with visible zoom and font compatibility", () => {
     expect(officeViewerSource).toContain("office-preview__zoom-controls");
     expect(officeViewerSource).toContain("wordResolvedScale");
-    expect(wordPreviewSource).toContain('font-family: "宋体"');
-    expect(wordPreviewSource).toContain('local("Songti SC")');
+    expect(wordPreviewSource).toContain("OFFICE_FONT_COMPATIBILITY_CSS");
+    expect(officeFontCompatibilitySource).toContain('font-family: "宋体"');
+    expect(officeFontCompatibilitySource).toContain('local("Songti SC")');
     expect(wordPreviewSource).toContain("await document.fonts?.ready");
     expect(wordPreviewSource).toContain("sanitizeDocxDom(fragment)");
     expect(wordPreviewSource).toContain("resolveWordPreviewScale");
@@ -70,6 +75,9 @@ describe("lightweight Office preview experience", () => {
     expect(officeViewerSource).toContain("renderThumbnailToContainer");
     expect(officeViewerSource).toContain("IntersectionObserver");
     expect(officeViewerSource).toContain("settlePresentationFonts(document.fonts?.ready");
+    expect(officeViewerSource).toContain("ensureOfficeFontCompatibilityStyles(document)");
+    expect(officeViewerSource).toContain("applyOfficeCjkFontFallbacks(element)");
+    expect(officeViewerSource).toContain("applyOfficeCjkFontFallbacks(host)");
     expect(officeViewerSource).toContain("onSlideError");
     expect(officeViewerSource).toContain("onSlideRendered");
     expect(officeViewerSource).toContain("office-pptx-slide-error");
@@ -84,7 +92,15 @@ describe("lightweight Office preview experience", () => {
     expect(officePreviewCss).toMatch(
       /\.office-pptx-thumbnail-rail\s*\{[^}]*overflow-y:\s*auto/s,
     );
-    expect(officePreviewCss).toContain("--po-file-accent-presentation");
+    expect(officePreviewCss).toMatch(
+      /\.office-pptx-thumbnail\[aria-selected="true"\]\s*\{[^}]*background:\s*var\(--po-selected\)/s,
+    );
+    expect(officePreviewCss).toMatch(
+      /\.office-pptx-thumbnail:hover\s*\{[^}]*background:\s*var\(--po-hover\)/s,
+    );
+    expect(officePreviewCss).toContain(
+      '.office-pptx-thumbnail[aria-selected="true"] .office-pptx-thumbnail__frame',
+    );
     expect(officePreviewCss).toContain('.office-pptx-thumbnail__frame[data-render-state="error"]');
     expect(officePreviewCss).toContain("prefers-reduced-motion: reduce");
     expect(tokenSource.match(/--po-file-accent-presentation:/g)).toHaveLength(5);

@@ -708,14 +708,18 @@
 }
 
 .office-pptx-thumbnail:hover {
-  background: color-mix(in srgb, var(--po-control-hover) 72%, transparent);
+  background: var(--po-hover);
   color: var(--po-text);
 }
 
 .office-pptx-thumbnail[aria-selected="true"] {
-  border-color: color-mix(in srgb, var(--po-file-accent-presentation) 68%, var(--po-border));
-  background: color-mix(in srgb, var(--po-file-accent-presentation) 10%, transparent);
+  border-color: transparent;
+  background: var(--po-selected);
   color: var(--po-text);
+}
+
+.office-pptx-thumbnail:focus-visible {
+  outline: none;
 }
 
 .office-pptx-thumbnail__number {
@@ -737,6 +741,20 @@
   border-radius: 2px;
   background: #fff;
   box-shadow: 0 2px 7px color-mix(in srgb, var(--po-shadow) 12%, transparent);
+}
+
+.office-pptx-thumbnail[aria-selected="true"] .office-pptx-thumbnail__frame {
+  border-color: color-mix(in srgb, var(--po-text) 42%, var(--po-border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--po-text) 14%, transparent),
+    0 2px 7px color-mix(in srgb, var(--po-shadow) 12%, transparent);
+}
+
+.office-pptx-thumbnail:focus-visible .office-pptx-thumbnail__frame {
+  border-color: var(--po-focus-ring);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--po-focus-ring) 72%, transparent),
+    0 2px 7px color-mix(in srgb, var(--po-shadow) 12%, transparent);
 }
 
 .office-pptx-thumbnail__frame[data-render-state="waiting"],
@@ -798,6 +816,8 @@
   justify-content: center;
   overflow: hidden;
   overscroll-behavior: contain;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .office-pptx-render-host[data-rendering="true"] {
@@ -921,12 +941,17 @@
 }
 
 .office-pptx-text-thumbnail:hover {
-  background: var(--po-control-hover);
+  background: var(--po-hover);
 }
 
 .office-pptx-text-thumbnail[aria-selected="true"] {
-  border-color: color-mix(in srgb, var(--po-file-accent-presentation) 64%, var(--po-border));
-  background: color-mix(in srgb, var(--po-file-accent-presentation) 10%, transparent);
+  border-color: transparent;
+  background: var(--po-selected);
+}
+
+.office-pptx-text-thumbnail:focus-visible {
+  outline: 2px solid var(--po-focus-ring);
+  outline-offset: -2px;
 }
 
 .office-pptx-text-thumbnail span {

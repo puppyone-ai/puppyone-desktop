@@ -47,11 +47,13 @@ function documentHtml(markup) {
             --po-file-accent-sheet: #8dc149;
             --po-focus-ring: rgba(96, 165, 250, 0.45);
             --po-font-ui: system-ui, sans-serif;
+            --po-hover: rgba(255, 250, 242, 0.052);
             --po-panel: #202020;
             --po-panel-raised: #292929;
             --po-scrollbar-thumb: rgba(255, 255, 255, 0.18);
             --po-shadow: rgba(0, 0, 0, 0.45);
             --po-shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.24);
+            --po-selected: rgba(255, 250, 242, 0.095);
             --po-text: #f5f5f5;
             --po-text-muted: #aaa;
             --po-text-subtle: #777;
@@ -228,6 +230,9 @@ async function measurePresentation(width) {
       const host = document.querySelector('.office-pptx-render-host');
       const navigation = document.querySelector('.office-pptx-navigation');
       const selected = document.querySelector('.office-pptx-thumbnail[aria-selected="true"]');
+      const selectedFrame = selected.querySelector('.office-pptx-thumbnail__frame');
+      const unselected = document.querySelector('.office-pptx-thumbnail[aria-selected="false"]');
+      const unselectedFrame = unselected.querySelector('.office-pptx-thumbnail__frame');
       const stageRect = stage.getBoundingClientRect();
       const navigationRect = navigation.getBoundingClientRect();
       return {
@@ -238,6 +243,10 @@ async function measurePresentation(width) {
         hostOverflow: getComputedStyle(host).overflow,
         navigationInsideStage: navigationRect.bottom < stageRect.bottom && navigationRect.top > stageRect.top,
         selectedBorder: getComputedStyle(selected).borderColor,
+        selectedBackground: getComputedStyle(selected).backgroundColor,
+        selectedFrameBorder: getComputedStyle(selectedFrame).borderColor,
+        unselectedBackground: getComputedStyle(unselected).backgroundColor,
+        unselectedFrameBorder: getComputedStyle(unselectedFrame).borderColor,
       };
     })();
   `, true);
@@ -281,7 +290,18 @@ async function run() {
     assertNear(widePresentation.railWidth, 162, "wide PowerPoint thumbnail rail width");
     assert(widePresentation.hostOverflow === "hidden", "PowerPoint stage host exposes an extra scrollbar");
     assert(widePresentation.navigationInsideStage, "PowerPoint navigation is outside the slide stage");
-    assert(widePresentation.selectedBorder !== "rgb(36, 99, 235)", "PowerPoint selection still uses the HTML accent");
+    assert(
+      widePresentation.selectedBorder === "rgba(0, 0, 0, 0)",
+      `PowerPoint selected row still has a colored outer border: ${widePresentation.selectedBorder}`,
+    );
+    assert(
+      widePresentation.selectedBackground !== widePresentation.unselectedBackground,
+      "PowerPoint selected row has no neutral product selection surface",
+    );
+    assert(
+      widePresentation.selectedFrameBorder !== widePresentation.unselectedFrameBorder,
+      "PowerPoint selected slide frame has no quiet focus boundary",
+    );
 
     const compactPresentation = await measurePresentation(640);
     assertNear(compactPresentation.railWidth, 112, "compact PowerPoint thumbnail rail width");
