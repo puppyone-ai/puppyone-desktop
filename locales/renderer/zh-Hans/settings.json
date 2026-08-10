@@ -125,6 +125,8 @@
   "editor.diffMarkers.color": "颜色",
   "experimental.title": "实验性功能",
   "experimental.detail": "选择体验早期桌面功能。所有实验默认关闭。",
+  "experimental.officeEditing.title": "Office 文档编辑",
+  "experimental.officeEditing.detail": "使用已配置的 ONLYOFFICE Document Server 编辑 .docx、.xlsx 和 .pptx 文件。关闭时，Office 文件保持只读预览。",
   "experimental.markdownBlockDrag.detail": "在 Markdown 实时预览中启用同一文档内的早期区块重排功能。",
   "experimental.markdownBlockDrag.title": "Markdown 区块拖动手柄",
   "experimental.minimalMode.detail": "用一个居中的悬浮面板替代常驻应用界面，同时保留项目、Git、聊天和终端操作。",

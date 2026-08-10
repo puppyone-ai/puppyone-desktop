@@ -241,7 +241,13 @@ export function AgentPickerPopover({
               />
             </label>
           )}
-          <div id={popupId} className="desktop-agent-picker-list" role="listbox" aria-label={t("agent.picker.options", { name: bidiIsolate(ariaLabel) })}>
+          <div
+            id={popupId}
+            className="desktop-agent-picker-list"
+            data-po-scrollbar="content"
+            role="listbox"
+            aria-label={t("agent.picker.options", { name: bidiIsolate(ariaLabel) })}
+          >
             {flatOptions.map((option) => (
               <button
                 ref={(node) => {

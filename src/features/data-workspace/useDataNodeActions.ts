@@ -107,13 +107,17 @@ export function useDataNodeActions({
   }, [onEnterDataView]);
 
   const selectCreateEntryKind = useCallback((kind: DesktopCreateEntryKind) => {
-    setCreateEntryDraft((current) => current ? {
-      ...current,
-      selectedKind: kind,
-      name: defaultCreateName(kind, t),
-      error: null,
-    } : current);
-  }, [t]);
+    if (!createEntryDraft) return;
+    setCreateEntryDraft((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        selectedKind: kind,
+        name: defaultCreateName(kind, t),
+        error: null,
+      };
+    });
+  }, [createEntryDraft, t]);
 
   const createEntryFromMenu = useCallback(async () => {
     if (
@@ -159,7 +163,6 @@ export function useDataNodeActions({
               t("editor.puppyflow.defaultPrompt.apply"),
             ],
           },
-          untitledAppName: t("workspace.node.untitledApp"),
         }));
       }
       setCreateEntryDraft(null);

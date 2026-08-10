@@ -220,7 +220,7 @@ export function BranchSwitchConflictDialog({
           <DesktopDialogCloseButton disabled={loading} onClick={onCancel} />
         </header>
 
-        <div className="desktop-dialog-body">
+        <div className="desktop-dialog-body" data-po-scrollbar="content">
           <div className="desktop-dialog-callout">
             <strong>{formatNumber(changeCount)}</strong>
             <span>{t("source-control.dialog.switch.changeCount", { count: changeCount })}</span>
@@ -286,12 +286,12 @@ export function GitOperationErrorDialog({
           <DesktopDialogCloseButton onClick={onClose} />
         </header>
 
-        <div className="desktop-dialog-body">
+        <div className="desktop-dialog-body" data-po-scrollbar="content">
           <p className="desktop-git-error-dialog-message">{message}</p>
           {error.raw && (
             <div className="desktop-git-error-dialog-raw">
               <span>{t("source-control.dialog.error.rawOutput")}</span>
-              <pre dir="ltr">{error.raw}</pre>
+              <pre dir="ltr" data-po-scrollbar="content">{error.raw}</pre>
             </div>
           )}
         </div>

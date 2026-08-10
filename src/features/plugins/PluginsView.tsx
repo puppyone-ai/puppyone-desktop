@@ -111,7 +111,7 @@ export function PluginsView({
 
   return (
     <section className="desktop-plugins-view">
-      <div className="desktop-plugins-scroll">
+      <div className="desktop-plugins-scroll" data-po-scrollbar="content">
         <div className="desktop-plugins-page">
           <header className="desktop-plugins-header">
             <div className="desktop-plugins-title-row">

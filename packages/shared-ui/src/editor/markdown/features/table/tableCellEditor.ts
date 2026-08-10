@@ -24,6 +24,7 @@ import { showMarkdownTableContextMenu } from "./tableContextMenu";
 import { closeActiveMarkdownTableMenu, isActiveMarkdownTableMenu } from "./tableMenuState";
 import { focusMarkdownTableCell } from "./tableFocus";
 import { getMarkdownMessageFormatter } from "../../core/editor/markdownLocalization";
+import { markdownInlineViewportContinuityEffect } from "../../platform/codemirror/embeddedInlineViewportSession";
 
 export type MarkdownTableCellEditorContext = {
   alignments: readonly MarkdownTableAlignment[];
@@ -198,20 +199,29 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
     }
 
     const mappedTable = getMappedTableRange();
-    const selectionPosition = target.exitPosition === tableTo ? mappedTable.to : mappedTable.from;
+    const nextCellSource = sanitizeMarkdownTableCell(nextText);
+    const nextTableTo = mappedTable.to + nextCellSource.length - session.baseSource.length;
+    const selectionPosition = target.exitPosition === tableTo ? nextTableTo : mappedTable.from;
+    const effects = [
+      markdownInlineViewportContinuityEffect.of({
+        featureId: "markdown-table",
+        oldRange: mappedTable,
+        newRange: { from: mappedTable.from, to: nextTableTo },
+        sequenceChange: { kind: "preserve" },
+      }),
+      target.focus ? requestMarkdownTableFocus(mappedTable.from, target.focus) : null,
+    ].filter((effect) => effect !== null);
     const result = host.transactions.commit(view, {
       mappedRange: session.mappedRange,
       baseSource: session.baseSource,
       baseRevision: session.baseRevision,
-      nextSource: sanitizeMarkdownTableCell(nextText),
+      nextSource: nextCellSource,
       rebase: "if-source-unchanged",
       selection: target.exitPosition != null || target.focus
         ? { from: selectionPosition, to: selectionPosition }
         : undefined,
       preserveSelection: target.exitPosition == null && !target.focus,
-      effects: target.focus
-        ? requestMarkdownTableFocus(mappedTable.from, target.focus)
-        : undefined,
+      effects,
     });
 
     if (!result.ok) {

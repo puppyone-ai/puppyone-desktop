@@ -4,6 +4,7 @@ import { Code2, Eye } from "lucide-react";
 import { useState } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import { DocumentSurfacePending } from "../DocumentSurfaceHost";
 import { getHtmlPreviewInteractionCss } from "../htmlPreviewInteraction";
 import { PlainTextEditor } from "../PlainTextEditor";
 import type { MarkdownHtmlTrustMode, PresetViewerRenderContext } from "../viewerTypes";
@@ -31,10 +32,10 @@ export function HtmlViewer({
   const { t } = useLocalization();
   const [mode, setMode] = useState<"preview" | "source">("preview");
 
-  if (loading && !content && !fileUrl) return <div className="editor-state">{t("editor.html.loading")}</div>;
+  if (loading && !content && !fileUrl) return <DocumentSurfacePending label={t("editor.html.loading")} />;
   if (error && !content && !fileUrl) return <div className="editor-state danger" dir="auto">{error}</div>;
-  if (content && fileUrlLoading && !fileUrl) return <div className="editor-state">{t("editor.preview.loading")}</div>;
-  if (fileUrlLoading && !content && !fileUrl) return <div className="editor-state">{t("editor.preview.loading")}</div>;
+  if (content && fileUrlLoading && !fileUrl) return <DocumentSurfacePending label={t("editor.preview.loading")} />;
+  if (fileUrlLoading && !content && !fileUrl) return <DocumentSurfacePending label={t("editor.preview.loading")} />;
   if (fileUrlError && !content && !fileUrl) {
     return (
       <div className="editor-state danger">
@@ -112,6 +113,7 @@ function HtmlPreviewFrame({
     fileUrl ?? "",
     content ? `${content.length}:${hashString(content)}` : "",
   ].join("|");
+  const [readyFrameKey, setReadyFrameKey] = useState<string | null>(null);
 
   return (
     <iframe
@@ -123,6 +125,8 @@ function HtmlPreviewFrame({
       referrerPolicy="no-referrer"
       src={useFileUrl ? fileUrl ?? undefined : undefined}
       srcDoc={!useFileUrl && content ? buildHtmlPreviewDocument(content, fileUrl, policy) : undefined}
+      aria-busy={readyFrameKey !== frameKey}
+      onLoad={() => setReadyFrameKey(frameKey)}
     />
   );
 }

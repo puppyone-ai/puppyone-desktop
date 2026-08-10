@@ -1,6 +1,6 @@
 import type { AppPreviewResult, AppPreviewSurfaceState } from "../../../core/types";
 
-export type AppPreviewMode = "preview" | "source" | "logs";
+export type AppPreviewMode = "preview" | "source" | "logs" | "settings";
 
 export type AppPreviewViewState = {
   status: "idle" | "starting" | "running" | "stopped" | "error";

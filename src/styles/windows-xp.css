@@ -42,7 +42,9 @@
   --po-menu-item-gap: 7px;
   --po-scrollbar-size: 13px;
   --po-scrollbar-thumb-size: 9px;
+  --po-scrollbar-thumb-active-size: 9px;
   --po-scrollbar-thumb-inset: 2px;
+  --po-scrollbar-thumb-active-inset: 2px;
   --po-scrollbar-radius: 0;
   --po-scrollbar-transition: 0s;
   --po-tree-row-height: 27px;
@@ -366,8 +368,9 @@
   border-radius: 2px;
 }
 
-:root[data-interface-style="windows-xp"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root) ::-webkit-scrollbar-thumb {
+:root[data-interface-style="windows-xp"][data-po-scrollbar-mode="product"]
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb {
   min-width: 18px;
   min-height: 18px;
   border: 2px solid var(--po-inset);

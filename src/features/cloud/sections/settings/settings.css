@@ -76,10 +76,6 @@
   overflow-x: auto;
 }
 
-.desktop-cloud-settings-tabs::-webkit-scrollbar {
-  display: none;
-}
-
 .desktop-cloud-settings-tabs button {
   display: inline-flex;
   height: 28px;

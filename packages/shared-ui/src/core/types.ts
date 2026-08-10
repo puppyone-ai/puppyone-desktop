@@ -1,21 +1,6 @@
-export type DataNodeKind =
-  | "folder"
-  | "app"
-  | "workflow"
-  | "markdown"
-  | "json"
-  | "html"
-  | "image"
-  | "audio"
-  | "pdf"
-  | "video"
-  | "spreadsheet"
-  | "archive"
-  | "document"
-  | "binary"
-  | "code"
-  | "text"
-  | "file";
+import type { FileSemanticKind } from "./fileFormats";
+
+export type DataNodeKind = FileSemanticKind;
 
 export type DataNodeStatus = "clean" | "modified" | "created" | "deleted" | "moved";
 
@@ -79,6 +64,52 @@ export type FileContent = {
 
 export type AppPreviewStatus = "starting" | "running" | "stopped" | "error";
 
+export type AppPreviewPackageManager = "npm" | "pnpm" | "yarn" | "bun";
+
+export type AppPreviewProjectCandidate = Readonly<{
+  id: string;
+  cwd: string;
+  directoryLabel: string;
+  script: string;
+  packageManager: AppPreviewPackageManager;
+  framework: string;
+  command: readonly string[];
+  commandLabel: string;
+  score: number;
+}>;
+
+export type AppPreviewHtmlCandidate = Readonly<{
+  path: string;
+  label: string;
+}>;
+
+export type AppPreviewDetectionResult = Readonly<{
+  projects: readonly AppPreviewProjectCandidate[];
+  htmlFiles: readonly AppPreviewHtmlCandidate[];
+}>;
+
+export type AppPreviewSetup =
+  | Readonly<{
+      kind: "local-server";
+      cwd: string;
+      command: readonly string[];
+      url?: string;
+    }>
+  | Readonly<{ kind: "static-file"; path: string }>
+  | Readonly<{ kind: "existing-url"; url: string }>;
+
+export type AppPreviewConfigureRequest = Readonly<{
+  path: string;
+  name: string;
+  setup: AppPreviewSetup;
+  expectedContent: string;
+}>;
+
+export type AppPreviewConfigureResult = Readonly<{
+  content: string;
+  version?: string | null;
+}>;
+
 export type AppPreviewResult = {
   runtimeId?: string | null;
   appId: string;
@@ -91,6 +122,10 @@ export type AppPreviewResult = {
   cwd?: string | null;
   message?: string | null;
   logs?: string | null;
+  generation?: number;
+  sequence?: number;
+  reason?: "cancelled" | "preflight" | "process-exit" | "health-timeout" | "surface" | "unknown" | null;
+  exitCode?: number | null;
 };
 
 export type AppPreviewBounds = {
@@ -114,6 +149,8 @@ export type AppPreviewSurfaceState = {
   canGoForward: boolean;
   attached: boolean;
   message?: string | null;
+  generation?: number;
+  sequence?: number;
 };
 
 export type AppPreviewActivationResult = {
@@ -130,6 +167,8 @@ export type AppPreviewAttachmentRequest = {
 };
 
 export type AppPreviewController = {
+  detect?: (path: string) => Promise<AppPreviewDetectionResult>;
+  configure?: (request: AppPreviewConfigureRequest) => Promise<AppPreviewConfigureResult>;
   start: (path: string) => Promise<AppPreviewResult>;
   activate?: (request: AppPreviewAttachmentRequest) => Promise<AppPreviewActivationResult>;
   restart?: (

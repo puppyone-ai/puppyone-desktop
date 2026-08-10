@@ -3,7 +3,31 @@
 }
 
 .desktop-create-entry-dialog {
+  --desktop-create-entry-inset: 20px;
   width: min(360px, calc(100vw - 32px));
+}
+
+.desktop-create-entry-dialog .desktop-dialog-header {
+  padding-block: var(--desktop-create-entry-inset) 10px;
+  padding-inline: var(--desktop-create-entry-inset);
+}
+
+.desktop-create-entry-dialog .desktop-dialog-title-row {
+  align-items: center;
+}
+
+.desktop-create-entry-dialog .desktop-file-dialog-body {
+  padding-block: 8px 18px;
+  padding-inline: var(--desktop-create-entry-inset);
+}
+
+.desktop-create-entry-dialog .desktop-dialog-footer {
+  padding-inline: var(--desktop-create-entry-inset);
+  padding-block-end: var(--desktop-create-entry-inset);
+}
+
+.desktop-create-entry-dialog .desktop-dialog-field input {
+  margin-top: 0;
 }
 
 .desktop-file-dialog-body {

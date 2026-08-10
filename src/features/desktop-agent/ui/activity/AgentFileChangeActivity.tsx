@@ -45,7 +45,12 @@ export function AgentFileChangeActivity({ activity, onOpenFile }: { activity: Ag
           </ul>
         )}
         {diffLines.length > 0 && (
-          <pre className="desktop-agent-inline-diff" aria-label={t("agent.activity.inlineDiff")} dir="ltr">
+          <pre
+            className="desktop-agent-inline-diff"
+            data-po-scrollbar="content"
+            aria-label={t("agent.activity.inlineDiff")}
+            dir="ltr"
+          >
             {diffLines.map((line, index) => <span className={`desktop-agent-diff-line is-${line.kind}`} key={`${index}:${line.text}`}>{line.text || " "}</span>)}
           </pre>
         )}

@@ -40,6 +40,8 @@ export type IngestStrategy =
 export interface FileFormat {
   id: string;
   label: string;
+  /** Explicit semantic identity for formats whose product family matters. */
+  semanticKind?: FileSemanticKind;
   filenames?: string[];
   filenamePatterns?: string[];
   extensions?: string[];
@@ -65,7 +67,10 @@ export const FILE_SEMANTIC_KINDS = [
   "audio",
   "pdf",
   "video",
+  "word",
+  "excel",
   "spreadsheet",
+  "presentation",
   "archive",
   "document",
   "binary",
@@ -258,8 +263,12 @@ export function getPreviewKindForFormat(format: FileFormat): FilePreviewKind {
 }
 
 export function getSemanticKindForFormat(format: FileFormat): FileSemanticKind {
-  if (format.id === "puppyflow") return "workflow";
-  if (format.id === "json" || format.id === "jsonl") return "json";
+  if (format.semanticKind !== undefined) {
+    if (!isFileSemanticKind(format.semanticKind)) {
+      throw new TypeError(`Unknown semantic kind for file format ${format.id}: ${format.semanticKind}`);
+    }
+    return format.semanticKind;
+  }
 
   switch (format.defaultViewer) {
     case "markdown-editor":
@@ -296,7 +305,7 @@ export function getSemanticKindForFormat(format: FileFormat): FileSemanticKind {
     case "archive":
       return "archive";
     case "document":
-      return format.id === "xlsx" ? "spreadsheet" : "document";
+      return "document";
     case "binary":
       return "binary";
     case "text":
@@ -386,6 +395,10 @@ function getPreviewKindForSemanticType(type?: string | null): FilePreviewKind | 
     case "text":
     case "spreadsheet":
       return "text";
+    case "word":
+    case "excel":
+    case "presentation":
+      return "placeholder";
     default:
       return null;
   }

@@ -83,7 +83,7 @@ export function DesktopWorkspaceSwitcher({
             label={t("shell.workspaceSwitcher.home")}
             onClick={onGoHome}
           />
-          <div className="desktop-project-list">
+          <div className="desktop-project-list" data-po-scrollbar="menu">
             {items.length > 0 && (
               <DesktopMenuSection className="desktop-project-section" aria-label={t("shell.workspaceSwitcher.localProjects")}>
                 {renderProjectRows(items)}
@@ -154,7 +154,15 @@ function DesktopProjectMenuRow({
         </span>
         <span className="desktop-menu-item-body">
           <bdi className="desktop-menu-item-label">{item.label}</bdi>
-          <bdi className="desktop-menu-item-detail">{item.detail}</bdi>
+          {item.detail && (
+            <bdi
+              className="desktop-menu-item-detail"
+              dir="ltr"
+              title={item.workspace.path}
+            >
+              {item.detail}
+            </bdi>
+          )}
         </span>
       </button>
       {path ? (

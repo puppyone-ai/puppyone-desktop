@@ -222,14 +222,7 @@ body.data-sidebar-resizing .data-preview-accessory {
       color-mix(in srgb, var(--po-selected) 38%, transparent) 100%
     )
   );
-  --tree-scrollbar-width: var(--po-tree-scrollbar-width, var(--po-scrollbar-size, 8px));
-  --tree-scrollbar-radius: var(--po-scrollbar-radius, 999px);
-  --tree-scrollbar-transition: var(--po-scrollbar-transition, 0.16s ease);
-  --tree-scrollbar-thumb: var(--desktop-sidebar-scrollbar-thumb, var(--po-scrollbar-thumb));
-  --tree-scrollbar-thumb-hover: var(
-    --desktop-sidebar-scrollbar-thumb-hover,
-    var(--po-scrollbar-thumb-hover)
-  );
+  --tree-scrollbar-width: var(--po-tree-scrollbar-width, var(--po-scrollbar-size, 12px));
 
   position: relative;
   display: flex;
@@ -269,30 +262,6 @@ body.data-sidebar-resizing .data-preview-accessory {
   /* Always reserve the scrollbar gutter so row width never depends on
      scroll state. The list compensates in its right padding. */
   scrollbar-gutter: stable;
-}
-
-.explorer-tree-scroll::-webkit-scrollbar {
-  width: var(--tree-scrollbar-width);
-  height: var(--tree-scrollbar-width);
-  background: transparent;
-}
-
-.explorer-tree-scroll::-webkit-scrollbar-track,
-.explorer-tree-scroll::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-.explorer-tree-scroll::-webkit-scrollbar-thumb {
-  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
-  border-radius: var(--tree-scrollbar-radius);
-  background-color: var(--tree-scrollbar-thumb);
-  background-clip: padding-box;
-  transition: background-color var(--tree-scrollbar-transition);
-}
-
-.explorer-tree-scroll::-webkit-scrollbar-thumb:hover,
-.explorer-tree-scroll.po-scrollbar-active::-webkit-scrollbar-thumb:hover {
-  background-color: var(--tree-scrollbar-thumb-hover);
 }
 
 .explorer-tree-list {
@@ -546,8 +515,7 @@ body.data-sidebar-resizing .data-preview-accessory {
 .tree-row.root:has(.tree-row-actions) .tree-row-content,
 .tree-row:hover:has(.tree-row-actions) .tree-row-content,
 .tree-row:focus-visible:has(.tree-row-actions) .tree-row-content,
-.tree-row:focus-within:has(.tree-row-actions) .tree-row-content,
-.tree-row.active:has(.tree-row-actions) .tree-row-content {
+.tree-row:has(.tree-row-action-button:focus-visible) .tree-row-content {
   padding-right: var(--tree-row-action-reserve);
 }
 
@@ -570,8 +538,7 @@ body.data-sidebar-resizing .data-preview-accessory {
 .tree-row.root .tree-row-actions.root-actions,
 .tree-row:hover .tree-row-actions,
 .tree-row:focus-visible .tree-row-actions,
-.tree-row:focus-within .tree-row-actions,
-.tree-row.active .tree-row-actions {
+.tree-row:has(.tree-row-action-button:focus-visible) .tree-row-actions {
   opacity: 1;
   pointer-events: auto;
 }
@@ -782,6 +749,34 @@ body.data-sidebar-resizing .data-preview-accessory {
   min-height: 0;
   flex-direction: column;
   border-bottom: 1px solid var(--po-divider);
+}
+
+.document-surface-host {
+  position: relative;
+  display: flex;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.document-surface-slot {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.document-surface-slot.is-committed {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.document-surface-slot.is-staging {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .file-preview-shell.without-header {

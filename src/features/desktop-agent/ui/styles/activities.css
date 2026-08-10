@@ -193,13 +193,14 @@
 .desktop-agent-inline-diff,
 .desktop-agent-tool-output {
   margin: 0;
-  overflow: auto;
   border: 1px solid var(--agent-border-subtle);
   border-radius: 10px;
   background: color-mix(in srgb, var(--agent-control-surface) 84%, var(--agent-canvas));
   font-family: var(--po-font-mono);
   font-size: var(--agent-code-font-size);
 }
+.desktop-agent-inline-diff,
+.desktop-agent-tool-output { overflow: auto; }
 .desktop-agent-command-line {
   display: grid;
   min-width: 0;

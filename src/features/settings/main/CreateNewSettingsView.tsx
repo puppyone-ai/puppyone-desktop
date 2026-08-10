@@ -98,11 +98,13 @@ export function CreateNewSettingsView({
   const addableKinds = CREATE_NEW_FILE_TYPE_IDS.filter((kind) => (
     !presentKinds.has(kind) && isCreateNewFileTypeAvailable(kind, experimentalSettings)
   ));
-  const defaultsRestored = settings.items.length === 2
+  const defaultsRestored = settings.items.length === 3
     && settings.items[0]?.kind === "markdown"
     && settings.items[0]?.enabled
     && settings.items[1]?.kind === "csv"
-    && settings.items[1]?.enabled;
+    && settings.items[1]?.enabled
+    && settings.items[2]?.kind === "app"
+    && settings.items[2]?.enabled;
 
   useEffect(() => {
     if (!addMenuOpen) return;
@@ -196,7 +198,7 @@ export function CreateNewSettingsView({
 
   return (
     <section className="desktop-utility-view desktop-settings-view">
-      <div className="desktop-utility-body desktop-settings-body">
+      <div className="desktop-utility-body desktop-settings-body" data-po-scrollbar="content">
         <div className="desktop-settings-section desktop-create-new-settings">
           <SettingsSectionHeader
             title={t("settings.createNew.title")}

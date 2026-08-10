@@ -178,7 +178,7 @@ export function CloudOrganizationPageShell({
   children: ReactNode;
 }) {
   return (
-    <div className="desktop-cloud-org-page">
+    <div className="desktop-cloud-org-page" data-po-scrollbar="content">
       <div className="desktop-cloud-org-shell">
         <div className="desktop-cloud-org-header">
           <div>

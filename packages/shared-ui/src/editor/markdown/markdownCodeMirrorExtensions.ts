@@ -25,6 +25,10 @@ import { markdownRevealedSourceField } from "./core/state/revealedSource";
 import { markdownLivePreviewFocusExtension } from "./core/state/livePreviewFocus";
 import { markdownAssetUrlResolverFacet, markdownWorkspaceRootFacet } from "./core/editor/markdownLivePreviewContext";
 import { getMarkdownEmbedHost, disposeMarkdownEmbedHost } from "./platform/codemirror/embedHost";
+import {
+  markdownInlineViewportContinuityEffect,
+  markdownInlineViewportHistoryExtension,
+} from "./platform/codemirror/embeddedInlineViewportSession";
 import { getDocRevision } from "./platform/brokers/transactionBroker";
 import {
   markdownHiddenMarkerSelectionNormalizer,
@@ -129,6 +133,7 @@ export function markdownLivePreviewCoreExtension(
     // experimental interaction is disabled, so an earlier move can still
     // undo and redo embedded-session relocation safely.
     markdownBlockRelocationHistoryExtension,
+    markdownInlineViewportHistoryExtension,
     markdownEmbedHostLifecycle,
     markdownLivePreviewDecorations,
     markdownBlockWidgetSelectionExtension,
@@ -164,8 +169,28 @@ const markdownEmbedHostLifecycle = ViewPlugin.fromClass(class {
           relocation,
           (pos, assoc) => transaction.changes.mapPos(pos, assoc),
         );
+        host.inlineViewports.mapRangesWithRelocation(
+          relocation,
+          (pos, assoc) => transaction.changes.mapPos(pos, assoc),
+        );
       } else {
         host.editSessions.mapRanges((pos, assoc) => transaction.changes.mapPos(pos, assoc));
+        host.inlineViewports.mapTransaction({
+          continuities: transaction.effects
+            .filter((effect) => effect.is(markdownInlineViewportContinuityEffect))
+            .map((effect) => effect.value),
+          mapPos: (pos, assoc) => transaction.changes.mapPos(pos, assoc),
+          touchesRange: (range) => {
+            let touched = false;
+            transaction.changes.iterChangedRanges((fromA, toA) => {
+              if (touched) return;
+              touched = fromA === toA
+                ? fromA > range.from && fromA < range.to
+                : fromA < range.to && toA > range.from;
+            });
+            return touched;
+          },
+        });
       }
     }
     // Executable and native web-embed capabilities are revision-bound. Static

@@ -55,14 +55,14 @@ describe("Create New settings", () => {
     });
   });
 
-  it("adds an available type at the end and offers no experimental types by default", () => {
+  it("adds an available type at the end and keeps only unfinished formats experimental", () => {
     const onChange = vi.fn();
     const container = render(defaultSettings(), onChange);
 
     click(findButton(container, "Add file type"));
     expect(container.textContent).toContain("Text file");
     expect(container.textContent).toContain("JSON file");
-    expect(container.textContent).not.toContain("PuppyOne app");
+    expect(container.textContent).toContain("PuppyOne app");
     expect(container.textContent).not.toContain("PuppyFlow file");
 
     click(findButton(container, "Text file"));
@@ -75,7 +75,7 @@ describe("Create New settings", () => {
     });
   });
 
-  it("keeps an unavailable experimental type removable while disabling its switch", () => {
+  it("keeps the App Preview type available when it is already configured", () => {
     const settings: CreateNewMenuSettings = {
       items: [
         { kind: "app", enabled: true },
@@ -86,9 +86,8 @@ describe("Create New settings", () => {
 
     expect(container.querySelector<HTMLInputElement>(
       '[aria-label="Show PuppyOne app in the New menu"]',
-    )?.disabled).toBe(true);
-    expect(container.querySelector('[data-unavailable] .desktop-create-new-row-label')?.textContent)
-      .toContain("PuppyOne app");
+    )?.disabled).toBe(false);
+    expect(container.querySelector('[data-unavailable] .desktop-create-new-row-label')).toBeNull();
   });
 });
 

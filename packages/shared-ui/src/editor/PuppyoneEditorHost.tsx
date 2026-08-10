@@ -16,6 +16,7 @@ import type {
   MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
+  OfficeEditorActionResolver,
 } from "./viewerTypes";
 import { DEFAULT_EDITOR_INTERACTION_PREFERENCES } from "./viewerTypes";
 import type {
@@ -33,6 +34,11 @@ import type { AiEditFile } from "./ai-edits/types";
 import { DocumentSessionBoundary } from "./document-session/DocumentSessionBoundary";
 import type { DocumentPersistedCommit } from "./document-session/types";
 import { resolveEditorAccess } from "./editorAccess";
+import { EditorFindHost } from "./find/editorFind";
+import {
+  DocumentSurfacePending,
+  DocumentSurfaceReadinessBoundary,
+} from "./DocumentSurfaceHost";
 
 export type { EditorDocument, EditorDocumentKind, EditorSaveMode, MarkdownHtmlTrustMode } from "./viewerTypes";
 
@@ -57,14 +63,27 @@ export type PuppyoneEditorHostProps = {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
+  resolveOfficeEditorActions?: OfficeEditorActionResolver | null;
   /**
    * Optional host composition port for external viewer extensions. The entire
    * port is absent in the default preset-only product profile.
    */
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
+  onSurfaceReady?: () => void;
 };
 
-export function PuppyoneEditorHost({
+export function PuppyoneEditorHost(props: PuppyoneEditorHostProps) {
+  return (
+    <DocumentSurfaceReadinessBoundary
+      readinessKey={props.document.path}
+      onReady={props.onSurfaceReady}
+    >
+      <PuppyoneEditorSurface {...props} />
+    </DocumentSurfaceReadinessBoundary>
+  );
+}
+
+function PuppyoneEditorSurface({
   document,
   loading = false,
   error = null,
@@ -85,6 +104,7 @@ export function PuppyoneEditorHost({
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
+  resolveOfficeEditorActions = null,
   viewerExtensionAdapter = null,
 }: PuppyoneEditorHostProps) {
   const { t } = useLocalization();
@@ -151,7 +171,7 @@ export function PuppyoneEditorHost({
   const canEdit = editorAccess.kind === "editable";
 
   if (viewer.source !== "resource" && loading && !content) {
-    return <div className="editor-state">{t("editor.loadingFile")}</div>;
+    return <DocumentSurfacePending label={t("editor.loadingFile")} />;
   }
 
   if (viewer.source !== "resource" && error && !content) {
@@ -192,27 +212,30 @@ export function PuppyoneEditorHost({
         appPreview,
         openExternalFile,
         convertOfficeDocumentToDocx,
+        officeEditorActions: resolveOfficeEditorActions?.(document) ?? [],
       }}
     />
   );
 
-  if (canEdit && documentPersistence) {
-    return (
-      <DocumentSessionBoundary
-        documentId={document.path}
-        initialContent={content}
-        initialVersion={document.version}
-        saveMode={saveMode}
-        persistence={documentPersistence}
-        onPersisted={onDocumentPersisted}
-        showSaveStatus={editorInteractionPreferences.showSaveStatus}
-      >
-        {presetViewer}
-      </DocumentSessionBoundary>
-    );
-  }
+  const editor = canEdit && documentPersistence ? (
+    <DocumentSessionBoundary
+      documentId={document.path}
+      initialContent={content}
+      initialVersion={document.version}
+      saveMode={saveMode}
+      persistence={documentPersistence}
+      onPersisted={onDocumentPersisted}
+      showSaveStatus={editorInteractionPreferences.showSaveStatus}
+    >
+      {presetViewer}
+    </DocumentSessionBoundary>
+  ) : presetViewer;
 
-  return presetViewer;
+  return (
+    <EditorFindHost documentId={document.path}>
+      {editor}
+    </EditorFindHost>
+  );
 }
 
 function ExternalViewerChooser({

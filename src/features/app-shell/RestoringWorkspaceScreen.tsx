@@ -32,6 +32,7 @@ export function RestoringWorkspaceScreen({
   return (
     <main
       className={`onboarding-shell ${resolvedTheme === "dark" ? "dark" : ""}`}
+      data-po-scrollbar="content"
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}

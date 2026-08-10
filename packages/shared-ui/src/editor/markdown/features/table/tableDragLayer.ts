@@ -17,10 +17,12 @@ import {
   getEditableTableColumnDropBoundary,
   getEditableTableDropBoundary,
 } from "../../../table/editableTableDrag";
+import type { MarkdownTableInlineViewportController } from "./tableInlineViewportController";
 
 export type MarkdownTableDragHandleContext = {
   alignments: readonly MarkdownTableAlignment[];
   columnCount: number;
+  inlineViewport: MarkdownTableInlineViewportController;
   rows: readonly MarkdownTableRow[];
   table: HTMLTableElement;
   tableFrom: number;
@@ -304,6 +306,8 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
     const startY = event.clientY;
     let moved = false;
     let dropBoundary: number | null = null;
+    let lastClientX = startX;
+    let lastClientY = startY;
 
     hover.dragging = true;
     setInteractionPinnedRow(kind === "row" ? sourceIndex : hover.rowIndex);
@@ -316,18 +320,11 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
       context.wrapper.classList.add("is-table-dragging");
     };
 
-    const onPointerMove = (moveEvent: PointerEvent) => {
-      moveEvent.preventDefault();
-      moveEvent.stopPropagation();
-      if (!moved) {
-        if (Math.abs(moveEvent.clientX - startX) <= 4 && Math.abs(moveEvent.clientY - startY) <= 4) return;
-        moved = true;
-        beginVisualDrag();
-      }
+    const updateDropBoundary = () => {
       dropBoundary = kind === "column"
         ? getEditableTableColumnDropBoundary(
           getHeaderCellElements(),
-          moveEvent.clientX,
+          lastClientX,
           localization.direction,
         )
         : getEditableTableDropBoundary(getBodyRowElements().map((row) => {
@@ -337,8 +334,24 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
             start: rect.top,
             size: rect.height,
           };
-        }), moveEvent.clientY);
+        }), lastClientY);
       renderDropIndicator(kind, sourceIndex, dropBoundary);
+    };
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      moveEvent.preventDefault();
+      moveEvent.stopPropagation();
+      if (!moved) {
+        if (Math.abs(moveEvent.clientX - startX) <= 4 && Math.abs(moveEvent.clientY - startY) <= 4) return;
+        moved = true;
+        beginVisualDrag();
+      }
+      lastClientX = moveEvent.clientX;
+      lastClientY = moveEvent.clientY;
+      updateDropBoundary();
+      if (kind === "column") {
+        context.inlineViewport.updateDragAutoScroll(lastClientX, updateDropBoundary);
+      }
     };
 
     const applyMove = () => {
@@ -371,6 +384,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
       hover.dragging = false;
       handle.classList.remove("is-dragging");
       context.wrapper.classList.remove("is-table-dragging");
+      context.inlineViewport.stopDragAutoScroll();
       setInteractionPinnedRow(null);
       dropIndicator.hidden = true;
       if (!preserveSourceHighlight) setDragSourceHighlight(kind, sourceIndex, false);

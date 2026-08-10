@@ -1,25 +1,47 @@
 "use client";
 
+import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { css } from "@codemirror/lang-css";
-import { html } from "@codemirror/lang-html";
-import { javascript } from "@codemirror/lang-javascript";
 import {
+  foldGutter,
+  foldKeymap,
   bracketMatching,
-  defaultHighlightStyle,
   indentOnInput,
   syntaxHighlighting,
 } from "@codemirror/language";
-import { Compartment, EditorState, type Extension } from "@codemirror/state";
+import { Annotation, Compartment, EditorState, type Extension } from "@codemirror/state";
 import {
+  crosshairCursor,
+  drawSelection,
+  dropCursor,
   EditorView,
   highlightActiveLine,
   highlightActiveLineGutter,
+  highlightSpecialChars,
+  highlightTrailingWhitespace,
   keymap,
   lineNumbers,
+  rectangularSelection,
 } from "@codemirror/view";
 import { useEffect, useMemo, useRef } from "react";
 import { subscribeTypographyChanges } from "../core/typography";
+import { CodeMirrorFindAdapter } from "./find/codeMirrorFindAdapter";
+import { useRegisterEditorFindAdapter } from "./find/editorFind";
+import { puppyCodeHighlightStyle } from "./codeHighlightStyle";
+import {
+  loadCodeLanguageExtension,
+  resolveCodeLanguageKey,
+  type CodeLanguageKey,
+} from "./codeLanguageSupport";
+import type {
+  EditorSourceRevision,
+  EditorSourceSnapshot,
+  EditorSourceSnapshotPort,
+} from "./sourceSnapshot";
+
+const externalDocumentUpdate = Annotation.define<boolean>();
+const revisionByDocument = new WeakMap<object, string>();
+let documentRevisionSequence = 0;
 
 export type CodeMirrorCodeEditorProps = {
   content: string;
@@ -27,6 +49,8 @@ export type CodeMirrorCodeEditorProps = {
   language?: string | null;
   readOnly?: boolean;
   onChange?: (content: string) => void;
+  onSourceRevisionChange?: (revision: EditorSourceRevision) => void;
+  onSnapshotPortChange?: (port: EditorSourceSnapshotPort | null) => void;
 };
 
 export function CodeMirrorCodeEditor({
@@ -35,20 +59,25 @@ export function CodeMirrorCodeEditor({
   language = null,
   readOnly = true,
   onChange,
+  onSourceRevisionChange,
+  onSnapshotPortChange,
 }: CodeMirrorCodeEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const languageCompartmentRef = useRef(new Compartment());
   const readOnlyCompartmentRef = useRef(new Compartment());
-  const onChangeRef = useRef(onChange);
+  const callbacksRef = useRef({ onChange, onSnapshotPortChange, onSourceRevisionChange });
   const readOnlyRef = useRef(readOnly);
-  const applyingExternalChangeRef = useRef(false);
-  const languageKey = useMemo(() => getCodeLanguageKey(language, nodeName), [language, nodeName]);
+  const externalContentRef = useRef(content);
+  const languageKey = useMemo(() => resolveCodeLanguageKey(language, nodeName), [language, nodeName]);
+  const findAdapter = useMemo(() => new CodeMirrorFindAdapter(), []);
   const initialEditorConfigRef = useRef({ content, languageKey, nodeName, readOnly });
 
+  useRegisterEditorFindAdapter(findAdapter);
+
   useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
+    callbacksRef.current = { onChange, onSnapshotPortChange, onSourceRevisionChange };
+  }, [onChange, onSnapshotPortChange, onSourceRevisionChange]);
 
   useEffect(() => {
     readOnlyRef.current = readOnly;
@@ -63,59 +92,91 @@ export function CodeMirrorCodeEditor({
       doc: initialConfig.content,
       extensions: [
         lineNumbers(),
+        foldGutter({ openText: "⌄", closedText: "›" }),
+        highlightSpecialChars(),
         highlightActiveLineGutter(),
         history(),
+        drawSelection(),
+        dropCursor(),
+        EditorState.allowMultipleSelections.of(true),
         indentOnInput(),
         bracketMatching(),
+        closeBrackets(),
+        rectangularSelection(),
+        crosshairCursor(),
         highlightActiveLine(),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        EditorView.lineWrapping,
-        keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+        highlightTrailingWhitespace(),
+        syntaxHighlighting(puppyCodeHighlightStyle),
+        findAdapter.extension,
+        keymap.of([
+          indentWithTab,
+          ...closeBracketsKeymap,
+          ...defaultKeymap,
+          ...historyKeymap,
+          ...foldKeymap,
+        ]),
         EditorView.updateListener.of((update) => {
-          if (!update.docChanged || readOnlyRef.current || applyingExternalChangeRef.current) return;
-          onChangeRef.current?.(update.state.doc.toString());
+          if (!update.docChanged || readOnlyRef.current) return;
+          if (update.transactions.some((transaction) => transaction.annotation(externalDocumentUpdate))) return;
+          callbacksRef.current.onSourceRevisionChange?.({
+            revision: getCodeDocumentRevision(update.state.doc),
+            dirty: true,
+          });
+          // Compatibility for controlled hosts. The built-in code viewer uses
+          // the snapshot port so ordinary typing does not stringify the file.
+          callbacksRef.current.onChange?.(update.state.doc.toString());
         }),
         EditorView.theme({
           "&": { height: "100%" },
           ".cm-scroller": { overflow: "auto" },
         }),
-        languageCompartmentRef.current.of(getCodeLanguageExtension(initialConfig.languageKey, initialConfig.nodeName)),
+        languageCompartmentRef.current.of([]),
         readOnlyCompartmentRef.current.of(getReadOnlyExtension(initialConfig.readOnly)),
       ],
     });
 
     const view = new EditorView({ state, parent: host });
+    view.scrollDOM.dataset.poScrollbar = "content";
     viewRef.current = view;
+    findAdapter.attach(view);
     const unsubscribeTypography = subscribeTypographyChanges(host.ownerDocument, () => {
       view.requestMeasure();
+    });
+    const snapshotPort: EditorSourceSnapshotPort = {
+      readSnapshot: () => readCodeEditorSnapshot(view),
+      replaceContent: (nextContent) => {
+        externalContentRef.current = nextContent;
+        replaceEditorContent(view, nextContent);
+        return readCodeEditorSnapshot(view);
+      },
+    };
+    callbacksRef.current.onSnapshotPortChange?.(snapshotPort);
+    callbacksRef.current.onSourceRevisionChange?.({
+      revision: getCodeDocumentRevision(view.state.doc),
+      dirty: false,
     });
 
     return () => {
       unsubscribeTypography();
+      callbacksRef.current.onSnapshotPortChange?.(null);
+      findAdapter.dispose();
       view.destroy();
       viewRef.current = null;
     };
-  }, []);
+  }, [findAdapter]);
 
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
 
-    const current = view.state.doc.toString();
-    if (current === content) return;
-
-    applyingExternalChangeRef.current = true;
-    try {
-      view.dispatch({
-        changes: {
-          from: 0,
-          to: view.state.doc.length,
-          insert: content,
-        },
-      });
-    } finally {
-      applyingExternalChangeRef.current = false;
-    }
+    if (Object.is(externalContentRef.current, content)) return;
+    externalContentRef.current = content;
+    if (view.state.doc.length === content.length && view.state.doc.toString() === content) return;
+    replaceEditorContent(view, content);
+    callbacksRef.current.onSourceRevisionChange?.({
+      revision: getCodeDocumentRevision(view.state.doc),
+      dirty: false,
+    });
   }, [content]);
 
   useEffect(() => {
@@ -130,11 +191,16 @@ export function CodeMirrorCodeEditor({
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
-
-    view.dispatch({
-      effects: languageCompartmentRef.current.reconfigure(getCodeLanguageExtension(languageKey, nodeName)),
+    let active = true;
+    view.dispatch({ effects: languageCompartmentRef.current.reconfigure([]) });
+    void loadCodeLanguageExtension(languageKey).then((extension) => {
+      if (!active || viewRef.current !== view) return;
+      view.dispatch({ effects: languageCompartmentRef.current.reconfigure(extension) });
+    }).catch((error) => {
+      console.warn(`Unable to load ${languageKey} code language support:`, error);
     });
-  }, [languageKey, nodeName]);
+    return () => { active = false; };
+  }, [languageKey]);
 
   return (
     <div className="code-codemirror-editor" data-language={languageKey || "plaintext"}>
@@ -150,54 +216,25 @@ function getReadOnlyExtension(readOnly: boolean): Extension {
   ];
 }
 
-function getCodeLanguageExtension(languageKey: string, nodeName: string): Extension {
-  switch (languageKey) {
-    case "javascript":
-    case "jsx":
-      return javascript({ jsx: languageKey === "jsx" || /\.jsx$/i.test(nodeName) });
-    case "typescript":
-    case "tsx":
-      return javascript({
-        typescript: true,
-        jsx: languageKey === "tsx" || /\.tsx$/i.test(nodeName),
-      });
-    case "html":
-    case "xml":
-      return html();
-    case "css":
-    case "scss":
-    case "less":
-      return css();
-    case "json":
-      return javascript();
-    default:
-      return [];
-  }
+function replaceEditorContent(view: EditorView, content: string) {
+  view.dispatch({
+    changes: { from: 0, to: view.state.doc.length, insert: content },
+    annotations: externalDocumentUpdate.of(true),
+  });
 }
 
-function getCodeLanguageKey(language: string | null | undefined, nodeName: string): string {
-  const normalizedLanguage = normalizeLanguage(language);
-  if (normalizedLanguage) return normalizedLanguage;
-
-  const lowerName = nodeName.toLowerCase();
-  if (lowerName.endsWith(".tsx")) return "tsx";
-  if (lowerName.endsWith(".ts")) return "typescript";
-  if (lowerName.endsWith(".jsx")) return "jsx";
-  if (lowerName.endsWith(".js") || lowerName.endsWith(".mjs") || lowerName.endsWith(".cjs")) return "javascript";
-  if (lowerName.endsWith(".css")) return "css";
-  if (lowerName.endsWith(".scss") || lowerName.endsWith(".sass")) return "scss";
-  if (lowerName.endsWith(".less")) return "less";
-  if (lowerName.endsWith(".html") || lowerName.endsWith(".htm")) return "html";
-  if (lowerName.endsWith(".xml") || lowerName.endsWith(".svg")) return "xml";
-  if (lowerName.endsWith(".json") || lowerName.endsWith(".jsonl")) return "json";
-  return "plaintext";
+function readCodeEditorSnapshot(view: EditorView): EditorSourceSnapshot {
+  return {
+    content: view.state.doc.toString(),
+    revision: getCodeDocumentRevision(view.state.doc),
+  };
 }
 
-function normalizeLanguage(language: string | null | undefined): string | null {
-  const value = language?.trim().toLowerCase();
-  if (!value) return null;
-  if (value === "js") return "javascript";
-  if (value === "ts") return "typescript";
-  if (value === "shell" || value === "bash" || value === "zsh" || value === "sh") return "plaintext";
-  return value;
+function getCodeDocumentRevision(document: object): string {
+  const existing = revisionByDocument.get(document);
+  if (existing) return existing;
+  documentRevisionSequence += 1;
+  const revision = `code-doc-revision:${documentRevisionSequence}`;
+  revisionByDocument.set(document, revision);
+  return revision;
 }

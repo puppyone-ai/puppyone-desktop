@@ -125,6 +125,8 @@
   "editor.diffMarkers.color": "Color",
   "experimental.title": "Experimental",
   "experimental.detail": "Opt in to early desktop experiences. Every experiment is off by default.",
+  "experimental.officeEditing.title": "Office document editing",
+  "experimental.officeEditing.detail": "Edit .docx, .xlsx, and .pptx files with the configured ONLYOFFICE Document Server. When off, Office files stay in read-only preview.",
   "experimental.markdownBlockDrag.detail": "Enable early same-document block rearrangement in Markdown Live Preview.",
   "experimental.markdownBlockDrag.title": "Markdown block drag handles",
   "experimental.minimalMode.detail": "Replace persistent app chrome with one centered hover dock while keeping project, Git, Chat, and Terminal actions available.",

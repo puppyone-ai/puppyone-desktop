@@ -39,12 +39,14 @@ describe("preset viewer host composition", () => {
     expect(container.querySelector('[data-testid="install-viewer"]')).toBeNull();
   });
 
-  it("renders loading and recoverable error states before mounting a content viewer", async () => {
+  it("keeps loading non-visual and renders recoverable errors before mounting a content viewer", async () => {
     const loadingContainer = renderHost({
       document: { path: "notes.txt", name: "notes.txt", type: "text" },
       loading: true,
     });
-    expect(loadingContainer.textContent).toContain("Loading file…");
+    expect(loadingContainer.textContent).not.toContain("Loading file…");
+    expect(loadingContainer.querySelector('[role="status"]')?.getAttribute("aria-label"))
+      .toBe("Loading file…");
 
     act(() => root?.unmount());
     root = null;

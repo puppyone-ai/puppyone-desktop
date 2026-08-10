@@ -9,6 +9,10 @@ import {
 import { normalizeLineEndings } from "../../shared/widgets/widgetDom";
 import { requestMarkdownTableFocus } from "./tableFocusState";
 import { closeActiveMarkdownTableMenu } from "./tableMenuState";
+import {
+  markdownInlineViewportContinuityEffect,
+  type EmbeddedInlineViewportSequenceChange,
+} from "../../platform/codemirror/embeddedInlineViewportSession";
 
 export type MarkdownTableDispatchContext = {
   alignments: readonly MarkdownTableAlignment[];
@@ -35,6 +39,25 @@ export function dispatchMarkdownTableStructureOperation(
     rows: getMarkdownTableRowsWithDraft(context.rows, context.currentDraft),
   }, operation);
 
+  const continuity = operation.type === "delete-table"
+    ? null
+    : markdownInlineViewportContinuityEffect.of({
+      featureId: "markdown-table",
+      oldRange: { from: context.tableFrom, to: context.tableTo },
+      newRange: {
+        from: context.tableFrom,
+        to: context.tableFrom + result.replacement.length,
+      },
+      sequenceChange: getMarkdownTableInlineSequenceChange(
+        operation,
+        Math.max(1, context.alignments.length),
+      ),
+    });
+  const effects = [
+    continuity,
+    result.focus ? requestMarkdownTableFocus(context.tableFrom, result.focus) : null,
+  ].filter((effect) => effect !== null);
+
   context.view.dispatch({
     changes: {
       from: context.tableFrom,
@@ -42,11 +65,43 @@ export function dispatchMarkdownTableStructureOperation(
       insert: result.replacement,
     },
     selection: EditorSelection.cursor(context.tableFrom),
-    effects: result.focus
-      ? requestMarkdownTableFocus(context.tableFrom, result.focus)
-      : undefined,
+    effects: effects.length > 0 ? effects : undefined,
   });
   if (!result.focus) context.view.focus();
+}
+
+export function getMarkdownTableInlineSequenceChange(
+  operation: MarkdownTableStructureOperation,
+  columnCount: number,
+): EmbeddedInlineViewportSequenceChange {
+  const lastColumnIndex = Math.max(0, columnCount - 1);
+  const columnIndex = clampInteger(operation.columnIndex, 0, lastColumnIndex);
+  switch (operation.type) {
+    case "insert-column-left":
+      return { kind: "insert", index: columnIndex, count: 1 };
+    case "insert-column-right":
+      return { kind: "insert", index: columnIndex + 1, count: 1 };
+    case "delete-column":
+      return columnCount > 1
+        ? { kind: "delete", index: columnIndex, count: 1 }
+        : { kind: "preserve" };
+    case "move-column-left":
+      return columnIndex > 0
+        ? { kind: "move", fromIndex: columnIndex, toIndex: columnIndex - 1 }
+        : { kind: "preserve" };
+    case "move-column-right":
+      return columnIndex < lastColumnIndex
+        ? { kind: "move", fromIndex: columnIndex, toIndex: columnIndex + 1 }
+        : { kind: "preserve" };
+    case "move-column-to":
+      return {
+        kind: "move",
+        fromIndex: columnIndex,
+        toIndex: clampInteger(operation.targetColumnIndex, 0, lastColumnIndex),
+      };
+    default:
+      return { kind: "preserve" };
+  }
 }
 
 function getMarkdownTableRowsWithDraft(
@@ -81,4 +136,8 @@ function getMarkdownTableCellDraft(cell: HTMLElement): MarkdownTableCellDraft | 
 
 export function normalizeMarkdownTableCellInput(value: string): string {
   return normalizeLineEndings(value).replace(/\n+/g, " ").trim();
+}
+
+function clampInteger(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, Math.trunc(value)));
 }

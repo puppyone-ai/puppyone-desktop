@@ -42,6 +42,16 @@
 }
 
 .code-codemirror-editor {
+  --po-code-token-comment: color-mix(in srgb, var(--po-text-muted) 88%, var(--po-editor-bg));
+  --po-code-token-keyword: var(--po-purple, #8250df);
+  --po-code-token-string: color-mix(in srgb, var(--po-success, #1a7f37) 82%, var(--po-text));
+  --po-code-token-constant: color-mix(in srgb, var(--po-warning, #9a6700) 80%, var(--po-text));
+  --po-code-token-special: color-mix(in srgb, var(--po-notification, #cf222e) 76%, var(--po-text));
+  --po-code-token-type: var(--po-info, #0550ae);
+  --po-code-token-function: var(--po-accent-text, var(--po-accent));
+  --po-code-token-property: color-mix(in srgb, var(--po-accent) 72%, var(--po-text));
+  --po-code-token-operator: color-mix(in srgb, var(--po-text) 82%, var(--po-accent));
+  --po-code-token-meta: color-mix(in srgb, var(--po-purple, #8250df) 72%, var(--po-text));
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -68,6 +78,8 @@
 
 .code-codemirror-editor .cm-scroller {
   font-family: var(--po-font-mono);
+  line-height: 20px;
+  scrollbar-gutter: stable;
 }
 
 .code-codemirror-editor .cm-content {
@@ -77,24 +89,42 @@
 }
 
 .code-codemirror-editor .cm-line {
-  padding: 0 4px;
+  padding: 0 8px;
 }
 
 .code-codemirror-editor .cm-gutters {
   border-right: 1px solid var(--po-editor-line);
-  background: color-mix(in srgb, var(--po-editor-bg) 94%, var(--po-surface));
+  background: color-mix(in srgb, var(--po-editor-bg) 96%, var(--po-text));
   color: var(--po-text-disabled);
 }
 
 .code-codemirror-editor .cm-lineNumbers .cm-gutterElement {
-  min-width: 38px;
-  padding: 0 10px 0 8px;
+  min-width: 42px;
+  padding: 0 12px 0 8px;
   font-size: 12px;
+}
+
+.code-codemirror-editor .cm-foldGutter .cm-gutterElement {
+  width: 18px;
+  color: var(--po-text-disabled);
+  font-size: 14px;
+  text-align: center;
+}
+
+.code-codemirror-editor .cm-foldPlaceholder {
+  border: 0;
+  border-radius: 4px;
+  background: var(--po-control-hover);
+  color: var(--po-text-muted);
 }
 
 .code-codemirror-editor .cm-activeLine,
 .code-codemirror-editor .cm-activeLineGutter {
-  background: color-mix(in srgb, var(--po-accent) 9%, transparent);
+  background: color-mix(in srgb, var(--po-accent) 7%, transparent);
+}
+
+.code-codemirror-editor .cm-activeLineGutter {
+  color: var(--po-text-muted);
 }
 
 .code-codemirror-editor .cm-selectionBackground,
@@ -104,8 +134,77 @@
 
 .code-codemirror-editor .cm-cursor {
   border-left-color: var(--po-accent);
+  border-left-width: 2px;
 }
 
 .code-codemirror-editor .cm-focused {
   outline: none;
+}
+
+.code-codemirror-editor .cm-matchingBracket {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--po-accent) 18%, transparent);
+  color: inherit;
+  outline: 1px solid color-mix(in srgb, var(--po-accent) 38%, transparent);
+}
+
+.code-codemirror-editor .cm-nonmatchingBracket {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--po-danger) 16%, transparent);
+  color: var(--po-danger);
+  outline: 1px solid color-mix(in srgb, var(--po-danger) 40%, transparent);
+}
+
+.code-codemirror-editor .cm-trailingSpace {
+  background: color-mix(in srgb, var(--po-danger) 20%, transparent);
+}
+
+.code-codemirror-editor .cm-code-comment {
+  color: var(--po-code-token-comment);
+  font-style: italic;
+}
+
+.code-codemirror-editor .cm-code-keyword {
+  color: var(--po-code-token-keyword);
+  font-weight: 600;
+}
+
+.code-codemirror-editor .cm-code-string {
+  color: var(--po-code-token-string);
+}
+
+.code-codemirror-editor .cm-code-constant {
+  color: var(--po-code-token-constant);
+}
+
+.code-codemirror-editor .cm-code-special {
+  color: var(--po-code-token-special);
+}
+
+.code-codemirror-editor .cm-code-type {
+  color: var(--po-code-token-type);
+}
+
+.code-codemirror-editor .cm-code-function {
+  color: var(--po-code-token-function);
+  font-weight: 550;
+}
+
+.code-codemirror-editor .cm-code-property {
+  color: var(--po-code-token-property);
+}
+
+.code-codemirror-editor .cm-code-operator {
+  color: var(--po-code-token-operator);
+}
+
+.code-codemirror-editor .cm-code-meta {
+  color: var(--po-code-token-meta);
+}
+
+.code-codemirror-editor .cm-code-invalid {
+  color: var(--po-danger);
+  text-decoration: underline wavy color-mix(in srgb, var(--po-danger) 75%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
 }

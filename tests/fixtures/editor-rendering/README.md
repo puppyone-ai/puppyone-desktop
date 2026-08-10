@@ -13,4 +13,12 @@ Suggested checks:
 - Image previews and vector rendering
 - PDF and Office document previews
 
+Office fidelity fixtures:
+
+- `puppyone-preview-sample.docx` checks authored Word pagination and typography.
+- `puppyone-preview-sample.xlsx` checks workbook styles, formulas, and sheet navigation.
+- `puppyone-presentation-fidelity.pptx` is a three-slide, 16:9 regression deck for
+  Chinese/English typography, native shapes, merged tables, charts, and source colors.
+  Its content and data are synthetic and safe for repeatable local rendering tests.
+
 All sample content is intentionally short and safe to load repeatedly during development.

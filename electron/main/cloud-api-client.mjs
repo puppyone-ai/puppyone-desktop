@@ -74,12 +74,19 @@ export async function fetchCloudAccessPointSemantics({ accessKey, userEmail, api
 }
 
 export async function requestCloudApi(apiBase, apiPath, init) {
+  const responseType = init?.responseType;
+  const fetchInit = { ...init };
+  delete fetchInit.responseType;
   let response;
   try {
-    response = await fetch(`${apiBase}${apiPath}`, init);
+    response = await fetch(`${apiBase}${apiPath}`, fetchInit);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     throw new Error(`Unable to reach Cloud API at ${apiBase}. ${reason}`);
+  }
+
+  if (response.ok && responseType === "bytes") {
+    return new Uint8Array(await response.arrayBuffer());
   }
 
   let payload = null;

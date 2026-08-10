@@ -248,8 +248,8 @@ describe("App Preview browser surface manager", () => {
     expect(window.children).toHaveLength(0);
   });
 
-  it("replaces a different app and blocks cross-owner mutations", async () => {
-    const { manager } = createHarness();
+  it("keeps independent app pages while attaching only the active one and blocks cross-owner mutations", async () => {
+    const { manager, window } = createHarness();
     const first = await manager.activate(DEFAULT_REQUEST);
     const second = await manager.activate({
       ...DEFAULT_REQUEST,
@@ -261,13 +261,22 @@ describe("App Preview browser surface manager", () => {
 
     expect(second.surfaceId).not.toBe(first.surfaceId);
     expect(createdViews).toHaveLength(2);
-    expect(createdViews[0].webContents.destroyed).toBe(true);
+    expect(createdViews[0].webContents.destroyed).toBe(false);
+    expect(window.children).toEqual([createdViews[1]]);
     expect(manager.setBounds({
       surfaceId: second.surfaceId,
       attachmentId: "attachment-2",
       callerWebContentsId: 99,
       bounds: DEFAULT_REQUEST.bounds,
     })).toEqual({ ok: false, visible: false });
+
+    const restored = await manager.activate({
+      ...DEFAULT_REQUEST,
+      attachmentId: "attachment-3",
+    });
+    expect(restored.surfaceId).toBe(first.surfaceId);
+    expect(createdViews).toHaveLength(2);
+    expect(window.children).toEqual([createdViews[0]]);
   });
 
   it("keeps top-level navigation on the exact local runtime origin", async () => {
@@ -283,5 +292,30 @@ describe("App Preview browser surface manager", () => {
     expect(navigate("http://127.0.0.1:4173/dashboard")).not.toHaveBeenCalled();
     expect(navigate("http://127.0.0.1:9999/")).toHaveBeenCalled();
     expect(navigate("https://example.com/")).toHaveBeenCalled();
+  });
+
+  it("loads a credential-free remote URL while keeping navigation on its origin", async () => {
+    const { manager } = createHarness();
+    const result = await manager.activate({
+      ...DEFAULT_REQUEST,
+      url: "https://example.com/slides",
+    });
+    const webContents = createdViews[0].webContents;
+    const navigate = (url) => {
+      const event = { preventDefault: vi.fn() };
+      webContents.emit("will-navigate", event, url);
+      return event.preventDefault;
+    };
+
+    expect(result).toMatchObject({ status: "ready", url: "https://example.com/slides" });
+    expect(webContents.getURL()).toBe("https://example.com/slides");
+    expect(navigate("https://example.com/next")).not.toHaveBeenCalled();
+    expect(navigate("https://cdn.example.com/asset")).toHaveBeenCalled();
+    expect(navigate("https://user:secret@example.com/private")).toHaveBeenCalled();
+    await expect(manager.activate({
+      ...DEFAULT_REQUEST,
+      runtimeId: "runtime-with-credentials",
+      url: "https://user:secret@example.com/",
+    })).rejects.toThrow(/credential/i);
   });
 });

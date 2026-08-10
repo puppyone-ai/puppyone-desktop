@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 describe("resource preview readiness", () => {
-  it("shows a deliberate loading state instead of treating image metadata as a source URL", async () => {
+  it("keeps the initial neutral surface committed while the image URL loads in staging", async () => {
     const fileUrl = deferred<string>();
     const { container, getFileUrl } = await renderWorkspace({
       activePath: "photo.png",
@@ -32,8 +32,13 @@ describe("resource preview readiness", () => {
     await waitFor(() => getFileUrl.mock.calls.length === 1);
 
     expect(container.querySelector(".native-image-preview")).toBeNull();
-    expect(container.querySelector(".editor-state")?.textContent)
-      .toBe(testT("editor.preview.loading"));
+    const pending = container.querySelector<HTMLElement>(".document-surface-pending");
+    expect(pending?.textContent).toBe("");
+    expect(pending?.getAttribute("aria-label")).toBe(testT("editor.preview.loading"));
+    expect(pending?.closest<HTMLElement>(".document-surface-slot")?.dataset.surfaceState)
+      .toBe("staging");
+    expect(container.querySelector('[data-surface-key="file-preview:empty"]')?.getAttribute("data-surface-state"))
+      .toBe("committed");
     expect(container.textContent).not.toContain("PNG metadata from the explorer");
   });
 
@@ -65,6 +70,9 @@ describe("resource preview readiness", () => {
 
     expect(container.querySelector(".document-preview__name")?.textContent).toBe("notes.bin");
     expect(container.querySelector(".native-image-preview")).toBeNull();
+    expect(container.querySelector(".document-surface-host")?.getAttribute("data-transitioning")).toBe("true");
+    expect(container.querySelector('[data-surface-key="notes.bin"]')?.getAttribute("data-surface-state")).toBe("committed");
+    expect(container.querySelector('[data-surface-key="photo.png"]')?.getAttribute("data-surface-state")).toBe("staging");
 
     fileUrl.resolve("blob:photo-preview");
     await act(async () => fileUrl.promise);
@@ -77,7 +85,9 @@ describe("resource preview readiness", () => {
     expect(image.hidden).toBe(true);
     expect(shell.dataset.previewState).toBe("loading");
     expect(shell.getAttribute("aria-busy")).toBe("true");
-    expect(container.querySelector(".native-image-preview-state")).not.toBeNull();
+    expect(shell.querySelector(".document-surface-pending")?.textContent).toBe("");
+    expect(shell.querySelector(".document-surface-pending")?.getAttribute("aria-label"))
+      .toBe(testT("editor.preview.loading"));
 
     Object.defineProperty(image, "decode", { configurable: true, value: undefined });
     act(() => image.dispatchEvent(new Event("load")));
@@ -85,7 +95,10 @@ describe("resource preview readiness", () => {
     expect(shell.dataset.previewState).toBe("ready");
     expect(shell.getAttribute("aria-busy")).toBe("false");
     expect(image.hidden).toBe(false);
-    expect(container.querySelector(".native-image-preview-state")).toBeNull();
+    expect(shell.querySelector(".document-surface-pending")).toBeNull();
+    await waitFor(() => container.querySelector(".document-surface-host")?.getAttribute("data-transitioning") === "false");
+    expect(container.querySelector('[data-surface-key="notes.bin"]')).toBeNull();
+    expect(container.querySelector('[data-surface-key="photo.png"]')?.getAttribute("data-surface-state")).toBe("committed");
   });
 });
 

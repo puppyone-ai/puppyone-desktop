@@ -36,9 +36,16 @@ describe("Markdown table drag lifecycle", () => {
     const removeDocumentListener = vi.spyOn(document, "removeEventListener");
     const removeTableListener = vi.spyOn(table, "removeEventListener");
     const removeWrapperListener = vi.spyOn(wrapper, "removeEventListener");
+    const stopDragAutoScroll = vi.fn();
     const dragLayer = createMarkdownTableDragLayer({
       alignments: [null],
       columnCount: 1,
+      inlineViewport: {
+        dispose: vi.fn(),
+        revealColumn: vi.fn(),
+        stopDragAutoScroll,
+        updateDragAutoScroll: vi.fn(),
+      },
       rows: [
         { header: true, cells: [{ from: 0, to: 4, text: "Name" }] },
         { header: false, cells: [{ from: 5, to: 13, text: "PuppyOne" }] },
@@ -83,5 +90,6 @@ describe("Markdown table drag lifecycle", () => {
     expect(removeTableListener).toHaveBeenCalledWith("pointerover", expect.any(Function));
     expect(removeWrapperListener).toHaveBeenCalledWith("pointerleave", expect.any(Function));
     expect(wrapper.classList.contains("is-table-dragging")).toBe(false);
+    expect(stopDragAutoScroll).toHaveBeenCalledOnce();
   });
 });

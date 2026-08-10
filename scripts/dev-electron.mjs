@@ -21,6 +21,7 @@ const mainWatchPaths = [
   path.join(desktopRoot, "electron"),
   path.join(desktopRoot, "local-api"),
   path.join(desktopRoot, "public", "logo-square.png"),
+  path.join(desktopRoot, "public", "logo-square-dev.png"),
   path.join(desktopRoot, "build", "icon.icns"),
 ];
 const rendererDependencyWatchPaths = [

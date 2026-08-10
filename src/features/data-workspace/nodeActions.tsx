@@ -28,6 +28,7 @@ import { useLocalization } from "@puppyone/localization/react";
 import { DesktopDialogCloseButton, DesktopDialogRoot } from "../../components/DesktopDialog";
 import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../components/DesktopMenu";
 import type { CreateNewFileTypeId, ExperimentalSettings } from "../../preferences";
+import { createUnconfiguredAppPreviewManifestContent } from "../../../shared/appPreviewManifest.js";
 
 export type DesktopCreateEntryKind = "folder" | "markdown" | "text" | "json" | "csv" | "app" | "puppyflow";
 export type DesktopCreateEntryAnchor = {
@@ -274,7 +275,6 @@ export function DesktopCreateEntryDialog({
   if (!selectedKind) return null;
 
   const selectedOption = getCreateEntryOption(selectedKind);
-  const extensionNote = getCreateEntryExtensionNote(selectedKind, t);
   const optionLabel = getCreateEntryOptionLabel(selectedKind, t);
   const errorMessage = formatDesktopNodeActionError(draft.error, t);
 
@@ -301,17 +301,16 @@ export function DesktopCreateEntryDialog({
             </span>
             <div>
               <h2 id="desktop-create-entry-title">{getCreateEntryDialogTitle(selectedKind, t)}</h2>
-              <p>{draft.parentPath
-                ? t("workspace.node.createIn", { path: bidiIsolate(draft.parentPath) })
-                : t("workspace.node.createInRoot")}</p>
             </div>
           </div>
           <DesktopDialogCloseButton disabled={draft.creatingKind !== null} onClick={onCancel} />
         </header>
 
-        <div className="desktop-dialog-body desktop-file-dialog-body">
-          <label className="desktop-dialog-field">
-            <span>{t("workspace.node.name")}</span>
+        <div
+          className="desktop-dialog-body desktop-file-dialog-body"
+          data-po-scrollbar="content"
+        >
+          <div className="desktop-dialog-field">
             <input
               ref={inputRef}
               value={draft.name}
@@ -323,11 +322,8 @@ export function DesktopCreateEntryDialog({
                 onChange((current) => current ? { ...current, name: value, error: null } : current);
               }}
             />
-          </label>
+          </div>
 
-          {extensionNote && (
-            <div className="desktop-dialog-note">{extensionNote}</div>
-          )}
           {errorMessage && <div className="desktop-dialog-error" dir="auto">{errorMessage}</div>}
         </div>
 
@@ -685,7 +681,10 @@ function DesktopNodeRenameDialog({
           <DesktopDialogCloseButton disabled={draft.operation !== null} onClick={onCancel} />
         </header>
 
-        <div className="desktop-dialog-body desktop-file-dialog-body">
+        <div
+          className="desktop-dialog-body desktop-file-dialog-body"
+          data-po-scrollbar="content"
+        >
           <label className="desktop-dialog-field">
             <span>{t("workspace.node.name")}</span>
             <input
@@ -822,7 +821,7 @@ const DESKTOP_FILE_TYPE_OPTIONS = [
   { id: "text", extension: ".txt" },
   { id: "csv", extension: ".csv" },
   { id: "html", extension: ".html" },
-  { id: "app", extension: ".puppyoneapp", experimentalSetting: "enablePuppyoneAppFiles" },
+  { id: "app", extension: ".puppyoneapp" },
   { id: "puppyflow", extension: ".puppyflow", experimentalSetting: "enablePuppyFlowFiles" },
   { id: "javascript", extension: ".js" },
   { id: "typescript", extension: ".ts" },
@@ -928,7 +927,6 @@ export function defaultCreateName(kind: DesktopCreateEntryKind, t: MessageFormat
 export type DesktopCreateEntryTemplates = Readonly<{
   csvHeaders: readonly [string, string, string];
   puppyFlow: PuppyFlowDocumentDefaults;
-  untitledAppName: string;
 }>;
 
 export function getCreateEntryInitialContent(
@@ -940,33 +938,7 @@ export function getCreateEntryInitialContent(
     const emptyRow = Array.from({ length: templates.csvHeaders.length }, () => "").join(",");
     return `${templates.csvHeaders.join(",")}\n${emptyRow}\n${emptyRow}\n`;
   }
-  if (kind === "app") {
-    return [
-      "{",
-      '  "type": "puppyone.app",',
-      '  "version": 1,',
-      `  "name": ${JSON.stringify(templates.untitledAppName)},`,
-      '  "launch": {',
-      '    "kind": "local-server",',
-      '    "command": ["node", "server.mjs"],',
-      '    "cwd": ".",',
-      '    "env": {',
-      '      "HOST": "127.0.0.1",',
-      '      "PORT": "${port}"',
-      "    },",
-      '    "url": "http://127.0.0.1:${port}/",',
-      '    "health": {',
-      '      "path": "/",',
-      '      "expectStatus": 200',
-      "    }",
-      "  },",
-      '  "permissions": {',
-      '    "workspace": ["read"]',
-      "  }",
-      "}",
-      "",
-    ].join("\n");
-  }
+  if (kind === "app") return createUnconfiguredAppPreviewManifestContent();
   if (kind === "puppyflow") {
     return serializePuppyFlowDocument(createDefaultPuppyFlowDocument(templates.puppyFlow));
   }
@@ -1008,11 +980,6 @@ export function normalizeCreateEntryName(kind: DesktopCreateEntryKind, value: st
 function ensureCreateEntryExtension(name: string, extensionPattern: RegExp, fallbackExtension: string): string {
   if (extensionPattern.test(name)) return name;
   return `${name}${fallbackExtension}`;
-}
-
-function getCreateEntryExtensionNote(kind: DesktopCreateEntryKind, t: MessageFormatter): string | null {
-  if (kind === "folder") return null;
-  return t(`workspace.node.create.kind.${kind}.extensionNote`);
 }
 
 function getCreateEntryOptionLabel(kind: DesktopCreateEntryKind, t: MessageFormatter): string {

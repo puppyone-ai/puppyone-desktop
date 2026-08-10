@@ -371,6 +371,7 @@ export function CsvTableResizeControl({
           <div
             ref={pickerRef}
             className="desktop-menu-surface csv-table-editor__resize-picker"
+            data-po-scrollbar="menu"
             role="dialog"
             aria-label={t("editor.csv.expandTable")}
           >

@@ -685,12 +685,14 @@ function isSessionForApiBase(session, apiBase) {
 }
 
 function withSessionHeaders(init, session, signal) {
+  const requestHeaders = normalizeRequestHeaders(init?.headers);
+  const formDataBody = typeof FormData !== "undefined" && init?.body instanceof FormData;
   return {
     ...init,
     signal,
     headers: {
-      "Content-Type": "application/json",
-      ...normalizeRequestHeaders(init?.headers),
+      ...(formDataBody ? {} : { "Content-Type": "application/json" }),
+      ...requestHeaders,
       Authorization: `Bearer ${session.access_token}`,
     },
   };

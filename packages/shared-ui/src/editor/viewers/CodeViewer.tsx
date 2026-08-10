@@ -22,13 +22,15 @@ export function JsonViewer(context: CodeViewerProps) {
       defaultMode="source"
       canEdit={context.canEdit}
       hideSourceView={context.hideSourceView}
+      sourceSnapshotMode
       renderLive={(value, controls) => (
         <CodeMirrorCodeEditor
           content={value}
           nodeName={context.document.name}
           language={language}
           readOnly={!controls.canEdit}
-          onChange={controls.canEdit ? controls.onChange : undefined}
+          onSourceRevisionChange={controls.onSourceRevisionChange}
+          onSnapshotPortChange={controls.onSnapshotPortChange}
         />
       )}
       renderSource={(value, controls) => (
@@ -37,7 +39,8 @@ export function JsonViewer(context: CodeViewerProps) {
           nodeName={context.document.name}
           language={language}
           readOnly={!controls.canEdit}
-          onChange={controls.canEdit ? controls.onChange : undefined}
+          onSourceRevisionChange={controls.onSourceRevisionChange}
+          onSnapshotPortChange={controls.onSnapshotPortChange}
         />
       )}
     />
@@ -55,13 +58,15 @@ export function TextFileViewer(context: CodeViewerProps) {
       defaultMode="source"
       canEdit={context.canEdit}
       hideSourceView={context.hideSourceView}
+      sourceSnapshotMode
       renderLive={(value, controls) => (
         <CodeMirrorCodeEditor
           content={value}
           nodeName={context.document.name}
           language={language}
           readOnly={!controls.canEdit}
-          onChange={controls.canEdit ? controls.onChange : undefined}
+          onSourceRevisionChange={controls.onSourceRevisionChange}
+          onSnapshotPortChange={controls.onSnapshotPortChange}
         />
       )}
       renderSource={(value, controls) => (
@@ -70,7 +75,8 @@ export function TextFileViewer(context: CodeViewerProps) {
           nodeName={context.document.name}
           language={language}
           readOnly={!controls.canEdit}
-          onChange={controls.canEdit ? controls.onChange : undefined}
+          onSourceRevisionChange={controls.onSourceRevisionChange}
+          onSnapshotPortChange={controls.onSnapshotPortChange}
         />
       )}
     />

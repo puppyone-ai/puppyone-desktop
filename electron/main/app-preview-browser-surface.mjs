@@ -9,7 +9,8 @@ const MAX_CANCELLED_ATTACHMENTS = 256;
  * Runtime processes deliberately outlive renderer attachments. A surface can
  * therefore be detached while a source file is open, then reattached without
  * reloading the page or losing browser state. The maps and opaque identifiers
- * are intentionally tab-ready even though V1 exposes one app per workspace.
+ * are intentionally tab-ready: every app keeps an isolated surface per owner,
+ * while only the currently attached editor is visible.
  */
 export function createAppPreviewBrowserSurfaceManager({
   WebContentsView,
@@ -29,19 +30,19 @@ export function createAppPreviewBrowserSurfaceManager({
   }
 
   const surfaces = new Map();
-  const surfaceIdsByWorkspace = new Map();
+  const surfaceIdsByApp = new Map();
   const ownerStates = new Map();
-  const pendingByWorkspace = new Map();
+  const pendingByApp = new Map();
   const cancelledAttachments = new Map();
   let disposed = false;
 
   async function activate(request) {
     assertNotDisposed();
     const normalized = normalizeActivationRequest(request);
-    return serializeWorkspaceOperation(normalized.workspaceKey, async () => {
+    return serializeAppOperation(normalized.surfaceKey, async () => {
       assertNotDisposed();
       const window = requireOwnerWindow(normalized.ownerWebContentsId);
-      let surface = getWorkspaceSurface(normalized.workspaceKey);
+      let surface = getAppSurface(normalized.surfaceKey);
 
       if (surface && (surface.appId !== normalized.appId || surface.appPath !== normalized.appPath)) {
         destroySurface(surface.surfaceId, { reason: "app-replaced" });
@@ -56,6 +57,7 @@ export function createAppPreviewBrowserSurfaceManager({
       }
 
       surface.runtimeId = normalized.runtimeId;
+      surface.generation = normalized.generation;
       surface.requestedBounds = normalized.bounds;
       surface.attachmentId = normalized.attachmentId;
       surface.message = null;
@@ -166,6 +168,20 @@ export function createAppPreviewBrowserSurfaceManager({
     return destroyed;
   }
 
+  function destroyApp(rootPath, appPath, ownerWebContentsId = null, reason = "app-closed") {
+    let destroyed = false;
+    for (const surface of Array.from(surfaces.values())) {
+      if (
+        surface.rootPath === rootPath &&
+        surface.appPath === appPath &&
+        (ownerWebContentsId == null || surface.ownerWebContentsId === ownerWebContentsId)
+      ) {
+        destroyed = destroySurface(surface.surfaceId, { reason }) || destroyed;
+      }
+    }
+    return destroyed;
+  }
+
   function destroyOwner(ownerWebContentsId, reason = "owner-closed") {
     for (const surface of Array.from(surfaces.values())) {
       if (surface.ownerWebContentsId === ownerWebContentsId) {
@@ -186,10 +202,16 @@ export function createAppPreviewBrowserSurfaceManager({
     cancelledAttachments.clear();
   }
 
-  function runtimeUnavailable({ rootPath, ownerWebContentsIds = [], reason = "runtime-unavailable" }) {
+  function runtimeUnavailable({
+    rootPath,
+    appPath = null,
+    ownerWebContentsIds = [],
+    reason = "runtime-unavailable",
+  }) {
     const owners = new Set(ownerWebContentsIds);
     for (const surface of Array.from(surfaces.values())) {
       if (surface.rootPath !== rootPath) continue;
+      if (appPath != null && surface.appPath !== appPath) continue;
       if (owners.size > 0 && !owners.has(surface.ownerWebContentsId)) continue;
       destroySurface(surface.surfaceId, { reason });
     }
@@ -226,9 +248,10 @@ export function createAppPreviewBrowserSurfaceManager({
     });
     const surface = {
       surfaceId,
-      workspaceKey: request.workspaceKey,
+      surfaceKey: request.surfaceKey,
       rootPath: request.rootPath,
       runtimeId: request.runtimeId,
+      generation: request.generation,
       appId: request.appId,
       appPath: request.appPath,
       ownerWebContentsId: request.ownerWebContentsId,
@@ -245,9 +268,10 @@ export function createAppPreviewBrowserSurfaceManager({
       canGoBack: false,
       canGoForward: false,
       attached: false,
+      sequence: 0,
     };
     surfaces.set(surfaceId, surface);
-    surfaceIdsByWorkspace.set(request.workspaceKey, surfaceId);
+    surfaceIdsByApp.set(request.surfaceKey, surfaceId);
     ensureOwnerState(window, request.ownerWebContentsId).surfaceIds.add(surfaceId);
     installWebContentsPolicy(surface, {
       publish: () => publishSurfaceState(surface),
@@ -263,8 +287,8 @@ export function createAppPreviewBrowserSurfaceManager({
     const surface = surfaces.get(surfaceId);
     if (!surface) return false;
     surfaces.delete(surfaceId);
-    if (surfaceIdsByWorkspace.get(surface.workspaceKey) === surfaceId) {
-      surfaceIdsByWorkspace.delete(surface.workspaceKey);
+    if (surfaceIdsByApp.get(surface.surfaceKey) === surfaceId) {
+      surfaceIdsByApp.delete(surface.surfaceKey);
     }
     const ownerState = ownerStates.get(surface.ownerWebContentsId);
     ownerState?.surfaceIds.delete(surfaceId);
@@ -276,6 +300,7 @@ export function createAppPreviewBrowserSurfaceManager({
     }
     cleanupPartitionSession(surface.partitionSession);
     if (ownerState?.surfaceIds.size === 0) releaseOwnerState(surface.ownerWebContentsId);
+    surface.sequence += 1;
     publishState({
       ...serializeSurface(surface),
       status: "destroyed",
@@ -424,13 +449,14 @@ export function createAppPreviewBrowserSurfaceManager({
     return surface;
   }
 
-  function getWorkspaceSurface(workspaceKey) {
-    const surfaceId = surfaceIdsByWorkspace.get(workspaceKey);
+  function getAppSurface(surfaceKey) {
+    const surfaceId = surfaceIdsByApp.get(surfaceKey);
     return surfaceId ? surfaces.get(surfaceId) ?? null : null;
   }
 
   function publishSurfaceState(surface) {
     if (surfaces.get(surface.surfaceId) !== surface) return;
+    surface.sequence += 1;
     try {
       publishState(serializeSurface(surface), surface.ownerWebContentsId);
     } catch {
@@ -438,12 +464,12 @@ export function createAppPreviewBrowserSurfaceManager({
     }
   }
 
-  function serializeWorkspaceOperation(workspaceKey, operation) {
-    const previous = pendingByWorkspace.get(workspaceKey) ?? Promise.resolve();
+  function serializeAppOperation(surfaceKey, operation) {
+    const previous = pendingByApp.get(surfaceKey) ?? Promise.resolve();
     const current = previous.catch(() => undefined).then(operation);
-    pendingByWorkspace.set(workspaceKey, current);
+    pendingByApp.set(surfaceKey, current);
     return current.finally(() => {
-      if (pendingByWorkspace.get(workspaceKey) === current) pendingByWorkspace.delete(workspaceKey);
+      if (pendingByApp.get(surfaceKey) === current) pendingByApp.delete(surfaceKey);
     });
   }
 
@@ -475,6 +501,7 @@ export function createAppPreviewBrowserSurfaceManager({
     setBounds,
     detach,
     runCommand,
+    destroyApp,
     destroyWorkspace,
     destroyOwner,
     destroyAll,
@@ -488,35 +515,37 @@ function normalizeActivationRequest(request) {
   const appId = requireString(request?.appId, "App id");
   const appPath = requireString(request?.appPath, "App path");
   const runtimeId = requireString(request?.runtimeId, "Runtime id");
+  const generation = Number.isSafeInteger(request?.generation) && request.generation > 0
+    ? request.generation
+    : 1;
   const attachmentId = normalizeAttachmentId(request?.attachmentId);
   const ownerWebContentsId = request?.ownerWebContentsId;
   if (!Number.isSafeInteger(ownerWebContentsId) || ownerWebContentsId <= 0) {
     throw new Error("App preview owner is invalid.");
   }
-  const url = normalizeLocalAppUrl(request?.url);
+  const url = normalizeAppUrl(request?.url);
   return {
     rootPath,
     appId,
     appPath,
     runtimeId,
+    generation,
     attachmentId,
     ownerWebContentsId,
     url,
     bounds: normalizeBounds(request?.bounds, { allowHidden: false }),
-    workspaceKey: `${ownerWebContentsId}\n${rootPath}`,
+    surfaceKey: `${ownerWebContentsId}\n${rootPath}\n${appPath}`,
   };
 }
 
-function normalizeLocalAppUrl(value) {
+function normalizeAppUrl(value) {
   const url = new URL(requireString(value, "App preview URL"));
   if (
     (url.protocol !== "http:" && url.protocol !== "https:") ||
-    (url.hostname !== "127.0.0.1" && url.hostname !== "localhost") ||
-    !url.port ||
     url.username ||
     url.password
   ) {
-    throw new Error("App preview browser URL must use an explicit localhost port.");
+    throw new Error("App preview browser URL must be a credential-free HTTP or HTTPS URL.");
   }
   return url.toString();
 }
@@ -652,7 +681,8 @@ function isAllowedTopLevelNavigation(href, allowedOrigin) {
     const url = new URL(href);
     return (
       (url.protocol === "http:" || url.protocol === "https:") &&
-      (url.hostname === "127.0.0.1" || url.hostname === "localhost") &&
+      !url.username &&
+      !url.password &&
       url.origin === allowedOrigin
     );
   } catch {
@@ -699,6 +729,8 @@ function serializeSurface(surface) {
     canGoForward: surface.canGoForward,
     attached: surface.attached,
     message: surface.message,
+    generation: surface.generation,
+    sequence: surface.sequence,
   };
 }
 

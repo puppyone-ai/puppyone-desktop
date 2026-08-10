@@ -222,18 +222,6 @@
   padding: 6px 0 10px;
 }
 
-.desktop-cloud-create-access-tree-body::-webkit-scrollbar {
-  width: var(--po-scrollbar-size, 8px);
-  height: var(--po-scrollbar-size, 8px);
-}
-
-.desktop-cloud-create-access-tree-body::-webkit-scrollbar-thumb {
-  border: var(--po-scrollbar-thumb-inset, 1px) solid transparent;
-  border-radius: var(--po-scrollbar-radius, 999px);
-  background-color: var(--po-scrollbar-thumb);
-  background-clip: padding-box;
-}
-
 .desktop-cloud-create-access-tree-row-wrap {
   position: relative;
   height: 30px;

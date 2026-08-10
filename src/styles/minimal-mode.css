@@ -217,9 +217,6 @@
     overflow-x: auto;
   }
 
-  .desktop-minimal-mode-controls::-webkit-scrollbar {
-    display: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

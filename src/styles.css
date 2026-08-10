@@ -1,6 +1,6 @@
 @import "./styles/tokens.css" layer(tokens);
 @import "./styles/base.css" layer(reset);
-@import "./styles/scrollbars.css";
+@import "./styles/scrollbars.css" layer(primitives);
 @import "./styles/animations.css";
 @import "./styles/shell.css";
 @import "./styles/window-chrome.css";

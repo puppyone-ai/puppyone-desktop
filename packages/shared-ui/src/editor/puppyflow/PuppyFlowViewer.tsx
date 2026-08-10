@@ -241,7 +241,7 @@ export function PuppyFlowViewer({
         <span>{t("editor.puppyflow.run")}</span>
       </button>
 
-      <div className="puppyflow-document">
+      <div className="puppyflow-document" data-po-scrollbar="content">
         {runMessage ? (
           <div className="puppyflow-toolbar-status" role="status">
             {runMessage === "no-enabled-prompts"

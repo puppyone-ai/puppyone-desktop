@@ -11,6 +11,7 @@ export const SidebarScrollArea = forwardRef<HTMLDivElement, SidebarScrollAreaPro
     <div
       ref={ref}
       className={joinSidebarClassNames("po-sidebar-scroll-area", className)}
+      data-po-scrollbar="sidebar"
       {...props}
     >
       {children}

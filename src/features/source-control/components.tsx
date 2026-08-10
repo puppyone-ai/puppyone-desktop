@@ -93,7 +93,11 @@ export function SourceControlPreviewResourceList({
   }
 
   return (
-    <div className={`desktop-git-remote-preview desktop-git-${origin}-preview`} aria-label={ariaLabel}>
+    <div
+      className={`desktop-git-remote-preview desktop-git-${origin}-preview`}
+      data-po-scrollbar="sidebar"
+      aria-label={ariaLabel}
+    >
       {resources.map((resource) => (
         <Fragment key={resource.id}>{renderResource(resource)}</Fragment>
       ))}

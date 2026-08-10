@@ -3,7 +3,11 @@ import type { EditorView } from "@codemirror/view";
 const GEOMETRY_CHANGE_THRESHOLD_PX = 0.75;
 
 export type MarkdownLayoutCoordinator = {
-  observe(element: HTMLElement, onHeightChange?: (height: number, previousHeight: number | null) => void): () => void;
+  observe(
+    element: HTMLElement,
+    onHeightChange?: (height: number, previousHeight: number | null) => void,
+    onInlineSizeChange?: (inlineSize: number, previousInlineSize: number | null) => void,
+  ): () => void;
   schedule<T>(key: object, read: () => T, write: (value: T) => void): void;
   request(): void;
   dispose(): void;
@@ -16,8 +20,18 @@ export type MarkdownLayoutCoordinator = {
  */
 export function createMarkdownLayoutCoordinator(view: EditorView): MarkdownLayoutCoordinator {
   const lastHeightByElement = new WeakMap<HTMLElement, number>();
+  const lastInlineSizeByElement = new WeakMap<HTMLElement, number>();
   const heightChangeByElement = new WeakMap<HTMLElement, (height: number, previousHeight: number | null) => void>();
-  const pendingHeightChanges = new Map<HTMLElement, { height: number; previousHeight: number | null }>();
+  const inlineSizeChangeByElement = new WeakMap<
+    HTMLElement,
+    (inlineSize: number, previousInlineSize: number | null) => void
+  >();
+  const pendingGeometryChanges = new Map<HTMLElement, {
+    height?: number;
+    previousHeight?: number | null;
+    inlineSize?: number;
+    previousInlineSize?: number | null;
+  }>();
   const observedElements = new Set<HTMLElement>();
   const measureKey = {};
   const heightMeasureKey = {};
@@ -44,8 +58,12 @@ export function createMarkdownLayoutCoordinator(view: EditorView): MarkdownLayou
           const element = entry.target as HTMLElement;
           if (!observedElements.has(element)) continue;
           const height = entry.contentRect.height;
+          const inlineSize = entry.contentRect.width;
           const previousHeight = lastHeightByElement.get(element);
+          const previousInlineSize = lastInlineSizeByElement.get(element);
           lastHeightByElement.set(element, height);
+          lastInlineSizeByElement.set(element, inlineSize);
+          const pending = pendingGeometryChanges.get(element) ?? {};
           if (
             previousHeight === undefined
             || Math.abs(height - previousHeight) >= GEOMETRY_CHANGE_THRESHOLD_PX
@@ -53,42 +71,65 @@ export function createMarkdownLayoutCoordinator(view: EditorView): MarkdownLayou
             geometryChanged = true;
             const callback = heightChangeByElement.get(element);
             if (callback) {
-              pendingHeightChanges.set(element, {
-                height,
-                previousHeight: previousHeight ?? null,
-              });
+              pending.height = height;
+              pending.previousHeight = previousHeight ?? null;
             }
           }
+          if (
+            previousInlineSize === undefined
+            || Math.abs(inlineSize - previousInlineSize) >= GEOMETRY_CHANGE_THRESHOLD_PX
+          ) {
+            geometryChanged = true;
+            const callback = inlineSizeChangeByElement.get(element);
+            if (callback) {
+              pending.inlineSize = inlineSize;
+              pending.previousInlineSize = previousInlineSize ?? null;
+            }
+          }
+          if (Object.keys(pending).length > 0) pendingGeometryChanges.set(element, pending);
         }
-        if (pendingHeightChanges.size > 0) {
+        if (pendingGeometryChanges.size > 0) {
           try {
             view.requestMeasure({
               key: heightMeasureKey,
               read: () => {
-                const pending = Array.from(pendingHeightChanges.entries());
-                pendingHeightChanges.clear();
+                const pending = Array.from(pendingGeometryChanges.entries());
+                pendingGeometryChanges.clear();
                 return pending;
               },
               write: (pending) => {
                 for (const [element, change] of pending) {
                   if (!observedElements.has(element)) continue;
-                  heightChangeByElement.get(element)?.(change.height, change.previousHeight);
+                  if (change.height !== undefined) {
+                    heightChangeByElement.get(element)?.(
+                      change.height,
+                      change.previousHeight ?? null,
+                    );
+                  }
+                  if (change.inlineSize !== undefined) {
+                    inlineSizeChangeByElement.get(element)?.(
+                      change.inlineSize,
+                      change.previousInlineSize ?? null,
+                    );
+                  }
                 }
               },
             });
           } catch {
-            pendingHeightChanges.clear();
+            pendingGeometryChanges.clear();
           }
         }
         if (geometryChanged) request();
       });
 
   const coordinator: MarkdownLayoutCoordinator = {
-    observe(element, onHeightChange) {
+    observe(element, onHeightChange, onInlineSizeChange) {
       if (disposed) return () => undefined;
       observedElements.add(element);
       lastHeightByElement.delete(element);
+      lastInlineSizeByElement.delete(element);
       if (onHeightChange) heightChangeByElement.set(element, onHeightChange);
+      if (onInlineSizeChange) inlineSizeChangeByElement.set(element, onInlineSizeChange);
       observer?.observe(element);
       let active = true;
       return () => {
@@ -96,8 +137,10 @@ export function createMarkdownLayoutCoordinator(view: EditorView): MarkdownLayou
         active = false;
         observedElements.delete(element);
         lastHeightByElement.delete(element);
+        lastInlineSizeByElement.delete(element);
         heightChangeByElement.delete(element);
-        pendingHeightChanges.delete(element);
+        inlineSizeChangeByElement.delete(element);
+        pendingGeometryChanges.delete(element);
         observer?.unobserve(element);
       };
     },
@@ -115,7 +158,7 @@ export function createMarkdownLayoutCoordinator(view: EditorView): MarkdownLayou
       disposed = true;
       observer?.disconnect();
       observedElements.clear();
-      pendingHeightChanges.clear();
+      pendingGeometryChanges.clear();
     },
   };
 

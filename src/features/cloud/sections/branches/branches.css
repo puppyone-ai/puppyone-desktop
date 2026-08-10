@@ -442,10 +442,6 @@ button.desktop-cloud-branch-graph-row {
     padding-bottom: 1px;
   }
 
-  .desktop-cloud-branches-toolbar::-webkit-scrollbar {
-    display: none;
-  }
-
   .desktop-cloud-branches-graph {
     padding-inline: 14px 12px;
   }

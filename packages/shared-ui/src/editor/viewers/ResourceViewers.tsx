@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { FilePreviewIcon } from "../../file/fileIcons";
+import { DocumentSurfacePending } from "../DocumentSurfaceHost";
 import type { PresetViewerRenderContext } from "../viewerTypes";
 
 type ResourceViewerProps = Pick<
@@ -43,14 +44,11 @@ function ImagePreviewSurface({ url, name }: { url: string; name: string }) {
   return (
     <div
       className="native-preview native-preview-centered native-image-preview-shell"
+      data-po-scrollbar="content"
       data-preview-state={ready ? "ready" : "loading"}
       aria-busy={!ready}
     >
-      {!ready && (
-        <div className="native-image-preview-state" role="status">
-          {t("editor.preview.loading")}
-        </div>
-      )}
+      {!ready && <DocumentSurfacePending label={t("editor.preview.loading")} />}
       <img
         key={url}
         className="native-image-preview"
@@ -90,16 +88,12 @@ export function AudioResourceViewer({ document, fileUrl, fileUrlLoading, fileUrl
   return (
     <ResourcePreviewState fileUrl={fileUrl} loading={fileUrlLoading} error={fileUrlError} kind="audio">
       {(url) => (
-        <div className="native-preview native-preview-centered">
-          <div className="native-media-card">
-            <FilePreviewIcon name={document.name} type="audio" size={54} theme={fileIconTheme} />
-            <strong dir="auto">{document.name}</strong>
-            <audio controls preload="metadata">
-              <source src={url} type={document.mimeType ?? undefined} />
-              <UnsupportedMedia kind="audio" />
-            </audio>
-          </div>
-        </div>
+        <AudioPreviewSurface
+          url={url}
+          name={document.name}
+          mimeType={document.mimeType}
+          fileIconTheme={fileIconTheme}
+        />
       )}
     </ResourcePreviewState>
   );
@@ -109,14 +103,70 @@ export function VideoResourceViewer({ document, fileUrl, fileUrlLoading, fileUrl
   return (
     <ResourcePreviewState fileUrl={fileUrl} loading={fileUrlLoading} error={fileUrlError} kind="video">
       {(url) => (
-        <div className="native-preview native-preview-centered">
-          <video className="native-video-preview" controls preload="metadata">
-            <source src={url} type={document.mimeType ?? undefined} />
-            <UnsupportedMedia kind="video" />
-          </video>
-        </div>
+        <VideoPreviewSurface url={url} mimeType={document.mimeType} />
       )}
     </ResourcePreviewState>
+  );
+}
+
+function AudioPreviewSurface({
+  url,
+  name,
+  mimeType,
+  fileIconTheme,
+}: {
+  url: string;
+  name: string;
+  mimeType?: string | null;
+  fileIconTheme: ResourceViewerProps["fileIconTheme"];
+}) {
+  const [readyUrl, setReadyUrl] = useState<string | null>(null);
+  const ready = readyUrl === url;
+  return (
+    <div
+      className="native-preview native-preview-centered"
+      data-po-scrollbar="content"
+      aria-busy={!ready}
+    >
+      <div className="native-media-card">
+        <FilePreviewIcon name={name} type="audio" size={54} theme={fileIconTheme} />
+        <strong dir="auto">{name}</strong>
+        <audio
+          key={url}
+          controls
+          preload="metadata"
+          onLoadedMetadata={() => setReadyUrl(url)}
+          onError={() => setReadyUrl(url)}
+        >
+          <source src={url} type={mimeType ?? undefined} />
+          <UnsupportedMedia kind="audio" />
+        </audio>
+      </div>
+    </div>
+  );
+}
+
+function VideoPreviewSurface({ url, mimeType }: { url: string; mimeType?: string | null }) {
+  const [readyUrl, setReadyUrl] = useState<string | null>(null);
+  const ready = readyUrl === url;
+  return (
+    <div
+      className="native-preview native-preview-centered"
+      data-po-scrollbar="content"
+      aria-busy={!ready}
+    >
+      <video
+        key={url}
+        className="native-video-preview"
+        controls
+        preload="metadata"
+        onLoadedMetadata={() => setReadyUrl(url)}
+        onError={() => setReadyUrl(url)}
+      >
+        <source src={url} type={mimeType ?? undefined} />
+        <UnsupportedMedia kind="video" />
+      </video>
+    </div>
   );
 }
 
@@ -144,7 +194,7 @@ function ResourcePreviewState({
       </div>
     );
   }
-  if (loading && !fileUrl) return <div className="editor-state">{t("editor.preview.loading")}</div>;
+  if (loading && !fileUrl) return <DocumentSurfacePending label={t("editor.preview.loading")} />;
   if (!fileUrl) {
     return (
       <div className="editor-state">
@@ -165,6 +215,7 @@ function PdfPreviewFrame({ url, title }: { url: string; title: string }) {
   const shouldUseBlobUrl = url.startsWith("puppyone-local:");
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [blobError, setBlobError] = useState<string | null>(null);
+  const [readyFrameUrl, setReadyFrameUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!shouldUseBlobUrl) {
@@ -207,10 +258,6 @@ function PdfPreviewFrame({ url, title }: { url: string; title: string }) {
     };
   }, [shouldUseBlobUrl, url]);
 
-  if (!shouldUseBlobUrl) {
-    return <iframe className="native-preview-frame" src={url} title={title} />;
-  }
-
   if (blobError) {
     return (
       <div className="editor-state danger">
@@ -222,9 +269,19 @@ function PdfPreviewFrame({ url, title }: { url: string; title: string }) {
     );
   }
 
-  if (!blobUrl) {
-    return <div className="editor-state">{t("editor.preview.loading")}</div>;
+  if (shouldUseBlobUrl && !blobUrl) {
+    return <DocumentSurfacePending label={t("editor.preview.loading")} />;
   }
 
-  return <iframe className="native-preview-frame" src={blobUrl} title={title} />;
+  const frameUrl = shouldUseBlobUrl ? blobUrl as string : url;
+  return (
+    <iframe
+      key={frameUrl}
+      className="native-preview-frame"
+      src={frameUrl}
+      title={title}
+      aria-busy={readyFrameUrl !== frameUrl}
+      onLoad={() => setReadyFrameUrl(frameUrl)}
+    />
+  );
 }

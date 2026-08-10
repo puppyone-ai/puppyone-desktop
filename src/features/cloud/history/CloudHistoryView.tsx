@@ -30,7 +30,7 @@ export function CloudProjectHistoryView({
       className="desktop-cloud-project-history-view"
       aria-label={`${t("cloud.route.history.title")} · ${projectName}`}
     >
-      <div className="desktop-cloud-project-history-body">
+      <div className="desktop-cloud-project-history-body" data-po-scrollbar="content">
         {loading && rows.length === 0 ? (
           <PageLoading variant="fill" label={t("cloud.history.loading")} className="desktop-cloud-project-history-loading" />
         ) : error && rows.length === 0 ? (
