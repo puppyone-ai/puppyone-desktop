@@ -515,8 +515,7 @@ body.data-sidebar-resizing .data-preview-accessory {
 .tree-row.root:has(.tree-row-actions) .tree-row-content,
 .tree-row:hover:has(.tree-row-actions) .tree-row-content,
 .tree-row:focus-visible:has(.tree-row-actions) .tree-row-content,
-.tree-row:focus-within:has(.tree-row-actions) .tree-row-content,
-.tree-row.active:has(.tree-row-actions) .tree-row-content {
+.tree-row:has(.tree-row-action-button:focus-visible) .tree-row-content {
   padding-right: var(--tree-row-action-reserve);
 }
 
@@ -539,8 +538,7 @@ body.data-sidebar-resizing .data-preview-accessory {
 .tree-row.root .tree-row-actions.root-actions,
 .tree-row:hover .tree-row-actions,
 .tree-row:focus-visible .tree-row-actions,
-.tree-row:focus-within .tree-row-actions,
-.tree-row.active .tree-row-actions {
+.tree-row:has(.tree-row-action-button:focus-visible) .tree-row-actions {
   opacity: 1;
   pointer-events: auto;
 }
