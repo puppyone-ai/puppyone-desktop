@@ -191,6 +191,7 @@
   --po-file-accent-audio: #8f69b0;
   --po-file-accent-video: #4f86a4;
   --po-file-accent-code: #4f86a4;
+  --po-file-accent-word: #3f70a8;
   --po-file-accent-sheet: #6d8b4f;
   --po-file-accent-presentation: #c65f32;
   --po-editor-line: rgba(73, 55, 35, 0.085);
@@ -466,6 +467,7 @@
   --po-file-accent-audio: #a879c9;
   --po-file-accent-video: #5aa2c0;
   --po-file-accent-code: #5aa2c0;
+  --po-file-accent-word: #69a5e8;
   --po-file-accent-sheet: #8dc149;
   --po-file-accent-presentation: #f07a43;
   --po-diff-added-bg: rgba(34, 197, 94, 0.13);
@@ -586,6 +588,7 @@
   --po-file-accent-audio: #8465a5;
   --po-file-accent-video: #397c8f;
   --po-file-accent-code: #397c8f;
+  --po-file-accent-word: #3f70a8;
   --po-file-accent-sheet: #5f844a;
   --po-file-accent-presentation: #bd5d34;
 
@@ -667,6 +670,7 @@
   --po-file-accent-audio: #7c65a8;
   --po-file-accent-video: #327b8a;
   --po-file-accent-code: #327b8a;
+  --po-file-accent-word: #376da8;
   --po-file-accent-sheet: #5f8148;
   --po-file-accent-presentation: #bd5a32;
 
@@ -734,6 +738,7 @@
   --po-file-accent-audio: #bd91d0;
   --po-file-accent-video: #83b5c5;
   --po-file-accent-code: #83b5c5;
+  --po-file-accent-word: #79a8d8;
   --po-file-accent-sheet: #93b978;
   --po-file-accent-presentation: #e98a58;
 

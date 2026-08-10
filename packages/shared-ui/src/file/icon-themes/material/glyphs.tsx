@@ -6,7 +6,9 @@ import type {
 import {
   AppGlyph,
   DocumentLinesSymbol,
+  PresentationDocumentGlyph,
   SpreadsheetGridGlyph,
+  WordDocumentGlyph,
   WorkflowGlyph,
 } from "../shared/semanticGlyphs";
 
@@ -21,7 +23,9 @@ export const materialGlyphRenderers = {
   audio: renderMaterialAudioGlyph,
   pdf: renderMaterialPdfDocumentGlyph,
   video: renderMaterialVideoGlyph,
+  word: renderMaterialWordGlyph,
   spreadsheet: renderMaterialSpreadsheetGlyph,
+  presentation: renderMaterialPresentationGlyph,
   archive: renderMaterialArchiveGlyph,
   document: renderMaterialLinesDocumentGlyph,
   binary: renderMaterialLinesDocumentGlyph,
@@ -133,6 +137,30 @@ function renderMaterialSpreadsheetGlyph(
       fill={tint}
       size={context.size}
       strokeWidth={1.2}
+    />
+  );
+}
+
+function renderMaterialWordGlyph(
+  context: FileIconRenderContext,
+): ReactNode {
+  return (
+    <WordDocumentGlyph
+      color={context.color}
+      fill={getMaterialTint(context.color)}
+      size={context.size}
+    />
+  );
+}
+
+function renderMaterialPresentationGlyph(
+  context: FileIconRenderContext,
+): ReactNode {
+  return (
+    <PresentationDocumentGlyph
+      color={context.color}
+      fill={getMaterialTint(context.color)}
+      size={context.size}
     />
   );
 }

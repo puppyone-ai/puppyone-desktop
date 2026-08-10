@@ -1,21 +1,6 @@
-export type DataNodeKind =
-  | "folder"
-  | "app"
-  | "workflow"
-  | "markdown"
-  | "json"
-  | "html"
-  | "image"
-  | "audio"
-  | "pdf"
-  | "video"
-  | "spreadsheet"
-  | "archive"
-  | "document"
-  | "binary"
-  | "code"
-  | "text"
-  | "file";
+import type { FileSemanticKind } from "./fileFormats";
+
+export type DataNodeKind = FileSemanticKind;
 
 export type DataNodeStatus = "clean" | "modified" | "created" | "deleted" | "moved";
 

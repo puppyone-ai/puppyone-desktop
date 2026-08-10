@@ -114,5 +114,8 @@ const FILE_KIND_LABELS: Partial<Record<FileVisualKind, string>> = {
   json: "{}",
   markdown: "DOC",
   pdf: "PDF",
+  presentation: "PPT",
+  spreadsheet: "XLS",
+  word: "DOC",
   workflow: "FLOW",
 };

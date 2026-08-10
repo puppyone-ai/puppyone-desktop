@@ -9,7 +9,9 @@ import type {
 } from "../iconThemeTypes";
 import {
   DocumentLinesSymbol,
+  PresentationDocumentGlyph,
   SpreadsheetGridGlyph,
+  WordDocumentGlyph,
 } from "../shared/semanticGlyphs";
 
 export function renderVsCodeGlyph(
@@ -29,6 +31,26 @@ export function renderVsCodeGlyph(
         fill={fill}
         size={context.size}
         strokeWidth={1.15}
+      />
+    );
+  }
+  if (context.kind === "word") {
+    return (
+      <WordDocumentGlyph
+        color={color}
+        fill={fill}
+        size={context.size}
+        strokeWidth={1.05}
+      />
+    );
+  }
+  if (context.kind === "presentation") {
+    return (
+      <PresentationDocumentGlyph
+        color={color}
+        fill={fill}
+        size={context.size}
+        strokeWidth={1.05}
       />
     );
   }
@@ -57,7 +79,9 @@ export const vscodeGlyphRenderers = {
   audio: renderVsCodeGlyph,
   pdf: renderVsCodeGlyph,
   video: renderVsCodeGlyph,
+  word: renderVsCodeGlyph,
   spreadsheet: renderVsCodeGlyph,
+  presentation: renderVsCodeGlyph,
   archive: renderVsCodeGlyph,
   document: renderVsCodeGlyph,
   binary: renderVsCodeGlyph,
@@ -99,7 +123,10 @@ function VsCodeSymbol({
   return VSCODE_SYMBOL_RENDERERS[kind]({ kind, color, label });
 }
 
-type VsCodeFileKind = Exclude<FileVisualKind, "folder" | "spreadsheet">;
+type VsCodeFileKind = Exclude<
+  FileVisualKind,
+  "folder" | "spreadsheet" | "word" | "presentation"
+>;
 
 type SymbolContext = {
   kind: VsCodeFileKind;

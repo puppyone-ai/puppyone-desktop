@@ -110,6 +110,7 @@ describe("lightweight Office preview experience", () => {
     expect(officePreviewCss).toContain('.office-pptx-thumbnail__frame[data-render-state="error"]');
     expect(officePreviewCss).toContain("prefers-reduced-motion: reduce");
     expect(tokenSource.match(/--po-file-accent-presentation:/g)).toHaveLength(5);
+    expect(tokenSource.match(/--po-file-accent-word:/g)).toHaveLength(5);
     expect(officePreviewCss).not.toMatch(
       /\.office-pptx-workspace\s*\{[^}]*var\(--po-inset\)/s,
     );

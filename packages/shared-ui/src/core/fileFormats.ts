@@ -65,7 +65,9 @@ export const FILE_SEMANTIC_KINDS = [
   "audio",
   "pdf",
   "video",
+  "word",
   "spreadsheet",
+  "presentation",
   "archive",
   "document",
   "binary",
@@ -260,6 +262,9 @@ export function getPreviewKindForFormat(format: FileFormat): FilePreviewKind {
 export function getSemanticKindForFormat(format: FileFormat): FileSemanticKind {
   if (format.id === "puppyflow") return "workflow";
   if (format.id === "json" || format.id === "jsonl") return "json";
+  if (format.id === "docx") return "word";
+  if (format.id === "xlsx" || format.id === "ods") return "spreadsheet";
+  if (format.id === "pptx" || format.id === "odp") return "presentation";
 
   switch (format.defaultViewer) {
     case "markdown-editor":
@@ -296,7 +301,7 @@ export function getSemanticKindForFormat(format: FileFormat): FileSemanticKind {
     case "archive":
       return "archive";
     case "document":
-      return format.id === "xlsx" ? "spreadsheet" : "document";
+      return "document";
     case "binary":
       return "binary";
     case "text":
@@ -386,6 +391,9 @@ function getPreviewKindForSemanticType(type?: string | null): FilePreviewKind | 
     case "text":
     case "spreadsheet":
       return "text";
+    case "word":
+    case "presentation":
+      return "placeholder";
     default:
       return null;
   }
