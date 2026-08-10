@@ -27,7 +27,7 @@ Committed preview document
 EditorHost + PresetViewerRenderer
         |
         +----> read-only Viewer Contribution
-        |        HTML / Office / image / PDF / media
+        |        HTML / image / PDF / media / Office
         |
         `----> editable Editor Contribution
                  Markdown / text / code / CSV / PuppyFlow
@@ -81,7 +81,10 @@ architecture documents one level above this directory.
 5. [Markdown Editor](markdown/README.md)
    - The format-specific source-first architecture and Live Preview UX contract
      for Markdown files.
-6. [Desktop Renderer Performance](../desktop-renderer-performance.md)
+6. [Office Preview and Editor Extension Boundary](office/README.md)
+   - The self-contained local preview pipeline, Word fidelity controls, and
+     narrow handoff into a future optional Office editor plugin.
+7. [Desktop Renderer Performance](../desktop-renderer-performance.md)
    - The urgent/deferred scheduling, Explorer virtualization, Markdown
      projection, snapshot, cancellation, worker-index, and production Electron
      performance contracts shared by Explorer and the editor.

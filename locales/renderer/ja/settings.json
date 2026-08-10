@@ -125,6 +125,8 @@
   "editor.diffMarkers.color": "色",
   "experimental.title": "実験的機能",
   "experimental.detail": "開発初期のデスクトップ機能を有効にします。すべてデフォルトではオフです。",
+  "experimental.officeEditing.title": "Office ドキュメント編集",
+  "experimental.officeEditing.detail": "設定済みの ONLYOFFICE Document Server で .docx、.xlsx、.pptx ファイルを編集します。オフの場合、Office ファイルは読み取り専用プレビューのままです。",
   "experimental.markdownBlockDrag.detail": "Markdown ライブプレビューで、同じドキュメント内のブロックを並べ替える初期機能を有効にします。",
   "experimental.markdownBlockDrag.title": "Markdown ブロックのドラッグハンドル",
   "experimental.minimalMode.detail": "常時表示のアプリ UI を中央のフローティングドックに置き換え、プロジェクト、Git、チャット、ターミナルの操作はそのまま利用できます。",

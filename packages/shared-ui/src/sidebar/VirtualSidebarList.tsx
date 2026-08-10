@@ -50,6 +50,7 @@ export function VirtualSidebarList<T>({
     <ol
       ref={scrollRef}
       className={joinSidebarClassNames("po-sidebar-virtual-scroll", className)}
+      data-po-scrollbar="sidebar"
       aria-label={ariaLabel}
       onScroll={windowState.onScroll}
     >

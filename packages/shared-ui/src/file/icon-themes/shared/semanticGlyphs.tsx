@@ -66,6 +66,187 @@ export function SpreadsheetGridGlyph({
   );
 }
 
+/**
+ * A compact Word-family mark. The overlapping W tile carries the product
+ * identity while the paper and text strokes keep it readable as a document
+ * at the 16–18px sizes used by the explorer.
+ */
+export function WordDocumentGlyph({
+  color,
+  fill,
+  size,
+  strokeWidth = 1.1,
+}: Readonly<{
+  color: string;
+  fill: string;
+  size: number;
+  strokeWidth?: number;
+}>) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 18 18"
+      fill="none"
+      aria-hidden
+      data-file-icon-office="word"
+      data-file-icon-shape="word-document"
+    >
+      <path
+        d="M5.35 2.7h5.25l2.55 2.55v9.05c0 .55-.45 1-1 1h-6.8c-.55 0-1-.45-1-1V3.7c0-.55.45-1 1-1Z"
+        fill={fill}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10.6 2.9v2.35h2.35"
+        stroke={color}
+        strokeWidth={strokeWidth * 0.82}
+        strokeLinejoin="round"
+        opacity="0.82"
+      />
+      <path
+        d="M9.7 8.15h2.15M9.7 10.15h2.15M9.7 12.15h1.55"
+        stroke={color}
+        strokeWidth={strokeWidth * 0.84}
+        strokeLinecap="round"
+        opacity="0.72"
+      />
+      <rect x="2.1" y="5.15" width="7.25" height="8.35" rx="1.15" fill={color} />
+      <path
+        d="m3.55 7.45.9 3.75 1.15-2.75 1.15 2.75.9-3.75"
+        stroke="#fff"
+        strokeWidth=".78"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * A compact Excel-family mark using the same badge-plus-content construction
+ * as Word and PowerPoint. CSV and OpenDocument sheets intentionally keep the
+ * neutral table glyph; only Microsoft Excel formats receive the X identity.
+ */
+export function ExcelSpreadsheetGlyph({
+  color,
+  fill,
+  size,
+  strokeWidth = 1.1,
+}: Readonly<{
+  color: string;
+  fill: string;
+  size: number;
+  strokeWidth?: number;
+}>) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 18 18"
+      fill="none"
+      aria-hidden
+      data-file-icon-office="excel"
+      data-file-icon-shape="excel-spreadsheet"
+    >
+      <rect
+        x="5.05"
+        y="3"
+        width="9.85"
+        height="12"
+        rx="1.2"
+        fill={fill}
+        stroke={color}
+        strokeWidth={strokeWidth}
+      />
+      <path
+        d="M9.55 5.85h4M9.55 8.95h4M9.55 12.05h4M10.9 4.15v9.7M12.55 4.15v9.7"
+        stroke={color}
+        strokeWidth={strokeWidth * 0.68}
+        opacity="0.72"
+      />
+      <rect x="2.1" y="5.15" width="7.25" height="8.35" rx="1.15" fill={color} />
+      <path
+        d="m4.15 7.45 3.15 3.75M7.3 7.45 4.15 11.2"
+        stroke="#fff"
+        strokeWidth=".88"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * A compact PowerPoint-family mark. The P tile, slide frame, and pie-chart
+ * motif remain distinguishable when filenames are truncated in the explorer.
+ */
+export function PresentationDocumentGlyph({
+  color,
+  fill,
+  size,
+  strokeWidth = 1.1,
+}: Readonly<{
+  color: string;
+  fill: string;
+  size: number;
+  strokeWidth?: number;
+}>) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 18 18"
+      fill="none"
+      aria-hidden
+      data-file-icon-office="presentation"
+      data-file-icon-shape="presentation-slide"
+    >
+      <rect
+        x="4.45"
+        y="3.15"
+        width="10.65"
+        height="11.1"
+        rx="1.25"
+        fill={fill}
+        stroke={color}
+        strokeWidth={strokeWidth}
+      />
+      <circle
+        cx="11.45"
+        cy="7.45"
+        r="2.15"
+        fill={`color-mix(in srgb, ${color} 20%, transparent)`}
+        stroke={color}
+        strokeWidth={strokeWidth * 0.72}
+      />
+      <path
+        d="M11.45 5.3v2.15h2.15"
+        fill={color}
+        stroke={color}
+        strokeWidth={strokeWidth * 0.72}
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10.25 11.15h2.85"
+        stroke={color}
+        strokeWidth={strokeWidth * 0.86}
+        strokeLinecap="round"
+        opacity="0.72"
+      />
+      <rect x="2.1" y="5.15" width="7.25" height="8.35" rx="1.15" fill={color} />
+      <path
+        d="M4.45 11.25v-3.8h1.3c1.18 0 1.88.57 1.88 1.55s-.7 1.55-1.88 1.55h-1.3M4.45 7.45v3.8"
+        stroke="#fff"
+        strokeWidth=".82"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function DocumentLinesSymbol({ color }: { color: string }) {
   return (
     <path

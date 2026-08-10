@@ -311,7 +311,10 @@ export function CloudNewAutomationDialog({
           </div>
           <DesktopDialogCloseButton disabled={saving} onClick={onClose} />
         </header>
-        <div className="desktop-dialog-body desktop-cloud-automation-dialog-body">
+        <div
+          className="desktop-dialog-body desktop-cloud-automation-dialog-body"
+          data-po-scrollbar="content"
+        >
           {providersLoading ? (
             <div className="desktop-cloud-automation-state">{t("automation.create.loadingSources")}</div>
           ) : providersError ? (

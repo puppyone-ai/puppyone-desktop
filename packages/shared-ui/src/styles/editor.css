@@ -24,6 +24,7 @@
 
 /* Editor chrome: live surface, save overlay, mode toggle, plain text editor */
 @import "./editor/editor-chrome.css";
+@import "./editor/editor-find.css";
 
 /* Markdown editor base: layout, typography, lines, AI edit markers */
 @import "./editor/markdown-editor.css";

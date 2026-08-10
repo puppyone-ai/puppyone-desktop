@@ -102,7 +102,7 @@ function AiEditFileDiff({ file, t }: { file: AiEditFile; t: MessageFormatter }) 
   }
 
   return (
-    <div className="ai-edit-review-popover__hunks">
+    <div className="ai-edit-review-popover__hunks" data-po-scrollbar="content">
       {file.hunks.map((hunk) => (
         <AiEditHunkDiff key={hunk.id} hunk={hunk} t={t} />
       ))}

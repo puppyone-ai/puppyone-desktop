@@ -58,10 +58,13 @@ describe("data workspace localization boundaries", () => {
     expect(defaultCreateName("folder", english)).toBe("Untitled Folder");
     expect(defaultCreateName("folder", simplifiedChinese)).toBe("未命名文件夹");
 
+    expect(normalizeCreateEntryName("markdown", "Notes")).toBe("Notes.md");
+    expect(normalizeCreateEntryName("csv", "Data")).toBe("Data.csv");
+    expect(normalizeCreateEntryName("csv", "Data.tsv")).toBe("Data.tsv");
+
     expect(getCreateEntryInitialContent("csv", {
       csvHeaders: ["第 1 列", "第 2 列", "第 3 列"],
       puppyFlow: { title: "未命名流程", prompts: ["分析", "应用"] },
-      untitledAppName: "未命名应用",
     })).toBe("第 1 列,第 2 列,第 3 列\n,,\n,,\n");
   });
 

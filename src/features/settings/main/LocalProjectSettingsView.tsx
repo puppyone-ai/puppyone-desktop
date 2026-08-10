@@ -33,7 +33,7 @@ export function LocalProjectSettingsView({
 
   return (
     <section className="desktop-utility-view desktop-settings-view">
-      <div className="desktop-utility-body desktop-settings-body">
+      <div className="desktop-utility-body desktop-settings-body" data-po-scrollbar="content">
         <div className="desktop-settings-section">
           <SettingsSectionHeader
             title={t("settings.localProject.title")}

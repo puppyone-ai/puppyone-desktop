@@ -205,7 +205,7 @@ export function CloudAccessSection({
 
   return (
     <section className="desktop-cloud-access-page desktop-cloud-access-catalog-page">
-      <main className="desktop-cloud-access-canvas">
+      <main className="desktop-cloud-access-canvas" data-po-scrollbar="content">
         <div className="desktop-cloud-access-catalog">
           <header className="desktop-cloud-access-landing-header">
             <div className="desktop-cloud-access-landing-copy">
@@ -221,7 +221,12 @@ export function CloudAccessSection({
           </header>
 
           <div className="desktop-cloud-access-toolbar">
-            <nav className="desktop-cloud-access-category-tabs" aria-label={t("cloud.access.filterAria")} role="tablist">
+            <nav
+              className="desktop-cloud-access-category-tabs"
+              data-po-scrollbar="hidden"
+              aria-label={t("cloud.access.filterAria")}
+              role="tablist"
+            >
               {CLOUD_ACCESS_FILTERS.map((item) => {
                 const presentation = getCloudAccessFilterPresentation(item.id, t);
                 const active = activeFilter === item.id;
@@ -310,7 +315,10 @@ export function CloudAccessSection({
               </div>
               <DesktopDialogCloseButton title={t("cloud.common.close")} onClick={closeCatalogDetail} />
             </header>
-            <div className="desktop-dialog-body desktop-cloud-access-manage-body">
+            <div
+              className="desktop-dialog-body desktop-cloud-access-manage-body"
+              data-po-scrollbar="content"
+            >
               <DesktopCloudScopeAccessDetail
                 projectId={projectId}
                 cloudSession={cloudSession}

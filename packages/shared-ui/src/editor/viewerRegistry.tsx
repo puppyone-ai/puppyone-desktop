@@ -38,7 +38,6 @@ const PRESET_VIEWER_IMPLEMENTATION_KEYS = new Set([
   "render",
   "load",
 ]);
-
 const RESOLVED_PRESET_VIEWER_KEYS = new Set([
   "contractVersion",
   "id",

@@ -182,7 +182,11 @@ export function DesktopCloudScopeAccessDetail({
   };
 
   return (
-    <div className="desktop-cloud-access-web-detail" key={scope.id}>
+    <div
+      className="desktop-cloud-access-web-detail"
+      data-po-scrollbar="content"
+      key={scope.id}
+    >
       <div className="desktop-cloud-access-web-rail">
         <header className="desktop-cloud-access-web-scope-header">
           <div className="desktop-cloud-access-web-scope-copy">

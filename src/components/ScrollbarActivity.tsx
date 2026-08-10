@@ -1,20 +1,23 @@
 import { useEffect } from "react";
 
 const ACTIVE_SCROLLBAR_CLASS = "po-scrollbar-active";
+const MANAGED_SCROLLBAR_SELECTOR = '[data-po-scrollbar]:not([data-po-scrollbar="hidden"])';
 const SCROLL_IDLE_DELAY_MS = 900;
 
-function getScrollTarget(target: EventTarget | null): Element {
+function getScrollTarget(target: EventTarget | null): Element | null {
   if (
     target === window ||
     target === document ||
     target === document.documentElement ||
     target === document.body
   ) {
-    return document.documentElement;
+    return document.documentElement.matches(MANAGED_SCROLLBAR_SELECTOR)
+      ? document.documentElement
+      : null;
   }
 
-  if (target instanceof Element) return target;
-  return document.documentElement;
+  if (!(target instanceof Element)) return null;
+  return target.matches(MANAGED_SCROLLBAR_SELECTOR) ? target : null;
 }
 
 export function ScrollbarActivity() {
@@ -23,6 +26,7 @@ export function ScrollbarActivity() {
 
     const markActive = (event: Event) => {
       const target = getScrollTarget(event.target);
+      if (!target) return;
       target.classList.add(ACTIVE_SCROLLBAR_CLASS);
 
       const existingTimer = timers.get(target);

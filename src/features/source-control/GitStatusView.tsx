@@ -259,7 +259,7 @@ function GitHistoryPanel({
   if (commits.length === 0) {
     return (
       <section className="desktop-utility-view desktop-history-detail-view">
-        <div className="desktop-history-detail-scroll">
+        <div className="desktop-history-detail-scroll" data-po-scrollbar="content">
           <EmptyGitHistoryState status={status} operationError={operationError} onRefresh={onRefresh} loading={loading} />
         </div>
       </section>
@@ -310,7 +310,7 @@ function GitHistoryPanel({
         <GripVertical size={12} aria-hidden="true" />
       </SidebarResizeHandle>
       <div className="desktop-history-panel-detail">
-        <div className="desktop-history-detail-scroll">
+        <div className="desktop-history-detail-scroll" data-po-scrollbar="content">
           {selectedCommit ? (
             <CommitDetail
               commit={selectedCommit}
@@ -493,7 +493,7 @@ function InitialGitRepositoryState({
 
   return (
     <section className="desktop-utility-view desktop-history-detail-view">
-      <div className="desktop-history-detail-scroll">
+      <div className="desktop-history-detail-scroll" data-po-scrollbar="content">
         <div className="desktop-initial-repo-state">
           <div className="desktop-initial-repo-card">
             <div className="desktop-initial-repo-header">

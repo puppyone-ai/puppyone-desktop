@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import {
   ensureShape,
@@ -32,6 +32,12 @@ import {
   EDITABLE_TABLE_COLUMN_MIN_WIDTH,
   estimateEditableTableColumnWidths,
 } from "./table/editableTableLayout";
+import {
+  getCsvFindMatchKey,
+  useCsvFindAdapter,
+} from "./find/useCsvFindAdapter";
+import { useRegisterEditorFindAdapter } from "./find/editorFind";
+import { useEditorChromeContributionPublisher } from "./editorChromeContribution";
 
 export type CsvTableEditorProps = {
   documentId?: string;
@@ -78,6 +84,14 @@ export function CsvTableEditor({
   const surfaceRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLTableElement>(null);
   const pendingFocusRef = useRef<CsvTableFocusTarget | null>(null);
+  const searchableMatrix = useMemo(
+    () => matrix.slice(0, MAX_CSV_TABLE_DATA_ROWS + (headerEnabled ? 1 : 0)),
+    [headerEnabled, matrix],
+  );
+  const csvFind = useCsvFindAdapter(searchableMatrix, tableRef);
+
+  useRegisterEditorFindAdapter(csvFind.adapter);
+  const publishChromeContribution = useEditorChromeContributionPublisher();
 
   useLayoutEffect(() => {
     if (headerPreferenceDocumentRef.current !== documentId) {
@@ -182,17 +196,39 @@ export function CsvTableEditor({
     });
   };
 
-  const setFirstRecordAsHeader = (enabled: boolean) => {
+  const setFirstRecordAsHeader = useCallback((enabled: boolean) => {
     headerPreferenceInitializedRef.current = true;
     setHeaderEnabled(enabled);
     writeCsvFirstRecordAsHeaderPreference(documentId, enabled);
-  };
+  }, [documentId]);
 
-  const setShowRowNumbers = (visible: boolean) => {
+  const setShowRowNumbers = useCallback((visible: boolean) => {
     rowNumbersPreferenceInitializedRef.current = true;
     setRowNumbersVisible(visible);
     writeCsvShowRowNumbersPreference(documentId, visible);
-  };
+  }, [documentId]);
+
+  useLayoutEffect(() => {
+    if (!publishChromeContribution || !documentId) return undefined;
+
+    publishChromeContribution({
+      kind: "csv-view-settings",
+      documentId,
+      headerEnabled,
+      rowNumbersVisible,
+      onHeaderChange: setFirstRecordAsHeader,
+      onRowNumbersChange: setShowRowNumbers,
+    });
+
+    return () => publishChromeContribution(null);
+  }, [
+    documentId,
+    headerEnabled,
+    publishChromeContribution,
+    rowNumbersVisible,
+    setFirstRecordAsHeader,
+    setShowRowNumbers,
+  ]);
 
   const ariaColumnOffset = rowNumbersVisible ? 2 : 1;
 
@@ -204,6 +240,7 @@ export function CsvTableEditor({
     >
       <div
         className="csv-table-editor__scroll"
+        data-po-scrollbar="content"
         onScroll={(event) => {
           const scrollContainer = event.currentTarget;
           const inlineScrolled = Math.abs(scrollContainer.scrollLeft) > 0.5;
@@ -211,14 +248,16 @@ export function CsvTableEditor({
           scrollContainer.toggleAttribute("data-inline-scrolled", inlineScrolled);
         }}
       >
-        <CsvViewSettings
-          direction={direction}
-          headerEnabled={headerEnabled}
-          onHeaderChange={setFirstRecordAsHeader}
-          onRowNumbersChange={setShowRowNumbers}
-          rowNumbersVisible={rowNumbersVisible}
-          t={t}
-        />
+        {!publishChromeContribution && (
+          <CsvViewSettings
+            direction={direction}
+            headerEnabled={headerEnabled}
+            onHeaderChange={setFirstRecordAsHeader}
+            onRowNumbersChange={setShowRowNumbers}
+            rowNumbersVisible={rowNumbersVisible}
+            t={t}
+          />
+        )}
 
         <div className="csv-table-editor__frame">
           <div
@@ -267,6 +306,8 @@ export function CsvTableEditor({
                         key={`header-${columnIndex}`}
                         data-csv-row="0"
                         data-csv-column={columnIndex}
+                        data-find-match={csvFind.matchKeys.has(getCsvFindMatchKey({ rowIndex: 0, columnIndex })) ? "true" : undefined}
+                        data-find-current={csvFind.currentMatch?.rowIndex === 0 && csvFind.currentMatch.columnIndex === columnIndex ? "true" : undefined}
                         aria-colindex={columnIndex + ariaColumnOffset}
                       >
                         <input
@@ -325,6 +366,8 @@ export function CsvTableEditor({
                           key={`cell-${rowIndex}-${columnIndex}`}
                           data-csv-row={rowIndex}
                           data-csv-column={columnIndex}
+                          data-find-match={csvFind.matchKeys.has(getCsvFindMatchKey({ rowIndex, columnIndex })) ? "true" : undefined}
+                          data-find-current={csvFind.currentMatch?.rowIndex === rowIndex && csvFind.currentMatch.columnIndex === columnIndex ? "true" : undefined}
                           aria-colindex={columnIndex + ariaColumnOffset}
                         >
                           <input
@@ -389,7 +432,7 @@ export function CsvTableEditor({
                   title={t("editor.csv.addRow")}
                   aria-label={t("editor.csv.addRow")}
                 >
-                  <span className="csv-table-editor__structure-button-visual po-editable-table-structure-button-visual" aria-hidden="true">+</span>
+                  <span className="csv-table-editor__structure-button-visual po-editable-table-structure-button-visual" aria-hidden="true" />
                 </button>
                 <button
                   type="button"
@@ -398,7 +441,7 @@ export function CsvTableEditor({
                   title={t("editor.csv.addColumn")}
                   aria-label={t("editor.csv.addColumn")}
                 >
-                  <span className="csv-table-editor__structure-button-visual po-editable-table-structure-button-visual" aria-hidden="true">+</span>
+                  <span className="csv-table-editor__structure-button-visual po-editable-table-structure-button-visual" aria-hidden="true" />
                 </button>
                 <CsvTableControls
                   columnCount={columnCount}

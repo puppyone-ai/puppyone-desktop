@@ -166,6 +166,7 @@ function AgentTranscriptView({
     >
       <div
         className="desktop-agent-transcript"
+        data-po-scrollbar="content"
         ref={scrollRef}
         onScroll={handleScroll}
         aria-label={t("agent.transcript.conversation", { agent: bidiIsolate(runtimeLabel) })}

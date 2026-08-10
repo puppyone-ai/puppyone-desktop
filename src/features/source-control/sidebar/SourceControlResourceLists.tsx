@@ -56,7 +56,7 @@ export function SourceControlWorkingResourceList({
   }
 
   return (
-    <div className="desktop-working-tree-list">
+    <div className="desktop-working-tree-list" data-po-scrollbar="sidebar">
       {resources.map((resource) => (
         <Fragment key={resource.id}>{renderResource(resource)}</Fragment>
       ))}

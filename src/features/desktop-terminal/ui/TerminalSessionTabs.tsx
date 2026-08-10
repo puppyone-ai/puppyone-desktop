@@ -76,6 +76,7 @@ export function TerminalSessionTabs({
     <header className="desktop-terminal-subheader" data-window-no-drag="true">
       <div
         className="desktop-terminal-tabs"
+        data-po-scrollbar="hidden"
         role="tablist"
         aria-label={t("terminal.title")}
       >

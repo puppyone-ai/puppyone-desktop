@@ -19,23 +19,22 @@
   gap: 6px;
   overflow: hidden;
   padding: 0 6.5px;
-  border: 0;
+  border: 1px solid var(--po-border-subtle);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--po-canvas) 68%, transparent);
+  background: var(--po-panel-raised);
   color: var(--po-text-subtle);
-  box-shadow: 0 1px 5px color-mix(in srgb, var(--po-shadow) 10%, transparent);
-  opacity: 0.52;
+  box-shadow:
+    0 1px 4px color-mix(in srgb, var(--po-shadow) 16%, transparent),
+    0 0 0 0.5px color-mix(in srgb, var(--po-border) 44%, transparent);
+  opacity: 1;
   pointer-events: auto;
   cursor: var(--po-clickable-cursor, pointer);
   white-space: nowrap;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
   transition:
     max-width 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
     background-color 120ms ease,
     color 120ms ease,
-    box-shadow 120ms ease,
-    opacity 120ms ease;
+    box-shadow 120ms ease;
 }
 
 .desktop-help-launcher > svg {
@@ -57,12 +56,12 @@
 .desktop-help-launcher:hover,
 .desktop-help-launcher:focus-visible {
   max-width: 120px;
-  background: color-mix(in srgb, var(--po-canvas) 86%, var(--po-hover));
+  background: var(--po-overlay);
   color: var(--po-text-muted);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--po-divider) 58%, transparent),
     0 2px 8px color-mix(in srgb, var(--po-shadow) 14%, transparent);
-  opacity: 0.92;
+  opacity: 1;
 }
 
 .desktop-help-launcher:hover .desktop-help-launcher-label,
@@ -72,9 +71,9 @@
 }
 
 .desktop-feedback[data-open="true"] .desktop-help-launcher {
-  background: color-mix(in srgb, var(--po-canvas) 82%, var(--po-hover));
+  background: var(--po-overlay);
   color: var(--po-text-muted);
-  opacity: 0.78;
+  opacity: 1;
 }
 
 .desktop-help-launcher:focus-visible {

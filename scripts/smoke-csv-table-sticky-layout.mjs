@@ -76,7 +76,7 @@ function tableMarkup() {
           <button class="csv-table-editor__settings-button" type="button">⋮</button>
         </div>
         <div class="csv-table-editor__frame">
-          <div class="csv-table-editor__surface" data-header-enabled="true" dir="ltr">
+          <div class="csv-table-editor__surface po-editable-table-interaction-root" data-header-enabled="true" dir="ltr">
             <table class="csv-table-editor__table">
               <colgroup>
                 <col class="csv-table-editor__record-index-column">
@@ -93,6 +93,20 @@ function tableMarkup() {
               </thead>
               <tbody>${rows}</tbody>
             </table>
+            <button
+              class="csv-table-editor__structure-button csv-table-editor__add-row po-editable-table-structure-button po-editable-table-add-row"
+              type="button"
+              aria-label="Add row"
+            >
+              <span class="csv-table-editor__structure-button-visual po-editable-table-structure-button-visual" aria-hidden="true">+</span>
+            </button>
+            <button
+              class="csv-table-editor__structure-button csv-table-editor__add-column po-editable-table-structure-button po-editable-table-add-column"
+              type="button"
+              aria-label="Add column"
+            >
+              <span class="csv-table-editor__structure-button-visual po-editable-table-structure-button-visual" aria-hidden="true"></span>
+            </button>
           </div>
         </div>
       </div>
@@ -186,12 +200,27 @@ async function measureScenario(viewportWidth) {
       const rowIndex = document.querySelector("tbody .csv-table-editor__record-index");
       const corner = document.querySelector("thead .csv-table-editor__record-index");
       const editor = document.querySelector(".csv-table-editor");
+      const addRow = document.querySelector(".csv-table-editor__add-row");
+      const addRowVisual = addRow.querySelector(".po-editable-table-structure-button-visual");
+      const addColumn = document.querySelector(".csv-table-editor__add-column");
+      const addColumnVisual = addColumn.querySelector(".po-editable-table-structure-button-visual");
       const scrollRect = scroll.getBoundingClientRect();
       const tableRect = table.getBoundingClientRect();
       const settingsRect = settings.getBoundingClientRect();
       const initialHeaderRect = header.getBoundingClientRect();
       const initialIndexRect = rowIndex.getBoundingClientRect();
+      const addRowRect = addRow.getBoundingClientRect();
+      const addRowVisualRect = addRowVisual.getBoundingClientRect();
+      const addColumnRect = addColumn.getBoundingClientRect();
+      const addColumnVisualRect = addColumnVisual.getBoundingClientRect();
+      const horizontalStroke = getComputedStyle(addRowVisual, "::before");
+      const verticalStroke = getComputedStyle(addRowVisual, "::after");
+      const addRowVisualStyle = getComputedStyle(addRowVisual);
       const styles = getComputedStyle(editor);
+      const centerOffset = (inner, outer) => ({
+        x: inner.left + inner.width / 2 - (outer.left + outer.width / 2),
+        y: inner.top + inner.height / 2 - (outer.top + outer.height / 2),
+      });
 
       const initial = {
         blockInset: Number.parseFloat(styles.getPropertyValue("--csv-table-content-block-start-inset")),
@@ -205,6 +234,20 @@ async function measureScenario(viewportWidth) {
         outerOverflowY: getComputedStyle(outer).overflowY,
         innerCanScroll:
           scroll.scrollHeight > scroll.clientHeight && scroll.scrollWidth > scroll.clientWidth,
+        structureControls: {
+          rowVisualCenterOffset: centerOffset(addRowVisualRect, addRowRect),
+          columnVisualCenterOffset: centerOffset(addColumnVisualRect, addColumnRect),
+          rowRailHeight: addRowVisualRect.height,
+          columnRailWidth: addColumnVisualRect.width,
+          horizontalStrokeWidth: Number.parseFloat(horizontalStroke.width),
+          horizontalStrokeHeight: Number.parseFloat(horizontalStroke.height),
+          verticalStrokeWidth: Number.parseFloat(verticalStroke.width),
+          verticalStrokeHeight: Number.parseFloat(verticalStroke.height),
+          tableBorderWidth: Number.parseFloat(getComputedStyle(table).borderTopWidth),
+          legacyTextContent: addRowVisual.textContent,
+          legacyTextFontSize: addRowVisualStyle.fontSize,
+          legacyTextLineHeight: addRowVisualStyle.lineHeight,
+        },
       };
 
       scroll.scrollTop = 144;
@@ -246,6 +289,58 @@ async function runSmoke() {
     assert(initial.innerCanScroll, `${label}: fixture did not exercise both scroll axes`);
     assertNear(initial.framePaddingTop, initial.blockInset, `${label}: block inset owner`);
     assertNear(initial.framePaddingLeft, initial.inlineInset, `${label}: inline inset owner`);
+    assertNear(
+      initial.structureControls.rowVisualCenterOffset.x,
+      0,
+      `${label}: add-row visual horizontal center`,
+      0.1,
+    );
+    assertNear(
+      initial.structureControls.rowVisualCenterOffset.y,
+      0,
+      `${label}: add-row visual vertical center`,
+      0.1,
+    );
+    assertNear(
+      initial.structureControls.columnVisualCenterOffset.x,
+      0,
+      `${label}: add-column visual horizontal center`,
+      0.1,
+    );
+    assertNear(
+      initial.structureControls.columnVisualCenterOffset.y,
+      0,
+      `${label}: add-column visual vertical center`,
+      0.1,
+    );
+    assertNear(initial.structureControls.rowRailHeight, 13, `${label}: add-row rail height`, 0.1);
+    assertNear(initial.structureControls.columnRailWidth, 13, `${label}: add-column rail width`, 0.1);
+    assertNear(initial.structureControls.horizontalStrokeWidth, 7, `${label}: add glyph horizontal length`, 0.1);
+    assertNear(
+      initial.structureControls.horizontalStrokeHeight,
+      initial.structureControls.tableBorderWidth,
+      `${label}: add glyph horizontal stroke matches table edge`,
+      0.1,
+    );
+    assertNear(
+      initial.structureControls.verticalStrokeWidth,
+      initial.structureControls.tableBorderWidth,
+      `${label}: add glyph vertical stroke matches table edge`,
+      0.1,
+    );
+    assertNear(initial.structureControls.verticalStrokeHeight, 7, `${label}: add glyph vertical length`, 0.1);
+    assert(
+      initial.structureControls.legacyTextContent === "+",
+      `${label}: stale-widget fixture lost its legacy text glyph`,
+    );
+    assert(
+      initial.structureControls.legacyTextFontSize === "0px",
+      `${label}: a stale widget can still render its legacy text glyph`,
+    );
+    assert(
+      initial.structureControls.legacyTextLineHeight === "0px",
+      `${label}: a stale widget text line can still affect glyph alignment`,
+    );
     assert(
       initial.settingsBottom <= initial.tableTop + 0.5,
       `${label}: view settings overlap the table at rest`,

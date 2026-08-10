@@ -3,7 +3,6 @@
   --po-markdown-editor-gutter-min: var(--po-editor-content-edge-inset, 64px);
   --po-markdown-editor-content-padding-block: var(--po-editor-content-edge-inset, 64px);
   --po-markdown-breakout-right-gutter: 48px;
-  --po-markdown-breakout-max-width: 1180px;
   --po-markdown-editor-line-spacing: 0px;
   --cm-md-block-hover-ring: color-mix(in srgb, var(--po-text-muted) 18%, transparent);
   --cm-md-block-selected-ring: color-mix(in srgb, var(--po-accent) 30%, transparent);
@@ -485,7 +484,7 @@
 .markdown-codemirror-editor .cm-md-hr-widget::before {
   width: 100%;
   height: 1px;
-  background: var(--po-divider);
+  background: var(--po-md-rule-color);
   content: "";
 }
 

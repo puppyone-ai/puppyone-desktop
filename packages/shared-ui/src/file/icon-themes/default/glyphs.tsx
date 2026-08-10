@@ -5,7 +5,10 @@ import type {
 } from "../iconThemeTypes";
 import {
   AppGlyph,
+  ExcelSpreadsheetGlyph,
+  PresentationDocumentGlyph,
   SpreadsheetGridGlyph,
+  WordDocumentGlyph,
   WorkflowGlyph,
 } from "../shared/semanticGlyphs";
 
@@ -20,7 +23,10 @@ export const defaultGlyphRenderers = {
   audio: renderDefaultAudioGlyph,
   pdf: renderDefaultDocumentGlyph,
   video: renderDefaultVideoGlyph,
+  word: renderDefaultWordGlyph,
+  excel: renderDefaultExcelGlyph,
   spreadsheet: renderDefaultSpreadsheetGlyph,
+  presentation: renderDefaultPresentationGlyph,
   archive: renderDefaultDocumentGlyph,
   document: renderDefaultDocumentGlyph,
   binary: renderDefaultDocumentGlyph,
@@ -152,6 +158,45 @@ function renderDefaultSpreadsheetGlyph({
     <SpreadsheetGridGlyph
       color={color}
       fill="color-mix(in srgb, var(--po-file-icon-body) 65%, transparent)"
+      size={size}
+    />
+  );
+}
+
+function renderDefaultWordGlyph({
+  color,
+  size,
+}: FileIconRenderContext): ReactNode {
+  return (
+    <WordDocumentGlyph
+      color={color}
+      fill="color-mix(in srgb, var(--po-file-icon-body) 72%, transparent)"
+      size={size}
+    />
+  );
+}
+
+function renderDefaultExcelGlyph({
+  color,
+  size,
+}: FileIconRenderContext): ReactNode {
+  return (
+    <ExcelSpreadsheetGlyph
+      color={color}
+      fill="color-mix(in srgb, var(--po-file-icon-body) 72%, transparent)"
+      size={size}
+    />
+  );
+}
+
+function renderDefaultPresentationGlyph({
+  color,
+  size,
+}: FileIconRenderContext): ReactNode {
+  return (
+    <PresentationDocumentGlyph
+      color={color}
+      fill="color-mix(in srgb, var(--po-file-icon-body) 72%, transparent)"
       size={size}
     />
   );

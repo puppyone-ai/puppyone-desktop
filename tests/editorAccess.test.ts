@@ -42,12 +42,12 @@ describe("editor access routing", () => {
     })).toEqual({ kind: "read-only", reason: "source-unavailable" });
   });
 
-  it("keeps Office spreadsheets read-only even when persistence exists", () => {
+  it("keeps modern Office resources read-only regardless of text persistence", () => {
     const document: EditorDocument = {
       path: "book.xlsx",
       name: "book.xlsx",
       type: "spreadsheet",
-      content: "not-a-text-workbook",
+      url: "puppyone-local://resource/book.xlsx",
     };
     const route = resolveEditorViewer(document);
 
@@ -57,6 +57,12 @@ describe("editor access routing", () => {
       ...route,
       content: document.content ?? "",
       persistenceAvailable: true,
+    })).toEqual({ kind: "read-only", reason: "viewer-capability" });
+    expect(resolveEditorAccess({
+      document,
+      ...route,
+      content: "",
+      persistenceAvailable: false,
     })).toEqual({ kind: "read-only", reason: "viewer-capability" });
   });
 

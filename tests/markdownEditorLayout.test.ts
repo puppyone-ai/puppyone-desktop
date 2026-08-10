@@ -9,8 +9,16 @@ const editorEntryCss = readFileSync(
   new URL("../packages/shared-ui/src/styles/editor.css", import.meta.url),
   "utf8",
 );
+const sharedTableCss = readFileSync(
+  new URL("../packages/shared-ui/src/styles/editor/editable-table.css", import.meta.url),
+  "utf8",
+);
 const markdownTableCss = readFileSync(
   new URL("../packages/shared-ui/src/styles/editor/markdown-table-widget.css", import.meta.url),
+  "utf8",
+);
+const markdownTableWidgetSource = readFileSync(
+  new URL("../packages/shared-ui/src/editor/markdown/features/table/tableWidget.ts", import.meta.url),
   "utf8",
 );
 const markdownHtmlCss = readFileSync(
@@ -60,6 +68,7 @@ describe("Markdown editor layout", () => {
     const editorRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor");
 
     expect(editorRule).toContain("--po-markdown-breakout-right-gutter: 48px;");
+    expect(editorRule).not.toContain("--po-markdown-breakout-max-width");
   });
 
   it("keeps task checkbox visuals compact inside a reliable desktop hit target", () => {
@@ -106,6 +115,14 @@ describe("Markdown HTML media layout", () => {
       markdownContentCss,
       ".markdown-codemirror-editor .cm-md-html-rendered-surface h1",
     );
+    const nativeHeading2Rule = readCssRule(
+      markdownContentCss,
+      '.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-2',
+    );
+    const htmlHeading2Rule = readCssRule(
+      markdownContentCss,
+      ".markdown-codemirror-editor .cm-md-html-rendered-surface h2",
+    );
     const htmlSurfaceRule = readCssRule(
       markdownContentCss,
       ".markdown-codemirror-editor .cm-md-html-rendered-surface",
@@ -121,10 +138,22 @@ describe("Markdown HTML media layout", () => {
 
     expect(editorEntryCss).toContain('@import "./editor/markdown-content.css";');
     expect(profileRule).toContain("--po-md-presentation-version: 1;");
+    expect(profileRule).toContain(
+      "--po-md-rule-color: color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 4%);",
+    );
     expect(nativeHeadingRule).toContain("font-size: var(--po-md-h1-size);");
     expect(htmlHeadingRule).toContain("font-size: var(--po-md-h1-size);");
-    expect(nativeHeadingRule).toContain("border-bottom: 1px solid var(--po-md-heading-rule);");
-    expect(htmlHeadingRule).toContain("border-bottom: 1px solid var(--po-md-heading-rule);");
+    expect(nativeHeading2Rule).toContain("font-size: var(--po-md-h2-size);");
+    expect(htmlHeading2Rule).toContain("font-size: var(--po-md-h2-size);");
+    for (const headingRule of [
+      nativeHeadingRule,
+      nativeHeading2Rule,
+      htmlHeadingRule,
+      htmlHeading2Rule,
+    ]) {
+      expect(headingRule).not.toContain("border-bottom");
+      expect(headingRule).not.toContain("padding-bottom");
+    }
     expect(htmlSurfaceRule).toContain("white-space: normal;");
     expect(htmlPreRule).toContain("white-space: pre-wrap;");
     expect(widgetRule).toContain("padding: 0;");
@@ -185,19 +214,20 @@ describe("Markdown rich-block boundary affordance", () => {
     expect(surfaceRule).not.toMatch(/\bborder\s*:/);
   });
 
-  it("draws table affordance on its existing frame rather than a second wrapper", () => {
-    const hoverSelector = [
-      ".markdown-codemirror-editor .cm-md-table-widget-wrap:hover:not(.is-doc-selected) .cm-md-table-widget,",
-      ".markdown-codemirror-editor .cm-md-table-widget-wrap:focus-within:not(.is-doc-selected) .cm-md-table-widget",
-    ].join("\n");
-    const hoverRule = readCssRule(markdownTableCss, hoverSelector);
+  it("keeps the outer table frame unchanged on hover and cell focus", () => {
+    const selectedRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-widget-wrap.is-doc-selected .cm-md-table-widget",
+    );
 
-    expect(markdownTableCss).toContain(
+    expect(markdownTableCss).not.toContain(
+      ".cm-md-table-widget-wrap:hover:not(.is-doc-selected) .cm-md-table-widget",
+    );
+    expect(markdownTableCss).not.toContain(
       ".cm-md-table-widget-wrap:focus-within:not(.is-doc-selected) .cm-md-table-widget",
     );
-    expect(hoverRule).toContain("box-shadow: 0 0 0 2px var(--po-editable-table-hover-ring);");
-    expect(hoverRule).not.toContain("border-color:");
-    expect(markdownTableCss).toContain("box-shadow: 0 0 0 2px var(--cm-md-block-selected-ring);");
+    expect(selectedRule).toContain("border-color:");
+    expect(selectedRule).toContain("box-shadow: 0 0 0 2px var(--cm-md-block-selected-ring);");
   });
 
   it("keeps vertical scrolling at the document level for code blocks", () => {
@@ -251,26 +281,149 @@ describe("Markdown rich-block boundary affordance", () => {
 });
 
 describe("Markdown table affordance layout", () => {
-  it("joins structure-button hit targets to the table while preserving the compact visual bars", () => {
-    const frameRule = readCssRule(markdownTableCss, ".markdown-codemirror-editor .cm-md-table-frame");
-    const addRowRule = readCssRule(markdownTableCss, ".markdown-codemirror-editor .cm-md-table-add-row");
-    const addRowVisualRule = readCssRule(
-      markdownTableCss,
-      ".markdown-codemirror-editor .cm-md-table-add-row .cm-md-table-structure-button-visual",
+  it("uses one normal-state rule color for dividers and table lines", () => {
+    const nativeDividerRule = readCssRule(
+      markdownEditorCss,
+      ".markdown-codemirror-editor .cm-md-hr-widget::before",
     );
-    const addColumnRule = readCssRule(markdownTableCss, ".markdown-codemirror-editor .cm-md-table-add-column");
-    const addColumnVisualRule = readCssRule(
+    const htmlDividerRule = readCssRule(
+      markdownContentCss,
+      ".markdown-codemirror-editor .cm-md-html-rendered-surface hr",
+    );
+    const viewportRule = readCssRule(
       markdownTableCss,
-      ".markdown-codemirror-editor .cm-md-table-add-column .cm-md-table-structure-button-visual",
+      ".markdown-codemirror-editor .cm-md-table-widget-wrap",
+    );
+    const tableRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-widget",
+    );
+    const cellRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-widget th,\n.markdown-codemirror-editor .cm-md-table-widget td",
+    );
+
+    expect(nativeDividerRule).toContain("background: var(--po-md-rule-color);");
+    expect(htmlDividerRule).toContain("background: var(--po-md-rule-color);");
+    expect(viewportRule).toContain("--po-editable-table-border: var(--po-md-rule-color);");
+    expect(viewportRule).toContain("--po-editable-table-cell-border: var(--po-md-rule-color);");
+    expect(tableRule).toContain("border: 1px solid var(--po-editable-table-border);");
+    expect(cellRule).toContain("border-right: 1px solid var(--po-editable-table-cell-border);");
+    expect(cellRule).toContain("border-bottom: 1px solid var(--po-editable-table-cell-border);");
+    expect(markdownContentCss).not.toContain("--po-md-heading-rule");
+  });
+
+  it("splits the safe-edge scrollport from the reading-rail table track", () => {
+    const rootRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-widget-wrap",
+    );
+    const viewportRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-scrollport",
+    );
+    const frameRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-frame",
+    );
+    const surfaceRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-surface",
+    );
+    const scrollbarRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-scrollbar-rail",
+    );
+    const scrollbarContentRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-scrollbar-content",
+    );
+
+    expect(rootRule).toContain("inline-size: 100%;");
+    expect(rootRule).toContain("overflow: visible;");
+    expect(rootRule).toContain("padding-block: 0 18px;");
+    expect(viewportRule).toContain("--cm-md-table-scroll-away-inset: 0px;");
+    expect(viewportRule).toContain(
+      "margin-inline-start: calc(-1 * var(--cm-md-table-scroll-away-inset));",
+    );
+    expect(viewportRule).toContain("overflow-x: auto;");
+    expect(viewportRule).toContain("overflow-y: hidden;");
+    expect(viewportRule).toContain(
+      "padding-block: var(--cm-md-table-handle-gutter) 0;",
+    );
+    expect(viewportRule).toContain("touch-action: pan-x pan-y;");
+    expect(markdownTableCss).toContain(
+      "calc(var(--po-markdown-editor-gutter-inline) - var(--po-markdown-editor-gutter-min))",
+    );
+    expect(markdownTableCss).not.toContain("--po-markdown-breakout-max-width");
+    expect(frameRule).toContain("padding-inline-start: calc(");
+    expect(frameRule).toContain("var(--cm-md-table-scroll-away-inset)");
+    expect(frameRule).toContain("padding-inline-end: var(--cm-md-table-action-gutter);");
+    expect(surfaceRule).toContain(
+      "margin-inline-start: calc(-1 * var(--cm-md-table-handle-gutter));",
+    );
+    expect(scrollbarRule).toContain("inline-size: 100%;");
+    expect(scrollbarRule).toContain("overflow-x: auto;");
+    expect(scrollbarRule).toContain("block-size: var(--po-scrollbar-size, 12px);");
+    expect(scrollbarContentRule).toContain("inline-size: 1px;");
+    expect(markdownTableWidgetSource).toContain('wrapper.dataset.mdTableInlineViewport = "true";');
+    expect(markdownTableWidgetSource).toContain('scrollport.dataset.poScrollbar = "hidden";');
+    expect(markdownTableWidgetSource).toContain('scrollport.dataset.mdTableScrollport = "true";');
+    expect(markdownTableWidgetSource).toContain('scrollbar.dataset.poScrollbar = "horizontal";');
+    expect(markdownTableWidgetSource).toContain('scrollbar.dataset.mdTableScrollbarRail = "true";');
+    expect(markdownTableWidgetSource).toContain('frame.dataset.mdTableScrollTrack = "true";');
+    expect(markdownTableWidgetSource).toContain('surface.dataset.mdTableSurface = "true";');
+  });
+
+  it("uses one shared, pixel-centered structure control for Markdown and CSV", () => {
+    const frameRule = readCssRule(markdownTableCss, ".markdown-codemirror-editor .cm-md-table-frame");
+    const visualRule = readCssRule(sharedTableCss, ".po-editable-table-structure-button-visual");
+    const glyphGeometryRule = readCssRule(
+      sharedTableCss,
+      ".po-editable-table-structure-button-visual::before,\n.po-editable-table-structure-button-visual::after",
+    );
+    const horizontalStrokeRule = readCssRule(
+      sharedTableCss,
+      ".po-editable-table-structure-button-visual::before",
+    );
+    const verticalStrokeRule = readLastCssRule(
+      sharedTableCss,
+      ".po-editable-table-structure-button-visual::after",
+    );
+    const addRowRule = readCssRule(sharedTableCss, ".po-editable-table-add-row");
+    const addRowVisualRule = readCssRule(
+      sharedTableCss,
+      ".po-editable-table-add-row .po-editable-table-structure-button-visual",
+    );
+    const addColumnRule = readCssRule(sharedTableCss, ".po-editable-table-add-column");
+    const addColumnVisualRule = readCssRule(
+      sharedTableCss,
+      ".po-editable-table-add-column .po-editable-table-structure-button-visual",
     );
 
     expect(frameRule).toContain("--cm-md-table-action-gutter: var(--po-editable-table-action-gutter);");
-    expect(addRowRule).toContain("height: var(--cm-md-table-action-gutter);");
-    expect(addRowRule).toContain("bottom: calc(-1 * var(--cm-md-table-action-gutter));");
-    expect(addRowVisualRule).toContain("height: 13px;");
-    expect(addColumnRule).toContain("width: var(--cm-md-table-action-gutter);");
-    expect(addColumnRule).toContain("right: calc(-1 * var(--cm-md-table-action-gutter));");
-    expect(addColumnVisualRule).toContain("width: 13px;");
+    expect(visualRule).toContain("position: relative;");
+    expect(visualRule).toContain("font-size: 0;");
+    expect(visualRule).toContain("line-height: 0;");
+    expect(visualRule).not.toContain("font-weight:");
+    expect(glyphGeometryRule).toContain("top: 50%;");
+    expect(glyphGeometryRule).toContain("left: 50%;");
+    expect(glyphGeometryRule).toContain("background: currentColor;");
+    expect(glyphGeometryRule).toContain("transform: translate(-50%, -50%);");
+    expect(horizontalStrokeRule).toContain("width: 7px;");
+    expect(horizontalStrokeRule).toContain("height: 1px;");
+    expect(verticalStrokeRule).toContain("width: 1px;");
+    expect(verticalStrokeRule).toContain("height: 7px;");
+    expect(addRowRule).toContain("block-size: var(--po-editable-table-action-gutter);");
+    expect(addRowRule).toContain("inset-block-end: calc(-1 * var(--po-editable-table-action-gutter));");
+    expect(addRowVisualRule).toContain("block-size: 13px;");
+    expect(addColumnRule).toContain("inline-size: var(--po-editable-table-action-gutter);");
+    expect(addColumnRule).toContain("inset-inline-end: calc(-1 * var(--po-editable-table-action-gutter));");
+    expect(addColumnVisualRule).toContain("inline-size: 13px;");
+    expect(markdownTableCss).not.toContain(
+      ".markdown-codemirror-editor .cm-md-table-structure-button {",
+    );
+    expect(markdownTableWidgetSource).not.toContain('visual.textContent = "+"');
   });
 
   it("keeps compact drag grips inside larger pointer targets", () => {
@@ -304,6 +457,15 @@ describe("Markdown table affordance layout", () => {
 
 function readCssRule(css: string, selector: string): string {
   const start = css.indexOf(`${selector} {`);
+  if (start < 0) throw new Error(`Missing CSS rule for ${selector}`);
+  const bodyStart = start + selector.length + 2;
+  const end = css.indexOf("\n}", bodyStart);
+  if (end < 0) throw new Error(`Unclosed CSS rule for ${selector}`);
+  return css.slice(bodyStart, end);
+}
+
+function readLastCssRule(css: string, selector: string): string {
+  const start = css.lastIndexOf(`${selector} {`);
   if (start < 0) throw new Error(`Missing CSS rule for ${selector}`);
   const bodyStart = start + selector.length + 2;
   const end = css.indexOf("\n}", bodyStart);

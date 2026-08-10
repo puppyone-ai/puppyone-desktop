@@ -257,6 +257,19 @@ describe("sidebar spacing architecture", () => {
     `));
   });
 
+  it("reveals low-frequency tree actions only on hover or keyboard focus", () => {
+    expect(dataTreeCss).toContain(
+      ".tree-row:hover .tree-row-actions,\n.tree-row:focus-visible .tree-row-actions,\n.tree-row:has(.tree-row-action-button:focus-visible) .tree-row-actions",
+    );
+    expect(dataTreeCss).toContain(
+      ".tree-row:has(.tree-row-action-button:focus-visible) .tree-row-content",
+    );
+    expect(dataTreeCss).not.toContain(".tree-row.active .tree-row-actions");
+    expect(dataTreeCss).not.toContain(".tree-row:focus-within .tree-row-actions");
+    expect(dataTreeCss).not.toContain(".tree-row.active:has(.tree-row-actions) .tree-row-content");
+    expect(dataTreeCss).not.toContain(".tree-row:focus-within:has(.tree-row-actions) .tree-row-content");
+  });
+
   it("keeps Data row colors authoritative while Agent mirrors them one way", () => {
     const treeShell = compact(readCssBlock(dataTreeCss, ".explorer-tree-shell"));
     const agentBoundary = compact(readCssBlock(

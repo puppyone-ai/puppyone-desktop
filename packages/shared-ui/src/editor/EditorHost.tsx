@@ -18,6 +18,7 @@ import type {
   MarkdownDialectId,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
+  OfficeEditorActionResolver,
 } from "./viewerTypes";
 import type { ViewerExtensionHostAdapter } from "./viewerHostAdapters";
 import type { DocumentPersistedCommit } from "./document-session/types";
@@ -46,9 +47,11 @@ export type EditorHostProps = {
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
+  resolveOfficeEditorActions?: OfficeEditorActionResolver | null;
   deferFallbackContent?: boolean;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   documentSourceKind?: DocumentSourceKind;
+  onSurfaceReady?: () => void;
 };
 
 export function EditorHost({
@@ -75,9 +78,11 @@ export function EditorHost({
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
+  resolveOfficeEditorActions = null,
   deferFallbackContent = false,
   viewerExtensionAdapter = null,
   documentSourceKind = "local",
+  onSurfaceReady,
 }: EditorHostProps) {
   return (
     <PuppyoneEditorHost
@@ -115,6 +120,8 @@ export function EditorHost({
       appPreview={appPreview}
       openExternalFile={openExternalFile}
       convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}
+      resolveOfficeEditorActions={resolveOfficeEditorActions}
+      onSurfaceReady={onSurfaceReady}
     />
   );
 }

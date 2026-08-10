@@ -73,15 +73,6 @@ export type DataWorkspaceState = {
   fileUrlError: string | null;
 };
 
-type CommittedPreviewDocument = {
-  node: DataNode;
-  fileContent: FileContent | null;
-  fileUrl: string | null;
-  fileUrlLoading: boolean;
-  fileUrlError: string | null;
-  fileError: string | null;
-};
-
 type MoveOperation = {
   node: DataNode;
   previousPath: string;
@@ -140,6 +131,7 @@ export type DataWorkspaceProps = {
   previewActionSlot?: FilePreviewProps["actionSlot"];
   previewAccessorySlot?: DataWorkspaceSlot;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
+  resolveOfficeEditorActions?: FilePreviewProps["resolveOfficeEditorActions"];
   documentSourceKind?: DocumentSourceKind;
   aiEditRequest?: AiEditRequest | null;
   enableMarkdownLinkContentIndexing?: boolean;
@@ -221,6 +213,7 @@ export function DataWorkspace({
   previewActionSlot,
   previewAccessorySlot,
   viewerExtensionAdapter = null,
+  resolveOfficeEditorActions = null,
   documentSourceKind,
   aiEditRequest = null,
   enableMarkdownLinkContentIndexing = true,
@@ -272,7 +265,6 @@ export function DataWorkspace({
   const [markdownLinkIndex, setMarkdownLinkIndex] = useState<MarkdownLinkGraphIndexSnapshot>(
     EMPTY_MARKDOWN_LINK_GRAPH_INDEX,
   );
-  const [committedPreviewDocument, setCommittedPreviewDocument] = useState<CommittedPreviewDocument | null>(null);
   const lastRefreshKeyRef = useRef(refreshKey);
   const loadGenerationRef = useRef(0);
   const fileOpenTraceRef = useRef<{ id: string; documentId: string } | null>(null);
@@ -383,7 +375,6 @@ export function DataWorkspace({
     setMarkdownLinkIndexing(false);
     setMarkdownLinkIndexBuilding(false);
     setMarkdownLinkIndex(EMPTY_MARKDOWN_LINK_GRAPH_INDEX);
-    setCommittedPreviewDocument(null);
   }, [workspace.path, dataPort, defaultActivePath]);
 
   useEffect(() => {
@@ -512,35 +503,7 @@ export function DataWorkspace({
     && (!selectedFileUrlMatchesPath || fileUrlLoading),
   );
   const selectedFileUrlError = selectedFileUrlMatchesPath ? fileUrlError : null;
-  const selectedFileResourcePending = selectedFileUrlLoading;
-  const selectedFilePreviewPending = selectedFileContentPending || selectedFileResourcePending;
-  const selectedPreviewDocument = useMemo<CommittedPreviewDocument | null>(() => (
-    selectedFile
-      ? {
-          node: selectedFile,
-          fileContent: selectedFileContent,
-          fileUrl: selectedFileUrl,
-          fileUrlLoading: selectedFileUrlLoading,
-          fileUrlError: selectedFileUrlError,
-          fileError: selectedFileError,
-        }
-      : null
-  ), [selectedFile, selectedFileContent, selectedFileError, selectedFileUrl, selectedFileUrlError, selectedFileUrlLoading]);
-  const renderedPreviewDocument = selectedFilePreviewPending && committedPreviewDocument
-    ? committedPreviewDocument
-    : selectedPreviewDocument;
-  const renderedPreviewIsSelectedFile = renderedPreviewDocument?.node.path === selectedFile?.path;
-  const renderedPreviewLoading = renderedPreviewIsSelectedFile
-    ? fileLoading || selectedFileContentPending
-    : false;
-  const renderedPreviewError = renderedPreviewIsSelectedFile ? selectedFileError : null;
-  const renderedPreviewUrlLoading = renderedPreviewIsSelectedFile
-    ? selectedFileUrlLoading
-    : renderedPreviewDocument?.fileUrlLoading ?? false;
-  const renderedPreviewUrlError = renderedPreviewIsSelectedFile
-    ? selectedFileUrlError
-    : renderedPreviewDocument?.fileUrlError ?? null;
-  const renderedPreviewAiEditFile = getAiEditFileForPath(aiEditRequest, renderedPreviewDocument?.node.path);
+  const selectedPreviewAiEditFile = getAiEditFileForPath(aiEditRequest, selectedFile?.path);
   const pathSegments = buildBreadcrumb(workspace.name, currentFolderPath, selectedFile?.name)
     .map((label) => ({ label }));
   const loadingPath = getFirstSetValue(loadingFolderPaths);
@@ -891,16 +854,6 @@ export function DataWorkspace({
   }, [resolvedActivePath]);
 
   useEffect(() => {
-    if (!selectedPreviewDocument) {
-      setCommittedPreviewDocument(null);
-      return;
-    }
-
-    if (selectedFilePreviewPending) return;
-    setCommittedPreviewDocument(selectedPreviewDocument);
-  }, [selectedPreviewDocument, selectedFilePreviewPending]);
-
-  useEffect(() => {
     if (!selectedFile) {
       fileOpenCoordinatorRef.current?.cancelCurrent();
       setFileContent(null);
@@ -1060,14 +1013,6 @@ export function DataWorkspace({
         : current
     ));
     setFileContentCache((current) => putBoundedFileContent(current, nextContent));
-    setCommittedPreviewDocument((current) => (
-      current?.node.path === node.path
-        ? {
-            ...current,
-            fileContent: nextContent,
-          }
-        : current
-    ));
     if (enableMarkdownLinkContentIndexing && isMarkdownNodeLike(node)) {
       void markdownLinkIndexCoordinatorRef.current
         ?.updateDocument({ path: node.path, name: node.name, content: commit.content })
@@ -1183,10 +1128,6 @@ export function DataWorkspace({
       ));
       setFileErrorPath((current) => rebasePathByMoveOperations(current, operations));
       setFileUrlPath((current) => rebasePathByMoveOperations(current, operations));
-      setCommittedPreviewDocument((current) => operations.reduce(
-        (nextDocument, operation) => rebaseCommittedPreviewDocument(nextDocument, operation.previousPath, operation.nextPath),
-        current,
-      ));
       setSelectedNodePaths((current) => rebasePathSetByMoveOperations(current, operations));
       setSelectionAnchorPath((current) => rebasePathByMoveOperations(current, operations));
 
@@ -1418,14 +1359,14 @@ export function DataWorkspace({
                   </div>
                 )}
                 <FilePreview
-                  node={renderedPreviewDocument?.node ?? null}
-                  fileContent={renderedPreviewDocument?.fileContent ?? null}
-                  fileUrl={renderedPreviewDocument?.fileUrl ?? null}
-                  fileUrlLoading={renderedPreviewUrlLoading}
-                  fileUrlError={renderedPreviewUrlError}
-                  loading={renderedPreviewLoading}
-                  error={renderedPreviewError}
-                  aiEditFile={renderedPreviewAiEditFile}
+                  node={selectedFile}
+                  fileContent={selectedFileContent}
+                  fileUrl={selectedFileUrl}
+                  fileUrlLoading={selectedFileUrlLoading}
+                  fileUrlError={selectedFileUrlError}
+                  loading={fileLoading || selectedFileContentPending}
+                  error={selectedFileError}
+                  aiEditFile={selectedPreviewAiEditFile}
                   showHeader={showPreviewHeader}
                   hideSourceView={hidePreviewSourceView}
                   fileIconTheme={fileIconTheme}
@@ -1440,13 +1381,16 @@ export function DataWorkspace({
                   appPreview={dataPort.appPreview ?? null}
                   openExternalFile={dataPort.openExternalFile}
                   convertOfficeDocumentToDocx={dataPort.convertOfficeDocumentToDocx}
+                  resolveOfficeEditorActions={resolveOfficeEditorActions}
                   viewerExtensionAdapter={viewerExtensionAdapter}
                   documentSourceKind={documentSourceKind ?? resolvedDocumentSourceKind}
-                  emptySlot={emptySlot}
+                  emptySlot={resolvedActivePath && !activeNode
+                    ? <div className="empty-preview" aria-busy="true" />
+                    : emptySlot}
                   actionSlot={previewActionSlot}
                   documentPersistence={dataPort.documentPersistence ?? null}
-                  onDocumentPersisted={dataPort.documentPersistence && renderedPreviewDocument
-                    ? (commit) => applyPersistedFileContent(renderedPreviewDocument.node, commit)
+                  onDocumentPersisted={dataPort.documentPersistence && selectedFile
+                    ? (commit) => applyPersistedFileContent(selectedFile, commit)
                     : undefined}
                 />
               </>
@@ -1711,22 +1655,6 @@ function rebaseFileContent(
 ): FileContent | null {
   const rebasedPath = rebaseMovedPath(content?.path ?? null, previousPath, nextPath);
   return content && rebasedPath ? { ...content, path: rebasedPath } : content;
-}
-
-function rebaseCommittedPreviewDocument(
-  document: CommittedPreviewDocument | null,
-  previousPath: string,
-  nextPath: string,
-): CommittedPreviewDocument | null {
-  if (!document) return null;
-  const rebasedNodePath = rebaseMovedPath(document.node.path, previousPath, nextPath);
-  if (!rebasedNodePath) return document;
-
-  return {
-    ...document,
-    node: rebaseDataNode(document.node, previousPath, nextPath),
-    fileContent: rebaseFileContent(document.fileContent, previousPath, nextPath),
-  };
 }
 
 function rebaseMovedPath(path: string | null, previousPath: string, nextPath: string): string | null {

@@ -7,6 +7,7 @@ import {
   type LazyExoticComponent,
 } from "react";
 import { useLocalization } from "@puppyone/localization/react";
+import { DocumentSurfacePending } from "./DocumentSurfaceHost";
 import type {
   LazyPresetViewerContribution,
   PresetViewerContribution,
@@ -43,7 +44,7 @@ export function PresetViewerRenderer({
 
   const LazyRenderer = getLazyRenderer(viewer as LazyPresetViewerContribution);
   return (
-    <Suspense fallback={<div className="editor-state">{t("editor.loadingViewer")}</div>}>
+    <Suspense fallback={<DocumentSurfacePending label={t("editor.loadingViewer")} />}>
       <LazyRenderer {...context} />
     </Suspense>
   );

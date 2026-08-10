@@ -23,18 +23,18 @@ export function AgentApprovalDock({ approval, queueLength, resolving, onResolve,
         <strong dir="auto">{approval.title || t("agent.approval.required")}</strong>
         {queueLength > 1 && <small>{t("agent.approval.pending", { count: queueLength })}</small>}
       </div>
-      {approval.command && <code>{approval.command}</code>}
+      {approval.command && <code data-po-scrollbar="content">{approval.command}</code>}
       {approval.cwd && <div className="desktop-agent-approval-scope">{t("agent.approval.inPath", { path: bidiIsolate(approval.cwd) })}</div>}
       {approval.networkApprovalContext && (
         <div className="desktop-agent-approval-material">
           <span>{t("agent.approval.networkTarget")}</span>
-          <code dir="ltr">{approval.networkApprovalContext.protocol}://{approval.networkApprovalContext.host}</code>
+          <code data-po-scrollbar="content" dir="ltr">{approval.networkApprovalContext.protocol}://{approval.networkApprovalContext.host}</code>
         </div>
       )}
       {approval.grantRoot && (
         <div className="desktop-agent-approval-material">
           <span>{t("agent.approval.writeScope")}</span>
-          <code dir="ltr">{approval.grantRoot}</code>
+          <code data-po-scrollbar="content" dir="ltr">{approval.grantRoot}</code>
         </div>
       )}
       {!approval.command && approval.commandActions.length > 0 && (

@@ -82,6 +82,16 @@ export type {
 
 export { EditorHost } from "./editor/EditorHost";
 export type { EditorHostProps } from "./editor/EditorHost";
+export {
+  EditorFindContributionProvider,
+  useEditorFindCommand,
+} from "./editor/find/editorFind";
+export type {
+  EditorFindAdapter,
+  EditorFindCommand,
+  EditorFindDirection,
+  EditorFindResult,
+} from "./editor/find/editorFind";
 // The app shell may request a durability barrier, but the session object and
 // editable-source bridge remain private to the trusted Editor host.
 export { flushActiveDocumentSessions } from "./editor/document-session";
@@ -196,6 +206,8 @@ export type {
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
   MarkdownWikiLinkResolvedTarget,
+  OfficeEditorAction,
+  OfficeEditorActionResolver,
   PresetViewerContribution,
   PresetViewerImplementation,
   PresetViewerRenderContext,
@@ -205,6 +217,14 @@ export { PlainTextEditor } from "./editor/PlainTextEditor";
 export type { PlainTextEditorProps } from "./editor/PlainTextEditor";
 export { CsvTableEditor } from "./editor/CsvTableEditor";
 export type { CsvTableEditorProps } from "./editor/CsvTableEditor";
+export {
+  EditorChromeContributionProvider,
+  useEditorChromeContributionPublisher,
+} from "./editor/editorChromeContribution";
+export type {
+  CsvViewSettingsContribution,
+  EditorChromeContribution,
+} from "./editor/editorChromeContribution";
 export { EditorSaveButton as SaveStatusButton } from "./editor/EditorSaveButton";
 export type {
   EditorSaveButtonProps as SaveStatusButtonProps,

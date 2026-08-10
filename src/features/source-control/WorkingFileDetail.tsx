@@ -37,7 +37,7 @@ export function WorkingFileDetail({
 
   return (
     <section className="desktop-utility-view desktop-history-detail-view desktop-working-file-detail-view">
-      <div className="desktop-history-detail-scroll">
+      <div className="desktop-history-detail-scroll" data-po-scrollbar="content">
         <div className="desktop-commit-detail">
           {!readOnly && (
             <div className="desktop-working-file-toolbar">

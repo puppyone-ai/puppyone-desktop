@@ -205,7 +205,7 @@ a central-directory preflight before a parser is invoked.
 | `.doc` `.rtf` (local macOS) | Native conversion to `.docx`, then the same Word surface | bounded `textutil` subprocess + `docx-preview` | One Word rendering path; conversion has workspace authorization, input/output limits, timeout, and temporary-file cleanup |
 | `.doc` `.rtf` (cloud or conversion failure) | Honest unsupported state + external-open when available | — | Cloud has no native conversion capability |
 | `.xlsx` `.xls` `.xlsm` `.xlsb` | Virtualized grid with sheet tabs | SheetJS CE 0.20.3 in a dedicated worker | Up to 12 visible sheets × the first 5,000 source rows × 36 visible columns; formatted values, formulas/cached values, merged cells, and column widths; hidden content omitted and reported |
-| `.pptx` `.ppsx` | Visual slide list | `@aiden0z/pptx-renderer` | Shapes, text, media, tables, and themes where supported; lazy/windowed rendering; JSZip text cards remain the error fallback |
+| `.pptx` `.ppsx` | One responsive slide stage with a lazy thumbnail rail | `@aiden0z/pptx-renderer` | Source slide geometry, text, media, tables, charts, shapes, colors, and themes where supported; source typography settles before the loading state clears; a failed slide or thumbnail is isolated while the rest of the deck remains navigable; bounded JSZip text cards remain the whole-document error fallback |
 | `.ppt` `.pps` | Honest unsupported state + external-open | — | Legacy binary PowerPoint is not parsed or converted |
 | `.ods` `.ots` | The same spreadsheet worker/grid | SheetJS CE | Same spreadsheet budgets and visible truncation notes |
 | `.odt` `.odp` `.ott` `.otp` | Plain text lines | JSZip `content.xml` extraction | Text only, capped at 400 lines |
@@ -234,6 +234,13 @@ surface: `electron/main/external-apps/inventory.mjs` scans installed
 macOS apps and ranks candidates per extension, while the titlebar and
 Office empty/error states expose the open-externally action when the
 desktop capability exists.
+
+The presentation surface is deliberately host-light: the Editor owns the
+themed workspace, focus, keyboard navigation, and error states, while the
+renderer exclusively owns pixels inside each authored slide. PuppyOne does not
+normalize slide fonts, spacing, colors, or object positions. Optional Office
+editing remains an `OfficeEditorActionResolver` plugin boundary and must not
+replace or couple itself to this built-in preview path.
 
 ## 6. Required formats and per-format support bar
 
@@ -431,7 +438,11 @@ source-code extensions)
 
 - Bar: SheetJS grid with sheet tabs, formatted values, formulas/cached
   values, merged cells (`!merges`), real column widths (`!cols`), and
-  virtualized rows. Parsing runs in a disposable Web Worker; aborting a
+  variable-height virtualized rows. Validated OOXML packages additionally
+  expose a bounded presentation layer for solid fills, fonts, common borders,
+  alignment, wrapping, freeze panes, and the saved selection. The renderer
+  supplies a read-only formula bar and keyboard cell navigation. Parsing runs
+  in a disposable Web Worker; aborting a
   selection terminates that worker. A metadata pass excludes hidden
   sheets and chooses at most 12 visible sheets before the content pass.
   Each selected sheet is capped at the first 5,000 source rows and 36
@@ -442,13 +453,19 @@ source-code extensions)
   executed or recalculated, OOXML packages pass the shared ZIP preflight,
   declared ranges must remain within Excel's row/column limits, and the
   input buffer is transferred to rather than copied into the worker.
-- Accepted fidelity limits: colors, borders, fonts, charts, images,
-  pivots, and macros are not rendered. Formula cells use cached values
-  when present and show the formula text when no cached value exists.
-  Hidden rows, columns, and sheets are omitted rather than revealed.
+- Accepted fidelity limits: conditional formatting, gradients, charts,
+  images, shapes, pivots, and macros are not rendered. Binary and OpenDocument
+  spreadsheet families receive the safe value/grid path but not the complete
+  OOXML style path. Formula cells use cached values when present and show the
+  formula text when no cached value exists. Hidden rows, columns, and sheets
+  are omitted rather than revealed.
 - Status: met for the lightweight grid contract. Tests cover supported
   workbook families, formulas, sheet/row/column budgets, hidden content,
-  merged cells crossing virtual-window boundaries, and cancellation.
+  merged cells crossing virtual-window boundaries, and cancellation. The
+  visual surface uses a stable light worksheet canvas, native text/number/date
+  alignment, source workbook styling, formula/selection chrome, neutral
+  row/column headers, bottom sheet tabs, and no decorative zebra striping.
+  Product theming remains in the surrounding shell.
 
 **PowerPoint — `.pptx`, `.ppsx`**
 
@@ -457,7 +474,8 @@ source-code extensions)
   images, tables, charts, SmartArt, gradients, groups, embedded fonts;
   verified upstream against PowerPoint ground truth with 450+ visual
   regression cases. Loaded via dynamic `import()` like every heavy
-  parser; large decks use its `lazyMedia`/`lazySlides`/windowed options.
+  parser; large decks use its `lazyMedia`/`lazySlides` options and lazily
+  mounted thumbnails.
   Render failure falls back to the unsupported state with external-open.
 - Risk note (deliberate): the library is young (first published
   2026-02) but rigorously tested and actively released; as a lazy-loaded
@@ -465,8 +483,30 @@ source-code extensions)
   Keep the current text-extraction path as the fallback branch rather
   than deleting it.
 - Status: met. The visual renderer uses recommended ZIP limits,
-  abortable lazy media/slides, and a windowed list; the former JSZip text
-  extraction remains a visible fallback when visual rendering fails.
+  abortable lazy media/slides, a single-slide stage, and a familiar thumbnail
+  rail. The former JSZip text extraction remains a visible fallback when
+  visual rendering fails and uses the same deck-shaped navigation rather than
+  imitating paginated paper. The stage and rail share the application canvas,
+  the active thumbnail uses a presentation-specific accent, and the focused
+  stage supports Arrow, Page, Home, and End navigation.
+
+**Built-in Office product boundary**
+
+- `office-preview` is deliberately a lightweight, read-only surface. Its
+  successful state is headerless because the application shell already owns
+  file identity and global actions. It may navigate pages/sheets/slides and
+  expose compact, content-local controls such as Word zoom. External-open is a
+  fallback in error or unsupported states rather than duplicate toolbar chrome.
+- It does not expose editing, Agent refinement, or an imitation Office ribbon.
+  Full Office editing belongs to an optional Viewer/Editor Pack installed
+  through the plugin marketplace, outside the built-in preview runtime.
+- Familiarity comes from each document metaphor inside one shell: paginated
+  paper for Word, sticky row/column headers with bottom sheet tabs for
+  spreadsheets, and thumbnail navigation plus a central stage for PowerPoint.
+- Spreadsheet typography is source-led rather than beautified: unstyled cells
+  inherit the workbook Normal-style font, explicit cell styles remain intact,
+  and a saved worksheet zoom scales the complete grid once. The viewer does
+  not classify titles/body text or maintain format-specific styling rules.
 
 **PowerPoint — `.ppt`, `.pps` (legacy)**
 
@@ -661,9 +701,11 @@ and DOM gates above.
   TOC/field codes, SmartArt, floating text boxes, and exact Word reflow
   remain approximate. Password-protected/encrypted Office files are not
   previewed.
-- The spreadsheet grid does not render cell fonts/colors/borders, charts,
-  images, pivots, or macros. It never executes VBA or recalculates formulas;
-  cached formula values are used when present. Hidden content is omitted.
+- The OOXML spreadsheet grid renders a bounded subset of cell fonts, colors,
+  borders, alignment, and wrapping. It does not render conditional formatting,
+  gradients, charts, images, shapes, pivots, or macros. It never executes VBA
+  or recalculates formulas; cached formula values are used when present.
+  Hidden content is omitted.
 - Only the first 12 visible sheets, first 5,000 source rows per selected
   sheet, and first 36 visible columns are previewed. The UI states every
   truncation and hidden-content omission.

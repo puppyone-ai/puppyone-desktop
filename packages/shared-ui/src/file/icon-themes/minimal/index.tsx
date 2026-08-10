@@ -19,7 +19,12 @@ import type {
   FileIconRendererMap,
 } from "../iconThemeTypes";
 import { createIconTheme } from "../themeFactory";
-import { SpreadsheetGridGlyph } from "../shared/semanticGlyphs";
+import {
+  ExcelSpreadsheetGlyph,
+  PresentationDocumentGlyph,
+  SpreadsheetGridGlyph,
+  WordDocumentGlyph,
+} from "../shared/semanticGlyphs";
 
 function renderMinimalGlyph(context: FileIconRenderContext): ReactNode {
   if (context.kind === "spreadsheet") {
@@ -29,6 +34,36 @@ function renderMinimalGlyph(context: FileIconRenderContext): ReactNode {
         fill="none"
         size={context.size}
         strokeWidth={1.35}
+      />
+    );
+  }
+  if (context.kind === "word") {
+    return (
+      <WordDocumentGlyph
+        color={context.color}
+        fill="none"
+        size={context.size}
+        strokeWidth={1.25}
+      />
+    );
+  }
+  if (context.kind === "excel") {
+    return (
+      <ExcelSpreadsheetGlyph
+        color={context.color}
+        fill="none"
+        size={context.size}
+        strokeWidth={1.25}
+      />
+    );
+  }
+  if (context.kind === "presentation") {
+    return (
+      <PresentationDocumentGlyph
+        color={context.color}
+        fill="none"
+        size={context.size}
+        strokeWidth={1.25}
       />
     );
   }
@@ -72,7 +107,10 @@ const MINIMAL_LUCIDE_ICONS = {
   audio: FileAudio,
   pdf: FileText,
   video: FileVideo,
+  word: FileText,
+  excel: LucideFile,
   spreadsheet: LucideFile,
+  presentation: FileText,
   archive: FileArchive,
   document: FileText,
   binary: LucideFile,
@@ -92,7 +130,10 @@ const minimalGlyphRenderers = {
   audio: renderMinimalGlyph,
   pdf: renderMinimalGlyph,
   video: renderMinimalGlyph,
+  word: renderMinimalGlyph,
+  excel: renderMinimalGlyph,
   spreadsheet: renderMinimalGlyph,
+  presentation: renderMinimalGlyph,
   archive: renderMinimalGlyph,
   document: renderMinimalGlyph,
   binary: renderMinimalGlyph,

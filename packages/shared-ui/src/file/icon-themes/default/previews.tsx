@@ -23,7 +23,10 @@ const DEFAULT_PREVIEW_GLYPH_RENDERERS = {
   audio: renderDefaultAudioPreviewGlyph,
   pdf: renderDefaultDocumentPreviewGlyph,
   video: renderDefaultVideoPreviewGlyph,
+  word: renderDefaultWordPreviewGlyph,
+  excel: renderDefaultExcelPreviewGlyph,
   spreadsheet: renderDefaultSpreadsheetPreviewGlyph,
+  presentation: renderDefaultPresentationPreviewGlyph,
   archive: renderDefaultArchivePreviewGlyph,
   document: renderDefaultDocumentPreviewGlyph,
   binary: renderDefaultDocumentPreviewGlyph,
@@ -157,6 +160,95 @@ function renderDefaultSpreadsheetPreviewGlyph({
     <svg viewBox="0 0 32 32" width="100%" height="100%" fill="none" aria-hidden>
       <rect x="6.5" y="7" width="19" height="18" rx="2" stroke={color} strokeWidth="2" />
       <path d="M6.5 13h19M6.5 19h19M13 7v18M19.5 7v18" stroke={color} strokeWidth="1.4" opacity="0.84" />
+    </svg>
+  );
+}
+
+function renderDefaultWordPreviewGlyph({
+  color,
+}: FileIconRenderContext): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      width="100%"
+      height="100%"
+      fill="none"
+      aria-hidden
+      data-file-icon-office="word"
+    >
+      <rect x="4" y="6" width="11.5" height="20" rx="2.2" fill={color} />
+      <path
+        d="m6.45 11.15 1.35 9 2-5.9 2 5.9 1.35-9"
+        stroke="#fff"
+        strokeWidth="1.55"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M18.5 10h9M18.5 14.5h9M18.5 19h7M18.5 23.5h5"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        opacity="0.82"
+      />
+    </svg>
+  );
+}
+
+function renderDefaultExcelPreviewGlyph({
+  color,
+}: FileIconRenderContext): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      width="100%"
+      height="100%"
+      fill="none"
+      aria-hidden
+      data-file-icon-office="excel"
+    >
+      <rect x="7" y="5" width="21" height="22" rx="2.2" stroke={color} strokeWidth="1.8" />
+      <path
+        d="M7 11h21M7 17h21M7 23h21M14 5v22M21 5v22"
+        stroke={color}
+        strokeWidth="1.25"
+        opacity="0.76"
+      />
+      <rect x="3.5" y="9.5" width="10.5" height="15" rx="2" fill={color} />
+      <path
+        d="m6.7 14 4.1 6M10.8 14l-4.1 6"
+        stroke="#fff"
+        strokeWidth="1.55"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function renderDefaultPresentationPreviewGlyph({
+  color,
+}: FileIconRenderContext): ReactNode {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      width="100%"
+      height="100%"
+      fill="none"
+      aria-hidden
+      data-file-icon-office="presentation"
+    >
+      <rect x="7" y="6.5" width="20.5" height="18.5" rx="2.2" stroke={color} strokeWidth="1.8" />
+      <circle cx="21" cy="13" r="4.1" fill={`color-mix(in srgb, ${color} 20%, transparent)`} stroke={color} strokeWidth="1.45" />
+      <path d="M21 8.9V13h4.1" fill={color} stroke={color} strokeWidth="1.45" strokeLinejoin="round" />
+      <path d="M17.5 21h7" stroke={color} strokeWidth="1.5" strokeLinecap="round" opacity="0.75" />
+      <rect x="3.5" y="10" width="10.5" height="15" rx="2" fill={color} />
+      <path
+        d="M7 21v-7h2c2 0 3 .95 3 2.55S11 19 9 19H7"
+        stroke="#fff"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

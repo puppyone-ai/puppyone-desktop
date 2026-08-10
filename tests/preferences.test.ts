@@ -19,11 +19,12 @@ import {
 } from "../src/preferences";
 
 describe("create new menu preferences", () => {
-  it("defaults to Markdown followed by CSV and preserves explicit order and visibility", () => {
+  it("defaults to Markdown, CSV, and App Preview while preserving explicit order and visibility", () => {
     expect(parseCreateNewMenuSettings(null)).toEqual({
       items: [
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
+        { kind: "app", enabled: true },
       ],
     });
     expect(parseCreateNewMenuSettings(JSON.stringify({
@@ -35,6 +36,18 @@ describe("create new menu preferences", () => {
       items: [
         { kind: "json", enabled: false },
         { kind: "text", enabled: true },
+      ],
+    });
+    expect(parseCreateNewMenuSettings(JSON.stringify({
+      items: [
+        { kind: "markdown", enabled: true },
+        { kind: "csv", enabled: true },
+      ],
+    }))).toEqual({
+      items: [
+        { kind: "markdown", enabled: true },
+        { kind: "csv", enabled: true },
+        { kind: "app", enabled: true },
       ],
     });
   });
@@ -55,6 +68,7 @@ describe("create new menu preferences", () => {
       items: [
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
+        { kind: "app", enabled: true },
       ],
     });
     expect(parseCreateNewMenuSettings(JSON.stringify({ items: [] }))).toEqual({ items: [] });
@@ -68,11 +82,7 @@ describe("create new menu preferences", () => {
         { kind: "csv", enabled: true },
       ],
     } as const;
-    expect(getVisibleCreateNewFileTypes(settings, DEFAULT_EXPERIMENTAL_SETTINGS)).toEqual(["csv"]);
-    expect(getVisibleCreateNewFileTypes(settings, {
-      ...DEFAULT_EXPERIMENTAL_SETTINGS,
-      enablePuppyoneAppFiles: true,
-    })).toEqual(["app", "csv"]);
+    expect(getVisibleCreateNewFileTypes(settings, DEFAULT_EXPERIMENTAL_SETTINGS)).toEqual(["app", "csv"]);
   });
 });
 
@@ -199,7 +209,6 @@ describe("experimental preferences", () => {
       enableEditorSaveStatus: false,
       enableMarkdownBlockDrag: false,
       enableMinimalMode: false,
-      enablePuppyoneAppFiles: false,
       enablePuppyFlowFiles: false,
       enableViewerPlugins: false,
     });
@@ -244,6 +253,11 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(null).enableViewerPlugins).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableViewerPlugins: false })).enableViewerPlugins).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableViewerPlugins: true })).enableViewerPlugins).toBe(true);
+  });
+
+  it("ignores the retired built-in Office editing experiment", () => {
+    expect(parseExperimentalSettings(JSON.stringify({ enableOfficeEditing: true })))
+      .not.toHaveProperty("enableOfficeEditing");
   });
 });
 

@@ -55,20 +55,6 @@
   flex: 1 1 auto;
 }
 
-.desktop-cloud-history-sidebar-list::-webkit-scrollbar {
-  width: var(--desktop-sidebar-scrollbar-width);
-  height: var(--desktop-sidebar-scrollbar-width);
-}
-
-.desktop-cloud-history-sidebar-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.desktop-cloud-history-sidebar-list::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background-color: var(--desktop-sidebar-scrollbar-thumb, var(--po-scrollbar-thumb));
-}
-
 .desktop-cloud-history-sidebar-row {
   --cloud-history-node-bg: var(--po-sidebar);
 

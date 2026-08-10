@@ -156,7 +156,12 @@ export function CloudAutomationPage({
           <p>{t("automation.page.addMoreDescription")}</p>
         </header>
       )}
-      <nav className="desktop-cloud-automation-category-tabs" aria-label={t("automation.page.categories")} role="tablist">
+      <nav
+        className="desktop-cloud-automation-category-tabs"
+        data-po-scrollbar="hidden"
+        aria-label={t("automation.page.categories")}
+        role="tablist"
+      >
         {AUTOMATION_CATEGORIES.map((category) => {
           const active = activeCategory === category.id;
           return (
@@ -200,7 +205,7 @@ export function CloudAutomationPage({
 
   return (
     <section className="desktop-cloud-automation-page">
-      <main className="desktop-cloud-automation-canvas">
+    <main className="desktop-cloud-automation-canvas" data-po-scrollbar="content">
         <section className={`desktop-cloud-automation-catalog ${hasAnyAutomation ? "has-automations" : ""}`}>
           <header className="desktop-cloud-automation-landing-header">
             <div className="desktop-cloud-automation-landing-copy">

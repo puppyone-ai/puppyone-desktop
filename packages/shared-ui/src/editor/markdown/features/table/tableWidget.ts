@@ -3,9 +3,9 @@ import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../../viewe
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { disposeWidgetSessionDom } from "../../platform/codemirror/widgetSession";
 import type { MarkdownTableAlignment, MarkdownTableRow } from "./tableModel";
-import { MarkdownWidgetMeasureController } from "../../platform/codemirror/layoutCoordinator";
 import {
   createMarkdownTableRenderKey,
+  createMarkdownTableViewportKey,
   estimateMarkdownTableColumnWidths,
   estimateMarkdownTableLayoutHeight,
 } from "./tableLayout";
@@ -19,6 +19,7 @@ import {
 } from "../../core/plans/markdownBlockExecution";
 import { createMarkdownTableWindowController } from "./tableWindowController";
 import type { MarkdownInlinePreviewRenderer } from "../../shared/preview/markdownInlinePreviewPort";
+import { createMarkdownTableInlineViewportController } from "./tableInlineViewportController";
 
 export class MarkdownTableWidget extends WidgetType {
   constructor(
@@ -33,6 +34,7 @@ export class MarkdownTableWidget extends WidgetType {
     private readonly layoutEstimatedHeight = estimateMarkdownTableLayoutHeight(rows),
     private readonly renderKey = createMarkdownTableRenderKey(alignments, rows),
     private readonly execution: MarkdownMountedBlockExecution = MARKDOWN_RICH_BLOCK_EXECUTION,
+    private readonly viewportKey = createMarkdownTableViewportKey(alignments, rows),
   ) {
     super();
   }
@@ -69,19 +71,30 @@ export class MarkdownTableWidget extends WidgetType {
       : "cm-md-table-widget-wrap po-editable-table-interaction-root";
     wrapper.dataset.mdTableFrom = String(this.from);
     wrapper.dataset.mdTableExecution = this.execution.mode;
+    wrapper.dataset.mdTableInlineViewport = "true";
     const rowCount = this.rows.length;
     // The semantic table model normalizes every row to the alignment width.
     // Do not rescan an oversized immutable row collection during DOM mount.
     const columnCount = Math.max(1, this.alignments.length);
 
+    const scrollport = doc.createElement("div");
+    scrollport.dir = localization.direction;
+    scrollport.className = "cm-md-table-scrollport";
+    scrollport.dataset.poScrollbar = "hidden";
+    scrollport.dataset.mdTableScrollport = "true";
     const frame = doc.createElement("div");
     frame.className = "cm-md-table-frame";
+    frame.dataset.mdTableScrollTrack = "true";
     const surface = doc.createElement("div");
     surface.className = "cm-md-table-surface";
+    surface.dataset.mdTableSurface = "true";
 
     const table = doc.createElement("table");
     table.className = "cm-md-table-widget";
-    table.dir = "auto";
+    // Column order follows the editor's logical direction. Cell content keeps
+    // its own dir=auto boundary, so mixed-language text still renders
+    // naturally without changing the viewport's inline axis.
+    table.dir = localization.direction;
     table.setAttribute("aria-rowcount", String(rowCount));
     table.setAttribute("aria-colcount", String(columnCount));
 
@@ -213,9 +226,37 @@ export class MarkdownTableWidget extends WidgetType {
         },
       }));
     }
+    frame.appendChild(surface);
+    scrollport.appendChild(frame);
+    wrapper.appendChild(scrollport);
+    const scrollbar = doc.createElement("div");
+    scrollbar.dir = localization.direction;
+    scrollbar.className = "cm-md-table-scrollbar-rail";
+    scrollbar.dataset.poScrollbar = "horizontal";
+    scrollbar.dataset.mdTableScrollbarRail = "true";
+    scrollbar.setAttribute("aria-hidden", "true");
+    const scrollbarContent = doc.createElement("div");
+    scrollbarContent.className = "cm-md-table-scrollbar-content";
+    scrollbarContent.dataset.mdTableScrollbarContent = "true";
+    scrollbar.appendChild(scrollbarContent);
+    wrapper.appendChild(scrollbar);
+    const inlineViewport = createMarkdownTableInlineViewportController({
+      columnCount,
+      direction: localization.direction,
+      host,
+      root: wrapper,
+      scrollbar,
+      scrollbarContent,
+      sourceIdentity: this.viewportKey,
+      table,
+      tableFrom: this.from,
+      tableTo: this.to,
+      viewport: scrollport,
+    });
     const dragLayer = createMarkdownTableDragLayer({
       alignments: this.alignments,
       columnCount,
+      inlineViewport,
       rows: this.rows,
       table,
       tableFrom: this.from,
@@ -224,20 +265,15 @@ export class MarkdownTableWidget extends WidgetType {
       wrapper,
     });
     surface.appendChild(dragLayer.element);
-    frame.appendChild(surface);
-    wrapper.appendChild(frame);
-
-    const measure = new MarkdownWidgetMeasureController(host.layout);
-    measure.observe(wrapper);
 
     host.sessions.mount(wrapper, () => ({
       dispose() {
         dragLayer.dispose();
+        inlineViewport.dispose();
         windowController?.dispose();
         for (const cell of wrapper.querySelectorAll<HTMLElement>(".cm-md-table-cell-content")) {
           disposeTableCellEditor(cell);
         }
-        measure.destroy();
       },
     }));
 
@@ -304,7 +340,6 @@ function createTableStructureButton({
   const visual = document.createElement("span");
   visual.className = "cm-md-table-structure-button-visual po-editable-table-structure-button-visual";
   visual.setAttribute("aria-hidden", "true");
-  visual.textContent = "+";
   button.appendChild(visual);
   button.addEventListener("mousedown", (event) => {
     event.preventDefault();

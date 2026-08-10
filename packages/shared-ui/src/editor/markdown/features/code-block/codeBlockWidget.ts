@@ -113,6 +113,7 @@ export class CodeBlockWidget extends WidgetType {
 
     const codeEditor = document.createElement("textarea");
     codeEditor.className = "cm-md-code-textarea";
+    codeEditor.dataset.poScrollbar = "horizontal";
     codeEditor.value = recoveredDraft.code;
     codeEditor.readOnly = readOnly;
     codeEditor.spellcheck = false;
