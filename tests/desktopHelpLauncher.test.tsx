@@ -189,6 +189,17 @@ describe("DesktopHelpLauncher", () => {
     expect(launcherCss).toMatch(
       /\.desktop-feedback-popover\s*\{[^}]*inset-block-end:\s*calc\(100% \+ 8px\)/s,
     );
+    const launcherRule = launcherCss.match(/\.desktop-help-launcher\s*\{[^}]*\}/s)?.[0] ?? "";
+    expect(launcherRule).toContain("border: 1px solid var(--po-border-subtle)");
+    expect(launcherRule).toContain("background: var(--po-panel-raised)");
+    expect(launcherRule).toContain("opacity: 1");
+    expect(launcherRule).not.toContain("backdrop-filter");
+    expect(launcherCss).toMatch(
+      /\.desktop-help-launcher:hover,[\s\S]*?\.desktop-help-launcher:focus-visible\s*\{[^}]*background:\s*var\(--po-overlay\)[^}]*opacity:\s*1/s,
+    );
+    expect(launcherCss).toMatch(
+      /\.desktop-feedback\[data-open="true"\] \.desktop-help-launcher\s*\{[^}]*background:\s*var\(--po-overlay\)[^}]*opacity:\s*1/s,
+    );
     expect(launcherCss).not.toMatch(/position:\s*fixed/);
   });
 });
