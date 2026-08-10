@@ -205,7 +205,7 @@ a central-directory preflight before a parser is invoked.
 | `.doc` `.rtf` (local macOS) | Native conversion to `.docx`, then the same Word surface | bounded `textutil` subprocess + `docx-preview` | One Word rendering path; conversion has workspace authorization, input/output limits, timeout, and temporary-file cleanup |
 | `.doc` `.rtf` (cloud or conversion failure) | Honest unsupported state + external-open when available | — | Cloud has no native conversion capability |
 | `.xlsx` `.xls` `.xlsm` `.xlsb` | Virtualized grid with sheet tabs | SheetJS CE 0.20.3 in a dedicated worker | Up to 12 visible sheets × the first 5,000 source rows × 36 visible columns; formatted values, formulas/cached values, merged cells, and column widths; hidden content omitted and reported |
-| `.pptx` `.ppsx` | Visual slide list | `@aiden0z/pptx-renderer` | Shapes, text, media, tables, and themes where supported; lazy/windowed rendering; JSZip text cards remain the error fallback |
+| `.pptx` `.ppsx` | One responsive slide stage with a lazy thumbnail rail | `@aiden0z/pptx-renderer` | Source slide geometry, text, media, tables, charts, shapes, colors, and themes where supported; source typography settles before the loading state clears; a failed slide or thumbnail is isolated while the rest of the deck remains navigable; bounded JSZip text cards remain the whole-document error fallback |
 | `.ppt` `.pps` | Honest unsupported state + external-open | — | Legacy binary PowerPoint is not parsed or converted |
 | `.ods` `.ots` | The same spreadsheet worker/grid | SheetJS CE | Same spreadsheet budgets and visible truncation notes |
 | `.odt` `.odp` `.ott` `.otp` | Plain text lines | JSZip `content.xml` extraction | Text only, capped at 400 lines |
@@ -234,6 +234,13 @@ surface: `electron/main/external-apps/inventory.mjs` scans installed
 macOS apps and ranks candidates per extension, while the titlebar and
 Office empty/error states expose the open-externally action when the
 desktop capability exists.
+
+The presentation surface is deliberately host-light: the Editor owns the
+themed workspace, focus, keyboard navigation, and error states, while the
+renderer exclusively owns pixels inside each authored slide. PuppyOne does not
+normalize slide fonts, spacing, colors, or object positions. Optional Office
+editing remains an `OfficeEditorActionResolver` plugin boundary and must not
+replace or couple itself to this built-in preview path.
 
 ## 6. Required formats and per-format support bar
 

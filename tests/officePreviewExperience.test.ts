@@ -69,6 +69,11 @@ describe("lightweight Office preview experience", () => {
     expect(officeViewerSource).toContain('renderMode: "slide"');
     expect(officeViewerSource).toContain("renderThumbnailToContainer");
     expect(officeViewerSource).toContain("IntersectionObserver");
+    expect(officeViewerSource).toContain("settlePresentationFonts(document.fonts?.ready");
+    expect(officeViewerSource).toContain("onSlideError");
+    expect(officeViewerSource).toContain("onSlideRendered");
+    expect(officeViewerSource).toContain("office-pptx-slide-error");
+    expect(officeViewerSource).toContain('data-render-state={renderStatus}');
     expect(officeViewerSource).toContain("office-pptx-thumbnail-rail");
     expect(officeViewerSource).toContain("office-pptx-stage");
     expect(officeViewerSource).toContain("getPresentationNavigationTarget");
@@ -80,6 +85,8 @@ describe("lightweight Office preview experience", () => {
       /\.office-pptx-thumbnail-rail\s*\{[^}]*overflow-y:\s*auto/s,
     );
     expect(officePreviewCss).toContain("--po-file-accent-presentation");
+    expect(officePreviewCss).toContain('.office-pptx-thumbnail__frame[data-render-state="error"]');
+    expect(officePreviewCss).toContain("prefers-reduced-motion: reduce");
     expect(tokenSource.match(/--po-file-accent-presentation:/g)).toHaveLength(5);
     expect(officePreviewCss).not.toMatch(
       /\.office-pptx-workspace\s*\{[^}]*var\(--po-inset\)/s,

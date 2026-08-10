@@ -254,6 +254,7 @@
   "office.sheets": "Hojas",
   "office.slideNumber": "Diapositiva {number, number}",
   "office.slidePosition": "{current, number} de {total, number}",
+  "office.slideRenderFailed": "No se pudo mostrar la diapositiva {number, number}. {detail}",
   "office.slides": "Diapositivas",
   "office.subject.converted-word": "Este documento de Word convertido",
   "office.subject.office": "Este archivo de Office",

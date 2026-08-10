@@ -33,7 +33,10 @@ import {
   OfficeResourceLimitError,
 } from "./officeResourceLoader";
 import { extractOfficeTextFallbackInWorker } from "./officeTextFallbackClient";
-import { getPresentationNavigationTarget } from "./presentationPreview";
+import {
+  getPresentationNavigationTarget,
+  settlePresentationFonts,
+} from "./presentationPreview";
 import {
   findSpreadsheetCellPosition,
   getSpreadsheetArchiveKind,
@@ -589,6 +592,7 @@ function PptxPresentationPreview({
     viewer: PptxViewer;
     slideCount: number;
   } | null>(null);
+  const [slideErrors, setSlideErrors] = useState<Record<number, string>>({});
 
   useEffect(() => {
     const host = hostRef.current;
@@ -602,6 +606,7 @@ function PptxPresentationPreview({
     setActiveSlide(0);
     setRenderState({ status: "loading" });
     setViewerState(null);
+    setSlideErrors({});
 
     import("@aiden0z/pptx-renderer")
       .then(({ PptxViewer, RECOMMENDED_ZIP_LIMITS }) => PptxViewer.open(arrayBuffer.slice(0), host, {
@@ -615,13 +620,31 @@ function PptxPresentationPreview({
         onSlideChange: (index) => {
           if (!cancelled) setActiveSlide(index);
         },
+        onSlideRendered: (index) => {
+          if (cancelled) return;
+          setSlideErrors((current) => {
+            if (!(index in current)) return current;
+            const next = { ...current };
+            delete next[index];
+            return next;
+          });
+        },
+        onSlideError: (index, error) => {
+          if (!cancelled) {
+            setSlideErrors((current) => ({
+              ...current,
+              [index]: error instanceof Error ? error.message : String(error),
+            }));
+          }
+        },
       }))
-      .then((nextViewer) => {
+      .then(async (nextViewer) => {
         if (cancelled) {
           nextViewer.destroy();
           return;
         }
         viewer = nextViewer;
+        await settlePresentationFonts(document.fonts?.ready, abortController.signal);
         setActiveSlide(nextViewer.currentSlideIndex);
         setViewerState({ viewer: nextViewer, slideCount: nextViewer.slideCount });
         setRenderState({ status: "ready" });
@@ -666,6 +689,16 @@ function PptxPresentationPreview({
     );
     activeButton?.scrollIntoView({ block: "nearest" });
   }, [activeSlide]);
+
+  const navigateToSlide = (index: number) => {
+    if (!viewerState) return;
+    void viewerState.viewer.goToSlide(index).catch((error) => {
+      setSlideErrors((current) => ({
+        ...current,
+        [index]: error instanceof Error ? error.message : String(error),
+      }));
+    });
+  };
 
   if (renderState.status === "fallback") {
     return (
@@ -715,7 +748,7 @@ function PptxPresentationPreview({
               slideIndex={index}
               active={index === activeSlide}
               scrollRoot={thumbnailRailRef.current}
-              onSelect={() => void viewerState.viewer.goToSlide(index)}
+              onSelect={() => navigateToSlide(index)}
             />
           ))}
         </aside>
@@ -728,7 +761,7 @@ function PptxPresentationPreview({
             event,
             activeSlide,
             viewerState?.slideCount ?? 0,
-            (index) => void viewerState?.viewer.goToSlide(index),
+            navigateToSlide,
           )}
         >
           <div
@@ -743,11 +776,19 @@ function PptxPresentationPreview({
           {viewerState?.slideCount === 0 && (
             <div className="office-pptx-render-state">{t("editor.office.emptyPresentation")}</div>
           )}
+          {slideErrors[activeSlide] && (
+            <div className="office-pptx-slide-error" role="status">
+              {t("editor.office.slideRenderFailed", {
+                number: activeSlide + 1,
+                detail: bidiIsolate(slideErrors[activeSlide]),
+              })}
+            </div>
+          )}
           {viewerState && viewerState.slideCount > 0 && (
             <PresentationNavigation
               activeSlide={activeSlide}
               slideCount={viewerState.slideCount}
-              onSelect={(index) => void viewerState.viewer.goToSlide(index)}
+              onSelect={navigateToSlide}
             />
           )}
         </div>
@@ -771,6 +812,7 @@ function PptxThumbnail({
 }) {
   const { formatNumber, t } = useLocalization();
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const [renderStatus, setRenderStatus] = useState<"waiting" | "rendering" | "ready" | "error">("waiting");
 
   useEffect(() => {
     const host = hostRef.current;
@@ -778,12 +820,22 @@ function PptxThumbnail({
     let handle: SlideHandle | null = null;
     let observer: IntersectionObserver | null = null;
     let disposed = false;
+    setRenderStatus("waiting");
 
     const renderThumbnail = () => {
       if (disposed || handle) return;
+      setRenderStatus("rendering");
       const width = Math.max(72, host.clientWidth || 112);
       handle = viewer.renderThumbnailToContainer(slideIndex, host, { width });
-      void handle?.ready.catch(() => undefined);
+      if (!handle) {
+        setRenderStatus("error");
+      } else {
+        void handle.ready.then(() => {
+          if (!disposed) setRenderStatus("ready");
+        }).catch(() => {
+          if (!disposed) setRenderStatus("error");
+        });
+      }
       observer?.disconnect();
     };
 
@@ -818,7 +870,12 @@ function PptxThumbnail({
       onClick={onSelect}
     >
       <span className="office-pptx-thumbnail__number">{formatNumber(slideIndex + 1)}</span>
-      <span className="office-pptx-thumbnail__frame" ref={hostRef} aria-hidden="true" />
+      <span
+        className="office-pptx-thumbnail__frame"
+        ref={hostRef}
+        aria-hidden="true"
+        data-render-state={renderStatus}
+      />
     </button>
   );
 }

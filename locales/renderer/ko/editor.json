@@ -254,6 +254,7 @@
   "office.sheets": "시트",
   "office.slideNumber": "슬라이드 {number, number}",
   "office.slidePosition": "{current, number} / {total, number}",
+  "office.slideRenderFailed": "슬라이드 {number, number}을(를) 렌더링할 수 없습니다. {detail}",
   "office.slides": "슬라이드",
   "office.subject.converted-word": "변환된 이 Word 문서",
   "office.subject.office": "이 Office 파일",

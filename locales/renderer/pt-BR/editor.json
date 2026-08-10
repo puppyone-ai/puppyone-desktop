@@ -254,6 +254,7 @@
   "office.sheets": "Planilhas",
   "office.slideNumber": "Slide {number, number}",
   "office.slidePosition": "{current, number} de {total, number}",
+  "office.slideRenderFailed": "Não foi possível renderizar o slide {number, number}. {detail}",
   "office.slides": "Slides",
   "office.subject.converted-word": "Este documento do Word convertido",
   "office.subject.office": "Este arquivo do Office",

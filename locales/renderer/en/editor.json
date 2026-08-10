@@ -254,6 +254,7 @@
   "office.sheets": "Sheets",
   "office.slideNumber": "Slide {number, number}",
   "office.slidePosition": "{current, number} of {total, number}",
+  "office.slideRenderFailed": "Slide {number, number} could not be rendered. {detail}",
   "office.slides": "Slides",
   "office.subject.converted-word": "This converted Word document",
   "office.subject.office": "This Office file",

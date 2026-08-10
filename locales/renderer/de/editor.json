@@ -254,6 +254,7 @@
   "office.sheets": "Blätter",
   "office.slideNumber": "Folie {number, number}",
   "office.slidePosition": "{current, number} von {total, number}",
+  "office.slideRenderFailed": "Folie {number, number} konnte nicht dargestellt werden. {detail}",
   "office.slides": "Folien",
   "office.subject.converted-word": "Dieses konvertierte Word-Dokument",
   "office.subject.office": "Diese Office-Datei",

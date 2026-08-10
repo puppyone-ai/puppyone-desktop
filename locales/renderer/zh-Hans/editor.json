@@ -254,6 +254,7 @@
   "office.sheets": "工作表",
   "office.slideNumber": "第 {number, number} 张幻灯片",
   "office.slidePosition": "第 {current, number} / {total, number} 张",
+  "office.slideRenderFailed": "第 {number, number} 张幻灯片无法呈现。{detail}",
   "office.slides": "幻灯片",
   "office.subject.converted-word": "转换后的 Word 文档",
   "office.subject.office": "此 Office 文件",
