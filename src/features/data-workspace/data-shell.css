@@ -15,7 +15,9 @@
 .data-content {
   position: relative;
   display: grid;
-  grid-template-columns: var(--data-explorer-width, clamp(282px, 26vw, 360px)) minmax(0, 1fr);
+  grid-template-columns:
+    var(--data-explorer-width, clamp(282px, 26vw, 360px))
+    minmax(var(--desktop-main-pane-min-width, 0px), 1fr);
   flex: 1;
   width: 100%;
   min-width: 0;
@@ -25,7 +27,7 @@
 }
 
 .data-content[data-explorer-collapsed="true"] {
-  grid-template-columns: 0 minmax(0, 1fr);
+  grid-template-columns: 0 minmax(var(--desktop-main-pane-min-width, 0px), 1fr);
 }
 
 .explorer-column {

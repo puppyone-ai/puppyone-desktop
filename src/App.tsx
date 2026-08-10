@@ -46,8 +46,6 @@ import {
   getWorkspaceSwitcherItems,
 } from "./features/app-shell/workspaceHomeModel";
 import {
-  MAX_RIGHT_SIDEBAR_WIDTH,
-  MIN_RIGHT_SIDEBAR_WIDTH,
   mergePuppyoneWorkspaceConfig,
 } from "./features/app-shell/preferences";
 import { DesktopTitlebarContext } from "./features/app-shell/DesktopTitlebarContext";
@@ -909,6 +907,9 @@ function AppContent() {
     >
       <EditorChromeContributionProvider onContributionChange={setEditorChromeContribution}>
         <DesktopCloudShell
+          leftSidebarCollapsed={sidebarCollapsed}
+          leftSidebarPresent={Boolean(dataPort)}
+          leftSidebarWidth={explorerWidth}
           minimalMode={minimalMode}
           minimalModeDock={minimalModeDock}
           titlebarSlot={titlebarSlot}
@@ -916,8 +917,7 @@ function AppContent() {
           rightSidebarOpen={rightSidebarOpen && desktopRightSidebarEnabled}
           resizableRightSidebar
           rightSidebarWidth={rightSidebarWidth}
-          minRightSidebarWidth={MIN_RIGHT_SIDEBAR_WIDTH}
-          maxRightSidebarWidth={MAX_RIGHT_SIDEBAR_WIDTH}
+          onRightSidebarOpenChange={setRightSidebarOpen}
           onRightSidebarWidthChange={setRightSidebarWidth}
           rightSidebar={desktopRightSidebarEnabled ? (
           <div className="desktop-right-sidebar-stack" key={workspace.path}>

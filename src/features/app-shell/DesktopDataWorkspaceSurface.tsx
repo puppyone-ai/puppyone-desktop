@@ -17,11 +17,12 @@ import {
 } from "../data-workspace/nodeActions";
 import type { FileClipboardController } from "../data-workspace/useFileClipboard";
 import type { GitStatusSnapshot } from "../../types/electron";
+import { useDesktopPaneLayout } from "./layout/DesktopPaneLayoutContext";
 import {
   COLLAPSED_EXPLORER_WIDTH,
-  MAX_EXPLORER_WIDTH,
+  EXPLORER_COLLAPSE_THRESHOLD,
   MIN_EXPLORER_WIDTH,
-} from "./preferences";
+} from "./layout/desktopPaneLayout";
 import type { DesktopPreferencesController } from "./useDesktopPreferences";
 import {
   DesktopSidebarFooterNavigation,
@@ -93,6 +94,12 @@ export function DesktopDataWorkspaceSurface({
   workspaceSurfaceError,
 }: DesktopDataWorkspaceSurfaceProps) {
   const { t } = useLocalization();
+  const paneLayout = useDesktopPaneLayout();
+  const resolvedExplorerWidth = paneLayout?.explorer.width ?? preferences.explorerWidth;
+  const resolvedExplorerMaxWidth = paneLayout?.explorer.maxWidth
+    ?? Math.max(preferences.explorerWidth, MIN_EXPLORER_WIDTH);
+  const resolvedExplorerCollapsed = paneLayout?.explorer.collapsed
+    ?? preferences.sidebarCollapsed;
   const navigationCommon = {
     activeView: navigation.activeView,
     availableSurfaceIds: navigation.availableSurfaceIds,
@@ -139,11 +146,13 @@ export function DesktopDataWorkspaceSurface({
         viewerExtensionAdapter={viewerExtensionAdapter}
         documentSourceKind="local"
         resizableExplorer
-        explorerCollapsed={false}
-        explorerWidth={preferences.explorerWidth}
+        explorerCollapsed={resolvedExplorerCollapsed}
+        explorerWidth={resolvedExplorerWidth}
         minExplorerWidth={MIN_EXPLORER_WIDTH}
-        maxExplorerWidth={MAX_EXPLORER_WIDTH}
+        maxExplorerWidth={resolvedExplorerMaxWidth}
         collapsedExplorerWidth={COLLAPSED_EXPLORER_WIDTH}
+        explorerCollapseThreshold={EXPLORER_COLLAPSE_THRESHOLD}
+        onExplorerCollapsedChange={preferences.setSidebarCollapsed}
         onExplorerWidthChange={preferences.setExplorerWidth}
         showHeader={false}
         showExplorerRoot={false}

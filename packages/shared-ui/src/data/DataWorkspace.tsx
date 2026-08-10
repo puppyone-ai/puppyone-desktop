@@ -120,6 +120,7 @@ export type DataWorkspaceProps = {
   minExplorerWidth?: number;
   maxExplorerWidth?: number;
   collapsedExplorerWidth?: number;
+  explorerCollapseThreshold?: number;
   mainSlot?: DataWorkspaceSlot;
   emptySlot?: ReactNode;
   showPreviewHeader?: boolean;
@@ -202,6 +203,7 @@ export function DataWorkspace({
   minExplorerWidth = MIN_EXPLORER_WIDTH,
   maxExplorerWidth = MAX_EXPLORER_WIDTH,
   collapsedExplorerWidth = COLLAPSED_EXPLORER_WIDTH,
+  explorerCollapseThreshold,
   mainSlot,
   emptySlot,
   showPreviewHeader = true,
@@ -290,6 +292,12 @@ export function DataWorkspace({
     explorerCollapsed ? collapsedExplorerWidth : expandedExplorerWidth,
     collapsedExplorerWidth,
     maxExplorerWidth,
+  );
+  const explorerCanCollapse = Boolean(onExplorerCollapsedChange);
+  const resolvedExplorerCollapseThreshold = clampNumber(
+    explorerCollapseThreshold ?? Math.round(minExplorerWidth * 0.75),
+    collapsedExplorerWidth,
+    minExplorerWidth,
   );
 
   const setExplorerWidth = useCallback(
@@ -1166,16 +1174,21 @@ export function DataWorkspace({
     bodyClassName: "data-sidebar-resizing",
     onDragStart: (event) => {
       const startX = event.clientX;
-      const startWidth = explorerCollapsed ? minExplorerWidth : expandedExplorerWidth;
-
-      if (explorerCollapsed) {
-        onExplorerCollapsedChange?.(false);
-      }
+      const startWidth = explorerCollapsed ? collapsedExplorerWidth : expandedExplorerWidth;
+      let collapsedDuringDrag = explorerCollapsed;
 
       return {
         onMove: (point) => {
           const physicalDelta = point.clientX - startX;
-          setExplorerWidth(startWidth + (direction === "rtl" ? -physicalDelta : physicalDelta));
+          const nextWidth = startWidth + (direction === "rtl" ? -physicalDelta : physicalDelta);
+          if (explorerCanCollapse && nextWidth < resolvedExplorerCollapseThreshold) {
+            if (!collapsedDuringDrag) onExplorerCollapsedChange?.(true);
+            collapsedDuringDrag = true;
+            return;
+          }
+          if (collapsedDuringDrag) onExplorerCollapsedChange?.(false);
+          collapsedDuringDrag = false;
+          setExplorerWidth(nextWidth);
         },
       };
     },
@@ -1185,10 +1198,15 @@ export function DataWorkspace({
     if (!resizableExplorer) return;
 
     if (intent === "minimum") {
+      if (explorerCanCollapse) {
+        onExplorerCollapsedChange?.(true);
+        return;
+      }
       setExplorerWidth(minExplorerWidth);
       return;
     }
     if (intent === "maximum") {
+      onExplorerCollapsedChange?.(false);
       setExplorerWidth(maxExplorerWidth);
       return;
     }
@@ -1196,7 +1214,19 @@ export function DataWorkspace({
     const step = accelerated ? 24 : 12;
     const physicalDirection = intent === "decrease" ? -1 : 1;
     const directionMultiplier = direction === "rtl" ? -1 : 1;
-    setExplorerWidth(resolvedExplorerWidth + physicalDirection * directionMultiplier * step);
+    const nextWidth = resolvedExplorerWidth + physicalDirection * directionMultiplier * step;
+    if (explorerCollapsed) {
+      if (nextWidth > collapsedExplorerWidth) {
+        onExplorerCollapsedChange?.(false);
+        setExplorerWidth(minExplorerWidth);
+      }
+      return;
+    }
+    if (explorerCanCollapse && nextWidth < minExplorerWidth) {
+      onExplorerCollapsedChange?.(true);
+      return;
+    }
+    setExplorerWidth(nextWidth);
   };
 
   const dataContentStyle = resizableExplorer
@@ -1320,13 +1350,13 @@ export function DataWorkspace({
           )}
         </aside>
 
-        {resizableExplorer && !explorerCollapsed && (
+        {resizableExplorer && (!explorerCollapsed || explorerCanCollapse) && (
           <SidebarResizeHandle
             className="data-explorer-resizer"
             paneEdge
             orientation="vertical"
             label={t("shared-ui.explorer.resizeSidebar")}
-            min={minExplorerWidth}
+            min={explorerCanCollapse ? collapsedExplorerWidth : minExplorerWidth}
             max={maxExplorerWidth}
             value={resolvedExplorerWidth}
             onPointerDown={beginExplorerResize}

@@ -69,7 +69,7 @@
 }
 
 .desktop-right-sidebar {
-  --desktop-right-sidebar-width: clamp(500px, 36vw, 680px);
+  --desktop-right-sidebar-width: 560px;
 
   position: relative;
   z-index: 25;

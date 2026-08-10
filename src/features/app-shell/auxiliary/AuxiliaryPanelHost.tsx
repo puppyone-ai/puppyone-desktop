@@ -13,21 +13,25 @@ import {
 
 export type AuxiliaryPanelHostProps = {
   children: ReactNode;
+  collapseThreshold?: number;
   open: boolean;
   width?: number;
   minWidth?: number;
   maxWidth?: number;
   resizable?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onWidthChange?: (width: number) => void;
 };
 
 export function AuxiliaryPanelHost({
   children,
+  collapseThreshold = 0,
   open,
   width,
   minWidth = 420,
   maxWidth = 760,
   resizable = false,
+  onOpenChange,
   onWidthChange,
 }: AuxiliaryPanelHostProps) {
   const { t } = useLocalization();
@@ -40,36 +44,50 @@ export function AuxiliaryPanelHost({
       const startX = event.clientX;
       const direction = getDocumentDirection();
       return {
-        onMove: (point) => onWidthChange(clamp(
-          getPointerResizedSidebarWidth({
+        onMove: (point) => {
+          const nextWidth = getPointerResizedSidebarWidth({
             currentX: point.clientX,
             direction,
             startWidth: resolvedWidth,
             startX,
-          }),
-          minWidth,
-          maxWidth,
-        )),
+          });
+          if (onOpenChange && nextWidth < collapseThreshold) {
+            onOpenChange(false);
+            return;
+          }
+          onOpenChange?.(true);
+          onWidthChange(clamp(nextWidth, minWidth, maxWidth));
+        },
       };
     },
   });
-  const panelStyle = width
+  const panelStyle = width !== undefined
     ? ({ "--desktop-right-sidebar-width": `${width}px` } as CSSProperties)
     : undefined;
 
   const resizeByKeyboard = (intent: SidebarResizeIntent, accelerated: boolean) => {
     if (!resizable || !onWidthChange) return;
     if (intent === "minimum" || intent === "maximum") {
+      if (intent === "minimum" && onOpenChange) {
+        onOpenChange(false);
+        return;
+      }
+      onOpenChange?.(true);
       onWidthChange(intent === "minimum" ? minWidth : maxWidth);
       return;
     }
     const step = accelerated ? 24 : 12;
-    onWidthChange(clamp(getArrowResizedSidebarWidth({
+    const nextWidth = getArrowResizedSidebarWidth({
       currentWidth: resolvedWidth,
       direction: getDocumentDirection(),
       key: intent === "decrease" ? "ArrowLeft" : "ArrowRight",
       step,
-    }), minWidth, maxWidth));
+    });
+    if (onOpenChange && nextWidth < minWidth) {
+      onOpenChange(false);
+      return;
+    }
+    onWidthChange(clamp(nextWidth, minWidth, maxWidth));
   };
 
   return (
@@ -79,15 +97,16 @@ export function AuxiliaryPanelHost({
       aria-hidden={open ? undefined : true}
       {...(!open ? { inert: "" } : {})}
     >
-      {resizable && open && (
+      {resizable && (open || Boolean(onOpenChange)) && (
         <SidebarResizeHandle
           className="desktop-right-sidebar-resizer"
           paneEdge
           orientation="vertical"
           label={t("shell.sidebar.resizeAuxiliary")}
-          min={minWidth}
+          min={onOpenChange ? 0 : minWidth}
           max={maxWidth}
           value={resolvedWidth}
+          tabIndex={open ? 0 : -1}
           onPointerDown={beginResize}
           onKeyboardResize={resizeByKeyboard}
         />
