@@ -72,7 +72,7 @@ const html = `<!doctype html>
             for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
             window.__pptxSmoke.status = "opening";
             const viewer = await PptxViewer.open(bytes.buffer, document.querySelector("#host"), {
-              fitMode: "contain",
+              fitMode: "none",
               lazyMedia: true,
               lazySlides: true,
               pdfjs: false,
@@ -83,7 +83,21 @@ const html = `<!doctype html>
             });
             window.__pptxSmoke.status = "fonts";
             await document.fonts?.ready;
+            const fitToHost = async () => {
+              const host = document.querySelector("#host");
+              const scale = Math.min(
+                host.clientWidth / viewer.slideWidth,
+                host.clientHeight / viewer.slideHeight,
+              );
+              const zoomPercent = Math.max(10, Math.min(400, Math.floor(scale * 10000) / 100));
+              await viewer.setZoom(zoomPercent);
+            };
+            await fitToHost();
+            const resizeObserver = new ResizeObserver(() => void fitToHost());
+            resizeObserver.observe(document.querySelector("#host"));
             window.__pptxViewer = viewer;
+            window.__pptxFitToHost = fitToHost;
+            window.__pptxResizeObserver = resizeObserver;
             window.__pptxSmoke.status = "ready";
             window.__pptxSmoke.slideCount = viewer.slideCount;
           } catch (error) {
@@ -116,7 +130,7 @@ async function waitForReady() {
   throw new Error(`PPTX renderer smoke timed out: ${JSON.stringify(lastState)}`);
 }
 
-async function inspectSlide(index) {
+async function inspectSlide(index, { renderThumbnail = true } = {}) {
   return window.webContents.executeJavaScript(`
     (async () => {
       await window.__pptxViewer.goToSlide(${index});
@@ -128,8 +142,10 @@ async function inspectSlide(index) {
       const childRect = child?.getBoundingClientRect();
       const thumbHost = document.createElement("div");
       thumbHost.className = "thumb";
-      document.querySelector("#rail").append(thumbHost);
-      const handle = window.__pptxViewer.renderThumbnailToContainer(${index}, thumbHost, { width: 140 });
+      if (${renderThumbnail}) document.querySelector("#rail").append(thumbHost);
+      const handle = ${renderThumbnail}
+        ? window.__pptxViewer.renderThumbnailToContainer(${index}, thumbHost, { width: 140 })
+        : null;
       if (handle) await handle.ready;
       const result = {
         index: ${index},
@@ -177,6 +193,8 @@ async function run() {
       const result = await inspectSlide(index);
       assert(result.text.includes(expectedText[index]), `slide ${index + 1} lost expected text`);
       assert(result.childWidth > 0 && result.childHeight > 0, `slide ${index + 1} has no rendered surface`);
+      assert(result.childWidth <= result.hostWidth + 1, `slide ${index + 1} exceeded host width`);
+      assert(result.childHeight <= result.hostHeight + 1, `slide ${index + 1} exceeded host height`);
       assert(result.overflowX <= 1 && result.overflowY <= 1, `slide ${index + 1} overflowed its host`);
       assert(result.thumbnailRendered, `slide ${index + 1} thumbnail did not render`);
       assert(!result.text.includes("Chart not found"), `slide ${index + 1} lost its native chart`);
@@ -187,9 +205,23 @@ async function run() {
       slides.push({ ...result, screenshotPath });
     }
 
+    window.setSize(1280, 420);
+    const shortViewport = await window.webContents.executeJavaScript(`
+      (async () => {
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        await window.__pptxFitToHost();
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        return true;
+      })();
+    `, true).then(() => inspectSlide(0, { renderThumbnail: false }));
+    assert(
+      shortViewport.childHeight <= shortViewport.hostHeight + 1,
+      `short viewport cropped the slide: ${shortViewport.childHeight} > ${shortViewport.hostHeight}`,
+    );
+
     const finalState = await window.webContents.executeJavaScript("window.__pptxSmoke", true);
     assert(finalState.slideErrors.length === 0, `slide errors: ${JSON.stringify(finalState.slideErrors)}`);
-    console.log(JSON.stringify({ ok: true, nodeErrors: finalState.nodeErrors, slides }, null, 2));
+    console.log(JSON.stringify({ ok: true, nodeErrors: finalState.nodeErrors, slides, shortViewport }, null, 2));
   } catch (error) {
     console.error(error);
     process.exitCode = 1;

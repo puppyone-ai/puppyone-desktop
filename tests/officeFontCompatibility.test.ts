@@ -22,6 +22,10 @@ describe("local Office font compatibility", () => {
     expect(OFFICE_FONT_COMPATIBILITY_CSS).toContain('local("Heiti SC")');
     expect(OFFICE_FONT_COMPATIBILITY_CSS).toContain('font-family: "Microsoft YaHei"');
     expect(OFFICE_FONT_COMPATIBILITY_CSS).toContain('font-family: "宋体"');
+    expect(OFFICE_FONT_COMPATIBILITY_CSS).toContain('font-family: "Microsoft JhengHei"');
+    expect(OFFICE_FONT_COMPATIBILITY_CSS).toContain('font-family: "Meiryo"');
+    expect(OFFICE_FONT_COMPATIBILITY_CSS).toContain('font-family: "Malgun Gothic"');
+    expect(OFFICE_FONT_COMPATIBILITY_CSS).toContain('font-family: "Aptos"');
   });
 
   it("keeps the authored font first and only appends a CJK fallback when needed", () => {
@@ -31,9 +35,12 @@ describe("local Office font compatibility", () => {
       <span id="latin" style="font-family: 'Times New Roman'; font-size: 18px">Quarterly report</span>
       <span id="authored" style="font-family: '黑体'; font-size: 22px">原始黑体</span>
       <svg><text id="svg-cjk" font-family="Cambria">图表文字</text></svg>
+      <span id="japanese" style="font-family: 'Times New Roman'">プレゼン資料</span>
+      <span id="korean" style="font-family: 'Times New Roman'">발표 자료</span>
+      <span id="traditional" lang="zh-Hant" style="font-family: 'Times New Roman'">簡報資料</span>
     `;
 
-    expect(applyOfficeCjkFontFallbacks(slide)).toBe(2);
+    expect(applyOfficeCjkFontFallbacks(slide)).toBe(5);
     expect(slide.querySelector<HTMLElement>("#cjk")?.style.fontFamily).toMatch(
       /^"Times New Roman", "PingFang SC"/,
     );
@@ -42,6 +49,15 @@ describe("local Office font compatibility", () => {
     expect(slide.querySelector<HTMLElement>("#authored")?.style.fontFamily).toBe("黑体");
     expect(slide.querySelector("#svg-cjk")?.getAttribute("font-family")).toMatch(
       /^Cambria, "PingFang SC"/,
+    );
+    expect(slide.querySelector<HTMLElement>("#japanese")?.style.fontFamily).toContain(
+      '"Hiragino Sans"',
+    );
+    expect(slide.querySelector<HTMLElement>("#korean")?.style.fontFamily).toContain(
+      '"Apple SD Gothic Neo"',
+    );
+    expect(slide.querySelector<HTMLElement>("#traditional")?.style.fontFamily).toContain(
+      '"PingFang TC"',
     );
   });
 });

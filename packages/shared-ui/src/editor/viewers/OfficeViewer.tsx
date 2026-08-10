@@ -38,6 +38,7 @@ import {
   ensureOfficeFontCompatibilityStyles,
 } from "./officeFontCompatibility";
 import {
+  getPresentationFitZoomPercent,
   getPresentationNavigationTarget,
   settlePresentationFonts,
 } from "./presentationPreview";
@@ -605,6 +606,35 @@ function PptxPresentationPreview({
     const abortController = new AbortController();
     let cancelled = false;
     let viewer: PptxViewer | null = null;
+    let fitFrame = 0;
+    let resizeObserver: ResizeObserver | null = null;
+    let windowResizeListener: (() => void) | null = null;
+
+    const fitViewerToHost = (targetViewer: PptxViewer) => {
+      const zoomPercent = getPresentationFitZoomPercent({
+        availableWidth: host.clientWidth,
+        availableHeight: host.clientHeight,
+        slideWidth: targetViewer.slideWidth,
+        slideHeight: targetViewer.slideHeight,
+      });
+      return zoomPercent === null ? Promise.resolve() : targetViewer.setZoom(zoomPercent);
+    };
+
+    const scheduleFit = () => {
+      cancelAnimationFrame(fitFrame);
+      fitFrame = requestAnimationFrame(() => {
+        fitFrame = 0;
+        const currentViewer = viewer;
+        if (cancelled || !currentViewer) return;
+        void fitViewerToHost(currentViewer).catch((error) => {
+          if (cancelled) return;
+          setSlideErrors((current) => ({
+            ...current,
+            [currentViewer.currentSlideIndex]: error instanceof Error ? error.message : String(error),
+          }));
+        });
+      });
+    };
 
     ensureOfficeFontCompatibilityStyles(document);
     host.replaceChildren();
@@ -615,7 +645,7 @@ function PptxPresentationPreview({
 
     import("@aiden0z/pptx-renderer")
       .then(({ PptxViewer, RECOMMENDED_ZIP_LIMITS }) => PptxViewer.open(arrayBuffer.slice(0), host, {
-        fitMode: "contain",
+        fitMode: "none",
         lazyMedia: true,
         lazySlides: true,
         pdfjs: false,
@@ -651,7 +681,16 @@ function PptxPresentationPreview({
         }
         viewer = nextViewer;
         await settlePresentationFonts(document.fonts?.ready, abortController.signal);
+        abortController.signal.throwIfAborted();
+        await fitViewerToHost(nextViewer);
         applyOfficeCjkFontFallbacks(host);
+        if (typeof ResizeObserver === "undefined") {
+          windowResizeListener = scheduleFit;
+          window.addEventListener("resize", windowResizeListener);
+        } else {
+          resizeObserver = new ResizeObserver(scheduleFit);
+          resizeObserver.observe(host);
+        }
         setActiveSlide(nextViewer.currentSlideIndex);
         setViewerState({ viewer: nextViewer, slideCount: nextViewer.slideCount });
         setRenderState({ status: "ready" });
@@ -684,6 +723,9 @@ function PptxPresentationPreview({
     return () => {
       cancelled = true;
       abortController.abort();
+      cancelAnimationFrame(fitFrame);
+      resizeObserver?.disconnect();
+      if (windowResizeListener) window.removeEventListener("resize", windowResizeListener);
       viewer?.destroy();
       host.replaceChildren();
     };

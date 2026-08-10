@@ -715,7 +715,12 @@
 .office-pptx-thumbnail[aria-selected="true"] {
   border-color: transparent;
   background: var(--po-selected);
-  color: var(--po-text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-text) 7%, transparent);
+  color: var(--po-file-accent-presentation);
+}
+
+.office-pptx-thumbnail[aria-selected="true"]:hover {
+  background: var(--po-selected);
 }
 
 .office-pptx-thumbnail:focus-visible {
@@ -728,6 +733,11 @@
   font-variant-numeric: tabular-nums;
   line-height: 1;
   text-align: right;
+}
+
+.office-pptx-thumbnail[aria-selected="true"] .office-pptx-thumbnail__number {
+  color: var(--po-file-accent-presentation);
+  font-weight: var(--po-text-weight-bold, 700);
 }
 
 .office-pptx-thumbnail__frame {
@@ -744,9 +754,9 @@
 }
 
 .office-pptx-thumbnail[aria-selected="true"] .office-pptx-thumbnail__frame {
-  border-color: color-mix(in srgb, var(--po-text) 42%, var(--po-border));
+  border-color: var(--po-file-accent-presentation);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--po-text) 14%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--po-file-accent-presentation) 52%, transparent),
     0 2px 7px color-mix(in srgb, var(--po-shadow) 12%, transparent);
 }
 
@@ -945,7 +955,12 @@
 }
 
 .office-pptx-text-thumbnail[aria-selected="true"] {
-  border-color: transparent;
+  border-color: var(--po-file-accent-presentation);
+  background: var(--po-selected);
+  color: var(--po-file-accent-presentation);
+}
+
+.office-pptx-text-thumbnail[aria-selected="true"]:hover {
   background: var(--po-selected);
 }
 

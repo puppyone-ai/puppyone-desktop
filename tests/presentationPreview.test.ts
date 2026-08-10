@@ -1,8 +1,41 @@
 import { describe, expect, it } from "vitest";
 import {
+  getPresentationFitZoomPercent,
   getPresentationNavigationTarget,
   settlePresentationFonts,
 } from "../packages/shared-ui/src/editor/viewers/presentationPreview";
+
+describe("PowerPoint preview fitting", () => {
+  it("uses the tighter of the available width and height", () => {
+    expect(getPresentationFitZoomPercent({
+      availableWidth: 1_200,
+      availableHeight: 300,
+      slideWidth: 960,
+      slideHeight: 540,
+    })).toBe(55.55);
+    expect(getPresentationFitZoomPercent({
+      availableWidth: 480,
+      availableHeight: 1_000,
+      slideWidth: 960,
+      slideHeight: 540,
+    })).toBe(50);
+  });
+
+  it("rejects unavailable geometry and respects renderer zoom bounds", () => {
+    expect(getPresentationFitZoomPercent({
+      availableWidth: 0,
+      availableHeight: 300,
+      slideWidth: 960,
+      slideHeight: 540,
+    })).toBeNull();
+    expect(getPresentationFitZoomPercent({
+      availableWidth: 20,
+      availableHeight: 20,
+      slideWidth: 960,
+      slideHeight: 540,
+    })).toBe(10);
+  });
+});
 
 describe("PowerPoint preview navigation", () => {
   it("supports familiar arrow, paging, and boundary keys", () => {

@@ -72,6 +72,9 @@ describe("lightweight Office preview experience", () => {
 
   it("presents PowerPoint as a thumbnail rail and one central slide stage", () => {
     expect(officeViewerSource).toContain('renderMode: "slide"');
+    expect(officeViewerSource).toContain('fitMode: "none"');
+    expect(officeViewerSource).toContain("getPresentationFitZoomPercent");
+    expect(officeViewerSource).toContain("new ResizeObserver(scheduleFit)");
     expect(officeViewerSource).toContain("renderThumbnailToContainer");
     expect(officeViewerSource).toContain("IntersectionObserver");
     expect(officeViewerSource).toContain("settlePresentationFonts(document.fonts?.ready");
@@ -100,6 +103,9 @@ describe("lightweight Office preview experience", () => {
     );
     expect(officePreviewCss).toContain(
       '.office-pptx-thumbnail[aria-selected="true"] .office-pptx-thumbnail__frame',
+    );
+    expect(officePreviewCss).toMatch(
+      /\.office-pptx-thumbnail\[aria-selected="true"\] \.office-pptx-thumbnail__number\s*\{[^}]*color:\s*var\(--po-file-accent-presentation\)/s,
     );
     expect(officePreviewCss).toContain('.office-pptx-thumbnail__frame[data-render-state="error"]');
     expect(officePreviewCss).toContain("prefers-reduced-motion: reduce");

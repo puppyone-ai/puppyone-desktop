@@ -1,5 +1,35 @@
 export const PRESENTATION_FONT_SETTLE_TIMEOUT_MS = 1_500;
 
+export function getPresentationFitZoomPercent({
+  availableWidth,
+  availableHeight,
+  slideWidth,
+  slideHeight,
+}: {
+  availableWidth: number;
+  availableHeight: number;
+  slideWidth: number;
+  slideHeight: number;
+}): number | null {
+  if (
+    !Number.isFinite(availableWidth)
+    || !Number.isFinite(availableHeight)
+    || !Number.isFinite(slideWidth)
+    || !Number.isFinite(slideHeight)
+    || availableWidth <= 0
+    || availableHeight <= 0
+    || slideWidth <= 0
+    || slideHeight <= 0
+  ) {
+    return null;
+  }
+
+  const scale = Math.min(availableWidth / slideWidth, availableHeight / slideHeight);
+  // The renderer accepts zoom percentages from 10–400. Round down so a
+  // fractional device pixel never creates a clipped edge in a tight viewport.
+  return Math.max(10, Math.min(400, Math.floor(scale * 10_000) / 100));
+}
+
 export async function settlePresentationFonts(
   fontsReady: PromiseLike<unknown> | undefined,
   signal: AbortSignal,

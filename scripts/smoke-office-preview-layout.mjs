@@ -230,6 +230,7 @@ async function measurePresentation(width) {
       const host = document.querySelector('.office-pptx-render-host');
       const navigation = document.querySelector('.office-pptx-navigation');
       const selected = document.querySelector('.office-pptx-thumbnail[aria-selected="true"]');
+      const selectedNumber = selected.querySelector('.office-pptx-thumbnail__number');
       const selectedFrame = selected.querySelector('.office-pptx-thumbnail__frame');
       const unselected = document.querySelector('.office-pptx-thumbnail[aria-selected="false"]');
       const unselectedFrame = unselected.querySelector('.office-pptx-thumbnail__frame');
@@ -244,6 +245,7 @@ async function measurePresentation(width) {
         navigationInsideStage: navigationRect.bottom < stageRect.bottom && navigationRect.top > stageRect.top,
         selectedBorder: getComputedStyle(selected).borderColor,
         selectedBackground: getComputedStyle(selected).backgroundColor,
+        selectedNumberColor: getComputedStyle(selectedNumber).color,
         selectedFrameBorder: getComputedStyle(selectedFrame).borderColor,
         unselectedBackground: getComputedStyle(unselected).backgroundColor,
         unselectedFrameBorder: getComputedStyle(unselectedFrame).borderColor,
@@ -296,7 +298,11 @@ async function run() {
     );
     assert(
       widePresentation.selectedBackground !== widePresentation.unselectedBackground,
-      "PowerPoint selected row has no neutral product selection surface",
+      "PowerPoint selected row has no visible selection surface",
+    );
+    assert(
+      widePresentation.selectedNumberColor === "rgb(240, 122, 67)",
+      `PowerPoint selected slide number does not use its file accent: ${widePresentation.selectedNumberColor}`,
     );
     assert(
       widePresentation.selectedFrameBorder !== widePresentation.unselectedFrameBorder,
