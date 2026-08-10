@@ -1,4 +1,107 @@
 export const PRESENTATION_FONT_SETTLE_TIMEOUT_MS = 1_500;
+export const PRESENTATION_WHEEL_IDLE_RESET_MS = 180;
+export const PRESENTATION_WHEEL_THRESHOLD_PX = 36;
+
+export type PresentationWheelGestureState = Readonly<{
+  accumulatedDelta: number;
+  consumed: boolean;
+  direction: -1 | 0 | 1;
+  lastEventAt: number;
+}>;
+
+export type PresentationWheelGestureResult = Readonly<{
+  handled: boolean;
+  state: PresentationWheelGestureState;
+  target: number | null;
+}>;
+
+export function createPresentationWheelGestureState(): PresentationWheelGestureState {
+  return {
+    accumulatedDelta: 0,
+    consumed: false,
+    direction: 0,
+    lastEventAt: Number.NEGATIVE_INFINITY,
+  };
+}
+
+/**
+ * Converts a wheel/trackpad stream into one slide change per physical gesture.
+ * The state machine is DOM-independent so both rendered and text-fallback
+ * presentations share the same behavior and the edge cases remain testable.
+ */
+export function reducePresentationWheelGesture({
+  state,
+  activeSlide,
+  slideCount,
+  deltaX,
+  deltaY,
+  deltaMode,
+  eventTime,
+}: {
+  state: PresentationWheelGestureState;
+  activeSlide: number;
+  slideCount: number;
+  deltaX: number;
+  deltaY: number;
+  deltaMode: number;
+  eventTime: number;
+}): PresentationWheelGestureResult {
+  if (
+    slideCount <= 0
+    || !Number.isFinite(deltaX)
+    || !Number.isFinite(deltaY)
+    || deltaY === 0
+    || Math.abs(deltaX) > Math.abs(deltaY)
+  ) {
+    return { handled: false, state, target: null };
+  }
+
+  const normalizedDelta = deltaY * getWheelDeltaScale(deltaMode);
+  const direction = Math.sign(normalizedDelta) as -1 | 1;
+  const startsNewGesture = (
+    !Number.isFinite(state.lastEventAt)
+    || eventTime < state.lastEventAt
+    || eventTime - state.lastEventAt > PRESENTATION_WHEEL_IDLE_RESET_MS
+  );
+  const gesture = startsNewGesture ? createPresentationWheelGestureState() : state;
+
+  if (gesture.consumed) {
+    return {
+      handled: true,
+      state: { ...gesture, lastEventAt: eventTime },
+      target: null,
+    };
+  }
+
+  const accumulatedDelta = gesture.direction !== 0 && gesture.direction !== direction
+    ? normalizedDelta
+    : gesture.accumulatedDelta + normalizedDelta;
+  const reachedThreshold = Math.abs(accumulatedDelta) >= PRESENTATION_WHEEL_THRESHOLD_PX;
+  const nextState: PresentationWheelGestureState = {
+    accumulatedDelta,
+    consumed: reachedThreshold,
+    direction,
+    lastEventAt: eventTime,
+  };
+
+  if (!reachedThreshold) {
+    return { handled: true, state: nextState, target: null };
+  }
+
+  const target = Math.max(0, Math.min(slideCount - 1, activeSlide + direction));
+  return {
+    handled: true,
+    state: nextState,
+    target: target === activeSlide ? null : target,
+  };
+}
+
+function getWheelDeltaScale(deltaMode: number): number {
+  // WheelEvent.DOM_DELTA_LINE and DOM_DELTA_PAGE are 1 and 2 respectively.
+  if (deltaMode === 1) return 16;
+  if (deltaMode === 2) return 320;
+  return 1;
+}
 
 export function getPresentationFitZoomPercent({
   availableWidth,

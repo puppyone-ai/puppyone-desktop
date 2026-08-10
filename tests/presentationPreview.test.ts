@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  createPresentationWheelGestureState,
   getPresentationFitZoomPercent,
   getPresentationNavigationTarget,
+  reducePresentationWheelGesture,
   settlePresentationFonts,
 } from "../packages/shared-ui/src/editor/viewers/presentationPreview";
 
@@ -58,6 +60,88 @@ describe("PowerPoint preview navigation", () => {
     expect(getPresentationNavigationTarget({ key: "ArrowLeft", activeSlide: 0, slideCount: 3 })).toBe(0);
     expect(getPresentationNavigationTarget({ key: "ArrowRight", activeSlide: 2, slideCount: 3 })).toBe(2);
     expect(getPresentationNavigationTarget({ key: "Home", activeSlide: 0, slideCount: 0 })).toBeNull();
+  });
+
+  it("turns vertical wheel gestures into one slide change", () => {
+    const first = reducePresentationWheelGesture({
+      state: createPresentationWheelGestureState(),
+      activeSlide: 1,
+      slideCount: 4,
+      deltaX: 0,
+      deltaY: 100,
+      deltaMode: 0,
+      eventTime: 100,
+    });
+    const momentum = reducePresentationWheelGesture({
+      state: first.state,
+      activeSlide: 2,
+      slideCount: 4,
+      deltaX: 0,
+      deltaY: 80,
+      deltaMode: 0,
+      eventTime: 120,
+    });
+
+    expect(first).toMatchObject({ handled: true, target: 2 });
+    expect(momentum).toMatchObject({ handled: true, target: null });
+  });
+
+  it("accumulates trackpad movement and resets after the gesture becomes idle", () => {
+    const first = reducePresentationWheelGesture({
+      state: createPresentationWheelGestureState(),
+      activeSlide: 2,
+      slideCount: 5,
+      deltaX: 0,
+      deltaY: -12,
+      deltaMode: 0,
+      eventTime: 100,
+    });
+    const second = reducePresentationWheelGesture({
+      state: first.state,
+      activeSlide: 2,
+      slideCount: 5,
+      deltaX: 0,
+      deltaY: -24,
+      deltaMode: 0,
+      eventTime: 120,
+    });
+    const nextGesture = reducePresentationWheelGesture({
+      state: second.state,
+      activeSlide: 1,
+      slideCount: 5,
+      deltaX: 0,
+      deltaY: 40,
+      deltaMode: 0,
+      eventTime: 400,
+    });
+
+    expect(first.target).toBeNull();
+    expect(second.target).toBe(1);
+    expect(nextGesture.target).toBe(2);
+  });
+
+  it("ignores horizontal gestures and clamps wheel navigation at boundaries", () => {
+    const horizontal = reducePresentationWheelGesture({
+      state: createPresentationWheelGestureState(),
+      activeSlide: 1,
+      slideCount: 3,
+      deltaX: 80,
+      deltaY: 20,
+      deltaMode: 0,
+      eventTime: 100,
+    });
+    const boundary = reducePresentationWheelGesture({
+      state: createPresentationWheelGestureState(),
+      activeSlide: 2,
+      slideCount: 3,
+      deltaX: 0,
+      deltaY: 3,
+      deltaMode: 1,
+      eventTime: 100,
+    });
+
+    expect(horizontal).toMatchObject({ handled: false, target: null });
+    expect(boundary).toMatchObject({ handled: true, target: null });
   });
 });
 

@@ -88,6 +88,8 @@ describe("lightweight Office preview experience", () => {
     expect(officeViewerSource).toContain("office-pptx-thumbnail-rail");
     expect(officeViewerSource).toContain("office-pptx-stage");
     expect(officeViewerSource).toContain("getPresentationNavigationTarget");
+    expect(officeViewerSource).toContain("reducePresentationWheelGesture");
+    expect(officeViewerSource.match(/onWheelCapture=\{handleStageWheel\}/g)).toHaveLength(2);
     expect(officeViewerSource).not.toContain('renderMode: "list"');
     expect(officePreviewCss).toMatch(
       /\.office-pptx-workspace\s*\{[^}]*display:\s*flex[^}]*background:\s*var\(--po-editor-bg\)/s,

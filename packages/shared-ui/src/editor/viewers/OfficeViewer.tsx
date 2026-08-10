@@ -16,6 +16,7 @@ import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
+  type WheelEvent as ReactWheelEvent,
 } from "react";
 import type { PptxViewer, SlideHandle } from "@aiden0z/pptx-renderer";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
@@ -38,9 +39,12 @@ import {
   ensureOfficeFontCompatibilityStyles,
 } from "./officeFontCompatibility";
 import {
+  createPresentationWheelGestureState,
   getPresentationFitZoomPercent,
   getPresentationNavigationTarget,
+  reducePresentationWheelGesture,
   settlePresentationFonts,
+  type PresentationWheelGestureState,
 } from "./presentationPreview";
 import {
   findSpreadsheetCellPosition,
@@ -491,6 +495,13 @@ function PresentationTextPreview({
     setActiveSlide(0);
   }, [slides]);
 
+  const handleStageWheel = usePresentationWheelNavigation({
+    activeSlide,
+    slideCount: slides.length,
+    onSelect: setActiveSlide,
+    resetKey: slides,
+  });
+
   if (slides.length === 0) {
     return (
       <OfficeEmptyState
@@ -538,6 +549,7 @@ function PresentationTextPreview({
           role="group"
           tabIndex={0}
           aria-label={t("editor.office.slides")}
+          onWheelCapture={handleStageWheel}
           onKeyDown={(event) => handlePresentationNavigationKeyDown(
             event,
             activeSlide,
@@ -749,6 +761,13 @@ function PptxPresentationPreview({
     });
   };
 
+  const handleStageWheel = usePresentationWheelNavigation({
+    activeSlide,
+    slideCount: viewerState?.slideCount ?? 0,
+    onSelect: navigateToSlide,
+    resetKey: arrayBuffer,
+  });
+
   if (renderState.status === "fallback") {
     return (
       <div className="office-pptx-render-preview">
@@ -806,6 +825,7 @@ function PptxPresentationPreview({
           role="group"
           tabIndex={0}
           aria-label={t("editor.office.slides")}
+          onWheelCapture={handleStageWheel}
           onKeyDown={(event) => handlePresentationNavigationKeyDown(
             event,
             activeSlide,
@@ -979,6 +999,45 @@ function handlePresentationNavigationKeyDown(
   if (target === null) return;
   event.preventDefault();
   if (target !== activeSlide) onSelect(target);
+}
+
+function usePresentationWheelNavigation({
+  activeSlide,
+  slideCount,
+  onSelect,
+  resetKey,
+}: {
+  activeSlide: number;
+  slideCount: number;
+  onSelect: (index: number) => void;
+  resetKey: unknown;
+}): (event: ReactWheelEvent<HTMLElement>) => void {
+  const gestureRef = useRef<PresentationWheelGestureState>(
+    createPresentationWheelGestureState(),
+  );
+
+  useEffect(() => {
+    gestureRef.current = createPresentationWheelGestureState();
+  }, [resetKey, slideCount]);
+
+  return (event) => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey) return;
+
+    const result = reducePresentationWheelGesture({
+      state: gestureRef.current,
+      activeSlide,
+      slideCount,
+      deltaX: event.deltaX,
+      deltaY: event.deltaY,
+      deltaMode: event.deltaMode,
+      eventTime: event.timeStamp,
+    });
+    gestureRef.current = result.state;
+
+    if (!result.handled) return;
+    event.preventDefault();
+    if (result.target !== null) onSelect(result.target);
+  };
 }
 
 function SpreadsheetPreview({
