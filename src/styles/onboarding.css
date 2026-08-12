@@ -290,7 +290,11 @@
 
 .onboarding-project-row:hover:not(:disabled),
 .onboarding-project-row:focus-visible {
-  background: color-mix(in srgb, var(--po-panel-raised) 54%, transparent);
+  background: var(--po-hover);
+}
+
+.onboarding-project-row:active:not(:disabled) {
+  background: var(--po-active);
 }
 
 .onboarding-project-row + .onboarding-project-row {

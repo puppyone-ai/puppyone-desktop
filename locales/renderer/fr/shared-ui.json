@@ -7,6 +7,7 @@
   "explorer.more": "Plus",
   "explorer.access": "Accès",
   "explorer.resizeSidebar": "Redimensionner la barre latérale",
+  "explorer.expandSidebar": "Afficher la barre latérale",
   "explorer.cutLabel": "{name}, coupé",
   "navigation.back": "Retour",
   "preview.selectFile": "Sélectionnez un fichier à prévisualiser",

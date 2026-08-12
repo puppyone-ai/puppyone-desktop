@@ -111,11 +111,12 @@ export function createLocalDataPort(rootPath: string): DataPort {
         });
         return { content, version: result.version ?? null };
       },
-      activate: ({ path, bounds, attachmentId }) => getDesktopBridge().activateAppPreview({
+      activate: ({ path, bounds, attachmentId, visible }) => getDesktopBridge().activateAppPreview({
         rootPath,
         path,
         bounds,
         attachmentId,
+        visible,
       }),
       start: (path) => getDesktopBridge().startAppPreview({ rootPath, path }),
       restart: (path, attachment) => getDesktopBridge().restartAppPreview({
@@ -298,6 +299,10 @@ export async function openWorkspaceInCurrentWindow(folderPath: string): Promise<
 
 export async function openWorkspaceInNewWindow(folderPath: string): Promise<WorkspaceOpenResult> {
   return getDesktopBridge().openWorkspaceInNewWindow(folderPath);
+}
+
+export async function openDroppedWorkspaceInCurrentWindow(folder: File): Promise<WorkspaceOpenResult> {
+  return getDesktopBridge().openDroppedWorkspaceInCurrentWindow(folder);
 }
 
 export async function selectWorkspaceFolder(): Promise<WorkspaceOpenResult | null> {

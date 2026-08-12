@@ -1,74 +1,6 @@
 import { AlertTriangle, CheckCircle2, Download, RefreshCw, RotateCw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
 import { useLocalization, type MessageFormatter } from "@puppyone/localization";
-import type { DesktopUpdateState, DesktopUpdateStatus } from "../types/electron";
-
-const FALLBACK_UPDATE_STATE: DesktopUpdateState = {
-  status: "disabled",
-  currentVersion: "0.0.0-dev.local",
-  channel: "dev",
-  availableVersion: null,
-  updateInfo: null,
-  progress: null,
-  blockers: [],
-  error: null,
-  reason: null,
-  lastCheckedAt: null,
-  updatedAt: new Date(0).toISOString(),
-};
-
-type DesktopUpdatesController = {
-  state: DesktopUpdateState;
-  checkForUpdates: () => Promise<void>;
-  updateNow: () => Promise<void>;
-};
-
-export function useDesktopUpdates(): DesktopUpdatesController {
-  const [state, setState] = useState<DesktopUpdateState>(FALLBACK_UPDATE_STATE);
-
-  useEffect(() => {
-    const bridge = window.puppyoneDesktop;
-    if (!bridge?.getUpdateState) return undefined;
-
-    let cancelled = false;
-    bridge.getUpdateState()
-      .then((nextState) => {
-        if (!cancelled) setState(normalizeUpdateState(nextState));
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setState({
-            ...FALLBACK_UPDATE_STATE,
-            status: "error",
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      });
-
-    const unsubscribe = bridge.onUpdateStateChanged?.((nextState) => {
-      setState(normalizeUpdateState(nextState));
-    });
-
-    return () => {
-      cancelled = true;
-      unsubscribe?.();
-    };
-  }, []);
-
-  const checkForUpdates = useCallback(async () => {
-    const bridge = window.puppyoneDesktop;
-    if (!bridge?.checkForUpdates) return;
-    setState(normalizeUpdateState(await bridge.checkForUpdates()));
-  }, []);
-
-  const updateNow = useCallback(async () => {
-    const bridge = window.puppyoneDesktop;
-    if (!bridge?.updateNow) return;
-    setState(normalizeUpdateState(await bridge.updateNow()));
-  }, []);
-
-  return { state, checkForUpdates, updateNow };
-}
+import type { DesktopUpdateState, DesktopUpdateStatus } from "../../types/electron";
 
 export function DesktopUpdateSettingsRow({
   state,
@@ -105,15 +37,6 @@ export function DesktopUpdateSettingsRow({
       </button>
     </div>
   );
-}
-
-function normalizeUpdateState(value: DesktopUpdateState | null | undefined): DesktopUpdateState {
-  if (!value || typeof value !== "object") return FALLBACK_UPDATE_STATE;
-  return {
-    ...FALLBACK_UPDATE_STATE,
-    ...value,
-    blockers: Array.isArray(value.blockers) ? value.blockers : [],
-  };
 }
 
 function getUpdateIcon(status: DesktopUpdateStatus) {

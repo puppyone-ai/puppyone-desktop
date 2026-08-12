@@ -40,6 +40,16 @@ export function registerWorkspaceNavigationIpcHandlers({
     return openWorkspaceInCurrentWindow(event.sender, persistedPath);
   });
 
+  // This path bypasses the recent-workspace allowlist only because the preload
+  // resolves it from a native File object granted by a user drop gesture. The
+  // renderer never receives a general arbitrary-path opener.
+  ipcMain.handle("workspace:open-dropped-current", async (event, folderPath) => {
+    if (typeof folderPath !== "string" || !folderPath.trim()) {
+      throw new Error("Dropped folder path is required.");
+    }
+    return openWorkspaceInCurrentWindow(event.sender, folderPath.trim());
+  });
+
   ipcMain.handle("workspace:open-new-window", async (_event, folderPath) => {
     const persistedPath = await workspaceStateStore.requireRecentWorkspacePath(folderPath);
     return openWorkspaceInNewWindow(persistedPath);

@@ -1,5 +1,6 @@
 import type { WorkspaceOpenResult } from "../types/electron";
 import {
+  openDroppedWorkspaceInCurrentWindow as openDroppedWorkspaceInCurrentWindowBridge,
   openWorkspaceInCurrentWindow as openWorkspaceInCurrentWindowBridge,
   openWorkspaceInNewWindow as openWorkspaceInNewWindowBridge,
   selectWorkspaceFolder as selectWorkspaceFolderBridge,
@@ -20,6 +21,10 @@ export async function openWorkspaceTarget(target: WorkspaceOpenTarget): Promise<
   }
 
   return openWorkspaceInNewWindowBridge(target.path);
+}
+
+export async function openDroppedWorkspaceTarget(folder: File): Promise<WorkspaceOpenResult> {
+  return openDroppedWorkspaceInCurrentWindowBridge(folder);
 }
 
 export async function selectLocalWorkspaceFolder({

@@ -4,6 +4,7 @@
   "projects.untitled": "제목 없는 프로젝트",
   "action.createCloudProject": "Cloud 프로젝트 만들기",
   "action.openLocalFolder": "로컬 폴더 열기",
+  "action.openOrDropLocalFolder": "폴더를 열거나 놓으세요",
   "action.switchTo": "전환",
   "action.switchToCloud": "Cloud 프로젝트로 전환",
   "action.switchToLocal": "로컬 프로젝트로 전환",

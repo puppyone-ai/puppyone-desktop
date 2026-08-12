@@ -73,6 +73,31 @@ describe("Sidebar primitives", () => {
     expect(onKeyboardResize).toHaveBeenNthCalledWith(3, "decrease", true);
   });
 
+  it("turns the same pane-edge handle into a minimal collapsed-edge activator", () => {
+    const onCollapsedActivate = vi.fn();
+    const container = render(
+      <SidebarResizeHandle
+        collapsedEdgeSide="inline-start"
+        label="Expand project sidebar"
+        orientation="vertical"
+        paneEdge
+        onCollapsedActivate={onCollapsedActivate}
+      />,
+    );
+    const handle = container.querySelector<HTMLElement>('[role="button"]');
+
+    expect(handle?.classList.contains("po-collapsed-pane-edge-handle")).toBe(true);
+    expect(handle?.getAttribute("aria-orientation")).toBeNull();
+    expect(handle?.querySelector("polyline")?.getAttribute("points")).toBe("1,1 7,7 1,13");
+
+    act(() => handle?.dispatchEvent(new KeyboardEvent("keydown", {
+      bubbles: true,
+      key: "Enter",
+    })));
+
+    expect(onCollapsedActivate).toHaveBeenCalledOnce();
+  });
+
   it("caps mounted rows for scalable lists while keeping native list semantics", () => {
     const items = Array.from({ length: 1_000 }, (_, index) => ({ id: `row-${index}`, label: `Row ${index}` }));
     expect(shouldVirtualizeSidebarList(items.length)).toBe(true);

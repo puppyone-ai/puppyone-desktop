@@ -248,6 +248,13 @@ export type {
   PaneResizeDragSession,
   UsePaneResizeDragOptions,
 } from "./primitives/usePaneResizeDrag";
+export { useCollapsiblePaneResize } from "./primitives/useCollapsiblePaneResize";
+export type {
+  CollapsiblePaneDirection,
+  CollapsiblePaneResizeState,
+  CollapsiblePaneSide,
+  UseCollapsiblePaneResizeOptions,
+} from "./primitives/useCollapsiblePaneResize";
 export { validateOfficePackageDecompression } from "./editor/security/officePackageValidationTask";
 export type {
   OfficePackageDecompressionBudget,

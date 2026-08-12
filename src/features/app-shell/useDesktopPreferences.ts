@@ -1,6 +1,9 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import type { FileIconThemeId } from "@puppyone/shared-ui";
-import { getInterfaceStyleFirstPaint } from "../appearance/interfaceStyles";
+import {
+  getInterfaceStyleFirstPaint,
+  supportsThemePreset,
+} from "../appearance/interfaceStyles";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
   CREATE_NEW_MENU_STORAGE_KEY,
@@ -130,6 +133,7 @@ export function useDesktopPreferences() {
   const [systemDark, setSystemDark] = useState(() => readSystemDarkMode());
   const activeThemeMode = resolveActiveThemeMode(interfaceStyle, themeMode);
   const resolvedTheme = activeThemeMode === "system" ? (systemDark ? "dark" : "light") : activeThemeMode;
+  const activeThemePreset = resolvedTheme === "light" ? lightThemePreset : darkThemePreset;
 
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
@@ -138,12 +142,18 @@ export function useDesktopPreferences() {
   useLayoutEffect(() => {
     window.localStorage.setItem(INTERFACE_STYLE_STORAGE_KEY, interfaceStyle);
     const root = document.documentElement;
-    const firstPaint = getInterfaceStyleFirstPaint(interfaceStyle, resolvedTheme);
+    const firstPaint = getInterfaceStyleFirstPaint(interfaceStyle, resolvedTheme, activeThemePreset);
     root.dataset.interfaceStyle = interfaceStyle;
     root.dataset.initialTheme = resolvedTheme;
+    if (supportsThemePreset(interfaceStyle, resolvedTheme)) {
+      root.dataset.initialThemePreset = activeThemePreset;
+    } else {
+      delete root.dataset.initialThemePreset;
+    }
     root.style.setProperty("--initial-shell-background", firstPaint.background);
     root.style.setProperty("--initial-shell-color-scheme", firstPaint.colorScheme);
-  }, [interfaceStyle, resolvedTheme]);
+    window.puppyoneDesktop?.setWindowBackground?.({ background: firstPaint.background });
+  }, [activeThemePreset, interfaceStyle, resolvedTheme]);
 
   useEffect(() => {
     window.localStorage.setItem(LIGHT_THEME_PRESET_STORAGE_KEY, lightThemePreset);

@@ -11,6 +11,7 @@ import {
 import {
   getCollapsedMarkerDeletionUnit,
   getMarkdownPlanIndex,
+  getMarkdownPlansInRange,
 } from "../packages/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
 import { MARKDOWN_HTML_PROFILE_VERSION } from "../packages/shared-ui/src/editor/markdown/platform/policy/markdownHtmlProfiles";
 import { createAsyncRenderBroker } from "../packages/shared-ui/src/editor/markdown/platform/brokers/asyncRenderBroker";
@@ -102,6 +103,33 @@ describe("Markdown render-plan compiler", () => {
       expect(table.plan.embed.rows.length).toBeGreaterThanOrEqual(2);
       expect(table.plan.embed.alignments.length).toBeGreaterThanOrEqual(2);
     }
+  });
+
+  it("propagates the refined table boundary through the canonical plan index", () => {
+    const prose = "**First, this remains a paragraph.**";
+    const source = [
+      "| A | B |",
+      "| --- | --- |",
+      "| 1 | 2 |",
+      prose,
+    ].join("\n");
+    const state = createMarkdownState(source);
+    const proseFrom = source.indexOf(prose);
+    const tableEntry = getMarkdownPlanIndex(state).find(({ plan }) => (
+      plan.presentation === "blockAtom" && plan.embed.kind === "table"
+    ));
+
+    expect(tableEntry?.plan.sourceRange).toEqual({ from: 0, to: proseFrom - 1 });
+    expect(tableEntry?.element).toMatchObject({ from: 0, to: proseFrom - 1 });
+    if (tableEntry?.plan.presentation === "blockAtom" && tableEntry.plan.embed.kind === "table") {
+      expect(tableEntry.plan.embed.rows).toHaveLength(2);
+    }
+    expect(getMarkdownPlansInRange(state, proseFrom, source.length).some(({ plan }) => (
+      plan.presentation === "blockAtom" && plan.embed.kind === "table"
+    ))).toBe(false);
+    expect(getMarkdownPlansInRange(state, proseFrom, source.length).some(({ element }) => (
+      element.kind === "strong"
+    ))).toBe(true);
   });
 
   it("carries legacy code-source references into the block plan", () => {

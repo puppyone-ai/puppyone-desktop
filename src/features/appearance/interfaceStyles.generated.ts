@@ -5,7 +5,10 @@ export const INTERFACE_STYLE_MANIFEST = {
   "defaultStyle": "default",
   "storage": {
     "interfaceStyle": "puppyone.desktop.interfaceStyle",
-    "themeMode": "puppyone.desktop.theme"
+    "themeMode": "puppyone.desktop.theme",
+    "lightThemePreset": "puppyone.desktop.lightThemePreset",
+    "darkThemePreset": "puppyone.desktop.darkThemePreset",
+    "legacyThemePreset": "puppyone.desktop.themePreset"
   },
   "styles": [
     {
@@ -26,12 +29,48 @@ export const INTERFACE_STYLE_MANIFEST = {
       },
       "firstPaint": {
         "light": {
-          "background": "#f1eadf",
+          "background": "#fbfaf7",
           "colorScheme": "light"
         },
         "dark": {
-          "background": "#0e0e0e",
+          "background": "#161413",
           "colorScheme": "dark"
+        }
+      },
+      "presetFirstPaint": {
+        "light": {
+          "defaultPreset": "neutral",
+          "values": {
+            "neutral": {
+              "background": "#fbfaf7",
+              "colorScheme": "light"
+            },
+            "warm": {
+              "background": "#fbf6ed",
+              "colorScheme": "light"
+            },
+            "graphite": {
+              "background": "#fbfbfc",
+              "colorScheme": "light"
+            }
+          }
+        },
+        "dark": {
+          "defaultPreset": "default",
+          "values": {
+            "default": {
+              "background": "#161413",
+              "colorScheme": "dark"
+            },
+            "warm": {
+              "background": "#18130f",
+              "colorScheme": "dark"
+            },
+            "graphite": {
+              "background": "#17181c",
+              "colorScheme": "dark"
+            }
+          }
         }
       },
       "stylesheet": null
@@ -45,7 +84,7 @@ export const INTERFACE_STYLE_MANIFEST = {
       },
       "firstPaint": {
         "light": {
-          "background": "#dfe9f5",
+          "background": "#ffffff",
           "colorScheme": "light"
         }
       },
@@ -60,7 +99,7 @@ export const INTERFACE_STYLE_MANIFEST = {
       },
       "firstPaint": {
         "light": {
-          "background": "#d7d7d7",
+          "background": "#ffffff",
           "colorScheme": "light"
         }
       },

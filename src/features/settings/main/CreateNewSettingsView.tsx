@@ -98,13 +98,11 @@ export function CreateNewSettingsView({
   const addableKinds = CREATE_NEW_FILE_TYPE_IDS.filter((kind) => (
     !presentKinds.has(kind) && isCreateNewFileTypeAvailable(kind, experimentalSettings)
   ));
-  const defaultsRestored = settings.items.length === 3
+  const defaultsRestored = settings.items.length === 2
     && settings.items[0]?.kind === "markdown"
     && settings.items[0]?.enabled
     && settings.items[1]?.kind === "csv"
-    && settings.items[1]?.enabled
-    && settings.items[2]?.kind === "app"
-    && settings.items[2]?.enabled;
+    && settings.items[1]?.enabled;
 
   useEffect(() => {
     if (!addMenuOpen) return;

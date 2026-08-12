@@ -2,6 +2,24 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 const externalViewerPacksEnabled = process.argv.includes("--puppyone-external-viewer-packs=1");
 
 contextBridge.exposeInMainWorld("puppyoneDesktop", {
+  setWindowBackground: (request) => {
+    ipcRenderer.send("appearance:set-window-background", {
+      background: request?.background,
+    });
+  },
+  setWindowMinimumWidth: (request) => (
+    ipcRenderer.invoke("window-layout:set-minimum-width", request)
+  ),
+  setNativeSurfaceOccluded: (request) => {
+    ipcRenderer.send("native-surfaces:set-overlay-occluded", {
+      occluded: request?.occluded === true,
+    });
+  },
+  setNativeSurfacePointerPassthrough: (request) => {
+    ipcRenderer.send("native-surfaces:set-pointer-passthrough", {
+      active: request?.active === true,
+    });
+  },
   getBuildInfo: () => ipcRenderer.invoke("build-info:get"),
   getLocalizationBootstrap: () => ipcRenderer.invoke("localization:get-bootstrap"),
   setLanguagePreference: (preference) => (
@@ -93,6 +111,13 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   showHomepage: () => ipcRenderer.invoke("workspace:show-homepage"),
   openWorkspaceInCurrentWindow: (folderPath) => ipcRenderer.invoke("workspace:open-current", folderPath),
   openWorkspaceInNewWindow: (folderPath) => ipcRenderer.invoke("workspace:open-new-window", folderPath),
+  openDroppedWorkspaceInCurrentWindow: (folder) => {
+    const folderPath = webUtils.getPathForFile(folder);
+    if (typeof folderPath !== "string" || !folderPath.trim()) {
+      return Promise.reject(new Error("Dropped folder could not be resolved."));
+    }
+    return ipcRenderer.invoke("workspace:open-dropped-current", folderPath.trim());
+  },
   selectFolder: () => ipcRenderer.invoke("workspace:select-folder-current"),
   selectFolderInNewWindow: () => ipcRenderer.invoke("workspace:select-folder-new-window"),
   getPathForFile: (file) => webUtils.getPathForFile(file),

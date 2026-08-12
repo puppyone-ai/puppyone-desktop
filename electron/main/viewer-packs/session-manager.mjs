@@ -28,6 +28,8 @@ export function createViewerPackSessionManager({
   registerPluginProtocol = defaultRegisterPluginProtocol,
   registerResourceProtocol = defaultRegisterResourceProtocol,
   getMimeType = null,
+  nativeSurfaceOcclusion = null,
+  nativeSurfacePointerPassthrough = null,
   // Production NEVER falls back to file://. Tests without a real Electron
   // protocol stack may opt into a file:// load to exercise session wiring.
   allowFileFallback = false,
@@ -39,6 +41,25 @@ export function createViewerPackSessionManager({
     if (!entry) return false;
     sessions.delete(sessionId);
     resourceBroker.revokeInstance(entry.instanceId);
+    entry.releaseOcclusion?.();
+    entry.releaseOcclusion = null;
+    entry.releasePointerPassthrough?.();
+    entry.releasePointerPassthrough = null;
+    for (const [emitter, eventName, listener] of entry.ownerListeners ?? []) {
+      try {
+        emitter.removeListener?.(eventName, listener);
+      } catch {
+        // ignore owner teardown races
+      }
+    }
+    entry.ownerListeners = [];
+    entry.attached = false;
+    try {
+      entry.view.setVisible?.(false);
+      entry.view.webContents?.setAudioMuted?.(true);
+    } catch {
+      // ignore native visibility races
+    }
     try {
       if (entry.window && !entry.window.isDestroyed() && entry.window.contentView) {
         entry.window.contentView.removeChildView(entry.view);
@@ -158,8 +179,10 @@ export function createViewerPackSessionManager({
       const pluginOriginUrl = `puppyone-plugin://${pluginId}/${contentHash}/${entry}`;
 
       installViewNavigationSecurity(view.webContents, { pluginId, contentHash });
-      view.setBounds(normalizeBounds(bounds, window));
-      window.contentView.addChildView(view);
+      const requestedBounds = normalizeBounds(bounds, window);
+      view.setBounds(requestedBounds);
+      view.setVisible?.(false);
+      view.webContents?.setAudioMuted?.(true);
 
       const entryRecord = {
         sessionId,
@@ -184,8 +207,33 @@ export function createViewerPackSessionManager({
         view,
         partitionSession,
         packageDir,
+        requestedBounds,
+        attached: false,
+        occluded: false,
+        visible: false,
+        releaseOcclusion: null,
+        releasePointerPassthrough: null,
+        ownerListeners: [],
       };
       sessions.set(sessionId, entryRecord);
+      entryRecord.releaseOcclusion = nativeSurfaceOcclusion?.register?.({
+        ownerWebContentsId,
+        setOccluded: (occluded) => {
+          entryRecord.occluded = occluded;
+          if (sessions.get(sessionId) === entryRecord) applyEntryVisibility(entryRecord);
+        },
+      }) ?? null;
+      entryRecord.releasePointerPassthrough = nativeSurfacePointerPassthrough?.register?.({
+        ownerWebContentsId,
+        ownerWebContents: window.webContents,
+        surfaceView: view,
+      }) ?? null;
+      window.contentView.addChildView(view);
+      entryRecord.attached = true;
+      installOwnerVisibilitySync(entryRecord, () => {
+        destroySession(sessionId, { reason: "owner-closed" });
+      });
+      applyEntryVisibility(entryRecord);
       view.webContents?.once?.("render-process-gone", () => {
         destroySession(sessionId, { reason: "render-process-gone" });
       });
@@ -216,7 +264,9 @@ export function createViewerPackSessionManager({
       const entry = sessions.get(sessionId);
       if (!entry) return { ok: false };
       if (entry.ownerWebContentsId !== callerWebContentsId) return { ok: false };
-      entry.view.setBounds(normalizeBounds(bounds, entry.window));
+      entry.requestedBounds = normalizeBounds(bounds, entry.window);
+      entry.view.setBounds(entry.requestedBounds);
+      applyEntryVisibility(entry);
       return { ok: true };
     },
 
@@ -263,6 +313,47 @@ export function createViewerPackSessionManager({
       return Array.from(sessions.values());
     },
   };
+}
+
+function installOwnerVisibilitySync(entry, destroy) {
+  const listen = (emitter, eventName, listener) => {
+    if (typeof emitter?.on !== "function") return;
+    emitter.on(eventName, listener);
+    entry.ownerListeners.push([emitter, eventName, listener]);
+  };
+  const hide = () => {
+    entry.visible = false;
+    try {
+      entry.view.setVisible?.(false);
+      entry.view.webContents?.setAudioMuted?.(true);
+    } catch {
+      // ignore native visibility races
+    }
+  };
+  const synchronize = () => applyEntryVisibility(entry);
+  listen(entry.window, "closed", destroy);
+  listen(entry.window, "hide", hide);
+  listen(entry.window, "minimize", hide);
+  listen(entry.window, "show", synchronize);
+  listen(entry.window, "restore", synchronize);
+  listen(entry.window.webContents, "destroyed", destroy);
+  listen(entry.window.webContents, "render-process-gone", destroy);
+}
+
+function applyEntryVisibility(entry) {
+  const ownerVisible =
+    !entry.window?.isDestroyed?.() &&
+    (typeof entry.window?.isVisible !== "function" || entry.window.isVisible()) &&
+    (typeof entry.window?.isMinimized !== "function" || !entry.window.isMinimized());
+  const visible = Boolean(entry.attached && !entry.occluded && ownerVisible);
+  entry.visible = visible;
+  try {
+    entry.view.setVisible?.(visible);
+    entry.view.webContents?.setAudioMuted?.(!visible);
+  } catch {
+    return false;
+  }
+  return visible;
 }
 
 function normalizeBounds(bounds, window) {

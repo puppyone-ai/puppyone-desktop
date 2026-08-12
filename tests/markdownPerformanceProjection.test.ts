@@ -116,6 +116,32 @@ describe("Markdown incremental document projection", () => {
     });
     expect(blockReplacementCount).toBeGreaterThan(0);
   });
+
+  it("keeps the table atom mounted when an adjacent empty line becomes prose", () => {
+    const tableSource = [
+      "| Name | Value |",
+      "| --- | ---: |",
+      "| A | 1 |",
+    ].join("\n");
+    let state = createState(`${tableSource}\n`);
+
+    state = state.update({
+      changes: { from: state.doc.length, insert: "正文" },
+      selection: EditorSelection.cursor(state.doc.length + 2),
+      userEvent: "input.type",
+    }).state;
+
+    const widgetRanges: Array<{ from: number; to: number }> = [];
+    state.field(markdownLivePreviewDecorations).decorations.between(
+      0,
+      state.doc.length,
+      (from, to, value) => {
+        if (value.spec.widget) widgetRanges.push({ from, to });
+      },
+    );
+    expect(widgetRanges).toContainEqual({ from: 0, to: tableSource.length });
+    expect(state.sliceDoc(tableSource.length)).toBe("\n正文");
+  });
 });
 
 function createState(source: string): EditorState {

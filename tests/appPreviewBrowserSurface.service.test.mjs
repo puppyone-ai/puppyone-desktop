@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAppPreviewBrowserSurfaceManager } from "../electron/main/app-preview-browser-surface.mjs";
+import { createNativeSurfaceOcclusionCoordinator } from "../electron/main/native-surfaces/occlusion-coordinator.mjs";
 
 const DEFAULT_REQUEST = Object.freeze({
   ownerWebContentsId: 7,
@@ -128,7 +129,7 @@ class FakeWindow extends EventEmitter {
   }
 }
 
-function createHarness() {
+function createHarness({ nativeSurfaceOcclusion = null } = {}) {
   const window = new FakeWindow();
   const states = [];
   const manager = createAppPreviewBrowserSurfaceManager({
@@ -141,6 +142,7 @@ function createHarness() {
     getOwnerWindow: (id) => id === window.webContents.id ? window : null,
     publishState: (state, ownerId) => states.push({ state, ownerId }),
     loadTimeoutMs: 500,
+    nativeSurfaceOcclusion,
   });
   return { manager, states, window };
 }
@@ -200,6 +202,36 @@ describe("App Preview browser surface manager", () => {
     expect(second.surfaceId).toBe(first.surfaceId);
     expect(createdViews).toHaveLength(1);
     expect(window.children).toEqual([createdViews[0]]);
+  });
+
+  it("hides without detaching or reloading while product chrome occludes the surface", async () => {
+    const nativeSurfaceOcclusion = createNativeSurfaceOcclusionCoordinator();
+    const { manager, window } = createHarness({ nativeSurfaceOcclusion });
+    const result = await manager.activate({ ...DEFAULT_REQUEST, visible: true });
+    const view = createdViews[0];
+    expect(view.setVisible).toHaveBeenLastCalledWith(true);
+    expect(window.children).toEqual([view]);
+
+    nativeSurfaceOcclusion.setOwnerOccluded(7, true);
+    expect(view.setVisible).toHaveBeenLastCalledWith(false);
+    expect(view.webContents.setAudioMuted).toHaveBeenLastCalledWith(true);
+    expect(window.children).toEqual([view]);
+
+    nativeSurfaceOcclusion.setOwnerOccluded(7, false);
+    expect(view.setVisible).toHaveBeenLastCalledWith(true);
+    expect(view.webContents.setAudioMuted).toHaveBeenLastCalledWith(false);
+    expect(window.children).toEqual([view]);
+
+    expect(manager.setBounds({
+      surfaceId: result.surfaceId,
+      attachmentId: "attachment-1",
+      callerWebContentsId: 7,
+      bounds: DEFAULT_REQUEST.bounds,
+      visible: false,
+    })).toEqual({ ok: true, visible: false });
+    nativeSurfaceOcclusion.setOwnerOccluded(7, true);
+    nativeSurfaceOcclusion.setOwnerOccluded(7, false);
+    expect(view.setVisible).toHaveBeenLastCalledWith(false);
   });
 
   it("ignores stale attachment cleanup after a newer lease is active", async () => {

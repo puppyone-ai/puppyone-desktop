@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 describe("desktop side-pane resize interactions", () => {
-  it("collapses the explorer after the pointer crosses its snap threshold", async () => {
+  it("collapses the explorer after pulling half a minimum width past its minimum", async () => {
     const onCollapsedChange = vi.fn();
     const onWidthChange = vi.fn();
     const container = await renderWorkspace({ onCollapsedChange, onWidthChange });
@@ -39,6 +39,40 @@ describe("desktop side-pane resize interactions", () => {
     expect(onWidthChange).not.toHaveBeenCalledWith(expect.any(Number));
   });
 
+  it("follows the pointer down to the explorer minimum, then holds while collapse is armed", async () => {
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    const onCollapsedChange = vi.fn();
+    const onWidthChange = vi.fn();
+    const container = await renderWorkspace({ onCollapsedChange, onWidthChange });
+    const handle = requireHandle(container, ".data-explorer-resizer");
+    const content = requireHandle(container, ".data-content");
+
+    act(() => {
+      handle.dispatchEvent(pointerEvent("pointerdown", 320, 2));
+      window.dispatchEvent(pointerEvent("pointermove", 250, 2));
+    });
+
+    expect(content.style.getPropertyValue("--data-explorer-width")).toBe("250px");
+    expect(onWidthChange).toHaveBeenLastCalledWith(250);
+
+    act(() => {
+      window.dispatchEvent(pointerEvent("pointerup", 250, 2));
+      handle.dispatchEvent(pointerEvent("pointerdown", 320, 2));
+      window.dispatchEvent(pointerEvent("pointermove", 200, 2));
+    });
+
+    expect(content.style.getPropertyValue("--data-explorer-width")).toBe("240px");
+    expect(onWidthChange).toHaveBeenLastCalledWith(240);
+    expect(onCollapsedChange).not.toHaveBeenCalledWith(true);
+
+    act(() => {
+      window.dispatchEvent(pointerEvent("pointerup", 200, 2));
+    });
+  });
+
   it("keeps explorer resize values inside the expanded range before snapping", async () => {
     const onCollapsedChange = vi.fn();
     const onWidthChange = vi.fn();
@@ -46,26 +80,59 @@ describe("desktop side-pane resize interactions", () => {
     const handle = requireHandle(container, ".data-explorer-resizer");
 
     act(() => {
-      handle.dispatchEvent(pointerEvent("pointerdown", 320, 2));
-      window.dispatchEvent(pointerEvent("pointermove", 500, 2));
-      window.dispatchEvent(pointerEvent("pointerup", 500, 2));
+      handle.dispatchEvent(pointerEvent("pointerdown", 320, 3));
+      window.dispatchEvent(pointerEvent("pointermove", 500, 3));
+      window.dispatchEvent(pointerEvent("pointerup", 500, 3));
     });
 
     expect(onCollapsedChange).not.toHaveBeenCalledWith(true);
     expect(onWidthChange).toHaveBeenLastCalledWith(500);
   });
 
-  it("collapses the right sidebar by pointer threshold and keyboard minimum", () => {
+  it("publishes the complete resize gesture without marking it as an occluding overlay", async () => {
+    const onResizeActiveChange = vi.fn();
+    const container = await renderWorkspace({
+      onCollapsedChange: vi.fn(),
+      onResizeActiveChange,
+      onWidthChange: vi.fn(),
+    });
+    const handle = requireHandle(container, ".data-explorer-resizer");
+    expect(handle.dataset.nativeSurfaceOccluder).toBeUndefined();
+
+    act(() => {
+      handle.dispatchEvent(pointerEvent("pointerdown", 320, 13));
+    });
+    expect(handle.dataset.nativeSurfaceOccluder).toBeUndefined();
+    expect(onResizeActiveChange).toHaveBeenLastCalledWith(true);
+
+    act(() => {
+      window.dispatchEvent(pointerEvent("pointerup", 360, 13));
+    });
+    expect(handle.dataset.nativeSurfaceOccluder).toBeUndefined();
+    expect(onResizeActiveChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("removes the explorer resize handle after collapse so Header owns expansion", async () => {
+    const container = await renderWorkspace({
+      explorerCollapsed: true,
+      onCollapsedChange: vi.fn(),
+      onWidthChange: vi.fn(),
+    });
+
+    expect(container.querySelector(".data-explorer-resizer")).toBeNull();
+  });
+
+  it("collapses the right sidebar after pulling half a minimum width past its minimum", () => {
     const onOpenChange = vi.fn();
     const onWidthChange = vi.fn();
     const container = render(withTestLocalization(
       <AuxiliaryPanelHost
-        collapseThreshold={320}
+        collapseThreshold={210}
         maxWidth={900}
         minWidth={420}
         open
         resizable
-        width={420}
+        width={700}
         onOpenChange={onOpenChange}
         onWidthChange={onWidthChange}
       >
@@ -75,9 +142,9 @@ describe("desktop side-pane resize interactions", () => {
     const handle = requireHandle(container, ".desktop-right-sidebar-resizer");
 
     act(() => {
-      handle.dispatchEvent(pointerEvent("pointerdown", 0, 3));
-      window.dispatchEvent(pointerEvent("pointermove", 150, 3));
-      window.dispatchEvent(pointerEvent("pointerup", 150, 3));
+      handle.dispatchEvent(pointerEvent("pointerdown", 0, 5));
+      window.dispatchEvent(pointerEvent("pointermove", 490, 5));
+      window.dispatchEvent(pointerEvent("pointerup", 490, 5));
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
 
@@ -87,13 +154,131 @@ describe("desktop side-pane resize interactions", () => {
     })));
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
+
+  it("grows the right sidebar pointer-synchronously up to the layout-supplied maximum", () => {
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    const onWidthChange = vi.fn();
+    const container = render(withTestLocalization(
+      <AuxiliaryPanelHost
+        collapseThreshold={210}
+        maxWidth={900}
+        minWidth={420}
+        open
+        resizable
+        width={420}
+        onOpenChange={vi.fn()}
+        onWidthChange={onWidthChange}
+      >
+        <div>Terminal</div>
+      </AuxiliaryPanelHost>,
+    ));
+    const handle = requireHandle(container, ".desktop-right-sidebar-resizer");
+    const panel = requireHandle(container, ".desktop-right-sidebar");
+
+    act(() => {
+      handle.dispatchEvent(pointerEvent("pointerdown", 0, 8));
+      window.dispatchEvent(pointerEvent("pointermove", -300, 8));
+    });
+
+    expect(panel.style.getPropertyValue("--desktop-right-sidebar-width")).toBe("720px");
+    expect(onWidthChange).toHaveBeenLastCalledWith(720);
+
+    act(() => {
+      window.dispatchEvent(pointerEvent("pointerup", -300, 8));
+    });
+  });
+
+  it("follows the pointer down to the right-sidebar minimum, then holds while collapse is armed", () => {
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    const onOpenChange = vi.fn();
+    const onWidthChange = vi.fn();
+    const container = render(withTestLocalization(
+      <AuxiliaryPanelHost
+        collapseThreshold={210}
+        maxWidth={900}
+        minWidth={420}
+        open
+        resizable
+        width={700}
+        onOpenChange={onOpenChange}
+        onWidthChange={onWidthChange}
+      >
+        <div>Terminal</div>
+      </AuxiliaryPanelHost>,
+    ));
+    const handle = requireHandle(container, ".desktop-right-sidebar-resizer");
+    const panel = requireHandle(container, ".desktop-right-sidebar");
+
+    act(() => {
+      handle.dispatchEvent(pointerEvent("pointerdown", 0, 6));
+      window.dispatchEvent(pointerEvent("pointermove", 200, 6));
+    });
+
+    expect(panel.style.getPropertyValue("--desktop-right-sidebar-width")).toBe("500px");
+    expect(onWidthChange).toHaveBeenLastCalledWith(500);
+
+    act(() => {
+      window.dispatchEvent(pointerEvent("pointerup", 200, 6));
+      handle.dispatchEvent(pointerEvent("pointerdown", 0, 6));
+      window.dispatchEvent(pointerEvent("pointermove", 300, 6));
+    });
+
+    expect(panel.style.getPropertyValue("--desktop-right-sidebar-width")).toBe("420px");
+    expect(onWidthChange).toHaveBeenLastCalledWith(420);
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    act(() => {
+      window.dispatchEvent(pointerEvent("pointerup", 300, 6));
+    });
+  });
+
+  it("reveals a closed right sidebar immediately while dragging out and snaps back below half width", () => {
+    const onOpenChange = vi.fn();
+    const container = render(withTestLocalization(
+      <AuxiliaryPanelHost
+        collapseThreshold={210}
+        maxWidth={900}
+        minWidth={420}
+        open={false}
+        resizable
+        width={0}
+        onOpenChange={onOpenChange}
+        onWidthChange={vi.fn()}
+      >
+        <div>Terminal</div>
+      </AuxiliaryPanelHost>,
+    ));
+    const handle = requireHandle(container, ".desktop-right-sidebar-resizer");
+    const panelInner = requireHandle(container, ".desktop-right-sidebar-inner");
+
+    expect(handle.classList.contains("po-collapsed-pane-edge-handle--inline-end")).toBe(true);
+    expect(panelInner.hasAttribute("inert")).toBe(true);
+
+    act(() => {
+      handle.dispatchEvent(pointerEvent("pointerdown", 0, 7));
+      window.dispatchEvent(pointerEvent("pointermove", -20, 7));
+      window.dispatchEvent(pointerEvent("pointerup", -20, 7));
+    });
+
+    expect(onOpenChange.mock.calls).toEqual([[true], [false]]);
+  });
 });
 
 async function renderWorkspace({
+  explorerCollapsed = false,
   onCollapsedChange,
+  onResizeActiveChange,
   onWidthChange,
 }: {
+  explorerCollapsed?: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
+  onResizeActiveChange?: (active: boolean) => void;
   onWidthChange: (width: number) => void;
 }) {
   const dataPort: DataPort = {
@@ -108,7 +293,8 @@ async function renderWorkspace({
         collapsedExplorerWidth={0}
         dataPort={dataPort}
         enableMarkdownLinkContentIndexing={false}
-        explorerCollapseThreshold={180}
+        explorerCollapsed={explorerCollapsed}
+        explorerCollapseThreshold={120}
         explorerWidth={320}
         maxExplorerWidth={900}
         minExplorerWidth={240}
@@ -116,6 +302,7 @@ async function renderWorkspace({
         showHeader={false}
         workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
         onExplorerCollapsedChange={onCollapsedChange}
+        onExplorerResizeActiveChange={onResizeActiveChange}
         onExplorerWidthChange={onWidthChange}
       />,
     ));

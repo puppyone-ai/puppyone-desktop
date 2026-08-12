@@ -206,13 +206,14 @@ export function useAppPreviewSession({
       animationFrame = 0;
       const element = hostRef.current;
       if (!element) return;
-      latestBounds = measureSurfaceBounds(element, surfaceVisibleRef.current);
+      latestBounds = measureSurfaceBounds(element);
       const surfaceId = surfaceRef.current?.surfaceId;
       if (!latestBounds || !surfaceId || activeAttachmentRef.current !== attachmentId) return;
       void appPreview.setSurfaceBounds?.({
         surfaceId,
         attachmentId,
         bounds: latestBounds,
+        visible: surfaceVisibleRef.current,
       }).catch(() => {});
     };
 
@@ -223,7 +224,7 @@ export function useAppPreviewSession({
 
     const begin = async () => {
       const element = hostRef.current;
-      const initialBounds = element ? measureSurfaceBounds(element, surfaceVisibleRef.current) : null;
+      const initialBounds = element ? measureSurfaceBounds(element) : null;
       if (!initialBounds) {
         animationFrame = window.requestAnimationFrame(() => void begin());
         return;
@@ -240,8 +241,17 @@ export function useAppPreviewSession({
         let surface: AppPreviewSurfaceState | null = null;
         if (nativeSurface && appPreview.activate) {
           const response = intent === "restart" && appPreview.restart
-            ? await appPreview.restart(path, { bounds: initialBounds, attachmentId })
-            : await appPreview.activate({ path, bounds: initialBounds, attachmentId });
+            ? await appPreview.restart(path, {
+              bounds: initialBounds,
+              attachmentId,
+              visible: surfaceVisibleRef.current,
+            })
+            : await appPreview.activate({
+              path,
+              bounds: initialBounds,
+              attachmentId,
+              visible: surfaceVisibleRef.current,
+            });
           ({ runtime, surface } = normalizeActivationResult(response));
         } else {
           runtime = intent === "restart" && appPreview.restart
@@ -321,12 +331,12 @@ export function useAppPreviewSession({
   };
 }
 
-function measureSurfaceBounds(element: HTMLElement, visible: boolean): AppPreviewBounds | null {
+function measureSurfaceBounds(element: HTMLElement): AppPreviewBounds | null {
   const rect = element.getBoundingClientRect();
   if (rect.width <= 0 || rect.height <= 0) return null;
   return {
-    x: visible ? Math.floor(rect.left) : -100_000,
-    y: visible ? Math.floor(rect.top) : -100_000,
+    x: Math.floor(rect.left),
+    y: Math.floor(rect.top),
     width: Math.ceil(rect.width),
     height: Math.ceil(rect.height),
   };

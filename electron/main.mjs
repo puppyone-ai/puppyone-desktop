@@ -43,13 +43,18 @@ import {
   handleSecondInstanceLaunch,
 } from "./main/desktop-launch-intent.mjs";
 import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
+import { registerAppearanceIpcHandlers } from "./main/ipc/appearance-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerBuildInfoIpcHandlers } from "./main/ipc/build-info-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
 import { registerCloudPublishIpcHandlers } from "./main/ipc/cloud-publish-ipc.mjs";
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
+import { registerNativeSurfaceOcclusionIpcHandlers } from "./main/ipc/native-surface-occlusion-ipc.mjs";
+import { registerNativeSurfacePointerPassthroughIpcHandlers } from "./main/ipc/native-surface-pointer-passthrough-ipc.mjs";
 import { registerLocalizationIpcHandlers } from "./main/ipc/localization-ipc.mjs";
 import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service.mjs";
+import { createNativeSurfaceOcclusionCoordinator } from "./main/native-surfaces/occlusion-coordinator.mjs";
+import { createNativeSurfacePointerPassthroughCoordinator } from "./main/native-surfaces/pointer-passthrough-coordinator.mjs";
 import { registerFeedbackIpcHandlers } from "./main/ipc/feedback-ipc.mjs";
 import { registerSystemIpcHandlers } from "./main/ipc/system-ipc.mjs";
 import { registerTerminalIpcHandlers } from "./main/ipc/terminal-ipc.mjs";
@@ -57,6 +62,7 @@ import { registerWorkspaceFileIpcHandlers } from "./main/ipc/workspace-files-ipc
 import { registerWorkspaceGitIpcHandlers } from "./main/ipc/workspace-git-ipc.mjs";
 import { registerWorkspaceNavigationIpcHandlers } from "./main/ipc/workspace-navigation-ipc.mjs";
 import { registerWorkspaceWatchIpcHandlers } from "./main/ipc/workspace-watch-ipc.mjs";
+import { registerWindowLayoutIpcHandlers } from "./main/ipc/window-layout-ipc.mjs";
 import { registerGitMetadataWatchIpcHandlers } from "./main/ipc/git-metadata-watch-ipc.mjs";
 import { registerLocalFileProtocol } from "./main/local-file-protocol.mjs";
 import { createLocalFileCapabilityStore } from "./main/local-file-capabilities.mjs";
@@ -68,6 +74,8 @@ import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
 import { createDesktopLocaleService } from "./main/localization/desktop-locale-service.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
+import { DESKTOP_WINDOW_MIN_WIDTH } from "./main/window-layout-contract.mjs";
+import { DEFAULT_INTERFACE_STYLE_FIRST_PAINT } from "./main/interface-style-first-paint.generated.mjs";
 import { createGitOperationCoordinator } from "./main/git-operation-coordinator.mjs";
 import { createCloudPublishCoordinator } from "./main/cloud-publish-coordinator.mjs";
 import { createCloudPublishSecretVault } from "./main/cloud-publish-secret-vault.mjs";
@@ -164,6 +172,7 @@ let updateService = null;
 let appPreviewRuntime = null;
 let viewerPackHost = null;
 let viewerPackRuntime = null;
+let markdownWebEmbedService = null;
 let stopLocaleNativeRefresh = null;
 const windowsById = new Map();
 const windowStateById = new Map();
@@ -173,6 +182,16 @@ let lastFocusedWindowId = null;
 const trustedIpcMain = createTrustedIpcMain({
   ipcMain,
   applicationUrl: rendererApplicationUrl,
+});
+const nativeSurfaceOcclusion = createNativeSurfaceOcclusionCoordinator({
+  onCallbackError: (error) => {
+    console.warn("Unable to synchronize a native surface visibility state:", error);
+  },
+});
+const nativeSurfacePointerPassthrough = createNativeSurfacePointerPassthroughCoordinator({
+  onForwardError: (error) => {
+    console.warn("Unable to forward a native surface drag event:", error);
+  },
 });
 const localeService = createDesktopLocaleService({
   app,
@@ -266,13 +285,15 @@ async function createWindow(options = {}) {
   const window = new BrowserWindow({
     width: 1280,
     height: 840,
-    minWidth: 920,
+    minWidth: DESKTOP_WINDOW_MIN_WIDTH,
     minHeight: 640,
     center: true,
     show: false,
     title: appName,
     ...(appIconPath ? { icon: appIconPath } : {}),
-    backgroundColor: "#f1eadf",
+    backgroundColor: nativeTheme.shouldUseDarkColors
+      ? DEFAULT_INTERFACE_STYLE_FIRST_PAINT.dark.background
+      : DEFAULT_INTERFACE_STYLE_FIRST_PAINT.light.background,
     ...macTitlebarOptions,
     webPreferences: {
       contextIsolation: true,
@@ -322,6 +343,13 @@ async function createWindow(options = {}) {
     revealWindow(window);
   });
 
+  window.webContents.on("did-start-navigation", (details) => {
+    if (details?.isMainFrame !== false && details?.isSameDocument !== true) {
+      nativeSurfaceOcclusion.releaseOwner(webContentsId);
+      nativeSurfacePointerPassthrough.releaseOwner(webContentsId);
+    }
+  });
+
   window.webContents.on("console-message", (details) => {
     console.log("puppyone renderer console:", {
       level: details.level,
@@ -350,6 +378,9 @@ async function createWindow(options = {}) {
 
   window.webContents.on("render-process-gone", (_event, details) => {
     console.error("puppyone renderer process gone:", details);
+    nativeSurfaceOcclusion.releaseOwner(webContentsId);
+    nativeSurfacePointerPassthrough.releaseOwner(webContentsId);
+    viewerPackHost?.destroySessionsForOwner(webContentsId);
     appPreviewRuntime?.closeSessionsForWindow(webContentsId);
   });
 
@@ -371,6 +402,8 @@ async function createWindow(options = {}) {
     releaseWindowWorkspaceById(webContentsId, window);
     viewerPackHost?.destroySessionsForOwner(webContentsId);
     appPreviewRuntime?.closeSessionsForWindow(webContentsId);
+    nativeSurfaceOcclusion.releaseOwner(webContentsId);
+    nativeSurfacePointerPassthrough.releaseOwner(webContentsId);
     terminalService.closeSessionsForWindow(webContentsId);
     void agentService.closeSessionsForWindow(webContentsId);
     workspaceWatchService.stopForWindow(webContentsId);
@@ -550,6 +583,8 @@ app.whenReady().then(async () => {
       if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
       window.webContents.send("app-preview:surface-state", state);
     },
+    nativeSurfaceOcclusion,
+    nativeSurfacePointerPassthrough,
   });
   const appPreviewProcessRuntime = createAppPreviewRuntime({
     app,
@@ -596,6 +631,8 @@ app.whenReady().then(async () => {
         mode: nativeTheme.shouldUseDarkColors ? "dark" : "light",
         tokens: {},
       }),
+      nativeSurfaceOcclusion,
+      nativeSurfacePointerPassthrough,
     });
   }
   registerIpcHandlers();
@@ -635,6 +672,9 @@ app.on("will-quit", () => {
   updateService?.dispose();
   viewerPackHost?.destroyAllSessions();
   appPreviewRuntime?.closeAll();
+  markdownWebEmbedService?.dispose();
+  nativeSurfaceOcclusion.dispose();
+  nativeSurfacePointerPassthrough.dispose();
   terminalService.closeAll();
   localAgentInventory.dispose();
   workspaceWatchService.closeAll();
@@ -652,6 +692,22 @@ app.on("before-quit", createAgentQuitCoordinator({
 }));
 
 function registerIpcHandlers() {
+  registerAppearanceIpcHandlers({
+    ipcMain: trustedIpcMain,
+    BrowserWindow,
+  });
+  registerWindowLayoutIpcHandlers({
+    ipcMain: trustedIpcMain,
+    BrowserWindow,
+  });
+  registerNativeSurfaceOcclusionIpcHandlers({
+    ipcMain: trustedIpcMain,
+    coordinator: nativeSurfaceOcclusion,
+  });
+  registerNativeSurfacePointerPassthroughIpcHandlers({
+    ipcMain: trustedIpcMain,
+    coordinator: nativeSurfacePointerPassthrough,
+  });
   registerBuildInfoIpcHandlers({
     ipcMain: trustedIpcMain,
     buildInfo: desktopBuildInfo,
@@ -683,7 +739,7 @@ function registerIpcHandlers() {
     ipcMain: trustedIpcMain,
     appVersion: desktopBuildInfo.version,
   });
-  registerMarkdownWebEmbedIpcHandlers({
+  markdownWebEmbedService = registerMarkdownWebEmbedIpcHandlers({
     ipcMain: trustedIpcMain,
     createMarkdownWebEmbedService,
     getOwnerWindow: (webContentsId) => {
@@ -692,6 +748,8 @@ function registerIpcHandlers() {
       }
       return null;
     },
+    nativeSurfaceOcclusion,
+    nativeSurfacePointerPassthrough,
   });
   registerWorkspaceFileIpcHandlers({
     app,

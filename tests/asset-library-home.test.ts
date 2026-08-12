@@ -68,6 +68,7 @@ function renderLibrary(overrides: Partial<MinimalOnboardingProps> = {}) {
   root = createRoot(container);
   const props: MinimalOnboardingProps = {
     onChooseWorkspace: vi.fn(async () => undefined),
+    onOpenDroppedWorkspace: vi.fn(async () => undefined),
     onOpenWorkspacePath: vi.fn(async () => undefined),
     projectItems: items,
     themeMode: "dark",

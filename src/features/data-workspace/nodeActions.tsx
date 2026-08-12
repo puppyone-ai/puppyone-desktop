@@ -180,19 +180,25 @@ export function DesktopCreateEntryMenu({
     getCreateEntryOption("folder"),
     ...Array.from(new Set(fileKinds)).map((kind) => getCreateEntryOption(kind)),
   ];
-  const position = getCreateEntryMenuPosition(draft.anchor);
+  const sidebarLauncher = draft.anchor.placement === "auto-end";
+  const menuWidth = sidebarLauncher
+    ? Math.max(CREATE_ENTRY_MENU_WIDTH, draft.anchor.width)
+    : CREATE_ENTRY_MENU_WIDTH;
+  const estimatedHeight = 8 + (menuOptions.length * 30) + (menuOptions.length > 1 ? 9 : 0);
+  const position = getCreateEntryMenuPosition(draft.anchor, menuWidth, estimatedHeight);
   const menuStyle = {
     "--node-action-menu-left": `${position.left}px`,
     "--node-action-menu-top": `${position.top}px`,
-    "--node-action-menu-width": `${CREATE_ENTRY_MENU_WIDTH}px`,
+    "--node-action-menu-width": `${menuWidth}px`,
   } as CSSProperties;
 
   useEffect(() => {
+    if (sidebarLauncher) return;
     const frame = window.requestAnimationFrame(() => {
       menuRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, []);
+  }, [sidebarLauncher]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -221,7 +227,9 @@ export function DesktopCreateEntryMenu({
     <DesktopMenuSurface
       ref={menuRef}
       className="desktop-create-entry-menu desktop-node-action-menu"
+      id={sidebarLauncher ? "desktop-sidebar-create-menu" : undefined}
       ariaLabel={t("workspace.node.createNew")}
+      data-sidebar-launcher={sidebarLauncher ? "true" : undefined}
       style={menuStyle}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
@@ -1071,14 +1079,18 @@ function getNodeActionMenuPosition(anchor: DesktopCreateEntryAnchor, menuWidth: 
   };
 }
 
-function getCreateEntryMenuPosition(anchor: DesktopCreateEntryAnchor) {
+function getCreateEntryMenuPosition(
+  anchor: DesktopCreateEntryAnchor,
+  menuWidth = CREATE_ENTRY_MENU_WIDTH,
+  estimatedHeight = CREATE_ENTRY_MENU_ESTIMATED_HEIGHT,
+) {
   const viewportWidth = typeof window === "undefined" ? 1024 : window.innerWidth;
   const viewportHeight = typeof window === "undefined" ? 768 : window.innerHeight;
-  const maxLeft = Math.max(CREATE_ENTRY_MENU_MARGIN, viewportWidth - CREATE_ENTRY_MENU_WIDTH - CREATE_ENTRY_MENU_MARGIN);
-  const maxTop = Math.max(CREATE_ENTRY_MENU_MARGIN, viewportHeight - CREATE_ENTRY_MENU_ESTIMATED_HEIGHT - CREATE_ENTRY_MENU_MARGIN);
+  const maxLeft = Math.max(CREATE_ENTRY_MENU_MARGIN, viewportWidth - menuWidth - CREATE_ENTRY_MENU_MARGIN);
+  const maxTop = Math.max(CREATE_ENTRY_MENU_MARGIN, viewportHeight - estimatedHeight - CREATE_ENTRY_MENU_MARGIN);
   const gap = 6;
   const belowTop = anchor.bottom + gap;
-  const aboveTop = anchor.top - CREATE_ENTRY_MENU_ESTIMATED_HEIGHT - gap;
+  const aboveTop = anchor.top - estimatedHeight - gap;
   const belowFits = belowTop <= maxTop;
   const aboveFits = aboveTop >= CREATE_ENTRY_MENU_MARGIN;
   const placement = anchor.placement ?? "below-start";
@@ -1090,7 +1102,7 @@ function getCreateEntryMenuPosition(anchor: DesktopCreateEntryAnchor) {
     : placement === "above-start" || placement === "above-end"
       ? (aboveFits || !belowFits ? aboveTop : belowTop)
       : (belowFits || !aboveFits ? belowTop : aboveTop);
-  const preferredLeft = alignEnd ? anchor.right - CREATE_ENTRY_MENU_WIDTH : anchor.left;
+  const preferredLeft = alignEnd ? anchor.right - menuWidth : anchor.left;
 
   return {
     left: clampNumber(preferredLeft, CREATE_ENTRY_MENU_MARGIN, maxLeft),

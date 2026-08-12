@@ -1,94 +1,137 @@
 import { describe, expect, it } from "vitest";
 import {
+  EXPLORER_RESIZE_GUTTER_WIDTH,
+  MAX_EXPLORER_WIDTH,
+  MAX_RIGHT_SIDEBAR_WIDTH,
+  MIN_EXPLORER_WIDTH,
   MIN_MAIN_PANE_WIDTH,
+  MIN_RIGHT_SIDEBAR_WIDTH,
   resolveDesktopPaneLayout,
 } from "../src/features/app-shell/layout/desktopPaneLayout";
 
 describe("desktop three-pane layout", () => {
-  it("keeps preferred side widths when the main pane has enough room", () => {
+  it("keeps independent preferred side widths while the main pane owns spare space", () => {
     const layout = resolveLayout({ availableWidth: 1440 });
 
     expect(layout.explorer.width).toBe(320);
     expect(layout.rightSidebar.width).toBe(560);
-    expect(layout.main.width).toBe(560);
+    expect(layout.main.width).toBe(552);
     expect(layout.main.minWidth).toBe(MIN_MAIN_PANE_WIDTH);
   });
 
-  it("uses the remaining space as the dynamic maximum instead of a fixed cap", () => {
+  it("clamps each sidebar to its own absolute maximum instead of a viewport ratio", () => {
     const layout = resolveLayout({
-      availableWidth: 1440,
-      explorerWidth: 320,
-      rightSidebarWidth: 1200,
-    });
-
-    expect(layout.rightSidebar.maxWidth).toBe(720);
-    expect(layout.rightSidebar.width).toBe(720);
-    expect(layout.explorer.width).toBe(240);
-    expect(layout.main.width).toBe(MIN_MAIN_PANE_WIDTH);
-  });
-
-  it("bounds either side pane without allowing it to consume the main pane", () => {
-    const wideExplorer = resolveLayout({
-      availableWidth: 1440,
+      availableWidth: 2200,
       explorerWidth: 1200,
-      rightSidebarWidth: 560,
-    });
-    const wideRightSidebar = resolveLayout({
-      availableWidth: 1920,
-      explorerCollapsed: true,
       rightSidebarWidth: 1600,
     });
 
-    expect(wideExplorer.explorer.width).toBe(400);
-    expect(wideExplorer.main.width).toBe(MIN_MAIN_PANE_WIDTH);
-    expect(wideRightSidebar.rightSidebar.width).toBe(1440);
-    expect(wideRightSidebar.main.width).toBe(MIN_MAIN_PANE_WIDTH);
+    expect(layout.explorer.width).toBe(MAX_EXPLORER_WIDTH);
+    expect(layout.explorer.maxWidth).toBe(MAX_EXPLORER_WIDTH);
+    expect(layout.rightSidebar.width).toBe(MAX_RIGHT_SIDEBAR_WIDTH);
+    expect(layout.rightSidebar.maxWidth).toBe(MAX_RIGHT_SIDEBAR_WIDTH);
+    expect(layout.main.width).toBe(912);
   });
 
-  it("temporarily collapses the explorer before violating three-pane minima", () => {
-    const compact = resolveLayout({ availableWidth: 1100 });
+  it("compresses only the main pane before touching either sidebar", () => {
+    const wide = resolveLayout({ availableWidth: 1440 });
+    const compressed = resolveLayout({ availableWidth: 1240 });
 
-    expect(compact.explorer.autoCollapsed).toBe(true);
-    expect(compact.explorer.collapsed).toBe(true);
-    expect(compact.explorer.width).toBe(0);
-    expect(compact.rightSidebar.width).toBe(560);
-    expect(compact.main.width).toBe(540);
+    expect(compressed.explorer.width).toBe(wide.explorer.width);
+    expect(compressed.rightSidebar.width).toBe(wide.rightSidebar.width);
+    expect(compressed.main.width).toBe(wide.main.width - 200);
   });
 
-  it("restores the preferred explorer width when space becomes available again", () => {
-    const compact = resolveLayout({ availableWidth: 1100, explorerWidth: 380 });
+  it("shrinks the auxiliary pane alone after the main pane reaches its minimum", () => {
+    const layout = resolveLayout({ availableWidth: 1100 });
+
+    expect(layout.main.width).toBe(MIN_MAIN_PANE_WIDTH);
+    expect(layout.explorer.width).toBe(320);
+    expect(layout.rightSidebar.width).toBe(452);
+  });
+
+  it("shrinks the explorer only after the auxiliary pane reaches its own minimum", () => {
+    const layout = resolveLayout({ availableWidth: 900 });
+
+    expect(layout.main.width).toBe(MIN_MAIN_PANE_WIDTH);
+    expect(layout.rightSidebar.width).toBe(MIN_RIGHT_SIDEBAR_WIDTH);
+    expect(layout.explorer.width).toBe(252);
+  });
+
+  it("raises the workbench minimum instead of proportionally violating pane minima", () => {
+    const layout = resolveLayout({ availableWidth: 640 });
+    const expectedMinimum = MIN_EXPLORER_WIDTH
+      + EXPLORER_RESIZE_GUTTER_WIDTH
+      + MIN_MAIN_PANE_WIDTH
+      + MIN_RIGHT_SIDEBAR_WIDTH;
+
+    expect(layout.availableWidth).toBe(640);
+    expect(layout.minimumWidth).toBe(expectedMinimum);
+    expect(layout.explorer.width).toBe(MIN_EXPLORER_WIDTH);
+    expect(layout.main.width).toBe(MIN_MAIN_PANE_WIDTH);
+    expect(layout.rightSidebar.width).toBe(MIN_RIGHT_SIDEBAR_WIDTH);
+    expect(
+      layout.explorer.width
+        + EXPLORER_RESIZE_GUTTER_WIDTH
+        + layout.main.width
+        + layout.rightSidebar.width,
+    ).toBe(expectedMinimum);
+  });
+
+  it("keeps visibility mapped directly from user state at every width", () => {
+    for (const availableWidth of [640, 900, 1440]) {
+      const hidden = resolveLayout({
+        availableWidth,
+        explorerCollapsed: true,
+        rightSidebarOpen: false,
+      });
+      const visible = resolveLayout({ availableWidth });
+
+      expect(hidden.explorer.collapsed).toBe(true);
+      expect(hidden.explorer.width).toBe(0);
+      expect(hidden.rightSidebar.open).toBe(false);
+      expect(hidden.rightSidebar.width).toBe(0);
+      expect(visible.explorer.collapsed).toBe(false);
+      expect(visible.rightSidebar.open).toBe(true);
+    }
+  });
+
+  it("restores saved preferred widths without a visibility-state transition", () => {
+    const compact = resolveLayout({ availableWidth: 900, explorerWidth: 380 });
     const restored = resolveLayout({ availableWidth: 1600, explorerWidth: 380 });
 
-    expect(compact.explorer.autoCollapsed).toBe(true);
-    expect(restored.explorer.autoCollapsed).toBe(false);
+    expect(compact.explorer.collapsed).toBe(false);
+    expect(compact.rightSidebar.open).toBe(true);
+    expect(restored.explorer.collapsed).toBe(false);
+    expect(restored.rightSidebar.open).toBe(true);
     expect(restored.explorer.width).toBe(380);
+    expect(restored.rightSidebar.width).toBe(560);
   });
 
-  it("temporarily closes the auxiliary pane only below its own viable width", () => {
-    const tooNarrow = resolveLayout({ availableWidth: 880 });
+  it("uses the 640px product floor when only the right sidebar is open", () => {
+    const layout = resolveLayout({
+      availableWidth: 640,
+      explorerCollapsed: true,
+      rightSidebarOpen: true,
+    });
 
-    expect(tooNarrow.rightSidebar.autoClosed).toBe(true);
-    expect(tooNarrow.rightSidebar.open).toBe(false);
-    expect(tooNarrow.rightSidebar.width).toBe(0);
-    expect(tooNarrow.main.width).toBeGreaterThanOrEqual(MIN_MAIN_PANE_WIDTH);
+    expect(layout.minimumWidth).toBe(640);
+    expect(layout.main.width).toBe(MIN_MAIN_PANE_WIDTH);
+    expect(layout.rightSidebar.width).toBe(MIN_RIGHT_SIDEBAR_WIDTH);
   });
 
-  it.each([920, 1100, 1200, 1440, 1920])(
-    "preserves the main-pane invariant at %ipx",
+  it.each([640, 888, 900, 968, 1100, 1208, 1440, 1920])(
+    "preserves every pane contract at %ipx without automatic visibility changes",
     (availableWidth) => {
-      for (const explorerWidth of [240, 320, 800, 2000]) {
-        for (const rightSidebarWidth of [420, 560, 1000, 2400]) {
-          const layout = resolveLayout({
-            availableWidth,
-            explorerWidth,
-            rightSidebarWidth,
-          });
-          expect(layout.main.width).toBeGreaterThanOrEqual(layout.main.minWidth);
-          expect(
-            layout.explorer.width + layout.main.width + layout.rightSidebar.width,
-          ).toBe(availableWidth);
-        }
-      }
+      const layout = resolveLayout({ availableWidth });
+
+      expect(layout.explorer.width).toBeGreaterThanOrEqual(layout.explorer.minWidth);
+      expect(layout.explorer.width).toBeLessThanOrEqual(layout.explorer.maxWidth);
+      expect(layout.main.width).toBeGreaterThanOrEqual(layout.main.minWidth);
+      expect(layout.rightSidebar.width).toBeGreaterThanOrEqual(layout.rightSidebar.minWidth);
+      expect(layout.rightSidebar.width).toBeLessThanOrEqual(layout.rightSidebar.maxWidth);
+      expect(layout.explorer.collapsed).toBe(false);
+      expect(layout.rightSidebar.open).toBe(true);
     },
   );
 });

@@ -21,6 +21,7 @@ import { useDesktopPaneLayout } from "./layout/DesktopPaneLayoutContext";
 import {
   COLLAPSED_EXPLORER_WIDTH,
   EXPLORER_COLLAPSE_THRESHOLD,
+  MAX_EXPLORER_WIDTH,
   MIN_EXPLORER_WIDTH,
 } from "./layout/desktopPaneLayout";
 import type { DesktopPreferencesController } from "./useDesktopPreferences";
@@ -31,6 +32,7 @@ import {
 } from "./navigation";
 import { WorkspaceSurfaceOutlet, type ResolvedWorkspaceSurface } from "./workspace-surfaces";
 import type { DesktopView } from "../../components/DesktopCloudShell";
+import { setNativeSurfacePointerPassthrough } from "../native-surfaces";
 
 type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 
@@ -62,6 +64,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
   ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
+  onDismissCreateEntryMenu: () => void;
   onNodeActionMenu: (node: DataNode, anchorRect: DOMRect, selectedNodes?: readonly DataNode[]) => void;
   preferences: DesktopPreferencesController;
   resolvedSurface: ResolvedWorkspaceSurface;
@@ -70,6 +73,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
   workspaceKey: string;
   workspaceRefreshToken: number;
   workspaceSurfaceError: string | null;
+  sidebarCreateMenuOpen: boolean;
 };
 
 export function DesktopDataWorkspaceSurface({
@@ -84,6 +88,7 @@ export function DesktopDataWorkspaceSurface({
   onActiveDataNodeChange,
   onActiveDataPathChange,
   onCreateEntryMenu,
+  onDismissCreateEntryMenu,
   onNodeActionMenu,
   preferences,
   resolvedSurface,
@@ -92,12 +97,14 @@ export function DesktopDataWorkspaceSurface({
   workspaceKey,
   workspaceRefreshToken,
   workspaceSurfaceError,
+  sidebarCreateMenuOpen,
 }: DesktopDataWorkspaceSurfaceProps) {
   const { t } = useLocalization();
   const paneLayout = useDesktopPaneLayout();
   const resolvedExplorerWidth = paneLayout?.explorer.width ?? preferences.explorerWidth;
   const resolvedExplorerMaxWidth = paneLayout?.explorer.maxWidth
-    ?? Math.max(preferences.explorerWidth, MIN_EXPLORER_WIDTH);
+    ?? MAX_EXPLORER_WIDTH;
+  const resolvedExplorerMinWidth = paneLayout?.explorer.minWidth ?? MIN_EXPLORER_WIDTH;
   const resolvedExplorerCollapsed = paneLayout?.explorer.collapsed
     ?? preferences.sidebarCollapsed;
   const navigationCommon = {
@@ -148,12 +155,13 @@ export function DesktopDataWorkspaceSurface({
         resizableExplorer
         explorerCollapsed={resolvedExplorerCollapsed}
         explorerWidth={resolvedExplorerWidth}
-        minExplorerWidth={MIN_EXPLORER_WIDTH}
+        minExplorerWidth={resolvedExplorerMinWidth}
         maxExplorerWidth={resolvedExplorerMaxWidth}
         collapsedExplorerWidth={COLLAPSED_EXPLORER_WIDTH}
         explorerCollapseThreshold={EXPLORER_COLLAPSE_THRESHOLD}
         onExplorerCollapsedChange={preferences.setSidebarCollapsed}
         onExplorerWidthChange={preferences.setExplorerWidth}
+        onExplorerResizeActiveChange={setNativeSurfacePointerPassthrough}
         showHeader={false}
         showExplorerRoot={false}
         onExplorerRootContextMenu={(_state, event) => {
@@ -175,19 +183,32 @@ export function DesktopDataWorkspaceSurface({
         onPasteNodes={fileClipboardController.pasteNodes}
         onDuplicateNodes={fileClipboardController.duplicateNodes}
         explorerListEndSlot={(
-          <button
-            className="tree-row desktop-explorer-list-end-create-row"
-            type="button"
-            onClick={(event) => onCreateEntryMenu(
-              null,
-              rectToCreateEntryAnchor(event.currentTarget.getBoundingClientRect(), "auto-end"),
-            )}
+          <div
+            className="desktop-explorer-list-end-create"
+            data-open={sidebarCreateMenuOpen ? "true" : undefined}
           >
-            <span className="tree-row-content desktop-explorer-list-end-create-command">
-              <span className="tree-icon-slot"><Plus size={14} strokeWidth={2.2} aria-hidden="true" /></span>
-              <span className="tree-label"><span className="tree-label-primary">{t("workspace.explorer.new")}</span></span>
-            </span>
-          </button>
+            <button
+              className="tree-row desktop-explorer-list-end-create-row"
+              type="button"
+              aria-expanded={sidebarCreateMenuOpen}
+              aria-controls="desktop-sidebar-create-menu"
+              onClick={(event) => {
+                if (sidebarCreateMenuOpen) {
+                  onDismissCreateEntryMenu();
+                  return;
+                }
+                onCreateEntryMenu(
+                  null,
+                  rectToCreateEntryAnchor(event.currentTarget.getBoundingClientRect(), "auto-end"),
+                );
+              }}
+            >
+              <span className="tree-row-content desktop-explorer-list-end-create-command">
+                <span className="tree-icon-slot"><Plus size={14} strokeWidth={2.2} aria-hidden="true" /></span>
+                <span className="tree-label"><span className="tree-label-primary">{t("workspace.explorer.new")}</span></span>
+              </span>
+            </button>
+          </div>
         )}
         showExplorerToolbar={!minimalMode && preferences.sidebarNavigationPlacement === "top"}
         explorerToolbarSlot={!minimalMode && preferences.sidebarNavigationPlacement === "top" ? (

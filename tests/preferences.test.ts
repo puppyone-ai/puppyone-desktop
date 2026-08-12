@@ -19,12 +19,11 @@ import {
 } from "../src/preferences";
 
 describe("create new menu preferences", () => {
-  it("defaults to Markdown, CSV, and App Preview while preserving explicit order and visibility", () => {
+  it("defaults to Markdown and CSV while preserving explicit order and visibility", () => {
     expect(parseCreateNewMenuSettings(null)).toEqual({
       items: [
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
-        { kind: "app", enabled: true },
       ],
     });
     expect(parseCreateNewMenuSettings(JSON.stringify({
@@ -47,7 +46,6 @@ describe("create new menu preferences", () => {
       items: [
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
-        { kind: "app", enabled: true },
       ],
     });
   });
@@ -68,7 +66,6 @@ describe("create new menu preferences", () => {
       items: [
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
-        { kind: "app", enabled: true },
       ],
     });
     expect(parseCreateNewMenuSettings(JSON.stringify({ items: [] }))).toEqual({ items: [] });
@@ -158,11 +155,11 @@ describe("appearance preferences", () => {
     expect(parsePointerCursors(null)).toBe(false);
   });
 
-  it("keeps the titlebar menu by default and accepts the Terminal tabs layout", () => {
-    expect(parseTerminalSessionLayout(null)).toBe("menu");
+  it("keeps Terminal sessions in the visible tab bar by default and accepts the header menu layout", () => {
+    expect(parseTerminalSessionLayout(null)).toBe("tabs");
     expect(parseTerminalSessionLayout("menu")).toBe("menu");
     expect(parseTerminalSessionLayout("tabs")).toBe("tabs");
-    expect(parseTerminalSessionLayout("floating")).toBe("menu");
+    expect(parseTerminalSessionLayout("floating")).toBe("tabs");
   });
 
 });

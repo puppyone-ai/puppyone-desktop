@@ -178,6 +178,7 @@ export function CsvTableMenu({
       ref={menuRef}
       id={target.menuId}
       className="desktop-menu-surface po-editable-table-context-menu csv-table-editor__context-menu"
+      data-native-surface-occluder="true"
       data-po-scrollbar="menu"
       role="menu"
       aria-label={t("editor.table.actions")}

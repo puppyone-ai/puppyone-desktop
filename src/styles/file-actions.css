@@ -186,6 +186,31 @@
   overflow: visible;
 }
 
+.desktop-create-entry-menu.desktop-node-action-menu[data-sidebar-launcher="true"] {
+  --po-menu-item-height: var(--desktop-sidebar-row-height);
+  --po-menu-item-padding-inline: var(--desktop-sidebar-row-content-left);
+  --po-menu-item-gap: var(--desktop-sidebar-icon-label-gap);
+  --po-menu-item-radius: var(--desktop-sidebar-row-radius);
+
+  padding: 4px;
+  border-color: var(--po-sidebar-divider, var(--po-divider));
+  border-radius: var(--desktop-sidebar-row-radius);
+  background: color-mix(in srgb, var(--po-sidebar) 94%, var(--po-text) 6%);
+  backdrop-filter: none;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--po-shadow) 38%, transparent);
+}
+
+.desktop-create-entry-menu[data-sidebar-launcher="true"] .desktop-menu-separator {
+  display: none;
+}
+
+.desktop-create-entry-menu[data-sidebar-launcher="true"] .desktop-menu-item {
+  color: var(--po-text-muted);
+  font-size: var(--desktop-sidebar-font-size);
+  font-weight: var(--desktop-sidebar-font-weight);
+  line-height: var(--desktop-sidebar-line-height);
+}
+
 .app-shell.dark .desktop-create-entry-menu,
 .desktop-overlay-root.dark .desktop-create-entry-menu {
   --po-text: #d2cec5;

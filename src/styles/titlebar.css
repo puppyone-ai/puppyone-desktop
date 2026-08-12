@@ -143,6 +143,76 @@
   width: var(--desktop-titlebar-control-height);
 }
 
+.desktop-titlebar-update {
+  width: var(--desktop-titlebar-control-height);
+  flex: 0 0 var(--desktop-titlebar-control-height);
+  isolation: isolate;
+  background: transparent;
+  color: var(--po-text-inverse);
+}
+
+.desktop-titlebar-update::before {
+  position: absolute;
+  z-index: 0;
+  inset: 2px;
+  border-radius: 50%;
+  background: var(--po-accent);
+  content: "";
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.desktop-titlebar-update > svg {
+  position: relative;
+  z-index: 1;
+}
+
+.desktop-titlebar-action.desktop-titlebar-update:hover,
+.desktop-titlebar-action.desktop-titlebar-update:focus-visible {
+  background: transparent;
+  color: var(--po-text-inverse);
+}
+
+.desktop-titlebar-action.desktop-titlebar-update:hover::before,
+.desktop-titlebar-action.desktop-titlebar-update:focus-visible::before {
+  background: color-mix(in srgb, var(--po-accent) 88%, var(--po-text));
+}
+
+.desktop-titlebar-action.desktop-titlebar-update:focus-visible {
+  box-shadow: none;
+}
+
+.desktop-titlebar-action.desktop-titlebar-update:focus-visible::before {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-text-inverse) 64%, transparent);
+}
+
+.desktop-titlebar-update.is-ready::before {
+  background: var(--po-success);
+}
+
+.desktop-titlebar-update.is-ready {
+  color: var(--po-success-contrast);
+}
+
+.desktop-titlebar-action.desktop-titlebar-update.is-ready:hover::before,
+.desktop-titlebar-action.desktop-titlebar-update.is-ready:focus-visible::before {
+  background: color-mix(in srgb, var(--po-success) 88%, var(--po-text));
+}
+
+.desktop-titlebar-update:disabled {
+  opacity: 1;
+}
+
+.desktop-titlebar-update-dot {
+  position: absolute;
+  z-index: 2;
+  right: 2px;
+  bottom: 2px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
 .desktop-titlebar-actions .desktop-titlebar-terminal,
 .desktop-titlebar-actions .desktop-titlebar-agent-chat {
   width: var(--desktop-titlebar-tool-action-width);
@@ -297,6 +367,11 @@
   background: var(--desktop-titlebar-hover);
   box-shadow: inset 0 0 0 1px var(--desktop-titlebar-focus);
   color: var(--desktop-titlebar-text);
+}
+
+.desktop-titlebar-sidebar-expand {
+  width: var(--desktop-titlebar-tool-action-width);
+  flex: 0 0 var(--desktop-titlebar-tool-action-width);
 }
 
 .desktop-titlebar-workspace-name {
@@ -485,6 +560,34 @@
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * At the native minimum width the optional panes leave the workbench, while
+ * titlebar tools stay reachable. Give the workspace/branch context the
+ * remaining flexible space and truncate labels instead of overflowing tools.
+ */
+@media (max-width: 720px) {
+  .desktop-titlebar {
+    gap: 2px;
+    padding-inline-end: 4px;
+  }
+
+  .desktop-titlebar-left {
+    overflow: hidden;
+  }
+
+  .desktop-titlebar-context {
+    overflow: hidden;
+  }
+
+  .desktop-titlebar-actions {
+    gap: 1px;
+  }
+
+  .desktop-titlebar-action-divider {
+    margin-inline: 1px;
+  }
 }
 
 .desktop-branch-menu {

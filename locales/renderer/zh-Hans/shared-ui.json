@@ -7,6 +7,7 @@
   "explorer.more": "更多",
   "explorer.access": "访问",
   "explorer.resizeSidebar": "调整侧边栏大小",
+  "explorer.expandSidebar": "展开侧边栏",
   "explorer.cutLabel": "{name}，已剪切",
   "navigation.back": "返回",
   "preview.selectFile": "请选择要预览的文件",

@@ -4,6 +4,7 @@
   "projects.untitled": "名称未設定のプロジェクト",
   "action.createCloudProject": "Cloud プロジェクトを作成",
   "action.openLocalFolder": "ローカルフォルダを開く",
+  "action.openOrDropLocalFolder": "フォルダを開くかドロップ",
   "action.switchTo": "切り替え",
   "action.switchToCloud": "Cloud プロジェクトに切り替え",
   "action.switchToLocal": "ローカルプロジェクトに切り替え",

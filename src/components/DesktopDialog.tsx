@@ -1,4 +1,5 @@
 import { useEffect, useRef, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import { useNativeSurfaceOcclusionLease } from "../features/native-surfaces";
 
 const DIALOG_FOCUSABLE_SELECTOR = [
   "button:not([disabled])",
@@ -20,6 +21,8 @@ export function DesktopDialogRoot({
   dismissOnBackdrop?: boolean;
   className?: string;
 }) {
+  useNativeSurfaceOcclusionLease();
+
   const pointerStartedOnBackdropRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -93,6 +96,7 @@ export function DesktopDialogRoot({
       ref={rootRef}
       className={`desktop-dialog-backdrop ${className}`.trim()}
       data-desktop-dialog-root="true"
+      data-native-surface-occluder="true"
       data-window-no-drag="true"
       role="presentation"
       onPointerDown={handlePointerDown}
@@ -148,16 +152,18 @@ function isTopmostDesktopDialog(root: HTMLElement) {
 
 export function DesktopDialogCloseButton({
   title = "Close",
+  className = "",
   disabled,
   onClick,
 }: {
   title?: string;
+  className?: string;
   disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
-      className="desktop-dialog-icon-button"
+      className={`desktop-dialog-icon-button ${className}`.trim()}
       type="button"
       disabled={disabled}
       aria-label={title}

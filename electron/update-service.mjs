@@ -9,12 +9,21 @@ import {
 
 const UPDATE_STATE_CHANNEL = "updates:state";
 
+export const BACKGROUND_UPDATE_INITIAL_DELAY_MS = 15 * 1000;
+export const BACKGROUND_UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
 const UPDATE_ACTION_STATES = new Set([
   "idle",
   "not-available",
   "available",
   "downloaded",
   "blocked",
+  "error",
+]);
+
+const BACKGROUND_CHECK_STATES = new Set([
+  "idle",
+  "not-available",
   "error",
 ]);
 
@@ -63,6 +72,8 @@ export function createUpdateService({
   const canUseUpdater = !disabledReason;
 
   let started = false;
+  let disposed = false;
+  let backgroundCheckTimer = null;
   let operationPromise = null;
   let latestUpdateInfo = null;
   let state = createInitialUpdateState({
@@ -86,10 +97,24 @@ export function createUpdateService({
       });
       return;
     }
+
+    scheduleBackgroundCheck(BACKGROUND_UPDATE_INITIAL_DELAY_MS);
   }
 
   function dispose() {
-    // Updates are manual-only, so the service owns no background timer.
+    disposed = true;
+    if (backgroundCheckTimer) clearTimeout(backgroundCheckTimer);
+    backgroundCheckTimer = null;
+  }
+
+  function scheduleBackgroundCheck(delay) {
+    if (disposed || !canUseUpdater || backgroundCheckTimer) return;
+    backgroundCheckTimer = setTimeout(async () => {
+      backgroundCheckTimer = null;
+      if (BACKGROUND_CHECK_STATES.has(state.status)) await checkForUpdates();
+      scheduleBackgroundCheck(BACKGROUND_UPDATE_INTERVAL_MS);
+    }, delay);
+    backgroundCheckTimer.unref?.();
   }
 
   function registerIpcHandlers() {

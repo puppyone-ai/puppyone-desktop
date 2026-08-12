@@ -82,6 +82,7 @@ export function showMarkdownTableContextMenu(
   const menu = document.createElement("div");
   menu.id = `cm-md-table-menu-${++markdownTableMenuSequence}`;
   menu.className = "desktop-menu-surface cm-md-table-context-menu po-editable-table-context-menu";
+  menu.dataset.nativeSurfaceOccluder = "true";
   menu.dataset.poScrollbar = "menu";
   menu.setAttribute("role", "menu");
   menu.setAttribute("aria-label", localization.t("editor.table.actions"));

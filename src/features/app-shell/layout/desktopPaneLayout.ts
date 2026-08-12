@@ -1,24 +1,29 @@
 export const DEFAULT_EXPLORER_WIDTH = 320;
 export const MIN_EXPLORER_WIDTH = 240;
+export const MAX_EXPLORER_WIDTH = 520;
 export const COLLAPSED_EXPLORER_WIDTH = 0;
-export const EXPLORER_COLLAPSE_THRESHOLD = 180;
+export const EXPLORER_COLLAPSE_THRESHOLD = MIN_EXPLORER_WIDTH * 0.5;
 
 export const DEFAULT_RIGHT_SIDEBAR_WIDTH = 560;
-export const MIN_RIGHT_SIDEBAR_WIDTH = 420;
-export const RIGHT_SIDEBAR_COLLAPSE_THRESHOLD = 320;
+export const MIN_RIGHT_SIDEBAR_WIDTH = 320;
+export const MAX_RIGHT_SIDEBAR_WIDTH = 760;
+export const RIGHT_SIDEBAR_COLLAPSE_THRESHOLD = MIN_RIGHT_SIDEBAR_WIDTH * 0.5;
 
-export const MIN_MAIN_PANE_WIDTH = 480;
+export const MIN_MAIN_PANE_WIDTH = 320;
+export const EXPLORER_RESIZE_GUTTER_WIDTH = 8;
 
 export type DesktopPaneLayoutInput = Readonly<{
   availableWidth: number;
   explorer: Readonly<{
     collapsed: boolean;
+    maxWidth?: number;
     minWidth?: number;
     preferredWidth: number;
     present: boolean;
   }>;
   mainMinWidth?: number;
   rightSidebar: Readonly<{
+    maxWidth?: number;
     minWidth?: number;
     open: boolean;
     preferredWidth: number;
@@ -29,7 +34,6 @@ export type DesktopPaneLayoutInput = Readonly<{
 export type ResolvedDesktopPaneLayout = Readonly<{
   availableWidth: number;
   explorer: Readonly<{
-    autoCollapsed: boolean;
     collapsed: boolean;
     maxWidth: number;
     minWidth: number;
@@ -39,8 +43,8 @@ export type ResolvedDesktopPaneLayout = Readonly<{
     minWidth: number;
     width: number;
   }>;
+  minimumWidth: number;
   rightSidebar: Readonly<{
-    autoClosed: boolean;
     maxWidth: number;
     minWidth: number;
     open: boolean;
@@ -50,11 +54,14 @@ export type ResolvedDesktopPaneLayout = Readonly<{
 }>;
 
 /**
- * Resolves the desktop shell as one coordinated three-pane layout.
+ * Resolves the desktop shell as an asymmetric three-pane workbench.
  *
- * The main pane is the invariant: side panes may shrink or temporarily leave
- * the layout, but the main pane never yields below its minimum while the
- * window itself can still satisfy that minimum.
+ * Visibility belongs exclusively to user state. Passive window resizing
+ * consumes the main pane first, then the auxiliary pane, then the explorer;
+ * it never interpolates all three panes or changes an open/collapsed flag.
+ * Every pane owns an independent minimum and maximum. When all pane minima
+ * cannot fit, `minimumWidth` raises the native window constraint instead of
+ * silently violating a pane contract.
  */
 export function resolveDesktopPaneLayout({
   availableWidth,
@@ -63,79 +70,111 @@ export function resolveDesktopPaneLayout({
   rightSidebar,
 }: DesktopPaneLayoutInput): ResolvedDesktopPaneLayout {
   const width = normalizeSize(availableWidth);
-  const resolvedMainMinWidth = Math.min(normalizeSize(mainMinWidth), width);
-  const explorerMinWidth = normalizeMinimum(explorer.minWidth, MIN_EXPLORER_WIDTH);
-  const rightSidebarMinWidth = normalizeMinimum(
+  const resolvedMainMinWidth = normalizeSize(mainMinWidth);
+  const explorerOpen = explorer.present && !explorer.collapsed;
+  const rightSidebarOpen = rightSidebar.present && rightSidebar.open;
+  const explorerRange = resolveRange(
+    explorer.minWidth,
+    explorer.maxWidth,
+    MIN_EXPLORER_WIDTH,
+    MAX_EXPLORER_WIDTH,
+  );
+  const rightSidebarRange = resolveRange(
     rightSidebar.minWidth,
+    rightSidebar.maxWidth,
     MIN_RIGHT_SIDEBAR_WIDTH,
+    MAX_RIGHT_SIDEBAR_WIDTH,
   );
-  const explorerRequestedOpen = explorer.present && !explorer.collapsed;
-  const rightSidebarRequestedOpen = rightSidebar.present && rightSidebar.open;
+  const explorerGutterWidth = explorerOpen ? EXPLORER_RESIZE_GUTTER_WIDTH : 0;
+  const minimumWidth = resolvedMainMinWidth
+    + explorerGutterWidth
+    + (explorerOpen ? explorerRange.min : 0)
+    + (rightSidebarOpen ? rightSidebarRange.min : 0);
+  const layoutWidth = Math.max(width, minimumWidth);
 
-  const rightSidebarAutoClosed = rightSidebarRequestedOpen
-    && width < resolvedMainMinWidth + rightSidebarMinWidth;
-  const rightSidebarOpen = rightSidebarRequestedOpen && !rightSidebarAutoClosed;
-
-  const explorerAutoCollapsed = explorerRequestedOpen && (
-    width < resolvedMainMinWidth
-      + explorerMinWidth
-      + (rightSidebarOpen ? rightSidebarMinWidth : 0)
-  );
-  const explorerCollapsed = !explorerRequestedOpen || explorerAutoCollapsed;
-
-  // Resolve the right pane first during passive window resizing. This makes
-  // the navigation pane the first pane to leave on compact windows, while
-  // explicit drag operations remain bounded by the current adjacent pane.
-  const rightSidebarMaxWidth = Math.max(
-    rightSidebarMinWidth,
-    width
-      - resolvedMainMinWidth
-      - (explorerCollapsed ? 0 : explorerMinWidth),
-  );
-  const rightSidebarWidth = rightSidebarOpen
-    ? clamp(
-      rightSidebar.preferredWidth,
-      rightSidebarMinWidth,
-      rightSidebarMaxWidth,
-    )
+  let explorerWidth = explorerOpen
+    ? clamp(explorer.preferredWidth, explorerRange.min, explorerRange.max)
+    : COLLAPSED_EXPLORER_WIDTH;
+  let rightSidebarWidth = rightSidebarOpen
+    ? clamp(rightSidebar.preferredWidth, rightSidebarRange.min, rightSidebarRange.max)
     : 0;
 
-  const explorerMaxWidth = Math.max(
-    explorerMinWidth,
-    width - resolvedMainMinWidth - rightSidebarWidth,
+  // The center owns ordinary window compression. Once it reaches its floor,
+  // reclaim only the required deficit from one side at a time. The auxiliary
+  // pane yields first, matching its role as secondary context; the explorer
+  // remains stable until the auxiliary pane has reached its own floor.
+  let deficit = Math.max(
+    0,
+    resolvedMainMinWidth
+      - (layoutWidth - explorerGutterWidth - explorerWidth - rightSidebarWidth),
   );
-  const explorerWidth = explorerCollapsed
-    ? COLLAPSED_EXPLORER_WIDTH
-    : clamp(explorer.preferredWidth, explorerMinWidth, explorerMaxWidth);
+  if (deficit > 0 && rightSidebarOpen) {
+    const reclaimed = Math.min(deficit, rightSidebarWidth - rightSidebarRange.min);
+    rightSidebarWidth -= reclaimed;
+    deficit -= reclaimed;
+  }
+  if (deficit > 0 && explorerOpen) {
+    const reclaimed = Math.min(deficit, explorerWidth - explorerRange.min);
+    explorerWidth -= reclaimed;
+  }
 
-  const resolvedRightSidebarMaxWidth = Math.max(
-    rightSidebarMinWidth,
-    width - resolvedMainMinWidth - explorerWidth,
-  );
-  const mainWidth = Math.max(0, width - explorerWidth - rightSidebarWidth);
+  const mainWidth = layoutWidth
+    - explorerGutterWidth
+    - explorerWidth
+    - rightSidebarWidth;
+  const explorerMaxWidth = explorerOpen
+    ? clamp(
+      layoutWidth
+        - explorerGutterWidth
+        - resolvedMainMinWidth
+        - (rightSidebarOpen ? rightSidebarRange.min : 0),
+      explorerRange.min,
+      explorerRange.max,
+    )
+    : explorerRange.max;
+  const rightSidebarMaxWidth = rightSidebarOpen
+    ? clamp(
+      layoutWidth
+        - explorerGutterWidth
+        - resolvedMainMinWidth
+        - (explorerOpen ? explorerRange.min : 0),
+      rightSidebarRange.min,
+      rightSidebarRange.max,
+    )
+    : rightSidebarRange.max;
 
   return {
     availableWidth: width,
     explorer: {
-      autoCollapsed: explorerAutoCollapsed,
-      collapsed: explorerCollapsed,
+      collapsed: !explorerOpen,
       maxWidth: explorerMaxWidth,
-      minWidth: explorerMinWidth,
+      minWidth: explorerRange.min,
       width: explorerWidth,
     },
     main: {
       minWidth: resolvedMainMinWidth,
       width: mainWidth,
     },
+    minimumWidth,
     rightSidebar: {
-      autoClosed: rightSidebarAutoClosed,
-      maxWidth: resolvedRightSidebarMaxWidth,
-      minWidth: rightSidebarMinWidth,
+      maxWidth: rightSidebarMaxWidth,
+      minWidth: rightSidebarRange.min,
       open: rightSidebarOpen,
       width: rightSidebarWidth,
     },
-    surfaceMinWidth: explorerWidth + resolvedMainMinWidth,
+    surfaceMinWidth: explorerWidth + explorerGutterWidth + resolvedMainMinWidth,
   };
+}
+
+function resolveRange(
+  minValue: number | undefined,
+  maxValue: number | undefined,
+  fallbackMin: number,
+  fallbackMax: number,
+) {
+  const min = normalizeMinimum(minValue, fallbackMin);
+  const max = Math.max(min, normalizeMinimum(maxValue, fallbackMax));
+  return { max, min };
 }
 
 function clamp(value: number, min: number, max: number) {

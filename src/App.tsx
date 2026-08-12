@@ -24,7 +24,7 @@ import {
   type DesktopTerminalSessionSnapshot,
   type RightTerminalPanelHandle,
 } from "./features/desktop-terminal";
-import { useDesktopUpdates } from "./components/DesktopUpdateControls";
+import { useDesktopUpdates } from "./features/updates";
 import {
   createLocalDataPort,
   readPuppyoneWorkspaceConfig,
@@ -128,6 +128,7 @@ function AppContent() {
     clearWorkspace,
     forgetActiveWorkspace,
     handleWorkspaceOpenResult,
+    openDroppedWorkspace,
     openFolder,
     openWorkspacePath,
     recentWorkspaceItems,
@@ -774,10 +775,21 @@ function AppContent() {
     return (
       <Homepage
         onChooseWorkspace={openFolder}
+        onOpenDroppedWorkspace={openDroppedWorkspace}
         onOpenWorkspacePath={openWorkspacePath}
         recentWorkspaces={recentWorkspaceItems}
         initialError={restoreWorkspaceError}
-        cornerSlot={<DesktopHelpLauncher />}
+        cornerSlot={(
+          <DesktopHelpLauncher
+            theme={resolvedTheme}
+            lightThemePreset={lightThemePreset}
+            darkThemePreset={darkThemePreset}
+            textSize={textSize}
+            typography={typography}
+            pointerCursors={pointerCursors}
+            diffMarkers={diffMarkers}
+          />
+        )}
         themeMode={activeThemeMode}
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}
@@ -826,6 +838,7 @@ function AppContent() {
       csvViewSettings={activeView === "data" && editorChromeContribution?.kind === "csv-view-settings"
         ? editorChromeContribution
         : null}
+      desktopUpdateState={desktopUpdates.state}
       activeFileExternalOpenTitle={activeExternalOpen.title}
       activeFileExternalOpenAppName={activeExternalOpen.appName}
       activeFileExternalOpenIconDataUrl={activeExternalOpen.iconDataUrl}
@@ -839,6 +852,7 @@ function AppContent() {
       agentChatEnabled={desktopAgentChatEnabled}
       agentChatSidebarOpen={rightSidebarOpen && desktopAgentChatEnabled && rightSidebarSurface === "chat"}
       onOpenActiveFileExternal={() => void activeExternalOpen.openActiveFileExternal()}
+      onUpdateNow={() => void desktopUpdates.updateNow()}
       onCreateTerminal={() => {
         terminalPanelRef.current?.create();
         setRightSidebarSurface("terminal");
@@ -917,6 +931,7 @@ function AppContent() {
           rightSidebarOpen={rightSidebarOpen && desktopRightSidebarEnabled}
           resizableRightSidebar
           rightSidebarWidth={rightSidebarWidth}
+          onLeftSidebarExpand={() => setSidebarCollapsed(false)}
           onRightSidebarOpenChange={setRightSidebarOpen}
           onRightSidebarWidthChange={setRightSidebarWidth}
           rightSidebar={desktopRightSidebarEnabled ? (
@@ -999,6 +1014,7 @@ function AppContent() {
           onActiveDataNodeChange={handleActiveDataNodeChange}
           onActiveDataPathChange={handleActiveDataPathChange}
           onCreateEntryMenu={openCreateEntryMenu}
+          onDismissCreateEntryMenu={() => setCreateEntryDraft(null)}
           fileClipboardController={fileClipboardController}
           onFilesVisibilitySettingsChange={handleFilesVisibilitySettingsChange}
           onNavigate={navigateDesktopView}
@@ -1017,8 +1033,21 @@ function AppContent() {
           workspaceSurfaceError={documentNavigationError ?? workspaceSurfaceError}
           workspaceKey={workspaceKey}
           workspaceRefreshToken={workspaceRefreshToken}
+          sidebarCreateMenuOpen={Boolean(
+            createEntryDraft
+            && !createEntryDraft.selectedKind
+            && createEntryDraft.anchor.placement === "auto-end"
+          )}
         />
-        <DesktopHelpLauncher />
+        <DesktopHelpLauncher
+          theme={resolvedTheme}
+          lightThemePreset={lightThemePreset}
+          darkThemePreset={darkThemePreset}
+          textSize={textSize}
+          typography={typography}
+          pointerCursors={pointerCursors}
+          diffMarkers={diffMarkers}
+        />
         </DesktopCloudShell>
       </EditorChromeContributionProvider>
       <DesktopOverlayPortal

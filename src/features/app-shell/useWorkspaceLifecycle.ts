@@ -7,6 +7,7 @@ import {
   hydrateRecentWorkspaces,
 } from "../../lib/localFiles";
 import {
+  openDroppedWorkspaceTarget,
   openWorkspaceTarget,
   selectLocalWorkspaceFolder,
 } from "../../lib/workspaceOpening";
@@ -89,6 +90,11 @@ export function useWorkspaceLifecycle({
     handleWorkspaceOpenResult(result);
   }, [handleWorkspaceOpenResult]);
 
+  const openDroppedWorkspace = useCallback(async (folder: File) => {
+    const result = await openDroppedWorkspaceTarget(folder);
+    handleWorkspaceOpenResult(result);
+  }, [handleWorkspaceOpenResult]);
+
   const openFolder = useCallback(async () => {
     const result = await selectLocalWorkspaceFolder({
       placement: workspace ? "dedicated-window" : "current-window",
@@ -162,6 +168,7 @@ export function useWorkspaceLifecycle({
     clearWorkspace,
     forgetActiveWorkspace,
     handleWorkspaceOpenResult,
+    openDroppedWorkspace,
     openFolder,
     openWorkspacePath,
     recentWorkspaceItems,

@@ -310,11 +310,20 @@
   font-weight: var(--desktop-sidebar-font-weight);
 }
 
+.desktop-data-workspace-wrap .desktop-explorer-list-end-create {
+  min-width: 0;
+}
+
 .desktop-data-workspace-wrap .desktop-explorer-list-end-create-row:hover
   .desktop-explorer-list-end-create-command,
 .desktop-data-workspace-wrap .desktop-explorer-list-end-create-row:focus-visible
   .desktop-explorer-list-end-create-command {
   color: var(--po-text-subtle);
+}
+
+.desktop-data-workspace-wrap .desktop-explorer-list-end-create[data-open="true"]
+  .desktop-explorer-list-end-create-command {
+  color: var(--po-text);
 }
 
 .desktop-data-workspace-wrap .desktop-explorer-list-end-create-row .tree-icon-slot {

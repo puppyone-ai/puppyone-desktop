@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import JSZip from "jszip";
 import { createViewerPackHost } from "../../electron/main/viewer-packs/index.mjs";
+import { createNativeSurfaceOcclusionCoordinator } from "../../electron/main/native-surfaces/occlusion-coordinator.mjs";
 import {
   createPackageSignatureEnvelope,
   generateTestKeyPair,
@@ -46,6 +47,7 @@ async function makeSignedPack(keys) {
 function createFakeElectronSurface() {
   let webContentsId = 100;
   const loadedUrls = [];
+  const createdViews = [];
   class FakeWebContentsView {
     constructor() {
       const listeners = new Map();
@@ -56,9 +58,13 @@ function createFakeElectronSurface() {
         on(event, listener) { listeners.set(event, listener); },
         once(event, listener) { listeners.set(event, listener); },
         setWindowOpenHandler() {},
+        setAudioMuted: (muted) => { this.audioMuted = muted; },
       };
+      this.visible = true;
+      createdViews.push(this);
     }
     setBounds() {}
+    setVisible(visible) { this.visible = visible; }
   }
   const owner = {
     isDestroyed: () => false,
@@ -68,6 +74,7 @@ function createFakeElectronSurface() {
   return {
     WebContentsView: FakeWebContentsView,
     loadedUrls,
+    createdViews,
     getOwnerWindow: () => owner,
     sessionFromPartition: () => ({
       setPermissionRequestHandler() {},
@@ -88,6 +95,7 @@ describe("viewer pack activation authority", () => {
     await fsp.writeFile(path.join(workspace, "scene.glb"), Buffer.from("glTFpayload"));
     const keys = generateTestKeyPair();
     const surface = createFakeElectronSurface();
+    const nativeSurfaceOcclusion = createNativeSurfaceOcclusionCoordinator();
     const host = createViewerPackHost({
       ...surface,
       userDataPath,
@@ -98,6 +106,7 @@ describe("viewer pack activation authority", () => {
         publisher: "puppyone",
         publicKeyPem: keys.publicKeyPem,
       }],
+      nativeSurfaceOcclusion,
     });
     await host.installLocalPackageBytesForTest(await makeSignedPack(keys));
 
@@ -124,6 +133,11 @@ describe("viewer pack activation authority", () => {
     });
     expect(activated.pluginId).toBe("ai.puppyone.viewer.glb");
     expect(surface.loadedUrls[0]).toMatch(/^puppyone-plugin:\/\/ai\.puppyone\.viewer\.glb\//);
+    expect(surface.createdViews[0].visible).toBe(true);
+    nativeSurfaceOcclusion.setOwnerOccluded(7, true);
+    expect(surface.createdViews[0].visible).toBe(false);
+    nativeSurfaceOcclusion.setOwnerOccluded(7, false);
+    expect(surface.createdViews[0].visible).toBe(true);
     host.destroyAllSessions();
   });
 });

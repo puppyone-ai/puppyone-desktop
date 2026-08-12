@@ -18,12 +18,14 @@ export type PaneResizeDragSession = {
 export type UsePaneResizeDragOptions = {
   enabled?: boolean;
   bodyClassName: string;
+  onDragActiveChange?: (active: boolean) => void;
   onDragStart: (event: ReactPointerEvent<HTMLElement>) => PaneResizeDragSession | null | undefined;
 };
 
 export function usePaneResizeDrag({
   enabled = true,
   bodyClassName,
+  onDragActiveChange,
   onDragStart,
 }: UsePaneResizeDragOptions) {
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -89,6 +91,7 @@ export function usePaneResizeDrag({
       document.removeEventListener("visibilitychange", handleVisibilityChange, true);
       handle.removeEventListener("lostpointercapture", stop);
       document.body.classList.remove(bodyClassName);
+      onDragActiveChange?.(false);
 
       try {
         if (handle.hasPointerCapture?.(pointerId)) {
@@ -120,6 +123,7 @@ export function usePaneResizeDrag({
     };
 
     document.body.classList.add(bodyClassName);
+    onDragActiveChange?.(true);
 
     try {
       handle.setPointerCapture?.(pointerId);
@@ -135,5 +139,5 @@ export function usePaneResizeDrag({
     document.addEventListener("visibilitychange", handleVisibilityChange, true);
 
     cleanupRef.current = stop;
-  }, [bodyClassName, enabled, onDragStart]);
+  }, [bodyClassName, enabled, onDragActiveChange, onDragStart]);
 }

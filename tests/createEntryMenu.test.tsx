@@ -24,6 +24,34 @@ afterEach(() => {
 });
 
 describe("create entry menu", () => {
+  it("marks the Sidebar launcher menu as a full-width floating surface that can open upward", () => {
+    const draft = createDraft();
+    draft.anchor = {
+      ...draft.anchor,
+      top: 700,
+      bottom: 730,
+      right: 284,
+      width: 264,
+      height: 30,
+      placement: "auto-end",
+    };
+    const container = render(
+      <DesktopCreateEntryMenu
+        draft={draft}
+        fileKinds={["markdown", "csv"]}
+        onCancel={vi.fn()}
+        onSelectKind={vi.fn()}
+      />,
+    );
+
+    const menu = container.querySelector<HTMLElement>(".desktop-create-entry-menu");
+    expect(menu?.dataset.sidebarLauncher).toBe("true");
+    expect(menu?.id).toBe("desktop-sidebar-create-menu");
+    expect(menu?.style.getPropertyValue("--node-action-menu-width")).toBe("264px");
+    expect(Number.parseFloat(menu?.style.getPropertyValue("--node-action-menu-top") ?? ""))
+      .toBeLessThan(draft.anchor.top);
+  });
+
   it("offers only Folder, Markdown, and CSV in the intended grouping", () => {
     const onSelectKind = vi.fn();
     const container = render(

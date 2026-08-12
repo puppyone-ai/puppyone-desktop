@@ -76,7 +76,7 @@ export function createMarkdownTableInlineViewportController(
       ? viewportRect.right - tableRect.right + logicalOffset
       : tableRect.left - viewportRect.left + logicalOffset;
     const cssLeadingInset = Number.parseFloat(
-      ownerWindow.getComputedStyle(context.viewport).getPropertyValue("--cm-md-table-scroll-away-inset"),
+      ownerWindow.getComputedStyle(context.viewport).getPropertyValue("--cm-md-table-interaction-start-inset"),
     );
     const leadingInset = Math.max(
       0,

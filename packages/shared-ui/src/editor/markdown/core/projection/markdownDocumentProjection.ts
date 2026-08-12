@@ -106,8 +106,17 @@ export const markdownLivePreviewDecorations = StateField.define<MarkdownDocument
       if (transaction.docChanged) {
         const changedRanges = getChangedProjectionRanges(transaction);
         patchRanges.push(...changedRanges);
+        // Decoration replacement uses one line of structural overscan. If
+        // that neighborhood crosses an existing block atom, rebuild from the
+        // atom's canonical start as well. Comparing only the raw changed range
+        // is insufficient when typing begins on the line immediately after a
+        // table: the overscan would remove the table decoration while a
+        // range-local semantic scan cannot rediscover its earlier header.
+        const changedNeighborhoods = changedRanges.map((range) => (
+          addLineOverscan(transaction.state, range.from, range.to, 1)
+        ));
         for (const blockRange of blockRanges) {
-          if (changedRanges.some((range) => rangesOverlapOrTouch(blockRange, range))) {
+          if (changedNeighborhoods.some((range) => rangesOverlapOrTouch(blockRange, range))) {
             patchRanges.push(blockRange);
           }
         }

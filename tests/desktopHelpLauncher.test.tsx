@@ -46,12 +46,18 @@ describe("DesktopHelpLauncher", () => {
     expect(launcher?.type).toBe("button");
     expect(launcher?.getAttribute("aria-haspopup")).toBe("dialog");
     expect(launcher?.getAttribute("aria-expanded")).toBe("false");
-    expect(launcher?.querySelector("svg")).not.toBeNull();
+    const iconSlot = launcher?.querySelector(".desktop-help-launcher-icon-slot");
+    expect(iconSlot).not.toBeNull();
+    const helpIcon = launcher?.querySelector(".desktop-feedback-help-icon");
+    expect(iconSlot?.contains(helpIcon ?? null)).toBe(true);
+    expect(helpIcon?.querySelector("[data-feedback-ring='true']")?.getAttribute("cx")).toBe("12");
+    expect(helpIcon?.querySelector("[data-feedback-question-dot='true']")?.getAttribute("cx")).toBe("12");
+    expect(helpIcon?.querySelector("[data-feedback-question-stem='true']")?.getAttribute("d")).toContain("12 13.75");
     expect(launcher?.querySelector(".desktop-help-launcher-label")?.textContent).toBe("Feedback");
     expect(container.querySelector("a")).toBeNull();
   });
 
-  it("opens one minimal composer and sends only the typed feedback through the desktop bridge", async () => {
+  it("collects a role before sending typed feedback through the desktop bridge", async () => {
     const submitFeedback = vi.fn().mockResolvedValue({ ok: true });
     window.puppyoneDesktop = {
       submitFeedback,
@@ -61,23 +67,41 @@ describe("DesktopHelpLauncher", () => {
     const launcher = container.querySelector<HTMLButtonElement>(".desktop-help-launcher");
     act(() => launcher?.click());
 
-    const dialog = container.querySelector<HTMLElement>('[role="dialog"]');
-    const textarea = container.querySelector<HTMLTextAreaElement>("textarea");
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    const textarea = document.querySelector<HTMLTextAreaElement>("textarea");
+    const developerRole = dialog?.querySelector<HTMLInputElement>('input[name="feedback-role"][value="developer"]');
     expect(dialog).not.toBeNull();
+    expect(dialog?.getAttribute("aria-modal")).toBe("true");
+    expect(dialog?.closest("#desktop-overlay-root")).not.toBeNull();
     expect(launcher?.getAttribute("aria-expanded")).toBe("true");
-    expect(document.activeElement).toBe(textarea);
+    expect(document.activeElement).toBe(developerRole);
     expect(textarea?.placeholder).toBe("Feedback…");
-    expect(dialog?.querySelector(".desktop-feedback-header")).toBeNull();
-    expect(dialog?.querySelector(".desktop-feedback-close")).toBeNull();
-    expect(dialog?.textContent).toBe("");
+    expect(dialog?.querySelector(".desktop-feedback-role")?.textContent).toContain("Your role");
+    expect(dialog?.querySelectorAll('input[name="feedback-role"]')).toHaveLength(4);
+    expect(dialog?.querySelector(".desktop-feedback-message-label")?.textContent).toBe("Your feedback");
+    expect(dialog?.querySelector(".desktop-feedback-message-label")?.getAttribute("for")).toBe(textarea?.id);
+    const fields = dialog?.querySelector(".desktop-feedback-fields");
+    expect(fields?.children).toHaveLength(2);
+    expect(fields?.children[0]?.classList.contains("desktop-feedback-role")).toBe(true);
+    expect(fields?.children[1]?.classList.contains("desktop-feedback-message-field")).toBe(true);
+    expect(dialog?.querySelector(".desktop-feedback-header")?.textContent).toContain("Feedback");
+    expect(dialog?.querySelector<HTMLButtonElement>(".desktop-feedback-close")?.getAttribute("aria-label")).toBe("Close");
     expect(
       dialog?.querySelector<HTMLButtonElement>(".desktop-feedback-attach")
         ?.getAttribute("aria-label"),
     ).toBe("Attach screenshot");
     const submitButton = dialog?.querySelector<HTMLButtonElement>(".desktop-feedback-submit");
     expect(submitButton?.getAttribute("aria-label")).toBe("Send");
-    expect(submitButton?.querySelector(".lucide-send")).not.toBeNull();
-    expect(submitButton?.querySelector(".lucide-arrow-up")).toBeNull();
+    expect(submitButton?.textContent).toBe("Send");
+    expect(submitButton?.classList.contains("desktop-dialog-button")).toBe(true);
+    expect(
+      dialog?.querySelector(".desktop-feedback-role-control")?.classList.contains(
+        "desktop-dialog-button",
+      ),
+    ).toBe(true);
+    expect(dialog?.querySelector(".desktop-feedback-composer .desktop-feedback-submit")).toBeNull();
+    expect(dialog?.querySelector(".desktop-feedback-footer > .desktop-feedback-submit")).toBe(submitButton);
+    expect(submitButton?.disabled).toBe(true);
 
     act(() => {
       if (!textarea) return;
@@ -87,18 +111,46 @@ describe("DesktopHelpLauncher", () => {
       );
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
     });
+    expect(submitButton?.disabled).toBe(true);
 
-    const form = container.querySelector<HTMLFormElement>(".desktop-feedback-composer");
+    act(() => developerRole?.click());
+    expect(developerRole?.checked).toBe(true);
+    expect(submitButton?.disabled).toBe(false);
+
+    const form = document.querySelector<HTMLFormElement>(".desktop-feedback-form");
     await act(async () => {
       form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
       await Promise.resolve();
     });
 
     expect(submitFeedback).toHaveBeenCalledWith({
+      role: "developer",
       message: "Please make search faster.",
       locale: "en",
     });
-    expect(container.querySelector(".desktop-feedback-status")?.textContent).toContain("Sent");
+    expect(document.querySelector(".desktop-feedback-status")?.textContent).toContain("Sent");
+  });
+
+  it("can only be dismissed with its close button", () => {
+    const container = renderLauncher(<DesktopHelpLauncher />);
+    const launcher = container.querySelector<HTMLButtonElement>(".desktop-help-launcher");
+    act(() => launcher?.click());
+
+    const backdrop = document.querySelector<HTMLElement>(".desktop-feedback-dialog-backdrop");
+    expect(backdrop).not.toBeNull();
+
+    act(() => {
+      backdrop?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      backdrop?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      launcher?.click();
+    });
+    expect(document.querySelector(".desktop-feedback-dialog")).not.toBeNull();
+    expect(launcher?.getAttribute("aria-expanded")).toBe("true");
+
+    act(() => document.querySelector<HTMLButtonElement>(".desktop-feedback-close")?.click());
+    expect(document.querySelector(".desktop-feedback-dialog")).toBeNull();
+    expect(launcher?.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("accepts a screenshot as the whole feedback and passes only its bytes and type", async () => {
@@ -112,7 +164,8 @@ describe("DesktopHelpLauncher", () => {
     const container = renderLauncher(<DesktopHelpLauncher />);
     act(() => container.querySelector<HTMLButtonElement>(".desktop-help-launcher")?.click());
 
-    const input = container.querySelector<HTMLInputElement>(".desktop-feedback-file-input");
+    const input = document.querySelector<HTMLInputElement>(".desktop-feedback-file-input");
+    const researcherRole = document.querySelector<HTMLInputElement>('input[name="feedback-role"][value="researcher"]');
     const screenshotBytes = new Uint8Array([
       0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
     ]);
@@ -121,6 +174,7 @@ describe("DesktopHelpLauncher", () => {
     });
 
     await act(async () => {
+      researcherRole?.click();
       Object.defineProperty(input, "files", {
         configurable: true,
         value: [screenshotFile],
@@ -130,18 +184,19 @@ describe("DesktopHelpLauncher", () => {
     });
 
     expect(
-      container.querySelector<HTMLImageElement>(".desktop-feedback-screenshot img")?.src,
+      document.querySelector<HTMLImageElement>(".desktop-feedback-screenshot img")?.src,
     ).toBe("blob:feedback-preview");
 
     await act(async () => {
-      container
-        .querySelector<HTMLFormElement>(".desktop-feedback-composer")
+      document
+        .querySelector<HTMLFormElement>(".desktop-feedback-form")
         ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
       await Promise.resolve();
     });
 
     expect(submitFeedback).toHaveBeenCalledOnce();
     expect(submitFeedback).toHaveBeenCalledWith({
+      role: "researcher",
       message: "",
       locale: "en",
       screenshot: {
@@ -150,7 +205,7 @@ describe("DesktopHelpLauncher", () => {
       },
     });
 
-    act(() => container.querySelector<HTMLButtonElement>(".desktop-help-launcher")?.click());
+    act(() => document.querySelector<HTMLButtonElement>(".desktop-feedback-close")?.click());
     expect(revokeObjectUrl).toHaveBeenCalledWith("blob:feedback-preview");
   });
 
@@ -172,8 +227,9 @@ describe("DesktopHelpLauncher", () => {
     expect(auxiliaryPanel?.contains(launcher)).toBe(false);
   });
 
-  it("uses the main surface as its logical-edge positioning boundary", () => {
+  it("keeps the launcher on the main surface and the modal on the global themed overlay", () => {
     const layoutCss = readFileSync("src/styles/layout.css", "utf8");
+    const dialogCss = readFileSync("src/styles/dialogs.css", "utf8");
     const launcherCss = readFileSync(
       "src/features/app-shell/desktop-help-launcher.css",
       "utf8",
@@ -186,20 +242,44 @@ describe("DesktopHelpLauncher", () => {
     expect(launcherCss).toMatch(
       /\.desktop-help-launcher:hover \.desktop-help-launcher-label/s,
     );
-    expect(launcherCss).toMatch(
-      /\.desktop-feedback-popover\s*\{[^}]*inset-block-end:\s*calc\(100% \+ 8px\)/s,
+    expect(dialogCss).toMatch(
+      /\.desktop-dialog-backdrop\s*\{[^}]*position:\s*fixed[^}]*align-items:\s*center[^}]*justify-content:\s*center/s,
     );
+    expect(launcherCss).toMatch(/\.desktop-feedback-dialog-backdrop\s*\{[^}]*pointer-events:\s*auto/s);
+    expect(launcherCss).toMatch(/\.desktop-feedback-dialog\s*\{[^}]*width:\s*min\(400px,/s);
+    expect(launcherCss).toMatch(
+      /\.desktop-feedback-header\s*\{[^}]*position:\s*relative[^}]*justify-content:\s*center/s,
+    );
+    expect(launcherCss).toMatch(
+      /\.desktop-feedback-fields\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s,
+    );
+    expect(launcherCss).toMatch(
+      /\.desktop-feedback-role\s*\{[^}]*border-block-end:\s*1px solid var\(--po-divider\)/s,
+    );
+    expect(launcherCss).toMatch(
+      /\.desktop-feedback-role-options\s*\{[^}]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/s,
+    );
+    expect(launcherCss).toMatch(
+      /\.desktop-feedback-role-option input:checked \+ \.desktop-feedback-role-control\s*\{[^}]*background:\s*var\(--po-selected\)/s,
+    );
+    expect(launcherCss).not.toContain("desktop-feedback-popover");
     const launcherRule = launcherCss.match(/\.desktop-help-launcher\s*\{[^}]*\}/s)?.[0] ?? "";
     expect(launcherRule).toContain("border: 1px solid var(--po-border-subtle)");
     expect(launcherRule).toContain("background: var(--po-panel-raised)");
+    expect(launcherRule).toContain("max-width: 30px");
+    expect(launcherRule).toContain("height: 30px");
     expect(launcherRule).toContain("opacity: 1");
+    expect(launcherRule).toContain("padding: 0");
     expect(launcherRule).not.toContain("backdrop-filter");
+    expect(launcherCss).toMatch(
+      /\.desktop-help-launcher-icon-slot\s*\{[^}]*width:\s*28px[^}]*height:\s*28px[^}]*place-items:\s*center/s,
+    );
     expect(launcherCss).toMatch(
       /\.desktop-help-launcher:hover,[\s\S]*?\.desktop-help-launcher:focus-visible\s*\{[^}]*background:\s*var\(--po-overlay\)[^}]*opacity:\s*1/s,
     );
     expect(launcherCss).toMatch(
       /\.desktop-feedback\[data-open="true"\] \.desktop-help-launcher\s*\{[^}]*background:\s*var\(--po-overlay\)[^}]*opacity:\s*1/s,
     );
-    expect(launcherCss).not.toMatch(/position:\s*fixed/);
+    expect(launcherCss).not.toMatch(/\.desktop-feedback\s*\{[^}]*position:\s*fixed/s);
   });
 });

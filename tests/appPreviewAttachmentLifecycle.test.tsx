@@ -12,9 +12,13 @@ import type { AppPreviewMode } from "../packages/shared-ui/src/editor/viewers/ap
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
+let resizeObserverCallback: ResizeObserverCallback | null = null;
 
 beforeEach(() => {
   class NoopResizeObserver {
+    constructor(callback: ResizeObserverCallback) {
+      resizeObserverCallback = callback;
+    }
     observe() {}
     disconnect() {}
   }
@@ -40,6 +44,7 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  resizeObserverCallback = null;
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -126,6 +131,71 @@ describe("App Preview attachment lifecycle", () => {
       attachmentId: attachmentIds.at(-1),
     }));
     expect(stop).not.toHaveBeenCalled();
+  });
+
+  it("publishes host bounds on every resize frame while the native surface stays visible", async () => {
+    let animationFrameCallback: FrameRequestCallback | null = null;
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      animationFrameCallback = callback;
+      return 41;
+    });
+    const setSurfaceBounds = vi.fn(async () => ({ ok: true, visible: true }));
+    const controller = {
+      start: vi.fn(),
+      activate: vi.fn(async ({ attachmentId }) => ({
+        runtime: {
+          runtimeId: "runtime-live-resize",
+          appId: "app-live-resize",
+          name: "Popular apps",
+          status: "running" as const,
+          path: "popular-apps.puppyoneapp",
+          url: "http://127.0.0.1:4173/",
+        },
+        surface: {
+          surfaceId: "surface-live-resize",
+          runtimeId: "runtime-live-resize",
+          appId: "app-live-resize",
+          path: "popular-apps.puppyoneapp",
+          status: "ready" as const,
+          url: "http://127.0.0.1:4173/",
+          title: "Popular apps",
+          canGoBack: false,
+          canGoForward: false,
+          attached: true,
+          attachmentId,
+        },
+      })),
+      detachSurface: vi.fn(async () => ({ ok: true })),
+      setSurfaceBounds,
+    } as unknown as AppPreviewController;
+
+    await act(async () => {
+      root?.render(<Harness controller={controller} mode="preview" />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => animationFrameCallback?.(0));
+    setSurfaceBounds.mockClear();
+
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue({
+      x: 60,
+      y: 20,
+      left: 60,
+      top: 20,
+      right: 650,
+      bottom: 500,
+      width: 590,
+      height: 480,
+      toJSON: () => ({}),
+    });
+    act(() => resizeObserverCallback?.([], {} as ResizeObserver));
+    act(() => animationFrameCallback?.(16));
+
+    expect(setSurfaceBounds).toHaveBeenCalledWith(expect.objectContaining({
+      surfaceId: "surface-live-resize",
+      bounds: { x: 60, y: 20, width: 590, height: 480 },
+      visible: true,
+    }));
   });
 
   it("ignores stale runtime generations and out-of-order Pub/Sub snapshots", async () => {

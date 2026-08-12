@@ -14,6 +14,9 @@ export const INTERFACE_STYLES = INTERFACE_STYLE_MANIFEST.styles;
 export const DEFAULT_INTERFACE_STYLE: InterfaceStyle = INTERFACE_STYLE_MANIFEST.defaultStyle;
 export const INTERFACE_STYLE_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.interfaceStyle;
 export const THEME_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.themeMode;
+export const LIGHT_THEME_PRESET_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.lightThemePreset;
+export const DARK_THEME_PRESET_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.darkThemePreset;
+export const LEGACY_THEME_PRESET_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.legacyThemePreset;
 
 export function isInterfaceStyle(value: string | null | undefined): value is InterfaceStyle {
   return typeof value === "string" && INTERFACE_STYLES.some((style) => style.id === value);
@@ -60,8 +63,19 @@ export function supportsThemePreset(
 export function getInterfaceStyleFirstPaint(
   interfaceStyle: InterfaceStyle,
   theme: ResolvedTheme,
+  preset?: string | null,
 ): InterfaceStyleFirstPaint {
   const definition = getInterfaceStyleDefinition(interfaceStyle);
+  if ("presetFirstPaint" in definition) {
+    const presetFirstPaint = definition.presetFirstPaint[theme];
+    if (presetFirstPaint) {
+      const presetId = preset && Object.hasOwn(presetFirstPaint.values, preset)
+        ? preset
+        : presetFirstPaint.defaultPreset;
+      const paint = presetFirstPaint.values[presetId as keyof typeof presetFirstPaint.values];
+      if (paint) return paint;
+    }
+  }
   const firstPaint = definition.firstPaint as Partial<Record<ResolvedTheme, InterfaceStyleFirstPaint>>;
   const paint = firstPaint[theme] ?? firstPaint.light ?? firstPaint.dark;
   if (!paint) throw new Error(`Interface style ${interfaceStyle} has no first-paint palette.`);

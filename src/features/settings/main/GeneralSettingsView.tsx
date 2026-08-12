@@ -1,5 +1,5 @@
 import { useLocalization } from "@puppyone/localization";
-import { DesktopUpdateSettingsRow, type useDesktopUpdates } from "../../../components/DesktopUpdateControls";
+import { DesktopUpdateSettingsRow, type DesktopUpdatesController } from "../../updates";
 import { DesktopBuildVersionSettingsRow } from "../../build-info/DesktopBuildIdentity";
 import { LanguageSettingRow } from "../LanguageSetting";
 import { SettingsSectionHeader } from "../components";
@@ -9,7 +9,7 @@ export function GeneralSettingsView({
   onCheckForUpdates,
   onUpdateNow,
 }: {
-  updateState: ReturnType<typeof useDesktopUpdates>["state"];
+  updateState: DesktopUpdatesController["state"];
   onCheckForUpdates: () => void;
   onUpdateNow: () => void;
 }) {

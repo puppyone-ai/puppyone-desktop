@@ -5,10 +5,25 @@ import {
   applyTypographyToElement,
   type ResolvedTypography,
 } from "../typography";
+import {
+  useNativeSurfaceOcclusionLease,
+  useNativeSurfaceOcclusionObserver,
+} from "../native-surfaces";
 
 const DESKTOP_OVERLAY_ROOT_ID = "desktop-overlay-root";
 
 export type DesktopOverlayTheme = "light" | "dark";
+
+export type DesktopOverlayPortalProps = {
+  children: ReactNode;
+  theme?: DesktopOverlayTheme;
+  lightThemePreset?: LightThemePreset;
+  darkThemePreset?: DarkThemePreset;
+  textSize?: TextSize;
+  typography?: ResolvedTypography;
+  pointerCursors?: boolean;
+  diffMarkers?: DiffMarkers;
+};
 
 export function DesktopOverlayPortal({
   children,
@@ -19,16 +34,8 @@ export function DesktopOverlayPortal({
   typography,
   pointerCursors,
   diffMarkers,
-}: {
-  children: ReactNode;
-  theme?: DesktopOverlayTheme;
-  lightThemePreset?: LightThemePreset;
-  darkThemePreset?: DarkThemePreset;
-  textSize?: TextSize;
-  typography?: ResolvedTypography;
-  pointerCursors?: boolean;
-  diffMarkers?: DiffMarkers;
-}) {
+}: DesktopOverlayPortalProps) {
+  useNativeSurfaceOcclusionObserver();
   const root = useDesktopOverlayRoot();
 
   useLayoutEffect(() => {
@@ -51,6 +58,7 @@ export function DesktopOverlayPortal({
 
 /** Portals feature-owned menus into the shared, themed desktop overlay root. */
 export function DesktopOverlayLayer({ children }: { children: ReactNode }) {
+  useNativeSurfaceOcclusionLease();
   const root = useDesktopOverlayRoot();
   if (!root) return null;
   return createPortal(children, root);

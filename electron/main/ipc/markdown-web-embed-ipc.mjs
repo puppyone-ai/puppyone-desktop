@@ -2,8 +2,14 @@ export function registerMarkdownWebEmbedIpcHandlers({
   ipcMain,
   createMarkdownWebEmbedService,
   getOwnerWindow,
+  nativeSurfaceOcclusion = null,
+  nativeSurfacePointerPassthrough = null,
 }) {
-  const service = createMarkdownWebEmbedService({ getOwnerWindow });
+  const service = createMarkdownWebEmbedService({
+    getOwnerWindow,
+    nativeSurfaceOcclusion,
+    nativeSurfacePointerPassthrough,
+  });
 
   ipcMain.handle("markdown-web-embed:create", async (event, request) => {
     const ownerWebContentsId = requireLiveMainFrameSender(event);

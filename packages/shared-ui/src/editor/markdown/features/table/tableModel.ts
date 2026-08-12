@@ -32,6 +32,7 @@ export type MarkdownTableBlock = {
   refinementValid: boolean;
 };
 
+/** Broad parser-owned Table node range; it may include pipe-less GFM body lines. */
 export type MarkdownTableSyntaxRange = Readonly<{ from: number; to: number }>;
 
 export type MarkdownTableFocusTarget = {
@@ -91,6 +92,11 @@ export function getMarkdownTableBlock(
   const delimiterLine = doc.line(lineNumber + 1);
   if (!syntaxRange || syntaxRange.from !== headerLine.from || syntaxRange.to <= delimiterLine.from) return null;
   const lastSyntaxLine = doc.lineAt(Math.max(syntaxRange.from, syntaxRange.to - 1));
+  const sourceExtent = getExplicitMarkdownTableSourceExtent(
+    state,
+    lineNumber,
+    lastSyntaxLine.number,
+  );
   const headerBytes = getUtf8ByteLength(headerLine.text);
   const delimiterBytes = getUtf8ByteLength(delimiterLine.text);
   // A single unbounded row cannot benefit from row virtualization. Leave it
@@ -101,9 +107,9 @@ export function getMarkdownTableBlock(
   ) {
     return createUnmaterializedTableBlock(
       state,
-      syntaxRange,
+      { from: syntaxRange.from, to: sourceExtent.to },
       lineNumber,
-      lastSyntaxLine.number,
+      sourceExtent.lastLineNumber,
     );
   }
 
@@ -133,7 +139,7 @@ export function getMarkdownTableBlock(
   );
   let nextLineNumber = lineNumber + 2;
 
-  while (nextLineNumber <= lastSyntaxLine.number) {
+  while (nextLineNumber <= sourceExtent.lastLineNumber) {
     const rowLine = doc.line(nextLineNumber);
     rowCount += 1;
     const rowBytes = getUtf8ByteLength(rowLine.text);
@@ -182,7 +188,7 @@ export function getMarkdownTableBlock(
 
   return {
     from: headerLine.from,
-    to: syntaxRange.to,
+    to: sourceExtent.to,
     alignments: normalizeTableAlignments(
       delimiterCells.slice(0, width).map(parseTableAlignment),
       width,
@@ -195,6 +201,34 @@ export function getMarkdownTableBlock(
     modelComplete,
     refinementValid,
   };
+}
+
+/**
+ * Lezer's GFM table parser keeps every non-blank line after the delimiter in
+ * the parser-owned Table leaf, including ordinary prose with no pipe at all.
+ * That is useful for lossless syntax classification, but an interactive table
+ * widget cannot safely claim those lines: its cell model only has stable
+ * source ranges for explicit Markdown rows. Keep the parser as the authority
+ * for recognizing the table start, then narrow the editable atom to the
+ * consecutive pipe-delimited source rows. Adjacent prose remains canonical
+ * CodeMirror text instead of becoming synthetic, uneditable empty cells.
+ */
+function getExplicitMarkdownTableSourceExtent(
+  state: EditorState,
+  headerLineNumber: number,
+  lastSyntaxLineNumber: number,
+): { to: number; lastLineNumber: number } {
+  let lastLine = state.doc.line(headerLineNumber + 1);
+  let lineNumber = headerLineNumber + 2;
+
+  while (lineNumber <= lastSyntaxLineNumber) {
+    const line = state.doc.line(lineNumber);
+    if (!isMarkdownTableLine(line.text) || isTableDelimiterLine(line.text)) break;
+    lastLine = line;
+    lineNumber += 1;
+  }
+
+  return { to: lastLine.to, lastLineNumber: lastLine.number };
 }
 
 export function getMarkdownTableSyntaxRange(

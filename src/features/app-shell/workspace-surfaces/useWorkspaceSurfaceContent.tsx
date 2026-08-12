@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import type { ViewerPackSnapshot, Workspace } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import type { DesktopView } from "../../../components/DesktopCloudShell";
-import type { useDesktopUpdates } from "../../../components/DesktopUpdateControls";
+import type { DesktopUpdatesController } from "../../updates";
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
 import type { FilesVisibilitySettings } from "../../../preferences";
 import type {
@@ -46,8 +46,6 @@ import type {
 const LazyPluginsView = lazy(() => import("../../plugins/PluginsView").then((module) => ({
   default: module.PluginsView,
 })));
-type DesktopUpdatesController = ReturnType<typeof useDesktopUpdates>;
-
 export type DesktopWorkspaceCloudSurfaceController = {
   activeSection: CloudWorkspaceSection;
   projectContext?: ProjectCloudContext | null;

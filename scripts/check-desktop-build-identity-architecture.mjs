@@ -143,11 +143,26 @@ requireSource(
   'ipcMain.handle("updates:check"',
   "the Stable updater must retain the Settings-owned manual check command",
 );
-for (const forbidden of ["DESKTOP_UPDATE_CHECK_SCHEDULE", "scheduleBackgroundCheck"]) {
-  if (updaterSource.includes(forbidden)) {
-    errors.push(`the manual-only updater must not retain background discovery through ${forbidden}`);
-  }
-}
+requireSource(
+  updaterSource,
+  "BACKGROUND_UPDATE_INITIAL_DELAY_MS",
+  "the Stable updater must delay background discovery until after cold start",
+);
+requireSource(
+  updaterSource,
+  "BACKGROUND_UPDATE_INTERVAL_MS",
+  "the Stable updater must rate-limit repeated background discovery",
+);
+requireSource(
+  updaterSource,
+  "scheduleBackgroundCheck(BACKGROUND_UPDATE_INITIAL_DELAY_MS)",
+  "the Stable updater must schedule background discovery for supported builds",
+);
+requireSource(
+  updaterSource,
+  "autoUpdater.autoDownload = false",
+  "background discovery must never become an automatic download",
+);
 for (const forbidden of [
   "PUPPYONE_DESKTOP_UPDATE_CHANNEL",
   "PUPPYONE_DESKTOP_UPDATE_URL",
@@ -180,11 +195,50 @@ requireSource(
 requireSource(
   generalSettingsSource,
   "<DesktopUpdateSettingsRow",
-  "Settings General must own the user-facing update workflow",
+  "Settings General must retain the detailed update workflow",
 );
 const titlebarActionsSource = await readText("src/features/app-shell/DesktopTitlebarActions.tsx");
-if (/DesktopUpdate|desktopUpdates|onUpdateNow/.test(titlebarActionsSource)) {
-  errors.push("Desktop update status and actions must not render in the Header");
+const titlebarUpdateSource = await readText("src/features/updates/DesktopUpdateTitlebarButton.tsx");
+const updateModelSource = await readText("src/features/updates/updateModel.ts");
+const updatePreviewSource = await readText("src/features/updates/updatePreview.ts");
+const updateControllerSource = await readText("src/features/updates/useDesktopUpdates.ts");
+requireSource(
+  titlebarActionsSource,
+  'group: "app-status"',
+  "the conditional update affordance must lead the right-side Header tools",
+);
+requireSource(
+  titlebarActionsSource,
+  "<DesktopUpdateTitlebarButton",
+  "the right-side Header tools must render the conditional update affordance",
+);
+requireSource(
+  titlebarUpdateSource,
+  "if (!presentation) return null",
+  "the Header update affordance must occupy no space when it is hidden",
+);
+for (const visibleStatus of ["available", "downloading", "downloaded", "blocked", "installing"]) {
+  requireSource(
+    updateModelSource,
+    `state.status === "${visibleStatus}"`,
+    `the Header update selector must handle ${visibleStatus}`,
+  );
+}
+if (/state\.status === "(?:disabled|idle|checking|not-available|error)"/.test(updateModelSource)) {
+  errors.push("the Header update selector must not expose unavailable, current, checking, or error states");
+}
+requireSource(
+  updatePreviewSource,
+  "if (!isDevelopment",
+  "the visual update fixture must be impossible to activate outside development",
+);
+requireSource(
+  updateControllerSource,
+  "isDevelopment: import.meta.env.DEV",
+  "the update controller must bind the visual fixture to Vite development builds",
+);
+if (!packageScripts["dev:update-preview"]?.includes("VITE_DESKTOP_UPDATE_PREVIEW=available")) {
+  errors.push("the development update affordance must have an explicit preview launcher");
 }
 const sidebarSources = [
   await readText("src/features/app-shell/DesktopDataWorkspaceSurface.tsx"),

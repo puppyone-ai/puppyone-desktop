@@ -131,8 +131,42 @@ if (!virtualizationPolicy.includes("SIDEBAR_VIRTUALIZATION_THRESHOLD = 200")) {
 }
 
 const auxiliarySource = read(absolute("src/features/app-shell/auxiliary/AuxiliaryPanelHost.tsx"));
-for (const token of ["SidebarResizeHandle", "usePaneResizeDrag", 'orientation="vertical"']) {
+for (const token of ["SidebarResizeHandle", "useCollapsiblePaneResize", 'orientation="vertical"']) {
   if (!auxiliarySource.includes(token)) errors.push(`AuxiliaryPanelHost must consume the shared resize contract (${token}).`);
+}
+const layoutStyle = read(absolute("src/styles/layout.css"));
+const dataWorkspaceStyle = read(absolute("packages/shared-ui/src/styles/data-workspace.css"));
+const desktopDataWorkspaceStyle = read(absolute("src/features/data-workspace/data-shell.css"));
+const collapsiblePaneResizeSource = read(absolute("packages/shared-ui/src/primitives/useCollapsiblePaneResize.ts"));
+const paneResizeDragSource = read(absolute("packages/shared-ui/src/primitives/usePaneResizeDrag.ts"));
+const desktopDataWorkspaceSource = read(absolute("src/features/app-shell/DesktopDataWorkspaceSurface.tsx"));
+if (layoutStyle.includes("--desktop-right-sidebar-visible-width") || auxiliarySource.includes("desktop-right-sidebar-visible-width")) {
+  errors.push("AuxiliaryPanelHost must not split its host and content into separate rendered widths.");
+}
+if (dataWorkspaceStyle.includes("--data-explorer-min-width")) {
+  errors.push("DataWorkspace content must follow the canonical Explorer track width.");
+}
+if (!collapsiblePaneResizeSource.includes("A pane has one rendered width")) {
+  errors.push("The shared collapsible pane resize contract must retain a single rendered-width invariant.");
+}
+for (const [label, source] of [
+  ["Shared DataWorkspace", dataWorkspaceStyle],
+  ["Desktop DataWorkspace", desktopDataWorkspaceStyle],
+]) {
+  for (const token of [
+    'data-resizable-explorer="true"',
+    "var(--po-pane-resizer-hit-size, 8px)",
+    "grid-column: 2",
+    "inset: auto",
+  ]) {
+    if (!source.includes(token)) errors.push(`${label} is missing its exclusive resize gutter contract (${token}).`);
+  }
+}
+if (!paneResizeDragSource.includes("onDragActiveChange?.(true)") || !paneResizeDragSource.includes("onDragActiveChange?.(false)")) {
+  errors.push("Pane resize drags must publish their complete host-neutral activity lifecycle.");
+}
+if (!desktopDataWorkspaceSource.includes("onExplorerResizeActiveChange={setNativeSurfacePointerPassthrough}")) {
+  errors.push("Desktop explorer resize must opt into native-surface pointer passthrough.");
 }
 const shellSource = read(absolute("src/components/DesktopCloudShell.tsx"));
 if (!shellSource.includes("<AuxiliaryPanelHost")) errors.push("DesktopCloudShell must delegate Auxiliary geometry/lifecycle to AuxiliaryPanelHost.");
