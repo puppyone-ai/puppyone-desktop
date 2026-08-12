@@ -5,6 +5,7 @@ import {
   type HTMLAttributes,
   type ReactNode,
 } from "react";
+import { useNativeSurfaceOcclusionLease } from "../features/native-surfaces";
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -26,12 +27,15 @@ export const DesktopMenuSurface = forwardRef<HTMLDivElement, DesktopMenuSurfaceP
   },
   ref,
 ) {
+  useNativeSurfaceOcclusionLease();
+
   return (
     <div
       ref={ref}
       className={cx("desktop-menu-surface", className)}
       role={role}
       aria-label={ariaLabel}
+      data-native-surface-occluder="true"
       data-po-scrollbar="menu"
       data-window-no-drag="true"
       {...props}

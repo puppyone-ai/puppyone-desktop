@@ -55,6 +55,8 @@ export function createViewerPackHost({
   getMimeType = null,
   getThemeSnapshot = () => ({ mode: "light", tokens: {} }),
   allowFileFallback = false,
+  nativeSurfaceOcclusion = null,
+  nativeSurfacePointerPassthrough = null,
 }) {
   if (typeof userDataPath !== "string" || !userDataPath.trim()) {
     throw new TypeError("userDataPath is required for createViewerPackHost.");
@@ -99,6 +101,8 @@ export function createViewerPackHost({
     applyPluginSessionSecurity,
     getMimeType,
     allowFileFallback,
+    nativeSurfaceOcclusion,
+    nativeSurfacePointerPassthrough,
   });
 
   function getSessionIdForSender(sender) {

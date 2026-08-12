@@ -5,7 +5,11 @@ export type { SidebarIconButtonProps } from "./SidebarIconButton";
 export { SidebarList } from "./SidebarList";
 export type { SidebarListProps } from "./SidebarList";
 export { SidebarResizeHandle } from "./SidebarResizeHandle";
-export type { SidebarResizeHandleProps, SidebarResizeIntent } from "./SidebarResizeHandle";
+export type {
+  CollapsedPaneEdgeSide,
+  SidebarResizeHandleProps,
+  SidebarResizeIntent,
+} from "./SidebarResizeHandle";
 export { SidebarRoot } from "./SidebarRoot";
 export type { SidebarRootProps } from "./SidebarRoot";
 export { SidebarRow } from "./SidebarRow";

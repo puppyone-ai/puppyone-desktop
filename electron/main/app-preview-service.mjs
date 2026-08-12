@@ -75,6 +75,7 @@ export function createAppPreviewService({
       url: runtimeResult.url,
       bounds: request.bounds,
       attachmentId: request.attachmentId,
+      visible: request.visible,
     });
   }
 

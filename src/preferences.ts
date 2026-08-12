@@ -5,7 +5,10 @@ import {
 } from "./features/typography/fontCatalog";
 import {
   DEFAULT_INTERFACE_STYLE,
+  DARK_THEME_PRESET_STORAGE_KEY,
   INTERFACE_STYLE_STORAGE_KEY,
+  LEGACY_THEME_PRESET_STORAGE_KEY,
+  LIGHT_THEME_PRESET_STORAGE_KEY,
   THEME_STORAGE_KEY,
   parseInterfaceStyle,
   resolveActiveThemeMode,
@@ -17,7 +20,10 @@ import type { PulseGridPresetId } from "@puppyone/shared-ui";
 export type { TypographyPreferences } from "./features/typography/fontCatalog";
 export {
   DEFAULT_INTERFACE_STYLE,
+  DARK_THEME_PRESET_STORAGE_KEY,
   INTERFACE_STYLE_STORAGE_KEY,
+  LEGACY_THEME_PRESET_STORAGE_KEY,
+  LIGHT_THEME_PRESET_STORAGE_KEY,
   THEME_STORAGE_KEY,
   parseInterfaceStyle,
   resolveActiveThemeMode,
@@ -101,9 +107,6 @@ export type CreateNewMenuSettings = {
   items: CreateNewMenuItem[];
 };
 
-export const LEGACY_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.themePreset";
-export const LIGHT_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.lightThemePreset";
-export const DARK_THEME_PRESET_STORAGE_KEY = "puppyone.desktop.darkThemePreset";
 export const TEXT_SIZE_STORAGE_KEY = "puppyone.desktop.textSize";
 export const TYPOGRAPHY_STORAGE_KEY = "puppyone.desktop.typography";
 export const POINTER_CURSORS_STORAGE_KEY = "puppyone.desktop.pointerCursors";
@@ -169,7 +172,7 @@ export const DEFAULT_TITLEBAR_ACTIONS_SETTINGS: TitlebarActionsSettings = {
   },
   order: [...TITLEBAR_ACTION_IDS],
 };
-export const DEFAULT_TERMINAL_SESSION_LAYOUT: TerminalSessionLayout = "menu";
+export const DEFAULT_TERMINAL_SESSION_LAYOUT: TerminalSessionLayout = "tabs";
 export const DEFAULT_AI_EDIT_ASSIST_ENABLED = false;
 export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableAgentChat: false,
@@ -185,7 +188,6 @@ export const DEFAULT_CREATE_NEW_MENU_SETTINGS: CreateNewMenuSettings = {
   items: [
     { kind: "markdown", enabled: true },
     { kind: "csv", enabled: true },
-    { kind: "app", enabled: true },
   ],
 };
 

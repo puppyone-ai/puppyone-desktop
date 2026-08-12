@@ -64,6 +64,9 @@ function tableMarkup(direction) {
               <button class="cm-md-table-drag-handle cm-md-table-column-handle po-editable-table-drag-handle po-editable-table-column-handle is-visible" style="left:90px;top:0" type="button">
                 <span class="cm-md-table-drag-handle-visual po-editable-table-drag-handle-visual"></span>
               </button>
+              <button class="cm-md-table-drag-handle cm-md-table-row-handle po-editable-table-drag-handle po-editable-table-row-handle is-visible" style="${direction === "rtl" ? "right:0" : "left:0"};top:48px" type="button">
+                <span class="cm-md-table-drag-handle-visual po-editable-table-drag-handle-visual"></span>
+              </button>
             </div>
           </div>
         </div>
@@ -74,7 +77,7 @@ function tableMarkup(direction) {
     </div>`;
 }
 
-function fixtureHtml(direction) {
+function fixtureHtml(direction, reserveVerticalScrollbar) {
   return `<!doctype html>
     <html dir="${direction}">
       <head>
@@ -101,7 +104,12 @@ function fixtureHtml(direction) {
           body { overflow: hidden; }
           .markdown-codemirror-editor { width: 100%; height: 100%; }
           .cm-editor, .cm-scroller { width: 100%; height: 100%; }
-          .cm-scroller { overflow-y: auto; overflow-x: auto; }
+          .cm-scroller {
+            overflow-y: ${reserveVerticalScrollbar ? "scroll" : "auto"};
+            overflow-x: auto;
+            scrollbar-gutter: ${reserveVerticalScrollbar ? "stable" : "auto"};
+          }
+          ${reserveVerticalScrollbar ? ".cm-scroller::-webkit-scrollbar { width: 12px; }" : ""}
           .cm-line { display: block; }
           ${markdownEditorCss}
           ${markdownContentCss}
@@ -125,7 +133,7 @@ function fixtureHtml(direction) {
     </html>`;
 }
 
-async function measureScenario(viewportWidth, direction) {
+async function measureScenario(viewportWidth, direction, reserveVerticalScrollbar = false) {
   const browserWindow = new BrowserWindow({
     show: false,
     width: viewportWidth,
@@ -139,7 +147,7 @@ async function measureScenario(viewportWidth, direction) {
   });
   windows.push(browserWindow);
   await browserWindow.loadURL(
-    `data:text/html;charset=utf-8,${encodeURIComponent(fixtureHtml(direction))}`,
+    `data:text/html;charset=utf-8,${encodeURIComponent(fixtureHtml(direction, reserveVerticalScrollbar))}`,
   );
 
   return browserWindow.webContents.executeJavaScript(`
@@ -163,6 +171,7 @@ async function measureScenario(viewportWidth, direction) {
       const firstColumn = table.rows[0].cells[0];
       const addColumn = document.querySelector(".cm-md-table-add-column");
       const columnHandle = document.querySelector(".cm-md-table-column-handle");
+      const rowHandle = document.querySelector(".cm-md-table-row-handle");
       const viewportMaximum = viewport.scrollWidth - viewport.clientWidth;
       scrollbarContent.style.inlineSize = scrollbar.clientWidth + viewportMaximum + "px";
       await nextFrame();
@@ -173,6 +182,7 @@ async function measureScenario(viewportWidth, direction) {
       const scrollbarRect = scrollbar.getBoundingClientRect();
       const tableRect = table.getBoundingClientRect();
       const columnHandleRect = columnHandle.getBoundingClientRect();
+      const rowHandleRect = rowHandle.getBoundingClientRect();
       const leadingInset = direction === "rtl"
         ? viewportRect.right - tableRect.right
         : tableRect.left - viewportRect.left;
@@ -192,12 +202,18 @@ async function measureScenario(viewportWidth, direction) {
         scrollbarClientWidth: scrollbar.clientWidth,
         tableLeft: tableRect.left,
         tableRight: tableRect.right,
+        tableWidth: tableRect.width,
         tableTop: tableRect.top,
         columnHandleTop: columnHandleRect.top,
         columnHandleBottom: columnHandleRect.bottom,
+        rowHandleLeft: rowHandleRect.left,
+        rowHandleRight: rowHandleRect.right,
         leadingInset,
         framePaddingInlineStart: Number.parseFloat(
           direction === "rtl" ? getComputedStyle(frame).paddingRight : getComputedStyle(frame).paddingLeft,
+        ),
+        framePaddingInlineEnd: Number.parseFloat(
+          direction === "rtl" ? getComputedStyle(frame).paddingLeft : getComputedStyle(frame).paddingRight,
         ),
         outerScrollLeft: outer.scrollLeft,
         outerScrollWidth: outer.scrollWidth,
@@ -238,30 +254,64 @@ async function measureScenario(viewportWidth, direction) {
       await nextFrame();
       await nextFrame();
       const endViewportRect = viewport.getBoundingClientRect();
+      const endScrollbarRect = scrollbar.getBoundingClientRect();
+      const endTableRect = table.getBoundingClientRect();
       const addRect = addColumn.getBoundingClientRect();
       const end = {
         addLeft: addRect.left,
         addRight: addRect.right,
+        scrollbarLeft: endScrollbarRect.left,
+        scrollbarRight: endScrollbarRect.right,
+        tableLeft: endTableRect.left,
+        tableRight: endTableRect.right,
         viewportLeft: endViewportRect.left,
         viewportRight: endViewportRect.right,
         outerScrollLeft: outer.scrollLeft,
       };
-      return { direction, viewportWidth: window.innerWidth, initial, scrolled, end };
+      return {
+        direction,
+        reserveVerticalScrollbar: ${JSON.stringify(reserveVerticalScrollbar)},
+        viewportWidth: window.innerWidth,
+        initial,
+        scrolled,
+        end,
+      };
     })()
   `, true);
 }
 
 async function runSmoke() {
   const results = [];
+  const scenarioSpecs = [
+    ...[600, 1000, 1600, 2100].map((viewportWidth) => ({
+      reserveVerticalScrollbar: false,
+      viewportWidth,
+    })),
+    ...[600, 1000].map((viewportWidth) => ({
+      reserveVerticalScrollbar: true,
+      viewportWidth,
+    })),
+  ];
   for (const direction of ["ltr", "rtl"]) {
-    for (const viewportWidth of [600, 1000, 1600, 2100]) {
-      const result = await measureScenario(viewportWidth, direction);
+    for (const { viewportWidth, reserveVerticalScrollbar } of scenarioSpecs) {
+      const result = await measureScenario(
+        viewportWidth,
+        direction,
+        reserveVerticalScrollbar,
+      );
       const { initial, scrolled, end } = result;
       const actualViewportWidth = result.viewportWidth;
-      const label = `${direction}-${actualViewportWidth}`;
+      const label = `${direction}-${actualViewportWidth}${reserveVerticalScrollbar ? "-vertical-scrollbar" : ""}`;
       const expectedGutter = Math.max(64, (actualViewportWidth - 724) / 2);
-      const expectedSafeStart = 64;
-      const expectedBreakoutEnd = actualViewportWidth - 48;
+      const expectedInteractionGutter = 18;
+      const expectedViewportInset = Math.min(
+        48,
+        expectedGutter - expectedInteractionGutter,
+      );
+      const expectedInteractionStartInset = expectedGutter - expectedViewportInset;
+      const expectedSafeStart = expectedViewportInset;
+      const expectedBreakoutEnd = actualViewportWidth - expectedViewportInset;
+      const expectedReadingRailEndInset = expectedInteractionStartInset;
 
       assert(initial.viewportScrollWidth > initial.viewportClientWidth, `${label}: fixture is not wide`);
       assert(
@@ -279,18 +329,44 @@ async function runSmoke() {
         initial.headingRuleWidth === "0px" && initial.headingPaddingBottom === "0px",
         `${label}: Markdown heading retained divider spacing`,
       );
-      assertNear(initial.leadingInset, expectedGutter - 64, `${label}: scroll-away inset`);
       assertNear(
         initial.framePaddingInlineStart,
-        initial.leadingInset + 14,
+        initial.leadingInset,
         `${label}: track leading padding`,
       );
-      assertNear(initial.scrollbarLeft, expectedGutter, `${label}: scrollbar reading-rail start`);
       assertNear(
-        initial.scrollbarRight,
-        actualViewportWidth - expectedGutter,
-        `${label}: scrollbar reading-rail end`,
+        initial.framePaddingInlineEnd,
+        initial.framePaddingInlineStart,
+        `${label}: symmetric interaction padding`,
       );
+      assertNear(
+        initial.viewportLeft - initial.contentLeft,
+        initial.contentRight - initial.viewportRight,
+        `${label}: symmetric physical clip edges`,
+      );
+      assertNear(
+        initial.viewportScrollWidth - initial.viewportClientWidth,
+        Math.max(0, initial.tableWidth - initial.scrollbarClientWidth),
+        `${label}: interaction chrome is excluded from semantic range`,
+      );
+      if (!reserveVerticalScrollbar) {
+        assertNear(
+          initial.leadingInset,
+          expectedInteractionStartInset,
+          `${label}: interaction start inset`,
+        );
+        assertNear(
+          initial.framePaddingInlineEnd,
+          expectedReadingRailEndInset,
+          `${label}: track reading-rail end padding`,
+        );
+        assertNear(initial.scrollbarLeft, expectedGutter, `${label}: scrollbar reading-rail start`);
+        assertNear(
+          initial.scrollbarRight,
+          actualViewportWidth - expectedGutter,
+          `${label}: scrollbar reading-rail end`,
+        );
+      }
       assertNear(
         initial.scrollbarScrollWidth - initial.scrollbarClientWidth,
         initial.viewportScrollWidth - initial.viewportClientWidth,
@@ -306,19 +382,33 @@ async function runSmoke() {
         `${label}: column handle no longer straddles the table border`,
       );
       if (direction === "ltr") {
-        assertNear(initial.viewportLeft, expectedSafeStart, `${label}: safe edge`);
-        assertNear(initial.viewportRight, expectedBreakoutEnd, `${label}: breakout end`);
-        assertNear(initial.tableLeft, expectedGutter, `${label}: resting reading rail`);
+        if (!reserveVerticalScrollbar) {
+          assertNear(initial.viewportLeft, expectedSafeStart, `${label}: safe edge`);
+          assertNear(initial.viewportRight, expectedBreakoutEnd, `${label}: breakout end`);
+        }
+        assertNear(initial.tableLeft, initial.scrollbarLeft, `${label}: resting reading rail`);
+        assertNear(initial.rowHandleLeft, initial.tableLeft - 14, `${label}: row handle table edge`);
+        assert(initial.rowHandleLeft >= initial.viewportLeft - 1.5, `${label}: row handle is clipped at safe edge`);
+        assert(initial.rowHandleRight > initial.tableLeft, `${label}: row handle no longer straddles table`);
         assertNear(scrolled.thirdLeft, scrolled.viewportLeft, `${label}: later column reaches safe edge`);
         assert(scrolled.tableLeft < scrolled.viewportLeft, `${label}: leading table content did not leave`);
+        assertNear(end.tableRight, end.scrollbarRight, `${label}: table and scrollbar reading-rail end`);
+        assertNear(end.addLeft, end.tableRight, `${label}: add-column rail follows table edge`);
         assert(end.addRight <= end.viewportRight + 1.5, `${label}: add-column rail is clipped at end`);
         assert(end.addLeft >= end.viewportLeft - 1.5, `${label}: add-column rail is unreachable`);
       } else {
-        assertNear(initial.viewportRight, actualViewportWidth - expectedSafeStart, `${label}: safe edge`);
-        assertNear(initial.viewportLeft, actualViewportWidth - expectedBreakoutEnd, `${label}: breakout end`);
-        assertNear(initial.tableRight, actualViewportWidth - expectedGutter, `${label}: resting reading rail`);
+        if (!reserveVerticalScrollbar) {
+          assertNear(initial.viewportRight, actualViewportWidth - expectedSafeStart, `${label}: safe edge`);
+          assertNear(initial.viewportLeft, actualViewportWidth - expectedBreakoutEnd, `${label}: breakout end`);
+        }
+        assertNear(initial.tableRight, initial.scrollbarRight, `${label}: resting reading rail`);
+        assertNear(initial.rowHandleRight, initial.tableRight + 14, `${label}: row handle table edge`);
+        assert(initial.rowHandleRight <= initial.viewportRight + 1.5, `${label}: row handle is clipped at safe edge`);
+        assert(initial.rowHandleLeft < initial.tableRight, `${label}: row handle no longer straddles table`);
         assertNear(scrolled.thirdRight, scrolled.viewportRight, `${label}: later column reaches safe edge`);
         assert(scrolled.tableRight > scrolled.viewportRight, `${label}: leading table content did not leave`);
+        assertNear(end.tableLeft, end.scrollbarLeft, `${label}: table and scrollbar reading-rail end`);
+        assertNear(end.addRight, end.tableLeft, `${label}: add-column rail follows table edge`);
         assert(end.addLeft >= end.viewportLeft - 1.5, `${label}: add-column rail is clipped at end`);
         assert(end.addRight <= end.viewportRight + 1.5, `${label}: add-column rail is unreachable`);
       }

@@ -7,7 +7,7 @@ describe("titlebar external-open architecture", () => {
     const actions = source("src/features/app-shell/DesktopTitlebarActions.tsx");
     const app = source("src/App.tsx");
     const titlebarCss = source("src/styles/titlebar.css");
-    const updateControls = source("src/components/DesktopUpdateControls.tsx");
+    const updateButton = source("src/features/updates/DesktopUpdateTitlebarButton.tsx");
 
     expect(definition).toContain('className="desktop-titlebar-action desktop-titlebar-external-open"');
     expect(definition).toContain("onClick={externalOpen.onOpen}");
@@ -23,9 +23,19 @@ describe("titlebar external-open architecture", () => {
     expect(titlebarCss).toMatch(
       /\.desktop-titlebar-action-divider\s*\{[^}]*height:\s*18px;[^}]*margin-inline:\s*3px;[^}]*background:\s*var\(--desktop-titlebar-divider\);[^}]*\}/s,
     );
-    expect(actions).not.toMatch(/DesktopUpdate|desktopUpdates|onUpdateNow/);
-    expect(updateControls).not.toContain("DesktopUpdateTitlebarButton");
-    expect(titlebarCss).not.toMatch(/desktop-update-titlebar-action|desktop-update-dot/);
+    expect(actions).toContain("DesktopUpdateTitlebarButton");
+    expect(actions.indexOf('group: "app-status"')).toBeLessThan(
+      actions.indexOf("if (editorFindCommand)"),
+    );
+    expect(updateButton).toContain("if (!presentation) return null");
+    expect(updateButton).toContain("strokeWidth={2.3}");
+    expect(titlebarCss).toMatch(
+      /\.desktop-titlebar-update\s*\{[^}]*width:\s*var\(--desktop-titlebar-control-height\);[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-inverse\);[^}]*\}/s,
+    );
+    expect(titlebarCss).toMatch(
+      /\.desktop-titlebar-update::before\s*\{[^}]*inset:\s*2px;[^}]*border-radius:\s*50%;[^}]*background:\s*var\(--po-accent\);[^}]*\}/s,
+    );
+    expect(titlebarCss).toContain(".desktop-titlebar-update-dot");
   });
 
   it("keeps application choice in Default Apps settings", () => {

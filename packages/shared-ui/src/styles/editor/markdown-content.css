@@ -15,6 +15,10 @@
   --po-md-heading-gap-before: 24px;
   --po-md-heading-gap-after: 16px;
   --po-md-heading-weight: 600;
+  --po-md-h1-weight: 650;
+  --po-md-h2-weight: 625;
+  --po-md-h3-weight: 600;
+  --po-md-strong-weight: 600;
   --po-md-heading-line-height: 1.25;
   --po-md-rule-color: color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 4%);
   --po-md-h1-size: 2em;
@@ -36,19 +40,22 @@
 .markdown-codemirror-editor .cm-md-syntax-heading,
 .markdown-codemirror-editor .cm-md-heading {
   color: var(--po-text);
-  font-weight: var(--po-md-heading-weight);
+  font-weight: var(--po-md-current-heading-weight, var(--po-md-heading-weight));
   line-height: var(--po-md-heading-line-height);
 }
 
 .markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-1 {
+  --po-md-current-heading-weight: var(--po-md-h1-weight);
   font-size: var(--po-md-h1-size);
 }
 
 .markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-2 {
+  --po-md-current-heading-weight: var(--po-md-h2-weight);
   font-size: var(--po-md-h2-size);
 }
 
 .markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-3 {
+  --po-md-current-heading-weight: var(--po-md-h3-weight);
   font-size: var(--po-md-h3-size);
 }
 
@@ -110,14 +117,17 @@
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface h1 {
   font-size: var(--po-md-h1-size);
+  font-weight: var(--po-md-h1-weight);
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface h2 {
   font-size: var(--po-md-h2-size);
+  font-weight: var(--po-md-h2-weight);
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface h3 {
   font-size: var(--po-md-h3-size);
+  font-weight: var(--po-md-h3-weight);
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface h4 {
@@ -166,6 +176,24 @@
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface a:hover {
   text-decoration: underline;
+}
+
+/* One emphasis weight across native Markdown, inline HTML, and rendered HTML.
+   Feature widgets consume the same token instead of defining parallel values. */
+.markdown-codemirror-editor .cm-md-syntax-strong,
+.markdown-codemirror-editor :is(strong, b).cm-md-inline-html,
+.markdown-codemirror-editor .cm-md-html-rendered-surface :where(strong, b) {
+  font-weight: var(--po-md-strong-weight);
+}
+
+/* Emphasis must never make an already-strong heading lighter. */
+.markdown-codemirror-editor .cm-md-heading .cm-md-syntax-strong,
+.markdown-codemirror-editor .cm-md-heading :is(strong, b).cm-md-inline-html,
+.markdown-codemirror-editor
+  .cm-md-html-rendered-surface
+  :where(h1, h2, h3, h4, h5, h6)
+  :where(strong, b) {
+  font-weight: inherit;
 }
 
 .markdown-codemirror-editor .cm-md-html-rendered-surface details {

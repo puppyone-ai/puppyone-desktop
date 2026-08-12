@@ -1,6 +1,8 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 import {
+  BACKGROUND_UPDATE_INITIAL_DELAY_MS,
+  BACKGROUND_UPDATE_INTERVAL_MS,
   createUpdateService,
   resolveDesktopUpdateConfiguration,
 } from "../electron/update-service.mjs";
@@ -109,7 +111,7 @@ describe("Desktop updater channel isolation", () => {
     });
   });
 
-  it("keeps Stable update checks manual and exposes only the Settings command", async () => {
+  it("checks Stable feeds quietly in the background and keeps the Settings command", async () => {
     vi.useFakeTimers();
     let service;
     try {
@@ -143,19 +145,23 @@ describe("Desktop updater channel isolation", () => {
 
       service.start();
       service.start();
-      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+      await vi.advanceTimersByTimeAsync(BACKGROUND_UPDATE_INITIAL_DELAY_MS - 1);
 
       expect(checkCount).toBe(0);
       expect(service.getState().status).toBe("idle");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(checkCount).toBe(1);
+      expect(service.getState().status).toBe("not-available");
+
       const checkFromSettings = handlers.get("updates:check");
       expect(checkFromSettings).toBeTypeOf("function");
       await checkFromSettings();
 
-      expect(checkCount).toBe(1);
+      expect(checkCount).toBe(2);
       expect(service.getState().status).toBe("not-available");
       service.dispose();
-      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
-      expect(checkCount).toBe(1);
+      await vi.advanceTimersByTimeAsync(BACKGROUND_UPDATE_INTERVAL_MS);
+      expect(checkCount).toBe(2);
     } finally {
       service?.dispose();
       vi.useRealTimers();

@@ -76,6 +76,7 @@ export function CsvViewSettings({
           ref={popoverRef}
           id={popoverId}
           className="desktop-menu-surface csv-table-editor__settings-popover"
+          data-native-surface-occluder="true"
           data-po-scrollbar="menu"
           role="dialog"
           aria-label={t("editor.csv.settings")}

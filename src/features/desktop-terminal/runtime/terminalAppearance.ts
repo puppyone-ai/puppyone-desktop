@@ -5,7 +5,7 @@ export function readTerminalTheme(element: HTMLElement): ITheme {
     background: cssColor(
       element,
       "--po-terminal-bg",
-      cssColor(element, "--po-surface-terminal", "#fbf6ed"),
+      cssColor(element, "--po-surface-terminal", "#fbfaf7"),
     ),
     foreground: cssColor(element, "--po-terminal-fg", cssColor(element, "--po-text", "#2f2a23")),
     cursor: cssColor(element, "--po-terminal-cursor", cssColor(element, "--po-text", "#2f2a23")),

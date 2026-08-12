@@ -64,10 +64,12 @@ describe("Markdown editor layout", () => {
     expect(contentRule).not.toMatch(/padding-(?:block|top):[^;]*content-gutter-inline/);
   });
 
-  it("keeps the table breakout reserve separate from the document edge inset", () => {
+  it("keeps a symmetric table breakout inset separate from the document edge inset", () => {
     const editorRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor");
 
-    expect(editorRule).toContain("--po-markdown-breakout-right-gutter: 48px;");
+    expect(editorRule).toContain("--po-markdown-breakout-inline-inset: 48px;");
+    expect(editorRule).not.toContain("--po-markdown-breakout-inline-end-gutter");
+    expect(editorRule).not.toContain("--po-markdown-breakout-right-gutter");
     expect(editorRule).not.toContain("--po-markdown-breakout-max-width");
   });
 
@@ -119,9 +121,17 @@ describe("Markdown HTML media layout", () => {
       markdownContentCss,
       '.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-2',
     );
+    const nativeHeading3Rule = readCssRule(
+      markdownContentCss,
+      '.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-3',
+    );
     const htmlHeading2Rule = readCssRule(
       markdownContentCss,
       ".markdown-codemirror-editor .cm-md-html-rendered-surface h2",
+    );
+    const htmlHeading3Rule = readCssRule(
+      markdownContentCss,
+      ".markdown-codemirror-editor .cm-md-html-rendered-surface h3",
     );
     const htmlSurfaceRule = readCssRule(
       markdownContentCss,
@@ -138,18 +148,38 @@ describe("Markdown HTML media layout", () => {
 
     expect(editorEntryCss).toContain('@import "./editor/markdown-content.css";');
     expect(profileRule).toContain("--po-md-presentation-version: 1;");
+    expect(profileRule).toContain("--po-md-h1-weight: 650;");
+    expect(profileRule).toContain("--po-md-h2-weight: 625;");
+    expect(profileRule).toContain("--po-md-h3-weight: 600;");
+    expect(profileRule).toContain("--po-md-strong-weight: 600;");
     expect(profileRule).toContain(
       "--po-md-rule-color: color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 4%);",
     );
     expect(nativeHeadingRule).toContain("font-size: var(--po-md-h1-size);");
+    expect(nativeHeadingRule).toContain(
+      "--po-md-current-heading-weight: var(--po-md-h1-weight);",
+    );
     expect(htmlHeadingRule).toContain("font-size: var(--po-md-h1-size);");
+    expect(htmlHeadingRule).toContain("font-weight: var(--po-md-h1-weight);");
     expect(nativeHeading2Rule).toContain("font-size: var(--po-md-h2-size);");
+    expect(nativeHeading2Rule).toContain(
+      "--po-md-current-heading-weight: var(--po-md-h2-weight);",
+    );
     expect(htmlHeading2Rule).toContain("font-size: var(--po-md-h2-size);");
+    expect(htmlHeading2Rule).toContain("font-weight: var(--po-md-h2-weight);");
+    expect(nativeHeading3Rule).toContain("font-size: var(--po-md-h3-size);");
+    expect(nativeHeading3Rule).toContain(
+      "--po-md-current-heading-weight: var(--po-md-h3-weight);",
+    );
+    expect(htmlHeading3Rule).toContain("font-size: var(--po-md-h3-size);");
+    expect(htmlHeading3Rule).toContain("font-weight: var(--po-md-h3-weight);");
     for (const headingRule of [
       nativeHeadingRule,
       nativeHeading2Rule,
+      nativeHeading3Rule,
       htmlHeadingRule,
       htmlHeading2Rule,
+      htmlHeading3Rule,
     ]) {
       expect(headingRule).not.toContain("border-bottom");
       expect(headingRule).not.toContain("padding-bottom");
@@ -158,6 +188,33 @@ describe("Markdown HTML media layout", () => {
     expect(htmlPreRule).toContain("white-space: pre-wrap;");
     expect(widgetRule).toContain("padding: 0;");
     expect(markdownHtmlCss).not.toContain("min-height: 80px;\n  border-radius: 5px;");
+  });
+
+  it("keeps emphasis weight consistent across Markdown presentation adapters", () => {
+    expect(markdownContentCss).toContain(
+      ".markdown-codemirror-editor .cm-md-syntax-strong,",
+    );
+    expect(markdownContentCss).toContain(
+      ".markdown-codemirror-editor :is(strong, b).cm-md-inline-html,",
+    );
+    expect(markdownContentCss).toContain(
+      ".markdown-codemirror-editor .cm-md-html-rendered-surface :where(strong, b)",
+    );
+    expect(markdownContentCss).toMatch(
+      /\.cm-md-html-rendered-surface :where\(strong, b\)\s*\{[^}]*font-weight:\s*var\(--po-md-strong-weight\)/s,
+    );
+    expect(markdownTableCss).toMatch(
+      /\.cm-md-table-cell-content b\s*\{[^}]*font-weight:\s*var\(--po-md-strong-weight\)/s,
+    );
+    expect(markdownContentCss).toMatch(
+      /:where\(h1, h2, h3, h4, h5, h6\)[\s\S]*?:where\(strong, b\)\s*\{[^}]*font-weight:\s*inherit/s,
+    );
+    expect(markdownTableCss).toMatch(
+      /\.cm-md-table-widget th \.cm-md-table-cell-content b\s*\{[^}]*font-weight:\s*inherit/s,
+    );
+    expect(markdownEditorCss).not.toMatch(
+      /\.cm-md-syntax-strong\s*\{[^}]*font-weight:\s*650/s,
+    );
   });
 });
 
@@ -342,9 +399,21 @@ describe("Markdown table affordance layout", () => {
     expect(rootRule).toContain("inline-size: 100%;");
     expect(rootRule).toContain("overflow: visible;");
     expect(rootRule).toContain("padding-block: 0 18px;");
-    expect(viewportRule).toContain("--cm-md-table-scroll-away-inset: 0px;");
+    expect(rootRule).toContain(
+      "--cm-md-table-interaction-gutter: var(--po-editable-table-interaction-gutter);",
+    );
+    expect(sharedTableCss).toContain("--po-editable-table-interaction-gutter: max(");
     expect(viewportRule).toContain(
-      "margin-inline-start: calc(-1 * var(--cm-md-table-scroll-away-inset));",
+      "--cm-md-table-interaction-start-inset: var(--cm-md-table-interaction-gutter);",
+    );
+    expect(viewportRule).toContain(
+      "--cm-md-table-reading-rail-end-inset: var(--cm-md-table-interaction-gutter);",
+    );
+    expect(viewportRule).toContain(
+      "margin-inline-start: calc(-1 * var(--cm-md-table-interaction-start-inset));",
+    );
+    expect(viewportRule).toContain(
+      "+ var(--cm-md-table-interaction-start-inset)",
     );
     expect(viewportRule).toContain("overflow-x: auto;");
     expect(viewportRule).toContain("overflow-y: hidden;");
@@ -352,16 +421,21 @@ describe("Markdown table affordance layout", () => {
       "padding-block: var(--cm-md-table-handle-gutter) 0;",
     );
     expect(viewportRule).toContain("touch-action: pan-x pan-y;");
-    expect(markdownTableCss).toContain(
-      "calc(var(--po-markdown-editor-gutter-inline) - var(--po-markdown-editor-gutter-min))",
+    expect(markdownTableCss).toContain("--cm-md-table-viewport-inline-inset: min(");
+    expect(markdownTableCss).toContain("var(--po-markdown-breakout-inline-inset)");
+    expect(markdownTableCss).toMatch(
+      /--cm-md-table-interaction-start-inset:\s*calc\(\s*var\(--po-markdown-editor-gutter-inline\)\s*-\s*var\(--cm-md-table-viewport-inline-inset\)\s*\)/s,
     );
+    expect(markdownTableCss).not.toContain("--cm-md-table-viewport-inline-end-gutter");
+    expect(markdownTableCss).not.toMatch(/(?:max-)?inline-size:\s*calc\(\s*100cqw/s);
     expect(markdownTableCss).not.toContain("--po-markdown-breakout-max-width");
-    expect(frameRule).toContain("padding-inline-start: calc(");
-    expect(frameRule).toContain("var(--cm-md-table-scroll-away-inset)");
-    expect(frameRule).toContain("padding-inline-end: var(--cm-md-table-action-gutter);");
-    expect(surfaceRule).toContain(
-      "margin-inline-start: calc(-1 * var(--cm-md-table-handle-gutter));",
+    expect(frameRule).toContain(
+      "padding-inline-start: var(--cm-md-table-interaction-start-inset);",
     );
+    expect(frameRule).toContain(
+      "padding-inline-end: var(--cm-md-table-reading-rail-end-inset);",
+    );
+    expect(surfaceRule).toContain("margin-inline-start: 0;");
     expect(scrollbarRule).toContain("inline-size: 100%;");
     expect(scrollbarRule).toContain("overflow-x: auto;");
     expect(scrollbarRule).toContain("block-size: var(--po-scrollbar-size, 12px);");
@@ -428,20 +502,20 @@ describe("Markdown table affordance layout", () => {
 
   it("keeps compact drag grips inside larger pointer targets", () => {
     const columnHandleRule = readCssRule(
-      markdownTableCss,
-      ".markdown-codemirror-editor .cm-md-table-column-handle",
+      sharedTableCss,
+      ".po-editable-table-column-handle",
     );
     const columnVisualRule = readCssRule(
-      markdownTableCss,
-      ".markdown-codemirror-editor .cm-md-table-column-handle .cm-md-table-drag-handle-visual",
+      sharedTableCss,
+      ".po-editable-table-column-handle .po-editable-table-drag-handle-visual",
     );
     const rowHandleRule = readCssRule(
-      markdownTableCss,
-      ".markdown-codemirror-editor .cm-md-table-row-handle",
+      sharedTableCss,
+      ".po-editable-table-row-handle",
     );
     const rowVisualRule = readCssRule(
-      markdownTableCss,
-      ".markdown-codemirror-editor .cm-md-table-row-handle .cm-md-table-drag-handle-visual",
+      sharedTableCss,
+      ".po-editable-table-row-handle .po-editable-table-drag-handle-visual",
     );
 
     expect(columnHandleRule).toContain("width: 32px;");
@@ -452,6 +526,9 @@ describe("Markdown table affordance layout", () => {
     expect(rowHandleRule).toContain("height: 32px;");
     expect(rowVisualRule).toContain("width: 13px;");
     expect(rowVisualRule).toContain("height: 26px;");
+    expect(markdownTableCss).not.toContain(
+      ".markdown-codemirror-editor .cm-md-table-drag-handle {",
+    );
   });
 });
 

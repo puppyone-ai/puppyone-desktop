@@ -2,13 +2,18 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const sharedSidebarCss = read("../packages/shared-ui/src/styles/sidebar-primitives.css");
+const sharedDataWorkspaceCss = read("../packages/shared-ui/src/styles/data-workspace.css");
 const dataShellCss = read("../src/features/data-workspace/data-shell.css");
 const patternCss = read("../src/styles/sidebar/patterns.css");
 const layoutCss = read("../src/styles/layout.css");
 const dataSurfaceSource = read("../src/features/app-shell/DesktopDataWorkspaceSurface.tsx");
+const dataWorkspaceSource = read("../packages/shared-ui/src/data/DataWorkspace.tsx");
+const desktopShellSource = read("../src/components/DesktopCloudShell.tsx");
+const appSource = read("../src/App.tsx");
 const workspaceContentSource = read("../src/features/app-shell/DesktopWorkspaceContent.tsx");
 const registrySource = read("../src/features/app-shell/workspace-surfaces/workspaceSurfaceRegistry.ts");
 const auxiliaryHostSource = read("../src/features/app-shell/auxiliary/AuxiliaryPanelHost.tsx");
+const collapsiblePaneResizeSource = read("../packages/shared-ui/src/primitives/useCollapsiblePaneResize.ts");
 const settingsSidebarSource = read("../src/features/settings/sidebar/SettingsSidebar.tsx");
 const settingsModelSource = read("../src/features/settings/sidebar/settingsSidebarModel.ts");
 const sourceControlResourceLists = read("../src/features/source-control/sidebar/SourceControlResourceLists.tsx");
@@ -55,15 +60,57 @@ describe("Sidebar architecture", () => {
   it("keeps Feature composition out of shared layers and Auxiliary routing independent", () => {
     expect(sharedSidebarCss).not.toMatch(/desktop-(?:git|cloud|settings|agent|terminal)/);
     expect(auxiliaryHostSource).toContain("SidebarResizeHandle");
-    expect(auxiliaryHostSource).toContain("usePaneResizeDrag");
+    expect(auxiliaryHostSource).toContain("useCollapsiblePaneResize");
     expect(auxiliaryHostSource).toContain('orientation="vertical"');
     expect(settingsSidebarSource).toContain("SETTINGS_SIDEBAR_GROUPS.map");
     expect(settingsModelSource).toContain("SETTINGS_SIDEBAR_GROUPS");
   });
 
-  it("reveals Auxiliary content without compressing its text during open and close", () => {
+  it("collapses panes through animated resize tracks without expanded-state toggle buttons", () => {
+    expect(sharedSidebarCss).not.toContain(".po-pane-edge-toggle");
+    expect(dataShellCss).not.toContain(".data-explorer-toggle");
+    expect(layoutCss).not.toContain(".desktop-right-sidebar-toggle");
+    expect(dataShellCss).toContain("transition: grid-template-columns 260ms");
+    expect(dataShellCss).not.toContain("transition: inset-inline-start 260ms");
+    expect(layoutCss).toContain("flex-basis 260ms cubic-bezier");
+    expect(collapsiblePaneResizeSource).toContain("minWidth - resolvedCollapsePullDistance");
+  });
+
+  it("gives the collapsed explorer one Header-owned expansion action", () => {
+    expect(dataWorkspaceSource).toContain("resizableExplorer && !explorerCollapsed");
+    expect(dataWorkspaceSource).not.toContain("explorerCollapsedEdgeVisible");
+    expect(desktopShellSource).toContain("paneLayout.explorer.collapsed && leftSidebarPresent");
+    expect(desktopShellSource).toContain("desktop-titlebar-sidebar-expand");
+    expect(desktopShellSource).toContain("<PanelLeft size={15}");
+    expect(desktopShellSource).not.toContain("PanelLeftOpen");
+    expect(desktopShellSource).not.toContain("autoCollapsed");
+    expect(desktopShellSource).not.toContain("autoClosed");
+    expect(appSource).toContain("onLeftSidebarExpand={() => setSidebarCollapsed(false)}");
+    expect(appSource).not.toContain("if (autoCollapsed)");
+  });
+
+  it("keeps the minimal collapsed-edge affordance for the auxiliary pane only", () => {
+    expect(sharedSidebarCss).toContain(".po-collapsed-pane-edge-handle::after");
+    expect(sharedSidebarCss).toContain(".po-collapsed-pane-edge-glyph");
+    expect(auxiliaryHostSource).toContain("!open && collapsedEdgeSettled");
+    expect(auxiliaryHostSource).toContain('collapsedEdgeSide={collapsedEdgeVisible ? "inline-end" : undefined}');
     expect(layoutCss).toMatch(
-      /\.desktop-right-sidebar-inner\s*\{[^}]*position:\s*absolute[^}]*inset-inline-end:\s*0[^}]*width:\s*var\(--desktop-right-sidebar-width\)[^}]*min-width:\s*var\(--desktop-right-sidebar-width\)[^}]*max-width:\s*none[^}]*pointer-events:\s*none/s,
+      /\.desktop-right-sidebar:not\(\.is-open\)\s*\{[^}]*overflow:\s*visible/s,
+    );
+  });
+
+  it("keeps each pane on one canonical width from host edge through content", () => {
+    expect(dataShellCss).toMatch(
+      /\.data-content\[data-resizable-explorer="true"\]\s*\{[^}]*grid-template-columns:[^}]*var\(--data-explorer-width[^}]*var\(--po-pane-resizer-hit-size, 8px\)[^}]*minmax/s,
+    );
+    expect(dataShellCss).toMatch(
+      /\.data-explorer-resizer\s*\{[^}]*position:\s*relative;[^}]*inset:\s*auto;[^}]*grid-column:\s*2;[^}]*width:\s*100%;/s,
+    );
+    expect(layoutCss).toMatch(
+      /\.desktop-right-sidebar\.is-open\s*\{[^}]*flex-basis:\s*var\(--desktop-right-sidebar-width\)[^}]*width:\s*var\(--desktop-right-sidebar-width\)/s,
+    );
+    expect(layoutCss).toMatch(
+      /\.desktop-right-sidebar-inner\s*\{[^}]*position:\s*absolute[^}]*inset-inline-end:\s*0[^}]*width:\s*100%[^}]*min-width:\s*0[^}]*pointer-events:\s*none/s,
     );
     expect(layoutCss).toMatch(
       /\.desktop-right-sidebar\.is-open \.desktop-right-sidebar-inner\s*\{[^}]*pointer-events:\s*auto/s,
@@ -71,9 +118,10 @@ describe("Sidebar architecture", () => {
     expect(layoutCss).not.toMatch(
       /\.desktop-right-sidebar-inner\s*\{[^}]*(?:opacity|visibility|transition):/s,
     );
-    expect(layoutCss).not.toMatch(
-      /\.desktop-right-sidebar-inner\s*\{[^}]*width:\s*100%/s,
-    );
+    expect(layoutCss).not.toContain("--desktop-right-sidebar-visible-width");
+    expect(auxiliaryHostSource).not.toContain("desktop-right-sidebar-visible-width");
+    expect(sharedDataWorkspaceCss).not.toContain("--data-explorer-min-width");
+    expect(collapsiblePaneResizeSource).toContain("A pane has one rendered width");
     expect(auxiliaryHostSource).toContain("aria-hidden={open ? undefined : true}");
     expect(auxiliaryHostSource).toContain('{...(!open ? { inert: "" } : {})}');
   });

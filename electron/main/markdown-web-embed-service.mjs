@@ -23,6 +23,8 @@ export function createMarkdownWebEmbedService({
   maxEmbedsPerOwner = DEFAULT_MAX_EMBEDS_PER_OWNER,
   maxEmbedsTotal = DEFAULT_MAX_EMBEDS_TOTAL,
   resolveHost = null,
+  nativeSurfaceOcclusion = null,
+  nativeSurfacePointerPassthrough = null,
 }) {
   if (typeof getOwnerWindow !== "function") {
     throw new TypeError("Markdown web embed owner resolver is required.");
@@ -60,6 +62,10 @@ export function createMarkdownWebEmbedService({
     embeds.delete(id);
     const ownerState = owners.get(embed.ownerWebContentsId);
     ownerState?.embedIds.delete(id);
+    embed.releaseOcclusion?.();
+    embed.releaseOcclusion = null;
+    embed.releasePointerPassthrough?.();
+    embed.releasePointerPassthrough = null;
 
     try {
       embed.view.setVisible?.(false);
@@ -73,6 +79,7 @@ export function createMarkdownWebEmbedService({
     } catch {
       // Ignore detach races.
     }
+    embed.attached = false;
     try {
       if (!embed.view.webContents?.isDestroyed?.()) embed.view.webContents?.destroy?.();
     } catch {
@@ -137,6 +144,7 @@ export function createMarkdownWebEmbedService({
         embed.visible = false;
         try {
           embed.view.setVisible?.(false);
+          embed.view.webContents?.setAudioMuted?.(true);
         } catch {
           // Ignore native-view visibility races.
         }
@@ -217,7 +225,7 @@ export function createMarkdownWebEmbedService({
       !embed.window.isDestroyed?.() &&
       (typeof embed.window.isVisible !== "function" || embed.window.isVisible()) &&
       (typeof embed.window.isMinimized !== "function" || !embed.window.isMinimized());
-    const visible = Boolean(clipped && ownerVisible);
+    const visible = Boolean(embed.attached && clipped && ownerVisible && !embed.occluded);
     embed.visible = visible;
 
     try {
@@ -295,13 +303,31 @@ export function createMarkdownWebEmbedService({
           requestedBounds,
           visible: false,
           attached: false,
+          occluded: false,
+          releaseOcclusion: null,
+          releasePointerPassthrough: null,
         };
         embeds.set(id, embed);
         ownerState.embedIds.add(id);
 
+        view.setVisible?.(false);
+        view.webContents?.setAudioMuted?.(true);
+        embed.releaseOcclusion = nativeSurfaceOcclusion?.register?.({
+          ownerWebContentsId,
+          setOccluded: (occluded) => {
+            embed.occluded = occluded;
+            if (embeds.get(id) === embed) applyEmbedBounds(embed);
+          },
+        }) ?? null;
+        embed.releasePointerPassthrough = nativeSurfacePointerPassthrough?.register?.({
+          ownerWebContentsId,
+          ownerWebContents: window.webContents,
+          surfaceView: view,
+        }) ?? null;
+
         window.contentView.addChildView(view);
         embed.attached = true;
-        if (!applyEmbedBounds(embed)) {
+        if (!applyEmbedBounds(embed) && !embed.occluded) {
           throw new Error("Markdown web embed owner is not visible.");
         }
         await loadUrlWithTimeout(view.webContents, canonicalHref, loadTimeoutMs);

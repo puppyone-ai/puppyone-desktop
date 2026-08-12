@@ -77,6 +77,13 @@ describe("titlebar typography architecture", () => {
     expect(toolActions).toContain("width: var(--desktop-titlebar-tool-action-width);");
   });
 
+  it("matches the collapsed explorer action to the rectangular tool target", () => {
+    const explorerAction = readCssBlock(titlebarCss, ".desktop-titlebar-sidebar-expand");
+
+    expect(explorerAction).toContain("width: var(--desktop-titlebar-tool-action-width);");
+    expect(explorerAction).toContain("flex: 0 0 var(--desktop-titlebar-tool-action-width);");
+  });
+
   it.each([
     ".desktop-titlebar-context-name",
     ".desktop-titlebar-workspace-name",
@@ -121,6 +128,18 @@ describe("titlebar typography architecture", () => {
     expect(currentLabel).not.toContain("font-size:");
     expect(titlebarCss).not.toContain(".desktop-branch-menu-label {");
   });
+
+  it("keeps project and branch intrinsically grouped at compact widths", () => {
+    const compactMediaRule = readCssMediaBlock(titlebarCss, "@media (max-width: 720px)");
+
+    expect(compactMediaRule).not.toContain("flex: 1 1 0;");
+    expect(compactMediaRule).not.toContain(".desktop-titlebar-workspace-wrap");
+    expect(compactMediaRule).not.toContain(".desktop-titlebar-branch-wrap");
+    expect(compactMediaRule).not.toContain(".desktop-titlebar-drag-fill");
+    expect(readCssBlock(titlebarCss, ".desktop-titlebar-drag-fill")).toContain(
+      "flex: 1 1 auto;",
+    );
+  });
 });
 
 function readCssBlock(css: string, selector: string): string {
@@ -131,4 +150,17 @@ function readCssBlock(css: string, selector: string): string {
   const end = css.indexOf("\n}", bodyStart);
   if (end < 0) throw new Error(`Unclosed CSS block for ${selector}`);
   return css.slice(bodyStart, end);
+}
+
+function readCssMediaBlock(css: string, query: string): string {
+  const start = css.indexOf(`${query} {`);
+  if (start < 0) throw new Error(`Missing CSS media block for ${query}`);
+  let depth = 0;
+  for (let index = start; index < css.length; index += 1) {
+    if (css[index] === "{") depth += 1;
+    if (css[index] !== "}") continue;
+    depth -= 1;
+    if (depth === 0) return css.slice(start, index + 1);
+  }
+  throw new Error(`Unclosed CSS media block for ${query}`);
 }

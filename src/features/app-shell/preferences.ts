@@ -1,6 +1,12 @@
 import { isFileIconThemeId, type FileIconThemeId } from "@puppyone/shared-ui";
 import type { PuppyoneWorkspaceConfig } from "../../types/electron";
 import {
+  DEFAULT_EXPLORER_WIDTH,
+  DEFAULT_RIGHT_SIDEBAR_WIDTH,
+  MIN_EXPLORER_WIDTH,
+  MIN_RIGHT_SIDEBAR_WIDTH,
+} from "./layout/desktopPaneLayout";
+import {
   AI_EDIT_ASSIST_STORAGE_KEY,
   CREATE_NEW_MENU_STORAGE_KEY,
   DIFF_MARKERS_STORAGE_KEY,
@@ -75,13 +81,6 @@ export const RIGHT_SIDEBAR_SURFACE_STORAGE_KEY = "puppyone.desktop.rightSidebarS
 export const AGENT_PREFERRED_RUNTIME_STORAGE_KEY = "puppyone.desktop.agentPreferredRuntime";
 export const AGENT_PREFERRED_MODEL_STORAGE_KEY = "puppyone.desktop.agentPreferredModel";
 export type RightSidebarSurface = "chat" | "terminal";
-export const DEFAULT_EXPLORER_WIDTH = 320;
-export const MIN_EXPLORER_WIDTH = 240;
-export const MAX_EXPLORER_WIDTH = 520;
-export const COLLAPSED_EXPLORER_WIDTH = 0;
-export const DEFAULT_RIGHT_SIDEBAR_WIDTH = 560;
-export const MIN_RIGHT_SIDEBAR_WIDTH = 420;
-export const MAX_RIGHT_SIDEBAR_WIDTH = 760;
 
 export function readInitialThemeMode(): ThemeMode {
   if (typeof window === "undefined") return DEFAULT_THEME_MODE;
@@ -253,9 +252,11 @@ export function readInitialExperimentalSettings(): ExperimentalSettings {
 
 export function readInitialExplorerWidth(): number {
   if (typeof window === "undefined") return DEFAULT_EXPLORER_WIDTH;
-  const stored = Number(window.localStorage.getItem(EXPLORER_WIDTH_STORAGE_KEY));
+  const storedValue = window.localStorage.getItem(EXPLORER_WIDTH_STORAGE_KEY);
+  if (storedValue === null) return DEFAULT_EXPLORER_WIDTH;
+  const stored = Number(storedValue);
   if (!Number.isFinite(stored)) return DEFAULT_EXPLORER_WIDTH;
-  return Math.min(Math.max(Math.round(stored), MIN_EXPLORER_WIDTH), MAX_EXPLORER_WIDTH);
+  return Math.max(Math.round(stored), MIN_EXPLORER_WIDTH);
 }
 
 export function readInitialSidebarCollapsed(): boolean {
@@ -265,9 +266,11 @@ export function readInitialSidebarCollapsed(): boolean {
 
 export function readInitialRightSidebarWidth(): number {
   if (typeof window === "undefined") return DEFAULT_RIGHT_SIDEBAR_WIDTH;
-  const stored = Number(window.localStorage.getItem(RIGHT_SIDEBAR_WIDTH_STORAGE_KEY));
+  const storedValue = window.localStorage.getItem(RIGHT_SIDEBAR_WIDTH_STORAGE_KEY);
+  if (storedValue === null) return DEFAULT_RIGHT_SIDEBAR_WIDTH;
+  const stored = Number(storedValue);
   if (!Number.isFinite(stored)) return DEFAULT_RIGHT_SIDEBAR_WIDTH;
-  return Math.min(Math.max(Math.round(stored), MIN_RIGHT_SIDEBAR_WIDTH), MAX_RIGHT_SIDEBAR_WIDTH);
+  return Math.max(Math.round(stored), MIN_RIGHT_SIDEBAR_WIDTH);
 }
 
 export function readInitialRightSidebarSurface(): RightSidebarSurface {

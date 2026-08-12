@@ -1,98 +1,137 @@
-import { type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import {
   SidebarResizeHandle,
-  usePaneResizeDrag,
+  useCollapsiblePaneResize,
   type SidebarResizeIntent,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import {
   getArrowResizedSidebarWidth,
-  getPointerResizedSidebarWidth,
   type InlineDirection,
 } from "../../../components/auxiliarySidebarGeometry";
+import { setNativeSurfacePointerPassthrough } from "../../native-surfaces";
 
 export type AuxiliaryPanelHostProps = {
   children: ReactNode;
+  collapseThreshold?: number;
   open: boolean;
   width?: number;
   minWidth?: number;
   maxWidth?: number;
   resizable?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onWidthChange?: (width: number) => void;
 };
 
+const PANE_COLLAPSE_ANIMATION_MS = 260;
+
 export function AuxiliaryPanelHost({
   children,
+  collapseThreshold = 0,
   open,
   width,
-  minWidth = 420,
+  minWidth = 320,
   maxWidth = 760,
   resizable = false,
+  onOpenChange,
   onWidthChange,
 }: AuxiliaryPanelHostProps) {
   const { t } = useLocalization();
   const resolvedWidth = width ?? 560;
-  const beginResize = usePaneResizeDrag({
+  const [collapsedEdgeSettled, setCollapsedEdgeSettled] = useState(!open);
+
+  useEffect(() => {
+    if (open) {
+      setCollapsedEdgeSettled(false);
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(
+      () => setCollapsedEdgeSettled(true),
+      PANE_COLLAPSE_ANIMATION_MS,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [open]);
+
+  const resize = useCollapsiblePaneResize({
     enabled: resizable && Boolean(onWidthChange),
     bodyClassName: "desktop-right-sidebar-resizing",
-    onDragStart: (event) => {
-      if (!onWidthChange) return null;
-      const startX = event.clientX;
-      const direction = getDocumentDirection();
-      return {
-        onMove: (point) => onWidthChange(clamp(
-          getPointerResizedSidebarWidth({
-            currentX: point.clientX,
-            direction,
-            startWidth: resolvedWidth,
-            startX,
-          }),
-          minWidth,
-          maxWidth,
-        )),
-      };
-    },
+    collapsed: !open,
+    collapsedWidth: 0,
+    collapseThreshold,
+    direction: getDocumentDirection(),
+    maxWidth,
+    minWidth,
+    side: "inline-end",
+    width: resolvedWidth,
+    onCollapsedChange: onOpenChange
+      ? (collapsed) => onOpenChange(!collapsed)
+      : undefined,
+    onDragActiveChange: setNativeSurfacePointerPassthrough,
+    onWidthChange: onWidthChange ?? noop,
   });
-  const panelStyle = width
-    ? ({ "--desktop-right-sidebar-width": `${width}px` } as CSSProperties)
+  const panelStyle = width !== undefined || resize.dragging
+    ? ({ "--desktop-right-sidebar-width": `${resize.width}px` } as CSSProperties)
     : undefined;
+  const collapsedEdgeVisible = !open && collapsedEdgeSettled;
 
   const resizeByKeyboard = (intent: SidebarResizeIntent, accelerated: boolean) => {
     if (!resizable || !onWidthChange) return;
     if (intent === "minimum" || intent === "maximum") {
+      if (intent === "minimum" && onOpenChange) {
+        onOpenChange(false);
+        return;
+      }
+      onOpenChange?.(true);
       onWidthChange(intent === "minimum" ? minWidth : maxWidth);
       return;
     }
     const step = accelerated ? 24 : 12;
-    onWidthChange(clamp(getArrowResizedSidebarWidth({
+    const nextWidth = getArrowResizedSidebarWidth({
       currentWidth: resolvedWidth,
       direction: getDocumentDirection(),
       key: intent === "decrease" ? "ArrowLeft" : "ArrowRight",
       step,
-    }), minWidth, maxWidth));
+    });
+    if (onOpenChange && nextWidth < minWidth) {
+      onOpenChange(false);
+      return;
+    }
+    onWidthChange(clamp(nextWidth, minWidth, maxWidth));
   };
 
   return (
     <aside
       className={`desktop-right-sidebar ${open ? "is-open" : ""}`}
       style={panelStyle}
-      aria-hidden={open ? undefined : true}
-      {...(!open ? { inert: "" } : {})}
     >
-      {resizable && open && (
+      {resizable && (open || Boolean(onOpenChange)) && (
         <SidebarResizeHandle
           className="desktop-right-sidebar-resizer"
           paneEdge
+          collapsedEdgeSide={collapsedEdgeVisible ? "inline-end" : undefined}
           orientation="vertical"
-          label={t("shell.sidebar.resizeAuxiliary")}
-          min={minWidth}
+          label={t(collapsedEdgeVisible
+            ? "shell.sidebar.expandAuxiliary"
+            : "shell.sidebar.resizeAuxiliary")}
+          min={onOpenChange ? 0 : minWidth}
           max={maxWidth}
-          value={resolvedWidth}
-          onPointerDown={beginResize}
+          value={resize.width}
+          tabIndex={open || collapsedEdgeVisible ? 0 : -1}
+          onCollapsedActivate={collapsedEdgeVisible
+            ? () => onOpenChange?.(true)
+            : undefined}
+          onPointerDown={resize.onPointerDown}
           onKeyboardResize={resizeByKeyboard}
         />
       )}
-      <div className="desktop-right-sidebar-inner">{children}</div>
+      <div
+        className="desktop-right-sidebar-inner"
+        aria-hidden={open ? undefined : true}
+        {...(!open ? { inert: "" } : {})}
+      >
+        {children}
+      </div>
     </aside>
   );
 }
@@ -104,3 +143,5 @@ function clamp(value: number, min: number, max: number) {
 function getDocumentDirection(): InlineDirection {
   return document.documentElement.dir === "rtl" ? "rtl" : "ltr";
 }
+
+function noop() {}

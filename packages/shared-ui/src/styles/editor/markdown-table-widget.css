@@ -1,5 +1,6 @@
 .markdown-codemirror-editor .cm-md-table-widget-wrap {
-  --cm-md-table-handle-gutter: 14px;
+  --cm-md-table-handle-gutter: var(--po-editable-table-handle-gutter);
+  --cm-md-table-interaction-gutter: var(--po-editable-table-interaction-gutter);
   --po-editable-table-border: var(--po-md-rule-color);
   --po-editable-table-cell-border: var(--po-md-rule-color);
   position: relative;
@@ -15,12 +16,21 @@
 }
 
 .markdown-codemirror-editor .cm-md-table-scrollport {
-  --cm-md-table-scroll-away-inset: 0px;
+  --cm-md-table-interaction-start-inset: var(--cm-md-table-interaction-gutter);
+  --cm-md-table-reading-rail-end-inset: var(--cm-md-table-interaction-gutter);
   box-sizing: border-box;
-  inline-size: 100%;
-  max-inline-size: 100%;
+  inline-size: calc(
+    100%
+    + var(--cm-md-table-interaction-start-inset)
+    + var(--cm-md-table-reading-rail-end-inset)
+  );
+  max-inline-size: calc(
+    100%
+    + var(--cm-md-table-interaction-start-inset)
+    + var(--cm-md-table-reading-rail-end-inset)
+  );
   margin: 0;
-  margin-inline-start: calc(-1 * var(--cm-md-table-scroll-away-inset));
+  margin-inline-start: calc(-1 * var(--cm-md-table-interaction-start-inset));
   padding-block: var(--cm-md-table-handle-gutter) 0;
   padding-inline: 0;
   overflow-x: auto;
@@ -36,22 +46,21 @@
       var(--po-markdown-editor-gutter-min),
       calc((100cqw - var(--po-markdown-editor-text-width)) / 2)
     );
-    --cm-md-table-scroll-away-inset: max(
-      0px,
-      calc(var(--po-markdown-editor-gutter-inline) - var(--po-markdown-editor-gutter-min))
+    /* One logical viewport inset owns both physical clipping edges. At the
+       minimum editor gutter it yields just enough room for the larger table
+       interaction; wider layouts converge on the document breakout inset. */
+    --cm-md-table-viewport-inline-inset: min(
+      var(--po-markdown-breakout-inline-inset),
+      calc(var(--po-markdown-editor-gutter-inline) - var(--cm-md-table-interaction-gutter))
     );
-    inline-size: calc(
-      var(--cm-md-table-scroll-away-inset)
-      + 100cqw
-      - var(--po-markdown-editor-gutter-inline)
-      - var(--po-markdown-breakout-right-gutter)
+    --cm-md-table-interaction-start-inset: calc(
+      var(--po-markdown-editor-gutter-inline) - var(--cm-md-table-viewport-inline-inset)
     );
-    max-inline-size: calc(
-      var(--cm-md-table-scroll-away-inset)
-      + 100cqw
-      - var(--po-markdown-editor-gutter-inline)
-      - var(--po-markdown-breakout-right-gutter)
-    );
+    --cm-md-table-reading-rail-end-inset: var(--cm-md-table-interaction-start-inset);
+    /* Keep the actual inline-size on the wrapper-relative rule above. Unlike
+       100cqw, 100% here is CodeMirror's client box and therefore excludes its
+       reserved vertical scrollbar. Mixing those coordinate spaces adds the
+       scrollbar width to the table's end and corrupts the proxy thumb range. */
   }
 }
 
@@ -86,18 +95,15 @@
   display: inline-block;
   min-width: max-content;
   padding-block: 0 var(--cm-md-table-action-gutter);
-  padding-inline-start: calc(
-    var(--cm-md-table-scroll-away-inset)
-    + var(--cm-md-table-handle-gutter)
-  );
-  padding-inline-end: var(--cm-md-table-action-gutter);
+  padding-inline-start: var(--cm-md-table-interaction-start-inset);
+  padding-inline-end: var(--cm-md-table-reading-rail-end-inset);
 }
 
 .markdown-codemirror-editor .cm-md-table-surface {
   position: relative;
   display: inline-block;
   min-width: max-content;
-  margin-inline-start: calc(-1 * var(--cm-md-table-handle-gutter));
+  margin-inline-start: 0;
   vertical-align: top;
 }
 
@@ -239,158 +245,8 @@
   background: var(--po-editable-table-header-focus-background);
 }
 
-.markdown-codemirror-editor .cm-md-table-drag-layer {
-  position: absolute;
-  z-index: 3;
-  inset: 0;
-  pointer-events: none;
-}
-
-.markdown-codemirror-editor .cm-md-table-drag-handle {
-  position: absolute;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: grab;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 140ms ease,
-    left 160ms cubic-bezier(0.2, 0, 0, 1),
-    top 160ms cubic-bezier(0.2, 0, 0, 1);
-}
-
-/* Keep the product's compact grip chrome while giving the pointer a quiet,
-   forgiving target. The outer button stays inside the reserved 14px gutter,
-   so moving from a cell to its handle never crosses a dead zone. */
-.markdown-codemirror-editor .cm-md-table-drag-handle-visual {
-  display: grid;
-  box-sizing: border-box;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--po-divider) 88%, var(--po-text-muted) 12%);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--po-panel) 94%, var(--po-control));
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--po-shadow) 14%, transparent);
-  color: color-mix(in srgb, var(--po-text-muted) 74%, var(--po-text));
-  pointer-events: none;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
-}
-
-/* While hidden, position changes apply instantly so the fade-in starts at
-   the hovered row/column instead of gliding over from a stale one. */
-.markdown-codemirror-editor .cm-md-table-drag-handle:not(.is-visible) {
-  transition-property: opacity;
-}
-
-.markdown-codemirror-editor .cm-md-table-drag-handle.is-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.markdown-codemirror-editor .cm-md-table-drag-handle-visual::before {
-  background-image: radial-gradient(currentColor 1.05px, transparent 1.2px);
-  background-position: center;
-  content: "";
-  opacity: 0.9;
-}
-
-.markdown-codemirror-editor .cm-md-table-column-handle {
-  width: 32px;
-  height: 24px;
-  transform: translate(-50%, calc(-1 * var(--cm-md-table-handle-gutter)));
-}
-
-.markdown-codemirror-editor .cm-md-table-column-handle .cm-md-table-drag-handle-visual {
-  width: 26px;
-  height: 13px;
-}
-
-.markdown-codemirror-editor .cm-md-table-row-handle {
-  width: 24px;
-  height: 32px;
-  transform: translate(calc(-1 * var(--cm-md-table-handle-gutter)), -50%);
-}
-
-.markdown-codemirror-editor .cm-md-table-column-handle .cm-md-table-drag-handle-visual::before {
-  width: 14px;
-  height: 5px;
-  background-size: 4.5px 4.5px;
-}
-
-.markdown-codemirror-editor .cm-md-table-row-handle .cm-md-table-drag-handle-visual {
-  width: 13px;
-  height: 26px;
-}
-
-.markdown-codemirror-editor .cm-md-table-row-handle .cm-md-table-drag-handle-visual::before {
-  width: 5px;
-  height: 14px;
-  background-size: 4.5px 4.5px;
-}
-
-.markdown-codemirror-editor .cm-md-table-drag-handle:hover .cm-md-table-drag-handle-visual,
-.markdown-codemirror-editor .cm-md-table-drag-handle:focus-visible .cm-md-table-drag-handle-visual,
-.markdown-codemirror-editor .cm-md-table-drag-handle.is-menu-active .cm-md-table-drag-handle-visual,
-.markdown-codemirror-editor .cm-md-table-drag-handle.is-dragging .cm-md-table-drag-handle-visual {
-  border-color: color-mix(in srgb, var(--po-accent) 42%, var(--po-divider));
-  background: color-mix(in srgb, var(--po-accent) 10%, var(--po-panel));
-  color: color-mix(in srgb, var(--po-accent) 68%, var(--po-text));
-}
-
-.markdown-codemirror-editor .cm-md-table-drag-handle:focus-visible {
-  outline: none;
-}
-
-.markdown-codemirror-editor .cm-md-table-drag-handle.is-dragging {
-  cursor: grabbing;
-}
-
-.markdown-codemirror-editor .cm-md-table-widget-wrap.is-table-dragging {
-  cursor: grabbing;
-  user-select: none;
-}
-
-.markdown-codemirror-editor .cm-md-table-widget-wrap.is-table-dragging .cm-md-table-structure-button {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.markdown-codemirror-editor .cm-md-table-drop-indicator {
-  position: absolute;
-  z-index: 4;
-  border-radius: 2px;
-  background: var(--po-accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-accent) 30%, transparent);
-  pointer-events: none;
-}
-
-.markdown-codemirror-editor .cm-md-table-drop-indicator[hidden] {
-  display: none;
-}
-
-.markdown-codemirror-editor .cm-md-table-drop-indicator.is-row {
-  height: 2px;
-  margin-top: -1px;
-}
-
-.markdown-codemirror-editor .cm-md-table-drop-indicator.is-column {
-  width: 2px;
-  margin-left: -1px;
-}
-
-.markdown-codemirror-editor .cm-md-table-widget-wrap .cm-md-table-widget td.cm-md-table-drag-source {
-  background: color-mix(in srgb, var(--po-accent) 10%, transparent);
-}
-
-.markdown-codemirror-editor .cm-md-table-widget-wrap .cm-md-table-widget th.cm-md-table-drag-source {
-  background: color-mix(in srgb, var(--po-accent) 12%, color-mix(in srgb, var(--po-control) 42%, transparent));
-}
-
-/* Markdown table structure controls use the shared editable-table primitive.
-   Keeping their geometry in one rule set prevents CSV and Markdown rails (and
-   their add glyphs) from drifting independently. */
+/* Drag handles, drop indicators, and structure controls are owned by the
+   shared editable-table primitive. Markdown owns only its scroll geometry. */
 
 .markdown-codemirror-editor .cm-md-table-widget-wrap.is-readonly .cm-md-table-structure-button {
   display: none;
@@ -535,7 +391,12 @@
 .markdown-codemirror-editor .cm-md-table-cell-content strong,
 .markdown-codemirror-editor .cm-md-table-cell-content b {
   color: color-mix(in srgb, var(--po-text) 92%, var(--po-text-muted));
-  font-weight: 650;
+  font-weight: var(--po-md-strong-weight);
+}
+
+.markdown-codemirror-editor .cm-md-table-widget th .cm-md-table-cell-content strong,
+.markdown-codemirror-editor .cm-md-table-widget th .cm-md-table-cell-content b {
+  font-weight: inherit;
 }
 
 .markdown-codemirror-editor .cm-md-table-cell-content em,
@@ -555,11 +416,7 @@
   .markdown-codemirror-editor .cm-md-table-widget,
   .markdown-codemirror-editor .cm-md-table-widget th,
   .markdown-codemirror-editor .cm-md-table-widget td,
-  .markdown-codemirror-editor .cm-md-table-cell-content,
-  .markdown-codemirror-editor .cm-md-table-drag-handle,
-  .markdown-codemirror-editor .cm-md-table-drag-handle-visual,
-  .markdown-codemirror-editor .cm-md-table-structure-button,
-  .markdown-codemirror-editor .cm-md-table-structure-button-visual {
+  .markdown-codemirror-editor .cm-md-table-cell-content {
     transition: none;
   }
 

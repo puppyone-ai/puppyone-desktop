@@ -1,0 +1,35 @@
+import { DESKTOP_WINDOW_MIN_WIDTH } from "../window-layout-contract.mjs";
+
+const MAXIMUM_REQUESTED_WINDOW_MIN_WIDTH = 4096;
+
+/**
+ * Keeps renderer pane constraints and the native BrowserWindow resize boundary
+ * in one contract. The renderer reports only the current workbench minimum;
+ * main owns validation and the product-level 640px floor.
+ */
+export function registerWindowLayoutIpcHandlers({ ipcMain, BrowserWindow }) {
+  ipcMain.handle("window-layout:set-minimum-width", (event, request) => {
+    const ownerWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!ownerWindow || ownerWindow.isDestroyed?.()) return { applied: false };
+
+    const requestedWidth = normalizeRequestedWidth(request?.width);
+    const minimumWidth = Math.max(DESKTOP_WINDOW_MIN_WIDTH, requestedWidth);
+    const [, minimumHeight] = ownerWindow.getMinimumSize();
+    ownerWindow.setMinimumSize(minimumWidth, minimumHeight);
+
+    const [currentWidth, currentHeight] = ownerWindow.getSize();
+    if (currentWidth < minimumWidth) {
+      ownerWindow.setSize(minimumWidth, currentHeight, true);
+    }
+
+    return { applied: true, width: minimumWidth };
+  });
+}
+
+function normalizeRequestedWidth(value) {
+  if (!Number.isFinite(value)) return DESKTOP_WINDOW_MIN_WIDTH;
+  return Math.min(
+    Math.max(0, Math.round(value)),
+    MAXIMUM_REQUESTED_WINDOW_MIN_WIDTH,
+  );
+}

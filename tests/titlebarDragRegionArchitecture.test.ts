@@ -28,7 +28,7 @@ describe("titlebar drag-region architecture", () => {
   it("renders chrome as a sibling of the workbench and keeps Shared UI process-neutral", () => {
     expect(desktopShell).toContain("<DesktopWindowChrome");
     expect(desktopShell.indexOf("<DesktopWindowChrome")).toBeLessThan(
-      desktopShell.indexOf('<div className="desktop-shell-body">'),
+      desktopShell.indexOf('className="desktop-shell-body"'),
     );
     expect(windowChromeComponent).toContain('data-window-drag-region="true"');
     expect(desktopMenu).toContain('data-window-no-drag="true"');

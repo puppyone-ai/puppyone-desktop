@@ -102,6 +102,78 @@ describe("markdown table model", () => {
     expect(state.sliceDoc(table?.to ?? 0)).toBe("\n\nafter");
   });
 
+  it("keeps adjacent prose outside the interactive table range", () => {
+    const source = [
+      "| Slot | Desktop | Cloud |",
+      "| --- | --- | --- |",
+      "| Storage | local disk | S3 |",
+      "这里面有几个要素值得注意。",
+      "**第一，正文不能变成空表格行。**",
+    ].join("\n");
+    const state = EditorState.create({
+      doc: source,
+      extensions: [markdownCodeMirrorLanguageExtension("puppy-gfm")],
+    });
+    const syntaxRange = getMarkdownTableSyntaxRange(state, 1);
+    const table = getMarkdownTableBlock(state, 1);
+    const proseFrom = source.indexOf("\n这里面") + 1;
+
+    // The GFM parser deliberately owns all non-blank lines in this leaf.
+    expect(syntaxRange).toEqual({ from: 0, to: source.length });
+    // The interactive table only owns rows with explicit pipe syntax.
+    expect(table).toMatchObject({
+      from: 0,
+      to: proseFrom - 1,
+      nextLineNumber: 4,
+      rowCount: 2,
+      modelComplete: true,
+    });
+    expect(table?.rows).toHaveLength(2);
+    expect(state.sliceDoc(table?.to ?? 0)).toBe(source.slice(proseFrom - 1));
+  });
+
+  it("keeps an explicit unframed body row but stops before pipe-less prose", () => {
+    const source = [
+      "Name | Runtime | Storage",
+      "--- | --- | ---",
+      "Desktop | macOS | local disk",
+      "Cloud native agents assemble context from many sources.",
+    ].join("\n");
+    const state = EditorState.create({
+      doc: source,
+      extensions: [markdownCodeMirrorLanguageExtension("puppy-gfm")],
+    });
+    const table = getMarkdownTableBlock(state, 1);
+
+    expect(table?.rows.map((row) => row.cells.map((cell) => cell.text))).toEqual([
+      ["Name", "Runtime", "Storage"],
+      ["Desktop", "macOS", "local disk"],
+    ]);
+    expect(table?.nextLineNumber).toBe(4);
+    expect(state.sliceDoc(table?.to ?? 0)).toBe(
+      "\nCloud native agents assemble context from many sources.",
+    );
+  });
+
+  it("does not mistake escaped prose pipes for an editable table row", () => {
+    const source = [
+      "| A | B |",
+      "| --- | --- |",
+      "ordinary prose with an escaped \\| character",
+    ].join("\n");
+    const state = EditorState.create({
+      doc: source,
+      extensions: [markdownCodeMirrorLanguageExtension("puppy-gfm")],
+    });
+    const table = getMarkdownTableBlock(state, 1);
+
+    expect(table?.rows).toHaveLength(1);
+    expect(table?.nextLineNumber).toBe(3);
+    expect(state.sliceDoc(table?.to ?? 0)).toBe(
+      "\nordinary prose with an escaped \\| character",
+    );
+  });
+
   it("refuses text-only table refinement without a parser-owned Table node", () => {
     const source = "| A | B |\n| - | - |\n| 1 | 2 |";
     const state = EditorState.create({ doc: source });

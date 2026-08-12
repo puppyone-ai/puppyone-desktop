@@ -1,7 +1,7 @@
 import type { Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
 import { AlertTriangle, Folder, FolderOpen } from "lucide-react";
-import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   createTypographyRootProps,
   type ResolvedTypography,
@@ -13,6 +13,7 @@ import type {
   TextSize,
   ThemeMode,
 } from "../preferences";
+import { useWorkspaceFolderDrop } from "../features/app-shell/useWorkspaceFolderDrop";
 import { InlineLoading } from "./loading";
 import { DesktopWindowDragRegion } from "./DesktopWindowChrome";
 
@@ -36,6 +37,7 @@ export type OnboardingOperationStatus = {
 export type MinimalOnboardingProps = {
   onChooseWorkspace: () => Promise<void>;
   onOpenWorkspacePath: (path: string) => Promise<void>;
+  onOpenDroppedWorkspace: (folder: File) => Promise<void>;
   recentWorkspaces?: RecentWorkspaceHomeItem[];
   projectItems?: ProjectHomeItem[];
   operationStatus?: OnboardingOperationStatus | null;
@@ -55,6 +57,7 @@ export type MinimalOnboardingProps = {
 export function MinimalOnboarding({
   onChooseWorkspace,
   onOpenWorkspacePath,
+  onOpenDroppedWorkspace,
   recentWorkspaces = [],
   projectItems,
   operationStatus = null,
@@ -71,7 +74,6 @@ export function MinimalOnboarding({
 }: MinimalOnboardingProps) {
   const { t, formatRelativeTime } = useLocalization();
   const [error, setError] = useState<string | null>(initialError);
-  const [dragging, setDragging] = useState(false);
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const items = useMemo(
     () => (projectItems ?? recentWorkspaces.map(({ workspace, lastOpenedAt }) => ({
@@ -86,7 +88,7 @@ export function MinimalOnboarding({
   useEffect(() => setError(initialError), [initialError]);
 
   const openPath = async (path: string) => {
-    if (openingPath) return;
+    if (openingPath || operationStatus) return;
     setError(null);
     setOpeningPath(path);
     try {
@@ -99,7 +101,7 @@ export function MinimalOnboarding({
   };
 
   const chooseFolder = async () => {
-    if (openingPath) return;
+    if (openingPath || operationStatus) return;
     setError(null);
     setOpeningPath("__new__");
     try {
@@ -111,19 +113,25 @@ export function MinimalOnboarding({
     }
   };
 
-  const handleDrop = async (event: DragEvent<HTMLElement>) => {
-    event.preventDefault();
-    setDragging(false);
-    const file = event.dataTransfer.files.item(0);
-    const path = file
-      ? window.puppyoneDesktop?.getPathForFile(file) || (file as File & { path?: string }).path
-      : null;
-    if (!path?.trim().startsWith("/")) {
-      setError(t("onboarding.error.dropLocalFolder"));
-      return;
+  const openDroppedFolder = async (folder: File) => {
+    if (openingPath || operationStatus) return;
+    setError(null);
+    setOpeningPath("__drop__");
+    try {
+      await onOpenDroppedWorkspace(folder);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
+    } finally {
+      setOpeningPath(null);
     }
-    await openPath(path.trim());
   };
+
+  const busy = Boolean(openingPath) || Boolean(operationStatus);
+  const folderDrop = useWorkspaceFolderDrop({
+    disabled: busy,
+    onDropFolder: openDroppedFolder,
+    onInvalidDrop: () => setError(t("onboarding.error.dropLocalFolder")),
+  });
 
   const localOperation = openingPath
     ? {
@@ -139,7 +147,7 @@ export function MinimalOnboarding({
 
   return (
     <main
-      className={`onboarding-shell onboarding-homepage-shell ${resolvedTheme === "dark" ? "dark" : ""} ${dragging ? "dragging" : ""}`}
+      className={`onboarding-shell onboarding-homepage-shell ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "dragging" : ""}`}
       data-po-scrollbar="content"
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}
@@ -148,22 +156,16 @@ export function MinimalOnboarding({
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
       {...createTypographyRootProps(typography)}
-      onDragEnter={() => setDragging(true)}
-      onDragOver={(event) => {
-        event.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={(event) => {
-        const nextTarget = event.relatedTarget;
-        if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) setDragging(false);
-      }}
-      onDrop={(event) => void handleDrop(event)}
+      onDragEnter={folderDrop.onDragEnter}
+      onDragOver={folderDrop.onDragOver}
+      onDragLeave={folderDrop.onDragLeave}
+      onDrop={folderDrop.onDrop}
     >
       <DesktopWindowDragRegion className="onboarding-titlebar" />
       <section className="onboarding-homepage" aria-label={t("onboarding.projects.title")}>
         <div className="onboarding-primary-area">
           <div className="onboarding-folder-action-wrap">
-            <div className={`folder-drop-zone ${dragging ? "dragging" : ""} ${openingPath ? "is-disabled" : ""}`}>
+            <div className={`folder-drop-zone ${folderDrop.dragging ? "dragging" : ""} ${busy ? "is-disabled" : ""}`}>
               <svg className="folder-drop-outline" viewBox="0 0 260 260" preserveAspectRatio="none" aria-hidden="true">
                 <path className="folder-drop-shadow" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
                 <path className="folder-drop-fill" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
@@ -172,7 +174,7 @@ export function MinimalOnboarding({
               <button
                 className="folder-drop-primary-action"
                 type="button"
-                disabled={Boolean(openingPath)}
+                disabled={busy}
                 aria-busy={openingPath === "__new__" || undefined}
                 aria-label={t("onboarding.action.openLocalFolder")}
                 onClick={() => void chooseFolder()}
@@ -181,9 +183,9 @@ export function MinimalOnboarding({
                 {openingPath === "__new__" ? (
                   <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
                 ) : (
-                  <FolderOpen size={25} strokeWidth={1.75} className="folder-drop-icon" aria-hidden="true" />
+                  <FolderOpen className="folder-drop-icon" size={25} strokeWidth={1.75} />
                 )}
-                <span className="folder-drop-copy"><strong>{t("onboarding.action.openLocalFolder")}</strong></span>
+                <span className="folder-drop-copy"><strong>{t("onboarding.action.openOrDropLocalFolder")}</strong></span>
               </span>
             </div>
           </div>

@@ -4,6 +4,7 @@
   "projects.untitled": "Projeto sem título",
   "action.createCloudProject": "Criar projeto na Cloud",
   "action.openLocalFolder": "Abrir pasta local",
+  "action.openOrDropLocalFolder": "Abra ou solte uma pasta",
   "action.switchTo": "mudar para",
   "action.switchToCloud": "Mudar para projeto na Cloud",
   "action.switchToLocal": "Mudar para projeto local",

@@ -13,6 +13,7 @@ import { closeActiveMarkdownTableMenu } from "../packages/shared-ui/src/editor/m
 import { markdownLocalizationExtension } from "../packages/shared-ui/src/editor/markdown/core/editor/markdownLocalization";
 import { testT } from "./testLocalization";
 import { focusMarkdownTableCell } from "../packages/shared-ui/src/editor/markdown/features/table/tableFocus";
+import { getMarkdownPlanIndex } from "../packages/shared-ui/src/editor/markdown/core/plans/markdownPlanIndex";
 
 const TABLE_SOURCE = [
   "| A | B | C |",
@@ -30,13 +31,13 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function createTableView() {
+function createTableView(source = TABLE_SOURCE) {
   const parent = document.createElement("div");
   document.body.appendChild(parent);
   const view = new EditorView({
     parent,
     state: EditorState.create({
-      doc: TABLE_SOURCE,
+      doc: source,
       extensions: [
         ...markdownCodeMirrorBaseExtensions(false),
         markdownLocalizationExtension({
@@ -118,6 +119,57 @@ function mockHorizontalScroller(element: HTMLElement, clientWidth: number, scrol
 }
 
 describe("Markdown table EditorView interactions", () => {
+  it("renders adjacent prose as editor text instead of synthetic table rows", () => {
+    const prose = "这里面有几个要素值得注意。";
+    const view = createTableView(`${TABLE_SOURCE}\n${prose}`);
+    const wrapper = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
+    const rows = wrapper.querySelectorAll("tr[data-md-table-row]");
+
+    expect(rows).toHaveLength(3);
+    expect(wrapper.textContent).not.toContain(prose);
+    expect(Array.from(view.dom.querySelectorAll(".cm-line")).some((line) => (
+      line.textContent?.includes(prose)
+    ))).toBe(true);
+
+    wrapper.querySelector<HTMLButtonElement>(".cm-md-table-add-row")?.click();
+    expect(source(view)).toContain(`\n${prose}`);
+    expect(source(view).split("\n").filter((line) => line === prose)).toHaveLength(1);
+  });
+
+  it("keeps prose typed directly after a table in the normal editor surface", () => {
+    const view = createTableView(`${TABLE_SOURCE}\n`);
+    const prose = "正文会留在表格外。";
+    expect(view.dom.querySelector(".cm-md-table-widget-wrap")).not.toBeNull();
+
+    for (const character of prose) {
+      view.dispatch({
+        changes: { from: view.state.doc.length, insert: character },
+        selection: { anchor: view.state.doc.length + character.length },
+        userEvent: "input.type",
+      });
+      const tablePlan = getMarkdownPlanIndex(view.state).find(({ plan }) => (
+        plan.presentation === "blockAtom" && plan.embed.kind === "table"
+      ));
+      expect(tablePlan?.plan.sourceRange, `table plan after typing ${character}`).toEqual({
+        from: 0,
+        to: TABLE_SOURCE.length,
+      });
+      expect(
+        view.dom.querySelector(".cm-md-table-widget-wrap"),
+        `table widget after typing ${character}`,
+      ).not.toBeNull();
+    }
+
+    const wrapper = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
+    expect(wrapper.querySelectorAll("tr[data-md-table-row]")).toHaveLength(3);
+    expect(wrapper.textContent).not.toContain(prose);
+    expect(source(view)).toBe(`${TABLE_SOURCE}\n${prose}`);
+    expect(view.state.selection.main.head).toBe(view.state.doc.length);
+    expect(Array.from(view.dom.querySelectorAll(".cm-line")).some((line) => (
+      line.textContent?.includes(prose)
+    ))).toBe(true);
+  });
+
   it("adds rows and columns and restores logical focus after the view update", async () => {
     const view = createTableView();
     const addRow = view.dom.querySelector<HTMLButtonElement>(".cm-md-table-add-row");

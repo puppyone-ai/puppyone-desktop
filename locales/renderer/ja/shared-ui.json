@@ -7,6 +7,7 @@
   "explorer.more": "その他",
   "explorer.access": "アクセス",
   "explorer.resizeSidebar": "サイドバーのサイズを変更",
+  "explorer.expandSidebar": "サイドバーを展開",
   "explorer.cutLabel": "{name}、切り取り済み",
   "navigation.back": "戻る",
   "preview.selectFile": "プレビューするファイルを選択してください",

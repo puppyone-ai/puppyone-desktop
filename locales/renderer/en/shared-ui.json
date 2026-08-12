@@ -7,6 +7,7 @@
   "explorer.more": "More",
   "explorer.access": "Access",
   "explorer.resizeSidebar": "Resize sidebar",
+  "explorer.expandSidebar": "Expand sidebar",
   "explorer.cutLabel": "{name}, cut",
   "navigation.back": "Back",
   "preview.selectFile": "Select a file to preview",

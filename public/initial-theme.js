@@ -17,15 +17,31 @@
     const resolvedTheme = activeMode === "system"
       ? systemDark ? "dark" : "light"
       : activeMode;
-    const firstPaint = style.firstPaint[resolvedTheme]
+    const presetDefinition = style.presetFirstPaint?.[resolvedTheme];
+    const presetStorageKey = resolvedTheme === "light"
+      ? manifest.storage.lightThemePreset
+      : manifest.storage.darkThemePreset;
+    const legacyPreset = resolvedTheme === "light" && manifest.storage.legacyThemePreset
+      ? window.localStorage.getItem(manifest.storage.legacyThemePreset)
+      : null;
+    const storedPreset = presetStorageKey
+      ? window.localStorage.getItem(presetStorageKey) ?? legacyPreset
+      : null;
+    const resolvedPreset = storedPreset && Object.hasOwn(presetDefinition?.values ?? {}, storedPreset)
+      ? storedPreset
+      : presetDefinition?.defaultPreset;
+    const firstPaint = presetDefinition?.values?.[resolvedPreset]
+      ?? style.firstPaint[resolvedTheme]
       ?? style.firstPaint.light
       ?? style.firstPaint.dark;
 
     document.documentElement.dataset.interfaceStyle = style.id;
     document.documentElement.dataset.initialTheme = resolvedTheme;
+    if (resolvedPreset) document.documentElement.dataset.initialThemePreset = resolvedPreset;
     if (firstPaint) {
       document.documentElement.style.setProperty("--initial-shell-background", firstPaint.background);
       document.documentElement.style.setProperty("--initial-shell-color-scheme", firstPaint.colorScheme);
+      window.puppyoneDesktop?.setWindowBackground?.({ background: firstPaint.background });
     }
   } catch {
     // Keep the static first-paint background when storage is unavailable.

@@ -164,6 +164,7 @@ export type AppPreviewAttachmentRequest = {
   path: string;
   bounds: AppPreviewBounds;
   attachmentId: string;
+  visible: boolean;
 };
 
 export type AppPreviewController = {
@@ -173,7 +174,7 @@ export type AppPreviewController = {
   activate?: (request: AppPreviewAttachmentRequest) => Promise<AppPreviewActivationResult>;
   restart?: (
     path: string,
-    attachment?: Pick<AppPreviewAttachmentRequest, "bounds" | "attachmentId">,
+    attachment?: Pick<AppPreviewAttachmentRequest, "bounds" | "attachmentId" | "visible">,
   ) => Promise<AppPreviewResult | AppPreviewActivationResult>;
   stop?: (path: string) => Promise<AppPreviewResult>;
   getLogs?: (path: string) => Promise<string>;
@@ -182,6 +183,7 @@ export type AppPreviewController = {
     surfaceId: string;
     attachmentId: string;
     bounds: AppPreviewBounds;
+    visible: boolean;
   }) => Promise<{ ok: boolean; visible: boolean }>;
   detachSurface?: (request: {
     surfaceId?: string | null;

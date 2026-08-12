@@ -6,6 +6,7 @@ import {
   isPublicIpAddress,
 } from "../electron/main/markdown-web-embed-policy.mjs";
 import { registerMarkdownWebEmbedIpcHandlers } from "../electron/main/ipc/markdown-web-embed-ipc.mjs";
+import { createNativeSurfaceOcclusionCoordinator } from "../electron/main/native-surfaces/occlusion-coordinator.mjs";
 
 const PUBLIC_ENDPOINT = { address: "93.184.216.34", family: "ipv4" };
 const DEFAULT_BOUNDS = { x: 20, y: 30, width: 320, height: 180 };
@@ -289,6 +290,30 @@ describe("Markdown web embed service", () => {
     await expect(
       wrongWindowService.create({ href: "https://example.com/", bounds: DEFAULT_BOUNDS, ownerWebContentsId: 7 }),
     ).rejects.toThrow(/owner window/i);
+  });
+
+  it("preserves the embedded page while product chrome temporarily occludes it", async () => {
+    const owner = new FakeOwnerWindow(42);
+    const nativeSurfaceOcclusion = createNativeSurfaceOcclusionCoordinator();
+    const service = createService(owner, { nativeSurfaceOcclusion });
+    await service.create({
+      href: "https://example.com/",
+      bounds: DEFAULT_BOUNDS,
+      ownerWebContentsId: 42,
+    });
+    const view = createdViews[0];
+    expect(view.visible).toBe(true);
+
+    nativeSurfaceOcclusion.setOwnerOccluded(42, true);
+    expect(view.visible).toBe(false);
+    expect(view.webContents.audioMuted).toBe(true);
+    expect(owner.children).toEqual([view]);
+    expect(view.webContents.destroyed).toBe(false);
+
+    nativeSurfaceOcclusion.setOwnerOccluded(42, false);
+    expect(view.visible).toBe(true);
+    expect(view.webContents.audioMuted).toBe(false);
+    expect(owner.children).toEqual([view]);
   });
 
   it("requires explicit finite bounds, clips partial bounds and hides offscreen views", async () => {

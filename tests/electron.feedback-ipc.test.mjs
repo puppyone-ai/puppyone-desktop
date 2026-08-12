@@ -14,6 +14,7 @@ describe("feedback IPC", () => {
     });
 
     await expect(handler({}, {
+      role: "developer",
       message: "  The search result ordering is confusing.  ",
       locale: "zh-Hans",
       workspacePath: "/private/project",
@@ -33,6 +34,7 @@ describe("feedback IPC", () => {
     expect(request.headers).not.toHaveProperty("content-type");
     expect(request.body).toBeInstanceOf(FormData);
     expect(Object.fromEntries(request.body.entries())).toEqual({
+      role: "developer",
       message: "The search result ordering is confusing.",
       appVersion: "0.1.2",
       locale: "zh-Hans",
@@ -52,8 +54,14 @@ describe("feedback IPC", () => {
     await expect(handler({}, { message: "   " })).rejects.toThrow(
       "requires a message or screenshot",
     );
-    await expect(handler({}, { message: "x".repeat(2_001) })).rejects.toThrow(
+    await expect(handler({}, { role: "developer", message: "x".repeat(2_001) })).rejects.toThrow(
       "cannot exceed 2000 characters",
+    );
+    await expect(handler({}, { message: "Useful feedback" })).rejects.toThrow(
+      "requires a valid role",
+    );
+    await expect(handler({}, { role: "customer", message: "Useful feedback" })).rejects.toThrow(
+      "requires a valid role",
     );
     expect(fetchImpl).not.toHaveBeenCalled();
   });
@@ -69,6 +77,7 @@ describe("feedback IPC", () => {
     ]);
 
     await expect(handler({}, {
+      role: "researcher",
       message: "",
       screenshot: {
         bytes: bytes.buffer,
@@ -79,6 +88,7 @@ describe("feedback IPC", () => {
     const request = fetchImpl.mock.calls[0][1];
     const screenshot = request.body.get("attachment");
     expect(request.body.get("message")).toBe("");
+    expect(request.body.get("role")).toBe("researcher");
     expect(request.body.get("appVersion")).toBe("0.1.2");
     expect(screenshot).toBeInstanceOf(Blob);
     expect(screenshot.type).toBe("image/png");
@@ -93,6 +103,7 @@ describe("feedback IPC", () => {
     const handler = createHandler({ fetchImpl });
 
     await expect(handler({}, {
+      role: "other",
       screenshot: {
         bytes: new Uint8Array([0x00, 0x01, 0x02]).buffer,
         mimeType: "image/png",
@@ -109,7 +120,7 @@ describe("feedback IPC", () => {
       }),
     });
 
-    await expect(handler({}, { message: "A useful message" })).rejects.toThrow(
+    await expect(handler({}, { role: "creator", message: "A useful message" })).rejects.toThrow(
       "could not accept",
     );
   });
@@ -121,7 +132,7 @@ describe("feedback IPC", () => {
     });
     const handler = createHandler({ fetchImpl, endpoint: null });
 
-    await expect(handler({}, { message: "A useful message" })).resolves.toEqual({
+    await expect(handler({}, { role: "developer", message: "A useful message" })).resolves.toEqual({
       ok: true,
     });
 

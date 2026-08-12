@@ -666,6 +666,13 @@ export type PuppyoneWorkspaceConfig = {
 declare global {
   interface Window {
     puppyoneDesktop?: {
+      setWindowBackground: (request: { background: string }) => void;
+      setWindowMinimumWidth: (request: { width: number }) => Promise<{
+        applied: boolean;
+        width?: number;
+      }>;
+      setNativeSurfaceOccluded: (request: { occluded: boolean }) => void;
+      setNativeSurfacePointerPassthrough: (request: { active: boolean }) => void;
       getBuildInfo: () => Promise<DesktopBuildInfo>;
       getLocalizationBootstrap: () => Promise<LocaleState>;
       setLanguagePreference: (preference: AppLanguagePreference) => Promise<LocaleState>;
@@ -755,6 +762,7 @@ declare global {
       }>;
       openExternalUrl: (href: string) => Promise<{ ok: boolean }>;
       submitFeedback: (request: {
+        role: "developer" | "researcher" | "creator" | "other";
         message: string;
         locale?: string;
         screenshot?: {
@@ -794,6 +802,7 @@ declare global {
       showHomepage: () => Promise<{ ok: boolean }>;
       openWorkspaceInCurrentWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
       openWorkspaceInNewWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
+      openDroppedWorkspaceInCurrentWindow: (folder: File) => Promise<WorkspaceOpenResult>;
       selectFolder: () => Promise<WorkspaceOpenResult | null>;
       selectFolderInNewWindow: () => Promise<WorkspaceOpenResult | null>;
       getPathForFile: (file: File) => string;
@@ -855,6 +864,7 @@ declare global {
         path: string;
         bounds: AppPreviewBounds;
         attachmentId: string;
+        visible: boolean;
       }) => Promise<AppPreviewActivationResult>;
       startAppPreview: (request: {
         rootPath: string;
@@ -865,6 +875,7 @@ declare global {
         path: string;
         bounds?: AppPreviewBounds;
         attachmentId?: string;
+        visible?: boolean;
       }) => Promise<AppPreviewResult | AppPreviewActivationResult>;
       stopAppPreview: (request: {
         rootPath: string;
@@ -882,6 +893,7 @@ declare global {
         surfaceId: string;
         attachmentId: string;
         bounds: AppPreviewBounds;
+        visible: boolean;
       }) => Promise<{ ok: boolean; visible: boolean }>;
       detachAppPreviewSurface: (request: {
         surfaceId?: string | null;

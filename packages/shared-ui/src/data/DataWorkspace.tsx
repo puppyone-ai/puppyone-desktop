@@ -43,7 +43,7 @@ import type { AiEditRequest } from "../editor/ai-edits/types";
 import type { DocumentPersistedCommit } from "../editor/document-session/types";
 import { flushActiveDocumentSessions } from "../editor/document-session/activeDocumentSessions";
 import type { FileIconThemeId } from "../file/fileIcons";
-import { usePaneResizeDrag } from "../primitives/usePaneResizeDrag";
+import { useCollapsiblePaneResize } from "../primitives/useCollapsiblePaneResize";
 import {
   SidebarResizeHandle,
   type SidebarResizeIntent,
@@ -120,6 +120,7 @@ export type DataWorkspaceProps = {
   minExplorerWidth?: number;
   maxExplorerWidth?: number;
   collapsedExplorerWidth?: number;
+  explorerCollapseThreshold?: number;
   mainSlot?: DataWorkspaceSlot;
   emptySlot?: ReactNode;
   showPreviewHeader?: boolean;
@@ -139,6 +140,7 @@ export type DataWorkspaceProps = {
   refreshKey?: unknown;
   onExplorerWidthChange?: (width: number) => void;
   onExplorerCollapsedChange?: (collapsed: boolean) => void;
+  onExplorerResizeActiveChange?: (active: boolean) => void;
   onActivePathChange?: (
     path: string | null,
     node: DataNode | null,
@@ -172,6 +174,7 @@ const DEFAULT_EXPLORER_WIDTH = 320;
 const MIN_EXPLORER_WIDTH = 240;
 const MAX_EXPLORER_WIDTH = 520;
 const COLLAPSED_EXPLORER_WIDTH = 47;
+const EXPLORER_COLLAPSE_ANIMATION_MS = 260;
 const MARKDOWN_LINK_INDEX_MAX_FILES = 250;
 
 export function DataWorkspace({
@@ -202,6 +205,7 @@ export function DataWorkspace({
   minExplorerWidth = MIN_EXPLORER_WIDTH,
   maxExplorerWidth = MAX_EXPLORER_WIDTH,
   collapsedExplorerWidth = COLLAPSED_EXPLORER_WIDTH,
+  explorerCollapseThreshold,
   mainSlot,
   emptySlot,
   showPreviewHeader = true,
@@ -221,6 +225,7 @@ export function DataWorkspace({
   refreshKey,
   onExplorerWidthChange,
   onExplorerCollapsedChange,
+  onExplorerResizeActiveChange,
   onActivePathChange,
   onActiveNodeChange,
   onExplorerRootClick,
@@ -280,6 +285,7 @@ export function DataWorkspace({
   const [internalExplorerWidth, setInternalExplorerWidth] = useState(() => (
     clampNumber(defaultExplorerWidth, minExplorerWidth, maxExplorerWidth)
   ));
+  const [keepExplorerContentMounted, setKeepExplorerContentMounted] = useState(!explorerCollapsed);
   const resolvedActivePath = activePath !== undefined ? activePath : internalActivePath;
   const expandedExplorerWidth = clampNumber(
     explorerWidth ?? internalExplorerWidth,
@@ -291,6 +297,12 @@ export function DataWorkspace({
     collapsedExplorerWidth,
     maxExplorerWidth,
   );
+  const explorerCanCollapse = Boolean(onExplorerCollapsedChange);
+  const resolvedExplorerCollapseThreshold = clampNumber(
+    explorerCollapseThreshold ?? Math.round(minExplorerWidth * 0.5),
+    collapsedExplorerWidth,
+    minExplorerWidth,
+  );
 
   const setExplorerWidth = useCallback(
     (nextWidth: number) => {
@@ -300,6 +312,19 @@ export function DataWorkspace({
     },
     [explorerWidth, maxExplorerWidth, minExplorerWidth, onExplorerWidthChange],
   );
+
+  useEffect(() => {
+    if (!explorerCollapsed) {
+      setKeepExplorerContentMounted(true);
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(
+      () => setKeepExplorerContentMounted(false),
+      EXPLORER_COLLAPSE_ANIMATION_MS,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [explorerCollapsed]);
 
   const setFolderLoading = useCallback((folderPath: string | null, loading: boolean) => {
     const loadingKey = getLoadingKey(folderPath);
@@ -1161,34 +1186,35 @@ export function DataWorkspace({
     [moveNodes],
   );
 
-  const beginExplorerResize = usePaneResizeDrag({
+  const explorerResize = useCollapsiblePaneResize({
     enabled: resizableExplorer,
     bodyClassName: "data-sidebar-resizing",
-    onDragStart: (event) => {
-      const startX = event.clientX;
-      const startWidth = explorerCollapsed ? minExplorerWidth : expandedExplorerWidth;
-
-      if (explorerCollapsed) {
-        onExplorerCollapsedChange?.(false);
-      }
-
-      return {
-        onMove: (point) => {
-          const physicalDelta = point.clientX - startX;
-          setExplorerWidth(startWidth + (direction === "rtl" ? -physicalDelta : physicalDelta));
-        },
-      };
-    },
+    collapsed: explorerCollapsed,
+    collapsedWidth: collapsedExplorerWidth,
+    collapseThreshold: resolvedExplorerCollapseThreshold,
+    direction,
+    maxWidth: maxExplorerWidth,
+    minWidth: minExplorerWidth,
+    side: "inline-start",
+    width: expandedExplorerWidth,
+    onCollapsedChange: onExplorerCollapsedChange,
+    onDragActiveChange: onExplorerResizeActiveChange,
+    onWidthChange: setExplorerWidth,
   });
 
   const resizeExplorerByKeyboard = (intent: SidebarResizeIntent, accelerated: boolean) => {
     if (!resizableExplorer) return;
 
     if (intent === "minimum") {
+      if (explorerCanCollapse) {
+        onExplorerCollapsedChange?.(true);
+        return;
+      }
       setExplorerWidth(minExplorerWidth);
       return;
     }
     if (intent === "maximum") {
+      onExplorerCollapsedChange?.(false);
       setExplorerWidth(maxExplorerWidth);
       return;
     }
@@ -1196,11 +1222,24 @@ export function DataWorkspace({
     const step = accelerated ? 24 : 12;
     const physicalDirection = intent === "decrease" ? -1 : 1;
     const directionMultiplier = direction === "rtl" ? -1 : 1;
-    setExplorerWidth(resolvedExplorerWidth + physicalDirection * directionMultiplier * step);
+    const nextWidth = resolvedExplorerWidth + physicalDirection * directionMultiplier * step;
+    if (explorerCollapsed) {
+      if (nextWidth > collapsedExplorerWidth) {
+        onExplorerCollapsedChange?.(false);
+        setExplorerWidth(minExplorerWidth);
+      }
+      return;
+    }
+    if (explorerCanCollapse && nextWidth < minExplorerWidth) {
+      onExplorerCollapsedChange?.(true);
+      return;
+    }
+    setExplorerWidth(nextWidth);
   };
 
+  const explorerContentVisible = !explorerCollapsed || keepExplorerContentMounted;
   const dataContentStyle = resizableExplorer
-    ? ({ "--data-explorer-width": `${resolvedExplorerWidth}px` } as CSSProperties)
+    ? ({ "--data-explorer-width": `${explorerResize.width}px` } as CSSProperties)
     : undefined;
 
   return (
@@ -1219,11 +1258,12 @@ export function DataWorkspace({
       <div
         className="data-content"
         data-explorer-collapsed={explorerCollapsed ? "true" : undefined}
+        data-explorer-dragging={explorerResize.dragging ? "true" : undefined}
         data-resizable-explorer={resizableExplorer ? "true" : undefined}
         style={dataContentStyle}
       >
         <aside className="explorer-column">
-          {!explorerCollapsed && (
+          {explorerContentVisible && (
             <div className="data-explorer-layout" data-has-rail={explorerRailSlot ? "true" : undefined}>
               {explorerRailSlot && (
                 <div className="data-explorer-rail">
@@ -1313,7 +1353,7 @@ export function DataWorkspace({
           {explorerCollapsed && (
             <div className="data-explorer-collapsed-fill" aria-hidden="true" />
           )}
-          {!explorerCollapsed && explorerFooterSlot && (
+          {explorerContentVisible && explorerFooterSlot && (
             <div className="data-explorer-footer">
               {renderWorkspaceSlot(explorerFooterSlot, workspaceState)}
             </div>
@@ -1326,10 +1366,10 @@ export function DataWorkspace({
             paneEdge
             orientation="vertical"
             label={t("shared-ui.explorer.resizeSidebar")}
-            min={minExplorerWidth}
+            min={explorerCanCollapse ? collapsedExplorerWidth : minExplorerWidth}
             max={maxExplorerWidth}
-            value={resolvedExplorerWidth}
-            onPointerDown={beginExplorerResize}
+            value={explorerResize.width}
+            onPointerDown={explorerResize.onPointerDown}
             onKeyboardResize={resizeExplorerByKeyboard}
           />
         )}

@@ -14,7 +14,7 @@ import { useLocalization } from "@puppyone/localization";
 import type { DesktopGitController } from "../source-control";
 import type { SettingsSection } from "../settings";
 import type { DesktopView } from "../../components/DesktopCloudShell";
-import type { useDesktopUpdates } from "../../components/DesktopUpdateControls";
+import type { DesktopUpdatesController } from "../updates";
 import type { FilesVisibilitySettings } from "../../preferences";
 import {
   formatFileOperationNotice,
@@ -32,8 +32,6 @@ import { useDesktopViewerPacks } from "../viewer-packs/host";
 import { DesktopDataWorkspaceSurface } from "./DesktopDataWorkspaceSurface";
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
-type DesktopUpdatesController = ReturnType<typeof useDesktopUpdates>;
-
 type DesktopWorkspaceContentProps = {
   activeAiEditRequest: AiEditRequest | null;
   activeDataPath: string | null;
@@ -51,6 +49,7 @@ type DesktopWorkspaceContentProps = {
   ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
+  onDismissCreateEntryMenu: () => void;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
   onNavigate: (view: DesktopView) => void;
   onNodeActionMenu: (node: DataNode, anchorRect: DOMRect, selectedNodes?: readonly DataNode[]) => void;
@@ -68,6 +67,7 @@ type DesktopWorkspaceContentProps = {
   workspaceSurfaceError?: string | null;
   workspaceKey: string;
   workspaceRefreshToken: number;
+  sidebarCreateMenuOpen: boolean;
 };
 
 export function DesktopWorkspaceContent({
@@ -83,6 +83,7 @@ export function DesktopWorkspaceContent({
   onActiveDataPathChange,
   onActiveDataNodeChange,
   onCreateEntryMenu,
+  onDismissCreateEntryMenu,
   onFilesVisibilitySettingsChange,
   onNavigate,
   onNodeActionMenu,
@@ -100,6 +101,7 @@ export function DesktopWorkspaceContent({
   workspaceSurfaceError = null,
   workspaceKey,
   workspaceRefreshToken,
+  sidebarCreateMenuOpen,
 }: DesktopWorkspaceContentProps) {
   const { t } = useLocalization();
   const fileOperationNotice = formatFileOperationNotice(fileClipboardController.notice, t);
@@ -186,6 +188,7 @@ export function DesktopWorkspaceContent({
       onActiveDataNodeChange={onActiveDataNodeChange}
       onActiveDataPathChange={onActiveDataPathChange}
       onCreateEntryMenu={onCreateEntryMenu}
+      onDismissCreateEntryMenu={onDismissCreateEntryMenu}
       onNodeActionMenu={onNodeActionMenu}
       preferences={preferences}
       resolvedSurface={resolvedSurface}
@@ -194,6 +197,7 @@ export function DesktopWorkspaceContent({
       workspaceKey={workspaceKey}
       workspaceRefreshToken={workspaceRefreshToken}
       workspaceSurfaceError={workspaceSurfaceError}
+      sidebarCreateMenuOpen={sidebarCreateMenuOpen}
     />
   );
 }

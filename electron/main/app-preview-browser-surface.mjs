@@ -18,6 +18,8 @@ export function createAppPreviewBrowserSurfaceManager({
   getOwnerWindow,
   publishState = () => {},
   loadTimeoutMs = DEFAULT_LOAD_TIMEOUT_MS,
+  nativeSurfaceOcclusion = null,
+  nativeSurfacePointerPassthrough = null,
 }) {
   if (typeof WebContentsView !== "function") {
     throw new TypeError("App preview WebContentsView constructor is required.");
@@ -59,6 +61,7 @@ export function createAppPreviewBrowserSurfaceManager({
       surface.runtimeId = normalized.runtimeId;
       surface.generation = normalized.generation;
       surface.requestedBounds = normalized.bounds;
+      surface.requestedVisible = normalized.visible;
       surface.attachmentId = normalized.attachmentId;
       surface.message = null;
 
@@ -98,14 +101,15 @@ export function createAppPreviewBrowserSurfaceManager({
     });
   }
 
-  function setBounds({ surfaceId, attachmentId, bounds, callerWebContentsId }) {
+  function setBounds({ surfaceId, attachmentId, bounds, visible, callerWebContentsId }) {
     const surface = requireOwnedSurface(surfaceId, callerWebContentsId);
     if (!surface || surface.attachmentId !== normalizeAttachmentId(attachmentId)) {
       return { ok: false, visible: false };
     }
     surface.requestedBounds = normalizeBounds(bounds, { allowHidden: true });
-    const visible = applySurfaceBounds(surface);
-    return { ok: true, visible };
+    if (typeof visible === "boolean") surface.requestedVisible = visible;
+    const effectiveVisible = applySurfaceBounds(surface);
+    return { ok: true, visible: effectiveVisible };
   }
 
   function detach({ surfaceId = null, attachmentId, callerWebContentsId }) {
@@ -259,6 +263,7 @@ export function createAppPreviewBrowserSurfaceManager({
       view,
       partitionSession,
       requestedBounds: request.bounds,
+      requestedVisible: request.visible,
       attachmentId: request.attachmentId,
       url: null,
       allowedOrigin: new URL(request.url).origin,
@@ -268,6 +273,9 @@ export function createAppPreviewBrowserSurfaceManager({
       canGoBack: false,
       canGoForward: false,
       attached: false,
+      occluded: false,
+      releaseOcclusion: null,
+      releasePointerPassthrough: null,
       sequence: 0,
     };
     surfaces.set(surfaceId, surface);
@@ -280,6 +288,18 @@ export function createAppPreviewBrowserSurfaceManager({
     });
     view.setVisible?.(false);
     view.webContents?.setAudioMuted?.(true);
+    surface.releaseOcclusion = nativeSurfaceOcclusion?.register?.({
+      ownerWebContentsId: request.ownerWebContentsId,
+      setOccluded: (occluded) => {
+        surface.occluded = occluded;
+        if (surfaces.get(surfaceId) === surface) applySurfaceBounds(surface);
+      },
+    }) ?? null;
+    surface.releasePointerPassthrough = nativeSurfacePointerPassthrough?.register?.({
+      ownerWebContentsId: request.ownerWebContentsId,
+      ownerWebContents: window.webContents,
+      surfaceView: view,
+    }) ?? null;
     return surface;
   }
 
@@ -292,6 +312,10 @@ export function createAppPreviewBrowserSurfaceManager({
     }
     const ownerState = ownerStates.get(surface.ownerWebContentsId);
     ownerState?.surfaceIds.delete(surfaceId);
+    surface.releaseOcclusion?.();
+    surface.releaseOcclusion = null;
+    surface.releasePointerPassthrough?.();
+    surface.releasePointerPassthrough = null;
     detachNativeView(surface);
     try {
       closeWebContents(surface.view.webContents);
@@ -360,7 +384,14 @@ export function createAppPreviewBrowserSurfaceManager({
       !surface.window?.isDestroyed?.() &&
       (typeof surface.window.isVisible !== "function" || surface.window.isVisible()) &&
       (typeof surface.window.isMinimized !== "function" || !surface.window.isMinimized());
-    const visible = Boolean(surface.attached && surface.attachmentId && clipped && ownerVisible);
+    const visible = Boolean(
+      surface.attached &&
+      surface.attachmentId &&
+      surface.requestedVisible &&
+      !surface.occluded &&
+      clipped &&
+      ownerVisible
+    );
     try {
       if (clipped) surface.view.setBounds(clipped);
       surface.view.setVisible?.(visible);
@@ -533,6 +564,7 @@ function normalizeActivationRequest(request) {
     attachmentId,
     ownerWebContentsId,
     url,
+    visible: request?.visible !== false,
     bounds: normalizeBounds(request?.bounds, { allowHidden: false }),
     surfaceKey: `${ownerWebContentsId}\n${rootPath}\n${appPath}`,
   };

@@ -10,6 +10,12 @@ import {
 } from "../../components/DesktopMenu";
 import { getOrderedHeaderElementDefinitions, type HeaderElementRenderContext } from "./headerElements";
 import type { TerminalSessionLayout, TitlebarActionsSettings } from "../../preferences";
+import type { DesktopUpdateState } from "../../types/electron";
+import {
+  DesktopUpdateTitlebarButton,
+  getDesktopUpdateTitlebarState,
+  normalizeDesktopUpdateState,
+} from "../updates";
 
 type TerminalTitlebarSession = {
   id: string;
@@ -33,6 +39,7 @@ type DesktopTitlebarActionsProps = {
   activeFileExternalOpenLoading?: boolean;
   canOpenActiveFileExternal: boolean;
   csvViewSettings?: CsvViewSettingsContribution | null;
+  desktopUpdateState?: DesktopUpdateState | null;
   titlebarActionsSettings: TitlebarActionsSettings;
   terminalSidebarOpen: boolean;
   terminalToolEnabled: boolean;
@@ -42,6 +49,7 @@ type DesktopTitlebarActionsProps = {
   agentChatEnabled: boolean;
   agentChatSidebarOpen: boolean;
   onOpenActiveFileExternal: () => void;
+  onUpdateNow?: () => void;
   onCreateTerminal: () => void;
   onActivateTerminal: (sessionId: string) => void;
   onCloseTerminal: (sessionId: string) => void;
@@ -57,6 +65,7 @@ export function DesktopTitlebarActions({
   activeFileExternalOpenLoading = false,
   canOpenActiveFileExternal,
   csvViewSettings = null,
+  desktopUpdateState = null,
   titlebarActionsSettings,
   terminalSidebarOpen,
   terminalToolEnabled,
@@ -66,6 +75,7 @@ export function DesktopTitlebarActions({
   agentChatEnabled,
   agentChatSidebarOpen,
   onOpenActiveFileExternal,
+  onUpdateNow = () => {},
   onCreateTerminal,
   onActivateTerminal,
   onCloseTerminal,
@@ -91,11 +101,25 @@ export function DesktopTitlebarActions({
     },
   };
 
+  const normalizedUpdateState = normalizeDesktopUpdateState(desktopUpdateState);
   const titlebarActionItems: Array<{
-    group: "header" | "right-sidebar";
+    group: "app-status" | "header" | "right-sidebar";
     id: string;
     node: ReactNode;
   }> = [];
+
+  if (getDesktopUpdateTitlebarState(normalizedUpdateState)) {
+    titlebarActionItems.push({
+      group: "app-status",
+      id: "app-update",
+      node: (
+        <DesktopUpdateTitlebarButton
+          state={normalizedUpdateState}
+          onUpdateNow={onUpdateNow}
+        />
+      ),
+    });
+  }
 
   if (editorFindCommand) {
     const findLabel = t("editor.find.label");

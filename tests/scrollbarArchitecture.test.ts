@@ -155,14 +155,21 @@ describe("scrollbar architecture", () => {
     expect(violations).toEqual([]);
   });
 
-  it("keeps Data and History pane resizers after their sidebar scroll lanes", () => {
+  it("gives the Data resizer an exclusive layout gutter beside the sidebar scroll lane", () => {
     for (const css of [dataWorkspaceCss, desktopDataShellCss]) {
       const resizerRule = readRule(css, ".data-explorer-resizer");
-      expect(resizerRule).toContain(
-        "inset-inline-start: var(--data-explorer-width, clamp(282px, 26vw, 360px));",
+      expect(css).toMatch(
+        /\.data-content\[data-resizable-explorer="true"\]\s*\{[^}]*grid-template-columns:[^}]*var\(--data-explorer-width[^}]*var\(--po-pane-resizer-hit-size, 8px\)[^}]*minmax/s,
       );
+      expect(css).toMatch(
+        /\.data-content\[data-resizable-explorer="true"\]\s*>\s*\.browser-column\s*\{[^}]*grid-column:\s*3;/s,
+      );
+      expect(resizerRule).toContain("position: relative;");
+      expect(resizerRule).toContain("inset: auto;");
+      expect(resizerRule).toContain("grid-column: 2;");
+      expect(resizerRule).toContain("width: 100%;");
       expect(resizerRule).not.toContain("transform:");
-      expect(resizerRule).not.toContain("inset-inline-end:");
+      expect(resizerRule).not.toContain("inset-inline-start:");
     }
 
     expect(dataWorkspaceSource.indexOf('className="data-explorer-resizer"')).toBeGreaterThan(
@@ -171,7 +178,9 @@ describe("scrollbar architecture", () => {
     expect(dataWorkspaceSource).toMatch(
       /className="data-explorer-resizer"\s+paneEdge/,
     );
+  });
 
+  it("keeps the History pane resizer after its sidebar scroll lane", () => {
     const historyResizerRule = readRule(
       historyDetailCss,
       ".desktop-history-panel-tree-resizer",

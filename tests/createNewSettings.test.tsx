@@ -65,12 +65,12 @@ describe("Create New settings", () => {
     expect(container.textContent).toContain("PuppyOne app");
     expect(container.textContent).not.toContain("PuppyFlow file");
 
-    click(findButton(container, "Text file"));
+    click(findButton(container, "PuppyOne app"));
     expect(onChange).toHaveBeenLastCalledWith({
       items: [
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
-        { kind: "text", enabled: true },
+        { kind: "app", enabled: true },
       ],
     });
   });

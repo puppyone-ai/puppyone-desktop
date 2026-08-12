@@ -1,7 +1,8 @@
 import { AlertTriangle, FolderOpen, Monitor, Plus } from "lucide-react";
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
 import { createTypographyRootProps } from "../features/typography";
+import { useWorkspaceFolderDrop } from "../features/app-shell/useWorkspaceFolderDrop";
 import type { MinimalOnboardingProps, ProjectHomeItem } from "./MinimalOnboarding";
 import { DesktopWindowDragRegion } from "./DesktopWindowChrome";
 import { InlineLoading } from "./loading";
@@ -10,6 +11,7 @@ import { InlineLoading } from "./loading";
 export function AssetLibraryHome({
   onChooseWorkspace,
   onOpenWorkspacePath,
+  onOpenDroppedWorkspace,
   recentWorkspaces = [],
   projectItems,
   operationStatus = null,
@@ -26,7 +28,6 @@ export function AssetLibraryHome({
 }: MinimalOnboardingProps) {
   const { t, formatDate, formatRelativeTime } = useLocalization();
   const [error, setError] = useState<string | null>(initialError);
-  const [dragging, setDragging] = useState(false);
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const items = useMemo(
     () => (projectItems ?? recentWorkspaces.map(({ workspace, lastOpenedAt }) => ({
@@ -66,24 +67,28 @@ export function AssetLibraryHome({
     }
   };
 
-  const handleDrop = async (event: DragEvent<HTMLElement>) => {
-    event.preventDefault();
-    setDragging(false);
-    const file = event.dataTransfer.files.item(0);
-    const path = file
-      ? window.puppyoneDesktop?.getPathForFile(file) || (file as File & { path?: string }).path
-      : null;
-    if (!path?.trim().startsWith("/")) {
-      setError(t("onboarding.library.error.dropLocalFolder"));
-      return;
+  const openDroppedFolder = async (folder: File) => {
+    if (openingPath || operationStatus) return;
+    setError(null);
+    setOpeningPath("__drop__");
+    try {
+      await onOpenDroppedWorkspace(folder);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
+    } finally {
+      setOpeningPath(null);
     }
-    await openPath(path.trim());
   };
 
   const busy = Boolean(openingPath) || Boolean(operationStatus);
+  const folderDrop = useWorkspaceFolderDrop({
+    disabled: busy,
+    onDropFolder: openDroppedFolder,
+    onInvalidDrop: () => setError(t("onboarding.library.error.dropLocalFolder")),
+  });
   return (
     <main
-      className={`onboarding-shell asset-library-home-shell ${resolvedTheme === "dark" ? "dark" : ""} ${dragging ? "is-dragging" : ""}`}
+      className={`onboarding-shell asset-library-home-shell ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "is-dragging" : ""}`}
       data-po-scrollbar="content"
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}
@@ -92,13 +97,10 @@ export function AssetLibraryHome({
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
       {...createTypographyRootProps(typography)}
-      onDragEnter={() => setDragging(true)}
-      onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
-      onDragLeave={(event) => {
-        const nextTarget = event.relatedTarget;
-        if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) setDragging(false);
-      }}
-      onDrop={(event) => void handleDrop(event)}
+      onDragEnter={folderDrop.onDragEnter}
+      onDragOver={folderDrop.onDragOver}
+      onDragLeave={folderDrop.onDragLeave}
+      onDrop={folderDrop.onDrop}
     >
       <DesktopWindowDragRegion className="asset-library-home-titlebar" />
       <section className="asset-library-home" aria-label={t("onboarding.projects.title")}>
@@ -131,7 +133,7 @@ export function AssetLibraryHome({
         </div>
       </section>
 
-      {dragging && <div className="asset-library-home-drop-overlay" aria-hidden="true"><FolderOpen size={24} strokeWidth={1.6} /><strong>{t("onboarding.library.dropOverlay")}</strong></div>}
+      {folderDrop.dragging && <div className="asset-library-home-drop-overlay" aria-hidden="true"><FolderOpen size={24} strokeWidth={1.6} /><strong>{t("onboarding.library.dropOverlay")}</strong></div>}
       {cornerSlot}
     </main>
   );

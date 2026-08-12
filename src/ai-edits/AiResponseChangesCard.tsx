@@ -73,6 +73,7 @@ export function AiResponseChangesCard({
       {reviewOpen && selectedFile && (
         <div
           className="ai-edit-review-popover"
+          data-native-surface-occluder="true"
           role="dialog"
           aria-label={t("source-control.aiChanges.reviewFile", { path: bidiIsolate(selectedFile.path) })}
         >

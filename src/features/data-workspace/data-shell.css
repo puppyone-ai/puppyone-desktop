@@ -15,17 +15,31 @@
 .data-content {
   position: relative;
   display: grid;
-  grid-template-columns: var(--data-explorer-width, clamp(282px, 26vw, 360px)) minmax(0, 1fr);
+  grid-template-columns:
+    var(--data-explorer-width, clamp(282px, 26vw, 360px))
+    minmax(var(--desktop-main-pane-min-width, 0px), 1fr);
   flex: 1;
   width: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   background: var(--po-canvas);
+  transition: grid-template-columns 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .data-content[data-explorer-collapsed="true"] {
-  grid-template-columns: 0 minmax(0, 1fr);
+  grid-template-columns: 0 minmax(var(--desktop-main-pane-min-width, 0px), 1fr);
+}
+
+.data-content[data-resizable-explorer="true"] {
+  grid-template-columns:
+    var(--data-explorer-width, clamp(282px, 26vw, 360px))
+    var(--po-pane-resizer-hit-size, 8px)
+    minmax(var(--desktop-main-pane-min-width, 0px), 1fr);
+}
+
+.data-content[data-resizable-explorer="true"][data-explorer-collapsed="true"] {
+  grid-template-columns: 0 0 minmax(var(--desktop-main-pane-min-width, 0px), 1fr);
 }
 
 .explorer-column {
@@ -37,10 +51,11 @@
   overflow: hidden;
   background: var(--po-sidebar);
   border-inline-end: 1px solid var(--po-shell-divider, var(--po-divider));
+  transition: background-color 260ms ease, border-color 260ms ease;
 }
 
 .data-content[data-explorer-collapsed="true"] .explorer-column {
-  border-inline-end: 0;
+  border-inline-end-color: transparent;
   background: transparent;
   pointer-events: none;
 }
@@ -85,10 +100,14 @@
 
 .data-explorer-resizer {
   /*
-   * The resize target belongs to the main-pane side of the boundary so it
-   * never competes with the explorer scrollbar immediately inside it.
+   * A real grid gutter owns the full hit target. Native WebContentsViews begin
+   * in the following main track, so they can never steal this pointer lane.
    */
-  inset-inline-start: var(--data-explorer-width, clamp(282px, 26vw, 360px));
+  position: relative;
+  inset: auto;
+  grid-column: 2;
+  grid-row: 1;
+  width: 100%;
 }
 
 .data-explorer-resizer::after {
@@ -105,6 +124,20 @@ body.data-sidebar-resizing,
 body.data-sidebar-resizing * {
   cursor: col-resize !important;
   user-select: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .data-content {
+    transition: none;
+  }
+
+  .explorer-column {
+    transition: none;
+  }
+
+  .data-explorer-resizer {
+    transition: none;
+  }
 }
 
 .desktop-explorer-toolbar {
@@ -674,10 +707,15 @@ body.data-sidebar-resizing * {
 }
 
 .browser-column {
+  grid-column: 2;
   display: flex;
   flex: 1;
   flex-direction: column;
   background: var(--po-canvas);
+}
+
+.data-content[data-resizable-explorer="true"] > .browser-column {
+  grid-column: 3;
 }
 
 .desktop-editor-panel {
