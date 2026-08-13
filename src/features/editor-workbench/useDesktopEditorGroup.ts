@@ -289,7 +289,9 @@ function readStoredEditorWorkbench(
       const parsed = JSON.parse(raw) as Partial<DesktopEditorWorkbenchState>;
       const group = parseEditorGroupState(parsed.group);
       const editorIds = new Set(group.editors.map(({ id }) => id));
-      const layout = parseEditorPaneLayoutState(parsed.layout, editorIds, group.activeEditorId);
+      const layout = collapseDuplicateVisibleResources(
+        parseEditorPaneLayoutState(parsed.layout, editorIds, group.activeEditorId),
+      );
       const activeEditorId = getActiveEditorPane(layout).editorId;
       return freezeWorkbench(activeEditorId ? activateEditor(group, activeEditorId) : group, layout);
     }
@@ -306,6 +308,29 @@ function freezeWorkbench(
   layout: EditorPaneLayoutState,
 ): DesktopEditorWorkbenchState {
   return Object.freeze({ group, layout });
+}
+
+function collapseDuplicateVisibleResources(
+  layout: EditorPaneLayoutState,
+): EditorPaneLayoutState {
+  const panes = getEditorPanes(layout);
+  const activePane = panes.find((pane) => pane.id === layout.activePaneId);
+  const orderedPanes = activePane
+    ? [activePane, ...panes.filter((pane) => pane.id !== activePane.id)]
+    : panes;
+  const visibleResources = new Set<string>();
+  const duplicatePaneIds: string[] = [];
+
+  for (const pane of orderedPanes) {
+    if (!pane.editorId) continue;
+    if (visibleResources.has(pane.editorId)) duplicatePaneIds.push(pane.id);
+    else visibleResources.add(pane.editorId);
+  }
+
+  return duplicatePaneIds.reduce(
+    (current, paneId) => closeEditorPane(current, paneId),
+    layout,
+  );
 }
 
 function isSameOrDescendant(candidate: string, resource: string): boolean {
