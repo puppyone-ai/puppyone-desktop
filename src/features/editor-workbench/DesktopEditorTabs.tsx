@@ -1,11 +1,14 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, type KeyboardEvent, type MouseEvent } from "react";
-import { useLocalization } from "@puppyone/localization/react";
-import { FilePreviewIcon, type FileIconThemeId } from "../../file/fileIcons";
-import type { EditorInput } from "./editorGroupModel";
-import type { DocumentSessionStatus } from "../document-session/types";
+import { useLocalization } from "@puppyone/localization";
+import {
+  FilePreviewIcon,
+  type DocumentSessionStatus,
+  type EditorInput,
+  type FileIconThemeId,
+} from "@puppyone/shared-ui";
 
-export type EditorTabsProps = Readonly<{
+export type DesktopEditorTabsProps = Readonly<{
   editors: readonly EditorInput[];
   activeEditorId: string | null;
   fileIconTheme?: FileIconThemeId;
@@ -14,14 +17,20 @@ export type EditorTabsProps = Readonly<{
   onClose: (editorId: string) => void;
 }>;
 
-export function EditorTabs({
+/**
+ * App-shell presentation for the primary Editor Group.
+ *
+ * Editor order and working-copy state stay in their process-neutral models;
+ * this component only projects those states into the native titlebar.
+ */
+export function DesktopEditorTabs({
   editors,
   activeEditorId,
   fileIconTheme = "default",
   workingCopyStatuses = new Map(),
   onActivate,
   onClose,
-}: EditorTabsProps) {
+}: DesktopEditorTabsProps) {
   const { t } = useLocalization();
   const activeTabRef = useRef<HTMLButtonElement | null>(null);
 
@@ -57,21 +66,27 @@ export function EditorTabs({
   };
 
   return (
-    <div className="editor-tabs" role="tablist" aria-label={t("editor.tabs.openEditors")}>
+    <div
+      className="desktop-editor-tabs"
+      role="tablist"
+      aria-label={t("editor.tabs.openEditors")}
+      data-window-no-drag="true"
+      data-po-scrollbar="hidden"
+    >
       {editors.map((editor) => {
         const active = editor.id === activeEditorId;
         const status = workingCopyStatuses.get(editor.resource);
         const dirty = status === "dirty" || status === "saving" || status === "error";
         return (
           <div
-            className="editor-tab"
+            className="desktop-editor-tab"
             data-active={active ? "true" : undefined}
             data-dirty={dirty ? "true" : undefined}
             data-status={status}
             key={editor.id}
           >
             <button
-              className="editor-tab-target"
+              className="desktop-editor-tab-target"
               type="button"
               role="tab"
               aria-selected={active}
@@ -82,11 +97,11 @@ export function EditorTabs({
               onAuxClick={(event) => handleAuxClick(event, editor.id)}
               onKeyDown={(event) => handleKeyDown(event, editor.id)}
             >
-              <FilePreviewIcon name={editor.label} size={16} theme={fileIconTheme} />
+              <FilePreviewIcon name={editor.label} size={14} theme={fileIconTheme} />
               <span dir="auto">{editor.label}</span>
             </button>
             <button
-              className="editor-tab-close"
+              className="desktop-editor-tab-close"
               type="button"
               tabIndex={-1}
               aria-label={t("editor.tabs.close", { name: editor.label })}
@@ -96,8 +111,8 @@ export function EditorTabs({
                 onClose(editor.id);
               }}
             >
-              {dirty && <span className="editor-tab-dirty-indicator" aria-hidden="true" />}
-              <X className="editor-tab-close-icon" size={14} aria-hidden="true" />
+              {dirty && <span className="desktop-editor-tab-dirty-indicator" aria-hidden="true" />}
+              <X className="desktop-editor-tab-close-icon" size={13} aria-hidden="true" />
             </button>
           </div>
         );

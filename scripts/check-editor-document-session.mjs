@@ -129,8 +129,16 @@ if (!/keeps an immediate-save failure visible and retryable in auto mode/.test(m
 
 const dataWorkspacePath = path.join(repoRoot, "packages/shared-ui/src/data/DataWorkspace.tsx");
 const dataWorkspaceSource = readFileSync(dataWorkspacePath, "utf8");
-if (!/openEditors[\s\S]*onEditorActivate[\s\S]*await onActivePathChange/.test(dataWorkspaceSource)) {
+if (!/await onActivePathChange/.test(dataWorkspaceSource)) {
   errors.push(`${relative(dataWorkspacePath)} does not route file activation through the Editor Group`);
+}
+const desktopAppShellPath = path.join(repoRoot, "src/App.tsx");
+const desktopAppShellSource = readFileSync(desktopAppShellPath, "utf8");
+if (!/handleActiveDataPathChange[\s\S]*editorGroup\.open/.test(desktopAppShellSource)) {
+  errors.push(`${relative(desktopAppShellPath)} does not own Editor Group activation`);
+}
+if (!/DesktopEditorTabs[\s\S]*editors=\{editorGroup\.state\.editors\}/.test(desktopAppShellSource)) {
+  errors.push(`${relative(desktopAppShellPath)} does not project the Editor Group into the app shell`);
 }
 if (!/useEditableDocumentSource\s*\(\s*\)/.test(textFrameSource)) {
   errors.push(`${relative(textFramePath)} does not use the narrow editable-source boundary`);
