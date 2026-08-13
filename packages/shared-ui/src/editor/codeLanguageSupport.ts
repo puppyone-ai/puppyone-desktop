@@ -1,5 +1,5 @@
 import { StreamLanguage, indentUnit } from "@codemirror/language";
-import type { Extension } from "@codemirror/state";
+import { EditorState, type Extension } from "@codemirror/state";
 
 export type CodeLanguageKey =
   | "css"
@@ -52,10 +52,14 @@ export function loadCodeLanguageExtension(languageKey: CodeLanguageKey): Promise
   const cached = languageExtensionCache.get(languageKey);
   if (cached) return cached;
 
-  const extension = loadLanguage(languageKey).then((languageSupport) => [
-    indentUnit.of(languageKey === "python" ? "    " : "  "),
-    languageSupport,
-  ]);
+  const extension = loadLanguage(languageKey).then((languageSupport) => {
+    const indentationWidth = languageKey === "python" ? 4 : 2;
+    return [
+      EditorState.tabSize.of(indentationWidth),
+      indentUnit.of(" ".repeat(indentationWidth)),
+      languageSupport,
+    ];
+  });
   languageExtensionCache.set(languageKey, extension);
   void extension.catch(() => {
     if (languageExtensionCache.get(languageKey) === extension) {

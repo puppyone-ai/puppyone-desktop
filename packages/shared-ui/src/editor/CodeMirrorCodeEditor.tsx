@@ -9,6 +9,7 @@ import {
   indentOnInput,
   syntaxHighlighting,
 } from "@codemirror/language";
+import { highlightSelectionMatches } from "@codemirror/search";
 import { Annotation, Compartment, EditorState, type Extension } from "@codemirror/state";
 import {
   crosshairCursor,
@@ -28,6 +29,7 @@ import { subscribeTypographyChanges } from "../core/typography";
 import { CodeMirrorFindAdapter } from "./find/codeMirrorFindAdapter";
 import { useRegisterEditorFindAdapter } from "./find/editorFind";
 import { puppyCodeHighlightStyle } from "./codeHighlightStyle";
+import { codeIndentGuides } from "./codeIndentGuides";
 import {
   loadCodeLanguageExtension,
   resolveCodeLanguageKey,
@@ -105,7 +107,9 @@ export function CodeMirrorCodeEditor({
         rectangularSelection(),
         crosshairCursor(),
         highlightActiveLine(),
+        highlightSelectionMatches({ minSelectionLength: 2 }),
         highlightTrailingWhitespace(),
+        codeIndentGuides,
         syntaxHighlighting(puppyCodeHighlightStyle),
         findAdapter.extension,
         keymap.of([

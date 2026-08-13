@@ -38,5 +38,13 @@ describe("code language support", () => {
     const extension = await loadCodeLanguageExtension("python");
     const state = EditorState.create({ doc: "def greet():\n    pass", extensions: extension });
     expect(getIndentUnit(state)).toBe(4);
+    expect(state.tabSize).toBe(4);
+  });
+
+  it("keeps tab rendering aligned with the language indentation width", async () => {
+    const extension = await loadCodeLanguageExtension("typescript");
+    const state = EditorState.create({ doc: "function greet() {\n\treturn 'hello'\n}", extensions: extension });
+    expect(getIndentUnit(state)).toBe(2);
+    expect(state.tabSize).toBe(2);
   });
 });

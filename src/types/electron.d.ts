@@ -676,6 +676,10 @@ export type PuppyoneWorkspaceConfig = {
 declare global {
   interface Window {
     puppyoneDesktop?: {
+      getWindowChromeState: () => Promise<{ fullScreen: boolean }>;
+      onWindowChromeStateChanged: (
+        callback: (state: { fullScreen: boolean }) => void,
+      ) => () => void;
       setWindowBackground: (request: { background: string }) => void;
       setWindowMinimumWidth: (request: { width: number }) => Promise<{
         applied: boolean;

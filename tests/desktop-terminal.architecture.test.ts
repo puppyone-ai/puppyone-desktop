@@ -107,10 +107,16 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(css).not.toContain(".desktop-terminal-subheader::after");
     expect(css).not.toMatch(/\.desktop-terminal-subheader\s*\{[^}]*border-bottom:/s);
     expect(css).toContain("text-spacing-trim: space-all");
-    expect(css).toContain("--desktop-terminal-scrollbar-track-size: 14px;");
+    expect(css).toContain(
+      "--desktop-terminal-scrollbar-track-size: var(--po-scrollbar-size, 12px);",
+    );
     expect(css).toContain(
       "--desktop-terminal-scrollbar-thumb-active-size: var(--po-scrollbar-thumb-active-size, 8px);",
     );
+    expect(css).toContain(
+      "--desktop-terminal-scrollbar-thumb-inset: var(--po-scrollbar-thumb-inset, 3px);",
+    );
+    expect(css).toContain("--po-scrollbar-thumb-active-inset,");
     expect(css).toContain(':root[data-interface-style="default"] .desktop-terminal-xterm');
     expect(css).toContain(
       "--desktop-terminal-scrollbar-thumb-color: var(",
@@ -121,14 +127,24 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(runtime).toContain("terminal.onScroll(() => this.markScrollbarActive())");
     expect(runtime).toContain('container.classList.add("po-scrollbar-active")');
     expect(css).toMatch(
+      /\.xterm-scrollable-element > \.scrollbar\.vertical\s*\{[^}]*width:\s*var\(--desktop-terminal-scrollbar-track-size\) !important;/s,
+    );
+    expect(css).toMatch(
       /\.xterm-scrollable-element > \.scrollbar > \.slider\s*\{[^}]*width:\s*var\(--desktop-terminal-scrollbar-track-size\) !important;/s,
     );
     expect(css).toContain(
       ".desktop-terminal-xterm .xterm .xterm-scrollable-element > .scrollbar > .slider::after",
     );
     expect(css).toMatch(
-      /\.slider::after\s*\{[^}]*width:\s*var\(--desktop-terminal-scrollbar-thumb-size\);[^}]*pointer-events:\s*none;/s,
+      /\.slider::after\s*\{[^}]*inset-inline-end:\s*var\(--desktop-terminal-scrollbar-thumb-inset\);[^}]*width:\s*var\(--desktop-terminal-scrollbar-thumb-size\);[^}]*pointer-events:\s*none;/s,
     );
+    expect(css).toContain(
+      "inset-inline-end: var(--desktop-terminal-scrollbar-thumb-active-inset);",
+    );
+    expect(css).toContain(
+      "border-inline-width: var(--desktop-terminal-scrollbar-thumb-inset);",
+    );
+    expect(css).not.toContain("border-left-width:");
     expect(globalLayout).not.toContain(".desktop-terminal-");
   });
 

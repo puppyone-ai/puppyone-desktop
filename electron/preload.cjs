@@ -2,6 +2,13 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 const externalViewerPacksEnabled = process.argv.includes("--puppyone-external-viewer-packs=1");
 
 contextBridge.exposeInMainWorld("puppyoneDesktop", {
+  getWindowChromeState: () => ipcRenderer.invoke("window-layout:get-chrome-state"),
+  onWindowChromeStateChanged: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("window-layout:chrome-state-changed", listener);
+    return () => ipcRenderer.removeListener("window-layout:chrome-state-changed", listener);
+  },
   setWindowBackground: (request) => {
     ipcRenderer.send("appearance:set-window-background", {
       background: request?.background,

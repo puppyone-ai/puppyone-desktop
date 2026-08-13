@@ -296,18 +296,19 @@
 }
 
 .desktop-terminal-xterm {
-  --desktop-terminal-scrollbar-track-size: 14px;
+  /* xterm renders a private scrollbar DOM, so it cannot consume the global
+   * [data-po-scrollbar] primitive directly. Mirror that primitive's geometry
+   * exactly: one shared interaction lane with the painted thumb centered
+   * inside it. Do not add panel padding to manufacture an optical gutter. */
+  --desktop-terminal-scrollbar-track-size: var(--po-scrollbar-size, 12px);
   --desktop-terminal-scrollbar-thumb-size: var(--po-scrollbar-thumb-size, 6px);
   --desktop-terminal-scrollbar-thumb-active-size: var(--po-scrollbar-thumb-active-size, 8px);
   --desktop-terminal-scrollbar-thumb-color: var(--po-scrollbar-thumb);
   --desktop-terminal-scrollbar-thumb-hover-color: var(--po-scrollbar-thumb-hover);
-  --desktop-terminal-scrollbar-thumb-offset: calc(
-    var(--desktop-terminal-scrollbar-track-size)
-    - var(--desktop-terminal-scrollbar-thumb-size)
-  );
-  --desktop-terminal-scrollbar-thumb-active-offset: calc(
-    var(--desktop-terminal-scrollbar-track-size)
-    - var(--desktop-terminal-scrollbar-thumb-active-size)
+  --desktop-terminal-scrollbar-thumb-inset: var(--po-scrollbar-thumb-inset, 3px);
+  --desktop-terminal-scrollbar-thumb-active-inset: var(
+    --po-scrollbar-thumb-active-inset,
+    2px
   );
 
   position: relative;
@@ -375,24 +376,26 @@
 .desktop-terminal-xterm .xterm-viewport::-webkit-scrollbar-thumb {
   min-height: 34px;
   border: 0 solid transparent;
-  border-left-width: var(--desktop-terminal-scrollbar-thumb-offset);
+  border-inline-width: var(--desktop-terminal-scrollbar-thumb-inset);
   border-radius: var(--po-scrollbar-radius, 999px);
   background-color: transparent;
   background-clip: padding-box;
-  transition: background-color var(--po-scrollbar-transition, 0.16s ease);
+  transition:
+    border-inline-width var(--po-scrollbar-transition, 0.16s ease),
+    background-color var(--po-scrollbar-transition, 0.16s ease);
 }
 
 .desktop-terminal-xterm:hover .xterm-viewport::-webkit-scrollbar-thumb,
 .desktop-terminal-xterm.po-scrollbar-active .xterm-viewport::-webkit-scrollbar-thumb,
 .desktop-terminal-xterm .xterm-viewport.po-scrollbar-active::-webkit-scrollbar-thumb {
-  border-left-width: var(--desktop-terminal-scrollbar-thumb-active-offset);
+  border-inline-width: var(--desktop-terminal-scrollbar-thumb-active-inset);
   background-color: var(--desktop-terminal-scrollbar-thumb-color);
 }
 
 .desktop-terminal-xterm .xterm-viewport::-webkit-scrollbar-thumb:hover,
 .desktop-terminal-xterm .xterm-viewport.po-scrollbar-active::-webkit-scrollbar-thumb:hover,
 .desktop-terminal-xterm .xterm-viewport:hover::-webkit-scrollbar-thumb:hover {
-  border-left-width: var(--desktop-terminal-scrollbar-thumb-active-offset);
+  border-inline-width: var(--desktop-terminal-scrollbar-thumb-active-inset);
   background-color: var(--desktop-terminal-scrollbar-thumb-hover-color);
   background-clip: padding-box;
 }
@@ -405,6 +408,10 @@
   background: transparent !important;
 }
 
+.desktop-terminal-xterm .xterm .xterm-scrollable-element > .scrollbar.vertical {
+  width: var(--desktop-terminal-scrollbar-track-size) !important;
+}
+
 .desktop-terminal-xterm .xterm .xterm-scrollable-element > .scrollbar > .slider {
   right: 0 !important;
   left: auto !important;
@@ -415,13 +422,14 @@
 .desktop-terminal-xterm .xterm .xterm-scrollable-element > .scrollbar > .slider::after {
   position: absolute;
   inset-block: 0;
-  inset-inline-end: 0;
+  inset-inline-end: var(--desktop-terminal-scrollbar-thumb-inset);
   width: var(--desktop-terminal-scrollbar-thumb-size);
   border-radius: var(--po-scrollbar-radius, 999px);
   background-color: transparent;
   content: "";
   pointer-events: none;
   transition:
+    inset-inline-end var(--po-scrollbar-transition, 0.16s ease),
     width var(--po-scrollbar-transition, 0.16s ease),
     background-color var(--po-scrollbar-transition, 0.16s ease);
 }
@@ -436,6 +444,7 @@
   .xterm-scrollable-element
   > .scrollbar.visible
   > .slider::after {
+  inset-inline-end: var(--desktop-terminal-scrollbar-thumb-active-inset);
   width: var(--desktop-terminal-scrollbar-thumb-active-size);
   background-color: var(--desktop-terminal-scrollbar-thumb-color);
 }
@@ -450,6 +459,7 @@
   .xterm-scrollable-element
   > .scrollbar
   > .slider.active::after {
+  inset-inline-end: var(--desktop-terminal-scrollbar-thumb-active-inset);
   width: var(--desktop-terminal-scrollbar-thumb-active-size);
   background-color: var(--desktop-terminal-scrollbar-thumb-hover-color);
 }

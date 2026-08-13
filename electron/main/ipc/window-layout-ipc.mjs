@@ -8,6 +8,17 @@ const MAXIMUM_REQUESTED_WINDOW_MIN_WIDTH = 4096;
  * main owns validation and the product-level 640px floor.
  */
 export function registerWindowLayoutIpcHandlers({ ipcMain, BrowserWindow }) {
+  ipcMain.handle("window-layout:get-chrome-state", (event) => {
+    const ownerWindow = BrowserWindow.fromWebContents(event.sender);
+    return {
+      fullScreen: Boolean(
+        ownerWindow
+        && !ownerWindow.isDestroyed?.()
+        && ownerWindow.isFullScreen?.(),
+      ),
+    };
+  });
+
   ipcMain.handle("window-layout:set-minimum-width", (event, request) => {
     const ownerWindow = BrowserWindow.fromWebContents(event.sender);
     if (!ownerWindow || ownerWindow.isDestroyed?.()) return { applied: false };
