@@ -1,4 +1,10 @@
 export type EditorSplitDirection = "horizontal" | "vertical";
+export type EditorSplitPlacement = "first" | "second";
+
+export type EditorPaneSplitOptions = Readonly<{
+  editorId?: string | null;
+  placement?: EditorSplitPlacement;
+}>;
 
 export type EditorPaneLayoutLeaf = Readonly<{
   kind: "pane";
@@ -70,6 +76,7 @@ export function splitEditorPane(
   state: EditorPaneLayoutState,
   paneId: string,
   direction: EditorSplitDirection,
+  options: EditorPaneSplitOptions = {},
 ): EditorPaneLayoutState {
   const source = findPane(state.root, paneId);
   if (!source) return state;
@@ -77,14 +84,18 @@ export function splitEditorPane(
   const splitIdNumber = nextNumericId(state.root, "editor-split-");
   const nextPaneId = `editor-pane-${paneIdNumber}`;
   const nextSplitId = `editor-split-${splitIdNumber}`;
-  const nextPane = createPane(nextPaneId, source.editorId);
+  const nextPane = createPane(
+    nextPaneId,
+    Object.prototype.hasOwnProperty.call(options, "editorId") ? options.editorId ?? null : source.editorId,
+  );
+  const nextPaneFirst = options.placement === "first";
   const root = replaceNode(state.root, paneId, freezeNode({
     kind: "split",
     id: nextSplitId,
     direction,
     ratio: 0.5,
-    first: source,
-    second: nextPane,
+    first: nextPaneFirst ? nextPane : source,
+    second: nextPaneFirst ? source : nextPane,
   }));
   return freezeLayout(root, nextPaneId);
 }
