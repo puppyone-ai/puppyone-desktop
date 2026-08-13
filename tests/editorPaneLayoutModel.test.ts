@@ -44,6 +44,23 @@ describe("EditorPaneLayoutModel", () => {
     expect(layout.activePaneId).toBe("editor-pane-1");
   });
 
+  it("places a dragged editor on the requested side of the target pane", () => {
+    const layout = splitEditorPane(
+      createEditorPaneLayout("target.md"),
+      "editor-pane-1",
+      "horizontal",
+      { editorId: "dragged.md", placement: "first" },
+    );
+
+    expect(layout.root).toMatchObject({
+      kind: "split",
+      direction: "horizontal",
+      first: { kind: "pane", editorId: "dragged.md" },
+      second: { kind: "pane", editorId: "target.md" },
+    });
+    expect(getActiveEditorPane(layout).editorId).toBe("dragged.md");
+  });
+
   it("rebases resources, removes closed editors, and clamps persisted ratios", () => {
     let layout = splitEditorPane(createEditorPaneLayout("docs/a.md"), "editor-pane-1", "horizontal");
     layout = assignEditorToActivePane(layout, "docs/b.md");

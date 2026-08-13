@@ -114,7 +114,9 @@ export type {
   EditorPaneLayoutNode,
   EditorPaneLayoutSplit,
   EditorPaneLayoutState,
+  EditorPaneSplitOptions,
   EditorSplitDirection,
+  EditorSplitPlacement,
 } from "./editor/workbench/editorPaneLayoutModel";
 export {
   EditorFindContributionProvider,

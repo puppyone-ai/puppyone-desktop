@@ -21,6 +21,7 @@ import {
   type DataNode,
   type EditorGroupState,
   type EditorPaneLayoutState,
+  type EditorPaneSplitOptions,
   type EditorSplitDirection,
   type Workspace,
 } from "@puppyone/shared-ui";
@@ -46,7 +47,11 @@ export type DesktopEditorGroupController = Readonly<{
   open: (path: string, node?: DataNode | null) => void;
   activate: (editorId: string) => void;
   focusPane: (paneId: string) => void;
-  splitPane: (paneId: string, direction: EditorSplitDirection) => void;
+  splitPane: (
+    paneId: string,
+    direction: EditorSplitDirection,
+    options?: EditorPaneSplitOptions,
+  ) => void;
   closePane: (paneId: string) => void;
   resizeSplit: (splitId: string, ratio: number) => void;
   close: (editorId: string) => void;
@@ -123,9 +128,13 @@ export function useDesktopEditorGroup(workspace: Workspace | null): DesktopEdito
     });
   }, [updateWorkbench]);
 
-  const splitPane = useCallback((paneId: string, direction: EditorSplitDirection) => {
+  const splitPane = useCallback((
+    paneId: string,
+    direction: EditorSplitDirection,
+    options?: EditorPaneSplitOptions,
+  ) => {
     updateWorkbench((current) => {
-      const layout = splitEditorPane(current.layout, paneId, direction);
+      const layout = splitEditorPane(current.layout, paneId, direction, options);
       if (layout === current.layout) return current;
       const editorId = getActiveEditorPane(layout).editorId;
       const group = editorId ? activateEditor(current.group, editorId) : current.group;

@@ -33,13 +33,17 @@ describe("editor split-pane architecture", () => {
     expect(surfaceSource).toContain('loadActiveFileSource={resolvedSurface.id !== "data"}');
     expect(splitSource).toContain('data-direction={split.direction}');
     expect(splitSource).toContain('role="separator"');
-    expect(splitSource).toContain('onSplitPane(pane.id, "horizontal")');
-    expect(splitSource).toContain('onSplitPane(pane.id, "vertical")');
+    expect(splitSource).toContain('className="desktop-editor-pane-handle"');
+    expect(splitSource).toContain("closestSplitEdge");
+    expect(splitSource).toContain('className="desktop-editor-drop-preview"');
   });
 
-  it("uses a neutral pane bar and dedicated resize lanes rather than tab styling", () => {
+  it("fills the editor region and uses overlay handles with dedicated resize lanes", () => {
     expect(splitStyles).toContain("--desktop-editor-splitter-size: var(--po-pane-resizer-hit-size, 8px);");
-    expect(splitStyles).toContain(".desktop-editor-pane-bar");
+    expect(splitStyles).toContain("flex: 1 1 0;");
+    expect(splitStyles).toContain(".desktop-editor-pane-handle-shell");
+    expect(splitStyles).toContain(".desktop-editor-drop-preview");
+    expect(splitStyles).not.toContain(".desktop-editor-pane-bar");
     expect(splitStyles).not.toContain("border-radius: 7px 7px 0 0");
     expect(splitStyles).not.toContain("tablist");
   });
