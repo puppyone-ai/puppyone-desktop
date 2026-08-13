@@ -238,12 +238,12 @@
 
 .desktop-editor-splitter:hover::after,
 .desktop-editor-splitter:focus-visible::after {
-  background: color-mix(in srgb, var(--po-accent) 60%, var(--po-divider));
+  background: var(--po-pane-resizer-hover-color);
 }
 
 .desktop-editor-splitter[data-resizing="true"]::after {
-  background: var(--po-accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-accent) 32%, transparent);
+  background: var(--po-pane-resizer-active-color);
+  box-shadow: 0 0 0 1px var(--po-pane-resizer-active-ring);
 }
 
 @media (prefers-reduced-motion: reduce) {

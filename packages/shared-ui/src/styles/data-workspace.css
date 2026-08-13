@@ -148,13 +148,13 @@
 
 .data-explorer-resizer:hover::after,
 .data-explorer-resizer:focus-visible::after {
-  background: color-mix(in srgb, var(--po-accent) 60%, var(--po-divider));
+  background: var(--po-pane-resizer-hover-color);
 }
 
 .data-content[data-explorer-dragging="true"] > .data-explorer-resizer::after,
 body.data-sidebar-resizing .data-explorer-resizer::after {
-  background: var(--po-accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-accent) 32%, transparent);
+  background: var(--po-pane-resizer-active-color);
+  box-shadow: 0 0 0 1px var(--po-pane-resizer-active-ring);
 }
 
 body.data-sidebar-resizing,

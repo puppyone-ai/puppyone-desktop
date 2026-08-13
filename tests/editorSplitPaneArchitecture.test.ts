@@ -34,6 +34,14 @@ const dataShellStyles = readFileSync(
   new URL("../src/features/data-workspace/data-shell.css", import.meta.url),
   "utf8",
 );
+const layoutStyles = readFileSync(
+  new URL("../src/styles/layout.css", import.meta.url),
+  "utf8",
+);
+const tokens = readFileSync(
+  new URL("../src/styles/tokens.css", import.meta.url),
+  "utf8",
+);
 const headerStyles = readFileSync(
   new URL("../src/features/app-shell/header-editor-columns.css", import.meta.url),
   "utf8",
@@ -93,5 +101,17 @@ describe("editor split-pane architecture", () => {
   it("does not project the Sidebar divider through the Header", () => {
     expect(headerStyles).not.toContain(".desktop-titlebar::before");
     expect(headerStyles).not.toContain("--desktop-titlebar-sidebar-width) - 1px");
+  });
+
+  it("shares neutral, hover, and active resize-boundary states across panes", () => {
+    expect(tokens).toContain("--po-pane-resizer-hover-color:");
+    expect(tokens).toContain("--po-pane-resizer-active-color:");
+    expect(tokens).toContain("--po-pane-resizer-active-ring:");
+    for (const styles of [dataShellStyles, splitStyles, layoutStyles]) {
+      expect(styles).toContain("var(--po-pane-resizer-hover-color)");
+      expect(styles).toContain("var(--po-pane-resizer-active-color)");
+      expect(styles).toContain("var(--po-pane-resizer-active-ring)");
+    }
+    expect(layoutStyles).toContain("body.desktop-right-sidebar-resizing");
   });
 });
