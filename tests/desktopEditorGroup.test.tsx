@@ -100,6 +100,48 @@ describe("useDesktopEditorGroup", () => {
     });
   });
 
+  it("collapses duplicate visible resources from the retired self-split layout", async () => {
+    const workspace: Workspace = {
+      id: "workspace-id",
+      name: "Workspace",
+      path: "/workspace",
+      status: "recording",
+    };
+    const storageKey = "puppyone.desktop.editor-workbench.v2:workspace-id:/workspace";
+    window.localStorage.setItem(storageKey, JSON.stringify({
+      group: {
+        editors: [{ id: "a.md", resource: "a.md", label: "a.md" }],
+        activeEditorId: "a.md",
+        mostRecentlyUsed: ["a.md"],
+      },
+      layout: {
+        activePaneId: "editor-pane-2",
+        root: {
+          kind: "split",
+          id: "editor-split-1",
+          direction: "horizontal",
+          ratio: 0.5,
+          first: { kind: "pane", id: "editor-pane-1", editorId: "a.md" },
+          second: { kind: "pane", id: "editor-pane-2", editorId: "a.md" },
+        },
+      },
+    }));
+    const snapshots: DesktopEditorGroupController[] = [];
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(<Probe workspace={workspace} onChange={(controller) => snapshots.push(controller)} />);
+      await Promise.resolve();
+    });
+
+    expect(snapshots.at(-1)!.paneLayout).toMatchObject({
+      activePaneId: "editor-pane-2",
+      root: { kind: "pane", id: "editor-pane-2", editorId: "a.md" },
+    });
+  });
+
   it("focuses an already visible file instead of splitting it into a duplicate pane", async () => {
     const workspace: Workspace = {
       id: "workspace-id",
