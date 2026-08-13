@@ -104,9 +104,11 @@ describe("editor split-pane architecture", () => {
   });
 
   it("shares neutral, hover, and active resize-boundary states across panes", () => {
+    expect(tokens).toContain("--po-pane-resizer-blue: light-dark(#3b82f6, #60a5fa);");
     expect(tokens).toContain("--po-pane-resizer-hover-color:");
     expect(tokens).toContain("--po-pane-resizer-active-color:");
     expect(tokens).toContain("--po-pane-resizer-active-ring:");
+    expect(tokens).not.toMatch(/--po-pane-resizer-(?:hover-color|active-color|active-ring):[^;]*--po-accent/);
     for (const styles of [dataShellStyles, splitStyles, layoutStyles]) {
       expect(styles).toContain("var(--po-pane-resizer-hover-color)");
       expect(styles).toContain("var(--po-pane-resizer-active-color)");

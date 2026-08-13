@@ -113,9 +113,10 @@
   --po-pane-resizer-hit-size: 8px;
   --po-pane-resizer-line-size: 1px;
   --po-pane-resizer-z-index: 35;
-  --po-pane-resizer-hover-color: color-mix(in srgb, var(--po-accent) 60%, var(--po-divider));
-  --po-pane-resizer-active-color: var(--po-accent);
-  --po-pane-resizer-active-ring: color-mix(in srgb, var(--po-accent) 32%, transparent);
+  --po-pane-resizer-blue: light-dark(#3b82f6, #60a5fa);
+  --po-pane-resizer-hover-color: color-mix(in srgb, var(--po-pane-resizer-blue) 55%, var(--po-divider));
+  --po-pane-resizer-active-color: var(--po-pane-resizer-blue);
+  --po-pane-resizer-active-ring: color-mix(in srgb, var(--po-pane-resizer-blue) 24%, transparent);
   --desktop-sidebar-scrollbar-width: var(--po-scrollbar-size);
   /*
    * Right gap for content inside sidebar scroll containers that reserve a
