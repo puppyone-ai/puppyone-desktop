@@ -58,8 +58,7 @@
 
 .desktop-editor-pane-handle-shell:hover,
 .desktop-editor-pane-handle-shell:focus-within,
-.desktop-editor-pane[data-drop-target] > .desktop-editor-pane-handle-shell,
-.desktop-editor-pane-dragging .desktop-editor-pane-handle-shell {
+.desktop-editor-pane[data-drop-target] > .desktop-editor-pane-handle-shell {
   opacity: 1;
 }
 

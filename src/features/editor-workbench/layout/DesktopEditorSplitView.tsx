@@ -85,13 +85,26 @@ export function DesktopEditorSplitView({
     () => new Map(editorGroup.editors.map((editor) => [editor.id, editor])),
     [editorGroup.editors],
   );
-  const paneCount = getEditorPanes(layout).length;
+  const panes = useMemo(() => getEditorPanes(layout), [layout]);
+  const paneCount = panes.length;
+  const [openActionsPaneId, setOpenActionsPaneId] = useState<string | null>(null);
   const paneMove = usePaneMoveDrag(onMovePane);
   const fileDrop = useExplorerFileDrop(workspace.id, onOpenAtPaneEdge);
+
+  useEffect(() => {
+    if (openActionsPaneId && !panes.some((pane) => pane.id === openActionsPaneId)) {
+      setOpenActionsPaneId(null);
+    }
+  }, [openActionsPaneId, panes]);
+
+  useEffect(() => {
+    if (paneMove.dragging) setOpenActionsPaneId(null);
+  }, [paneMove.dragging]);
 
   return (
     <div className="desktop-editor-split-view" data-pane-count={paneCount}>
       <EditorLayoutNode
+        key={layout.root.id}
         node={layout.root}
         touchesInlineStart
         activePaneId={layout.activePaneId}
@@ -106,12 +119,14 @@ export function DesktopEditorSplitView({
         viewerExtensionAdapter={viewerExtensionAdapter}
         fileDrop={fileDrop}
         paneMove={paneMove}
+        openActionsPaneId={openActionsPaneId}
         workspace={workspace}
         onClosePane={onClosePane}
         onFocusPane={onFocusPane}
         onMovePane={onMovePane}
         onOpenAtPaneEdge={onOpenAtPaneEdge}
         onResizeSplit={onResizeSplit}
+        onOpenActionsPaneChange={setOpenActionsPaneId}
       />
     </div>
   );
@@ -124,7 +139,9 @@ type EditorLayoutNodeProps = Omit<DesktopEditorSplitViewProps, "editorGroup" | "
   paneCount: number;
   fileDrop: EditorFileDropController;
   paneMove: PaneMoveDragController;
+  openActionsPaneId: string | null;
   touchesInlineStart: boolean;
+  onOpenActionsPaneChange: (paneId: string | null) => void;
 }>;
 
 function EditorLayoutNode(props: EditorLayoutNodeProps): ReactNode {
@@ -149,6 +166,7 @@ function EditorSplit({
       style={style as CSSProperties}
     >
       <EditorLayoutNode
+        key={split.first.id}
         {...props}
         node={split.first}
         touchesInlineStart={props.touchesInlineStart}
@@ -160,6 +178,7 @@ function EditorSplit({
         onResize={props.onResizeSplit}
       />
       <EditorLayoutNode
+        key={split.second.id}
         {...props}
         node={split.second}
         touchesInlineStart={split.direction === "vertical" && props.touchesInlineStart}
@@ -179,17 +198,19 @@ function EditorPane({
   pane,
   paneCount,
   paneMove,
+  openActionsPaneId,
   refreshKey,
   state,
   viewerExtensionAdapter,
   workspace,
   onClosePane,
   onFocusPane,
+  onOpenActionsPaneChange,
 }: EditorLayoutNodeProps & { pane: EditorPaneLayoutLeaf }) {
   const { t } = useLocalization();
-  const [actionsOpen, setActionsOpen] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
   const active = pane.id === activePaneId;
+  const actionsOpen = pane.id === openActionsPaneId;
   const editor = pane.editorId ? editorById.get(pane.editorId) ?? null : null;
   const paneMoveEdge = paneMove.dropIntent?.targetPaneId === pane.id
     ? paneMove.dropIntent.edge
@@ -202,11 +223,15 @@ function EditorPane({
   useEffect(() => {
     if (!actionsOpen) return undefined;
     const close = (event: globalThis.PointerEvent) => {
-      if (!actionsRef.current?.contains(event.target as Node)) setActionsOpen(false);
+      if (!actionsRef.current?.contains(event.target as Node)) onOpenActionsPaneChange(null);
     };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
-  }, [actionsOpen]);
+  }, [actionsOpen, onOpenActionsPaneChange]);
+
+  const activatePane = () => {
+    if (!active) onFocusPane(pane.id);
+  };
 
   return (
     <section
@@ -219,8 +244,12 @@ function EditorPane({
       aria-label={editor
         ? t("editor.panes.label", { name: editor.label })
         : t("editor.panes.empty")}
-      onPointerDownCapture={() => {
-        if (!active) onFocusPane(pane.id);
+      onFocusCapture={activatePane}
+      onPointerUp={(event) => {
+        // Focusable editors activate through focus, after the browser has placed
+        // their caret. This pointer-up fallback covers non-focusable previews
+        // without changing workbench state during native selection handling.
+        if (event.button === 0) activatePane();
       }}
       onDragEnterCapture={(event) => fileDrop.over(event, pane.id)}
       onDragOverCapture={(event) => fileDrop.over(event, pane.id)}
@@ -236,11 +265,12 @@ function EditorPane({
           aria-expanded={actionsOpen}
           title={t("editor.panes.dragToMove")}
           onClick={() => {
-            if (!paneMove.consumeDraggedClick()) setActionsOpen((open) => !open);
+            if (!paneMove.consumeDraggedClick()) {
+              onOpenActionsPaneChange(actionsOpen ? null : pane.id);
+            }
           }}
           onPointerDown={(event) => {
             if (event.button !== 0) return;
-            setActionsOpen(false);
             paneMove.start(event, pane);
           }}
           onPointerMove={paneMove.move}
@@ -255,7 +285,7 @@ function EditorPane({
               label={t("editor.panes.closePane")}
               onClick={() => {
                 onClosePane(pane.id);
-                setActionsOpen(false);
+                onOpenActionsPaneChange(null);
               }}
             />
           </div>

@@ -26,6 +26,7 @@ export type EditorPaneMoveHandler = (
 ) => void;
 
 export type PaneMoveDragController = Readonly<{
+  dragging: boolean;
   dropIntent: PaneDropIntent | null;
   start: (event: PointerEvent<HTMLButtonElement>, pane: EditorPaneLayoutLeaf) => void;
   move: (event: PointerEvent<HTMLButtonElement>) => void;
@@ -46,6 +47,7 @@ type PaneMoveSession = {
 const PANE_MOVE_THRESHOLD_PX = 5;
 
 export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDragController {
+  const [dragging, setDragging] = useState(false);
   const [dropIntent, setDropIntent] = useState<PaneDropIntent | null>(null);
   const sessionRef = useRef<PaneMoveSession | null>(null);
   const dropIntentRef = useRef<PaneDropIntent | null>(null);
@@ -63,6 +65,7 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
       session.handle.releasePointerCapture(session.pointerId);
     }
     sessionRef.current = null;
+    setDragging(false);
     publishDropIntent(null);
     document.body.classList.remove("desktop-editor-pane-dragging");
     setNativeSurfacePointerPassthrough(false);
@@ -96,8 +99,6 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
       dragging: false,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
-    document.body.classList.add("desktop-editor-pane-dragging");
-    setNativeSurfacePointerPassthrough(true);
   }, [finishGesture]);
 
   const move = useCallback((event: PointerEvent<HTMLButtonElement>) => {
@@ -107,9 +108,14 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
       event.clientX - session.originX,
       event.clientY - session.originY,
     );
-    if (!session.dragging && distance < PANE_MOVE_THRESHOLD_PX) return;
-    session.dragging = true;
-    draggedClickRef.current = true;
+    if (!session.dragging) {
+      if (distance < PANE_MOVE_THRESHOLD_PX) return;
+      session.dragging = true;
+      draggedClickRef.current = true;
+      setDragging(true);
+      document.body.classList.add("desktop-editor-pane-dragging");
+      setNativeSurfacePointerPassthrough(true);
+    }
     const element = document.elementFromPoint?.(event.clientX, event.clientY);
     const target = element?.closest<HTMLElement>("[data-editor-pane-id]");
     if (!target || target.dataset.editorPaneId === session.sourcePaneId) {
@@ -150,11 +156,12 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
   }, []);
 
   return useMemo(() => ({
+    dragging,
     dropIntent,
     start,
     move,
     end,
     cancel,
     consumeDraggedClick,
-  }), [cancel, consumeDraggedClick, dropIntent, end, move, start]);
+  }), [cancel, consumeDraggedClick, dragging, dropIntent, end, move, start]);
 }

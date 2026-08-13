@@ -86,6 +86,20 @@ describe("editor split-pane architecture", () => {
     expect(splitStyles).not.toContain("tablist");
   });
 
+  it("isolates editor focus, overlay, and drag gesture state by scope", () => {
+    expect(splitSource).toContain("openActionsPaneId");
+    expect(splitSource).toContain("onFocusCapture={activatePane}");
+    expect(splitSource).toContain("onPointerUp={(event)");
+    expect(splitSource).not.toContain("onPointerDownCapture");
+    expect(splitSource).toContain("key={split.first.id}");
+    expect(splitSource).toContain("key={split.second.id}");
+    expect(paneMoveSource.indexOf('distance < PANE_MOVE_THRESHOLD_PX'))
+      .toBeLessThan(paneMoveSource.indexOf('classList.add("desktop-editor-pane-dragging")'));
+    expect(splitStyles).not.toContain(
+      ".desktop-editor-pane-dragging .desktop-editor-pane-handle-shell",
+    );
+  });
+
   it("joins root split dividers to the Editor-facing edge of the Sidebar gutter", () => {
     expect(dataShellStyles).toContain(
       "--desktop-editor-sidebar-gutter-size: var(--po-pane-resizer-hit-size, 8px);",
