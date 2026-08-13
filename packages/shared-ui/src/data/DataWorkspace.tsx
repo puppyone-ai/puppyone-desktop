@@ -35,7 +35,9 @@ import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
 import type {
   DocumentSourceKind,
   EditorInteractionPreferences,
+  MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
+  MarkdownLinkGraph,
 } from "../editor/viewerTypes";
 import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
 import { getAiEditFileForPath } from "../editor/ai-edits/diff";
@@ -71,6 +73,8 @@ export type DataWorkspaceState = {
   fileUrl: string | null;
   fileUrlLoading: boolean;
   fileUrlError: string | null;
+  markdownLinkGraph: MarkdownLinkGraph;
+  markdownAssetUrlResolver: MarkdownAssetUrlResolver;
 };
 
 type MoveOperation = {
@@ -114,6 +118,7 @@ export type DataWorkspaceProps = {
   collapsedExplorerWidth?: number;
   explorerCollapseThreshold?: number;
   mainSlot?: DataWorkspaceSlot;
+  loadActiveFileSource?: boolean;
   emptySlot?: ReactNode;
   showPreviewHeader?: boolean;
   hidePreviewSourceView?: boolean;
@@ -199,6 +204,7 @@ export function DataWorkspace({
   collapsedExplorerWidth = COLLAPSED_EXPLORER_WIDTH,
   explorerCollapseThreshold,
   mainSlot,
+  loadActiveFileSource = true,
   emptySlot,
   showPreviewHeader = true,
   hidePreviewSourceView = false,
@@ -502,8 +508,14 @@ export function DataWorkspace({
       }).viewer
     : null, [documentSourceKind, resolvedDocumentSourceKind, selectedFile]);
   const selectedFileSourceRequirement = selectedFile ? getEditorSourceRequirement(selectedFile) : "none";
-  const selectedFileNeedsFullContent = Boolean(selectedFile && dataPort.readFile && shouldReadEditorContent(selectedFile));
+  const selectedFileNeedsFullContent = Boolean(
+    loadActiveFileSource
+    && selectedFile
+    && dataPort.readFile
+    && shouldReadEditorContent(selectedFile),
+  );
   const selectedFileNeedsResourceUrl = Boolean(
+    loadActiveFileSource &&
     selectedFile &&
     dataPort.getFileUrl &&
     (selectedFileSourceRequirement === "resource" || selectedFileSourceRequirement === "content-and-resource"),
@@ -863,6 +875,8 @@ export function DataWorkspace({
     fileUrl: selectedFileUrl,
     fileUrlLoading: selectedFileUrlLoading,
     fileUrlError: selectedFileUrlError,
+    markdownLinkGraph,
+    markdownAssetUrlResolver,
   };
   const previewAccessory = renderWorkspaceSlot(previewAccessorySlot, workspaceState);
 
@@ -874,7 +888,7 @@ export function DataWorkspace({
   }, [resolvedActivePath]);
 
   useEffect(() => {
-    if (!selectedFile) {
+    if (!loadActiveFileSource || !selectedFile) {
       fileOpenCoordinatorRef.current?.cancelCurrent();
       setFileContent(null);
       setFileError(null);
@@ -934,7 +948,7 @@ export function DataWorkspace({
     return () => {
       request.cancel();
     };
-  }, [dataPort, refreshKey, selectedFile]);
+  }, [dataPort, loadActiveFileSource, refreshKey, selectedFile]);
 
   useEffect(() => {
     if (!selectedFile || !selectedFileNeedsResourceUrl || !dataPort.getFileUrl) {

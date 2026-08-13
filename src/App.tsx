@@ -93,7 +93,6 @@ import {
   useTypographyRuntime,
 } from "./features/typography";
 import { useDesktopEditorGroup } from "./features/editor-workbench/useDesktopEditorGroup";
-import { DesktopEditorTabs } from "./features/editor-workbench/DesktopEditorTabs";
 
 const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMinimalModeDock").then((module) => ({
   default: module.DesktopMinimalModeDock,
@@ -621,10 +620,6 @@ function AppContent() {
     if (path && node?.type !== "folder") editorGroup.open(path, node);
     setActiveDataNode(node);
   }, [editorGroup]);
-  const handleEditorActivate = useCallback((editorId: string) => {
-    editorGroup.activate(editorId);
-    setDocumentNavigationError(null);
-  }, [editorGroup]);
   const handleEditorClose = useCallback(async (editorId: string) => {
     try {
       await closeDocumentWorkingCopy(editorId);
@@ -644,6 +639,11 @@ function AppContent() {
         void handleEditorClose(editorGroup.activePath);
         return;
       }
+      if (platformModifier && !event.altKey && event.key === "\\") {
+        event.preventDefault();
+        editorGroup.splitPane(editorGroup.activePaneId, "horizontal");
+        return;
+      }
       if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === "Tab") {
         event.preventDefault();
         const currentIndex = editorGroup.state.editors.findIndex(({ id }) => id === editorGroup.activePath);
@@ -651,15 +651,6 @@ function AppContent() {
         const nextIndex = (currentIndex + offset + editorGroup.state.editors.length) % editorGroup.state.editors.length;
         editorGroup.activate(editorGroup.state.editors[nextIndex]!.id);
         return;
-      }
-      if (platformModifier && !event.altKey && !event.shiftKey && /^[1-9]$/.test(event.key)) {
-        const requestedIndex = Number(event.key) - 1;
-        const editor = event.key === "9"
-          ? editorGroup.state.editors.at(-1)
-          : editorGroup.state.editors[requestedIndex];
-        if (!editor) return;
-        event.preventDefault();
-        editorGroup.activate(editor.id);
       }
     };
     window.addEventListener("keydown", handleEditorShortcut, true);
@@ -900,26 +891,13 @@ function AppContent() {
     />
   );
 
-  const titlebarEditorSlot = (
-    <DesktopEditorTabs
-      editors={editorGroup.state.editors}
-      activeEditorId={editorGroup.activePath}
-      connectedToEditor={!minimalMode && activeView === "data"}
-      fileIconTheme={fileIconTheme}
-      workingCopyStatuses={workingCopyStatuses}
-      onActivate={(editorId) => {
-        handleEditorActivate(editorId);
-        navigateDesktopView("data");
-      }}
-      onClose={(editorId) => { void handleEditorClose(editorId); }}
-    />
-  );
-
   const titlebarActions = (
     <DesktopTitlebarActions
       editorFindCommand={editorFindCommand}
       canOpenActiveFileExternal={activeExternalOpen.canOpen}
-      csvViewSettings={activeView === "data" && editorChromeContribution?.kind === "csv-view-settings"
+      csvViewSettings={activeView === "data"
+        && editorChromeContribution?.kind === "csv-view-settings"
+        && editorChromeContribution.documentId === editorGroup.activePath
         ? editorChromeContribution
         : null}
       desktopUpdateState={desktopUpdates.state}
@@ -976,10 +954,7 @@ function AppContent() {
         cloudHubEnabled={cloudEnabled}
         contextMenuOpen={switcherOpen || branchSwitcherOpen}
         contextSlot={(
-          <>
-            {titlebarSidebarSlot}
-            {titlebarEditorSlot}
-          </>
+          titlebarSidebarSlot
         )}
         pluginsEnabled={
           experimentalSettings.enableViewerPlugins
@@ -1016,7 +991,6 @@ function AppContent() {
           minimalMode={minimalMode}
           minimalModeDock={minimalModeDock}
           titlebarSidebarSlot={titlebarSidebarSlot}
-          titlebarEditorSlot={titlebarEditorSlot}
           titlebarActions={titlebarActions}
           rightSidebarOpen={rightSidebarOpen && desktopRightSidebarEnabled}
           resizableRightSidebar
@@ -1098,10 +1072,12 @@ function AppContent() {
             onStartPuppyoneBackup: handleStartPuppyoneBackup,
           }}
           dataPort={dataPort}
+          editorWorkbench={editorGroup}
           desktopUpdates={desktopUpdates}
           git={git}
           minimalMode={minimalMode}
           onActiveDataNodeChange={handleActiveDataNodeChange}
+          onCloseEditor={(editorId) => { void handleEditorClose(editorId); }}
           onActiveDataPathChange={handleActiveDataPathChange}
           onResourceMove={handleResourceMoved}
           onCreateEntryMenu={openCreateEntryMenu}
@@ -1124,6 +1100,7 @@ function AppContent() {
           workspaceSurfaceError={documentNavigationError ?? workspaceSurfaceError}
           workspaceKey={workspaceKey}
           workspaceRefreshToken={workspaceRefreshToken}
+          workingCopyStatuses={workingCopyStatuses}
           sidebarCreateMenuOpen={Boolean(
             createEntryDraft
             && !createEntryDraft.selectedKind

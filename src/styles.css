@@ -5,7 +5,8 @@
 @import "./styles/shell.css";
 @import "./styles/window-chrome.css";
 @import "./styles/titlebar.css";
-@import "./features/editor-workbench/desktop-editor-tabs.css";
+@import "./features/app-shell/header-editor-columns.css";
+@import "./features/editor-workbench/desktop-editor-split-view.css";
 @import "./styles/minimal-mode.css";
 @import "./styles/dialogs.css";
 @import "./styles/layout.css";

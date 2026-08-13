@@ -6,6 +6,7 @@ import {
   DataWorkspace,
   type AiEditRequest,
   type DataNode,
+  type DocumentSessionStatus,
   type EditorInteractionPreferences,
   type Workspace,
 } from "@puppyone/shared-ui";
@@ -29,6 +30,7 @@ import {
 } from "./workspace-surfaces";
 import { useDesktopViewerPacks } from "../viewer-packs/host";
 import { DesktopDataWorkspaceSurface } from "./DesktopDataWorkspaceSurface";
+import type { DesktopEditorGroupController } from "../editor-workbench/useDesktopEditorGroup";
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopWorkspaceContentProps = {
@@ -37,6 +39,7 @@ type DesktopWorkspaceContentProps = {
   activeView: DesktopView;
   cloud: DesktopWorkspaceCloudSurfaceController;
   dataPort: DataWorkspacePort | null;
+  editorWorkbench: DesktopEditorGroupController;
   fileClipboardController: FileClipboardController;
   desktopUpdates: DesktopUpdatesController;
   git: DesktopGitController;
@@ -46,6 +49,7 @@ type DesktopWorkspaceContentProps = {
     node?: DataNode | null,
   ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
+  onCloseEditor: (editorId: string) => void;
   onResourceMove: (previousPath: string, nextPath: string) => void | Promise<void>;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onDismissCreateEntryMenu: () => void;
@@ -66,6 +70,7 @@ type DesktopWorkspaceContentProps = {
   workspaceSurfaceError?: string | null;
   workspaceKey: string;
   workspaceRefreshToken: number;
+  workingCopyStatuses: ReadonlyMap<string, DocumentSessionStatus>;
   sidebarCreateMenuOpen: boolean;
 };
 
@@ -75,12 +80,14 @@ export function DesktopWorkspaceContent({
   activeView,
   cloud,
   dataPort,
+  editorWorkbench,
   fileClipboardController,
   desktopUpdates,
   git,
   minimalMode = false,
   onActiveDataPathChange,
   onActiveDataNodeChange,
+  onCloseEditor,
   onResourceMove,
   onCreateEntryMenu,
   onDismissCreateEntryMenu,
@@ -101,6 +108,7 @@ export function DesktopWorkspaceContent({
   workspaceSurfaceError = null,
   workspaceKey,
   workspaceRefreshToken,
+  workingCopyStatuses,
   sidebarCreateMenuOpen,
 }: DesktopWorkspaceContentProps) {
   const { t } = useLocalization();
@@ -168,6 +176,7 @@ export function DesktopWorkspaceContent({
       activeAiEditRequest={activeAiEditRequest}
       activeDataPath={activeDataPath}
       dataPort={dataPort}
+      editorWorkbench={editorWorkbench}
       editorInteractionPreferences={editorInteractionPreferences}
       fileClipboardController={fileClipboardController}
       fileOperationNotice={fileOperationNotice}
@@ -186,6 +195,7 @@ export function DesktopWorkspaceContent({
         onOpenSettings,
       }}
       onActiveDataNodeChange={onActiveDataNodeChange}
+      onCloseEditor={onCloseEditor}
       onActiveDataPathChange={onActiveDataPathChange}
       onResourceMove={onResourceMove}
       onCreateEntryMenu={onCreateEntryMenu}
@@ -198,6 +208,7 @@ export function DesktopWorkspaceContent({
       workspaceKey={workspaceKey}
       workspaceRefreshToken={workspaceRefreshToken}
       workspaceSurfaceError={workspaceSurfaceError}
+      workingCopyStatuses={workingCopyStatuses}
       sidebarCreateMenuOpen={sidebarCreateMenuOpen}
     />
   );

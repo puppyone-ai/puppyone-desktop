@@ -1,0 +1,178 @@
+.desktop-editor-split-view {
+  --desktop-editor-pane-bar-height: 31px;
+  --desktop-editor-splitter-size: var(--po-pane-resizer-hit-size, 8px);
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--po-canvas);
+}
+
+.desktop-editor-split {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desktop-editor-pane {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--po-canvas);
+}
+
+.desktop-editor-pane-bar {
+  display: flex;
+  box-sizing: border-box;
+  height: var(--desktop-editor-pane-bar-height);
+  min-height: var(--desktop-editor-pane-bar-height);
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 5px 0 10px;
+  border-bottom: 1px solid var(--po-divider);
+  background: color-mix(in srgb, var(--po-canvas) 92%, var(--po-panel));
+  color: var(--po-text-muted);
+}
+
+.desktop-editor-pane[data-active="true"] .desktop-editor-pane-bar {
+  box-shadow: inset 0 -1px color-mix(in srgb, var(--po-accent) 32%, var(--po-divider));
+  color: var(--po-text);
+}
+
+.desktop-editor-pane-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--po-font-size-chrome, 13px);
+  font-weight: var(--po-font-weight-chrome, 500);
+  line-height: 18px;
+}
+
+.desktop-editor-pane-identity > svg {
+  flex: 0 0 auto;
+}
+
+.desktop-editor-pane-identity > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-editor-pane-dirty {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.desktop-editor-pane-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.desktop-editor-pane[data-active="true"] .desktop-editor-pane-actions,
+.desktop-editor-pane:hover .desktop-editor-pane-actions,
+.desktop-editor-pane-actions:focus-within {
+  opacity: 1;
+}
+
+.desktop-editor-pane-action {
+  appearance: none;
+  display: inline-grid;
+  width: 23px;
+  height: 23px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  outline: 0;
+}
+
+.desktop-editor-pane-action:hover,
+.desktop-editor-pane-action:focus-visible {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-editor-pane-action:disabled {
+  opacity: 0.35;
+}
+
+.desktop-editor-pane-content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desktop-editor-pane-content > .document-surface-host {
+  flex: 1;
+}
+
+.desktop-editor-splitter {
+  position: relative;
+  z-index: 5;
+  min-width: 0;
+  min-height: 0;
+  background: var(--po-canvas);
+  outline: 0;
+  touch-action: none;
+}
+
+.desktop-editor-splitter::after {
+  position: absolute;
+  background: var(--po-divider);
+  content: "";
+  pointer-events: none;
+}
+
+.desktop-editor-splitter[data-direction="horizontal"] {
+  cursor: col-resize;
+}
+
+.desktop-editor-splitter[data-direction="horizontal"]::after {
+  inset-block: 0;
+  inset-inline-start: calc(50% - 0.5px);
+  width: 1px;
+}
+
+.desktop-editor-splitter[data-direction="vertical"] {
+  cursor: row-resize;
+}
+
+.desktop-editor-splitter[data-direction="vertical"]::after {
+  inset-block-start: calc(50% - 0.5px);
+  inset-inline: 0;
+  height: 1px;
+}
+
+.desktop-editor-splitter:hover::after,
+.desktop-editor-splitter:focus-visible::after,
+.desktop-editor-splitter[data-resizing="true"]::after {
+  background: color-mix(in srgb, var(--po-accent) 60%, var(--po-divider));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-editor-pane-actions {
+    transition: none;
+  }
+}
