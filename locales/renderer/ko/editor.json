@@ -332,7 +332,7 @@
   "text.readNamed": "{name} 읽기",
   "panes.closeEditor": "편집기 닫기",
   "panes.closePane": "편집기 창 닫기",
-  "panes.dragToSplit": "드래그하여 편집기를 분할하고 클릭하여 창 작업 열기",
+  "panes.dragToMove": "드래그하여 편집기 창을 이동하고 클릭하여 창 작업 열기",
   "panes.empty": "빈 편집기",
   "panes.label": "{name} 편집기 창",
   "panes.resize": "편집기 창 크기 조절",

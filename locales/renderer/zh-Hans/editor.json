@@ -332,7 +332,7 @@
   "text.readNamed": "读取 {name}",
   "panes.closeEditor": "关闭编辑器",
   "panes.closePane": "关闭编辑器分屏",
-  "panes.dragToSplit": "拖动以拆分编辑器；点击打开分屏操作",
+  "panes.dragToMove": "拖动以移动编辑器分屏；点击打开分屏操作",
   "panes.empty": "空编辑器",
   "panes.label": "{name} 编辑器分屏",
   "panes.resize": "调整编辑器分屏大小",

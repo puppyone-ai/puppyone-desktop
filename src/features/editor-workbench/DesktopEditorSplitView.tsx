@@ -26,7 +26,6 @@ import {
   type DataPort,
   type DataWorkspaceState,
   type DocumentPersistedCommit,
-  type DocumentSessionStatus,
   type EditorGroupState,
   type EditorInteractionPreferences,
   type EditorPaneLayoutLeaf,
@@ -41,6 +40,12 @@ import {
   type Workspace,
 } from "@puppyone/shared-ui";
 import { setNativeSurfacePointerPassthrough } from "../native-surfaces";
+import {
+  useEditorFileDrop,
+  usePaneMoveDrag,
+  type EditorFileDropController,
+  type PaneMoveDragController,
+} from "./useEditorWorkbenchDragAndDrop";
 
 type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 
@@ -54,16 +59,22 @@ export type DesktopEditorSplitViewProps = Readonly<{
   refreshKey?: unknown;
   state: DataWorkspaceState;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
-  workingCopyStatuses?: ReadonlyMap<string, DocumentSessionStatus>;
   workspace: Workspace;
-  onCloseEditor: (editorId: string) => void;
   onClosePane: (paneId: string) => void;
   onFocusPane: (paneId: string) => void;
   onResizeSplit: (splitId: string, ratio: number) => void;
-  onSplitPane: (
-    paneId: string,
+  onMovePane: (
+    sourcePaneId: string,
+    targetPaneId: string,
     direction: EditorSplitDirection,
-    options?: EditorPaneSplitOptions,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
+  ) => void;
+  onOpenAtPaneEdge: (
+    path: string,
+    label: string,
+    targetPaneId: string,
+    direction: EditorSplitDirection,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
   ) => void;
 }>;
 
@@ -78,18 +89,19 @@ export function DesktopEditorSplitView({
   state,
   viewerExtensionAdapter = null,
   workspace,
-  onCloseEditor,
   onClosePane,
   onFocusPane,
+  onMovePane,
+  onOpenAtPaneEdge,
   onResizeSplit,
-  onSplitPane,
 }: DesktopEditorSplitViewProps) {
   const editorById = useMemo(
     () => new Map(editorGroup.editors.map((editor) => [editor.id, editor])),
     [editorGroup.editors],
   );
   const paneCount = getEditorPanes(layout).length;
-  const splitDrag = useSplitPaneDrag(onSplitPane);
+  const paneMove = usePaneMoveDrag(onMovePane);
+  const fileDrop = useEditorFileDrop(workspace.id, onOpenAtPaneEdge);
 
   return (
     <div className="desktop-editor-split-view" data-pane-count={paneCount}>
@@ -105,13 +117,14 @@ export function DesktopEditorSplitView({
         refreshKey={refreshKey}
         state={state}
         viewerExtensionAdapter={viewerExtensionAdapter}
-        splitDrag={splitDrag}
+        fileDrop={fileDrop}
+        paneMove={paneMove}
         workspace={workspace}
-        onCloseEditor={onCloseEditor}
         onClosePane={onClosePane}
         onFocusPane={onFocusPane}
+        onMovePane={onMovePane}
+        onOpenAtPaneEdge={onOpenAtPaneEdge}
         onResizeSplit={onResizeSplit}
-        onSplitPane={onSplitPane}
       />
     </div>
   );
@@ -122,7 +135,8 @@ type EditorLayoutNodeProps = Omit<DesktopEditorSplitViewProps, "editorGroup" | "
   editorById: ReadonlyMap<string, EditorGroupState["editors"][number]>;
   node: EditorPaneLayoutNode;
   paneCount: number;
-  splitDrag: SplitPaneDragController;
+  fileDrop: EditorFileDropController;
+  paneMove: PaneMoveDragController;
 }>;
 
 function EditorLayoutNode(props: EditorLayoutNodeProps): ReactNode {
@@ -164,26 +178,29 @@ function EditorPane({
   editorById,
   editorInteractionPreferences,
   fileIconTheme,
+  fileDrop,
   pane,
   paneCount,
+  paneMove,
   refreshKey,
   state,
   viewerExtensionAdapter,
   workspace,
-  onCloseEditor,
   onClosePane,
   onFocusPane,
-  onSplitPane,
-  splitDrag,
 }: EditorLayoutNodeProps & { pane: EditorPaneLayoutLeaf }) {
   const { t } = useLocalization();
   const [actionsOpen, setActionsOpen] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
   const active = pane.id === activePaneId;
   const editor = pane.editorId ? editorById.get(pane.editorId) ?? null : null;
-  const dropEdge = splitDrag.dropIntent?.targetPaneId === pane.id
-    ? splitDrag.dropIntent.edge
+  const paneMoveEdge = paneMove.dropIntent?.targetPaneId === pane.id
+    ? paneMove.dropIntent.edge
     : null;
+  const fileDropEdge = fileDrop.dropIntent?.targetPaneId === pane.id
+    ? fileDrop.dropIntent.edge
+    : null;
+  const dropEdge = fileDropEdge ?? paneMoveEdge;
 
   useEffect(() => {
     if (!actionsOpen) return undefined;
@@ -194,12 +211,6 @@ function EditorPane({
     return () => document.removeEventListener("pointerdown", close);
   }, [actionsOpen]);
 
-  const splitAt = (edge: SplitDropEdge) => {
-    const { direction, placement } = splitDefinitionForEdge(edge);
-    onSplitPane(pane.id, direction, { editorId: pane.editorId, placement });
-    setActionsOpen(false);
-  };
-
   return (
     <section
       className="desktop-editor-pane"
@@ -207,54 +218,52 @@ function EditorPane({
       data-active={active ? "true" : undefined}
       data-empty={editor ? undefined : "true"}
       data-drop-target={dropEdge ?? undefined}
+      data-drop-kind={fileDropEdge ? "file" : paneMoveEdge ? "pane" : undefined}
       aria-label={editor
         ? t("editor.panes.label", { name: editor.label })
         : t("editor.panes.empty")}
       onPointerDownCapture={() => {
         if (!active) onFocusPane(pane.id);
       }}
+      onDragEnterCapture={(event) => fileDrop.over(event, pane.id)}
+      onDragOverCapture={(event) => fileDrop.over(event, pane.id)}
+      onDragLeaveCapture={(event) => fileDrop.leave(event, pane.id)}
+      onDropCapture={(event) => fileDrop.drop(event, pane.id)}
     >
-      <div className="desktop-editor-pane-handle-shell" ref={actionsRef}>
+      {paneCount > 1 && <div className="desktop-editor-pane-handle-shell" ref={actionsRef}>
         <button
           className="desktop-editor-pane-handle"
           type="button"
-          aria-label={t("editor.panes.dragToSplit")}
+          aria-label={t("editor.panes.dragToMove")}
           aria-haspopup="menu"
           aria-expanded={actionsOpen}
-          title={t("editor.panes.dragToSplit")}
+          title={t("editor.panes.dragToMove")}
           onClick={() => {
-            if (!splitDrag.consumeDraggedClick()) setActionsOpen((open) => !open);
+            if (!paneMove.consumeDraggedClick()) setActionsOpen((open) => !open);
           }}
           onPointerDown={(event) => {
             if (event.button !== 0) return;
             setActionsOpen(false);
-            splitDrag.start(event, pane);
+            paneMove.start(event, pane);
           }}
-          onPointerMove={splitDrag.move}
-          onPointerUp={splitDrag.end}
-          onPointerCancel={splitDrag.cancel}
+          onPointerMove={paneMove.move}
+          onPointerUp={paneMove.end}
+          onPointerCancel={paneMove.cancel}
         >
           <i /><i /><i />
         </button>
         {actionsOpen && (
           <div className="desktop-editor-pane-menu" role="menu">
-            <PaneMenuAction label={t("editor.panes.splitLeft")} onClick={() => splitAt("left")} />
-            <PaneMenuAction label={t("editor.panes.splitRight")} onClick={() => splitAt("right")} />
-            <PaneMenuAction label={t("editor.panes.splitUp")} onClick={() => splitAt("top")} />
-            <PaneMenuAction label={t("editor.panes.splitDown")} onClick={() => splitAt("bottom")} />
-            <span className="desktop-editor-pane-menu-divider" role="separator" />
             <PaneMenuAction
-              label={paneCount > 1 ? t("editor.panes.closePane") : t("editor.panes.closeEditor")}
-              disabled={!editor && paneCount === 1}
+              label={t("editor.panes.closePane")}
               onClick={() => {
-                if (paneCount > 1) onClosePane(pane.id);
-                else if (editor) onCloseEditor(editor.id);
+                onClosePane(pane.id);
                 setActionsOpen(false);
               }}
             />
           </div>
         )}
-      </div>
+      </div>}
       <div className="desktop-editor-pane-content">
         <EditorPaneDocument
           active={active}
@@ -275,11 +284,9 @@ function EditorPane({
 }
 
 function PaneMenuAction({
-  disabled = false,
   label,
   onClick,
 }: Readonly<{
-  disabled?: boolean;
   label: string;
   onClick: () => void;
 }>) {
@@ -289,180 +296,11 @@ function PaneMenuAction({
       role="menuitem"
       type="button"
       aria-label={label}
-      disabled={disabled}
       onClick={onClick}
     >
       {label}
     </button>
   );
-}
-
-type SplitDropEdge = "left" | "right" | "top" | "bottom";
-
-type SplitDropIntent = Readonly<{
-  targetPaneId: string;
-  edge: SplitDropEdge;
-}>;
-
-type SplitPaneDragController = Readonly<{
-  dropIntent: SplitDropIntent | null;
-  start: (event: PointerEvent<HTMLButtonElement>, pane: EditorPaneLayoutLeaf) => void;
-  move: (event: PointerEvent<HTMLButtonElement>) => void;
-  end: (event: PointerEvent<HTMLButtonElement>) => void;
-  cancel: (event: PointerEvent<HTMLButtonElement>) => void;
-  consumeDraggedClick: () => boolean;
-}>;
-
-type SplitDragSession = {
-  handle: HTMLButtonElement;
-  sourceEditorId: string | null;
-  originX: number;
-  originY: number;
-  pointerId: number;
-  dragging: boolean;
-};
-
-const SPLIT_DRAG_THRESHOLD_PX = 5;
-
-function useSplitPaneDrag(
-  onSplitPane: DesktopEditorSplitViewProps["onSplitPane"],
-): SplitPaneDragController {
-  const [dropIntent, setDropIntent] = useState<SplitDropIntent | null>(null);
-  const sessionRef = useRef<SplitDragSession | null>(null);
-  const dropIntentRef = useRef<SplitDropIntent | null>(null);
-  const draggedClickRef = useRef(false);
-
-  const publishDropIntent = useCallback((intent: SplitDropIntent | null) => {
-    dropIntentRef.current = intent;
-    setDropIntent(intent);
-  }, []);
-
-  const finishGesture = useCallback(() => {
-    const session = sessionRef.current;
-    if (!session) return;
-    if (session.handle.hasPointerCapture(session.pointerId)) {
-      session.handle.releasePointerCapture(session.pointerId);
-    }
-    sessionRef.current = null;
-    publishDropIntent(null);
-    document.body.classList.remove("desktop-editor-pane-dragging");
-    setNativeSurfacePointerPassthrough(false);
-  }, [publishDropIntent]);
-
-  useEffect(() => {
-    const cancelOnEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape" || !sessionRef.current) return;
-      draggedClickRef.current = sessionRef.current.dragging;
-      finishGesture();
-    };
-    window.addEventListener("keydown", cancelOnEscape, true);
-    return () => {
-      window.removeEventListener("keydown", cancelOnEscape, true);
-      finishGesture();
-    };
-  }, [finishGesture]);
-
-  const start = useCallback((
-    event: PointerEvent<HTMLButtonElement>,
-    pane: EditorPaneLayoutLeaf,
-  ) => {
-    if (sessionRef.current) finishGesture();
-    draggedClickRef.current = false;
-    sessionRef.current = {
-      handle: event.currentTarget,
-      sourceEditorId: pane.editorId,
-      originX: event.clientX,
-      originY: event.clientY,
-      pointerId: event.pointerId,
-      dragging: false,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-    document.body.classList.add("desktop-editor-pane-dragging");
-    setNativeSurfacePointerPassthrough(true);
-  }, [finishGesture]);
-
-  const move = useCallback((event: PointerEvent<HTMLButtonElement>) => {
-    const session = sessionRef.current;
-    if (!session || session.pointerId !== event.pointerId) return;
-    const distance = Math.hypot(
-      event.clientX - session.originX,
-      event.clientY - session.originY,
-    );
-    if (!session.dragging && distance < SPLIT_DRAG_THRESHOLD_PX) return;
-    session.dragging = true;
-    draggedClickRef.current = true;
-    const element = document.elementFromPoint?.(event.clientX, event.clientY);
-    const target = element?.closest<HTMLElement>("[data-editor-pane-id]");
-    if (!target) {
-      publishDropIntent(null);
-      return;
-    }
-    publishDropIntent({
-      targetPaneId: target.dataset.editorPaneId!,
-      edge: closestSplitEdge(target.getBoundingClientRect(), event.clientX, event.clientY),
-    });
-  }, [publishDropIntent]);
-
-  const end = useCallback((event: PointerEvent<HTMLButtonElement>) => {
-    const session = sessionRef.current;
-    if (!session || session.pointerId !== event.pointerId) return;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    const intent = dropIntentRef.current;
-    if (session.dragging && intent) {
-      const { direction, placement } = splitDefinitionForEdge(intent.edge);
-      onSplitPane(intent.targetPaneId, direction, {
-        editorId: session.sourceEditorId,
-        placement,
-      });
-    }
-    finishGesture();
-  }, [finishGesture, onSplitPane]);
-
-  const cancel = useCallback((event: PointerEvent<HTMLButtonElement>) => {
-    const session = sessionRef.current;
-    if (!session || session.pointerId !== event.pointerId) return;
-    draggedClickRef.current = session.dragging;
-    finishGesture();
-  }, [finishGesture]);
-
-  const consumeDraggedClick = useCallback(() => {
-    const dragged = draggedClickRef.current;
-    draggedClickRef.current = false;
-    return dragged;
-  }, []);
-
-  return useMemo(() => ({
-    dropIntent,
-    start,
-    move,
-    end,
-    cancel,
-    consumeDraggedClick,
-  }), [cancel, consumeDraggedClick, dropIntent, end, move, start]);
-}
-
-function closestSplitEdge(rect: DOMRect, x: number, y: number): SplitDropEdge {
-  const distances: ReadonlyArray<readonly [SplitDropEdge, number]> = [
-    ["left", Math.abs(x - rect.left) / Math.max(1, rect.width)],
-    ["right", Math.abs(rect.right - x) / Math.max(1, rect.width)],
-    ["top", Math.abs(y - rect.top) / Math.max(1, rect.height)],
-    ["bottom", Math.abs(rect.bottom - y) / Math.max(1, rect.height)],
-  ];
-  return distances.reduce((closest, candidate) => (
-    candidate[1] < closest[1] ? candidate : closest
-  ))[0];
-}
-
-function splitDefinitionForEdge(edge: SplitDropEdge): {
-  direction: EditorSplitDirection;
-  placement: NonNullable<EditorPaneSplitOptions["placement"]>;
-} {
-  if (edge === "left") return { direction: "horizontal", placement: "first" };
-  if (edge === "right") return { direction: "horizontal", placement: "second" };
-  if (edge === "top") return { direction: "vertical", placement: "first" };
-  return { direction: "vertical", placement: "second" };
 }
 
 function EditorPaneDocument({

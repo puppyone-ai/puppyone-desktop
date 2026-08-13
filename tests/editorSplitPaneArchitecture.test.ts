@@ -10,6 +10,10 @@ const splitSource = readFileSync(
   new URL("../src/features/editor-workbench/DesktopEditorSplitView.tsx", import.meta.url),
   "utf8",
 );
+const dragSource = readFileSync(
+  new URL("../src/features/editor-workbench/useEditorWorkbenchDragAndDrop.ts", import.meta.url),
+  "utf8",
+);
 const splitStyles = readFileSync(
   new URL("../src/features/editor-workbench/desktop-editor-split-view.css", import.meta.url),
   "utf8",
@@ -34,8 +38,14 @@ describe("editor split-pane architecture", () => {
     expect(splitSource).toContain('data-direction={split.direction}');
     expect(splitSource).toContain('role="separator"');
     expect(splitSource).toContain('className="desktop-editor-pane-handle"');
-    expect(splitSource).toContain("closestSplitEdge");
+    expect(splitSource).toContain("onOpenAtPaneEdge");
+    expect(splitSource).toContain("onMovePane");
+    expect(splitSource).not.toContain("onSplitPane");
     expect(splitSource).toContain('className="desktop-editor-drop-preview"');
+    expect(dragSource).toContain("closestSplitEdge");
+    expect(dragSource).toContain("parseExplorerReferenceDrag");
+    expect(dragSource).toContain("onOpenAtPaneEdge");
+    expect(dragSource).toContain("onMovePane");
   });
 
   it("fills the editor region and uses overlay handles with dedicated resize lanes", () => {
@@ -48,10 +58,8 @@ describe("editor split-pane architecture", () => {
     expect(splitStyles).not.toContain("tablist");
   });
 
-  it("keeps the Header/body divider on the same border-inclusive pixel", () => {
-    expect(headerStyles).toContain(
-      "inset-inline-start: calc(var(--desktop-titlebar-sidebar-width) - 1px);",
-    );
-    expect(headerStyles).not.toContain("transition: inset-inline-start");
+  it("does not project the Sidebar divider through the Header", () => {
+    expect(headerStyles).not.toContain(".desktop-titlebar::before");
+    expect(headerStyles).not.toContain("--desktop-titlebar-sidebar-width) - 1px");
   });
 });

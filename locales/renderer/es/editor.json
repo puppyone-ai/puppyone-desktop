@@ -332,7 +332,7 @@
   "text.readNamed": "Leer {name}",
   "panes.closeEditor": "Cerrar editor",
   "panes.closePane": "Cerrar panel del editor",
-  "panes.dragToSplit": "Arrastra para dividir el editor; haz clic para ver las acciones del panel",
+  "panes.dragToMove": "Arrastra para mover el panel del editor; haz clic para ver sus acciones",
   "panes.empty": "Editor vacío",
   "panes.label": "Panel de editor de {name}",
   "panes.resize": "Cambiar el tamaño de los paneles del editor",

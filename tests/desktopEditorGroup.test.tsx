@@ -72,11 +72,17 @@ describe("useDesktopEditorGroup", () => {
     await act(async () => {
       const controller = snapshots.at(-1)!;
       controller.open("a.md");
-      controller.splitPane(controller.activePaneId, "horizontal");
       await Promise.resolve();
     });
     await act(async () => {
-      snapshots.at(-1)!.open("b.md");
+      const controller = snapshots.at(-1)!;
+      controller.openAtPaneEdge(
+        "b.md",
+        "b.md",
+        controller.activePaneId,
+        "horizontal",
+        "second",
+      );
       await Promise.resolve();
     });
 
@@ -91,6 +97,83 @@ describe("useDesktopEditorGroup", () => {
         first: { editorId: "a.md" },
         second: { editorId: "b.md" },
       },
+    });
+  });
+
+  it("focuses an already visible file instead of splitting it into a duplicate pane", async () => {
+    const workspace: Workspace = {
+      id: "workspace-id",
+      name: "Workspace",
+      path: "/workspace",
+      status: "recording",
+    };
+    const snapshots: DesktopEditorGroupController[] = [];
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(<Probe workspace={workspace} onChange={(controller) => snapshots.push(controller)} />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      snapshots.at(-1)!.open("a.md");
+      await Promise.resolve();
+    });
+    await act(async () => {
+      const controller = snapshots.at(-1)!;
+      controller.openAtPaneEdge(
+        "a.md",
+        "a.md",
+        controller.activePaneId,
+        "horizontal",
+        "second",
+      );
+      await Promise.resolve();
+    });
+
+    expect(snapshots.at(-1)!.paneLayout.root).toMatchObject({
+      kind: "pane",
+      editorId: "a.md",
+    });
+  });
+
+  it("focuses an already visible pane when Explorer opens its file again", async () => {
+    const workspace: Workspace = {
+      id: "workspace-id",
+      name: "Workspace",
+      path: "/workspace",
+      status: "recording",
+    };
+    const snapshots: DesktopEditorGroupController[] = [];
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(<Probe workspace={workspace} onChange={(controller) => snapshots.push(controller)} />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      snapshots.at(-1)!.open("a.md");
+      await Promise.resolve();
+    });
+    await act(async () => {
+      const controller = snapshots.at(-1)!;
+      controller.openAtPaneEdge("b.md", "b.md", controller.activePaneId, "horizontal", "second");
+      await Promise.resolve();
+    });
+    await act(async () => {
+      snapshots.at(-1)!.open("a.md");
+      await Promise.resolve();
+    });
+
+    const controller = snapshots.at(-1)!;
+    expect(controller.activePaneId).toBe("editor-pane-1");
+    expect(controller.paneLayout.root).toMatchObject({
+      kind: "split",
+      first: { editorId: "a.md" },
+      second: { editorId: "b.md" },
     });
   });
 });

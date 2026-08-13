@@ -332,7 +332,7 @@
   "text.readNamed": "{name} を読む",
   "panes.closeEditor": "エディターを閉じる",
   "panes.closePane": "エディターペインを閉じる",
-  "panes.dragToSplit": "ドラッグしてエディターを分割、クリックしてペイン操作を表示",
+  "panes.dragToMove": "ドラッグしてエディターペインを移動、クリックしてペイン操作を表示",
   "panes.empty": "空のエディター",
   "panes.label": "{name} エディターペイン",
   "panes.resize": "エディターペインのサイズを変更",

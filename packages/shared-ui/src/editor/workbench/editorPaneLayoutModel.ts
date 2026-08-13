@@ -100,6 +100,33 @@ export function splitEditorPane(
   return freezeLayout(root, nextPaneId);
 }
 
+export function moveEditorPane(
+  state: EditorPaneLayoutState,
+  sourcePaneId: string,
+  targetPaneId: string,
+  direction: EditorSplitDirection,
+  placement: EditorSplitPlacement = "second",
+): EditorPaneLayoutState {
+  if (sourcePaneId === targetPaneId || state.root.kind === "pane") return state;
+  const source = findPane(state.root, sourcePaneId);
+  const target = findPane(state.root, targetPaneId);
+  if (!source || !target) return state;
+
+  const collapsed = collapsePane(state.root, sourcePaneId);
+  if (!collapsed.removed || !findPane(collapsed.node, targetPaneId)) return state;
+  const nextSplitId = `editor-split-${nextNumericId(state.root, "editor-split-")}`;
+  const sourceFirst = placement === "first";
+  const root = replaceNode(collapsed.node, targetPaneId, freezeNode({
+    kind: "split",
+    id: nextSplitId,
+    direction,
+    ratio: 0.5,
+    first: sourceFirst ? source : target,
+    second: sourceFirst ? target : source,
+  }));
+  return freezeLayout(root, sourcePaneId);
+}
+
 export function closeEditorPane(
   state: EditorPaneLayoutState,
   paneId: string,

@@ -332,7 +332,7 @@
   "text.readNamed": "Lire {name}",
   "panes.closeEditor": "Fermer l’éditeur",
   "panes.closePane": "Fermer le volet d’éditeur",
-  "panes.dragToSplit": "Faire glisser pour diviser l’éditeur ; cliquer pour les actions du volet",
+  "panes.dragToMove": "Faire glisser pour déplacer le volet d’éditeur ; cliquer pour ses actions",
   "panes.empty": "Éditeur vide",
   "panes.label": "Volet d’éditeur {name}",
   "panes.resize": "Redimensionner les volets d’éditeur",

@@ -6,17 +6,6 @@
   );
 }
 
-.desktop-shell[data-titlebar-sidebar-state="expanded"] .desktop-titlebar::before {
-  position: absolute;
-  z-index: 3;
-  inset-block: 0;
-  inset-inline-start: calc(var(--desktop-titlebar-sidebar-width) - 1px);
-  width: 1px;
-  background: var(--desktop-titlebar-divider);
-  content: "";
-  pointer-events: none;
-}
-
 .desktop-titlebar-left:has(.desktop-titlebar-sidebar-context) {
   display: flex;
   min-width: 0;

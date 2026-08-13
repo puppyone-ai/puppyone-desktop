@@ -6,7 +6,6 @@ import {
   DataWorkspace,
   type AiEditRequest,
   type DataNode,
-  type DocumentSessionStatus,
   type EditorInteractionPreferences,
   type Workspace,
 } from "@puppyone/shared-ui";
@@ -49,7 +48,6 @@ type DesktopWorkspaceContentProps = {
     node?: DataNode | null,
   ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
-  onCloseEditor: (editorId: string) => void;
   onResourceMove: (previousPath: string, nextPath: string) => void | Promise<void>;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onDismissCreateEntryMenu: () => void;
@@ -70,7 +68,6 @@ type DesktopWorkspaceContentProps = {
   workspaceSurfaceError?: string | null;
   workspaceKey: string;
   workspaceRefreshToken: number;
-  workingCopyStatuses: ReadonlyMap<string, DocumentSessionStatus>;
   sidebarCreateMenuOpen: boolean;
 };
 
@@ -87,7 +84,6 @@ export function DesktopWorkspaceContent({
   minimalMode = false,
   onActiveDataPathChange,
   onActiveDataNodeChange,
-  onCloseEditor,
   onResourceMove,
   onCreateEntryMenu,
   onDismissCreateEntryMenu,
@@ -108,7 +104,6 @@ export function DesktopWorkspaceContent({
   workspaceSurfaceError = null,
   workspaceKey,
   workspaceRefreshToken,
-  workingCopyStatuses,
   sidebarCreateMenuOpen,
 }: DesktopWorkspaceContentProps) {
   const { t } = useLocalization();
@@ -195,7 +190,6 @@ export function DesktopWorkspaceContent({
         onOpenSettings,
       }}
       onActiveDataNodeChange={onActiveDataNodeChange}
-      onCloseEditor={onCloseEditor}
       onActiveDataPathChange={onActiveDataPathChange}
       onResourceMove={onResourceMove}
       onCreateEntryMenu={onCreateEntryMenu}
@@ -208,7 +202,6 @@ export function DesktopWorkspaceContent({
       workspaceKey={workspaceKey}
       workspaceRefreshToken={workspaceRefreshToken}
       workspaceSurfaceError={workspaceSurfaceError}
-      workingCopyStatuses={workingCopyStatuses}
       sidebarCreateMenuOpen={sidebarCreateMenuOpen}
     />
   );

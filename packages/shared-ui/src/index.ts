@@ -103,6 +103,7 @@ export {
   createEditorPaneLayout,
   getActiveEditorPane,
   getEditorPanes,
+  moveEditorPane,
   parseEditorPaneLayoutState,
   rebaseEditorPaneResources,
   removeEditorFromPanes,
