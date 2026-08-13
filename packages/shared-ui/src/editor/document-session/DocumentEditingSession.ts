@@ -7,7 +7,7 @@ import type {
   EditorSourceSnapshot,
   EditorSourceSnapshotPort,
 } from "../sourceSnapshot";
-import type { EditorSaveMode } from "../viewerTypes";
+import type { EditorSaveMode } from "../registry/viewerTypes";
 import type {
   DocumentEditingSessionOptions,
   DocumentPersistedCommit,

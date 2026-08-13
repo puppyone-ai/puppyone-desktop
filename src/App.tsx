@@ -90,7 +90,7 @@ import {
   useTypographyCatalog,
   useTypographyRuntime,
 } from "./features/typography";
-import { useDesktopEditorGroup } from "./features/editor-workbench/useDesktopEditorGroup";
+import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
 
 const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMinimalModeDock").then((module) => ({
   default: module.DesktopMinimalModeDock,
@@ -211,31 +211,31 @@ function AppContent() {
   const Homepage = assetLibraryHomeEnabled ? AssetLibraryHome : MinimalOnboarding;
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("general");
   const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
-  const editorGroup = useDesktopEditorGroup(workspace);
-  const activeDataPath = editorGroup.activePath;
+  const editorWorkbench = useDesktopEditorWorkbench(workspace);
+  const activeDataPath = editorWorkbench.activePath;
   const setActiveDataPath = useCallback<Dispatch<SetStateAction<string | null>>>((update) => {
     if (typeof update !== "function") {
-      if (update) editorGroup.open(update);
-      else editorGroup.clear();
+      if (update) editorWorkbench.open(update);
+      else editorWorkbench.clear();
       return;
     }
     const nextPath = update(activeDataPath);
     if (nextPath === activeDataPath) return;
     if (activeDataPath && nextPath) {
-      editorGroup.rebaseResource(activeDataPath, nextPath);
+      editorWorkbench.rebaseResource(activeDataPath, nextPath);
       return;
     }
-    if (nextPath) editorGroup.open(nextPath);
-    else if (activeDataPath) editorGroup.closeUnderResource(activeDataPath);
-  }, [activeDataPath, editorGroup]);
+    if (nextPath) editorWorkbench.open(nextPath);
+    else if (activeDataPath) editorWorkbench.closeUnderResource(activeDataPath);
+  }, [activeDataPath, editorWorkbench]);
   const handleResourceMoved = useCallback(async (previousPath: string, nextPath: string) => {
     await closeDocumentWorkingCopiesUnderResource(previousPath);
-    editorGroup.rebaseResource(previousPath, nextPath);
-  }, [editorGroup]);
+    editorWorkbench.rebaseResource(previousPath, nextPath);
+  }, [editorWorkbench]);
   const handleResourceDeleted = useCallback(async (path: string) => {
     await closeDocumentWorkingCopiesUnderResource(path);
-    editorGroup.closeUnderResource(path);
-  }, [editorGroup]);
+    editorWorkbench.closeUnderResource(path);
+  }, [editorWorkbench]);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
   const [editorChromeContribution, setEditorChromeContribution] = useState<EditorChromeContribution | null>(null);
   const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
@@ -610,40 +610,40 @@ function AppContent() {
     const requestId = ++documentNavigationRequestRef.current;
     if (requestId !== documentNavigationRequestRef.current) return;
     setDocumentNavigationError(null);
-    if (path && node?.type !== "folder") editorGroup.open(path, node);
+    if (path && node?.type !== "folder") editorWorkbench.open(path, node);
     setActiveDataNode(node);
-  }, [editorGroup]);
+  }, [editorWorkbench]);
   const handleEditorClose = useCallback(async (editorId: string) => {
     try {
       await closeDocumentWorkingCopy(editorId);
-      editorGroup.close(editorId);
+      editorWorkbench.close(editorId);
       setDocumentNavigationError(null);
     } catch (error) {
       setDocumentNavigationError(error instanceof Error ? error.message : String(error));
     }
-  }, [editorGroup]);
+  }, [editorWorkbench]);
   useEffect(() => {
     const handleEditorShortcut = (event: KeyboardEvent) => {
-      if (activeView !== "data" || editorGroup.state.editors.length === 0) return;
+      if (activeView !== "data" || editorWorkbench.state.editors.length === 0) return;
       const platformModifier = event.metaKey || event.ctrlKey;
       if (platformModifier && !event.altKey && event.key.toLowerCase() === "w") {
-        if (!editorGroup.activePath) return;
+        if (!editorWorkbench.activePath) return;
         event.preventDefault();
-        void handleEditorClose(editorGroup.activePath);
+        void handleEditorClose(editorWorkbench.activePath);
         return;
       }
       if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === "Tab") {
         event.preventDefault();
-        const currentIndex = editorGroup.state.editors.findIndex(({ id }) => id === editorGroup.activePath);
+        const currentIndex = editorWorkbench.state.editors.findIndex(({ id }) => id === editorWorkbench.activePath);
         const offset = event.shiftKey ? -1 : 1;
-        const nextIndex = (currentIndex + offset + editorGroup.state.editors.length) % editorGroup.state.editors.length;
-        editorGroup.activate(editorGroup.state.editors[nextIndex]!.id);
+        const nextIndex = (currentIndex + offset + editorWorkbench.state.editors.length) % editorWorkbench.state.editors.length;
+        editorWorkbench.activate(editorWorkbench.state.editors[nextIndex]!.id);
         return;
       }
     };
     window.addEventListener("keydown", handleEditorShortcut, true);
     return () => window.removeEventListener("keydown", handleEditorShortcut, true);
-  }, [activeView, editorGroup, handleEditorClose]);
+  }, [activeView, editorWorkbench, handleEditorClose]);
   const handleActiveDataNodeChange = useCallback((node: DataNode | null) => {
     setActiveDataNode((current) => (
       hasSameActiveDataNodeIdentity(current, node) ? current : node
@@ -885,7 +885,7 @@ function AppContent() {
       canOpenActiveFileExternal={activeExternalOpen.canOpen}
       csvViewSettings={activeView === "data"
         && editorChromeContribution?.kind === "csv-view-settings"
-        && editorChromeContribution.documentId === editorGroup.activePath
+        && editorChromeContribution.documentId === editorWorkbench.activePath
         ? editorChromeContribution
         : null}
       desktopUpdateState={desktopUpdates.state}
@@ -1060,7 +1060,7 @@ function AppContent() {
             onStartPuppyoneBackup: handleStartPuppyoneBackup,
           }}
           dataPort={dataPort}
-          editorWorkbench={editorGroup}
+          editorWorkbench={editorWorkbench}
           desktopUpdates={desktopUpdates}
           git={git}
           minimalMode={minimalMode}

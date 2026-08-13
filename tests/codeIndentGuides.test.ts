@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getIndentGuideCharacterOffsets } from "../packages/shared-ui/src/editor/codeIndentGuides";
+import { getIndentGuideCharacterOffsets } from "../packages/shared-ui/src/editor/viewers/code/codeIndentGuides";
 
 describe("code indentation guides", () => {
   it("renders one guide for each complete indentation level", () => {

@@ -8,8 +8,8 @@ import {
   DocumentSurfaceHost,
   DocumentSurfacePending,
   DocumentSurfaceReadinessBoundary,
-} from "../packages/shared-ui/src/editor/DocumentSurfaceHost";
-import { FilePreview } from "../packages/shared-ui/src/data/FilePreview";
+} from "../packages/shared-ui/src/editor/host/DocumentSurfaceHost";
+import { FilePreview } from "../packages/shared-ui/src/editor/host/FilePreview";
 import { testT, withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })

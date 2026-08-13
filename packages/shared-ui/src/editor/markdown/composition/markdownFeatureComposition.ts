@@ -27,7 +27,7 @@ import { createMdxComponentFeature } from "../features/mdx-component/mdxComponen
 import { createTableFeature } from "../features/table/tableFeature";
 import { videoFeature } from "../features/video/videoFeature";
 import { renderMarkdownInlineFromSharedPolicy } from "./preview/markdownInlinePlanAdapter";
-import type { MarkdownDialectId } from "../../viewerTypes";
+import type { MarkdownDialectId } from "../../registry/viewerTypes";
 
 /**
  * The only built-in Markdown Feature registration point. The list is static,

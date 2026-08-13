@@ -10,18 +10,18 @@ import {
   PRESET_VIEWER_REGISTRY,
   PRESET_VIEWERS,
   resolveEditorViewer,
-} from "../packages/shared-ui/src/editor/viewerRegistry";
-import { PRESET_VIEWER_CONTRACT_VERSION } from "../packages/shared-ui/src/editor/viewerContract";
+} from "../packages/shared-ui/src/editor/registry/viewerRegistry";
+import { PRESET_VIEWER_CONTRACT_VERSION } from "../packages/shared-ui/src/editor/registry/viewerContract";
 import {
   coreViewerCapability,
   PRESET_VIEWER_MANIFEST,
-} from "../packages/shared-ui/src/editor/presetViewerManifest";
+} from "../packages/shared-ui/src/editor/registry/presetViewerManifest";
 import type {
   EditorDocument,
   EditorViewerMatch,
   PresetViewerContribution,
   PresetViewerImplementation,
-} from "../packages/shared-ui/src/editor/viewerTypes";
+} from "../packages/shared-ui/src/editor/registry/viewerTypes";
 
 function document(name: string, type = "file", mimeType: string | null = null): EditorDocument {
   return { path: name, name, type, mimeType };

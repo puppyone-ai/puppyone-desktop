@@ -29,7 +29,7 @@ import {
 } from "./workspace-surfaces";
 import { useDesktopViewerPacks } from "../viewer-packs/host";
 import { DesktopDataWorkspaceSurface } from "./DesktopDataWorkspaceSurface";
-import type { DesktopEditorGroupController } from "../editor-workbench/useDesktopEditorGroup";
+import type { DesktopEditorWorkbenchController } from "../editor-workbench/controller/useDesktopEditorWorkbench";
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopWorkspaceContentProps = {
@@ -38,7 +38,7 @@ type DesktopWorkspaceContentProps = {
   activeView: DesktopView;
   cloud: DesktopWorkspaceCloudSurfaceController;
   dataPort: DataWorkspacePort | null;
-  editorWorkbench: DesktopEditorGroupController;
+  editorWorkbench: DesktopEditorWorkbenchController;
   fileClipboardController: FileClipboardController;
   desktopUpdates: DesktopUpdatesController;
   git: DesktopGitController;

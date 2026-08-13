@@ -14,12 +14,12 @@ import {
 } from "react";
 import type { DataCapabilities, DataNode, DataPort, FileContent, Workspace } from "../core/types";
 import { defaultDataCapabilities } from "../core/types";
-import { preloadPresetViewer } from "../editor/PresetViewerRenderer";
+import { preloadPresetViewer } from "../editor/host/PresetViewerRenderer";
 import {
   getEditorSourceRequirement,
   resolveEditorViewer,
   shouldReadEditorContent,
-} from "../editor/viewerRegistry";
+} from "../editor/registry/viewerRegistry";
 import {
   createMarkdownLinkGraph,
   EMPTY_MARKDOWN_LINK_GRAPH_INDEX,
@@ -29,17 +29,17 @@ import {
 } from "../editor/markdown/linkIndex";
 import { resolveMarkdownAssetPath } from "../editor/markdown/assetResolution";
 import { ExplorerTree } from "./ExplorerTree";
-import { FilePreview, type FilePreviewProps } from "./FilePreview";
+import { FilePreview, type FilePreviewProps } from "../editor/host/FilePreview";
 import { ProjectsHeader } from "./ProjectsHeader";
-import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
+import type { EditorSaveMode } from "../editor/host/EditorDocumentHost";
 import type {
   DocumentSourceKind,
   EditorInteractionPreferences,
   MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
-} from "../editor/viewerTypes";
-import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
+} from "../editor/registry/viewerTypes";
+import type { ViewerExtensionHostAdapter } from "../editor/registry/viewerHostAdapters";
 import { getAiEditFileForPath } from "../editor/ai-edits/diff";
 import type { AiEditRequest } from "../editor/ai-edits/types";
 import type { DocumentPersistedCommit } from "../editor/document-session/types";
@@ -546,7 +546,7 @@ export function DataWorkspace({
     // Selection owns route preloading. The currently committed preview may
     // intentionally remain on screen while a different format is read, so a
     // preload initiated by the rendered document can target the old viewer.
-    // The loader cache deduplicates this with PuppyoneEditorHost and React.lazy.
+    // The loader cache deduplicates this with EditorDocumentHost and React.lazy.
     void preloadPresetViewer(selectedFileViewer).catch(() => undefined);
   }, [selectedFileViewer]);
 

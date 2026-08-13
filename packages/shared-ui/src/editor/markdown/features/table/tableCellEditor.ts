@@ -1,6 +1,6 @@
 import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
-import type { MarkdownLinkGraph } from "../../../viewerTypes";
+import type { MarkdownLinkGraph } from "../../../registry/viewerTypes";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { requestMarkdownTableFocus } from "./tableFocusState";
 import type { MarkdownInlinePreviewRenderer } from "../../shared/preview/markdownInlinePreviewPort";

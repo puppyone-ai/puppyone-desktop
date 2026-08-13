@@ -7,15 +7,27 @@ const surfaceSource = readFileSync(
   "utf8",
 );
 const splitSource = readFileSync(
-  new URL("../src/features/editor-workbench/DesktopEditorSplitView.tsx", import.meta.url),
+  new URL("../src/features/editor-workbench/layout/DesktopEditorSplitView.tsx", import.meta.url),
   "utf8",
 );
-const dragSource = readFileSync(
-  new URL("../src/features/editor-workbench/useEditorWorkbenchDragAndDrop.ts", import.meta.url),
+const resizeSource = readFileSync(
+  new URL("../src/features/editor-workbench/layout/EditorSplitResizeHandle.tsx", import.meta.url),
+  "utf8",
+);
+const paneMoveSource = readFileSync(
+  new URL("../src/features/editor-workbench/drag-and-drop/usePaneMoveDrag.ts", import.meta.url),
+  "utf8",
+);
+const fileDropSource = readFileSync(
+  new URL("../src/features/editor-workbench/drag-and-drop/useExplorerFileDrop.ts", import.meta.url),
+  "utf8",
+);
+const dropGeometrySource = readFileSync(
+  new URL("../src/features/editor-workbench/drag-and-drop/paneDropGeometry.ts", import.meta.url),
   "utf8",
 );
 const splitStyles = readFileSync(
-  new URL("../src/features/editor-workbench/desktop-editor-split-view.css", import.meta.url),
+  new URL("../src/features/editor-workbench/layout/desktop-editor-split-view.css", import.meta.url),
   "utf8",
 );
 const headerStyles = readFileSync(
@@ -36,16 +48,16 @@ describe("editor split-pane architecture", () => {
     expect(surfaceSource).toContain("layout={editorWorkbench.paneLayout}");
     expect(surfaceSource).toContain('loadActiveFileSource={resolvedSurface.id !== "data"}');
     expect(splitSource).toContain('data-direction={split.direction}');
-    expect(splitSource).toContain('role="separator"');
+    expect(resizeSource).toContain('role="separator"');
     expect(splitSource).toContain('className="desktop-editor-pane-handle"');
     expect(splitSource).toContain("onOpenAtPaneEdge");
     expect(splitSource).toContain("onMovePane");
     expect(splitSource).not.toContain("onSplitPane");
     expect(splitSource).toContain('className="desktop-editor-drop-preview"');
-    expect(dragSource).toContain("closestSplitEdge");
-    expect(dragSource).toContain("parseExplorerReferenceDrag");
-    expect(dragSource).toContain("onOpenAtPaneEdge");
-    expect(dragSource).toContain("onMovePane");
+    expect(dropGeometrySource).toContain("closestPaneDropEdge");
+    expect(fileDropSource).toContain("parseExplorerReferenceDrag");
+    expect(fileDropSource).toContain("onOpenAtPaneEdge");
+    expect(paneMoveSource).toContain("onMovePane");
   });
 
   it("fills the editor region and uses overlay handles with dedicated resize lanes", () => {

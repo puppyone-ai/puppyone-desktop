@@ -21,9 +21,7 @@ for (const filePath of walkTypeScript(sharedEditorRoot)) {
 
 const contributionFiles = [
   ...walkTypeScript(path.join(sharedEditorRoot, "viewers")),
-  ...walkTypeScript(path.join(sharedEditorRoot, "csv")),
   ...walkTypeScript(path.join(sharedEditorRoot, "markdown")),
-  ...walkTypeScript(path.join(sharedEditorRoot, "puppyflow")),
 ];
 for (const filePath of contributionFiles) {
   const source = readFileSync(filePath, "utf8");
@@ -39,13 +37,13 @@ for (const filePath of contributionFiles) {
   }
 }
 
-const textFramePath = path.join(sharedEditorRoot, "viewers/TextEditorFrame.tsx");
+const textFramePath = path.join(sharedEditorRoot, "viewers/shared/TextEditorFrame.tsx");
 const textFrameSource = readFileSync(textFramePath, "utf8");
 if (/\bsetTimeout\s*\(/.test(textFrameSource)) {
   errors.push(`${relative(textFramePath)} owns a timer; save scheduling belongs to DocumentEditingSession`);
 }
 
-const codeViewerPath = path.join(sharedEditorRoot, "viewers/CodeViewer.tsx");
+const codeViewerPath = path.join(sharedEditorRoot, "viewers/code/CodeViewer.tsx");
 const codeViewerSource = readFileSync(codeViewerPath, "utf8");
 if (!/\bsourceSnapshotMode\b/.test(codeViewerSource)) {
   errors.push(`${relative(codeViewerPath)} does not keep canonical code source in CodeMirror snapshots`);
@@ -73,7 +71,7 @@ if (!/readSnapshot\(\),\s*this\.strongestDrainReason\(\)\s*\?\?\s*["']edit["']/.
   errors.push(`${relative(sessionKernel)} does not enqueue the latest editor snapshot with the edit reason`);
 }
 
-const externalAdapterPath = path.join(sharedEditorRoot, "viewerHostAdapters.ts");
+const externalAdapterPath = path.join(sharedEditorRoot, "registry/viewerHostAdapters.ts");
 const externalAdapterSource = readFileSync(externalAdapterPath, "utf8");
 for (const authority of ["EditableDocumentSource", "DocumentPersistencePort", "documentSession", "persistence"]) {
   if (new RegExp(`\\b${authority}\\b`).test(externalAdapterSource)) {
@@ -81,7 +79,7 @@ for (const authority of ["EditableDocumentSource", "DocumentPersistencePort", "d
   }
 }
 
-const packTypesPath = path.join(sharedEditorRoot, "viewerPackTypes.ts");
+const packTypesPath = path.join(sharedEditorRoot, "registry/viewerPackTypes.ts");
 const packTypesSource = readFileSync(packTypesPath, "utf8");
 if (!/export type ViewerPackFormatContribution\s*=\s*\{[\s\S]*?editable:\s*false;[\s\S]*?\};/.test(packTypesSource)) {
   errors.push(`${relative(packTypesPath)} no longer fixes Viewer Pack v1 contributions to editable: false`);
@@ -134,10 +132,10 @@ if (!/await onActivePathChange/.test(dataWorkspaceSource)) {
 }
 const desktopAppShellPath = path.join(repoRoot, "src/App.tsx");
 const desktopAppShellSource = readFileSync(desktopAppShellPath, "utf8");
-if (!/handleActiveDataPathChange[\s\S]*editorGroup\.open/.test(desktopAppShellSource)) {
+if (!/handleActiveDataPathChange[\s\S]*editorWorkbench\.open/.test(desktopAppShellSource)) {
   errors.push(`${relative(desktopAppShellPath)} does not own Editor Group activation`);
 }
-if (!/DesktopWorkspaceContent[\s\S]*editorWorkbench=\{editorGroup\}/.test(desktopAppShellSource)) {
+if (!/DesktopWorkspaceContent[\s\S]*editorWorkbench=\{editorWorkbench\}/.test(desktopAppShellSource)) {
   errors.push(`${relative(desktopAppShellPath)} does not project the Editor Workbench into the app shell`);
 }
 if (!/useEditableDocumentSource\s*\(\s*\)/.test(textFrameSource)) {
@@ -153,10 +151,10 @@ if (!/replaceContent:\s*\(content:\s*string\)\s*=>\s*EditorSourceSnapshot/.test(
   errors.push(`${relative(sourceSnapshotPath)} does not require format-aware external replacement`);
 }
 for (const relativeAdapterPath of [
-  "viewers/TextEditorFrame.tsx",
-  "CodeMirrorCodeEditor.tsx",
+  "viewers/shared/TextEditorFrame.tsx",
+  "viewers/code/CodeMirrorCodeEditor.tsx",
   "markdown/MarkdownCodeMirrorEditor.tsx",
-  "puppyflow/PuppyFlowViewer.tsx",
+  "viewers/puppyflow/PuppyFlowViewer.tsx",
 ]) {
   const adapterPath = path.join(sharedEditorRoot, relativeAdapterPath);
   if (!/\breplaceContent\s*:/.test(readFileSync(adapterPath, "utf8"))) {
@@ -164,9 +162,9 @@ for (const relativeAdapterPath of [
   }
 }
 
-const viewerRegistryPath = path.join(sharedEditorRoot, "viewerRegistry.tsx");
+const viewerRegistryPath = path.join(sharedEditorRoot, "registry/viewerRegistry.tsx");
 const viewerRegistrySource = readFileSync(viewerRegistryPath, "utf8");
-if (!/id:\s*["']puppyflow["'][\s\S]*?import\(["']\.\/puppyflow\/PuppyFlowViewer["']\)/.test(viewerRegistrySource)) {
+if (!/id:\s*["']puppyflow["'][\s\S]*?import\(["']\.\.\/viewers\/puppyflow\/PuppyFlowViewer["']\)/.test(viewerRegistrySource)) {
   errors.push(`${relative(viewerRegistryPath)} does not route PuppyFlow through a preset contribution`);
 }
 

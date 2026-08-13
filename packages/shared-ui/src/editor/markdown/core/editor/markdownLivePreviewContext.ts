@@ -12,7 +12,7 @@ import {
 import { getDocRevision } from "../../platform/brokers/transactionBroker";
 import { isSafeHref } from "../../platform/policy/markdownUrlPolicy";
 import { getInlineRevealElement, type MarkdownElement } from "../syntax/markdownElements";
-import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../../../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../../../registry/viewerTypes";
 
 export const markdownHtmlTrustModeFacet = Facet.define<MarkdownHtmlTrustMode, MarkdownHtmlTrustMode>({
   combine(values) {

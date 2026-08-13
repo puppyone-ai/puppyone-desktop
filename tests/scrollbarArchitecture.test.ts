@@ -68,7 +68,7 @@ describe("scrollbar architecture", () => {
     );
     expect(readCss("packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor.tsx"))
       .toContain('view.scrollDOM.dataset.poScrollbar = "content";');
-    expect(readCss("packages/shared-ui/src/editor/CodeMirrorCodeEditor.tsx"))
+    expect(readCss("packages/shared-ui/src/editor/viewers/code/CodeMirrorCodeEditor.tsx"))
       .toContain('view.scrollDOM.dataset.poScrollbar = "content";');
   });
 
@@ -215,7 +215,7 @@ describe("scrollbar architecture", () => {
   });
 
   it("registers structured and horizontal editor scroll owners without local paint rules", () => {
-    expect(readCss("packages/shared-ui/src/editor/CsvTableEditor.tsx")).toContain(
+    expect(readCss("packages/shared-ui/src/editor/viewers/csv/CsvTableEditor.tsx")).toContain(
       'data-po-scrollbar="content"',
     );
     expect(readCss("packages/shared-ui/src/editor/markdown/features/code-block/codeBlockWidget.ts"))

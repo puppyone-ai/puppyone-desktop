@@ -18,7 +18,7 @@ The stable boundary is:
 Explorer / DataWorkspace
           |
           v
-EditorHost + Viewer Router
+EditorDocumentHost + Viewer Router
           |
           +----> read-only Viewer Contribution
           |
@@ -325,7 +325,7 @@ Adding it should require:
 5. applying an accepted external replacement through its own parser/model;
 6. passing the shared editable-contribution conformance tests.
 
-It should not require changes to `DataWorkspace`, `EditorHost`,
+It should not require changes to `DataWorkspace`, `EditorDocumentHost`,
 `DocumentEditingSession`, Local/Cloud ports, Electron IPC, or window-close
 coordination.
 
@@ -358,15 +358,17 @@ replace the editor's save lifecycle.
 
 ```text
 packages/shared-ui/src/editor/
-  PuppyoneEditorHost.tsx           # route and attach editable boundary
+  host/EditorDocumentHost.tsx      # route and attach editable boundary
+  host/DataNodeEditorHost.tsx      # adapt DataNode and source to EditorDocument
   editorAccess.ts                  # pure Host-level edit authority decision
-  viewers/*                        # text/Markdown/CSV contributions
-  csv/csvDocument.ts               # CSV/TSV parse, model, and serialization
-  csv/csvTableOperations.ts        # pure CSV row/column structural operations
-  csv/csvViewPreferences.ts        # bounded, non-document CSV display preferences
+  registry/*                       # manifest, contribution contract, and routing
+  viewers/*                        # format-specific viewer packages
+  viewers/csv/csvDocument.ts       # CSV/TSV parse, model, and serialization
+  viewers/csv/csvTableOperations.ts # pure CSV row/column structural operations
+  viewers/csv/csvViewPreferences.ts # bounded, non-document CSV display preferences
   table/editableTableLayout.ts      # bounded column sizing shared by table UIs
   table/editableTableDrag.ts        # shared midpoint drop-boundary geometry
-  puppyflow/*                      # structured PuppyFlow contribution
+  viewers/puppyflow/*              # structured PuppyFlow contribution
 
 packages/shared-ui/src/editor/document-session/
   DocumentEditingSession.ts        # thin save lifecycle

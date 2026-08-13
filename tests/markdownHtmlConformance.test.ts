@@ -31,7 +31,7 @@ import {
 import type {
   MarkdownAssetUrlResolver,
   MarkdownDialectId,
-} from "../packages/shared-ui/src/editor/viewerTypes";
+} from "../packages/shared-ui/src/editor/registry/viewerTypes";
 import { CENTERED_README_HEADER } from "./fixtures/markdown/centeredReadme";
 
 const inertAssetResolver: MarkdownAssetUrlResolver = () => null;

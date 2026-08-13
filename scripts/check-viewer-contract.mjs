@@ -27,9 +27,8 @@ for (const format of [...(formatRegistry.formats ?? []), formatRegistry.unknownF
 }
 
 const presetCoreFiles = [
-  path.join(repoRoot, "packages/shared-ui/src/editor/viewerRegistry.tsx"),
-  path.join(repoRoot, "packages/shared-ui/src/editor/viewerTypes.ts"),
-  ...walkFiles(path.join(repoRoot, "packages/shared-ui/src/editor/csv")),
+  path.join(repoRoot, "packages/shared-ui/src/editor/registry/viewerRegistry.tsx"),
+  path.join(repoRoot, "packages/shared-ui/src/editor/registry/viewerTypes.ts"),
   ...walkFiles(path.join(repoRoot, "packages/shared-ui/src/editor/viewers")),
 ];
 for (const filePath of presetCoreFiles) {
@@ -43,7 +42,7 @@ for (const filePath of presetCoreFiles) {
 
 const documentSurfacePath = path.join(
   repoRoot,
-  "packages/shared-ui/src/editor/DocumentSurfaceHost.tsx",
+  "packages/shared-ui/src/editor/host/DocumentSurfaceHost.tsx",
 );
 const documentSurfaceSource = readFileSync(documentSurfacePath, "utf8");
 if (!/export function DocumentSurfacePending[\s\S]*?role="status"[\s\S]*?aria-busy="true"[\s\S]*?aria-label=\{label\}/.test(documentSurfaceSource)) {
@@ -61,7 +60,7 @@ if (
 }
 
 const pdfViewerSource = readFileSync(
-  path.join(repoRoot, "packages/shared-ui/src/editor/viewers/PdfViewer.tsx"),
+  path.join(repoRoot, "packages/shared-ui/src/editor/viewers/pdf/PdfViewer.tsx"),
   "utf8",
 );
 if (
@@ -76,8 +75,8 @@ if (
 }
 
 const documentSurfaceConsumers = [
-  path.join(repoRoot, "packages/shared-ui/src/editor/PuppyoneEditorHost.tsx"),
-  path.join(repoRoot, "packages/shared-ui/src/editor/PresetViewerRenderer.tsx"),
+  path.join(repoRoot, "packages/shared-ui/src/editor/host/EditorDocumentHost.tsx"),
+  path.join(repoRoot, "packages/shared-ui/src/editor/host/PresetViewerRenderer.tsx"),
   ...walkFiles(path.join(repoRoot, "packages/shared-ui/src/editor/viewers")),
 ];
 for (const filePath of documentSurfaceConsumers) {
