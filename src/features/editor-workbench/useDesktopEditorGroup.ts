@@ -4,12 +4,15 @@ import {
   activateEditor,
   activateEditorPane,
   assignEditorToActivePane,
+  assignEditorToPane,
   closeEditor,
   closeEditorPane,
   closeEditorsUnderResource,
   createEditorInput,
   createEditorPaneLayout,
   getActiveEditorPane,
+  getEditorPanes,
+  moveEditorPane,
   openEditor,
   parseEditorGroupState,
   parseEditorPaneLayoutState,
@@ -45,12 +48,20 @@ export type DesktopEditorGroupController = Readonly<{
   activePath: string | null;
   activePaneId: string;
   open: (path: string, node?: DataNode | null) => void;
+  openAtPaneEdge: (
+    path: string,
+    label: string,
+    targetPaneId: string,
+    direction: EditorSplitDirection,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
+  ) => void;
   activate: (editorId: string) => void;
   focusPane: (paneId: string) => void;
-  splitPane: (
-    paneId: string,
+  movePane: (
+    sourcePaneId: string,
+    targetPaneId: string,
     direction: EditorSplitDirection,
-    options?: EditorPaneSplitOptions,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
   ) => void;
   closePane: (paneId: string) => void;
   resizeSplit: (splitId: string, ratio: number) => void;
@@ -106,7 +117,11 @@ export function useDesktopEditorGroup(workspace: Workspace | null): DesktopEdito
     if (!path || node?.type === "folder") return;
     updateWorkbench((current) => {
       const group = openEditor(current.group, createEditorInput(path, node?.name));
-      return freezeWorkbench(group, assignEditorToActivePane(current.layout, path));
+      const visiblePane = getEditorPanes(current.layout).find((pane) => pane.editorId === path);
+      const layout = visiblePane
+        ? activateEditorPane(current.layout, visiblePane.id)
+        : assignEditorToActivePane(current.layout, path);
+      return freezeWorkbench(group, layout);
     });
   }, [updateWorkbench]);
 
@@ -114,7 +129,38 @@ export function useDesktopEditorGroup(workspace: Workspace | null): DesktopEdito
     updateWorkbench((current) => {
       const group = activateEditor(current.group, editorId);
       if (group === current.group && group.activeEditorId !== editorId) return current;
-      return freezeWorkbench(group, assignEditorToActivePane(current.layout, editorId));
+      const visiblePane = getEditorPanes(current.layout).find((pane) => pane.editorId === editorId);
+      const layout = visiblePane
+        ? activateEditorPane(current.layout, visiblePane.id)
+        : assignEditorToActivePane(current.layout, editorId);
+      return freezeWorkbench(group, layout);
+    });
+  }, [updateWorkbench]);
+
+  const openAtPaneEdge = useCallback((
+    path: string,
+    label: string,
+    targetPaneId: string,
+    direction: EditorSplitDirection,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
+  ) => {
+    if (!path) return;
+    updateWorkbench((current) => {
+      const visiblePane = getEditorPanes(current.layout).find((pane) => pane.editorId === path);
+      const group = openEditor(current.group, createEditorInput(path, label));
+      if (visiblePane) {
+        return freezeWorkbench(
+          activateEditor(group, path),
+          activateEditorPane(current.layout, visiblePane.id),
+        );
+      }
+
+      const targetPane = getEditorPanes(current.layout).find((pane) => pane.id === targetPaneId);
+      if (!targetPane) return current;
+      const layout = targetPane.editorId === null
+        ? assignEditorToPane(current.layout, targetPaneId, path)
+        : splitEditorPane(current.layout, targetPaneId, direction, { editorId: path, placement });
+      return freezeWorkbench(activateEditor(group, path), layout);
     });
   }, [updateWorkbench]);
 
@@ -128,13 +174,20 @@ export function useDesktopEditorGroup(workspace: Workspace | null): DesktopEdito
     });
   }, [updateWorkbench]);
 
-  const splitPane = useCallback((
-    paneId: string,
+  const movePane = useCallback((
+    sourcePaneId: string,
+    targetPaneId: string,
     direction: EditorSplitDirection,
-    options?: EditorPaneSplitOptions,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
   ) => {
     updateWorkbench((current) => {
-      const layout = splitEditorPane(current.layout, paneId, direction, options);
+      const layout = moveEditorPane(
+        current.layout,
+        sourcePaneId,
+        targetPaneId,
+        direction,
+        placement,
+      );
       if (layout === current.layout) return current;
       const editorId = getActiveEditorPane(layout).editorId;
       const group = editorId ? activateEditor(current.group, editorId) : current.group;
@@ -197,9 +250,10 @@ export function useDesktopEditorGroup(workspace: Workspace | null): DesktopEdito
     activePath: activePane.editorId,
     activePaneId: activePane.id,
     open,
+    openAtPaneEdge,
     activate,
     focusPane,
-    splitPane,
+    movePane,
     closePane,
     resizeSplit,
     close,
@@ -215,10 +269,11 @@ export function useDesktopEditorGroup(workspace: Workspace | null): DesktopEdito
     closePane,
     closeUnderResource,
     focusPane,
+    movePane,
     open,
+    openAtPaneEdge,
     rebaseResource,
     resizeSplit,
-    splitPane,
     workbench.group,
     workbench.layout,
   ]);

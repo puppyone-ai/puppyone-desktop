@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   EditorChromeContributionProvider,
   EditorFindContributionProvider,
@@ -6,8 +6,6 @@ import {
   closeDocumentWorkingCopy,
   closeDocumentWorkingCopiesUnderResource,
   flushActiveDocumentSessions,
-  getDocumentWorkingCopyStatuses,
-  subscribeDocumentWorkingCopyStatuses,
   type DataNode,
   type EditorChromeContribution,
   useEditorFindCommand,
@@ -214,11 +212,6 @@ function AppContent() {
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("general");
   const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
   const editorGroup = useDesktopEditorGroup(workspace);
-  const workingCopyStatuses = useSyncExternalStore(
-    subscribeDocumentWorkingCopyStatuses,
-    getDocumentWorkingCopyStatuses,
-    getDocumentWorkingCopyStatuses,
-  );
   const activeDataPath = editorGroup.activePath;
   const setActiveDataPath = useCallback<Dispatch<SetStateAction<string | null>>>((update) => {
     if (typeof update !== "function") {
@@ -637,11 +630,6 @@ function AppContent() {
         if (!editorGroup.activePath) return;
         event.preventDefault();
         void handleEditorClose(editorGroup.activePath);
-        return;
-      }
-      if (platformModifier && !event.altKey && event.key === "\\") {
-        event.preventDefault();
-        editorGroup.splitPane(editorGroup.activePaneId, "horizontal");
         return;
       }
       if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === "Tab") {
@@ -1077,7 +1065,6 @@ function AppContent() {
           git={git}
           minimalMode={minimalMode}
           onActiveDataNodeChange={handleActiveDataNodeChange}
-          onCloseEditor={(editorId) => { void handleEditorClose(editorId); }}
           onActiveDataPathChange={handleActiveDataPathChange}
           onResourceMove={handleResourceMoved}
           onCreateEntryMenu={openCreateEntryMenu}
@@ -1100,7 +1087,6 @@ function AppContent() {
           workspaceSurfaceError={documentNavigationError ?? workspaceSurfaceError}
           workspaceKey={workspaceKey}
           workspaceRefreshToken={workspaceRefreshToken}
-          workingCopyStatuses={workingCopyStatuses}
           sidebarCreateMenuOpen={Boolean(
             createEntryDraft
             && !createEntryDraft.selectedKind

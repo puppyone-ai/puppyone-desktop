@@ -332,7 +332,7 @@
   "text.readNamed": "{name} lesen",
   "panes.closeEditor": "Editor schließen",
   "panes.closePane": "Editorbereich schließen",
-  "panes.dragToSplit": "Ziehen, um den Editor zu teilen; klicken für Bereichsaktionen",
+  "panes.dragToMove": "Ziehen, um den Editorbereich zu verschieben; klicken für Bereichsaktionen",
   "panes.empty": "Leerer Editor",
   "panes.label": "Editorbereich {name}",
   "panes.resize": "Editorbereiche skalieren",

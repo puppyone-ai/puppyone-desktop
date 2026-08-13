@@ -5,7 +5,6 @@ import {
   DataWorkspace,
   type AiEditRequest,
   type DataNode,
-  type DocumentSessionStatus,
   type Workspace,
 } from "@puppyone/shared-ui";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
@@ -65,7 +64,6 @@ export type DesktopDataWorkspaceSurfaceProps = {
     node?: DataNode | null,
   ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
-  onCloseEditor: (editorId: string) => void;
   onResourceMove: (previousPath: string, nextPath: string) => void | Promise<void>;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onDismissCreateEntryMenu: () => void;
@@ -77,7 +75,6 @@ export type DesktopDataWorkspaceSurfaceProps = {
   workspaceKey: string;
   workspaceRefreshToken: number;
   workspaceSurfaceError: string | null;
-  workingCopyStatuses: ReadonlyMap<string, DocumentSessionStatus>;
   sidebarCreateMenuOpen: boolean;
 };
 
@@ -92,7 +89,6 @@ export function DesktopDataWorkspaceSurface({
   minimalMode,
   navigation,
   onActiveDataNodeChange,
-  onCloseEditor,
   onResourceMove,
   onActiveDataPathChange,
   onCreateEntryMenu,
@@ -105,7 +101,6 @@ export function DesktopDataWorkspaceSurface({
   workspaceKey,
   workspaceRefreshToken,
   workspaceSurfaceError,
-  workingCopyStatuses,
   sidebarCreateMenuOpen,
 }: DesktopDataWorkspaceSurfaceProps) {
   const { t } = useLocalization();
@@ -272,13 +267,12 @@ export function DesktopDataWorkspaceSurface({
                 refreshKey={workspaceRefreshToken}
                 state={state}
                 viewerExtensionAdapter={viewerExtensionAdapter}
-                workingCopyStatuses={workingCopyStatuses}
                 workspace={workspace}
-                onCloseEditor={onCloseEditor}
                 onClosePane={editorWorkbench.closePane}
                 onFocusPane={editorWorkbench.focusPane}
+                onMovePane={editorWorkbench.movePane}
+                onOpenAtPaneEdge={editorWorkbench.openAtPaneEdge}
                 onResizeSplit={editorWorkbench.resizeSplit}
-                onSplitPane={editorWorkbench.splitPane}
               />
             )
           : resolvedSurface.content.main == null

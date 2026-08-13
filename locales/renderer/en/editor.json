@@ -332,7 +332,7 @@
   "text.readNamed": "Read {name}",
   "panes.closeEditor": "Close editor",
   "panes.closePane": "Close editor pane",
-  "panes.dragToSplit": "Drag to split editor; click for pane actions",
+  "panes.dragToMove": "Drag to move editor pane; click for pane actions",
   "panes.empty": "Empty editor",
   "panes.label": "{name} editor pane",
   "panes.resize": "Resize editor panes",

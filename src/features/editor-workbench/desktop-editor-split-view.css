@@ -127,17 +127,6 @@
   outline: 0;
 }
 
-.desktop-editor-pane-menu-action:disabled {
-  opacity: 0.42;
-}
-
-.desktop-editor-pane-menu-divider {
-  display: block;
-  height: 1px;
-  margin: 4px;
-  background: var(--po-divider);
-}
-
 .desktop-editor-pane-content {
   display: flex;
   flex: 1;
