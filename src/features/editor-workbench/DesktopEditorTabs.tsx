@@ -11,6 +11,7 @@ import {
 export type DesktopEditorTabsProps = Readonly<{
   editors: readonly EditorInput[];
   activeEditorId: string | null;
+  connectedToEditor?: boolean;
   fileIconTheme?: FileIconThemeId;
   workingCopyStatuses?: ReadonlyMap<string, DocumentSessionStatus>;
   onActivate: (editorId: string) => void;
@@ -26,6 +27,7 @@ export type DesktopEditorTabsProps = Readonly<{
 export function DesktopEditorTabs({
   editors,
   activeEditorId,
+  connectedToEditor = true,
   fileIconTheme = "default",
   workingCopyStatuses = new Map(),
   onActivate,
@@ -70,6 +72,7 @@ export function DesktopEditorTabs({
       className="desktop-editor-tabs"
       role="tablist"
       aria-label={t("editor.tabs.openEditors")}
+      data-connected-to-editor={connectedToEditor ? "true" : undefined}
       data-window-no-drag="true"
       data-po-scrollbar="hidden"
     >
