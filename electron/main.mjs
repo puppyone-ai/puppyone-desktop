@@ -17,7 +17,6 @@ import {
 import { initializeWorkspaceEditReview } from "../local-api/edit-review.mjs";
 import { createUpdateService } from "./update-service.mjs";
 import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
-import { createAppPreviewBrowserSurfaceManager } from "./main/app-preview-browser-surface.mjs";
 import { createAppPreviewService } from "./main/app-preview-service.mjs";
 import {
   configureDesktopApplicationIdentity,
@@ -574,18 +573,6 @@ app.whenReady().then(async () => {
     getRestartBlockers: getUpdateRestartBlockers,
     confirmRestartWithBlockers: confirmUpdateRestartWithBlockers,
   });
-  const appPreviewBrowserSurfaces = createAppPreviewBrowserSurfaceManager({
-    WebContentsView,
-    sessionFromPartition: (partition, options) => electronSession.fromPartition(partition, options),
-    getOwnerWindow: (ownerWebContentsId) => windowsById.get(ownerWebContentsId) ?? null,
-    publishState: (state, ownerWebContentsId) => {
-      const window = windowsById.get(ownerWebContentsId);
-      if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
-      window.webContents.send("app-preview:surface-state", state);
-    },
-    nativeSurfaceOcclusion,
-    nativeSurfacePointerPassthrough,
-  });
   const appPreviewProcessRuntime = createAppPreviewRuntime({
     app,
     dialog,
@@ -602,20 +589,9 @@ app.whenReady().then(async () => {
           ...event.result,
         });
       }
-      if (event.result.status === "stopped" || event.result.status === "error") {
-        appPreviewBrowserSurfaces.runtimeUnavailable({
-          rootPath: event.rootPath,
-          appPath: event.result.path,
-          ownerWebContentsIds: event.ownerWebContentsIds,
-          reason: event.result.status === "error" ? "runtime-error" : "runtime-stopped",
-        });
-      }
     },
   });
-  appPreviewRuntime = createAppPreviewService({
-    runtime: appPreviewProcessRuntime,
-    browserSurfaces: appPreviewBrowserSurfaces,
-  });
+  appPreviewRuntime = createAppPreviewService({ runtime: appPreviewProcessRuntime });
   if (viewerPackFeatureProfile.externalViewerPacks) {
     viewerPackRuntime = await loadViewerPackRuntime(true);
     viewerPackHost = viewerPackRuntime.createViewerPackHost({

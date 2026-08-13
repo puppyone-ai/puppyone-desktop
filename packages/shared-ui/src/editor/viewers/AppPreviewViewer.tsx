@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  ArrowLeft,
-  ArrowRight,
   Code2,
   ExternalLink,
   Eye,
@@ -12,7 +10,7 @@ import {
   Square,
   TerminalSquare,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import {
   getAppPreviewManifestDisplayName,
@@ -22,12 +20,14 @@ import { PlainTextEditor } from "../PlainTextEditor";
 import type { PresetViewerRenderContext } from "../viewerTypes";
 import { AppPreviewSetupView } from "./app-preview/AppPreviewSetupView";
 import { AppPreviewStateView } from "./app-preview/AppPreviewStateView";
+import {
+  resolveAppPreviewFrameUrl,
+  SandboxedAppFrame,
+} from "./app-preview/SandboxedAppFrame";
 import type { AppPreviewMode } from "./app-preview/types";
 import { useAppPreviewSession } from "./app-preview/useAppPreviewSession";
-import {
-  DocumentSurfacePending,
-  useDocumentSurfaceState,
-} from "../DocumentSurfaceHost";
+import { DocumentSurfacePending } from "../DocumentSurfaceHost";
+import { useVisibleFrameReadiness } from "./useVisibleFrameReadiness";
 
 export function AppPreviewViewer({
   document,
@@ -40,11 +40,9 @@ export function AppPreviewViewer({
   "document" | "content" | "loading" | "error" | "appPreview"
 >) {
   const { t } = useLocalization();
-  const documentSurfaceState = useDocumentSurfaceState();
   const [mode, setMode] = useState<AppPreviewMode>("preview");
   const [manifestContent, setManifestContent] = useState(content);
-  const [readyFrameUrl, setReadyFrameUrl] = useState<string | null>(null);
-  const hostRef = useRef<HTMLDivElement>(null);
+  const [reloadVersion, setReloadVersion] = useState(0);
 
   useEffect(() => {
     setManifestContent(content);
@@ -63,36 +61,53 @@ export function AppPreviewViewer({
   const session = useAppPreviewSession({
     appPreview,
     path: document.path,
-    mode,
-    hostRef,
     enabled: configured,
-    surfaceVisible: documentSurfaceState === "committed",
   });
+  const refreshLogs = session.refreshLogs;
+
+  useEffect(() => {
+    if (configured && mode === "logs") void refreshLogs();
+  }, [configured, mode, refreshLogs]);
+
+  const { state } = session;
+  const runningUrl = state.runtime?.status === "running" ? state.runtime.url : null;
+  const frameUrl = resolveAppPreviewFrameUrl(runningUrl);
+  const frameKey = frameUrl
+    ? [
+      state.runtime?.runtimeId ?? frameUrl,
+      state.runtime?.generation ?? 0,
+      reloadVersion,
+    ].join(":")
+    : null;
+  const frameReadiness = useVisibleFrameReadiness(frameKey);
 
   if (loading && !manifestContent) return <DocumentSurfacePending label={t("editor.app.loading")} />;
   if (error && !manifestContent) return <div className="editor-state danger" dir="auto">{error}</div>;
 
-  const { state } = session;
-  const runningUrl = state.runtime?.status === "running" ? state.runtime.url : null;
+  const frameSecurityError = Boolean(runningUrl && !frameUrl);
+  const previewState = frameSecurityError
+    ? {
+      ...state,
+      status: "error" as const,
+      error: { code: "start-failed" as const, detail: "App Preview URL is not safe to embed." },
+    }
+    : state;
   const statusLabel = manifestState.error
     ? t("editor.app.status.needsAttention")
     : !configured
       ? t("editor.app.status.notConfigured")
-      : state.status === "error"
+      : previewState.status === "error"
         ? t("editor.app.status.needsAttention")
-        : t(`editor.app.status.${state.status}`);
-  const status = manifestState.error || state.status === "error"
+        : t(`editor.app.status.${previewState.status}`);
+  const status = manifestState.error || previewState.status === "error"
     ? "error"
-    : configured ? state.status : "idle";
-  const browserControlsEnabled = mode === "preview" && Boolean(state.surface?.surfaceId);
+    : configured ? previewState.status : "idle";
   const previewSurfaceBusy = Boolean(
     configured
     && mode === "preview"
-    && state.status !== "error"
-    && state.status !== "stopped"
-    && (session.nativeSurface
-      ? state.surface?.status !== "ready" || !state.surface.attached
-      : !runningUrl || readyFrameUrl !== runningUrl),
+    && previewState.status !== "error"
+    && previewState.status !== "stopped"
+    && (!frameKey || !frameReadiness.ready),
   );
 
   return (
@@ -123,13 +138,13 @@ export function AppPreviewViewer({
           {configured && mode === "preview" ? (
             <>
               <span className="app-preview-toolbar-separator" aria-hidden="true" />
-              <ToolbarButton label={t("editor.app.back")} disabled={!browserControlsEnabled || !state.surface?.canGoBack} onClick={() => session.runSurfaceCommand("back")}>
-                <ArrowLeft size={14} strokeWidth={2} />
-              </ToolbarButton>
-              <ToolbarButton label={t("editor.app.forward")} disabled={!browserControlsEnabled || !state.surface?.canGoForward} onClick={() => session.runSurfaceCommand("forward")}>
-                <ArrowRight size={14} strokeWidth={2} />
-              </ToolbarButton>
-              <ToolbarButton label={t("editor.app.reload")} disabled={!browserControlsEnabled} onClick={() => session.runSurfaceCommand("reload")}>
+              <ToolbarButton
+                label={t("editor.app.reload")}
+                disabled={!frameUrl}
+                onClick={() => {
+                  setReloadVersion((value) => value + 1);
+                }}
+              >
                 <RefreshCw size={14} strokeWidth={2} />
               </ToolbarButton>
               <span className="app-preview-toolbar-separator" aria-hidden="true" />
@@ -148,6 +163,34 @@ export function AppPreviewViewer({
       </header>
 
       <div className="app-preview-body">
+        {configured && !manifestState.error ? (
+          <div
+            className="app-preview-surface-host"
+            data-active={mode === "preview" ? "true" : "false"}
+            aria-hidden={mode === "preview" ? undefined : true}
+          >
+            {frameUrl && frameKey ? (
+              <SandboxedAppFrame
+                key={frameKey}
+                url={frameUrl}
+                title={appName}
+                busy={!frameReadiness.ready}
+                onLoad={frameReadiness.onFrameLoad}
+              />
+            ) : (
+              <AppPreviewStateView
+                appName={appName}
+                state={previewState}
+                canRun={Boolean(appPreview?.start)}
+                onRun={session.run}
+                onEditSetup={() => setMode("settings")}
+                onViewLogs={() => setMode("logs")}
+                onCancel={() => void session.stop()}
+              />
+            )}
+          </div>
+        ) : null}
+
         {mode === "source" ? (
           <div className="app-preview-source">
             <PlainTextEditor content={manifestContent} nodeName={document.name} readOnly />
@@ -192,32 +235,7 @@ export function AppPreviewViewer({
           >
             <pre dir="ltr">{session.logs || t("editor.app.noLogs")}</pre>
           </div>
-        ) : (
-          <div ref={hostRef} className="app-preview-surface-host">
-            {!session.nativeSurface && runningUrl ? (
-              <iframe
-                key={runningUrl}
-                className="app-preview-frame"
-                src={runningUrl}
-                title={appName}
-                sandbox="allow-forms allow-modals allow-scripts allow-same-origin"
-                referrerPolicy="no-referrer"
-                aria-busy={readyFrameUrl !== runningUrl}
-                onLoad={() => setReadyFrameUrl(runningUrl)}
-              />
-            ) : state.surface?.status === "ready" && state.surface.attached ? null : (
-              <AppPreviewStateView
-                appName={appName}
-                state={state}
-                canRun={Boolean(appPreview?.start)}
-                onRun={session.run}
-                onEditSetup={() => setMode("settings")}
-                onViewLogs={() => setMode("logs")}
-                onCancel={() => void session.stop()}
-              />
-            )}
-          </div>
-        )}
+        ) : null}
       </div>
     </section>
   );

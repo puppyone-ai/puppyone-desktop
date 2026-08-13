@@ -152,26 +152,16 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   resolveExternalOpenTarget: (request) => ipcRenderer.invoke("workspace:resolve-external-open-target", request),
   listExternalOpenTargets: (request) => ipcRenderer.invoke("workspace:list-external-open-targets", request),
   chooseExternalApp: (request) => ipcRenderer.invoke("workspace:choose-external-app", request),
-  activateAppPreview: (request) => ipcRenderer.invoke("app-preview:activate", request),
   startAppPreview: (request) => ipcRenderer.invoke("app-preview:start", request),
   restartAppPreview: (request) => ipcRenderer.invoke("app-preview:restart", request),
   stopAppPreview: (request) => ipcRenderer.invoke("app-preview:stop", request),
   getAppPreviewLogs: (request) => ipcRenderer.invoke("app-preview:get-logs", request),
   openAppPreviewExternal: (request) => ipcRenderer.invoke("app-preview:open-external", request),
-  setAppPreviewSurfaceBounds: (request) => ipcRenderer.invoke("app-preview:surface-set-bounds", request),
-  detachAppPreviewSurface: (request) => ipcRenderer.invoke("app-preview:surface-detach", request),
-  runAppPreviewSurfaceCommand: (request) => ipcRenderer.invoke("app-preview:surface-command", request),
   onAppPreviewRuntimeState: (callback) => {
     if (typeof callback !== "function") return () => {};
     const listener = (_event, state) => callback(state);
     ipcRenderer.on("app-preview:runtime-state", listener);
     return () => ipcRenderer.removeListener("app-preview:runtime-state", listener);
-  },
-  onAppPreviewSurfaceState: (callback) => {
-    if (typeof callback !== "function") return () => {};
-    const listener = (_event, state) => callback(state);
-    ipcRenderer.on("app-preview:surface-state", listener);
-    return () => ipcRenderer.removeListener("app-preview:surface-state", listener);
   },
   watchWorkspace: (rootPath, callback) => {
     const listener = (_event, payload) => {

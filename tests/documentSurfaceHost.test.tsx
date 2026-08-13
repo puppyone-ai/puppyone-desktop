@@ -99,6 +99,33 @@ describe("DocumentSurfaceHost", () => {
     expect(getSurface(container, "c.csv").dataset.surfaceState).toBe("committed");
   });
 
+  it("commits a visible-first Viewer immediately instead of mounting it in a hidden staging slot", async () => {
+    const ready = new Map<string, () => void>();
+    const container = createContainer();
+
+    await renderSurface(container, "a.md", "Document A", ready);
+    act(() => ready.get("a.md")?.());
+    await renderSurface(
+      container,
+      "report.pdf",
+      "PDF document",
+      ready,
+      "requires-visible",
+    );
+
+    expect(container.querySelector('[data-surface-key="a.md"]')).toBeNull();
+    const pdfSurface = getSurface(container, "report.pdf");
+    expect(pdfSurface.dataset.surfaceState).toBe("committed");
+    expect(pdfSurface.dataset.surfacePreparation).toBe("requires-visible");
+    expect(pdfSurface.dataset.surfaceReady).toBe("false");
+    expect(pdfSurface.getAttribute("aria-hidden")).toBeNull();
+    expect(pdfSurface.inert).toBe(false);
+    expect(container.querySelector(".document-surface-slot.is-staging")).toBeNull();
+
+    act(() => ready.get("report.pdf")?.());
+    expect(pdfSurface.dataset.surfaceReady).toBe("true");
+  });
+
   it("updates the current document without remounting or creating a staging slot", async () => {
     const ready = new Map<string, () => void>();
     const container = createContainer();
@@ -184,9 +211,13 @@ async function renderSurface(
   surfaceKey: string,
   label: string,
   ready: Map<string, () => void>,
+  surfacePreparation: "hidden-safe" | "requires-visible" = "hidden-safe",
 ) {
   await act(async () => root?.render(
-    <DocumentSurfaceHost surfaceKey={surfaceKey}>
+    <DocumentSurfaceHost
+      surfaceKey={surfaceKey}
+      surfacePreparation={surfacePreparation}
+    >
       {({ onSurfaceReady }) => {
         ready.set(surfaceKey, onSurfaceReady);
         return <button type="button">{label}</button>;

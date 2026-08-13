@@ -144,17 +144,22 @@ export {
   PRESET_VIEWER_CONTRACT_VERSION,
   PRESET_VIEWER_RUNTIMES,
   PRESET_VIEWER_SOURCES,
+  VIEWER_SURFACE_PREPARATIONS,
+  VIEWER_SURFACE_READINESS_SIGNALS,
 } from "./editor/viewerContract";
 export type {
   PresetViewerContractVersion,
   PresetViewerRuntime,
   PresetViewerSource,
+  ViewerSurfacePreparation,
+  ViewerSurfaceReadinessSignal,
 } from "./editor/viewerContract";
 export { findPackCandidates, resolveViewerRoute } from "./editor/viewerCapability";
 export type { ResolveViewerRouteInput } from "./editor/viewerCapability";
 export {
   ExternalViewerAdapter,
   resolveViewerRouteForDocument,
+  resolveViewerSurfacePreparationForDocument,
 } from "./editor/viewerPackAdapter";
 export type { ExternalViewerAdapterProps } from "./editor/viewerPackAdapter";
 export { EMPTY_VIEWER_PACK_SNAPSHOT } from "./editor/viewerPackTypes";

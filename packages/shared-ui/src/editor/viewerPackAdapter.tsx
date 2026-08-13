@@ -3,7 +3,10 @@
 import { useLocalization } from "@puppyone/localization/react";
 import { normalizeDocumentSourceKind } from "./documentSource";
 import { resolveViewerRoute } from "./viewerCapability";
-import type { ExternalViewerSurfaceRenderer } from "./viewerHostAdapters";
+import type {
+  ExternalViewerSurfaceRenderer,
+  ViewerExtensionHostAdapter,
+} from "./viewerHostAdapters";
 import {
   EMPTY_VIEWER_PACK_SNAPSHOT,
   type ViewerContribution,
@@ -12,6 +15,7 @@ import {
 } from "./viewerPackTypes";
 import { resolveEditorViewer } from "./viewerRegistry";
 import type { EditorDocument } from "./viewerTypes";
+import type { ViewerSurfacePreparation } from "./viewerContract";
 
 /**
  * Renderer-side route preview for the optional Viewer Pack adapter. The main
@@ -33,6 +37,24 @@ export function resolveViewerRouteForDocument(
     snapshot: snapshot ?? EMPTY_VIEWER_PACK_SNAPSHOT,
     sourceKind: normalizeDocumentSourceKind(document.sourceKind),
   });
+}
+
+/**
+ * Resolves the layout requirement before DocumentSurfaceHost mounts a Viewer.
+ * External Viewer Pack surfaces are conservatively visible-first because the
+ * Host may attach a native/WebGL/worker-backed renderer outside React's DOM.
+ */
+export function resolveViewerSurfacePreparationForDocument(
+  document: EditorDocument,
+  adapter: ViewerExtensionHostAdapter | null | undefined,
+): ViewerSurfacePreparation {
+  const { viewer } = resolveEditorViewer(document);
+  if (!adapter?.renderSurface) return viewer.surfacePreparation;
+
+  const route = resolveViewerRouteForDocument(document, adapter.snapshot);
+  return route.kind === "plugin" || route.kind === "chooser"
+    ? "requires-visible"
+    : viewer.surfacePreparation;
 }
 
 export type ExternalViewerAdapterProps = {

@@ -51,6 +51,29 @@ if (!/export function DocumentSurfacePending[\s\S]*?role="status"[\s\S]*?aria-bu
     "DocumentSurfacePending no longer provides the shared non-visual busy contract",
   );
 }
+if (
+  !documentSurfaceSource.includes('preparation === "requires-visible"')
+  || !documentSurfaceSource.includes('data-surface-preparation={entry.preparation}')
+) {
+  errors.push(
+    "DocumentSurfaceHost no longer activates visible-first Viewers outside the hidden staging slot",
+  );
+}
+
+const pdfViewerSource = readFileSync(
+  path.join(repoRoot, "packages/shared-ui/src/editor/viewers/PdfViewer.tsx"),
+  "utf8",
+);
+if (
+  !pdfViewerSource.includes("getDocument({")
+  || !pdfViewerSource.includes("await renderTask.promise")
+  || !pdfViewerSource.includes("onFirstPageReady")
+  || /<iframe\b/.test(pdfViewerSource)
+) {
+  errors.push(
+    "PDF Viewer must use PDF.js canvas first-frame readiness and cannot regress to an iframe",
+  );
+}
 
 const documentSurfaceConsumers = [
   path.join(repoRoot, "packages/shared-ui/src/editor/PuppyoneEditorHost.tsx"),

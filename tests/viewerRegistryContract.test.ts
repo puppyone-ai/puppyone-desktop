@@ -70,6 +70,24 @@ describe("preset viewer contribution contract", () => {
     ])).toEqual(new Set(PRESET_VIEWER_MANIFEST.viewers.map(({ id }) => id)));
   });
 
+  it("declares the layout and first-frame contract for every preset Viewer", () => {
+    expect(PRESET_VIEWER_MANIFEST.viewers.every((viewer) => (
+      viewer.surfacePreparation === "hidden-safe"
+      || viewer.surfacePreparation === "requires-visible"
+    ))).toBe(true);
+    expect(resolveEditorViewer(document("report.pdf")).viewer).toMatchObject({
+      runtime: "lazy",
+      surfacePreparation: "requires-visible",
+      readinessSignal: "first-rendered-frame",
+    });
+    expect(resolveEditorViewer(document("page.html")).viewer.surfacePreparation)
+      .toBe("requires-visible");
+    expect(resolveEditorViewer(document("movie.mp4")).viewer.surfacePreparation)
+      .toBe("requires-visible");
+    expect(resolveEditorViewer(document("photo.png")).viewer.surfacePreparation)
+      .toBe("hidden-safe");
+  });
+
   it.each([
     [document("notes.md"), "markdown", "content", "edit"],
     [document("settings.json", "text"), "json", "content", "edit"],

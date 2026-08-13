@@ -3,13 +3,29 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const manifestJson = require("../../../packages/shared-ui/src/editor/presetViewerManifest.json");
 
-const CONTRACT_VERSION = 2;
+const CONTRACT_VERSION = 3;
 const CAPABILITIES = new Set(["edit", "preview", "placeholder"]);
 const SOURCES = new Set(["content", "resource", "content-and-resource", "none"]);
 const RUNTIMES = new Set(["eager", "lazy"]);
+const SURFACE_PREPARATIONS = new Set(["hidden-safe", "requires-visible"]);
+const READINESS_SIGNALS = new Set([
+  "dom-stable",
+  "decoded-resource",
+  "frame-paint",
+  "first-rendered-frame",
+  "media-metadata",
+]);
 const ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const MANIFEST_KEYS = new Set(["contractVersion", "fallbackViewerId", "viewers"]);
-const DEFINITION_KEYS = new Set(["id", "formatViewerIds", "capability", "source", "runtime"]);
+const DEFINITION_KEYS = new Set([
+  "id",
+  "formatViewerIds",
+  "capability",
+  "source",
+  "runtime",
+  "surfacePreparation",
+  "readinessSignal",
+]);
 
 export const PRESET_VIEWER_MANIFEST = parseManifest(manifestJson);
 
@@ -101,6 +117,12 @@ function parseDefinition(input, index) {
   if (!RUNTIMES.has(record.runtime)) {
     throw new TypeError(`Preset viewer ${record.id} has an unsupported runtime boundary.`);
   }
+  if (!SURFACE_PREPARATIONS.has(record.surfacePreparation)) {
+    throw new TypeError(`Preset viewer ${record.id} has an unsupported surface preparation policy.`);
+  }
+  if (!READINESS_SIGNALS.has(record.readinessSignal)) {
+    throw new TypeError(`Preset viewer ${record.id} has an unsupported readiness signal.`);
+  }
   if (record.capability === "edit" && record.source === "none") {
     throw new TypeError(`Editable preset viewer ${record.id} must receive content or a resource.`);
   }
@@ -118,6 +140,8 @@ function parseDefinition(input, index) {
     capability: record.capability,
     source: record.source,
     runtime: record.runtime,
+    surfacePreparation: record.surfacePreparation,
+    readinessSignal: record.readinessSignal,
   });
 }
 

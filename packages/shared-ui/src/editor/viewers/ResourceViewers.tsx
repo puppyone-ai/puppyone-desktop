@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { FilePreviewIcon } from "../../file/fileIcons";
 import { DocumentSurfacePending } from "../DocumentSurfaceHost";
 import type { PresetViewerRenderContext } from "../viewerTypes";
 
-type ResourceViewerProps = Pick<
+export type ResourceViewerProps = Pick<
   PresetViewerRenderContext,
   | "document"
   | "fileUrl"
@@ -72,18 +72,6 @@ function ImagePreviewSurface({ url, name }: { url: string; name: string }) {
   );
 }
 
-export function PdfResourceViewer({ document, fileUrl, fileUrlLoading, fileUrlError }: ResourceViewerProps) {
-  return (
-    <ResourcePreviewState fileUrl={fileUrl} loading={fileUrlLoading} error={fileUrlError} kind="pdf">
-      {(url) => (
-        <div className="native-preview native-preview-framed">
-          <PdfPreviewFrame url={url} title={document.name} />
-        </div>
-      )}
-    </ResourcePreviewState>
-  );
-}
-
 export function AudioResourceViewer({ document, fileUrl, fileUrlLoading, fileUrlError, fileIconTheme }: ResourceViewerProps) {
   return (
     <ResourcePreviewState fileUrl={fileUrl} loading={fileUrlLoading} error={fileUrlError} kind="audio">
@@ -120,8 +108,17 @@ function AudioPreviewSurface({
   mimeType?: string | null;
   fileIconTheme: ResourceViewerProps["fileIconTheme"];
 }) {
+  const { t } = useLocalization();
   const [readyUrl, setReadyUrl] = useState<string | null>(null);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const ready = readyUrl === url;
+  if (failedUrl === url) {
+    return (
+      <div className="editor-state danger">
+        {t("editor.resource.unavailable", { kind: t("editor.resource.kind.audio") })}
+      </div>
+    );
+  }
   return (
     <div
       className="native-preview native-preview-centered"
@@ -136,7 +133,7 @@ function AudioPreviewSurface({
           controls
           preload="metadata"
           onLoadedMetadata={() => setReadyUrl(url)}
-          onError={() => setReadyUrl(url)}
+          onError={() => setFailedUrl(url)}
         >
           <source src={url} type={mimeType ?? undefined} />
           <UnsupportedMedia kind="audio" />
@@ -147,8 +144,17 @@ function AudioPreviewSurface({
 }
 
 function VideoPreviewSurface({ url, mimeType }: { url: string; mimeType?: string | null }) {
+  const { t } = useLocalization();
   const [readyUrl, setReadyUrl] = useState<string | null>(null);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const ready = readyUrl === url;
+  if (failedUrl === url) {
+    return (
+      <div className="editor-state danger">
+        {t("editor.resource.unavailable", { kind: t("editor.resource.kind.video") })}
+      </div>
+    );
+  }
   return (
     <div
       className="native-preview native-preview-centered"
@@ -159,9 +165,9 @@ function VideoPreviewSurface({ url, mimeType }: { url: string; mimeType?: string
         key={url}
         className="native-video-preview"
         controls
-        preload="metadata"
-        onLoadedMetadata={() => setReadyUrl(url)}
-        onError={() => setReadyUrl(url)}
+        preload="auto"
+        onLoadedData={(event) => markVideoFrameReady(event.currentTarget, () => setReadyUrl(url))}
+        onError={() => setFailedUrl(url)}
       >
         <source src={url} type={mimeType ?? undefined} />
         <UnsupportedMedia kind="video" />
@@ -170,7 +176,15 @@ function VideoPreviewSurface({ url, mimeType }: { url: string; mimeType?: string
   );
 }
 
-function ResourcePreviewState({
+function markVideoFrameReady(video: HTMLVideoElement, onReady: () => void) {
+  if (typeof video.requestVideoFrameCallback === "function") {
+    video.requestVideoFrameCallback(() => onReady());
+    return;
+  }
+  window.requestAnimationFrame(onReady);
+}
+
+export function ResourcePreviewState({
   fileUrl,
   loading,
   error,
@@ -208,80 +222,4 @@ function ResourcePreviewState({
 function UnsupportedMedia({ kind }: { kind: "audio" | "video" }) {
   const { t } = useLocalization();
   return <>{t(`editor.resource.unsupported.${kind}`)}</>;
-}
-
-function PdfPreviewFrame({ url, title }: { url: string; title: string }) {
-  const { t } = useLocalization();
-  const shouldUseBlobUrl = url.startsWith("puppyone-local:");
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [blobError, setBlobError] = useState<string | null>(null);
-  const [readyFrameUrl, setReadyFrameUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!shouldUseBlobUrl) {
-      setBlobUrl(null);
-      setBlobError(null);
-      return undefined;
-    }
-
-    let cancelled = false;
-    let objectUrl: string | null = null;
-
-    setBlobUrl(null);
-    setBlobError(null);
-
-    fetch(url)
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        return response.blob();
-      })
-      .then((blob) => {
-        const pdfBlob = blob.type === "application/pdf"
-          ? blob
-          : blob.slice(0, blob.size, "application/pdf");
-        objectUrl = URL.createObjectURL(pdfBlob);
-        if (cancelled) {
-          URL.revokeObjectURL(objectUrl);
-          return;
-        }
-        setBlobUrl(objectUrl);
-      })
-      .catch((error) => {
-        if (!cancelled) setBlobError(error instanceof Error ? error.message : String(error));
-      });
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [shouldUseBlobUrl, url]);
-
-  if (blobError) {
-    return (
-      <div className="editor-state danger">
-        {t("editor.resource.loadFailed", {
-          kind: t("editor.resource.kind.pdf"),
-          detail: bidiIsolate(blobError),
-        })}
-      </div>
-    );
-  }
-
-  if (shouldUseBlobUrl && !blobUrl) {
-    return <DocumentSurfacePending label={t("editor.preview.loading")} />;
-  }
-
-  const frameUrl = shouldUseBlobUrl ? blobUrl as string : url;
-  return (
-    <iframe
-      key={frameUrl}
-      className="native-preview-frame"
-      src={frameUrl}
-      title={title}
-      aria-busy={readyFrameUrl !== frameUrl}
-      onLoad={() => setReadyFrameUrl(frameUrl)}
-    />
-  );
 }

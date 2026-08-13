@@ -1,129 +1,77 @@
 import { describe, expect, it, vi } from "vitest";
 import { createAppPreviewService } from "../electron/main/app-preview-service.mjs";
 
-describe("App Preview service", () => {
-  it("coordinates a running workspace runtime with a reusable browser surface", async () => {
-    const runtimeResult = {
-      runtimeId: "runtime-1",
-      appId: "app-1",
-      name: "Demo",
-      status: "running",
-      path: "demo.puppyoneapp",
-      url: "http://127.0.0.1:4173/",
-    };
-    const runtime = {
-      start: vi.fn(async () => runtimeResult),
-      restart: vi.fn(async () => ({ ...runtimeResult, runtimeId: "runtime-2" })),
-      stop: vi.fn(async () => ({ ...runtimeResult, status: "stopped" })),
-      stopForIdle: vi.fn(async () => ({ ...runtimeResult, status: "stopped" })),
-      getLogs: vi.fn(),
-      openExternal: vi.fn(),
-      closeSessionsForWindow: vi.fn(),
-      closeAll: vi.fn(),
-    };
-    const browserSurfaces = {
-      activate: vi.fn(async (request) => ({ surfaceId: "surface-1", ...request, status: "ready" })),
-      setBounds: vi.fn(() => ({ ok: true, visible: true })),
-      detach: vi.fn(() => ({ ok: true })),
-      runCommand: vi.fn(() => ({ ok: true })),
-      destroyApp: vi.fn(),
-      destroyWorkspace: vi.fn(),
-      destroyOwner: vi.fn(),
-      destroyAll: vi.fn(),
-    };
-    const service = createAppPreviewService({ runtime, browserSurfaces });
+describe("App Preview runtime coordinator", () => {
+  it("serializes Stop behind an in-flight Start for the same App", async () => {
+    let releaseStart;
+    const runtime = createRuntime({
+      start: vi.fn(() => new Promise((resolve) => { releaseStart = resolve; })),
+    });
+    const service = createAppPreviewService({ runtime });
     const sender = { id: 42 };
-    const request = {
-      rootPath: "/workspace",
-      path: "demo.puppyoneapp",
-      attachmentId: "attachment-1",
-      bounds: { x: 0, y: 0, width: 500, height: 400 },
-    };
+    const request = { rootPath: "/workspace", path: "demo.puppyoneapp" };
 
-    const activated = await service.activate(sender, request);
-    expect(activated.runtime).toBe(runtimeResult);
-    expect(browserSurfaces.activate).toHaveBeenCalledWith(expect.objectContaining({
-      ownerWebContentsId: 42,
-      rootPath: "/workspace",
-      appPath: "demo.puppyoneapp",
-      runtimeId: "runtime-1",
-      attachmentId: "attachment-1",
-    }));
+    const starting = service.start(sender, request);
+    const stopping = service.stop(sender, request);
+    await vi.waitFor(() => expect(releaseStart).toBeTypeOf("function"));
+    expect(runtime.stop).not.toHaveBeenCalled();
 
-    await service.stop(sender, request);
-    expect(browserSurfaces.destroyApp).toHaveBeenCalledWith(
-      "/workspace",
-      "demo.puppyoneapp",
-      null,
-      "runtime-stopped",
-    );
-    service.closeSessionsForWindow(42);
-    expect(browserSurfaces.destroyOwner).toHaveBeenCalledWith(42, "owner-closed");
+    releaseStart(runningResult());
+    await starting;
+    await stopping;
+    expect(runtime.stop).toHaveBeenCalledWith(sender, request);
+  });
+
+  it("waits for pending owner mutations before closing the window runtime", async () => {
+    let releaseStart;
+    const runtime = createRuntime({
+      start: vi.fn(() => new Promise((resolve) => { releaseStart = resolve; })),
+    });
+    const service = createAppPreviewService({ runtime });
+    const request = { rootPath: "/workspace", path: "demo.puppyoneapp" };
+
+    const starting = service.start({ id: 42 }, request);
+    const closing = service.closeSessionsForWindow(42);
+    await vi.waitFor(() => expect(releaseStart).toBeTypeOf("function"));
+    expect(runtime.closeSessionsForWindow).not.toHaveBeenCalled();
+
+    releaseStart(runningResult());
+    await starting;
+    await closing;
     expect(runtime.closeSessionsForWindow).toHaveBeenCalledWith(42);
   });
 
-  it("keeps detached apps warm briefly and collects them after the idle lease expires", async () => {
-    vi.useFakeTimers();
-    try {
-      const runtimeResult = {
-        runtimeId: "runtime-1",
-        appId: "app-1",
-        name: "Demo",
-        status: "running",
-        path: "demo.puppyoneapp",
-        url: "http://127.0.0.1:4173/",
-      };
-      const runtime = {
-        start: vi.fn(async () => runtimeResult),
-        restart: vi.fn(async () => runtimeResult),
-        stop: vi.fn(),
-        stopForIdle: vi.fn(async () => ({ ...runtimeResult, status: "stopped" })),
-        getLogs: vi.fn(),
-        openExternal: vi.fn(),
-        closeSessionsForWindow: vi.fn(),
-        closeAll: vi.fn(),
-      };
-      const browserSurfaces = {
-        activate: vi.fn(async (request) => ({ ...request, surfaceId: "surface-1", attached: true })),
-        setBounds: vi.fn(),
-        detach: vi.fn(() => ({ ok: true })),
-        runCommand: vi.fn(),
-        destroyApp: vi.fn(),
-        destroyOwner: vi.fn(),
-        destroyAll: vi.fn(),
-      };
-      const service = createAppPreviewService({ runtime, browserSurfaces, idleTimeoutMs: 60_000 });
-      const sender = { id: 42 };
-      const request = {
-        rootPath: "/workspace",
-        path: "demo.puppyoneapp",
-        attachmentId: "attachment-1",
-        bounds: { x: 0, y: 0, width: 500, height: 400 },
-      };
-
-      await service.activate(sender, request);
-      service.detachSurface(sender, { surfaceId: "surface-1", attachmentId: "attachment-1" });
-      await vi.advanceTimersByTimeAsync(59_999);
-      expect(runtime.stopForIdle).not.toHaveBeenCalled();
-
-      await service.activate(sender, { ...request, attachmentId: "attachment-2" });
-      await vi.advanceTimersByTimeAsync(1);
-      expect(runtime.stopForIdle).not.toHaveBeenCalled();
-
-      service.detachSurface(sender, { surfaceId: "surface-1", attachmentId: "attachment-2" });
-      await vi.advanceTimersByTimeAsync(60_000);
-      expect(runtime.stopForIdle).toHaveBeenCalledWith({
-        rootPath: "/workspace",
-        path: "demo.puppyoneapp",
-      });
-      expect(browserSurfaces.destroyApp).toHaveBeenCalledWith(
-        "/workspace",
-        "demo.puppyoneapp",
-        null,
-        "idle-timeout",
-      );
-    } finally {
-      vi.useRealTimers();
-    }
+  it("keeps different Apps independent", async () => {
+    const runtime = createRuntime();
+    const service = createAppPreviewService({ runtime });
+    await Promise.all([
+      service.start({ id: 42 }, { rootPath: "/workspace", path: "one.puppyoneapp" }),
+      service.start({ id: 42 }, { rootPath: "/workspace", path: "two.puppyoneapp" }),
+    ]);
+    expect(runtime.start).toHaveBeenCalledTimes(2);
   });
 });
+
+function createRuntime(overrides = {}) {
+  return {
+    start: vi.fn(async () => runningResult()),
+    restart: vi.fn(async () => runningResult()),
+    stop: vi.fn(async () => ({ ...runningResult(), status: "stopped" })),
+    getLogs: vi.fn(async () => ""),
+    openExternal: vi.fn(async () => undefined),
+    closeSessionsForWindow: vi.fn(async () => undefined),
+    closeAll: vi.fn(async () => undefined),
+    ...overrides,
+  };
+}
+
+function runningResult() {
+  return {
+    runtimeId: "runtime-1",
+    appId: "app-1",
+    name: "Demo",
+    status: "running",
+    path: "demo.puppyoneapp",
+    url: "http://127.0.0.1:4173/",
+  };
+}

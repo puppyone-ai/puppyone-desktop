@@ -377,14 +377,20 @@ source-code extensions)
 
 **PDF** (`.pdf`)
 
-- Bar: Chromium's built-in PDF viewer in an iframe; local files are
-  re-wrapped as blob URLs (the custom protocol cannot feed the PDF
-  plugin directly); loading/error states per the cross-cutting bar.
-- Status: met.
+- Bar: PDF.js renders authorized resource bytes into editor-owned canvases;
+  the Viewer is activated in a visible layout slot and reports ready only
+  after the first page's render promise completes. Remaining pages render
+  near the scroll viewport, and resize is driven by the editor container.
+  The Chromium PDF extension/plugin and blob-iframe path are not part of the
+  product contract.
+- Security: use the current patched PDF.js production dependency and keep the
+  production dependency audit clean before release.
+- Status: met, including real Electron switch/first-frame/resize smoke coverage.
 
 **Audio / Video** (registry audio/video families)
 
-- Bar: native `<audio>`/`<video>` elements with `preload="metadata"`;
+- Bar: native `<audio>` uses metadata readiness; `<video>` waits for decoded
+  data plus `requestVideoFrameCallback` (with an animation-frame fallback);
   codec coverage is whatever Chromium decodes — formats it cannot play
   fall back to the media element's error state; seeking/scrubbing must
   work for large local files, which requires the `puppyone-local://`

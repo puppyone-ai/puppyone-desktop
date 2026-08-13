@@ -8,6 +8,7 @@ import { DocumentSurfacePending } from "../DocumentSurfaceHost";
 import { getHtmlPreviewInteractionCss } from "../htmlPreviewInteraction";
 import { PlainTextEditor } from "../PlainTextEditor";
 import type { MarkdownHtmlTrustMode, PresetViewerRenderContext } from "../viewerTypes";
+import { useVisibleFrameReadiness } from "./useVisibleFrameReadiness";
 
 export function HtmlViewer({
   document,
@@ -113,7 +114,7 @@ function HtmlPreviewFrame({
     fileUrl ?? "",
     content ? `${content.length}:${hashString(content)}` : "",
   ].join("|");
-  const [readyFrameKey, setReadyFrameKey] = useState<string | null>(null);
+  const frameReadiness = useVisibleFrameReadiness(frameKey);
 
   return (
     <iframe
@@ -125,8 +126,8 @@ function HtmlPreviewFrame({
       referrerPolicy="no-referrer"
       src={useFileUrl ? fileUrl ?? undefined : undefined}
       srcDoc={!useFileUrl && content ? buildHtmlPreviewDocument(content, fileUrl, policy) : undefined}
-      aria-busy={readyFrameKey !== frameKey}
-      onLoad={() => setReadyFrameKey(frameKey)}
+      aria-busy={!frameReadiness.ready}
+      onLoad={frameReadiness.onFrameLoad}
     />
   );
 }

@@ -23,7 +23,6 @@ import { HtmlViewer } from "./viewers/HtmlViewer";
 import {
   AudioResourceViewer,
   ImageResourceViewer,
-  PdfResourceViewer,
   VideoResourceViewer,
 } from "./viewers/ResourceViewers";
 import { formatJson } from "./viewers/viewerUtils";
@@ -45,6 +44,8 @@ const RESOLVED_PRESET_VIEWER_KEYS = new Set([
   "capability",
   "source",
   "runtime",
+  "surfacePreparation",
+  "readinessSignal",
   ...PRESET_VIEWER_IMPLEMENTATION_KEYS,
 ]);
 
@@ -85,7 +86,14 @@ function normalizePresetViewerContribution(
     throw new TypeError("Preset viewer id must be a string.");
   }
   const definition = getPresetViewerDefinition(record.id);
-  for (const key of ["contractVersion", "capability", "source", "runtime"] as const) {
+  for (const key of [
+    "contractVersion",
+    "capability",
+    "source",
+    "runtime",
+    "surfacePreparation",
+    "readinessSignal",
+  ] as const) {
     if (record[key] !== definition[key]) {
       throw new TypeError(`Preset viewer ${record.id} does not match canonical ${key} metadata.`);
     }
@@ -224,7 +232,9 @@ const PRESET_VIEWER_DEFINITIONS: PresetViewerContribution[] = [
   definePresetViewer({
     id: "pdf-preview",
     match: ({ document, format }) => document.type === "pdf" || format.defaultViewer === "pdf-preview",
-    render: (context) => <PdfResourceViewer {...context} />,
+    load: () => import("./viewers/PdfViewer").then(({ PdfResourceViewer }) => ({
+      default: PdfResourceViewer,
+    })),
   }),
   definePresetViewer({
     id: "office-preview",

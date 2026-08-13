@@ -27,6 +27,7 @@ import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
 import type { AiEditFile } from "../editor/ai-edits/types";
 import { FilePreviewIcon, type FileIconThemeId } from "../file/fileIcons";
 import type { DocumentPersistedCommit } from "../editor/document-session/types";
+import { resolveViewerSurfacePreparationForDocument } from "../editor/viewerPackAdapter";
 
 export type FilePreviewProps = {
   node: DataNode | null;
@@ -97,9 +98,21 @@ export function FilePreview({
     ? typeof actionSlot === "function" ? actionSlot(node) : actionSlot
     : null;
   const deferFallbackContent = loading && !fileContent;
+  const surfacePreparation = node
+    ? resolveViewerSurfacePreparationForDocument({
+      path: node.path,
+      name: node.name,
+      type: fileContent?.type ?? node.type,
+      mimeType: fileContent?.mimeType ?? node.mimeType ?? null,
+      sourceKind: documentSourceKind,
+    }, viewerExtensionAdapter)
+    : "hidden-safe";
 
   return (
-    <DocumentSurfaceHost surfaceKey={surfaceKey}>
+    <DocumentSurfaceHost
+      surfaceKey={surfaceKey}
+      surfacePreparation={surfacePreparation}
+    >
       {({ onSurfaceReady }) => node ? (
         <div className={`file-preview-shell ${showHeader ? "" : "without-header"}`}>
           {showHeader && (

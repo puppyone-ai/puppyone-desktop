@@ -1,10 +1,6 @@
 import type {
   AiEditRequest,
-  AppPreviewActivationResult,
-  AppPreviewBounds,
   AppPreviewResult,
-  AppPreviewSurfaceCommand,
-  AppPreviewSurfaceState,
   DataNode,
   FileContent,
   Workspace,
@@ -859,13 +855,6 @@ declare global {
       resolveExternalOpenTarget: (request: WorkspaceResolveExternalOpenTargetRequest) => Promise<WorkspaceExternalOpenTarget>;
       listExternalOpenTargets: (request: WorkspaceResolveExternalOpenTargetRequest) => Promise<WorkspaceExternalOpenTarget[]>;
       chooseExternalApp: (request: WorkspaceChooseExternalAppRequest) => Promise<WorkspaceExternalOpenTarget | null>;
-      activateAppPreview: (request: {
-        rootPath: string;
-        path: string;
-        bounds: AppPreviewBounds;
-        attachmentId: string;
-        visible: boolean;
-      }) => Promise<AppPreviewActivationResult>;
       startAppPreview: (request: {
         rootPath: string;
         path: string;
@@ -873,10 +862,7 @@ declare global {
       restartAppPreview: (request: {
         rootPath: string;
         path: string;
-        bounds?: AppPreviewBounds;
-        attachmentId?: string;
-        visible?: boolean;
-      }) => Promise<AppPreviewResult | AppPreviewActivationResult>;
+      }) => Promise<AppPreviewResult>;
       stopAppPreview: (request: {
         rootPath: string;
         path: string;
@@ -889,25 +875,8 @@ declare global {
         rootPath: string;
         path: string;
       }) => Promise<{ ok: boolean }>;
-      setAppPreviewSurfaceBounds: (request: {
-        surfaceId: string;
-        attachmentId: string;
-        bounds: AppPreviewBounds;
-        visible: boolean;
-      }) => Promise<{ ok: boolean; visible: boolean }>;
-      detachAppPreviewSurface: (request: {
-        surfaceId?: string | null;
-        attachmentId: string;
-      }) => Promise<{ ok: boolean }>;
-      runAppPreviewSurfaceCommand: (request: {
-        surfaceId: string;
-        command: AppPreviewSurfaceCommand;
-      }) => Promise<{ ok: boolean }>;
       onAppPreviewRuntimeState: (
         callback: (state: AppPreviewResult & { rootPath: string }) => void,
-      ) => () => void;
-      onAppPreviewSurfaceState: (
-        callback: (state: AppPreviewSurfaceState & { rootPath: string }) => void,
       ) => () => void;
       watchWorkspace: (
         rootPath: string,

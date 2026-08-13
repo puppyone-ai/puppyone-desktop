@@ -141,7 +141,8 @@ model.
 
 1. The canonical File Format registry, serializable Preset Viewer manifest, and
    versioned implementation registry are active production paths. The manifest
-   is the single source of truth for capability, source, and runtime metadata;
+   is the single source of truth for capability, source, runtime, surface
+   preparation, and first-frame readiness metadata;
    the registry binds reviewed React implementations without repeating those
    authority fields. Existing Markdown, text/code, CSV, HTML, Office, image,
    PDF, audio, video, PuppyFlow, and placeholder viewers are built-in

@@ -820,6 +820,32 @@ body.data-sidebar-resizing .data-content:not([data-explorer-collapsed="true"]) {
   pointer-events: none;
 }
 
+.document-surface-slot.is-committed[data-surface-preparation="requires-visible"][data-surface-ready="false"]::after {
+  position: absolute;
+  z-index: 10;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 2px solid color-mix(in srgb, var(--po-text-subtle) 28%, transparent);
+  border-top-color: var(--po-text-muted);
+  border-radius: 999px;
+  content: "";
+  pointer-events: none;
+  animation: po-document-surface-spin 700ms linear infinite;
+}
+
+@keyframes po-document-surface-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .document-surface-slot.is-committed[data-surface-preparation="requires-visible"][data-surface-ready="false"]::after {
+    animation: none;
+  }
+}
+
 .file-preview-shell.without-header {
   border-bottom: 0;
 }

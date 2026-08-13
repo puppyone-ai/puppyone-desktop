@@ -1,5 +1,5 @@
 {
-  "contractVersion": 2,
+  "contractVersion": 3,
   "fallbackViewerId": "document-placeholder",
   "viewers": [
     {
@@ -7,91 +7,117 @@
       "formatViewerIds": [],
       "capability": "preview",
       "source": "content",
-      "runtime": "eager"
+      "runtime": "eager",
+      "surfacePreparation": "requires-visible",
+      "readinessSignal": "frame-paint"
     },
     {
       "id": "markdown",
       "formatViewerIds": ["markdown-editor"],
       "capability": "edit",
       "source": "content",
-      "runtime": "lazy"
+      "runtime": "lazy",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "dom-stable"
     },
     {
       "id": "puppyflow",
       "formatViewerIds": ["puppyflow-editor"],
       "capability": "edit",
       "source": "content",
-      "runtime": "lazy"
+      "runtime": "lazy",
+      "surfacePreparation": "requires-visible",
+      "readinessSignal": "dom-stable"
     },
     {
       "id": "json",
       "formatViewerIds": [],
       "capability": "edit",
       "source": "content",
-      "runtime": "eager"
+      "runtime": "eager",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "dom-stable"
     },
     {
       "id": "csv-table",
       "formatViewerIds": [],
       "capability": "edit",
       "source": "content",
-      "runtime": "eager"
+      "runtime": "eager",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "dom-stable"
     },
     {
       "id": "html-artifact",
       "formatViewerIds": [],
       "capability": "preview",
       "source": "content-and-resource",
-      "runtime": "eager"
+      "runtime": "eager",
+      "surfacePreparation": "requires-visible",
+      "readinessSignal": "frame-paint"
     },
     {
       "id": "image-preview",
       "formatViewerIds": [],
       "capability": "preview",
       "source": "resource",
-      "runtime": "eager"
+      "runtime": "eager",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "decoded-resource"
     },
     {
       "id": "pdf-preview",
       "formatViewerIds": [],
       "capability": "preview",
       "source": "resource",
-      "runtime": "eager"
+      "runtime": "lazy",
+      "surfacePreparation": "requires-visible",
+      "readinessSignal": "first-rendered-frame"
     },
     {
       "id": "office-preview",
       "formatViewerIds": [],
       "capability": "preview",
       "source": "resource",
-      "runtime": "lazy"
+      "runtime": "lazy",
+      "surfacePreparation": "requires-visible",
+      "readinessSignal": "first-rendered-frame"
     },
     {
       "id": "audio-preview",
       "formatViewerIds": [],
       "capability": "preview",
       "source": "resource",
-      "runtime": "eager"
+      "runtime": "eager",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "media-metadata"
     },
     {
       "id": "video-preview",
       "formatViewerIds": [],
       "capability": "preview",
       "source": "resource",
-      "runtime": "eager"
+      "runtime": "eager",
+      "surfacePreparation": "requires-visible",
+      "readinessSignal": "first-rendered-frame"
     },
     {
       "id": "text",
       "formatViewerIds": ["plain-text", "monaco-code"],
       "capability": "edit",
       "source": "content",
-      "runtime": "eager"
+      "runtime": "eager",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "dom-stable"
     },
     {
       "id": "document-placeholder",
       "formatViewerIds": ["binary-placeholder"],
       "capability": "placeholder",
       "source": "none",
-      "runtime": "eager"
+      "runtime": "eager",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "dom-stable"
     }
   ]
 }

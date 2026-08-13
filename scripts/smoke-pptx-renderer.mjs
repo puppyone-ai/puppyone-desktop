@@ -13,7 +13,7 @@ const fixturePath = path.join(
 );
 const rendererPath = path.join(
   repoRoot,
-  "node_modules/@aiden0z/pptx-renderer/dist/aiden0z-pptx-renderer.es.js",
+  "node_modules/@aiden0z/pptx-renderer/dist/aiden0z-pptx-renderer.browser.es.js",
 );
 const jszipPath = path.join(repoRoot, "node_modules/jszip/dist/jszip.min.js");
 const requestedOutputIndex = process.argv.indexOf("--output-dir");

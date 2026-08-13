@@ -4,10 +4,14 @@ import {
   PRESET_VIEWER_CONTRACT_VERSION,
   PRESET_VIEWER_RUNTIMES,
   PRESET_VIEWER_SOURCES,
+  VIEWER_SURFACE_PREPARATIONS,
+  VIEWER_SURFACE_READINESS_SIGNALS,
   type CoreViewerCapability,
   type PresetViewerContractVersion,
   type PresetViewerRuntime,
   type PresetViewerSource,
+  type ViewerSurfacePreparation,
+  type ViewerSurfaceReadinessSignal,
 } from "./viewerContract";
 
 export type PresetViewerDefinition = Readonly<{
@@ -17,6 +21,8 @@ export type PresetViewerDefinition = Readonly<{
   capability: CoreViewerCapability;
   source: PresetViewerSource;
   runtime: PresetViewerRuntime;
+  surfacePreparation: ViewerSurfacePreparation;
+  readinessSignal: ViewerSurfaceReadinessSignal;
 }>;
 
 export type PresetViewerManifest = Readonly<{
@@ -33,6 +39,8 @@ const DEFINITION_KEYS = new Set([
   "capability",
   "source",
   "runtime",
+  "surfacePreparation",
+  "readinessSignal",
 ]);
 
 export const PRESET_VIEWER_MANIFEST = parsePresetViewerManifest(manifestJson);
@@ -144,6 +152,12 @@ function parseDefinition(input: unknown, index: number): PresetViewerDefinition 
   if (!PRESET_VIEWER_RUNTIMES.includes(record.runtime as never)) {
     throw new TypeError(`Preset viewer ${record.id} has an unsupported runtime boundary.`);
   }
+  if (!VIEWER_SURFACE_PREPARATIONS.includes(record.surfacePreparation as never)) {
+    throw new TypeError(`Preset viewer ${record.id} has an unsupported surface preparation policy.`);
+  }
+  if (!VIEWER_SURFACE_READINESS_SIGNALS.includes(record.readinessSignal as never)) {
+    throw new TypeError(`Preset viewer ${record.id} has an unsupported readiness signal.`);
+  }
 
   const capability = record.capability as CoreViewerCapability;
   const source = record.source as PresetViewerSource;
@@ -164,6 +178,8 @@ function parseDefinition(input: unknown, index: number): PresetViewerDefinition 
     capability,
     source,
     runtime: record.runtime as PresetViewerRuntime,
+    surfacePreparation: record.surfacePreparation as ViewerSurfacePreparation,
+    readinessSignal: record.readinessSignal as ViewerSurfaceReadinessSignal,
   });
 }
 
