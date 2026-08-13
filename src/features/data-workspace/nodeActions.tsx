@@ -27,10 +27,10 @@ import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core"
 import { useLocalization } from "@puppyone/localization/react";
 import { DesktopDialogCloseButton, DesktopDialogRoot } from "../../components/DesktopDialog";
 import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../components/DesktopMenu";
-import type { CreateNewFileTypeId, ExperimentalSettings } from "../../preferences";
+import type { CreateNewItemId, ExperimentalSettings } from "../../preferences";
 import { createUnconfiguredAppPreviewManifestContent } from "../../../shared/appPreviewManifest.js";
 
-export type DesktopCreateEntryKind = "folder" | "markdown" | "text" | "json" | "csv" | "app" | "puppyflow";
+export type DesktopCreateEntryKind = "folder" | CreateNewItemId;
 export type DesktopCreateEntryAnchor = {
   left: number;
   top: number;
@@ -111,6 +111,16 @@ const CREATE_ENTRY_OPTIONS = [
     iconName: "Untitled.csv",
     iconType: "spreadsheet",
   },
+  {
+    kind: "html",
+    iconName: "Untitled.html",
+    iconType: "html",
+  },
+  {
+    kind: "slides",
+    iconName: "Untitled Slides.puppyoneapp",
+    iconType: "app",
+  },
 ] as const satisfies Array<{
   kind: DesktopCreateEntryKind;
   iconName: string;
@@ -163,13 +173,13 @@ export function DesktopExplorerRowActions({
 
 export function DesktopCreateEntryMenu({
   draft,
-  fileKinds,
+  itemKinds,
   fileIconTheme,
   onCancel,
   onSelectKind,
 }: {
   draft: DesktopCreateEntryDraft;
-  fileKinds: readonly CreateNewFileTypeId[];
+  itemKinds: readonly CreateNewItemId[];
   fileIconTheme?: FileIconThemeId | null;
   onCancel: () => void;
   onSelectKind: (kind: DesktopCreateEntryKind) => void;
@@ -178,7 +188,7 @@ export function DesktopCreateEntryMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const menuOptions = [
     getCreateEntryOption("folder"),
-    ...Array.from(new Set(fileKinds)).map((kind) => getCreateEntryOption(kind)),
+    ...Array.from(new Set(itemKinds)).map((kind) => getCreateEntryOption(kind)),
   ];
   const sidebarLauncher = draft.anchor.placement === "auto-end";
   const menuWidth = sidebarLauncher
@@ -331,6 +341,21 @@ export function DesktopCreateEntryDialog({
               }}
             />
           </div>
+
+          {selectedKind === "slides" && (
+            <section className="desktop-slides-template" aria-label={t("workspace.node.create.slides.templateLabel")}>
+              <div className="desktop-slides-template-preview" aria-hidden="true">
+                <span>{t("workspace.node.create.slides.brand")}</span>
+                <strong>{t("workspace.node.create.slides.previewTitle")}</strong>
+                <i />
+              </div>
+              <div className="desktop-slides-template-copy">
+                <strong>{t("workspace.node.create.slides.defaultTemplate")}</strong>
+                <span>{t("workspace.node.create.slides.defaultTemplateDetail")}</span>
+              </div>
+              <span className="desktop-slides-template-selected" aria-hidden="true">✓</span>
+            </section>
+          )}
 
           {errorMessage && <div className="desktop-dialog-error" dir="auto">{errorMessage}</div>}
         </div>
@@ -946,6 +971,7 @@ export function getCreateEntryInitialContent(
     const emptyRow = Array.from({ length: templates.csvHeaders.length }, () => "").join(",");
     return `${templates.csvHeaders.join(",")}\n${emptyRow}\n${emptyRow}\n`;
   }
+  if (kind === "html") return "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>Untitled</title>\n</head>\n<body>\n\n</body>\n</html>\n";
   if (kind === "app") return createUnconfiguredAppPreviewManifestContent();
   if (kind === "puppyflow") {
     return serializePuppyFlowDocument(createDefaultPuppyFlowDocument(templates.puppyFlow));
@@ -976,12 +1002,16 @@ export function normalizeCreateEntryName(kind: DesktopCreateEntryKind, value: st
   if (kind === "csv") {
     return ensureCreateEntryExtension(name, /\.(csv|tsv)$/i, ".csv");
   }
+  if (kind === "html") {
+    return ensureCreateEntryExtension(name, /\.(html?|xhtml)$/i, ".html");
+  }
   if (kind === "app") {
     return ensureCreateEntryExtension(name, /\.puppyoneapp$/i, ".puppyoneapp");
   }
   if (kind === "puppyflow") {
     return ensureCreateEntryExtension(name, /\.(puppyflow|puppyflow\.json)$/i, ".puppyflow");
   }
+  if (kind === "slides") return name.replace(/\.puppyoneapp$/i, "");
   return name;
 }
 

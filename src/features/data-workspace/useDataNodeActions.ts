@@ -123,14 +123,17 @@ export function useDataNodeActions({
     if (
       !workspace ||
       !dataPort ||
-      !dataPort.createFolder ||
-      !dataPort.createFile ||
       !createEntryDraft ||
       createEntryDraft.creatingKind ||
       !createEntryDraft.selectedKind
     ) return;
 
     const kind = createEntryDraft.selectedKind;
+    if (kind === "slides") {
+      if (!dataPort.instantiateTemplate) return;
+    } else if (!dataPort.createFolder || !dataPort.createFile) {
+      return;
+    }
     let requestedName: string;
     try {
       requestedName = normalizeCreateEntryName(kind, createEntryDraft.name);
@@ -144,26 +147,36 @@ export function useDataNodeActions({
 
     setCreateEntryDraft((current) => current ? { ...current, creatingKind: kind, error: null } : current);
     try {
-      const existingChildren = await dataPort.listChildren(createEntryDraft.parentPath).catch(() => []);
-      const name = uniqueCreateEntryName(requestedName, new Set(existingChildren.map((node) => node.name)));
-      const nextPath = joinDataPath(createEntryDraft.parentPath, name);
-      if (kind === "folder") {
-        await dataPort.createFolder(nextPath);
+      let nextPath: string;
+      if (kind === "slides") {
+        const result = await dataPort.instantiateTemplate!({
+          templateId: "slides.default",
+          parentPath: createEntryDraft.parentPath,
+          name: requestedName,
+        });
+        nextPath = result.openPath;
       } else {
-        await dataPort.createFile(nextPath, getCreateEntryInitialContent(kind, {
-          csvHeaders: [
-            t("workspace.node.csvColumn", { number: 1 }),
-            t("workspace.node.csvColumn", { number: 2 }),
-            t("workspace.node.csvColumn", { number: 3 }),
-          ],
-          puppyFlow: {
-            title: t("editor.puppyflow.untitledFlow"),
-            prompts: [
-              t("editor.puppyflow.defaultPrompt.analyze"),
-              t("editor.puppyflow.defaultPrompt.apply"),
+        const existingChildren = await dataPort.listChildren(createEntryDraft.parentPath).catch(() => []);
+        const name = uniqueCreateEntryName(requestedName, new Set(existingChildren.map((node) => node.name)));
+        nextPath = joinDataPath(createEntryDraft.parentPath, name);
+        if (kind === "folder") {
+          await dataPort.createFolder!(nextPath);
+        } else {
+          await dataPort.createFile!(nextPath, getCreateEntryInitialContent(kind, {
+            csvHeaders: [
+              t("workspace.node.csvColumn", { number: 1 }),
+              t("workspace.node.csvColumn", { number: 2 }),
+              t("workspace.node.csvColumn", { number: 3 }),
             ],
-          },
-        }));
+            puppyFlow: {
+              title: t("editor.puppyflow.untitledFlow"),
+              prompts: [
+                t("editor.puppyflow.defaultPrompt.analyze"),
+                t("editor.puppyflow.defaultPrompt.apply"),
+              ],
+            },
+          }));
+        }
       }
       setCreateEntryDraft(null);
       setNodeActionMenu(null);

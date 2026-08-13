@@ -129,6 +129,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   cancelOfficeDocumentToDocxConversion: (request) => ipcRenderer.invoke("workspace:convert-office-docx-cancel", request),
   writeFile: (request) => ipcRenderer.invoke("workspace:write-file", request),
   createEntry: (request) => ipcRenderer.invoke("workspace:create-entry", request),
+  instantiateTemplate: (request) => ipcRenderer.invoke("workspace:instantiate-template", request),
   renameEntry: (request) => ipcRenderer.invoke("workspace:rename-entry", request),
   moveEntry: (request) => ipcRenderer.invoke("workspace:move-entry", request),
   copyEntry: (request) => ipcRenderer.invoke("workspace:copy-entry", request),

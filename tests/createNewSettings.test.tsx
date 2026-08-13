@@ -31,27 +31,38 @@ describe("Create New settings", () => {
     expect(Array.from(
       container.querySelectorAll(".desktop-create-new-row-label strong"),
       (item) => item.textContent?.trim(),
-    )).toEqual(["Folder", "Markdown file", "CSV file"]);
+    )).toEqual(["Folder", "Markdown file", "CSV file", "HTML file", "Slides"]);
 
     click(container.querySelector('[aria-label="Move CSV file up"]'));
     expect(onChange).toHaveBeenLastCalledWith({
+      version: 2,
       items: [
         { kind: "csv", enabled: true },
         { kind: "markdown", enabled: true },
+        { kind: "html", enabled: true },
+        { kind: "slides", enabled: true },
       ],
     });
 
     click(container.querySelector('[aria-label="Show Markdown file in the New menu"]'));
     expect(onChange).toHaveBeenLastCalledWith({
+      version: 2,
       items: [
         { kind: "markdown", enabled: false },
         { kind: "csv", enabled: true },
+        { kind: "html", enabled: true },
+        { kind: "slides", enabled: true },
       ],
     });
 
     click(container.querySelector('[aria-label="Remove CSV file"]'));
     expect(onChange).toHaveBeenLastCalledWith({
-      items: [{ kind: "markdown", enabled: true }],
+      version: 2,
+      items: [
+        { kind: "markdown", enabled: true },
+        { kind: "html", enabled: true },
+        { kind: "slides", enabled: true },
+      ],
     });
   });
 
@@ -59,7 +70,7 @@ describe("Create New settings", () => {
     const onChange = vi.fn();
     const container = render(defaultSettings(), onChange);
 
-    click(findButton(container, "Add file type"));
+    click(findButton(container, "Add item"));
     expect(container.textContent).toContain("Text file");
     expect(container.textContent).toContain("JSON file");
     expect(container.textContent).toContain("PuppyOne app");
@@ -67,9 +78,12 @@ describe("Create New settings", () => {
 
     click(findButton(container, "PuppyOne app"));
     expect(onChange).toHaveBeenLastCalledWith({
+      version: 2,
       items: [
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
+        { kind: "html", enabled: true },
+        { kind: "slides", enabled: true },
         { kind: "app", enabled: true },
       ],
     });
@@ -77,6 +91,7 @@ describe("Create New settings", () => {
 
   it("keeps the App Preview type available when it is already configured", () => {
     const settings: CreateNewMenuSettings = {
+      version: 2,
       items: [
         { kind: "app", enabled: true },
         { kind: "csv", enabled: true },
@@ -120,9 +135,12 @@ function findButton(container: HTMLElement, text: string) {
 
 function defaultSettings(): CreateNewMenuSettings {
   return {
+    version: 2,
     items: [
       { kind: "markdown", enabled: true },
       { kind: "csv", enabled: true },
+      { kind: "html", enabled: true },
+      { kind: "slides", enabled: true },
     ],
   };
 }

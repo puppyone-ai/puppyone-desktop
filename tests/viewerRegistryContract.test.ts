@@ -81,7 +81,7 @@ describe("preset viewer contribution contract", () => {
       readinessSignal: "first-rendered-frame",
     });
     expect(resolveEditorViewer(document("page.html")).viewer.surfacePreparation)
-      .toBe("requires-visible");
+      .toBe("hidden-safe");
     expect(resolveEditorViewer(document("movie.mp4")).viewer.surfacePreparation)
       .toBe("requires-visible");
     expect(resolveEditorViewer(document("photo.png")).viewer.surfacePreparation)
@@ -92,7 +92,7 @@ describe("preset viewer contribution contract", () => {
     [document("notes.md"), "markdown", "content", "edit"],
     [document("settings.json", "text"), "json", "content", "edit"],
     [document("table.csv"), "csv-table", "content", "edit"],
-    [document("page.html"), "html-artifact", "content-and-resource", "preview"],
+    [document("page.html"), "html-artifact", "content-and-resource", "edit"],
     [document("photo.png"), "image-preview", "resource", "preview"],
     [document("report.pdf"), "pdf-preview", "resource", "preview"],
     [document("report.docx"), "office-preview", "resource", "preview"],

@@ -222,6 +222,7 @@ const PRESET_VIEWER_DEFINITIONS: PresetViewerContribution[] = [
     id: "html-artifact",
     allowPreviewContent: false,
     match: ({ document, format }) => document.type === "html" || format.defaultViewer === "html-artifact",
+    isEditable: () => true,
     render: (context) => <HtmlViewer {...context} />,
   }),
   definePresetViewer({

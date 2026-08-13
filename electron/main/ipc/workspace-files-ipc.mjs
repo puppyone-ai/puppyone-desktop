@@ -25,6 +25,10 @@ import {
 import { isPotentiallyExecutableFile } from "../security.mjs";
 import { buildLocalFileCapabilityUrl } from "../local-file-capabilities.mjs";
 import { parseLocalFileUrl } from "../local-file-protocol.mjs";
+import {
+  instantiateWorkspaceTemplate,
+  loadBundledSlidesFont,
+} from "../../../local-api/workspace-templates.mjs";
 
 const MAX_OFFICE_CONVERSIONS_PER_WINDOW = 2;
 const DEFAULT_NATIVE_MESSAGES = Object.freeze({
@@ -202,6 +206,16 @@ export function registerWorkspaceFileIpcHandlers({
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const result = await createWorkspaceEntry(rootPath, request);
     await absorbWorkspaceEditReviewPath(rootPath, result.path);
+    return result;
+  });
+
+  ipcMain.handle("workspace:instantiate-template", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
+    const fontBytes = await loadBundledSlidesFont(app.getAppPath());
+    const result = await instantiateWorkspaceTemplate(rootPath, request, { fontBytes });
+    await Promise.all(result.createdPaths.map((createdPath) => (
+      absorbWorkspaceEditReviewPath(rootPath, createdPath)
+    )));
     return result;
   });
 

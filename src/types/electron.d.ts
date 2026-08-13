@@ -514,6 +514,20 @@ export type WorkspaceCreateEntryResult = {
   path: string;
 };
 
+export type WorkspaceInstantiateTemplateRequest = {
+  rootPath: string;
+  parentPath: string | null;
+  name: string;
+  templateId: "slides.default";
+};
+
+export type WorkspaceInstantiateTemplateResult = {
+  rootPath: string;
+  openPath: string;
+  createdPaths: string[];
+  template: { id: "slides.default"; version: number };
+};
+
 export type WorkspaceRenameEntryRequest = {
   rootPath: string;
   path: string;
@@ -845,6 +859,9 @@ declare global {
         expectedVersion?: string | null;
       }) => Promise<{ version: string }>;
       createEntry: (request: WorkspaceCreateEntryRequest) => Promise<WorkspaceCreateEntryResult>;
+      instantiateTemplate: (
+        request: WorkspaceInstantiateTemplateRequest,
+      ) => Promise<WorkspaceInstantiateTemplateResult>;
       renameEntry: (request: WorkspaceRenameEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       moveEntry: (request: WorkspaceMoveEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       copyEntry: (request: WorkspaceCopyEntryRequest) => Promise<WorkspaceCreateEntryResult>;

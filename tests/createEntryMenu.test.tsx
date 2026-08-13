@@ -38,7 +38,7 @@ describe("create entry menu", () => {
     const container = render(
       <DesktopCreateEntryMenu
         draft={draft}
-        fileKinds={["markdown", "csv"]}
+        itemKinds={["markdown", "csv"]}
         onCancel={vi.fn()}
         onSelectKind={vi.fn()}
       />,
@@ -52,12 +52,12 @@ describe("create entry menu", () => {
       .toBeLessThan(draft.anchor.top);
   });
 
-  it("offers only Folder, Markdown, and CSV in the intended grouping", () => {
+  it("offers Folder followed by Markdown, CSV, HTML, and Slides in the intended grouping", () => {
     const onSelectKind = vi.fn();
     const container = render(
       <DesktopCreateEntryMenu
         draft={createDraft()}
-        fileKinds={["markdown", "csv"]}
+        itemKinds={["markdown", "csv", "html", "slides"]}
         onCancel={vi.fn()}
         onSelectKind={onSelectKind}
       />,
@@ -71,6 +71,8 @@ describe("create entry menu", () => {
       "divider",
       "Markdown file",
       "CSV file",
+      "HTML file",
+      "Slides",
     ]);
 
     expect(container.textContent).not.toContain("Paste");
@@ -87,7 +89,7 @@ describe("create entry menu", () => {
     const container = render(
       <DesktopCreateEntryMenu
         draft={createDraft()}
-        fileKinds={["json", "markdown"]}
+        itemKinds={["json", "markdown"]}
         onCancel={vi.fn()}
         onSelectKind={vi.fn()}
       />,
@@ -110,7 +112,7 @@ describe("create entry menu", () => {
     const container = render(
       <DesktopCreateEntryMenu
         draft={createDraft()}
-        fileKinds={[]}
+        itemKinds={[]}
         onCancel={vi.fn()}
         onSelectKind={vi.fn()}
       />,
