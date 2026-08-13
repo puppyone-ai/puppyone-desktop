@@ -43,6 +43,19 @@ describe("editor tabs header architecture", () => {
     expect(tabsStyles).toContain(
       'inset-inline-start: var(--desktop-titlebar-sidebar-width);',
     );
+    expect(tabsStyles).not.toContain("transition: inset-inline-start");
+    expect(tabsStyles).not.toContain("transition: width");
+  });
+
+  it("keeps only the occupied tab strip non-draggable", () => {
+    expect(tabsSource).toContain('data-window-no-drag="true"');
+    expect(tabsStyles).toContain("width: fit-content;");
+    expect(tabsStyles).toContain("max-width: min(100%, 680px);");
+    expect(tabsStyles).toContain("flex: 0 1 auto;");
+    expect(desktopShellSource).toContain('className="desktop-titlebar-editor-context"');
+    expect(desktopShellSource).not.toMatch(
+      /className="desktop-titlebar-editor-context"[^>]*data-window-no-drag/s,
+    );
   });
 
   it("keeps tab presentation out of the shared editor canvas", () => {
