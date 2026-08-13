@@ -31,6 +31,10 @@
   grid-template-columns: 0 0 minmax(0, 1fr);
 }
 
+.data-content[data-resizable-explorer="true"] > .explorer-column {
+  border-inline-end-color: transparent;
+}
+
 .explorer-column {
   position: relative;
   display: flex;
@@ -138,9 +142,13 @@
   grid-column: 2;
   grid-row: 1;
   width: 100%;
+  background: var(--po-sidebar);
 }
 
 .data-explorer-resizer::after {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+  background: var(--po-shell-divider, var(--po-divider));
   transition: background 120ms ease, box-shadow 120ms ease;
 }
 

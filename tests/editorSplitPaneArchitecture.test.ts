@@ -30,6 +30,10 @@ const splitStyles = readFileSync(
   new URL("../src/features/editor-workbench/layout/desktop-editor-split-view.css", import.meta.url),
   "utf8",
 );
+const dataShellStyles = readFileSync(
+  new URL("../src/features/data-workspace/data-shell.css", import.meta.url),
+  "utf8",
+);
 const headerStyles = readFileSync(
   new URL("../src/features/app-shell/header-editor-columns.css", import.meta.url),
   "utf8",
@@ -72,6 +76,18 @@ describe("editor split-pane architecture", () => {
     expect(splitStyles).not.toContain(".desktop-editor-pane-bar");
     expect(splitStyles).not.toContain("border-radius: 7px 7px 0 0");
     expect(splitStyles).not.toContain("tablist");
+  });
+
+  it("joins root split dividers to the Editor-facing edge of the Sidebar gutter", () => {
+    expect(dataShellStyles).toMatch(
+      /\.data-explorer-resizer::after\s*\{[^}]*inset-inline-start:\s*auto;[^}]*inset-inline-end:\s*0;/s,
+    );
+    expect(dataShellStyles).toMatch(
+      /\.data-content\[data-resizable-explorer="true"\]\s*>\s*\.explorer-column\s*\{[^}]*border-inline-end-color:\s*transparent;/s,
+    );
+    expect(dataShellStyles).toMatch(
+      /\.data-explorer-resizer\s*\{[^}]*background:\s*var\(--po-sidebar\);/s,
+    );
   });
 
   it("does not project the Sidebar divider through the Header", () => {
