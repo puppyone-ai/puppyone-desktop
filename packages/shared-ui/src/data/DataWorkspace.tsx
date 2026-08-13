@@ -30,8 +30,6 @@ import {
 import { resolveMarkdownAssetPath } from "../editor/markdown/assetResolution";
 import { ExplorerTree } from "./ExplorerTree";
 import { FilePreview, type FilePreviewProps } from "./FilePreview";
-import { EditorTabs } from "../editor/workbench/EditorTabs";
-import type { EditorInput } from "../editor/workbench/editorGroupModel";
 import { ProjectsHeader } from "./ProjectsHeader";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
 import type {
@@ -43,7 +41,6 @@ import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
 import { getAiEditFileForPath } from "../editor/ai-edits/diff";
 import type { AiEditRequest } from "../editor/ai-edits/types";
 import type { DocumentPersistedCommit } from "../editor/document-session/types";
-import type { DocumentSessionStatus } from "../editor/document-session/types";
 import { flushActiveDocumentSessions } from "../editor/document-session/activeDocumentSessions";
 import type { FileIconThemeId } from "../file/fileIcons";
 import { useCollapsiblePaneResize } from "../primitives/useCollapsiblePaneResize";
@@ -126,11 +123,7 @@ export type DataWorkspaceProps = {
   htmlTrustMode?: MarkdownHtmlTrustMode;
   previewActionSlot?: FilePreviewProps["actionSlot"];
   previewAccessorySlot?: DataWorkspaceSlot;
-  openEditors?: readonly EditorInput[];
-  onEditorActivate?: (editorId: string) => void;
-  onEditorClose?: (editorId: string) => void | Promise<void>;
   onResourceMove?: (previousPath: string, nextPath: string) => void | Promise<void>;
-  workingCopyStatuses?: ReadonlyMap<string, DocumentSessionStatus>;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   resolveOfficeEditorActions?: FilePreviewProps["resolveOfficeEditorActions"];
   documentSourceKind?: DocumentSourceKind;
@@ -215,11 +208,7 @@ export function DataWorkspace({
   htmlTrustMode = "safe",
   previewActionSlot,
   previewAccessorySlot,
-  openEditors = [],
-  onEditorActivate,
-  onEditorClose,
   onResourceMove,
-  workingCopyStatuses,
   viewerExtensionAdapter = null,
   resolveOfficeEditorActions = null,
   documentSourceKind,
@@ -1393,16 +1382,6 @@ export function DataWorkspace({
               renderWorkspaceSlot(mainSlot, workspaceState)
             ) : (
               <>
-                {openEditors.length > 0 && onEditorActivate && onEditorClose && (
-                  <EditorTabs
-                    editors={openEditors}
-                    activeEditorId={resolvedActivePath}
-                    fileIconTheme={fileIconTheme}
-                    workingCopyStatuses={workingCopyStatuses}
-                    onActivate={onEditorActivate}
-                    onClose={(editorId) => { void onEditorClose(editorId); }}
-                  />
-                )}
                 {previewAccessory && (
                   <div className="data-preview-accessory">
                     {previewAccessory}

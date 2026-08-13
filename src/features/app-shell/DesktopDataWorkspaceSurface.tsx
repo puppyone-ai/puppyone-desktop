@@ -5,8 +5,6 @@ import {
   DataWorkspace,
   type AiEditRequest,
   type DataNode,
-  type EditorInput,
-  type DocumentSessionStatus,
   type Workspace,
 } from "@puppyone/shared-ui";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
@@ -40,8 +38,6 @@ type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 export type DesktopDataWorkspaceSurfaceProps = {
   activeAiEditRequest: AiEditRequest | null;
   activeDataPath: string | null;
-  openEditors: readonly EditorInput[];
-  workingCopyStatuses: ReadonlyMap<string, DocumentSessionStatus>;
   dataPort: NonNullable<DataWorkspaceProps["dataPort"]>;
   editorInteractionPreferences: NonNullable<DataWorkspaceProps["editorInteractionPreferences"]>;
   fileClipboardController: FileClipboardController;
@@ -65,8 +61,6 @@ export type DesktopDataWorkspaceSurfaceProps = {
     node?: DataNode | null,
   ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
-  onEditorActivate: (editorId: string) => void;
-  onEditorClose: (editorId: string) => void | Promise<void>;
   onResourceMove: (previousPath: string, nextPath: string) => void | Promise<void>;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onDismissCreateEntryMenu: () => void;
@@ -84,8 +78,6 @@ export type DesktopDataWorkspaceSurfaceProps = {
 export function DesktopDataWorkspaceSurface({
   activeAiEditRequest,
   activeDataPath,
-  openEditors,
-  workingCopyStatuses,
   dataPort,
   editorInteractionPreferences,
   fileClipboardController,
@@ -93,8 +85,6 @@ export function DesktopDataWorkspaceSurface({
   minimalMode,
   navigation,
   onActiveDataNodeChange,
-  onEditorActivate,
-  onEditorClose,
   onResourceMove,
   onActiveDataPathChange,
   onCreateEntryMenu,
@@ -157,10 +147,6 @@ export function DesktopDataWorkspaceSurface({
         labels={{ root: workspace.name }}
         dataPort={dataPort}
         activePath={activeDataPath}
-        openEditors={openEditors}
-        workingCopyStatuses={workingCopyStatuses}
-        onEditorActivate={onEditorActivate}
-        onEditorClose={onEditorClose}
         onResourceMove={onResourceMove}
         onActivePathChange={onActiveDataPathChange}
         onActiveNodeChange={onActiveDataNodeChange}

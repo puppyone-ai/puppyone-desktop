@@ -81,8 +81,6 @@ export type {
 
 export { EditorHost } from "./editor/EditorHost";
 export type { EditorHostProps } from "./editor/EditorHost";
-export { EditorTabs } from "./editor/workbench/EditorTabs";
-export type { EditorTabsProps } from "./editor/workbench/EditorTabs";
 export {
   EMPTY_EDITOR_GROUP,
   activateEditor,

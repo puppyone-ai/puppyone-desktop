@@ -7,8 +7,6 @@ import {
   type AiEditRequest,
   type DataNode,
   type EditorInteractionPreferences,
-  type EditorInput,
-  type DocumentSessionStatus,
   type Workspace,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
@@ -36,8 +34,6 @@ type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopWorkspaceContentProps = {
   activeAiEditRequest: AiEditRequest | null;
   activeDataPath: string | null;
-  openEditors: readonly EditorInput[];
-  workingCopyStatuses: ReadonlyMap<string, DocumentSessionStatus>;
   activeView: DesktopView;
   cloud: DesktopWorkspaceCloudSurfaceController;
   dataPort: DataWorkspacePort | null;
@@ -50,8 +46,6 @@ type DesktopWorkspaceContentProps = {
     node?: DataNode | null,
   ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
-  onEditorActivate: (editorId: string) => void;
-  onEditorClose: (editorId: string) => void | Promise<void>;
   onResourceMove: (previousPath: string, nextPath: string) => void | Promise<void>;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onDismissCreateEntryMenu: () => void;
@@ -78,8 +72,6 @@ type DesktopWorkspaceContentProps = {
 export function DesktopWorkspaceContent({
   activeAiEditRequest,
   activeDataPath,
-  openEditors,
-  workingCopyStatuses,
   activeView,
   cloud,
   dataPort,
@@ -89,8 +81,6 @@ export function DesktopWorkspaceContent({
   minimalMode = false,
   onActiveDataPathChange,
   onActiveDataNodeChange,
-  onEditorActivate,
-  onEditorClose,
   onResourceMove,
   onCreateEntryMenu,
   onDismissCreateEntryMenu,
@@ -177,8 +167,6 @@ export function DesktopWorkspaceContent({
     <DesktopDataWorkspaceSurface
       activeAiEditRequest={activeAiEditRequest}
       activeDataPath={activeDataPath}
-      openEditors={openEditors}
-      workingCopyStatuses={workingCopyStatuses}
       dataPort={dataPort}
       editorInteractionPreferences={editorInteractionPreferences}
       fileClipboardController={fileClipboardController}
@@ -199,8 +187,6 @@ export function DesktopWorkspaceContent({
       }}
       onActiveDataNodeChange={onActiveDataNodeChange}
       onActiveDataPathChange={onActiveDataPathChange}
-      onEditorActivate={onEditorActivate}
-      onEditorClose={onEditorClose}
       onResourceMove={onResourceMove}
       onCreateEntryMenu={onCreateEntryMenu}
       onDismissCreateEntryMenu={onDismissCreateEntryMenu}

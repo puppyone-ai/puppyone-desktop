@@ -93,6 +93,7 @@ import {
   useTypographyRuntime,
 } from "./features/typography";
 import { useDesktopEditorGroup } from "./features/editor-workbench/useDesktopEditorGroup";
+import { DesktopEditorTabs } from "./features/editor-workbench/DesktopEditorTabs";
 
 const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMinimalModeDock").then((module) => ({
   default: module.DesktopMinimalModeDock,
@@ -876,27 +877,40 @@ function AppContent() {
     : createEmptyDesktopTerminalSessionSnapshot(workspace.path);
 
   const titlebarSlot = (
-    <DesktopTitlebarContext
-      activeGitStatus={activeGitStatus}
-      branchSwitcherOpen={branchSwitcherOpen}
-      branchSwitcherRef={branchSwitcherRef}
-      compact={minimalMode}
-      gitStatusLoading={gitStatusLoading}
-      gitOperationLoading={gitOperationLoading}
-      localBranches={localBranches}
-      remoteBranches={remoteBranches}
-      workspace={workspace}
-      workspaceSwitcherItems={workspaceSwitcherItems}
-      workspaceSwitcherOpen={switcherOpen}
-      workspaceSwitcherRef={switcherRef}
-      onCheckoutBranch={handleCheckoutGitBranch}
-      onGoHome={() => void goToHomepage()}
-      onOpenFolder={openFolder}
-      onOpenWorkspaceSwitcherItem={openWorkspaceSwitcherItem}
-      onCloseBranchSwitcher={closeBranchSwitcher}
-      onToggleBranchSwitcher={toggleBranchSwitcher}
-      onToggleWorkspaceSwitcher={toggleWorkspaceSwitcher}
-    />
+    <>
+      <DesktopTitlebarContext
+        activeGitStatus={activeGitStatus}
+        branchSwitcherOpen={branchSwitcherOpen}
+        branchSwitcherRef={branchSwitcherRef}
+        compact={minimalMode}
+        gitStatusLoading={gitStatusLoading}
+        gitOperationLoading={gitOperationLoading}
+        localBranches={localBranches}
+        remoteBranches={remoteBranches}
+        workspace={workspace}
+        workspaceSwitcherItems={workspaceSwitcherItems}
+        workspaceSwitcherOpen={switcherOpen}
+        workspaceSwitcherRef={switcherRef}
+        onCheckoutBranch={handleCheckoutGitBranch}
+        onGoHome={() => void goToHomepage()}
+        onOpenFolder={openFolder}
+        onOpenWorkspaceSwitcherItem={openWorkspaceSwitcherItem}
+        onCloseBranchSwitcher={closeBranchSwitcher}
+        onToggleBranchSwitcher={toggleBranchSwitcher}
+        onToggleWorkspaceSwitcher={toggleWorkspaceSwitcher}
+      />
+      <DesktopEditorTabs
+        editors={editorGroup.state.editors}
+        activeEditorId={editorGroup.activePath}
+        fileIconTheme={fileIconTheme}
+        workingCopyStatuses={workingCopyStatuses}
+        onActivate={(editorId) => {
+          handleEditorActivate(editorId);
+          navigateDesktopView("data");
+        }}
+        onClose={(editorId) => { void handleEditorClose(editorId); }}
+      />
+    </>
   );
 
   const titlebarActions = (
@@ -1050,8 +1064,6 @@ function AppContent() {
         <DesktopWorkspaceContent
           activeAiEditRequest={activeAiEditRequest}
           activeDataPath={activeDataPath}
-          openEditors={editorGroup.state.editors}
-          workingCopyStatuses={workingCopyStatuses}
           activeView={activeView}
           cloud={{
             activeSection: activeCloudSection,
@@ -1083,8 +1095,6 @@ function AppContent() {
           minimalMode={minimalMode}
           onActiveDataNodeChange={handleActiveDataNodeChange}
           onActiveDataPathChange={handleActiveDataPathChange}
-          onEditorActivate={handleEditorActivate}
-          onEditorClose={handleEditorClose}
           onResourceMove={handleResourceMoved}
           onCreateEntryMenu={openCreateEntryMenu}
           onDismissCreateEntryMenu={() => setCreateEntryDraft(null)}
