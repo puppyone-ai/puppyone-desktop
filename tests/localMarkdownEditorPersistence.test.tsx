@@ -105,7 +105,7 @@ describe("local Markdown editor persistence", () => {
     expect((await waitForEditor(reopened)).state.doc.toString()).toBe("alpha beta gamma");
   });
 
-  it("keeps the local editor mounted when its pre-navigation save fails", async () => {
+  it("keeps failed local edits in their Working Copy across editor navigation", async () => {
     const fixture = await createLocalWorkspace({
       "alpha.md": "alpha",
       "bravo.md": "bravo",
@@ -135,11 +135,17 @@ describe("local Markdown editor persistence", () => {
     const nextFile = container.querySelector<HTMLElement>('[data-explorer-path="bravo.md"]');
     if (!nextFile) throw new Error("Second local Markdown file is unavailable.");
     act(() => nextFile.click());
-    await waitFor(() => bridge.writeFile.mock.calls.length >= 2);
-
-    expect(container.querySelector('[data-explorer-path="alpha.md"]')?.getAttribute("aria-current"))
+    await waitFor(() => getMountedEditorContent(container) === "bravo");
+    expect(container.querySelector('[data-explorer-path="bravo.md"]')?.getAttribute("aria-current"))
       .toBe("true");
+
+    const firstFile = container.querySelector<HTMLElement>('[data-explorer-path="alpha.md"]');
+    if (!firstFile) throw new Error("First local Markdown file is unavailable.");
+    act(() => firstFile.click());
+    await waitFor(() => getMountedEditorContent(container) === "alpha changed");
+
     expect(getMountedEditor(container).state.doc.toString()).toBe("alpha changed");
+    expect(container.querySelector(".editor-inline-error")).not.toBeNull();
     expect(await readFile(join(fixture.root, "alpha.md"), "utf8")).toBe("alpha");
   });
 });
@@ -238,6 +244,11 @@ function getMountedEditor(container: HTMLElement): EditorView {
   const editor = container.querySelector<HTMLElement>(".cm-editor");
   if (!editor) throw new Error("CodeMirror editor is not mounted.");
   return EditorView.findFromDOM(editor);
+}
+
+function getMountedEditorContent(container: HTMLElement): string | null {
+  const editor = container.querySelector<HTMLElement>(".cm-editor");
+  return editor ? EditorView.findFromDOM(editor).state.doc.toString() : null;
 }
 
 async function waitFor(assertion: () => boolean | Promise<boolean>, attempts = 200): Promise<void> {

@@ -1,10 +1,14 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from "react";
 import {
   EditorChromeContributionProvider,
   EditorFindContributionProvider,
+  closeAllDocumentWorkingCopies,
+  closeDocumentWorkingCopy,
+  closeDocumentWorkingCopiesUnderResource,
   flushActiveDocumentSessions,
+  getDocumentWorkingCopyStatuses,
+  subscribeDocumentWorkingCopyStatuses,
   type DataNode,
-  type DataWorkspaceActivePathChangeContext,
   type EditorChromeContribution,
   useEditorFindCommand,
 } from "@puppyone/shared-ui";
@@ -88,6 +92,7 @@ import {
   useTypographyCatalog,
   useTypographyRuntime,
 } from "./features/typography";
+import { useDesktopEditorGroup } from "./features/editor-workbench/useDesktopEditorGroup";
 
 const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMinimalModeDock").then((module) => ({
   default: module.DesktopMinimalModeDock,
@@ -208,7 +213,36 @@ function AppContent() {
   const Homepage = assetLibraryHomeEnabled ? AssetLibraryHome : MinimalOnboarding;
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("general");
   const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
-  const [activeDataPath, setActiveDataPath] = useState<string | null>(null);
+  const editorGroup = useDesktopEditorGroup(workspace);
+  const workingCopyStatuses = useSyncExternalStore(
+    subscribeDocumentWorkingCopyStatuses,
+    getDocumentWorkingCopyStatuses,
+    getDocumentWorkingCopyStatuses,
+  );
+  const activeDataPath = editorGroup.activePath;
+  const setActiveDataPath = useCallback<Dispatch<SetStateAction<string | null>>>((update) => {
+    if (typeof update !== "function") {
+      if (update) editorGroup.open(update);
+      else editorGroup.clear();
+      return;
+    }
+    const nextPath = update(activeDataPath);
+    if (nextPath === activeDataPath) return;
+    if (activeDataPath && nextPath) {
+      editorGroup.rebaseResource(activeDataPath, nextPath);
+      return;
+    }
+    if (nextPath) editorGroup.open(nextPath);
+    else if (activeDataPath) editorGroup.closeUnderResource(activeDataPath);
+  }, [activeDataPath, editorGroup]);
+  const handleResourceMoved = useCallback(async (previousPath: string, nextPath: string) => {
+    await closeDocumentWorkingCopiesUnderResource(previousPath);
+    editorGroup.rebaseResource(previousPath, nextPath);
+  }, [editorGroup]);
+  const handleResourceDeleted = useCallback(async (path: string) => {
+    await closeDocumentWorkingCopiesUnderResource(path);
+    editorGroup.closeUnderResource(path);
+  }, [editorGroup]);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
   const [editorChromeContribution, setEditorChromeContribution] = useState<EditorChromeContribution | null>(null);
   const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
@@ -216,7 +250,7 @@ function AppContent() {
   const desktopViewNavigationRequestRef = useRef(0);
   const drainWorkspaceNavigation = useCallback(async (): Promise<boolean> => {
     try {
-      await flushActiveDocumentSessions("workspace-switch");
+      await closeAllDocumentWorkingCopies("workspace-switch");
       setDocumentNavigationError(null);
       return true;
     } catch (error) {
@@ -372,6 +406,8 @@ function AppContent() {
     onEnterDataView: enterDataView,
     onLocalWorkspaceContentChanged: refreshGitStatus,
     onWorkspaceContentChanged: refreshWorkspaceContent,
+    onResourceDeleted: handleResourceDeleted,
+    onResourceMoved: handleResourceMoved,
     setActiveDataNode,
     setActiveDataPath,
     workspace,
@@ -430,7 +466,6 @@ function AppContent() {
     setGitOperationLoading(null);
     setActiveSettingsSection("general");
     setBranchSwitcherOpen(false);
-    setActiveDataPath(null);
     setActiveDataNode(null);
     resetDataNodeActions();
   }, [resetDataNodeActions, setBranchSwitcherOpen, setGitOperationError, setGitOperationLoading, workspace?.path]);
@@ -578,24 +613,57 @@ function AppContent() {
   const handleActiveDataPathChange = useCallback(async (
     path: string | null,
     node: DataNode | null = null,
-    context?: DataWorkspaceActivePathChangeContext,
   ) => {
     const requestId = ++documentNavigationRequestRef.current;
-    if (path !== activeDataPath && !context?.documentSessionsDrained) {
-      try {
-        await flushActiveDocumentSessions("document-switch");
-      } catch (error) {
-        if (requestId === documentNavigationRequestRef.current) {
-          setDocumentNavigationError(error instanceof Error ? error.message : String(error));
-        }
-        throw error;
-      }
-    }
     if (requestId !== documentNavigationRequestRef.current) return;
     setDocumentNavigationError(null);
-    setActiveDataPath(path);
+    if (path && node?.type !== "folder") editorGroup.open(path, node);
     setActiveDataNode(node);
-  }, [activeDataPath]);
+  }, [editorGroup]);
+  const handleEditorActivate = useCallback((editorId: string) => {
+    editorGroup.activate(editorId);
+    setDocumentNavigationError(null);
+  }, [editorGroup]);
+  const handleEditorClose = useCallback(async (editorId: string) => {
+    try {
+      await closeDocumentWorkingCopy(editorId);
+      editorGroup.close(editorId);
+      setDocumentNavigationError(null);
+    } catch (error) {
+      setDocumentNavigationError(error instanceof Error ? error.message : String(error));
+    }
+  }, [editorGroup]);
+  useEffect(() => {
+    const handleEditorShortcut = (event: KeyboardEvent) => {
+      if (activeView !== "data" || editorGroup.state.editors.length === 0) return;
+      const platformModifier = event.metaKey || event.ctrlKey;
+      if (platformModifier && !event.altKey && event.key.toLowerCase() === "w") {
+        if (!editorGroup.activePath) return;
+        event.preventDefault();
+        void handleEditorClose(editorGroup.activePath);
+        return;
+      }
+      if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === "Tab") {
+        event.preventDefault();
+        const currentIndex = editorGroup.state.editors.findIndex(({ id }) => id === editorGroup.activePath);
+        const offset = event.shiftKey ? -1 : 1;
+        const nextIndex = (currentIndex + offset + editorGroup.state.editors.length) % editorGroup.state.editors.length;
+        editorGroup.activate(editorGroup.state.editors[nextIndex]!.id);
+        return;
+      }
+      if (platformModifier && !event.altKey && !event.shiftKey && /^[1-9]$/.test(event.key)) {
+        const requestedIndex = Number(event.key) - 1;
+        const editor = event.key === "9"
+          ? editorGroup.state.editors.at(-1)
+          : editorGroup.state.editors[requestedIndex];
+        if (!editor) return;
+        event.preventDefault();
+        editorGroup.activate(editor.id);
+      }
+    };
+    window.addEventListener("keydown", handleEditorShortcut, true);
+    return () => window.removeEventListener("keydown", handleEditorShortcut, true);
+  }, [activeView, editorGroup, handleEditorClose]);
   const handleActiveDataNodeChange = useCallback((node: DataNode | null) => {
     setActiveDataNode((current) => (
       hasSameActiveDataNodeIdentity(current, node) ? current : node
@@ -982,6 +1050,8 @@ function AppContent() {
         <DesktopWorkspaceContent
           activeAiEditRequest={activeAiEditRequest}
           activeDataPath={activeDataPath}
+          openEditors={editorGroup.state.editors}
+          workingCopyStatuses={workingCopyStatuses}
           activeView={activeView}
           cloud={{
             activeSection: activeCloudSection,
@@ -1013,6 +1083,9 @@ function AppContent() {
           minimalMode={minimalMode}
           onActiveDataNodeChange={handleActiveDataNodeChange}
           onActiveDataPathChange={handleActiveDataPathChange}
+          onEditorActivate={handleEditorActivate}
+          onEditorClose={handleEditorClose}
+          onResourceMove={handleResourceMoved}
           onCreateEntryMenu={openCreateEntryMenu}
           onDismissCreateEntryMenu={() => setCreateEntryDraft(null)}
           fileClipboardController={fileClipboardController}

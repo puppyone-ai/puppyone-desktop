@@ -330,6 +330,8 @@
   "text.placeholder": "Empieza a escribir…",
   "text.read": "Leer archivo de texto",
   "text.readNamed": "Leer {name}",
+  "tabs.close": "Cerrar {name}",
+  "tabs.openEditors": "Editores abiertos",
   "unavailable.title": "No se puede abrir en el editor",
   "viewer.chooseFor": "Elige un visor para {name}",
   "viewer.noHostSurface": "Este paquete de visor no puede mostrarse aquí: no hay una superficie anfitriona disponible."

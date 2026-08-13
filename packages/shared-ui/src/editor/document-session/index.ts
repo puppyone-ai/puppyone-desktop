@@ -7,6 +7,13 @@ export {
 } from "./activeDocumentSessions";
 export { useDocumentSessionState } from "./useDocumentSessionState";
 export { formatDocumentSessionError } from "./formatDocumentSessionError";
+export {
+  closeAllDocumentWorkingCopies,
+  closeDocumentWorkingCopy,
+  closeDocumentWorkingCopiesUnderResource,
+  getDocumentWorkingCopyStatuses,
+  subscribeDocumentWorkingCopyStatuses,
+} from "./documentWorkingCopies";
 export type { DocumentSessionBoundaryProps } from "./DocumentSessionBoundary";
 export type {
   DocumentEditingSessionOptions,

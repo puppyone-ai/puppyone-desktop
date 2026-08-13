@@ -1,5 +1,5 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
-import type { DataNode, DataPort, Workspace } from "@puppyone/shared-ui";
+import { flushActiveDocumentSessions, type DataNode, type DataPort, type Workspace } from "@puppyone/shared-ui";
 import {
   openWorkspaceEntryExternal,
   revealWorkspaceEntryInFinder,
@@ -42,6 +42,8 @@ export function useDataNodeActions({
   onEnterDataView,
   onLocalWorkspaceContentChanged,
   onWorkspaceContentChanged,
+  onResourceDeleted,
+  onResourceMoved,
   setActiveDataPath,
   setActiveDataNode,
   workspace,
@@ -51,6 +53,8 @@ export function useDataNodeActions({
   onEnterDataView: () => void;
   onLocalWorkspaceContentChanged: () => void;
   onWorkspaceContentChanged: () => void;
+  onResourceDeleted?: (path: string) => void | Promise<void>;
+  onResourceMoved?: (previousPath: string, nextPath: string) => void | Promise<void>;
   setActiveDataPath: Dispatch<SetStateAction<string | null>>;
   setActiveDataNode: Dispatch<SetStateAction<DataNode | null>>;
   workspace: Workspace | null;
@@ -66,6 +70,7 @@ export function useDataNodeActions({
     setActiveDataNode,
     setActiveDataPath,
     workspace,
+    onResourceMoved,
   });
 
   const resetDataNodeActions = useCallback(() => {
@@ -229,7 +234,9 @@ export function useDataNodeActions({
     const nextPath = joinDataPath(getDataParentPath(previousPath), nextName);
 
     try {
+      await flushActiveDocumentSessions("document-switch");
       await dataPort.renameNode(previousPath, nextName);
+      await onResourceMoved?.(previousPath, nextPath);
       setNodeActionMenu(null);
       setActiveDataPath((current) => remapActivePathAfterRename(current, previousPath, nextPath));
       setActiveDataNode((current) => (
@@ -253,6 +260,7 @@ export function useDataNodeActions({
     nodeActionMenu,
     onLocalWorkspaceContentChanged,
     onWorkspaceContentChanged,
+    onResourceMoved,
     setActiveDataNode,
     setActiveDataPath,
     t,
@@ -268,6 +276,16 @@ export function useDataNodeActions({
       : t("workspace.node.confirmDeleteMany", { count: nodes.length }));
     if (!confirmed) return;
 
+    try {
+      await flushActiveDocumentSessions("document-switch");
+    } catch (error) {
+      setNodeActionMenu((current) => current ? {
+        ...current,
+        error: toDesktopNodeActionError(error),
+      } : current);
+      return;
+    }
+
     setNodeActionMenu((current) => current ? { ...current, operation: "delete", error: null } : current);
     const deletedNodes: DataNode[] = [];
     const failures: Array<{ name: string; message: string }> = [];
@@ -275,6 +293,7 @@ export function useDataNodeActions({
       try {
         await dataPort.deleteNode(node.path);
         deletedNodes.push(node);
+        await onResourceDeleted?.(node.path);
       } catch (error) {
         failures.push({
           name: node.name,
@@ -318,6 +337,7 @@ export function useDataNodeActions({
     nodeActionMenu,
     onLocalWorkspaceContentChanged,
     onWorkspaceContentChanged,
+    onResourceDeleted,
     setActiveDataNode,
     setActiveDataPath,
     t,

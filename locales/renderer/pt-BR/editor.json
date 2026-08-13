@@ -330,6 +330,8 @@
   "text.placeholder": "Comece a escrever…",
   "text.read": "Ler arquivo de texto",
   "text.readNamed": "Ler {name}",
+  "tabs.close": "Fechar {name}",
+  "tabs.openEditors": "Editores abertos",
   "unavailable.title": "Não foi possível abrir no editor",
   "viewer.chooseFor": "Escolha um visualizador para {name}",
   "viewer.noHostSurface": "Este pacote de visualizador não pode ser renderizado aqui — nenhuma superfície do host está disponível."

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { DataNode, DataPort, Workspace } from "@puppyone/shared-ui";
+import { flushActiveDocumentSessions, type DataNode, type DataPort, type Workspace } from "@puppyone/shared-ui";
 import {
   collapseNestedNodes,
   createFileClipboardState,
@@ -61,6 +61,7 @@ export function useFileClipboard({
   onEnterDataView,
   onLocalWorkspaceContentChanged,
   onWorkspaceContentChanged,
+  onResourceMoved,
   setActiveDataPath,
   setActiveDataNode,
   workspace,
@@ -69,6 +70,7 @@ export function useFileClipboard({
   onEnterDataView: () => void;
   onLocalWorkspaceContentChanged: () => void;
   onWorkspaceContentChanged: () => void;
+  onResourceMoved?: (previousPath: string, nextPath: string) => void | Promise<void>;
   setActiveDataPath: Dispatch<SetStateAction<string | null>>;
   setActiveDataNode: Dispatch<SetStateAction<DataNode | null>>;
   workspace: Workspace | null;
@@ -172,6 +174,9 @@ export function useFileClipboard({
     onEnterDataView();
 
     try {
+      if (activeClipboard.mode === "cut") {
+        await flushActiveDocumentSessions("document-switch");
+      }
       const result = await executeFileClipboardPaste(dataPort, activeClipboard, targetFolderPath);
       if (
         latestWorkspaceKeyRef.current !== operationToken.workspaceKey
@@ -182,6 +187,13 @@ export function useFileClipboard({
       const firstFailure = result.failures[0];
 
       if (activeClipboard.mode === "cut") {
+        for (let index = 0; index < result.completedSourcePaths.length; index += 1) {
+          const previousPath = result.completedSourcePaths[index];
+          const nextPath = result.destinationPaths[index];
+          if (previousPath && nextPath && previousPath !== nextPath) {
+            await onResourceMoved?.(previousPath, nextPath);
+          }
+        }
         const remainingNodes = activeClipboard.nodes.filter((node) => !completedSourcePaths.has(node.path));
         const nextClipboard = remainingNodes.length > 0 ? { ...activeClipboard, nodes: remainingNodes } : null;
         clipboardRef.current = nextClipboard;
@@ -217,6 +229,18 @@ export function useFileClipboard({
         count: completedCount,
         targetFolderPath,
       });
+    } catch (error) {
+      if (
+        latestWorkspaceKeyRef.current === operationToken.workspaceKey
+        && generationRef.current === operationToken.generation
+        && operationRef.current === operationToken
+      ) {
+        setNotice({
+          tone: "error",
+          code: "failed",
+          detail: error instanceof Error ? error.message : String(error),
+        });
+      }
     } finally {
       if (
         latestWorkspaceKeyRef.current === operationToken.workspaceKey
@@ -232,6 +256,7 @@ export function useFileClipboard({
     onEnterDataView,
     onLocalWorkspaceContentChanged,
     onWorkspaceContentChanged,
+    onResourceMoved,
     setActiveDataNode,
     setActiveDataPath,
     workspace,

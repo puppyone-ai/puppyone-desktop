@@ -330,6 +330,8 @@
   "text.placeholder": "入力を開始…",
   "text.read": "テキストファイルを読む",
   "text.readNamed": "{name} を読む",
+  "tabs.close": "{name} を閉じる",
+  "tabs.openEditors": "開いているエディター",
   "unavailable.title": "エディターで開けません",
   "viewer.chooseFor": "{name} のビューアーを選択",
   "viewer.noHostSurface": "このビューアーパックはここでは表示できません。利用可能なホスト画面がありません。"
