@@ -21,7 +21,6 @@
   background: var(--desktop-titlebar-divider);
   content: "";
   pointer-events: none;
-  transition: inset-inline-start 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .desktop-titlebar-left:has(.desktop-editor-tabs) {
@@ -59,9 +58,9 @@
   flex-grow: 0;
   flex-shrink: 0;
   padding-inline-end: 8px;
-  transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1),
-    flex-basis 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+/* Direct manipulation is 1:1 with the pointer; pane width is never eased. */
 
 .desktop-titlebar-sidebar-context[data-sidebar-state="expanded"] .desktop-titlebar-context {
   width: 100%;
@@ -88,10 +87,11 @@
 
 .desktop-editor-tabs {
   display: flex;
-  width: min(100%, 680px);
+  width: fit-content;
+  max-width: min(100%, 680px);
   height: calc(var(--desktop-titlebar-control-height) + 5px);
   min-width: 0;
-  flex: 1 1 440px;
+  flex: 0 1 auto;
   align-items: stretch;
   gap: 1px;
   margin-block-end: -5px;
@@ -260,18 +260,11 @@
 
 @media (max-width: 840px) {
   .desktop-editor-tabs {
-    width: min(100%, 400px);
+    max-width: min(100%, 400px);
   }
 
   .desktop-editor-tab {
     min-width: 84px;
     max-width: 146px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .desktop-shell[data-titlebar-sidebar-state="expanded"] .desktop-titlebar::before,
-  .desktop-titlebar-sidebar-context[data-sidebar-state="expanded"] {
-    transition: none;
   }
 }
