@@ -7,6 +7,7 @@ import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HtmlViewer } from "../packages/shared-ui/src/editor/viewers/HtmlViewer";
 import { DocumentSessionBoundary } from "../packages/shared-ui/src/editor/document-session/DocumentSessionBoundary";
+import { closeDocumentWorkingCopy } from "../packages/shared-ui/src/editor/document-session/documentWorkingCopies";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -100,6 +101,7 @@ describe("HTML editor and safe preview", () => {
       userEvent: "input.type",
     }));
     act(() => container.querySelector<HTMLButtonElement>('[aria-label="HTML preview"]')?.click());
+    await act(async () => closeDocumentWorkingCopy("page.html"));
     act(() => root?.unmount());
     root = null;
     await act(async () => Promise.resolve());
@@ -107,7 +109,7 @@ describe("HTML editor and safe preview", () => {
     expect(persist).toHaveBeenCalledWith(expect.objectContaining({
       path: "page.html",
       content: "<h1>After</h1>",
-      reason: "destroy",
+      reason: "document-close",
     }));
   });
 });

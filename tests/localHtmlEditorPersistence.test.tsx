@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DataWorkspace } from "../packages/shared-ui/src/data/DataWorkspace";
 import type { FileContent } from "../packages/shared-ui/src/core/types";
 import { flushActiveDocumentSessions } from "../packages/shared-ui/src/editor/document-session/activeDocumentSessions";
+import { closeAllDocumentWorkingCopies } from "../packages/shared-ui/src/editor/document-session/documentWorkingCopies";
 import { createLocalDataPort } from "../src/lib/localFiles";
 import { withTestLocalization } from "./testLocalization";
 
@@ -24,6 +25,7 @@ let originalDesktopBridge: Window["puppyoneDesktop"];
 afterEach(async () => {
   act(() => root?.unmount());
   root = null;
+  await closeAllDocumentWorkingCopies("app-close").catch(() => undefined);
   await flushActiveDocumentSessions("app-close").catch(() => undefined);
   document.body.innerHTML = "";
   window.puppyoneDesktop = originalDesktopBridge;
