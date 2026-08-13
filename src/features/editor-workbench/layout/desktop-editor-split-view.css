@@ -6,7 +6,7 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   background: var(--po-canvas);
 }
 
@@ -17,6 +17,15 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.desktop-editor-split[data-touches-inline-start="true"] {
+  overflow: visible;
+}
+
+.desktop-editor-panel:has(.desktop-editor-split-view),
+.data-main-view-frame:has(> .desktop-editor-split-view) {
+  overflow: visible;
 }
 
 .desktop-editor-pane {
@@ -222,10 +231,19 @@
   height: 1px;
 }
 
+.desktop-editor-split[data-touches-inline-start="true"]
+  > .desktop-editor-splitter[data-direction="vertical"]::after {
+  inset-inline-start: calc(-1 * var(--desktop-editor-sidebar-gutter-size, 0px));
+}
+
 .desktop-editor-splitter:hover::after,
-.desktop-editor-splitter:focus-visible::after,
-.desktop-editor-splitter[data-resizing="true"]::after {
+.desktop-editor-splitter:focus-visible::after {
   background: color-mix(in srgb, var(--po-accent) 60%, var(--po-divider));
+}
+
+.desktop-editor-splitter[data-resizing="true"]::after {
+  background: var(--po-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-accent) 32%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

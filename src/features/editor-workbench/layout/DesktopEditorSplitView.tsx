@@ -93,6 +93,7 @@ export function DesktopEditorSplitView({
     <div className="desktop-editor-split-view" data-pane-count={paneCount}>
       <EditorLayoutNode
         node={layout.root}
+        touchesInlineStart
         activePaneId={layout.activePaneId}
         aiEditRequest={aiEditRequest}
         dataPort={dataPort}
@@ -123,6 +124,7 @@ type EditorLayoutNodeProps = Omit<DesktopEditorSplitViewProps, "editorGroup" | "
   paneCount: number;
   fileDrop: EditorFileDropController;
   paneMove: PaneMoveDragController;
+  touchesInlineStart: boolean;
 }>;
 
 function EditorLayoutNode(props: EditorLayoutNodeProps): ReactNode {
@@ -143,16 +145,25 @@ function EditorSplit({
     <div
       className="desktop-editor-split"
       data-direction={split.direction}
+      data-touches-inline-start={props.touchesInlineStart ? "true" : undefined}
       style={style as CSSProperties}
     >
-      <EditorLayoutNode {...props} node={split.first} />
+      <EditorLayoutNode
+        {...props}
+        node={split.first}
+        touchesInlineStart={props.touchesInlineStart}
+      />
       <EditorSplitResizeHandle
         direction={split.direction}
         ratio={split.ratio}
         splitId={split.id}
         onResize={props.onResizeSplit}
       />
-      <EditorLayoutNode {...props} node={split.second} />
+      <EditorLayoutNode
+        {...props}
+        node={split.second}
+        touchesInlineStart={split.direction === "vertical" && props.touchesInlineStart}
+      />
     </div>
   );
 }

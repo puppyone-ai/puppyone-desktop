@@ -79,15 +79,15 @@ describe("editor split-pane architecture", () => {
   });
 
   it("joins root split dividers to the Editor-facing edge of the Sidebar gutter", () => {
-    expect(dataShellStyles).toMatch(
-      /\.data-explorer-resizer::after\s*\{[^}]*inset-inline-start:\s*auto;[^}]*inset-inline-end:\s*0;/s,
+    expect(dataShellStyles).toContain(
+      "--desktop-editor-sidebar-gutter-size: var(--po-pane-resizer-hit-size, 8px);",
     );
-    expect(dataShellStyles).toMatch(
-      /\.data-content\[data-resizable-explorer="true"\]\s*>\s*\.explorer-column\s*\{[^}]*border-inline-end-color:\s*transparent;/s,
+    expect(splitSource).toContain("touchesInlineStart");
+    expect(splitStyles).toContain('data-touches-inline-start="true"');
+    expect(splitStyles).toContain(
+      "inset-inline-start: calc(-1 * var(--desktop-editor-sidebar-gutter-size, 0px));",
     );
-    expect(dataShellStyles).toMatch(
-      /\.data-explorer-resizer\s*\{[^}]*background:\s*var\(--po-sidebar\);/s,
-    );
+    expect(dataShellStyles).not.toContain("border-inline-end-color: transparent;\n}\n\n.explorer-column");
   });
 
   it("does not project the Sidebar divider through the Header", () => {
