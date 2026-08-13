@@ -96,6 +96,27 @@ export type {
   EditorInput,
 } from "./editor/workbench/editorGroupModel";
 export {
+  activateEditorPane,
+  assignEditorToActivePane,
+  assignEditorToPane,
+  closeEditorPane,
+  createEditorPaneLayout,
+  getActiveEditorPane,
+  getEditorPanes,
+  parseEditorPaneLayoutState,
+  rebaseEditorPaneResources,
+  removeEditorFromPanes,
+  splitEditorPane,
+  updateEditorSplitRatio,
+} from "./editor/workbench/editorPaneLayoutModel";
+export type {
+  EditorPaneLayoutLeaf,
+  EditorPaneLayoutNode,
+  EditorPaneLayoutSplit,
+  EditorPaneLayoutState,
+  EditorSplitDirection,
+} from "./editor/workbench/editorPaneLayoutModel";
+export {
   EditorFindContributionProvider,
   useEditorFindCommand,
 } from "./editor/find/editorFind";

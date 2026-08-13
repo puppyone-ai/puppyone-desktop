@@ -137,8 +137,8 @@ const desktopAppShellSource = readFileSync(desktopAppShellPath, "utf8");
 if (!/handleActiveDataPathChange[\s\S]*editorGroup\.open/.test(desktopAppShellSource)) {
   errors.push(`${relative(desktopAppShellPath)} does not own Editor Group activation`);
 }
-if (!/DesktopEditorTabs[\s\S]*editors=\{editorGroup\.state\.editors\}/.test(desktopAppShellSource)) {
-  errors.push(`${relative(desktopAppShellPath)} does not project the Editor Group into the app shell`);
+if (!/DesktopWorkspaceContent[\s\S]*editorWorkbench=\{editorGroup\}/.test(desktopAppShellSource)) {
+  errors.push(`${relative(desktopAppShellPath)} does not project the Editor Workbench into the app shell`);
 }
 if (!/useEditableDocumentSource\s*\(\s*\)/.test(textFrameSource)) {
   errors.push(`${relative(textFramePath)} does not use the narrow editable-source boundary`);
@@ -179,7 +179,7 @@ if (/\b(?:PuppyFlowEditor|renderPreviewBody|DocumentSessionBoundary)\b/.test(des
 const desktopAppPath = path.join(repoRoot, "src/App.tsx");
 const desktopAppSource = readFileSync(desktopAppPath, "utf8");
 if (!/closeDocumentWorkingCopy\(editorId\)/.test(desktopAppSource)) {
-  errors.push(`${relative(desktopAppPath)} does not close the targeted document Working Copy with its tab`);
+  errors.push(`${relative(desktopAppPath)} does not close the targeted document Working Copy with its Input`);
 }
 if (!/closeAllDocumentWorkingCopies\("workspace-switch"\)/.test(desktopAppSource)) {
   errors.push(`${relative(desktopAppPath)} does not close all Working Copies before workspace navigation`);

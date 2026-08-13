@@ -52,6 +52,47 @@ describe("useDesktopEditorGroup", () => {
     expect(snapshots.at(-1)?.activePath).toBe("b.md");
     expect(JSON.parse(window.localStorage.getItem(storageKey) ?? "null").activeEditorId).toBe("b.md");
   });
+
+  it("persists pane assignments with the v2 workbench record", async () => {
+    const workspace: Workspace = {
+      id: "workspace-id",
+      name: "Workspace",
+      path: "/workspace",
+      status: "recording",
+    };
+    const snapshots: DesktopEditorGroupController[] = [];
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(<Probe workspace={workspace} onChange={(controller) => snapshots.push(controller)} />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      const controller = snapshots.at(-1)!;
+      controller.open("a.md");
+      controller.splitPane(controller.activePaneId, "horizontal");
+      await Promise.resolve();
+    });
+    await act(async () => {
+      snapshots.at(-1)!.open("b.md");
+      await Promise.resolve();
+    });
+
+    const storageKey = "puppyone.desktop.editor-workbench.v2:workspace-id:/workspace";
+    const stored = JSON.parse(window.localStorage.getItem(storageKey) ?? "null");
+    expect(stored.group.editors.map(({ id }: { id: string }) => id)).toEqual(["a.md", "b.md"]);
+    expect(stored.layout).toMatchObject({
+      activePaneId: "editor-pane-2",
+      root: {
+        kind: "split",
+        direction: "horizontal",
+        first: { editorId: "a.md" },
+        second: { editorId: "b.md" },
+      },
+    });
+  });
 });
 
 function Probe({

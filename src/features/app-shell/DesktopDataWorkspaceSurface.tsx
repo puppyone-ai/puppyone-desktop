@@ -5,6 +5,7 @@ import {
   DataWorkspace,
   type AiEditRequest,
   type DataNode,
+  type DocumentSessionStatus,
   type Workspace,
 } from "@puppyone/shared-ui";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
@@ -32,6 +33,8 @@ import {
 import { WorkspaceSurfaceOutlet, type ResolvedWorkspaceSurface } from "./workspace-surfaces";
 import type { DesktopView } from "../../components/DesktopCloudShell";
 import { setNativeSurfacePointerPassthrough } from "../native-surfaces";
+import { DesktopEditorSplitView } from "../editor-workbench/DesktopEditorSplitView";
+import type { DesktopEditorGroupController } from "../editor-workbench/useDesktopEditorGroup";
 
 type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 
@@ -39,6 +42,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
   activeAiEditRequest: AiEditRequest | null;
   activeDataPath: string | null;
   dataPort: NonNullable<DataWorkspaceProps["dataPort"]>;
+  editorWorkbench: DesktopEditorGroupController;
   editorInteractionPreferences: NonNullable<DataWorkspaceProps["editorInteractionPreferences"]>;
   fileClipboardController: FileClipboardController;
   fileOperationNotice: string | null;
@@ -61,6 +65,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
     node?: DataNode | null,
   ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
+  onCloseEditor: (editorId: string) => void;
   onResourceMove: (previousPath: string, nextPath: string) => void | Promise<void>;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onDismissCreateEntryMenu: () => void;
@@ -72,6 +77,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
   workspaceKey: string;
   workspaceRefreshToken: number;
   workspaceSurfaceError: string | null;
+  workingCopyStatuses: ReadonlyMap<string, DocumentSessionStatus>;
   sidebarCreateMenuOpen: boolean;
 };
 
@@ -79,12 +85,14 @@ export function DesktopDataWorkspaceSurface({
   activeAiEditRequest,
   activeDataPath,
   dataPort,
+  editorWorkbench,
   editorInteractionPreferences,
   fileClipboardController,
   fileOperationNotice,
   minimalMode,
   navigation,
   onActiveDataNodeChange,
+  onCloseEditor,
   onResourceMove,
   onActiveDataPathChange,
   onCreateEntryMenu,
@@ -97,6 +105,7 @@ export function DesktopDataWorkspaceSurface({
   workspaceKey,
   workspaceRefreshToken,
   workspaceSurfaceError,
+  workingCopyStatuses,
   sidebarCreateMenuOpen,
 }: DesktopDataWorkspaceSurfaceProps) {
   const { t } = useLocalization();
@@ -222,6 +231,7 @@ export function DesktopDataWorkspaceSurface({
           <DesktopSidebarRailNavigation {...navigationCommon} />
         ) : undefined}
         showPreviewHeader={false}
+        loadActiveFileSource={resolvedSurface.id !== "data"}
         hidePreviewSourceView
         fileIconTheme={preferences.fileIconTheme}
         editorInteractionPreferences={editorInteractionPreferences}
@@ -250,9 +260,30 @@ export function DesktopDataWorkspaceSurface({
         explorerFooterSlot={!minimalMode && preferences.sidebarNavigationPlacement === "bottom"
           ? <DesktopSidebarFooterNavigation {...navigationCommon} />
           : undefined}
-        mainSlot={resolvedSurface.id === "data" || resolvedSurface.content.main == null
-          ? undefined
-          : <WorkspaceSurfaceOutlet region="main" surface={resolvedSurface} />}
+        mainSlot={resolvedSurface.id === "data"
+          ? (state) => (
+              <DesktopEditorSplitView
+                aiEditRequest={activeAiEditRequest}
+                dataPort={dataPort}
+                editorGroup={editorWorkbench.state}
+                editorInteractionPreferences={editorInteractionPreferences}
+                fileIconTheme={preferences.fileIconTheme}
+                layout={editorWorkbench.paneLayout}
+                refreshKey={workspaceRefreshToken}
+                state={state}
+                viewerExtensionAdapter={viewerExtensionAdapter}
+                workingCopyStatuses={workingCopyStatuses}
+                workspace={workspace}
+                onCloseEditor={onCloseEditor}
+                onClosePane={editorWorkbench.closePane}
+                onFocusPane={editorWorkbench.focusPane}
+                onResizeSplit={editorWorkbench.resizeSplit}
+                onSplitPane={editorWorkbench.splitPane}
+              />
+            )
+          : resolvedSurface.content.main == null
+            ? undefined
+            : <WorkspaceSurfaceOutlet region="main" surface={resolvedSurface} />}
         capabilities={{
           create: true,
           rename: true,
