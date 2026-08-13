@@ -61,7 +61,11 @@ describe("editor split-pane architecture", () => {
   });
 
   it("fills the editor region and uses overlay handles with dedicated resize lanes", () => {
-    expect(splitStyles).toContain("--desktop-editor-splitter-size: var(--po-pane-resizer-hit-size, 8px);");
+    expect(splitStyles).toContain("--desktop-editor-divider-size: var(--po-pane-resizer-line-size, 1px);");
+    expect(splitStyles).toContain("--desktop-editor-resize-hit-size: var(--po-pane-resizer-hit-size, 8px);");
+    expect(splitSource).toContain("var(--desktop-editor-divider-size)");
+    expect(splitStyles).toContain(".desktop-editor-splitter::before");
+    expect(resizeSource).toContain("const dividerSize");
     expect(splitStyles).toContain("flex: 1 1 0;");
     expect(splitStyles).toContain(".desktop-editor-pane-handle-shell");
     expect(splitStyles).toContain(".desktop-editor-drop-preview");

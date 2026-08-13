@@ -136,8 +136,8 @@ function EditorSplit({
   ...props
 }: EditorLayoutNodeProps & { split: EditorPaneLayoutSplit }) {
   const style = split.direction === "horizontal"
-    ? { gridTemplateColumns: `${split.ratio}fr var(--desktop-editor-splitter-size) ${1 - split.ratio}fr` }
-    : { gridTemplateRows: `${split.ratio}fr var(--desktop-editor-splitter-size) ${1 - split.ratio}fr` };
+    ? { gridTemplateColumns: `${split.ratio}fr var(--desktop-editor-divider-size) ${1 - split.ratio}fr` }
+    : { gridTemplateRows: `${split.ratio}fr var(--desktop-editor-divider-size) ${1 - split.ratio}fr` };
 
   return (
     <div

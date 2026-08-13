@@ -1,5 +1,6 @@
 .desktop-editor-split-view {
-  --desktop-editor-splitter-size: var(--po-pane-resizer-hit-size, 8px);
+  --desktop-editor-divider-size: var(--po-pane-resizer-line-size, 1px);
+  --desktop-editor-resize-hit-size: var(--po-pane-resizer-hit-size, 8px);
   display: flex;
   width: 100%;
   height: 100%;
@@ -174,6 +175,12 @@
   touch-action: none;
 }
 
+.desktop-editor-splitter::before {
+  position: absolute;
+  z-index: 1;
+  content: "";
+}
+
 .desktop-editor-splitter::after {
   position: absolute;
   background: var(--po-divider);
@@ -185,6 +192,13 @@
   cursor: col-resize;
 }
 
+.desktop-editor-splitter[data-direction="horizontal"]::before {
+  width: var(--desktop-editor-resize-hit-size);
+  inset-block: 0;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+}
+
 .desktop-editor-splitter[data-direction="horizontal"]::after {
   inset-block: 0;
   inset-inline-start: calc(50% - 0.5px);
@@ -193,6 +207,13 @@
 
 .desktop-editor-splitter[data-direction="vertical"] {
   cursor: row-resize;
+}
+
+.desktop-editor-splitter[data-direction="vertical"]::before {
+  height: var(--desktop-editor-resize-hit-size);
+  inset-block-start: 50%;
+  inset-inline: 0;
+  transform: translateY(-50%);
 }
 
 .desktop-editor-splitter[data-direction="vertical"]::after {

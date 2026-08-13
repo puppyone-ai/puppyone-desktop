@@ -36,11 +36,15 @@ export function EditorSplitResizeHandle({
   const updateFromPointer = (event: PointerEvent<HTMLDivElement>) => {
     const container = event.currentTarget.parentElement;
     if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const total = direction === "horizontal" ? rect.width : rect.height;
-    const offset = direction === "horizontal" ? event.clientX - rect.left : event.clientY - rect.top;
-    const usable = Math.max(1, total - 8);
-    onResize(splitId, (offset - 4) / usable);
+    const containerRect = container.getBoundingClientRect();
+    const dividerRect = event.currentTarget.getBoundingClientRect();
+    const total = direction === "horizontal" ? containerRect.width : containerRect.height;
+    const dividerSize = direction === "horizontal" ? dividerRect.width : dividerRect.height;
+    const offset = direction === "horizontal"
+      ? event.clientX - containerRect.left
+      : event.clientY - containerRect.top;
+    const usable = Math.max(1, total - dividerSize);
+    onResize(splitId, (offset - dividerSize / 2) / usable);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
