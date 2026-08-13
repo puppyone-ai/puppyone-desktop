@@ -876,41 +876,43 @@ function AppContent() {
     ? terminalSnapshot
     : createEmptyDesktopTerminalSessionSnapshot(workspace.path);
 
-  const titlebarSlot = (
-    <>
-      <DesktopTitlebarContext
-        activeGitStatus={activeGitStatus}
-        branchSwitcherOpen={branchSwitcherOpen}
-        branchSwitcherRef={branchSwitcherRef}
-        compact={minimalMode}
-        gitStatusLoading={gitStatusLoading}
-        gitOperationLoading={gitOperationLoading}
-        localBranches={localBranches}
-        remoteBranches={remoteBranches}
-        workspace={workspace}
-        workspaceSwitcherItems={workspaceSwitcherItems}
-        workspaceSwitcherOpen={switcherOpen}
-        workspaceSwitcherRef={switcherRef}
-        onCheckoutBranch={handleCheckoutGitBranch}
-        onGoHome={() => void goToHomepage()}
-        onOpenFolder={openFolder}
-        onOpenWorkspaceSwitcherItem={openWorkspaceSwitcherItem}
-        onCloseBranchSwitcher={closeBranchSwitcher}
-        onToggleBranchSwitcher={toggleBranchSwitcher}
-        onToggleWorkspaceSwitcher={toggleWorkspaceSwitcher}
-      />
-      <DesktopEditorTabs
-        editors={editorGroup.state.editors}
-        activeEditorId={editorGroup.activePath}
-        fileIconTheme={fileIconTheme}
-        workingCopyStatuses={workingCopyStatuses}
-        onActivate={(editorId) => {
-          handleEditorActivate(editorId);
-          navigateDesktopView("data");
-        }}
-        onClose={(editorId) => { void handleEditorClose(editorId); }}
-      />
-    </>
+  const titlebarSidebarSlot = (
+    <DesktopTitlebarContext
+      activeGitStatus={activeGitStatus}
+      branchSwitcherOpen={branchSwitcherOpen}
+      branchSwitcherRef={branchSwitcherRef}
+      compact={minimalMode}
+      gitStatusLoading={gitStatusLoading}
+      gitOperationLoading={gitOperationLoading}
+      localBranches={localBranches}
+      remoteBranches={remoteBranches}
+      workspace={workspace}
+      workspaceSwitcherItems={workspaceSwitcherItems}
+      workspaceSwitcherOpen={switcherOpen}
+      workspaceSwitcherRef={switcherRef}
+      onCheckoutBranch={handleCheckoutGitBranch}
+      onGoHome={() => void goToHomepage()}
+      onOpenFolder={openFolder}
+      onOpenWorkspaceSwitcherItem={openWorkspaceSwitcherItem}
+      onCloseBranchSwitcher={closeBranchSwitcher}
+      onToggleBranchSwitcher={toggleBranchSwitcher}
+      onToggleWorkspaceSwitcher={toggleWorkspaceSwitcher}
+    />
+  );
+
+  const titlebarEditorSlot = (
+    <DesktopEditorTabs
+      editors={editorGroup.state.editors}
+      activeEditorId={editorGroup.activePath}
+      connectedToEditor={!minimalMode && activeView === "data"}
+      fileIconTheme={fileIconTheme}
+      workingCopyStatuses={workingCopyStatuses}
+      onActivate={(editorId) => {
+        handleEditorActivate(editorId);
+        navigateDesktopView("data");
+      }}
+      onClose={(editorId) => { void handleEditorClose(editorId); }}
+    />
   );
 
   const titlebarActions = (
@@ -973,7 +975,12 @@ function AppContent() {
         activeView={activeView}
         cloudHubEnabled={cloudEnabled}
         contextMenuOpen={switcherOpen || branchSwitcherOpen}
-        contextSlot={titlebarSlot}
+        contextSlot={(
+          <>
+            {titlebarSidebarSlot}
+            {titlebarEditorSlot}
+          </>
+        )}
         pluginsEnabled={
           experimentalSettings.enableViewerPlugins
           && preferences.sidebarNavigationVisibilitySettings.enabled.plugins
@@ -1008,7 +1015,8 @@ function AppContent() {
           leftSidebarWidth={explorerWidth}
           minimalMode={minimalMode}
           minimalModeDock={minimalModeDock}
-          titlebarSlot={titlebarSlot}
+          titlebarSidebarSlot={titlebarSidebarSlot}
+          titlebarEditorSlot={titlebarEditorSlot}
           titlebarActions={titlebarActions}
           rightSidebarOpen={rightSidebarOpen && desktopRightSidebarEnabled}
           resizableRightSidebar
