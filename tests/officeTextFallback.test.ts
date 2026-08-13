@@ -3,13 +3,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_OFFICE_TEXT_FALLBACK_WORKER_TIMEOUT_MS,
   extractOfficeTextFallbackInWorker,
-} from "../packages/shared-ui/src/editor/viewers/officeTextFallbackClient";
+} from "../packages/shared-ui/src/editor/viewers/office/officeTextFallbackClient";
 import {
   extractOfficeTextFallback,
   runOfficeTextFallbackWorkerTask,
   type OfficeTextFallbackWorkerResponse,
   type PresentationTextFallbackResult,
-} from "../packages/shared-ui/src/editor/viewers/officeTextFallbackTask";
+} from "../packages/shared-ui/src/editor/viewers/office/officeTextFallbackTask";
 
 afterEach(() => {
   vi.unstubAllGlobals();

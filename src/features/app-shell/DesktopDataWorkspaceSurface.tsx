@@ -32,8 +32,8 @@ import {
 import { WorkspaceSurfaceOutlet, type ResolvedWorkspaceSurface } from "./workspace-surfaces";
 import type { DesktopView } from "../../components/DesktopCloudShell";
 import { setNativeSurfacePointerPassthrough } from "../native-surfaces";
-import { DesktopEditorSplitView } from "../editor-workbench/DesktopEditorSplitView";
-import type { DesktopEditorGroupController } from "../editor-workbench/useDesktopEditorGroup";
+import { DesktopEditorSplitView } from "../editor-workbench/layout/DesktopEditorSplitView";
+import type { DesktopEditorWorkbenchController } from "../editor-workbench/controller/useDesktopEditorWorkbench";
 
 type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 
@@ -41,7 +41,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
   activeAiEditRequest: AiEditRequest | null;
   activeDataPath: string | null;
   dataPort: NonNullable<DataWorkspaceProps["dataPort"]>;
-  editorWorkbench: DesktopEditorGroupController;
+  editorWorkbench: DesktopEditorWorkbenchController;
   editorInteractionPreferences: NonNullable<DataWorkspaceProps["editorInteractionPreferences"]>;
   fileClipboardController: FileClipboardController;
   fileOperationNotice: string | null;

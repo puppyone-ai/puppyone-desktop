@@ -102,7 +102,7 @@ describe("typography architecture", () => {
     const terminalAppearance = source("src/features/desktop-terminal/runtime/terminalAppearance.ts");
     const terminalAppearanceSync = source("src/features/desktop-terminal/runtime/useTerminalAppearanceSync.ts");
     const markdownEditor = source("packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor.tsx");
-    const codeEditor = source("packages/shared-ui/src/editor/CodeMirrorCodeEditor.tsx");
+    const codeEditor = source("packages/shared-ui/src/editor/viewers/code/CodeMirrorCodeEditor.tsx");
 
     expect(tokens).toContain("--po-font-ui: var(--font-geist-sans);");
     expect(tokens).toContain("--po-font-content: var(--font-geist-sans);");

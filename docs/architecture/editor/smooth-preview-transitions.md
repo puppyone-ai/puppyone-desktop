@@ -131,27 +131,27 @@ the document content and editor instance are ready.
   - owns committed preview document state
   - binds persistence acknowledgement to the rendered document
 
-- `packages/shared-ui/src/data/FilePreview.tsx`
+- `packages/shared-ui/src/editor/host/FilePreview.tsx`
   - renders the current preview shell
   - avoids fallback preview content while full content is pending
   - resolves the selected Viewer's surface-preparation policy before mount
 
-- `packages/shared-ui/src/editor/DocumentSurfaceHost.tsx`
+- `packages/shared-ui/src/editor/host/DocumentSurfaceHost.tsx`
   - owns hidden-safe staging versus visible-first activation
   - ignores stale ready signals by surface identity
 
-- `packages/shared-ui/src/editor/presetViewerManifest.json`
+- `packages/shared-ui/src/editor/registry/presetViewerManifest.json`
   - is the canonical layout/readiness contract shared with Electron main
 
-- `packages/shared-ui/src/editor/viewers/TextEditorFrame.tsx`
+- `packages/shared-ui/src/editor/viewers/shared/TextEditorFrame.tsx`
   - owns text editor draft, mode state, and editor snapshot attachment
   - resets by `documentId` without forcing a React remount
 
-- `packages/shared-ui/src/editor/viewers/ResourceViewers.tsx`
+- `packages/shared-ui/src/editor/viewers/media/ResourceViewers.tsx`
   - owns resource-specific loading and failure presentation
   - reveals images only after the current resource has loaded and decoded
 
-- `packages/shared-ui/src/editor/viewers/PdfViewer.tsx`
+- `packages/shared-ui/src/editor/viewers/pdf/PdfViewer.tsx`
   - owns the lazy PDF.js worker boundary and progressive page canvases
   - reports ready only after the first page canvas has actually rendered
 

@@ -5,7 +5,7 @@
 - Do not import from `frontend/`, app-shell source, `@/`, `next/*`, `electron`,
   `@tauri-apps/*`, `@supabase/*`, or `swr`.
 - Prefer product-semantic component names such as `ExplorerTree`,
-  `EditorHost`, and `FilePreview`.
+  `DataNodeEditorHost`, `EditorDocumentHost`, and `FilePreview`.
 - Keep app shell concerns out of this package. Cloud auth/routing and desktop
   native window behavior belong in their app directories.
 - After changes, run `npm run check:shared-ui` from the repository root.

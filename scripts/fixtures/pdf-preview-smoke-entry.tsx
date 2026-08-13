@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { TestLocalizationProvider } from "@puppyone/localization/testing";
 import englishCatalog from "../../src/localization/catalog-loaders/en";
-import { DocumentSurfaceHost, DocumentSurfaceReadinessBoundary } from "../../packages/shared-ui/src/editor/DocumentSurfaceHost";
-import { PdfResourceViewer } from "../../packages/shared-ui/src/editor/viewers/PdfViewer";
+import { DocumentSurfaceHost, DocumentSurfaceReadinessBoundary } from "../../packages/shared-ui/src/editor/host/DocumentSurfaceHost";
+import { PdfResourceViewer } from "../../packages/shared-ui/src/editor/viewers/pdf/PdfViewer";
 import "../../packages/shared-ui/src/styles/shared-ui.css";
 
 declare global {

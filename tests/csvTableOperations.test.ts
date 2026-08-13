@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyCsvTableOperation } from "../packages/shared-ui/src/editor/csv/csvTableOperations";
+import { applyCsvTableOperation } from "../packages/shared-ui/src/editor/viewers/csv/csvTableOperations";
 
 describe("CSV table structural operations", () => {
   it("keeps the header fixed while rows move through commands and direct drops", () => {

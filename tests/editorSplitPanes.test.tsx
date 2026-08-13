@@ -17,7 +17,7 @@ import {
   type EditorGroupState,
   type EditorPaneLayoutState,
 } from "@puppyone/shared-ui";
-import { DesktopEditorSplitView } from "../src/features/editor-workbench/DesktopEditorSplitView";
+import { DesktopEditorSplitView } from "../src/features/editor-workbench/layout/DesktopEditorSplitView";
 import { withTestLocalization } from "./testLocalization";
 
 let root: Root | null = null;

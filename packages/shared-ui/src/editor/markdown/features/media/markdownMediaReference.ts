@@ -1,4 +1,4 @@
-import type { MarkdownLinkGraph } from "../../../viewerTypes";
+import type { MarkdownLinkGraph } from "../../../registry/viewerTypes";
 import type { MarkdownMediaReferenceKind } from "../../core/features/markdownFeatureData";
 export type { MarkdownMediaReferenceKind } from "../../core/features/markdownFeatureData";
 import {

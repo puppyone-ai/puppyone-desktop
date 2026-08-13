@@ -5,9 +5,9 @@ import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PuppyoneEditorHost } from "../packages/shared-ui/src/editor/PuppyoneEditorHost";
-import { preloadPresetViewer } from "../packages/shared-ui/src/editor/PresetViewerRenderer";
-import { resolveEditorViewer } from "../packages/shared-ui/src/editor/viewerRegistry";
+import { EditorDocumentHost } from "../packages/shared-ui/src/editor/host/EditorDocumentHost";
+import { preloadPresetViewer } from "../packages/shared-ui/src/editor/host/PresetViewerRenderer";
+import { resolveEditorViewer } from "../packages/shared-ui/src/editor/registry/viewerRegistry";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -35,7 +35,7 @@ describe("PuppyFlow Document Session integration", () => {
     }).viewer);
 
     await act(async () => root?.render(withTestLocalization(
-      <PuppyoneEditorHost
+      <EditorDocumentHost
         document={{
           path: "workflow.puppyflow",
           name: "workflow.puppyflow",

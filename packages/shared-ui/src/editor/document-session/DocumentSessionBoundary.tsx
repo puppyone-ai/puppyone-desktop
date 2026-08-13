@@ -10,7 +10,7 @@ import {
 import { useLocalization } from "@puppyone/localization/react";
 import type { DocumentPersistencePort } from "../../core/types";
 import { EditorSaveButton } from "../EditorSaveButton";
-import type { EditorSaveMode } from "../viewerTypes";
+import type { EditorSaveMode } from "../registry/viewerTypes";
 import { getOrCreateDocumentWorkingCopy } from "./documentWorkingCopies";
 import { EditableDocumentSourceProvider } from "./EditableDocumentSourceContext";
 import { formatDocumentSessionError } from "./formatDocumentSessionError";

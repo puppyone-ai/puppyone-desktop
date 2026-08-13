@@ -14,7 +14,7 @@ import {
   closeAllDocumentWorkingCopies,
   closeDocumentWorkingCopy,
 } from "../packages/shared-ui/src/editor/document-session/documentWorkingCopies";
-import { TextEditorFrame } from "../packages/shared-ui/src/editor/viewers/TextEditorFrame";
+import { TextEditorFrame } from "../packages/shared-ui/src/editor/viewers/shared/TextEditorFrame";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

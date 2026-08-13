@@ -77,11 +77,11 @@ if (!markdownMenuSource.includes('menu.dataset.nativeSurfaceOccluder = "true"'))
   errors.push("The imperative Markdown table menu must opt into native-surface occlusion");
 }
 
-const appPreviewViewer = read("packages/shared-ui/src/editor/viewers/AppPreviewViewer.tsx");
+const appPreviewViewer = read("packages/shared-ui/src/editor/viewers/app/AppPreviewViewer.tsx");
 if (!appPreviewViewer.includes("SandboxedAppFrame")) {
   errors.push("App Preview must render inside the editor DOM instead of a native surface");
 }
-const appPreviewHook = read("packages/shared-ui/src/editor/viewers/app-preview/useAppPreviewSession.ts");
+const appPreviewHook = read("packages/shared-ui/src/editor/viewers/app/useAppPreviewSession.ts");
 for (const forbidden of ["ResizeObserver", "getBoundingClientRect", "setSurfaceBounds", "attachmentId"]) {
   if (appPreviewHook.includes(forbidden)) {
     errors.push(`App Preview runtime hook must not coordinate native surface geometry (${forbidden})`);

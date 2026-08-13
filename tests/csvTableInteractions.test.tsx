@@ -5,8 +5,8 @@ import React, { useState } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CsvTableEditor } from "../packages/shared-ui/src/editor/CsvTableEditor";
-import { CsvTableResizeControl } from "../packages/shared-ui/src/editor/csv/CsvTableResizeControl";
+import { CsvTableEditor } from "../packages/shared-ui/src/editor/viewers/csv/CsvTableEditor";
+import { CsvTableResizeControl } from "../packages/shared-ui/src/editor/viewers/csv/CsvTableResizeControl";
 import { testT, withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })

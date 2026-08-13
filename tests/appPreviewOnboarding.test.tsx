@@ -5,7 +5,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AppPreviewController } from "@puppyone/shared-ui";
-import { AppPreviewSetupView } from "../packages/shared-ui/src/editor/viewers/app-preview/AppPreviewSetupView";
+import { AppPreviewSetupView } from "../packages/shared-ui/src/editor/viewers/app/AppPreviewSetupView";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

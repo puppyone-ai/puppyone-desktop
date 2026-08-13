@@ -2,7 +2,7 @@ import type { EditorState } from "@codemirror/state";
 import { markdownDialectFacet } from "../dialect/markdownDialect";
 import { getMarkdownPlanIndex } from "../plans/markdownPlanIndex";
 import type { MarkdownElementKind } from "../syntax/markdownElementTypes";
-import type { MarkdownDialectId } from "../../../viewerTypes";
+import type { MarkdownDialectId } from "../../../registry/viewerTypes";
 
 export type MarkdownConformanceEntry = Readonly<{
   kind: MarkdownElementKind;

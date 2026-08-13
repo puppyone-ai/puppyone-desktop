@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 import {
   getSpreadsheetCellKind,
   parseSpreadsheetPreview,
-} from "../packages/shared-ui/src/editor/viewers/spreadsheetParser";
+} from "../packages/shared-ui/src/editor/viewers/office/spreadsheetParser";
 import {
   getSpreadsheetArchiveKind,
   getSpreadsheetNavigationTarget,
@@ -15,11 +15,11 @@ import {
   getSpreadsheetVisibleRowWindow,
   MAX_SPREADSHEET_MATERIALIZED_CELLS,
   MAX_SPREADSHEET_STRING_PAYLOAD_BYTES,
-} from "../packages/shared-ui/src/editor/viewers/spreadsheetPreview";
+} from "../packages/shared-ui/src/editor/viewers/office/spreadsheetPreview";
 import {
   DEFAULT_SPREADSHEET_WORKER_TIMEOUT_MS,
   parseSpreadsheetInWorker,
-} from "../packages/shared-ui/src/editor/viewers/spreadsheetPreviewClient";
+} from "../packages/shared-ui/src/editor/viewers/office/spreadsheetPreviewClient";
 
 const CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
 const END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50;

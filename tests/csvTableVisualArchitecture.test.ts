@@ -2,31 +2,31 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const csvEditorSource = readFileSync(
-  new URL("../packages/shared-ui/src/editor/CsvTableEditor.tsx", import.meta.url),
+  new URL("../packages/shared-ui/src/editor/viewers/csv/CsvTableEditor.tsx", import.meta.url),
   "utf8",
 );
 const csvControlsSource = readFileSync(
-  new URL("../packages/shared-ui/src/editor/csv/CsvTableControls.tsx", import.meta.url),
+  new URL("../packages/shared-ui/src/editor/viewers/csv/CsvTableControls.tsx", import.meta.url),
   "utf8",
 );
 const csvMenuSource = readFileSync(
-  new URL("../packages/shared-ui/src/editor/csv/CsvTableMenu.tsx", import.meta.url),
+  new URL("../packages/shared-ui/src/editor/viewers/csv/CsvTableMenu.tsx", import.meta.url),
   "utf8",
 );
 const csvViewSettingsSource = readFileSync(
-  new URL("../packages/shared-ui/src/editor/csv/CsvViewSettings.tsx", import.meta.url),
+  new URL("../packages/shared-ui/src/editor/viewers/csv/CsvViewSettings.tsx", import.meta.url),
   "utf8",
 );
 const csvResizeSource = readFileSync(
-  new URL("../packages/shared-ui/src/editor/csv/CsvTableResizeControl.tsx", import.meta.url),
+  new URL("../packages/shared-ui/src/editor/viewers/csv/CsvTableResizeControl.tsx", import.meta.url),
   "utf8",
 );
 const csvViewerSource = readFileSync(
-  new URL("../packages/shared-ui/src/editor/viewers/CsvViewer.tsx", import.meta.url),
+  new URL("../packages/shared-ui/src/editor/viewers/csv/CsvViewer.tsx", import.meta.url),
   "utf8",
 );
 const textEditorFrameSource = readFileSync(
-  new URL("../packages/shared-ui/src/editor/viewers/TextEditorFrame.tsx", import.meta.url),
+  new URL("../packages/shared-ui/src/editor/viewers/shared/TextEditorFrame.tsx", import.meta.url),
   "utf8",
 );
 const editorEntryCss = readFileSync(

@@ -4,7 +4,7 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PdfResourceViewer } from "../packages/shared-ui/src/editor/viewers/PdfViewer";
+import { PdfResourceViewer } from "../packages/shared-ui/src/editor/viewers/pdf/PdfViewer";
 import { withTestLocalization } from "./testLocalization";
 
 const pdfMocks = vi.hoisted(() => {

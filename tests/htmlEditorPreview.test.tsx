@@ -5,7 +5,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HtmlViewer } from "../packages/shared-ui/src/editor/viewers/HtmlViewer";
+import { HtmlViewer } from "../packages/shared-ui/src/editor/viewers/html/HtmlViewer";
 import { DocumentSessionBoundary } from "../packages/shared-ui/src/editor/document-session/DocumentSessionBoundary";
 import { closeDocumentWorkingCopy } from "../packages/shared-ui/src/editor/document-session/documentWorkingCopies";
 import { withTestLocalization } from "./testLocalization";

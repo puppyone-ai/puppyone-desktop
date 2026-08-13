@@ -2,7 +2,7 @@ import type {
   EditorDocument,
   EditorViewerMatch,
   PresetViewerContribution,
-} from "./viewerTypes";
+} from "./registry/viewerTypes";
 
 export type EditorAccessReadOnlyReason =
   | "viewer-capability"

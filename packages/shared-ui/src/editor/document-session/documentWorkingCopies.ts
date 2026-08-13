@@ -6,7 +6,7 @@ import type {
   DocumentSessionDrainReason,
   DocumentSessionStatus,
 } from "./types";
-import type { EditorSaveMode } from "../viewerTypes";
+import type { EditorSaveMode } from "../registry/viewerTypes";
 
 type WorkingCopyBinding = {
   session: DocumentEditingSession;

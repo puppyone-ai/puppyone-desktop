@@ -6,7 +6,7 @@ import {
 import { isBrokerSafeResolvedAssetUrl } from "../../platform/policy/markdownAssetPolicy";
 import { getSafeMarkdownHref } from "../../platform/policy/markdownUrlPolicy";
 import { appendSanitizedInlineHtml } from "../../features/html/sanitizeHtml";
-import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../../registry/viewerTypes";
 import {
   findMarkdownImageTokens,
   parseMarkdownImageTokenAt,
