@@ -20,6 +20,7 @@ import type {
   WorkspaceChooseExternalAppRequest,
   WorkspaceCreateEntryKind,
   WorkspaceCreateEntryResult,
+  WorkspaceInstantiateTemplateResult,
   WorkspaceExternalOpenTarget,
   WorkspaceOpenEntryExternalRequest,
   WorkspaceImportEntriesResult,
@@ -137,6 +138,12 @@ export function createLocalDataPort(rootPath: string): DataPort {
       const { parentPath, name } = splitDataPath(path);
       return getDesktopBridge().createEntry({ rootPath, parentPath, name, kind: "file", content }).then(() => undefined);
     },
+    instantiateTemplate: ({ templateId, parentPath, name }) => getDesktopBridge().instantiateTemplate({
+      rootPath,
+      templateId,
+      parentPath,
+      name,
+    }),
     importFiles: (files, targetFolderPath) => importWorkspaceFiles(rootPath, targetFolderPath, files),
     renameNode: (path, nextName) => getDesktopBridge().renameEntry({ rootPath, path, nextName }).then(() => undefined),
     moveNode: (from, to) => getDesktopBridge().moveEntry({ rootPath, fromPath: from, toPath: to }).then(() => undefined),
@@ -306,6 +313,17 @@ export async function createWorkspaceEntry(
   },
 ): Promise<WorkspaceCreateEntryResult> {
   return getDesktopBridge().createEntry({ rootPath, ...request });
+}
+
+export async function instantiateWorkspaceTemplate(
+  rootPath: string,
+  request: {
+    parentPath: string | null;
+    name: string;
+    templateId: "slides.default";
+  },
+): Promise<WorkspaceInstantiateTemplateResult> {
+  return getDesktopBridge().instantiateTemplate({ rootPath, ...request });
 }
 
 export async function importWorkspaceFiles(

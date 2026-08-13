@@ -524,7 +524,7 @@
         "html-artifact",
         "monaco-code"
       ],
-      "editable": false,
+      "editable": true,
       "ingestStrategy": "parse-text",
       "monacoLanguage": "html"
     },

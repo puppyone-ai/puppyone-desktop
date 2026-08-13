@@ -22,10 +22,11 @@ import {
 import { useLocalization } from "@puppyone/localization";
 import { DesktopMenuItem, DesktopMenuSurface } from "../../../components/DesktopMenu";
 import {
-  CREATE_NEW_FILE_TYPE_IDS,
+  CREATE_NEW_ITEM_IDS,
+  CREATE_NEW_MENU_VERSION,
   cloneDefaultCreateNewMenuSettings,
-  isCreateNewFileTypeAvailable,
-  type CreateNewFileTypeId,
+  isCreateNewItemAvailable,
+  type CreateNewItemId,
   type CreateNewMenuSettings,
   type ExperimentalSettings,
 } from "../../../preferences";
@@ -39,10 +40,10 @@ type CreateNewTypeVisual = {
 
 type DragTarget = {
   edge: "before" | "after";
-  kind: CreateNewFileTypeId;
+  kind: CreateNewItemId;
 };
 
-const CREATE_NEW_TYPE_VISUALS: Record<CreateNewFileTypeId, CreateNewTypeVisual> = {
+const CREATE_NEW_TYPE_VISUALS: Record<CreateNewItemId, CreateNewTypeVisual> = {
   markdown: {
     extension: ".md",
     iconName: "Untitled.md",
@@ -62,6 +63,16 @@ const CREATE_NEW_TYPE_VISUALS: Record<CreateNewFileTypeId, CreateNewTypeVisual> 
     extension: ".csv",
     iconName: "Untitled.csv",
     iconType: "spreadsheet",
+  },
+  html: {
+    extension: ".html",
+    iconName: "Untitled.html",
+    iconType: "html",
+  },
+  slides: {
+    extension: ".puppyoneapp",
+    iconName: "Untitled Slides.puppyoneapp",
+    iconType: "app",
   },
   app: {
     extension: ".puppyoneapp",
@@ -89,20 +100,24 @@ export function CreateNewSettingsView({
   const { t } = useLocalization();
   const addMenuRef = useRef<HTMLDivElement>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const [draggedKind, setDraggedKind] = useState<CreateNewFileTypeId | null>(null);
+  const [draggedKind, setDraggedKind] = useState<CreateNewItemId | null>(null);
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
   const presentKinds = useMemo(
     () => new Set(settings.items.map((item) => item.kind)),
     [settings.items],
   );
-  const addableKinds = CREATE_NEW_FILE_TYPE_IDS.filter((kind) => (
-    !presentKinds.has(kind) && isCreateNewFileTypeAvailable(kind, experimentalSettings)
+  const addableKinds = CREATE_NEW_ITEM_IDS.filter((kind) => (
+    !presentKinds.has(kind) && isCreateNewItemAvailable(kind, experimentalSettings)
   ));
-  const defaultsRestored = settings.items.length === 2
+  const defaultsRestored = settings.items.length === 4
     && settings.items[0]?.kind === "markdown"
     && settings.items[0]?.enabled
     && settings.items[1]?.kind === "csv"
-    && settings.items[1]?.enabled;
+    && settings.items[1]?.enabled
+    && settings.items[2]?.kind === "html"
+    && settings.items[2]?.enabled
+    && settings.items[3]?.kind === "slides"
+    && settings.items[3]?.enabled;
 
   useEffect(() => {
     if (!addMenuOpen) return;
@@ -130,15 +145,16 @@ export function CreateNewSettingsView({
     if (addableKinds.length === 0) setAddMenuOpen(false);
   }, [addableKinds.length]);
 
-  const updateEnabled = (kind: CreateNewFileTypeId, enabled: boolean) => {
+  const updateEnabled = (kind: CreateNewItemId, enabled: boolean) => {
     onChange({
+      version: CREATE_NEW_MENU_VERSION,
       items: settings.items.map((item) => (
         item.kind === kind ? { ...item, enabled } : item
       )),
     });
   };
 
-  const moveItem = (kind: CreateNewFileTypeId, offset: -1 | 1) => {
+  const moveItem = (kind: CreateNewItemId, offset: -1 | 1) => {
     const sourceIndex = settings.items.findIndex((item) => item.kind === kind);
     const targetIndex = sourceIndex + offset;
     if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= settings.items.length) return;
@@ -146,10 +162,10 @@ export function CreateNewSettingsView({
     const [item] = items.splice(sourceIndex, 1);
     if (!item) return;
     items.splice(targetIndex, 0, item);
-    onChange({ items });
+    onChange({ version: CREATE_NEW_MENU_VERSION, items });
   };
 
-  const dropItem = (sourceKind: CreateNewFileTypeId, target: DragTarget) => {
+  const dropItem = (sourceKind: CreateNewItemId, target: DragTarget) => {
     if (sourceKind === target.kind) return;
     const sourceIndex = settings.items.findIndex((item) => item.kind === sourceKind);
     if (sourceIndex < 0) return;
@@ -160,12 +176,12 @@ export function CreateNewSettingsView({
     const targetIndex = items.findIndex((candidate) => candidate.kind === target.kind);
     if (targetIndex < 0) return;
     items.splice(target.edge === "before" ? targetIndex : targetIndex + 1, 0, item);
-    onChange({ items });
+    onChange({ version: CREATE_NEW_MENU_VERSION, items });
   };
 
   const handleDragStart = (
     event: DragEvent<HTMLButtonElement>,
-    kind: CreateNewFileTypeId,
+    kind: CreateNewItemId,
   ) => {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", kind);
@@ -174,7 +190,7 @@ export function CreateNewSettingsView({
 
   const handleDragOver = (
     event: DragEvent<HTMLDivElement>,
-    kind: CreateNewFileTypeId,
+    kind: CreateNewItemId,
   ) => {
     if (!draggedKind || draggedKind === kind) return;
     event.preventDefault();
@@ -189,8 +205,8 @@ export function CreateNewSettingsView({
     setDragTarget(null);
   };
 
-  const addType = (kind: CreateNewFileTypeId) => {
-    onChange({ items: [...settings.items, { kind, enabled: true }] });
+  const addType = (kind: CreateNewItemId) => {
+    onChange({ version: CREATE_NEW_MENU_VERSION, items: [...settings.items, { kind, enabled: true }] });
     setAddMenuOpen(false);
   };
 
@@ -233,7 +249,7 @@ export function CreateNewSettingsView({
                   {settings.items.map((item, index) => {
                     const visual = CREATE_NEW_TYPE_VISUALS[item.kind];
                     const label = t(`workspace.node.create.kind.${item.kind}.label`);
-                    const available = isCreateNewFileTypeAvailable(item.kind, experimentalSettings);
+                    const available = isCreateNewItemAvailable(item.kind, experimentalSettings);
                     const dragBefore = dragTarget?.kind === item.kind && dragTarget.edge === "before";
                     const dragAfter = dragTarget?.kind === item.kind && dragTarget.edge === "after";
                     return (
@@ -248,9 +264,9 @@ export function CreateNewSettingsView({
                         onDragOver={(event) => handleDragOver(event, item.kind)}
                         onDrop={(event) => {
                           event.preventDefault();
-                          const sourceKind = event.dataTransfer.getData("text/plain") as CreateNewFileTypeId;
+                          const sourceKind = event.dataTransfer.getData("text/plain") as CreateNewItemId;
                           const target = dragTarget ?? { kind: item.kind, edge: "before" };
-                          if (CREATE_NEW_FILE_TYPE_IDS.includes(sourceKind)) dropItem(sourceKind, target);
+                          if (CREATE_NEW_ITEM_IDS.includes(sourceKind)) dropItem(sourceKind, target);
                           clearDragState();
                         }}
                       >
@@ -313,6 +329,7 @@ export function CreateNewSettingsView({
                             aria-label={t("settings.createNew.remove", { type: label })}
                             title={t("settings.createNew.remove", { type: label })}
                             onClick={() => onChange({
+                              version: CREATE_NEW_MENU_VERSION,
                               items: settings.items.filter((candidate) => candidate.kind !== item.kind),
                             })}
                           >

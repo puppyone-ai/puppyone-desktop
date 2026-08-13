@@ -233,6 +233,7 @@ export type DataPort = {
   documentPersistence?: DocumentPersistencePort;
   createFolder?: (path: string) => Promise<void>;
   createFile?: (path: string, content?: string) => Promise<void>;
+  instantiateTemplate?: (request: DataTemplateInstantiationRequest) => Promise<DataTemplateInstantiationResult>;
   importFiles?: (files: File[], targetFolderPath: string | null) => Promise<DataImportResult>;
   renameNode?: (path: string, nextName: string) => Promise<void>;
   deleteNode?: (path: string) => Promise<void>;
@@ -242,6 +243,22 @@ export type DataPort = {
     targetFolderPath: string | null,
     options?: DataCopyOptions,
   ) => Promise<DataCopyResult>;
+};
+
+export type DataTemplateInstantiationRequest = {
+  templateId: "slides.default";
+  parentPath: string | null;
+  name: string;
+};
+
+export type DataTemplateInstantiationResult = {
+  rootPath: string;
+  openPath: string;
+  createdPaths: string[];
+  template: {
+    id: "slides.default";
+    version: number;
+  };
 };
 
 export const defaultDataCapabilities: DataCapabilities = {

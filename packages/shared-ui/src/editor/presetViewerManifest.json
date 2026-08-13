@@ -50,11 +50,11 @@
     {
       "id": "html-artifact",
       "formatViewerIds": [],
-      "capability": "preview",
+      "capability": "edit",
       "source": "content-and-resource",
       "runtime": "eager",
-      "surfacePreparation": "requires-visible",
-      "readinessSignal": "frame-paint"
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "dom-stable"
     },
     {
       "id": "image-preview",

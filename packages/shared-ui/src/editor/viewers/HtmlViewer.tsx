@@ -1,13 +1,12 @@
 "use client";
 
-import { Code2, Eye } from "lucide-react";
-import { useState } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import { CodeMirrorCodeEditor } from "../CodeMirrorCodeEditor";
 import { DocumentSurfacePending } from "../DocumentSurfaceHost";
 import { getHtmlPreviewInteractionCss } from "../htmlPreviewInteraction";
-import { PlainTextEditor } from "../PlainTextEditor";
 import type { MarkdownHtmlTrustMode, PresetViewerRenderContext } from "../viewerTypes";
+import { TextEditorFrame } from "./TextEditorFrame";
 import { useVisibleFrameReadiness } from "./useVisibleFrameReadiness";
 
 export function HtmlViewer({
@@ -19,6 +18,8 @@ export function HtmlViewer({
   loading,
   error,
   htmlTrustMode,
+  canEdit,
+  hideSourceView,
 }: Pick<
   PresetViewerRenderContext,
   | "document"
@@ -29,13 +30,13 @@ export function HtmlViewer({
   | "loading"
   | "error"
   | "htmlTrustMode"
+  | "canEdit"
+  | "hideSourceView"
 >) {
   const { t } = useLocalization();
-  const [mode, setMode] = useState<"preview" | "source">("preview");
 
-  if (loading && !content && !fileUrl) return <DocumentSurfacePending label={t("editor.html.loading")} />;
-  if (error && !content && !fileUrl) return <div className="editor-state danger" dir="auto">{error}</div>;
-  if (content && fileUrlLoading && !fileUrl) return <DocumentSurfacePending label={t("editor.preview.loading")} />;
+  if (loading && content === "" && !fileUrl) return <DocumentSurfacePending label={t("editor.html.loading")} />;
+  if (error && content === "" && !fileUrl) return <div className="editor-state danger" dir="auto">{error}</div>;
   if (fileUrlLoading && !content && !fileUrl) return <DocumentSurfacePending label={t("editor.preview.loading")} />;
   if (fileUrlError && !content && !fileUrl) {
     return (
@@ -45,49 +46,41 @@ export function HtmlViewer({
     );
   }
 
-  const sourceAvailable = Boolean(content);
-  const resolvedMode = sourceAvailable ? mode : "preview";
-
   return (
-    <section className="html-preview-shell" data-mode={resolvedMode}>
-      <div className="html-preview-toolbar" aria-label={t("editor.html.mode")}>
-        <button
-          className={resolvedMode === "preview" ? "active" : ""}
-          type="button"
-          title={t("editor.html.preview")}
-          aria-label={t("editor.html.preview")}
-          onClick={() => setMode("preview")}
-        >
-          <Eye size={14} strokeWidth={2} />
-        </button>
-        <button
-          className={resolvedMode === "source" ? "active" : ""}
-          type="button"
-          title={sourceAvailable ? t("editor.html.source") : t("editor.html.sourceUnavailable")}
-          aria-label={t("editor.html.source")}
-          disabled={!sourceAvailable}
-          onClick={() => setMode("source")}
-        >
-          <Code2 size={14} strokeWidth={2} />
-        </button>
-      </div>
-
-      {resolvedMode === "source" ? (
-        <div className="html-source-preview">
-          <PlainTextEditor content={content} nodeName={document.name} readOnly />
-        </div>
-      ) : (
+    <TextEditorFrame
+      documentId={document.path}
+      documentVersion={document.version}
+      content={content}
+      nodeName={document.name}
+      defaultMode="source"
+      canEdit={canEdit}
+      hideSourceView={hideSourceView}
+      liveModeLabel={t("editor.html.preview")}
+      sourceModeLabel={t("editor.html.source")}
+      liveModeIcon="preview"
+      sourceSnapshotMode
+      renderLive={(value) => (
         <div className="native-preview native-preview-framed">
           <HtmlPreviewFrame
             path={document.path}
             title={document.name}
-            content={content || null}
+            content={value}
             fileUrl={fileUrl}
             htmlTrustMode={htmlTrustMode}
           />
         </div>
       )}
-    </section>
+      renderSource={(value, controls) => (
+        <CodeMirrorCodeEditor
+          content={value}
+          nodeName={document.name}
+          language="html"
+          readOnly={!controls.canEdit}
+          onSourceRevisionChange={controls.onSourceRevisionChange}
+          onSnapshotPortChange={controls.onSnapshotPortChange}
+        />
+      )}
+    />
   );
 }
 
@@ -105,14 +98,13 @@ function HtmlPreviewFrame({
   htmlTrustMode: MarkdownHtmlTrustMode;
 }) {
   const policy = getHtmlPreviewPolicy(htmlTrustMode);
-  const useFileUrl = htmlTrustMode === "localTrusted"
-    ? Boolean(fileUrl)
-    : Boolean(fileUrl && !content);
+  const hasContentSnapshot = content !== null && content !== undefined;
+  const useFileUrl = Boolean(fileUrl && !hasContentSnapshot);
   const frameKey = [
     path,
     htmlTrustMode,
     fileUrl ?? "",
-    content ? `${content.length}:${hashString(content)}` : "",
+    hasContentSnapshot ? `${content.length}:${hashString(content)}` : "",
   ].join("|");
   const frameReadiness = useVisibleFrameReadiness(frameKey);
 
@@ -125,7 +117,7 @@ function HtmlPreviewFrame({
       sandbox={policy.sandbox}
       referrerPolicy="no-referrer"
       src={useFileUrl ? fileUrl ?? undefined : undefined}
-      srcDoc={!useFileUrl && content ? buildHtmlPreviewDocument(content, fileUrl, policy) : undefined}
+      srcDoc={!useFileUrl && hasContentSnapshot ? buildHtmlPreviewDocument(content, fileUrl, policy) : undefined}
       aria-busy={!frameReadiness.ready}
       onLoad={frameReadiness.onFrameLoad}
     />

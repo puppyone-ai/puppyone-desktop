@@ -33,6 +33,9 @@ export type TextEditorFrameProps = {
   defaultMode: EditorMode;
   canEdit: boolean;
   hideSourceView: boolean;
+  liveModeLabel?: string;
+  sourceModeLabel?: string;
+  liveModeIcon?: "edit" | "preview";
   /**
    * The frame scrolls ordinary document surfaces. Structured viewers that
    * coordinate both axes and sticky panes must explicitly own their viewport.
@@ -52,6 +55,9 @@ export function TextEditorFrame({
   defaultMode,
   canEdit,
   hideSourceView,
+  liveModeLabel,
+  sourceModeLabel,
+  liveModeIcon = "edit",
   liveScrollOwner = "frame",
   sourceSnapshotMode = false,
   renderLive,
@@ -69,6 +75,11 @@ export function TextEditorFrame({
   const contentPropRef = useRef(content);
   const documentVersionPropRef = useRef(documentVersion);
   const snapshotPortRef = useRef<EditorSourceSnapshotPort | null>(null);
+  const fallbackSourceRequestedRef = useRef(false);
+  const sourceSnapshotRef = useRef({
+    content,
+    revision: createDraftRevision(documentId, 0),
+  });
   const detachSourceRef = useRef<(() => void) | null>(null);
   const editingSourceRef = useRef<EditableDocumentSource | null>(editingSource);
 
@@ -80,6 +91,7 @@ export function TextEditorFrame({
     detachSourceRef.current?.();
     detachSourceRef.current = null;
     snapshotPortRef.current = null;
+    fallbackSourceRequestedRef.current = false;
 
     documentIdRef.current = documentId;
     editingSourceRef.current = editingSource;
@@ -88,6 +100,7 @@ export function TextEditorFrame({
     documentVersionPropRef.current = documentVersion;
     draftRevisionCounterRef.current = 0;
     draftRevisionRef.current = createDraftRevision(documentId, 0);
+    sourceSnapshotRef.current = { content, revision: draftRevisionRef.current };
     setMode(hideSourceView ? "live" : defaultMode);
     setDraft(content);
     setEditorValue(content);
@@ -161,7 +174,9 @@ export function TextEditorFrame({
   }, [documentId, editingSource, sourceSnapshotMode]);
 
   useEffect(() => {
-    if (hideSourceView) setMode("live");
+    if (hideSourceView) {
+      setMode("live");
+    }
   }, [hideSourceView]);
 
   const handleDraftChange = useCallback((nextContent: string) => {
@@ -176,6 +191,7 @@ export function TextEditorFrame({
   }, []);
 
   const handleSourceRevisionChange = (revision: EditorSourceRevision) => {
+    sourceSnapshotRef.current = { ...sourceSnapshotRef.current, revision: revision.revision };
     editingSourceRef.current?.reportRevision(revision);
   };
 
@@ -184,10 +200,26 @@ export function TextEditorFrame({
     detachSourceRef.current = null;
     snapshotPortRef.current = port;
     if (port && editingSourceRef.current) {
+      fallbackSourceRequestedRef.current = false;
       detachSourceRef.current = editingSourceRef.current.attachSource({
         readSnapshot: port.readSnapshot,
         replaceContent: (nextContent) => {
           const snapshot = port.replaceContent(nextContent);
+          setEditorValue(nextContent);
+          return snapshot;
+        },
+      });
+    } else if (sourceSnapshotMode && fallbackSourceRequestedRef.current && editingSourceRef.current) {
+      fallbackSourceRequestedRef.current = false;
+      detachSourceRef.current = editingSourceRef.current.attachSource({
+        readSnapshot: () => sourceSnapshotRef.current,
+        replaceContent: (nextContent) => {
+          draftRevisionCounterRef.current += 1;
+          const snapshot = {
+            content: nextContent,
+            revision: createDraftRevision(documentIdRef.current, draftRevisionCounterRef.current),
+          };
+          sourceSnapshotRef.current = snapshot;
           setEditorValue(nextContent);
           return snapshot;
         },
@@ -206,7 +238,11 @@ export function TextEditorFrame({
     if (nextMode === mode) return;
     if (sourceSnapshotMode) {
       const snapshot = snapshotPortRef.current?.readSnapshot();
-      if (snapshot) setEditorValue(snapshot.content);
+      if (snapshot) {
+        sourceSnapshotRef.current = snapshot;
+        setEditorValue(snapshot.content);
+        fallbackSourceRequestedRef.current = nextMode === "live";
+      }
     }
     setMode(nextMode);
   };
@@ -244,17 +280,17 @@ export function TextEditorFrame({
             className={mode === "live" ? "active" : ""}
             type="button"
             onClick={() => switchMode("live")}
-            title={t("editor.mode.live")}
-            aria-label={t("editor.mode.live")}
+            title={liveModeLabel ?? t("editor.mode.live")}
+            aria-label={liveModeLabel ?? t("editor.mode.live")}
           >
-            <PencilIcon />
+            {liveModeIcon === "preview" ? <PreviewIcon /> : <PencilIcon />}
           </button>
           <button
             className={mode === "source" ? "active" : ""}
             type="button"
             onClick={() => switchMode("source")}
-            title={t("editor.mode.source")}
-            aria-label={t("editor.mode.source")}
+            title={sourceModeLabel ?? t("editor.mode.source")}
+            aria-label={sourceModeLabel ?? t("editor.mode.source")}
           >
             <CodeIcon />
           </button>
@@ -282,6 +318,15 @@ function CodeIcon() {
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <polyline points="16 18 22 12 16 6" />
       <polyline points="8 6 2 12 8 18" />
+    </svg>
+  );
+}
+
+function PreviewIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   );
 }
