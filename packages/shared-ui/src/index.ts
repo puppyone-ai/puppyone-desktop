@@ -41,7 +41,6 @@ export type {
   MarkdownLinkIndexRequest,
 } from "./editor/markdown/linkIndex";
 export type {
-  DataWorkspaceActivePathChangeContext,
   DataWorkspaceFolderExpansionStrategy,
   DataWorkspaceProps,
   DataWorkspaceState,
@@ -82,6 +81,22 @@ export type {
 
 export { EditorHost } from "./editor/EditorHost";
 export type { EditorHostProps } from "./editor/EditorHost";
+export { EditorTabs } from "./editor/workbench/EditorTabs";
+export type { EditorTabsProps } from "./editor/workbench/EditorTabs";
+export {
+  EMPTY_EDITOR_GROUP,
+  activateEditor,
+  closeEditor,
+  closeEditorsUnderResource,
+  createEditorInput,
+  openEditor,
+  parseEditorGroupState,
+  rebaseEditorResources,
+} from "./editor/workbench/editorGroupModel";
+export type {
+  EditorGroupState,
+  EditorInput,
+} from "./editor/workbench/editorGroupModel";
 export {
   EditorFindContributionProvider,
   useEditorFindCommand,
@@ -94,8 +109,18 @@ export type {
 } from "./editor/find/editorFind";
 // The app shell may request a durability barrier, but the session object and
 // editable-source bridge remain private to the trusted Editor host.
-export { flushActiveDocumentSessions } from "./editor/document-session";
-export type { DocumentPersistedCommit } from "./editor/document-session";
+export {
+  closeAllDocumentWorkingCopies,
+  closeDocumentWorkingCopy,
+  closeDocumentWorkingCopiesUnderResource,
+  flushActiveDocumentSessions,
+  getDocumentWorkingCopyStatuses,
+  subscribeDocumentWorkingCopyStatuses,
+} from "./editor/document-session";
+export type {
+  DocumentPersistedCommit,
+  DocumentSessionStatus,
+} from "./editor/document-session";
 export {
   classifyEditorViewerCapability,
   createPresetViewerRegistry,

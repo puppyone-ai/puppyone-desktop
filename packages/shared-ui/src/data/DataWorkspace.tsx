@@ -30,6 +30,8 @@ import {
 import { resolveMarkdownAssetPath } from "../editor/markdown/assetResolution";
 import { ExplorerTree } from "./ExplorerTree";
 import { FilePreview, type FilePreviewProps } from "./FilePreview";
+import { EditorTabs } from "../editor/workbench/EditorTabs";
+import type { EditorInput } from "../editor/workbench/editorGroupModel";
 import { ProjectsHeader } from "./ProjectsHeader";
 import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
 import type {
@@ -41,6 +43,7 @@ import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
 import { getAiEditFileForPath } from "../editor/ai-edits/diff";
 import type { AiEditRequest } from "../editor/ai-edits/types";
 import type { DocumentPersistedCommit } from "../editor/document-session/types";
+import type { DocumentSessionStatus } from "../editor/document-session/types";
 import { flushActiveDocumentSessions } from "../editor/document-session/activeDocumentSessions";
 import type { FileIconThemeId } from "../file/fileIcons";
 import { useCollapsiblePaneResize } from "../primitives/useCollapsiblePaneResize";
@@ -84,14 +87,6 @@ export type DataWorkspaceSlot = ReactNode | ((state: DataWorkspaceState) => Reac
 export type DataWorkspaceFolderSlot = ReactNode | ((state: DataWorkspaceState, folder: DataNode) => ReactNode);
 export type DataWorkspaceNodeSlot = ReactNode | ((state: DataWorkspaceState, node: DataNode) => ReactNode);
 export type DataWorkspaceFolderExpansionStrategy = "load-before-expand" | "optimistic";
-export type DataWorkspaceActivePathChangeContext = Readonly<{
-  documentSessionsDrained: true;
-}>;
-
-const DRAINED_ACTIVE_PATH_CHANGE: DataWorkspaceActivePathChangeContext = Object.freeze({
-  documentSessionsDrained: true,
-});
-
 export type DataWorkspaceProps = {
   workspace: Workspace;
   dataPort: DataPort;
@@ -131,6 +126,11 @@ export type DataWorkspaceProps = {
   htmlTrustMode?: MarkdownHtmlTrustMode;
   previewActionSlot?: FilePreviewProps["actionSlot"];
   previewAccessorySlot?: DataWorkspaceSlot;
+  openEditors?: readonly EditorInput[];
+  onEditorActivate?: (editorId: string) => void;
+  onEditorClose?: (editorId: string) => void | Promise<void>;
+  onResourceMove?: (previousPath: string, nextPath: string) => void | Promise<void>;
+  workingCopyStatuses?: ReadonlyMap<string, DocumentSessionStatus>;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   resolveOfficeEditorActions?: FilePreviewProps["resolveOfficeEditorActions"];
   documentSourceKind?: DocumentSourceKind;
@@ -144,7 +144,6 @@ export type DataWorkspaceProps = {
   onActivePathChange?: (
     path: string | null,
     node: DataNode | null,
-    context?: DataWorkspaceActivePathChangeContext,
   ) => void | Promise<void>;
   onActiveNodeChange?: (node: DataNode | null) => void;
   onExplorerRootClick?: (state: DataWorkspaceState, event: ReactMouseEvent<HTMLElement>) => void;
@@ -216,6 +215,11 @@ export function DataWorkspace({
   htmlTrustMode = "safe",
   previewActionSlot,
   previewAccessorySlot,
+  openEditors = [],
+  onEditorActivate,
+  onEditorClose,
+  onResourceMove,
+  workingCopyStatuses,
   viewerExtensionAdapter = null,
   resolveOfficeEditorActions = null,
   documentSourceKind,
@@ -265,6 +269,7 @@ export function DataWorkspace({
   const [fileUrlLoading, setFileUrlLoading] = useState(false);
   const [fileUrlError, setFileUrlError] = useState<string | null>(null);
   const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
+  const [unavailableActivePath, setUnavailableActivePath] = useState<string | null>(null);
   const [markdownLinkIndexing, setMarkdownLinkIndexing] = useState(false);
   const [markdownLinkIndexBuilding, setMarkdownLinkIndexBuilding] = useState(false);
   const [markdownLinkIndex, setMarkdownLinkIndex] = useState<MarkdownLinkGraphIndexSnapshot>(
@@ -581,14 +586,9 @@ export function DataWorkspace({
     const requestId = ++documentNavigationRequestRef.current;
 
     try {
-      if (nextPath !== resolvedActivePath) {
-        // Navigation is a persistence transaction. Keep the current editor
-        // mounted until every active or retiring session has durably drained.
-        await flushActiveDocumentSessions("document-switch");
-      }
       if (requestId !== documentNavigationRequestRef.current) return false;
 
-      await onActivePathChange?.(nextPath, node, DRAINED_ACTIVE_PATH_CHANGE);
+      await onActivePathChange?.(nextPath, node);
       if (requestId !== documentNavigationRequestRef.current) return false;
 
       if (activePath === undefined) setInternalActivePath(nextPath);
@@ -600,7 +600,7 @@ export function DataWorkspace({
       }
       return false;
     }
-  }, [activePath, onActivePathChange, resolvedActivePath]);
+  }, [activePath, onActivePathChange]);
 
   const activateNode = useCallback(
     (node: DataNode | null, intent: { additive?: boolean; range?: boolean } = {}) => {
@@ -713,9 +713,15 @@ export function DataWorkspace({
     }
 
     activePathHydrationAttemptRef.current = { path: resolvedActivePath, refreshKey };
+    setUnavailableActivePath(null);
     let cancelled = false;
     void loadLinkedPathNode(resolvedActivePath).then((node) => {
-      if (cancelled || !node) return;
+      if (cancelled) return;
+      if (!node) {
+        setUnavailableActivePath(resolvedActivePath);
+        return;
+      }
+      setUnavailableActivePath(null);
       setExpandedFolderPaths((current) => addSetValues(current, collectAncestorFolderPaths(node.path)));
     });
 
@@ -1120,19 +1126,12 @@ export function DataWorkspace({
       setLoadError(null);
 
       const nextActivePath = rebasePathByMoveOperations(resolvedActivePath, operations);
-      if (nextActivePath !== resolvedActivePath) {
-        try {
-          await flushActiveDocumentSessions("document-switch");
-          setDocumentNavigationError(null);
-        } catch (error) {
-          setDocumentNavigationError(error instanceof Error ? error.message : String(error));
-          return;
-        }
-      }
-
       try {
+        await flushActiveDocumentSessions("document-switch");
+        setDocumentNavigationError(null);
         for (const operation of operations) {
           await dataPort.moveNode(operation.previousPath, operation.nextPath);
+          await onResourceMove?.(operation.previousPath, operation.nextPath);
         }
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : String(error));
@@ -1179,6 +1178,7 @@ export function DataWorkspace({
       requestActiveNodeChange,
       resolvedActivePath,
       resolvedCapabilities.move,
+      onResourceMove,
     ],
   );
   const moveNode = useCallback(
@@ -1393,6 +1393,16 @@ export function DataWorkspace({
               renderWorkspaceSlot(mainSlot, workspaceState)
             ) : (
               <>
+                {openEditors.length > 0 && onEditorActivate && onEditorClose && (
+                  <EditorTabs
+                    editors={openEditors}
+                    activeEditorId={resolvedActivePath}
+                    fileIconTheme={fileIconTheme}
+                    workingCopyStatuses={workingCopyStatuses}
+                    onActivate={onEditorActivate}
+                    onClose={(editorId) => { void onEditorClose(editorId); }}
+                  />
+                )}
                 {previewAccessory && (
                   <div className="data-preview-accessory">
                     {previewAccessory}
@@ -1425,7 +1435,9 @@ export function DataWorkspace({
                   viewerExtensionAdapter={viewerExtensionAdapter}
                   documentSourceKind={documentSourceKind ?? resolvedDocumentSourceKind}
                   emptySlot={resolvedActivePath && !activeNode
-                    ? <div className="empty-preview" aria-busy="true" />
+                    ? unavailableActivePath === resolvedActivePath
+                      ? <div className="empty-preview" role="alert"><span>{t("editor.unavailable.title")}</span></div>
+                      : <div className="empty-preview" aria-busy="true" />
                     : emptySlot}
                   actionSlot={previewActionSlot}
                   documentPersistence={dataPort.documentPersistence ?? null}

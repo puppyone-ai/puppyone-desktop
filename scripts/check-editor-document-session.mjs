@@ -129,8 +129,8 @@ if (!/keeps an immediate-save failure visible and retryable in auto mode/.test(m
 
 const dataWorkspacePath = path.join(repoRoot, "packages/shared-ui/src/data/DataWorkspace.tsx");
 const dataWorkspaceSource = readFileSync(dataWorkspacePath, "utf8");
-if (!/await flushActiveDocumentSessions\("document-switch"\)[\s\S]*await onActivePathChange/.test(dataWorkspaceSource)) {
-  errors.push(`${relative(dataWorkspacePath)} does not await the Document Session drain before changing files`);
+if (!/openEditors[\s\S]*onEditorActivate[\s\S]*await onActivePathChange/.test(dataWorkspaceSource)) {
+  errors.push(`${relative(dataWorkspacePath)} does not route file activation through the Editor Group`);
 }
 if (!/useEditableDocumentSource\s*\(\s*\)/.test(textFrameSource)) {
   errors.push(`${relative(textFramePath)} does not use the narrow editable-source boundary`);
@@ -170,11 +170,11 @@ if (/\b(?:PuppyFlowEditor|renderPreviewBody|DocumentSessionBoundary)\b/.test(des
 
 const desktopAppPath = path.join(repoRoot, "src/App.tsx");
 const desktopAppSource = readFileSync(desktopAppPath, "utf8");
-if (!/flushActiveDocumentSessions\("document-close"\)/.test(desktopAppSource)) {
-  errors.push(`${relative(desktopAppPath)} does not await sessions before leaving the editor surface`);
+if (!/closeDocumentWorkingCopy\(editorId\)/.test(desktopAppSource)) {
+  errors.push(`${relative(desktopAppPath)} does not close the targeted document Working Copy with its tab`);
 }
-if (!/flushActiveDocumentSessions\("workspace-switch"\)/.test(desktopAppSource)) {
-  errors.push(`${relative(desktopAppPath)} does not await sessions before workspace navigation`);
+if (!/closeAllDocumentWorkingCopies\("workspace-switch"\)/.test(desktopAppSource)) {
+  errors.push(`${relative(desktopAppPath)} does not close all Working Copies before workspace navigation`);
 }
 
 const localMarkdownPersistenceTestPath = path.join(
@@ -185,8 +185,8 @@ const localMarkdownPersistenceTestSource = readFileSync(localMarkdownPersistence
 if (!/persists a real CodeMirror edit through DataWorkspace and the local desktop bridge/.test(localMarkdownPersistenceTestSource)) {
   errors.push(`${relative(localMarkdownPersistenceTestPath)} does not cover the complete local Markdown write path`);
 }
-if (!/keeps the local editor mounted when its pre-navigation save fails/.test(localMarkdownPersistenceTestSource)) {
-  errors.push(`${relative(localMarkdownPersistenceTestPath)} does not cover failed local navigation drain`);
+if (!/keeps failed local edits in their Working Copy across editor navigation/.test(localMarkdownPersistenceTestSource)) {
+  errors.push(`${relative(localMarkdownPersistenceTestPath)} does not cover failed Working Copy persistence across navigation`);
 }
 
 const localCsvPersistenceTestPath = path.join(

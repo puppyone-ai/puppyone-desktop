@@ -330,6 +330,8 @@
   "text.placeholder": "Start writing…",
   "text.read": "Read text file",
   "text.readNamed": "Read {name}",
+  "tabs.close": "Close {name}",
+  "tabs.openEditors": "Open editors",
   "unavailable.title": "Cannot open in editor",
   "viewer.chooseFor": "Choose a viewer for {name}",
   "viewer.noHostSurface": "This viewer pack cannot render here — no host surface is available."

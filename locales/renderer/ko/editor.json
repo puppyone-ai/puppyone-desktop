@@ -330,6 +330,8 @@
   "text.placeholder": "작성을 시작하세요…",
   "text.read": "텍스트 파일 읽기",
   "text.readNamed": "{name} 읽기",
+  "tabs.close": "{name} 닫기",
+  "tabs.openEditors": "열린 편집기",
   "unavailable.title": "편집기에서 열 수 없음",
   "viewer.chooseFor": "{name}용 뷰어 선택",
   "viewer.noHostSurface": "이 뷰어 팩을 여기에 렌더링할 수 없습니다. 사용할 수 있는 호스트 화면이 없습니다."

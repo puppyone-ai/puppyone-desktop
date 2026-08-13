@@ -10,6 +10,10 @@ import { MarkdownCodeMirrorEditor } from "../packages/shared-ui/src/editor/markd
 import { markdownRevealedSourceField } from "../packages/shared-ui/src/editor/markdown/core/state/revealedSource";
 import type { EditorSourceSnapshotPort } from "../packages/shared-ui/src/editor/sourceSnapshot";
 import { DocumentSessionBoundary } from "../packages/shared-ui/src/editor/document-session/DocumentSessionBoundary";
+import {
+  closeAllDocumentWorkingCopies,
+  closeDocumentWorkingCopy,
+} from "../packages/shared-ui/src/editor/document-session/documentWorkingCopies";
 import { TextEditorFrame } from "../packages/shared-ui/src/editor/viewers/TextEditorFrame";
 import { withTestLocalization } from "./testLocalization";
 
@@ -17,9 +21,10 @@ import { withTestLocalization } from "./testLocalization";
 
 let root: Root | null = null;
 
-afterEach(() => {
+afterEach(async () => {
   act(() => root?.unmount());
   root = null;
+  await closeAllDocumentWorkingCopies("app-close").catch(() => undefined);
   document.body.innerHTML = "";
   vi.restoreAllMocks();
 });
@@ -161,7 +166,7 @@ describe("Markdown source snapshot boundary", () => {
     expect(container.querySelector(".editor-save-chip.error")).not.toBeNull();
   });
 
-  it("flushes the canonical EditorView snapshot before destruction", async () => {
+  it("flushes the canonical EditorView snapshot on explicit Working Copy close", async () => {
     const persist = vi.fn(async () => ({ version: "v2" }));
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -200,14 +205,12 @@ describe("Markdown source snapshot boundary", () => {
     const view = getEditorView(container);
     act(() => view.dispatch({ changes: { from: 5, insert: " beta" }, userEvent: "input.type" }));
 
-    act(() => root?.unmount());
-    root = null;
-    await act(async () => Promise.resolve());
+    await act(async () => closeDocumentWorkingCopy("note.md"));
 
     expect(persist).toHaveBeenCalledWith(expect.objectContaining({
       path: "note.md",
       content: "alpha beta",
-      reason: "destroy",
+      reason: "document-close",
     }));
   });
 

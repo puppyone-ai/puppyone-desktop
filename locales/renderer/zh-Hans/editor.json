@@ -330,6 +330,8 @@
   "text.placeholder": "开始输入…",
   "text.read": "读取文本文件",
   "text.readNamed": "读取 {name}",
+  "tabs.close": "关闭 {name}",
+  "tabs.openEditors": "已打开的编辑器",
   "unavailable.title": "无法在编辑器中打开",
   "viewer.chooseFor": "为 {name} 选择查看器",
   "viewer.noHostSurface": "无法在此处呈现此查看器包，因为没有可用的宿主界面。"
