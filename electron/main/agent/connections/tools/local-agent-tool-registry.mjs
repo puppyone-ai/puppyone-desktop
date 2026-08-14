@@ -1,7 +1,14 @@
 import { CODEX_LOCAL_TOOL } from "./codex-tool.mjs";
+import { CLAUDE_LOCAL_TOOL } from "./claude-tool.mjs";
 import { CURSOR_LOCAL_TOOL } from "./cursor-tool.mjs";
+import { OPENCODE_LOCAL_TOOL } from "./opencode-tool.mjs";
 
-const DEFAULT_LOCAL_AGENT_TOOLS = Object.freeze([CODEX_LOCAL_TOOL, CURSOR_LOCAL_TOOL]);
+const DEFAULT_LOCAL_AGENT_TOOLS = Object.freeze([
+  CODEX_LOCAL_TOOL,
+  CLAUDE_LOCAL_TOOL,
+  CURSOR_LOCAL_TOOL,
+  OPENCODE_LOCAL_TOOL,
+]);
 
 export function createLocalAgentToolRegistry(descriptors = DEFAULT_LOCAL_AGENT_TOOLS) {
   const seen = new Set();
@@ -13,6 +20,7 @@ export function createLocalAgentToolRegistry(descriptors = DEFAULT_LOCAL_AGENT_T
       id: descriptor.id,
       displayName: descriptor.displayName,
       executableNames: Object.freeze([...descriptor.executableNames]),
+      ...(descriptor.candidatePaths ? { candidatePaths: descriptor.candidatePaths } : {}),
       probe: descriptor.probe,
       unavailableMessage: descriptor.unavailableMessage,
     });
@@ -31,6 +39,9 @@ function validateDescriptor(descriptor) {
   }
   if (typeof descriptor.probe !== "function") {
     throw new TypeError(`Local Agent tool ${descriptor.id} requires a probe.`);
+  }
+  if (descriptor.candidatePaths !== undefined && typeof descriptor.candidatePaths !== "function") {
+    throw new TypeError(`Local Agent tool ${descriptor.id} candidate paths must be a function.`);
   }
   if (typeof descriptor.unavailableMessage !== "string" || !descriptor.unavailableMessage.trim()) {
     throw new TypeError(`Local Agent tool ${descriptor.id} requires an unavailable-state message.`);

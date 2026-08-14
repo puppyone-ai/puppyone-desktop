@@ -23,18 +23,23 @@ afterEach(() => {
 });
 
 describe("Desktop Terminal launcher", () => {
-  it("presents coding tools without starting a session before selection", () => {
+  it("presents installed Agents without starting a session before selection", () => {
     const onLaunch = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
 
     act(() => root?.render(withTestLocalization(
-      <TerminalLauncher onLaunch={onLaunch} />,
+      <TerminalLauncher
+        discoveryPhase="ready"
+        installedAgentIds={["codex", "claude", "cursor", "opencode"]}
+        onLaunch={onLaunch}
+        onRefresh={vi.fn()}
+      />,
     )));
 
     expect(container.querySelector(".desktop-terminal-launcher")).not.toBeNull();
-    expect(container.textContent).toContain("Start a coding tool");
+    expect(container.textContent).toContain("Start an Agent");
     expect(container.textContent).toContain("Codex");
     expect(container.textContent).toContain("Claude Code");
     expect(container.textContent).toContain("Cursor Agent");
@@ -47,6 +52,27 @@ describe("Desktop Terminal launcher", () => {
 
     clickButton(container, "Open a shell");
     expect(onLaunch).toHaveBeenLastCalledWith("shell");
+  });
+
+  it("hides Agents that the trusted local inventory did not detect", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(withTestLocalization(
+      <TerminalLauncher
+        discoveryPhase="ready"
+        installedAgentIds={["codex"]}
+        onLaunch={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    )));
+
+    expect(container.textContent).toContain("Codex");
+    expect(container.textContent).not.toContain("Claude Code");
+    expect(container.textContent).not.toContain("Cursor Agent");
+    expect(container.textContent).not.toContain("OpenCode");
+    expect(container.textContent).toContain("Open a shell");
   });
 
   it("keeps launcher commands closed, explicit, and unique", () => {

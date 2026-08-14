@@ -1,4 +1,9 @@
-export type DesktopTerminalSessionStatus = "starting" | "running" | "exited" | "error";
+export type DesktopTerminalSessionStatus =
+  | "selecting"
+  | "starting"
+  | "running"
+  | "exited"
+  | "error";
 
 export type DesktopTerminalSessionSummary = {
   id: string;
@@ -23,6 +28,8 @@ export type DesktopTerminalSessionsState = {
 
 export type DesktopTerminalSessionsAction =
   | { type: "create"; sessionId: string }
+  | { type: "create-launcher"; sessionId: string }
+  | { type: "launch"; sessionId: string }
   | { type: "activate"; sessionId: string }
   | { type: "close"; sessionId: string }
   | {
@@ -61,6 +68,33 @@ export function desktopTerminalSessionsReducer(
       activeSessionId: action.sessionId,
       nextOrdinal: state.nextOrdinal + 1,
     };
+  }
+
+  if (action.type === "create-launcher") {
+    const existing = state.sessions.find((session) => session.status === "selecting");
+    if (existing) {
+      return state.activeSessionId === existing.id
+        ? state
+        : { ...state, activeSessionId: existing.id };
+    }
+    return {
+      sessions: [
+        ...state.sessions,
+        createSession(action.sessionId, state.nextOrdinal, "selecting"),
+      ],
+      activeSessionId: action.sessionId,
+      nextOrdinal: state.nextOrdinal + 1,
+    };
+  }
+
+  if (action.type === "launch") {
+    let changed = false;
+    const sessions = state.sessions.map((session) => {
+      if (session.id !== action.sessionId || session.status !== "selecting") return session;
+      changed = true;
+      return { ...session, status: "starting" as const };
+    });
+    return changed ? { ...state, sessions } : state;
   }
 
   if (action.type === "activate") {
@@ -135,11 +169,15 @@ export function createEmptyDesktopTerminalSessionSnapshot(
   };
 }
 
-function createSession(id: string, ordinal: number): DesktopTerminalSession {
+function createSession(
+  id: string,
+  ordinal: number,
+  status: DesktopTerminalSessionStatus = "starting",
+): DesktopTerminalSession {
   return {
     id,
     ordinal,
     shell: null,
-    status: "starting",
+    status,
   };
 }

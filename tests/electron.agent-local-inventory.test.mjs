@@ -22,8 +22,15 @@ import {
   parseCursorLocalVersion,
   probeCursorLocal,
 } from "../electron/main/agent/connections/probes/cursor-local-probe.mjs";
+import {
+  parseVersionedLocalAgentVersion,
+  probeVersionedLocalAgent,
+} from "../electron/main/agent/connections/probes/versioned-local-agent-probe.mjs";
 import { createLocalAgentInventory } from "../electron/main/agent/connections/local-agent-inventory.mjs";
 import { deriveLocalConnection } from "../electron/main/agent/connections/local-agent-connection-policy.mjs";
+import { localAgentToolRegistryDefaults } from "../electron/main/agent/connections/tools/local-agent-tool-registry.mjs";
+import { CLAUDE_LOCAL_TOOL } from "../electron/main/agent/connections/tools/claude-tool.mjs";
+import { OPENCODE_LOCAL_TOOL } from "../electron/main/agent/connections/tools/opencode-tool.mjs";
 
 const temporaryDirectories = [];
 
@@ -150,6 +157,51 @@ describe("Desktop Agent local-tool inventory", () => {
     expect(parseCursorAuthentication("Authenticated as local@example.test")).toBe("signed-in");
     expect(parseCursorAuthentication("ERROR: SecItemCopyMatching failed -50")).toBe("error");
     expect(parseCursorAuthentication("new additive status format")).toBe("unknown");
+  });
+
+  it("registers every terminal-launched Agent and verifies generic local versions", async () => {
+    expect(localAgentToolRegistryDefaults.map(({ id }) => id)).toEqual([
+      "codex",
+      "claude",
+      "cursor-agent",
+      "opencode",
+    ]);
+    expect(parseVersionedLocalAgentVersion("claude 2.1.159")).toBe("2.1.159");
+    const result = await probeVersionedLocalAgent({
+      candidate: fixedCandidate("/tools/claude", "claude"),
+      id: "claude",
+      displayName: "Claude Code",
+      runCommand: vi.fn(async () => ({ code: 0, stdout: "2.1.159 (Claude Code)", stderr: "" })),
+    });
+    expect(result).toMatchObject({
+      id: "claude",
+      installation: "detected",
+      version: "2.1.159",
+      protocolCompatible: false,
+    });
+  });
+
+  it("finds GUI-missing NVM Claude and standard OpenCode installations", async () => {
+    const home = await temporaryDirectory();
+    const claudePath = path.join(home, ".nvm", "versions", "node", "v22.17.0", "bin", "claude");
+    const opencodePath = path.join(home, ".opencode", "bin", "opencode");
+    await mkdir(path.dirname(claudePath), { recursive: true });
+    await mkdir(path.dirname(opencodePath), { recursive: true });
+    await executable(claudePath, "#!/bin/sh\necho '2.1.159 (Claude Code)'\n");
+    await executable(opencodePath, "#!/bin/sh\necho 'opencode 1.2.3'\n");
+    const inventory = createLocalAgentInventory({
+      env: { PATH: "" },
+      homedir: home,
+      toolDescriptors: [CLAUDE_LOCAL_TOOL, OPENCODE_LOCAL_TOOL],
+    });
+
+    await expect(inventory.discover({ refresh: true })).resolves.toMatchObject({
+      connections: [
+        { id: "claude", installation: "detected", version: "2.1.159" },
+        { id: "opencode", installation: "detected", version: "1.2.3" },
+      ],
+    });
+    inventory.dispose();
   });
 
   it("probes Codex protocol/account and Cursor status without exposing raw output", async () => {
@@ -430,8 +482,8 @@ async function temporaryDirectory() {
   return directory;
 }
 
-async function executable(filename) {
-  await writeFile(filename, "#!/bin/sh\nexit 0\n", "utf8");
+async function executable(filename, contents = "#!/bin/sh\nexit 0\n") {
+  await writeFile(filename, contents, "utf8");
   await chmod(filename, 0o755);
   return filename;
 }

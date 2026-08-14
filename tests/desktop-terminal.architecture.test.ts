@@ -22,6 +22,8 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(panel).not.toContain("window.puppyoneDesktop");
     expect(controller).toContain("desktopTerminalSessionsReducer");
     expect(controller).toContain('dispatch({ type: "create"');
+    expect(controller).toContain('dispatch({ type: "create-launcher"');
+    expect(controller).toContain('dispatch({ type: "launch"');
     expect(controller).toContain('dispatch({ type: "activate"');
     expect(controller).toContain('dispatch({ type: "close"');
     expect(controller).toContain("runtimeRegistry.ensure(sessionId, launcher.command)");
@@ -31,6 +33,10 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(panel).toContain("onClose={requestCloseSession}");
     expect(panel).toContain("<TerminalCloseConfirmationDialog");
     expect(panel).toContain("<TerminalLauncher");
+    expect(panel).toContain("create: createLauncher");
+    expect(panel).toContain("onCreate={createLauncher}");
+    expect(panel).not.toContain('createSession("shell")');
+    expect(panel).toContain('session.status === "selecting"');
     expect(panel).toContain('sessions.length > 0');
     expect(panel).not.toContain("initiallyActive");
     expect(controller).not.toContain("initiallyActive");

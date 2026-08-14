@@ -19,7 +19,12 @@ export function TerminalLauncherVisualSmokeHarness() {
         style={{ width }}
       >
         <div className="desktop-terminal-body is-empty">
-          <TerminalLauncher onLaunch={setSelection} />
+          <TerminalLauncher
+            discoveryPhase="ready"
+            installedAgentIds={["codex", "claude", "cursor", "opencode"]}
+            onLaunch={setSelection}
+            onRefresh={() => undefined}
+          />
         </div>
       </section>
       <output className="desktop-terminal-launcher-smoke-output">

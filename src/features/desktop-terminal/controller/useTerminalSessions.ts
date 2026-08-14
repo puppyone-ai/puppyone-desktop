@@ -61,6 +61,19 @@ export function useTerminalSessions({
     dispatch({ type: "create", sessionId });
   }, [runtimeRegistry]);
 
+  const createLauncher = useCallback(() => {
+    dispatch({ type: "create-launcher", sessionId: createTerminalId() });
+  }, []);
+
+  const launchSession = useCallback((
+    sessionId: string,
+    launcherId: DesktopTerminalLauncherId,
+  ) => {
+    const launcher = getDesktopTerminalLauncher(launcherId);
+    runtimeRegistry.ensure(sessionId, launcher.command);
+    dispatch({ type: "launch", sessionId });
+  }, [runtimeRegistry]);
+
   const activateSession = useCallback((sessionId: string) => {
     dispatch({ type: "activate", sessionId });
   }, []);
@@ -71,8 +84,13 @@ export function useTerminalSessions({
   }, [runtimeRegistry]);
 
   const requestCloseSession = useCallback((sessionId: string) => {
+    const session = state.sessions.find((candidate) => candidate.id === sessionId);
+    if (session?.status === "selecting") {
+      dispatch({ type: "close", sessionId });
+      return;
+    }
     setPendingCloseSessionId(sessionId);
-  }, []);
+  }, [state.sessions]);
 
   const cancelCloseSession = useCallback(() => {
     setPendingCloseSessionId(null);
@@ -117,7 +135,9 @@ export function useTerminalSessions({
     activateSession,
     cancelCloseSession,
     confirmCloseSession,
+    createLauncher,
     createSession,
+    launchSession,
     pendingCloseSession,
     requestCloseSession,
     runtimeRegistry,
