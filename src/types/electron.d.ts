@@ -709,6 +709,16 @@ declare global {
         applied: boolean;
         width?: number;
       }>;
+      capturePanePreview: (request: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }) => Promise<{
+        dataUrl: string;
+        width: number;
+        height: number;
+      } | null>;
       setNativeSurfaceOccluded: (request: { occluded: boolean }) => void;
       setNativeSurfacePointerPassthrough: (request: { active: boolean }) => void;
       getBuildInfo: () => Promise<DesktopBuildInfo>;

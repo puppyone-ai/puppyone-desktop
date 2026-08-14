@@ -42,6 +42,10 @@ const paneMoveSource = readFileSync(
   new URL("../src/features/editor-workbench/drag-and-drop/usePaneMoveDrag.ts", import.meta.url),
   "utf8",
 );
+const paneMovePreviewSource = readFileSync(
+  new URL("../src/features/editor-workbench/drag-and-drop/paneMovePreview.ts", import.meta.url),
+  "utf8",
+);
 const fileDropSource = readFileSync(
   new URL("../src/features/editor-workbench/drag-and-drop/useExplorerFileDrop.ts", import.meta.url),
   "utf8",
@@ -111,13 +115,14 @@ describe("editor split-pane architecture", () => {
     const handleRule = readCssBlock(splitStyles, ".desktop-editor-pane-handle");
     expect(handleRule).toContain("border: 0;");
     expect(handleRule).toContain("background: transparent;");
-    expect(handleRule).toContain("color: var(--po-divider);");
+    expect(handleRule).toContain("color: var(--po-border);");
+    expect(handleRule).toContain("gap: 2px;");
     expect(handleRule).not.toContain("box-shadow:");
     expect(handleRule).not.toContain("border-radius:");
     const handleDotRule = readCssBlock(splitStyles, ".desktop-editor-pane-handle > i");
-    expect(handleDotRule).toContain("width: 2px;");
-    expect(handleDotRule).toContain("height: 2px;");
-    expect(handleDotRule).toContain("var(--po-divider)");
+    expect(handleDotRule).toContain("width: 3px;");
+    expect(handleDotRule).toContain("height: 3px;");
+    expect(handleDotRule).toContain("var(--po-border)");
     expect(handleDotRule).toContain("var(--po-canvas)");
     expect(splitStyles).not.toContain(".desktop-editor-pane-bar");
     expect(splitStyles).not.toContain("border-radius: 7px 7px 0 0");
@@ -130,6 +135,7 @@ describe("editor split-pane architecture", () => {
     expect(paneShellSource).toContain("PANE_HANDLE_REVEAL_RATIO = 1 / 3");
     expect(paneShellSource).toContain('data-handle-hot={handleRevealed ? "true" : undefined}');
     expect(paneShellSource).toContain("onPointerMove={onPanePointerMove}");
+    expect(paneShellSource).toContain("paneMove.prepare(host, pane.id)");
     expect(paneShellSource).toContain("onPointerUp={(event)");
     expect(paneShellSource).not.toContain("onPointerDownCapture");
     expect(splitSource).toContain("key={split.first.id}");
@@ -143,6 +149,11 @@ describe("editor split-pane architecture", () => {
     expect(paneSourceLifecycle).toContain("new AbortController()");
     expect(paneMoveSource).toContain("createPaneMovePreview");
     expect(paneMoveSource).toContain("destroyPaneMovePreview");
+    expect(paneMoveSource).toContain("samePaneDropIntent");
+    expect(paneMovePreviewSource).toContain("capturePanePreview");
+    expect(paneMovePreviewSource).toContain('getElementById("desktop-overlay-root")');
+    expect(paneMovePreviewSource).not.toContain("cloneNode");
+    expect(paneMovePreviewSource).not.toContain('querySelectorAll("*")');
     expect(paneMoveSource.indexOf('distance < PANE_MOVE_THRESHOLD_PX'))
       .toBeLessThan(paneMoveSource.indexOf('classList.add("desktop-editor-pane-dragging")'));
     expect(splitStyles).not.toContain(

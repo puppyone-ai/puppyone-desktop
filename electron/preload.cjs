@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   setWindowMinimumWidth: (request) => (
     ipcRenderer.invoke("window-layout:set-minimum-width", request)
   ),
+  capturePanePreview: (request) => ipcRenderer.invoke("pane-preview:capture", request),
   setNativeSurfaceOccluded: (request) => {
     ipcRenderer.send("native-surfaces:set-overlay-occluded", {
       occluded: request?.occluded === true,

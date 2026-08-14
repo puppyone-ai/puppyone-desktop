@@ -141,7 +141,7 @@ describe("DesktopEditorSplitView", () => {
     expect(pane.dataset.handleHot).toBe("true");
   });
 
-  it("uses the grab handle only to move an existing pane", () => {
+  it("uses the grab handle only to move an existing pane", async () => {
     const onMovePane = vi.fn();
     let group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("a.md"));
     group = openEditor(group, createEditorInput("b.md"));
@@ -172,6 +172,10 @@ describe("DesktopEditorSplitView", () => {
     const preview = document.body.querySelector<HTMLElement>(".desktop-editor-pane-move-preview");
     expect(preview).not.toBeNull();
     expect(preview!.style.transform).toContain("790px");
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     expect(panes[0]!.getAttribute("data-move-source")).toBe("true");
 
     act(() => handle.dispatchEvent(new PointerEvent("pointerup", {

@@ -1,46 +1,73 @@
 export const PANE_MOVE_PREVIEW_CLASS = "desktop-editor-pane-move-preview";
 export const PANE_MOVE_PREVIEW_MAX_WIDTH = 240;
 export const PANE_MOVE_PREVIEW_MAX_HEIGHT = 156;
+export const PANE_MOVE_PREVIEW_MAX_SCALE = 0.36;
+
+export type PaneMovePreviewSnapshot = Readonly<{
+  dataUrl: string;
+  width: number;
+  height: number;
+}>;
+
+export async function capturePaneMovePreview(
+  sourcePane: HTMLElement,
+): Promise<PaneMovePreviewSnapshot | null> {
+  const bridge = window.puppyoneDesktop?.capturePanePreview;
+  if (!bridge) return null;
+
+  const content = getPanePreviewContent(sourcePane);
+  const rect = content.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+
+  try {
+    const snapshot = await bridge({
+      x: rect.left,
+      y: rect.top,
+      width: rect.width,
+      height: rect.height,
+    });
+    return isPaneMovePreviewSnapshot(snapshot) ? snapshot : null;
+  } catch {
+    return null;
+  }
+}
 
 export function createPaneMovePreview(
   sourcePane: HTMLElement,
   clientX: number,
   clientY: number,
+  snapshot?: PaneMovePreviewSnapshot | null,
 ): HTMLElement {
-  const content = sourcePane.querySelector<HTMLElement>(".desktop-editor-pane-content")
-    ?? sourcePane;
+  const content = getPanePreviewContent(sourcePane);
   const rect = content.getBoundingClientRect();
-  const width = Math.max(rect.width, 1);
-  const height = Math.max(rect.height, 1);
-  const scale = Math.min(
-    PANE_MOVE_PREVIEW_MAX_WIDTH / width,
-    PANE_MOVE_PREVIEW_MAX_HEIGHT / height,
-    0.36,
-  );
+  const { width, height } = getPaneMovePreviewSize(rect.width, rect.height);
 
   const doc = sourcePane.ownerDocument;
   const preview = doc.createElement("div");
   preview.className = PANE_MOVE_PREVIEW_CLASS;
   preview.setAttribute("aria-hidden", "true");
-  preview.style.width = `${width * scale}px`;
-  preview.style.height = `${height * scale}px`;
+  preview.dataset.ready = "false";
+  preview.style.width = `${width}px`;
+  preview.style.height = `${height}px`;
 
-  const frame = doc.createElement("div");
-  frame.className = `${PANE_MOVE_PREVIEW_CLASS}-frame`;
-  frame.style.width = `${width}px`;
-  frame.style.height = `${height}px`;
-  frame.style.transform = `scale(${scale})`;
-
-  const clone = content.cloneNode(true) as HTMLElement;
-  sanitizePaneMovePreviewClone(clone);
-  copyScrollPositions(content, clone);
-  clone.style.width = `${width}px`;
-  clone.style.height = `${height}px`;
-  frame.append(clone);
-  preview.append(frame);
-  doc.body.append(preview);
+  getPaneMovePreviewHost(sourcePane).append(preview);
+  if (snapshot) applyPaneMovePreviewSnapshot(preview, snapshot);
   movePaneMovePreview(preview, clientX, clientY);
   return preview;
+}
+
+export function applyPaneMovePreviewSnapshot(
+  preview: HTMLElement,
+  snapshot: PaneMovePreviewSnapshot,
+): void {
+  if (!isPaneMovePreviewSnapshot(snapshot)) return;
+  const image = preview.ownerDocument.createElement("img");
+  image.alt = "";
+  image.decoding = "async";
+  image.draggable = false;
+  image.src = snapshot.dataUrl;
+  preview.replaceChildren(image);
+  preview.dataset.ready = "true";
 }
 
 export function movePaneMovePreview(
@@ -55,26 +82,39 @@ export function destroyPaneMovePreview(preview: HTMLElement | null | undefined):
   preview?.remove();
 }
 
-function sanitizePaneMovePreviewClone(root: HTMLElement) {
-  root.querySelector(".desktop-editor-pane-handle-shell")?.remove();
-  root.querySelector(".desktop-editor-drop-preview")?.remove();
-  root.removeAttribute("id");
-  root.removeAttribute("data-editor-pane-id");
-  for (const node of root.querySelectorAll("[id], [data-editor-pane-id]")) {
-    node.removeAttribute("id");
-    node.removeAttribute("data-editor-pane-id");
-  }
+function getPanePreviewContent(sourcePane: HTMLElement): HTMLElement {
+  return sourcePane.querySelector<HTMLElement>(".desktop-editor-pane-content")
+    ?? sourcePane;
 }
 
-function copyScrollPositions(source: Element, clone: Element) {
-  const sourceNodes = [source, ...source.querySelectorAll("*")];
-  const cloneNodes = [clone, ...clone.querySelectorAll("*")];
-  const count = Math.min(sourceNodes.length, cloneNodes.length);
-  for (let index = 0; index < count; index += 1) {
-    const from = sourceNodes[index];
-    const to = cloneNodes[index];
-    if (!(from instanceof HTMLElement) || !(to instanceof HTMLElement)) continue;
-    if (from.scrollTop) to.scrollTop = from.scrollTop;
-    if (from.scrollLeft) to.scrollLeft = from.scrollLeft;
-  }
+function getPaneMovePreviewHost(sourcePane: HTMLElement): HTMLElement {
+  const doc = sourcePane.ownerDocument;
+  const overlayRoot = doc.getElementById("desktop-overlay-root");
+  if (overlayRoot instanceof HTMLElement) return overlayRoot;
+  return sourcePane.closest<HTMLElement>(".app-shell") ?? doc.body;
+}
+
+function getPaneMovePreviewSize(width: number, height: number) {
+  const safeWidth = Math.max(width, 1);
+  const safeHeight = Math.max(height, 1);
+  const scale = Math.min(
+    PANE_MOVE_PREVIEW_MAX_WIDTH / safeWidth,
+    PANE_MOVE_PREVIEW_MAX_HEIGHT / safeHeight,
+    PANE_MOVE_PREVIEW_MAX_SCALE,
+  );
+  return {
+    width: Math.max(1, Math.round(safeWidth * scale)),
+    height: Math.max(1, Math.round(safeHeight * scale)),
+  };
+}
+
+function isPaneMovePreviewSnapshot(value: unknown): value is PaneMovePreviewSnapshot {
+  if (!value || typeof value !== "object") return false;
+  const snapshot = value as Partial<PaneMovePreviewSnapshot>;
+  return typeof snapshot.dataUrl === "string"
+    && snapshot.dataUrl.startsWith("data:image/")
+    && Number.isFinite(snapshot.width)
+    && Number.isFinite(snapshot.height)
+    && snapshot.width! > 0
+    && snapshot.height! > 0;
 }

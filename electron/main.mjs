@@ -50,6 +50,7 @@ import { registerCloudPublishIpcHandlers } from "./main/ipc/cloud-publish-ipc.mj
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
 import { registerNativeSurfaceOcclusionIpcHandlers } from "./main/ipc/native-surface-occlusion-ipc.mjs";
 import { registerNativeSurfacePointerPassthroughIpcHandlers } from "./main/ipc/native-surface-pointer-passthrough-ipc.mjs";
+import { registerPanePreviewIpcHandlers } from "./main/ipc/pane-preview-ipc.mjs";
 import { registerLocalizationIpcHandlers } from "./main/ipc/localization-ipc.mjs";
 import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service.mjs";
 import { createNativeSurfaceOcclusionCoordinator } from "./main/native-surfaces/occlusion-coordinator.mjs";
@@ -701,6 +702,10 @@ function registerIpcHandlers() {
   registerNativeSurfacePointerPassthroughIpcHandlers({
     ipcMain: trustedIpcMain,
     coordinator: nativeSurfacePointerPassthrough,
+  });
+  registerPanePreviewIpcHandlers({
+    ipcMain: trustedIpcMain,
+    BrowserWindow,
   });
   registerBuildInfoIpcHandlers({
     ipcMain: trustedIpcMain,
