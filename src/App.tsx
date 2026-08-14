@@ -436,6 +436,10 @@ function AppContent() {
       const target = event.target;
       if (target instanceof Node && switcherRef.current?.contains(target)) return;
       if (target instanceof Node && branchSwitcherRef.current?.contains(target)) return;
+      if (
+        target instanceof Element
+        && target.closest('[data-titlebar-context-menu="true"]')
+      ) return;
       setSwitcherOpen(false);
       setBranchSwitcherOpen(false);
     };

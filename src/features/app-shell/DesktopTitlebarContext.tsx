@@ -2,9 +2,10 @@ import type { RefObject } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { GitBranch } from "lucide-react";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
-import { DesktopMenuItem, DesktopMenuSurface } from "../../components/DesktopMenu";
+import { DesktopMenuItem } from "../../components/DesktopMenu";
 import type { GitBranchSummary, GitStatusSnapshot } from "../../types/electron";
 import { BranchMenuGroup } from "../source-control/operationDialogs";
+import { DesktopTitlebarMenuLayer } from "./DesktopTitlebarMenuLayer";
 import {
   DesktopWorkspaceSwitcher,
   type DesktopWorkspaceSwitcherItem,
@@ -56,6 +57,7 @@ export function DesktopTitlebarContext({
         onToggle={onToggleWorkspaceSwitcher}
       />
       <DesktopBranchSwitcher
+        compact={compact}
         open={branchSwitcherOpen}
         refObject={branchSwitcherRef}
         titlebarLabel={branchTitlebarLabel}
@@ -97,6 +99,7 @@ type DesktopTitlebarContextProps = {
 
 function DesktopBranchSwitcher({
   branchLabel,
+  compact,
   disabled,
   loading,
   localBranches,
@@ -110,6 +113,7 @@ function DesktopBranchSwitcher({
   onToggle,
 }: {
   branchLabel: string;
+  compact: boolean;
   disabled: boolean;
   loading: boolean;
   localBranches: GitBranchSummary[];
@@ -143,42 +147,46 @@ function DesktopBranchSwitcher({
         <span>{titlebarLabel}</span>
       </button>
 
-      {open && !disabled && (
-        <DesktopMenuSurface className="desktop-titlebar-menu desktop-branch-menu">
-          {loading ? (
-            <DesktopMenuItem
-              className="desktop-branch-menu-row"
-              disabled
-              icon={<GitBranch size={13} strokeWidth={1.8} />}
-              label={t("shell.branch.loadingBranches")}
+      <DesktopTitlebarMenuLayer
+        anchorRef={refObject}
+        className="desktop-branch-menu"
+        gap={compact ? 8 : 4}
+        open={open && !disabled}
+        preferredMaxHeight={440}
+      >
+        {loading ? (
+          <DesktopMenuItem
+            className="desktop-branch-menu-row"
+            disabled
+            icon={<GitBranch size={13} strokeWidth={1.8} />}
+            label={t("shell.branch.loadingBranches")}
+          />
+        ) : hasBranches ? (
+          <>
+            <BranchMenuGroup
+              title={t("shell.branch.localBranches")}
+              branches={localBranches}
+              operationLoading={operationLoading}
+              onCheckout={onCheckout}
+              onDone={onDone}
             />
-          ) : hasBranches ? (
-            <>
-              <BranchMenuGroup
-                title={t("shell.branch.localBranches")}
-                branches={localBranches}
-                operationLoading={operationLoading}
-                onCheckout={onCheckout}
-                onDone={onDone}
-              />
-              <BranchMenuGroup
-                title={t("shell.branch.remoteBranches")}
-                branches={remoteBranches}
-                operationLoading={operationLoading}
-                onCheckout={onCheckout}
-                onDone={onDone}
-              />
-            </>
-          ) : (
-            <DesktopMenuItem
-              className="desktop-branch-menu-row"
-              disabled
-              icon={<GitBranch size={13} strokeWidth={1.8} />}
-              label={t("shell.branch.noBranches")}
+            <BranchMenuGroup
+              title={t("shell.branch.remoteBranches")}
+              branches={remoteBranches}
+              operationLoading={operationLoading}
+              onCheckout={onCheckout}
+              onDone={onDone}
             />
-          )}
-        </DesktopMenuSurface>
-      )}
+          </>
+        ) : (
+          <DesktopMenuItem
+            className="desktop-branch-menu-row"
+            disabled
+            icon={<GitBranch size={13} strokeWidth={1.8} />}
+            label={t("shell.branch.noBranches")}
+          />
+        )}
+      </DesktopTitlebarMenuLayer>
     </div>
   );
 }

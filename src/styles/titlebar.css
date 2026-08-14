@@ -422,6 +422,11 @@
   box-shadow: var(--po-menu-shadow);
 }
 
+.desktop-titlebar-menu.desktop-titlebar-menu-overlay {
+  position: fixed;
+  inset-inline-start: auto;
+}
+
 /* Keep the shared titlebar-menu treatment; only reverse its anchor near the window edge. */
 .desktop-titlebar-terminal-menu {
   inset-inline-start: auto;

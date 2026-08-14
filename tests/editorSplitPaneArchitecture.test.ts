@@ -167,6 +167,23 @@ describe("editor split-pane architecture", () => {
     expect(headerStyles).not.toContain("--desktop-titlebar-sidebar-width) - 1px");
   });
 
+  it("lets Header context grow independently of the Sidebar width", () => {
+    const sidebarContext = readCssBlock(headerStyles, ".desktop-titlebar-sidebar-context");
+    const expandedContext = readCssBlock(
+      headerStyles,
+      '.desktop-titlebar-sidebar-context[data-sidebar-state="expanded"]',
+    );
+
+    expect(sidebarContext).toContain("--desktop-titlebar-context-max-width: 440px;");
+    expect(sidebarContext).toContain("max-width: 100%;");
+    expect(sidebarContext).toContain("overflow: hidden;");
+    expect(expandedContext).toContain("width: fit-content;");
+    expect(expandedContext).toContain(
+      "max-width: min(var(--desktop-titlebar-context-max-width), 100%);",
+    );
+    expect(headerStyles).not.toContain("--desktop-titlebar-sidebar-width");
+  });
+
   it("shares neutral, hover, and active resize-boundary states across panes", () => {
     expect(tokens).toContain("--po-pane-resizer-blue: light-dark(#3b82f6, #60a5fa);");
     expect(tokens).toContain("--po-pane-resizer-hover-color:");
@@ -181,3 +198,13 @@ describe("editor split-pane architecture", () => {
     expect(layoutStyles).toContain("body.desktop-right-sidebar-resizing");
   });
 });
+
+function readCssBlock(css: string, selector: string): string {
+  const marker = `${selector} {`;
+  const start = css.indexOf(marker);
+  if (start < 0) throw new Error(`Missing CSS block for ${selector}`);
+  const bodyStart = start + marker.length;
+  const end = css.indexOf("\n}", bodyStart);
+  if (end < 0) throw new Error(`Unclosed CSS block for ${selector}`);
+  return css.slice(bodyStart, end);
+}
