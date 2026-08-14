@@ -168,7 +168,13 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(css).not.toContain(".desktop-terminal-launcher");
     expect(launcher).toContain('import "./terminal-launcher.css"');
     expect(launcherCss).toContain(".desktop-terminal-launcher");
-    expect(launcherCss).toContain("container-type: inline-size");
+    expect(launcherCss).toContain("container-type: size");
+    expect(launcherCss).toMatch(
+      /\.desktop-terminal-launcher\s*\{[^}]*place-items:\s*start center;[^}]*padding:\s*clamp\(56px, 20vh, 220px\) 0 32px;/s,
+    );
+    expect(launcherCss).toMatch(
+      /\.desktop-terminal-launcher-availability\.is-assistive\s*\{[^}]*position:\s*absolute;[^}]*width:\s*1px;[^}]*height:\s*1px;/s,
+    );
     expect(launcherCss).toContain("@container (min-width: 460px)");
     expect(launcherCss).toContain("var(--po-terminal-bg)");
     expect(launcherCss).toContain("var(--po-focus-ring)");

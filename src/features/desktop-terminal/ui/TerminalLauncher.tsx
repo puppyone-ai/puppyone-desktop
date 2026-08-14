@@ -40,9 +40,10 @@ export function TerminalLauncher({
   );
   const visibleAgents = partitionTerminalAgentLaunchers(agents);
   const shell = DESKTOP_TERMINAL_LAUNCHERS.find(({ id }) => id === "shell");
+  const scanning = discoveryPhase === "idle" || discoveryPhase === "loading";
   const availabilityMessage = discoveryPhase === "error"
     ? "terminal.launcher.detectionFailed"
-    : discoveryPhase === "idle" || discoveryPhase === "loading"
+    : scanning
       ? "terminal.launcher.detecting"
       : agents.length === 0
         ? "terminal.launcher.noneInstalled"
@@ -54,7 +55,10 @@ export function TerminalLauncher({
       aria-labelledby={titleId}
     >
       <div className="desktop-terminal-launcher-content">
-        <div className="desktop-terminal-launcher-group is-agents">
+        <div
+          className="desktop-terminal-launcher-group is-agents"
+          data-discovery-phase={discoveryPhase}
+        >
           <header className="desktop-terminal-launcher-heading">
             <h2 id={titleId}>
               {launching && (
@@ -66,9 +70,9 @@ export function TerminalLauncher({
             </h2>
             <button
               type="button"
-              className="desktop-terminal-launcher-scan"
+              className={`desktop-terminal-launcher-scan ${scanning ? "is-scanning" : ""}`}
               onClick={onRefresh}
-              disabled={launching || discoveryPhase === "idle" || discoveryPhase === "loading"}
+              disabled={launching || scanning}
               aria-label={t("terminal.launcher.scanAgain")}
               title={t("terminal.launcher.scanAgain")}
             >
@@ -83,16 +87,18 @@ export function TerminalLauncher({
             </div>
           )}
 
-          <div className="desktop-terminal-launcher-tools">
-            {visibleAgents.primary.map((launcher) => (
-              <TerminalLauncherButton
-                key={launcher.id}
-                launcher={launcher}
-                disabled={launching}
-                onLaunch={onLaunch}
-              />
-            ))}
-          </div>
+          {visibleAgents.primary.length > 0 && (
+            <div className="desktop-terminal-launcher-tools">
+              {visibleAgents.primary.map((launcher) => (
+                <TerminalLauncherButton
+                  key={launcher.id}
+                  launcher={launcher}
+                  disabled={launching}
+                  onLaunch={onLaunch}
+                />
+              ))}
+            </div>
+          )}
 
           {visibleAgents.overflow.length > 0 && (
             <details className="desktop-terminal-launcher-more">
@@ -111,7 +117,10 @@ export function TerminalLauncher({
           )}
 
           {availabilityMessage && (
-            <div className="desktop-terminal-launcher-availability" aria-live="polite">
+            <div
+              className={`desktop-terminal-launcher-availability ${agents.length > 0 ? "is-assistive" : ""}`}
+              aria-live="polite"
+            >
               <span>{t(availabilityMessage)}</span>
             </div>
           )}

@@ -92,6 +92,55 @@ describe("Desktop Terminal launcher", () => {
     expect(container.textContent).toContain("Open a shell");
   });
 
+  it("keeps refresh discovery status out of layout when Agent cards already exist", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const render = (discoveryPhase: "loading" | "ready") => withTestLocalization(
+      <TerminalLauncher
+        discoveryPhase={discoveryPhase}
+        availableAgentIds={["codex", "claude"]}
+        onLaunch={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    act(() => root?.render(render("ready")));
+    const codexButton = findButton(container, "Codex");
+    const tools = container.querySelector(".desktop-terminal-launcher-tools");
+
+    act(() => root?.render(render("loading")));
+    expect(findButton(container, "Codex")).toBe(codexButton);
+    expect(container.querySelector(".desktop-terminal-launcher-tools")).toBe(tools);
+    expect(container.querySelector(".desktop-terminal-launcher-availability")?.classList)
+      .toContain("is-assistive");
+    expect(container.querySelector(".desktop-terminal-launcher-scan")?.classList)
+      .toContain("is-scanning");
+
+    act(() => root?.render(render("ready")));
+    expect(findButton(container, "Codex")).toBe(codexButton);
+    expect(container.querySelector(".desktop-terminal-launcher-availability")).toBeNull();
+  });
+
+  it("uses the detecting row as the empty-state slot before the first Agent arrives", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(withTestLocalization(
+      <TerminalLauncher
+        discoveryPhase="loading"
+        availableAgentIds={[]}
+        onLaunch={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    )));
+
+    expect(container.querySelector(".desktop-terminal-launcher-tools")).toBeNull();
+    expect(container.querySelector(".desktop-terminal-launcher-availability")?.classList)
+      .not.toContain("is-assistive");
+  });
+
   it("keeps launcher identities closed, explicit, and free of renderer commands", () => {
     expect(DESKTOP_TERMINAL_LAUNCHERS.map(({ id }) => id)).toEqual([
       "codex",
@@ -142,8 +191,12 @@ describe("Desktop Terminal launcher", () => {
 });
 
 function clickButton(container: HTMLElement, text: string) {
-  const button = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
-    .find((candidate) => candidate.textContent?.includes(text));
+  const button = findButton(container, text);
   if (!button) throw new Error(`Button not found: ${text}`);
   act(() => button.click());
+}
+
+function findButton(container: HTMLElement, text: string) {
+  return Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+    .find((candidate) => candidate.textContent?.includes(text));
 }
