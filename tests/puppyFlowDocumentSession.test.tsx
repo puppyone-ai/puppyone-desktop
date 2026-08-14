@@ -23,7 +23,7 @@ afterEach(() => {
 
 describe("PuppyFlow Document Session integration", () => {
   it("preserves an invalid source verbatim until the user performs an edit", async () => {
-    const persist = vi.fn(async () => ({ version: "v2" }));
+    const persist = vi.fn(async () => ({ ok: true as const, version: "v2" }));
     const source = "{ invalid puppyflow source";
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -44,7 +44,7 @@ describe("PuppyFlow Document Session integration", () => {
           content: source,
           version: "v1",
         }}
-        documentPersistence={{ kind: "local-fs", persist }}
+        documentPersistence={{ kind: "local-fs", storageIdentity: "test:puppyflow", persist }}
         saveMode="manual"
       />,
     )));

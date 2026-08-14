@@ -1,3 +1,9 @@
+import {
+  canonicalizeResourcePath,
+  isSameOrDescendantResourcePath,
+  rebaseResourcePath,
+} from "../../core/resourcePath";
+
 export type EditorInput = Readonly<{
   id: string;
   resource: string;
@@ -17,7 +23,12 @@ export const EMPTY_EDITOR_GROUP: EditorGroupState = Object.freeze({
 });
 
 export function createEditorInput(resource: string, label = basename(resource)): EditorInput {
-  return Object.freeze({ id: resource, resource, label: label || basename(resource) });
+  const canonicalResource = canonicalizeResourcePath(resource);
+  return Object.freeze({
+    id: canonicalResource,
+    resource: canonicalResource,
+    label: label || basename(canonicalResource),
+  });
 }
 
 export function openEditor(
@@ -65,7 +76,7 @@ export function closeEditorsUnderResource(
   resource: string,
 ): EditorGroupState {
   return state.editors
-    .filter((editor) => isSameOrDescendant(editor.resource, resource))
+    .filter((editor) => isSameOrDescendantResourcePath(editor.resource, resource))
     .reduce((next, editor) => closeEditor(next, editor.id), state);
 }
 
@@ -74,18 +85,16 @@ export function rebaseEditorResources(
   previousResource: string,
   nextResource: string,
 ): EditorGroupState {
-  const remap = (value: string) => {
-    if (value === previousResource) return nextResource;
-    return value.startsWith(`${previousResource}/`)
-      ? `${nextResource}${value.slice(previousResource.length)}`
-      : value;
-  };
+  const canonicalNextResource = canonicalizeResourcePath(nextResource);
   const idMap = new Map<string, string>();
   const editors = state.editors.map((editor) => {
-    const resource = remap(editor.resource);
+    const resource = rebaseResourcePath(editor.resource, previousResource, canonicalNextResource);
     if (resource === editor.resource) return editor;
     idMap.set(editor.id, resource);
-    return createEditorInput(resource, resource === nextResource ? basename(resource) : editor.label);
+    return createEditorInput(
+      resource,
+      resource === canonicalNextResource ? basename(resource) : editor.label,
+    );
   });
   const mapId = (id: string) => idMap.get(id) ?? id;
   return freezeState(
@@ -140,8 +149,4 @@ function freezeState(
 
 function basename(resource: string): string {
   return resource.split("/").filter(Boolean).at(-1) ?? resource;
-}
-
-function isSameOrDescendant(candidate: string, resource: string): boolean {
-  return candidate === resource || candidate.startsWith(`${resource}/`);
 }

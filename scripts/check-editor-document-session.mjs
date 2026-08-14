@@ -61,11 +61,14 @@ const sessionSource = readFileSync(sessionKernel, "utf8");
 if (/from\s+["'][^"']*(?:electron|localFiles|cloudDataPort|node:fs)[^"']*["']/.test(sessionSource)) {
   errors.push(`${relative(sessionKernel)} imports a storage implementation`);
 }
-if (!/queueMicrotask\s*\(/.test(sessionSource)) {
-  errors.push(`${relative(sessionKernel)} does not schedule immediate edit persistence in a microtask`);
+if (!/from\s+["']\.\/autoSavePolicy["']/.test(sessionSource)) {
+  errors.push(`${relative(sessionKernel)} does not delegate save timing to an auto-save policy`);
 }
-if (/\b(?:idleDelayMs|maxDelayMs|scheduleAutomaticCommit)\b/.test(sessionSource)) {
-  errors.push(`${relative(sessionKernel)} still owns a delayed/idle autosave policy`);
+if (/\b(?:queueMicrotask|idleDelayMs|maxDelayMs)\b/.test(sessionSource)) {
+  errors.push(`${relative(sessionKernel)} still owns auto-save timing details`);
+}
+if (/\b(?:normalizePersistenceResult|dirty\?:\s*boolean)\b/.test(sessionSource)) {
+  errors.push(`${relative(sessionKernel)} still accepts a legacy persistence or dirty-state protocol`);
 }
 if (!/readSnapshot\(\),\s*this\.strongestDrainReason\(\)\s*\?\?\s*["']edit["']/.test(sessionSource)) {
   errors.push(`${relative(sessionKernel)} does not enqueue the latest editor snapshot with the edit reason`);
@@ -144,9 +147,21 @@ if (!/useEditableDocumentSource\s*\(\s*\)/.test(textFrameSource)) {
 if (/\b(?:requestSave|flushCurrent|flushSnapshot|getPersistedContent|resolveExternalConflict)\b/.test(textFrameSource)) {
   errors.push(`${relative(textFramePath)} controls host persistence directly`);
 }
+if (
+  !/!sourceSnapshotMode\s*\|\|\s*snapshotPortRef\.current/.test(textFrameSource)
+  || !/editingSource\.attachSource\(fallbackSource\)/.test(textFrameSource)
+) {
+  errors.push(`${relative(textFramePath)} leaves projection-only editable Views without a Working Copy model port`);
+}
 
 const sourceSnapshotPath = path.join(sharedEditorRoot, "sourceSnapshot.ts");
 const sourceSnapshotSource = readFileSync(sourceSnapshotPath, "utf8");
+if (!/origin:\s*["']local-edit["']\s*\|\s*["']model-initialization["']/.test(sourceSnapshotSource)) {
+  errors.push(`${relative(sourceSnapshotPath)} does not make local edit provenance explicit`);
+}
+if (/\bdirty:\s*boolean\b/.test(sourceSnapshotSource)) {
+  errors.push(`${relative(sourceSnapshotPath)} lets format Views guess Working Copy dirty state`);
+}
 if (!/replaceContent:\s*\(content:\s*string\)\s*=>\s*EditorSourceSnapshot/.test(sourceSnapshotSource)) {
   errors.push(`${relative(sourceSnapshotPath)} does not require format-aware external replacement`);
 }
@@ -160,12 +175,70 @@ for (const relativeAdapterPath of [
   if (!/\breplaceContent\s*:/.test(readFileSync(adapterPath, "utf8"))) {
     errors.push(`${relative(adapterPath)} cannot apply an accepted external version`);
   }
+  if (/\breconcileExternalBaseline\b/.test(readFileSync(adapterPath, "utf8"))) {
+    errors.push(`${relative(adapterPath)} consumes storage events inside a format View`);
+  }
+}
+
+const paneSourcePath = path.join(
+  repoRoot,
+  "src/features/editor-workbench/runtime/useEditorPaneSource.ts",
+);
+const paneSourceSource = readFileSync(paneSourcePath, "utf8");
+if (/\bsetContent\(null\)/.test(paneSourceSource)) {
+  errors.push(`${relative(paneSourcePath)} destroys stable editable content during refresh`);
+}
+if (!/workspaceContentChangeMatchesPath\(refreshKey,\s*nodePath\)/.test(paneSourceSource)) {
+  errors.push(`${relative(paneSourcePath)} does not scope external refreshes by resource path`);
+}
+
+const workspaceWatchPath = path.join(repoRoot, "electron/main/workspace-watch-service.mjs");
+const workspaceWatchSource = readFileSync(workspaceWatchPath, "utf8");
+if (!/pendingPaths:\s*new Set\(\)/.test(workspaceWatchSource) || !/paths:\s*visiblePaths/.test(workspaceWatchSource)) {
+  errors.push(`${relative(workspaceWatchPath)} drops resource paths while debouncing workspace events`);
+}
+
+if (
+  !/type DocumentPersistenceSuccess\s*=\s*Readonly<\{[\s\S]*?ok:\s*true/.test(coreTypesSource)
+  || !/type DocumentPersistenceConflict\s*=\s*Readonly<\{[\s\S]*?kind:\s*["']conflict["']/.test(coreTypesSource)
+) {
+  errors.push(`${relative(coreTypesPath)} does not model conditional-write outcomes as data`);
+}
+
+const puppyFlowContributionPath = path.join(
+  sharedEditorRoot,
+  "viewers/puppyflow/contribution.ts",
+);
+const puppyFlowContributionSource = readFileSync(puppyFlowContributionPath, "utf8");
+if (!/id:\s*["']puppyflow["'][\s\S]*?import\(["']\.\/PuppyFlowViewer["']\)/.test(puppyFlowContributionSource)) {
+  errors.push(`${relative(puppyFlowContributionPath)} does not route PuppyFlow through its format-owned contribution`);
 }
 
 const viewerRegistryPath = path.join(sharedEditorRoot, "registry/viewerRegistry.tsx");
 const viewerRegistrySource = readFileSync(viewerRegistryPath, "utf8");
-if (!/id:\s*["']puppyflow["'][\s\S]*?import\(["']\.\.\/viewers\/puppyflow\/PuppyFlowViewer["']\)/.test(viewerRegistrySource)) {
-  errors.push(`${relative(viewerRegistryPath)} does not route PuppyFlow through a preset contribution`);
+if (/from\s+["']\.\.\/(?:markdown|viewers)\//.test(viewerRegistrySource)) {
+  errors.push(`${relative(viewerRegistryPath)} imports a concrete Viewer instead of composing format-owned contributions`);
+}
+
+if (
+  !/storageIdentity:\s*DocumentStorageIdentity/.test(coreTypesSource)
+  || !/createDocumentIdentity\(options\.persistence,\s*options\.documentId\)/.test(
+    readFileSync(path.join(sharedEditorRoot, "document-session/documentWorkingCopies.ts"), "utf8"),
+  )
+) {
+  errors.push("Document Working Copies are not keyed by stable storage identity and canonical resource path");
+}
+if (!/"conflict"/.test(readFileSync(path.join(sharedEditorRoot, "document-session/types.ts"), "utf8"))) {
+  errors.push("Document Session does not expose conflict as a first-class status");
+}
+
+const resourceLeasePath = path.join(sharedEditorRoot, "resource/useFileResourceLease.ts");
+const paneSourceSourceForLease = readFileSync(paneSourcePath, "utf8");
+if (
+  !/workspaceContentChangeMatchesPath/.test(readFileSync(resourceLeasePath, "utf8"))
+  || !/useFileResourceLease/.test(paneSourceSourceForLease)
+) {
+  errors.push("Editor resources do not use the shared path-scoped resource lease");
 }
 
 const desktopWorkspaceContentPath = path.join(repoRoot, "src/features/app-shell/DesktopWorkspaceContent.tsx");
@@ -176,11 +249,38 @@ if (/\b(?:PuppyFlowEditor|renderPreviewBody|DocumentSessionBoundary)\b/.test(des
 
 const desktopAppPath = path.join(repoRoot, "src/App.tsx");
 const desktopAppSource = readFileSync(desktopAppPath, "utf8");
-if (!/closeDocumentWorkingCopy\(editorId\)/.test(desktopAppSource)) {
+if (!/closeDocumentWorkingCopy\(\{[\s\S]*?storageIdentity:\s*documentStorageIdentity,[\s\S]*?resourcePath:\s*editorId,[\s\S]*?\}\)/.test(desktopAppSource)) {
   errors.push(`${relative(desktopAppPath)} does not close the targeted document Working Copy with its Input`);
 }
 if (!/closeAllDocumentWorkingCopies\("workspace-switch"\)/.test(desktopAppSource)) {
   errors.push(`${relative(desktopAppPath)} does not close all Working Copies before workspace navigation`);
+}
+
+const editorGroupModelPath = path.join(sharedEditorRoot, "workbench/editorGroupModel.ts");
+const editorGroupModelSource = readFileSync(editorGroupModelPath, "utf8");
+const editorPaneLayoutModelPath = path.join(sharedEditorRoot, "workbench/editorPaneLayoutModel.ts");
+const editorPaneLayoutModelSource = readFileSync(editorPaneLayoutModelPath, "utf8");
+for (const [filePath, source] of [
+  [editorGroupModelPath, editorGroupModelSource],
+  [editorPaneLayoutModelPath, editorPaneLayoutModelSource],
+]) {
+  if (/\b(?:DocumentPersistencePort|EditableDocumentSource|FileContent|DataPort)\b/.test(source)) {
+    errors.push(`${relative(filePath)} crosses from editor placement metadata into document content or persistence`);
+  }
+}
+if (!/canonicalizeResourcePath/.test(editorGroupModelSource)) {
+  errors.push(`${relative(editorGroupModelPath)} does not canonicalize resource identity at the Open Editor boundary`);
+}
+if (!/rebaseResourcePath/.test(editorPaneLayoutModelSource)) {
+  errors.push(`${relative(editorPaneLayoutModelPath)} does not keep Pane editor references aligned with resource moves`);
+}
+const workbenchPersistencePath = path.join(
+  repoRoot,
+  "src/features/editor-workbench/persistence/editorWorkbenchPersistence.ts",
+);
+const workbenchPersistenceSource = readFileSync(workbenchPersistencePath, "utf8");
+if (/\b(?:persistedContent|DocumentPersistencePort|EditableDocumentSource)\b/.test(workbenchPersistenceSource)) {
+  errors.push(`${relative(workbenchPersistencePath)} persists document authority instead of layout metadata only`);
 }
 
 const localMarkdownPersistenceTestPath = path.join(
@@ -202,6 +302,34 @@ const localCsvPersistenceTestPath = path.join(
 const localCsvPersistenceTestSource = readFileSync(localCsvPersistenceTestPath, "utf8");
 if (!/edits a spreadsheet-classified CSV and persists its serialized snapshot/.test(localCsvPersistenceTestSource)) {
   errors.push(`${relative(localCsvPersistenceTestPath)} does not cover the complete local CSV write path`);
+}
+
+const externalConsistencyMatrixTestPath = path.join(
+  repoRoot,
+  "tests/editorExternalConsistencyMatrix.integration.test.tsx",
+);
+const externalConsistencyMatrixTestSource = readFileSync(
+  externalConsistencyMatrixTestPath,
+  "utf8",
+);
+for (const requiredContract of [
+  "requires every editable preset Viewer family to have a P0 consistency fixture",
+  "adopts a clean Agent update in the open Pane with zero writeback",
+  "restores the Agent version after the complete Pane tree remounts without saving",
+  "preserves dirty local content and exposes an explicit external conflict",
+  "saves local content only after explicit conflict resolution against the latest version",
+  "updates different format Panes from one watcher batch without cross-reading or writeback",
+  "discards an obsolete read that resolves after a newer matching watcher event",
+]) {
+  if (!externalConsistencyMatrixTestSource.includes(requiredContract)) {
+    errors.push(`${relative(externalConsistencyMatrixTestPath)} does not enforce: ${requiredContract}`);
+  }
+}
+if (
+  !/PRESET_VIEWERS[\s\S]*capability\s*===\s*["']edit["']/.test(externalConsistencyMatrixTestSource)
+  || !/FORMAT_CASES\.map\(\(\{\s*viewerId\s*\}\)\s*=>\s*viewerId\)/.test(externalConsistencyMatrixTestSource)
+) {
+  errors.push(`${relative(externalConsistencyMatrixTestPath)} does not fail when an editable Viewer lacks P0 matrix coverage`);
 }
 
 const closeDrainSources = [

@@ -77,11 +77,7 @@ export function PuppyFlowViewer({
 
   useLayoutEffect(() => {
     const pathChanged = documentPathRef.current !== sourceDocument.path;
-    const reconciliation = editingSource?.reconcileExternalBaseline(
-      sourceContent,
-      sourceDocument.version ?? null,
-    ) ?? "applied";
-    if (!pathChanged && reconciliation !== "applied") return;
+    if (!pathChanged) return;
 
     documentPathRef.current = sourceDocument.path;
     revisionCounterRef.current = 0;
@@ -91,7 +87,7 @@ export function PuppyFlowViewer({
     sourceContentRef.current = sourceContent;
     setParseError(parsed.ok ? null : parsed.error);
     setRunMessage(null);
-  }, [editingSource, parsed, sourceContent, sourceDocument.path, sourceDocument.version]);
+  }, [parsed, sourceContent, sourceDocument.path]);
 
   useLayoutEffect(() => {
     if (!editingSource) return undefined;
@@ -118,7 +114,7 @@ export function PuppyFlowViewer({
     const detach = editingSource.attachSource(source);
     editingSource.reportRevision({
       revision: revisionRef.current,
-      dirty: false,
+      origin: "model-initialization",
     });
     return detach;
   }, [defaults, editingSource, sourceDocument.path]);
@@ -138,7 +134,7 @@ export function PuppyFlowViewer({
     );
     editingSource?.reportRevision({
       revision: revisionRef.current,
-      dirty: true,
+      origin: "local-edit",
     });
   }, [canEdit, editingSource, sourceDocument.path]);
 

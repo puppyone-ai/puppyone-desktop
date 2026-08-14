@@ -75,13 +75,16 @@ export function inspectStableReleaseWorkflow(workflowSource) {
   const errors = inspectSource(workflowSource, "stable release workflow");
   if (errors.length > 0) return errors;
   requireSnippets(workflowSource, errors, [
-    ["- \"!v*.*.*-*\"", "internal or other prerelease tags must not trigger the stable workflow"],
+    ["workflow_dispatch:", "Stable publication must require an explicit operator action"],
+    ["promotion_source_tag:", "Stable publication must require the exact tested Internal candidate"],
+    ["Exact installed and approved Internal candidate tag", "the promotion input must describe installed-candidate approval"],
     ["runs-on: macos-15", "the stable build must pin its macOS runner"],
     ["name: desktop-signing", "stable signing must use its dedicated deployment environment"],
     ["Test release transaction and Terminal launcher", "the stable build must run release integration tests on macOS"],
     ["Prepare release application without deployment secrets", "stable application preparation must be secretless"],
     ["Verify exact Internal promotion source", "Stable must be promoted from verified Internal evidence"],
     ["verify-stable-promotion-source.mjs", "Stable must use the canonical promotion verifier"],
+    ["--source-tag \"${{ inputs.promotion_source_tag }}\"", "Stable must verify the operator-selected Internal candidate"],
     ["Sign, notarize, and verify release package", "stable packaging must sign and notarize"],
     ["APPLE_API_KEY_BASE64", "stable CI must receive the App Store Connect key as base64 secret material"],
     ["export APPLE_API_KEY=\"${api_key_path}\"", "stable CI must pass notarytool a materialized API key file path"],
@@ -96,6 +99,7 @@ export function inspectStableReleaseWorkflow(workflowSource) {
     ["--promotion-source-tag", "Stable release metadata must retain Internal promotion evidence"],
   ]);
   forbidSnippets(workflowSource, errors, [
+    ["push:\n    tags:", "pushing a Stable tag must not publish without explicit candidate selection"],
     ["R2_ACCESS_KEY_ID", "the stable build workflow must not receive R2 deployment credentials"],
     ["gh release create", "the stable build must delegate GitHub publication to the canonical publisher"],
   ]);

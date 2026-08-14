@@ -144,7 +144,7 @@ describe("preset viewer host composition", () => {
         installedAt: "2026-07-13T00:00:00.000Z",
       }],
     } as const satisfies ViewerPackSnapshot;
-    const persist = vi.fn(async () => ({ version: "should-not-run" }));
+    const persist = vi.fn(async () => ({ ok: true as const, version: "should-not-run" }));
     const renderSurface = vi.fn((request: object) => React.createElement(
       "div",
       { "data-testid": "external-viewer" },
@@ -161,6 +161,7 @@ describe("preset viewer host composition", () => {
       },
       documentPersistence: {
         kind: "local-fs",
+        storageIdentity: "test:viewer-host",
         persist,
       },
       viewerExtensionAdapter: { snapshot, renderSurface },

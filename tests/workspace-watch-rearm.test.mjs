@@ -138,6 +138,141 @@ describe("workspace content watch re-arm", () => {
     service.closeAll();
   });
 
+  it("preserves every changed path coalesced in one debounce window", async () => {
+    const { fsModule, watchers } = createFakeFsWatch();
+    const queued = [];
+    globalThis.setTimeout = ((callback, ms, ...args) => {
+      const entry = { callback, ms, args };
+      queued.push(entry);
+      const handle = realSetTimeout(() => {}, 0);
+      timers.push(handle);
+      return handle;
+    });
+    globalThis.clearTimeout = (handle) => realClearTimeout(handle);
+
+    const service = createWorkspaceWatchService({
+      logger: { warn: () => {}, info: () => {} },
+      fsModule,
+    });
+    const observer = createSender(15);
+    service.start(observer.sender, "/tmp");
+
+    watchers[0]._listener("change", "notes/first.md");
+    watchers[0]._listener("change", "notes/second.md");
+    queued.filter((entry) => entry.ms === 200).at(-1)?.callback();
+
+    await vi.waitFor(() => expect(observer.events).toHaveLength(1));
+    expect(observer.events[0]?.payload).toMatchObject({
+      path: null,
+      paths: ["notes/first.md", "notes/second.md"],
+    });
+    service.closeAll();
+  });
+
+  it("deduplicates repeated native events for one resource in a debounce window", async () => {
+    const { fsModule, watchers } = createFakeFsWatch();
+    const queued = [];
+    globalThis.setTimeout = ((callback, ms, ...args) => {
+      const entry = { callback, ms, args };
+      queued.push(entry);
+      const handle = realSetTimeout(() => {}, 0);
+      timers.push(handle);
+      return handle;
+    });
+    globalThis.clearTimeout = (handle) => realClearTimeout(handle);
+
+    const service = createWorkspaceWatchService({
+      logger: { warn: () => {}, info: () => {} },
+      fsModule,
+    });
+    const observer = createSender(16);
+    service.start(observer.sender, "/tmp");
+
+    watchers[0]._listener("rename", "notes/repeated.md");
+    watchers[0]._listener("change", "notes/repeated.md");
+    watchers[0]._listener("rename", "notes/repeated.md");
+    queued.filter((entry) => entry.ms === 200).at(-1)?.callback();
+
+    await vi.waitFor(() => expect(observer.events).toHaveLength(1));
+    expect(observer.events[0]?.payload).toMatchObject({
+      path: "notes/repeated.md",
+      paths: ["notes/repeated.md"],
+    });
+    service.closeAll();
+  });
+
+  it("uses a bulk invalidation when the native watcher cannot identify a path", async () => {
+    const { fsModule, watchers } = createFakeFsWatch();
+    const queued = [];
+    globalThis.setTimeout = ((callback, ms, ...args) => {
+      const entry = { callback, ms, args };
+      queued.push(entry);
+      const handle = realSetTimeout(() => {}, 0);
+      timers.push(handle);
+      return handle;
+    });
+    globalThis.clearTimeout = (handle) => realClearTimeout(handle);
+
+    const service = createWorkspaceWatchService({
+      logger: { warn: () => {}, info: () => {} },
+      fsModule,
+    });
+    const observer = createSender(17);
+    service.start(observer.sender, "/tmp");
+
+    watchers[0]._listener("change", null);
+    queued.filter((entry) => entry.ms === 200).at(-1)?.callback();
+
+    await vi.waitFor(() => expect(observer.events).toHaveLength(1));
+    expect(observer.events[0]?.payload?.path).toBeNull();
+    expect(observer.events[0]?.payload).not.toHaveProperty("paths");
+    service.closeAll();
+  });
+
+  it("filters an own-write path per sender without hiding other paths in the same batch", async () => {
+    const { fsModule, watchers } = createFakeFsWatch();
+    const queued = [];
+    globalThis.setTimeout = ((callback, ms, ...args) => {
+      const entry = { callback, ms, args };
+      queued.push(entry);
+      const handle = realSetTimeout(() => {}, 0);
+      timers.push(handle);
+      return handle;
+    });
+    globalThis.clearTimeout = (handle) => realClearTimeout(handle);
+
+    const service = createWorkspaceWatchService({
+      logger: { warn: () => {}, info: () => {} },
+      fsModule,
+    });
+    const writer = createSender(18);
+    const observer = createSender(19);
+    service.start(writer.sender, "/tmp");
+    service.start(observer.sender, "/tmp");
+    service.noteInternalWrite({
+      rootPath: "/tmp",
+      path: "notes/ours.md",
+      senderId: 18,
+      version: fingerprint("after"),
+    });
+
+    watchers[0]._listener("rename", "notes/ours.md");
+    watchers[0]._listener("change", "notes/agent.md");
+    queued.filter((entry) => entry.ms === 200).at(-1)?.callback();
+
+    await vi.waitFor(() => expect(observer.events).toHaveLength(1));
+    await vi.waitFor(() => expect(writer.events).toHaveLength(1));
+    expect(writer.events[0]?.payload).toMatchObject({
+      path: "notes/agent.md",
+      paths: ["notes/agent.md"],
+    });
+    expect(observer.events[0]?.payload).toMatchObject({
+      path: null,
+      paths: ["notes/ours.md", "notes/agent.md"],
+    });
+    service.closeAll();
+  });
+
   it("correlates an internal save when fs.watch fires just after the write returns", async () => {
     const { fsModule, watchers } = createFakeFsWatch();
     const queued = [];

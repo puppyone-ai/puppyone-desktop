@@ -25,7 +25,8 @@ describe("DocumentSessionBoundary", () => {
   it("hides save chrome by default and only renders it when explicitly enabled", () => {
     const persistence = {
       kind: "local-fs" as const,
-      persist: vi.fn(async () => ({ version: "v2" })),
+      storageIdentity: "test:document-boundary:hidden",
+      persist: vi.fn(async () => ({ ok: true as const, version: "v2" })),
     };
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -59,7 +60,8 @@ describe("DocumentSessionBoundary", () => {
   it("remains writable after React StrictMode's cleanup/setup probe", async () => {
     const persistence = {
       kind: "local-fs" as const,
-      persist: vi.fn(async () => ({ version: "v2" })),
+      storageIdentity: "test:document-boundary:strict",
+      persist: vi.fn(async () => ({ ok: true as const, version: "v2" })),
     };
     let edit: (() => void) | null = null;
     const captureEdit = (nextEdit: () => void) => {
@@ -99,9 +101,10 @@ describe("DocumentSessionBoundary", () => {
   });
 
   it("routes a late acknowledgement to the callback owned by the original document", async () => {
-    const write = deferred<{ version: string }>();
+    const write = deferred<{ ok: true; version: string }>();
     const persistence = {
       kind: "local-fs" as const,
+      storageIdentity: "test:document-boundary:pending",
       persist: vi.fn(() => write.promise),
     };
     const onPersistedA = vi.fn<(commit: DocumentPersistedCommit) => void>();
@@ -139,7 +142,7 @@ describe("DocumentSessionBoundary", () => {
     }));
 
     act(() => renderDocument("b.md", onPersistedB));
-    write.resolve({ version: "v2" });
+    write.resolve({ ok: true, version: "v2" });
     await act(async () => write.promise);
 
     expect(onPersistedA).toHaveBeenCalledWith(expect.objectContaining({
@@ -170,10 +173,10 @@ function SourceProbe({
         return snapshot;
       },
     });
-    editingSource.reportRevision({ revision: snapshot.revision, dirty: false });
+    editingSource.reportRevision({ revision: snapshot.revision, origin: "model-initialization" });
     onEditReady?.(() => {
       snapshot = { revision: `${documentId}:r2`, content: `updated ${documentId}` };
-      editingSource.reportRevision({ revision: snapshot.revision, dirty: true });
+      editingSource.reportRevision({ revision: snapshot.revision, origin: "local-edit" });
     });
     return detach;
   }, [documentId, editingSource, onEditReady]);

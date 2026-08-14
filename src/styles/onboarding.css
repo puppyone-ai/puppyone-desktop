@@ -31,12 +31,21 @@
   padding: 48px;
 }
 
+.onboarding-homepage-shell.has-projects {
+  padding-inline: 32px;
+}
+
 .onboarding-homepage {
   display: grid;
   width: min(760px, 100%);
   max-height: 100%;
   min-height: 0;
   gap: 42px;
+}
+
+.onboarding-homepage.has-projects {
+  height: fit-content;
+  gap: 0;
 }
 
 .onboarding-primary-area {
@@ -215,43 +224,166 @@
   transform: translateY(-1px);
 }
 
-.onboarding-operation-status {
-  position: absolute;
-  top: calc(100% + 18px);
-  left: 50%;
+.onboarding-projects-layout {
   display: grid;
-  min-width: 240px;
+  width: min(680px, 100%);
+  height: fit-content;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 186px auto;
+  justify-self: center;
   justify-items: center;
-  gap: 5px;
-  color: var(--po-text-subtle);
-  font-size: 11.5px;
-  font-weight: 560;
-  line-height: 1.35;
-  text-align: center;
-  transform: translateX(-50%);
-}
-
-.onboarding-operation-status > span:last-child {
-  color: var(--po-text-disabled);
-  font-size: 11px;
-  font-weight: 520;
+  gap: 28px;
 }
 
 .onboarding-recent-projects {
+  position: relative;
+  box-sizing: border-box;
   display: grid;
-  width: min(560px, 100%);
+  width: min(680px, 100%);
   min-width: 0;
   max-height: min(332px, calc(100vh - 430px));
   grid-template-rows: auto minmax(0, 1fr);
   justify-self: center;
   gap: 8px;
+  padding: 18px;
+  border: 1px solid var(--po-border);
+  border-radius: 0;
+}
+
+.onboarding-homepage.has-projects .onboarding-recent-projects {
+  display: flex;
+  width: 100%;
+  height: fit-content;
+  min-height: 0;
+  max-height: none;
+  flex-direction: column;
+  align-self: start;
+  overflow: visible;
+}
+
+.onboarding-recent-header {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  inset-inline: 22px 6px;
+  display: flex;
+  min-width: 0;
+  height: var(--po-menu-item-height);
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  pointer-events: none;
+  transform: translateY(-50%);
 }
 
 .onboarding-recent-heading {
+  padding: 0 6px;
+  background: var(--po-canvas);
+  color: var(--po-text-subtle);
+  font-family: var(--po-font-sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.onboarding-folder-compact-action {
+  position: relative;
+  display: grid;
+  width: 186px;
+  height: 186px;
+  min-width: 0;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   color: var(--po-text-muted);
-  font-size: 12.5px;
-  font-weight: 560;
-  line-height: 1.25;
+  cursor: var(--po-clickable-cursor, pointer);
+  font: inherit;
+  pointer-events: auto;
+  transform: none;
+  transition:
+    opacity 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.onboarding-folder-compact-action:hover:not(:disabled),
+.onboarding-folder-compact-action:focus-visible,
+.onboarding-folder-compact-action.dragging {
+  outline: none;
+  color: var(--po-text);
+  transform: translateY(-3px);
+}
+
+.onboarding-folder-compact-outline {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.onboarding-folder-compact-shadow {
+  fill: var(--po-shadow);
+  opacity: 0;
+  transform: translate(4px, 5px);
+  transition: opacity 150ms ease-out;
+}
+
+.onboarding-folder-compact-fill {
+  fill: var(--po-canvas);
+}
+
+.onboarding-folder-compact-border {
+  fill: none;
+  stroke: var(--po-border);
+  stroke-dasharray: 4 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 150ms ease-out;
+}
+
+.onboarding-folder-compact-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px 12px 0;
+  pointer-events: none;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.onboarding-folder-compact-action:hover:not(:disabled) .onboarding-folder-compact-border,
+.onboarding-folder-compact-action.dragging .onboarding-folder-compact-border {
+  stroke: var(--po-border-strong);
+}
+
+.onboarding-folder-compact-action:hover:not(:disabled) .onboarding-folder-compact-shadow,
+.onboarding-folder-compact-action.dragging .onboarding-folder-compact-shadow {
+  opacity: 1;
+}
+
+.onboarding-folder-compact-action:focus-visible .onboarding-folder-compact-border {
+  stroke: var(--po-focus-ring);
+}
+
+.onboarding-folder-compact-action:disabled {
+  cursor: default;
+  opacity: 0.64;
 }
 
 .onboarding-project-list {
@@ -260,148 +392,97 @@
   min-width: 0;
   min-height: 0;
   max-height: clamp(112px, calc(100vh - 455px), 306px);
-  gap: 0;
+  align-content: start;
+  gap: 2px;
+  padding: 0;
   overflow: auto;
   overscroll-behavior: contain;
-  border: 1px solid var(--po-divider);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--po-panel-raised) 24%, transparent);
-}
-
-.onboarding-project-row {
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  min-height: 36px;
-  padding: 5px 10px;
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--po-text);
-  text-align: start;
-  cursor: var(--po-clickable-cursor, pointer);
-  transition:
-    background-color 150ms ease,
-    color 150ms ease;
 }
 
-.onboarding-project-row:hover:not(:disabled),
-.onboarding-project-row:focus-visible {
+.onboarding-homepage.has-projects .onboarding-project-list {
+  flex: 0 1 auto;
+  max-height: clamp(112px, calc(100vh - 324px), 446px);
+}
+
+.onboarding-project-row {
+  width: 100%;
+}
+
+.onboarding-project-row-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.onboarding-project-remove {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  inset-inline-end: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.onboarding-project-row-wrap:hover .onboarding-project-remove,
+.onboarding-project-row-wrap:focus-within .onboarding-project-remove,
+.onboarding-project-row-wrap.is-removing .onboarding-project-remove {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.desktop-menu-icon-button.onboarding-project-remove:hover:not(:disabled),
+.desktop-menu-icon-button.onboarding-project-remove:focus-visible:not(:disabled) {
+  background: color-mix(in srgb, var(--po-danger) 10%, transparent);
+  color: var(--po-danger);
+}
+
+.onboarding-project-row-wrap:hover .onboarding-project-row:not(:disabled),
+.onboarding-project-row-wrap:focus-within .onboarding-project-row:not(:disabled),
+.onboarding-project-row-wrap.is-removing .onboarding-project-row {
   background: var(--po-hover);
+  color: var(--po-text);
 }
 
-.onboarding-project-row:active:not(:disabled) {
-  background: var(--po-active);
+.onboarding-project-row-wrap.is-dragging .onboarding-project-row {
+  background: var(--po-hover);
+  color: var(--po-text);
+  opacity: 0.62;
 }
 
-.onboarding-project-row + .onboarding-project-row {
-  border-top: 1px solid var(--po-divider);
+.onboarding-project-row .desktop-menu-item-trailing {
+  transition: opacity 100ms ease;
 }
 
-.onboarding-project-row:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--po-accent) 42%, transparent);
+.onboarding-project-row-wrap:hover .desktop-menu-item-trailing,
+.onboarding-project-row-wrap:focus-within .desktop-menu-item-trailing,
+.onboarding-project-row-wrap.is-removing .desktop-menu-item-trailing {
+  opacity: 0;
 }
 
-.onboarding-project-row:disabled {
-  cursor: default;
-  opacity: 0.64;
+.onboarding-project-row .desktop-menu-item-label {
+  max-width: 65%;
+  flex: 0 0 auto;
 }
 
-.onboarding-project-row:disabled:hover {
-  background: transparent;
-  box-shadow: none;
-}
-
-.onboarding-project-row-static {
-  cursor: default;
-}
-
-.onboarding-project-row-static:hover {
-  background: transparent;
-}
-
-.onboarding-project-row-icon {
-  display: inline-grid;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  color: var(--po-text-muted);
-}
-
-.onboarding-project-row-main {
-  display: block;
+.onboarding-project-row .desktop-menu-item-detail {
   min-width: 0;
+  flex: 1 1 auto;
+  direction: ltr;
+  text-align: start;
 }
 
-.onboarding-project-row-title {
-  min-width: 0;
+.onboarding-project-row .desktop-menu-item-trailing {
+  max-width: 112px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.onboarding-project-row-title {
-  display: block;
-  color: var(--po-text-muted);
-  font-size: 12.5px;
-  font-weight: 560;
-  line-height: 1.25;
-}
-
-.onboarding-project-row-meta {
-  display: inline-flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.onboarding-project-row-badge {
-  max-width: 88px;
-  overflow: hidden;
-  color: var(--po-text-subtle);
-  font-size: 11.5px;
-  font-weight: 560;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.onboarding-project-row-badge.muted {
-  color: var(--po-text-subtle);
-}
-
-.onboarding-project-row-path,
-.onboarding-project-row-path span,
-.onboarding-project-row-time {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.onboarding-project-row-path {
-  display: block;
-}
-
-.onboarding-project-row-path span {
-  display: block;
-  color: var(--po-text-muted);
-  font-size: 12.5px;
-  font-weight: 560;
-  line-height: 1.25;
-}
-
-.onboarding-project-row-time {
-  justify-self: end;
   color: var(--po-text-subtle);
   font-size: 11.5px;
   font-weight: 500;
-  line-height: 1.25;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 .onboarding-homepage-error {
@@ -559,13 +640,32 @@
     width: min(260px, 100%);
   }
 
-  .onboarding-project-row {
-    grid-template-columns: 28px minmax(0, 1fr);
+  .onboarding-recent-header {
+    gap: 8px;
   }
 
-  .onboarding-project-row-meta,
-  .onboarding-project-row-time {
+  .onboarding-project-row .desktop-menu-item-label {
+    max-width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .onboarding-project-row .desktop-menu-item-detail {
     display: none;
+  }
+
+  .onboarding-project-row .desktop-menu-item-trailing {
+    max-width: 76px;
+  }
+}
+
+@media (hover: none) {
+  .onboarding-project-remove {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .onboarding-project-row .desktop-menu-item-trailing {
+    opacity: 0;
   }
 }
 

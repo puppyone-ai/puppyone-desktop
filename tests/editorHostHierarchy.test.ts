@@ -17,11 +17,15 @@ describe("editor host hierarchy", () => {
 
   it("routes format implementations from isolated viewer packages", () => {
     const registry = source("../packages/shared-ui/src/editor/registry/viewerRegistry.tsx");
+    const builtins = source("../packages/shared-ui/src/editor/registry/builtinViewerContributions.ts");
 
     for (const viewerPackage of ["app", "code", "csv", "fallback", "html", "media", "office", "pdf", "puppyflow"]) {
-      expect(registry).toContain(`../viewers/${viewerPackage}/`);
+      expect(builtins).toContain(`../viewers/${viewerPackage}/`);
     }
+    expect(registry).toContain("./builtinViewerContributions");
+    expect(registry).not.toContain("../viewers/");
     expect(registry).not.toContain("../host/");
+    expect(builtins).not.toContain("../host/");
   });
 
   it("does not restore the former flat ownership paths", () => {

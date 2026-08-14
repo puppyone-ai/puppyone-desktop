@@ -11,6 +11,8 @@ import {
   type FileIconThemeId,
   type ViewerExtensionHostAdapter,
   type Workspace,
+  type WorkspaceContentChange,
+  workspaceContentChangeMatchesPath,
 } from "@puppyone/shared-ui";
 import { useEditorPaneSource } from "./useEditorPaneSource";
 
@@ -22,7 +24,7 @@ export type EditorPaneDocumentRuntimeProps = Readonly<{
   fileIconTheme: FileIconThemeId;
   markdownAssetUrlResolver: DataWorkspaceState["markdownAssetUrlResolver"];
   markdownLinkGraph: DataWorkspaceState["markdownLinkGraph"];
-  refreshKey?: unknown;
+  refreshKey?: WorkspaceContentChange;
   treeNode: DataNode | null;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   workspaceId: Workspace["id"];
@@ -105,12 +107,21 @@ export function areEditorPaneDocumentRuntimePropsEqual(
     && previous.fileIconTheme === next.fileIconTheme
     && previous.markdownAssetUrlResolver === next.markdownAssetUrlResolver
     && previous.markdownLinkGraph === next.markdownLinkGraph
-    && previous.refreshKey === next.refreshKey
+    && sameDocumentRefresh(previous.refreshKey, next.refreshKey, next.editor?.resource ?? null)
     && previous.treeNode === next.treeNode
     && previous.viewerExtensionAdapter === next.viewerExtensionAdapter
     && previous.workspaceId === next.workspaceId
     && previous.workspaceRoot === next.workspaceRoot
     && previous.markdownDialect === next.markdownDialect;
+}
+
+function sameDocumentRefresh(
+  previous: WorkspaceContentChange | undefined,
+  next: WorkspaceContentChange | undefined,
+  resource: string | null,
+): boolean {
+  if (previous === next) return true;
+  return !workspaceContentChangeMatchesPath(next, resource);
 }
 
 function sameEditor(

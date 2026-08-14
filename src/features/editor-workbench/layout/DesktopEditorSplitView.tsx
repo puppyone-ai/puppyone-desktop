@@ -22,6 +22,7 @@ import {
   type FileIconThemeId,
   type ViewerExtensionHostAdapter,
   type Workspace,
+  type WorkspaceContentChange,
 } from "@puppyone/shared-ui";
 import {
   useExplorerFileDrop,
@@ -43,7 +44,7 @@ export type DesktopEditorSplitViewProps = Readonly<{
   editorInteractionPreferences: EditorInteractionPreferences;
   fileIconTheme: FileIconThemeId;
   layout: EditorPaneLayoutState;
-  refreshKey?: unknown;
+  refreshKey?: WorkspaceContentChange;
   state: DataWorkspaceState;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   workspace: Workspace;

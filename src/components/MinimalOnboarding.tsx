@@ -1,7 +1,13 @@
 import type { Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
-import { AlertTriangle, Folder, FolderOpen } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { AlertTriangle, Folder, FolderOpen, Unlink } from "lucide-react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type DragEvent as ReactDragEvent,
+  type ReactNode,
+} from "react";
 import {
   createTypographyRootProps,
   type ResolvedTypography,
@@ -14,6 +20,9 @@ import type {
   ThemeMode,
 } from "../preferences";
 import { useWorkspaceFolderDrop } from "../features/app-shell/useWorkspaceFolderDrop";
+import { getWorkspaceParentPathForDisplay } from "../features/app-shell/workspaceHomeModel";
+import { writeClipboardText } from "../features/settings/utils";
+import { DesktopMenuIconButton, DesktopMenuItem } from "./DesktopMenu";
 import { InlineLoading } from "./loading";
 import { DesktopWindowDragRegion } from "./DesktopWindowChrome";
 
@@ -38,6 +47,7 @@ export type MinimalOnboardingProps = {
   onChooseWorkspace: () => Promise<void>;
   onOpenWorkspacePath: (path: string) => Promise<void>;
   onOpenDroppedWorkspace: (folder: File) => Promise<void>;
+  onRemoveProject?: (path: string) => Promise<void>;
   recentWorkspaces?: RecentWorkspaceHomeItem[];
   projectItems?: ProjectHomeItem[];
   operationStatus?: OnboardingOperationStatus | null;
@@ -58,9 +68,9 @@ export function MinimalOnboarding({
   onChooseWorkspace,
   onOpenWorkspacePath,
   onOpenDroppedWorkspace,
+  onRemoveProject,
   recentWorkspaces = [],
   projectItems,
-  operationStatus = null,
   initialError = null,
   themeMode,
   lightThemePreset,
@@ -75,10 +85,12 @@ export function MinimalOnboarding({
   const { t, formatRelativeTime } = useLocalization();
   const [error, setError] = useState<string | null>(initialError);
   const [openingPath, setOpeningPath] = useState<string | null>(null);
+  const [removingPath, setRemovingPath] = useState<string | null>(null);
+  const [draggingPath, setDraggingPath] = useState<string | null>(null);
   const items = useMemo(
     () => (projectItems ?? recentWorkspaces.map(({ workspace, lastOpenedAt }) => ({
       id: workspace.id,
-      label: workspace.path,
+      label: workspace.name,
       localPath: workspace.path,
       lastOpenedAt: lastOpenedAt ?? null,
     }))).slice(0, 40),
@@ -88,7 +100,7 @@ export function MinimalOnboarding({
   useEffect(() => setError(initialError), [initialError]);
 
   const openPath = async (path: string) => {
-    if (openingPath || operationStatus) return;
+    if (openingPath) return;
     setError(null);
     setOpeningPath(path);
     try {
@@ -101,7 +113,7 @@ export function MinimalOnboarding({
   };
 
   const chooseFolder = async () => {
-    if (openingPath || operationStatus) return;
+    if (openingPath) return;
     setError(null);
     setOpeningPath("__new__");
     try {
@@ -114,7 +126,7 @@ export function MinimalOnboarding({
   };
 
   const openDroppedFolder = async (folder: File) => {
-    if (openingPath || operationStatus) return;
+    if (openingPath) return;
     setError(null);
     setOpeningPath("__drop__");
     try {
@@ -126,28 +138,48 @@ export function MinimalOnboarding({
     }
   };
 
-  const busy = Boolean(openingPath) || Boolean(operationStatus);
+  const removeProject = async (item: ProjectHomeItem) => {
+    if (!onRemoveProject || openingPath || removingPath) return;
+    const projectName = getProjectName(item, t("onboarding.projects.untitled"));
+    const confirmed = window.confirm(
+      t("settings.localProject.unlink.confirm", { workspace: bidiIsolate(projectName) }),
+    );
+    if (!confirmed) return;
+    setError(null);
+    setRemovingPath(item.localPath);
+    try {
+      await onRemoveProject(item.localPath);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
+    } finally {
+      setRemovingPath(null);
+    }
+  };
+
+  const busy = Boolean(openingPath) || Boolean(removingPath);
+  const startProjectDrag = (event: ReactDragEvent<HTMLButtonElement>, item: ProjectHomeItem) => {
+    const absolutePath = item.localPath.trim();
+    if (busy || !absolutePath) {
+      event.preventDefault();
+      return;
+    }
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData("text/plain", absolutePath);
+    setDraggingPath(absolutePath);
+    void writeClipboardText(absolutePath).catch(() => undefined);
+  };
   const folderDrop = useWorkspaceFolderDrop({
     disabled: busy,
     onDropFolder: openDroppedFolder,
     onInvalidDrop: () => setError(t("onboarding.error.dropLocalFolder")),
   });
 
-  const localOperation = openingPath
-    ? {
-        title: t(openingPath === "__new__"
-          ? "onboarding.operation.choosingFolder.title"
-          : "onboarding.operation.openingLocal.title"),
-        detail: t(openingPath === "__new__"
-          ? "onboarding.operation.choosingFolder.detail"
-          : "onboarding.operation.openingLocal.detail"),
-      }
-    : null;
-  const activeOperation = operationStatus ?? localOperation;
+  const hasProjects = items.length > 0;
 
   return (
     <main
-      className={`onboarding-shell onboarding-homepage-shell ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "dragging" : ""}`}
+      className={`onboarding-shell onboarding-homepage-shell ${hasProjects ? "has-projects" : "is-empty"} ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "dragging" : ""}`}
       data-po-scrollbar="content"
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}
@@ -162,67 +194,107 @@ export function MinimalOnboarding({
       onDrop={folderDrop.onDrop}
     >
       <DesktopWindowDragRegion className="onboarding-titlebar" />
-      <section className="onboarding-homepage" aria-label={t("onboarding.projects.title")}>
-        <div className="onboarding-primary-area">
-          <div className="onboarding-folder-action-wrap">
-            <div className={`folder-drop-zone ${folderDrop.dragging ? "dragging" : ""} ${busy ? "is-disabled" : ""}`}>
-              <svg className="folder-drop-outline" viewBox="0 0 260 260" preserveAspectRatio="none" aria-hidden="true">
-                <path className="folder-drop-shadow" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-                <path className="folder-drop-fill" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-                <path className="folder-drop-border" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-              </svg>
-              <button
-                className="folder-drop-primary-action"
-                type="button"
-                disabled={busy}
-                aria-busy={openingPath === "__new__" || undefined}
-                aria-label={t("onboarding.action.openLocalFolder")}
-                onClick={() => void chooseFolder()}
-              />
-              <span className="folder-drop-body">
-                {openingPath === "__new__" ? (
-                  <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
-                ) : (
-                  <FolderOpen className="folder-drop-icon" size={25} strokeWidth={1.75} />
-                )}
-                <span className="folder-drop-copy"><strong>{t("onboarding.action.openOrDropLocalFolder")}</strong></span>
-              </span>
+      <section className={`onboarding-homepage ${hasProjects ? "has-projects" : "is-empty"}`} aria-label={t(hasProjects ? "onboarding.projects.localTitle" : "onboarding.projects.title")}>
+        {!hasProjects && (
+          <div className="onboarding-primary-area">
+            <div className="onboarding-folder-action-wrap">
+              <div className={`folder-drop-zone ${folderDrop.dragging ? "dragging" : ""} ${busy ? "is-disabled" : ""}`}>
+                <svg className="folder-drop-outline" viewBox="0 0 260 260" preserveAspectRatio="none" aria-hidden="true">
+                  <path className="folder-drop-shadow" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
+                  <path className="folder-drop-fill" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
+                  <path className="folder-drop-border" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
+                </svg>
+                <button
+                  className="folder-drop-primary-action"
+                  type="button"
+                  disabled={busy}
+                  aria-busy={openingPath === "__new__" || undefined}
+                  aria-label={t("onboarding.action.openLocalFolder")}
+                  onClick={() => void chooseFolder()}
+                />
+                <span className="folder-drop-body">
+                  {openingPath === "__new__" ? (
+                    <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
+                  ) : (
+                    <FolderOpen className="folder-drop-icon" size={25} strokeWidth={1.75} />
+                  )}
+                  <span className="folder-drop-copy"><strong>{t("onboarding.action.openOrDropLocalFolder")}</strong></span>
+                </span>
+              </div>
             </div>
           </div>
-          {activeOperation && (
-            <div className="onboarding-operation-status" role="status" aria-live="polite">
-              <InlineLoading label={activeOperation.title} size="xs" tone="neutral" />
-              {activeOperation.detail && <span>{activeOperation.detail}</span>}
-            </div>
-          )}
-        </div>
+        )}
 
-        {items.length > 0 && (
-          <div className="onboarding-recent-projects">
-            <div className="onboarding-recent-heading">{t("onboarding.projects.title")}</div>
-            <div className="onboarding-project-list" data-po-scrollbar="content">
-              {items.map((item) => (
-                <button
-                  key={item.id}
-                  className="onboarding-project-row"
-                  type="button"
-                  disabled={Boolean(openingPath) || Boolean(operationStatus)}
-                  aria-busy={openingPath === item.localPath || undefined}
-                  aria-label={t("onboarding.projects.open", { project: bidiIsolate(item.label) })}
-                  title={item.localPath}
-                  onClick={() => void openPath(item.localPath)}
-                >
-                  <span className="onboarding-project-row-icon" aria-hidden="true"><Folder size={14} strokeWidth={1.85} /></span>
-                  <span className="onboarding-project-row-main"><bdi className="onboarding-project-row-title">{formatWorkspaceLocator(item.label)}</bdi></span>
-                  <span className="onboarding-project-row-meta">
-                    <span className="onboarding-project-row-time">
-                      {openingPath === item.localPath
-                        ? <InlineLoading label={t("onboarding.status.opening")} size="xs" tone="neutral" />
-                        : formatRecentWorkspaceTime(item.lastOpenedAt, t, formatRelativeTime)}
-                    </span>
-                  </span>
-                </button>
-              ))}
+        {hasProjects && (
+          <div className="onboarding-projects-layout">
+            <button
+              className={`onboarding-folder-compact-action ${folderDrop.dragging ? "dragging" : ""}`}
+              type="button"
+              disabled={busy}
+              aria-busy={openingPath === "__new__" || undefined}
+              aria-label={t("onboarding.action.openLocalFolder")}
+              onClick={() => void chooseFolder()}
+            >
+              <svg className="onboarding-folder-compact-outline" viewBox="0 0 260 260" preserveAspectRatio="none" aria-hidden="true">
+                <path className="onboarding-folder-compact-shadow" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
+                <path className="onboarding-folder-compact-fill" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
+                <path className="onboarding-folder-compact-border" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
+              </svg>
+              <span className="onboarding-folder-compact-body">
+                {openingPath === "__new__"
+                  ? <InlineLoading label={null} size="sm" tone="neutral" />
+                  : <FolderOpen size={21} strokeWidth={1.75} />}
+                <span>{t("onboarding.action.openOrDropLocalFolder")}</span>
+              </span>
+            </button>
+
+            <div className="onboarding-recent-projects">
+              <div className="onboarding-recent-header">
+                <div className="onboarding-recent-heading">{t("onboarding.projects.localTitle")}</div>
+              </div>
+              <div className="onboarding-project-list" data-po-scrollbar="menu">
+                {items.map((item) => {
+                  const name = getProjectName(item, t("onboarding.projects.untitled"));
+                  const parentPath = getWorkspaceParentPathForDisplay(item.localPath);
+                  const removing = removingPath === item.localPath;
+                  const dragging = draggingPath === item.localPath;
+                  return (
+                    <div className={`onboarding-project-row-wrap ${removing ? "is-removing" : ""} ${dragging ? "is-dragging" : ""}`} key={item.id}>
+                      <DesktopMenuItem
+                        className="onboarding-project-row"
+                        role="button"
+                        icon={<Folder size={14} strokeWidth={1.85} />}
+                        label={<bdi>{name}</bdi>}
+                        detail={parentPath ? <bdi dir="ltr" title={item.localPath}>{parentPath}</bdi> : undefined}
+                        trailing={openingPath === item.localPath
+                          ? <InlineLoading label={t("onboarding.status.opening")} size="xs" tone="neutral" />
+                          : formatRecentWorkspaceTime(item.lastOpenedAt, t, formatRelativeTime)}
+                        disabled={busy}
+                        aria-busy={openingPath === item.localPath || undefined}
+                        aria-label={t("onboarding.projects.open", { project: bidiIsolate(name) })}
+                        title={item.localPath}
+                        draggable={!busy}
+                        onClick={() => void openPath(item.localPath)}
+                        onDragStart={(event) => startProjectDrag(event, item)}
+                        onDragEnd={() => setDraggingPath(null)}
+                      />
+                      {onRemoveProject && (
+                        <DesktopMenuIconButton
+                          className="onboarding-project-remove"
+                          disabled={busy && !removing}
+                          aria-busy={removing || undefined}
+                          label={t("onboarding.projects.removeFor", { project: bidiIsolate(name) })}
+                          title={t("onboarding.projects.removeHint")}
+                          onClick={() => void removeProject(item)}
+                          icon={removing
+                            ? <InlineLoading label={null} size="xs" tone="neutral" />
+                            : <Unlink size={14} aria-hidden="true" />}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -234,10 +306,14 @@ export function MinimalOnboarding({
   );
 }
 
-function formatWorkspaceLocator(path: string) {
-  if (!path.startsWith("/Users/")) return path;
-  const [, , ...rest] = path.split("/");
-  return rest.length > 0 ? `~/${rest.join("/")}` : "~";
+function getProjectName(item: ProjectHomeItem, fallback: string) {
+  const label = item.label.trim();
+  if (label && label !== item.localPath) return label;
+
+  const normalizedPath = item.localPath.length > 1
+    ? item.localPath.replace(/\/+$/, "")
+    : item.localPath;
+  return normalizedPath.split("/").at(-1) || label || fallback;
 }
 
 function formatRecentWorkspaceTime(

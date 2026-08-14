@@ -383,7 +383,19 @@ git tag v0.1.6
 git push origin v0.1.6
 ```
 
-The tag and package version must match exactly. The stable workflow prepares the
+Pushing the tag does not publish anything. Install that exact Internal build,
+complete the release-candidate smoke test, then run **Actions → Desktop Stable
+Release → Run workflow** from the Stable tag and enter the tested Internal tag
+as `promotion_source_tag`. For example:
+
+```text
+workflow ref: v0.1.6
+promotion_source_tag: v0.1.6-internal.1843
+```
+
+The Stable tag, package version, selected Internal base version, and full source
+commit must match exactly. The workflow never substitutes a newer Internal
+build for the explicitly approved candidate. The stable workflow prepares the
 application before exposing signing credentials, verifies the immutable
 Internal manifest/checksums/assets for the same commit, then scopes Apple
 credentials to only the signing/notarization step.
@@ -394,8 +406,8 @@ Local verification is supported:
 PUPPYONE_BUILD_NUMBER=1843 PUPPYONE_RELEASE_TAG=v0.1.6 npm run dist:mac:release
 ```
 
-Local publication is not supported. Only the tagged GitHub workflow can publish
-stable GitHub and R2 state.
+Local publication is not supported. Only the manually approved GitHub workflow
+running from the exact Stable tag can publish stable GitHub and R2 state.
 
 Operators can run the same read-only production check locally or from Actions:
 

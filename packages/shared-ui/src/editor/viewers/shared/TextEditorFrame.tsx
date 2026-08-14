@@ -73,7 +73,6 @@ export function TextEditorFrame({
   const draftRevisionCounterRef = useRef(0);
   const draftRevisionRef = useRef(createDraftRevision(documentId, 0));
   const contentPropRef = useRef(content);
-  const documentVersionPropRef = useRef(documentVersion);
   const snapshotPortRef = useRef<EditorSourceSnapshotPort | null>(null);
   const fallbackSourceRequestedRef = useRef(false);
   const sourceSnapshotRef = useRef({
@@ -97,7 +96,6 @@ export function TextEditorFrame({
     editingSourceRef.current = editingSource;
     draftRef.current = content;
     contentPropRef.current = content;
-    documentVersionPropRef.current = documentVersion;
     draftRevisionCounterRef.current = 0;
     draftRevisionRef.current = createDraftRevision(documentId, 0);
     sourceSnapshotRef.current = { content, revision: draftRevisionRef.current };
@@ -118,27 +116,19 @@ export function TextEditorFrame({
   }, [draft]);
 
   useLayoutEffect(() => {
-    if (
-      documentIdRef.current !== documentId
-      || (
-        contentPropRef.current === content
-        && documentVersionPropRef.current === documentVersion
-      )
-    ) return;
+    // Read-only previews do not have a Working Copy/model port, so their
+    // stable content projection follows host reads directly. Editable models
+    // are replaced exclusively by the Working Copy boundary.
+    if (editingSource || documentIdRef.current !== documentId || contentPropRef.current === content) {
+      return;
+    }
     contentPropRef.current = content;
-    documentVersionPropRef.current = documentVersion;
-    const reconciliation = editingSource?.reconcileExternalBaseline(
-      content,
-      documentVersion,
-    ) ?? "applied";
-    if (reconciliation !== "applied") return;
-
     draftRef.current = content;
     draftRevisionCounterRef.current = 0;
     draftRevisionRef.current = createDraftRevision(documentId, 0);
     if (sourceSnapshotMode) setEditorValue(content);
     else setDraft(content);
-  }, [content, documentId, documentVersion, editingSource, sourceSnapshotMode]);
+  }, [content, documentId, editingSource, sourceSnapshotMode]);
 
   useLayoutEffect(() => {
     if (!editingSource || sourceSnapshotMode) return undefined;
@@ -165,11 +155,44 @@ export function TextEditorFrame({
     detachSourceRef.current = editingSource.attachSource(source);
     editingSource.reportRevision({
       revision: draftRevisionRef.current,
-      dirty: false,
+      origin: "model-initialization",
     });
     return () => {
       detachSourceRef.current?.();
       detachSourceRef.current = null;
+    };
+  }, [documentId, editingSource, sourceSnapshotMode]);
+
+  useLayoutEffect(() => {
+    if (!editingSource || !sourceSnapshotMode || snapshotPortRef.current) return undefined;
+
+    // A source-snapshot Viewer can open directly on a projection that does not
+    // mount its heavyweight editor model (HTML preview is the canonical case).
+    // The Working Copy must still have a model port so an accepted storage
+    // snapshot can update that projection without remounting or writeback.
+    const fallbackSource: EditorSourceSnapshotPort = {
+      readSnapshot: () => sourceSnapshotRef.current,
+      replaceContent: (nextContent) => {
+        draftRevisionCounterRef.current += 1;
+        const snapshot = {
+          content: nextContent,
+          revision: createDraftRevision(documentIdRef.current, draftRevisionCounterRef.current),
+        };
+        sourceSnapshotRef.current = snapshot;
+        setEditorValue(nextContent);
+        return snapshot;
+      },
+    };
+    const detach = editingSource.attachSource(fallbackSource);
+    detachSourceRef.current = detach;
+    editingSource.reportRevision({
+      revision: sourceSnapshotRef.current.revision,
+      origin: "model-initialization",
+    });
+
+    return () => {
+      detach();
+      if (detachSourceRef.current === detach) detachSourceRef.current = null;
     };
   }, [documentId, editingSource, sourceSnapshotMode]);
 
@@ -186,7 +209,7 @@ export function TextEditorFrame({
     draftRevisionRef.current = createDraftRevision(documentIdRef.current, draftRevisionCounterRef.current);
     editingSourceRef.current?.reportRevision({
       revision: draftRevisionRef.current,
-      dirty: true,
+      origin: "local-edit",
     });
   }, []);
 

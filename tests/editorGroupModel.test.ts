@@ -23,6 +23,16 @@ describe("EditorGroupModel", () => {
     expect(state.activeEditorId).toBe("a.md");
   });
 
+  it("normalizes equivalent resource addresses before identity and layout coordination", () => {
+    let state = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("./docs\\a.md"));
+    state = openEditor(state, createEditorInput("docs//a.md", "A"));
+
+    expect(state.editors).toEqual([
+      expect.objectContaining({ id: "docs/a.md", resource: "docs/a.md", label: "A" }),
+    ]);
+    expect(state.activeEditorId).toBe("docs/a.md");
+  });
+
   it("activates the most recently used remaining editor on close", () => {
     let state = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("a.md"));
     state = openEditor(state, createEditorInput("b.md"));
@@ -46,6 +56,14 @@ describe("EditorGroupModel", () => {
     ]);
     expect(closeEditorsUnderResource(state, "notes").editors.map(({ resource }) => resource))
       .toEqual(["other.md"]);
+  });
+
+  it("normalizes folder addresses when rebasing and closing an editor subtree", () => {
+    let state = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("./docs//nested/a.md"));
+    state = rebaseEditorResources(state, "docs/", ".\\notes\\");
+
+    expect(state.editors[0]).toMatchObject({ id: "notes/nested/a.md" });
+    expect(closeEditorsUnderResource(state, "./notes/").editors).toHaveLength(0);
   });
 
   it("sanitizes persisted state instead of trusting storage", () => {

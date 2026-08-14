@@ -1,3 +1,5 @@
+import { rebaseResourcePath } from "../../core/resourcePath";
+
 export type EditorSplitDirection = "horizontal" | "vertical";
 export type EditorSplitPlacement = "first" | "second";
 
@@ -179,16 +181,10 @@ export function rebaseEditorPaneResources(
   previousResource: string,
   nextResource: string,
 ): EditorPaneLayoutState {
-  const remap = (resource: string) => {
-    if (resource === previousResource) return nextResource;
-    return resource.startsWith(`${previousResource}/`)
-      ? `${nextResource}${resource.slice(previousResource.length)}`
-      : resource;
-  };
   let changed = false;
   const root = mapPanes(state.root, (pane) => {
     if (!pane.editorId) return pane;
-    const editorId = remap(pane.editorId);
+    const editorId = rebaseResourcePath(pane.editorId, previousResource, nextResource);
     if (editorId === pane.editorId) return pane;
     changed = true;
     return createPane(pane.id, editorId);

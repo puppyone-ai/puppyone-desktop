@@ -29,6 +29,7 @@ import {
 import { useDesktopUpdates } from "./features/updates";
 import {
   createLocalDataPort,
+  createLocalDocumentStorageIdentity,
   readPuppyoneWorkspaceConfig,
   removeWorkspaceGitRemote,
   showHomepage,
@@ -135,6 +136,7 @@ function AppContent() {
     openFolder,
     openWorkspacePath,
     recentWorkspaceItems,
+    removeWorkspaceFromRecents,
     refreshRecentWorkspaceList,
     restoreWorkspaceError,
     restoringWorkspace,
@@ -155,6 +157,9 @@ function AppContent() {
       setSwitcherOpen(false);
     }, []),
   });
+  const documentStorageIdentity = workspace
+    ? createLocalDocumentStorageIdentity(workspace.path)
+    : null;
   const {
     activeThemeMode,
     aiEditAssistEnabled,
@@ -210,7 +215,10 @@ function AppContent() {
   });
   const Homepage = assetLibraryHomeEnabled ? AssetLibraryHome : MinimalOnboarding;
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("general");
-  const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
+  const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState({
+    sequence: 0,
+    paths: null as readonly string[] | null,
+  });
   const editorWorkbench = useDesktopEditorWorkbench(workspace);
   const activeDataPath = editorWorkbench.activePath;
   const setActiveDataPath = useCallback<Dispatch<SetStateAction<string | null>>>((update) => {
@@ -229,13 +237,17 @@ function AppContent() {
     else if (activeDataPath) editorWorkbench.closeUnderResource(activeDataPath);
   }, [activeDataPath, editorWorkbench]);
   const handleResourceMoved = useCallback(async (previousPath: string, nextPath: string) => {
-    await closeDocumentWorkingCopiesUnderResource(previousPath);
+    if (documentStorageIdentity) {
+      await closeDocumentWorkingCopiesUnderResource(documentStorageIdentity, previousPath);
+    }
     editorWorkbench.rebaseResource(previousPath, nextPath);
-  }, [editorWorkbench]);
+  }, [documentStorageIdentity, editorWorkbench]);
   const handleResourceDeleted = useCallback(async (path: string) => {
-    await closeDocumentWorkingCopiesUnderResource(path);
+    if (documentStorageIdentity) {
+      await closeDocumentWorkingCopiesUnderResource(documentStorageIdentity, path);
+    }
     editorWorkbench.closeUnderResource(path);
-  }, [editorWorkbench]);
+  }, [documentStorageIdentity, editorWorkbench]);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
   const [editorChromeContribution, setEditorChromeContribution] = useState<EditorChromeContribution | null>(null);
   const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
@@ -284,8 +296,11 @@ function AppContent() {
     setRightSidebarOpen,
     setRightSidebarSurface,
   ]);
-  const refreshWorkspaceContent = useCallback(() => {
-    setWorkspaceRefreshToken((token) => token + 1);
+  const refreshWorkspaceContent = useCallback((paths: readonly string[] | string | null = null) => {
+    setWorkspaceRefreshToken((current) => ({
+      sequence: current.sequence + 1,
+      paths: typeof paths === "string" ? [paths] : paths,
+    }));
   }, []);
   const git = useDesktopGitController({
     workspace,
@@ -619,13 +634,18 @@ function AppContent() {
   }, [editorWorkbench]);
   const handleEditorClose = useCallback(async (editorId: string) => {
     try {
-      await closeDocumentWorkingCopy(editorId);
+      if (documentStorageIdentity) {
+        await closeDocumentWorkingCopy({
+          storageIdentity: documentStorageIdentity,
+          resourcePath: editorId,
+        });
+      }
       editorWorkbench.close(editorId);
       setDocumentNavigationError(null);
     } catch (error) {
       setDocumentNavigationError(error instanceof Error ? error.message : String(error));
     }
-  }, [editorWorkbench]);
+  }, [documentStorageIdentity, editorWorkbench]);
   useEffect(() => {
     const handleEditorShortcut = (event: KeyboardEvent) => {
       if (activeView !== "data" || editorWorkbench.state.editors.length === 0) return;
@@ -656,17 +676,17 @@ function AppContent() {
 
   const handleFilesVisibilitySettingsChange = useCallback((nextSettings: FilesVisibilitySettings) => {
     setFilesVisibilitySettings(nextSettings);
-    setWorkspaceRefreshToken((token) => token + 1);
-  }, [setFilesVisibilitySettings]);
+    refreshWorkspaceContent();
+  }, [refreshWorkspaceContent, setFilesVisibilitySettings]);
 
   const handlePuppyoneConfigChange = useCallback(async (nextConfig: PuppyoneWorkspaceConfig) => {
     const savedConfig = await savePuppyoneConfig(nextConfig);
     if (savedConfig) {
-      setWorkspaceRefreshToken((token) => token + 1);
+      refreshWorkspaceContent();
       await refreshGitStatus("configuration");
     }
     return savedConfig;
-  }, [refreshGitStatus, savePuppyoneConfig]);
+  }, [refreshGitStatus, refreshWorkspaceContent, savePuppyoneConfig]);
 
   const [workspaceSurfaceError, setWorkspaceSurfaceError] = useState<string | null>(null);
 
@@ -829,6 +849,7 @@ function AppContent() {
         onChooseWorkspace={openFolder}
         onOpenDroppedWorkspace={openDroppedWorkspace}
         onOpenWorkspacePath={openWorkspacePath}
+        onRemoveProject={removeWorkspaceFromRecents}
         recentWorkspaces={recentWorkspaceItems}
         initialError={restoreWorkspaceError}
         cornerSlot={(

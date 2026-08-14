@@ -73,7 +73,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
   viewerExtensionAdapter: DataWorkspaceProps["viewerExtensionAdapter"];
   workspace: Workspace;
   workspaceKey: string;
-  workspaceRefreshToken: number;
+  workspaceRefreshToken: Readonly<{ sequence: number; paths: readonly string[] | null }>;
   workspaceSurfaceError: string | null;
   sidebarCreateMenuOpen: boolean;
 };

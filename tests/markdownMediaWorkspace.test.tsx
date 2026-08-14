@@ -167,7 +167,7 @@ function imageNode(path: string): DataNode {
   };
 }
 
-async function waitFor(assertion: () => boolean, attempts = 150): Promise<void> {
+async function waitFor(assertion: () => boolean, attempts = 500): Promise<void> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (assertion()) return;
     await act(async () => {

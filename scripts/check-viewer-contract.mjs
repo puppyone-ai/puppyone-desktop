@@ -27,8 +27,13 @@ for (const format of [...(formatRegistry.formats ?? []), formatRegistry.unknownF
 }
 
 const presetCoreFiles = [
-  path.join(repoRoot, "packages/shared-ui/src/editor/registry/viewerRegistry.tsx"),
-  path.join(repoRoot, "packages/shared-ui/src/editor/registry/viewerTypes.ts"),
+  ...[
+    "viewerRegistry.tsx",
+    "viewerTypes.ts",
+    "presetViewerContribution.ts",
+    "builtinViewerContributions.ts",
+  ].map((fileName) => path.join(repoRoot, "packages/shared-ui/src/editor/registry", fileName)),
+  path.join(repoRoot, "packages/shared-ui/src/editor/markdown/contribution.ts"),
   ...walkFiles(path.join(repoRoot, "packages/shared-ui/src/editor/viewers")),
 ];
 for (const filePath of presetCoreFiles) {

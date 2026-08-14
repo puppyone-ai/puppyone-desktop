@@ -449,10 +449,17 @@ export type WorkspaceChangedEvent = {
   rootPath: string;
   eventType: string;
   path: string | null;
+  /** All paths coalesced in the watcher debounce window. */
+  paths?: string[];
   error?: string;
   recovered?: boolean;
   reason?: string;
 };
+
+export type WorkspaceWriteFileResult =
+  | { ok: true; version: string | null }
+  | { ok: false; kind: "conflict"; content: string; version: string | null }
+  | { ok: false; kind: "not-found" | "permission-denied" | "io"; message: string };
 
 export type AiEditReviewUpdatedEvent = {
   rootPath: string;
@@ -812,6 +819,11 @@ declare global {
       getLastWorkspace: () => Promise<LastWorkspaceResult>;
       getRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
       hydrateRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
+      removeRecentWorkspace: (folderPath: string) => Promise<{
+        ok: true;
+        removed: true;
+        path: string;
+      }>;
       forgetLastWorkspace: () => Promise<void>;
       showHomepage: () => Promise<{ ok: boolean }>;
       openWorkspaceInCurrentWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
@@ -861,7 +873,7 @@ declare global {
         path: string;
         content: string;
         expectedVersion?: string | null;
-      }) => Promise<{ version: string }>;
+      }) => Promise<WorkspaceWriteFileResult>;
       createEntry: (request: WorkspaceCreateEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       instantiateTemplate: (
         request: WorkspaceInstantiateTemplateRequest,

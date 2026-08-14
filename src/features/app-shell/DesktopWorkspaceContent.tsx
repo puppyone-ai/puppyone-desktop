@@ -67,7 +67,7 @@ type DesktopWorkspaceContentProps = {
   workspace: Workspace;
   workspaceSurfaceError?: string | null;
   workspaceKey: string;
-  workspaceRefreshToken: number;
+  workspaceRefreshToken: Readonly<{ sequence: number; paths: readonly string[] | null }>;
   sidebarCreateMenuOpen: boolean;
 };
 

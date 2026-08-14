@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
@@ -58,11 +59,18 @@ export function DocumentSessionBoundary({
   const sessionState = useDocumentSessionState(session);
   const sessionError = formatDocumentSessionError(sessionState.error, t);
 
+  useLayoutEffect(() => {
+    // Every read result is an explicit storage event. This is deliberately
+    // independent from Viewer mount state: the Working Copy decides whether
+    // to adopt it, acknowledge an own-write echo, or enter conflict.
+    session.reconcileExternalBaseline(initialContent, initialVersion);
+  }, [initialContent, initialVersion, session]);
+
   useEffect(() => {
     session.setSaveMode(saveMode);
   }, [saveMode, session]);
 
-  const saveBlocked = sessionState.error?.code === "external-conflict";
+  const saveBlocked = sessionState.status === "conflict";
   const showSaveChrome = showSaveStatus
     || (sessionState.status === "error" && !saveBlocked);
   const save = useCallback(() => {

@@ -65,7 +65,7 @@ describe("HTML editor and safe preview", () => {
   });
 
   it("keeps the latest source snapshot durable after switching to Preview", async () => {
-    const persist = vi.fn(async () => ({ version: "v2" }));
+    const persist = vi.fn(async () => ({ ok: true as const, version: "v2" }));
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -76,7 +76,7 @@ describe("HTML editor and safe preview", () => {
           initialContent="<h1>Before</h1>"
           initialVersion="v1"
           saveMode="manual"
-          persistence={{ kind: "local-fs", persist }}
+          persistence={{ kind: "local-fs", storageIdentity: "test:html-preview", persist }}
         >
           <HtmlViewer
             document={{ path: "page.html", name: "page.html", type: "html", version: "v1" }}
@@ -101,7 +101,10 @@ describe("HTML editor and safe preview", () => {
       userEvent: "input.type",
     }));
     act(() => container.querySelector<HTMLButtonElement>('[aria-label="HTML preview"]')?.click());
-    await act(async () => closeDocumentWorkingCopy("page.html"));
+    await act(async () => closeDocumentWorkingCopy({
+      storageIdentity: "test:html-preview",
+      resourcePath: "page.html",
+    }));
     act(() => root?.unmount());
     root = null;
     await act(async () => Promise.resolve());

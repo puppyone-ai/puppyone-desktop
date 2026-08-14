@@ -1,6 +1,9 @@
 {
   "projects.title": "Projets",
+  "projects.localTitle": "Projets locaux",
   "projects.open": "Ouvrir {project}",
+  "projects.removeFor": "Retirer {project} des projets locaux",
+  "projects.removeHint": "Seule cette inscription est retirée. Les fichiers locaux ne sont pas supprimés.",
   "projects.untitled": "Projet sans titre",
   "action.createCloudProject": "Créer un projet Cloud",
   "action.openLocalFolder": "Ouvrir le dossier local",

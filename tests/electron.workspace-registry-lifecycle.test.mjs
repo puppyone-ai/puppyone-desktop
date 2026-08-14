@@ -55,6 +55,21 @@ describe("workspace registry lifecycle", () => {
     for (const folder of addedPaths) expect(paths.has(folder)).toBe(true);
   });
 
+  it("removes a stale registration after its local folder no longer exists", async () => {
+    const store = createStore();
+    const folder = path.join(root, "stale-workspace");
+    await fs.promises.mkdir(folder);
+    await store.rememberRecentWorkspacePath(folder);
+    const persistedPath = (await store.getRecentWorkspacesResult()).items[0].workspace.path;
+    await fs.promises.rm(folder, { recursive: true, force: true });
+
+    await expect(store.removeRecentWorkspacePath(persistedPath)).resolves.toEqual({
+      removed: true,
+      path: persistedPath,
+    });
+    await expect(store.getRecentWorkspacesResult()).resolves.toMatchObject({ items: [] });
+  });
+
   it("deduplicates a symlink alias of the same physical workspace", async () => {
     const store = createStore();
     const workspace = path.join(root, "physical-workspace");

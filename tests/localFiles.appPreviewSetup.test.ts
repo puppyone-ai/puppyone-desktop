@@ -9,7 +9,7 @@ afterEach(() => {
 
 describe("local App Preview setup port", () => {
   it("preflights a package script and conditionally persists the confirmed setup", async () => {
-    const writeFile = vi.fn(async () => ({ version: "sha256:configured" }));
+    const writeFile = vi.fn(async () => ({ ok: true as const, version: "sha256:configured" }));
     const readFile = vi.fn(async ({ path }: { path: string }) => {
       if (path === "demo.puppyoneapp") {
         return { path, name: path, type: "app", content: EMPTY_APP, version: "sha256:empty" };
@@ -75,7 +75,7 @@ describe("local App Preview setup port", () => {
   });
 
   it("does not misclassify an advanced package-manager command as a package script", async () => {
-    const writeFile = vi.fn(async () => ({ version: "sha256:configured" }));
+    const writeFile = vi.fn(async () => ({ ok: true as const, version: "sha256:configured" }));
     vi.stubGlobal("window", {
       puppyoneDesktop: {
         readFile: vi.fn(async ({ path }: { path: string }) => ({

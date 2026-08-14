@@ -1,24 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getEditorSourceRequirement,
   shouldReadEditorContent,
+  useFileResourceLease,
+  workspaceContentChangeMatchesPath,
   type DataNode,
   type DataPort,
   type DocumentPersistedCommit,
   type FileContent,
+  type WorkspaceContentChange,
 } from "@puppyone/shared-ui";
 
 export function useEditorPaneSource(
   node: DataNode | null,
   dataPort: DataPort,
-  refreshKey: unknown,
+  refreshKey?: WorkspaceContentChange,
 ) {
   const [content, setContent] = useState<FileContent | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [fileUrlLoading, setFileUrlLoading] = useState(false);
-  const [fileUrlError, setFileUrlError] = useState<string | null>(null);
+  const lastContentReadPathRef = useRef<string | null>(null);
   const nodePath = node?.path ?? null;
   const needsContent = Boolean(node && dataPort.readFile && shouldReadEditorContent(node));
   const sourceRequirement = node ? getEditorSourceRequirement(node) : "none";
@@ -29,13 +30,20 @@ export function useEditorPaneSource(
   );
 
   useEffect(() => {
-    setContent(null);
+    setContent((current) => current?.path === nodePath ? current : null);
     setError(null);
+  }, [nodePath]);
+
+  useEffect(() => {
+    const firstReadForPath = Boolean(nodePath && lastContentReadPathRef.current !== nodePath);
+    if (!firstReadForPath && !workspaceContentChangeMatchesPath(refreshKey, nodePath)) return undefined;
     if (!nodePath || !needsContent || !dataPort.readFile) {
       setLoading(false);
       return undefined;
     }
+    lastContentReadPathRef.current = nodePath;
     const controller = new AbortController();
+    setError(null);
     setLoading(true);
     dataPort.readFile(nodePath, { signal: controller.signal })
       .then((nextContent) => {
@@ -52,40 +60,12 @@ export function useEditorPaneSource(
     return () => controller.abort();
   }, [dataPort, needsContent, nodePath, refreshKey]);
 
-  useEffect(() => {
-    setFileUrl(null);
-    setFileUrlError(null);
-    if (!nodePath || !needsResource || !dataPort.getFileUrl) {
-      setFileUrlLoading(false);
-      return undefined;
-    }
-    let cancelled = false;
-    let activeUrl: string | null = null;
-    setFileUrlLoading(true);
-    Promise.resolve(dataPort.getFileUrl(nodePath))
-      .then((url) => {
-        if (cancelled) {
-          void Promise.resolve(dataPort.revokeFileUrl?.(url)).catch(() => undefined);
-          return;
-        }
-        activeUrl = url;
-        setFileUrl(url);
-      })
-      .catch((nextError) => {
-        if (!cancelled) {
-          setFileUrlError(nextError instanceof Error ? nextError.message : String(nextError));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setFileUrlLoading(false);
-      });
-    return () => {
-      cancelled = true;
-      if (activeUrl) {
-        void Promise.resolve(dataPort.revokeFileUrl?.(activeUrl)).catch(() => undefined);
-      }
-    };
-  }, [dataPort, needsResource, nodePath]);
+  const resource = useFileResourceLease({
+    dataPort,
+    enabled: needsResource,
+    path: nodePath,
+    refresh: refreshKey,
+  });
 
   const applyPersistedCommit = useCallback((commit: DocumentPersistedCommit) => {
     setContent((current) => {
@@ -102,21 +82,23 @@ export function useEditorPaneSource(
     });
   }, [node]);
 
+  const visibleContent = content?.path === nodePath ? content : null;
+
   return useMemo(() => ({
-    content,
-    loading: loading || (needsContent && !content && !error),
+    content: visibleContent,
+    loading: loading || (needsContent && !visibleContent && !error),
     error,
-    fileUrl,
-    fileUrlLoading,
-    fileUrlError,
+    fileUrl: resource.fileUrl,
+    fileUrlLoading: resource.fileUrlLoading,
+    fileUrlError: resource.fileUrlError,
     applyPersistedCommit,
   }), [
     applyPersistedCommit,
-    content,
+    visibleContent,
     error,
-    fileUrl,
-    fileUrlError,
-    fileUrlLoading,
+    resource.fileUrl,
+    resource.fileUrlError,
+    resource.fileUrlLoading,
     loading,
     needsContent,
   ]);

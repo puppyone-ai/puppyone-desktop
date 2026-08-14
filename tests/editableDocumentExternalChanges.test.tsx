@@ -13,6 +13,7 @@ import { withTestLocalization } from "./testLocalization";
   .IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root | null = null;
+let persistenceIdentity = 0;
 
 afterEach(() => {
   act(() => root?.unmount());
@@ -29,6 +30,20 @@ describe("editable document external changes", () => {
     await act(async () => harness.render("agent update", "v2"));
 
     expect(harness.value()).toBe("agent update");
+    expect(persistence.persist).not.toHaveBeenCalled();
+  });
+
+  it("adopts an Agent version after the complete Viewer tree remounts without writing it back", async () => {
+    const persistence = createPersistence();
+    const harness = createHarness(persistence, "auto");
+
+    await act(async () => harness.render("one", "v1"));
+    await act(async () => harness.hide());
+    await act(async () => harness.render("agent update while hidden", "v2"));
+    await act(async () => Promise.resolve());
+
+    expect(harness.value()).toBe("agent update while hidden");
+    expect(harness.container.querySelector(".editor-inline-error")).toBeNull();
     expect(persistence.persist).not.toHaveBeenCalled();
   });
 
@@ -71,10 +86,11 @@ describe("editable document external changes", () => {
   });
 
   it("does not show an external-conflict banner for its own in-flight save echo", async () => {
-    const first = deferred<{ version: string }>();
-    const second = deferred<{ version: string }>();
+    const first = deferred<{ ok: true; version: string }>();
+    const second = deferred<{ ok: true; version: string }>();
     const persistence = {
       kind: "local-fs" as const,
+      storageIdentity: "test:editable-external:queued",
       persist: vi.fn()
         .mockImplementationOnce(() => first.promise)
         .mockImplementationOnce(() => second.promise),
@@ -92,7 +108,7 @@ describe("editable document external changes", () => {
     expect(harness.container.querySelector(".editor-inline-error")).toBeNull();
 
     await act(async () => {
-      first.resolve({ version: "v2" });
+      first.resolve({ ok: true, version: "v2" });
       await Promise.resolve();
     });
     expect(persistence.persist).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -101,7 +117,7 @@ describe("editable document external changes", () => {
     }));
 
     await act(async () => {
-      second.resolve({ version: "v3" });
+      second.resolve({ ok: true, version: "v3" });
       await Promise.resolve();
     });
     expect(harness.container.querySelector(".editor-inline-error")).toBeNull();
@@ -111,7 +127,8 @@ describe("editable document external changes", () => {
 function createPersistence() {
   return {
     kind: "local-fs" as const,
-    persist: vi.fn(async () => ({ version: "saved-version" })),
+    storageIdentity: `test:editable-external:${++persistenceIdentity}`,
+    persist: vi.fn(async () => ({ ok: true as const, version: "saved-version" })),
   };
 }
 
@@ -130,8 +147,8 @@ function createHarness(
       root?.render(withTestLocalization(
         <DocumentSessionBoundary
           documentId="notes.txt"
-          initialContent="one"
-          initialVersion="v1"
+          initialContent={content}
+          initialVersion={version}
           saveMode={saveMode}
           persistence={persistence}
         >
@@ -150,6 +167,9 @@ function createHarness(
           />
         </DocumentSessionBoundary>,
       ));
+    },
+    hide() {
+      root?.render(null);
     },
     change(content: string) {
       change(content);

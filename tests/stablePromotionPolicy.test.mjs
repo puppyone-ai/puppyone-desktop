@@ -22,7 +22,25 @@ describe("Stable promotion policy", () => {
       catalog,
       baseVersion: "1.4.0",
       commitSha,
-    }).tag).toBe("v1.4.0-internal.42");
+      sourceTag: "v1.4.0-internal.41",
+    }).tag).toBe("v1.4.0-internal.41");
+  });
+
+  it("never substitutes a newer unapproved Internal build for the selected candidate", () => {
+    const approved = releaseFixture(41, "2026-07-26T09:00:00.000Z");
+    const unapproved = releaseFixture(42, "2026-07-26T10:00:00.000Z");
+    const catalog = mergeReleaseCatalog(
+      mergeReleaseCatalog(null, approved, "2026-07-26T09:00:00.000Z"),
+      unapproved,
+      "2026-07-26T10:00:00.000Z",
+    );
+
+    expect(selectStablePromotionSource({
+      catalog,
+      baseVersion: "1.4.0",
+      commitSha,
+      sourceTag: "v1.4.0-internal.41",
+    })).toStrictEqual(approved);
   });
 
   it("rejects unknown commits, legacy manifests, and withdrawn releases", () => {
@@ -32,7 +50,8 @@ describe("Stable promotion policy", () => {
       catalog,
       baseVersion: "1.4.0",
       commitSha: "0".repeat(40),
-    })).toThrow(/No verified Internal/);
+      sourceTag: "v1.4.0-internal.42",
+    })).toThrow(/Verified Internal candidate/);
 
     const withdrawnCatalog = structuredClone(catalog);
     withdrawnCatalog.releases[0].withdrawnAt = "2026-07-26T11:00:00.000Z";
@@ -40,7 +59,27 @@ describe("Stable promotion policy", () => {
       catalog: withdrawnCatalog,
       baseVersion: "1.4.0",
       commitSha,
-    })).toThrow(/No verified Internal/);
+      sourceTag: "v1.4.0-internal.42",
+    })).toThrow(/Verified Internal candidate/);
+  });
+
+  it("requires an explicit candidate tag for the same base version", () => {
+    const catalog = mergeReleaseCatalog(
+      null,
+      releaseFixture(42, "2026-07-26T10:00:00.000Z"),
+    );
+
+    expect(() => selectStablePromotionSource({
+      catalog,
+      baseVersion: "1.4.0",
+      commitSha,
+    })).toThrow(/explicit Internal candidate tag/);
+    expect(() => selectStablePromotionSource({
+      catalog,
+      baseVersion: "1.4.0",
+      commitSha,
+      sourceTag: "v1.5.0-internal.42",
+    })).toThrow(/explicit Internal candidate tag/);
   });
 
   it("keeps authenticated promotion downloads on the Internal distribution origin", () => {
