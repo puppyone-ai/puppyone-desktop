@@ -1,4 +1,4 @@
-import { ArrowRight, SquareTerminal } from "lucide-react";
+import { SquareTerminal } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
 import {
   DESKTOP_TERMINAL_LAUNCHERS,
@@ -22,15 +22,9 @@ export function TerminalLauncher({ onLaunch }: TerminalLauncherProps) {
       aria-labelledby="desktop-terminal-launcher-title"
     >
       <div className="desktop-terminal-launcher-content">
-        <div className="desktop-terminal-launcher-intro">
-          <span className="desktop-terminal-launcher-kicker">
-            {t("terminal.launcher.kicker")}
-          </span>
-          <h2 id="desktop-terminal-launcher-title">
-            {t("terminal.launcher.title")}
-          </h2>
-          <p>{t("terminal.launcher.description")}</p>
-        </div>
+        <h2 id="desktop-terminal-launcher-title">
+          {t("terminal.launcher.title")}
+        </h2>
 
         <div className="desktop-terminal-launcher-tools">
           {codingTools.map((launcher) => (
@@ -47,20 +41,13 @@ export function TerminalLauncher({ onLaunch }: TerminalLauncherProps) {
             type="button"
             className="desktop-terminal-launcher-shell"
             onClick={() => onLaunch(shell.id)}
+            aria-label={`${t(shell.nameMessage)}. ${t(shell.descriptionMessage)}`}
+            title={t(shell.descriptionMessage)}
           >
             <span className="desktop-terminal-launcher-shell-icon" aria-hidden="true">
-              <SquareTerminal size={16} strokeWidth={1.7} />
+              <SquareTerminal size={16} strokeWidth={1.6} />
             </span>
-            <span className="desktop-terminal-launcher-shell-copy">
-              <strong>{t(shell.nameMessage)}</strong>
-              <span>{t(shell.descriptionMessage)}</span>
-            </span>
-            <ArrowRight
-              className="desktop-terminal-launcher-arrow"
-              size={14}
-              strokeWidth={1.7}
-              aria-hidden="true"
-            />
+            <span>{t(shell.nameMessage)}</span>
           </button>
         )}
       </div>
@@ -81,18 +68,11 @@ function TerminalLauncherButton({ launcher, onLaunch }: TerminalLauncherButtonPr
       type="button"
       className="desktop-terminal-launcher-tool"
       onClick={() => onLaunch(launcher.id)}
+      aria-label={`${t(launcher.nameMessage)}. ${t(launcher.descriptionMessage)}`}
+      title={t(launcher.descriptionMessage)}
     >
       <TerminalLauncherMark launcher={launcher} />
-      <span className="desktop-terminal-launcher-tool-copy">
-        <strong>{t(launcher.nameMessage)}</strong>
-        <span>{t(launcher.descriptionMessage)}</span>
-      </span>
-      <ArrowRight
-        className="desktop-terminal-launcher-arrow"
-        size={14}
-        strokeWidth={1.7}
-        aria-hidden="true"
-      />
+      <span>{t(launcher.nameMessage)}</span>
     </button>
   );
 }

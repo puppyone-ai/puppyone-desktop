@@ -13,53 +13,28 @@
 
 .desktop-terminal-launcher-content {
   display: flex;
-  width: min(100%, 560px);
+  width: min(100%, 252px);
   min-width: 0;
   flex-direction: column;
-  gap: 18px;
-  padding: clamp(28px, 8cqw, 52px) clamp(18px, 7cqw, 40px);
+  gap: 8px;
+  padding: 18px;
   box-sizing: border-box;
 }
 
-.desktop-terminal-launcher-intro {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.desktop-terminal-launcher-kicker {
-  margin-bottom: 6px;
+.desktop-terminal-launcher-content h2 {
+  margin: 0 0 2px;
   color: var(--po-text-subtle);
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.06em;
-  line-height: 16px;
-  text-transform: uppercase;
-}
-
-.desktop-terminal-launcher-intro h2 {
-  margin: 0;
-  color: var(--po-text);
-  font-size: 19px;
-  font-weight: 610;
-  letter-spacing: -0.015em;
-  line-height: 25px;
-}
-
-.desktop-terminal-launcher-intro p {
-  max-width: 440px;
-  margin: 7px 0 0;
-  color: var(--po-text-muted);
   font-size: 12px;
+  font-weight: 500;
   line-height: 18px;
+  text-align: center;
 }
 
 .desktop-terminal-launcher-tools {
   display: grid;
   min-width: 0;
   grid-template-columns: minmax(0, 1fr);
-  gap: 7px;
+  gap: 1px;
 }
 
 .desktop-terminal-launcher-tool,
@@ -68,33 +43,32 @@
   width: 100%;
   min-width: 0;
   align-items: center;
-  border: 1px solid var(--po-border);
-  background: color-mix(in srgb, var(--po-terminal-fg) 2%, transparent);
-  color: var(--po-text);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--po-text-muted);
   cursor: var(--po-clickable-cursor, pointer);
   font: inherit;
   text-align: start;
 }
 
 .desktop-terminal-launcher-tool {
-  min-height: 64px;
-  gap: 11px;
-  padding: 10px 11px;
-  border-radius: 10px;
+  min-height: 34px;
+  gap: 9px;
+  padding: 5px 8px;
+  border-radius: 6px;
 }
 
 .desktop-terminal-launcher-shell {
-  min-height: 48px;
-  gap: 10px;
-  padding: 8px 10px;
-  border-color: transparent;
-  border-radius: 9px;
-  background: transparent;
+  min-height: 34px;
+  gap: 9px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  color: var(--po-text-subtle);
 }
 
 .desktop-terminal-launcher-tool:hover,
 .desktop-terminal-launcher-shell:hover {
-  border-color: color-mix(in srgb, var(--po-border-strong) 76%, transparent);
+  color: var(--po-text);
   background: var(--po-hover);
 }
 
@@ -108,14 +82,15 @@
 .desktop-terminal-launcher-mark,
 .desktop-terminal-launcher-shell-icon {
   display: grid;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
   place-items: center;
   overflow: hidden;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--po-terminal-fg) 7%, transparent);
+  border-radius: 4px;
+  background: transparent;
   color: var(--po-text-muted);
+  opacity: 0.72;
 }
 
 .desktop-terminal-launcher-mark img {
@@ -140,65 +115,30 @@
 }
 
 .desktop-terminal-launcher-shell-icon {
-  width: 26px;
-  height: 26px;
-  flex-basis: 26px;
-  border-radius: 7px;
+  border-radius: 4px;
 }
 
-.desktop-terminal-launcher-tool-copy,
-.desktop-terminal-launcher-shell-copy {
-  display: flex;
+.desktop-terminal-launcher-tool > span:last-child,
+.desktop-terminal-launcher-shell > span:last-child {
   min-width: 0;
-  flex: 1;
-  flex-direction: column;
-}
-
-.desktop-terminal-launcher-tool-copy strong,
-.desktop-terminal-launcher-shell-copy strong {
   overflow: hidden;
   font-size: 12px;
-  font-weight: 610;
-  line-height: 17px;
+  font-weight: 500;
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.desktop-terminal-launcher-tool-copy span,
-.desktop-terminal-launcher-shell-copy span {
-  overflow: hidden;
-  color: var(--po-text-subtle);
-  font-size: 11px;
-  line-height: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-terminal-launcher-arrow {
-  flex: 0 0 auto;
-  color: var(--po-text-subtle);
-  opacity: 0;
-  transform: translateX(-2px);
-  transition: opacity 120ms ease, transform 120ms ease;
-}
-
-.desktop-terminal-launcher-tool:hover .desktop-terminal-launcher-arrow,
-.desktop-terminal-launcher-tool:focus-visible .desktop-terminal-launcher-arrow,
-.desktop-terminal-launcher-shell:hover .desktop-terminal-launcher-arrow,
-.desktop-terminal-launcher-shell:focus-visible .desktop-terminal-launcher-arrow {
+.desktop-terminal-launcher-tool:hover .desktop-terminal-launcher-mark,
+.desktop-terminal-launcher-tool:focus-visible .desktop-terminal-launcher-mark,
+.desktop-terminal-launcher-shell:hover .desktop-terminal-launcher-shell-icon,
+.desktop-terminal-launcher-shell:focus-visible .desktop-terminal-launcher-shell-icon {
   opacity: 1;
-  transform: translateX(0);
 }
 
 @container (min-width: 460px) {
-  .desktop-terminal-launcher-tools {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .desktop-terminal-launcher-arrow {
-    transition: none;
+  .desktop-terminal-launcher-content {
+    width: 264px;
   }
 }
 
