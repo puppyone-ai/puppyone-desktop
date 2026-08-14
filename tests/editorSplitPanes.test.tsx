@@ -33,13 +33,25 @@ afterEach(() => {
 });
 
 describe("DesktopEditorSplitView", () => {
-  it("has no pane header or grab handle when only one pane exists", () => {
+  it("keeps the pane actions handle when only one pane exists", () => {
     const container = renderSplitView(EMPTY_EDITOR_GROUP, createEditorPaneLayout());
+    const pane = container.querySelector<HTMLElement>(".desktop-editor-pane")!;
+    const handle = container.querySelector<HTMLButtonElement>(".desktop-editor-pane-handle")!;
+    pane.getBoundingClientRect = () => new DOMRect(0, 0, 800, 600);
 
     expect(container.querySelector('[role="tablist"]')).toBeNull();
     expect(container.querySelector(".desktop-editor-pane-bar")).toBeNull();
     expect(container.querySelectorAll(".desktop-editor-pane")).toHaveLength(1);
-    expect(container.querySelector(".desktop-editor-pane-handle")).toBeNull();
+    expect(handle).not.toBeNull();
+
+    act(() => pane.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true, clientX: 400, clientY: 100,
+    })));
+    expect(pane.dataset.handleHot).toBe("true");
+
+    clickPaneHandle(handle, 1);
+    expect(handle.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector('[role="menu"]')).not.toBeNull();
   });
 
   it("opens one Explorer file at the nearest pane edge on drop", () => {

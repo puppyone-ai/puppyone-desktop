@@ -65,7 +65,6 @@ export function EditorPaneShell({
   };
 
   const onPanePointerMove = (event: PointerEvent<HTMLElement>) => {
-    if (paneCount < 2) return;
     updateHandleHotFromPoint(event.clientX, event.clientY);
   };
 
@@ -104,8 +103,7 @@ export function EditorPaneShell({
       onDragLeaveCapture={(event) => fileDrop.leave(event, pane.id)}
       onDropCapture={(event) => fileDrop.drop(event, pane.id)}
     >
-      {paneCount > 1 && (
-        <div className="desktop-editor-pane-handle-shell" ref={actionsRef}>
+      <div className="desktop-editor-pane-handle-shell" ref={actionsRef}>
           <button
             className="desktop-editor-pane-handle"
             type="button"
@@ -119,7 +117,7 @@ export function EditorPaneShell({
               }
             }}
             onPointerDown={(event) => {
-              if (event.button === 0) paneMove.start(event, pane);
+              if (event.button === 0 && paneCount > 1) paneMove.start(event, pane);
             }}
             onPointerMove={paneMove.move}
             onPointerUp={paneMove.end}
@@ -144,8 +142,7 @@ export function EditorPaneShell({
               </button>
             </div>
           )}
-        </div>
-      )}
+      </div>
       <div className="desktop-editor-pane-content">{children}</div>
       {dropEdge && <div className="desktop-editor-drop-preview" data-edge={dropEdge} />}
     </section>

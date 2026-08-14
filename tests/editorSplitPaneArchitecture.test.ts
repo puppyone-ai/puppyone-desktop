@@ -90,6 +90,7 @@ describe("editor split-pane architecture", () => {
     expect(splitSource).toContain('data-direction={split.direction}');
     expect(resizeSource).toContain('role="separator"');
     expect(paneShellSource).toContain('className="desktop-editor-pane-handle"');
+    expect(paneShellSource).not.toContain("paneCount > 1 &&");
     expect(splitSource).toContain("onOpenAtPaneEdge");
     expect(splitSource).toContain("onMovePane");
     expect(splitSource).not.toContain("onSplitPane");
