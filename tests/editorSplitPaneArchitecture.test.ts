@@ -125,8 +125,8 @@ describe("editor split-pane architecture", () => {
     expect(handleRule).not.toContain("box-shadow:");
     expect(handleRule).not.toContain("border-radius:");
     const handleDotRule = readCssBlock(splitStyles, ".desktop-editor-pane-handle > i");
-    expect(handleDotRule).toContain("width: 3px;");
-    expect(handleDotRule).toContain("height: 3px;");
+    expect(handleDotRule).toContain("width: 2px;");
+    expect(handleDotRule).toContain("height: 2px;");
     expect(handleDotRule).toContain("border-radius: 0;");
     expect(handleDotRule).toContain("background: currentColor;");
     expect(splitStyles).not.toContain(".desktop-editor-pane-bar");
