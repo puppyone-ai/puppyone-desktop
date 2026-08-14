@@ -140,7 +140,7 @@ describe("editor split-pane architecture", () => {
     expect(paneShellSource).toContain("PANE_HANDLE_REVEAL_RATIO = 1 / 3");
     expect(paneShellSource).toContain('data-handle-hot={handleRevealed ? "true" : undefined}');
     expect(paneShellSource).toContain("onPointerMove={onPanePointerMove}");
-    expect(paneShellSource).toContain("paneMove.prepare(host, pane.id)");
+    expect(paneShellSource).not.toContain("paneMove.prepare");
     expect(paneShellSource).toContain("onPointerUp={(event)");
     expect(paneShellSource).not.toContain("onPointerDownCapture");
     expect(splitSource).toContain("key={split.first.id}");
@@ -155,6 +155,9 @@ describe("editor split-pane architecture", () => {
     expect(paneMoveSource).toContain("createPaneMovePreview");
     expect(paneMoveSource).toContain("destroyPaneMovePreview");
     expect(paneMoveSource).toContain("samePaneDropIntent");
+    expect(paneMoveSource).not.toContain("PREPARED_SNAPSHOT_MAX_AGE_MS");
+    expect(paneMoveSource.indexOf("capturePaneMovePreview(session.sourcePane)"))
+      .toBeGreaterThan(paneMoveSource.indexOf("distance < PANE_MOVE_THRESHOLD_PX"));
     expect(paneMovePreviewSource).toContain("capturePanePreview");
     expect(paneMovePreviewSource).toContain('getElementById("desktop-overlay-root")');
     expect(paneMovePreviewSource).not.toContain("cloneNode");

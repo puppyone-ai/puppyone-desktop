@@ -59,9 +59,7 @@ export function EditorPaneShell({
     const host = paneRef.current;
     if (!host) return;
     const rect = host.getBoundingClientRect();
-    const next = isPointInPaneHandleRevealZone(rect, clientX, clientY);
-    if (next && !handleHotRef.current) paneMove.prepare(host, pane.id);
-    setHandleHotIfChanged(next);
+    setHandleHotIfChanged(isPointInPaneHandleRevealZone(rect, clientX, clientY));
   };
 
   const onPanePointerMove = (event: PointerEvent<HTMLElement>) => {
