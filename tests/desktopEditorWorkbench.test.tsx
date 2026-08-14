@@ -85,6 +85,7 @@ describe("useDesktopEditorWorkbench", () => {
       );
       await Promise.resolve();
     });
+    act(() => window.dispatchEvent(new Event("pagehide")));
 
     const storageKey = "puppyone.desktop.editor-workbench.v2:workspace-id:/workspace";
     const stored = JSON.parse(window.localStorage.getItem(storageKey) ?? "null");

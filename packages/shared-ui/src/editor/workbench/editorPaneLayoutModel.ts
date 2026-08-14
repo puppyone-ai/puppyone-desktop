@@ -29,8 +29,8 @@ export type EditorPaneLayoutState = Readonly<{
 }>;
 
 const DEFAULT_PANE_ID = "editor-pane-1";
-const MIN_SPLIT_RATIO = 0.15;
-const MAX_SPLIT_RATIO = 0.85;
+export const EDITOR_SPLIT_RATIO_MIN = 0.15;
+export const EDITOR_SPLIT_RATIO_MAX = 0.85;
 const MAX_LAYOUT_DEPTH = 12;
 
 export function createEditorPaneLayout(editorId: string | null = null): EditorPaneLayoutState {
@@ -150,7 +150,7 @@ export function updateEditorSplitRatio(
   splitId: string,
   ratio: number,
 ): EditorPaneLayoutState {
-  const nextRatio = clampRatio(ratio);
+  const nextRatio = clampEditorSplitRatio(ratio);
   let changed = false;
   const root = mapNodes(state.root, (node) => {
     if (node.kind !== "split" || node.id !== splitId || node.ratio === nextRatio) return node;
@@ -242,7 +242,7 @@ function parseNode(
     kind: "split",
     id: candidate.id,
     direction: candidate.direction,
-    ratio: clampRatio(typeof candidate.ratio === "number" ? candidate.ratio : 0.5),
+    ratio: clampEditorSplitRatio(typeof candidate.ratio === "number" ? candidate.ratio : 0.5),
     first,
     second,
   });
@@ -337,7 +337,10 @@ function freezeLayout(root: EditorPaneLayoutNode, activePaneId: string): EditorP
   return Object.freeze({ root, activePaneId });
 }
 
-function clampRatio(ratio: number): number {
+export function clampEditorSplitRatio(ratio: number): number {
   if (!Number.isFinite(ratio)) return 0.5;
-  return Math.min(MAX_SPLIT_RATIO, Math.max(MIN_SPLIT_RATIO, Math.round(ratio * 1_000) / 1_000));
+  return Math.min(
+    EDITOR_SPLIT_RATIO_MAX,
+    Math.max(EDITOR_SPLIT_RATIO_MIN, Math.round(ratio * 1_000) / 1_000),
+  );
 }

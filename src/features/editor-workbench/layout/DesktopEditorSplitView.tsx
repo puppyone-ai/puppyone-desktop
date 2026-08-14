@@ -1,13 +1,12 @@
 import {
   useEffect,
   useMemo,
-  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { useLocalization } from "@puppyone/localization";
 import {
+  getAiEditFileForPath,
   getEditorPanes,
   type AiEditRequest,
   type DataPort,
@@ -32,7 +31,9 @@ import {
   usePaneMoveDrag,
   type PaneMoveDragController,
 } from "../drag-and-drop/usePaneMoveDrag";
-import { EditorPaneDocument } from "./EditorPaneDocument";
+import { createEditorNodeIndex, type EditorNodeIndex } from "../runtime/editorNodeIndex";
+import { EditorPaneRuntime } from "../runtime/EditorPaneRuntime";
+import { EditorPaneShell } from "./EditorPaneShell";
 import { EditorSplitResizeHandle } from "./EditorSplitResizeHandle";
 
 export type DesktopEditorSplitViewProps = Readonly<{
@@ -86,6 +87,7 @@ export function DesktopEditorSplitView({
     [editorGroup.editors],
   );
   const panes = useMemo(() => getEditorPanes(layout), [layout]);
+  const editorNodeIndex = useMemo(() => createEditorNodeIndex(state.tree), [state.tree]);
   const paneCount = panes.length;
   const [openActionsPaneId, setOpenActionsPaneId] = useState<string | null>(null);
   const paneMove = usePaneMoveDrag(onMovePane);
@@ -111,6 +113,7 @@ export function DesktopEditorSplitView({
         aiEditRequest={aiEditRequest}
         dataPort={dataPort}
         editorById={editorById}
+        editorNodeIndex={editorNodeIndex}
         editorInteractionPreferences={editorInteractionPreferences}
         fileIconTheme={fileIconTheme}
         paneCount={paneCount}
@@ -135,6 +138,7 @@ export function DesktopEditorSplitView({
 type EditorLayoutNodeProps = Omit<DesktopEditorSplitViewProps, "editorGroup" | "layout"> & Readonly<{
   activePaneId: string;
   editorById: ReadonlyMap<string, EditorGroupState["editors"][number]>;
+  editorNodeIndex: EditorNodeIndex;
   node: EditorPaneLayoutNode;
   paneCount: number;
   fileDrop: EditorFileDropController;
@@ -154,9 +158,10 @@ function EditorSplit({
   split,
   ...props
 }: EditorLayoutNodeProps & { split: EditorPaneLayoutSplit }) {
-  const style = split.direction === "horizontal"
-    ? { gridTemplateColumns: `${split.ratio}fr var(--desktop-editor-divider-size) ${1 - split.ratio}fr` }
-    : { gridTemplateRows: `${split.ratio}fr var(--desktop-editor-divider-size) ${1 - split.ratio}fr` };
+  const style = {
+    "--desktop-editor-first-track": `${split.ratio}fr`,
+    "--desktop-editor-second-track": `${1 - split.ratio}fr`,
+  };
 
   return (
     <div
@@ -175,7 +180,7 @@ function EditorSplit({
         direction={split.direction}
         ratio={split.ratio}
         splitId={split.id}
-        onResize={props.onResizeSplit}
+        onCommit={props.onResizeSplit}
       />
       <EditorLayoutNode
         key={split.second.id}
@@ -192,6 +197,7 @@ function EditorPane({
   aiEditRequest,
   dataPort,
   editorById,
+  editorNodeIndex,
   editorInteractionPreferences,
   fileIconTheme,
   fileDrop,
@@ -207,125 +213,42 @@ function EditorPane({
   onFocusPane,
   onOpenActionsPaneChange,
 }: EditorLayoutNodeProps & { pane: EditorPaneLayoutLeaf }) {
-  const { t } = useLocalization();
-  const actionsRef = useRef<HTMLDivElement>(null);
   const active = pane.id === activePaneId;
   const actionsOpen = pane.id === openActionsPaneId;
   const editor = pane.editorId ? editorById.get(pane.editorId) ?? null : null;
-  const paneMoveEdge = paneMove.dropIntent?.targetPaneId === pane.id
-    ? paneMove.dropIntent.edge
-    : null;
-  const fileDropEdge = fileDrop.dropIntent?.targetPaneId === pane.id
-    ? fileDrop.dropIntent.edge
-    : null;
-  const dropEdge = fileDropEdge ?? paneMoveEdge;
-
-  useEffect(() => {
-    if (!actionsOpen) return undefined;
-    const close = (event: globalThis.PointerEvent) => {
-      if (!actionsRef.current?.contains(event.target as Node)) onOpenActionsPaneChange(null);
-    };
-    document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
-  }, [actionsOpen, onOpenActionsPaneChange]);
-
-  const activatePane = () => {
-    if (!active) onFocusPane(pane.id);
-  };
+  const treeNode = editor ? editorNodeIndex.get(editor.resource) ?? null : null;
 
   return (
-    <section
-      className="desktop-editor-pane"
-      data-editor-pane-id={pane.id}
-      data-active={active ? "true" : undefined}
-      data-empty={editor ? undefined : "true"}
-      data-drop-target={dropEdge ?? undefined}
-      data-drop-kind={fileDropEdge ? "file" : paneMoveEdge ? "pane" : undefined}
-      aria-label={editor
-        ? t("editor.panes.label", { name: editor.label })
-        : t("editor.panes.empty")}
-      onFocusCapture={activatePane}
-      onPointerUp={(event) => {
-        // Focusable editors activate through focus, after the browser has placed
-        // their caret. This pointer-up fallback covers non-focusable previews
-        // without changing workbench state during native selection handling.
-        if (event.button === 0) activatePane();
+    <EditorPaneShell
+      active={active}
+      actionsOpen={actionsOpen}
+      editorLabel={editor?.label ?? null}
+      fileDrop={fileDrop}
+      pane={pane}
+      paneCount={paneCount}
+      paneMove={paneMove}
+      onActionsPaneChange={onOpenActionsPaneChange}
+      onActivate={() => {
+        if (!active) onFocusPane(pane.id);
       }}
-      onDragEnterCapture={(event) => fileDrop.over(event, pane.id)}
-      onDragOverCapture={(event) => fileDrop.over(event, pane.id)}
-      onDragLeaveCapture={(event) => fileDrop.leave(event, pane.id)}
-      onDropCapture={(event) => fileDrop.drop(event, pane.id)}
+      onClose={() => onClosePane(pane.id)}
     >
-      {paneCount > 1 && <div className="desktop-editor-pane-handle-shell" ref={actionsRef}>
-        <button
-          className="desktop-editor-pane-handle"
-          type="button"
-          aria-label={t("editor.panes.dragToMove")}
-          aria-haspopup="menu"
-          aria-expanded={actionsOpen}
-          title={t("editor.panes.dragToMove")}
-          onClick={() => {
-            if (!paneMove.consumeDraggedClick()) {
-              onOpenActionsPaneChange(actionsOpen ? null : pane.id);
-            }
-          }}
-          onPointerDown={(event) => {
-            if (event.button !== 0) return;
-            paneMove.start(event, pane);
-          }}
-          onPointerMove={paneMove.move}
-          onPointerUp={paneMove.end}
-          onPointerCancel={paneMove.cancel}
-        >
-          <i /><i /><i />
-        </button>
-        {actionsOpen && (
-          <div className="desktop-editor-pane-menu" role="menu">
-            <PaneMenuAction
-              label={t("editor.panes.closePane")}
-              onClick={() => {
-                onClosePane(pane.id);
-                onOpenActionsPaneChange(null);
-              }}
-            />
-          </div>
-        )}
-      </div>}
-      <div className="desktop-editor-pane-content">
-        <EditorPaneDocument
-          active={active}
-          aiEditRequest={aiEditRequest}
-          dataPort={dataPort}
-          editor={editor}
-          editorInteractionPreferences={editorInteractionPreferences}
-          fileIconTheme={fileIconTheme}
-          refreshKey={refreshKey}
-          state={state}
-          viewerExtensionAdapter={viewerExtensionAdapter}
-          workspace={workspace}
-        />
-      </div>
-      {dropEdge && <div className="desktop-editor-drop-preview" data-edge={dropEdge} />}
-    </section>
-  );
-}
-
-function PaneMenuAction({
-  label,
-  onClick,
-}: Readonly<{
-  label: string;
-  onClick: () => void;
-}>) {
-  return (
-    <button
-      className="desktop-editor-pane-menu-action"
-      role="menuitem"
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-    >
-      {label}
-    </button>
+      <EditorPaneRuntime
+        active={active}
+        aiEditFile={getAiEditFileForPath(aiEditRequest, editor?.resource) ?? null}
+        dataPort={dataPort}
+        editor={editor}
+        editorInteractionPreferences={editorInteractionPreferences}
+        fileIconTheme={fileIconTheme}
+        markdownAssetUrlResolver={state.markdownAssetUrlResolver}
+        markdownLinkGraph={state.markdownLinkGraph}
+        refreshKey={refreshKey}
+        treeNode={treeNode}
+        viewerExtensionAdapter={viewerExtensionAdapter}
+        workspaceId={workspace.id}
+        workspaceRoot={workspace.path}
+        markdownDialect={workspace.markdownDialect}
+      />
+    </EditorPaneShell>
   );
 }

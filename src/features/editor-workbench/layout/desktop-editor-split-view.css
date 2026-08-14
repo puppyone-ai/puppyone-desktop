@@ -19,6 +19,20 @@
   overflow: hidden;
 }
 
+.desktop-editor-split[data-direction="horizontal"] {
+  grid-template-columns:
+    var(--desktop-editor-first-track)
+    var(--desktop-editor-divider-size)
+    var(--desktop-editor-second-track);
+}
+
+.desktop-editor-split[data-direction="vertical"] {
+  grid-template-rows:
+    var(--desktop-editor-first-track)
+    var(--desktop-editor-divider-size)
+    var(--desktop-editor-second-track);
+}
+
 .desktop-editor-split[data-touches-inline-start="true"] {
   overflow: visible;
 }

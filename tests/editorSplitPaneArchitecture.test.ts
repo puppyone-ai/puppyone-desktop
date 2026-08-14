@@ -14,6 +14,30 @@ const resizeSource = readFileSync(
   new URL("../src/features/editor-workbench/layout/EditorSplitResizeHandle.tsx", import.meta.url),
   "utf8",
 );
+const paneShellSource = readFileSync(
+  new URL("../src/features/editor-workbench/layout/EditorPaneShell.tsx", import.meta.url),
+  "utf8",
+);
+const paneRuntimeSource = readFileSync(
+  new URL("../src/features/editor-workbench/runtime/EditorPaneRuntime.tsx", import.meta.url),
+  "utf8",
+);
+const paneDocumentRuntimeSource = readFileSync(
+  new URL("../src/features/editor-workbench/runtime/EditorPaneDocumentRuntime.tsx", import.meta.url),
+  "utf8",
+);
+const paneSourceLifecycle = readFileSync(
+  new URL("../src/features/editor-workbench/runtime/useEditorPaneSource.ts", import.meta.url),
+  "utf8",
+);
+const resizeGestureSource = readFileSync(
+  new URL("../src/features/editor-workbench/interactions/useSplitResizeGesture.ts", import.meta.url),
+  "utf8",
+);
+const persistenceSource = readFileSync(
+  new URL("../src/features/editor-workbench/persistence/editorWorkbenchPersistence.ts", import.meta.url),
+  "utf8",
+);
 const paneMoveSource = readFileSync(
   new URL("../src/features/editor-workbench/drag-and-drop/usePaneMoveDrag.ts", import.meta.url),
   "utf8",
@@ -61,11 +85,11 @@ describe("editor split-pane architecture", () => {
     expect(surfaceSource).toContain('loadActiveFileSource={resolvedSurface.id !== "data"}');
     expect(splitSource).toContain('data-direction={split.direction}');
     expect(resizeSource).toContain('role="separator"');
-    expect(splitSource).toContain('className="desktop-editor-pane-handle"');
+    expect(paneShellSource).toContain('className="desktop-editor-pane-handle"');
     expect(splitSource).toContain("onOpenAtPaneEdge");
     expect(splitSource).toContain("onMovePane");
     expect(splitSource).not.toContain("onSplitPane");
-    expect(splitSource).toContain('className="desktop-editor-drop-preview"');
+    expect(paneShellSource).toContain('className="desktop-editor-drop-preview"');
     expect(dropGeometrySource).toContain("closestPaneDropEdge");
     expect(fileDropSource).toContain("parseExplorerReferenceDrag");
     expect(fileDropSource).toContain("onOpenAtPaneEdge");
@@ -75,9 +99,9 @@ describe("editor split-pane architecture", () => {
   it("fills the editor region and uses overlay handles with dedicated resize lanes", () => {
     expect(splitStyles).toContain("--desktop-editor-divider-size: var(--po-pane-resizer-line-size, 1px);");
     expect(splitStyles).toContain("--desktop-editor-resize-hit-size: var(--po-pane-resizer-hit-size, 8px);");
-    expect(splitSource).toContain("var(--desktop-editor-divider-size)");
+    expect(splitStyles).toContain("var(--desktop-editor-divider-size)");
     expect(splitStyles).toContain(".desktop-editor-splitter::before");
-    expect(resizeSource).toContain("const dividerSize");
+    expect(resizeGestureSource).toContain("const dividerSize");
     expect(splitStyles).toContain("flex: 1 1 0;");
     expect(splitStyles).toContain(".desktop-editor-pane-handle-shell");
     expect(splitStyles).toContain(".desktop-editor-drop-preview");
@@ -88,16 +112,40 @@ describe("editor split-pane architecture", () => {
 
   it("isolates editor focus, overlay, and drag gesture state by scope", () => {
     expect(splitSource).toContain("openActionsPaneId");
-    expect(splitSource).toContain("onFocusCapture={activatePane}");
-    expect(splitSource).toContain("onPointerUp={(event)");
-    expect(splitSource).not.toContain("onPointerDownCapture");
+    expect(paneShellSource).toContain("onFocusCapture={onActivate}");
+    expect(paneShellSource).toContain("onPointerUp={(event)");
+    expect(paneShellSource).not.toContain("onPointerDownCapture");
     expect(splitSource).toContain("key={split.first.id}");
     expect(splitSource).toContain("key={split.second.id}");
+    expect(splitSource).toContain("createEditorNodeIndex(state.tree)");
+    expect(splitSource).toContain("<EditorPaneRuntime");
+    expect(paneRuntimeSource).toContain("memo(function EditorPaneRuntime");
+    expect(paneRuntimeSource).toContain("<EditorPaneDocumentRuntime");
+    expect(paneDocumentRuntimeSource).toContain("memo(function EditorPaneDocumentRuntime");
+    expect(paneDocumentRuntimeSource).toContain("useEditorPaneSource(sourceNode");
+    expect(paneSourceLifecycle).toContain("new AbortController()");
     expect(paneMoveSource.indexOf('distance < PANE_MOVE_THRESHOLD_PX'))
       .toBeLessThan(paneMoveSource.indexOf('classList.add("desktop-editor-pane-dragging")'));
     expect(splitStyles).not.toContain(
       ".desktop-editor-pane-dragging .desktop-editor-pane-handle-shell",
     );
+  });
+
+  it("previews split resize outside React and commits durable metadata once", () => {
+    expect(splitSource).toContain('"--desktop-editor-first-track"');
+    expect(splitSource).toContain('"--desktop-editor-second-track"');
+    expect(resizeGestureSource).toContain("requestAnimationFrame");
+    expect(resizeGestureSource).toContain('finish("commit")');
+    expect(resizeGestureSource).toContain('finish("cancel")');
+    expect(resizeGestureSource).toContain("onCommit(splitId, session.previewRatio)");
+    expect(resizeSource).toContain("useSplitResizeGesture");
+  });
+
+  it("coalesces Workbench metadata persistence behind an explicit flush boundary", () => {
+    expect(persistenceSource).toContain("EDITOR_WORKBENCH_PERSISTENCE_DELAY_MS = 200");
+    expect(persistenceSource).toContain("class EditorWorkbenchPersistenceScheduler");
+    expect(persistenceSource).toContain("schedule(storageKey");
+    expect(persistenceSource).toContain("flush(): void");
   });
 
   it("joins root split dividers to the Editor-facing edge of the Sidebar gutter", () => {

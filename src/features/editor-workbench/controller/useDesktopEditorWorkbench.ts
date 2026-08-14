@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   activateEditor,
   activateEditorPane,
@@ -32,6 +32,7 @@ import {
   readStoredEditorWorkbench,
   type DesktopEditorWorkbenchState,
 } from "../persistence/editorWorkbenchStorage";
+import { EditorWorkbenchPersistenceScheduler } from "../persistence/editorWorkbenchPersistence";
 
 export type DesktopEditorWorkbenchController = Readonly<{
   state: EditorGroupState;
@@ -73,6 +74,11 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
     storageKey: string | null;
     workbench: DesktopEditorWorkbenchState;
   }>({ storageKey: null, workbench: EMPTY_EDITOR_WORKBENCH });
+  const persistenceRef = useRef<EditorWorkbenchPersistenceScheduler | null>(null);
+  persistenceRef.current ??= new EditorWorkbenchPersistenceScheduler(
+    window.localStorage,
+    window,
+  );
   const workbench = record.storageKey === storageKey ? record.workbench : EMPTY_EDITOR_WORKBENCH;
 
   useEffect(() => {
@@ -86,12 +92,17 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
 
   useEffect(() => {
     if (!storageKey || record.storageKey !== storageKey) return;
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(record.workbench));
-    } catch {
-      // Session restoration is best-effort and must never block editing.
-    }
+    persistenceRef.current?.schedule(storageKey, record.workbench);
   }, [record, storageKey]);
+
+  useEffect(() => {
+    const flush = () => persistenceRef.current?.flush();
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, []);
 
   const updateWorkbench = useCallback((
     update: (current: DesktopEditorWorkbenchState) => DesktopEditorWorkbenchState,

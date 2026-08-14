@@ -20,6 +20,7 @@ import {
   type EditorPaneLayoutState,
 } from "@puppyone/shared-ui";
 import { DesktopEditorSplitView } from "../src/features/editor-workbench/layout/DesktopEditorSplitView";
+import { DocumentSurfaceHost } from "../packages/shared-ui/src/editor/host/DocumentSurfaceHost";
 import { withTestLocalization } from "./testLocalization";
 
 let root: Root | null = null;
@@ -233,6 +234,19 @@ describe("DesktopEditorSplitView", () => {
     expect(Array.from(container.querySelectorAll<HTMLElement>(".cm-editor")).map(
       (element) => EditorView.findFromDOM(element),
     )).toEqual(views);
+
+    const surfaceRender = vi.spyOn(DocumentSurfaceHost.prototype, "render");
+    const activeHandle = container.querySelector<HTMLElement>(
+      '[data-editor-pane-id="editor-pane-2"] .desktop-editor-pane-handle',
+    )!;
+    installPointerCaptureStub(activeHandle);
+    clickPaneHandle(activeHandle, 31);
+    expect(surfaceRender).not.toHaveBeenCalled();
+
+    act(() => views[0]!.focus());
+    expect(container.querySelector('[data-editor-pane-id="editor-pane-1"]')?.dataset.active)
+      .toBe("true");
+    expect(surfaceRender).not.toHaveBeenCalled();
   });
 });
 
@@ -280,14 +294,14 @@ function createThreePaneWorkspace(extension = "md") {
   return { group, layout };
 }
 
-function installPointerCaptureStub(handle: HTMLButtonElement) {
+function installPointerCaptureStub(handle: HTMLElement) {
   const capturedPointers = new Set<number>();
   handle.setPointerCapture = (pointerId) => capturedPointers.add(pointerId);
   handle.hasPointerCapture = (pointerId) => capturedPointers.has(pointerId);
   handle.releasePointerCapture = (pointerId) => capturedPointers.delete(pointerId);
 }
 
-function clickPaneHandle(handle: HTMLButtonElement, pointerId: number) {
+function clickPaneHandle(handle: HTMLElement, pointerId: number) {
   act(() => {
     handle.dispatchEvent(new PointerEvent("pointerdown", {
       bubbles: true, button: 0, clientX: 100, clientY: 5, pointerId,
