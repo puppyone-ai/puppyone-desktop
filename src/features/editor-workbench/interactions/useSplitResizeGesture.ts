@@ -1,17 +1,30 @@
-import { useCallback, useEffect, useRef, type PointerEvent } from "react";
+import { useCallback, useRef, type PointerEvent } from "react";
 import {
   clampEditorSplitRatio,
   type EditorSplitDirection,
 } from "@puppyone/shared-ui";
-import { setNativeSurfacePointerPassthrough } from "../../native-surfaces";
+import {
+  acquireNativeSurfacePointerPassthroughLease,
+  createNativeSurfacePointerSessionId,
+  type NativeSurfacePointerPassthroughLease,
+} from "../../native-surfaces";
+import {
+  useInteractionTermination,
+  type InteractionTerminationReason,
+} from "./useInteractionTermination";
 
 type ResizeSession = {
   committedRatio: number;
   container: HTMLElement;
+  direction: EditorSplitDirection;
   frameId: number | null;
   handle: HTMLElement;
+  id: string;
+  nativeLease: NativeSurfacePointerPassthroughLease;
+  onCommit: SplitResizeGestureOptions["onCommit"];
   pointerId: number;
   previewRatio: number;
+  splitId: string;
 };
 
 export type SplitResizeGestureOptions = Readonly<{
@@ -46,48 +59,44 @@ export function useSplitResizeGesture({
     applyPreview(session, session.previewRatio);
   }, [applyPreview]);
 
-  const finish = useCallback((mode: "commit" | "cancel") => {
+  const finish = useCallback((mode: "commit" | "cancel"): boolean => {
     const session = sessionRef.current;
-    if (!session) return;
+    if (!session) return false;
     flushPreview(session);
     sessionRef.current = null;
     delete session.handle.dataset.resizing;
-    setNativeSurfacePointerPassthrough(false);
-    if (mode === "cancel") {
-      applyPreview(session, session.committedRatio);
-      return;
-    }
-    if (session.previewRatio !== session.committedRatio) {
-      onCommit(splitId, session.previewRatio);
-    }
-  }, [applyPreview, flushPreview, onCommit, splitId]);
-
-  useEffect(() => {
-    const cancelOnEscape = (event: globalThis.KeyboardEvent) => {
-      const session = sessionRef.current;
-      if (event.key !== "Escape" || !session) return;
-      event.preventDefault();
-      event.stopPropagation();
-      finish("cancel");
+    session.nativeLease.release();
+    try {
       if (session.handle.hasPointerCapture(session.pointerId)) {
         session.handle.releasePointerCapture(session.pointerId);
       }
-    };
-    window.addEventListener("keydown", cancelOnEscape, true);
-    return () => {
-      window.removeEventListener("keydown", cancelOnEscape, true);
-      finish("cancel");
-    };
-  }, [finish]);
+    } catch {
+      // Pointer capture may already have been released by the browser.
+    }
+    if (mode === "cancel") {
+      applyPreview(session, session.committedRatio);
+      return true;
+    }
+    if (session.previewRatio !== session.committedRatio) {
+      session.onCommit(session.splitId, session.previewRatio);
+    }
+    return true;
+  }, [applyPreview, flushPreview]);
+
+  const finishFromLifecycle = useCallback((
+    _reason: InteractionTerminationReason,
+  ) => finish("cancel"), [finish]);
+
+  useInteractionTermination({ finish: finishFromLifecycle });
 
   const previewFromPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const session = sessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
     const containerRect = session.container.getBoundingClientRect();
     const dividerRect = session.handle.getBoundingClientRect();
-    const total = direction === "horizontal" ? containerRect.width : containerRect.height;
-    const dividerSize = direction === "horizontal" ? dividerRect.width : dividerRect.height;
-    const offset = direction === "horizontal"
+    const total = session.direction === "horizontal" ? containerRect.width : containerRect.height;
+    const dividerSize = session.direction === "horizontal" ? dividerRect.width : dividerRect.height;
+    const offset = session.direction === "horizontal"
       ? event.clientX - containerRect.left
       : event.clientY - containerRect.top;
     session.previewRatio = clampEditorSplitRatio(
@@ -103,7 +112,7 @@ export function useSplitResizeGesture({
       session.frameId = null;
       if (sessionRef.current === session) applyPreview(session, session.previewRatio);
     });
-  }, [applyPreview, direction]);
+  }, [applyPreview]);
 
   const start = useCallback((event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -112,19 +121,29 @@ export function useSplitResizeGesture({
     const container = event.currentTarget.parentElement;
     if (!container) return;
     const committedRatio = clampEditorSplitRatio(ratio);
+    const id = createNativeSurfacePointerSessionId("editor-split-resize");
     sessionRef.current = {
       committedRatio,
       container,
+      direction,
       frameId: null,
       handle: event.currentTarget,
+      id,
+      nativeLease: acquireNativeSurfacePointerPassthroughLease("editor-split-resize", id),
+      onCommit,
       pointerId: event.pointerId,
       previewRatio: committedRatio,
+      splitId,
     };
-    setNativeSurfacePointerPassthrough(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      finish("cancel");
+      return;
+    }
     event.currentTarget.dataset.resizing = "true";
     previewFromPointer(event);
-  }, [finish, previewFromPointer, ratio]);
+  }, [direction, finish, onCommit, previewFromPointer, ratio, splitId]);
 
   const move = useCallback((event: PointerEvent<HTMLDivElement>) => {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) previewFromPointer(event);
@@ -146,7 +165,7 @@ export function useSplitResizeGesture({
     finish("cancel");
   }, [finish]);
 
-  const lostCapture = useCallback(() => finish("commit"), [finish]);
+  const lostCapture = useCallback(() => finish("cancel"), [finish]);
 
   return { start, move, end, cancel, lostCapture } as const;
 }

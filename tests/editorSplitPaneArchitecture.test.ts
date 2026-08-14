@@ -137,7 +137,9 @@ describe("editor split-pane architecture", () => {
     expect(resizeGestureSource).toContain("requestAnimationFrame");
     expect(resizeGestureSource).toContain('finish("commit")');
     expect(resizeGestureSource).toContain('finish("cancel")');
-    expect(resizeGestureSource).toContain("onCommit(splitId, session.previewRatio)");
+    expect(resizeGestureSource).toContain(
+      "session.onCommit(session.splitId, session.previewRatio)",
+    );
     expect(resizeSource).toContain("useSplitResizeGesture");
   });
 

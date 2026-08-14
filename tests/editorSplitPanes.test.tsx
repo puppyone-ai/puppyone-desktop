@@ -78,6 +78,31 @@ describe("DesktopEditorSplitView", () => {
     expect(pane.dataset.dropTarget).toBeUndefined();
   });
 
+  it("clears an Explorer split preview when the window loses the drag session", () => {
+    const group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("a.md"));
+    const container = renderSplitView(group, createEditorPaneLayout("a.md"));
+    const pane = container.querySelector<HTMLElement>(".desktop-editor-pane")!;
+    pane.getBoundingClientRect = () => new DOMRect(0, 0, 800, 600);
+    const transfer = new DataTransfer();
+    transfer.setData(
+      EXPLORER_REFERENCE_DRAG_TYPE,
+      serializeExplorerReferenceDrag("workspace", [{
+        id: "b.md",
+        name: "b.md",
+        path: "b.md",
+        type: "file",
+        source: "local",
+      }]),
+    );
+
+    act(() => pane.dispatchEvent(dragEvent("dragover", transfer, 790, 300)));
+    expect(pane.dataset.dropTarget).toBe("right");
+
+    act(() => window.dispatchEvent(new Event("blur")));
+    expect(pane.dataset.dropTarget).toBeUndefined();
+    expect(container.querySelector(".desktop-editor-drop-preview")).toBeNull();
+  });
+
   it("uses the grab handle only to move an existing pane", () => {
     const onMovePane = vi.fn();
     let group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("a.md"));
@@ -116,6 +141,37 @@ describe("DesktopEditorSplitView", () => {
       "second",
     );
     expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(false);
+  });
+
+  it("cancels pane movement when pointer capture is lost", () => {
+    const onMovePane = vi.fn();
+    let group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("a.md"));
+    group = openEditor(group, createEditorInput("b.md"));
+    let layout = splitEditorPane(createEditorPaneLayout("a.md"), "editor-pane-1", "horizontal");
+    layout = assignEditorToActivePane(layout, "b.md");
+    const container = renderSplitView(group, layout, { onMovePane });
+    const panes = container.querySelectorAll<HTMLElement>(".desktop-editor-pane");
+    const handle = panes[0]!.querySelector<HTMLButtonElement>(".desktop-editor-pane-handle")!;
+    installPointerCaptureStub(handle);
+    panes[1]!.getBoundingClientRect = () => new DOMRect(400, 0, 400, 600);
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(panes[1]!);
+
+    act(() => {
+      handle.dispatchEvent(new PointerEvent("pointerdown", {
+        bubbles: true, button: 0, clientX: 200, clientY: 5, pointerId: 17,
+      }));
+      handle.dispatchEvent(new PointerEvent("pointermove", {
+        bubbles: true, clientX: 790, clientY: 300, pointerId: 17,
+      }));
+    });
+    expect(panes[1]!.dataset.dropTarget).toBe("right");
+
+    act(() => handle.dispatchEvent(new PointerEvent("lostpointercapture", {
+      bubbles: true, pointerId: 17,
+    })));
+    expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(false);
+    expect(panes[1]!.dataset.dropTarget).toBeUndefined();
+    expect(onMovePane).not.toHaveBeenCalled();
   });
 
   it("keeps pane menus exclusive without entering global drag state on click", () => {

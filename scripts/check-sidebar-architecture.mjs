@@ -165,7 +165,13 @@ for (const [label, source] of [
 if (!paneResizeDragSource.includes("onDragActiveChange?.(true)") || !paneResizeDragSource.includes("onDragActiveChange?.(false)")) {
   errors.push("Pane resize drags must publish their complete host-neutral activity lifecycle.");
 }
-if (!desktopDataWorkspaceSource.includes("onExplorerResizeActiveChange={setNativeSurfacePointerPassthrough}")) {
+if (
+  !desktopDataWorkspaceSource.includes("useNativeSurfacePointerPassthroughActivity(")
+  || !desktopDataWorkspaceSource.includes('"explorer-resize"')
+  || !desktopDataWorkspaceSource.includes(
+    "onExplorerResizeActiveChange={onExplorerResizeActiveChange}",
+  )
+) {
   errors.push("Desktop explorer resize must opt into native-surface pointer passthrough.");
 }
 const shellSource = read(absolute("src/components/DesktopCloudShell.tsx"));

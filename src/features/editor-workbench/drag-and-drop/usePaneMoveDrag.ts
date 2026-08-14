@@ -1,6 +1,5 @@
 import {
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -11,7 +10,15 @@ import type {
   EditorPaneSplitOptions,
   EditorSplitDirection,
 } from "@puppyone/shared-ui";
-import { setNativeSurfacePointerPassthrough } from "../../native-surfaces";
+import {
+  acquireNativeSurfacePointerPassthroughLease,
+  createNativeSurfacePointerSessionId,
+  type NativeSurfacePointerPassthroughLease,
+} from "../../native-surfaces";
+import {
+  useInteractionTermination,
+  type InteractionTerminationReason,
+} from "../interactions/useInteractionTermination";
 import {
   closestPaneDropEdge,
   paneSplitDefinition,
@@ -32,6 +39,7 @@ export type PaneMoveDragController = Readonly<{
   move: (event: PointerEvent<HTMLButtonElement>) => void;
   end: (event: PointerEvent<HTMLButtonElement>) => void;
   cancel: (event: PointerEvent<HTMLButtonElement>) => void;
+  lostCapture: (event: PointerEvent<HTMLButtonElement>) => void;
   consumeDraggedClick: () => boolean;
 }>;
 
@@ -42,7 +50,16 @@ type PaneMoveSession = {
   originY: number;
   pointerId: number;
   dragging: boolean;
+  id: string;
+  nativeLease: NativeSurfacePointerPassthroughLease | null;
+  onMovePane: EditorPaneMoveHandler;
 };
+
+type PaneMoveFinishReason = InteractionTerminationReason
+  | "lostpointercapture"
+  | "pointercancel"
+  | "pointerup"
+  | "restart";
 
 const PANE_MOVE_THRESHOLD_PX = 5;
 
@@ -58,48 +75,62 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
     setDropIntent(intent);
   }, []);
 
-  const finishGesture = useCallback(() => {
+  const finishGesture = useCallback((
+    reason: PaneMoveFinishReason,
+    expectedSessionId?: string,
+  ): boolean => {
     const session = sessionRef.current;
-    if (!session) return;
-    if (session.handle.hasPointerCapture(session.pointerId)) {
-      session.handle.releasePointerCapture(session.pointerId);
-    }
+    if (!session || (expectedSessionId && session.id !== expectedSessionId)) return false;
     sessionRef.current = null;
-    setDragging(false);
-    publishDropIntent(null);
+    if (reason !== "unmount") {
+      setDragging(false);
+      publishDropIntent(null);
+    } else {
+      dropIntentRef.current = null;
+    }
     document.body.classList.remove("desktop-editor-pane-dragging");
-    setNativeSurfacePointerPassthrough(false);
+    session.nativeLease?.release();
+    try {
+      if (session.handle.hasPointerCapture(session.pointerId)) {
+        session.handle.releasePointerCapture(session.pointerId);
+      }
+    } catch {
+      // Pointer capture may already have been released by the browser.
+    }
+    return true;
   }, [publishDropIntent]);
 
-  useEffect(() => {
-    const cancelOnEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape" || !sessionRef.current) return;
-      draggedClickRef.current = sessionRef.current.dragging;
-      finishGesture();
-    };
-    window.addEventListener("keydown", cancelOnEscape, true);
-    return () => {
-      window.removeEventListener("keydown", cancelOnEscape, true);
-      finishGesture();
-    };
+  const finishFromLifecycle = useCallback((reason: InteractionTerminationReason): boolean => {
+    if (sessionRef.current?.dragging) draggedClickRef.current = true;
+    return finishGesture(reason);
   }, [finishGesture]);
+
+  useInteractionTermination({ finish: finishFromLifecycle });
 
   const start = useCallback((
     event: PointerEvent<HTMLButtonElement>,
     pane: EditorPaneLayoutLeaf,
   ) => {
-    if (sessionRef.current) finishGesture();
+    if (sessionRef.current) finishGesture("restart");
     draggedClickRef.current = false;
+    const id = createNativeSurfacePointerSessionId("editor-pane-move");
     sessionRef.current = {
       handle: event.currentTarget,
+      id,
       sourcePaneId: pane.id,
       originX: event.clientX,
       originY: event.clientY,
       pointerId: event.pointerId,
       dragging: false,
+      nativeLease: null,
+      onMovePane,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }, [finishGesture]);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      finishGesture("pointercancel", id);
+    }
+  }, [finishGesture, onMovePane]);
 
   const move = useCallback((event: PointerEvent<HTMLButtonElement>) => {
     const session = sessionRef.current;
@@ -114,7 +145,10 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
       draggedClickRef.current = true;
       setDragging(true);
       document.body.classList.add("desktop-editor-pane-dragging");
-      setNativeSurfacePointerPassthrough(true);
+      session.nativeLease = acquireNativeSurfacePointerPassthroughLease(
+        "editor-pane-move",
+        session.id,
+      );
     }
     const element = document.elementFromPoint?.(event.clientX, event.clientY);
     const target = element?.closest<HTMLElement>("[data-editor-pane-id]");
@@ -131,22 +165,27 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
   const end = useCallback((event: PointerEvent<HTMLButtonElement>) => {
     const session = sessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
     const intent = dropIntentRef.current;
-    if (session.dragging && intent) {
+    const shouldMove = session.dragging && Boolean(intent);
+    finishGesture("pointerup", session.id);
+    if (shouldMove && intent) {
       const { direction, placement } = paneSplitDefinition(intent.edge);
-      onMovePane(session.sourcePaneId, intent.targetPaneId, direction, placement);
+      session.onMovePane(session.sourcePaneId, intent.targetPaneId, direction, placement);
     }
-    finishGesture();
-  }, [finishGesture, onMovePane]);
+  }, [finishGesture]);
 
   const cancel = useCallback((event: PointerEvent<HTMLButtonElement>) => {
     const session = sessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
     draggedClickRef.current = session.dragging;
-    finishGesture();
+    finishGesture("pointercancel", session.id);
+  }, [finishGesture]);
+
+  const lostCapture = useCallback((event: PointerEvent<HTMLButtonElement>) => {
+    const session = sessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    draggedClickRef.current = session.dragging;
+    finishGesture("lostpointercapture", session.id);
   }, [finishGesture]);
 
   const consumeDraggedClick = useCallback(() => {
@@ -162,6 +201,7 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
     move,
     end,
     cancel,
+    lostCapture,
     consumeDraggedClick,
-  }), [cancel, consumeDraggedClick, dragging, dropIntent, end, move, start]);
+  }), [cancel, consumeDraggedClick, dragging, dropIntent, end, lostCapture, move, start]);
 }

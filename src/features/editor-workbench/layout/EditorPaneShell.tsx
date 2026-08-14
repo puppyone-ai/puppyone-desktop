@@ -93,6 +93,7 @@ export function EditorPaneShell({
             onPointerMove={paneMove.move}
             onPointerUp={paneMove.end}
             onPointerCancel={paneMove.cancel}
+            onLostPointerCapture={paneMove.lostCapture}
           >
             <i /><i /><i />
           </button>

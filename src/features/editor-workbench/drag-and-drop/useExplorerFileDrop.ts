@@ -12,7 +12,15 @@ import {
   type EditorPaneSplitOptions,
   type EditorSplitDirection,
 } from "@puppyone/shared-ui";
-import { setNativeSurfacePointerPassthrough } from "../../native-surfaces";
+import {
+  acquireNativeSurfacePointerPassthroughLease,
+  createNativeSurfacePointerSessionId,
+  type NativeSurfacePointerPassthroughLease,
+} from "../../native-surfaces";
+import {
+  useInteractionTermination,
+  type InteractionTerminationReason,
+} from "../interactions/useInteractionTermination";
 import {
   closestPaneDropEdge,
   paneSplitDefinition,
@@ -34,64 +42,83 @@ export type EditorFileDropController = Readonly<{
   drop: (event: DragEvent<HTMLElement>, paneId: string) => void;
 }>;
 
+type ExplorerFileDropSession = Readonly<{
+  id: string;
+  nativeLease: NativeSurfacePointerPassthroughLease;
+}>;
+
+type ExplorerFileDropPreview = Readonly<{
+  intent: PaneDropIntent;
+  sessionId: string;
+}>;
+
 export function useExplorerFileDrop(
   workspaceId: string,
   onOpenAtPaneEdge: EditorFileDropHandler,
 ): EditorFileDropController {
-  const [dropIntent, setDropIntent] = useState<PaneDropIntent | null>(null);
-  const nativePassthroughRef = useRef(false);
+  const [preview, setPreview] = useState<ExplorerFileDropPreview | null>(null);
+  const sessionRef = useRef<ExplorerFileDropSession | null>(null);
 
-  const beginNativePassthrough = useCallback(() => {
-    if (nativePassthroughRef.current) return;
-    nativePassthroughRef.current = true;
-    setNativeSurfacePointerPassthrough(true);
+  const beginFileDrag = useCallback((): ExplorerFileDropSession => {
+    const current = sessionRef.current;
+    if (current) return current;
+    const id = createNativeSurfacePointerSessionId("explorer-file-drop");
+    const session = {
+      id,
+      nativeLease: acquireNativeSurfacePointerPassthroughLease("explorer-file-drop", id),
+    };
+    sessionRef.current = session;
+    return session;
   }, []);
-  const finishFileDrag = useCallback(() => {
-    setDropIntent(null);
-    if (!nativePassthroughRef.current) return;
-    nativePassthroughRef.current = false;
-    setNativeSurfacePointerPassthrough(false);
+
+  const finishFileDrag = useCallback((reason: InteractionTerminationReason): boolean => {
+    const session = sessionRef.current;
+    if (!session) return false;
+    sessionRef.current = null;
+    session.nativeLease.release();
+    if (reason !== "unmount") {
+      setPreview((current) => current?.sessionId === session.id ? null : current);
+    }
+    return true;
   }, []);
+
+  useInteractionTermination({
+    finish: finishFileDrag,
+    includeHtmlDragEvents: true,
+  });
 
   useEffect(() => {
     const start = (event: globalThis.DragEvent) => {
-      if (hasExplorerFileDrag(event.dataTransfer)) beginNativePassthrough();
+      if (hasExplorerFileDrag(event.dataTransfer)) beginFileDrag();
     };
-    const cancelOnEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") finishFileDrag();
-    };
-    window.addEventListener("dragstart", start);
-    window.addEventListener("dragend", finishFileDrag);
-    window.addEventListener("drop", finishFileDrag);
-    window.addEventListener("keydown", cancelOnEscape, true);
+    window.addEventListener("dragstart", start, true);
     return () => {
-      window.removeEventListener("dragstart", start);
-      window.removeEventListener("dragend", finishFileDrag);
-      window.removeEventListener("drop", finishFileDrag);
-      window.removeEventListener("keydown", cancelOnEscape, true);
-      finishFileDrag();
+      window.removeEventListener("dragstart", start, true);
     };
-  }, [beginNativePassthrough, finishFileDrag]);
+  }, [beginFileDrag]);
 
   const over = useCallback((event: DragEvent<HTMLElement>, paneId: string) => {
     if (!hasExplorerFileDrag(event.dataTransfer)) return;
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = "copy";
-    beginNativePassthrough();
-    setDropIntent({
-      targetPaneId: paneId,
-      edge: closestPaneDropEdge(
-        event.currentTarget.getBoundingClientRect(),
-        event.clientX,
-        event.clientY,
-      ),
+    const session = beginFileDrag();
+    setPreview({
+      sessionId: session.id,
+      intent: {
+        targetPaneId: paneId,
+        edge: closestPaneDropEdge(
+          event.currentTarget.getBoundingClientRect(),
+          event.clientX,
+          event.clientY,
+        ),
+      },
     });
-  }, [beginNativePassthrough]);
+  }, [beginFileDrag]);
 
   const leave = useCallback((event: DragEvent<HTMLElement>, paneId: string) => {
     if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
-    setDropIntent((current) => current?.targetPaneId === paneId ? null : current);
+    setPreview((current) => current?.intent.targetPaneId === paneId ? null : current);
   }, []);
 
   const drop = useCallback((event: DragEvent<HTMLElement>, paneId: string) => {
@@ -109,12 +136,13 @@ export function useExplorerFileDrop(
       event.clientX,
       event.clientY,
     );
-    finishFileDrag();
+    finishFileDrag("drop");
     if (!entry || entry.entryType !== "file") return;
     const { direction, placement } = paneSplitDefinition(edge);
     onOpenAtPaneEdge(entry.path, entry.name, paneId, direction, placement);
   }, [finishFileDrag, onOpenAtPaneEdge, workspaceId]);
 
+  const dropIntent = preview?.intent ?? null;
   return useMemo(() => ({ dropIntent, over, leave, drop }), [drop, dropIntent, leave, over]);
 }
 

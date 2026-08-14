@@ -31,7 +31,7 @@ import {
 } from "./navigation";
 import { WorkspaceSurfaceOutlet, type ResolvedWorkspaceSurface } from "./workspace-surfaces";
 import type { DesktopView } from "../../components/DesktopCloudShell";
-import { setNativeSurfacePointerPassthrough } from "../native-surfaces";
+import { useNativeSurfacePointerPassthroughActivity } from "../native-surfaces";
 import { DesktopEditorSplitView } from "../editor-workbench/layout/DesktopEditorSplitView";
 import type { DesktopEditorWorkbenchController } from "../editor-workbench/controller/useDesktopEditorWorkbench";
 
@@ -103,6 +103,9 @@ export function DesktopDataWorkspaceSurface({
   workspaceSurfaceError,
   sidebarCreateMenuOpen,
 }: DesktopDataWorkspaceSurfaceProps) {
+  const onExplorerResizeActiveChange = useNativeSurfacePointerPassthroughActivity(
+    "explorer-resize",
+  );
   const { t } = useLocalization();
   const paneLayout = useDesktopPaneLayout();
   const resolvedExplorerWidth = paneLayout?.explorer.width ?? preferences.explorerWidth;
@@ -166,7 +169,7 @@ export function DesktopDataWorkspaceSurface({
         explorerCollapseThreshold={EXPLORER_COLLAPSE_THRESHOLD}
         onExplorerCollapsedChange={preferences.setSidebarCollapsed}
         onExplorerWidthChange={preferences.setExplorerWidth}
-        onExplorerResizeActiveChange={setNativeSurfacePointerPassthrough}
+        onExplorerResizeActiveChange={onExplorerResizeActiveChange}
         showHeader={false}
         showExplorerRoot={false}
         onExplorerRootContextMenu={(_state, event) => {

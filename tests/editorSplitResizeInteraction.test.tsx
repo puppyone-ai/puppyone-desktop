@@ -65,6 +65,26 @@ describe("EditorSplitResizeHandle", () => {
     expect(handle.getAttribute("aria-valuenow")).toBe("50");
   });
 
+  it("cancels a resize preview when the window loses the session", () => {
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(performance.now());
+      return 1;
+    });
+    const onCommit = vi.fn();
+    const { container, handle } = renderResizeHandle(onCommit);
+    installResizeGeometry(container, handle);
+    installPointerCapture(handle);
+
+    act(() => {
+      handle.dispatchEvent(pointerEvent("pointerdown", 650, 19));
+      window.dispatchEvent(new Event("blur"));
+    });
+
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(container.style.getPropertyValue("--desktop-editor-first-track")).toBe("0.5fr");
+    expect(handle.dataset.resizing).toBeUndefined();
+  });
+
   it("keeps keyboard and equalize operations as immediate single commits", () => {
     const onCommit = vi.fn();
     const { handle } = renderResizeHandle(onCommit, 0.6);
