@@ -88,10 +88,15 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--po-border);
+  color: color-mix(in srgb, var(--po-text-muted) 84%, transparent);
   outline: 0;
   cursor: grab;
   touch-action: none;
+}
+
+.desktop-editor-pane-handle:hover,
+.desktop-editor-pane-handle:focus-visible {
+  color: var(--po-text-muted);
 }
 
 .desktop-editor-pane-handle > i {
@@ -99,9 +104,7 @@
   width: 3px;
   height: 3px;
   border-radius: 50%;
-  background:
-    linear-gradient(var(--po-border), var(--po-border)),
-    var(--po-canvas);
+  background: currentColor;
 }
 
 .desktop-editor-pane-dragging,
