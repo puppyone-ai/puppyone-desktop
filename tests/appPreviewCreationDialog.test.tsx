@@ -45,6 +45,7 @@ describe("Create entry dialog", () => {
   it.each([
     ["markdown", "Untitled.md", "Create Markdown file", "Markdown file name"],
     ["csv", "Untitled.csv", "Create CSV file", "CSV file name"],
+    ["html", "Untitled.html", "Create HTML file", "HTML file name"],
     ["folder", "Untitled folder", "Create folder", "Folder name"],
   ] as const)("keeps the %s creation form concise", (selectedKind, name, title, accessibleName) => {
     const container = render(
@@ -62,6 +63,22 @@ describe("Create entry dialog", () => {
     expect(container.querySelector(".desktop-dialog-field > span")).toBeNull();
     expect(container.querySelectorAll("input")).toHaveLength(1);
     expect(container.querySelector("input")?.getAttribute("aria-label")).toBe(accessibleName);
+  });
+
+  it("shows the single built-in Slides template without exposing generic template plumbing", () => {
+    const container = render(
+      <DesktopCreateEntryDialog
+        draft={createDraft({ selectedKind: "slides", name: "Untitled Slides" })}
+        onChange={vi.fn()}
+        onCancel={vi.fn()}
+        onCreate={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelectorAll("input")).toHaveLength(1);
+    expect(container.querySelector(".desktop-slides-template")?.textContent)
+      .toContain("PuppyOne Starter");
+    expect(container.textContent).not.toContain("Browse templates");
   });
 });
 

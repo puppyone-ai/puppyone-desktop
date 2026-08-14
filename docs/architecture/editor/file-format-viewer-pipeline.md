@@ -47,7 +47,7 @@ presetViewerManifest.json ──► capability/source/runtime│
                          DataWorkspace acquires declared content/resource source
                                                        │
                                                        ▼
- FilePreview ──► EditorHost ──► PuppyoneEditorHost ──► PresetViewerRenderer
+ FilePreview ──► DataNodeEditorHost ──► EditorDocumentHost ──► PresetViewerRenderer
                                                        │
                                           eager render() / lazy load()
 ```
@@ -91,7 +91,7 @@ formats; that distinction is a *viewer capability*, handled in stage 2/3.
 
 ## 3. Stage 2 — the viewer registry
 
-`packages/shared-ui/src/editor/presetViewerManifest.json` is the serializable
+`packages/shared-ui/src/editor/registry/presetViewerManifest.json` is the serializable
 single source of truth for a preset viewer's stable id, aliases used by
 `FileFormat.defaultViewer`, core capability, source requirement, and runtime
 boundary. Both shared-ui and Electron main parse this exact file strictly.
@@ -99,7 +99,7 @@ Unknown fields, duplicate ids/aliases, invalid capability/source combinations,
 an undeclared format viewer id, or anything other than one `placeholder` +
 `none` fallback fail at startup/test time.
 
-`packages/shared-ui/src/editor/viewerRegistry.tsx` owns the immutable
+`packages/shared-ui/src/editor/registry/viewerRegistry.tsx` owns the immutable
 `PRESET_VIEWER_REGISTRY`. Each implementation supplies only its canonical id,
 format-aware `match`, optional normalization/editability, and one executable
 render boundary. `definePresetViewer()` joins that implementation to the
@@ -157,8 +157,8 @@ file and loads only what the viewer needs:
   enforcing its 25 MiB cap even when `Content-Length` is absent or
   inaccurate.
 
-The render chain is `FilePreview` → `EditorHost` (adapts a `DataNode` +
-loaded content into an `EditorDocument`) → `PuppyoneEditorHost` (resolves
+The render chain is `FilePreview` → `DataNodeEditorHost` (adapts a `DataNode` +
+loaded content into an `EditorDocument`) → `EditorDocumentHost` (resolves
 the viewer and computes editability) → `PresetViewerRenderer`. Leaf Viewer
 components receive format-specific `Pick`-based prop contracts instead of
 depending on external extension authority. The optional
@@ -377,14 +377,20 @@ source-code extensions)
 
 **PDF** (`.pdf`)
 
-- Bar: Chromium's built-in PDF viewer in an iframe; local files are
-  re-wrapped as blob URLs (the custom protocol cannot feed the PDF
-  plugin directly); loading/error states per the cross-cutting bar.
-- Status: met.
+- Bar: PDF.js renders authorized resource bytes into editor-owned canvases;
+  the Viewer is activated in a visible layout slot and reports ready only
+  after the first page's render promise completes. Remaining pages render
+  near the scroll viewport, and resize is driven by the editor container.
+  The Chromium PDF extension/plugin and blob-iframe path are not part of the
+  product contract.
+- Security: use the current patched PDF.js production dependency and keep the
+  production dependency audit clean before release.
+- Status: met, including real Electron switch/first-frame/resize smoke coverage.
 
 **Audio / Video** (registry audio/video families)
 
-- Bar: native `<audio>`/`<video>` elements with `preload="metadata"`;
+- Bar: native `<audio>` uses metadata readiness; `<video>` waits for decoded
+  data plus `requestVideoFrameCallback` (with an animation-frame fallback);
   codec coverage is whatever Chromium decodes — formats it cannot play
   fall back to the media element's error state; seeking/scrubbing must
   work for large local files, which requires the `puppyone-local://`
@@ -563,7 +569,7 @@ source-code extensions)
   last by construction.
 - Preset render context never contains external Viewer Pack snapshots, session
   creation, or surface authority. Those capabilities enter only through the
-  optional `ViewerExtensionHostAdapter` owned by `PuppyoneEditorHost`.
+  optional `ViewerExtensionHostAdapter` owned by `EditorDocumentHost`.
 - A viewer's `source` declaration is honored: `resource` viewers must
   never trigger a text read (binary files through the text path would be
   wasted I/O and a 1 MB cap they shouldn't inherit).

@@ -33,30 +33,45 @@ describe("native window layout IPC", () => {
     expect(handler(createEvent(), { width: 888 })).toEqual({ applied: false });
     expect(ownerWindow.setMinimumSize).not.toHaveBeenCalled();
   });
+
+  it("reports the native full-screen state for adaptive window chrome", () => {
+    const ownerWindow = createWindow({ fullScreen: true });
+    const handlers = registerHandlers(ownerWindow);
+
+    expect(handlers.get("window-layout:get-chrome-state")(createEvent())).toEqual({
+      fullScreen: true,
+    });
+  });
 });
 
 function register(ownerWindow) {
-  let handler;
+  const handlers = registerHandlers(ownerWindow);
+  const handler = handlers.get("window-layout:set-minimum-width");
+  if (!handler) throw new Error("Window layout IPC handler was not registered.");
+  return handler;
+}
+
+function registerHandlers(ownerWindow) {
+  const handlers = new Map();
   registerWindowLayoutIpcHandlers({
     ipcMain: {
       handle: (channel, listener) => {
-        expect(channel).toBe("window-layout:set-minimum-width");
-        handler = listener;
+        handlers.set(channel, listener);
       },
     },
     BrowserWindow: {
       fromWebContents: () => ownerWindow,
     },
   });
-  if (!handler) throw new Error("Window layout IPC handler was not registered.");
-  return handler;
+  return handlers;
 }
 
-function createWindow({ destroyed = false, width = 900 } = {}) {
+function createWindow({ destroyed = false, fullScreen = false, width = 900 } = {}) {
   return {
     getMinimumSize: vi.fn(() => [640, 640]),
     getSize: vi.fn(() => [width, 840]),
     isDestroyed: vi.fn(() => destroyed),
+    isFullScreen: vi.fn(() => fullScreen),
     setMinimumSize: vi.fn(),
     setSize: vi.fn(),
   };

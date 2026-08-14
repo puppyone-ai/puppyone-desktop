@@ -4,6 +4,7 @@ import {
   installWindowNavigationSecurity,
   isPotentiallyExecutableFile,
   requireSafeExternalUrl,
+  shouldBlockEmbeddedFrameNavigation,
 } from "../electron/main/security.mjs";
 
 describe("desktop window navigation security", () => {
@@ -79,6 +80,41 @@ describe("desktop window navigation security", () => {
     expect(windowOpenHandler({ url: applicationUrl })).toEqual({ action: "deny" });
     expect(windowOpenHandler({ url: "file:///tmp/untrusted.html" })).toEqual({ action: "deny" });
     expect(shell.openExternal).toHaveBeenCalledTimes(3);
+
+    const embeddedApplicationEvent = {
+      preventDefault: vi.fn(),
+      isMainFrame: false,
+      url: applicationUrl,
+    };
+    listeners.get("will-frame-navigate")(embeddedApplicationEvent);
+    expect(embeddedApplicationEvent.preventDefault).toHaveBeenCalledOnce();
+
+    const embeddedWebEvent = {
+      preventDefault: vi.fn(),
+      isMainFrame: false,
+      url: "http://127.0.0.1:4173/",
+    };
+    listeners.get("will-frame-navigate")(embeddedWebEvent);
+    expect(embeddedWebEvent.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("prevents an embedded frame from ever becoming same-origin with the shell", () => {
+    expect(shouldBlockEmbeddedFrameNavigation(
+      "http://127.0.0.1:5173/settings",
+      "http://127.0.0.1:5173/",
+    )).toBe(true);
+    expect(shouldBlockEmbeddedFrameNavigation(
+      "http://127.0.0.1:4173/",
+      "http://127.0.0.1:5173/",
+    )).toBe(false);
+    expect(shouldBlockEmbeddedFrameNavigation(
+      "file:///Applications/PuppyOne.app/Contents/Resources/app.asar/dist/index.html",
+      "file:///Applications/PuppyOne.app/Contents/Resources/app.asar/dist/index.html",
+    )).toBe(true);
+    expect(shouldBlockEmbeddedFrameNavigation(
+      "puppyone-local://file/capability/asset.html",
+      "file:///Applications/PuppyOne.app/Contents/Resources/app.asar/dist/index.html",
+    )).toBe(false);
   });
 
   it("treats platform launchers and executable file modes as dangerous", () => {

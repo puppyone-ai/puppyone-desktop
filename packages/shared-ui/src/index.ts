@@ -41,7 +41,6 @@ export type {
   MarkdownLinkIndexRequest,
 } from "./editor/markdown/linkIndex";
 export type {
-  DataWorkspaceActivePathChangeContext,
   DataWorkspaceFolderExpansionStrategy,
   DataWorkspaceProps,
   DataWorkspaceState,
@@ -72,16 +71,65 @@ export type {
   RendererPerformanceSummary,
   RendererPerformanceTrace,
 } from "./performance/rendererPerformance";
-export { FilePreview } from "./data/FilePreview";
-export type { FilePreviewProps } from "./data/FilePreview";
+export { FilePreview } from "./editor/host/FilePreview";
+export type { FilePreviewProps } from "./editor/host/FilePreview";
 export { ProjectsHeader as WorkspaceHeader } from "./data/ProjectsHeader";
 export type {
   BreadcrumbSegment,
   ProjectsHeaderProps as WorkspaceHeaderProps,
 } from "./data/ProjectsHeader";
 
-export { EditorHost } from "./editor/EditorHost";
-export type { EditorHostProps } from "./editor/EditorHost";
+export {
+  DataNodeEditorHost,
+  DataNodeEditorHost as EditorHost,
+} from "./editor/host/DataNodeEditorHost";
+export type {
+  DataNodeEditorHostProps,
+  DataNodeEditorHostProps as EditorHostProps,
+} from "./editor/host/DataNodeEditorHost";
+export { EditorDocumentHost } from "./editor/host/EditorDocumentHost";
+export type { EditorDocumentHostProps } from "./editor/host/EditorDocumentHost";
+export {
+  EMPTY_EDITOR_GROUP,
+  activateEditor,
+  closeEditor,
+  closeEditorsUnderResource,
+  createEditorInput,
+  openEditor,
+  parseEditorGroupState,
+  rebaseEditorResources,
+} from "./editor/workbench/editorGroupModel";
+export type {
+  EditorGroupState,
+  EditorInput,
+} from "./editor/workbench/editorGroupModel";
+export {
+  activateEditorPane,
+  assignEditorToActivePane,
+  assignEditorToPane,
+  closeEditorPane,
+  clampEditorSplitRatio,
+  createEditorPaneLayout,
+  EDITOR_SPLIT_RATIO_MAX,
+  EDITOR_SPLIT_RATIO_MIN,
+  getActiveEditorPane,
+  getEditorPanes,
+  moveEditorPane,
+  parseEditorPaneLayoutState,
+  rebaseEditorPaneResources,
+  removeEditorFromPanes,
+  splitEditorPane,
+  updateEditorSplitRatio,
+} from "./editor/workbench/editorPaneLayoutModel";
+export type {
+  EditorPaneLayoutLeaf,
+  EditorPaneLayoutNode,
+  EditorPaneLayoutSplit,
+  EditorPaneLayoutState,
+  EditorPaneSplitOptions,
+  EditorSplitDirection,
+  EditorSplitPlacement,
+} from "./editor/workbench/editorPaneLayoutModel";
 export {
   EditorFindContributionProvider,
   useEditorFindCommand,
@@ -94,8 +142,18 @@ export type {
 } from "./editor/find/editorFind";
 // The app shell may request a durability barrier, but the session object and
 // editable-source bridge remain private to the trusted Editor host.
-export { flushActiveDocumentSessions } from "./editor/document-session";
-export type { DocumentPersistedCommit } from "./editor/document-session";
+export {
+  closeAllDocumentWorkingCopies,
+  closeDocumentWorkingCopy,
+  closeDocumentWorkingCopiesUnderResource,
+  flushActiveDocumentSessions,
+  getDocumentWorkingCopyStatuses,
+  subscribeDocumentWorkingCopyStatuses,
+} from "./editor/document-session";
+export type {
+  DocumentPersistedCommit,
+  DocumentSessionStatus,
+} from "./editor/document-session";
 export {
   classifyEditorViewerCapability,
   createPresetViewerRegistry,
@@ -106,10 +164,10 @@ export {
   PRESET_VIEWERS,
   resolveEditorViewer,
   shouldReadEditorContent,
-} from "./editor/viewerRegistry";
+} from "./editor/registry/viewerRegistry";
 export type {
   PresetViewerRegistry,
-} from "./editor/viewerRegistry";
+} from "./editor/registry/viewerRegistry";
 export {
   compilePuppyFlowRun,
   createDefaultPuppyFlowDocument,
@@ -120,7 +178,7 @@ export {
   parsePuppyFlowDocument,
   PUPPYFLOW_AGENT_OPTIONS,
   serializePuppyFlowDocument,
-} from "./editor/puppyflow/puppyflowModel";
+} from "./editor/viewers/puppyflow/puppyflowModel";
 export type {
   PuppyFlowAgentId,
   PuppyFlowAgentOption,
@@ -128,36 +186,41 @@ export type {
   PuppyFlowDocumentDefaults,
   PuppyFlowParseResult,
   PuppyFlowStep,
-} from "./editor/puppyflow/puppyflowModel";
+} from "./editor/viewers/puppyflow/puppyflowModel";
 export {
   coreViewerCapability,
   getPresetViewerDefinition,
   getPresetViewerDefinitionForViewerId,
   PRESET_VIEWER_MANIFEST,
-} from "./editor/presetViewerManifest";
+} from "./editor/registry/presetViewerManifest";
 export type {
   PresetViewerDefinition,
   PresetViewerManifest,
-} from "./editor/presetViewerManifest";
+} from "./editor/registry/presetViewerManifest";
 export {
   PRESET_VIEWER_CAPABILITIES,
   PRESET_VIEWER_CONTRACT_VERSION,
   PRESET_VIEWER_RUNTIMES,
   PRESET_VIEWER_SOURCES,
-} from "./editor/viewerContract";
+  VIEWER_SURFACE_PREPARATIONS,
+  VIEWER_SURFACE_READINESS_SIGNALS,
+} from "./editor/registry/viewerContract";
 export type {
   PresetViewerContractVersion,
   PresetViewerRuntime,
   PresetViewerSource,
-} from "./editor/viewerContract";
-export { findPackCandidates, resolveViewerRoute } from "./editor/viewerCapability";
-export type { ResolveViewerRouteInput } from "./editor/viewerCapability";
+  ViewerSurfacePreparation,
+  ViewerSurfaceReadinessSignal,
+} from "./editor/registry/viewerContract";
+export { findPackCandidates, resolveViewerRoute } from "./editor/registry/viewerCapability";
+export type { ResolveViewerRouteInput } from "./editor/registry/viewerCapability";
 export {
   ExternalViewerAdapter,
   resolveViewerRouteForDocument,
-} from "./editor/viewerPackAdapter";
-export type { ExternalViewerAdapterProps } from "./editor/viewerPackAdapter";
-export { EMPTY_VIEWER_PACK_SNAPSHOT } from "./editor/viewerPackTypes";
+  resolveViewerSurfacePreparationForDocument,
+} from "./editor/registry/viewerPackAdapter";
+export type { ExternalViewerAdapterProps } from "./editor/registry/viewerPackAdapter";
+export { EMPTY_VIEWER_PACK_SNAPSHOT } from "./editor/registry/viewerPackTypes";
 export type {
   CoreViewerCapability,
   DocumentSourceKind,
@@ -168,15 +231,15 @@ export type {
   ViewerPackSnapshot,
   ViewerRoutePlaceholderReason,
   ViewerRouteResult,
-} from "./editor/viewerPackTypes";
+} from "./editor/registry/viewerPackTypes";
 export type {
   ExternalViewerSurfaceRenderer,
   ViewerExtensionHostAdapter,
   ViewerExtensionInstallFallbackRenderer,
-} from "./editor/viewerHostAdapters";
+} from "./editor/registry/viewerHostAdapters";
 export {
   VIEWER_HOST_IPC_CHANNELS,
-} from "./editor/viewerHostApi";
+} from "./editor/registry/viewerHostApi";
 export type {
   ViewerDocumentMeta,
   ViewerHostApiV1,
@@ -189,7 +252,7 @@ export type {
   ViewerStatus,
   ViewerThemeMode,
   ViewerThemeSnapshot,
-} from "./editor/viewerHostApi";
+} from "./editor/registry/viewerHostApi";
 export type {
   EditorInteractionPreferences,
   EditorDocument,
@@ -211,12 +274,12 @@ export type {
   PresetViewerContribution,
   PresetViewerImplementation,
   PresetViewerRenderContext,
-} from "./editor/viewerTypes";
-export { DEFAULT_EDITOR_INTERACTION_PREFERENCES } from "./editor/viewerTypes";
-export { PlainTextEditor } from "./editor/PlainTextEditor";
-export type { PlainTextEditorProps } from "./editor/PlainTextEditor";
-export { CsvTableEditor } from "./editor/CsvTableEditor";
-export type { CsvTableEditorProps } from "./editor/CsvTableEditor";
+} from "./editor/registry/viewerTypes";
+export { DEFAULT_EDITOR_INTERACTION_PREFERENCES } from "./editor/registry/viewerTypes";
+export { PlainTextEditor } from "./editor/viewers/code/PlainTextEditor";
+export type { PlainTextEditorProps } from "./editor/viewers/code/PlainTextEditor";
+export { CsvTableEditor } from "./editor/viewers/csv/CsvTableEditor";
+export type { CsvTableEditorProps } from "./editor/viewers/csv/CsvTableEditor";
 export {
   EditorChromeContributionProvider,
   useEditorChromeContributionPublisher,

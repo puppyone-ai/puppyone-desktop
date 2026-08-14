@@ -1,5 +1,5 @@
 import { EditorView, WidgetType } from "@codemirror/view";
-import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../../registry/viewerTypes";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { disposeWidgetSessionDom } from "../../platform/codemirror/widgetSession";
 import type { MarkdownTableAlignment, MarkdownTableRow } from "./tableModel";

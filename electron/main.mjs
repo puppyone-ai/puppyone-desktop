@@ -17,7 +17,6 @@ import {
 import { initializeWorkspaceEditReview } from "../local-api/edit-review.mjs";
 import { createUpdateService } from "./update-service.mjs";
 import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
-import { createAppPreviewBrowserSurfaceManager } from "./main/app-preview-browser-surface.mjs";
 import { createAppPreviewService } from "./main/app-preview-service.mjs";
 import {
   configureDesktopApplicationIdentity,
@@ -143,6 +142,7 @@ const developmentDockIconResources = Object.freeze({
 const macTitlebarOptions = process.platform === "darwin"
   ? {
       titleBarStyle: "hiddenInset",
+      titleBarOverlay: true,
       trafficLightPosition: { x: 13, y: 12 },
     }
   : {
@@ -332,6 +332,20 @@ async function createWindow(options = {}) {
     if (!window.webContents.isDestroyed()) {
       window.webContents.send("git-repository:window-focus", { focused: false });
     }
+  });
+
+  const publishWindowChromeState = (fullScreen) => {
+    if (!window.webContents.isDestroyed()) {
+      window.webContents.send("window-layout:chrome-state-changed", { fullScreen });
+    }
+  };
+  window.on("enter-full-screen", () => {
+    window.setTitle("");
+    publishWindowChromeState(true);
+  });
+  window.on("leave-full-screen", () => {
+    window.setTitle(resolveWindowTitle(window));
+    publishWindowChromeState(false);
   });
 
   window.once("ready-to-show", () => {
@@ -574,18 +588,6 @@ app.whenReady().then(async () => {
     getRestartBlockers: getUpdateRestartBlockers,
     confirmRestartWithBlockers: confirmUpdateRestartWithBlockers,
   });
-  const appPreviewBrowserSurfaces = createAppPreviewBrowserSurfaceManager({
-    WebContentsView,
-    sessionFromPartition: (partition, options) => electronSession.fromPartition(partition, options),
-    getOwnerWindow: (ownerWebContentsId) => windowsById.get(ownerWebContentsId) ?? null,
-    publishState: (state, ownerWebContentsId) => {
-      const window = windowsById.get(ownerWebContentsId);
-      if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
-      window.webContents.send("app-preview:surface-state", state);
-    },
-    nativeSurfaceOcclusion,
-    nativeSurfacePointerPassthrough,
-  });
   const appPreviewProcessRuntime = createAppPreviewRuntime({
     app,
     dialog,
@@ -602,20 +604,9 @@ app.whenReady().then(async () => {
           ...event.result,
         });
       }
-      if (event.result.status === "stopped" || event.result.status === "error") {
-        appPreviewBrowserSurfaces.runtimeUnavailable({
-          rootPath: event.rootPath,
-          appPath: event.result.path,
-          ownerWebContentsIds: event.ownerWebContentsIds,
-          reason: event.result.status === "error" ? "runtime-error" : "runtime-stopped",
-        });
-      }
     },
   });
-  appPreviewRuntime = createAppPreviewService({
-    runtime: appPreviewProcessRuntime,
-    browserSurfaces: appPreviewBrowserSurfaces,
-  });
+  appPreviewRuntime = createAppPreviewService({ runtime: appPreviewProcessRuntime });
   if (viewerPackFeatureProfile.externalViewerPacks) {
     viewerPackRuntime = await loadViewerPackRuntime(true);
     viewerPackHost = viewerPackRuntime.createViewerPackHost({
@@ -1042,7 +1033,7 @@ function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
   state.workspace = workspace;
   state.workspacePath = canonicalPath;
   workspaceWindowByPath.set(canonicalPath, window);
-  window.setTitle(`${appName} - ${workspace.name}`);
+  window.setTitle(window.isFullScreen() ? "" : resolveWindowTitle(window));
   if (typeof window.setRepresentedFilename === "function") {
     try {
       window.setRepresentedFilename(canonicalPath);
@@ -1074,7 +1065,7 @@ function releaseWindowWorkspaceById(webContentsId, window = null) {
     state.workspace = null;
   }
   if (window && !window.isDestroyed()) {
-    window.setTitle(appName);
+    window.setTitle(window.isFullScreen() ? "" : resolveWindowTitle(window));
   }
   return workspacePath;
 }
@@ -1108,6 +1099,11 @@ function getOrCreateWindowState(window) {
     windowStateById.set(webContentsId, state);
   }
   return state;
+}
+
+function resolveWindowTitle(window) {
+  const workspace = windowStateById.get(window.webContents.id)?.workspace;
+  return workspace ? `${appName} - ${workspace.name}` : appName;
 }
 
 function getWorkspaceWindow(canonicalPath) {

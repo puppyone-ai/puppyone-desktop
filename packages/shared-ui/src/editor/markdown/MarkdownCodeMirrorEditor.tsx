@@ -16,7 +16,7 @@ import { getMarkdownPlanIndex } from "./core/plans/markdownPlanIndex";
 import { markdownRevealedSourceEffect } from "./core/state/revealedSource";
 import { getDocRevision } from "./platform/brokers/transactionBroker";
 import type { AiEditFile } from "../ai-edits/types";
-import type { MarkdownAssetUrlResolver, MarkdownDialectId, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownDialectId, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../registry/viewerTypes";
 import type {
   EditorSourceRevision,
   EditorSourceSnapshot,

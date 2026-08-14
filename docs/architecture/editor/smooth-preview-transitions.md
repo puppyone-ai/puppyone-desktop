@@ -34,10 +34,20 @@ The desktop preview path uses three separate concepts:
 - Committed preview document: the document currently safe to render in the main
   editor surface.
 
-When a user selects a new file, the sidebar selection may update immediately, but
-the main editor only switches to that file when the file has enough data to
-render. If the selected file is still pending and a previous document is already
-committed, the main editor keeps rendering the previous committed document.
+When a user selects a new file, the sidebar selection updates immediately. The
+Viewer's canonical lifecycle declaration then selects one of two transition
+paths:
+
+- `hidden-safe`: the main editor keeps the previous committed document while
+  the next Viewer prepares in a hidden staging slot.
+- `requires-visible`: the requested Viewer becomes the committed layout slot
+  immediately and renders behind a background-matched progress indicator. It
+  is never initialized under `visibility:hidden`.
+
+The second path is required for iframe, canvas, video, WebGL and native surfaces
+whose first trustworthy frame depends on real container geometry. Keeping the
+old document visible for those surfaces is not continuity; it prevents the new
+surface from becoming ready.
 
 This avoids the unstable state where React switches to a new document path before
 the document content and editor instance are ready.
@@ -62,18 +72,27 @@ the document content and editor instance are ready.
    preview text and metadata are never valid substitutes for a declared
    resource URL.
 
-4. Do not use `key={document.path}` to reset text editors.
+4. Resolve layout capability before mounting the Viewer.
+
+   `presetViewerManifest.json` is the canonical source for
+   `surfacePreparation` and `readinessSignal`. PDF, HTML, App Preview, video,
+   Office/PuppyFlow, and activated external Viewer surfaces are visible-first.
+   Text/JSON/CSV, decoded images, audio metadata, and the placeholder are safe
+   to stage. A component must not infer this policy from an event that arrives
+   after it has already mounted.
+
+5. Do not use `key={document.path}` to reset text editors.
 
    Forced remounts create blank-frame windows and discard editor state too
    aggressively. Text editors receive an explicit `documentId` and reset their
    local draft/session attachment state in layout phase.
 
-5. Initialize DOM-owned editors before paint.
+6. Initialize DOM-owned editors before paint.
 
    CodeMirror setup and content reconfiguration must run in `useLayoutEffect`
    so the browser does not paint an empty host before the editor DOM is attached.
 
-6. Reveal decoded media, not a raw browser element.
+7. Reveal decoded media, not a raw browser element.
 
    An image element remains visually hidden behind a neutral,
    background-matched loading surface until its current URL has loaded and
@@ -82,7 +101,7 @@ the document content and editor instance are ready.
    frame from becoming visible between URL acquisition and the first image
    paint.
 
-7. Reuse embedded media by semantic identity, not absolute source position.
+8. Reuse embedded media by semantic identity, not absolute source position.
 
    An edit before `![alt](src)` moves that token's CodeMirror offsets without
    changing the image. The decoration range maps through the transaction, while
@@ -92,14 +111,14 @@ the document content and editor instance are ready.
    replaced or the view is disposed; an unrelated document revision must not
    revoke and re-resolve it.
 
-8. Bind the Document Session to the rendered document, not the selected document.
+9. Bind the Document Session to the rendered document, not the selected document.
 
    During a pending selection, the main area may still render the previous
    committed document. The session and its persistence acknowledgement must
    remain bound to the document currently rendered, not whichever file is
    highlighted in the sidebar.
 
-9. Scope errors by document path.
+10. Scope errors by document path.
 
    A read error from one path must not leak into another path during rapid file
    switching.
@@ -112,17 +131,29 @@ the document content and editor instance are ready.
   - owns committed preview document state
   - binds persistence acknowledgement to the rendered document
 
-- `packages/shared-ui/src/data/FilePreview.tsx`
+- `packages/shared-ui/src/editor/host/FilePreview.tsx`
   - renders the current preview shell
   - avoids fallback preview content while full content is pending
+  - resolves the selected Viewer's surface-preparation policy before mount
 
-- `packages/shared-ui/src/editor/viewers/TextEditorFrame.tsx`
+- `packages/shared-ui/src/editor/host/DocumentSurfaceHost.tsx`
+  - owns hidden-safe staging versus visible-first activation
+  - ignores stale ready signals by surface identity
+
+- `packages/shared-ui/src/editor/registry/presetViewerManifest.json`
+  - is the canonical layout/readiness contract shared with Electron main
+
+- `packages/shared-ui/src/editor/viewers/shared/TextEditorFrame.tsx`
   - owns text editor draft, mode state, and editor snapshot attachment
   - resets by `documentId` without forcing a React remount
 
-- `packages/shared-ui/src/editor/viewers/ResourceViewers.tsx`
+- `packages/shared-ui/src/editor/viewers/media/ResourceViewers.tsx`
   - owns resource-specific loading and failure presentation
   - reveals images only after the current resource has loaded and decoded
+
+- `packages/shared-ui/src/editor/viewers/pdf/PdfViewer.tsx`
+  - owns the lazy PDF.js worker boundary and progressive page canvases
+  - reports ready only after the first page canvas has actually rendered
 
 - `packages/shared-ui/src/editor/markdown/features/image/imagePreviewWidget.ts`
   - keeps brokered Markdown-image placeholders mounted through load/decode
@@ -151,6 +182,7 @@ For this feature, the minimum verification is:
 ```bash
 npm run check:shared-ui
 npm run build
+npm run smoke:pdf-preview
 ```
 
 Manual verification should cover:
@@ -167,6 +199,11 @@ These invariants should remain true after future changes:
 
 - A selected sidebar row does not guarantee that the main editor has switched.
 - The main editor always renders a committed document or a deliberate empty state.
+- A `requires-visible` Viewer is never mounted in a hidden staging slot.
+- Iframe `load` is navigation completion, not first-paint proof; frame Viewers
+  wait for subsequent compositor frames.
+- PDF readiness means the first PDF.js canvas render completed, not that an
+  iframe or resource request fired `load`.
 - Text content and resource URLs both participate in preview commitment.
 - Explorer metadata is never mounted as an image URL.
 - A newly mounted image is not visible until its current source is ready.

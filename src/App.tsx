@@ -1,10 +1,12 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   EditorChromeContributionProvider,
   EditorFindContributionProvider,
+  closeAllDocumentWorkingCopies,
+  closeDocumentWorkingCopy,
+  closeDocumentWorkingCopiesUnderResource,
   flushActiveDocumentSessions,
   type DataNode,
-  type DataWorkspaceActivePathChangeContext,
   type EditorChromeContribution,
   useEditorFindCommand,
 } from "@puppyone/shared-ui";
@@ -38,7 +40,7 @@ import {
   type DesktopCloudSession,
 } from "./lib/cloudApi";
 import {
-  getVisibleCreateNewFileTypes,
+  getVisibleCreateNewItems,
   type FilesVisibilitySettings,
 } from "./preferences";
 import type { PuppyoneWorkspaceConfig } from "./types/electron";
@@ -88,6 +90,7 @@ import {
   useTypographyCatalog,
   useTypographyRuntime,
 } from "./features/typography";
+import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
 
 const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMinimalModeDock").then((module) => ({
   default: module.DesktopMinimalModeDock,
@@ -196,8 +199,8 @@ function AppContent() {
     setSidebarNavigationLayout,
     setThemeMode,
   } = preferences;
-  const createNewFileKinds = useMemo(
-    () => getVisibleCreateNewFileTypes(createNewMenuSettings, experimentalSettings),
+  const createNewItems = useMemo(
+    () => getVisibleCreateNewItems(createNewMenuSettings, experimentalSettings),
     [createNewMenuSettings, experimentalSettings],
   );
   const minimalMode = experimentalSettings.enableMinimalMode;
@@ -208,7 +211,31 @@ function AppContent() {
   const Homepage = assetLibraryHomeEnabled ? AssetLibraryHome : MinimalOnboarding;
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("general");
   const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
-  const [activeDataPath, setActiveDataPath] = useState<string | null>(null);
+  const editorWorkbench = useDesktopEditorWorkbench(workspace);
+  const activeDataPath = editorWorkbench.activePath;
+  const setActiveDataPath = useCallback<Dispatch<SetStateAction<string | null>>>((update) => {
+    if (typeof update !== "function") {
+      if (update) editorWorkbench.open(update);
+      else editorWorkbench.clear();
+      return;
+    }
+    const nextPath = update(activeDataPath);
+    if (nextPath === activeDataPath) return;
+    if (activeDataPath && nextPath) {
+      editorWorkbench.rebaseResource(activeDataPath, nextPath);
+      return;
+    }
+    if (nextPath) editorWorkbench.open(nextPath);
+    else if (activeDataPath) editorWorkbench.closeUnderResource(activeDataPath);
+  }, [activeDataPath, editorWorkbench]);
+  const handleResourceMoved = useCallback(async (previousPath: string, nextPath: string) => {
+    await closeDocumentWorkingCopiesUnderResource(previousPath);
+    editorWorkbench.rebaseResource(previousPath, nextPath);
+  }, [editorWorkbench]);
+  const handleResourceDeleted = useCallback(async (path: string) => {
+    await closeDocumentWorkingCopiesUnderResource(path);
+    editorWorkbench.closeUnderResource(path);
+  }, [editorWorkbench]);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
   const [editorChromeContribution, setEditorChromeContribution] = useState<EditorChromeContribution | null>(null);
   const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
@@ -216,7 +243,7 @@ function AppContent() {
   const desktopViewNavigationRequestRef = useRef(0);
   const drainWorkspaceNavigation = useCallback(async (): Promise<boolean> => {
     try {
-      await flushActiveDocumentSessions("workspace-switch");
+      await closeAllDocumentWorkingCopies("workspace-switch");
       setDocumentNavigationError(null);
       return true;
     } catch (error) {
@@ -372,6 +399,8 @@ function AppContent() {
     onEnterDataView: enterDataView,
     onLocalWorkspaceContentChanged: refreshGitStatus,
     onWorkspaceContentChanged: refreshWorkspaceContent,
+    onResourceDeleted: handleResourceDeleted,
+    onResourceMoved: handleResourceMoved,
     setActiveDataNode,
     setActiveDataPath,
     workspace,
@@ -430,7 +459,6 @@ function AppContent() {
     setGitOperationLoading(null);
     setActiveSettingsSection("general");
     setBranchSwitcherOpen(false);
-    setActiveDataPath(null);
     setActiveDataNode(null);
     resetDataNodeActions();
   }, [resetDataNodeActions, setBranchSwitcherOpen, setGitOperationError, setGitOperationLoading, workspace?.path]);
@@ -578,24 +606,44 @@ function AppContent() {
   const handleActiveDataPathChange = useCallback(async (
     path: string | null,
     node: DataNode | null = null,
-    context?: DataWorkspaceActivePathChangeContext,
   ) => {
     const requestId = ++documentNavigationRequestRef.current;
-    if (path !== activeDataPath && !context?.documentSessionsDrained) {
-      try {
-        await flushActiveDocumentSessions("document-switch");
-      } catch (error) {
-        if (requestId === documentNavigationRequestRef.current) {
-          setDocumentNavigationError(error instanceof Error ? error.message : String(error));
-        }
-        throw error;
-      }
-    }
     if (requestId !== documentNavigationRequestRef.current) return;
     setDocumentNavigationError(null);
-    setActiveDataPath(path);
+    if (path && node?.type !== "folder") editorWorkbench.open(path, node);
     setActiveDataNode(node);
-  }, [activeDataPath]);
+  }, [editorWorkbench]);
+  const handleEditorClose = useCallback(async (editorId: string) => {
+    try {
+      await closeDocumentWorkingCopy(editorId);
+      editorWorkbench.close(editorId);
+      setDocumentNavigationError(null);
+    } catch (error) {
+      setDocumentNavigationError(error instanceof Error ? error.message : String(error));
+    }
+  }, [editorWorkbench]);
+  useEffect(() => {
+    const handleEditorShortcut = (event: KeyboardEvent) => {
+      if (activeView !== "data" || editorWorkbench.state.editors.length === 0) return;
+      const platformModifier = event.metaKey || event.ctrlKey;
+      if (platformModifier && !event.altKey && event.key.toLowerCase() === "w") {
+        if (!editorWorkbench.activePath) return;
+        event.preventDefault();
+        void handleEditorClose(editorWorkbench.activePath);
+        return;
+      }
+      if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === "Tab") {
+        event.preventDefault();
+        const currentIndex = editorWorkbench.state.editors.findIndex(({ id }) => id === editorWorkbench.activePath);
+        const offset = event.shiftKey ? -1 : 1;
+        const nextIndex = (currentIndex + offset + editorWorkbench.state.editors.length) % editorWorkbench.state.editors.length;
+        editorWorkbench.activate(editorWorkbench.state.editors[nextIndex]!.id);
+        return;
+      }
+    };
+    window.addEventListener("keydown", handleEditorShortcut, true);
+    return () => window.removeEventListener("keydown", handleEditorShortcut, true);
+  }, [activeView, editorWorkbench, handleEditorClose]);
   const handleActiveDataNodeChange = useCallback((node: DataNode | null) => {
     setActiveDataNode((current) => (
       hasSameActiveDataNodeIdentity(current, node) ? current : node
@@ -807,7 +855,7 @@ function AppContent() {
     ? terminalSnapshot
     : createEmptyDesktopTerminalSessionSnapshot(workspace.path);
 
-  const titlebarSlot = (
+  const titlebarSidebarSlot = (
     <DesktopTitlebarContext
       activeGitStatus={activeGitStatus}
       branchSwitcherOpen={branchSwitcherOpen}
@@ -835,7 +883,9 @@ function AppContent() {
     <DesktopTitlebarActions
       editorFindCommand={editorFindCommand}
       canOpenActiveFileExternal={activeExternalOpen.canOpen}
-      csvViewSettings={activeView === "data" && editorChromeContribution?.kind === "csv-view-settings"
+      csvViewSettings={activeView === "data"
+        && editorChromeContribution?.kind === "csv-view-settings"
+        && editorChromeContribution.documentId === editorWorkbench.activePath
         ? editorChromeContribution
         : null}
       desktopUpdateState={desktopUpdates.state}
@@ -891,7 +941,9 @@ function AppContent() {
         activeView={activeView}
         cloudHubEnabled={cloudEnabled}
         contextMenuOpen={switcherOpen || branchSwitcherOpen}
-        contextSlot={titlebarSlot}
+        contextSlot={(
+          titlebarSidebarSlot
+        )}
         pluginsEnabled={
           experimentalSettings.enableViewerPlugins
           && preferences.sidebarNavigationVisibilitySettings.enabled.plugins
@@ -926,7 +978,7 @@ function AppContent() {
           leftSidebarWidth={explorerWidth}
           minimalMode={minimalMode}
           minimalModeDock={minimalModeDock}
-          titlebarSlot={titlebarSlot}
+          titlebarSidebarSlot={titlebarSidebarSlot}
           titlebarActions={titlebarActions}
           rightSidebarOpen={rightSidebarOpen && desktopRightSidebarEnabled}
           resizableRightSidebar
@@ -1008,11 +1060,13 @@ function AppContent() {
             onStartPuppyoneBackup: handleStartPuppyoneBackup,
           }}
           dataPort={dataPort}
+          editorWorkbench={editorWorkbench}
           desktopUpdates={desktopUpdates}
           git={git}
           minimalMode={minimalMode}
           onActiveDataNodeChange={handleActiveDataNodeChange}
           onActiveDataPathChange={handleActiveDataPathChange}
+          onResourceMove={handleResourceMoved}
           onCreateEntryMenu={openCreateEntryMenu}
           onDismissCreateEntryMenu={() => setCreateEntryDraft(null)}
           fileClipboardController={fileClipboardController}
@@ -1090,7 +1144,7 @@ function AppContent() {
             ) : (
               <DesktopCreateEntryMenu
                 draft={createEntryDraft}
-                fileKinds={createNewFileKinds}
+                itemKinds={createNewItems}
                 fileIconTheme={fileIconTheme}
                 onCancel={() => setCreateEntryDraft(null)}
                 onSelectKind={selectCreateEntryKind}

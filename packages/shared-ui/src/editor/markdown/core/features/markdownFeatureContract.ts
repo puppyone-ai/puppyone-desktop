@@ -5,7 +5,7 @@ import type {
   MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
   MarkdownLinkGraph,
-} from "../../../viewerTypes";
+} from "../../../registry/viewerTypes";
 import type {
   BlockEmbedModel,
   InlineAtomModel,

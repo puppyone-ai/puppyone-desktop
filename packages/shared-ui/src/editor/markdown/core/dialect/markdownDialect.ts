@@ -1,5 +1,5 @@
 import { Facet } from "@codemirror/state";
-import type { MarkdownDialectId } from "../../../viewerTypes";
+import type { MarkdownDialectId } from "../../../registry/viewerTypes";
 
 export const DEFAULT_MARKDOWN_DIALECT: MarkdownDialectId = "puppy-gfm";
 

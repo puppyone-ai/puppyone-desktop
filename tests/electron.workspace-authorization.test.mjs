@@ -75,15 +75,11 @@ describe("sender-bound workspace authorization", () => {
       getWorkspaceRootForSender: () => root,
     });
     const appPreviewRuntime = {
-      activate: vi.fn(),
       start: vi.fn(),
       restart: vi.fn(),
       stop: vi.fn(),
       getLogs: vi.fn(),
       openExternal: vi.fn(),
-      setSurfaceBounds: vi.fn(),
-      detachSurface: vi.fn(),
-      runSurfaceCommand: vi.fn(),
     };
     const workspaceWatchService = { start: vi.fn(), stop: vi.fn() };
     const gitMetadataWatchService = { start: vi.fn(), stop: vi.fn(), stopForWindow: vi.fn(), closeAll: vi.fn() };
@@ -119,12 +115,6 @@ describe("sender-bound workspace authorization", () => {
       ["workspace:watch-start", { rootPath: otherRoot }],
       ["git-repository:watch-start", { rootPath: otherRoot }],
       ["ai-edit-review:get-latest", { rootPath: otherRoot }],
-      ["app-preview:activate", {
-        rootPath: otherRoot,
-        path: "app.puppyoneapp",
-        attachmentId: "attachment-1",
-        bounds: { x: 0, y: 0, width: 100, height: 100 },
-      }],
       ["app-preview:start", { rootPath: otherRoot, path: "app.puppyoneapp" }],
       ["terminal:create", { rootPath: otherRoot, cwd: otherRoot }],
     ]) {
@@ -132,7 +122,6 @@ describe("sender-bound workspace authorization", () => {
     }
 
     expect(workspaceWatchService.start).not.toHaveBeenCalled();
-    expect(appPreviewRuntime.activate).not.toHaveBeenCalled();
     expect(appPreviewRuntime.start).not.toHaveBeenCalled();
     expect(terminalService.create).not.toHaveBeenCalled();
   });
@@ -144,15 +133,11 @@ describe("sender-bound workspace authorization", () => {
       getWorkspaceRootForSender: () => root,
     });
     const appPreviewRuntime = {
-      activate: vi.fn(async () => ({ runtime: { status: "running" }, surface: null })),
       start: vi.fn(async () => ({ status: "running" })),
       restart: vi.fn(),
       stop: vi.fn(),
       getLogs: vi.fn(),
       openExternal: vi.fn(),
-      setSurfaceBounds: vi.fn(() => ({ ok: true, visible: true })),
-      detachSurface: vi.fn(() => ({ ok: true })),
-      runSurfaceCommand: vi.fn(() => ({ ok: true })),
     };
     const terminalService = {
       create: vi.fn(),
@@ -165,17 +150,6 @@ describe("sender-bound workspace authorization", () => {
 
     const sender = { id: 8 };
     const event = { sender };
-    const activationRequest = {
-      rootPath: root,
-      path: "app.puppyoneapp",
-      attachmentId: "attachment-1",
-      bounds: { x: 0, y: 0, width: 100, height: 100 },
-    };
-    await handlers.get("app-preview:activate")(event, activationRequest);
-    expect(appPreviewRuntime.activate).toHaveBeenCalledWith(sender, {
-      ...activationRequest,
-      rootPath: await fs.promises.realpath(root),
-    });
     await handlers.get("app-preview:start")(event, { rootPath: root, path: "app.puppyoneapp" });
     expect(appPreviewRuntime.start).toHaveBeenCalledWith(sender, {
       rootPath: await fs.promises.realpath(root),

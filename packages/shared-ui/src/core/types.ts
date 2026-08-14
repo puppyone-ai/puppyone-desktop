@@ -124,77 +124,19 @@ export type AppPreviewResult = {
   logs?: string | null;
   generation?: number;
   sequence?: number;
-  reason?: "cancelled" | "preflight" | "process-exit" | "health-timeout" | "surface" | "unknown" | null;
+  reason?: "cancelled" | "preflight" | "process-exit" | "health-timeout" | "unknown" | null;
   exitCode?: number | null;
-};
-
-export type AppPreviewBounds = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
-export type AppPreviewSurfaceStatus = "loading" | "ready" | "error" | "destroyed";
-
-export type AppPreviewSurfaceState = {
-  surfaceId: string;
-  runtimeId: string;
-  appId: string;
-  path: string;
-  status: AppPreviewSurfaceStatus;
-  url?: string | null;
-  title?: string | null;
-  canGoBack: boolean;
-  canGoForward: boolean;
-  attached: boolean;
-  message?: string | null;
-  generation?: number;
-  sequence?: number;
-};
-
-export type AppPreviewActivationResult = {
-  runtime: AppPreviewResult;
-  surface: AppPreviewSurfaceState | null;
-};
-
-export type AppPreviewSurfaceCommand = "back" | "forward" | "reload";
-
-export type AppPreviewAttachmentRequest = {
-  path: string;
-  bounds: AppPreviewBounds;
-  attachmentId: string;
-  visible: boolean;
 };
 
 export type AppPreviewController = {
   detect?: (path: string) => Promise<AppPreviewDetectionResult>;
   configure?: (request: AppPreviewConfigureRequest) => Promise<AppPreviewConfigureResult>;
   start: (path: string) => Promise<AppPreviewResult>;
-  activate?: (request: AppPreviewAttachmentRequest) => Promise<AppPreviewActivationResult>;
-  restart?: (
-    path: string,
-    attachment?: Pick<AppPreviewAttachmentRequest, "bounds" | "attachmentId" | "visible">,
-  ) => Promise<AppPreviewResult | AppPreviewActivationResult>;
+  restart?: (path: string) => Promise<AppPreviewResult>;
   stop?: (path: string) => Promise<AppPreviewResult>;
   getLogs?: (path: string) => Promise<string>;
   openExternal?: (path: string) => Promise<void>;
-  setSurfaceBounds?: (request: {
-    surfaceId: string;
-    attachmentId: string;
-    bounds: AppPreviewBounds;
-    visible: boolean;
-  }) => Promise<{ ok: boolean; visible: boolean }>;
-  detachSurface?: (request: {
-    surfaceId?: string | null;
-    attachmentId: string;
-  }) => Promise<{ ok: boolean }>;
-  runSurfaceCommand?: (request: {
-    surfaceId: string;
-    command: AppPreviewSurfaceCommand;
-  }) => Promise<{ ok: boolean }>;
   subscribeRuntime?: (listener: (state: AppPreviewResult) => void) => () => void;
-  subscribeSurface?: (listener: (state: AppPreviewSurfaceState) => void) => () => void;
 };
 
 export type OfficeDocumentConversionResult = {
@@ -291,6 +233,7 @@ export type DataPort = {
   documentPersistence?: DocumentPersistencePort;
   createFolder?: (path: string) => Promise<void>;
   createFile?: (path: string, content?: string) => Promise<void>;
+  instantiateTemplate?: (request: DataTemplateInstantiationRequest) => Promise<DataTemplateInstantiationResult>;
   importFiles?: (files: File[], targetFolderPath: string | null) => Promise<DataImportResult>;
   renameNode?: (path: string, nextName: string) => Promise<void>;
   deleteNode?: (path: string) => Promise<void>;
@@ -300,6 +243,22 @@ export type DataPort = {
     targetFolderPath: string | null,
     options?: DataCopyOptions,
   ) => Promise<DataCopyResult>;
+};
+
+export type DataTemplateInstantiationRequest = {
+  templateId: "slides.default";
+  parentPath: string | null;
+  name: string;
+};
+
+export type DataTemplateInstantiationResult = {
+  rootPath: string;
+  openPath: string;
+  createdPaths: string[];
+  template: {
+    id: "slides.default";
+    version: number;
+  };
 };
 
 export const defaultDataCapabilities: DataCapabilities = {

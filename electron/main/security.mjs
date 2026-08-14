@@ -105,6 +105,12 @@ export function installWindowNavigationSecurity({
 
   webContents.on("will-navigate", handleTopLevelNavigation);
   webContents.on("will-redirect", handleTopLevelNavigation);
+  webContents.on("will-frame-navigate", (details) => {
+    if (!details || details.isMainFrame) return;
+    if (shouldBlockEmbeddedFrameNavigation(details.url, applicationUrl)) {
+      details.preventDefault();
+    }
+  });
 
   webContents.setWindowOpenHandler(({ url }) => {
     const decision = classifyWindowNavigation(url, applicationUrl);
@@ -113,6 +119,30 @@ export function installWindowNavigationSecurity({
     }
     return { action: "deny" };
   });
+}
+
+/**
+ * Sandboxed app frames need script + origin semantics for normal web tooling.
+ * They must therefore never become same-origin with the privileged shell,
+ * including after a redirect or an in-frame navigation.
+ */
+export function shouldBlockEmbeddedFrameNavigation(targetValue, applicationValue) {
+  let targetUrl;
+  let applicationUrl;
+  try {
+    targetUrl = new URL(targetValue);
+    applicationUrl = new URL(applicationValue);
+  } catch {
+    return true;
+  }
+
+  if (applicationUrl.protocol === "http:" || applicationUrl.protocol === "https:") {
+    return targetUrl.origin === applicationUrl.origin;
+  }
+  if (applicationUrl.protocol === "file:") {
+    return targetUrl.protocol === "file:";
+  }
+  return targetUrl.href === applicationUrl.href;
 }
 
 function isApplicationNavigation(targetUrl, applicationUrl) {

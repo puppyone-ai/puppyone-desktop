@@ -1,0 +1,266 @@
+.desktop-editor-split-view {
+  --desktop-editor-divider-size: var(--po-pane-resizer-line-size, 1px);
+  --desktop-editor-resize-hit-size: var(--po-pane-resizer-hit-size, 8px);
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+  background: var(--po-canvas);
+}
+
+.desktop-editor-split {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desktop-editor-split[data-direction="horizontal"] {
+  grid-template-columns:
+    var(--desktop-editor-first-track)
+    var(--desktop-editor-divider-size)
+    var(--desktop-editor-second-track);
+}
+
+.desktop-editor-split[data-direction="vertical"] {
+  grid-template-rows:
+    var(--desktop-editor-first-track)
+    var(--desktop-editor-divider-size)
+    var(--desktop-editor-second-track);
+}
+
+.desktop-editor-split[data-touches-inline-start="true"] {
+  overflow: visible;
+}
+
+.desktop-editor-panel:has(.desktop-editor-split-view),
+.data-main-view-frame:has(> .desktop-editor-split-view) {
+  overflow: visible;
+}
+
+.desktop-editor-pane {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--po-canvas);
+}
+
+.desktop-editor-pane-handle-shell {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  width: 52px;
+  height: 20px;
+  align-items: flex-start;
+  justify-content: center;
+  inset-block-start: 4px;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 90ms ease;
+}
+
+.desktop-editor-pane-handle-shell:hover,
+.desktop-editor-pane-handle-shell:focus-within,
+.desktop-editor-pane[data-drop-target] > .desktop-editor-pane-handle-shell {
+  opacity: 1;
+}
+
+.desktop-editor-pane-handle {
+  appearance: none;
+  display: flex;
+  width: 27px;
+  height: 13px;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--po-divider) 86%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--po-panel) 92%, transparent);
+  box-shadow: 0 1px 3px color-mix(in srgb, black 12%, transparent);
+  color: var(--po-text-muted);
+  outline: 0;
+  cursor: grab;
+  touch-action: none;
+}
+
+.desktop-editor-pane-handle:hover,
+.desktop-editor-pane-handle:focus-visible {
+  border-color: color-mix(in srgb, var(--po-text-muted) 55%, var(--po-divider));
+  color: var(--po-text);
+}
+
+.desktop-editor-pane-handle > i {
+  display: block;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.desktop-editor-pane-dragging,
+.desktop-editor-pane-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+.desktop-editor-pane-menu {
+  position: absolute;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 136px;
+  inset-block-start: 17px;
+  inset-inline-start: 50%;
+  padding: 4px;
+  transform: translateX(-50%);
+  border: 1px solid var(--po-divider);
+  border-radius: 7px;
+  background: var(--po-panel);
+  box-shadow: 0 8px 24px color-mix(in srgb, black 16%, transparent);
+}
+
+.desktop-editor-pane-menu-action {
+  appearance: none;
+  display: block;
+  width: 100%;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--po-text);
+  font: inherit;
+  font-size: var(--po-font-size-chrome, 13px);
+  text-align: start;
+}
+
+.desktop-editor-pane-menu-action:hover,
+.desktop-editor-pane-menu-action:focus-visible {
+  background: var(--po-hover);
+  outline: 0;
+}
+
+.desktop-editor-pane-content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desktop-editor-pane-content > .document-surface-host {
+  flex: 1;
+}
+
+.desktop-editor-drop-preview {
+  position: absolute;
+  z-index: 10;
+  border: 1px solid color-mix(in srgb, var(--po-accent) 58%, transparent);
+  background: color-mix(in srgb, var(--po-accent) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 18%, transparent);
+  pointer-events: none;
+}
+
+.desktop-editor-drop-preview[data-edge="left"] {
+  inset: 4px 50% 4px 4px;
+}
+
+.desktop-editor-drop-preview[data-edge="right"] {
+  inset: 4px 4px 4px 50%;
+}
+
+.desktop-editor-drop-preview[data-edge="top"] {
+  inset: 4px 4px 50%;
+}
+
+.desktop-editor-drop-preview[data-edge="bottom"] {
+  inset: 50% 4px 4px;
+}
+
+.desktop-editor-splitter {
+  position: relative;
+  z-index: 5;
+  min-width: 0;
+  min-height: 0;
+  background: var(--po-canvas);
+  outline: 0;
+  touch-action: none;
+}
+
+.desktop-editor-splitter::before {
+  position: absolute;
+  z-index: 1;
+  content: "";
+}
+
+.desktop-editor-splitter::after {
+  position: absolute;
+  background: var(--po-divider);
+  content: "";
+  pointer-events: none;
+}
+
+.desktop-editor-splitter[data-direction="horizontal"] {
+  cursor: col-resize;
+}
+
+.desktop-editor-splitter[data-direction="horizontal"]::before {
+  width: var(--desktop-editor-resize-hit-size);
+  inset-block: 0;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+}
+
+.desktop-editor-splitter[data-direction="horizontal"]::after {
+  inset-block: 0;
+  inset-inline-start: calc(50% - 0.5px);
+  width: 1px;
+}
+
+.desktop-editor-splitter[data-direction="vertical"] {
+  cursor: row-resize;
+}
+
+.desktop-editor-splitter[data-direction="vertical"]::before {
+  height: var(--desktop-editor-resize-hit-size);
+  inset-block-start: 50%;
+  inset-inline: 0;
+  transform: translateY(-50%);
+}
+
+.desktop-editor-splitter[data-direction="vertical"]::after {
+  inset-block-start: calc(50% - 0.5px);
+  inset-inline: 0;
+  height: 1px;
+}
+
+.desktop-editor-split[data-touches-inline-start="true"]
+  > .desktop-editor-splitter[data-direction="vertical"]::after {
+  inset-inline-start: calc(-1 * var(--desktop-editor-sidebar-gutter-size, 0px));
+}
+
+.desktop-editor-splitter:hover::after,
+.desktop-editor-splitter:focus-visible::after {
+  background: var(--po-pane-resizer-hover-color);
+}
+
+.desktop-editor-splitter[data-resizing="true"]::after {
+  background: var(--po-pane-resizer-active-color);
+  box-shadow: 0 0 0 1px var(--po-pane-resizer-active-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-editor-pane-handle-shell {
+    transition: none;
+  }
+}

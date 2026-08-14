@@ -29,7 +29,6 @@ for (const token of [
 }
 
 for (const relativePath of [
-  "electron/main/app-preview-browser-surface.mjs",
   "electron/main/markdown-web-embed-service.mjs",
   "electron/main/viewer-packs/session-manager.mjs",
 ]) {
@@ -78,12 +77,21 @@ if (!markdownMenuSource.includes('menu.dataset.nativeSurfaceOccluder = "true"'))
   errors.push("The imperative Markdown table menu must opt into native-surface occlusion");
 }
 
-const appPreviewHook = read("packages/shared-ui/src/editor/viewers/app-preview/useAppPreviewSession.ts");
-if (appPreviewHook.includes("-100_000")) {
-  errors.push("App Preview must use explicit visibility, not offscreen bounds, to hide its native surface");
+const appPreviewViewer = read("packages/shared-ui/src/editor/viewers/app/AppPreviewViewer.tsx");
+if (!appPreviewViewer.includes("SandboxedAppFrame")) {
+  errors.push("App Preview must render inside the editor DOM instead of a native surface");
 }
-if (!appPreviewHook.includes("visible: surfaceVisibleRef.current")) {
-  errors.push("App Preview does not publish its explicit renderer visibility state");
+const appPreviewHook = read("packages/shared-ui/src/editor/viewers/app/useAppPreviewSession.ts");
+for (const forbidden of ["ResizeObserver", "getBoundingClientRect", "setSurfaceBounds", "attachmentId"]) {
+  if (appPreviewHook.includes(forbidden)) {
+    errors.push(`App Preview runtime hook must not coordinate native surface geometry (${forbidden})`);
+  }
+}
+const appPreviewService = read("electron/main/app-preview-service.mjs");
+for (const forbidden of ["WebContentsView", "setBounds", "attachmentId", "browserSurfaces"]) {
+  if (appPreviewService.includes(forbidden)) {
+    errors.push(`App Preview coordinator must remain runtime-only (${forbidden})`);
+  }
 }
 
 const paneResizeDrag = read("packages/shared-ui/src/primitives/usePaneResizeDrag.ts");
@@ -95,7 +103,6 @@ if (!pointerPassthrough.includes('surfaceWebContents.on("before-mouse-event"') |
   errors.push("Native surface pointer passthrough must bridge child-view drag events back to the owner renderer");
 }
 for (const relativePath of [
-  "electron/main/app-preview-browser-surface.mjs",
   "electron/main/markdown-web-embed-service.mjs",
   "electron/main/viewer-packs/session-manager.mjs",
 ]) {

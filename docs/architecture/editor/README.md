@@ -24,7 +24,7 @@ Content / resource acquisition
 Committed preview document
         |
         v
-EditorHost + PresetViewerRenderer
+EditorDocumentHost + PresetViewerRenderer
         |
         +----> read-only Viewer Contribution
         |        HTML / image / PDF / media / Office
@@ -105,10 +105,37 @@ format-specific model and UI
 ```
 
 For a normal text-backed or structured single-file editor, adding the
-contribution must not require changes to `DataWorkspace`, `EditorHost`,
+contribution must not require changes to `DataWorkspace`, `EditorDocumentHost`,
 `DocumentEditingSession`, persistence ports, Electron IPC, or window-close
 coordination. The new format supplies its component, contribution registration,
 source adapter, serializer when needed, and focused tests.
+
+## Implementation ownership
+
+The source tree follows runtime responsibility rather than placing every editor
+file in one flat directory:
+
+```text
+packages/shared-ui/src/editor/
+  host/                 # DataNode -> document adaptation and host composition
+  registry/             # manifest, route resolution, and extension contracts
+  document-session/     # working copy, persistence, and close/navigation drain
+  viewers/<format>/     # format-owned rendering, model, and serialization
+  markdown/             # the Markdown engine and its viewer contribution
+
+src/features/editor-workbench/
+  controller/           # Desktop workbench commands and state transitions
+  persistence/          # versioned local restoration and legacy migration
+  layout/               # pane-tree projection, document slot, and split resize
+  drag-and-drop/        # Explorer drops, pane moves, and drop geometry
+```
+
+`FilePreview` → `DataNodeEditorHost` → `EditorDocumentHost` is the host chain.
+`EditorDocumentHost` is the only layer that resolves a contribution and attaches
+the shared editing session. `viewerRegistry.tsx` may route to a format package,
+but format viewers cannot import Desktop workbench code or persistence adapters.
+The package index keeps `EditorHost` as a compatibility alias for
+`DataNodeEditorHost`; new code uses the explicit names.
 
 A format-specific architecture package belongs under this directory only when
 the format has durable architecture beyond that shared contract. Use a focused
@@ -141,7 +168,8 @@ model.
 
 1. The canonical File Format registry, serializable Preset Viewer manifest, and
    versioned implementation registry are active production paths. The manifest
-   is the single source of truth for capability, source, and runtime metadata;
+   is the single source of truth for capability, source, runtime, surface
+   preparation, and first-frame readiness metadata;
    the registry binds reviewed React implementations without repeating those
    authority fields. Existing Markdown, text/code, CSV, HTML, Office, image,
    PDF, audio, video, PuppyFlow, and placeholder viewers are built-in

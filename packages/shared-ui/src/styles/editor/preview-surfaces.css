@@ -63,6 +63,53 @@
   background: var(--po-panel-raised);
 }
 
+.puppyone-pdf-preview {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--po-editor-bg) 82%, var(--po-text) 18%);
+}
+
+.puppyone-pdf-pages {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  overflow: auto;
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+.puppyone-pdf-page {
+  position: relative;
+  display: flex;
+  width: min(100%, 1200px);
+  min-width: 0;
+  min-height: 360px;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.puppyone-pdf-page canvas {
+  display: block;
+  max-width: 100%;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 20%);
+}
+
+.puppyone-pdf-page-error {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  color: var(--po-danger);
+  font-size: 12px;
+}
+
 .html-preview-shell {
   position: relative;
   display: flex;
@@ -259,6 +306,10 @@
   min-height: 0;
   overflow: hidden;
   background: var(--po-panel-raised);
+}
+
+.app-preview-surface-host[data-active="false"] {
+  display: none;
 }
 
 .app-preview-source {

@@ -7,18 +7,36 @@
   --desktop-titlebar-active: var(--po-selected);
   --desktop-titlebar-focus: var(--po-focus-ring);
   --desktop-titlebar-divider: var(--po-header-divider);
+  --desktop-titlebar-safe-area-x: env(titlebar-area-x, 80px);
+  --desktop-titlebar-safe-area-width: env(titlebar-area-width, calc(100% - 80px));
+  --desktop-titlebar-content-start: 6px;
   position: relative;
   z-index: 40;
+  box-sizing: border-box;
+  height: var(--desktop-chrome-height);
+  min-height: var(--desktop-chrome-height);
+  border-bottom: 0;
+  background: var(--desktop-titlebar-bg);
+  color: var(--desktop-titlebar-text);
+}
+
+.desktop-titlebar[data-window-full-screen="true"] {
+  --desktop-titlebar-safe-area-x: 0px;
+  --desktop-titlebar-safe-area-width: 100%;
+  --desktop-titlebar-content-start: calc(
+    var(--desktop-sidebar-row-left-gap) + var(--desktop-sidebar-row-content-left)
+  );
+}
+
+.desktop-titlebar-layout {
   display: flex;
   box-sizing: border-box;
   align-items: center;
   gap: 6px;
-  height: var(--desktop-chrome-height);
-  min-height: var(--desktop-chrome-height);
-  padding: 4px 6px 5px 86px;
-  border-bottom: 0;
-  background: var(--desktop-titlebar-bg);
-  color: var(--desktop-titlebar-text);
+  width: var(--desktop-titlebar-safe-area-width);
+  height: 100%;
+  margin-left: var(--desktop-titlebar-safe-area-x);
+  padding: 4px 6px 5px var(--desktop-titlebar-content-start);
 }
 
 /* Keep the app-owned divider out of the native window frame's edge pixels. */

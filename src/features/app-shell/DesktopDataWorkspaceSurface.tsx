@@ -5,7 +5,6 @@ import {
   DataWorkspace,
   type AiEditRequest,
   type DataNode,
-  type DataWorkspaceActivePathChangeContext,
   type Workspace,
 } from "@puppyone/shared-ui";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
@@ -32,7 +31,9 @@ import {
 } from "./navigation";
 import { WorkspaceSurfaceOutlet, type ResolvedWorkspaceSurface } from "./workspace-surfaces";
 import type { DesktopView } from "../../components/DesktopCloudShell";
-import { setNativeSurfacePointerPassthrough } from "../native-surfaces";
+import { useNativeSurfacePointerPassthroughActivity } from "../native-surfaces";
+import { DesktopEditorSplitView } from "../editor-workbench/layout/DesktopEditorSplitView";
+import type { DesktopEditorWorkbenchController } from "../editor-workbench/controller/useDesktopEditorWorkbench";
 
 type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 
@@ -40,6 +41,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
   activeAiEditRequest: AiEditRequest | null;
   activeDataPath: string | null;
   dataPort: NonNullable<DataWorkspaceProps["dataPort"]>;
+  editorWorkbench: DesktopEditorWorkbenchController;
   editorInteractionPreferences: NonNullable<DataWorkspaceProps["editorInteractionPreferences"]>;
   fileClipboardController: FileClipboardController;
   fileOperationNotice: string | null;
@@ -60,9 +62,9 @@ export type DesktopDataWorkspaceSurfaceProps = {
   onActiveDataPathChange: (
     path: string | null,
     node?: DataNode | null,
-    context?: DataWorkspaceActivePathChangeContext,
   ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
+  onResourceMove: (previousPath: string, nextPath: string) => void | Promise<void>;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onDismissCreateEntryMenu: () => void;
   onNodeActionMenu: (node: DataNode, anchorRect: DOMRect, selectedNodes?: readonly DataNode[]) => void;
@@ -80,12 +82,14 @@ export function DesktopDataWorkspaceSurface({
   activeAiEditRequest,
   activeDataPath,
   dataPort,
+  editorWorkbench,
   editorInteractionPreferences,
   fileClipboardController,
   fileOperationNotice,
   minimalMode,
   navigation,
   onActiveDataNodeChange,
+  onResourceMove,
   onActiveDataPathChange,
   onCreateEntryMenu,
   onDismissCreateEntryMenu,
@@ -99,6 +103,9 @@ export function DesktopDataWorkspaceSurface({
   workspaceSurfaceError,
   sidebarCreateMenuOpen,
 }: DesktopDataWorkspaceSurfaceProps) {
+  const onExplorerResizeActiveChange = useNativeSurfacePointerPassthroughActivity(
+    "explorer-resize",
+  );
   const { t } = useLocalization();
   const paneLayout = useDesktopPaneLayout();
   const resolvedExplorerWidth = paneLayout?.explorer.width ?? preferences.explorerWidth;
@@ -147,6 +154,7 @@ export function DesktopDataWorkspaceSurface({
         labels={{ root: workspace.name }}
         dataPort={dataPort}
         activePath={activeDataPath}
+        onResourceMove={onResourceMove}
         onActivePathChange={onActiveDataPathChange}
         onActiveNodeChange={onActiveDataNodeChange}
         onOpenExternalUrl={openExternalUrl}
@@ -161,7 +169,7 @@ export function DesktopDataWorkspaceSurface({
         explorerCollapseThreshold={EXPLORER_COLLAPSE_THRESHOLD}
         onExplorerCollapsedChange={preferences.setSidebarCollapsed}
         onExplorerWidthChange={preferences.setExplorerWidth}
-        onExplorerResizeActiveChange={setNativeSurfacePointerPassthrough}
+        onExplorerResizeActiveChange={onExplorerResizeActiveChange}
         showHeader={false}
         showExplorerRoot={false}
         onExplorerRootContextMenu={(_state, event) => {
@@ -221,6 +229,7 @@ export function DesktopDataWorkspaceSurface({
           <DesktopSidebarRailNavigation {...navigationCommon} />
         ) : undefined}
         showPreviewHeader={false}
+        loadActiveFileSource={resolvedSurface.id !== "data"}
         hidePreviewSourceView
         fileIconTheme={preferences.fileIconTheme}
         editorInteractionPreferences={editorInteractionPreferences}
@@ -249,9 +258,29 @@ export function DesktopDataWorkspaceSurface({
         explorerFooterSlot={!minimalMode && preferences.sidebarNavigationPlacement === "bottom"
           ? <DesktopSidebarFooterNavigation {...navigationCommon} />
           : undefined}
-        mainSlot={resolvedSurface.id === "data" || resolvedSurface.content.main == null
-          ? undefined
-          : <WorkspaceSurfaceOutlet region="main" surface={resolvedSurface} />}
+        mainSlot={resolvedSurface.id === "data"
+          ? (state) => (
+              <DesktopEditorSplitView
+                aiEditRequest={activeAiEditRequest}
+                dataPort={dataPort}
+                editorGroup={editorWorkbench.state}
+                editorInteractionPreferences={editorInteractionPreferences}
+                fileIconTheme={preferences.fileIconTheme}
+                layout={editorWorkbench.paneLayout}
+                refreshKey={workspaceRefreshToken}
+                state={state}
+                viewerExtensionAdapter={viewerExtensionAdapter}
+                workspace={workspace}
+                onClosePane={editorWorkbench.closePane}
+                onFocusPane={editorWorkbench.focusPane}
+                onMovePane={editorWorkbench.movePane}
+                onOpenAtPaneEdge={editorWorkbench.openAtPaneEdge}
+                onResizeSplit={editorWorkbench.resizeSplit}
+              />
+            )
+          : resolvedSurface.content.main == null
+            ? undefined
+            : <WorkspaceSurfaceOutlet region="main" surface={resolvedSurface} />}
         capabilities={{
           create: true,
           rename: true,

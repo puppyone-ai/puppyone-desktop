@@ -7,7 +7,7 @@ import type {
   EditorSourceSnapshot,
   EditorSourceSnapshotPort,
 } from "../sourceSnapshot";
-import type { EditorSaveMode } from "../viewerTypes";
+import type { EditorSaveMode } from "../registry/viewerTypes";
 import type {
   DocumentEditingSessionOptions,
   DocumentPersistedCommit,
@@ -96,7 +96,16 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
   attachSource = (source: EditorSourceSnapshotPort): (() => void) => {
     if (this.disposed) return () => undefined;
     this.source = source;
-    this.detachedSnapshot = null;
+    const retainedSnapshot = this.detachedSnapshot;
+    if (retainedSnapshot && source.readSnapshot().content !== retainedSnapshot.content) {
+      // A Pane can be recreated while its Working Copy remains open. Restore
+      // the authoritative unsaved snapshot before the new editor reports its
+      // initial disk-backed revision, otherwise tab activation could silently
+      // replace dirty content with a stale file read.
+      source.replaceContent(retainedSnapshot.content);
+    } else if (!this.hasUnpersistedChanges()) {
+      this.detachedSnapshot = null;
+    }
     return () => {
       if (this.source !== source) return;
       if (this.hasUnpersistedChanges()) {

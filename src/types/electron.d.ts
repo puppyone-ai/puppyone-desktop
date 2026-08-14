@@ -1,10 +1,6 @@
 import type {
   AiEditRequest,
-  AppPreviewActivationResult,
-  AppPreviewBounds,
   AppPreviewResult,
-  AppPreviewSurfaceCommand,
-  AppPreviewSurfaceState,
   DataNode,
   FileContent,
   Workspace,
@@ -518,6 +514,20 @@ export type WorkspaceCreateEntryResult = {
   path: string;
 };
 
+export type WorkspaceInstantiateTemplateRequest = {
+  rootPath: string;
+  parentPath: string | null;
+  name: string;
+  templateId: "slides.default";
+};
+
+export type WorkspaceInstantiateTemplateResult = {
+  rootPath: string;
+  openPath: string;
+  createdPaths: string[];
+  template: { id: "slides.default"; version: number };
+};
+
 export type WorkspaceRenameEntryRequest = {
   rootPath: string;
   path: string;
@@ -666,6 +676,10 @@ export type PuppyoneWorkspaceConfig = {
 declare global {
   interface Window {
     puppyoneDesktop?: {
+      getWindowChromeState: () => Promise<{ fullScreen: boolean }>;
+      onWindowChromeStateChanged: (
+        callback: (state: { fullScreen: boolean }) => void,
+      ) => () => void;
       setWindowBackground: (request: { background: string }) => void;
       setWindowMinimumWidth: (request: { width: number }) => Promise<{
         applied: boolean;
@@ -849,6 +863,9 @@ declare global {
         expectedVersion?: string | null;
       }) => Promise<{ version: string }>;
       createEntry: (request: WorkspaceCreateEntryRequest) => Promise<WorkspaceCreateEntryResult>;
+      instantiateTemplate: (
+        request: WorkspaceInstantiateTemplateRequest,
+      ) => Promise<WorkspaceInstantiateTemplateResult>;
       renameEntry: (request: WorkspaceRenameEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       moveEntry: (request: WorkspaceMoveEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       copyEntry: (request: WorkspaceCopyEntryRequest) => Promise<WorkspaceCreateEntryResult>;
@@ -859,13 +876,6 @@ declare global {
       resolveExternalOpenTarget: (request: WorkspaceResolveExternalOpenTargetRequest) => Promise<WorkspaceExternalOpenTarget>;
       listExternalOpenTargets: (request: WorkspaceResolveExternalOpenTargetRequest) => Promise<WorkspaceExternalOpenTarget[]>;
       chooseExternalApp: (request: WorkspaceChooseExternalAppRequest) => Promise<WorkspaceExternalOpenTarget | null>;
-      activateAppPreview: (request: {
-        rootPath: string;
-        path: string;
-        bounds: AppPreviewBounds;
-        attachmentId: string;
-        visible: boolean;
-      }) => Promise<AppPreviewActivationResult>;
       startAppPreview: (request: {
         rootPath: string;
         path: string;
@@ -873,10 +883,7 @@ declare global {
       restartAppPreview: (request: {
         rootPath: string;
         path: string;
-        bounds?: AppPreviewBounds;
-        attachmentId?: string;
-        visible?: boolean;
-      }) => Promise<AppPreviewResult | AppPreviewActivationResult>;
+      }) => Promise<AppPreviewResult>;
       stopAppPreview: (request: {
         rootPath: string;
         path: string;
@@ -889,25 +896,8 @@ declare global {
         rootPath: string;
         path: string;
       }) => Promise<{ ok: boolean }>;
-      setAppPreviewSurfaceBounds: (request: {
-        surfaceId: string;
-        attachmentId: string;
-        bounds: AppPreviewBounds;
-        visible: boolean;
-      }) => Promise<{ ok: boolean; visible: boolean }>;
-      detachAppPreviewSurface: (request: {
-        surfaceId?: string | null;
-        attachmentId: string;
-      }) => Promise<{ ok: boolean }>;
-      runAppPreviewSurfaceCommand: (request: {
-        surfaceId: string;
-        command: AppPreviewSurfaceCommand;
-      }) => Promise<{ ok: boolean }>;
       onAppPreviewRuntimeState: (
         callback: (state: AppPreviewResult & { rootPath: string }) => void,
-      ) => () => void;
-      onAppPreviewSurfaceState: (
-        callback: (state: AppPreviewSurfaceState & { rootPath: string }) => void,
       ) => () => void;
       watchWorkspace: (
         rootPath: string,

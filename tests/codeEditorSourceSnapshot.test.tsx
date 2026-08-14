@@ -5,10 +5,10 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CodeMirrorCodeEditor } from "../packages/shared-ui/src/editor/CodeMirrorCodeEditor";
+import { CodeMirrorCodeEditor } from "../packages/shared-ui/src/editor/viewers/code/CodeMirrorCodeEditor";
 import { DocumentSessionBoundary } from "../packages/shared-ui/src/editor/document-session/DocumentSessionBoundary";
 import type { EditorSourceSnapshotPort } from "../packages/shared-ui/src/editor/sourceSnapshot";
-import { TextEditorFrame } from "../packages/shared-ui/src/editor/viewers/TextEditorFrame";
+import { TextEditorFrame } from "../packages/shared-ui/src/editor/viewers/shared/TextEditorFrame";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

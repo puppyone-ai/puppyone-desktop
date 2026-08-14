@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getCsvTableExpansionFromDrag,
   getCsvTableResizeViewportConstraints,
-} from "../packages/shared-ui/src/editor/csv/CsvTableResizeControl";
+} from "../packages/shared-ui/src/editor/viewers/csv/CsvTableResizeControl";
 
 describe("CSV table corner resize geometry", () => {
   it("snaps outward distance to the nearest complete row and column", () => {

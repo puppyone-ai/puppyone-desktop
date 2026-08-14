@@ -21,9 +21,7 @@ for (const filePath of walkTypeScript(sharedEditorRoot)) {
 
 const contributionFiles = [
   ...walkTypeScript(path.join(sharedEditorRoot, "viewers")),
-  ...walkTypeScript(path.join(sharedEditorRoot, "csv")),
   ...walkTypeScript(path.join(sharedEditorRoot, "markdown")),
-  ...walkTypeScript(path.join(sharedEditorRoot, "puppyflow")),
 ];
 for (const filePath of contributionFiles) {
   const source = readFileSync(filePath, "utf8");
@@ -39,13 +37,13 @@ for (const filePath of contributionFiles) {
   }
 }
 
-const textFramePath = path.join(sharedEditorRoot, "viewers/TextEditorFrame.tsx");
+const textFramePath = path.join(sharedEditorRoot, "viewers/shared/TextEditorFrame.tsx");
 const textFrameSource = readFileSync(textFramePath, "utf8");
 if (/\bsetTimeout\s*\(/.test(textFrameSource)) {
   errors.push(`${relative(textFramePath)} owns a timer; save scheduling belongs to DocumentEditingSession`);
 }
 
-const codeViewerPath = path.join(sharedEditorRoot, "viewers/CodeViewer.tsx");
+const codeViewerPath = path.join(sharedEditorRoot, "viewers/code/CodeViewer.tsx");
 const codeViewerSource = readFileSync(codeViewerPath, "utf8");
 if (!/\bsourceSnapshotMode\b/.test(codeViewerSource)) {
   errors.push(`${relative(codeViewerPath)} does not keep canonical code source in CodeMirror snapshots`);
@@ -73,7 +71,7 @@ if (!/readSnapshot\(\),\s*this\.strongestDrainReason\(\)\s*\?\?\s*["']edit["']/.
   errors.push(`${relative(sessionKernel)} does not enqueue the latest editor snapshot with the edit reason`);
 }
 
-const externalAdapterPath = path.join(sharedEditorRoot, "viewerHostAdapters.ts");
+const externalAdapterPath = path.join(sharedEditorRoot, "registry/viewerHostAdapters.ts");
 const externalAdapterSource = readFileSync(externalAdapterPath, "utf8");
 for (const authority of ["EditableDocumentSource", "DocumentPersistencePort", "documentSession", "persistence"]) {
   if (new RegExp(`\\b${authority}\\b`).test(externalAdapterSource)) {
@@ -81,7 +79,7 @@ for (const authority of ["EditableDocumentSource", "DocumentPersistencePort", "d
   }
 }
 
-const packTypesPath = path.join(sharedEditorRoot, "viewerPackTypes.ts");
+const packTypesPath = path.join(sharedEditorRoot, "registry/viewerPackTypes.ts");
 const packTypesSource = readFileSync(packTypesPath, "utf8");
 if (!/export type ViewerPackFormatContribution\s*=\s*\{[\s\S]*?editable:\s*false;[\s\S]*?\};/.test(packTypesSource)) {
   errors.push(`${relative(packTypesPath)} no longer fixes Viewer Pack v1 contributions to editable: false`);
@@ -129,8 +127,16 @@ if (!/keeps an immediate-save failure visible and retryable in auto mode/.test(m
 
 const dataWorkspacePath = path.join(repoRoot, "packages/shared-ui/src/data/DataWorkspace.tsx");
 const dataWorkspaceSource = readFileSync(dataWorkspacePath, "utf8");
-if (!/await flushActiveDocumentSessions\("document-switch"\)[\s\S]*await onActivePathChange/.test(dataWorkspaceSource)) {
-  errors.push(`${relative(dataWorkspacePath)} does not await the Document Session drain before changing files`);
+if (!/await onActivePathChange/.test(dataWorkspaceSource)) {
+  errors.push(`${relative(dataWorkspacePath)} does not route file activation through the Editor Group`);
+}
+const desktopAppShellPath = path.join(repoRoot, "src/App.tsx");
+const desktopAppShellSource = readFileSync(desktopAppShellPath, "utf8");
+if (!/handleActiveDataPathChange[\s\S]*editorWorkbench\.open/.test(desktopAppShellSource)) {
+  errors.push(`${relative(desktopAppShellPath)} does not own Editor Group activation`);
+}
+if (!/DesktopWorkspaceContent[\s\S]*editorWorkbench=\{editorWorkbench\}/.test(desktopAppShellSource)) {
+  errors.push(`${relative(desktopAppShellPath)} does not project the Editor Workbench into the app shell`);
 }
 if (!/useEditableDocumentSource\s*\(\s*\)/.test(textFrameSource)) {
   errors.push(`${relative(textFramePath)} does not use the narrow editable-source boundary`);
@@ -145,10 +151,10 @@ if (!/replaceContent:\s*\(content:\s*string\)\s*=>\s*EditorSourceSnapshot/.test(
   errors.push(`${relative(sourceSnapshotPath)} does not require format-aware external replacement`);
 }
 for (const relativeAdapterPath of [
-  "viewers/TextEditorFrame.tsx",
-  "CodeMirrorCodeEditor.tsx",
+  "viewers/shared/TextEditorFrame.tsx",
+  "viewers/code/CodeMirrorCodeEditor.tsx",
   "markdown/MarkdownCodeMirrorEditor.tsx",
-  "puppyflow/PuppyFlowViewer.tsx",
+  "viewers/puppyflow/PuppyFlowViewer.tsx",
 ]) {
   const adapterPath = path.join(sharedEditorRoot, relativeAdapterPath);
   if (!/\breplaceContent\s*:/.test(readFileSync(adapterPath, "utf8"))) {
@@ -156,9 +162,9 @@ for (const relativeAdapterPath of [
   }
 }
 
-const viewerRegistryPath = path.join(sharedEditorRoot, "viewerRegistry.tsx");
+const viewerRegistryPath = path.join(sharedEditorRoot, "registry/viewerRegistry.tsx");
 const viewerRegistrySource = readFileSync(viewerRegistryPath, "utf8");
-if (!/id:\s*["']puppyflow["'][\s\S]*?import\(["']\.\/puppyflow\/PuppyFlowViewer["']\)/.test(viewerRegistrySource)) {
+if (!/id:\s*["']puppyflow["'][\s\S]*?import\(["']\.\.\/viewers\/puppyflow\/PuppyFlowViewer["']\)/.test(viewerRegistrySource)) {
   errors.push(`${relative(viewerRegistryPath)} does not route PuppyFlow through a preset contribution`);
 }
 
@@ -170,11 +176,11 @@ if (/\b(?:PuppyFlowEditor|renderPreviewBody|DocumentSessionBoundary)\b/.test(des
 
 const desktopAppPath = path.join(repoRoot, "src/App.tsx");
 const desktopAppSource = readFileSync(desktopAppPath, "utf8");
-if (!/flushActiveDocumentSessions\("document-close"\)/.test(desktopAppSource)) {
-  errors.push(`${relative(desktopAppPath)} does not await sessions before leaving the editor surface`);
+if (!/closeDocumentWorkingCopy\(editorId\)/.test(desktopAppSource)) {
+  errors.push(`${relative(desktopAppPath)} does not close the targeted document Working Copy with its Input`);
 }
-if (!/flushActiveDocumentSessions\("workspace-switch"\)/.test(desktopAppSource)) {
-  errors.push(`${relative(desktopAppPath)} does not await sessions before workspace navigation`);
+if (!/closeAllDocumentWorkingCopies\("workspace-switch"\)/.test(desktopAppSource)) {
+  errors.push(`${relative(desktopAppPath)} does not close all Working Copies before workspace navigation`);
 }
 
 const localMarkdownPersistenceTestPath = path.join(
@@ -185,8 +191,8 @@ const localMarkdownPersistenceTestSource = readFileSync(localMarkdownPersistence
 if (!/persists a real CodeMirror edit through DataWorkspace and the local desktop bridge/.test(localMarkdownPersistenceTestSource)) {
   errors.push(`${relative(localMarkdownPersistenceTestPath)} does not cover the complete local Markdown write path`);
 }
-if (!/keeps the local editor mounted when its pre-navigation save fails/.test(localMarkdownPersistenceTestSource)) {
-  errors.push(`${relative(localMarkdownPersistenceTestPath)} does not cover failed local navigation drain`);
+if (!/keeps failed local edits in their Working Copy across editor navigation/.test(localMarkdownPersistenceTestSource)) {
+  errors.push(`${relative(localMarkdownPersistenceTestPath)} does not cover failed Working Copy persistence across navigation`);
 }
 
 const localCsvPersistenceTestPath = path.join(

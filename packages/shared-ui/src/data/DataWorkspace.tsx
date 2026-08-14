@@ -14,12 +14,12 @@ import {
 } from "react";
 import type { DataCapabilities, DataNode, DataPort, FileContent, Workspace } from "../core/types";
 import { defaultDataCapabilities } from "../core/types";
-import { preloadPresetViewer } from "../editor/PresetViewerRenderer";
+import { preloadPresetViewer } from "../editor/host/PresetViewerRenderer";
 import {
   getEditorSourceRequirement,
   resolveEditorViewer,
   shouldReadEditorContent,
-} from "../editor/viewerRegistry";
+} from "../editor/registry/viewerRegistry";
 import {
   createMarkdownLinkGraph,
   EMPTY_MARKDOWN_LINK_GRAPH_INDEX,
@@ -29,15 +29,17 @@ import {
 } from "../editor/markdown/linkIndex";
 import { resolveMarkdownAssetPath } from "../editor/markdown/assetResolution";
 import { ExplorerTree } from "./ExplorerTree";
-import { FilePreview, type FilePreviewProps } from "./FilePreview";
+import { FilePreview, type FilePreviewProps } from "../editor/host/FilePreview";
 import { ProjectsHeader } from "./ProjectsHeader";
-import type { EditorSaveMode } from "../editor/PuppyoneEditorHost";
+import type { EditorSaveMode } from "../editor/host/EditorDocumentHost";
 import type {
   DocumentSourceKind,
   EditorInteractionPreferences,
+  MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
-} from "../editor/viewerTypes";
-import type { ViewerExtensionHostAdapter } from "../editor/viewerHostAdapters";
+  MarkdownLinkGraph,
+} from "../editor/registry/viewerTypes";
+import type { ViewerExtensionHostAdapter } from "../editor/registry/viewerHostAdapters";
 import { getAiEditFileForPath } from "../editor/ai-edits/diff";
 import type { AiEditRequest } from "../editor/ai-edits/types";
 import type { DocumentPersistedCommit } from "../editor/document-session/types";
@@ -71,6 +73,8 @@ export type DataWorkspaceState = {
   fileUrl: string | null;
   fileUrlLoading: boolean;
   fileUrlError: string | null;
+  markdownLinkGraph: MarkdownLinkGraph;
+  markdownAssetUrlResolver: MarkdownAssetUrlResolver;
 };
 
 type MoveOperation = {
@@ -84,14 +88,6 @@ export type DataWorkspaceSlot = ReactNode | ((state: DataWorkspaceState) => Reac
 export type DataWorkspaceFolderSlot = ReactNode | ((state: DataWorkspaceState, folder: DataNode) => ReactNode);
 export type DataWorkspaceNodeSlot = ReactNode | ((state: DataWorkspaceState, node: DataNode) => ReactNode);
 export type DataWorkspaceFolderExpansionStrategy = "load-before-expand" | "optimistic";
-export type DataWorkspaceActivePathChangeContext = Readonly<{
-  documentSessionsDrained: true;
-}>;
-
-const DRAINED_ACTIVE_PATH_CHANGE: DataWorkspaceActivePathChangeContext = Object.freeze({
-  documentSessionsDrained: true,
-});
-
 export type DataWorkspaceProps = {
   workspace: Workspace;
   dataPort: DataPort;
@@ -122,6 +118,7 @@ export type DataWorkspaceProps = {
   collapsedExplorerWidth?: number;
   explorerCollapseThreshold?: number;
   mainSlot?: DataWorkspaceSlot;
+  loadActiveFileSource?: boolean;
   emptySlot?: ReactNode;
   showPreviewHeader?: boolean;
   hidePreviewSourceView?: boolean;
@@ -131,6 +128,7 @@ export type DataWorkspaceProps = {
   htmlTrustMode?: MarkdownHtmlTrustMode;
   previewActionSlot?: FilePreviewProps["actionSlot"];
   previewAccessorySlot?: DataWorkspaceSlot;
+  onResourceMove?: (previousPath: string, nextPath: string) => void | Promise<void>;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   resolveOfficeEditorActions?: FilePreviewProps["resolveOfficeEditorActions"];
   documentSourceKind?: DocumentSourceKind;
@@ -144,7 +142,6 @@ export type DataWorkspaceProps = {
   onActivePathChange?: (
     path: string | null,
     node: DataNode | null,
-    context?: DataWorkspaceActivePathChangeContext,
   ) => void | Promise<void>;
   onActiveNodeChange?: (node: DataNode | null) => void;
   onExplorerRootClick?: (state: DataWorkspaceState, event: ReactMouseEvent<HTMLElement>) => void;
@@ -207,6 +204,7 @@ export function DataWorkspace({
   collapsedExplorerWidth = COLLAPSED_EXPLORER_WIDTH,
   explorerCollapseThreshold,
   mainSlot,
+  loadActiveFileSource = true,
   emptySlot,
   showPreviewHeader = true,
   hidePreviewSourceView = false,
@@ -216,6 +214,7 @@ export function DataWorkspace({
   htmlTrustMode = "safe",
   previewActionSlot,
   previewAccessorySlot,
+  onResourceMove,
   viewerExtensionAdapter = null,
   resolveOfficeEditorActions = null,
   documentSourceKind,
@@ -265,6 +264,7 @@ export function DataWorkspace({
   const [fileUrlLoading, setFileUrlLoading] = useState(false);
   const [fileUrlError, setFileUrlError] = useState<string | null>(null);
   const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
+  const [unavailableActivePath, setUnavailableActivePath] = useState<string | null>(null);
   const [markdownLinkIndexing, setMarkdownLinkIndexing] = useState(false);
   const [markdownLinkIndexBuilding, setMarkdownLinkIndexBuilding] = useState(false);
   const [markdownLinkIndex, setMarkdownLinkIndex] = useState<MarkdownLinkGraphIndexSnapshot>(
@@ -508,8 +508,14 @@ export function DataWorkspace({
       }).viewer
     : null, [documentSourceKind, resolvedDocumentSourceKind, selectedFile]);
   const selectedFileSourceRequirement = selectedFile ? getEditorSourceRequirement(selectedFile) : "none";
-  const selectedFileNeedsFullContent = Boolean(selectedFile && dataPort.readFile && shouldReadEditorContent(selectedFile));
+  const selectedFileNeedsFullContent = Boolean(
+    loadActiveFileSource
+    && selectedFile
+    && dataPort.readFile
+    && shouldReadEditorContent(selectedFile),
+  );
   const selectedFileNeedsResourceUrl = Boolean(
+    loadActiveFileSource &&
     selectedFile &&
     dataPort.getFileUrl &&
     (selectedFileSourceRequirement === "resource" || selectedFileSourceRequirement === "content-and-resource"),
@@ -540,7 +546,7 @@ export function DataWorkspace({
     // Selection owns route preloading. The currently committed preview may
     // intentionally remain on screen while a different format is read, so a
     // preload initiated by the rendered document can target the old viewer.
-    // The loader cache deduplicates this with PuppyoneEditorHost and React.lazy.
+    // The loader cache deduplicates this with EditorDocumentHost and React.lazy.
     void preloadPresetViewer(selectedFileViewer).catch(() => undefined);
   }, [selectedFileViewer]);
 
@@ -581,14 +587,9 @@ export function DataWorkspace({
     const requestId = ++documentNavigationRequestRef.current;
 
     try {
-      if (nextPath !== resolvedActivePath) {
-        // Navigation is a persistence transaction. Keep the current editor
-        // mounted until every active or retiring session has durably drained.
-        await flushActiveDocumentSessions("document-switch");
-      }
       if (requestId !== documentNavigationRequestRef.current) return false;
 
-      await onActivePathChange?.(nextPath, node, DRAINED_ACTIVE_PATH_CHANGE);
+      await onActivePathChange?.(nextPath, node);
       if (requestId !== documentNavigationRequestRef.current) return false;
 
       if (activePath === undefined) setInternalActivePath(nextPath);
@@ -600,7 +601,7 @@ export function DataWorkspace({
       }
       return false;
     }
-  }, [activePath, onActivePathChange, resolvedActivePath]);
+  }, [activePath, onActivePathChange]);
 
   const activateNode = useCallback(
     (node: DataNode | null, intent: { additive?: boolean; range?: boolean } = {}) => {
@@ -713,9 +714,15 @@ export function DataWorkspace({
     }
 
     activePathHydrationAttemptRef.current = { path: resolvedActivePath, refreshKey };
+    setUnavailableActivePath(null);
     let cancelled = false;
     void loadLinkedPathNode(resolvedActivePath).then((node) => {
-      if (cancelled || !node) return;
+      if (cancelled) return;
+      if (!node) {
+        setUnavailableActivePath(resolvedActivePath);
+        return;
+      }
+      setUnavailableActivePath(null);
       setExpandedFolderPaths((current) => addSetValues(current, collectAncestorFolderPaths(node.path)));
     });
 
@@ -868,6 +875,8 @@ export function DataWorkspace({
     fileUrl: selectedFileUrl,
     fileUrlLoading: selectedFileUrlLoading,
     fileUrlError: selectedFileUrlError,
+    markdownLinkGraph,
+    markdownAssetUrlResolver,
   };
   const previewAccessory = renderWorkspaceSlot(previewAccessorySlot, workspaceState);
 
@@ -879,7 +888,7 @@ export function DataWorkspace({
   }, [resolvedActivePath]);
 
   useEffect(() => {
-    if (!selectedFile) {
+    if (!loadActiveFileSource || !selectedFile) {
       fileOpenCoordinatorRef.current?.cancelCurrent();
       setFileContent(null);
       setFileError(null);
@@ -939,7 +948,7 @@ export function DataWorkspace({
     return () => {
       request.cancel();
     };
-  }, [dataPort, refreshKey, selectedFile]);
+  }, [dataPort, loadActiveFileSource, refreshKey, selectedFile]);
 
   useEffect(() => {
     if (!selectedFile || !selectedFileNeedsResourceUrl || !dataPort.getFileUrl) {
@@ -1120,19 +1129,12 @@ export function DataWorkspace({
       setLoadError(null);
 
       const nextActivePath = rebasePathByMoveOperations(resolvedActivePath, operations);
-      if (nextActivePath !== resolvedActivePath) {
-        try {
-          await flushActiveDocumentSessions("document-switch");
-          setDocumentNavigationError(null);
-        } catch (error) {
-          setDocumentNavigationError(error instanceof Error ? error.message : String(error));
-          return;
-        }
-      }
-
       try {
+        await flushActiveDocumentSessions("document-switch");
+        setDocumentNavigationError(null);
         for (const operation of operations) {
           await dataPort.moveNode(operation.previousPath, operation.nextPath);
+          await onResourceMove?.(operation.previousPath, operation.nextPath);
         }
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : String(error));
@@ -1179,6 +1181,7 @@ export function DataWorkspace({
       requestActiveNodeChange,
       resolvedActivePath,
       resolvedCapabilities.move,
+      onResourceMove,
     ],
   );
   const moveNode = useCallback(
@@ -1425,7 +1428,9 @@ export function DataWorkspace({
                   viewerExtensionAdapter={viewerExtensionAdapter}
                   documentSourceKind={documentSourceKind ?? resolvedDocumentSourceKind}
                   emptySlot={resolvedActivePath && !activeNode
-                    ? <div className="empty-preview" aria-busy="true" />
+                    ? unavailableActivePath === resolvedActivePath
+                      ? <div className="empty-preview" role="alert"><span>{t("editor.unavailable.title")}</span></div>
+                      : <div className="empty-preview" aria-busy="true" />
                     : emptySlot}
                   actionSlot={previewActionSlot}
                   documentPersistence={dataPort.documentPersistence ?? null}

@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { CsvTableEditor } from "../packages/shared-ui/src/editor/CsvTableEditor";
+import { CsvTableEditor } from "../packages/shared-ui/src/editor/viewers/csv/CsvTableEditor";
 import { CodeMirrorFindAdapter } from "../packages/shared-ui/src/editor/find/codeMirrorFindAdapter";
 import { MarkdownCodeMirrorEditor } from "../packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor";
 import { DesktopTitlebarActions } from "../src/features/app-shell/DesktopTitlebarActions";

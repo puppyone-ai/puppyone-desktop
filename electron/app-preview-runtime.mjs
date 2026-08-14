@@ -155,17 +155,6 @@ export function createAppPreviewRuntime({
     return serializeSession(existing);
   }
 
-  async function stopForIdle(request) {
-    const rootPath = normalizeRootPath(request?.rootPath);
-    const appPath = normalizeAppPath(request?.path);
-    const existing = getSession(getSessionKey(rootPath, appPath));
-    if (!existing) return null;
-    await stopSession(existing, "idle timeout");
-    const result = serializeSession(existing);
-    releaseSession(existing);
-    return result;
-  }
-
   async function getLogs(sender, request) {
     const rootPath = normalizeRootPath(request?.rootPath);
     const appPath = normalizeAppPath(request?.path);
@@ -454,7 +443,6 @@ export function createAppPreviewRuntime({
     start,
     restart,
     stop,
-    stopForIdle,
     getLogs,
     openExternal,
     closeSessionsForWindow,

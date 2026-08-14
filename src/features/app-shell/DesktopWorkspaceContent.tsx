@@ -6,7 +6,6 @@ import {
   DataWorkspace,
   type AiEditRequest,
   type DataNode,
-  type DataWorkspaceActivePathChangeContext,
   type EditorInteractionPreferences,
   type Workspace,
 } from "@puppyone/shared-ui";
@@ -30,6 +29,7 @@ import {
 } from "./workspace-surfaces";
 import { useDesktopViewerPacks } from "../viewer-packs/host";
 import { DesktopDataWorkspaceSurface } from "./DesktopDataWorkspaceSurface";
+import type { DesktopEditorWorkbenchController } from "../editor-workbench/controller/useDesktopEditorWorkbench";
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopWorkspaceContentProps = {
@@ -38,6 +38,7 @@ type DesktopWorkspaceContentProps = {
   activeView: DesktopView;
   cloud: DesktopWorkspaceCloudSurfaceController;
   dataPort: DataWorkspacePort | null;
+  editorWorkbench: DesktopEditorWorkbenchController;
   fileClipboardController: FileClipboardController;
   desktopUpdates: DesktopUpdatesController;
   git: DesktopGitController;
@@ -45,9 +46,9 @@ type DesktopWorkspaceContentProps = {
   onActiveDataPathChange: (
     path: string | null,
     node?: DataNode | null,
-    context?: DataWorkspaceActivePathChangeContext,
   ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
+  onResourceMove: (previousPath: string, nextPath: string) => void | Promise<void>;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onDismissCreateEntryMenu: () => void;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
@@ -76,12 +77,14 @@ export function DesktopWorkspaceContent({
   activeView,
   cloud,
   dataPort,
+  editorWorkbench,
   fileClipboardController,
   desktopUpdates,
   git,
   minimalMode = false,
   onActiveDataPathChange,
   onActiveDataNodeChange,
+  onResourceMove,
   onCreateEntryMenu,
   onDismissCreateEntryMenu,
   onFilesVisibilitySettingsChange,
@@ -168,6 +171,7 @@ export function DesktopWorkspaceContent({
       activeAiEditRequest={activeAiEditRequest}
       activeDataPath={activeDataPath}
       dataPort={dataPort}
+      editorWorkbench={editorWorkbench}
       editorInteractionPreferences={editorInteractionPreferences}
       fileClipboardController={fileClipboardController}
       fileOperationNotice={fileOperationNotice}
@@ -187,6 +191,7 @@ export function DesktopWorkspaceContent({
       }}
       onActiveDataNodeChange={onActiveDataNodeChange}
       onActiveDataPathChange={onActiveDataPathChange}
+      onResourceMove={onResourceMove}
       onCreateEntryMenu={onCreateEntryMenu}
       onDismissCreateEntryMenu={onDismissCreateEntryMenu}
       onNodeActionMenu={onNodeActionMenu}

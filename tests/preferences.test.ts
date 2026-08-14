@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   DEFAULT_EXPERIMENTAL_SETTINGS,
   TEXT_SIZE_PRESETS,
-  getVisibleCreateNewFileTypes,
+  getVisibleCreateNewItems,
   parseCreateNewMenuSettings,
   parseDarkThemePreset,
   parseDiffMarkers,
@@ -19,11 +19,14 @@ import {
 } from "../src/preferences";
 
 describe("create new menu preferences", () => {
-  it("defaults to Markdown and CSV while preserving explicit order and visibility", () => {
+  it("migrates the legacy default while preserving explicit order and visibility", () => {
     expect(parseCreateNewMenuSettings(null)).toEqual({
+      version: 2,
       items: [
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
+        { kind: "html", enabled: true },
+        { kind: "slides", enabled: true },
       ],
     });
     expect(parseCreateNewMenuSettings(JSON.stringify({
@@ -32,6 +35,7 @@ describe("create new menu preferences", () => {
         { kind: "text", enabled: true },
       ],
     }))).toEqual({
+      version: 2,
       items: [
         { kind: "json", enabled: false },
         { kind: "text", enabled: true },
@@ -43,6 +47,22 @@ describe("create new menu preferences", () => {
         { kind: "csv", enabled: true },
       ],
     }))).toEqual({
+      version: 2,
+      items: [
+        { kind: "markdown", enabled: true },
+        { kind: "csv", enabled: true },
+        { kind: "html", enabled: true },
+        { kind: "slides", enabled: true },
+      ],
+    });
+    expect(parseCreateNewMenuSettings(JSON.stringify({
+      version: 2,
+      items: [
+        { kind: "markdown", enabled: true },
+        { kind: "csv", enabled: true },
+      ],
+    }))).toEqual({
+      version: 2,
       items: [
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
@@ -58,28 +78,33 @@ describe("create new menu preferences", () => {
         { kind: "not-a-file-type", enabled: true },
       ],
     }))).toEqual({
+      version: 2,
       items: [{ kind: "json", enabled: true }],
     });
     expect(parseCreateNewMenuSettings(JSON.stringify({
       items: [{ kind: "not-a-file-type" }],
     }))).toEqual({
+      version: 2,
       items: [
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
+        { kind: "html", enabled: true },
+        { kind: "slides", enabled: true },
       ],
     });
-    expect(parseCreateNewMenuSettings(JSON.stringify({ items: [] }))).toEqual({ items: [] });
+    expect(parseCreateNewMenuSettings(JSON.stringify({ items: [] }))).toEqual({ version: 2, items: [] });
   });
 
   it("shows only enabled and currently available file types", () => {
     const settings = {
+      version: 2,
       items: [
         { kind: "app", enabled: true },
         { kind: "json", enabled: false },
         { kind: "csv", enabled: true },
       ],
     } as const;
-    expect(getVisibleCreateNewFileTypes(settings, DEFAULT_EXPERIMENTAL_SETTINGS)).toEqual(["app", "csv"]);
+    expect(getVisibleCreateNewItems(settings, DEFAULT_EXPERIMENTAL_SETTINGS)).toEqual(["app", "csv"]);
   });
 });
 

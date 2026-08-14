@@ -10,9 +10,8 @@ import {
 import { useLocalization } from "@puppyone/localization/react";
 import type { DocumentPersistencePort } from "../../core/types";
 import { EditorSaveButton } from "../EditorSaveButton";
-import type { EditorSaveMode } from "../viewerTypes";
-import { registerActiveDocumentSession } from "./activeDocumentSessions";
-import { DocumentEditingSession } from "./DocumentEditingSession";
+import type { EditorSaveMode } from "../registry/viewerTypes";
+import { getOrCreateDocumentWorkingCopy } from "./documentWorkingCopies";
 import { EditableDocumentSourceProvider } from "./EditableDocumentSourceContext";
 import { formatDocumentSessionError } from "./formatDocumentSessionError";
 import type { DocumentPersistedCommit } from "./types";
@@ -44,21 +43,14 @@ export function DocumentSessionBoundary({
   // Baseline, callback, and policy changes reconcile into this document's
   // existing session. Only document/storage identity creates a new queue.
   const binding = useMemo(() => {
-    // Each session gets its own callback cell. An old session may finish after
-    // React has committed the next document; sharing one ref across sessions
-    // would misroute (or drop) that old document's acknowledgement.
-    const onPersistedRef: { current: typeof onPersisted } = { current: onPersisted };
-    return {
-      onPersistedRef,
-      session: new DocumentEditingSession({
-        documentId,
-        initialContent,
-        initialVersion,
-        saveMode,
-        persistence,
-        onPersisted: (commit) => onPersistedRef.current?.(commit),
-      }),
-    };
+    return getOrCreateDocumentWorkingCopy({
+      documentId,
+      initialContent,
+      initialVersion,
+      saveMode,
+      persistence,
+      onPersisted,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId, persistence]);
   binding.onPersistedRef.current = onPersisted;
@@ -69,13 +61,6 @@ export function DocumentSessionBoundary({
   useEffect(() => {
     session.setSaveMode(saveMode);
   }, [saveMode, session]);
-
-  useEffect(() => {
-    // The registry defers permanent disposal until it can distinguish a real
-    // unmount from React StrictMode's cleanup/setup development probe. Child
-    // detachment still captures the final editor snapshot synchronously.
-    return registerActiveDocumentSession(session);
-  }, [session]);
 
   const saveBlocked = sessionState.error?.code === "external-conflict";
   const showSaveChrome = showSaveStatus
