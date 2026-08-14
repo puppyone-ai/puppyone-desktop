@@ -88,7 +88,7 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: color-mix(in srgb, var(--po-text-muted) 84%, transparent);
+  color: color-mix(in srgb, var(--po-text-muted) 68%, transparent);
   outline: 0;
   cursor: grab;
   touch-action: none;
@@ -96,14 +96,14 @@
 
 .desktop-editor-pane-handle:hover,
 .desktop-editor-pane-handle:focus-visible {
-  color: var(--po-text-muted);
+  color: color-mix(in srgb, var(--po-text-muted) 82%, transparent);
 }
 
 .desktop-editor-pane-handle > i {
   display: block;
   width: 3px;
   height: 3px;
-  border-radius: 50%;
+  border-radius: 0;
   background: currentColor;
 }
 
