@@ -99,7 +99,12 @@ describe("sender-bound workspace authorization", () => {
     registerWorkspaceWatchIpcHandlers({ ipcMain, workspaceWatchService, authorizeWorkspaceRoot });
     registerGitMetadataWatchIpcHandlers({ ipcMain, gitMetadataWatchService, authorizeWorkspaceRoot });
     registerAppPreviewIpcHandlers({ ipcMain, appPreviewRuntime, authorizeWorkspaceRoot });
-    registerTerminalIpcHandlers({ ipcMain, terminalService, authorizeWorkspaceRoot });
+    registerTerminalIpcHandlers({
+      ipcMain,
+      terminalAgentLocator: { locate: vi.fn() },
+      terminalService,
+      authorizeWorkspaceRoot,
+    });
 
     const event = { sender: { id: 7 } };
     for (const [channel, request] of [
@@ -145,11 +150,42 @@ describe("sender-bound workspace authorization", () => {
       resize: vi.fn(),
       close: vi.fn(),
     };
+    const terminalAgentLocator = {
+      locate: vi.fn(async () => ({
+        availableAgentIds: ["codex"],
+        scannedAt: "2026-08-15T00:00:00.000Z",
+        source: "scan",
+      })),
+    };
     registerAppPreviewIpcHandlers({ ipcMain, appPreviewRuntime, authorizeWorkspaceRoot });
-    registerTerminalIpcHandlers({ ipcMain, terminalService, authorizeWorkspaceRoot });
+    registerTerminalIpcHandlers({
+      ipcMain,
+      terminalAgentLocator,
+      terminalService,
+      authorizeWorkspaceRoot,
+    });
 
-    const sender = { id: 8 };
+    const sender = { id: 8, send: vi.fn() };
     const event = { sender };
+    await handlers.get("terminal:agents-locate")(event, {
+      refresh: true,
+      requestId: "terminal-agent-location:test",
+    });
+    expect(terminalAgentLocator.locate).toHaveBeenCalledWith({
+      refresh: true,
+      onProgress: expect.any(Function),
+    });
+    terminalAgentLocator.locate.mock.calls[0][0].onProgress({
+      availableAgentIds: ["codex"],
+      completedAgentCount: 1,
+      totalAgentCount: 6,
+    });
+    expect(sender.send).toHaveBeenCalledWith("terminal:agents-progress", {
+      availableAgentIds: ["codex"],
+      completedAgentCount: 1,
+      requestId: "terminal-agent-location:test",
+      totalAgentCount: 6,
+    });
     await handlers.get("app-preview:start")(event, { rootPath: root, path: "app.puppyoneapp" });
     expect(appPreviewRuntime.start).toHaveBeenCalledWith(sender, {
       rootPath: await fs.promises.realpath(root),

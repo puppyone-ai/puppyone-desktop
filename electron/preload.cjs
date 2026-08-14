@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   setWindowMinimumWidth: (request) => (
     ipcRenderer.invoke("window-layout:set-minimum-width", request)
   ),
+  capturePanePreview: (request) => ipcRenderer.invoke("pane-preview:capture", request),
   setNativeSurfaceOccluded: (request) => {
     ipcRenderer.send("native-surfaces:set-overlay-occluded", {
       occluded: request?.occluded === true,
@@ -327,6 +328,13 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
       },
     },
   } : {}),
+  locateTerminalAgents: (request) => ipcRenderer.invoke("terminal:agents-locate", request),
+  onTerminalAgentLocationProgress: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("terminal:agents-progress", listener);
+    return () => ipcRenderer.removeListener("terminal:agents-progress", listener);
+  },
   createTerminal: (request) => ipcRenderer.invoke("terminal:create", request),
   writeTerminal: (request) => ipcRenderer.send("terminal:input", request),
   resizeTerminal: (request) => ipcRenderer.send("terminal:resize", request),

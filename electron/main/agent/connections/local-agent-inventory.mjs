@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { deriveLocalConnection } from "./local-agent-connection-policy.mjs";
 import { resolveFirstExecutable } from "./probes/executable-candidates.mjs";
@@ -8,12 +9,12 @@ import { sanitizeAgentLocalConnectionsSnapshot } from "../../../../shared/agent-
 const CACHE_TTL_MS = 5 * 60 * 1_000;
 const PERSISTED_CACHE_TTL_MS = 24 * 60 * 60 * 1_000;
 const MAX_PERSISTED_CACHE_BYTES = 64 * 1024;
-const PERSISTED_CACHE_VERSION = 1;
+const PERSISTED_CACHE_VERSION = 2;
 
 export function createLocalAgentInventory({
   appVersion = "0.0.0",
   env = process.env,
-  homedir,
+  homedir = os.homedir(),
   platform = process.platform,
   now = Date.now,
   cacheTtlMs = CACHE_TTL_MS,
@@ -22,10 +23,13 @@ export function createLocalAgentInventory({
   fsModule = fs,
   logger = console,
   toolDescriptors = createLocalAgentToolRegistry(),
-  resolveCandidate = (tool) => resolveFirstExecutable({
+  resolveCandidate = async (tool) => resolveFirstExecutable({
     names: tool.executableNames,
+    configuredPaths: typeof tool.candidatePaths === "function"
+      ? await tool.candidatePaths({ env, homedir, platform })
+      : [],
     env,
-    ...(homedir ? { homedir } : {}),
+    homedir,
     platform,
   }),
   probes = {},

@@ -1,8 +1,11 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization";
 import type { EditorPaneLayoutLeaf } from "@puppyone/shared-ui";
 import type { EditorFileDropController } from "../drag-and-drop/useExplorerFileDrop";
 import type { PaneMoveDragController } from "../drag-and-drop/usePaneMoveDrag";
+
+/** Ghostty-style reveal: the grab dots appear in the leading third of the pane. */
+export const PANE_HANDLE_REVEAL_RATIO = 1 / 3;
 
 export type EditorPaneShellProps = Readonly<{
   active: boolean;
@@ -34,6 +37,9 @@ export function EditorPaneShell({
 }: EditorPaneShellProps) {
   const { t } = useLocalization();
   const actionsRef = useRef<HTMLDivElement>(null);
+  const paneRef = useRef<HTMLElement>(null);
+  const handleHotRef = useRef(false);
+  const [handleHot, setHandleHot] = useState(false);
   const paneMoveEdge = paneMove.dropIntent?.targetPaneId === pane.id
     ? paneMove.dropIntent.edge
     : null;
@@ -41,6 +47,24 @@ export function EditorPaneShell({
     ? fileDrop.dropIntent.edge
     : null;
   const dropEdge = fileDropEdge ?? paneMoveEdge;
+  const handleRevealed = handleHot || actionsOpen;
+
+  const setHandleHotIfChanged = (next: boolean) => {
+    if (handleHotRef.current === next) return;
+    handleHotRef.current = next;
+    setHandleHot(next);
+  };
+
+  const updateHandleHotFromPoint = (clientX: number, clientY: number) => {
+    const host = paneRef.current;
+    if (!host) return;
+    const rect = host.getBoundingClientRect();
+    setHandleHotIfChanged(isPointInPaneHandleRevealZone(rect, clientX, clientY));
+  };
+
+  const onPanePointerMove = (event: PointerEvent<HTMLElement>) => {
+    updateHandleHotFromPoint(event.clientX, event.clientY);
+  };
 
   useEffect(() => {
     if (!actionsOpen) return undefined;
@@ -53,16 +77,20 @@ export function EditorPaneShell({
 
   return (
     <section
+      ref={paneRef}
       className="desktop-editor-pane"
       data-editor-pane-id={pane.id}
       data-active={active ? "true" : undefined}
       data-empty={editorLabel ? undefined : "true"}
+      data-handle-hot={handleRevealed ? "true" : undefined}
       data-drop-target={dropEdge ?? undefined}
       data-drop-kind={fileDropEdge ? "file" : paneMoveEdge ? "pane" : undefined}
       aria-label={editorLabel
         ? t("editor.panes.label", { name: editorLabel })
         : t("editor.panes.empty")}
       onFocusCapture={onActivate}
+      onPointerMove={onPanePointerMove}
+      onPointerLeave={() => setHandleHotIfChanged(false)}
       onPointerUp={(event) => {
         // Focusable editors activate through focus after native caret placement.
         // Pointer-up covers non-focusable previews after selection handling.
@@ -73,8 +101,7 @@ export function EditorPaneShell({
       onDragLeaveCapture={(event) => fileDrop.leave(event, pane.id)}
       onDropCapture={(event) => fileDrop.drop(event, pane.id)}
     >
-      {paneCount > 1 && (
-        <div className="desktop-editor-pane-handle-shell" ref={actionsRef}>
+      <div className="desktop-editor-pane-handle-shell" ref={actionsRef}>
           <button
             className="desktop-editor-pane-handle"
             type="button"
@@ -88,7 +115,7 @@ export function EditorPaneShell({
               }
             }}
             onPointerDown={(event) => {
-              if (event.button === 0) paneMove.start(event, pane);
+              if (event.button === 0 && paneCount > 1) paneMove.start(event, pane);
             }}
             onPointerMove={paneMove.move}
             onPointerUp={paneMove.end}
@@ -113,10 +140,20 @@ export function EditorPaneShell({
               </button>
             </div>
           )}
-        </div>
-      )}
+      </div>
       <div className="desktop-editor-pane-content">{children}</div>
       {dropEdge && <div className="desktop-editor-drop-preview" data-edge={dropEdge} />}
     </section>
   );
+}
+
+export function isPointInPaneHandleRevealZone(
+  rect: Pick<DOMRect, "left" | "right" | "top" | "height">,
+  clientX: number,
+  clientY: number,
+): boolean {
+  return clientX >= rect.left
+    && clientX <= rect.right
+    && clientY >= rect.top
+    && clientY < rect.top + rect.height * PANE_HANDLE_REVEAL_RATIO;
 }

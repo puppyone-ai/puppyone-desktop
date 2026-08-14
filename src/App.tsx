@@ -943,9 +943,6 @@ function AppContent() {
       onCloseTerminal={(sessionId) => terminalPanelRef.current?.close(sessionId)}
       onToggleTerminal={() => {
         const terminalIsOpen = rightSidebarOpen && rightSidebarSurface === "terminal";
-        if (!terminalIsOpen && currentTerminalSnapshot.sessions.length === 0) {
-          terminalPanelRef.current?.create();
-        }
         setRightSidebarSurface("terminal");
         setRightSidebarOpen(!terminalIsOpen);
         setSwitcherOpen(false);

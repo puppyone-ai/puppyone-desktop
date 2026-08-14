@@ -50,6 +50,7 @@ import { registerCloudPublishIpcHandlers } from "./main/ipc/cloud-publish-ipc.mj
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
 import { registerNativeSurfaceOcclusionIpcHandlers } from "./main/ipc/native-surface-occlusion-ipc.mjs";
 import { registerNativeSurfacePointerPassthroughIpcHandlers } from "./main/ipc/native-surface-pointer-passthrough-ipc.mjs";
+import { registerPanePreviewIpcHandlers } from "./main/ipc/pane-preview-ipc.mjs";
 import { registerLocalizationIpcHandlers } from "./main/ipc/localization-ipc.mjs";
 import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service.mjs";
 import { createNativeSurfaceOcclusionCoordinator } from "./main/native-surfaces/occlusion-coordinator.mjs";
@@ -67,6 +68,7 @@ import { registerLocalFileProtocol } from "./main/local-file-protocol.mjs";
 import { createLocalFileCapabilityStore } from "./main/local-file-capabilities.mjs";
 import { installWindowNavigationSecurity, requireNonEmptyString } from "./main/security.mjs";
 import { createTerminalService } from "./main/terminal-service.mjs";
+import { createTerminalAgentLocator } from "./main/terminal-agent/terminal-agent-locator.mjs";
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
@@ -211,6 +213,7 @@ const terminalService = createTerminalService({
   appVersion: desktopBuildInfo.version,
   initializeWorkspaceEditReview,
 });
+const terminalAgentLocator = createTerminalAgentLocator();
 const agentSessionCache = createEphemeralAgentSessionCache({ app });
 const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   appVersion: desktopBuildInfo.version,
@@ -667,6 +670,7 @@ app.on("will-quit", () => {
   nativeSurfaceOcclusion.dispose();
   nativeSurfacePointerPassthrough.dispose();
   terminalService.closeAll();
+  terminalAgentLocator.dispose();
   localAgentInventory.dispose();
   workspaceWatchService.closeAll();
   gitMetadataWatchService.closeAll();
@@ -698,6 +702,10 @@ function registerIpcHandlers() {
   registerNativeSurfacePointerPassthroughIpcHandlers({
     ipcMain: trustedIpcMain,
     coordinator: nativeSurfacePointerPassthrough,
+  });
+  registerPanePreviewIpcHandlers({
+    ipcMain: trustedIpcMain,
+    BrowserWindow,
   });
   registerBuildInfoIpcHandlers({
     ipcMain: trustedIpcMain,
@@ -783,6 +791,7 @@ function registerIpcHandlers() {
   });
   registerTerminalIpcHandlers({
     ipcMain: trustedIpcMain,
+    terminalAgentLocator,
     terminalService,
     authorizeWorkspaceRoot,
   });

@@ -34,7 +34,10 @@ export function TerminalSessionView({
     if (!container) return undefined;
     const unsubscribeReady = runtime.subscribeReady(setReady);
     runtime.mount(container);
-    return unsubscribeReady;
+    return () => {
+      unsubscribeReady();
+      runtime.unmount(container);
+    };
   }, [runtime]);
 
   useLayoutEffect(() => {

@@ -1,0 +1,54 @@
+.desktop-terminal-activity-grid {
+  --desktop-terminal-activity-cell-size: 3px;
+  --desktop-terminal-activity-gap: 2px;
+
+  display: grid;
+  width: calc(var(--desktop-terminal-activity-cell-size) * 2 + var(--desktop-terminal-activity-gap));
+  height: calc(var(--desktop-terminal-activity-cell-size) * 2 + var(--desktop-terminal-activity-gap));
+  grid-template-columns: repeat(2, var(--desktop-terminal-activity-cell-size));
+  grid-template-rows: repeat(2, var(--desktop-terminal-activity-cell-size));
+  gap: var(--desktop-terminal-activity-gap);
+}
+
+.desktop-terminal-activity-grid > span {
+  width: var(--desktop-terminal-activity-cell-size);
+  height: var(--desktop-terminal-activity-cell-size);
+  background: currentColor;
+  opacity: 0.22;
+  animation: desktop-terminal-activity-cell 0.8s steps(1, end) infinite;
+}
+
+.desktop-terminal-activity-grid > span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.desktop-terminal-activity-grid > span:nth-child(4) {
+  animation-delay: 0.4s;
+}
+
+.desktop-terminal-activity-grid > span:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+@keyframes desktop-terminal-activity-cell {
+  0%,
+  24% {
+    opacity: 1;
+  }
+
+  25%,
+  100% {
+    opacity: 0.22;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-terminal-activity-grid > span {
+    animation: none;
+    opacity: 0.35;
+  }
+
+  .desktop-terminal-activity-grid > span:first-child {
+    opacity: 1;
+  }
+}

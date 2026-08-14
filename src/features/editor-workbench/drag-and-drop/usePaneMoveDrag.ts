@@ -24,6 +24,13 @@ import {
   paneSplitDefinition,
   type PaneDropIntent,
 } from "./paneDropGeometry";
+import {
+  applyPaneMovePreviewSnapshot,
+  capturePaneMovePreview,
+  createPaneMovePreview,
+  destroyPaneMovePreview,
+  movePaneMovePreview,
+} from "./paneMovePreview";
 
 export type EditorPaneMoveHandler = (
   sourcePaneId: string,
@@ -45,6 +52,7 @@ export type PaneMoveDragController = Readonly<{
 
 type PaneMoveSession = {
   handle: HTMLButtonElement;
+  sourcePane: HTMLElement | null;
   sourcePaneId: string;
   originX: number;
   originY: number;
@@ -53,6 +61,7 @@ type PaneMoveSession = {
   id: string;
   nativeLease: NativeSurfacePointerPassthroughLease | null;
   onMovePane: EditorPaneMoveHandler;
+  preview: HTMLElement | null;
 };
 
 type PaneMoveFinishReason = InteractionTerminationReason
@@ -71,6 +80,7 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
   const draggedClickRef = useRef(false);
 
   const publishDropIntent = useCallback((intent: PaneDropIntent | null) => {
+    if (samePaneDropIntent(dropIntentRef.current, intent)) return;
     dropIntentRef.current = intent;
     setDropIntent(intent);
   }, []);
@@ -89,6 +99,8 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
       dropIntentRef.current = null;
     }
     document.body.classList.remove("desktop-editor-pane-dragging");
+    session.sourcePane?.removeAttribute("data-move-source");
+    destroyPaneMovePreview(session.preview);
     session.nativeLease?.release();
     try {
       if (session.handle.hasPointerCapture(session.pointerId)) {
@@ -114,9 +126,11 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
     if (sessionRef.current) finishGesture("restart");
     draggedClickRef.current = false;
     const id = createNativeSurfacePointerSessionId("editor-pane-move");
+    const sourcePane = event.currentTarget.closest<HTMLElement>("[data-editor-pane-id]");
     sessionRef.current = {
       handle: event.currentTarget,
       id,
+      sourcePane,
       sourcePaneId: pane.id,
       originX: event.clientX,
       originY: event.clientY,
@@ -124,6 +138,7 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
       dragging: false,
       nativeLease: null,
       onMovePane,
+      preview: null,
     };
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -145,10 +160,29 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
       draggedClickRef.current = true;
       setDragging(true);
       document.body.classList.add("desktop-editor-pane-dragging");
+      if (session.sourcePane) {
+        const snapshotPromise = capturePaneMovePreview(session.sourcePane);
+        session.preview = createPaneMovePreview(
+          session.sourcePane,
+          event.clientX,
+          event.clientY,
+        );
+        const activeSessionId = session.id;
+        void snapshotPromise.then((snapshot) => {
+          const active = sessionRef.current;
+          if (!active || active.id !== activeSessionId) return;
+          if (snapshot && active.preview) {
+            applyPaneMovePreviewSnapshot(active.preview, snapshot);
+          }
+          active.sourcePane?.setAttribute("data-move-source", "true");
+        });
+      }
       session.nativeLease = acquireNativeSurfacePointerPassthroughLease(
         "editor-pane-move",
         session.id,
       );
+    } else if (session.preview) {
+      movePaneMovePreview(session.preview, event.clientX, event.clientY);
     }
     const element = document.elementFromPoint?.(event.clientX, event.clientY);
     const target = element?.closest<HTMLElement>("[data-editor-pane-id]");
@@ -204,4 +238,13 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
     lostCapture,
     consumeDraggedClick,
   }), [cancel, consumeDraggedClick, dragging, dropIntent, end, lostCapture, move, start]);
+}
+
+function samePaneDropIntent(left: PaneDropIntent | null, right: PaneDropIntent | null): boolean {
+  return left === right || Boolean(
+    left
+    && right
+    && left.targetPaneId === right.targetPaneId
+    && left.edge === right.edge,
+  );
 }

@@ -21,10 +21,11 @@ type TerminalTitlebarSession = {
   id: string;
   ordinal: number;
   shell: string | null;
-  status: "starting" | "running" | "exited" | "error";
+  status: "selecting" | "starting" | "running" | "exited" | "error";
 };
 
 const terminalStatusMessageKey = {
+  selecting: "terminal.launcher.title",
   starting: "terminal.status.starting",
   running: "terminal.status.running",
   exited: "terminal.status.exited",

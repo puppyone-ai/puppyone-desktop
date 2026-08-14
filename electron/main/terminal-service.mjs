@@ -1,7 +1,17 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import pty from "node-pty";
+import {
+  createTerminalAgentLaunchResolver,
+  isTerminalAgentLauncherId,
+} from "./terminal-agent/terminal-agent-launch-resolver.mjs";
+import {
+  createTerminalShellHost,
+  isTerminalAgentDisplayReady,
+} from "./terminal-shell-host.mjs";
 import { resolveCanonicalWorkspaceDirectory } from "./workspace-authorization.mjs";
+
+const DEFAULT_AGENT_REVEAL_TIMEOUT_MS = 2_400;
 
 export function createTerminalService({
   appVersion,
@@ -10,6 +20,11 @@ export function createTerminalService({
   logger = console,
   platform = process.platform,
   ptyService = pty,
+  resolveTerminalAgentLaunch = createTerminalAgentLaunchResolver({
+    env: environment,
+    platform,
+  }),
+  agentRevealTimeoutMs = DEFAULT_AGENT_REVEAL_TIMEOUT_MS,
 }) {
   const sessions = new Map();
 
@@ -26,7 +41,10 @@ export function createTerminalService({
     const id = normalizeTerminalId(request?.id);
     const cols = normalizeTerminalSize(request?.cols, 80, 20, 400);
     const rows = normalizeTerminalSize(request?.rows, 24, 8, 120);
-    const spawnConfig = buildTerminalSpawnConfig(environment, platform);
+    const spawnConfig = await resolveTerminalSpawnConfig(
+      request?.launcherId,
+      { environment, platform, resolveTerminalAgentLaunch },
+    );
 
     const existing = get(id);
     if (existing && existing.sender.id !== senderId) {
@@ -39,16 +57,21 @@ export function createTerminalService({
 
     let terminal;
     try {
+      const terminalEnvironment = buildTerminalEnvironment(environment, {
+        appVersion,
+        freshLoginShell: spawnConfig.loginShell,
+        platform,
+      });
       terminal = ptyService.spawn(spawnConfig.file, spawnConfig.args, {
         name: "xterm-256color",
         cwd,
         cols,
         rows,
-        env: buildTerminalEnvironment(environment, {
-          appVersion,
-          freshLoginShell: spawnConfig.loginShell,
+        env: prependTerminalPathEntries(
+          terminalEnvironment,
+          spawnConfig.pathEntries,
           platform,
-        }),
+        ),
       });
     } catch (error) {
       throw new Error(`Failed to start terminal: ${error instanceof Error ? error.message : String(error)}`);
@@ -64,11 +87,30 @@ export function createTerminalService({
 
     sessions.set(id, session);
 
-    terminal.onData((data) => sendTerminalData(session, data));
+    const agentRevealGate = spawnConfig.kind === "agent"
+      ? createAgentRevealGate(agentRevealTimeoutMs)
+      : null;
+    terminal.onData((data) => {
+      sendTerminalData(session, data);
+      agentRevealGate?.observe(data);
+    });
     terminal.onExit(({ exitCode, signal }) => {
+      agentRevealGate?.settle();
       sendTerminalExit(session, exitCode, signal ? String(signal) : null);
       if (sessions.get(id) === session) sessions.delete(id);
     });
+
+    if (spawnConfig.agentBootstrapInput) {
+      try {
+        agentRevealGate?.begin();
+        terminal.write(spawnConfig.agentBootstrapInput);
+      } catch (error) {
+        agentRevealGate?.settle();
+        closeSession(session);
+        throw new Error(`TERMINAL_AGENT_START_FAILED: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      await agentRevealGate?.wait();
+    }
 
     return {
       id,
@@ -152,6 +194,53 @@ export function createTerminalService({
   };
 }
 
+function createAgentRevealGate(timeoutValue) {
+  const timeoutMs = normalizeAgentRevealTimeout(timeoutValue);
+  let buffer = "";
+  let started = false;
+  let settled = false;
+  let timer = null;
+  let resolveWait;
+  const waitPromise = new Promise((resolve) => {
+    resolveWait = resolve;
+  });
+
+  const settle = () => {
+    if (settled) return;
+    settled = true;
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+    resolveWait();
+  };
+
+  return {
+    begin() {
+      if (started || settled) return;
+      started = true;
+      if (timeoutMs === 0) {
+        settle();
+        return;
+      }
+      timer = setTimeout(settle, timeoutMs);
+    },
+    observe(data) {
+      if (!started || settled) return;
+      buffer = `${buffer}${String(data)}`.slice(-8_192);
+      if (isTerminalAgentDisplayReady(buffer)) settle();
+    },
+    settle,
+    wait() {
+      return waitPromise;
+    },
+  };
+}
+
+function normalizeAgentRevealTimeout(value) {
+  const milliseconds = Number(value);
+  if (!Number.isFinite(milliseconds)) return DEFAULT_AGENT_REVEAL_TIMEOUT_MS;
+  return Math.min(Math.max(Math.round(milliseconds), 0), 5_000);
+}
+
 function requireSenderId(sender) {
   const senderId = sender?.id;
   if (!Number.isSafeInteger(senderId) || senderId <= 0) {
@@ -173,27 +262,34 @@ function normalizeTerminalSize(value, fallback, min, max) {
   return Math.min(Math.max(Math.round(next), min), max);
 }
 
-function buildTerminalSpawnConfig(environment, platform) {
-  const pathModule = platform === "win32" ? path.win32 : path.posix;
-  if (platform === "win32") {
-    const file = environment.ComSpec || environment.COMSPEC || "cmd.exe";
-    return {
-      file,
-      args: [],
-      displayShell: pathModule.basename(file),
-      loginShell: false,
-    };
+async function resolveTerminalSpawnConfig(
+  launcherId,
+  { environment, platform, resolveTerminalAgentLaunch },
+) {
+  if (launcherId === undefined || launcherId === null || launcherId === "shell") {
+    return createTerminalShellHost({ environment, platform });
   }
+  if (!isTerminalAgentLauncherId(launcherId)) {
+    throw new Error("TERMINAL_AGENT_UNAVAILABLE");
+  }
+  const launch = await resolveTerminalAgentLaunch(launcherId);
+  return createTerminalShellHost({ agentLaunch: launch, environment, platform });
+}
 
-  const file = environment.SHELL || "/bin/zsh";
-  const shellName = pathModule.basename(file);
-  const args = shellName === "bash" || shellName === "zsh" ? ["-l"] : [];
-
+export function prependTerminalPathEntries(environment, entries, platform = process.platform) {
+  if (!Array.isArray(entries) || entries.length === 0) return environment;
+  const separator = platform === "win32" ? ";" : ":";
+  const validEntries = entries.filter((entry) => (
+    typeof entry === "string"
+    && path.isAbsolute(entry)
+    && entry.length <= 4_096
+    && !/[\r\n\0]/u.test(entry)
+  ));
+  if (validEntries.length === 0) return environment;
+  const currentEntries = String(environment.PATH || "").split(separator).filter(Boolean);
   return {
-    file,
-    args,
-    displayShell: shellName,
-    loginShell: args.length > 0,
+    ...environment,
+    PATH: Array.from(new Set([...validEntries, ...currentEntries])).join(separator),
   };
 }
 

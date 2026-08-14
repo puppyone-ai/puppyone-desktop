@@ -6,6 +6,7 @@ import type {
   Workspace,
 } from "@puppyone/shared-ui";
 import type { AppLanguagePreference, LocaleState } from "@puppyone/localization/core";
+import type { DesktopTerminalLauncherId } from "../features/desktop-terminal/model/terminalLaunchers";
 import type {
   AgentAccountReadRequest,
   AgentAccountState,
@@ -353,6 +354,22 @@ export type TerminalCreateRequest = {
   cwd: string;
   cols: number;
   rows: number;
+  launcherId?: DesktopTerminalLauncherId;
+};
+
+export type TerminalAgentId = Exclude<DesktopTerminalLauncherId, "shell">;
+
+export type TerminalAgentLocationSnapshot = {
+  availableAgentIds: TerminalAgentId[];
+  scannedAt: string;
+  source: "scan" | "memory-cache";
+};
+
+export type TerminalAgentLocationProgressEvent = {
+  availableAgentIds: TerminalAgentId[];
+  completedAgentCount: number;
+  requestId: string;
+  totalAgentCount: number;
 };
 
 export type TerminalCreateResult = {
@@ -692,6 +709,16 @@ declare global {
         applied: boolean;
         width?: number;
       }>;
+      capturePanePreview: (request: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }) => Promise<{
+        dataUrl: string;
+        width: number;
+        height: number;
+      } | null>;
       setNativeSurfaceOccluded: (request: { occluded: boolean }) => void;
       setNativeSurfacePointerPassthrough: (request: { active: boolean }) => void;
       getBuildInfo: () => Promise<DesktopBuildInfo>;
@@ -1137,6 +1164,13 @@ declare global {
           };
         }) => void) => () => void;
       };
+      locateTerminalAgents: (request: {
+        refresh?: boolean;
+        requestId: string;
+      }) => Promise<TerminalAgentLocationSnapshot>;
+      onTerminalAgentLocationProgress: (
+        callback: (event: TerminalAgentLocationProgressEvent) => void,
+      ) => () => void;
       createTerminal: (request: TerminalCreateRequest) => Promise<TerminalCreateResult>;
       writeTerminal: (request: TerminalInputRequest) => void;
       resizeTerminal: (request: TerminalResizeRequest) => void;
