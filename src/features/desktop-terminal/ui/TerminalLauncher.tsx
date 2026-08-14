@@ -1,5 +1,9 @@
-import { SquareTerminal } from "lucide-react";
+import { RefreshCw, SquareTerminal } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
+import type {
+  InstalledTerminalAgentId,
+  TerminalAgentDiscoveryPhase,
+} from "../model/terminalAgentAvailability";
 import {
   DESKTOP_TERMINAL_LAUNCHERS,
   type DesktopTerminalLauncherDefinition,
@@ -8,13 +12,25 @@ import {
 import "./terminal-launcher.css";
 
 type TerminalLauncherProps = {
+  discoveryPhase: TerminalAgentDiscoveryPhase;
+  installedAgentIds: readonly InstalledTerminalAgentId[];
   onLaunch: (launcherId: DesktopTerminalLauncherId) => void;
+  onRefresh: () => void;
 };
 
-export function TerminalLauncher({ onLaunch }: TerminalLauncherProps) {
+export function TerminalLauncher({
+  discoveryPhase,
+  installedAgentIds,
+  onLaunch,
+  onRefresh,
+}: TerminalLauncherProps) {
   const { t } = useLocalization();
-  const codingTools = DESKTOP_TERMINAL_LAUNCHERS.filter(({ id }) => id !== "shell");
+  const installedAgentIdSet = new Set(installedAgentIds);
+  const agents = DESKTOP_TERMINAL_LAUNCHERS.filter(
+    ({ id }) => id !== "shell" && installedAgentIdSet.has(id),
+  );
   const shell = DESKTOP_TERMINAL_LAUNCHERS.find(({ id }) => id === "shell");
+  const showAvailability = agents.length === 0;
 
   return (
     <section
@@ -27,7 +43,7 @@ export function TerminalLauncher({ onLaunch }: TerminalLauncherProps) {
         </h2>
 
         <div className="desktop-terminal-launcher-tools">
-          {codingTools.map((launcher) => (
+          {agents.map((launcher) => (
             <TerminalLauncherButton
               key={launcher.id}
               launcher={launcher}
@@ -35,6 +51,24 @@ export function TerminalLauncher({ onLaunch }: TerminalLauncherProps) {
             />
           ))}
         </div>
+
+        {showAvailability && (
+          <div className="desktop-terminal-launcher-availability" aria-live="polite">
+            <span>
+              {t(discoveryPhase === "error"
+                ? "terminal.launcher.detectionFailed"
+                : discoveryPhase === "ready"
+                  ? "terminal.launcher.noneInstalled"
+                  : "terminal.launcher.detecting")}
+            </span>
+            {(discoveryPhase === "error" || discoveryPhase === "ready") && (
+              <button type="button" onClick={onRefresh}>
+                <RefreshCw size={12} strokeWidth={1.7} aria-hidden="true" />
+                <span>{t("terminal.launcher.scanAgain")}</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {shell && (
           <button

@@ -263,6 +263,10 @@
   padding: 0;
 }
 
+.desktop-terminal-body.is-launcher {
+  padding: 0;
+}
+
 .desktop-terminal-session {
   grid-area: 1 / 1;
   min-width: 0;

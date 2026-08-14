@@ -6,6 +6,31 @@ import {
 } from "../src/features/desktop-terminal/model/terminalSessions";
 
 describe("Desktop Terminal session state", () => {
+  it("creates one launcher tab and binds the selected runtime in place", () => {
+    let state = createDesktopTerminalSessionsState("terminal-a");
+    state = desktopTerminalSessionsReducer(state, {
+      type: "create-launcher",
+      sessionId: "launcher-a",
+    });
+    state = desktopTerminalSessionsReducer(state, {
+      type: "create-launcher",
+      sessionId: "launcher-duplicate",
+    });
+
+    expect(state.sessions).toMatchObject([
+      { id: "terminal-a", ordinal: 1, status: "starting" },
+      { id: "launcher-a", ordinal: 2, status: "selecting" },
+    ]);
+    expect(state.activeSessionId).toBe("launcher-a");
+
+    state = desktopTerminalSessionsReducer(state, { type: "launch", sessionId: "launcher-a" });
+    expect(state.sessions[1]).toMatchObject({
+      id: "launcher-a",
+      ordinal: 2,
+      status: "starting",
+    });
+  });
+
   it("creates and activates user-owned terminal sessions", () => {
     let state = createDesktopTerminalSessionsState();
     state = desktopTerminalSessionsReducer(state, { type: "create", sessionId: "terminal-a" });

@@ -37,6 +37,54 @@
   gap: 1px;
 }
 
+.desktop-terminal-launcher-availability {
+  display: flex;
+  min-height: 34px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 3px 8px;
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.desktop-terminal-launcher-availability button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 5px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: var(--po-clickable-cursor, pointer);
+  font: inherit;
+}
+
+.desktop-terminal-launcher-availability button:hover {
+  background: var(--po-hover);
+  color: var(--po-text-muted);
+}
+
+.desktop-terminal-launcher-availability button:focus-visible {
+  outline: 1px solid var(--po-focus-ring);
+  outline-offset: 1px;
+}
+
+.desktop-terminal-launcher-tab {
+  display: grid;
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.desktop-terminal-launcher-tab[hidden] {
+  display: none;
+}
+
 .desktop-terminal-launcher-tool,
 .desktop-terminal-launcher-shell {
   display: flex;

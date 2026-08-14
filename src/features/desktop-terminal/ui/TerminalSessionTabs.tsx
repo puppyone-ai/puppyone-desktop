@@ -12,6 +12,7 @@ import type { TerminalRuntimeRegistry } from "../runtime/terminalRuntimeRegistry
 import { readTerminalActivitySpinnerFrame } from "../runtime/terminalTitleActivity";
 
 const terminalStatusMessageKey = {
+  selecting: "terminal.launcher.title",
   starting: "terminal.status.starting",
   running: "terminal.status.running",
   exited: "terminal.status.exited",
@@ -84,7 +85,9 @@ export function TerminalSessionTabs({
           <TerminalSessionTab
             key={session.id}
             session={session}
-            runtime={runtimeRegistry?.require(session.id) ?? null}
+            runtime={session.status === "selecting"
+              ? null
+              : runtimeRegistry?.require(session.id) ?? null}
             fallbackShell={fallbackShell}
             active={session.id === activeSessionId}
             onActivate={onActivate}

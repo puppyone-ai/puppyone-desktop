@@ -120,6 +120,32 @@ describe("Desktop Terminal titlebar session manager", () => {
     expect(onCreate).toHaveBeenCalledOnce();
   });
 
+  it("labels a runtime-free launcher tab without requiring a Terminal runtime", () => {
+    const requireRuntime = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(withTestLocalization(
+      <TerminalSessionTabs
+        sessions={[{
+          id: "launcher-a",
+          ordinal: 1,
+          shell: null,
+          status: "selecting",
+        }]}
+        activeSessionId="launcher-a"
+        onActivate={vi.fn()}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        runtimeRegistry={{ require: requireRuntime }}
+      />,
+    )));
+
+    expect(container.querySelector('[role="tab"]')?.textContent).toBe("Start an Agent");
+    expect(requireRuntime).not.toHaveBeenCalled();
+  });
+
   it("replaces the always-on running dot with terminal-reported activity frames", () => {
     const titleHarness = createTerminalTitleHarness();
     const container = document.createElement("div");
