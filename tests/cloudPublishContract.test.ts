@@ -9,9 +9,10 @@ const contractUrl = new URL("../contracts/cloud-project-publish-v1.json", import
 describe("Cloud Project publish cross-repository contract", () => {
   it("uses the pinned backend-compatible v1 fixture", () => {
     const payload = readFileSync(fileURLToPath(contractUrl));
-    const contract = JSON.parse(payload.toString("utf8"));
+    const canonicalPayload = Buffer.from(payload.toString("utf8").replace(/\r\n?/g, "\n"), "utf8");
+    const contract = JSON.parse(canonicalPayload.toString("utf8"));
 
-    expect(createHash("sha256").update(payload).digest("hex")).toBe(CONTRACT_SHA256);
+    expect(createHash("sha256").update(canonicalPayload).digest("hex")).toBe(CONTRACT_SHA256);
     expect(contract.contract).toBe("puppyone.cloud-project-publish");
     expect(contract.version).toBe(1);
     expect(contract.identity).toEqual({

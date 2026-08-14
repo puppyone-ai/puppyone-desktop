@@ -1,5 +1,9 @@
-import { readFileSync } from "node:fs";
+import { readFileSync as readRawFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+
+const readFileSync = (file: URL, encoding: "utf8") => (
+  readRawFileSync(file, encoding).replace(/\r\n?/g, "\n")
+);
 
 const markdownEditorCss = readFileSync(
   new URL("../packages/shared-ui/src/styles/editor/markdown-editor.css", import.meta.url),

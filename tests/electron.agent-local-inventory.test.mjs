@@ -24,6 +24,7 @@ import {
 } from "../electron/main/agent/connections/probes/cursor-local-probe.mjs";
 import { createLocalAgentInventory } from "../electron/main/agent/connections/local-agent-inventory.mjs";
 import { deriveLocalConnection } from "../electron/main/agent/connections/local-agent-connection-policy.mjs";
+import { createSymlinkOrSkip } from "./helpers/symlink-capability.mjs";
 
 const temporaryDirectories = [];
 
@@ -33,12 +34,12 @@ afterEach(async () => {
 });
 
 describe("Desktop Agent local-tool inventory", () => {
-  it("finds GUI-missing PATH installations from a bounded user registry and deduplicates aliases", async () => {
+  it("finds GUI-missing PATH installations from a bounded user registry and deduplicates aliases", async (context) => {
     const home = await temporaryDirectory();
     const bin = path.join(home, ".local", "bin");
     await mkdir(bin, { recursive: true });
-    const cursorAgent = await executable(path.join(bin, "cursor-agent"));
-    await symlink(cursorAgent, path.join(bin, "agent"));
+    const cursorAgent = await executable(path.join(bin, executableFilename("cursor-agent")));
+    await createSymlinkOrSkip(context, { symlink }, cursorAgent, path.join(bin, executableFilename("agent")));
 
     const candidate = await resolveFirstExecutable({
       names: ["cursor-agent", "agent"],
@@ -68,11 +69,11 @@ describe("Desktop Agent local-tool inventory", () => {
     })).rejects.toThrow(/changed identity/i);
   });
 
-  it("accepts configured paths with spaces and skips broken or non-executable candidates", async () => {
+  it("accepts configured paths with spaces", async () => {
     const home = await temporaryDirectory();
     const configuredDirectory = path.join(home, "CLI tools");
     await mkdir(configuredDirectory, { recursive: true });
-    const configured = await executable(path.join(configuredDirectory, "codex"));
+    const configured = await executable(path.join(configuredDirectory, executableFilename("codex")));
     const resolved = await resolveFirstExecutable({
       names: ["codex"],
       configuredPaths: [configured],
@@ -81,13 +82,22 @@ describe("Desktop Agent local-tool inventory", () => {
       platform: process.platform,
     });
     expect(resolved).toMatchObject({ invokedAs: "codex", source: "configured" });
+  });
 
+  it("skips broken or non-executable candidates where POSIX executable bits are available", async (context) => {
+    const home = await temporaryDirectory();
     const bin = path.join(home, ".local", "bin");
     await mkdir(bin, { recursive: true });
-    await writeFile(path.join(bin, "plain"), "not executable", "utf8");
-    await symlink(path.join(home, "missing"), path.join(bin, "broken"));
+    await writeFile(path.join(bin, executableFilename("plain")), "not executable", "utf8");
+    await createSymlinkOrSkip(
+      context,
+      { symlink },
+      path.join(home, "missing"),
+      path.join(bin, executableFilename("broken")),
+    );
+    const names = process.platform === "win32" ? ["broken"] : ["broken", "plain"];
     await expect(resolveFirstExecutable({
-      names: ["broken", "plain"],
+      names,
       env: { PATH: "" },
       homedir: home,
       platform: process.platform,
@@ -434,6 +444,10 @@ async function executable(filename) {
   await writeFile(filename, "#!/bin/sh\nexit 0\n", "utf8");
   await chmod(filename, 0o755);
   return filename;
+}
+
+function executableFilename(name) {
+  return process.platform === "win32" ? `${name}.exe` : name;
 }
 
 function fixedCandidate(executablePath, invokedAs) {

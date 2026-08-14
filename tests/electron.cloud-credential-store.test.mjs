@@ -21,7 +21,9 @@ describe("desktop credential store", () => {
     const envelope = JSON.parse(await fs.promises.readFile(filePath, "utf8"));
     expect(envelope).toMatchObject({ version: 2, storage: "electron-safe-storage" });
     expect(JSON.stringify(envelope)).not.toContain("access-token-must-not-persist");
-    expect((await fs.promises.stat(filePath)).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") {
+      expect((await fs.promises.stat(filePath)).mode & 0o777).toBe(0o600);
+    }
   });
 
   it("reads a legacy full-session envelope without returning its access token", async () => {

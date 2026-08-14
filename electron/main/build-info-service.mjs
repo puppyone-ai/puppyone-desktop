@@ -48,7 +48,8 @@ export function configureDesktopApplicationIdentity({
 }) {
   const identity = assertDesktopBuildInfo(buildInfo);
   const policy = getDesktopBuildChannelPolicy(identity.channel);
-  const userDataPath = path.join(app.getPath("appData"), policy.userDataName);
+  const platformPath = platform === "win32" ? path.win32 : path.posix;
+  const userDataPath = platformPath.join(app.getPath("appData"), policy.userDataName);
 
   app.setName(policy.applicationName);
   app.setPath("userData", userDataPath);

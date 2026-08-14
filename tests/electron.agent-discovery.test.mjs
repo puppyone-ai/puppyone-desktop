@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import path from "node:path";
 import {
   compareVersions,
   discoverCodexExecutable,
@@ -17,12 +18,13 @@ describe("Codex provider discovery", () => {
   });
 
   it("returns ready using deterministic paths without executing a login shell", async () => {
+    const expectedExecutable = path.join("/usr/local/bin", "codex");
     const spawn = vi.fn(() => createCompletedChild("codex-cli 0.144.1\n"));
     const fsModule = {
       constants: { X_OK: 1 },
       promises: {
         access: vi.fn(async (candidate) => {
-          if (candidate !== "/usr/local/bin/codex") throw Object.assign(new Error("missing"), { code: "ENOENT" });
+          if (candidate !== expectedExecutable) throw Object.assign(new Error("missing"), { code: "ENOENT" });
         }),
         realpath: vi.fn(async (candidate) => candidate),
       },
@@ -34,14 +36,15 @@ describe("Codex provider discovery", () => {
       platform: "darwin",
       homedir: "/Users/test",
     });
-    expect(readiness).toMatchObject({ status: "ready", version: "0.144.1", executablePath: "/usr/local/bin/codex" });
+    expect(readiness).toMatchObject({ status: "ready", version: "0.144.1", executablePath: expectedExecutable });
     expect(spawn.mock.calls.every((call) => call[2]?.shell === false)).toBe(true);
     expect(spawn).toHaveBeenCalledTimes(1);
     expect(spawn.mock.calls[0][1]).toEqual(["--version"]);
-    expect(readiness.environment.PATH).toContain("/Users/test/.local/bin");
+    expect(readiness.environment.PATH).toContain(path.join("/Users/test", ".local", "bin"));
   });
 
   it("classifies missing and older installations", async () => {
+    const expectedExecutable = path.join("/usr/local/bin", "codex");
     const missing = await discoverCodexExecutable({
       fsModule: {
         constants: { X_OK: 1 },
@@ -63,7 +66,7 @@ describe("Codex provider discovery", () => {
         constants: { X_OK: 1 },
         promises: {
           access: vi.fn(async (candidate) => {
-            if (candidate !== "/usr/local/bin/codex") throw new Error("missing");
+            if (candidate !== expectedExecutable) throw new Error("missing");
           }),
           realpath: vi.fn(async (candidate) => candidate),
         },

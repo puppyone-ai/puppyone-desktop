@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync as readRawFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -34,13 +34,17 @@ describe("renderer style architecture", () => {
 
     const duplicateEntries = walkCss(path.join(repoRoot, "src"))
       .filter((filePath) => path.relative(repoRoot, filePath) !== path.join("src", "cloud-globals.css"))
-      .filter((filePath) => /^\s*@tailwind\s+(?:base|components|utilities)\s*;/m.test(readFileSync(filePath, "utf8")));
+      .filter((filePath) => /^\s*@tailwind\s+(?:base|components|utilities)\s*;/m.test(readText(filePath)));
     expect(duplicateEntries).toEqual([]);
   });
 });
 
 function source(relativePath: string) {
-  return readFileSync(path.join(repoRoot, relativePath), "utf8");
+  return readText(path.join(repoRoot, relativePath));
+}
+
+function readText(filePath: string) {
+  return readRawFileSync(filePath, "utf8").replace(/\r\n?/g, "\n");
 }
 
 function expectInOrder(sourceText: string, needles: string[]) {

@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -63,11 +61,13 @@ export async function buildTerminalPreviewPackage({
 
   try {
     await fs.promises.mkdir(binDirectory, { recursive: true });
-    await fs.promises.copyFile(
+    const launcherPath = path.join(binDirectory, "puppyone-preview.mjs");
+    const launcherSource = await fs.promises.readFile(
       path.join(root, "scripts", "terminal-preview-launcher.mjs"),
-      path.join(binDirectory, "puppyone-preview.mjs"),
+      "utf8",
     );
-    await fs.promises.chmod(path.join(binDirectory, "puppyone-preview.mjs"), 0o755);
+    await fs.promises.writeFile(launcherPath, `#!/usr/bin/env node\n${launcherSource}`, "utf8");
+    await fs.promises.chmod(launcherPath, 0o755);
 
     const packageJson = {
       name: "@puppyone/desktop-terminal-preview",

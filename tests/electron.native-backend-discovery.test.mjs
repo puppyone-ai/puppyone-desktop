@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { discoverCursorBackend } from "../electron/main/agent/runtimes/cursor/cursor-discovery.mjs";
 import { buildUserOpenCodeEnvironment } from "../electron/main/agent/runtimes/opencode-native/opencode-native-discovery.mjs";
@@ -98,7 +99,7 @@ describe("native Agent backend discovery", () => {
       environment: { CLAUDE_CONFIG_DIR: "/home/test/.claude-custom" },
     });
     const probeEnvironment = spawn.mock.calls[0][2].env;
-    expect(probeEnvironment.CLAUDE_CONFIG_DIR).toMatch(/^\/tmp\/puppyone-claude-version-probe-/u);
+    expect(probeEnvironment.CLAUDE_CONFIG_DIR).toBe(path.join("/tmp", "puppyone-claude-version-probe-test"));
     expect(probeEnvironment.CLAUDE_CONFIG_DIR).not.toBe(readiness.environment.CLAUDE_CONFIG_DIR);
     expect(removed).toHaveLength(2);
     expect(removed[0]).toEqual([probeEnvironment.CLAUDE_CONFIG_DIR, { recursive: true, force: true }]);

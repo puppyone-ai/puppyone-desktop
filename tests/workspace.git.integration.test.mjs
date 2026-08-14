@@ -4,6 +4,7 @@
 // the source-control half of the "端" (desktop/local) product surface.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, rm, writeFile, symlink } from "node:fs/promises";
+import { createSymlinkOrSkip } from "./helpers/symlink-capability.mjs";
 import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -201,13 +202,13 @@ describe("diffs", { timeout: 20_000 }, () => {
     expect(detail.files[0].revisionPair.after.bytes).toEqual(bytes);
   });
 
-  it("refuses to read an untracked symbolic link outside the workspace", async () => {
+  it("refuses to read an untracked symbolic link outside the workspace", async (context) => {
     await initRepoWithIdentity();
     const external = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-external-"));
     try {
       const secretPath = path.join(external, "secret.txt");
       await writeFile(secretPath, "outside secret\n");
-      await symlink(secretPath, path.join(root, "linked.txt"));
+      await createSymlinkOrSkip(context, { symlink }, secretPath, path.join(root, "linked.txt"));
       await expect(getWorkspaceGitFileDiff(root, "linked.txt", "untracked"))
         .rejects.toThrow(/symbolic links|workspace entry/i);
     } finally {
