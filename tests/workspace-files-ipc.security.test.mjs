@@ -89,12 +89,63 @@ describe("workspace file IPC authorization", () => {
     );
 
     expect(await readFile(notePath, "utf8")).toBe("after");
+    expect(result.ok).toBe(true);
     expect(workspaceWatchService.noteInternalWrite).toHaveBeenCalledWith({
       rootPath: await fs.promises.realpath(root),
       path: "note.txt",
       senderId: 80,
       version: result.version,
     });
+  });
+
+  it("returns a structured conflict with the latest bytes instead of throwing Error metadata", async () => {
+    const { handlers } = createHarness(() => root);
+    const notePath = path.join(root, "note.txt");
+    await writeFile(notePath, "base");
+    const opened = await handlers.get("workspace:read-file")(
+      { sender: { id: 81 } },
+      { rootPath: root, path: "note.txt" },
+    );
+    await writeFile(notePath, "agent version");
+
+    const result = await handlers.get("workspace:write-file")(
+      { sender: { id: 81 } },
+      {
+        rootPath: root,
+        path: "note.txt",
+        content: "stale editor version",
+        expectedVersion: opened.version,
+      },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      kind: "conflict",
+      content: "agent version",
+    });
+    expect(result.version).toMatch(/^sha256:/);
+    expect(await readFile(notePath, "utf8")).toBe("agent version");
+  });
+
+  it("returns a structured not-found failure and never attributes a failed write", async () => {
+    const workspaceWatchService = { noteInternalWrite: vi.fn() };
+    const { handlers } = createHarness(() => root, { workspaceWatchService });
+
+    const result = await handlers.get("workspace:write-file")(
+      { sender: { id: 82 } },
+      {
+        rootPath: root,
+        path: "missing-folder/note.txt",
+        content: "human version",
+        expectedVersion: "sha256:stale",
+      },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      kind: "not-found",
+    });
+    expect(workspaceWatchService.noteInternalWrite).not.toHaveBeenCalled();
   });
 
   it("issues a sender-owned URL capability scoped to the exact file", async () => {

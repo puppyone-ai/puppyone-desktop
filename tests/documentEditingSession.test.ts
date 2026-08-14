@@ -8,7 +8,7 @@ import type { EditorSourceSnapshot } from "../packages/shared-ui/src/editor/sour
 
 describe("DocumentEditingSession", () => {
   it("starts persistence in the next microtask without waiting for a timer", async () => {
-    const persist = vi.fn(async () => ({ version: "v2" }));
+    const persist = vi.fn(async () => ({ ok: true as const, version: "v2" }));
     const session = createSession(persist);
     const source = bindSource(session, { revision: "r1", content: "one" });
 
@@ -27,7 +27,7 @@ describe("DocumentEditingSession", () => {
   });
 
   it("coalesces edits from one JavaScript turn to the newest snapshot", async () => {
-    const persist = vi.fn(async () => ({ version: "v2" }));
+    const persist = vi.fn(async () => ({ ok: true as const, version: "v2" }));
     const session = createSession(persist);
     const source = bindSource(session, { revision: "r1", content: "one" });
 
@@ -43,8 +43,8 @@ describe("DocumentEditingSession", () => {
   });
 
   it("keeps one write in flight and persists only the newest following edit", async () => {
-    const first = deferred<{ version: string }>();
-    const second = deferred<{ version: string }>();
+    const first = deferred<{ ok: true; version: string }>();
+    const second = deferred<{ ok: true; version: string }>();
     const requests: DocumentPersistenceRequest[] = [];
     const persist = vi.fn((request: DocumentPersistenceRequest) => {
       requests.push(request);
@@ -60,12 +60,12 @@ describe("DocumentEditingSession", () => {
     await nextMicrotask();
 
     expect(requests.map(({ revision }) => revision)).toEqual(["r2"]);
-    first.resolve({ version: "v2" });
+    first.resolve({ ok: true, version: "v2" });
     await nextMicrotask();
     expect(requests.map(({ revision }) => revision)).toEqual(["r2", "r4"]);
     expect(requests[1]).toMatchObject({ content: "four", baseVersion: "v2" });
 
-    second.resolve({ version: "v3" });
+    second.resolve({ ok: true, version: "v3" });
     await session.flushCurrent("document-close");
     expect(session.hasUnpersistedChanges()).toBe(false);
     expect(session.getState()).toMatchObject({
@@ -76,8 +76,8 @@ describe("DocumentEditingSession", () => {
   });
 
   it("does not treat the filesystem echo of an in-flight save as an external conflict", async () => {
-    const first = deferred<{ version: string }>();
-    const second = deferred<{ version: string }>();
+    const first = deferred<{ ok: true; version: string }>();
+    const second = deferred<{ ok: true; version: string }>();
     const requests: DocumentPersistenceRequest[] = [];
     const persist = vi.fn((request: DocumentPersistenceRequest) => {
       requests.push(request);
@@ -94,11 +94,11 @@ describe("DocumentEditingSession", () => {
     expect(session.reconcileExternalBaseline("two", "v2")).toBe("acknowledged");
     expect(session.getState()).toMatchObject({ status: "saving", error: null });
 
-    first.resolve({ version: "v2" });
+    first.resolve({ ok: true, version: "v2" });
     await nextMicrotask();
     expect(requests[1]).toMatchObject({ content: "three", baseVersion: "v2" });
 
-    second.resolve({ version: "v3" });
+    second.resolve({ ok: true, version: "v3" });
     await session.flushCurrent("document-close");
     expect(session.hasUnpersistedChanges()).toBe(false);
     expect(session.getState()).toMatchObject({
@@ -108,9 +108,42 @@ describe("DocumentEditingSession", () => {
     });
   });
 
+  it("acknowledges matching external bytes before scheduled autosave without writing them back", async () => {
+    const persist = vi.fn(async () => ({ ok: true as const, version: "unexpected" }));
+    const session = createSession(persist);
+    const source = bindSource(session, { revision: "r1", content: "one" });
+
+    source.change({ revision: "r2", content: "agent and editor converged" });
+    expect(session.reconcileExternalBaseline("agent and editor converged", "agent-v2"))
+      .toBe("acknowledged");
+    await nextMicrotask();
+
+    expect(persist).not.toHaveBeenCalled();
+    expect(session.hasUnpersistedChanges()).toBe(false);
+    expect(session.getState()).toMatchObject({
+      status: "clean",
+      storageVersion: "agent-v2",
+      currentRevision: "r2",
+      persistedRevision: "r2",
+    });
+  });
+
+  it("never turns model initialization or projection replacement into persistence", async () => {
+    const persist = vi.fn(async () => ({ ok: true as const, version: "unexpected" }));
+    const session = createSession(persist);
+    const source = bindSource(session, { revision: "r1", content: "one" });
+
+    source.change({ revision: "model:2", content: "projection-only replacement" }, false);
+    await nextMicrotask();
+
+    expect(persist).not.toHaveBeenCalled();
+    expect(session.hasUnpersistedChanges()).toBe(false);
+    expect(session.getState()).toMatchObject({ status: "clean", error: null });
+  });
+
   it("promotes a pending edit to the navigation drain reason", async () => {
-    const first = deferred<{ version: string }>();
-    const second = deferred<{ version: string }>();
+    const first = deferred<{ ok: true; version: string }>();
+    const second = deferred<{ ok: true; version: string }>();
     const requests: DocumentPersistenceRequest[] = [];
     const persist = vi.fn((request: DocumentPersistenceRequest) => {
       requests.push(request);
@@ -124,7 +157,7 @@ describe("DocumentEditingSession", () => {
     source.change({ revision: "r3", content: "three" });
     const drain = session.flushCurrent("document-switch");
 
-    first.resolve({ version: "v2" });
+    first.resolve({ ok: true, version: "v2" });
     await nextMicrotask();
     expect(requests[1]).toMatchObject({
       revision: "r3",
@@ -132,12 +165,12 @@ describe("DocumentEditingSession", () => {
       baseVersion: "v2",
       reason: "document-switch",
     });
-    second.resolve({ version: "v3" });
+    second.resolve({ ok: true, version: "v3" });
     await drain;
   });
 
   it("captures the exact final snapshot before an editor model is destroyed", async () => {
-    const persist = vi.fn(async () => ({ version: "v2" }));
+    const persist = vi.fn(async () => ({ ok: true as const, version: "v2" }));
     const session = createSession(persist);
     const source = bindSource(session, { revision: "r1", content: "one" });
     source.change({ revision: "r2", content: "closing text" });
@@ -155,8 +188,8 @@ describe("DocumentEditingSession", () => {
   });
 
   it("drains a newer revision that arrives during an app-close write", async () => {
-    const first = deferred<{ version: string }>();
-    const second = deferred<{ version: string }>();
+    const first = deferred<{ ok: true; version: string }>();
+    const second = deferred<{ ok: true; version: string }>();
     const requests: DocumentPersistenceRequest[] = [];
     const persist = vi.fn((request: DocumentPersistenceRequest) => {
       requests.push(request);
@@ -168,7 +201,7 @@ describe("DocumentEditingSession", () => {
 
     const closePromise = session.flushCurrent("app-close");
     source.change({ revision: "r3", content: "last close snapshot" });
-    first.resolve({ version: "v2" });
+    first.resolve({ ok: true, version: "v2" });
     await nextMicrotask();
 
     expect(requests[1]).toMatchObject({
@@ -177,17 +210,19 @@ describe("DocumentEditingSession", () => {
       baseVersion: "v2",
       reason: "app-close",
     });
-    second.resolve({ version: "v3" });
+    second.resolve({ ok: true, version: "v3" });
     await closePromise;
     expect(session.hasUnpersistedChanges()).toBe(false);
   });
 
   it("writes an undo after the older edited value has crossed storage", async () => {
-    const first = deferred<{ version: string }>();
+    const first = deferred<{ ok: true; version: string }>();
     const requests: DocumentPersistenceRequest[] = [];
     const persist = vi.fn((request: DocumentPersistenceRequest) => {
       requests.push(request);
-      return requests.length === 1 ? first.promise : Promise.resolve({ version: "v3" });
+      return requests.length === 1
+        ? first.promise
+        : Promise.resolve({ ok: true as const, version: "v3" });
     });
     const session = createSession(persist);
     const source = bindSource(session, { revision: "r1", content: "one" });
@@ -196,7 +231,7 @@ describe("DocumentEditingSession", () => {
 
     source.change({ revision: "r3", content: "one" }, false);
     const drain = session.flushCurrent("document-switch");
-    first.resolve({ version: "v2" });
+    first.resolve({ ok: true, version: "v2" });
     await drain;
 
     expect(requests.map(({ content }) => content)).toEqual(["two", "one"]);
@@ -205,7 +240,7 @@ describe("DocumentEditingSession", () => {
   });
 
   it("does not write twice when a newer revision has the in-flight content", async () => {
-    const first = deferred<{ version: string }>();
+    const first = deferred<{ ok: true; version: string }>();
     const persist = vi.fn(() => first.promise);
     const session = createSession(persist);
     const source = bindSource(session, { revision: "r1", content: "one" });
@@ -214,7 +249,7 @@ describe("DocumentEditingSession", () => {
 
     source.change({ revision: "r3", content: "two" });
     const drain = session.flushCurrent("document-switch");
-    first.resolve({ version: "v2" });
+    first.resolve({ ok: true, version: "v2" });
     await drain;
 
     expect(persist).toHaveBeenCalledTimes(1);
@@ -226,7 +261,7 @@ describe("DocumentEditingSession", () => {
   });
 
   it("applies an external baseline only while clean", async () => {
-    const persist = vi.fn(async () => ({ version: "v2" }));
+    const persist = vi.fn(async () => ({ ok: true as const, version: "v2" }));
     const session = createSession(persist, "manual");
     const source = bindSource(session, { revision: "r1", content: "one" });
 
@@ -236,7 +271,7 @@ describe("DocumentEditingSession", () => {
     source.change({ revision: "r2", content: "local" });
     expect(session.reconcileExternalBaseline("agent edit", "external-v2")).toBe("conflict");
     expect(session.getState()).toMatchObject({
-      status: "error",
+      status: "conflict",
       error: { code: "external-conflict" },
       storageVersion: "external-v1",
     });
@@ -251,8 +286,27 @@ describe("DocumentEditingSession", () => {
     });
   });
 
+  it.each([
+    ["empty file", ""],
+    ["CJK and emoji", "你好，外部 Agent 👋\n第二行"],
+    ["CRLF line endings", "first\r\nsecond\r\n"],
+    ["trailing whitespace", "value  \n\n"],
+    ["large text snapshot", `${"0123456789abcdef".repeat(16_384)}\n`],
+  ])("adopts a byte-exact %s external snapshot without persistence", (_label, content) => {
+    const persist = vi.fn(async () => ({ ok: true as const, version: "unexpected" }));
+    const session = createSession(persist, "manual");
+    const source = bindSource(session, { revision: "r1", content: "one" });
+
+    expect(session.reconcileExternalBaseline(content, "external-v2")).toBe("applied");
+
+    expect(source.snapshot().content).toBe(content);
+    expect(session.hasUnpersistedChanges()).toBe(false);
+    expect(session.getState()).toMatchObject({ status: "clean", storageVersion: "external-v2" });
+    expect(persist).not.toHaveBeenCalled();
+  });
+
   it("does not let a remounted editor mark detached unsaved content clean", async () => {
-    const persist = vi.fn(async () => ({ version: "v2" }));
+    const persist = vi.fn(async () => ({ ok: true as const, version: "v2" }));
     const session = createSession(persist, "manual");
     const firstSource = bindSource(session, { revision: "r1", content: "one" });
     firstSource.change({ revision: "r2", content: "two" });
@@ -272,7 +326,7 @@ describe("DocumentEditingSession", () => {
   });
 
   it("cancels a queued follow-up write when an external conflict arrives", async () => {
-    const first = deferred<{ version: string }>();
+    const first = deferred<{ ok: true; version: string }>();
     const persist = vi.fn(() => first.promise);
     const session = createSession(persist);
     const source = bindSource(session, { revision: "r1", content: "one" });
@@ -282,12 +336,12 @@ describe("DocumentEditingSession", () => {
     await nextMicrotask();
 
     expect(session.reconcileExternalBaseline("agent update", "agent-v2")).toBe("conflict");
-    first.resolve({ version: "v2" });
+    first.resolve({ ok: true, version: "v2" });
     await nextMicrotask();
 
     expect(persist).toHaveBeenCalledTimes(1);
     expect(session.getState()).toMatchObject({
-      status: "error",
+      status: "conflict",
       error: { code: "external-conflict" },
     });
     await expect(session.flushCurrent("document-switch"))
@@ -297,7 +351,7 @@ describe("DocumentEditingSession", () => {
   it("surfaces a failed conditional write and keeps the dirty snapshot retryable", async () => {
     const persist = vi.fn()
       .mockRejectedValueOnce(new Error("File changed outside PuppyOne"))
-      .mockResolvedValueOnce({ version: "v3" });
+      .mockResolvedValueOnce({ ok: true, version: "v3" });
     const session = createSession(persist, "manual");
     const source = bindSource(session, { revision: "r1", content: "one" });
     source.change({ revision: "r2", content: "two" });
@@ -313,6 +367,86 @@ describe("DocumentEditingSession", () => {
     expect(session.hasUnpersistedChanges()).toBe(false);
     expect(persist).toHaveBeenCalledTimes(2);
   });
+
+  it("turns a structured conditional-write conflict into a recoverable external conflict", async () => {
+    const persist = vi.fn(async () => ({
+      ok: false as const,
+      kind: "conflict" as const,
+      content: "agent version",
+      version: "agent-v2",
+    }));
+    const session = createSession(persist, "manual");
+    const source = bindSource(session, { revision: "r1", content: "one" });
+    source.change({ revision: "r2", content: "human version" });
+
+    await expect(session.requestSave()).rejects.toThrow("changed outside the editor");
+    expect(session.getState()).toMatchObject({
+      status: "conflict",
+      error: { code: "external-conflict" },
+      storageVersion: "v1",
+    });
+    expect(source.snapshot().content).toBe("human version");
+
+    await session.resolveExternalConflict("reload-external");
+    expect(source.snapshot().content).toBe("agent version");
+    expect(session.getState()).toMatchObject({
+      status: "clean",
+      storageVersion: "agent-v2",
+    });
+  });
+
+  it("retries an explicitly kept local snapshot against the version returned by conditional-write conflict", async () => {
+    const persist = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false as const,
+        kind: "conflict" as const,
+        content: "agent version",
+        version: "agent-v2",
+      })
+      .mockResolvedValueOnce({ ok: true as const, version: "saved-v3" });
+    const session = createSession(persist, "manual");
+    const source = bindSource(session, { revision: "r1", content: "one" });
+    source.change({ revision: "r2", content: "human version" });
+
+    await expect(session.requestSave()).rejects.toThrow("changed outside the editor");
+    await session.resolveExternalConflict("keep-local");
+
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(persist).toHaveBeenLastCalledWith(expect.objectContaining({
+      content: "human version",
+      baseVersion: "agent-v2",
+      reason: "manual",
+    }));
+    expect(session.getState()).toMatchObject({
+      storageVersion: "saved-v3",
+      error: null,
+    });
+    expect(session.hasUnpersistedChanges()).toBe(false);
+  });
+
+  it.each([
+    ["not-found", "The file was removed"],
+    ["permission-denied", "The file is read-only"],
+    ["io", "The disk is unavailable"],
+  ] as const)(
+    "keeps local content retryable after a structured %s persistence failure",
+    async (kind, message) => {
+      const persist = vi.fn(async () => ({ ok: false as const, kind, message }));
+      const session = createSession(persist, "manual");
+      const source = bindSource(session, { revision: "r1", content: "one" });
+      source.change({ revision: "r2", content: "human version" });
+
+      await expect(session.requestSave()).rejects.toThrow(message);
+
+      expect(source.snapshot().content).toBe("human version");
+      expect(session.hasUnpersistedChanges()).toBe(true);
+      expect(session.getState()).toMatchObject({
+        status: "error",
+        error: { code: "persistence-failed", detail: message },
+        storageVersion: "v1",
+      });
+    },
+  );
 
   it("settles the drain when an adapter throws before returning a Promise", async () => {
     const session = createSession(() => {
@@ -339,7 +473,7 @@ function createSession(
     initialContent: "one",
     initialVersion: "v1",
     saveMode,
-    persistence: { kind: "local-fs", persist },
+    persistence: { kind: "local-fs", storageIdentity: "test:document-session", persist },
   });
 }
 
@@ -355,11 +489,14 @@ function bindSource(
       return snapshot;
     },
   });
-  session.reportRevision({ revision: snapshot.revision, dirty: false });
+  session.reportRevision({ revision: snapshot.revision, origin: "model-initialization" });
   return {
     change(nextSnapshot: EditorSourceSnapshot, dirty = true) {
       snapshot = nextSnapshot;
-      session.reportRevision({ revision: snapshot.revision, dirty });
+      session.reportRevision({
+        revision: snapshot.revision,
+        origin: dirty ? "local-edit" : "model-initialization",
+      });
     },
     snapshot: () => snapshot,
     detach,

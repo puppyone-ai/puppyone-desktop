@@ -38,6 +38,18 @@ const DEFAULT_NATIVE_MESSAGES = Object.freeze({
   "native.executable.open.detail": "This file type may run code or install software. Only open it if you trust this workspace.",
 });
 
+function classifyWorkspaceWriteFailure(error) {
+  const code = typeof error?.code === "string" ? error.code : "";
+  const message = error instanceof Error ? error.message : String(error);
+  if (code === "ENOENT" || /not found|no such file/i.test(message)) {
+    return { ok: false, kind: "not-found", message };
+  }
+  if (code === "EACCES" || code === "EPERM" || /permission denied/i.test(message)) {
+    return { ok: false, kind: "permission-denied", message };
+  }
+  return { ok: false, kind: "io", message };
+}
+
 function defaultTranslate(messageId, values = {}) {
   if (messageId === "native.executable.open.message") {
     return `Open “${values.fileName}” in another app?`;
@@ -182,9 +194,23 @@ export function registerWorkspaceFileIpcHandlers({
       throw new Error("File path is required.");
     }
     const senderId = requireIpcSenderId(event);
-    const result = await writeWorkspaceTextFile(rootPath, filePath, content, {
-      expectedVersion: request?.expectedVersion ?? null,
-    });
+    let result;
+    try {
+      result = await writeWorkspaceTextFile(rootPath, filePath, content, {
+        expectedVersion: request?.expectedVersion ?? null,
+      });
+    } catch (error) {
+      if (error?.code === "WORKSPACE_VERSION_CONFLICT") {
+        const latest = await readWorkspaceTextFile(rootPath, filePath);
+        return {
+          ok: false,
+          kind: "conflict",
+          content: latest.content ?? "",
+          version: latest.version ?? null,
+        };
+      }
+      return classifyWorkspaceWriteFailure(error);
+    }
     try {
       workspaceWatchService?.noteInternalWrite?.({
         rootPath,
@@ -199,7 +225,7 @@ export function registerWorkspaceFileIpcHandlers({
       console.warn("Unable to attribute internal workspace write:", error);
     }
     await absorbWorkspaceEditReviewPath(rootPath, filePath);
-    return result;
+    return { ok: true, version: result?.version ?? null };
   });
 
   ipcMain.handle("workspace:create-entry", async (event, request) => {

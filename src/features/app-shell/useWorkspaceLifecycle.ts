@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import {
   forgetLastWorkspace,
   getInitialWorkspace,
   getRecentWorkspaces,
   hydrateRecentWorkspaces,
+  removeRecentWorkspace,
 } from "../../lib/localFiles";
 import {
   openDroppedWorkspaceTarget,
@@ -32,6 +33,7 @@ export function useWorkspaceLifecycle({
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [restoringWorkspace, setRestoringWorkspace] = useState(true);
   const [restoreWorkspaceError, setRestoreWorkspaceError] = useState<string | null>(null);
+  const recentWorkspaceRequestRef = useRef(0);
 
   const workspace = useMemo(
     () => activeWorkspaceId ? workspaces.find((item) => item.id === activeWorkspaceId) ?? null : null,
@@ -49,7 +51,10 @@ export function useWorkspaceLifecycle({
   }, [onWorkspaceActivated]);
 
   const refreshRecentWorkspaceList = useCallback(async () => {
+    const requestId = recentWorkspaceRequestRef.current + 1;
+    recentWorkspaceRequestRef.current = requestId;
     const result = await getRecentWorkspaces();
+    if (recentWorkspaceRequestRef.current !== requestId) return;
     setRecentWorkspaceItems(getRecentWorkspaceItems(result));
     setWorkspaces((current) => mergeWorkspaceLists(current, result.workspaces));
     if (result.errors.length > 0) {
@@ -57,6 +62,7 @@ export function useWorkspaceLifecycle({
     }
     void hydrateRecentWorkspaces()
       .then((hydrated) => {
+        if (recentWorkspaceRequestRef.current !== requestId) return;
         setRecentWorkspaceItems(getRecentWorkspaceItems(hydrated));
         setWorkspaces((current) => mergeWorkspaceLists(current, hydrated.workspaces));
         if (hydrated.errors.length > 0) {
@@ -102,6 +108,13 @@ export function useWorkspaceLifecycle({
     handleWorkspaceOpenResult(result);
   }, [handleWorkspaceOpenResult, workspace]);
 
+  const removeWorkspaceFromRecents = useCallback(async (folderPath: string) => {
+    await removeRecentWorkspace(folderPath);
+    recentWorkspaceRequestRef.current += 1;
+    setRecentWorkspaceItems((current) => current.filter((item) => item.workspace.path !== folderPath));
+    setWorkspaces((current) => current.filter((item) => item.path !== folderPath));
+  }, []);
+
   const clearWorkspace = useCallback(() => {
     setActiveWorkspaceId(null);
     onWorkspaceCleared();
@@ -110,6 +123,7 @@ export function useWorkspaceLifecycle({
   const forgetActiveWorkspace = useCallback(async () => {
     const currentWorkspaceId = workspace?.id ?? null;
     await forgetLastWorkspace();
+    recentWorkspaceRequestRef.current += 1;
     if (currentWorkspaceId) {
       setWorkspaces((current) => current.filter((item) => item.id !== currentWorkspaceId));
       setRecentWorkspaceItems((current) => current.filter((item) => item.workspace.id !== currentWorkspaceId));
@@ -122,14 +136,18 @@ export function useWorkspaceLifecycle({
 
   useEffect(() => {
     let cancelled = false;
+    const recentRequestId = recentWorkspaceRequestRef.current + 1;
+    recentWorkspaceRequestRef.current = recentRequestId;
 
     Promise.all([getInitialWorkspace(), getRecentWorkspaces()])
       .then(([initialWorkspace, recentWorkspaces]) => {
         if (cancelled) return;
-        setRecentWorkspaceItems(getRecentWorkspaceItems(recentWorkspaces));
-        setWorkspaces((current) => mergeWorkspaceLists(current, recentWorkspaces.workspaces));
-        if (recentWorkspaces.errors.length > 0) {
-          console.warn("Some recent puppyone workspaces could not be loaded:", recentWorkspaces.errors);
+        if (recentWorkspaceRequestRef.current === recentRequestId) {
+          setRecentWorkspaceItems(getRecentWorkspaceItems(recentWorkspaces));
+          setWorkspaces((current) => mergeWorkspaceLists(current, recentWorkspaces.workspaces));
+          if (recentWorkspaces.errors.length > 0) {
+            console.warn("Some recent puppyone workspaces could not be loaded:", recentWorkspaces.errors);
+          }
         }
         if (initialWorkspace.workspace) {
           activateWorkspace(initialWorkspace.workspace);
@@ -138,7 +156,7 @@ export function useWorkspaceLifecycle({
         }
         void hydrateRecentWorkspaces()
           .then((hydrated) => {
-            if (cancelled) return;
+            if (cancelled || recentWorkspaceRequestRef.current !== recentRequestId) return;
             setRecentWorkspaceItems(getRecentWorkspaceItems(hydrated));
             setWorkspaces((current) => mergeWorkspaceLists(current, hydrated.workspaces));
             if (hydrated.errors.length > 0) {
@@ -171,6 +189,7 @@ export function useWorkspaceLifecycle({
     openDroppedWorkspace,
     openFolder,
     openWorkspacePath,
+    removeWorkspaceFromRecents,
     recentWorkspaceItems,
     refreshRecentWorkspaceList,
     restoreWorkspaceError,

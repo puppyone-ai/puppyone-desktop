@@ -48,7 +48,7 @@ export type PendingBranchSwitch = {
 type UseDesktopGitControllerOptions = {
   workspace: Workspace | null;
   gitViewActive: boolean;
-  onWorkspaceContentChanged: () => void;
+  onWorkspaceContentChanged: (paths?: readonly string[] | string | null) => void;
   onEnterGitView: () => void;
 };
 

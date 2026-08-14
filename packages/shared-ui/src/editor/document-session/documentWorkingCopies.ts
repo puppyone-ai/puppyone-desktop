@@ -7,16 +7,22 @@ import type {
   DocumentSessionStatus,
 } from "./types";
 import type { EditorSaveMode } from "../registry/viewerTypes";
+import {
+  createDocumentIdentity,
+  getDocumentIdentityKey,
+  type DocumentIdentity,
+} from "./documentIdentity";
 
 type WorkingCopyBinding = {
   session: DocumentEditingSession;
+  identity: DocumentIdentity;
   onPersistedRef: { current: ((commit: DocumentPersistedCommit) => void) | undefined };
   owner: Map<string, WorkingCopyBinding>;
   unsubscribeState: () => void;
   unregister: () => void;
 };
 
-const bindingsByPersistence = new WeakMap<DocumentPersistencePort, Map<string, WorkingCopyBinding>>();
+const bindingsByStorageIdentity = new Map<string, Map<string, WorkingCopyBinding>>();
 const allBindings = new Set<WorkingCopyBinding>();
 const registryListeners = new Set<() => void>();
 let statusSnapshot: ReadonlyMap<string, DocumentSessionStatus> = new Map();
@@ -38,12 +44,13 @@ export function getOrCreateDocumentWorkingCopy(options: Readonly<{
   persistence: DocumentPersistencePort;
   onPersisted?: (commit: DocumentPersistedCommit) => void;
 }>): WorkingCopyBinding {
-  let bindings = bindingsByPersistence.get(options.persistence);
+  const identity = createDocumentIdentity(options.persistence, options.documentId);
+  let bindings = bindingsByStorageIdentity.get(identity.storageIdentity);
   if (!bindings) {
     bindings = new Map();
-    bindingsByPersistence.set(options.persistence, bindings);
+    bindingsByStorageIdentity.set(identity.storageIdentity, bindings);
   }
-  const existing = bindings.get(options.documentId);
+  const existing = bindings.get(identity.resourcePath);
   if (existing) {
     existing.onPersistedRef.current = options.onPersisted;
     existing.session.setSaveMode(options.saveMode);
@@ -52,7 +59,7 @@ export function getOrCreateDocumentWorkingCopy(options: Readonly<{
 
   const onPersistedRef = { current: options.onPersisted };
   const session = new DocumentEditingSession({
-    documentId: options.documentId,
+    documentId: identity.resourcePath,
     initialContent: options.initialContent,
     initialVersion: options.initialVersion,
     saveMode: options.saveMode,
@@ -61,6 +68,7 @@ export function getOrCreateDocumentWorkingCopy(options: Readonly<{
   });
   const binding: WorkingCopyBinding = {
     session,
+    identity,
     onPersistedRef,
     owner: bindings,
     unsubscribeState: () => undefined,
@@ -68,20 +76,27 @@ export function getOrCreateDocumentWorkingCopy(options: Readonly<{
   };
   binding.unregister = registerActiveDocumentSession(session);
   binding.unsubscribeState = session.subscribe(publishStatuses);
-  bindings.set(options.documentId, binding);
+  bindings.set(identity.resourcePath, binding);
   allBindings.add(binding);
   publishStatuses();
   return binding;
 }
 
-export async function closeDocumentWorkingCopy(documentId: string): Promise<void> {
-  const matches = [...allBindings].filter((binding) => binding.session.documentId === documentId);
+export async function closeDocumentWorkingCopy(identity: DocumentIdentity): Promise<void> {
+  const key = getDocumentIdentityKey(identity);
+  const matches = [...allBindings].filter((binding) => getDocumentIdentityKey(binding.identity) === key);
   await flushAndRelease(matches, "document-close");
 }
 
-export async function closeDocumentWorkingCopiesUnderResource(resource: string): Promise<void> {
+export async function closeDocumentWorkingCopiesUnderResource(
+  storageIdentity: string,
+  resource: string,
+): Promise<void> {
+  const canonicalResource = createDocumentIdentity({ storageIdentity }, resource).resourcePath;
   const matches = [...allBindings].filter(({ session }) => (
-    session.documentId === resource || session.documentId.startsWith(`${resource}/`)
+    session.documentId === canonicalResource || session.documentId.startsWith(`${canonicalResource}/`)
+  )).filter(({ identity }) => (
+    identity.storageIdentity === storageIdentity
   ));
   await flushAndRelease(matches, "document-close");
 }
@@ -108,6 +123,9 @@ async function flushAndRelease(
 function releaseBinding(binding: WorkingCopyBinding): void {
   if (!allBindings.delete(binding)) return;
   binding.owner.delete(binding.session.documentId);
+  if (binding.owner.size === 0) {
+    bindingsByStorageIdentity.delete(binding.identity.storageIdentity);
+  }
   binding.unsubscribeState();
   binding.unregister();
   publishStatuses();
@@ -115,7 +133,10 @@ function releaseBinding(binding: WorkingCopyBinding): void {
 
 function publishStatuses(): void {
   statusSnapshot = new Map(
-    [...allBindings].map(({ session }) => [session.documentId, session.getState().status]),
+    [...allBindings].map(({ identity, session }) => [
+      getDocumentIdentityKey(identity),
+      session.getState().status,
+    ]),
   );
   registryListeners.forEach((listener) => listener());
 }

@@ -50,7 +50,7 @@ describe("local HTML editor persistence", () => {
         throw new Error("local file version conflict");
       }
       await writeFile(absolutePath, request.content, "utf8");
-      return { version: fingerprint(request.content) };
+      return { ok: true as const, version: fingerprint(request.content) };
     });
     originalDesktopBridge = window.puppyoneDesktop;
     window.puppyoneDesktop = {

@@ -42,14 +42,14 @@ describe("code editor source snapshot boundary", () => {
     act(() => view.dispatch({ changes: { from: 5, to: 6, insert: "x" }, userEvent: "input.type" }));
 
     expect(toStringSpy).not.toHaveBeenCalled();
-    expect(onRevision).toHaveBeenLastCalledWith(expect.objectContaining({ dirty: true }));
+    expect(onRevision).toHaveBeenLastCalledWith(expect.objectContaining({ origin: "local-edit" }));
     expect(snapshotPort).not.toBeNull();
     expect(snapshotPort!.readSnapshot().content[5]).toBe("x");
     expect(toStringSpy).toHaveBeenCalledTimes(1);
   });
 
   it("persists the latest CodeMirror snapshot through the shared document session", async () => {
-    const persist = vi.fn(async () => ({ version: "v2" }));
+    const persist = vi.fn(async () => ({ ok: true as const, version: "v2" }));
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -60,7 +60,7 @@ describe("code editor source snapshot boundary", () => {
           initialContent="answer = 41"
           initialVersion="v1"
           saveMode="auto"
-          persistence={{ kind: "local-fs", persist }}
+          persistence={{ kind: "local-fs", storageIdentity: "test:code-source", persist }}
         >
           <TextEditorFrame
             documentId="worker.py"

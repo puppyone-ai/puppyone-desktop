@@ -39,6 +39,10 @@ export type FileNode = DataNode;
 
 let gitStatusRequestSequence = 0;
 
+export function createLocalDocumentStorageIdentity(rootPath: string): string {
+  return `local-fs:${rootPath.replace(/\/+$/, "") || "/"}`;
+}
+
 export function createLocalDataPort(rootPath: string): DataPort {
   return {
     listChildren: (folderPath) => loadFolderChildren(rootPath, folderPath),
@@ -110,7 +114,8 @@ export function createLocalDataPort(rootPath: string): DataPort {
           content,
           expectedVersion: current.version ?? null,
         });
-        return { content, version: result.version ?? null };
+        const success = requireWorkspaceWriteSuccess(result);
+        return { content, version: success.version };
       },
       start: (path) => getDesktopBridge().startAppPreview({ rootPath, path }),
       restart: (path) => getDesktopBridge().restartAppPreview({ rootPath, path }),
@@ -123,6 +128,7 @@ export function createLocalDataPort(rootPath: string): DataPort {
     },
     documentPersistence: {
       kind: "local-fs",
+      storageIdentity: createLocalDocumentStorageIdentity(rootPath),
       persist: ({ path, content, baseVersion }) => getDesktopBridge().writeFile({
         rootPath,
         path,
@@ -155,6 +161,16 @@ export function createLocalDataPort(rootPath: string): DataPort {
     }),
     deleteNode: (path) => getDesktopBridge().deleteEntry({ rootPath, path }).then(() => undefined),
   };
+}
+
+function requireWorkspaceWriteSuccess(
+  result: Awaited<ReturnType<ReturnType<typeof getDesktopBridge>["writeFile"]>>,
+): Extract<typeof result, { ok: true }> {
+  if (result.ok) return result;
+  if (result.kind === "conflict") {
+    throw new Error("This file changed while the operation was in progress.");
+  }
+  throw new Error(result.message);
 }
 
 async function preflightAppPreviewLaunch(
@@ -247,6 +263,10 @@ export async function getRecentWorkspaces(): Promise<RecentWorkspacesResult> {
 
 export async function hydrateRecentWorkspaces(): Promise<RecentWorkspacesResult> {
   return getDesktopBridge().hydrateRecentWorkspaces();
+}
+
+export async function removeRecentWorkspace(folderPath: string): Promise<void> {
+  await getDesktopBridge().removeRecentWorkspace(folderPath);
 }
 
 export async function openExternalUrl(href: string): Promise<void> {

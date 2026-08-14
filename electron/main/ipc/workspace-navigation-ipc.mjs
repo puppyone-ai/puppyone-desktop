@@ -25,6 +25,11 @@ export function registerWorkspaceNavigationIpcHandlers({
     return workspaceStateStore.hydrateRecentWorkspacesResult();
   });
 
+  ipcMain.handle("workspace:remove-recent", async (_event, folderPath) => {
+    const result = await workspaceStateStore.removeRecentWorkspacePath(folderPath);
+    return { ok: true, ...result };
+  });
+
   ipcMain.handle("workspace:forget-last", async (event) => {
     await forgetCurrentWindowWorkspace(event.sender);
     return { ok: true };

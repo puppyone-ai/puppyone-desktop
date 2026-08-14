@@ -210,7 +210,16 @@ export function OfficeViewer({
       cancelled = true;
       abortController.abort();
     };
-  }, [canUseNativeDocxConversion, convertOfficeDocumentToDocx, document.name, document.path, extension, previewResourceLoading, previewResourceUrl]);
+  }, [
+    canUseNativeDocxConversion,
+    convertOfficeDocumentToDocx,
+    document.name,
+    document.path,
+    extension,
+    fileUrl,
+    previewResourceLoading,
+    previewResourceUrl,
+  ]);
 
   let previewBody: ReactNode;
   if (fileUrlError && !canUseNativeDocxConversion) {

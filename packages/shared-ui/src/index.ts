@@ -1,5 +1,12 @@
 export * from "./core/types";
 export {
+  canonicalizeResourcePath,
+  isSameOrDescendantResourcePath,
+  rebaseResourcePath,
+} from "./core/resourcePath";
+export type { CanonicalResourcePath } from "./core/resourcePath";
+export { workspaceContentChangeMatchesPath } from "./core/workspaceContentChange";
+export {
   TYPOGRAPHY_CHANGE_EVENT,
   dispatchTypographyChange,
   subscribeTypographyChanges,
@@ -134,6 +141,7 @@ export {
   EditorFindContributionProvider,
   useEditorFindCommand,
 } from "./editor/find/editorFind";
+export { useFileResourceLease } from "./editor/resource/useFileResourceLease";
 export type {
   EditorFindAdapter,
   EditorFindCommand,
@@ -146,11 +154,13 @@ export {
   closeAllDocumentWorkingCopies,
   closeDocumentWorkingCopy,
   closeDocumentWorkingCopiesUnderResource,
+  createDocumentIdentity,
   flushActiveDocumentSessions,
   getDocumentWorkingCopyStatuses,
   subscribeDocumentWorkingCopyStatuses,
 } from "./editor/document-session";
 export type {
+  DocumentIdentity,
   DocumentPersistedCommit,
   DocumentSessionStatus,
 } from "./editor/document-session";

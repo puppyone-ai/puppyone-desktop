@@ -1,199 +1,48 @@
-# Editor and Viewer Architecture
+# Editor Architecture
 
-This directory is the architecture home for PuppyOne's file editing and
-preview subsystem. It covers the lifecycle after a workspace node is selected:
-format classification, source acquisition, preview commitment, viewer
-selection, editing, and format-specific rendering.
+本目录是随产品代码维护的编辑器架构摘要，正文统一使用中文。
 
-## System boundary
+## 核心决定
 
-```text
-Explorer selection
-        |
-        v
-Format registry
-        |
-        v
-Preset Viewer Registry
-        |
-        | format + capability + source requirement
-        v
-Content / resource acquisition
-        |
-        v
-Committed preview document
-        |
-        v
-EditorDocumentHost + PresetViewerRenderer
-        |
-        +----> read-only Viewer Contribution
-        |        HTML / image / PDF / media / Office
-        |
-        `----> editable Editor Contribution
-                 Markdown / text / code / CSV / PuppyFlow
-                          |
-                          | revision change + readSnapshot()
-                          v
-                 DocumentEditingSession
-                          |
-                          v
-                 Local FS / Cloud persistence port
+每个存储身份与规范资源路径只对应一个 Working Copy。编辑器工作台分成三类状态：打开项目录记录“打开了什么”，Pane 布局记录“显示在哪里”，Working Copy 记录“内容是什么、是否需要保存”。三者通过稳定身份关联，不互相代管状态。
+
+```mermaid
+flowchart TB
+  ADDRESS[规范资源地址\n存储身份 + 相对路径]
+  ADDRESS --> OPEN[打开项目录\n资源、标题、活动项、最近使用]
+  OPEN --> LAYOUT[Pane 布局\n位置、分屏、比例、活动 Pane]
+  OPEN --> WC[唯一 Working Copy\n基线、模型、状态、保存队列]
+  LAYOUT --> ROUTER[Viewer 路由]
+  ROUTER --> CONTRIBUTION[格式 Contribution\n匹配、能力、输入、懒加载]
+  CONTRIBUTION -.附着模型端口.-> WC
+  WATCH[文件系统事件\n路径集合 + 序号] --> INVALIDATE[资源级失效路由]
+  INVALIDATE --> WC
+  INVALIDATE --> LEASE[只读资源租约]
+  WC --> POLICY[自动保存策略]
+  POLICY --> PORT[结构化条件写端口]
+  PORT --> DISK[(文件系统)]
+  DISK --> WATCH
 ```
 
-The Explorer owns selection, not rendering. The format and viewer registries
-own the decision about which format-specific surface receives a committed
-document. A file-level HTML viewer and an HTML block embedded in Markdown are
-therefore different architectural layers even when both eventually render
-HTML.
+## 不变量
 
-This subsystem owns:
+1. 没有本地模型编辑时，任意 watcher、refresh、split、attach/detach 序列的写入次数为零。
+2. 干净外部更新直接采纳；脏或保存中的外部更新进入显式冲突。
+3. 条件写冲突是结构化结果，不依赖 Electron Error 自定义字段。
+4. Viewer 不直接读取或写入文件。
+5. 自动保存策略不拥有版本和冲突语义。
+6. 当前同一路径至多一个可见可编辑模型；未来开放并发多视图前必须先升级为一对多模型协议。
+7. 每个可编辑 Viewer 都必须出现在 Registry 驱动的 P0 外部一致性测试矩阵中。
+8. 打开、关闭、重命名和 Pane 移动只改变工作台元数据，不能触发文档写入。
+9. 布局树只引用 `editorId`，不能持有文件内容、存储端口或保存状态。
+10. 格式 Contribution 只声明该格式的匹配、能力、输入与懒加载入口；中央 Registry 只负责确定性组合和路由。
 
-- file format classification and viewer routing;
-- text/content versus binary/resource acquisition;
-- loading, error, unsupported, and committed-preview states;
-- editable versus read-only capability decisions;
-- the versioned, immutable preset Viewer Contribution contract and registry;
-- the small editable-contribution revision/snapshot boundary;
-- the shared save lifecycle and navigation/close flush contract;
-- format-specific preview and editing architecture;
-- the dormant, capability-gated external Viewer Pack adapter boundary.
+## 文档
 
-It does not own Explorer loading and tree state, app-shell navigation,
-workspace authorization, or native-window lifecycle. Those remain in their focused
-architecture documents one level above this directory.
-
-## Authoritative documents
-
-1. [File Format and Viewer Pipeline](file-format-viewer-pipeline.md)
-   - The primary end-to-end contract from format detection through viewer
-     selection, source acquisition, editing capability, and fallback states.
-2. [Smooth Preview Transitions](smooth-preview-transitions.md)
-   - Selection, loaded content, committed preview documents, and editor mount
-     lifecycle without stale content or visual flashes.
-3. [Viewer Plugin Architecture](viewer-plugin-architecture.md)
-   - The experimental local Host retained behind a default-off product
-     capability, its security boundary, and the reserved future distribution
-     adapter. It is not a marketplace commitment.
-4. [Document Editing and Persistence](document-editing-persistence.md)
-   - The intentionally thin `DocumentEditingSession`, the editor-side
-     revision/snapshot adapter, Local/Cloud persistence ports, navigation/close
-     flush behavior, and the conservative external-change policy.
-5. [Markdown Editor](markdown/README.md)
-   - The format-specific source-first architecture and Live Preview UX contract
-     for Markdown files.
-6. [Office Preview and Editor Extension Boundary](office/README.md)
-   - The self-contained local preview pipeline, Word fidelity controls, and
-     narrow handoff into a future optional Office editor plugin.
-7. [Desktop Renderer Performance](../desktop-renderer-performance.md)
-   - The urgent/deferred scheduling, Explorer virtualization, Markdown
-     projection, snapshot, cancellation, worker-index, and production Electron
-     performance contracts shared by Explorer and the editor.
-
-## Adding a format-specific editor
-
-A new editor must fit the shared boundary, not copy the shared save stack:
-
-```text
-format-specific model and UI
-          |
-          +----> reportRevision({ revision, dirty })
-          +----> readSnapshot() -> canonical file content
-          `----> replaceContent() for an accepted external version
-                              |
-                              v
-                   DocumentEditingSession
-```
-
-For a normal text-backed or structured single-file editor, adding the
-contribution must not require changes to `DataWorkspace`, `EditorDocumentHost`,
-`DocumentEditingSession`, persistence ports, Electron IPC, or window-close
-coordination. The new format supplies its component, contribution registration,
-source adapter, serializer when needed, and focused tests.
-
-## Implementation ownership
-
-The source tree follows runtime responsibility rather than placing every editor
-file in one flat directory:
-
-```text
-packages/shared-ui/src/editor/
-  host/                 # DataNode -> document adaptation and host composition
-  registry/             # manifest, route resolution, and extension contracts
-  document-session/     # working copy, persistence, and close/navigation drain
-  viewers/<format>/     # format-owned rendering, model, and serialization
-  markdown/             # the Markdown engine and its viewer contribution
-
-src/features/editor-workbench/
-  controller/           # Desktop workbench commands and state transitions
-  persistence/          # versioned local restoration and legacy migration
-  layout/               # pane-tree projection, document slot, and split resize
-  drag-and-drop/        # Explorer drops, pane moves, and drop geometry
-```
-
-`FilePreview` → `DataNodeEditorHost` → `EditorDocumentHost` is the host chain.
-`EditorDocumentHost` is the only layer that resolves a contribution and attaches
-the shared editing session. `viewerRegistry.tsx` may route to a format package,
-but format viewers cannot import Desktop workbench code or persistence adapters.
-The package index keeps `EditorHost` as a compatibility alias for
-`DataNodeEditorHost`; new code uses the explicit names.
-
-A format-specific architecture package belongs under this directory only when
-the format has durable architecture beyond that shared contract. Use a focused
-subdirectory, for example:
-
-```text
-editor/
-  markdown/
-  spreadsheet/   # only when a dedicated architecture document is needed
-  document/      # only when a dedicated architecture document is needed
-```
-
-Do not create a folder merely because a viewer component exists. The shared
-pipeline document remains the source of truth until a format has enough unique
-editing, rendering, security, or round-trip rules to justify its own
-architecture package.
-
-Binary editing and one operation spanning multiple files are separate
-capabilities. Do not enlarge the common text-snapshot contract until a real
-editor requires one of them.
-
-## Reading order
-
-Start with the file-format pipeline, then read the preview lifecycle. Read a
-format subdirectory only for the format being changed. Consult the plugin
-document only when work affects the viewer registry boundary or distribution
-model.
-
-## Current implementation status
-
-1. The canonical File Format registry, serializable Preset Viewer manifest, and
-   versioned implementation registry are active production paths. The manifest
-   is the single source of truth for capability, source, runtime, surface
-   preparation, and first-frame readiness metadata;
-   the registry binds reviewed React implementations without repeating those
-   authority fields. Existing Markdown, text/code, CSV, HTML, Office, image,
-   PDF, audio, video, PuppyFlow, and placeholder viewers are built-in
-   contributions.
-2. The external Viewer Pack Host has an experimental implementation and
-   security coverage, but the signed default product uses the
-   `preset-viewers-only` profile. That profile does not register Pack schemes,
-   import the main-process Pack runtime, create a Host, expose Pack IPC/preload
-   APIs, load the renderer Pack chunk, or inject installation UI.
-3. A future signed build may explicitly enable the external adapter through
-   package capability metadata. Catalog, publisher, marketplace, and concrete
-   third-party Pack delivery remain uncommitted work and require a separate
-   issue.
-4. Built-in editable contributions share the host-owned
-   `DocumentEditingSession` and Local/Cloud persistence ports. Markdown and
-   text/code, CSV, and PuppyFlow use the same narrow revision/snapshot
-   attachment path. Format components no longer receive or call session save
-   methods. Watcher-driven clean reload, dirty conflict preservation, and
-   explicit reload/keep-local resolution are active; side-by-side comparison
-   and format-aware merge remain follow-up UX. Multi-agent merge, CRDT, binary
-   editing, and multi-file transactions are not part of the current Editor
-   contract.
-5. `editorAccess.ts` is the single Host-level edit authority decision. It
-   intersects the routed Viewer's manifest capability, the resolved format's
-   `editable` policy, complete text-source readiness, and the host persistence
-   capability. Semantic kinds such as CSV's `spreadsheet` classification are
-   presentation metadata and cannot silently make a routed editor read-only.
+- [Document Editing and Persistence](./document-editing-persistence.md)
+- [Editor Workbench Boundaries](./editor-workbench-boundaries.md)
+- [File Format and Viewer Pipeline](./file-format-viewer-pipeline.md)
+- [Preview Transitions](./smooth-preview-transitions.md)
+- [Markdown Editor](./markdown/README.md)
+- [Office](./office/README.md)
+- [Viewer Plugin Architecture](./viewer-plugin-architecture.md)

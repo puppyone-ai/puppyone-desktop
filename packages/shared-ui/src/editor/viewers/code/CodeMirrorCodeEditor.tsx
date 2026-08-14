@@ -124,7 +124,7 @@ export function CodeMirrorCodeEditor({
           if (update.transactions.some((transaction) => transaction.annotation(externalDocumentUpdate))) return;
           callbacksRef.current.onSourceRevisionChange?.({
             revision: getCodeDocumentRevision(update.state.doc),
-            dirty: true,
+            origin: "local-edit",
           });
           // Compatibility for controlled hosts. The built-in code viewer uses
           // the snapshot port so ordinary typing does not stringify the file.
@@ -157,7 +157,7 @@ export function CodeMirrorCodeEditor({
     callbacksRef.current.onSnapshotPortChange?.(snapshotPort);
     callbacksRef.current.onSourceRevisionChange?.({
       revision: getCodeDocumentRevision(view.state.doc),
-      dirty: false,
+      origin: "model-initialization",
     });
 
     return () => {
@@ -179,7 +179,7 @@ export function CodeMirrorCodeEditor({
     replaceEditorContent(view, content);
     callbacksRef.current.onSourceRevisionChange?.({
       revision: getCodeDocumentRevision(view.state.doc),
-      dirty: false,
+      origin: "model-initialization",
     });
   }, [content]);
 

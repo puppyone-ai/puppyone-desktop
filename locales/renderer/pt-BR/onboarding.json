@@ -1,6 +1,9 @@
 {
   "projects.title": "Projetos",
+  "projects.localTitle": "Projetos locais",
   "projects.open": "Abrir {project}",
+  "projects.removeFor": "Remover {project} de Projetos locais",
+  "projects.removeHint": "Remove apenas este registro. Os arquivos locais não são excluídos.",
   "projects.untitled": "Projeto sem título",
   "action.createCloudProject": "Criar projeto na Cloud",
   "action.openLocalFolder": "Abrir pasta local",

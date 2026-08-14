@@ -145,11 +145,28 @@ export function createWorkspaceStateStore({
   }
 
   async function removeRecentWorkspacePath(folderPath) {
-    const canonicalPath = await canonicalizeWorkspacePath(folderPath);
+    if (typeof folderPath !== "string" || !folderPath.trim()) {
+      throw new Error("Workspace path is required.");
+    }
+    const requestedPath = path.resolve(folderPath.trim());
+    let canonicalPath = null;
+    try {
+      canonicalPath = await canonicalizeWorkspacePath(requestedPath);
+    } catch {
+      // A stale registration must remain removable after its folder moved or
+      // disappeared. The exact persisted path is still safe to forget.
+    }
     return enqueueMutation(async () => {
       const state = normalizeWorkspaceState(await readWorkspaceState());
-      const recentWorkspaceRecords = state.recentWorkspaceRecords.filter((item) => item.path !== canonicalPath);
+      const matchingRecord = state.recentWorkspaceRecords.find((item) => (
+        item.path === requestedPath || (canonicalPath && item.path === canonicalPath)
+      ));
+      if (!matchingRecord) {
+        throw new Error("Workspace path is not in the main-process recent workspace list.");
+      }
+      const recentWorkspaceRecords = state.recentWorkspaceRecords.filter((item) => item !== matchingRecord);
       await writeWorkspaceState(createPersistedState(recentWorkspaceRecords));
+      return { removed: true, path: matchingRecord.path };
     });
   }
 

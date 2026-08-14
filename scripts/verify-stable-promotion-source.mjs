@@ -22,6 +22,7 @@ try {
     catalog,
     baseVersion: required(args, "base-version"),
     commitSha: required(args, "commit"),
+    sourceTag: required(args, "source-tag"),
   });
   assertStablePromotionCoordinates({ source, catalogUrl });
 

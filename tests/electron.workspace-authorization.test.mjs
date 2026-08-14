@@ -202,6 +202,14 @@ describe("recent workspace authorization", () => {
     await expect(handlers.get("workspace:open-current")(event, root)).resolves.toEqual({ status: "opened-current" });
     expect(openWorkspaceInCurrentWindow).toHaveBeenCalledWith(event.sender, await fs.promises.realpath(root));
 
+    await expect(handlers.get("workspace:remove-recent")(event, otherRoot)).rejects.toThrow(/recent workspace list/i);
+    await expect(handlers.get("workspace:remove-recent")(event, root)).resolves.toEqual({
+      ok: true,
+      removed: true,
+      path: await fs.promises.realpath(root),
+    });
+    await expect(handlers.get("workspace:open-current")(event, root)).rejects.toThrow(/recent workspace list/i);
+
     await expect(handlers.get("workspace:open-dropped-current")(event, otherRoot)).resolves.toEqual({ status: "opened-current" });
     expect(openWorkspaceInCurrentWindow).toHaveBeenCalledWith(event.sender, otherRoot);
     await expect(handlers.get("workspace:open-dropped-current")(event, "  ")).rejects.toThrow(/path is required/i);

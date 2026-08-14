@@ -34,6 +34,13 @@ export type Workspace = {
   markdownDialect?: "puppy-gfm" | "openknowledge-mdx";
 };
 
+/** Resource-scoped invalidation signal; null path means a genuine bulk refresh. */
+export type WorkspaceContentChange = Readonly<{
+  sequence: number;
+  /** null means the watcher could not enumerate the affected resources. */
+  paths: readonly string[] | null;
+}>;
+
 export type DataNode = {
   id: string;
   name: string;
@@ -178,6 +185,12 @@ export type DataReadOptions = {
 
 export type DocumentPersistenceKind = "local-fs" | "cloud";
 
+/**
+ * Stable identity for one storage namespace. It must survive adapter and React
+ * object recreation; callback/object identity is never a document identity.
+ */
+export type DocumentStorageIdentity = string;
+
 export type DocumentPersistenceReason =
   | "edit"
   | "manual"
@@ -195,9 +208,31 @@ export type DocumentPersistenceRequest = {
   reason: DocumentPersistenceReason;
 };
 
-export type DocumentPersistenceResult = {
-  version?: string | null;
-};
+export type DocumentPersistenceSuccess = Readonly<{
+  ok: true;
+  version: string | null;
+}>;
+
+export type DocumentPersistenceConflict = Readonly<{
+  ok: false;
+  kind: "conflict";
+  /** Latest storage bytes, read after the failed compare-and-swap. */
+  content: string;
+  version: string | null;
+}>;
+
+export type DocumentPersistenceFailure = Readonly<{
+  ok: false;
+  kind: "not-found" | "permission-denied" | "io";
+  /** Untrusted adapter detail; presentation code must isolate it. */
+  message: string;
+}>;
+
+/** Expected storage outcomes cross process boundaries as data, never Error metadata. */
+export type DocumentPersistenceResult =
+  | DocumentPersistenceSuccess
+  | DocumentPersistenceConflict
+  | DocumentPersistenceFailure;
 
 /**
  * Host-owned storage strategy. Editors never receive this port directly;
@@ -205,7 +240,8 @@ export type DocumentPersistenceResult = {
  */
 export type DocumentPersistencePort = {
   kind: DocumentPersistenceKind;
-  persist: (request: DocumentPersistenceRequest) => Promise<DocumentPersistenceResult | void>;
+  storageIdentity: DocumentStorageIdentity;
+  persist: (request: DocumentPersistenceRequest) => Promise<DocumentPersistenceResult>;
 };
 
 export type DataCapabilities = {

@@ -93,4 +93,14 @@ describe("EditorPaneLayoutModel", () => {
     );
     expect(parsed.root).toMatchObject({ kind: "split", ratio: 0.15 });
   });
+
+  it("keeps pane references aligned when resource addresses use equivalent separators", () => {
+    const layout = rebaseEditorPaneResources(
+      createEditorPaneLayout("docs/nested/a.md"),
+      ".\\docs\\",
+      "./notes//",
+    );
+
+    expect(getActiveEditorPane(layout).editorId).toBe("notes/nested/a.md");
+  });
 });

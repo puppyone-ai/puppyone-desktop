@@ -114,9 +114,6 @@ export function DesktopCloudShell({
     "--desktop-main-pane-min-width": `${paneLayout.main.minWidth}px`,
     minWidth: paneLayout.minimumWidth,
   } as CSSProperties;
-  const shellStyle = {
-    "--desktop-titlebar-sidebar-width": `${paneLayout.explorer.width}px`,
-  } as CSSProperties;
   const sidebarState = !leftSidebarPresent
     ? "absent"
     : paneLayout.explorer.collapsed
@@ -135,7 +132,6 @@ export function DesktopCloudShell({
     <div
       className={`desktop-shell ${minimalMode ? "is-minimal-mode" : ""}`}
       data-titlebar-sidebar-state={sidebarState}
-      style={shellStyle}
     >
       <DesktopWindowChrome
         context={(
@@ -155,7 +151,7 @@ export function DesktopCloudShell({
                   <PanelLeft size={15} strokeWidth={1.8} aria-hidden="true" />
                 </button>
               )}
-              {sidebarState !== "collapsed" && titlebarSidebarSlot}
+              {titlebarSidebarSlot}
             </div>
             <div className="desktop-titlebar-editor-context">
               {titlebarEditorSlot}

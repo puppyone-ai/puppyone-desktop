@@ -10,6 +10,7 @@ import {
   createEditorInput,
   getActiveEditorPane,
   getEditorPanes,
+  isSameOrDescendantResourcePath,
   moveEditorPane,
   openEditor,
   rebaseEditorPaneResources,
@@ -120,11 +121,12 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
   const open = useCallback((path: string, node?: DataNode | null) => {
     if (!path || node?.type === "folder") return;
     updateWorkbench((current) => {
-      const group = openEditor(current.group, createEditorInput(path, node?.name));
-      const visiblePane = getEditorPanes(current.layout).find((pane) => pane.editorId === path);
+      const input = createEditorInput(path, node?.name);
+      const group = openEditor(current.group, input);
+      const visiblePane = getEditorPanes(current.layout).find((pane) => pane.editorId === input.id);
       const layout = visiblePane
         ? activateEditorPane(current.layout, visiblePane.id)
-        : assignEditorToActivePane(current.layout, path);
+        : assignEditorToActivePane(current.layout, input.id);
       return createEditorWorkbenchState(group, layout);
     });
   }, [updateWorkbench]);
@@ -150,11 +152,12 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
   ) => {
     if (!path) return;
     updateWorkbench((current) => {
-      const visiblePane = getEditorPanes(current.layout).find((pane) => pane.editorId === path);
-      const group = openEditor(current.group, createEditorInput(path, label));
+      const input = createEditorInput(path, label);
+      const visiblePane = getEditorPanes(current.layout).find((pane) => pane.editorId === input.id);
+      const group = openEditor(current.group, input);
       if (visiblePane) {
         return createEditorWorkbenchState(
-          activateEditor(group, path),
+          activateEditor(group, input.id),
           activateEditorPane(current.layout, visiblePane.id),
         );
       }
@@ -162,9 +165,9 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
       const targetPane = getEditorPanes(current.layout).find((pane) => pane.id === targetPaneId);
       if (!targetPane) return current;
       const layout = targetPane.editorId === null
-        ? assignEditorToPane(current.layout, targetPaneId, path)
-        : splitEditorPane(current.layout, targetPaneId, direction, { editorId: path, placement });
-      return createEditorWorkbenchState(activateEditor(group, path), layout);
+        ? assignEditorToPane(current.layout, targetPaneId, input.id)
+        : splitEditorPane(current.layout, targetPaneId, direction, { editorId: input.id, placement });
+      return createEditorWorkbenchState(activateEditor(group, input.id), layout);
     });
   }, [updateWorkbench]);
 
@@ -227,7 +230,7 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
   const closeUnderResource = useCallback((resource: string) => {
     updateWorkbench((current) => {
       const removedEditorIds = current.group.editors
-        .filter((editor) => isSameOrDescendant(editor.resource, resource))
+        .filter((editor) => isSameOrDescendantResourcePath(editor.resource, resource))
         .map((editor) => editor.id);
       const group = closeEditorsUnderResource(current.group, resource);
       const layout = removedEditorIds.reduce(
@@ -281,9 +284,4 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
     workbench.group,
     workbench.layout,
   ]);
-}
-
-
-function isSameOrDescendant(candidate: string, resource: string): boolean {
-  return candidate === resource || candidate.startsWith(`${resource}/`);
 }

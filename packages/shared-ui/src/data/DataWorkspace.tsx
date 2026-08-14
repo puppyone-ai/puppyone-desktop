@@ -12,7 +12,14 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
-import type { DataCapabilities, DataNode, DataPort, FileContent, Workspace } from "../core/types";
+import type {
+  DataCapabilities,
+  DataNode,
+  DataPort,
+  FileContent,
+  Workspace,
+  WorkspaceContentChange,
+} from "../core/types";
 import { defaultDataCapabilities } from "../core/types";
 import { preloadPresetViewer } from "../editor/host/PresetViewerRenderer";
 import {
@@ -30,6 +37,7 @@ import {
 import { resolveMarkdownAssetPath } from "../editor/markdown/assetResolution";
 import { ExplorerTree } from "./ExplorerTree";
 import { FilePreview, type FilePreviewProps } from "../editor/host/FilePreview";
+import { useFileResourceLease } from "../editor/resource/useFileResourceLease";
 import { ProjectsHeader } from "./ProjectsHeader";
 import type { EditorSaveMode } from "../editor/host/EditorDocumentHost";
 import type {
@@ -135,7 +143,7 @@ export type DataWorkspaceProps = {
   aiEditRequest?: AiEditRequest | null;
   enableMarkdownLinkContentIndexing?: boolean;
   folderExpansionStrategy?: DataWorkspaceFolderExpansionStrategy;
-  refreshKey?: unknown;
+  refreshKey?: WorkspaceContentChange;
   onExplorerWidthChange?: (width: number) => void;
   onExplorerCollapsedChange?: (collapsed: boolean) => void;
   onExplorerResizeActiveChange?: (active: boolean) => void;
@@ -259,10 +267,6 @@ export function DataWorkspace({
   const [fileLoading, setFileLoading] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [fileErrorPath, setFileErrorPath] = useState<string | null>(null);
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [fileUrlPath, setFileUrlPath] = useState<string | null>(null);
-  const [fileUrlLoading, setFileUrlLoading] = useState(false);
-  const [fileUrlError, setFileUrlError] = useState<string | null>(null);
   const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
   const [unavailableActivePath, setUnavailableActivePath] = useState<string | null>(null);
   const [markdownLinkIndexing, setMarkdownLinkIndexing] = useState(false);
@@ -281,7 +285,10 @@ export function DataWorkspace({
   markdownLinkIndexCoordinatorRef.current ??= new MarkdownLinkIndexCoordinator();
   const suppressSelectionSyncRef = useRef(false);
   const documentNavigationRequestRef = useRef(0);
-  const activePathHydrationAttemptRef = useRef<{ path: string; refreshKey: unknown } | null>(null);
+  const activePathHydrationAttemptRef = useRef<{
+    path: string;
+    refreshKey: WorkspaceContentChange | undefined;
+  } | null>(null);
   const [internalExplorerWidth, setInternalExplorerWidth] = useState(() => (
     clampNumber(defaultExplorerWidth, minExplorerWidth, maxExplorerWidth)
   ));
@@ -391,10 +398,6 @@ export function DataWorkspace({
     setFileError(null);
     setFileErrorPath(null);
     setFileLoading(false);
-    setFileUrl(null);
-    setFileUrlPath(null);
-    setFileUrlError(null);
-    setFileUrlLoading(false);
     setDocumentNavigationError(null);
     documentNavigationRequestRef.current += 1;
     setMarkdownLinkIndexing(false);
@@ -520,20 +523,21 @@ export function DataWorkspace({
     dataPort.getFileUrl &&
     (selectedFileSourceRequirement === "resource" || selectedFileSourceRequirement === "content-and-resource"),
   );
+  const selectedFileResource = useFileResourceLease({
+    dataPort,
+    enabled: selectedFileNeedsResourceUrl,
+    path: selectedFile?.path ?? null,
+    refresh: refreshKey,
+  });
   const cachedSelectedFileContent = selectedFile ? fileContentCache[selectedFile.path] ?? null : null;
   const selectedFileContent = fileContent?.path === selectedFile?.path ? fileContent : cachedSelectedFileContent;
   const selectedFileError = fileErrorPath === selectedFile?.path ? fileError : null;
   const selectedFileContentPending = Boolean(
     selectedFileNeedsFullContent && selectedFile && !selectedFileContent && !selectedFileError,
   );
-  const selectedFileUrlMatchesPath = Boolean(selectedFile && fileUrlPath === selectedFile.path);
-  const selectedFileUrl = selectedFileUrlMatchesPath ? fileUrl : null;
-  const selectedFileUrlLoading = Boolean(
-    selectedFileNeedsResourceUrl
-    && selectedFile
-    && (!selectedFileUrlMatchesPath || fileUrlLoading),
-  );
-  const selectedFileUrlError = selectedFileUrlMatchesPath ? fileUrlError : null;
+  const selectedFileUrl = selectedFileResource.fileUrl;
+  const selectedFileUrlLoading = selectedFileResource.fileUrlLoading;
+  const selectedFileUrlError = selectedFileResource.fileUrlError;
   const selectedPreviewAiEditFile = getAiEditFileForPath(aiEditRequest, selectedFile?.path);
   const pathSegments = buildBreadcrumb(workspace.name, currentFolderPath, selectedFile?.name)
     .map((label) => ({ label }));
@@ -950,51 +954,6 @@ export function DataWorkspace({
     };
   }, [dataPort, loadActiveFileSource, refreshKey, selectedFile]);
 
-  useEffect(() => {
-    if (!selectedFile || !selectedFileNeedsResourceUrl || !dataPort.getFileUrl) {
-      setFileUrl(null);
-      setFileUrlPath(null);
-      setFileUrlError(null);
-      setFileUrlLoading(false);
-      return undefined;
-    }
-
-    let cancelled = false;
-    let activeUrl: string | null = null;
-    setFileUrl(null);
-    setFileUrlPath(selectedFile.path);
-    setFileUrlLoading(true);
-    setFileUrlError(null);
-
-    Promise.resolve(dataPort.getFileUrl(selectedFile.path))
-      .then((url) => {
-        if (cancelled) {
-          void Promise.resolve(dataPort.revokeFileUrl?.(url)).catch(() => undefined);
-          return;
-        }
-        activeUrl = url;
-        setFileUrl(url);
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setFileUrl(null);
-          setFileUrlPath(selectedFile.path);
-          setFileUrlError(error instanceof Error ? error.message : String(error));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setFileUrlLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-      if (activeUrl) {
-        void Promise.resolve(dataPort.revokeFileUrl?.(activeUrl)).catch(() => undefined);
-        activeUrl = null;
-      }
-    };
-  }, [dataPort, selectedFile, selectedFileNeedsResourceUrl]);
-
   const toggleFolder = useCallback(
     (node: DataNode, expanded: boolean) => {
       if (!expanded) {
@@ -1154,7 +1113,6 @@ export function DataWorkspace({
         current,
       ));
       setFileErrorPath((current) => rebasePathByMoveOperations(current, operations));
-      setFileUrlPath((current) => rebasePathByMoveOperations(current, operations));
       setSelectedNodePaths((current) => rebasePathSetByMoveOperations(current, operations));
       setSelectionAnchorPath((current) => rebasePathByMoveOperations(current, operations));
 

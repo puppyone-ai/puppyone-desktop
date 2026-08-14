@@ -114,6 +114,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   getLastWorkspace: () => ipcRenderer.invoke("workspace:get-last"),
   getRecentWorkspaces: () => ipcRenderer.invoke("workspace:get-recent"),
   hydrateRecentWorkspaces: () => ipcRenderer.invoke("workspace:hydrate-recent"),
+  removeRecentWorkspace: (folderPath) => ipcRenderer.invoke("workspace:remove-recent", folderPath),
   forgetLastWorkspace: () => ipcRenderer.invoke("workspace:forget-last"),
   showHomepage: () => ipcRenderer.invoke("workspace:show-homepage"),
   openWorkspaceInCurrentWindow: (folderPath) => ipcRenderer.invoke("workspace:open-current", folderPath),
