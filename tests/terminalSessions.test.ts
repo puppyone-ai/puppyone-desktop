@@ -18,14 +18,19 @@ describe("Desktop Terminal session state", () => {
     });
 
     expect(state.sessions).toMatchObject([
-      { id: "terminal-a", ordinal: 1, status: "starting" },
-      { id: "launcher-a", ordinal: 2, status: "selecting" },
+      { id: "terminal-a", launcherId: "shell", ordinal: 1, status: "starting" },
+      { id: "launcher-a", launcherId: null, ordinal: 2, status: "selecting" },
     ]);
     expect(state.activeSessionId).toBe("launcher-a");
 
-    state = desktopTerminalSessionsReducer(state, { type: "launch", sessionId: "launcher-a" });
+    state = desktopTerminalSessionsReducer(state, {
+      type: "launch",
+      sessionId: "launcher-a",
+      launcherId: "codex",
+    });
     expect(state.sessions[1]).toMatchObject({
       id: "launcher-a",
+      launcherId: "codex",
       ordinal: 2,
       status: "starting",
     });
@@ -33,12 +38,20 @@ describe("Desktop Terminal session state", () => {
 
   it("creates and activates user-owned terminal sessions", () => {
     let state = createDesktopTerminalSessionsState();
-    state = desktopTerminalSessionsReducer(state, { type: "create", sessionId: "terminal-a" });
-    state = desktopTerminalSessionsReducer(state, { type: "create", sessionId: "terminal-b" });
+    state = desktopTerminalSessionsReducer(state, {
+      type: "create",
+      sessionId: "terminal-a",
+      launcherId: "codex",
+    });
+    state = desktopTerminalSessionsReducer(state, {
+      type: "create",
+      sessionId: "terminal-b",
+      launcherId: "shell",
+    });
 
     expect(state.sessions).toMatchObject([
-      { id: "terminal-a", ordinal: 1, status: "starting" },
-      { id: "terminal-b", ordinal: 2, status: "starting" },
+      { id: "terminal-a", launcherId: "codex", ordinal: 1, status: "starting" },
+      { id: "terminal-b", launcherId: "shell", ordinal: 2, status: "starting" },
     ]);
     expect(state.activeSessionId).toBe("terminal-b");
 
@@ -46,10 +59,45 @@ describe("Desktop Terminal session state", () => {
     expect(state.activeSessionId).toBe("terminal-a");
   });
 
+  it("returns a failed startup to the selector with a visible error", () => {
+    let state = createDesktopTerminalSessionsState();
+    state = desktopTerminalSessionsReducer(state, {
+      type: "create-launcher",
+      sessionId: "terminal-agent",
+    });
+    state = desktopTerminalSessionsReducer(state, {
+      type: "launch",
+      sessionId: "terminal-agent",
+      launcherId: "claude",
+    });
+    state = desktopTerminalSessionsReducer(state, {
+      type: "runtime-status",
+      sessionId: "terminal-agent",
+      status: "error",
+      error: "Agent is unavailable",
+    });
+
+    expect(state.sessions[0]).toMatchObject({
+      id: "terminal-agent",
+      launcherId: null,
+      launchError: "Agent is unavailable",
+      shell: null,
+      status: "selecting",
+    });
+  });
+
   it("closes only the selected session and chooses a deterministic neighbor", () => {
     let state = createDesktopTerminalSessionsState("terminal-a");
-    state = desktopTerminalSessionsReducer(state, { type: "create", sessionId: "terminal-b" });
-    state = desktopTerminalSessionsReducer(state, { type: "create", sessionId: "terminal-c" });
+    state = desktopTerminalSessionsReducer(state, {
+      type: "create",
+      sessionId: "terminal-b",
+      launcherId: "shell",
+    });
+    state = desktopTerminalSessionsReducer(state, {
+      type: "create",
+      sessionId: "terminal-c",
+      launcherId: "shell",
+    });
     state = desktopTerminalSessionsReducer(state, { type: "activate", sessionId: "terminal-b" });
     state = desktopTerminalSessionsReducer(state, { type: "close", sessionId: "terminal-b" });
 
@@ -66,7 +114,11 @@ describe("Desktop Terminal session state", () => {
 
   it("publishes renderer-safe session status metadata", () => {
     let state = createDesktopTerminalSessionsState("terminal-a");
-    state = desktopTerminalSessionsReducer(state, { type: "create", sessionId: "terminal-b" });
+    state = desktopTerminalSessionsReducer(state, {
+      type: "create",
+      sessionId: "terminal-b",
+      launcherId: "claude",
+    });
     state = desktopTerminalSessionsReducer(state, {
       type: "runtime-status",
       sessionId: "terminal-b",
@@ -74,15 +126,27 @@ describe("Desktop Terminal session state", () => {
       shell: "zsh",
     });
     expect(state.sessions).toMatchObject([
-      { id: "terminal-a", status: "starting" },
-      { id: "terminal-b", shell: "zsh", status: "running" },
+      { id: "terminal-a", launcherId: "shell", status: "starting" },
+      { id: "terminal-b", launcherId: "claude", shell: "zsh", status: "running" },
     ]);
     expect(createDesktopTerminalSessionSnapshot("/workspace", state)).toEqual({
       workspacePath: "/workspace",
       activeSessionId: "terminal-b",
       sessions: [
-        { id: "terminal-a", ordinal: 1, shell: null, status: "starting" },
-        { id: "terminal-b", ordinal: 2, shell: "zsh", status: "running" },
+        {
+          id: "terminal-a",
+          launcherId: "shell",
+          ordinal: 1,
+          shell: null,
+          status: "starting",
+        },
+        {
+          id: "terminal-b",
+          launcherId: "claude",
+          ordinal: 2,
+          shell: "zsh",
+          status: "running",
+        },
       ],
     });
   });

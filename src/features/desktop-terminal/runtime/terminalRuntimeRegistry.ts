@@ -1,16 +1,18 @@
 import type { MessageFormatter } from "@puppyone/localization/core";
 import type { DesktopTerminalSessionStatus } from "../model/terminalSessions";
+import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
 import { TerminalRuntime, type TerminalRuntimeHandle } from "./terminalRuntime";
 
 type TerminalRuntimeFactoryOptions = {
   sessionId: string;
-  initialCommand?: string | null;
+  launcherId: DesktopTerminalLauncherId;
   workspacePath: string;
   getMessageFormatter: () => MessageFormatter;
   onStatus: (
     sessionId: string,
     status: DesktopTerminalSessionStatus,
     shell?: string | null,
+    error?: string | null,
   ) => void;
 };
 
@@ -18,7 +20,10 @@ export type TerminalRuntimeFactory = (
   options: TerminalRuntimeFactoryOptions,
 ) => TerminalRuntimeHandle;
 
-type TerminalRuntimeRegistryOptions = Omit<TerminalRuntimeFactoryOptions, "sessionId"> & {
+type TerminalRuntimeRegistryOptions = Omit<
+  TerminalRuntimeFactoryOptions,
+  "sessionId" | "launcherId"
+> & {
   createRuntime?: TerminalRuntimeFactory;
 };
 
@@ -43,12 +48,12 @@ export class TerminalRuntimeRegistry {
     this.createRuntime = createRuntime;
   }
 
-  ensure(sessionId: string, initialCommand: string | null = null) {
+  ensure(sessionId: string, launcherId: DesktopTerminalLauncherId = "shell") {
     const existing = this.runtimes.get(sessionId);
     if (existing) return existing;
     const runtime = this.createRuntime({
       sessionId,
-      initialCommand,
+      launcherId,
       workspacePath: this.workspacePath,
       getMessageFormatter: this.getMessageFormatter,
       onStatus: this.onStatus,

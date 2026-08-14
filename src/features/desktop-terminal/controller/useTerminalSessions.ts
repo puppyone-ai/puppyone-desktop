@@ -14,10 +14,7 @@ import {
   desktopTerminalSessionsReducer,
   type DesktopTerminalSessionSnapshot,
 } from "../model/terminalSessions";
-import {
-  getDesktopTerminalLauncher,
-  type DesktopTerminalLauncherId,
-} from "../model/terminalLaunchers";
+import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
 import { TerminalRuntimeRegistry } from "../runtime/terminalRuntimeRegistry";
 
 type UseTerminalSessionsOptions = {
@@ -47,18 +44,25 @@ export function useTerminalSessions({
     const registry = new TerminalRuntimeRegistry({
       workspacePath,
       getMessageFormatter: () => messageFormatterRef.current,
-      onStatus: (sessionId, status, shell) => {
-        dispatch({ type: "runtime-status", sessionId, status, shell });
+      onStatus: (sessionId, status, shell, error) => {
+        dispatch({
+          type: "runtime-status",
+          sessionId,
+          status,
+          shell,
+          error: status === "error"
+            ? error ?? messageFormatterRef.current("terminal.launcher.agentStartFailed")
+            : error,
+        });
       },
     });
     return registry;
   });
 
   const createSession = useCallback((launcherId: DesktopTerminalLauncherId = "shell") => {
-    const launcher = getDesktopTerminalLauncher(launcherId);
     const sessionId = createTerminalId();
-    runtimeRegistry.ensure(sessionId, launcher.command);
-    dispatch({ type: "create", sessionId });
+    runtimeRegistry.ensure(sessionId, launcherId);
+    dispatch({ type: "create", sessionId, launcherId });
   }, [runtimeRegistry]);
 
   const createLauncher = useCallback(() => {
@@ -69,9 +73,8 @@ export function useTerminalSessions({
     sessionId: string,
     launcherId: DesktopTerminalLauncherId,
   ) => {
-    const launcher = getDesktopTerminalLauncher(launcherId);
-    runtimeRegistry.ensure(sessionId, launcher.command);
-    dispatch({ type: "launch", sessionId });
+    runtimeRegistry.ensure(sessionId, launcherId);
+    dispatch({ type: "launch", sessionId, launcherId });
   }, [runtimeRegistry]);
 
   const activateSession = useCallback((sessionId: string) => {
@@ -110,6 +113,14 @@ export function useTerminalSessions({
   useEffect(() => {
     onSessionsChangeRef.current(snapshot);
   }, [snapshot]);
+
+  useEffect(() => {
+    state.sessions.forEach((session) => {
+      if (session.status === "selecting" && session.launchError) {
+        runtimeRegistry.close(session.id);
+      }
+    });
+  }, [runtimeRegistry, state.sessions]);
 
   useEffect(() => {
     if (snapshotCleanupTimerRef.current !== null) {

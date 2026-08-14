@@ -35,6 +35,7 @@ describe("Terminal session view lifecycle", () => {
       .toBe(true);
 
     act(() => root.unmount());
+    expect(runtime.unmount).toHaveBeenCalled();
     expect(runtime.dispose).not.toHaveBeenCalled();
     container.remove();
   });
@@ -42,19 +43,20 @@ describe("Terminal session view lifecycle", () => {
 
 function createRuntime(): TerminalRuntimeHandle {
   return {
+    activity: false,
     ready: true,
-    title: "",
     applyAppearance: vi.fn(),
     dispose: vi.fn(),
     focus: vi.fn(),
     mount: vi.fn(),
+    unmount: vi.fn(),
     setActive: vi.fn(),
-    subscribeReady: vi.fn((listener) => {
-      listener(true);
+    subscribeActivity: vi.fn((listener) => {
+      listener(false);
       return () => undefined;
     }),
-    subscribeTitle: vi.fn((listener) => {
-      listener("");
+    subscribeReady: vi.fn((listener) => {
+      listener(true);
       return () => undefined;
     }),
     write: vi.fn(),

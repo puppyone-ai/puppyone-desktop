@@ -1,0 +1,78 @@
+.desktop-terminal-launcher-icon {
+  --desktop-terminal-launcher-mark-scale: 1;
+
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--po-text-muted);
+  opacity: 0.72;
+}
+
+.desktop-terminal-launcher-icon.is-compact {
+  width: 14px;
+  height: 14px;
+  flex-basis: 14px;
+  border-radius: 3px;
+  opacity: 0.78;
+}
+
+.desktop-terminal-launcher-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scale(var(--desktop-terminal-launcher-mark-scale));
+  transform-origin: center;
+}
+
+.desktop-terminal-launcher-icon.is-codex {
+  /* The source PNG has roughly 25% transparent padding around the mark. */
+  --desktop-terminal-launcher-mark-scale: 1.24;
+
+  border-radius: 999px;
+  background: #050505;
+}
+
+.desktop-terminal-launcher-icon.is-opencode {
+  /* OpenCode's visible frame occupies only about half of its source canvas. */
+  --desktop-terminal-launcher-mark-scale: 1.3;
+
+  background: #111418;
+}
+
+.desktop-terminal-launcher-icon.is-cursor {
+  /* Cursor's solid cube fills its viewBox, so match its optical weight to the other marks. */
+  --desktop-terminal-launcher-mark-scale: 0.84;
+}
+
+.desktop-terminal-launcher-icon.is-pi {
+  /* Pi's official mark occupies about 59% of its square source canvas. */
+  --desktop-terminal-launcher-mark-scale: 1.28;
+
+  border-radius: 3px;
+}
+
+.desktop-terminal-launcher-icon.is-hermes {
+  /* The official favicon is a dense edge-to-edge square at launcher size. */
+  --desktop-terminal-launcher-mark-scale: 0.82;
+
+  border-radius: 4px;
+}
+
+.desktop-terminal-launcher-icon.is-compact.is-hermes {
+  /* Preserve the favicon's face details at tab scale without enlarging it in the launcher. */
+  --desktop-terminal-launcher-mark-scale: 0.94;
+}
+
+.dark .desktop-terminal-launcher-icon.is-cursor img {
+  content: url("/icons/agent-cursor-dark.svg");
+}
+
+.dark .desktop-terminal-launcher-icon.is-pi img {
+  content: url("/icons/agent-pi-dark.svg");
+}

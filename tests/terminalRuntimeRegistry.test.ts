@@ -44,7 +44,7 @@ describe("Terminal runtime ownership", () => {
     expect(harness.registry.require("terminal-b")).toBe(second);
   });
 
-  it("binds a fixed launch command to a newly owned runtime", () => {
+  it("binds a closed launcher identity to a newly owned runtime", () => {
     const harness = createRegistryHarness();
 
     harness.registry.ensure("terminal-codex", "codex");
@@ -52,7 +52,7 @@ describe("Terminal runtime ownership", () => {
     expect(harness.createdOptions).toHaveLength(1);
     expect(harness.createdOptions[0]).toMatchObject({
       sessionId: "terminal-codex",
-      initialCommand: "codex",
+      launcherId: "codex",
       workspacePath: "/workspace",
     });
   });
@@ -63,15 +63,16 @@ function createRegistryHarness() {
   const createdOptions: Array<Parameters<TerminalRuntimeFactory>[0]> = [];
   const createRuntime: TerminalRuntimeFactory = (options) => {
     const runtime: TerminalRuntimeHandle = {
+      activity: false,
       ready: false,
-      title: "",
       applyAppearance: vi.fn(),
       dispose: vi.fn(),
       focus: vi.fn(),
       mount: vi.fn(),
+      unmount: vi.fn(),
       setActive: vi.fn(),
+      subscribeActivity: vi.fn(() => () => undefined),
       subscribeReady: vi.fn(() => () => undefined),
-      subscribeTitle: vi.fn(() => () => undefined),
       write: vi.fn(),
     };
     created.push(runtime);

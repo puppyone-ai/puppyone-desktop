@@ -9,6 +9,10 @@ import {
   DESKTOP_TERMINAL_LAUNCHERS,
   getDesktopTerminalLauncher,
 } from "../src/features/desktop-terminal/model/terminalLaunchers";
+import {
+  partitionTerminalAgentLaunchers,
+  TERMINAL_AGENT_PRIMARY_LIMIT,
+} from "../src/features/desktop-terminal/model/terminalLauncherPresentation";
 import { TerminalLauncher } from "../src/features/desktop-terminal/ui/TerminalLauncher";
 import { withTestLocalization } from "./testLocalization";
 
@@ -32,19 +36,30 @@ describe("Desktop Terminal launcher", () => {
     act(() => root?.render(withTestLocalization(
       <TerminalLauncher
         discoveryPhase="ready"
-        installedAgentIds={["codex", "claude", "cursor", "opencode"]}
+        availableAgentIds={["codex", "claude", "cursor", "opencode", "pi", "hermes"]}
         onLaunch={onLaunch}
         onRefresh={vi.fn()}
       />,
     )));
 
     expect(container.querySelector(".desktop-terminal-launcher")).not.toBeNull();
-    expect(container.textContent).toContain("Start an Agent");
+    expect(container.querySelector(".desktop-terminal-launcher-scan")?.getAttribute("aria-label"))
+      .toBe("Scan again");
+    expect(container.querySelector(".desktop-terminal-launcher-scan")?.textContent?.trim()).toBe("");
+    expect(container.textContent).toContain("start with an agent");
+    expect(container.textContent).toContain("or open a shell");
+    expect(container.querySelector(".desktop-terminal-launcher-group.is-agents")).not.toBeNull();
+    expect(container.querySelector(".desktop-terminal-launcher-group.is-shell")).not.toBeNull();
     expect(container.textContent).toContain("Codex");
     expect(container.textContent).toContain("Claude Code");
     expect(container.textContent).toContain("Cursor Agent");
     expect(container.textContent).toContain("OpenCode");
+    expect(container.textContent).toContain("Pi Agent");
+    expect(container.textContent).toContain("Hermes Agent");
     expect(container.textContent).toContain("Open a shell");
+    for (const id of ["codex", "claude", "cursor", "opencode", "pi", "hermes"]) {
+      expect(container.querySelector(`.desktop-terminal-launcher-icon.is-${id} img`)).not.toBeNull();
+    }
     expect(onLaunch).not.toHaveBeenCalled();
 
     clickButton(container, "Codex");
@@ -62,7 +77,7 @@ describe("Desktop Terminal launcher", () => {
     act(() => root?.render(withTestLocalization(
       <TerminalLauncher
         discoveryPhase="ready"
-        installedAgentIds={["codex"]}
+        availableAgentIds={["codex"]}
         onLaunch={vi.fn()}
         onRefresh={vi.fn()}
       />,
@@ -72,23 +87,57 @@ describe("Desktop Terminal launcher", () => {
     expect(container.textContent).not.toContain("Claude Code");
     expect(container.textContent).not.toContain("Cursor Agent");
     expect(container.textContent).not.toContain("OpenCode");
+    expect(container.textContent).not.toContain("Pi Agent");
+    expect(container.textContent).not.toContain("Hermes Agent");
     expect(container.textContent).toContain("Open a shell");
   });
 
-  it("keeps launcher commands closed, explicit, and unique", () => {
+  it("keeps launcher identities closed, explicit, and free of renderer commands", () => {
     expect(DESKTOP_TERMINAL_LAUNCHERS.map(({ id }) => id)).toEqual([
       "codex",
       "claude",
       "cursor",
       "opencode",
+      "pi",
+      "hermes",
       "shell",
     ]);
     expect(new Set(DESKTOP_TERMINAL_LAUNCHERS.map(({ id }) => id)).size)
       .toBe(DESKTOP_TERMINAL_LAUNCHERS.length);
-    expect(getDesktopTerminalLauncher("codex").command).toBe("codex");
-    expect(getDesktopTerminalLauncher("claude").command).toBe("claude");
-    expect(getDesktopTerminalLauncher("cursor").command).toBe("cursor-agent");
-    expect(getDesktopTerminalLauncher("shell").command).toBeNull();
+    expect(getDesktopTerminalLauncher("codex").id).toBe("codex");
+    expect(getDesktopTerminalLauncher("cursor").id).toBe("cursor");
+    expect(getDesktopTerminalLauncher("pi").id).toBe("pi");
+    expect(getDesktopTerminalLauncher("hermes").id).toBe("hermes");
+    expect(DESKTOP_TERMINAL_LAUNCHERS.every((launcher) => !("command" in launcher))).toBe(true);
+  });
+
+  it("keeps the launcher visible and reports a failed Agent start", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(withTestLocalization(
+      <TerminalLauncher
+        discoveryPhase="ready"
+        availableAgentIds={["codex"]}
+        launchError="The Agent could not start."
+        launching={false}
+        onLaunch={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    )));
+
+    expect(container.querySelector('[role="alert"]')?.textContent)
+      .toContain("The Agent could not start.");
+    expect(container.textContent).toContain("start with an agent");
+  });
+
+  it("moves only future catalog growth into the quiet overflow section", () => {
+    const values = Array.from({ length: 8 }, (_, index) => `agent-${index}`);
+    expect(partitionTerminalAgentLaunchers(values)).toEqual({
+      primary: values.slice(0, TERMINAL_AGENT_PRIMARY_LIMIT),
+      overflow: values.slice(TERMINAL_AGENT_PRIMARY_LIMIT),
+    });
   });
 });
 

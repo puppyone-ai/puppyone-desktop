@@ -67,6 +67,7 @@ import { registerLocalFileProtocol } from "./main/local-file-protocol.mjs";
 import { createLocalFileCapabilityStore } from "./main/local-file-capabilities.mjs";
 import { installWindowNavigationSecurity, requireNonEmptyString } from "./main/security.mjs";
 import { createTerminalService } from "./main/terminal-service.mjs";
+import { createTerminalAgentLocator } from "./main/terminal-agent/terminal-agent-locator.mjs";
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
@@ -211,6 +212,7 @@ const terminalService = createTerminalService({
   appVersion: desktopBuildInfo.version,
   initializeWorkspaceEditReview,
 });
+const terminalAgentLocator = createTerminalAgentLocator();
 const agentSessionCache = createEphemeralAgentSessionCache({ app });
 const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   appVersion: desktopBuildInfo.version,
@@ -667,6 +669,7 @@ app.on("will-quit", () => {
   nativeSurfaceOcclusion.dispose();
   nativeSurfacePointerPassthrough.dispose();
   terminalService.closeAll();
+  terminalAgentLocator.dispose();
   localAgentInventory.dispose();
   workspaceWatchService.closeAll();
   gitMetadataWatchService.closeAll();
@@ -783,6 +786,7 @@ function registerIpcHandlers() {
   });
   registerTerminalIpcHandlers({
     ipcMain: trustedIpcMain,
+    terminalAgentLocator,
     terminalService,
     authorizeWorkspaceRoot,
   });

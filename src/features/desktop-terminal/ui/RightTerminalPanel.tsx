@@ -1,6 +1,7 @@
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
   type ForwardedRef,
@@ -8,15 +9,19 @@ import {
 import type { Workspace } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
 import type { TerminalSessionLayout } from "../../../preferences";
-import { useInstalledTerminalAgents } from "../controller/useInstalledTerminalAgents";
+import { useTerminalAgentLocator } from "../controller/useTerminalAgentLocator";
 import { useTerminalSessions } from "../controller/useTerminalSessions";
 import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
 import type { DesktopTerminalSessionSnapshot } from "../model/terminalSessions";
 import { useTerminalAppearanceSync } from "../runtime/useTerminalAppearanceSync";
 import { TerminalCloseConfirmationDialog } from "./TerminalCloseConfirmationDialog";
 import { TerminalLauncher } from "./TerminalLauncher";
-import { TerminalSessionTabs, terminalPanelId, terminalTabId } from "./TerminalSessionTabs";
-import { TerminalSessionView } from "./TerminalSessionView";
+import { TerminalSessionHost } from "./TerminalSessionHost";
+import { TerminalSessionHeader } from "./session-header/TerminalSessionHeader";
+import {
+  terminalPanelId,
+  terminalTabId,
+} from "./session-header/terminalSessionHeaderIds";
 import "@xterm/xterm/css/xterm.css";
 import "./desktop-terminal.css";
 
@@ -58,14 +63,21 @@ function RightTerminalPanelComponent(
   });
   const activeSession = sessions.find((session) => session.id === activeSessionId) ?? null;
   const launcherVisible = active
-    && (sessions.length === 0 || activeSession?.status === "selecting");
-  const installedAgents = useInstalledTerminalAgents({
+    && (
+      sessions.length === 0
+      || activeSession?.status === "selecting"
+      || activeSession?.status === "starting"
+    );
+  const {
+    ids: availableAgentIds,
+    phase: agentDiscoveryPhase,
+    refresh: refreshAvailableAgents,
+  } = useTerminalAgentLocator({
     enabled: launcherVisible,
-    workspacePath: workspace.path,
   });
   const canLaunch = useCallback((launcherId: DesktopTerminalLauncherId) => (
-    launcherId === "shell" || installedAgents.ids.includes(launcherId)
-  ), [installedAgents.ids]);
+    launcherId === "shell" || availableAgentIds.includes(launcherId)
+  ), [availableAgentIds]);
   const createDetectedSession = useCallback((launcherId: DesktopTerminalLauncherId) => {
     if (!canLaunch(launcherId)) return;
     createSession(launcherId);
@@ -77,6 +89,11 @@ function RightTerminalPanelComponent(
     if (!canLaunch(launcherId)) return;
     launchSession(sessionId, launcherId);
   }, [canLaunch, launchSession]);
+
+  useEffect(() => {
+    if (!activeSession?.launchError) return;
+    void refreshAvailableAgents();
+  }, [activeSession?.launchError, refreshAvailableAgents]);
 
   useTerminalAppearanceSync(panelRef, runtimeRegistry);
   useImperativeHandle(ref, () => ({
@@ -92,48 +109,58 @@ function RightTerminalPanelComponent(
       aria-label={t("terminal.title")}
     >
       {sessionLayout === "tabs" && sessions.length > 0 && (
-        <TerminalSessionTabs
+        <TerminalSessionHeader
           sessions={sessions}
           activeSessionId={activeSessionId}
           onActivate={activateSession}
           onClose={requestCloseSession}
           onCreate={createLauncher}
           runtimeRegistry={runtimeRegistry}
+          workspacePath={workspace.path}
         />
       )}
-      <div className={`desktop-terminal-body ${sessions.length === 0 ? "is-empty" : ""} ${activeSession?.status === "selecting" ? "is-launcher" : ""}`}>
+      <div className={`desktop-terminal-body ${sessions.length === 0 ? "is-empty" : ""} ${activeSession?.status === "selecting" || activeSession?.status === "starting" ? "is-launcher" : ""}`}>
         {sessions.length === 0 ? (
           <TerminalLauncher
-            discoveryPhase={installedAgents.phase}
-            installedAgentIds={installedAgents.ids}
+            discoveryPhase={agentDiscoveryPhase}
+            availableAgentIds={availableAgentIds}
             onLaunch={createDetectedSession}
-            onRefresh={() => void installedAgents.refresh()}
+            onRefresh={() => void refreshAvailableAgents()}
           />
-        ) : sessions.map((session) => session.status === "selecting" ? (
-          <div
-            key={session.id}
-            id={sessionLayout === "tabs" ? terminalPanelId(session.id) : undefined}
-            className="desktop-terminal-launcher-tab"
-            role={sessionLayout === "tabs" ? "tabpanel" : undefined}
-            aria-labelledby={sessionLayout === "tabs" ? terminalTabId(session.id) : undefined}
-            hidden={!active || activeSessionId !== session.id}
-          >
-            <TerminalLauncher
-              discoveryPhase={installedAgents.phase}
-              installedAgentIds={installedAgents.ids}
+        ) : sessions.map((session) => (
+          session.status === "selecting" ? (
+              <div
+                key={session.id}
+                id={sessionLayout === "tabs" ? terminalPanelId(session.id) : undefined}
+                className="desktop-terminal-launcher-tab"
+                role={sessionLayout === "tabs" ? "tabpanel" : undefined}
+                aria-labelledby={sessionLayout === "tabs" ? terminalTabId(session.id) : undefined}
+                hidden={!active || activeSessionId !== session.id}
+              >
+                <TerminalLauncher
+                  discoveryPhase={agentDiscoveryPhase}
+                  availableAgentIds={availableAgentIds}
+                  launchError={session.launchError}
+                  onLaunch={(launcherId) => launchDetectedSession(session.id, launcherId)}
+                  onRefresh={() => void refreshAvailableAgents()}
+                  titleId={`desktop-terminal-launcher-title-${session.id}`}
+                />
+              </div>
+          ) : (
+            <TerminalSessionHost
+              key={session.id}
+              active={active && activeSessionId === session.id}
+              discoveryPhase={agentDiscoveryPhase}
+              availableAgentIds={availableAgentIds}
+              labelledBy={sessionLayout === "tabs" ? terminalTabId(session.id) : undefined}
               onLaunch={(launcherId) => launchDetectedSession(session.id, launcherId)}
-              onRefresh={() => void installedAgents.refresh()}
+              onRefresh={() => void refreshAvailableAgents()}
+              panelId={sessionLayout === "tabs" ? terminalPanelId(session.id) : undefined}
+              runtime={runtimeRegistry.require(session.id)}
+              session={session}
+              workspacePath={workspace.path}
             />
-          </div>
-        ) : (
-          <TerminalSessionView
-            key={session.id}
-            active={active && activeSessionId === session.id}
-            labelledBy={sessionLayout === "tabs" ? terminalTabId(session.id) : undefined}
-            panelId={sessionLayout === "tabs" ? terminalPanelId(session.id) : undefined}
-            runtime={runtimeRegistry.require(session.id)}
-            workspacePath={workspace.path}
-          />
+          )
         ))}
       </div>
       {pendingCloseSession && (

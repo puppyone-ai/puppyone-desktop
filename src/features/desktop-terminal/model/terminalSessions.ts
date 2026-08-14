@@ -1,3 +1,5 @@
+import type { DesktopTerminalLauncherId } from "./terminalLaunchers";
+
 export type DesktopTerminalSessionStatus =
   | "selecting"
   | "starting"
@@ -7,6 +9,7 @@ export type DesktopTerminalSessionStatus =
 
 export type DesktopTerminalSessionSummary = {
   id: string;
+  launcherId: DesktopTerminalLauncherId | null;
   ordinal: number;
   shell: string | null;
   status: DesktopTerminalSessionStatus;
@@ -18,7 +21,9 @@ export type DesktopTerminalSessionSnapshot = {
   activeSessionId: string | null;
 };
 
-export type DesktopTerminalSession = DesktopTerminalSessionSummary;
+export type DesktopTerminalSession = DesktopTerminalSessionSummary & {
+  launchError: string | null;
+};
 
 export type DesktopTerminalSessionsState = {
   sessions: DesktopTerminalSession[];
@@ -27,9 +32,9 @@ export type DesktopTerminalSessionsState = {
 };
 
 export type DesktopTerminalSessionsAction =
-  | { type: "create"; sessionId: string }
+  | { type: "create"; sessionId: string; launcherId: DesktopTerminalLauncherId }
   | { type: "create-launcher"; sessionId: string }
-  | { type: "launch"; sessionId: string }
+  | { type: "launch"; sessionId: string; launcherId: DesktopTerminalLauncherId }
   | { type: "activate"; sessionId: string }
   | { type: "close"; sessionId: string }
   | {
@@ -37,6 +42,7 @@ export type DesktopTerminalSessionsAction =
     sessionId: string;
     status: DesktopTerminalSessionStatus;
     shell?: string | null;
+    error?: string | null;
   };
 
 export function createDesktopTerminalSessionsState(
@@ -51,7 +57,7 @@ export function createDesktopTerminalSessionsState(
   }
 
   return {
-    sessions: [createSession(initialSessionId, 1)],
+    sessions: [createSession(initialSessionId, 1, "starting", "shell")],
     activeSessionId: initialSessionId,
     nextOrdinal: 2,
   };
@@ -64,7 +70,10 @@ export function desktopTerminalSessionsReducer(
   if (action.type === "create") {
     if (state.sessions.some((session) => session.id === action.sessionId)) return state;
     return {
-      sessions: [...state.sessions, createSession(action.sessionId, state.nextOrdinal)],
+      sessions: [
+        ...state.sessions,
+        createSession(action.sessionId, state.nextOrdinal, "starting", action.launcherId),
+      ],
       activeSessionId: action.sessionId,
       nextOrdinal: state.nextOrdinal + 1,
     };
@@ -80,7 +89,7 @@ export function desktopTerminalSessionsReducer(
     return {
       sessions: [
         ...state.sessions,
-        createSession(action.sessionId, state.nextOrdinal, "selecting"),
+        createSession(action.sessionId, state.nextOrdinal, "selecting", null),
       ],
       activeSessionId: action.sessionId,
       nextOrdinal: state.nextOrdinal + 1,
@@ -92,7 +101,12 @@ export function desktopTerminalSessionsReducer(
     const sessions = state.sessions.map((session) => {
       if (session.id !== action.sessionId || session.status !== "selecting") return session;
       changed = true;
-      return { ...session, status: "starting" as const };
+      return {
+        ...session,
+        launcherId: action.launcherId,
+        launchError: null,
+        status: "starting" as const,
+      };
     });
     return changed ? { ...state, sessions } : state;
   }
@@ -128,11 +142,26 @@ export function desktopTerminalSessionsReducer(
     let changed = false;
     const sessions = state.sessions.map((session) => {
       if (session.id !== action.sessionId) return session;
+      if (action.status === "error" && session.status === "starting") {
+        changed = true;
+        return {
+          ...session,
+          launcherId: null,
+          launchError: action.error ?? null,
+          shell: null,
+          status: "selecting" as const,
+        };
+      }
       const shell = action.shell === undefined ? session.shell : action.shell;
-      if (session.status === action.status && session.shell === shell) return session;
+      if (
+        session.status === action.status
+        && session.shell === shell
+        && session.launchError === null
+      ) return session;
       changed = true;
       return {
         ...session,
+        launchError: null,
         shell,
         status: action.status,
       };
@@ -149,8 +178,9 @@ export function createDesktopTerminalSessionSnapshot(
 ): DesktopTerminalSessionSnapshot {
   return {
     workspacePath,
-    sessions: state.sessions.map(({ id, ordinal, shell, status }) => ({
+    sessions: state.sessions.map(({ id, launcherId, ordinal, shell, status }) => ({
       id,
+      launcherId,
       ordinal,
       shell,
       status,
@@ -173,9 +203,12 @@ function createSession(
   id: string,
   ordinal: number,
   status: DesktopTerminalSessionStatus = "starting",
+  launcherId: DesktopTerminalLauncherId | null = "shell",
 ): DesktopTerminalSession {
   return {
     id,
+    launcherId,
+    launchError: null,
     ordinal,
     shell: null,
     status,

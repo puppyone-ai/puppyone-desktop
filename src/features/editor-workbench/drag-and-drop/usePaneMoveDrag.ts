@@ -24,6 +24,11 @@ import {
   paneSplitDefinition,
   type PaneDropIntent,
 } from "./paneDropGeometry";
+import {
+  createPaneMovePreview,
+  destroyPaneMovePreview,
+  movePaneMovePreview,
+} from "./paneMovePreview";
 
 export type EditorPaneMoveHandler = (
   sourcePaneId: string,
@@ -45,6 +50,7 @@ export type PaneMoveDragController = Readonly<{
 
 type PaneMoveSession = {
   handle: HTMLButtonElement;
+  sourcePane: HTMLElement | null;
   sourcePaneId: string;
   originX: number;
   originY: number;
@@ -53,6 +59,7 @@ type PaneMoveSession = {
   id: string;
   nativeLease: NativeSurfacePointerPassthroughLease | null;
   onMovePane: EditorPaneMoveHandler;
+  preview: HTMLElement | null;
 };
 
 type PaneMoveFinishReason = InteractionTerminationReason
@@ -89,6 +96,8 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
       dropIntentRef.current = null;
     }
     document.body.classList.remove("desktop-editor-pane-dragging");
+    session.sourcePane?.removeAttribute("data-move-source");
+    destroyPaneMovePreview(session.preview);
     session.nativeLease?.release();
     try {
       if (session.handle.hasPointerCapture(session.pointerId)) {
@@ -117,6 +126,7 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
     sessionRef.current = {
       handle: event.currentTarget,
       id,
+      sourcePane: event.currentTarget.closest<HTMLElement>("[data-editor-pane-id]"),
       sourcePaneId: pane.id,
       originX: event.clientX,
       originY: event.clientY,
@@ -124,6 +134,7 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
       dragging: false,
       nativeLease: null,
       onMovePane,
+      preview: null,
     };
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -145,10 +156,20 @@ export function usePaneMoveDrag(onMovePane: EditorPaneMoveHandler): PaneMoveDrag
       draggedClickRef.current = true;
       setDragging(true);
       document.body.classList.add("desktop-editor-pane-dragging");
+      session.sourcePane?.setAttribute("data-move-source", "true");
+      if (session.sourcePane) {
+        session.preview = createPaneMovePreview(
+          session.sourcePane,
+          event.clientX,
+          event.clientY,
+        );
+      }
       session.nativeLease = acquireNativeSurfacePointerPassthroughLease(
         "editor-pane-move",
         session.id,
       );
+    } else if (session.preview) {
+      movePaneMovePreview(session.preview, event.clientX, event.clientY);
     }
     const element = document.elementFromPoint?.(event.clientX, event.clientY);
     const target = element?.closest<HTMLElement>("[data-editor-pane-id]");

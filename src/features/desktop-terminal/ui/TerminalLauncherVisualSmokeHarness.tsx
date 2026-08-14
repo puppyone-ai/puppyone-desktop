@@ -21,7 +21,7 @@ export function TerminalLauncherVisualSmokeHarness() {
         <div className="desktop-terminal-body is-empty">
           <TerminalLauncher
             discoveryPhase="ready"
-            installedAgentIds={["codex", "claude", "cursor", "opencode"]}
+            availableAgentIds={["codex", "claude", "cursor", "opencode", "pi", "hermes"]}
             onLaunch={setSelection}
             onRefresh={() => undefined}
           />

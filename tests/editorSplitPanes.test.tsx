@@ -103,6 +103,44 @@ describe("DesktopEditorSplitView", () => {
     expect(container.querySelector(".desktop-editor-drop-preview")).toBeNull();
   });
 
+  it("reveals the unframed grab dots when the pointer is in the top third of a pane", () => {
+    const { group, layout } = createThreePaneWorkspace();
+    const container = renderSplitView(group, layout);
+    const pane = container.querySelector<HTMLElement>(".desktop-editor-pane")!;
+    pane.getBoundingClientRect = () => new DOMRect(0, 0, 400, 600);
+
+    expect(pane.dataset.handleHot).toBeUndefined();
+
+    act(() => pane.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true, clientX: 200, clientY: 100,
+    })));
+    expect(pane.dataset.handleHot).toBe("true");
+
+    act(() => pane.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true, clientX: 200, clientY: 400,
+    })));
+    expect(pane.dataset.handleHot).toBeUndefined();
+
+    act(() => pane.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true })));
+    expect(pane.dataset.handleHot).toBeUndefined();
+  });
+
+  it("keeps the grab dots visible while the pane menu is open", () => {
+    const { group, layout } = createThreePaneWorkspace();
+    const container = renderSplitView(group, layout);
+    const pane = container.querySelector<HTMLElement>(".desktop-editor-pane")!;
+    const handle = pane.querySelector<HTMLButtonElement>(".desktop-editor-pane-handle")!;
+    pane.getBoundingClientRect = () => new DOMRect(0, 0, 400, 600);
+    installPointerCaptureStub(handle);
+
+    clickPaneHandle(handle, 41);
+    expect(handle.getAttribute("aria-expanded")).toBe("true");
+    expect(pane.dataset.handleHot).toBe("true");
+
+    act(() => pane.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true })));
+    expect(pane.dataset.handleHot).toBe("true");
+  });
+
   it("uses the grab handle only to move an existing pane", () => {
     const onMovePane = vi.fn();
     let group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("a.md"));
@@ -112,6 +150,7 @@ describe("DesktopEditorSplitView", () => {
     const container = renderSplitView(group, layout, { onMovePane });
     const panes = container.querySelectorAll<HTMLElement>(".desktop-editor-pane");
     const handle = panes[0]!.querySelector<HTMLButtonElement>(".desktop-editor-pane-handle")!;
+    panes[0]!.getBoundingClientRect = () => new DOMRect(0, 0, 400, 600);
     panes[1]!.getBoundingClientRect = () => new DOMRect(400, 0, 400, 600);
     const capturedPointers = new Set<number>();
     handle.setPointerCapture = (pointerId) => capturedPointers.add(pointerId);
@@ -130,6 +169,10 @@ describe("DesktopEditorSplitView", () => {
     });
     expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(true);
     expect(panes[1]!.dataset.dropTarget).toBe("right");
+    const preview = document.body.querySelector<HTMLElement>(".desktop-editor-pane-move-preview");
+    expect(preview).not.toBeNull();
+    expect(preview!.style.transform).toContain("790px");
+    expect(panes[0]!.getAttribute("data-move-source")).toBe("true");
 
     act(() => handle.dispatchEvent(new PointerEvent("pointerup", {
       bubbles: true, clientX: 790, clientY: 300, pointerId: 7,
@@ -141,6 +184,8 @@ describe("DesktopEditorSplitView", () => {
       "second",
     );
     expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(false);
+    expect(document.body.querySelector(".desktop-editor-pane-move-preview")).toBeNull();
+    expect(panes[0]!.getAttribute("data-move-source")).toBeNull();
   });
 
   it("cancels pane movement when pointer capture is lost", () => {
@@ -170,6 +215,7 @@ describe("DesktopEditorSplitView", () => {
       bubbles: true, pointerId: 17,
     })));
     expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(false);
+    expect(document.body.querySelector(".desktop-editor-pane-move-preview")).toBeNull();
     expect(panes[1]!.dataset.dropTarget).toBeUndefined();
     expect(onMovePane).not.toHaveBeenCalled();
   });
