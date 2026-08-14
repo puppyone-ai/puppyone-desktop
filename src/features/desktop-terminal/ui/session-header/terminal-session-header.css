@@ -22,8 +22,7 @@
   gap: var(--desktop-terminal-header-gap);
 }
 
-.desktop-terminal-tab-rail,
-.desktop-terminal-tabs {
+.desktop-terminal-tab-rail {
   display: flex;
   min-width: 0;
   flex: 0 1 auto;
@@ -32,14 +31,28 @@
   overflow: hidden;
 }
 
-.desktop-terminal-tab {
-  --desktop-terminal-tab-resolved-width: var(--desktop-terminal-tab-width);
+.desktop-terminal-tabs {
+  --desktop-terminal-tabs-resolved-width: 0px;
 
   position: relative;
+  display: block;
+  width: var(--desktop-terminal-tabs-resolved-width);
+  height: var(--desktop-terminal-tab-control-height);
+  min-width: 0;
+  flex: 0 0 var(--desktop-terminal-tabs-resolved-width);
+  overflow: hidden;
+}
+
+.desktop-terminal-tab {
+  --desktop-terminal-tab-inline-start: 0px;
+  --desktop-terminal-tab-resolved-width: var(--desktop-terminal-tab-width);
+
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: var(--desktop-terminal-tab-inline-start);
   display: flex;
   width: var(--desktop-terminal-tab-resolved-width);
   height: var(--desktop-terminal-tab-control-height);
-  flex: 0 0 var(--desktop-terminal-tab-resolved-width);
   align-items: center;
   overflow: hidden;
   border: 0;
@@ -53,10 +66,10 @@
 }
 
 .desktop-terminal-tab-rail[data-activation-motion="true"] .desktop-terminal-tab {
-  will-change: width, flex-basis;
+  will-change: inset-inline-start, width;
   transition:
+    inset-inline-start var(--desktop-terminal-tab-activation-motion) cubic-bezier(0.2, 0, 0, 1),
     width var(--desktop-terminal-tab-activation-motion) cubic-bezier(0.2, 0, 0, 1),
-    flex-basis var(--desktop-terminal-tab-activation-motion) cubic-bezier(0.2, 0, 0, 1),
     background-color 120ms ease;
 }
 

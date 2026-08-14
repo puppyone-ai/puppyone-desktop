@@ -8,6 +8,7 @@ import type { TerminalSessionHeaderItem } from "./types";
 type TerminalSessionTabProps = {
   active: boolean;
   compact: boolean;
+  inlineStart: number;
   index: number;
   item: TerminalSessionHeaderItem;
   onActivate: (sessionId: string) => void;
@@ -21,6 +22,7 @@ type TerminalSessionTabProps = {
 export const TerminalSessionTab = memo(function TerminalSessionTab({
   active,
   compact,
+  inlineStart,
   index,
   item,
   onActivate,
@@ -38,7 +40,10 @@ export const TerminalSessionTab = memo(function TerminalSessionTab({
       className={`desktop-terminal-tab ${active ? "is-active" : ""} ${compact ? "is-compact" : ""}`}
       data-status={session.status}
       role="presentation"
-      style={{ "--desktop-terminal-tab-resolved-width": `${width}px` } as CSSProperties}
+      style={{
+        "--desktop-terminal-tab-inline-start": `${inlineStart}px`,
+        "--desktop-terminal-tab-resolved-width": `${width}px`,
+      } as CSSProperties}
     >
       <button
         id={tabId(session.id)}

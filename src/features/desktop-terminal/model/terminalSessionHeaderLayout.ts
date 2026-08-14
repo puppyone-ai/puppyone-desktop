@@ -15,8 +15,16 @@ export type TerminalSessionHeaderLayout = {
   mode: TerminalSessionHeaderLayoutMode;
   activeTabWidth: number;
   inactiveTabWidth: number;
+  tabBounds: readonly TerminalSessionTabBounds[];
+  tabsWidth: number;
   visibleSessionIds: readonly string[];
   hiddenSessionIds: readonly string[];
+};
+
+export type TerminalSessionTabBounds = {
+  inlineStart: number;
+  sessionId: string;
+  width: number;
 };
 
 type ResolveTerminalSessionHeaderLayoutInput = {
@@ -44,6 +52,8 @@ export function resolveTerminalSessionHeaderLayout({
       mode: "full",
       activeTabWidth: metrics.fullMaximum,
       inactiveTabWidth: metrics.fullMaximum,
+      tabBounds: [],
+      tabsWidth: 0,
       visibleSessionIds: [],
       hiddenSessionIds: [],
     };
@@ -64,13 +74,13 @@ export function resolveTerminalSessionHeaderLayout({
   const compactGaps = metrics.gap * (count - 1);
   const compactActiveWidth = width - compactInactiveWidth - compactGaps;
   if (compactActiveWidth >= metrics.fullMinimum) {
-    return {
-      mode: "compact",
-      activeTabWidth: Math.min(metrics.fullMaximum, compactActiveWidth),
-      inactiveTabWidth: metrics.compact,
-      visibleSessionIds: [...sessionIds],
-      hiddenSessionIds: [],
-    };
+    return createLayout(
+      "compact",
+      Math.min(metrics.fullMaximum, compactActiveWidth),
+      metrics.compact,
+      sessionIds,
+      [],
+    );
   }
 
   const availableForCompactTabs = Math.max(
@@ -102,31 +112,51 @@ export function resolveTerminalSessionHeaderLayout({
   );
   const visibleSet = new Set(visibleSessionIds);
 
-  return {
-    mode: "overflow",
+  return createLayout(
+    "overflow",
     activeTabWidth,
-    inactiveTabWidth: metrics.compact,
+    metrics.compact,
     visibleSessionIds,
-    hiddenSessionIds: sessionIds.filter((sessionId) => !visibleSet.has(sessionId)),
-  };
+    sessionIds.filter((sessionId) => !visibleSet.has(sessionId)),
+  );
 
   function allVisible(
     mode: TerminalSessionHeaderLayoutMode,
     tabWidth: number,
   ): TerminalSessionHeaderLayout {
+    return createLayout(mode, tabWidth, tabWidth, sessionIds, []);
+  }
+
+  function createLayout(
+    mode: TerminalSessionHeaderLayoutMode,
+    activeTabWidth: number,
+    inactiveTabWidth: number,
+    visibleSessionIds: readonly string[],
+    hiddenSessionIds: readonly string[],
+  ): TerminalSessionHeaderLayout {
+    let inlineStart = 0;
+    const tabBounds = visibleSessionIds.map((sessionId) => {
+      const width = sessionId === effectiveActiveId ? activeTabWidth : inactiveTabWidth;
+      const bounds = { inlineStart, sessionId, width };
+      inlineStart += width + metrics.gap;
+      return bounds;
+    });
+    const tabsWidth = tabBounds.length === 0 ? 0 : inlineStart - metrics.gap;
     return {
       mode,
-      activeTabWidth: tabWidth,
-      inactiveTabWidth: tabWidth,
-      visibleSessionIds: [...sessionIds],
-      hiddenSessionIds: [],
+      activeTabWidth,
+      inactiveTabWidth,
+      tabBounds,
+      tabsWidth,
+      visibleSessionIds: [...visibleSessionIds],
+      hiddenSessionIds: [...hiddenSessionIds],
     };
   }
 }
 
 /**
  * Preserve the rendered tab window while the user moves between tabs that are
- * already visible. Stable DOM identity lets flex geometry interpolate so the
+ * already visible. Stable DOM identity lets ideal bounds interpolate so the
  * newly active tab pushes its siblings instead of replacing them.
  */
 function canPreserveVisibleWindow({

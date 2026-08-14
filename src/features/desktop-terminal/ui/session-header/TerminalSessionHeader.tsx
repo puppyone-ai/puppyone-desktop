@@ -65,9 +65,12 @@ export function TerminalSessionHeader({
     sessionIds,
     tabId: terminalTabId,
   });
-  const visibleItems = layout.visibleSessionIds
-    .map((sessionId) => itemById.get(sessionId))
-    .filter((item): item is TerminalSessionHeaderItem => Boolean(item));
+  const visibleItems = layout.tabBounds
+    .map((bounds) => {
+      const item = itemById.get(bounds.sessionId);
+      return item ? { bounds, item } : null;
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
   const hiddenItems = layout.hiddenSessionIds
     .map((sessionId) => itemById.get(sessionId))
     .filter((item): item is TerminalSessionHeaderItem => Boolean(item));
@@ -93,8 +96,11 @@ export function TerminalSessionHeader({
             className="desktop-terminal-tabs"
             role="tablist"
             aria-label={t("terminal.title")}
+            style={{
+              "--desktop-terminal-tabs-resolved-width": `${layout.tabsWidth}px`,
+            } as CSSProperties}
           >
-            {visibleItems.map((item) => {
+            {visibleItems.map(({ bounds, item }) => {
               const { session } = item;
               const active = session.id === activeSessionId;
               return (
@@ -104,7 +110,8 @@ export function TerminalSessionHeader({
                   index={sessionIndexById.get(session.id) ?? 0}
                   active={active}
                   compact={!active && layout.mode !== "full"}
-                  width={active ? layout.activeTabWidth : layout.inactiveTabWidth}
+                  inlineStart={bounds.inlineStart}
+                  width={bounds.width}
                   onActivate={controller.activate}
                   onClose={onClose}
                   onKeyDown={controller.handleKeyDown}

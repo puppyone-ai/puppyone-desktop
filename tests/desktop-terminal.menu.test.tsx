@@ -335,12 +335,21 @@ describe("Desktop Terminal titlebar session manager", () => {
     act(() => root?.render(withTestLocalization(<Harness />)));
     const rail = container.querySelector(".desktop-terminal-tab-rail");
     const tabs = container.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    const tabShells = container.querySelectorAll<HTMLElement>(".desktop-terminal-tab");
     expect(rail?.getAttribute("data-layout")).toBe("compact");
     expect(rail?.hasAttribute("data-activation-motion")).toBe(false);
+    expect(tabShells[0]?.style.getPropertyValue("--desktop-terminal-tab-inline-start")).toBe("0px");
+    expect(tabShells[0]?.style.getPropertyValue("--desktop-terminal-tab-resolved-width")).toBe("144px");
+    expect(tabShells[1]?.style.getPropertyValue("--desktop-terminal-tab-inline-start")).toBe("147px");
+    expect(tabShells[1]?.style.getPropertyValue("--desktop-terminal-tab-resolved-width")).toBe("28px");
 
     act(() => tabs[1]?.click());
     expect(tabs[1]?.getAttribute("aria-selected")).toBe("true");
     expect(rail?.getAttribute("data-activation-motion")).toBe("true");
+    expect(tabShells[0]?.style.getPropertyValue("--desktop-terminal-tab-inline-start")).toBe("0px");
+    expect(tabShells[0]?.style.getPropertyValue("--desktop-terminal-tab-resolved-width")).toBe("28px");
+    expect(tabShells[1]?.style.getPropertyValue("--desktop-terminal-tab-inline-start")).toBe("31px");
+    expect(tabShells[1]?.style.getPropertyValue("--desktop-terminal-tab-resolved-width")).toBe("144px");
 
     act(() => vi.advanceTimersByTime(TERMINAL_SESSION_ACTIVATION_MOTION_MS));
     expect(rail?.hasAttribute("data-activation-motion")).toBe(false);

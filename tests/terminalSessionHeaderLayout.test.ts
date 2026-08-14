@@ -64,6 +64,30 @@ describe("Terminal Session Header adaptive layout", () => {
     expect(next.hiddenSessionIds).toEqual(["a", "f"]);
   });
 
+  it("anchors activation to the physical edge implied by session direction", () => {
+    const ids = ["left", "right", "tail"];
+    const leftActive = resolveTerminalSessionHeaderLayout({
+      sessionIds: ids,
+      activeSessionId: "left",
+      availableWidth: 206,
+    });
+    const rightActive = resolveTerminalSessionHeaderLayout({
+      sessionIds: ids,
+      activeSessionId: "right",
+      availableWidth: 206,
+      preferredVisibleSessionIds: leftActive.visibleSessionIds,
+    });
+    const left = Object.fromEntries(leftActive.tabBounds.map((bounds) => [bounds.sessionId, bounds]));
+    const right = Object.fromEntries(rightActive.tabBounds.map((bounds) => [bounds.sessionId, bounds]));
+
+    expect(leftActive.tabsWidth).toBe(206);
+    expect(rightActive.tabsWidth).toBe(206);
+    expect(left.left.inlineStart).toBe(right.left.inlineStart);
+    expect(left.right.inlineStart + left.right.width)
+      .toBe(right.right.inlineStart + right.right.width);
+    expect(right.right.inlineStart).toBeLessThan(left.right.inlineStart);
+  });
+
   function resolve(availableWidth: number) {
     return resolveTerminalSessionHeaderLayout({
       sessionIds,

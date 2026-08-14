@@ -208,8 +208,8 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(headerStatus).toContain("<TerminalActivityGrid");
     expect(headerStatus).toContain("<TerminalLauncherIcon");
     expect(headerLayout).toContain('mode: "full"');
-    expect(headerLayout).toContain('mode: "compact"');
-    expect(headerLayout).toContain('mode: "overflow"');
+    expect(headerLayout).toContain('"compact"');
+    expect(headerLayout).toContain('"overflow"');
     expect(headerOverflow).toContain("<DesktopMenuSurface");
     expect(headerOverflow).toContain("<TerminalSessionHeaderStatus");
     expect(headerController).toContain("TERMINAL_SESSION_HEADER_METRICS.activationMotionMs");
@@ -234,13 +234,18 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(headerCss).toContain("background: var(--po-selected);");
     expect(headerCss).not.toContain(".desktop-terminal-tab::after");
     expect(headerCss).not.toContain(".desktop-terminal-tab-shell");
-    expect(headerCss).toMatch(/\.desktop-terminal-tab-rail,\s*\.desktop-terminal-tabs\s*\{[^}]*flex:\s*0 1 auto;/s);
+    expect(headerLayout).toContain("tabBounds");
+    expect(headerLayout).toContain("inlineStart");
+    expect(headerCss).toMatch(/\.desktop-terminal-tab-rail\s*\{[^}]*flex:\s*0 1 auto;/s);
     expect(headerCss).toMatch(
-      /\.desktop-terminal-tab\s*\{[^}]*flex:\s*0 0 var\(--desktop-terminal-tab-resolved-width\);/s,
+      /\.desktop-terminal-tabs\s*\{[^}]*position:\s*relative;[^}]*width:\s*var\(--desktop-terminal-tabs-resolved-width\);/s,
+    );
+    expect(headerCss).toMatch(
+      /\.desktop-terminal-tab\s*\{[^}]*position:\s*absolute;[^}]*inset-inline-start:\s*var\(--desktop-terminal-tab-inline-start\);/s,
     );
     expect(headerCss).toMatch(/\.desktop-terminal-tab\s*\{(?![^}]*transition:)[^}]*\}/s);
     expect(headerCss).toMatch(
-      /\.desktop-terminal-tab-rail\[data-activation-motion="true"\] \.desktop-terminal-tab\s*\{[^}]*width var\(--desktop-terminal-tab-activation-motion\)[^}]*flex-basis var\(--desktop-terminal-tab-activation-motion\)/s,
+      /\.desktop-terminal-tab-rail\[data-activation-motion="true"\] \.desktop-terminal-tab\s*\{[^}]*inset-inline-start var\(--desktop-terminal-tab-activation-motion\)[^}]*width var\(--desktop-terminal-tab-activation-motion\)/s,
     );
     expect(headerCss).toMatch(
       /\.desktop-terminal-tab-select\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*var\(--desktop-terminal-tab-control-height\) minmax\(0, 1fr\);/s,
