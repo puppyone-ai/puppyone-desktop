@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 describe("Desktop Terminal architecture boundaries", () => {
   it("keeps terminal processes user-owned and the content free of overlapping chrome", () => {
     const panel = source("src/features/desktop-terminal/ui/RightTerminalPanel.tsx");
+    const launcher = source("src/features/desktop-terminal/ui/TerminalLauncher.tsx");
+    const launchers = source("src/features/desktop-terminal/model/terminalLaunchers.ts");
     const sessionView = source("src/features/desktop-terminal/ui/TerminalSessionView.tsx");
     const controller = source("src/features/desktop-terminal/controller/useTerminalSessions.ts");
     const runtime = source("src/features/desktop-terminal/runtime/terminalRuntime.ts");
@@ -22,12 +24,22 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(controller).toContain('dispatch({ type: "create"');
     expect(controller).toContain('dispatch({ type: "activate"');
     expect(controller).toContain('dispatch({ type: "close"');
-    expect(controller).toContain("runtimeRegistry.ensure(sessionId)");
+    expect(controller).toContain("runtimeRegistry.ensure(sessionId, launcher.command)");
     expect(controller).toContain("runtimeRegistry.close(sessionId)");
     expect(controller).toContain("pendingCloseSessionId");
     expect(panel).toContain("close: requestCloseSession");
     expect(panel).toContain("onClose={requestCloseSession}");
     expect(panel).toContain("<TerminalCloseConfirmationDialog");
+    expect(panel).toContain("<TerminalLauncher");
+    expect(panel).toContain('sessions.length > 0');
+    expect(panel).not.toContain("initiallyActive");
+    expect(controller).not.toContain("initiallyActive");
+    expect(controller).toContain("getDesktopTerminalLauncher(launcherId)");
+    expect(launcher).toContain("DESKTOP_TERMINAL_LAUNCHERS");
+    expect(launcher).not.toContain("window.puppyoneDesktop");
+    expect(launchers).toContain('command: "codex"');
+    expect(launchers).toContain('command: "claude"');
+    expect(launchers).toContain('command: "cursor-agent"');
     expect(controller).not.toContain('dispatch({ type: "restart-active" });');
     expect(panel).toContain("sessions.map");
     expect(sessionView).toContain("runtime.mount(container)");
@@ -36,6 +48,8 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(sessionView).not.toContain("window.puppyoneDesktop?.closeTerminal");
     expect(runtime).toContain("void window.puppyoneDesktop?.closeTerminal?.(this.sessionId)");
     expect(runtime).toContain("sameTerminalSize(this.lastPtySize, size)");
+    expect(runtime).toContain("if (this.initialCommand)");
+    expect(runtime).toContain("data: `${this.initialCommand}\\r`");
     expect(runtime).not.toContain("[80, 180, 260]");
     expect(registry).toContain("runtime.dispose()");
     expect(registry).toContain("this.disposeTimer = setTimeout");
@@ -57,6 +71,7 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(app).not.toContain("terminalSessionResetToken");
     expect(app).toContain("terminalPanelRef");
     expect(app).toContain("terminalPanelRef.current?.create()");
+    expect(app).not.toContain("currentTerminalSnapshot.sessions.length === 0");
     expect(app).toContain("terminalPanelRef.current?.activate(sessionId)");
     expect(app).toContain("terminalPanelRef.current?.close(sessionId)");
     expect(app).not.toContain("terminalPanelRef.current?.restartActive()");
@@ -70,16 +85,22 @@ describe("Desktop Terminal architecture boundaries", () => {
   it("keeps terminal presentation styles co-located with the feature", () => {
     const panel = source("src/features/desktop-terminal/ui/RightTerminalPanel.tsx");
     const css = source("src/features/desktop-terminal/ui/desktop-terminal.css");
+    const launcher = source("src/features/desktop-terminal/ui/TerminalLauncher.tsx");
+    const launcherCss = source("src/features/desktop-terminal/ui/terminal-launcher.css");
     const runtime = source("src/features/desktop-terminal/runtime/terminalRuntime.ts");
     const globalLayout = source("src/styles/layout.css");
     expect(css).not.toContain(".desktop-terminal-surface-actions");
     expect(css).not.toContain(".desktop-terminal-action-trigger");
     expect(css).not.toContain(".desktop-terminal-surface-header");
     expect(css).toContain(".desktop-terminal-session.is-active");
-    expect(css).toContain(".desktop-terminal-empty-state");
     expect(css).toContain(".desktop-terminal-body.is-empty");
-    expect(css).toMatch(/\.desktop-terminal-empty-state\s*\{[^}]*color:\s*var\(--po-text-subtle\);/s);
-    expect(css).not.toContain(".desktop-terminal-empty-state button");
+    expect(css).not.toContain(".desktop-terminal-launcher");
+    expect(launcher).toContain('import "./terminal-launcher.css"');
+    expect(launcherCss).toContain(".desktop-terminal-launcher");
+    expect(launcherCss).toContain("container-type: inline-size");
+    expect(launcherCss).toContain("@container (min-width: 460px)");
+    expect(launcherCss).toContain("var(--po-terminal-bg)");
+    expect(launcherCss).toContain("var(--po-focus-ring)");
     expect(panel).not.toContain("<SquareTerminal");
     expect(css).toContain("border-radius: var(--desktop-toolbar-action-radius);");
     expect(css).toContain("background: var(--po-selected);");

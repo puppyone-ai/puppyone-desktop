@@ -281,20 +281,6 @@
   visibility: hidden;
 }
 
-.desktop-terminal-empty-state {
-  display: grid;
-  grid-area: 1 / 1;
-  place-items: center;
-  min-width: 0;
-  min-height: 0;
-  padding: 18px;
-  color: var(--po-text-subtle);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 18px;
-  text-align: center;
-}
-
 .desktop-terminal-xterm {
   /* xterm renders a private scrollbar DOM, so it cannot consume the global
    * [data-po-scrollbar] primitive directly. Mirror that primitive's geometry

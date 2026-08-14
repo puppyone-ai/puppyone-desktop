@@ -4,6 +4,7 @@ import { TerminalRuntime, type TerminalRuntimeHandle } from "./terminalRuntime";
 
 type TerminalRuntimeFactoryOptions = {
   sessionId: string;
+  initialCommand?: string | null;
   workspacePath: string;
   getMessageFormatter: () => MessageFormatter;
   onStatus: (
@@ -42,11 +43,12 @@ export class TerminalRuntimeRegistry {
     this.createRuntime = createRuntime;
   }
 
-  ensure(sessionId: string) {
+  ensure(sessionId: string, initialCommand: string | null = null) {
     const existing = this.runtimes.get(sessionId);
     if (existing) return existing;
     const runtime = this.createRuntime({
       sessionId,
+      initialCommand,
       workspacePath: this.workspacePath,
       getMessageFormatter: this.getMessageFormatter,
       onStatus: this.onStatus,
