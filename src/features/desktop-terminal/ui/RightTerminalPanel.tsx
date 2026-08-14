@@ -11,6 +11,7 @@ import { useTerminalSessions } from "../controller/useTerminalSessions";
 import type { DesktopTerminalSessionSnapshot } from "../model/terminalSessions";
 import { useTerminalAppearanceSync } from "../runtime/useTerminalAppearanceSync";
 import { TerminalCloseConfirmationDialog } from "./TerminalCloseConfirmationDialog";
+import { TerminalLauncher } from "./TerminalLauncher";
 import { TerminalSessionTabs, terminalPanelId, terminalTabId } from "./TerminalSessionTabs";
 import { TerminalSessionView } from "./TerminalSessionView";
 import "@xterm/xterm/css/xterm.css";
@@ -46,7 +47,6 @@ function RightTerminalPanelComponent(
     runtimeRegistry,
     sessions,
   } = useTerminalSessions({
-    initiallyActive: active,
     messageFormatter: t,
     onSessionsChange,
     workspacePath: workspace.path,
@@ -54,7 +54,7 @@ function RightTerminalPanelComponent(
 
   useTerminalAppearanceSync(panelRef, runtimeRegistry);
   useImperativeHandle(ref, () => ({
-    create: createSession,
+    create: () => createSession("shell"),
     activate: activateSession,
     close: requestCloseSession,
   }), [activateSession, createSession, requestCloseSession]);
@@ -65,21 +65,19 @@ function RightTerminalPanelComponent(
       className="desktop-terminal-panel"
       aria-label={t("terminal.title")}
     >
-      {sessionLayout === "tabs" && (
+      {sessionLayout === "tabs" && sessions.length > 0 && (
         <TerminalSessionTabs
           sessions={sessions}
           activeSessionId={activeSessionId}
           onActivate={activateSession}
           onClose={requestCloseSession}
-          onCreate={createSession}
+          onCreate={() => createSession("shell")}
           runtimeRegistry={runtimeRegistry}
         />
       )}
       <div className={`desktop-terminal-body ${sessions.length === 0 ? "is-empty" : ""}`}>
         {sessions.length === 0 ? (
-          <div className="desktop-terminal-empty-state">
-            <span>{t("terminal.empty")}</span>
-          </div>
+          <TerminalLauncher onLaunch={createSession} />
         ) : sessions.map((session) => (
           <TerminalSessionView
             key={session.id}

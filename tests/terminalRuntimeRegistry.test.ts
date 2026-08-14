@@ -43,11 +43,25 @@ describe("Terminal runtime ownership", () => {
     expect(second.dispose).not.toHaveBeenCalled();
     expect(harness.registry.require("terminal-b")).toBe(second);
   });
+
+  it("binds a fixed launch command to a newly owned runtime", () => {
+    const harness = createRegistryHarness();
+
+    harness.registry.ensure("terminal-codex", "codex");
+
+    expect(harness.createdOptions).toHaveLength(1);
+    expect(harness.createdOptions[0]).toMatchObject({
+      sessionId: "terminal-codex",
+      initialCommand: "codex",
+      workspacePath: "/workspace",
+    });
+  });
 });
 
 function createRegistryHarness() {
   const created: TerminalRuntimeHandle[] = [];
-  const createRuntime: TerminalRuntimeFactory = () => {
+  const createdOptions: Array<Parameters<TerminalRuntimeFactory>[0]> = [];
+  const createRuntime: TerminalRuntimeFactory = (options) => {
     const runtime: TerminalRuntimeHandle = {
       ready: false,
       title: "",
@@ -61,6 +75,7 @@ function createRegistryHarness() {
       write: vi.fn(),
     };
     created.push(runtime);
+    createdOptions.push(options);
     return runtime;
   };
   const registry = new TerminalRuntimeRegistry({
@@ -69,5 +84,5 @@ function createRegistryHarness() {
     onStatus: vi.fn(),
     createRuntime,
   });
-  return { created, registry };
+  return { created, createdOptions, registry };
 }

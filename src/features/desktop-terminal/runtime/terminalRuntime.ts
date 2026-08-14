@@ -19,6 +19,7 @@ type TerminalSize = {
 
 type TerminalRuntimeOptions = {
   sessionId: string;
+  initialCommand?: string | null;
   workspacePath: string;
   getMessageFormatter: () => MessageFormatter;
   onStatus: (
@@ -43,6 +44,7 @@ export interface TerminalRuntimeHandle {
 
 export class TerminalRuntime implements TerminalRuntimeHandle {
   private readonly sessionId: string;
+  private readonly initialCommand: string | null;
   private readonly workspacePath: string;
   private readonly getMessageFormatter: () => MessageFormatter;
   private readonly onStatus: TerminalRuntimeOptions["onStatus"];
@@ -71,8 +73,15 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   private viewReady = false;
   private terminalTitle = "";
 
-  constructor({ sessionId, workspacePath, getMessageFormatter, onStatus }: TerminalRuntimeOptions) {
+  constructor({
+    sessionId,
+    initialCommand = null,
+    workspacePath,
+    getMessageFormatter,
+    onStatus,
+  }: TerminalRuntimeOptions) {
     this.sessionId = sessionId;
+    this.initialCommand = initialCommand;
     this.workspacePath = workspacePath;
     this.getMessageFormatter = getMessageFormatter;
     this.onStatus = onStatus;
@@ -301,6 +310,12 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
         cols: terminal.cols,
         rows: terminal.rows,
       });
+      if (this.initialCommand) {
+        bridge.writeTerminal({
+          id: this.sessionId,
+          data: `${this.initialCommand}\r`,
+        });
+      }
       if (this.active) terminal.focus();
     }).catch((error) => {
       if (this.disposed) return;

@@ -14,25 +14,26 @@ import {
   desktopTerminalSessionsReducer,
   type DesktopTerminalSessionSnapshot,
 } from "../model/terminalSessions";
+import {
+  getDesktopTerminalLauncher,
+  type DesktopTerminalLauncherId,
+} from "../model/terminalLaunchers";
 import { TerminalRuntimeRegistry } from "../runtime/terminalRuntimeRegistry";
 
 type UseTerminalSessionsOptions = {
-  initiallyActive: boolean;
   messageFormatter: MessageFormatter;
   onSessionsChange: (snapshot: DesktopTerminalSessionSnapshot) => void;
   workspacePath: string;
 };
 
 export function useTerminalSessions({
-  initiallyActive,
   messageFormatter,
   onSessionsChange,
   workspacePath,
 }: UseTerminalSessionsOptions) {
-  const [initialSessionId] = useState(() => (initiallyActive ? createTerminalId() : null));
   const [state, dispatch] = useReducer(
     desktopTerminalSessionsReducer,
-    initialSessionId,
+    null,
     createDesktopTerminalSessionsState,
   );
   const [pendingCloseSessionId, setPendingCloseSessionId] = useState<string | null>(null);
@@ -50,13 +51,13 @@ export function useTerminalSessions({
         dispatch({ type: "runtime-status", sessionId, status, shell });
       },
     });
-    if (initialSessionId) registry.ensure(initialSessionId);
     return registry;
   });
 
-  const createSession = useCallback(() => {
+  const createSession = useCallback((launcherId: DesktopTerminalLauncherId = "shell") => {
+    const launcher = getDesktopTerminalLauncher(launcherId);
     const sessionId = createTerminalId();
-    runtimeRegistry.ensure(sessionId);
+    runtimeRegistry.ensure(sessionId, launcher.command);
     dispatch({ type: "create", sessionId });
   }, [runtimeRegistry]);
 
