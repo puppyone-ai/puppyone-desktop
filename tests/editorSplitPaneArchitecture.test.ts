@@ -113,6 +113,10 @@ describe("editor split-pane architecture", () => {
     expect(splitStyles).toContain(".desktop-editor-drop-preview");
     expect(splitStyles).toContain(".desktop-editor-pane-move-preview");
     expect(splitStyles).toContain(".desktop-editor-pane[data-move-source]");
+    const movePreviewRule = readCssBlock(splitStyles, ".desktop-editor-pane-move-preview");
+    expect(movePreviewRule).toContain("border: 0;");
+    expect(movePreviewRule).toContain("border-radius: 2px;");
+    expect(movePreviewRule).not.toContain("0 18px 40px");
     const handleRule = readCssBlock(splitStyles, ".desktop-editor-pane-handle");
     expect(handleRule).toContain("border: 0;");
     expect(handleRule).toContain("background: transparent;");

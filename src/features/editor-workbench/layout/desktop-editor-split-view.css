@@ -121,12 +121,10 @@
   left: 0;
   contain: layout paint style;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--po-text) 16%, transparent);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 2px;
   background: color-mix(in srgb, var(--po-canvas) 88%, transparent);
-  box-shadow:
-    0 1px 2px color-mix(in srgb, black 10%, transparent),
-    0 18px 40px color-mix(in srgb, black 20%, transparent);
+  box-shadow: 0 10px 24px color-mix(in srgb, black 16%, transparent);
   opacity: 0.88;
   pointer-events: none;
   will-change: transform;
