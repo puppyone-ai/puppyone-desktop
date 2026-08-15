@@ -7,6 +7,9 @@ const splitStyles = source(
 const paneChromeSource = source(
   "src/features/editor-workbench/layout/EditorPaneChrome.tsx",
 );
+const paneShellSource = source(
+  "src/features/editor-workbench/layout/EditorPaneShell.tsx",
+);
 
 describe("editor pane chrome hit-target architecture", () => {
   it("keeps first-gesture hit testing independent from visual reveal state", () => {
@@ -36,6 +39,14 @@ describe("editor pane chrome hit-target architecture", () => {
     expect(paneChromeSource).toContain("onClick={() =>");
     expect(paneChromeSource).toContain("toggleMenu();");
     expect(paneChromeSource).not.toContain("event.detail === 0");
+  });
+
+  it("keeps the accent inset for the complete menu, press, or drag interaction", () => {
+    expect(paneShellSource).toContain('data-pane-menu-open={actionsOpen ? "true" : undefined}');
+    expect(splitStyles).toContain(".desktop-editor-pane[data-pane-menu-open]::after");
+    expect(splitStyles).toContain(".desktop-editor-pane[data-move-source]::after");
+    expect(splitStyles).toContain(".desktop-editor-pane-handle:active)::after");
+    expect(splitStyles).not.toContain("@keyframes desktop-editor-pane-handle-press");
   });
 });
 

@@ -72,6 +72,7 @@ export function EditorPaneShell({
       data-active={active ? "true" : undefined}
       data-empty={editorLabel ? undefined : "true"}
       data-handle-hot={chromeReveal.revealed ? "true" : undefined}
+      data-pane-menu-open={actionsOpen ? "true" : undefined}
       data-drop-target={dropEdge ?? undefined}
       data-drop-kind={fileDropEdge ? "file" : paneMoveEdge ? "pane" : undefined}
       aria-label={editorLabel

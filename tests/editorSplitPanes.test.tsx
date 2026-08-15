@@ -163,9 +163,14 @@ describe("DesktopEditorSplitView", () => {
     clickPaneHandle(handle, 41);
     expect(handle.getAttribute("aria-expanded")).toBe("true");
     expect(pane.dataset.handleHot).toBe("true");
+    expect(pane.dataset.paneMenuOpen).toBe("true");
 
     act(() => pane.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true })));
     expect(pane.dataset.handleHot).toBe("true");
+
+    clickPaneHandle(handle, 42);
+    expect(handle.getAttribute("aria-expanded")).toBe("false");
+    expect(pane.dataset.paneMenuOpen).toBeUndefined();
   });
 
   it("uses the grab handle only to move an existing pane", async () => {
