@@ -176,19 +176,20 @@
 .desktop-editor-pane-menu-primary-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
 }
 
 .desktop-editor-pane-menu-primary-action.desktop-menu-icon-button {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--po-menu-item-radius);
-  color: var(--po-text-muted);
+  width: var(--desktop-chrome-control-size);
+  height: var(--desktop-titlebar-control-height);
+  border-radius: var(--desktop-toolbar-action-radius);
+  color: var(--desktop-titlebar-text-muted, var(--po-text-muted));
 }
 
 .desktop-editor-pane-menu-primary-action.desktop-menu-icon-button:hover,
 .desktop-editor-pane-menu-primary-action.desktop-menu-icon-button:focus-visible {
-  background: var(--po-hover);
+  background: var(--desktop-titlebar-hover, var(--po-hover));
+  color: var(--desktop-titlebar-text, var(--po-text));
 }
 
 .desktop-editor-pane-menu-secondary-actions {

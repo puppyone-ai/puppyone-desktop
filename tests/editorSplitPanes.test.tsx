@@ -353,6 +353,7 @@ describe("DesktopEditorSplitView", () => {
           onMovePane={vi.fn()}
           onOpenAtPaneEdge={vi.fn()}
           onResizeSplit={vi.fn()}
+          onSplitPane={vi.fn()}
         />,
       );
     }
@@ -421,6 +422,7 @@ describe("DesktopEditorSplitView", () => {
           onMovePane={vi.fn()}
           onOpenAtPaneEdge={vi.fn()}
           onResizeSplit={vi.fn()}
+          onSplitPane={vi.fn()}
         />,
       );
     }
@@ -469,7 +471,8 @@ function renderSplitView(
   layout: EditorPaneLayoutState,
   callbacks: {
     onMovePane?: React.ComponentProps<typeof DesktopEditorSplitView>["onMovePane"];
-    onOpenAtPaneEdge?: React.ComponentProps<typeof DesktopEditorSplitView>["onOpenAtPaneEdge"];
+  onOpenAtPaneEdge?: React.ComponentProps<typeof DesktopEditorSplitView>["onOpenAtPaneEdge"];
+  onSplitPane?: React.ComponentProps<typeof DesktopEditorSplitView>["onSplitPane"];
     onFocusPane?: React.ComponentProps<typeof DesktopEditorSplitView>["onFocusPane"];
   } = {},
 ) {
@@ -491,6 +494,7 @@ function renderSplitView(
       onMovePane={callbacks.onMovePane ?? vi.fn()}
       onOpenAtPaneEdge={callbacks.onOpenAtPaneEdge ?? vi.fn()}
       onResizeSplit={vi.fn()}
+      onSplitPane={callbacks.onSplitPane ?? vi.fn()}
     />,
   )));
   return container;

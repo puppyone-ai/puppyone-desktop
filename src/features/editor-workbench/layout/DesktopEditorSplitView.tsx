@@ -70,6 +70,11 @@ export type DesktopEditorSplitViewProps = Readonly<{
     direction: EditorSplitDirection,
     placement: NonNullable<EditorPaneSplitOptions["placement"]>,
   ) => void;
+  onSplitPane: (
+    paneId: string,
+    direction: EditorSplitDirection,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
+  ) => void;
 }>;
 
 export function DesktopEditorSplitView({
@@ -89,6 +94,7 @@ export function DesktopEditorSplitView({
   onMovePane,
   onOpenAtPaneEdge,
   onResizeSplit,
+  onSplitPane,
 }: DesktopEditorSplitViewProps) {
   const editorById = useMemo(
     () => new Map(editorGroup.editors.map((editor) => [editor.id, editor])),
@@ -138,6 +144,7 @@ export function DesktopEditorSplitView({
         onMovePane={onMovePane}
         onOpenAtPaneEdge={onOpenAtPaneEdge}
         onResizeSplit={onResizeSplit}
+        onSplitPane={onSplitPane}
         onOpenActionsPaneChange={setOpenActionsPaneId}
       />
     </div>
@@ -222,6 +229,7 @@ function EditorPane({
   onClosePane,
   onFocusPane,
   onOpenActionsPaneChange,
+  onSplitPane,
 }: EditorLayoutNodeProps & { pane: EditorPaneLayoutLeaf }) {
   const active = pane.id === activePaneId;
   const actionsOpen = pane.id === openActionsPaneId;
@@ -251,6 +259,7 @@ function EditorPane({
       onOpenExternal={externalOpen && externalOpenPath
         ? () => externalOpen.open(externalOpenPath)
         : null}
+      onSplit={(direction, placement) => onSplitPane(pane.id, direction, placement)}
     >
       <EditorPaneRuntime
         aiEditFile={getAiEditFileForPath(aiEditRequest, editor?.resource) ?? null}

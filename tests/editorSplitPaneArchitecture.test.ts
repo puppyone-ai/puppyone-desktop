@@ -10,6 +10,10 @@ const splitSource = readFileSync(
   new URL("../src/features/editor-workbench/layout/DesktopEditorSplitView.tsx", import.meta.url),
   "utf8",
 );
+const workbenchControllerSource = readFileSync(
+  new URL("../src/features/editor-workbench/controller/useDesktopEditorWorkbench.ts", import.meta.url),
+  "utf8",
+);
 const resizeSource = readFileSync(
   new URL("../src/features/editor-workbench/layout/EditorSplitResizeHandle.tsx", import.meta.url),
   "utf8",
@@ -93,7 +97,13 @@ describe("editor split-pane architecture", () => {
     expect(paneShellSource).not.toContain("paneCount > 1 &&");
     expect(splitSource).toContain("onOpenAtPaneEdge");
     expect(splitSource).toContain("onMovePane");
-    expect(splitSource).not.toContain("onSplitPane");
+    expect(splitSource).toContain("onSplitPane");
+    expect(paneShellSource).toContain('t("editor.panes.splitLeft")');
+    expect(paneShellSource).toContain('t("editor.panes.splitRight")');
+    expect(paneShellSource).toContain('t("editor.panes.splitUp")');
+    expect(paneShellSource).toContain('t("editor.panes.splitDown")');
+    expect(workbenchControllerSource).toContain("const splitPane = useCallback");
+    expect(workbenchControllerSource).toContain("editorId: null");
     expect(paneShellSource).toContain('className="desktop-editor-drop-preview"');
     expect(dropGeometrySource).toContain("closestPaneDropEdge");
     expect(fileDropSource).toContain("parseExplorerReferenceDrag");
@@ -129,6 +139,13 @@ describe("editor split-pane architecture", () => {
     expect(handleDotRule).toContain("height: 2px;");
     expect(handleDotRule).toContain("border-radius: 0;");
     expect(handleDotRule).toContain("background: currentColor;");
+    const menuPrimaryActionRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-menu-primary-action.desktop-menu-icon-button",
+    );
+    expect(menuPrimaryActionRule).toContain("width: var(--desktop-chrome-control-size);");
+    expect(menuPrimaryActionRule).toContain("height: var(--desktop-titlebar-control-height);");
+    expect(menuPrimaryActionRule).toContain("border-radius: var(--desktop-toolbar-action-radius);");
     expect(splitStyles).not.toContain(".desktop-editor-pane-bar");
     expect(splitStyles).not.toContain("border-radius: 7px 7px 0 0");
     expect(splitStyles).not.toContain("tablist");

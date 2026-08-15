@@ -71,6 +71,7 @@ describe("CSV pane-menu settings", () => {
           onMovePane={vi.fn()}
           onOpenAtPaneEdge={vi.fn()}
           onResizeSplit={vi.fn()}
+          onSplitPane={vi.fn()}
         />,
       ));
       await Promise.resolve();
@@ -89,9 +90,13 @@ describe("CSV pane-menu settings", () => {
     const primaryActions = menu?.querySelectorAll<HTMLButtonElement>(
       ".desktop-editor-pane-menu-primary-action",
     );
-    expect(primaryActions).toHaveLength(2);
+    expect(primaryActions).toHaveLength(6);
     expect(Array.from(primaryActions ?? []).map((item) => item.getAttribute("aria-label"))).toEqual([
       "Open in Numbers",
+      "Split editor left",
+      "Split editor right",
+      "Split editor up",
+      "Split editor down",
       "Close editor pane",
     ]);
     expect(Array.from(primaryActions ?? []).every((item) => item.textContent === "")).toBe(true);
@@ -175,6 +180,7 @@ describe("CSV pane-menu settings", () => {
           onMovePane={vi.fn()}
           onOpenAtPaneEdge={vi.fn()}
           onResizeSplit={vi.fn()}
+          onSplitPane={vi.fn()}
         />,
       ));
     });
@@ -211,6 +217,7 @@ describe("CSV pane-menu settings", () => {
     const group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput(path));
     const openExternal = vi.fn();
     const closePane = vi.fn();
+    const splitPane = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -234,6 +241,7 @@ describe("CSV pane-menu settings", () => {
         onMovePane={vi.fn()}
         onOpenAtPaneEdge={vi.fn()}
         onResizeSplit={vi.fn()}
+        onSplitPane={splitPane}
       />,
     )));
 
@@ -244,14 +252,35 @@ describe("CSV pane-menu settings", () => {
 
     expect(menu.dataset.hasSecondary).toBeUndefined();
     expect(menu.textContent).toBe("");
-    expect(actions).toHaveLength(2);
+    expect(actions).toHaveLength(6);
     expect(actions.map((item) => item.getAttribute("aria-label"))).toEqual([
       "Open in default app",
+      "Split editor left",
+      "Split editor right",
+      "Split editor up",
+      "Split editor down",
       "Close editor pane",
     ]);
     expect(menu.querySelector(".desktop-menu-section")).toBeNull();
 
-    await act(async () => actions[1]!.click());
+    const splitCases = [
+      ["Split editor left", "horizontal", "first"],
+      ["Split editor right", "horizontal", "second"],
+      ["Split editor up", "vertical", "first"],
+      ["Split editor down", "vertical", "second"],
+    ] as const;
+    for (const [label, direction, placement] of splitCases) {
+      const splitAction = container.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`);
+      await act(async () => splitAction?.click());
+      expect(splitPane).toHaveBeenLastCalledWith("editor-pane-1", direction, placement);
+      expect(container.querySelector(".desktop-editor-pane-menu")).toBeNull();
+      await openPaneMenu(handle);
+    }
+
+    const closeAction = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Close editor pane"]',
+    );
+    await act(async () => closeAction?.click());
     expect(closePane).toHaveBeenCalledWith("editor-pane-1");
     expect(container.querySelector(".desktop-editor-pane-menu")).toBeNull();
   });

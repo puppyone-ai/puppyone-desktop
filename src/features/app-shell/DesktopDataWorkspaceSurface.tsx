@@ -282,6 +282,7 @@ export function DesktopDataWorkspaceSurface({
                 onMovePane={editorWorkbench.movePane}
                 onOpenAtPaneEdge={editorWorkbench.openAtPaneEdge}
                 onResizeSplit={editorWorkbench.resizeSplit}
+                onSplitPane={editorWorkbench.splitPane}
               />
             )
           : resolvedSurface.content.main == null

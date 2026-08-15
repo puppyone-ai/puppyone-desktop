@@ -1,10 +1,21 @@
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization";
-import { Check, ExternalLink, Search, X } from "lucide-react";
+import {
+  Check,
+  ExternalLink,
+  PanelBottom,
+  PanelLeft,
+  PanelRight,
+  PanelTop,
+  Search,
+  X,
+} from "lucide-react";
 import type {
   EditorFindCommand,
   EditorPaneLayoutLeaf,
   EditorPaneMenuContribution,
+  EditorPaneSplitOptions,
+  EditorSplitDirection,
 } from "@puppyone/shared-ui";
 import {
   DesktopMenuIconButton,
@@ -34,6 +45,10 @@ export type EditorPaneShellProps = Readonly<{
   onActivate: () => void;
   onClose: () => void;
   onOpenExternal: (() => void | Promise<void>) | null;
+  onSplit: (
+    direction: EditorSplitDirection,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
+  ) => void;
 }>;
 
 /** Lightweight interaction chrome around a memoized Viewer runtime. */
@@ -53,6 +68,7 @@ export function EditorPaneShell({
   onActivate,
   onClose,
   onOpenExternal,
+  onSplit,
 }: EditorPaneShellProps) {
   const { t } = useLocalization();
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -214,7 +230,7 @@ export function EditorPaneShell({
                 {onOpenExternal && (
                   <DesktopMenuIconButton
                     className="desktop-editor-pane-menu-primary-action"
-                    icon={<ExternalLink size={17} strokeWidth={1.8} />}
+                    icon={<ExternalLink size={15} strokeWidth={1.8} />}
                     label={openExternalLabel}
                     role="menuitem"
                     onClick={() => runAndClose(onOpenExternal)}
@@ -222,7 +238,35 @@ export function EditorPaneShell({
                 )}
                 <DesktopMenuIconButton
                   className="desktop-editor-pane-menu-primary-action"
-                  icon={<X size={17} strokeWidth={1.8} />}
+                  icon={<PanelLeft size={15} strokeWidth={1.8} />}
+                  label={t("editor.panes.splitLeft")}
+                  role="menuitem"
+                  onClick={() => runAndClose(() => onSplit("horizontal", "first"))}
+                />
+                <DesktopMenuIconButton
+                  className="desktop-editor-pane-menu-primary-action"
+                  icon={<PanelRight size={15} strokeWidth={1.8} />}
+                  label={t("editor.panes.splitRight")}
+                  role="menuitem"
+                  onClick={() => runAndClose(() => onSplit("horizontal", "second"))}
+                />
+                <DesktopMenuIconButton
+                  className="desktop-editor-pane-menu-primary-action"
+                  icon={<PanelTop size={15} strokeWidth={1.8} />}
+                  label={t("editor.panes.splitUp")}
+                  role="menuitem"
+                  onClick={() => runAndClose(() => onSplit("vertical", "first"))}
+                />
+                <DesktopMenuIconButton
+                  className="desktop-editor-pane-menu-primary-action"
+                  icon={<PanelBottom size={15} strokeWidth={1.8} />}
+                  label={t("editor.panes.splitDown")}
+                  role="menuitem"
+                  onClick={() => runAndClose(() => onSplit("vertical", "second"))}
+                />
+                <DesktopMenuIconButton
+                  className="desktop-editor-pane-menu-primary-action"
+                  icon={<X size={15} strokeWidth={1.8} />}
                   label={t("editor.panes.closePane")}
                   role="menuitem"
                   onClick={() => runAndClose(onClose)}
