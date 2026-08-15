@@ -292,13 +292,15 @@ export type { PlainTextEditorProps } from "./editor/viewers/code/PlainTextEditor
 export { CsvTableEditor } from "./editor/viewers/csv/CsvTableEditor";
 export type { CsvTableEditorProps } from "./editor/viewers/csv/CsvTableEditor";
 export {
-  EditorChromeContributionProvider,
-  useEditorChromeContributionPublisher,
-} from "./editor/editorChromeContribution";
+  EditorPaneMenuContributionProvider,
+  useEditorPaneMenuContributionPublisher,
+} from "./editor/editorPaneMenuContribution";
 export type {
-  CsvViewSettingsContribution,
-  EditorChromeContribution,
-} from "./editor/editorChromeContribution";
+  EditorPaneMenuCommand,
+  EditorPaneMenuContribution,
+  EditorPaneMenuItem,
+  EditorPaneMenuToggle,
+} from "./editor/editorPaneMenuContribution";
 export { EditorSaveButton as SaveStatusButton } from "./editor/EditorSaveButton";
 export type {
   EditorSaveButtonProps as SaveStatusButtonProps,

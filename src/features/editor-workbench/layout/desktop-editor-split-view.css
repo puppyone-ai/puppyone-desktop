@@ -160,36 +160,25 @@
 .desktop-editor-pane-menu {
   position: absolute;
   box-sizing: border-box;
-  width: max-content;
-  min-width: 136px;
+  width: min(248px, calc(100vw - 16px));
+  min-width: 208px;
   inset-block-start: 17px;
   inset-inline-start: 50%;
   padding: 4px;
   transform: translateX(-50%);
-  border: 1px solid var(--po-divider);
-  border-radius: 7px;
-  background: var(--po-panel);
-  box-shadow: 0 8px 24px color-mix(in srgb, black 16%, transparent);
 }
 
-.desktop-editor-pane-menu-action {
-  appearance: none;
-  display: block;
-  width: 100%;
-  padding: 5px 9px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
+.desktop-editor-pane-menu-title {
+  min-width: 0;
+  margin: 0 4px 6px;
+  padding: 5px 7px 7px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--po-divider);
   color: var(--po-text);
-  font: inherit;
   font-size: var(--po-font-size-chrome, 13px);
-  text-align: start;
-}
-
-.desktop-editor-pane-menu-action:hover,
-.desktop-editor-pane-menu-action:focus-visible {
-  background: var(--po-hover);
-  outline: 0;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desktop-editor-pane-content {

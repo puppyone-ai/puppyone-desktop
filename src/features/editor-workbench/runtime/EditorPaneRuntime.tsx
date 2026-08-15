@@ -1,8 +1,9 @@
 import { memo, useCallback } from "react";
 import {
-  EditorChromeContributionProvider,
   EditorFindContributionProvider,
-  useEditorChromeContributionPublisher,
+  EditorPaneMenuContributionProvider,
+  type EditorFindCommand,
+  type EditorPaneMenuContribution,
 } from "@puppyone/shared-ui";
 import {
   areEditorPaneDocumentRuntimePropsEqual,
@@ -11,31 +12,31 @@ import {
 } from "./EditorPaneDocumentRuntime";
 
 export type EditorPaneRuntimeProps = EditorPaneDocumentRuntimeProps & Readonly<{
-  active: boolean;
+  onFindCommandChange: (command: EditorFindCommand | null) => void;
+  onMenuContributionChange: (contribution: EditorPaneMenuContribution | null) => void;
 }>;
 
-/** Routes active-pane contributions while the nested document runtime remains
- * stable across focus, menu, drag-preview, and split-preview changes. */
+/** Captures Viewer contributions inside the pane that owns the document while
+ * the nested document runtime remains stable across focus and pane chrome. */
 export const EditorPaneRuntime = memo(function EditorPaneRuntime({
-  active,
+  onFindCommandChange,
+  onMenuContributionChange,
   ...documentProps
 }: EditorPaneRuntimeProps) {
-  const upstreamChromePublisher = useEditorChromeContributionPublisher();
-  const publishChromeContribution = useCallback(
-    (contribution: Parameters<NonNullable<typeof upstreamChromePublisher>>[0]) => {
-      if (active) upstreamChromePublisher?.(contribution);
-    },
-    [active, upstreamChromePublisher],
+  const publishMenuContribution = useCallback(
+    (contribution: EditorPaneMenuContribution | null) => onMenuContributionChange(contribution),
+    [onMenuContributionChange],
   );
 
   return (
-    <EditorChromeContributionProvider onContributionChange={publishChromeContribution}>
-      <EditorFindContributionProvider active={active}>
+    <EditorPaneMenuContributionProvider onContributionChange={publishMenuContribution}>
+      <EditorFindContributionProvider onCommandChange={onFindCommandChange}>
         <EditorPaneDocumentRuntime {...documentProps} />
       </EditorFindContributionProvider>
-    </EditorChromeContributionProvider>
+    </EditorPaneMenuContributionProvider>
   );
 }, (previous, next) => (
-  previous.active === next.active
+  previous.onFindCommandChange === next.onFindCommandChange
+  && previous.onMenuContributionChange === next.onMenuContributionChange
   && areEditorPaneDocumentRuntimePropsEqual(previous, next)
 ));

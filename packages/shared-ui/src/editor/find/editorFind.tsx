@@ -46,9 +46,11 @@ const EMPTY_RESULT: EditorFindResult = Object.freeze({ current: 0, total: 0 });
 export function EditorFindContributionProvider({
   active = true,
   children,
+  onCommandChange,
 }: {
   active?: boolean;
   children: ReactNode;
+  onCommandChange?: (command: EditorFindCommand | null) => void;
 }) {
   const upstreamPublishCommand = useContext(EditorFindPublisherContext);
   const [command, setCommand] = useState<EditorFindCommand | null>(null);
@@ -62,6 +64,10 @@ export function EditorFindContributionProvider({
     if (!active || !command || !upstreamPublishCommand) return undefined;
     return upstreamPublishCommand(command);
   }, [active, command, upstreamPublishCommand]);
+  useEffect(() => {
+    onCommandChange?.(command);
+    return () => onCommandChange?.(null);
+  }, [command, onCommandChange]);
   return (
     <EditorFindPublisherContext.Provider value={publishCommand}>
       <EditorFindCommandContext.Provider value={command}>

@@ -1,23 +1,22 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-describe("titlebar external-open architecture", () => {
-  it("keeps the Header as a single default-app action", () => {
+describe("pane-scoped external-open architecture", () => {
+  it("keeps file-scoped actions out of the product Header", () => {
     const definition = source("src/features/app-shell/headerElements.tsx");
     const actions = source("src/features/app-shell/DesktopTitlebarActions.tsx");
     const app = source("src/App.tsx");
     const titlebarCss = source("src/styles/titlebar.css");
+    const pane = source("src/features/editor-workbench/layout/EditorPaneShell.tsx");
     const updateButton = source("src/features/updates/DesktopUpdateTitlebarButton.tsx");
 
-    expect(definition).toContain('className="desktop-titlebar-action desktop-titlebar-external-open"');
-    expect(definition).toContain("onClick={externalOpen.onOpen}");
-    expect(definition).not.toMatch(/DesktopMenu|ChevronDown|menuTargets|onCustomize|onOpenWithApp|setMenuOpen|aria-haspopup/);
-    expect(actions).not.toMatch(/externalOpenTargets|externalOpenMenuOpen|onCustomizeExternalApp|onOpenActiveFileWithApp/);
-    expect(app).not.toMatch(/externalOpenTargets=|onCustomizeExternalAppForActiveFile=|onOpenActiveFileWithApp=/);
-    expect(titlebarCss).not.toMatch(/external-open-(?:main|menu-button|menu|row)/);
-    expect(titlebarCss).toMatch(
-      /\.desktop-titlebar-external-open\s*\{[^}]*width:\s*var\(--desktop-titlebar-control-height\);[^}]*\}/s,
-    );
+    expect(definition).not.toContain("external-open");
+    expect(actions).not.toMatch(/editorFindCommand|csvViewSettings|activeFileExternalOpen/);
+    expect(app).not.toMatch(/editorFindCommand|editorChromeContribution|activeExternalOpen/);
+    expect(titlebarCss).not.toMatch(/desktop-titlebar-(?:external-open|csv-settings|editor-find)/);
+    expect(pane).toContain("onOpenExternal");
+    expect(pane).toContain("findCommand.open");
+    expect(pane).toContain("menuContribution?.viewItems");
     expect(actions).toContain('group: "right-sidebar"');
     expect(actions).toContain('className="desktop-titlebar-action-divider"');
     expect(titlebarCss).toMatch(
@@ -25,7 +24,7 @@ describe("titlebar external-open architecture", () => {
     );
     expect(actions).toContain("DesktopUpdateTitlebarButton");
     expect(actions.indexOf('group: "app-status"')).toBeLessThan(
-      actions.indexOf("if (editorFindCommand)"),
+      actions.indexOf("for (const definition"),
     );
     expect(updateButton).toContain("if (!presentation) return null");
     expect(updateButton).toContain("strokeWidth={2.3}");
@@ -40,13 +39,14 @@ describe("titlebar external-open architecture", () => {
 
   it("keeps application choice in Default Apps settings", () => {
     const settings = source("src/features/settings/main/FileSettingsViews.tsx");
-    const target = source("src/features/external-apps/useActiveExternalOpenTarget.ts");
+    const target = source("src/features/external-apps/useExternalFileOpen.ts");
 
     expect(settings).toContain("chooseWorkspaceExternalApp");
     expect(settings).toContain("settings.defaultApps.fileTypeDefaults");
     expect(settings).toContain("upsertExternalAppOverride");
     expect(settings).toContain("removeExternalAppOverride");
-    expect(target).toContain("resolveWorkspaceExternalOpenTarget");
+    expect(target).toContain("openWorkspaceEntryExternal");
+    expect(target).toContain("getExternalAppOverrideForExtension");
     expect(target).not.toContain("listWorkspaceExternalOpenTargets");
   });
 });

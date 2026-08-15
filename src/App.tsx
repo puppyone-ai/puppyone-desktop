@@ -1,14 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
-  EditorChromeContributionProvider,
-  EditorFindContributionProvider,
   closeAllDocumentWorkingCopies,
   closeDocumentWorkingCopy,
   closeDocumentWorkingCopiesUnderResource,
   flushActiveDocumentSessions,
   type DataNode,
-  type EditorChromeContribution,
-  useEditorFindCommand,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import { DesktopCloudShell, type DesktopView } from "./components/DesktopCloudShell";
@@ -62,7 +58,7 @@ import { useDesktopPreferences } from "./features/app-shell/useDesktopPreference
 import { isAssetLibraryHomeEnabled } from "./features/app-shell/homeFeatureGate";
 import { useWorkspaceLifecycle } from "./features/app-shell/useWorkspaceLifecycle";
 import { usePuppyoneConfig } from "./features/app-shell/usePuppyoneConfig";
-import { useActiveExternalOpenTarget } from "./features/external-apps/useActiveExternalOpenTarget";
+import { useExternalFileOpen } from "./features/external-apps/useExternalFileOpen";
 import { useDesktopCloudSession } from "./features/cloud/hooks/useDesktopCloudSession";
 import {
   getResolvedCloudProjectId,
@@ -99,16 +95,11 @@ const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMi
 const RightAgentPanel = lazy(loadRightAgentPanel);
 
 export function App() {
-  return (
-    <EditorFindContributionProvider>
-      <AppContent />
-    </EditorFindContributionProvider>
-  );
+  return <AppContent />;
 }
 
 function AppContent() {
   const { t } = useLocalization();
-  const editorFindCommand = useEditorFindCommand();
   const desktopUpdates = useDesktopUpdates();
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
@@ -191,7 +182,6 @@ function AppContent() {
     textSize,
     setAiEditAssistEnabled,
     setExplorerWidth,
-    setExternalAppsSettings,
     setFileIconTheme,
     setFilesVisibilitySettings,
     setRightSidebarOpen,
@@ -249,7 +239,6 @@ function AppContent() {
     editorWorkbench.closeUnderResource(path);
   }, [documentStorageIdentity, editorWorkbench]);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
-  const [editorChromeContribution, setEditorChromeContribution] = useState<EditorChromeContribution | null>(null);
   const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
   const documentNavigationRequestRef = useRef(0);
   const desktopViewNavigationRequestRef = useRef(0);
@@ -693,14 +682,10 @@ function AppContent() {
   const closeSwitcher = useCallback(() => {
     setSwitcherOpen(false);
   }, []);
-  const activeExternalOpen = useActiveExternalOpenTarget({
-    activeDataNode,
-    activeDataPath,
-    activeViewIsData: activeView === "data",
+  const externalFileOpen = useExternalFileOpen({
     externalAppsSettings,
     onActionSettled: closeSwitcher,
     onError: setWorkspaceSurfaceError,
-    setExternalAppsSettings,
     workspace,
   });
 
@@ -906,18 +891,7 @@ function AppContent() {
 
   const titlebarActions = (
     <DesktopTitlebarActions
-      editorFindCommand={editorFindCommand}
-      canOpenActiveFileExternal={activeExternalOpen.canOpen}
-      csvViewSettings={activeView === "data"
-        && editorChromeContribution?.kind === "csv-view-settings"
-        && editorChromeContribution.documentId === editorWorkbench.activePath
-        ? editorChromeContribution
-        : null}
       desktopUpdateState={desktopUpdates.state}
-      activeFileExternalOpenTitle={activeExternalOpen.title}
-      activeFileExternalOpenAppName={activeExternalOpen.appName}
-      activeFileExternalOpenIconDataUrl={activeExternalOpen.iconDataUrl}
-      activeFileExternalOpenLoading={activeExternalOpen.loading}
       titlebarActionsSettings={titlebarActionsSettings}
       terminalSidebarOpen={rightSidebarOpen && desktopTerminalEnabled && rightSidebarSurface === "terminal"}
       terminalToolEnabled={desktopTerminalEnabled}
@@ -926,7 +900,6 @@ function AppContent() {
       activeTerminalSessionId={currentTerminalSnapshot.activeSessionId}
       agentChatEnabled={desktopAgentChatEnabled}
       agentChatSidebarOpen={rightSidebarOpen && desktopAgentChatEnabled && rightSidebarSurface === "chat"}
-      onOpenActiveFileExternal={() => void activeExternalOpen.openActiveFileExternal()}
       onUpdateNow={() => void desktopUpdates.updateNow()}
       onCreateTerminal={() => {
         terminalPanelRef.current?.create();
@@ -993,8 +966,7 @@ function AppContent() {
       data-diff-markers={diffMarkers}
       {...typographyRootProps}
     >
-      <EditorChromeContributionProvider onContributionChange={setEditorChromeContribution}>
-        <DesktopCloudShell
+      <DesktopCloudShell
           leftSidebarCollapsed={sidebarCollapsed}
           leftSidebarPresent={Boolean(dataPort)}
           leftSidebarWidth={explorerWidth}
@@ -1083,6 +1055,7 @@ function AppContent() {
           }}
           dataPort={dataPort}
           editorWorkbench={editorWorkbench}
+          externalOpen={externalFileOpen}
           desktopUpdates={desktopUpdates}
           git={git}
           minimalMode={minimalMode}
@@ -1124,8 +1097,7 @@ function AppContent() {
           pointerCursors={pointerCursors}
           diffMarkers={diffMarkers}
         />
-        </DesktopCloudShell>
-      </EditorChromeContributionProvider>
+      </DesktopCloudShell>
       <DesktopOverlayPortal
         theme={resolvedTheme}
         lightThemePreset={lightThemePreset}

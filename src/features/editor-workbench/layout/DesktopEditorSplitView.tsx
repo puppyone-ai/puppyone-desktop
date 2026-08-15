@@ -12,7 +12,9 @@ import {
   type DataPort,
   type DataWorkspaceState,
   type EditorGroupState,
+  type EditorFindCommand,
   type EditorInteractionPreferences,
+  type EditorPaneMenuContribution,
   type EditorPaneLayoutLeaf,
   type EditorPaneLayoutNode,
   type EditorPaneLayoutSplit,
@@ -48,6 +50,10 @@ export type DesktopEditorSplitViewProps = Readonly<{
   state: DataWorkspaceState;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   workspace: Workspace;
+  externalOpen?: Readonly<{
+    getAppName: (path: string) => string | null;
+    open: (path: string) => void | Promise<void>;
+  }>;
   onClosePane: (paneId: string) => void;
   onFocusPane: (paneId: string) => void;
   onResizeSplit: (splitId: string, ratio: number) => void;
@@ -77,6 +83,7 @@ export function DesktopEditorSplitView({
   state,
   viewerExtensionAdapter = null,
   workspace,
+  externalOpen,
   onClosePane,
   onFocusPane,
   onMovePane,
@@ -125,6 +132,7 @@ export function DesktopEditorSplitView({
         paneMove={paneMove}
         openActionsPaneId={openActionsPaneId}
         workspace={workspace}
+        externalOpen={externalOpen}
         onClosePane={onClosePane}
         onFocusPane={onFocusPane}
         onMovePane={onMovePane}
@@ -200,6 +208,7 @@ function EditorPane({
   editorById,
   editorNodeIndex,
   editorInteractionPreferences,
+  externalOpen,
   fileIconTheme,
   fileDrop,
   pane,
@@ -218,24 +227,32 @@ function EditorPane({
   const actionsOpen = pane.id === openActionsPaneId;
   const editor = pane.editorId ? editorById.get(pane.editorId) ?? null : null;
   const treeNode = editor ? editorNodeIndex.get(editor.resource) ?? null : null;
+  const [findCommand, setFindCommand] = useState<EditorFindCommand | null>(null);
+  const [menuContribution, setMenuContribution] = useState<EditorPaneMenuContribution | null>(null);
+  const externalOpenPath = editor?.resource ?? null;
 
   return (
     <EditorPaneShell
       active={active}
       actionsOpen={actionsOpen}
       editorLabel={editor?.label ?? null}
+      externalOpenAppName={externalOpenPath ? externalOpen?.getAppName(externalOpenPath) ?? null : null}
+      findCommand={findCommand}
       fileDrop={fileDrop}
       pane={pane}
       paneCount={paneCount}
       paneMove={paneMove}
+      menuContribution={menuContribution?.documentId === editor?.resource ? menuContribution : null}
       onActionsPaneChange={onOpenActionsPaneChange}
       onActivate={() => {
         if (!active) onFocusPane(pane.id);
       }}
       onClose={() => onClosePane(pane.id)}
+      onOpenExternal={externalOpen && externalOpenPath
+        ? () => externalOpen.open(externalOpenPath)
+        : null}
     >
       <EditorPaneRuntime
-        active={active}
         aiEditFile={getAiEditFileForPath(aiEditRequest, editor?.resource) ?? null}
         dataPort={dataPort}
         editor={editor}
@@ -249,6 +266,8 @@ function EditorPane({
         workspaceId={workspace.id}
         workspaceRoot={workspace.path}
         markdownDialect={workspace.markdownDialect}
+        onFindCommandChange={setFindCommand}
+        onMenuContributionChange={setMenuContribution}
       />
     </EditorPaneShell>
   );

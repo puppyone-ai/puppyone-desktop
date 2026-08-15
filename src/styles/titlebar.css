@@ -157,10 +157,6 @@
   transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
 
-.desktop-titlebar-external-open {
-  width: var(--desktop-titlebar-control-height);
-}
-
 .desktop-titlebar-update {
   width: var(--desktop-titlebar-control-height);
   flex: 0 0 var(--desktop-titlebar-control-height);
@@ -234,19 +230,6 @@
 .desktop-titlebar-actions .desktop-titlebar-terminal,
 .desktop-titlebar-actions .desktop-titlebar-agent-chat {
   width: var(--desktop-titlebar-tool-action-width);
-}
-
-.desktop-titlebar-csv-settings-wrap {
-  position: relative;
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  overflow: visible;
-}
-
-.desktop-titlebar-csv-settings[aria-expanded="true"] {
-  background: var(--desktop-titlebar-active);
-  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-terminal-menu-wrap {
@@ -437,15 +420,6 @@
   padding: var(--po-menu-padding);
 }
 
-.desktop-titlebar-csv-settings-menu {
-  inset-inline-start: auto;
-  inset-inline-end: 0;
-  display: grid;
-  gap: 2px;
-  width: min(220px, calc(100vw - 32px));
-  padding: var(--po-menu-padding);
-}
-
 .desktop-titlebar-terminal-session-list {
   display: grid;
   gap: 2px;
@@ -486,44 +460,6 @@
 .desktop-titlebar-terminal-session-close:focus-visible {
   opacity: 1;
   pointer-events: auto;
-}
-
-.desktop-titlebar-external-app-icon {
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  overflow: hidden;
-  border-radius: 4px;
-  flex: 0 0 auto;
-}
-
-.desktop-titlebar-external-app-icon.fallback {
-  background: color-mix(in srgb, var(--po-text-muted) 13%, transparent);
-  color: var(--po-text);
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.desktop-titlebar-external-open-loader {
-  justify-content: center;
-}
-
-.desktop-titlebar-external-app-loader {
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 auto;
-  color: var(--po-text-muted);
-}
-
-.desktop-titlebar-external-app-icon img {
-  display: block;
-  width: 16px;
-  height: 16px;
-  object-fit: contain;
 }
 
 .desktop-titlebar-branch-wrap {

@@ -75,7 +75,7 @@ export type RightSidebarToolsSettings = {
   enabled: Record<RightSidebarToolId, boolean>;
   order: RightSidebarToolId[];
 };
-export const TITLEBAR_ACTION_IDS = ["external-open", "terminal"] as const;
+export const TITLEBAR_ACTION_IDS = ["terminal"] as const;
 export type TitlebarActionId = typeof TITLEBAR_ACTION_IDS[number];
 export type TitlebarActionsSettings = {
   enabled: Record<TitlebarActionId, boolean>;
@@ -174,7 +174,6 @@ export const DEFAULT_RIGHT_SIDEBAR_TOOLS_SETTINGS: RightSidebarToolsSettings = {
 };
 export const DEFAULT_TITLEBAR_ACTIONS_SETTINGS: TitlebarActionsSettings = {
   enabled: {
-    "external-open": true,
     terminal: true,
   },
   order: [...TITLEBAR_ACTION_IDS],
@@ -532,13 +531,11 @@ export function parseTitlebarActionsSettings(value: string | null | undefined): 
   if (!value) return DEFAULT_TITLEBAR_ACTIONS_SETTINGS;
 
   try {
-    const parsed = JSON.parse(value) as Partial<TitlebarActionsSettings> & { showExternalOpenButton?: boolean } | null;
+    const parsed = JSON.parse(value) as Partial<TitlebarActionsSettings> | null;
     if (!parsed || typeof parsed !== "object") return DEFAULT_TITLEBAR_ACTIONS_SETTINGS;
 
-    const legacyExternalOpenEnabled = parsed.showExternalOpenButton !== false;
     return {
       enabled: {
-        "external-open": readTitlebarActionEnabled(parsed, "external-open", legacyExternalOpenEnabled),
         terminal: readTitlebarActionEnabled(parsed, "terminal", true),
       },
       order: normalizeTitlebarActionOrder(parsed.order),

@@ -36,7 +36,6 @@ describe("Desktop Terminal titlebar session manager", () => {
 
     act(() => root?.render(withTestLocalization(
       <DesktopTitlebarActions
-        canOpenActiveFileExternal={false}
         titlebarActionsSettings={DEFAULT_TITLEBAR_ACTIONS_SETTINGS}
         terminalSidebarOpen
         terminalToolEnabled
@@ -48,7 +47,6 @@ describe("Desktop Terminal titlebar session manager", () => {
         activeTerminalSessionId="terminal-a"
         agentChatEnabled={false}
         agentChatSidebarOpen={false}
-        onOpenActiveFileExternal={vi.fn()}
         onCreateTerminal={onCreateTerminal}
         onActivateTerminal={onActivateTerminal}
         onCloseTerminal={onCloseTerminal}

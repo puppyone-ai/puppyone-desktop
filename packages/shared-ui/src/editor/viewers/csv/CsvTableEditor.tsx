@@ -37,7 +37,7 @@ import {
   useCsvFindAdapter,
 } from "../../find/useCsvFindAdapter";
 import { useRegisterEditorFindAdapter } from "../../find/editorFind";
-import { useEditorChromeContributionPublisher } from "../../editorChromeContribution";
+import { useEditorPaneMenuContributionPublisher } from "../../editorPaneMenuContribution";
 
 export type CsvTableEditorProps = {
   documentId?: string;
@@ -91,7 +91,7 @@ export function CsvTableEditor({
   const csvFind = useCsvFindAdapter(searchableMatrix, tableRef);
 
   useRegisterEditorFindAdapter(csvFind.adapter);
-  const publishChromeContribution = useEditorChromeContributionPublisher();
+  const publishPaneMenuContribution = useEditorPaneMenuContributionPublisher();
 
   useLayoutEffect(() => {
     if (headerPreferenceDocumentRef.current !== documentId) {
@@ -209,25 +209,37 @@ export function CsvTableEditor({
   }, [documentId]);
 
   useLayoutEffect(() => {
-    if (!publishChromeContribution || !documentId) return undefined;
+    if (!publishPaneMenuContribution || !documentId) return undefined;
 
-    publishChromeContribution({
-      kind: "csv-view-settings",
+    publishPaneMenuContribution({
       documentId,
-      headerEnabled,
-      rowNumbersVisible,
-      onHeaderChange: setFirstRecordAsHeader,
-      onRowNumbersChange: setShowRowNumbers,
+      viewItems: [
+        {
+          kind: "toggle",
+          id: "csv-header-row",
+          label: t("editor.csv.headerToggle"),
+          checked: headerEnabled,
+          setChecked: setFirstRecordAsHeader,
+        },
+        {
+          kind: "toggle",
+          id: "csv-row-numbers",
+          label: t("editor.csv.rowNumbersToggle"),
+          checked: rowNumbersVisible,
+          setChecked: setShowRowNumbers,
+        },
+      ],
     });
 
-    return () => publishChromeContribution(null);
+    return () => publishPaneMenuContribution(null);
   }, [
     documentId,
     headerEnabled,
-    publishChromeContribution,
+    publishPaneMenuContribution,
     rowNumbersVisible,
     setFirstRecordAsHeader,
     setShowRowNumbers,
+    t,
   ]);
 
   const ariaColumnOffset = rowNumbersVisible ? 2 : 1;
@@ -248,7 +260,7 @@ export function CsvTableEditor({
           scrollContainer.toggleAttribute("data-inline-scrolled", inlineScrolled);
         }}
       >
-        {!publishChromeContribution && (
+        {!publishPaneMenuContribution && (
           <CsvViewSettings
             direction={direction}
             headerEnabled={headerEnabled}
