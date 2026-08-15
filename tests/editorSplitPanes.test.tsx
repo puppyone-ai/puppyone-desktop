@@ -9,6 +9,7 @@ import {
   EXPLORER_REFERENCE_DRAG_TYPE,
   activateEditorPane,
   assignEditorToActivePane,
+  assignEditorToPane,
   createEditorInput,
   createEditorPaneLayout,
   openEditor,
@@ -301,6 +302,81 @@ describe("DesktopEditorSplitView", () => {
     expect(onFocusPane).toHaveBeenCalledWith("editor-pane-1");
   });
 
+  it("keeps mixed source transitions isolated inside a real three-pane split", async () => {
+    const csv = "report.csv";
+    const image = "diagram.png";
+    const markdown = "notes.md";
+    let group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput(csv));
+    group = openEditor(group, createEditorInput(image));
+    group = openEditor(group, createEditorInput(markdown));
+    let initialLayout = splitEditorPane(createEditorPaneLayout(csv), "editor-pane-1", "horizontal");
+    initialLayout = assignEditorToActivePane(initialLayout, image);
+    initialLayout = splitEditorPane(initialLayout, initialLayout.activePaneId, "vertical");
+    initialLayout = assignEditorToActivePane(initialLayout, markdown);
+    const tree: DataNode[] = [
+      { id: csv, path: csv, name: csv, type: "spreadsheet", mimeType: "text/csv", source: "local" },
+      { id: image, path: image, name: image, type: "image", mimeType: "image/png", source: "local" },
+      { id: markdown, path: markdown, name: markdown, type: "markdown", mimeType: "text/markdown", source: "local" },
+    ];
+    const readFile = vi.fn(async (path: string) => ({
+      path,
+      name: path,
+      type: path === csv ? "spreadsheet" as const : "markdown" as const,
+      mimeType: path === csv ? "text/csv" : "text/markdown",
+      content: `content:${path}`,
+      version: `version:${path}:${readFile.mock.calls.length}`,
+    }));
+    const getFileUrl = vi.fn(async (path: string) => `blob:${path}`);
+    const dataPort = { listChildren: async () => tree, readFile, getFileUrl };
+    const state = { ...emptyWorkspaceState(), tree };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    let updateLayout!: React.Dispatch<React.SetStateAction<EditorPaneLayoutState>>;
+
+    function Harness() {
+      const [layout, setLayout] = React.useState(initialLayout);
+      updateLayout = setLayout;
+      return withTestLocalization(
+        <DesktopEditorSplitView
+          aiEditRequest={null}
+          dataPort={dataPort}
+          editorGroup={group}
+          editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+          fileIconTheme="default"
+          layout={layout}
+          state={state}
+          workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
+          onClosePane={vi.fn()}
+          onFocusPane={vi.fn()}
+          onMovePane={vi.fn()}
+          onOpenAtPaneEdge={vi.fn()}
+          onResizeSplit={vi.fn()}
+        />,
+      );
+    }
+
+    await act(async () => root?.render(<Harness />));
+    await waitForCondition(() => (
+      readCount(readFile, csv) === 1
+      && readCount(readFile, markdown) === 1
+      && getFileUrl.mock.calls.some(([path]) => path === image)
+    ));
+    expect(container.querySelectorAll(".desktop-editor-pane")).toHaveLength(3);
+
+    await act(async () => updateLayout((layout) => assignEditorToPane(layout, "editor-pane-1", image)));
+    await waitForCondition(() => (
+      container.querySelector('[data-editor-pane-id="editor-pane-1"] img') !== null
+      || getFileUrl.mock.calls.filter(([path]) => path === image).length >= 1
+    ));
+    await act(async () => updateLayout((layout) => assignEditorToPane(layout, "editor-pane-1", csv)));
+    await waitForCondition(() => readCount(readFile, csv) === 2);
+
+    expect(readCount(readFile, markdown)).toBe(1);
+    expect(readCount(readFile, image)).toBe(0);
+    expect(container.querySelectorAll(".desktop-editor-pane")).toHaveLength(3);
+  });
+
   it("keeps three CodeMirror focus and selection states isolated across pane activation", async () => {
     const { group, layout } = createThreePaneWorkspace("txt");
     const state = {
@@ -458,6 +534,10 @@ function dragEvent(type: string, dataTransfer: DataTransfer, clientX: number, cl
     clientY: { value: clientY },
   });
   return event;
+}
+
+function readCount(readFile: ReturnType<typeof vi.fn>, path: string) {
+  return readFile.mock.calls.filter(([readPath]) => readPath === path).length;
 }
 
 async function waitForCondition(condition: () => boolean, attempts = 200) {
