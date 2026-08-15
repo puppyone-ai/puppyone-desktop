@@ -19,7 +19,11 @@ export function useEditorPaneSource(
   const [content, setContent] = useState<FileContent | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const lastContentReadPathRef = useRef<string | null>(null);
+  // Track every selected source, not only sources that require a text read.
+  // Otherwise CSV -> image -> the same CSV leaves the ref pinned to the CSV
+  // while the image transition clears its content, so returning to the CSV is
+  // incorrectly treated as already loaded and remains pending forever.
+  const lastObservedPathRef = useRef<string | null>(null);
   const nodePath = node?.path ?? null;
   const needsContent = Boolean(node && dataPort.readFile && shouldReadEditorContent(node));
   const sourceRequirement = node ? getEditorSourceRequirement(node) : "none";
@@ -35,13 +39,13 @@ export function useEditorPaneSource(
   }, [nodePath]);
 
   useEffect(() => {
-    const firstReadForPath = Boolean(nodePath && lastContentReadPathRef.current !== nodePath);
-    if (!firstReadForPath && !workspaceContentChangeMatchesPath(refreshKey, nodePath)) return undefined;
+    const pathChanged = lastObservedPathRef.current !== nodePath;
+    lastObservedPathRef.current = nodePath;
+    if (!pathChanged && !workspaceContentChangeMatchesPath(refreshKey, nodePath)) return undefined;
     if (!nodePath || !needsContent || !dataPort.readFile) {
       setLoading(false);
       return undefined;
     }
-    lastContentReadPathRef.current = nodePath;
     const controller = new AbortController();
     setError(null);
     setLoading(true);

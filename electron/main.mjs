@@ -57,6 +57,7 @@ import { createNativeSurfaceOcclusionCoordinator } from "./main/native-surfaces/
 import { createNativeSurfacePointerPassthroughCoordinator } from "./main/native-surfaces/pointer-passthrough-coordinator.mjs";
 import { registerFeedbackIpcHandlers } from "./main/ipc/feedback-ipc.mjs";
 import { registerSystemIpcHandlers } from "./main/ipc/system-ipc.mjs";
+import { resolveDockIconResource } from "./main/dock-icon-resources.mjs";
 import { registerTerminalIpcHandlers } from "./main/ipc/terminal-ipc.mjs";
 import { registerWorkspaceFileIpcHandlers } from "./main/ipc/workspace-files-ipc.mjs";
 import { registerWorkspaceGitIpcHandlers } from "./main/ipc/workspace-git-ipc.mjs";
@@ -131,16 +132,6 @@ const viewerPackFeatureProfile = resolveViewerPackFeatureProfile({
   isPackaged: app.isPackaged,
 });
 const workspaceStateFilename = "desktop-workspace-state.json";
-const dockIconResources = Object.freeze({
-  polished: "logo-square.png",
-  light: "dock-icon-light.png",
-  matte: "dock-icon-matte.png",
-});
-const developmentDockIconResources = Object.freeze({
-  polished: "logo-square-dev.png",
-  light: "dock-icon-light-dev.png",
-  matte: "dock-icon-matte-dev.png",
-});
 const macTitlebarOptions = process.platform === "darwin"
   ? {
       titleBarStyle: "hiddenInset",
@@ -500,24 +491,12 @@ function resolveAppIconPath() {
 }
 
 function resolveDockIconPath(iconId) {
-  const normalizedIconId = Object.hasOwn(dockIconResources, iconId) ? iconId : "polished";
-  const developmentBuild = desktopBuildInfo.channel === "dev";
-  const resourceFilename = developmentBuild
-    ? developmentDockIconResources[normalizedIconId]
-    : dockIconResources[normalizedIconId];
-  const sourceFilename = normalizedIconId === "light"
-    ? `logo-square-v0.1.3-light${developmentBuild ? "-dev" : ""}.png`
-    : normalizedIconId === "matte"
-      ? `logo-square-v0.1.3-dark${developmentBuild ? "-dev" : ""}.png`
-      : `logo-square${developmentBuild ? "-dev" : ""}.png`;
-  const candidates = [
-    path.join(process.resourcesPath ?? projectRoot, resourceFilename),
-    path.join(projectRoot, "public", sourceFilename),
-  ];
-  return {
-    iconId: normalizedIconId,
-    path: candidates.find((candidate) => fs.existsSync(candidate)) ?? null,
-  };
+  return resolveDockIconResource({
+    iconId,
+    developmentBuild: desktopBuildInfo.channel === "dev",
+    resourcesPath: process.resourcesPath,
+    projectRoot,
+  });
 }
 
 function setDockIcon(iconId = "polished") {
