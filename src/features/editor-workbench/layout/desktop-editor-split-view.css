@@ -96,12 +96,14 @@
   transition: opacity 90ms ease;
 }
 
+/* Visual reveal and pointer hit-testing are deliberately independent. The
+ * shell never owns a strip of editor input, while the 27×13 button remains a
+ * stable target so the first press/drag cannot fall through to the Viewer. */
 .desktop-editor-pane[data-handle-hot] > .desktop-editor-pane-handle-shell,
 .desktop-editor-pane-handle-shell:hover,
 .desktop-editor-pane-handle-shell:focus-within,
 .desktop-editor-pane[data-drop-target] > .desktop-editor-pane-handle-shell {
   opacity: 1;
-  pointer-events: auto;
 }
 
 .desktop-editor-pane-handle {
@@ -118,6 +120,7 @@
   color: color-mix(in srgb, var(--po-text-muted) 68%, transparent);
   outline: 0;
   cursor: grab;
+  pointer-events: auto;
   touch-action: none;
 }
 

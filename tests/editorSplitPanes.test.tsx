@@ -292,6 +292,8 @@ describe("DesktopEditorSplitView", () => {
     );
     expect(handles).toHaveLength(3);
     handles.forEach(installPointerCaptureStub);
+    expect(Array.from(container.querySelectorAll<HTMLElement>(".desktop-editor-pane"))
+      .every((pane) => pane.dataset.handleHot === undefined)).toBe(true);
 
     clickPaneHandle(handles[0]!, 11);
     expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(false);
