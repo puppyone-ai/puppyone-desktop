@@ -235,6 +235,7 @@ describe("editor split-pane architecture", () => {
     expect(paneActionsMenuSource).toContain("<DesktopOverlayLayer>");
     expect(paneActionsMenuSource).toContain("useAnchoredOverlayPosition");
     expect(paneActionsMenuSource).toContain('alignment: "center"');
+    expect(paneActionsMenuSource).toContain('placementPreference: "below"');
     expect(splitSource).not.toContain("key={layout.root.id}");
     expect(splitSource).toContain("key={split.first.id}");
     expect(splitSource).toContain("key={split.second.id}");

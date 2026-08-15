@@ -74,6 +74,7 @@ export function EditorPaneActionsMenu({
     gap: 4,
     margin: 8,
     alignment: "center",
+    placementPreference: "below",
   });
 
   const setMenuRef = useCallback((node: HTMLDivElement | null) => {

@@ -76,6 +76,26 @@ describe("titlebar menu overlay architecture", () => {
     expect(clamped.left).toBe(8);
     expect(clamped.left + clamped.width).toBeLessThanOrEqual(212);
   });
+
+  it("keeps a fixed-below pane menu below its trigger and scrolls within remaining space", () => {
+    const position = resolveAnchoredOverlayPosition({
+      anchor: { top: 430, right: 414, bottom: 443, left: 387, width: 27, height: 13 },
+      boundary: { top: 0, right: 800, bottom: 600, left: 0, width: 800, height: 600 },
+      viewportWidth: 800,
+      viewportHeight: 600,
+      overlayHeight: 300,
+      preferredWidth: 196,
+      preferredMaxHeight: 360,
+      gap: 4,
+      margin: 8,
+      alignment: "center",
+      placementPreference: "below",
+    });
+
+    expect(position.placement).toBe("below");
+    expect(position.top).toBe(447);
+    expect(position.maxHeight).toBe(145);
+  });
 });
 
 function source(path: string) {
