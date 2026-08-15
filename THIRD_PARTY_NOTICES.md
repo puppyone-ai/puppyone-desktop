@@ -2,15 +2,17 @@
 
 ## Integration product marks
 
-The Agent selector includes local vector marks solely to identify user-selected
-third-party products. Claude and Claude Code are marks of Anthropic PBC; Cursor
-is a mark of Anysphere, Inc.; OpenCode and its mark belong to their respective
-owners. Their appearance does not imply sponsorship or endorsement.
+The Agent selector includes local marks solely to identify user-selected
+third-party products. Codex and OpenAI are marks of OpenAI, L.L.C.; Claude and
+Claude Code are marks of Anthropic PBC; Cursor is a mark of Anysphere, Inc.;
+OpenCode and its mark belong to their respective owners. Their appearance does
+not imply sponsorship or endorsement.
 
-The Claude mark follows Anthropic's published product identity, the Cursor mark
+The Codex mark is a size-optimized copy of the official Codex application icon;
+the Claude mark follows Anthropic's published product identity, the Cursor mark
 follows Cursor's official application/brand asset, and the OpenCode mark comes
 from `packages/identity/mark.svg` in the official OpenCode repository. PuppyOne
-ships bounded local SVG copies so opening a menu never performs a remote image
+ships bounded local copies so opening a menu never performs a remote image
 request.
 
 ## OpenCode

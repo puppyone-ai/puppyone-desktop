@@ -1,4 +1,5 @@
 export * from "./core/types";
+export { resolveRendererPublicAssetUrl } from "./core/rendererPublicAsset";
 export {
   canonicalizeResourcePath,
   isSameOrDescendantResourcePath,

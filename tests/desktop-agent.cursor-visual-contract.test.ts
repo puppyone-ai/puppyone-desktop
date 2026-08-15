@@ -137,9 +137,10 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(panel).toContain('t("agent.composer.placeholder.followUp")');
     expect(panel).toContain("<AgentPanelLayout");
     expect(css).toMatch(/\.desktop-agent-jump-latest\s*\{[^}]*position:\s*absolute[^}]*inset-inline-start:\s*50%[^}]*width:\s*var\(--agent-control-size\)[^}]*height:\s*var\(--agent-control-size\)[^}]*border-radius:\s*50%[^}]*transform:\s*translateX\(-50%\)/s);
-    expect(brandMark).toContain("/icons/agent-claude-code.svg");
-    expect(brandMark).toContain("/icons/agent-cursor.svg");
-    expect(brandMark).toContain("/icons/agent-opencode.svg");
+    expect(brandMark).toContain('resolveRendererPublicAssetUrl("icons/agent-codex-light.png")');
+    expect(brandMark).toContain('resolveRendererPublicAssetUrl("icons/agent-claude-code.svg")');
+    expect(brandMark).toContain('resolveRendererPublicAssetUrl("icons/agent-cursor.svg")');
+    expect(brandMark).toContain('resolveRendererPublicAssetUrl("icons/agent-opencode.svg")');
     expect(brandMark).not.toMatch(/https?:\/\//);
   });
 

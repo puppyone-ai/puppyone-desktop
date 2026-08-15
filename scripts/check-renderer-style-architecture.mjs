@@ -13,6 +13,7 @@ const tailwindEntry = read("src/cloud-globals.css");
 const tailwindConfig = read("tailwind.config.cjs");
 const windowChromeStyles = read("src/styles/window-chrome.css");
 const windowChromeOwner = path.join(repoRoot, "src", "styles", "window-chrome.css");
+const rootRelativeAssetPattern = /(["'`])\/(?!\/)[^"'`]+\.(?:png|svg|webp|jpe?g|gif|ico|woff2?)(?:[?#][^"'`]*)?\1/gi;
 
 if (cascade.trim() !== "@layer reset, tokens, primitives, patterns, features, overrides;") {
   errors.push("Renderer cascade order must remain reset → tokens → primitives → patterns → features → overrides.");
@@ -87,6 +88,13 @@ for (const filePath of rendererSourceRoots.flatMap(walkRendererSource)) {
     && /(?:-webkit-)?app-region\b|WebkitAppRegion|webkitAppRegion/.test(source)
   ) {
     errors.push(`${relativePath} declares native window hit testing; src/styles/window-chrome.css is the single owner.`);
+  }
+
+  if (!filePath.endsWith(".css")) {
+    const rootRelativeAssets = source.match(rootRelativeAssetPattern) ?? [];
+    if (rootRelativeAssets.length > 0) {
+      errors.push(`${relativePath} uses root-relative renderer assets (${rootRelativeAssets.join(", ")}); use resolveRendererPublicAssetUrl().`);
+    }
   }
 }
 

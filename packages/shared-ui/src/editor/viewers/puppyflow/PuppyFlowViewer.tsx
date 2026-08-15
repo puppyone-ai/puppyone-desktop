@@ -24,6 +24,7 @@ import {
 } from "./puppyflowModel";
 import { useEditableDocumentSource } from "../../document-session/EditableDocumentSourceContext";
 import type { PresetViewerRenderContext } from "../../registry/viewerTypes";
+import { resolveRendererPublicAssetUrl } from "../../../core/rendererPublicAsset";
 
 type PuppyFlowViewerProps = Pick<
   PresetViewerRenderContext,
@@ -462,7 +463,14 @@ function PuppyFlowStepRow({
 
 function PuppyFlowAgentLogo({ agentId }: { agentId: PuppyFlowAgentId }) {
   if (agentId === "codex") {
-    return <img src="/icons/ChatGPT_logo.png" alt="" draggable={false} />;
+    return (
+      <img
+        className="is-codex"
+        src={resolveRendererPublicAssetUrl("icons/agent-codex-light.png")}
+        alt=""
+        draggable={false}
+      />
+    );
   }
 
   if (agentId === "claude-code") {
