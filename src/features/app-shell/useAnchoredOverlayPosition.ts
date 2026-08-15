@@ -18,6 +18,7 @@ export type AnchoredOverlayPositionInput = {
   preferredMaxHeight?: number;
   gap?: number;
   margin?: number;
+  alignment?: "start" | "center" | "end";
 };
 
 export type AnchoredOverlayPosition = {
@@ -38,6 +39,7 @@ export function resolveAnchoredOverlayPosition({
   preferredMaxHeight = 360,
   gap = 8,
   margin = 12,
+  alignment = "start",
 }: AnchoredOverlayPositionInput): AnchoredOverlayPosition {
   const boundaryHasArea = boundary.width > 0 && boundary.height > 0;
   const boundaryLeft = boundaryHasArea ? boundary.left : 0;
@@ -50,7 +52,12 @@ export function resolveAnchoredOverlayPosition({
   const safeBottom = Math.min(viewportHeight - margin, boundaryBottom - margin);
   const availableWidth = Math.max(1, safeRight - safeLeft);
   const width = Math.min(preferredWidth, availableWidth);
-  const left = clamp(anchor.left, safeLeft, Math.max(safeLeft, safeRight - width));
+  const preferredLeft = alignment === "center"
+    ? anchor.left + (anchor.width - width) / 2
+    : alignment === "end"
+      ? anchor.right - width
+      : anchor.left;
+  const left = clamp(preferredLeft, safeLeft, Math.max(safeLeft, safeRight - width));
   const spaceAbove = Math.max(0, anchor.top - gap - safeTop);
   const spaceBelow = Math.max(0, safeBottom - anchor.bottom - gap);
   const measuredHeight = overlayHeight > 0 ? overlayHeight : preferredMaxHeight;
@@ -75,6 +82,7 @@ type UseAnchoredOverlayPositionOptions = {
   preferredMaxHeight?: number;
   gap?: number;
   margin?: number;
+  alignment?: "start" | "center" | "end";
 };
 
 export function useAnchoredOverlayPosition({
@@ -85,6 +93,7 @@ export function useAnchoredOverlayPosition({
   preferredMaxHeight = 360,
   gap = 8,
   margin = 12,
+  alignment = "start",
 }: UseAnchoredOverlayPositionOptions) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const [overlayElement, setOverlayElement] = useState<HTMLDivElement | null>(null);
@@ -111,9 +120,10 @@ export function useAnchoredOverlayPosition({
       preferredMaxHeight,
       gap,
       margin,
+      alignment,
     });
     setPosition(position);
-  }, [anchorRef, boundarySelector, gap, margin, preferredMaxHeight, preferredWidth]);
+  }, [alignment, anchorRef, boundarySelector, gap, margin, preferredMaxHeight, preferredWidth]);
 
   useLayoutEffect(() => {
     if (!open) {

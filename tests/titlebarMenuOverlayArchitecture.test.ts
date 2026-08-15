@@ -45,6 +45,37 @@ describe("titlebar menu overlay architecture", () => {
       placement: "below",
     });
   });
+
+  it("centers pane chrome overlays on their trigger and clamps them to the editor boundary", () => {
+    const centered = resolveAnchoredOverlayPosition({
+      anchor: { top: 20, right: 410, bottom: 33, left: 383, width: 27, height: 13 },
+      boundary: { top: 0, right: 800, bottom: 600, left: 0, width: 800, height: 600 },
+      viewportWidth: 800,
+      viewportHeight: 600,
+      overlayHeight: 36,
+      preferredWidth: 196,
+      preferredMaxHeight: 360,
+      gap: 4,
+      margin: 8,
+      alignment: "center",
+    });
+    expect(centered.left).toBe(298.5);
+
+    const clamped = resolveAnchoredOverlayPosition({
+      anchor: { top: 20, right: 27, bottom: 33, left: 0, width: 27, height: 13 },
+      boundary: { top: 0, right: 220, bottom: 600, left: 0, width: 220, height: 600 },
+      viewportWidth: 800,
+      viewportHeight: 600,
+      overlayHeight: 36,
+      preferredWidth: 196,
+      preferredMaxHeight: 360,
+      gap: 4,
+      margin: 8,
+      alignment: "center",
+    });
+    expect(clamped.left).toBe(8);
+    expect(clamped.left + clamped.width).toBeLessThanOrEqual(212);
+  });
 });
 
 function source(path: string) {

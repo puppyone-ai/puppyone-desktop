@@ -55,6 +55,31 @@
   background: var(--po-canvas);
 }
 
+/* Pane chrome has one reveal source: the leading-third hit zone maintained by
+ * EditorPaneShell. The neutral inset and grab handle therefore enter and leave
+ * together; active editor state never creates persistent decoration. */
+.desktop-editor-split-view:not([data-pane-count="1"]) .desktop-editor-pane::after {
+  position: absolute;
+  z-index: 11;
+  inset: 0;
+  box-shadow: inset 0 0 0 1px var(--po-divider);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 90ms ease;
+}
+
+.desktop-editor-split-view:not([data-pane-count="1"])
+  .desktop-editor-pane[data-handle-hot]:not([data-move-source])::after {
+  opacity: 1;
+}
+
+.desktop-editor-split-view:not([data-pane-count="1"])
+  .desktop-editor-pane:has(> .desktop-editor-pane-handle-shell > .desktop-editor-pane-handle:active)::after {
+  animation: desktop-editor-pane-handle-press 220ms ease-out;
+  opacity: 1;
+}
+
 .desktop-editor-pane-handle-shell {
   position: absolute;
   z-index: 12;
@@ -67,6 +92,7 @@
   inset-inline-start: 50%;
   transform: translateX(-50%);
   opacity: 0;
+  pointer-events: none;
   transition: opacity 90ms ease;
 }
 
@@ -75,6 +101,7 @@
 .desktop-editor-pane-handle-shell:focus-within,
 .desktop-editor-pane[data-drop-target] > .desktop-editor-pane-handle-shell {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .desktop-editor-pane-handle {
@@ -158,19 +185,15 @@
 }
 
 .desktop-editor-pane-menu {
-  position: absolute;
-  box-sizing: border-box;
-  width: max-content;
-  min-width: 0;
-  max-width: calc(100vw - 16px);
-  inset-block-start: 17px;
-  inset-inline-start: 50%;
-  padding: 4px;
-  transform: translateX(-50%);
-}
+  --desktop-editor-pane-menu-action-size: var(--desktop-titlebar-control-height);
 
-.desktop-editor-pane-menu[data-has-secondary="true"] {
-  width: min(232px, calc(100vw - 16px));
+  position: fixed;
+  z-index: var(--po-overlay-z-menu, 80);
+  box-sizing: border-box;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 4px;
 }
 
 .desktop-editor-pane-menu-primary-actions {
@@ -180,8 +203,8 @@
 }
 
 .desktop-editor-pane-menu-primary-action.desktop-menu-icon-button {
-  width: var(--desktop-chrome-control-size);
-  height: var(--desktop-titlebar-control-height);
+  width: var(--desktop-editor-pane-menu-action-size);
+  height: var(--desktop-editor-pane-menu-action-size);
   border-radius: var(--desktop-toolbar-action-radius);
   color: var(--desktop-titlebar-text-muted, var(--po-text-muted));
 }
@@ -190,6 +213,39 @@
 .desktop-editor-pane-menu-primary-action.desktop-menu-icon-button:focus-visible {
   background: var(--desktop-titlebar-hover, var(--po-hover));
   color: var(--desktop-titlebar-text, var(--po-text));
+}
+
+.desktop-editor-pane-menu-end-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-inline-start: auto;
+}
+
+.desktop-editor-pane-menu-action-divider {
+  display: grid;
+  width: var(--desktop-editor-pane-menu-action-size);
+  height: var(--desktop-editor-pane-menu-action-size);
+  flex: 0 0 var(--desktop-editor-pane-menu-action-size);
+  place-items: center;
+  pointer-events: none;
+}
+
+.desktop-editor-pane-menu-action-divider::before {
+  width: 1px;
+  height: 12px;
+  background: var(--po-divider);
+  content: "";
+}
+
+.desktop-editor-pane-menu-close-action.desktop-menu-icon-button {
+  color: var(--po-danger);
+}
+
+.desktop-editor-pane-menu-close-action.desktop-menu-icon-button:hover,
+.desktop-editor-pane-menu-close-action.desktop-menu-icon-button:focus-visible {
+  background: color-mix(in srgb, var(--po-danger) 10%, transparent);
+  color: var(--po-danger);
 }
 
 .desktop-editor-pane-menu-secondary-actions {
@@ -307,8 +363,33 @@
   box-shadow: 0 0 0 1px var(--po-pane-resizer-active-ring);
 }
 
+@keyframes desktop-editor-pane-handle-press {
+  from {
+    box-shadow: inset 0 0 0 1px color-mix(
+      in srgb,
+      var(--po-pane-resizer-active-color) 76%,
+      transparent
+    );
+  }
+
+  to {
+    box-shadow: inset 0 0 0 1px var(--po-divider);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .desktop-editor-pane-handle-shell {
+  .desktop-editor-pane-handle-shell,
+  .desktop-editor-split-view:not([data-pane-count="1"]) .desktop-editor-pane::after {
     transition: none;
+  }
+
+  .desktop-editor-split-view:not([data-pane-count="1"])
+    .desktop-editor-pane:has(> .desktop-editor-pane-handle-shell > .desktop-editor-pane-handle:active)::after {
+    animation: none;
+    box-shadow: inset 0 0 0 1px color-mix(
+      in srgb,
+      var(--po-pane-resizer-active-color) 48%,
+      transparent
+    );
   }
 }

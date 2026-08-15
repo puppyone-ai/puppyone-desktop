@@ -84,26 +84,29 @@ describe("CSV pane-menu settings", () => {
     expect(container.querySelector(".desktop-titlebar-csv-settings")).toBeNull();
 
     await openPaneMenu(handle!);
-    const menu = container.querySelector<HTMLElement>(".desktop-editor-pane-menu");
+    const menu = document.querySelector<HTMLElement>(".desktop-editor-pane-menu");
     expect(menu?.textContent).not.toContain("data.csv");
-    expect(container.querySelector(".desktop-editor-pane-menu-title")).toBeNull();
+    expect(document.querySelector(".desktop-editor-pane-menu-title")).toBeNull();
     const primaryActions = menu?.querySelectorAll<HTMLButtonElement>(
       ".desktop-editor-pane-menu-primary-action",
     );
     expect(primaryActions).toHaveLength(6);
     expect(Array.from(primaryActions ?? []).map((item) => item.getAttribute("aria-label"))).toEqual([
-      "Open in Numbers",
       "Split editor left",
       "Split editor right",
       "Split editor up",
       "Split editor down",
+      "Open in Numbers",
       "Close editor pane",
     ]);
+    expect(primaryActions?.item(primaryActions.length - 1).classList.contains(
+      "desktop-editor-pane-menu-close-action",
+    )).toBe(true);
     expect(Array.from(primaryActions ?? []).every((item) => item.textContent === "")).toBe(true);
     expect(menu?.textContent).toContain("Find in file");
     expect(menu?.textContent).toContain("Header row");
     expect(menu?.textContent).toContain("Row numbers");
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("Open in Numbers");
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Split editor left");
 
     await act(async () => document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", {
       key: "End",
@@ -114,7 +117,7 @@ describe("CSV pane-menu settings", () => {
       key: "Home",
       bubbles: true,
     })));
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("Open in Numbers");
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Split editor left");
 
     const toggles = menu?.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]');
     expect(toggles).toHaveLength(2);
@@ -122,17 +125,17 @@ describe("CSV pane-menu settings", () => {
 
     await act(async () => toggles?.[0]?.click());
     expect(container.querySelector(".csv-table-editor__table thead")).toBeNull();
-    expect(container.querySelector(".desktop-editor-pane-menu")).not.toBeNull();
-    expect(container.querySelector('[role="menuitemcheckbox"]')?.getAttribute("aria-checked"))
+    expect(document.querySelector(".desktop-editor-pane-menu")).not.toBeNull();
+    expect(document.querySelector('[role="menuitemcheckbox"]')?.getAttribute("aria-checked"))
       .toBe("false");
 
     const externalItem = menu?.querySelector<HTMLButtonElement>('[aria-label="Open in Numbers"]');
     await act(async () => externalItem?.click());
     expect(openExternal).toHaveBeenCalledWith(path);
-    expect(container.querySelector(".desktop-editor-pane-menu")).toBeNull();
+    expect(document.querySelector(".desktop-editor-pane-menu")).toBeNull();
 
     await openPaneMenu(handle!);
-    const findItem = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+    const findItem = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
       .find((item) => item.textContent?.includes("Find in file"));
     await act(async () => findItem?.click());
     expect(container.querySelector(".editor-find-widget input")).toBeInstanceOf(HTMLInputElement);
@@ -189,15 +192,15 @@ describe("CSV pane-menu settings", () => {
     const panes = container.querySelectorAll<HTMLElement>(".desktop-editor-pane");
     const leftHandle = panes[0]!.querySelector<HTMLButtonElement>(".desktop-editor-pane-handle")!;
     await openPaneMenu(leftHandle);
-    expect(container.querySelector(".desktop-editor-pane-menu-title")).toBeNull();
-    expect(container.querySelector(".desktop-editor-pane-menu")?.textContent).not.toContain("left.csv");
+    expect(document.querySelector(".desktop-editor-pane-menu-title")).toBeNull();
+    expect(document.querySelector(".desktop-editor-pane-menu")?.textContent).not.toContain("left.csv");
 
-    const leftHeaderToggle = container.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]');
+    const leftHeaderToggle = document.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]');
     await act(async () => leftHeaderToggle?.click());
     expect(panes[0]!.querySelector(".csv-table-editor__table thead")).toBeNull();
     expect(panes[1]!.querySelector(".csv-table-editor__table thead")).not.toBeNull();
 
-    const externalItem = container.querySelector<HTMLButtonElement>(
+    const externalItem = document.querySelector<HTMLButtonElement>(
       '[aria-label="Open in default app"]',
     );
     await act(async () => externalItem?.click());
@@ -247,18 +250,18 @@ describe("CSV pane-menu settings", () => {
 
     const handle = container.querySelector<HTMLButtonElement>(".desktop-editor-pane-handle")!;
     await openPaneMenu(handle);
-    const menu = container.querySelector<HTMLElement>(".desktop-editor-pane-menu")!;
+    const menu = document.querySelector<HTMLElement>(".desktop-editor-pane-menu")!;
     const actions = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
 
     expect(menu.dataset.hasSecondary).toBeUndefined();
     expect(menu.textContent).toBe("");
     expect(actions).toHaveLength(6);
     expect(actions.map((item) => item.getAttribute("aria-label"))).toEqual([
-      "Open in default app",
       "Split editor left",
       "Split editor right",
       "Split editor up",
       "Split editor down",
+      "Open in default app",
       "Close editor pane",
     ]);
     expect(menu.querySelector(".desktop-menu-section")).toBeNull();
@@ -270,19 +273,19 @@ describe("CSV pane-menu settings", () => {
       ["Split editor down", "vertical", "second"],
     ] as const;
     for (const [label, direction, placement] of splitCases) {
-      const splitAction = container.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`);
+      const splitAction = document.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`);
       await act(async () => splitAction?.click());
       expect(splitPane).toHaveBeenLastCalledWith("editor-pane-1", direction, placement);
-      expect(container.querySelector(".desktop-editor-pane-menu")).toBeNull();
+      expect(document.querySelector(".desktop-editor-pane-menu")).toBeNull();
       await openPaneMenu(handle);
     }
 
-    const closeAction = container.querySelector<HTMLButtonElement>(
+    const closeAction = document.querySelector<HTMLButtonElement>(
       '[aria-label="Close editor pane"]',
     );
     await act(async () => closeAction?.click());
     expect(closePane).toHaveBeenCalledWith("editor-pane-1");
-    expect(container.querySelector(".desktop-editor-pane-menu")).toBeNull();
+    expect(document.querySelector(".desktop-editor-pane-menu")).toBeNull();
   });
 });
 
@@ -291,6 +294,7 @@ async function openPaneMenu(handle: HTMLButtonElement) {
     handle.click();
     await Promise.resolve();
   });
+  await waitForCondition(() => document.querySelector(".desktop-editor-pane-menu") !== null);
 }
 
 async function waitForCondition(condition: () => boolean, attempts = 100) {

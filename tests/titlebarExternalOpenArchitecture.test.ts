@@ -8,6 +8,7 @@ describe("pane-scoped external-open architecture", () => {
     const app = source("src/App.tsx");
     const titlebarCss = source("src/styles/titlebar.css");
     const pane = source("src/features/editor-workbench/layout/EditorPaneShell.tsx");
+    const paneMenu = source("src/features/editor-workbench/layout/EditorPaneActionsMenu.tsx");
     const updateButton = source("src/features/updates/DesktopUpdateTitlebarButton.tsx");
 
     expect(definition).not.toContain("external-open");
@@ -15,8 +16,8 @@ describe("pane-scoped external-open architecture", () => {
     expect(app).not.toMatch(/editorFindCommand|editorChromeContribution|activeExternalOpen/);
     expect(titlebarCss).not.toMatch(/desktop-titlebar-(?:external-open|csv-settings|editor-find)/);
     expect(pane).toContain("onOpenExternal");
-    expect(pane).toContain("findCommand.open");
-    expect(pane).toContain("menuContribution?.viewItems");
+    expect(paneMenu).toContain("findCommand.open");
+    expect(paneMenu).toContain("menuContribution?.viewItems");
     expect(actions).toContain('group: "right-sidebar"');
     expect(actions).toContain('className="desktop-titlebar-action-divider"');
     expect(titlebarCss).toMatch(

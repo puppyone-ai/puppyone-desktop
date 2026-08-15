@@ -120,7 +120,6 @@ export function DesktopEditorSplitView({
   return (
     <div className="desktop-editor-split-view" data-pane-count={paneCount}>
       <EditorLayoutNode
-        key={layout.root.id}
         node={layout.root}
         touchesInlineStart
         activePaneId={layout.activePaneId}
@@ -193,6 +192,7 @@ function EditorSplit({
         touchesInlineStart={props.touchesInlineStart}
       />
       <EditorSplitResizeHandle
+        key={split.id}
         direction={split.direction}
         ratio={split.ratio}
         splitId={split.id}

@@ -22,6 +22,18 @@ const paneShellSource = readFileSync(
   new URL("../src/features/editor-workbench/layout/EditorPaneShell.tsx", import.meta.url),
   "utf8",
 );
+const paneChromeSource = readFileSync(
+  new URL("../src/features/editor-workbench/layout/EditorPaneChrome.tsx", import.meta.url),
+  "utf8",
+);
+const paneActionsMenuSource = readFileSync(
+  new URL("../src/features/editor-workbench/layout/EditorPaneActionsMenu.tsx", import.meta.url),
+  "utf8",
+);
+const paneChromeRevealSource = readFileSync(
+  new URL("../src/features/editor-workbench/layout/useEditorPaneChromeReveal.ts", import.meta.url),
+  "utf8",
+);
 const paneRuntimeSource = readFileSync(
   new URL("../src/features/editor-workbench/runtime/EditorPaneRuntime.tsx", import.meta.url),
   "utf8",
@@ -93,15 +105,15 @@ describe("editor split-pane architecture", () => {
     expect(surfaceSource).toContain('loadActiveFileSource={resolvedSurface.id !== "data"}');
     expect(splitSource).toContain('data-direction={split.direction}');
     expect(resizeSource).toContain('role="separator"');
-    expect(paneShellSource).toContain('className="desktop-editor-pane-handle"');
+    expect(paneChromeSource).toContain('className="desktop-editor-pane-handle"');
     expect(paneShellSource).not.toContain("paneCount > 1 &&");
     expect(splitSource).toContain("onOpenAtPaneEdge");
     expect(splitSource).toContain("onMovePane");
     expect(splitSource).toContain("onSplitPane");
-    expect(paneShellSource).toContain('t("editor.panes.splitLeft")');
-    expect(paneShellSource).toContain('t("editor.panes.splitRight")');
-    expect(paneShellSource).toContain('t("editor.panes.splitUp")');
-    expect(paneShellSource).toContain('t("editor.panes.splitDown")');
+    expect(paneActionsMenuSource).toContain('t("editor.panes.splitLeft")');
+    expect(paneActionsMenuSource).toContain('t("editor.panes.splitRight")');
+    expect(paneActionsMenuSource).toContain('t("editor.panes.splitUp")');
+    expect(paneActionsMenuSource).toContain('t("editor.panes.splitDown")');
     expect(workbenchControllerSource).toContain("const splitPane = useCallback");
     expect(workbenchControllerSource).toContain("editorId: null");
     expect(paneShellSource).toContain('className="desktop-editor-drop-preview"');
@@ -120,6 +132,9 @@ describe("editor split-pane architecture", () => {
     expect(splitStyles).toContain("flex: 1 1 0;");
     expect(splitStyles).toContain(".desktop-editor-pane-handle-shell");
     expect(splitStyles).toContain(".desktop-editor-pane[data-handle-hot]");
+    const handleShellRule = readCssBlock(splitStyles, ".desktop-editor-pane-handle-shell");
+    expect(handleShellRule).toContain("pointer-events: none;");
+    expect(splitStyles).toContain("pointer-events: auto;");
     expect(splitStyles).toContain(".desktop-editor-drop-preview");
     expect(splitStyles).toContain(".desktop-editor-pane-move-preview");
     expect(splitStyles).toContain(".desktop-editor-pane[data-move-source]");
@@ -143,9 +158,62 @@ describe("editor split-pane architecture", () => {
       splitStyles,
       ".desktop-editor-pane-menu-primary-action.desktop-menu-icon-button",
     );
-    expect(menuPrimaryActionRule).toContain("width: var(--desktop-chrome-control-size);");
-    expect(menuPrimaryActionRule).toContain("height: var(--desktop-titlebar-control-height);");
+    expect(menuPrimaryActionRule).toContain("width: var(--desktop-editor-pane-menu-action-size);");
+    expect(menuPrimaryActionRule).toContain("height: var(--desktop-editor-pane-menu-action-size);");
     expect(menuPrimaryActionRule).toContain("border-radius: var(--desktop-toolbar-action-radius);");
+    const paneMenuRule = readCssBlock(splitStyles, ".desktop-editor-pane-menu");
+    expect(paneMenuRule).toContain(
+      "--desktop-editor-pane-menu-action-size: var(--desktop-titlebar-control-height);",
+    );
+    expect(paneMenuRule).toContain("position: fixed;");
+    expect(paneMenuRule).toContain("overflow-y: auto;");
+    expect(splitStyles).not.toContain('.desktop-editor-pane-menu[data-has-secondary="true"]');
+    const closeActionRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-menu-close-action.desktop-menu-icon-button",
+    );
+    expect(closeActionRule).toContain("color: var(--po-danger);");
+    const endActionsRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-menu-end-actions",
+    );
+    expect(endActionsRule).toContain("display: flex;");
+    expect(endActionsRule).toContain("margin-inline-start: auto;");
+    const externalDividerRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-menu-action-divider",
+    );
+    expect(externalDividerRule).toContain(
+      "width: var(--desktop-editor-pane-menu-action-size);",
+    );
+    expect(externalDividerRule).toContain(
+      "height: var(--desktop-editor-pane-menu-action-size);",
+    );
+    expect(externalDividerRule).toContain("pointer-events: none;");
+    const externalDividerLineRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-menu-action-divider::before",
+    );
+    expect(externalDividerLineRule).toContain("width: 1px;");
+    expect(externalDividerLineRule).toContain("height: 12px;");
+    expect(externalDividerLineRule).toContain("background: var(--po-divider);");
+    expect(paneActionsMenuSource).toContain(
+      'className="desktop-editor-pane-menu-primary-action desktop-editor-pane-menu-close-action"',
+    );
+    const paneHoverOverlayRule = readCssBlock(
+      splitStyles,
+      '.desktop-editor-split-view:not([data-pane-count="1"]) .desktop-editor-pane::after',
+    );
+    expect(paneHoverOverlayRule).toContain("position: absolute;");
+    expect(paneHoverOverlayRule).toContain("pointer-events: none;");
+    expect(paneHoverOverlayRule).toContain("inset: 0;");
+    expect(paneHoverOverlayRule).toContain("box-shadow: inset 0 0 0 1px var(--po-divider);");
+    expect(paneHoverOverlayRule).toContain("opacity: 0;");
+    expect(splitStyles).toContain(
+      ".desktop-editor-pane[data-handle-hot]:not([data-move-source])::after",
+    );
+    expect(splitStyles).not.toContain("@keyframes desktop-editor-pane-activate");
+    expect(splitStyles).toContain("var(--po-pane-resizer-active-color)");
     expect(splitStyles).not.toContain(".desktop-editor-pane-bar");
     expect(splitStyles).not.toContain("border-radius: 7px 7px 0 0");
     expect(splitStyles).not.toContain("tablist");
@@ -154,14 +222,23 @@ describe("editor split-pane architecture", () => {
   it("isolates editor focus, overlay, and drag gesture state by scope", () => {
     expect(splitSource).toContain("openActionsPaneId");
     expect(paneShellSource).toContain("onFocusCapture={onActivate}");
-    expect(paneShellSource).toContain("PANE_HANDLE_REVEAL_RATIO = 1 / 3");
-    expect(paneShellSource).toContain('data-handle-hot={handleRevealed ? "true" : undefined}');
-    expect(paneShellSource).toContain("onPointerMove={onPanePointerMove}");
-    expect(paneShellSource).not.toContain("paneMove.prepare");
-    expect(paneShellSource).toContain("onPointerUp={(event)");
+    expect(paneShellSource).toContain("<EditorPaneChrome");
+    expect(paneShellSource).toContain("useEditorPaneChromeReveal");
+    expect(paneChromeRevealSource).toContain("PANE_HANDLE_REVEAL_RATIO = 1 / 3");
+    expect(paneShellSource).toContain('data-handle-hot={chromeReveal.revealed ? "true" : undefined}');
+    expect(paneShellSource).toContain("onPointerMove={chromeReveal.onPointerMove}");
+    expect(paneChromeSource).toContain("onPointerEnter={() =>");
+    expect(paneChromeSource).toContain("paneMove.prepare(paneRef.current, pane.id)");
+    expect(paneChromeSource).toContain("onPointerUp={(event)");
     expect(paneShellSource).not.toContain("onPointerDownCapture");
+    expect(paneChromeSource).not.toContain("consumeDraggedClick");
+    expect(paneActionsMenuSource).toContain("<DesktopOverlayLayer>");
+    expect(paneActionsMenuSource).toContain("useAnchoredOverlayPosition");
+    expect(paneActionsMenuSource).toContain('alignment: "center"');
+    expect(splitSource).not.toContain("key={layout.root.id}");
     expect(splitSource).toContain("key={split.first.id}");
     expect(splitSource).toContain("key={split.second.id}");
+    expect(splitSource).toContain("key={split.id}");
     expect(splitSource).toContain("createEditorNodeIndex(state.tree)");
     expect(splitSource).toContain("<EditorPaneRuntime");
     expect(paneRuntimeSource).toContain("memo(function EditorPaneRuntime");
@@ -172,9 +249,10 @@ describe("editor split-pane architecture", () => {
     expect(paneMoveSource).toContain("createPaneMovePreview");
     expect(paneMoveSource).toContain("destroyPaneMovePreview");
     expect(paneMoveSource).toContain("samePaneDropIntent");
-    expect(paneMoveSource).not.toContain("PREPARED_SNAPSHOT_MAX_AGE_MS");
-    expect(paneMoveSource.indexOf("capturePaneMovePreview(session.sourcePane)"))
-      .toBeGreaterThan(paneMoveSource.indexOf("distance < PANE_MOVE_THRESHOLD_PX"));
+    expect(paneMoveSource).toContain("PREPARED_SNAPSHOT_MAX_AGE_MS = 1_000");
+    expect(paneMoveSource).toContain("PANE_MOVE_THRESHOLD_PX = 3");
+    expect(paneMoveSource.indexOf("capturePaneMovePreview(sourcePane)"))
+      .toBeLessThan(paneMoveSource.indexOf("distance < PANE_MOVE_THRESHOLD_PX"));
     expect(paneMovePreviewSource).toContain("capturePanePreview");
     expect(paneMovePreviewSource).toContain('getElementById("desktop-overlay-root")');
     expect(paneMovePreviewSource).not.toContain("cloneNode");
