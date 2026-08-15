@@ -84,24 +84,32 @@ describe("CSV pane-menu settings", () => {
 
     await openPaneMenu(handle!);
     const menu = container.querySelector<HTMLElement>(".desktop-editor-pane-menu");
-    expect(menu?.textContent).toContain("data.csv");
+    expect(menu?.textContent).not.toContain("data.csv");
+    expect(container.querySelector(".desktop-editor-pane-menu-title")).toBeNull();
+    const primaryActions = menu?.querySelectorAll<HTMLButtonElement>(
+      ".desktop-editor-pane-menu-primary-action",
+    );
+    expect(primaryActions).toHaveLength(2);
+    expect(Array.from(primaryActions ?? []).map((item) => item.getAttribute("aria-label"))).toEqual([
+      "Open in Numbers",
+      "Close editor pane",
+    ]);
+    expect(Array.from(primaryActions ?? []).every((item) => item.textContent === "")).toBe(true);
     expect(menu?.textContent).toContain("Find in file");
-    expect(menu?.textContent).toContain("Open in Numbers");
     expect(menu?.textContent).toContain("Header row");
     expect(menu?.textContent).toContain("Row numbers");
-    expect(menu?.textContent).toContain("Close editor pane");
-    expect(document.activeElement?.textContent).toContain("Find in file");
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Open in Numbers");
 
     await act(async () => document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", {
       key: "End",
       bubbles: true,
     })));
-    expect(document.activeElement?.textContent).toContain("Close editor pane");
+    expect(document.activeElement?.textContent).toContain("Row numbers");
     await act(async () => document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", {
       key: "Home",
       bubbles: true,
     })));
-    expect(document.activeElement?.textContent).toContain("Find in file");
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Open in Numbers");
 
     const toggles = menu?.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]');
     expect(toggles).toHaveLength(2);
@@ -113,8 +121,7 @@ describe("CSV pane-menu settings", () => {
     expect(container.querySelector('[role="menuitemcheckbox"]')?.getAttribute("aria-checked"))
       .toBe("false");
 
-    const externalItem = Array.from(menu?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])
-      .find((item) => item.textContent?.includes("Open in Numbers"));
+    const externalItem = menu?.querySelector<HTMLButtonElement>('[aria-label="Open in Numbers"]');
     await act(async () => externalItem?.click());
     expect(openExternal).toHaveBeenCalledWith(path);
     expect(container.querySelector(".desktop-editor-pane-menu")).toBeNull();
@@ -176,17 +183,77 @@ describe("CSV pane-menu settings", () => {
     const panes = container.querySelectorAll<HTMLElement>(".desktop-editor-pane");
     const leftHandle = panes[0]!.querySelector<HTMLButtonElement>(".desktop-editor-pane-handle")!;
     await openPaneMenu(leftHandle);
-    expect(container.querySelector(".desktop-editor-pane-menu-title")?.textContent).toBe("left.csv");
+    expect(container.querySelector(".desktop-editor-pane-menu-title")).toBeNull();
+    expect(container.querySelector(".desktop-editor-pane-menu")?.textContent).not.toContain("left.csv");
 
     const leftHeaderToggle = container.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]');
     await act(async () => leftHeaderToggle?.click());
     expect(panes[0]!.querySelector(".csv-table-editor__table thead")).toBeNull();
     expect(panes[1]!.querySelector(".csv-table-editor__table thead")).not.toBeNull();
 
-    const externalItem = Array.from(container.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
-      .find((item) => item.textContent?.includes("Open in default app"));
+    const externalItem = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Open in default app"]',
+    );
     await act(async () => externalItem?.click());
     expect(openExternal).toHaveBeenCalledWith("left.csv");
+  });
+
+  it("reduces a resource-only pane menu to two icon actions without headings or a filename", async () => {
+    const path = "009_Bauhaus.png";
+    const node: DataNode = {
+      id: path,
+      path,
+      name: path,
+      type: "image",
+      mimeType: "image/png",
+      source: "local",
+    };
+    const group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput(path));
+    const openExternal = vi.fn();
+    const closePane = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => root?.render(withTestLocalization(
+      <DesktopEditorSplitView
+        aiEditRequest={null}
+        dataPort={{
+          listChildren: async () => [node],
+          getFileUrl: async () => `blob:${path}`,
+        }}
+        editorGroup={group}
+        editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+        externalOpen={{ getAppName: () => null, open: openExternal }}
+        fileIconTheme="default"
+        layout={createEditorPaneLayout(path)}
+        state={workspaceState(node)}
+        workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
+        onClosePane={closePane}
+        onFocusPane={vi.fn()}
+        onMovePane={vi.fn()}
+        onOpenAtPaneEdge={vi.fn()}
+        onResizeSplit={vi.fn()}
+      />,
+    )));
+
+    const handle = container.querySelector<HTMLButtonElement>(".desktop-editor-pane-handle")!;
+    await openPaneMenu(handle);
+    const menu = container.querySelector<HTMLElement>(".desktop-editor-pane-menu")!;
+    const actions = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+
+    expect(menu.dataset.hasSecondary).toBeUndefined();
+    expect(menu.textContent).toBe("");
+    expect(actions).toHaveLength(2);
+    expect(actions.map((item) => item.getAttribute("aria-label"))).toEqual([
+      "Open in default app",
+      "Close editor pane",
+    ]);
+    expect(menu.querySelector(".desktop-menu-section")).toBeNull();
+
+    await act(async () => actions[1]!.click());
+    expect(closePane).toHaveBeenCalledWith("editor-pane-1");
+    expect(container.querySelector(".desktop-editor-pane-menu")).toBeNull();
   });
 });
 

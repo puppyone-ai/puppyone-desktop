@@ -160,25 +160,41 @@
 .desktop-editor-pane-menu {
   position: absolute;
   box-sizing: border-box;
-  width: min(248px, calc(100vw - 16px));
-  min-width: 208px;
+  width: max-content;
+  min-width: 0;
+  max-width: calc(100vw - 16px);
   inset-block-start: 17px;
   inset-inline-start: 50%;
   padding: 4px;
   transform: translateX(-50%);
 }
 
-.desktop-editor-pane-menu-title {
-  min-width: 0;
-  margin: 0 4px 6px;
-  padding: 5px 7px 7px;
-  overflow: hidden;
-  border-bottom: 1px solid var(--po-divider);
-  color: var(--po-text);
-  font-size: var(--po-font-size-chrome, 13px);
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.desktop-editor-pane-menu[data-has-secondary="true"] {
+  width: min(232px, calc(100vw - 16px));
+}
+
+.desktop-editor-pane-menu-primary-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.desktop-editor-pane-menu-primary-action.desktop-menu-icon-button {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--po-menu-item-radius);
+  color: var(--po-text-muted);
+}
+
+.desktop-editor-pane-menu-primary-action.desktop-menu-icon-button:hover,
+.desktop-editor-pane-menu-primary-action.desktop-menu-icon-button:focus-visible {
+  background: var(--po-hover);
+}
+
+.desktop-editor-pane-menu-secondary-actions {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--po-divider);
 }
 
 .desktop-editor-pane-content {

@@ -7,6 +7,7 @@ import type {
   EditorPaneMenuContribution,
 } from "@puppyone/shared-ui";
 import {
+  DesktopMenuIconButton,
   DesktopMenuItem,
   DesktopMenuSection,
   DesktopMenuSurface,
@@ -137,8 +138,11 @@ export function EditorPaneShell({
     void action();
   };
 
-  const hasFileActions = Boolean(findCommand || onOpenExternal);
   const viewItems = menuContribution?.viewItems ?? [];
+  const hasSecondaryActions = Boolean(findCommand || viewItems.length > 0);
+  const openExternalLabel = externalOpenAppName
+    ? t("editor.panes.openInApp", { app: externalOpenAppName })
+    : t("editor.openDefaultApp");
   const showPaneHandle = Boolean(editorLabel) || paneCount > 1;
   const handleLabel = paneCount > 1
     ? t("editor.panes.dragToMove")
@@ -201,13 +205,31 @@ export function EditorPaneShell({
             <DesktopMenuSurface
               ref={menuRef}
               className="desktop-editor-pane-menu"
+              data-has-secondary={hasSecondaryActions ? "true" : undefined}
               ariaLabel={editorLabel
                 ? t("editor.panes.actionsFor", { name: editorLabel })
                 : t("editor.panes.actions")}
             >
-              {editorLabel && <div className="desktop-editor-pane-menu-title" dir="auto">{editorLabel}</div>}
-              {hasFileActions && (
-                <DesktopMenuSection label={t("editor.panes.fileActions")}>
+              <div className="desktop-editor-pane-menu-primary-actions">
+                {onOpenExternal && (
+                  <DesktopMenuIconButton
+                    className="desktop-editor-pane-menu-primary-action"
+                    icon={<ExternalLink size={17} strokeWidth={1.8} />}
+                    label={openExternalLabel}
+                    role="menuitem"
+                    onClick={() => runAndClose(onOpenExternal)}
+                  />
+                )}
+                <DesktopMenuIconButton
+                  className="desktop-editor-pane-menu-primary-action"
+                  icon={<X size={17} strokeWidth={1.8} />}
+                  label={t("editor.panes.closePane")}
+                  role="menuitem"
+                  onClick={() => runAndClose(onClose)}
+                />
+              </div>
+              {hasSecondaryActions && (
+                <DesktopMenuSection className="desktop-editor-pane-menu-secondary-actions">
                   {findCommand && (
                     <DesktopMenuItem
                       icon={<Search size={14} strokeWidth={1.9} />}
@@ -216,19 +238,6 @@ export function EditorPaneShell({
                       onClick={() => runAndClose(findCommand.open)}
                     />
                   )}
-                  {onOpenExternal && (
-                    <DesktopMenuItem
-                      icon={<ExternalLink size={14} strokeWidth={1.9} />}
-                      label={externalOpenAppName
-                        ? t("editor.panes.openInApp", { app: externalOpenAppName })
-                        : t("editor.openDefaultApp")}
-                      onClick={() => runAndClose(onOpenExternal)}
-                    />
-                  )}
-                </DesktopMenuSection>
-              )}
-              {viewItems.length > 0 && (
-                <DesktopMenuSection label={t("editor.panes.viewActions")}>
                   {viewItems.map((item) => item.kind === "toggle" ? (
                     <DesktopMenuItem
                       key={item.id}
@@ -248,13 +257,6 @@ export function EditorPaneShell({
                   ))}
                 </DesktopMenuSection>
               )}
-              <DesktopMenuSection label={t("editor.panes.paneActions")}>
-                <DesktopMenuItem
-                  icon={<X size={14} strokeWidth={1.9} />}
-                  label={t("editor.panes.closePane")}
-                  onClick={() => runAndClose(onClose)}
-                />
-              </DesktopMenuSection>
             </DesktopMenuSurface>
           )}
         </div>

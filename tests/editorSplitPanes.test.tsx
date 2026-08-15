@@ -36,7 +36,8 @@ afterEach(() => {
 
 describe("DesktopEditorSplitView", () => {
   it("keeps the pane actions handle when only one pane exists", () => {
-    const container = renderSplitView(EMPTY_EDITOR_GROUP, createEditorPaneLayout());
+    const group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("a.md"));
+    const container = renderSplitView(group, createEditorPaneLayout("a.md"));
     const pane = container.querySelector<HTMLElement>(".desktop-editor-pane")!;
     const handle = container.querySelector<HTMLButtonElement>(".desktop-editor-pane-handle")!;
     pane.getBoundingClientRect = () => new DOMRect(0, 0, 800, 600);
