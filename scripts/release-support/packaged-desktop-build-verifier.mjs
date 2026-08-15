@@ -9,6 +9,11 @@ import {
 
 const { extractFile } = asarPackage;
 const { parse: parsePlist } = plistPackage;
+const packagedDockIconAssets = Object.freeze({
+  "logo-square.png": "dist/logo-square.png",
+  "dock-icon-light.png": "dist/logo-square-v0.1.3-light.png",
+  "dock-icon-matte.png": "dist/logo-square-v0.1.3-dark.png",
+});
 
 export async function verifyPackagedDesktopBuild({
   releaseDirectory,
@@ -46,6 +51,27 @@ export async function verifyPackagedDesktopBuild({
       throw new Error(
         `${path.basename(application.path)} package version ${applicationPackage.version} must equal ${identity.version}.`,
       );
+    }
+
+    for (const [resourceFilename, rendererAssetPath] of Object.entries(packagedDockIconAssets)) {
+      const nativeIcon = await fs.readFile(path.join(resourcesDirectory, resourceFilename)).catch((error) => {
+        if (error?.code === "ENOENT") {
+          throw new Error(`${path.basename(application.path)} is missing Dock icon resource ${resourceFilename}.`);
+        }
+        throw error;
+      });
+      assertPng(nativeIcon, `${path.basename(application.path)} ${resourceFilename}`);
+
+      let rendererIcon;
+      try {
+        rendererIcon = extractFile(
+          path.join(resourcesDirectory, "app.asar"),
+          rendererAssetPath,
+        );
+      } catch {
+        throw new Error(`${path.basename(application.path)} is missing renderer Dock icon ${rendererAssetPath}.`);
+      }
+      assertPng(rendererIcon, `${path.basename(application.path)} ${rendererAssetPath}`);
     }
 
     const plist = parsePlist(
@@ -119,6 +145,16 @@ export async function verifyPackagedDesktopBuild({
     distributables: distributableFiles.map((entry) => entry.path),
     updaterMetadata: updaterMetadata.map((entry) => entry.path),
   });
+}
+
+function assertPng(contents, label) {
+  const pngSignature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (
+    contents.length < pngSignature.length
+    || pngSignature.some((byte, index) => contents[index] !== byte)
+  ) {
+    throw new Error(`${label} is not a valid PNG resource.`);
+  }
 }
 
 async function collectReleaseEntries(releaseDirectory) {

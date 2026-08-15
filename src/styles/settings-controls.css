@@ -314,18 +314,24 @@
   border-radius: 2px;
 }
 
-.desktop-text-size-segment button {
-  min-width: 70px;
+.desktop-appearance-option-segment {
+  display: grid;
+  width: min(100%, 360px);
+  min-width: 0;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
 }
 
-.desktop-loading-animation-segment {
-  max-width: 520px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+.desktop-appearance-option-segment button {
+  min-width: 0;
+  padding-inline: 6px;
+  white-space: nowrap;
 }
 
-.desktop-loading-animation-segment button {
-  min-width: 132px;
+.desktop-appearance-option-segment button > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .desktop-loading-animation-preview {
@@ -344,14 +350,4 @@
 
 .desktop-dock-icon-segment span {
   color: inherit;
-}
-
-.desktop-sidebar-layout-segment {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  max-width: 410px;
-}
-
-.desktop-sidebar-layout-segment button {
-  min-width: 112px;
 }
