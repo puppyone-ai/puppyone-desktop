@@ -237,6 +237,9 @@ describe("DesktopEditorSplitView", () => {
     act(() => handle.dispatchEvent(new PointerEvent("pointerup", {
       bubbles: true, clientX: 790, clientY: 300, pointerId: 7,
     })));
+    act(() => handle.dispatchEvent(new MouseEvent("click", {
+      bubbles: true, button: 0, detail: 0,
+    })));
     expect(onMovePane).toHaveBeenCalledWith(
       "editor-pane-1",
       "editor-pane-2",
@@ -246,6 +249,7 @@ describe("DesktopEditorSplitView", () => {
     expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(false);
     expect(document.body.querySelector(".desktop-editor-pane-move-preview")).toBeNull();
     expect(panes[0]!.getAttribute("data-move-source")).toBeNull();
+    expect(document.querySelector(".desktop-editor-pane-menu")).toBeNull();
   });
 
   it("cancels pane movement without swallowing the next menu press", () => {
@@ -657,15 +661,15 @@ function installPointerCaptureStub(handle: HTMLElement) {
 }
 
 function clickPaneHandle(handle: HTMLElement, pointerId: number) {
-  act(() => {
-    handle.dispatchEvent(new PointerEvent("pointerdown", {
-      bubbles: true, button: 0, clientX: 100, clientY: 5, pointerId,
-    }));
-    handle.dispatchEvent(new PointerEvent("pointerup", {
-      bubbles: true, button: 0, clientX: 100, clientY: 5, pointerId,
-    }));
-    handle.dispatchEvent(new MouseEvent("click", { bubbles: true, button: 0, detail: 1 }));
-  });
+  act(() => handle.dispatchEvent(new PointerEvent("pointerdown", {
+    bubbles: true, button: 0, clientX: 100, clientY: 5, pointerId,
+  })));
+  act(() => handle.dispatchEvent(new PointerEvent("pointerup", {
+    bubbles: true, button: 0, clientX: 100, clientY: 5, pointerId,
+  })));
+  act(() => handle.dispatchEvent(new MouseEvent("click", {
+    bubbles: true, button: 0, detail: 0,
+  })));
 }
 
 function dragEvent(type: string, dataTransfer: DataTransfer, clientX: number, clientY: number) {

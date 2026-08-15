@@ -31,7 +31,11 @@ describe("editor pane chrome hit-target architecture", () => {
     expect(paneChromeSource).toContain("onPointerDown={(event) =>");
     expect(paneChromeSource).toContain("paneMove.start(event, pane)");
     expect(paneChromeSource).toContain("onPointerUp={(event) =>");
-    expect(paneChromeSource).toContain('if (result === "press") toggleMenu();');
+    expect(paneChromeSource).toContain('paneMove.end(event) === "drag"');
+    expect(paneChromeSource).toContain("suppressDerivedDragClick();");
+    expect(paneChromeSource).toContain("onClick={() =>");
+    expect(paneChromeSource).toContain("toggleMenu();");
+    expect(paneChromeSource).not.toContain("event.detail === 0");
   });
 });
 

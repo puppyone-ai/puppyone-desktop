@@ -1,4 +1,4 @@
-import { useCallback, useRef, type MouseEvent, type RefObject } from "react";
+import { useCallback, useEffect, useRef, type RefObject } from "react";
 import { useLocalization } from "@puppyone/localization";
 import type {
   EditorFindCommand,
@@ -50,6 +50,8 @@ export function EditorPaneChrome({
 }: EditorPaneChromeProps) {
   const { t } = useLocalization();
   const handleRef = useRef<HTMLButtonElement>(null);
+  const suppressClickRef = useRef(false);
+  const suppressClickTimerRef = useRef<number | null>(null);
   const canMovePane = paneCount > 1;
   const showPaneHandle = Boolean(editorLabel) || canMovePane;
   const handleLabel = canMovePane
@@ -66,13 +68,26 @@ export function EditorPaneChrome({
     [actionsOpen, onActionsPaneChange, pane.id],
   );
 
-  if (!showPaneHandle) return null;
+  const clearClickSuppression = useCallback(() => {
+    suppressClickRef.current = false;
+    if (suppressClickTimerRef.current !== null) {
+      window.clearTimeout(suppressClickTimerRef.current);
+      suppressClickTimerRef.current = null;
+    }
+  }, []);
 
-  const onKeyboardClick = (event: MouseEvent<HTMLButtonElement>) => {
-    // Pointer gestures are resolved synchronously on pointerup. A click with
-    // detail=0 is keyboard/assistive activation and must remain supported.
-    if (event.detail === 0) toggleMenu();
-  };
+  const suppressDerivedDragClick = useCallback(() => {
+    clearClickSuppression();
+    suppressClickRef.current = true;
+    // The browser-generated click follows pointerup in the same interaction
+    // cycle. Expire at the next task so a missing click can never poison a
+    // later, intentional menu press.
+    suppressClickTimerRef.current = window.setTimeout(clearClickSuppression, 0);
+  }, [clearClickSuppression]);
+
+  useEffect(() => clearClickSuppression, [clearClickSuppression]);
+
+  if (!showPaneHandle) return null;
 
   return (
     <>
@@ -88,15 +103,22 @@ export function EditorPaneChrome({
           onPointerEnter={() => {
             if (canMovePane && paneRef.current) paneMove.prepare(paneRef.current, pane.id);
           }}
-          onClick={onKeyboardClick}
+          onClick={() => {
+            if (suppressClickRef.current) {
+              clearClickSuppression();
+              return;
+            }
+            toggleMenu();
+          }}
           onPointerDown={(event) => {
             if (event.button === 0 && canMovePane) paneMove.start(event, pane);
           }}
           onPointerMove={paneMove.move}
           onPointerUp={(event) => {
             if (event.button !== 0) return;
-            const result = canMovePane ? paneMove.end(event) : "press";
-            if (result === "press") toggleMenu();
+            if (canMovePane && paneMove.end(event) === "drag") {
+              suppressDerivedDragClick();
+            }
           }}
           onPointerCancel={paneMove.cancel}
           onLostPointerCapture={paneMove.lostCapture}
