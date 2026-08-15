@@ -1,15 +1,16 @@
 import { SquareTerminal } from "lucide-react";
+import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
 import "./terminal-launcher-icon.css";
 
 const launcherIconSource: Partial<Record<DesktopTerminalLauncherId, string>> = {
-  codex: "/icons/ChatGPT_logo.png",
-  claude: "/icons/agent-claude-code.svg",
-  cursor: "/icons/agent-cursor.svg",
-  opencode: "/icons/agent-opencode.svg",
-  pi: "/icons/agent-pi.svg",
+  codex: resolveRendererPublicAssetUrl("icons/agent-codex-light.png"),
+  claude: resolveRendererPublicAssetUrl("icons/agent-claude-code.svg"),
+  cursor: resolveRendererPublicAssetUrl("icons/agent-cursor.svg"),
+  opencode: resolveRendererPublicAssetUrl("icons/agent-opencode.svg"),
+  pi: resolveRendererPublicAssetUrl("icons/agent-pi.svg"),
   // Official 32px favicon from NousResearch/hermes-agent/website/static/img.
-  hermes: "/icons/agent-hermes.png",
+  hermes: resolveRendererPublicAssetUrl("icons/agent-hermes.png"),
 };
 
 export function TerminalLauncherIcon({

@@ -15,7 +15,10 @@ import {
   type InterfaceStyle,
   type ThemeMode,
 } from "./features/appearance/interfaceStyles";
-import type { PulseGridPresetId } from "@puppyone/shared-ui";
+import {
+  resolveRendererPublicAssetUrl,
+  type PulseGridPresetId,
+} from "@puppyone/shared-ui";
 
 export type { TypographyPreferences } from "./features/typography/fontCatalog";
 export {
@@ -359,19 +362,19 @@ export const DOCK_ICON_OPTIONS = [
     id: "polished",
     label: "Polished",
     description: "The current high-contrast PuppyOne icon.",
-    previewSrc: "/logo-square.png",
+    previewSrc: resolveRendererPublicAssetUrl("logo-square.png"),
   },
   {
     id: "light",
     label: "Light",
     description: "A warm light icon with a quiet outline.",
-    previewSrc: "/logo-square-v0.1.3-light.png",
+    previewSrc: resolveRendererPublicAssetUrl("logo-square-v0.1.3-light.png"),
   },
   {
     id: "matte",
     label: "Matte",
     description: "A flat dark icon without the metallic rim.",
-    previewSrc: "/logo-square-v0.1.3-dark.png",
+    previewSrc: resolveRendererPublicAssetUrl("logo-square-v0.1.3-dark.png"),
   },
 ] as const satisfies ReadonlyArray<{
   id: DockIcon;

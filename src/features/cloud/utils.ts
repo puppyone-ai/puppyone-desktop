@@ -1,5 +1,6 @@
 import { Bot, Cloud, Database, GitBranch, Link, Server, SquareTerminal } from "lucide-react";
 import type { LocaleFormatters, MessageFormatter } from "@puppyone/localization/core";
+import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 import type {
   DesktopCloudConnector,
   DesktopCloudMcpEndpoint,
@@ -78,23 +79,23 @@ export function normalizeProviderKey(provider: string) {
 export function getCloudProviderIconUrl(provider: string) {
   switch (normalizeProviderKey(provider)) {
     case "gmail":
-      return "/icons/gmail.svg";
+      return resolveRendererPublicAssetUrl("icons/gmail.svg");
     case "google_calendar":
-      return "/icons/google_calendar.svg";
+      return resolveRendererPublicAssetUrl("icons/google_calendar.svg");
     case "google_docs":
-      return "/icons/google_doc.svg";
+      return resolveRendererPublicAssetUrl("icons/google_doc.svg");
     case "google_sheets":
-      return "/icons/google_sheet.svg";
+      return resolveRendererPublicAssetUrl("icons/google_sheet.svg");
     case "notion":
-      return "/icons/notion.svg";
+      return resolveRendererPublicAssetUrl("icons/notion.svg");
     case "airtable":
-      return "/icons/airtable.png";
+      return resolveRendererPublicAssetUrl("icons/airtable.png");
     case "linear":
-      return "/icons/linear.svg";
+      return resolveRendererPublicAssetUrl("icons/linear.svg");
     case "supabase":
-      return "/icons/supabase-icon.png";
+      return resolveRendererPublicAssetUrl("icons/supabase-icon.png");
     case "slack":
-      return "/icons/Slack_icon_2019.svg.png";
+      return resolveRendererPublicAssetUrl("icons/Slack_icon_2019.svg.png");
     default:
       return "";
   }

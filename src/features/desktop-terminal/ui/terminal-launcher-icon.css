@@ -31,11 +31,18 @@
 }
 
 .desktop-terminal-launcher-icon.is-codex {
-  /* The source PNG has roughly 25% transparent padding around the mark. */
-  --desktop-terminal-launcher-mark-scale: 1.24;
+  /* Optical crop removes the App Icon's oversized safety area without
+     stretching or recoloring the official light/dark Codex artwork. */
+  --desktop-terminal-launcher-mark-scale: 1;
 
-  border-radius: 999px;
-  background: #050505;
+  border-radius: 4px;
+  opacity: 0.9;
+}
+
+.desktop-terminal-launcher-icon.is-claude {
+  /* Claude's radial mark fills its entire 24px viewBox; reduce its visible
+     footprint to match the other launcher marks rather than their canvases. */
+  --desktop-terminal-launcher-mark-scale: 0.84;
 }
 
 .desktop-terminal-launcher-icon.is-opencode {
@@ -71,6 +78,10 @@
 
 .dark .desktop-terminal-launcher-icon.is-cursor img {
   content: url("/icons/agent-cursor-dark.svg");
+}
+
+.dark .desktop-terminal-launcher-icon.is-codex img {
+  content: url("/icons/agent-codex-dark.png");
 }
 
 .dark .desktop-terminal-launcher-icon.is-pi img {

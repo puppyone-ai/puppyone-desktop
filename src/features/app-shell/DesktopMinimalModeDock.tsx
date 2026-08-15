@@ -7,6 +7,7 @@ import {
   Settings,
 } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
+import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 import type { DesktopView } from "../../components/DesktopCloudShell";
 import { VersionControlIcon } from "../source-control/VersionControlIcon";
 
@@ -70,7 +71,7 @@ export function DesktopMinimalModeDock({
         title={t("shell.minimal.controls")}
         onClick={() => setPinned((value) => !value)}
       >
-        <img src="/logo-square.png" alt="" aria-hidden="true" />
+        <img src={resolveRendererPublicAssetUrl("logo-square.png")} alt="" aria-hidden="true" />
       </button>
 
       <div

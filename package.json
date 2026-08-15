@@ -33,7 +33,7 @@
     "dev:renderer": "vite",
     "dev:browser": "vite --host 127.0.0.1",
     "postinstall": "node scripts/fix-node-pty-permissions.mjs",
-    "build": "node scripts/check-desktop-build-environment.mjs && npm run check:boundaries && tsc && vite build && node scripts/check-bundle-budget.mjs && node scripts/check-packaged-artifact-budgets.mjs",
+    "build": "node scripts/check-desktop-build-environment.mjs && npm run check:boundaries && tsc && vite build && node scripts/check-renderer-public-assets.mjs && node scripts/check-bundle-budget.mjs && node scripts/check-packaged-artifact-budgets.mjs",
     "package:viewer-pack": "node scripts/package-viewer-pack.mjs",
     "check:artifact-budgets": "node scripts/check-packaged-artifact-budgets.mjs",
     "check:viewer-pack-trust": "node scripts/check-viewer-pack-release.mjs",

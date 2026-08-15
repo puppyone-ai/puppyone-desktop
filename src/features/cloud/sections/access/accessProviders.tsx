@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, Copy, ExternalLink, Monitor, Settings, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { MessageFormatter } from "@puppyone/localization/core";
+import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 import type { CloudAccessSurface } from "../../model";
 import { formatProviderLabel, normalizeProviderKey, providerIcon } from "../../utils";
 import { isGitAccessSurface, isVmAccessSurface } from "./accessSurfaceModel";
@@ -99,7 +100,7 @@ export function DesktopCloudProviderIcon({ provider, size }: { provider: string;
     return (
       <img
         className="desktop-cloud-access-git-brand-icon"
-        src="/assets/brand/git-icon-inverse.svg"
+        src={resolveRendererPublicAssetUrl("assets/brand/git-icon-inverse.svg")}
         alt=""
         width={size}
         height={size}

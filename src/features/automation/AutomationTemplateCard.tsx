@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 import { getCloudProviderIconUrl, providerIcon } from "../cloud/utils";
 import type { AutomationTemplate } from "./automationTemplates";
 import {
@@ -44,7 +45,7 @@ export function AutomationTemplateCard({
             <ArrowRight className="po-directional-icon" size={12} strokeWidth={1.8} />
           </span>
           <span className="desktop-cloud-automation-template-mark target">
-            <img src="/icons/folder.svg" alt="" />
+            <img src={resolveRendererPublicAssetUrl("icons/folder.svg")} alt="" />
           </span>
         </div>
         {status && <span className={`desktop-cloud-automation-template-status ${statusTone}`}>{status}</span>}

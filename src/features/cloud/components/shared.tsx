@@ -1,5 +1,9 @@
 import { Check, ChevronRight, Cloud, Copy, ExternalLink, FileText, FolderOpen, GitBranch, RefreshCw, Server } from "lucide-react";
-import { FilePreviewIcon, type Workspace } from "@puppyone/shared-ui";
+import {
+  FilePreviewIcon,
+  resolveRendererPublicAssetUrl,
+  type Workspace,
+} from "@puppyone/shared-ui";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import "./shared.css";
@@ -171,7 +175,12 @@ export function CloudFilePreviewIcon({
         style={{ width: size, height: size }}
         aria-hidden="true"
       >
-        <img src="/icons/folder.svg" alt="" width={size} height={size} />
+        <img
+          src={resolveRendererPublicAssetUrl("icons/folder.svg")}
+          alt=""
+          width={size}
+          height={size}
+        />
         {childrenCount != null && childrenCount > 0 && (
           <em>{childrenCount}</em>
         )}
