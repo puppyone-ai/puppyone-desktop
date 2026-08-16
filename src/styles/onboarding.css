@@ -231,10 +231,7 @@
   max-height: 100%;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: 186px auto;
   justify-self: center;
-  justify-items: center;
-  gap: 28px;
 }
 
 .onboarding-recent-projects {
@@ -250,6 +247,7 @@
   padding: 18px;
   border: 1px solid var(--po-border);
   border-radius: 0;
+  transition: border-color 120ms ease;
 }
 
 .onboarding-homepage.has-projects .onboarding-recent-projects {
@@ -290,100 +288,27 @@
   white-space: nowrap;
 }
 
-.onboarding-folder-compact-action {
-  position: relative;
+.onboarding-project-add {
   display: grid;
-  width: 186px;
-  height: 186px;
   min-width: 0;
-  flex: 0 0 auto;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  color: var(--po-text-muted);
-  cursor: var(--po-clickable-cursor, pointer);
-  font: inherit;
-  pointer-events: auto;
-  transform: none;
-  transition:
-    opacity 150ms ease,
-    color 150ms ease,
-    transform 150ms ease;
+  min-width: 0;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--po-divider);
 }
 
-.onboarding-folder-compact-action:hover:not(:disabled),
-.onboarding-folder-compact-action:focus-visible,
-.onboarding-folder-compact-action.dragging {
-  outline: none;
+.onboarding-project-add-action {
+  width: 100%;
+  color: var(--po-text-subtle);
+}
+
+.onboarding-shell.dragging .onboarding-recent-projects {
+  border-color: var(--po-border-strong);
+}
+
+.onboarding-shell.dragging .onboarding-project-add-action:not(:disabled) {
+  background: var(--po-hover);
   color: var(--po-text);
-  transform: translateY(-3px);
-}
-
-.onboarding-folder-compact-outline {
-  position: absolute;
-  inset: 0;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.onboarding-folder-compact-shadow {
-  fill: var(--po-shadow);
-  opacity: 0;
-  transform: translate(4px, 5px);
-  transition: opacity 150ms ease-out;
-}
-
-.onboarding-folder-compact-fill {
-  fill: var(--po-canvas);
-}
-
-.onboarding-folder-compact-border {
-  fill: none;
-  stroke: var(--po-border);
-  stroke-dasharray: 4 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.5;
-  vector-effect: non-scaling-stroke;
-  transition: stroke 150ms ease-out;
-}
-
-.onboarding-folder-compact-body {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 20px 12px 0;
-  pointer-events: none;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 18px;
-  white-space: nowrap;
-}
-
-.onboarding-folder-compact-action:hover:not(:disabled) .onboarding-folder-compact-border,
-.onboarding-folder-compact-action.dragging .onboarding-folder-compact-border {
-  stroke: var(--po-border-strong);
-}
-
-.onboarding-folder-compact-action:hover:not(:disabled) .onboarding-folder-compact-shadow,
-.onboarding-folder-compact-action.dragging .onboarding-folder-compact-shadow {
-  opacity: 1;
-}
-
-.onboarding-folder-compact-action:focus-visible .onboarding-folder-compact-border {
-  stroke: var(--po-focus-ring);
-}
-
-.onboarding-folder-compact-action:disabled {
-  cursor: default;
-  opacity: 0.64;
 }
 
 .onboarding-project-list {

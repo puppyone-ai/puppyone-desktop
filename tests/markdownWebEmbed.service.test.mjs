@@ -64,6 +64,8 @@ class FakeWebContents extends EventEmitter {
     this.destroyed = false;
     this.stopped = false;
     this.session = session;
+    this.currentUrl = "";
+    this.transientUserActivation = false;
   }
 
   setWindowOpenHandler(handler) {
@@ -71,7 +73,16 @@ class FakeWebContents extends EventEmitter {
   }
 
   async loadURL(href) {
+    this.currentUrl = href;
     return loadUrlImplementation(href, this);
+  }
+
+  getURL() {
+    return this.currentUrl;
+  }
+
+  async executeJavaScript() {
+    return this.transientUserActivation;
   }
 
   stop() {
@@ -170,12 +181,17 @@ class FakeOwnerWindow extends EventEmitter {
 }
 
 function createService(window, options = {}) {
+  const externalNavigation = options.externalNavigation ?? {
+    openDetached: vi.fn(() => true),
+  };
   const service = createMarkdownWebEmbedService({
+    externalNavigation,
     getOwnerWindow: () => window,
     ...options,
   });
   return {
     ...service,
+    externalNavigation,
     create: (request) => service.create({ capability: DEFAULT_CAPABILITY, ...request }),
   };
 }
@@ -237,7 +253,7 @@ describe("Markdown web embed service", () => {
     expect(await decideRequest("https://cdn.example.com/lib.js")).toEqual({});
   });
 
-  it("keeps top-level navigation and redirects on the approved origin", async () => {
+  it("keeps fragment navigation in the embed and externalizes activated page links", async () => {
     const owner = new FakeOwnerWindow(1);
     const service = createService(owner);
     await service.create({ href: "https://example.com/start", bounds: DEFAULT_BOUNDS, ownerWebContentsId: 1 });
@@ -249,14 +265,31 @@ describe("Markdown web embed service", () => {
       return prevented;
     };
 
-    expect(run("will-navigate", "https://example.com/next")).toBe(false);
+    expect(run("will-navigate", "https://example.com/start#details")).toBe(false);
+    webContents.transientUserActivation = true;
+    expect(run("will-navigate", "https://example.com/next")).toBe(true);
     expect(run("will-navigate", "https://other.example/next")).toBe(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(service.externalNavigation.openDetached).toHaveBeenNthCalledWith(
+      1,
+      "https://example.com/next",
+    );
+    expect(service.externalNavigation.openDetached).toHaveBeenNthCalledWith(
+      2,
+      "https://other.example/next",
+    );
+
+    webContents.transientUserActivation = false;
+    expect(run("will-navigate", "https://example.com/automatic")).toBe(true);
     expect(run("will-redirect", "http://example.com/down")).toBe(true);
     expect(run("will-redirect", "https://127.0.0.1/x")).toBe(true);
+    await Promise.resolve();
+    expect(service.externalNavigation.openDetached).toHaveBeenCalledTimes(2);
     expect(await decideRequest("https://other.example/next", "mainFrame")).toEqual({ cancel: true });
   });
 
-  it("cancels downloads and denies browser windows and dialogs", async () => {
+  it("cancels downloads and routes only activated popup intents to external navigation", async () => {
     const owner = new FakeOwnerWindow(1);
     const service = createService(owner);
     await service.create({ href: "https://example.com/", bounds: DEFAULT_BOUNDS, ownerWebContentsId: 1 });
@@ -264,7 +297,17 @@ describe("Markdown web embed service", () => {
     let downloadPrevented = false;
     createdSessions[0].emit("will-download", { preventDefault: () => { downloadPrevented = true; } });
     expect(downloadPrevented).toBe(true);
-    expect(createdViews[0].webContents.windowOpenHandler()).toEqual({ action: "deny" });
+    const webContents = createdViews[0].webContents;
+    webContents.transientUserActivation = true;
+    expect(webContents.windowOpenHandler({ url: "https://example.com/docs" })).toEqual({ action: "deny" });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(service.externalNavigation.openDetached).toHaveBeenCalledWith("https://example.com/docs");
+
+    webContents.transientUserActivation = false;
+    expect(webContents.windowOpenHandler({ url: "https://example.com/automatic" })).toEqual({ action: "deny" });
+    await Promise.resolve();
+    expect(service.externalNavigation.openDetached).toHaveBeenCalledTimes(1);
 
     let loginPrevented = false;
     createdViews[0].webContents.emit("login", { preventDefault: () => { loginPrevented = true; } });
@@ -469,6 +512,7 @@ describe("Markdown web embed IPC ownership", () => {
     registerMarkdownWebEmbedIpcHandlers({
       ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) },
       createMarkdownWebEmbedService: () => service,
+      externalNavigation: { openDetached: vi.fn(() => true) },
       getOwnerWindow: () => null,
     });
 

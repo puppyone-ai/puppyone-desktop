@@ -1,6 +1,6 @@
 import type { Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
-import { AlertTriangle, Folder, FolderOpen, Unlink } from "lucide-react";
+import { AlertTriangle, Folder, FolderOpen, FolderPlus, Unlink } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -227,27 +227,6 @@ export function MinimalOnboarding({
 
         {hasProjects && (
           <div className="onboarding-projects-layout">
-            <button
-              className={`onboarding-folder-compact-action ${folderDrop.dragging ? "dragging" : ""}`}
-              type="button"
-              disabled={busy}
-              aria-busy={openingPath === "__new__" || undefined}
-              aria-label={t("onboarding.action.openLocalFolder")}
-              onClick={() => void chooseFolder()}
-            >
-              <svg className="onboarding-folder-compact-outline" viewBox="0 0 260 260" preserveAspectRatio="none" aria-hidden="true">
-                <path className="onboarding-folder-compact-shadow" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-                <path className="onboarding-folder-compact-fill" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-                <path className="onboarding-folder-compact-border" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-              </svg>
-              <span className="onboarding-folder-compact-body">
-                {openingPath === "__new__"
-                  ? <InlineLoading label={null} size="sm" tone="neutral" />
-                  : <FolderOpen size={21} strokeWidth={1.75} />}
-                <span>{t("onboarding.action.openOrDropLocalFolder")}</span>
-              </span>
-            </button>
-
             <div className="onboarding-recent-projects">
               <div className="onboarding-recent-header">
                 <div className="onboarding-recent-heading">{t("onboarding.projects.localTitle")}</div>
@@ -294,6 +273,19 @@ export function MinimalOnboarding({
                     </div>
                   );
                 })}
+              </div>
+              <div className="onboarding-project-add">
+                <DesktopMenuItem
+                  className="onboarding-project-add-action"
+                  role="button"
+                  icon={openingPath === "__new__"
+                    ? <InlineLoading label={null} size="xs" tone="neutral" />
+                    : <FolderPlus size={14} strokeWidth={1.85} />}
+                  label={t("onboarding.action.openLocalFolder")}
+                  disabled={busy}
+                  aria-busy={openingPath === "__new__" || undefined}
+                  onClick={() => void chooseFolder()}
+                />
               </div>
             </div>
           </div>

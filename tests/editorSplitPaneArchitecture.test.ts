@@ -200,18 +200,16 @@ describe("editor split-pane architecture", () => {
     expect(paneActionsMenuSource).toContain(
       'className="desktop-editor-pane-menu-primary-action desktop-editor-pane-menu-close-action"',
     );
-    const paneHoverOverlayRule = readCssBlock(
-      splitStyles,
-      '.desktop-editor-split-view:not([data-pane-count="1"]) .desktop-editor-pane::after',
-    );
-    expect(paneHoverOverlayRule).toContain("position: absolute;");
-    expect(paneHoverOverlayRule).toContain("pointer-events: none;");
-    expect(paneHoverOverlayRule).toContain("inset: 0;");
-    expect(paneHoverOverlayRule).toContain("box-shadow: inset 0 0 0 1px var(--po-divider);");
-    expect(paneHoverOverlayRule).toContain("opacity: 0;");
+    const paneFrameRule = readCssBlock(splitStyles, ".desktop-editor-pane");
+    expect(paneFrameRule).toContain("position: relative;");
+    expect(paneFrameRule).toContain("box-sizing: border-box;");
+    expect(paneFrameRule).toContain("border: 1px solid transparent;");
+    expect(paneFrameRule).toContain("transition: border-color 90ms ease;");
     expect(splitStyles).toContain(
-      ".desktop-editor-pane[data-handle-hot]:not([data-move-source])::after",
+      ".desktop-editor-pane[data-handle-hot]:not([data-move-source])",
     );
+    expect(splitStyles).toContain("border-color: var(--po-divider);");
+    expect(splitStyles).not.toContain(".desktop-editor-pane::after");
     expect(splitStyles).not.toContain("@keyframes desktop-editor-pane-activate");
     expect(splitStyles).toContain("var(--po-pane-resizer-active-color)");
     expect(splitStyles).not.toContain(".desktop-editor-pane-bar");
@@ -284,16 +282,20 @@ describe("editor split-pane architecture", () => {
     expect(persistenceSource).toContain("flush(): void");
   });
 
-  it("joins root split dividers to the Editor-facing edge of the Sidebar gutter", () => {
-    expect(dataShellStyles).toContain(
-      "--desktop-editor-sidebar-gutter-size: var(--po-pane-resizer-hit-size, 8px);",
+  it("keeps the Sidebar resize hit lane on the Sidebar side of the visible divider", () => {
+    const explorerRule = readCssBlock(dataShellStyles, ".explorer-column");
+    const resizerRule = readCssBlock(dataShellStyles, ".data-explorer-resizer");
+    const resizerDividerRule = readCssBlock(dataShellStyles, ".data-explorer-resizer::after");
+
+    expect(explorerRule).toContain("border-inline-end: 1px solid transparent;");
+    expect(resizerRule).toContain("background: var(--po-sidebar);");
+    expect(resizerDividerRule).toContain("inset-inline-end: 0;");
+    expect(resizerDividerRule).toContain(
+      "background: var(--po-shell-divider, var(--po-divider));",
     );
     expect(splitSource).toContain("touchesInlineStart");
     expect(splitStyles).toContain('data-touches-inline-start="true"');
-    expect(splitStyles).toContain(
-      "inset-inline-start: calc(-1 * var(--desktop-editor-sidebar-gutter-size, 0px));",
-    );
-    expect(dataShellStyles).not.toContain("border-inline-end-color: transparent;\n}\n\n.explorer-column");
+    expect(splitStyles).not.toContain("--desktop-editor-sidebar-gutter-size");
   });
 
   it("does not project the Sidebar divider through the Header", () => {

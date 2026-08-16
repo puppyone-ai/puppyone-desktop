@@ -53,6 +53,7 @@ describe("Markdown editor layout", () => {
 
   it("keeps vertical document padding fixed while the inline gutter responds to width", () => {
     const editorRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor");
+    const scrollerRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor .cm-scroller");
     const contentRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor .cm-content");
 
     expect(editorEntryCss).toContain("--po-editor-content-edge-inset: 64px;");
@@ -62,14 +63,17 @@ describe("Markdown editor layout", () => {
     expect(contentRule).toContain("padding-block: var(--po-markdown-editor-content-padding-block);");
     expect(contentRule).toContain("padding-inline: var(--po-markdown-editor-content-gutter-inline);");
     expect(contentRule).not.toMatch(/padding-(?:block|top):[^;]*content-gutter-inline/);
+    expect(editorRule).toContain("container-type: inline-size;");
+    expect(editorRule).toContain("--po-markdown-scroll-viewport-inline-size: 100cqw;");
+    expect(scrollerRule).not.toContain("container-type: inline-size;");
   });
 
-  it("keeps a symmetric table breakout inset separate from the document edge inset", () => {
+  it("keeps the full-width block edge separate from the document reading rail", () => {
     const editorRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor");
 
-    expect(editorRule).toContain("--po-markdown-breakout-inline-inset: 48px;");
-    expect(editorRule).not.toContain("--po-markdown-breakout-inline-end-gutter");
-    expect(editorRule).not.toContain("--po-markdown-breakout-right-gutter");
+    expect(editorRule).toContain("--po-markdown-wide-block-edge-inset: 0px;");
+    expect(editorRule).not.toContain("--po-markdown-wide-block-edge-inline-end-inset");
+    expect(editorRule).not.toContain("--po-markdown-breakout-inline-inset");
     expect(editorRule).not.toContain("--po-markdown-breakout-max-width");
   });
 
@@ -370,7 +374,7 @@ describe("Markdown table affordance layout", () => {
     expect(markdownContentCss).not.toContain("--po-md-heading-rule");
   });
 
-  it("splits the safe-edge scrollport from the reading-rail table track", () => {
+  it("splits the editor-edge scrollport from the reading-rail table track", () => {
     const rootRule = readCssRule(
       markdownTableCss,
       ".markdown-codemirror-editor .cm-md-table-widget-wrap",
@@ -421,13 +425,15 @@ describe("Markdown table affordance layout", () => {
       "padding-block: var(--cm-md-table-handle-gutter) 0;",
     );
     expect(viewportRule).toContain("touch-action: pan-x pan-y;");
-    expect(markdownTableCss).toContain("--cm-md-table-viewport-inline-inset: min(");
-    expect(markdownTableCss).toContain("var(--po-markdown-breakout-inline-inset)");
+    expect(markdownTableCss).toContain("--cm-md-table-viewport-inline-inset: clamp(");
+    expect(markdownTableCss).toContain("var(--po-markdown-wide-block-edge-inset)");
+    expect(markdownTableCss).toContain("var(--po-markdown-scroll-viewport-inline-size)");
     expect(markdownTableCss).toMatch(
       /--cm-md-table-interaction-start-inset:\s*calc\(\s*var\(--po-markdown-editor-gutter-inline\)\s*-\s*var\(--cm-md-table-viewport-inline-inset\)\s*\)/s,
     );
     expect(markdownTableCss).not.toContain("--cm-md-table-viewport-inline-end-gutter");
     expect(markdownTableCss).not.toMatch(/(?:max-)?inline-size:\s*calc\(\s*100cqw/s);
+    expect(markdownTableCss).not.toContain("--po-markdown-breakout-inline-inset");
     expect(markdownTableCss).not.toContain("--po-markdown-breakout-max-width");
     expect(frameRule).toContain(
       "padding-inline-start: var(--cm-md-table-interaction-start-inset);",

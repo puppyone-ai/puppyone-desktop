@@ -1,9 +1,6 @@
-import { requireSafeExternalUrl } from "../security.mjs";
-
-export function registerSystemIpcHandlers({ ipcMain, shell, setDockIcon }) {
+export function registerSystemIpcHandlers({ ipcMain, externalNavigation, setDockIcon }) {
   ipcMain.handle("system:open-external-url", async (_event, href) => {
-    const url = requireSafeExternalUrl(href);
-    await shell.openExternal(url);
+    await externalNavigation.open(href);
     return { ok: true };
   });
 

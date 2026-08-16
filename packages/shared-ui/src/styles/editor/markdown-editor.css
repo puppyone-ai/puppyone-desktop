@@ -2,7 +2,10 @@
   --po-markdown-editor-text-width: 724px;
   --po-markdown-editor-gutter-min: var(--po-editor-content-edge-inset, 64px);
   --po-markdown-editor-content-padding-block: var(--po-editor-content-edge-inset, 64px);
-  --po-markdown-breakout-inline-inset: 48px;
+  /* Reading content stays on the centered text rail. Wide block viewports are
+     a separate layout tier and may use the full editor client width. */
+  --po-markdown-wide-block-edge-inset: 0px;
+  --po-markdown-scroll-viewport-inline-size: 100cqw;
   --po-markdown-editor-line-spacing: 0px;
   --cm-md-block-hover-ring: color-mix(in srgb, var(--po-text-muted) 18%, transparent);
   --cm-md-block-selected-ring: color-mix(in srgb, var(--po-accent) 30%, transparent);

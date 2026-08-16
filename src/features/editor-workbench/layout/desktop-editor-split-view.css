@@ -363,11 +363,6 @@
   height: 1px;
 }
 
-.desktop-editor-split[data-touches-inline-start="true"]
-  > .desktop-editor-splitter[data-direction="vertical"]::after {
-  inset-inline-start: calc(-1 * var(--desktop-editor-sidebar-gutter-size, 0px));
-}
-
 .desktop-editor-splitter:hover::after,
 .desktop-editor-splitter:focus-visible::after {
   background: var(--po-pane-resizer-hover-color);

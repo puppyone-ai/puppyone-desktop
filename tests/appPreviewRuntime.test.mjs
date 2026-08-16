@@ -56,7 +56,7 @@ function createRuntime(onStateChange = vi.fn(), overrides = {}) {
   runtime = createAppPreviewRuntime({
     app: { getPath: () => userDataPath },
     dialog,
-    shell: { openExternal: vi.fn() },
+    externalNavigation: { open: vi.fn(async () => ({ ok: true })) },
     readWorkspaceTextFile: async (rootPath, relativePath) => ({
       content: await readFile(path.join(rootPath, relativePath), "utf8"),
     }),

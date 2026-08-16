@@ -172,6 +172,8 @@ async function measureScenario(viewportWidth, direction, reserveVerticalScrollba
       const addColumn = document.querySelector(".cm-md-table-add-column");
       const columnHandle = document.querySelector(".cm-md-table-column-handle");
       const rowHandle = document.querySelector(".cm-md-table-row-handle");
+      root.style.setProperty("--po-markdown-scroll-viewport-inline-size", outer.clientWidth + "px");
+      await nextFrame();
       const viewportMaximum = viewport.scrollWidth - viewport.clientWidth;
       scrollbarContent.style.inlineSize = scrollbar.clientWidth + viewportMaximum + "px";
       await nextFrame();
@@ -304,8 +306,9 @@ async function runSmoke() {
       const label = `${direction}-${actualViewportWidth}${reserveVerticalScrollbar ? "-vertical-scrollbar" : ""}`;
       const expectedGutter = Math.max(64, (actualViewportWidth - 724) / 2);
       const expectedInteractionGutter = 18;
+      const expectedWideBlockEdgeInset = 0;
       const expectedViewportInset = Math.min(
-        48,
+        Math.max(0, expectedWideBlockEdgeInset),
         expectedGutter - expectedInteractionGutter,
       );
       const expectedInteractionStartInset = expectedGutter - expectedViewportInset;
@@ -383,14 +386,14 @@ async function runSmoke() {
       );
       if (direction === "ltr") {
         if (!reserveVerticalScrollbar) {
-          assertNear(initial.viewportLeft, expectedSafeStart, `${label}: safe edge`);
-          assertNear(initial.viewportRight, expectedBreakoutEnd, `${label}: breakout end`);
+          assertNear(initial.viewportLeft, expectedSafeStart, `${label}: editor edge`);
+          assertNear(initial.viewportRight, expectedBreakoutEnd, `${label}: editor edge end`);
         }
         assertNear(initial.tableLeft, initial.scrollbarLeft, `${label}: resting reading rail`);
         assertNear(initial.rowHandleLeft, initial.tableLeft - 14, `${label}: row handle table edge`);
-        assert(initial.rowHandleLeft >= initial.viewportLeft - 1.5, `${label}: row handle is clipped at safe edge`);
+        assert(initial.rowHandleLeft >= initial.viewportLeft - 1.5, `${label}: row handle is clipped at editor edge`);
         assert(initial.rowHandleRight > initial.tableLeft, `${label}: row handle no longer straddles table`);
-        assertNear(scrolled.thirdLeft, scrolled.viewportLeft, `${label}: later column reaches safe edge`);
+        assertNear(scrolled.thirdLeft, scrolled.viewportLeft, `${label}: later column reaches editor edge`);
         assert(scrolled.tableLeft < scrolled.viewportLeft, `${label}: leading table content did not leave`);
         assertNear(end.tableRight, end.scrollbarRight, `${label}: table and scrollbar reading-rail end`);
         assertNear(end.addLeft, end.tableRight, `${label}: add-column rail follows table edge`);
@@ -398,14 +401,14 @@ async function runSmoke() {
         assert(end.addLeft >= end.viewportLeft - 1.5, `${label}: add-column rail is unreachable`);
       } else {
         if (!reserveVerticalScrollbar) {
-          assertNear(initial.viewportRight, actualViewportWidth - expectedSafeStart, `${label}: safe edge`);
-          assertNear(initial.viewportLeft, actualViewportWidth - expectedBreakoutEnd, `${label}: breakout end`);
+          assertNear(initial.viewportRight, actualViewportWidth - expectedSafeStart, `${label}: editor edge`);
+          assertNear(initial.viewportLeft, actualViewportWidth - expectedBreakoutEnd, `${label}: editor edge end`);
         }
         assertNear(initial.tableRight, initial.scrollbarRight, `${label}: resting reading rail`);
         assertNear(initial.rowHandleRight, initial.tableRight + 14, `${label}: row handle table edge`);
-        assert(initial.rowHandleRight <= initial.viewportRight + 1.5, `${label}: row handle is clipped at safe edge`);
+        assert(initial.rowHandleRight <= initial.viewportRight + 1.5, `${label}: row handle is clipped at editor edge`);
         assert(initial.rowHandleLeft < initial.tableRight, `${label}: row handle no longer straddles table`);
-        assertNear(scrolled.thirdRight, scrolled.viewportRight, `${label}: later column reaches safe edge`);
+        assertNear(scrolled.thirdRight, scrolled.viewportRight, `${label}: later column reaches editor edge`);
         assert(scrolled.tableRight > scrolled.viewportRight, `${label}: leading table content did not leave`);
         assertNear(end.tableLeft, end.scrollbarLeft, `${label}: table and scrollbar reading-rail end`);
         assertNear(end.addRight, end.tableLeft, `${label}: add-column rail follows table edge`);
