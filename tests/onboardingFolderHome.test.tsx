@@ -81,7 +81,21 @@ describe("project folder home", () => {
     expect(container.querySelector(".onboarding-folder-compact-action")).toBeNull();
     const panel = container.querySelector(".onboarding-recent-projects");
     expect(panel?.lastElementChild?.classList.contains("onboarding-project-add")).toBe(true);
-    expect(container.querySelector(".onboarding-project-add-action .lucide-folder-plus")).not.toBeNull();
+    const projectFolder = container.querySelector(
+      ".onboarding-project-row .lucide-folder",
+    );
+    const addFolder = container.querySelector(
+      ".onboarding-project-folder-add-icon .lucide-folder",
+    );
+    expect(projectFolder).not.toBeNull();
+    expect(addFolder).not.toBeNull();
+    expect(addFolder?.getAttribute("width")).toBe(projectFolder?.getAttribute("width"));
+    expect(addFolder?.getAttribute("height")).toBe(projectFolder?.getAttribute("height"));
+    expect(addFolder?.getAttribute("stroke-width"))
+      .toBe(projectFolder?.getAttribute("stroke-width"));
+    expect(container.querySelector(
+      ".onboarding-project-folder-add-icon .lucide-plus",
+    )).not.toBeNull();
     expect(container.querySelector(".onboarding-project-add-action")?.textContent).toContain("Open local folder");
     expect(container.querySelector(".desktop-menu-item-label")?.textContent).toBe("Notes");
     expect(container.querySelector(".desktop-menu-item-detail")?.textContent).toBe("~/Desktop");

@@ -302,6 +302,24 @@
   color: var(--po-text-subtle);
 }
 
+.onboarding-project-folder-add-icon {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.onboarding-project-folder-add-icon > .lucide-folder {
+  position: absolute;
+  inset: 0;
+}
+
+.onboarding-project-folder-add-icon > .lucide-plus {
+  position: absolute;
+  top: 5px;
+  left: 4px;
+}
+
 .onboarding-shell.dragging .onboarding-recent-projects {
   border-color: var(--po-border-strong);
 }

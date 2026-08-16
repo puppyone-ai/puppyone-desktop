@@ -1,6 +1,6 @@
 import type { Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
-import { AlertTriangle, Folder, FolderOpen, FolderPlus, Unlink } from "lucide-react";
+import { AlertTriangle, Folder, FolderOpen, Plus, Unlink } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -280,7 +280,7 @@ export function MinimalOnboarding({
                   role="button"
                   icon={openingPath === "__new__"
                     ? <InlineLoading label={null} size="xs" tone="neutral" />
-                    : <FolderPlus size={14} strokeWidth={1.85} />}
+                    : <ProjectFolderAddIcon />}
                   label={t("onboarding.action.openLocalFolder")}
                   disabled={busy}
                   aria-busy={openingPath === "__new__" || undefined}
@@ -295,6 +295,15 @@ export function MinimalOnboarding({
       </section>
       {cornerSlot}
     </main>
+  );
+}
+
+function ProjectFolderAddIcon() {
+  return (
+    <span className="onboarding-project-folder-add-icon" aria-hidden="true">
+      <Folder size={14} strokeWidth={1.85} />
+      <Plus size={6} strokeWidth={2} />
+    </span>
   );
 }
 
