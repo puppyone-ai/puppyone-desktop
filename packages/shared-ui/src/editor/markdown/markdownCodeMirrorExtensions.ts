@@ -124,7 +124,7 @@ export function markdownLivePreviewCoreExtension(
   return [
     keymap.of([...markdownEditingKeymap]),
     markdownHiddenMarkerSelectionNormalizer,
-    markdownLivePreviewFocusExtension,
+    markdownLivePreviewFocusExtension(),
     markdownInputCompositionExtension,
     markdownComposingBlockLineField,
     markdownRevealedSourceField,
