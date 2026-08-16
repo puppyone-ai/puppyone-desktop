@@ -36,5 +36,8 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Test MDI focus continuity in Chromium
+        run: xvfb-run --auto-servernum npm run smoke:markdown-pane-focus-continuity
+
       - name: Build
         run: npm run build

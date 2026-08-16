@@ -636,6 +636,139 @@ describe("DesktopEditorSplitView", () => {
     )).toEqual([1, 2, 3]);
   });
 
+  it("keeps horizontal Markdown pane scroll and runtimes stable across repeated focus routing", async () => {
+    const paths = ["left.md", "right.md"] as const;
+    const markdown = Array.from({ length: 80 }, (_, index) => [
+      `## Section ${index + 1}`,
+      "",
+      `Paragraph ${index + 1} contains **projected source** for focus continuity coverage.`,
+      "",
+    ]).flat().join("\n");
+    let group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput(paths[0]));
+    group = openEditor(group, createEditorInput(paths[1]));
+    let initialLayout = splitEditorPane(
+      createEditorPaneLayout(paths[0]),
+      "editor-pane-1",
+      "horizontal",
+    );
+    initialLayout = assignEditorToActivePane(initialLayout, paths[1]);
+    const tree: DataNode[] = paths.map((path) => ({
+      id: path,
+      name: path,
+      path,
+      type: "markdown",
+      mimeType: "text/markdown",
+      source: "local",
+    }));
+    const readFile = vi.fn(async (path: string) => ({
+      path,
+      name: path,
+      type: "markdown" as const,
+      mimeType: "text/markdown",
+      content: `${markdown}\n\n${path}`,
+      version: `version:${path}`,
+    }));
+    const dataPort = {
+      listChildren: async () => tree,
+      readFile,
+      documentPersistence: {
+        kind: "local-fs" as const,
+        storageIdentity: "test:horizontal-markdown-focus",
+        persist: async (request: { baseVersion?: string | null; path: string }) => ({
+          ok: true as const,
+          version: request.baseVersion ?? `version:${request.path}`,
+        }),
+      },
+    };
+    const state = { ...emptyWorkspaceState(), tree };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    function Harness() {
+      const [layout, setLayout] = React.useState(initialLayout);
+      return withTestLocalization(
+        <DesktopEditorSplitView
+          aiEditRequest={null}
+          dataPort={dataPort}
+          editorGroup={group}
+          editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+          fileIconTheme="default"
+          layout={layout}
+          state={state}
+          workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
+          onClosePane={vi.fn()}
+          onFocusPane={(paneId) => setLayout((current) => activateEditorPane(current, paneId))}
+          onMovePane={vi.fn()}
+          onOpenAtPaneEdge={vi.fn()}
+          onResizeSplit={vi.fn()}
+          onSplitPane={vi.fn()}
+        />,
+      );
+    }
+
+    await act(async () => root?.render(<Harness />));
+    await waitForCondition(() => container.querySelectorAll(".cm-editor").length === 2);
+    const panes = Array.from(container.querySelectorAll<HTMLElement>(".desktop-editor-pane"));
+    const views = panes.map((pane) => (
+      EditorView.findFromDOM(pane.querySelector<HTMLElement>(".cm-editor")!)
+    ));
+    const leftSnapshot = vi.spyOn(views[0]!, "scrollSnapshot");
+    const rightSnapshot = vi.spyOn(views[1]!, "scrollSnapshot");
+
+    act(() => {
+      views[0]!.dispatch({ selection: { anchor: 120 } });
+      views[1]!.dispatch({ selection: { anchor: 240 } });
+    });
+    // happy-dom does not start with a native BrowserWindow focus owner. Prime
+    // both CodeMirror observers once, then measure only deterministic MDI
+    // transitions. The Chromium regression below exercises the cold boundary.
+    await focusEditorView(views[1]!);
+    await focusEditorView(views[0]!);
+    leftSnapshot.mockClear();
+    rightSnapshot.mockClear();
+    act(() => {
+      views[0]!.scrollDOM.scrollTop = 640;
+      views[1]!.scrollDOM.scrollTop = 960;
+    });
+    const surfaceRender = vi.spyOn(DocumentSurfaceHost.prototype, "render");
+    await act(async () => new Promise((resolve) => window.setTimeout(resolve, 40)));
+    surfaceRender.mockClear();
+
+    for (let cycle = 0; cycle < 6; cycle += 1) {
+      const beforeRightFocus = [leftSnapshot.mock.calls.length, rightSnapshot.mock.calls.length];
+      await focusEditorView(views[1]!);
+      expect([
+        leftSnapshot.mock.calls.length - beforeRightFocus[0]!,
+        rightSnapshot.mock.calls.length - beforeRightFocus[1]!,
+      ], `right focus boundary ${cycle + 1}`).toEqual([1, 1]);
+      expect(container.querySelector('[data-editor-pane-id="editor-pane-2"]')?.dataset.active)
+        .toBe("true");
+      expect(views[0]!.scrollDOM.scrollTop).toBe(640);
+
+      const beforeLeftFocus = [leftSnapshot.mock.calls.length, rightSnapshot.mock.calls.length];
+      await focusEditorView(views[0]!);
+      expect([
+        leftSnapshot.mock.calls.length - beforeLeftFocus[0]!,
+        rightSnapshot.mock.calls.length - beforeLeftFocus[1]!,
+      ], `left focus boundary ${cycle + 1}`).toEqual([1, 1]);
+      expect(container.querySelector('[data-editor-pane-id="editor-pane-1"]')?.dataset.active)
+        .toBe("true");
+      expect(views[1]!.scrollDOM.scrollTop).toBe(960);
+    }
+
+    expect([leftSnapshot.mock.calls.length, rightSnapshot.mock.calls.length])
+      .toEqual([12, 12]);
+    expect(surfaceRender).not.toHaveBeenCalled();
+    expect(readFile).toHaveBeenCalledTimes(2);
+    expect(views.map((view) => view.state.selection.main.anchor)).toEqual([120, 240]);
+    expect(Array.from(container.querySelectorAll<HTMLElement>(".desktop-editor-pane")))
+      .toEqual(panes);
+    expect(Array.from(container.querySelectorAll<HTMLElement>(".cm-editor")).map(
+      (element) => EditorView.findFromDOM(element),
+    )).toEqual(views);
+  });
+
   it("keeps three CodeMirror focus and selection states isolated across pane activation", async () => {
     const { group, layout } = createThreePaneWorkspace("txt");
     const state = {
@@ -808,6 +941,13 @@ async function waitForCondition(condition: () => boolean, attempts = 200) {
     await act(async () => new Promise((resolve) => window.setTimeout(resolve, 5)));
   }
   throw new Error("Timed out waiting for split editor state.");
+}
+
+async function focusEditorView(view: EditorView) {
+  await act(async () => {
+    view.focus();
+    await new Promise((resolve) => window.setTimeout(resolve, 20));
+  });
 }
 
 function emptyWorkspaceState(): DataWorkspaceState {
