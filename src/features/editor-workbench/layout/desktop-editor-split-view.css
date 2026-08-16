@@ -281,26 +281,25 @@
 .desktop-editor-drop-preview {
   position: absolute;
   z-index: 10;
-  border: 1px solid color-mix(in srgb, var(--po-accent) 58%, transparent);
+  border: 0;
   background: color-mix(in srgb, var(--po-accent) 13%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 18%, transparent);
   pointer-events: none;
 }
 
 .desktop-editor-drop-preview[data-edge="left"] {
-  inset: 4px 50% 4px 4px;
+  inset: 0 50% 0 0;
 }
 
 .desktop-editor-drop-preview[data-edge="right"] {
-  inset: 4px 4px 4px 50%;
+  inset: 0 0 0 50%;
 }
 
 .desktop-editor-drop-preview[data-edge="top"] {
-  inset: 4px 4px 50%;
+  inset: 0 0 50%;
 }
 
 .desktop-editor-drop-preview[data-edge="bottom"] {
-  inset: 50% 4px 4px;
+  inset: 50% 0 0;
 }
 
 .desktop-editor-splitter {

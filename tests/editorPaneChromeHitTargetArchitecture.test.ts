@@ -48,6 +48,22 @@ describe("editor pane chrome hit-target architecture", () => {
     expect(splitStyles).toContain(".desktop-editor-pane-handle:active)::after");
     expect(splitStyles).not.toContain("@keyframes desktop-editor-pane-handle-press");
   });
+
+  it("renders edge drop intent as an edge-to-edge fill without decorative framing", () => {
+    const previewRule = readCssBlock(splitStyles, ".desktop-editor-drop-preview");
+    const leftRule = readCssBlock(splitStyles, '.desktop-editor-drop-preview[data-edge="left"]');
+    const rightRule = readCssBlock(splitStyles, '.desktop-editor-drop-preview[data-edge="right"]');
+    const topRule = readCssBlock(splitStyles, '.desktop-editor-drop-preview[data-edge="top"]');
+    const bottomRule = readCssBlock(splitStyles, '.desktop-editor-drop-preview[data-edge="bottom"]');
+
+    expect(previewRule).toContain("border: 0;");
+    expect(previewRule).toContain("background: color-mix(in srgb, var(--po-accent) 13%, transparent);");
+    expect(previewRule).not.toContain("box-shadow:");
+    expect(leftRule).toContain("inset: 0 50% 0 0;");
+    expect(rightRule).toContain("inset: 0 0 0 50%;");
+    expect(topRule).toContain("inset: 0 0 50%;");
+    expect(bottomRule).toContain("inset: 50% 0 0;");
+  });
 });
 
 function source(relativePath: string) {
