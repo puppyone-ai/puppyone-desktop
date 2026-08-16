@@ -66,18 +66,19 @@
 }
 
 /* Pane chrome has one reveal source: the leading-third hit zone maintained by
- * EditorPaneShell. Hover is neutral; an explicit menu/press/drag interaction
- * uses the accent inset for the full lifetime of that interaction. Active
- * editor state never creates persistent decoration. */
+ * EditorPaneShell. Hover is neutral; only an active press/drag uses the accent
+ * frame. An open menu and active editor state never create persistent accent
+ * decoration. */
 .desktop-editor-split-view:not([data-pane-count="1"]) .desktop-editor-pane::after {
   position: absolute;
   z-index: 11;
   inset: 0;
-  box-shadow: inset 0 0 0 1px var(--po-divider);
+  box-sizing: border-box;
+  border: 1px solid var(--po-divider);
   content: "";
   opacity: 0;
   pointer-events: none;
-  transition: box-shadow 90ms ease, opacity 90ms ease;
+  transition: border-color 90ms ease, opacity 90ms ease;
 }
 
 .desktop-editor-split-view:not([data-pane-count="1"])
@@ -86,13 +87,11 @@
 }
 
 .desktop-editor-split-view:not([data-pane-count="1"])
-  .desktop-editor-pane[data-pane-menu-open]::after,
-.desktop-editor-split-view:not([data-pane-count="1"])
   .desktop-editor-pane[data-move-source]::after,
 .desktop-editor-split-view:not([data-pane-count="1"])
   .desktop-editor-pane:has(> .desktop-editor-pane-handle-shell > .desktop-editor-pane-handle:active)::after {
   opacity: 1;
-  box-shadow: inset 0 0 0 1px color-mix(
+  border-color: color-mix(
     in srgb,
     var(--po-pane-resizer-active-color) 76%,
     transparent

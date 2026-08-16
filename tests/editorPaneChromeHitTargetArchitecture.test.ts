@@ -41,7 +41,7 @@ describe("editor pane chrome hit-target architecture", () => {
     expect(paneChromeSource).not.toContain("event.detail === 0");
   });
 
-  it("keeps the accent inset for the complete menu, press, or drag interaction", () => {
+  it("keeps a complete inside frame while limiting accent to press or drag", () => {
     const paneFrameRule = readCssBlock(
       splitStyles,
       '.desktop-editor-split-view:not([data-pane-count="1"]) .desktop-editor-pane::after',
@@ -49,11 +49,13 @@ describe("editor pane chrome hit-target architecture", () => {
     const paneContentRule = readCssBlock(splitStyles, ".desktop-editor-pane-content");
 
     expect(paneShellSource).toContain('data-pane-menu-open={actionsOpen ? "true" : undefined}');
-    expect(splitStyles).toContain(".desktop-editor-pane[data-pane-menu-open]::after");
     expect(splitStyles).toContain(".desktop-editor-pane[data-move-source]::after");
     expect(splitStyles).toContain(".desktop-editor-pane-handle:active)::after");
+    expect(splitStyles).not.toContain(".desktop-editor-pane[data-pane-menu-open]::after");
     expect(paneFrameRule).toContain("inset: 0;");
-    expect(paneFrameRule).toContain("box-shadow: inset 0 0 0 1px");
+    expect(paneFrameRule).toContain("box-sizing: border-box;");
+    expect(paneFrameRule).toContain("border: 1px solid var(--po-divider);");
+    expect(paneFrameRule).not.toContain("box-shadow:");
     expect(paneContentRule).toContain("z-index: 0;");
     expect(paneContentRule).toContain("isolation: isolate;");
     expect(splitStyles).not.toContain("@keyframes desktop-editor-pane-handle-press");
