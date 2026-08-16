@@ -1,4 +1,7 @@
 import path from "node:path";
+import { requireSafeExternalUrl } from "./external-navigation-service.mjs";
+
+export { requireSafeExternalUrl } from "./external-navigation-service.mjs";
 
 export function requireNonEmptyString(value, message) {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -12,38 +15,6 @@ export function requireCloudApiPath(value) {
     throw new Error("Cloud API path must be a root-relative path.");
   }
   return value;
-}
-
-export function requireSafeExternalUrl(value) {
-  if (
-    typeof value !== "string"
-    || /[\u0000-\u001f\u007f]/.test(value)
-    || /%(?:0[0-9a-f]|1[0-9a-f]|7f)/i.test(value)
-  ) {
-    throw new Error("External URL contains control characters.");
-  }
-  const rawUrl = requireNonEmptyString(value, "External URL is required.");
-  let url;
-  try {
-    url = new URL(rawUrl);
-  } catch {
-    throw new Error("External URL is invalid.");
-  }
-
-  if (!["http:", "https:", "mailto:"].includes(url.protocol)) {
-    throw new Error("External URL protocol is not allowed.");
-  }
-  if (
-    (url.protocol === "http:" || url.protocol === "https:")
-    && (!url.hostname || url.username || url.password)
-  ) {
-    throw new Error("External web URL host or credentials are not allowed.");
-  }
-  if (url.protocol === "mailto:" && !url.pathname) {
-    throw new Error("External mail URL must include a recipient.");
-  }
-
-  return url.toString();
 }
 
 export function classifyWindowNavigation(targetValue, applicationValue) {
@@ -80,18 +51,11 @@ export function classifyWindowNavigation(targetValue, applicationValue) {
 export function installWindowNavigationSecurity({
   webContents,
   applicationUrl,
-  shell,
-  logger = console,
+  externalNavigation,
 }) {
-  const openExternal = (url) => {
-    try {
-      Promise.resolve(shell.openExternal(url)).catch((error) => {
-        logger.warn("Unable to open external navigation target:", error);
-      });
-    } catch (error) {
-      logger.warn("Unable to open external navigation target:", error);
-    }
-  };
+  if (!externalNavigation || typeof externalNavigation.openDetached !== "function") {
+    throw new TypeError("Window navigation security requires the external navigation service.");
+  }
 
   const handleTopLevelNavigation = (event, targetUrl) => {
     const decision = classifyWindowNavigation(targetUrl, applicationUrl);
@@ -99,7 +63,7 @@ export function installWindowNavigationSecurity({
 
     event.preventDefault();
     if (decision.action === "open-external") {
-      openExternal(decision.url);
+      externalNavigation.openDetached(decision.url);
     }
   };
 
@@ -115,7 +79,7 @@ export function installWindowNavigationSecurity({
   webContents.setWindowOpenHandler(({ url }) => {
     const decision = classifyWindowNavigation(url, applicationUrl);
     if (decision.action === "open-external") {
-      openExternal(decision.url);
+      externalNavigation.openDetached(decision.url);
     }
     return { action: "deny" };
   });

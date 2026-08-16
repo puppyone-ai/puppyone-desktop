@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import {
   classifyWindowNavigation,
@@ -6,6 +9,7 @@ import {
   requireSafeExternalUrl,
   shouldBlockEmbeddedFrameNavigation,
 } from "../electron/main/security.mjs";
+import { createExternalNavigationService } from "../electron/main/external-navigation-service.mjs";
 
 describe("desktop window navigation security", () => {
   it("allows only the packaged application document to navigate in place", () => {
@@ -52,9 +56,10 @@ describe("desktop window navigation security", () => {
       openExternal: vi.fn(() => Promise.resolve()),
     };
     const logger = { warn: vi.fn() };
+    const externalNavigation = createExternalNavigationService({ shell, logger });
     const applicationUrl = "file:///app/dist/index.html";
 
-    installWindowNavigationSecurity({ webContents, applicationUrl, shell, logger });
+    installWindowNavigationSecurity({ webContents, applicationUrl, externalNavigation });
 
     const applicationEvent = { preventDefault: vi.fn() };
     listeners.get("will-navigate")(applicationEvent, `${applicationUrl}#files`);
@@ -96,6 +101,35 @@ describe("desktop window navigation security", () => {
     };
     listeners.get("will-frame-navigate")(embeddedWebEvent);
     expect(embeddedWebEvent.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("keeps every external-navigation caller behind one protocol authority", async () => {
+    const shell = { openExternal: vi.fn(async () => undefined) };
+    const logger = { warn: vi.fn() };
+    const navigation = createExternalNavigationService({ shell, logger });
+
+    await expect(navigation.open("https://example.com/docs")).resolves.toEqual({
+      ok: true,
+      url: "https://example.com/docs",
+    });
+    expect(navigation.openDetached("mailto:docs@example.com")).toBe(true);
+    expect(navigation.openDetached("javascript:alert(1)")).toBe(false);
+    expect(navigation.openDetached("file:///tmp/secret")).toBe(false);
+    expect(shell.openExternal).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the Electron shell opener private to the external navigation service", () => {
+    const electronRoot = fileURLToPath(new URL("../electron", import.meta.url));
+    const authorityPath = path.join(electronRoot, "main", "external-navigation-service.mjs");
+    const bypasses = listJavaScriptFiles(electronRoot)
+      .filter((filePath) => filePath !== authorityPath)
+      .flatMap((filePath) => fs.readFileSync(filePath, "utf8")
+        .split("\n")
+        .map((line, index) => ({ filePath, line, lineNumber: index + 1 })))
+      .filter(({ line }) => /\bshell\.openExternal\s*\(/.test(line))
+      .map(({ filePath, lineNumber }) => `${path.relative(electronRoot, filePath)}:${lineNumber}`);
+
+    expect(bypasses).toEqual([]);
   });
 
   it("prevents an embedded frame from ever becoming same-origin with the shell", () => {
@@ -151,3 +185,11 @@ describe("desktop window navigation security", () => {
     }
   });
 });
+
+function listJavaScriptFiles(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return listJavaScriptFiles(entryPath);
+    return /\.(?:cjs|mjs)$/.test(entry.name) ? [entryPath] : [];
+  });
+}

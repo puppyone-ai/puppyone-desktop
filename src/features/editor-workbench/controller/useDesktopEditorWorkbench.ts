@@ -48,6 +48,11 @@ export type DesktopEditorWorkbenchController = Readonly<{
     direction: EditorSplitDirection,
     placement: NonNullable<EditorPaneSplitOptions["placement"]>,
   ) => void;
+  splitPane: (
+    paneId: string,
+    direction: EditorSplitDirection,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
+  ) => void;
   activate: (editorId: string) => void;
   focusPane: (paneId: string) => void;
   movePane: (
@@ -181,6 +186,20 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
     });
   }, [updateWorkbench]);
 
+  const splitPane = useCallback((
+    paneId: string,
+    direction: EditorSplitDirection,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
+  ) => {
+    updateWorkbench((current) => {
+      const layout = splitEditorPane(current.layout, paneId, direction, {
+        editorId: null,
+        placement,
+      });
+      return layout === current.layout ? current : createEditorWorkbenchState(current.group, layout);
+    });
+  }, [updateWorkbench]);
+
   const movePane = useCallback((
     sourcePaneId: string,
     targetPaneId: string,
@@ -258,6 +277,7 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
     activePaneId: activePane.id,
     open,
     openAtPaneEdge,
+    splitPane,
     activate,
     focusPane,
     movePane,
@@ -279,6 +299,7 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
     movePane,
     open,
     openAtPaneEdge,
+    splitPane,
     rebaseResource,
     resizeSplit,
     workbench.group,

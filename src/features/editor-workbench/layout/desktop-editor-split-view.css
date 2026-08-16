@@ -42,9 +42,20 @@
   overflow: visible;
 }
 
+.desktop-editor-pane-slot,
+.desktop-editor-pane-host {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .desktop-editor-pane {
   position: relative;
   display: flex;
+  box-sizing: border-box;
   width: 100%;
   height: 100%;
   min-width: 0;
@@ -52,7 +63,31 @@
   flex: 1 1 0;
   flex-direction: column;
   overflow: hidden;
+  border: 1px solid transparent;
   background: var(--po-canvas);
+  transition: border-color 90ms ease;
+}
+
+/* Pane chrome has one reveal source: the leading-third hit zone maintained by
+ * EditorPaneShell. Hover is neutral; only an active press/drag uses the accent
+ * frame. An open menu and active editor state never create persistent accent
+ * decoration. The transparent border belongs to the pane's own border box,
+ * so no descendant or clipping ancestor can cover one of its four edges. */
+
+.desktop-editor-split-view:not([data-pane-count="1"])
+  .desktop-editor-pane[data-handle-hot]:not([data-move-source]) {
+  border-color: var(--po-divider);
+}
+
+.desktop-editor-split-view:not([data-pane-count="1"])
+  .desktop-editor-pane[data-move-source],
+.desktop-editor-split-view:not([data-pane-count="1"])
+  .desktop-editor-pane:has(> .desktop-editor-pane-handle-shell > .desktop-editor-pane-handle:active) {
+  border-color: color-mix(
+    in srgb,
+    var(--po-pane-resizer-active-color) 76%,
+    transparent
+  );
 }
 
 .desktop-editor-pane-handle-shell {
@@ -67,9 +102,13 @@
   inset-inline-start: 50%;
   transform: translateX(-50%);
   opacity: 0;
+  pointer-events: none;
   transition: opacity 90ms ease;
 }
 
+/* Visual reveal and pointer hit-testing are deliberately independent. The
+ * shell never owns a strip of editor input, while the 27×13 button remains a
+ * stable target so the first press/drag cannot fall through to the Viewer. */
 .desktop-editor-pane[data-handle-hot] > .desktop-editor-pane-handle-shell,
 .desktop-editor-pane-handle-shell:hover,
 .desktop-editor-pane-handle-shell:focus-within,
@@ -91,6 +130,7 @@
   color: color-mix(in srgb, var(--po-text-muted) 68%, transparent);
   outline: 0;
   cursor: grab;
+  pointer-events: auto;
   touch-action: none;
 }
 
@@ -158,45 +198,83 @@
 }
 
 .desktop-editor-pane-menu {
-  position: absolute;
+  --desktop-editor-pane-menu-action-size: var(--desktop-titlebar-control-height);
+
+  position: fixed;
+  z-index: var(--po-overlay-z-menu, 80);
   box-sizing: border-box;
-  width: max-content;
-  min-width: 136px;
-  inset-block-start: 17px;
-  inset-inline-start: 50%;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 4px;
-  transform: translateX(-50%);
-  border: 1px solid var(--po-divider);
-  border-radius: 7px;
-  background: var(--po-panel);
-  box-shadow: 0 8px 24px color-mix(in srgb, black 16%, transparent);
 }
 
-.desktop-editor-pane-menu-action {
-  appearance: none;
-  display: block;
-  width: 100%;
-  padding: 5px 9px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--po-text);
-  font: inherit;
-  font-size: var(--po-font-size-chrome, 13px);
-  text-align: start;
+.desktop-editor-pane-menu-primary-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
-.desktop-editor-pane-menu-action:hover,
-.desktop-editor-pane-menu-action:focus-visible {
-  background: var(--po-hover);
-  outline: 0;
+.desktop-editor-pane-menu-primary-action.desktop-menu-icon-button {
+  width: var(--desktop-editor-pane-menu-action-size);
+  height: var(--desktop-editor-pane-menu-action-size);
+  border-radius: var(--desktop-toolbar-action-radius);
+  color: var(--desktop-titlebar-text-muted, var(--po-text-muted));
+}
+
+.desktop-editor-pane-menu-primary-action.desktop-menu-icon-button:hover,
+.desktop-editor-pane-menu-primary-action.desktop-menu-icon-button:focus-visible {
+  background: var(--desktop-titlebar-hover, var(--po-hover));
+  color: var(--desktop-titlebar-text, var(--po-text));
+}
+
+.desktop-editor-pane-menu-end-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-inline-start: auto;
+}
+
+.desktop-editor-pane-menu-action-divider {
+  display: grid;
+  width: var(--desktop-editor-pane-menu-action-size);
+  height: var(--desktop-editor-pane-menu-action-size);
+  flex: 0 0 var(--desktop-editor-pane-menu-action-size);
+  place-items: center;
+  pointer-events: none;
+}
+
+.desktop-editor-pane-menu-action-divider::before {
+  width: 1px;
+  height: 12px;
+  background: var(--po-divider);
+  content: "";
+}
+
+.desktop-editor-pane-menu-close-action.desktop-menu-icon-button {
+  color: var(--po-danger);
+}
+
+.desktop-editor-pane-menu-close-action.desktop-menu-icon-button:hover,
+.desktop-editor-pane-menu-close-action.desktop-menu-icon-button:focus-visible {
+  background: color-mix(in srgb, var(--po-danger) 10%, transparent);
+  color: var(--po-danger);
+}
+
+.desktop-editor-pane-menu-secondary-actions {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--po-divider);
 }
 
 .desktop-editor-pane-content {
+  position: relative;
+  z-index: 0;
   display: flex;
   flex: 1;
   min-width: 0;
   min-height: 0;
+  isolation: isolate;
   overflow: hidden;
 }
 
@@ -207,26 +285,25 @@
 .desktop-editor-drop-preview {
   position: absolute;
   z-index: 10;
-  border: 1px solid color-mix(in srgb, var(--po-accent) 58%, transparent);
+  border: 0;
   background: color-mix(in srgb, var(--po-accent) 13%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, white 18%, transparent);
   pointer-events: none;
 }
 
 .desktop-editor-drop-preview[data-edge="left"] {
-  inset: 4px 50% 4px 4px;
+  inset: 0 50% 0 0;
 }
 
 .desktop-editor-drop-preview[data-edge="right"] {
-  inset: 4px 4px 4px 50%;
+  inset: 0 0 0 50%;
 }
 
 .desktop-editor-drop-preview[data-edge="top"] {
-  inset: 4px 4px 50%;
+  inset: 0 0 50%;
 }
 
 .desktop-editor-drop-preview[data-edge="bottom"] {
-  inset: 50% 4px 4px;
+  inset: 50% 0 0;
 }
 
 .desktop-editor-splitter {
@@ -286,11 +363,6 @@
   height: 1px;
 }
 
-.desktop-editor-split[data-touches-inline-start="true"]
-  > .desktop-editor-splitter[data-direction="vertical"]::after {
-  inset-inline-start: calc(-1 * var(--desktop-editor-sidebar-gutter-size, 0px));
-}
-
 .desktop-editor-splitter:hover::after,
 .desktop-editor-splitter:focus-visible::after {
   background: var(--po-pane-resizer-hover-color);
@@ -302,7 +374,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .desktop-editor-pane,
   .desktop-editor-pane-handle-shell {
     transition: none;
   }
+
 }

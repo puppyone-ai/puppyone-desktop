@@ -18,7 +18,7 @@ export function createCloudAuthService({
   getWindows,
   revealWindow,
   secureStorage,
-  openExternal,
+  externalNavigation,
   startCallbackServer = startLoopbackCallbackServer,
   fetchImpl = globalThis.fetch,
   localCloudWebUrl = null,
@@ -30,8 +30,8 @@ export function createCloudAuthService({
   if (!providedCredentialStore && !secureStorage) {
     throw new TypeError("Cloud authentication secureStorage is required.");
   }
-  if (typeof openExternal !== "function") {
-    throw new TypeError("Cloud authentication openExternal is required.");
+  if (!externalNavigation || typeof externalNavigation.open !== "function") {
+    throw new TypeError("Cloud authentication requires the external navigation service.");
   }
   const credentialStore = providedCredentialStore ?? createCredentialStore({
     filePath: path.join(app.getPath("userData"), DEFAULT_SESSION_STATE_FILENAME),
@@ -153,7 +153,7 @@ export function createCloudAuthService({
         });
         callbackServer = null;
 
-        await openExternal(loginUrl);
+        await externalNavigation.open(loginUrl);
         return { ok: true };
       } catch (error) {
         await callbackServer?.close?.().catch(() => undefined);

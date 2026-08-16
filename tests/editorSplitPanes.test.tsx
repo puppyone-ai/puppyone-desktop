@@ -12,6 +12,7 @@ import {
   assignEditorToPane,
   createEditorInput,
   createEditorPaneLayout,
+  moveEditorPane,
   openEditor,
   serializeExplorerReferenceDrag,
   splitEditorPane,
@@ -23,6 +24,9 @@ import {
 import { DesktopEditorSplitView } from "../src/features/editor-workbench/layout/DesktopEditorSplitView";
 import { DocumentSurfaceHost } from "../packages/shared-ui/src/editor/host/DocumentSurfaceHost";
 import { withTestLocalization } from "./testLocalization";
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root | null = null;
 
@@ -36,7 +40,8 @@ afterEach(() => {
 
 describe("DesktopEditorSplitView", () => {
   it("keeps the pane actions handle when only one pane exists", () => {
-    const container = renderSplitView(EMPTY_EDITOR_GROUP, createEditorPaneLayout());
+    const group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("a.md"));
+    const container = renderSplitView(group, createEditorPaneLayout("a.md"));
     const pane = container.querySelector<HTMLElement>(".desktop-editor-pane")!;
     const handle = container.querySelector<HTMLButtonElement>(".desktop-editor-pane-handle")!;
     pane.getBoundingClientRect = () => new DOMRect(0, 0, 800, 600);
@@ -53,7 +58,10 @@ describe("DesktopEditorSplitView", () => {
 
     clickPaneHandle(handle, 1);
     expect(handle.getAttribute("aria-expanded")).toBe("true");
-    expect(container.querySelector('[role="menu"]')).not.toBeNull();
+    const menu = document.querySelector('[role="menu"]');
+    expect(menu).not.toBeNull();
+    expect(menu?.closest("#desktop-overlay-root")).not.toBeNull();
+    expect(pane.contains(menu)).toBe(false);
   });
 
   it("opens one Explorer file at the nearest pane edge on drop", () => {
@@ -117,7 +125,7 @@ describe("DesktopEditorSplitView", () => {
     expect(container.querySelector(".desktop-editor-drop-preview")).toBeNull();
   });
 
-  it("reveals the unframed grab dots when the pointer is in the top third of a pane", () => {
+  it("reveals pane chrome only when the pointer is in the top third of a pane", () => {
     const capturePanePreview = vi.fn(async () => null);
     window.puppyoneDesktop = {
       capturePanePreview,
@@ -155,14 +163,23 @@ describe("DesktopEditorSplitView", () => {
     clickPaneHandle(handle, 41);
     expect(handle.getAttribute("aria-expanded")).toBe("true");
     expect(pane.dataset.handleHot).toBe("true");
+    expect(pane.dataset.paneMenuOpen).toBe("true");
 
     act(() => pane.dispatchEvent(new PointerEvent("pointerleave", { bubbles: true })));
     expect(pane.dataset.handleHot).toBe("true");
+
+    clickPaneHandle(handle, 42);
+    expect(handle.getAttribute("aria-expanded")).toBe("false");
+    expect(pane.dataset.paneMenuOpen).toBeUndefined();
   });
 
   it("uses the grab handle only to move an existing pane", async () => {
     const onMovePane = vi.fn();
-    const capturePanePreview = vi.fn(async () => null);
+    const capturePanePreview = vi.fn(async () => ({
+      dataUrl: "data:image/png;base64,c25hcHNob3Q=",
+      width: 104,
+      height: 156,
+    }));
     window.puppyoneDesktop = {
       capturePanePreview,
     } as NonNullable<typeof window.puppyoneDesktop>;
@@ -183,35 +200,50 @@ describe("DesktopEditorSplitView", () => {
     handle.releasePointerCapture = (pointerId) => capturedPointers.delete(pointerId);
     vi.spyOn(document, "elementFromPoint").mockReturnValue(panes[1]!);
 
+    act(() => handle.dispatchEvent(new PointerEvent("pointerover", {
+      bubbles: true, clientX: 200, clientY: 5, pointerId: 7,
+    })));
+    expect(capturePanePreview).toHaveBeenCalledTimes(1);
+
     act(() => handle.dispatchEvent(new PointerEvent("pointerdown", {
       bubbles: true, button: 0, clientX: 200, clientY: 5, pointerId: 7,
     })));
     expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(false);
-    expect(capturePanePreview).not.toHaveBeenCalled();
+    expect(capturePanePreview).toHaveBeenCalledTimes(1);
+
+    act(() => handle.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true, clientX: 201, clientY: 6, pointerId: 7,
+    })));
+    expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(false);
+    expect(capturePanePreview).toHaveBeenCalledTimes(1);
 
     act(() => handle.dispatchEvent(new PointerEvent("pointermove", {
       bubbles: true, clientX: 203, clientY: 7, pointerId: 7,
     })));
-    expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(false);
-    expect(capturePanePreview).not.toHaveBeenCalled();
-
-    act(() => handle.dispatchEvent(new PointerEvent("pointermove", {
-      bubbles: true, clientX: 790, clientY: 300, pointerId: 7,
-    })));
     expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(true);
     expect(capturePanePreview).toHaveBeenCalledTimes(1);
-    expect(panes[1]!.dataset.dropTarget).toBe("right");
     const preview = document.body.querySelector<HTMLElement>(".desktop-editor-pane-move-preview");
     expect(preview).not.toBeNull();
-    expect(preview!.style.transform).toContain("790px");
+    expect(preview!.style.transform).toContain("203px");
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+    expect(preview!.dataset.ready).toBe("true");
+    expect(preview!.querySelector("img")?.getAttribute("src")).toContain("data:image/png");
     expect(panes[0]!.getAttribute("data-move-source")).toBe("true");
+
+    act(() => handle.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true, clientX: 790, clientY: 300, pointerId: 7,
+    })));
+    expect(preview!.style.transform).toContain("790px");
+    expect(panes[1]!.dataset.dropTarget).toBe("right");
 
     act(() => handle.dispatchEvent(new PointerEvent("pointerup", {
       bubbles: true, clientX: 790, clientY: 300, pointerId: 7,
+    })));
+    act(() => handle.dispatchEvent(new MouseEvent("click", {
+      bubbles: true, button: 0, detail: 0,
     })));
     expect(onMovePane).toHaveBeenCalledWith(
       "editor-pane-1",
@@ -222,9 +254,10 @@ describe("DesktopEditorSplitView", () => {
     expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(false);
     expect(document.body.querySelector(".desktop-editor-pane-move-preview")).toBeNull();
     expect(panes[0]!.getAttribute("data-move-source")).toBeNull();
+    expect(document.querySelector(".desktop-editor-pane-menu")).toBeNull();
   });
 
-  it("cancels pane movement when pointer capture is lost", () => {
+  it("cancels pane movement without swallowing the next menu press", () => {
     const onMovePane = vi.fn();
     let group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("a.md"));
     group = openEditor(group, createEditorInput("b.md"));
@@ -254,6 +287,10 @@ describe("DesktopEditorSplitView", () => {
     expect(document.body.querySelector(".desktop-editor-pane-move-preview")).toBeNull();
     expect(panes[1]!.dataset.dropTarget).toBeUndefined();
     expect(onMovePane).not.toHaveBeenCalled();
+
+    clickPaneHandle(handle, 18);
+    expect(handle.getAttribute("aria-expanded")).toBe("true");
+    expect(document.querySelector(".desktop-editor-pane-menu")).not.toBeNull();
   });
 
   it("keeps pane menus exclusive without entering global drag state on click", () => {
@@ -264,24 +301,26 @@ describe("DesktopEditorSplitView", () => {
     );
     expect(handles).toHaveLength(3);
     handles.forEach(installPointerCaptureStub);
+    expect(Array.from(container.querySelectorAll<HTMLElement>(".desktop-editor-pane"))
+      .every((pane) => pane.dataset.handleHot === undefined)).toBe(true);
 
     clickPaneHandle(handles[0]!, 11);
     expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(false);
     expect(handles.map((handle) => handle.getAttribute("aria-expanded"))).toEqual([
       "true", "false", "false",
     ]);
-    expect(container.querySelectorAll('[role="menu"]')).toHaveLength(1);
+    expect(document.querySelectorAll('[role="menu"]')).toHaveLength(1);
 
     clickPaneHandle(handles[0]!, 13);
     expect(handles.every((handle) => handle.getAttribute("aria-expanded") === "false")).toBe(true);
-    expect(container.querySelector('[role="menu"]')).toBeNull();
+    expect(document.querySelector('[role="menu"]')).toBeNull();
 
     clickPaneHandle(handles[2]!, 12);
     expect(document.body.classList.contains("desktop-editor-pane-dragging")).toBe(false);
     expect(handles.map((handle) => handle.getAttribute("aria-expanded"))).toEqual([
       "false", "false", "true",
     ]);
-    expect(container.querySelectorAll('[role="menu"]')).toHaveLength(1);
+    expect(document.querySelectorAll('[role="menu"]')).toHaveLength(1);
   });
 
   it("activates a non-focusable pane after pointer selection completes", () => {
@@ -352,6 +391,7 @@ describe("DesktopEditorSplitView", () => {
           onMovePane={vi.fn()}
           onOpenAtPaneEdge={vi.fn()}
           onResizeSplit={vi.fn()}
+          onSplitPane={vi.fn()}
         />,
       );
     }
@@ -375,6 +415,203 @@ describe("DesktopEditorSplitView", () => {
     expect(readCount(readFile, markdown)).toBe(1);
     expect(readCount(readFile, image)).toBe(0);
     expect(container.querySelectorAll(".desktop-editor-pane")).toHaveLength(3);
+  });
+
+  it("reorders two sibling panes without clearing or remounting their editor runtimes", async () => {
+    const paths = ["left.txt", "right.txt"] as const;
+    let group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput(paths[0]));
+    group = openEditor(group, createEditorInput(paths[1]));
+    let initialLayout = splitEditorPane(
+      createEditorPaneLayout(paths[0]),
+      "editor-pane-1",
+      "horizontal",
+    );
+    initialLayout = assignEditorToActivePane(initialLayout, paths[1]);
+    const tree: DataNode[] = paths.map((path) => ({
+      id: path,
+      name: path,
+      path,
+      type: "text",
+      source: "local",
+    }));
+    const readFile = vi.fn(async (path: string) => ({
+      path,
+      name: path,
+      type: "text" as const,
+      content: `stable content for ${path}`,
+      version: `version:${path}`,
+    }));
+    const state = { ...emptyWorkspaceState(), tree };
+    const dataPort = { listChildren: async () => tree, readFile };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    window.puppyoneDesktop = {
+      capturePanePreview: vi.fn(async () => null),
+    } as NonNullable<typeof window.puppyoneDesktop>;
+
+    function Harness() {
+      const [layout, setLayout] = React.useState(initialLayout);
+      return withTestLocalization(
+        <DesktopEditorSplitView
+          aiEditRequest={null}
+          dataPort={dataPort}
+          editorGroup={group}
+          editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+          fileIconTheme="default"
+          layout={layout}
+          state={state}
+          workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
+          onClosePane={vi.fn()}
+          onFocusPane={vi.fn()}
+          onMovePane={(sourcePaneId, targetPaneId, direction, placement) => {
+            setLayout((current) => moveEditorPane(
+              current,
+              sourcePaneId,
+              targetPaneId,
+              direction,
+              placement,
+            ));
+          }}
+          onOpenAtPaneEdge={vi.fn()}
+          onResizeSplit={vi.fn()}
+          onSplitPane={vi.fn()}
+        />,
+      );
+    }
+
+    await act(async () => root?.render(<Harness />));
+    await waitForCondition(() => container.querySelectorAll(".cm-editor").length === 2);
+    const originalViews = new Map(
+      Array.from(container.querySelectorAll<HTMLElement>(".desktop-editor-pane")).map((pane) => [
+        pane.dataset.editorPaneId!,
+        EditorView.findFromDOM(pane.querySelector<HTMLElement>(".cm-editor")!),
+      ]),
+    );
+    const panes = container.querySelectorAll<HTMLElement>(".desktop-editor-pane");
+    const leftPane = panes[0]!;
+    const rightPane = panes[1]!;
+    leftPane.getBoundingClientRect = () => new DOMRect(0, 0, 400, 600);
+    rightPane.getBoundingClientRect = () => new DOMRect(400, 0, 400, 600);
+    rightPane.querySelector<HTMLElement>(".desktop-editor-pane-content")!
+      .getBoundingClientRect = () => new DOMRect(400, 0, 400, 600);
+    const rightHandle = rightPane.querySelector<HTMLButtonElement>(
+      ".desktop-editor-pane-handle",
+    )!;
+    installPointerCaptureStub(rightHandle);
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(leftPane);
+
+    await act(async () => {
+      rightHandle.dispatchEvent(new PointerEvent("pointerdown", {
+        bubbles: true, button: 0, clientX: 600, clientY: 5, pointerId: 71,
+      }));
+      rightHandle.dispatchEvent(new PointerEvent("pointermove", {
+        bubbles: true, clientX: 10, clientY: 300, pointerId: 71,
+      }));
+      rightHandle.dispatchEvent(new PointerEvent("pointerup", {
+        bubbles: true, button: 0, clientX: 10, clientY: 300, pointerId: 71,
+      }));
+      await Promise.resolve();
+    });
+
+    expect(Array.from(container.querySelectorAll<HTMLElement>(".desktop-editor-pane")).map(
+      (pane) => pane.dataset.editorPaneId,
+    )).toEqual(["editor-pane-2", "editor-pane-1"]);
+    expect(readFile).toHaveBeenCalledTimes(2);
+    for (const [paneId, originalView] of originalViews) {
+      const pane = container.querySelector<HTMLElement>(`[data-editor-pane-id="${paneId}"]`)!;
+      expect(EditorView.findFromDOM(pane.querySelector<HTMLElement>(".cm-editor")!))
+        .toBe(originalView);
+    }
+  });
+
+  it("reparents panes across nested split axes without remounting any editor runtime", async () => {
+    const { group, layout: initialLayout } = createThreePaneWorkspace("txt");
+    const paths = ["a.txt", "b.txt", "c.txt"] as const;
+    const tree: DataNode[] = paths.map((path) => ({
+      id: path,
+      name: path,
+      path,
+      type: "text",
+      source: "local",
+    }));
+    const readFile = vi.fn(async (path: string) => ({
+      path,
+      name: path,
+      type: "text" as const,
+      content: `stable content for ${path}`,
+      version: `version:${path}`,
+    }));
+    const state = { ...emptyWorkspaceState(), tree };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    let updateLayout!: React.Dispatch<React.SetStateAction<EditorPaneLayoutState>>;
+
+    function Harness() {
+      const [layout, setLayout] = React.useState(initialLayout);
+      updateLayout = setLayout;
+      return withTestLocalization(
+        <DesktopEditorSplitView
+          aiEditRequest={null}
+          dataPort={{ listChildren: async () => tree, readFile }}
+          editorGroup={group}
+          editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+          fileIconTheme="default"
+          layout={layout}
+          state={state}
+          workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
+          onClosePane={vi.fn()}
+          onFocusPane={vi.fn()}
+          onMovePane={vi.fn()}
+          onOpenAtPaneEdge={vi.fn()}
+          onResizeSplit={vi.fn()}
+          onSplitPane={vi.fn()}
+        />,
+      );
+    }
+
+    await act(async () => root?.render(<Harness />));
+    await waitForCondition(() => container.querySelectorAll(".cm-editor").length === 3);
+    const initialReadCount = readFile.mock.calls.length;
+    const paneElements = new Map(
+      Array.from(container.querySelectorAll<HTMLElement>(".desktop-editor-pane")).map((pane) => [
+        pane.dataset.editorPaneId!,
+        pane,
+      ]),
+    );
+    const editorViews = new Map(
+      Array.from(paneElements, ([paneId, pane]) => [
+        paneId,
+        EditorView.findFromDOM(pane.querySelector<HTMLElement>(".cm-editor")!),
+      ]),
+    );
+
+    act(() => {
+      editorViews.get("editor-pane-1")!.dispatch({ selection: { anchor: 1 } });
+      editorViews.get("editor-pane-2")!.dispatch({ selection: { anchor: 2 } });
+      editorViews.get("editor-pane-3")!.dispatch({ selection: { anchor: 3 } });
+    });
+    await act(async () => updateLayout((current) => moveEditorPane(
+      current,
+      "editor-pane-1",
+      "editor-pane-3",
+      "vertical",
+      "second",
+    )));
+
+    expect(readFile).toHaveBeenCalledTimes(initialReadCount);
+    for (const [paneId, paneElement] of paneElements) {
+      const currentPane = container.querySelector<HTMLElement>(
+        `[data-editor-pane-id="${paneId}"]`,
+      )!;
+      expect(currentPane).toBe(paneElement);
+      expect(EditorView.findFromDOM(currentPane.querySelector<HTMLElement>(".cm-editor")!))
+        .toBe(editorViews.get(paneId));
+    }
+    expect(Array.from(editorViews.values()).map(
+      (view) => view.state.selection.main.anchor,
+    )).toEqual([1, 2, 3]);
   });
 
   it("keeps three CodeMirror focus and selection states isolated across pane activation", async () => {
@@ -420,6 +657,7 @@ describe("DesktopEditorSplitView", () => {
           onMovePane={vi.fn()}
           onOpenAtPaneEdge={vi.fn()}
           onResizeSplit={vi.fn()}
+          onSplitPane={vi.fn()}
         />,
       );
     }
@@ -468,7 +706,8 @@ function renderSplitView(
   layout: EditorPaneLayoutState,
   callbacks: {
     onMovePane?: React.ComponentProps<typeof DesktopEditorSplitView>["onMovePane"];
-    onOpenAtPaneEdge?: React.ComponentProps<typeof DesktopEditorSplitView>["onOpenAtPaneEdge"];
+  onOpenAtPaneEdge?: React.ComponentProps<typeof DesktopEditorSplitView>["onOpenAtPaneEdge"];
+  onSplitPane?: React.ComponentProps<typeof DesktopEditorSplitView>["onSplitPane"];
     onFocusPane?: React.ComponentProps<typeof DesktopEditorSplitView>["onFocusPane"];
   } = {},
 ) {
@@ -490,6 +729,7 @@ function renderSplitView(
       onMovePane={callbacks.onMovePane ?? vi.fn()}
       onOpenAtPaneEdge={callbacks.onOpenAtPaneEdge ?? vi.fn()}
       onResizeSplit={vi.fn()}
+      onSplitPane={callbacks.onSplitPane ?? vi.fn()}
     />,
   )));
   return container;
@@ -515,15 +755,15 @@ function installPointerCaptureStub(handle: HTMLElement) {
 }
 
 function clickPaneHandle(handle: HTMLElement, pointerId: number) {
-  act(() => {
-    handle.dispatchEvent(new PointerEvent("pointerdown", {
-      bubbles: true, button: 0, clientX: 100, clientY: 5, pointerId,
-    }));
-    handle.dispatchEvent(new PointerEvent("pointerup", {
-      bubbles: true, button: 0, clientX: 100, clientY: 5, pointerId,
-    }));
-    handle.dispatchEvent(new MouseEvent("click", { bubbles: true, button: 0 }));
-  });
+  act(() => handle.dispatchEvent(new PointerEvent("pointerdown", {
+    bubbles: true, button: 0, clientX: 100, clientY: 5, pointerId,
+  })));
+  act(() => handle.dispatchEvent(new PointerEvent("pointerup", {
+    bubbles: true, button: 0, clientX: 100, clientY: 5, pointerId,
+  })));
+  act(() => handle.dispatchEvent(new MouseEvent("click", {
+    bubbles: true, button: 0, detail: 0,
+  })));
 }
 
 function dragEvent(type: string, dataTransfer: DataTransfer, clientX: number, clientY: number) {

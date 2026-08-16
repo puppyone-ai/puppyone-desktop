@@ -5,6 +5,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   getAiEditFileForPath,
   getEditorPanes,
@@ -12,7 +13,9 @@ import {
   type DataPort,
   type DataWorkspaceState,
   type EditorGroupState,
+  type EditorFindCommand,
   type EditorInteractionPreferences,
+  type EditorPaneMenuContribution,
   type EditorPaneLayoutLeaf,
   type EditorPaneLayoutNode,
   type EditorPaneLayoutSplit,
@@ -36,6 +39,11 @@ import { createEditorNodeIndex, type EditorNodeIndex } from "../runtime/editorNo
 import { EditorPaneRuntime } from "../runtime/EditorPaneRuntime";
 import { EditorPaneShell } from "./EditorPaneShell";
 import { EditorSplitResizeHandle } from "./EditorSplitResizeHandle";
+import { EditorPaneHostSlot } from "./pane-host/EditorPaneHostSlot";
+import {
+  usePersistentEditorPaneHosts,
+  type PersistentEditorPaneHosts,
+} from "./pane-host/usePersistentEditorPaneHosts";
 
 export type DesktopEditorSplitViewProps = Readonly<{
   aiEditRequest: AiEditRequest | null;
@@ -48,6 +56,10 @@ export type DesktopEditorSplitViewProps = Readonly<{
   state: DataWorkspaceState;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   workspace: Workspace;
+  externalOpen?: Readonly<{
+    getAppName: (path: string) => string | null;
+    open: (path: string) => void | Promise<void>;
+  }>;
   onClosePane: (paneId: string) => void;
   onFocusPane: (paneId: string) => void;
   onResizeSplit: (splitId: string, ratio: number) => void;
@@ -64,6 +76,11 @@ export type DesktopEditorSplitViewProps = Readonly<{
     direction: EditorSplitDirection,
     placement: NonNullable<EditorPaneSplitOptions["placement"]>,
   ) => void;
+  onSplitPane: (
+    paneId: string,
+    direction: EditorSplitDirection,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
+  ) => void;
 }>;
 
 export function DesktopEditorSplitView({
@@ -77,11 +94,13 @@ export function DesktopEditorSplitView({
   state,
   viewerExtensionAdapter = null,
   workspace,
+  externalOpen,
   onClosePane,
   onFocusPane,
   onMovePane,
   onOpenAtPaneEdge,
   onResizeSplit,
+  onSplitPane,
 }: DesktopEditorSplitViewProps) {
   const editorById = useMemo(
     () => new Map(editorGroup.editors.map((editor) => [editor.id, editor])),
@@ -90,6 +109,7 @@ export function DesktopEditorSplitView({
   const panes = useMemo(() => getEditorPanes(layout), [layout]);
   const editorNodeIndex = useMemo(() => createEditorNodeIndex(state.tree), [state.tree]);
   const paneCount = panes.length;
+  const paneHosts = usePersistentEditorPaneHosts(panes.map((pane) => pane.id));
   const [openActionsPaneId, setOpenActionsPaneId] = useState<string | null>(null);
   const paneMove = usePaneMoveDrag(onMovePane);
   const fileDrop = useExplorerFileDrop(workspace.id, onOpenAtPaneEdge);
@@ -107,50 +127,58 @@ export function DesktopEditorSplitView({
   return (
     <div className="desktop-editor-split-view" data-pane-count={paneCount}>
       <EditorLayoutNode
-        key={layout.root.id}
         node={layout.root}
         touchesInlineStart
-        activePaneId={layout.activePaneId}
-        aiEditRequest={aiEditRequest}
-        dataPort={dataPort}
-        editorById={editorById}
-        editorNodeIndex={editorNodeIndex}
-        editorInteractionPreferences={editorInteractionPreferences}
-        fileIconTheme={fileIconTheme}
-        paneCount={paneCount}
-        refreshKey={refreshKey}
-        state={state}
-        viewerExtensionAdapter={viewerExtensionAdapter}
-        fileDrop={fileDrop}
-        paneMove={paneMove}
-        openActionsPaneId={openActionsPaneId}
-        workspace={workspace}
-        onClosePane={onClosePane}
-        onFocusPane={onFocusPane}
-        onMovePane={onMovePane}
-        onOpenAtPaneEdge={onOpenAtPaneEdge}
+        paneHosts={paneHosts}
         onResizeSplit={onResizeSplit}
-        onOpenActionsPaneChange={setOpenActionsPaneId}
       />
+      {panes.map((pane) => createPortal(
+        <EditorPane
+          activePaneId={layout.activePaneId}
+          aiEditRequest={aiEditRequest}
+          dataPort={dataPort}
+          editorById={editorById}
+          editorNodeIndex={editorNodeIndex}
+          editorInteractionPreferences={editorInteractionPreferences}
+          externalOpen={externalOpen}
+          fileIconTheme={fileIconTheme}
+          fileDrop={fileDrop}
+          pane={pane}
+          paneCount={paneCount}
+          paneMove={paneMove}
+          openActionsPaneId={openActionsPaneId}
+          refreshKey={refreshKey}
+          state={state}
+          viewerExtensionAdapter={viewerExtensionAdapter}
+          workspace={workspace}
+          onClosePane={onClosePane}
+          onFocusPane={onFocusPane}
+          onOpenActionsPaneChange={setOpenActionsPaneId}
+          onSplitPane={onSplitPane}
+        />,
+        paneHosts.get(pane.id)!,
+        pane.id,
+      ))}
     </div>
   );
 }
 
-type EditorLayoutNodeProps = Omit<DesktopEditorSplitViewProps, "editorGroup" | "layout"> & Readonly<{
-  activePaneId: string;
-  editorById: ReadonlyMap<string, EditorGroupState["editors"][number]>;
-  editorNodeIndex: EditorNodeIndex;
+type EditorLayoutNodeProps = Readonly<{
   node: EditorPaneLayoutNode;
-  paneCount: number;
-  fileDrop: EditorFileDropController;
-  paneMove: PaneMoveDragController;
-  openActionsPaneId: string | null;
+  paneHosts: PersistentEditorPaneHosts;
   touchesInlineStart: boolean;
-  onOpenActionsPaneChange: (paneId: string | null) => void;
+  onResizeSplit: DesktopEditorSplitViewProps["onResizeSplit"];
 }>;
 
 function EditorLayoutNode(props: EditorLayoutNodeProps): ReactNode {
-  if (props.node.kind === "pane") return <EditorPane {...props} pane={props.node} />;
+  if (props.node.kind === "pane") {
+    return (
+      <EditorPaneHostSlot
+        host={props.paneHosts.get(props.node.id)!}
+        paneId={props.node.id}
+      />
+    );
+  }
   return <EditorSplit {...props} split={props.node} />;
 }
 
@@ -178,6 +206,7 @@ function EditorSplit({
         touchesInlineStart={props.touchesInlineStart}
       />
       <EditorSplitResizeHandle
+        key={split.id}
         direction={split.direction}
         ratio={split.ratio}
         splitId={split.id}
@@ -193,6 +222,30 @@ function EditorSplit({
   );
 }
 
+type EditorPaneProps = Readonly<{
+  activePaneId: string;
+  aiEditRequest: AiEditRequest | null;
+  dataPort: DataPort;
+  editorById: ReadonlyMap<string, EditorGroupState["editors"][number]>;
+  editorNodeIndex: EditorNodeIndex;
+  editorInteractionPreferences: EditorInteractionPreferences;
+  externalOpen?: DesktopEditorSplitViewProps["externalOpen"];
+  fileIconTheme: FileIconThemeId;
+  fileDrop: EditorFileDropController;
+  pane: EditorPaneLayoutLeaf;
+  paneCount: number;
+  paneMove: PaneMoveDragController;
+  openActionsPaneId: string | null;
+  refreshKey?: WorkspaceContentChange;
+  state: DataWorkspaceState;
+  viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
+  workspace: Workspace;
+  onClosePane: DesktopEditorSplitViewProps["onClosePane"];
+  onFocusPane: DesktopEditorSplitViewProps["onFocusPane"];
+  onOpenActionsPaneChange: (paneId: string | null) => void;
+  onSplitPane: DesktopEditorSplitViewProps["onSplitPane"];
+}>;
+
 function EditorPane({
   activePaneId,
   aiEditRequest,
@@ -200,6 +253,7 @@ function EditorPane({
   editorById,
   editorNodeIndex,
   editorInteractionPreferences,
+  externalOpen,
   fileIconTheme,
   fileDrop,
   pane,
@@ -213,29 +267,39 @@ function EditorPane({
   onClosePane,
   onFocusPane,
   onOpenActionsPaneChange,
-}: EditorLayoutNodeProps & { pane: EditorPaneLayoutLeaf }) {
+  onSplitPane,
+}: EditorPaneProps) {
   const active = pane.id === activePaneId;
   const actionsOpen = pane.id === openActionsPaneId;
   const editor = pane.editorId ? editorById.get(pane.editorId) ?? null : null;
   const treeNode = editor ? editorNodeIndex.get(editor.resource) ?? null : null;
+  const [findCommand, setFindCommand] = useState<EditorFindCommand | null>(null);
+  const [menuContribution, setMenuContribution] = useState<EditorPaneMenuContribution | null>(null);
+  const externalOpenPath = editor?.resource ?? null;
 
   return (
     <EditorPaneShell
       active={active}
       actionsOpen={actionsOpen}
       editorLabel={editor?.label ?? null}
+      externalOpenAppName={externalOpenPath ? externalOpen?.getAppName(externalOpenPath) ?? null : null}
+      findCommand={findCommand}
       fileDrop={fileDrop}
       pane={pane}
       paneCount={paneCount}
       paneMove={paneMove}
+      menuContribution={menuContribution?.documentId === editor?.resource ? menuContribution : null}
       onActionsPaneChange={onOpenActionsPaneChange}
       onActivate={() => {
         if (!active) onFocusPane(pane.id);
       }}
       onClose={() => onClosePane(pane.id)}
+      onOpenExternal={externalOpen && externalOpenPath
+        ? () => externalOpen.open(externalOpenPath)
+        : null}
+      onSplit={(direction, placement) => onSplitPane(pane.id, direction, placement)}
     >
       <EditorPaneRuntime
-        active={active}
         aiEditFile={getAiEditFileForPath(aiEditRequest, editor?.resource) ?? null}
         dataPort={dataPort}
         editor={editor}
@@ -249,6 +313,8 @@ function EditorPane({
         workspaceId={workspace.id}
         workspaceRoot={workspace.path}
         markdownDialect={workspace.markdownDialect}
+        onFindCommandChange={setFindCommand}
+        onMenuContributionChange={setMenuContribution}
       />
     </EditorPaneShell>
   );

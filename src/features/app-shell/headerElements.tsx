@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { ExternalLink, Terminal, type LucideIcon } from "lucide-react";
-import { ExternalAppIcon } from "../external-apps/ExternalAppIcon";
+import { Terminal, type LucideIcon } from "lucide-react";
 import type { RightSidebarToolId, TitlebarActionId } from "../../preferences";
 import type { MessageFormatter } from "@puppyone/localization";
 
@@ -15,14 +14,6 @@ export type HeaderElementDefinition = {
 
 export type HeaderElementRenderContext = {
   t: MessageFormatter;
-  externalOpen: {
-    appName?: string | null;
-    canOpen: boolean;
-    iconDataUrl?: string | null;
-    loading: boolean;
-    onOpen: () => void;
-    title?: string;
-  };
   terminal: {
     enabled: boolean;
     onToggle: () => void;
@@ -31,34 +22,6 @@ export type HeaderElementRenderContext = {
 };
 
 export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
-  {
-    id: "external-open",
-    label: "Open external",
-    icon: ExternalLink,
-    isAvailable: (context) => context.externalOpen.canOpen,
-    render: (context) => {
-      const externalOpen = context.externalOpen;
-      const label = externalOpen.title ?? context.t("shell.titlebar.openWithApp");
-      return (
-        <button
-          className="desktop-titlebar-action desktop-titlebar-external-open"
-          type="button"
-          title={label}
-          aria-label={label}
-          onClick={externalOpen.onOpen}
-        >
-          <ExternalAppIcon
-            appName={externalOpen.appName}
-            className="desktop-titlebar-external-app-icon"
-            iconDataUrl={externalOpen.iconDataUrl}
-            loadingClassName="desktop-titlebar-external-app-loader"
-            loaderClassName="desktop-titlebar-external-open-loader"
-            loading={externalOpen.loading}
-          />
-        </button>
-      );
-    },
-  },
   {
     id: "terminal",
     label: "Terminal",

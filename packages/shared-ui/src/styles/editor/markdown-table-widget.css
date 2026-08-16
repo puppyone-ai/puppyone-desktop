@@ -44,23 +44,26 @@
   .markdown-codemirror-editor .cm-md-table-scrollport {
     --po-markdown-editor-gutter-inline: max(
       var(--po-markdown-editor-gutter-min),
-      calc((100cqw - var(--po-markdown-editor-text-width)) / 2)
+      calc(
+        (var(--po-markdown-scroll-viewport-inline-size) - var(--po-markdown-editor-text-width)) / 2
+      )
     );
-    /* One logical viewport inset owns both physical clipping edges. At the
-       minimum editor gutter it yields just enough room for the larger table
-       interaction; wider layouts converge on the document breakout inset. */
-    --cm-md-table-viewport-inline-inset: min(
-      var(--po-markdown-breakout-inline-inset),
+    /* The table scrollport is a wide-block viewport, independent of the
+       centered reading rail. One logical inset owns both clipping edges; the
+       default reaches the editor client edge while the clamp keeps custom
+       themes from placing interaction chrome outside a narrow editor. */
+    --cm-md-table-viewport-inline-inset: clamp(
+      0px,
+      var(--po-markdown-wide-block-edge-inset),
       calc(var(--po-markdown-editor-gutter-inline) - var(--cm-md-table-interaction-gutter))
     );
     --cm-md-table-interaction-start-inset: calc(
       var(--po-markdown-editor-gutter-inline) - var(--cm-md-table-viewport-inline-inset)
     );
     --cm-md-table-reading-rail-end-inset: var(--cm-md-table-interaction-start-inset);
-    /* Keep the actual inline-size on the wrapper-relative rule above. Unlike
-       100cqw, 100% here is CodeMirror's client box and therefore excludes its
-       reserved vertical scrollbar. Mixing those coordinate spaces adds the
-       scrollbar width to the table's end and corrupts the proxy thumb range. */
+    /* Keep actual sizing on the wrapper-relative rule above. The Host-owned
+       viewport token imports the scroller client width into the reading-rail
+       calculation; the wrapper still owns interaction inset accounting. */
   }
 }
 

@@ -32,7 +32,6 @@
 }
 
 .data-content[data-resizable-explorer="true"] {
-  --desktop-editor-sidebar-gutter-size: var(--po-pane-resizer-hit-size, 8px);
   grid-template-columns:
     var(--data-explorer-width, clamp(282px, 26vw, 360px))
     var(--po-pane-resizer-hit-size, 8px)
@@ -40,7 +39,6 @@
 }
 
 .data-content[data-resizable-explorer="true"][data-explorer-collapsed="true"] {
-  --desktop-editor-sidebar-gutter-size: 0px;
   grid-template-columns: 0 0 minmax(var(--desktop-main-pane-min-width, 0px), 1fr);
 }
 
@@ -52,7 +50,7 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--po-sidebar);
-  border-inline-end: 1px solid var(--po-shell-divider, var(--po-divider));
+  border-inline-end: 1px solid transparent;
   transition: background-color 260ms ease, border-color 260ms ease;
 }
 
@@ -102,17 +100,23 @@
 
 .data-explorer-resizer {
   /*
-   * A real grid gutter owns the full hit target. Native WebContentsViews begin
-   * in the following main track, so they can never steal this pointer lane.
+   * A real grid gutter owns the full hit target. It is painted as the trailing
+   * edge of the Sidebar, with the divider on its Editor-facing edge, so the
+   * Editor begins directly at the visible boundary. Native WebContentsViews
+   * still begin in the following main track and cannot steal this pointer lane.
    */
   position: relative;
   inset: auto;
   grid-column: 2;
   grid-row: 1;
   width: 100%;
+  background: var(--po-sidebar);
 }
 
 .data-explorer-resizer::after {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+  background: var(--po-shell-divider, var(--po-divider));
   transition: background 120ms ease, box-shadow 120ms ease;
 }
 

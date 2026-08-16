@@ -39,6 +39,10 @@ type DesktopWorkspaceContentProps = {
   cloud: DesktopWorkspaceCloudSurfaceController;
   dataPort: DataWorkspacePort | null;
   editorWorkbench: DesktopEditorWorkbenchController;
+  externalOpen: Readonly<{
+    getAppName: (path: string) => string | null;
+    open: (path: string) => void | Promise<void>;
+  }>;
   fileClipboardController: FileClipboardController;
   desktopUpdates: DesktopUpdatesController;
   git: DesktopGitController;
@@ -78,6 +82,7 @@ export function DesktopWorkspaceContent({
   cloud,
   dataPort,
   editorWorkbench,
+  externalOpen,
   fileClipboardController,
   desktopUpdates,
   git,
@@ -172,6 +177,7 @@ export function DesktopWorkspaceContent({
       activeDataPath={activeDataPath}
       dataPort={dataPort}
       editorWorkbench={editorWorkbench}
+      externalOpen={externalOpen}
       editorInteractionPreferences={editorInteractionPreferences}
       fileClipboardController={fileClipboardController}
       fileOperationNotice={fileOperationNotice}

@@ -65,16 +65,54 @@ describe("EditorPaneLayoutModel", () => {
   it("moves an existing pane without duplicating its editor assignment", () => {
     let layout = splitEditorPane(createEditorPaneLayout("a.md"), "editor-pane-1", "horizontal");
     layout = assignEditorToActivePane(layout, "b.md");
+    const originalSplitId = layout.root.id;
     layout = moveEditorPane(layout, "editor-pane-1", "editor-pane-2", "vertical", "second");
 
     expect(layout.root).toMatchObject({
       kind: "split",
+      id: originalSplitId,
       direction: "vertical",
       first: { kind: "pane", id: "editor-pane-2", editorId: "b.md" },
       second: { kind: "pane", id: "editor-pane-1", editorId: "a.md" },
     });
     expect(getEditorPanes(layout).map(({ editorId }) => editorId)).toEqual(["b.md", "a.md"]);
     expect(layout.activePaneId).toBe("editor-pane-1");
+  });
+
+  it("reorders sibling panes without replacing their split identity", () => {
+    let layout = splitEditorPane(createEditorPaneLayout("a.md"), "editor-pane-1", "horizontal");
+    layout = assignEditorToActivePane(layout, "b.md");
+    const originalRootId = layout.root.id;
+    const originalPanes = new Map(getEditorPanes(layout).map((pane) => [pane.id, pane]));
+
+    const reordered = moveEditorPane(
+      layout,
+      "editor-pane-2",
+      "editor-pane-1",
+      "horizontal",
+      "first",
+    );
+
+    expect(reordered.root).toMatchObject({
+      kind: "split",
+      id: originalRootId,
+      first: { id: "editor-pane-2", editorId: "b.md" },
+      second: { id: "editor-pane-1", editorId: "a.md" },
+    });
+    expect(getEditorPanes(reordered).every((pane) => originalPanes.get(pane.id) === pane)).toBe(true);
+  });
+
+  it("returns the same layout when a sibling pane is dropped back into its current slot", () => {
+    let layout = splitEditorPane(createEditorPaneLayout("a.md"), "editor-pane-1", "horizontal");
+    layout = assignEditorToActivePane(layout, "b.md");
+
+    expect(moveEditorPane(
+      layout,
+      "editor-pane-2",
+      "editor-pane-1",
+      "horizontal",
+      "second",
+    )).toBe(layout);
   });
 
   it("rebases resources, removes closed editors, and clamps persisted ratios", () => {

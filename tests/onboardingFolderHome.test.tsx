@@ -53,10 +53,10 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-recent-heading\s*\{[^}]*background:\s*var\(--po-canvas\);[^}]*color:\s*var\(--po-text-subtle\);[^}]*font-family:\s*var\(--po-font-sans\);[^}]*font-size:\s*11\.5px;[^}]*font-weight:\s*500;/s);
     expect(css).toMatch(/\.onboarding-recent-header\s*\{[^}]*inset-inline:\s*22px 6px;/s);
     expect(css).toMatch(/\.onboarding-homepage\.has-projects\s*\{[^}]*height:\s*fit-content;[^}]*gap:\s*0;/s);
-    expect(css).toMatch(/\.onboarding-projects-layout\s*\{[^}]*height:\s*fit-content;[^}]*max-height:\s*100%;[^}]*grid-template-rows:\s*186px auto;[^}]*justify-items:\s*center;[^}]*gap:\s*28px;/s);
-    expect(css).toMatch(/\.onboarding-folder-compact-action\s*\{[^}]*width:\s*186px;[^}]*height:\s*186px;[^}]*border:\s*0;[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-muted\);[^}]*transform:\s*none;/s);
-    expect(css).toMatch(/\.onboarding-folder-compact-body\s*\{[^}]*font-size:\s*13px;[^}]*font-weight:\s*500;[^}]*line-height:\s*18px;/s);
-    expect(css).toMatch(/\.onboarding-folder-compact-border\s*\{[^}]*stroke:\s*var\(--po-border\);[^}]*stroke-dasharray:\s*4 4;/s);
+    expect(css).toMatch(/\.onboarding-projects-layout\s*\{[^}]*height:\s*fit-content;[^}]*max-height:\s*100%;[^}]*justify-self:\s*center;/s);
+    expect(css).toMatch(/\.onboarding-project-add\s*\{[^}]*margin-top:\s*8px;[^}]*padding-top:\s*8px;[^}]*border-top:\s*1px solid var\(--po-divider\);/s);
+    expect(css).toMatch(/\.onboarding-project-add-action\s*\{[^}]*width:\s*100%;[^}]*color:\s*var\(--po-text-subtle\);/s);
+    expect(css).toMatch(/\.onboarding-shell\.dragging \.onboarding-recent-projects\s*\{[^}]*border-color:\s*var\(--po-border-strong\);/s);
     expect(css).toMatch(/\.onboarding-project-list\s*\{[^}]*align-content:\s*start;[^}]*gap:\s*2px;[^}]*padding:\s*0;[^}]*border:\s*0;[^}]*background:\s*transparent;/s);
     expect(css).not.toMatch(/\.onboarding-project-row\s*\{[^}]*height:/s);
     expect(css).toMatch(/\.onboarding-project-row-wrap:hover \.onboarding-project-remove,[^}]*opacity:\s*1;[^}]*pointer-events:\s*auto;/s);
@@ -65,7 +65,7 @@ describe("project folder home", () => {
     expect(css).not.toMatch(/\.onboarding-project-row\s*\+\s*\.onboarding-project-row/);
   });
 
-  it("moves the folder action above the project list when projects exist", async () => {
+  it("keeps a lightweight folder action below the project list when projects exist", async () => {
     const onChooseWorkspace = vi.fn(async () => undefined);
     const container = renderHome({
       onChooseWorkspace,
@@ -78,19 +78,16 @@ describe("project folder home", () => {
     });
 
     expect(container.querySelectorAll(".folder-drop-zone")).toHaveLength(0);
-    expect(container.querySelectorAll(".onboarding-folder-compact-action")).toHaveLength(1);
-    expect(container.querySelector(".onboarding-folder-compact-outline")).not.toBeNull();
-    expect(container.querySelector(".onboarding-folder-compact-outline")?.getAttribute("viewBox")).toBe("0 0 260 260");
-    expect(container.querySelector(".onboarding-folder-compact-action .lucide-folder-open")).not.toBeNull();
-    const layout = container.querySelector(".onboarding-projects-layout");
-    expect(layout?.firstElementChild?.classList.contains("onboarding-folder-compact-action")).toBe(true);
-    expect(layout?.lastElementChild?.classList.contains("onboarding-recent-projects")).toBe(true);
-    expect(container.textContent).toContain("open or drop a folder");
+    expect(container.querySelector(".onboarding-folder-compact-action")).toBeNull();
+    const panel = container.querySelector(".onboarding-recent-projects");
+    expect(panel?.lastElementChild?.classList.contains("onboarding-project-add")).toBe(true);
+    expect(container.querySelector(".onboarding-project-add-action .lucide-folder-plus")).not.toBeNull();
+    expect(container.querySelector(".onboarding-project-add-action")?.textContent).toContain("Open local folder");
     expect(container.querySelector(".desktop-menu-item-label")?.textContent).toBe("Notes");
     expect(container.querySelector(".desktop-menu-item-detail")?.textContent).toBe("~/Desktop");
     expect(container.querySelector(".desktop-menu-item-trailing")?.textContent).toContain("Previously opened");
 
-    await act(async () => container.querySelector<HTMLButtonElement>(".onboarding-folder-compact-action")?.click());
+    await act(async () => container.querySelector<HTMLButtonElement>(".onboarding-project-add-action")?.click());
     expect(onChooseWorkspace).toHaveBeenCalledTimes(1);
   });
 
@@ -98,7 +95,7 @@ describe("project folder home", () => {
     const container = renderHome();
 
     expect(container.querySelectorAll(".folder-drop-zone")).toHaveLength(1);
-    expect(container.querySelector(".onboarding-folder-compact-action")).toBeNull();
+    expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
     expect(container.querySelector(".folder-drop-outline")).not.toBeNull();
     expect(container.querySelector(".folder-drop-icon.lucide-folder-open")).not.toBeNull();
   });
@@ -126,7 +123,7 @@ describe("project folder home", () => {
 
     expect(row?.querySelectorAll("[data-puppy-loader]")).toHaveLength(1);
     expect(container.querySelector(".onboarding-operation-status")).toBeNull();
-    expect(container.querySelector(".onboarding-folder-compact-action [data-puppy-loader]")).toBeNull();
+    expect(container.querySelector(".onboarding-project-add-action [data-puppy-loader]")).toBeNull();
 
     await act(async () => finishOpening?.());
   });
@@ -145,7 +142,7 @@ describe("project folder home", () => {
         lastOpenedAt: null,
       }],
     });
-    const folderAction = container.querySelector<HTMLButtonElement>(".onboarding-folder-compact-action");
+    const folderAction = container.querySelector<HTMLButtonElement>(".onboarding-project-add-action");
 
     await act(async () => {
       folderAction?.click();

@@ -42,6 +42,10 @@ export type DesktopDataWorkspaceSurfaceProps = {
   activeDataPath: string | null;
   dataPort: NonNullable<DataWorkspaceProps["dataPort"]>;
   editorWorkbench: DesktopEditorWorkbenchController;
+  externalOpen: Readonly<{
+    getAppName: (path: string) => string | null;
+    open: (path: string) => void | Promise<void>;
+  }>;
   editorInteractionPreferences: NonNullable<DataWorkspaceProps["editorInteractionPreferences"]>;
   fileClipboardController: FileClipboardController;
   fileOperationNotice: string | null;
@@ -83,6 +87,7 @@ export function DesktopDataWorkspaceSurface({
   activeDataPath,
   dataPort,
   editorWorkbench,
+  externalOpen,
   editorInteractionPreferences,
   fileClipboardController,
   fileOperationNotice,
@@ -264,6 +269,7 @@ export function DesktopDataWorkspaceSurface({
                 aiEditRequest={activeAiEditRequest}
                 dataPort={dataPort}
                 editorGroup={editorWorkbench.state}
+                externalOpen={externalOpen}
                 editorInteractionPreferences={editorInteractionPreferences}
                 fileIconTheme={preferences.fileIconTheme}
                 layout={editorWorkbench.paneLayout}
@@ -276,6 +282,7 @@ export function DesktopDataWorkspaceSurface({
                 onMovePane={editorWorkbench.movePane}
                 onOpenAtPaneEdge={editorWorkbench.openAtPaneEdge}
                 onResizeSplit={editorWorkbench.resizeSplit}
+                onSplitPane={editorWorkbench.splitPane}
               />
             )
           : resolvedSurface.content.main == null

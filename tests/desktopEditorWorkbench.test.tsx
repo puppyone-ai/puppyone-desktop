@@ -219,6 +219,93 @@ describe("useDesktopEditorWorkbench", () => {
       second: { editorId: "b.md" },
     });
   });
+
+  it("creates an empty pane on the requested side without duplicating the current file", async () => {
+    const workspace: Workspace = {
+      id: "workspace-id",
+      name: "Workspace",
+      path: "/workspace",
+      status: "recording",
+    };
+    const snapshots: DesktopEditorWorkbenchController[] = [];
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(<Probe workspace={workspace} onChange={(controller) => snapshots.push(controller)} />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      snapshots.at(-1)!.open("a.md");
+      await Promise.resolve();
+    });
+    await act(async () => {
+      const controller = snapshots.at(-1)!;
+      controller.splitPane(controller.activePaneId, "horizontal", "first");
+      await Promise.resolve();
+    });
+
+    const controller = snapshots.at(-1)!;
+    expect(controller.activePath).toBeNull();
+    expect(controller.state.editors.map(({ id }) => id)).toEqual(["a.md"]);
+    expect(controller.paneLayout.root).toMatchObject({
+      kind: "split",
+      direction: "horizontal",
+      first: { kind: "pane", editorId: null },
+      second: { kind: "pane", editorId: "a.md" },
+    });
+  });
+
+  it("reorders sibling panes without clearing their file assignments", async () => {
+    const workspace: Workspace = {
+      id: "workspace-id",
+      name: "Workspace",
+      path: "/workspace",
+      status: "recording",
+    };
+    const snapshots: DesktopEditorWorkbenchController[] = [];
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(<Probe workspace={workspace} onChange={(controller) => snapshots.push(controller)} />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      snapshots.at(-1)!.open("a.md");
+      await Promise.resolve();
+    });
+    await act(async () => {
+      const controller = snapshots.at(-1)!;
+      controller.openAtPaneEdge("b.md", "b.md", controller.activePaneId, "horizontal", "second");
+      await Promise.resolve();
+    });
+    const originalRootId = snapshots.at(-1)!.paneLayout.root.id;
+
+    await act(async () => {
+      snapshots.at(-1)!.movePane(
+        "editor-pane-2",
+        "editor-pane-1",
+        "horizontal",
+        "first",
+      );
+      await Promise.resolve();
+    });
+
+    const controller = snapshots.at(-1)!;
+    expect(controller.state.editors.map(({ id }) => id)).toEqual(["a.md", "b.md"]);
+    expect(controller.paneLayout).toMatchObject({
+      activePaneId: "editor-pane-2",
+      root: {
+        id: originalRootId,
+        first: { id: "editor-pane-2", editorId: "b.md" },
+        second: { id: "editor-pane-1", editorId: "a.md" },
+      },
+    });
+    expect(controller.activePath).toBe("b.md");
+  });
 });
 
 function Probe({

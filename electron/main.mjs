@@ -53,6 +53,7 @@ import { registerNativeSurfacePointerPassthroughIpcHandlers } from "./main/ipc/n
 import { registerPanePreviewIpcHandlers } from "./main/ipc/pane-preview-ipc.mjs";
 import { registerLocalizationIpcHandlers } from "./main/ipc/localization-ipc.mjs";
 import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service.mjs";
+import { createExternalNavigationService } from "./main/external-navigation-service.mjs";
 import { createNativeSurfaceOcclusionCoordinator } from "./main/native-surfaces/occlusion-coordinator.mjs";
 import { createNativeSurfacePointerPassthroughCoordinator } from "./main/native-surfaces/pointer-passthrough-coordinator.mjs";
 import { registerFeedbackIpcHandlers } from "./main/ipc/feedback-ipc.mjs";
@@ -186,6 +187,7 @@ const nativeSurfacePointerPassthrough = createNativeSurfacePointerPassthroughCoo
     console.warn("Unable to forward a native surface drag event:", error);
   },
 });
+const externalNavigation = createExternalNavigationService({ shell });
 const localeService = createDesktopLocaleService({
   app,
   getWindows: () => BrowserWindow.getAllWindows(),
@@ -242,7 +244,7 @@ const cloudAuthService = createCloudAuthService({
   requestCloudApi,
   getCloudApiErrorMessage,
   secureStorage: safeStorage,
-  openExternal: (href) => shell.openExternal(href),
+  externalNavigation,
   localCloudWebUrl: process.env.VITE_DESKTOP_CLOUD_WEB_URL,
   getWindows: () => BrowserWindow.getAllWindows(),
   revealWindow: revealLastFocusedWindow,
@@ -302,7 +304,7 @@ async function createWindow(options = {}) {
   installWindowNavigationSecurity({
     webContents: window.webContents,
     applicationUrl: rendererApplicationUrl,
-    shell,
+    externalNavigation,
   });
   windowsById.set(webContentsId, window);
   windowStateById.set(webContentsId, {
@@ -573,7 +575,7 @@ app.whenReady().then(async () => {
   const appPreviewProcessRuntime = createAppPreviewRuntime({
     app,
     dialog,
-    shell,
+    externalNavigation,
     readWorkspaceTextFile,
     resolveWorkspacePath: resolveLocalWorkspacePath,
     t: (messageId, values) => localeService.t(messageId, values),
@@ -712,7 +714,7 @@ function registerIpcHandlers() {
     cloudGitConnectCoordinator,
     cloudPublishCoordinator,
   });
-  registerSystemIpcHandlers({ ipcMain: trustedIpcMain, shell, setDockIcon });
+  registerSystemIpcHandlers({ ipcMain: trustedIpcMain, externalNavigation, setDockIcon });
   registerFeedbackIpcHandlers({
     ipcMain: trustedIpcMain,
     appVersion: desktopBuildInfo.version,
@@ -720,6 +722,7 @@ function registerIpcHandlers() {
   markdownWebEmbedService = registerMarkdownWebEmbedIpcHandlers({
     ipcMain: trustedIpcMain,
     createMarkdownWebEmbedService,
+    externalNavigation,
     getOwnerWindow: (webContentsId) => {
       for (const window of BrowserWindow.getAllWindows()) {
         if (window.webContents?.id === webContentsId) return window;

@@ -18,6 +18,7 @@ const DEFAULT_MAX_EMBEDS_TOTAL = 32;
  * non-public network target.
  */
 export function createMarkdownWebEmbedService({
+  externalNavigation,
   getOwnerWindow,
   loadTimeoutMs = DEFAULT_LOAD_TIMEOUT_MS,
   maxEmbedsPerOwner = DEFAULT_MAX_EMBEDS_PER_OWNER,
@@ -28,6 +29,9 @@ export function createMarkdownWebEmbedService({
 }) {
   if (typeof getOwnerWindow !== "function") {
     throw new TypeError("Markdown web embed owner resolver is required.");
+  }
+  if (!externalNavigation || typeof externalNavigation.openDetached !== "function") {
+    throw new TypeError("Markdown web embeds require the external navigation service.");
   }
   if (!Number.isFinite(loadTimeoutMs) || loadTimeoutMs <= 0) {
     throw new TypeError("Markdown web embed load timeout must be positive.");
@@ -289,7 +293,12 @@ export function createMarkdownWebEmbedService({
         });
 
         const initialOrigin = new URL(canonicalHref).origin;
-        installWebContentsPolicy(view.webContents, initialOrigin, () => destroyEmbed(id, null));
+        installWebContentsPolicy(
+          view.webContents,
+          canonicalHref,
+          externalNavigation,
+          () => destroyEmbed(id, null),
+        );
         installRequestPolicy(partitionSession, initialOrigin, sessionResolveHost);
 
         const embed = {
@@ -440,10 +449,26 @@ function assertWebEmbedCapabilityScope(value) {
   });
 }
 
-function installWebContentsPolicy(webContents, initialOrigin, destroy) {
-  webContents.setWindowOpenHandler?.(() => ({ action: "deny" }));
+const USER_ACTIVATION_EXPRESSION = "Boolean(navigator.userActivation && navigator.userActivation.isActive)";
+
+function installWebContentsPolicy(webContents, initialHref, externalNavigation, destroy) {
+  const initialOrigin = new URL(initialHref).origin;
+  const externalizeActivatedNavigation = (href) => {
+    void hasTransientUserActivation(webContents).then((activated) => {
+      if (!activated || webContents.isDestroyed?.()) return;
+      externalNavigation.openDetached(href);
+    });
+  };
+
+  webContents.setWindowOpenHandler?.(({ url } = {}) => {
+    externalizeActivatedNavigation(url);
+    return { action: "deny" };
+  });
   webContents.on?.("will-navigate", (event, url) => {
-    if (!isAllowedTopLevelNavigation(url, initialOrigin)) event.preventDefault();
+    const currentHref = webContents.getURL?.() || initialHref;
+    if (isSameDocumentFragmentNavigation(url, currentHref)) return;
+    event.preventDefault();
+    externalizeActivatedNavigation(url);
   });
   webContents.on?.("will-redirect", (event, url) => {
     if (!isAllowedTopLevelNavigation(url, initialOrigin)) event.preventDefault();
@@ -451,6 +476,30 @@ function installWebContentsPolicy(webContents, initialOrigin, destroy) {
   webContents.on?.("login", (event) => event.preventDefault());
   webContents.on?.("render-process-gone", destroy);
   webContents.on?.("unresponsive", destroy);
+}
+
+async function hasTransientUserActivation(webContents) {
+  if (typeof webContents.executeJavaScript !== "function") return false;
+  try {
+    return await webContents.executeJavaScript(USER_ACTIVATION_EXPRESSION) === true;
+  } catch {
+    return false;
+  }
+}
+
+function isSameDocumentFragmentNavigation(targetHref, currentHref) {
+  try {
+    const target = new URL(assertMarkdownWebEmbedHref(targetHref));
+    const current = new URL(assertMarkdownWebEmbedHref(currentHref));
+    return (
+      target.origin === current.origin
+      && target.pathname === current.pathname
+      && target.search === current.search
+      && target.hash !== current.hash
+    );
+  } catch {
+    return false;
+  }
 }
 
 function installRequestPolicy(partitionSession, initialOrigin, resolveHost) {

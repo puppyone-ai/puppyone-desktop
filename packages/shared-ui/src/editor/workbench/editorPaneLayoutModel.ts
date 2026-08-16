@@ -114,6 +114,34 @@ export function moveEditorPane(
   const target = findPane(state.root, targetPaneId);
   if (!source || !target) return state;
 
+  // Reordering direct siblings is an in-place layout operation. Rebuilding
+  // their split gives it a new identity, which forces the renderer to unmount
+  // both otherwise-stable editor runtimes during a simple left/right swap.
+  const siblingSplit = findDirectSiblingSplit(state.root, sourcePaneId, targetPaneId);
+  if (siblingSplit) {
+    const sourceFirst = placement === "first";
+    const first = sourceFirst ? source : target;
+    const second = sourceFirst ? target : source;
+    const ratio = siblingSplit.direction === direction ? siblingSplit.ratio : 0.5;
+    if (
+      siblingSplit.direction === direction
+      && siblingSplit.first === first
+      && siblingSplit.second === second
+    ) {
+      return state.activePaneId === sourcePaneId
+        ? state
+        : freezeLayout(state.root, sourcePaneId);
+    }
+    const root = replaceNode(state.root, siblingSplit.id, freezeNode({
+      ...siblingSplit,
+      direction,
+      ratio,
+      first,
+      second,
+    }));
+    return freezeLayout(root, sourcePaneId);
+  }
+
   const collapsed = collapsePane(state.root, sourcePaneId);
   if (!collapsed.removed || !findPane(collapsed.node, targetPaneId)) return state;
   const nextSplitId = `editor-split-${nextNumericId(state.root, "editor-split-")}`;
@@ -301,6 +329,20 @@ function collectPanes(node: EditorPaneLayoutNode): EditorPaneLayoutLeaf[] {
 function findPane(node: EditorPaneLayoutNode, paneId: string): EditorPaneLayoutLeaf | null {
   if (node.kind === "pane") return node.id === paneId ? node : null;
   return findPane(node.first, paneId) ?? findPane(node.second, paneId);
+}
+
+function findDirectSiblingSplit(
+  node: EditorPaneLayoutNode,
+  firstPaneId: string,
+  secondPaneId: string,
+): EditorPaneLayoutSplit | null {
+  if (node.kind === "pane") return null;
+  if (node.first.kind === "pane" && node.second.kind === "pane") {
+    const directIds = new Set([node.first.id, node.second.id]);
+    if (directIds.has(firstPaneId) && directIds.has(secondPaneId)) return node;
+  }
+  return findDirectSiblingSplit(node.first, firstPaneId, secondPaneId)
+    ?? findDirectSiblingSplit(node.second, firstPaneId, secondPaneId);
 }
 
 function nextNumericId(node: EditorPaneLayoutNode, prefix: string): number {
