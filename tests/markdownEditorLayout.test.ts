@@ -39,6 +39,18 @@ const markdownInlineCss = readFileSync(
 );
 
 describe("Markdown editor layout", () => {
+  it("keeps the centered reading rail invariant when stacked panes cross the overflow threshold", () => {
+    const scrollerRule = readCssRule(
+      markdownEditorCss,
+      ".markdown-codemirror-editor .cm-scroller",
+    );
+
+    // A classic product scrollbar consumes 12px. Reserving both logical edges
+    // keeps the 724px reading rail centered and prevents pane focus reflow from
+    // moving it by half a scrollbar width when overflow appears or disappears.
+    expect(scrollerRule).toContain("scrollbar-gutter: stable both-edges;");
+  });
+
   it("keeps canonical Markdown source invisible until Live Preview commits", () => {
     const pendingRule = readCssRule(
       markdownEditorCss,
@@ -289,6 +301,18 @@ describe("Markdown rich-block boundary affordance", () => {
     );
     expect(selectedRule).toContain("border-color:");
     expect(selectedRule).toContain("box-shadow: 0 0 0 2px var(--cm-md-block-selected-ring);");
+  });
+
+  it("uses semantic fixed column tracks so cell focus cannot resize a Markdown table", () => {
+    const tableRule = readCssRule(
+      markdownTableCss,
+      ".markdown-codemirror-editor .cm-md-table-widget",
+    );
+
+    expect(tableRule).toContain("table-layout: fixed;");
+    expect(markdownTableWidgetSource).toMatch(
+      /const colgroup = doc\.createElement\("colgroup"\);[\s\S]*table\.appendChild\(colgroup\);[\s\S]*if \(this\.execution\.mode === "windowed"\)/,
+    );
   });
 
   it("keeps vertical scrolling at the document level for code blocks", () => {

@@ -13,7 +13,11 @@ const windows = [];
 app.setPath("userData", path.join(tempRoot, "user-data"));
 app.commandLine.appendSwitch("disable-gpu");
 
-const [markdownEditorCss, markdownContentCss, editableTableCss, markdownTableCss] = await Promise.all([
+const [scrollbarsCss, markdownEditorCss, markdownContentCss, editableTableCss, markdownTableCss] = await Promise.all([
+  fsp.readFile(
+    path.join(repoRoot, "src/styles/scrollbars.css"),
+    "utf8",
+  ),
   fsp.readFile(
     path.join(repoRoot, "packages/shared-ui/src/styles/editor/markdown-editor.css"),
     "utf8",
@@ -282,6 +286,159 @@ async function measureScenario(viewportWidth, direction, reserveVerticalScrollba
   `, true);
 }
 
+function focusStabilityFixtureHtml() {
+  const longSource = "**The Game Awards focus source is deliberately wider than its rendered preview**";
+  return `<!doctype html>
+    <html data-po-scrollbar-mode="product" data-interface-style="vscode">
+      <head>
+        <meta charset="utf-8">
+        <style>
+          :root {
+            --po-accent: #4c70ff;
+            --po-border: #d8dbe2;
+            --po-control: #eef0f4;
+            --po-divider: #d6d9df;
+            --po-editor-bg: #fff;
+            --po-editor-content-edge-inset: 64px;
+            --po-font-sans: system-ui, sans-serif;
+            --po-panel: #fff;
+            --po-scrollbar-size: 12px;
+            --po-scrollbar-thumb: #aeb4bf;
+            --po-text: #20232a;
+            --po-text-muted: #626873;
+          }
+          html, body, #root { width: 100%; height: 100%; margin: 0; }
+          body { overflow: hidden; }
+          #root {
+            display: grid;
+            grid-template-rows: minmax(0, 1fr) 1px minmax(0, 1fr);
+          }
+          .pane { min-width: 0; min-height: 0; overflow: hidden; }
+          .divider { background: var(--po-divider); }
+          .markdown-codemirror-editor,
+          .cm-editor,
+          .cm-scroller { width: 100%; height: 100%; }
+          .cm-line { display: block; }
+          #focus-expander { height: 0; }
+          #bottom-focus { width: 1px; height: 1px; opacity: 0; }
+          ${scrollbarsCss}
+          ${markdownEditorCss}
+          ${markdownContentCss}
+          ${editableTableCss}
+          ${markdownTableCss}
+        </style>
+      </head>
+      <body>
+        <div id="root">
+          <section class="pane" id="top-pane">
+            <div class="markdown-codemirror-editor" data-live-preview="true">
+              <div class="cm-editor">
+                <div class="cm-scroller" data-po-scrollbar="content">
+                  <div class="cm-content">
+                    <div class="cm-line">
+                      <div class="cm-md-table-widget-wrap po-editable-table-interaction-root">
+                        <div class="cm-md-table-scrollport">
+                          <div class="cm-md-table-frame">
+                            <div class="cm-md-table-surface">
+                              <table class="cm-md-table-widget" id="focus-table">
+                                <colgroup><col style="width:150px"><col style="width:150px"></colgroup>
+                                <tbody><tr>
+                                  <td><span class="cm-md-table-cell-content" id="focus-cell" contenteditable="true"><strong>The Game Awards</strong></span></td>
+                                  <td><span class="cm-md-table-cell-content">Value</span></td>
+                                </tr></tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div id="focus-expander"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+          <div class="divider"></div>
+          <section class="pane" id="bottom-pane" tabindex="-1"><button id="bottom-focus">bottom</button></section>
+        </div>
+        <script>window.__longTableCellSource = ${JSON.stringify(longSource)};</script>
+      </body>
+    </html>`;
+}
+
+async function measureFocusStability() {
+  const browserWindow = new BrowserWindow({
+    show: false,
+    width: 1000,
+    height: 700,
+    webPreferences: {
+      backgroundThrottling: false,
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  windows.push(browserWindow);
+  await browserWindow.loadURL(
+    `data:text/html;charset=utf-8,${encodeURIComponent(focusStabilityFixtureHtml())}`,
+  );
+
+  return browserWindow.webContents.executeJavaScript(`
+    (async () => {
+      const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+      const scroller = document.querySelector(".cm-scroller");
+      const content = document.querySelector(".cm-content");
+      const table = document.querySelector("#focus-table");
+      const cell = document.querySelector("#focus-cell");
+      const expander = document.querySelector("#focus-expander");
+      const bottom = document.querySelector("#bottom-focus");
+      const snapshot = (label) => {
+        const contentRect = content.getBoundingClientRect();
+        const tableRect = table.getBoundingClientRect();
+        const cellRect = cell.getBoundingClientRect();
+        const style = getComputedStyle(content);
+        const paddingLeft = Number.parseFloat(style.paddingLeft);
+        const paddingRight = Number.parseFloat(style.paddingRight);
+        return {
+          label,
+          scrollerClientWidth: scroller.clientWidth,
+          scrollerOffsetWidth: scroller.offsetWidth,
+          scrollerClientHeight: scroller.clientHeight,
+          scrollerScrollHeight: scroller.scrollHeight,
+          scrollerScrollLeft: scroller.scrollLeft,
+          contentLeft: contentRect.left,
+          contentRight: contentRect.right,
+          readingRailCenter: (
+            contentRect.left + paddingLeft
+            + contentRect.right - paddingRight
+          ) / 2,
+          tableLeft: tableRect.left,
+          tableWidth: tableRect.width,
+          cellLeft: cellRect.left,
+          cellWidth: cellRect.width,
+        };
+      };
+
+      await nextFrame();
+      await nextFrame();
+      const before = snapshot("before");
+      cell.focus({ preventScroll: true });
+      cell.textContent = window.__longTableCellSource;
+      expander.style.height = "300px";
+      await nextFrame();
+      await nextFrame();
+      const focused = snapshot("focused");
+      bottom.focus({ preventScroll: true });
+      cell.replaceChildren(Object.assign(document.createElement("strong"), { textContent: "The Game Awards" }));
+      expander.style.height = "0";
+      await nextFrame();
+      await nextFrame();
+      const blurred = snapshot("blurred");
+      return { before, focused, blurred };
+    })()
+  `, true);
+}
+
 async function runSmoke() {
   const results = [];
   const scenarioSpecs = [
@@ -429,7 +586,28 @@ async function runSmoke() {
       results.push(result);
     }
   }
-  console.log(JSON.stringify({ ok: true, scenarios: results }, null, 2));
+  const focusStability = await measureFocusStability();
+  const { before, focused, blurred } = focusStability;
+  assert(
+    before.scrollerScrollHeight <= before.scrollerClientHeight,
+    "focus-stability: initial pane unexpectedly overflows",
+  );
+  assert(
+    focused.scrollerScrollHeight > focused.scrollerClientHeight,
+    "focus-stability: focused pane did not cross the overflow threshold",
+  );
+  for (const sample of [focused, blurred]) {
+    assertNear(sample.scrollerClientWidth, before.scrollerClientWidth, `${sample.label}: scroller width`);
+    assertNear(sample.contentLeft, before.contentLeft, `${sample.label}: content left`);
+    assertNear(sample.contentRight, before.contentRight, `${sample.label}: content right`);
+    assertNear(sample.readingRailCenter, before.readingRailCenter, `${sample.label}: reading rail center`);
+    assertNear(sample.tableLeft, before.tableLeft, `${sample.label}: table left`);
+    assertNear(sample.tableWidth, before.tableWidth, `${sample.label}: table width`);
+    assertNear(sample.cellLeft, before.cellLeft, `${sample.label}: cell left`);
+    assertNear(sample.cellWidth, before.cellWidth, `${sample.label}: cell width`);
+    assertNear(sample.scrollerScrollLeft, 0, `${sample.label}: outer horizontal position`);
+  }
+  console.log(JSON.stringify({ ok: true, scenarios: results, focusStability }, null, 2));
 }
 
 async function finish(exitCode) {

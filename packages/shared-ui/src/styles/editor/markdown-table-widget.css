@@ -120,7 +120,10 @@
   border-radius: var(--po-editable-table-radius);
   border-collapse: separate;
   border-spacing: 0;
-  table-layout: auto;
+  /* Column tracks come from the semantic table model. Preview DOM and the
+     transient Markdown source editor therefore share one geometry instead of
+     asking the browser to recalculate intrinsic widths on every focus hop. */
+  table-layout: fixed;
   background: var(--po-editable-table-background);
   color: var(--po-editable-table-color);
   font-size: var(--po-editable-table-font-size);
@@ -129,7 +132,6 @@
 }
 
 .markdown-codemirror-editor .cm-md-table-widget.is-windowed {
-  table-layout: fixed;
   contain: layout paint style;
 }
 

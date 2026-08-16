@@ -91,6 +91,11 @@
 
 .markdown-codemirror-editor .cm-scroller {
   overflow: auto;
+  /* MDI pane focus may reveal Markdown source or exchange an embedded
+     preview/edit surface, briefly changing document height. Reserve matching
+     logical gutters up front so those content-local reflows can never move
+     the centered reading rail. */
+  scrollbar-gutter: stable both-edges;
   cursor: text;
   font-family: var(--po-font-content, var(--po-font-sans));
 }

@@ -98,15 +98,20 @@ export class MarkdownTableWidget extends WidgetType {
     table.setAttribute("aria-rowcount", String(rowCount));
     table.setAttribute("aria-colcount", String(columnCount));
 
+    // Every execution mode uses semantic column tracks. A cell swaps rendered
+    // inline Markdown for canonical source while it owns focus; leaving small
+    // tables on browser auto-layout would let that transient DOM resize the
+    // entire block and, near an overflow threshold, the editor reading rail.
+    const colgroup = doc.createElement("colgroup");
+    for (const width of estimateMarkdownTableColumnWidths(this.alignments, this.rows)) {
+      const column = doc.createElement("col");
+      column.style.width = `${width}px`;
+      colgroup.appendChild(column);
+    }
+    table.appendChild(colgroup);
+
     if (this.execution.mode === "windowed") {
       table.classList.add("is-windowed");
-      const colgroup = doc.createElement("colgroup");
-      for (const width of estimateMarkdownTableColumnWidths(this.alignments, this.rows)) {
-        const column = doc.createElement("col");
-        column.style.width = `${width}px`;
-        colgroup.appendChild(column);
-      }
-      table.appendChild(colgroup);
     }
 
     const createRow = (row: MarkdownTableRow, rowIndex: number, header: boolean) => {
