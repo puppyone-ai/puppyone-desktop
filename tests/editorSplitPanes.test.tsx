@@ -525,6 +525,95 @@ describe("DesktopEditorSplitView", () => {
     }
   });
 
+  it("reparents panes across nested split axes without remounting any editor runtime", async () => {
+    const { group, layout: initialLayout } = createThreePaneWorkspace("txt");
+    const paths = ["a.txt", "b.txt", "c.txt"] as const;
+    const tree: DataNode[] = paths.map((path) => ({
+      id: path,
+      name: path,
+      path,
+      type: "text",
+      source: "local",
+    }));
+    const readFile = vi.fn(async (path: string) => ({
+      path,
+      name: path,
+      type: "text" as const,
+      content: `stable content for ${path}`,
+      version: `version:${path}`,
+    }));
+    const state = { ...emptyWorkspaceState(), tree };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    let updateLayout!: React.Dispatch<React.SetStateAction<EditorPaneLayoutState>>;
+
+    function Harness() {
+      const [layout, setLayout] = React.useState(initialLayout);
+      updateLayout = setLayout;
+      return withTestLocalization(
+        <DesktopEditorSplitView
+          aiEditRequest={null}
+          dataPort={{ listChildren: async () => tree, readFile }}
+          editorGroup={group}
+          editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+          fileIconTheme="default"
+          layout={layout}
+          state={state}
+          workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
+          onClosePane={vi.fn()}
+          onFocusPane={vi.fn()}
+          onMovePane={vi.fn()}
+          onOpenAtPaneEdge={vi.fn()}
+          onResizeSplit={vi.fn()}
+          onSplitPane={vi.fn()}
+        />,
+      );
+    }
+
+    await act(async () => root?.render(<Harness />));
+    await waitForCondition(() => container.querySelectorAll(".cm-editor").length === 3);
+    const initialReadCount = readFile.mock.calls.length;
+    const paneElements = new Map(
+      Array.from(container.querySelectorAll<HTMLElement>(".desktop-editor-pane")).map((pane) => [
+        pane.dataset.editorPaneId!,
+        pane,
+      ]),
+    );
+    const editorViews = new Map(
+      Array.from(paneElements, ([paneId, pane]) => [
+        paneId,
+        EditorView.findFromDOM(pane.querySelector<HTMLElement>(".cm-editor")!),
+      ]),
+    );
+
+    act(() => {
+      editorViews.get("editor-pane-1")!.dispatch({ selection: { anchor: 1 } });
+      editorViews.get("editor-pane-2")!.dispatch({ selection: { anchor: 2 } });
+      editorViews.get("editor-pane-3")!.dispatch({ selection: { anchor: 3 } });
+    });
+    await act(async () => updateLayout((current) => moveEditorPane(
+      current,
+      "editor-pane-1",
+      "editor-pane-3",
+      "vertical",
+      "second",
+    )));
+
+    expect(readFile).toHaveBeenCalledTimes(initialReadCount);
+    for (const [paneId, paneElement] of paneElements) {
+      const currentPane = container.querySelector<HTMLElement>(
+        `[data-editor-pane-id="${paneId}"]`,
+      )!;
+      expect(currentPane).toBe(paneElement);
+      expect(EditorView.findFromDOM(currentPane.querySelector<HTMLElement>(".cm-editor")!))
+        .toBe(editorViews.get(paneId));
+    }
+    expect(Array.from(editorViews.values()).map(
+      (view) => view.state.selection.main.anchor,
+    )).toEqual([1, 2, 3]);
+  });
+
   it("keeps three CodeMirror focus and selection states isolated across pane activation", async () => {
     const { group, layout } = createThreePaneWorkspace("txt");
     const state = {
