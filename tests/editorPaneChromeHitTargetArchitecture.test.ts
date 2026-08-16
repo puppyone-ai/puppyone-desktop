@@ -42,20 +42,16 @@ describe("editor pane chrome hit-target architecture", () => {
   });
 
   it("keeps a complete inside frame while limiting accent to press or drag", () => {
-    const paneFrameRule = readCssBlock(
-      splitStyles,
-      '.desktop-editor-split-view:not([data-pane-count="1"]) .desktop-editor-pane::after',
-    );
+    const paneRule = readCssBlock(splitStyles, ".desktop-editor-pane");
     const paneContentRule = readCssBlock(splitStyles, ".desktop-editor-pane-content");
 
     expect(paneShellSource).toContain('data-pane-menu-open={actionsOpen ? "true" : undefined}');
-    expect(splitStyles).toContain(".desktop-editor-pane[data-move-source]::after");
-    expect(splitStyles).toContain(".desktop-editor-pane-handle:active)::after");
+    expect(splitStyles).toContain(".desktop-editor-pane[data-move-source]");
+    expect(splitStyles).toContain(".desktop-editor-pane-handle:active)");
     expect(splitStyles).not.toContain(".desktop-editor-pane[data-pane-menu-open]::after");
-    expect(paneFrameRule).toContain("inset: 0;");
-    expect(paneFrameRule).toContain("box-sizing: border-box;");
-    expect(paneFrameRule).toContain("border: 1px solid var(--po-divider);");
-    expect(paneFrameRule).not.toContain("box-shadow:");
+    expect(splitStyles).not.toContain(".desktop-editor-pane::after");
+    expect(paneRule).toContain("box-sizing: border-box;");
+    expect(paneRule).toContain("border: 1px solid transparent;");
     expect(paneContentRule).toContain("z-index: 0;");
     expect(paneContentRule).toContain("isolation: isolate;");
     expect(splitStyles).not.toContain("@keyframes desktop-editor-pane-handle-press");
