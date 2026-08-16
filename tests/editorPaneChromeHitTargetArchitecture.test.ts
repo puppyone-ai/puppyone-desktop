@@ -10,6 +10,9 @@ const paneChromeSource = source(
 const paneShellSource = source(
   "src/features/editor-workbench/layout/EditorPaneShell.tsx",
 );
+const paneHostSlotSource = source(
+  "src/features/editor-workbench/layout/pane-host/EditorPaneHostSlot.tsx",
+);
 
 describe("editor pane chrome hit-target architecture", () => {
   it("keeps first-gesture hit testing independent from visual reveal state", () => {
@@ -42,16 +45,34 @@ describe("editor pane chrome hit-target architecture", () => {
   });
 
   it("keeps a complete inside frame while limiting accent to press or drag", () => {
-    const paneRule = readCssBlock(splitStyles, ".desktop-editor-pane");
+    const frameRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-interaction-frame",
+    );
     const paneContentRule = readCssBlock(splitStyles, ".desktop-editor-pane-content");
 
     expect(paneShellSource).toContain('data-pane-menu-open={actionsOpen ? "true" : undefined}');
+    expect(paneShellSource).toContain(
+      'className="desktop-editor-pane-interaction-frame"',
+    );
     expect(splitStyles).toContain(".desktop-editor-pane[data-move-source]");
     expect(splitStyles).toContain(".desktop-editor-pane-handle:active)");
-    expect(splitStyles).not.toContain(".desktop-editor-pane[data-pane-menu-open]::after");
+    expect(splitStyles).not.toContain(".desktop-editor-pane[data-pane-menu-open]");
     expect(splitStyles).not.toContain(".desktop-editor-pane::after");
-    expect(paneRule).toContain("box-sizing: border-box;");
-    expect(paneRule).toContain("border: 1px solid transparent;");
+    expect(frameRule).toContain("position: absolute;");
+    expect(frameRule).toContain("z-index: 11;");
+    expect(frameRule).toContain("inset: 0;");
+    expect(frameRule).toContain("pointer-events: none;");
+    expect(frameRule).toContain(
+      "linear-gradient(currentColor, currentColor) bottom / 100% 1px no-repeat",
+    );
+    expect(paneHostSlotSource).toContain(
+      'data-touches-block-end={touchesBlockEnd ? "true" : undefined}',
+    );
+    expect(splitStyles).toContain(
+      '.desktop-editor-pane-slot[data-touches-block-end="true"]',
+    );
+    expect(splitStyles).toContain("inset-block-end: 1px;");
     expect(paneContentRule).toContain("z-index: 0;");
     expect(paneContentRule).toContain("isolation: isolate;");
     expect(splitStyles).not.toContain("@keyframes desktop-editor-pane-handle-press");

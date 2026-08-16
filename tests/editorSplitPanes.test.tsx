@@ -64,6 +64,28 @@ describe("DesktopEditorSplitView", () => {
     expect(pane.contains(menu)).toBe(false);
   });
 
+  it("marks only nested layout leaves that touch the workbench bottom edge", () => {
+    const { group, layout } = createThreePaneWorkspace();
+    const container = renderSplitView(group, layout);
+    const slots = new Map(Array.from(
+      container.querySelectorAll<HTMLElement>(".desktop-editor-pane-slot"),
+      (slot) => [
+        slot.dataset.editorPaneSlotId,
+        slot.dataset.touchesBlockEnd,
+      ],
+    ));
+
+    // The left pane spans the full height. On the right, only the lower leaf
+    // reaches the BrowserWindow paint edge.
+    expect(slots).toEqual(new Map([
+      ["editor-pane-1", "true"],
+      ["editor-pane-2", undefined],
+      ["editor-pane-3", "true"],
+    ]));
+    expect(container.querySelectorAll(".desktop-editor-pane-interaction-frame"))
+      .toHaveLength(3);
+  });
+
   it("opens one Explorer file at the nearest pane edge on drop", () => {
     const onOpenAtPaneEdge = vi.fn();
     const group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("a.md"));

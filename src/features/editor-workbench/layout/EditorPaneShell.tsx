@@ -108,6 +108,7 @@ export function EditorPaneShell({
       />
       <div className="desktop-editor-pane-content">{children}</div>
       {dropEdge && <div className="desktop-editor-drop-preview" data-edge={dropEdge} />}
+      <div className="desktop-editor-pane-interaction-frame" aria-hidden="true" />
     </section>
   );
 }

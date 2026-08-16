@@ -63,27 +63,53 @@
   flex: 1 1 0;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid transparent;
   background: var(--po-canvas);
-  transition: border-color 90ms ease;
 }
 
 /* Pane chrome has one reveal source: the leading-third hit zone maintained by
  * EditorPaneShell. Hover is neutral; only an active press/drag uses the accent
  * frame. An open menu and active editor state never create persistent accent
- * decoration. The transparent border belongs to the pane's own border box,
- * so no descendant or clipping ancestor can cover one of its four edges. */
+ * decoration. The frame is a dedicated, non-interactive layer painted above
+ * every document runtime. Its four one-pixel gradients are drawn inside the
+ * pane bounds, so a pane touching the workbench clipping edge cannot lose its
+ * bottom or trailing stroke. */
 
-.desktop-editor-split-view:not([data-pane-count="1"])
-  .desktop-editor-pane[data-handle-hot]:not([data-move-source]) {
-  border-color: var(--po-divider);
+.desktop-editor-pane-interaction-frame {
+  position: absolute;
+  z-index: 11;
+  color: transparent;
+  background:
+    linear-gradient(currentColor, currentColor) top / 100% 1px no-repeat,
+    linear-gradient(currentColor, currentColor) right / 1px 100% no-repeat,
+    linear-gradient(currentColor, currentColor) bottom / 100% 1px no-repeat,
+    linear-gradient(currentColor, currentColor) left / 1px 100% no-repeat;
+  inset: 0;
+  pointer-events: none;
+  transition: color 90ms ease;
+}
+
+/* Chromium clips the BrowserWindow's final paint row. Layout edge metadata is
+ * carried by the split tree, so only a leaf that actually touches the
+ * workbench block end moves its transient bottom stroke into the final safe
+ * paint row. Internal pane frames remain flush with their splitter. */
+.desktop-editor-pane-slot[data-touches-block-end="true"]
+  .desktop-editor-pane-interaction-frame {
+  inset-block-end: 1px;
 }
 
 .desktop-editor-split-view:not([data-pane-count="1"])
-  .desktop-editor-pane[data-move-source],
+  .desktop-editor-pane[data-handle-hot]:not([data-move-source])
+  > .desktop-editor-pane-interaction-frame {
+  color: var(--po-divider);
+}
+
 .desktop-editor-split-view:not([data-pane-count="1"])
-  .desktop-editor-pane:has(> .desktop-editor-pane-handle-shell > .desktop-editor-pane-handle:active) {
-  border-color: color-mix(
+  .desktop-editor-pane[data-move-source]
+  > .desktop-editor-pane-interaction-frame,
+.desktop-editor-split-view:not([data-pane-count="1"])
+  .desktop-editor-pane:has(> .desktop-editor-pane-handle-shell > .desktop-editor-pane-handle:active)
+  > .desktop-editor-pane-interaction-frame {
+  color: color-mix(
     in srgb,
     var(--po-pane-resizer-active-color) 76%,
     transparent
@@ -374,7 +400,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .desktop-editor-pane,
+  .desktop-editor-pane-interaction-frame,
   .desktop-editor-pane-handle-shell {
     transition: none;
   }

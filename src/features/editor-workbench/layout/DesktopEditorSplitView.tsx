@@ -128,6 +128,7 @@ export function DesktopEditorSplitView({
     <div className="desktop-editor-split-view" data-pane-count={paneCount}>
       <EditorLayoutNode
         node={layout.root}
+        touchesBlockEnd
         touchesInlineStart
         paneHosts={paneHosts}
         onResizeSplit={onResizeSplit}
@@ -166,6 +167,7 @@ export function DesktopEditorSplitView({
 type EditorLayoutNodeProps = Readonly<{
   node: EditorPaneLayoutNode;
   paneHosts: PersistentEditorPaneHosts;
+  touchesBlockEnd: boolean;
   touchesInlineStart: boolean;
   onResizeSplit: DesktopEditorSplitViewProps["onResizeSplit"];
 }>;
@@ -176,6 +178,7 @@ function EditorLayoutNode(props: EditorLayoutNodeProps): ReactNode {
       <EditorPaneHostSlot
         host={props.paneHosts.get(props.node.id)!}
         paneId={props.node.id}
+        touchesBlockEnd={props.touchesBlockEnd}
       />
     );
   }
@@ -203,6 +206,7 @@ function EditorSplit({
         key={split.first.id}
         {...props}
         node={split.first}
+        touchesBlockEnd={split.direction === "horizontal" && props.touchesBlockEnd}
         touchesInlineStart={props.touchesInlineStart}
       />
       <EditorSplitResizeHandle
@@ -216,6 +220,7 @@ function EditorSplit({
         key={split.second.id}
         {...props}
         node={split.second}
+        touchesBlockEnd={props.touchesBlockEnd}
         touchesInlineStart={split.direction === "vertical" && props.touchesInlineStart}
       />
     </div>

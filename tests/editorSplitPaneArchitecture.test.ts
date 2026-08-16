@@ -104,6 +104,11 @@ describe("editor split-pane architecture", () => {
     expect(surfaceSource).toContain("layout={editorWorkbench.paneLayout}");
     expect(surfaceSource).toContain('loadActiveFileSource={resolvedSurface.id !== "data"}');
     expect(splitSource).toContain('data-direction={split.direction}');
+    expect(splitSource).toContain("touchesBlockEnd");
+    expect(splitSource).toContain(
+      'touchesBlockEnd={split.direction === "horizontal" && props.touchesBlockEnd}',
+    );
+    expect(splitSource).toContain("touchesBlockEnd={props.touchesBlockEnd}");
     expect(resizeSource).toContain('role="separator"');
     expect(paneChromeSource).toContain('className="desktop-editor-pane-handle"');
     expect(paneShellSource).not.toContain("paneCount > 1 &&");
@@ -200,15 +205,21 @@ describe("editor split-pane architecture", () => {
     expect(paneActionsMenuSource).toContain(
       'className="desktop-editor-pane-menu-primary-action desktop-editor-pane-menu-close-action"',
     );
-    const paneFrameRule = readCssBlock(splitStyles, ".desktop-editor-pane");
-    expect(paneFrameRule).toContain("position: relative;");
-    expect(paneFrameRule).toContain("box-sizing: border-box;");
-    expect(paneFrameRule).toContain("border: 1px solid transparent;");
-    expect(paneFrameRule).toContain("transition: border-color 90ms ease;");
+    const paneRule = readCssBlock(splitStyles, ".desktop-editor-pane");
+    const paneFrameRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-interaction-frame",
+    );
+    expect(paneRule).toContain("position: relative;");
+    expect(paneRule).toContain("box-sizing: border-box;");
+    expect(paneRule).not.toContain("border: 1px solid transparent;");
+    expect(paneFrameRule).toContain("position: absolute;");
+    expect(paneFrameRule).toContain("inset: 0;");
+    expect(paneFrameRule).toContain("transition: color 90ms ease;");
     expect(splitStyles).toContain(
       ".desktop-editor-pane[data-handle-hot]:not([data-move-source])",
     );
-    expect(splitStyles).toContain("border-color: var(--po-divider);");
+    expect(splitStyles).toContain("color: var(--po-divider);");
     expect(splitStyles).not.toContain(".desktop-editor-pane::after");
     expect(splitStyles).not.toContain("@keyframes desktop-editor-pane-activate");
     expect(splitStyles).toContain("var(--po-pane-resizer-active-color)");
