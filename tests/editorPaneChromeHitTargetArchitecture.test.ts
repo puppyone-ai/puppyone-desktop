@@ -42,10 +42,20 @@ describe("editor pane chrome hit-target architecture", () => {
   });
 
   it("keeps the accent inset for the complete menu, press, or drag interaction", () => {
+    const paneFrameRule = readCssBlock(
+      splitStyles,
+      '.desktop-editor-split-view:not([data-pane-count="1"]) .desktop-editor-pane::after',
+    );
+    const paneContentRule = readCssBlock(splitStyles, ".desktop-editor-pane-content");
+
     expect(paneShellSource).toContain('data-pane-menu-open={actionsOpen ? "true" : undefined}');
     expect(splitStyles).toContain(".desktop-editor-pane[data-pane-menu-open]::after");
     expect(splitStyles).toContain(".desktop-editor-pane[data-move-source]::after");
     expect(splitStyles).toContain(".desktop-editor-pane-handle:active)::after");
+    expect(paneFrameRule).toContain("inset: 0;");
+    expect(paneFrameRule).toContain("box-shadow: inset 0 0 0 1px");
+    expect(paneContentRule).toContain("z-index: 0;");
+    expect(paneContentRule).toContain("isolation: isolate;");
     expect(splitStyles).not.toContain("@keyframes desktop-editor-pane-handle-press");
   });
 
