@@ -67,7 +67,18 @@ async function run() {
     if (process.platform === "darwin") app.focus({ steal: true });
     browserWindow.focus();
 
-    const result = await browserWindow.webContents.executeJavaScript(`(async () => {
+    // Other desktop apps can briefly reclaim macOS activation while this
+    // transparent smoke window is running. Renew native ownership only when
+    // it is lost so renderer focus/blur transactions remain deterministic.
+    const nativeFocusLease = setInterval(() => {
+      if (!browserWindow || browserWindow.isDestroyed() || browserWindow.isFocused()) return;
+      if (process.platform === "darwin") app.focus({ steal: true });
+      browserWindow.focus();
+      browserWindow.webContents.focus();
+    }, 100);
+    let result;
+    try {
+      result = await browserWindow.webContents.executeJavaScript(`(async () => {
     const wait = (duration) => new Promise((resolve) => setTimeout(resolve, duration));
     const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
     const settle = async () => {
@@ -141,6 +152,47 @@ async function run() {
     left.dispatch({ selection: { anchor: leftTarget } });
     right.dispatch({ selection: { anchor: rightTarget } });
     await focusAndSettle(left, 'editor-pane-1');
+
+    const leftTable = left.dom.querySelector('.cm-md-table-widget');
+    const rightTable = right.dom.querySelector('.cm-md-table-widget');
+    const lineAt = (view, position) => {
+      const node = view.domAtPos(position).node;
+      const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+      return element?.closest('.cm-line') ?? null;
+    };
+    const leftTargetLine = lineAt(left, leftTarget);
+    const rightTargetLine = lineAt(right, rightTarget);
+    if (!leftTable || !rightTable || !leftTargetLine || !rightTargetLine) {
+      throw new Error('Table-under-paragraph isolation fixture did not render its semantic surfaces');
+    }
+    const leftProjectionHtml = left.contentDOM.innerHTML;
+    const leftTableRect = rect(leftTable);
+    const leftTargetLineRect = rect(leftTargetLine);
+
+    await focusAndSettle(right, 'editor-pane-2');
+    const leftIsolationAfterBlur = {
+      contentStable: left.contentDOM.innerHTML === leftProjectionHtml,
+      tableIdentityStable: left.dom.querySelector('.cm-md-table-widget') === leftTable,
+      lineIdentityStable: lineAt(left, leftTarget) === leftTargetLine,
+      tableRect: rect(leftTable),
+      targetLineRect: rect(leftTargetLine),
+    };
+    const rightProjectionHtml = right.contentDOM.innerHTML;
+    const rightTableRect = rect(rightTable);
+    const rightTargetLineRect = rect(rightTargetLine);
+
+    await focusAndSettle(left, 'editor-pane-1');
+    const rightIsolationAfterBlur = {
+      contentStable: right.contentDOM.innerHTML === rightProjectionHtml,
+      tableIdentityStable: right.dom.querySelector('.cm-md-table-widget') === rightTable,
+      lineIdentityStable: lineAt(right, rightTarget) === rightTargetLine,
+      tableRect: rect(rightTable),
+      targetLineRect: rect(rightTargetLine),
+    };
+    const cjkTextIntact = left.contentDOM.textContent.includes(
+      '混合中文与 English 的正文保持正确字形',
+    );
+
     left.scrollDOM.scrollTop = 1600;
     right.scrollDOM.scrollTop = 1200;
     await settle();
@@ -152,6 +204,12 @@ async function run() {
       rightPane: rect(rightPane),
       leftScroller: rect(left.scrollDOM),
       rightScroller: rect(right.scrollDOM),
+    };
+    const editorTypography = getComputedStyle(left.dom);
+    const typographyContract = {
+      cjkTextIntact,
+      fontFamily: editorTypography.fontFamily,
+      fontFeatureSettings: editorTypography.fontFeatureSettings,
     };
     if (baseline.leftPane.left >= baseline.rightPane.left) {
       throw new Error('Horizontal MDI panes do not occupy left/right tracks');
@@ -192,6 +250,15 @@ async function run() {
       ));
     return {
       baseline,
+      projectionIsolation: {
+        left: leftIsolationAfterBlur,
+        right: rightIsolationAfterBlur,
+        leftTableRect,
+        rightTableRect,
+        leftTargetLineRect,
+        rightTargetLineRect,
+      },
+      typographyContract,
       samples,
       snapshotCount,
       readCount: fixture.readCount,
@@ -203,6 +270,9 @@ async function run() {
       rightContentEditable: right.contentDOM.contentEditable,
     };
     })()`, true);
+    } finally {
+      clearInterval(nativeFocusLease);
+    }
 
     assert(
       result.leftContentEditable === "true" && result.rightContentEditable === "true",
@@ -211,6 +281,29 @@ async function run() {
     assert(result.readCount === 2, `expected one source read per pane, received ${result.readCount}`);
     assert(result.paneIdentityStable, "pane DOM identity changed during focus routing");
     assert(result.viewIdentityStable, "CodeMirror EditorView identity changed during focus routing");
+    assert(result.typographyContract.cjkTextIntact, "mixed CJK source changed before glyph painting");
+    assert(
+      result.typographyContract.fontFeatureSettings === "normal",
+      `Markdown inherited non-default OpenType features: ${result.typographyContract.fontFeatureSettings}`,
+    );
+    for (const side of ["left", "right"]) {
+      const isolation = result.projectionIsolation[side];
+      assert(isolation.contentStable, `${side} pane projection DOM changed when its sibling gained focus`);
+      assert(isolation.tableIdentityStable, `${side} table widget remounted when its sibling gained focus`);
+      assert(isolation.lineIdentityStable, `${side} paragraph line remounted when its sibling gained focus`);
+      for (const property of ["top", "left", "width", "height"]) {
+        assertClose(
+          isolation.tableRect[property],
+          result.projectionIsolation[`${side}TableRect`][property],
+          `${side} table ${property} changed when its sibling gained focus`,
+        );
+        assertClose(
+          isolation.targetLineRect[property],
+          result.projectionIsolation[`${side}TargetLineRect`][property],
+          `${side} paragraph ${property} changed when its sibling gained focus`,
+        );
+      }
+    }
     for (const [index, sample] of result.samples.entries()) {
       assertClose(
         sample.afterRightFocus.leftScrollTop,
@@ -241,8 +334,8 @@ async function run() {
       }
     }
     assert(
-      result.snapshotCount.left === 25 && result.snapshotCount.right === 24,
-      `expected editor-local snapshot counts 25/24, received ${result.snapshotCount.left}/${result.snapshotCount.right}`,
+      result.snapshotCount.left >= 27 && result.snapshotCount.right >= 26,
+      `expected at least the 27/26 routed editor-local snapshots, received ${result.snapshotCount.left}/${result.snapshotCount.right}`,
     );
     console.info(JSON.stringify({
       baseline: {

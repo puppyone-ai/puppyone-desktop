@@ -48,6 +48,12 @@ describe("typography architecture", () => {
     const defaults = resolveTypography(DEFAULT_TYPOGRAPHY_PREFERENCES);
     expect(defaults.ui.family).toContain('"Geist Sans"');
     expect(defaults.content.family).toBe(defaults.ui.family);
+    expect(defaults.content.family.indexOf('"PingFang SC"')).toBeGreaterThan(
+      defaults.content.family.indexOf('"Geist Sans"'),
+    );
+    expect(defaults.content.family.indexOf('ui-sans-serif')).toBeGreaterThan(
+      defaults.content.family.indexOf('"PingFang SC"'),
+    );
     expect(defaults.code.family).toContain('"Geist Mono"');
     expect(defaults.terminal.family).toBe(
       '"SF Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
@@ -96,6 +102,7 @@ describe("typography architecture", () => {
 
   it("binds content surfaces and metric-sensitive consumers to semantic contracts", () => {
     const tokens = source("src/styles/tokens.css");
+    const base = source("src/styles/base.css");
     const markdown = source("packages/shared-ui/src/styles/editor/markdown-editor.css");
     const plainText = source("packages/shared-ui/src/styles/editor/editor-chrome.css");
     const agentTranscript = source("src/features/desktop-agent/ui/styles/transcript.css");
@@ -110,7 +117,11 @@ describe("typography architecture", () => {
     expect(tokens).toContain("--po-font-terminal: var(--font-terminal-mono);");
     expect(tokens).toContain("--po-font-sans: var(--po-font-ui);");
     expect(tokens).toContain("--po-font-mono: var(--po-font-code);");
+    expect(tokens).toContain('"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC"');
+    expect(base).toContain("font-feature-settings: normal;");
+    expect(base).not.toContain("'cv02'");
     expect(markdown).toContain("font-family: var(--po-font-content, var(--po-font-sans));");
+    expect(markdown).toContain("font-feature-settings: normal;");
     expect(plainText).toContain("font-family: var(--po-font-content, var(--po-font-sans));");
     expect(agentTranscript).toContain("font-family: var(--po-font-content, var(--po-font-sans));");
     expect(terminalAppearance).toContain('getPropertyValue("--po-font-terminal")');

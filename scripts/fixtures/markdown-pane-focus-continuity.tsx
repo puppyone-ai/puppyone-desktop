@@ -33,9 +33,20 @@ declare global {
 }
 
 const paths = ["left-focus-continuity.md", "right-focus-continuity.md"] as const;
-const source = Array.from({ length: 260 }, (_, index) => (
-  `- [${index % 3 === 0 ? "x" : " "}] Task ${index + 1} exercises **focus continuity** with enough text to wrap across multiple visual rows in a side-by-side Markdown pane.`
-)).join("\n");
+const source = [
+  "| Pane | Projection | Geometry |",
+  "| --- | --- | --- |",
+  "| left | isolated | stable |",
+  "| right | isolated | stable |",
+  "| 中文 | 字形回退 | 稳定 |",
+  "",
+  "Paragraph immediately below the table keeps **focus continuity** without rebuilding sibling-pane line boxes.",
+  "混合中文与 English 的正文保持正确字形，不继承仅适用于拉丁字体的特性标签。",
+  "",
+  ...Array.from({ length: 260 }, (_, index) => (
+    `- [${index % 3 === 0 ? "x" : " "}] Task ${index + 1} provides enough wrapped content to exercise independent scroll anchoring in a side-by-side Markdown pane.`
+  )),
+].join("\n");
 const tree: DataNode[] = paths.map((path) => ({
   id: path,
   name: path,

@@ -26,7 +26,9 @@ body {
   color: var(--po-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'ss01';
+  /* Low-level OpenType variants must not leak into fallback fonts. Mixed CJK
+     content commonly crosses multiple font faces inside one line. */
+  font-feature-settings: normal;
 }
 
 button {

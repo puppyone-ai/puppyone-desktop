@@ -1,5 +1,5 @@
 import { Facet, type Extension } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
+import { EditorView, ViewPlugin } from "@codemirror/view";
 import { findWikiLinkTokens } from "../links/wikiLinkModel";
 import { findMarkdownLinkTokens, isExternalMarkdownHref } from "../links/markdownLinkModel";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
@@ -12,6 +12,7 @@ import {
 import { getDocRevision } from "../../platform/brokers/transactionBroker";
 import { isSafeHref } from "../../platform/policy/markdownUrlPolicy";
 import { getInlineRevealElement, type MarkdownElement } from "../syntax/markdownElements";
+import { MarkdownLinkInteractionSession } from "../state/markdownLinkInteraction";
 import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../../../registry/viewerTypes";
 
 export const markdownHtmlTrustModeFacet = Facet.define<MarkdownHtmlTrustMode, MarkdownHtmlTrustMode>({
@@ -71,6 +72,7 @@ export function markdownLivePreviewContextExtension(
     markdownWorkspaceIdFacet.of(workspaceId),
     markdownWorkspaceRootFacet.of(workspaceRoot),
     markdownLinkModifierClassHandler,
+    markdownLinkInteractionPlugin,
     markdownLinkOpenHandler,
   ];
 }
@@ -133,20 +135,25 @@ function setMarkdownLinkModifierClass(view: EditorView, active: boolean) {
   view.dom.classList.toggle(MARKDOWN_LINK_OPEN_MODIFIER_CLASS, active);
 }
 
+const markdownLinkInteractionPlugin = ViewPlugin.define<MarkdownLinkInteractionSession>(
+  () => new MarkdownLinkInteractionSession(),
+);
+
 const markdownLinkOpenHandler = EditorView.domEventHandlers({
   mousedown(event, view) {
     if (event.button !== 0) return false;
     const opened = openMarkdownLinkFromEvent(event, view);
-    if (opened) suppressNextMouseLinkClickUntil = Date.now() + 700;
+    const session = view.plugin(markdownLinkInteractionPlugin);
+    if (opened) session?.recordHandledMouseDown();
     return opened;
   },
   click(event, view) {
+    const session = view.plugin(markdownLinkInteractionPlugin);
     if (
-      event.detail > 0 &&
-      suppressNextMouseLinkClickUntil >= Date.now() &&
-      getMarkdownLinkElementFromEvent(event, view)
+      event.detail > 0
+      && getMarkdownLinkElementFromEvent(event, view)
+      && session?.consumeDuplicateClick()
     ) {
-      suppressNextMouseLinkClickUntil = 0;
       event.preventDefault();
       event.stopPropagation();
       return true;
@@ -162,8 +169,6 @@ const markdownLinkOpenHandler = EditorView.domEventHandlers({
     return openMarkdownLinkFromEvent(event, view);
   },
 });
-
-let suppressNextMouseLinkClickUntil = 0;
 
 function openMarkdownLinkFromEvent(event: Event, view: EditorView): boolean {
   if (event.defaultPrevented) return false;

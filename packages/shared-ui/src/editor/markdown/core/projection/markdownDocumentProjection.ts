@@ -33,7 +33,7 @@ import {
   type MarkdownRevealedSourceRange,
 } from "../state/revealedSource";
 import { getLivePreviewFocusState } from "../state/livePreviewFocus";
-import { getInlineRevealElement } from "../syntax/markdownElements";
+import { resolvePaneLocalInlineRevealRange } from "../state/livePreviewReveal";
 import { getMarkdownPlansInRange } from "../plans/markdownPlanIndex";
 import { getDocRevision } from "../../platform/brokers/transactionBroker";
 
@@ -87,7 +87,12 @@ export const markdownLivePreviewDecorations = StateField.define<MarkdownDocument
     const inputComposing = getInputCompositionState(previous.inputComposing, transaction.effects);
     const composingLine = transaction.state.field(markdownComposingBlockLineField, false) ?? null;
     const revealedSourceRange = transaction.state.field(markdownRevealedSourceField, false) ?? null;
-    const revealRange = getLivePreviewInlineRevealRange(transaction.state, focused);
+    const revealRange = resolvePaneLocalInlineRevealRange(
+      previous.revealRange,
+      previous.focused,
+      transaction,
+      focused,
+    );
     const contextInvalidation = getDecorationContextInvalidation(transaction);
 
     let decorations = previous.decorations.map(transaction.changes);
@@ -472,17 +477,6 @@ function mergeProjectionRanges(ranges: readonly InlineRevealRange[]): InlineReve
     }
   }
   return merged;
-}
-
-function getLivePreviewInlineRevealRange(
-  state: EditorState,
-  focused: boolean,
-): InlineRevealRange | null {
-  if (!focused || state.readOnly || state.selection.ranges.length !== 1) return null;
-  const selection = state.selection.main;
-  if (!selection.empty) return null;
-  const element = getInlineRevealElement(state, selection.from);
-  return element ? { from: element.from, to: element.to } : null;
 }
 
 function getDecorationContextInvalidation(
