@@ -66,7 +66,7 @@ describe("active Document Session registry", () => {
   });
 
   it("keeps an unmounted dirty session registered until its destroy write is durable", async () => {
-    const write = deferred<{ version: string }>();
+    const write = deferred<{ ok: true; version: string }>();
     const persist = vi.fn(() => write.promise);
     const session = new DocumentEditingSession({
       documentId: "old.md",
@@ -75,6 +75,7 @@ describe("active Document Session registry", () => {
       saveMode: "auto",
       persistence: {
         kind: "local-fs",
+        storageIdentity: "test:active-document-sessions",
         persist,
       },
     });
@@ -82,7 +83,7 @@ describe("active Document Session registry", () => {
       readSnapshot: () => ({ revision: "r2", content: "after" }),
       replaceContent: (content) => ({ revision: "external", content }),
     });
-    session.reportRevision({ revision: "r2", dirty: true });
+    session.reportRevision({ revision: "r2", origin: "local-edit" });
     const unregister = registerActiveDocumentSession(session);
 
     unregister();
@@ -94,7 +95,7 @@ describe("active Document Session registry", () => {
     await Promise.resolve();
     expect(closeSettled).toBe(false);
 
-    write.resolve({ version: "v2" });
+    write.resolve({ ok: true, version: "v2" });
     await closeDrain;
     expect(closeSettled).toBe(true);
     expect(persist).toHaveBeenCalledOnce();

@@ -5,8 +5,8 @@ import {
   DesktopMenuIconButton,
   DesktopMenuItem,
   DesktopMenuSection,
-  DesktopMenuSurface,
 } from "../../components/DesktopMenu";
+import { DesktopTitlebarMenuLayer } from "./DesktopTitlebarMenuLayer";
 import { writeClipboardText } from "../settings/utils";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
 
@@ -75,31 +75,35 @@ export function DesktopWorkspaceSwitcher({
         <bdi className="desktop-titlebar-workspace-name">{titlebarLabel}</bdi>
       </button>
 
-      {open && (
-        <DesktopMenuSurface className="desktop-project-menu desktop-titlebar-menu">
+      <DesktopTitlebarMenuLayer
+        anchorRef={refObject}
+        className="desktop-project-menu"
+        gap={compact ? 8 : 4}
+        open={open}
+        preferredMaxHeight={520}
+      >
+        <DesktopMenuItem
+          className="desktop-project-add desktop-project-home"
+          icon={<ArrowLeft className="po-directional-icon" size={14} />}
+          label={t("shell.workspaceSwitcher.home")}
+          onClick={onGoHome}
+        />
+        <div className="desktop-project-list" data-po-scrollbar="menu">
+          {items.length > 0 && (
+            <DesktopMenuSection className="desktop-project-section" aria-label={t("shell.workspaceSwitcher.localProjects")}>
+              {renderProjectRows(items)}
+            </DesktopMenuSection>
+          )}
+        </div>
+        <div className="desktop-project-actions">
           <DesktopMenuItem
-            className="desktop-project-add desktop-project-home"
-            icon={<ArrowLeft className="po-directional-icon" size={14} />}
-            label={t("shell.workspaceSwitcher.home")}
-            onClick={onGoHome}
+            className="desktop-project-add"
+            icon={<FolderOpen size={14} />}
+            label={t("shell.workspaceSwitcher.openLocalFolder")}
+            onClick={onOpenFolder}
           />
-          <div className="desktop-project-list" data-po-scrollbar="menu">
-            {items.length > 0 && (
-              <DesktopMenuSection className="desktop-project-section" aria-label={t("shell.workspaceSwitcher.localProjects")}>
-                {renderProjectRows(items)}
-              </DesktopMenuSection>
-            )}
-          </div>
-          <div className="desktop-project-actions">
-            <DesktopMenuItem
-              className="desktop-project-add"
-              icon={<FolderOpen size={14} />}
-              label={t("shell.workspaceSwitcher.openLocalFolder")}
-              onClick={onOpenFolder}
-            />
-          </div>
-        </DesktopMenuSurface>
-      )}
+        </div>
+      </DesktopTitlebarMenuLayer>
     </div>
   );
 }

@@ -6,9 +6,9 @@ import type {
   EditorSourceRevision,
   EditorSourceSnapshotPort,
 } from "../sourceSnapshot";
-import type { EditorSaveMode } from "../viewerTypes";
+import type { EditorSaveMode } from "../registry/viewerTypes";
 
-export type DocumentSessionStatus = "clean" | "dirty" | "saving" | "saved" | "error";
+export type DocumentSessionStatus = "clean" | "dirty" | "saving" | "saved" | "conflict" | "error";
 
 export type DocumentSessionErrorCode = "external-conflict" | "persistence-failed";
 
@@ -59,12 +59,12 @@ export type DocumentSessionDrainReason = Extract<
 export type EditableDocumentSource = {
   attachSource: (source: EditorSourceSnapshotPort) => () => void;
   reportRevision: (revision: EditorSourceRevision) => void;
-  reconcileExternalBaseline: (content: string, version?: string | null) => ExternalBaselineResult;
 };
 
 /** Host-only lifecycle handle used by the boundary and close registry. */
 export type DocumentEditingSessionHandle = EditableDocumentSource & {
   readonly documentId: string;
+  reconcileExternalBaseline: (content: string, version?: string | null) => ExternalBaselineResult;
   requestSave: () => Promise<void>;
   resolveExternalConflict: (resolution: ExternalConflictResolution) => Promise<void>;
   /** Read and durably drain the current source before navigation or host close. */

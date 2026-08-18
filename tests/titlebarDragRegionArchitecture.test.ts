@@ -8,6 +8,7 @@ const windowChromeComponent = readFileSync(
   new URL("../src/components/DesktopWindowChrome.tsx", import.meta.url),
   "utf8",
 );
+const electronMain = readFileSync(new URL("../electron/main.mjs", import.meta.url), "utf8");
 const desktopShell = readFileSync(new URL("../src/components/DesktopCloudShell.tsx", import.meta.url), "utf8");
 const desktopMenu = readFileSync(new URL("../src/components/DesktopMenu.tsx", import.meta.url), "utf8");
 const sharedWorkspaceCss = readFileSync(
@@ -34,5 +35,12 @@ describe("titlebar drag-region architecture", () => {
     expect(desktopMenu).toContain('data-window-no-drag="true"');
     expect(sharedWorkspaceCss).not.toContain("-webkit-app-region");
     expect(sharedWorkspaceCss).not.toContain("data-window-drag-region");
+  });
+
+  it("keeps the native fullscreen reveal bar free of application titles", () => {
+    expect(electronMain).toContain('window.on("enter-full-screen"');
+    expect(electronMain).toContain('window.setTitle("");');
+    expect(electronMain).toContain('window.on("leave-full-screen"');
+    expect(electronMain).toContain("window.setTitle(resolveWindowTitle(window));");
   });
 });

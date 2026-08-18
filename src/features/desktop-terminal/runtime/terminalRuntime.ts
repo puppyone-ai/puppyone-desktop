@@ -5,49 +5,61 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal, type IDisposable } from "@xterm/xterm";
 import type { DesktopTerminalSessionStatus } from "../model/terminalSessions";
+import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
 import {
   applyTerminalAppearance,
   readTerminalFontFamily,
   readTerminalFontSize,
   readTerminalTheme,
 } from "./terminalAppearance";
+import { TerminalActivityController } from "./terminalActivity";
 
 type TerminalSize = {
   cols: number;
   rows: number;
 };
 
+type TerminalExit = {
+  code: number | null;
+  signal: string | null;
+};
+
 type TerminalRuntimeOptions = {
   sessionId: string;
+  launcherId: DesktopTerminalLauncherId;
   workspacePath: string;
   getMessageFormatter: () => MessageFormatter;
   onStatus: (
     sessionId: string,
     status: DesktopTerminalSessionStatus,
     shell?: string | null,
+    error?: string | null,
   ) => void;
 };
 
 export interface TerminalRuntimeHandle {
+  readonly activity: boolean;
   readonly ready: boolean;
-  readonly title: string;
   applyAppearance: () => void;
   dispose: () => void;
   focus: () => void;
   mount: (container: HTMLDivElement) => void;
+  unmount: (container: HTMLDivElement) => void;
   setActive: (active: boolean) => void;
+  subscribeActivity: (listener: (active: boolean) => void) => () => void;
   subscribeReady: (listener: (ready: boolean) => void) => () => void;
-  subscribeTitle: (listener: (title: string) => void) => () => void;
   write: (data: string) => void;
 }
 
 export class TerminalRuntime implements TerminalRuntimeHandle {
   private readonly sessionId: string;
+  private readonly launcherId: DesktopTerminalLauncherId;
   private readonly workspacePath: string;
   private readonly getMessageFormatter: () => MessageFormatter;
   private readonly onStatus: TerminalRuntimeOptions["onStatus"];
+  private readonly activityController: TerminalActivityController;
+  private readonly activityListeners = new Set<(active: boolean) => void>();
   private readonly readyListeners = new Set<(ready: boolean) => void>();
-  private readonly titleListeners = new Set<(title: string) => void>();
   private readonly disposables: IDisposable[] = [];
   private terminal: Terminal | null = null;
   private fitAddon: FitAddon | null = null;
@@ -66,43 +78,73 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   private pendingPtySize: TerminalSize | null = null;
   private lastPtySize: TerminalSize | null = null;
   private ptyReady = false;
+  private pendingExit: TerminalExit | null = null;
   private active = false;
+  private hasBeenActive = false;
   private disposed = false;
   private viewReady = false;
-  private terminalTitle = "";
 
-  constructor({ sessionId, workspacePath, getMessageFormatter, onStatus }: TerminalRuntimeOptions) {
+  constructor({
+    sessionId,
+    launcherId,
+    workspacePath,
+    getMessageFormatter,
+    onStatus,
+  }: TerminalRuntimeOptions) {
     this.sessionId = sessionId;
+    this.launcherId = launcherId;
     this.workspacePath = workspacePath;
     this.getMessageFormatter = getMessageFormatter;
     this.onStatus = onStatus;
+    this.activityController = new TerminalActivityController({
+      launcherId,
+      onChange: (activity) => {
+        this.activityListeners.forEach((listener) => listener(activity));
+      },
+    });
+  }
+
+  get activity() {
+    return this.activityController.active;
   }
 
   get ready() {
     return this.viewReady;
   }
 
-  get title() {
-    return this.terminalTitle;
-  }
-
   mount(container: HTMLDivElement) {
     if (this.disposed) return;
-    if (this.container && this.container !== container) {
-      throw new Error(`Terminal runtime ${this.sessionId} is already mounted.`);
-    }
+    if (this.container === container) return;
+    if (this.container) this.unmount(this.container);
     this.container = container;
     if (this.terminal) {
+      const terminalElement = this.terminal.element;
+      if (terminalElement && terminalElement.parentElement !== container) {
+        container.appendChild(terminalElement);
+      }
+      this.observeSize(container);
+      this.observeSidebarTransition(container);
+      this.applyAppearance();
       this.scheduleFit();
       return;
     }
     this.initializeTerminal(container);
   }
 
+  unmount(container: HTMLDivElement) {
+    if (this.disposed || this.container !== container) return;
+    this.active = false;
+    this.stopObservingContainer();
+    this.container = null;
+  }
+
   setActive(active: boolean) {
     if (this.disposed || this.active === active) return;
     this.active = active;
     if (!active) return;
+    const reactivating = this.hasBeenActive;
+    this.hasBeenActive = true;
+    if (reactivating) this.activityController.beginPresentationRefresh();
     this.scheduleFit();
     requestAnimationFrame(() => {
       if (!this.disposed && this.active) this.terminal?.focus();
@@ -127,10 +169,10 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     return () => this.readyListeners.delete(listener);
   }
 
-  subscribeTitle(listener: (title: string) => void) {
-    this.titleListeners.add(listener);
-    listener(this.terminalTitle);
-    return () => this.titleListeners.delete(listener);
+  subscribeActivity(listener: (active: boolean) => void) {
+    this.activityListeners.add(listener);
+    listener(this.activityController.active);
+    return () => this.activityListeners.delete(listener);
   }
 
   applyAppearance() {
@@ -143,11 +185,13 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     if (this.disposed) return;
     this.disposed = true;
     this.ptyReady = false;
+    this.pendingExit = null;
     this.pendingPtySize = null;
     this.lastPtySize = null;
     this.setReady(false);
+    this.activityController.dispose();
+    this.activityListeners.clear();
     this.readyListeners.clear();
-    this.titleListeners.clear();
 
     if (this.fitFrame !== null) cancelAnimationFrame(this.fitFrame);
     if (this.revealFrame !== null) cancelAnimationFrame(this.revealFrame);
@@ -156,16 +200,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     this.revealFrame = null;
     this.scrollbarIdleTimer = null;
     this.container?.classList.remove("po-scrollbar-active");
-    this.resizeObserver?.disconnect();
-    this.resizeObserver = null;
-    if (this.terminalSidebarElement && this.sidebarTransitionEndListener) {
-      this.terminalSidebarElement.removeEventListener(
-        "transitionend",
-        this.sidebarTransitionEndListener,
-      );
-    }
-    this.terminalSidebarElement = null;
-    this.sidebarTransitionEndListener = null;
+    this.stopObservingContainer();
     this.removeDataListener?.();
     this.removeExitListener?.();
     this.removeDataListener = null;
@@ -220,7 +255,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
       terminal.onRender(() => this.setReady(true)),
       terminal.onData((data) => this.write(data)),
       terminal.onScroll(() => this.markScrollbarActive()),
-      terminal.onTitleChange((title) => this.setTitle(title)),
+      terminal.onTitleChange((title) => this.activityController.noteTitle(title)),
     );
     terminal.open(container);
     this.loadWebglRenderer();
@@ -261,16 +296,17 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
 
     this.removeDataListener = bridge.onTerminalData((event) => {
       if (event.id !== this.sessionId || this.disposed) return;
+      this.activityController.noteOutput(event.data);
       this.terminal?.write(event.data);
     });
     this.removeExitListener = bridge.onTerminalExit((event) => {
       if (event.id !== this.sessionId || this.disposed) return;
-      const exitText = event.signal
-        ? this.message("terminal.processExitedSignal", { signal: bidiIsolate(event.signal) })
-        : this.message("terminal.processExitedCode", { code: event.code ?? 0 });
-      this.terminal?.writeln(`\r\n\x1b[38;5;244m${exitText}\x1b[0m`);
-      this.ptyReady = false;
-      this.onStatus(this.sessionId, "exited");
+      const terminalExit = { code: event.code, signal: event.signal };
+      if (!this.ptyReady) {
+        this.pendingExit = terminalExit;
+        return;
+      }
+      this.handleExit(terminalExit);
     });
   }
 
@@ -278,8 +314,9 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     const bridge = window.puppyoneDesktop;
     this.onStatus(this.sessionId, "starting");
     if (!bridge?.createTerminal || !bridge.writeTerminal || !bridge.resizeTerminal) {
-      this.writeSystemLine(this.message("terminal.bridgeUnavailable"));
-      this.onStatus(this.sessionId, "error");
+      const errorMessage = this.message("terminal.bridgeUnavailable");
+      this.writeSystemLine(errorMessage);
+      this.onStatus(this.sessionId, "error", undefined, errorMessage);
       return;
     }
 
@@ -290,6 +327,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
       cwd: this.workspacePath,
       cols: terminal.cols,
       rows: terminal.rows,
+      launcherId: this.launcherId,
     }).then((result) => {
       if (this.disposed) {
         void bridge.closeTerminal(result.id);
@@ -301,15 +339,36 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
         cols: terminal.cols,
         rows: terminal.rows,
       });
+      if (this.pendingExit) {
+        const pendingExit = this.pendingExit;
+        this.pendingExit = null;
+        this.handleExit(pendingExit);
+        return;
+      }
       if (this.active) terminal.focus();
     }).catch((error) => {
       if (this.disposed) return;
-      this.onStatus(this.sessionId, "error");
-      this.writeSystemLine(formatTerminalError(error, this.getMessageFormatter()));
+      this.pendingExit = null;
+      const errorMessage = this.launcherId === "shell"
+        ? formatTerminalError(error, this.getMessageFormatter())
+        : formatTerminalLaunchError(error, this.getMessageFormatter());
+      this.onStatus(this.sessionId, "error", undefined, errorMessage);
+      this.writeSystemLine(errorMessage);
     });
   }
 
+  private handleExit(event: TerminalExit) {
+    this.activityController.reset();
+    const exitText = event.signal
+      ? this.message("terminal.processExitedSignal", { signal: bidiIsolate(event.signal) })
+      : this.message("terminal.processExitedCode", { code: event.code ?? 0 });
+    this.terminal?.writeln(`\r\n\x1b[38;5;244m${exitText}\x1b[0m`);
+    this.ptyReady = false;
+    this.onStatus(this.sessionId, "exited");
+  }
+
   private observeSize(container: HTMLDivElement) {
+    this.resizeObserver?.disconnect();
     this.resizeObserver = new ResizeObserver(() => {
       if (this.active) this.scheduleFit();
     });
@@ -317,6 +376,12 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   }
 
   private observeSidebarTransition(container: HTMLDivElement) {
+    if (this.terminalSidebarElement && this.sidebarTransitionEndListener) {
+      this.terminalSidebarElement.removeEventListener(
+        "transitionend",
+        this.sidebarTransitionEndListener,
+      );
+    }
     this.terminalSidebarElement = container.closest(".desktop-right-sidebar");
     if (!this.terminalSidebarElement) return;
     this.sidebarTransitionEndListener = (event: Event) => {
@@ -331,6 +396,19 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
       "transitionend",
       this.sidebarTransitionEndListener,
     );
+  }
+
+  private stopObservingContainer() {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
+    if (this.terminalSidebarElement && this.sidebarTransitionEndListener) {
+      this.terminalSidebarElement.removeEventListener(
+        "transitionend",
+        this.sidebarTransitionEndListener,
+      );
+    }
+    this.terminalSidebarElement = null;
+    this.sidebarTransitionEndListener = null;
   }
 
   private scheduleFit() {
@@ -363,7 +441,9 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     if (sameTerminalSize(this.lastPtySize, size)) return;
     const bridge = window.puppyoneDesktop;
     if (!bridge?.resizeTerminal) return;
+    const resizingExistingPty = this.lastPtySize !== null;
     this.lastPtySize = size;
+    if (resizingExistingPty) this.activityController.beginPresentationRefresh();
     bridge.resizeTerminal({
       id: this.sessionId,
       cols: size.cols,
@@ -419,11 +499,6 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     this.readyListeners.forEach((listener) => listener(ready));
   }
 
-  private setTitle(title: string) {
-    if (this.terminalTitle === title) return;
-    this.terminalTitle = title;
-    this.titleListeners.forEach((listener) => listener(title));
-  }
 }
 
 function sameTerminalSize(left: TerminalSize | null, right: TerminalSize) {
@@ -452,4 +527,26 @@ function formatTerminalError(error: unknown, t: MessageFormatter) {
     return t("terminal.runtimeRestartRequired");
   }
   return t("terminal.errorDetail", { detail: bidiIsolate(message) });
+}
+
+function formatTerminalLaunchError(error: unknown, t: MessageFormatter) {
+  if (messageFrom(error).includes("No handler registered for 'terminal:create'")) {
+    return t("terminal.runtimeRestartRequired");
+  }
+  return formatAgentLaunchError(error, t);
+}
+
+function formatAgentLaunchError(error: unknown, t: MessageFormatter) {
+  const message = messageFrom(error);
+  if (message.includes("TERMINAL_AGENT_UNAVAILABLE")) {
+    return t("terminal.launcher.agentUnavailable");
+  }
+  if (message.includes("TERMINAL_AGENT_START_FAILED")) {
+    return t("terminal.launcher.agentStartFailed");
+  }
+  return t("terminal.launcher.agentStartFailed");
+}
+
+function messageFrom(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }

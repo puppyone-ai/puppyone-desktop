@@ -14,25 +14,23 @@ import {
   desktopTerminalSessionsReducer,
   type DesktopTerminalSessionSnapshot,
 } from "../model/terminalSessions";
+import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
 import { TerminalRuntimeRegistry } from "../runtime/terminalRuntimeRegistry";
 
 type UseTerminalSessionsOptions = {
-  initiallyActive: boolean;
   messageFormatter: MessageFormatter;
   onSessionsChange: (snapshot: DesktopTerminalSessionSnapshot) => void;
   workspacePath: string;
 };
 
 export function useTerminalSessions({
-  initiallyActive,
   messageFormatter,
   onSessionsChange,
   workspacePath,
 }: UseTerminalSessionsOptions) {
-  const [initialSessionId] = useState(() => (initiallyActive ? createTerminalId() : null));
   const [state, dispatch] = useReducer(
     desktopTerminalSessionsReducer,
-    initialSessionId,
+    null,
     createDesktopTerminalSessionsState,
   );
   const [pendingCloseSessionId, setPendingCloseSessionId] = useState<string | null>(null);
@@ -46,18 +44,37 @@ export function useTerminalSessions({
     const registry = new TerminalRuntimeRegistry({
       workspacePath,
       getMessageFormatter: () => messageFormatterRef.current,
-      onStatus: (sessionId, status, shell) => {
-        dispatch({ type: "runtime-status", sessionId, status, shell });
+      onStatus: (sessionId, status, shell, error) => {
+        dispatch({
+          type: "runtime-status",
+          sessionId,
+          status,
+          shell,
+          error: status === "error"
+            ? error ?? messageFormatterRef.current("terminal.launcher.agentStartFailed")
+            : error,
+        });
       },
     });
-    if (initialSessionId) registry.ensure(initialSessionId);
     return registry;
   });
 
-  const createSession = useCallback(() => {
+  const createSession = useCallback((launcherId: DesktopTerminalLauncherId = "shell") => {
     const sessionId = createTerminalId();
-    runtimeRegistry.ensure(sessionId);
-    dispatch({ type: "create", sessionId });
+    runtimeRegistry.ensure(sessionId, launcherId);
+    dispatch({ type: "create", sessionId, launcherId });
+  }, [runtimeRegistry]);
+
+  const createLauncher = useCallback(() => {
+    dispatch({ type: "create-launcher", sessionId: createTerminalId() });
+  }, []);
+
+  const launchSession = useCallback((
+    sessionId: string,
+    launcherId: DesktopTerminalLauncherId,
+  ) => {
+    runtimeRegistry.ensure(sessionId, launcherId);
+    dispatch({ type: "launch", sessionId, launcherId });
   }, [runtimeRegistry]);
 
   const activateSession = useCallback((sessionId: string) => {
@@ -70,8 +87,13 @@ export function useTerminalSessions({
   }, [runtimeRegistry]);
 
   const requestCloseSession = useCallback((sessionId: string) => {
+    const session = state.sessions.find((candidate) => candidate.id === sessionId);
+    if (session?.status === "selecting") {
+      dispatch({ type: "close", sessionId });
+      return;
+    }
     setPendingCloseSessionId(sessionId);
-  }, []);
+  }, [state.sessions]);
 
   const cancelCloseSession = useCallback(() => {
     setPendingCloseSessionId(null);
@@ -91,6 +113,14 @@ export function useTerminalSessions({
   useEffect(() => {
     onSessionsChangeRef.current(snapshot);
   }, [snapshot]);
+
+  useEffect(() => {
+    state.sessions.forEach((session) => {
+      if (session.status === "selecting" && session.launchError) {
+        runtimeRegistry.close(session.id);
+      }
+    });
+  }, [runtimeRegistry, state.sessions]);
 
   useEffect(() => {
     if (snapshotCleanupTimerRef.current !== null) {
@@ -116,7 +146,9 @@ export function useTerminalSessions({
     activateSession,
     cancelCloseSession,
     confirmCloseSession,
+    createLauncher,
     createSession,
+    launchSession,
     pendingCloseSession,
     requestCloseSession,
     runtimeRegistry,

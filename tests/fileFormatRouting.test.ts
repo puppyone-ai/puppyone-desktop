@@ -4,7 +4,7 @@ import {
   getResolvedFileExtension,
   resolveFileFormat,
 } from "../packages/shared-ui/src/core/fileFormats";
-import { getEditorSourceRequirement } from "../packages/shared-ui/src/editor/viewerRegistry";
+import { getEditorSourceRequirement } from "../packages/shared-ui/src/editor/registry/viewerRegistry";
 
 describe("Office family format routing", () => {
   it.each([

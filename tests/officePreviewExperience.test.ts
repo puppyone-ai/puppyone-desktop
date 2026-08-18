@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const officeViewerSource = readFileSync(
-  new URL("../packages/shared-ui/src/editor/viewers/OfficeViewer.tsx", import.meta.url),
+  new URL("../packages/shared-ui/src/editor/viewers/office/OfficeViewer.tsx", import.meta.url),
   "utf8",
 );
 const officePreviewCss = readFileSync(
@@ -10,15 +10,15 @@ const officePreviewCss = readFileSync(
   "utf8",
 );
 const wordPreviewSource = readFileSync(
-  new URL("../packages/shared-ui/src/editor/viewers/word/WordDocumentPreview.tsx", import.meta.url),
+  new URL("../packages/shared-ui/src/editor/viewers/office/word/WordDocumentPreview.tsx", import.meta.url),
   "utf8",
 );
 const officeFontCompatibilitySource = readFileSync(
-  new URL("../packages/shared-ui/src/editor/viewers/officeFontCompatibility.ts", import.meta.url),
+  new URL("../packages/shared-ui/src/editor/viewers/office/officeFontCompatibility.ts", import.meta.url),
   "utf8",
 );
 const viewerTypesSource = readFileSync(
-  new URL("../packages/shared-ui/src/editor/viewerTypes.ts", import.meta.url),
+  new URL("../packages/shared-ui/src/editor/registry/viewerTypes.ts", import.meta.url),
   "utf8",
 );
 const viewerArchitecture = readFileSync(
@@ -38,8 +38,8 @@ describe("lightweight Office preview experience", () => {
     expect(officeViewerSource).toContain("office-preview__floating-controls");
     expect(officeViewerSource).not.toMatch(/Ask Agent|continue editing|继续修改/i);
     expect(officeViewerSource).not.toContain("OfficeEditorViewer");
-    expect(viewerArchitecture).toContain("lightweight, read-only surface");
-    expect(viewerArchitecture).toContain("plugin marketplace");
+    expect(viewerArchitecture).toContain("只读资源");
+    expect(viewerArchitecture).toContain("Viewer Pack v1 固定只读");
   });
 
   it("renders Word on a stable paper surface with visible zoom and font compatibility", () => {

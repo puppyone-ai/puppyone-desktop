@@ -1,4 +1,4 @@
-import type { MarkdownLinkGraph } from "../../../viewerTypes";
+import type { MarkdownLinkGraph } from "../../../registry/viewerTypes";
 import { resolveMarkdownMediaReference } from "../media/markdownMediaReference";
 import type { MarkdownVideoModel } from "./markdownVideoModel";
 

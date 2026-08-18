@@ -1,0 +1,56 @@
+/* Header context follows its content instead of inheriting the Sidebar width. */
+
+.desktop-titlebar-left:has(.desktop-titlebar-sidebar-context) {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: visible;
+}
+
+.desktop-titlebar-left:has(.desktop-titlebar-sidebar-context) + .desktop-titlebar-drag-fill {
+  min-width: 32px;
+  flex: 0 10 120px;
+}
+
+.desktop-titlebar-sidebar-context {
+  --desktop-titlebar-context-max-width: 440px;
+  position: relative;
+  display: flex;
+  box-sizing: border-box;
+  height: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: center;
+  overflow: hidden;
+}
+
+.desktop-titlebar-sidebar-context[data-sidebar-state="expanded"] {
+  width: fit-content;
+  max-width: min(var(--desktop-titlebar-context-max-width), 100%);
+  flex: 0 1 auto;
+  padding-inline-end: 8px;
+}
+
+.desktop-titlebar-sidebar-context[data-sidebar-state="expanded"] .desktop-titlebar-context {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.desktop-titlebar-sidebar-context[data-sidebar-state="collapsed"] {
+  flex: 0 0 auto;
+  margin-inline-end: 4px;
+}
+
+.desktop-titlebar-editor-context {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  padding-inline-start: 8px;
+}
+
+.desktop-shell[data-titlebar-sidebar-state="expanded"] .desktop-titlebar-editor-context {
+  padding-inline-start: var(--po-pane-resizer-hit-size, 8px);
+}

@@ -38,7 +38,7 @@ import {
   getMarkdownFeatureComposition,
   markdownFeatureCompositionExtension,
 } from "./composition/markdownFeatureComposition";
-import type { MarkdownAssetUrlResolver, MarkdownDialectId, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownDialectId, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../registry/viewerTypes";
 import {
   DEFAULT_MARKDOWN_DIALECT,
   markdownDialectFacet,

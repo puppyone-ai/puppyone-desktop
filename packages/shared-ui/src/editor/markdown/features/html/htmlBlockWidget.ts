@@ -1,7 +1,7 @@
 import { EditorSelection } from "@codemirror/state";
 import { EditorView, WidgetType } from "@codemirror/view";
 import { bidiIsolate } from "@puppyone/localization/core";
-import type { MarkdownAssetUrlResolver } from "../../../viewerTypes";
+import type { MarkdownAssetUrlResolver } from "../../../registry/viewerTypes";
 import type { MarkdownHtmlBlockRenderProfile } from "../../core/features/markdownFeatureData";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { disposeWidgetSessionDom } from "../../platform/codemirror/widgetSession";

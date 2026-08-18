@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, MessageSquare, MoreHorizontal, Plus, Search, Settings2, SquareTerminal, Trash2 } from "lucide-react";
+import { Check, MessageSquare, MoreHorizontal, Plus, SquareTerminal, Trash2 } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
-import type { CsvViewSettingsContribution, EditorFindCommand } from "@puppyone/shared-ui";
 import {
   DesktopMenuIconButton,
   DesktopMenuItem,
@@ -21,10 +20,11 @@ type TerminalTitlebarSession = {
   id: string;
   ordinal: number;
   shell: string | null;
-  status: "starting" | "running" | "exited" | "error";
+  status: "selecting" | "starting" | "running" | "exited" | "error";
 };
 
 const terminalStatusMessageKey = {
+  selecting: "terminal.launcher.title",
   starting: "terminal.status.starting",
   running: "terminal.status.running",
   exited: "terminal.status.exited",
@@ -32,13 +32,6 @@ const terminalStatusMessageKey = {
 } as const;
 
 type DesktopTitlebarActionsProps = {
-  editorFindCommand?: EditorFindCommand | null;
-  activeFileExternalOpenTitle?: string;
-  activeFileExternalOpenAppName?: string | null;
-  activeFileExternalOpenIconDataUrl?: string | null;
-  activeFileExternalOpenLoading?: boolean;
-  canOpenActiveFileExternal: boolean;
-  csvViewSettings?: CsvViewSettingsContribution | null;
   desktopUpdateState?: DesktopUpdateState | null;
   titlebarActionsSettings: TitlebarActionsSettings;
   terminalSidebarOpen: boolean;
@@ -48,7 +41,6 @@ type DesktopTitlebarActionsProps = {
   activeTerminalSessionId: string | null;
   agentChatEnabled: boolean;
   agentChatSidebarOpen: boolean;
-  onOpenActiveFileExternal: () => void;
   onUpdateNow?: () => void;
   onCreateTerminal: () => void;
   onActivateTerminal: (sessionId: string) => void;
@@ -58,13 +50,6 @@ type DesktopTitlebarActionsProps = {
 };
 
 export function DesktopTitlebarActions({
-  editorFindCommand = null,
-  activeFileExternalOpenTitle,
-  activeFileExternalOpenAppName,
-  activeFileExternalOpenIconDataUrl,
-  activeFileExternalOpenLoading = false,
-  canOpenActiveFileExternal,
-  csvViewSettings = null,
   desktopUpdateState = null,
   titlebarActionsSettings,
   terminalSidebarOpen,
@@ -74,7 +59,6 @@ export function DesktopTitlebarActions({
   activeTerminalSessionId,
   agentChatEnabled,
   agentChatSidebarOpen,
-  onOpenActiveFileExternal,
   onUpdateNow = () => {},
   onCreateTerminal,
   onActivateTerminal,
@@ -86,14 +70,6 @@ export function DesktopTitlebarActions({
 
   const headerElementContext: HeaderElementRenderContext = {
     t,
-    externalOpen: {
-      appName: activeFileExternalOpenAppName,
-      canOpen: canOpenActiveFileExternal,
-      iconDataUrl: activeFileExternalOpenIconDataUrl,
-      loading: activeFileExternalOpenLoading,
-      onOpen: onOpenActiveFileExternal,
-      title: activeFileExternalOpenTitle,
-    },
     terminal: {
       enabled: terminalToolEnabled,
       onToggle: onToggleTerminal,
@@ -118,33 +94,6 @@ export function DesktopTitlebarActions({
           onUpdateNow={onUpdateNow}
         />
       ),
-    });
-  }
-
-  if (editorFindCommand) {
-    const findLabel = t("editor.find.label");
-    titlebarActionItems.push({
-      group: "header",
-      id: "editor-find",
-      node: (
-        <button
-          className="desktop-titlebar-action desktop-titlebar-editor-find"
-          type="button"
-          title={`${findLabel} (⌘F)`}
-          aria-label={findLabel}
-          onClick={editorFindCommand.open}
-        >
-          <Search aria-hidden="true" size={15} strokeWidth={1.8} />
-        </button>
-      ),
-    });
-  }
-
-  if (csvViewSettings) {
-    titlebarActionItems.push({
-      group: "header",
-      id: "csv-view-settings",
-      node: <CsvViewSettingsTitlebarMenu settings={csvViewSettings} />,
     });
   }
 
@@ -215,117 +164,6 @@ export function DesktopTitlebarActions({
         );
       })}
     </>
-  );
-}
-
-function CsvViewSettingsTitlebarMenu({
-  settings,
-}: {
-  settings: CsvViewSettingsContribution;
-}) {
-  const { t } = useLocalization();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => setMenuOpen(false), [settings.documentId]);
-
-  useEffect(() => {
-    if (!menuOpen) return undefined;
-    const root = rootRef.current;
-    const menu = menuRef.current;
-    const trigger = triggerRef.current;
-    const firstItem = menu?.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]');
-    if (!root || !menu || !trigger || !firstItem) return undefined;
-    firstItem.focus({ preventScroll: true });
-
-    const document = root.ownerDocument;
-    const closeAndRestoreFocus = () => {
-      setMenuOpen(false);
-      trigger.focus({ preventScroll: true });
-    };
-    const onPointerDown = (event: PointerEvent) => {
-      if (!(event.target instanceof Node) || root.contains(event.target)) return;
-      setMenuOpen(false);
-    };
-    const onFocusIn = (event: FocusEvent) => {
-      if (!(event.target instanceof Node) || root.contains(event.target)) return;
-      setMenuOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        closeAndRestoreFocus();
-        return;
-      }
-      if (!(event.target instanceof Node) || !menu.contains(event.target)) return;
-      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
-
-      const items = Array.from(
-        menu.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]:not(:disabled)'),
-      );
-      if (items.length === 0) return;
-      event.preventDefault();
-      const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
-      const nextIndex = event.key === "Home"
-        ? 0
-        : event.key === "End"
-          ? items.length - 1
-          : event.key === "ArrowUp"
-            ? (currentIndex - 1 + items.length) % items.length
-            : (currentIndex + 1) % items.length;
-      items[nextIndex]?.focus({ preventScroll: true });
-    };
-
-    document.addEventListener("pointerdown", onPointerDown, true);
-    document.addEventListener("focusin", onFocusIn, true);
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("focusin", onFocusIn, true);
-      document.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [menuOpen]);
-
-  return (
-    <div className="desktop-titlebar-csv-settings-wrap" ref={rootRef}>
-      <button
-        ref={triggerRef}
-        className="desktop-titlebar-action desktop-titlebar-csv-settings"
-        type="button"
-        title={t("editor.csv.settings")}
-        aria-label={t("editor.csv.settings")}
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen((current) => !current)}
-      >
-        <Settings2 size={15} strokeWidth={1.8} aria-hidden="true" />
-      </button>
-      {menuOpen && (
-        <DesktopMenuSurface
-          ref={menuRef}
-          ariaLabel={t("editor.csv.settings")}
-          className="desktop-titlebar-menu desktop-titlebar-csv-settings-menu"
-        >
-          <DesktopMenuItem
-            icon={settings.headerEnabled ? <Check size={14} strokeWidth={2} /> : <span />}
-            label={t("editor.csv.headerToggle")}
-            role="menuitemcheckbox"
-            aria-checked={settings.headerEnabled}
-            onClick={() => settings.onHeaderChange(!settings.headerEnabled)}
-          />
-          <DesktopMenuItem
-            icon={settings.rowNumbersVisible ? <Check size={14} strokeWidth={2} /> : <span />}
-            label={t("editor.csv.rowNumbersToggle")}
-            role="menuitemcheckbox"
-            aria-checked={settings.rowNumbersVisible}
-            onClick={() => settings.onRowNumbersChange(!settings.rowNumbersVisible)}
-          />
-        </DesktopMenuSurface>
-      )}
-    </div>
   );
 }
 

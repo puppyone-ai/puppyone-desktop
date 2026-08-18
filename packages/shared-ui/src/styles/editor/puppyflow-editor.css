@@ -323,13 +323,17 @@
 }
 
 .puppyflow-agent-select.tone-green .puppyflow-agent-logo {
-  border-radius: 50%;
-  background: #050505;
+  background: transparent;
 }
 
 .puppyflow-agent-select.tone-orange .puppyflow-agent-logo {
   background: #f2e7da;
   color: #c15f3f;
+}
+
+.puppyflow-agent-select.tone-orange .puppyflow-agent-logo svg {
+  transform: scale(0.84);
+  transform-origin: center;
 }
 
 .puppyflow-agent-select.tone-slate .puppyflow-agent-logo {
@@ -345,6 +349,10 @@
 .puppyflow-agent-logo svg {
   box-sizing: border-box;
   padding: 3px;
+}
+
+.dark .puppyflow-agent-logo img.is-codex {
+  content: url("/icons/agent-codex-dark.png");
 }
 
 .puppyflow-agent-select select {

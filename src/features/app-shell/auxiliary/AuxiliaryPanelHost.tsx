@@ -9,7 +9,7 @@ import {
   getArrowResizedSidebarWidth,
   type InlineDirection,
 } from "../../../components/auxiliarySidebarGeometry";
-import { setNativeSurfacePointerPassthrough } from "../../native-surfaces";
+import { useNativeSurfacePointerPassthroughActivity } from "../../native-surfaces";
 
 export type AuxiliaryPanelHostProps = {
   children: ReactNode;
@@ -39,6 +39,9 @@ export function AuxiliaryPanelHost({
   const { t } = useLocalization();
   const resolvedWidth = width ?? 560;
   const [collapsedEdgeSettled, setCollapsedEdgeSettled] = useState(!open);
+  const onResizeActiveChange = useNativeSurfacePointerPassthroughActivity(
+    "auxiliary-panel-resize",
+  );
 
   useEffect(() => {
     if (open) {
@@ -67,7 +70,7 @@ export function AuxiliaryPanelHost({
     onCollapsedChange: onOpenChange
       ? (collapsed) => onOpenChange(!collapsed)
       : undefined,
-    onDragActiveChange: setNativeSurfacePointerPassthrough,
+    onDragActiveChange: onResizeActiveChange,
     onWidthChange: onWidthChange ?? noop,
   });
   const panelStyle = width !== undefined || resize.dragging

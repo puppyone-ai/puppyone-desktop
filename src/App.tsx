@@ -1,12 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
-  EditorChromeContributionProvider,
-  EditorFindContributionProvider,
+  closeAllDocumentWorkingCopies,
+  closeDocumentWorkingCopy,
+  closeDocumentWorkingCopiesUnderResource,
   flushActiveDocumentSessions,
   type DataNode,
-  type DataWorkspaceActivePathChangeContext,
-  type EditorChromeContribution,
-  useEditorFindCommand,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import { DesktopCloudShell, type DesktopView } from "./components/DesktopCloudShell";
@@ -27,6 +25,7 @@ import {
 import { useDesktopUpdates } from "./features/updates";
 import {
   createLocalDataPort,
+  createLocalDocumentStorageIdentity,
   readPuppyoneWorkspaceConfig,
   removeWorkspaceGitRemote,
   showHomepage,
@@ -38,7 +37,7 @@ import {
   type DesktopCloudSession,
 } from "./lib/cloudApi";
 import {
-  getVisibleCreateNewFileTypes,
+  getVisibleCreateNewItems,
   type FilesVisibilitySettings,
 } from "./preferences";
 import type { PuppyoneWorkspaceConfig } from "./types/electron";
@@ -59,7 +58,7 @@ import { useDesktopPreferences } from "./features/app-shell/useDesktopPreference
 import { isAssetLibraryHomeEnabled } from "./features/app-shell/homeFeatureGate";
 import { useWorkspaceLifecycle } from "./features/app-shell/useWorkspaceLifecycle";
 import { usePuppyoneConfig } from "./features/app-shell/usePuppyoneConfig";
-import { useActiveExternalOpenTarget } from "./features/external-apps/useActiveExternalOpenTarget";
+import { useExternalFileOpen } from "./features/external-apps/useExternalFileOpen";
 import { useDesktopCloudSession } from "./features/cloud/hooks/useDesktopCloudSession";
 import {
   getResolvedCloudProjectId,
@@ -88,6 +87,7 @@ import {
   useTypographyCatalog,
   useTypographyRuntime,
 } from "./features/typography";
+import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
 
 const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMinimalModeDock").then((module) => ({
   default: module.DesktopMinimalModeDock,
@@ -95,16 +95,11 @@ const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMi
 const RightAgentPanel = lazy(loadRightAgentPanel);
 
 export function App() {
-  return (
-    <EditorFindContributionProvider>
-      <AppContent />
-    </EditorFindContributionProvider>
-  );
+  return <AppContent />;
 }
 
 function AppContent() {
   const { t } = useLocalization();
-  const editorFindCommand = useEditorFindCommand();
   const desktopUpdates = useDesktopUpdates();
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
@@ -132,6 +127,7 @@ function AppContent() {
     openFolder,
     openWorkspacePath,
     recentWorkspaceItems,
+    removeWorkspaceFromRecents,
     refreshRecentWorkspaceList,
     restoreWorkspaceError,
     restoringWorkspace,
@@ -152,6 +148,9 @@ function AppContent() {
       setSwitcherOpen(false);
     }, []),
   });
+  const documentStorageIdentity = workspace
+    ? createLocalDocumentStorageIdentity(workspace.path)
+    : null;
   const {
     activeThemeMode,
     aiEditAssistEnabled,
@@ -183,7 +182,6 @@ function AppContent() {
     textSize,
     setAiEditAssistEnabled,
     setExplorerWidth,
-    setExternalAppsSettings,
     setFileIconTheme,
     setFilesVisibilitySettings,
     setRightSidebarOpen,
@@ -196,8 +194,8 @@ function AppContent() {
     setSidebarNavigationLayout,
     setThemeMode,
   } = preferences;
-  const createNewFileKinds = useMemo(
-    () => getVisibleCreateNewFileTypes(createNewMenuSettings, experimentalSettings),
+  const createNewItems = useMemo(
+    () => getVisibleCreateNewItems(createNewMenuSettings, experimentalSettings),
     [createNewMenuSettings, experimentalSettings],
   );
   const minimalMode = experimentalSettings.enableMinimalMode;
@@ -207,16 +205,46 @@ function AppContent() {
   });
   const Homepage = assetLibraryHomeEnabled ? AssetLibraryHome : MinimalOnboarding;
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSection>("general");
-  const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState(0);
-  const [activeDataPath, setActiveDataPath] = useState<string | null>(null);
+  const [workspaceRefreshToken, setWorkspaceRefreshToken] = useState({
+    sequence: 0,
+    paths: null as readonly string[] | null,
+  });
+  const editorWorkbench = useDesktopEditorWorkbench(workspace);
+  const activeDataPath = editorWorkbench.activePath;
+  const setActiveDataPath = useCallback<Dispatch<SetStateAction<string | null>>>((update) => {
+    if (typeof update !== "function") {
+      if (update) editorWorkbench.open(update);
+      else editorWorkbench.clear();
+      return;
+    }
+    const nextPath = update(activeDataPath);
+    if (nextPath === activeDataPath) return;
+    if (activeDataPath && nextPath) {
+      editorWorkbench.rebaseResource(activeDataPath, nextPath);
+      return;
+    }
+    if (nextPath) editorWorkbench.open(nextPath);
+    else if (activeDataPath) editorWorkbench.closeUnderResource(activeDataPath);
+  }, [activeDataPath, editorWorkbench]);
+  const handleResourceMoved = useCallback(async (previousPath: string, nextPath: string) => {
+    if (documentStorageIdentity) {
+      await closeDocumentWorkingCopiesUnderResource(documentStorageIdentity, previousPath);
+    }
+    editorWorkbench.rebaseResource(previousPath, nextPath);
+  }, [documentStorageIdentity, editorWorkbench]);
+  const handleResourceDeleted = useCallback(async (path: string) => {
+    if (documentStorageIdentity) {
+      await closeDocumentWorkingCopiesUnderResource(documentStorageIdentity, path);
+    }
+    editorWorkbench.closeUnderResource(path);
+  }, [documentStorageIdentity, editorWorkbench]);
   const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
-  const [editorChromeContribution, setEditorChromeContribution] = useState<EditorChromeContribution | null>(null);
   const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
   const documentNavigationRequestRef = useRef(0);
   const desktopViewNavigationRequestRef = useRef(0);
   const drainWorkspaceNavigation = useCallback(async (): Promise<boolean> => {
     try {
-      await flushActiveDocumentSessions("workspace-switch");
+      await closeAllDocumentWorkingCopies("workspace-switch");
       setDocumentNavigationError(null);
       return true;
     } catch (error) {
@@ -257,8 +285,11 @@ function AppContent() {
     setRightSidebarOpen,
     setRightSidebarSurface,
   ]);
-  const refreshWorkspaceContent = useCallback(() => {
-    setWorkspaceRefreshToken((token) => token + 1);
+  const refreshWorkspaceContent = useCallback((paths: readonly string[] | string | null = null) => {
+    setWorkspaceRefreshToken((current) => ({
+      sequence: current.sequence + 1,
+      paths: typeof paths === "string" ? [paths] : paths,
+    }));
   }, []);
   const git = useDesktopGitController({
     workspace,
@@ -372,6 +403,8 @@ function AppContent() {
     onEnterDataView: enterDataView,
     onLocalWorkspaceContentChanged: refreshGitStatus,
     onWorkspaceContentChanged: refreshWorkspaceContent,
+    onResourceDeleted: handleResourceDeleted,
+    onResourceMoved: handleResourceMoved,
     setActiveDataNode,
     setActiveDataPath,
     workspace,
@@ -407,6 +440,10 @@ function AppContent() {
       const target = event.target;
       if (target instanceof Node && switcherRef.current?.contains(target)) return;
       if (target instanceof Node && branchSwitcherRef.current?.contains(target)) return;
+      if (
+        target instanceof Element
+        && target.closest('[data-titlebar-context-menu="true"]')
+      ) return;
       setSwitcherOpen(false);
       setBranchSwitcherOpen(false);
     };
@@ -430,7 +467,6 @@ function AppContent() {
     setGitOperationLoading(null);
     setActiveSettingsSection("general");
     setBranchSwitcherOpen(false);
-    setActiveDataPath(null);
     setActiveDataNode(null);
     resetDataNodeActions();
   }, [resetDataNodeActions, setBranchSwitcherOpen, setGitOperationError, setGitOperationLoading, workspace?.path]);
@@ -578,24 +614,49 @@ function AppContent() {
   const handleActiveDataPathChange = useCallback(async (
     path: string | null,
     node: DataNode | null = null,
-    context?: DataWorkspaceActivePathChangeContext,
   ) => {
     const requestId = ++documentNavigationRequestRef.current;
-    if (path !== activeDataPath && !context?.documentSessionsDrained) {
-      try {
-        await flushActiveDocumentSessions("document-switch");
-      } catch (error) {
-        if (requestId === documentNavigationRequestRef.current) {
-          setDocumentNavigationError(error instanceof Error ? error.message : String(error));
-        }
-        throw error;
-      }
-    }
     if (requestId !== documentNavigationRequestRef.current) return;
     setDocumentNavigationError(null);
-    setActiveDataPath(path);
+    if (path && node?.type !== "folder") editorWorkbench.open(path, node);
     setActiveDataNode(node);
-  }, [activeDataPath]);
+  }, [editorWorkbench]);
+  const handleEditorClose = useCallback(async (editorId: string) => {
+    try {
+      if (documentStorageIdentity) {
+        await closeDocumentWorkingCopy({
+          storageIdentity: documentStorageIdentity,
+          resourcePath: editorId,
+        });
+      }
+      editorWorkbench.close(editorId);
+      setDocumentNavigationError(null);
+    } catch (error) {
+      setDocumentNavigationError(error instanceof Error ? error.message : String(error));
+    }
+  }, [documentStorageIdentity, editorWorkbench]);
+  useEffect(() => {
+    const handleEditorShortcut = (event: KeyboardEvent) => {
+      if (activeView !== "data" || editorWorkbench.state.editors.length === 0) return;
+      const platformModifier = event.metaKey || event.ctrlKey;
+      if (platformModifier && !event.altKey && event.key.toLowerCase() === "w") {
+        if (!editorWorkbench.activePath) return;
+        event.preventDefault();
+        void handleEditorClose(editorWorkbench.activePath);
+        return;
+      }
+      if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === "Tab") {
+        event.preventDefault();
+        const currentIndex = editorWorkbench.state.editors.findIndex(({ id }) => id === editorWorkbench.activePath);
+        const offset = event.shiftKey ? -1 : 1;
+        const nextIndex = (currentIndex + offset + editorWorkbench.state.editors.length) % editorWorkbench.state.editors.length;
+        editorWorkbench.activate(editorWorkbench.state.editors[nextIndex]!.id);
+        return;
+      }
+    };
+    window.addEventListener("keydown", handleEditorShortcut, true);
+    return () => window.removeEventListener("keydown", handleEditorShortcut, true);
+  }, [activeView, editorWorkbench, handleEditorClose]);
   const handleActiveDataNodeChange = useCallback((node: DataNode | null) => {
     setActiveDataNode((current) => (
       hasSameActiveDataNodeIdentity(current, node) ? current : node
@@ -604,31 +665,27 @@ function AppContent() {
 
   const handleFilesVisibilitySettingsChange = useCallback((nextSettings: FilesVisibilitySettings) => {
     setFilesVisibilitySettings(nextSettings);
-    setWorkspaceRefreshToken((token) => token + 1);
-  }, [setFilesVisibilitySettings]);
+    refreshWorkspaceContent();
+  }, [refreshWorkspaceContent, setFilesVisibilitySettings]);
 
   const handlePuppyoneConfigChange = useCallback(async (nextConfig: PuppyoneWorkspaceConfig) => {
     const savedConfig = await savePuppyoneConfig(nextConfig);
     if (savedConfig) {
-      setWorkspaceRefreshToken((token) => token + 1);
+      refreshWorkspaceContent();
       await refreshGitStatus("configuration");
     }
     return savedConfig;
-  }, [refreshGitStatus, savePuppyoneConfig]);
+  }, [refreshGitStatus, refreshWorkspaceContent, savePuppyoneConfig]);
 
   const [workspaceSurfaceError, setWorkspaceSurfaceError] = useState<string | null>(null);
 
   const closeSwitcher = useCallback(() => {
     setSwitcherOpen(false);
   }, []);
-  const activeExternalOpen = useActiveExternalOpenTarget({
-    activeDataNode,
-    activeDataPath,
-    activeViewIsData: activeView === "data",
+  const externalFileOpen = useExternalFileOpen({
     externalAppsSettings,
     onActionSettled: closeSwitcher,
     onError: setWorkspaceSurfaceError,
-    setExternalAppsSettings,
     workspace,
   });
 
@@ -777,6 +834,7 @@ function AppContent() {
         onChooseWorkspace={openFolder}
         onOpenDroppedWorkspace={openDroppedWorkspace}
         onOpenWorkspacePath={openWorkspacePath}
+        onRemoveProject={removeWorkspaceFromRecents}
         recentWorkspaces={recentWorkspaceItems}
         initialError={restoreWorkspaceError}
         cornerSlot={(
@@ -807,7 +865,7 @@ function AppContent() {
     ? terminalSnapshot
     : createEmptyDesktopTerminalSessionSnapshot(workspace.path);
 
-  const titlebarSlot = (
+  const titlebarSidebarSlot = (
     <DesktopTitlebarContext
       activeGitStatus={activeGitStatus}
       branchSwitcherOpen={branchSwitcherOpen}
@@ -833,16 +891,7 @@ function AppContent() {
 
   const titlebarActions = (
     <DesktopTitlebarActions
-      editorFindCommand={editorFindCommand}
-      canOpenActiveFileExternal={activeExternalOpen.canOpen}
-      csvViewSettings={activeView === "data" && editorChromeContribution?.kind === "csv-view-settings"
-        ? editorChromeContribution
-        : null}
       desktopUpdateState={desktopUpdates.state}
-      activeFileExternalOpenTitle={activeExternalOpen.title}
-      activeFileExternalOpenAppName={activeExternalOpen.appName}
-      activeFileExternalOpenIconDataUrl={activeExternalOpen.iconDataUrl}
-      activeFileExternalOpenLoading={activeExternalOpen.loading}
       titlebarActionsSettings={titlebarActionsSettings}
       terminalSidebarOpen={rightSidebarOpen && desktopTerminalEnabled && rightSidebarSurface === "terminal"}
       terminalToolEnabled={desktopTerminalEnabled}
@@ -851,7 +900,6 @@ function AppContent() {
       activeTerminalSessionId={currentTerminalSnapshot.activeSessionId}
       agentChatEnabled={desktopAgentChatEnabled}
       agentChatSidebarOpen={rightSidebarOpen && desktopAgentChatEnabled && rightSidebarSurface === "chat"}
-      onOpenActiveFileExternal={() => void activeExternalOpen.openActiveFileExternal()}
       onUpdateNow={() => void desktopUpdates.updateNow()}
       onCreateTerminal={() => {
         terminalPanelRef.current?.create();
@@ -868,9 +916,6 @@ function AppContent() {
       onCloseTerminal={(sessionId) => terminalPanelRef.current?.close(sessionId)}
       onToggleTerminal={() => {
         const terminalIsOpen = rightSidebarOpen && rightSidebarSurface === "terminal";
-        if (!terminalIsOpen && currentTerminalSnapshot.sessions.length === 0) {
-          terminalPanelRef.current?.create();
-        }
         setRightSidebarSurface("terminal");
         setRightSidebarOpen(!terminalIsOpen);
         setSwitcherOpen(false);
@@ -891,7 +936,9 @@ function AppContent() {
         activeView={activeView}
         cloudHubEnabled={cloudEnabled}
         contextMenuOpen={switcherOpen || branchSwitcherOpen}
-        contextSlot={titlebarSlot}
+        contextSlot={(
+          titlebarSidebarSlot
+        )}
         pluginsEnabled={
           experimentalSettings.enableViewerPlugins
           && preferences.sidebarNavigationVisibilitySettings.enabled.plugins
@@ -919,14 +966,13 @@ function AppContent() {
       data-diff-markers={diffMarkers}
       {...typographyRootProps}
     >
-      <EditorChromeContributionProvider onContributionChange={setEditorChromeContribution}>
-        <DesktopCloudShell
+      <DesktopCloudShell
           leftSidebarCollapsed={sidebarCollapsed}
           leftSidebarPresent={Boolean(dataPort)}
           leftSidebarWidth={explorerWidth}
           minimalMode={minimalMode}
           minimalModeDock={minimalModeDock}
-          titlebarSlot={titlebarSlot}
+          titlebarSidebarSlot={titlebarSidebarSlot}
           titlebarActions={titlebarActions}
           rightSidebarOpen={rightSidebarOpen && desktopRightSidebarEnabled}
           resizableRightSidebar
@@ -1008,11 +1054,14 @@ function AppContent() {
             onStartPuppyoneBackup: handleStartPuppyoneBackup,
           }}
           dataPort={dataPort}
+          editorWorkbench={editorWorkbench}
+          externalOpen={externalFileOpen}
           desktopUpdates={desktopUpdates}
           git={git}
           minimalMode={minimalMode}
           onActiveDataNodeChange={handleActiveDataNodeChange}
           onActiveDataPathChange={handleActiveDataPathChange}
+          onResourceMove={handleResourceMoved}
           onCreateEntryMenu={openCreateEntryMenu}
           onDismissCreateEntryMenu={() => setCreateEntryDraft(null)}
           fileClipboardController={fileClipboardController}
@@ -1048,8 +1097,7 @@ function AppContent() {
           pointerCursors={pointerCursors}
           diffMarkers={diffMarkers}
         />
-        </DesktopCloudShell>
-      </EditorChromeContributionProvider>
+      </DesktopCloudShell>
       <DesktopOverlayPortal
         theme={resolvedTheme}
         lightThemePreset={lightThemePreset}
@@ -1090,7 +1138,7 @@ function AppContent() {
             ) : (
               <DesktopCreateEntryMenu
                 draft={createEntryDraft}
-                fileKinds={createNewFileKinds}
+                itemKinds={createNewItems}
                 fileIconTheme={fileIconTheme}
                 onCancel={() => setCreateEntryDraft(null)}
                 onSelectKind={selectCreateEntryKind}

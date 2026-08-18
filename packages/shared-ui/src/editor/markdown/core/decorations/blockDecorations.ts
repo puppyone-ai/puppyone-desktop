@@ -1,6 +1,6 @@
 import type { EditorState } from "@codemirror/state";
 import { Decoration } from "@codemirror/view";
-import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../../../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../../../registry/viewerTypes";
 import {
   markdownFeatureCompositionFacet,
   type MarkdownFeatureComposition,

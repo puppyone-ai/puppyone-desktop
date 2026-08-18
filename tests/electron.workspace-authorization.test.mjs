@@ -75,15 +75,11 @@ describe("sender-bound workspace authorization", () => {
       getWorkspaceRootForSender: () => root,
     });
     const appPreviewRuntime = {
-      activate: vi.fn(),
       start: vi.fn(),
       restart: vi.fn(),
       stop: vi.fn(),
       getLogs: vi.fn(),
       openExternal: vi.fn(),
-      setSurfaceBounds: vi.fn(),
-      detachSurface: vi.fn(),
-      runSurfaceCommand: vi.fn(),
     };
     const workspaceWatchService = { start: vi.fn(), stop: vi.fn() };
     const gitMetadataWatchService = { start: vi.fn(), stop: vi.fn(), stopForWindow: vi.fn(), closeAll: vi.fn() };
@@ -103,7 +99,12 @@ describe("sender-bound workspace authorization", () => {
     registerWorkspaceWatchIpcHandlers({ ipcMain, workspaceWatchService, authorizeWorkspaceRoot });
     registerGitMetadataWatchIpcHandlers({ ipcMain, gitMetadataWatchService, authorizeWorkspaceRoot });
     registerAppPreviewIpcHandlers({ ipcMain, appPreviewRuntime, authorizeWorkspaceRoot });
-    registerTerminalIpcHandlers({ ipcMain, terminalService, authorizeWorkspaceRoot });
+    registerTerminalIpcHandlers({
+      ipcMain,
+      terminalAgentLocator: { locate: vi.fn() },
+      terminalService,
+      authorizeWorkspaceRoot,
+    });
 
     const event = { sender: { id: 7 } };
     for (const [channel, request] of [
@@ -119,12 +120,6 @@ describe("sender-bound workspace authorization", () => {
       ["workspace:watch-start", { rootPath: otherRoot }],
       ["git-repository:watch-start", { rootPath: otherRoot }],
       ["ai-edit-review:get-latest", { rootPath: otherRoot }],
-      ["app-preview:activate", {
-        rootPath: otherRoot,
-        path: "app.puppyoneapp",
-        attachmentId: "attachment-1",
-        bounds: { x: 0, y: 0, width: 100, height: 100 },
-      }],
       ["app-preview:start", { rootPath: otherRoot, path: "app.puppyoneapp" }],
       ["terminal:create", { rootPath: otherRoot, cwd: otherRoot }],
     ]) {
@@ -132,7 +127,6 @@ describe("sender-bound workspace authorization", () => {
     }
 
     expect(workspaceWatchService.start).not.toHaveBeenCalled();
-    expect(appPreviewRuntime.activate).not.toHaveBeenCalled();
     expect(appPreviewRuntime.start).not.toHaveBeenCalled();
     expect(terminalService.create).not.toHaveBeenCalled();
   });
@@ -144,15 +138,11 @@ describe("sender-bound workspace authorization", () => {
       getWorkspaceRootForSender: () => root,
     });
     const appPreviewRuntime = {
-      activate: vi.fn(async () => ({ runtime: { status: "running" }, surface: null })),
       start: vi.fn(async () => ({ status: "running" })),
       restart: vi.fn(),
       stop: vi.fn(),
       getLogs: vi.fn(),
       openExternal: vi.fn(),
-      setSurfaceBounds: vi.fn(() => ({ ok: true, visible: true })),
-      detachSurface: vi.fn(() => ({ ok: true })),
-      runSurfaceCommand: vi.fn(() => ({ ok: true })),
     };
     const terminalService = {
       create: vi.fn(),
@@ -160,21 +150,41 @@ describe("sender-bound workspace authorization", () => {
       resize: vi.fn(),
       close: vi.fn(),
     };
-    registerAppPreviewIpcHandlers({ ipcMain, appPreviewRuntime, authorizeWorkspaceRoot });
-    registerTerminalIpcHandlers({ ipcMain, terminalService, authorizeWorkspaceRoot });
-
-    const sender = { id: 8 };
-    const event = { sender };
-    const activationRequest = {
-      rootPath: root,
-      path: "app.puppyoneapp",
-      attachmentId: "attachment-1",
-      bounds: { x: 0, y: 0, width: 100, height: 100 },
+    const terminalAgentLocator = {
+      locate: vi.fn(async () => ({
+        availableAgentIds: ["codex"],
+        scannedAt: "2026-08-15T00:00:00.000Z",
+        source: "scan",
+      })),
     };
-    await handlers.get("app-preview:activate")(event, activationRequest);
-    expect(appPreviewRuntime.activate).toHaveBeenCalledWith(sender, {
-      ...activationRequest,
-      rootPath: await fs.promises.realpath(root),
+    registerAppPreviewIpcHandlers({ ipcMain, appPreviewRuntime, authorizeWorkspaceRoot });
+    registerTerminalIpcHandlers({
+      ipcMain,
+      terminalAgentLocator,
+      terminalService,
+      authorizeWorkspaceRoot,
+    });
+
+    const sender = { id: 8, send: vi.fn() };
+    const event = { sender };
+    await handlers.get("terminal:agents-locate")(event, {
+      refresh: true,
+      requestId: "terminal-agent-location:test",
+    });
+    expect(terminalAgentLocator.locate).toHaveBeenCalledWith({
+      refresh: true,
+      onProgress: expect.any(Function),
+    });
+    terminalAgentLocator.locate.mock.calls[0][0].onProgress({
+      availableAgentIds: ["codex"],
+      completedAgentCount: 1,
+      totalAgentCount: 6,
+    });
+    expect(sender.send).toHaveBeenCalledWith("terminal:agents-progress", {
+      availableAgentIds: ["codex"],
+      completedAgentCount: 1,
+      requestId: "terminal-agent-location:test",
+      totalAgentCount: 6,
     });
     await handlers.get("app-preview:start")(event, { rootPath: root, path: "app.puppyoneapp" });
     expect(appPreviewRuntime.start).toHaveBeenCalledWith(sender, {
@@ -227,6 +237,14 @@ describe("recent workspace authorization", () => {
 
     await expect(handlers.get("workspace:open-current")(event, root)).resolves.toEqual({ status: "opened-current" });
     expect(openWorkspaceInCurrentWindow).toHaveBeenCalledWith(event.sender, await fs.promises.realpath(root));
+
+    await expect(handlers.get("workspace:remove-recent")(event, otherRoot)).rejects.toThrow(/recent workspace list/i);
+    await expect(handlers.get("workspace:remove-recent")(event, root)).resolves.toEqual({
+      ok: true,
+      removed: true,
+      path: await fs.promises.realpath(root),
+    });
+    await expect(handlers.get("workspace:open-current")(event, root)).rejects.toThrow(/recent workspace list/i);
 
     await expect(handlers.get("workspace:open-dropped-current")(event, otherRoot)).resolves.toEqual({ status: "opened-current" });
     expect(openWorkspaceInCurrentWindow).toHaveBeenCalledWith(event.sender, otherRoot);

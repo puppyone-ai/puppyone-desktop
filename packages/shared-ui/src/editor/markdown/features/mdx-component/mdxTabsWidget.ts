@@ -1,6 +1,6 @@
 import { EditorSelection } from "@codemirror/state";
 import { EditorView, WidgetType } from "@codemirror/view";
-import type { MarkdownLinkGraph } from "../../../viewerTypes";
+import type { MarkdownLinkGraph } from "../../../registry/viewerTypes";
 import type { MarkdownMdxTab } from "../../core/features/markdownFeatureData";
 import { getMarkdownLocalization } from "../../core/editor/markdownLocalization";
 import { openMarkdownHref } from "../../core/editor/markdownLivePreviewContext";

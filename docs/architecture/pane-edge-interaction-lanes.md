@@ -51,3 +51,16 @@ Logical inset properties preserve the same ownership in RTL.
   boundaries and are outside this contract.
 
 The architecture checks live in `tests/scrollbarArchitecture.test.ts`.
+
+## Third-party scroll surfaces
+
+Third-party widgets that render a private scrollbar DOM, such as xterm, cannot
+attach the product primitive to their actual scroll owner. They must still use
+the same `--po-scrollbar-size`, thumb-size, color, radius, and activity tokens.
+The widget's hit track and its painted thumb are separate geometry: the track
+stays at the pane edge while the thumb is centered inside it. Do not add outer
+panel padding or a second spacer merely to imitate a scrollbar gutter.
+
+The xterm adapter is feature-owned in
+`src/features/desktop-terminal/ui/desktop-terminal.css`; its architecture checks
+live in `tests/desktop-terminal.architecture.test.ts`.

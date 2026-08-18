@@ -46,6 +46,21 @@ describe("packaged Desktop Build Identity verification", () => {
       buildInfo: fixture.buildInfo,
     })).rejects.toThrow(/canonical update feed/);
   });
+
+  it("fails when a native Dock icon resource is absent", async () => {
+    const fixture = await createFixture();
+    await fs.rm(path.join(
+      fixture.applicationPath,
+      "Contents",
+      "Resources",
+      "dock-icon-light.png",
+    ));
+
+    await expect(verifyPackagedDesktopBuild({
+      releaseDirectory: fixture.releaseDirectory,
+      buildInfo: fixture.buildInfo,
+    })).rejects.toThrow(/missing Dock icon resource dock-icon-light\.png/);
+  });
 });
 
 async function createFixture() {
@@ -73,7 +88,24 @@ async function createFixture() {
     path.join(sourceDirectory, "package.json"),
     JSON.stringify({ name: "@puppyone/desktop", version: buildInfo.version }),
   );
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  for (const rendererAssetPath of [
+    "dist/logo-square.png",
+    "dist/logo-square-v0.1.3-light.png",
+    "dist/logo-square-v0.1.3-dark.png",
+  ]) {
+    const target = path.join(sourceDirectory, rendererAssetPath);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, png);
+  }
   await createPackage(sourceDirectory, path.join(resourcesDirectory, "app.asar"));
+  for (const resourceFilename of [
+    "logo-square.png",
+    "dock-icon-light.png",
+    "dock-icon-matte.png",
+  ]) {
+    await fs.writeFile(path.join(resourcesDirectory, resourceFilename), png);
+  }
   await fs.writeFile(
     path.join(resourcesDirectory, "build-info.json"),
     `${JSON.stringify(buildInfo, null, 2)}\n`,

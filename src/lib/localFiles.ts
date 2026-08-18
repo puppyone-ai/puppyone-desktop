@@ -20,6 +20,7 @@ import type {
   WorkspaceChooseExternalAppRequest,
   WorkspaceCreateEntryKind,
   WorkspaceCreateEntryResult,
+  WorkspaceInstantiateTemplateResult,
   WorkspaceExternalOpenTarget,
   WorkspaceOpenEntryExternalRequest,
   WorkspaceImportEntriesResult,
@@ -37,6 +38,10 @@ export type FileKind = DataNodeKind;
 export type FileNode = DataNode;
 
 let gitStatusRequestSequence = 0;
+
+export function createLocalDocumentStorageIdentity(rootPath: string): string {
+  return `local-fs:${rootPath.replace(/\/+$/, "") || "/"}`;
+}
 
 export function createLocalDataPort(rootPath: string): DataPort {
   return {
@@ -109,36 +114,21 @@ export function createLocalDataPort(rootPath: string): DataPort {
           content,
           expectedVersion: current.version ?? null,
         });
-        return { content, version: result.version ?? null };
+        const success = requireWorkspaceWriteSuccess(result);
+        return { content, version: success.version };
       },
-      activate: ({ path, bounds, attachmentId, visible }) => getDesktopBridge().activateAppPreview({
-        rootPath,
-        path,
-        bounds,
-        attachmentId,
-        visible,
-      }),
       start: (path) => getDesktopBridge().startAppPreview({ rootPath, path }),
-      restart: (path, attachment) => getDesktopBridge().restartAppPreview({
-        rootPath,
-        path,
-        ...attachment,
-      }),
+      restart: (path) => getDesktopBridge().restartAppPreview({ rootPath, path }),
       stop: (path) => getDesktopBridge().stopAppPreview({ rootPath, path }),
       getLogs: (path) => getDesktopBridge().getAppPreviewLogs({ rootPath, path }),
       openExternal: (path) => getDesktopBridge().openAppPreviewExternal({ rootPath, path }).then(() => undefined),
-      setSurfaceBounds: (request) => getDesktopBridge().setAppPreviewSurfaceBounds(request),
-      detachSurface: (request) => getDesktopBridge().detachAppPreviewSurface(request),
-      runSurfaceCommand: (request) => getDesktopBridge().runAppPreviewSurfaceCommand(request),
       subscribeRuntime: (listener) => getDesktopBridge().onAppPreviewRuntimeState((state) => {
-        if (state.rootPath === rootPath) listener(state);
-      }),
-      subscribeSurface: (listener) => getDesktopBridge().onAppPreviewSurfaceState((state) => {
         if (state.rootPath === rootPath) listener(state);
       }),
     },
     documentPersistence: {
       kind: "local-fs",
+      storageIdentity: createLocalDocumentStorageIdentity(rootPath),
       persist: ({ path, content, baseVersion }) => getDesktopBridge().writeFile({
         rootPath,
         path,
@@ -154,6 +144,12 @@ export function createLocalDataPort(rootPath: string): DataPort {
       const { parentPath, name } = splitDataPath(path);
       return getDesktopBridge().createEntry({ rootPath, parentPath, name, kind: "file", content }).then(() => undefined);
     },
+    instantiateTemplate: ({ templateId, parentPath, name }) => getDesktopBridge().instantiateTemplate({
+      rootPath,
+      templateId,
+      parentPath,
+      name,
+    }),
     importFiles: (files, targetFolderPath) => importWorkspaceFiles(rootPath, targetFolderPath, files),
     renameNode: (path, nextName) => getDesktopBridge().renameEntry({ rootPath, path, nextName }).then(() => undefined),
     moveNode: (from, to) => getDesktopBridge().moveEntry({ rootPath, fromPath: from, toPath: to }).then(() => undefined),
@@ -165,6 +161,16 @@ export function createLocalDataPort(rootPath: string): DataPort {
     }),
     deleteNode: (path) => getDesktopBridge().deleteEntry({ rootPath, path }).then(() => undefined),
   };
+}
+
+function requireWorkspaceWriteSuccess(
+  result: Awaited<ReturnType<ReturnType<typeof getDesktopBridge>["writeFile"]>>,
+): Extract<typeof result, { ok: true }> {
+  if (result.ok) return result;
+  if (result.kind === "conflict") {
+    throw new Error("This file changed while the operation was in progress.");
+  }
+  throw new Error(result.message);
 }
 
 async function preflightAppPreviewLaunch(
@@ -259,6 +265,10 @@ export async function hydrateRecentWorkspaces(): Promise<RecentWorkspacesResult>
   return getDesktopBridge().hydrateRecentWorkspaces();
 }
 
+export async function removeRecentWorkspace(folderPath: string): Promise<void> {
+  await getDesktopBridge().removeRecentWorkspace(folderPath);
+}
+
 export async function openExternalUrl(href: string): Promise<void> {
   await getDesktopBridge().openExternalUrl(href);
 }
@@ -323,6 +333,17 @@ export async function createWorkspaceEntry(
   },
 ): Promise<WorkspaceCreateEntryResult> {
   return getDesktopBridge().createEntry({ rootPath, ...request });
+}
+
+export async function instantiateWorkspaceTemplate(
+  rootPath: string,
+  request: {
+    parentPath: string | null;
+    name: string;
+    templateId: "slides.default";
+  },
+): Promise<WorkspaceInstantiateTemplateResult> {
+  return getDesktopBridge().instantiateTemplate({ rootPath, ...request });
 }
 
 export async function importWorkspaceFiles(

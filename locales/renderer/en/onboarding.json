@@ -1,6 +1,9 @@
 {
   "projects.title": "Projects",
+  "projects.localTitle": "Local Projects",
   "projects.open": "Open {project}",
+  "projects.removeFor": "Remove {project} from Local Projects",
+  "projects.removeHint": "Removes this registration only. Local files are not deleted.",
   "projects.untitled": "Untitled Project",
   "action.createCloudProject": "Create cloud project",
   "action.openLocalFolder": "Open local folder",

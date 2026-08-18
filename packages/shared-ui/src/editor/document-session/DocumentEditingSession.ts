@@ -7,7 +7,7 @@ import type {
   EditorSourceSnapshot,
   EditorSourceSnapshotPort,
 } from "../sourceSnapshot";
-import type { EditorSaveMode } from "../viewerTypes";
+import type { EditorSaveMode } from "../registry/viewerTypes";
 import type {
   DocumentEditingSessionOptions,
   DocumentPersistedCommit,
@@ -18,6 +18,10 @@ import type {
   ExternalBaselineResult,
   ExternalConflictResolution,
 } from "./types";
+import {
+  createImmediateAutoSaveScheduler,
+  type DocumentAutoSaveScheduler,
+} from "./autoSavePolicy";
 
 type CommitCandidate = {
   sequence: number;
@@ -66,8 +70,7 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
   private externalConflict: { content: string; version: string | null } | null = null;
   private state: DocumentSessionState;
   private readonly listeners = new Set<() => void>();
-  private immediateCommitScheduled = false;
-  private immediateCommitGeneration = 0;
+  private readonly autoSave: DocumentAutoSaveScheduler;
   private savedStatusTimer: ReturnType<typeof setTimeout> | null = null;
   private pending: CommitCandidate | null = null;
   private inFlight: CommitCandidate | null = null;
@@ -83,6 +86,12 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
     this.saveMode = options.saveMode;
     this.persistedContent = options.initialContent;
     this.storageVersion = options.initialVersion ?? null;
+    this.autoSave = createImmediateAutoSaveScheduler(() => {
+      if (this.disposed || this.saveMode !== "auto" || !this.dirty) return;
+      void this.requestAutomaticSave().catch(() => {
+        // enqueue has already projected the failure into observable state.
+      });
+    });
     this.state = Object.freeze({
       documentId: this.documentId,
       status: "clean",
@@ -96,7 +105,21 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
   attachSource = (source: EditorSourceSnapshotPort): (() => void) => {
     if (this.disposed) return () => undefined;
     this.source = source;
-    this.detachedSnapshot = null;
+    const retainedSnapshot = this.detachedSnapshot;
+    if (retainedSnapshot && source.readSnapshot().content !== retainedSnapshot.content) {
+      // A Pane can be recreated while its Working Copy remains open. Restore
+      // the authoritative unsaved snapshot before the new editor reports its
+      // initial disk-backed revision, otherwise tab activation could silently
+      // replace dirty content with a stale file read.
+      source.replaceContent(retainedSnapshot.content);
+    } else if (!this.hasUnpersistedChanges() && source.readSnapshot().content !== this.persistedContent) {
+      // A newly mounted Viewer is a projection, not a new data authority. Its
+      // props may lag a storage event; initialize it from the Working Copy and
+      // wait for an explicit storage snapshot instead of inferring an edit.
+      source.replaceContent(this.persistedContent);
+    } else if (!this.hasUnpersistedChanges()) {
+      this.detachedSnapshot = null;
+    }
     return () => {
       if (this.source !== source) return;
       if (this.hasUnpersistedChanges()) {
@@ -115,29 +138,28 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
     if (this.externalConflict) {
       this.cancelImmediateCommit();
       this.dirty = true;
-      this.publish("error", createSessionError("external-conflict"));
+      this.publish("conflict", createSessionError("external-conflict"));
       return;
     }
 
-    if (!revision.dirty) {
+    const localEdit = revision.origin === "local-edit";
+    if (!localEdit) {
       const attachedSnapshot = this.source?.readSnapshot();
       const attachedSourceDiffers = Boolean(
         attachedSnapshot && attachedSnapshot.content !== this.persistedContent,
       );
       if (!this.hasActiveCommit()) {
-        if (attachedSourceDiffers) {
-          // A format editor may remount its model (for example when switching
-          // Markdown modes) and report a fresh initial revision. Content, not
-          // that lifecycle hint, decides whether the document is persisted.
-          this.dirty = true;
-          this.publish("dirty", null);
-          if (this.saveMode === "auto") this.scheduleImmediateCommit();
-        } else {
+        if (!attachedSourceDiffers && !this.dirty) {
           this.cancelImmediateCommit();
           this.detachedSnapshot = null;
           this.dirty = false;
           this.persistedRevision = revision.revision;
           this.publish("clean", null);
+        } else {
+          // Model lifecycle is never evidence of a local edit. A dirty Working
+          // Copy stays dirty; a clean mismatch is repaired by attachSource or
+          // the next explicit storage-snapshot event, but is never written.
+          this.publish(this.dirty ? "dirty" : this.state.status, this.state.error);
         }
       } else {
         // An older revision may already be crossing the storage boundary. Keep
@@ -248,7 +270,7 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
       this.dirty = true;
       this.rejectPendingForExternalConflict();
       this.publish(
-        "error",
+        "conflict",
         createSessionError("external-conflict"),
       );
       return "conflict";
@@ -256,8 +278,9 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
 
     this.persistedContent = content;
     this.storageVersion = version;
-    this.currentRevision = null;
-    this.persistedRevision = null;
+    const replacement = this.source?.replaceContent(content) ?? null;
+    this.currentRevision = replacement?.revision ?? null;
+    this.persistedRevision = replacement?.revision ?? null;
     this.externalConflict = null;
     this.dirty = false;
     this.publish("clean", null);
@@ -330,6 +353,7 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
     if (this.disposed) return;
     this.disposed = true;
     this.cancelImmediateCommit();
+    this.autoSave.dispose();
     this.clearSavedStatusTimer();
     if (this.source && this.hasUnpersistedChanges()) {
       this.detachedSnapshot = this.source.readSnapshot();
@@ -338,36 +362,16 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
     this.listeners.clear();
   }
 
-  /**
-   * Coalesce only transactions produced in the same JavaScript turn. This is
-   * deliberately a microtask rather than a timer: the first dirty revision is
-   * eligible for persistence immediately and never waits for typing to stop.
-   */
   private scheduleImmediateCommit(): void {
-    if (this.disposed || this.immediateCommitScheduled) return;
-    this.immediateCommitScheduled = true;
-    const generation = ++this.immediateCommitGeneration;
-    queueMicrotask(() => {
-      if (
-        generation !== this.immediateCommitGeneration
-        || !this.immediateCommitScheduled
-      ) return;
-      this.immediateCommitScheduled = false;
-      if (this.disposed || this.saveMode !== "auto" || !this.dirty) return;
-      void this.requestImmediateSave().catch(() => {
-        // enqueue records the error in observable Session state. Consuming the
-        // scheduling Promise prevents an unhandled rejection; it does not hide
-        // the failure from the subscribed UI or later close drain.
-      });
-    });
+    if (this.disposed) return;
+    this.autoSave.schedule();
   }
 
   private cancelImmediateCommit(): void {
-    this.immediateCommitScheduled = false;
-    this.immediateCommitGeneration += 1;
+    this.autoSave.cancel();
   }
 
-  private async requestImmediateSave(): Promise<void> {
+  private async requestAutomaticSave(): Promise<void> {
     const source = this.source;
     if (!source) return;
     await this.enqueue(source.readSnapshot(), this.strongestDrainReason() ?? "edit");
@@ -399,7 +403,7 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
     if (this.externalConflict) {
       const error = createExternalConflictError(this.documentId);
       this.dirty = true;
-      this.publish("error", createSessionError("external-conflict"));
+      this.publish("conflict", createSessionError("external-conflict"));
       return Promise.reject(error);
     }
 
@@ -451,7 +455,7 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
       const error = createExternalConflictError(this.documentId);
       this.dirty = true;
       this.rejectWaitersThrough(blocked.sequence, error);
-      this.publish("error", createSessionError("external-conflict"));
+      this.publish("conflict", createSessionError("external-conflict"));
       return;
     }
 
@@ -486,7 +490,14 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
         baseVersion: this.storageVersion,
         reason: candidate.reason,
       });
-      this.acknowledge(candidate, result);
+      if (result.ok) {
+        this.acknowledge(candidate, result);
+      } else if (result.kind === "conflict") {
+        this.reconcileExternalBaseline(result.content, result.version);
+        failure = createExternalConflictError(this.documentId);
+      } else {
+        failure = new Error(result.message);
+      }
     } catch (error) {
       failure = error;
     } finally {
@@ -499,10 +510,10 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
         : createSessionError("persistence-failed", toErrorMessage(failure));
       if (this.pending) {
         this.dirty = true;
-        this.publish(this.externalConflict ? "error" : "dirty", sessionError);
+        this.publish(this.externalConflict ? "conflict" : "dirty", sessionError);
       } else {
         this.dirty = true;
-        this.publish("error", sessionError);
+        this.publish(this.externalConflict ? "conflict" : "error", sessionError);
         this.rejectWaitersThrough(candidate.sequence, failure);
       }
     }
@@ -528,16 +539,14 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
 
   private acknowledge(
     candidate: CommitCandidate,
-    result: DocumentPersistenceResult | void,
+    result: Extract<DocumentPersistenceResult, { ok: true }>,
   ): void {
     this.persistedContent = candidate.snapshot.content;
     this.persistedRevision = candidate.snapshot.revision;
     if (sameSnapshot(this.detachedSnapshot, candidate.snapshot)) {
       this.detachedSnapshot = null;
     }
-    if (result && Object.prototype.hasOwnProperty.call(result, "version")) {
-      this.storageVersion = result.version ?? null;
-    }
+    this.storageVersion = result.version;
     this.dirty = this.currentRevision !== null && this.currentRevision !== candidate.snapshot.revision;
     this.resolveWaitersThrough(candidate.sequence);
 
@@ -555,7 +564,7 @@ export class DocumentEditingSession implements DocumentEditingSessionHandle {
 
     if (this.externalConflict) {
       this.dirty = true;
-      this.publish("error", createSessionError("external-conflict"));
+      this.publish("conflict", createSessionError("external-conflict"));
       return;
     }
 

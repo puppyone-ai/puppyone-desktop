@@ -121,6 +121,8 @@ function createWatcher(rootPath, logger, fsModule) {
     debounceTimer: null,
     editReviewTimer: null,
     lastEvent: null,
+    pendingPaths: new Set(),
+    pendingUnknownPath: false,
     internalWrites: new Map(),
     watcher: null,
     rearmTimer: null,
@@ -158,7 +160,11 @@ function armWorkspaceWatcher(entry) {
       if (entry.disposed) return;
       if (shouldIgnoreWorkspaceChange(filename)) return;
 
-      const eventPath = typeof filename === "string" ? filename : null;
+      const eventPath = normalizeWorkspaceRelativePath(
+        typeof filename === "string" ? filename : null,
+      );
+      if (eventPath) entry.pendingPaths.add(eventPath);
+      else entry.pendingUnknownPath = true;
       entry.lastEvent = {
         rootPath: entry.rootPath,
         eventType: eventType ?? "change",
@@ -238,6 +244,8 @@ function disposeWatcher(entry, rootPath) {
   entry.editReviewTimer = null;
   entry.rearmTimer = null;
   entry.internalWrites.clear();
+  entry.pendingPaths.clear();
+  entry.pendingUnknownPath = false;
   if (entry.watcher) {
     try {
       entry.watcher.close();
@@ -268,41 +276,69 @@ function scheduleWorkspaceEditReviewFlush(entry) {
 function broadcastWorkspaceChange(entry) {
   if (!entry.lastEvent) return;
 
-  const event = entry.lastEvent;
-  const eventPath = normalizeWorkspaceRelativePath(event.path);
-  const internalWrite = eventPath
-    ? findInternalWrite(entry, eventPath, Date.now())
-    : null;
-  if (!internalWrite) {
-    deliverWorkspaceChange(entry, event, null);
+  const paths = [...entry.pendingPaths];
+  const unknownPath = entry.pendingUnknownPath || paths.length === 0;
+  entry.pendingPaths.clear();
+  entry.pendingUnknownPath = false;
+  const event = {
+    ...entry.lastEvent,
+    path: !unknownPath && paths.length === 1 ? paths[0] : null,
+    ...(unknownPath ? {} : { paths }),
+  };
+  if (unknownPath || paths.length === 0) {
+    deliverWorkspaceChange(entry, event, new Map());
     return;
   }
 
-  void internalWriteMatchesDisk(entry, eventPath, internalWrite)
-    .then((matches) => {
+  const now = Date.now();
+  const internalWrites = paths.map((eventPath) => ({
+    eventPath,
+    internalWrite: findInternalWrite(entry, eventPath, now),
+  }));
+  if (internalWrites.every(({ internalWrite }) => !internalWrite)) {
+    deliverWorkspaceChange(entry, event, new Map());
+    return;
+  }
+
+  void Promise.all(internalWrites.map(async ({ eventPath, internalWrite }) => {
+    if (!internalWrite) return [eventPath, null];
+    try {
+      const matches = await internalWriteMatchesDisk(entry, eventPath, internalWrite);
       if (!matches && entry.internalWrites.get(eventPath) === internalWrite) {
         entry.internalWrites.delete(eventPath);
       }
-      deliverWorkspaceChange(entry, event, matches ? internalWrite.senderId : null);
-    })
-    .catch(() => {
+      return [eventPath, matches ? internalWrite.senderId : null];
+    } catch {
       if (entry.internalWrites.get(eventPath) === internalWrite) {
         entry.internalWrites.delete(eventPath);
       }
-      deliverWorkspaceChange(entry, event, null);
-    });
+      return [eventPath, null];
+    }
+  })).then((suppressionEntries) => {
+    deliverWorkspaceChange(entry, event, new Map(suppressionEntries));
+  });
 }
 
-function deliverWorkspaceChange(entry, event, suppressedSenderId) {
+function deliverWorkspaceChange(entry, event, suppressedSendersByPath) {
   if (entry.disposed) return;
   for (const [id, sender] of entry.clients.entries()) {
     if (typeof sender.isDestroyed === "function" && sender.isDestroyed()) {
       entry.clients.delete(id);
       continue;
     }
-    if (sender.id === suppressedSenderId) continue;
+    const visiblePaths = Array.isArray(event.paths)
+      ? event.paths.filter((eventPath) => suppressedSendersByPath.get(eventPath) !== sender.id)
+      : null;
+    if (visiblePaths && visiblePaths.length === 0) continue;
+    const payload = visiblePaths
+      ? {
+          ...event,
+          paths: visiblePaths,
+          path: visiblePaths.length === 1 ? visiblePaths[0] : null,
+        }
+      : event;
     try {
-      sender.send("workspace:changed", event);
+      sender.send("workspace:changed", payload);
     } catch {
       entry.clients.delete(id);
     }

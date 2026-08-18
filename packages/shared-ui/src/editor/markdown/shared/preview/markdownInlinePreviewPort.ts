@@ -1,5 +1,5 @@
 import type { MessageFormatter } from "@puppyone/localization/core";
-import type { MarkdownLinkGraph } from "../../../viewerTypes";
+import type { MarkdownLinkGraph } from "../../../registry/viewerTypes";
 
 /**
  * Narrow port for rendering an isolated Markdown string (for example a table

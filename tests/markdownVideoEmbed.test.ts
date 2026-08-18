@@ -16,7 +16,7 @@ import {
 } from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
 import { disposeMarkdownEmbedHost } from "../packages/shared-ui/src/editor/markdown/platform/codemirror/embedHost";
 import { createSanitizedBlockHtmlFragment } from "../packages/shared-ui/src/editor/markdown/features/html/sanitizeHtml";
-import type { MarkdownLinkGraph } from "../packages/shared-ui/src/editor/viewerTypes";
+import type { MarkdownLinkGraph } from "../packages/shared-ui/src/editor/registry/viewerTypes";
 
 const views = new Set<EditorView>();
 

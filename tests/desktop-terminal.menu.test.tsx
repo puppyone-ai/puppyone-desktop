@@ -8,7 +8,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DesktopTitlebarActions } from "../src/features/app-shell/DesktopTitlebarActions";
 import { TerminalCloseConfirmationDialog } from "../src/features/desktop-terminal/ui/TerminalCloseConfirmationDialog";
 import type { TerminalRuntimeHandle } from "../src/features/desktop-terminal/runtime/terminalRuntime";
-import { TerminalSessionTabs } from "../src/features/desktop-terminal/ui/TerminalSessionTabs";
+import { TerminalSessionHeader } from "../src/features/desktop-terminal/ui/session-header/TerminalSessionHeader";
+import { TERMINAL_SESSION_ACTIVATION_MOTION_MS } from "../src/features/desktop-terminal/ui/session-header/useTerminalSessionHeaderController";
 import { DEFAULT_TITLEBAR_ACTIONS_SETTINGS } from "../src/preferences";
 import { withTestLocalization } from "./testLocalization";
 
@@ -20,6 +21,8 @@ afterEach(() => {
   act(() => root?.unmount());
   root = null;
   document.body.innerHTML = "";
+  vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("Desktop Terminal titlebar session manager", () => {
@@ -33,7 +36,6 @@ describe("Desktop Terminal titlebar session manager", () => {
 
     act(() => root?.render(withTestLocalization(
       <DesktopTitlebarActions
-        canOpenActiveFileExternal={false}
         titlebarActionsSettings={DEFAULT_TITLEBAR_ACTIONS_SETTINGS}
         terminalSidebarOpen
         terminalToolEnabled
@@ -45,7 +47,6 @@ describe("Desktop Terminal titlebar session manager", () => {
         activeTerminalSessionId="terminal-a"
         agentChatEnabled={false}
         agentChatSidebarOpen={false}
-        onOpenActiveFileExternal={vi.fn()}
         onCreateTerminal={onCreateTerminal}
         onActivateTerminal={onActivateTerminal}
         onCloseTerminal={onCloseTerminal}
@@ -90,25 +91,29 @@ describe("Desktop Terminal titlebar session manager", () => {
     root = createRoot(container);
 
     act(() => root?.render(withTestLocalization(
-      <TerminalSessionTabs
+      <TerminalSessionHeader
         sessions={[
-          { id: "terminal-a", ordinal: 1, shell: "zsh", status: "running" },
-          { id: "terminal-b", ordinal: 2, shell: null, status: "exited" },
+          { id: "terminal-a", launcherId: "codex", ordinal: 1, shell: "Codex", status: "running" },
+          { id: "terminal-b", launcherId: "shell", ordinal: 2, shell: null, status: "exited" },
         ]}
         activeSessionId="terminal-a"
         onActivate={onActivate}
         onClose={onClose}
         onCreate={onCreate}
+        workspacePath="/workspace/my private"
       />,
     )));
 
     const tabs = container.querySelectorAll<HTMLButtonElement>('[role="tab"]');
     expect(tabs).toHaveLength(2);
     expect(tabs[0]?.getAttribute("aria-selected")).toBe("true");
-    expect(tabs[0]?.getAttribute("aria-label")).toContain("Terminal 1 — zsh");
-    expect(tabs[1]?.getAttribute("aria-label")).toContain("Terminal 2 — Exited");
-    expect(tabs[0]?.textContent).toBe("zsh");
-    expect(tabs[1]?.textContent).toBe("Exited");
+    expect(tabs[0]?.getAttribute("aria-label"))
+      .toContain("Terminal 1 — Codex — /workspace/my private — Running");
+    expect(tabs[1]?.getAttribute("aria-label"))
+      .toContain("Terminal 2 — Open a shell — /workspace/my private — Exited");
+    expect(tabs[0]?.textContent).toBe("my private");
+    expect(tabs[1]?.textContent).toBe("my private");
+    expect(tabs[0]?.querySelector(".desktop-terminal-launcher-icon.is-codex")).not.toBeNull();
 
     act(() => tabs[1]?.click());
     expect(onActivate).toHaveBeenCalledWith("terminal-b");
@@ -120,57 +125,359 @@ describe("Desktop Terminal titlebar session manager", () => {
     expect(onCreate).toHaveBeenCalledOnce();
   });
 
-  it("replaces the always-on running dot with terminal-reported activity frames", () => {
-    const titleHarness = createTerminalTitleHarness();
+  it("keeps roving-tab keyboard navigation on the complete session order", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    function Harness() {
+      const [activeSessionId, setActiveSessionId] = React.useState("terminal-b");
+      return (
+        <TerminalSessionHeader
+          sessions={[
+            { id: "terminal-a", launcherId: "codex", ordinal: 1, shell: "codex", status: "running" },
+            { id: "terminal-b", launcherId: "claude", ordinal: 2, shell: "claude", status: "running" },
+            { id: "terminal-c", launcherId: "cursor", ordinal: 3, shell: "cursor", status: "running" },
+          ]}
+          activeSessionId={activeSessionId}
+          onActivate={setActiveSessionId}
+          onClose={vi.fn()}
+          onCreate={vi.fn()}
+          workspacePath="/workspace/my private"
+        />
+      );
+    }
+
+    act(() => root?.render(withTestLocalization(<Harness />)));
+    const selectedTab = () => container.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]');
+
+    act(() => selectedTab()?.dispatchEvent(new KeyboardEvent("keydown", {
+      bubbles: true,
+      key: "End",
+    })));
+    expect(selectedTab()?.id).toBe("desktop-terminal-tab-terminal-c");
+
+    act(() => selectedTab()?.dispatchEvent(new KeyboardEvent("keydown", {
+      bubbles: true,
+      key: "Home",
+    })));
+    expect(selectedTab()?.id).toBe("desktop-terminal-tab-terminal-a");
+
+    act(() => selectedTab()?.dispatchEvent(new KeyboardEvent("keydown", {
+      bubbles: true,
+      key: "ArrowLeft",
+    })));
+    expect(selectedTab()?.id).toBe("desktop-terminal-tab-terminal-c");
+  });
+
+  it("labels a runtime-free launcher tab without requiring a Terminal runtime", () => {
+    const requireRuntime = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
 
     act(() => root?.render(withTestLocalization(
-      <TerminalSessionTabs
+      <TerminalSessionHeader
+        sessions={[{
+          id: "launcher-a",
+          launcherId: null,
+          ordinal: 1,
+          shell: null,
+          status: "selecting",
+        }]}
+        activeSessionId="launcher-a"
+        onActivate={vi.fn()}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        runtimeRegistry={{ require: requireRuntime }}
+        workspacePath="/workspace/my private"
+      />,
+    )));
+
+    expect(container.querySelector('[role="tab"]')?.textContent).toBe("my private");
+    expect(requireRuntime).not.toHaveBeenCalled();
+  });
+
+  it("compresses inactive tabs and moves excess sessions into an accessible menu", () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 281,
+      height: 38,
+      top: 0,
+      right: 281,
+      bottom: 38,
+      left: 0,
+      toJSON: () => ({}),
+    });
+    const onActivate = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const launchers = ["codex", "claude", "cursor", "opencode", "pi", "hermes"] as const;
+
+    act(() => root?.render(withTestLocalization(
+      <TerminalSessionHeader
+        sessions={launchers.map((launcherId, index) => ({
+          id: `terminal-${index + 1}`,
+          launcherId,
+          ordinal: index + 1,
+          shell: launcherId,
+          status: "running" as const,
+        }))}
+        activeSessionId="terminal-4"
+        onActivate={onActivate}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        workspacePath="/workspace/my private"
+      />,
+    )));
+
+    expect(container.querySelector(".desktop-terminal-tab-rail")?.getAttribute("data-layout"))
+      .toBe("overflow");
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(4);
+    expect(container.querySelectorAll(".desktop-terminal-tab.is-compact")).toHaveLength(3);
+    expect(container.querySelector(".desktop-terminal-tab.is-active")?.textContent)
+      .toBe("my private");
+
+    clickButton(container, "More terminal tabs (2)");
+    expect(document.querySelectorAll('.desktop-terminal-tab-overflow-menu [role="menuitemradio"]'))
+      .toHaveLength(2);
+    clickButton(document.body, "Codex");
+    expect(onActivate).toHaveBeenCalledWith("terminal-1");
+    expect(document.querySelector(".desktop-terminal-tab-overflow-menu")).toBeNull();
+  });
+
+  it("measures stable Header capacity and expands from overflow back to full tabs", () => {
+    let headerWidth = 281;
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(() => ({
+      x: 0,
+      y: 0,
+      width: headerWidth,
+      height: 38,
+      top: 0,
+      right: headerWidth,
+      bottom: 38,
+      left: 0,
+      toJSON: () => ({}),
+    }));
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const launchers = ["codex", "claude", "cursor", "opencode", "pi", "hermes"] as const;
+
+    act(() => root?.render(withTestLocalization(
+      <TerminalSessionHeader
+        sessions={launchers.map((launcherId, index) => ({
+          id: `terminal-${index + 1}`,
+          launcherId,
+          ordinal: index + 1,
+          shell: launcherId,
+          status: "running" as const,
+        }))}
+        activeSessionId="terminal-4"
+        onActivate={vi.fn()}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        workspacePath="/workspace/my private"
+      />,
+    )));
+
+    const rail = container.querySelector(".desktop-terminal-tab-rail");
+    expect(rail?.getAttribute("data-layout")).toBe("overflow");
+
+    headerWidth = 931;
+    act(() => window.dispatchEvent(new Event("resize")));
+
+    expect(rail?.getAttribute("data-layout")).toBe("full");
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(6);
+    expect(container.querySelectorAll(".desktop-terminal-tab.is-compact")).toHaveLength(0);
+    expect(container.querySelector(".desktop-terminal-tab-overflow-trigger")).toBeNull();
+  });
+
+  it("animates an explicit compact-tab activation without animating steady layout", () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 38,
+      top: 0,
+      right: 300,
+      bottom: 38,
+      left: 0,
+      toJSON: () => ({}),
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    function Harness() {
+      const [activeSessionId, setActiveSessionId] = React.useState("terminal-a");
+      return (
+        <TerminalSessionHeader
+          sessions={[
+            { id: "terminal-a", launcherId: "codex", ordinal: 1, shell: "codex", status: "running" },
+            { id: "terminal-b", launcherId: "claude", ordinal: 2, shell: "claude", status: "running" },
+            { id: "terminal-c", launcherId: "cursor", ordinal: 3, shell: "cursor", status: "running" },
+          ]}
+          activeSessionId={activeSessionId}
+          onActivate={setActiveSessionId}
+          onClose={vi.fn()}
+          onCreate={vi.fn()}
+          workspacePath="/workspace/my private"
+        />
+      );
+    }
+
+    act(() => root?.render(withTestLocalization(<Harness />)));
+    const rail = container.querySelector(".desktop-terminal-tab-rail");
+    const tabs = container.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    const tabShells = container.querySelectorAll<HTMLElement>(".desktop-terminal-tab");
+    expect(rail?.getAttribute("data-layout")).toBe("compact");
+    expect(rail?.hasAttribute("data-activation-motion")).toBe(false);
+    expect(tabShells[0]?.style.getPropertyValue("--desktop-terminal-tab-inline-start")).toBe("0px");
+    expect(tabShells[0]?.style.getPropertyValue("--desktop-terminal-tab-resolved-width")).toBe("144px");
+    expect(tabShells[1]?.style.getPropertyValue("--desktop-terminal-tab-inline-start")).toBe("147px");
+    expect(tabShells[1]?.style.getPropertyValue("--desktop-terminal-tab-resolved-width")).toBe("28px");
+
+    act(() => tabs[1]?.click());
+    expect(tabs[1]?.getAttribute("aria-selected")).toBe("true");
+    expect(rail?.getAttribute("data-activation-motion")).toBe("true");
+    expect(tabShells[0]?.style.getPropertyValue("--desktop-terminal-tab-inline-start")).toBe("0px");
+    expect(tabShells[0]?.style.getPropertyValue("--desktop-terminal-tab-resolved-width")).toBe("28px");
+    expect(tabShells[1]?.style.getPropertyValue("--desktop-terminal-tab-inline-start")).toBe("31px");
+    expect(tabShells[1]?.style.getPropertyValue("--desktop-terminal-tab-resolved-width")).toBe("144px");
+
+    act(() => vi.advanceTimersByTime(TERMINAL_SESSION_ACTIVATION_MOTION_MS));
+    expect(rail?.hasAttribute("data-activation-motion")).toBe(false);
+  });
+
+  it("keeps visible overflow tabs mounted while the active width pushes across the rail", () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      width: 281,
+      height: 38,
+      top: 0,
+      right: 281,
+      bottom: 38,
+      left: 0,
+      toJSON: () => ({}),
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const sessions = ["codex", "claude", "cursor", "opencode", "pi", "hermes"]
+      .map((launcherId, index) => ({
+        id: `terminal-${index + 1}`,
+        launcherId,
+        ordinal: index + 1,
+        shell: launcherId,
+        status: "running" as const,
+      }));
+
+    function Harness() {
+      const [activeSessionId, setActiveSessionId] = React.useState("terminal-4");
+      return (
+        <TerminalSessionHeader
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onActivate={setActiveSessionId}
+          onClose={vi.fn()}
+          onCreate={vi.fn()}
+          workspacePath="/workspace/my private"
+        />
+      );
+    }
+
+    act(() => root?.render(withTestLocalization(<Harness />)));
+    const before = [...container.querySelectorAll<HTMLElement>(".desktop-terminal-tab")];
+    expect(before.map((tab) => tab.querySelector('[role="tab"]')?.id)).toEqual([
+      "desktop-terminal-tab-terminal-2",
+      "desktop-terminal-tab-terminal-3",
+      "desktop-terminal-tab-terminal-4",
+      "desktop-terminal-tab-terminal-5",
+    ]);
+
+    act(() => container.querySelector<HTMLButtonElement>("#desktop-terminal-tab-terminal-5")?.click());
+    const after = [...container.querySelectorAll<HTMLElement>(".desktop-terminal-tab")];
+    expect(after).toEqual(before);
+    expect(after[2]?.classList.contains("is-compact")).toBe(true);
+    expect(after[3]?.classList.contains("is-active")).toBe(true);
+    expect(container.querySelector(".desktop-terminal-tab-rail")?.getAttribute("data-activation-motion"))
+      .toBe("true");
+  });
+
+  it("uses one activity grid for every Agent while preserving its idle brand mark", () => {
+    const activityHarness = createTerminalActivityHarness();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(withTestLocalization(
+      <TerminalSessionHeader
         sessions={[
-          { id: "terminal-a", ordinal: 1, shell: "zsh", status: "running" },
+          { id: "terminal-a", launcherId: "cursor", ordinal: 1, shell: "Cursor Agent", status: "running" },
         ]}
         activeSessionId="terminal-a"
         onActivate={vi.fn()}
         onClose={vi.fn()}
         onCreate={vi.fn()}
-        runtimeRegistry={{ require: () => titleHarness.runtime }}
+        runtimeRegistry={{ require: () => activityHarness.runtime }}
+        workspacePath="/workspace/my private"
       />,
     )));
 
     const status = container.querySelector(".desktop-terminal-tab-status");
-    expect(status?.querySelector(".desktop-terminal-tab-idle-mark")).not.toBeNull();
+    expect(status?.querySelector(".desktop-terminal-launcher-icon.is-cursor")).not.toBeNull();
     expect(status?.classList.contains("is-activity")).toBe(false);
-    expect(status?.querySelectorAll(".desktop-terminal-tab-activity-dot")).toHaveLength(0);
+    expect(status?.querySelectorAll(".desktop-terminal-activity-grid > span")).toHaveLength(0);
 
-    titleHarness.setTitle("⠋ puppyone");
-    expect(status?.querySelector(".desktop-terminal-tab-idle-mark")).toBeNull();
+    activityHarness.setActivity(true);
+    expect(status?.querySelector(".desktop-terminal-launcher-icon")).toBeNull();
     expect(status?.classList.contains("is-activity")).toBe(true);
-    expect(status?.querySelectorAll(".desktop-terminal-tab-activity-dot")).toHaveLength(4);
+    expect(status?.querySelectorAll(".desktop-terminal-activity-grid > span")).toHaveLength(4);
 
-    titleHarness.setTitle("✳ puppyone");
-    expect(status?.querySelector(".desktop-terminal-tab-idle-mark")).not.toBeNull();
+    activityHarness.setActivity(false);
+    expect(status?.querySelector(".desktop-terminal-launcher-icon.is-cursor")).not.toBeNull();
     expect(status?.classList.contains("is-activity")).toBe(false);
-    expect(status?.querySelectorAll(".desktop-terminal-tab-activity-dot")).toHaveLength(0);
+    expect(status?.querySelectorAll(".desktop-terminal-activity-grid > span")).toHaveLength(0);
 
-    titleHarness.setTitle("⠙ puppyone");
     act(() => root?.render(withTestLocalization(
-      <TerminalSessionTabs
+      <TerminalSessionHeader
         sessions={[
-          { id: "terminal-a", ordinal: 1, shell: "zsh", status: "exited" },
+          { id: "terminal-a", launcherId: "cursor", ordinal: 1, shell: null, status: "starting" },
         ]}
         activeSessionId="terminal-a"
         onActivate={vi.fn()}
         onClose={vi.fn()}
         onCreate={vi.fn()}
-        runtimeRegistry={{ require: () => titleHarness.runtime }}
+        runtimeRegistry={{ require: () => activityHarness.runtime }}
+        workspacePath="/workspace/my private"
       />,
     )));
-    expect(status?.textContent).toBe("");
-    expect(status?.querySelector(".desktop-terminal-tab-idle-mark")).toBeNull();
+    expect(status?.querySelector(".desktop-terminal-launcher-icon")).toBeNull();
+    expect(status?.classList.contains("is-activity")).toBe(true);
+    expect(status?.querySelectorAll(".desktop-terminal-activity-grid > span")).toHaveLength(4);
+
+    activityHarness.setActivity(true);
+    act(() => root?.render(withTestLocalization(
+      <TerminalSessionHeader
+        sessions={[
+          { id: "terminal-a", launcherId: "cursor", ordinal: 1, shell: "Cursor Agent", status: "exited" },
+        ]}
+        activeSessionId="terminal-a"
+        onActivate={vi.fn()}
+        onClose={vi.fn()}
+        onCreate={vi.fn()}
+        runtimeRegistry={{ require: () => activityHarness.runtime }}
+        workspacePath="/workspace/my private"
+      />,
+    )));
+    expect(status?.querySelector(".desktop-terminal-launcher-icon.is-cursor")).not.toBeNull();
     expect(status?.classList.contains("is-activity")).toBe(false);
-    expect(status?.querySelectorAll(".desktop-terminal-tab-activity-dot")).toHaveLength(0);
   });
 
   it("makes cancellation the safe default before closing a terminal", () => {
@@ -217,33 +524,34 @@ function clickButton(container: HTMLElement, accessibleName: string) {
   act(() => button.click());
 }
 
-function createTerminalTitleHarness() {
-  let title = "";
-  const listeners = new Set<(nextTitle: string) => void>();
+function createTerminalActivityHarness() {
+  let activity = false;
+  const listeners = new Set<(nextActivity: boolean) => void>();
   const runtime: TerminalRuntimeHandle = {
-    get title() {
-      return title;
+    get activity() {
+      return activity;
     },
     ready: true,
     applyAppearance: vi.fn(),
     dispose: vi.fn(),
     focus: vi.fn(),
     mount: vi.fn(),
+    unmount: vi.fn(),
     setActive: vi.fn(),
-    subscribeReady: vi.fn(() => () => undefined),
-    subscribeTitle: vi.fn((listener) => {
+    subscribeActivity: vi.fn((listener) => {
       listeners.add(listener);
-      listener(title);
+      listener(activity);
       return () => listeners.delete(listener);
     }),
+    subscribeReady: vi.fn(() => () => undefined),
     write: vi.fn(),
   };
 
   return {
     runtime,
-    setTitle(nextTitle: string) {
-      title = nextTitle;
-      act(() => listeners.forEach((listener) => listener(title)));
+    setActivity(nextActivity: boolean) {
+      activity = nextActivity;
+      act(() => listeners.forEach((listener) => listener(activity)));
     },
   };
 }

@@ -242,9 +242,69 @@ export function SettingsView({
                 onDarkThemePresetChange={onDarkThemePresetChange}
               />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
+                <span>{t("settings.appearance.textSize.title")}</span>
+                <div className="desktop-theme-segment desktop-appearance-option-segment" aria-label={t("settings.appearance.textSize.ariaLabel")}>
+                  {TEXT_SIZE_PRESETS.map((option) => (
+                    <button
+                      key={option.value}
+                      className={textSize === option.value ? "active" : ""}
+                      type="button"
+                      title={t(`settings.appearance.textSize.${option.value}.description`)}
+                      aria-pressed={textSize === option.value}
+                      onClick={() => onTextSizeChange(option.value)}
+                    >
+                      <span>{t(`settings.appearance.textSize.${option.value}.label`)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <ContentFontSetting
+                preferences={typographyPreferences}
+                onChange={onTypographyPreferencesChange}
+              />
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
+                <span>{t("settings.appearance.fileIcons.title")}</span>
+                <div className="desktop-theme-segment desktop-appearance-option-segment" aria-label={t("settings.appearance.fileIcons.ariaLabel")}>
+                  {FILE_ICON_THEMES.map((theme) => (
+                    <button
+                      key={theme.id}
+                      className={fileIconTheme === theme.id ? "active" : ""}
+                      type="button"
+                      title={t(`settings.appearance.fileIcons.${theme.id}.description`)}
+                      onClick={() => onFileIconThemeChange(theme.id)}
+                    >
+                      <FileGlyphIcon name="document.md" size={14} theme={theme.id} />
+                      <span>{t(`settings.appearance.fileIcons.${theme.id}.label`)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
+                <span>{t("settings.appearance.navigation.title")}</span>
+                <div className="desktop-theme-segment desktop-appearance-option-segment" aria-label={t("settings.appearance.navigation.ariaLabel")}>
+                  {SIDEBAR_NAVIGATION_LAYOUT_OPTIONS.map((option) => {
+                    const Icon = option.placement === "top"
+                      ? PanelTop
+                      : option.placement === "left" ? PanelLeft : PanelBottom;
+                    return (
+                      <button
+                        className={sidebarNavigationLayout === option.value ? "active" : ""}
+                        type="button"
+                        key={option.value}
+                        title={t(`settings.appearance.navigation.${option.placement}.description`)}
+                        onClick={() => onSidebarNavigationLayoutChange(option.value)}
+                      >
+                        <Icon size={14} />
+                        <span>{t(`settings.appearance.navigation.${option.placement}.label`)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.loadingAnimation.title")}</span>
                 <div
-                  className="desktop-theme-segment desktop-loading-animation-segment"
+                  className="desktop-theme-segment desktop-appearance-option-segment"
                   aria-label={t("settings.appearance.loadingAnimation.ariaLabel")}
                 >
                   {PULSE_GRID_PRESET_IDS.map((presetId) => (
@@ -267,66 +327,6 @@ export function SettingsView({
                       <span>{t(`settings.appearance.loadingAnimation.${presetId}.label`)}</span>
                     </button>
                   ))}
-                </div>
-              </div>
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-                <span>{t("settings.appearance.textSize.title")}</span>
-                <div className="desktop-theme-segment desktop-text-size-segment" aria-label={t("settings.appearance.textSize.ariaLabel")}>
-                  {TEXT_SIZE_PRESETS.map((option) => (
-                    <button
-                      key={option.value}
-                      className={textSize === option.value ? "active" : ""}
-                      type="button"
-                      title={t(`settings.appearance.textSize.${option.value}.description`)}
-                      aria-pressed={textSize === option.value}
-                      onClick={() => onTextSizeChange(option.value)}
-                    >
-                      <span>{t(`settings.appearance.textSize.${option.value}.label`)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <ContentFontSetting
-                preferences={typographyPreferences}
-                onChange={onTypographyPreferencesChange}
-              />
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-                <span>{t("settings.appearance.fileIcons.title")}</span>
-                <div className="desktop-theme-segment desktop-file-icon-theme-segment" aria-label={t("settings.appearance.fileIcons.ariaLabel")}>
-                  {FILE_ICON_THEMES.map((theme) => (
-                    <button
-                      key={theme.id}
-                      className={fileIconTheme === theme.id ? "active" : ""}
-                      type="button"
-                      title={t(`settings.appearance.fileIcons.${theme.id}.description`)}
-                      onClick={() => onFileIconThemeChange(theme.id)}
-                    >
-                      <FileGlyphIcon name="document.md" size={14} theme={theme.id} />
-                      <span>{t(`settings.appearance.fileIcons.${theme.id}.label`)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-                <span>{t("settings.appearance.navigation.title")}</span>
-                <div className="desktop-theme-segment desktop-sidebar-layout-segment" aria-label={t("settings.appearance.navigation.ariaLabel")}>
-                  {SIDEBAR_NAVIGATION_LAYOUT_OPTIONS.map((option) => {
-                    const Icon = option.placement === "top"
-                      ? PanelTop
-                      : option.placement === "left" ? PanelLeft : PanelBottom;
-                    return (
-                      <button
-                        className={sidebarNavigationLayout === option.value ? "active" : ""}
-                        type="button"
-                        key={option.value}
-                        title={t(`settings.appearance.navigation.${option.placement}.description`)}
-                        onClick={() => onSidebarNavigationLayoutChange(option.value)}
-                      >
-                        <Icon size={14} />
-                        <span>{t(`settings.appearance.navigation.${option.placement}.label`)}</span>
-                      </button>
-                    );
-                  })}
                 </div>
               </div>
               {experimentalSettings.enableViewerPlugins && (
@@ -440,7 +440,7 @@ export function SettingsView({
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span id="desktop-dock-icon-label">{t("settings.appearance.dockIcon.title")}</span>
                 <div
-                  className="desktop-theme-segment desktop-dock-icon-segment"
+                  className="desktop-theme-segment desktop-appearance-option-segment desktop-dock-icon-segment"
                   aria-labelledby="desktop-dock-icon-label"
                 >
                   {DOCK_ICON_OPTIONS.map((option) => (

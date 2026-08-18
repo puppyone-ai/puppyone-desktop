@@ -7,7 +7,23 @@ export {
 } from "./activeDocumentSessions";
 export { useDocumentSessionState } from "./useDocumentSessionState";
 export { formatDocumentSessionError } from "./formatDocumentSessionError";
+export {
+  canonicalizeDocumentResourcePath,
+  createDocumentIdentity,
+  getDocumentIdentityKey,
+} from "./documentIdentity";
+export {
+  closeAllDocumentWorkingCopies,
+  closeDocumentWorkingCopy,
+  closeDocumentWorkingCopiesUnderResource,
+  getDocumentWorkingCopyStatuses,
+  subscribeDocumentWorkingCopyStatuses,
+} from "./documentWorkingCopies";
 export type { DocumentSessionBoundaryProps } from "./DocumentSessionBoundary";
+export type {
+  CanonicalDocumentResourcePath,
+  DocumentIdentity,
+} from "./documentIdentity";
 export type {
   DocumentEditingSessionOptions,
   DocumentSessionDrainReason,

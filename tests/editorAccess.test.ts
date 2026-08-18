@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveEditorAccess } from "../packages/shared-ui/src/editor/editorAccess";
-import { resolveEditorViewer } from "../packages/shared-ui/src/editor/viewerRegistry";
-import type { EditorDocument } from "../packages/shared-ui/src/editor/viewerTypes";
+import { resolveEditorViewer } from "../packages/shared-ui/src/editor/registry/viewerRegistry";
+import type { EditorDocument } from "../packages/shared-ui/src/editor/registry/viewerTypes";
 
 describe("editor access routing", () => {
   it("allows a loaded CSV classified as a spreadsheet to use the editable contribution", () => {

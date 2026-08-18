@@ -36,7 +36,7 @@ function defaultTranslate(messageId, values = {}) {
 export function createAppPreviewRuntime({
   app,
   dialog,
-  shell,
+  externalNavigation,
   readWorkspaceTextFile,
   resolveWorkspacePath,
   t = defaultTranslate,
@@ -46,6 +46,9 @@ export function createAppPreviewRuntime({
   fetchHealth = fetchWithTimeout,
   serveStaticFile = startStaticFileServer,
 }) {
+  if (!externalNavigation || typeof externalNavigation.open !== "function") {
+    throw new TypeError("App Preview requires the external navigation service.");
+  }
   const sessionsById = new Map();
   const runtimeIdBySession = new Map();
   const generationBySession = new Map();
@@ -155,17 +158,6 @@ export function createAppPreviewRuntime({
     return serializeSession(existing);
   }
 
-  async function stopForIdle(request) {
-    const rootPath = normalizeRootPath(request?.rootPath);
-    const appPath = normalizeAppPath(request?.path);
-    const existing = getSession(getSessionKey(rootPath, appPath));
-    if (!existing) return null;
-    await stopSession(existing, "idle timeout");
-    const result = serializeSession(existing);
-    releaseSession(existing);
-    return result;
-  }
-
   async function getLogs(sender, request) {
     const rootPath = normalizeRootPath(request?.rootPath);
     const appPath = normalizeAppPath(request?.path);
@@ -179,7 +171,7 @@ export function createAppPreviewRuntime({
     if (!result.url) {
       throw new Error("App Preview URL is unavailable.");
     }
-    await shell.openExternal(result.url);
+    await externalNavigation.open(result.url);
   }
 
   function closeSessionsForWindow(webContentsId) {
@@ -454,7 +446,6 @@ export function createAppPreviewRuntime({
     start,
     restart,
     stop,
-    stopForIdle,
     getLogs,
     openExternal,
     closeSessionsForWindow,

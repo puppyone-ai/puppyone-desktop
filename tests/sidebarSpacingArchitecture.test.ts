@@ -54,16 +54,21 @@ describe("sidebar spacing architecture", () => {
     expect(shell).toContain("margin: 0;");
   });
 
-  it("gives the Explorer host sole ownership of the sidebar divider", () => {
+  it("gives the Explorer resize gutter sole ownership of the sidebar divider", () => {
     const explorerColumn = compact(readCssBlock(dataTreeCss, ".explorer-column"));
+    const explorerResizer = compact(readCssBlock(dataTreeCss, ".data-explorer-resizer"));
+    const explorerDivider = compact(readCssBlock(dataTreeCss, ".data-explorer-resizer::after"));
     const injectedSurface = compact(readCssBlock(layoutCss, ".desktop-view-surface-sidebar"));
     expect(dataWorkspaceSource).toContain('<aside className="explorer-column">');
     expect(dataWorkspaceSource).toContain("renderWorkspaceSlot(explorerSlot, workspaceState)");
     expect(workspaceSurfaceOutletSource).toContain(
       'className={`desktop-view-surface desktop-view-surface-${region}`}',
     );
-    expect(explorerColumn).toContain(
-      "border-inline-end: 1px solid var(--po-shell-divider, var(--po-divider));",
+    expect(explorerColumn).toContain("border-inline-end: 1px solid transparent;");
+    expect(explorerResizer).toContain("background: var(--po-sidebar);");
+    expect(explorerDivider).toContain("inset-inline-end: 0;");
+    expect(explorerDivider).toContain(
+      "background: var(--po-shell-divider, var(--po-divider));",
     );
     expect(injectedSurface).not.toContain("border-inline-end:");
     expect(cloudSidebarCss).not.toContain("border-inline-end:");

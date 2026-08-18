@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Workspace } from "@puppyone/shared-ui";
+import type { Workspace, WorkspaceContentChange } from "@puppyone/shared-ui";
 import {
   fetchWorkspaceGit,
   getWorkspaceGitStatus,
@@ -21,7 +21,7 @@ import {
 
 type UseGitRepositoryLifecycleOptions = {
   workspace: Workspace | null;
-  onWorkspaceContentChanged: () => void;
+  onWorkspaceContentChanged: (paths?: WorkspaceContentChange["paths"] | string) => void;
 };
 
 export function useGitRepositoryLifecycle({
@@ -209,7 +209,7 @@ export function useGitRepositoryLifecycle({
       ? bridge.watchWorkspace(rootPath, (event) => {
         if (cancelled) return;
         if (event.error && !("recovered" in event && event.recovered)) return;
-        onWorkspaceContentChanged();
+        onWorkspaceContentChanged(event.paths ?? event.path ?? null);
         scheduler.invalidate({
           reason: createRepositoryRefreshReason("working-tree", "watcher"),
           priority: "debounced",

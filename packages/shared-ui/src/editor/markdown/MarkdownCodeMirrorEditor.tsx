@@ -16,7 +16,7 @@ import { getMarkdownPlanIndex } from "./core/plans/markdownPlanIndex";
 import { markdownRevealedSourceEffect } from "./core/state/revealedSource";
 import { getDocRevision } from "./platform/brokers/transactionBroker";
 import type { AiEditFile } from "../ai-edits/types";
-import type { MarkdownAssetUrlResolver, MarkdownDialectId, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownDialectId, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../registry/viewerTypes";
 import type {
   EditorSourceRevision,
   EditorSourceSnapshot,
@@ -215,7 +215,7 @@ export function MarkdownCodeMirrorEditor({
             if (!update.docChanged) return;
             if (update.transactions.some((transaction) => transaction.annotation(externalDocumentUpdate))) return;
             const revision = getDocRevision(update.state.doc);
-            callbacksRef.current.onSourceRevisionChange?.({ revision, dirty: true });
+            callbacksRef.current.onSourceRevisionChange?.({ revision, origin: "local-edit" });
             // Compatibility only. The main Markdown persistence path never
             // supplies this callback, so ordinary typing does not stringify.
             if (callbacksRef.current.onChange) {
@@ -251,7 +251,10 @@ export function MarkdownCodeMirrorEditor({
     };
     callbacksRef.current.onSnapshotPortChange?.(snapshotPort);
     const baseRevision = getDocRevision(view.state.doc);
-    callbacksRef.current.onSourceRevisionChange?.({ revision: baseRevision, dirty: false });
+    callbacksRef.current.onSourceRevisionChange?.({
+      revision: baseRevision,
+      origin: "model-initialization",
+    });
     callbacksRef.current.onEditorBaseReady?.(baseRevision);
     if (documentPathRef.current) {
       rendererPerformance.markActiveDocument(documentPathRef.current, "editor_base_ready");
@@ -510,7 +513,7 @@ export function MarkdownCodeMirrorEditor({
     });
     callbacksRef.current.onSourceRevisionChange?.({
       revision: getDocRevision(view.state.doc),
-      dirty: false,
+      origin: "model-initialization",
     });
   }, [value]);
 

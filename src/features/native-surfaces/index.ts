@@ -3,4 +3,10 @@ export {
   useNativeSurfaceOcclusionLease,
   useNativeSurfaceOcclusionObserver,
 } from "./nativeSurfaceOcclusion";
-export { setNativeSurfacePointerPassthrough } from "./nativeSurfacePointerPassthrough";
+export {
+  acquireNativeSurfacePointerPassthroughLease,
+  createNativeSurfacePointerSessionId,
+  type NativeSurfacePointerPassthroughLease,
+  type NativeSurfacePointerPassthroughOwner,
+} from "./nativeSurfacePointerPassthrough";
+export { useNativeSurfacePointerPassthroughActivity } from "./useNativeSurfacePointerPassthroughActivity";

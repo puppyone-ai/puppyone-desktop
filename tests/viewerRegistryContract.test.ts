@@ -10,18 +10,18 @@ import {
   PRESET_VIEWER_REGISTRY,
   PRESET_VIEWERS,
   resolveEditorViewer,
-} from "../packages/shared-ui/src/editor/viewerRegistry";
-import { PRESET_VIEWER_CONTRACT_VERSION } from "../packages/shared-ui/src/editor/viewerContract";
+} from "../packages/shared-ui/src/editor/registry/viewerRegistry";
+import { PRESET_VIEWER_CONTRACT_VERSION } from "../packages/shared-ui/src/editor/registry/viewerContract";
 import {
   coreViewerCapability,
   PRESET_VIEWER_MANIFEST,
-} from "../packages/shared-ui/src/editor/presetViewerManifest";
+} from "../packages/shared-ui/src/editor/registry/presetViewerManifest";
 import type {
   EditorDocument,
   EditorViewerMatch,
   PresetViewerContribution,
   PresetViewerImplementation,
-} from "../packages/shared-ui/src/editor/viewerTypes";
+} from "../packages/shared-ui/src/editor/registry/viewerTypes";
 
 function document(name: string, type = "file", mimeType: string | null = null): EditorDocument {
   return { path: name, name, type, mimeType };
@@ -70,11 +70,29 @@ describe("preset viewer contribution contract", () => {
     ])).toEqual(new Set(PRESET_VIEWER_MANIFEST.viewers.map(({ id }) => id)));
   });
 
+  it("declares the layout and first-frame contract for every preset Viewer", () => {
+    expect(PRESET_VIEWER_MANIFEST.viewers.every((viewer) => (
+      viewer.surfacePreparation === "hidden-safe"
+      || viewer.surfacePreparation === "requires-visible"
+    ))).toBe(true);
+    expect(resolveEditorViewer(document("report.pdf")).viewer).toMatchObject({
+      runtime: "lazy",
+      surfacePreparation: "requires-visible",
+      readinessSignal: "first-rendered-frame",
+    });
+    expect(resolveEditorViewer(document("page.html")).viewer.surfacePreparation)
+      .toBe("hidden-safe");
+    expect(resolveEditorViewer(document("movie.mp4")).viewer.surfacePreparation)
+      .toBe("requires-visible");
+    expect(resolveEditorViewer(document("photo.png")).viewer.surfacePreparation)
+      .toBe("hidden-safe");
+  });
+
   it.each([
     [document("notes.md"), "markdown", "content", "edit"],
     [document("settings.json", "text"), "json", "content", "edit"],
     [document("table.csv"), "csv-table", "content", "edit"],
-    [document("page.html"), "html-artifact", "content-and-resource", "preview"],
+    [document("page.html"), "html-artifact", "content-and-resource", "edit"],
     [document("photo.png"), "image-preview", "resource", "preview"],
     [document("report.pdf"), "pdf-preview", "resource", "preview"],
     [document("report.docx"), "office-preview", "resource", "preview"],

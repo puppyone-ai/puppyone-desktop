@@ -1,15 +1,12 @@
 import type {
   AiEditRequest,
-  AppPreviewActivationResult,
-  AppPreviewBounds,
   AppPreviewResult,
-  AppPreviewSurfaceCommand,
-  AppPreviewSurfaceState,
   DataNode,
   FileContent,
   Workspace,
 } from "@puppyone/shared-ui";
 import type { AppLanguagePreference, LocaleState } from "@puppyone/localization/core";
+import type { DesktopTerminalLauncherId } from "../features/desktop-terminal/model/terminalLaunchers";
 import type {
   AgentAccountReadRequest,
   AgentAccountState,
@@ -357,6 +354,22 @@ export type TerminalCreateRequest = {
   cwd: string;
   cols: number;
   rows: number;
+  launcherId?: DesktopTerminalLauncherId;
+};
+
+export type TerminalAgentId = Exclude<DesktopTerminalLauncherId, "shell">;
+
+export type TerminalAgentLocationSnapshot = {
+  availableAgentIds: TerminalAgentId[];
+  scannedAt: string;
+  source: "scan" | "memory-cache";
+};
+
+export type TerminalAgentLocationProgressEvent = {
+  availableAgentIds: TerminalAgentId[];
+  completedAgentCount: number;
+  requestId: string;
+  totalAgentCount: number;
 };
 
 export type TerminalCreateResult = {
@@ -453,10 +466,17 @@ export type WorkspaceChangedEvent = {
   rootPath: string;
   eventType: string;
   path: string | null;
+  /** All paths coalesced in the watcher debounce window. */
+  paths?: string[];
   error?: string;
   recovered?: boolean;
   reason?: string;
 };
+
+export type WorkspaceWriteFileResult =
+  | { ok: true; version: string | null }
+  | { ok: false; kind: "conflict"; content: string; version: string | null }
+  | { ok: false; kind: "not-found" | "permission-denied" | "io"; message: string };
 
 export type AiEditReviewUpdatedEvent = {
   rootPath: string;
@@ -516,6 +536,20 @@ export type WorkspaceCreateEntryRequest = {
 
 export type WorkspaceCreateEntryResult = {
   path: string;
+};
+
+export type WorkspaceInstantiateTemplateRequest = {
+  rootPath: string;
+  parentPath: string | null;
+  name: string;
+  templateId: "slides.default";
+};
+
+export type WorkspaceInstantiateTemplateResult = {
+  rootPath: string;
+  openPath: string;
+  createdPaths: string[];
+  template: { id: "slides.default"; version: number };
 };
 
 export type WorkspaceRenameEntryRequest = {
@@ -666,11 +700,25 @@ export type PuppyoneWorkspaceConfig = {
 declare global {
   interface Window {
     puppyoneDesktop?: {
+      getWindowChromeState: () => Promise<{ fullScreen: boolean }>;
+      onWindowChromeStateChanged: (
+        callback: (state: { fullScreen: boolean }) => void,
+      ) => () => void;
       setWindowBackground: (request: { background: string }) => void;
       setWindowMinimumWidth: (request: { width: number }) => Promise<{
         applied: boolean;
         width?: number;
       }>;
+      capturePanePreview: (request: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }) => Promise<{
+        dataUrl: string;
+        width: number;
+        height: number;
+      } | null>;
       setNativeSurfaceOccluded: (request: { occluded: boolean }) => void;
       setNativeSurfacePointerPassthrough: (request: { active: boolean }) => void;
       getBuildInfo: () => Promise<DesktopBuildInfo>;
@@ -802,6 +850,11 @@ declare global {
       getLastWorkspace: () => Promise<LastWorkspaceResult>;
       getRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
       hydrateRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
+      removeRecentWorkspace: (folderPath: string) => Promise<{
+        ok: true;
+        removed: true;
+        path: string;
+      }>;
       forgetLastWorkspace: () => Promise<void>;
       showHomepage: () => Promise<{ ok: boolean }>;
       openWorkspaceInCurrentWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
@@ -851,8 +904,11 @@ declare global {
         path: string;
         content: string;
         expectedVersion?: string | null;
-      }) => Promise<{ version: string }>;
+      }) => Promise<WorkspaceWriteFileResult>;
       createEntry: (request: WorkspaceCreateEntryRequest) => Promise<WorkspaceCreateEntryResult>;
+      instantiateTemplate: (
+        request: WorkspaceInstantiateTemplateRequest,
+      ) => Promise<WorkspaceInstantiateTemplateResult>;
       renameEntry: (request: WorkspaceRenameEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       moveEntry: (request: WorkspaceMoveEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       copyEntry: (request: WorkspaceCopyEntryRequest) => Promise<WorkspaceCreateEntryResult>;
@@ -863,13 +919,6 @@ declare global {
       resolveExternalOpenTarget: (request: WorkspaceResolveExternalOpenTargetRequest) => Promise<WorkspaceExternalOpenTarget>;
       listExternalOpenTargets: (request: WorkspaceResolveExternalOpenTargetRequest) => Promise<WorkspaceExternalOpenTarget[]>;
       chooseExternalApp: (request: WorkspaceChooseExternalAppRequest) => Promise<WorkspaceExternalOpenTarget | null>;
-      activateAppPreview: (request: {
-        rootPath: string;
-        path: string;
-        bounds: AppPreviewBounds;
-        attachmentId: string;
-        visible: boolean;
-      }) => Promise<AppPreviewActivationResult>;
       startAppPreview: (request: {
         rootPath: string;
         path: string;
@@ -877,10 +926,7 @@ declare global {
       restartAppPreview: (request: {
         rootPath: string;
         path: string;
-        bounds?: AppPreviewBounds;
-        attachmentId?: string;
-        visible?: boolean;
-      }) => Promise<AppPreviewResult | AppPreviewActivationResult>;
+      }) => Promise<AppPreviewResult>;
       stopAppPreview: (request: {
         rootPath: string;
         path: string;
@@ -893,25 +939,8 @@ declare global {
         rootPath: string;
         path: string;
       }) => Promise<{ ok: boolean }>;
-      setAppPreviewSurfaceBounds: (request: {
-        surfaceId: string;
-        attachmentId: string;
-        bounds: AppPreviewBounds;
-        visible: boolean;
-      }) => Promise<{ ok: boolean; visible: boolean }>;
-      detachAppPreviewSurface: (request: {
-        surfaceId?: string | null;
-        attachmentId: string;
-      }) => Promise<{ ok: boolean }>;
-      runAppPreviewSurfaceCommand: (request: {
-        surfaceId: string;
-        command: AppPreviewSurfaceCommand;
-      }) => Promise<{ ok: boolean }>;
       onAppPreviewRuntimeState: (
         callback: (state: AppPreviewResult & { rootPath: string }) => void,
-      ) => () => void;
-      onAppPreviewSurfaceState: (
-        callback: (state: AppPreviewSurfaceState & { rootPath: string }) => void,
       ) => () => void;
       watchWorkspace: (
         rootPath: string,
@@ -1139,6 +1168,13 @@ declare global {
           };
         }) => void) => () => void;
       };
+      locateTerminalAgents: (request: {
+        refresh?: boolean;
+        requestId: string;
+      }) => Promise<TerminalAgentLocationSnapshot>;
+      onTerminalAgentLocationProgress: (
+        callback: (event: TerminalAgentLocationProgressEvent) => void,
+      ) => () => void;
       createTerminal: (request: TerminalCreateRequest) => Promise<TerminalCreateResult>;
       writeTerminal: (request: TerminalInputRequest) => void;
       resizeTerminal: (request: TerminalResizeRequest) => void;

@@ -109,6 +109,8 @@ describe("settings visual architecture", () => {
     expect(view).toContain("PULSE_GRID_PRESET_IDS.map");
     expect(view).toContain("PULSE_GRID_PRESET_FRAMES[presetId]");
     expect(view).toContain("onLoadingAnimationPresetChange(presetId)");
+    expect(view.indexOf('settings.appearance.loadingAnimation.title'))
+      .toBeGreaterThan(view.indexOf('settings.appearance.navigation.title'));
     expect(preferences).toContain('LOADING_ANIMATION_STORAGE_KEY = "puppyone.desktop.loadingAnimation"');
 
     for (const { locale } of manifest.locales) {
@@ -168,6 +170,7 @@ describe("settings visual architecture", () => {
   });
 
   it("locks the compact Appearance-derived dimensions and responsive rules", () => {
+    const view = source("src/features/settings/SettingsView.tsx");
     const settings = source("src/styles/settings.css");
     const controls = source("src/styles/settings-controls.css");
     const language = source("src/styles/settings-view.css");
@@ -182,6 +185,11 @@ describe("settings visual architecture", () => {
     expect(controls).toMatch(/\.desktop-settings-action\s*{[^}]*height:\s*28px;[^}]*border-radius:\s*6px;[^}]*font-size:\s*12px;[^}]*font-weight:\s*650;/s);
     expect(controls).toMatch(/\.desktop-theme-segment\s*{[^}]*border-radius:\s*7px;/s);
     expect(controls).toMatch(/\.desktop-theme-segment button\s*{[^}]*height:\s*26px;[^}]*border-radius:\s*5px;/s);
+    expect(controls).toMatch(/\.desktop-appearance-option-segment\s*{[^}]*width:\s*min\(100%, 360px\);[^}]*grid-auto-columns:\s*minmax\(0, 1fr\);/s);
+    expect(view.match(/desktop-theme-segment desktop-appearance-option-segment/g)).toHaveLength(5);
+    expect(controls).not.toContain(".desktop-loading-animation-segment");
+    expect(controls).not.toContain(".desktop-text-size-segment");
+    expect(controls).not.toContain(".desktop-sidebar-layout-segment");
     expect(settings).toContain("@media (max-width: 760px)");
     expect(settings).toContain(".desktop-settings-wide-control-row");
 

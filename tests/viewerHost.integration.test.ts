@@ -5,11 +5,11 @@ import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PuppyoneEditorHost } from "../packages/shared-ui/src/editor/PuppyoneEditorHost";
+import { EditorDocumentHost } from "../packages/shared-ui/src/editor/host/EditorDocumentHost";
 import {
   EMPTY_VIEWER_PACK_SNAPSHOT,
   type ViewerPackSnapshot,
-} from "../packages/shared-ui/src/editor/viewerPackTypes";
+} from "../packages/shared-ui/src/editor/registry/viewerPackTypes";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -144,7 +144,7 @@ describe("preset viewer host composition", () => {
         installedAt: "2026-07-13T00:00:00.000Z",
       }],
     } as const satisfies ViewerPackSnapshot;
-    const persist = vi.fn(async () => ({ version: "should-not-run" }));
+    const persist = vi.fn(async () => ({ ok: true as const, version: "should-not-run" }));
     const renderSurface = vi.fn((request: object) => React.createElement(
       "div",
       { "data-testid": "external-viewer" },
@@ -161,6 +161,7 @@ describe("preset viewer host composition", () => {
       },
       documentPersistence: {
         kind: "local-fs",
+        storageIdentity: "test:viewer-host",
         persist,
       },
       viewerExtensionAdapter: { snapshot, renderSurface },
@@ -173,10 +174,10 @@ describe("preset viewer host composition", () => {
   });
 });
 
-function renderHost(props: React.ComponentProps<typeof PuppyoneEditorHost>) {
+function renderHost(props: React.ComponentProps<typeof EditorDocumentHost>) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root?.render(withTestLocalization(React.createElement(PuppyoneEditorHost, props))));
+  act(() => root?.render(withTestLocalization(React.createElement(EditorDocumentHost, props))));
   return container;
 }

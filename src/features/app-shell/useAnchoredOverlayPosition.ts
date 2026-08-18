@@ -7,6 +7,8 @@ import {
 } from "react";
 
 type Rect = Pick<DOMRect, "top" | "right" | "bottom" | "left" | "width" | "height">;
+type AnchoredOverlayPlacement = "above" | "below";
+type AnchoredOverlayPlacementPreference = "auto" | AnchoredOverlayPlacement;
 
 export type AnchoredOverlayPositionInput = {
   anchor: Rect;
@@ -18,6 +20,8 @@ export type AnchoredOverlayPositionInput = {
   preferredMaxHeight?: number;
   gap?: number;
   margin?: number;
+  alignment?: "start" | "center" | "end";
+  placementPreference?: AnchoredOverlayPlacementPreference;
 };
 
 export type AnchoredOverlayPosition = {
@@ -25,7 +29,7 @@ export type AnchoredOverlayPosition = {
   top: number;
   width: number;
   maxHeight: number;
-  placement: "above" | "below";
+  placement: AnchoredOverlayPlacement;
 };
 
 export function resolveAnchoredOverlayPosition({
@@ -38,6 +42,8 @@ export function resolveAnchoredOverlayPosition({
   preferredMaxHeight = 360,
   gap = 8,
   margin = 12,
+  alignment = "start",
+  placementPreference = "auto",
 }: AnchoredOverlayPositionInput): AnchoredOverlayPosition {
   const boundaryHasArea = boundary.width > 0 && boundary.height > 0;
   const boundaryLeft = boundaryHasArea ? boundary.left : 0;
@@ -50,19 +56,29 @@ export function resolveAnchoredOverlayPosition({
   const safeBottom = Math.min(viewportHeight - margin, boundaryBottom - margin);
   const availableWidth = Math.max(1, safeRight - safeLeft);
   const width = Math.min(preferredWidth, availableWidth);
-  const left = clamp(anchor.left, safeLeft, Math.max(safeLeft, safeRight - width));
+  const preferredLeft = alignment === "center"
+    ? anchor.left + (anchor.width - width) / 2
+    : alignment === "end"
+      ? anchor.right - width
+      : anchor.left;
+  const left = clamp(preferredLeft, safeLeft, Math.max(safeLeft, safeRight - width));
   const spaceAbove = Math.max(0, anchor.top - gap - safeTop);
   const spaceBelow = Math.max(0, safeBottom - anchor.bottom - gap);
   const measuredHeight = overlayHeight > 0 ? overlayHeight : preferredMaxHeight;
-  const placement = spaceAbove >= Math.min(measuredHeight, preferredMaxHeight) || spaceAbove > spaceBelow
-    ? "above"
-    : "below";
+  const placement = resolvePlacement(
+    placementPreference,
+    spaceAbove,
+    spaceBelow,
+    Math.min(measuredHeight, preferredMaxHeight),
+  );
   const availableHeight = placement === "above" ? spaceAbove : spaceBelow;
   const maxHeight = Math.max(1, Math.min(preferredMaxHeight, availableHeight));
   const renderedHeight = Math.min(measuredHeight, maxHeight);
   const top = placement === "above"
     ? Math.max(safeTop, anchor.top - gap - renderedHeight)
-    : Math.min(anchor.bottom + gap, safeBottom - renderedHeight);
+    : placementPreference === "below"
+      ? anchor.bottom + gap
+      : Math.min(anchor.bottom + gap, safeBottom - renderedHeight);
 
   return { left, top, width, maxHeight, placement };
 }
@@ -75,6 +91,8 @@ type UseAnchoredOverlayPositionOptions = {
   preferredMaxHeight?: number;
   gap?: number;
   margin?: number;
+  alignment?: "start" | "center" | "end";
+  placementPreference?: AnchoredOverlayPlacementPreference;
 };
 
 export function useAnchoredOverlayPosition({
@@ -85,6 +103,8 @@ export function useAnchoredOverlayPosition({
   preferredMaxHeight = 360,
   gap = 8,
   margin = 12,
+  alignment = "start",
+  placementPreference = "auto",
 }: UseAnchoredOverlayPositionOptions) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const [overlayElement, setOverlayElement] = useState<HTMLDivElement | null>(null);
@@ -111,9 +131,20 @@ export function useAnchoredOverlayPosition({
       preferredMaxHeight,
       gap,
       margin,
+      alignment,
+      placementPreference,
     });
     setPosition(position);
-  }, [anchorRef, boundarySelector, gap, margin, preferredMaxHeight, preferredWidth]);
+  }, [
+    alignment,
+    anchorRef,
+    boundarySelector,
+    gap,
+    margin,
+    placementPreference,
+    preferredMaxHeight,
+    preferredWidth,
+  ]);
 
   useLayoutEffect(() => {
     if (!open) {
@@ -147,4 +178,14 @@ function viewportRect(width: number, height: number): Rect {
 
 function clamp(value: number, minimum: number, maximum: number) {
   return Math.min(Math.max(value, minimum), maximum);
+}
+
+function resolvePlacement(
+  preference: AnchoredOverlayPlacementPreference,
+  spaceAbove: number,
+  spaceBelow: number,
+  desiredHeight: number,
+): AnchoredOverlayPlacement {
+  if (preference !== "auto") return preference;
+  return spaceAbove >= desiredHeight || spaceAbove > spaceBelow ? "above" : "below";
 }

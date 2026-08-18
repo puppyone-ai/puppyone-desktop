@@ -15,7 +15,10 @@ import {
   type InterfaceStyle,
   type ThemeMode,
 } from "./features/appearance/interfaceStyles";
-import type { PulseGridPresetId } from "@puppyone/shared-ui";
+import {
+  resolveRendererPublicAssetUrl,
+  type PulseGridPresetId,
+} from "@puppyone/shared-ui";
 
 export type { TypographyPreferences } from "./features/typography/fontCatalog";
 export {
@@ -72,7 +75,7 @@ export type RightSidebarToolsSettings = {
   enabled: Record<RightSidebarToolId, boolean>;
   order: RightSidebarToolId[];
 };
-export const TITLEBAR_ACTION_IDS = ["external-open", "terminal"] as const;
+export const TITLEBAR_ACTION_IDS = ["terminal"] as const;
 export type TitlebarActionId = typeof TITLEBAR_ACTION_IDS[number];
 export type TitlebarActionsSettings = {
   enabled: Record<TitlebarActionId, boolean>;
@@ -90,20 +93,24 @@ export type ExperimentalSettings = {
   enableViewerPlugins: boolean;
 };
 
-export const CREATE_NEW_FILE_TYPE_IDS = [
+export const CREATE_NEW_MENU_VERSION = 2 as const;
+export const CREATE_NEW_ITEM_IDS = [
   "markdown",
   "text",
   "json",
   "csv",
+  "html",
+  "slides",
   "app",
   "puppyflow",
 ] as const;
-export type CreateNewFileTypeId = typeof CREATE_NEW_FILE_TYPE_IDS[number];
+export type CreateNewItemId = typeof CREATE_NEW_ITEM_IDS[number];
 export type CreateNewMenuItem = {
-  kind: CreateNewFileTypeId;
+  kind: CreateNewItemId;
   enabled: boolean;
 };
 export type CreateNewMenuSettings = {
+  version: typeof CREATE_NEW_MENU_VERSION;
   items: CreateNewMenuItem[];
 };
 
@@ -167,7 +174,6 @@ export const DEFAULT_RIGHT_SIDEBAR_TOOLS_SETTINGS: RightSidebarToolsSettings = {
 };
 export const DEFAULT_TITLEBAR_ACTIONS_SETTINGS: TitlebarActionsSettings = {
   enabled: {
-    "external-open": true,
     terminal: true,
   },
   order: [...TITLEBAR_ACTION_IDS],
@@ -185,9 +191,12 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableViewerPlugins: false,
 };
 export const DEFAULT_CREATE_NEW_MENU_SETTINGS: CreateNewMenuSettings = {
+  version: CREATE_NEW_MENU_VERSION,
   items: [
     { kind: "markdown", enabled: true },
     { kind: "csv", enabled: true },
+    { kind: "html", enabled: true },
+    { kind: "slides", enabled: true },
   ],
 };
 
@@ -352,19 +361,19 @@ export const DOCK_ICON_OPTIONS = [
     id: "polished",
     label: "Polished",
     description: "The current high-contrast PuppyOne icon.",
-    previewSrc: "/logo-square.png",
+    previewSrc: resolveRendererPublicAssetUrl("logo-square.png"),
   },
   {
     id: "light",
     label: "Light",
     description: "A warm light icon with a quiet outline.",
-    previewSrc: "/logo-square-v0.1.3-light.png",
+    previewSrc: resolveRendererPublicAssetUrl("logo-square-v0.1.3-light.png"),
   },
   {
     id: "matte",
     label: "Matte",
     description: "A flat dark icon without the metallic rim.",
-    previewSrc: "/logo-square-v0.1.3-dark.png",
+    previewSrc: resolveRendererPublicAssetUrl("logo-square-v0.1.3-dark.png"),
   },
 ] as const satisfies ReadonlyArray<{
   id: DockIcon;
@@ -522,13 +531,11 @@ export function parseTitlebarActionsSettings(value: string | null | undefined): 
   if (!value) return DEFAULT_TITLEBAR_ACTIONS_SETTINGS;
 
   try {
-    const parsed = JSON.parse(value) as Partial<TitlebarActionsSettings> & { showExternalOpenButton?: boolean } | null;
+    const parsed = JSON.parse(value) as Partial<TitlebarActionsSettings> | null;
     if (!parsed || typeof parsed !== "object") return DEFAULT_TITLEBAR_ACTIONS_SETTINGS;
 
-    const legacyExternalOpenEnabled = parsed.showExternalOpenButton !== false;
     return {
       enabled: {
-        "external-open": readTitlebarActionEnabled(parsed, "external-open", legacyExternalOpenEnabled),
         terminal: readTitlebarActionEnabled(parsed, "terminal", true),
       },
       order: normalizeTitlebarActionOrder(parsed.order),
@@ -579,17 +586,17 @@ export function parseCreateNewMenuSettings(value: string | null | undefined): Cr
   if (!value) return cloneDefaultCreateNewMenuSettings();
 
   try {
-    const parsed = JSON.parse(value) as Partial<CreateNewMenuSettings> | null;
+    const parsed = JSON.parse(value) as (Partial<CreateNewMenuSettings> & { version?: unknown }) | null;
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.items)) {
       return cloneDefaultCreateNewMenuSettings();
     }
 
     const items: CreateNewMenuItem[] = [];
-    const seen = new Set<CreateNewFileTypeId>();
+    const seen = new Set<CreateNewItemId>();
     for (const item of parsed.items) {
       if (!item || typeof item !== "object") continue;
       const kind = "kind" in item ? item.kind : null;
-      if (!isCreateNewFileTypeId(kind) || seen.has(kind)) continue;
+      if (!isCreateNewItemId(kind) || seen.has(kind)) continue;
       seen.add(kind);
       items.push({
         kind,
@@ -600,16 +607,17 @@ export function parseCreateNewMenuSettings(value: string | null | undefined): Cr
     if (parsed.items.length > 0 && items.length === 0) {
       return cloneDefaultCreateNewMenuSettings();
     }
-    if (
+    const isLegacyDefault = parsed.version !== CREATE_NEW_MENU_VERSION && (
       items.length === 2
       && items[0]?.kind === "markdown"
       && items[0].enabled
       && items[1]?.kind === "csv"
       && items[1].enabled
-    ) {
+    );
+    if (isLegacyDefault) {
       return cloneDefaultCreateNewMenuSettings();
     }
-    return { items };
+    return { version: CREATE_NEW_MENU_VERSION, items };
   } catch {
     return cloneDefaultCreateNewMenuSettings();
   }
@@ -617,29 +625,30 @@ export function parseCreateNewMenuSettings(value: string | null | undefined): Cr
 
 export function cloneDefaultCreateNewMenuSettings(): CreateNewMenuSettings {
   return {
+    version: CREATE_NEW_MENU_VERSION,
     items: DEFAULT_CREATE_NEW_MENU_SETTINGS.items.map((item) => ({ ...item })),
   };
 }
 
-export function isCreateNewFileTypeId(value: unknown): value is CreateNewFileTypeId {
+export function isCreateNewItemId(value: unknown): value is CreateNewItemId {
   return typeof value === "string"
-    && CREATE_NEW_FILE_TYPE_IDS.includes(value as CreateNewFileTypeId);
+    && CREATE_NEW_ITEM_IDS.includes(value as CreateNewItemId);
 }
 
-export function isCreateNewFileTypeAvailable(
-  kind: CreateNewFileTypeId,
+export function isCreateNewItemAvailable(
+  kind: CreateNewItemId,
   experimentalSettings: ExperimentalSettings,
 ): boolean {
   if (kind === "puppyflow") return experimentalSettings.enablePuppyFlowFiles;
   return true;
 }
 
-export function getVisibleCreateNewFileTypes(
+export function getVisibleCreateNewItems(
   settings: CreateNewMenuSettings,
   experimentalSettings: ExperimentalSettings,
-): CreateNewFileTypeId[] {
+): CreateNewItemId[] {
   return settings.items
-    .filter((item) => item.enabled && isCreateNewFileTypeAvailable(item.kind, experimentalSettings))
+    .filter((item) => item.enabled && isCreateNewItemAvailable(item.kind, experimentalSettings))
     .map((item) => item.kind);
 }
 

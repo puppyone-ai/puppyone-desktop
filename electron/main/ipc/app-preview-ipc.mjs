@@ -3,13 +3,6 @@ export function registerAppPreviewIpcHandlers({
   appPreviewRuntime,
   authorizeWorkspaceRoot,
 }) {
-  ipcMain.handle("app-preview:activate", async (event, request) => {
-    return appPreviewRuntime.activate(
-      event.sender,
-      await authorizeRequestRoot(event, request, authorizeWorkspaceRoot),
-    );
-  });
-
   ipcMain.handle("app-preview:start", async (event, request) => {
     return appPreviewRuntime.start(event.sender, await authorizeRequestRoot(event, request, authorizeWorkspaceRoot));
   });
@@ -34,17 +27,6 @@ export function registerAppPreviewIpcHandlers({
     return { ok: true };
   });
 
-  ipcMain.handle("app-preview:surface-set-bounds", async (event, request) => {
-    return appPreviewRuntime.setSurfaceBounds(event.sender, request);
-  });
-
-  ipcMain.handle("app-preview:surface-detach", async (event, request) => {
-    return appPreviewRuntime.detachSurface(event.sender, request);
-  });
-
-  ipcMain.handle("app-preview:surface-command", async (event, request) => {
-    return appPreviewRuntime.runSurfaceCommand(event.sender, request);
-  });
 }
 
 async function authorizeRequestRoot(event, request, authorizeWorkspaceRoot) {

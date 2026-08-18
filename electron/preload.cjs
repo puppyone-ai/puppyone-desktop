@@ -2,6 +2,13 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 const externalViewerPacksEnabled = process.argv.includes("--puppyone-external-viewer-packs=1");
 
 contextBridge.exposeInMainWorld("puppyoneDesktop", {
+  getWindowChromeState: () => ipcRenderer.invoke("window-layout:get-chrome-state"),
+  onWindowChromeStateChanged: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("window-layout:chrome-state-changed", listener);
+    return () => ipcRenderer.removeListener("window-layout:chrome-state-changed", listener);
+  },
   setWindowBackground: (request) => {
     ipcRenderer.send("appearance:set-window-background", {
       background: request?.background,
@@ -10,6 +17,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   setWindowMinimumWidth: (request) => (
     ipcRenderer.invoke("window-layout:set-minimum-width", request)
   ),
+  capturePanePreview: (request) => ipcRenderer.invoke("pane-preview:capture", request),
   setNativeSurfaceOccluded: (request) => {
     ipcRenderer.send("native-surfaces:set-overlay-occluded", {
       occluded: request?.occluded === true,
@@ -128,6 +136,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   getLastWorkspace: () => ipcRenderer.invoke("workspace:get-last"),
   getRecentWorkspaces: () => ipcRenderer.invoke("workspace:get-recent"),
   hydrateRecentWorkspaces: () => ipcRenderer.invoke("workspace:hydrate-recent"),
+  removeRecentWorkspace: (folderPath) => ipcRenderer.invoke("workspace:remove-recent", folderPath),
   forgetLastWorkspace: () => ipcRenderer.invoke("workspace:forget-last"),
   showHomepage: () => ipcRenderer.invoke("workspace:show-homepage"),
   openWorkspaceInCurrentWindow: (folderPath) => ipcRenderer.invoke("workspace:open-current", folderPath),
@@ -150,6 +159,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   cancelOfficeDocumentToDocxConversion: (request) => ipcRenderer.invoke("workspace:convert-office-docx-cancel", request),
   writeFile: (request) => ipcRenderer.invoke("workspace:write-file", request),
   createEntry: (request) => ipcRenderer.invoke("workspace:create-entry", request),
+  instantiateTemplate: (request) => ipcRenderer.invoke("workspace:instantiate-template", request),
   renameEntry: (request) => ipcRenderer.invoke("workspace:rename-entry", request),
   moveEntry: (request) => ipcRenderer.invoke("workspace:move-entry", request),
   copyEntry: (request) => ipcRenderer.invoke("workspace:copy-entry", request),
@@ -173,26 +183,16 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   resolveExternalOpenTarget: (request) => ipcRenderer.invoke("workspace:resolve-external-open-target", request),
   listExternalOpenTargets: (request) => ipcRenderer.invoke("workspace:list-external-open-targets", request),
   chooseExternalApp: (request) => ipcRenderer.invoke("workspace:choose-external-app", request),
-  activateAppPreview: (request) => ipcRenderer.invoke("app-preview:activate", request),
   startAppPreview: (request) => ipcRenderer.invoke("app-preview:start", request),
   restartAppPreview: (request) => ipcRenderer.invoke("app-preview:restart", request),
   stopAppPreview: (request) => ipcRenderer.invoke("app-preview:stop", request),
   getAppPreviewLogs: (request) => ipcRenderer.invoke("app-preview:get-logs", request),
   openAppPreviewExternal: (request) => ipcRenderer.invoke("app-preview:open-external", request),
-  setAppPreviewSurfaceBounds: (request) => ipcRenderer.invoke("app-preview:surface-set-bounds", request),
-  detachAppPreviewSurface: (request) => ipcRenderer.invoke("app-preview:surface-detach", request),
-  runAppPreviewSurfaceCommand: (request) => ipcRenderer.invoke("app-preview:surface-command", request),
   onAppPreviewRuntimeState: (callback) => {
     if (typeof callback !== "function") return () => {};
     const listener = (_event, state) => callback(state);
     ipcRenderer.on("app-preview:runtime-state", listener);
     return () => ipcRenderer.removeListener("app-preview:runtime-state", listener);
-  },
-  onAppPreviewSurfaceState: (callback) => {
-    if (typeof callback !== "function") return () => {};
-    const listener = (_event, state) => callback(state);
-    ipcRenderer.on("app-preview:surface-state", listener);
-    return () => ipcRenderer.removeListener("app-preview:surface-state", listener);
   },
   watchWorkspace: (rootPath, callback) => {
     const listener = (_event, payload) => {
@@ -349,6 +349,13 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
       },
     },
   } : {}),
+  locateTerminalAgents: (request) => ipcRenderer.invoke("terminal:agents-locate", request),
+  onTerminalAgentLocationProgress: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("terminal:agents-progress", listener);
+    return () => ipcRenderer.removeListener("terminal:agents-progress", listener);
+  },
   createTerminal: (request) => ipcRenderer.invoke("terminal:create", request),
   writeTerminal: (request) => ipcRenderer.send("terminal:input", request),
   resizeTerminal: (request) => ipcRenderer.send("terminal:resize", request),

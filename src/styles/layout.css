@@ -127,10 +127,13 @@
 }
 
 .desktop-right-sidebar-resizer:hover::after,
-.desktop-right-sidebar-resizer:focus-visible::after,
+.desktop-right-sidebar-resizer:focus-visible::after {
+  background: var(--po-pane-resizer-hover-color);
+}
+
 body.desktop-right-sidebar-resizing .desktop-right-sidebar-resizer::after {
-  background: var(--po-border-strong);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-border-strong) 35%, transparent);
+  background: var(--po-pane-resizer-active-color);
+  box-shadow: 0 0 0 1px var(--po-pane-resizer-active-ring);
 }
 
 body.desktop-right-sidebar-resizing,

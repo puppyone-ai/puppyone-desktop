@@ -10,16 +10,21 @@ import { MarkdownCodeMirrorEditor } from "../packages/shared-ui/src/editor/markd
 import { markdownRevealedSourceField } from "../packages/shared-ui/src/editor/markdown/core/state/revealedSource";
 import type { EditorSourceSnapshotPort } from "../packages/shared-ui/src/editor/sourceSnapshot";
 import { DocumentSessionBoundary } from "../packages/shared-ui/src/editor/document-session/DocumentSessionBoundary";
-import { TextEditorFrame } from "../packages/shared-ui/src/editor/viewers/TextEditorFrame";
+import {
+  closeAllDocumentWorkingCopies,
+  closeDocumentWorkingCopy,
+} from "../packages/shared-ui/src/editor/document-session/documentWorkingCopies";
+import { TextEditorFrame } from "../packages/shared-ui/src/editor/viewers/shared/TextEditorFrame";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root | null = null;
 
-afterEach(() => {
+afterEach(async () => {
   act(() => root?.unmount());
   root = null;
+  await closeAllDocumentWorkingCopies("app-close").catch(() => undefined);
   document.body.innerHTML = "";
   vi.restoreAllMocks();
 });
@@ -44,7 +49,7 @@ describe("Markdown source snapshot boundary", () => {
     act(() => view.dispatch({ changes: { from: 5, to: 6, insert: "x" }, userEvent: "input.type" }));
 
     expect(toStringSpy).not.toHaveBeenCalled();
-    expect(onRevision).toHaveBeenLastCalledWith(expect.objectContaining({ dirty: true }));
+    expect(onRevision).toHaveBeenLastCalledWith(expect.objectContaining({ origin: "local-edit" }));
     expect(snapshotPort).not.toBeNull();
     const snapshot = snapshotPort!.readSnapshot();
     expect(snapshot.content[5]).toBe("x");
@@ -52,7 +57,7 @@ describe("Markdown source snapshot boundary", () => {
   });
 
   it("starts frontend Markdown persistence immediately after an edit transaction", async () => {
-    const persist = vi.fn(async () => ({ version: "v2" }));
+    const persist = vi.fn(async () => ({ ok: true as const, version: "v2" }));
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -63,7 +68,7 @@ describe("Markdown source snapshot boundary", () => {
           initialContent="alpha"
           initialVersion="v1"
           saveMode="auto"
-          persistence={{ kind: "local-fs", persist }}
+          persistence={{ kind: "local-fs", storageIdentity: "test:markdown-source", persist }}
         >
           <TextEditorFrame
             documentId="instant.md"
@@ -122,7 +127,7 @@ describe("Markdown source snapshot boundary", () => {
           initialContent="alpha"
           initialVersion="v1"
           saveMode="auto"
-          persistence={{ kind: "local-fs", persist }}
+          persistence={{ kind: "local-fs", storageIdentity: "test:markdown-source", persist }}
         >
           <TextEditorFrame
             documentId="failure.md"
@@ -161,8 +166,8 @@ describe("Markdown source snapshot boundary", () => {
     expect(container.querySelector(".editor-save-chip.error")).not.toBeNull();
   });
 
-  it("flushes the canonical EditorView snapshot before destruction", async () => {
-    const persist = vi.fn(async () => ({ version: "v2" }));
+  it("flushes the canonical EditorView snapshot on explicit Working Copy close", async () => {
+    const persist = vi.fn(async () => ({ ok: true as const, version: "v2" }));
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -173,7 +178,7 @@ describe("Markdown source snapshot boundary", () => {
           initialContent="alpha"
           initialVersion="v1"
           saveMode="manual"
-          persistence={{ kind: "local-fs", persist }}
+          persistence={{ kind: "local-fs", storageIdentity: "test:markdown-source", persist }}
         >
           <TextEditorFrame
             documentId="note.md"
@@ -200,21 +205,23 @@ describe("Markdown source snapshot boundary", () => {
     const view = getEditorView(container);
     act(() => view.dispatch({ changes: { from: 5, insert: " beta" }, userEvent: "input.type" }));
 
-    act(() => root?.unmount());
-    root = null;
-    await act(async () => Promise.resolve());
+    await act(async () => closeDocumentWorkingCopy({
+      storageIdentity: "test:markdown-source",
+      resourcePath: "note.md",
+    }));
 
     expect(persist).toHaveBeenCalledWith(expect.objectContaining({
       path: "note.md",
       content: "alpha beta",
-      reason: "destroy",
+      reason: "document-close",
     }));
   });
 
   it("reloads an explicitly chosen external version into CodeMirror", async () => {
     const persistence = {
       kind: "local-fs" as const,
-      persist: vi.fn(async () => ({ version: "saved" })),
+      storageIdentity: "test:markdown-source",
+      persist: vi.fn(async () => ({ ok: true as const, version: "saved" })),
     };
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -222,8 +229,8 @@ describe("Markdown source snapshot boundary", () => {
     const render = (content: string, version: string) => withTestLocalization(
       <DocumentSessionBoundary
         documentId="conflict.md"
-        initialContent="alpha"
-        initialVersion="v1"
+        initialContent={content}
+        initialVersion={version}
         saveMode="manual"
         persistence={persistence}
       >
@@ -287,7 +294,9 @@ describe("Markdown source snapshot boundary", () => {
     const view = getEditorView(container);
     expect(view.state.doc.toString()).toBe("bravo");
     expect(onRevision).toHaveBeenCalledTimes(1);
-    expect(onRevision).toHaveBeenCalledWith(expect.objectContaining({ dirty: false }));
+    expect(onRevision).toHaveBeenCalledWith(expect.objectContaining({
+      origin: "model-initialization",
+    }));
   });
 
   it("does not replace the CodeMirror document when a controlled host echoes identical local bytes", async () => {

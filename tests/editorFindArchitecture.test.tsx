@@ -8,11 +8,9 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { CsvTableEditor } from "../packages/shared-ui/src/editor/CsvTableEditor";
+import { CsvTableEditor } from "../packages/shared-ui/src/editor/viewers/csv/CsvTableEditor";
 import { CodeMirrorFindAdapter } from "../packages/shared-ui/src/editor/find/codeMirrorFindAdapter";
 import { MarkdownCodeMirrorEditor } from "../packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor";
-import { DesktopTitlebarActions } from "../src/features/app-shell/DesktopTitlebarActions";
-import { DEFAULT_TITLEBAR_ACTIONS_SETTINGS } from "../src/preferences";
 import {
   EditorFindContributionProvider,
   EditorFindHost,
@@ -161,40 +159,6 @@ describe("editor find architecture", () => {
       .toHaveLength(1);
   });
 
-  it("places the discoverable search action before Open external in the product header", async () => {
-    const openFind = vi.fn();
-    await act(async () => {
-      root.render(withTestLocalization(
-        <DesktopTitlebarActions
-          editorFindCommand={{ documentId: "notes.md", open: openFind }}
-          canOpenActiveFileExternal
-          titlebarActionsSettings={DEFAULT_TITLEBAR_ACTIONS_SETTINGS}
-          terminalSidebarOpen={false}
-          terminalToolEnabled={false}
-          terminalSessionLayout="menu"
-          terminalSessions={[]}
-          activeTerminalSessionId={null}
-          agentChatEnabled={false}
-          agentChatSidebarOpen={false}
-          onOpenActiveFileExternal={vi.fn()}
-          onCreateTerminal={vi.fn()}
-          onActivateTerminal={vi.fn()}
-          onCloseTerminal={vi.fn()}
-          onToggleAgentChat={vi.fn()}
-          onToggleTerminal={vi.fn()}
-        />,
-      ));
-    });
-
-    const actions = Array.from(container.querySelectorAll<HTMLButtonElement>(
-      ".desktop-titlebar-action",
-    ));
-    expect(actions.map((action) => action.getAttribute("aria-label")))
-      .toEqual(["Find in file", "Open with app"]);
-    await act(async () => actions[0]?.click());
-    expect(openFind).toHaveBeenCalledOnce();
-  });
-
   it("uses the CodeMirror adapter for query matching, highlights, and wrapped navigation", () => {
     const host = document.createElement("div");
     container.appendChild(host);
@@ -223,12 +187,12 @@ describe("editor find architecture", () => {
     view.destroy();
   });
 
-  it("publishes a header command while keeping keyboard and widget behavior in the host", async () => {
+  it("publishes a pane command while keeping keyboard and widget behavior in the host", async () => {
     const adapter = createAdapter();
     await act(async () => {
       root.render(withTestLocalization(
         <EditorFindContributionProvider>
-          <HeaderFindButton />
+          <PaneFindButton />
           <EditorFindHost documentId="notes.md">
             <AdapterViewer adapter={adapter} />
           </EditorFindHost>
@@ -236,11 +200,11 @@ describe("editor find architecture", () => {
       ));
     });
 
-    const headerButton = container.querySelector<HTMLButtonElement>("[data-test-header-find]");
-    expect(headerButton).toBeInstanceOf(HTMLButtonElement);
+    const paneButton = container.querySelector<HTMLButtonElement>("[data-test-pane-find]");
+    expect(paneButton).toBeInstanceOf(HTMLButtonElement);
     expect(container.querySelector(".editor-find-widget")).toBeNull();
 
-    await act(async () => headerButton?.click());
+    await act(async () => paneButton?.click());
     const input = container.querySelector<HTMLInputElement>(".editor-find-widget input");
     expect(input).toBeInstanceOf(HTMLInputElement);
     expect(document.activeElement).toBe(input);
@@ -307,10 +271,10 @@ describe("editor find architecture", () => {
   });
 });
 
-function HeaderFindButton() {
+function PaneFindButton() {
   const command = useEditorFindCommand();
   return command ? (
-    <button type="button" data-test-header-find onClick={command.open}>Find</button>
+    <button type="button" data-test-pane-find onClick={command.open}>Find</button>
   ) : null;
 }
 

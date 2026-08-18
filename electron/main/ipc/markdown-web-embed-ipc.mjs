@@ -1,11 +1,13 @@
 export function registerMarkdownWebEmbedIpcHandlers({
   ipcMain,
   createMarkdownWebEmbedService,
+  externalNavigation,
   getOwnerWindow,
   nativeSurfaceOcclusion = null,
   nativeSurfacePointerPassthrough = null,
 }) {
   const service = createMarkdownWebEmbedService({
+    externalNavigation,
     getOwnerWindow,
     nativeSurfaceOcclusion,
     nativeSurfacePointerPassthrough,

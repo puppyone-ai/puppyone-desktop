@@ -470,7 +470,7 @@ function createFixture({
   }));
   const messages = windowMessages[0];
   const requestCloudApi = vi.fn();
-  const openExternal = vi.fn(async () => {});
+  const openExternal = vi.fn(async () => ({ ok: true }));
   const startCallbackServer = vi.fn();
   const service = createCloudAuthService({
     app: {
@@ -484,7 +484,7 @@ function createFixture({
     credentialStore,
     fetchImpl,
     localCloudWebUrl,
-    openExternal,
+    externalNavigation: { open: openExternal },
     startCallbackServer,
     logger: { warn: vi.fn(), error: vi.fn() },
   });

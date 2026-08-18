@@ -5,7 +5,8 @@ export type EditorSourceSnapshot = {
 
 export type EditorSourceRevision = {
   revision: string;
-  dirty: boolean;
+  /** Only an explicit local model transaction may make a Working Copy dirty. */
+  origin: "local-edit" | "model-initialization";
 };
 
 /**

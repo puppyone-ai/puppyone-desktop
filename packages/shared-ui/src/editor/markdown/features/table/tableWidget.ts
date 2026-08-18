@@ -1,5 +1,5 @@
 import { EditorView, WidgetType } from "@codemirror/view";
-import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../../registry/viewerTypes";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { disposeWidgetSessionDom } from "../../platform/codemirror/widgetSession";
 import type { MarkdownTableAlignment, MarkdownTableRow } from "./tableModel";
@@ -229,7 +229,7 @@ export class MarkdownTableWidget extends WidgetType {
     frame.appendChild(surface);
     scrollport.appendChild(frame);
     wrapper.appendChild(scrollport);
-    // The wide table clips against the symmetric breakout viewport above,
+    // The wide table clips against the editor-edge viewport above,
     // while its visible scrollbar stays on the centered reading rail. This
     // sibling is only a presentation adapter: the scrollport remains the
     // authoritative offset and the controller maps both endpoints exactly.

@@ -14,7 +14,7 @@ import {
   markdownLivePreviewCoreExtension,
   markdownLivePreviewExtension,
 } from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
-import type { MarkdownLinkGraph } from "../packages/shared-ui/src/editor/viewerTypes";
+import type { MarkdownLinkGraph } from "../packages/shared-ui/src/editor/registry/viewerTypes";
 
 const mounted: Array<{
   widget: ImagePreviewWidget;

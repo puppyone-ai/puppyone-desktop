@@ -52,6 +52,8 @@
   --po-code-token-property: color-mix(in srgb, var(--po-accent) 72%, var(--po-text));
   --po-code-token-operator: color-mix(in srgb, var(--po-text) 82%, var(--po-accent));
   --po-code-token-meta: color-mix(in srgb, var(--po-purple, #8250df) 72%, var(--po-text));
+  --po-code-indent-guide: color-mix(in srgb, var(--po-text) 10%, transparent);
+  --po-code-occurrence: color-mix(in srgb, var(--po-accent) 10%, transparent);
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -74,6 +76,7 @@
   font-size: var(--po-code-font-size, 13px);
   line-height: 20px;
   letter-spacing: 0;
+  font-variant-ligatures: none;
 }
 
 .code-codemirror-editor .cm-scroller {
@@ -84,7 +87,7 @@
 
 .code-codemirror-editor .cm-content {
   min-height: 100%;
-  padding: var(--po-editor-code-padding-block) var(--po-editor-code-padding-inline) var(--po-editor-code-padding-bottom) 12px;
+  padding: var(--po-editor-code-padding-block) var(--po-editor-code-padding-inline) var(--po-editor-code-padding-bottom) 0;
   caret-color: var(--po-accent);
 }
 
@@ -93,22 +96,33 @@
 }
 
 .code-codemirror-editor .cm-gutters {
-  border-right: 1px solid var(--po-editor-line);
-  background: color-mix(in srgb, var(--po-editor-bg) 96%, var(--po-text));
-  color: var(--po-text-disabled);
+  border-right: 0;
+  background: var(--po-editor-bg);
+  color: color-mix(in srgb, var(--po-text) 34%, transparent);
 }
 
 .code-codemirror-editor .cm-lineNumbers .cm-gutterElement {
-  min-width: 42px;
-  padding: 0 12px 0 8px;
-  font-size: 12px;
+  min-width: 36px;
+  padding: 0 9px 0 8px;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
 }
 
 .code-codemirror-editor .cm-foldGutter .cm-gutterElement {
-  width: 18px;
-  color: var(--po-text-disabled);
-  font-size: 14px;
+  width: 16px;
+  color: color-mix(in srgb, var(--po-text) 48%, transparent);
+  font-size: 13px;
   text-align: center;
+}
+
+.code-codemirror-editor .cm-foldGutter .cm-gutterElement span {
+  opacity: 0;
+  transition: opacity 80ms ease;
+}
+
+.code-codemirror-editor .cm-foldGutter .cm-gutterElement:hover span,
+.code-codemirror-editor .cm-foldGutter .cm-gutterElement.cm-activeLineGutter span {
+  opacity: 1;
 }
 
 .code-codemirror-editor .cm-foldPlaceholder {
@@ -118,18 +132,28 @@
   color: var(--po-text-muted);
 }
 
-.code-codemirror-editor .cm-activeLine,
-.code-codemirror-editor .cm-activeLineGutter {
-  background: color-mix(in srgb, var(--po-accent) 7%, transparent);
+.code-codemirror-editor .cm-activeLine {
+  background: color-mix(in srgb, var(--po-text) 4%, transparent);
 }
 
 .code-codemirror-editor .cm-activeLineGutter {
-  color: var(--po-text-muted);
+  background: transparent;
+  color: var(--po-text);
+  font-weight: 500;
 }
 
 .code-codemirror-editor .cm-selectionBackground,
 .code-codemirror-editor .cm-focused .cm-selectionBackground {
   background: var(--po-selected);
+}
+
+.code-codemirror-editor .cm-selectionMatch {
+  border-radius: 2px;
+  background: var(--po-code-occurrence);
+}
+
+.code-codemirror-editor .cm-codeIndentGuide {
+  box-shadow: inset 1px 0 var(--po-code-indent-guide);
 }
 
 .code-codemirror-editor .cm-cursor {
@@ -161,7 +185,7 @@
 
 .code-codemirror-editor .cm-code-comment {
   color: var(--po-code-token-comment);
-  font-style: italic;
+  font-style: normal;
 }
 
 .code-codemirror-editor .cm-code-keyword {

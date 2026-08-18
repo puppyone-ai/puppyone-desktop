@@ -3,7 +3,7 @@ import type {
   MarkdownBacklinkReference,
   MarkdownLinkGraph,
   MarkdownWikiLinkResolvedTarget,
-} from "../../../viewerTypes";
+} from "../../../registry/viewerTypes";
 import { findMarkdownLinkTokens, isExternalMarkdownHref } from "./markdownLinkModel";
 import { findWikiLinkTokens, splitWikiLinkTarget } from "./wikiLinkModel";
 

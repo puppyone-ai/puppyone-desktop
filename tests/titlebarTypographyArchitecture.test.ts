@@ -34,9 +34,25 @@ describe("titlebar typography architecture", () => {
 
   it("keeps the titlebar divider inside the native window edge", () => {
     const titlebarRule = readCssBlock(`\n${titlebarCss}`, ".desktop-titlebar");
+    const fullScreenTitlebarRule = readCssBlock(
+      titlebarCss,
+      '.desktop-titlebar[data-window-full-screen="true"]',
+    );
+    const titlebarLayoutRule = readCssBlock(titlebarCss, ".desktop-titlebar-layout");
     const dividerRule = readCssBlock(titlebarCss, ".desktop-titlebar::after");
 
-    expect(titlebarRule).toContain("padding: 4px 6px 5px 86px;");
+    expect(titlebarRule).toContain("--desktop-titlebar-safe-area-x: env(titlebar-area-x, 80px);");
+    expect(titlebarRule).toContain(
+      "--desktop-titlebar-safe-area-width: env(titlebar-area-width, calc(100% - 80px));",
+    );
+    expect(titlebarLayoutRule).toContain("margin-left: var(--desktop-titlebar-safe-area-x);");
+    expect(titlebarLayoutRule).toContain("width: var(--desktop-titlebar-safe-area-width);");
+    expect(titlebarLayoutRule).toContain(
+      "padding: 4px 6px 5px var(--desktop-titlebar-content-start);",
+    );
+    expect(fullScreenTitlebarRule).toContain(
+      "var(--desktop-sidebar-row-left-gap) + var(--desktop-sidebar-row-content-left)",
+    );
     expect(titlebarRule).toContain("border-bottom: 0;");
     expect(dividerRule).toContain("inset-inline: 1px;");
     expect(dividerRule).toContain("inset-block-end: 0;");

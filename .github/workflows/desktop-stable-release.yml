@@ -1,10 +1,12 @@
 name: Desktop Stable Release
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
-      - "!v*.*.*-*"
+  workflow_dispatch:
+    inputs:
+      promotion_source_tag:
+        description: Exact installed and approved Internal candidate tag
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -85,6 +87,7 @@ jobs:
             --catalog-url "https://downloads.puppyone.ai/desktop/internal/catalog/releases.json" \
             --base-version "${{ steps.release.outputs.base_version }}" \
             --commit "${GITHUB_SHA}" \
+            --source-tag "${{ inputs.promotion_source_tag }}" \
             --github-output "${GITHUB_OUTPUT}"
 
       - name: Stage pinned OpenCode runtime without deployment secrets

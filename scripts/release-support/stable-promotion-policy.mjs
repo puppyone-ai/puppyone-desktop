@@ -7,6 +7,7 @@ export function selectStablePromotionSource({
   catalog,
   baseVersion,
   commitSha,
+  sourceTag,
 }) {
   assertDesktopReleaseCatalog(catalog);
   if (!/^\d+\.\d+\.\d+$/.test(String(baseVersion ?? ""))) {
@@ -14,6 +15,14 @@ export function selectStablePromotionSource({
   }
   if (!/^[a-f0-9]{40}$/.test(String(commitSha ?? ""))) {
     throw new Error("Stable promotion requires a full lowercase Git commit SHA.");
+  }
+  const expectedTagPattern = new RegExp(
+    `^v${escapeRegularExpression(baseVersion)}-internal\\.[1-9]\\d*$`,
+  );
+  if (!expectedTagPattern.test(String(sourceTag ?? ""))) {
+    throw new Error(
+      `Stable promotion requires an explicit Internal candidate tag for ${baseVersion}.`,
+    );
   }
 
   const candidates = catalog.releases
@@ -23,6 +32,7 @@ export function selectStablePromotionSource({
       && release.provenance === "pipeline"
       && release.baseVersion === baseVersion
       && release.commitSha === commitSha
+      && release.tag === sourceTag
       && release.prerelease === true
       && release.build?.sourceDirty === false
       && release.status !== "withdrawn"
@@ -37,11 +47,15 @@ export function selectStablePromotionSource({
   const source = candidates[0];
   if (!source) {
     throw new Error(
-      `No verified Internal ${baseVersion} release exists for commit ${commitSha}.`,
+      `Verified Internal candidate ${sourceTag} does not exist for commit ${commitSha}.`,
     );
   }
   assertDesktopReleaseManifest(source);
   return source;
+}
+
+function escapeRegularExpression(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export function assertStablePromotionCoordinates({ source, catalogUrl }) {

@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { preloadPresetViewer } from "../packages/shared-ui/src/editor/PresetViewerRenderer";
-import { getPresetViewerDefinition } from "../packages/shared-ui/src/editor/presetViewerManifest";
-import type { LazyPresetViewerContribution } from "../packages/shared-ui/src/editor/viewerTypes";
+import { preloadPresetViewer } from "../packages/shared-ui/src/editor/host/PresetViewerRenderer";
+import { getPresetViewerDefinition } from "../packages/shared-ui/src/editor/registry/presetViewerManifest";
+import type { LazyPresetViewerContribution } from "../packages/shared-ui/src/editor/registry/viewerTypes";
 
 describe("preset viewer preload cache", () => {
   it("starts route acquisition from the selected document rather than the retained preview", () => {

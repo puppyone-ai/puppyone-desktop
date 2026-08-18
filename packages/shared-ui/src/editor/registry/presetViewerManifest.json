@@ -1,0 +1,123 @@
+{
+  "contractVersion": 3,
+  "fallbackViewerId": "document-placeholder",
+  "viewers": [
+    {
+      "id": "app-preview",
+      "formatViewerIds": [],
+      "capability": "preview",
+      "source": "content",
+      "runtime": "eager",
+      "surfacePreparation": "requires-visible",
+      "readinessSignal": "frame-paint"
+    },
+    {
+      "id": "markdown",
+      "formatViewerIds": ["markdown-editor"],
+      "capability": "edit",
+      "source": "content",
+      "runtime": "lazy",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "dom-stable"
+    },
+    {
+      "id": "puppyflow",
+      "formatViewerIds": ["puppyflow-editor"],
+      "capability": "edit",
+      "source": "content",
+      "runtime": "lazy",
+      "surfacePreparation": "requires-visible",
+      "readinessSignal": "dom-stable"
+    },
+    {
+      "id": "json",
+      "formatViewerIds": [],
+      "capability": "edit",
+      "source": "content",
+      "runtime": "eager",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "dom-stable"
+    },
+    {
+      "id": "csv-table",
+      "formatViewerIds": [],
+      "capability": "edit",
+      "source": "content",
+      "runtime": "eager",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "dom-stable"
+    },
+    {
+      "id": "html-artifact",
+      "formatViewerIds": [],
+      "capability": "edit",
+      "source": "content-and-resource",
+      "runtime": "eager",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "dom-stable"
+    },
+    {
+      "id": "image-preview",
+      "formatViewerIds": [],
+      "capability": "preview",
+      "source": "resource",
+      "runtime": "eager",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "decoded-resource"
+    },
+    {
+      "id": "pdf-preview",
+      "formatViewerIds": [],
+      "capability": "preview",
+      "source": "resource",
+      "runtime": "lazy",
+      "surfacePreparation": "requires-visible",
+      "readinessSignal": "first-rendered-frame"
+    },
+    {
+      "id": "office-preview",
+      "formatViewerIds": [],
+      "capability": "preview",
+      "source": "resource",
+      "runtime": "lazy",
+      "surfacePreparation": "requires-visible",
+      "readinessSignal": "first-rendered-frame"
+    },
+    {
+      "id": "audio-preview",
+      "formatViewerIds": [],
+      "capability": "preview",
+      "source": "resource",
+      "runtime": "eager",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "media-metadata"
+    },
+    {
+      "id": "video-preview",
+      "formatViewerIds": [],
+      "capability": "preview",
+      "source": "resource",
+      "runtime": "eager",
+      "surfacePreparation": "requires-visible",
+      "readinessSignal": "first-rendered-frame"
+    },
+    {
+      "id": "text",
+      "formatViewerIds": ["plain-text", "monaco-code"],
+      "capability": "edit",
+      "source": "content",
+      "runtime": "eager",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "dom-stable"
+    },
+    {
+      "id": "document-placeholder",
+      "formatViewerIds": ["binary-placeholder"],
+      "capability": "placeholder",
+      "source": "none",
+      "runtime": "eager",
+      "surfacePreparation": "hidden-safe",
+      "readinessSignal": "dom-stable"
+    }
+  ]
+}

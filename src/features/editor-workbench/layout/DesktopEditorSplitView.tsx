@@ -1,0 +1,326 @@
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
+import {
+  getAiEditFileForPath,
+  getEditorPanes,
+  type AiEditRequest,
+  type DataPort,
+  type DataWorkspaceState,
+  type EditorGroupState,
+  type EditorFindCommand,
+  type EditorInteractionPreferences,
+  type EditorPaneMenuContribution,
+  type EditorPaneLayoutLeaf,
+  type EditorPaneLayoutNode,
+  type EditorPaneLayoutSplit,
+  type EditorPaneLayoutState,
+  type EditorPaneSplitOptions,
+  type EditorSplitDirection,
+  type FileIconThemeId,
+  type ViewerExtensionHostAdapter,
+  type Workspace,
+  type WorkspaceContentChange,
+} from "@puppyone/shared-ui";
+import {
+  useExplorerFileDrop,
+  type EditorFileDropController,
+} from "../drag-and-drop/useExplorerFileDrop";
+import {
+  usePaneMoveDrag,
+  type PaneMoveDragController,
+} from "../drag-and-drop/usePaneMoveDrag";
+import { createEditorNodeIndex, type EditorNodeIndex } from "../runtime/editorNodeIndex";
+import { EditorPaneRuntime } from "../runtime/EditorPaneRuntime";
+import { EditorPaneShell } from "./EditorPaneShell";
+import { EditorSplitResizeHandle } from "./EditorSplitResizeHandle";
+import { EditorPaneHostSlot } from "./pane-host/EditorPaneHostSlot";
+import {
+  usePersistentEditorPaneHosts,
+  type PersistentEditorPaneHosts,
+} from "./pane-host/usePersistentEditorPaneHosts";
+
+export type DesktopEditorSplitViewProps = Readonly<{
+  aiEditRequest: AiEditRequest | null;
+  dataPort: DataPort;
+  editorGroup: EditorGroupState;
+  editorInteractionPreferences: EditorInteractionPreferences;
+  fileIconTheme: FileIconThemeId;
+  layout: EditorPaneLayoutState;
+  refreshKey?: WorkspaceContentChange;
+  state: DataWorkspaceState;
+  viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
+  workspace: Workspace;
+  externalOpen?: Readonly<{
+    getAppName: (path: string) => string | null;
+    open: (path: string) => void | Promise<void>;
+  }>;
+  onClosePane: (paneId: string) => void;
+  onFocusPane: (paneId: string) => void;
+  onResizeSplit: (splitId: string, ratio: number) => void;
+  onMovePane: (
+    sourcePaneId: string,
+    targetPaneId: string,
+    direction: EditorSplitDirection,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
+  ) => void;
+  onOpenAtPaneEdge: (
+    path: string,
+    label: string,
+    targetPaneId: string,
+    direction: EditorSplitDirection,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
+  ) => void;
+  onSplitPane: (
+    paneId: string,
+    direction: EditorSplitDirection,
+    placement: NonNullable<EditorPaneSplitOptions["placement"]>,
+  ) => void;
+}>;
+
+export function DesktopEditorSplitView({
+  aiEditRequest,
+  dataPort,
+  editorGroup,
+  editorInteractionPreferences,
+  fileIconTheme,
+  layout,
+  refreshKey,
+  state,
+  viewerExtensionAdapter = null,
+  workspace,
+  externalOpen,
+  onClosePane,
+  onFocusPane,
+  onMovePane,
+  onOpenAtPaneEdge,
+  onResizeSplit,
+  onSplitPane,
+}: DesktopEditorSplitViewProps) {
+  const editorById = useMemo(
+    () => new Map(editorGroup.editors.map((editor) => [editor.id, editor])),
+    [editorGroup.editors],
+  );
+  const panes = useMemo(() => getEditorPanes(layout), [layout]);
+  const editorNodeIndex = useMemo(() => createEditorNodeIndex(state.tree), [state.tree]);
+  const paneCount = panes.length;
+  const paneHosts = usePersistentEditorPaneHosts(panes.map((pane) => pane.id));
+  const [openActionsPaneId, setOpenActionsPaneId] = useState<string | null>(null);
+  const paneMove = usePaneMoveDrag(onMovePane);
+  const fileDrop = useExplorerFileDrop(workspace.id, onOpenAtPaneEdge);
+
+  useEffect(() => {
+    if (openActionsPaneId && !panes.some((pane) => pane.id === openActionsPaneId)) {
+      setOpenActionsPaneId(null);
+    }
+  }, [openActionsPaneId, panes]);
+
+  useEffect(() => {
+    if (paneMove.dragging) setOpenActionsPaneId(null);
+  }, [paneMove.dragging]);
+
+  return (
+    <div className="desktop-editor-split-view" data-pane-count={paneCount}>
+      <EditorLayoutNode
+        node={layout.root}
+        touchesBlockEnd
+        touchesInlineStart
+        paneHosts={paneHosts}
+        onResizeSplit={onResizeSplit}
+      />
+      {panes.map((pane) => createPortal(
+        <EditorPane
+          activePaneId={layout.activePaneId}
+          aiEditRequest={aiEditRequest}
+          dataPort={dataPort}
+          editorById={editorById}
+          editorNodeIndex={editorNodeIndex}
+          editorInteractionPreferences={editorInteractionPreferences}
+          externalOpen={externalOpen}
+          fileIconTheme={fileIconTheme}
+          fileDrop={fileDrop}
+          pane={pane}
+          paneCount={paneCount}
+          paneMove={paneMove}
+          openActionsPaneId={openActionsPaneId}
+          refreshKey={refreshKey}
+          state={state}
+          viewerExtensionAdapter={viewerExtensionAdapter}
+          workspace={workspace}
+          onClosePane={onClosePane}
+          onFocusPane={onFocusPane}
+          onOpenActionsPaneChange={setOpenActionsPaneId}
+          onSplitPane={onSplitPane}
+        />,
+        paneHosts.get(pane.id)!,
+        pane.id,
+      ))}
+    </div>
+  );
+}
+
+type EditorLayoutNodeProps = Readonly<{
+  node: EditorPaneLayoutNode;
+  paneHosts: PersistentEditorPaneHosts;
+  touchesBlockEnd: boolean;
+  touchesInlineStart: boolean;
+  onResizeSplit: DesktopEditorSplitViewProps["onResizeSplit"];
+}>;
+
+function EditorLayoutNode(props: EditorLayoutNodeProps): ReactNode {
+  if (props.node.kind === "pane") {
+    return (
+      <EditorPaneHostSlot
+        host={props.paneHosts.get(props.node.id)!}
+        paneId={props.node.id}
+        touchesBlockEnd={props.touchesBlockEnd}
+      />
+    );
+  }
+  return <EditorSplit {...props} split={props.node} />;
+}
+
+function EditorSplit({
+  node: _node,
+  split,
+  ...props
+}: EditorLayoutNodeProps & { split: EditorPaneLayoutSplit }) {
+  const style = {
+    "--desktop-editor-first-track": `${split.ratio}fr`,
+    "--desktop-editor-second-track": `${1 - split.ratio}fr`,
+  };
+
+  return (
+    <div
+      className="desktop-editor-split"
+      data-direction={split.direction}
+      data-touches-inline-start={props.touchesInlineStart ? "true" : undefined}
+      style={style as CSSProperties}
+    >
+      <EditorLayoutNode
+        key={split.first.id}
+        {...props}
+        node={split.first}
+        touchesBlockEnd={split.direction === "horizontal" && props.touchesBlockEnd}
+        touchesInlineStart={props.touchesInlineStart}
+      />
+      <EditorSplitResizeHandle
+        key={split.id}
+        direction={split.direction}
+        ratio={split.ratio}
+        splitId={split.id}
+        onCommit={props.onResizeSplit}
+      />
+      <EditorLayoutNode
+        key={split.second.id}
+        {...props}
+        node={split.second}
+        touchesBlockEnd={props.touchesBlockEnd}
+        touchesInlineStart={split.direction === "vertical" && props.touchesInlineStart}
+      />
+    </div>
+  );
+}
+
+type EditorPaneProps = Readonly<{
+  activePaneId: string;
+  aiEditRequest: AiEditRequest | null;
+  dataPort: DataPort;
+  editorById: ReadonlyMap<string, EditorGroupState["editors"][number]>;
+  editorNodeIndex: EditorNodeIndex;
+  editorInteractionPreferences: EditorInteractionPreferences;
+  externalOpen?: DesktopEditorSplitViewProps["externalOpen"];
+  fileIconTheme: FileIconThemeId;
+  fileDrop: EditorFileDropController;
+  pane: EditorPaneLayoutLeaf;
+  paneCount: number;
+  paneMove: PaneMoveDragController;
+  openActionsPaneId: string | null;
+  refreshKey?: WorkspaceContentChange;
+  state: DataWorkspaceState;
+  viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
+  workspace: Workspace;
+  onClosePane: DesktopEditorSplitViewProps["onClosePane"];
+  onFocusPane: DesktopEditorSplitViewProps["onFocusPane"];
+  onOpenActionsPaneChange: (paneId: string | null) => void;
+  onSplitPane: DesktopEditorSplitViewProps["onSplitPane"];
+}>;
+
+function EditorPane({
+  activePaneId,
+  aiEditRequest,
+  dataPort,
+  editorById,
+  editorNodeIndex,
+  editorInteractionPreferences,
+  externalOpen,
+  fileIconTheme,
+  fileDrop,
+  pane,
+  paneCount,
+  paneMove,
+  openActionsPaneId,
+  refreshKey,
+  state,
+  viewerExtensionAdapter,
+  workspace,
+  onClosePane,
+  onFocusPane,
+  onOpenActionsPaneChange,
+  onSplitPane,
+}: EditorPaneProps) {
+  const active = pane.id === activePaneId;
+  const actionsOpen = pane.id === openActionsPaneId;
+  const editor = pane.editorId ? editorById.get(pane.editorId) ?? null : null;
+  const treeNode = editor ? editorNodeIndex.get(editor.resource) ?? null : null;
+  const [findCommand, setFindCommand] = useState<EditorFindCommand | null>(null);
+  const [menuContribution, setMenuContribution] = useState<EditorPaneMenuContribution | null>(null);
+  const externalOpenPath = editor?.resource ?? null;
+
+  return (
+    <EditorPaneShell
+      active={active}
+      actionsOpen={actionsOpen}
+      editorLabel={editor?.label ?? null}
+      externalOpenAppName={externalOpenPath ? externalOpen?.getAppName(externalOpenPath) ?? null : null}
+      findCommand={findCommand}
+      fileDrop={fileDrop}
+      pane={pane}
+      paneCount={paneCount}
+      paneMove={paneMove}
+      menuContribution={menuContribution?.documentId === editor?.resource ? menuContribution : null}
+      onActionsPaneChange={onOpenActionsPaneChange}
+      onActivate={() => {
+        if (!active) onFocusPane(pane.id);
+      }}
+      onClose={() => onClosePane(pane.id)}
+      onOpenExternal={externalOpen && externalOpenPath
+        ? () => externalOpen.open(externalOpenPath)
+        : null}
+      onSplit={(direction, placement) => onSplitPane(pane.id, direction, placement)}
+    >
+      <EditorPaneRuntime
+        aiEditFile={getAiEditFileForPath(aiEditRequest, editor?.resource) ?? null}
+        dataPort={dataPort}
+        editor={editor}
+        editorInteractionPreferences={editorInteractionPreferences}
+        fileIconTheme={fileIconTheme}
+        markdownAssetUrlResolver={state.markdownAssetUrlResolver}
+        markdownLinkGraph={state.markdownLinkGraph}
+        refreshKey={refreshKey}
+        treeNode={treeNode}
+        viewerExtensionAdapter={viewerExtensionAdapter}
+        workspaceId={workspace.id}
+        workspaceRoot={workspace.path}
+        markdownDialect={workspace.markdownDialect}
+        onFindCommandChange={setFindCommand}
+        onMenuContributionChange={setMenuContribution}
+      />
+    </EditorPaneShell>
+  );
+}

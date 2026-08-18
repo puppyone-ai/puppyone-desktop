@@ -17,7 +17,6 @@ import {
 import { initializeWorkspaceEditReview } from "../local-api/edit-review.mjs";
 import { createUpdateService } from "./update-service.mjs";
 import { createAppPreviewRuntime } from "./app-preview-runtime.mjs";
-import { createAppPreviewBrowserSurfaceManager } from "./main/app-preview-browser-surface.mjs";
 import { createAppPreviewService } from "./main/app-preview-service.mjs";
 import {
   configureDesktopApplicationIdentity,
@@ -55,12 +54,15 @@ import {
 } from "./main/ipc/markdown-format-ipc.mjs";
 import { registerNativeSurfaceOcclusionIpcHandlers } from "./main/ipc/native-surface-occlusion-ipc.mjs";
 import { registerNativeSurfacePointerPassthroughIpcHandlers } from "./main/ipc/native-surface-pointer-passthrough-ipc.mjs";
+import { registerPanePreviewIpcHandlers } from "./main/ipc/pane-preview-ipc.mjs";
 import { registerLocalizationIpcHandlers } from "./main/ipc/localization-ipc.mjs";
 import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service.mjs";
+import { createExternalNavigationService } from "./main/external-navigation-service.mjs";
 import { createNativeSurfaceOcclusionCoordinator } from "./main/native-surfaces/occlusion-coordinator.mjs";
 import { createNativeSurfacePointerPassthroughCoordinator } from "./main/native-surfaces/pointer-passthrough-coordinator.mjs";
 import { registerFeedbackIpcHandlers } from "./main/ipc/feedback-ipc.mjs";
 import { registerSystemIpcHandlers } from "./main/ipc/system-ipc.mjs";
+import { resolveDockIconResource } from "./main/dock-icon-resources.mjs";
 import { registerTerminalIpcHandlers } from "./main/ipc/terminal-ipc.mjs";
 import { registerWorkspaceFileIpcHandlers } from "./main/ipc/workspace-files-ipc.mjs";
 import { registerWorkspaceGitIpcHandlers } from "./main/ipc/workspace-git-ipc.mjs";
@@ -72,6 +74,7 @@ import { registerLocalFileProtocol } from "./main/local-file-protocol.mjs";
 import { createLocalFileCapabilityStore } from "./main/local-file-capabilities.mjs";
 import { installWindowNavigationSecurity, requireNonEmptyString } from "./main/security.mjs";
 import { createTerminalService } from "./main/terminal-service.mjs";
+import { createTerminalAgentLocator } from "./main/terminal-agent/terminal-agent-locator.mjs";
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
@@ -134,19 +137,10 @@ const viewerPackFeatureProfile = resolveViewerPackFeatureProfile({
   isPackaged: app.isPackaged,
 });
 const workspaceStateFilename = "desktop-workspace-state.json";
-const dockIconResources = Object.freeze({
-  polished: "logo-square.png",
-  light: "dock-icon-light.png",
-  matte: "dock-icon-matte.png",
-});
-const developmentDockIconResources = Object.freeze({
-  polished: "logo-square-dev.png",
-  light: "dock-icon-light-dev.png",
-  matte: "dock-icon-matte-dev.png",
-});
 const macTitlebarOptions = process.platform === "darwin"
   ? {
       titleBarStyle: "hiddenInset",
+      titleBarOverlay: true,
       trafficLightPosition: { x: 13, y: 12 },
     }
   : {
@@ -197,6 +191,7 @@ const nativeSurfacePointerPassthrough = createNativeSurfacePointerPassthroughCoo
     console.warn("Unable to forward a native surface drag event:", error);
   },
 });
+const externalNavigation = createExternalNavigationService({ shell });
 const localeService = createDesktopLocaleService({
   app,
   getWindows: () => BrowserWindow.getAllWindows(),
@@ -215,6 +210,7 @@ const terminalService = createTerminalService({
   appVersion: desktopBuildInfo.version,
   initializeWorkspaceEditReview,
 });
+const terminalAgentLocator = createTerminalAgentLocator();
 const agentSessionCache = createEphemeralAgentSessionCache({ app });
 const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   appVersion: desktopBuildInfo.version,
@@ -252,7 +248,7 @@ const cloudAuthService = createCloudAuthService({
   requestCloudApi,
   getCloudApiErrorMessage,
   secureStorage: safeStorage,
-  openExternal: (href) => shell.openExternal(href),
+  externalNavigation,
   localCloudWebUrl: process.env.VITE_DESKTOP_CLOUD_WEB_URL,
   getWindows: () => BrowserWindow.getAllWindows(),
   revealWindow: revealLastFocusedWindow,
@@ -313,7 +309,7 @@ async function createWindow(options = {}) {
   installWindowNavigationSecurity({
     webContents: window.webContents,
     applicationUrl: rendererApplicationUrl,
-    shell,
+    externalNavigation,
   });
   windowsById.set(webContentsId, window);
   windowStateById.set(webContentsId, {
@@ -337,6 +333,20 @@ async function createWindow(options = {}) {
     if (!window.webContents.isDestroyed()) {
       window.webContents.send("git-repository:window-focus", { focused: false });
     }
+  });
+
+  const publishWindowChromeState = (fullScreen) => {
+    if (!window.webContents.isDestroyed()) {
+      window.webContents.send("window-layout:chrome-state-changed", { fullScreen });
+    }
+  };
+  window.on("enter-full-screen", () => {
+    window.setTitle("");
+    publishWindowChromeState(true);
+  });
+  window.on("leave-full-screen", () => {
+    window.setTitle(resolveWindowTitle(window));
+    publishWindowChromeState(false);
   });
 
   window.once("ready-to-show", () => {
@@ -488,24 +498,12 @@ function resolveAppIconPath() {
 }
 
 function resolveDockIconPath(iconId) {
-  const normalizedIconId = Object.hasOwn(dockIconResources, iconId) ? iconId : "polished";
-  const developmentBuild = desktopBuildInfo.channel === "dev";
-  const resourceFilename = developmentBuild
-    ? developmentDockIconResources[normalizedIconId]
-    : dockIconResources[normalizedIconId];
-  const sourceFilename = normalizedIconId === "light"
-    ? `logo-square-v0.1.3-light${developmentBuild ? "-dev" : ""}.png`
-    : normalizedIconId === "matte"
-      ? `logo-square-v0.1.3-dark${developmentBuild ? "-dev" : ""}.png`
-      : `logo-square${developmentBuild ? "-dev" : ""}.png`;
-  const candidates = [
-    path.join(process.resourcesPath ?? projectRoot, resourceFilename),
-    path.join(projectRoot, "public", sourceFilename),
-  ];
-  return {
-    iconId: normalizedIconId,
-    path: candidates.find((candidate) => fs.existsSync(candidate)) ?? null,
-  };
+  return resolveDockIconResource({
+    iconId,
+    developmentBuild: desktopBuildInfo.channel === "dev",
+    resourcesPath: process.resourcesPath,
+    projectRoot,
+  });
 }
 
 function setDockIcon(iconId = "polished") {
@@ -579,22 +577,10 @@ app.whenReady().then(async () => {
     getRestartBlockers: getUpdateRestartBlockers,
     confirmRestartWithBlockers: confirmUpdateRestartWithBlockers,
   });
-  const appPreviewBrowserSurfaces = createAppPreviewBrowserSurfaceManager({
-    WebContentsView,
-    sessionFromPartition: (partition, options) => electronSession.fromPartition(partition, options),
-    getOwnerWindow: (ownerWebContentsId) => windowsById.get(ownerWebContentsId) ?? null,
-    publishState: (state, ownerWebContentsId) => {
-      const window = windowsById.get(ownerWebContentsId);
-      if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
-      window.webContents.send("app-preview:surface-state", state);
-    },
-    nativeSurfaceOcclusion,
-    nativeSurfacePointerPassthrough,
-  });
   const appPreviewProcessRuntime = createAppPreviewRuntime({
     app,
     dialog,
-    shell,
+    externalNavigation,
     readWorkspaceTextFile,
     resolveWorkspacePath: resolveLocalWorkspacePath,
     t: (messageId, values) => localeService.t(messageId, values),
@@ -607,20 +593,9 @@ app.whenReady().then(async () => {
           ...event.result,
         });
       }
-      if (event.result.status === "stopped" || event.result.status === "error") {
-        appPreviewBrowserSurfaces.runtimeUnavailable({
-          rootPath: event.rootPath,
-          appPath: event.result.path,
-          ownerWebContentsIds: event.ownerWebContentsIds,
-          reason: event.result.status === "error" ? "runtime-error" : "runtime-stopped",
-        });
-      }
     },
   });
-  appPreviewRuntime = createAppPreviewService({
-    runtime: appPreviewProcessRuntime,
-    browserSurfaces: appPreviewBrowserSurfaces,
-  });
+  appPreviewRuntime = createAppPreviewService({ runtime: appPreviewProcessRuntime });
   if (viewerPackFeatureProfile.externalViewerPacks) {
     viewerPackRuntime = await loadViewerPackRuntime(true);
     viewerPackHost = viewerPackRuntime.createViewerPackHost({
@@ -681,6 +656,7 @@ app.on("will-quit", () => {
   nativeSurfaceOcclusion.dispose();
   nativeSurfacePointerPassthrough.dispose();
   terminalService.closeAll();
+  terminalAgentLocator.dispose();
   localAgentInventory.dispose();
   workspaceWatchService.closeAll();
   gitMetadataWatchService.closeAll();
@@ -713,6 +689,10 @@ function registerIpcHandlers() {
     ipcMain: trustedIpcMain,
     coordinator: nativeSurfacePointerPassthrough,
   });
+  registerPanePreviewIpcHandlers({
+    ipcMain: trustedIpcMain,
+    BrowserWindow,
+  });
   registerBuildInfoIpcHandlers({
     ipcMain: trustedIpcMain,
     buildInfo: desktopBuildInfo,
@@ -742,7 +722,7 @@ function registerIpcHandlers() {
     cloudGitConnectCoordinator,
     cloudPublishCoordinator,
   });
-  registerSystemIpcHandlers({ ipcMain: trustedIpcMain, shell, setDockIcon });
+  registerSystemIpcHandlers({ ipcMain: trustedIpcMain, externalNavigation, setDockIcon });
   registerFeedbackIpcHandlers({
     ipcMain: trustedIpcMain,
     appVersion: desktopBuildInfo.version,
@@ -750,6 +730,7 @@ function registerIpcHandlers() {
   markdownWebEmbedService = registerMarkdownWebEmbedIpcHandlers({
     ipcMain: trustedIpcMain,
     createMarkdownWebEmbedService,
+    externalNavigation,
     getOwnerWindow: (webContentsId) => {
       for (const window of BrowserWindow.getAllWindows()) {
         if (window.webContents?.id === webContentsId) return window;
@@ -800,6 +781,7 @@ function registerIpcHandlers() {
   });
   registerTerminalIpcHandlers({
     ipcMain: trustedIpcMain,
+    terminalAgentLocator,
     terminalService,
     authorizeWorkspaceRoot,
   });
@@ -1050,7 +1032,7 @@ function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
   state.workspace = workspace;
   state.workspacePath = canonicalPath;
   workspaceWindowByPath.set(canonicalPath, window);
-  window.setTitle(`${appName} - ${workspace.name}`);
+  window.setTitle(window.isFullScreen() ? "" : resolveWindowTitle(window));
   if (typeof window.setRepresentedFilename === "function") {
     try {
       window.setRepresentedFilename(canonicalPath);
@@ -1082,7 +1064,7 @@ function releaseWindowWorkspaceById(webContentsId, window = null) {
     state.workspace = null;
   }
   if (window && !window.isDestroyed()) {
-    window.setTitle(appName);
+    window.setTitle(window.isFullScreen() ? "" : resolveWindowTitle(window));
   }
   return workspacePath;
 }
@@ -1116,6 +1098,11 @@ function getOrCreateWindowState(window) {
     windowStateById.set(webContentsId, state);
   }
   return state;
+}
+
+function resolveWindowTitle(window) {
+  const workspace = windowStateById.get(window.webContents.id)?.workspace;
+  return workspace ? `${appName} - ${workspace.name}` : appName;
 }
 
 function getWorkspaceWindow(canonicalPath) {

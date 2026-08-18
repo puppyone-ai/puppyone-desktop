@@ -9,6 +9,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 import type {
   DesktopCloudAutomationProviderSpec,
   DesktopCloudAutomationRun,
@@ -318,7 +319,7 @@ export function CloudManageAutomationDialog({
             </div>
             <section className="desktop-cloud-automation-node">
               <div className="desktop-cloud-automation-node-header">
-                <span className="desktop-cloud-automation-node-icon"><img src="/icons/folder.svg" alt="" /></span>
+                <span className="desktop-cloud-automation-node-icon"><img src={resolveRendererPublicAssetUrl("icons/folder.svg")} alt="" /></span>
                 <span>{targetTitle}</span>
               </div>
               <div className="desktop-cloud-automation-node-body">

@@ -31,7 +31,8 @@ export type DesktopView = WorkspaceSurfaceId;
 
 type DesktopCloudShellProps = {
   children: ReactNode;
-  titlebarSlot?: ReactNode;
+  titlebarSidebarSlot?: ReactNode;
+  titlebarEditorSlot?: ReactNode;
   titlebarActions?: ReactNode;
   minimalMode?: boolean;
   minimalModeDock?: ReactNode;
@@ -54,7 +55,8 @@ type DesktopCloudShellProps = {
 
 export function DesktopCloudShell({
   children,
-  titlebarSlot,
+  titlebarSidebarSlot,
+  titlebarEditorSlot,
   titlebarActions,
   minimalMode = false,
   minimalModeDock,
@@ -112,6 +114,11 @@ export function DesktopCloudShell({
     "--desktop-main-pane-min-width": `${paneLayout.main.minWidth}px`,
     minWidth: paneLayout.minimumWidth,
   } as CSSProperties;
+  const sidebarState = !leftSidebarPresent
+    ? "absent"
+    : paneLayout.explorer.collapsed
+      ? "collapsed"
+      : "expanded";
 
   useEffect(() => {
     publishWindowMinimumWidth(paneLayout.minimumWidth);
@@ -122,22 +129,33 @@ export function DesktopCloudShell({
   }, []);
 
   return (
-    <div className={`desktop-shell ${minimalMode ? "is-minimal-mode" : ""}`}>
+    <div
+      className={`desktop-shell ${minimalMode ? "is-minimal-mode" : ""}`}
+      data-titlebar-sidebar-state={sidebarState}
+    >
       <DesktopWindowChrome
         context={(
           <>
-            {paneLayout.explorer.collapsed && leftSidebarPresent && onLeftSidebarExpand && (
-              <button
-                className="desktop-titlebar-context-icon-button desktop-titlebar-sidebar-expand"
-                type="button"
-                aria-label={t("shared-ui.explorer.expandSidebar")}
-                title={t("shared-ui.explorer.expandSidebar")}
-                onClick={() => onLeftSidebarExpand()}
-              >
-                <PanelLeft size={15} strokeWidth={1.8} aria-hidden="true" />
-              </button>
-            )}
-            {titlebarSlot}
+            <div
+              className="desktop-titlebar-sidebar-context"
+              data-sidebar-state={sidebarState}
+            >
+              {paneLayout.explorer.collapsed && leftSidebarPresent && onLeftSidebarExpand && (
+                <button
+                  className="desktop-titlebar-context-icon-button desktop-titlebar-sidebar-expand"
+                  type="button"
+                  aria-label={t("shared-ui.explorer.expandSidebar")}
+                  title={t("shared-ui.explorer.expandSidebar")}
+                  onClick={() => onLeftSidebarExpand()}
+                >
+                  <PanelLeft size={15} strokeWidth={1.8} aria-hidden="true" />
+                </button>
+              )}
+              {titlebarSidebarSlot}
+            </div>
+            <div className="desktop-titlebar-editor-context">
+              {titlebarEditorSlot}
+            </div>
           </>
         )}
         actions={titlebarActions}

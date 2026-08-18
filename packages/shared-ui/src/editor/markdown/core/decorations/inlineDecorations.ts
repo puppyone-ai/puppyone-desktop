@@ -1,7 +1,7 @@
 import type { EditorState } from "@codemirror/state";
 import { Decoration } from "@codemirror/view";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
-import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../../../viewerTypes";
+import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../../../registry/viewerTypes";
 import { markdownFeatureCompositionFacet } from "../features/markdownFeatureContract";
 import {
   findMarkdownLinkTokens,

@@ -20,14 +20,29 @@ afterEach(() => {
 });
 
 describe("desktop explorer Header expansion", () => {
-  it("shows the expansion action only while the resolved explorer is collapsed", () => {
+  it("shows the expansion action without hiding workspace or Git context", () => {
     const collapsed = renderShell({ leftSidebarCollapsed: true });
     expect(collapsed.querySelector(".desktop-titlebar-sidebar-expand")).not.toBeNull();
+    expect(collapsed.querySelector(".desktop-shell")?.getAttribute("data-titlebar-sidebar-state"))
+      .toBe("collapsed");
+    expect(collapsed.querySelector(".desktop-titlebar-sidebar-context")?.textContent)
+      .toContain("Workspace");
+    expect(collapsed.querySelector(".desktop-titlebar-sidebar-context")?.textContent)
+      .toContain("main");
+    expect(collapsed.querySelector(".desktop-titlebar-editor-context")?.textContent)
+      .toContain("Editors");
 
     resetRender();
 
     const expanded = renderShell({ leftSidebarCollapsed: false });
     expect(expanded.querySelector(".desktop-titlebar-sidebar-expand")).toBeNull();
+    expect(expanded.querySelector(".desktop-shell")?.getAttribute("data-titlebar-sidebar-state"))
+      .toBe("expanded");
+    expect(expanded.querySelector<HTMLElement>(".desktop-shell")?.style.getPropertyValue(
+      "--desktop-titlebar-sidebar-width",
+    )).toBe("");
+    expect(expanded.querySelector(".desktop-titlebar-sidebar-context")?.textContent)
+      .toContain("Workspace");
   });
 
   it("does not expose an expansion action merely because the window is compact", () => {
@@ -81,7 +96,8 @@ function renderShell({
         onLeftSidebarExpand={onLeftSidebarExpand}
         rightSidebar={rightSidebar}
         rightSidebarOpen={rightSidebarOpen}
-        titlebarSlot={<div>Workspace</div>}
+        titlebarSidebarSlot={<div>Workspace · main</div>}
+        titlebarEditorSlot={<div>Editors</div>}
       >
         <div>Editor</div>
       </DesktopCloudShell>,

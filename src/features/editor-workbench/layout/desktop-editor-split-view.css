@@ -1,0 +1,408 @@
+.desktop-editor-split-view {
+  --desktop-editor-divider-size: var(--po-pane-resizer-line-size, 1px);
+  --desktop-editor-resize-hit-size: var(--po-pane-resizer-hit-size, 8px);
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+  background: var(--po-canvas);
+}
+
+.desktop-editor-split {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desktop-editor-split[data-direction="horizontal"] {
+  grid-template-columns:
+    var(--desktop-editor-first-track)
+    var(--desktop-editor-divider-size)
+    var(--desktop-editor-second-track);
+}
+
+.desktop-editor-split[data-direction="vertical"] {
+  grid-template-rows:
+    var(--desktop-editor-first-track)
+    var(--desktop-editor-divider-size)
+    var(--desktop-editor-second-track);
+}
+
+.desktop-editor-split[data-touches-inline-start="true"] {
+  overflow: visible;
+}
+
+.desktop-editor-panel:has(.desktop-editor-split-view),
+.data-main-view-frame:has(> .desktop-editor-split-view) {
+  overflow: visible;
+}
+
+.desktop-editor-pane-slot,
+.desktop-editor-pane-host {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desktop-editor-pane {
+  position: relative;
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--po-canvas);
+}
+
+/* Pane chrome has one reveal source: the leading-third hit zone maintained by
+ * EditorPaneShell. Hover is neutral; only an active press/drag uses the accent
+ * frame. An open menu and active editor state never create persistent accent
+ * decoration. The frame is a dedicated, non-interactive layer painted above
+ * every document runtime. Its four one-pixel gradients are drawn inside the
+ * pane bounds, so a pane touching the workbench clipping edge cannot lose its
+ * bottom or trailing stroke. */
+
+.desktop-editor-pane-interaction-frame {
+  position: absolute;
+  z-index: 11;
+  color: transparent;
+  background:
+    linear-gradient(currentColor, currentColor) top / 100% 1px no-repeat,
+    linear-gradient(currentColor, currentColor) right / 1px 100% no-repeat,
+    linear-gradient(currentColor, currentColor) bottom / 100% 1px no-repeat,
+    linear-gradient(currentColor, currentColor) left / 1px 100% no-repeat;
+  inset: 0;
+  pointer-events: none;
+  transition: color 90ms ease;
+}
+
+/* Chromium clips the BrowserWindow's final paint row. Layout edge metadata is
+ * carried by the split tree, so only a leaf that actually touches the
+ * workbench block end moves its transient bottom stroke into the final safe
+ * paint row. Internal pane frames remain flush with their splitter. */
+.desktop-editor-pane-slot[data-touches-block-end="true"]
+  .desktop-editor-pane-interaction-frame {
+  inset-block-end: 1px;
+}
+
+.desktop-editor-split-view:not([data-pane-count="1"])
+  .desktop-editor-pane[data-handle-hot]:not([data-move-source])
+  > .desktop-editor-pane-interaction-frame {
+  color: var(--po-divider);
+}
+
+.desktop-editor-split-view:not([data-pane-count="1"])
+  .desktop-editor-pane[data-move-source]
+  > .desktop-editor-pane-interaction-frame,
+.desktop-editor-split-view:not([data-pane-count="1"])
+  .desktop-editor-pane:has(> .desktop-editor-pane-handle-shell > .desktop-editor-pane-handle:active)
+  > .desktop-editor-pane-interaction-frame {
+  color: color-mix(
+    in srgb,
+    var(--po-pane-resizer-active-color) 76%,
+    transparent
+  );
+}
+
+.desktop-editor-pane-handle-shell {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  width: 52px;
+  height: 20px;
+  align-items: flex-start;
+  justify-content: center;
+  inset-block-start: 4px;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 90ms ease;
+}
+
+/* Visual reveal and pointer hit-testing are deliberately independent. The
+ * shell never owns a strip of editor input, while the 27×13 button remains a
+ * stable target so the first press/drag cannot fall through to the Viewer. */
+.desktop-editor-pane[data-handle-hot] > .desktop-editor-pane-handle-shell,
+.desktop-editor-pane-handle-shell:hover,
+.desktop-editor-pane-handle-shell:focus-within,
+.desktop-editor-pane[data-drop-target] > .desktop-editor-pane-handle-shell {
+  opacity: 1;
+}
+
+.desktop-editor-pane-handle {
+  appearance: none;
+  display: flex;
+  width: 27px;
+  height: 13px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--po-text-muted) 68%, transparent);
+  outline: 0;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.desktop-editor-pane-handle:hover,
+.desktop-editor-pane-handle:focus-visible {
+  color: color-mix(in srgb, var(--po-text-muted) 82%, transparent);
+}
+
+.desktop-editor-pane-handle > i {
+  display: block;
+  width: 2px;
+  height: 2px;
+  border-radius: 0;
+  background: currentColor;
+}
+
+.desktop-editor-pane-dragging,
+.desktop-editor-pane-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+.desktop-editor-pane[data-move-source] {
+  opacity: 0.58;
+}
+
+.desktop-editor-pane-move-preview {
+  position: fixed;
+  z-index: 80;
+  top: 0;
+  left: 0;
+  contain: layout paint style;
+  overflow: hidden;
+  border: 0;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--po-canvas) 88%, transparent);
+  box-shadow: 0 10px 24px color-mix(in srgb, black 16%, transparent);
+  opacity: 0.88;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.desktop-editor-pane-move-preview::before {
+  position: absolute;
+  inset: 12%;
+  border-radius: 4px;
+  background:
+    linear-gradient(var(--po-divider), var(--po-divider)) 0 0 / 46% 1px no-repeat,
+    linear-gradient(var(--po-divider), var(--po-divider)) 0 32% / 72% 1px no-repeat,
+    linear-gradient(var(--po-divider), var(--po-divider)) 0 64% / 58% 1px no-repeat;
+  content: "";
+}
+
+.desktop-editor-pane-move-preview[data-ready="true"]::before {
+  content: none;
+}
+
+.desktop-editor-pane-move-preview > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}
+
+.desktop-editor-pane-menu {
+  --desktop-editor-pane-menu-action-size: var(--desktop-titlebar-control-height);
+
+  position: fixed;
+  z-index: var(--po-overlay-z-menu, 80);
+  box-sizing: border-box;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.desktop-editor-pane-menu-primary-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.desktop-editor-pane-menu-primary-action.desktop-menu-icon-button {
+  width: var(--desktop-editor-pane-menu-action-size);
+  height: var(--desktop-editor-pane-menu-action-size);
+  border-radius: var(--desktop-toolbar-action-radius);
+  color: var(--desktop-titlebar-text-muted, var(--po-text-muted));
+}
+
+.desktop-editor-pane-menu-primary-action.desktop-menu-icon-button:hover,
+.desktop-editor-pane-menu-primary-action.desktop-menu-icon-button:focus-visible {
+  background: var(--desktop-titlebar-hover, var(--po-hover));
+  color: var(--desktop-titlebar-text, var(--po-text));
+}
+
+.desktop-editor-pane-menu-end-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-inline-start: auto;
+}
+
+.desktop-editor-pane-menu-action-divider {
+  display: grid;
+  width: var(--desktop-editor-pane-menu-action-size);
+  height: var(--desktop-editor-pane-menu-action-size);
+  flex: 0 0 var(--desktop-editor-pane-menu-action-size);
+  place-items: center;
+  pointer-events: none;
+}
+
+.desktop-editor-pane-menu-action-divider::before {
+  width: 1px;
+  height: 12px;
+  background: var(--po-divider);
+  content: "";
+}
+
+.desktop-editor-pane-menu-close-action.desktop-menu-icon-button {
+  color: var(--po-danger);
+}
+
+.desktop-editor-pane-menu-close-action.desktop-menu-icon-button:hover,
+.desktop-editor-pane-menu-close-action.desktop-menu-icon-button:focus-visible {
+  background: color-mix(in srgb, var(--po-danger) 10%, transparent);
+  color: var(--po-danger);
+}
+
+.desktop-editor-pane-menu-secondary-actions {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--po-divider);
+}
+
+.desktop-editor-pane-content {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.desktop-editor-pane-content > .document-surface-host {
+  flex: 1;
+}
+
+.desktop-editor-drop-preview {
+  position: absolute;
+  z-index: 10;
+  border: 0;
+  background: color-mix(in srgb, var(--po-accent) 13%, transparent);
+  pointer-events: none;
+}
+
+.desktop-editor-drop-preview[data-edge="left"] {
+  inset: 0 50% 0 0;
+}
+
+.desktop-editor-drop-preview[data-edge="right"] {
+  inset: 0 0 0 50%;
+}
+
+.desktop-editor-drop-preview[data-edge="top"] {
+  inset: 0 0 50%;
+}
+
+.desktop-editor-drop-preview[data-edge="bottom"] {
+  inset: 50% 0 0;
+}
+
+.desktop-editor-splitter {
+  position: relative;
+  z-index: 5;
+  min-width: 0;
+  min-height: 0;
+  background: var(--po-canvas);
+  outline: 0;
+  touch-action: none;
+}
+
+.desktop-editor-splitter::before {
+  position: absolute;
+  z-index: 1;
+  content: "";
+}
+
+.desktop-editor-splitter::after {
+  position: absolute;
+  background: var(--po-divider);
+  content: "";
+  pointer-events: none;
+}
+
+.desktop-editor-splitter[data-direction="horizontal"] {
+  cursor: col-resize;
+}
+
+.desktop-editor-splitter[data-direction="horizontal"]::before {
+  width: var(--desktop-editor-resize-hit-size);
+  inset-block: 0;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+}
+
+.desktop-editor-splitter[data-direction="horizontal"]::after {
+  inset-block: 0;
+  inset-inline-start: calc(50% - 0.5px);
+  width: 1px;
+}
+
+.desktop-editor-splitter[data-direction="vertical"] {
+  cursor: row-resize;
+}
+
+.desktop-editor-splitter[data-direction="vertical"]::before {
+  height: var(--desktop-editor-resize-hit-size);
+  inset-block-start: 50%;
+  inset-inline: 0;
+  transform: translateY(-50%);
+}
+
+.desktop-editor-splitter[data-direction="vertical"]::after {
+  inset-block-start: calc(50% - 0.5px);
+  inset-inline: 0;
+  height: 1px;
+}
+
+.desktop-editor-splitter:hover::after,
+.desktop-editor-splitter:focus-visible::after {
+  background: var(--po-pane-resizer-hover-color);
+}
+
+.desktop-editor-splitter[data-resizing="true"]::after {
+  background: var(--po-pane-resizer-active-color);
+  box-shadow: 0 0 0 1px var(--po-pane-resizer-active-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-editor-pane-interaction-frame,
+  .desktop-editor-pane-handle-shell {
+    transition: none;
+  }
+
+}
