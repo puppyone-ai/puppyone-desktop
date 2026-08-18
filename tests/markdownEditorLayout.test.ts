@@ -193,7 +193,7 @@ describe("Markdown HTML media layout", () => {
       "--po-md-content-letter-spacing: var(--po-content-reading-letter-spacing, 0);",
     );
     expect(profileRule).toContain(
-      "--po-md-content-line-height: var(--po-content-reading-line-height, 1.5714285714);",
+      "--po-md-content-line-height: var(--po-content-reading-line-height, 1.7142857143);",
     );
     expect(profileRule).toContain("--po-md-block-gap: 16px;");
     expect(profileRule).toContain("--po-md-heading-gap-before: 24px;");

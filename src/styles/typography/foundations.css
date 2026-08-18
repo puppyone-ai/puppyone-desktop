@@ -35,7 +35,9 @@
      supplied by locales.css at the explicit document boundary. */
   --po-content-reading-weight: 450;
   --po-content-reading-letter-spacing: 0;
-  --po-content-reading-line-height: 1.5714285714;
+  /* One 24px content line across scripts. Live Preview adds 3px per edge,
+     producing a stable 30px editor row for every document language. */
+  --po-content-reading-line-height: 1.7142857143;
 }
 
 :root,

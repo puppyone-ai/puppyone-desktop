@@ -42,11 +42,12 @@ while the user edits, so another pane cannot change its fallback face or text
 metrics.
 
 The locale layer owns optical corrections for long-form reading. Default/Latin
-content uses weight `450`, zero tracking, and `22px` leading at the default
-`14px` size. Chinese content uses weight `400`, `0.01em` tracking, and `23px`
-leading. This is intentional: macOS resolves an intermediate `450` request for
-PingFang upward to its Medium face, which is materially denser than Geist at
-the same declared weight. Markdown consumes the product-level
+content uses weight `450` and zero tracking; Chinese content uses weight `400`
+and `0.01em` tracking. Both use the same `24px` leading at the default `14px`
+size, producing one stable `30px` Live Preview row after its `3px` padding on
+each edge. This is intentional: macOS resolves an intermediate `450` request
+for PingFang upward to its Medium face, which is materially denser than Geist
+at the same declared weight. Markdown consumes the product-level
 `--po-content-reading-*` tokens and does not name PingFang or another CJK face
 itself.
 

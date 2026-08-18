@@ -11,7 +11,7 @@
   --po-md-content-size: var(--po-text-size-content, 14px);
   --po-md-content-weight: var(--po-content-reading-weight, 450);
   --po-md-content-letter-spacing: var(--po-content-reading-letter-spacing, 0);
-  --po-md-content-line-height: var(--po-content-reading-line-height, 1.5714285714);
+  --po-md-content-line-height: var(--po-content-reading-line-height, 1.7142857143);
   --po-md-content-color: color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted));
   --po-md-block-gap: 16px;
   --po-md-heading-gap-before: 24px;
