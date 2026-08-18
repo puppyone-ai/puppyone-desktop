@@ -29,7 +29,10 @@ export function matchMarkdownFormatInput(input, platform = process.platform) {
   return null;
 }
 
-export function attachMarkdownFormatShortcuts(webContents) {
+export function attachMarkdownFormatShortcuts(
+  webContents,
+  { platform = process.platform } = {},
+) {
   if (!webContents || typeof webContents.on !== "function" || typeof webContents.send !== "function") {
     throw new TypeError("A WebContents instance is required for Markdown format shortcuts.");
   }
@@ -40,7 +43,7 @@ export function attachMarkdownFormatShortcuts(webContents) {
   let active = false;
   const onBeforeInput = (event, input) => {
     if (!active) return;
-    const type = matchMarkdownFormatInput(input);
+    const type = matchMarkdownFormatInput(input, platform);
     if (!type) return;
     event.preventDefault();
     if (webContents.isDestroyed?.()) return;

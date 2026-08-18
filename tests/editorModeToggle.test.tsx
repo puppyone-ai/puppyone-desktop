@@ -1,17 +1,18 @@
 /**
  * @vitest-environment happy-dom
  */
-import { readFileSync } from "node:fs";
 import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
+import {
+  EditorPaneMenuContributionProvider,
+  type EditorPaneMenuContribution,
+} from "../packages/shared-ui/src/editor/editorPaneMenuContribution";
 import { TextEditorFrame } from "../packages/shared-ui/src/editor/viewers/shared/TextEditorFrame";
 import { testT, withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
-const editorChromeCss = read("../packages/shared-ui/src/styles/editor/editor-chrome.css");
 
 let root: Root | null = null;
 
@@ -22,45 +23,60 @@ afterEach(() => {
 });
 
 describe("editor mode toggle", () => {
-  it("keeps the control on the editor's logical starting edge", () => {
-    const rule = readCssBlock(editorChromeCss, ".editor-mode-toggle");
-
-    expect(rule).toContain("inset-inline-start: 12px;");
-    expect(rule).not.toMatch(/\bright\s*:/);
-    expect(rule).not.toContain("inset-inline-end:");
-  });
-
-  it("switches from Live View to Source Code", () => {
+  it("publishes Source Code into the pane menu instead of rendering editor chrome", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
+    let contribution: EditorPaneMenuContribution | null = null;
 
     act(() => root?.render(withTestLocalization(
-      <TextEditorFrame
-        documentId="mode.md"
-        content="# Heading"
-        nodeName="mode.md"
-        defaultMode="live"
-        canEdit
-        hideSourceView={false}
-        renderLive={() => <output data-editor-mode="live" />}
-        renderSource={() => <output data-editor-mode="source" />}
-      />,
+      <EditorPaneMenuContributionProvider
+        onContributionChange={(nextContribution) => {
+          contribution = nextContribution;
+        }}
+      >
+        <TextEditorFrame
+          documentId="mode.md"
+          content="# Heading"
+          nodeName="mode.md"
+          defaultMode="live"
+          canEdit
+          hideSourceView={false}
+          modeControlPlacement="pane-menu"
+          renderLive={() => <output data-editor-mode="live" />}
+          renderSource={() => <output data-editor-mode="source" />}
+        />
+      </EditorPaneMenuContributionProvider>,
     )));
 
     expect(container.querySelector('[data-editor-mode="live"]')).not.toBeNull();
     expect(container.querySelector('[data-editor-mode="source"]')).toBeNull();
+    expect(container.querySelector(".editor-mode-toggle")).toBeNull();
+    expect(contribution).toMatchObject({
+      documentId: "mode.md",
+      viewItems: [{
+        kind: "toggle",
+        id: "editor-source-mode",
+        label: testT("editor.mode.source"),
+        checked: false,
+      }],
+    });
 
-    const sourceButton = container.querySelector<HTMLButtonElement>(
-      `button[aria-label="${testT("editor.mode.source")}"]`,
-    );
-    act(() => sourceButton?.click());
+    const sourceModeItem = contribution?.viewItems[0];
+    expect(sourceModeItem?.kind).toBe("toggle");
+    act(() => {
+      if (sourceModeItem?.kind === "toggle") sourceModeItem.setChecked(true);
+    });
 
     expect(container.querySelector('[data-editor-mode="live"]')).toBeNull();
     expect(container.querySelector('[data-editor-mode="source"]')).not.toBeNull();
+    expect(contribution?.viewItems[0]).toMatchObject({ checked: true });
   });
 
-  it("toggles preview/source mode with keyboard shortcut", () => {
+  it.each([
+    ["Command", { metaKey: true }],
+    ["Control", { ctrlKey: true }],
+  ])("toggles preview/source mode with %s shortcut", (_modifierName, modifier) => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -88,7 +104,7 @@ describe("editor mode toggle", () => {
     act(() => {
       liveButton?.dispatchEvent(new KeyboardEvent("keydown", {
         key: "/",
-        metaKey: true,
+        ...modifier,
         bubbles: true,
         cancelable: true,
       }));
@@ -98,17 +114,3 @@ describe("editor mode toggle", () => {
     expect(container.querySelector('[data-editor-mode="source"]')).not.toBeNull();
   });
 });
-
-function read(relativePath: string) {
-  return readFileSync(new URL(relativePath, import.meta.url), "utf8");
-}
-
-function readCssBlock(css: string, selector: string) {
-  const marker = `${selector} {`;
-  const start = css.indexOf(marker);
-  if (start < 0) throw new Error(`Missing CSS block for ${selector}`);
-  const bodyStart = start + marker.length;
-  const end = css.indexOf("\n}", bodyStart);
-  if (end < 0) throw new Error(`Unclosed CSS block for ${selector}`);
-  return css.slice(bodyStart, end);
-}

@@ -8,15 +8,20 @@ const editorPaneDocumentRuntime = read(
 const textEditorFrame = read(
   "../packages/shared-ui/src/editor/viewers/shared/TextEditorFrame.tsx",
 );
+const markdownViewer = read(
+  "../packages/shared-ui/src/editor/markdown/MarkdownViewer.tsx",
+);
 
 describe("Desktop editor architecture", () => {
-  it("exposes the shared Live View and Source Code switch in the Desktop workspace", () => {
+  it("exposes Markdown Source Code through the pane menu in the Desktop workspace", () => {
     expect(desktopDataSurface).toContain("hidePreviewSourceView");
     expect(editorPaneDocumentRuntime).toContain('node?.type === "markdown"');
     expect(editorPaneDocumentRuntime).toContain("hideSourceView={hideSourceView}");
+    expect(markdownViewer).toContain('modeControlPlacement="pane-menu"');
+    expect(textEditorFrame).toContain("publishPaneMenuContribution");
+    expect(textEditorFrame).toContain('id: "editor-source-mode"');
     expect(textEditorFrame).toContain('switchMode("live")');
     expect(textEditorFrame).toContain('switchMode("source")');
-    expect(textEditorFrame).toContain('t("editor.mode.live")');
     expect(textEditorFrame).toContain('t("editor.mode.source")');
   });
 });

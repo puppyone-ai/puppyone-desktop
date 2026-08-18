@@ -1,15 +1,17 @@
 # Editor Mode Toggle Placement Design
 
-## Context and Root Cause
+## Context
 
-The Desktop Markdown mode switch is rendered by the shared `TextEditorFrame` and its state transition works: choosing Source Code changes the frame from `renderLive` to `renderSource`, and `MarkdownCodeMirrorEditor` removes the Live Preview extensions. The apparent failure is an interaction collision. `.editor-mode-toggle` and the shell-level `.desktop-feedback` launcher are both absolutely positioned at the bottom-right 12-pixel inset. The feedback launcher has z-index 44 while the editor control has z-index 20, so the shell overlay intercepts pointer input over the right side of the mode switch. The Source Code action is therefore inaccessible even though it is present in the DOM.
+The Markdown editor supports mutually exclusive Live View and Source Code modes. The mode state and source-snapshot transition belong to `TextEditorFrame`, while the Desktop editor pane already owns interaction chrome through its three-dot actions menu. Rendering another floating control inside the document surface duplicates pane chrome, competes with document content and shell overlays, and requires independent positioning and stacking rules.
+
+The pane actions menu already accepts document-scoped Viewer contributions. It provides the shared menu surface, focus management, keyboard navigation, outside dismissal, localization, and pane isolation used by other structured editors.
 
 ## Decision
 
-Keep the existing two-button, single-surface mode control and move it to the bottom-left of the editor. Use `inset-inline-start: 12px` rather than the physical `left` property so the control remains at the natural starting edge in right-to-left interfaces. Remove the physical `right` declaration. Do not raise z-index, add another mode state, move the feedback launcher, or create a Desktop-specific toolbar. This leaves `TextEditorFrame` as the only mode owner and removes the collision at its source.
+Keep mode state and source snapshots in `TextEditorFrame`, but let Markdown request pane-menu placement. While the frame is mounted under an `EditorPaneMenuContributionProvider`, it publishes one checked menu item named Source Code. Enabling the item switches to Source Code; disabling it returns to Live View. This models the two mutually exclusive presentations as one boolean view setting and reuses the existing menu interaction contract.
 
-Alternatives considered were raising the editor control above the feedback launcher and offsetting it farther from the right edge. Raising z-index would make two controls continue to occupy the same space, while a fixed offset would remain coupled to the feedback button's current size. Moving to the opposite edge is simpler and matches the requested placement.
+Do not render the floating mode control inside a Desktop Markdown pane. Retain the inline control only as a compatibility fallback when the shared Markdown viewer is embedded without pane-menu infrastructure. Continue to scope the keyboard shortcut to events originating inside the current editor host.
 
 ## Verification
 
-Add a CSS contract test that fails while the mode control uses the right edge and requires the logical starting edge. Add a behavioral test that renders `TextEditorFrame`, clicks Source Code, and confirms the source surface becomes active. Run focused editor tests, shared UI checks, lint, and the full suite.
+Cover contribution publication, checked-state updates, absence of floating editor chrome, and a full Desktop interaction that opens the three-dot menu and switches to source mode. Keep macOS and Control-based shortcut behavior deterministic through explicit platform injection in Electron shortcut tests.
