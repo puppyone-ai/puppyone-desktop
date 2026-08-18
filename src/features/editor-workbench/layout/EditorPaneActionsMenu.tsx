@@ -175,6 +175,7 @@ export function EditorPaneActionsMenu({
       <DesktopMenuSurface
         ref={setMenuRef}
         className="desktop-editor-pane-menu"
+        elevation="compact"
         ariaLabel={editorLabel
           ? t("editor.panes.actionsFor", { name: editorLabel })
           : t("editor.panes.actions")}

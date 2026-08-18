@@ -235,7 +235,6 @@
   overflow-x: hidden;
   overflow-y: auto;
   padding: 4px;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--po-shadow) 42%, transparent);
 }
 
 .desktop-editor-pane-menu-primary-actions {

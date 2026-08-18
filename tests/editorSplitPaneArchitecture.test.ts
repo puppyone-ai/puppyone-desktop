@@ -82,6 +82,14 @@ const splitStyles = readFileSync(
   new URL("../src/features/editor-workbench/layout/desktop-editor-split-view.css", import.meta.url),
   "utf8",
 );
+const menuStyles = readFileSync(
+  new URL("../src/styles/menus.css", import.meta.url),
+  "utf8",
+);
+const desktopMenuSource = readFileSync(
+  new URL("../src/components/DesktopMenu.tsx", import.meta.url),
+  "utf8",
+);
 const dataShellStyles = readFileSync(
   new URL("../src/features/data-workspace/data-shell.css", import.meta.url),
   "utf8",
@@ -180,6 +188,7 @@ describe("editor split-pane architecture", () => {
     );
     expect(paneMenuRule).toContain("position: fixed;");
     expect(paneMenuRule).toContain("overflow-y: auto;");
+    expect(paneMenuRule).not.toContain("box-shadow:");
     expect(splitStyles).not.toContain('.desktop-editor-pane-menu[data-has-secondary="true"]');
     const closeActionRule = readCssBlock(
       splitStyles,
@@ -208,9 +217,25 @@ describe("editor split-pane architecture", () => {
     expect(externalDividerRule).toContain("background: var(--po-divider);");
     expect(externalDividerRule).toContain("pointer-events: none;");
     expect(splitStyles).not.toContain(".desktop-editor-pane-menu-action-divider::before");
-    expect(paneMenuRule).toContain(
-      "box-shadow: 0 2px 8px color-mix(in srgb, var(--po-shadow) 42%, transparent);",
+    expect(paneActionsMenuSource).toContain('elevation="compact"');
+    expect(desktopMenuSource).toContain('elevation?: "default" | "compact";');
+    expect(desktopMenuSource).toContain(
+      'data-menu-elevation={elevation === "compact" ? elevation : undefined}',
     );
+    const compactMenuElevationRule = readCssBlock(
+      menuStyles,
+      '.desktop-menu-surface[data-menu-elevation="compact"]',
+    );
+    expect(compactMenuElevationRule).toContain(
+      "--po-menu-shadow-compact: 0 2px 4px -2px",
+    );
+    expect(compactMenuElevationRule).toContain(
+      "color-mix(in srgb, var(--po-shadow) 32%, transparent);",
+    );
+    expect(compactMenuElevationRule).toContain(
+      "--interface-menu-box-shadow: var(--po-menu-shadow-compact);",
+    );
+    expect(compactMenuElevationRule).toContain("box-shadow: var(--po-menu-shadow-compact);");
     expect(paneActionsMenuSource).toContain("PANE_DIVIDER_WIDTH = 1");
     expect(paneActionsMenuSource).toContain("PANE_DIVIDER_INLINE_MARGIN = 3");
     expect(paneActionsMenuSource).toContain(
