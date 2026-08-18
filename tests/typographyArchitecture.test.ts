@@ -153,7 +153,7 @@ describe("typography architecture", () => {
     expect(locales).not.toContain('"Noto Sans CJK SC", sans-serif');
     expect(locales).toContain('"Hiragino Sans", "Yu Gothic", "Meiryo", "Noto Sans CJK JP"');
     expect(locales).toContain('"Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR"');
-    expect(locales).toContain("--po-content-reading-weight: 400;");
+    expect(locales).toContain("--po-content-reading-weight: 500;");
     expect(locales).toContain("--po-content-reading-letter-spacing: 0.01em;");
     expect(locales).not.toContain("--po-content-reading-line-height:");
     expect(base).toContain("font-feature-settings: normal;");
