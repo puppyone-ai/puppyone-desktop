@@ -38,6 +38,7 @@ export type MarkdownTableCellEditorContext = {
   rowIndex: number;
   rows: readonly MarkdownTableRow[];
   renderInlinePreview: MarkdownInlinePreviewRenderer;
+  getTableRange: () => { from: number; to: number } | null;
   tableFrom: number;
   tableTo: number;
   view: EditorView;
@@ -63,6 +64,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
     rowIndex,
     rows,
     renderInlinePreview,
+    getTableRange,
     tableFrom,
     tableTo,
     view,
@@ -131,13 +133,29 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
   // the single recoverable owner (range-mapped, revision-aware).
   const beginEditSession = () => {
     const existing = editSessionId ? host.editSessions.get(editSessionId) : undefined;
-    const session = existing ?? host.editSessions.acquire({
-      ...recoveryKey,
-      baseRevision: getDocRevision(view.state.doc),
-      draft: { text: content.textContent ?? cell.text },
-      mode: "editing",
-      focusTarget: { rowIndex, columnIndex },
-    });
+    const currentTableRange = existing ? null : getTableRange();
+    if (!existing && !currentTableRange) return null;
+    const delta = currentTableRange ? currentTableRange.from - tableFrom : 0;
+    const mappedRange = existing?.mappedRange ?? {
+      from: cell.from + delta,
+      to: cell.to + delta,
+    };
+    const currentBaseSource = view.state.sliceDoc(mappedRange.from, mappedRange.to);
+    const session = existing
+      ?? host.editSessions.findRecoverable({
+        featureId: "table-cell",
+        mappedRange,
+        baseSource: currentBaseSource,
+      })
+      ?? host.editSessions.acquire({
+        featureId: "table-cell",
+        mappedRange,
+        baseSource: currentBaseSource,
+        baseRevision: getDocRevision(view.state.doc),
+        draft: { text: content.textContent ?? cell.text },
+        mode: "editing",
+        focusTarget: { rowIndex, columnIndex },
+      });
     editSessionId = session.elementId;
     return host.editSessions.update(session.elementId, {
       lifecycle: "mounted",
@@ -147,6 +165,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
   };
   const updateEditSessionDraft = () => {
     const session = beginEditSession();
+    if (!session) return null;
     return host.editSessions.update(session.elementId, {
       draft: { text: content.textContent ?? "" },
       mode: "editing",
@@ -162,11 +181,9 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
 
   const getMappedTableRange = () => {
     const session = editSessionId ? host.editSessions.get(editSessionId) : undefined;
-    const delta = session ? session.mappedRange.from - cell.from : 0;
-    return {
-      from: tableFrom + delta,
-      to: tableTo + delta,
-    };
+    if (!session) return getTableRange();
+    const delta = session.mappedRange.from - cell.from;
+    return { from: tableFrom + delta, to: tableTo + delta };
   };
 
   const getDraft = (): MarkdownTableCellDraft => ({
@@ -178,12 +195,14 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
   const commitCellEdit = (target: { exitPosition?: number; focus?: MarkdownTableFocusTarget }): boolean => {
     const nextText = normalizeMarkdownTableCellInput(content.textContent ?? "");
     const session = updateEditSessionDraft() ?? beginEditSession();
+    if (!session) return false;
     // The CAS source is the exact Markdown slice (which may contain escaped
     // pipes); the editable draft is its decoded table-cell representation.
     const changed = nextText !== cell.text;
 
     if (!changed) {
       const mappedTable = getMappedTableRange();
+      if (!mappedTable) return false;
       finishEditSession("cancel");
       if (target.focus) {
         view.dispatch({
@@ -200,6 +219,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
     }
 
     const mappedTable = getMappedTableRange();
+    if (!mappedTable) return false;
     const nextCellSource = sanitizeMarkdownTableCell(nextText);
     const nextTableTo = mappedTable.to + nextCellSource.length - session.baseSource.length;
     const selectionPosition = target.exitPosition === tableTo ? nextTableTo : mappedTable.from;
@@ -243,6 +263,7 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
     suppressBlurCommit = true;
     if (editing) updateEditSessionDraft();
     const mappedTable = getMappedTableRange();
+    if (!mappedTable) return;
     const currentDraft = editing ? getDraft() : null;
     finishEditSession("complete");
     dispatchMarkdownTableStructureOperation({
@@ -298,8 +319,14 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
       // Cell edit owns the chrome; drop the block selection so the table ring
       // and the cell ring never compete.
       const selection = view.state.selection.main;
-      if (!selection.empty && selection.from <= tableFrom && selection.to >= tableTo) {
-        view.dispatch({ selection: EditorSelection.cursor(getMappedTableRange().from) });
+      const mappedTable = getMappedTableRange();
+      if (
+        mappedTable
+        && !selection.empty
+        && selection.from <= mappedTable.from
+        && selection.to >= mappedTable.to
+      ) {
+        view.dispatch({ selection: EditorSelection.cursor(mappedTable.from) });
       }
     });
     content.addEventListener("keydown", (event) => {
@@ -370,11 +397,12 @@ export function createTableCellEditor(context: MarkdownTableCellEditorContext): 
     content.addEventListener("contextmenu", (event) => {
       event.preventDefault();
       event.stopPropagation();
+      const mappedTable = getMappedTableRange();
+      if (!mappedTable) return;
       closeActiveMarkdownTableMenu();
       tableMenuOpen = true;
       const tableWrapper = content.closest<HTMLElement>(".cm-md-table-widget-wrap");
       if (tableWrapper && rowIndex > 0) tableWrapper.dataset.mdTablePinnedRow = String(rowIndex);
-      const mappedTable = getMappedTableRange();
       const keyboardInvocation = event.clientX === 0 && event.clientY === 0;
       const anchorRect = keyboardInvocation ? content.getBoundingClientRect() : null;
       let nextMenu: HTMLElement | null = null;

@@ -1,6 +1,7 @@
 import { EditorView, type Rect, WidgetType } from "@codemirror/view";
 import type { MarkdownTaskLine } from "../rendering/taskModel";
 import { getInlineWidgetEdgeX, getInlineWidgetTextCoords } from "../../shared/widgets/markdownWidgetMeasure";
+import { getMappedWidgetPosition } from "../../shared/widgets/widgetDom";
 import { toggleMarkdownTaskCheckboxAt } from "../commands/markdownTaskCommands";
 import { getMarkdownMessage } from "../editor/markdownLocalization";
 
@@ -111,7 +112,7 @@ export class TaskCheckboxWidget extends WidgetType {
       event.preventDefault();
       event.stopPropagation();
 
-      const position = readTaskCheckboxPosition(view, control);
+      const position = getMappedWidgetPosition(view, control);
       if (position === null || !toggleMarkdownTaskCheckboxAt(view, position)) return;
     });
 
@@ -160,18 +161,6 @@ function syncTaskCheckboxControl(
 
 function syncTaskCheckboxIndicator(indicator: HTMLElement, checked: boolean) {
   indicator.className = checked ? "cm-md-task-checkbox is-checked" : "cm-md-task-checkbox";
-}
-
-function readTaskCheckboxPosition(
-  view: EditorView,
-  control: HTMLButtonElement,
-): number | null {
-  if (!control.isConnected || !view.dom.contains(control)) return null;
-  try {
-    return view.posAtDOM(control);
-  } catch {
-    return null;
-  }
 }
 
 export class HorizontalRuleWidget extends WidgetType {
