@@ -1,7 +1,7 @@
 import { EditorView, type Rect, WidgetType } from "@codemirror/view";
 import type { MarkdownTaskLine } from "../rendering/taskModel";
 import { getInlineWidgetEdgeX, getInlineWidgetTextCoords } from "../../shared/widgets/markdownWidgetMeasure";
-import { toggleMarkdownTaskCheckbox } from "../commands/markdownTaskCommands";
+import { toggleMarkdownTaskCheckboxAt } from "../commands/markdownTaskCommands";
 import { getMarkdownMessage } from "../editor/markdownLocalization";
 
 export type MarkdownSourceSyntaxKind =
@@ -111,8 +111,8 @@ export class TaskCheckboxWidget extends WidgetType {
       event.preventDefault();
       event.stopPropagation();
 
-      const target = readTaskCheckboxTarget(control);
-      if (!target || !toggleMarkdownTaskCheckbox(view, target)) return;
+      const position = readTaskCheckboxPosition(view, control);
+      if (position === null || !toggleMarkdownTaskCheckboxAt(view, position)) return;
     });
 
     return control;
@@ -148,8 +148,6 @@ function syncTaskCheckboxControl(
   view: EditorView,
 ) {
   control.style.setProperty("--md-list-depth", String(task.depth));
-  control.dataset.checkboxFrom = String(task.checkboxFrom);
-  control.dataset.checkboxTo = String(task.checkboxTo);
   control.setAttribute(
     "aria-label",
     getMarkdownMessage(
@@ -164,11 +162,16 @@ function syncTaskCheckboxIndicator(indicator: HTMLElement, checked: boolean) {
   indicator.className = checked ? "cm-md-task-checkbox is-checked" : "cm-md-task-checkbox";
 }
 
-function readTaskCheckboxTarget(control: HTMLButtonElement) {
-  const from = Number(control.dataset.checkboxFrom);
-  const to = Number(control.dataset.checkboxTo);
-  if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
-  return { from, to };
+function readTaskCheckboxPosition(
+  view: EditorView,
+  control: HTMLButtonElement,
+): number | null {
+  if (!control.isConnected || !view.dom.contains(control)) return null;
+  try {
+    return view.posAtDOM(control);
+  } catch {
+    return null;
+  }
 }
 
 export class HorizontalRuleWidget extends WidgetType {
