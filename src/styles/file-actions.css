@@ -270,7 +270,7 @@
   border-radius: var(--desktop-sidebar-row-radius);
   background: color-mix(in srgb, var(--po-sidebar) 94%, var(--po-text) 6%);
   backdrop-filter: none;
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--po-shadow) 38%, transparent);
+  box-shadow: var(--po-menu-shadow-compact);
 }
 
 .desktop-create-entry-menu[data-sidebar-launcher="true"] .desktop-menu-separator {

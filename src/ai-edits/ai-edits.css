@@ -110,7 +110,7 @@
   border: 1px solid color-mix(in srgb, var(--po-border-subtle) 64%, transparent);
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-panel) 78%, transparent);
-  box-shadow: 0 6px 18px rgba(47, 42, 35, 0.06);
+  box-shadow: var(--po-elevation-low);
   color: var(--po-text);
   pointer-events: auto;
   backdrop-filter: blur(12px);
@@ -197,7 +197,7 @@
   border: 1px solid color-mix(in srgb, var(--po-border) 70%, transparent);
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-panel) 96%, transparent);
-  box-shadow: 0 18px 46px rgba(47, 42, 35, 0.16);
+  box-shadow: var(--po-menu-shadow);
   backdrop-filter: blur(14px);
 }
 

@@ -34,9 +34,7 @@
   border: 1px solid color-mix(in srgb, var(--po-menu-border) 82%, transparent);
   border-radius: 10px;
   background: color-mix(in srgb, var(--po-menu-bg) 94%, transparent);
-  box-shadow:
-    0 8px 26px color-mix(in srgb, var(--po-shadow) 22%, transparent),
-    0 1px 3px color-mix(in srgb, var(--po-shadow) 14%, transparent);
+  box-shadow: var(--po-elevation-low);
   color: var(--po-text);
   backdrop-filter: blur(18px) saturate(1.08);
   transform: translateX(-50%);
@@ -48,9 +46,7 @@
 .desktop-minimal-mode-dock[data-expanded="true"] {
   border-color: var(--po-menu-border);
   background: var(--po-menu-bg);
-  box-shadow:
-    0 12px 34px color-mix(in srgb, var(--po-shadow) 28%, transparent),
-    0 2px 7px color-mix(in srgb, var(--po-shadow) 18%, transparent);
+  box-shadow: var(--po-elevation-low);
 }
 
 .desktop-minimal-mode-logo,

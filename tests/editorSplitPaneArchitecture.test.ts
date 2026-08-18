@@ -227,15 +227,10 @@ describe("editor split-pane architecture", () => {
       '.desktop-menu-surface[data-menu-elevation="compact"]',
     );
     expect(compactMenuElevationRule).toContain(
-      "--po-menu-shadow-compact: 0 2px 4px -2px",
-    );
-    expect(compactMenuElevationRule).toContain(
-      "color-mix(in srgb, var(--po-shadow) 32%, transparent);",
-    );
-    expect(compactMenuElevationRule).toContain(
       "--interface-menu-box-shadow: var(--po-menu-shadow-compact);",
     );
     expect(compactMenuElevationRule).toContain("box-shadow: var(--po-menu-shadow-compact);");
+    expect(tokens).toContain("--po-menu-shadow-compact: var(--po-elevation-low);");
     expect(paneActionsMenuSource).toContain("PANE_DIVIDER_WIDTH = 1");
     expect(paneActionsMenuSource).toContain("PANE_DIVIDER_INLINE_MARGIN = 3");
     expect(paneActionsMenuSource).toContain(

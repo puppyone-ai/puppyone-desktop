@@ -195,7 +195,7 @@
   border: 0;
   border-radius: 2px;
   background: color-mix(in srgb, var(--po-canvas) 88%, transparent);
-  box-shadow: 0 10px 24px color-mix(in srgb, black 16%, transparent);
+  box-shadow: var(--po-elevation-popover);
   opacity: 0.88;
   pointer-events: none;
   will-change: transform;

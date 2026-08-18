@@ -12,8 +12,6 @@
 }
 
 .desktop-menu-surface[data-menu-elevation="compact"] {
-  --po-menu-shadow-compact: 0 2px 4px -2px
-    color-mix(in srgb, var(--po-shadow) 32%, transparent);
   --interface-menu-box-shadow: var(--po-menu-shadow-compact);
 
   box-shadow: var(--po-menu-shadow-compact);
