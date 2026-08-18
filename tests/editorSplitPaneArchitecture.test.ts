@@ -237,6 +237,15 @@ describe("editor split-pane architecture", () => {
     expect(paneActionsMenuSource).toContain(
       "segmentedControl && <PaneMenuSegmentedControl item={segmentedControl}",
     );
+    expect(paneActionsMenuSource).toContain("resolvePaneActionsMenuWidth({");
+    expect(paneActionsMenuSource).toContain("PANE_ACTION_SLOT_SIZE = 25");
+    expect(splitSource).toContain("editorResource: editor?.resource ?? null");
+    expect(splitSource).toContain(
+      "menuContribution?.editorResource === editor?.resource",
+    );
+    expect(splitSource).not.toContain(
+      "menuContribution?.documentId === editor?.resource",
+    );
     const segmentedControlRule = readCssBlock(
       splitStyles,
       ".desktop-editor-pane-menu-segmented-control",

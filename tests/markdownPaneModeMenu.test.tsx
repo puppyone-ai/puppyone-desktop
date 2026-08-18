@@ -33,7 +33,7 @@ describe("Markdown pane mode menu", () => {
       id: path,
       path,
       name: path,
-      type: "markdown",
+      type: "file",
       mimeType: "text/markdown",
       source: "local",
     };
@@ -60,6 +60,7 @@ describe("Markdown pane mode menu", () => {
             markdownBlockDragEnabled: false,
           }}
           editorTree={[node]}
+          externalOpen={{ getAppName: () => "Terminal", open: vi.fn() }}
           fileIconTheme="default"
           layout={createEditorPaneLayout(path)}
           markdownEnvironment={workspaceState(node).markdownEnvironment}
@@ -95,6 +96,9 @@ describe("Markdown pane mode menu", () => {
     const modeControl = document.querySelector<HTMLElement>(
       '.desktop-editor-pane-menu-segmented-control[aria-label="Editor mode"]',
     );
+    expect(document.querySelector<HTMLElement>(
+      ".desktop-editor-pane-menu",
+    )?.style.width).toBe("177px");
     const primaryActions = document.querySelector(".desktop-editor-pane-menu-primary-actions");
     expect(primaryActions?.firstElementChild).toBe(modeControl);
     expect(document.querySelector(".desktop-editor-pane-menu-secondary-actions")).toBeNull();

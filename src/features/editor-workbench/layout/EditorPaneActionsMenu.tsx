@@ -30,6 +30,11 @@ import { useAnchoredOverlayPosition } from "../../app-shell/useAnchoredOverlayPo
 
 const PANE_ACTIONS_MENU_WIDTH = 196;
 const PANE_ACTIONS_MENU_MAX_HEIGHT = 360;
+const PANE_ACTION_SLOT_SIZE = 25;
+const PANE_ACTION_GAP = 3;
+const PANE_MENU_INLINE_CHROME = 10;
+const PANE_SEGMENT_GAP = 1;
+const PANE_SEGMENT_PADDING = 4;
 
 export type EditorPaneActionsMenuProps = Readonly<{
   anchorRef: RefObject<HTMLElement | null>;
@@ -61,11 +66,20 @@ export function EditorPaneActionsMenu({
 }: EditorPaneActionsMenuProps) {
   const { t } = useLocalization();
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const viewItems = menuContribution?.viewItems ?? [];
+  const segmentedControl = viewItems.find((item) => item.kind === "segmented") ?? null;
+  const hasSecondaryActions = viewItems.some((item) => item.kind !== "segmented");
+  const preferredWidth = resolvePaneActionsMenuWidth({
+    segmentedControl,
+    hasSecondaryActions,
+    hasFind: Boolean(findCommand),
+    hasExternalOpen: Boolean(onOpenExternal),
+  });
   const { setOverlayRef, overlayPosition } = useAnchoredOverlayPosition({
     open,
     anchorRef,
     boundarySelector: ".desktop-editor-split-view",
-    preferredWidth: PANE_ACTIONS_MENU_WIDTH,
+    preferredWidth,
     preferredMaxHeight: PANE_ACTIONS_MENU_MAX_HEIGHT,
     gap: 4,
     margin: 8,
@@ -136,9 +150,6 @@ export function EditorPaneActionsMenu({
     onCloseMenu();
     void action();
   };
-  const viewItems = menuContribution?.viewItems ?? [];
-  const segmentedControl = viewItems.find((item) => item.kind === "segmented") ?? null;
-  const hasSecondaryActions = viewItems.some((item) => item.kind !== "segmented");
   const openExternalLabel = externalOpenAppName
     ? t("editor.panes.openInApp", { app: externalOpenAppName })
     : t("editor.openDefaultApp");
@@ -152,7 +163,7 @@ export function EditorPaneActionsMenu({
     : {
         left: 0,
         top: 0,
-        width: PANE_ACTIONS_MENU_WIDTH,
+        width: preferredWidth,
         maxHeight: PANE_ACTIONS_MENU_MAX_HEIGHT,
         visibility: "hidden",
         pointerEvents: "none",
@@ -276,5 +287,40 @@ function PaneMenuSegmentedControl({
         );
       })}
     </div>
+  );
+}
+
+function resolvePaneActionsMenuWidth({
+  segmentedControl,
+  hasSecondaryActions,
+  hasFind,
+  hasExternalOpen,
+}: Readonly<{
+  segmentedControl: EditorPaneMenuSegmentedControl | null;
+  hasSecondaryActions: boolean;
+  hasFind: boolean;
+  hasExternalOpen: boolean;
+}>): number {
+  if (hasSecondaryActions) return PANE_ACTIONS_MENU_WIDTH;
+
+  const actionCount = 1 + Number(hasFind) + Number(hasExternalOpen);
+  const endItemCount = actionCount + Number(Boolean(segmentedControl));
+  const endActionsWidth = (
+    endItemCount * PANE_ACTION_SLOT_SIZE
+    + Math.max(0, endItemCount - 1) * PANE_ACTION_GAP
+  );
+  if (!segmentedControl) return PANE_MENU_INLINE_CHROME + endActionsWidth;
+
+  const segmentCount = segmentedControl.options.length;
+  const segmentedWidth = (
+    segmentCount * PANE_ACTION_SLOT_SIZE
+    + Math.max(0, segmentCount - 1) * PANE_SEGMENT_GAP
+    + PANE_SEGMENT_PADDING
+  );
+  return (
+    PANE_MENU_INLINE_CHROME
+    + segmentedWidth
+    + PANE_ACTION_GAP
+    + endActionsWidth
   );
 }

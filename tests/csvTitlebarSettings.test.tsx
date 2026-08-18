@@ -86,6 +86,7 @@ describe("CSV pane-menu settings", () => {
 
     await openPaneMenu(handle!);
     const menu = document.querySelector<HTMLElement>(".desktop-editor-pane-menu");
+    expect(menu?.style.width).toBe("196px");
     expect(menu?.textContent).not.toContain("data.csv");
     expect(document.querySelector(".desktop-editor-pane-menu-title")).toBeNull();
     const primaryActions = menu?.querySelectorAll<HTMLButtonElement>(
@@ -251,6 +252,7 @@ describe("CSV pane-menu settings", () => {
     const handle = container.querySelector<HTMLButtonElement>(".desktop-editor-pane-handle")!;
     await openPaneMenu(handle);
     const menu = document.querySelector<HTMLElement>(".desktop-editor-pane-menu")!;
+    expect(menu.style.width).toBe("63px");
     const actions = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
 
     expect(menu.dataset.hasSecondary).toBeUndefined();

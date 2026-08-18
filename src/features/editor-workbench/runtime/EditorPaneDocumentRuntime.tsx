@@ -96,7 +96,10 @@ function RegularEditorPaneDocumentRuntime({
     listChildren: dataPort.listChildren,
     readFile: dataPort.readFile,
   }), [dataPort.listChildren, dataPort.readFile, refreshKey?.sequence]);
-  const hideSourceView = node?.type === "markdown" ? false : true;
+  const hideSourceView = !isMarkdownDocumentDescriptor(
+    node,
+    editor?.resource ?? null,
+  );
 
   return (
     <FilePreview
