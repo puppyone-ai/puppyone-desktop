@@ -28,13 +28,13 @@ afterEach(() => {
 
 describe("Markdown pane mode menu", () => {
   it("switches source mode from the three-dot pane menu without floating editor controls", async () => {
-    const path = "notes.md";
+    const path = "20260817";
     const node: DataNode = {
       id: path,
       path,
       name: path,
       type: "file",
-      mimeType: "text/markdown",
+      mimeType: "text/markdown; charset=utf-8",
       source: "local",
     };
     const editorGroup = openEditor(EMPTY_EDITOR_GROUP, createEditorInput(path));
@@ -132,6 +132,23 @@ describe("Markdown pane mode menu", () => {
     expect(document.querySelector<HTMLButtonElement>(
       '[role="menuitemradio"][aria-label="Live view"]',
     )?.getAttribute("aria-checked")).toBe("false");
+
+    await act(async () => {
+      handle?.click();
+      await Promise.resolve();
+    });
+    expect(document.querySelector(".desktop-editor-pane-menu")).toBeNull();
+
+    await act(async () => {
+      handle?.click();
+      await Promise.resolve();
+    });
+    await waitForCondition(() => document.querySelector(
+      '.desktop-editor-pane-menu-segmented-control[aria-label="Editor mode"]',
+    ) !== null);
+    expect(document.querySelector<HTMLButtonElement>(
+      '[role="menuitemradio"][aria-label="Source code"]',
+    )?.getAttribute("aria-checked")).toBe("true");
   });
 });
 
