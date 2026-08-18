@@ -260,6 +260,9 @@
   display: flex;
   align-items: center;
   gap: 3px;
+}
+
+.desktop-editor-pane-menu-segmented-control + .desktop-editor-pane-menu-end-actions {
   margin-inline-start: auto;
 }
 
@@ -297,14 +300,15 @@
 
 .desktop-editor-pane-menu-segmented-control {
   display: grid;
-  grid-auto-columns: 1fr;
+  grid-auto-columns: var(--desktop-editor-pane-menu-action-size);
   grid-auto-flow: column;
-  gap: 2px;
-  min-width: 0;
+  flex: 0 0 auto;
+  gap: 1px;
   padding: 2px;
-  border: 1px solid var(--po-divider);
-  border-radius: var(--desktop-toolbar-action-radius);
-  background: color-mix(in srgb, var(--po-control) 72%, transparent);
+  border: 0;
+  border-radius: calc(var(--desktop-toolbar-action-radius) + 1px);
+  background: color-mix(in srgb, var(--po-control) 78%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-divider) 82%, transparent);
 }
 
 .desktop-editor-pane-menu-segment {
@@ -330,8 +334,9 @@
 }
 
 .desktop-editor-pane-menu-segment[aria-checked="true"] {
-  background: var(--po-selected);
-  color: var(--po-text);
+  background: var(--desktop-titlebar-active, var(--po-selected));
+  color: var(--desktop-titlebar-text, var(--po-text));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-text-muted) 10%, transparent);
 }
 
 .desktop-editor-pane-content {

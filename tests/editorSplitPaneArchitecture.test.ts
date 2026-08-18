@@ -123,10 +123,10 @@ describe("editor split-pane architecture", () => {
     expect(splitSource).toContain("onOpenAtPaneEdge");
     expect(splitSource).toContain("onMovePane");
     expect(splitSource).toContain("onSplitPane");
-    expect(paneActionsMenuSource).toContain('t("editor.panes.splitLeft")');
-    expect(paneActionsMenuSource).toContain('t("editor.panes.splitRight")');
-    expect(paneActionsMenuSource).toContain('t("editor.panes.splitUp")');
-    expect(paneActionsMenuSource).toContain('t("editor.panes.splitDown")');
+    expect(paneActionsMenuSource).not.toContain('t("editor.panes.splitLeft")');
+    expect(paneActionsMenuSource).not.toContain('t("editor.panes.splitRight")');
+    expect(paneActionsMenuSource).not.toContain('t("editor.panes.splitUp")');
+    expect(paneActionsMenuSource).not.toContain('t("editor.panes.splitDown")');
     expect(workbenchControllerSource).toContain("const splitPane = useCallback");
     expect(workbenchControllerSource).toContain("editorId: null");
     expect(paneShellSource).toContain('className="desktop-editor-drop-preview"');
@@ -191,7 +191,12 @@ describe("editor split-pane architecture", () => {
       ".desktop-editor-pane-menu-end-actions",
     );
     expect(endActionsRule).toContain("display: flex;");
-    expect(endActionsRule).toContain("margin-inline-start: auto;");
+    expect(endActionsRule).not.toContain("margin-inline-start: auto;");
+    const segmentedEndActionsRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-menu-segmented-control + .desktop-editor-pane-menu-end-actions",
+    );
+    expect(segmentedEndActionsRule).toContain("margin-inline-start: auto;");
     const externalDividerRule = readCssBlock(
       splitStyles,
       ".desktop-editor-pane-menu-action-divider",
@@ -225,19 +230,32 @@ describe("editor split-pane architecture", () => {
     expect(findActionIndex).toBeGreaterThan(0);
     expect(externalActionIndex).toBeGreaterThan(findActionIndex);
     expect(closeActionIndex).toBeGreaterThan(externalActionIndex);
-    expect(paneActionsMenuSource).toContain("PANE_ACTIONS_MENU_EXTENDED_WIDTH = 224");
+    expect(paneActionsMenuSource).not.toContain("PanelLeft");
+    expect(paneActionsMenuSource).not.toContain("PanelRight");
+    expect(paneActionsMenuSource).not.toContain("PanelTop");
+    expect(paneActionsMenuSource).not.toContain("PanelBottom");
+    expect(paneActionsMenuSource).toContain(
+      "segmentedControl && <PaneMenuSegmentedControl item={segmentedControl}",
+    );
     const segmentedControlRule = readCssBlock(
       splitStyles,
       ".desktop-editor-pane-menu-segmented-control",
     );
-    expect(segmentedControlRule).toContain("grid-auto-columns: 1fr;");
-    expect(segmentedControlRule).toContain("border: 1px solid var(--po-divider);");
+    expect(segmentedControlRule).toContain(
+      "grid-auto-columns: var(--desktop-editor-pane-menu-action-size);",
+    );
+    expect(segmentedControlRule).toContain("flex: 0 0 auto;");
+    expect(segmentedControlRule).toContain("border: 0;");
     const selectedSegmentRule = readCssBlock(
       splitStyles,
       '.desktop-editor-pane-menu-segment[aria-checked="true"]',
     );
-    expect(selectedSegmentRule).toContain("background: var(--po-selected);");
-    expect(selectedSegmentRule).toContain("color: var(--po-text);");
+    expect(selectedSegmentRule).toContain(
+      "background: var(--desktop-titlebar-active, var(--po-selected));",
+    );
+    expect(selectedSegmentRule).toContain(
+      "color: var(--desktop-titlebar-text, var(--po-text));",
+    );
     const paneRule = readCssBlock(splitStyles, ".desktop-editor-pane");
     const paneFrameRule = readCssBlock(
       splitStyles,

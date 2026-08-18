@@ -95,6 +95,10 @@ describe("Markdown pane mode menu", () => {
     const modeControl = document.querySelector<HTMLElement>(
       '.desktop-editor-pane-menu-segmented-control[aria-label="Editor mode"]',
     );
+    const primaryActions = document.querySelector(".desktop-editor-pane-menu-primary-actions");
+    expect(primaryActions?.firstElementChild).toBe(modeControl);
+    expect(document.querySelector(".desktop-editor-pane-menu-secondary-actions")).toBeNull();
+    expect(document.querySelector(".desktop-editor-pane-menu-action-divider")).not.toBeNull();
     const liveModeItem = modeControl?.querySelector<HTMLButtonElement>(
       '[role="menuitemradio"][aria-label="Live view"]',
     );

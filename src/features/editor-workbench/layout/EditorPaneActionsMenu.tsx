@@ -9,16 +9,13 @@ import { useLocalization } from "@puppyone/localization";
 import {
   Check,
   ExternalLink,
-  PanelBottom,
-  PanelLeft,
-  PanelRight,
-  PanelTop,
   Search,
   X,
 } from "lucide-react";
 import type {
   EditorFindCommand,
   EditorPaneMenuContribution,
+  EditorPaneMenuSegmentedControl,
   EditorPaneSplitOptions,
   EditorSplitDirection,
 } from "@puppyone/shared-ui";
@@ -32,7 +29,6 @@ import { DesktopOverlayLayer } from "../../app-shell/DesktopOverlayPortal";
 import { useAnchoredOverlayPosition } from "../../app-shell/useAnchoredOverlayPosition";
 
 const PANE_ACTIONS_MENU_WIDTH = 196;
-const PANE_ACTIONS_MENU_EXTENDED_WIDTH = 224;
 const PANE_ACTIONS_MENU_MAX_HEIGHT = 360;
 
 export type EditorPaneActionsMenuProps = Readonly<{
@@ -62,18 +58,14 @@ export function EditorPaneActionsMenu({
   onCloseMenu,
   onClosePane,
   onOpenExternal,
-  onSplit,
 }: EditorPaneActionsMenuProps) {
   const { t } = useLocalization();
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const preferredWidth = findCommand && onOpenExternal
-    ? PANE_ACTIONS_MENU_EXTENDED_WIDTH
-    : PANE_ACTIONS_MENU_WIDTH;
   const { setOverlayRef, overlayPosition } = useAnchoredOverlayPosition({
     open,
     anchorRef,
     boundarySelector: ".desktop-editor-split-view",
-    preferredWidth,
+    preferredWidth: PANE_ACTIONS_MENU_WIDTH,
     preferredMaxHeight: PANE_ACTIONS_MENU_MAX_HEIGHT,
     gap: 4,
     margin: 8,
@@ -145,7 +137,8 @@ export function EditorPaneActionsMenu({
     void action();
   };
   const viewItems = menuContribution?.viewItems ?? [];
-  const hasSecondaryActions = viewItems.length > 0;
+  const segmentedControl = viewItems.find((item) => item.kind === "segmented") ?? null;
+  const hasSecondaryActions = viewItems.some((item) => item.kind !== "segmented");
   const openExternalLabel = externalOpenAppName
     ? t("editor.panes.openInApp", { app: externalOpenAppName })
     : t("editor.openDefaultApp");
@@ -159,7 +152,7 @@ export function EditorPaneActionsMenu({
     : {
         left: 0,
         top: 0,
-        width: preferredWidth,
+        width: PANE_ACTIONS_MENU_WIDTH,
         maxHeight: PANE_ACTIONS_MENU_MAX_HEIGHT,
         visibility: "hidden",
         pointerEvents: "none",
@@ -176,36 +169,9 @@ export function EditorPaneActionsMenu({
         style={menuStyle}
       >
         <div className="desktop-editor-pane-menu-primary-actions">
-          <DesktopMenuIconButton
-            className="desktop-editor-pane-menu-primary-action"
-            icon={<PanelLeft size={15} strokeWidth={1.8} />}
-            label={t("editor.panes.splitLeft")}
-            role="menuitem"
-            onClick={() => runAndClose(() => onSplit("horizontal", "first"))}
-          />
-          <DesktopMenuIconButton
-            className="desktop-editor-pane-menu-primary-action"
-            icon={<PanelRight size={15} strokeWidth={1.8} />}
-            label={t("editor.panes.splitRight")}
-            role="menuitem"
-            onClick={() => runAndClose(() => onSplit("horizontal", "second"))}
-          />
-          <DesktopMenuIconButton
-            className="desktop-editor-pane-menu-primary-action"
-            icon={<PanelTop size={15} strokeWidth={1.8} />}
-            label={t("editor.panes.splitUp")}
-            role="menuitem"
-            onClick={() => runAndClose(() => onSplit("vertical", "first"))}
-          />
-          <DesktopMenuIconButton
-            className="desktop-editor-pane-menu-primary-action"
-            icon={<PanelBottom size={15} strokeWidth={1.8} />}
-            label={t("editor.panes.splitDown")}
-            role="menuitem"
-            onClick={() => runAndClose(() => onSplit("vertical", "second"))}
-          />
+          {segmentedControl && <PaneMenuSegmentedControl item={segmentedControl} />}
           <div className="desktop-editor-pane-menu-end-actions">
-            {(findCommand || onOpenExternal) && (
+            {segmentedControl && (
               <span className="desktop-editor-pane-menu-action-divider" aria-hidden="true" />
             )}
             {findCommand && (
@@ -238,6 +204,7 @@ export function EditorPaneActionsMenu({
         {hasSecondaryActions && (
           <DesktopMenuSection className="desktop-editor-pane-menu-secondary-actions">
             {viewItems.map((item) => {
+              if (item.kind === "segmented") return null;
               if (item.kind === "toggle") {
                 return (
                   <DesktopMenuItem
@@ -248,48 +215,6 @@ export function EditorPaneActionsMenu({
                     aria-checked={item.checked}
                     onClick={() => item.setChecked(!item.checked)}
                   />
-                );
-              }
-              if (item.kind === "segmented") {
-                return (
-                  <div
-                    key={item.id}
-                    className="desktop-editor-pane-menu-segmented-control"
-                    role="group"
-                    aria-label={item.label}
-                  >
-                    {item.options.map((option, optionIndex) => {
-                      const selected = option.id === item.value;
-                      return (
-                        <button
-                          key={option.id}
-                          className="desktop-editor-pane-menu-segment"
-                          type="button"
-                          role="menuitemradio"
-                          aria-label={option.label}
-                          aria-checked={selected}
-                          title={option.label}
-                          onClick={() => item.setValue(option.id)}
-                          onKeyDown={(event) => {
-                            if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-                            event.preventDefault();
-                            const offset = event.key === "ArrowLeft" ? -1 : 1;
-                            const nextIndex = (
-                              optionIndex + offset + item.options.length
-                            ) % item.options.length;
-                            const nextOption = item.options[nextIndex];
-                            const buttons = event.currentTarget.parentElement?.querySelectorAll<
-                              HTMLButtonElement
-                            >(".desktop-editor-pane-menu-segment");
-                            buttons?.item(nextIndex).focus({ preventScroll: true });
-                            if (nextOption) item.setValue(nextOption.id);
-                          }}
-                        >
-                          {option.icon}
-                        </button>
-                      );
-                    })}
-                  </div>
                 );
               }
               return (
@@ -305,5 +230,51 @@ export function EditorPaneActionsMenu({
         )}
       </DesktopMenuSurface>
     </DesktopOverlayLayer>
+  );
+}
+
+function PaneMenuSegmentedControl({
+  item,
+}: Readonly<{
+  item: EditorPaneMenuSegmentedControl;
+}>) {
+  return (
+    <div
+      className="desktop-editor-pane-menu-segmented-control"
+      role="group"
+      aria-label={item.label}
+    >
+      {item.options.map((option, optionIndex) => {
+        const selected = option.id === item.value;
+        return (
+          <button
+            key={option.id}
+            className="desktop-editor-pane-menu-segment"
+            type="button"
+            role="menuitemradio"
+            aria-label={option.label}
+            aria-checked={selected}
+            title={option.label}
+            onClick={() => item.setValue(option.id)}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+              event.preventDefault();
+              const offset = event.key === "ArrowLeft" ? -1 : 1;
+              const nextIndex = (
+                optionIndex + offset + item.options.length
+              ) % item.options.length;
+              const nextOption = item.options[nextIndex];
+              const buttons = event.currentTarget.parentElement?.querySelectorAll<
+                HTMLButtonElement
+              >(".desktop-editor-pane-menu-segment");
+              buttons?.item(nextIndex).focus({ preventScroll: true });
+              if (nextOption) item.setValue(nextOption.id);
+            }}
+          >
+            {option.icon}
+          </button>
+        );
+      })}
+    </div>
   );
 }
