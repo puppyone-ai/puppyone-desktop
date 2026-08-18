@@ -144,6 +144,10 @@ describe("Markdown HTML media layout", () => {
 
   it("uses one semantic presentation profile without a second HTML widget gap", () => {
     const profileRule = readCssRule(markdownContentCss, ".markdown-codemirror-editor");
+    const darkProfileRule = readCssRule(
+      markdownContentCss,
+      ":where(.dark) .markdown-codemirror-editor",
+    );
     const editorTextRule = readCssRule(
       markdownEditorCss,
       ".markdown-codemirror-editor .cm-editor",
@@ -195,6 +199,11 @@ describe("Markdown HTML media layout", () => {
     expect(profileRule).toContain(
       "--po-md-content-line-height: var(--po-content-reading-line-height, 1.7142857143);",
     );
+    expect(profileRule).toContain("--po-md-content-color: var(--po-text);");
+    expect(darkProfileRule).toContain(
+      "--po-md-content-color: color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted));",
+    );
+    expect(darkProfileRule).not.toContain("--po-md-content-weight:");
     expect(profileRule).toContain("--po-md-block-gap: 16px;");
     expect(profileRule).toContain("--po-md-heading-gap-before: 24px;");
     expect(profileRule).toContain("--po-md-heading-gap-after: 16px;");

@@ -12,7 +12,9 @@
   --po-md-content-weight: var(--po-content-reading-weight, 450);
   --po-md-content-letter-spacing: var(--po-content-reading-letter-spacing, 0);
   --po-md-content-line-height: var(--po-content-reading-line-height, 1.7142857143);
-  --po-md-content-color: color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted));
+  /* Light surfaces use the full semantic foreground. Regular CJK glyphs need
+     contrast, not a theme-specific synthetic weight. */
+  --po-md-content-color: var(--po-text);
   --po-md-block-gap: 16px;
   --po-md-heading-gap-before: 24px;
   --po-md-heading-gap-after: 16px;
@@ -29,6 +31,12 @@
   --po-md-h4-size: 1em;
   --po-md-h5-size: 0.875em;
   --po-md-h6-size: 0.85em;
+}
+
+/* Reverse-polarity text appears optically heavier. Keep the exact same font
+   face and weight across themes, and soften only the dark-theme foreground. */
+:where(.dark) .markdown-codemirror-editor {
+  --po-md-content-color: color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted));
 }
 
 .markdown-codemirror-editor .cm-scroller {

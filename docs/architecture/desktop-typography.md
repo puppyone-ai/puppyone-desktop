@@ -51,6 +51,13 @@ at the same declared weight. Markdown consumes the product-level
 `--po-content-reading-*` tokens and does not name PingFang or another CJK face
 itself.
 
+Light and dark appearances never select different font weights. Light Markdown
+uses the complete semantic foreground because regular CJK strokes lose
+definition when mixed toward muted text. Dark Markdown keeps the same face and
+weight, but softens the foreground through its color token to compensate for
+the heavier optical appearance of light-on-dark text. Theme changes therefore
+cannot change line wrapping, cursor geometry, or CodeMirror measurements.
+
 Language inference is a fallback, not durable metadata. Future project format
 metadata should pass an explicit BCP 47 language to the editor and bypass the
 heuristic.
