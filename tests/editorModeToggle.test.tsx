@@ -59,6 +59,44 @@ describe("editor mode toggle", () => {
     expect(container.querySelector('[data-editor-mode="live"]')).toBeNull();
     expect(container.querySelector('[data-editor-mode="source"]')).not.toBeNull();
   });
+
+  it("toggles preview/source mode with keyboard shortcut", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(withTestLocalization(
+      <TextEditorFrame
+        documentId="mode-shortcut.md"
+        content="# Heading"
+        nodeName="mode-shortcut.md"
+        defaultMode="live"
+        canEdit
+        hideSourceView={false}
+        enableModeToggleShortcut
+        renderLive={() => <button type="button" data-editor-mode="live">live</button>}
+        renderSource={() => <button type="button" data-editor-mode="source">source</button>}
+      />,
+    )));
+
+    const liveButton = container.querySelector<HTMLButtonElement>('[data-editor-mode="live"]');
+    liveButton?.focus();
+
+    expect(container.querySelector('[data-editor-mode="live"]')).not.toBeNull();
+    expect(container.querySelector('[data-editor-mode="source"]')).toBeNull();
+
+    act(() => {
+      liveButton?.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "/",
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      }));
+    });
+
+    expect(container.querySelector('[data-editor-mode="live"]')).toBeNull();
+    expect(container.querySelector('[data-editor-mode="source"]')).not.toBeNull();
+  });
 });
 
 function read(relativePath: string) {

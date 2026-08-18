@@ -53,6 +53,44 @@ export function wrapMarkdownLink(view: EditorView): boolean {
   return true;
 }
 
+export function toggleMarkdownHtmlTag(tagName: "u") {
+  const openTag = `<${tagName}>`;
+  const closeTag = `</${tagName}>`;
+  return (view: EditorView): boolean => {
+    const { state } = view;
+    if (state.readOnly || state.selection.ranges.length !== 1) return false;
+
+    const selection = state.selection.main;
+    const range = selection.empty ? getWordRangeAt(state, selection.from) : { from: selection.from, to: selection.to };
+    if (!range || range.from === range.to) return false;
+
+    const beforeFrom = Math.max(0, range.from - openTag.length);
+    const afterTo = Math.min(state.doc.length, range.to + closeTag.length);
+    const before = state.sliceDoc(beforeFrom, range.from);
+    const after = state.sliceDoc(range.to, afterTo);
+
+    if (before === openTag && after === closeTag) {
+      view.dispatch({
+        changes: [
+          { from: range.to, to: afterTo, insert: "" },
+          { from: beforeFrom, to: range.from, insert: "" },
+        ],
+        selection: EditorSelection.range(beforeFrom, range.to - openTag.length),
+      });
+      return true;
+    }
+
+    view.dispatch({
+      changes: [
+        { from: range.to, insert: closeTag },
+        { from: range.from, insert: openTag },
+      ],
+      selection: EditorSelection.range(range.from + openTag.length, range.to + openTag.length),
+    });
+    return true;
+  };
+}
+
 function getWordRangeAt(state: EditorState, pos: number): { from: number; to: number } | null {
   const line = state.doc.lineAt(pos);
   const offset = pos - line.from;

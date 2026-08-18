@@ -33,6 +33,7 @@ export type TextEditorFrameProps = {
   defaultMode: EditorMode;
   canEdit: boolean;
   hideSourceView: boolean;
+  enableModeToggleShortcut?: boolean;
   /**
    * The frame scrolls ordinary document surfaces. Structured viewers that
    * coordinate both axes and sticky panes must explicitly own their viewport.
@@ -52,6 +53,7 @@ export function TextEditorFrame({
   defaultMode,
   canEdit,
   hideSourceView,
+  enableModeToggleShortcut = false,
   liveScrollOwner = "frame",
   sourceSnapshotMode = false,
   renderLive,
@@ -68,6 +70,7 @@ export function TextEditorFrame({
   const draftRevisionRef = useRef(createDraftRevision(documentId, 0));
   const contentPropRef = useRef(content);
   const documentVersionPropRef = useRef(documentVersion);
+  const hostRef = useRef<HTMLElement | null>(null);
   const snapshotPortRef = useRef<EditorSourceSnapshotPort | null>(null);
   const detachSourceRef = useRef<(() => void) | null>(null);
   const editingSourceRef = useRef<EditableDocumentSource | null>(editingSource);
@@ -211,8 +214,26 @@ export function TextEditorFrame({
     setMode(nextMode);
   };
 
+  useEffect(() => {
+    if (hideSourceView || !enableModeToggleShortcut) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isModeToggleShortcut(event) || event.defaultPrevented) return;
+      const host = hostRef.current;
+      const eventTarget = event.target;
+      if (
+        !host
+        || !(eventTarget instanceof Node)
+        || !host.contains(eventTarget)
+      ) return;
+      event.preventDefault();
+      switchMode(mode === "live" ? "source" : "live");
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [enableModeToggleShortcut, hideSourceView, mode]);
+
   return (
-    <section className="editor-host">
+    <section className="editor-host" ref={hostRef}>
       {mode === "live" ? (
         <div
           className="editor-live-surface"
@@ -262,6 +283,14 @@ export function TextEditorFrame({
       )}
     </section>
   );
+}
+
+function isModeToggleShortcut(event: KeyboardEvent): boolean {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey) return false;
+  const key = event.key.toLowerCase();
+  if (key === "/" && !event.shiftKey) return true;
+  if (key === "m" && event.shiftKey) return true;
+  return false;
 }
 
 function createDraftRevision(documentId: string, sequence: number): string {
