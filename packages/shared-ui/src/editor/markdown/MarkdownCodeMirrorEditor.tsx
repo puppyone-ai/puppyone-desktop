@@ -337,8 +337,11 @@ export function MarkdownCodeMirrorEditor({
       if (!isCurrent()) return;
       const languageStartedAt = performance.now();
       try {
+        const languageExtension = livePreview
+          ? markdownCodeMirrorLanguageExtension(resolvedDialect)
+          : [];
         view.dispatch({
-          effects: languageCompartmentRef.current.reconfigure(markdownCodeMirrorLanguageExtension(resolvedDialect)),
+          effects: languageCompartmentRef.current.reconfigure(languageExtension),
         });
       } catch (error) {
         if (livePreview) failPreview(error);
