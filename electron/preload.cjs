@@ -39,6 +39,27 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     ipcRenderer.on("localization:changed", listener);
     return () => ipcRenderer.removeListener("localization:changed", listener);
   },
+  setMarkdownFormatShortcutsActive: (request) => {
+    ipcRenderer.send("editor:markdown-format-active", {
+      active: request?.active === true,
+    });
+  },
+  onMarkdownFormatShortcut: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, payload) => {
+      const type = payload?.type;
+      if (
+        type === "strong"
+        || type === "emphasis"
+        || type === "underline"
+        || type === "strike"
+      ) {
+        callback({ type });
+      }
+    };
+    ipcRenderer.on("editor:markdown-format-shortcut", listener);
+    return () => ipcRenderer.removeListener("editor:markdown-format-shortcut", listener);
+  },
   onDocumentSessionFlushRequested: (callback) => {
     if (typeof callback !== "function") return () => {};
     const listener = async (_event, payload) => {

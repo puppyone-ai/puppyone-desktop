@@ -1,13 +1,16 @@
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { EditorState } from "@codemirror/state";
+import { EditorSelection, EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 import {
   getBlockMarkerAtVisibleStart,
   getHiddenBlockMarkerCaretNormalization,
+  getInlineFormatCoverage,
+  getInlineFormatSelectionElement,
   getInlineRevealElement,
   getMarkdownElements,
   getMarkdownElementsInRange,
 } from "../packages/shared-ui/src/editor/markdown/core/syntax/markdownElements";
+import { markdownHiddenMarkerSelectionNormalizer } from "../packages/shared-ui/src/editor/markdown/core/state/selectionBehavior";
 import {
   puppyMarkdownFeatureCompositionExtension,
   puppyMarkdownParserExtensions,
@@ -20,6 +23,7 @@ function createMarkdownState(source: string) {
     extensions: [
       puppyMarkdownFeatureCompositionExtension,
       markdown({ base: markdownLanguage, extensions: puppyMarkdownParserExtensions }),
+      markdownHiddenMarkerSelectionNormalizer,
     ],
   });
 }
@@ -71,6 +75,42 @@ describe("markdown live preview element model", () => {
     expect(getInlineRevealElement(state, 3)?.kind).toBe("strong");
     expect(getInlineRevealElement(state, 8)?.kind).toBe("strong");
     expect(getInlineRevealElement(state, 10)).toBeNull();
+  });
+
+  it("treats an inner selection of formatted text as the wrapping format", () => {
+    const state = createMarkdownState("A **bold** word");
+    const bold = getInlineFormatSelectionElement(state, 4, 8);
+
+    expect(bold).toMatchObject({
+      kind: "strong",
+      from: 2,
+      to: 10,
+      contentRange: { from: 4, to: 8 },
+    });
+    expect(getInlineFormatSelectionElement(state, 2, 10)?.kind).toBe("strong");
+    expect(getInlineFormatSelectionElement(state, 0, 15)).toBeNull();
+    expect(getInlineFormatSelectionElement(state, 4, 7)).toBeNull();
+  });
+
+  it("covers a format when the selection is inside the token, not only on its markers", () => {
+    const state = createMarkdownState("A **bold** word");
+    const inner = getInlineFormatCoverage(state, 4, 8, "strong");
+    const partial = getInlineFormatCoverage(state, 4, 7, "strong");
+
+    expect(inner.formats).toHaveLength(1);
+    expect(inner.formats[0]?.kind).toBe("strong");
+    expect(partial.formats).toHaveLength(1);
+    expect(partial.neighbors).toHaveLength(1);
+  });
+
+  it("keeps a visible-content selection on the inner text rather than the wrapping markers", () => {
+    const next = createMarkdownState("A **bold** word").update({
+      selection: EditorSelection.range(4, 8),
+    }).state;
+
+    expect(next.selection.main.from).toBe(4);
+    expect(next.selection.main.to).toBe(8);
+    expect(next.sliceDoc(next.selection.main.from, next.selection.main.to)).toBe("bold");
   });
 
   it("keeps images atomic rather than inline-revealed", () => {

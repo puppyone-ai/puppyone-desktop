@@ -24,7 +24,7 @@ import {
   toggleMarkdownList,
   toggleMarkdownQuote,
 } from "./markdownBlockCommands";
-import { toggleMarkdownInline, wrapMarkdownLink } from "./markdownInlineCommands";
+import { toggleMarkdownHtmlTag, toggleMarkdownInline, wrapMarkdownLink } from "./markdownInlineCommands";
 
 export const markdownEditingKeymap: readonly KeyBinding[] = [
   { key: "Escape", run: collapseMarkdownRevealedSource },
@@ -49,7 +49,9 @@ export const markdownEditingKeymap: readonly KeyBinding[] = [
   { key: "Mod-Shift-.", run: toggleMarkdownQuote, preventDefault: true },
   { key: "Mod-b", run: toggleMarkdownInline("**"), preventDefault: true },
   { key: "Mod-i", run: toggleMarkdownInline("*"), preventDefault: true },
+  { key: "Mod-u", run: toggleMarkdownHtmlTag("u"), preventDefault: true },
   { key: "Mod-e", run: toggleMarkdownInline("`"), preventDefault: true },
+  { key: "Mod-d", run: toggleMarkdownInline("~~"), preventDefault: true },
   { key: "Mod-Shift-x", run: toggleMarkdownInline("~~"), preventDefault: true },
   { key: "Mod-k", run: wrapMarkdownLink, preventDefault: true },
 ];

@@ -58,6 +58,7 @@ export const EditorPaneDocumentRuntime = memo(function EditorPaneDocumentRuntime
   const node = useMemo(() => (
     source.content ? mergeNodeWithContent(sourceNode, source.content) : sourceNode
   ), [source.content, sourceNode]);
+  const hideSourceView = node?.type === "markdown" ? false : true;
 
   return (
     <FilePreview
@@ -70,7 +71,7 @@ export const EditorPaneDocumentRuntime = memo(function EditorPaneDocumentRuntime
       error={source.error}
       aiEditFile={aiEditFile}
       showHeader={false}
-      hideSourceView
+      hideSourceView={hideSourceView}
       fileIconTheme={fileIconTheme}
       editorInteractionPreferences={editorInteractionPreferences}
       editorSaveMode="auto"

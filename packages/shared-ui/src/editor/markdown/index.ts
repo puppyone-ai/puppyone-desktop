@@ -15,3 +15,9 @@ export {
   markdownCodeMirrorUrgentExtensions,
   markdownLivePreviewExtension,
 } from "./markdownCodeMirrorExtensions";
+export {
+  MARKDOWN_FORMAT_ACTIVE_EVENT,
+  MARKDOWN_FORMAT_SHORTCUT_EVENT,
+  isMarkdownFormatCommand,
+  type MarkdownFormatCommand,
+} from "./core/commands/markdownFormatHotkeys";
