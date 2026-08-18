@@ -152,6 +152,9 @@ describe("typography architecture", () => {
     expect(locales).not.toContain('"Noto Sans CJK SC", sans-serif');
     expect(locales).toContain('"Hiragino Sans", "Yu Gothic", "Meiryo", "Noto Sans CJK JP"');
     expect(locales).toContain('"Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR"');
+    expect(locales).toContain("--po-content-reading-weight: 400;");
+    expect(locales).toContain("--po-content-reading-letter-spacing: 0.01em;");
+    expect(locales).toContain("--po-content-reading-line-height: 1.6428571429;");
     expect(base).toContain("font-feature-settings: normal;");
     expect(base).not.toContain("'cv02'");
     expect(markdown).toContain("font-family: var(--po-md-content-font);");
@@ -165,7 +168,8 @@ describe("typography architecture", () => {
     expect(terminalAppearanceSync).toContain("subscribeTypographyChanges(document, applyAppearance)");
     expect(markdownEditor).toContain("subscribeTypographyChanges(host.ownerDocument");
     expect(markdownEditor).toContain('data-po-typography-role="content"');
-    expect(markdownEditor).toContain("lang={locale}");
+    expect(markdownEditor).toContain("lang={contentLanguage.language}");
+    expect(markdownEditor).toContain("resolveMarkdownContentLanguage(value, locale, documentLanguage)");
     expect(codeEditor).toContain("subscribeTypographyChanges(host.ownerDocument");
     expect(codeEditor).toContain('data-po-typography-role="code"');
     expect(plainTextEditor).toContain('data-po-typography-role="content"');

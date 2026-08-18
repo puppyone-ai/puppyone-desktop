@@ -31,6 +31,11 @@
   --po-line-height-body: 1.45;
   --po-line-height-relaxed: 1.6;
   --po-font-weight-chrome: var(--po-text-weight-medium);
+  /* Long-form content defaults. Script-specific optical corrections are
+     supplied by locales.css at the explicit document boundary. */
+  --po-content-reading-weight: 450;
+  --po-content-reading-letter-spacing: 0;
+  --po-content-reading-line-height: 1.5714285714;
 }
 
 :root,

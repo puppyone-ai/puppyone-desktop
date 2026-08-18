@@ -30,7 +30,7 @@
   /* Keep shaping deterministic across Latin and CJK fallback faces. Feature
      tags selected for a bundled Latin font must never reach editor content. */
   font-feature-settings: normal;
-  letter-spacing: 0;
+  letter-spacing: var(--po-md-content-letter-spacing);
 }
 
 /* Live Preview is a presentation commit, not a progressive source-to-rich

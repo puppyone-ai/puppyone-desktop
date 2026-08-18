@@ -33,6 +33,10 @@ import { getRendererPerformanceTracker } from "../../performance/rendererPerform
 import { subscribeTypographyChanges } from "../../core/typography";
 import { markdownLocalizationExtension } from "./core/editor/markdownLocalization";
 import { resolveMarkdownDialect } from "./core/dialect/markdownDialect";
+import {
+  resolveMarkdownContentLanguage,
+  type MarkdownContentLanguageResolution,
+} from "./core/presentation/markdownContentLanguage";
 import { CodeMirrorFindAdapter } from "../find/codeMirrorFindAdapter";
 import { useRegisterEditorFindAdapter } from "../find/editorFind";
 
@@ -46,6 +50,7 @@ export type MarkdownCodeMirrorEditorProps = {
   aiEditFile?: AiEditFile | null;
   htmlTrustMode?: MarkdownHtmlTrustMode;
   documentPath?: string;
+  documentLanguage?: string | null;
   markdownDialect?: MarkdownDialectId | null;
   workspaceId?: string;
   workspaceRoot?: string | null;
@@ -75,6 +80,7 @@ export function MarkdownCodeMirrorEditor({
   aiEditFile = null,
   htmlTrustMode = "safe",
   documentPath = "",
+  documentLanguage = null,
   markdownDialect = null,
   workspaceId = "",
   workspaceRoot = null,
@@ -98,6 +104,27 @@ export function MarkdownCodeMirrorEditor({
     () => resolveMarkdownDialect({ documentPath, explicitDialect: markdownDialect }).dialect,
     [documentPath, markdownDialect],
   );
+  const contentLanguageKey = `${documentPath}\u0000${documentLanguage ?? ""}\u0000${locale}`;
+  const contentLanguageStateRef = useRef<{
+    key: string;
+    awaitingContent: boolean;
+    resolution: MarkdownContentLanguageResolution;
+  } | null>(null);
+  let contentLanguageState = contentLanguageStateRef.current;
+  const hasContent = value.trim().length > 0;
+  if (
+    contentLanguageState === null
+    || contentLanguageState.key !== contentLanguageKey
+    || (contentLanguageState.awaitingContent && hasContent)
+  ) {
+    contentLanguageState = {
+      key: contentLanguageKey,
+      awaitingContent: !hasContent,
+      resolution: resolveMarkdownContentLanguage(value, locale, documentLanguage),
+    };
+    contentLanguageStateRef.current = contentLanguageState;
+  }
+  const contentLanguage = contentLanguageState.resolution;
   const initialLocalizationRef = useRef(localization);
   const findAdapter = useMemo(() => new CodeMirrorFindAdapter(), []);
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -542,9 +569,10 @@ export function MarkdownCodeMirrorEditor({
       <div
         ref={hostRef}
         dir="auto"
-        lang={locale}
+        lang={contentLanguage.language}
         className="markdown-codemirror-editor"
         data-po-typography-role="content"
+        data-po-content-language-source={contentLanguage.source}
         data-live-preview={livePreview ? "true" : "false"}
         data-preview-state={previewState}
         data-preview-message={previewMessage ?? undefined}

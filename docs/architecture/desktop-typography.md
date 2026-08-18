@@ -31,6 +31,29 @@ appearance root so inline role values are resolved at the correct boundary.
 Document-owned surfaces are outside this contract. DOCX, PDF, embedded web
 content, and viewer packs retain their authored or sandbox-owned fonts.
 
+## Document language boundary
+
+The interface locale and a document's language are different state. A Markdown
+pane resolves its own `lang` once per document session: explicit document
+metadata wins, otherwise a bounded script sample distinguishes Simplified or
+Traditional Chinese, Japanese, and Korean; content without a script signal
+falls back to the interface locale. The result is pane-local and remains stable
+while the user edits, so another pane cannot change its fallback face or text
+metrics.
+
+The locale layer owns optical corrections for long-form reading. Default/Latin
+content uses weight `450`, zero tracking, and `22px` leading at the default
+`14px` size. Chinese content uses weight `400`, `0.01em` tracking, and `23px`
+leading. This is intentional: macOS resolves an intermediate `450` request for
+PingFang upward to its Medium face, which is materially denser than Geist at
+the same declared weight. Markdown consumes the product-level
+`--po-content-reading-*` tokens and does not name PingFang or another CJK face
+itself.
+
+Language inference is a fallback, not durable metadata. Future project format
+metadata should pass an explicit BCP 47 language to the editor and bypass the
+heuristic.
+
 ## Preference and catalog model
 
 `puppyone.desktop.typography` stores this versioned value:
@@ -106,6 +129,8 @@ protocol. That transport choice is deliberately below the catalog boundary.
 
 - No raw family, URL, `@font-face`, or file path is accepted from localStorage.
 - Content font selection cannot alter UI or terminal metrics.
+- Interface-language changes cannot relabel an already resolved CJK document
+  or mutate a sibling pane's reading metrics.
 - A terminal font is not selectable until its monospace metrics and xterm
   re-fitting behavior are verified.
 - A font-loading failure leaves the product usable with the role fallback.

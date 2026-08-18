@@ -32,6 +32,12 @@
   --po-font-locale-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC";
   --po-font-locale-serif: "Songti SC", STSong, "Noto Serif CJK SC";
   --po-font-locale-mono: "PingFang SC", "Microsoft YaHei", "Noto Sans Mono CJK SC";
+  /* PingFang has no stable 450 face: browsers resolve 450 upward to Medium.
+     Regular plus restrained tracking keeps dense mixed CJK/Latin prose calm,
+     while 23px leading separates wrapped visual rows without changing size. */
+  --po-content-reading-weight: 400;
+  --po-content-reading-letter-spacing: 0.01em;
+  --po-content-reading-line-height: 1.6428571429;
 }
 
 :where(
@@ -45,6 +51,9 @@
   --po-font-locale-sans: "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC";
   --po-font-locale-serif: "Songti TC", "Noto Serif CJK TC";
   --po-font-locale-mono: "PingFang TC", "Microsoft JhengHei", "Noto Sans Mono CJK TC";
+  --po-content-reading-weight: 400;
+  --po-content-reading-letter-spacing: 0.01em;
+  --po-content-reading-line-height: 1.6428571429;
 }
 
 :where(

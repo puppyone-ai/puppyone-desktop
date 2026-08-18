@@ -9,8 +9,9 @@
   --po-md-presentation-version: 2;
   --po-md-content-font: var(--po-font-content, var(--po-font-sans));
   --po-md-content-size: var(--po-text-size-content, 14px);
-  --po-md-content-weight: 450;
-  --po-md-content-line-height: 1.5714285714;
+  --po-md-content-weight: var(--po-content-reading-weight, 450);
+  --po-md-content-letter-spacing: var(--po-content-reading-letter-spacing, 0);
+  --po-md-content-line-height: var(--po-content-reading-line-height, 1.5714285714);
   --po-md-content-color: color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted));
   --po-md-block-gap: 16px;
   --po-md-heading-gap-before: 24px;
@@ -89,6 +90,7 @@
   font-family: var(--po-md-content-font);
   font-size: var(--po-md-content-size);
   font-weight: var(--po-md-content-weight);
+  letter-spacing: var(--po-md-content-letter-spacing);
   line-height: var(--po-md-content-line-height);
   /* CodeMirror source lines use inherited `white-space: pre`. Sanitized HTML
      must re-enter browser HTML whitespace semantics at this adapter boundary. */
