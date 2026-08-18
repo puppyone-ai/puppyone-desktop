@@ -1,5 +1,5 @@
 import { installBrokenStdioGuards } from "./main/stdio-guard.mjs";
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, session as electronSession, shell, WebContentsView } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, session as electronSession, shell, webContents, WebContentsView } from "electron";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
 import { createRequire } from "node:module";
@@ -42,6 +42,7 @@ import {
   handleSecondInstanceLaunch,
 } from "./main/desktop-launch-intent.mjs";
 import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
+import { registerAgentActivityIpcHandlers } from "./main/ipc/agent-activity-ipc.mjs";
 import { registerAppearanceIpcHandlers } from "./main/ipc/appearance-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerBuildInfoIpcHandlers } from "./main/ipc/build-info-ipc.mjs";
@@ -72,6 +73,7 @@ import { createLocalFileCapabilityStore } from "./main/local-file-capabilities.m
 import { installWindowNavigationSecurity, requireNonEmptyString } from "./main/security.mjs";
 import { createTerminalService } from "./main/terminal-service.mjs";
 import { createTerminalAgentLocator } from "./main/terminal-agent/terminal-agent-locator.mjs";
+import { createDefaultTerminalAgentActivityHost } from "./main/terminal-agent/activity/bootstrap/create-terminal-agent-activity-host.mjs";
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
@@ -212,9 +214,16 @@ documentSessionCloseCoordinator.registerIpc(trustedIpcMain);
 const authorizeWorkspaceRoot = createSenderWorkspaceAuthorization({
   getWorkspaceRootForSender,
 });
+const terminalAgentActivityHost = createDefaultTerminalAgentActivityHost({
+  appPath: app.getAppPath(),
+  userDataPath: app.getPath("userData"),
+  executablePath: process.execPath,
+  getWebContents: (webContentsId) => webContents.fromId(webContentsId),
+});
 const terminalService = createTerminalService({
   appVersion: desktopBuildInfo.version,
   initializeWorkspaceEditReview,
+  terminalAgentActivityHost,
 });
 const terminalAgentLocator = createTerminalAgentLocator();
 const agentSessionCache = createEphemeralAgentSessionCache({ app });
@@ -646,6 +655,7 @@ app.on("will-quit", () => {
   nativeSurfaceOcclusion.dispose();
   nativeSurfacePointerPassthrough.dispose();
   terminalService.closeAll();
+  void terminalAgentActivityHost.dispose();
   terminalAgentLocator.dispose();
   localAgentInventory.dispose();
   workspaceWatchService.closeAll();
@@ -771,6 +781,10 @@ function registerIpcHandlers() {
     terminalAgentLocator,
     terminalService,
     authorizeWorkspaceRoot,
+  });
+  registerAgentActivityIpcHandlers({
+    ipcMain: trustedIpcMain,
+    activityHost: terminalAgentActivityHost,
   });
   registerAgentIpcHandlers({
     ipcMain: trustedIpcMain,

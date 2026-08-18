@@ -24,6 +24,7 @@ export function createTerminalService({
     env: environment,
     platform,
   }),
+  terminalAgentActivityHost = null,
   agentRevealTimeoutMs = DEFAULT_AGENT_REVEAL_TIMEOUT_MS,
 }) {
   const sessions = new Map();
@@ -55,13 +56,30 @@ export function createTerminalService({
       logger.warn("Unable to initialize edit review baseline:", error);
     });
 
+    let activityPreparation = null;
+    if (terminalAgentActivityHost) {
+      try {
+        activityPreparation = await terminalAgentActivityHost?.prepareTerminalSession?.({
+          terminalSessionId: id,
+          providerId: request?.launcherId ?? "shell",
+          workspaceRoot,
+          webContentsId: senderId,
+        });
+      } catch (error) {
+        logger.warn("Unable to prepare Terminal Agent activity; continuing without it:", error);
+      }
+    }
+
     let terminal;
     try {
-      const terminalEnvironment = buildTerminalEnvironment(environment, {
-        appVersion,
-        freshLoginShell: spawnConfig.loginShell,
-        platform,
-      });
+      const terminalEnvironment = {
+        ...buildTerminalEnvironment(environment, {
+          appVersion,
+          freshLoginShell: spawnConfig.loginShell,
+          platform,
+        }),
+        ...(activityPreparation?.environment ?? {}),
+      };
       terminal = ptyService.spawn(spawnConfig.file, spawnConfig.args, {
         name: "xterm-256color",
         cwd,
@@ -74,6 +92,7 @@ export function createTerminalService({
         ),
       });
     } catch (error) {
+      terminalAgentActivityHost?.closeTerminalSession?.(id);
       throw new Error(`Failed to start terminal: ${error instanceof Error ? error.message : String(error)}`);
     }
 
@@ -98,6 +117,7 @@ export function createTerminalService({
       agentRevealGate?.settle();
       sendTerminalExit(session, exitCode, signal ? String(signal) : null);
       if (sessions.get(id) === session) sessions.delete(id);
+      terminalAgentActivityHost?.closeTerminalSession?.(id);
     });
 
     if (spawnConfig.agentBootstrapInput) {
@@ -148,6 +168,7 @@ export function createTerminalService({
 
   function closeSession(session) {
     sessions.delete(session.id);
+    terminalAgentActivityHost?.closeTerminalSession?.(session.id);
     try {
       session.terminal.kill();
     } catch {

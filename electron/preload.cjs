@@ -349,4 +349,14 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     ipcRenderer.on("terminal:exit", listener);
     return () => ipcRenderer.removeListener("terminal:exit", listener);
   },
+  subscribeAgentActivity: () => ipcRenderer.invoke("agent-activity:subscribe"),
+  unsubscribeAgentActivity: () => ipcRenderer.send("agent-activity:unsubscribe"),
+  onAgentActivityEvent: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("agent-activity:event", listener);
+    return () => ipcRenderer.removeListener("agent-activity:event", listener);
+  },
+  getAgentActivityEnrollment: () => ipcRenderer.invoke("agent-activity:enrollment-snapshot"),
+  setAgentActivityEnrollment: (request) => ipcRenderer.invoke("agent-activity:enrollment-set", request),
 });

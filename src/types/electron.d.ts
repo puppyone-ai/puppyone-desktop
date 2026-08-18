@@ -33,6 +33,11 @@ import type {
   AgentTurnSteerRequest,
 } from "../../shared/agent-contract/types";
 import type {
+  AgentActivityEnrollmentSnapshot,
+  AgentActivityEvent,
+  AgentActivitySnapshot,
+} from "../../shared/agent-activity-contract/types";
+import type {
   CloudInitializationCleanupRequest,
   CloudInitializationErrorCode,
   CloudInitializationIdentityRequest,
@@ -1177,6 +1182,14 @@ declare global {
       closeTerminal: (id: string) => Promise<void>;
       onTerminalData: (callback: (event: TerminalDataEvent) => void) => () => void;
       onTerminalExit: (callback: (event: TerminalExitEvent) => void) => () => void;
+      subscribeAgentActivity: () => Promise<AgentActivitySnapshot>;
+      unsubscribeAgentActivity: () => void;
+      onAgentActivityEvent: (callback: (event: AgentActivityEvent) => void) => () => void;
+      getAgentActivityEnrollment: () => Promise<AgentActivityEnrollmentSnapshot>;
+      setAgentActivityEnrollment: (request: {
+        providerId: string;
+        enabled: boolean;
+      }) => Promise<{ enrollment: string; reason?: string }>;
     };
   }
 }

@@ -16,6 +16,7 @@ import { AccountSettingsView } from "./main/AccountSettingsView";
 import { EditorSettingsView, ExperimentalSettingsView } from "./main/EditorSettingsViews";
 import { DefaultAppsSettingsView, FilesSettingsView } from "./main/FileSettingsViews";
 import { GeneralSettingsView } from "./main/GeneralSettingsView";
+import { AgentPortalSettingsView } from "./main/AgentPortalSettingsView";
 import { LocalProjectSettingsView } from "./main/LocalProjectSettingsView";
 import { InterfacePaletteSettings } from "./main/InterfacePaletteSettings";
 import { InterfaceStyleSetting } from "./main/InterfaceStyleSetting";
@@ -103,6 +104,10 @@ export function SettingsView({
         onUpdateNow={onUpdateNow}
       />
     );
+  }
+
+  if (activeSection === "agent-portal") {
+    return <AgentPortalSettingsView />;
   }
 
   if (activeSection === "local-project") {

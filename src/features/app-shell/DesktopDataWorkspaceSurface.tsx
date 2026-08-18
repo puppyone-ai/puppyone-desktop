@@ -34,6 +34,11 @@ import type { DesktopView } from "../../components/DesktopCloudShell";
 import { useNativeSurfacePointerPassthroughActivity } from "../native-surfaces";
 import { DesktopEditorSplitView } from "../editor-workbench/layout/DesktopEditorSplitView";
 import type { DesktopEditorWorkbenchController } from "../editor-workbench/controller/useDesktopEditorWorkbench";
+import {
+  AgentFilePresence,
+  desktopAgentActivityStore,
+  toWorkspaceRelativePath,
+} from "../desktop-agent-presence";
 
 type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 
@@ -244,19 +249,33 @@ export function DesktopDataWorkspaceSurface({
         enableMarkdownLinkContentIndexing
         folderExpansionStrategy="load-before-expand"
         refreshKey={workspaceRefreshToken}
-        explorerNodeActionSlot={(state, node) => (
-          <DesktopExplorerRowActions
-            node={node}
-            parentPath={node.type === "folder" ? node.path : null}
-            onCreate={onCreateEntryMenu}
-            onOpenNodeMenu={(targetNode, anchorRect) => {
-              const selectedNodes = state.selectedNodes.some(({ path }) => path === targetNode.path)
-                ? state.selectedNodes
-                : [targetNode];
-              onNodeActionMenu(targetNode, anchorRect, selectedNodes);
-            }}
-          />
-        )}
+        explorerNodeActionSlot={(state, node) => {
+          const agentPresencePath = node.type === "file"
+            ? toWorkspaceRelativePath(workspace.path, node.path)
+            : null;
+          return (
+            <>
+              {agentPresencePath && (
+                <AgentFilePresence
+                  path={agentPresencePath}
+                  store={desktopAgentActivityStore}
+                  variant="explorer"
+                />
+              )}
+              <DesktopExplorerRowActions
+                node={node}
+                parentPath={node.type === "folder" ? node.path : null}
+                onCreate={onCreateEntryMenu}
+                onOpenNodeMenu={(targetNode, anchorRect) => {
+                  const selectedNodes = state.selectedNodes.some(({ path }) => path === targetNode.path)
+                    ? state.selectedNodes
+                    : [targetNode];
+                  onNodeActionMenu(targetNode, anchorRect, selectedNodes);
+                }}
+              />
+            </>
+          );
+        }}
         explorerSlot={resolvedSurface.id === "data"
           ? undefined
           : <WorkspaceSurfaceOutlet region="sidebar" surface={resolvedSurface} />}

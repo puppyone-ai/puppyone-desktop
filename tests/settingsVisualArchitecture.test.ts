@@ -7,13 +7,16 @@ describe("settings visual architecture", () => {
     const sidebarModel = source("src/features/settings/sidebar/settingsSidebarModel.ts");
     const types = source("src/features/settings/types.ts");
     const general = source("src/features/settings/main/GeneralSettingsView.tsx");
+    const agentPortal = source("src/features/settings/main/AgentPortalSettingsView.tsx");
     const localProject = source("src/features/settings/main/LocalProjectSettingsView.tsx");
     const language = source("src/features/settings/LanguageSetting.tsx");
 
     expect(types).toContain('"general" | "local-project"');
+    expect(types).toContain('"appearance" | "agent-portal"');
     expect(types).not.toContain('| "language"');
     expect(types).not.toContain('"workspace"');
     expect(view).toContain('if (activeSection === "general")');
+    expect(view).toContain('if (activeSection === "agent-portal")');
     expect(view).toContain('if (activeSection === "local-project")');
     expect(view).not.toContain('activeSection === "language"');
     expect(general).toContain("<LanguageSettingRow />");
@@ -21,6 +24,13 @@ describe("settings visual architecture", () => {
     expect(general).toContain("<DesktopUpdateSettingsRow");
     expect(general).not.toContain("Workspace");
     expect(general).not.toContain("onUnlinkWorkspace");
+    expect(general).not.toContain("AgentActivity");
+    expect(general).not.toContain("agentPortal");
+    expect(agentPortal).toContain('settings.agentPortal.title');
+    expect(agentPortal).toContain("provider.displayName");
+    expect(agentPortal).toContain("desktop-settings-switch");
+    expect(agentPortal).not.toContain("desktop-settings-label-stack");
+    expect(agentPortal).not.toContain("<small>");
     expect(localProject).toContain("settings.localProject.path");
     expect(localProject).toContain("onUnlinkWorkspace");
     expect(localProject).not.toContain("DesktopBuildVersionSettingsRow");
@@ -33,6 +43,7 @@ describe("settings visual architecture", () => {
     expectInOrder(desktopAppItems, [
       'labelId: "settings.sidebar.general"',
       'labelId: "settings.sidebar.appearance"',
+      'labelId: "settings.sidebar.agentPortal"',
       'labelId: "settings.sidebar.defaultApps"',
       'labelId: "settings.sidebar.editor"',
       'labelId: "settings.sidebar.experimental"',
@@ -57,8 +68,11 @@ describe("settings visual architecture", () => {
       expect(catalog["sidebar.language"], locale).toBeUndefined();
       expect(catalog["sidebar.localProject"], locale).toBeTruthy();
       expect(catalog["sidebar.projectInfo"], locale).toBeTruthy();
+      expect(catalog["sidebar.agentPortal"], locale).toBe("Agent Portal");
       expect(catalog["general.title"], locale).toBeTruthy();
       expect(catalog["general.detail"], locale).toBeTruthy();
+      expect(catalog["agentPortal.title"], locale).toBe("Agent Portal");
+      expect(catalog["agentPortal.toggle"], locale).toBeTruthy();
       for (const key of [
         "selectorLabel",
         "system",

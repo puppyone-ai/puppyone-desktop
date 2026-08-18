@@ -45,6 +45,7 @@ import {
   usePersistentEditorPaneHosts,
   type PersistentEditorPaneHosts,
 } from "./pane-host/usePersistentEditorPaneHosts";
+import { toWorkspaceRelativePath } from "../../desktop-agent-presence";
 
 export type DesktopEditorSplitViewProps = Readonly<{
   aiEditRequest: AiEditRequest | null;
@@ -286,11 +287,15 @@ function EditorPane({
   const [findCommand, setFindCommand] = useState<EditorFindCommand | null>(null);
   const [menuContribution, setMenuContribution] = useState<EditorPaneMenuContribution | null>(null);
   const externalOpenPath = editor?.resource ?? null;
+  const agentPresencePath = editor
+    ? toWorkspaceRelativePath(workspace.path, editor.resource)
+    : null;
 
   return (
     <EditorPaneShell
       active={active}
       actionsOpen={actionsOpen}
+      agentPresencePath={agentPresencePath}
       editorLabel={editor?.label ?? null}
       externalOpenAppName={externalOpenPath ? externalOpen?.getAppName(externalOpenPath) ?? null : null}
       findCommand={findCommand}
