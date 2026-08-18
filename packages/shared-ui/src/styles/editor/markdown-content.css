@@ -9,7 +9,7 @@
   --po-md-presentation-version: 2;
   --po-md-content-font: var(--po-font-content, var(--po-font-sans));
   --po-md-content-size: var(--po-text-size-content, 14px);
-  --po-md-content-weight: 500;
+  --po-md-content-weight: 450;
   --po-md-content-line-height: 1.5714285714;
   --po-md-content-color: color-mix(in srgb, var(--po-text) 80%, var(--po-text-muted));
   --po-md-block-gap: 16px;

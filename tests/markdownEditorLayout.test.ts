@@ -188,7 +188,7 @@ describe("Markdown HTML media layout", () => {
     expect(editorEntryCss).toContain('@import "./editor/markdown-content.css";');
     expect(profileRule).toContain("--po-md-presentation-version: 2;");
     expect(profileRule).toContain("--po-md-content-size: var(--po-text-size-content, 14px);");
-    expect(profileRule).toContain("--po-md-content-weight: 500;");
+    expect(profileRule).toContain("--po-md-content-weight: 450;");
     expect(profileRule).toContain("--po-md-content-line-height: 1.5714285714;");
     expect(profileRule).toContain("--po-md-block-gap: 16px;");
     expect(profileRule).toContain("--po-md-heading-gap-before: 24px;");
