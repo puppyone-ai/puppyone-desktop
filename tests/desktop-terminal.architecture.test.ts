@@ -4,6 +4,9 @@ import { describe, expect, it } from "vitest";
 describe("Desktop Terminal architecture boundaries", () => {
   it("keeps terminal processes user-owned and the content free of overlapping chrome", () => {
     const panel = source("src/features/desktop-terminal/ui/RightTerminalPanel.tsx");
+    const closeDialog = source(
+      "src/features/desktop-terminal/ui/TerminalCloseConfirmationDialog.tsx",
+    );
     const launcher = source("src/features/desktop-terminal/ui/TerminalLauncher.tsx");
     const launchers = source("src/features/desktop-terminal/model/terminalLaunchers.ts");
     const sessionView = source("src/features/desktop-terminal/ui/TerminalSessionView.tsx");
@@ -62,6 +65,8 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(panel).toContain("close: requestCloseSession");
     expect(panel).toContain("onClose={requestCloseSession}");
     expect(panel).toContain("<TerminalCloseConfirmationDialog");
+    expect(closeDialog).toContain("<DesktopOverlayLayer>");
+    expect(closeDialog).toContain("<DesktopDialogRoot");
     expect(panel).toContain("<TerminalLauncher");
     expect(panel).toContain("create: createLauncher");
     expect(panel).toContain("onCreate={createLauncher}");
