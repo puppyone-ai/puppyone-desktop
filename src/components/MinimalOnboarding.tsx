@@ -305,7 +305,7 @@ function ProjectFolderAddIcon() {
   return (
     <span className="onboarding-project-folder-add-icon" aria-hidden="true">
       <Folder size={14} strokeWidth={1.85} />
-      <Plus size={6} strokeWidth={2} />
+      <Plus size={6} strokeWidth={4} />
     </span>
   );
 }

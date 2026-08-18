@@ -93,9 +93,12 @@ describe("project folder home", () => {
     expect(addFolder?.getAttribute("height")).toBe(projectFolder?.getAttribute("height"));
     expect(addFolder?.getAttribute("stroke-width"))
       .toBe(projectFolder?.getAttribute("stroke-width"));
-    expect(container.querySelector(
+    const addPlus = container.querySelector(
       ".onboarding-project-folder-add-icon .lucide-plus",
-    )).not.toBeNull();
+    );
+    expect(addPlus).not.toBeNull();
+    expect(addPlus?.getAttribute("width")).toBe("6");
+    expect(addPlus?.getAttribute("stroke-width")).toBe("4");
     expect(container.querySelector(".onboarding-project-add-action")?.textContent).toContain("Open local folder");
     expect(container.querySelector(".desktop-menu-item-label")?.textContent).toBe("Notes");
     expect(container.querySelector(".desktop-menu-item-detail")?.textContent).toBe("~/Desktop");
