@@ -1,4 +1,5 @@
 import type { PresetViewerContribution } from "./viewerTypes";
+import { contextMapViewerContribution } from "../viewers/context-map/contribution";
 import { markdownViewerContribution } from "../markdown/contribution";
 import { appPreviewViewerContribution } from "../viewers/app/contribution";
 import { jsonViewerContribution, textViewerContribution } from "../viewers/code/contributions";
@@ -15,6 +16,7 @@ import { pdfViewerContribution } from "../viewers/pdf/contribution";
 import { puppyFlowViewerContribution } from "../viewers/puppyflow/contribution";
 
 export const BUILTIN_VIEWER_CONTRIBUTIONS: readonly PresetViewerContribution[] = Object.freeze([
+  contextMapViewerContribution,
   appPreviewViewerContribution,
   markdownViewerContribution,
   puppyFlowViewerContribution,

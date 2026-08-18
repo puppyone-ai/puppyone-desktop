@@ -16,6 +16,7 @@ import {
 export const materialGlyphRenderers = {
   folder: renderMaterialCompactFolderGlyph,
   app: AppGlyph,
+  "context-map": WorkflowGlyph,
   workflow: WorkflowGlyph,
   markdown: renderMaterialLinesDocumentGlyph,
   json: renderMaterialJsonDocumentGlyph,

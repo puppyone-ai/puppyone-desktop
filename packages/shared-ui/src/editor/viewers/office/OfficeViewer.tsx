@@ -142,7 +142,7 @@ type OfficeViewerProps = Pick<
   | "fileUrlError"
   | "openExternalFile"
   | "convertOfficeDocumentToDocx"
-  | "markdownLinkGraph"
+  | "markdownEnvironment"
   | "officeEditorActions"
 >;
 
@@ -154,7 +154,7 @@ export function OfficeViewer({
   fileUrlError,
   openExternalFile,
   convertOfficeDocumentToDocx,
-  markdownLinkGraph,
+  markdownEnvironment,
   officeEditorActions = [],
 }: OfficeViewerProps) {
   const { t } = useLocalization();
@@ -267,7 +267,7 @@ export function OfficeViewer({
             activeSheet={activeSheet}
             onActiveSheetChange={setActiveSheet}
             openExternalFile={openExternalFile}
-            openExternalUrl={markdownLinkGraph?.openExternalUrl}
+            openExternalUrl={markdownEnvironment?.linkCommands.openExternalUrl}
             wordZoom={wordZoom}
             onWordResolvedScaleChange={setWordResolvedScale}
           />

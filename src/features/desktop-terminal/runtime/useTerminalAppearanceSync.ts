@@ -24,6 +24,7 @@ export function useTerminalAppearanceSync(
         "data-light-theme-preset",
         "data-dark-theme-preset",
         "data-text-size",
+        "data-terminal-text-size",
         "data-font-terminal",
       ],
     });

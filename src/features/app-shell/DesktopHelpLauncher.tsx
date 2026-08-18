@@ -30,7 +30,6 @@ import "./desktop-help-launcher.css";
 
 type SubmissionState = "idle" | "sending" | "sent" | "error";
 type AttachmentState = "idle" | "processing" | "error";
-type FeedbackRole = "developer" | "researcher" | "creator" | "other";
 type FeedbackScreenshotMimeType = "image/jpeg" | "image/png" | "image/webp";
 type FeedbackScreenshot = {
   bytes: ArrayBuffer;
@@ -39,15 +38,10 @@ type FeedbackScreenshot = {
 };
 
 const FEEDBACK_MAX_LENGTH = 2_000;
+const FEEDBACK_EMAIL_MAX_LENGTH = 254;
 const MAX_SCREENSHOT_BYTES = 3 * 1024 * 1024;
 const MAX_SOURCE_SCREENSHOT_BYTES = 20 * 1024 * 1024;
 const MAX_SCREENSHOT_EDGE = 1_920;
-const FEEDBACK_ROLE_OPTIONS = [
-  { value: "developer", label: "shell.feedback.role.developer" },
-  { value: "researcher", label: "shell.feedback.role.researcher" },
-  { value: "creator", label: "shell.feedback.role.creator" },
-  { value: "other", label: "shell.feedback.role.other" },
-] as const satisfies ReadonlyArray<{ value: FeedbackRole; label: string }>;
 const SUPPORTED_SCREENSHOT_TYPES = new Set<FeedbackScreenshotMimeType>([
   "image/jpeg",
   "image/png",
@@ -64,9 +58,10 @@ export type DesktopHelpLauncherProps = Omit<DesktopOverlayPortalProps, "children
 export function DesktopHelpLauncher(overlayTheme: DesktopHelpLauncherProps) {
   const { locale, t } = useLocalization();
   const feedbackMessageId = useId();
+  const feedbackEmailId = useId();
   const [open, setOpen] = useState(false);
-  const [role, setRole] = useState<FeedbackRole | null>(null);
   const [message, setMessage] = useState("");
+  const [email, setEmail] = useState("");
   const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
   const [attachmentState, setAttachmentState] = useState<AttachmentState>("idle");
   const [attachmentError, setAttachmentError] = useState("");
@@ -95,8 +90,8 @@ export function DesktopHelpLauncher(overlayTheme: DesktopHelpLauncherProps) {
     submissionIdRef.current += 1;
     attachmentIdRef.current += 1;
     setOpen(false);
-    setRole(null);
     setMessage("");
+    setEmail("");
     setSubmissionState("idle");
     setAttachmentState("idle");
     setAttachmentError("");
@@ -167,8 +162,13 @@ export function DesktopHelpLauncher(overlayTheme: DesktopHelpLauncherProps) {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedMessage = message.trim();
+    const trimmedEmail = email.trim();
     const submitFeedback = window.puppyoneDesktop?.submitFeedback;
-    if (!role || (!trimmedMessage && !screenshot) || !submitFeedback) {
+    if (
+      !isValidFeedbackEmail(trimmedEmail)
+      || !trimmedMessage
+      || !submitFeedback
+    ) {
       setSubmissionState("error");
       return;
     }
@@ -179,8 +179,8 @@ export function DesktopHelpLauncher(overlayTheme: DesktopHelpLauncherProps) {
 
     try {
       await submitFeedback({
-        role,
         message: trimmedMessage,
+        email: trimmedEmail,
         locale,
         ...(screenshot
           ? {
@@ -200,8 +200,8 @@ export function DesktopHelpLauncher(overlayTheme: DesktopHelpLauncherProps) {
   };
 
   const canSend =
-    Boolean(role)
-    && (Boolean(message.trim()) || Boolean(screenshot))
+    Boolean(email.trim())
+    && Boolean(message.trim())
     && submissionState !== "sending"
     && submissionState !== "sent"
     && attachmentState !== "processing";
@@ -270,37 +270,10 @@ export function DesktopHelpLauncher(overlayTheme: DesktopHelpLauncherProps) {
                 onDrop={handleDrop}
               >
                 <div className="desktop-feedback-fields">
-                  <fieldset
-                    className="desktop-feedback-role"
-                    disabled={submissionState === "sending" || submissionState === "sent"}
-                  >
-                    <legend>{t("shell.feedback.roleLabel")}</legend>
-                    <div className="desktop-feedback-role-options">
-                      {FEEDBACK_ROLE_OPTIONS.map((option, index) => (
-                        <label className="desktop-feedback-role-option" key={option.value}>
-                          <input
-                            type="radio"
-                            name="feedback-role"
-                            value={option.value}
-                            required
-                            checked={role === option.value}
-                            data-desktop-dialog-initial-focus={index === 0 ? "true" : undefined}
-                            onChange={() => {
-                              setRole(option.value);
-                              if (submissionState === "error") setSubmissionState("idle");
-                            }}
-                          />
-                          <span className="desktop-dialog-button desktop-feedback-role-control">
-                            {t(option.label)}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-
                   <div className="desktop-feedback-message-field">
-                    <label className="desktop-feedback-message-label" htmlFor={feedbackMessageId}>
+                    <label className="desktop-feedback-field-label" htmlFor={feedbackMessageId}>
                       {t("shell.feedback.messageLabel")}
+                      <span className="desktop-feedback-required-marker" aria-hidden="true">*</span>
                     </label>
                     <div
                       className="desktop-feedback-composer"
@@ -311,6 +284,8 @@ export function DesktopHelpLauncher(overlayTheme: DesktopHelpLauncherProps) {
                         id={feedbackMessageId}
                         value={message}
                         maxLength={FEEDBACK_MAX_LENGTH}
+                        required
+                        data-desktop-dialog-initial-focus="true"
                         disabled={submissionState === "sending" || submissionState === "sent"}
                         aria-label={t("shell.feedback.messageLabel")}
                         placeholder={t("shell.feedback.placeholder")}
@@ -387,6 +362,34 @@ export function DesktopHelpLauncher(overlayTheme: DesktopHelpLauncherProps) {
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  <div className="desktop-feedback-contact-field">
+                    <label className="desktop-feedback-field-label" htmlFor={feedbackEmailId}>
+                      {t("shell.feedback.contactLabel")}
+                      <span className="desktop-feedback-required-marker" aria-hidden="true">*</span>
+                    </label>
+                    <input
+                      className="desktop-feedback-contact-input"
+                      id={feedbackEmailId}
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      required
+                      maxLength={FEEDBACK_EMAIL_MAX_LENGTH}
+                      value={email}
+                      disabled={submissionState === "sending" || submissionState === "sent"}
+                      aria-label={t("shell.feedback.contactLabel")}
+                      aria-invalid={Boolean(email.trim()) && !isValidFeedbackEmail(email.trim())}
+                      placeholder={t("shell.feedback.contactPlaceholder")}
+                      onChange={(event) => {
+                        setEmail(event.currentTarget.value);
+                        if (submissionState === "error") setSubmissionState("idle");
+                      }}
+                    />
                   </div>
                 </div>
 
@@ -465,6 +468,12 @@ function FeedbackHelpIcon() {
       <circle data-feedback-question-dot="true" cx="12" cy="17" r="0.82" fill="currentColor" stroke="none" />
     </svg>
   );
+}
+
+function isValidFeedbackEmail(value: string) {
+  return value.length > 0
+    && value.length <= FEEDBACK_EMAIL_MAX_LENGTH
+    && /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(value);
 }
 
 class ScreenshotPreparationError extends Error {

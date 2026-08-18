@@ -1,11 +1,19 @@
 /** @vitest-environment happy-dom */
-import { EditorState } from "@codemirror/state";
+import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it } from "vitest";
 import { markdownLivePreviewDecorations } from "../packages/shared-ui/src/editor/markdown/core/decorations/livePreviewDecorations";
+import {
+  markdownLivePreviewContextExtension,
+} from "../packages/shared-ui/src/editor/markdown/core/editor/markdownLivePreviewContext";
+import {
+  getMarkdownProjectionDiagnostics,
+  resetMarkdownProjectionDiagnostics,
+} from "../packages/shared-ui/src/editor/markdown/core/projection/markdownDocumentProjection";
 import { MarkdownLinkInteractionSession } from "../packages/shared-ui/src/editor/markdown/core/state/markdownLinkInteraction";
 import {
   markdownCodeMirrorBaseExtensions,
+  markdownLivePreviewCoreExtension,
   markdownLivePreviewExtension,
 } from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
 import type { MarkdownLinkGraph } from "../packages/shared-ui/src/editor/registry/viewerTypes";
@@ -67,6 +75,65 @@ describe("Markdown pane-owned view state", () => {
     expect(left.consumeDuplicateClick(1_100)).toBe(true);
     expect(left.consumeDuplicateClick(1_101)).toBe(false);
   });
+
+  it("invalidates a projection only when its semantic link revision changes", () => {
+    const source = [
+      "| Name | Value |",
+      "| --- | --- |",
+      "| row | [Target](target.md) |",
+      "",
+      "Paragraph below the table remains mounted.",
+    ].join("\n");
+    const context = new Compartment();
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const firstGraph = createRevisionGraph(7);
+    const view = new EditorView({
+      parent,
+      state: EditorState.create({
+        doc: source,
+        extensions: [
+          ...markdownCodeMirrorBaseExtensions(false),
+          context.of(markdownLivePreviewContextExtension(
+            "safe",
+            firstGraph,
+            "note.md",
+            null,
+          )),
+          markdownLivePreviewCoreExtension(),
+        ],
+      }),
+    });
+    views.push(view);
+    const table = view.dom.querySelector(".cm-md-table-widget");
+    expect(table).not.toBeNull();
+
+    resetMarkdownProjectionDiagnostics();
+    view.dispatch({
+      effects: context.reconfigure(markdownLivePreviewContextExtension(
+        "safe",
+        createRevisionGraph(7),
+        "note.md",
+        null,
+        "",
+        null,
+        { openPath: () => undefined },
+      )),
+    });
+
+    expect(getMarkdownProjectionDiagnostics().globalInvalidations).toBe(0);
+    expect(view.dom.querySelector(".cm-md-table-widget")).toBe(table);
+
+    view.dispatch({
+      effects: context.reconfigure(markdownLivePreviewContextExtension(
+        "safe",
+        createRevisionGraph(8),
+        "note.md",
+        null,
+      )),
+    });
+    expect(getMarkdownProjectionDiagnostics().globalInvalidations).toBe(1);
+  });
 });
 
 function createView(
@@ -105,4 +172,28 @@ function projectionSnapshot(view: EditorView) {
 
 async function settleFocusChange() {
   await new Promise((resolve) => window.setTimeout(resolve, 20));
+}
+
+function createRevisionGraph(revision: number): MarkdownLinkGraph {
+  return {
+    revision,
+    documentCount: 2,
+    indexedDocumentCount: 2,
+    resolveWikiLink: (_sourcePath, target) => ({
+      exists: true,
+      ambiguous: false,
+      path: target,
+      name: target,
+      displayName: target,
+      target,
+    }),
+    resolveMarkdownLink: (sourcePath, target) => ({
+      exists: true,
+      ambiguous: false,
+      path: target,
+      name: target,
+      displayName: target,
+      target,
+    }),
+  };
 }

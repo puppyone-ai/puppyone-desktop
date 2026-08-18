@@ -45,7 +45,8 @@ import type {
   EditorInteractionPreferences,
   MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
-  MarkdownLinkGraph,
+  MarkdownLinkCommands,
+  MarkdownWorkspaceEnvironment,
 } from "../editor/registry/viewerTypes";
 import type { ViewerExtensionHostAdapter } from "../editor/registry/viewerHostAdapters";
 import { getAiEditFileForPath } from "../editor/ai-edits/diff";
@@ -61,6 +62,7 @@ import {
 import { getRendererPerformanceTracker } from "../performance/rendererPerformance";
 import { FileOpenRequestCoordinator } from "./file-open/fileOpenRequestCoordinator";
 import { putBoundedFileContent } from "./file-open/fileContentCache";
+import { useStableEventCallback } from "../primitives/useStableEventCallback";
 
 const rendererPerformance = getRendererPerformanceTracker();
 
@@ -81,8 +83,7 @@ export type DataWorkspaceState = {
   fileUrl: string | null;
   fileUrlLoading: boolean;
   fileUrlError: string | null;
-  markdownLinkGraph: MarkdownLinkGraph;
-  markdownAssetUrlResolver: MarkdownAssetUrlResolver;
+  markdownEnvironment: MarkdownWorkspaceEnvironment;
 };
 
 type MoveOperation = {
@@ -269,8 +270,6 @@ export function DataWorkspace({
   const [fileErrorPath, setFileErrorPath] = useState<string | null>(null);
   const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
   const [unavailableActivePath, setUnavailableActivePath] = useState<string | null>(null);
-  const [markdownLinkIndexing, setMarkdownLinkIndexing] = useState(false);
-  const [markdownLinkIndexBuilding, setMarkdownLinkIndexBuilding] = useState(false);
   const [markdownLinkIndex, setMarkdownLinkIndex] = useState<MarkdownLinkGraphIndexSnapshot>(
     EMPTY_MARKDOWN_LINK_GRAPH_INDEX,
   );
@@ -283,6 +282,11 @@ export function DataWorkspace({
   });
   const markdownLinkIndexCoordinatorRef = useRef<MarkdownLinkIndexCoordinator | null>(null);
   markdownLinkIndexCoordinatorRef.current ??= new MarkdownLinkIndexCoordinator();
+  const markdownLinkGraphRevisionRef = useRef(0);
+  const markdownAssetResolverRevisionRef = useRef<{
+    resolver: MarkdownAssetUrlResolver | null;
+    revision: number;
+  }>({ resolver: null, revision: 0 });
   const suppressSelectionSyncRef = useRef(false);
   const documentNavigationRequestRef = useRef(0);
   const activePathHydrationAttemptRef = useRef<{
@@ -400,8 +404,6 @@ export function DataWorkspace({
     setFileLoading(false);
     setDocumentNavigationError(null);
     documentNavigationRequestRef.current += 1;
-    setMarkdownLinkIndexing(false);
-    setMarkdownLinkIndexBuilding(false);
     setMarkdownLinkIndex(EMPTY_MARKDOWN_LINK_GRAPH_INDEX);
   }, [workspace.path, dataPort, defaultActivePath]);
 
@@ -584,7 +586,7 @@ export function DataWorkspace({
     setSelectionAnchorPath(resolvedActivePath);
   }, [resolvedActivePath]);
 
-  const requestActiveNodeChange = useCallback(async (
+  const requestActiveNodeChange = useStableEventCallback(async (
     node: DataNode | null,
     nextPath: string | null = node?.path ?? null,
   ): Promise<boolean> => {
@@ -605,7 +607,7 @@ export function DataWorkspace({
       }
       return false;
     }
-  }, [activePath, onActivePathChange]);
+  });
 
   const activateNode = useCallback(
     (node: DataNode | null, intent: { additive?: boolean; range?: boolean } = {}) => {
@@ -755,6 +757,29 @@ export function DataWorkspace({
     },
     [loadFolder, loadLinkedPathNode, requestActiveNodeChange, tree],
   );
+  const openMarkdownLinkCandidatesCommand = useStableEventCallback(
+    (paths: readonly string[]) => openMarkdownLinkCandidates(paths),
+  );
+  const openExternalMarkdownUrlCommand = useStableEventCallback(
+    (href: string) => onOpenExternalUrl?.(href),
+  );
+  const markdownLinkCommands = useMemo<MarkdownLinkCommands>(() => ({
+    openWikiLink(target) {
+      if (target.exists && target.path) {
+        void openMarkdownLinkCandidatesCommand([target.path]);
+        return;
+      }
+      if (target.candidatePaths && target.candidatePaths.length > 0) {
+        void openMarkdownLinkCandidatesCommand(target.candidatePaths);
+      }
+    },
+    openPath(path) {
+      void openMarkdownLinkCandidatesCommand([path]);
+    },
+    openExternalUrl(href) {
+      return openExternalMarkdownUrlCommand(href);
+    },
+  }), [openExternalMarkdownUrlCommand, openMarkdownLinkCandidatesCommand]);
   const markdownLinkWorkspaceIndex = useStableMarkdownLinkWorkspaceIndex(tree);
   const markdownLinkMetadataDocuments = markdownLinkWorkspaceIndex.metadataDocuments;
   useEffect(() => {
@@ -765,8 +790,6 @@ export function DataWorkspace({
       || markdownLinkWorkspaceIndex.sourcePaths.length === 0
     ) {
       coordinator.cancel();
-      setMarkdownLinkIndexing(false);
-      setMarkdownLinkIndexBuilding(false);
       setMarkdownLinkIndex((current) => (
         current === EMPTY_MARKDOWN_LINK_GRAPH_INDEX
           ? current
@@ -790,20 +813,12 @@ export function DataWorkspace({
       },
     );
     setMarkdownLinkIndex(EMPTY_MARKDOWN_LINK_GRAPH_INDEX);
-    setMarkdownLinkIndexing(true);
-    setMarkdownLinkIndexBuilding(true);
     request.promise
       .then((index) => {
         if (!cancelled) setMarkdownLinkIndex(index);
       })
       .catch((error) => {
         if (!cancelled) console.warn("Unable to build Markdown link index:", error);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setMarkdownLinkIndexing(false);
-          setMarkdownLinkIndexBuilding(false);
-        }
       });
 
     return () => {
@@ -817,25 +832,14 @@ export function DataWorkspace({
     markdownLinkWorkspaceIndex.sourcePaths,
   ]);
   const markdownLinkGraph = useMemo(
-    () => createMarkdownLinkGraph(markdownLinkMetadataDocuments, {
-      isIndexing: markdownLinkIndexing || markdownLinkIndexBuilding,
-      onOpenPath: (path) => {
-        void openMarkdownLinkCandidates([path]);
-      },
-      onOpenCandidatePaths: (paths) => {
-        void openMarkdownLinkCandidates(paths);
-      },
-      onOpenExternalUrl: (href) => {
-        return onOpenExternalUrl?.(href);
-      },
-    }, markdownLinkIndex),
+    () => createMarkdownLinkGraph(
+      markdownLinkMetadataDocuments,
+      markdownLinkIndex,
+      ++markdownLinkGraphRevisionRef.current,
+    ),
     [
       markdownLinkIndex,
-      markdownLinkIndexBuilding,
-      markdownLinkIndexing,
       markdownLinkMetadataDocuments,
-      onOpenExternalUrl,
-      openMarkdownLinkCandidates,
     ],
   );
   const markdownAssetUrlResolver = useCallback(
@@ -862,6 +866,18 @@ export function DataWorkspace({
     },
     [dataPort],
   );
+  if (markdownAssetResolverRevisionRef.current.resolver !== markdownAssetUrlResolver) {
+    markdownAssetResolverRevisionRef.current = {
+      resolver: markdownAssetUrlResolver,
+      revision: markdownAssetResolverRevisionRef.current.revision + 1,
+    };
+  }
+  const markdownEnvironment = useMemo<MarkdownWorkspaceEnvironment>(() => ({
+    linkGraph: markdownLinkGraph,
+    linkCommands: markdownLinkCommands,
+    assetUrlResolver: markdownAssetUrlResolver,
+    assetResolverRevision: markdownAssetResolverRevisionRef.current.revision,
+  }), [markdownAssetUrlResolver, markdownLinkCommands, markdownLinkGraph]);
   const workspaceState: DataWorkspaceState = {
     tree,
     activePath: resolvedActivePath,
@@ -879,8 +895,7 @@ export function DataWorkspace({
     fileUrl: selectedFileUrl,
     fileUrlLoading: selectedFileUrlLoading,
     fileUrlError: selectedFileUrlError,
-    markdownLinkGraph,
-    markdownAssetUrlResolver,
+    markdownEnvironment,
   };
   const previewAccessory = renderWorkspaceSlot(previewAccessorySlot, workspaceState);
 
@@ -1377,8 +1392,7 @@ export function DataWorkspace({
                   workspaceId={workspace.id}
                   workspaceRoot={workspace.path}
                   markdownDialect={workspace.markdownDialect ?? null}
-                  markdownLinkGraph={markdownLinkGraph}
-                  markdownAssetUrlResolver={markdownAssetUrlResolver}
+                  markdownEnvironment={markdownEnvironment}
                   appPreview={dataPort.appPreview ?? null}
                   openExternalFile={dataPort.openExternalFile}
                   convertOfficeDocumentToDocx={dataPort.convertOfficeDocumentToDocx}

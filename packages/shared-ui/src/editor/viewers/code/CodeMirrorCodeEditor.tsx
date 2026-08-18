@@ -207,7 +207,11 @@ export function CodeMirrorCodeEditor({
   }, [languageKey]);
 
   return (
-    <div className="code-codemirror-editor" data-language={languageKey || "plaintext"}>
+    <div
+      className="code-codemirror-editor"
+      data-language={languageKey || "plaintext"}
+      data-po-typography-role="code"
+    >
       <div ref={hostRef} className="code-codemirror-editor__host" />
     </div>
   );

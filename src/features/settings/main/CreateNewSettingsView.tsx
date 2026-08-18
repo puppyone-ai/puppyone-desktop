@@ -49,6 +49,11 @@ const CREATE_NEW_TYPE_VISUALS: Record<CreateNewItemId, CreateNewTypeVisual> = {
     iconName: "Untitled.md",
     iconType: "markdown",
   },
+  contextMap: {
+    extension: ".contextmap",
+    iconName: "Untitled.contextmap",
+    iconType: "context-map",
+  },
   text: {
     extension: ".txt",
     iconName: "Untitled.txt",
@@ -109,15 +114,17 @@ export function CreateNewSettingsView({
   const addableKinds = CREATE_NEW_ITEM_IDS.filter((kind) => (
     !presentKinds.has(kind) && isCreateNewItemAvailable(kind, experimentalSettings)
   ));
-  const defaultsRestored = settings.items.length === 4
+  const defaultsRestored = settings.items.length === 5
     && settings.items[0]?.kind === "markdown"
     && settings.items[0]?.enabled
-    && settings.items[1]?.kind === "csv"
+    && settings.items[1]?.kind === "contextMap"
     && settings.items[1]?.enabled
-    && settings.items[2]?.kind === "html"
+    && settings.items[2]?.kind === "csv"
     && settings.items[2]?.enabled
-    && settings.items[3]?.kind === "slides"
-    && settings.items[3]?.enabled;
+    && settings.items[3]?.kind === "html"
+    && settings.items[3]?.enabled
+    && settings.items[4]?.kind === "slides"
+    && settings.items[4]?.enabled;
 
   useEffect(() => {
     if (!addMenuOpen) return;

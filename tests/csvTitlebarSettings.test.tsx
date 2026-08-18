@@ -62,9 +62,10 @@ describe("CSV pane-menu settings", () => {
           editorGroup={group}
           editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
           externalOpen={{ getAppName: () => "Numbers", open: openExternal }}
+          editorTree={[node]}
           fileIconTheme="default"
           layout={createEditorPaneLayout(path)}
-          state={workspaceState(node)}
+          markdownEnvironment={workspaceState(node).markdownEnvironment}
           workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
           onClosePane={vi.fn()}
           onFocusPane={vi.fn()}
@@ -174,9 +175,10 @@ describe("CSV pane-menu settings", () => {
           editorGroup={group}
           editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
           externalOpen={{ getAppName: () => null, open: openExternal }}
+          editorTree={nodes}
           fileIconTheme="default"
           layout={layout}
-          state={{ ...workspaceState(nodes[1]!), tree: nodes }}
+          markdownEnvironment={workspaceState(nodes[1]!).markdownEnvironment}
           workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
           onClosePane={vi.fn()}
           onFocusPane={vi.fn()}
@@ -235,9 +237,10 @@ describe("CSV pane-menu settings", () => {
         editorGroup={group}
         editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
         externalOpen={{ getAppName: () => null, open: openExternal }}
+        editorTree={[node]}
         fileIconTheme="default"
         layout={createEditorPaneLayout(path)}
-        state={workspaceState(node)}
+        markdownEnvironment={workspaceState(node).markdownEnvironment}
         workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
         onClosePane={closePane}
         onFocusPane={vi.fn()}
@@ -323,14 +326,18 @@ function workspaceState(node: DataNode): DataWorkspaceState {
     fileUrl: null,
     fileUrlLoading: false,
     fileUrlError: null,
-    markdownLinkGraph: {
-      documentCount: 0,
-      indexedDocumentCount: 0,
-      isIndexing: false,
-      resolveWikiLink: () => ({ exists: false, ambiguous: false, path: null, name: "", displayName: "", target: "" }),
-      resolveMarkdownLink: () => null,
-      getBacklinks: () => [],
+    markdownEnvironment: {
+      linkGraph: {
+        revision: 0,
+        documentCount: 0,
+        indexedDocumentCount: 0,
+        resolveWikiLink: () => ({ exists: false, ambiguous: false, path: null, name: "", displayName: "", target: "" }),
+        resolveMarkdownLink: () => null,
+        getBacklinks: () => [],
+      },
+      linkCommands: {},
+      assetUrlResolver: () => null,
+      assetResolverRevision: 0,
     },
-    markdownAssetUrlResolver: () => null,
   };
 }

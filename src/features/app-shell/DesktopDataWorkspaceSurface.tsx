@@ -271,10 +271,11 @@ export function DesktopDataWorkspaceSurface({
                 editorGroup={editorWorkbench.state}
                 externalOpen={externalOpen}
                 editorInteractionPreferences={editorInteractionPreferences}
+                editorTree={state.tree}
                 fileIconTheme={preferences.fileIconTheme}
                 layout={editorWorkbench.paneLayout}
+                markdownEnvironment={state.markdownEnvironment}
                 refreshKey={workspaceRefreshToken}
-                state={state}
                 viewerExtensionAdapter={viewerExtensionAdapter}
                 workspace={workspace}
                 onClosePane={editorWorkbench.closePane}

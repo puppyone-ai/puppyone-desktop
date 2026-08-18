@@ -20,6 +20,7 @@ export type FileIconThemeMetadata = {
 const KIND_ACCENT = {
   folder: "var(--po-file-accent-default)",
   app: "var(--po-accent)",
+  "context-map": "var(--po-accent)",
   workflow: "var(--po-accent)",
   json: "var(--po-file-accent-json)",
   markdown: "var(--po-file-accent-markdown)",

@@ -46,6 +46,14 @@ const paneSourceLifecycle = readFileSync(
   new URL("../src/features/editor-workbench/runtime/useEditorPaneSource.ts", import.meta.url),
   "utf8",
 );
+const dataWorkspaceSource = readFileSync(
+  new URL("../packages/shared-ui/src/data/DataWorkspace.tsx", import.meta.url),
+  "utf8",
+);
+const viewerTypesSource = readFileSync(
+  new URL("../packages/shared-ui/src/editor/registry/viewerTypes.ts", import.meta.url),
+  "utf8",
+);
 const resizeGestureSource = readFileSync(
   new URL("../src/features/editor-workbench/interactions/useSplitResizeGesture.ts", import.meta.url),
   "utf8",
@@ -249,12 +257,29 @@ describe("editor split-pane architecture", () => {
     expect(splitSource).toContain("key={split.first.id}");
     expect(splitSource).toContain("key={split.second.id}");
     expect(splitSource).toContain("key={split.id}");
-    expect(splitSource).toContain("createEditorNodeIndex(state.tree)");
+    expect(splitSource).toContain("createEditorNodeIndex(editorTree)");
+    expect(surfaceSource).toContain("editorTree={state.tree}");
+    expect(surfaceSource).toContain("markdownEnvironment={state.markdownEnvironment}");
+    expect(splitSource).not.toContain("DataWorkspaceState");
+    expect(splitSource).not.toContain("state: DataWorkspaceState");
     expect(splitSource).toContain("<EditorPaneRuntime");
     expect(paneRuntimeSource).toContain("memo(function EditorPaneRuntime");
     expect(paneRuntimeSource).toContain("<EditorPaneDocumentRuntime");
     expect(paneDocumentRuntimeSource).toContain("memo(function EditorPaneDocumentRuntime");
     expect(paneDocumentRuntimeSource).toContain("useEditorPaneSource(sourceNode");
+    expect(paneDocumentRuntimeSource).toContain("samePaneEnvironment");
+    expect(paneDocumentRuntimeSource).toContain("isMarkdownDocumentDescriptor");
+    expect(dataWorkspaceSource).toContain("useStableEventCallback");
+    expect(dataWorkspaceSource).toContain("markdownEnvironment: MarkdownWorkspaceEnvironment");
+    expect(viewerTypesSource).toContain("export type MarkdownLinkCommands");
+    expect(viewerTypesSource).toContain("export type MarkdownWorkspaceEnvironment");
+    const graphContract = viewerTypesSource.slice(
+      viewerTypesSource.indexOf("export type MarkdownLinkGraph ="),
+      viewerTypesSource.indexOf("export type MarkdownLinkCommands ="),
+    );
+    expect(graphContract).toContain("revision: number");
+    expect(graphContract).not.toContain("openWikiLink");
+    expect(graphContract).not.toContain("openExternalUrl");
     expect(paneSourceLifecycle).toContain("new AbortController()");
     expect(paneMoveSource).toContain("createPaneMovePreview");
     expect(paneMoveSource).toContain("destroyPaneMovePreview");

@@ -37,6 +37,10 @@ const markdownInlineCss = readFileSync(
   new URL("../packages/shared-ui/src/styles/editor/markdown-inline-widgets.css", import.meta.url),
   "utf8",
 );
+const markdownCodeMirrorExtensionsSource = readFileSync(
+  new URL("../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions.ts", import.meta.url),
+  "utf8",
+);
 
 describe("Markdown editor layout", () => {
   it("keeps the centered reading rail invariant when stacked panes cross the overflow threshold", () => {
@@ -89,6 +93,21 @@ describe("Markdown editor layout", () => {
     expect(editorRule).not.toContain("--po-markdown-breakout-max-width");
   });
 
+  it("keeps ordinary editable-line geometry independent of empty-line DOM", () => {
+    const livePreviewRule = readCssRule(
+      markdownEditorCss,
+      '.markdown-codemirror-editor[data-live-preview="true"]',
+    );
+
+    expect(livePreviewRule).toContain("--po-markdown-editor-line-spacing: 3px;");
+    expect(markdownCodeMirrorExtensionsSource).toContain(
+      'padding: "var(--po-markdown-editor-line-spacing, 0px) 0"',
+    );
+    expect(markdownEditorCss).not.toMatch(
+      /\.cm-line:has\(\s*>\s*br:only-child\s*\)/,
+    );
+  });
+
   it("keeps task checkbox visuals compact inside a reliable desktop hit target", () => {
     const taskLineRule = readCssRule(
       markdownEditorCss,
@@ -125,6 +144,10 @@ describe("Markdown HTML media layout", () => {
 
   it("uses one semantic presentation profile without a second HTML widget gap", () => {
     const profileRule = readCssRule(markdownContentCss, ".markdown-codemirror-editor");
+    const editorTextRule = readCssRule(
+      markdownEditorCss,
+      ".markdown-codemirror-editor .cm-editor",
+    );
     const nativeHeadingRule = readCssRule(
       markdownContentCss,
       '.markdown-codemirror-editor[data-live-preview="true"] .cm-md-heading-1',
@@ -163,11 +186,30 @@ describe("Markdown HTML media layout", () => {
     );
 
     expect(editorEntryCss).toContain('@import "./editor/markdown-content.css";');
-    expect(profileRule).toContain("--po-md-presentation-version: 1;");
+    expect(profileRule).toContain("--po-md-presentation-version: 2;");
+    expect(profileRule).toContain("--po-md-content-size: var(--po-text-size-content, 14px);");
+    expect(profileRule).toContain("--po-md-content-weight: 500;");
+    expect(profileRule).toContain("--po-md-content-line-height: 1.5714285714;");
+    expect(profileRule).toContain("--po-md-block-gap: 16px;");
+    expect(profileRule).toContain("--po-md-heading-gap-before: 24px;");
+    expect(profileRule).toContain("--po-md-heading-gap-after: 16px;");
+    expect(editorTextRule).toContain("font-family: var(--po-md-content-font);");
+    expect(editorTextRule).toContain("font-size: var(--po-md-content-size);");
+    expect(editorTextRule).toContain("font-weight: var(--po-md-content-weight);");
+    expect(htmlSurfaceRule).toContain("font-size: var(--po-md-content-size);");
+    expect(htmlSurfaceRule).toContain("font-weight: var(--po-md-content-weight);");
+    expect(htmlSurfaceRule).toContain("line-height: var(--po-md-content-line-height);");
     expect(profileRule).toContain("--po-md-h1-weight: 650;");
     expect(profileRule).toContain("--po-md-h2-weight: 625;");
     expect(profileRule).toContain("--po-md-h3-weight: 600;");
     expect(profileRule).toContain("--po-md-strong-weight: 600;");
+    expect(profileRule).toContain("--po-md-heading-line-height: 1.25;");
+    expect(profileRule).toContain("--po-md-h1-size: 2em;");
+    expect(profileRule).toContain("--po-md-h2-size: 1.5em;");
+    expect(profileRule).toContain("--po-md-h3-size: 1.25em;");
+    expect(profileRule).toContain("--po-md-h4-size: 1em;");
+    expect(profileRule).toContain("--po-md-h5-size: 0.875em;");
+    expect(profileRule).toContain("--po-md-h6-size: 0.85em;");
     expect(profileRule).toContain(
       "--po-md-rule-color: color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 4%);",
     );

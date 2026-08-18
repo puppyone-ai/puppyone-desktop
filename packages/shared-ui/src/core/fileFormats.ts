@@ -15,6 +15,7 @@ export type FileCategory =
 
 export type GenericViewerId =
   | "app-preview"
+  | "context-map-viewer"
   | "markdown-editor"
   | "plain-text"
   | "monaco-code"
@@ -59,6 +60,7 @@ export interface FileFormat {
 export const FILE_SEMANTIC_KINDS = [
   "folder",
   "app",
+  "context-map",
   "workflow",
   "markdown",
   "json",

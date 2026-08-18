@@ -43,8 +43,13 @@ export {
 } from "./core/fileFormats";
 
 export { DataWorkspace } from "./data/DataWorkspace";
-export { MarkdownLinkIndexCoordinator } from "./editor/markdown/linkIndex";
+export {
+  createMarkdownLinkGraphIndex,
+  MarkdownLinkIndexCoordinator,
+} from "./editor/markdown/linkIndex";
 export type {
+  MarkdownLinkGraphDocument,
+  MarkdownLinkGraphIndexSnapshot,
   MarkdownLinkIndexDocumentReader,
   MarkdownLinkIndexRequest,
 } from "./editor/markdown/linkIndex";
@@ -199,6 +204,24 @@ export type {
   PuppyFlowStep,
 } from "./editor/viewers/puppyflow/puppyflowModel";
 export {
+  CONTEXT_MAP_DOCUMENT_VERSION,
+  CONTEXT_MAP_FILE_EXTENSION,
+  CONTEXT_MAP_MIME_TYPE,
+  createDefaultContextMapDocument,
+  createDefaultContextMapDocumentContent,
+  fromContextMapRelativePath,
+  getContextMapScopePath,
+  isContextMapFilename,
+  parseContextMapDocument,
+  serializeContextMapDocument,
+  toContextMapRelativePath,
+} from "./editor/viewers/context-map/contextMapDocument";
+export type {
+  ContextMapDocument,
+  ContextMapNodeOffset,
+  ParsedContextMapDocument,
+} from "./editor/viewers/context-map/contextMapDocument";
+export {
   coreViewerCapability,
   getPresetViewerDefinition,
   getPresetViewerDefinitionForViewerId,
@@ -265,6 +288,7 @@ export type {
   ViewerThemeSnapshot,
 } from "./editor/registry/viewerHostApi";
 export type {
+  ContextMapWorkspaceEnvironment,
   EditorInteractionPreferences,
   EditorDocument,
   EditorDocumentKind,
@@ -278,7 +302,9 @@ export type {
   MarkdownBacklinkReference,
   MarkdownDialectId,
   MarkdownHtmlTrustMode,
+  MarkdownLinkCommands,
   MarkdownLinkGraph,
+  MarkdownWorkspaceEnvironment,
   MarkdownWikiLinkResolvedTarget,
   OfficeEditorAction,
   OfficeEditorActionResolver,
@@ -287,6 +313,10 @@ export type {
   PresetViewerRenderContext,
 } from "./editor/registry/viewerTypes";
 export { DEFAULT_EDITOR_INTERACTION_PREFERENCES } from "./editor/registry/viewerTypes";
+export {
+  EMPTY_MARKDOWN_LINK_COMMANDS,
+  EMPTY_MARKDOWN_WORKSPACE_ENVIRONMENT,
+} from "./editor/registry/viewerTypes";
 export { PlainTextEditor } from "./editor/viewers/code/PlainTextEditor";
 export type { PlainTextEditorProps } from "./editor/viewers/code/PlainTextEditor";
 export { CsvTableEditor } from "./editor/viewers/csv/CsvTableEditor";

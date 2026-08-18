@@ -1,6 +1,7 @@
 import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import type { MarkdownLinkGraph } from "../../../registry/viewerTypes";
+import { markdownLinkCommandsFacet } from "../../core/editor/markdownLivePreviewContext";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { requestMarkdownTableFocus } from "./tableFocusState";
 import type { MarkdownInlinePreviewRenderer } from "../../shared/preview/markdownInlinePreviewPort";
@@ -466,6 +467,7 @@ function renderTableCellPreview(
   renderInlinePreview(content, source, {
     t: getMarkdownMessageFormatter(view),
     markdownLinkGraph,
+    markdownLinkCommands: view.state.facet(markdownLinkCommandsFacet),
     resolveAssetUrl,
     openHref: (href) => {
       openMarkdownHref(href, view);

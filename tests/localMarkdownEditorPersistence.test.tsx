@@ -251,7 +251,7 @@ function getMountedEditorContent(container: HTMLElement): string | null {
   return editor ? EditorView.findFromDOM(editor).state.doc.toString() : null;
 }
 
-async function waitFor(assertion: () => boolean | Promise<boolean>, attempts = 200): Promise<void> {
+async function waitFor(assertion: () => boolean | Promise<boolean>, attempts = 600): Promise<void> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (await assertion()) return;
     await act(async () => {

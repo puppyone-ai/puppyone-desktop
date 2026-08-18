@@ -135,6 +135,8 @@
   "experimental.viewerPlugins.detail": "启用仅限本地的实验性插件页面及其可选导航快捷方式。",
   "experimental.editorSaveStatus.title": "编辑器保存状态",
   "experimental.editorSaveStatus.detail": "在右上角显示保存控件和状态诊断。隐藏后文件仍会正常保存。",
+  "experimental.contextMaps.title": "上下文地图文件",
+  "experimental.contextMaps.detail": "将知识关系图作为可持久化文件创建，并在编辑器中打开。",
   "experimental.projectsHome.title": "项目首页",
   "experimental.projectsHome.detail": "试用面向云端和本地项目的统一卡片布局。",
   "experimental.agentChat.title": "智能体聊天",

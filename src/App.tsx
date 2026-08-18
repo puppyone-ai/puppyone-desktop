@@ -99,12 +99,16 @@ export function App() {
 }
 
 function AppContent() {
-  const { t } = useLocalization();
+  const { locale, t } = useLocalization();
   const desktopUpdates = useDesktopUpdates();
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
   const fontCatalog = useTypographyCatalog();
-  const typography = useTypographyRuntime(preferences.typographyPreferences, fontCatalog);
+  const typography = useTypographyRuntime(
+    preferences.typographyPreferences,
+    fontCatalog,
+    locale,
+  );
   const typographyRootProps = useMemo(() => createTypographyRootProps(typography), [typography]);
   const cloudAvailable = useFeatureFlag("cloudWorkspace");
   // The build flag only marks availability; PuppyOne Cloud stays hidden until
@@ -618,7 +622,9 @@ function AppContent() {
     const requestId = ++documentNavigationRequestRef.current;
     if (requestId !== documentNavigationRequestRef.current) return;
     setDocumentNavigationError(null);
-    if (path && node?.type !== "folder") editorWorkbench.open(path, node);
+    if (path && node?.type !== "folder") {
+      editorWorkbench.open(path, node);
+    }
     setActiveDataNode(node);
   }, [editorWorkbench]);
   const handleEditorClose = useCallback(async (editorId: string) => {
@@ -962,6 +968,9 @@ function AppContent() {
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
       data-text-size={textSize}
+      data-interface-text-size={textSize}
+      data-content-text-size={textSize}
+      data-terminal-text-size={textSize}
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
       {...typographyRootProps}

@@ -135,6 +135,8 @@
   "experimental.viewerPlugins.detail": "ローカル専用の実験的なプラグインページと、任意のナビゲーションショートカットを有効にします。",
   "experimental.editorSaveStatus.title": "エディターの保存状態",
   "experimental.editorSaveStatus.detail": "右上に保存コントロールと状態診断を表示します。非表示でもファイルは通常どおり保存されます。",
+  "experimental.contextMaps.title": "コンテキストマップファイル",
+  "experimental.contextMaps.detail": "関係マップを永続ファイルとして作成し、エディターで開きます。",
   "experimental.projectsHome.title": "プロジェクトホーム",
   "experimental.projectsHome.detail": "Cloud とローカルプロジェクトを統合した実験的なカードレイアウトを試します。",
   "experimental.agentChat.title": "エージェントチャット",

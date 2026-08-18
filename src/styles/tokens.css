@@ -1,51 +1,5 @@
-@font-face {
-  font-family: "Geist Sans";
-  src: url("/fonts/geist/Geist-Variable.woff2") format("woff2");
-  font-display: swap;
-  font-style: normal;
-  font-weight: 100 900;
-}
-
-@font-face {
-  font-family: "Geist Mono";
-  src: url("/fonts/geist/GeistMono-Variable.woff2") format("woff2");
-  font-display: swap;
-  font-style: normal;
-  font-weight: 100 900;
-}
-
 :root {
   color-scheme: light;
-  --font-geist-sans: "Geist Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-geist-mono: "Geist Mono", "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
-  --font-terminal-mono: "SF Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  --po-font-ui: var(--font-geist-sans);
-  --po-font-content: var(--font-geist-sans);
-  --po-font-code: var(--font-geist-mono);
-  --po-font-terminal: var(--font-terminal-mono);
-  /* Compatibility aliases for feature CSS that has not yet adopted a role. */
-  --po-font-sans: var(--po-font-ui);
-  --po-font-mono: var(--po-font-code);
-  --po-text-size-micro: 10px;
-  --po-text-size-caption: 11px;
-  --po-text-size-meta: 12px;
-  --po-text-size-sidebar: 13px;
-  --po-text-size-body: 13px;
-  --po-text-size-body-lg: 14px;
-  --po-text-size-content: 14px;
-  --po-text-size-title: 16px;
-  --po-text-size-page-title: 20px;
-  --po-text-size-display: 24px;
-  --po-code-font-size: 13px;
-  --po-text-weight-regular: 400;
-  --po-text-weight-medium: 500;
-  --po-text-weight-semibold: 600;
-  --po-text-weight-bold: 700;
-  --po-line-height-tight: 1.25;
-  --po-line-height-body: 1.45;
-  --po-line-height-relaxed: 1.6;
-  --po-font-size-chrome: var(--po-text-size-body);
-  --po-font-weight-chrome: var(--po-text-weight-medium);
   --desktop-control-radius: 6px;
   /* Mirrored from electron/main/window-layout-contract.mjs and guarded by the architecture check. */
   --desktop-window-min-width: 640px;
@@ -274,24 +228,6 @@
 :root,
 :where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface, .dark) {
   /*
-   * Re-declare aliases at each appearance boundary. The role values can be
-   * supplied inline by the runtime, including future imported FontFace IDs.
-   */
-  --po-font-sans: var(--po-font-ui);
-  --po-font-mono: var(--po-font-code);
-  --po-text-size-micro: 10px;
-  --po-text-size-caption: 11px;
-  --po-text-size-meta: 12px;
-  --po-text-size-sidebar: 13px;
-  --po-text-size-body: 13px;
-  --po-text-size-body-lg: 14px;
-  --po-text-size-content: 14px;
-  --po-text-size-title: 16px;
-  --po-text-size-page-title: 20px;
-  --po-text-size-display: 24px;
-  --po-code-font-size: 13px;
-  --po-font-size-chrome: 13px;
-  /*
    * Re-declare semantic sidebar aliases at the themed shell boundary. Custom
    * properties are resolved where they are declared, so inheriting only the
    * :root aliases would freeze them at the default scale instead of following
@@ -361,36 +297,6 @@
   --po-menu-bg: color-mix(in srgb, var(--po-overlay) 92%, var(--po-panel) 8%);
   --po-menu-border: color-mix(in srgb, var(--po-border) 82%, transparent);
   --po-menu-shadow: 0 18px 44px color-mix(in srgb, var(--po-shadow) 86%, transparent);
-}
-
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="small"] {
-  --po-text-size-micro: 9px;
-  --po-text-size-caption: 10px;
-  --po-text-size-meta: 11px;
-  --po-text-size-sidebar: 12px;
-  --po-text-size-body: 12px;
-  --po-text-size-body-lg: 13px;
-  --po-text-size-content: 13px;
-  --po-text-size-title: 15px;
-  --po-text-size-page-title: 18px;
-  --po-text-size-display: 22px;
-  --po-code-font-size: 12px;
-  --po-font-size-chrome: 12px;
-}
-
-:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="large"] {
-  --po-text-size-micro: 11px;
-  --po-text-size-caption: 12px;
-  --po-text-size-meta: 13px;
-  --po-text-size-sidebar: 14px;
-  --po-text-size-body: 14px;
-  --po-text-size-body-lg: 16px;
-  --po-text-size-content: 16px;
-  --po-text-size-title: 18px;
-  --po-text-size-page-title: 22px;
-  --po-text-size-display: 28px;
-  --po-code-font-size: 15px;
-  --po-font-size-chrome: 14px;
 }
 
 .dark {

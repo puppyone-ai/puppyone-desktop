@@ -21,9 +21,10 @@ import {
 describe("create new menu preferences", () => {
   it("migrates the legacy default while preserving explicit order and visibility", () => {
     expect(parseCreateNewMenuSettings(null)).toEqual({
-      version: 2,
+      version: 3,
       items: [
         { kind: "markdown", enabled: true },
+        { kind: "contextMap", enabled: true },
         { kind: "csv", enabled: true },
         { kind: "html", enabled: true },
         { kind: "slides", enabled: true },
@@ -35,7 +36,7 @@ describe("create new menu preferences", () => {
         { kind: "text", enabled: true },
       ],
     }))).toEqual({
-      version: 2,
+      version: 3,
       items: [
         { kind: "json", enabled: false },
         { kind: "text", enabled: true },
@@ -47,9 +48,10 @@ describe("create new menu preferences", () => {
         { kind: "csv", enabled: true },
       ],
     }))).toEqual({
-      version: 2,
+      version: 3,
       items: [
         { kind: "markdown", enabled: true },
+        { kind: "contextMap", enabled: true },
         { kind: "csv", enabled: true },
         { kind: "html", enabled: true },
         { kind: "slides", enabled: true },
@@ -62,7 +64,23 @@ describe("create new menu preferences", () => {
         { kind: "csv", enabled: true },
       ],
     }))).toEqual({
-      version: 2,
+      version: 3,
+      items: [
+        { kind: "markdown", enabled: true },
+        { kind: "contextMap", enabled: true },
+        { kind: "csv", enabled: true },
+        { kind: "html", enabled: true },
+        { kind: "slides", enabled: true },
+      ],
+    });
+    expect(parseCreateNewMenuSettings(JSON.stringify({
+      version: 3,
+      items: [
+        { kind: "markdown", enabled: true },
+        { kind: "csv", enabled: true },
+      ],
+    }))).toEqual({
+      version: 3,
       items: [
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
@@ -78,26 +96,27 @@ describe("create new menu preferences", () => {
         { kind: "not-a-file-type", enabled: true },
       ],
     }))).toEqual({
-      version: 2,
+      version: 3,
       items: [{ kind: "json", enabled: true }],
     });
     expect(parseCreateNewMenuSettings(JSON.stringify({
       items: [{ kind: "not-a-file-type" }],
     }))).toEqual({
-      version: 2,
+      version: 3,
       items: [
         { kind: "markdown", enabled: true },
+        { kind: "contextMap", enabled: true },
         { kind: "csv", enabled: true },
         { kind: "html", enabled: true },
         { kind: "slides", enabled: true },
       ],
     });
-    expect(parseCreateNewMenuSettings(JSON.stringify({ items: [] }))).toEqual({ version: 2, items: [] });
+    expect(parseCreateNewMenuSettings(JSON.stringify({ items: [] }))).toEqual({ version: 3, items: [] });
   });
 
   it("shows only enabled and currently available file types", () => {
     const settings = {
-      version: 2,
+      version: 3,
       items: [
         { kind: "app", enabled: true },
         { kind: "json", enabled: false },
@@ -115,10 +134,11 @@ describe("appearance preferences", () => {
       sidebar: preset.sizes.sidebar,
       content: preset.sizes.content,
       code: preset.sizes.code,
+      terminal: preset.sizes.terminal,
     }))).toEqual([
-      { value: "small", sidebar: 12, content: 13, code: 12 },
-      { value: "default", sidebar: 13, content: 14, code: 13 },
-      { value: "large", sidebar: 14, content: 16, code: 15 },
+      { value: "small", sidebar: 12, content: 13, code: 12, terminal: 12 },
+      { value: "default", sidebar: 13, content: 14, code: 13, terminal: 13 },
+      { value: "large", sidebar: 14, content: 16, code: 15, terminal: 15 },
     ]);
 
     for (const preset of TEXT_SIZE_PRESETS) {
@@ -127,11 +147,44 @@ describe("appearance preferences", () => {
   });
 
   it("keeps the CSS typography token sets aligned with the preset contract", () => {
-    const css = readFileSync(new URL("../src/styles/tokens.css", import.meta.url), "utf8");
+    const css = readFileSync(
+      new URL("../src/styles/typography/foundations.css", import.meta.url),
+      "utf8",
+    );
+    const tokens = readFileSync(new URL("../src/styles/tokens.css", import.meta.url), "utf8");
     const blocks = {
-      small: readCssBlock(css, ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="small"]'),
-      default: readCssBlock(css, ":root"),
-      large: readCssBlock(css, ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="large"]'),
+      small: [
+        readCssBlock(
+          css,
+          ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-interface-text-size="small"],\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="small"]:not([data-interface-text-size])',
+        ),
+        readCssBlock(
+          css,
+          ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-content-text-size="small"],\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="small"]:not([data-content-text-size])',
+        ),
+        readCssBlock(
+          css,
+          ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-terminal-text-size="small"],\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="small"]:not([data-terminal-text-size])',
+        ),
+      ].join("\n"),
+      default: readCssBlock(
+        css,
+        ":root,\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface, .dark)",
+      ),
+      large: [
+        readCssBlock(
+          css,
+          ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-interface-text-size="large"],\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="large"]:not([data-interface-text-size])',
+        ),
+        readCssBlock(
+          css,
+          ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-content-text-size="large"],\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="large"]:not([data-content-text-size])',
+        ),
+        readCssBlock(
+          css,
+          ':where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-terminal-text-size="large"],\n:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-text-size="large"]:not([data-terminal-text-size])',
+        ),
+      ].join("\n"),
     };
     const tokenNames = {
       micro: "--po-text-size-micro",
@@ -142,6 +195,7 @@ describe("appearance preferences", () => {
       bodyLarge: "--po-text-size-body-lg",
       content: "--po-text-size-content",
       code: "--po-code-font-size",
+      terminal: "--po-terminal-font-size",
       title: "--po-text-size-title",
       pageTitle: "--po-text-size-page-title",
       display: "--po-text-size-display",
@@ -154,7 +208,7 @@ describe("appearance preferences", () => {
       }
     }
 
-    expect(css).toMatch(
+    expect(tokens).toMatch(
       /:root,\s*:where\(\.app-shell, \.onboarding-shell, \.desktop-overlay-root, \.desktop-theme-preview-surface, \.dark\)\s*\{[^}]*--desktop-sidebar-font-size:\s*var\(--po-text-size-sidebar\);[^}]*--desktop-sidebar-font-size-meta:\s*var\(--po-text-size-meta\);/s,
     );
   });
@@ -249,6 +303,14 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings("not-json").enableEditorSaveStatus).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableEditorSaveStatus: false })).enableEditorSaveStatus).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableEditorSaveStatus: true })).enableEditorSaveStatus).toBe(true);
+  });
+
+  it("keeps Context Maps experimental and migrates the former relationship flag", () => {
+    expect(parseExperimentalSettings(null).enableContextMaps).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableContextMaps: true })).enableContextMaps)
+      .toBe(true);
+    expect(parseExperimentalSettings(JSON.stringify({ enableFolderRelationships: true })).enableContextMaps)
+      .toBe(true);
   });
 
   it("keeps Minimal Mode off unless the user explicitly opts in", () => {

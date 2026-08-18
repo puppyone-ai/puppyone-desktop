@@ -1,6 +1,9 @@
 {
   "native.messageUnavailable": "This text is unavailable.",
   "native.dock.newWindow": "New Window",
+  "native.menu.file": "File",
+  "native.menu.openWorkspace": "Open Workspace…",
+  "native.menu.openWorkspaceInNewWindow": "Open Workspace in New Window…",
   "native.workspace.open.title": "Open local PuppyOne workspace",
   "native.update.blocker.terminal.label": "PuppyOne terminal sessions open ({count})",
   "native.update.blocker.terminal.detail": "Updating will close {count} terminal session(s) created inside PuppyOne. Ghostty and other external terminals are not affected.",

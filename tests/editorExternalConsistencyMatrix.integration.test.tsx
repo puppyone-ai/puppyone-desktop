@@ -13,6 +13,7 @@ import type {
   EditorDocument,
   FileContent,
 } from "@puppyone/shared-ui";
+import { EMPTY_MARKDOWN_WORKSPACE_ENVIRONMENT } from "@puppyone/shared-ui";
 import { closeAllDocumentWorkingCopies } from "../packages/shared-ui/src/editor/document-session/documentWorkingCopies";
 import { EditorDocumentHost } from "../packages/shared-ui/src/editor/host/EditorDocumentHost";
 import { preloadPresetViewer } from "../packages/shared-ui/src/editor/host/PresetViewerRenderer";
@@ -43,6 +44,29 @@ type FormatCase = Readonly<{
 const MARKERS = ["alpha", "agent", "human"] as const;
 
 const FORMAT_CASES: readonly FormatCase[] = [
+  {
+    label: "Context Map",
+    viewerId: "context-map",
+    path: "matrix-map.contextmap",
+    type: "context-map",
+    mimeType: "application/vnd.puppyone.context-map+json",
+    initial: contextMapContent("alpha"),
+    external: contextMapContent("agent"),
+    local: contextMapContent("human"),
+    readRuntimeMarker: readContextMapMarker,
+    readEditorMarker: readContextMapMarker,
+    applyLocalEdit: (container) => {
+      const collapse = container.querySelector<HTMLButtonElement>(
+        '.folder-relationship-group[data-node-path="alpha"] .folder-relationship-collapse',
+      );
+      const expand = container.querySelector<HTMLButtonElement>(
+        'button.folder-relationship-card[data-node-path="human"]',
+      );
+      if (!collapse || !expand) throw new Error("Context Map disclosure controls are unavailable.");
+      collapse.click();
+      expand.click();
+    },
+  },
   codeMirrorCase({
     label: "Markdown",
     viewerId: "markdown",
@@ -253,7 +277,7 @@ describe("P0 editor external-consistency matrix", () => {
       return content;
     });
     const dataPort: DataPort = {
-      listChildren: vi.fn(async () => []),
+      listChildren: vi.fn(contextMapListChildren),
       readFile,
       documentPersistence: {
         kind: "local-fs",
@@ -402,7 +426,7 @@ function createRuntimeHarness(formatCase: FormatCase) {
   const persist = vi.fn(async () => ({ ok: true as const, version: "unexpected" }));
   const readFile = vi.fn(async () => storage);
   const dataPort: DataPort = {
-    listChildren: vi.fn(async () => []),
+    listChildren: vi.fn(contextMapListChildren),
     readFile,
     documentPersistence: {
       kind: "local-fs",
@@ -456,6 +480,10 @@ async function createEditorHarness(formatCase: FormatCase) {
       await act(async () => root.render(withTestLocalization(
         <EditorDocumentHost
           document={editorDocument(formatCase, content, version)}
+          contextMapEnvironment={{
+            revision: 1,
+            listChildren: contextMapListChildren,
+          }}
           documentPersistence={persistence}
           saveMode="manual"
         />,
@@ -487,8 +515,7 @@ function runtimeElement(
         markdownBlockDragEnabled: false,
       }}
       fileIconTheme="default"
-      markdownAssetUrlResolver={null}
-      markdownLinkGraph={null}
+      markdownEnvironment={EMPTY_MARKDOWN_WORKSPACE_ENVIRONMENT}
       refreshKey={refreshKey}
       treeNode={node}
       workspaceId="workspace"
@@ -560,6 +587,13 @@ function readPuppyFlowMarker(container: HTMLElement): string | null {
   return textarea ? markerFromText(textarea.value) : null;
 }
 
+function readContextMapMarker(container: HTMLElement): string | null {
+  const expanded = container.querySelector<HTMLElement>(
+    ".folder-relationship-group[data-node-path]",
+  );
+  return expanded ? markerFromText(expanded.dataset.nodePath ?? "") : null;
+}
+
 function markerFromText(content: string): string | null {
   return MARKERS.find((marker) => content.includes(marker)) ?? null;
 }
@@ -583,6 +617,25 @@ function puppyFlowContent(marker: string): string {
     description: "",
     steps: [{ id: "step_matrix", agent: "codex", prompt: marker, enabled: true }],
   }, null, 2)}\n`;
+}
+
+function contextMapContent(marker: string): string {
+  return `${JSON.stringify({
+    version: 1,
+    scope: ".",
+    layout: { expanded: [marker], offsets: {} },
+  }, null, 2)}\n`;
+}
+
+async function contextMapListChildren(path: string | null): Promise<DataNode[]> {
+  if (path !== null) return [];
+  return MARKERS.map((marker) => ({
+    id: marker,
+    name: marker,
+    path: marker,
+    source: "local" as const,
+    type: "folder" as const,
+  }));
 }
 
 async function waitForMarker(

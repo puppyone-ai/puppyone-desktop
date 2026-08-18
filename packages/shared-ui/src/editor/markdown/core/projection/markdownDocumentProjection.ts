@@ -13,6 +13,7 @@ import {
   type DecorationSet,
 } from "@codemirror/view";
 import {
+  markdownAssetResolverRevisionFacet,
   markdownAssetUrlResolverFacet,
   markdownDocumentPathFacet,
   markdownHtmlTrustModeFacet,
@@ -486,10 +487,12 @@ function getDecorationContextInvalidation(
   if (
     transaction.startState.facet(markdownHtmlTrustModeFacet) !== transaction.state.facet(markdownHtmlTrustModeFacet)
     || transaction.startState.facet(markdownDocumentPathFacet) !== transaction.state.facet(markdownDocumentPathFacet)
-    || transaction.startState.facet(markdownAssetUrlResolverFacet) !== transaction.state.facet(markdownAssetUrlResolverFacet)
+    || transaction.startState.facet(markdownAssetResolverRevisionFacet) !== transaction.state.facet(markdownAssetResolverRevisionFacet)
   ) {
     return "global";
   }
-  if (transaction.startState.facet(markdownLinkGraphFacet) !== transaction.state.facet(markdownLinkGraphFacet)) return "global";
+  const previousLinkRevision = transaction.startState.facet(markdownLinkGraphFacet)?.revision ?? 0;
+  const nextLinkRevision = transaction.state.facet(markdownLinkGraphFacet)?.revision ?? 0;
+  if (previousLinkRevision !== nextLinkRevision) return "global";
   return "none";
 }

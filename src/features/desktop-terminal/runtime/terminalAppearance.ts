@@ -54,7 +54,7 @@ export function readTerminalFontFamily(element: HTMLElement) {
 }
 
 export function readTerminalFontSize(element: HTMLElement) {
-  const value = getComputedStyle(element).getPropertyValue("--po-code-font-size").trim();
+  const value = getComputedStyle(element).getPropertyValue("--po-terminal-font-size").trim();
   const fontSize = Number.parseFloat(value);
   return Number.isInteger(fontSize) ? fontSize : 13;
 }

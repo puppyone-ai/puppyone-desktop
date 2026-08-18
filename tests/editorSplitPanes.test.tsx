@@ -6,22 +6,32 @@ import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   EMPTY_EDITOR_GROUP,
+  EMPTY_MARKDOWN_LINK_COMMANDS,
   EXPLORER_REFERENCE_DRAG_TYPE,
+  DataWorkspace,
   activateEditorPane,
   assignEditorToActivePane,
   assignEditorToPane,
   createEditorInput,
   createEditorPaneLayout,
+  getEditorPanes,
   moveEditorPane,
   openEditor,
   serializeExplorerReferenceDrag,
   splitEditorPane,
   type DataNode,
+  type DataPort,
   type DataWorkspaceState,
   type EditorGroupState,
   type EditorPaneLayoutState,
+  type MarkdownLinkCommands,
+  type MarkdownWorkspaceEnvironment,
 } from "@puppyone/shared-ui";
 import { DesktopEditorSplitView } from "../src/features/editor-workbench/layout/DesktopEditorSplitView";
+import {
+  areEditorPaneDocumentRuntimePropsEqual,
+  type EditorPaneDocumentRuntimeProps,
+} from "../src/features/editor-workbench/runtime/EditorPaneDocumentRuntime";
 import { DocumentSurfaceHost } from "../packages/shared-ui/src/editor/host/DocumentSurfaceHost";
 import { withTestLocalization } from "./testLocalization";
 
@@ -404,9 +414,10 @@ describe("DesktopEditorSplitView", () => {
           dataPort={dataPort}
           editorGroup={group}
           editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+          editorTree={state.tree}
           fileIconTheme="default"
           layout={layout}
-          state={state}
+          markdownEnvironment={state.markdownEnvironment}
           workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
           onClosePane={vi.fn()}
           onFocusPane={vi.fn()}
@@ -480,9 +491,10 @@ describe("DesktopEditorSplitView", () => {
           dataPort={dataPort}
           editorGroup={group}
           editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+          editorTree={state.tree}
           fileIconTheme="default"
           layout={layout}
-          state={state}
+          markdownEnvironment={state.markdownEnvironment}
           workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
           onClosePane={vi.fn()}
           onFocusPane={vi.fn()}
@@ -579,9 +591,10 @@ describe("DesktopEditorSplitView", () => {
           dataPort={{ listChildren: async () => tree, readFile }}
           editorGroup={group}
           editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+          editorTree={state.tree}
           fileIconTheme="default"
           layout={layout}
-          state={state}
+          markdownEnvironment={state.markdownEnvironment}
           workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
           onClosePane={vi.fn()}
           onFocusPane={vi.fn()}
@@ -693,9 +706,10 @@ describe("DesktopEditorSplitView", () => {
           dataPort={dataPort}
           editorGroup={group}
           editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+          editorTree={state.tree}
           fileIconTheme="default"
           layout={layout}
-          state={state}
+          markdownEnvironment={state.markdownEnvironment}
           workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
           onClosePane={vi.fn()}
           onFocusPane={(paneId) => setLayout((current) => activateEditorPane(current, paneId))}
@@ -803,9 +817,10 @@ describe("DesktopEditorSplitView", () => {
           dataPort={dataPort}
           editorGroup={group}
           editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+          editorTree={state.tree}
           fileIconTheme="default"
           layout={currentLayout}
-          state={state}
+          markdownEnvironment={state.markdownEnvironment}
           workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
           onClosePane={vi.fn()}
           onFocusPane={(paneId) => setCurrentLayout((current) => activateEditorPane(current, paneId))}
@@ -854,6 +869,163 @@ describe("DesktopEditorSplitView", () => {
       .toBe("true");
     expect(surfaceRender).not.toHaveBeenCalled();
   });
+
+  it("keeps an inactive Markdown table pane byte-for-byte mounted while sibling panes route workspace focus", async () => {
+    const { group, layout: initialLayout } = createThreePaneWorkspace("md");
+    const sources = new Map([
+      ["a.md", [
+        "| Name | Value |",
+        "| --- | --- |",
+        "| stable | table |",
+        "",
+        "Paragraph below the table keeps **the same DOM identity**.",
+      ].join("\n")],
+      ["b.md", "# B\n\nSibling B owns its own projection."],
+      ["c.md", "# C\n\nSibling C owns its own projection."],
+    ]);
+    const tree: DataNode[] = Array.from(sources.keys(), (path) => ({
+      id: path,
+      name: path,
+      path,
+      type: "markdown",
+      mimeType: "text/markdown",
+      source: "local",
+    }));
+    const readFile = vi.fn(async (path: string) => ({
+      path,
+      name: path,
+      type: "markdown" as const,
+      mimeType: "text/markdown",
+      content: sources.get(path) ?? "",
+      version: `version:${path}`,
+    }));
+    const dataPort = { listChildren: async () => tree, readFile };
+    const editorById = new Map(group.editors.map((editor) => [editor.id, editor]));
+    const paneResource = new Map(getEditorPanes(initialLayout).map((pane) => [
+      pane.id,
+      pane.editorId ? editorById.get(pane.editorId)?.resource ?? null : null,
+    ]));
+    const readyEnvironments: DataWorkspaceState["markdownEnvironment"][] = [];
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    function Harness() {
+      const [layout, setLayout] = React.useState(initialLayout);
+      const [activePath, setActivePath] = React.useState<string | null>("a.md");
+      return withTestLocalization(
+        <DataWorkspace
+          activePath={activePath}
+          dataPort={dataPort}
+          enableMarkdownLinkContentIndexing={false}
+          loadActiveFileSource={false}
+          showHeader={false}
+          workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
+          mainSlot={(state) => {
+            if (state.tree.length === tree.length) readyEnvironments.push(state.markdownEnvironment);
+            return (
+              <DesktopEditorSplitView
+                aiEditRequest={null}
+                dataPort={dataPort}
+                editorGroup={group}
+                editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+                editorTree={state.tree}
+                fileIconTheme="default"
+                layout={layout}
+                markdownEnvironment={state.markdownEnvironment}
+                workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
+                onClosePane={vi.fn()}
+                onFocusPane={(paneId) => {
+                  setLayout((current) => activateEditorPane(current, paneId));
+                  setActivePath(paneResource.get(paneId) ?? null);
+                }}
+                onMovePane={vi.fn()}
+                onOpenAtPaneEdge={vi.fn()}
+                onResizeSplit={vi.fn()}
+                onSplitPane={vi.fn()}
+              />
+            );
+          }}
+          onActivePathChange={async (path) => setActivePath(path)}
+        />,
+      );
+    }
+
+    await act(async () => root?.render(<Harness />));
+    await waitForCondition(() => (
+      container.querySelectorAll(".cm-editor").length === 3
+      && container.querySelector('[data-editor-pane-id="editor-pane-1"] .cm-md-table-widget') !== null
+    ));
+    const panes = Array.from(container.querySelectorAll<HTMLElement>(".desktop-editor-pane"));
+    const views = panes.map((pane) => EditorView.findFromDOM(
+      pane.querySelector<HTMLElement>(".cm-editor")!,
+    ));
+    await focusEditorView(views[0]!);
+    await focusEditorView(views[1]!);
+
+    const firstPane = container.querySelector<HTMLElement>(
+      '[data-editor-pane-id="editor-pane-1"]',
+    )!;
+    const table = firstPane.querySelector(".cm-md-table-widget");
+    const paragraph = Array.from(firstPane.querySelectorAll<HTMLElement>(".cm-line"))
+      .find((line) => line.textContent?.includes("Paragraph below the table"));
+    expect(table).not.toBeNull();
+    expect(paragraph).not.toBeUndefined();
+    const firstPaneHtml = views[0]!.contentDOM.innerHTML;
+    const firstPaneDispatch = vi.spyOn(views[0]!, "dispatch");
+    const surfaceRender = vi.spyOn(DocumentSurfaceHost.prototype, "render");
+    surfaceRender.mockClear();
+
+    for (let cycle = 0; cycle < 6; cycle += 1) {
+      await focusEditorView(views[2]!);
+      await focusEditorView(views[1]!);
+      expect(firstPane.querySelector(".cm-md-table-widget")).toBe(table);
+      expect(Array.from(firstPane.querySelectorAll<HTMLElement>(".cm-line"))
+        .find((line) => line.textContent?.includes("Paragraph below the table")))
+        .toBe(paragraph);
+    }
+
+    expect(views[0]!.contentDOM.innerHTML).toBe(firstPaneHtml);
+    expect(firstPaneDispatch).not.toHaveBeenCalled();
+    expect(surfaceRender).not.toHaveBeenCalled();
+    expect(readFile).toHaveBeenCalledTimes(3);
+    expect(new Set(readyEnvironments).size).toBe(1);
+    expect(Array.from(container.querySelectorAll<HTMLElement>(".cm-editor")).map(
+      (element) => EditorView.findFromDOM(element),
+    )).toEqual(views);
+  });
+
+  it("routes semantic Markdown revisions only to runtimes that consume them", () => {
+    const image: DataNode = {
+      id: "diagram.png",
+      name: "diagram.png",
+      path: "diagram.png",
+      type: "image",
+      mimeType: "image/png",
+      source: "local",
+    };
+    const markdown: DataNode = {
+      id: "note.md",
+      name: "note.md",
+      path: "note.md",
+      type: "markdown",
+      mimeType: "text/markdown",
+      source: "local",
+    };
+
+    expect(areEditorPaneDocumentRuntimePropsEqual(
+      runtimeProps(image, runtimeEnvironment(1)),
+      runtimeProps({ ...image }, runtimeEnvironment(2)),
+    )).toBe(true);
+    expect(areEditorPaneDocumentRuntimePropsEqual(
+      runtimeProps(markdown, runtimeEnvironment(1)),
+      runtimeProps({ ...markdown }, runtimeEnvironment(2)),
+    )).toBe(false);
+    expect(areEditorPaneDocumentRuntimePropsEqual(
+      runtimeProps(markdown, runtimeEnvironment(7)),
+      runtimeProps({ ...markdown }, runtimeEnvironment(7)),
+    )).toBe(true);
+  });
 });
 
 function renderSplitView(
@@ -875,9 +1047,10 @@ function renderSplitView(
       dataPort={{ listChildren: async () => [] }}
       editorGroup={editorGroup}
       editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+      editorTree={[]}
       fileIconTheme="default"
       layout={layout}
-      state={emptyWorkspaceState()}
+      markdownEnvironment={emptyWorkspaceState().markdownEnvironment}
       workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
       onClosePane={vi.fn()}
       onFocusPane={callbacks.onFocusPane ?? vi.fn()}
@@ -968,14 +1141,64 @@ function emptyWorkspaceState(): DataWorkspaceState {
     fileUrl: null,
     fileUrlLoading: false,
     fileUrlError: null,
-    markdownLinkGraph: {
-      documentCount: 0,
-      indexedDocumentCount: 0,
-      isIndexing: false,
-      resolveWikiLink: () => ({ exists: false, ambiguous: false, path: null, name: "", displayName: "", target: "" }),
-      resolveMarkdownLink: () => null,
-      getBacklinks: () => [],
+    markdownEnvironment: {
+      linkGraph: {
+        revision: 0,
+        documentCount: 0,
+        indexedDocumentCount: 0,
+        resolveWikiLink: () => ({ exists: false, ambiguous: false, path: null, name: "", displayName: "", target: "" }),
+        resolveMarkdownLink: () => null,
+        getBacklinks: () => [],
+      },
+      linkCommands: EMPTY_MARKDOWN_LINK_COMMANDS,
+      assetUrlResolver: () => null,
+      assetResolverRevision: 0,
     },
-    markdownAssetUrlResolver: () => null,
+  };
+}
+
+const runtimeDataPort: DataPort = { listChildren: async () => [] };
+const runtimeLinkCommands: MarkdownLinkCommands = { openPath: () => undefined };
+
+function runtimeProps(
+  node: DataNode,
+  markdownEnvironment: MarkdownWorkspaceEnvironment,
+): EditorPaneDocumentRuntimeProps {
+  return {
+    aiEditFile: null,
+    dataPort: runtimeDataPort,
+    editor: { id: node.path, resource: node.path, label: node.name },
+    editorInteractionPreferences: {
+      showSaveStatus: false,
+      markdownBlockDragEnabled: false,
+    },
+    fileIconTheme: "default",
+    markdownEnvironment,
+    treeNode: node,
+    workspaceId: "workspace",
+    workspaceRoot: "/workspace",
+    markdownDialect: "puppy-gfm",
+  };
+}
+
+function runtimeEnvironment(revision: number): MarkdownWorkspaceEnvironment {
+  return {
+    linkGraph: {
+      revision,
+      documentCount: 1,
+      indexedDocumentCount: 1,
+      resolveWikiLink: (_sourcePath, target) => ({
+        exists: false,
+        ambiguous: false,
+        path: null,
+        name: target,
+        displayName: target,
+        target,
+      }),
+      resolveMarkdownLink: () => null,
+    },
+    linkCommands: runtimeLinkCommands,
+    assetUrlResolver: null,
+    assetResolverRevision: 1,
   };
 }

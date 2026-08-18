@@ -88,7 +88,8 @@ const importedFont: FontCatalogEntry = {
   id: "imported:fixture-font",
   label: "Imported",
   description: "Imported fixture font",
-  family: '"PuppyOne Imported Fixture", serif',
+  family: '"PuppyOne Imported Fixture"',
+  category: "serif",
   source: "imported",
   roles: ["content"],
 };

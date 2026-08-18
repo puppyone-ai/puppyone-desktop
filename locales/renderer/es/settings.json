@@ -135,6 +135,8 @@
   "experimental.viewerPlugins.detail": "Activa la página experimental de Plugins, solo local, y su acceso directo opcional de navegación.",
   "experimental.editorSaveStatus.title": "Estado de guardado del editor",
   "experimental.editorSaveStatus.detail": "Muestra el control de guardado y el diagnóstico de estado en la esquina superior derecha. Los archivos se siguen guardando con normalidad cuando está oculto.",
+  "experimental.contextMaps.title": "Archivos de mapa de contexto",
+  "experimental.contextMaps.detail": "Crea mapas de relaciones persistentes como archivos y ábrelos en el editor.",
   "experimental.projectsHome.title": "Página de inicio de proyectos",
   "experimental.projectsHome.detail": "Prueba el diseño unificado de tarjetas para proyectos de Cloud y locales.",
   "experimental.agentChat.title": "Chat del agente",

@@ -6,7 +6,11 @@ import {
 import { isBrokerSafeResolvedAssetUrl } from "../../platform/policy/markdownAssetPolicy";
 import { getSafeMarkdownHref } from "../../platform/policy/markdownUrlPolicy";
 import { appendSanitizedInlineHtml } from "../../features/html/sanitizeHtml";
-import type { MarkdownAssetUrlResolver, MarkdownLinkGraph } from "../../../registry/viewerTypes";
+import type {
+  MarkdownAssetUrlResolver,
+  MarkdownLinkCommands,
+  MarkdownLinkGraph,
+} from "../../../registry/viewerTypes";
 import {
   findMarkdownImageTokens,
   parseMarkdownImageTokenAt,
@@ -48,6 +52,7 @@ type InlineParseBudget = {
 
 export type MarkdownInlineRenderOptions = {
   markdownLinkGraph?: MarkdownLinkGraph | null;
+  markdownLinkCommands?: MarkdownLinkCommands;
   /**
    * @deprecated Raw asset resolvers are no longer used by preview rendering.
    * Hosts must provide the AssetBroker-backed `resolveAssetUrl` callback.
@@ -280,7 +285,7 @@ function appendWikiLink(target: Node, token: MarkdownWikiLinkToken, options: Mar
     : "cm-md-wiki-link-inline is-resolved";
   link.textContent = token.label;
   link.title = resolvedTarget.path ?? token.target;
-  const openWikiLink = linkGraph?.openWikiLink;
+  const openWikiLink = options.markdownLinkCommands?.openWikiLink;
   if (!openWikiLink) {
     target.appendChild(link);
     return;

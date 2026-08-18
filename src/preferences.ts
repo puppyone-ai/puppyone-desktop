@@ -86,6 +86,7 @@ export type ExperimentalSettings = {
   enableAgentChat: boolean;
   enableAssetLibraryHome: boolean;
   enableCloudWorkspace: boolean;
+  enableContextMaps: boolean;
   enableEditorSaveStatus: boolean;
   enableMarkdownBlockDrag: boolean;
   enableMinimalMode: boolean;
@@ -93,9 +94,10 @@ export type ExperimentalSettings = {
   enableViewerPlugins: boolean;
 };
 
-export const CREATE_NEW_MENU_VERSION = 2 as const;
+export const CREATE_NEW_MENU_VERSION = 3 as const;
 export const CREATE_NEW_ITEM_IDS = [
   "markdown",
+  "contextMap",
   "text",
   "json",
   "csv",
@@ -184,6 +186,7 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableAgentChat: false,
   enableAssetLibraryHome: false,
   enableCloudWorkspace: false,
+  enableContextMaps: false,
   enableEditorSaveStatus: false,
   enableMarkdownBlockDrag: false,
   enableMinimalMode: false,
@@ -194,6 +197,7 @@ export const DEFAULT_CREATE_NEW_MENU_SETTINGS: CreateNewMenuSettings = {
   version: CREATE_NEW_MENU_VERSION,
   items: [
     { kind: "markdown", enabled: true },
+    { kind: "contextMap", enabled: true },
     { kind: "csv", enabled: true },
     { kind: "html", enabled: true },
     { kind: "slides", enabled: true },
@@ -296,6 +300,7 @@ export const TEXT_SIZE_PRESETS = [
       bodyLarge: 13,
       content: 13,
       code: 12,
+      terminal: 12,
       title: 15,
       pageTitle: 18,
       display: 22,
@@ -314,6 +319,7 @@ export const TEXT_SIZE_PRESETS = [
       bodyLarge: 14,
       content: 14,
       code: 13,
+      terminal: 13,
       title: 16,
       pageTitle: 20,
       display: 24,
@@ -332,6 +338,7 @@ export const TEXT_SIZE_PRESETS = [
       bodyLarge: 16,
       content: 16,
       code: 15,
+      terminal: 15,
       title: 18,
       pageTitle: 22,
       display: 28,
@@ -350,6 +357,7 @@ export const TEXT_SIZE_PRESETS = [
     bodyLarge: number;
     content: number;
     code: number;
+    terminal: number;
     title: number;
     pageTitle: number;
     display: number;
@@ -566,11 +574,16 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
     const parsed = JSON.parse(value) as Partial<ExperimentalSettings> | null;
     if (!parsed || typeof parsed !== "object") return DEFAULT_EXPERIMENTAL_SETTINGS;
 
-    const legacy = parsed as typeof parsed & { enableAgentCompanion?: unknown };
+    const legacy = parsed as typeof parsed & {
+      enableAgentCompanion?: unknown;
+      enableFolderRelationships?: unknown;
+    };
     return {
       enableAgentChat: parsed.enableAgentChat === true || legacy.enableAgentCompanion === true,
       enableAssetLibraryHome: parsed.enableAssetLibraryHome === true,
       enableCloudWorkspace: parsed.enableCloudWorkspace === true,
+      enableContextMaps: parsed.enableContextMaps === true
+        || legacy.enableFolderRelationships === true,
       enableEditorSaveStatus: parsed.enableEditorSaveStatus === true,
       enableMarkdownBlockDrag: parsed.enableMarkdownBlockDrag === true,
       enableMinimalMode: parsed.enableMinimalMode === true,
@@ -607,13 +620,9 @@ export function parseCreateNewMenuSettings(value: string | null | undefined): Cr
     if (parsed.items.length > 0 && items.length === 0) {
       return cloneDefaultCreateNewMenuSettings();
     }
-    const isLegacyDefault = parsed.version !== CREATE_NEW_MENU_VERSION && (
-      items.length === 2
-      && items[0]?.kind === "markdown"
-      && items[0].enabled
-      && items[1]?.kind === "csv"
-      && items[1].enabled
-    );
+    const isLegacyDefault = parsed.version !== CREATE_NEW_MENU_VERSION
+      && (matchesEnabledCreateMenu(items, ["markdown", "csv"])
+        || matchesEnabledCreateMenu(items, ["markdown", "csv", "html", "slides"]));
     if (isLegacyDefault) {
       return cloneDefaultCreateNewMenuSettings();
     }
@@ -640,7 +649,16 @@ export function isCreateNewItemAvailable(
   experimentalSettings: ExperimentalSettings,
 ): boolean {
   if (kind === "puppyflow") return experimentalSettings.enablePuppyFlowFiles;
+  if (kind === "contextMap") return experimentalSettings.enableContextMaps;
   return true;
+}
+
+function matchesEnabledCreateMenu(
+  items: readonly CreateNewMenuItem[],
+  kinds: readonly CreateNewItemId[],
+): boolean {
+  return items.length === kinds.length
+    && items.every((item, index) => item.enabled && item.kind === kinds[index]);
 }
 
 export function getVisibleCreateNewItems(

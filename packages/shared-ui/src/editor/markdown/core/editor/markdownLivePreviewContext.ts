@@ -13,7 +13,13 @@ import { getDocRevision } from "../../platform/brokers/transactionBroker";
 import { isSafeHref } from "../../platform/policy/markdownUrlPolicy";
 import { getInlineRevealElement, type MarkdownElement } from "../syntax/markdownElements";
 import { MarkdownLinkInteractionSession } from "../state/markdownLinkInteraction";
-import type { MarkdownAssetUrlResolver, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../../../registry/viewerTypes";
+import {
+  EMPTY_MARKDOWN_LINK_COMMANDS,
+  type MarkdownAssetUrlResolver,
+  type MarkdownHtmlTrustMode,
+  type MarkdownLinkCommands,
+  type MarkdownLinkGraph,
+} from "../../../registry/viewerTypes";
 
 export const markdownHtmlTrustModeFacet = Facet.define<MarkdownHtmlTrustMode, MarkdownHtmlTrustMode>({
   combine(values) {
@@ -27,6 +33,12 @@ export const markdownLinkGraphFacet = Facet.define<MarkdownLinkGraph | null, Mar
   },
 });
 
+export const markdownLinkCommandsFacet = Facet.define<MarkdownLinkCommands, MarkdownLinkCommands>({
+  combine(values) {
+    return values.length > 0 ? values[values.length - 1] : EMPTY_MARKDOWN_LINK_COMMANDS;
+  },
+});
+
 export const markdownDocumentPathFacet = Facet.define<string, string>({
   combine(values) {
     return values.length > 0 ? values[values.length - 1] : "";
@@ -36,6 +48,12 @@ export const markdownDocumentPathFacet = Facet.define<string, string>({
 export const markdownAssetUrlResolverFacet = Facet.define<MarkdownAssetUrlResolver | null, MarkdownAssetUrlResolver | null>({
   combine(values) {
     return values.length > 0 ? values[values.length - 1] : null;
+  },
+});
+
+export const markdownAssetResolverRevisionFacet = Facet.define<number, number>({
+  combine(values) {
+    return values.length > 0 ? values[values.length - 1] : 0;
   },
 });
 
@@ -63,12 +81,16 @@ export function markdownLivePreviewContextExtension(
   markdownAssetUrlResolver: MarkdownAssetUrlResolver | null,
   workspaceId = "",
   workspaceRoot: string | null = null,
+  markdownLinkCommands: MarkdownLinkCommands = EMPTY_MARKDOWN_LINK_COMMANDS,
+  markdownAssetResolverRevision = 0,
 ): Extension {
   return [
     markdownHtmlTrustModeFacet.of(htmlTrustMode),
     markdownLinkGraphFacet.of(markdownLinkGraph),
+    markdownLinkCommandsFacet.of(markdownLinkCommands),
     markdownDocumentPathFacet.of(documentPath),
     markdownAssetUrlResolverFacet.of(markdownAssetUrlResolver),
+    markdownAssetResolverRevisionFacet.of(markdownAssetResolverRevision),
     markdownWorkspaceIdFacet.of(workspaceId),
     markdownWorkspaceRootFacet.of(workspaceRoot),
     markdownLinkModifierClassHandler,
@@ -245,15 +267,16 @@ function openMarkdownLinkElementFromSource(element: MarkdownElement, view: Edito
 
 function openWikiLinkTarget(wikiTarget: string, view: EditorView): boolean {
   const linkGraph = view.state.facet(markdownLinkGraphFacet);
+  const linkCommands = view.state.facet(markdownLinkCommandsFacet);
   const sourcePath = view.state.facet(markdownDocumentPathFacet);
-  if (!linkGraph?.openWikiLink) return false;
+  if (!linkGraph || !linkCommands.openWikiLink) return false;
 
   const resolvedTarget = linkGraph.resolveWikiLink(sourcePath, wikiTarget);
   if (!resolvedTarget.exists && (!resolvedTarget.candidatePaths || resolvedTarget.candidatePaths.length === 0)) {
     return false;
   }
 
-  linkGraph.openWikiLink(resolvedTarget, sourcePath);
+  linkCommands.openWikiLink(resolvedTarget, sourcePath);
   return true;
 }
 
@@ -271,12 +294,13 @@ export function openMarkdownHref(href: string, view: EditorView): boolean {
 
   if (result.action === "navigate-internal") {
     const linkGraph = view.state.facet(markdownLinkGraphFacet);
+    const linkCommands = view.state.facet(markdownLinkCommandsFacet);
     const resolvedTarget = linkGraph?.resolveMarkdownLink(documentPath, result.path) ?? null;
-    if (!resolvedTarget || !linkGraph?.openWikiLink) return false;
+    if (!resolvedTarget || !linkCommands.openWikiLink) return false;
     if (!resolvedTarget.exists && (!resolvedTarget.candidatePaths || resolvedTarget.candidatePaths.length === 0)) {
       return false;
     }
-    linkGraph.openWikiLink(resolvedTarget, documentPath);
+    linkCommands.openWikiLink(resolvedTarget, documentPath);
     return true;
   }
 
@@ -288,9 +312,9 @@ export function openMarkdownHref(href: string, view: EditorView): boolean {
 }
 
 function openExternalMarkdownHref(href: string, view: EditorView): boolean {
-  const linkGraph = view.state.facet(markdownLinkGraphFacet);
-  if (linkGraph?.openExternalUrl) {
-    void Promise.resolve().then(() => linkGraph.openExternalUrl?.(href)).catch((error) => {
+  const linkCommands = view.state.facet(markdownLinkCommandsFacet);
+  if (linkCommands.openExternalUrl) {
+    void Promise.resolve().then(() => linkCommands.openExternalUrl?.(href)).catch((error) => {
       console.warn("Unable to open external Markdown link:", error);
     });
     return true;

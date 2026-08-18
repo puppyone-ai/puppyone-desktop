@@ -1,5 +1,5 @@
 import type { MessageFormatter } from "@puppyone/localization/core";
-import type { MarkdownLinkGraph } from "../../../registry/viewerTypes";
+import type { MarkdownLinkCommands, MarkdownLinkGraph } from "../../../registry/viewerTypes";
 
 /**
  * Narrow port for rendering an isolated Markdown string (for example a table
@@ -9,6 +9,7 @@ import type { MarkdownLinkGraph } from "../../../registry/viewerTypes";
  */
 export type MarkdownInlinePreviewOptions = {
   markdownLinkGraph?: MarkdownLinkGraph | null;
+  markdownLinkCommands?: MarkdownLinkCommands;
   sourcePath?: string;
   onLayoutChange?: () => void;
   resolveAssetUrl?: (

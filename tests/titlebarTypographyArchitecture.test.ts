@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 
 const titlebarCss = readFileSync(new URL("../src/styles/titlebar.css", import.meta.url), "utf8");
 const tokensCss = readFileSync(new URL("../src/styles/tokens.css", import.meta.url), "utf8");
+const typographyFoundationsCss = readFileSync(
+  new URL("../src/styles/typography/foundations.css", import.meta.url),
+  "utf8",
+);
 const titlebarContextSource = readFileSync(
   new URL("../src/features/app-shell/DesktopTitlebarContext.tsx", import.meta.url),
   "utf8",
@@ -60,14 +64,15 @@ describe("titlebar typography architecture", () => {
   });
 
   it("keeps chrome text at the shared medium-weight contract", () => {
-    const rootTokens = readCssBlock(tokensCss, ":root");
+    const typographyRoot = readCssBlock(typographyFoundationsCss, ":root");
+    const layoutRoot = readCssBlock(`\n${tokensCss}`, ":root");
 
-    expect(rootTokens).toContain("--po-text-weight-medium: 500;");
-    expect(rootTokens).toContain("--po-font-weight-chrome: var(--po-text-weight-medium);");
-    expect(rootTokens).toContain("--desktop-chrome-control-size: 30px;");
-    expect(rootTokens).toContain("--desktop-toolbar-action-radius: 5px;");
-    expect(rootTokens).toContain("--desktop-titlebar-control-height: 24px;");
-    expect(rootTokens).toContain("--desktop-titlebar-tool-action-width: 34px;");
+    expect(typographyRoot).toContain("--po-text-weight-medium: 500;");
+    expect(typographyRoot).toContain("--po-font-weight-chrome: var(--po-text-weight-medium);");
+    expect(layoutRoot).toContain("--desktop-chrome-control-size: 30px;");
+    expect(layoutRoot).toContain("--desktop-toolbar-action-radius: 5px;");
+    expect(layoutRoot).toContain("--desktop-titlebar-control-height: 24px;");
+    expect(layoutRoot).toContain("--desktop-titlebar-tool-action-width: 34px;");
   });
 
   it("uses the compact titlebar height without shrinking shared sidebar controls", () => {

@@ -16,7 +16,14 @@ import { getMarkdownPlanIndex } from "./core/plans/markdownPlanIndex";
 import { markdownRevealedSourceEffect } from "./core/state/revealedSource";
 import { getDocRevision } from "./platform/brokers/transactionBroker";
 import type { AiEditFile } from "../ai-edits/types";
-import type { MarkdownAssetUrlResolver, MarkdownDialectId, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../registry/viewerTypes";
+import {
+  EMPTY_MARKDOWN_LINK_COMMANDS,
+  type MarkdownAssetUrlResolver,
+  type MarkdownDialectId,
+  type MarkdownHtmlTrustMode,
+  type MarkdownLinkCommands,
+  type MarkdownLinkGraph,
+} from "../registry/viewerTypes";
 import type {
   EditorSourceRevision,
   EditorSourceSnapshot,
@@ -43,7 +50,9 @@ export type MarkdownCodeMirrorEditorProps = {
   workspaceId?: string;
   workspaceRoot?: string | null;
   markdownLinkGraph?: MarkdownLinkGraph | null;
+  markdownLinkCommands?: MarkdownLinkCommands;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
+  markdownAssetResolverRevision?: number;
   /** Legacy controlled boundary. Product Markdown surfaces use snapshot ports. */
   onChange?: (value: string) => void;
   onSourceRevisionChange?: (revision: EditorSourceRevision) => void;
@@ -70,7 +79,9 @@ export function MarkdownCodeMirrorEditor({
   workspaceId = "",
   workspaceRoot = null,
   markdownLinkGraph = null,
+  markdownLinkCommands = EMPTY_MARKDOWN_LINK_COMMANDS,
   markdownAssetUrlResolver = null,
+  markdownAssetResolverRevision = 0,
   onChange,
   onSourceRevisionChange,
   onSnapshotPortChange,
@@ -131,16 +142,20 @@ export function MarkdownCodeMirrorEditor({
   const livePreviewContextRef = useRef({
     htmlTrustMode,
     markdownLinkGraph,
+    markdownLinkCommands,
     documentPath,
     markdownAssetUrlResolver,
+    markdownAssetResolverRevision,
     workspaceId,
     workspaceRoot,
   });
   livePreviewContextRef.current = {
     htmlTrustMode,
     markdownLinkGraph,
+    markdownLinkCommands,
     documentPath,
     markdownAssetUrlResolver,
+    markdownAssetResolverRevision,
     workspaceId,
     workspaceRoot,
   };
@@ -395,6 +410,8 @@ export function MarkdownCodeMirrorEditor({
                     context.markdownAssetUrlResolver,
                     context.workspaceId,
                     context.workspaceRoot,
+                    context.markdownLinkCommands,
+                    context.markdownAssetResolverRevision,
                   ),
                 ),
                 livePreviewCoreCompartmentRef.current.reconfigure(
@@ -454,6 +471,8 @@ export function MarkdownCodeMirrorEditor({
             context.markdownAssetUrlResolver,
             context.workspaceId,
             context.workspaceRoot,
+            context.markdownLinkCommands,
+            context.markdownAssetResolverRevision,
           ),
         ),
       });
@@ -466,8 +485,9 @@ export function MarkdownCodeMirrorEditor({
     documentPath,
     htmlTrustMode,
     livePreview,
-    markdownAssetUrlResolver,
-    markdownLinkGraph,
+    markdownAssetResolverRevision,
+    markdownLinkCommands,
+    markdownLinkGraph?.revision,
     workspaceId,
     workspaceRoot,
   ]);
@@ -522,7 +542,9 @@ export function MarkdownCodeMirrorEditor({
       <div
         ref={hostRef}
         dir="auto"
+        lang={locale}
         className="markdown-codemirror-editor"
+        data-po-typography-role="content"
         data-live-preview={livePreview ? "true" : "false"}
         data-preview-state={previewState}
         data-preview-message={previewMessage ?? undefined}

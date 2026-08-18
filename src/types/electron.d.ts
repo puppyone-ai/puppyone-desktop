@@ -810,8 +810,8 @@ declare global {
       }>;
       openExternalUrl: (href: string) => Promise<{ ok: boolean }>;
       submitFeedback: (request: {
-        role: "developer" | "researcher" | "creator" | "other";
         message: string;
+        email: string;
         locale?: string;
         screenshot?: {
           bytes: ArrayBuffer;

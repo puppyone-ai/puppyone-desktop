@@ -57,7 +57,7 @@ describe("DesktopHelpLauncher", () => {
     expect(container.querySelector("a")).toBeNull();
   });
 
-  it("collects a role before sending typed feedback through the desktop bridge", async () => {
+  it("collects required feedback and a required contact email before sending", async () => {
     const submitFeedback = vi.fn().mockResolvedValue({ ok: true });
     window.puppyoneDesktop = {
       submitFeedback,
@@ -69,21 +69,34 @@ describe("DesktopHelpLauncher", () => {
 
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
     const textarea = document.querySelector<HTMLTextAreaElement>("textarea");
-    const developerRole = dialog?.querySelector<HTMLInputElement>('input[name="feedback-role"][value="developer"]');
+    const emailInput = dialog?.querySelector<HTMLInputElement>('.desktop-feedback-contact-input');
     expect(dialog).not.toBeNull();
     expect(dialog?.getAttribute("aria-modal")).toBe("true");
     expect(dialog?.closest("#desktop-overlay-root")).not.toBeNull();
     expect(launcher?.getAttribute("aria-expanded")).toBe("true");
-    expect(document.activeElement).toBe(developerRole);
-    expect(textarea?.placeholder).toBe("Feedback…");
-    expect(dialog?.querySelector(".desktop-feedback-role")?.textContent).toContain("Your role");
-    expect(dialog?.querySelectorAll('input[name="feedback-role"]')).toHaveLength(4);
-    expect(dialog?.querySelector(".desktop-feedback-message-label")?.textContent).toBe("Your feedback");
-    expect(dialog?.querySelector(".desktop-feedback-message-label")?.getAttribute("for")).toBe(textarea?.id);
+    expect(document.activeElement).toBe(textarea);
+    expect(textarea?.placeholder).toBe("Tell us what happened, what you need, or what we could improve…");
+    expect(dialog?.querySelectorAll('input[name="feedback-category"]')).toHaveLength(0);
+    expect(dialog?.querySelector(".desktop-feedback-message-field .desktop-feedback-field-label")?.textContent)
+      .toContain("What's your feedback?");
+    expect(dialog?.querySelector(".desktop-feedback-message-field .desktop-feedback-field-label")?.getAttribute("for"))
+      .toBe(textarea?.id);
+    expect(textarea?.getAttribute("aria-label")).toBe("What's your feedback?");
+    expect(textarea?.required).toBe(true);
+    expect(dialog?.querySelector(".desktop-feedback-contact-field .desktop-feedback-field-label")?.textContent)
+      .toContain("How should we contact you?");
+    expect(dialog?.querySelector(".desktop-feedback-contact-field .desktop-feedback-field-label")?.getAttribute("for"))
+      .toBe(emailInput?.id);
+    expect(dialog?.querySelectorAll(".desktop-feedback-required-marker")).toHaveLength(2);
+    expect(Array.from(dialog?.querySelectorAll(".desktop-feedback-required-marker") ?? [])
+      .every((marker) => marker.textContent === "*")).toBe(true);
+    expect(emailInput?.type).toBe("email");
+    expect(emailInput?.required).toBe(true);
+    expect(emailInput?.placeholder).toBe("you@example.com");
     const fields = dialog?.querySelector(".desktop-feedback-fields");
     expect(fields?.children).toHaveLength(2);
-    expect(fields?.children[0]?.classList.contains("desktop-feedback-role")).toBe(true);
-    expect(fields?.children[1]?.classList.contains("desktop-feedback-message-field")).toBe(true);
+    expect(fields?.children[0]?.classList.contains("desktop-feedback-message-field")).toBe(true);
+    expect(fields?.children[1]?.classList.contains("desktop-feedback-contact-field")).toBe(true);
     expect(dialog?.querySelector(".desktop-feedback-header")?.textContent).toContain("Feedback");
     expect(dialog?.querySelector<HTMLButtonElement>(".desktop-feedback-close")?.getAttribute("aria-label")).toBe("Close");
     expect(
@@ -94,11 +107,6 @@ describe("DesktopHelpLauncher", () => {
     expect(submitButton?.getAttribute("aria-label")).toBe("Send");
     expect(submitButton?.textContent).toBe("Send");
     expect(submitButton?.classList.contains("desktop-dialog-button")).toBe(true);
-    expect(
-      dialog?.querySelector(".desktop-feedback-role-control")?.classList.contains(
-        "desktop-dialog-button",
-      ),
-    ).toBe(true);
     expect(dialog?.querySelector(".desktop-feedback-composer .desktop-feedback-submit")).toBeNull();
     expect(dialog?.querySelector(".desktop-feedback-footer > .desktop-feedback-submit")).toBe(submitButton);
     expect(submitButton?.disabled).toBe(true);
@@ -113,8 +121,26 @@ describe("DesktopHelpLauncher", () => {
     });
     expect(submitButton?.disabled).toBe(true);
 
-    act(() => developerRole?.click());
-    expect(developerRole?.checked).toBe(true);
+    act(() => {
+      if (!emailInput) return;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+        emailInput,
+        "not-an-email",
+      );
+      emailInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(emailInput?.getAttribute("aria-invalid")).toBe("true");
+    expect(submitButton?.disabled).toBe(false);
+
+    act(() => {
+      if (!emailInput) return;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+        emailInput,
+        "person@example.com",
+      );
+      emailInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(emailInput?.getAttribute("aria-invalid")).toBe("false");
     expect(submitButton?.disabled).toBe(false);
 
     const form = document.querySelector<HTMLFormElement>(".desktop-feedback-form");
@@ -124,8 +150,8 @@ describe("DesktopHelpLauncher", () => {
     });
 
     expect(submitFeedback).toHaveBeenCalledWith({
-      role: "developer",
       message: "Please make search faster.",
+      email: "person@example.com",
       locale: "en",
     });
     expect(document.querySelector(".desktop-feedback-status")?.textContent).toContain("Sent");
@@ -153,7 +179,7 @@ describe("DesktopHelpLauncher", () => {
     expect(launcher?.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("accepts a screenshot as the whole feedback and passes only its bytes and type", async () => {
+  it("attaches a screenshot alongside the required written feedback", async () => {
     const submitFeedback = vi.fn().mockResolvedValue({ ok: true });
     window.puppyoneDesktop = {
       submitFeedback,
@@ -165,7 +191,8 @@ describe("DesktopHelpLauncher", () => {
     act(() => container.querySelector<HTMLButtonElement>(".desktop-help-launcher")?.click());
 
     const input = document.querySelector<HTMLInputElement>(".desktop-feedback-file-input");
-    const researcherRole = document.querySelector<HTMLInputElement>('input[name="feedback-role"][value="researcher"]');
+    const textarea = document.querySelector<HTMLTextAreaElement>("textarea");
+    const emailInput = document.querySelector<HTMLInputElement>(".desktop-feedback-contact-input");
     const screenshotBytes = new Uint8Array([
       0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
     ]);
@@ -174,7 +201,20 @@ describe("DesktopHelpLauncher", () => {
     });
 
     await act(async () => {
-      researcherRole?.click();
+      if (textarea) {
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(
+          textarea,
+          "The export button is not responding.",
+        );
+        textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (emailInput) {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+          emailInput,
+          "support@example.com",
+        );
+        emailInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
       Object.defineProperty(input, "files", {
         configurable: true,
         value: [screenshotFile],
@@ -196,8 +236,8 @@ describe("DesktopHelpLauncher", () => {
 
     expect(submitFeedback).toHaveBeenCalledOnce();
     expect(submitFeedback).toHaveBeenCalledWith({
-      role: "researcher",
-      message: "",
+      message: "The export button is not responding.",
+      email: "support@example.com",
       locale: "en",
       screenshot: {
         bytes: expect.any(ArrayBuffer),
@@ -253,14 +293,15 @@ describe("DesktopHelpLauncher", () => {
     expect(launcherCss).toMatch(
       /\.desktop-feedback-fields\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s,
     );
+    expect(launcherCss).not.toContain("desktop-feedback-category");
     expect(launcherCss).toMatch(
-      /\.desktop-feedback-role\s*\{[^}]*border-block-end:\s*1px solid var\(--po-divider\)/s,
+      /\.desktop-feedback-required-marker\s*\{[^}]*color:\s*var\(--po-danger\)/s,
     );
     expect(launcherCss).toMatch(
-      /\.desktop-feedback-role-options\s*\{[^}]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/s,
+      /\.desktop-feedback-contact-input\s*\{[^}]*border:\s*1px solid var\(--po-border\)[^}]*background:\s*var\(--po-canvas\)/s,
     );
-    expect(launcherCss).toMatch(
-      /\.desktop-feedback-role-option input:checked \+ \.desktop-feedback-role-control\s*\{[^}]*background:\s*var\(--po-selected\)/s,
+    expect(launcherCss.match(/\.desktop-feedback-footer\s*\{[^}]*\}/s)?.[0]).not.toContain(
+      "border-block-start",
     );
     expect(launcherCss).not.toContain("desktop-feedback-popover");
     const launcherRule = launcherCss.match(/\.desktop-help-launcher\s*\{[^}]*\}/s)?.[0] ?? "";

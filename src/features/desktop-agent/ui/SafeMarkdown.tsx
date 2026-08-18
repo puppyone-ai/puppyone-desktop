@@ -13,7 +13,7 @@ const MAX_INITIAL_MARKDOWN_BLOCKS = 240;
  * exists at the Agent boundary.
  */
 export function SafeMarkdown({ text, streaming = false }: SafeMarkdownProps) {
-  const { t } = useLocalization();
+  const { locale, t } = useLocalization();
   const [expanded, setExpanded] = useState(false);
   // External-store stream updates are synchronous. Deferring only the growing
   // Markdown payload keeps typing and scrolling responsive while React catches
@@ -26,7 +26,11 @@ export function SafeMarkdown({ text, streaming = false }: SafeMarkdownProps) {
     || parsedBlocks.length > MAX_INITIAL_MARKDOWN_BLOCKS;
   const blocks = expanded ? parsedBlocks : parsedBlocks.slice(0, MAX_INITIAL_MARKDOWN_BLOCKS);
   return (
-    <div className="desktop-agent-markdown">
+    <div
+      className="desktop-agent-markdown"
+      data-po-typography-role="content"
+      lang={locale}
+    >
       {blocks.map((block, index) => renderBlock(block, index))}
       {streaming && <span className="desktop-agent-stream-caret" aria-hidden="true" />}
       {(expanded || initiallyTruncated) && (

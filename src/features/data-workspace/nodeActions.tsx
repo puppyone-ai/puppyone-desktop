@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import {
+  createDefaultContextMapDocumentContent,
   createDefaultPuppyFlowDocument,
   FileGlyphIcon,
   getMatchedExtension,
@@ -85,6 +86,11 @@ const CREATE_ENTRY_OPTIONS = [
     kind: "markdown",
     iconName: "Untitled.md",
     iconType: "markdown",
+  },
+  {
+    kind: "contextMap",
+    iconName: "Untitled.contextmap",
+    iconType: "context-map",
   },
   {
     kind: "text",
@@ -849,6 +855,7 @@ type DesktopFileTypeOption = {
 const DESKTOP_FILE_TYPE_OPTIONS = [
   { id: "none", extension: "" },
   { id: "markdown", extension: ".md" },
+  { id: "contextMap", extension: ".contextmap", experimentalSetting: "enableContextMaps" },
   { id: "json", extension: ".json" },
   { id: "jsonLines", extension: ".jsonl" },
   { id: "text", extension: ".txt" },
@@ -967,6 +974,7 @@ export function getCreateEntryInitialContent(
   templates: DesktopCreateEntryTemplates,
 ): string {
   if (kind === "json") return "{}\n";
+  if (kind === "contextMap") return createDefaultContextMapDocumentContent();
   if (kind === "csv") {
     const emptyRow = Array.from({ length: templates.csvHeaders.length }, () => "").join(",");
     return `${templates.csvHeaders.join(",")}\n${emptyRow}\n${emptyRow}\n`;
@@ -992,6 +1000,9 @@ export function normalizeCreateEntryName(kind: DesktopCreateEntryKind, value: st
   }
   if (kind === "markdown") {
     return ensureCreateEntryExtension(name, /\.(md|markdown|mdx)$/i, ".md");
+  }
+  if (kind === "contextMap") {
+    return ensureCreateEntryExtension(name, /\.contextmap$/i, ".contextmap");
   }
   if (kind === "text") {
     return getDesktopNodeExtension(name) ? name : `${name}.txt`;

@@ -28,7 +28,6 @@ describe("Markdown link index boundary", () => {
     const direct = createMarkdownLinkGraph(documents);
     const indexed = createMarkdownLinkGraph(
       metadata,
-      {},
       createMarkdownLinkGraphIndex(documents),
     );
 
@@ -123,7 +122,7 @@ describe("Markdown link index boundary", () => {
     expect(reads).toEqual(["a.md", "b.md"]);
     expect(maxActiveReads).toBe(1);
     expect(initial.indexedDocumentCount).toBe(2);
-    expect(createMarkdownLinkGraph(metadata, {}, initial).getBacklinks("b.md")[0]?.count).toBe(1);
+    expect(createMarkdownLinkGraph(metadata, initial).getBacklinks("b.md")[0]?.count).toBe(1);
 
     const updated = coordinator.updateDocument({
       path: "a.md",
@@ -132,7 +131,7 @@ describe("Markdown link index boundary", () => {
     });
     await vi.runAllTimersAsync();
     const next = await updated;
-    expect(createMarkdownLinkGraph(metadata, {}, next).getBacklinks("b.md")).toEqual([]);
+    expect(createMarkdownLinkGraph(metadata, next).getBacklinks("b.md")).toEqual([]);
   });
 
   it("keeps backlink excerpts bounded for a link on a very long line", () => {

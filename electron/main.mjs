@@ -56,6 +56,7 @@ import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service
 import { createExternalNavigationService } from "./main/external-navigation-service.mjs";
 import { createNativeSurfaceOcclusionCoordinator } from "./main/native-surfaces/occlusion-coordinator.mjs";
 import { createNativeSurfacePointerPassthroughCoordinator } from "./main/native-surfaces/pointer-passthrough-coordinator.mjs";
+import { createDesktopNativeMenuService } from "./main/native-menu-service.mjs";
 import { registerFeedbackIpcHandlers } from "./main/ipc/feedback-ipc.mjs";
 import { registerSystemIpcHandlers } from "./main/ipc/system-ipc.mjs";
 import { resolveDockIconResource } from "./main/dock-icon-resources.mjs";
@@ -127,6 +128,7 @@ if (!gotSingleInstanceLock) {
 
 const devServerUrl = process.env.PUPPYONE_DESKTOP_DEV_URL;
 const rendererApplicationUrl = devServerUrl || pathToFileURL(rendererDistPath).toString();
+if (devServerUrl) app.commandLine.appendSwitch("remote-debugging-port", "9222");
 const viewerPackFeatureProfile = resolveViewerPackFeatureProfile({
   packageMetadata,
   environment: process.env,
@@ -191,6 +193,14 @@ const externalNavigation = createExternalNavigationService({ shell });
 const localeService = createDesktopLocaleService({
   app,
   getWindows: () => BrowserWindow.getAllWindows(),
+});
+const nativeMenuService = createDesktopNativeMenuService({
+  app,
+  Menu,
+  t: (messageId, values) => localeService.t(messageId, values),
+  onNewWindow: () => createWindow(),
+  onOpenWorkspace: () => selectWorkspaceForLastFocusedWindow(),
+  onOpenWorkspaceInNewWindow: () => selectWorkspaceForNewWindow(),
 });
 const applicationQuitIntent = createApplicationQuitIntent({ app });
 const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({
@@ -516,21 +526,6 @@ function setDockIcon(iconId = "polished") {
   }
 }
 
-function setDockMenu() {
-  if (process.platform !== "darwin" || !app.dock) return;
-
-  const dockMenu = Menu.buildFromTemplate([
-    {
-      label: localeService.t("native.dock.newWindow"),
-      click: () => {
-        void createWindow();
-      },
-    },
-  ]);
-
-  app.dock.setMenu(dockMenu);
-}
-
 app.on("second-instance", (_event, argv, workingDirectory, launchIntent) => {
   void handleSecondInstanceLaunch({
     launchIntent,
@@ -546,12 +541,12 @@ app.on("second-instance", (_event, argv, workingDirectory, launchIntent) => {
 app.whenReady().then(async () => {
   await localeService.initialize();
   stopLocaleNativeRefresh = localeService.onDidChange(() => {
-    setDockMenu();
+    nativeMenuService.refresh();
   });
   if (process.platform === "darwin" && app.dock) {
     setDockIcon();
-    setDockMenu();
   }
+  nativeMenuService.refresh();
 
   registerLocalFileProtocol({
     protocol,
@@ -923,6 +918,15 @@ async function selectWorkspaceForCurrentWindow(sender) {
 
   if (result.canceled || result.filePaths.length === 0) return null;
   return openWorkspaceInCurrentWindow(sender, result.filePaths[0]);
+}
+
+async function selectWorkspaceForLastFocusedWindow() {
+  const window = getLastFocusedWindow();
+  if (!window || window.isDestroyed()) return selectWorkspaceForNewWindow();
+
+  const result = await showWorkspaceOpenDialog(window);
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return openWorkspaceInCurrentWindow(window.webContents, result.filePaths[0]);
 }
 
 async function selectWorkspaceForNewWindow(sender = null) {

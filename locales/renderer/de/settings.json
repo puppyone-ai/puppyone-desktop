@@ -135,6 +135,8 @@
   "experimental.viewerPlugins.detail": "Aktiviert die experimentelle, rein lokale Plugin-Seite und ihre optionale Navigationsverknüpfung.",
   "experimental.editorSaveStatus.title": "Speicherstatus des Editors",
   "experimental.editorSaveStatus.detail": "Zeigt oben rechts die Speichersteuerung und Statusdiagnose. Dateien werden auch bei ausgeblendeter Anzeige normal gespeichert.",
+  "experimental.contextMaps.title": "Kontextkarten-Dateien",
+  "experimental.contextMaps.detail": "Beziehungskarten als dauerhafte Dateien erstellen und im Editor öffnen.",
   "experimental.projectsHome.title": "Projektstartseite",
   "experimental.projectsHome.detail": "Teste das einheitliche Kartenlayout für Cloud- und lokale Projekte.",
   "experimental.agentChat.title": "Agenten-Chat",

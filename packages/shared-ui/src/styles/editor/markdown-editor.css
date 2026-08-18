@@ -24,9 +24,9 @@
   height: 100%;
   min-height: 100%;
   color: var(--po-text);
-  font-family: var(--po-font-content, var(--po-font-sans));
-  font-size: var(--po-text-size-content, 14px);
-  font-weight: 450;
+  font-family: var(--po-md-content-font);
+  font-size: var(--po-md-content-size);
+  font-weight: var(--po-md-content-weight);
   /* Keep shaping deterministic across Latin and CJK fallback faces. Feature
      tags selected for a bundled Latin font must never reach editor content. */
   font-feature-settings: normal;
@@ -100,7 +100,7 @@
      the centered reading rail. */
   scrollbar-gutter: stable both-edges;
   cursor: text;
-  font-family: var(--po-font-content, var(--po-font-sans));
+  font-family: var(--po-md-content-font);
 }
 
 .markdown-codemirror-editor .cm-content {
@@ -119,7 +119,7 @@
   padding-block: var(--po-markdown-editor-content-padding-block);
   padding-inline: var(--po-markdown-editor-content-gutter-inline);
   caret-color: var(--po-text);
-  color: color-mix(in srgb, var(--po-text) 78%, var(--po-text-muted));
+  color: var(--po-md-content-color);
   overflow-wrap: anywhere;
 }
 
@@ -127,20 +127,13 @@
  * Vertical rhythm: the shared presentation line-height spaces wrapped lines;
  * per-line padding spaces blocks apart (the block-editor convention). The
  * token is 0 in source mode and only opens up in live preview; the editor
- * theme applies it to every .cm-line.
+ * theme applies it uniformly to every ordinary .cm-line. Editable line
+ * geometry must not depend on CodeMirror rendering an empty line as a lone
+ * <br>, otherwise inserting or deleting the first character shifts the
+ * caret and every following line.
  */
 .markdown-codemirror-editor[data-live-preview="true"] {
   --po-markdown-editor-line-spacing: 3px;
-}
-
-/*
- * Blank separator lines already contribute a full content-line box; skipping their
- * padding keeps paragraph gaps from compounding (empty CM lines render as a
- * lone <br>).
- */
-.markdown-codemirror-editor .cm-line:has(> br:only-child) {
-  padding-top: 0;
-  padding-bottom: 0;
 }
 
 /* Table source lines form one contiguous mono block; keep them compact. */

@@ -1,6 +1,9 @@
 {
   "native.messageUnavailable": "此文本不可用。",
   "native.dock.newWindow": "新建窗口",
+  "native.menu.file": "文件",
+  "native.menu.openWorkspace": "打开工作区…",
+  "native.menu.openWorkspaceInNewWindow": "在新窗口中打开工作区…",
   "native.workspace.open.title": "打开本地 PuppyOne 工作区",
   "native.update.blocker.terminal.label": "PuppyOne 内有 {count} 个终端会话仍在后台",
   "native.update.blocker.terminal.detail": "更新将关闭 PuppyOne 内创建的 {count} 个终端会话。Ghostty 和其他外部终端不会受到影响。",

@@ -22,6 +22,9 @@
 /* Structured PuppyFlow editor */
 @import "./editor/puppyflow-editor.css";
 
+/* Workspace-aware Context Map document viewer */
+@import "./editor/context-map-viewer.css";
+
 /* Editor chrome: live surface, save overlay, mode toggle, plain text editor */
 @import "./editor/editor-chrome.css";
 @import "./editor/editor-find.css";

@@ -499,9 +499,9 @@ describe("Markdown image readiness", () => {
 
 function createLinkGraph(documentCount: number, resolvedPath: string | null = null): MarkdownLinkGraph {
   return {
+    revision: documentCount,
     documentCount,
     indexedDocumentCount: documentCount,
-    isIndexing: false,
     resolveWikiLink: (_sourcePath, target) => ({
       exists: Boolean(resolvedPath),
       ambiguous: false,

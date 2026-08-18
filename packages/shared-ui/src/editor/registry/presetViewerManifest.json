@@ -3,6 +3,15 @@
   "fallbackViewerId": "document-placeholder",
   "viewers": [
     {
+      "id": "context-map",
+      "formatViewerIds": ["context-map-viewer"],
+      "capability": "edit",
+      "source": "content",
+      "runtime": "lazy",
+      "surfacePreparation": "requires-visible",
+      "readinessSignal": "dom-stable"
+    },
+    {
       "id": "app-preview",
       "formatViewerIds": [],
       "capability": "preview",

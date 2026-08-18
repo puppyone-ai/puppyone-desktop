@@ -10,8 +10,8 @@ import {
   getAiEditFileForPath,
   getEditorPanes,
   type AiEditRequest,
+  type DataNode,
   type DataPort,
-  type DataWorkspaceState,
   type EditorGroupState,
   type EditorFindCommand,
   type EditorInteractionPreferences,
@@ -23,6 +23,7 @@ import {
   type EditorPaneSplitOptions,
   type EditorSplitDirection,
   type FileIconThemeId,
+  type MarkdownWorkspaceEnvironment,
   type ViewerExtensionHostAdapter,
   type Workspace,
   type WorkspaceContentChange,
@@ -52,8 +53,9 @@ export type DesktopEditorSplitViewProps = Readonly<{
   editorInteractionPreferences: EditorInteractionPreferences;
   fileIconTheme: FileIconThemeId;
   layout: EditorPaneLayoutState;
+  editorTree: readonly DataNode[];
+  markdownEnvironment: MarkdownWorkspaceEnvironment;
   refreshKey?: WorkspaceContentChange;
-  state: DataWorkspaceState;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   workspace: Workspace;
   externalOpen?: Readonly<{
@@ -90,8 +92,9 @@ export function DesktopEditorSplitView({
   editorInteractionPreferences,
   fileIconTheme,
   layout,
+  editorTree,
+  markdownEnvironment,
   refreshKey,
-  state,
   viewerExtensionAdapter = null,
   workspace,
   externalOpen,
@@ -107,7 +110,7 @@ export function DesktopEditorSplitView({
     [editorGroup.editors],
   );
   const panes = useMemo(() => getEditorPanes(layout), [layout]);
-  const editorNodeIndex = useMemo(() => createEditorNodeIndex(state.tree), [state.tree]);
+  const editorNodeIndex = useMemo(() => createEditorNodeIndex(editorTree), [editorTree]);
   const paneCount = panes.length;
   const paneHosts = usePersistentEditorPaneHosts(panes.map((pane) => pane.id));
   const [openActionsPaneId, setOpenActionsPaneId] = useState<string | null>(null);
@@ -148,8 +151,8 @@ export function DesktopEditorSplitView({
           paneCount={paneCount}
           paneMove={paneMove}
           openActionsPaneId={openActionsPaneId}
+          markdownEnvironment={markdownEnvironment}
           refreshKey={refreshKey}
-          state={state}
           viewerExtensionAdapter={viewerExtensionAdapter}
           workspace={workspace}
           onClosePane={onClosePane}
@@ -241,8 +244,8 @@ type EditorPaneProps = Readonly<{
   paneCount: number;
   paneMove: PaneMoveDragController;
   openActionsPaneId: string | null;
+  markdownEnvironment: MarkdownWorkspaceEnvironment;
   refreshKey?: WorkspaceContentChange;
-  state: DataWorkspaceState;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   workspace: Workspace;
   onClosePane: DesktopEditorSplitViewProps["onClosePane"];
@@ -265,8 +268,8 @@ function EditorPane({
   paneCount,
   paneMove,
   openActionsPaneId,
+  markdownEnvironment,
   refreshKey,
-  state,
   viewerExtensionAdapter,
   workspace,
   onClosePane,
@@ -277,7 +280,9 @@ function EditorPane({
   const active = pane.id === activePaneId;
   const actionsOpen = pane.id === openActionsPaneId;
   const editor = pane.editorId ? editorById.get(pane.editorId) ?? null : null;
-  const treeNode = editor ? editorNodeIndex.get(editor.resource) ?? null : null;
+  const treeNode = editor
+    ? editorNodeIndex.get(editor.resource) ?? null
+    : null;
   const [findCommand, setFindCommand] = useState<EditorFindCommand | null>(null);
   const [menuContribution, setMenuContribution] = useState<EditorPaneMenuContribution | null>(null);
   const externalOpenPath = editor?.resource ?? null;
@@ -310,8 +315,7 @@ function EditorPane({
         editor={editor}
         editorInteractionPreferences={editorInteractionPreferences}
         fileIconTheme={fileIconTheme}
-        markdownAssetUrlResolver={state.markdownAssetUrlResolver}
-        markdownLinkGraph={state.markdownLinkGraph}
+        markdownEnvironment={markdownEnvironment}
         refreshKey={refreshKey}
         treeNode={treeNode}
         viewerExtensionAdapter={viewerExtensionAdapter}

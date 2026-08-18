@@ -82,6 +82,7 @@ export function renderVsCodeGlyph(
 export const vscodeGlyphRenderers = {
   folder: renderVsCodeGlyph,
   app: renderVsCodeGlyph,
+  "context-map": renderVsCodeGlyph,
   workflow: renderVsCodeGlyph,
   markdown: renderVsCodeGlyph,
   json: renderVsCodeGlyph,
@@ -158,6 +159,14 @@ const VSCODE_SYMBOL_RENDERERS = {
       <path d="M9.55 10.6 8.85 7.2" stroke={color} strokeWidth="0.95" strokeLinecap="round" />
       <circle cx="8.65" cy="5.95" r="1.35" stroke={color} strokeWidth="1" />
       <circle cx="11.65" cy="11.75" r="0.42" fill={color} opacity="0.78" />
+    </>
+  ),
+  "context-map": ({ color }) => (
+    <>
+      <circle cx="6" cy="7" r="1.2" stroke={color} strokeWidth="1" />
+      <circle cx="11.8" cy="6.2" r="1.2" stroke={color} strokeWidth="1" />
+      <circle cx="9.4" cy="12.3" r="1.2" stroke={color} strokeWidth="1" />
+      <path d="m7.1 7 3.5-.55M6.65 8.05l2.1 3.15m2.1-3.9-.9 3.8" stroke={color} strokeWidth="0.9" strokeLinecap="round" />
     </>
   ),
   workflow: ({ color }) => (

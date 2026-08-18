@@ -47,7 +47,7 @@ export class MarkdownTableWidget extends WidgetType {
       widget.renderKey === this.renderKey &&
       widget.layoutEstimatedHeight === this.layoutEstimatedHeight &&
       markdownTableExecutionsEqual(widget.execution, this.execution) &&
-      widget.markdownLinkGraph === this.markdownLinkGraph &&
+      (widget.markdownLinkGraph?.revision ?? 0) === (this.markdownLinkGraph?.revision ?? 0) &&
       widget.documentPath === this.documentPath &&
       widget._markdownAssetUrlResolver === this._markdownAssetUrlResolver &&
       widget.renderInlinePreview === this.renderInlinePreview
