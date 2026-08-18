@@ -1,0 +1,78 @@
+.desktop-agent-activity-permission-leading {
+  background: color-mix(in srgb, var(--po-accent) 12%, transparent);
+  color: var(--po-accent);
+}
+
+.desktop-agent-activity-permission-body {
+  gap: 14px;
+}
+
+.desktop-agent-activity-permission-preview {
+  display: flex;
+  height: 54px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--po-accent) 5%, var(--po-panel));
+}
+
+.desktop-agent-activity-permission-preview > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--po-accent) 28%, var(--po-border));
+  border-radius: 999px;
+  background: var(--po-overlay);
+  color: var(--po-accent);
+}
+
+.desktop-agent-activity-permission-preview > span[data-kind="write"] {
+  border-color: color-mix(in srgb, #db8b31 36%, var(--po-border));
+  color: #c67822;
+}
+
+.desktop-agent-activity-permission-preview > i {
+  width: 34px;
+  height: 1px;
+  overflow: visible;
+  background: var(--po-border-strong);
+}
+
+.desktop-agent-activity-permission-preview > i::after {
+  display: block;
+  width: 5px;
+  height: 5px;
+  margin-top: -2px;
+  border-radius: 999px;
+  background: var(--po-accent);
+  content: "";
+  animation: desktop-agent-activity-permission-flow 1.8s ease-in-out infinite;
+}
+
+.desktop-agent-activity-permission-access {
+  display: grid;
+  gap: 3px;
+}
+
+.desktop-agent-activity-permission-access strong {
+  color: var(--po-text);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.desktop-agent-activity-permission-access span,
+.desktop-agent-activity-permission-note {
+  margin: 0;
+}
+
+@keyframes desktop-agent-activity-permission-flow {
+  0%, 100% { transform: translateX(0); opacity: 0.4; }
+  50% { transform: translateX(29px); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-agent-activity-permission-preview > i::after { animation: none; }
+}

@@ -12,6 +12,17 @@ export function listCodingAgentProviders(inspection: AgentProviderInspection | n
   return listAgentBackends(inspection).filter((entry) => entry.descriptor.distribution !== "bundled");
 }
 
+export function listEnabledCodingAgentProviders(
+  inspection: AgentProviderInspection | null,
+  enabledRuntimeIds: readonly string[] | null,
+): AgentRuntimeCatalogEntry[] {
+  const enabled = enabledRuntimeIds ? new Set(enabledRuntimeIds) : null;
+  return listCodingAgentProviders(inspection).filter((entry) => (
+    entry.readiness.status !== "not-installed"
+    && (!enabled || enabled.has(entry.descriptor.id))
+  ));
+}
+
 export function isSelectableAgentBackend(entry: AgentRuntimeCatalogEntry) {
   return entry.readiness.status === "ready" && entry.readiness.selectable !== false;
 }

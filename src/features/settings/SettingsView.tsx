@@ -10,13 +10,14 @@ import { useLocalization } from "@puppyone/localization";
 import { DOCK_ICON_OPTIONS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, TEXT_SIZE_PRESETS } from "../../preferences";
 import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements";
 import { useFeatureFlag } from "../flags";
+import { AgentFileActivityAppearanceSetting } from "../desktop-agent-presence";
+import { LocalAgentsSettingsView } from "../local-agents";
 import { SettingsSectionHeader } from "./components";
 import { ContentFontSetting } from "./ContentFontSetting";
 import { AccountSettingsView } from "./main/AccountSettingsView";
 import { EditorSettingsView, ExperimentalSettingsView } from "./main/EditorSettingsViews";
 import { DefaultAppsSettingsView, FilesSettingsView } from "./main/FileSettingsViews";
 import { GeneralSettingsView } from "./main/GeneralSettingsView";
-import { AgentPortalSettingsView } from "./main/AgentPortalSettingsView";
 import { LocalProjectSettingsView } from "./main/LocalProjectSettingsView";
 import { InterfacePaletteSettings } from "./main/InterfacePaletteSettings";
 import { InterfaceStyleSetting } from "./main/InterfaceStyleSetting";
@@ -36,6 +37,8 @@ export function SettingsView({
   lightThemePreset,
   darkThemePreset,
   loadingAnimationPreset,
+  localAgentsSettings,
+  agentFileActivityIndicatorsEnabled,
   textSize,
   typographyPreferences,
   pointerCursors,
@@ -66,6 +69,8 @@ export function SettingsView({
   onLightThemePresetChange,
   onDarkThemePresetChange,
   onLoadingAnimationPresetChange,
+  onLocalAgentsSettingsChange,
+  onAgentFileActivityIndicatorsEnabledChange,
   onTextSizeChange,
   onTypographyPreferencesChange,
   onPointerCursorsChange,
@@ -106,8 +111,14 @@ export function SettingsView({
     );
   }
 
-  if (activeSection === "agent-portal") {
-    return <AgentPortalSettingsView />;
+  if (activeSection === "local-agents") {
+    return (
+      <LocalAgentsSettingsView
+        workspaceRoot={workspace.path}
+        settings={localAgentsSettings}
+        onChange={onLocalAgentsSettingsChange}
+      />
+    );
   }
 
   if (activeSection === "local-project") {
@@ -442,6 +453,11 @@ export function SettingsView({
                   <span aria-hidden="true" />
                 </label>
               </div>
+              <AgentFileActivityAppearanceSetting
+                enabled={agentFileActivityIndicatorsEnabled}
+                workspaceRoot={workspace.path}
+                onChange={onAgentFileActivityIndicatorsEnabledChange}
+              />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span id="desktop-dock-icon-label">{t("settings.appearance.dockIcon.title")}</span>
                 <div

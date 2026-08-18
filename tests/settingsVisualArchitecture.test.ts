@@ -7,16 +7,18 @@ describe("settings visual architecture", () => {
     const sidebarModel = source("src/features/settings/sidebar/settingsSidebarModel.ts");
     const types = source("src/features/settings/types.ts");
     const general = source("src/features/settings/main/GeneralSettingsView.tsx");
-    const agentPortal = source("src/features/settings/main/AgentPortalSettingsView.tsx");
+    const localAgents = source("src/features/local-agents/ui/LocalAgentsSettingsView.tsx");
+    const activityAppearance = source("src/features/desktop-agent-presence/ui/AgentFileActivityAppearanceSetting.tsx");
+    const activityPermission = source("src/features/desktop-agent-presence/ui/AgentFileActivityPermissionDialog.tsx");
     const localProject = source("src/features/settings/main/LocalProjectSettingsView.tsx");
     const language = source("src/features/settings/LanguageSetting.tsx");
 
     expect(types).toContain('"general" | "local-project"');
-    expect(types).toContain('"appearance" | "agent-portal"');
+    expect(types).toContain('"appearance" | "local-agents"');
     expect(types).not.toContain('| "language"');
     expect(types).not.toContain('"workspace"');
     expect(view).toContain('if (activeSection === "general")');
-    expect(view).toContain('if (activeSection === "agent-portal")');
+    expect(view).toContain('if (activeSection === "local-agents")');
     expect(view).toContain('if (activeSection === "local-project")');
     expect(view).not.toContain('activeSection === "language"');
     expect(general).toContain("<LanguageSettingRow />");
@@ -25,12 +27,21 @@ describe("settings visual architecture", () => {
     expect(general).not.toContain("Workspace");
     expect(general).not.toContain("onUnlinkWorkspace");
     expect(general).not.toContain("AgentActivity");
-    expect(general).not.toContain("agentPortal");
-    expect(agentPortal).toContain('settings.agentPortal.title');
-    expect(agentPortal).toContain("provider.displayName");
-    expect(agentPortal).toContain("desktop-settings-switch");
-    expect(agentPortal).not.toContain("desktop-settings-label-stack");
-    expect(agentPortal).not.toContain("<small>");
+    expect(general).not.toContain("localAgents");
+    expect(localAgents).toContain('settings.localAgents.title');
+    expect(localAgents).toContain("connection.displayName");
+    expect(localAgents).toContain("desktop-settings-switch");
+    expect(localAgents).toContain("discoverLocalAgents");
+    expect(localAgents).not.toMatch(/AgentActivity|ActivityHook|agentFileActivity/u);
+    expect(localAgents).not.toContain("desktop-settings-label-stack");
+    expect(localAgents).not.toContain("<small>");
+    expect(view).toContain("<AgentFileActivityAppearanceSetting");
+    expect(activityAppearance).toContain("<AgentFileActivityPermissionDialog");
+    expect(activityAppearance.indexOf("onChange(true)"))
+      .toBeGreaterThan(activityAppearance.indexOf("await reconcileNativeActivityHooks({ enabled: true"));
+    expect(activityPermission).toContain("DesktopDialogRoot");
+    expect(activityPermission).toContain("permission.accessTitle");
+    expect(activityPermission).not.toMatch(/providerId|providers\.map|connection\.displayName/u);
     expect(localProject).toContain("settings.localProject.path");
     expect(localProject).toContain("onUnlinkWorkspace");
     expect(localProject).not.toContain("DesktopBuildVersionSettingsRow");
@@ -43,7 +54,7 @@ describe("settings visual architecture", () => {
     expectInOrder(desktopAppItems, [
       'labelId: "settings.sidebar.general"',
       'labelId: "settings.sidebar.appearance"',
-      'labelId: "settings.sidebar.agentPortal"',
+      'labelId: "settings.sidebar.localAgents"',
       'labelId: "settings.sidebar.defaultApps"',
       'labelId: "settings.sidebar.editor"',
       'labelId: "settings.sidebar.experimental"',
@@ -68,11 +79,27 @@ describe("settings visual architecture", () => {
       expect(catalog["sidebar.language"], locale).toBeUndefined();
       expect(catalog["sidebar.localProject"], locale).toBeTruthy();
       expect(catalog["sidebar.projectInfo"], locale).toBeTruthy();
-      expect(catalog["sidebar.agentPortal"], locale).toBe("Agent Portal");
+      expect(catalog["sidebar.localAgents"], locale).toBeTruthy();
       expect(catalog["general.title"], locale).toBeTruthy();
       expect(catalog["general.detail"], locale).toBeTruthy();
-      expect(catalog["agentPortal.title"], locale).toBe("Agent Portal");
-      expect(catalog["agentPortal.toggle"], locale).toBeTruthy();
+      expect(catalog["localAgents.title"], locale).toBeTruthy();
+      expect(catalog["localAgents.toggle"], locale).toBeTruthy();
+      expect(catalog["appearance.agentFileActivity.title"], locale).toBeTruthy();
+      for (const key of [
+        "title",
+        "detail",
+        "accessTitle",
+        "accessDetail",
+        "localOnly",
+        "enable",
+        "enabling",
+        "error",
+      ]) {
+        expect(
+          catalog[`appearance.agentFileActivity.permission.${key}`],
+          `${locale}: settings.appearance.agentFileActivity.permission.${key}`,
+        ).toBeTruthy();
+      }
       for (const key of [
         "selectorLabel",
         "system",

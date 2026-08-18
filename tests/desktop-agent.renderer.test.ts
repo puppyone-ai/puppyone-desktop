@@ -21,7 +21,10 @@ import {
 } from "../src/features/desktop-agent/ui/AgentTranscript";
 import { resolveAnchoredOverlayPosition } from "../src/features/app-shell/useAnchoredOverlayPosition";
 import { createAgentProjection } from "../src/features/desktop-agent/agentProjection";
-import { listCodingAgentProviders } from "../src/features/desktop-agent/domain/agent-backend-routing";
+import {
+  listCodingAgentProviders,
+  listEnabledCodingAgentProviders,
+} from "../src/features/desktop-agent/domain/agent-backend-routing";
 import type { AgentProviderReadiness } from "../src/features/desktop-agent/agentTypes";
 import { stripBidiIsolation, testT, withTestLocalization } from "./testLocalization";
 
@@ -444,6 +447,31 @@ describe("Desktop Agent renderer surfaces", () => {
       "OpenCode",
       "Cursor Agent",
     ]);
+  });
+
+  it("shows only locally selected and still-installed Coding Agents", () => {
+    const inspection = {
+      runtimes: [
+        codingProvider("codex", "Codex"),
+        codingProvider("claude", "Claude Code"),
+        codingProvider("opencode-native", "OpenCode"),
+        {
+          ...codingProvider("cursor", "Cursor Agent"),
+          readiness: {
+            ...codingProvider("cursor", "Cursor Agent").readiness,
+            status: "not-installed" as const,
+          },
+        },
+      ],
+      readiness: codingProvider("codex", "Codex").readiness,
+      account: null,
+      models: [],
+      capabilities: null,
+      warnings: [],
+    };
+
+    expect(listEnabledCodingAgentProviders(inspection, ["claude", "opencode-native", "cursor"])
+      .map((entry) => entry.descriptor.id)).toEqual(["claude", "opencode-native"]);
   });
 
   it("shows Provider in the header and withholds Model until a connected provider is selected", () => {

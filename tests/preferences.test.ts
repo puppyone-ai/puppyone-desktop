@@ -12,6 +12,8 @@ import {
   parseExternalAppsSettings,
   parseExperimentalSettings,
   parseLoadingAnimationPreset,
+  parseLocalAgentsSettings,
+  parseAgentFileActivityIndicatorsEnabled,
   parsePointerCursors,
   parseSidebarNavigationVisibilitySettings,
   parseTerminalSessionLayout,
@@ -128,6 +130,12 @@ describe("create new menu preferences", () => {
 });
 
 describe("appearance preferences", () => {
+  it("keeps Agent file activity visibility opt-in", () => {
+    expect(parseAgentFileActivityIndicatorsEnabled(null)).toBe(false);
+    expect(parseAgentFileActivityIndicatorsEnabled("true")).toBe(true);
+    expect(parseAgentFileActivityIndicatorsEnabled("invalid")).toBe(false);
+  });
+
   it("defines curated integer typography presets", () => {
     expect(TEXT_SIZE_PRESETS.map((preset) => ({
       value: preset.value,
@@ -241,6 +249,16 @@ describe("appearance preferences", () => {
     expect(parseTerminalSessionLayout("floating")).toBe("tabs");
   });
 
+});
+
+describe("local Agent preferences", () => {
+  it("keeps only bounded, unique local Agent ids", () => {
+    expect(parseLocalAgentsSettings(null)).toEqual({ enabledAgentIds: [] });
+    expect(parseLocalAgentsSettings(JSON.stringify({
+      enabledAgentIds: ["codex", "claude", "codex", "../../bad", 7],
+    }))).toEqual({ enabledAgentIds: ["codex", "claude"] });
+    expect(parseLocalAgentsSettings("invalid")).toEqual({ enabledAgentIds: [] });
+  });
 });
 
 function readCssBlock(css: string, selector: string): string {

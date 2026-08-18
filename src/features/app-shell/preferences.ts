@@ -8,6 +8,7 @@ import {
 } from "./layout/desktopPaneLayout";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
+  AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY,
   CREATE_NEW_MENU_STORAGE_KEY,
   DIFF_MARKERS_STORAGE_KEY,
   DOCK_ICON_STORAGE_KEY,
@@ -22,6 +23,7 @@ import {
   DARK_THEME_PRESET_STORAGE_KEY,
   LEGACY_THEME_PRESET_STORAGE_KEY,
   LIGHT_THEME_PRESET_STORAGE_KEY,
+  LOCAL_AGENTS_STORAGE_KEY,
   LOADING_ANIMATION_STORAGE_KEY,
   POINTER_CURSORS_STORAGE_KEY,
   RIGHT_SIDEBAR_TOOLS_STORAGE_KEY,
@@ -33,6 +35,7 @@ import {
   TERMINAL_SESSION_LAYOUT_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
   parseAiEditAssistEnabled,
+  parseAgentFileActivityIndicatorsEnabled,
   parseCreateNewMenuSettings,
   parseDarkThemePreset,
   parseDiffMarkers,
@@ -44,6 +47,7 @@ import {
   parseInterfaceStyle,
   parseLightThemePreset,
   parseLoadingAnimationPreset,
+  parseLocalAgentsSettings,
   parsePointerCursors,
   parseRightSidebarToolsSettings,
   parseSidebarNavigationLayout,
@@ -64,6 +68,7 @@ import {
   type InterfaceStyle,
   type LightThemePreset,
   type LoadingAnimationPreset,
+  type LocalAgentsSettings,
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
   type SidebarNavigationVisibilitySettings,
@@ -186,6 +191,18 @@ export function readInitialTitlebarActionsSettings(): TitlebarActionsSettings {
 export function readInitialTerminalSessionLayout(): TerminalSessionLayout {
   if (typeof window === "undefined") return parseTerminalSessionLayout(null);
   return parseTerminalSessionLayout(window.localStorage.getItem(TERMINAL_SESSION_LAYOUT_STORAGE_KEY));
+}
+
+export function readInitialLocalAgentsSettings(): LocalAgentsSettings {
+  if (typeof window === "undefined") return parseLocalAgentsSettings(null);
+  return parseLocalAgentsSettings(window.localStorage.getItem(LOCAL_AGENTS_STORAGE_KEY));
+}
+
+export function readInitialAgentFileActivityIndicatorsEnabled(): boolean {
+  if (typeof window === "undefined") return parseAgentFileActivityIndicatorsEnabled(null);
+  return parseAgentFileActivityIndicatorsEnabled(
+    window.localStorage.getItem(AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY),
+  );
 }
 
 export function mergePuppyoneWorkspaceConfig(

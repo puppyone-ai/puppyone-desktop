@@ -6,6 +6,7 @@ import {
 } from "../appearance/interfaceStyles";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
+  AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY,
   CREATE_NEW_MENU_STORAGE_KEY,
   DIFF_MARKERS_STORAGE_KEY,
   DOCK_ICON_STORAGE_KEY,
@@ -19,6 +20,7 @@ import {
   LIGHT_THEME_PRESET_STORAGE_KEY,
   LOADING_ANIMATION_CHANGE_EVENT,
   LOADING_ANIMATION_STORAGE_KEY,
+  LOCAL_AGENTS_STORAGE_KEY,
   POINTER_CURSORS_STORAGE_KEY,
   RIGHT_SIDEBAR_TOOLS_STORAGE_KEY,
   SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY,
@@ -43,6 +45,7 @@ import {
   type GitDisplayMode,
   type InterfaceStyle,
   type LoadingAnimationPreset,
+  type LocalAgentsSettings,
   type RightSidebarToolsSettings,
   type SidebarNavigationLayout,
   type SidebarNavigationVisibilitySettings,
@@ -61,6 +64,7 @@ import {
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   readInitialAgentPreferredModel,
   readInitialAgentPreferredRuntime,
+  readInitialAgentFileActivityIndicatorsEnabled,
   readInitialAiEditAssistEnabled,
   readInitialCreateNewMenuSettings,
   readInitialExperimentalSettings,
@@ -82,6 +86,7 @@ import {
   readInitialDockIcon,
   readInitialLightThemePreset,
   readInitialLoadingAnimationPreset,
+  readInitialLocalAgentsSettings,
   readInitialPointerCursors,
   readInitialTextSize,
   readInitialTerminalSessionLayout,
@@ -121,6 +126,12 @@ export function useDesktopPreferences() {
   const [titlebarActionsSettings, setTitlebarActionsSettings] = useState<TitlebarActionsSettings>(() => readInitialTitlebarActionsSettings());
   const [terminalSessionLayout, setTerminalSessionLayout] = useState<TerminalSessionLayout>(
     () => readInitialTerminalSessionLayout(),
+  );
+  const [localAgentsSettings, setLocalAgentsSettings] = useState<LocalAgentsSettings>(
+    () => readInitialLocalAgentsSettings(),
+  );
+  const [agentFileActivityIndicatorsEnabled, setAgentFileActivityIndicatorsEnabled] = useState(
+    () => readInitialAgentFileActivityIndicatorsEnabled(),
   );
   const [aiEditAssistEnabled, setAiEditAssistEnabled] = useState(() => readInitialAiEditAssistEnabled());
   const [explorerWidth, setExplorerWidth] = useState(() => readInitialExplorerWidth());
@@ -264,6 +275,20 @@ export function useDesktopPreferences() {
   }, [terminalSessionLayout]);
 
   useEffect(() => {
+    window.localStorage.setItem(LOCAL_AGENTS_STORAGE_KEY, JSON.stringify(localAgentsSettings));
+  }, [localAgentsSettings]);
+
+  useLayoutEffect(() => {
+    window.localStorage.setItem(
+      AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY,
+      agentFileActivityIndicatorsEnabled ? "true" : "false",
+    );
+    document.documentElement.dataset.agentFileActivity = agentFileActivityIndicatorsEnabled
+      ? "visible"
+      : "hidden";
+  }, [agentFileActivityIndicatorsEnabled]);
+
+  useEffect(() => {
     window.localStorage.setItem(AI_EDIT_ASSIST_STORAGE_KEY, aiEditAssistEnabled ? "true" : "false");
   }, [aiEditAssistEnabled]);
 
@@ -325,6 +350,7 @@ export function useDesktopPreferences() {
     rightSidebarSurface,
     agentPreferredRuntime,
     agentPreferredModel,
+    agentFileActivityIndicatorsEnabled,
     sidebarCollapsed,
     sidebarNavigationLayout,
     sidebarNavigationOrientation,
@@ -336,6 +362,7 @@ export function useDesktopPreferences() {
     darkThemePreset,
     lightThemePreset,
     loadingAnimationPreset,
+    localAgentsSettings,
     themeMode,
     textSize,
     typographyPreferences,
@@ -358,12 +385,14 @@ export function useDesktopPreferences() {
     setRightSidebarSurface,
     setAgentPreferredRuntime,
     setAgentPreferredModel,
+    setAgentFileActivityIndicatorsEnabled,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setSidebarNavigationVisibilitySettings,
     setTitlebarActionsSettings,
     setLightThemePreset,
     setLoadingAnimationPreset,
+    setLocalAgentsSettings,
     setPointerCursors,
     setTextSize,
     setTerminalSessionLayout,

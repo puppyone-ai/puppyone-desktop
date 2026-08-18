@@ -14,7 +14,7 @@ import { AgentQuestionDock } from "./AgentQuestionDock";
 import { readinessLabel, readinessStatusCode, sessionStatusCode, sessionStatusLabel } from "./agentPanelPresentation";
 import { getAgentSessionController } from "../application/controllerRegistry";
 import type { AgentSubmissionStage } from "../application/agent-controller-state";
-import { listCodingAgentProviders } from "../domain/agent-backend-routing";
+import { listEnabledCodingAgentProviders } from "../domain/agent-backend-routing";
 import { getElectronAgentClient } from "../infrastructure/electron/electronAgentClient";
 import { useAgentSessionPreparation } from "./useAgentSessionPreparation";
 import { useAgentReferenceIngestion } from "./useAgentReferenceIngestion";
@@ -31,11 +31,10 @@ type RightAgentPanelProps = {
   onPreferredRuntimeChange?: (runtimeId: string) => void;
   preferredModel?: string | null;
   onPreferredModelChange?: (model: string) => void;
+  enabledRuntimeIds?: readonly string[] | null;
 };
 export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanelProps>(function RightAgentPanel({
-  workspace,
-  active,
-  minimalMode = false,
+  workspace, active, minimalMode = false,
   onViewChanges,
   onOpenFile,
   onRunningChange,
@@ -43,6 +42,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   onPreferredRuntimeChange,
   preferredModel = null,
   onPreferredModelChange,
+  enabledRuntimeIds = null,
 }, ref) {
   const { t } = useLocalization();
   const controller = useMemo(() => getAgentSessionController(workspace.path, getElectronAgentClient), [workspace.path]);
@@ -84,7 +84,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   const startupLoading = active && (!state.initialized || loading) && !state.pendingPrompt && !hasCommittedTranscript;
   const sessionKey = state.session?.id || "new-agent-session";
   const viewport = useMemo(() => ({ sessionKey, value: controller.readViewport() }), [controller, sessionKey]).value;
-  const agentProviders = useMemo(() => listCodingAgentProviders(inspection), [inspection]);
+  const agentProviders = listEnabledCodingAgentProviders(inspection, enabledRuntimeIds);
   const codingProviderSelected = agentProviders.some((entry) => entry.descriptor.id === state.selectedRuntimeId);
   const providerModels = codingProviderSelected ? inspection?.models ?? [] : [];
   const modelSelectionAvailable = Boolean(capabilities?.modelSelection);

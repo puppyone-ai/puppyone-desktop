@@ -35,7 +35,7 @@ export const SETTINGS_SIDEBAR_GROUPS = [
     items: [
       { id: "general", labelId: "settings.sidebar.general", icon: Settings, disabled: false },
       { id: "appearance", labelId: "settings.sidebar.appearance", icon: Monitor, disabled: false },
-      { id: "agent-portal", labelId: "settings.sidebar.agentPortal", icon: Bot, disabled: false },
+      { id: "local-agents", labelId: "settings.sidebar.localAgents", icon: Bot, disabled: false },
       { id: "external-apps", labelId: "settings.sidebar.defaultApps", icon: ExternalLink, disabled: false },
       { id: "editor", labelId: "settings.sidebar.editor", icon: Pencil, disabled: false },
       { id: "new-menu", labelId: "settings.sidebar.createNew", icon: ListPlus, disabled: false },

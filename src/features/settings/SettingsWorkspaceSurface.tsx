@@ -10,6 +10,7 @@ import type {
   InterfaceStyle,
   LightThemePreset,
   LoadingAnimationPreset,
+  LocalAgentsSettings,
   RightSidebarToolsSettings,
   SidebarNavigationLayout,
   SidebarNavigationVisibilitySettings,
@@ -35,6 +36,8 @@ export type SettingsPreferencesPort = {
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
   loadingAnimationPreset: LoadingAnimationPreset;
+  localAgentsSettings: LocalAgentsSettings;
+  agentFileActivityIndicatorsEnabled: boolean;
   textSize: TextSize;
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
@@ -56,6 +59,8 @@ export type SettingsPreferencesPort = {
   setLightThemePreset: (value: LightThemePreset) => void;
   setDarkThemePreset: (value: DarkThemePreset) => void;
   setLoadingAnimationPreset: (value: LoadingAnimationPreset) => void;
+  setLocalAgentsSettings: (value: LocalAgentsSettings) => void;
+  setAgentFileActivityIndicatorsEnabled: (value: boolean) => void;
   setTextSize: (value: TextSize) => void;
   setTypographyPreferences: (value: TypographyPreferences) => void;
   setPointerCursors: (value: boolean) => void;
@@ -132,6 +137,8 @@ export function createSettingsWorkspaceSurface({
         lightThemePreset={preferences.lightThemePreset}
         darkThemePreset={preferences.darkThemePreset}
         loadingAnimationPreset={preferences.loadingAnimationPreset}
+        localAgentsSettings={preferences.localAgentsSettings}
+        agentFileActivityIndicatorsEnabled={preferences.agentFileActivityIndicatorsEnabled}
         textSize={preferences.textSize}
         typographyPreferences={preferences.typographyPreferences}
         pointerCursors={preferences.pointerCursors}
@@ -162,6 +169,8 @@ export function createSettingsWorkspaceSurface({
         onLightThemePresetChange={preferences.setLightThemePreset}
         onDarkThemePresetChange={preferences.setDarkThemePreset}
         onLoadingAnimationPresetChange={preferences.setLoadingAnimationPreset}
+        onLocalAgentsSettingsChange={preferences.setLocalAgentsSettings}
+        onAgentFileActivityIndicatorsEnabledChange={preferences.setAgentFileActivityIndicatorsEnabled}
         onTextSizeChange={preferences.setTextSize}
         onTypographyPreferencesChange={preferences.setTypographyPreferences}
         onPointerCursorsChange={preferences.setPointerCursors}

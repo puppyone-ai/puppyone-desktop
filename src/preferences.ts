@@ -82,6 +82,9 @@ export type TitlebarActionsSettings = {
   order: TitlebarActionId[];
 };
 export type TerminalSessionLayout = "menu" | "tabs";
+export type LocalAgentsSettings = {
+  enabledAgentIds: string[];
+};
 export type ExperimentalSettings = {
   enableAgentChat: boolean;
   enableAssetLibraryHome: boolean;
@@ -131,6 +134,8 @@ export const EXTERNAL_APPS_STORAGE_KEY = "puppyone.desktop.externalApps";
 export const RIGHT_SIDEBAR_TOOLS_STORAGE_KEY = "puppyone.desktop.rightSidebarTools";
 export const TITLEBAR_ACTIONS_STORAGE_KEY = "puppyone.desktop.titlebarActions";
 export const TERMINAL_SESSION_LAYOUT_STORAGE_KEY = "puppyone.desktop.terminalSessionLayout";
+export const LOCAL_AGENTS_STORAGE_KEY = "puppyone.desktop.localAgents";
+export const AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY = "puppyone.desktop.agentFileActivityIndicators";
 export const AI_EDIT_ASSIST_STORAGE_KEY = "puppyone.desktop.aiEditAssist";
 export const GIT_DISPLAY_MODE_STORAGE_KEY = "puppyone.desktop.gitDisplayMode";
 export const EXPERIMENTAL_SETTINGS_STORAGE_KEY = "puppyone.desktop.experimental";
@@ -181,6 +186,8 @@ export const DEFAULT_TITLEBAR_ACTIONS_SETTINGS: TitlebarActionsSettings = {
   order: [...TITLEBAR_ACTION_IDS],
 };
 export const DEFAULT_TERMINAL_SESSION_LAYOUT: TerminalSessionLayout = "tabs";
+export const DEFAULT_LOCAL_AGENTS_SETTINGS: LocalAgentsSettings = { enabledAgentIds: [] };
+export const DEFAULT_AGENT_FILE_ACTIVITY_INDICATORS_ENABLED = false;
 export const DEFAULT_AI_EDIT_ASSIST_ENABLED = false;
 export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableAgentChat: false,
@@ -559,6 +566,30 @@ export function parseTerminalSessionLayout(
   return value === "tabs" || value === "menu"
     ? value
     : DEFAULT_TERMINAL_SESSION_LAYOUT;
+}
+
+export function parseLocalAgentsSettings(
+  value: string | null | undefined,
+): LocalAgentsSettings {
+  if (!value) return DEFAULT_LOCAL_AGENTS_SETTINGS;
+  try {
+    const parsed = JSON.parse(value) as { enabledAgentIds?: unknown } | null;
+    if (!parsed || !Array.isArray(parsed.enabledAgentIds)) return DEFAULT_LOCAL_AGENTS_SETTINGS;
+    const enabledAgentIds = Array.from(new Set(parsed.enabledAgentIds.filter(
+      (id): id is string => typeof id === "string" && /^[a-z0-9][a-z0-9._-]{0,79}$/u.test(id),
+    ))).slice(0, 16);
+    return { enabledAgentIds };
+  } catch {
+    return DEFAULT_LOCAL_AGENTS_SETTINGS;
+  }
+}
+
+export function parseAgentFileActivityIndicatorsEnabled(
+  value: string | null | undefined,
+): boolean {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return DEFAULT_AGENT_FILE_ACTIVITY_INDICATORS_ENABLED;
 }
 
 export function parseAiEditAssistEnabled(value: string | null | undefined): boolean {
