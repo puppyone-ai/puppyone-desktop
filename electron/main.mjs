@@ -201,8 +201,6 @@ const nativeMenuService = createDesktopNativeMenuService({
   Menu,
   t: (messageId, values) => localeService.t(messageId, values),
   onNewWindow: () => createWindow(),
-  onOpenWorkspace: () => selectWorkspaceForLastFocusedWindow(),
-  onOpenWorkspaceInNewWindow: () => selectWorkspaceForNewWindow(),
 });
 const applicationQuitIntent = createApplicationQuitIntent({ app });
 const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({
@@ -932,15 +930,6 @@ async function selectWorkspaceForCurrentWindow(sender) {
 
   if (result.canceled || result.filePaths.length === 0) return null;
   return openWorkspaceInCurrentWindow(sender, result.filePaths[0]);
-}
-
-async function selectWorkspaceForLastFocusedWindow() {
-  const window = getLastFocusedWindow();
-  if (!window || window.isDestroyed()) return selectWorkspaceForNewWindow();
-
-  const result = await showWorkspaceOpenDialog(window);
-  if (result.canceled || result.filePaths.length === 0) return null;
-  return openWorkspaceInCurrentWindow(window.webContents, result.filePaths[0]);
 }
 
 async function selectWorkspaceForNewWindow(sender = null) {

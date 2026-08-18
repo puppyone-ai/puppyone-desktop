@@ -12,8 +12,6 @@ export function createDesktopNativeMenuService({
   platform = process.platform,
   t,
   onNewWindow,
-  onOpenWorkspace,
-  onOpenWorkspaceInNewWindow,
   logger = console,
 }) {
   if (!app) throw new TypeError("An Electron app is required.");
@@ -22,12 +20,6 @@ export function createDesktopNativeMenuService({
   }
   if (typeof t !== "function") throw new TypeError("A native menu translator is required.");
   if (typeof onNewWindow !== "function") throw new TypeError("onNewWindow must be a function.");
-  if (typeof onOpenWorkspace !== "function") {
-    throw new TypeError("onOpenWorkspace must be a function.");
-  }
-  if (typeof onOpenWorkspaceInNewWindow !== "function") {
-    throw new TypeError("onOpenWorkspaceInNewWindow must be a function.");
-  }
 
   const action = (actionId, handler) => () => runMenuAction(actionId, handler, logger);
 
@@ -39,19 +31,6 @@ export function createDesktopNativeMenuService({
         label: t("native.dock.newWindow"),
         accelerator: "CmdOrCtrl+N",
         click: action("file.newWindow", onNewWindow),
-      },
-      { type: "separator" },
-      {
-        id: "file.openWorkspace",
-        label: t("native.menu.openWorkspace"),
-        accelerator: "CmdOrCtrl+O",
-        click: action("file.openWorkspace", onOpenWorkspace),
-      },
-      {
-        id: "file.openWorkspaceInNewWindow",
-        label: t("native.menu.openWorkspaceInNewWindow"),
-        accelerator: "CmdOrCtrl+Shift+O",
-        click: action("file.openWorkspaceInNewWindow", onOpenWorkspaceInNewWindow),
       },
       { type: "separator" },
       { role: "close" },

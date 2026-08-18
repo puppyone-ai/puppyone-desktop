@@ -9,14 +9,10 @@ function createHarness({ platform = "darwin" } = {}) {
   const app = { dock: { setMenu: vi.fn() } };
   const actions = {
     newWindow: vi.fn(),
-    openWorkspace: vi.fn(),
-    openWorkspaceInNewWindow: vi.fn(),
   };
   const labels = {
     "native.menu.file": "File",
     "native.dock.newWindow": "New Window",
-    "native.menu.openWorkspace": "Open Workspace…",
-    "native.menu.openWorkspaceInNewWindow": "Open Workspace in New Window…",
   };
   const service = createDesktopNativeMenuService({
     app,
@@ -24,8 +20,6 @@ function createHarness({ platform = "darwin" } = {}) {
     platform,
     t: (messageId) => labels[messageId] ?? messageId,
     onNewWindow: actions.newWindow,
-    onOpenWorkspace: actions.openWorkspace,
-    onOpenWorkspaceInNewWindow: actions.openWorkspaceInNewWindow,
   });
   return { actions, app, Menu, service };
 }
@@ -50,28 +44,17 @@ describe("DesktopNativeMenuService", () => {
 
     const fileItems = applicationTemplate[1].submenu;
     const newWindow = fileItems.find((item) => item.id === "file.newWindow");
-    const openWorkspace = fileItems.find((item) => item.id === "file.openWorkspace");
-    const openWorkspaceInNewWindow = fileItems.find(
-      (item) => item.id === "file.openWorkspaceInNewWindow",
-    );
+    expect(fileItems).toHaveLength(3);
     expect(newWindow).toMatchObject({ label: "New Window", accelerator: "CmdOrCtrl+N" });
-    expect(openWorkspace).toMatchObject({ label: "Open Workspace…", accelerator: "CmdOrCtrl+O" });
-    expect(openWorkspaceInNewWindow).toMatchObject({
-      label: "Open Workspace in New Window…",
-      accelerator: "CmdOrCtrl+Shift+O",
-    });
+    expect(fileItems[1]).toEqual({ type: "separator" });
     expect(fileItems.at(-1)).toEqual({ role: "close" });
 
     newWindow.click();
-    openWorkspace.click();
-    openWorkspaceInNewWindow.click();
     Menu.buildFromTemplate.mock.calls[1][0][0].click();
     await Promise.resolve();
     await Promise.resolve();
 
     expect(actions.newWindow).toHaveBeenCalledTimes(2);
-    expect(actions.openWorkspace).toHaveBeenCalledOnce();
-    expect(actions.openWorkspaceInNewWindow).toHaveBeenCalledOnce();
   });
 
   it("does not replace native menus outside macOS", () => {

@@ -60,10 +60,6 @@ describe("DesktopLocaleService", () => {
     });
     expect(service.t("native.dock.newWindow")).toBe("Nouvelle fenêtre");
     expect(service.t("native.menu.file")).toBe("Fichier");
-    expect(service.t("native.menu.openWorkspace")).toBe("Ouvrir l’espace de travail…");
-    expect(service.t("native.menu.openWorkspaceInNewWindow")).toBe(
-      "Ouvrir l’espace de travail dans une nouvelle fenêtre…",
-    );
     expect(send).not.toHaveBeenCalled();
 
     await expect(service.setLanguagePreference("de")).resolves.toMatchObject({
