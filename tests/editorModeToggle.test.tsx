@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 describe("editor mode toggle", () => {
-  it("publishes Source Code into the pane menu instead of rendering editor chrome", () => {
+  it("publishes the editor modes as a segmented pane-menu control", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -55,22 +55,26 @@ describe("editor mode toggle", () => {
     expect(contribution).toMatchObject({
       documentId: "mode.md",
       viewItems: [{
-        kind: "toggle",
-        id: "editor-source-mode",
-        label: testT("editor.mode.source"),
-        checked: false,
+        kind: "segmented",
+        id: "editor-view-mode",
+        label: testT("editor.mode.label"),
+        value: "live",
+        options: [
+          { id: "live", label: testT("editor.mode.live") },
+          { id: "source", label: testT("editor.mode.source") },
+        ],
       }],
     });
 
-    const sourceModeItem = contribution?.viewItems[0];
-    expect(sourceModeItem?.kind).toBe("toggle");
+    const modeControl = contribution?.viewItems[0];
+    expect(modeControl?.kind).toBe("segmented");
     act(() => {
-      if (sourceModeItem?.kind === "toggle") sourceModeItem.setChecked(true);
+      if (modeControl?.kind === "segmented") modeControl.setValue("source");
     });
 
     expect(container.querySelector('[data-editor-mode="live"]')).toBeNull();
     expect(container.querySelector('[data-editor-mode="source"]')).not.toBeNull();
-    expect(contribution?.viewItems[0]).toMatchObject({ checked: true });
+    expect(contribution?.viewItems[0]).toMatchObject({ value: "source" });
   });
 
   it.each([

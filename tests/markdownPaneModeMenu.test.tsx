@@ -92,21 +92,38 @@ describe("Markdown pane mode menu", () => {
     });
     await waitForCondition(() => document.querySelector(".desktop-editor-pane-menu") !== null);
 
-    const sourceModeItem = Array.from(
-      document.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]'),
-    ).find((item) => item.textContent?.includes("Source code"));
+    const modeControl = document.querySelector<HTMLElement>(
+      '.desktop-editor-pane-menu-segmented-control[aria-label="Editor mode"]',
+    );
+    const liveModeItem = modeControl?.querySelector<HTMLButtonElement>(
+      '[role="menuitemradio"][aria-label="Live view"]',
+    );
+    const sourceModeItem = modeControl?.querySelector<HTMLButtonElement>(
+      '[role="menuitemradio"][aria-label="Source code"]',
+    );
+    expect(modeControl?.textContent).toBe("");
+    expect(liveModeItem?.getAttribute("aria-checked")).toBe("true");
     expect(sourceModeItem).toBeInstanceOf(HTMLButtonElement);
     expect(sourceModeItem?.getAttribute("aria-checked")).toBe("false");
 
-    await act(async () => sourceModeItem?.click());
+    liveModeItem?.focus();
+    await act(async () => liveModeItem?.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "ArrowRight",
+      bubbles: true,
+      cancelable: true,
+    })));
     await waitForCondition(() => container.querySelector(
       '.markdown-codemirror-editor[data-preview-state="source"]',
     ) !== null);
 
     expect(document.querySelector(".desktop-editor-pane-menu")).not.toBeNull();
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Source code");
     expect(document.querySelector<HTMLButtonElement>(
-      '[role="menuitemcheckbox"][aria-checked="true"]',
-    )?.textContent).toContain("Source code");
+      '[role="menuitemradio"][aria-label="Source code"]',
+    )?.getAttribute("aria-checked")).toBe("true");
+    expect(document.querySelector<HTMLButtonElement>(
+      '[role="menuitemradio"][aria-label="Live view"]',
+    )?.getAttribute("aria-checked")).toBe("false");
   });
 });
 

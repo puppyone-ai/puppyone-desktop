@@ -213,6 +213,31 @@ describe("editor split-pane architecture", () => {
     expect(paneActionsMenuSource).toContain(
       'className="desktop-editor-pane-menu-primary-action desktop-editor-pane-menu-close-action"',
     );
+    const findActionIndex = paneActionsMenuSource.indexOf(
+      "desktop-editor-pane-menu-find-action",
+    );
+    const externalActionIndex = paneActionsMenuSource.indexOf(
+      "desktop-editor-pane-menu-external-action",
+    );
+    const closeActionIndex = paneActionsMenuSource.indexOf(
+      "desktop-editor-pane-menu-close-action",
+    );
+    expect(findActionIndex).toBeGreaterThan(0);
+    expect(externalActionIndex).toBeGreaterThan(findActionIndex);
+    expect(closeActionIndex).toBeGreaterThan(externalActionIndex);
+    expect(paneActionsMenuSource).toContain("PANE_ACTIONS_MENU_EXTENDED_WIDTH = 224");
+    const segmentedControlRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-menu-segmented-control",
+    );
+    expect(segmentedControlRule).toContain("grid-auto-columns: 1fr;");
+    expect(segmentedControlRule).toContain("border: 1px solid var(--po-divider);");
+    const selectedSegmentRule = readCssBlock(
+      splitStyles,
+      '.desktop-editor-pane-menu-segment[aria-checked="true"]',
+    );
+    expect(selectedSegmentRule).toContain("background: var(--po-selected);");
+    expect(selectedSegmentRule).toContain("color: var(--po-text);");
     const paneRule = readCssBlock(splitStyles, ".desktop-editor-pane");
     const paneFrameRule = readCssBlock(
       splitStyles,

@@ -277,8 +277,8 @@ export function TextEditorFrame({
     setMode(nextMode);
   }, [mode, sourceSnapshotMode]);
 
-  const setSourceModeEnabled = useCallback((enabled: boolean) => {
-    switchMode(enabled ? "source" : "live");
+  const setPaneMenuMode = useCallback((nextMode: string) => {
+    if (nextMode === "live" || nextMode === "source") switchMode(nextMode);
   }, [switchMode]);
 
   useLayoutEffect(() => {
@@ -292,11 +292,23 @@ export function TextEditorFrame({
       documentId,
       viewItems: [
         {
-          kind: "toggle",
-          id: "editor-source-mode",
-          label: sourceModeLabel ?? t("editor.mode.source"),
-          checked: mode === "source",
-          setChecked: setSourceModeEnabled,
+          kind: "segmented",
+          id: "editor-view-mode",
+          label: t("editor.mode.label"),
+          value: mode,
+          options: [
+            {
+              id: "live",
+              label: liveModeLabel ?? t("editor.mode.live"),
+              icon: liveModeIcon === "preview" ? <PreviewIcon /> : <PencilIcon />,
+            },
+            {
+              id: "source",
+              label: sourceModeLabel ?? t("editor.mode.source"),
+              icon: <CodeIcon />,
+            },
+          ],
+          setValue: setPaneMenuMode,
         },
       ],
     });
@@ -305,10 +317,12 @@ export function TextEditorFrame({
   }, [
     documentId,
     hideSourceView,
+    liveModeIcon,
+    liveModeLabel,
     mode,
     modeControlPlacement,
     publishPaneMenuContribution,
-    setSourceModeEnabled,
+    setPaneMenuMode,
     sourceModeLabel,
     t,
   ]);

@@ -22,7 +22,25 @@ export type EditorPaneMenuToggle = Readonly<{
   setChecked: (checked: boolean) => void;
 }>;
 
-export type EditorPaneMenuItem = EditorPaneMenuCommand | EditorPaneMenuToggle;
+export type EditorPaneMenuSegmentedOption = Readonly<{
+  id: string;
+  label: string;
+  icon: ReactNode;
+}>;
+
+export type EditorPaneMenuSegmentedControl = Readonly<{
+  kind: "segmented";
+  id: string;
+  label: string;
+  value: string;
+  options: readonly EditorPaneMenuSegmentedOption[];
+  setValue: (value: string) => void;
+}>;
+
+export type EditorPaneMenuItem =
+  | EditorPaneMenuCommand
+  | EditorPaneMenuToggle
+  | EditorPaneMenuSegmentedControl;
 
 export type EditorPaneMenuContribution = Readonly<{
   documentId: string;

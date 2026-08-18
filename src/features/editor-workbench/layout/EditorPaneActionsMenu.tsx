@@ -32,6 +32,7 @@ import { DesktopOverlayLayer } from "../../app-shell/DesktopOverlayPortal";
 import { useAnchoredOverlayPosition } from "../../app-shell/useAnchoredOverlayPosition";
 
 const PANE_ACTIONS_MENU_WIDTH = 196;
+const PANE_ACTIONS_MENU_EXTENDED_WIDTH = 224;
 const PANE_ACTIONS_MENU_MAX_HEIGHT = 360;
 
 export type EditorPaneActionsMenuProps = Readonly<{
@@ -65,11 +66,14 @@ export function EditorPaneActionsMenu({
 }: EditorPaneActionsMenuProps) {
   const { t } = useLocalization();
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const preferredWidth = findCommand && onOpenExternal
+    ? PANE_ACTIONS_MENU_EXTENDED_WIDTH
+    : PANE_ACTIONS_MENU_WIDTH;
   const { setOverlayRef, overlayPosition } = useAnchoredOverlayPosition({
     open,
     anchorRef,
     boundarySelector: ".desktop-editor-split-view",
-    preferredWidth: PANE_ACTIONS_MENU_WIDTH,
+    preferredWidth,
     preferredMaxHeight: PANE_ACTIONS_MENU_MAX_HEIGHT,
     gap: 4,
     margin: 8,
@@ -141,7 +145,7 @@ export function EditorPaneActionsMenu({
     void action();
   };
   const viewItems = menuContribution?.viewItems ?? [];
-  const hasSecondaryActions = Boolean(findCommand || viewItems.length > 0);
+  const hasSecondaryActions = viewItems.length > 0;
   const openExternalLabel = externalOpenAppName
     ? t("editor.panes.openInApp", { app: externalOpenAppName })
     : t("editor.openDefaultApp");
@@ -155,7 +159,7 @@ export function EditorPaneActionsMenu({
     : {
         left: 0,
         top: 0,
-        width: PANE_ACTIONS_MENU_WIDTH,
+        width: preferredWidth,
         maxHeight: PANE_ACTIONS_MENU_MAX_HEIGHT,
         visibility: "hidden",
         pointerEvents: "none",
@@ -201,8 +205,17 @@ export function EditorPaneActionsMenu({
             onClick={() => runAndClose(() => onSplit("vertical", "second"))}
           />
           <div className="desktop-editor-pane-menu-end-actions">
-            {onOpenExternal && (
+            {(findCommand || onOpenExternal) && (
               <span className="desktop-editor-pane-menu-action-divider" aria-hidden="true" />
+            )}
+            {findCommand && (
+              <DesktopMenuIconButton
+                className="desktop-editor-pane-menu-primary-action desktop-editor-pane-menu-find-action"
+                icon={<Search size={15} strokeWidth={1.9} />}
+                label={t("editor.find.label")}
+                role="menuitem"
+                onClick={() => runAndClose(findCommand.open)}
+              />
             )}
             {onOpenExternal && (
               <DesktopMenuIconButton
@@ -224,31 +237,70 @@ export function EditorPaneActionsMenu({
         </div>
         {hasSecondaryActions && (
           <DesktopMenuSection className="desktop-editor-pane-menu-secondary-actions">
-            {findCommand && (
-              <DesktopMenuItem
-                icon={<Search size={14} strokeWidth={1.9} />}
-                label={t("editor.find.label")}
-                trailing="⌘F"
-                onClick={() => runAndClose(findCommand.open)}
-              />
-            )}
-            {viewItems.map((item) => item.kind === "toggle" ? (
-              <DesktopMenuItem
-                key={item.id}
-                icon={item.checked ? <Check size={14} strokeWidth={2} /> : <span />}
-                label={item.label}
-                role="menuitemcheckbox"
-                aria-checked={item.checked}
-                onClick={() => item.setChecked(!item.checked)}
-              />
-            ) : (
-              <DesktopMenuItem
-                key={item.id}
-                disabled={item.disabled}
-                label={item.label}
-                onClick={() => runAndClose(item.run)}
-              />
-            ))}
+            {viewItems.map((item) => {
+              if (item.kind === "toggle") {
+                return (
+                  <DesktopMenuItem
+                    key={item.id}
+                    icon={item.checked ? <Check size={14} strokeWidth={2} /> : <span />}
+                    label={item.label}
+                    role="menuitemcheckbox"
+                    aria-checked={item.checked}
+                    onClick={() => item.setChecked(!item.checked)}
+                  />
+                );
+              }
+              if (item.kind === "segmented") {
+                return (
+                  <div
+                    key={item.id}
+                    className="desktop-editor-pane-menu-segmented-control"
+                    role="group"
+                    aria-label={item.label}
+                  >
+                    {item.options.map((option, optionIndex) => {
+                      const selected = option.id === item.value;
+                      return (
+                        <button
+                          key={option.id}
+                          className="desktop-editor-pane-menu-segment"
+                          type="button"
+                          role="menuitemradio"
+                          aria-label={option.label}
+                          aria-checked={selected}
+                          title={option.label}
+                          onClick={() => item.setValue(option.id)}
+                          onKeyDown={(event) => {
+                            if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                            event.preventDefault();
+                            const offset = event.key === "ArrowLeft" ? -1 : 1;
+                            const nextIndex = (
+                              optionIndex + offset + item.options.length
+                            ) % item.options.length;
+                            const nextOption = item.options[nextIndex];
+                            const buttons = event.currentTarget.parentElement?.querySelectorAll<
+                              HTMLButtonElement
+                            >(".desktop-editor-pane-menu-segment");
+                            buttons?.item(nextIndex).focus({ preventScroll: true });
+                            if (nextOption) item.setValue(nextOption.id);
+                          }}
+                        >
+                          {option.icon}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              }
+              return (
+                <DesktopMenuItem
+                  key={item.id}
+                  disabled={item.disabled}
+                  label={item.label}
+                  onClick={() => runAndClose(item.run)}
+                />
+              );
+            })}
           </DesktopMenuSection>
         )}
       </DesktopMenuSurface>

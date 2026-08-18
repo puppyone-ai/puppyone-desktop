@@ -295,6 +295,45 @@
   border-top: 1px solid var(--po-divider);
 }
 
+.desktop-editor-pane-menu-segmented-control {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px;
+  border: 1px solid var(--po-divider);
+  border-radius: var(--desktop-toolbar-action-radius);
+  background: color-mix(in srgb, var(--po-control) 72%, transparent);
+}
+
+.desktop-editor-pane-menu-segment {
+  appearance: none;
+  display: grid;
+  height: var(--desktop-editor-pane-menu-action-size);
+  min-width: 0;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--desktop-toolbar-action-radius) - 2px);
+  background: transparent;
+  color: var(--desktop-titlebar-text-muted, var(--po-text-muted));
+  cursor: var(--po-clickable-cursor, pointer);
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.desktop-editor-pane-menu-segment:hover,
+.desktop-editor-pane-menu-segment:focus-visible {
+  background: var(--desktop-titlebar-hover, var(--po-hover));
+  color: var(--desktop-titlebar-text, var(--po-text));
+  outline: none;
+}
+
+.desktop-editor-pane-menu-segment[aria-checked="true"] {
+  background: var(--po-selected);
+  color: var(--po-text);
+}
+
 .desktop-editor-pane-content {
   position: relative;
   z-index: 0;
