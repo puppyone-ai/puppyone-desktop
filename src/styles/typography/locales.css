@@ -34,9 +34,9 @@
   --po-font-locale-mono: "PingFang SC", "Microsoft YaHei", "Noto Sans Mono CJK SC";
   /* PingFang does not expose a stable intermediate face between Regular and
      Medium. Select Medium explicitly instead of relying on browser matching
-     for 450; theme polarity is compensated by color, not font geometry. */
+     for 450; theme polarity is compensated by color, not font geometry.
+     Letter spacing remains the script-neutral foundation default. */
   --po-content-reading-weight: 500;
-  --po-content-reading-letter-spacing: 0.01em;
 }
 
 :where(
@@ -51,7 +51,6 @@
   --po-font-locale-serif: "Songti TC", "Noto Serif CJK TC";
   --po-font-locale-mono: "PingFang TC", "Microsoft JhengHei", "Noto Sans Mono CJK TC";
   --po-content-reading-weight: 500;
-  --po-content-reading-letter-spacing: 0.01em;
 }
 
 :where(

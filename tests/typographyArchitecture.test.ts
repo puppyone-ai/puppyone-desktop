@@ -138,6 +138,7 @@ describe("typography architecture", () => {
     expect(foundations).toContain("--po-text-size-content: 14px;");
     expect(foundations).toContain("--po-text-weight-medium: 500;");
     expect(foundations).toContain("--po-content-reading-line-height: 1.7142857143;");
+    expect(foundations).toContain("--po-content-reading-letter-spacing: 0;");
     expect(roles).toContain("--po-font-ui-primary: \"Geist Sans\";");
     expect(roles).toContain("--po-font-content-primary: \"Geist Sans\";");
     expect(roles).toContain("--po-font-code-primary: \"Geist Mono\";");
@@ -154,7 +155,7 @@ describe("typography architecture", () => {
     expect(locales).toContain('"Hiragino Sans", "Yu Gothic", "Meiryo", "Noto Sans CJK JP"');
     expect(locales).toContain('"Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR"');
     expect(locales).toContain("--po-content-reading-weight: 500;");
-    expect(locales).toContain("--po-content-reading-letter-spacing: 0.01em;");
+    expect(locales).not.toContain("--po-content-reading-letter-spacing:");
     expect(locales).not.toContain("--po-content-reading-line-height:");
     expect(base).toContain("font-feature-settings: normal;");
     expect(base).not.toContain("'cv02'");

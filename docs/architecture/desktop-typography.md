@@ -42,9 +42,10 @@ while the user edits, so another pane cannot change its fallback face or text
 metrics.
 
 The locale layer owns optical corrections for long-form reading. Default/Latin
-content uses weight `450` and zero tracking; Chinese content explicitly uses
-weight `500` and `0.01em` tracking. Both use the same `24px` leading at the
-default `14px` size, producing one stable `30px` Live Preview row after its
+content uses weight `450`; Chinese content explicitly uses weight `500`.
+Every script uses the font's native spacing (`letter-spacing: 0`) and the same
+`24px` leading at the default `14px` size, producing one stable `30px` Live
+Preview row after its
 `3px` padding on each edge. This is intentional: PingFang does not expose a
 stable intermediate face between Regular and Medium, so the product selects
 Medium explicitly instead of relying on browser matching for `450`. Markdown
