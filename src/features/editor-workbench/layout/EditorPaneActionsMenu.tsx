@@ -34,6 +34,8 @@ const PANE_ACTION_SLOT_SIZE = 25;
 const PANE_ACTION_GAP = 3;
 const PANE_MENU_INLINE_CHROME = 10;
 const PANE_SEGMENT_GAP = 1;
+const PANE_DIVIDER_WIDTH = 1;
+const PANE_DIVIDER_INLINE_MARGIN = 3;
 
 export type EditorPaneActionsMenuProps = Readonly<{
   anchorRef: RefObject<HTMLElement | null>;
@@ -303,18 +305,22 @@ function resolvePaneActionsMenuWidth({
   if (hasSecondaryActions) return PANE_ACTIONS_MENU_WIDTH;
 
   const actionCount = 1 + Number(hasFind) + Number(hasExternalOpen);
-  const endItemCount = actionCount + Number(Boolean(segmentedControl));
-  const endActionsWidth = (
-    endItemCount * PANE_ACTION_SLOT_SIZE
-    + Math.max(0, endItemCount - 1) * PANE_ACTION_GAP
+  const actionsWidth = (
+    actionCount * PANE_ACTION_SLOT_SIZE
+    + Math.max(0, actionCount - 1) * PANE_ACTION_GAP
   );
-  if (!segmentedControl) return PANE_MENU_INLINE_CHROME + endActionsWidth;
+  if (!segmentedControl) return PANE_MENU_INLINE_CHROME + actionsWidth;
 
   const segmentCount = segmentedControl.options.length;
   const segmentedWidth = (
     segmentCount * PANE_ACTION_SLOT_SIZE
     + Math.max(0, segmentCount - 1) * PANE_SEGMENT_GAP
   );
+  const dividerWidth = (
+    PANE_DIVIDER_WIDTH
+    + PANE_DIVIDER_INLINE_MARGIN * 2
+  );
+  const endActionsWidth = dividerWidth + PANE_ACTION_GAP + actionsWidth;
   return (
     PANE_MENU_INLINE_CHROME
     + segmentedWidth

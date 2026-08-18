@@ -235,6 +235,7 @@
   overflow-x: hidden;
   overflow-y: auto;
   padding: 4px;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--po-shadow) 42%, transparent);
 }
 
 .desktop-editor-pane-menu-primary-actions {
@@ -267,19 +268,12 @@
 }
 
 .desktop-editor-pane-menu-action-divider {
-  display: grid;
-  width: var(--desktop-editor-pane-menu-action-size);
-  height: var(--desktop-editor-pane-menu-action-size);
-  flex: 0 0 var(--desktop-editor-pane-menu-action-size);
-  place-items: center;
-  pointer-events: none;
-}
-
-.desktop-editor-pane-menu-action-divider::before {
   width: 1px;
-  height: 12px;
+  height: 18px;
+  flex: 0 0 1px;
+  margin-inline: 3px;
   background: var(--po-divider);
-  content: "";
+  pointer-events: none;
 }
 
 .desktop-editor-pane-menu-close-action.desktop-menu-icon-button {

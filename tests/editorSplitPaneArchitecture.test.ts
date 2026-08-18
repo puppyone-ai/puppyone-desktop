@@ -201,20 +201,18 @@ describe("editor split-pane architecture", () => {
       splitStyles,
       ".desktop-editor-pane-menu-action-divider",
     );
-    expect(externalDividerRule).toContain(
-      "width: var(--desktop-editor-pane-menu-action-size);",
-    );
-    expect(externalDividerRule).toContain(
-      "height: var(--desktop-editor-pane-menu-action-size);",
-    );
+    expect(externalDividerRule).toContain("width: 1px;");
+    expect(externalDividerRule).toContain("height: 18px;");
+    expect(externalDividerRule).toContain("flex: 0 0 1px;");
+    expect(externalDividerRule).toContain("margin-inline: 3px;");
+    expect(externalDividerRule).toContain("background: var(--po-divider);");
     expect(externalDividerRule).toContain("pointer-events: none;");
-    const externalDividerLineRule = readCssBlock(
-      splitStyles,
-      ".desktop-editor-pane-menu-action-divider::before",
+    expect(splitStyles).not.toContain(".desktop-editor-pane-menu-action-divider::before");
+    expect(paneMenuRule).toContain(
+      "box-shadow: 0 2px 8px color-mix(in srgb, var(--po-shadow) 42%, transparent);",
     );
-    expect(externalDividerLineRule).toContain("width: 1px;");
-    expect(externalDividerLineRule).toContain("height: 12px;");
-    expect(externalDividerLineRule).toContain("background: var(--po-divider);");
+    expect(paneActionsMenuSource).toContain("PANE_DIVIDER_WIDTH = 1");
+    expect(paneActionsMenuSource).toContain("PANE_DIVIDER_INLINE_MARGIN = 3");
     expect(paneActionsMenuSource).toContain(
       'className="desktop-editor-pane-menu-primary-action desktop-editor-pane-menu-close-action"',
     );
