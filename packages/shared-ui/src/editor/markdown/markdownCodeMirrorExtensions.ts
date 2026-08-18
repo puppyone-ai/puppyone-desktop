@@ -84,7 +84,7 @@ export function markdownCodeMirrorUrgentExtensions(readOnly: boolean): Extension
     // rebuilds inline replacement widgets when a pointer selection crosses
     // lines. Markdown intentionally has no active-line background, and the
     // rebuild would restart image asset/decode lifecycles for no visible gain.
-    keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+    keymap.of([...markdownEditingKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
     puppyMarkdownEditorTheme,
   ];
 }
@@ -133,7 +133,6 @@ export function markdownLivePreviewCoreExtension(
 ): Extension {
   const composition = getMarkdownFeatureComposition(dialect);
   return [
-    keymap.of([...markdownEditingKeymap]),
     markdownHiddenMarkerSelectionNormalizer,
     markdownLivePreviewFocusExtension(),
     markdownInputCompositionExtension,

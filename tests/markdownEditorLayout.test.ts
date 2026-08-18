@@ -67,6 +67,27 @@ describe("Markdown editor layout", () => {
     expect(markdownEditorCss).not.toMatch(/data-preview-state="pending"[^}]*display\s*:\s*none/s);
   });
 
+  it("keeps Markdown source mode typography uniform", () => {
+    expect(markdownEditorCss).toMatch(
+      /\.markdown-codemirror-editor\[data-live-preview="false"\]\s*:is\([\s\S]*?\.cm-md-syntax-strong,[\s\S]*?\)\s*\{[\s\S]*?color:\s*inherit;/s,
+    );
+    expect(markdownEditorCss).toMatch(
+      /\.markdown-codemirror-editor\[data-live-preview="false"\][\s\S]*?\{[\s\S]*?font-family:\s*inherit;/s,
+    );
+    expect(markdownEditorCss).toMatch(
+      /\.markdown-codemirror-editor\[data-live-preview="false"\][\s\S]*?\{[\s\S]*?font-size:\s*inherit;/s,
+    );
+    expect(markdownEditorCss).toMatch(
+      /\.markdown-codemirror-editor\[data-live-preview="false"\][\s\S]*?\{[\s\S]*?font-style:\s*normal;/s,
+    );
+    expect(markdownEditorCss).toMatch(
+      /\.markdown-codemirror-editor\[data-live-preview="false"\][\s\S]*?\{[\s\S]*?font-weight:\s*inherit;/s,
+    );
+    expect(markdownEditorCss).toMatch(
+      /\.markdown-codemirror-editor\[data-live-preview="false"\][\s\S]*?\{[\s\S]*?text-decoration:\s*none;/s,
+    );
+  });
+
   it("keeps vertical document padding fixed while the inline gutter responds to width", () => {
     const editorRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor");
     const scrollerRule = readCssRule(markdownEditorCss, ".markdown-codemirror-editor .cm-scroller");

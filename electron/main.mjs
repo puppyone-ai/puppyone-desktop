@@ -49,6 +49,10 @@ import { registerBuildInfoIpcHandlers } from "./main/ipc/build-info-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
 import { registerCloudPublishIpcHandlers } from "./main/ipc/cloud-publish-ipc.mjs";
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
+import {
+  attachMarkdownFormatShortcuts,
+  registerMarkdownFormatIpcHandlers,
+} from "./main/ipc/markdown-format-ipc.mjs";
 import { registerNativeSurfaceOcclusionIpcHandlers } from "./main/ipc/native-surface-occlusion-ipc.mjs";
 import { registerNativeSurfacePointerPassthroughIpcHandlers } from "./main/ipc/native-surface-pointer-passthrough-ipc.mjs";
 import { registerPanePreviewIpcHandlers } from "./main/ipc/pane-preview-ipc.mjs";
@@ -318,6 +322,7 @@ async function createWindow(options = {}) {
   });
   const webContentsId = window.webContents.id;
   documentSessionCloseCoordinator.attachWindow(window);
+  attachMarkdownFormatShortcuts(window.webContents);
   installWindowNavigationSecurity({
     webContents: window.webContents,
     applicationUrl: rendererApplicationUrl,
@@ -698,6 +703,9 @@ function registerIpcHandlers() {
   registerLocalizationIpcHandlers({
     ipcMain: trustedIpcMain,
     localeService,
+  });
+  registerMarkdownFormatIpcHandlers({
+    ipcMain: trustedIpcMain,
   });
   registerWorkspaceNavigationIpcHandlers({
     ipcMain: trustedIpcMain,

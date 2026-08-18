@@ -17,6 +17,7 @@ import type {
 } from "../../sourceSnapshot";
 import { useEditableDocumentSource } from "../../document-session/EditableDocumentSourceContext";
 import type { EditableDocumentSource } from "../../document-session/types";
+import { useEditorPaneMenuContributionPublisher } from "../../editorPaneMenuContribution";
 
 export type TextEditorControls = {
   canEdit: boolean;
@@ -33,6 +34,8 @@ export type TextEditorFrameProps = {
   defaultMode: EditorMode;
   canEdit: boolean;
   hideSourceView: boolean;
+  enableModeToggleShortcut?: boolean;
+  modeControlPlacement?: "inline" | "pane-menu";
   liveModeLabel?: string;
   sourceModeLabel?: string;
   liveModeIcon?: "edit" | "preview";
@@ -55,6 +58,8 @@ export function TextEditorFrame({
   defaultMode,
   canEdit,
   hideSourceView,
+  enableModeToggleShortcut = false,
+  modeControlPlacement = "inline",
   liveModeLabel,
   sourceModeLabel,
   liveModeIcon = "edit",
@@ -65,6 +70,7 @@ export function TextEditorFrame({
 }: TextEditorFrameProps) {
   const { t } = useLocalization();
   const editingSource = useEditableDocumentSource();
+  const publishPaneMenuContribution = useEditorPaneMenuContributionPublisher();
   const [mode, setMode] = useState<EditorMode>(hideSourceView ? "live" : defaultMode);
   const [draft, setDraft] = useState(content);
   const [editorValue, setEditorValue] = useState(content);
@@ -73,6 +79,7 @@ export function TextEditorFrame({
   const draftRevisionCounterRef = useRef(0);
   const draftRevisionRef = useRef(createDraftRevision(documentId, 0));
   const contentPropRef = useRef(content);
+  const hostRef = useRef<HTMLElement | null>(null);
   const snapshotPortRef = useRef<EditorSourceSnapshotPort | null>(null);
   const fallbackSourceRequestedRef = useRef(false);
   const sourceSnapshotRef = useRef({
@@ -257,7 +264,7 @@ export function TextEditorFrame({
     onSnapshotPortChange: handleSnapshotPortChange,
   };
 
-  const switchMode = (nextMode: EditorMode) => {
+  const switchMode = useCallback((nextMode: EditorMode) => {
     if (nextMode === mode) return;
     if (sourceSnapshotMode) {
       const snapshot = snapshotPortRef.current?.readSnapshot();
@@ -268,10 +275,64 @@ export function TextEditorFrame({
       }
     }
     setMode(nextMode);
-  };
+  }, [mode, sourceSnapshotMode]);
+
+  const setSourceModeEnabled = useCallback((enabled: boolean) => {
+    switchMode(enabled ? "source" : "live");
+  }, [switchMode]);
+
+  useLayoutEffect(() => {
+    if (
+      hideSourceView
+      || modeControlPlacement !== "pane-menu"
+      || !publishPaneMenuContribution
+    ) return undefined;
+
+    publishPaneMenuContribution({
+      documentId,
+      viewItems: [
+        {
+          kind: "toggle",
+          id: "editor-source-mode",
+          label: sourceModeLabel ?? t("editor.mode.source"),
+          checked: mode === "source",
+          setChecked: setSourceModeEnabled,
+        },
+      ],
+    });
+
+    return () => publishPaneMenuContribution(null);
+  }, [
+    documentId,
+    hideSourceView,
+    mode,
+    modeControlPlacement,
+    publishPaneMenuContribution,
+    setSourceModeEnabled,
+    sourceModeLabel,
+    t,
+  ]);
+
+  useEffect(() => {
+    if (hideSourceView || !enableModeToggleShortcut) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isModeToggleShortcut(event) || event.defaultPrevented) return;
+      const host = hostRef.current;
+      const eventTarget = event.target;
+      if (
+        !host
+        || !(eventTarget instanceof Node)
+        || !host.contains(eventTarget)
+      ) return;
+      event.preventDefault();
+      switchMode(mode === "live" ? "source" : "live");
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [enableModeToggleShortcut, hideSourceView, mode, switchMode]);
 
   return (
-    <section className="editor-host">
+    <section className="editor-host" ref={hostRef}>
       {mode === "live" ? (
         <div
           className="editor-live-surface"
@@ -298,6 +359,8 @@ export function TextEditorFrame({
       )}
 
       {!hideSourceView && (
+        modeControlPlacement === "inline" || !publishPaneMenuContribution
+      ) && (
         <div className="editor-mode-toggle" aria-label={t("editor.mode.label")}>
           <button
             className={mode === "live" ? "active" : ""}
@@ -321,6 +384,14 @@ export function TextEditorFrame({
       )}
     </section>
   );
+}
+
+function isModeToggleShortcut(event: KeyboardEvent): boolean {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey) return false;
+  const key = event.key.toLowerCase();
+  if (key === "/" && !event.shiftKey) return true;
+  if (key === "m" && event.shiftKey) return true;
+  return false;
 }
 
 function createDraftRevision(documentId: string, sequence: number): string {

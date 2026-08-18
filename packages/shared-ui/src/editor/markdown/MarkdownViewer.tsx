@@ -28,6 +28,8 @@ export function MarkdownViewer(context: MarkdownViewerProps) {
       defaultMode="live"
       canEdit={context.canEdit}
       hideSourceView={context.hideSourceView}
+      enableModeToggleShortcut
+      modeControlPlacement="pane-menu"
       sourceSnapshotMode
       renderLive={(value, controls) => (
         <MarkdownCodeMirrorEditor

@@ -1,0 +1,160 @@
+/**
+ * @vitest-environment happy-dom
+ */
+import React, { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  EMPTY_EDITOR_GROUP,
+  createEditorInput,
+  createEditorPaneLayout,
+  openEditor,
+  type DataNode,
+  type DataWorkspaceState,
+} from "@puppyone/shared-ui";
+import { DesktopEditorSplitView } from "../src/features/editor-workbench/layout/DesktopEditorSplitView";
+import { withTestLocalization } from "./testLocalization";
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
+
+let root: Root | null = null;
+
+afterEach(() => {
+  act(() => root?.unmount());
+  root = null;
+  document.body.replaceChildren();
+});
+
+describe("Markdown pane mode menu", () => {
+  it("switches source mode from the three-dot pane menu without floating editor controls", async () => {
+    const path = "notes.md";
+    const node: DataNode = {
+      id: path,
+      path,
+      name: path,
+      type: "markdown",
+      mimeType: "text/markdown",
+      source: "local",
+    };
+    const editorGroup = openEditor(EMPTY_EDITOR_GROUP, createEditorInput(path));
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(withTestLocalization(
+        <DesktopEditorSplitView
+          aiEditRequest={null}
+          dataPort={{
+            listChildren: async () => [node],
+            readFile: async () => ({
+              ...node,
+              content: "# Heading\n\nBody",
+              version: "v1",
+            }),
+          }}
+          editorGroup={editorGroup}
+          editorInteractionPreferences={{
+            showSaveStatus: false,
+            markdownBlockDragEnabled: false,
+          }}
+          editorTree={[node]}
+          fileIconTheme="default"
+          layout={createEditorPaneLayout(path)}
+          markdownEnvironment={workspaceState(node).markdownEnvironment}
+          workspace={{
+            id: "workspace",
+            name: "Workspace",
+            path: "/workspace",
+            status: "recording",
+          }}
+          onClosePane={vi.fn()}
+          onFocusPane={vi.fn()}
+          onMovePane={vi.fn()}
+          onOpenAtPaneEdge={vi.fn()}
+          onResizeSplit={vi.fn()}
+          onSplitPane={vi.fn()}
+        />,
+      ));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitForCondition(() => container.querySelector(".markdown-codemirror-editor") !== null);
+
+    expect(container.querySelector(".editor-mode-toggle")).toBeNull();
+    const handle = container.querySelector<HTMLButtonElement>(".desktop-editor-pane-handle");
+    expect(handle).toBeInstanceOf(HTMLButtonElement);
+
+    await act(async () => {
+      handle?.click();
+      await Promise.resolve();
+    });
+    await waitForCondition(() => document.querySelector(".desktop-editor-pane-menu") !== null);
+
+    const sourceModeItem = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]'),
+    ).find((item) => item.textContent?.includes("Source code"));
+    expect(sourceModeItem).toBeInstanceOf(HTMLButtonElement);
+    expect(sourceModeItem?.getAttribute("aria-checked")).toBe("false");
+
+    await act(async () => sourceModeItem?.click());
+    await waitForCondition(() => container.querySelector(
+      '.markdown-codemirror-editor[data-preview-state="source"]',
+    ) !== null);
+
+    expect(document.querySelector(".desktop-editor-pane-menu")).not.toBeNull();
+    expect(document.querySelector<HTMLButtonElement>(
+      '[role="menuitemcheckbox"][aria-checked="true"]',
+    )?.textContent).toContain("Source code");
+  });
+});
+
+async function waitForCondition(condition: () => boolean, attempts = 100) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (condition()) return;
+    await act(async () => new Promise((resolve) => window.setTimeout(resolve, 5)));
+  }
+  throw new Error("Timed out waiting for Markdown pane mode state.");
+}
+
+function workspaceState(node: DataNode): DataWorkspaceState {
+  return {
+    tree: [node],
+    activePath: node.path,
+    activeNode: node,
+    selectedPaths: [node.path],
+    selectedNodes: [node],
+    currentFolderPath: null,
+    selectedFile: node,
+    loadingPath: null,
+    loadError: null,
+    rootLoading: false,
+    fileContent: null,
+    fileLoading: false,
+    fileError: null,
+    fileUrl: null,
+    fileUrlLoading: false,
+    fileUrlError: null,
+    markdownEnvironment: {
+      linkGraph: {
+        revision: 0,
+        documentCount: 0,
+        indexedDocumentCount: 0,
+        resolveWikiLink: () => ({
+          exists: false,
+          ambiguous: false,
+          path: null,
+          name: "",
+          displayName: "",
+          target: "",
+        }),
+        resolveMarkdownLink: () => null,
+        getBacklinks: () => [],
+      },
+      linkCommands: {},
+      assetUrlResolver: () => null,
+      assetResolverRevision: 0,
+    },
+  };
+}

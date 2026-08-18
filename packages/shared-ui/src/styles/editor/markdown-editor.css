@@ -281,6 +281,31 @@
   text-decoration: line-through;
 }
 
+/*
+ * Source mode should present raw Markdown bytes with uniform typography.
+ * Keep semantic token classes for parsing features, but neutralize their
+ * typographic emphasis so size/family/weight stay consistent.
+ */
+.markdown-codemirror-editor[data-live-preview="false"] :is(
+  .cm-md-syntax-strong,
+  .cm-md-syntax-emphasis,
+  .cm-md-syntax-link,
+  .cm-md-syntax-monospace,
+  .cm-md-code-fence,
+  .cm-md-code-block-line,
+  .cm-md-syntax-strikethrough,
+  .cm-md-source-syntax-heading,
+  .cm-md-source-syntax-list,
+  .cm-md-source-syntax-task
+) {
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  font-style: normal;
+  font-weight: inherit;
+  text-decoration: none;
+}
+
 .markdown-codemirror-editor[data-live-preview="true"] .cm-md-code-block-line {
   background: color-mix(in srgb, var(--po-control) 28%, transparent);
 }

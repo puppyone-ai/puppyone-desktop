@@ -162,14 +162,106 @@ export function getInlineRevealElement(
   const candidates = elements ?? getMarkdownElementsInRange(state, state.doc.lineAt(caret).from, state.doc.lineAt(caret).to);
   let best: MarkdownElement | null = null;
   for (const element of candidates) {
-    if (!isInlineRevealKind(element.kind)) continue;
-    // Incomplete / malformed inline HTML compiles to visibleSource and must not
-    // participate in collapsed-marker reveal or deletion.
-    if (element.kind === "inlineHtml" && element.inlineHtml?.status !== "complete") continue;
+    if (!isSelectableInlineFormat(element)) continue;
     if (caret <= element.from || caret >= element.to) continue;
     if (!best || element.to - element.from < best.to - best.from) best = element;
   }
   return best;
+}
+
+const INLINE_FORMAT_SELECTION_KINDS = new Set<MarkdownElementKind>([
+  "emphasis",
+  "inlineHtml",
+  "strike",
+  "strong",
+]);
+
+/**
+ * When a selection covers the visible content of an inline format, return that
+ * format so callers can inspect its markers without changing the selection.
+ */
+export function getInlineFormatSelectionElement(
+  state: EditorState,
+  from: number,
+  to: number,
+): MarkdownElement | null {
+  const start = Math.min(from, to);
+  const end = Math.max(from, to);
+  if (start === end) return getInlineRevealElement(state, start);
+
+  const lineFrom = state.doc.lineAt(start).from;
+  const lineTo = state.doc.lineAt(end).to;
+  const candidates = getMarkdownElementsInRange(state, lineFrom, lineTo);
+  let best: MarkdownElement | null = null;
+  for (const element of candidates) {
+    if (!INLINE_FORMAT_SELECTION_KINDS.has(element.kind) || !isSelectableInlineFormat(element)) continue;
+    if (start < element.from || end > element.to) continue;
+    const content = element.contentRange;
+    const matchesContent = Boolean(content && start === content.from && end === content.to);
+    const matchesWhole = start === element.from && end === element.to;
+    if (!matchesContent && !matchesWhole) continue;
+    if (!best || element.to - element.from < best.to - best.from) best = element;
+  }
+  return best;
+}
+
+function isSelectableInlineFormat(element: MarkdownElement): boolean {
+  if (!isInlineRevealKind(element.kind)) return false;
+  return !(element.kind === "inlineHtml" && element.inlineHtml?.status !== "complete");
+}
+
+export type MarkdownInlineFormatKind = "emphasis" | "inlineCode" | "strike" | "strong" | "underline";
+
+export type MarkdownInlineFormatCoverage = {
+  formats: MarkdownElement[];
+  neighbors: MarkdownElement[];
+};
+
+/**
+ * MarkText-style coverage: formats fully contain the selection, neighbors overlap it.
+ * An inner selection like `hello` inside `**hello**` still counts as strong.
+ */
+export function getInlineFormatCoverage(
+  state: EditorState,
+  from: number,
+  to: number,
+  kind: MarkdownInlineFormatKind,
+): MarkdownInlineFormatCoverage {
+  const start = Math.min(from, to);
+  const end = Math.max(from, to);
+  const lineFrom = state.doc.lineAt(start).from;
+  const lineTo = state.doc.lineAt(end).to;
+  const formats: MarkdownElement[] = [];
+  const neighbors: MarkdownElement[] = [];
+
+  for (const element of getMarkdownElementsInRange(state, lineFrom, lineTo)) {
+    if (!matchesInlineFormatKind(element, kind)) continue;
+    if (isSelectionContainedByElement(start, end, element)) formats.push(element);
+    if (isSelectionOverlappingElement(start, end, element)) neighbors.push(element);
+  }
+
+  return { formats, neighbors };
+}
+
+function matchesInlineFormatKind(element: MarkdownElement, kind: MarkdownInlineFormatKind): boolean {
+  if (kind === "underline") return isCompleteHtmlTag(element, "u");
+  if (kind === "strong") return (element.kind === "strong" && isSelectableInlineFormat(element)) || isCompleteHtmlTag(element, "strong");
+  if (kind === "emphasis") return (element.kind === "emphasis" && isSelectableInlineFormat(element)) || isCompleteHtmlTag(element, "em");
+  return element.kind === kind && isSelectableInlineFormat(element);
+}
+
+function isCompleteHtmlTag(element: MarkdownElement, tagName: string): boolean {
+  return element.kind === "inlineHtml"
+    && element.inlineHtml.tagName === tagName
+    && element.inlineHtml.status === "complete";
+}
+
+function isSelectionContainedByElement(start: number, end: number, element: MarkdownElement): boolean {
+  return start >= element.from && end <= element.to && start < element.to;
+}
+
+function isSelectionOverlappingElement(start: number, end: number, element: MarkdownElement): boolean {
+  return start < element.to && end > element.from;
 }
 
 export function isInlineRevealKind(kind: MarkdownElementKind): boolean {

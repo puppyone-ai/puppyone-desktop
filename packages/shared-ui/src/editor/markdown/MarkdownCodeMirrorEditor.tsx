@@ -37,6 +37,7 @@ import {
   resolveMarkdownContentLanguage,
   type MarkdownContentLanguageResolution,
 } from "./core/presentation/markdownContentLanguage";
+import { bindMarkdownFormatHotkeys } from "./core/commands/markdownFormatHotkeys";
 import { CodeMirrorFindAdapter } from "../find/codeMirrorFindAdapter";
 import { useRegisterEditorFindAdapter } from "../find/editorFind";
 
@@ -274,6 +275,7 @@ export function MarkdownCodeMirrorEditor({
 
     viewRef.current = view;
     findAdapter.attach(view);
+    const unbindFormatHotkeys = bindMarkdownFormatHotkeys(view);
     const unsubscribeTypography = subscribeTypographyChanges(host.ownerDocument, () => {
       view.requestMeasure();
     });
@@ -302,6 +304,7 @@ export function MarkdownCodeMirrorEditor({
 
     return () => {
       previewGenerationRef.current += 1;
+      unbindFormatHotkeys();
       unsubscribeTypography();
       // Detaching the port synchronously lets the host capture the final
       // snapshot while the CodeMirror document is still alive.
@@ -382,8 +385,11 @@ export function MarkdownCodeMirrorEditor({
       if (!isCurrent()) return;
       const languageStartedAt = performance.now();
       try {
+        const languageExtension = livePreview
+          ? markdownCodeMirrorLanguageExtension(resolvedDialect)
+          : [];
         view.dispatch({
-          effects: languageCompartmentRef.current.reconfigure(markdownCodeMirrorLanguageExtension(resolvedDialect)),
+          effects: languageCompartmentRef.current.reconfigure(languageExtension),
         });
       } catch (error) {
         if (livePreview) failPreview(error);

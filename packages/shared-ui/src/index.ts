@@ -171,6 +171,12 @@ export type {
   DocumentSessionStatus,
 } from "./editor/document-session";
 export {
+  MARKDOWN_FORMAT_ACTIVE_EVENT,
+  MARKDOWN_FORMAT_SHORTCUT_EVENT,
+  isMarkdownFormatCommand,
+} from "./editor/markdown";
+export type { MarkdownFormatCommand } from "./editor/markdown";
+export {
   classifyEditorViewerCapability,
   createPresetViewerRegistry,
   definePresetViewer,

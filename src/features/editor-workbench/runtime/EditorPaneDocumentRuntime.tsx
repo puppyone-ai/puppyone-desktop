@@ -96,6 +96,7 @@ function RegularEditorPaneDocumentRuntime({
     listChildren: dataPort.listChildren,
     readFile: dataPort.readFile,
   }), [dataPort.listChildren, dataPort.readFile, refreshKey?.sequence]);
+  const hideSourceView = node?.type === "markdown" ? false : true;
 
   return (
     <FilePreview
@@ -108,7 +109,7 @@ function RegularEditorPaneDocumentRuntime({
       error={source.error}
       aiEditFile={aiEditFile}
       showHeader={false}
-      hideSourceView
+      hideSourceView={hideSourceView}
       fileIconTheme={fileIconTheme}
       editorInteractionPreferences={editorInteractionPreferences}
       editorSaveMode="auto"
