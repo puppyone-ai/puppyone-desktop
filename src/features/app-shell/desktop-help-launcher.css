@@ -9,14 +9,18 @@
 }
 
 .desktop-help-launcher {
+  --desktop-help-launcher-label-gap: 6px;
+  --desktop-help-launcher-label-max-width: 84px;
+  --desktop-help-launcher-padding-end: 8px;
+
   display: flex;
   width: auto;
-  max-width: 30px;
-  height: 30px;
+  max-width: var(--desktop-chrome-control-size);
+  height: var(--desktop-chrome-control-size);
   box-sizing: border-box;
   align-items: center;
   justify-content: flex-start;
-  gap: 6px;
+  gap: var(--desktop-help-launcher-label-gap);
   overflow: hidden;
   padding: 0;
   border: 1px solid var(--po-border-subtle);
@@ -32,17 +36,18 @@
   white-space: nowrap;
   transition:
     max-width 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    padding-inline-end 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
     background-color 120ms ease,
     color 120ms ease,
     box-shadow 120ms ease;
 }
 
 .desktop-help-launcher-icon-slot {
-  /* The 30px button minus its 1px borders: keep the icon centered independently of the label. */
+  /* The control minus its 1px borders: keep the icon centered independently of the label. */
   display: grid;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
+  width: calc(var(--desktop-chrome-control-size) - 2px);
+  height: calc(var(--desktop-chrome-control-size) - 2px);
+  flex: 0 0 calc(var(--desktop-chrome-control-size) - 2px);
   place-items: center;
 }
 
@@ -65,7 +70,13 @@
 
 .desktop-help-launcher:hover,
 .desktop-help-launcher:focus-visible {
-  max-width: 120px;
+  max-width: calc(
+    var(--desktop-chrome-control-size)
+    + var(--desktop-help-launcher-label-gap)
+    + var(--desktop-help-launcher-label-max-width)
+    + var(--desktop-help-launcher-padding-end)
+  );
+  padding-inline-end: var(--desktop-help-launcher-padding-end);
   background: var(--po-overlay);
   color: var(--po-text-muted);
   box-shadow:
@@ -76,7 +87,7 @@
 
 .desktop-help-launcher:hover .desktop-help-launcher-label,
 .desktop-help-launcher:focus-visible .desktop-help-launcher-label {
-  max-width: 84px;
+  max-width: var(--desktop-help-launcher-label-max-width);
   opacity: 1;
 }
 

@@ -307,13 +307,17 @@ describe("DesktopHelpLauncher", () => {
     const launcherRule = launcherCss.match(/\.desktop-help-launcher\s*\{[^}]*\}/s)?.[0] ?? "";
     expect(launcherRule).toContain("border: 1px solid var(--po-border-subtle)");
     expect(launcherRule).toContain("background: var(--po-panel-raised)");
-    expect(launcherRule).toContain("max-width: 30px");
-    expect(launcherRule).toContain("height: 30px");
+    expect(launcherRule).toContain("max-width: var(--desktop-chrome-control-size)");
+    expect(launcherRule).toContain("height: var(--desktop-chrome-control-size)");
     expect(launcherRule).toContain("opacity: 1");
     expect(launcherRule).toContain("padding: 0");
+    expect(launcherRule).toContain("--desktop-help-launcher-padding-end: 8px");
     expect(launcherRule).not.toContain("backdrop-filter");
     expect(launcherCss).toMatch(
-      /\.desktop-help-launcher-icon-slot\s*\{[^}]*width:\s*28px[^}]*height:\s*28px[^}]*place-items:\s*center/s,
+      /\.desktop-help-launcher-icon-slot\s*\{[^}]*width:\s*calc\(var\(--desktop-chrome-control-size\) - 2px\)[^}]*height:\s*calc\(var\(--desktop-chrome-control-size\) - 2px\)[^}]*place-items:\s*center/s,
+    );
+    expect(launcherCss).toMatch(
+      /\.desktop-help-launcher:hover,[\s\S]*?\.desktop-help-launcher:focus-visible\s*\{[^}]*padding-inline-end:\s*var\(--desktop-help-launcher-padding-end\)/s,
     );
     expect(launcherCss).toMatch(
       /\.desktop-help-launcher:hover,[\s\S]*?\.desktop-help-launcher:focus-visible\s*\{[^}]*background:\s*var\(--po-overlay\)[^}]*opacity:\s*1/s,
