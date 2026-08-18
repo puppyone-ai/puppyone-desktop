@@ -38,5 +38,16 @@ storage replacement 使用专用 annotation，更新投影但不报告本地编�
 5. 回归测试必须覆盖“在 Widget 之前编辑、Widget DOM 未重建、随后执行交互”的
    增量路径，并验证目标内容和无关正文都保持正确。
 
+当前交互采用两种且仅两种坐标生命周期：
+
+- task、image、HTML、MDX source toggle 以及 table structure command 在触发时解析
+  挂载 Widget 的实时 range；
+- code block 在挂载时建立 edit session，Mermaid 和 table cell 在首次编辑时从实时
+  Widget range 建立 edit session；session 此后由每个 `EditorView` 随 transaction
+  映射。取消后再次编辑必须重新从挂载 Widget 建立 session。
+
+纯展示语法和不修改 Markdown 源码的媒体播放不持有交互坐标，因此不创建 edit
+session。新增 Feature 必须选择上述一种生命周期，不得增加第三套坐标所有权。
+
 不能用每次输入后全量重建 projection 来规避坐标问题；那会破坏长文档的增量性能，
 也会重新引入滚动锚点和 pane 闪烁问题。

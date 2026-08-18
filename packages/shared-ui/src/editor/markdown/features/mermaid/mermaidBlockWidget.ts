@@ -19,7 +19,11 @@ import { MarkdownWidgetMeasureController } from "../../platform/codemirror/layou
 import { estimateMermaidLayoutHeight } from "../code-block/codeBlockLayout";
 import { getDocRevision, type CommitResult } from "../../platform/brokers/transactionBroker";
 import { createPrincipalFromView, openMarkdownHref } from "../../core/editor/markdownLivePreviewContext";
-import { normalizeLineEndings, stopCodeMirrorEvent } from "../../shared/widgets/widgetDom";
+import {
+  getMappedWidgetSourceRange,
+  normalizeLineEndings,
+  stopCodeMirrorEvent,
+} from "../../shared/widgets/widgetDom";
 import {
   getMarkdownLocalization,
   type MarkdownLocalization,
@@ -72,6 +76,7 @@ export class MermaidBlockWidget extends WidgetType {
     shell.dir = direction;
     const readOnly = view.state.readOnly;
     const measure = new MarkdownWidgetMeasureController(host.layout);
+    const sourceLength = Math.max(0, this.to - this.from);
     const elementKey = `${this.from}:${this.to}`;
     const baseSource = view.state.sliceDoc(this.from, this.to);
     const recoveryKey = {
@@ -122,10 +127,12 @@ export class MermaidBlockWidget extends WidgetType {
     const ensureEditSession = (mode: "preview" | "editing" = editing ? "editing" : "preview") => {
       const existing = editSessionId ? host.editSessions.get(editSessionId) : undefined;
       if (existing) return existing;
+      const mappedRange = getMappedWidgetSourceRange(view, shell, sourceLength);
+      if (!mappedRange) return null;
       const session = host.editSessions.acquire({
         featureId: "mermaid",
-        mappedRange: { from: this.from, to: this.to },
-        baseSource,
+        mappedRange,
+        baseSource: view.state.sliceDoc(mappedRange.from, mappedRange.to),
         baseRevision: getDocRevision(view.state.doc),
         draft: { code: draftCode, language: this.language },
         mode,
@@ -136,6 +143,7 @@ export class MermaidBlockWidget extends WidgetType {
 
     const syncDraft = () => {
       const session = ensureEditSession("editing");
+      if (!session) return;
       host.editSessions.update(session.elementId, {
         draft: { code: draftCode, language: this.language },
         mode: "editing",
@@ -146,6 +154,7 @@ export class MermaidBlockWidget extends WidgetType {
     const commit = (options: { focus?: boolean; selection?: "start" | "end" } = {}): CommitResult | null => {
       if (committed || readOnly) return null;
       const session = ensureEditSession("editing");
+      if (!session) return null;
       committed = true;
       const nextCode = normalizeLineEndings(textarea?.value ?? draftCode);
       if (nextCode === this.code) {
@@ -305,11 +314,12 @@ export class MermaidBlockWidget extends WidgetType {
 
     const openEditor = () => {
       if (readOnly || editing) return;
+      const session = ensureEditSession("editing");
+      if (!session) return;
       activated = true;
       editing = true;
       committed = false;
       draftCode = textarea?.value ?? draftCode;
-      const session = ensureEditSession("editing");
       host.editSessions.update(session.elementId, {
         draft: { code: draftCode, language: this.language },
         mode: "editing",

@@ -17,6 +17,10 @@ import {
 import { CodeBlockWidget } from "../packages/shared-ui/src/editor/markdown/features/code-block/codeBlockWidget";
 import { MermaidBlockWidget } from "../packages/shared-ui/src/editor/markdown/features/mermaid/mermaidBlockWidget";
 import {
+  markdownCodeMirrorBaseExtensions,
+  markdownLivePreviewExtension,
+} from "../packages/shared-ui/src/editor/markdown/markdownCodeMirrorExtensions";
+import {
   createTableCellEditor,
   disposeTableCellEditor,
 } from "../packages/shared-ui/src/editor/markdown/features/table/tableCellEditor";
@@ -59,6 +63,23 @@ function createView(source: string): EditorView {
   const view = new EditorView({
     parent,
     state: EditorState.create({ doc: source }),
+  });
+  views.push(view);
+  return view;
+}
+
+function createProjectedView(source: string): EditorView {
+  const parent = document.createElement("div");
+  document.body.appendChild(parent);
+  const view = new EditorView({
+    parent,
+    state: EditorState.create({
+      doc: source,
+      extensions: [
+        ...markdownCodeMirrorBaseExtensions(false),
+        markdownLivePreviewExtension("safe", null, "note.md", null, "", null),
+      ],
+    }),
   });
   views.push(view);
   return view;
@@ -186,6 +207,25 @@ describe("Markdown embedded runtime", () => {
     secondWidget.destroy(secondDom);
   });
 
+  it("keeps a mounted code block anchored after an edit before its widget", () => {
+    const source = "Intro\n\n```ts\nold\n```";
+    const view = createProjectedView(source);
+    const widgetBefore = view.dom.querySelector<HTMLElement>(".cm-md-code-widget");
+    if (!widgetBefore) throw new Error("Code block did not mount");
+
+    view.dispatch({ changes: { from: 0, insert: "Shifted\n" } });
+
+    const widgetAfter = view.dom.querySelector<HTMLElement>(".cm-md-code-widget");
+    expect(widgetAfter).toBe(widgetBefore);
+    const editor = widgetAfter?.querySelector<HTMLTextAreaElement>(".cm-md-code-textarea");
+    if (!editor) throw new Error("Code block editor did not mount");
+    editor.value = "new";
+    editor.dispatchEvent(new InputEvent("input", { bubbles: true }));
+    editor.dispatchEvent(new FocusEvent("blur"));
+
+    expect(view.state.doc.toString()).toBe("Shifted\nIntro\n\n```ts\nnew\n```");
+  });
+
   it("uses the exact code-fence slice and commits only when focus leaves the composite widget", () => {
     const source = "~~~js\nold\n~~~";
     const view = createView(source);
@@ -255,6 +295,7 @@ describe("Markdown embedded runtime", () => {
       rowIndex: 0,
       rows: firstTable.rows,
       renderInlinePreview,
+      getTableRange: () => ({ from: firstTable.from, to: firstTable.to }),
       tableFrom: firstTable.from,
       tableTo: firstTable.to,
       view,
@@ -289,6 +330,7 @@ describe("Markdown embedded runtime", () => {
       rowIndex: 0,
       rows: movedTable.rows,
       renderInlinePreview,
+      getTableRange: () => ({ from: movedTable.from, to: movedTable.to }),
       tableFrom: movedTable.from,
       tableTo: movedTable.to,
       view,
@@ -325,6 +367,7 @@ describe("Markdown embedded runtime", () => {
       rowIndex: 0,
       rows: table.rows,
       renderInlinePreview,
+      getTableRange: () => ({ from: table.from, to: table.to }),
       tableFrom: table.from,
       tableTo: table.to,
       view,
@@ -365,5 +408,27 @@ describe("Markdown embedded runtime", () => {
     await Promise.resolve();
     await Promise.resolve();
     widget.destroy(dom);
+  });
+
+  it("creates a delayed Mermaid edit session from the widget's mapped range", () => {
+    const source = "Intro\n\n```mermaid\ngraph TD; A-->B\n```";
+    const view = createProjectedView(source);
+    const widgetBefore = view.dom.querySelector<HTMLElement>(".cm-md-mermaid-widget");
+    if (!widgetBefore) throw new Error("Mermaid block did not mount");
+
+    view.dispatch({ changes: { from: 0, insert: "Shifted\n" } });
+
+    const widgetAfter = view.dom.querySelector<HTMLElement>(".cm-md-mermaid-widget");
+    expect(widgetAfter).toBe(widgetBefore);
+    widgetAfter?.querySelector<HTMLButtonElement>(".cm-md-mermaid-action")?.click();
+    const editor = widgetAfter?.querySelector<HTMLTextAreaElement>(".cm-md-mermaid-source");
+    if (!editor) throw new Error("Mermaid editor did not open");
+    editor.value = "graph TD; A-->C";
+    editor.dispatchEvent(new InputEvent("input", { bubbles: true }));
+    widgetAfter?.querySelector<HTMLButtonElement>(".cm-md-mermaid-action")?.click();
+
+    expect(view.state.doc.toString()).toBe(
+      "Shifted\nIntro\n\n```mermaid\ngraph TD; A-->C\n```",
+    );
   });
 });
