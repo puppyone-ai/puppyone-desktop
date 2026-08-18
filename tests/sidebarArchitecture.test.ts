@@ -101,11 +101,12 @@ describe("Sidebar architecture", () => {
 
   it("keeps each pane on one canonical width from host edge through content", () => {
     expect(dataShellCss).toMatch(
-      /\.data-content\[data-resizable-explorer="true"\]\s*\{[^}]*grid-template-columns:[^}]*var\(--data-explorer-width[^}]*var\(--po-pane-resizer-hit-size, 8px\)[^}]*minmax/s,
+      /\.data-content\[data-resizable-explorer="true"\]\s*\{[^}]*grid-template-columns:[^}]*var\(--data-explorer-width[^}]*minmax/s,
     );
     expect(dataShellCss).toMatch(
-      /\.data-explorer-resizer\s*\{[^}]*position:\s*relative;[^}]*inset:\s*auto;[^}]*grid-column:\s*2;[^}]*width:\s*100%;/s,
+      /\.data-explorer-resizer\s*\{[^}]*inset-inline-start:\s*var\(--data-explorer-width[^}]*inset-inline-end:\s*auto;[^}]*background:\s*transparent;/s,
     );
+    expect(dataShellCss).not.toContain("grid-column: 3;");
     expect(layoutCss).toMatch(
       /\.desktop-right-sidebar\.is-open\s*\{[^}]*flex-basis:\s*var\(--desktop-right-sidebar-width\)[^}]*width:\s*var\(--desktop-right-sidebar-width\)/s,
     );

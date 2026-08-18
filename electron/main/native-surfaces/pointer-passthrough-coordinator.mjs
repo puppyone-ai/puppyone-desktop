@@ -1,19 +1,21 @@
 const FORWARDED_MOUSE_TYPES = new Set(["mouseMove", "mouseUp"]);
+const INITIAL_ROUTED_MOUSE_TYPE = "mouseDown";
 
 /**
  * Keeps renderer-owned resize gestures alive across native WebContentsViews.
  *
- * A child view receives OS mouse input before the BrowserWindow renderer. While
- * an owner-scoped drag is active, move/up events are translated back into the
- * owner's content coordinates and delivered to that renderer. The native view
- * remains attached and visible, so its bounds can follow layout changes every
- * animation frame instead of flashing blank for the whole gesture.
+ * A child view receives OS mouse input before the BrowserWindow renderer.
+ * Renderer-published routing regions recover the initial primary press for an
+ * overlay sash; while an owner-scoped drag is active, move/up events are then
+ * translated back into owner coordinates. The native view remains attached
+ * and visible throughout the gesture.
  */
 export function createNativeSurfacePointerPassthroughCoordinator({
   onForwardError = () => {},
 } = {}) {
   const registrationsByOwner = new Map();
   const activeOwners = new Set();
+  const routingRegionsByOwner = new Map();
   let disposed = false;
 
   function register({ ownerWebContentsId, ownerWebContents, surfaceView }) {
@@ -40,13 +42,25 @@ export function createNativeSurfacePointerPassthroughCoordinator({
       handleMouse: null,
     };
     registration.handleMouse = (event, mouse) => {
-      if (!activeOwners.has(ownerWebContentsId) || !FORWARDED_MOUSE_TYPES.has(mouse?.type)) return;
+      const canRouteInitialPress =
+        mouse?.type === INITIAL_ROUTED_MOUSE_TYPE &&
+        isPrimaryMouseButton(mouse) &&
+        routingRegionsByOwner.has(ownerWebContentsId);
+      const routesActiveGesture =
+        activeOwners.has(ownerWebContentsId) && FORWARDED_MOUSE_TYPES.has(mouse?.type);
+      if (!canRouteInitialPress && !routesActiveGesture) return;
+
+      const ownerInput = toOwnerMouseInput(mouse, surfaceView.getBounds());
+      const routesInitialPress =
+        canRouteInitialPress && pointFallsInsideOwnerRegion(ownerWebContentsId, ownerInput);
+      if (!routesInitialPress && !routesActiveGesture) return;
 
       event?.preventDefault?.();
       try {
-        const surfaceBounds = surfaceView.getBounds();
-        ownerWebContents.sendInputEvent(toOwnerMouseInput(mouse, surfaceBounds));
+        if (routesInitialPress) activeOwners.add(ownerWebContentsId);
+        ownerWebContents.sendInputEvent(ownerInput);
       } catch (error) {
+        if (routesInitialPress) activeOwners.delete(ownerWebContentsId);
         try {
           onForwardError(error);
         } catch {
@@ -88,9 +102,22 @@ export function createNativeSurfacePointerPassthroughCoordinator({
     return true;
   }
 
+  function setOwnerRoutingRegions(ownerWebContentsId, regions) {
+    assertOwnerWebContentsId(ownerWebContentsId);
+    if (disposed) return false;
+    const normalized = normalizeRoutingRegions(regions);
+    const current = routingRegionsByOwner.get(ownerWebContentsId) ?? [];
+    if (sameRoutingRegions(current, normalized)) return false;
+    if (normalized.length === 0) routingRegionsByOwner.delete(ownerWebContentsId);
+    else routingRegionsByOwner.set(ownerWebContentsId, normalized);
+    return true;
+  }
+
   function releaseOwner(ownerWebContentsId) {
     assertOwnerWebContentsId(ownerWebContentsId);
-    return activeOwners.delete(ownerWebContentsId);
+    const releasedActive = activeOwners.delete(ownerWebContentsId);
+    const releasedRegions = routingRegionsByOwner.delete(ownerWebContentsId);
+    return releasedActive || releasedRegions;
   }
 
   function isOwnerActive(ownerWebContentsId) {
@@ -98,10 +125,20 @@ export function createNativeSurfacePointerPassthroughCoordinator({
     return activeOwners.has(ownerWebContentsId);
   }
 
+  function pointFallsInsideOwnerRegion(ownerWebContentsId, point) {
+    return (routingRegionsByOwner.get(ownerWebContentsId) ?? []).some((region) => (
+      point.x >= region.x &&
+      point.x < region.x + region.width &&
+      point.y >= region.y &&
+      point.y < region.y + region.height
+    ));
+  }
+
   function dispose() {
     if (disposed) return;
     disposed = true;
     activeOwners.clear();
+    routingRegionsByOwner.clear();
     for (const registrations of registrationsByOwner.values()) {
       for (const registration of registrations) {
         registration.surfaceWebContents.removeListener?.(
@@ -116,6 +153,7 @@ export function createNativeSurfacePointerPassthroughCoordinator({
   return Object.freeze({
     register,
     setOwnerActive,
+    setOwnerRoutingRegions,
     releaseOwner,
     isOwnerActive,
     dispose,
@@ -129,12 +167,53 @@ function toOwnerMouseInput(mouse, surfaceBounds) {
     y: Math.round(surfaceBounds.y + mouse.y),
   };
   if (mouse.button) input.button = mouse.button;
-  else if (mouse.type === "mouseUp") input.button = "left";
+  else if (mouse.type === "mouseDown" || mouse.type === "mouseUp") input.button = "left";
   if (Number.isFinite(mouse.clickCount)) input.clickCount = mouse.clickCount;
   if (Number.isFinite(mouse.movementX)) input.movementX = mouse.movementX;
   if (Number.isFinite(mouse.movementY)) input.movementY = mouse.movementY;
   if (Array.isArray(mouse.modifiers)) input.modifiers = [...mouse.modifiers];
   return input;
+}
+
+function isPrimaryMouseButton(mouse) {
+  return mouse?.button === undefined || mouse.button === "left";
+}
+
+function normalizeRoutingRegions(regions) {
+  if (!Array.isArray(regions)) {
+    throw new TypeError("Native surface pointer routing regions must be an array.");
+  }
+  return regions.map((region) => {
+    const normalized = {
+      x: Number(region?.x),
+      y: Number(region?.y),
+      width: Number(region?.width),
+      height: Number(region?.height),
+    };
+    if (
+      !Number.isSafeInteger(normalized.x) ||
+      !Number.isSafeInteger(normalized.y) ||
+      !Number.isSafeInteger(normalized.width) ||
+      !Number.isSafeInteger(normalized.height) ||
+      normalized.x < 0 ||
+      normalized.y < 0 ||
+      normalized.width <= 0 ||
+      normalized.height <= 0
+    ) {
+      throw new TypeError("Native surface pointer routing region is invalid.");
+    }
+    return Object.freeze(normalized);
+  });
+}
+
+function sameRoutingRegions(first, second) {
+  return first.length === second.length && first.every((region, index) => {
+    const candidate = second[index];
+    return region.x === candidate.x &&
+      region.y === candidate.y &&
+      region.width === candidate.width &&
+      region.height === candidate.height;
+  });
 }
 
 function assertOwnerWebContentsId(value) {

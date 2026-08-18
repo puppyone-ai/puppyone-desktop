@@ -28,6 +28,11 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
       active: request?.active === true,
     });
   },
+  setNativeSurfacePointerRoutingRegions: (request) => {
+    ipcRenderer.send("native-surfaces:set-pointer-routing-regions", {
+      regions: Array.isArray(request?.regions) ? request.regions : [],
+    });
+  },
   getBuildInfo: () => ipcRenderer.invoke("build-info:get"),
   getLocalizationBootstrap: () => ipcRenderer.invoke("localization:get-bootstrap"),
   setLanguagePreference: (preference) => (

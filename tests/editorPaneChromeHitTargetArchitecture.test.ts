@@ -60,7 +60,9 @@ describe("editor pane chrome hit-target architecture", () => {
     expect(splitStyles).not.toContain(".desktop-editor-pane[data-pane-menu-open]");
     expect(splitStyles).not.toContain(".desktop-editor-pane::after");
     expect(frameRule).toContain("position: absolute;");
-    expect(frameRule).toContain("z-index: 11;");
+    expect(frameRule).toContain(
+      "z-index: calc(var(--po-pane-resizer-z-index, 35) + 1);",
+    );
     expect(frameRule).toContain("inset: 0;");
     expect(frameRule).toContain("pointer-events: none;");
     expect(frameRule).toContain(

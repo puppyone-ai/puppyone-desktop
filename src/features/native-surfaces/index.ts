@@ -10,3 +10,9 @@ export {
   type NativeSurfacePointerPassthroughOwner,
 } from "./nativeSurfacePointerPassthrough";
 export { useNativeSurfacePointerPassthroughActivity } from "./useNativeSurfacePointerPassthroughActivity";
+export {
+  acquireNativeSurfacePointerRoutingRegion,
+  type NativeSurfacePointerRoutingRegion,
+  type NativeSurfacePointerRoutingRegionLease,
+} from "./nativeSurfacePointerRoutingRegions";
+export { useNativeSurfacePointerRoutingRegion } from "./useNativeSurfacePointerRoutingRegion";

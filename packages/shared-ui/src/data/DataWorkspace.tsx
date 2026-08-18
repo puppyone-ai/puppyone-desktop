@@ -11,6 +11,7 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
+  type Ref,
 } from "react";
 import type {
   DataCapabilities,
@@ -148,6 +149,7 @@ export type DataWorkspaceProps = {
   onExplorerWidthChange?: (width: number) => void;
   onExplorerCollapsedChange?: (collapsed: boolean) => void;
   onExplorerResizeActiveChange?: (active: boolean) => void;
+  explorerResizeHandleRef?: Ref<HTMLDivElement>;
   onActivePathChange?: (
     path: string | null,
     node: DataNode | null,
@@ -234,6 +236,7 @@ export function DataWorkspace({
   onExplorerWidthChange,
   onExplorerCollapsedChange,
   onExplorerResizeActiveChange,
+  explorerResizeHandleRef,
   onActivePathChange,
   onActiveNodeChange,
   onExplorerRootClick,
@@ -1338,6 +1341,7 @@ export function DataWorkspace({
 
         {resizableExplorer && !explorerCollapsed && (
           <SidebarResizeHandle
+            ref={explorerResizeHandleRef}
             className="data-explorer-resizer"
             paneEdge
             orientation="vertical"

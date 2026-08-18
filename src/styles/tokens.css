@@ -59,10 +59,11 @@
   --po-scrollbar-radius: 999px;
   --po-scrollbar-transition: 0.16s ease;
   /*
-   * Pane boundaries use two adjacent interaction lanes: the scrollbar owns
-   * the final 12px inside its scroll pane and the resize handle owns a real
-   * 8px layout gutter beside it. Native content begins after that gutter, so
-   * neither scrollbars nor WebContentsViews can steal resize pointer input.
+   * Pane boundaries separate paint from hit testing: the scrollbar owns the
+   * final 12px inside its pane, while an 8px overlay sash begins at the shared
+   * visual boundary and extends into the neighboring pane. The sash does not
+   * consume layout width. Native surfaces use owner-scoped pointer routing for
+   * an initial press in that overlay rectangle.
    */
   --po-pane-resizer-hit-size: 8px;
   --po-pane-resizer-line-size: 1px;

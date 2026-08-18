@@ -1,4 +1,4 @@
-import { type ComponentProps, type MouseEvent as ReactMouseEvent } from "react";
+import { useState, type ComponentProps, type MouseEvent as ReactMouseEvent } from "react";
 import { Plus } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
 import {
@@ -31,7 +31,10 @@ import {
 } from "./navigation";
 import { WorkspaceSurfaceOutlet, type ResolvedWorkspaceSurface } from "./workspace-surfaces";
 import type { DesktopView } from "../../components/DesktopCloudShell";
-import { useNativeSurfacePointerPassthroughActivity } from "../native-surfaces";
+import {
+  useNativeSurfacePointerPassthroughActivity,
+  useNativeSurfacePointerRoutingRegion,
+} from "../native-surfaces";
 import { DesktopEditorSplitView } from "../editor-workbench/layout/DesktopEditorSplitView";
 import type { DesktopEditorWorkbenchController } from "../editor-workbench/controller/useDesktopEditorWorkbench";
 import {
@@ -116,6 +119,8 @@ export function DesktopDataWorkspaceSurface({
   const onExplorerResizeActiveChange = useNativeSurfacePointerPassthroughActivity(
     "explorer-resize",
   );
+  const [explorerResizeHandle, setExplorerResizeHandle] = useState<HTMLDivElement | null>(null);
+  useNativeSurfacePointerRoutingRegion("explorer-resize", explorerResizeHandle);
   const { t } = useLocalization();
   const paneLayout = useDesktopPaneLayout();
   const resolvedExplorerWidth = paneLayout?.explorer.width ?? preferences.explorerWidth;
@@ -180,6 +185,7 @@ export function DesktopDataWorkspaceSurface({
         onExplorerCollapsedChange={preferences.setSidebarCollapsed}
         onExplorerWidthChange={preferences.setExplorerWidth}
         onExplorerResizeActiveChange={onExplorerResizeActiveChange}
+        explorerResizeHandleRef={setExplorerResizeHandle}
         showHeader={false}
         showExplorerRoot={false}
         onExplorerRootContextMenu={(_state, event) => {

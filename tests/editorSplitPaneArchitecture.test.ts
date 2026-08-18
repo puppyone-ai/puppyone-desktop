@@ -318,20 +318,33 @@ describe("editor split-pane architecture", () => {
     expect(persistenceSource).toContain("flush(): void");
   });
 
-  it("keeps the Sidebar resize hit lane on the Sidebar side of the visible divider", () => {
+  it("keeps one Sidebar and Editor layout boundary under an overlay sash", () => {
     const explorerRule = readCssBlock(dataShellStyles, ".explorer-column");
     const resizerRule = readCssBlock(dataShellStyles, ".data-explorer-resizer");
     const resizerDividerRule = readCssBlock(dataShellStyles, ".data-explorer-resizer::after");
 
     expect(explorerRule).toContain("border-inline-end: 1px solid transparent;");
-    expect(resizerRule).toContain("background: var(--po-sidebar);");
-    expect(resizerDividerRule).toContain("inset-inline-end: 0;");
+    expect(resizerRule).toContain("background: transparent;");
+    expect(resizerRule).toContain(
+      "inset-inline-start: var(--data-explorer-width, clamp(282px, 26vw, 360px));",
+    );
+    expect(resizerDividerRule).toContain("inset-inline-start: 0;");
+    expect(resizerDividerRule).toContain("inset-inline-end: auto;");
     expect(resizerDividerRule).toContain(
       "background: var(--po-shell-divider, var(--po-divider));",
     );
-    expect(splitSource).toContain("touchesInlineStart");
-    expect(splitStyles).toContain('data-touches-inline-start="true"');
-    expect(splitStyles).not.toContain("--desktop-editor-sidebar-gutter-size");
+    expect(dataShellStyles).not.toContain("grid-column: 3;");
+    expect(dataShellStyles).not.toMatch(
+      /grid-template-columns:[^}]*var\(--po-pane-resizer-hit-size/s,
+    );
+    expect(splitStyles).not.toContain(
+      "inset-inline-start: calc(-1 * var(--po-pane-resizer-hit-size, 8px));",
+    );
+    expect(splitStyles).toContain(
+      "z-index: calc(var(--po-pane-resizer-z-index, 35) + 1);",
+    );
+    expect(surfaceSource).toContain("useNativeSurfacePointerRoutingRegion");
+    expect(surfaceSource).toContain("explorerResizeHandleRef={setExplorerResizeHandle}");
   });
 
   it("does not project the Sidebar divider through the Header", () => {

@@ -76,7 +76,9 @@
 
 .desktop-editor-pane-interaction-frame {
   position: absolute;
-  z-index: 11;
+  /* Presentation chrome stays above overlay sashes while remaining entirely
+   * non-interactive, so the pane's leading stroke is never visually clipped. */
+  z-index: calc(var(--po-pane-resizer-z-index, 35) + 1);
   color: transparent;
   background:
     linear-gradient(currentColor, currentColor) top / 100% 1px no-repeat,

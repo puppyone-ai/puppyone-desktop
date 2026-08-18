@@ -726,6 +726,9 @@ declare global {
       } | null>;
       setNativeSurfaceOccluded: (request: { occluded: boolean }) => void;
       setNativeSurfacePointerPassthrough: (request: { active: boolean }) => void;
+      setNativeSurfacePointerRoutingRegions: (request: {
+        regions: Array<{ x: number; y: number; width: number; height: number }>;
+      }) => void;
       getBuildInfo: () => Promise<DesktopBuildInfo>;
       getLocalizationBootstrap: () => Promise<LocaleState>;
       setLanguagePreference: (preference: AppLanguagePreference) => Promise<LocaleState>;

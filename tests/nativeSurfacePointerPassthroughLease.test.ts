@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  acquireNativeSurfacePointerRoutingRegion,
   acquireNativeSurfacePointerPassthroughLease,
   useNativeSurfacePointerPassthroughActivity,
 } from "../src/features/native-surfaces";
@@ -20,6 +21,22 @@ afterEach(() => {
 });
 
 describe("native surface pointer passthrough leases", () => {
+  it("publishes owner viewport rectangles independently from active gestures", () => {
+    const publishRegions = vi.fn();
+    Object.defineProperty(window, "puppyoneDesktop", {
+      configurable: true,
+      value: { setNativeSurfacePointerRoutingRegions: publishRegions },
+    });
+    const region = acquireNativeSurfacePointerRoutingRegion("explorer-resize");
+
+    region.update({ x: 320.2, y: 38.4, width: 7.7, height: 700.1 });
+    expect(publishRegions).toHaveBeenLastCalledWith({
+      regions: [{ x: 320, y: 38, width: 8, height: 700 }],
+    });
+    region.release();
+    expect(publishRegions).toHaveBeenLastCalledWith({ regions: [] });
+  });
+
   it("publishes only aggregate boundary transitions for overlapping owners", () => {
     const publish = installDesktopBridge();
     const first = acquireNativeSurfacePointerPassthroughLease("explorer-file-drop", "drag-1");
