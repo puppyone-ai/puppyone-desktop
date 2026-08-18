@@ -34,7 +34,6 @@ const PANE_ACTION_SLOT_SIZE = 25;
 const PANE_ACTION_GAP = 3;
 const PANE_MENU_INLINE_CHROME = 10;
 const PANE_SEGMENT_GAP = 1;
-const PANE_SEGMENT_PADDING = 4;
 
 export type EditorPaneActionsMenuProps = Readonly<{
   anchorRef: RefObject<HTMLElement | null>;
@@ -315,7 +314,6 @@ function resolvePaneActionsMenuWidth({
   const segmentedWidth = (
     segmentCount * PANE_ACTION_SLOT_SIZE
     + Math.max(0, segmentCount - 1) * PANE_SEGMENT_GAP
-    + PANE_SEGMENT_PADDING
   );
   return (
     PANE_MENU_INLINE_CHROME

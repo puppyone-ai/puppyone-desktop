@@ -98,7 +98,7 @@ describe("Markdown pane mode menu", () => {
     );
     expect(document.querySelector<HTMLElement>(
       ".desktop-editor-pane-menu",
-    )?.style.width).toBe("177px");
+    )?.style.width).toBe("173px");
     const primaryActions = document.querySelector(".desktop-editor-pane-menu-primary-actions");
     expect(primaryActions?.firstElementChild).toBe(modeControl);
     expect(document.querySelector(".desktop-editor-pane-menu-secondary-actions")).toBeNull();

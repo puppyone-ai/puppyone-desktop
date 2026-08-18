@@ -253,8 +253,14 @@ describe("editor split-pane architecture", () => {
     expect(segmentedControlRule).toContain(
       "grid-auto-columns: var(--desktop-editor-pane-menu-action-size);",
     );
+    expect(segmentedControlRule).toContain(
+      "height: var(--desktop-editor-pane-menu-action-size);",
+    );
     expect(segmentedControlRule).toContain("flex: 0 0 auto;");
+    expect(segmentedControlRule).toContain("padding: 0;");
     expect(segmentedControlRule).toContain("border: 0;");
+    expect(segmentedControlRule).toContain("background: transparent;");
+    expect(segmentedControlRule).toContain("box-shadow: none;");
     const selectedSegmentRule = readCssBlock(
       splitStyles,
       '.desktop-editor-pane-menu-segment[aria-checked="true"]',
