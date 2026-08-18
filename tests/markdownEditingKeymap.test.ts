@@ -18,6 +18,7 @@ describe("Markdown editing shortcuts", () => {
     expect(keys.has("Mod-b")).toBe(true);
     expect(keys.has("Mod-i")).toBe(true);
     expect(keys.has("Mod-u")).toBe(true);
+    expect(keys.has("Mod-d")).toBe(true);
     expect(keys.has("Mod-Shift-x")).toBe(true);
     expect(keys.has("Mod-1")).toBe(true);
     expect(keys.has("Mod-2")).toBe(true);

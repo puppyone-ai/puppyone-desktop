@@ -26,6 +26,7 @@ import { getRendererPerformanceTracker } from "../../performance/rendererPerform
 import { subscribeTypographyChanges } from "../../core/typography";
 import { markdownLocalizationExtension } from "./core/editor/markdownLocalization";
 import { resolveMarkdownDialect } from "./core/dialect/markdownDialect";
+import { bindMarkdownFormatHotkeys } from "./core/commands/markdownFormatHotkeys";
 import { CodeMirrorFindAdapter } from "../find/codeMirrorFindAdapter";
 import { useRegisterEditorFindAdapter } from "../find/editorFind";
 
@@ -232,6 +233,7 @@ export function MarkdownCodeMirrorEditor({
 
     viewRef.current = view;
     findAdapter.attach(view);
+    const unbindFormatHotkeys = bindMarkdownFormatHotkeys(view);
     const unsubscribeTypography = subscribeTypographyChanges(host.ownerDocument, () => {
       view.requestMeasure();
     });
@@ -257,6 +259,7 @@ export function MarkdownCodeMirrorEditor({
 
     return () => {
       previewGenerationRef.current += 1;
+      unbindFormatHotkeys();
       unsubscribeTypography();
       // Detaching the port synchronously lets the host capture the final
       // snapshot while the CodeMirror document is still alive.

@@ -97,6 +97,12 @@ export type {
 export { flushActiveDocumentSessions } from "./editor/document-session";
 export type { DocumentPersistedCommit } from "./editor/document-session";
 export {
+  MARKDOWN_FORMAT_ACTIVE_EVENT,
+  MARKDOWN_FORMAT_SHORTCUT_EVENT,
+  isMarkdownFormatCommand,
+} from "./editor/markdown/core/commands/markdownFormatHotkeys";
+export type { MarkdownFormatCommand } from "./editor/markdown/core/commands/markdownFormatHotkeys";
+export {
   classifyEditorViewerCapability,
   createPresetViewerRegistry,
   definePresetViewer,

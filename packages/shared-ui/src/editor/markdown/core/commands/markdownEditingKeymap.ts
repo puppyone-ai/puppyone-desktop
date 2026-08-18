@@ -51,6 +51,7 @@ export const markdownEditingKeymap: readonly KeyBinding[] = [
   { key: "Mod-i", run: toggleMarkdownInline("*"), preventDefault: true },
   { key: "Mod-u", run: toggleMarkdownHtmlTag("u"), preventDefault: true },
   { key: "Mod-e", run: toggleMarkdownInline("`"), preventDefault: true },
+  { key: "Mod-d", run: toggleMarkdownInline("~~"), preventDefault: true },
   { key: "Mod-Shift-x", run: toggleMarkdownInline("~~"), preventDefault: true },
   { key: "Mod-k", run: wrapMarkdownLink, preventDefault: true },
 ];

@@ -677,6 +677,10 @@ declare global {
       getLocalizationBootstrap: () => Promise<LocaleState>;
       setLanguagePreference: (preference: AppLanguagePreference) => Promise<LocaleState>;
       onLocaleChanged: (callback: (state: LocaleState) => void) => () => void;
+      setMarkdownFormatShortcutsActive: (request: { active: boolean }) => void;
+      onMarkdownFormatShortcut: (
+        callback: (payload: { type: "strong" | "emphasis" | "underline" | "strike" }) => void,
+      ) => () => void;
       onDocumentSessionFlushRequested: (
         callback: (request: { requestId: string }) => void | Promise<void>,
       ) => () => void;
