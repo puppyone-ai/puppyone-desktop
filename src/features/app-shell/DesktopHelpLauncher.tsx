@@ -295,71 +295,71 @@ export function DesktopHelpLauncher(overlayTheme: DesktopHelpLauncherProps) {
                           if (submissionState === "error") setSubmissionState("idle");
                         }}
                       />
+                    </div>
 
-                      <div className="desktop-feedback-composer-toolbar">
-                        <div className="desktop-feedback-attachment-slot">
-                          <input
-                            ref={fileInputRef}
-                            className="desktop-feedback-file-input"
-                            type="file"
-                            accept="image/png,image/jpeg,image/webp"
-                            tabIndex={-1}
-                            onChange={handleScreenshotInput}
-                          />
-                          {screenshot ? (
-                            <button
-                              className="desktop-feedback-screenshot"
-                              type="button"
-                              aria-label={t("shell.feedback.removeScreenshot")}
-                              title={t("shell.feedback.removeScreenshot")}
-                              disabled={submissionState === "sending" || submissionState === "sent"}
-                              onClick={() => {
-                                replaceScreenshot(null);
-                                setAttachmentError("");
-                                setAttachmentState("idle");
-                              }}
-                            >
-                              <img src={screenshot.previewUrl} alt="" />
-                              <span aria-hidden="true">
-                                <Trash2 size={12} strokeWidth={1.9} />
-                              </span>
-                            </button>
-                          ) : (
-                            <button
-                              className="desktop-feedback-attach"
-                              type="button"
-                              aria-label={t("shell.feedback.attachScreenshot")}
-                              title={t("shell.feedback.attachScreenshot")}
-                              disabled={
-                                attachmentState === "processing"
-                                || submissionState === "sending"
-                                || submissionState === "sent"
-                              }
-                              onClick={() => fileInputRef.current?.click()}
-                            >
-                              {attachmentState === "processing" ? (
-                                <LoaderCircle
-                                  className="desktop-feedback-spinner"
-                                  size={16}
-                                  strokeWidth={1.8}
-                                  aria-hidden="true"
-                                />
-                              ) : (
-                                <ImagePlus size={16} strokeWidth={1.7} aria-hidden="true" />
-                              )}
-                            </button>
-                          )}
-                          {attachmentState === "error" && attachmentError ? (
-                            <span
-                              className="desktop-feedback-attachment-error"
-                              role="img"
-                              aria-label={attachmentError}
-                              title={attachmentError}
-                            >
-                              <CircleAlert size={14} strokeWidth={1.8} aria-hidden="true" />
+                    <div className="desktop-feedback-attachment-row">
+                      <div className="desktop-feedback-attachment-slot">
+                        <input
+                          ref={fileInputRef}
+                          className="desktop-feedback-file-input"
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          tabIndex={-1}
+                          onChange={handleScreenshotInput}
+                        />
+                        {screenshot ? (
+                          <button
+                            className="desktop-feedback-screenshot"
+                            type="button"
+                            aria-label={t("shell.feedback.removeScreenshot")}
+                            title={t("shell.feedback.removeScreenshot")}
+                            disabled={submissionState === "sending" || submissionState === "sent"}
+                            onClick={() => {
+                              replaceScreenshot(null);
+                              setAttachmentError("");
+                              setAttachmentState("idle");
+                            }}
+                          >
+                            <img src={screenshot.previewUrl} alt="" />
+                            <span aria-hidden="true">
+                              <Trash2 size={12} strokeWidth={1.9} />
                             </span>
-                          ) : null}
-                        </div>
+                          </button>
+                        ) : (
+                          <button
+                            className="desktop-feedback-attach"
+                            type="button"
+                            aria-label={t("shell.feedback.attachScreenshot")}
+                            title={t("shell.feedback.attachScreenshot")}
+                            disabled={
+                              attachmentState === "processing"
+                              || submissionState === "sending"
+                              || submissionState === "sent"
+                            }
+                            onClick={() => fileInputRef.current?.click()}
+                          >
+                            {attachmentState === "processing" ? (
+                              <LoaderCircle
+                                className="desktop-feedback-spinner"
+                                size={16}
+                                strokeWidth={1.8}
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <ImagePlus size={16} strokeWidth={1.7} aria-hidden="true" />
+                            )}
+                          </button>
+                        )}
+                        {attachmentState === "error" && attachmentError ? (
+                          <span
+                            className="desktop-feedback-attachment-error"
+                            role="img"
+                            aria-label={attachmentError}
+                            title={attachmentError}
+                          >
+                            <CircleAlert size={14} strokeWidth={1.8} aria-hidden="true" />
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>

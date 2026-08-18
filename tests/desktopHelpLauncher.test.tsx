@@ -103,6 +103,8 @@ describe("DesktopHelpLauncher", () => {
       dialog?.querySelector<HTMLButtonElement>(".desktop-feedback-attach")
         ?.getAttribute("aria-label"),
     ).toBe("Attach screenshot");
+    expect(dialog?.querySelector(".desktop-feedback-composer")?.nextElementSibling?.classList)
+      .toContain("desktop-feedback-attachment-row");
     const submitButton = dialog?.querySelector<HTMLButtonElement>(".desktop-feedback-submit");
     expect(submitButton?.getAttribute("aria-label")).toBe("Send");
     expect(submitButton?.textContent).toBe("Send");
@@ -288,7 +290,7 @@ describe("DesktopHelpLauncher", () => {
     expect(launcherCss).toMatch(/\.desktop-feedback-dialog-backdrop\s*\{[^}]*pointer-events:\s*auto/s);
     expect(launcherCss).toMatch(/\.desktop-feedback-dialog\s*\{[^}]*width:\s*min\(400px,/s);
     expect(launcherCss).toMatch(
-      /\.desktop-feedback-header\s*\{[^}]*position:\s*relative[^}]*justify-content:\s*center/s,
+      /\.desktop-feedback-header\s*\{[^}]*align-items:\s*center/s,
     );
     expect(launcherCss).toMatch(
       /\.desktop-feedback-fields\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s,
@@ -298,8 +300,17 @@ describe("DesktopHelpLauncher", () => {
       /\.desktop-feedback-required-marker\s*\{[^}]*color:\s*var\(--po-danger\)/s,
     );
     expect(launcherCss).toMatch(
-      /\.desktop-feedback-contact-input\s*\{[^}]*border:\s*1px solid var\(--po-border\)[^}]*background:\s*var\(--po-canvas\)/s,
+      /\.desktop-feedback-contact-input\s*\{[^}]*border:\s*1px solid var\(--po-divider\)[^}]*border-radius:\s*6px[^}]*background:\s*var\(--po-input, var\(--po-panel-raised\)\)/s,
     );
+    expect(launcherCss).toMatch(
+      /\.desktop-feedback-composer:focus-within\s*\{[^}]*border-color:\s*var\(--po-border-strong\)[^}]*\}/s,
+    );
+    expect(launcherCss.match(/\.desktop-feedback-composer:focus-within\s*\{[^}]*\}/s)?.[0])
+      .not.toContain("box-shadow");
+    expect(launcherCss.match(/\.desktop-feedback-contact-input:focus\s*\{[^}]*\}/s)?.[0])
+      .not.toContain("box-shadow");
+    expect(launcherCss).not.toContain("desktop-feedback-composer-toolbar");
+    expect(launcherCss).not.toContain("translateY(-1px)");
     expect(launcherCss.match(/\.desktop-feedback-footer\s*\{[^}]*\}/s)?.[0]).not.toContain(
       "border-block-start",
     );
