@@ -37,7 +37,7 @@ export const AGENT_ACTIVITY_LIMITS = Object.freeze({
   targetsPerActivity: 32,
   activeClaimsPerWindow: 256,
   activeClaimLeaseMs: 2 * 60 * 1000,
-  completedLingerMs: 1_600,
+  completedLingerMs: 4_000,
 });
 
 export function isAgentActivityPhase(value) {

@@ -6,7 +6,7 @@ import type {
 const PROVIDER_LABELS: Readonly<Record<string, string>> = Object.freeze({
   codex: "Codex",
   claude: "Claude Code",
-  cursor: "Cursor Agent",
+  cursor: "Cursor Agent CLI",
   opencode: "OpenCode",
   pi: "Pi Agent",
   hermes: "Hermes Agent",
@@ -56,15 +56,23 @@ export function projectFilePresence(
 }
 
 export function toWorkspaceRelativePath(workspaceRoot: string, resourcePath: string) {
+  const resourceCandidate = String(resourcePath).replaceAll("\\", "/");
+  if (isUri(resourceCandidate)) return null;
+  if (!isAbsolutePath(resourceCandidate)) {
+    return normalizeWorkspaceRelativePath(resourceCandidate);
+  }
   const root = normalizeAbsolutePath(workspaceRoot).replace(/\/$/u, "");
-  const resource = normalizeAbsolutePath(resourcePath);
+  const resource = normalizeAbsolutePath(resourceCandidate);
   if (!root || resource === root || !resource.startsWith(`${root}/`)) return null;
   return normalizeWorkspaceRelativePath(resource.slice(root.length + 1));
 }
 
 export function normalizeWorkspaceRelativePath(value: string) {
   const normalized = String(value).replaceAll("\\", "/").replace(/^\.\//u, "");
-  return normalized && !normalized.startsWith("/") && !/(?:^|\/)\.\.(?:\/|$)/u.test(normalized)
+  return normalized
+    && !isAbsolutePath(normalized)
+    && !isUri(normalized)
+    && !/(?:^|\/)\.\.(?:\/|$)/u.test(normalized)
     ? normalized
     : null;
 }
@@ -81,4 +89,12 @@ function compareClaims(left: AgentFilePresenceClaim, right: AgentFilePresenceCla
 
 function normalizeAbsolutePath(value: string) {
   return String(value).replaceAll("\\", "/").replace(/\/{2,}/gu, "/");
+}
+
+function isAbsolutePath(value: string) {
+  return value.startsWith("/") || /^[A-Za-z]:\//u.test(value);
+}
+
+function isUri(value: string) {
+  return /^[A-Za-z][A-Za-z0-9+.-]*:\/\//u.test(value);
 }

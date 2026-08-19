@@ -1,11 +1,12 @@
 import os from "node:os";
 import path from "node:path";
 import { createOwnedJsonHookConfig } from "./owned-config-mutation.mjs";
+import { createOwnedCursorCliHookConfig } from "./cursor-cli-hook-config.mjs";
 
 const PROVIDERS = Object.freeze([
   Object.freeze({ providerId: "codex", displayName: "Codex", configurable: true }),
   Object.freeze({ providerId: "claude", displayName: "Claude Code", configurable: true }),
-  Object.freeze({ providerId: "cursor", displayName: "Cursor Agent", configurable: false }),
+  Object.freeze({ providerId: "cursor", displayName: "Cursor Agent CLI", configurable: true }),
   Object.freeze({ providerId: "opencode", displayName: "OpenCode", configurable: false }),
   Object.freeze({ providerId: "pi", displayName: "Pi Agent", configurable: false }),
   Object.freeze({ providerId: "hermes", displayName: "Hermes Agent", configurable: false }),
@@ -23,6 +24,10 @@ export function createHookRegistrationService({ bridgeInstaller, homedir = os.ho
       providerId: "claude",
       command: providerBridgeCommand(bridgeInstaller.command, "claude"),
     })],
+    ["cursor", createOwnedCursorCliHookConfig({
+      configPath: path.join(homedir, ".cursor", "hooks.json"),
+      command: providerBridgeCommand(bridgeInstaller.command, "cursor"),
+    })],
   ]);
 
   async function getSnapshot() {
@@ -31,7 +36,7 @@ export function createHookRegistrationService({ bridgeInstaller, homedir = os.ho
       let enrollment = registration
         ? (await registration.inspect()).enrollment
         : "basic-only";
-      if (enrollment === "enabled" && !(await bridgeInstaller.exists())) {
+      if (enrollment === "enabled" && !(await bridgeInstaller.isCurrent())) {
         enrollment = "needs-repair";
       }
       return Object.freeze({ ...provider, enrollment });
@@ -51,11 +56,9 @@ export function createHookRegistrationService({ bridgeInstaller, homedir = os.ho
 
   async function isEnabled(providerId) {
     const registration = registrations.get(providerId);
-    return Boolean(
-      registration
-      && (await registration.inspect()).enrollment === "enabled"
-      && await bridgeInstaller.exists(),
-    );
+    if (!registration || (await registration.inspect()).enrollment !== "enabled") return false;
+    await bridgeInstaller.ensureCurrent();
+    return true;
   }
 
   async function hasAnyEnabled() {

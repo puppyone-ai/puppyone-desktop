@@ -4,5 +4,6 @@ export {
   installedLocalAgents,
   isLocalAgentEnabled,
   isLocalAgentRuntimeEnabled,
+  localAgentActivityProviderId,
   setLocalAgentEnabled,
 } from "./model/localAgentSelection";

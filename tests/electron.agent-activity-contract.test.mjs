@@ -40,6 +40,16 @@ describe("Agent activity path policy", () => {
     })).resolves.toMatchObject({ workspaceRelativePath: "src/new/deep.txt" });
   });
 
+  it("canonicalizes the workspace root before enforcing the containment boundary", async () => {
+    const root = await temporaryWorkspace();
+    await writeFile(path.join(root, "readme.md"), "ok");
+    await expect(resolvePublicActivityTarget({
+      candidate: { path: "readme.md", access: "read", confidence: "exact" },
+      cwd: root,
+      workspaceRoot: root,
+    })).resolves.toMatchObject({ workspaceRelativePath: "readme.md" });
+  });
+
   it("rejects traversal and symlink escape", async () => {
     const parent = await temporaryWorkspace();
     const root = path.join(parent, "workspace");

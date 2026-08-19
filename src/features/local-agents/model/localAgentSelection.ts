@@ -2,7 +2,12 @@ import type { AgentLocalConnection } from "../../../../shared/agent-contract/typ
 import type { LocalAgentsSettings } from "../../../preferences";
 
 const RUNTIME_ID_BY_LOCAL_AGENT_ID: Readonly<Record<string, string>> = {
+  "cursor-agent": "cursor",
   opencode: "opencode-native",
+};
+
+const ACTIVITY_PROVIDER_ID_BY_LOCAL_AGENT_ID: Readonly<Record<string, string>> = {
+  "cursor-agent": "cursor",
 };
 
 export function installedLocalAgents(connections: readonly AgentLocalConnection[]) {
@@ -30,4 +35,8 @@ export function enabledLocalAgentRuntimeIds(settings: LocalAgentsSettings) {
 
 export function isLocalAgentRuntimeEnabled(settings: LocalAgentsSettings, runtimeId: string) {
   return enabledLocalAgentRuntimeIds(settings).includes(runtimeId);
+}
+
+export function localAgentActivityProviderId(localAgentId: string) {
+  return ACTIVITY_PROVIDER_ID_BY_LOCAL_AGENT_ID[localAgentId] ?? localAgentId;
 }

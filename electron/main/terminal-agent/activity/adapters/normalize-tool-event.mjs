@@ -9,7 +9,10 @@ export function normalizeProjectedToolEvent({
   occurredAt = Date.now(),
 }) {
   if (!payload || !phase) return null;
-  const operation = classifyTool(payload.toolName, toolGroups);
+  const classifiedOperation = classifyTool(payload.toolName, toolGroups);
+  const operation = classifiedOperation === "command" && Array.isArray(payload.input?.read_paths)
+    ? "file.read"
+    : classifiedOperation;
   const targets = operation === "command" || operation === "subagent" || operation === "tool"
     ? []
     : createTargets(payload.input, operation);

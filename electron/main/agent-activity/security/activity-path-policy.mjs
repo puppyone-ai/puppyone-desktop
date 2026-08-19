@@ -11,10 +11,19 @@ export async function resolvePublicActivityTarget({
   fsService = fs,
   platform = process.platform,
 }) {
-  if (!isSafePath(candidate?.path) || !isSafePath(cwd) || !path.isAbsolute(workspaceRoot)) {
+  const pathModule = platform === "win32" ? path.win32 : path;
+  if (!isSafePath(candidate?.path)
+    || !isSafePath(cwd)
+    || !isSafePath(workspaceRoot)
+    || !pathModule.isAbsolute(workspaceRoot)) {
     return null;
   }
-  const pathModule = platform === "win32" ? path.win32 : path;
+  const canonicalWorkspaceRoot = await canonicalizeWorkspaceRoot({
+    workspaceRoot,
+    fsService,
+    pathModule,
+  });
+  if (!canonicalWorkspaceRoot) return null;
   const absoluteCandidate = pathModule.isAbsolute(candidate.path)
     ? pathModule.normalize(candidate.path)
     : pathModule.resolve(cwd, candidate.path);
@@ -25,16 +34,24 @@ export async function resolvePublicActivityTarget({
     fsService,
     pathModule,
   });
-  if (!canonicalTarget || !isContained(workspaceRoot, canonicalTarget, pathModule, platform)) {
+  if (!canonicalTarget || !isContained(canonicalWorkspaceRoot, canonicalTarget, pathModule, platform)) {
     return null;
   }
-  const relative = pathModule.relative(workspaceRoot, canonicalTarget);
+  const relative = pathModule.relative(canonicalWorkspaceRoot, canonicalTarget);
   if (!relative || relative === "." || !isSafeRelative(relative, pathModule)) return null;
   return Object.freeze({
     workspaceRelativePath: relative.split(pathModule.sep).join("/"),
     access: candidate.access,
     confidence: candidate.confidence,
   });
+}
+
+async function canonicalizeWorkspaceRoot({ workspaceRoot, fsService, pathModule }) {
+  try {
+    return pathModule.normalize(await fsService.realpath(workspaceRoot));
+  } catch {
+    return null;
+  }
 }
 
 async function canonicalizeTarget({ absoluteCandidate, access, fsService, pathModule }) {

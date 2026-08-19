@@ -10,9 +10,12 @@ const phaseFor = createPhaseResolver({
 
 export const cursorActivityAdapter = Object.freeze({
   providerId: "cursor",
-  displayName: "Cursor Agent",
-  registrationKind: "manual",
+  displayName: "Cursor Agent CLI",
+  registrationKind: "cursor-json-hooks",
   normalize(payload, context) {
+    if (String(payload.eventName).toLowerCase() === "sessionend") {
+      return Object.freeze({ kind: "source-session-ended", sourceSessionId: payload.sessionId ?? null });
+    }
     return normalizeProjectedToolEvent({
       payload,
       providerId: "cursor",

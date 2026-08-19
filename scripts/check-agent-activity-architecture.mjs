@@ -46,7 +46,47 @@ for (const filePath of sourceFiles(path.join(root, "src", "features", "editor-wo
 requirePath("src/features/local-agents/ui/LocalAgentsSettingsView.tsx");
 requirePath("src/features/desktop-agent-presence/ui/AgentFileActivityAppearanceSetting.tsx");
 requirePath("src/features/desktop-agent-presence/ui/AgentFileActivityPermissionDialog.tsx");
+requirePath("electron/main/terminal-agent/activity/registration/cursor-cli-hook-config.mjs");
+requirePath("electron/main/terminal-agent/activity/bridge/shell-file-intent.mjs");
+requirePath("tests/fixtures/agent-activity/codex-0.147.0/pre-tool-use-bash-read.json");
+requirePath("tests/fixtures/agent-activity/codex-0.147.0/pre-tool-use-apply-patch-write.json");
+requirePath("tests/fixtures/agent-activity/README.md");
 requirePath("docs/architecture/desktop-agent/local-agents-and-file-activity.md");
+
+const activityFixtureRoot = path.join(root, "tests", "fixtures", "agent-activity");
+for (const filePath of files(activityFixtureRoot)) {
+  if (path.extname(filePath) !== ".json") continue;
+  const source = readFileSync(filePath, "utf8");
+  if (/(?:\/Users\/|\/home\/|[A-Za-z]:\\\\Users\\\\)/u.test(source)) {
+    errors.push(`${relative(filePath)} contains a developer home path; Agent fixtures must be synthetic`);
+  }
+  let fixture;
+  try {
+    fixture = JSON.parse(source);
+  } catch {
+    errors.push(`${relative(filePath)} is not valid JSON`);
+    continue;
+  }
+  for (const key of ["cwd", "workspace_root", "workspaceRoot", "project_root", "projectRoot"]) {
+    if (typeof fixture[key] === "string" && !fixture[key].startsWith("/workspace")) {
+      errors.push(`${relative(filePath)} must use a synthetic /workspace value for ${key}`);
+    }
+  }
+  if (fixture.transcript_path !== null && fixture.transcript_path !== undefined) {
+    errors.push(`${relative(filePath)} must not retain a transcript path`);
+  }
+  for (const key of [
+    "session_id",
+    "turn_id",
+    "tool_use_id",
+    "conversation_id",
+    "generation_id",
+  ]) {
+    if (typeof fixture[key] === "string" && !/(?:fixture|test)/u.test(fixture[key])) {
+      errors.push(`${relative(filePath)} must use a synthetic ${key}`);
+    }
+  }
+}
 const generalSettings = read("src/features/settings/main/GeneralSettingsView.tsx");
 if (/AgentActivity|agentFileActivity|localAgents/u.test(generalSettings)) {
   errors.push("General Settings must not own Agent activity enrollment");
@@ -96,6 +136,37 @@ if (/providerId|providers\.map|connection\.displayName|desktop-settings-switch/u
   errors.push("Agent file activity permission must remain one batch action, not per-Agent controls");
 }
 
+const hookRegistrationService = read("electron/main/terminal-agent/activity/registration/hook-registration-service.mjs");
+const cursorHookConfig = read("electron/main/terminal-agent/activity/registration/cursor-cli-hook-config.mjs");
+const bridgeInstaller = read("electron/main/terminal-agent/activity/registration/bridge-installer.mjs");
+const payloadProjector = read("electron/main/terminal-agent/activity/bridge/payload-projector.mjs");
+if (!hookRegistrationService.includes('{ providerId: "cursor", displayName: "Cursor Agent CLI", configurable: true }')
+    || !hookRegistrationService.includes('path.join(homedir, ".cursor", "hooks.json")')) {
+  errors.push("Cursor Agent CLI must remain an automatically configurable user-level Hook provider");
+}
+for (const eventName of ["preToolUse", "postToolUse", "postToolUseFailure", "sessionEnd"]) {
+  if (!cursorHookConfig.includes(`name: "${eventName}"`)) {
+    errors.push(`Cursor Agent CLI registration is missing ${eventName}`);
+  }
+}
+if (!cursorHookConfig.includes("writeOwnedJsonFileIfUnchanged")
+    || !cursorHookConfig.includes("AGENT_ACTIVITY_CONFIG_CONFLICT")) {
+  errors.push("Cursor Agent CLI registration must preserve compare-and-swap and owned-entry conflict safety");
+}
+if (!bridgeInstaller.includes('"shell-file-intent.mjs"')
+    || !bridgeInstaller.includes("async function isCurrent()")
+    || !bridgeInstaller.includes("async function ensureCurrent()")
+    || !hookRegistrationService.includes("await bridgeInstaller.ensureCurrent()")) {
+  errors.push("enrolled Terminal sessions must atomically refresh the complete Hook bridge before launch");
+}
+if (!payloadProjector.includes("projectShellReadPaths")
+    || !payloadProjector.includes("input.read_paths = shellReadPaths")) {
+  errors.push("the Hook bridge must project conservative literal shell reads at the provider edge");
+}
+if (/transcript_path|transcriptPath/u.test(payloadProjector)) {
+  errors.push("the Hook bridge must never treat Agent transcripts as an activity source");
+}
+
 if (errors.length > 0) {
   console.error("Agent activity architecture check failed:");
   errors.forEach((error) => console.error(`- ${error}`));
@@ -130,5 +201,13 @@ function* sourceFiles(directory) {
     const filePath = path.join(directory, entry);
     if (statSync(filePath).isDirectory()) yield* sourceFiles(filePath);
     else if (/\.(?:mjs|ts|tsx)$/u.test(entry)) yield filePath;
+  }
+}
+
+function* files(directory) {
+  for (const entry of readdirSync(directory)) {
+    const filePath = path.join(directory, entry);
+    if (statSync(filePath).isDirectory()) yield* files(filePath);
+    else yield filePath;
   }
 }

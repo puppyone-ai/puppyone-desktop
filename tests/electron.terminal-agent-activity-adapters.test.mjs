@@ -1,8 +1,12 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   extractPatchPaths,
   projectAgentHookPayload,
 } from "../electron/main/terminal-agent/activity/bridge/payload-projector.mjs";
+import {
+  extractShellReadPaths,
+} from "../electron/main/terminal-agent/activity/bridge/shell-file-intent.mjs";
 import { createTerminalAgentActivityAdapterRegistry } from "../electron/main/terminal-agent/activity/terminal-agent-activity-adapter-registry.mjs";
 import { createTerminalAgentActivityHost } from "../electron/main/terminal-agent/activity/terminal-agent-activity-host.mjs";
 
@@ -36,6 +40,65 @@ describe("Terminal Agent activity bridge projection", () => {
     });
     expect(payload.input).toEqual({ file_path: "/workspace/a.md" });
   });
+
+  it("projects Cursor CLI Hook input without forwarding file content", () => {
+    const payload = projectAgentHookPayload({
+      hook_event_name: "preToolUse",
+      conversation_id: "cursor-conversation",
+      generation_id: "cursor-generation",
+      tool_name: "Read",
+      tool_use_id: "cursor-call",
+      cwd: "/workspace",
+      tool_input: { path: "/workspace/cursor.ts", content: "private" },
+    });
+    expect(payload).toMatchObject({
+      eventName: "preToolUse",
+      sessionId: "cursor-conversation",
+      toolCallId: "cursor-call",
+      toolName: "Read",
+      input: { path: "/workspace/cursor.ts" },
+    });
+    expect(JSON.stringify(payload)).not.toContain("private");
+  });
+
+  it("projects literal Codex Bash reads without forwarding the shell command", () => {
+    const payload = projectAgentHookPayload(readFixture("codex-0.147.0/pre-tool-use-bash-read.json"));
+    expect(payload).toMatchObject({
+      eventName: "PreToolUse",
+      toolName: "Bash",
+      input: { read_paths: ["notes.md"] },
+    });
+    expect(JSON.stringify(payload)).not.toContain("tail -20");
+  });
+
+  it("projects a versioned Codex apply_patch payload without forwarding its body", () => {
+    const payload = projectAgentHookPayload(
+      readFixture("codex-0.147.0/pre-tool-use-apply-patch-write.json"),
+    );
+    expect(payload).toMatchObject({
+      eventName: "PreToolUse",
+      toolName: "apply_patch",
+      input: { paths: ["notes.md"] },
+    });
+    expect(JSON.stringify(payload)).not.toContain("+new");
+  });
+
+  it("extracts literal reads from pipelines and fails closed for dynamic shell paths", () => {
+    expect(extractShellReadPaths("tail -c 80 notes.md | od -An -t x1"))
+      .toEqual(["notes.md"]);
+    expect(extractShellReadPaths("cat 'notes with spaces.md'"))
+      .toEqual(["notes with spaces.md"]);
+    expect(extractShellReadPaths("sed -n '1,220p' notes.md"))
+      .toEqual(["notes.md"]);
+    expect(extractShellReadPaths("sed -f transforms.sed notes.md"))
+      .toEqual(["transforms.sed", "notes.md"]);
+    expect(extractShellReadPaths("sed -i '' 's/old/new/' notes.md")).toEqual([]);
+    expect(extractShellReadPaths('cat "$TARGET"')).toEqual([]);
+    expect(extractShellReadPaths("cat *.md")).toEqual([]);
+    expect(extractShellReadPaths("cat $(resolve-file)")).toEqual([]);
+    expect(extractShellReadPaths("cd nested && cat note.md")).toEqual([]);
+    expect(extractShellReadPaths("python3 script.py note.md")).toEqual([]);
+  });
 });
 
 describe("Terminal Agent activity adapter registry", () => {
@@ -63,13 +126,35 @@ describe("Terminal Agent activity adapter registry", () => {
     });
   });
 
-  it("keeps shell commands target-free", () => {
+  it("normalizes conservatively projected shell reads as exact file activity", () => {
+    const adapter = createTerminalAgentActivityAdapterRegistry().get("codex");
+    const event = adapter.normalize(projectAgentHookPayload(
+      readFixture("codex-0.147.0/pre-tool-use-bash-read.json"),
+    ), {
+      terminalSessionId: "terminal-1",
+      occurredAt: 42,
+    });
+    expect(event).toMatchObject({
+      operation: "file.read",
+      targets: [{ path: "notes.md", access: "read", confidence: "exact" }],
+    });
+  });
+
+  it("keeps unsupported shell commands target-free", () => {
     const adapter = createTerminalAgentActivityAdapterRegistry().get("codex");
     const event = adapter.normalize(projectedPayload({ eventName: "PreToolUse", toolName: "Bash" }), {
       terminalSessionId: "terminal-1",
       occurredAt: 42,
     });
     expect(event).toMatchObject({ operation: "command", targets: [] });
+  });
+
+  it("closes a Cursor CLI source session when its shell remains open", () => {
+    const adapter = createTerminalAgentActivityAdapterRegistry().get("cursor");
+    expect(adapter.normalize(projectedPayload({ eventName: "sessionEnd", toolName: "unknown" }), {
+      terminalSessionId: "terminal-1",
+      occurredAt: 42,
+    })).toEqual({ kind: "source-session-ended", sourceSessionId: "session-1" });
   });
 });
 
@@ -120,4 +205,8 @@ function projectedPayload({ eventName, toolName }) {
     cwd: "/workspace",
     input: { file_path: "src/a.ts" },
   };
+}
+
+function readFixture(relativePath) {
+  return JSON.parse(readFileSync(new URL(`./fixtures/agent-activity/${relativePath}`, import.meta.url), "utf8"));
 }

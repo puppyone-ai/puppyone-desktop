@@ -1,4 +1,5 @@
 import type { AgentActivityEvent } from "../../../../shared/agent-activity-contract/types";
+import { AGENT_ACTIVITY_LIMITS } from "../../../../shared/agent-activity-contract/constants.mjs";
 import type { AgentActivityClient } from "./agentActivityClient";
 import {
   normalizeWorkspaceRelativePath,
@@ -6,7 +7,7 @@ import {
   type AgentFilePresenceProjection,
 } from "../domain/agentActivity";
 
-const COMPLETION_LINGER_MS = 1_600;
+export const AGENT_FILE_ACTIVITY_COMPLETION_LINGER_MS = AGENT_ACTIVITY_LIMITS.completedLingerMs;
 
 export class AgentActivityStore {
   private readonly activities = new Map<string, AgentActivityEvent>();
@@ -54,7 +55,10 @@ export class AgentActivityStore {
     } else {
       this.activities.set(event.activityId, event);
       if (event.phase === "completed" || event.phase === "failed") {
-        const timer = setTimeout(() => this.remove(event.activityId), COMPLETION_LINGER_MS);
+        const timer = setTimeout(
+          () => this.remove(event.activityId),
+          AGENT_FILE_ACTIVITY_COMPLETION_LINGER_MS,
+        );
         this.removalTimers.set(event.activityId, timer);
       }
     }
