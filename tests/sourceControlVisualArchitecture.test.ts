@@ -94,6 +94,10 @@ const gitControllerSource = readFileSync(
   new URL("../src/features/source-control/useDesktopGitController.ts", import.meta.url),
   "utf8",
 );
+const gitRepositoryLifecycleSource = readFileSync(
+  new URL("../src/features/source-control/useGitRepositoryLifecycle.ts", import.meta.url),
+  "utf8",
+);
 const historyListCss = readFileSync(
   new URL("../src/features/source-control/styles/history-list.css", import.meta.url),
   "utf8",
@@ -175,7 +179,7 @@ describe("source-control visual architecture", () => {
     ));
     const emptyStateSources = `${sourceControlSidebarSource}\n${sourceControlSidebarSectionsSource}`;
 
-    expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(2);
+    expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(3);
     expect(emptyStateSources).not.toMatch(/desktop-git-empty-(?:remote|committed|stage|changes)/);
     expect(sourceControlComponentsSource).toContain("<ChevronRight size={14}");
     expect(sidebarBaseCss).toContain("--git-section-leading-slot-size: 14px;");
@@ -210,6 +214,31 @@ describe("source-control visual architecture", () => {
     );
     expect(sidebarResourcesCss).toContain(
       ".desktop-git-section-collapse-inner > .po-sidebar-empty.desktop-git-section-empty",
+    );
+  });
+
+  it("keeps GitHub incoming updates inside the canonical provider row and file list", () => {
+    expect(sourceControlSidebarSource).toContain("<GitHubProviderSection");
+    expect(sourceControlSidebarSectionsSource).toContain(
+      'className="desktop-git-cloud-provider-section desktop-git-github-provider-section"',
+    );
+    expect(sourceControlSidebarSectionsSource).toContain("<GitHostingIdentityRow");
+    expect(sourceControlSidebarSectionsSource).toContain("<SourceControlPreviewResourceList");
+    expect(sourceControlSidebarSectionsSource).toContain(
+      't("source-control.status.empty")',
+    );
+    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-update-card");
+  });
+
+  it("keeps GitHub Fetch lifecycle out of the presentational sidebar", () => {
+    const sidebarPresentation = `${sourceControlSidebarSource}\n${sourceControlSidebarSectionsSource}`;
+
+    expect(sidebarPresentation).not.toContain("fetchWorkspaceGit");
+    expect(sidebarPresentation).not.toContain("setInterval");
+    expect(gitRepositoryLifecycleSource).toContain("getGitHubRemoteFetchTarget(activeGitStatus)");
+    expect(gitRepositoryLifecycleSource).toContain("GITHUB_REMOTE_FETCH_INTERVAL_MS");
+    expect(gitRepositoryLifecycleSource).toContain(
+      "fetchWorkspaceGit(context.rootPath, { remoteName })",
     );
   });
 

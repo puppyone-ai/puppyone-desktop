@@ -1713,7 +1713,7 @@ export async function createWorkspaceGitBranch(rootPath, branchName) {
   return getWorkspaceGitStatus(root);
 }
 
-export async function fetchWorkspaceGit(rootPath) {
+export async function fetchWorkspaceGit(rootPath, options = {}) {
   const root = resolveWorkspacePath(rootPath, null);
   const remotes = await readGitRemotes(root);
 
@@ -1721,14 +1721,25 @@ export async function fetchWorkspaceGit(rootPath) {
     throw new Error("Unable to fetch remotes: no Git remotes are configured.");
   }
 
+  const requestedRemoteName = typeof options.remoteName === "string"
+    ? options.remoteName.trim()
+    : "";
+  const selectedRemotes = requestedRemoteName
+    ? remotes.filter((remote) => remote.name === requestedRemoteName)
+    : remotes;
+
+  if (requestedRemoteName && selectedRemotes.length === 0) {
+    throw new Error(`Unable to fetch remote '${requestedRemoteName}': remote is not configured.`);
+  }
+
   const failures = [];
-  for (const remote of remotes) {
+  for (const remote of selectedRemotes) {
     await execGit(root, ["fetch", "--prune", remote.name], { timeout: GIT_NETWORK_TIMEOUT_MS }).catch((error) => {
       failures.push(`remote '${remote.name}': ${getGitErrorOutput(error)}`);
     });
   }
 
-  if (failures.length === remotes.length) {
+  if (failures.length === selectedRemotes.length) {
     throw new Error(`Unable to fetch remotes: ${failures.join("; ")}`);
   }
 

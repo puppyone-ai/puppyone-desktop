@@ -25,7 +25,7 @@ import {
 } from "./sidebar/useGitSidebarPanelLayout";
 import {
   GitHistoryShortcut,
-  GitHostingIdentityRow,
+  GitHubProviderSection,
   GitOperationButton,
   GitRemotePrompt,
   GitScmSyncRow,
@@ -106,12 +106,20 @@ export function GitSidebar({
     t,
   });
   const remoteSection = showRemoteSyncSection && !syncState.setupRequired ? getGitScmSyncSection(status, syncState, t) : null;
+  const githubSection = hostingMode === "github" && !syncState.setupRequired
+    ? getGitScmSyncSection(status, syncState, t)
+    : null;
   const cloudSyncActionAvailable = hostingMode === "puppyone-cloud"
     && status?.sourceControl.remote?.canPull === true
     && mergeResources.length === 0;
+  const githubSyncActionAvailable = githubSection?.action?.kind === "pull"
+    && githubSection.action.disabled === false
+    && mergeResources.length === 0;
   const primaryActionSlot = getSourceControlPrimaryActionSlot({
     hasStagedAction: professionalMode && Boolean(stagedPrimaryAction && !stagedPrimaryAction.disabled),
-    hasSyncAction: cloudSyncActionAvailable || Boolean(remoteSection?.action && !remoteSection.action.disabled),
+    hasSyncAction: cloudSyncActionAvailable
+      || githubSyncActionAvailable
+      || Boolean(remoteSection?.action && !remoteSection.action.disabled),
     hasCommittedAction: Boolean(committedPrimaryAction && !committedPrimaryAction.disabled),
     hasSimpleAction: !professionalMode && showSimpleChangeAction,
   });
@@ -127,8 +135,19 @@ export function GitSidebar({
       onSelectWorkingFile={onSelectWorkingFile}
       onPull={onPull}
     />
-  ) : hostingIdentity ? (
-    <GitHostingIdentityRow identity={hostingIdentity} />
+  ) : hostingMode === "github" && hostingIdentity && githubSection ? (
+    <GitHubProviderSection
+      identity={hostingIdentity}
+      section={githubSection}
+      mergeCount={mergeResources.length}
+      fileIconTheme={fileIconTheme}
+      selectedWorkingFile={selectedWorkingFile}
+      disabled={disabled}
+      operationLoading={operationLoading}
+      primaryAction={primaryActionSlot === "sync"}
+      onSelectWorkingFile={onSelectWorkingFile}
+      onPull={onPull}
+    />
   ) : null;
 
   const scrollableContentRevision = useMemo(() => ({

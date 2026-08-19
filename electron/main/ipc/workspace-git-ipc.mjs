@@ -342,8 +342,8 @@ export function registerWorkspaceGitIpcHandlers({
     createWorkspaceGitBranch(rootPath, request?.branchName)
   )));
 
-  ipcMain.handle("workspace:git-fetch", withAuthorizedRepositoryMutation((rootPath) => (
-    fetchWorkspaceGit(rootPath)
+  ipcMain.handle("workspace:git-fetch", withAuthorizedRepositoryMutation((rootPath, request) => (
+    fetchWorkspaceGit(rootPath, { remoteName: request?.remoteName })
   )));
 
   ipcMain.handle("workspace:git-pull", withAuthorizedRepositoryMutation((rootPath, request, event) => (

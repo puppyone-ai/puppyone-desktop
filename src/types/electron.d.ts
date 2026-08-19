@@ -1086,6 +1086,7 @@ declare global {
       }) => Promise<GitStatusSnapshot>;
       fetchGit: (request: {
         rootPath: string;
+        remoteName?: string;
       }) => Promise<GitStatusSnapshot>;
       pullGit: (request: {
         rootPath: string;

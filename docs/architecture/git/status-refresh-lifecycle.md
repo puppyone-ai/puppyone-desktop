@@ -34,6 +34,13 @@ snapshot consumer and sidebar state model are documented in
 - Operation coordination uses worktree locks for index mutations and repository
   (`commonDir`) locks for shared-ref / network mutations.
 - Hidden-window debounce and retry timers re-check focus before starting status.
+- Effective GitHub remotes use a foreground-only targeted fetch loop: initial
+  detection/sidebar entry, stale focus, online recovery, and a three-minute
+  interval all share a fifteen-second minimum gap and one in-flight request per
+  repository epoch/remote.
+- Background fetch failures are non-destructive and quiet. They preserve the
+  last good snapshot; explicit Pull remains the only operation that changes the
+  worktree or surfaces a user-facing synchronization failure.
 - Status output is streamed and bounded to 10,000 changes. A truncated snapshot
   explicitly returns `didHitStatusLimit` and the UI reports the limit.
 - Git child processes run with `LC_ALL=C` so error classification stays locale-stable.
@@ -79,6 +86,7 @@ PuppyOne Git operations ----+              |                    |
 Integrated terminal signal -+              |                    v
 Manual refresh -------------/              +------------> GitStatusSnapshot
 Window focus fallback ------/
+GitHub remote fetch --------> targeted remote refs ------/
 ```
 
 ### Initial and application-owned updates
@@ -136,6 +144,34 @@ Application-owned mutations are serialized per canonical repository in the
 main process. Status/history reads wait for that operation coordinator to become
 idle. Mutation snapshots are accepted only when their captured repository
 context still matches the scheduler's current root and epoch.
+
+### GitHub remote freshness
+
+Filesystem and metadata watchers can observe local ref changes, but they cannot
+discover a commit that exists only on GitHub. `useGitRepositoryLifecycle`
+therefore derives one target from `GitStatusSnapshot.effectiveHosting` and calls
+the authorized fetch bridge for that remote only. `githubRemoteRefreshPolicy.ts`
+keeps eligibility and timing pure/testable; the lifecycle owns timers,
+foreground checks, in-flight deduplication, and epoch-safe snapshot publication.
+
+```text
+effectiveHosting(kind=github, remote=origin)
+                    |
+                    v
+foreground cadence / sidebar entry / focus / online
+                    |
+                    v
+       fetch --prune origin       (no worktree mutation)
+                    |
+                    v
+    fresh ahead/behind + incomingPreview snapshot
+```
+
+The default interval is three minutes, focus refresh requires one minute of
+staleness, and all foreground triggers share a fifteen-second minimum gap.
+Fetch is single-flight per `(rootEpoch, rootPath, remoteName)`. A delayed result
+from an obsolete workspace is rejected by the existing repository context.
+The sidebar never owns a timer or a network request.
 
 ### Fast status and lazy history
 

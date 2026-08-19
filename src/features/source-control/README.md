@@ -12,6 +12,9 @@ contracts here.
 - `viewModel.ts` derives source-control state from the raw Git snapshot. Keep button labels, enabled states, display modes, and remote/commit counts here instead of inside TSX views.
 - `gitRefreshScheduler.ts` owns cancellable single-flight reads, root epochs,
   generation ordering, retry and focus reconciliation.
+- `githubRemoteRefreshPolicy.ts` derives the effective GitHub fetch target and
+  foreground refresh cadence. It is pure policy; timers and IPC stay in the
+  repository lifecycle.
 - `repositoryRefreshPolicy.ts` maps structured repository-change causes to
   history invalidation without encoding semantics in log strings.
 - `useGitRepositoryLifecycle.ts` owns watcher bootstrap, repository contexts,
@@ -22,6 +25,9 @@ contracts here.
 - `VersionControlIcon.tsx` owns the canonical Version Control icon shared by navigation, menus, and the opt-in state.
 - `VersionControlSetupState.tsx` owns the full-page opt-in state for a local workspace that has not enabled version control.
 - `SourceControlSidebar.tsx` composes the sidebar flow and wires user actions to the view model.
+- `sidebar/SourceControlSidebarSections.tsx` owns presentational provider and
+  resource sections. The GitHub provider reuses the canonical Empty, preview,
+  and operation-button primitives and must not execute Fetch itself.
 - `WorkingFileDetail.tsx` composes local file actions and canonical file surfaces for the focused diff route.
 - `diff/GitFileDiffSurface.tsx` is the single fact-first file-level visual contract used by focused Changes and embedded History. Its type label and renderer share one Diff Registry resolution.
 
