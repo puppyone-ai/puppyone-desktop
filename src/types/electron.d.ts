@@ -360,6 +360,10 @@ export type TerminalCreateRequest = {
   cols: number;
   rows: number;
   launcherId?: DesktopTerminalLauncherId;
+  defaultColors?: {
+    foreground: [number, number, number];
+    background: [number, number, number];
+  };
 };
 
 export type TerminalAgentId = Exclude<DesktopTerminalLauncherId, "shell">;

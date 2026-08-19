@@ -12,6 +12,14 @@ import {
 import { resolveCanonicalWorkspaceDirectory } from "./workspace-authorization.mjs";
 
 const DEFAULT_AGENT_REVEAL_TIMEOUT_MS = 2_400;
+const TERMINAL_DEFAULT_COLOR_QUERIES = Object.freeze([
+  { sequence: "\u001b]10;?\u001b\\", slot: 10 },
+  { sequence: "\u001b]10;?\u0007", slot: 10 },
+  { sequence: "\u001b]11;?\u001b\\", slot: 11 },
+  { sequence: "\u001b]11;?\u0007", slot: 11 },
+  { sequence: "\u009d10;?\u009c", slot: 10 },
+  { sequence: "\u009d11;?\u009c", slot: 11 },
+]);
 
 export function createTerminalService({
   appVersion,
@@ -102,6 +110,7 @@ export function createTerminalService({
       sender,
       cols,
       rows,
+      defaultColorResponder: createTerminalDefaultColorResponder(request?.defaultColors),
     };
 
     sessions.set(id, session);
@@ -110,10 +119,24 @@ export function createTerminalService({
       ? createAgentRevealGate(agentRevealTimeoutMs)
       : null;
     terminal.onData((data) => {
-      sendTerminalData(session, data);
+      const handled = session.defaultColorResponder?.process(data) ?? {
+        data: String(data),
+        replies: [],
+      };
+      try {
+        handled.replies.forEach((reply) => terminal.write(reply));
+      } catch (error) {
+        logger.warn("Unable to answer terminal default-color query:", error);
+        sendTerminalData(session, data);
+        agentRevealGate?.observe(data);
+        return;
+      }
+      if (handled.data.length > 0) sendTerminalData(session, handled.data);
       agentRevealGate?.observe(data);
     });
     terminal.onExit(({ exitCode, signal }) => {
+      const trailingData = session.defaultColorResponder?.flush() ?? "";
+      if (trailingData.length > 0) sendTerminalData(session, trailingData);
       agentRevealGate?.settle();
       sendTerminalExit(session, exitCode, signal ? String(signal) : null);
       if (sessions.get(id) === session) sessions.delete(id);
@@ -213,6 +236,92 @@ export function createTerminalService({
     closeAll,
     getSessionCount,
   };
+}
+
+export function createTerminalDefaultColorResponder(value) {
+  const colors = normalizeTerminalDefaultColors(value);
+  if (!colors) return null;
+  let carry = "";
+
+  return {
+    process(data) {
+      const source = `${carry}${String(data)}`;
+      const replies = [];
+      let output = "";
+      let cursor = 0;
+      carry = "";
+
+      while (cursor < source.length) {
+        const match = findNextTerminalDefaultColorQuery(source, cursor);
+        if (!match) {
+          const remainder = source.slice(cursor);
+          const carryLength = longestTerminalDefaultColorQueryPrefixSuffix(remainder);
+          output += remainder.slice(0, remainder.length - carryLength);
+          carry = remainder.slice(remainder.length - carryLength);
+          break;
+        }
+        output += source.slice(cursor, match.index);
+        replies.push(formatTerminalDefaultColorReply(match.slot, colors));
+        cursor = match.index + match.sequence.length;
+      }
+
+      return { data: output, replies };
+    },
+    flush() {
+      const data = carry;
+      carry = "";
+      return data;
+    },
+  };
+}
+
+function normalizeTerminalDefaultColors(value) {
+  const foreground = normalizeTerminalRgb(value?.foreground);
+  const background = normalizeTerminalRgb(value?.background);
+  return foreground && background ? { foreground, background } : null;
+}
+
+function normalizeTerminalRgb(value) {
+  if (!Array.isArray(value) || value.length !== 3) return null;
+  const channels = value.map(Number);
+  if (channels.some((channel) => (
+    !Number.isInteger(channel) || channel < 0 || channel > 255
+  ))) return null;
+  return channels;
+}
+
+function findNextTerminalDefaultColorQuery(source, cursor) {
+  let result = null;
+  for (const query of TERMINAL_DEFAULT_COLOR_QUERIES) {
+    const index = source.indexOf(query.sequence, cursor);
+    if (index !== -1 && (!result || index < result.index)) {
+      result = { ...query, index };
+    }
+  }
+  return result;
+}
+
+function longestTerminalDefaultColorQueryPrefixSuffix(value) {
+  const maxLength = Math.min(
+    value.length,
+    Math.max(...TERMINAL_DEFAULT_COLOR_QUERIES.map(({ sequence }) => sequence.length)) - 1,
+  );
+  for (let length = maxLength; length > 0; length -= 1) {
+    const suffix = value.slice(-length);
+    if (TERMINAL_DEFAULT_COLOR_QUERIES.some(({ sequence }) => sequence.startsWith(suffix))) {
+      return length;
+    }
+  }
+  return 0;
+}
+
+function formatTerminalDefaultColorReply(slot, colors) {
+  const color = slot === 10 ? colors.foreground : colors.background;
+  const components = color.map((channel) => {
+    const hex = channel.toString(16).padStart(2, "0");
+    return `${hex}${hex}`;
+  });
+  return `\u001b]${slot};rgb:${components.join("/")}\u001b\\`;
 }
 
 function createAgentRevealGate(timeoutValue) {

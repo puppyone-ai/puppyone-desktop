@@ -66,7 +66,10 @@ renderer-supplied UUID (validated server-side). Spawns the user's login
 shell via node-pty with `TERM=xterm-256color`, `COLORTERM=truecolor`, and
 app-identifying env vars. Confines `cwd` to the workspace root, clamps
 cols/rows (20–400 / 8–120), kills sessions when their window closes, and
-reports exit code/signal back to the renderer.
+reports exit code/signal back to the renderer. Default foreground/background
+colors are normalized to RGB at session creation; the service answers OSC
+10/11 queries before forwarding output to xterm so startup color probes do
+not depend on the renderer's paint queue.
 
 **Styles — `src/features/desktop-terminal/ui/desktop-terminal.css`.**
 Co-located `.desktop-terminal-*` rules and `.xterm` overrides: the panel is
@@ -169,6 +172,24 @@ Two adjacent facts worth pinning:
   disagree between the PTY program's wrapping and xterm's grid.
   `@xterm/addon-unicode11` narrows this gap.
 
+### 4.1 Known failure mode: WebGL glyph-atlas mipmaps
+
+The stable `@xterm/addon-webgl` 0.19 bundle calls `generateMipmap` whenever
+it uploads a glyph-atlas page. On affected Chromium/ANGLE GPU paths the
+context can remain alive while terminal cells sample corrupt atlas data.
+The visible result is arbitrary replacement glyphs, black cells, or smeared
+text even though xterm's buffer still contains the correct Unicode. Because
+the context is not lost, `onContextLoss` does not fire and cannot recover.
+
+Upstream removed glyph-atlas mipmaps in xtermjs/xterm.js#5987 and replaced
+them with explicit linear minification/magnification filters. That change is
+targeted at xterm 7 and is not present in the latest stable addon compatible
+with xterm 6. `scripts/patch-xterm-webgl-atlas.mjs` therefore applies the
+same narrow transform after every install. It patches both published bundle
+formats plus any existing Vite optimizer cache, and fails closed if the
+upstream bundle changes shape. Remove the backport only after a stable xterm
+upgrade is verified to contain upstream commit `6471844`.
+
 ## 5. Geometry and resize pipeline
 
 Sizing flows one way: **DOM size → FitAddon → xterm grid → PTY winsize**.
@@ -224,6 +245,13 @@ with `--po-*` fallbacks) resolved via `getComputedStyle` at mount and
 re-applied when the app-shell theme attributes or stylesheets mutate
 (two `MutationObserver`s). ANSI palette, cursor, selection, and scrollbar
 colors all follow the active theme without recreating the terminal.
+
+Terminal programs can discover the mount-time default foreground/background
+with OSC 10/11. These two queries are answered at the PTY boundary from the
+same resolved RGB values supplied to xterm, then removed from display output
+to prevent a duplicate asynchronous reply from xterm. Keep this fast path:
+Codex CLI 0.147 gives its startup color probe only 100ms and removes the
+composer background when either answer misses that deadline.
 
 ## 8. References
 
