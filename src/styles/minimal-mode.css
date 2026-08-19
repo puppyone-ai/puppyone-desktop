@@ -20,6 +20,7 @@
   --desktop-titlebar-active: var(--po-selected);
   --desktop-titlebar-focus: var(--po-focus-ring);
   --desktop-titlebar-control-height: var(--desktop-chrome-control-size);
+  --desktop-titlebar-button-gap: 2px;
 
   position: absolute;
   z-index: 90;
@@ -29,7 +30,7 @@
   min-width: 0;
   height: 34px;
   align-items: center;
-  gap: 2px;
+  gap: var(--desktop-titlebar-button-gap);
   padding: 2px;
   border: 1px solid color-mix(in srgb, var(--po-menu-border) 82%, transparent);
   border-radius: 10px;
@@ -110,7 +111,7 @@
   display: none;
   min-width: 0;
   align-items: center;
-  gap: 2px;
+  gap: var(--desktop-titlebar-button-gap);
 }
 
 .desktop-minimal-mode-dock:hover .desktop-minimal-mode-controls,
@@ -129,7 +130,7 @@
 
 .desktop-minimal-mode-context .desktop-titlebar-context {
   height: var(--desktop-chrome-control-size);
-  gap: 2px;
+  gap: var(--desktop-titlebar-button-gap);
 }
 
 .desktop-minimal-mode-context .desktop-titlebar-workspace-wrap,
@@ -160,7 +161,7 @@
 }
 
 .desktop-minimal-mode-titlebar-actions {
-  gap: 2px;
+  gap: var(--desktop-titlebar-button-gap);
 }
 
 .desktop-minimal-mode-titlebar-actions .desktop-titlebar-action {

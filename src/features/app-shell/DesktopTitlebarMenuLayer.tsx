@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode, RefObject } from "react";
+import { useEffect, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { DesktopMenuSurface } from "../../components/DesktopMenu";
 import { DesktopOverlayLayer } from "./DesktopOverlayPortal";
 import { useAnchoredOverlayPosition } from "./useAnchoredOverlayPosition";
@@ -8,9 +8,12 @@ type DesktopTitlebarMenuLayerProps = {
   children: ReactNode;
   className: string;
   gap?: number;
+  onDismiss: () => void;
   open: boolean;
   preferredMaxHeight: number;
 };
+
+const TITLEBAR_CONTEXT_MENU_WIDTH = 300;
 
 /**
  * Keeps Header controls in the native chrome tree while rendering their
@@ -22,17 +25,46 @@ export function DesktopTitlebarMenuLayer({
   children,
   className,
   gap = 4,
+  onDismiss,
   open,
   preferredMaxHeight,
 }: DesktopTitlebarMenuLayerProps) {
-  const { setOverlayRef, overlayPosition } = useAnchoredOverlayPosition({
+  const { overlayRef, setOverlayRef, overlayPosition } = useAnchoredOverlayPosition({
     open,
     anchorRef,
-    preferredWidth: 360,
+    preferredWidth: TITLEBAR_CONTEXT_MENU_WIDTH,
     preferredMaxHeight,
     gap,
     margin: 8,
   });
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const isInsideMenu = (target: EventTarget | null) => target instanceof Node && Boolean(
+      anchorRef.current?.contains(target) || overlayRef.current?.contains(target),
+    );
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (!isInsideMenu(event.target)) onDismiss();
+    };
+    const closeOnFocusExit = (event: FocusEvent) => {
+      if (!isInsideMenu(event.target)) onDismiss();
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      onDismiss();
+      anchorRef.current?.querySelector<HTMLElement>('[aria-haspopup="menu"]')?.focus();
+    };
+
+    document.addEventListener("pointerdown", closeOnPointerDown, true);
+    document.addEventListener("focusin", closeOnFocusExit, true);
+    document.addEventListener("keydown", closeOnEscape, true);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnPointerDown, true);
+      document.removeEventListener("focusin", closeOnFocusExit, true);
+      document.removeEventListener("keydown", closeOnEscape, true);
+    };
+  }, [anchorRef, onDismiss, open, overlayRef]);
 
   if (!open) return null;
 
@@ -46,7 +78,7 @@ export function DesktopTitlebarMenuLayer({
     : {
         left: 0,
         top: 0,
-        width: 360,
+        width: TITLEBAR_CONTEXT_MENU_WIDTH,
         maxHeight: preferredMaxHeight,
         visibility: "hidden",
         pointerEvents: "none",

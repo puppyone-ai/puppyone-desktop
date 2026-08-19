@@ -26,3 +26,14 @@
 :where([data-window-no-drag="true"]) {
   -webkit-app-region: no-drag;
 }
+
+/*
+ * Native drag regions do not emit renderer pointer events. While a titlebar
+ * menu is present, temporarily return every chrome drag region to normal hit
+ * testing so clicks on empty Header space can dismiss the menu. Removing the
+ * Portal menu restores native window dragging without a second state owner.
+ */
+:where(body:has([data-titlebar-context-menu="true"]))
+  :where([data-window-drag-region="true"]) {
+  -webkit-app-region: no-drag;
+}
