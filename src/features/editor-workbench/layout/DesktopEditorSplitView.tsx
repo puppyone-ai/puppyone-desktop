@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -285,10 +286,21 @@ function EditorPane({
     ? editorNodeIndex.get(editor.resource) ?? null
     : null;
   const [findCommand, setFindCommand] = useState<EditorFindCommand | null>(null);
-  const [menuContribution, setMenuContribution] = useState<EditorPaneMenuContribution | null>(null);
+  const [menuContribution, setMenuContribution] = useState<Readonly<{
+    editorResource: string | null;
+    contribution: EditorPaneMenuContribution;
+  }> | null>(null);
+  const publishMenuContribution = useCallback((contribution: EditorPaneMenuContribution | null) => {
+    setMenuContribution(contribution
+      ? { editorResource: editor?.resource ?? null, contribution }
+      : null);
+  }, [editor?.resource]);
   const externalOpenPath = editor?.resource ?? null;
   const agentPresencePath = editor
     ? toWorkspaceRelativePath(workspace.path, editor.resource)
+    : null;
+  const paneMenuContribution = menuContribution?.editorResource === editor?.resource
+    ? menuContribution?.contribution ?? null
     : null;
 
   return (
@@ -303,7 +315,7 @@ function EditorPane({
       pane={pane}
       paneCount={paneCount}
       paneMove={paneMove}
-      menuContribution={menuContribution?.documentId === editor?.resource ? menuContribution : null}
+      menuContribution={paneMenuContribution}
       onActionsPaneChange={onOpenActionsPaneChange}
       onActivate={() => {
         if (!active) onFocusPane(pane.id);
@@ -328,7 +340,7 @@ function EditorPane({
         workspaceRoot={workspace.path}
         markdownDialect={workspace.markdownDialect}
         onFindCommandChange={setFindCommand}
-        onMenuContributionChange={setMenuContribution}
+        onMenuContributionChange={publishMenuContribution}
       />
     </EditorPaneShell>
   );

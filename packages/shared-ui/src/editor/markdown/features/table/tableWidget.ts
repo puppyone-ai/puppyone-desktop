@@ -20,6 +20,7 @@ import {
 import { createMarkdownTableWindowController } from "./tableWindowController";
 import type { MarkdownInlinePreviewRenderer } from "../../shared/preview/markdownInlinePreviewPort";
 import { createMarkdownTableInlineViewportController } from "./tableInlineViewportController";
+import { getMappedWidgetSourceRange } from "../../shared/widgets/widgetDom";
 
 export class MarkdownTableWidget extends WidgetType {
   constructor(
@@ -72,6 +73,8 @@ export class MarkdownTableWidget extends WidgetType {
     wrapper.dataset.mdTableFrom = String(this.from);
     wrapper.dataset.mdTableExecution = this.execution.mode;
     wrapper.dataset.mdTableInlineViewport = "true";
+    const sourceLength = Math.max(0, this.to - this.from);
+    const getTableRange = () => getMappedWidgetSourceRange(view, wrapper, sourceLength);
     const rowCount = this.rows.length;
     // The semantic table model normalizes every row to the alignment width.
     // Do not rescan an oversized immutable row collection during DOM mount.
@@ -133,6 +136,7 @@ export class MarkdownTableWidget extends WidgetType {
           rowIndex,
           rows: this.rows,
           renderInlinePreview: this.renderInlinePreview,
+          getTableRange,
           tableFrom: this.from,
           tableTo: this.to,
           view,
@@ -198,12 +202,14 @@ export class MarkdownTableWidget extends WidgetType {
         className: "cm-md-table-add-row",
         label: localization.t("editor.table.addRow"),
         onActivate: () => {
+          const tableRange = getTableRange();
+          if (!tableRange) return;
           dispatchMarkdownTableStructureOperation({
             alignments: this.alignments,
             currentDraft: getActiveMarkdownTableCellDraft(wrapper),
             rows: this.rows,
-            tableFrom: this.from,
-            tableTo: this.to,
+            tableFrom: tableRange.from,
+            tableTo: tableRange.to,
             view,
           }, {
             type: "insert-row-below",
@@ -216,12 +222,14 @@ export class MarkdownTableWidget extends WidgetType {
         className: "cm-md-table-add-column",
         label: localization.t("editor.table.addColumn"),
         onActivate: () => {
+          const tableRange = getTableRange();
+          if (!tableRange) return;
           dispatchMarkdownTableStructureOperation({
             alignments: this.alignments,
             currentDraft: getActiveMarkdownTableCellDraft(wrapper),
             rows: this.rows,
-            tableFrom: this.from,
-            tableTo: this.to,
+            tableFrom: tableRange.from,
+            tableTo: tableRange.to,
             view,
           }, {
             type: "insert-column-right",
@@ -268,8 +276,7 @@ export class MarkdownTableWidget extends WidgetType {
       inlineViewport,
       rows: this.rows,
       table,
-      tableFrom: this.from,
-      tableTo: this.to,
+      getTableRange,
       view,
       wrapper,
     });

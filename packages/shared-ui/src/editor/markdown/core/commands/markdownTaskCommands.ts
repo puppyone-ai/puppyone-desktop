@@ -1,5 +1,6 @@
 import { Transaction } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
+import { getMarkdownTaskLine } from "../rendering/taskModel";
 
 export type MarkdownTaskCheckboxTarget = Readonly<{
   from: number;
@@ -9,9 +10,28 @@ export type MarkdownTaskCheckboxTarget = Readonly<{
 const TASK_CHECKBOX_TOKEN = /^\[[ xX]\]$/;
 
 /**
- * Toggles a task marker against the current EditorState rather than trusting
- * the widget's render-time checked value. That keeps repeated input and
- * mapped widgets deterministic while limiting projection work to one token.
+ * Resolves the task token from the current document at activation time.
+ *
+ * Incremental projections may map a widget through edits without rebuilding
+ * its WidgetType. A render-time absolute range can therefore become stale
+ * even though the widget is still mounted at the correct visual line.
+ */
+export function toggleMarkdownTaskCheckboxAt(
+  view: EditorView,
+  position: number,
+): boolean {
+  const safePosition = Math.max(0, Math.min(position, view.state.doc.length));
+  const task = getMarkdownTaskLine(view.state.doc.lineAt(safePosition));
+  if (!task) return false;
+  return toggleMarkdownTaskCheckbox(view, {
+    from: task.checkboxFrom,
+    to: task.checkboxTo,
+  });
+}
+
+/**
+ * Toggles a validated task marker against the current EditorState rather than
+ * trusting the widget's render-time checked value.
  */
 export function toggleMarkdownTaskCheckbox(
   view: EditorView,

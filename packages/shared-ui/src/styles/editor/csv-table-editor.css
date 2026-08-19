@@ -576,7 +576,7 @@
   border: 1px solid var(--po-border);
   border-radius: 7px;
   background: color-mix(in srgb, var(--po-panel-raised) 96%, transparent);
-  box-shadow: 0 5px 18px color-mix(in srgb, var(--po-shadow) 18%, transparent);
+  box-shadow: var(--po-elevation-low);
   color: var(--po-text-muted);
   font-size: var(--po-editable-table-font-size);
   line-height: 1.2;

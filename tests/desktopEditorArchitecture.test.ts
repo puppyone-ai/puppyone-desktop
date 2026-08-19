@@ -15,11 +15,12 @@ const markdownViewer = read(
 describe("Desktop editor architecture", () => {
   it("exposes Markdown Source Code through the pane menu in the Desktop workspace", () => {
     expect(desktopDataSurface).toContain("hidePreviewSourceView");
-    expect(editorPaneDocumentRuntime).toContain('node?.type === "markdown"');
+    expect(editorPaneDocumentRuntime).toContain("!isMarkdownDocumentDescriptor(");
     expect(editorPaneDocumentRuntime).toContain("hideSourceView={hideSourceView}");
     expect(markdownViewer).toContain('modeControlPlacement="pane-menu"');
     expect(textEditorFrame).toContain("publishPaneMenuContribution");
-    expect(textEditorFrame).toContain('id: "editor-source-mode"');
+    expect(textEditorFrame).toContain('kind: "segmented"');
+    expect(textEditorFrame).toContain('id: "editor-view-mode"');
     expect(textEditorFrame).toContain('switchMode("live")');
     expect(textEditorFrame).toContain('switchMode("source")');
     expect(textEditorFrame).toContain('t("editor.mode.source")');

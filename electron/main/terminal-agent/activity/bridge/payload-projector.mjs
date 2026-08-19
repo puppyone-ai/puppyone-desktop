@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { projectShellReadPaths } from "./shell-file-intent.mjs";
 
 const PROJECTOR_LIMITS = Object.freeze({
   frameBytes: 64 * 1024,
@@ -30,6 +31,8 @@ export function projectAgentHookPayload(rawValue) {
   if (!eventName || !cwd) return null;
   const nativeInput = firstRecord(rawValue.tool_input, rawValue.input, rawValue.args) ?? {};
   const input = projectPathInput(nativeInput, toolName);
+  const shellReadPaths = projectShellReadPaths(toolName, nativeInput);
+  if (shellReadPaths.length > 0) input.read_paths = shellReadPaths;
   const sessionId = nullableString(firstString(
     rawValue.session_id,
     rawValue.conversation_id,

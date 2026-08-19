@@ -495,18 +495,21 @@ describe("Desktop Terminal titlebar session manager", () => {
       />,
     )));
 
-    const dialog = container.querySelector<HTMLElement>('[role="dialog"]');
+    const overlayRoot = document.querySelector<HTMLElement>("#desktop-overlay-root");
+    const dialog = overlayRoot?.querySelector<HTMLElement>('[role="dialog"]');
+    expect(overlayRoot).not.toBeNull();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
     expect(dialog?.getAttribute("aria-label")).toBe("Close Terminal 2?");
     expect(dialog?.textContent).toContain(
       "This will stop the shell and any command running in this terminal.",
     );
     expect(document.activeElement?.textContent).toBe("Cancel");
 
-    clickButton(container, "Cancel");
+    clickButton(overlayRoot!, "Cancel");
     expect(onCancel).toHaveBeenCalledOnce();
     expect(onConfirm).not.toHaveBeenCalled();
 
-    clickButton(container, "Close terminal");
+    clickButton(overlayRoot!, "Close terminal");
     expect(onConfirm).toHaveBeenCalledOnce();
   });
 });

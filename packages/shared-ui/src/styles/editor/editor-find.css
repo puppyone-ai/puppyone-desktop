@@ -23,9 +23,7 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-overlay) 88%, var(--po-panel-raised) 12%);
   color: var(--po-text-subtle);
-  box-shadow:
-    0 1px 2px color-mix(in srgb, var(--po-shadow) 18%, transparent),
-    0 8px 24px color-mix(in srgb, var(--po-shadow) 16%, transparent);
+  box-shadow: var(--po-elevation-low);
 }
 
 .editor-find-widget > svg {

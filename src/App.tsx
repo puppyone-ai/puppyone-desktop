@@ -444,35 +444,6 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (!switcherOpen && !branchSwitcherOpen) return undefined;
-
-    const closeOnPointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Node && switcherRef.current?.contains(target)) return;
-      if (target instanceof Node && branchSwitcherRef.current?.contains(target)) return;
-      if (
-        target instanceof Element
-        && target.closest('[data-titlebar-context-menu="true"]')
-      ) return;
-      setSwitcherOpen(false);
-      setBranchSwitcherOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setSwitcherOpen(false);
-        setBranchSwitcherOpen(false);
-      }
-    };
-
-    window.addEventListener("pointerdown", closeOnPointerDown, true);
-    window.addEventListener("keydown", closeOnEscape, true);
-    return () => {
-      window.removeEventListener("pointerdown", closeOnPointerDown, true);
-      window.removeEventListener("keydown", closeOnEscape, true);
-    };
-  }, [branchSwitcherOpen, branchSwitcherRef, setBranchSwitcherOpen, switcherOpen]);
-
-  useEffect(() => {
     setGitOperationError(null);
     setGitOperationLoading(null);
     setActiveSettingsSection("general");
@@ -825,6 +796,10 @@ function AppContent() {
     setBranchSwitcherOpen(false);
   }, [setBranchSwitcherOpen]);
 
+  const closeWorkspaceSwitcher = useCallback(() => {
+    setSwitcherOpen(false);
+  }, []);
+
   if (restoringWorkspace && !workspace) {
     return (
       <RestoringWorkspaceScreen
@@ -893,6 +868,7 @@ function AppContent() {
       workspaceSwitcherRef={switcherRef}
       onCheckoutBranch={handleCheckoutGitBranch}
       onGoHome={() => void goToHomepage()}
+      onCloseWorkspaceSwitcher={closeWorkspaceSwitcher}
       onOpenFolder={openFolder}
       onOpenWorkspaceSwitcherItem={openWorkspaceSwitcherItem}
       onCloseBranchSwitcher={closeBranchSwitcher}

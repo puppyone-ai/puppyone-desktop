@@ -28,13 +28,13 @@ afterEach(() => {
 
 describe("Markdown pane mode menu", () => {
   it("switches source mode from the three-dot pane menu without floating editor controls", async () => {
-    const path = "notes.md";
+    const path = "20260817";
     const node: DataNode = {
       id: path,
       path,
       name: path,
-      type: "markdown",
-      mimeType: "text/markdown",
+      type: "file",
+      mimeType: "text/markdown; charset=utf-8",
       source: "local",
     };
     const editorGroup = openEditor(EMPTY_EDITOR_GROUP, createEditorInput(path));
@@ -60,6 +60,7 @@ describe("Markdown pane mode menu", () => {
             markdownBlockDragEnabled: false,
           }}
           editorTree={[node]}
+          externalOpen={{ getAppName: () => "Terminal", open: vi.fn() }}
           fileIconTheme="default"
           layout={createEditorPaneLayout(path)}
           markdownEnvironment={workspaceState(node).markdownEnvironment}
@@ -92,21 +93,62 @@ describe("Markdown pane mode menu", () => {
     });
     await waitForCondition(() => document.querySelector(".desktop-editor-pane-menu") !== null);
 
-    const sourceModeItem = Array.from(
-      document.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]'),
-    ).find((item) => item.textContent?.includes("Source code"));
+    const modeControl = document.querySelector<HTMLElement>(
+      '.desktop-editor-pane-menu-segmented-control[aria-label="Editor mode"]',
+    );
+    expect(document.querySelector<HTMLElement>(
+      ".desktop-editor-pane-menu",
+    )?.style.width).toBe("155px");
+    const primaryActions = document.querySelector(".desktop-editor-pane-menu-primary-actions");
+    expect(primaryActions?.firstElementChild).toBe(modeControl);
+    expect(document.querySelector(".desktop-editor-pane-menu-secondary-actions")).toBeNull();
+    expect(document.querySelector(".desktop-editor-pane-menu-action-divider")).not.toBeNull();
+    const liveModeItem = modeControl?.querySelector<HTMLButtonElement>(
+      '[role="menuitemradio"][aria-label="Live view"]',
+    );
+    const sourceModeItem = modeControl?.querySelector<HTMLButtonElement>(
+      '[role="menuitemradio"][aria-label="Source code"]',
+    );
+    expect(modeControl?.textContent).toBe("");
+    expect(liveModeItem?.getAttribute("aria-checked")).toBe("true");
     expect(sourceModeItem).toBeInstanceOf(HTMLButtonElement);
     expect(sourceModeItem?.getAttribute("aria-checked")).toBe("false");
 
-    await act(async () => sourceModeItem?.click());
+    liveModeItem?.focus();
+    await act(async () => liveModeItem?.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "ArrowRight",
+      bubbles: true,
+      cancelable: true,
+    })));
     await waitForCondition(() => container.querySelector(
       '.markdown-codemirror-editor[data-preview-state="source"]',
     ) !== null);
 
     expect(document.querySelector(".desktop-editor-pane-menu")).not.toBeNull();
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Source code");
     expect(document.querySelector<HTMLButtonElement>(
-      '[role="menuitemcheckbox"][aria-checked="true"]',
-    )?.textContent).toContain("Source code");
+      '[role="menuitemradio"][aria-label="Source code"]',
+    )?.getAttribute("aria-checked")).toBe("true");
+    expect(document.querySelector<HTMLButtonElement>(
+      '[role="menuitemradio"][aria-label="Live view"]',
+    )?.getAttribute("aria-checked")).toBe("false");
+
+    await act(async () => {
+      handle?.click();
+      await Promise.resolve();
+    });
+    expect(document.querySelector(".desktop-editor-pane-menu")).toBeNull();
+
+    await act(async () => {
+      handle?.click();
+      await Promise.resolve();
+    });
+    await waitForCondition(() => document.querySelector(
+      '.desktop-editor-pane-menu-segmented-control[aria-label="Editor mode"]',
+    ) !== null);
+    expect(document.querySelector<HTMLButtonElement>(
+      '[role="menuitemradio"][aria-label="Source code"]',
+    )?.getAttribute("aria-checked")).toBe("true");
   });
 });
 

@@ -9,6 +9,26 @@ export function hasPointerMoved(event: MouseEvent, pointerDown: { x: number; y: 
 }
 
 /**
+ * Resolve a mounted widget to its current document anchor.
+ *
+ * A DecorationSet maps the widget's range through transactions without
+ * mutating the immutable WidgetType that created its DOM. Interactive widgets
+ * must use this live anchor instead of constructor-time absolute offsets.
+ */
+export function getMappedWidgetPosition(
+  view: EditorView,
+  element: HTMLElement,
+): number | null {
+  if (!element.isConnected || !view.dom.contains(element)) return null;
+  try {
+    return view.posAtDOM(element, 0);
+  } catch {
+    // CodeMirror may detach a widget between pointer delivery and dispatch.
+    return null;
+  }
+}
+
+/**
  * Resolve a mounted replacement widget back to its current document range.
  *
  * CodeMirror maps decoration positions through every transaction, while a
@@ -21,16 +41,13 @@ export function getMappedWidgetSourceRange(
   element: HTMLElement,
   sourceLength: number,
 ): { from: number; to: number } | null {
-  try {
-    const from = view.posAtDOM(element, 0);
-    return {
-      from,
-      to: Math.min(view.state.doc.length, from + Math.max(0, sourceLength)),
-    };
-  } catch {
-    // CodeMirror may detach a widget between pointer delivery and dispatch.
-    return null;
-  }
+  const from = getMappedWidgetPosition(view, element);
+  return from === null
+    ? null
+    : {
+        from,
+        to: Math.min(view.state.doc.length, from + Math.max(0, sourceLength)),
+      };
 }
 
 export function normalizeLineEndings(value: string): string {

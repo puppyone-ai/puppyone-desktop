@@ -1,7 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const BRIDGE_FILES = Object.freeze(["puppyone-agent-hook.mjs", "payload-projector.mjs"]);
+const BRIDGE_FILES = Object.freeze([
+  "puppyone-agent-hook.mjs",
+  "payload-projector.mjs",
+  "shell-file-intent.mjs",
+]);
 
 export function createAgentActivityBridgeInstaller({
   sourceDirectory,
@@ -12,6 +16,7 @@ export function createAgentActivityBridgeInstaller({
 }) {
   const installDirectory = path.join(userDataPath, "agent-activity", "bridge", "current");
   const bridgePath = path.join(installDirectory, "puppyone-agent-hook.mjs");
+  let ensurePromise = null;
 
   async function install() {
     await fsService.mkdir(installDirectory, { recursive: true, mode: 0o700 });
@@ -23,10 +28,46 @@ export function createAgentActivityBridgeInstaller({
   }
 
   async function exists() {
-    return fsService.access(bridgePath).then(() => true, () => false);
+    return Promise.all(BRIDGE_FILES.map((fileName) => (
+      fsService.access(path.join(installDirectory, fileName)).then(() => true, () => false)
+    ))).then((results) => results.every(Boolean));
   }
 
-  return Object.freeze({ install, exists, bridgePath, command: createBridgeCommand({ bridgePath, executablePath, platform }) });
+  async function isCurrent() {
+    try {
+      for (const fileName of BRIDGE_FILES) {
+        const [source, installed] = await Promise.all([
+          fsService.readFile(path.join(sourceDirectory, fileName)),
+          fsService.readFile(path.join(installDirectory, fileName)),
+        ]);
+        if (!Buffer.from(source).equals(Buffer.from(installed))) return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function ensureCurrent() {
+    if (!ensurePromise) {
+      ensurePromise = (async () => {
+        if (!(await isCurrent())) await install();
+        return Object.freeze({ bridgePath, command: createBridgeCommand({ bridgePath, executablePath, platform }) });
+      })().finally(() => {
+        ensurePromise = null;
+      });
+    }
+    return ensurePromise;
+  }
+
+  return Object.freeze({
+    install,
+    exists,
+    isCurrent,
+    ensureCurrent,
+    bridgePath,
+    command: createBridgeCommand({ bridgePath, executablePath, platform }),
+  });
 }
 
 export function createBridgeCommand({ bridgePath, executablePath, platform = process.platform }) {

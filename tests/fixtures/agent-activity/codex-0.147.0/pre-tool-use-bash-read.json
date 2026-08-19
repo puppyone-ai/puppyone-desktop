@@ -1,0 +1,14 @@
+{
+  "hook_event_name": "PreToolUse",
+  "session_id": "codex-session-fixture",
+  "turn_id": "codex-turn-fixture",
+  "tool_name": "Bash",
+  "tool_use_id": "codex-tool-fixture",
+  "cwd": "/workspace",
+  "model": "gpt-test",
+  "permission_mode": "default",
+  "transcript_path": null,
+  "tool_input": {
+    "command": "tail -20 notes.md && wc -l notes.md"
+  }
+}

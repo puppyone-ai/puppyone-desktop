@@ -171,7 +171,7 @@
   border: 1px solid color-mix(in srgb, var(--po-border) 82%, transparent);
   border-radius: 7px;
   background: color-mix(in srgb, var(--po-panel) 98%, transparent);
-  box-shadow: 0 12px 32px rgba(47, 42, 35, 0.13);
+  box-shadow: var(--po-menu-shadow);
   color: var(--po-text);
   backdrop-filter: blur(12px);
 }

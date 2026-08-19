@@ -25,6 +25,7 @@ type DesktopWorkspaceSwitcherProps = {
   titlebarLabel: string;
   workspace: Workspace;
   items: DesktopWorkspaceSwitcherItem[];
+  onClose: () => void;
   onOpenFolder: () => void;
   onOpenItem: (item: DesktopWorkspaceSwitcherItem) => void;
   onGoHome: () => void;
@@ -38,6 +39,7 @@ export function DesktopWorkspaceSwitcher({
   titlebarLabel,
   workspace,
   items,
+  onClose,
   onOpenFolder,
   onOpenItem,
   onGoHome,
@@ -79,6 +81,7 @@ export function DesktopWorkspaceSwitcher({
         anchorRef={refObject}
         className="desktop-project-menu"
         gap={compact ? 8 : 4}
+        onDismiss={onClose}
         open={open}
         preferredMaxHeight={520}
       >

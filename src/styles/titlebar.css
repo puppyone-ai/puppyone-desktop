@@ -77,7 +77,7 @@
   height: 100%;
   min-width: 0;
   align-items: center;
-  gap: 0;
+  gap: var(--desktop-titlebar-button-gap);
 }
 
 .desktop-titlebar-context-item {
@@ -127,7 +127,7 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 3px;
+  gap: var(--desktop-titlebar-button-gap);
   height: var(--desktop-titlebar-control-height);
   overflow: visible;
 }
@@ -397,7 +397,7 @@
   z-index: 80;
   top: calc(100% + 4px);
   inset-inline-start: 0;
-  width: min(360px, calc(100vw - 32px));
+  width: min(300px, calc(100vw - 16px));
   padding: 8px;
   border: 1px solid var(--po-menu-border);
   border-radius: var(--po-menu-radius);
@@ -528,6 +528,7 @@
  */
 @media (max-width: 720px) {
   .desktop-titlebar {
+    --desktop-titlebar-button-gap: 1px;
     gap: 2px;
     padding-inline-end: 4px;
   }
@@ -538,10 +539,6 @@
 
   .desktop-titlebar-context {
     overflow: hidden;
-  }
-
-  .desktop-titlebar-actions {
-    gap: 1px;
   }
 
   .desktop-titlebar-action-divider {

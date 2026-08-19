@@ -19,6 +19,12 @@ import {
   resolveRendererPublicAssetUrl,
   type PulseGridPresetId,
 } from "@puppyone/shared-ui";
+import {
+  CREATE_NEW_ITEM_IDS,
+  getCreateEntryMenuItem,
+  getDefaultCreateNewMenuItems,
+  type CreateNewItemId,
+} from "./features/create-new/createEntryMenuRegistry";
 
 export type { TypographyPreferences } from "./features/typography/fontCatalog";
 export {
@@ -32,6 +38,8 @@ export {
   resolveActiveThemeMode,
 };
 export type { InterfaceStyle, ThemeMode };
+export { CREATE_NEW_ITEM_IDS };
+export type { CreateNewItemId };
 
 export type LightThemePreset = "neutral" | "warm" | "graphite";
 export type DarkThemePreset = "default" | "warm" | "graphite";
@@ -98,18 +106,6 @@ export type ExperimentalSettings = {
 };
 
 export const CREATE_NEW_MENU_VERSION = 3 as const;
-export const CREATE_NEW_ITEM_IDS = [
-  "markdown",
-  "contextMap",
-  "text",
-  "json",
-  "csv",
-  "html",
-  "slides",
-  "app",
-  "puppyflow",
-] as const;
-export type CreateNewItemId = typeof CREATE_NEW_ITEM_IDS[number];
 export type CreateNewMenuItem = {
   kind: CreateNewItemId;
   enabled: boolean;
@@ -202,13 +198,7 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
 };
 export const DEFAULT_CREATE_NEW_MENU_SETTINGS: CreateNewMenuSettings = {
   version: CREATE_NEW_MENU_VERSION,
-  items: [
-    { kind: "markdown", enabled: true },
-    { kind: "contextMap", enabled: true },
-    { kind: "csv", enabled: true },
-    { kind: "html", enabled: true },
-    { kind: "slides", enabled: true },
-  ],
+  items: getDefaultCreateNewMenuItems(),
 };
 
 export const SIDEBAR_NAVIGATION_LAYOUT_OPTIONS = [
@@ -679,9 +669,8 @@ export function isCreateNewItemAvailable(
   kind: CreateNewItemId,
   experimentalSettings: ExperimentalSettings,
 ): boolean {
-  if (kind === "puppyflow") return experimentalSettings.enablePuppyFlowFiles;
-  if (kind === "contextMap") return experimentalSettings.enableContextMaps;
-  return true;
+  const experimentalSetting = getCreateEntryMenuItem(kind).experimentalSetting;
+  return !experimentalSetting || experimentalSettings[experimentalSetting];
 }
 
 function matchesEnabledCreateMenu(

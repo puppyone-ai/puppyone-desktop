@@ -32,7 +32,7 @@
     "dev:update-preview": "VITE_DESKTOP_UPDATE_PREVIEW=available VITE_DESKTOP_UPDATE_PREVIEW_VERSION=0.3.0-preview.1 VITE_DESKTOP_CLOUD_API_URL=https://api.puppyone.ai/api/v1 VITE_DESKTOP_CLOUD_WEB_URL=https://app.puppyone.ai npm run dev",
     "dev:renderer": "vite",
     "dev:browser": "vite --host 127.0.0.1",
-    "postinstall": "node scripts/fix-node-pty-permissions.mjs",
+    "postinstall": "node scripts/fix-node-pty-permissions.mjs && node scripts/patch-xterm-webgl-atlas.mjs",
     "build": "node scripts/check-desktop-build-environment.mjs && npm run check:boundaries && tsc && vite build && node scripts/check-renderer-public-assets.mjs && node scripts/check-bundle-budget.mjs && node scripts/check-packaged-artifact-budgets.mjs",
     "package:viewer-pack": "node scripts/package-viewer-pack.mjs",
     "check:artifact-budgets": "node scripts/check-packaged-artifact-budgets.mjs",

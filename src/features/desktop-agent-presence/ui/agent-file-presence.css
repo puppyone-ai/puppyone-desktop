@@ -10,7 +10,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--po-panel) 88%, var(--agent-presence-accent));
   color: var(--po-text);
-  box-shadow: 0 4px 14px rgb(0 0 0 / 10%);
+  box-shadow: var(--po-elevation-low);
   font-size: 10px;
   font-weight: 600;
   line-height: 1;

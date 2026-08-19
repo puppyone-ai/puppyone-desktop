@@ -34,7 +34,7 @@
   border: 1px solid var(--po-border);
   border-radius: 6px;
   background: var(--po-control);
-  box-shadow: 0 4px 12px var(--po-shadow);
+  box-shadow: var(--po-elevation-low);
 }
 
 .editor-mode-toggle button {

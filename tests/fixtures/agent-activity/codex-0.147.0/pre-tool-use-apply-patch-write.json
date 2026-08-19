@@ -1,0 +1,14 @@
+{
+  "hook_event_name": "PreToolUse",
+  "session_id": "codex-session-fixture",
+  "turn_id": "codex-turn-fixture",
+  "tool_name": "apply_patch",
+  "tool_use_id": "codex-patch-fixture",
+  "cwd": "/workspace",
+  "model": "gpt-test",
+  "permission_mode": "default",
+  "transcript_path": null,
+  "tool_input": {
+    "command": "*** Begin Patch\n*** Update File: notes.md\n@@\n-old\n+new\n*** End Patch"
+  }
+}

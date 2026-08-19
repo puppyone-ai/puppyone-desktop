@@ -21,7 +21,15 @@ describe("titlebar menu overlay architecture", () => {
   });
 
   it("keeps portal menu interactions inside the controlled open state", () => {
-    expect(appSource).toContain("target.closest('[data-titlebar-context-menu=\"true\"]')");
+    expect(layerSource).toContain('document.addEventListener("pointerdown", closeOnPointerDown, true)');
+    expect(layerSource).toContain("overlayRef.current?.contains(target)");
+    expect(layerSource).toContain("anchorRef.current?.contains(target)");
+    expect(appSource).not.toContain("const closeOnPointerDown = (event: PointerEvent)");
+  });
+
+  it("uses a compact fixed width for both project and branch menus", () => {
+    expect(layerSource).toContain("const TITLEBAR_CONTEXT_MENU_WIDTH = 300;");
+    expect(titlebarCss).toContain("width: min(300px, calc(100vw - 16px));");
   });
 
   it("fits a titlebar menu into a narrow viewport instead of clipping it", () => {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocalization } from "@puppyone/localization";
+import { localAgentActivityProviderId } from "../../local-agents";
 import { AgentFileActivityPermissionDialog } from "./AgentFileActivityPermissionDialog";
 
 export function AgentFileActivityAppearanceSetting({
@@ -107,7 +108,7 @@ export async function reconcileNativeActivityHooks({
     const inventory = await desktop.discoverLocalAgentConnections({ rootPath: workspaceRoot, refresh: false });
     installedIds = new Set(inventory.connections
       .filter((connection) => connection.installation !== "not-found")
-      .map((connection) => connection.id));
+      .map((connection) => localAgentActivityProviderId(connection.id)));
   }
 
   const changed: Array<{ providerId: string; enabled: boolean }> = [];

@@ -195,7 +195,7 @@
   border: 0;
   border-radius: 2px;
   background: color-mix(in srgb, var(--po-canvas) 88%, transparent);
-  box-shadow: 0 10px 24px color-mix(in srgb, black 16%, transparent);
+  box-shadow: var(--po-elevation-popover);
   opacity: 0.88;
   pointer-events: none;
   will-change: transform;
@@ -260,23 +260,19 @@
   display: flex;
   align-items: center;
   gap: 3px;
+}
+
+.desktop-editor-pane-menu-segmented-control + .desktop-editor-pane-menu-end-actions {
   margin-inline-start: auto;
 }
 
 .desktop-editor-pane-menu-action-divider {
-  display: grid;
-  width: var(--desktop-editor-pane-menu-action-size);
-  height: var(--desktop-editor-pane-menu-action-size);
-  flex: 0 0 var(--desktop-editor-pane-menu-action-size);
-  place-items: center;
-  pointer-events: none;
-}
-
-.desktop-editor-pane-menu-action-divider::before {
   width: 1px;
-  height: 12px;
+  height: 18px;
+  flex: 0 0 1px;
+  margin-inline: 3px;
   background: var(--po-divider);
-  content: "";
+  pointer-events: none;
 }
 
 .desktop-editor-pane-menu-close-action.desktop-menu-icon-button {
@@ -293,6 +289,46 @@
   margin-top: 4px;
   padding-top: 4px;
   border-top: 1px solid var(--po-divider);
+}
+
+.desktop-editor-pane-menu-segmented-control {
+  display: grid;
+  grid-auto-columns: var(--desktop-editor-pane-menu-action-size);
+  grid-auto-flow: column;
+  height: var(--desktop-editor-pane-menu-action-size);
+  flex: 0 0 auto;
+  gap: 1px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.desktop-editor-pane-menu-segment {
+  appearance: none;
+  display: grid;
+  height: var(--desktop-editor-pane-menu-action-size);
+  min-width: 0;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--desktop-toolbar-action-radius);
+  background: transparent;
+  color: var(--desktop-titlebar-text-muted, var(--po-text-muted));
+  cursor: var(--po-clickable-cursor, pointer);
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.desktop-editor-pane-menu-segment:hover,
+.desktop-editor-pane-menu-segment:focus-visible {
+  background: var(--desktop-titlebar-hover, var(--po-hover));
+  color: var(--desktop-titlebar-text, var(--po-text));
+  outline: none;
+}
+
+.desktop-editor-pane-menu-segment[aria-checked="true"] {
+  background: var(--desktop-titlebar-active, var(--po-selected));
+  color: var(--desktop-titlebar-text, var(--po-text));
 }
 
 .desktop-editor-pane-content {

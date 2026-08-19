@@ -8,6 +8,7 @@
   --desktop-chrome-control-size: 30px;
   --desktop-titlebar-control-height: 24px;
   --desktop-titlebar-tool-action-width: 34px;
+  --desktop-titlebar-button-gap: 3px;
   --desktop-sidebar-control-size: var(--desktop-chrome-control-size);
   --desktop-sidebar-nav-height: calc(var(--desktop-sidebar-control-size) + 8px);
   --desktop-sidebar-nav-padding: 4px;
@@ -297,7 +298,12 @@
   --po-tree-guide: color-mix(in srgb, var(--po-sidebar) 94%, var(--po-text));
   --po-menu-bg: color-mix(in srgb, var(--po-overlay) 92%, var(--po-panel) 8%);
   --po-menu-border: color-mix(in srgb, var(--po-border) 82%, transparent);
-  --po-menu-shadow: 0 18px 44px color-mix(in srgb, var(--po-shadow) 86%, transparent);
+  --po-elevation-low: 0 2px 4px -2px
+    color-mix(in srgb, var(--po-shadow) 32%, transparent);
+  --po-elevation-popover: 0 3px 8px -4px
+    color-mix(in srgb, var(--po-shadow) 64%, transparent);
+  --po-menu-shadow-compact: var(--po-elevation-low);
+  --po-menu-shadow: var(--po-elevation-popover);
 }
 
 .dark {
@@ -420,7 +426,10 @@
   --po-scrollbar-thumb-hover: rgba(255, 255, 255, 0.16);
   --po-menu-bg: color-mix(in srgb, var(--po-overlay) 92%, var(--po-panel-raised) 8%);
   --po-menu-border: color-mix(in srgb, var(--po-border) 88%, transparent);
-  --po-menu-shadow: 0 18px 44px color-mix(in srgb, var(--po-shadow) 92%, transparent);
+  --po-elevation-low: 0 2px 4px -2px
+    color-mix(in srgb, var(--po-shadow) 28%, transparent);
+  --po-elevation-popover: 0 3px 8px -4px
+    color-mix(in srgb, var(--po-shadow) 36%, transparent);
 }
 
 :where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface)[data-light-theme-preset="warm"]:not(.dark) {

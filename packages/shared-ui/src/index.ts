@@ -335,6 +335,8 @@ export type {
   EditorPaneMenuCommand,
   EditorPaneMenuContribution,
   EditorPaneMenuItem,
+  EditorPaneMenuSegmentedControl,
+  EditorPaneMenuSegmentedOption,
   EditorPaneMenuToggle,
 } from "./editor/editorPaneMenuContribution";
 export { EditorSaveButton as SaveStatusButton } from "./editor/EditorSaveButton";

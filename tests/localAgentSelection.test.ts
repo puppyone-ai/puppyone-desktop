@@ -4,6 +4,7 @@ import {
   installedLocalAgents,
   isLocalAgentEnabled,
   isLocalAgentRuntimeEnabled,
+  localAgentActivityProviderId,
   setLocalAgentEnabled,
 } from "../src/features/local-agents";
 import type { AgentLocalConnection } from "../shared/agent-contract/types";
@@ -21,9 +22,14 @@ describe("Local Agent selection", () => {
   });
 
   it("maps installed product identities to their Editor runtime routes", () => {
-    const settings = { enabledAgentIds: ["codex", "opencode"] };
-    expect(enabledLocalAgentRuntimeIds(settings)).toEqual(["codex", "opencode-native"]);
+    const settings = { enabledAgentIds: ["codex", "cursor-agent", "opencode"] };
+    expect(enabledLocalAgentRuntimeIds(settings)).toEqual(["codex", "cursor", "opencode-native"]);
     expect(isLocalAgentRuntimeEnabled(settings, "opencode-native")).toBe(true);
+  });
+
+  it("maps Cursor CLI inventory identity to its activity adapter", () => {
+    expect(localAgentActivityProviderId("cursor-agent")).toBe("cursor");
+    expect(localAgentActivityProviderId("claude")).toBe("claude");
   });
 });
 

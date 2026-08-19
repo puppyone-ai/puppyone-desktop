@@ -96,7 +96,10 @@ function RegularEditorPaneDocumentRuntime({
     listChildren: dataPort.listChildren,
     readFile: dataPort.readFile,
   }), [dataPort.listChildren, dataPort.readFile, refreshKey?.sequence]);
-  const hideSourceView = node?.type === "markdown" ? false : true;
+  const hideSourceView = !isMarkdownDocumentDescriptor(
+    node,
+    editor?.resource ?? null,
+  );
 
   return (
     <FilePreview
@@ -180,8 +183,12 @@ function samePaneEnvironment(
 
 function isMarkdownDocumentDescriptor(node: DataNode | null, resource: string | null): boolean {
   return node?.type === "markdown"
-    || node?.mimeType === "text/markdown"
+    || hasMimeType(node, "text/markdown")
     || /\.(?:md|markdown|mdx)$/i.test(node?.path ?? resource ?? "");
+}
+
+function hasMimeType(node: DataNode | null, expected: string): boolean {
+  return node?.mimeType?.split(";", 1)[0]?.trim().toLowerCase() === expected;
 }
 
 function sameDocumentRefresh(

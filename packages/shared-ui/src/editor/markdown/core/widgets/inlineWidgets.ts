@@ -1,7 +1,8 @@
 import { EditorView, type Rect, WidgetType } from "@codemirror/view";
 import type { MarkdownTaskLine } from "../rendering/taskModel";
 import { getInlineWidgetEdgeX, getInlineWidgetTextCoords } from "../../shared/widgets/markdownWidgetMeasure";
-import { toggleMarkdownTaskCheckbox } from "../commands/markdownTaskCommands";
+import { getMappedWidgetPosition } from "../../shared/widgets/widgetDom";
+import { toggleMarkdownTaskCheckboxAt } from "../commands/markdownTaskCommands";
 import { getMarkdownMessage } from "../editor/markdownLocalization";
 
 export type MarkdownSourceSyntaxKind =
@@ -111,8 +112,8 @@ export class TaskCheckboxWidget extends WidgetType {
       event.preventDefault();
       event.stopPropagation();
 
-      const target = readTaskCheckboxTarget(control);
-      if (!target || !toggleMarkdownTaskCheckbox(view, target)) return;
+      const position = getMappedWidgetPosition(view, control);
+      if (position === null || !toggleMarkdownTaskCheckboxAt(view, position)) return;
     });
 
     return control;
@@ -148,8 +149,6 @@ function syncTaskCheckboxControl(
   view: EditorView,
 ) {
   control.style.setProperty("--md-list-depth", String(task.depth));
-  control.dataset.checkboxFrom = String(task.checkboxFrom);
-  control.dataset.checkboxTo = String(task.checkboxTo);
   control.setAttribute(
     "aria-label",
     getMarkdownMessage(
@@ -162,13 +161,6 @@ function syncTaskCheckboxControl(
 
 function syncTaskCheckboxIndicator(indicator: HTMLElement, checked: boolean) {
   indicator.className = checked ? "cm-md-task-checkbox is-checked" : "cm-md-task-checkbox";
-}
-
-function readTaskCheckboxTarget(control: HTMLButtonElement) {
-  const from = Number(control.dataset.checkboxFrom);
-  const to = Number(control.dataset.checkboxTo);
-  if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
-  return { from, to };
 }
 
 export class HorizontalRuleWidget extends WidgetType {

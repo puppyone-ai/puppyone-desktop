@@ -82,6 +82,14 @@ const splitStyles = readFileSync(
   new URL("../src/features/editor-workbench/layout/desktop-editor-split-view.css", import.meta.url),
   "utf8",
 );
+const menuStyles = readFileSync(
+  new URL("../src/styles/menus.css", import.meta.url),
+  "utf8",
+);
+const desktopMenuSource = readFileSync(
+  new URL("../src/components/DesktopMenu.tsx", import.meta.url),
+  "utf8",
+);
 const dataShellStyles = readFileSync(
   new URL("../src/features/data-workspace/data-shell.css", import.meta.url),
   "utf8",
@@ -123,10 +131,10 @@ describe("editor split-pane architecture", () => {
     expect(splitSource).toContain("onOpenAtPaneEdge");
     expect(splitSource).toContain("onMovePane");
     expect(splitSource).toContain("onSplitPane");
-    expect(paneActionsMenuSource).toContain('t("editor.panes.splitLeft")');
-    expect(paneActionsMenuSource).toContain('t("editor.panes.splitRight")');
-    expect(paneActionsMenuSource).toContain('t("editor.panes.splitUp")');
-    expect(paneActionsMenuSource).toContain('t("editor.panes.splitDown")');
+    expect(paneActionsMenuSource).not.toContain('t("editor.panes.splitLeft")');
+    expect(paneActionsMenuSource).not.toContain('t("editor.panes.splitRight")');
+    expect(paneActionsMenuSource).not.toContain('t("editor.panes.splitUp")');
+    expect(paneActionsMenuSource).not.toContain('t("editor.panes.splitDown")');
     expect(workbenchControllerSource).toContain("const splitPane = useCallback");
     expect(workbenchControllerSource).toContain("editorId: null");
     expect(paneShellSource).toContain('className="desktop-editor-drop-preview"');
@@ -180,6 +188,7 @@ describe("editor split-pane architecture", () => {
     );
     expect(paneMenuRule).toContain("position: fixed;");
     expect(paneMenuRule).toContain("overflow-y: auto;");
+    expect(paneMenuRule).not.toContain("box-shadow:");
     expect(splitStyles).not.toContain('.desktop-editor-pane-menu[data-has-secondary="true"]');
     const closeActionRule = readCssBlock(
       splitStyles,
@@ -191,27 +200,94 @@ describe("editor split-pane architecture", () => {
       ".desktop-editor-pane-menu-end-actions",
     );
     expect(endActionsRule).toContain("display: flex;");
-    expect(endActionsRule).toContain("margin-inline-start: auto;");
+    expect(endActionsRule).not.toContain("margin-inline-start: auto;");
+    const segmentedEndActionsRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-menu-segmented-control + .desktop-editor-pane-menu-end-actions",
+    );
+    expect(segmentedEndActionsRule).toContain("margin-inline-start: auto;");
     const externalDividerRule = readCssBlock(
       splitStyles,
       ".desktop-editor-pane-menu-action-divider",
     );
-    expect(externalDividerRule).toContain(
-      "width: var(--desktop-editor-pane-menu-action-size);",
-    );
-    expect(externalDividerRule).toContain(
-      "height: var(--desktop-editor-pane-menu-action-size);",
-    );
+    expect(externalDividerRule).toContain("width: 1px;");
+    expect(externalDividerRule).toContain("height: 18px;");
+    expect(externalDividerRule).toContain("flex: 0 0 1px;");
+    expect(externalDividerRule).toContain("margin-inline: 3px;");
+    expect(externalDividerRule).toContain("background: var(--po-divider);");
     expect(externalDividerRule).toContain("pointer-events: none;");
-    const externalDividerLineRule = readCssBlock(
-      splitStyles,
-      ".desktop-editor-pane-menu-action-divider::before",
+    expect(splitStyles).not.toContain(".desktop-editor-pane-menu-action-divider::before");
+    expect(paneActionsMenuSource).toContain('elevation="compact"');
+    expect(desktopMenuSource).toContain('elevation?: "default" | "compact";');
+    expect(desktopMenuSource).toContain(
+      'data-menu-elevation={elevation === "compact" ? elevation : undefined}',
     );
-    expect(externalDividerLineRule).toContain("width: 1px;");
-    expect(externalDividerLineRule).toContain("height: 12px;");
-    expect(externalDividerLineRule).toContain("background: var(--po-divider);");
+    const compactMenuElevationRule = readCssBlock(
+      menuStyles,
+      '.desktop-menu-surface[data-menu-elevation="compact"]',
+    );
+    expect(compactMenuElevationRule).toContain(
+      "--interface-menu-box-shadow: var(--po-menu-shadow-compact);",
+    );
+    expect(compactMenuElevationRule).toContain("box-shadow: var(--po-menu-shadow-compact);");
+    expect(tokens).toContain("--po-menu-shadow-compact: var(--po-elevation-low);");
+    expect(paneActionsMenuSource).toContain("PANE_DIVIDER_WIDTH = 1");
+    expect(paneActionsMenuSource).toContain("PANE_DIVIDER_INLINE_MARGIN = 3");
     expect(paneActionsMenuSource).toContain(
       'className="desktop-editor-pane-menu-primary-action desktop-editor-pane-menu-close-action"',
+    );
+    const findActionIndex = paneActionsMenuSource.indexOf(
+      "desktop-editor-pane-menu-find-action",
+    );
+    const externalActionIndex = paneActionsMenuSource.indexOf(
+      "desktop-editor-pane-menu-external-action",
+    );
+    const closeActionIndex = paneActionsMenuSource.indexOf(
+      "desktop-editor-pane-menu-close-action",
+    );
+    expect(findActionIndex).toBeGreaterThan(0);
+    expect(externalActionIndex).toBeGreaterThan(findActionIndex);
+    expect(closeActionIndex).toBeGreaterThan(externalActionIndex);
+    expect(paneActionsMenuSource).not.toContain("PanelLeft");
+    expect(paneActionsMenuSource).not.toContain("PanelRight");
+    expect(paneActionsMenuSource).not.toContain("PanelTop");
+    expect(paneActionsMenuSource).not.toContain("PanelBottom");
+    expect(paneActionsMenuSource).toContain(
+      "segmentedControl && <PaneMenuSegmentedControl item={segmentedControl}",
+    );
+    expect(paneActionsMenuSource).toContain("resolvePaneActionsMenuWidth({");
+    expect(paneActionsMenuSource).toContain("PANE_ACTION_SLOT_SIZE = 25");
+    expect(splitSource).toContain("editorResource: editor?.resource ?? null");
+    expect(splitSource).toContain(
+      "menuContribution?.editorResource === editor?.resource",
+    );
+    expect(splitSource).not.toContain(
+      "menuContribution?.documentId === editor?.resource",
+    );
+    const segmentedControlRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-menu-segmented-control",
+    );
+    expect(segmentedControlRule).toContain(
+      "grid-auto-columns: var(--desktop-editor-pane-menu-action-size);",
+    );
+    expect(segmentedControlRule).toContain(
+      "height: var(--desktop-editor-pane-menu-action-size);",
+    );
+    expect(segmentedControlRule).toContain("flex: 0 0 auto;");
+    expect(segmentedControlRule).toContain("padding: 0;");
+    expect(segmentedControlRule).toContain("border: 0;");
+    expect(segmentedControlRule).toContain("background: transparent;");
+    expect(segmentedControlRule).toContain("box-shadow: none;");
+    const selectedSegmentRule = readCssBlock(
+      splitStyles,
+      '.desktop-editor-pane-menu-segment[aria-checked="true"]',
+    );
+    expect(selectedSegmentRule).toContain(
+      "background: var(--desktop-titlebar-active, var(--po-selected));",
+    );
+    expect(selectedSegmentRule).toContain(
+      "color: var(--desktop-titlebar-text, var(--po-text));",
     );
     const paneRule = readCssBlock(splitStyles, ".desktop-editor-pane");
     const paneFrameRule = readCssBlock(

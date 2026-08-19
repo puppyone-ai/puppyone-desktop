@@ -27,9 +27,7 @@
   border-radius: 999px;
   background: var(--po-panel-raised);
   color: var(--po-text-subtle);
-  box-shadow:
-    0 1px 4px color-mix(in srgb, var(--po-shadow) 16%, transparent),
-    0 0 0 0.5px color-mix(in srgb, var(--po-border) 44%, transparent);
+  box-shadow: none;
   opacity: 1;
   pointer-events: auto;
   cursor: var(--po-clickable-cursor, pointer);
@@ -38,8 +36,7 @@
     max-width 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
     padding-inline-end 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
     background-color 120ms ease,
-    color 120ms ease,
-    box-shadow 120ms ease;
+    color 120ms ease;
 }
 
 .desktop-help-launcher-icon-slot {
@@ -79,9 +76,7 @@
   padding-inline-end: var(--desktop-help-launcher-padding-end);
   background: var(--po-overlay);
   color: var(--po-text-muted);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--po-divider) 58%, transparent),
-    0 2px 8px color-mix(in srgb, var(--po-shadow) 14%, transparent);
+  box-shadow: none;
   opacity: 1;
 }
 
@@ -113,16 +108,8 @@
 }
 
 .desktop-feedback-header {
-  position: relative;
   align-items: center;
-  justify-content: center;
   padding-block-end: 10px;
-}
-
-.desktop-feedback-header .desktop-dialog-title-row {
-  width: 100%;
-  justify-content: center;
-  text-align: center;
 }
 
 .desktop-feedback-header .desktop-dialog-title-row h2 {
@@ -133,10 +120,7 @@
 }
 
 .desktop-feedback-close {
-  position: absolute;
-  inset-inline-end: 16px;
-  inset-block-start: 50%;
-  transform: translateY(-50%);
+  margin-inline-start: auto;
 }
 
 .desktop-feedback-form {
@@ -186,19 +170,17 @@
 
 .desktop-feedback-contact-input {
   width: 100%;
-  height: 34px;
+  height: 32px;
   box-sizing: border-box;
-  padding: 0 11px;
-  border: 1px solid var(--po-border);
-  border-radius: 8px;
+  padding: 0 9px;
+  border: 1px solid var(--po-divider);
+  border-radius: 6px;
   outline: 0;
-  background: var(--po-canvas);
+  background: var(--po-input, var(--po-panel-raised));
   color: var(--po-text);
   font: inherit;
   font-size: var(--po-text-size-body);
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease;
+  transition: border-color 120ms ease;
 }
 
 .desktop-feedback-contact-input::placeholder {
@@ -206,8 +188,7 @@
 }
 
 .desktop-feedback-contact-input:focus {
-  border-color: color-mix(in srgb, var(--po-accent) 38%, var(--po-border));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--po-focus-ring) 48%, transparent);
+  border-color: var(--po-border-strong);
 }
 
 .desktop-feedback-contact-input[aria-invalid="true"] {
@@ -220,24 +201,19 @@
 }
 
 .desktop-feedback-composer {
-  display: flex;
-  min-height: 174px;
-  flex: 1 1 auto;
-  flex-direction: column;
+  min-height: 132px;
   overflow: hidden;
   margin: 0;
-  border: 1px solid var(--po-border);
-  border-radius: 10px;
-  background: var(--po-canvas);
+  border: 1px solid var(--po-divider);
+  border-radius: 6px;
+  background: var(--po-input, var(--po-panel-raised));
   transition:
     border-color 120ms ease,
-    background-color 120ms ease,
-    box-shadow 120ms ease;
+    background-color 120ms ease;
 }
 
 .desktop-feedback-composer:focus-within {
-  border-color: color-mix(in srgb, var(--po-accent) 38%, var(--po-border));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--po-focus-ring) 48%, transparent);
+  border-color: var(--po-border-strong);
 }
 
 .desktop-feedback-composer[data-dragging="true"] {
@@ -246,12 +222,12 @@
 }
 
 .desktop-feedback-composer textarea {
+  display: block;
   width: 100%;
-  min-height: 108px;
+  min-height: 130px;
   box-sizing: border-box;
-  flex: 1 1 auto;
   resize: none;
-  padding: 12px 13px 4px;
+  padding: 10px 11px;
   border: 0;
   outline: 0;
   background: transparent;
@@ -270,13 +246,12 @@
   opacity: 0.74;
 }
 
-.desktop-feedback-composer-toolbar {
+.desktop-feedback-attachment-row {
   display: flex;
-  min-height: 38px;
-  align-items: flex-end;
+  min-height: 30px;
+  align-items: center;
   justify-content: flex-start;
-  gap: 10px;
-  padding: 3px 7px 7px 8px;
+  margin-block-start: 6px;
 }
 
 .desktop-feedback-attachment-slot {
@@ -393,14 +368,6 @@
 .desktop-feedback-submit {
   min-width: 78px;
   gap: 6px;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease,
-    transform 100ms ease;
-}
-
-.desktop-feedback-submit:hover:not(:disabled) {
-  transform: translateY(-1px);
 }
 
 .desktop-feedback-submit[data-state="sent"] {

@@ -25,8 +25,7 @@ export type MarkdownTableDragHandleContext = {
   inlineViewport: MarkdownTableInlineViewportController;
   rows: readonly MarkdownTableRow[];
   table: HTMLTableElement;
-  tableFrom: number;
-  tableTo: number;
+  getTableRange: () => { from: number; to: number } | null;
   view: EditorView;
   wrapper: HTMLElement;
 };
@@ -167,16 +166,23 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
   context.table.addEventListener("pointerover", updateHoverFromEvent);
   context.wrapper.addEventListener("pointerleave", clearHover);
 
-  const buildDispatchContext = (): MarkdownTableDispatchContext => ({
-    alignments: context.alignments,
-    currentDraft: getActiveMarkdownTableCellDraft(context.wrapper),
-    rows: context.rows,
-    tableFrom: context.tableFrom,
-    tableTo: context.tableTo,
-    view: context.view,
-  });
+  const buildDispatchContext = (): MarkdownTableDispatchContext | null => {
+    const tableRange = context.getTableRange();
+    return tableRange
+      ? {
+          alignments: context.alignments,
+          currentDraft: getActiveMarkdownTableCellDraft(context.wrapper),
+          rows: context.rows,
+          tableFrom: tableRange.from,
+          tableTo: tableRange.to,
+          view: context.view,
+        }
+      : null;
+  };
 
   const openHandleMenu = (kind: MarkdownTableDragKind, sourceIndex: number, handle: HTMLElement) => {
+    const dispatchContext = buildDispatchContext();
+    if (!dispatchContext) return;
     closeActiveMarkdownTableMenu();
     setInteractionPinnedRow(kind === "row" ? sourceIndex : hover.rowIndex);
     setDragSourceHighlight(kind, sourceIndex, true);
@@ -186,7 +192,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
     const anchor = handle.querySelector<HTMLElement>(".cm-md-table-drag-handle-visual") ?? handle;
     const rect = anchor.getBoundingClientRect();
     let nextMenu: HTMLElement | null = null;
-    nextMenu = showMarkdownTableContextMenu(buildDispatchContext(), {
+    nextMenu = showMarkdownTableContextMenu(dispatchContext, {
       clientX: kind === "row"
         ? localization.direction === "rtl" ? rect.left - 4 : rect.right + 4
         : rect.left,
@@ -356,10 +362,12 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
 
     const applyMove = () => {
       if (dropBoundary == null) return;
+      const dispatchContext = buildDispatchContext();
+      if (!dispatchContext) return;
       if (kind === "column") {
         const targetColumnIndex = dropBoundary > sourceIndex ? dropBoundary - 1 : dropBoundary;
         if (targetColumnIndex === sourceIndex) return;
-        dispatchMarkdownTableStructureOperation(buildDispatchContext(), {
+        dispatchMarkdownTableStructureOperation(dispatchContext, {
           type: "move-column-to",
           rowIndex: hover.rowIndex ?? 0,
           columnIndex: sourceIndex,
@@ -370,7 +378,7 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
       const sourceBodyIndex = sourceIndex - 1;
       const targetBodyIndex = dropBoundary > sourceBodyIndex ? dropBoundary - 1 : dropBoundary;
       if (targetBodyIndex === sourceBodyIndex) return;
-      dispatchMarkdownTableStructureOperation(buildDispatchContext(), {
+      dispatchMarkdownTableStructureOperation(dispatchContext, {
         type: "move-row-to",
         rowIndex: sourceIndex,
         columnIndex: hover.columnIndex ?? 0,

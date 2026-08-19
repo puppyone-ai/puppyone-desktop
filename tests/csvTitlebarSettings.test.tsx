@@ -86,17 +86,15 @@ describe("CSV pane-menu settings", () => {
 
     await openPaneMenu(handle!);
     const menu = document.querySelector<HTMLElement>(".desktop-editor-pane-menu");
+    expect(menu?.style.width).toBe("196px");
     expect(menu?.textContent).not.toContain("data.csv");
     expect(document.querySelector(".desktop-editor-pane-menu-title")).toBeNull();
     const primaryActions = menu?.querySelectorAll<HTMLButtonElement>(
       ".desktop-editor-pane-menu-primary-action",
     );
-    expect(primaryActions).toHaveLength(6);
+    expect(primaryActions).toHaveLength(3);
     expect(Array.from(primaryActions ?? []).map((item) => item.getAttribute("aria-label"))).toEqual([
-      "Split editor left",
-      "Split editor right",
-      "Split editor up",
-      "Split editor down",
+      "Find in file",
       "Open in Numbers",
       "Close editor pane",
     ]);
@@ -104,10 +102,12 @@ describe("CSV pane-menu settings", () => {
       "desktop-editor-pane-menu-close-action",
     )).toBe(true);
     expect(Array.from(primaryActions ?? []).every((item) => item.textContent === "")).toBe(true);
-    expect(menu?.textContent).toContain("Find in file");
+    expect(menu?.textContent).not.toContain("Find in file");
+    expect(menu?.querySelector('[aria-label="Find in file"]')).not.toBeNull();
     expect(menu?.textContent).toContain("Header row");
     expect(menu?.textContent).toContain("Row numbers");
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("Split editor left");
+    expect(menu?.querySelector(".desktop-editor-pane-menu-action-divider")).toBeNull();
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Find in file");
 
     await act(async () => document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", {
       key: "End",
@@ -118,7 +118,7 @@ describe("CSV pane-menu settings", () => {
       key: "Home",
       bubbles: true,
     })));
-    expect(document.activeElement?.getAttribute("aria-label")).toBe("Split editor left");
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Find in file");
 
     const toggles = menu?.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]');
     expect(toggles).toHaveLength(2);
@@ -136,8 +136,7 @@ describe("CSV pane-menu settings", () => {
     expect(document.querySelector(".desktop-editor-pane-menu")).toBeNull();
 
     await openPaneMenu(handle!);
-    const findItem = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
-      .find((item) => item.textContent?.includes("Find in file"));
+    const findItem = document.querySelector<HTMLButtonElement>('[aria-label="Find in file"]');
     await act(async () => findItem?.click());
     expect(container.querySelector(".editor-find-widget input")).toBeInstanceOf(HTMLInputElement);
   });
@@ -222,7 +221,6 @@ describe("CSV pane-menu settings", () => {
     const group = openEditor(EMPTY_EDITOR_GROUP, createEditorInput(path));
     const openExternal = vi.fn();
     const closePane = vi.fn();
-    const splitPane = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -247,41 +245,24 @@ describe("CSV pane-menu settings", () => {
         onMovePane={vi.fn()}
         onOpenAtPaneEdge={vi.fn()}
         onResizeSplit={vi.fn()}
-        onSplitPane={splitPane}
+        onSplitPane={vi.fn()}
       />,
     )));
 
     const handle = container.querySelector<HTMLButtonElement>(".desktop-editor-pane-handle")!;
     await openPaneMenu(handle);
     const menu = document.querySelector<HTMLElement>(".desktop-editor-pane-menu")!;
+    expect(menu.style.width).toBe("63px");
     const actions = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
 
     expect(menu.dataset.hasSecondary).toBeUndefined();
     expect(menu.textContent).toBe("");
-    expect(actions).toHaveLength(6);
+    expect(actions).toHaveLength(2);
     expect(actions.map((item) => item.getAttribute("aria-label"))).toEqual([
-      "Split editor left",
-      "Split editor right",
-      "Split editor up",
-      "Split editor down",
       "Open in default app",
       "Close editor pane",
     ]);
     expect(menu.querySelector(".desktop-menu-section")).toBeNull();
-
-    const splitCases = [
-      ["Split editor left", "horizontal", "first"],
-      ["Split editor right", "horizontal", "second"],
-      ["Split editor up", "vertical", "first"],
-      ["Split editor down", "vertical", "second"],
-    ] as const;
-    for (const [label, direction, placement] of splitCases) {
-      const splitAction = document.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`);
-      await act(async () => splitAction?.click());
-      expect(splitPane).toHaveBeenLastCalledWith("editor-pane-1", direction, placement);
-      expect(document.querySelector(".desktop-editor-pane-menu")).toBeNull();
-      await openPaneMenu(handle);
-    }
 
     const closeAction = document.querySelector<HTMLButtonElement>(
       '[aria-label="Close editor pane"]',

@@ -4,6 +4,7 @@ import { EditorView } from "@codemirror/view";
 import { TestLocalizationProvider } from "@puppyone/localization/testing";
 import {
   EMPTY_EDITOR_GROUP,
+  EMPTY_MARKDOWN_WORKSPACE_ENVIRONMENT,
   activateEditorPane,
   assignEditorToActivePane,
   createEditorInput,
@@ -12,7 +13,6 @@ import {
   splitEditorPane,
   type DataNode,
   type DataPort,
-  type DataWorkspaceState,
 } from "@puppyone/shared-ui";
 import englishCatalog from "../../src/localization/catalog-loaders/en";
 import { DesktopEditorSplitView } from "../../src/features/editor-workbench/layout/DesktopEditorSplitView";
@@ -95,41 +95,6 @@ const dataPort: DataPort = {
     },
   },
 };
-const workspaceState: DataWorkspaceState = {
-  tree,
-  activePath: null,
-  activeNode: null,
-  selectedPaths: [],
-  selectedNodes: [],
-  currentFolderPath: null,
-  selectedFile: null,
-  loadingPath: null,
-  loadError: null,
-  rootLoading: false,
-  fileContent: null,
-  fileLoading: false,
-  fileError: null,
-  fileUrl: null,
-  fileUrlLoading: false,
-  fileUrlError: null,
-  markdownLinkGraph: {
-    documentCount: 0,
-    indexedDocumentCount: 0,
-    isIndexing: false,
-    resolveWikiLink: () => ({
-      exists: false,
-      ambiguous: false,
-      path: null,
-      name: "",
-      displayName: "",
-      target: "",
-    }),
-    resolveMarkdownLink: () => null,
-    getBacklinks: () => [],
-  },
-  markdownAssetUrlResolver: () => null,
-};
-
 function HorizontalMarkdownSplitFixture() {
   const [layout, setLayout] = useState(initialLayout);
   return (
@@ -139,9 +104,10 @@ function HorizontalMarkdownSplitFixture() {
         dataPort={dataPort}
         editorGroup={editorGroup}
         editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
+        editorTree={tree}
         fileIconTheme="default"
         layout={layout}
-        state={workspaceState}
+        markdownEnvironment={EMPTY_MARKDOWN_WORKSPACE_ENVIRONMENT}
         workspace={{ id: "workspace", name: "Workspace", path: "/workspace", status: "recording" }}
         onClosePane={() => undefined}
         onFocusPane={(paneId) => setLayout((current) => activateEditorPane(current, paneId))}

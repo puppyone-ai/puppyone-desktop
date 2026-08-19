@@ -29,12 +29,13 @@ describe("Agent file activity Appearance setting", () => {
       getAgentActivityEnrollment: vi.fn(async () => enrollment([
         provider("codex", true, "not-configured"),
         provider("claude", true, "not-configured"),
-        provider("cursor", false, "basic-only"),
+        provider("cursor", true, "not-configured"),
       ])),
       discoverLocalAgentConnections: vi.fn(async () => ({
         connections: [
           localConnection("codex", "detected"),
           localConnection("claude", "not-found"),
+          localConnection("cursor-agent", "detected"),
         ],
         scannedAt: new Date(0).toISOString(),
         warnings: [],
@@ -44,8 +45,10 @@ describe("Agent file activity Appearance setting", () => {
 
     await reconcileNativeActivityHooks({ enabled: true, workspaceRoot: "/workspace" });
 
-    expect(setEnrollment).toHaveBeenCalledTimes(1);
-    expect(setEnrollment).toHaveBeenCalledWith({ providerId: "codex", enabled: true });
+    expect(setEnrollment.mock.calls).toEqual([
+      [{ providerId: "codex", enabled: true }],
+      [{ providerId: "cursor", enabled: true }],
+    ]);
   });
 
   it("removes every configurable Hook when the Appearance switch is disabled", async () => {

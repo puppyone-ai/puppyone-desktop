@@ -1,5 +1,9 @@
 import fs from "node:fs/promises";
-import path from "node:path";
+import {
+  isRecord,
+  readOwnedJsonFile,
+  writeOwnedJsonFileIfUnchanged,
+} from "./owned-json-file.mjs";
 
 const OWNED_EVENTS = Object.freeze({
   codex: Object.freeze(["PreToolUse", "PostToolUse", "SessionEnd"]),
@@ -11,7 +15,7 @@ export function createOwnedJsonHookConfig({ configPath, providerId, command, fsS
   if (!events) throw new Error(`Provider ${providerId} does not use JSON Hook registration.`);
 
   async function inspect() {
-    const source = await readSource(configPath, fsService);
+    const source = await readOwnedJsonFile(configPath, fsService);
     if (source.error) return Object.freeze({ enrollment: "needs-repair", reason: "invalid-json" });
     const counts = countOwnedHandlers(source.value, command, events);
     if (counts.exact === events.length && counts.related === events.length) {
@@ -24,7 +28,7 @@ export function createOwnedJsonHookConfig({ configPath, providerId, command, fsS
   }
 
   async function enable() {
-    const before = await readSource(configPath, fsService);
+    const before = await readOwnedJsonFile(configPath, fsService);
     if (before.error) throw new Error("AGENT_ACTIVITY_CONFIG_INVALID_JSON");
     const counts = countOwnedHandlers(before.value, command, events);
     if (counts.related > counts.exact) throw new Error("AGENT_ACTIVITY_CONFIG_CONFLICT");
@@ -37,12 +41,17 @@ export function createOwnedJsonHookConfig({ configPath, providerId, command, fsS
       }
       next.hooks[eventName] = groups;
     }
-    await writeIfUnchanged(configPath, before.source, next, fsService);
+    await writeOwnedJsonFileIfUnchanged({
+      configPath,
+      originalSource: before.source,
+      value: next,
+      fsService,
+    });
     return inspect();
   }
 
   async function disable() {
-    const before = await readSource(configPath, fsService);
+    const before = await readOwnedJsonFile(configPath, fsService);
     if (before.error) throw new Error("AGENT_ACTIVITY_CONFIG_INVALID_JSON");
     const counts = countOwnedHandlers(before.value, command, events);
     if (counts.related > counts.exact) throw new Error("AGENT_ACTIVITY_CONFIG_CONFLICT");
@@ -55,7 +64,12 @@ export function createOwnedJsonHookConfig({ configPath, providerId, command, fsS
       if (next.hooks[eventName].length === 0) delete next.hooks[eventName];
     }
     if (isRecord(next.hooks) && Object.keys(next.hooks).length === 0) delete next.hooks;
-    await writeIfUnchanged(configPath, before.source, next, fsService);
+    await writeOwnedJsonFileIfUnchanged({
+      configPath,
+      originalSource: before.source,
+      value: next,
+      fsService,
+    });
     return inspect();
   }
 
@@ -103,40 +117,4 @@ function removeExactHandler(group, command) {
   if (!isRecord(group) || !Array.isArray(group.hooks)) return group;
   const hooks = group.hooks.filter((handler) => !isExactHandler(handler, command));
   return hooks.length > 0 ? { ...group, hooks } : null;
-}
-
-async function readSource(configPath, fsService) {
-  let source;
-  try {
-    source = await fsService.readFile(configPath, "utf8");
-  } catch (error) {
-    if (error?.code !== "ENOENT") throw error;
-    return { source: null, value: {} };
-  }
-  try {
-    const value = JSON.parse(source);
-    return isRecord(value) ? { source, value } : { source, value: {}, error: true };
-  } catch {
-    return { source, value: {}, error: true };
-  }
-}
-
-async function writeIfUnchanged(configPath, originalSource, value, fsService) {
-  const latest = await readSource(configPath, fsService);
-  if (latest.source !== originalSource) throw new Error("AGENT_ACTIVITY_CONFIG_CHANGED");
-  await fsService.mkdir(path.dirname(configPath), { recursive: true, mode: 0o700 });
-  const tempPath = `${configPath}.puppyone-${process.pid}-${Date.now()}.tmp`;
-  const source = `${JSON.stringify(value, null, 2)}\n`;
-  try {
-    await fsService.writeFile(tempPath, source, { encoding: "utf8", mode: 0o600, flag: "wx" });
-    await fsService.rename(tempPath, configPath);
-    await fsService.chmod(configPath, 0o600).catch(() => undefined);
-  } catch (error) {
-    await fsService.unlink(tempPath).catch(() => undefined);
-    throw error;
-  }
-}
-
-function isRecord(value) {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
