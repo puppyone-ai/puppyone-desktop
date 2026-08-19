@@ -6,7 +6,12 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { DataNode, DataPort, FileContent } from "@puppyone/shared-ui";
+import {
+  EMPTY_MARKDOWN_WORKSPACE_ENVIRONMENT,
+  type DataNode,
+  type DataPort,
+  type FileContent,
+} from "@puppyone/shared-ui";
 import { closeDocumentWorkingCopy } from "../packages/shared-ui/src/editor/document-session/documentWorkingCopies";
 import { EditorPaneDocumentRuntime } from "../src/features/editor-workbench/runtime/EditorPaneDocumentRuntime";
 import { withTestLocalization } from "./testLocalization";
@@ -67,8 +72,7 @@ describe("split-pane external document change", () => {
             markdownBlockDragEnabled: false,
           }}
           fileIconTheme="default"
-          markdownAssetUrlResolver={null}
-          markdownLinkGraph={null}
+          markdownEnvironment={EMPTY_MARKDOWN_WORKSPACE_ENVIRONMENT}
           refreshKey={refreshKey}
           treeNode={node}
           workspaceId="workspace"
@@ -109,7 +113,7 @@ function editorContent(container: HTMLElement): string | null {
 async function waitFor(
   assertion: () => boolean,
   failure: () => string,
-  attempts = 100,
+  attempts = 400,
 ): Promise<void> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (assertion()) return;

@@ -1,9 +1,9 @@
 const DEFAULT_FEEDBACK_ENDPOINT = "https://formspree.io/f/mlgqvydy";
 const MAX_FEEDBACK_LENGTH = 2_000;
+const MAX_CONTACT_EMAIL_LENGTH = 254;
 const MAX_LOCALE_LENGTH = 80;
 const MAX_SCREENSHOT_BYTES = 3 * 1024 * 1024;
 const FEEDBACK_TIMEOUT_MS = 15_000;
-const FEEDBACK_ROLES = new Set(["developer", "researcher", "creator", "other"]);
 const SCREENSHOT_FILENAMES = new Map([
   ["image/jpeg", "feedback-screenshot.jpg"],
   ["image/png", "feedback-screenshot.png"],
@@ -24,8 +24,8 @@ export function registerFeedbackIpcHandlers({
   const feedbackEndpoint = requireFeedbackEndpoint(endpoint);
 
   ipcMain.handle("feedback:submit", async (_event, request) => {
-    const role = parseFeedbackRole(request?.role);
     const message = typeof request?.message === "string" ? request.message.trim() : "";
+    const email = parseContactEmail(request?.email);
     const locale = typeof request?.locale === "string"
       ? request.locale.trim().slice(0, MAX_LOCALE_LENGTH)
       : "";
@@ -34,17 +34,17 @@ export function registerFeedbackIpcHandlers({
     if (message.length > MAX_FEEDBACK_LENGTH) {
       throw new Error("Feedback cannot exceed 2000 characters.");
     }
-    if (!message && !screenshot) {
-      throw new Error("Feedback requires a message or screenshot.");
+    if (!message) {
+      throw new Error("Feedback requires a message.");
     }
-    if (!role) {
-      throw new Error("Feedback requires a valid role.");
+    if (!email) {
+      throw new Error("Feedback requires a valid contact email.");
     }
 
     const normalizedAppVersion = normalizeContextValue(appVersion);
     const body = new FormData();
-    body.set("role", role);
     body.set("message", message);
+    body.set("email", email);
     body.set("appVersion", normalizedAppVersion);
     body.set("locale", locale);
     body.set("platform", normalizeContextValue(platform));
@@ -86,9 +86,13 @@ export function registerFeedbackIpcHandlers({
   });
 }
 
-function parseFeedbackRole(value) {
-  const role = typeof value === "string" ? value.trim().toLowerCase() : "";
-  return FEEDBACK_ROLES.has(role) ? role : null;
+function parseContactEmail(value) {
+  const email = typeof value === "string" ? value.trim() : "";
+  return email.length > 0
+    && email.length <= MAX_CONTACT_EMAIL_LENGTH
+    && /^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(email)
+    ? email
+    : null;
 }
 
 function normalizeContextValue(value) {

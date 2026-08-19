@@ -1,5 +1,5 @@
 import { installBrokenStdioGuards } from "./main/stdio-guard.mjs";
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, session as electronSession, shell, WebContentsView } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, session as electronSession, shell, webContents, WebContentsView } from "electron";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
 import { createRequire } from "node:module";
@@ -42,12 +42,17 @@ import {
   handleSecondInstanceLaunch,
 } from "./main/desktop-launch-intent.mjs";
 import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
+import { registerAgentActivityIpcHandlers } from "./main/ipc/agent-activity-ipc.mjs";
 import { registerAppearanceIpcHandlers } from "./main/ipc/appearance-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerBuildInfoIpcHandlers } from "./main/ipc/build-info-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
 import { registerCloudPublishIpcHandlers } from "./main/ipc/cloud-publish-ipc.mjs";
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
+import {
+  attachMarkdownFormatShortcuts,
+  registerMarkdownFormatIpcHandlers,
+} from "./main/ipc/markdown-format-ipc.mjs";
 import { registerNativeSurfaceOcclusionIpcHandlers } from "./main/ipc/native-surface-occlusion-ipc.mjs";
 import { registerNativeSurfacePointerPassthroughIpcHandlers } from "./main/ipc/native-surface-pointer-passthrough-ipc.mjs";
 import { registerPanePreviewIpcHandlers } from "./main/ipc/pane-preview-ipc.mjs";
@@ -56,6 +61,7 @@ import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service
 import { createExternalNavigationService } from "./main/external-navigation-service.mjs";
 import { createNativeSurfaceOcclusionCoordinator } from "./main/native-surfaces/occlusion-coordinator.mjs";
 import { createNativeSurfacePointerPassthroughCoordinator } from "./main/native-surfaces/pointer-passthrough-coordinator.mjs";
+import { createDesktopNativeMenuService } from "./main/native-menu-service.mjs";
 import { registerFeedbackIpcHandlers } from "./main/ipc/feedback-ipc.mjs";
 import { registerSystemIpcHandlers } from "./main/ipc/system-ipc.mjs";
 import { resolveDockIconResource } from "./main/dock-icon-resources.mjs";
@@ -71,6 +77,7 @@ import { createLocalFileCapabilityStore } from "./main/local-file-capabilities.m
 import { installWindowNavigationSecurity, requireNonEmptyString } from "./main/security.mjs";
 import { createTerminalService } from "./main/terminal-service.mjs";
 import { createTerminalAgentLocator } from "./main/terminal-agent/terminal-agent-locator.mjs";
+import { createDefaultTerminalAgentActivityHost } from "./main/terminal-agent/activity/bootstrap/create-terminal-agent-activity-host.mjs";
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
@@ -127,6 +134,7 @@ if (!gotSingleInstanceLock) {
 
 const devServerUrl = process.env.PUPPYONE_DESKTOP_DEV_URL;
 const rendererApplicationUrl = devServerUrl || pathToFileURL(rendererDistPath).toString();
+if (devServerUrl) app.commandLine.appendSwitch("remote-debugging-port", "9222");
 const viewerPackFeatureProfile = resolveViewerPackFeatureProfile({
   packageMetadata,
   environment: process.env,
@@ -192,6 +200,12 @@ const localeService = createDesktopLocaleService({
   app,
   getWindows: () => BrowserWindow.getAllWindows(),
 });
+const nativeMenuService = createDesktopNativeMenuService({
+  app,
+  Menu,
+  t: (messageId, values) => localeService.t(messageId, values),
+  onNewWindow: () => createWindow(),
+});
 const applicationQuitIntent = createApplicationQuitIntent({ app });
 const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({
   dialog,
@@ -202,9 +216,16 @@ documentSessionCloseCoordinator.registerIpc(trustedIpcMain);
 const authorizeWorkspaceRoot = createSenderWorkspaceAuthorization({
   getWorkspaceRootForSender,
 });
+const terminalAgentActivityHost = createDefaultTerminalAgentActivityHost({
+  appPath: app.getAppPath(),
+  userDataPath: app.getPath("userData"),
+  executablePath: process.execPath,
+  getWebContents: (webContentsId) => webContents.fromId(webContentsId),
+});
 const terminalService = createTerminalService({
   appVersion: desktopBuildInfo.version,
   initializeWorkspaceEditReview,
+  terminalAgentActivityHost,
 });
 const terminalAgentLocator = createTerminalAgentLocator();
 const agentSessionCache = createEphemeralAgentSessionCache({ app });
@@ -301,6 +322,7 @@ async function createWindow(options = {}) {
   });
   const webContentsId = window.webContents.id;
   documentSessionCloseCoordinator.attachWindow(window);
+  attachMarkdownFormatShortcuts(window.webContents);
   installWindowNavigationSecurity({
     webContents: window.webContents,
     applicationUrl: rendererApplicationUrl,
@@ -516,21 +538,6 @@ function setDockIcon(iconId = "polished") {
   }
 }
 
-function setDockMenu() {
-  if (process.platform !== "darwin" || !app.dock) return;
-
-  const dockMenu = Menu.buildFromTemplate([
-    {
-      label: localeService.t("native.dock.newWindow"),
-      click: () => {
-        void createWindow();
-      },
-    },
-  ]);
-
-  app.dock.setMenu(dockMenu);
-}
-
 app.on("second-instance", (_event, argv, workingDirectory, launchIntent) => {
   void handleSecondInstanceLaunch({
     launchIntent,
@@ -546,12 +553,12 @@ app.on("second-instance", (_event, argv, workingDirectory, launchIntent) => {
 app.whenReady().then(async () => {
   await localeService.initialize();
   stopLocaleNativeRefresh = localeService.onDidChange(() => {
-    setDockMenu();
+    nativeMenuService.refresh();
   });
   if (process.platform === "darwin" && app.dock) {
     setDockIcon();
-    setDockMenu();
   }
+  nativeMenuService.refresh();
 
   registerLocalFileProtocol({
     protocol,
@@ -651,6 +658,7 @@ app.on("will-quit", () => {
   nativeSurfaceOcclusion.dispose();
   nativeSurfacePointerPassthrough.dispose();
   terminalService.closeAll();
+  void terminalAgentActivityHost.dispose();
   terminalAgentLocator.dispose();
   localAgentInventory.dispose();
   workspaceWatchService.closeAll();
@@ -695,6 +703,9 @@ function registerIpcHandlers() {
   registerLocalizationIpcHandlers({
     ipcMain: trustedIpcMain,
     localeService,
+  });
+  registerMarkdownFormatIpcHandlers({
+    ipcMain: trustedIpcMain,
   });
   registerWorkspaceNavigationIpcHandlers({
     ipcMain: trustedIpcMain,
@@ -776,6 +787,10 @@ function registerIpcHandlers() {
     terminalAgentLocator,
     terminalService,
     authorizeWorkspaceRoot,
+  });
+  registerAgentActivityIpcHandlers({
+    ipcMain: trustedIpcMain,
+    activityHost: terminalAgentActivityHost,
   });
   registerAgentIpcHandlers({
     ipcMain: trustedIpcMain,

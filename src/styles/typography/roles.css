@@ -1,0 +1,62 @@
+/*
+ * Typography role composition.
+ *
+ * The runtime may replace only `*-primary` with a trusted catalog family.
+ * Locale fallbacks remain product-owned and are recomposed at every appearance
+ * or explicit content boundary. Components consume the four final role tokens.
+ */
+:root,
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface, .dark) {
+  --po-font-ui-primary: "Geist Sans";
+  --po-font-content-primary: "Geist Sans";
+  --po-font-code-primary: "Geist Mono";
+  --po-font-terminal-primary: "SF Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono";
+  --po-font-ui-fallback: var(--po-font-locale-sans), var(--po-font-emoji), sans-serif;
+  --po-font-content-fallback: var(--po-font-locale-sans), var(--po-font-emoji), sans-serif;
+  --po-font-code-fallback: var(--po-font-locale-mono), var(--po-font-emoji), monospace;
+  --po-font-terminal-fallback: var(--po-font-locale-mono), var(--po-font-emoji), monospace;
+  --po-font-ui: var(--po-font-ui-primary), var(--po-font-ui-fallback);
+  --po-font-content: var(--po-font-content-primary), var(--po-font-content-fallback);
+  --po-font-code: var(--po-font-code-primary), var(--po-font-code-fallback);
+  --po-font-terminal: var(--po-font-terminal-primary), var(--po-font-terminal-fallback);
+  /* Temporary aliases for feature CSS that has not adopted a specific role. */
+  --po-font-sans: var(--po-font-ui);
+  --po-font-mono: var(--po-font-code);
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-font-ui-category="serif"] {
+  --po-font-ui-fallback: var(--po-font-locale-serif), var(--po-font-emoji), serif;
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-font-ui-category="monospace"] {
+  --po-font-ui-fallback: var(--po-font-locale-mono), var(--po-font-emoji), monospace;
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-font-content-category="serif"] {
+  --po-font-content-fallback: var(--po-font-locale-serif), var(--po-font-emoji), serif;
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root)[data-font-content-category="monospace"] {
+  --po-font-content-fallback: var(--po-font-locale-mono), var(--po-font-emoji), monospace;
+}
+
+/* Recompose content/code stacks at explicit document boundaries. This keeps a
+   future per-document `lang` override local to its pane instead of mutating the
+   application root or another editor. */
+:where([data-po-typography-role="content"]) {
+  --po-font-content-fallback: var(--po-font-locale-sans), var(--po-font-emoji), sans-serif;
+  --po-font-content: var(--po-font-content-primary), var(--po-font-content-fallback);
+}
+
+:where([data-font-content-category="serif"]) :where([data-po-typography-role="content"]) {
+  --po-font-content-fallback: var(--po-font-locale-serif), var(--po-font-emoji), serif;
+}
+
+:where([data-font-content-category="monospace"]) :where([data-po-typography-role="content"]) {
+  --po-font-content-fallback: var(--po-font-locale-mono), var(--po-font-emoji), monospace;
+}
+
+:where([data-po-typography-role="code"]) {
+  --po-font-code-fallback: var(--po-font-locale-mono), var(--po-font-emoji), monospace;
+  --po-font-code: var(--po-font-code-primary), var(--po-font-code-fallback);
+}

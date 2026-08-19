@@ -26,6 +26,7 @@ export function DesktopTitlebarContext({
   workspaceSwitcherRef,
   onCheckoutBranch,
   onCloseBranchSwitcher,
+  onCloseWorkspaceSwitcher,
   onGoHome,
   onOpenFolder,
   onOpenWorkspaceSwitcherItem,
@@ -51,6 +52,7 @@ export function DesktopTitlebarContext({
         titlebarLabel={workspaceTitlebarLabel}
         workspace={workspace}
         items={workspaceSwitcherItems}
+        onClose={onCloseWorkspaceSwitcher}
         onOpenFolder={onOpenFolder}
         onOpenItem={onOpenWorkspaceSwitcherItem}
         onGoHome={onGoHome}
@@ -90,6 +92,7 @@ type DesktopTitlebarContextProps = {
   workspaceSwitcherRef: RefObject<HTMLDivElement>;
   onCheckoutBranch: (branchName: string, remote: boolean) => Promise<boolean>;
   onCloseBranchSwitcher: () => void;
+  onCloseWorkspaceSwitcher: () => void;
   onGoHome: () => void;
   onOpenFolder: () => void;
   onOpenWorkspaceSwitcherItem: (item: DesktopWorkspaceSwitcherItem) => void;
@@ -151,6 +154,7 @@ function DesktopBranchSwitcher({
         anchorRef={refObject}
         className="desktop-branch-menu"
         gap={compact ? 8 : 4}
+        onDismiss={onDone}
         open={open && !disabled}
         preferredMaxHeight={440}
       >

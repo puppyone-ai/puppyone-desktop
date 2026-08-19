@@ -31,6 +31,39 @@ appearance root so inline role values are resolved at the correct boundary.
 Document-owned surfaces are outside this contract. DOCX, PDF, embedded web
 content, and viewer packs retain their authored or sandbox-owned fonts.
 
+## Document language boundary
+
+The interface locale and a document's language are different state. A Markdown
+pane resolves its own `lang` once per document session: explicit document
+metadata wins, otherwise a bounded script sample distinguishes Simplified or
+Traditional Chinese, Japanese, and Korean; content without a script signal
+falls back to the interface locale. The result is pane-local and remains stable
+while the user edits, so another pane cannot change its fallback face or text
+metrics.
+
+The locale layer owns optical corrections for long-form reading. Default/Latin
+content uses weight `450`; Chinese content explicitly uses weight `500`.
+Every script uses the font's native spacing (`letter-spacing: 0`) and the same
+`24px` leading at the default `14px` size, producing one stable `30px` Live
+Preview row after its
+`3px` padding on each edge. This is intentional: PingFang does not expose a
+stable intermediate face between Regular and Medium, so the product selects
+Medium explicitly instead of relying on browser matching for `450`. Markdown
+consumes the product-level
+`--po-content-reading-*` tokens and does not name PingFang or another CJK face
+itself.
+
+Light and dark appearances never select different font weights. Light Markdown
+uses the complete semantic foreground because regular CJK strokes lose
+definition when mixed toward muted text. Dark Markdown keeps the same face and
+weight, but softens the foreground through its color token to compensate for
+the heavier optical appearance of light-on-dark text. Theme changes therefore
+cannot change line wrapping, cursor geometry, or CodeMirror measurements.
+
+Language inference is a fallback, not durable metadata. Future project format
+metadata should pass an explicit BCP 47 language to the editor and bypass the
+heuristic.
+
 ## Preference and catalog model
 
 `puppyone.desktop.typography` stores this versioned value:
@@ -106,6 +139,8 @@ protocol. That transport choice is deliberately below the catalog boundary.
 
 - No raw family, URL, `@font-face`, or file path is accepted from localStorage.
 - Content font selection cannot alter UI or terminal metrics.
+- Interface-language changes cannot relabel an already resolved CJK document
+  or mutate a sibling pane's reading metrics.
 - A terminal font is not selectable until its monospace metrics and xterm
   re-fitting behavior are verified.
 - A font-loading failure leaves the product usable with the role fallback.

@@ -19,12 +19,17 @@ export function PlainTextEditor({
   readOnly = true,
   onChange,
 }: PlainTextEditorProps) {
-  const { t } = useLocalization();
+  const { locale, t } = useLocalization();
   const lowerName = nodeName.toLowerCase();
   const isTechnicalText = technicalTextExtensions.some((extension) => lowerName.endsWith(extension));
 
   return (
-    <div className="plain-text-editor" data-po-scrollbar="content">
+    <div
+      className="plain-text-editor"
+      data-po-scrollbar="content"
+      data-po-typography-role="content"
+      lang={locale}
+    >
       <ConflictMarkerBanner content={content} onResolve={readOnly ? undefined : onChange} />
       <div className="plain-text-editor__rail">
         {readOnly ? (

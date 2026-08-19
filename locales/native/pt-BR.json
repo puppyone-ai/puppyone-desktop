@@ -1,6 +1,7 @@
 {
   "native.messageUnavailable": "Este texto não está disponível.",
   "native.dock.newWindow": "Nova janela",
+  "native.menu.file": "Arquivo",
   "native.workspace.open.title": "Abrir workspace local do PuppyOne",
   "native.update.blocker.terminal.label": "Sessões de terminal do PuppyOne abertas ({count})",
   "native.update.blocker.terminal.detail": "A atualização fechará {count} sessão(ões) de terminal criada(s) dentro do PuppyOne. O Ghostty e outros terminais externos não serão afetados.",

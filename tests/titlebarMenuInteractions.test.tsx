@@ -28,6 +28,7 @@ describe("titlebar Portal menu interactions", () => {
     root = createRoot(container);
     const anchorRef = createRef<HTMLDivElement>();
     const onGoHome = vi.fn();
+    const onClose = vi.fn();
     const onOpenItem = vi.fn();
     const workspace = createWorkspace("one", "Workspace one");
     const item = {
@@ -47,6 +48,7 @@ describe("titlebar Portal menu interactions", () => {
           titlebarLabel={workspace.name}
           workspace={workspace}
           items={[item]}
+          onClose={onClose}
           onOpenFolder={vi.fn()}
           onOpenItem={onOpenItem}
           onGoHome={onGoHome}
@@ -59,11 +61,51 @@ describe("titlebar Portal menu interactions", () => {
     const menu = requireMenu();
     expect(container.contains(menu)).toBe(false);
     expect(menu.dataset.windowNoDrag).toBe("true");
+    expect(menu.style.width).toBe("300px");
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-home")?.click());
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-option")?.click());
 
     expect(onGoHome).toHaveBeenCalledOnce();
     expect(onOpenItem).toHaveBeenCalledWith(item);
+  });
+
+  it("dismisses a titlebar menu when the user points outside it", async () => {
+    const container = document.createElement("div");
+    const titlebarDragRegion = document.createElement("div");
+    titlebarDragRegion.dataset.windowDragRegion = "true";
+    document.body.append(container, titlebarDragRegion);
+    root = createRoot(container);
+    const onClose = vi.fn();
+
+    await act(async () => {
+      root?.render(withTestLocalization(
+        <DesktopWorkspaceSwitcher
+          compact={false}
+          open
+          refObject={createRef<HTMLDivElement>()}
+          titlebarLabel="Workspace one"
+          workspace={createWorkspace("one", "Workspace one")}
+          items={[]}
+          onClose={onClose}
+          onOpenFolder={vi.fn()}
+          onOpenItem={vi.fn()}
+          onGoHome={vi.fn()}
+          onToggle={vi.fn()}
+        />,
+      ));
+      await Promise.resolve();
+    });
+
+    act(() => {
+      requireMenu().dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    });
+    expect(onClose).not.toHaveBeenCalled();
+
+    act(() => {
+      titlebarDragRegion.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    });
+
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it("executes branch checkout from the Portal menu and closes after success", async () => {
@@ -91,6 +133,7 @@ describe("titlebar Portal menu interactions", () => {
           workspaceSwitcherRef={createRef<HTMLDivElement>()}
           onCheckoutBranch={onCheckoutBranch}
           onCloseBranchSwitcher={onCloseBranchSwitcher}
+          onCloseWorkspaceSwitcher={vi.fn()}
           onGoHome={vi.fn()}
           onOpenFolder={vi.fn()}
           onOpenWorkspaceSwitcherItem={vi.fn()}

@@ -4,11 +4,12 @@ import {
   type AiEditFile,
   type DataNode,
   type DataPort,
-  type DataWorkspaceState,
+  type ContextMapWorkspaceEnvironment,
   type EditorGroupState,
   type EditorInteractionPreferences,
   type FileContent,
   type FileIconThemeId,
+  type MarkdownWorkspaceEnvironment,
   type ViewerExtensionHostAdapter,
   type Workspace,
   type WorkspaceContentChange,
@@ -22,8 +23,7 @@ export type EditorPaneDocumentRuntimeProps = Readonly<{
   editor: EditorGroupState["editors"][number] | null;
   editorInteractionPreferences: EditorInteractionPreferences;
   fileIconTheme: FileIconThemeId;
-  markdownAssetUrlResolver: DataWorkspaceState["markdownAssetUrlResolver"];
-  markdownLinkGraph: DataWorkspaceState["markdownLinkGraph"];
+  markdownEnvironment: MarkdownWorkspaceEnvironment;
   refreshKey?: WorkspaceContentChange;
   treeNode: DataNode | null;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
@@ -40,8 +40,7 @@ export const EditorPaneDocumentRuntime = memo(function EditorPaneDocumentRuntime
   editor,
   editorInteractionPreferences,
   fileIconTheme,
-  markdownAssetUrlResolver,
-  markdownLinkGraph,
+  markdownEnvironment,
   refreshKey,
   treeNode,
   viewerExtensionAdapter = null,
@@ -49,6 +48,40 @@ export const EditorPaneDocumentRuntime = memo(function EditorPaneDocumentRuntime
   workspaceRoot,
   markdownDialect,
 }: EditorPaneDocumentRuntimeProps) {
+  return (
+    <RegularEditorPaneDocumentRuntime
+      aiEditFile={aiEditFile}
+      dataPort={dataPort}
+      editor={editor}
+      editorInteractionPreferences={editorInteractionPreferences}
+      fileIconTheme={fileIconTheme}
+      markdownEnvironment={markdownEnvironment}
+      refreshKey={refreshKey}
+      treeNode={treeNode}
+      viewerExtensionAdapter={viewerExtensionAdapter}
+      workspaceId={workspaceId}
+      workspaceRoot={workspaceRoot}
+      markdownDialect={markdownDialect}
+    />
+  );
+}, areEditorPaneDocumentRuntimePropsEqual);
+
+type RegularEditorPaneDocumentRuntimeProps = EditorPaneDocumentRuntimeProps;
+
+function RegularEditorPaneDocumentRuntime({
+  aiEditFile,
+  dataPort,
+  editor,
+  editorInteractionPreferences,
+  fileIconTheme,
+  markdownEnvironment,
+  refreshKey,
+  treeNode,
+  viewerExtensionAdapter = null,
+  workspaceId,
+  workspaceRoot,
+  markdownDialect,
+}: RegularEditorPaneDocumentRuntimeProps) {
   const fallbackNode = useMemo(
     () => editor ? createFallbackNode(editor.resource, editor.label) : null,
     [editor],
@@ -58,6 +91,15 @@ export const EditorPaneDocumentRuntime = memo(function EditorPaneDocumentRuntime
   const node = useMemo(() => (
     source.content ? mergeNodeWithContent(sourceNode, source.content) : sourceNode
   ), [source.content, sourceNode]);
+  const contextMapEnvironment = useMemo<ContextMapWorkspaceEnvironment>(() => ({
+    revision: refreshKey?.sequence ?? 0,
+    listChildren: dataPort.listChildren,
+    readFile: dataPort.readFile,
+  }), [dataPort.listChildren, dataPort.readFile, refreshKey?.sequence]);
+  const hideSourceView = !isMarkdownDocumentDescriptor(
+    node,
+    editor?.resource ?? null,
+  );
 
   return (
     <FilePreview
@@ -70,7 +112,7 @@ export const EditorPaneDocumentRuntime = memo(function EditorPaneDocumentRuntime
       error={source.error}
       aiEditFile={aiEditFile}
       showHeader={false}
-      hideSourceView
+      hideSourceView={hideSourceView}
       fileIconTheme={fileIconTheme}
       editorInteractionPreferences={editorInteractionPreferences}
       editorSaveMode="auto"
@@ -78,8 +120,8 @@ export const EditorPaneDocumentRuntime = memo(function EditorPaneDocumentRuntime
       workspaceId={workspaceId}
       workspaceRoot={workspaceRoot}
       markdownDialect={markdownDialect ?? null}
-      markdownLinkGraph={markdownLinkGraph}
-      markdownAssetUrlResolver={markdownAssetUrlResolver}
+      markdownEnvironment={markdownEnvironment}
+      contextMapEnvironment={contextMapEnvironment}
       appPreview={dataPort.appPreview ?? null}
       openExternalFile={dataPort.openExternalFile}
       convertOfficeDocumentToDocx={dataPort.convertOfficeDocumentToDocx}
@@ -91,7 +133,7 @@ export const EditorPaneDocumentRuntime = memo(function EditorPaneDocumentRuntime
       }
     />
   );
-}, areEditorPaneDocumentRuntimePropsEqual);
+}
 
 export function areEditorPaneDocumentRuntimePropsEqual(
   previous: EditorPaneDocumentRuntimeProps,
@@ -105,14 +147,48 @@ export function areEditorPaneDocumentRuntimePropsEqual(
     && previous.editorInteractionPreferences.markdownBlockDragEnabled
       === next.editorInteractionPreferences.markdownBlockDragEnabled
     && previous.fileIconTheme === next.fileIconTheme
-    && previous.markdownAssetUrlResolver === next.markdownAssetUrlResolver
-    && previous.markdownLinkGraph === next.markdownLinkGraph
+    && samePaneEnvironment(
+      previous.markdownEnvironment,
+      next.markdownEnvironment,
+      next.treeNode,
+      next.editor?.resource ?? null,
+    )
     && sameDocumentRefresh(previous.refreshKey, next.refreshKey, next.editor?.resource ?? null)
-    && previous.treeNode === next.treeNode
+    && sameDocumentDescriptor(previous.treeNode, next.treeNode)
     && previous.viewerExtensionAdapter === next.viewerExtensionAdapter
     && previous.workspaceId === next.workspaceId
     && previous.workspaceRoot === next.workspaceRoot
     && previous.markdownDialect === next.markdownDialect;
+}
+
+function samePaneEnvironment(
+  previous: MarkdownWorkspaceEnvironment,
+  next: MarkdownWorkspaceEnvironment,
+  node: DataNode | null,
+  resource: string | null,
+): boolean {
+  if (previous === next) return true;
+  // Link and asset revisions are Markdown-only semantic inputs. Other
+  // Viewers may use the stable navigation command port (for example Office
+  // hyperlinks), but must not receive Markdown index broadcasts.
+  if (!isMarkdownDocumentDescriptor(node, resource)) {
+    return previous.linkCommands === next.linkCommands;
+  }
+  return (
+    previous.linkGraph?.revision === next.linkGraph?.revision
+    && previous.linkCommands === next.linkCommands
+    && previous.assetResolverRevision === next.assetResolverRevision
+  );
+}
+
+function isMarkdownDocumentDescriptor(node: DataNode | null, resource: string | null): boolean {
+  return node?.type === "markdown"
+    || hasMimeType(node, "text/markdown")
+    || /\.(?:md|markdown|mdx)$/i.test(node?.path ?? resource ?? "");
+}
+
+function hasMimeType(node: DataNode | null, expected: string): boolean {
+  return node?.mimeType?.split(";", 1)[0]?.trim().toLowerCase() === expected;
 }
 
 function sameDocumentRefresh(
@@ -121,7 +197,16 @@ function sameDocumentRefresh(
   resource: string | null,
 ): boolean {
   if (previous === next) return true;
+  if (isContextMapDocumentDescriptor(null, resource)) {
+    return previous?.sequence === next?.sequence;
+  }
   return !workspaceContentChangeMatchesPath(next, resource);
+}
+
+function isContextMapDocumentDescriptor(node: DataNode | null, resource: string | null): boolean {
+  return node?.type === "context-map"
+    || node?.mimeType === "application/vnd.puppyone.context-map+json"
+    || /\.contextmap$/i.test(node?.path ?? resource ?? "");
 }
 
 function sameEditor(
@@ -134,6 +219,28 @@ function sameEditor(
     && previous.id === next.id
     && previous.resource === next.resource
     && previous.label === next.label,
+  );
+}
+
+/** Explorer tree containers may be rebuilt for an unrelated folder update.
+ * A pane consumes only its flat document descriptor, so child-array identity
+ * is intentionally excluded from the expensive runtime boundary. */
+function sameDocumentDescriptor(previous: DataNode | null, next: DataNode | null): boolean {
+  return previous === next || Boolean(
+    previous
+    && next
+    && previous.id === next.id
+    && previous.name === next.name
+    && previous.path === next.path
+    && previous.type === next.type
+    && previous.mimeType === next.mimeType
+    && previous.size === next.size
+    && previous.modified === next.modified
+    && previous.status === next.status
+    && previous.preview === next.preview
+    && previous.content === next.content
+    && previous.hasChildren === next.hasChildren
+    && previous.source === next.source,
   );
 }
 

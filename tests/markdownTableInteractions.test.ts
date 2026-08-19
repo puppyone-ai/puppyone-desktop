@@ -119,6 +119,32 @@ function mockHorizontalScroller(element: HTMLElement, clientWidth: number, scrol
 }
 
 describe("Markdown table EditorView interactions", () => {
+  it("defines stable semantic column tracks before a rich cell enters edit mode", () => {
+    const view = createTableView([
+      "| **Name** | Value |",
+      "| --- | --- |",
+      "| Alpha | Beta |",
+    ].join("\n"));
+    const table = view.dom.querySelector<HTMLTableElement>(".cm-md-table-widget")!;
+    const columns = Array.from(table.querySelectorAll<HTMLTableColElement>("colgroup col"));
+    const widths = columns.map((column) => column.style.width);
+    const firstCell = table.querySelector<HTMLElement>(
+      '.cm-md-table-cell-content[data-md-table-row="0"][data-md-table-column="0"]',
+    )!;
+
+    expect(columns).toHaveLength(2);
+    expect(widths.every((width) => /^\d+px$/.test(width))).toBe(true);
+
+    firstCell.focus();
+    expect(firstCell.textContent).toBe("**Name**");
+    expect(Array.from(table.querySelectorAll<HTMLTableColElement>("colgroup col"))
+      .map((column) => column.style.width)).toEqual(widths);
+
+    firstCell.blur();
+    expect(Array.from(table.querySelectorAll<HTMLTableColElement>("colgroup col"))
+      .map((column) => column.style.width)).toEqual(widths);
+  });
+
   it("renders adjacent prose as editor text instead of synthetic table rows", () => {
     const prose = "这里面有几个要素值得注意。";
     const view = createTableView(`${TABLE_SOURCE}\n${prose}`);
@@ -192,6 +218,69 @@ describe("Markdown table EditorView interactions", () => {
     await nextAnimationFrame();
     expect((document.activeElement as HTMLElement | null)?.dataset.mdTableRow).toBe("0");
     expect((document.activeElement as HTMLElement | null)?.dataset.mdTableColumn).toBe("3");
+  });
+
+  it("targets the current table range after an earlier edit outside its projection patch", () => {
+    const prefix = [
+      "Top",
+      "",
+      "Paragraph one",
+      "Paragraph two",
+      "Paragraph three",
+      "",
+    ].join("\n");
+    const view = createTableView(`${prefix}${TABLE_SOURCE}\nOutro`);
+    const tableBeforeEdit = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap");
+    if (!tableBeforeEdit) throw new Error("Table did not mount before the edit");
+
+    view.dispatch({
+      changes: {
+        from: view.state.doc.line(2).to,
+        insert: "\nInserted before the table",
+      },
+    });
+
+    const tableAfterEdit = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap");
+    expect(tableAfterEdit).toBe(tableBeforeEdit);
+    tableAfterEdit?.querySelector<HTMLButtonElement>(".cm-md-table-add-row")?.click();
+
+    expect(source(view)).toContain("Paragraph two");
+    expect(source(view)).toMatch(/\| four \| five \| six\s+\|\n\|\s+\|\s+\|\s+\|\nOutro/);
+  });
+
+  it("commits a cell to the current table range after an earlier mapped edit", () => {
+    const prefix = [
+      "Top",
+      "",
+      "Paragraph one",
+      "Paragraph two",
+      "Paragraph three",
+      "",
+    ].join("\n");
+    const view = createTableView(`${prefix}${TABLE_SOURCE}\nOutro`);
+    const tableBeforeEdit = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap");
+    if (!tableBeforeEdit) throw new Error("Table did not mount before the edit");
+
+    view.dispatch({
+      changes: {
+        from: view.state.doc.line(2).to,
+        insert: "\nInserted before the table",
+      },
+    });
+
+    const tableAfterEdit = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap");
+    expect(tableAfterEdit).toBe(tableBeforeEdit);
+    const firstBodyCell = tableAfterEdit?.querySelector<HTMLElement>(
+      '.cm-md-table-cell-content[data-md-table-row="1"][data-md-table-column="0"]',
+    );
+    if (!firstBodyCell) throw new Error("Editable table cell did not mount");
+    firstBodyCell.focus();
+    firstBodyCell.textContent = "updated";
+    firstBodyCell.dispatchEvent(new InputEvent("input", { bubbles: true }));
+    firstBodyCell.blur();
+
+    expect(source(view)).toContain("Paragraph two");
+    expect(source(view)).toContain("| updated | two | three |");
   });
 
   it("keeps the inline viewport session across a structural Widget replacement", async () => {

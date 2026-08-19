@@ -13,13 +13,6 @@ export type MarkdownLinkGraphDocument = {
   content?: string | null;
 };
 
-export type CreateMarkdownLinkGraphOptions = {
-  isIndexing?: boolean;
-  onOpenPath?: (path: string) => void;
-  onOpenCandidatePaths?: (paths: readonly string[]) => void;
-  onOpenExternalUrl?: (href: string) => void | Promise<void>;
-};
-
 export type MarkdownLinkGraphIndexSnapshot = {
   indexedDocumentCount: number;
   truncatedDocumentCount?: number;
@@ -53,8 +46,8 @@ const MAX_BACKLINK_LINE_TEXT_LENGTH = 320;
 
 export function createMarkdownLinkGraph(
   documents: readonly MarkdownLinkGraphDocument[],
-  options: CreateMarkdownLinkGraphOptions = {},
   indexSnapshot?: MarkdownLinkGraphIndexSnapshot,
+  revision = 0,
 ): MarkdownLinkGraph {
   const indexedDocuments = documents.map(toIndexedDocument).sort((left, right) => left.path.localeCompare(right.path));
   const pathIndex = createPathIndex(indexedDocuments);
@@ -69,31 +62,15 @@ export function createMarkdownLinkGraph(
   };
 
   return {
+    revision,
     documentCount: indexedDocuments.length,
     indexedDocumentCount: indexSnapshot?.indexedDocumentCount
       ?? indexedDocuments.filter((document) => document.content !== null).length,
-    isIndexing: Boolean(options.isIndexing),
     resolveWikiLink,
     resolveMarkdownLink(sourcePath, href) {
       const target = normalizeMarkdownHrefTarget(href);
       if (!target) return null;
       return resolveWikiLinkTarget(indexedDocuments, pathIndex, titleIndex, sourcePath, target);
-    },
-    openWikiLink(target) {
-      if (target.exists && target.path) {
-        options.onOpenPath?.(target.path);
-        return;
-      }
-
-      if (target.candidatePaths && target.candidatePaths.length > 0) {
-        options.onOpenCandidatePaths?.(target.candidatePaths);
-      }
-    },
-    openPath(path) {
-      options.onOpenPath?.(path);
-    },
-    openExternalUrl(href) {
-      return options.onOpenExternalUrl?.(href);
     },
     getBacklinks(path) {
       return backlinksByTargetPath.get(normalizeDataPath(path)) ?? [];

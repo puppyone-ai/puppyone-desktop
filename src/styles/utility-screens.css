@@ -115,7 +115,7 @@
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-danger) 9%, var(--po-panel-raised));
   color: var(--po-danger);
-  box-shadow: 0 12px 30px rgba(73, 55, 35, 0.16);
+  box-shadow: var(--po-elevation-low);
   font-size: 13px;
   font-weight: 750;
 }

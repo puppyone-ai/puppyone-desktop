@@ -15,6 +15,7 @@ import { renderDefaultFolderPreviewGlyph } from "./glyphs";
 const DEFAULT_PREVIEW_GLYPH_RENDERERS = {
   folder: renderDefaultFolderPreviewGlyph,
   app: renderDefaultAppPreviewGlyph,
+  "context-map": renderDefaultWorkflowPreviewGlyph,
   workflow: renderDefaultWorkflowPreviewGlyph,
   markdown: renderDefaultDocumentPreviewGlyph,
   json: renderDefaultDocumentPreviewGlyph,

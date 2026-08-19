@@ -3,6 +3,7 @@ export {
   BUILTIN_FONT_IDS,
   DEFAULT_TYPOGRAPHY_PREFERENCES,
   TYPOGRAPHY_PREFERENCE_VERSION,
+  createCatalogFontFamily,
   getFontCatalogEntries,
   isValidFontCatalogEntry,
   parseTypographyPreferences,
@@ -11,6 +12,7 @@ export {
 } from "./fontCatalog";
 export type {
   FontCatalogEntry,
+  FontCategory,
   FontSourceKind,
   ResolvedTypography,
   TypographyPreferences,

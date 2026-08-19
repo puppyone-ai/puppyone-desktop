@@ -3,10 +3,15 @@ import { useLayoutEffect, useRef } from "react";
 export type EditorPaneHostSlotProps = Readonly<{
   host: HTMLDivElement;
   paneId: string;
+  touchesBlockEnd: boolean;
 }>;
 
 /** Reparents an existing pane host during the layout phase, before paint. */
-export function EditorPaneHostSlot({ host, paneId }: EditorPaneHostSlotProps) {
+export function EditorPaneHostSlot({
+  host,
+  paneId,
+  touchesBlockEnd,
+}: EditorPaneHostSlotProps) {
   const slotRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -23,6 +28,7 @@ export function EditorPaneHostSlot({ host, paneId }: EditorPaneHostSlotProps) {
       ref={slotRef}
       className="desktop-editor-pane-slot"
       data-editor-pane-slot-id={paneId}
+      data-touches-block-end={touchesBlockEnd ? "true" : undefined}
     />
   );
 }

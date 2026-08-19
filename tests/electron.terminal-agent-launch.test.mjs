@@ -199,6 +199,48 @@ describe("Terminal Agent launch boundary", () => {
     expect(resolved).toBe(true);
   });
 
+  it("answers startup default-color probes before forwarding Agent output", async () => {
+    const workspaceRoot = await makeTemporaryDirectory();
+    const terminal = createFakeTerminal();
+    const sender = createSender();
+    const service = createService({
+      agentRevealTimeoutMs: 5_000,
+      environment: { PATH: "/usr/bin", SHELL: "/bin/zsh" },
+      platform: "darwin",
+      ptyService: { spawn: vi.fn(() => terminal) },
+      resolveTerminalAgentLaunch: vi.fn(async () => ({
+        args: [],
+        displayName: "Codex",
+        executablePath: "/verified/codex",
+      })),
+    });
+
+    const createPromise = service.create(sender, {
+      id: "terminal_codex_colors",
+      cwd: workspaceRoot,
+      cols: 80,
+      rows: 24,
+      launcherId: "codex",
+      defaultColors: {
+        foreground: [109, 102, 93],
+        background: [251, 250, 247],
+      },
+    }, workspaceRoot);
+
+    await vi.waitFor(() => expect(terminal.write).toHaveBeenCalledOnce());
+    terminal.emitData(
+      "before\u001b]10;?\u001b\\middle\u001b]11;?\u001b\\after\u001b[?1049h",
+    );
+    await expect(createPromise).resolves.toMatchObject({ shell: "Codex" });
+
+    expect(terminal.write).toHaveBeenNthCalledWith(2, "\u001b]10;rgb:6d6d/6666/5d5d\u001b\\");
+    expect(terminal.write).toHaveBeenNthCalledWith(3, "\u001b]11;rgb:fbfb/fafa/f7f7\u001b\\");
+    expect(sender.send).toHaveBeenCalledWith("terminal:data", {
+      id: "terminal_codex_colors",
+      data: "beforemiddleafter\u001b[?1049h",
+    });
+  });
+
   it("closes the host shell if the Agent bootstrap cannot be written", async () => {
     const workspaceRoot = await makeTemporaryDirectory();
     const terminal = createFakeTerminal();

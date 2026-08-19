@@ -325,7 +325,7 @@
   border: 1px solid var(--po-border);
   border-radius: 7px;
   background: var(--po-overlay);
-  box-shadow: 0 10px 28px color-mix(in srgb, #000 20%, transparent);
+  box-shadow: var(--po-menu-shadow-compact);
 }
 
 .desktop-plugin-menu button {

@@ -38,7 +38,14 @@ import {
   getMarkdownFeatureComposition,
   markdownFeatureCompositionExtension,
 } from "./composition/markdownFeatureComposition";
-import type { MarkdownAssetUrlResolver, MarkdownDialectId, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../registry/viewerTypes";
+import {
+  EMPTY_MARKDOWN_LINK_COMMANDS,
+  type MarkdownAssetUrlResolver,
+  type MarkdownDialectId,
+  type MarkdownHtmlTrustMode,
+  type MarkdownLinkCommands,
+  type MarkdownLinkGraph,
+} from "../registry/viewerTypes";
 import {
   DEFAULT_MARKDOWN_DIALECT,
   markdownDialectFacet,
@@ -77,7 +84,7 @@ export function markdownCodeMirrorUrgentExtensions(readOnly: boolean): Extension
     // rebuilds inline replacement widgets when a pointer selection crosses
     // lines. Markdown intentionally has no active-line background, and the
     // rebuild would restart image asset/decode lifecycles for no visible gain.
-    keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+    keymap.of([...markdownEditingKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
     puppyMarkdownEditorTheme,
   ];
 }
@@ -103,6 +110,8 @@ export function markdownLivePreviewExtension(
   workspaceId = "",
   workspaceRoot: string | null = null,
   dialect: MarkdownDialectId = DEFAULT_MARKDOWN_DIALECT,
+  markdownLinkCommands: MarkdownLinkCommands = EMPTY_MARKDOWN_LINK_COMMANDS,
+  markdownAssetResolverRevision = 0,
 ): Extension {
   return [
     markdownLivePreviewContextExtension(
@@ -112,6 +121,8 @@ export function markdownLivePreviewExtension(
       markdownAssetUrlResolver,
       workspaceId,
       workspaceRoot,
+      markdownLinkCommands,
+      markdownAssetResolverRevision,
     ),
     markdownLivePreviewCoreExtension(dialect),
   ];
@@ -122,9 +133,8 @@ export function markdownLivePreviewCoreExtension(
 ): Extension {
   const composition = getMarkdownFeatureComposition(dialect);
   return [
-    keymap.of([...markdownEditingKeymap]),
     markdownHiddenMarkerSelectionNormalizer,
-    markdownLivePreviewFocusExtension,
+    markdownLivePreviewFocusExtension(),
     markdownInputCompositionExtension,
     markdownComposingBlockLineField,
     markdownRevealedSourceField,

@@ -23,12 +23,11 @@
 .data-content[data-resizable-explorer="true"] {
   grid-template-columns:
     var(--data-explorer-width, clamp(282px, 26vw, 360px))
-    var(--po-pane-resizer-hit-size, 8px)
     minmax(0, 1fr);
 }
 
 .data-content[data-resizable-explorer="true"][data-explorer-collapsed="true"] {
-  grid-template-columns: 0 0 minmax(0, 1fr);
+  grid-template-columns: 0 minmax(0, 1fr);
 }
 
 .explorer-column {
@@ -130,22 +129,19 @@
 
 .data-explorer-resizer {
   /*
-   * A real grid gutter owns the full hit target. It is painted as the trailing
-   * edge of the Sidebar, with the divider on its Editor-facing edge, so the
-   * Editor begins directly at the visible boundary. Native WebContentsViews
-   * still begin in the following main track and cannot steal this pointer lane.
+   * The Sidebar and Editor share one layout boundary. The wide sash is an
+   * overlay extending into the Editor; it never becomes a third grid track.
+   * Native surfaces route initial presses in this registered rectangle back
+   * to the renderer before normal drag passthrough takes over.
    */
-  position: relative;
-  inset: auto;
-  grid-column: 2;
-  grid-row: 1;
-  width: 100%;
-  background: var(--po-sidebar);
+  inset-inline-start: var(--data-explorer-width, clamp(282px, 26vw, 360px));
+  inset-inline-end: auto;
+  background: transparent;
 }
 
 .data-explorer-resizer::after {
-  inset-inline-start: auto;
-  inset-inline-end: 0;
+  inset-inline-start: 0;
+  inset-inline-end: auto;
   background: var(--po-shell-divider, var(--po-divider));
   transition: background 120ms ease, box-shadow 120ms ease;
 }
@@ -766,10 +762,6 @@ body.data-sidebar-resizing .data-content:not([data-explorer-collapsed="true"]) {
   flex-direction: column;
   overflow: hidden;
   background: var(--po-canvas);
-}
-
-.data-content[data-resizable-explorer="true"] > .browser-column {
-  grid-column: 3;
 }
 
 .desktop-editor-panel {

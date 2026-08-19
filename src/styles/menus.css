@@ -11,6 +11,12 @@
   backdrop-filter: blur(20px);
 }
 
+.desktop-menu-surface[data-menu-elevation="compact"] {
+  --interface-menu-box-shadow: var(--po-menu-shadow-compact);
+
+  box-shadow: var(--po-menu-shadow-compact);
+}
+
 .desktop-create-entry-menu.desktop-node-action-menu {
   border-color: var(--po-menu-border);
   border-radius: var(--po-menu-radius);

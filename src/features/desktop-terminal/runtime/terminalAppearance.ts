@@ -1,5 +1,12 @@
 import { Terminal, type ITheme } from "@xterm/xterm";
 
+export type TerminalRgbColor = [number, number, number];
+
+export type TerminalDefaultColors = {
+  foreground: TerminalRgbColor;
+  background: TerminalRgbColor;
+};
+
 export function readTerminalTheme(element: HTMLElement): ITheme {
   return {
     background: cssColor(
@@ -42,10 +49,19 @@ export function readTerminalTheme(element: HTMLElement): ITheme {
 }
 
 export function applyTerminalAppearance(terminal: Terminal, element: HTMLElement) {
-  terminal.options.theme = readTerminalTheme(element);
+  const theme = readTerminalTheme(element);
+  terminal.options.theme = theme;
   terminal.options.fontFamily = readTerminalFontFamily(element);
   terminal.options.fontSize = readTerminalFontSize(element);
   terminal.refresh(0, Math.max(0, terminal.rows - 1));
+  return terminalDefaultColorsFromTheme(theme);
+}
+
+export function terminalDefaultColorsFromTheme(theme: ITheme): TerminalDefaultColors {
+  return {
+    foreground: parseResolvedRgb(theme.foreground, [47, 42, 35]),
+    background: parseResolvedRgb(theme.background, [251, 250, 247]),
+  };
 }
 
 export function readTerminalFontFamily(element: HTMLElement) {
@@ -54,7 +70,7 @@ export function readTerminalFontFamily(element: HTMLElement) {
 }
 
 export function readTerminalFontSize(element: HTMLElement) {
-  const value = getComputedStyle(element).getPropertyValue("--po-code-font-size").trim();
+  const value = getComputedStyle(element).getPropertyValue("--po-terminal-font-size").trim();
   const fontSize = Number.parseFloat(value);
   return Number.isInteger(fontSize) ? fontSize : 13;
 }
@@ -74,4 +90,15 @@ function resolveCssColor(element: HTMLElement, color: string) {
   const resolved = getComputedStyle(probe).color;
   probe.remove();
   return resolved || color;
+}
+
+function parseResolvedRgb(value: string | undefined, fallback: TerminalRgbColor): TerminalRgbColor {
+  if (typeof value !== "string") return fallback;
+  const match = value.match(
+    /^rgba?\(\s*([\d.]+)\s*[, ]\s*([\d.]+)\s*[, ]\s*([\d.]+)(?:\s*[,/]\s*[\d.]+)?\s*\)$/iu,
+  );
+  if (!match) return fallback;
+  const channels = match.slice(1, 4).map((channel) => Number(channel));
+  if (channels.some((channel) => !Number.isFinite(channel))) return fallback;
+  return channels.map((channel) => Math.min(Math.max(Math.round(channel), 0), 255)) as TerminalRgbColor;
 }

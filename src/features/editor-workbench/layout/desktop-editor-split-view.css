@@ -63,27 +63,55 @@
   flex: 1 1 0;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid transparent;
   background: var(--po-canvas);
-  transition: border-color 90ms ease;
 }
 
 /* Pane chrome has one reveal source: the leading-third hit zone maintained by
  * EditorPaneShell. Hover is neutral; only an active press/drag uses the accent
  * frame. An open menu and active editor state never create persistent accent
- * decoration. The transparent border belongs to the pane's own border box,
- * so no descendant or clipping ancestor can cover one of its four edges. */
+ * decoration. The frame is a dedicated, non-interactive layer painted above
+ * every document runtime. Its four one-pixel gradients are drawn inside the
+ * pane bounds, so a pane touching the workbench clipping edge cannot lose its
+ * bottom or trailing stroke. */
 
-.desktop-editor-split-view:not([data-pane-count="1"])
-  .desktop-editor-pane[data-handle-hot]:not([data-move-source]) {
-  border-color: var(--po-divider);
+.desktop-editor-pane-interaction-frame {
+  position: absolute;
+  /* Presentation chrome stays above overlay sashes while remaining entirely
+   * non-interactive, so the pane's leading stroke is never visually clipped. */
+  z-index: calc(var(--po-pane-resizer-z-index, 35) + 1);
+  color: transparent;
+  background:
+    linear-gradient(currentColor, currentColor) top / 100% 1px no-repeat,
+    linear-gradient(currentColor, currentColor) right / 1px 100% no-repeat,
+    linear-gradient(currentColor, currentColor) bottom / 100% 1px no-repeat,
+    linear-gradient(currentColor, currentColor) left / 1px 100% no-repeat;
+  inset: 0;
+  pointer-events: none;
+  transition: color 90ms ease;
+}
+
+/* Chromium clips the BrowserWindow's final paint row. Layout edge metadata is
+ * carried by the split tree, so only a leaf that actually touches the
+ * workbench block end moves its transient bottom stroke into the final safe
+ * paint row. Internal pane frames remain flush with their splitter. */
+.desktop-editor-pane-slot[data-touches-block-end="true"]
+  .desktop-editor-pane-interaction-frame {
+  inset-block-end: 1px;
 }
 
 .desktop-editor-split-view:not([data-pane-count="1"])
-  .desktop-editor-pane[data-move-source],
+  .desktop-editor-pane[data-handle-hot]:not([data-move-source])
+  > .desktop-editor-pane-interaction-frame {
+  color: var(--po-divider);
+}
+
 .desktop-editor-split-view:not([data-pane-count="1"])
-  .desktop-editor-pane:has(> .desktop-editor-pane-handle-shell > .desktop-editor-pane-handle:active) {
-  border-color: color-mix(
+  .desktop-editor-pane[data-move-source]
+  > .desktop-editor-pane-interaction-frame,
+.desktop-editor-split-view:not([data-pane-count="1"])
+  .desktop-editor-pane:has(> .desktop-editor-pane-handle-shell > .desktop-editor-pane-handle:active)
+  > .desktop-editor-pane-interaction-frame {
+  color: color-mix(
     in srgb,
     var(--po-pane-resizer-active-color) 76%,
     transparent
@@ -167,7 +195,7 @@
   border: 0;
   border-radius: 2px;
   background: color-mix(in srgb, var(--po-canvas) 88%, transparent);
-  box-shadow: 0 10px 24px color-mix(in srgb, black 16%, transparent);
+  box-shadow: var(--po-elevation-popover);
   opacity: 0.88;
   pointer-events: none;
   will-change: transform;
@@ -232,23 +260,19 @@
   display: flex;
   align-items: center;
   gap: 3px;
+}
+
+.desktop-editor-pane-menu-segmented-control + .desktop-editor-pane-menu-end-actions {
   margin-inline-start: auto;
 }
 
 .desktop-editor-pane-menu-action-divider {
-  display: grid;
-  width: var(--desktop-editor-pane-menu-action-size);
-  height: var(--desktop-editor-pane-menu-action-size);
-  flex: 0 0 var(--desktop-editor-pane-menu-action-size);
-  place-items: center;
-  pointer-events: none;
-}
-
-.desktop-editor-pane-menu-action-divider::before {
   width: 1px;
-  height: 12px;
+  height: 18px;
+  flex: 0 0 1px;
+  margin-inline: 3px;
   background: var(--po-divider);
-  content: "";
+  pointer-events: none;
 }
 
 .desktop-editor-pane-menu-close-action.desktop-menu-icon-button {
@@ -265,6 +289,46 @@
   margin-top: 4px;
   padding-top: 4px;
   border-top: 1px solid var(--po-divider);
+}
+
+.desktop-editor-pane-menu-segmented-control {
+  display: grid;
+  grid-auto-columns: var(--desktop-editor-pane-menu-action-size);
+  grid-auto-flow: column;
+  height: var(--desktop-editor-pane-menu-action-size);
+  flex: 0 0 auto;
+  gap: 1px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.desktop-editor-pane-menu-segment {
+  appearance: none;
+  display: grid;
+  height: var(--desktop-editor-pane-menu-action-size);
+  min-width: 0;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--desktop-toolbar-action-radius);
+  background: transparent;
+  color: var(--desktop-titlebar-text-muted, var(--po-text-muted));
+  cursor: var(--po-clickable-cursor, pointer);
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.desktop-editor-pane-menu-segment:hover,
+.desktop-editor-pane-menu-segment:focus-visible {
+  background: var(--desktop-titlebar-hover, var(--po-hover));
+  color: var(--desktop-titlebar-text, var(--po-text));
+  outline: none;
+}
+
+.desktop-editor-pane-menu-segment[aria-checked="true"] {
+  background: var(--desktop-titlebar-active, var(--po-selected));
+  color: var(--desktop-titlebar-text, var(--po-text));
 }
 
 .desktop-editor-pane-content {
@@ -374,7 +438,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .desktop-editor-pane,
+  .desktop-editor-pane-interaction-frame,
   .desktop-editor-pane-handle-shell {
     transition: none;
   }

@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import type { AppPreviewController, OfficeDocumentConverter } from "../../core/types";
+import type { AppPreviewController, DataPort, OfficeDocumentConverter } from "../../core/types";
 import type { FileFormat } from "../../core/fileFormats";
 import type { FileIconThemeId } from "../../file/fileIcons";
 import type { AiEditFile } from "../ai-edits/types";
@@ -85,17 +85,46 @@ export type MarkdownBacklink = {
   references: MarkdownBacklinkReference[];
 };
 
-export type MarkdownLinkGraph = {
+export type MarkdownLinkGraph = Readonly<{
+  /** Changes only when link resolution or backlink query semantics change. */
+  revision: number;
   documentCount: number;
   indexedDocumentCount: number;
-  isIndexing: boolean;
   resolveWikiLink: (sourcePath: string, target: string) => MarkdownWikiLinkResolvedTarget;
   resolveMarkdownLink: (sourcePath: string, href: string) => MarkdownWikiLinkResolvedTarget | null;
+  getBacklinks?: (path: string) => MarkdownBacklink[];
+}>;
+
+/** Stable workspace command port. It is deliberately separate from queries. */
+export type MarkdownLinkCommands = Readonly<{
   openWikiLink?: (target: MarkdownWikiLinkResolvedTarget, sourcePath: string) => void;
   openPath?: (path: string) => void;
   openExternalUrl?: (href: string) => void | Promise<void>;
-  getBacklinks?: (path: string) => MarkdownBacklink[];
-};
+}>;
+
+export type MarkdownWorkspaceEnvironment = Readonly<{
+  linkGraph: MarkdownLinkGraph | null;
+  linkCommands: MarkdownLinkCommands;
+  assetUrlResolver: MarkdownAssetUrlResolver | null;
+  /** Changes only when asset resolution semantics change. */
+  assetResolverRevision: number;
+}>;
+
+/** Host-authorized query surface for the workspace-aware Context Map Viewer. */
+export type ContextMapWorkspaceEnvironment = Readonly<{
+  revision: number;
+  listChildren: DataPort["listChildren"];
+  readFile?: DataPort["readFile"];
+}>;
+
+export const EMPTY_MARKDOWN_LINK_COMMANDS: MarkdownLinkCommands = Object.freeze({});
+
+export const EMPTY_MARKDOWN_WORKSPACE_ENVIRONMENT: MarkdownWorkspaceEnvironment = Object.freeze({
+  linkGraph: null,
+  linkCommands: EMPTY_MARKDOWN_LINK_COMMANDS,
+  assetUrlResolver: null,
+  assetResolverRevision: 0,
+});
 
 export type MarkdownResolvedAssetUrl = {
   url: string;
@@ -148,8 +177,8 @@ export type PresetViewerRenderContext = EditorViewerMatch & {
   htmlTrustMode: MarkdownHtmlTrustMode;
   workspaceId?: string;
   workspaceRoot?: string | null;
-  markdownLinkGraph?: MarkdownLinkGraph | null;
-  markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
+  markdownEnvironment?: MarkdownWorkspaceEnvironment | null;
+  contextMapEnvironment?: ContextMapWorkspaceEnvironment | null;
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;

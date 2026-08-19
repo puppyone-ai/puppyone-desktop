@@ -36,5 +36,13 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Test MDI focus continuity in Chromium
+        env:
+          # npm-installed Electron cannot provide a root-owned SUID sandbox on
+          # GitHub-hosted runners. Limit the test-only fallback to this local
+          # fixture instead of weakening the application or the whole CI job.
+          ELECTRON_DISABLE_SANDBOX: "1"
+        run: xvfb-run --auto-servernum npm run smoke:markdown-pane-focus-continuity
+
       - name: Build
         run: npm run build

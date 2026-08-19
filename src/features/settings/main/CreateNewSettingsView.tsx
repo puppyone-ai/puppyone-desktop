@@ -30,60 +30,12 @@ import {
   type CreateNewMenuSettings,
   type ExperimentalSettings,
 } from "../../../preferences";
+import { getCreateEntryMenuItem } from "../../create-new/createEntryMenuRegistry";
 import { SettingsSectionHeader } from "../components";
-
-type CreateNewTypeVisual = {
-  extension: string;
-  iconName: string;
-  iconType: DataNode["type"];
-};
 
 type DragTarget = {
   edge: "before" | "after";
   kind: CreateNewItemId;
-};
-
-const CREATE_NEW_TYPE_VISUALS: Record<CreateNewItemId, CreateNewTypeVisual> = {
-  markdown: {
-    extension: ".md",
-    iconName: "Untitled.md",
-    iconType: "markdown",
-  },
-  text: {
-    extension: ".txt",
-    iconName: "Untitled.txt",
-    iconType: "text",
-  },
-  json: {
-    extension: ".json",
-    iconName: "Untitled.json",
-    iconType: "json",
-  },
-  csv: {
-    extension: ".csv",
-    iconName: "Untitled.csv",
-    iconType: "spreadsheet",
-  },
-  html: {
-    extension: ".html",
-    iconName: "Untitled.html",
-    iconType: "html",
-  },
-  slides: {
-    extension: ".puppyoneapp",
-    iconName: "Untitled Slides.puppyoneapp",
-    iconType: "app",
-  },
-  app: {
-    extension: ".puppyoneapp",
-    iconName: "Untitled.puppyoneapp",
-    iconType: "app",
-  },
-  puppyflow: {
-    extension: ".puppyflow",
-    iconName: "Untitled.puppyflow",
-    iconType: "workflow",
-  },
 };
 
 export function CreateNewSettingsView({
@@ -109,15 +61,17 @@ export function CreateNewSettingsView({
   const addableKinds = CREATE_NEW_ITEM_IDS.filter((kind) => (
     !presentKinds.has(kind) && isCreateNewItemAvailable(kind, experimentalSettings)
   ));
-  const defaultsRestored = settings.items.length === 4
+  const defaultsRestored = settings.items.length === 5
     && settings.items[0]?.kind === "markdown"
     && settings.items[0]?.enabled
-    && settings.items[1]?.kind === "csv"
+    && settings.items[1]?.kind === "contextMap"
     && settings.items[1]?.enabled
-    && settings.items[2]?.kind === "html"
+    && settings.items[2]?.kind === "csv"
     && settings.items[2]?.enabled
-    && settings.items[3]?.kind === "slides"
-    && settings.items[3]?.enabled;
+    && settings.items[3]?.kind === "html"
+    && settings.items[3]?.enabled
+    && settings.items[4]?.kind === "slides"
+    && settings.items[4]?.enabled;
 
   useEffect(() => {
     if (!addMenuOpen) return;
@@ -247,7 +201,7 @@ export function CreateNewSettingsView({
 
                 <div className="desktop-create-new-file-list" role="list">
                   {settings.items.map((item, index) => {
-                    const visual = CREATE_NEW_TYPE_VISUALS[item.kind];
+                    const visual = getCreateEntryMenuItem(item.kind);
                     const label = t(`workspace.node.create.kind.${item.kind}.label`);
                     const available = isCreateNewItemAvailable(item.kind, experimentalSettings);
                     const dragBefore = dragTarget?.kind === item.kind && dragTarget.edge === "before";
@@ -362,7 +316,7 @@ export function CreateNewSettingsView({
                       ariaLabel={t("settings.createNew.addMenu")}
                     >
                       {addableKinds.map((kind) => {
-                        const visual = CREATE_NEW_TYPE_VISUALS[kind];
+                        const visual = getCreateEntryMenuItem(kind);
                         return (
                           <DesktopMenuItem
                             key={kind}

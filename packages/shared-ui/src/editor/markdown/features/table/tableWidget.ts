@@ -20,6 +20,7 @@ import {
 import { createMarkdownTableWindowController } from "./tableWindowController";
 import type { MarkdownInlinePreviewRenderer } from "../../shared/preview/markdownInlinePreviewPort";
 import { createMarkdownTableInlineViewportController } from "./tableInlineViewportController";
+import { getMappedWidgetSourceRange } from "../../shared/widgets/widgetDom";
 
 export class MarkdownTableWidget extends WidgetType {
   constructor(
@@ -47,7 +48,7 @@ export class MarkdownTableWidget extends WidgetType {
       widget.renderKey === this.renderKey &&
       widget.layoutEstimatedHeight === this.layoutEstimatedHeight &&
       markdownTableExecutionsEqual(widget.execution, this.execution) &&
-      widget.markdownLinkGraph === this.markdownLinkGraph &&
+      (widget.markdownLinkGraph?.revision ?? 0) === (this.markdownLinkGraph?.revision ?? 0) &&
       widget.documentPath === this.documentPath &&
       widget._markdownAssetUrlResolver === this._markdownAssetUrlResolver &&
       widget.renderInlinePreview === this.renderInlinePreview
@@ -72,6 +73,8 @@ export class MarkdownTableWidget extends WidgetType {
     wrapper.dataset.mdTableFrom = String(this.from);
     wrapper.dataset.mdTableExecution = this.execution.mode;
     wrapper.dataset.mdTableInlineViewport = "true";
+    const sourceLength = Math.max(0, this.to - this.from);
+    const getTableRange = () => getMappedWidgetSourceRange(view, wrapper, sourceLength);
     const rowCount = this.rows.length;
     // The semantic table model normalizes every row to the alignment width.
     // Do not rescan an oversized immutable row collection during DOM mount.
@@ -98,15 +101,20 @@ export class MarkdownTableWidget extends WidgetType {
     table.setAttribute("aria-rowcount", String(rowCount));
     table.setAttribute("aria-colcount", String(columnCount));
 
+    // Every execution mode uses semantic column tracks. A cell swaps rendered
+    // inline Markdown for canonical source while it owns focus; leaving small
+    // tables on browser auto-layout would let that transient DOM resize the
+    // entire block and, near an overflow threshold, the editor reading rail.
+    const colgroup = doc.createElement("colgroup");
+    for (const width of estimateMarkdownTableColumnWidths(this.alignments, this.rows)) {
+      const column = doc.createElement("col");
+      column.style.width = `${width}px`;
+      colgroup.appendChild(column);
+    }
+    table.appendChild(colgroup);
+
     if (this.execution.mode === "windowed") {
       table.classList.add("is-windowed");
-      const colgroup = doc.createElement("colgroup");
-      for (const width of estimateMarkdownTableColumnWidths(this.alignments, this.rows)) {
-        const column = doc.createElement("col");
-        column.style.width = `${width}px`;
-        colgroup.appendChild(column);
-      }
-      table.appendChild(colgroup);
     }
 
     const createRow = (row: MarkdownTableRow, rowIndex: number, header: boolean) => {
@@ -128,6 +136,7 @@ export class MarkdownTableWidget extends WidgetType {
           rowIndex,
           rows: this.rows,
           renderInlinePreview: this.renderInlinePreview,
+          getTableRange,
           tableFrom: this.from,
           tableTo: this.to,
           view,
@@ -193,12 +202,14 @@ export class MarkdownTableWidget extends WidgetType {
         className: "cm-md-table-add-row",
         label: localization.t("editor.table.addRow"),
         onActivate: () => {
+          const tableRange = getTableRange();
+          if (!tableRange) return;
           dispatchMarkdownTableStructureOperation({
             alignments: this.alignments,
             currentDraft: getActiveMarkdownTableCellDraft(wrapper),
             rows: this.rows,
-            tableFrom: this.from,
-            tableTo: this.to,
+            tableFrom: tableRange.from,
+            tableTo: tableRange.to,
             view,
           }, {
             type: "insert-row-below",
@@ -211,12 +222,14 @@ export class MarkdownTableWidget extends WidgetType {
         className: "cm-md-table-add-column",
         label: localization.t("editor.table.addColumn"),
         onActivate: () => {
+          const tableRange = getTableRange();
+          if (!tableRange) return;
           dispatchMarkdownTableStructureOperation({
             alignments: this.alignments,
             currentDraft: getActiveMarkdownTableCellDraft(wrapper),
             rows: this.rows,
-            tableFrom: this.from,
-            tableTo: this.to,
+            tableFrom: tableRange.from,
+            tableTo: tableRange.to,
             view,
           }, {
             type: "insert-column-right",
@@ -263,8 +276,7 @@ export class MarkdownTableWidget extends WidgetType {
       inlineViewport,
       rows: this.rows,
       table,
-      tableFrom: this.from,
-      tableTo: this.to,
+      getTableRange,
       view,
       wrapper,
     });

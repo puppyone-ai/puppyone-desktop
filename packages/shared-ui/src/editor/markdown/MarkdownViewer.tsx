@@ -15,8 +15,7 @@ type MarkdownViewerProps = Pick<
   | "htmlTrustMode"
   | "workspaceId"
   | "workspaceRoot"
-  | "markdownLinkGraph"
-  | "markdownAssetUrlResolver"
+  | "markdownEnvironment"
 >;
 
 export function MarkdownViewer(context: MarkdownViewerProps) {
@@ -29,6 +28,8 @@ export function MarkdownViewer(context: MarkdownViewerProps) {
       defaultMode="live"
       canEdit={context.canEdit}
       hideSourceView={context.hideSourceView}
+      enableModeToggleShortcut
+      modeControlPlacement="pane-menu"
       sourceSnapshotMode
       renderLive={(value, controls) => (
         <MarkdownCodeMirrorEditor
@@ -42,8 +43,10 @@ export function MarkdownViewer(context: MarkdownViewerProps) {
           markdownDialect={context.document.markdownDialect}
           workspaceId={context.workspaceId}
           workspaceRoot={context.workspaceRoot}
-          markdownLinkGraph={context.markdownLinkGraph}
-          markdownAssetUrlResolver={context.markdownAssetUrlResolver}
+          markdownLinkGraph={context.markdownEnvironment?.linkGraph}
+          markdownLinkCommands={context.markdownEnvironment?.linkCommands}
+          markdownAssetUrlResolver={context.markdownEnvironment?.assetUrlResolver}
+          markdownAssetResolverRevision={context.markdownEnvironment?.assetResolverRevision}
           onSourceRevisionChange={controls.onSourceRevisionChange}
           onSnapshotPortChange={controls.onSnapshotPortChange}
         />
@@ -59,8 +62,10 @@ export function MarkdownViewer(context: MarkdownViewerProps) {
           markdownDialect={context.document.markdownDialect}
           workspaceId={context.workspaceId}
           workspaceRoot={context.workspaceRoot}
-          markdownLinkGraph={context.markdownLinkGraph}
-          markdownAssetUrlResolver={context.markdownAssetUrlResolver}
+          markdownLinkGraph={context.markdownEnvironment?.linkGraph}
+          markdownLinkCommands={context.markdownEnvironment?.linkCommands}
+          markdownAssetUrlResolver={context.markdownEnvironment?.assetUrlResolver}
+          markdownAssetResolverRevision={context.markdownEnvironment?.assetResolverRevision}
           onSourceRevisionChange={controls.onSourceRevisionChange}
           onSnapshotPortChange={controls.onSnapshotPortChange}
         />

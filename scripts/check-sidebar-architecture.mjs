@@ -135,6 +135,7 @@ for (const token of ["SidebarResizeHandle", "useCollapsiblePaneResize", 'orienta
   if (!auxiliarySource.includes(token)) errors.push(`AuxiliaryPanelHost must consume the shared resize contract (${token}).`);
 }
 const layoutStyle = read(absolute("src/styles/layout.css"));
+const sidebarPrimitiveStyle = read(absolute("packages/shared-ui/src/styles/sidebar-primitives.css"));
 const dataWorkspaceStyle = read(absolute("packages/shared-ui/src/styles/data-workspace.css"));
 const desktopDataWorkspaceStyle = read(absolute("src/features/data-workspace/data-shell.css"));
 const collapsiblePaneResizeSource = read(absolute("packages/shared-ui/src/primitives/useCollapsiblePaneResize.ts"));
@@ -149,17 +150,38 @@ if (dataWorkspaceStyle.includes("--data-explorer-min-width")) {
 if (!collapsiblePaneResizeSource.includes("A pane has one rendered width")) {
   errors.push("The shared collapsible pane resize contract must retain a single rendered-width invariant.");
 }
+const paneEdgeHandle = sidebarPrimitiveStyle.match(/\.po-pane-edge-resize-handle\s*\{([^}]*)\}/s)?.[1] ?? "";
+for (const token of [
+  "position: absolute",
+  "width: var(--po-pane-resizer-hit-size, 8px)",
+]) {
+  if (!paneEdgeHandle.includes(token)) {
+    errors.push(`Shared pane-edge resize handle is missing its overlay hit-target contract (${token}).`);
+  }
+}
 for (const [label, source] of [
   ["Shared DataWorkspace", dataWorkspaceStyle],
   ["Desktop DataWorkspace", desktopDataWorkspaceStyle],
 ]) {
+  const resizableGrid = source.match(
+    /\.data-content\[data-resizable-explorer="true"\]\s*\{([^}]*)\}/s,
+  )?.[1] ?? "";
+  const resizer = source.match(/\.data-explorer-resizer\s*\{([^}]*)\}/s)?.[1] ?? "";
   for (const token of [
-    'data-resizable-explorer="true"',
-    "var(--po-pane-resizer-hit-size, 8px)",
-    "grid-column: 2",
-    "inset: auto",
+    "inset-inline-start: var(--data-explorer-width",
+    "inset-inline-end: auto",
+    "background: transparent",
   ]) {
-    if (!source.includes(token)) errors.push(`${label} is missing its exclusive resize gutter contract (${token}).`);
+    if (!resizer.includes(token)) errors.push(`${label} is missing its overlay resize sash contract (${token}).`);
+  }
+  if (!resizableGrid.includes("grid-template-columns")) {
+    errors.push(`${label} is missing its two-pane resizable grid contract.`);
+  }
+  if (resizableGrid.includes("--po-pane-resizer-hit-size") || resizer.includes("grid-column")) {
+    errors.push(`${label} must not consume the overlay resize hit target as layout width.`);
+  }
+  if (source.includes('.data-content[data-resizable-explorer="true"] > .browser-column')) {
+    errors.push(`${label} must keep the Editor in the second grid column at the shared pane boundary.`);
   }
 }
 if (!paneResizeDragSource.includes("onDragActiveChange?.(true)") || !paneResizeDragSource.includes("onDragActiveChange?.(false)")) {
@@ -167,12 +189,13 @@ if (!paneResizeDragSource.includes("onDragActiveChange?.(true)") || !paneResizeD
 }
 if (
   !desktopDataWorkspaceSource.includes("useNativeSurfacePointerPassthroughActivity(")
+  || !desktopDataWorkspaceSource.includes("useNativeSurfacePointerRoutingRegion(")
   || !desktopDataWorkspaceSource.includes('"explorer-resize"')
   || !desktopDataWorkspaceSource.includes(
     "onExplorerResizeActiveChange={onExplorerResizeActiveChange}",
   )
 ) {
-  errors.push("Desktop explorer resize must opt into native-surface pointer passthrough.");
+  errors.push("Desktop explorer resize must register both initial-press routing and active-drag native-surface passthrough.");
 }
 const shellSource = read(absolute("src/components/DesktopCloudShell.tsx"));
 if (!shellSource.includes("<AuxiliaryPanelHost")) errors.push("DesktopCloudShell must delegate Auxiliary geometry/lifecycle to AuxiliaryPanelHost.");

@@ -11,6 +11,8 @@ import {
   readTerminalFontFamily,
   readTerminalFontSize,
   readTerminalTheme,
+  terminalDefaultColorsFromTheme,
+  type TerminalDefaultColors,
 } from "./terminalAppearance";
 import { TerminalActivityController } from "./terminalActivity";
 
@@ -77,6 +79,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   private scrollbarIdleTimer: number | null = null;
   private pendingPtySize: TerminalSize | null = null;
   private lastPtySize: TerminalSize | null = null;
+  private defaultColors: TerminalDefaultColors | null = null;
   private ptyReady = false;
   private pendingExit: TerminalExit | null = null;
   private active = false;
@@ -177,7 +180,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
 
   applyAppearance() {
     if (this.disposed || !this.container || !this.terminal) return;
-    applyTerminalAppearance(this.terminal, this.container);
+    this.defaultColors = applyTerminalAppearance(this.terminal, this.container);
     this.scheduleFit();
   }
 
@@ -220,6 +223,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   }
 
   private initializeTerminal(container: HTMLDivElement) {
+    const theme = readTerminalTheme(container);
     const terminal = new Terminal({
       allowProposedApi: true,
       customGlyphs: true,
@@ -238,7 +242,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
       },
       rescaleOverlappingGlyphs: true,
       scrollback: 6000,
-      theme: readTerminalTheme(container),
+      theme,
     });
     const fitAddon = new FitAddon();
     const unicode11Addon = new Unicode11Addon();
@@ -246,6 +250,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     this.terminal = terminal;
     this.fitAddon = fitAddon;
     this.unicode11Addon = unicode11Addon;
+    this.defaultColors = terminalDefaultColorsFromTheme(theme);
 
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(unicode11Addon);
@@ -328,6 +333,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
       cols: terminal.cols,
       rows: terminal.rows,
       launcherId: this.launcherId,
+      defaultColors: this.defaultColors ?? undefined,
     }).then((result) => {
       if (this.disposed) {
         void bridge.closeTerminal(result.id);

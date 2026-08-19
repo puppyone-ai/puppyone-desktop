@@ -44,6 +44,7 @@ deliberate ownership of knowledge content:
 | Content font | One catalog-backed selector with an inline live content sample. Built-in entries are Geist, System, and Serif. Preferences store an opaque font ID rather than a CSS family or file path, so a future local imported-font catalog can extend the same surface without changing the preference schema. UI, code, and terminal fonts remain fixed until separately designed. |
 | Dock icon | Curated set of 2-3 official icons only, presented in the shared content-sized segmented control. No custom image upload. macOS only. |
 | Pointer cursors | Single toggle. Default off (macOS-native arrow cursor). |
+| Agent file activity | Single global toggle. Default off. Shows the Editor eye/hand presence treatment for Hook-observed reads/writes; Agent inventory and selection remain in Local Agents. |
 | Third dark preset | A warm dark preset pairing with the light `warm` preset, giving 3 light + 3 dark. |
 | Theme previews | Mini app-preview cards for System / Light / Dark mode, rendered from live tokens with CSS (no screenshots). Individual light and dark presets use compact palette swatches inside the same segmented-control pattern as Text size, File icons, and Navigation. |
 | Reduce motion | Zero-UI. Respect system `prefers-reduced-motion` automatically. Not a settings row. |
@@ -67,7 +68,7 @@ Rejected, and why:
 The Appearance section stays a single flat list (Interface style, Light or
 Dark controls when supported, presets, Text size, Content font, File icons,
 Navigation, Header elements,
-Pointer cursors, Dock icon). It must fit in roughly one screen. Do not adopt grouped-card layouts
+Pointer cursors, Agent file activity, Dock icon). It must fit in roughly one screen. Do not adopt grouped-card layouts
 while the list stays this small.
 
 Header elements are visibility controls, not configuration surfaces. The
@@ -215,6 +216,15 @@ Implemented:
    Dark palette with light and dark preset controls. XP and Tiger declare a
    fixed light palette, so those controls are absent without discarding the
    user's saved Default choices.
+10. **Agent file activity.**
+    `puppyone.desktop.agentFileActivityIndicators` is an opt-in global
+    Appearance preference. It controls the Editor eye/hand treatment for
+    Hook-observed file reads and writes. Turning it on opens one concise consent
+    dialog and enrolls all supported installed-Agent Hooks as a batch; the
+    preference changes only after success. There are no per-Agent permission
+    controls here. Provider-native trust review remains provider-owned, while
+    the Local Agents page owns only installed compute selection.
+    See [Local Agents and Agent file activity](desktop-agent/local-agents-and-file-activity.md).
 
 ### Interface Style Extension Contract
 

@@ -14,8 +14,8 @@ describe("feedback IPC", () => {
     });
 
     await expect(handler({}, {
-      role: "developer",
       message: "  The search result ordering is confusing.  ",
+      email: "  person@example.com  ",
       locale: "zh-Hans",
       workspacePath: "/private/project",
       accountEmail: "private@example.com",
@@ -34,8 +34,8 @@ describe("feedback IPC", () => {
     expect(request.headers).not.toHaveProperty("content-type");
     expect(request.body).toBeInstanceOf(FormData);
     expect(Object.fromEntries(request.body.entries())).toEqual({
-      role: "developer",
       message: "The search result ordering is confusing.",
+      email: "person@example.com",
       appVersion: "0.1.2",
       locale: "zh-Hans",
       platform: "darwin",
@@ -51,22 +51,32 @@ describe("feedback IPC", () => {
     const fetchImpl = vi.fn();
     const handler = createHandler({ fetchImpl });
 
-    await expect(handler({}, { message: "   " })).rejects.toThrow(
-      "requires a message or screenshot",
+    await expect(handler({}, { email: "person@example.com", message: "   " })).rejects.toThrow(
+      "requires a message",
     );
-    await expect(handler({}, { role: "developer", message: "x".repeat(2_001) })).rejects.toThrow(
+    await expect(handler({}, {
+      email: "person@example.com",
+      message: "",
+      screenshot: {
+        bytes: new Uint8Array([
+          0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        ]).buffer,
+        mimeType: "image/png",
+      },
+    })).rejects.toThrow("requires a message");
+    await expect(handler({}, { email: "person@example.com", message: "x".repeat(2_001) })).rejects.toThrow(
       "cannot exceed 2000 characters",
     );
     await expect(handler({}, { message: "Useful feedback" })).rejects.toThrow(
-      "requires a valid role",
+      "requires a valid contact email",
     );
-    await expect(handler({}, { role: "customer", message: "Useful feedback" })).rejects.toThrow(
-      "requires a valid role",
+    await expect(handler({}, { email: "not-an-email", message: "Useful feedback" })).rejects.toThrow(
+      "requires a valid contact email",
     );
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("accepts screenshot-only feedback and forwards a validated image attachment", async () => {
+  it("forwards a validated image attachment with required written feedback", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ ok: true }),
@@ -77,8 +87,8 @@ describe("feedback IPC", () => {
     ]);
 
     await expect(handler({}, {
-      role: "researcher",
-      message: "",
+      message: "The export button is not responding.",
+      email: "support@example.com",
       screenshot: {
         bytes: bytes.buffer,
         mimeType: "image/png",
@@ -87,8 +97,8 @@ describe("feedback IPC", () => {
 
     const request = fetchImpl.mock.calls[0][1];
     const screenshot = request.body.get("attachment");
-    expect(request.body.get("message")).toBe("");
-    expect(request.body.get("role")).toBe("researcher");
+    expect(request.body.get("message")).toBe("The export button is not responding.");
+    expect(request.body.get("email")).toBe("support@example.com");
     expect(request.body.get("appVersion")).toBe("0.1.2");
     expect(screenshot).toBeInstanceOf(Blob);
     expect(screenshot.type).toBe("image/png");
@@ -103,7 +113,7 @@ describe("feedback IPC", () => {
     const handler = createHandler({ fetchImpl });
 
     await expect(handler({}, {
-      role: "other",
+      email: "person@example.com",
       screenshot: {
         bytes: new Uint8Array([0x00, 0x01, 0x02]).buffer,
         mimeType: "image/png",
@@ -120,7 +130,7 @@ describe("feedback IPC", () => {
       }),
     });
 
-    await expect(handler({}, { role: "creator", message: "A useful message" })).rejects.toThrow(
+    await expect(handler({}, { email: "person@example.com", message: "A useful message" })).rejects.toThrow(
       "could not accept",
     );
   });
@@ -132,7 +142,7 @@ describe("feedback IPC", () => {
     });
     const handler = createHandler({ fetchImpl, endpoint: null });
 
-    await expect(handler({}, { role: "developer", message: "A useful message" })).resolves.toEqual({
+    await expect(handler({}, { email: "person@example.com", message: "A useful message" })).resolves.toEqual({
       ok: true,
     });
 

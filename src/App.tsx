@@ -88,6 +88,7 @@ import {
   useTypographyRuntime,
 } from "./features/typography";
 import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
+import { enabledLocalAgentRuntimeIds, isLocalAgentRuntimeEnabled } from "./features/local-agents";
 
 const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMinimalModeDock").then((module) => ({
   default: module.DesktopMinimalModeDock,
@@ -99,12 +100,16 @@ export function App() {
 }
 
 function AppContent() {
-  const { t } = useLocalization();
+  const { locale, t } = useLocalization();
   const desktopUpdates = useDesktopUpdates();
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
   const fontCatalog = useTypographyCatalog();
-  const typography = useTypographyRuntime(preferences.typographyPreferences, fontCatalog);
+  const typography = useTypographyRuntime(
+    preferences.typographyPreferences,
+    fontCatalog,
+    locale,
+  );
   const typographyRootProps = useMemo(() => createTypographyRootProps(typography), [typography]);
   const cloudAvailable = useFeatureFlag("cloudWorkspace");
   // The build flag only marks availability; PuppyOne Cloud stays hidden until
@@ -168,6 +173,7 @@ function AppContent() {
     rightSidebarSurface,
     agentPreferredRuntime,
     agentPreferredModel,
+    localAgentsSettings,
     sidebarCollapsed,
     sidebarNavigationLayout,
     sidebarNavigationOrientation,
@@ -197,6 +203,10 @@ function AppContent() {
   const createNewItems = useMemo(
     () => getVisibleCreateNewItems(createNewMenuSettings, experimentalSettings),
     [createNewMenuSettings, experimentalSettings],
+  );
+  const enabledAgentRuntimeIds = useMemo(
+    () => enabledLocalAgentRuntimeIds(localAgentsSettings),
+    [localAgentsSettings],
   );
   const minimalMode = experimentalSettings.enableMinimalMode;
   const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
@@ -434,35 +444,6 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (!switcherOpen && !branchSwitcherOpen) return undefined;
-
-    const closeOnPointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Node && switcherRef.current?.contains(target)) return;
-      if (target instanceof Node && branchSwitcherRef.current?.contains(target)) return;
-      if (
-        target instanceof Element
-        && target.closest('[data-titlebar-context-menu="true"]')
-      ) return;
-      setSwitcherOpen(false);
-      setBranchSwitcherOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setSwitcherOpen(false);
-        setBranchSwitcherOpen(false);
-      }
-    };
-
-    window.addEventListener("pointerdown", closeOnPointerDown, true);
-    window.addEventListener("keydown", closeOnEscape, true);
-    return () => {
-      window.removeEventListener("pointerdown", closeOnPointerDown, true);
-      window.removeEventListener("keydown", closeOnEscape, true);
-    };
-  }, [branchSwitcherOpen, branchSwitcherRef, setBranchSwitcherOpen, switcherOpen]);
-
-  useEffect(() => {
     setGitOperationError(null);
     setGitOperationLoading(null);
     setActiveSettingsSection("general");
@@ -618,7 +599,9 @@ function AppContent() {
     const requestId = ++documentNavigationRequestRef.current;
     if (requestId !== documentNavigationRequestRef.current) return;
     setDocumentNavigationError(null);
-    if (path && node?.type !== "folder") editorWorkbench.open(path, node);
+    if (path && node?.type !== "folder") {
+      editorWorkbench.open(path, node);
+    }
     setActiveDataNode(node);
   }, [editorWorkbench]);
   const handleEditorClose = useCallback(async (editorId: string) => {
@@ -813,6 +796,10 @@ function AppContent() {
     setBranchSwitcherOpen(false);
   }, [setBranchSwitcherOpen]);
 
+  const closeWorkspaceSwitcher = useCallback(() => {
+    setSwitcherOpen(false);
+  }, []);
+
   if (restoringWorkspace && !workspace) {
     return (
       <RestoringWorkspaceScreen
@@ -881,6 +868,7 @@ function AppContent() {
       workspaceSwitcherRef={switcherRef}
       onCheckoutBranch={handleCheckoutGitBranch}
       onGoHome={() => void goToHomepage()}
+      onCloseWorkspaceSwitcher={closeWorkspaceSwitcher}
       onOpenFolder={openFolder}
       onOpenWorkspaceSwitcherItem={openWorkspaceSwitcherItem}
       onCloseBranchSwitcher={closeBranchSwitcher}
@@ -962,6 +950,9 @@ function AppContent() {
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
       data-text-size={textSize}
+      data-interface-text-size={textSize}
+      data-content-text-size={textSize}
+      data-terminal-text-size={textSize}
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
       {...typographyRootProps}
@@ -1006,7 +997,10 @@ function AppContent() {
                     workspace={workspace}
                     active={rightSidebarOpen && rightSidebarSurface === "chat"}
                     minimalMode={minimalMode}
-                    preferredRuntimeId={agentPreferredRuntime}
+                    preferredRuntimeId={agentPreferredRuntime && isLocalAgentRuntimeEnabled(localAgentsSettings, agentPreferredRuntime)
+                      ? agentPreferredRuntime
+                      : null}
+                    enabledRuntimeIds={enabledAgentRuntimeIds}
                     onPreferredRuntimeChange={setAgentPreferredRuntime}
                     preferredModel={agentPreferredModel}
                     onPreferredModelChange={setAgentPreferredModel}

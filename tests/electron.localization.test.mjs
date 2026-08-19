@@ -59,6 +59,7 @@ describe("DesktopLocaleService", () => {
       direction: "ltr",
     });
     expect(service.t("native.dock.newWindow")).toBe("Nouvelle fenêtre");
+    expect(service.t("native.menu.file")).toBe("Fichier");
     expect(send).not.toHaveBeenCalled();
 
     await expect(service.setLanguagePreference("de")).resolves.toMatchObject({

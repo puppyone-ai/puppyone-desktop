@@ -52,40 +52,52 @@ describe("create entry menu", () => {
       .toBeLessThan(draft.anchor.top);
   });
 
-  it("offers Folder followed by Markdown, CSV, HTML, and Slides in the intended grouping", () => {
+  it("keeps Folder and the three core files in front of a hoverable Custom files submenu", () => {
     const onSelectKind = vi.fn();
     const container = render(
       <DesktopCreateEntryMenu
         draft={createDraft()}
-        itemKinds={["markdown", "csv", "html", "slides"]}
+        itemKinds={["contextMap", "html", "app", "markdown", "csv", "slides"]}
         onCancel={vi.fn()}
         onSelectKind={onSelectKind}
       />,
     );
     const menu = container.querySelector<HTMLElement>(".desktop-create-entry-menu");
     expect(menu).not.toBeNull();
-    expect(Array.from(menu?.children ?? [], (child) => (
-      child.classList.contains("desktop-menu-separator") ? "divider" : child.textContent?.trim()
-    ))).toEqual([
+    expect(readDirectMenuRows(menu)).toEqual([
       "Folder",
       "divider",
       "Markdown file",
       "CSV file",
       "HTML file",
-      "Slides",
+      "divider",
+      "Custom files",
     ]);
 
     expect(container.textContent).not.toContain("Paste");
     expect(container.textContent).not.toContain("Text file");
     expect(container.textContent).not.toContain("JSON file");
-    expect(container.textContent).not.toContain("Custom files");
+    const customMenuWrap = container.querySelector<HTMLElement>(".desktop-create-entry-submenu-wrap");
+    const customMenuTrigger = container.querySelector<HTMLButtonElement>(".desktop-create-entry-submenu-trigger");
+    expect(customMenuWrap?.dataset.open).toBe("false");
+    expect(Array.from(
+      container.querySelectorAll(".desktop-create-entry-submenu .desktop-menu-item-label"),
+      (label) => label.textContent?.trim(),
+    )).toEqual(["Context Map", "PuppyOne app", "Slides"]);
+
+    act(() => customMenuTrigger?.dispatchEvent(new PointerEvent("pointerover", { bubbles: true })));
+    expect(customMenuWrap?.dataset.open).toBe("true");
 
     act(() => Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent?.trim() === "CSV file")?.click());
     expect(onSelectKind).toHaveBeenCalledWith("csv");
+
+    act(() => Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "Context Map")?.click());
+    expect(onSelectKind).toHaveBeenCalledWith("contextMap");
   });
 
-  it("renders the configured file type order without adding hidden defaults", () => {
+  it("keeps configured custom types in the submenu without adding hidden defaults", () => {
     const container = render(
       <DesktopCreateEntryMenu
         draft={createDraft()}
@@ -95,17 +107,65 @@ describe("create entry menu", () => {
       />,
     );
 
-    expect(Array.from(
-      container.querySelector(".desktop-create-entry-menu")?.children ?? [],
-      (child) => child.classList.contains("desktop-menu-separator")
-        ? "divider"
-        : child.querySelector(".desktop-menu-item-label")?.textContent?.trim(),
-    )).toEqual([
+    expect(readDirectMenuRows(container.querySelector(".desktop-create-entry-menu"))).toEqual([
       "Folder",
       "divider",
-      "JSON file",
       "Markdown file",
+      "divider",
+      "Custom files",
     ]);
+    expect(container.querySelector(
+      ".desktop-create-entry-submenu .desktop-menu-item-label",
+    )?.textContent?.trim())
+      .toBe("JSON file");
+    expect(container.textContent).not.toContain("CSV file");
+    expect(container.textContent).not.toContain("HTML file");
+  });
+
+  it("opens the Custom files submenu away from the nearest viewport edge", () => {
+    const draft = createDraft();
+    draft.anchor = {
+      ...draft.anchor,
+      left: 980,
+      right: 1004,
+    };
+    const container = render(
+      <DesktopCreateEntryMenu
+        draft={draft}
+        itemKinds={["markdown", "contextMap"]}
+        onCancel={vi.fn()}
+        onSelectKind={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector<HTMLElement>(".desktop-create-entry-submenu-wrap")
+      ?.dataset.submenuSide).toBe("start");
+  });
+
+  it("opens Custom files from focus and returns to its trigger with ArrowLeft", () => {
+    const container = render(
+      <DesktopCreateEntryMenu
+        draft={createDraft()}
+        itemKinds={["markdown", "contextMap"]}
+        onCancel={vi.fn()}
+        onSelectKind={vi.fn()}
+      />,
+    );
+    const wrap = container.querySelector<HTMLElement>(".desktop-create-entry-submenu-wrap");
+    const trigger = container.querySelector<HTMLButtonElement>(".desktop-create-entry-submenu-trigger");
+    const customItem = container.querySelector<HTMLButtonElement>(
+      ".desktop-create-entry-submenu .desktop-menu-item",
+    );
+
+    act(() => trigger?.focus());
+    expect(wrap?.dataset.open).toBe("true");
+
+    act(() => {
+      customItem?.focus();
+      customItem?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+    });
+    expect(wrap?.dataset.open).toBe("false");
+    expect(document.activeElement).toBe(trigger);
   });
 
   it("does not render a divider when Folder is the only configured item", () => {
@@ -155,6 +215,15 @@ function render(element: React.ReactElement) {
   root = createRoot(container);
   act(() => root?.render(withTestLocalization(element)));
   return container;
+}
+
+function readDirectMenuRows(menu: Element | null): Array<string | undefined> {
+  return Array.from(menu?.children ?? [], (child) => {
+    if (child.classList.contains("desktop-menu-separator")) return "divider";
+    return child.querySelector(".desktop-menu-item-label")
+      ?.textContent
+      ?.trim();
+  });
 }
 
 function createDraft(): DesktopCreateEntryDraft {

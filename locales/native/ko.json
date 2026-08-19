@@ -1,6 +1,7 @@
 {
   "native.messageUnavailable": "이 텍스트를 사용할 수 없습니다.",
   "native.dock.newWindow": "새 윈도우",
+  "native.menu.file": "파일",
   "native.workspace.open.title": "로컬 PuppyOne 워크스페이스 열기",
   "native.update.blocker.terminal.label": "PuppyOne 터미널 세션 열림({count}개)",
   "native.update.blocker.terminal.detail": "업데이트하면 PuppyOne 안에서 생성된 터미널 세션 {count}개가 닫힙니다. Ghostty와 다른 외부 터미널은 영향을 받지 않습니다.",

@@ -11,7 +11,11 @@ import {
 } from "./codeBlockModel";
 import { getDocRevision, type CommitResult } from "../../platform/brokers/transactionBroker";
 import { estimateCodeBlockLayoutHeight } from "./codeBlockLayout";
-import { normalizeLineEndings, stopCodeMirrorEvent } from "../../shared/widgets/widgetDom";
+import {
+  getMappedWidgetSourceRange,
+  normalizeLineEndings,
+  stopCodeMirrorEvent,
+} from "../../shared/widgets/widgetDom";
 import { getMarkdownLocalization } from "../../core/editor/markdownLocalization";
 import {
   MARKDOWN_RICH_BLOCK_EXECUTION,
@@ -62,6 +66,7 @@ export class CodeBlockWidget extends WidgetType {
     const panel = document.createElement("div");
     panel.className = "cm-md-code-panel";
     const readOnly = view.state.readOnly;
+    const sourceLength = Math.max(0, this.to - this.from);
     const baseSource = view.state.sliceDoc(this.from, this.to);
     const baseRevision = getDocRevision(view.state.doc);
     const initialSession = readOnly
@@ -124,10 +129,12 @@ export class CodeBlockWidget extends WidgetType {
     const ensureSession = () => {
       const existing = elementId ? host.editSessions.get(elementId) : undefined;
       if (existing) return existing;
+      const mappedRange = getMappedWidgetSourceRange(view, wrapper, sourceLength);
+      if (!mappedRange) return null;
       const session = host.editSessions.acquire({
         featureId: "codeBlock",
-        mappedRange: { from: this.from, to: this.to },
-        baseSource,
+        mappedRange,
+        baseSource: view.state.sliceDoc(mappedRange.from, mappedRange.to),
         baseRevision: getDocRevision(view.state.doc),
         draft: {
           code: normalizeLineEndings(codeEditor.value),
@@ -141,6 +148,7 @@ export class CodeBlockWidget extends WidgetType {
 
     const syncDraft = () => {
       const session = ensureSession();
+      if (!session) return;
       host.editSessions.update(session.elementId, {
         draft: {
           code: normalizeLineEndings(codeEditor.value),
@@ -154,6 +162,7 @@ export class CodeBlockWidget extends WidgetType {
     const commit = (options: { finish?: boolean; selection?: "start" | "end" } = {}): CommitResult | null => {
       if (committed || readOnly) return null;
       const session = ensureSession();
+      if (!session) return null;
       committed = true;
       const language = sanitizeCodeLanguage(languageInput.value);
       const code = normalizeLineEndings(codeEditor.value);
@@ -244,6 +253,10 @@ export class CodeBlockWidget extends WidgetType {
         event.preventDefault();
         committed = true;
         const session = ensureSession();
+        if (!session) {
+          committed = false;
+          return;
+        }
         const deleteFrom = session.mappedRange.from;
         const result = host.transactions.commit(view, {
           mappedRange: session.mappedRange,

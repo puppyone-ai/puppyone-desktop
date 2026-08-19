@@ -2,12 +2,15 @@ export const TYPOGRAPHY_PREFERENCE_VERSION = 1 as const;
 
 export type TypographyRole = "ui" | "content" | "code" | "terminal";
 export type FontSourceKind = "bundled" | "system" | "imported";
+export type FontCategory = "sans" | "serif" | "monospace";
 
 export type FontCatalogEntry = Readonly<{
   id: string;
   label: string;
   description: string;
+  /** Trusted primary family expression. Locale and Emoji fallbacks are product-owned. */
   family: string;
+  category: FontCategory;
   source: FontSourceKind;
   roles: readonly TypographyRole[];
 }>;
@@ -40,7 +43,8 @@ export const BUILTIN_FONT_CATALOG = [
     id: BUILTIN_FONT_IDS.geistSans,
     label: "Geist",
     description: "PuppyOne's balanced default reading font.",
-    family: "\"Geist Sans\", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+    family: "\"Geist Sans\"",
+    category: "sans",
     source: "bundled",
     roles: ["ui", "content"],
   },
@@ -48,7 +52,8 @@ export const BUILTIN_FONT_CATALOG = [
     id: BUILTIN_FONT_IDS.systemSans,
     label: "System",
     description: "Use the native sans-serif font from this device.",
-    family: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+    family: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\"",
+    category: "sans",
     source: "system",
     roles: ["ui", "content"],
   },
@@ -56,7 +61,8 @@ export const BUILTIN_FONT_CATALOG = [
     id: BUILTIN_FONT_IDS.systemSerif,
     label: "Serif",
     description: "A quiet system serif stack for long-form reading.",
-    family: "ui-serif, \"New York\", \"Iowan Old Style\", \"Palatino Linotype\", Palatino, Georgia, serif",
+    family: "ui-serif, \"New York\", \"Iowan Old Style\", \"Palatino Linotype\", Palatino, Georgia",
+    category: "serif",
     source: "system",
     roles: ["content"],
   },
@@ -64,7 +70,8 @@ export const BUILTIN_FONT_CATALOG = [
     id: BUILTIN_FONT_IDS.geistMono,
     label: "Geist Mono",
     description: "PuppyOne's metric-stable code font.",
-    family: "\"Geist Mono\", \"SFMono-Regular\", \"SF Mono\", Consolas, \"Liberation Mono\", monospace",
+    family: "\"Geist Mono\"",
+    category: "monospace",
     source: "bundled",
     roles: ["code"],
   },
@@ -72,7 +79,8 @@ export const BUILTIN_FONT_CATALOG = [
     id: BUILTIN_FONT_IDS.terminalSystemMono,
     label: "Terminal Mono",
     description: "The metric-stable native terminal stack.",
-    family: "\"SF Mono\", \"SFMono-Regular\", Menlo, Monaco, Consolas, \"Liberation Mono\", monospace",
+    family: "\"SF Mono\", \"SFMono-Regular\", Menlo, Monaco, Consolas, \"Liberation Mono\"",
+    category: "monospace",
     source: "system",
     roles: ["terminal"],
   },
@@ -114,13 +122,27 @@ export function isValidFontCatalogEntry(value: unknown): value is FontCatalogEnt
     && entry.family.trim().length > 0
     && entry.family.length <= 1024
     && !/[\u0000-\u001f\u007f;{}]/.test(entry.family)
-    && !/url\s*\(/i.test(entry.family)
+    && !/(?:url|var|env|attr|calc)\s*\(/i.test(entry.family)
+    && (entry.category === "sans" || entry.category === "serif" || entry.category === "monospace")
     && (entry.source === "bundled" || entry.source === "system" || entry.source === "imported")
     && Array.isArray(entry.roles)
     && entry.roles.length > 0
     && entry.roles.every((role) => (
       role === "ui" || role === "content" || role === "code" || role === "terminal"
     ));
+}
+
+/** Builds a preview/isolated family without duplicating locale fallback lists in TS. */
+export function createCatalogFontFamily(entry: FontCatalogEntry) {
+  const localeToken = entry.category === "monospace"
+    ? "--po-font-locale-mono"
+    : `--po-font-locale-${entry.category}`;
+  const generic = entry.category === "monospace"
+    ? "monospace"
+    : entry.category === "sans"
+      ? "sans-serif"
+      : "serif";
+  return `${entry.family}, var(${localeToken}), var(--po-font-emoji), ${generic}`;
 }
 
 export function parseTypographyPreferences(value: string | null | undefined): TypographyPreferences {

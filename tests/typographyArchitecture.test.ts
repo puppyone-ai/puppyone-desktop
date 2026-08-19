@@ -4,6 +4,7 @@ import {
   BUILTIN_FONT_CATALOG,
   BUILTIN_FONT_IDS,
   DEFAULT_TYPOGRAPHY_PREFERENCES,
+  createCatalogFontFamily,
   createTypographyRootProps,
   getFontCatalogEntries,
   isValidFontCatalogEntry,
@@ -30,7 +31,8 @@ describe("typography architecture", () => {
       id: importedId,
       label: "Imported reading font",
       description: "Test font",
-      family: '"PuppyOne Imported 9f2b2dc0", serif',
+      family: '"PuppyOne Imported 9f2b2dc0"',
+      category: "serif",
       source: "imported",
       roles: ["content"],
     };
@@ -38,8 +40,9 @@ describe("typography architecture", () => {
     expect(resolved.content).toBe(importedEntry);
     expect(createTypographyRootProps(resolved)).toMatchObject({
       "data-font-content": importedId,
+      "data-font-content-category": "serif",
       style: {
-        "--po-font-content": importedEntry.family,
+        "--po-font-content-primary": importedEntry.family,
       },
     });
   });
@@ -47,10 +50,16 @@ describe("typography architecture", () => {
   it("changes one semantic role without coupling the other typography roles", () => {
     const defaults = resolveTypography(DEFAULT_TYPOGRAPHY_PREFERENCES);
     expect(defaults.ui.family).toContain('"Geist Sans"');
+    expect(defaults.content.family).toBe('"Geist Sans"');
+    expect(defaults.content.category).toBe("sans");
     expect(defaults.content.family).toBe(defaults.ui.family);
     expect(defaults.code.family).toContain('"Geist Mono"');
+    expect(defaults.code.category).toBe("monospace");
     expect(defaults.terminal.family).toBe(
-      '"SF Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+      '"SF Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono"',
+    );
+    expect(createCatalogFontFamily(defaults.content)).toBe(
+      '"Geist Sans", var(--po-font-locale-sans), var(--po-font-emoji), sans-serif',
     );
 
     const next = withTypographyFont(
@@ -89,13 +98,27 @@ describe("typography architecture", () => {
       label: "Unsafe",
       description: "Unsafe test entry",
       family: "url(https://example.invalid/font.woff2)",
+      category: "sans",
+      source: "imported",
+      roles: ["content"],
+    })).toBe(false);
+    expect(isValidFontCatalogEntry({
+      id: "imported:token-hijack",
+      label: "Unsafe variable",
+      description: "Unsafe test entry",
+      family: "var(--po-font-ui)",
+      category: "sans",
       source: "imported",
       roles: ["content"],
     })).toBe(false);
   });
 
   it("binds content surfaces and metric-sensitive consumers to semantic contracts", () => {
-    const tokens = source("src/styles/tokens.css");
+    const styles = source("src/styles.css");
+    const foundations = source("src/styles/typography/foundations.css");
+    const locales = source("src/styles/typography/locales.css");
+    const roles = source("src/styles/typography/roles.css");
+    const base = source("src/styles/base.css");
     const markdown = source("packages/shared-ui/src/styles/editor/markdown-editor.css");
     const plainText = source("packages/shared-ui/src/styles/editor/editor-chrome.css");
     const agentTranscript = source("src/features/desktop-agent/ui/styles/transcript.css");
@@ -103,20 +126,62 @@ describe("typography architecture", () => {
     const terminalAppearanceSync = source("src/features/desktop-terminal/runtime/useTerminalAppearanceSync.ts");
     const markdownEditor = source("packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor.tsx");
     const codeEditor = source("packages/shared-ui/src/editor/viewers/code/CodeMirrorCodeEditor.tsx");
+    const plainTextEditor = source("packages/shared-ui/src/editor/viewers/code/PlainTextEditor.tsx");
+    const agentMarkdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
+    const typographyRuntime = source("src/features/typography/typographyRuntime.ts");
+    const app = source("src/App.tsx");
 
-    expect(tokens).toContain("--po-font-ui: var(--font-geist-sans);");
-    expect(tokens).toContain("--po-font-content: var(--font-geist-sans);");
-    expect(tokens).toContain("--po-font-code: var(--font-geist-mono);");
-    expect(tokens).toContain("--po-font-terminal: var(--font-terminal-mono);");
-    expect(tokens).toContain("--po-font-sans: var(--po-font-ui);");
-    expect(tokens).toContain("--po-font-mono: var(--po-font-code);");
-    expect(markdown).toContain("font-family: var(--po-font-content, var(--po-font-sans));");
+    expect(styles).toContain('@import "./styles/typography/foundations.css" layer(tokens);');
+    expect(styles).toContain('@import "./styles/typography/locales.css" layer(tokens);');
+    expect(styles).toContain('@import "./styles/typography/roles.css" layer(tokens);');
+    expect(foundations).toContain('font-family: "Geist Sans";');
+    expect(foundations).toContain("--po-text-size-content: 14px;");
+    expect(foundations).toContain("--po-text-weight-medium: 500;");
+    expect(foundations).toContain("--po-content-reading-line-height: 1.7142857143;");
+    expect(foundations).toContain("--po-content-reading-letter-spacing: 0;");
+    expect(roles).toContain("--po-font-ui-primary: \"Geist Sans\";");
+    expect(roles).toContain("--po-font-content-primary: \"Geist Sans\";");
+    expect(roles).toContain("--po-font-code-primary: \"Geist Mono\";");
+    expect(roles).toContain("--po-font-content: var(--po-font-content-primary), var(--po-font-content-fallback);");
+    expect(roles).toContain("--po-font-content-fallback: var(--po-font-locale-sans), var(--po-font-emoji), sans-serif;");
+    expect(roles).toContain("--po-font-sans: var(--po-font-ui);");
+    expect(roles).toContain("--po-font-mono: var(--po-font-code);");
+    expect(locales).toContain(':lang(zh-Hans)');
+    expect(locales).toContain(':lang(zh-Hant)');
+    expect(locales).toContain(':lang(ja)');
+    expect(locales).toContain(':lang(ko)');
+    expect(locales).toContain('"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC"');
+    expect(locales).not.toContain('"Noto Sans CJK SC", sans-serif');
+    expect(locales).toContain('"Hiragino Sans", "Yu Gothic", "Meiryo", "Noto Sans CJK JP"');
+    expect(locales).toContain('"Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR"');
+    expect(locales).toContain("--po-content-reading-weight: 500;");
+    expect(locales).not.toContain("--po-content-reading-letter-spacing:");
+    expect(locales).not.toContain("--po-content-reading-line-height:");
+    expect(base).toContain("font-feature-settings: normal;");
+    expect(base).not.toContain("'cv02'");
+    expect(markdown).toContain("font-family: var(--po-md-content-font);");
+    expect(markdown).toContain("font-weight: var(--po-md-content-weight);");
+    expect(markdown).toContain("font-feature-settings: normal;");
     expect(plainText).toContain("font-family: var(--po-font-content, var(--po-font-sans));");
+    expect(plainText).toContain("font-weight: var(--po-text-weight-medium);");
     expect(agentTranscript).toContain("font-family: var(--po-font-content, var(--po-font-sans));");
     expect(terminalAppearance).toContain('getPropertyValue("--po-font-terminal")');
+    expect(terminalAppearance).toContain('getPropertyValue("--po-terminal-font-size")');
     expect(terminalAppearanceSync).toContain("subscribeTypographyChanges(document, applyAppearance)");
     expect(markdownEditor).toContain("subscribeTypographyChanges(host.ownerDocument");
+    expect(markdownEditor).toContain('data-po-typography-role="content"');
+    expect(markdownEditor).toContain("lang={contentLanguage.language}");
+    expect(markdownEditor).toContain("resolveMarkdownContentLanguage(value, locale, documentLanguage)");
     expect(codeEditor).toContain("subscribeTypographyChanges(host.ownerDocument");
+    expect(codeEditor).toContain('data-po-typography-role="code"');
+    expect(plainTextEditor).toContain('data-po-typography-role="content"');
+    expect(agentMarkdown).toContain('data-po-typography-role="content"');
+    expect(typographyRuntime).toContain('"--po-font-content-primary": resolved.content.family');
+    expect(typographyRuntime).not.toContain('"--po-font-content": resolved.content.family');
+    expect(app).toContain("fontCatalog,\n    locale,");
+    expect(app).toContain("data-interface-text-size={textSize}");
+    expect(app).toContain("data-content-text-size={textSize}");
+    expect(app).toContain("data-terminal-text-size={textSize}");
   });
 });
 

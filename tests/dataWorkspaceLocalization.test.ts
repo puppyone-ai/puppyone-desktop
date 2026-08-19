@@ -13,6 +13,7 @@ import {
   formatFileOperationNotice,
   type FileOperationNotice,
 } from "../src/features/data-workspace/useFileClipboard";
+import { DEFAULT_EXPERIMENTAL_SETTINGS } from "../src/preferences";
 
 const english = createMessageFormatter({
   locale: "en",
@@ -59,6 +60,7 @@ describe("data workspace localization boundaries", () => {
     expect(defaultCreateName("folder", simplifiedChinese)).toBe("未命名文件夹");
 
     expect(normalizeCreateEntryName("markdown", "Notes")).toBe("Notes.md");
+    expect(normalizeCreateEntryName("contextMap", "Knowledge")).toBe("Knowledge.contextmap");
     expect(normalizeCreateEntryName("csv", "Data")).toBe("Data.csv");
     expect(normalizeCreateEntryName("csv", "Data.tsv")).toBe("Data.tsv");
 
@@ -66,6 +68,10 @@ describe("data workspace localization boundaries", () => {
       csvHeaders: ["第 1 列", "第 2 列", "第 3 列"],
       puppyFlow: { title: "未命名流程", prompts: ["分析", "应用"] },
     })).toBe("第 1 列,第 2 列,第 3 列\n,,\n,,\n");
+    expect(getCreateEntryInitialContent("contextMap", {
+      csvHeaders: ["A", "B", "C"],
+      puppyFlow: { title: "Flow", prompts: ["Analyze", "Apply"] },
+    })).toContain('"scope": "."');
   });
 
   it("localizes known and previously unseen file type labels", () => {
@@ -78,5 +84,10 @@ describe("data workspace localization boundaries", () => {
       .toBe("当前类型（⁨.custom⁩）");
     expect(chineseOptions.find(({ extension }) => extension === ".txt")?.label)
       .toBe("文本 (.txt)");
+    expect(getDesktopFileTypeOptions(".contextmap", english, {
+      ...DEFAULT_EXPERIMENTAL_SETTINGS,
+      enableContextMaps: true,
+    }).find(({ extension }) => extension === ".contextmap")?.label)
+      .toBe("Context Map (.contextmap)");
   });
 });

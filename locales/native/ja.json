@@ -1,6 +1,7 @@
 {
   "native.messageUnavailable": "このテキストは利用できません。",
   "native.dock.newWindow": "新規ウインドウ",
+  "native.menu.file": "ファイル",
   "native.workspace.open.title": "ローカルの PuppyOne ワークスペースを開く",
   "native.update.blocker.terminal.label": "PuppyOne のターミナルセッションが開いています（{count} 件）",
   "native.update.blocker.terminal.detail": "アップデートすると、PuppyOne 内で作成された {count} 件のターミナルセッションが閉じられます。Ghostty などの外部ターミナルには影響しません。",

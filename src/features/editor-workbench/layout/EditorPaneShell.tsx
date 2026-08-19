@@ -11,10 +11,15 @@ import type { EditorFileDropController } from "../drag-and-drop/useExplorerFileD
 import type { PaneMoveDragController } from "../drag-and-drop/usePaneMoveDrag";
 import { EditorPaneChrome } from "./EditorPaneChrome";
 import { useEditorPaneChromeReveal } from "./useEditorPaneChromeReveal";
+import {
+  AgentFilePresence,
+  desktopAgentActivityStore,
+} from "../../desktop-agent-presence";
 
 export type EditorPaneShellProps = Readonly<{
   active: boolean;
   actionsOpen: boolean;
+  agentPresencePath: string | null;
   children: ReactNode;
   editorLabel: string | null;
   externalOpenAppName: string | null;
@@ -38,6 +43,7 @@ export type EditorPaneShellProps = Readonly<{
 export function EditorPaneShell({
   active,
   actionsOpen,
+  agentPresencePath,
   children,
   editorLabel,
   externalOpenAppName,
@@ -91,6 +97,9 @@ export function EditorPaneShell({
       onDragLeaveCapture={(event) => fileDrop.leave(event, pane.id)}
       onDropCapture={(event) => fileDrop.drop(event, pane.id)}
     >
+      {agentPresencePath && (
+        <AgentFilePresence path={agentPresencePath} store={desktopAgentActivityStore} />
+      )}
       <EditorPaneChrome
         actionsOpen={actionsOpen}
         editorLabel={editorLabel}
@@ -108,6 +117,7 @@ export function EditorPaneShell({
       />
       <div className="desktop-editor-pane-content">{children}</div>
       {dropEdge && <div className="desktop-editor-drop-preview" data-edge={dropEdge} />}
+      <div className="desktop-editor-pane-interaction-frame" aria-hidden="true" />
     </section>
   );
 }

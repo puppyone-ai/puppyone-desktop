@@ -10,12 +10,12 @@ import {
   resolveViewerRouteForDocument,
 } from "../registry/viewerPackAdapter";
 import type {
+  ContextMapWorkspaceEnvironment,
   EditorDocument,
   EditorInteractionPreferences,
   EditorSaveMode,
-  MarkdownAssetUrlResolver,
   MarkdownHtmlTrustMode,
-  MarkdownLinkGraph,
+  MarkdownWorkspaceEnvironment,
   OfficeEditorActionResolver,
 } from "../registry/viewerTypes";
 import { DEFAULT_EDITOR_INTERACTION_PREFERENCES } from "../registry/viewerTypes";
@@ -58,8 +58,8 @@ export type EditorDocumentHostProps = {
   htmlTrustMode?: MarkdownHtmlTrustMode;
   workspaceId?: string;
   workspaceRoot?: string | null;
-  markdownLinkGraph?: MarkdownLinkGraph | null;
-  markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
+  markdownEnvironment?: MarkdownWorkspaceEnvironment | null;
+  contextMapEnvironment?: ContextMapWorkspaceEnvironment | null;
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
@@ -99,8 +99,8 @@ function EditorDocumentSurface({
   htmlTrustMode = "safe",
   workspaceId = "",
   workspaceRoot = null,
-  markdownLinkGraph = null,
-  markdownAssetUrlResolver = null,
+  markdownEnvironment = null,
+  contextMapEnvironment = null,
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
@@ -207,8 +207,8 @@ function EditorDocumentSurface({
         htmlTrustMode,
         workspaceId,
         workspaceRoot,
-        markdownLinkGraph,
-        markdownAssetUrlResolver,
+        markdownEnvironment,
+        contextMapEnvironment,
         appPreview,
         openExternalFile,
         convertOfficeDocumentToDocx,

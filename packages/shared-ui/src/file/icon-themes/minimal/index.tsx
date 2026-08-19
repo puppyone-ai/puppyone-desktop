@@ -99,6 +99,7 @@ function getMinimalLucideIcon(kind: FileVisualKind): LucideIcon {
 const MINIMAL_LUCIDE_ICONS = {
   folder: LucideFolder,
   app: Joystick,
+  "context-map": Workflow,
   workflow: Workflow,
   markdown: FileText,
   json: FileJson,
@@ -122,6 +123,7 @@ const MINIMAL_LUCIDE_ICONS = {
 const minimalGlyphRenderers = {
   folder: renderMinimalGlyph,
   app: renderMinimalGlyph,
+  "context-map": renderMinimalGlyph,
   workflow: renderMinimalGlyph,
   markdown: renderMinimalGlyph,
   json: renderMinimalGlyph,

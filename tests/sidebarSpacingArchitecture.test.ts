@@ -54,7 +54,7 @@ describe("sidebar spacing architecture", () => {
     expect(shell).toContain("margin: 0;");
   });
 
-  it("gives the Explorer resize gutter sole ownership of the sidebar divider", () => {
+  it("shares one visible boundary between the Explorer scrollbar and Editor", () => {
     const explorerColumn = compact(readCssBlock(dataTreeCss, ".explorer-column"));
     const explorerResizer = compact(readCssBlock(dataTreeCss, ".data-explorer-resizer"));
     const explorerDivider = compact(readCssBlock(dataTreeCss, ".data-explorer-resizer::after"));
@@ -65,8 +65,9 @@ describe("sidebar spacing architecture", () => {
       'className={`desktop-view-surface desktop-view-surface-${region}`}',
     );
     expect(explorerColumn).toContain("border-inline-end: 1px solid transparent;");
-    expect(explorerResizer).toContain("background: var(--po-sidebar);");
-    expect(explorerDivider).toContain("inset-inline-end: 0;");
+    expect(explorerResizer).toContain("background: transparent;");
+    expect(explorerDivider).toContain("inset-inline-start: 0;");
+    expect(explorerDivider).toContain("inset-inline-end: auto;");
     expect(explorerDivider).toContain(
       "background: var(--po-shell-divider, var(--po-divider));",
     );

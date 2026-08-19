@@ -46,6 +46,14 @@ const paneSourceLifecycle = readFileSync(
   new URL("../src/features/editor-workbench/runtime/useEditorPaneSource.ts", import.meta.url),
   "utf8",
 );
+const dataWorkspaceSource = readFileSync(
+  new URL("../packages/shared-ui/src/data/DataWorkspace.tsx", import.meta.url),
+  "utf8",
+);
+const viewerTypesSource = readFileSync(
+  new URL("../packages/shared-ui/src/editor/registry/viewerTypes.ts", import.meta.url),
+  "utf8",
+);
 const resizeGestureSource = readFileSync(
   new URL("../src/features/editor-workbench/interactions/useSplitResizeGesture.ts", import.meta.url),
   "utf8",
@@ -72,6 +80,14 @@ const dropGeometrySource = readFileSync(
 );
 const splitStyles = readFileSync(
   new URL("../src/features/editor-workbench/layout/desktop-editor-split-view.css", import.meta.url),
+  "utf8",
+);
+const menuStyles = readFileSync(
+  new URL("../src/styles/menus.css", import.meta.url),
+  "utf8",
+);
+const desktopMenuSource = readFileSync(
+  new URL("../src/components/DesktopMenu.tsx", import.meta.url),
   "utf8",
 );
 const dataShellStyles = readFileSync(
@@ -104,16 +120,21 @@ describe("editor split-pane architecture", () => {
     expect(surfaceSource).toContain("layout={editorWorkbench.paneLayout}");
     expect(surfaceSource).toContain('loadActiveFileSource={resolvedSurface.id !== "data"}');
     expect(splitSource).toContain('data-direction={split.direction}');
+    expect(splitSource).toContain("touchesBlockEnd");
+    expect(splitSource).toContain(
+      'touchesBlockEnd={split.direction === "horizontal" && props.touchesBlockEnd}',
+    );
+    expect(splitSource).toContain("touchesBlockEnd={props.touchesBlockEnd}");
     expect(resizeSource).toContain('role="separator"');
     expect(paneChromeSource).toContain('className="desktop-editor-pane-handle"');
     expect(paneShellSource).not.toContain("paneCount > 1 &&");
     expect(splitSource).toContain("onOpenAtPaneEdge");
     expect(splitSource).toContain("onMovePane");
     expect(splitSource).toContain("onSplitPane");
-    expect(paneActionsMenuSource).toContain('t("editor.panes.splitLeft")');
-    expect(paneActionsMenuSource).toContain('t("editor.panes.splitRight")');
-    expect(paneActionsMenuSource).toContain('t("editor.panes.splitUp")');
-    expect(paneActionsMenuSource).toContain('t("editor.panes.splitDown")');
+    expect(paneActionsMenuSource).not.toContain('t("editor.panes.splitLeft")');
+    expect(paneActionsMenuSource).not.toContain('t("editor.panes.splitRight")');
+    expect(paneActionsMenuSource).not.toContain('t("editor.panes.splitUp")');
+    expect(paneActionsMenuSource).not.toContain('t("editor.panes.splitDown")');
     expect(workbenchControllerSource).toContain("const splitPane = useCallback");
     expect(workbenchControllerSource).toContain("editorId: null");
     expect(paneShellSource).toContain('className="desktop-editor-drop-preview"');
@@ -167,6 +188,7 @@ describe("editor split-pane architecture", () => {
     );
     expect(paneMenuRule).toContain("position: fixed;");
     expect(paneMenuRule).toContain("overflow-y: auto;");
+    expect(paneMenuRule).not.toContain("box-shadow:");
     expect(splitStyles).not.toContain('.desktop-editor-pane-menu[data-has-secondary="true"]');
     const closeActionRule = readCssBlock(
       splitStyles,
@@ -178,37 +200,110 @@ describe("editor split-pane architecture", () => {
       ".desktop-editor-pane-menu-end-actions",
     );
     expect(endActionsRule).toContain("display: flex;");
-    expect(endActionsRule).toContain("margin-inline-start: auto;");
+    expect(endActionsRule).not.toContain("margin-inline-start: auto;");
+    const segmentedEndActionsRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-menu-segmented-control + .desktop-editor-pane-menu-end-actions",
+    );
+    expect(segmentedEndActionsRule).toContain("margin-inline-start: auto;");
     const externalDividerRule = readCssBlock(
       splitStyles,
       ".desktop-editor-pane-menu-action-divider",
     );
-    expect(externalDividerRule).toContain(
-      "width: var(--desktop-editor-pane-menu-action-size);",
-    );
-    expect(externalDividerRule).toContain(
-      "height: var(--desktop-editor-pane-menu-action-size);",
-    );
+    expect(externalDividerRule).toContain("width: 1px;");
+    expect(externalDividerRule).toContain("height: 18px;");
+    expect(externalDividerRule).toContain("flex: 0 0 1px;");
+    expect(externalDividerRule).toContain("margin-inline: 3px;");
+    expect(externalDividerRule).toContain("background: var(--po-divider);");
     expect(externalDividerRule).toContain("pointer-events: none;");
-    const externalDividerLineRule = readCssBlock(
-      splitStyles,
-      ".desktop-editor-pane-menu-action-divider::before",
+    expect(splitStyles).not.toContain(".desktop-editor-pane-menu-action-divider::before");
+    expect(paneActionsMenuSource).toContain('elevation="compact"');
+    expect(desktopMenuSource).toContain('elevation?: "default" | "compact";');
+    expect(desktopMenuSource).toContain(
+      'data-menu-elevation={elevation === "compact" ? elevation : undefined}',
     );
-    expect(externalDividerLineRule).toContain("width: 1px;");
-    expect(externalDividerLineRule).toContain("height: 12px;");
-    expect(externalDividerLineRule).toContain("background: var(--po-divider);");
+    const compactMenuElevationRule = readCssBlock(
+      menuStyles,
+      '.desktop-menu-surface[data-menu-elevation="compact"]',
+    );
+    expect(compactMenuElevationRule).toContain(
+      "--interface-menu-box-shadow: var(--po-menu-shadow-compact);",
+    );
+    expect(compactMenuElevationRule).toContain("box-shadow: var(--po-menu-shadow-compact);");
+    expect(tokens).toContain("--po-menu-shadow-compact: var(--po-elevation-low);");
+    expect(paneActionsMenuSource).toContain("PANE_DIVIDER_WIDTH = 1");
+    expect(paneActionsMenuSource).toContain("PANE_DIVIDER_INLINE_MARGIN = 3");
     expect(paneActionsMenuSource).toContain(
       'className="desktop-editor-pane-menu-primary-action desktop-editor-pane-menu-close-action"',
     );
-    const paneFrameRule = readCssBlock(splitStyles, ".desktop-editor-pane");
-    expect(paneFrameRule).toContain("position: relative;");
-    expect(paneFrameRule).toContain("box-sizing: border-box;");
-    expect(paneFrameRule).toContain("border: 1px solid transparent;");
-    expect(paneFrameRule).toContain("transition: border-color 90ms ease;");
+    const findActionIndex = paneActionsMenuSource.indexOf(
+      "desktop-editor-pane-menu-find-action",
+    );
+    const externalActionIndex = paneActionsMenuSource.indexOf(
+      "desktop-editor-pane-menu-external-action",
+    );
+    const closeActionIndex = paneActionsMenuSource.indexOf(
+      "desktop-editor-pane-menu-close-action",
+    );
+    expect(findActionIndex).toBeGreaterThan(0);
+    expect(externalActionIndex).toBeGreaterThan(findActionIndex);
+    expect(closeActionIndex).toBeGreaterThan(externalActionIndex);
+    expect(paneActionsMenuSource).not.toContain("PanelLeft");
+    expect(paneActionsMenuSource).not.toContain("PanelRight");
+    expect(paneActionsMenuSource).not.toContain("PanelTop");
+    expect(paneActionsMenuSource).not.toContain("PanelBottom");
+    expect(paneActionsMenuSource).toContain(
+      "segmentedControl && <PaneMenuSegmentedControl item={segmentedControl}",
+    );
+    expect(paneActionsMenuSource).toContain("resolvePaneActionsMenuWidth({");
+    expect(paneActionsMenuSource).toContain("PANE_ACTION_SLOT_SIZE = 25");
+    expect(splitSource).toContain("editorResource: editor?.resource ?? null");
+    expect(splitSource).toContain(
+      "menuContribution?.editorResource === editor?.resource",
+    );
+    expect(splitSource).not.toContain(
+      "menuContribution?.documentId === editor?.resource",
+    );
+    const segmentedControlRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-menu-segmented-control",
+    );
+    expect(segmentedControlRule).toContain(
+      "grid-auto-columns: var(--desktop-editor-pane-menu-action-size);",
+    );
+    expect(segmentedControlRule).toContain(
+      "height: var(--desktop-editor-pane-menu-action-size);",
+    );
+    expect(segmentedControlRule).toContain("flex: 0 0 auto;");
+    expect(segmentedControlRule).toContain("padding: 0;");
+    expect(segmentedControlRule).toContain("border: 0;");
+    expect(segmentedControlRule).toContain("background: transparent;");
+    expect(segmentedControlRule).toContain("box-shadow: none;");
+    const selectedSegmentRule = readCssBlock(
+      splitStyles,
+      '.desktop-editor-pane-menu-segment[aria-checked="true"]',
+    );
+    expect(selectedSegmentRule).toContain(
+      "background: var(--desktop-titlebar-active, var(--po-selected));",
+    );
+    expect(selectedSegmentRule).toContain(
+      "color: var(--desktop-titlebar-text, var(--po-text));",
+    );
+    const paneRule = readCssBlock(splitStyles, ".desktop-editor-pane");
+    const paneFrameRule = readCssBlock(
+      splitStyles,
+      ".desktop-editor-pane-interaction-frame",
+    );
+    expect(paneRule).toContain("position: relative;");
+    expect(paneRule).toContain("box-sizing: border-box;");
+    expect(paneRule).not.toContain("border: 1px solid transparent;");
+    expect(paneFrameRule).toContain("position: absolute;");
+    expect(paneFrameRule).toContain("inset: 0;");
+    expect(paneFrameRule).toContain("transition: color 90ms ease;");
     expect(splitStyles).toContain(
       ".desktop-editor-pane[data-handle-hot]:not([data-move-source])",
     );
-    expect(splitStyles).toContain("border-color: var(--po-divider);");
+    expect(splitStyles).toContain("color: var(--po-divider);");
     expect(splitStyles).not.toContain(".desktop-editor-pane::after");
     expect(splitStyles).not.toContain("@keyframes desktop-editor-pane-activate");
     expect(splitStyles).toContain("var(--po-pane-resizer-active-color)");
@@ -238,12 +333,29 @@ describe("editor split-pane architecture", () => {
     expect(splitSource).toContain("key={split.first.id}");
     expect(splitSource).toContain("key={split.second.id}");
     expect(splitSource).toContain("key={split.id}");
-    expect(splitSource).toContain("createEditorNodeIndex(state.tree)");
+    expect(splitSource).toContain("createEditorNodeIndex(editorTree)");
+    expect(surfaceSource).toContain("editorTree={state.tree}");
+    expect(surfaceSource).toContain("markdownEnvironment={state.markdownEnvironment}");
+    expect(splitSource).not.toContain("DataWorkspaceState");
+    expect(splitSource).not.toContain("state: DataWorkspaceState");
     expect(splitSource).toContain("<EditorPaneRuntime");
     expect(paneRuntimeSource).toContain("memo(function EditorPaneRuntime");
     expect(paneRuntimeSource).toContain("<EditorPaneDocumentRuntime");
     expect(paneDocumentRuntimeSource).toContain("memo(function EditorPaneDocumentRuntime");
     expect(paneDocumentRuntimeSource).toContain("useEditorPaneSource(sourceNode");
+    expect(paneDocumentRuntimeSource).toContain("samePaneEnvironment");
+    expect(paneDocumentRuntimeSource).toContain("isMarkdownDocumentDescriptor");
+    expect(dataWorkspaceSource).toContain("useStableEventCallback");
+    expect(dataWorkspaceSource).toContain("markdownEnvironment: MarkdownWorkspaceEnvironment");
+    expect(viewerTypesSource).toContain("export type MarkdownLinkCommands");
+    expect(viewerTypesSource).toContain("export type MarkdownWorkspaceEnvironment");
+    const graphContract = viewerTypesSource.slice(
+      viewerTypesSource.indexOf("export type MarkdownLinkGraph ="),
+      viewerTypesSource.indexOf("export type MarkdownLinkCommands ="),
+    );
+    expect(graphContract).toContain("revision: number");
+    expect(graphContract).not.toContain("openWikiLink");
+    expect(graphContract).not.toContain("openExternalUrl");
     expect(paneSourceLifecycle).toContain("new AbortController()");
     expect(paneMoveSource).toContain("createPaneMovePreview");
     expect(paneMoveSource).toContain("destroyPaneMovePreview");
@@ -282,20 +394,33 @@ describe("editor split-pane architecture", () => {
     expect(persistenceSource).toContain("flush(): void");
   });
 
-  it("keeps the Sidebar resize hit lane on the Sidebar side of the visible divider", () => {
+  it("keeps one Sidebar and Editor layout boundary under an overlay sash", () => {
     const explorerRule = readCssBlock(dataShellStyles, ".explorer-column");
     const resizerRule = readCssBlock(dataShellStyles, ".data-explorer-resizer");
     const resizerDividerRule = readCssBlock(dataShellStyles, ".data-explorer-resizer::after");
 
     expect(explorerRule).toContain("border-inline-end: 1px solid transparent;");
-    expect(resizerRule).toContain("background: var(--po-sidebar);");
-    expect(resizerDividerRule).toContain("inset-inline-end: 0;");
+    expect(resizerRule).toContain("background: transparent;");
+    expect(resizerRule).toContain(
+      "inset-inline-start: var(--data-explorer-width, clamp(282px, 26vw, 360px));",
+    );
+    expect(resizerDividerRule).toContain("inset-inline-start: 0;");
+    expect(resizerDividerRule).toContain("inset-inline-end: auto;");
     expect(resizerDividerRule).toContain(
       "background: var(--po-shell-divider, var(--po-divider));",
     );
-    expect(splitSource).toContain("touchesInlineStart");
-    expect(splitStyles).toContain('data-touches-inline-start="true"');
-    expect(splitStyles).not.toContain("--desktop-editor-sidebar-gutter-size");
+    expect(dataShellStyles).not.toContain("grid-column: 3;");
+    expect(dataShellStyles).not.toMatch(
+      /grid-template-columns:[^}]*var\(--po-pane-resizer-hit-size/s,
+    );
+    expect(splitStyles).not.toContain(
+      "inset-inline-start: calc(-1 * var(--po-pane-resizer-hit-size, 8px));",
+    );
+    expect(splitStyles).toContain(
+      "z-index: calc(var(--po-pane-resizer-z-index, 35) + 1);",
+    );
+    expect(surfaceSource).toContain("useNativeSurfacePointerRoutingRegion");
+    expect(surfaceSource).toContain("explorerResizeHandleRef={setExplorerResizeHandle}");
   });
 
   it("does not project the Sidebar divider through the Header", () => {

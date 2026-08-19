@@ -3,7 +3,10 @@ import { EditorView, WidgetType } from "@codemirror/view";
 import type { MarkdownLinkGraph } from "../../../registry/viewerTypes";
 import type { MarkdownMdxTab } from "../../core/features/markdownFeatureData";
 import { getMarkdownLocalization } from "../../core/editor/markdownLocalization";
-import { openMarkdownHref } from "../../core/editor/markdownLivePreviewContext";
+import {
+  markdownLinkCommandsFacet,
+  openMarkdownHref,
+} from "../../core/editor/markdownLivePreviewContext";
 import { markdownRevealedSourceEffect } from "../../core/state/revealedSource";
 import { getMarkdownEmbedHost } from "../../platform/codemirror/embedHost";
 import { MarkdownWidgetMeasureController } from "../../platform/codemirror/layoutCoordinator";
@@ -32,7 +35,7 @@ export class MarkdownMdxTabsWidget extends WidgetType {
       && other.from === this.from
       && other.to === this.to
       && other.source === this.source
-      && other.markdownLinkGraph === this.markdownLinkGraph
+      && (other.markdownLinkGraph?.revision ?? 0) === (this.markdownLinkGraph?.revision ?? 0)
       && other.documentPath === this.documentPath
       && other.renderInlinePreview === this.renderInlinePreview
       && other.layoutEstimatedHeight === this.layoutEstimatedHeight
@@ -125,6 +128,7 @@ export class MarkdownMdxTabsWidget extends WidgetType {
       panel.dir = "auto";
       this.renderInlinePreview(panel, tab.content.trim(), {
         markdownLinkGraph: this.markdownLinkGraph,
+        markdownLinkCommands: view.state.facet(markdownLinkCommandsFacet),
         sourcePath: this.documentPath,
         openHref: (href) => openMarkdownHref(href, view),
         t: localization.t,

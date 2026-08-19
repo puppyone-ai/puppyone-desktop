@@ -89,6 +89,7 @@ describe("preset viewer contribution contract", () => {
   });
 
   it.each([
+    [document("Knowledge.contextmap"), "context-map", "content", "edit"],
     [document("notes.md"), "markdown", "content", "edit"],
     [document("settings.json", "text"), "json", "content", "edit"],
     [document("table.csv"), "csv-table", "content", "edit"],

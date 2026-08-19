@@ -22,6 +22,10 @@ describe("titlebar drag-region architecture", () => {
     expect(windowChromeCss).toContain("-webkit-app-region: drag;");
     expect(windowChromeCss).toContain('[data-window-no-drag="true"]');
     expect(windowChromeCss).toContain("-webkit-app-region: no-drag;");
+    expect(windowChromeCss).toContain('body:has([data-titlebar-context-menu="true"])');
+    expect(windowChromeCss).toMatch(
+      /body:has\(\[data-titlebar-context-menu="true"\]\)[\s\S]*\[data-window-drag-region="true"\][\s\S]*-webkit-app-region:\s*no-drag;/,
+    );
     expect(titlebarCss).not.toContain("-webkit-app-region");
     expect(baseCss).not.toContain("-webkit-app-region");
   });

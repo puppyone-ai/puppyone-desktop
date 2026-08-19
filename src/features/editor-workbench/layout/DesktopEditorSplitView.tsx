@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -10,8 +11,8 @@ import {
   getAiEditFileForPath,
   getEditorPanes,
   type AiEditRequest,
+  type DataNode,
   type DataPort,
-  type DataWorkspaceState,
   type EditorGroupState,
   type EditorFindCommand,
   type EditorInteractionPreferences,
@@ -23,6 +24,7 @@ import {
   type EditorPaneSplitOptions,
   type EditorSplitDirection,
   type FileIconThemeId,
+  type MarkdownWorkspaceEnvironment,
   type ViewerExtensionHostAdapter,
   type Workspace,
   type WorkspaceContentChange,
@@ -44,6 +46,7 @@ import {
   usePersistentEditorPaneHosts,
   type PersistentEditorPaneHosts,
 } from "./pane-host/usePersistentEditorPaneHosts";
+import { toWorkspaceRelativePath } from "../../desktop-agent-presence";
 
 export type DesktopEditorSplitViewProps = Readonly<{
   aiEditRequest: AiEditRequest | null;
@@ -52,8 +55,9 @@ export type DesktopEditorSplitViewProps = Readonly<{
   editorInteractionPreferences: EditorInteractionPreferences;
   fileIconTheme: FileIconThemeId;
   layout: EditorPaneLayoutState;
+  editorTree: readonly DataNode[];
+  markdownEnvironment: MarkdownWorkspaceEnvironment;
   refreshKey?: WorkspaceContentChange;
-  state: DataWorkspaceState;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   workspace: Workspace;
   externalOpen?: Readonly<{
@@ -90,8 +94,9 @@ export function DesktopEditorSplitView({
   editorInteractionPreferences,
   fileIconTheme,
   layout,
+  editorTree,
+  markdownEnvironment,
   refreshKey,
-  state,
   viewerExtensionAdapter = null,
   workspace,
   externalOpen,
@@ -107,7 +112,7 @@ export function DesktopEditorSplitView({
     [editorGroup.editors],
   );
   const panes = useMemo(() => getEditorPanes(layout), [layout]);
-  const editorNodeIndex = useMemo(() => createEditorNodeIndex(state.tree), [state.tree]);
+  const editorNodeIndex = useMemo(() => createEditorNodeIndex(editorTree), [editorTree]);
   const paneCount = panes.length;
   const paneHosts = usePersistentEditorPaneHosts(panes.map((pane) => pane.id));
   const [openActionsPaneId, setOpenActionsPaneId] = useState<string | null>(null);
@@ -128,6 +133,7 @@ export function DesktopEditorSplitView({
     <div className="desktop-editor-split-view" data-pane-count={paneCount}>
       <EditorLayoutNode
         node={layout.root}
+        touchesBlockEnd
         touchesInlineStart
         paneHosts={paneHosts}
         onResizeSplit={onResizeSplit}
@@ -147,8 +153,8 @@ export function DesktopEditorSplitView({
           paneCount={paneCount}
           paneMove={paneMove}
           openActionsPaneId={openActionsPaneId}
+          markdownEnvironment={markdownEnvironment}
           refreshKey={refreshKey}
-          state={state}
           viewerExtensionAdapter={viewerExtensionAdapter}
           workspace={workspace}
           onClosePane={onClosePane}
@@ -166,6 +172,7 @@ export function DesktopEditorSplitView({
 type EditorLayoutNodeProps = Readonly<{
   node: EditorPaneLayoutNode;
   paneHosts: PersistentEditorPaneHosts;
+  touchesBlockEnd: boolean;
   touchesInlineStart: boolean;
   onResizeSplit: DesktopEditorSplitViewProps["onResizeSplit"];
 }>;
@@ -176,6 +183,7 @@ function EditorLayoutNode(props: EditorLayoutNodeProps): ReactNode {
       <EditorPaneHostSlot
         host={props.paneHosts.get(props.node.id)!}
         paneId={props.node.id}
+        touchesBlockEnd={props.touchesBlockEnd}
       />
     );
   }
@@ -203,6 +211,7 @@ function EditorSplit({
         key={split.first.id}
         {...props}
         node={split.first}
+        touchesBlockEnd={split.direction === "horizontal" && props.touchesBlockEnd}
         touchesInlineStart={props.touchesInlineStart}
       />
       <EditorSplitResizeHandle
@@ -216,6 +225,7 @@ function EditorSplit({
         key={split.second.id}
         {...props}
         node={split.second}
+        touchesBlockEnd={props.touchesBlockEnd}
         touchesInlineStart={split.direction === "vertical" && props.touchesInlineStart}
       />
     </div>
@@ -236,8 +246,8 @@ type EditorPaneProps = Readonly<{
   paneCount: number;
   paneMove: PaneMoveDragController;
   openActionsPaneId: string | null;
+  markdownEnvironment: MarkdownWorkspaceEnvironment;
   refreshKey?: WorkspaceContentChange;
-  state: DataWorkspaceState;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   workspace: Workspace;
   onClosePane: DesktopEditorSplitViewProps["onClosePane"];
@@ -260,8 +270,8 @@ function EditorPane({
   paneCount,
   paneMove,
   openActionsPaneId,
+  markdownEnvironment,
   refreshKey,
-  state,
   viewerExtensionAdapter,
   workspace,
   onClosePane,
@@ -272,15 +282,32 @@ function EditorPane({
   const active = pane.id === activePaneId;
   const actionsOpen = pane.id === openActionsPaneId;
   const editor = pane.editorId ? editorById.get(pane.editorId) ?? null : null;
-  const treeNode = editor ? editorNodeIndex.get(editor.resource) ?? null : null;
+  const treeNode = editor
+    ? editorNodeIndex.get(editor.resource) ?? null
+    : null;
   const [findCommand, setFindCommand] = useState<EditorFindCommand | null>(null);
-  const [menuContribution, setMenuContribution] = useState<EditorPaneMenuContribution | null>(null);
+  const [menuContribution, setMenuContribution] = useState<Readonly<{
+    editorResource: string | null;
+    contribution: EditorPaneMenuContribution;
+  }> | null>(null);
+  const publishMenuContribution = useCallback((contribution: EditorPaneMenuContribution | null) => {
+    setMenuContribution(contribution
+      ? { editorResource: editor?.resource ?? null, contribution }
+      : null);
+  }, [editor?.resource]);
   const externalOpenPath = editor?.resource ?? null;
+  const agentPresencePath = editor
+    ? toWorkspaceRelativePath(workspace.path, editor.resource)
+    : null;
+  const paneMenuContribution = menuContribution?.editorResource === editor?.resource
+    ? menuContribution?.contribution ?? null
+    : null;
 
   return (
     <EditorPaneShell
       active={active}
       actionsOpen={actionsOpen}
+      agentPresencePath={agentPresencePath}
       editorLabel={editor?.label ?? null}
       externalOpenAppName={externalOpenPath ? externalOpen?.getAppName(externalOpenPath) ?? null : null}
       findCommand={findCommand}
@@ -288,7 +315,7 @@ function EditorPane({
       pane={pane}
       paneCount={paneCount}
       paneMove={paneMove}
-      menuContribution={menuContribution?.documentId === editor?.resource ? menuContribution : null}
+      menuContribution={paneMenuContribution}
       onActionsPaneChange={onOpenActionsPaneChange}
       onActivate={() => {
         if (!active) onFocusPane(pane.id);
@@ -305,8 +332,7 @@ function EditorPane({
         editor={editor}
         editorInteractionPreferences={editorInteractionPreferences}
         fileIconTheme={fileIconTheme}
-        markdownAssetUrlResolver={state.markdownAssetUrlResolver}
-        markdownLinkGraph={state.markdownLinkGraph}
+        markdownEnvironment={markdownEnvironment}
         refreshKey={refreshKey}
         treeNode={treeNode}
         viewerExtensionAdapter={viewerExtensionAdapter}
@@ -314,7 +340,7 @@ function EditorPane({
         workspaceRoot={workspace.path}
         markdownDialect={workspace.markdownDialect}
         onFindCommandChange={setFindCommand}
-        onMenuContributionChange={setMenuContribution}
+        onMenuContributionChange={publishMenuContribution}
       />
     </EditorPaneShell>
   );

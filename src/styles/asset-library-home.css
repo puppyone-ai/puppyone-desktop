@@ -110,7 +110,7 @@
   border: 1px solid var(--po-border-subtle);
   border-radius: 8px;
   background: var(--po-overlay);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--po-shadow) 52%, transparent);
+  box-shadow: var(--po-menu-shadow);
 }
 
 .asset-library-home-create-menu button {
@@ -262,7 +262,7 @@
 .asset-library-card:focus-within .asset-library-card-main {
   border-color: var(--po-border-strong);
   background: var(--po-panel-raised);
-  box-shadow: 6px 7px 0 var(--po-shadow);
+  box-shadow: var(--po-elevation-low);
 }
 
 .asset-library-card-main:disabled {
@@ -466,7 +466,7 @@
   outline: none;
   border-color: var(--po-border-strong);
   background: color-mix(in srgb, var(--po-panel-raised) 32%, transparent);
-  box-shadow: 6px 7px 0 var(--po-shadow);
+  box-shadow: var(--po-elevation-low);
   color: var(--po-text);
   transform: translateY(-2px);
 }

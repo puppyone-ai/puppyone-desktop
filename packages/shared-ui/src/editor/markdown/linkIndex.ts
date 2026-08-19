@@ -3,7 +3,6 @@ export {
   createMarkdownLinkGraphIndex,
   createMarkdownLinkGraphIndexer,
   EMPTY_MARKDOWN_LINK_GRAPH_INDEX,
-  type CreateMarkdownLinkGraphOptions,
   type MarkdownLinkGraphDocument,
   type MarkdownLinkGraphIndexer,
   type MarkdownLinkGraphIndexSnapshot,

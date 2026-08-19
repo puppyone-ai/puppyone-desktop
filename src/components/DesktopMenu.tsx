@@ -14,6 +14,7 @@ function cx(...classes: Array<string | false | null | undefined>) {
 export type DesktopMenuSurfaceProps = HTMLAttributes<HTMLDivElement> & {
   ariaLabel?: string;
   className?: string;
+  elevation?: "default" | "compact";
   style?: CSSProperties;
 };
 
@@ -22,6 +23,7 @@ export const DesktopMenuSurface = forwardRef<HTMLDivElement, DesktopMenuSurfaceP
     ariaLabel,
     children,
     className,
+    elevation = "default",
     role = "menu",
     ...props
   },
@@ -35,6 +37,7 @@ export const DesktopMenuSurface = forwardRef<HTMLDivElement, DesktopMenuSurfaceP
       className={cx("desktop-menu-surface", className)}
       role={role}
       aria-label={ariaLabel}
+      data-menu-elevation={elevation === "compact" ? elevation : undefined}
       data-native-surface-occluder="true"
       data-po-scrollbar="menu"
       data-window-no-drag="true"

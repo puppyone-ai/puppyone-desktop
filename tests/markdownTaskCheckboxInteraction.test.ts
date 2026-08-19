@@ -49,6 +49,33 @@ describe("Markdown task checkbox interaction", () => {
     expect(view.state.doc.toString()).toBe("- [ ] Repeat");
   });
 
+  it("resolves a task from the current document after edits before its line", () => {
+    const view = mountMarkdown([
+      "- [ ] Top",
+      "",
+      "Paragraph one",
+      "Paragraph two",
+      "Paragraph three",
+      "",
+      "- [ ] Middle",
+      "",
+      "- [ ] Bottom",
+    ].join("\n"));
+    const middleBeforeEdit = getTaskControl(view, 1);
+    const insertAt = view.state.doc.line(2).to;
+
+    view.dispatch({
+      changes: { from: insertAt, insert: "\nInserted between task groups" },
+    });
+
+    const middleAfterEdit = getTaskControl(view, 1);
+    expect(middleAfterEdit).toBe(middleBeforeEdit);
+    middleAfterEdit.click();
+
+    expect(view.state.doc.toString()).toContain("- [x] Middle");
+    expect(view.state.doc.toString()).toContain("- [ ] Bottom");
+  });
+
   it("changes only on native activation, never on pointer-down alone", () => {
     const view = mountMarkdown("- [ ] Native click");
     const control = getTaskControl(view, 0);

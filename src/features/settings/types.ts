@@ -1,9 +1,9 @@
 import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import type { CreateNewMenuSettings, DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TerminalSessionLayout, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
+import type { CreateNewMenuSettings, DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, LocalAgentsSettings, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TerminalSessionLayout, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
 
-export type SettingsSection = "general" | "local-project" | "appearance" | "external-apps" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
+export type SettingsSection = "general" | "local-project" | "appearance" | "local-agents" | "external-apps" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
 
 export type SettingsViewProps = {
   workspace: Workspace;
@@ -16,6 +16,8 @@ export type SettingsViewProps = {
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
   loadingAnimationPreset: LoadingAnimationPreset;
+  localAgentsSettings: LocalAgentsSettings;
+  agentFileActivityIndicatorsEnabled: boolean;
   textSize: TextSize;
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
@@ -46,6 +48,8 @@ export type SettingsViewProps = {
   onLightThemePresetChange: (preset: LightThemePreset) => void;
   onDarkThemePresetChange: (preset: DarkThemePreset) => void;
   onLoadingAnimationPresetChange: (preset: LoadingAnimationPreset) => void;
+  onLocalAgentsSettingsChange: (settings: LocalAgentsSettings) => void;
+  onAgentFileActivityIndicatorsEnabledChange: (enabled: boolean) => void;
   onTextSizeChange: (textSize: TextSize) => void;
   onTypographyPreferencesChange: (preferences: TypographyPreferences) => void;
   onPointerCursorsChange: (enabled: boolean) => void;

@@ -34,12 +34,11 @@
 .data-content[data-resizable-explorer="true"] {
   grid-template-columns:
     var(--data-explorer-width, clamp(282px, 26vw, 360px))
-    var(--po-pane-resizer-hit-size, 8px)
     minmax(var(--desktop-main-pane-min-width, 0px), 1fr);
 }
 
 .data-content[data-resizable-explorer="true"][data-explorer-collapsed="true"] {
-  grid-template-columns: 0 0 minmax(var(--desktop-main-pane-min-width, 0px), 1fr);
+  grid-template-columns: 0 minmax(var(--desktop-main-pane-min-width, 0px), 1fr);
 }
 
 .explorer-column {
@@ -100,22 +99,19 @@
 
 .data-explorer-resizer {
   /*
-   * A real grid gutter owns the full hit target. It is painted as the trailing
-   * edge of the Sidebar, with the divider on its Editor-facing edge, so the
-   * Editor begins directly at the visible boundary. Native WebContentsViews
-   * still begin in the following main track and cannot steal this pointer lane.
+   * The Sidebar and Editor share one layout boundary. The wide sash is an
+   * overlay extending into the Editor; it never becomes a third grid track.
+   * Native surfaces route initial presses in this registered rectangle back
+   * to the renderer before normal drag passthrough takes over.
    */
-  position: relative;
-  inset: auto;
-  grid-column: 2;
-  grid-row: 1;
-  width: 100%;
-  background: var(--po-sidebar);
+  inset-inline-start: var(--data-explorer-width, clamp(282px, 26vw, 360px));
+  inset-inline-end: auto;
+  background: transparent;
 }
 
 .data-explorer-resizer::after {
-  inset-inline-start: auto;
-  inset-inline-end: 0;
+  inset-inline-start: 0;
+  inset-inline-end: auto;
   background: var(--po-shell-divider, var(--po-divider));
   transition: background 120ms ease, box-shadow 120ms ease;
 }
@@ -405,7 +401,7 @@ body.data-sidebar-resizing * {
   font-size: 12px;
   font-weight: 620;
   line-height: 1.35;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--po-elevation-low);
   pointer-events: none;
 }
 
@@ -423,7 +419,7 @@ body.data-sidebar-resizing * {
   font-size: 12px;
   font-weight: 620;
   line-height: 1.35;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--po-elevation-low);
   pointer-events: none;
 }
 
@@ -580,9 +576,7 @@ body.data-sidebar-resizing * {
   padding: 0 4px;
   border-radius: 999px;
   background: var(--po-notification);
-  box-shadow:
-    0 0 0 1px var(--po-sidebar),
-    0 5px 12px color-mix(in srgb, var(--po-notification) 26%, transparent);
+  box-shadow: 0 0 0 1px var(--po-sidebar);
   color: var(--po-notification-text);
   font-size: 10px;
   font-style: normal;
@@ -614,10 +608,7 @@ body.data-sidebar-resizing * {
   border: 1px solid var(--desktop-git-bubble-border);
   border-radius: 999px;
   background: var(--desktop-git-bubble-bg);
-  box-shadow:
-    0 8px 18px color-mix(in srgb, var(--po-warning) 18%, transparent),
-    0 4px 12px color-mix(in srgb, var(--po-shadow) 24%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--po-text-inverse) 22%, transparent);
+  box-shadow: var(--po-elevation-low);
   color: var(--desktop-git-bubble-text);
   font-size: 11.5px;
   font-weight: 680;
@@ -723,10 +714,6 @@ body.data-sidebar-resizing * {
   flex: 1;
   flex-direction: column;
   background: var(--po-canvas);
-}
-
-.data-content[data-resizable-explorer="true"] > .browser-column {
-  grid-column: 3;
 }
 
 .desktop-editor-panel {

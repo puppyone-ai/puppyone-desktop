@@ -218,9 +218,9 @@ describe("Markdown video embeds", () => {
 
 function createLinkGraph(resolvedPath: string): MarkdownLinkGraph {
   return {
+    revision: 1,
     documentCount: 1,
     indexedDocumentCount: 1,
-    isIndexing: false,
     resolveWikiLink: (_sourcePath, target) => ({
       exists: true,
       ambiguous: false,

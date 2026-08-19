@@ -28,6 +28,11 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
       active: request?.active === true,
     });
   },
+  setNativeSurfacePointerRoutingRegions: (request) => {
+    ipcRenderer.send("native-surfaces:set-pointer-routing-regions", {
+      regions: Array.isArray(request?.regions) ? request.regions : [],
+    });
+  },
   getBuildInfo: () => ipcRenderer.invoke("build-info:get"),
   getLocalizationBootstrap: () => ipcRenderer.invoke("localization:get-bootstrap"),
   setLanguagePreference: (preference) => (
@@ -38,6 +43,27 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     const listener = (_event, state) => callback(state);
     ipcRenderer.on("localization:changed", listener);
     return () => ipcRenderer.removeListener("localization:changed", listener);
+  },
+  setMarkdownFormatShortcutsActive: (request) => {
+    ipcRenderer.send("editor:markdown-format-active", {
+      active: request?.active === true,
+    });
+  },
+  onMarkdownFormatShortcut: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, payload) => {
+      const type = payload?.type;
+      if (
+        type === "strong"
+        || type === "emphasis"
+        || type === "underline"
+        || type === "strike"
+      ) {
+        callback({ type });
+      }
+    };
+    ipcRenderer.on("editor:markdown-format-shortcut", listener);
+    return () => ipcRenderer.removeListener("editor:markdown-format-shortcut", listener);
   },
   onDocumentSessionFlushRequested: (callback) => {
     if (typeof callback !== "function") return () => {};
@@ -349,4 +375,14 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     ipcRenderer.on("terminal:exit", listener);
     return () => ipcRenderer.removeListener("terminal:exit", listener);
   },
+  subscribeAgentActivity: () => ipcRenderer.invoke("agent-activity:subscribe"),
+  unsubscribeAgentActivity: () => ipcRenderer.send("agent-activity:unsubscribe"),
+  onAgentActivityEvent: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("agent-activity:event", listener);
+    return () => ipcRenderer.removeListener("agent-activity:event", listener);
+  },
+  getAgentActivityEnrollment: () => ipcRenderer.invoke("agent-activity:enrollment-snapshot"),
+  setAgentActivityEnrollment: (request) => ipcRenderer.invoke("agent-activity:enrollment-set", request),
 });

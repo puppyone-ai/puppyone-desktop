@@ -33,6 +33,11 @@ import type {
   AgentTurnSteerRequest,
 } from "../../shared/agent-contract/types";
 import type {
+  AgentActivityEnrollmentSnapshot,
+  AgentActivityEvent,
+  AgentActivitySnapshot,
+} from "../../shared/agent-activity-contract/types";
+import type {
   CloudInitializationCleanupRequest,
   CloudInitializationErrorCode,
   CloudInitializationIdentityRequest,
@@ -355,6 +360,10 @@ export type TerminalCreateRequest = {
   cols: number;
   rows: number;
   launcherId?: DesktopTerminalLauncherId;
+  defaultColors?: {
+    foreground: [number, number, number];
+    background: [number, number, number];
+  };
 };
 
 export type TerminalAgentId = Exclude<DesktopTerminalLauncherId, "shell">;
@@ -721,10 +730,17 @@ declare global {
       } | null>;
       setNativeSurfaceOccluded: (request: { occluded: boolean }) => void;
       setNativeSurfacePointerPassthrough: (request: { active: boolean }) => void;
+      setNativeSurfacePointerRoutingRegions: (request: {
+        regions: Array<{ x: number; y: number; width: number; height: number }>;
+      }) => void;
       getBuildInfo: () => Promise<DesktopBuildInfo>;
       getLocalizationBootstrap: () => Promise<LocaleState>;
       setLanguagePreference: (preference: AppLanguagePreference) => Promise<LocaleState>;
       onLocaleChanged: (callback: (state: LocaleState) => void) => () => void;
+      setMarkdownFormatShortcutsActive: (request: { active: boolean }) => void;
+      onMarkdownFormatShortcut: (
+        callback: (payload: { type: "strong" | "emphasis" | "underline" | "strike" }) => void,
+      ) => () => void;
       onDocumentSessionFlushRequested: (
         callback: (request: { requestId: string }) => void | Promise<void>,
       ) => () => void;
@@ -810,8 +826,8 @@ declare global {
       }>;
       openExternalUrl: (href: string) => Promise<{ ok: boolean }>;
       submitFeedback: (request: {
-        role: "developer" | "researcher" | "creator" | "other";
         message: string;
+        email: string;
         locale?: string;
         screenshot?: {
           bytes: ArrayBuffer;
@@ -1177,6 +1193,14 @@ declare global {
       closeTerminal: (id: string) => Promise<void>;
       onTerminalData: (callback: (event: TerminalDataEvent) => void) => () => void;
       onTerminalExit: (callback: (event: TerminalExitEvent) => void) => () => void;
+      subscribeAgentActivity: () => Promise<AgentActivitySnapshot>;
+      unsubscribeAgentActivity: () => void;
+      onAgentActivityEvent: (callback: (event: AgentActivityEvent) => void) => () => void;
+      getAgentActivityEnrollment: () => Promise<AgentActivityEnrollmentSnapshot>;
+      setAgentActivityEnrollment: (request: {
+        providerId: string;
+        enabled: boolean;
+      }) => Promise<{ enrollment: string; reason?: string }>;
     };
   }
 }

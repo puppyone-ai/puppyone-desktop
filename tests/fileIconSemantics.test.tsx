@@ -33,6 +33,11 @@ describe("file icon semantics", () => {
     expect(resolveFileFormat({ name: "deck.pptx" }).semanticKind).toBe("presentation");
   });
 
+  it("classifies Context Map documents with their dedicated semantic icon", () => {
+    expect(resolveFileFormat({ name: "Knowledge.contextmap" }).semanticKind).toBe("context-map");
+    expect(getFileVisualKind("Knowledge.contextmap")).toBe("context-map");
+  });
+
   it("fails fast instead of falling back for an invalid declared semantic kind", () => {
     const invalidFormat = {
       ...resolveFileFormat({ name: "model.xlsx" }),

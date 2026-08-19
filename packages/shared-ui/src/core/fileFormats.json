@@ -1,6 +1,26 @@
 {
   "formats": [
     {
+      "id": "context-map",
+      "label": "Context Map",
+      "semanticKind": "context-map",
+      "extensions": [
+        ".contextmap"
+      ],
+      "mimeTypes": [
+        "application/vnd.puppyone.context-map+json"
+      ],
+      "category": "data",
+      "defaultViewer": "context-map-viewer",
+      "availableViewers": [
+        "context-map-viewer",
+        "monaco-code"
+      ],
+      "editable": true,
+      "ingestStrategy": "parse-structured",
+      "monacoLanguage": "json"
+    },
+    {
       "id": "puppyflow",
       "label": "PuppyFlow",
       "semanticKind": "workflow",

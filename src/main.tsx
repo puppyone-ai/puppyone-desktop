@@ -12,6 +12,7 @@ import { ScrollbarActivity } from "./components/ScrollbarActivity";
 import { FeatureFlagsProvider } from "./features/flags";
 import { TypographyCatalogProvider } from "./features/typography";
 import { bootstrapRendererLocalization } from "./localization";
+import { startMarkdownFormatShortcutBridge } from "./lib/markdownFormatShortcutBridge";
 
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("PuppyOne renderer root is unavailable.");
@@ -54,9 +55,11 @@ const stopDocumentSessionCloseCancelledListener = window.puppyoneDesktop
     activeCloseRequestId = null;
     setCloseInteractionBarrier(false);
   });
+const stopMarkdownFormatShortcutBridge = startMarkdownFormatShortcutBridge();
 window.addEventListener("pagehide", () => {
   stopDocumentSessionFlushListener?.();
   stopDocumentSessionCloseCancelledListener?.();
+  stopMarkdownFormatShortcutBridge();
 }, { once: true });
 
 const root = ReactDOM.createRoot(rootElement);
@@ -76,6 +79,9 @@ async function renderApplication() {
   } else if (window.location.hash === "#renderer-performance-smoke") {
     const { RendererPerformanceSmokeHarness } = await import("./performance/RendererPerformanceSmokeHarness");
     surface = <RendererPerformanceSmokeHarness />;
+  } else if (window.location.hash === "#markdown-line-geometry-smoke") {
+    const { MarkdownLineGeometrySmokeHarness } = await import("./performance/MarkdownLineGeometrySmokeHarness");
+    surface = <MarkdownLineGeometrySmokeHarness />;
   } else {
     surface = (
       <>

@@ -1,0 +1,80 @@
+/*
+ * Locale-aware system fallback policy.
+ *
+ * Bundled/imported primary faces are supplied by the runtime. This layer owns
+ * only script fallbacks, so switching a content font cannot silently replace
+ * the Japanese, Korean, Simplified Chinese, Traditional Chinese, or Emoji
+ * policy. A content boundary may set its own valid `lang` later without
+ * changing the catalog or presentation profile.
+ */
+:root,
+:where(
+  .app-shell,
+  .onboarding-shell,
+  .desktop-overlay-root,
+  .desktop-theme-preview-surface,
+  [data-po-typography-role]
+) {
+  --po-font-locale-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI";
+  --po-font-locale-serif: ui-serif, "New York", "Iowan Old Style", Palatino, Georgia;
+  --po-font-locale-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono";
+  --po-font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+}
+
+:where(
+  :root,
+  .app-shell,
+  .onboarding-shell,
+  .desktop-overlay-root,
+  .desktop-theme-preview-surface,
+  [data-po-typography-role]
+):lang(zh-Hans) {
+  --po-font-locale-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC";
+  --po-font-locale-serif: "Songti SC", STSong, "Noto Serif CJK SC";
+  --po-font-locale-mono: "PingFang SC", "Microsoft YaHei", "Noto Sans Mono CJK SC";
+  /* PingFang does not expose a stable intermediate face between Regular and
+     Medium. Select Medium explicitly instead of relying on browser matching
+     for 450; theme polarity is compensated by color, not font geometry.
+     Letter spacing remains the script-neutral foundation default. */
+  --po-content-reading-weight: 500;
+}
+
+:where(
+  :root,
+  .app-shell,
+  .onboarding-shell,
+  .desktop-overlay-root,
+  .desktop-theme-preview-surface,
+  [data-po-typography-role]
+):lang(zh-Hant) {
+  --po-font-locale-sans: "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC";
+  --po-font-locale-serif: "Songti TC", "Noto Serif CJK TC";
+  --po-font-locale-mono: "PingFang TC", "Microsoft JhengHei", "Noto Sans Mono CJK TC";
+  --po-content-reading-weight: 500;
+}
+
+:where(
+  :root,
+  .app-shell,
+  .onboarding-shell,
+  .desktop-overlay-root,
+  .desktop-theme-preview-surface,
+  [data-po-typography-role]
+):lang(ja) {
+  --po-font-locale-sans: "Hiragino Sans", "Yu Gothic", "Meiryo", "Noto Sans CJK JP";
+  --po-font-locale-serif: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP";
+  --po-font-locale-mono: "Hiragino Sans", "Yu Gothic", "Noto Sans Mono CJK JP";
+}
+
+:where(
+  :root,
+  .app-shell,
+  .onboarding-shell,
+  .desktop-overlay-root,
+  .desktop-theme-preview-surface,
+  [data-po-typography-role]
+):lang(ko) {
+  --po-font-locale-sans: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR";
+  --po-font-locale-serif: AppleMyungjo, Batang, "Noto Serif CJK KR";
+  --po-font-locale-mono: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans Mono CJK KR";
+}

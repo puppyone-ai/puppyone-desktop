@@ -1,4 +1,4 @@
-import { type ComponentProps, type MouseEvent as ReactMouseEvent } from "react";
+import { useState, type ComponentProps, type MouseEvent as ReactMouseEvent } from "react";
 import { Plus } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
 import {
@@ -31,9 +31,17 @@ import {
 } from "./navigation";
 import { WorkspaceSurfaceOutlet, type ResolvedWorkspaceSurface } from "./workspace-surfaces";
 import type { DesktopView } from "../../components/DesktopCloudShell";
-import { useNativeSurfacePointerPassthroughActivity } from "../native-surfaces";
+import {
+  useNativeSurfacePointerPassthroughActivity,
+  useNativeSurfacePointerRoutingRegion,
+} from "../native-surfaces";
 import { DesktopEditorSplitView } from "../editor-workbench/layout/DesktopEditorSplitView";
 import type { DesktopEditorWorkbenchController } from "../editor-workbench/controller/useDesktopEditorWorkbench";
+import {
+  AgentFilePresence,
+  desktopAgentActivityStore,
+  toWorkspaceRelativePath,
+} from "../desktop-agent-presence";
 
 type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 
@@ -111,6 +119,8 @@ export function DesktopDataWorkspaceSurface({
   const onExplorerResizeActiveChange = useNativeSurfacePointerPassthroughActivity(
     "explorer-resize",
   );
+  const [explorerResizeHandle, setExplorerResizeHandle] = useState<HTMLDivElement | null>(null);
+  useNativeSurfacePointerRoutingRegion("explorer-resize", explorerResizeHandle);
   const { t } = useLocalization();
   const paneLayout = useDesktopPaneLayout();
   const resolvedExplorerWidth = paneLayout?.explorer.width ?? preferences.explorerWidth;
@@ -175,6 +185,7 @@ export function DesktopDataWorkspaceSurface({
         onExplorerCollapsedChange={preferences.setSidebarCollapsed}
         onExplorerWidthChange={preferences.setExplorerWidth}
         onExplorerResizeActiveChange={onExplorerResizeActiveChange}
+        explorerResizeHandleRef={setExplorerResizeHandle}
         showHeader={false}
         showExplorerRoot={false}
         onExplorerRootContextMenu={(_state, event) => {
@@ -244,19 +255,33 @@ export function DesktopDataWorkspaceSurface({
         enableMarkdownLinkContentIndexing
         folderExpansionStrategy="load-before-expand"
         refreshKey={workspaceRefreshToken}
-        explorerNodeActionSlot={(state, node) => (
-          <DesktopExplorerRowActions
-            node={node}
-            parentPath={node.type === "folder" ? node.path : null}
-            onCreate={onCreateEntryMenu}
-            onOpenNodeMenu={(targetNode, anchorRect) => {
-              const selectedNodes = state.selectedNodes.some(({ path }) => path === targetNode.path)
-                ? state.selectedNodes
-                : [targetNode];
-              onNodeActionMenu(targetNode, anchorRect, selectedNodes);
-            }}
-          />
-        )}
+        explorerNodeActionSlot={(state, node) => {
+          const agentPresencePath = node.type === "file"
+            ? toWorkspaceRelativePath(workspace.path, node.path)
+            : null;
+          return (
+            <>
+              {agentPresencePath && (
+                <AgentFilePresence
+                  path={agentPresencePath}
+                  store={desktopAgentActivityStore}
+                  variant="explorer"
+                />
+              )}
+              <DesktopExplorerRowActions
+                node={node}
+                parentPath={node.type === "folder" ? node.path : null}
+                onCreate={onCreateEntryMenu}
+                onOpenNodeMenu={(targetNode, anchorRect) => {
+                  const selectedNodes = state.selectedNodes.some(({ path }) => path === targetNode.path)
+                    ? state.selectedNodes
+                    : [targetNode];
+                  onNodeActionMenu(targetNode, anchorRect, selectedNodes);
+                }}
+              />
+            </>
+          );
+        }}
         explorerSlot={resolvedSurface.id === "data"
           ? undefined
           : <WorkspaceSurfaceOutlet region="sidebar" surface={resolvedSurface} />}
@@ -271,10 +296,11 @@ export function DesktopDataWorkspaceSurface({
                 editorGroup={editorWorkbench.state}
                 externalOpen={externalOpen}
                 editorInteractionPreferences={editorInteractionPreferences}
+                editorTree={state.tree}
                 fileIconTheme={preferences.fileIconTheme}
                 layout={editorWorkbench.paneLayout}
+                markdownEnvironment={state.markdownEnvironment}
                 refreshKey={workspaceRefreshToken}
-                state={state}
                 viewerExtensionAdapter={viewerExtensionAdapter}
                 workspace={workspace}
                 onClosePane={editorWorkbench.closePane}

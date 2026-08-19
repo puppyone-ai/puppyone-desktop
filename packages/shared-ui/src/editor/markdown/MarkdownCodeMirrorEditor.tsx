@@ -16,7 +16,14 @@ import { getMarkdownPlanIndex } from "./core/plans/markdownPlanIndex";
 import { markdownRevealedSourceEffect } from "./core/state/revealedSource";
 import { getDocRevision } from "./platform/brokers/transactionBroker";
 import type { AiEditFile } from "../ai-edits/types";
-import type { MarkdownAssetUrlResolver, MarkdownDialectId, MarkdownHtmlTrustMode, MarkdownLinkGraph } from "../registry/viewerTypes";
+import {
+  EMPTY_MARKDOWN_LINK_COMMANDS,
+  type MarkdownAssetUrlResolver,
+  type MarkdownDialectId,
+  type MarkdownHtmlTrustMode,
+  type MarkdownLinkCommands,
+  type MarkdownLinkGraph,
+} from "../registry/viewerTypes";
 import type {
   EditorSourceRevision,
   EditorSourceSnapshot,
@@ -26,6 +33,11 @@ import { getRendererPerformanceTracker } from "../../performance/rendererPerform
 import { subscribeTypographyChanges } from "../../core/typography";
 import { markdownLocalizationExtension } from "./core/editor/markdownLocalization";
 import { resolveMarkdownDialect } from "./core/dialect/markdownDialect";
+import {
+  resolveMarkdownContentLanguage,
+  type MarkdownContentLanguageResolution,
+} from "./core/presentation/markdownContentLanguage";
+import { bindMarkdownFormatHotkeys } from "./core/commands/markdownFormatHotkeys";
 import { CodeMirrorFindAdapter } from "../find/codeMirrorFindAdapter";
 import { useRegisterEditorFindAdapter } from "../find/editorFind";
 
@@ -39,11 +51,14 @@ export type MarkdownCodeMirrorEditorProps = {
   aiEditFile?: AiEditFile | null;
   htmlTrustMode?: MarkdownHtmlTrustMode;
   documentPath?: string;
+  documentLanguage?: string | null;
   markdownDialect?: MarkdownDialectId | null;
   workspaceId?: string;
   workspaceRoot?: string | null;
   markdownLinkGraph?: MarkdownLinkGraph | null;
+  markdownLinkCommands?: MarkdownLinkCommands;
   markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
+  markdownAssetResolverRevision?: number;
   /** Legacy controlled boundary. Product Markdown surfaces use snapshot ports. */
   onChange?: (value: string) => void;
   onSourceRevisionChange?: (revision: EditorSourceRevision) => void;
@@ -66,11 +81,14 @@ export function MarkdownCodeMirrorEditor({
   aiEditFile = null,
   htmlTrustMode = "safe",
   documentPath = "",
+  documentLanguage = null,
   markdownDialect = null,
   workspaceId = "",
   workspaceRoot = null,
   markdownLinkGraph = null,
+  markdownLinkCommands = EMPTY_MARKDOWN_LINK_COMMANDS,
   markdownAssetUrlResolver = null,
+  markdownAssetResolverRevision = 0,
   onChange,
   onSourceRevisionChange,
   onSnapshotPortChange,
@@ -87,6 +105,27 @@ export function MarkdownCodeMirrorEditor({
     () => resolveMarkdownDialect({ documentPath, explicitDialect: markdownDialect }).dialect,
     [documentPath, markdownDialect],
   );
+  const contentLanguageKey = `${documentPath}\u0000${documentLanguage ?? ""}\u0000${locale}`;
+  const contentLanguageStateRef = useRef<{
+    key: string;
+    awaitingContent: boolean;
+    resolution: MarkdownContentLanguageResolution;
+  } | null>(null);
+  let contentLanguageState = contentLanguageStateRef.current;
+  const hasContent = value.trim().length > 0;
+  if (
+    contentLanguageState === null
+    || contentLanguageState.key !== contentLanguageKey
+    || (contentLanguageState.awaitingContent && hasContent)
+  ) {
+    contentLanguageState = {
+      key: contentLanguageKey,
+      awaitingContent: !hasContent,
+      resolution: resolveMarkdownContentLanguage(value, locale, documentLanguage),
+    };
+    contentLanguageStateRef.current = contentLanguageState;
+  }
+  const contentLanguage = contentLanguageState.resolution;
   const initialLocalizationRef = useRef(localization);
   const findAdapter = useMemo(() => new CodeMirrorFindAdapter(), []);
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -131,16 +170,20 @@ export function MarkdownCodeMirrorEditor({
   const livePreviewContextRef = useRef({
     htmlTrustMode,
     markdownLinkGraph,
+    markdownLinkCommands,
     documentPath,
     markdownAssetUrlResolver,
+    markdownAssetResolverRevision,
     workspaceId,
     workspaceRoot,
   });
   livePreviewContextRef.current = {
     htmlTrustMode,
     markdownLinkGraph,
+    markdownLinkCommands,
     documentPath,
     markdownAssetUrlResolver,
+    markdownAssetResolverRevision,
     workspaceId,
     workspaceRoot,
   };
@@ -232,6 +275,7 @@ export function MarkdownCodeMirrorEditor({
 
     viewRef.current = view;
     findAdapter.attach(view);
+    const unbindFormatHotkeys = bindMarkdownFormatHotkeys(view);
     const unsubscribeTypography = subscribeTypographyChanges(host.ownerDocument, () => {
       view.requestMeasure();
     });
@@ -260,6 +304,7 @@ export function MarkdownCodeMirrorEditor({
 
     return () => {
       previewGenerationRef.current += 1;
+      unbindFormatHotkeys();
       unsubscribeTypography();
       // Detaching the port synchronously lets the host capture the final
       // snapshot while the CodeMirror document is still alive.
@@ -340,8 +385,11 @@ export function MarkdownCodeMirrorEditor({
       if (!isCurrent()) return;
       const languageStartedAt = performance.now();
       try {
+        const languageExtension = livePreview
+          ? markdownCodeMirrorLanguageExtension(resolvedDialect)
+          : [];
         view.dispatch({
-          effects: languageCompartmentRef.current.reconfigure(markdownCodeMirrorLanguageExtension(resolvedDialect)),
+          effects: languageCompartmentRef.current.reconfigure(languageExtension),
         });
       } catch (error) {
         if (livePreview) failPreview(error);
@@ -395,6 +443,8 @@ export function MarkdownCodeMirrorEditor({
                     context.markdownAssetUrlResolver,
                     context.workspaceId,
                     context.workspaceRoot,
+                    context.markdownLinkCommands,
+                    context.markdownAssetResolverRevision,
                   ),
                 ),
                 livePreviewCoreCompartmentRef.current.reconfigure(
@@ -454,6 +504,8 @@ export function MarkdownCodeMirrorEditor({
             context.markdownAssetUrlResolver,
             context.workspaceId,
             context.workspaceRoot,
+            context.markdownLinkCommands,
+            context.markdownAssetResolverRevision,
           ),
         ),
       });
@@ -466,8 +518,9 @@ export function MarkdownCodeMirrorEditor({
     documentPath,
     htmlTrustMode,
     livePreview,
-    markdownAssetUrlResolver,
-    markdownLinkGraph,
+    markdownAssetResolverRevision,
+    markdownLinkCommands,
+    markdownLinkGraph?.revision,
     workspaceId,
     workspaceRoot,
   ]);
@@ -522,7 +575,10 @@ export function MarkdownCodeMirrorEditor({
       <div
         ref={hostRef}
         dir="auto"
+        lang={contentLanguage.language}
         className="markdown-codemirror-editor"
+        data-po-typography-role="content"
+        data-po-content-language-source={contentLanguage.source}
         data-live-preview={livePreview ? "true" : "false"}
         data-preview-state={previewState}
         data-preview-message={previewMessage ?? undefined}

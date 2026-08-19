@@ -15,12 +15,12 @@ import {
 } from "./DocumentSurfaceHost";
 import type { EditorSaveMode } from "./EditorDocumentHost";
 import type {
+  ContextMapWorkspaceEnvironment,
   DocumentSourceKind,
   EditorInteractionPreferences,
-  MarkdownAssetUrlResolver,
   MarkdownDialectId,
   MarkdownHtmlTrustMode,
-  MarkdownLinkGraph,
+  MarkdownWorkspaceEnvironment,
   OfficeEditorActionResolver,
 } from "../registry/viewerTypes";
 import type { ViewerExtensionHostAdapter } from "../registry/viewerHostAdapters";
@@ -51,8 +51,8 @@ export type FilePreviewProps = {
   workspaceId?: string;
   workspaceRoot?: string | null;
   markdownDialect?: MarkdownDialectId | null;
-  markdownLinkGraph?: MarkdownLinkGraph | null;
-  markdownAssetUrlResolver?: MarkdownAssetUrlResolver | null;
+  markdownEnvironment?: MarkdownWorkspaceEnvironment | null;
+  contextMapEnvironment?: ContextMapWorkspaceEnvironment | null;
   appPreview?: AppPreviewController | null;
   openExternalFile?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
@@ -83,8 +83,8 @@ export function FilePreview({
   workspaceId = "",
   workspaceRoot = null,
   markdownDialect = null,
-  markdownLinkGraph = null,
-  markdownAssetUrlResolver = null,
+  markdownEnvironment = null,
+  contextMapEnvironment = null,
   appPreview = null,
   openExternalFile,
   convertOfficeDocumentToDocx,
@@ -167,8 +167,8 @@ export function FilePreview({
                 workspaceId={workspaceId}
                 workspaceRoot={workspaceRoot}
                 markdownDialect={markdownDialect}
-                markdownLinkGraph={markdownLinkGraph}
-                markdownAssetUrlResolver={markdownAssetUrlResolver}
+                markdownEnvironment={markdownEnvironment}
+                contextMapEnvironment={contextMapEnvironment}
                 appPreview={appPreview}
                 openExternalFile={openExternalFile}
                 convertOfficeDocumentToDocx={convertOfficeDocumentToDocx}

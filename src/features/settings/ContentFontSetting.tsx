@@ -1,6 +1,7 @@
 import type { TypographyPreferences } from "../../preferences";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
 import {
+  createCatalogFontFamily,
   getFontCatalogEntries,
   useTypographyCatalog,
   withTypographyFont,
@@ -33,7 +34,7 @@ export function ContentFontSetting({
             aria-pressed={preferences.contentFontId === font.id}
             onClick={() => onChange(withTypographyFont(preferences, "content", font.id))}
           >
-            <span style={{ fontFamily: font.family }}>{font.label}</span>
+            <span style={{ fontFamily: createCatalogFontFamily(font) }}>{font.label}</span>
           </button>
         ))}
       </div>

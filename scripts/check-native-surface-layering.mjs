@@ -10,7 +10,11 @@ const errors = [];
 for (const requiredPath of [
   "electron/main/native-surfaces/occlusion-coordinator.mjs",
   "electron/main/ipc/native-surface-occlusion-ipc.mjs",
+  "electron/main/native-surfaces/pointer-passthrough-coordinator.mjs",
+  "electron/main/ipc/native-surface-pointer-passthrough-ipc.mjs",
   "src/features/native-surfaces/nativeSurfaceOcclusion.ts",
+  "src/features/native-surfaces/nativeSurfacePointerRoutingRegions.ts",
+  "src/features/native-surfaces/useNativeSurfacePointerRoutingRegion.ts",
   "src/features/native-surfaces/index.ts",
 ]) {
   if (!existsSync(absolute(requiredPath))) {
@@ -102,6 +106,34 @@ const pointerPassthrough = read("electron/main/native-surfaces/pointer-passthrou
 if (!pointerPassthrough.includes('surfaceWebContents.on("before-mouse-event"') || !pointerPassthrough.includes("ownerWebContents.sendInputEvent")) {
   errors.push("Native surface pointer passthrough must bridge child-view drag events back to the owner renderer");
 }
+for (const token of [
+  'const INITIAL_ROUTED_MOUSE_TYPE = "mouseDown"',
+  "setOwnerRoutingRegions",
+  "pointFallsInsideOwnerRegion",
+  "isPrimaryMouseButton",
+]) {
+  if (!pointerPassthrough.includes(token)) {
+    errors.push(`Native surface pointer passthrough does not recover overlay-sash initial presses (${token})`);
+  }
+}
+const pointerIpc = read("electron/main/ipc/native-surface-pointer-passthrough-ipc.mjs");
+if (!pointerIpc.includes("NATIVE_SURFACE_POINTER_ROUTING_REGIONS_CHANNEL")) {
+  errors.push("Native surface pointer IPC does not accept owner-scoped routing regions");
+}
+const preloadSource = read("electron/preload.cjs");
+if (!preloadSource.includes("setNativeSurfacePointerRoutingRegions")) {
+  errors.push("Desktop preload does not expose native pointer-routing region publication");
+}
+const dataSurfaceSource = read("src/features/app-shell/DesktopDataWorkspaceSurface.tsx");
+for (const token of [
+  "useNativeSurfacePointerRoutingRegion",
+  'useNativeSurfacePointerRoutingRegion("explorer-resize", explorerResizeHandle)',
+  "explorerResizeHandleRef={setExplorerResizeHandle}",
+]) {
+  if (!dataSurfaceSource.includes(token)) {
+    errors.push(`Desktop explorer does not register its overlay sash with native pointer routing (${token})`);
+  }
+}
 for (const relativePath of [
   "electron/main/markdown-web-embed-service.mjs",
   "electron/main/viewer-packs/session-manager.mjs",
@@ -115,15 +147,30 @@ for (const relativePath of [
   "src/features/data-workspace/data-shell.css",
 ]) {
   const source = read(relativePath);
+  const resizableGrid = source.match(
+    /\.data-content\[data-resizable-explorer="true"\]\s*\{([^}]*)\}/s,
+  )?.[1] ?? "";
+  const resizer = source.match(/\.data-explorer-resizer\s*\{([^}]*)\}/s)?.[1] ?? "";
+  if (!resizableGrid.includes("grid-template-columns")) {
+    errors.push(`${relativePath} does not define the resizable explorer's two-pane grid`);
+  }
+  if (resizableGrid.includes("--po-pane-resizer-hit-size")) {
+    errors.push(`${relativePath} incorrectly consumes overlay sash width as a third grid track`);
+  }
+  if (source.includes('.data-content[data-resizable-explorer="true"] > .browser-column')) {
+    errors.push(`${relativePath} still routes the Editor through a removed third grid column`);
+  }
   for (const token of [
-    'data-resizable-explorer="true"',
-    "var(--po-pane-resizer-hit-size, 8px)",
-    "grid-column: 2",
-    "inset: auto",
+    "inset-inline-start: var(--data-explorer-width",
+    "inset-inline-end: auto",
+    "background: transparent",
   ]) {
-    if (!source.includes(token)) {
-      errors.push(`${relativePath} does not reserve an exclusive native-safe resize gutter (${token})`);
+    if (!resizer.includes(token)) {
+      errors.push(`${relativePath} does not overlay the native-routed sash at the shared pane boundary (${token})`);
     }
+  }
+  if (resizer.includes("grid-column") || resizer.includes("position: relative")) {
+    errors.push(`${relativePath} turns the overlay sash back into layout content`);
   }
 }
 

@@ -24,10 +24,13 @@
   height: 100%;
   min-height: 100%;
   color: var(--po-text);
-  font-family: var(--po-font-content, var(--po-font-sans));
-  font-size: var(--po-text-size-content, 14px);
-  font-weight: 450;
-  letter-spacing: 0;
+  font-family: var(--po-md-content-font);
+  font-size: var(--po-md-content-size);
+  font-weight: var(--po-md-content-weight);
+  /* Keep shaping deterministic across Latin and CJK fallback faces. Feature
+     tags selected for a bundled Latin font must never reach editor content. */
+  font-feature-settings: normal;
+  letter-spacing: var(--po-md-content-letter-spacing);
 }
 
 /* Live Preview is a presentation commit, not a progressive source-to-rich
@@ -91,8 +94,13 @@
 
 .markdown-codemirror-editor .cm-scroller {
   overflow: auto;
+  /* MDI pane focus may reveal Markdown source or exchange an embedded
+     preview/edit surface, briefly changing document height. Reserve matching
+     logical gutters up front so those content-local reflows can never move
+     the centered reading rail. */
+  scrollbar-gutter: stable both-edges;
   cursor: text;
-  font-family: var(--po-font-content, var(--po-font-sans));
+  font-family: var(--po-md-content-font);
 }
 
 .markdown-codemirror-editor .cm-content {
@@ -111,7 +119,7 @@
   padding-block: var(--po-markdown-editor-content-padding-block);
   padding-inline: var(--po-markdown-editor-content-gutter-inline);
   caret-color: var(--po-text);
-  color: color-mix(in srgb, var(--po-text) 78%, var(--po-text-muted));
+  color: var(--po-md-content-color);
   overflow-wrap: anywhere;
 }
 
@@ -119,20 +127,13 @@
  * Vertical rhythm: the shared presentation line-height spaces wrapped lines;
  * per-line padding spaces blocks apart (the block-editor convention). The
  * token is 0 in source mode and only opens up in live preview; the editor
- * theme applies it to every .cm-line.
+ * theme applies it uniformly to every ordinary .cm-line. Editable line
+ * geometry must not depend on CodeMirror rendering an empty line as a lone
+ * <br>, otherwise inserting or deleting the first character shifts the
+ * caret and every following line.
  */
 .markdown-codemirror-editor[data-live-preview="true"] {
   --po-markdown-editor-line-spacing: 3px;
-}
-
-/*
- * Blank separator lines already contribute a full content-line box; skipping their
- * padding keeps paragraph gaps from compounding (empty CM lines render as a
- * lone <br>).
- */
-.markdown-codemirror-editor .cm-line:has(> br:only-child) {
-  padding-top: 0;
-  padding-bottom: 0;
 }
 
 /* Table source lines form one contiguous mono block; keep them compact. */
@@ -170,7 +171,7 @@
   border: 1px solid color-mix(in srgb, var(--po-border) 82%, transparent);
   border-radius: 7px;
   background: color-mix(in srgb, var(--po-panel) 98%, transparent);
-  box-shadow: 0 12px 32px rgba(47, 42, 35, 0.13);
+  box-shadow: var(--po-menu-shadow);
   color: var(--po-text);
   backdrop-filter: blur(12px);
 }
@@ -278,6 +279,31 @@
 .markdown-codemirror-editor .cm-md-syntax-strikethrough {
   color: var(--po-text-subtle);
   text-decoration: line-through;
+}
+
+/*
+ * Source mode should present raw Markdown bytes with uniform typography.
+ * Keep semantic token classes for parsing features, but neutralize their
+ * typographic emphasis so size/family/weight stay consistent.
+ */
+.markdown-codemirror-editor[data-live-preview="false"] :is(
+  .cm-md-syntax-strong,
+  .cm-md-syntax-emphasis,
+  .cm-md-syntax-link,
+  .cm-md-syntax-monospace,
+  .cm-md-code-fence,
+  .cm-md-code-block-line,
+  .cm-md-syntax-strikethrough,
+  .cm-md-source-syntax-heading,
+  .cm-md-source-syntax-list,
+  .cm-md-source-syntax-task
+) {
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  font-style: normal;
+  font-weight: inherit;
+  text-decoration: none;
 }
 
 .markdown-codemirror-editor[data-live-preview="true"] .cm-md-code-block-line {
