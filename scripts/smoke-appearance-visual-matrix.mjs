@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const rendererPath = path.join(repoRoot, "dist", "index.html");
-const styles = ["default", "windows-xp", "macos-tiger"];
+const styles = ["default", "windows-xp"];
 const expectedFamilies = ["document", "code", "grid", "canvas", "media", "embedded", "fallback"];
 const screenshotDirectory = process.env.PUPPYONE_APPEARANCE_SCREENSHOT_DIR;
 const userDataPath = path.join(os.tmpdir(), `puppyone-appearance-smoke-${process.pid}`);
@@ -496,11 +496,14 @@ async function runSmoke() {
           const titlebar = document.querySelector('.desktop-titlebar');
           const grid = document.querySelector('[data-viewer-surface-family="grid"]');
           const titlebarStyle = getComputedStyle(titlebar);
+          const gridStyle = getComputedStyle(grid);
           return {
             style: root.dataset.interfaceStyle,
             height: Math.round(titlebar.getBoundingClientRect().height),
             background: titlebarStyle.backgroundImage || titlebarStyle.backgroundColor,
-            editorTableBorder: getComputedStyle(grid).getPropertyValue('--po-surface-editable-table-border').trim(),
+            editorTableBorder: gridStyle.getPropertyValue('--po-surface-editable-table-border').trim(),
+            editorText: gridStyle.getPropertyValue('--po-text').trim(),
+            editorScrollbarSize: gridStyle.getPropertyValue('--po-scrollbar-size').trim(),
           };
         };
         const before = sample();
@@ -524,6 +527,14 @@ async function runSmoke() {
       assert(
         roundTrip.xpProductDefault.editorTableBorder === "",
         "Product-default Editor presentation still received XP component tokens",
+      );
+      assert(
+        roundTrip.xpProductDefault.editorText === "#292723",
+        `Product-default Editor presentation inherited XP text (${roundTrip.xpProductDefault.editorText})`,
+      );
+      assert(
+        roundTrip.xpProductDefault.editorScrollbarSize === "12px",
+        `Product-default Editor presentation inherited XP scrollbar geometry (${roundTrip.xpProductDefault.editorScrollbarSize})`,
       );
     }
 

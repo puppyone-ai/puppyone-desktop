@@ -168,6 +168,8 @@
   display: grid;
   min-width: 0;
   grid-template-rows: auto auto;
+  border-radius: var(--po-surface-editor-card-radius, 0);
+  box-shadow: var(--po-surface-editor-card-shadow, none);
 }
 
 .puppyflow-step-row:hover .puppyflow-prompt-cell {

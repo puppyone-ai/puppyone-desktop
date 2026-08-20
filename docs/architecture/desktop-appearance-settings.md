@@ -211,11 +211,10 @@ Implemented:
    (`color | symbols`) is rendered in compact AI review surfaces; its settings
    row lives in the Editor section. The full Git Changes review surface always
    renders `+/-` because color alone cannot communicate its row structure.
-9. **Curated interface styles.** Default, Windows XP, and macOS Tiger are
-   registered built-in styles. Default declares an adaptive System / Light /
-   Dark palette with light and dark preset controls. XP and Tiger declare a
-   fixed light palette, so those controls are absent without discarding the
-   user's saved Default choices.
+9. **Curated interface styles.** Default and Windows XP are registered built-in
+   styles. Default declares an adaptive System / Light / Dark palette with
+   light and dark preset controls. XP declares a fixed light palette, so those
+   controls are absent without discarding the user's saved Default choices.
 10. **Agent file activity.**
     `puppyone.desktop.agentFileActivityIndicators` is an opt-in global
     Appearance preference. It controls the Editor eye/hand treatment for

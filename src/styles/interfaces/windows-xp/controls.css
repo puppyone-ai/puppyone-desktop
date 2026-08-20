@@ -6,8 +6,7 @@
     .desktop-settings-action,
     .desktop-settings-row-action,
     .desktop-branch-menu-action,
-    .desktop-version-control-enable-button,
-    .puppyflow-add-button
+    .desktop-version-control-enable-button
   ) {
   border: 1px solid var(--xp-control-border);
   border-radius: 2px;
@@ -24,8 +23,7 @@
     .desktop-settings-action,
     .desktop-settings-row-action,
     .desktop-branch-menu-action,
-    .desktop-version-control-enable-button,
-    .puppyflow-add-button
+    .desktop-version-control-enable-button
   ):active:not(:disabled) {
   background: linear-gradient(180deg, var(--xp-button-active-start), var(--xp-button-active-end));
   box-shadow: inset 1px 1px 1px #808080, inset -1px -1px 0 #ffffff;
