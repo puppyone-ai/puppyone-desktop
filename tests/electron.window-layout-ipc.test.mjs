@@ -40,7 +40,57 @@ describe("native window layout IPC", () => {
 
     expect(handlers.get("window-layout:get-chrome-state")(createEvent())).toEqual({
       fullScreen: true,
+      maximized: false,
     });
+  });
+
+  it("switches native buttons from the manifest-owned titlebar composition", () => {
+    const ownerWindow = createWindow();
+    const handlers = registerHandlers(ownerWindow);
+
+    expect(handlers.get("window-layout:set-chrome-profile")(createEvent(), {
+      titlebar: "windows-xp-luna-titlebar-v1",
+    })).toEqual({ applied: true, customControls: true });
+    expect(ownerWindow.setWindowButtonVisibility).toHaveBeenCalledWith(false);
+
+    expect(handlers.get("window-layout:set-chrome-profile")(createEvent(), {
+      titlebar: "default-titlebar-v1",
+    })).toEqual({ applied: true, customControls: false });
+    expect(ownerWindow.setWindowButtonVisibility).toHaveBeenLastCalledWith(true);
+    expect(ownerWindow.setWindowButtonPosition).toHaveBeenLastCalledWith({ x: 13, y: 12 });
+    expect(ownerWindow.setWindowButtonPosition.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      ownerWindow.setWindowButtonVisibility.mock.invocationCallOrder.at(-1),
+    );
+  });
+
+  it("keeps native traffic lights vertically centered for each macOS titlebar profile", () => {
+    const ownerWindow = createWindow();
+    const handlers = registerHandlers(ownerWindow);
+    const applyProfile = handlers.get("window-layout:set-chrome-profile");
+
+    expect(applyProfile(createEvent(), {
+      titlebar: "macos-tiger-brushed-titlebar-v1",
+    })).toEqual({ applied: true, customControls: false });
+    expect(ownerWindow.setWindowButtonPosition).toHaveBeenLastCalledWith({ x: 13, y: 13 });
+
+    expect(applyProfile(createEvent(), {
+      titlebar: "unknown-titlebar-v1",
+    })).toEqual({ applied: true, customControls: false });
+    expect(ownerWindow.setWindowButtonPosition).toHaveBeenLastCalledWith({ x: 13, y: 12 });
+  });
+
+  it("executes only allowlisted renderer window actions", () => {
+    const ownerWindow = createWindow();
+    const handlers = registerHandlers(ownerWindow);
+    const perform = handlers.get("window-layout:perform-window-action");
+
+    expect(perform(createEvent(), { action: "minimize" })).toEqual({ applied: true });
+    expect(perform(createEvent(), { action: "toggle-maximize" })).toEqual({ applied: true });
+    expect(perform(createEvent(), { action: "close" })).toEqual({ applied: true });
+    expect(perform(createEvent(), { action: "inspect" })).toEqual({ applied: false });
+    expect(ownerWindow.minimize).toHaveBeenCalledOnce();
+    expect(ownerWindow.maximize).toHaveBeenCalledOnce();
+    expect(ownerWindow.close).toHaveBeenCalledOnce();
   });
 });
 
@@ -72,8 +122,15 @@ function createWindow({ destroyed = false, fullScreen = false, width = 900 } = {
     getSize: vi.fn(() => [width, 840]),
     isDestroyed: vi.fn(() => destroyed),
     isFullScreen: vi.fn(() => fullScreen),
+    isMaximized: vi.fn(() => false),
+    close: vi.fn(),
+    maximize: vi.fn(),
+    minimize: vi.fn(),
+    setWindowButtonVisibility: vi.fn(),
+    setWindowButtonPosition: vi.fn(),
     setMinimumSize: vi.fn(),
     setSize: vi.fn(),
+    unmaximize: vi.fn(),
   };
 }
 

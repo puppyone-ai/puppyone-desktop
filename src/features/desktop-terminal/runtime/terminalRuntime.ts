@@ -26,6 +26,22 @@ type TerminalExit = {
   signal: string | null;
 };
 
+export type TerminalScrollbarState = {
+  visible: boolean;
+  canDecrement: boolean;
+  canIncrement: boolean;
+  position: number;
+  viewportRatio: number;
+};
+
+const INITIAL_SCROLLBAR_STATE: TerminalScrollbarState = {
+  visible: false,
+  canDecrement: false,
+  canIncrement: false,
+  position: 0,
+  viewportRatio: 1,
+};
+
 type TerminalRuntimeOptions = {
   sessionId: string;
   launcherId: DesktopTerminalLauncherId;
@@ -42,14 +58,18 @@ type TerminalRuntimeOptions = {
 export interface TerminalRuntimeHandle {
   readonly activity: boolean;
   readonly ready: boolean;
+  readonly scrollbarState: TerminalScrollbarState;
   applyAppearance: () => void;
   dispose: () => void;
   focus: () => void;
   mount: (container: HTMLDivElement) => void;
+  scrollLines: (direction: -1 | 1) => void;
+  scrollToRatio: (ratio: number) => void;
   unmount: (container: HTMLDivElement) => void;
   setActive: (active: boolean) => void;
   subscribeActivity: (listener: (active: boolean) => void) => () => void;
   subscribeReady: (listener: (ready: boolean) => void) => () => void;
+  subscribeScrollbar: (listener: (state: TerminalScrollbarState) => void) => () => void;
   write: (data: string) => void;
 }
 
@@ -62,6 +82,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   private readonly activityController: TerminalActivityController;
   private readonly activityListeners = new Set<(active: boolean) => void>();
   private readonly readyListeners = new Set<(ready: boolean) => void>();
+  private readonly scrollbarListeners = new Set<(state: TerminalScrollbarState) => void>();
   private readonly disposables: IDisposable[] = [];
   private terminal: Terminal | null = null;
   private fitAddon: FitAddon | null = null;
@@ -86,6 +107,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   private hasBeenActive = false;
   private disposed = false;
   private viewReady = false;
+  private currentScrollbarState = INITIAL_SCROLLBAR_STATE;
 
   constructor({
     sessionId,
@@ -115,6 +137,10 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     return this.viewReady;
   }
 
+  get scrollbarState() {
+    return this.currentScrollbarState;
+  }
+
   mount(container: HTMLDivElement) {
     if (this.disposed) return;
     if (this.container === container) return;
@@ -128,6 +154,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
       this.observeSize(container);
       this.observeSidebarTransition(container);
       this.applyAppearance();
+      this.syncScrollbarPresentation();
       this.scheduleFit();
       return;
     }
@@ -158,6 +185,20 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     if (!this.disposed) this.terminal?.focus();
   }
 
+  scrollLines(direction: -1 | 1) {
+    if (this.disposed) return;
+    this.terminal?.scrollLines(direction);
+  }
+
+  scrollToRatio(ratio: number) {
+    if (this.disposed || !this.terminal) return;
+    const maximumViewportY = Math.max(0, this.terminal.buffer.active.baseY);
+    const nextViewportY = Math.round(
+      maximumViewportY * Math.min(1, Math.max(0, ratio)),
+    );
+    this.terminal.scrollToLine(nextViewportY);
+  }
+
   write(data: string) {
     if (this.disposed || data.length === 0) return;
     window.puppyoneDesktop?.writeTerminal?.({
@@ -178,9 +219,16 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     return () => this.activityListeners.delete(listener);
   }
 
+  subscribeScrollbar(listener: (state: TerminalScrollbarState) => void) {
+    this.scrollbarListeners.add(listener);
+    listener(this.currentScrollbarState);
+    return () => this.scrollbarListeners.delete(listener);
+  }
+
   applyAppearance() {
     if (this.disposed || !this.container || !this.terminal) return;
     this.defaultColors = applyTerminalAppearance(this.terminal, this.container);
+    this.syncScrollbarPresentation();
     this.scheduleFit();
   }
 
@@ -195,6 +243,8 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     this.activityController.dispose();
     this.activityListeners.clear();
     this.readyListeners.clear();
+    this.currentScrollbarState = INITIAL_SCROLLBAR_STATE;
+    this.scrollbarListeners.clear();
 
     if (this.fitFrame !== null) cancelAnimationFrame(this.fitFrame);
     if (this.revealFrame !== null) cancelAnimationFrame(this.revealFrame);
@@ -257,9 +307,16 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     terminal.loadAddon(new WebLinksAddon((_event, href) => this.openExternalUrl(href)));
     activateUnicode11(terminal);
     this.disposables.push(
-      terminal.onRender(() => this.setReady(true)),
+      terminal.onRender(() => {
+        this.setReady(true);
+        this.syncScrollbarPresentation();
+      }),
       terminal.onData((data) => this.write(data)),
-      terminal.onScroll(() => this.markScrollbarActive()),
+      terminal.onResize(() => this.syncScrollbarPresentation()),
+      terminal.onScroll(() => {
+        this.markScrollbarActive();
+        this.syncScrollbarPresentation();
+      }),
       terminal.onTitleChange((title) => this.activityController.noteTitle(title)),
     );
     terminal.open(container);
@@ -293,6 +350,27 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
       this.scrollbarIdleTimer = null;
       container.classList.remove("po-scrollbar-active");
     }, 900);
+  }
+
+  private syncScrollbarPresentation() {
+    const terminal = this.terminal;
+    if (!terminal) return;
+
+    const buffer = terminal.buffer.active;
+    const totalLineCount = Math.max(terminal.rows, buffer.length);
+    const maximumViewportY = Math.max(0, buffer.baseY);
+    const nextState: TerminalScrollbarState = {
+      visible: maximumViewportY > 0,
+      canDecrement: buffer.viewportY > 0,
+      canIncrement: buffer.viewportY < maximumViewportY,
+      position: maximumViewportY > 0
+        ? Math.min(1, Math.max(0, buffer.viewportY / maximumViewportY))
+        : 0,
+      viewportRatio: Math.min(1, terminal.rows / totalLineCount),
+    };
+    if (sameTerminalScrollbarState(this.currentScrollbarState, nextState)) return;
+    this.currentScrollbarState = nextState;
+    this.scrollbarListeners.forEach((listener) => listener(nextState));
   }
 
   private subscribeBridge() {
@@ -509,6 +587,17 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
 
 function sameTerminalSize(left: TerminalSize | null, right: TerminalSize) {
   return left?.cols === right.cols && left.rows === right.rows;
+}
+
+function sameTerminalScrollbarState(
+  left: TerminalScrollbarState,
+  right: TerminalScrollbarState,
+) {
+  return left.visible === right.visible
+    && left.canDecrement === right.canDecrement
+    && left.canIncrement === right.canIncrement
+    && left.position === right.position
+    && left.viewportRatio === right.viewportRatio;
 }
 
 function activateUnicode11(terminal: Terminal) {

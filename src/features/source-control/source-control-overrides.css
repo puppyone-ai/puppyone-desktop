@@ -1,5 +1,5 @@
-/* Shared sidebar primitives are intentionally unlayered. Keep this narrowly
-   scoped bridge unlayered as well so section empties retain the Git tree inset. */
+/* Narrow product bridge loaded after the shared sidebar primitives in the
+   features layer so section empties retain the Git tree inset. */
 .desktop-git-sidebar .po-sidebar-empty.desktop-git-section-empty {
   padding-inline: calc(
     var(--git-sidebar-left-gap)

@@ -334,6 +334,29 @@
   text-overflow: ellipsis;
 }
 
+.desktop-theme-segment button.is-policy-controlled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.desktop-theme-segment button.is-policy-controlled.active {
+  opacity: 1;
+}
+
+.desktop-appearance-policy-reason {
+  grid-column: 2;
+  width: min(100%, 360px);
+  color: var(--po-text-muted);
+  font-size: var(--po-font-size-caption);
+  line-height: 1.3;
+}
+
+@media (max-width: 760px) {
+  .desktop-appearance-policy-reason {
+    grid-column: 1;
+  }
+}
+
 .desktop-loading-animation-preview {
   display: inline-grid;
   width: 17px;

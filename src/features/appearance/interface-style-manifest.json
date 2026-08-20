@@ -1,8 +1,9 @@
 {
-  "version": 1,
+  "version": 3,
   "defaultStyle": "default",
   "storage": {
     "interfaceStyle": "puppyone.desktop.interfaceStyle",
+    "appearancePreferences": "puppyone.desktop.appearance.v2",
     "themeMode": "puppyone.desktop.theme",
     "lightThemePreset": "puppyone.desktop.lightThemePreset",
     "darkThemePreset": "puppyone.desktop.darkThemePreset",
@@ -12,6 +13,27 @@
     {
       "id": "default",
       "labelKey": "settings.appearance.interfaceStyle.default",
+      "profile": {
+        "family": "default",
+        "variant": "product",
+        "palette": "adaptive"
+      },
+      "tokenSet": "default-v1",
+      "composition": {
+        "shell": "default-shell-v1",
+        "titlebar": "default-titlebar-v1",
+        "navigation": "user-preference",
+        "locationBar": "none",
+        "scrollbar": "product-modern-v1",
+        "iconPack": "product-v1"
+      },
+      "policies": {
+        "themeMode": { "mode": "inherit" },
+        "sidebarNavigationLayout": { "mode": "inherit" },
+        "textSize": { "mode": "inherit" },
+        "fileIconTheme": { "mode": "inherit" },
+        "editorPresentation": { "mode": "inherit" }
+      },
       "palette": {
         "kind": "adaptive",
         "modes": ["system", "light", "dark"],
@@ -72,6 +94,39 @@
     {
       "id": "windows-xp",
       "labelKey": "settings.appearance.interfaceStyle.windowsXp",
+      "profile": {
+        "family": "windows-xp",
+        "variant": "luna",
+        "palette": "blue"
+      },
+      "tokenSet": "windows-xp-luna-blue-v1",
+      "composition": {
+        "shell": "windows-xp-shell-v1",
+        "titlebar": "windows-xp-luna-titlebar-v1",
+        "navigation": "sidebar-top-toolbar",
+        "locationBar": "workspace-path-v1",
+        "scrollbar": "windows-xp-classic-v1",
+        "iconPack": "windows-xp-native-v1"
+      },
+      "policies": {
+        "themeMode": {
+          "mode": "force",
+          "value": "light",
+          "reasonKey": "settings.appearance.controlledBy.windowsXp"
+        },
+        "sidebarNavigationLayout": {
+          "mode": "force",
+          "value": "top-horizontal",
+          "reasonKey": "settings.appearance.controlledBy.windowsXpNavigation"
+        },
+        "textSize": { "mode": "inherit" },
+        "fileIconTheme": { "mode": "inherit" },
+        "editorPresentation": {
+          "mode": "allow",
+          "values": ["follow-interface", "product-default"],
+          "default": "follow-interface"
+        }
+      },
       "palette": {
         "kind": "fixed",
         "mode": "light"
@@ -82,11 +137,40 @@
           "colorScheme": "light"
         }
       },
-      "stylesheet": "windows-xp.css"
+      "stylesheet": "interfaces/windows-xp/index.css"
     },
     {
       "id": "macos-tiger",
       "labelKey": "settings.appearance.interfaceStyle.macosTiger",
+      "profile": {
+        "family": "macos-tiger",
+        "variant": "tiger",
+        "palette": "aqua"
+      },
+      "tokenSet": "macos-tiger-aqua-v1",
+      "composition": {
+        "shell": "macos-tiger-shell-v1",
+        "titlebar": "macos-tiger-brushed-titlebar-v1",
+        "navigation": "user-preference",
+        "locationBar": "none",
+        "scrollbar": "macos-tiger-aqua-v1",
+        "iconPack": "product-v1"
+      },
+      "policies": {
+        "themeMode": {
+          "mode": "force",
+          "value": "light",
+          "reasonKey": "settings.appearance.controlledBy.macosTiger"
+        },
+        "sidebarNavigationLayout": { "mode": "inherit" },
+        "textSize": { "mode": "inherit" },
+        "fileIconTheme": { "mode": "inherit" },
+        "editorPresentation": {
+          "mode": "allow",
+          "values": ["follow-interface", "product-default"],
+          "default": "follow-interface"
+        }
+      },
       "palette": {
         "kind": "fixed",
         "mode": "light"

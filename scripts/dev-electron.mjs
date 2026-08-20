@@ -2,6 +2,7 @@ import { watch, watchFile, unwatchFile } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getDefaultElectronBin } from "./electron-runtime.mjs";
+import { watchInterfaceStyleGraph } from "./interface-style-graph-watcher.mjs";
 import {
   isLoopbackHostname,
   loadDesktopDevelopmentEnvironment,
@@ -31,7 +32,9 @@ const rendererDependencyWatchPaths = [
   path.join(desktopRoot, "package-lock.json"),
   path.join(desktopRoot, "node_modules", "vite", "package.json"),
   path.join(desktopRoot, "node_modules", "vite", "dist", "client", "client.mjs"),
+  path.join(desktopRoot, "src", "styles", "interface-styles.generated.css"),
 ];
+const rendererStyleGraphRoot = path.join(desktopRoot, "src", "styles", "interfaces");
 
 let renderer = null;
 let rendererHost = null;
@@ -45,6 +48,7 @@ let electronRestarting = false;
 let electronRestartTimer = null;
 let environmentRestartTimer = null;
 let rendererRestartTimer = null;
+let rendererStyleGraphWatcher = null;
 let environmentRestarting = false;
 let rendererStartedDuringEnvironmentRestart = false;
 let shuttingDown = false;
@@ -112,6 +116,7 @@ async function startDevelopmentEnvironment() {
 
     startRenderer();
     startRendererDependencyWatchers();
+    startRendererStyleGraphWatcher();
     startRendererHealthCheck();
   } catch (error) {
     console.error(
@@ -334,6 +339,21 @@ function stopRendererDependencyWatchers() {
   }
 }
 
+function startRendererStyleGraphWatcher() {
+  if (rendererStyleGraphWatcher) return;
+  rendererStyleGraphWatcher = watchInterfaceStyleGraph(
+    rendererStyleGraphRoot,
+    ({ fileName }) => {
+      scheduleEnvironmentRestart(`Interface Style import graph changed (${fileName})`, 300);
+    },
+  );
+}
+
+function stopRendererStyleGraphWatcher() {
+  rendererStyleGraphWatcher?.close();
+  rendererStyleGraphWatcher = null;
+}
+
 function scheduleEnvironmentRestart(reason, delayMs) {
   if (shuttingDown) return;
   lastEnvironmentRestartReason = reason;
@@ -370,6 +390,7 @@ function beginShutdown(code) {
   exitCode = code;
   stopMainWatchers();
   stopRendererDependencyWatchers();
+  stopRendererStyleGraphWatcher();
   if (healthCheck) clearInterval(healthCheck);
   if (localCloudHealthCheck) clearInterval(localCloudHealthCheck);
   if (electronRestartTimer) clearTimeout(electronRestartTimer);

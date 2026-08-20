@@ -255,6 +255,10 @@
   align-items: center;
 }
 
+.desktop-agent-surface-brand {
+  display: none;
+}
+
 .desktop-agent-session-agent-selector {
   width: max-content;
   min-width: 0;

@@ -1,9 +1,12 @@
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent as ReactDragEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
   classifyReferenceDataTransfer,
@@ -19,6 +22,9 @@ type TerminalSessionViewProps = {
   workspacePath: string;
 };
 
+const SCROLLBAR_REPEAT_DELAY_MS = 320;
+const SCROLLBAR_REPEAT_INTERVAL_MS = 54;
+
 export function TerminalSessionView({
   active,
   labelledBy,
@@ -27,15 +33,22 @@ export function TerminalSessionView({
   workspacePath,
 }: TerminalSessionViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollbarTrackRef = useRef<HTMLDivElement>(null);
+  const scrollbarDragRef = useRef<{ pointerId: number; offset: number } | null>(null);
+  const repeatDelayRef = useRef<number | null>(null);
+  const repeatIntervalRef = useRef<number | null>(null);
   const [ready, setReady] = useState(runtime.ready);
+  const [scrollbarState, setScrollbarState] = useState(runtime.scrollbarState);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return undefined;
     const unsubscribeReady = runtime.subscribeReady(setReady);
+    const unsubscribeScrollbar = runtime.subscribeScrollbar(setScrollbarState);
     runtime.mount(container);
     return () => {
       unsubscribeReady();
+      unsubscribeScrollbar();
       runtime.unmount(container);
     };
   }, [runtime]);
@@ -43,6 +56,77 @@ export function TerminalSessionView({
   useLayoutEffect(() => {
     runtime.setActive(active);
   }, [active, runtime]);
+
+  const stopScrollbarRepeat = useCallback(() => {
+    if (repeatDelayRef.current !== null) window.clearTimeout(repeatDelayRef.current);
+    if (repeatIntervalRef.current !== null) window.clearInterval(repeatIntervalRef.current);
+    repeatDelayRef.current = null;
+    repeatIntervalRef.current = null;
+  }, []);
+
+  useEffect(() => stopScrollbarRepeat, [stopScrollbarRepeat]);
+
+  const beginScrollbarScroll = useCallback((
+    event: ReactPointerEvent<HTMLButtonElement>,
+    direction: -1 | 1,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    stopScrollbarRepeat();
+    const scroll = () => runtime.scrollLines(direction);
+    scroll();
+    repeatDelayRef.current = window.setTimeout(() => {
+      repeatIntervalRef.current = window.setInterval(scroll, SCROLLBAR_REPEAT_INTERVAL_MS);
+    }, SCROLLBAR_REPEAT_DELAY_MS);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, [runtime, stopScrollbarRepeat]);
+
+  const scrollToPointer = useCallback((clientY: number, pointerOffset: number) => {
+    const track = scrollbarTrackRef.current;
+    const thumb = track?.querySelector<HTMLElement>(".desktop-terminal-classic-scrollbar-thumb");
+    if (!track || !thumb) return;
+    const trackRect = track.getBoundingClientRect();
+    const thumbRect = thumb.getBoundingClientRect();
+    const travel = Math.max(0, trackRect.height - thumbRect.height);
+    const offset = Math.min(travel, Math.max(0, clientY - trackRect.top - pointerOffset));
+    runtime.scrollToRatio(travel > 0 ? offset / travel : 0);
+  }, [runtime]);
+
+  const handleScrollbarTrackPointerDown = useCallback((
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
+    const thumb = event.currentTarget.querySelector<HTMLElement>(
+      ".desktop-terminal-classic-scrollbar-thumb",
+    );
+    scrollToPointer(event.clientY, (thumb?.getBoundingClientRect().height ?? 0) / 2);
+  }, [scrollToPointer]);
+
+  const handleScrollbarThumbPointerDown = useCallback((
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    scrollbarDragRef.current = {
+      pointerId: event.pointerId,
+      offset: event.clientY - event.currentTarget.getBoundingClientRect().top,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, []);
+
+  const handleScrollbarThumbPointerMove = useCallback((
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    const drag = scrollbarDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    scrollToPointer(event.clientY, drag.offset);
+  }, [scrollToPointer]);
+
+  const stopScrollbarDrag = useCallback(() => {
+    scrollbarDragRef.current = null;
+  }, []);
 
   const handleTerminalDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     if (!hasTerminalDroppablePaths(event.dataTransfer)) return;
@@ -75,7 +159,52 @@ export function TerminalSessionView({
         ref={containerRef}
         onDragOver={handleTerminalDragOver}
         onDrop={handleTerminalDrop}
-      />
+      >
+        <div
+          className="desktop-terminal-classic-scrollbar-controls"
+          data-visible={scrollbarState.visible ? "true" : "false"}
+          aria-hidden="true"
+          style={{
+            "--desktop-terminal-scrollbar-position": scrollbarState.position,
+            "--desktop-terminal-scrollbar-viewport-ratio": scrollbarState.viewportRatio,
+          } as CSSProperties}
+        >
+          <button
+            className="desktop-terminal-classic-scrollbar-button decrement"
+            type="button"
+            tabIndex={-1}
+            disabled={!scrollbarState.canDecrement}
+            onPointerDown={(event) => beginScrollbarScroll(event, -1)}
+            onPointerUp={stopScrollbarRepeat}
+            onPointerCancel={stopScrollbarRepeat}
+            onLostPointerCapture={stopScrollbarRepeat}
+          />
+          <div
+            ref={scrollbarTrackRef}
+            className="desktop-terminal-classic-scrollbar-track"
+            onPointerDown={handleScrollbarTrackPointerDown}
+          >
+            <div
+              className="desktop-terminal-classic-scrollbar-thumb"
+              onPointerDown={handleScrollbarThumbPointerDown}
+              onPointerMove={handleScrollbarThumbPointerMove}
+              onPointerUp={stopScrollbarDrag}
+              onPointerCancel={stopScrollbarDrag}
+              onLostPointerCapture={stopScrollbarDrag}
+            />
+          </div>
+          <button
+            className="desktop-terminal-classic-scrollbar-button increment"
+            type="button"
+            tabIndex={-1}
+            disabled={!scrollbarState.canIncrement}
+            onPointerDown={(event) => beginScrollbarScroll(event, 1)}
+            onPointerUp={stopScrollbarRepeat}
+            onPointerCancel={stopScrollbarRepeat}
+            onLostPointerCapture={stopScrollbarRepeat}
+          />
+        </div>
+      </div>
     </div>
   );
 }

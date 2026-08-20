@@ -183,13 +183,16 @@ export function aggregateFolderRelationshipEdges(
 
   return [...directionalByPair.entries()]
     .map(([pairKey, relationships]) => {
-      const [sourceId, targetId] = pairKey.split("\u0000") as [string, string];
+      const [firstId, secondId] = pairKey.split("\u0000") as [string, string];
+      const bidirectional = relationships.some((relationship) => relationship.sourceId === firstId)
+        && relationships.some((relationship) => relationship.sourceId === secondId);
+      const sourceId = bidirectional ? firstId : relationships[0].sourceId;
+      const targetId = bidirectional ? secondId : relationships[0].targetId;
       return {
         sourceId,
         targetId,
         count: relationships.reduce((total, relationship) => total + relationship.count, 0),
-        bidirectional: relationships.some((relationship) => relationship.sourceId === sourceId)
-          && relationships.some((relationship) => relationship.sourceId === targetId),
+        bidirectional,
       };
     })
     .sort((left, right) => right.count - left.count || left.sourceId.localeCompare(right.sourceId));

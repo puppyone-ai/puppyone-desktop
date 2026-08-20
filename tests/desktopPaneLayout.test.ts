@@ -10,6 +10,10 @@ import {
 } from "../src/features/app-shell/layout/desktopPaneLayout";
 
 describe("desktop three-pane layout", () => {
+  it("uses the compact 220px product floor for the left explorer", () => {
+    expect(MIN_EXPLORER_WIDTH).toBe(220);
+  });
+
   it("keeps independent preferred side widths while the main pane owns spare space", () => {
     const layout = resolveLayout({ availableWidth: 1440 });
 

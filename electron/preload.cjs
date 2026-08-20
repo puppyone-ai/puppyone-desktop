@@ -3,6 +3,16 @@ const externalViewerPacksEnabled = process.argv.includes("--puppyone-external-vi
 
 contextBridge.exposeInMainWorld("puppyoneDesktop", {
   getWindowChromeState: () => ipcRenderer.invoke("window-layout:get-chrome-state"),
+  setWindowChromeProfile: (request) => (
+    ipcRenderer.invoke("window-layout:set-chrome-profile", {
+      titlebar: request?.titlebar,
+    })
+  ),
+  performWindowAction: (request) => (
+    ipcRenderer.invoke("window-layout:perform-window-action", {
+      action: request?.action,
+    })
+  ),
   onWindowChromeStateChanged: (callback) => {
     if (typeof callback !== "function") return () => {};
     const listener = (_event, state) => callback(state);

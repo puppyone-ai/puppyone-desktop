@@ -5,6 +5,7 @@ import {
   Suspense,
   type ComponentType,
   type LazyExoticComponent,
+  type ReactNode,
 } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import { DocumentSurfacePending } from "./DocumentSurfaceHost";
@@ -13,6 +14,7 @@ import type {
   PresetViewerContribution,
   PresetViewerRenderContext,
 } from "../registry/viewerTypes";
+import type { ViewerSurfaceFamily, ViewerSurfaceTrait } from "../registry/viewerContract";
 
 const lazyRenderers = new WeakMap<
   LazyPresetViewerContribution,
@@ -39,14 +41,51 @@ export function PresetViewerRenderer({
 }) {
   const { t } = useLocalization();
   if ("render" in viewer && typeof viewer.render === "function") {
-    return <>{viewer.render(context)}</>;
+    return (
+      <ViewerSurfaceBoundary
+        viewerId={viewer.id}
+        family={viewer.surfaceFamily}
+        traits={viewer.surfaceTraits}
+      >
+        {viewer.render(context)}
+      </ViewerSurfaceBoundary>
+    );
   }
 
   const LazyRenderer = getLazyRenderer(viewer as LazyPresetViewerContribution);
   return (
-    <Suspense fallback={<DocumentSurfacePending label={t("editor.loadingViewer")} />}>
-      <LazyRenderer {...context} />
-    </Suspense>
+    <ViewerSurfaceBoundary
+      viewerId={viewer.id}
+      family={viewer.surfaceFamily}
+      traits={viewer.surfaceTraits}
+    >
+      <Suspense fallback={<DocumentSurfacePending label={t("editor.loadingViewer")} />}>
+        <LazyRenderer {...context} />
+      </Suspense>
+    </ViewerSurfaceBoundary>
+  );
+}
+
+export function ViewerSurfaceBoundary({
+  viewerId,
+  family,
+  traits,
+  children,
+}: {
+  viewerId: string;
+  family: ViewerSurfaceFamily;
+  traits: readonly ViewerSurfaceTrait[];
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className="po-viewer-surface-boundary"
+      data-viewer-id={viewerId}
+      data-viewer-surface-family={family}
+      data-viewer-surface-traits={traits.join(" ") || undefined}
+    >
+      {children}
+    </div>
   );
 }
 

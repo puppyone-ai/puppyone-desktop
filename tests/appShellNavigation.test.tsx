@@ -87,6 +87,38 @@ describe("DesktopSidebarTopNavigation", () => {
     act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Cloud"]')?.click());
     expect(onNavigate).toHaveBeenCalledWith("cloud");
   });
+
+  it("exposes a stable Shell-toolbar contract without replacing Sidebar semantics", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <DesktopSidebarTopNavigation
+        activeView="data"
+        cloudHubEnabled
+        gitEnabled
+        pluginsEnabled={false}
+        orientation="horizontal"
+        gitIncomingCount={0}
+        gitOperationLoading={null}
+        gitStatus={null}
+        shellToolbar
+        useToolLabels
+        workspaceChangeCount={65}
+        onNavigate={vi.fn()}
+        onOpenSettings={vi.fn()}
+      />,
+    ));
+
+    const navigation = container.querySelector('[data-shell-toolbar-section="navigation"]');
+    expect(navigation?.classList.contains("desktop-sidebar-top-navigation")).toBe(true);
+    expect(navigation?.classList.contains("desktop-shell-toolbar-navigation")).toBe(true);
+    expect(navigation?.querySelectorAll(".desktop-shell-toolbar-button")).toHaveLength(4);
+    expect(navigation?.querySelectorAll(".desktop-shell-toolbar-button-icon")).toHaveLength(4);
+    expect(navigation?.querySelectorAll(".desktop-shell-toolbar-button-label")).toHaveLength(4);
+    expect(navigation?.querySelector(".desktop-sidebar-nav-badge")).toBeNull();
+  });
 });
 
 describe("DesktopSidebarFooterNavigation", () => {

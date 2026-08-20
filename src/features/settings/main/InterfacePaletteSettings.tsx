@@ -13,10 +13,15 @@ import {
   type LightThemePreset,
 } from "../../../preferences";
 import { ThemePreview } from "./ThemePreview";
+import {
+  isAppearanceDecisionLocked,
+  isAppearanceValueAllowed,
+  type AppearanceSettingDecision,
+} from "../../appearance/resolveAppearance";
 
 type InterfacePaletteSettingsProps = {
   interfaceStyle: InterfaceStyle;
-  themeMode: ThemeMode;
+  decision: AppearanceSettingDecision<ThemeMode>;
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
   onThemeModeChange: (mode: ThemeMode) => void;
@@ -32,7 +37,7 @@ const THEME_MODE_OPTIONS = {
 
 export function InterfacePaletteSettings({
   interfaceStyle,
-  themeMode,
+  decision,
   lightThemePreset,
   darkThemePreset,
   onThemeModeChange,
@@ -42,6 +47,7 @@ export function InterfacePaletteSettings({
   const { t } = useLocalization();
   const palette = getInterfaceStyleDefinition(interfaceStyle).palette;
   if (palette.kind !== "adaptive") return null;
+  const locked = isAppearanceDecisionLocked(decision);
 
   return (
     <>
@@ -53,11 +59,15 @@ export function InterfacePaletteSettings({
             const Icon = option.icon;
             return (
               <button
-                className={`desktop-theme-choice ${themeMode === mode ? "active" : ""}`}
+                className={`desktop-theme-choice ${decision.effectiveValue === mode ? "active" : ""}${locked || !isAppearanceValueAllowed(decision, mode) ? " is-policy-controlled" : ""}`}
                 type="button"
                 key={mode}
-                aria-pressed={themeMode === mode}
-                onClick={() => onThemeModeChange(mode)}
+                title={decision.reasonKey ? t(decision.reasonKey) : undefined}
+                aria-disabled={locked || !isAppearanceValueAllowed(decision, mode)}
+                aria-pressed={decision.effectiveValue === mode}
+                onClick={() => {
+                  if (!locked && isAppearanceValueAllowed(decision, mode)) onThemeModeChange(mode);
+                }}
               >
                 <ThemePreview
                   mode={mode}
@@ -72,6 +82,9 @@ export function InterfacePaletteSettings({
             );
           })}
         </div>
+        {decision.reasonKey && (
+          <small className="desktop-appearance-policy-reason">{t(decision.reasonKey)}</small>
+        )}
       </div>
       {palette.presetControls.light && (
         <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">

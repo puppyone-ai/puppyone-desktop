@@ -33,7 +33,7 @@ async function runSmoke() {
 
   const result = await pollForResult(window);
   if ("error" in result) throw new Error(result.error);
-  if (result.ok !== true || result.scenarios.length !== 3) {
+  if (result.ok !== true || !result.presentation || result.scenarios.length !== 3) {
     throw new Error("Markdown line-geometry smoke returned an incomplete result.");
   }
   console.log(JSON.stringify(result, null, 2));

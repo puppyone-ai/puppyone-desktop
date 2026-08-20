@@ -53,6 +53,14 @@ export default defineConfig({
         replacement: fileURLToPath(new URL("./packages/shared-ui/src/styles/shared-ui.css", import.meta.url)),
       },
       {
+        find: "@puppyone/shared-ui/shared-ui-patterns.css",
+        replacement: fileURLToPath(new URL("./packages/shared-ui/src/styles/shared-ui-patterns.css", import.meta.url)),
+      },
+      {
+        find: "@puppyone/shared-ui/editor.css",
+        replacement: fileURLToPath(new URL("./packages/shared-ui/src/styles/editor.css", import.meta.url)),
+      },
+      {
         find: "@puppyone/shared-ui",
         replacement: fileURLToPath(new URL("./packages/shared-ui/src/index.ts", import.meta.url)),
       },

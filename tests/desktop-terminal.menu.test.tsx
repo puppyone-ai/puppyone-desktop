@@ -26,6 +26,49 @@ afterEach(() => {
 });
 
 describe("Desktop Terminal titlebar session manager", () => {
+  it("presents the terminal launcher as Agent in the workspace toolbar", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(withTestLocalization(
+      <DesktopTitlebarActions
+        titlebarActionsSettings={DEFAULT_TITLEBAR_ACTIONS_SETTINGS}
+        terminalSidebarOpen={false}
+        terminalToolEnabled
+        terminalSessionLayout="menu"
+        terminalSessions={[]}
+        activeTerminalSessionId={null}
+        agentChatEnabled
+        agentChatSidebarOpen={false}
+        placement="toolbar"
+        visibleGroups={["right-sidebar"]}
+        onCreateTerminal={vi.fn()}
+        onActivateTerminal={vi.fn()}
+        onCloseTerminal={vi.fn()}
+        onToggleAgentChat={vi.fn()}
+        onToggleTerminal={vi.fn()}
+      />,
+    )));
+
+    const terminal = container.querySelector('[data-toolbar-action="terminal"]');
+    const agent = container.querySelector('[data-toolbar-action="agent"]');
+    expect(terminal?.textContent).toBe("Agent");
+    expect(terminal?.classList.contains("desktop-shell-toolbar-button")).toBe(true);
+    expect(terminal?.classList.contains("desktop-titlebar-action")).toBe(false);
+    expect(terminal?.querySelector(".lucide-square-terminal")).not.toBeNull();
+    expect(terminal?.querySelector(".desktop-shell-toolbar-button-icon")).not.toBeNull();
+    expect(terminal?.querySelector(".desktop-shell-toolbar-button-label")).not.toBeNull();
+    expect(agent?.textContent).toBe("Chat");
+    expect(agent?.classList.contains("desktop-shell-toolbar-button")).toBe(true);
+    expect(agent?.classList.contains("desktop-titlebar-action")).toBe(false);
+    expect(agent?.querySelector(".desktop-shell-toolbar-agent-logo")).not.toBeNull();
+    expect(agent?.querySelector(".desktop-shell-toolbar-button-icon")).not.toBeNull();
+    expect(agent?.querySelector(".desktop-shell-toolbar-button-label")).not.toBeNull();
+    expect(Array.from(container.querySelectorAll("[data-toolbar-action]"), (item) => item.textContent))
+      .toEqual(["Chat", "Agent"]);
+  });
+
   it("lets the user create, switch, and close explicit terminal sessions", () => {
     const onCreateTerminal = vi.fn();
     const onActivateTerminal = vi.fn();
@@ -535,10 +578,19 @@ function createTerminalActivityHarness() {
       return activity;
     },
     ready: true,
+    scrollbarState: {
+      visible: false,
+      canDecrement: false,
+      canIncrement: false,
+      position: 0,
+      viewportRatio: 1,
+    },
     applyAppearance: vi.fn(),
     dispose: vi.fn(),
     focus: vi.fn(),
     mount: vi.fn(),
+    scrollLines: vi.fn(),
+    scrollToRatio: vi.fn(),
     unmount: vi.fn(),
     setActive: vi.fn(),
     subscribeActivity: vi.fn((listener) => {
@@ -547,6 +599,7 @@ function createTerminalActivityHarness() {
       return () => listeners.delete(listener);
     }),
     subscribeReady: vi.fn(() => () => undefined),
+    subscribeScrollbar: vi.fn(() => () => undefined),
     write: vi.fn(),
   };
 

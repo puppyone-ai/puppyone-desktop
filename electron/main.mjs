@@ -84,7 +84,11 @@ import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
 import { createDesktopLocaleService } from "./main/localization/desktop-locale-service.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
-import { DESKTOP_WINDOW_MIN_WIDTH } from "./main/window-layout-contract.mjs";
+import {
+  DESKTOP_WINDOW_MIN_HEIGHT,
+  DESKTOP_WINDOW_MIN_WIDTH,
+} from "./main/window-layout-contract.mjs";
+import { DEFAULT_MACOS_WINDOW_BUTTON_POSITION } from "./main/window-chrome-profile.mjs";
 import { DEFAULT_INTERFACE_STYLE_FIRST_PAINT } from "./main/interface-style-first-paint.generated.mjs";
 import { createGitOperationCoordinator } from "./main/git-operation-coordinator.mjs";
 import { createCloudPublishCoordinator } from "./main/cloud-publish-coordinator.mjs";
@@ -145,7 +149,7 @@ const macTitlebarOptions = process.platform === "darwin"
   ? {
       titleBarStyle: "hiddenInset",
       titleBarOverlay: true,
-      trafficLightPosition: { x: 13, y: 12 },
+      trafficLightPosition: DEFAULT_MACOS_WINDOW_BUTTON_POSITION,
     }
   : {
       titleBarStyle: "default",
@@ -303,7 +307,7 @@ async function createWindow(options = {}) {
     width: 1280,
     height: 840,
     minWidth: DESKTOP_WINDOW_MIN_WIDTH,
-    minHeight: 640,
+    minHeight: DESKTOP_WINDOW_MIN_HEIGHT,
     center: true,
     show: false,
     title: appName,

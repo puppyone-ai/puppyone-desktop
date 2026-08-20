@@ -1,5 +1,5 @@
 {
-  "contractVersion": 3,
+  "contractVersion": 4,
   "fallbackViewerId": "document-placeholder",
   "viewers": [
     {
@@ -9,7 +9,9 @@
       "source": "content",
       "runtime": "lazy",
       "surfacePreparation": "requires-visible",
-      "readinessSignal": "dom-stable"
+      "readinessSignal": "dom-stable",
+      "surfaceFamily": "canvas",
+      "surfaceTraits": ["zoomable"]
     },
     {
       "id": "app-preview",
@@ -18,7 +20,9 @@
       "source": "content",
       "runtime": "eager",
       "surfacePreparation": "requires-visible",
-      "readinessSignal": "frame-paint"
+      "readinessSignal": "frame-paint",
+      "surfaceFamily": "embedded",
+      "surfaceTraits": ["sandboxed"]
     },
     {
       "id": "markdown",
@@ -27,7 +31,9 @@
       "source": "content",
       "runtime": "lazy",
       "surfacePreparation": "hidden-safe",
-      "readinessSignal": "dom-stable"
+      "readinessSignal": "dom-stable",
+      "surfaceFamily": "document",
+      "surfaceTraits": ["rich-text", "scrollable"]
     },
     {
       "id": "puppyflow",
@@ -36,7 +42,9 @@
       "source": "content",
       "runtime": "lazy",
       "surfacePreparation": "requires-visible",
-      "readinessSignal": "dom-stable"
+      "readinessSignal": "dom-stable",
+      "surfaceFamily": "canvas",
+      "surfaceTraits": ["zoomable"]
     },
     {
       "id": "json",
@@ -45,7 +53,9 @@
       "source": "content",
       "runtime": "eager",
       "surfacePreparation": "hidden-safe",
-      "readinessSignal": "dom-stable"
+      "readinessSignal": "dom-stable",
+      "surfaceFamily": "code",
+      "surfaceTraits": ["monospace", "scrollable"]
     },
     {
       "id": "csv-table",
@@ -54,7 +64,9 @@
       "source": "content",
       "runtime": "eager",
       "surfacePreparation": "hidden-safe",
-      "readinessSignal": "dom-stable"
+      "readinessSignal": "dom-stable",
+      "surfaceFamily": "grid",
+      "surfaceTraits": ["tabular", "scrollable"]
     },
     {
       "id": "html-artifact",
@@ -63,7 +75,9 @@
       "source": "content-and-resource",
       "runtime": "eager",
       "surfacePreparation": "hidden-safe",
-      "readinessSignal": "dom-stable"
+      "readinessSignal": "dom-stable",
+      "surfaceFamily": "embedded",
+      "surfaceTraits": ["sandboxed", "scrollable"]
     },
     {
       "id": "image-preview",
@@ -72,7 +86,9 @@
       "source": "resource",
       "runtime": "eager",
       "surfacePreparation": "hidden-safe",
-      "readinessSignal": "decoded-resource"
+      "readinessSignal": "decoded-resource",
+      "surfaceFamily": "media",
+      "surfaceTraits": ["zoomable"]
     },
     {
       "id": "pdf-preview",
@@ -81,7 +97,9 @@
       "source": "resource",
       "runtime": "lazy",
       "surfacePreparation": "requires-visible",
-      "readinessSignal": "first-rendered-frame"
+      "readinessSignal": "first-rendered-frame",
+      "surfaceFamily": "document",
+      "surfaceTraits": ["paginated", "zoomable", "scrollable"]
     },
     {
       "id": "office-preview",
@@ -90,7 +108,9 @@
       "source": "resource",
       "runtime": "lazy",
       "surfacePreparation": "requires-visible",
-      "readinessSignal": "first-rendered-frame"
+      "readinessSignal": "first-rendered-frame",
+      "surfaceFamily": "document",
+      "surfaceTraits": ["paginated", "scrollable"]
     },
     {
       "id": "audio-preview",
@@ -99,7 +119,9 @@
       "source": "resource",
       "runtime": "eager",
       "surfacePreparation": "hidden-safe",
-      "readinessSignal": "media-metadata"
+      "readinessSignal": "media-metadata",
+      "surfaceFamily": "media",
+      "surfaceTraits": []
     },
     {
       "id": "video-preview",
@@ -108,7 +130,9 @@
       "source": "resource",
       "runtime": "eager",
       "surfacePreparation": "requires-visible",
-      "readinessSignal": "first-rendered-frame"
+      "readinessSignal": "first-rendered-frame",
+      "surfaceFamily": "media",
+      "surfaceTraits": []
     },
     {
       "id": "text",
@@ -117,7 +141,9 @@
       "source": "content",
       "runtime": "eager",
       "surfacePreparation": "hidden-safe",
-      "readinessSignal": "dom-stable"
+      "readinessSignal": "dom-stable",
+      "surfaceFamily": "code",
+      "surfaceTraits": ["monospace", "scrollable"]
     },
     {
       "id": "document-placeholder",
@@ -126,7 +152,9 @@
       "source": "none",
       "runtime": "eager",
       "surfacePreparation": "hidden-safe",
-      "readinessSignal": "dom-stable"
+      "readinessSignal": "dom-stable",
+      "surfaceFamily": "fallback",
+      "surfaceTraits": []
     }
   ]
 }

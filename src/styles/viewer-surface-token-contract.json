@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "tokens": {
+    "--po-canvas": { "type": "paint" },
+    "--po-panel": { "type": "paint" },
+    "--po-control": { "type": "paint" },
+    "--po-border": { "type": "paint" },
+    "--po-editor-bg": { "type": "paint" },
+    "--po-editor-line": { "type": "paint" },
+    "--po-jsoneditor-bg": { "type": "paint" },
+    "--po-jsoneditor-toolbar-bg": { "type": "paint" },
+    "--po-surface-editable-table-border": { "type": "paint" },
+    "--po-surface-editable-table-cell-border": { "type": "paint" },
+    "--po-surface-editable-table-background": { "type": "paint" },
+    "--po-surface-editable-table-header-background": { "type": "paint" },
+    "--po-surface-editable-table-sticky-header-background": { "type": "paint" },
+    "--po-surface-editable-table-cell-hover-background": { "type": "paint" },
+    "--po-surface-editable-table-cell-focus-background": { "type": "paint" },
+    "--po-surface-editable-table-radius": {
+      "type": "dimension",
+      "unit": "px",
+      "min": 0,
+      "max": 16
+    }
+  }
+}

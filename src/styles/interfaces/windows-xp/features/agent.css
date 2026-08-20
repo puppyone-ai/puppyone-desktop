@@ -1,0 +1,71 @@
+/* Agent reuses its existing layout but adopts the same sunken work-area and
+ * hard control states as Explorer. */
+:root[data-interface-style="windows-xp"] .desktop-agent-boundary {
+  --agent-canvas: #ffffff;
+  --agent-report-surface: #ffffff;
+  --agent-control-surface: #ece9d8;
+  --agent-config-surface: #ece9d8;
+  --agent-config-surface-hover: #fff4ce;
+  --agent-row-hover-surface: #eaf2ff;
+  --agent-row-selected-surface: #c6d7ef;
+  --agent-composer-surface: #ffffff;
+  --agent-border: #7697c5;
+  --agent-border-subtle: #aca899;
+  --agent-sidebar-border: #7697c5;
+  --agent-radius-message: 0px;
+  --agent-radius-composer: 0px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-agent-composer {
+  border: 1px solid var(--xp-field-border);
+  background: #ffffff;
+  box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.22), inset -1px -1px 0 #ffffff;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-agent-composer:hover {
+  border-color: #1059c9;
+  background: #ffffff;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-agent-composer:focus-within {
+  border-color: #0054e3;
+  background: #ffffff;
+  box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.22), 0 0 0 1px #0054e3;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-agent-composer textarea {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-agent-composer-action {
+  border: 1px solid #003c74;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #76a9f2, #0d4cbd);
+  color: #ffffff;
+  box-shadow: inset 1px 1px 0 #bed7fa;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-agent-readiness, .desktop-agent-inline-error, .desktop-agent-history-warning, .desktop-agent-code-block) {
+  border-radius: 0;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(button, [role="button"], [role="menuitem"], [role="option"]):focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -3px;
+}
+
+:root[data-interface-style="windows-xp"] .onboarding-shell {
+  background: #ece9d8;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.folder-drop-shell, .folder-drop-panel, .folder-drop-card, .onboarding-card) {
+  border-color: var(--xp-field-border);
+  border-radius: 2px;
+  background: #ffffff;
+  box-shadow: inset 1px 1px 0 #ffffff, 3px 3px 7px rgba(0, 0, 0, 0.22);
+}

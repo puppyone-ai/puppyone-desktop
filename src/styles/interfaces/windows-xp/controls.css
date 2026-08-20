@@ -1,0 +1,126 @@
+/* Buttons and toolbar controls */
+:root[data-interface-style="windows-xp"]
+  :where(
+    .po-button--neutral,
+    .desktop-dialog-button,
+    .desktop-settings-action,
+    .desktop-settings-row-action,
+    .desktop-branch-menu-action,
+    .desktop-version-control-enable-button,
+    .puppyflow-add-button
+  ) {
+  border: 1px solid var(--xp-control-border);
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--xp-button-start), var(--xp-button-mid) 54%, var(--xp-button-end));
+  color: #000000;
+  text-shadow: none;
+  box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #aca899;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(
+    .po-button--neutral,
+    .desktop-dialog-button,
+    .desktop-settings-action,
+    .desktop-settings-row-action,
+    .desktop-branch-menu-action,
+    .desktop-version-control-enable-button,
+    .puppyflow-add-button
+  ):active:not(:disabled) {
+  background: linear-gradient(180deg, var(--xp-button-active-start), var(--xp-button-active-end));
+  box-shadow: inset 1px 1px 1px #808080, inset -1px -1px 0 #ffffff;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.po-button--primary, .desktop-dialog-button.primary, .desktop-settings-action.primary) {
+  border-color: #003c74;
+  background: linear-gradient(180deg, var(--xp-button-start), var(--xp-button-mid) 54%, var(--xp-button-end));
+  color: #000000;
+  text-shadow: none;
+  box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #aca899, 0 0 0 1px var(--xp-default-ring);
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(
+    .desktop-sidebar-footer-button,
+    .desktop-sidebar-rail-button,
+    .desktop-sidebar-top-navigation-button,
+    .desktop-explorer-actions button,
+    .desktop-agent-icon-button,
+    .tree-row-action-button
+  ) {
+  border-radius: 2px;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(
+    .desktop-sidebar-footer-button,
+    .desktop-sidebar-rail-button,
+    .desktop-sidebar-top-navigation-button,
+    .desktop-explorer-actions button,
+    .desktop-agent-icon-button,
+    .tree-row-action-button
+  ):hover:not(:disabled) {
+  border: 1px solid var(--xp-default-ring);
+  background: linear-gradient(180deg, var(--xp-button-hover-start), var(--xp-button-hover-end));
+  color: #000000;
+  box-shadow: inset 1px 1px 0 #ffffff;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(
+    .desktop-sidebar-footer-button,
+    .desktop-sidebar-rail-button,
+    .desktop-sidebar-top-navigation-button
+  ) {
+  color: #174f9c;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(
+    .desktop-sidebar-footer-button.active,
+    .desktop-sidebar-rail-button.active,
+    .desktop-sidebar-top-navigation-button.active
+  ),
+:root[data-interface-style="windows-xp"]
+  :where(
+    .desktop-sidebar-footer-button.active,
+    .desktop-sidebar-rail-button.active,
+    .desktop-sidebar-top-navigation-button.active
+  ):hover {
+  border: 1px solid #0a4ca5;
+  background: var(--po-tree-row-selected-bg);
+  color: #ffffff;
+  text-shadow: 1px 1px 0 rgba(0, 35, 121, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Caption actions stay white-on-blue. The warm orange hot-track belongs to
+ * beige Explorer toolbars, not to controls embedded in a blue pane caption. */
+:root[data-interface-style="windows-xp"]
+  .desktop-agent-session-header .desktop-agent-icon-button:hover:not(:disabled) {
+  border-color: #c7e3ff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(0, 52, 154, 0.26));
+  color: #ffffff;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* Menus use the Windows highlight color, not a modern pale hover wash. */
+:root[data-interface-style="windows-xp"] .desktop-menu-item:hover:not(:disabled),
+:root[data-interface-style="windows-xp"] .desktop-menu-item:focus-visible:not(:disabled),
+:root[data-interface-style="windows-xp"] .desktop-menu-item.selected {
+  border-color: var(--xp-selection);
+  background: var(--xp-selection);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(
+    .desktop-menu-item:hover:not(:disabled),
+    .desktop-menu-item:focus-visible:not(:disabled),
+    .desktop-menu-item.selected
+  )
+  :where(.desktop-menu-item-label, .desktop-menu-item-detail, .desktop-menu-item-icon, svg) {
+  color: inherit;
+}

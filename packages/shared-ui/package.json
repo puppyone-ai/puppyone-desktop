@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./shared-ui.css": "./src/styles/shared-ui.css",
+    "./shared-ui-patterns.css": "./src/styles/shared-ui-patterns.css",
     "./editor.css": "./src/styles/editor.css",
     "./data-workspace.css": "./src/styles/data-workspace.css"
   }

@@ -9,6 +9,11 @@ const stylesEntry = readCss("src/styles.css");
 const tokensCss = readCss("src/styles/tokens.css");
 const scrollbarsCss = readCss("src/styles/scrollbars.css");
 const scrollbarActivitySource = readCss("src/components/ScrollbarActivity.tsx");
+const terminalSessionSource = readCss(
+  "src/features/desktop-terminal/ui/TerminalSessionView.tsx",
+);
+const terminalCss = readCss("src/features/desktop-terminal/ui/desktop-terminal.css");
+const interfaceSkinContractCss = readCss("src/styles/interface-skin-contract.css");
 const dataWorkspaceCss = readCss("packages/shared-ui/src/styles/data-workspace.css");
 const dataWorkspaceSource = readCss("packages/shared-ui/src/data/DataWorkspace.tsx");
 const desktopDataShellCss = readCss("src/features/data-workspace/data-shell.css");
@@ -63,6 +68,13 @@ describe("scrollbar architecture", () => {
       `'[data-po-scrollbar]:not([data-po-scrollbar="hidden"])'`,
     );
     expect(scrollbarActivitySource).toContain("target.matches(MANAGED_SCROLLBAR_SELECTOR)");
+    expect(scrollbarActivitySource).toContain("HISTORICAL_SCROLLBAR_COMPOSITION");
+    expect(scrollbarActivitySource).toContain("resolveHistoricalScrollbarControls");
+    expect(scrollbarActivitySource).toContain("createPortal(");
+    expect(scrollbarActivitySource).toContain("control.host");
+    expect(scrollbarActivitySource).toContain("owner.scrollBy");
+    expect(scrollbarActivitySource).not.toContain("position: fixed");
+    expect(scrollbarActivitySource).not.toContain('data-interface-style="windows-xp"');
     expect(readCss("packages/shared-ui/src/sidebar/SidebarScrollArea.tsx")).toContain(
       'data-po-scrollbar="sidebar"',
     );
@@ -72,13 +84,53 @@ describe("scrollbar architecture", () => {
       .toContain('view.scrollDOM.dataset.poScrollbar = "content";');
   });
 
+  it("keeps arrow controls inside the owner pane instead of a viewport overlay", () => {
+    expect(interfaceSkinContractCss).toContain("::-webkit-scrollbar-button:single-button");
+    expect(interfaceSkinContractCss).toContain(
+      "real controls inside the owner's local pane",
+    );
+    expect(scrollbarActivitySource).toContain('owner.dataset.poScrollbar !== "menu"');
+    expect(scrollbarActivitySource).toContain('orientation: "horizontal"');
+    expect(scrollbarActivitySource).toContain('orientation: "vertical"');
+    expect(scrollbarActivitySource).toContain("rect.height - (hasHorizontalOverflow ? scrollbarSize : 0)");
+    expect(scrollbarActivitySource).toContain("rect.width - (hasVerticalOverflow ? scrollbarSize : 0)");
+    expect(scrollbarActivitySource).toContain("orientation === \"horizontal\"");
+    expect(scrollbarActivitySource).toContain("data-po-scrollbar-control-host");
+    const ownerControlsRule = readRule(layoutCss, ".po-classic-scrollbar-controls");
+    expect(ownerControlsRule).toContain("position: absolute;");
+    expect(ownerControlsRule).toContain("z-index: 4;");
+    expect(ownerControlsRule).toContain("contain: layout paint style;");
+    expect(ownerControlsRule).not.toContain("position: fixed;");
+    expect(layoutCss).toContain(".po-classic-scrollbar-button.decrement");
+    expect(layoutCss).toContain(".po-classic-scrollbar-button.increment");
+    expect(layoutCss).toContain('[data-scrollbar-orientation="horizontal"]');
+    expect(layoutCss).toContain("var(--interface-scrollbar-button-left-image, none)");
+    expect(layoutCss).toContain("var(--interface-scrollbar-button-right-image, none)");
+    expect(terminalSessionSource).toContain(
+      'className="desktop-terminal-classic-scrollbar-controls"',
+    );
+    expect(terminalSessionSource).toContain(
+      'className="desktop-terminal-classic-scrollbar-button decrement"',
+    );
+    expect(terminalSessionSource).not.toContain("po-classic-scrollbar-button");
+    expect(terminalCss).toMatch(
+      /\.desktop-terminal-xterm\s*\{[^}]*overflow:\s*hidden;[^}]*isolation:\s*isolate;/s,
+    );
+    expect(terminalCss).toMatch(
+      /\.desktop-terminal-classic-scrollbar-controls\s*\{[^}]*position:\s*absolute;/s,
+    );
+    expect(terminalCss).not.toMatch(
+      /\.desktop-terminal-classic-scrollbar-controls\s*\{[^}]*position:\s*fixed;/s,
+    );
+  });
+
   it("restricts scrollbar pseudo-elements to the primitive, skins, and xterm adapter", () => {
     const allowedFiles = new Set([
       "src/features/desktop-terminal/ui/desktop-terminal.css",
       "src/styles/interface-skin-contract.css",
       "src/styles/macos-tiger.css",
       "src/styles/scrollbars.css",
-      "src/styles/windows-xp.css",
+      "src/styles/interfaces/windows-xp/tokens.css",
     ]);
     const violations = [
       ...listCssFiles(path.join(repositoryRoot, "src")),
@@ -255,7 +307,7 @@ describe("scrollbar architecture", () => {
     const legacySkinFiles = new Set([
       "src/styles/interface-skin-contract.css",
       "src/styles/macos-tiger.css",
-      "src/styles/windows-xp.css",
+      "src/styles/interfaces/windows-xp/tokens.css",
     ]);
     const violations = [
       ...listCssFiles(path.join(repositoryRoot, "src")),

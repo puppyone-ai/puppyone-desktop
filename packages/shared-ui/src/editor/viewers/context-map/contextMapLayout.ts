@@ -38,6 +38,57 @@ export type RelationshipSceneLayout = Readonly<{
   width: number;
 }>;
 
+export type RadialRelationshipLayoutNode = Readonly<{
+  angle: number;
+  depth: number;
+  node: DataNode;
+  parentPath: string | null;
+  radius: number;
+  x: number;
+  y: number;
+}>;
+
+export type RadialRelationshipHierarchyEdge = Readonly<{
+  sourceId: string;
+  targetId: string;
+}>;
+
+export type RadialRelationshipSceneLayout = Readonly<{
+  center: RelationshipLayoutOffset;
+  height: number;
+  hierarchyEdges: readonly RadialRelationshipHierarchyEdge[];
+  nodes: readonly RadialRelationshipLayoutNode[];
+  positions: ReadonlyMap<string, RadialRelationshipLayoutNode>;
+  ringRadii: readonly number[];
+  width: number;
+}>;
+
+export type RadialRelationshipSceneLayoutInput = Readonly<{
+  childrenByFolderPath: ReadonlyMap<string, readonly DataNode[]>;
+  expandedFolderPaths: ReadonlySet<string>;
+  root: DataNode;
+  rootNodes: readonly DataNode[];
+}>;
+
+export type LayeredRelationshipLayoutNode = Readonly<{
+  depth: number;
+  node: DataNode;
+  parentPath: string | null;
+  x: number;
+  y: number;
+}>;
+
+export type LayeredRelationshipSceneLayout = Readonly<{
+  anchor: RelationshipLayoutOffset;
+  height: number;
+  hierarchyEdges: readonly RadialRelationshipHierarchyEdge[];
+  nodes: readonly LayeredRelationshipLayoutNode[];
+  positions: ReadonlyMap<string, LayeredRelationshipLayoutNode>;
+  width: number;
+}>;
+
+export type LayeredRelationshipSceneLayoutInput = RadialRelationshipSceneLayoutInput;
+
 export type FolderRelationshipSceneLayoutInput = Readonly<{
   childrenByFolderPath: ReadonlyMap<string, readonly DataNode[]>;
   edges: readonly FolderRelationshipEdge[];
@@ -59,6 +110,17 @@ const RELATIONSHIP_SCENE_MIN_WIDTH = 1120;
 const RELATIONSHIP_SCENE_MIN_HEIGHT = 640;
 const RELATIONSHIP_FOLDER_GAP = 72;
 const RELATIONSHIP_FORCE_ITERATIONS = 42;
+const RADIAL_RELATIONSHIP_RING_GAP = 148;
+const RADIAL_RELATIONSHIP_NODE_ARC_LENGTH = 132;
+const RADIAL_RELATIONSHIP_SCENE_PADDING = 124;
+const RADIAL_RELATIONSHIP_SCENE_MIN_SIZE = 760;
+const LAYERED_RELATIONSHIP_HORIZONTAL_GAP = 148;
+const LAYERED_RELATIONSHIP_VERTICAL_GAP = 152;
+const LAYERED_RELATIONSHIP_HORIZONTAL_PADDING = 124;
+const LAYERED_RELATIONSHIP_TOP_PADDING = 96;
+const LAYERED_RELATIONSHIP_BOTTOM_PADDING = 112;
+const LAYERED_RELATIONSHIP_SCENE_MIN_WIDTH = 760;
+const LAYERED_RELATIONSHIP_SCENE_MIN_HEIGHT = 560;
 
 type MutableSceneNode = {
   height: number;
@@ -69,6 +131,23 @@ type MutableSceneNode = {
   width: number;
   x: number;
   y: number;
+};
+
+type MutableRadialTreeNode = {
+  angle: number;
+  children: MutableRadialTreeNode[];
+  depth: number;
+  node: DataNode;
+  parentPath: string | null;
+  weight: number;
+};
+
+type MutableLayeredTreeNode = {
+  children: MutableLayeredTreeNode[];
+  depth: number;
+  node: DataNode;
+  parentPath: string | null;
+  xSlot: number;
 };
 
 export function buildFolderRelationshipLayoutZones(
@@ -205,6 +284,272 @@ export function buildFolderRelationshipSceneLayout({
     width,
   });
   return { height, positions, width };
+}
+
+/**
+ * Places the visible disclosure tree on concentric depth rings. Each subtree
+ * owns one contiguous angular sector, which keeps the polar hierarchy routes
+ * deterministic and prevents sibling branches from crossing.
+ */
+export function buildRadialRelationshipSceneLayout({
+  childrenByFolderPath,
+  expandedFolderPaths,
+  root,
+  rootNodes,
+}: RadialRelationshipSceneLayoutInput): RadialRelationshipSceneLayout {
+  const normalizedExpandedPaths = new Set([...expandedFolderPaths].map(normalizePath));
+  const radialRoot = createRadialTreeNode({
+    childrenByFolderPath,
+    depth: 0,
+    expandedFolderPaths: normalizedExpandedPaths,
+    node: root,
+    parentPath: null,
+    rootChildren: rootNodes,
+  });
+  radialRoot.angle = -Math.PI / 2;
+  assignRadialChildSectors(radialRoot, -Math.PI / 2, Math.PI * 3 / 2);
+
+  const visibleNodes = flattenRadialTree(radialRoot);
+  const maximumDepth = visibleNodes.reduce((maximum, entry) => (
+    Math.max(maximum, entry.depth)
+  ), 0);
+  const ringRadii: number[] = [];
+  let previousRadius = 0;
+  for (let depth = 1; depth <= maximumDepth; depth += 1) {
+    const nodeCount = visibleNodes.filter((entry) => entry.depth === depth).length;
+    const circumferenceRadius = nodeCount * RADIAL_RELATIONSHIP_NODE_ARC_LENGTH
+      / (Math.PI * 2);
+    const radius = Math.ceil(Math.max(
+      previousRadius + RADIAL_RELATIONSHIP_RING_GAP,
+      circumferenceRadius,
+    ));
+    ringRadii.push(radius);
+    previousRadius = radius;
+  }
+
+  const outerRadius = ringRadii.at(-1) ?? 0;
+  const sceneSize = Math.max(
+    RADIAL_RELATIONSHIP_SCENE_MIN_SIZE,
+    Math.ceil((outerRadius + RADIAL_RELATIONSHIP_SCENE_PADDING) * 2),
+  );
+  const center = { x: sceneSize / 2, y: sceneSize / 2 };
+  const nodes = visibleNodes.map<RadialRelationshipLayoutNode>((entry) => {
+    const radius = entry.depth === 0 ? 0 : ringRadii[entry.depth - 1] ?? 0;
+    return {
+      angle: entry.angle,
+      depth: entry.depth,
+      node: entry.node,
+      parentPath: entry.parentPath,
+      radius,
+      x: center.x + Math.cos(entry.angle) * radius,
+      y: center.y + Math.sin(entry.angle) * radius,
+    };
+  });
+  const positions = new Map(nodes.map((entry) => [entry.node.path, entry] as const));
+  const hierarchyEdges = nodes.flatMap((entry) => entry.parentPath === null ? [] : [{
+    sourceId: entry.parentPath,
+    targetId: entry.node.path,
+  }]);
+  return {
+    center,
+    height: sceneSize,
+    hierarchyEdges,
+    nodes,
+    positions,
+    ringRadii,
+    width: sceneSize,
+  };
+}
+
+/**
+ * Places the visible disclosure tree from top to bottom. Depth maps directly
+ * to the y axis, while leaf slots reserve the horizontal width of each
+ * subtree so parents remain centered over their visible descendants.
+ */
+export function buildLayeredRelationshipSceneLayout({
+  childrenByFolderPath,
+  expandedFolderPaths,
+  root,
+  rootNodes,
+}: LayeredRelationshipSceneLayoutInput): LayeredRelationshipSceneLayout {
+  const normalizedExpandedPaths = new Set([...expandedFolderPaths].map(normalizePath));
+  const layeredRoot = createLayeredTreeNode({
+    childrenByFolderPath,
+    depth: 0,
+    expandedFolderPaths: normalizedExpandedPaths,
+    node: root,
+    parentPath: null,
+    rootChildren: rootNodes,
+  });
+  let nextLeafSlot = 0;
+  const assignHorizontalSlots = (entry: MutableLayeredTreeNode): number => {
+    if (entry.children.length === 0) {
+      entry.xSlot = nextLeafSlot;
+      nextLeafSlot += 1;
+      return entry.xSlot;
+    }
+    const childSlots = entry.children.map(assignHorizontalSlots);
+    entry.xSlot = ((childSlots[0] ?? 0) + (childSlots.at(-1) ?? 0)) / 2;
+    return entry.xSlot;
+  };
+  assignHorizontalSlots(layeredRoot);
+
+  const visibleNodes = flattenLayeredTree(layeredRoot);
+  const maximumDepth = visibleNodes.reduce((maximum, entry) => (
+    Math.max(maximum, entry.depth)
+  ), 0);
+  const leafCount = Math.max(1, nextLeafSlot);
+  const contentWidth = Math.max(0, (leafCount - 1) * LAYERED_RELATIONSHIP_HORIZONTAL_GAP);
+  const width = Math.max(
+    LAYERED_RELATIONSHIP_SCENE_MIN_WIDTH,
+    contentWidth + LAYERED_RELATIONSHIP_HORIZONTAL_PADDING * 2,
+  );
+  const height = Math.max(
+    LAYERED_RELATIONSHIP_SCENE_MIN_HEIGHT,
+    LAYERED_RELATIONSHIP_TOP_PADDING
+      + maximumDepth * LAYERED_RELATIONSHIP_VERTICAL_GAP
+      + LAYERED_RELATIONSHIP_BOTTOM_PADDING,
+  );
+  const horizontalOffset = (width - contentWidth) / 2;
+  const nodes = visibleNodes.map<LayeredRelationshipLayoutNode>((entry) => ({
+    depth: entry.depth,
+    node: entry.node,
+    parentPath: entry.parentPath,
+    x: horizontalOffset + entry.xSlot * LAYERED_RELATIONSHIP_HORIZONTAL_GAP,
+    y: LAYERED_RELATIONSHIP_TOP_PADDING + entry.depth * LAYERED_RELATIONSHIP_VERTICAL_GAP,
+  }));
+  const positions = new Map(nodes.map((entry) => [entry.node.path, entry] as const));
+  const hierarchyEdges = nodes.flatMap((entry) => entry.parentPath === null ? [] : [{
+    sourceId: entry.parentPath,
+    targetId: entry.node.path,
+  }]);
+  const anchor = positions.get(root.path) ?? {
+    x: width / 2,
+    y: LAYERED_RELATIONSHIP_TOP_PADDING,
+  };
+  return {
+    anchor: { x: anchor.x, y: anchor.y },
+    height,
+    hierarchyEdges,
+    nodes,
+    positions,
+    width,
+  };
+}
+
+function createLayeredTreeNode({
+  childrenByFolderPath,
+  depth,
+  expandedFolderPaths,
+  node,
+  parentPath,
+  rootChildren,
+}: Readonly<{
+  childrenByFolderPath: ReadonlyMap<string, readonly DataNode[]>;
+  depth: number;
+  expandedFolderPaths: ReadonlySet<string>;
+  node: DataNode;
+  parentPath: string | null;
+  rootChildren?: readonly DataNode[];
+}>): MutableLayeredTreeNode {
+  const children = rootChildren ?? (node.type === "folder"
+    && expandedFolderPaths.has(normalizePath(node.path))
+    ? childrenByFolderPath.get(normalizePath(node.path)) ?? []
+    : []);
+  const entry: MutableLayeredTreeNode = {
+    children: [],
+    depth,
+    node,
+    parentPath,
+    xSlot: 0,
+  };
+  entry.children = children.map((child) => createLayeredTreeNode({
+    childrenByFolderPath,
+    depth: depth + 1,
+    expandedFolderPaths,
+    node: child,
+    parentPath: node.path,
+  }));
+  return entry;
+}
+
+function flattenLayeredTree(root: MutableLayeredTreeNode): MutableLayeredTreeNode[] {
+  const nodes: MutableLayeredTreeNode[] = [];
+  const visit = (entry: MutableLayeredTreeNode): void => {
+    nodes.push(entry);
+    entry.children.forEach(visit);
+  };
+  visit(root);
+  return nodes;
+}
+
+function createRadialTreeNode({
+  childrenByFolderPath,
+  depth,
+  expandedFolderPaths,
+  node,
+  parentPath,
+  rootChildren,
+}: Readonly<{
+  childrenByFolderPath: ReadonlyMap<string, readonly DataNode[]>;
+  depth: number;
+  expandedFolderPaths: ReadonlySet<string>;
+  node: DataNode;
+  parentPath: string | null;
+  rootChildren?: readonly DataNode[];
+}>): MutableRadialTreeNode {
+  const children = rootChildren ?? (node.type === "folder"
+    && expandedFolderPaths.has(normalizePath(node.path))
+    ? childrenByFolderPath.get(normalizePath(node.path)) ?? []
+    : []);
+  const entry: MutableRadialTreeNode = {
+    angle: 0,
+    children: [],
+    depth,
+    node,
+    parentPath,
+    weight: 1,
+  };
+  entry.children = children.map((child) => createRadialTreeNode({
+    childrenByFolderPath,
+    depth: depth + 1,
+    expandedFolderPaths,
+    node: child,
+    parentPath: node.path,
+  }));
+  entry.weight = entry.children.length > 0
+    ? entry.children.reduce((total, child) => total + child.weight, 0)
+    : 1;
+  return entry;
+}
+
+function assignRadialChildSectors(
+  parent: MutableRadialTreeNode,
+  sectorStart: number,
+  sectorEnd: number,
+): void {
+  if (parent.children.length === 0) return;
+  const totalWeight = parent.children.reduce((total, child) => total + child.weight, 0);
+  let cursor = sectorStart;
+  for (const child of parent.children) {
+    const childSpan = (sectorEnd - sectorStart) * child.weight / totalWeight;
+    const childStart = cursor;
+    const childEnd = childStart + childSpan;
+    child.angle = (childStart + childEnd) / 2;
+    const padding = Math.min(0.06, childSpan * 0.08);
+    assignRadialChildSectors(child, childStart + padding, childEnd - padding);
+    cursor = childEnd;
+  }
+}
+
+function flattenRadialTree(root: MutableRadialTreeNode): MutableRadialTreeNode[] {
+  const nodes: MutableRadialTreeNode[] = [];
+  const visit = (entry: MutableRadialTreeNode): void => {
+    nodes.push(entry);
+    entry.children.forEach(visit);
+  };
+  visit(root);
+  return nodes;
 }
 
 function createMutableFolderSceneNodes({
@@ -590,8 +935,10 @@ export function getZoomedRelationshipViewport(
   current: RelationshipViewportTransform,
   focalPoint: RelationshipLayoutOffset,
   requestedScale: number,
+  minimumScale = 0.35,
+  maximumScale = 2.4,
 ): RelationshipViewportTransform {
-  const scale = Math.min(2.4, Math.max(0.35, requestedScale));
+  const scale = Math.min(maximumScale, Math.max(minimumScale, requestedScale));
   const worldX = (focalPoint.x - current.x) / current.scale;
   const worldY = (focalPoint.y - current.y) / current.scale;
   return {

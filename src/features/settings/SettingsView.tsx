@@ -9,6 +9,10 @@ import {
 import { useLocalization } from "@puppyone/localization";
 import { DOCK_ICON_OPTIONS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, TEXT_SIZE_PRESETS } from "../../preferences";
 import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements";
+import {
+  isAppearanceDecisionLocked,
+  isAppearanceValueAllowed,
+} from "../appearance/resolveAppearance";
 import { useFeatureFlag } from "../flags";
 import { AgentFileActivityAppearanceSetting } from "../desktop-agent-presence";
 import { LocalAgentsSettingsView } from "../local-agents";
@@ -32,20 +36,18 @@ export function SettingsView({
   gitStatus,
   gitStatusLoading,
   gitStatusError,
-  themeMode,
   interfaceStyle,
+  resolvedAppearance,
   lightThemePreset,
   darkThemePreset,
   loadingAnimationPreset,
   localAgentsSettings,
   agentFileActivityIndicatorsEnabled,
-  textSize,
   typographyPreferences,
   pointerCursors,
   dockIcon,
   diffMarkers,
   fileIconTheme,
-  sidebarNavigationLayout,
   sidebarNavigationVisibilitySettings,
   filesVisibilitySettings,
   externalAppsSettings,
@@ -66,6 +68,7 @@ export function SettingsView({
   updateState,
   onThemeModeChange,
   onInterfaceStyleChange,
+  onEditorPresentationChange,
   onLightThemePresetChange,
   onDarkThemePresetChange,
   onLoadingAnimationPresetChange,
@@ -238,6 +241,14 @@ export function SettingsView({
   }
 
   if (activeSection === "appearance") {
+    const textSizeDecision = resolvedAppearance.decisions.textSize;
+    const fileIconDecision = resolvedAppearance.decisions.fileIconTheme;
+    const navigationDecision = resolvedAppearance.decisions.sidebarNavigationLayout;
+    const editorPresentationDecision = resolvedAppearance.decisions.editorPresentation;
+    const textSizeLocked = isAppearanceDecisionLocked(textSizeDecision);
+    const fileIconLocked = isAppearanceDecisionLocked(fileIconDecision);
+    const navigationLocked = isAppearanceDecisionLocked(navigationDecision);
+    const editorPresentationLocked = isAppearanceDecisionLocked(editorPresentationDecision);
     return (
       <section className="desktop-utility-view desktop-settings-view">
         <div className="desktop-utility-body desktop-settings-body" data-po-scrollbar="content">
@@ -250,7 +261,7 @@ export function SettingsView({
               <InterfaceStyleSetting value={interfaceStyle} onChange={onInterfaceStyleChange} />
               <InterfacePaletteSettings
                 interfaceStyle={interfaceStyle}
-                themeMode={themeMode}
+                decision={resolvedAppearance.decisions.themeMode}
                 lightThemePreset={lightThemePreset}
                 darkThemePreset={darkThemePreset}
                 onThemeModeChange={onThemeModeChange}
@@ -258,21 +269,61 @@ export function SettingsView({
                 onDarkThemePresetChange={onDarkThemePresetChange}
               />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
+                <span>{t("settings.appearance.editorPresentation.title")}</span>
+                <div
+                  className="desktop-theme-segment desktop-appearance-option-segment"
+                  aria-label={t("settings.appearance.editorPresentation.ariaLabel")}
+                >
+                  {(["follow-interface", "product-default"] as const).map((presentation) => (
+                    <button
+                      key={presentation}
+                      className={`${editorPresentationDecision.effectiveValue === presentation ? "active" : ""}${editorPresentationLocked || !isAppearanceValueAllowed(editorPresentationDecision, presentation) ? " is-policy-controlled" : ""}`}
+                      type="button"
+                      title={editorPresentationDecision.reasonKey
+                        ? t(editorPresentationDecision.reasonKey)
+                        : t(`settings.appearance.editorPresentation.${presentation}.description`)}
+                      aria-disabled={editorPresentationLocked || !isAppearanceValueAllowed(editorPresentationDecision, presentation)}
+                      aria-pressed={editorPresentationDecision.effectiveValue === presentation}
+                      onClick={() => {
+                        if (!editorPresentationLocked && isAppearanceValueAllowed(editorPresentationDecision, presentation)) {
+                          onEditorPresentationChange(presentation);
+                        }
+                      }}
+                    >
+                      <span>{t(`settings.appearance.editorPresentation.${presentation}.label`)}</span>
+                    </button>
+                  ))}
+                </div>
+                {editorPresentationDecision.reasonKey && (
+                  <small className="desktop-appearance-policy-reason">{t(editorPresentationDecision.reasonKey)}</small>
+                )}
+              </div>
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.textSize.title")}</span>
                 <div className="desktop-theme-segment desktop-appearance-option-segment" aria-label={t("settings.appearance.textSize.ariaLabel")}>
                   {TEXT_SIZE_PRESETS.map((option) => (
                     <button
                       key={option.value}
-                      className={textSize === option.value ? "active" : ""}
+                      className={`${textSizeDecision.effectiveValue === option.value ? "active" : ""}${textSizeLocked || !isAppearanceValueAllowed(textSizeDecision, option.value) ? " is-policy-controlled" : ""}`}
                       type="button"
-                      title={t(`settings.appearance.textSize.${option.value}.description`)}
-                      aria-pressed={textSize === option.value}
-                      onClick={() => onTextSizeChange(option.value)}
+                      title={textSizeDecision.reasonKey
+                        ? t(textSizeDecision.reasonKey)
+                        : t(`settings.appearance.textSize.${option.value}.description`)}
+                      aria-disabled={textSizeLocked || !isAppearanceValueAllowed(textSizeDecision, option.value)}
+                      aria-pressed={textSizeDecision.effectiveValue === option.value}
+                      onClick={() => {
+                        if (!textSizeLocked && isAppearanceValueAllowed(textSizeDecision, option.value)) {
+                          onTextSizeChange(option.value);
+                        }
+                      }}
                     >
                       <span>{t(`settings.appearance.textSize.${option.value}.label`)}</span>
                     </button>
                   ))}
                 </div>
+                {textSizeDecision.reasonKey && (
+                  <small className="desktop-appearance-policy-reason">{t(textSizeDecision.reasonKey)}</small>
+                )}
               </div>
               <ContentFontSetting
                 preferences={typographyPreferences}
@@ -284,16 +335,27 @@ export function SettingsView({
                   {FILE_ICON_THEMES.map((theme) => (
                     <button
                       key={theme.id}
-                      className={fileIconTheme === theme.id ? "active" : ""}
+                      className={`${fileIconDecision.effectiveValue === theme.id ? "active" : ""}${fileIconLocked || !isAppearanceValueAllowed(fileIconDecision, theme.id) ? " is-policy-controlled" : ""}`}
                       type="button"
-                      title={t(`settings.appearance.fileIcons.${theme.id}.description`)}
-                      onClick={() => onFileIconThemeChange(theme.id)}
+                      title={fileIconDecision.reasonKey
+                        ? t(fileIconDecision.reasonKey)
+                        : t(`settings.appearance.fileIcons.${theme.id}.description`)}
+                      aria-disabled={fileIconLocked || !isAppearanceValueAllowed(fileIconDecision, theme.id)}
+                      aria-pressed={fileIconDecision.effectiveValue === theme.id}
+                      onClick={() => {
+                        if (!fileIconLocked && isAppearanceValueAllowed(fileIconDecision, theme.id)) {
+                          onFileIconThemeChange(theme.id);
+                        }
+                      }}
                     >
                       <FileGlyphIcon name="document.md" size={14} theme={theme.id} />
                       <span>{t(`settings.appearance.fileIcons.${theme.id}.label`)}</span>
                     </button>
                   ))}
                 </div>
+                {fileIconDecision.reasonKey && (
+                  <small className="desktop-appearance-policy-reason">{t(fileIconDecision.reasonKey)}</small>
+                )}
               </div>
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.navigation.title")}</span>
@@ -304,11 +366,19 @@ export function SettingsView({
                       : option.placement === "left" ? PanelLeft : PanelBottom;
                     return (
                       <button
-                        className={sidebarNavigationLayout === option.value ? "active" : ""}
+                        className={`${navigationDecision.effectiveValue === option.value ? "active" : ""}${navigationLocked || !isAppearanceValueAllowed(navigationDecision, option.value) ? " is-policy-controlled" : ""}`}
                         type="button"
                         key={option.value}
-                        title={t(`settings.appearance.navigation.${option.placement}.description`)}
-                        onClick={() => onSidebarNavigationLayoutChange(option.value)}
+                        title={navigationDecision.reasonKey
+                          ? t(navigationDecision.reasonKey)
+                          : t(`settings.appearance.navigation.${option.placement}.description`)}
+                        aria-disabled={navigationLocked || !isAppearanceValueAllowed(navigationDecision, option.value)}
+                        aria-pressed={navigationDecision.effectiveValue === option.value}
+                        onClick={() => {
+                          if (!navigationLocked && isAppearanceValueAllowed(navigationDecision, option.value)) {
+                            onSidebarNavigationLayoutChange(option.value);
+                          }
+                        }}
                       >
                         <Icon size={14} />
                         <span>{t(`settings.appearance.navigation.${option.placement}.label`)}</span>
@@ -316,6 +386,11 @@ export function SettingsView({
                     );
                   })}
                 </div>
+                {navigationDecision.reasonKey && (
+                  <small className="desktop-appearance-policy-reason">
+                    {t(navigationDecision.reasonKey)}
+                  </small>
+                )}
               </div>
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.loadingAnimation.title")}</span>

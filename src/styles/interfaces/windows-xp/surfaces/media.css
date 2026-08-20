@@ -1,0 +1,7 @@
+/* Media pixels are content; only their host backdrop and controls adopt XP. */
+:root[data-interface-style="windows-xp"][data-editor-presentation="follow-interface"]
+  .po-viewer-surface-boundary[data-viewer-surface-family="media"] {
+  --po-canvas: #ffffff;
+  --po-panel: #ece9d8;
+  --po-control: #ece9d8;
+}
