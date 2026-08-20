@@ -665,10 +665,17 @@ async function runDialogSmoke() {
       .find((button) => button.textContent.trim() === 'Close terminal');
     const rect = (element) => {
       const value = element.getBoundingClientRect();
-      return { width: Math.round(value.width), height: Math.round(value.height) };
+      return {
+        top: Math.round(value.top),
+        right: Math.round(value.right),
+        bottom: Math.round(value.bottom),
+        left: Math.round(value.left),
+        width: Math.round(value.width),
+        height: Math.round(value.height),
+      };
     };
-    const paint = (element) => {
-      const value = getComputedStyle(element);
+    const paint = (element, pseudo) => {
+      const value = getComputedStyle(element, pseudo);
       return {
         backgroundColor: value.backgroundColor,
         backgroundImage: value.backgroundImage,
@@ -681,6 +688,7 @@ async function runDialogSmoke() {
       titlebar: { ...rect(titlebar), ...paint(titlebar) },
       header: { ...rect(header), ...paint(header) },
       close: { ...rect(close), ...paint(close) },
+      closeVisual: paint(close, '::before'),
       shellClose: { ...rect(shellClose), ...paint(shellClose) },
       closeSvgDisplay: getComputedStyle(close.querySelector('svg')).display,
       leadingBackground: getComputedStyle(leading).backgroundColor,
@@ -690,11 +698,54 @@ async function runDialogSmoke() {
     };
   })()`, true);
 
+  const closePoint = await window.webContents.executeJavaScript(`(() => {
+    const value = document.querySelector('.desktop-terminal-close-dialog .desktop-dialog-icon-button')
+      .getBoundingClientRect();
+    return {
+      x: Math.round(value.left + value.width / 2),
+      y: Math.round(value.top + value.height / 2),
+    };
+  })()`, true);
+  window.webContents.sendInputEvent({ type: "mouseMove", ...closePoint });
+  await new Promise((resolve) => setTimeout(resolve, 140));
+  const hoverSnapshot = await window.webContents.executeJavaScript(`(() => {
+    const close = document.querySelector('.desktop-terminal-close-dialog .desktop-dialog-icon-button');
+    const rect = close.getBoundingClientRect();
+    const style = getComputedStyle(close);
+    const visualStyle = getComputedStyle(close, '::before');
+    return {
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+      transform: style.transform,
+      translate: style.translate,
+      visualBackgroundImage: visualStyle.backgroundImage,
+      visualBackgroundPosition: visualStyle.backgroundPosition,
+      visualBackgroundSize: visualStyle.backgroundSize,
+    };
+  })()`, true);
+
   assert(snapshot.header.height === snapshot.titlebar.height, `XP dialog: caption is ${snapshot.header.height}px high, Shell titlebar is ${snapshot.titlebar.height}px`);
   assert(snapshot.header.backgroundImage === snapshot.titlebar.backgroundImage, "XP dialog: caption does not share the Shell titlebar paint");
   assert(snapshot.close.width === 26 && snapshot.close.height === 26, `XP dialog: close control has the wrong geometry (${JSON.stringify(snapshot.close)})`);
-  assert(snapshot.close.backgroundImage === snapshot.shellClose.backgroundImage, "XP dialog: close control does not share the Shell close asset");
+  assert(snapshot.closeVisual.backgroundImage === snapshot.shellClose.backgroundImage, "XP dialog: close control does not share the Shell close asset");
   assert(snapshot.closeSvgDisplay === "none", `XP dialog: fallback close glyph is still visible (${snapshot.closeSvgDisplay})`);
+  assert(
+    hoverSnapshot.top === snapshot.close.top
+      && hoverSnapshot.right === snapshot.close.right
+      && hoverSnapshot.bottom === snapshot.close.bottom
+      && hoverSnapshot.left === snapshot.close.left
+      && hoverSnapshot.width === snapshot.close.width
+      && hoverSnapshot.height === snapshot.close.height,
+    `XP dialog: close control changes geometry on hover (${JSON.stringify({ normal: snapshot.close, hover: hoverSnapshot })})`,
+  );
+  assert(hoverSnapshot.transform === "none" && hoverSnapshot.translate === "none", `XP dialog: close control moves on hover (${JSON.stringify(hoverSnapshot)})`);
+  assert(hoverSnapshot.visualBackgroundImage !== snapshot.closeVisual.backgroundImage, "XP dialog: close control did not switch to its hover state");
+  assert(hoverSnapshot.visualBackgroundPosition === "50% 50%", `XP dialog: close asset moves off-center on hover (${hoverSnapshot.visualBackgroundPosition})`);
+  assert(hoverSnapshot.visualBackgroundSize === "100% 100%", `XP dialog: close asset changes scale on hover (${hoverSnapshot.visualBackgroundSize})`);
   assert(snapshot.leadingBackground === "rgba(0, 0, 0, 0)", `XP dialog: leading icon retained a modern tile (${snapshot.leadingBackground})`);
   assert(snapshot.confirmClasses.includes("primary") && snapshot.confirmClasses.includes("destructive"), "XP dialog: destructive action lost its semantic modifiers");
   assert(snapshot.confirm.backgroundImage === snapshot.cancel.backgroundImage, "XP dialog: destructive action bypasses Windows button chrome");
@@ -705,7 +756,7 @@ async function runDialogSmoke() {
   assert(!capture.isEmpty(), "XP dialog: screenshot capture was empty");
   assert(hasVisualDiversity(capture), "XP dialog: screenshot capture was visually blank");
   if (screenshotDirectory) {
-    await writeFile(path.join(screenshotDirectory, "appearance-windows-xp-dialog.png"), capture.toPNG());
+    await writeFile(path.join(screenshotDirectory, "appearance-windows-xp-dialog-hover.png"), capture.toPNG());
   }
   window.hide();
 }

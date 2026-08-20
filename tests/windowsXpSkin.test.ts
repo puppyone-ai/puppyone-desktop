@@ -225,6 +225,12 @@ describe("Interface style registry", () => {
     expect(xp).toMatch(
       /\.desktop-dialog-header \.desktop-dialog-icon-button\s*\{[^}]*var\(--xp-window-control-close-image\)/s,
     );
+    expect(xp).toMatch(
+      /\.desktop-dialog-header \.desktop-dialog-icon-button::before\s*\{[^}]*inset:\s*0;[^}]*var\(--desktop-dialog-caption-close-image\)[^}]*100% 100%/s,
+    );
+    expect(xp).toMatch(
+      /\.desktop-dialog-header \.desktop-dialog-icon-button:hover:not\(:disabled\)\s*\{[^}]*--desktop-dialog-caption-close-image:\s*var\(--xp-window-control-close-hover-image\)/s,
+    );
   });
 
   it("keeps Luna paint authentic and delegates structure to the profile", () => {
