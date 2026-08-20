@@ -50,6 +50,7 @@ describe("renderer style architecture", () => {
     const editorEntry = source("packages/shared-ui/src/styles/editor.css");
     const editableTable = source("packages/shared-ui/src/styles/editor/editable-table.css");
     const xpTableProjection = source("src/styles/interfaces/windows-xp/surfaces/editable-table.css");
+    const xpDocumentProjection = source("src/styles/interfaces/windows-xp/surfaces/document.css");
 
     expect(sharedEntry).toContain('@import "./shared-ui-patterns.css";');
     expect(sharedEntry).toContain('@import "./editor.css";');
@@ -60,6 +61,10 @@ describe("renderer style architecture", () => {
     expect(xpTableProjection).toContain(".po-viewer-surface-boundary");
     expect(xpTableProjection).toContain('[data-editor-presentation="follow-interface"]');
     expect(xpTableProjection).not.toMatch(/\.(?:cm-|markdown-codemirror-editor|csv-table-editor)/);
+    expect(xpDocumentProjection).toContain("--po-text: #303236");
+    expect(xpDocumentProjection).toContain(".po-viewer-surface-boundary");
+    expect(xpDocumentProjection).toContain('[data-editor-presentation="follow-interface"]');
+    expect(xpDocumentProjection).not.toMatch(/\.(?:cm-|markdown-codemirror-editor|csv-table-editor)/);
   });
 });
 

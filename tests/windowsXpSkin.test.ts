@@ -254,6 +254,10 @@ describe("Interface style registry", () => {
     expect(xp).toContain("--xp-pane-caption-end: #0a59cc;");
     expect(xp).toContain("--xp-scroll-thumb-mid: #c4d3f8;");
     expect(xp).toContain("--po-surface-chrome: #ece9d8;");
+    expect(xp).toContain("--po-text: #303236;");
+    expect(xp).toContain("--po-text-muted: #5f6368;");
+    expect(xp).toContain("--po-text-subtle: #7a7e84;");
+    expect(xp).toContain("--po-text-disabled: #a2a5aa;");
     expect(xp).toContain("--po-tree-row-selected-bg: #316ac5;");
     expect(xp).toContain("--po-tree-row-selected-muted-bg: #d4d0c8;");
     expect(xp).toContain("--po-shell-divider: #c9c7be;");

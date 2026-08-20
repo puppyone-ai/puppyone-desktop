@@ -4,4 +4,11 @@
   --po-editor-bg: #ffffff;
   --po-canvas: #ffffff;
   --po-editor-line: #d4d0c8;
+  /* XP chrome keeps historically pure foregrounds. Reading surfaces use a
+   * quieter neutral ramp so high-DPI antialiasing does not turn medium-weight
+   * Latin/CJK text into a dense black fringe. */
+  --po-text: #303236;
+  --po-text-muted: #5f6368;
+  --po-text-subtle: #7a7e84;
+  --po-text-disabled: #a2a5aa;
 }
