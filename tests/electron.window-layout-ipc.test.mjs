@@ -64,15 +64,10 @@ describe("native window layout IPC", () => {
     );
   });
 
-  it("keeps native traffic lights vertically centered for each macOS titlebar profile", () => {
+  it("falls back to the default native traffic-light position for unknown profiles", () => {
     const ownerWindow = createWindow();
     const handlers = registerHandlers(ownerWindow);
     const applyProfile = handlers.get("window-layout:set-chrome-profile");
-
-    expect(applyProfile(createEvent(), {
-      titlebar: "macos-tiger-brushed-titlebar-v1",
-    })).toEqual({ applied: true, customControls: false });
-    expect(ownerWindow.setWindowButtonPosition).toHaveBeenLastCalledWith({ x: 13, y: 13 });
 
     expect(applyProfile(createEvent(), {
       titlebar: "unknown-titlebar-v1",

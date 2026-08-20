@@ -26,6 +26,7 @@ describe("renderer style architecture", () => {
     expect(styles).toContain('@import "./styles/base.css" layer(reset);');
     expect(styles).toContain('@import "@puppyone/shared-ui/shared-ui-patterns.css" layer(patterns);');
     expect(styles).toContain('@import "@puppyone/shared-ui/editor.css";');
+    expect(styles).toContain('@import "./styles/viewer-product-default.css" layer(features);');
     expect(styles
       .replace('@import "./styles/interface-styles.generated.css";', "")
       .replace('@import "@puppyone/shared-ui/editor.css";', ""))
@@ -49,8 +50,14 @@ describe("renderer style architecture", () => {
     const sharedEntry = source("packages/shared-ui/src/styles/shared-ui.css");
     const editorEntry = source("packages/shared-ui/src/styles/editor.css");
     const editableTable = source("packages/shared-ui/src/styles/editor/editable-table.css");
+    const editorChrome = source("packages/shared-ui/src/styles/editor/editor-chrome.css");
+    const puppyflowEditor = source("packages/shared-ui/src/styles/editor/puppyflow-editor.css");
+    const interfaceSkinContract = source("src/styles/interface-skin-contract.css");
+    const productDefaultProjection = source("src/styles/viewer-product-default.css");
     const xpTableProjection = source("src/styles/interfaces/windows-xp/surfaces/editable-table.css");
     const xpDocumentProjection = source("src/styles/interfaces/windows-xp/surfaces/document.css");
+    const xpEditorControlsProjection = source("src/styles/interfaces/windows-xp/surfaces/editor-controls.css");
+    const xpSettings = source("src/styles/interfaces/windows-xp/settings.css");
 
     expect(sharedEntry).toContain('@import "./shared-ui-patterns.css";');
     expect(sharedEntry).toContain('@import "./editor.css";');
@@ -65,6 +72,27 @@ describe("renderer style architecture", () => {
     expect(xpDocumentProjection).toContain(".po-viewer-surface-boundary");
     expect(xpDocumentProjection).toContain('[data-editor-presentation="follow-interface"]');
     expect(xpDocumentProjection).not.toMatch(/\.(?:cm-|markdown-codemirror-editor|csv-table-editor)/);
+    expect(xpEditorControlsProjection).toContain("--po-surface-editor-mode-radius: 2px");
+    expect(xpEditorControlsProjection).toContain("--po-surface-editor-card-radius: 2px");
+    expect(xpEditorControlsProjection).toContain(".po-viewer-surface-boundary");
+    expect(xpEditorControlsProjection).not.toMatch(/\.(?:editor-mode-toggle|puppyflow-)/);
+    expect(editorChrome).toContain("var(--po-surface-editor-mode-radius, 6px)");
+    expect(puppyflowEditor).toContain("var(--po-surface-editor-card-radius, 0)");
+    expect(interfaceSkinContract).not.toMatch(/\.(?:editor-mode-toggle|puppyflow-)/);
+
+    expect(productDefaultProjection).toContain('[data-editor-presentation="product-default"]');
+    expect(productDefaultProjection).toContain(".po-viewer-surface-boundary");
+    expect(productDefaultProjection).toContain("--po-text: #292723");
+    expect(productDefaultProjection).toContain("--po-font-sans: var(--po-font-ui)");
+    expect(productDefaultProjection).toContain("--po-scrollbar-size: 12px");
+    expect(productDefaultProjection).not.toMatch(/\.(?:cm-|markdown-codemirror-editor|csv-table-editor|editor-mode-toggle|puppyflow-)/);
+
+    expect(xpSettings).toMatch(
+      /:where\(\.desktop-settings-view, \.desktop-dialog-surface, \.onboarding-shell\)\s+:where\(\.desktop-settings-select, input/s,
+    );
+    expect(xpSettings).not.toMatch(
+      /:where\(\.app-shell, \.onboarding-shell, \.desktop-overlay-root\)\s+:where\([^)]*input/s,
+    );
   });
 });
 

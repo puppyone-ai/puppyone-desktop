@@ -62,7 +62,7 @@ describe("desktop elevation architecture", () => {
     expect(readCssBlock(editorFind, ".editor-find-widget"))
       .toContain("box-shadow: var(--po-elevation-low);");
     expect(readCssBlock(editorChrome, ".editor-mode-toggle"))
-      .toContain("box-shadow: var(--po-elevation-low);");
+      .toContain("box-shadow: var(--po-surface-editor-mode-shadow, var(--po-elevation-low));");
     expect(readCssBlock(plugins, ".desktop-plugin-menu > div"))
       .toContain("box-shadow: var(--po-menu-shadow-compact);");
     expect(fileActions).toContain("box-shadow: var(--po-menu-shadow-compact);");

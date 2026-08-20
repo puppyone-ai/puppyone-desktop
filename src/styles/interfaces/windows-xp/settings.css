@@ -82,6 +82,7 @@
 }
 
 :root[data-interface-style="windows-xp"]
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
   :where(.desktop-settings-select, input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
   border: 1px solid var(--xp-field-border);
   border-radius: 0;
@@ -91,6 +92,7 @@
 }
 
 :root[data-interface-style="windows-xp"]
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
   :where(.desktop-settings-select, input:not([type="checkbox"]):not([type="radio"]), textarea, select):focus {
   border-color: #0054e3;
   outline: 1px solid #0054e3;
@@ -98,10 +100,10 @@
 }
 
 :root[data-interface-style="windows-xp"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
   input[type="checkbox"]:not([role="switch"]),
 :root[data-interface-style="windows-xp"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
   input[type="radio"] {
   appearance: none;
   box-sizing: border-box;
@@ -114,25 +116,25 @@
 }
 
 :root[data-interface-style="windows-xp"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
   input[type="checkbox"]:not([role="switch"]):checked {
   background: #ffffff center / 11px 11px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 11'%3E%3Cpath d='m2 5.5 2.2 2.2L9 2.8' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E");
 }
 
 :root[data-interface-style="windows-xp"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
   input[type="radio"] {
   border-radius: 50%;
 }
 
 :root[data-interface-style="windows-xp"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
   input[type="radio"]:checked {
   background: radial-gradient(circle, #000000 0 3px, #ffffff 3.5px);
 }
 
 :root[data-interface-style="windows-xp"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
   :where(input[type="checkbox"], input[type="radio"]):disabled {
   border-color: #aca899;
   background-color: #ece9d8;

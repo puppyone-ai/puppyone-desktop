@@ -205,7 +205,7 @@ describe("appearance profile architecture", () => {
     );
     expect(workflow).toContain("npm run smoke:appearance-visual");
     expect(harness).toContain('data-appearance-visual-ready="true"');
-    expect(smoke).toContain('const styles = ["default", "windows-xp", "macos-tiger"]');
+    expect(smoke).toContain('const styles = ["default", "windows-xp"]');
     for (const family of VIEWER_SURFACE_FAMILIES) expect(harness).toContain(`"${family}"`);
   });
 

@@ -10,6 +10,7 @@
 @import "./surfaces/code.css";
 @import "./surfaces/grid.css";
 @import "./surfaces/editable-table.css";
+@import "./surfaces/editor-controls.css";
 @import "./surfaces/canvas.css";
 @import "./surfaces/media.css";
 @import "./surfaces/embedded.css";

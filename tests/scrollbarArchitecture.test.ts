@@ -8,6 +8,7 @@ const indexHtml = readCss("index.html");
 const stylesEntry = readCss("src/styles.css");
 const tokensCss = readCss("src/styles/tokens.css");
 const scrollbarsCss = readCss("src/styles/scrollbars.css");
+const productDefaultViewerCss = readCss("src/styles/viewer-product-default.css");
 const scrollbarActivitySource = readCss("src/components/ScrollbarActivity.tsx");
 const terminalSessionSource = readCss(
   "src/features/desktop-terminal/ui/TerminalSessionView.tsx",
@@ -75,6 +76,15 @@ describe("scrollbar architecture", () => {
     expect(scrollbarActivitySource).toContain("owner.scrollBy");
     expect(scrollbarActivitySource).not.toContain("position: fixed");
     expect(scrollbarActivitySource).not.toContain('data-interface-style="windows-xp"');
+    expect(scrollbarActivitySource).toContain('root.dataset.editorPresentation === "product-default"');
+    expect(scrollbarActivitySource).toContain('owner.closest(".po-viewer-surface-boundary")');
+    expect(interfaceSkinContractCss).toContain(
+      ':not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)',
+    );
+    expect(productDefaultViewerCss).toContain("--po-scrollbar-size: 12px;");
+    expect(scrollbarsCss).toContain(
+      ':root[data-po-scrollbar-mode="product"][data-editor-presentation="product-default"]',
+    );
     expect(readCss("packages/shared-ui/src/sidebar/SidebarScrollArea.tsx")).toContain(
       'data-po-scrollbar="sidebar"',
     );
@@ -128,7 +138,6 @@ describe("scrollbar architecture", () => {
     const allowedFiles = new Set([
       "src/features/desktop-terminal/ui/desktop-terminal.css",
       "src/styles/interface-skin-contract.css",
-      "src/styles/macos-tiger.css",
       "src/styles/scrollbars.css",
       "src/styles/interfaces/windows-xp/tokens.css",
     ]);
@@ -306,7 +315,6 @@ describe("scrollbar architecture", () => {
   it("does not reset modern thumb clipping with the background shorthand", () => {
     const legacySkinFiles = new Set([
       "src/styles/interface-skin-contract.css",
-      "src/styles/macos-tiger.css",
       "src/styles/interfaces/windows-xp/tokens.css",
     ]);
     const violations = [

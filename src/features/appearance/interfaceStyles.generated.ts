@@ -161,59 +161,6 @@ export const INTERFACE_STYLE_MANIFEST = {
         }
       },
       "stylesheet": "interfaces/windows-xp/index.css"
-    },
-    {
-      "id": "macos-tiger",
-      "labelKey": "settings.appearance.interfaceStyle.macosTiger",
-      "profile": {
-        "family": "macos-tiger",
-        "variant": "tiger",
-        "palette": "aqua"
-      },
-      "tokenSet": "macos-tiger-aqua-v1",
-      "composition": {
-        "shell": "macos-tiger-shell-v1",
-        "titlebar": "macos-tiger-brushed-titlebar-v1",
-        "navigation": "user-preference",
-        "locationBar": "none",
-        "scrollbar": "macos-tiger-aqua-v1",
-        "iconPack": "product-v1"
-      },
-      "policies": {
-        "themeMode": {
-          "mode": "force",
-          "value": "light",
-          "reasonKey": "settings.appearance.controlledBy.macosTiger"
-        },
-        "sidebarNavigationLayout": {
-          "mode": "inherit"
-        },
-        "textSize": {
-          "mode": "inherit"
-        },
-        "fileIconTheme": {
-          "mode": "inherit"
-        },
-        "editorPresentation": {
-          "mode": "allow",
-          "values": [
-            "follow-interface",
-            "product-default"
-          ],
-          "default": "follow-interface"
-        }
-      },
-      "palette": {
-        "kind": "fixed",
-        "mode": "light"
-      },
-      "firstPaint": {
-        "light": {
-          "background": "#ffffff",
-          "colorScheme": "light"
-        }
-      },
-      "stylesheet": "macos-tiger.css"
     }
   ]
 } as const;

@@ -33,12 +33,11 @@ describe("Interface style settings", () => {
     expect(buttons.map((button) => button.textContent)).toEqual([
       "Default",
       "Windows XP",
-      "macOS Tiger",
     ]);
     expect(buttons[0]?.getAttribute("aria-pressed")).toBe("true");
 
-    act(() => buttons[2]?.click());
-    expect(onChange).toHaveBeenCalledWith("macos-tiger");
+    act(() => buttons[1]?.click());
+    expect(onChange).toHaveBeenCalledWith("windows-xp");
   });
 
   it("shows color controls only when the selected style declares an adaptive palette", () => {

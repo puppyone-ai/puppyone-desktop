@@ -49,7 +49,6 @@ describe("Interface style registry", () => {
     expect(bootstrapIndex).toBeGreaterThan(0);
     expect(resolverIndex).toBeGreaterThan(bootstrapIndex);
     expect(initialTheme).not.toContain('"windows-xp"');
-    expect(initialTheme).not.toContain('"macos-tiger"');
 
     for (const style of INTERFACE_STYLES) {
       const requestedMode = "dark";
@@ -212,14 +211,10 @@ describe("Interface style registry", () => {
     }
   });
 
-  it("retains the historically specific XP and Tiger treatments", () => {
+  it("retains the historically specific XP treatment", () => {
     const xp = windowsXpStylePack();
-    const tiger = source("src/styles/macos-tiger.css");
     expect(xp).toContain("--xp-titlebar-start:");
     expect(xp).toContain("--xp-button-hover-start:");
-    expect(tiger).toContain("--tiger-brushed-metal:");
-    expect(tiger).toContain("--tiger-pinstripe:");
-    expect(tiger).toContain("--tiger-aqua:");
   });
 
   it("keeps Luna paint authentic and delegates structure to the profile", () => {
@@ -401,7 +396,6 @@ describe("Interface style registry", () => {
   it("keeps historical scrollbar geometry and arrow buttons style-dependent", () => {
     const contract = source("src/styles/interface-skin-contract.css");
     const xp = windowsXpStylePack();
-    const tiger = source("src/styles/macos-tiger.css");
     const explorer = source("packages/shared-ui/src/data/ExplorerTree.tsx");
     const scrollbarActivity = source("src/components/ScrollbarActivity.tsx");
     const layout = source("src/styles/layout.css");
@@ -472,7 +466,6 @@ describe("Interface style registry", () => {
     expect(fallbackArrows[2]).toContain('x2="0" y2="1"');
     expect(fallbackArrows[3]).toContain('x2="0" y2="1"');
     expect(explorer).not.toContain("po-classic-scrollbar");
-    expect(tiger).toContain("--interface-scrollbar-button-display: none;");
   });
 
   it("has a translated label for every registered style", () => {
@@ -570,6 +563,7 @@ function windowsXpStylePack() {
     "surfaces/code.css",
     "surfaces/grid.css",
     "surfaces/editable-table.css",
+    "surfaces/editor-controls.css",
     "surfaces/canvas.css",
     "surfaces/media.css",
     "surfaces/embedded.css",

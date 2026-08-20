@@ -12,12 +12,16 @@ const productStyles = read("src/styles.css");
 const tailwindEntry = read("src/cloud-globals.css");
 const tailwindConfig = read("tailwind.config.cjs");
 const windowChromeStyles = read("src/styles/window-chrome.css");
+const interfaceSkinContractStyles = read("src/styles/interface-skin-contract.css");
+const productDefaultViewerProjection = read("src/styles/viewer-product-default.css");
 const windowChromeOwner = path.join(repoRoot, "src", "styles", "window-chrome.css");
 const sharedUiRoot = path.join(repoRoot, "packages", "shared-ui", "src");
 const interfaceStyleRoot = path.join(repoRoot, "src", "styles", "interfaces");
 const viewerSurfaceTokenContract = JSON.parse(read("src/styles/viewer-surface-token-contract.json"));
-const concreteStylePattern = /\b(?:windows-xp|macos-tiger)\b/;
-const editorInternalSelectorPattern = /\.(?:cm-|markdown-codemirror-editor\b|csv-table-editor\b|desktop-terminal-xterm\b)/;
+const concreteStylePattern = /\bwindows-xp\b/;
+const editorInternalSelectorPattern = /\.(?:cm-|markdown-codemirror-editor\b|csv-table-editor\b|desktop-terminal-xterm\b|puppyflow-[a-z0-9-]+\b|editor-mode-toggle\b|plain-text-editor\b|code-codemirror-editor\b)/;
+const genericFormControlPattern = /(^|[\s>:,(])(?:input|textarea|select)(?=[\s.#:[>,+~]|$)/;
+const ownedFormControlScopePattern = /\.(?:desktop-settings-view|desktop-settings-switch|desktop-dialog-surface|onboarding-shell|desktop-agent-composer)\b/;
 const rootRelativeAssetPattern = /(["'`])\/(?!\/)[^"'`]+\.(?:png|svg|webp|jpe?g|gif|ico|woff2?)(?:[?#][^"'`]*)?\1/gi;
 
 if (cascade.trim() !== "@layer reset, tokens, primitives, patterns, features, interface-style, accessibility, overrides;") {
@@ -70,6 +74,10 @@ for (const match of productStyles.matchAll(/^@import\s+([^;]+);$/gm)) {
 
 if (!productStyles.includes('@import "./styles/window-chrome.css" layer(features);')) {
   errors.push("Desktop product styles must load the dedicated native window chrome contract.");
+}
+
+if (!productStyles.includes('@import "./styles/viewer-product-default.css" layer(features);')) {
+  errors.push("Desktop product styles must load the explicit Product Default Viewer projection.");
 }
 
 if (
@@ -134,23 +142,29 @@ for (const filePath of walkRendererSource(sharedUiRoot)) {
   }
 }
 
-for (const filePath of walkCss(interfaceStyleRoot)) {
+const interfaceStyleFiles = walkCss(interfaceStyleRoot);
+
+for (const filePath of interfaceStyleFiles) {
   const source = readAbsolute(filePath);
   const relativePath = path.relative(repoRoot, filePath);
   if (editorInternalSelectorPattern.test(source)) {
     errors.push(`${relativePath} targets Editor internals; project semantic custom properties at a Viewer surface boundary instead.`);
   }
+  validateOwnedFormControlSelectors(relativePath, source);
   if (filePath.includes(`${path.sep}surfaces${path.sep}`)) {
-    validateSurfaceTokenProjection(relativePath, source);
+    validateSurfaceTokenProjection(relativePath, source, "follow-interface");
   }
 }
 
-for (const relativePath of ["src/styles/macos-tiger.css"]) {
-  const source = read(relativePath);
-  if (editorInternalSelectorPattern.test(source)) {
-    errors.push(`${relativePath} targets Editor internals; project semantic custom properties at a Viewer surface boundary instead.`);
-  }
+if (editorInternalSelectorPattern.test(interfaceSkinContractStyles)) {
+  errors.push("src/styles/interface-skin-contract.css targets Editor internals; project semantic custom properties at a Viewer surface boundary instead.");
 }
+validateOwnedFormControlSelectors("src/styles/interface-skin-contract.css", interfaceSkinContractStyles);
+validateSurfaceTokenProjection(
+  "src/styles/viewer-product-default.css",
+  productDefaultViewerProjection,
+  "product-default",
+);
 
 for (const filePath of walkRendererSource(path.join(repoRoot, "src", "features", "appearance"))) {
   if (/surfaceAdapters|SurfaceAdapter/.test(readAbsolute(filePath))) {
@@ -190,12 +204,12 @@ function walkCss(directory) {
   });
 }
 
-function validateSurfaceTokenProjection(relativePath, source) {
+function validateSurfaceTokenProjection(relativePath, source, presentationMode) {
   if (!source.includes(".po-viewer-surface-boundary")) {
     errors.push(`${relativePath} is a Viewer surface pack but does not scope tokens to .po-viewer-surface-boundary.`);
   }
-  if (!source.includes('[data-editor-presentation="follow-interface"]')) {
-    errors.push(`${relativePath} does not honor the Follow Interface / Product Default Editor presentation boundary.`);
+  if (!source.includes(`[data-editor-presentation="${presentationMode}"]`)) {
+    errors.push(`${relativePath} does not honor the ${presentationMode} Editor presentation boundary.`);
   }
   for (const match of source.matchAll(/\{([^{}]*)\}/gs)) {
     const declarations = match[1]
@@ -218,6 +232,17 @@ function validateSurfaceTokenProjection(relativePath, source) {
       if (definition.type === "dimension" && !isDimensionWithinContract(value.trim(), definition)) {
         errors.push(`${relativePath} assigns ${token}: ${value.trim()}, outside its ${definition.min}-${definition.max}${definition.unit} contract.`);
       }
+    }
+  }
+}
+
+function validateOwnedFormControlSelectors(relativePath, source) {
+  const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const match of withoutComments.matchAll(/([^{}]+)\{[^{}]*\}/g)) {
+    const selector = match[1].trim();
+    if (selector.startsWith("@") || !genericFormControlPattern.test(selector)) continue;
+    if (!ownedFormControlScopePattern.test(selector)) {
+      errors.push(`${relativePath} styles a generic form control without a feature-owned scope (${selector}); Interface Styles must not penetrate Viewer/editor controls.`);
     }
   }
 }
