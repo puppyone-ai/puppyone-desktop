@@ -67,6 +67,8 @@ async function runSmoke() {
       const navigationButtons = [...document.querySelectorAll('.desktop-shell-navigation-toolbar-host .desktop-sidebar-top-navigation-button')];
       const toolbarActionButtons = [...document.querySelectorAll('.desktop-shell-navigation-toolbar-actions [data-toolbar-action]')];
       const toolbarButtons = [...document.querySelectorAll('.desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-button')];
+      const currentNavigationButton = document.querySelector('.desktop-shell-navigation-toolbar-host [aria-current="page"]');
+      const pressedToolbarAction = document.querySelector('.desktop-shell-navigation-toolbar-actions [aria-pressed="true"]');
       const controls = document.querySelector('.desktop-window-controls');
       const windowControlButtons = controls
         ? [...controls.querySelectorAll('.desktop-window-control')]
@@ -144,6 +146,24 @@ async function runSmoke() {
           ? Math.round(toolbarActionButtons[toolbarActionButtons.length - 1].getBoundingClientRect().right)
           : 0,
         toolbarActionLabels: toolbarActionButtons.map((button) => button.textContent.trim()),
+        currentNavigationPaint: currentNavigationButton ? (() => {
+          const style = getComputedStyle(currentNavigationButton);
+          return {
+            borderColor: style.borderTopColor,
+            background: style.backgroundImage,
+            color: style.color,
+            boxShadow: style.boxShadow,
+          };
+        })() : null,
+        pressedToolbarActionPaint: pressedToolbarAction ? (() => {
+          const style = getComputedStyle(pressedToolbarAction);
+          return {
+            borderColor: style.borderTopColor,
+            background: style.backgroundImage,
+            color: style.color,
+            boxShadow: style.boxShadow,
+          };
+        })() : null,
         navigationButtonBottoms: navigationButtons.map((button) => Math.round(button.getBoundingClientRect().bottom)),
         toolbarButtonRects: toolbarButtons.map((button) => {
           const rect = button.getBoundingClientRect();
@@ -364,6 +384,23 @@ async function runSmoke() {
         snapshot.toolbarFontSizes.every((fontSize) => fontSize === "13px"),
         `XP: toolbar typography is not 96-DPI Tahoma sizing: ${JSON.stringify(snapshot.toolbarFontSizes)}`,
       );
+      for (const [role, paint] of [
+        ["current navigation", snapshot.currentNavigationPaint],
+        ["open toolbar action", snapshot.pressedToolbarActionPaint],
+      ]) {
+        assert(paint, `XP: ${role} lost its persistent state`);
+        assert(paint.borderColor === "rgb(127, 157, 185)", `XP: ${role} uses the wrong checked border (${paint.borderColor})`);
+        assert(
+          paint.background.includes("rgb(238, 244, 255)")
+            && paint.background.includes("rgb(203, 220, 244)"),
+          `XP: ${role} is not using the checked blue treatment (${paint.background})`,
+        );
+        assert(paint.color === "rgb(0, 0, 0)", `XP: ${role} changed text contrast (${paint.color})`);
+        assert(
+          !paint.background.includes("rgb(239, 208, 128)"),
+          `XP: ${role} still uses the warm hover treatment (${paint.background})`,
+        );
+      }
       assert(snapshot.scrollbarComposition === "windows-xp-classic-v1", "XP: wrong scrollbar composition");
       assert(snapshot.titlebarHeight === 36, `XP: titlebar height is ${snapshot.titlebarHeight}px, expected 36px`);
       assert(snapshot.titlebarBackground.includes("linear-gradient"), `XP: titlebar lost its scalable Luna layers (${snapshot.titlebarBackground})`);
@@ -540,12 +577,34 @@ async function runSmoke() {
 
     if (style === "windows-xp") {
       const hoverPoint = await window.webContents.executeJavaScript(`(() => {
-        const button = document.querySelector('[data-navigation-item="cloud"]');
+        const button = document.querySelector('[data-navigation-item="git"]');
         const rect = button.getBoundingClientRect();
         return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
       })()`, true);
       window.webContents.sendInputEvent({ type: "mouseMove", x: hoverPoint.x, y: hoverPoint.y });
       await new Promise((resolve) => setTimeout(resolve, 80));
+      const hoverPaint = await window.webContents.executeJavaScript(`(() => {
+        const style = getComputedStyle(document.querySelector('[data-navigation-item="git"]'));
+        return { borderColor: style.borderTopColor, background: style.backgroundImage };
+      })()`, true);
+      assert(hoverPaint.borderColor === "rgb(230, 139, 44)", `XP: inactive hover lost warm hot tracking (${hoverPaint.borderColor})`);
+      assert(
+        hoverPaint.background.includes("rgb(255, 254, 244)")
+          && hoverPaint.background.includes("rgb(244, 221, 161)"),
+        `XP: inactive hover uses the wrong paint (${hoverPaint.background})`,
+      );
+      window.webContents.sendInputEvent({ type: "mouseDown", ...hoverPoint, button: "left", clickCount: 1 });
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        const pressedPaint = await window.webContents.executeJavaScript(`(() => {
+          const style = getComputedStyle(document.querySelector('[data-navigation-item="git"]'));
+          return { borderColor: style.borderTopColor, background: style.backgroundImage };
+        })()`, true);
+        assert(pressedPaint.borderColor === "rgb(49, 106, 197)", `XP: pressed toolbar state lost its blue edge (${pressedPaint.borderColor})`);
+        assert(pressedPaint.background.includes("rgb(195, 213, 241)"), `XP: pressed toolbar state is not sunken blue (${pressedPaint.background})`);
+      } finally {
+        window.webContents.sendInputEvent({ type: "mouseUp", ...hoverPoint, button: "left", clickCount: 1 });
+      }
     }
     const capture = await window.capturePage();
     assert(!capture.isEmpty(), `${style}: screenshot capture was empty`);

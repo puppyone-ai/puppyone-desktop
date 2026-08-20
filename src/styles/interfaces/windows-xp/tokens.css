@@ -213,6 +213,38 @@
   --xp-scroll-thumb-mid: #c4d3f8;
   --xp-scroll-thumb-dark: #b9ccf6;
 
+  /* Explorer command-band state model. Warm gold is hot tracking only;
+   * persistent routes and open tools use the native checked blue treatment. */
+  --interface-shell-toolbar-button-hover-border-color: var(--xp-default-ring);
+  --interface-shell-toolbar-button-hover-background: linear-gradient(
+    180deg,
+    var(--xp-button-hover-start) 0%,
+    #fff3ca 52%,
+    var(--xp-button-hover-end) 100%
+  );
+  --interface-shell-toolbar-button-hover-box-shadow: inset 0 1px 0 #ffffff;
+  --interface-shell-toolbar-button-checked-border-color: #7f9db9;
+  --interface-shell-toolbar-button-checked-background: linear-gradient(
+    180deg,
+    #eef4ff 0%,
+    #dce9fb 52%,
+    #cbdcf4 100%
+  );
+  --interface-shell-toolbar-button-checked-color: #000000;
+  --interface-shell-toolbar-button-checked-box-shadow:
+    inset 1px 1px 1px rgba(49, 106, 197, 0.18),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.82);
+  --interface-shell-toolbar-button-pressed-border-color: var(--xp-selection);
+  --interface-shell-toolbar-button-pressed-background: linear-gradient(
+    180deg,
+    #c3d5f1 0%,
+    #d2e1f7 52%,
+    #e7effc 100%
+  );
+  --interface-shell-toolbar-button-pressed-box-shadow:
+    inset 1px 1px 2px rgba(35, 78, 142, 0.34),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.62);
+
   /* Shared component contract. */
   --interface-typography-webkit-font-smoothing: auto;
   --interface-typography-moz-osx-font-smoothing: auto;
