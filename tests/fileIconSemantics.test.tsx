@@ -38,6 +38,20 @@ describe("file icon semantics", () => {
     expect(getFileVisualKind("Knowledge.contextmap")).toBe("context-map");
   });
 
+  it.each<FileIconThemeId>(["default", "lines", "vscode", "material", "minimal"])(
+    "renders Context Map as a treasure map product mark in the %s theme",
+    (theme) => {
+      const markup = renderToStaticMarkup(
+        <FileGlyphIcon name="Knowledge.contextmap" size={18} theme={theme} />,
+      );
+
+      expect(markup).toContain('data-file-icon-product="context-map"');
+      expect(markup).toContain('data-file-icon-shape="treasure-map"');
+      expect(markup).toContain('data-file-icon-complexity="minimal"');
+      expect(markup).toContain('data-file-icon-route="treasure-trail"');
+    },
+  );
+
   it("fails fast instead of falling back for an invalid declared semantic kind", () => {
     const invalidFormat = {
       ...resolveFileFormat({ name: "model.xlsx" }),

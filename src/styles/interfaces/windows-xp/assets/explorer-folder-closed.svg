@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!--
+    B00merang Windows-XP 16x16/places/gtk-directory.png at
+    24e95ad2b12c55dd11883ee7066525527d944039. The original 16px PNG
+    payload is embedded without pixel modification so the Explorer skin can
+    keep the hand-tuned small-size artwork in a text-reviewable asset.
+  -->
+  <image width="16" height="16" image-rendering="pixelated" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABa0lEQVR4nKWSPUsDQRCGn3MPDrWxUgKCGLCwESEgamlhJ1iYvyAIWljYCX6VFgELIWJpqQiCFhYWFoKQSkvBdGr6JHfJZXYs7vJhEhLFgWF3YeeZd4YX/hlOn7f+GpDLplRVsdZirWVh8yUJFIByXxlx8Y94zEwrMA8MxY3aM1KQy6Y0tZ4Dztqw6zwcTyEiiEhDmYiwelRIAl+A76oqBCcg0gbIsLTz1qH2encUY8yaiFwBeef5dFbn0mkIQ54uL7uOGIYhtVqtkarRblf2P5KutRZKJZ5ubljceu27Lz4PILHHxfYwxpi1CFAs4nlelz10RiWfx0ucIdHIE66IQBA0ZBEEPQG+7+MB1loAx40vVKvV6Eex2Bcw0gTgxlKagFKpJ6BcjnwVAQaagEql8msFQH1kdYDJ28Px97pJ6mergVqNZK1FVdk4H7hzHOfZIbLqjDFmGRjr2f5nFETkvu7pobh48A8AHyh8A7Ih5wdbGTd7AAAAAElFTkSuQmCC"/>
+</svg>

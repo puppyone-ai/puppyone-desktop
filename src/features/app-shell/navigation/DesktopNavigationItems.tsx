@@ -13,6 +13,8 @@ import type { DesktopNavigationItem, DesktopNavigationRuntime } from "./types";
 type NavigationItemsProps = DesktopNavigationRuntime & {
   buttonClassName: string;
   items: readonly DesktopNavigationItem[];
+  labelIdOverrides?: Readonly<Partial<Record<DesktopView, string>>>;
+  shellToolbar?: boolean;
   showLabel?: boolean;
 };
 
@@ -23,8 +25,10 @@ export function DesktopNavigationItems({
   gitIncomingCount,
   gitOperationLoading,
   gitStatus,
+  labelIdOverrides,
   workspaceChangeCount,
   onNavigate,
+  shellToolbar = false,
   showLabel = false,
 }: NavigationItemsProps) {
   const { t } = useLocalization();
@@ -32,7 +36,7 @@ export function DesktopNavigationItems({
     <>
       {items.map((item) => {
         const badge = getDesktopNavigationBadge(item.view, gitIncomingCount, workspaceChangeCount);
-        const itemLabel = t(item.labelId);
+        const itemLabel = t(labelIdOverrides?.[item.view] ?? item.labelId);
         const navLabel = getDesktopNavigationLabel(t, itemLabel, item.view, badge, workspaceChangeCount);
         const gitSummary = item.view === "git"
           ? getDesktopGitNavSummary(gitStatus, gitIncomingCount, gitOperationLoading)
@@ -44,13 +48,21 @@ export function DesktopNavigationItems({
             type="button"
             aria-label={navLabel}
             aria-current={activeView === item.view ? "page" : undefined}
+            data-navigation-item={item.view}
             onClick={() => onNavigate(item.view)}
           >
-            <i className="desktop-sidebar-nav-icon-wrap" aria-hidden="true">
+            <i
+              className={`desktop-sidebar-nav-icon-wrap${shellToolbar ? " desktop-shell-toolbar-button-icon" : ""}`}
+              aria-hidden="true"
+            >
               <item.icon size={item.iconSize ?? 16} />
             </i>
-            {showLabel && <span className="desktop-sidebar-nav-label">{itemLabel}</span>}
-            <DesktopNavBadge count={badge.count} tone={badge.tone} />
+            {showLabel && (
+              <span className={`desktop-sidebar-nav-label${shellToolbar ? " desktop-shell-toolbar-button-label" : ""}`}>
+                {itemLabel}
+              </span>
+            )}
+            {!shellToolbar && <DesktopNavBadge count={badge.count} tone={badge.tone} />}
             {gitSummary && <DesktopGitNavBubble summary={gitSummary} />}
           </button>
         );
@@ -63,10 +75,14 @@ export function DesktopSidebarSettingsButton({
   activeView,
   buttonClassName,
   onOpenSettings,
+  shellToolbar = false,
+  showLabel = false,
 }: {
   activeView: DesktopView;
   buttonClassName: string;
   onOpenSettings: () => void;
+  shellToolbar?: boolean;
+  showLabel?: boolean;
 }) {
   const { t } = useLocalization();
   return (
@@ -76,17 +92,37 @@ export function DesktopSidebarSettingsButton({
       title={t("shell.navigation.settings")}
       aria-label={t("shell.navigation.settings")}
       aria-current={activeView === "settings" ? "page" : undefined}
+      data-navigation-item="settings"
       onClick={onOpenSettings}
     >
-      <Settings size={16} />
+      <i
+        className={`desktop-sidebar-nav-icon-wrap${shellToolbar ? " desktop-shell-toolbar-button-icon" : ""}`}
+        aria-hidden="true"
+      >
+        <Settings size={16} />
+      </i>
+      {showLabel && (
+        <span className={`desktop-sidebar-nav-label${shellToolbar ? " desktop-shell-toolbar-button-label" : ""}`}>
+          {t("shell.navigation.settings")}
+        </span>
+      )}
     </button>
   );
 }
 
-function DesktopNavBadge({ count, tone }: { count: number; tone: "remote" | "workspace" }) {
+function DesktopNavBadge({
+  count,
+  tone,
+}: {
+  count: number;
+  tone: "remote" | "workspace";
+}) {
   if (count <= 0) return null;
   return (
-    <em className={`desktop-sidebar-nav-badge ${tone}`} aria-hidden="true">
+    <em
+      className={`desktop-sidebar-nav-badge ${tone}`}
+      aria-hidden="true"
+    >
       {count > 99 ? "99+" : count}
     </em>
   );

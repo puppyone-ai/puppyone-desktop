@@ -23,10 +23,12 @@ import {
   ExcelSpreadsheetGlyph,
   PresentationDocumentGlyph,
   SpreadsheetGridGlyph,
+  TreasureMapGlyph,
   WordDocumentGlyph,
 } from "../shared/semanticGlyphs";
 
 function renderMinimalGlyph(context: FileIconRenderContext): ReactNode {
+  if (context.kind === "context-map") return <TreasureMapGlyph {...context} />;
   if (context.kind === "spreadsheet") {
     return (
       <SpreadsheetGridGlyph

@@ -71,6 +71,10 @@
   min-width: 0;
 }
 
+.desktop-titlebar-brand {
+  display: none;
+}
+
 .desktop-titlebar-context {
   display: flex;
   flex: 0 1 auto;
@@ -130,6 +134,13 @@
   gap: var(--desktop-titlebar-button-gap);
   height: var(--desktop-titlebar-control-height);
   overflow: visible;
+}
+
+/* Interface Style profiles can opt into renderer-owned window controls. The
+ * platform chrome remains authoritative unless a profile explicitly reveals
+ * this stable composition slot. */
+.desktop-window-controls {
+  display: none;
 }
 
 .desktop-titlebar-action-divider {

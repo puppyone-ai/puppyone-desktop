@@ -257,9 +257,37 @@
   --interface-scrollbar-background: #e1e1e1;
   --interface-scrollbar-track-border: 1px solid #b2b2b2;
   --interface-scrollbar-track-background: repeating-linear-gradient(0deg, #e8e8e8 0 1px, #dcdcdc 1px 2px);
+  --interface-scrollbar-track-background-horizontal: repeating-linear-gradient(90deg, #e8e8e8 0 1px, #dcdcdc 1px 2px);
+  --interface-scrollbar-thumb-min-inline-size: 20px;
+  --interface-scrollbar-thumb-min-block-size: 20px;
+  --interface-scrollbar-thumb-border: 2px solid #dedede;
+  --interface-scrollbar-thumb-border-radius: 8px;
+  --interface-scrollbar-thumb-background: linear-gradient(90deg, rgba(255, 255, 255, 0.7), transparent 42%),
+    linear-gradient(90deg, #167cc9, #65baf1 52%, #0871bd);
+  --interface-scrollbar-thumb-background-horizontal: linear-gradient(180deg, rgba(255, 255, 255, 0.7), transparent 42%),
+    linear-gradient(180deg, #167cc9, #65baf1 52%, #0871bd);
+  --interface-scrollbar-thumb-background-clip: padding-box;
+  --interface-scrollbar-thumb-box-shadow: inset 0 0 0 1px rgba(4, 91, 151, 0.64);
   --interface-scrollbar-thumb-hover-background: linear-gradient(90deg, rgba(255, 255, 255, 0.76), transparent 42%),
     linear-gradient(90deg, #0875c4, #74c6f6 52%, #0065ad);
+  --interface-scrollbar-thumb-hover-background-horizontal: linear-gradient(180deg, rgba(255, 255, 255, 0.76), transparent 42%),
+    linear-gradient(180deg, #0875c4, #74c6f6 52%, #0065ad);
   --interface-scrollbar-thumb-hover-background-clip: padding-box;
+  --interface-scrollbar-button-display: none;
+  --interface-scrollbar-button-size: 0px;
+  --interface-directional-arrow-size: 7px;
+  --interface-scrollbar-button-border-color: transparent;
+  --interface-scrollbar-button-border: 0;
+  --interface-scrollbar-button-background-color: transparent;
+  --interface-scrollbar-button-background-image: none;
+  --interface-scrollbar-button-background-image-horizontal: none;
+  --interface-scrollbar-button-box-shadow: none;
+  --interface-scrollbar-button-hover-border-color: transparent;
+  --interface-scrollbar-button-hover-background-color: transparent;
+  --interface-scrollbar-button-up-image: none;
+  --interface-scrollbar-button-down-image: none;
+  --interface-scrollbar-button-left-image: none;
+  --interface-scrollbar-button-right-image: none;
 }
 
 :root[data-interface-style="macos-tiger"] .desktop-titlebar {
@@ -474,20 +502,6 @@
   border-color: #3c9ee3;
   outline: 2px solid rgba(73, 166, 230, 0.34);
   outline-offset: 0;
-}
-
-:root[data-interface-style="macos-tiger"][data-po-scrollbar-mode="product"]
-  :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb {
-  min-width: 20px;
-  min-height: 20px;
-  border: 2px solid #dedede;
-  border-radius: 8px;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.7), transparent 42%),
-    linear-gradient(90deg, #167cc9, #65baf1 52%, #0871bd);
-  background-clip: padding-box;
-  box-shadow: inset 0 0 0 1px rgba(4, 91, 151, 0.64);
 }
 
 :root[data-interface-style="macos-tiger"] .onboarding-shell {

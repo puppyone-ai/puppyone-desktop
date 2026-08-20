@@ -10,7 +10,11 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type { DataNode } from "../core/types";
-import { FileGlyphIcon, type FileIconThemeId } from "../file/fileIcons";
+import {
+  FileGlyphIcon,
+  getFileVisualKind,
+  type FileIconThemeId,
+} from "../file/fileIcons";
 import { DotsLoader, InlineLoading } from "../primitives/LoadingIndicator";
 import { useScrollEdgeState } from "../primitives/useScrollableClass";
 import {
@@ -843,6 +847,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
       <span className="tree-row-content">
         <span
           className="tree-icon-slot"
+          data-file-kind={isFolder ? undefined : getFileVisualKind(node.name, node.type)}
           onClick={(event) => {
             if (!isFolder) return;
             event.stopPropagation();
@@ -1007,7 +1012,10 @@ function ExplorerExitGhostRow({
       style={{ "--depth": row.depth } as CSSProperties}
     >
       <span className="tree-row-content">
-        <span className="tree-icon-slot">
+        <span
+          className="tree-icon-slot"
+          data-file-kind={isFolder ? undefined : getFileVisualKind(row.node.name, row.node.type)}
+        >
           {isFolder ? (
             <TreeDisclosureMarker expanded={expandedPaths.has(row.path)} />
           ) : (
@@ -1048,6 +1056,7 @@ function TreeDisclosureMarker({
       strokeLinejoin="round"
       aria-hidden="true"
       className="tree-disclosure-marker"
+      data-expanded={expanded ? "true" : "false"}
       style={{
         transform: expanded
           ? direction === "rtl" ? "rotate(-90deg)" : "rotate(90deg)"

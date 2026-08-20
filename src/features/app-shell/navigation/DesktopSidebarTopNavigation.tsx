@@ -17,7 +17,13 @@ export function DesktopSidebarTopNavigation({
   workspaceChangeCount,
   onNavigate,
   onOpenSettings,
-}: DesktopNavigationProps & { orientation: SidebarNavigationOrientation }) {
+  shellToolbar = false,
+  useToolLabels = false,
+}: DesktopNavigationProps & {
+  orientation: SidebarNavigationOrientation;
+  shellToolbar?: boolean;
+  useToolLabels?: boolean;
+}) {
   const { t } = useLocalization();
   const { cloudHubItems, localItems } = resolveNavigationItems({
     availableSurfaceIds,
@@ -33,32 +39,45 @@ export function DesktopSidebarTopNavigation({
     workspaceChangeCount,
     onNavigate,
   };
+  const buttonClassName = [
+    "desktop-sidebar-top-navigation-button",
+    shellToolbar ? "desktop-shell-toolbar-button" : "",
+  ].filter(Boolean).join(" ");
 
   return (
     <div
-      className={`desktop-sidebar-top-navigation desktop-sidebar-navigation-surface ${orientation}`}
+      className={`desktop-sidebar-top-navigation desktop-sidebar-navigation-surface ${orientation}${shellToolbar ? " desktop-shell-toolbar-navigation desktop-shell-toolbar-section" : ""}`}
       data-placement="top"
       data-orientation={orientation}
+      data-shell-toolbar-section={shellToolbar ? "navigation" : undefined}
     >
-      <div className="desktop-sidebar-top-navigation-list" aria-label={t("shell.navigation.ariaLabel")}>
-        <div className="desktop-sidebar-top-navigation-group desktop-sidebar-top-navigation-local">
+      <div
+        className={`desktop-sidebar-top-navigation-list${shellToolbar ? " desktop-shell-toolbar-list" : ""}`}
+        aria-label={t("shell.navigation.ariaLabel")}
+      >
+        <div className={`desktop-sidebar-top-navigation-group desktop-sidebar-top-navigation-local${shellToolbar ? " desktop-shell-toolbar-group" : ""}`}>
           <DesktopNavigationItems
             {...runtime}
-            buttonClassName="desktop-sidebar-top-navigation-button"
+            buttonClassName={buttonClassName}
             items={localItems}
+            labelIdOverrides={useToolLabels ? { git: "shell.navigation.git" } : undefined}
+            shellToolbar={shellToolbar}
             showLabel
           />
           <DesktopSidebarSettingsButton
             activeView={activeView}
-            buttonClassName="desktop-sidebar-top-navigation-button"
+            buttonClassName={buttonClassName}
             onOpenSettings={onOpenSettings}
+            shellToolbar={shellToolbar}
+            showLabel
           />
           {cloudHubItems.length > 0 && (
             <DesktopNavigationItems
-              {...runtime}
-              buttonClassName="desktop-sidebar-top-navigation-button"
-              items={cloudHubItems}
-              showLabel
+                {...runtime}
+                buttonClassName={buttonClassName}
+                items={cloudHubItems}
+                shellToolbar={shellToolbar}
+                showLabel
             />
           )}
         </div>

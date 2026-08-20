@@ -1,3 +1,7 @@
+.po-viewer-surface-boundary {
+  display: contents;
+}
+
 .editor-host {
   position: relative;
   display: flex;

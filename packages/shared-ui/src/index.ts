@@ -244,6 +244,8 @@ export {
   PRESET_VIEWER_SOURCES,
   VIEWER_SURFACE_PREPARATIONS,
   VIEWER_SURFACE_READINESS_SIGNALS,
+  VIEWER_SURFACE_FAMILIES,
+  VIEWER_SURFACE_TRAITS,
 } from "./editor/registry/viewerContract";
 export type {
   PresetViewerContractVersion,
@@ -251,6 +253,8 @@ export type {
   PresetViewerSource,
   ViewerSurfacePreparation,
   ViewerSurfaceReadinessSignal,
+  ViewerSurfaceFamily,
+  ViewerSurfaceTrait,
 } from "./editor/registry/viewerContract";
 export { findPackCandidates, resolveViewerRoute } from "./editor/registry/viewerCapability";
 export type { ResolveViewerRouteInput } from "./editor/registry/viewerCapability";

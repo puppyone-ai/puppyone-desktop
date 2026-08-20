@@ -1,4 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { useLocalization } from "@puppyone/localization/react";
+import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 
 type DesktopWindowChromeProps = {
   context?: ReactNode;
@@ -20,6 +22,7 @@ export function DesktopWindowChrome({
   minimalMode = false,
   minimalModeDock,
 }: DesktopWindowChromeProps) {
+  const { t } = useLocalization();
   const fullScreen = useWindowFullScreenState();
 
   if (minimalMode) {
@@ -39,6 +42,16 @@ export function DesktopWindowChrome({
     >
       <div className="desktop-titlebar-layout">
         <div className="desktop-titlebar-left">
+          <div className="desktop-titlebar-brand" aria-hidden="true">
+            <img
+              className="desktop-titlebar-brand-icon"
+              src={resolveRendererPublicAssetUrl("assets/brand/puppyone-xp.svg")}
+              alt=""
+              draggable={false}
+            />
+            <strong className="desktop-titlebar-brand-name">{t("shell.brand.name")}</strong>
+            <span className="desktop-titlebar-brand-separator">—</span>
+          </div>
           {context}
         </div>
         <div
@@ -51,9 +64,42 @@ export function DesktopWindowChrome({
             {actions}
           </div>
         )}
+        <div className="desktop-window-controls" data-window-no-drag="true">
+          <button
+            className="desktop-window-control is-minimize"
+            type="button"
+            aria-label={t("shell.windowControls.minimize")}
+            title={t("shell.windowControls.minimize")}
+            onClick={() => performWindowAction("minimize")}
+          >
+            <span aria-hidden="true" />
+          </button>
+          <button
+            className="desktop-window-control is-maximize"
+            type="button"
+            aria-label={t("shell.windowControls.maximize")}
+            title={t("shell.windowControls.maximize")}
+            onClick={() => performWindowAction("toggle-maximize")}
+          >
+            <span aria-hidden="true" />
+          </button>
+          <button
+            className="desktop-window-control is-close"
+            type="button"
+            aria-label={t("shell.windowControls.close")}
+            title={t("shell.windowControls.close")}
+            onClick={() => performWindowAction("close")}
+          >
+            <span aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </header>
   );
+}
+
+function performWindowAction(action: "minimize" | "toggle-maximize" | "close") {
+  void window.puppyoneDesktop?.performWindowAction?.({ action }).catch(() => undefined);
 }
 
 function useWindowFullScreenState() {

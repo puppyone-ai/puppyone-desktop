@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="22" viewBox="0 0 24 22" fill="none">
+  <defs>
+    <linearGradient id="blue" x1="8" y1="3" x2="8" y2="13" gradientUnits="userSpaceOnUse"><stop stop-color="#DDF7FF"/><stop offset=".38" stop-color="#67C7F2"/><stop offset="1" stop-color="#1470BD"/></linearGradient>
+    <linearGradient id="green" x1="16" y1="9" x2="16" y2="19" gradientUnits="userSpaceOnUse"><stop stop-color="#F3FFD5"/><stop offset=".4" stop-color="#9DDB4E"/><stop offset="1" stop-color="#3B8E16"/></linearGradient>
+    <linearGradient id="gold" x1="8" y1="10" x2="8" y2="20" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF5A9"/><stop offset=".42" stop-color="#F8C33B"/><stop offset="1" stop-color="#C87808"/></linearGradient>
+  </defs>
+  <path d="M4 3h7v2.2a2 2 0 1 1 0 3.6V11H8.8a2 2 0 1 0-3.6 0H3V4c0-.6.4-1 1-1Z" fill="url(#blue)" stroke="#175894" stroke-linejoin="round"/>
+  <path d="M13 10h2.2a2 2 0 1 1 3.6 0H21v7c0 .6-.4 1-1 1h-7v-2.2a2 2 0 1 0 0-3.6V10Z" fill="url(#green)" stroke="#3D7719" stroke-linejoin="round"/>
+  <path d="M3 12h2.2a2 2 0 1 1 3.6 0H11v2.2a2 2 0 1 0 0 3.6V20H4c-.6 0-1-.4-1-1v-7Z" fill="url(#gold)" stroke="#A05B08" stroke-linejoin="round"/>
+  <path d="M4.5 3.8h5" stroke="#fff" stroke-linecap="round" stroke-opacity=".8"/>
+</svg>

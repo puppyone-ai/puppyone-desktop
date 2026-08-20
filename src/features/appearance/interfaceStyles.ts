@@ -2,6 +2,7 @@ import { INTERFACE_STYLE_MANIFEST } from "./interfaceStyles.generated";
 
 export type ThemeMode = "system" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
+export type EditorPresentation = "follow-interface" | "product-default";
 export type InterfaceStyle = typeof INTERFACE_STYLE_MANIFEST.styles[number]["id"];
 export type InterfaceStyleDefinition = typeof INTERFACE_STYLE_MANIFEST.styles[number];
 export type InterfaceStylePalette = InterfaceStyleDefinition["palette"];
@@ -11,8 +12,10 @@ export type InterfaceStyleFirstPaint = {
 };
 
 export const INTERFACE_STYLES = INTERFACE_STYLE_MANIFEST.styles;
+export const EDITOR_PRESENTATIONS = ["follow-interface", "product-default"] as const;
 export const DEFAULT_INTERFACE_STYLE: InterfaceStyle = INTERFACE_STYLE_MANIFEST.defaultStyle;
 export const INTERFACE_STYLE_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.interfaceStyle;
+export const APPEARANCE_PREFERENCES_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.appearancePreferences;
 export const THEME_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.themeMode;
 export const LIGHT_THEME_PRESET_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.lightThemePreset;
 export const DARK_THEME_PRESET_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.darkThemePreset;
@@ -26,9 +29,23 @@ export function parseInterfaceStyle(value: string | null | undefined): Interface
   return isInterfaceStyle(value) ? value : DEFAULT_INTERFACE_STYLE;
 }
 
+export function parseEditorPresentation(value: string | null | undefined): EditorPresentation {
+  return EDITOR_PRESENTATIONS.includes(value as EditorPresentation)
+    ? value as EditorPresentation
+    : "follow-interface";
+}
+
 export function getInterfaceStyleDefinition(style: InterfaceStyle): InterfaceStyleDefinition {
   return INTERFACE_STYLES.find((definition) => definition.id === style)
     ?? getDefaultInterfaceStyleDefinition();
+}
+
+export function getInterfaceStyleComposition(style: InterfaceStyle) {
+  return getInterfaceStyleDefinition(style).composition;
+}
+
+export function getInterfaceStylePolicies(style: InterfaceStyle) {
+  return getInterfaceStyleDefinition(style).policies;
 }
 
 export function getDefaultInterfaceStyleDefinition(): InterfaceStyleDefinition {

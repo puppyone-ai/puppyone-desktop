@@ -1,0 +1,16 @@
+/* CSS-import-only Style Pack entry. Co-located visual assets belong to the
+ * same development dependency graph. Viewer surface modules project tokens
+ * at the host boundary; feature modules may style App Shell-owned components. */
+@import "./tokens.css";
+@import "./shell.css";
+@import "./controls.css";
+@import "./settings.css";
+@import "./features/explorer.css";
+@import "./surfaces/document.css";
+@import "./surfaces/code.css";
+@import "./surfaces/grid.css";
+@import "./surfaces/editable-table.css";
+@import "./surfaces/canvas.css";
+@import "./surfaces/media.css";
+@import "./surfaces/embedded.css";
+@import "./features/agent.css";

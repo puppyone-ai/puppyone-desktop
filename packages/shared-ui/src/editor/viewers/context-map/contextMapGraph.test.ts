@@ -64,6 +64,26 @@ describe("aggregateFolderRelationshipEdges", () => {
       bidirectional: false,
     }]);
   });
+
+  it("preserves a one-way relationship whose source sorts after its target", () => {
+    const bucketByPath = new Map([
+      ["alpha.md", "alpha.md"],
+      ["zebra.md", "zebra.md"],
+    ]);
+    const backlinks: Array<[string, MarkdownBacklink[]]> = [["alpha.md", [{
+      sourcePath: "zebra.md",
+      sourceName: "zebra.md",
+      count: 2,
+      references: [],
+    }]]];
+
+    expect(aggregateFolderRelationshipEdges(backlinks, bucketByPath)).toEqual([{
+      sourceId: "zebra.md",
+      targetId: "alpha.md",
+      count: 2,
+      bidirectional: false,
+    }]);
+  });
 });
 
 describe("buildFolderRelationshipProjection", () => {
@@ -118,8 +138,8 @@ describe("buildFolderRelationshipProjection", () => {
     const expanded = buildFolderRelationshipProjection(graph, new Set(["civil"]));
     expect(expanded.edges).toEqual([
       {
-        sourceId: "civil/contract.md",
-        targetId: "civil/property.md",
+        sourceId: "civil/property.md",
+        targetId: "civil/contract.md",
         count: 5,
         bidirectional: false,
       },
@@ -131,8 +151,8 @@ describe("buildFolderRelationshipProjection", () => {
       },
     ]);
     expect([...expanded.relationshipCountByNode.entries()]).toEqual([
-      ["civil/contract.md", 8],
       ["civil/property.md", 5],
+      ["civil/contract.md", 8],
       ["criminal", 3],
     ]);
   });

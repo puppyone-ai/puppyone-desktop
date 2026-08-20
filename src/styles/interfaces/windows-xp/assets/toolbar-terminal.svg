@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="22" viewBox="0 0 24 22" fill="none">
+  <defs>
+    <linearGradient id="case" x1="12" y1="2" x2="12" y2="19" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EAF6FF"/>
+      <stop offset="0.34" stop-color="#8CC7F3"/>
+      <stop offset="0.72" stop-color="#397FC4"/>
+      <stop offset="1" stop-color="#13539B"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="12" y1="5" x2="12" y2="15" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A3550"/>
+      <stop offset="1" stop-color="#071523"/>
+    </linearGradient>
+  </defs>
+  <path d="M4 2.5h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2v-12c0-1.1.9-2 2-2Z" fill="#103F7B" stroke="#fff" stroke-linejoin="round"/>
+  <path d="M4 3h16c.8 0 1.5.7 1.5 1.5v11.8c0 .8-.7 1.5-1.5 1.5H4c-.8 0-1.5-.7-1.5-1.5V4.5C2.5 3.7 3.2 3 4 3Z" fill="url(#case)" stroke="#2365A7"/>
+  <path d="M5 5h14v9.5H5V5Z" fill="url(#screen)" stroke="#0B345E"/>
+  <path d="M6 5.8h12" stroke="#8AC4ED" stroke-opacity=".55"/>
+  <path d="m7.5 8 2.3 2-2.3 2M11.5 12h4" stroke="#fff" stroke-width="1.35" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M8 18h8l1.3 2H6.7L8 18Z" fill="#4A78A8" stroke="#fff" stroke-linejoin="round"/>
+  <path d="M7 20h10" stroke="#174E82" stroke-linecap="round"/>
+</svg>

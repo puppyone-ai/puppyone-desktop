@@ -1,14 +1,18 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
+  type Dispatch,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type RefCallback,
+  type RefObject,
+  type SetStateAction,
 } from "react";
 import { ChevronUp, LoaderCircle } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
@@ -16,6 +20,7 @@ import type { DataNode, DataPort } from "../../../core/types";
 import { FileGlyphIcon } from "../../../file/fileIcons";
 import type { FileIconThemeId } from "../../../file/fileIconTypes";
 import { useEditableDocumentSource } from "../../document-session/EditableDocumentSourceContext";
+import { useEditorPaneMenuContributionPublisher } from "../../editorPaneMenuContribution";
 import type { PresetViewerRenderContext } from "../../registry/viewerTypes";
 import {
   createDefaultContextMapDocument,
@@ -27,6 +32,13 @@ import {
   type ContextMapDocument,
 } from "./contextMapDocument";
 import {
+  DEFAULT_CONTEXT_MAP_LINE_FILTERS,
+  isContextMapReferenceVisible,
+  updateContextMapLineFilter,
+  type ContextMapLineFilterKey,
+  type ContextMapLineFilterState,
+} from "./contextMapFilters";
+import {
   buildFolderRelationshipProjection,
   loadFolderRelationshipGraph,
   type FolderRelationshipEdge,
@@ -35,6 +47,8 @@ import {
 import {
   buildFolderRelationshipLayoutZones,
   buildFolderRelationshipSceneLayout,
+  buildLayeredRelationshipSceneLayout,
+  buildRadialRelationshipSceneLayout,
   getExpandedFolderPreferredWidth,
   getDraggedRelationshipOffset,
   getFolderRelationshipLayoutOffset,
@@ -45,12 +59,28 @@ import {
   type RelationshipViewportTransform,
 } from "./contextMapLayout";
 import {
+  routeLayeredHierarchyRelationships,
+  routeLayeredReferenceRelationship,
+  routeRadialHierarchyRelationships,
+  routeRadialReferenceRelationship,
   routeStraightRelationships,
   type RelationshipRouteRect,
 } from "./contextMapRouting";
+import {
+  EMPTY_CONTEXT_MAP_WHEEL_GESTURE_STATE,
+  resolveContextMapWheelGesture,
+} from "./contextMapWheelNavigation";
 
 type RelationshipLine = FolderRelationshipEdge & Readonly<{
   path: string;
+}>;
+
+type ContextMapLayoutMode = "canvas" | "layered" | "radial";
+
+type RadialHierarchyLine = Readonly<{
+  path: string;
+  sourceId: string;
+  targetId: string;
 }>;
 
 type RelationshipDragSession = {
@@ -254,6 +284,7 @@ export function ContextMapViewer({
       )}
       <ContextMapSurface
         dataPort={dataPort}
+        documentId={sourceDocument.path}
         expandedFolderPaths={expandedFolderPaths}
         fileIconTheme={fileIconTheme}
         initialFolder={initialFolder}
@@ -268,6 +299,7 @@ export function ContextMapViewer({
 
 function ContextMapSurface({
   dataPort,
+  documentId,
   expandedFolderPaths,
   fileIconTheme,
   initialFolder,
@@ -277,6 +309,7 @@ function ContextMapSurface({
   onToggleFolder,
 }: {
   dataPort: DataPort;
+  documentId: string;
   expandedFolderPaths: ReadonlySet<string>;
   fileIconTheme: FileIconThemeId;
   initialFolder: DataNode;
@@ -288,8 +321,13 @@ function ContextMapSurface({
   onToggleFolder: (node: DataNode) => void;
 }) {
   const { t } = useLocalization();
+  const publishPaneMenuContribution = useEditorPaneMenuContributionPublisher();
   const [graph, setGraph] = useState<FolderRelationshipGraph | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [layoutMode, setLayoutMode] = useState<ContextMapLayoutMode>("radial");
+  const [lineFilters, setLineFilters] = useState<ContextMapLineFilterState>(
+    DEFAULT_CONTEXT_MAP_LINE_FILTERS,
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -313,6 +351,75 @@ function ContextMapSurface({
       controller.abort();
     };
   }, [dataPort, initialFolder, refreshSequence]);
+
+  const setPaneMenuLayoutMode = useCallback((mode: string) => {
+    if (mode === "radial" || mode === "canvas" || mode === "layered") {
+      setLayoutMode(mode);
+    }
+  }, []);
+
+  const setLineFilterVisibility = useCallback((
+    key: ContextMapLineFilterKey,
+    visible: boolean,
+  ) => {
+    setLineFilters((current) => updateContextMapLineFilter(current, key, visible));
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!publishPaneMenuContribution) return undefined;
+    publishPaneMenuContribution({
+      documentId,
+      viewItems: [
+        {
+          kind: "segmented",
+          id: "context-map-layout",
+          label: t("workspace.relationships.layoutSwitcher"),
+          value: layoutMode,
+          options: [
+            {
+              id: "radial",
+              label: t("workspace.relationships.layout.radial"),
+              icon: <RadialLayoutIcon size={12} />,
+            },
+            {
+              id: "canvas",
+              label: t("workspace.relationships.layout.canvas"),
+              icon: <CanvasLayoutIcon size={12} />,
+            },
+            {
+              id: "layered",
+              label: t("workspace.relationships.layout.layered"),
+              icon: <LayeredLayoutIcon size={12} />,
+            },
+          ],
+          setValue: setPaneMenuLayoutMode,
+        },
+        {
+          kind: "toggle",
+          id: "context-map-filter-one-way-links",
+          label: t("workspace.relationships.filter.oneWayLinks"),
+          checked: lineFilters.oneWayLinks,
+          setChecked: (visible) => setLineFilterVisibility("oneWayLinks", visible),
+        },
+        {
+          kind: "toggle",
+          id: "context-map-filter-bidirectional-links",
+          label: t("workspace.relationships.filter.bidirectionalLinks"),
+          checked: lineFilters.bidirectionalLinks,
+          setChecked: (visible) => setLineFilterVisibility("bidirectionalLinks", visible),
+        },
+      ],
+    });
+    return () => publishPaneMenuContribution(null);
+  }, [
+    documentId,
+    layoutMode,
+    lineFilters,
+    publishPaneMenuContribution,
+    setLineFilterVisibility,
+    setPaneMenuLayoutMode,
+    t,
+  ]);
 
   const projection = useMemo(
     () => graph ? buildFolderRelationshipProjection(graph, expandedFolderPaths) : null,
@@ -341,16 +448,37 @@ function ContextMapSurface({
           </div>
         )}
         {graph && graph.rootNodes.length > 0 && projection && (
-          <RelationshipCanvas
-            edges={projection.edges}
-            expandedFolderPaths={expandedFolderPaths}
-            fileIconTheme={fileIconTheme}
-            graph={graph}
-            manualOffsetsByNode={manualOffsetsByNode}
-            relationshipCountByNode={projection.relationshipCountByNode}
-            onManualOffsetsChange={onManualOffsetsChange}
-            onToggleFolder={onToggleFolder}
-          />
+          layoutMode === "canvas" ? (
+            <RelationshipCanvas
+              edges={projection.edges}
+              expandedFolderPaths={expandedFolderPaths}
+              fileIconTheme={fileIconTheme}
+              graph={graph}
+              lineFilters={lineFilters}
+              manualOffsetsByNode={manualOffsetsByNode}
+              relationshipCountByNode={projection.relationshipCountByNode}
+              onManualOffsetsChange={onManualOffsetsChange}
+              onToggleFolder={onToggleFolder}
+            />
+          ) : layoutMode === "radial" ? (
+            <RadialRelationshipCanvas
+              edges={projection.edges}
+              expandedFolderPaths={expandedFolderPaths}
+              fileIconTheme={fileIconTheme}
+              graph={graph}
+              lineFilters={lineFilters}
+              onToggleFolder={onToggleFolder}
+            />
+          ) : (
+            <LayeredRelationshipCanvas
+              edges={projection.edges}
+              expandedFolderPaths={expandedFolderPaths}
+              fileIconTheme={fileIconTheme}
+              graph={graph}
+              lineFilters={lineFilters}
+              onToggleFolder={onToggleFolder}
+            />
+          )
         )}
         {graph?.truncated && (
           <div className="folder-relationship-limit-note" role="status">
@@ -362,11 +490,843 @@ function ContextMapSurface({
   );
 }
 
+function ContextMapReferenceArrowMarker({ id }: Readonly<{ id: string }>) {
+  return (
+    <marker
+      id={id}
+      markerHeight="8"
+      markerUnits="userSpaceOnUse"
+      markerWidth="8"
+      orient="auto-start-reverse"
+      refX="7"
+      refY="4"
+      viewBox="0 0 8 8"
+    >
+      <path className="folder-relationship-reference-arrow" d="M 0.75 0.75 L 7 4 L 0.75 7.25 Z" />
+    </marker>
+  );
+}
+
+function useContextMapWheelNavigation({
+  canvasRef,
+  centeredFocalPoint,
+  minimumScale,
+  setViewportTransform,
+}: Readonly<{
+  canvasRef: RefObject<HTMLDivElement | null>;
+  centeredFocalPoint: boolean;
+  minimumScale: number;
+  setViewportTransform: Dispatch<SetStateAction<RelationshipViewportTransform>>;
+}>) {
+  const gestureStateRef = useRef(EMPTY_CONTEXT_MAP_WHEEL_GESTURE_STATE);
+  const handleWheel = useCallback((event: WheelEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const bounds = canvas.getBoundingClientRect();
+    const legacyEvent = event as WheelEvent & { wheelDeltaY?: number };
+    const result = resolveContextMapWheelGesture({
+      ctrlKey: event.ctrlKey,
+      deltaMode: event.deltaMode,
+      deltaX: event.deltaX,
+      deltaY: event.deltaY,
+      legacyWheelDeltaY: legacyEvent.wheelDeltaY,
+      pageHeight: bounds.height,
+      pageWidth: bounds.width,
+      shiftKey: event.shiftKey,
+      timestamp: event.timeStamp,
+    }, gestureStateRef.current);
+    gestureStateRef.current = result.state;
+
+    setViewportTransform((current) => {
+      if (result.gesture.kind === "pan") {
+        return {
+          ...current,
+          x: current.x + result.gesture.x,
+          y: current.y + result.gesture.y,
+        };
+      }
+      const focalPoint = {
+        x: event.clientX - bounds.left - (centeredFocalPoint ? bounds.width / 2 : 0),
+        y: event.clientY - bounds.top - (centeredFocalPoint ? bounds.height / 2 : 0),
+      };
+      return getZoomedRelationshipViewport(
+        current,
+        focalPoint,
+        current.scale * result.gesture.factor,
+        minimumScale,
+      );
+    });
+    event.preventDefault();
+  }, [canvasRef, centeredFocalPoint, minimumScale, setViewportTransform]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    canvas.addEventListener("wheel", handleWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", handleWheel);
+  }, [canvasRef, handleWheel]);
+}
+
+function RadialRelationshipCanvas({
+  edges,
+  expandedFolderPaths,
+  fileIconTheme,
+  graph,
+  lineFilters,
+  onToggleFolder,
+}: Readonly<{
+  edges: readonly FolderRelationshipEdge[];
+  expandedFolderPaths: ReadonlySet<string>;
+  fileIconTheme: FileIconThemeId;
+  graph: FolderRelationshipGraph;
+  lineFilters: ContextMapLineFilterState;
+  onToggleFolder: (node: DataNode) => void;
+}>) {
+  const referenceArrowId = `context-map-radial-reference-arrow-${useId().replaceAll(":", "")}`;
+  const referenceArrowUrl = `url(#${referenceArrowId})`;
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const panSessionRef = useRef<RelationshipPanSession | null>(null);
+  const [focusedNodePath, setFocusedNodePath] = useState<string | null>(null);
+  const [panning, setPanning] = useState(false);
+  const [viewportTransform, setViewportTransform] = useState<RelationshipViewportTransform>({
+    x: 0,
+    y: 0,
+    scale: 1,
+  });
+  useContextMapWheelNavigation({
+    canvasRef,
+    centeredFocalPoint: true,
+    minimumScale: 0.08,
+    setViewportTransform,
+  });
+  const layout = useMemo(() => buildRadialRelationshipSceneLayout({
+    childrenByFolderPath: graph.childrenByFolderPath,
+    expandedFolderPaths,
+    root: graph.folder,
+    rootNodes: graph.rootNodes,
+  }), [expandedFolderPaths, graph.childrenByFolderPath, graph.folder, graph.rootNodes]);
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+  const previousLayoutRef = useRef(layout);
+  const hierarchyLines = useMemo<readonly RadialHierarchyLine[]>(() => {
+    const routableEdges = layout.hierarchyEdges.flatMap((edge) => {
+      const source = layout.positions.get(edge.sourceId);
+      const target = layout.positions.get(edge.targetId);
+      if (!source || !target) return [];
+      return [{
+        edge,
+        input: {
+          center: layout.center,
+          id: `${edge.sourceId}\u0000${edge.targetId}`,
+          source: { angle: source.angle, radius: source.radius },
+          target: { angle: target.angle, radius: target.radius },
+        },
+      }];
+    });
+    const routes = routeRadialHierarchyRelationships(routableEdges.map(({ input }) => input));
+    return routes.map((route, index) => ({
+      ...routableEdges[index].edge,
+      path: route.path,
+    }));
+  }, [layout]);
+  const referenceLines = useMemo<readonly RelationshipLine[]>(() => edges.flatMap((edge) => {
+    if (!isContextMapReferenceVisible(edge, lineFilters)) return [];
+    const source = layout.positions.get(edge.sourceId);
+    const target = layout.positions.get(edge.targetId);
+    if (!source || !target) return [];
+    return [{
+      ...edge,
+      path: routeRadialReferenceRelationship(source, target, layout.center),
+    }];
+  }), [edges, layout, lineFilters]);
+  const connectedNodePaths = useMemo(() => {
+    const connected = new Set<string>();
+    if (!focusedNodePath) return connected;
+    connected.add(focusedNodePath);
+    for (const edge of [...hierarchyLines, ...referenceLines]) {
+      if (edge.sourceId !== focusedNodePath && edge.targetId !== focusedNodePath) continue;
+      connected.add(edge.sourceId);
+      connected.add(edge.targetId);
+    }
+    return connected;
+  }, [focusedNodePath, hierarchyLines, referenceLines]);
+
+  const fitCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    setViewportTransform(getRadialFitViewport(canvas, layoutRef.current));
+  }, []);
+
+  useLayoutEffect(() => {
+    fitCanvas();
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const observer = new ResizeObserver(fitCanvas);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [fitCanvas]);
+
+  useLayoutEffect(() => {
+    if (previousLayoutRef.current === layout) return;
+    previousLayoutRef.current = layout;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const fittedViewport = getRadialFitViewport(canvas, layout);
+    setViewportTransform((current) => ({
+      ...current,
+      scale: fittedViewport.scale,
+    }));
+  }, [layout]);
+
+  const startCanvasPan = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !event.isPrimary || panSessionRef.current) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest(".folder-relationship-radial-node")) return;
+    const captureElement = event.currentTarget;
+    panSessionRef.current = {
+      captureElement,
+      origin: { x: viewportTransform.x, y: viewportTransform.y },
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    try {
+      captureElement.setPointerCapture(event.pointerId);
+    } catch {
+      panSessionRef.current = null;
+      return;
+    }
+    setPanning(true);
+    setFocusedNodePath(null);
+    event.preventDefault();
+  }, [viewportTransform.x, viewportTransform.y]);
+
+  const moveCanvasPan = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const session = panSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    setViewportTransform((current) => ({
+      ...current,
+      x: session.origin.x + event.clientX - session.startX,
+      y: session.origin.y + event.clientY - session.startY,
+    }));
+    event.preventDefault();
+  }, []);
+
+  const finishCanvasPan = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const session = panSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    try {
+      if (session.captureElement.hasPointerCapture(event.pointerId)) {
+        session.captureElement.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // The pointer may already have been released by the browser.
+    }
+    panSessionRef.current = null;
+    setPanning(false);
+  }, []);
+
+  return (
+    <div
+      className="folder-relationship-canvas folder-relationship-radial-canvas"
+      data-panning={panning ? "true" : undefined}
+      ref={canvasRef}
+      style={{
+        "--relationship-grid-offset-x": `${viewportTransform.x + 4}px`,
+        "--relationship-grid-offset-y": `${viewportTransform.y + 4}px`,
+        "--relationship-grid-size": `${22 * viewportTransform.scale}px`,
+      } as CSSProperties}
+      onDoubleClick={(event) => {
+        const target = event.target;
+        if (!(target instanceof Element) || !target.closest(".folder-relationship-radial-node")) {
+          fitCanvas();
+        }
+      }}
+      onPointerCancel={finishCanvasPan}
+      onPointerDown={startCanvasPan}
+      onPointerLeave={() => {
+        if (!panning) setFocusedNodePath(null);
+      }}
+      onPointerMove={moveCanvasPan}
+      onPointerUp={finishCanvasPan}
+    >
+      <div
+        className="folder-relationship-radial-world"
+        style={{
+          height: `${layout.height}px`,
+          left: "50%",
+          top: "50%",
+          transform: `translate3d(${viewportTransform.x - layout.width / 2}px, ${viewportTransform.y - layout.height / 2}px, 0) scale(${viewportTransform.scale})`,
+          transformOrigin: `${layout.center.x}px ${layout.center.y}px`,
+          width: `${layout.width}px`,
+        }}
+      >
+        <svg
+          aria-hidden="true"
+          className="folder-relationship-radial-lines"
+          height={layout.height}
+          viewBox={`0 0 ${layout.width} ${layout.height}`}
+          width={layout.width}
+        >
+          <defs>
+            <ContextMapReferenceArrowMarker id={referenceArrowId} />
+          </defs>
+          <g className="folder-relationship-radial-references">
+            {referenceLines.map((line) => {
+              const focused = Boolean(focusedNodePath && (
+                  line.sourceId === focusedNodePath || line.targetId === focusedNodePath
+              ));
+              return (
+                <path
+                  d={line.path}
+                  data-bidirectional={line.bidirectional ? "true" : undefined}
+                  data-focused={focused ? "true" : undefined}
+                  key={`${line.sourceId}:${line.targetId}`}
+                  markerEnd={focused ? referenceArrowUrl : undefined}
+                  markerStart={focused && line.bidirectional ? referenceArrowUrl : undefined}
+                />
+              );
+            })}
+          </g>
+          <g className="folder-relationship-radial-hierarchy">
+            {hierarchyLines.map((line) => (
+              <path
+                d={line.path}
+                data-focused={focusedNodePath && (
+                  line.sourceId === focusedNodePath || line.targetId === focusedNodePath
+                ) ? "true" : undefined}
+                key={`${line.sourceId}:${line.targetId}`}
+              />
+            ))}
+          </g>
+        </svg>
+        {layout.nodes.map((entry) => (
+          <RadialRelationshipNode
+            connectedNodePaths={connectedNodePaths}
+            entry={entry}
+            expandedFolderPaths={expandedFolderPaths}
+            fileIconTheme={fileIconTheme}
+            focusedNodePath={focusedNodePath}
+            key={entry.node.path || graph.folder.id}
+            onFocusNode={setFocusedNodePath}
+            onToggleFolder={onToggleFolder}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function getRadialVisibleBounds(
+  nodes: ReturnType<typeof buildRadialRelationshipSceneLayout>["nodes"],
+  fallbackCenter: Readonly<{ x: number; y: number }>,
+): Readonly<{
+  center: Readonly<{ x: number; y: number }>;
+  height: number;
+  width: number;
+}> {
+  if (nodes.length === 0) {
+    return { center: fallbackCenter, height: 240, width: 240 };
+  }
+  const padding = 118;
+  const minimumX = Math.min(...nodes.map((entry) => entry.x)) - padding;
+  const maximumX = Math.max(...nodes.map((entry) => entry.x)) + padding;
+  const minimumY = Math.min(...nodes.map((entry) => entry.y)) - padding;
+  const maximumY = Math.max(...nodes.map((entry) => entry.y)) + padding;
+  return {
+    center: {
+      x: (minimumX + maximumX) / 2,
+      y: (minimumY + maximumY) / 2,
+    },
+    height: Math.max(240, maximumY - minimumY),
+    width: Math.max(240, maximumX - minimumX),
+  };
+}
+
+function getRadialFitViewport(
+  canvas: HTMLDivElement,
+  layout: ReturnType<typeof buildRadialRelationshipSceneLayout>,
+): RelationshipViewportTransform {
+  const bounds = canvas.getBoundingClientRect();
+  const availableWidth = Math.max(1, bounds.width - 80);
+  const availableHeight = Math.max(1, bounds.height - 80);
+  const visibleBounds = getRadialVisibleBounds(layout.nodes, layout.center);
+  const scale = Math.min(1, Math.max(
+    0.08,
+    Math.min(
+      availableWidth / visibleBounds.width,
+      availableHeight / visibleBounds.height,
+    ),
+  ));
+  return {
+    x: (layout.center.x - visibleBounds.center.x) * scale,
+    y: (layout.center.y - visibleBounds.center.y) * scale,
+    scale,
+  };
+}
+
+function RadialRelationshipNode({
+  connectedNodePaths,
+  entry,
+  expandedFolderPaths,
+  fileIconTheme,
+  focusedNodePath,
+  onFocusNode,
+  onToggleFolder,
+}: Readonly<{
+  connectedNodePaths: ReadonlySet<string>;
+  entry: ReturnType<typeof buildRadialRelationshipSceneLayout>["nodes"][number];
+  expandedFolderPaths: ReadonlySet<string>;
+  fileIconTheme: FileIconThemeId;
+  focusedNodePath: string | null;
+  onFocusNode: (path: string | null) => void;
+  onToggleFolder: (node: DataNode) => void;
+}>) {
+  const { t } = useLocalization();
+  const isRoot = entry.depth === 0;
+  const isFolder = entry.node.type === "folder";
+  const expanded = isFolder && expandedFolderPaths.has(entry.node.path);
+  const content = (
+    <span className="folder-relationship-card-hitarea">
+      <span className="folder-relationship-card-icon" aria-hidden="true">
+        <FileGlyphIcon
+          name={entry.node.name}
+          type={entry.node.type}
+          size={isRoot ? 30 : 24}
+          theme={fileIconTheme}
+        />
+      </span>
+      <span className="folder-relationship-card-copy">
+        <strong>{entry.node.name}</strong>
+      </span>
+    </span>
+  );
+  const interactionProps = {
+    "data-expanded": expanded ? "true" : undefined,
+    "data-focused": focusedNodePath === entry.node.path ? "true" : undefined,
+    "data-folder": isFolder ? "true" : undefined,
+    "data-node-path": entry.node.path,
+    "data-related": focusedNodePath && focusedNodePath !== entry.node.path
+      && connectedNodePaths.has(entry.node.path) ? "true" : undefined,
+    "data-root": isRoot ? "true" : undefined,
+    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => event.stopPropagation(),
+    onPointerEnter: () => onFocusNode(entry.node.path),
+    onPointerLeave: () => onFocusNode(null),
+    style: { left: `${entry.x}px`, top: `${entry.y}px` },
+  } as const;
+
+  if (isFolder && !isRoot) {
+    return (
+      <button
+        className="folder-relationship-card folder-relationship-radial-node"
+        {...interactionProps}
+        title={t(expanded
+          ? "workspace.relationships.collapseFolder"
+          : "workspace.relationships.expandFolder", { name: entry.node.name })}
+        type="button"
+        onClick={() => onToggleFolder(entry.node)}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className="folder-relationship-card folder-relationship-radial-node"
+      {...interactionProps}
+      title={entry.node.name}
+    >
+      {content}
+    </div>
+  );
+}
+
+function LayeredRelationshipCanvas({
+  edges,
+  expandedFolderPaths,
+  fileIconTheme,
+  graph,
+  lineFilters,
+  onToggleFolder,
+}: Readonly<{
+  edges: readonly FolderRelationshipEdge[];
+  expandedFolderPaths: ReadonlySet<string>;
+  fileIconTheme: FileIconThemeId;
+  graph: FolderRelationshipGraph;
+  lineFilters: ContextMapLineFilterState;
+  onToggleFolder: (node: DataNode) => void;
+}>) {
+  const referenceArrowId = `context-map-layered-reference-arrow-${useId().replaceAll(":", "")}`;
+  const referenceArrowUrl = `url(#${referenceArrowId})`;
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const panSessionRef = useRef<RelationshipPanSession | null>(null);
+  const [focusedNodePath, setFocusedNodePath] = useState<string | null>(null);
+  const [panning, setPanning] = useState(false);
+  const [viewportTransform, setViewportTransform] = useState<RelationshipViewportTransform>({
+    x: 0,
+    y: 0,
+    scale: 1,
+  });
+  useContextMapWheelNavigation({
+    canvasRef,
+    centeredFocalPoint: true,
+    minimumScale: 0.08,
+    setViewportTransform,
+  });
+  const layout = useMemo(() => buildLayeredRelationshipSceneLayout({
+    childrenByFolderPath: graph.childrenByFolderPath,
+    expandedFolderPaths,
+    root: graph.folder,
+    rootNodes: graph.rootNodes,
+  }), [expandedFolderPaths, graph.childrenByFolderPath, graph.folder, graph.rootNodes]);
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+  const previousLayoutRef = useRef(layout);
+  const hierarchyLines = useMemo<readonly RadialHierarchyLine[]>(() => {
+    const routableEdges = layout.hierarchyEdges.flatMap((edge) => {
+      const source = layout.positions.get(edge.sourceId);
+      const target = layout.positions.get(edge.targetId);
+      if (!source || !target) return [];
+      return [{
+        edge,
+        input: {
+          id: `${edge.sourceId}\u0000${edge.targetId}`,
+          source: {
+            inset: source.depth === 0 ? 38 : 18,
+            x: source.x,
+            y: source.y,
+          },
+          target: { inset: 18, x: target.x, y: target.y },
+        },
+      }];
+    });
+    const routes = routeLayeredHierarchyRelationships(routableEdges.map(({ input }) => input));
+    return routes.map((route, index) => ({
+      ...routableEdges[index].edge,
+      path: route.path,
+    }));
+  }, [layout]);
+  const referenceLines = useMemo<readonly RelationshipLine[]>(() => edges.flatMap((edge) => {
+    if (!isContextMapReferenceVisible(edge, lineFilters)) return [];
+    const source = layout.positions.get(edge.sourceId);
+    const target = layout.positions.get(edge.targetId);
+    if (!source || !target) return [];
+    return [{
+      ...edge,
+      path: routeLayeredReferenceRelationship(source, target),
+    }];
+  }), [edges, layout, lineFilters]);
+  const connectedNodePaths = useMemo(() => {
+    const connected = new Set<string>();
+    if (!focusedNodePath) return connected;
+    connected.add(focusedNodePath);
+    for (const edge of [...hierarchyLines, ...referenceLines]) {
+      if (edge.sourceId !== focusedNodePath && edge.targetId !== focusedNodePath) continue;
+      connected.add(edge.sourceId);
+      connected.add(edge.targetId);
+    }
+    return connected;
+  }, [focusedNodePath, hierarchyLines, referenceLines]);
+
+  const fitCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    setViewportTransform(getLayeredFitViewport(canvas, layoutRef.current));
+  }, []);
+
+  useLayoutEffect(() => {
+    fitCanvas();
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const observer = new ResizeObserver(fitCanvas);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [fitCanvas]);
+
+  useLayoutEffect(() => {
+    if (previousLayoutRef.current === layout) return;
+    previousLayoutRef.current = layout;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const fittedViewport = getLayeredFitViewport(canvas, layout);
+    setViewportTransform((current) => ({
+      ...current,
+      scale: fittedViewport.scale,
+    }));
+  }, [layout]);
+
+  const startCanvasPan = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !event.isPrimary || panSessionRef.current) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest(".folder-relationship-layered-node")) return;
+    const captureElement = event.currentTarget;
+    panSessionRef.current = {
+      captureElement,
+      origin: { x: viewportTransform.x, y: viewportTransform.y },
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+    };
+    try {
+      captureElement.setPointerCapture(event.pointerId);
+    } catch {
+      panSessionRef.current = null;
+      return;
+    }
+    setPanning(true);
+    setFocusedNodePath(null);
+    event.preventDefault();
+  }, [viewportTransform.x, viewportTransform.y]);
+
+  const moveCanvasPan = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const session = panSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    setViewportTransform((current) => ({
+      ...current,
+      x: session.origin.x + event.clientX - session.startX,
+      y: session.origin.y + event.clientY - session.startY,
+    }));
+    event.preventDefault();
+  }, []);
+
+  const finishCanvasPan = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const session = panSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    try {
+      if (session.captureElement.hasPointerCapture(event.pointerId)) {
+        session.captureElement.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // The pointer may already have been released by the browser.
+    }
+    panSessionRef.current = null;
+    setPanning(false);
+  }, []);
+
+  return (
+    <div
+      className="folder-relationship-canvas folder-relationship-layered-canvas"
+      data-panning={panning ? "true" : undefined}
+      ref={canvasRef}
+      style={{
+        "--relationship-grid-offset-x": `${viewportTransform.x + 4}px`,
+        "--relationship-grid-offset-y": `${viewportTransform.y + 4}px`,
+        "--relationship-grid-size": `${22 * viewportTransform.scale}px`,
+      } as CSSProperties}
+      onDoubleClick={(event) => {
+        const target = event.target;
+        if (!(target instanceof Element) || !target.closest(".folder-relationship-layered-node")) {
+          fitCanvas();
+        }
+      }}
+      onPointerCancel={finishCanvasPan}
+      onPointerDown={startCanvasPan}
+      onPointerLeave={() => {
+        if (!panning) setFocusedNodePath(null);
+      }}
+      onPointerMove={moveCanvasPan}
+      onPointerUp={finishCanvasPan}
+    >
+      <div
+        className="folder-relationship-layered-world"
+        style={{
+          height: `${layout.height}px`,
+          left: "50%",
+          top: "50%",
+          transform: `translate3d(${viewportTransform.x - layout.anchor.x}px, ${viewportTransform.y - layout.anchor.y}px, 0) scale(${viewportTransform.scale})`,
+          transformOrigin: `${layout.anchor.x}px ${layout.anchor.y}px`,
+          width: `${layout.width}px`,
+        }}
+      >
+        <svg
+          aria-hidden="true"
+          className="folder-relationship-layered-lines"
+          height={layout.height}
+          viewBox={`0 0 ${layout.width} ${layout.height}`}
+          width={layout.width}
+        >
+          <defs>
+            <ContextMapReferenceArrowMarker id={referenceArrowId} />
+          </defs>
+          <g className="folder-relationship-layered-references">
+            {referenceLines.map((line) => {
+              const focused = Boolean(focusedNodePath && (
+                  line.sourceId === focusedNodePath || line.targetId === focusedNodePath
+              ));
+              return (
+                <path
+                  d={line.path}
+                  data-bidirectional={line.bidirectional ? "true" : undefined}
+                  data-focused={focused ? "true" : undefined}
+                  key={`${line.sourceId}:${line.targetId}`}
+                  markerEnd={focused ? referenceArrowUrl : undefined}
+                  markerStart={focused && line.bidirectional ? referenceArrowUrl : undefined}
+                />
+              );
+            })}
+          </g>
+          <g className="folder-relationship-layered-hierarchy">
+            {hierarchyLines.map((line) => (
+              <path
+                d={line.path}
+                data-focused={focusedNodePath && (
+                  line.sourceId === focusedNodePath || line.targetId === focusedNodePath
+                ) ? "true" : undefined}
+                key={`${line.sourceId}:${line.targetId}`}
+              />
+            ))}
+          </g>
+        </svg>
+        {layout.nodes.map((entry) => (
+          <LayeredRelationshipNode
+            connectedNodePaths={connectedNodePaths}
+            entry={entry}
+            expandedFolderPaths={expandedFolderPaths}
+            fileIconTheme={fileIconTheme}
+            focusedNodePath={focusedNodePath}
+            key={entry.node.path || graph.folder.id}
+            onFocusNode={setFocusedNodePath}
+            onToggleFolder={onToggleFolder}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function getLayeredVisibleBounds(
+  nodes: ReturnType<typeof buildLayeredRelationshipSceneLayout>["nodes"],
+  fallbackAnchor: Readonly<{ x: number; y: number }>,
+): Readonly<{
+  center: Readonly<{ x: number; y: number }>;
+  height: number;
+  width: number;
+}> {
+  if (nodes.length === 0) {
+    return { center: fallbackAnchor, height: 240, width: 240 };
+  }
+  const horizontalPadding = 118;
+  const verticalPadding = 88;
+  const minimumX = Math.min(...nodes.map((entry) => entry.x)) - horizontalPadding;
+  const maximumX = Math.max(...nodes.map((entry) => entry.x)) + horizontalPadding;
+  const minimumY = Math.min(...nodes.map((entry) => entry.y)) - verticalPadding;
+  const maximumY = Math.max(...nodes.map((entry) => entry.y)) + verticalPadding;
+  return {
+    center: {
+      x: (minimumX + maximumX) / 2,
+      y: (minimumY + maximumY) / 2,
+    },
+    height: Math.max(240, maximumY - minimumY),
+    width: Math.max(240, maximumX - minimumX),
+  };
+}
+
+function getLayeredFitViewport(
+  canvas: HTMLDivElement,
+  layout: ReturnType<typeof buildLayeredRelationshipSceneLayout>,
+): RelationshipViewportTransform {
+  const bounds = canvas.getBoundingClientRect();
+  const availableWidth = Math.max(1, bounds.width - 80);
+  const availableHeight = Math.max(1, bounds.height - 80);
+  const visibleBounds = getLayeredVisibleBounds(layout.nodes, layout.anchor);
+  const scale = Math.min(1, Math.max(
+    0.08,
+    Math.min(
+      availableWidth / visibleBounds.width,
+      availableHeight / visibleBounds.height,
+    ),
+  ));
+  return {
+    x: (layout.anchor.x - visibleBounds.center.x) * scale,
+    y: (layout.anchor.y - visibleBounds.center.y) * scale,
+    scale,
+  };
+}
+
+function LayeredRelationshipNode({
+  connectedNodePaths,
+  entry,
+  expandedFolderPaths,
+  fileIconTheme,
+  focusedNodePath,
+  onFocusNode,
+  onToggleFolder,
+}: Readonly<{
+  connectedNodePaths: ReadonlySet<string>;
+  entry: ReturnType<typeof buildLayeredRelationshipSceneLayout>["nodes"][number];
+  expandedFolderPaths: ReadonlySet<string>;
+  fileIconTheme: FileIconThemeId;
+  focusedNodePath: string | null;
+  onFocusNode: (path: string | null) => void;
+  onToggleFolder: (node: DataNode) => void;
+}>) {
+  const { t } = useLocalization();
+  const isRoot = entry.depth === 0;
+  const isFolder = entry.node.type === "folder";
+  const expanded = isFolder && expandedFolderPaths.has(entry.node.path);
+  const content = (
+    <span className="folder-relationship-card-hitarea">
+      <span className="folder-relationship-card-icon" aria-hidden="true">
+        <FileGlyphIcon
+          name={entry.node.name}
+          type={entry.node.type}
+          size={isRoot ? 30 : 24}
+          theme={fileIconTheme}
+        />
+      </span>
+      <span className="folder-relationship-card-copy">
+        <strong>{entry.node.name}</strong>
+      </span>
+    </span>
+  );
+  const interactionProps = {
+    "data-expanded": expanded ? "true" : undefined,
+    "data-focused": focusedNodePath === entry.node.path ? "true" : undefined,
+    "data-folder": isFolder ? "true" : undefined,
+    "data-node-path": entry.node.path,
+    "data-related": focusedNodePath && focusedNodePath !== entry.node.path
+      && connectedNodePaths.has(entry.node.path) ? "true" : undefined,
+    "data-root": isRoot ? "true" : undefined,
+    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => event.stopPropagation(),
+    onPointerEnter: () => onFocusNode(entry.node.path),
+    onPointerLeave: () => onFocusNode(null),
+    style: { left: `${entry.x}px`, top: `${entry.y}px` },
+  } as const;
+
+  if (isFolder && !isRoot) {
+    return (
+      <button
+        className="folder-relationship-card folder-relationship-layered-node"
+        {...interactionProps}
+        title={t(expanded
+          ? "workspace.relationships.collapseFolder"
+          : "workspace.relationships.expandFolder", { name: entry.node.name })}
+        type="button"
+        onClick={() => onToggleFolder(entry.node)}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className="folder-relationship-card folder-relationship-layered-node"
+      {...interactionProps}
+      title={entry.node.name}
+    >
+      {content}
+    </div>
+  );
+}
+
 function RelationshipCanvas({
   edges,
   expandedFolderPaths,
   fileIconTheme,
   graph,
+  lineFilters,
   manualOffsetsByNode,
   relationshipCountByNode,
   onManualOffsetsChange,
@@ -376,6 +1336,7 @@ function RelationshipCanvas({
   expandedFolderPaths: ReadonlySet<string>;
   fileIconTheme: FileIconThemeId;
   graph: FolderRelationshipGraph;
+  lineFilters: ContextMapLineFilterState;
   manualOffsetsByNode: ReadonlyMap<string, RelationshipLayoutOffset>;
   relationshipCountByNode: ReadonlyMap<string, number>;
   onManualOffsetsChange: (
@@ -400,6 +1361,12 @@ function RelationshipCanvas({
     y: 0,
     scale: 1,
   });
+  useContextMapWheelNavigation({
+    canvasRef,
+    centeredFocalPoint: false,
+    minimumScale: 0.35,
+    setViewportTransform,
+  });
   const [rootSceneLayout, setRootSceneLayout] = useState<RelationshipSceneLayout>(() => (
     buildFolderRelationshipSceneLayout({
       childrenByFolderPath: graph.childrenByFolderPath,
@@ -413,17 +1380,21 @@ function RelationshipCanvas({
   manualOffsetsRef.current = manualOffsetsByNode;
   const viewportScaleRef = useRef(viewportTransform.scale);
   viewportScaleRef.current = viewportTransform.scale;
+  const visibleEdges = useMemo(
+    () => edges.filter((edge) => isContextMapReferenceVisible(edge, lineFilters)),
+    [edges, lineFilters],
+  );
   const connectedNodePaths = useMemo(() => {
     const connected = new Set<string>();
     if (!focusedNodePath) return connected;
     connected.add(focusedNodePath);
-    for (const edge of edges) {
+    for (const edge of visibleEdges) {
       if (edge.sourceId !== focusedNodePath && edge.targetId !== focusedNodePath) continue;
       connected.add(edge.sourceId);
       connected.add(edge.targetId);
     }
     return connected;
-  }, [edges, focusedNodePath]);
+  }, [focusedNodePath, visibleEdges]);
 
   const updateSceneGeometry = useCallback(() => {
     const world = worldRef.current;
@@ -431,8 +1402,8 @@ function RelationshipCanvas({
     const worldBounds = world.getBoundingClientRect();
     const activeNodePath = dragSessionRef.current?.nodePath ?? null;
     const edgesToRoute = activeNodePath
-      ? edges.filter((edge) => isRelationshipEdgeAffectedByNode(edge, activeNodePath))
-      : edges;
+      ? visibleEdges.filter((edge) => isRelationshipEdgeAffectedByNode(edge, activeNodePath))
+      : visibleEdges;
     const routableEdges = edgesToRoute.flatMap((edge) => {
       const source = cardElementsRef.current.get(edge.sourceId);
       const target = cardElementsRef.current.get(edge.targetId);
@@ -483,7 +1454,7 @@ function RelationshipCanvas({
       return;
     }
     setLines(nextLines);
-  }, [edges]);
+  }, [visibleEdges]);
 
   const scheduleSceneGeometryUpdate = useCallback(() => {
     if (geometryFrameRef.current !== null) return;
@@ -518,7 +1489,7 @@ function RelationshipCanvas({
   }, [draggingNodePath, manualOffsetsByNode, rootSceneLayout, updateSceneGeometry]);
 
   useLayoutEffect(() => {
-    if (edges.length > 250) return undefined;
+    if (visibleEdges.length > 250) return undefined;
     const startTime = performance.now();
     const updateDuringLayoutTransition = (time: number): void => {
       updateSceneGeometry();
@@ -537,7 +1508,7 @@ function RelationshipCanvas({
         layoutAnimationFrameRef.current = null;
       }
     };
-  }, [edges.length, rootSceneLayout, updateSceneGeometry]);
+  }, [rootSceneLayout, updateSceneGeometry, visibleEdges.length]);
 
   useLayoutEffect(() => {
     setRootSceneLayout((current) => buildFolderRelationshipSceneLayout({
@@ -743,30 +1714,6 @@ function RelationshipCanvas({
     panSessionRef.current = null;
     setPanning(false);
   }, []);
-
-  const zoomCanvas = useCallback((event: WheelEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const canvasBounds = canvas.getBoundingClientRect();
-    const focalPoint = {
-      x: event.clientX - canvasBounds.left,
-      y: event.clientY - canvasBounds.top,
-    };
-    const zoomFactor = Math.exp(-event.deltaY * 0.0015);
-    setViewportTransform((current) => getZoomedRelationshipViewport(
-      current,
-      focalPoint,
-      current.scale * zoomFactor,
-    ));
-    event.preventDefault();
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return undefined;
-    canvas.addEventListener("wheel", zoomCanvas, { passive: false });
-    return () => canvas.removeEventListener("wheel", zoomCanvas);
-  }, [zoomCanvas]);
 
   const resetCanvasViewport = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     const target = event.target;
@@ -1180,4 +2127,67 @@ function getScopeName(scopePath: string | null): string {
   if (!scopePath) return "Workspace";
   const normalized = normalizePath(scopePath);
   return normalized.slice(normalized.lastIndexOf("/") + 1) || "Workspace";
+}
+
+function RadialLayoutIcon({ size }: Readonly<{ size: number }>) {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height={size}
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.5"
+      viewBox="0 0 16 16"
+      width={size}
+    >
+      <circle cx="8" cy="8" r="1.45" />
+      <path d="M8 6.55V3.7M9.28 8.72l2.5 1.45M6.72 8.72l-2.5 1.45" />
+      <circle cx="8" cy="2.45" r="1.15" />
+      <circle cx="13" cy="10.9" r="1.15" />
+      <circle cx="3" cy="10.9" r="1.15" />
+    </svg>
+  );
+}
+
+function CanvasLayoutIcon({ size }: Readonly<{ size: number }>) {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height={size}
+      stroke="currentColor"
+      strokeLinejoin="round"
+      strokeWidth="1.5"
+      viewBox="0 0 16 16"
+      width={size}
+    >
+      <rect x="2" y="2" width="4.5" height="4.5" rx="0.8" />
+      <rect x="9.5" y="2" width="4.5" height="4.5" rx="0.8" />
+      <rect x="2" y="9.5" width="4.5" height="4.5" rx="0.8" />
+      <rect x="9.5" y="9.5" width="4.5" height="4.5" rx="0.8" />
+    </svg>
+  );
+}
+
+function LayeredLayoutIcon({ size }: Readonly<{ size: number }>) {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height={size}
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.5"
+      viewBox="0 0 16 16"
+      width={size}
+    >
+      <rect x="6.25" y="1.5" width="3.5" height="3" rx="0.7" />
+      <path d="M8 4.5v3H3.5v2.25M8 7.5h4.5v2.25" />
+      <rect x="1.75" y="9.75" width="3.5" height="3" rx="0.7" />
+      <rect x="10.75" y="9.75" width="3.5" height="3" rx="0.7" />
+    </svg>
+  );
 }

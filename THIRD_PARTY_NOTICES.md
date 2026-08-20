@@ -1,5 +1,67 @@
 # Third-party notices
 
+## B00merang Windows-XP icon theme
+
+The Windows XP interface Style includes seven 128px toolbar assets and ten
+hand-tuned 16px Explorer folder/file assets from the
+`B00merang-Artwork/Windows-XP` icon theme at immutable commit
+`24e95ad2b12c55dd11883ee7066525527d944039`: `gtk-directory.png`,
+`dotNETconnectedtechnology.png`, `gnome-system.png`, `emblem-system.png`,
+`gnome-remote-desktop.png`, `utilities-terminal.png`, and `gnobots2.png`.
+The Explorer assets are the 16px `places/gtk-directory.png`,
+`status/stock_open.png`, and the `mimetypes` assets `gtk-file.png`, `html.png`,
+`gnome-mime-image.png`, `gnome-mime-audio.png`, `video-x-generic.png`,
+`application-pdf.png`, `zip.png`, and `application-x-executable.png`; their
+original PNG payloads are embedded without pixel modification in
+text-reviewable SVG containers. The assets are
+redistributed under the GNU General Public License, version 2. The complete
+license text is distributed at
+`src/styles/interfaces/windows-xp/assets/B00MERANG-WINDOWS-XP-GPL-2.0.txt`.
+Upstream source: https://github.com/B00merang-Artwork/Windows-XP
+
+## B00merang Windows-XP Luna caption buttons
+
+The Windows XP interface Style includes the normal, hover, and pressed 21x21
+minimize, maximize, and close caption-button assets from
+`B00merang-Project/Windows-XP` at immutable commit
+`7637830906823af40a3cd7e7079be753d8b7d679`. The source files are the
+`Windows XP Luna/metacity-1/minimize*.png`, `maximize*.png`, and `close*.png`
+state images. Their original PNG payloads are embedded without pixel
+modification in text-reviewable SVG containers and are restricted to the
+Windows XP Style Pack.
+
+The assets are redistributed under the GNU General Public License, version 3.
+The complete license text is distributed at
+`src/styles/interfaces/windows-xp/assets/B00MERANG-WINDOWS-XP-THEME-GPL-3.0.txt`.
+Upstream source: https://github.com/B00merang-Project/Windows-XP
+
+## Git official logomark
+
+The Windows XP interface Style includes the official orange Git logomark by
+Jason Long. The SVG is redistributed without modification; PuppyOne applies
+only a CSS drop shadow when it is painted in the toolbar. The mark is licensed
+under the Creative Commons Attribution 3.0 Unported License.
+Official source: https://git-scm.com/community/logos.html
+License: https://creativecommons.org/licenses/by/3.0/
+
+## GNOME gitg classic icon
+
+The Windows XP interface Style uses the 256px `gitg` application icon from
+the official GNOME gitg v0.3.3 tag. The unmodified PNG is redistributed under
+the GNU General Public License, version 2. The complete license text is at
+`src/styles/interfaces/windows-xp/assets/GITG-GPL-2.0.txt`.
+Upstream source: https://github.com/GNOME/gitg/blob/v0.3.3/data/icons/hicolor_apps_256x256_gitg.png
+
+## Crystal Clear configure icon
+
+The Windows XP interface Style uses the 128px `Action configure` icon from
+Everaldo Coelho's Crystal Clear icon set for Settings. The asset is
+redistributed without modification under the GNU Lesser General Public
+License, version 2.1 or later. The complete LGPL 2.1 text is distributed at
+`src/styles/interfaces/windows-xp/assets/CRYSTAL-CLEAR-LGPL-2.1.txt`.
+Icon source: https://www.iconarchive.com/show/crystal-clear-icons-by-everaldo/Action-configure-icon.html
+Icon-set archive and license record: https://commons.wikimedia.org/wiki/Crystal_Clear
+
 ## Integration product marks
 
 The Agent selector includes local marks solely to identify user-selected

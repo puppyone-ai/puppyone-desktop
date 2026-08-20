@@ -1,6 +1,5 @@
 import "./styles/cascade.css";
 import "./cloud-globals.css";
-import "@puppyone/shared-ui/shared-ui.css";
 import "./styles.css";
 
 import React from "react";
@@ -82,16 +81,18 @@ async function renderApplication() {
   } else if (window.location.hash === "#markdown-line-geometry-smoke") {
     const { MarkdownLineGeometrySmokeHarness } = await import("./performance/MarkdownLineGeometrySmokeHarness");
     surface = <MarkdownLineGeometrySmokeHarness />;
+  } else if (window.location.hash === "#appearance-visual-smoke") {
+    const { AppearanceVisualSmokeHarness } = await import(
+      "./features/appearance/AppearanceVisualSmokeHarness"
+    );
+    surface = <AppearanceVisualSmokeHarness />;
   } else {
     surface = (
-      <>
-        <ScrollbarActivity />
-        <TypographyCatalogProvider>
-          <FeatureFlagsProvider>
-            <App />
-          </FeatureFlagsProvider>
-        </TypographyCatalogProvider>
-      </>
+      <TypographyCatalogProvider>
+        <FeatureFlagsProvider>
+          <App />
+        </FeatureFlagsProvider>
+      </TypographyCatalogProvider>
     );
   }
 
@@ -104,6 +105,7 @@ async function renderApplication() {
         loadCatalog={localization.loadCatalog}
         client={localization.client}
       >
+        <ScrollbarActivity />
         {surface}
       </LocalizationProvider>
     </React.StrictMode>,

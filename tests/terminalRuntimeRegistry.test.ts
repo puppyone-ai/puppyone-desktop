@@ -65,14 +65,24 @@ function createRegistryHarness() {
     const runtime: TerminalRuntimeHandle = {
       activity: false,
       ready: false,
+      scrollbarState: {
+        visible: false,
+        canDecrement: false,
+        canIncrement: false,
+        position: 0,
+        viewportRatio: 1,
+      },
       applyAppearance: vi.fn(),
       dispose: vi.fn(),
       focus: vi.fn(),
       mount: vi.fn(),
+      scrollLines: vi.fn(),
+      scrollToRatio: vi.fn(),
       unmount: vi.fn(),
       setActive: vi.fn(),
       subscribeActivity: vi.fn(() => () => undefined),
       subscribeReady: vi.fn(() => () => undefined),
+      subscribeScrollbar: vi.fn(() => () => undefined),
       write: vi.fn(),
     };
     created.push(runtime);

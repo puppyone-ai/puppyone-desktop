@@ -10,6 +10,23 @@ const manifestPath = path.join(
   "src/features/appearance/interface-style-manifest.json",
 );
 const THEME_MODES = new Set(["system", "light", "dark"]);
+const STYLE_COMPONENT_KEYS = [
+  "shell",
+  "titlebar",
+  "navigation",
+  "locationBar",
+  "scrollbar",
+  "iconPack",
+];
+const STYLE_POLICY_KEYS = [
+  "themeMode",
+  "sidebarNavigationLayout",
+  "textSize",
+  "fileIconTheme",
+  "editorPresentation",
+];
+const STYLE_PROFILE_KEYS = ["family", "variant", "palette"];
+const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const checkOnly = process.argv.includes("--check");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 
@@ -56,9 +73,10 @@ if (staleOutputs.length > 0) {
 if (checkOnly) console.log("Interface style manifest and generated files are in sync.");
 
 function validateManifest(value) {
-  if (value?.version !== 1) fail("manifest version must be 1");
+  if (value?.version !== 3) fail("manifest version must be 3");
   if (!isNonEmptyString(value?.defaultStyle)) fail("defaultStyle must be a non-empty string");
   if (!isNonEmptyString(value?.storage?.interfaceStyle)) fail("storage.interfaceStyle is required");
+  if (!isNonEmptyString(value?.storage?.appearancePreferences)) fail("storage.appearancePreferences is required");
   if (!isNonEmptyString(value?.storage?.themeMode)) fail("storage.themeMode is required");
   if (!isNonEmptyString(value?.storage?.lightThemePreset)) fail("storage.lightThemePreset is required");
   if (!isNonEmptyString(value?.storage?.darkThemePreset)) fail("storage.darkThemePreset is required");
@@ -67,12 +85,18 @@ function validateManifest(value) {
 
   const ids = new Set();
   for (const style of value.styles) {
-    if (!isNonEmptyString(style?.id) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(style.id)) {
+    if (!isNonEmptyString(style?.id) || !ID_PATTERN.test(style.id)) {
       fail(`invalid style id: ${String(style?.id)}`);
     }
     if (ids.has(style.id)) fail(`duplicate style id: ${style.id}`);
     ids.add(style.id);
     if (!isNonEmptyString(style.labelKey)) fail(`${style.id}.labelKey is required`);
+    validateProfile(style);
+    if (!isNonEmptyString(style.tokenSet) || !ID_PATTERN.test(style.tokenSet)) {
+      fail(`${style.id}.tokenSet must be a stable kebab-case id`);
+    }
+    validateComposition(style);
+    validatePolicies(style);
 
     const palette = style.palette;
     if (palette?.kind === "fixed") {
@@ -104,8 +128,8 @@ function validateManifest(value) {
     }
 
     if (style.stylesheet !== null) {
-      if (!isNonEmptyString(style.stylesheet) || path.basename(style.stylesheet) !== style.stylesheet || !style.stylesheet.endsWith(".css")) {
-        fail(`${style.id}.stylesheet must be null or a CSS basename`);
+      if (!isNonEmptyString(style.stylesheet) || !/^[a-z0-9-]+(?:\/[a-z0-9-]+)*\.css$/.test(style.stylesheet)) {
+        fail(`${style.id}.stylesheet must be null or a relative kebab-case CSS path`);
       }
       const stylesheetPath = path.join(repoRoot, "src/styles", style.stylesheet);
       if (!existsSync(stylesheetPath)) fail(`${style.id}.stylesheet does not exist: ${style.stylesheet}`);
@@ -113,6 +137,78 @@ function validateManifest(value) {
   }
 
   if (!ids.has(value.defaultStyle)) fail("defaultStyle must reference a registered style");
+  const defaultStyle = value.styles.find((style) => style.id === value.defaultStyle);
+  if (defaultStyle?.stylesheet !== null) fail("The Default style must be a no-op baseline with stylesheet: null");
+}
+
+function validateProfile(style) {
+  if (!style.profile || typeof style.profile !== "object" || Array.isArray(style.profile)) {
+    fail(`${style.id}.profile is required`);
+  }
+  const unknown = Object.keys(style.profile).filter((key) => !STYLE_PROFILE_KEYS.includes(key));
+  if (unknown.length > 0) fail(`${style.id}.profile has unknown fields: ${unknown.join(", ")}`);
+  for (const key of STYLE_PROFILE_KEYS) {
+    const value = style.profile[key];
+    if (!isNonEmptyString(value) || !ID_PATTERN.test(value)) {
+      fail(`${style.id}.profile.${key} must be a stable kebab-case id`);
+    }
+  }
+}
+
+function validateComposition(style) {
+  if (!style.composition || typeof style.composition !== "object" || Array.isArray(style.composition)) {
+    fail(`${style.id}.composition is required`);
+  }
+  const unknown = Object.keys(style.composition).filter((key) => !STYLE_COMPONENT_KEYS.includes(key));
+  if (unknown.length > 0) fail(`${style.id}.composition has unknown fields: ${unknown.join(", ")}`);
+  for (const key of STYLE_COMPONENT_KEYS) {
+    const value = style.composition[key];
+    if (!isNonEmptyString(value) || !ID_PATTERN.test(value)) {
+      fail(`${style.id}.composition.${key} must be a stable kebab-case id`);
+    }
+  }
+}
+
+function validatePolicies(style) {
+  if (!style.policies || typeof style.policies !== "object" || Array.isArray(style.policies)) {
+    fail(`${style.id}.policies is required`);
+  }
+  const unknown = Object.keys(style.policies).filter((key) => !STYLE_POLICY_KEYS.includes(key));
+  if (unknown.length > 0) fail(`${style.id}.policies has unknown fields: ${unknown.join(", ")}`);
+  for (const key of STYLE_POLICY_KEYS) {
+    const policy = style.policies[key];
+    if (!policy || typeof policy !== "object" || Array.isArray(policy)) {
+      fail(`${style.id}.policies.${key} is required`);
+    }
+    if (policy.mode === "inherit") {
+      if (Object.keys(policy).some((field) => field !== "mode")) {
+        fail(`${style.id}.policies.${key} inherit policy cannot declare extra fields`);
+      }
+      continue;
+    }
+    if (policy.mode === "force") {
+      if (!isNonEmptyString(policy.value) || !isNonEmptyString(policy.reasonKey)) {
+        fail(`${style.id}.policies.${key} force policy requires value and reasonKey`);
+      }
+      continue;
+    }
+    if (policy.mode === "allow") {
+      if (!Array.isArray(policy.values) || policy.values.length === 0 || policy.values.some((value) => !isNonEmptyString(value))) {
+        fail(`${style.id}.policies.${key} allow policy requires string values`);
+      }
+      if (policy.default !== undefined && !policy.values.includes(policy.default)) {
+        fail(`${style.id}.policies.${key} default must be allowed`);
+      }
+      continue;
+    }
+    if (policy.mode === "unavailable") {
+      if (!isNonEmptyString(policy.reasonKey)) {
+        fail(`${style.id}.policies.${key} unavailable policy requires reasonKey`);
+      }
+      continue;
+    }
+    fail(`${style.id}.policies.${key} has unsupported mode ${String(policy.mode)}`);
+  }
 }
 
 function validatePresetFirstPaint(style, mode) {
@@ -167,7 +263,7 @@ function validateSkinContract(value) {
   for (const style of value.styles) {
     if (style.stylesheet === null) continue;
     const stylesheetPath = path.join(repoRoot, "src/styles", style.stylesheet);
-    const source = readFileSync(stylesheetPath, "utf8");
+    const source = readStylePackSource(stylesheetPath);
     if (!source.includes(`:root[data-interface-style="${style.id}"]`)) {
       fail(`${style.stylesheet} does not scope itself to ${style.id}`);
     }
@@ -176,6 +272,24 @@ function validateSkinContract(value) {
       fail(`${style.stylesheet} is missing contract tokens: ${missingTokens.join(", ")}`);
     }
   }
+}
+
+function readStylePackSource(stylesheetPath, visited = new Set()) {
+  const resolvedPath = path.resolve(stylesheetPath);
+  const stylesRoot = path.resolve(repoRoot, "src/styles");
+  if (resolvedPath !== stylesRoot && !resolvedPath.startsWith(`${stylesRoot}${path.sep}`)) {
+    fail(`style import escapes src/styles: ${stylesheetPath}`);
+  }
+  if (visited.has(resolvedPath)) fail(`circular style import: ${path.relative(repoRoot, resolvedPath)}`);
+  visited.add(resolvedPath);
+  const source = readFileSync(resolvedPath, "utf8");
+  const imported = [...source.matchAll(/@import\s+["']([^"']+)["']\s*;/g)].map((match) => {
+    const importedPath = path.resolve(path.dirname(resolvedPath), match[1]);
+    if (!existsSync(importedPath)) fail(`style import does not exist: ${match[1]}`);
+    return readStylePackSource(importedPath, visited);
+  });
+  visited.delete(resolvedPath);
+  return [source, ...imported].join("\n");
 }
 
 function renderTypeScriptManifest(value) {
@@ -210,7 +324,7 @@ function renderStylesheetEntry(value) {
   ))];
   return [
     "/* This file is generated by scripts/generate-interface-styles.mjs. */",
-    ...imports.map((stylesheet) => `@import "./${stylesheet}";`),
+    ...imports.map((stylesheet) => `@import "./${stylesheet}" layer(interface-style);`),
     "",
   ].join("\n");
 }

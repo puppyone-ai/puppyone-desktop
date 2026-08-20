@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Terminal, type LucideIcon } from "lucide-react";
+import { SquareTerminal, Terminal, type LucideIcon } from "lucide-react";
 import type { RightSidebarToolId, TitlebarActionId } from "../../preferences";
 import type { MessageFormatter } from "@puppyone/localization";
 
@@ -14,6 +14,7 @@ export type HeaderElementDefinition = {
 
 export type HeaderElementRenderContext = {
   t: MessageFormatter;
+  placement?: "titlebar" | "toolbar";
   terminal: {
     enabled: boolean;
     onToggle: () => void;
@@ -24,23 +25,44 @@ export type HeaderElementRenderContext = {
 export const HEADER_ELEMENT_DEFINITIONS: readonly HeaderElementDefinition[] = [
   {
     id: "terminal",
-    label: "Terminal",
+    label: "Agent",
     icon: Terminal,
     linkedRightSidebarToolId: "terminal",
     isAvailable: (context) => context.terminal.enabled,
     render: (context) => {
       const terminal = context.terminal;
-      const toggleLabel = context.t(terminal.sidebarOpen ? "shell.titlebar.hideTerminal" : "shell.titlebar.showTerminal");
+      const toolbarPlacement = context.placement === "toolbar";
+      const TerminalIcon = toolbarPlacement ? SquareTerminal : Terminal;
+      const toggleLabel = toolbarPlacement
+        ? context.t("agent.name")
+        : context.t(terminal.sidebarOpen ? "shell.titlebar.hideTerminal" : "shell.titlebar.showTerminal");
       return (
         <button
-          className="desktop-titlebar-action desktop-titlebar-terminal"
+          className={toolbarPlacement
+            ? "desktop-shell-toolbar-button desktop-shell-toolbar-terminal"
+            : "desktop-titlebar-action desktop-titlebar-terminal"}
           type="button"
           title={toggleLabel}
           aria-label={toggleLabel}
           aria-pressed={terminal.sidebarOpen}
+          data-toolbar-action={toolbarPlacement ? "terminal" : undefined}
           onClick={terminal.onToggle}
         >
-          <Terminal size={15} strokeWidth={1.8} />
+          {toolbarPlacement ? (
+            <i
+              className="desktop-shell-toolbar-button-icon"
+              aria-hidden="true"
+            >
+              <TerminalIcon size={19} strokeWidth={1.8} />
+            </i>
+          ) : (
+            <TerminalIcon size={15} strokeWidth={1.8} />
+          )}
+          {toolbarPlacement && (
+            <span className="desktop-shell-toolbar-button-label">
+              {context.t("agent.name")}
+            </span>
+          )}
         </button>
       );
     },

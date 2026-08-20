@@ -1,0 +1,7 @@
+:root[data-interface-style="windows-xp"][data-editor-presentation="follow-interface"]
+  .po-viewer-surface-boundary[data-viewer-surface-family="code"] {
+  --po-editor-bg: #ffffff;
+  --po-jsoneditor-bg: #ffffff;
+  --po-jsoneditor-toolbar-bg: #ece9d8;
+  --po-editor-line: #d4d0c8;
+}

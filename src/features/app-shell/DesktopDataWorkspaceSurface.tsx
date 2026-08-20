@@ -42,6 +42,7 @@ import {
   desktopAgentActivityStore,
   toWorkspaceRelativePath,
 } from "../desktop-agent-presence";
+import { DesktopShellNavigationToolbarPortal } from "./DesktopShellAccessoryContext";
 
 type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 
@@ -71,6 +72,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
     onNavigate: (view: DesktopView) => void;
     onOpenSettings: () => void;
   };
+  navigationComposition: string;
   onActiveDataPathChange: (
     path: string | null,
     node?: DataNode | null,
@@ -101,6 +103,7 @@ export function DesktopDataWorkspaceSurface({
   fileOperationNotice,
   minimalMode,
   navigation,
+  navigationComposition,
   onActiveDataNodeChange,
   onResourceMove,
   onActiveDataPathChange,
@@ -142,6 +145,17 @@ export function DesktopDataWorkspaceSurface({
     onNavigate: navigation.onNavigate,
     onOpenSettings: navigation.onOpenSettings,
   } as const;
+  const shellHostedTopNavigation = !minimalMode
+    && navigationComposition === "sidebar-top-toolbar"
+    && preferences.sidebarNavigationPlacement === "top";
+  const topNavigation = !minimalMode && preferences.sidebarNavigationPlacement === "top" ? (
+    <DesktopSidebarTopNavigation
+      {...navigationCommon}
+      orientation={preferences.sidebarNavigationOrientation}
+      shellToolbar={shellHostedTopNavigation}
+      useToolLabels={shellHostedTopNavigation}
+    />
+  ) : null;
 
   return (
     <div
@@ -149,6 +163,11 @@ export function DesktopDataWorkspaceSurface({
       data-minimal-mode={minimalMode ? "true" : undefined}
       data-sidebar-navigation-placement={minimalMode ? undefined : preferences.sidebarNavigationPlacement}
     >
+      {shellHostedTopNavigation && topNavigation && (
+        <DesktopShellNavigationToolbarPortal>
+          {topNavigation}
+        </DesktopShellNavigationToolbarPortal>
+      )}
       {workspaceSurfaceError && (
         <div className="desktop-workspace-surface-alert" role="status">{workspaceSurfaceError}</div>
       )}
@@ -234,13 +253,8 @@ export function DesktopDataWorkspaceSurface({
             </button>
           </div>
         )}
-        showExplorerToolbar={!minimalMode && preferences.sidebarNavigationPlacement === "top"}
-        explorerToolbarSlot={!minimalMode && preferences.sidebarNavigationPlacement === "top" ? (
-          <DesktopSidebarTopNavigation
-            {...navigationCommon}
-            orientation={preferences.sidebarNavigationOrientation}
-          />
-        ) : undefined}
+        showExplorerToolbar={!shellHostedTopNavigation && Boolean(topNavigation)}
+        explorerToolbarSlot={shellHostedTopNavigation ? undefined : (topNavigation ?? undefined)}
         explorerRailSlot={!minimalMode && preferences.sidebarNavigationPlacement === "left" ? (
           <DesktopSidebarRailNavigation {...navigationCommon} />
         ) : undefined}

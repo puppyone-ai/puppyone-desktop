@@ -3,6 +3,8 @@ import type { DataNode } from "../../../core/types";
 import {
   buildFolderRelationshipLayoutZones,
   buildFolderRelationshipSceneLayout,
+  buildLayeredRelationshipSceneLayout,
+  buildRadialRelationshipSceneLayout,
   getExpandedFolderPreferredWidth,
   getDraggedRelationshipOffset,
   getFolderRelationshipLayoutOffset,
@@ -174,6 +176,100 @@ describe("folder relationship layout", () => {
 
     expect(layout.positions.get("civil")).toEqual({ x: 84, y: 92 });
   });
+
+  it("places the visible file hierarchy on deterministic concentric rings", () => {
+    const root = node("", "folder");
+    const layout = buildRadialRelationshipSceneLayout({
+      childrenByFolderPath: new Map([
+        ["src", [node("src/editor", "folder"), node("src/index.ts", "file")]],
+        ["src/editor", [node("src/editor/view.tsx", "file")]],
+      ]),
+      expandedFolderPaths: new Set(["src", "src/editor"]),
+      root,
+      rootNodes: [node("src", "folder"), node("README.md", "file")],
+    });
+
+    expect(layout.nodes.map((entry) => entry.node.path)).toEqual([
+      "",
+      "src",
+      "src/editor",
+      "src/editor/view.tsx",
+      "src/index.ts",
+      "README.md",
+    ]);
+    expect(layout.ringRadii).toHaveLength(3);
+    expect(layout.ringRadii[1]).toBeGreaterThan(layout.ringRadii[0] ?? 0);
+    expect(layout.positions.get("src")?.radius).toBe(layout.ringRadii[0]);
+    expect(layout.positions.get("src/editor/view.tsx")?.radius).toBe(layout.ringRadii[2]);
+    expect(layout.hierarchyEdges).toContainEqual({
+      sourceId: "src/editor",
+      targetId: "src/editor/view.tsx",
+    });
+  });
+
+  it("keeps collapsed folder descendants out of the radial scene", () => {
+    const layout = buildRadialRelationshipSceneLayout({
+      childrenByFolderPath: new Map([
+        ["src", [node("src/index.ts", "file")]],
+      ]),
+      expandedFolderPaths: new Set(),
+      root: node("", "folder"),
+      rootNodes: [node("src", "folder")],
+    });
+
+    expect(layout.nodes.map((entry) => entry.node.path)).toEqual(["", "src"]);
+    expect(layout.ringRadii).toHaveLength(1);
+  });
+
+  it("places visible hierarchy depth on y and subtree width on x", () => {
+    const layout = buildLayeredRelationshipSceneLayout({
+      childrenByFolderPath: new Map([
+        ["src", [node("src/editor", "folder"), node("src/index.ts", "file")]],
+        ["src/editor", [node("src/editor/view.tsx", "file")]],
+      ]),
+      expandedFolderPaths: new Set(["src", "src/editor"]),
+      root: node("", "folder"),
+      rootNodes: [node("src", "folder"), node("README.md", "file")],
+    });
+
+    expect(layout.nodes.map((entry) => entry.node.path)).toEqual([
+      "",
+      "src",
+      "src/editor",
+      "src/editor/view.tsx",
+      "src/index.ts",
+      "README.md",
+    ]);
+    expect(layout.positions.get("src")?.y).toBe(layout.positions.get("README.md")?.y);
+    expect(layout.positions.get("src/editor")?.y).toBeGreaterThan(
+      layout.positions.get("src")?.y ?? 0,
+    );
+    expect(layout.positions.get("src/editor/view.tsx")?.y).toBeGreaterThan(
+      layout.positions.get("src/editor")?.y ?? 0,
+    );
+    expect(layout.positions.get("src")?.x).toBeLessThan(
+      layout.positions.get("README.md")?.x ?? 0,
+    );
+    expect(layout.anchor).toEqual({
+      x: layout.positions.get("")?.x,
+      y: layout.positions.get("")?.y,
+    });
+  });
+
+  it("keeps collapsed descendants out of the layered tree", () => {
+    const layout = buildLayeredRelationshipSceneLayout({
+      childrenByFolderPath: new Map([
+        ["src", [node("src/index.ts", "file")]],
+      ]),
+      expandedFolderPaths: new Set(),
+      root: node("", "folder"),
+      rootNodes: [node("src", "folder")],
+    });
+
+    expect(layout.nodes.map((entry) => entry.node.path)).toEqual(["", "src"]);
+    expect(layout.positions.get("src")?.y).toBeGreaterThan(layout.positions.get("")?.y ?? 0);
+  });
+
 });
 
 function node(path: string, type: DataNode["type"]): DataNode {

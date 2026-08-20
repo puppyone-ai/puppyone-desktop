@@ -7,6 +7,234 @@
   background: var(--po-canvas);
 }
 
+.desktop-shell-navigation-toolbar-host {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.desktop-shell-navigation-toolbar-host:empty {
+  display: none;
+}
+
+.desktop-shell-location-bar-host {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.desktop-shell-location-bar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+}
+
+.desktop-shell-location-bar-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.desktop-shell-location-bar-field {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+}
+
+.desktop-shell-location-bar-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  font-style: normal;
+  line-height: 0;
+}
+
+.desktop-shell-location-bar-value {
+  box-sizing: border-box;
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.desktop-shell-location-bar-dropdown,
+.desktop-shell-location-bar-go,
+.desktop-shell-location-bar-go-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Stable Shell-toolbar composition contract. Portaled navigation stops being
+ * a padded Sidebar surface once the Shell owns it; editors and Viewer
+ * internals never participate in this contract. */
+.desktop-shell-navigation-toolbar-host
+  > .desktop-shell-toolbar-section[data-shell-toolbar-section="navigation"][data-placement="top"] {
+  order: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.desktop-shell-navigation-toolbar-host
+  > .desktop-shell-toolbar-section[data-shell-toolbar-section="actions"] {
+  order: 1;
+}
+
+.desktop-shell-navigation-toolbar-host
+  > .desktop-shell-toolbar-section[data-shell-toolbar-section]
+  .desktop-shell-toolbar-button {
+  position: relative;
+  appearance: none;
+  display: inline-flex;
+  box-sizing: border-box;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 0;
+  text-align: start;
+}
+
+.desktop-shell-navigation-toolbar-host
+  > .desktop-shell-toolbar-section[data-shell-toolbar-section]
+  .desktop-shell-toolbar-button
+  .desktop-shell-toolbar-button-icon {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  font-style: normal;
+  line-height: 0;
+}
+
+.desktop-shell-navigation-toolbar-host
+  > .desktop-shell-toolbar-section[data-shell-toolbar-section]
+  .desktop-shell-toolbar-button
+  .desktop-shell-toolbar-button-label {
+  position: static;
+  display: block;
+  width: auto;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: nowrap;
+  border: 0;
+}
+
+.desktop-shell-toolbar-menu-wrap {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  overflow: visible;
+}
+
+/* Chromium does not materialize scrollbar-button pseudo-elements on every
+ * platform. Historical arrow controls therefore portal into the scrollbar
+ * owner's immediate pane. The pane is the containing block, while the low
+ * local z-index keeps every menu/overlay layer above these controls. */
+[data-po-scrollbar-control-host-positioned="true"] {
+  position: relative;
+}
+
+.po-classic-scrollbar-controls {
+  position: absolute;
+  z-index: 4;
+  display: none;
+  overflow: hidden;
+  contain: layout paint style;
+  pointer-events: none;
+}
+
+.po-classic-scrollbar-controls[data-visible="true"] {
+  display: block;
+}
+
+.po-classic-scrollbar-button {
+  position: absolute;
+  display: block;
+  box-sizing: border-box;
+  padding: 0;
+  appearance: none;
+  border: var(--interface-scrollbar-button-border, 0);
+  border-radius: 0;
+  background-color: var(--interface-scrollbar-button-background-color, transparent);
+  background-position: center, 0 0;
+  background-repeat: no-repeat, repeat;
+  background-size: var(--interface-directional-arrow-size, 7px) var(--interface-directional-arrow-size, 7px), auto;
+  box-shadow: var(--interface-scrollbar-button-box-shadow, none);
+  pointer-events: auto;
+}
+
+.po-classic-scrollbar-controls[data-scrollbar-orientation="vertical"]
+  .po-classic-scrollbar-button {
+  inset-inline-end: 0;
+  width: 100%;
+  height: var(--po-classic-scrollbar-size, 17px);
+}
+
+.po-classic-scrollbar-controls[data-scrollbar-orientation="vertical"]
+  .po-classic-scrollbar-button.decrement {
+  inset-block-start: 0;
+  background-image: var(--interface-scrollbar-button-up-image, none),
+    var(--interface-scrollbar-button-background-image, none);
+}
+
+.po-classic-scrollbar-controls[data-scrollbar-orientation="vertical"]
+  .po-classic-scrollbar-button.increment {
+  inset-block-end: 0;
+  background-image: var(--interface-scrollbar-button-down-image, none),
+    var(--interface-scrollbar-button-background-image, none);
+}
+
+.po-classic-scrollbar-controls[data-scrollbar-orientation="horizontal"]
+  .po-classic-scrollbar-button {
+  inset-block-end: 0;
+  width: var(--po-classic-scrollbar-size, 17px);
+  height: 100%;
+}
+
+.po-classic-scrollbar-controls[data-scrollbar-orientation="horizontal"]
+  .po-classic-scrollbar-button.decrement {
+  left: 0;
+  background-image: var(--interface-scrollbar-button-left-image, none),
+    var(--interface-scrollbar-button-background-image-horizontal, none);
+}
+
+.po-classic-scrollbar-controls[data-scrollbar-orientation="horizontal"]
+  .po-classic-scrollbar-button.increment {
+  right: 0;
+  background-image: var(--interface-scrollbar-button-right-image, none),
+    var(--interface-scrollbar-button-background-image-horizontal, none);
+}
+
+.po-classic-scrollbar-button:hover:not(:disabled) {
+  border-color: var(--interface-scrollbar-button-hover-border-color, transparent);
+  background-color: var(--interface-scrollbar-button-hover-background-color, transparent);
+}
+
+.po-classic-scrollbar-button:active:not(:disabled) {
+  filter: brightness(0.97);
+  transform: translate(1px, 1px);
+}
+
+.po-classic-scrollbar-button:disabled {
+  filter: saturate(0.45) brightness(1.03);
+}
+
 .desktop-rail {
   position: relative;
   z-index: 20;
