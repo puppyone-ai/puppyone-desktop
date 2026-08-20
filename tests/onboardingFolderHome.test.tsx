@@ -35,6 +35,18 @@ afterEach(() => {
 });
 
 describe("project folder home", () => {
+  it("expands the right sidebar when a workspace becomes active", () => {
+    const appSource = readFileSync(`${process.cwd()}/src/App.tsx`, "utf8");
+    const activationStart = appSource.indexOf("onWorkspaceActivated: useCallback");
+    const activationEnd = appSource.indexOf("onWorkspaceCleared:", activationStart);
+
+    expect(activationStart).toBeGreaterThanOrEqual(0);
+    expect(activationEnd).toBeGreaterThan(activationStart);
+    expect(appSource.slice(activationStart, activationEnd)).toContain(
+      "setRightSidebarOpen(true)",
+    );
+  });
+
   it("uses editor menu rows inside one padded developer-panel frame", () => {
     const css = readFileSync(`${process.cwd()}/src/styles/onboarding.css`, "utf8");
     const container = renderHome({
