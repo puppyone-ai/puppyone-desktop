@@ -75,7 +75,6 @@
     width var(--desktop-terminal-tab-activation-motion) cubic-bezier(0.2, 0, 0, 1),
     border-color 120ms ease,
     background-color 120ms ease,
-    box-shadow 120ms ease,
     color 120ms ease;
 }
 
@@ -87,7 +86,6 @@
   border-color: var(--desktop-terminal-tab-active-border, var(--po-border));
   background: var(--desktop-terminal-tab-active-background, var(--po-control));
   color: var(--desktop-terminal-tab-active-color, var(--po-text));
-  box-shadow: inset 0 -2px 0 var(--desktop-terminal-tab-active-indicator, var(--po-accent));
 }
 
 .desktop-terminal-tab-select {

@@ -242,9 +242,7 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(headerCss).toContain(
       "background: var(--desktop-terminal-tab-active-background, var(--po-control));",
     );
-    expect(headerCss).toContain(
-      "box-shadow: inset 0 -2px 0 var(--desktop-terminal-tab-active-indicator, var(--po-accent));",
-    );
+    expect(headerCss).not.toContain("--desktop-terminal-tab-active-indicator");
     expect(headerCss).not.toContain(".desktop-terminal-tab::after");
     expect(headerCss).not.toContain(".desktop-terminal-tab-shell");
     expect(headerLayout).toContain("tabBounds");
@@ -283,7 +281,7 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(headerCss).not.toContain(".desktop-terminal-subheader::after");
     expect(xpTokensCss).toContain("--desktop-terminal-tab-bar-background: #f5f4ee;");
     expect(xpTokensCss).toContain("--desktop-terminal-tab-active-background: #ddd9cf;");
-    expect(xpTokensCss).toContain("--desktop-terminal-tab-active-indicator: #e88a16;");
+    expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-indicator");
     expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-background: #1059c9;");
     expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-background: #316ac5;");
     expect(css).not.toContain(".desktop-terminal-subheader");
