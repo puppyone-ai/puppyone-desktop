@@ -9,6 +9,7 @@ import {
   ExcelSpreadsheetGlyph,
   PresentationDocumentGlyph,
   SpreadsheetGridGlyph,
+  TreasureMapGlyph,
   WordDocumentGlyph,
   WorkflowGlyph,
 } from "../shared/semanticGlyphs";
@@ -16,7 +17,7 @@ import {
 export const materialGlyphRenderers = {
   folder: renderMaterialCompactFolderGlyph,
   app: AppGlyph,
-  "context-map": WorkflowGlyph,
+  "context-map": TreasureMapGlyph,
   workflow: WorkflowGlyph,
   markdown: renderMaterialLinesDocumentGlyph,
   json: renderMaterialJsonDocumentGlyph,

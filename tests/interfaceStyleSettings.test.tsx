@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { INTERFACE_STYLES, type InterfaceStyle } from "../src/features/appearance/interfaceStyles";
+import { resolveAppearance } from "../src/features/appearance/resolveAppearance";
 import { InterfacePaletteSettings } from "../src/features/settings/main/InterfacePaletteSettings";
 import { InterfaceStyleSetting } from "../src/features/settings/main/InterfaceStyleSetting";
 import { withTestLocalization } from "./testLocalization";
@@ -32,12 +33,11 @@ describe("Interface style settings", () => {
     expect(buttons.map((button) => button.textContent)).toEqual([
       "Default",
       "Windows XP",
-      "macOS Tiger",
     ]);
     expect(buttons[0]?.getAttribute("aria-pressed")).toBe("true");
 
-    act(() => buttons[2]?.click());
-    expect(onChange).toHaveBeenCalledWith("macos-tiger");
+    act(() => buttons[1]?.click());
+    expect(onChange).toHaveBeenCalledWith("windows-xp");
   });
 
   it("shows color controls only when the selected style declares an adaptive palette", () => {
@@ -68,10 +68,18 @@ function mount(element: React.ReactElement) {
 }
 
 function renderPalette(host: HTMLElement, interfaceStyle: InterfaceStyle) {
+  const decision = resolveAppearance({
+    interfaceStyle,
+    themeMode: "system",
+    sidebarNavigationLayout: "bottom-horizontal",
+    textSize: "medium",
+    fileIconTheme: "vscode",
+    editorPresentation: "follow-interface",
+  }).decisions.themeMode;
   act(() => root?.render(withTestLocalization(
     <InterfacePaletteSettings
       interfaceStyle={interfaceStyle}
-      themeMode="system"
+      decision={decision}
       lightThemePreset="neutral"
       darkThemePreset="default"
       onThemeModeChange={() => undefined}

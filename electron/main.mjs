@@ -84,7 +84,14 @@ import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
 import { createDesktopLocaleService } from "./main/localization/desktop-locale-service.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
-import { DESKTOP_WINDOW_MIN_WIDTH } from "./main/window-layout-contract.mjs";
+import {
+  DESKTOP_WINDOW_MIN_HEIGHT,
+  DESKTOP_WINDOW_MIN_WIDTH,
+} from "./main/window-layout-contract.mjs";
+import {
+  DEFAULT_MACOS_WINDOW_BUTTON_POSITION,
+  reapplyWindowChromeProfile,
+} from "./main/window-chrome-profile.mjs";
 import { DEFAULT_INTERFACE_STYLE_FIRST_PAINT } from "./main/interface-style-first-paint.generated.mjs";
 import { createGitOperationCoordinator } from "./main/git-operation-coordinator.mjs";
 import { createCloudPublishCoordinator } from "./main/cloud-publish-coordinator.mjs";
@@ -145,7 +152,7 @@ const macTitlebarOptions = process.platform === "darwin"
   ? {
       titleBarStyle: "hiddenInset",
       titleBarOverlay: true,
-      trafficLightPosition: { x: 13, y: 12 },
+      trafficLightPosition: DEFAULT_MACOS_WINDOW_BUTTON_POSITION,
     }
   : {
       titleBarStyle: "default",
@@ -303,7 +310,7 @@ async function createWindow(options = {}) {
     width: 1280,
     height: 840,
     minWidth: DESKTOP_WINDOW_MIN_WIDTH,
-    minHeight: 640,
+    minHeight: DESKTOP_WINDOW_MIN_HEIGHT,
     center: true,
     show: false,
     title: appName,
@@ -338,6 +345,7 @@ async function createWindow(options = {}) {
   lastFocusedWindowId = webContentsId;
 
   window.on("focus", () => {
+    reapplyNativeWindowChrome(window);
     lastFocusedWindowId = webContentsId;
     const state = windowStateById.get(webContentsId);
     if (state) state.lastFocusedAt = Date.now();
@@ -364,6 +372,15 @@ async function createWindow(options = {}) {
   window.on("leave-full-screen", () => {
     window.setTitle(resolveWindowTitle(window));
     publishWindowChromeState(false);
+    reapplyNativeWindowChrome(window);
+  });
+
+  window.on("show", () => {
+    reapplyNativeWindowChrome(window);
+  });
+
+  window.on("restore", () => {
+    reapplyNativeWindowChrome(window);
   });
 
   window.once("ready-to-show", () => {
@@ -467,6 +484,17 @@ function revealWindow(window) {
   if (process.platform === "darwin") {
     app.focus({ steal: true });
   }
+}
+
+function reapplyNativeWindowChrome(window) {
+  if (process.platform !== "darwin" || !window || window.isDestroyed()) return;
+  reapplyWindowChromeProfile(window);
+  // AppKit can recreate the traffic-light views after emitting a window
+  // lifecycle event. A second pass on the next main-loop turn keeps the
+  // manifest-owned profile authoritative after that native work completes.
+  setImmediate(() => {
+    if (!window.isDestroyed()) reapplyWindowChromeProfile(window);
+  });
 }
 
 function revealLastFocusedWindow() {

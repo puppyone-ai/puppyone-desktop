@@ -1,3 +1,8 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@layer reset {
+  @tailwind base;
+}
+
+@layer features {
+  @tailwind components;
+  @tailwind utilities;
+}

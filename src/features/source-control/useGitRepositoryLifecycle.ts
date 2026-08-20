@@ -9,10 +9,18 @@ import {
 } from "../../lib/localFiles";
 import type { GitBranchGraphSnapshot, GitStatusSnapshot } from "../../types/electron";
 import {
+  createGitRefreshReason,
   createGitRefreshScheduler,
   type GitRefreshReason,
   type GitRepositoryContext,
 } from "./gitRefreshScheduler";
+import {
+  getGitHubRemoteFetchTarget,
+  GITHUB_REMOTE_FETCH_FOCUS_STALE_MS,
+  GITHUB_REMOTE_FETCH_INTERVAL_MS,
+  GITHUB_REMOTE_FETCH_MIN_GAP_MS,
+  shouldFetchGitHubRemote,
+} from "./githubRemoteRefreshPolicy";
 import {
   createRepositoryRefreshReason,
   mergePreservedHistory,
@@ -21,17 +29,21 @@ import {
 
 type UseGitRepositoryLifecycleOptions = {
   workspace: Workspace | null;
+  remoteUpdatesActive: boolean;
   onWorkspaceContentChanged: (paths?: WorkspaceContentChange["paths"] | string) => void;
 };
 
 export function useGitRepositoryLifecycle({
   workspace,
+  remoteUpdatesActive,
   onWorkspaceContentChanged,
 }: UseGitRepositoryLifecycleOptions) {
   const workspacePathRef = useRef<string | null>(null);
   const gitStatusRef = useRef<GitStatusSnapshot | null>(null);
   const schedulerRef = useRef<ReturnType<typeof createGitRefreshScheduler<GitStatusSnapshot>> | null>(null);
   const historyEpochRef = useRef(0);
+  const fetchRequestsRef = useRef(new Map<string, Promise<boolean>>());
+  const lastRemoteFetchAttemptRef = useRef(new Map<string, number>());
   const [gitStatus, setGitStatus] = useState<GitStatusSnapshot | null>(null);
   const [gitStatusPath, setGitStatusPath] = useState<string | null>(null);
   const [gitStatusLoading, setGitStatusLoading] = useState(false);
@@ -162,18 +174,107 @@ export function useGitRepositoryLifecycle({
     });
   }, [ensureScheduler]);
 
-  const refreshGitStatusWithFetch = useCallback(async () => {
+  const refreshGitStatusWithFetch = useCallback(async (options: {
+    remoteName?: string | null;
+    silent?: boolean;
+    detail?: string;
+  } = {}) => {
     if (!workspace) return;
     const context = captureGitRepositoryContext(workspace.path);
     if (!context) return;
-    setGitStatusError(null);
-    try {
-      const nextStatus = await fetchWorkspaceGit(context.rootPath);
-      applyGitStatus(nextStatus, context, createRepositoryRefreshReason("fetch", "mutation"));
-    } catch (error) {
-      reportGitStatusError(context, error);
-    }
+    const remoteName = options.remoteName?.trim() || null;
+    const requestKey = `${context.rootEpoch}:${context.rootPath}:${remoteName ?? "all"}`;
+    const existing = fetchRequestsRef.current.get(requestKey);
+    if (existing) return existing;
+
+    if (!options.silent) setGitStatusError(null);
+    const request = (async () => {
+      try {
+        const nextStatus = await fetchWorkspaceGit(context.rootPath, { remoteName });
+        return applyGitStatus(
+          nextStatus,
+          context,
+          createGitRefreshReason("refs", "mutation", options.detail ?? "fetch"),
+        );
+      } catch (error) {
+        if (options.silent) {
+          console.info("[git-remote-refresh] fetch skipped", {
+            rootPath: context.rootPath,
+            remoteName,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        } else {
+          reportGitStatusError(context, error);
+        }
+        return false;
+      } finally {
+        fetchRequestsRef.current.delete(requestKey);
+      }
+    })();
+    fetchRequestsRef.current.set(requestKey, request);
+    return request;
   }, [applyGitStatus, captureGitRepositoryContext, reportGitStatusError, workspace]);
+
+  const githubFetchTarget = getGitHubRemoteFetchTarget(activeGitStatus);
+  const githubFetchTargetKey = githubFetchTarget?.key ?? null;
+
+  useEffect(() => {
+    const rootPath = workspace?.path ?? null;
+    const remoteName = githubFetchTarget?.remoteName ?? null;
+    if (!rootPath || !remoteName) return undefined;
+
+    const fetchIdentity = `${rootPath}:${remoteName}`;
+    const isForeground = () => {
+      const visible = typeof document === "undefined" || document.visibilityState === "visible";
+      const focused = typeof document === "undefined"
+        || typeof document.hasFocus !== "function"
+        || document.hasFocus();
+      return visible && focused;
+    };
+    const isOnline = () => typeof navigator === "undefined" || navigator.onLine !== false;
+    const requestFetch = (detail: string, minimumGapMs: number) => {
+      const now = Date.now();
+      const lastAttemptAt = lastRemoteFetchAttemptRef.current.get(fetchIdentity) ?? null;
+      if (!shouldFetchGitHubRemote({
+        focused: isForeground(),
+        online: isOnline(),
+        now,
+        lastAttemptAt,
+        minimumGapMs,
+      })) return;
+      lastRemoteFetchAttemptRef.current.set(fetchIdentity, now);
+      void refreshGitStatusWithFetch({
+        remoteName,
+        silent: true,
+        detail,
+      });
+    };
+
+    requestFetch(
+      remoteUpdatesActive ? "github-sidebar" : "github-target",
+      GITHUB_REMOTE_FETCH_MIN_GAP_MS,
+    );
+
+    const interval = window.setInterval(() => {
+      requestFetch("github-interval", GITHUB_REMOTE_FETCH_INTERVAL_MS);
+    }, GITHUB_REMOTE_FETCH_INTERVAL_MS);
+    const handleFocus = () => requestFetch("github-focus", GITHUB_REMOTE_FETCH_FOCUS_STALE_MS);
+    const handleOnline = () => requestFetch("github-online", GITHUB_REMOTE_FETCH_MIN_GAP_MS);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [
+    githubFetchTarget?.remoteName,
+    githubFetchTargetKey,
+    refreshGitStatusWithFetch,
+    remoteUpdatesActive,
+    workspace?.path,
+  ]);
 
   useEffect(() => {
     workspacePathRef.current = workspace?.path ?? null;

@@ -32,9 +32,9 @@
   gap: 1px;
   padding: 2px;
   border: 1px solid var(--po-border);
-  border-radius: 6px;
+  border-radius: var(--po-surface-editor-mode-radius, 6px);
   background: var(--po-control);
-  box-shadow: var(--po-elevation-low);
+  box-shadow: var(--po-surface-editor-mode-shadow, var(--po-elevation-low));
 }
 
 .editor-mode-toggle button {
@@ -43,16 +43,18 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  border: 0;
-  border-radius: 4px;
+  border: var(--po-surface-editor-mode-button-border, 0);
+  border-radius: var(--po-surface-editor-mode-button-radius, 4px);
   background: transparent;
   color: var(--po-text-subtle);
 }
 
 .editor-mode-toggle button:hover,
 .editor-mode-toggle button.active {
-  background: var(--po-selected);
-  color: var(--po-text);
+  border-color: var(--po-surface-editor-mode-button-active-border-color, transparent);
+  background: var(--po-surface-editor-mode-button-active-background, var(--po-selected));
+  color: var(--po-surface-editor-mode-button-active-color, var(--po-text));
+  box-shadow: var(--po-surface-editor-mode-button-active-shadow, none);
 }
 
 .editor-save-chip {

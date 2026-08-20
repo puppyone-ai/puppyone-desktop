@@ -1,0 +1,784 @@
+/* Window chrome */
+:root[data-interface-style="windows-xp"] .app-shell::before {
+  position: absolute;
+  z-index: 101;
+  inset: 0;
+  border: 2px solid #0757c8;
+  box-shadow: inset 0 0 0 1px #76b7ff;
+  content: "";
+  pointer-events: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-titlebar {
+  --desktop-titlebar-safe-area-x: 0px;
+  --desktop-titlebar-safe-area-width: 100%;
+  --desktop-titlebar-content-start: 8px;
+  padding: 0;
+  border: 1px solid var(--xp-titlebar-edge);
+  border-bottom-width: 2px;
+  background-color: var(--xp-titlebar-background-color);
+  background-image: var(--xp-titlebar-background-image);
+  color: var(--xp-titlebar-text);
+  text-shadow: 1px 1px 0 rgba(0, 35, 121, 0.86);
+  box-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-titlebar-layout {
+  gap: 3px;
+  padding: 3px 4px 3px var(--desktop-titlebar-content-start);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-titlebar-left {
+  align-items: center;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-titlebar-brand {
+  display: inline-flex;
+  height: 100%;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-titlebar-brand-icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  image-rendering: auto;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-titlebar-brand-name {
+  font-weight: 700;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-titlebar-brand-separator {
+  margin-inline-start: -3px;
+  font-weight: 700;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-titlebar-workspace-button, .desktop-titlebar-branch-button) {
+  height: 26px;
+  padding-inline: 2px 6px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-titlebar-workspace-name, .desktop-titlebar-branch-button span) {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-titlebar-branch-button svg {
+  color: #ffffff;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-window-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  height: 26px;
+  margin-inline-start: 1px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-window-control {
+  appearance: none;
+  display: block;
+  box-sizing: border-box;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 26px 26px;
+  box-shadow: none;
+  image-rendering: auto;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-window-control.is-minimize {
+  background-image: var(--xp-window-control-minimize-image);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-window-control.is-minimize:hover {
+  background-image: var(--xp-window-control-minimize-hover-image);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-window-control.is-minimize:active {
+  background-image: var(--xp-window-control-minimize-active-image);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-window-control.is-maximize {
+  background-image: var(--xp-window-control-maximize-image);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-window-control.is-maximize:hover {
+  background-image: var(--xp-window-control-maximize-hover-image);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-window-control.is-maximize:active {
+  background-image: var(--xp-window-control-maximize-active-image);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-window-control.is-close {
+  background-image: var(--xp-window-control-close-image);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-window-control.is-close:hover {
+  background-image: var(--xp-window-control-close-hover-image);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-window-control.is-close:active {
+  background-image: var(--xp-window-control-close-active-image);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-window-control:focus-visible {
+  outline: 1px dotted #ffffff;
+  outline-offset: -4px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-window-control span {
+  display: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-titlebar::after {
+  display: none;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(
+    .desktop-titlebar-context-item,
+    .desktop-titlebar-context-name,
+    .desktop-titlebar-context-item svg,
+    .desktop-titlebar-action,
+    .desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger
+  ) {
+  color: #ffffff;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-titlebar-action-divider {
+  background: rgba(255, 255, 255, 0.58);
+}
+
+/* Explorer command band: use the tall large-button proportions and glossy
+ * icon language of the Windows XP Explorer toolbar. The selectors stay on the
+ * stable Shell toolbar contract; feature surfaces and editors are not part of
+ * this presentation layer. */
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-navigation-composition="sidebar-top-toolbar"]
+  .desktop-shell-navigation-toolbar-host {
+  position: relative;
+  z-index: 35;
+  display: flex;
+  box-sizing: border-box;
+  height: 56px;
+  min-height: 56px;
+  align-items: center;
+  gap: 0;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 0;
+  background: #f5f4ee;
+  box-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-navigation {
+  order: 0;
+  width: auto;
+  height: 56px;
+  min-height: 56px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-list,
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-group {
+  width: auto;
+  height: 100%;
+  min-height: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host .desktop-shell-navigation-toolbar-actions {
+  position: relative;
+  order: 1;
+  display: flex;
+  height: 56px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  padding-inline: 0;
+  margin-inline-start: auto;
+  border: 0;
+  box-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host .desktop-shell-navigation-toolbar-actions::before {
+  content: none;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button {
+  width: auto;
+  height: 48px;
+  max-height: 48px;
+  align-self: center;
+  padding: 0 10px;
+  column-gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: #000000;
+  font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+  text-shadow: none;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button:hover:not(:disabled):where(:not(.active):not([aria-current="page"]):not([aria-pressed="true"])) {
+  border-color: var(--interface-shell-toolbar-button-hover-border-color);
+  background: var(--interface-shell-toolbar-button-hover-background);
+  color: #000000;
+  box-shadow: var(--interface-shell-toolbar-button-hover-box-shadow);
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button:is(.active, [aria-current="page"], [aria-pressed="true"]) {
+  border-color: var(--interface-shell-toolbar-button-checked-border-color);
+  background: var(--interface-shell-toolbar-button-checked-background);
+  color: var(--interface-shell-toolbar-button-checked-color);
+  text-shadow: none;
+  box-shadow: var(--interface-shell-toolbar-button-checked-box-shadow);
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button:active:not(:disabled) {
+  border-color: var(--interface-shell-toolbar-button-pressed-border-color);
+  background: var(--interface-shell-toolbar-button-pressed-background);
+  color: #000000;
+  box-shadow: var(--interface-shell-toolbar-button-pressed-box-shadow);
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -4px;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-button-label {
+  line-height: 18px;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-button-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button-icon > svg {
+  width: 36px;
+  height: 36px;
+  stroke-width: 1.7;
+}
+
+/* Native icon-pack projection. React continues to render semantic fallback
+ * glyphs, while this concrete pack supplies only XP-era paint. */
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-icon-pack="windows-xp-native-v1"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button-icon {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  image-rendering: auto;
+}
+
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-icon-pack="windows-xp-native-v1"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button-icon > svg,
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-icon-pack="windows-xp-native-v1"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button-icon > img {
+  opacity: 0;
+}
+
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-icon-pack="windows-xp-native-v1"]
+  .desktop-shell-toolbar-button[data-navigation-item="data"]
+  .desktop-shell-toolbar-button-icon {
+  background-image: url("./assets/toolbar-files-skeuomorphic.png");
+}
+
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-icon-pack="windows-xp-native-v1"]
+  .desktop-shell-toolbar-button[data-navigation-item="git"]
+  .desktop-shell-toolbar-button-icon {
+  background-image: url("./assets/toolbar-git-gitg-classic.png");
+  background-size: 38px 38px;
+}
+
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-icon-pack="windows-xp-native-v1"]
+  .desktop-shell-toolbar-button[data-navigation-item="plugins"]
+  .desktop-shell-toolbar-button-icon {
+  background-image: url("./assets/toolbar-plugins.svg");
+}
+
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-icon-pack="windows-xp-native-v1"]
+  .desktop-shell-toolbar-button[data-navigation-item="settings"]
+  .desktop-shell-toolbar-button-icon {
+  background-image: url("./assets/toolbar-settings-system.png");
+}
+
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-icon-pack="windows-xp-native-v1"]
+  .desktop-shell-toolbar-button[data-navigation-item="cloud"]
+  .desktop-shell-toolbar-button-icon {
+  background-image: url("./assets/toolbar-cloud-skeuomorphic.png");
+}
+
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-icon-pack="windows-xp-native-v1"]
+  .desktop-shell-toolbar-button[data-toolbar-action="terminal"]
+  .desktop-shell-toolbar-button-icon {
+  background-image: url("./assets/toolbar-terminal-skeuomorphic.png");
+}
+
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-icon-pack="windows-xp-native-v1"]
+  .desktop-shell-toolbar-button[data-toolbar-action="agent"]
+  .desktop-shell-toolbar-button-icon {
+  background-image: url("./assets/toolbar-agent-skeuomorphic.png");
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button[data-navigation-item="data"] svg {
+  fill: #f6c85e;
+  color: #a66a0b;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button[data-navigation-item="git"] svg {
+  color: #2f6ead;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button[data-navigation-item="settings"] svg {
+  color: #637287;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button[data-navigation-item="cloud"] svg {
+  fill: #cde6ff;
+  color: #3f79b7;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button[data-toolbar-action="terminal"] svg {
+  width: 36px;
+  height: 36px;
+  color: #315f91;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-agent-logo {
+  display: block;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-menu-trigger {
+  appearance: none;
+  display: inline-flex;
+  box-sizing: border-box;
+  width: 40px;
+  height: 44px;
+  flex: 0 0 40px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  color: #4f5966;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-menu-trigger:hover:not(:disabled):where(:not([aria-expanded="true"])) {
+  border-color: var(--interface-shell-toolbar-button-hover-border-color);
+  background: var(--interface-shell-toolbar-button-hover-background);
+  color: #000000;
+  box-shadow: var(--interface-shell-toolbar-button-hover-box-shadow);
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-menu-trigger[aria-expanded="true"] {
+  border-color: var(--interface-shell-toolbar-button-checked-border-color);
+  background: var(--interface-shell-toolbar-button-checked-background);
+  color: var(--interface-shell-toolbar-button-checked-color);
+  box-shadow: var(--interface-shell-toolbar-button-checked-box-shadow);
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-menu-trigger:active:not(:disabled) {
+  border-color: var(--interface-shell-toolbar-button-pressed-border-color);
+  background: var(--interface-shell-toolbar-button-pressed-background);
+  color: #000000;
+  box-shadow: var(--interface-shell-toolbar-button-pressed-box-shadow);
+}
+
+/* Explorer address band is a Shell composition slot. It reads workspace
+ * location data supplied by the Shell and never reaches into an Editor or
+ * feature surface to infer a path. */
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-location-bar-composition="workspace-path-v1"]
+  .desktop-shell-location-bar-host {
+  position: relative;
+  box-sizing: border-box;
+  height: 32px;
+  min-height: 32px;
+  padding: 3px 5px 3px 6px;
+  border: 0;
+  background: #f5f4ee;
+  box-shadow: none;
+}
+
+/* Explorer chrome is largely flat. Restrict the bevel to the two immediate
+ * pixels around each separator instead of shading both complete bands. */
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-location-bar-composition="workspace-path-v1"]
+  .desktop-shell-location-bar-host::before,
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-location-bar-composition="workspace-path-v1"]
+  .desktop-shell-location-bar-host::after {
+  position: absolute;
+  z-index: 0;
+  inset-inline: 0;
+  height: 1px;
+  content: "";
+  pointer-events: none;
+}
+
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-location-bar-composition="workspace-path-v1"]
+  .desktop-shell-location-bar-host::before {
+  inset-block-start: 0;
+  background: #d8d5cb;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-location-bar-composition="workspace-path-v1"]
+  .desktop-shell-location-bar-host::after {
+  inset-block-end: 0;
+  background: #c8c5bb;
+}
+
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-location-bar-composition="workspace-path-v1"]
+  .desktop-shell-location-bar {
+  position: relative;
+  z-index: 1;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-shell-location-bar {
+  gap: 3px;
+  color: #000000;
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-shell-location-bar-field {
+  box-sizing: border-box;
+  height: 24px;
+  overflow: hidden;
+  border: 1px solid #7f9db9;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-shell-location-bar-icon {
+  width: 21px;
+  height: 22px;
+  color: #a66a0b;
+}
+
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-icon-pack="windows-xp-native-v1"]
+  .desktop-shell-location-bar-icon {
+  background: center / 16px 16px no-repeat url("./assets/toolbar-files-skeuomorphic.png");
+}
+
+:root[data-interface-style="windows-xp"]
+  .app-shell[data-icon-pack="windows-xp-native-v1"]
+  .desktop-shell-location-bar-icon > svg {
+  opacity: 0;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-location-bar
+  .desktop-shell-location-bar-value {
+  appearance: none;
+  height: 22px;
+  padding: 1px 3px 1px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #000000;
+  font-size: 13px;
+  line-height: 20px;
+  box-shadow: none;
+  text-overflow: ellipsis;
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-location-bar
+  .desktop-shell-location-bar-value:focus {
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-shell-location-bar-dropdown {
+  box-sizing: border-box;
+  width: 18px;
+  height: 22px;
+  border-inline-start: 1px solid var(--interface-scrollbar-button-border-color);
+  background-color: var(--interface-scrollbar-button-background-color);
+  background-image: var(--interface-scrollbar-button-down-image),
+    var(--interface-scrollbar-button-background-image);
+  background-position: center, 0 0;
+  background-repeat: no-repeat, repeat;
+  background-size: var(--interface-directional-arrow-size) var(--interface-directional-arrow-size), auto;
+  color: #245b91;
+  box-shadow: var(--interface-scrollbar-button-box-shadow);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-shell-location-bar-dropdown > svg {
+  display: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-shell-location-bar-dropdown::before {
+  content: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-shell-location-bar-go {
+  appearance: none;
+  height: 24px;
+  min-width: 39px;
+  gap: 3px;
+  padding-inline: 1px 2px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #000000;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 24px;
+  white-space: nowrap;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-shell-location-bar-go-icon {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #4d8f13;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #b9ef58 0%, #6fbd16 48%, #3d940c 100%);
+  color: #ffffff;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.7),
+    inset -1px -1px 0 rgba(41, 106, 4, 0.5);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-shell-location-bar-go:active
+  .desktop-shell-location-bar-go-icon {
+  transform: translateY(1px);
+}
+
+/* The window frame already supplies the strong Luna edge. Keep the workspace
+ * itself flush so the Explorer and document surface read as one continuous
+ * work area rather than a second framed window. */
+:root[data-interface-style="windows-xp"] .desktop-shell-body {
+  padding: 0;
+  gap: 0;
+  background: #ffffff;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-surface {
+  border: 0;
+  background: #ffffff;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-right-sidebar.is-open {
+  border: 1px solid #2c6fc4;
+  background: #ffffff;
+}
+
+/* XP pane captions are the second strongest hierarchy after the title bar. */
+:root[data-interface-style="windows-xp"]
+  :where(
+    .po-desktop-sidebar-header,
+    .desktop-settings-sidebar-header,
+    .desktop-agent-session-header
+  ) {
+  border: 1px solid #0a469d;
+  border-inline-color: #2363b5;
+  background: linear-gradient(
+    180deg,
+    var(--xp-pane-caption-start) 0%,
+    var(--xp-pane-caption-mid) 24%,
+    #135fcf 50%,
+    var(--xp-pane-caption-end) 72%,
+    #276bd6 100%
+  );
+  color: #ffffff;
+  text-shadow: 1px 1px 0 rgba(0, 35, 121, 0.76);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.46);
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(
+    .po-desktop-sidebar-header__title,
+    .desktop-settings-sidebar-header,
+    .desktop-agent-session-header .desktop-agent-picker-trigger,
+    .desktop-agent-session-header .desktop-agent-icon-button,
+    .desktop-agent-session-header svg
+  ) {
+  color: #ffffff;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-agent-surface-brand {
+  display: inline-flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  margin-inline-end: 3px;
+  color: #ffffff;
+  font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-agent-surface-brand img {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+/* Explorer's Folders toolbar is warm system chrome in Luna. Blue pane
+ * captions are reserved for task/sidebar section headers. */
+:root[data-interface-style="windows-xp"] .desktop-explorer-toolbar,
+:root[data-interface-style="windows-xp"] .desktop-explorer-toolbar > span,
+:root[data-interface-style="windows-xp"] .desktop-explorer-toolbar .desktop-explorer-actions button {
+  color: #000000;
+  text-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-agent-session-header .desktop-agent-picker-trigger, .desktop-agent-session-header .desktop-agent-icon-button):hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+/* Sunken work areas and hard pane edges replace modern floating shadows. */
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-right-sidebar.is-open, .file-preview-shell) {
+  border-color: var(--xp-field-border);
+  box-shadow: inset 1px 0 0 #ffffff;
+}
+
+/* Keep the Explorer/content boundary legible without repeating the strong
+ * Luna window frame. The rule stays quiet at rest and gains contrast only
+ * while the resize affordance is being used. */
+:root[data-interface-style="windows-xp"] .explorer-column {
+  border-inline-end-color: transparent;
+  box-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"] .data-explorer-resizer::after {
+  background: var(--po-shell-divider);
+  box-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"] .data-explorer-resizer:hover::after,
+:root[data-interface-style="windows-xp"] .data-explorer-resizer:focus-visible::after {
+  background: #7f9db9;
+}
+
+:root[data-interface-style="windows-xp"]
+  .data-content[data-explorer-dragging="true"] > .data-explorer-resizer::after,
+:root[data-interface-style="windows-xp"] body.data-sidebar-resizing .data-explorer-resizer::after {
+  background: #2c6fc4;
+  box-shadow: 0 0 0 1px rgba(44, 111, 196, 0.24);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-right-sidebar::before {
+  display: none;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-sidebar-navigation-surface, .data-explorer-footer, .desktop-agent-dock-region) {
+  border-color: #aca899;
+  background: linear-gradient(180deg, #fffef8 0%, #f1efe3 28%, #e8e5d8 100%);
+  box-shadow: inset 0 1px 0 #ffffff;
+}

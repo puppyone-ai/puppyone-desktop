@@ -50,6 +50,11 @@ import {
 import { DesktopTitlebarContext } from "./features/app-shell/DesktopTitlebarContext";
 import { DesktopWorkspaceContent } from "./features/app-shell/DesktopWorkspaceContent";
 import { DesktopTitlebarActions } from "./features/app-shell/DesktopTitlebarActions";
+import {
+  DesktopShellLocationBar,
+  resolveDesktopShellLocationPath,
+  resolveDesktopShellWorkspaceEntryPath,
+} from "./features/app-shell/DesktopShellLocationBar";
 import { DesktopOverlayPortal } from "./features/app-shell/DesktopOverlayPortal";
 import { DesktopHelpLauncher } from "./features/app-shell/DesktopHelpLauncher";
 import type { DesktopWorkspaceSwitcherItem } from "./features/app-shell/DesktopWorkspaceSwitcher";
@@ -104,6 +109,7 @@ function AppContent() {
   const desktopUpdates = useDesktopUpdates();
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
+  const { setRightSidebarOpen } = preferences;
   const fontCatalog = useTypographyCatalog();
   const typography = useTypographyRuntime(
     preferences.typographyPreferences,
@@ -144,7 +150,8 @@ function AppContent() {
     onWorkspaceActivated: useCallback(() => {
       setActiveView("data");
       setSwitcherOpen(false);
-    }, []),
+      setRightSidebarOpen(true);
+    }, [setRightSidebarOpen]),
     onWorkspaceCleared: useCallback(() => {
       setActiveView("data");
       setSwitcherOpen(false);
@@ -166,6 +173,7 @@ function AppContent() {
     fileIconTheme,
     filesVisibilitySettings,
     interfaceStyle,
+    resolvedAppearance,
     resolvedTheme,
     rightSidebarOpen,
     rightSidebarToolsSettings,
@@ -190,7 +198,6 @@ function AppContent() {
     setExplorerWidth,
     setFileIconTheme,
     setFilesVisibilitySettings,
-    setRightSidebarOpen,
     setRightSidebarToolsSettings,
     setRightSidebarWidth,
     setRightSidebarSurface,
@@ -800,6 +807,27 @@ function AppContent() {
     setSwitcherOpen(false);
   }, []);
 
+  const handleLocationBarNavigate = useCallback(async (displayPath: string) => {
+    if (!workspace) return;
+    navigateDesktopView("data");
+    const entryPath = resolveDesktopShellWorkspaceEntryPath(displayPath, workspace.path);
+    if (entryPath === undefined || entryPath === null || !dataPort) {
+      if (entryPath === null) setActiveDataNode(null);
+      return;
+    }
+
+    const separatorIndex = entryPath.lastIndexOf("/");
+    const parentPath = separatorIndex < 0 ? null : entryPath.slice(0, separatorIndex) || null;
+    try {
+      const siblings = await dataPort.listChildren(parentPath);
+      const node = siblings.find((candidate) => candidate.path === entryPath);
+      if (node) await handleActiveDataPathChange(node.path, node);
+    } catch {
+      // The workspace surface already owns filesystem error presentation. An
+      // invalid address remains editable so the user can correct it in place.
+    }
+  }, [dataPort, handleActiveDataPathChange, navigateDesktopView, workspace]);
+
   if (restoringWorkspace && !workspace) {
     return (
       <RestoringWorkspaceScreen
@@ -877,46 +905,68 @@ function AppContent() {
     />
   );
 
+  const toolsInNavigationToolbar = !minimalMode
+    && resolvedAppearance.composition.navigation === "sidebar-top-toolbar";
+  const locationBarVisible = !minimalMode
+    && resolvedAppearance.composition.locationBar === "workspace-path-v1";
+  const locationBarPath = resolveDesktopShellLocationPath({
+    // The address bar describes the content surface. Keep the active editor
+    // authoritative even if explorer selection state is briefly catching up.
+    activePath: activeDataPath ?? activeDataNode?.path ?? null,
+    dataViewActive: activeView === "data",
+    workspacePath: workspace.path,
+  });
+  const chromeActionProps = {
+    desktopUpdateState: desktopUpdates.state,
+    titlebarActionsSettings,
+    terminalSidebarOpen: rightSidebarOpen && desktopTerminalEnabled && rightSidebarSurface === "terminal",
+    terminalToolEnabled: desktopTerminalEnabled,
+    terminalSessionLayout,
+    terminalSessions: currentTerminalSnapshot.sessions,
+    activeTerminalSessionId: currentTerminalSnapshot.activeSessionId,
+    agentChatEnabled: desktopAgentChatEnabled,
+    agentChatSidebarOpen: rightSidebarOpen && desktopAgentChatEnabled && rightSidebarSurface === "chat",
+    onUpdateNow: () => void desktopUpdates.updateNow(),
+    onCreateTerminal: () => {
+      terminalPanelRef.current?.create();
+      setRightSidebarSurface("terminal");
+      setRightSidebarOpen(true);
+      setSwitcherOpen(false);
+    },
+    onActivateTerminal: (sessionId: string) => {
+      terminalPanelRef.current?.activate(sessionId);
+      setRightSidebarSurface("terminal");
+      setRightSidebarOpen(true);
+      setSwitcherOpen(false);
+    },
+    onCloseTerminal: (sessionId: string) => terminalPanelRef.current?.close(sessionId),
+    onToggleTerminal: () => {
+      const terminalIsOpen = rightSidebarOpen && rightSidebarSurface === "terminal";
+      setRightSidebarSurface("terminal");
+      setRightSidebarOpen(!terminalIsOpen);
+      setSwitcherOpen(false);
+    },
+    onToggleAgentChat: () => {
+      if (!desktopAgentChatEnabled) return;
+      const chatIsOpen = rightSidebarOpen && rightSidebarSurface === "chat";
+      setRightSidebarSurface("chat");
+      setRightSidebarOpen(!chatIsOpen);
+      setSwitcherOpen(false);
+    },
+  };
   const titlebarActions = (
     <DesktopTitlebarActions
-      desktopUpdateState={desktopUpdates.state}
-      titlebarActionsSettings={titlebarActionsSettings}
-      terminalSidebarOpen={rightSidebarOpen && desktopTerminalEnabled && rightSidebarSurface === "terminal"}
-      terminalToolEnabled={desktopTerminalEnabled}
-      terminalSessionLayout={terminalSessionLayout}
-      terminalSessions={currentTerminalSnapshot.sessions}
-      activeTerminalSessionId={currentTerminalSnapshot.activeSessionId}
-      agentChatEnabled={desktopAgentChatEnabled}
-      agentChatSidebarOpen={rightSidebarOpen && desktopAgentChatEnabled && rightSidebarSurface === "chat"}
-      onUpdateNow={() => void desktopUpdates.updateNow()}
-      onCreateTerminal={() => {
-        terminalPanelRef.current?.create();
-        setRightSidebarSurface("terminal");
-        setRightSidebarOpen(true);
-        setSwitcherOpen(false);
-      }}
-      onActivateTerminal={(sessionId) => {
-        terminalPanelRef.current?.activate(sessionId);
-        setRightSidebarSurface("terminal");
-        setRightSidebarOpen(true);
-        setSwitcherOpen(false);
-      }}
-      onCloseTerminal={(sessionId) => terminalPanelRef.current?.close(sessionId)}
-      onToggleTerminal={() => {
-        const terminalIsOpen = rightSidebarOpen && rightSidebarSurface === "terminal";
-        setRightSidebarSurface("terminal");
-        setRightSidebarOpen(!terminalIsOpen);
-        setSwitcherOpen(false);
-      }}
-      onToggleAgentChat={() => {
-        if (!desktopAgentChatEnabled) return;
-        const chatIsOpen = rightSidebarOpen && rightSidebarSurface === "chat";
-        setRightSidebarSurface("chat");
-        setRightSidebarOpen(!chatIsOpen);
-        setSwitcherOpen(false);
-      }}
+      {...chromeActionProps}
+      visibleGroups={toolsInNavigationToolbar ? ["app-status", "header"] : undefined}
     />
   );
+  const navigationToolbarActions = toolsInNavigationToolbar && desktopRightSidebarEnabled ? (
+    <DesktopTitlebarActions
+      {...chromeActionProps}
+      placement="toolbar"
+      visibleGroups={["right-sidebar"]}
+    />
+  ) : undefined;
 
   const minimalModeDock = minimalMode ? (
     <Suspense fallback={null}>
@@ -947,6 +997,17 @@ function AppContent() {
       data-minimal-mode={minimalMode ? "true" : undefined}
       data-theme-mode={activeThemeMode}
       data-interface-style={interfaceStyle}
+      data-interface-style-family={resolvedAppearance.profile.family}
+      data-interface-style-variant={resolvedAppearance.profile.variant}
+      data-interface-style-palette={resolvedAppearance.profile.palette}
+      data-editor-presentation={resolvedAppearance.editorPresentation}
+      data-appearance-token-set={resolvedAppearance.tokenSet}
+      data-shell-composition={resolvedAppearance.composition.shell}
+      data-titlebar-composition={resolvedAppearance.composition.titlebar}
+      data-navigation-composition={resolvedAppearance.composition.navigation}
+      data-location-bar-composition={resolvedAppearance.composition.locationBar}
+      data-scrollbar-composition={resolvedAppearance.composition.scrollbar}
+      data-icon-pack={resolvedAppearance.composition.iconPack}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
       data-text-size={textSize}
@@ -965,6 +1026,13 @@ function AppContent() {
           minimalModeDock={minimalModeDock}
           titlebarSidebarSlot={titlebarSidebarSlot}
           titlebarActions={titlebarActions}
+          navigationToolbarActions={navigationToolbarActions}
+          locationBar={locationBarVisible ? (
+            <DesktopShellLocationBar
+              path={locationBarPath}
+              onNavigate={handleLocationBarNavigate}
+            />
+          ) : undefined}
           rightSidebarOpen={rightSidebarOpen && desktopRightSidebarEnabled}
           resizableRightSidebar
           rightSidebarWidth={rightSidebarWidth}
@@ -1053,6 +1121,7 @@ function AppContent() {
           desktopUpdates={desktopUpdates}
           git={git}
           minimalMode={minimalMode}
+          navigationComposition={resolvedAppearance.composition.navigation}
           onActiveDataNodeChange={handleActiveDataNodeChange}
           onActiveDataPathChange={handleActiveDataPathChange}
           onResourceMove={handleResourceMoved}

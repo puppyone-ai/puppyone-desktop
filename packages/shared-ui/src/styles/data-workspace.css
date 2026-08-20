@@ -228,6 +228,7 @@ body.data-sidebar-resizing .data-content:not([data-explorer-collapsed="true"]) {
 }
 
 .explorer-tree-shell {
+  --tree-virtual-row-size: 32px;
   --tree-row-left-gap: var(--po-tree-row-left-gap, 12px);
   --tree-row-right-gap: var(--po-tree-row-right-gap, 12px);
   --tree-row-height: var(--po-tree-row-height, 30px);
@@ -332,7 +333,7 @@ body.data-sidebar-resizing .data-content:not([data-explorer-collapsed="true"]) {
   top: 0;
   right: 0;
   left: 0;
-  height: 32px;
+  height: var(--tree-virtual-row-size);
   contain: layout style;
 }
 

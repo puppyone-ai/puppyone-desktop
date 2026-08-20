@@ -47,6 +47,7 @@ type DesktopWorkspaceContentProps = {
   desktopUpdates: DesktopUpdatesController;
   git: DesktopGitController;
   minimalMode?: boolean;
+  navigationComposition: string;
   onActiveDataPathChange: (
     path: string | null,
     node?: DataNode | null,
@@ -87,6 +88,7 @@ export function DesktopWorkspaceContent({
   desktopUpdates,
   git,
   minimalMode = false,
+  navigationComposition,
   onActiveDataPathChange,
   onActiveDataNodeChange,
   onResourceMove,
@@ -195,6 +197,7 @@ export function DesktopWorkspaceContent({
         onNavigate,
         onOpenSettings,
       }}
+      navigationComposition={navigationComposition}
       onActiveDataNodeChange={onActiveDataNodeChange}
       onActiveDataPathChange={onActiveDataPathChange}
       onResourceMove={onResourceMove}

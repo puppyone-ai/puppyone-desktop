@@ -22,6 +22,8 @@ const RESOLVED_KEYS = new Set([
   "runtime",
   "surfacePreparation",
   "readinessSignal",
+  "surfaceFamily",
+  "surfaceTraits",
   ...IMPLEMENTATION_KEYS,
 ]);
 const OPTIONAL_FUNCTION_KEYS = ["normalizeContent", "isEditable"] as const;
@@ -61,6 +63,7 @@ export function normalizePresetViewerContribution(
     "runtime",
     "surfacePreparation",
     "readinessSignal",
+    "surfaceFamily",
   ] as const) {
     if (record[key] !== definition[key]) {
       throw new TypeError(`Preset viewer ${record.id} does not match canonical ${key} metadata.`);
@@ -72,6 +75,13 @@ export function normalizePresetViewerContribution(
     || record.formatViewerIds.some((value, index) => value !== definition.formatViewerIds[index])
   ) {
     throw new TypeError(`Preset viewer ${record.id} does not match canonical format viewer ids.`);
+  }
+  if (
+    !Array.isArray(record.surfaceTraits)
+    || record.surfaceTraits.length !== definition.surfaceTraits.length
+    || record.surfaceTraits.some((value, index) => value !== definition.surfaceTraits[index])
+  ) {
+    throw new TypeError(`Preset viewer ${record.id} does not match canonical surface traits.`);
   }
   if (typeof record.match !== "function") {
     throw new TypeError(`Preset viewer ${record.id} must define a match function.`);
@@ -107,5 +117,9 @@ export function normalizePresetViewerContribution(
   } else if (typeof record.load !== "function" || record.render !== undefined) {
     throw new TypeError(`Lazy preset viewer ${record.id} must define load and cannot define render.`);
   }
-  return Object.freeze({ ...contribution, formatViewerIds: definition.formatViewerIds });
+  return Object.freeze({
+    ...contribution,
+    formatViewerIds: definition.formatViewerIds,
+    surfaceTraits: definition.surfaceTraits,
+  });
 }

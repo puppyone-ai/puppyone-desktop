@@ -16,6 +16,7 @@ import {
   commitWorkspaceGit,
   createWorkspaceGitBranch,
   checkoutWorkspaceGitBranch,
+  fetchWorkspaceGit,
   getWorkspaceGitFileDiff,
   configureWorkspaceCloudRemote,
   pushWorkspaceGit,
@@ -361,6 +362,60 @@ describe("branches", { timeout: 20_000 }, () => {
 
     await expect(createWorkspaceGitBranch(root, "-rf")).rejects.toThrow(/invalid/i);
     await expect(createWorkspaceGitBranch(root, "bad..name")).rejects.toThrow(/invalid/i);
+  });
+});
+
+describe("targeted remote fetch", { timeout: 30_000 }, () => {
+  it("refreshes only the selected hosting remote and reports its incoming files", async () => {
+    await initRepoWithIdentity();
+    await writeFile(path.join(root, "policy.md"), "base\n");
+    await stageAllWorkspaceGitChanges(root);
+    await commitWorkspaceGit(root, "base");
+
+    const originRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-origin-"));
+    const archiveRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-archive-"));
+    const peerRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-git-fetch-peer-"));
+    try {
+      execFileSync("git", ["init", "--bare", originRoot]);
+      execFileSync("git", ["init", "--bare", archiveRoot]);
+      const branch = execFileSync("git", ["-C", root, "branch", "--show-current"]).toString().trim();
+      execFileSync("git", ["-C", root, "remote", "add", "origin", originRoot]);
+      execFileSync("git", ["-C", root, "remote", "add", "archive", archiveRoot]);
+      execFileSync("git", ["-C", root, "push", "-u", "origin", branch]);
+      execFileSync("git", ["-C", root, "push", "archive", branch]);
+      const archiveBefore = execFileSync(
+        "git",
+        ["-C", root, "rev-parse", `refs/remotes/archive/${branch}`],
+      ).toString().trim();
+
+      execFileSync("git", ["clone", "--branch", branch, originRoot, peerRoot]);
+      execFileSync("git", ["-C", peerRoot, "config", "user.email", "peer@puppyone.test"]);
+      execFileSync("git", ["-C", peerRoot, "config", "user.name", "PuppyOne Peer"]);
+      await writeFile(path.join(peerRoot, "policy.md"), "remote update\n");
+      execFileSync("git", ["-C", peerRoot, "add", "policy.md"]);
+      execFileSync("git", ["-C", peerRoot, "commit", "-m", "update policy"]);
+      execFileSync("git", ["-C", peerRoot, "push", "origin", branch]);
+
+      const status = await fetchWorkspaceGit(root, { remoteName: "origin" });
+      expect(status.sourceControl.remote).toMatchObject({
+        state: "incoming",
+        behind: 1,
+        canPull: true,
+      });
+      expect(status.sourceControl.remote.incomingPreview).toEqual(expect.arrayContaining([
+        expect.objectContaining({ path: "policy.md", status: "modified" }),
+      ]));
+      expect(execFileSync(
+        "git",
+        ["-C", root, "rev-parse", `refs/remotes/archive/${branch}`],
+      ).toString().trim()).toBe(archiveBefore);
+      await expect(fetchWorkspaceGit(root, { remoteName: "missing" }))
+        .rejects.toThrow(/remote 'missing'.*not configured/i);
+    } finally {
+      await rm(originRoot, { recursive: true, force: true });
+      await rm(archiveRoot, { recursive: true, force: true });
+      await rm(peerRoot, { recursive: true, force: true });
+    }
   });
 });
 

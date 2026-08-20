@@ -16,6 +16,7 @@ import {
 import type {
   GitActionIconKind,
   GitHostingIdentity,
+  GitScmSyncSection,
   GitSyncState,
   GitWorkingSelection,
 } from "../types";
@@ -111,9 +112,20 @@ export function getCommittedSummary(count: number, actionLabel: string, t: Messa
   return t("source-control.committed.ready", { count, action: actionLabel });
 }
 
-export function GitHostingIdentityRow({ identity }: { identity: GitHostingIdentity }) {
+export function GitHostingIdentityRow({
+  identity,
+  count = 0,
+  action = null,
+}: {
+  identity: GitHostingIdentity;
+  count?: number;
+  action?: ReactNode;
+}) {
   const { t } = useLocalization();
   const { label, href } = identity;
+  const countBadge = count > 0
+    ? <small className="desktop-git-section-count-badge">{count}</small>
+    : null;
   return (
     <div className="desktop-git-section-row desktop-git-hosting-identity-row" aria-label={t("source-control.hosting.repository")}>
       {href ? (
@@ -128,15 +140,91 @@ export function GitHostingIdentityRow({ identity }: { identity: GitHostingIdenti
         >
           <span className="desktop-git-section-leading-icon"><Github size={14} strokeWidth={2} aria-hidden="true" /></span>
           <bdi>{label}</bdi>
+          {countBadge}
           <ArrowUpRight size={12} aria-hidden="true" />
         </a>
       ) : (
         <div className="desktop-git-section-title desktop-git-hosting-identity-text">
           <span className="desktop-git-section-leading-icon"><Github size={14} strokeWidth={2} aria-hidden="true" /></span>
           <bdi>{label}</bdi>
+          {countBadge}
         </div>
       )}
+      {action}
     </div>
+  );
+}
+
+export function GitHubProviderSection({
+  identity,
+  section,
+  mergeCount,
+  fileIconTheme,
+  selectedWorkingFile,
+  disabled,
+  operationLoading,
+  primaryAction,
+  onSelectWorkingFile,
+  onPull,
+}: {
+  identity: GitHostingIdentity;
+  section: GitScmSyncSection;
+  mergeCount: number;
+  fileIconTheme: FileIconThemeId;
+  selectedWorkingFile: GitWorkingSelection | null;
+  disabled: boolean;
+  operationLoading: string | null;
+  primaryAction: boolean;
+  onSelectWorkingFile: (selection: GitWorkingSelection) => void;
+  onPull: () => Promise<boolean>;
+}) {
+  const { t } = useLocalization();
+  const pullAction = section.action?.kind === "pull" ? section.action : null;
+  const pullBlockedByConflicts = mergeCount > 0;
+
+  return (
+    <section className="desktop-git-cloud-provider-section desktop-git-github-provider-section">
+      <GitHostingIdentityRow
+        identity={identity}
+        count={section.copy.count}
+        action={pullAction ? (
+          <GitOperationButton
+            className="desktop-git-remote-action"
+            disabled={disabled || pullBlockedByConflicts || pullAction.disabled}
+            title={pullBlockedByConflicts
+              ? t("source-control.cloud.resolveBeforeDownload")
+              : pullAction.title}
+            icon={pullAction.icon}
+            label={pullAction.label}
+            loadingKey={pullAction.kind}
+            loadingLabel={pullAction.loadingLabel}
+            operationLoading={operationLoading}
+            primary={primaryAction}
+            onClick={() => void onPull()}
+          />
+        ) : null}
+      />
+      <div className="desktop-git-cloud-provider-body desktop-git-github-provider-body">
+        {section.previewResources.length > 0 ? (
+          <SourceControlPreviewResourceList
+            resources={section.previewResources}
+            fileIconTheme={fileIconTheme}
+            selectedWorkingFile={selectedWorkingFile}
+            origin="remote"
+            ariaLabel={t("source-control.preview.remote")}
+            onSelectWorkingFile={onSelectWorkingFile}
+          />
+        ) : section.fallbackSummary ? (
+          <div className="desktop-git-preview-summary" data-po-scrollbar="sidebar">
+            {section.fallbackSummary}
+          </div>
+        ) : (
+          <SidebarEmptyState compact className="desktop-git-section-empty">
+            {t("source-control.status.empty")}
+          </SidebarEmptyState>
+        )}
+      </div>
+    </section>
   );
 }
 

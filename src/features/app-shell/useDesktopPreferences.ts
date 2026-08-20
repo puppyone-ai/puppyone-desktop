@@ -1,9 +1,17 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { FileIconThemeId } from "@puppyone/shared-ui";
 import {
   getInterfaceStyleFirstPaint,
   supportsThemePreset,
+  type EditorPresentation,
 } from "../appearance/interfaceStyles";
+import {
+  APPEARANCE_PREFERENCES_STORAGE_KEY,
+  createAppearancePreferencesV2,
+  readAppearancePreferences,
+  serializeAppearancePreferences,
+} from "../appearance/appearancePreferences";
+import { resolveAppearance } from "../appearance/resolveAppearance";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
   AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY,
@@ -30,12 +38,9 @@ import {
   THEME_STORAGE_KEY,
   TERMINAL_SESSION_LAYOUT_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
-  getSidebarNavigationOrientation,
-  getSidebarNavigationPlacement,
   parseLoadingAnimationPreset,
   parseCreateNewMenuSettings,
   parseTypography,
-  resolveActiveThemeMode,
   type ExternalAppsSettings,
   type CreateNewMenuSettings,
   type DiffMarkers,
@@ -96,22 +101,44 @@ import {
 } from "./preferences";
 
 export function useDesktopPreferences() {
-  const [themeMode, setThemeMode] = useState<ThemeMode>(() => readInitialThemeMode());
-  const [interfaceStyle, setInterfaceStyle] = useState<InterfaceStyle>(() => readInitialInterfaceStyle());
-  const [lightThemePreset, setLightThemePreset] = useState(() => readInitialLightThemePreset());
-  const [darkThemePreset, setDarkThemePreset] = useState(() => readInitialDarkThemePreset());
-  const [textSize, setTextSize] = useState<TextSize>(() => readInitialTextSize());
+  const [initialAppearanceRead] = useState(() => readAppearancePreferences(
+    window.localStorage.getItem(APPEARANCE_PREFERENCES_STORAGE_KEY),
+    {
+      activeStyle: readInitialInterfaceStyle(),
+      themeMode: readInitialThemeMode(),
+      lightThemePreset: readInitialLightThemePreset(),
+      darkThemePreset: readInitialDarkThemePreset(),
+      textSize: readInitialTextSize(),
+      typography: readInitialTypographyPreferences(),
+      pointerCursors: readInitialPointerCursors(),
+      loadingAnimationPreset: readInitialLoadingAnimationPreset(),
+      dockIcon: readInitialDockIcon(),
+      fileIconTheme: readInitialFileIconTheme(),
+      sidebarNavigationLayout: readInitialSidebarNavigationLayout(),
+    },
+  ));
+  const initialAppearance = initialAppearanceRead.preferences;
+  const [themeMode, setThemeMode] = useState<ThemeMode>(initialAppearance.shared.themeMode);
+  const [interfaceStyle, setInterfaceStyle] = useState<InterfaceStyle>(initialAppearance.activeStyle);
+  const [editorPresentation, setEditorPresentation] = useState<EditorPresentation>(
+    initialAppearance.shared.editorPresentation,
+  );
+  const [lightThemePreset, setLightThemePreset] = useState(initialAppearance.shared.lightThemePreset);
+  const [darkThemePreset, setDarkThemePreset] = useState(initialAppearance.shared.darkThemePreset);
+  const [textSize, setTextSize] = useState<TextSize>(initialAppearance.shared.textSize);
   const [typographyPreferences, setTypographyPreferences] = useState<TypographyPreferences>(
-    () => readInitialTypographyPreferences(),
+    initialAppearance.shared.typography,
   );
-  const [pointerCursors, setPointerCursors] = useState(() => readInitialPointerCursors());
+  const [pointerCursors, setPointerCursors] = useState(initialAppearance.shared.pointerCursors);
   const [loadingAnimationPreset, setLoadingAnimationPreset] = useState<LoadingAnimationPreset>(
-    () => readInitialLoadingAnimationPreset(),
+    initialAppearance.shared.loadingAnimationPreset,
   );
-  const [dockIcon, setDockIcon] = useState<DockIcon>(() => readInitialDockIcon());
+  const [dockIcon, setDockIcon] = useState<DockIcon>(initialAppearance.shared.dockIcon);
   const [diffMarkers, setDiffMarkers] = useState<DiffMarkers>(() => readInitialDiffMarkers());
-  const [fileIconTheme, setFileIconTheme] = useState<FileIconThemeId>(() => readInitialFileIconTheme());
-  const [sidebarNavigationLayout, setSidebarNavigationLayout] = useState<SidebarNavigationLayout>(() => readInitialSidebarNavigationLayout());
+  const [fileIconTheme, setFileIconTheme] = useState<FileIconThemeId>(initialAppearance.shared.fileIconTheme);
+  const [sidebarNavigationLayout, setSidebarNavigationLayout] = useState<SidebarNavigationLayout>(
+    initialAppearance.shared.sidebarNavigationLayout,
+  );
   const [sidebarNavigationVisibilitySettings, setSidebarNavigationVisibilitySettings] = useState<SidebarNavigationVisibilitySettings>(
     () => readInitialSidebarNavigationVisibilitySettings(),
   );
@@ -142,7 +169,15 @@ export function useDesktopPreferences() {
   const [agentPreferredRuntime, setAgentPreferredRuntime] = useState<string | null>(() => readInitialAgentPreferredRuntime());
   const [agentPreferredModel, setAgentPreferredModel] = useState<string | null>(() => readInitialAgentPreferredModel());
   const [systemDark, setSystemDark] = useState(() => readSystemDarkMode());
-  const activeThemeMode = resolveActiveThemeMode(interfaceStyle, themeMode);
+  const resolvedAppearance = useMemo(() => resolveAppearance({
+    interfaceStyle,
+    themeMode,
+    sidebarNavigationLayout,
+    textSize,
+    fileIconTheme,
+    editorPresentation,
+  }), [editorPresentation, fileIconTheme, interfaceStyle, sidebarNavigationLayout, textSize, themeMode]);
+  const activeThemeMode = resolvedAppearance.themeMode;
   const resolvedTheme = activeThemeMode === "system" ? (systemDark ? "dark" : "light") : activeThemeMode;
   const activeThemePreset = resolvedTheme === "light" ? lightThemePreset : darkThemePreset;
 
@@ -155,6 +190,17 @@ export function useDesktopPreferences() {
     const root = document.documentElement;
     const firstPaint = getInterfaceStyleFirstPaint(interfaceStyle, resolvedTheme, activeThemePreset);
     root.dataset.interfaceStyle = interfaceStyle;
+    root.dataset.interfaceStyleFamily = resolvedAppearance.profile.family;
+    root.dataset.interfaceStyleVariant = resolvedAppearance.profile.variant;
+    root.dataset.interfaceStylePalette = resolvedAppearance.profile.palette;
+    root.dataset.editorPresentation = resolvedAppearance.editorPresentation;
+    root.dataset.appearanceTokenSet = resolvedAppearance.tokenSet;
+    root.dataset.shellComposition = resolvedAppearance.composition.shell;
+    root.dataset.titlebarComposition = resolvedAppearance.composition.titlebar;
+    root.dataset.navigationComposition = resolvedAppearance.composition.navigation;
+    root.dataset.locationBarComposition = resolvedAppearance.composition.locationBar;
+    root.dataset.scrollbarComposition = resolvedAppearance.composition.scrollbar;
+    root.dataset.iconPack = resolvedAppearance.composition.iconPack;
     root.dataset.initialTheme = resolvedTheme;
     if (supportsThemePreset(interfaceStyle, resolvedTheme)) {
       root.dataset.initialThemePreset = activeThemePreset;
@@ -164,7 +210,10 @@ export function useDesktopPreferences() {
     root.style.setProperty("--initial-shell-background", firstPaint.background);
     root.style.setProperty("--initial-shell-color-scheme", firstPaint.colorScheme);
     window.puppyoneDesktop?.setWindowBackground?.({ background: firstPaint.background });
-  }, [activeThemePreset, interfaceStyle, resolvedTheme]);
+    void window.puppyoneDesktop?.setWindowChromeProfile?.({
+      titlebar: resolvedAppearance.composition.titlebar,
+    }).catch(() => undefined);
+  }, [activeThemePreset, interfaceStyle, resolvedAppearance, resolvedTheme]);
 
   useEffect(() => {
     window.localStorage.setItem(LIGHT_THEME_PRESET_STORAGE_KEY, lightThemePreset);
@@ -225,6 +274,48 @@ export function useDesktopPreferences() {
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY, sidebarNavigationLayout);
   }, [sidebarNavigationLayout]);
+
+  useEffect(() => {
+    if (!initialAppearanceRead.writable) return;
+    const preferences = createAppearancePreferencesV2({
+      activeStyle: interfaceStyle,
+      shared: {
+        themeMode,
+        lightThemePreset,
+        darkThemePreset,
+        textSize,
+        typography: typographyPreferences,
+        pointerCursors,
+        loadingAnimationPreset,
+        dockIcon,
+        fileIconTheme,
+        sidebarNavigationLayout,
+        editorPresentation,
+      },
+      byStyle: initialAppearance.byStyle,
+      bySurface: initialAppearance.bySurface,
+      byStyleSurface: initialAppearance.byStyleSurface,
+    });
+    window.localStorage.setItem(
+      APPEARANCE_PREFERENCES_STORAGE_KEY,
+      serializeAppearancePreferences(preferences),
+    );
+  }, [
+    darkThemePreset,
+    dockIcon,
+    editorPresentation,
+    fileIconTheme,
+    initialAppearance,
+    initialAppearanceRead.writable,
+    interfaceStyle,
+    lightThemePreset,
+    loadingAnimationPreset,
+    pointerCursors,
+    sidebarNavigationLayout,
+    textSize,
+    themeMode,
+    typographyPreferences,
+  ]);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -326,8 +417,8 @@ export function useDesktopPreferences() {
     return () => query.removeEventListener("change", sync);
   }, []);
 
-  const sidebarNavigationPlacement = getSidebarNavigationPlacement(sidebarNavigationLayout);
-  const sidebarNavigationOrientation = getSidebarNavigationOrientation(sidebarNavigationLayout);
+  const sidebarNavigationPlacement = resolvedAppearance.sidebarNavigationPlacement;
+  const sidebarNavigationOrientation = resolvedAppearance.sidebarNavigationOrientation;
   const terminalToolEnabled = rightSidebarToolsSettings.enabled.terminal;
 
   return {
@@ -339,10 +430,12 @@ export function useDesktopPreferences() {
     createNewMenuSettings,
     externalAppsSettings,
     experimentalSettings,
-    fileIconTheme,
+    fileIconTheme: resolvedAppearance.fileIconTheme,
+    editorPresentation,
     filesVisibilitySettings,
     gitDisplayMode,
     interfaceStyle,
+    resolvedAppearance,
     resolvedTheme,
     rightSidebarOpen,
     rightSidebarToolsSettings,
@@ -353,6 +446,7 @@ export function useDesktopPreferences() {
     agentFileActivityIndicatorsEnabled,
     sidebarCollapsed,
     sidebarNavigationLayout,
+    effectiveSidebarNavigationLayout: resolvedAppearance.sidebarNavigationLayout,
     sidebarNavigationOrientation,
     sidebarNavigationPlacement,
     sidebarNavigationVisibilitySettings,
@@ -364,7 +458,7 @@ export function useDesktopPreferences() {
     loadingAnimationPreset,
     localAgentsSettings,
     themeMode,
-    textSize,
+    textSize: resolvedAppearance.textSize,
     typographyPreferences,
     pointerCursors,
     setAiEditAssistEnabled,
@@ -376,6 +470,7 @@ export function useDesktopPreferences() {
     setExternalAppsSettings,
     setExperimentalSettings,
     setFileIconTheme,
+    setEditorPresentation,
     setFilesVisibilitySettings,
     setGitDisplayMode,
     setInterfaceStyle,

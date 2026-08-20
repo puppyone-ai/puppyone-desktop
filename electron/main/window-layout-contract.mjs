@@ -6,3 +6,4 @@
  * boundaries synchronized because CSS cannot import an Electron main module.
  */
 export const DESKTOP_WINDOW_MIN_WIDTH = 640;
+export const DESKTOP_WINDOW_MIN_HEIGHT = 520;

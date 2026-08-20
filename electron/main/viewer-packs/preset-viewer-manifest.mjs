@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const manifestJson = require("../../../packages/shared-ui/src/editor/registry/presetViewerManifest.json");
 
-const CONTRACT_VERSION = 3;
+const CONTRACT_VERSION = 4;
 const CAPABILITIES = new Set(["edit", "preview", "placeholder"]);
 const SOURCES = new Set(["content", "resource", "content-and-resource", "none"]);
 const RUNTIMES = new Set(["eager", "lazy"]);
@@ -15,6 +15,24 @@ const READINESS_SIGNALS = new Set([
   "first-rendered-frame",
   "media-metadata",
 ]);
+const SURFACE_FAMILIES = new Set([
+  "document",
+  "code",
+  "grid",
+  "canvas",
+  "media",
+  "embedded",
+  "fallback",
+]);
+const SURFACE_TRAITS = new Set([
+  "rich-text",
+  "monospace",
+  "tabular",
+  "scrollable",
+  "zoomable",
+  "paginated",
+  "sandboxed",
+]);
 const ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const MANIFEST_KEYS = new Set(["contractVersion", "fallbackViewerId", "viewers"]);
 const DEFINITION_KEYS = new Set([
@@ -25,6 +43,8 @@ const DEFINITION_KEYS = new Set([
   "runtime",
   "surfacePreparation",
   "readinessSignal",
+  "surfaceFamily",
+  "surfaceTraits",
 ]);
 
 export const PRESET_VIEWER_MANIFEST = parseManifest(manifestJson);
@@ -123,6 +143,16 @@ function parseDefinition(input, index) {
   if (!READINESS_SIGNALS.has(record.readinessSignal)) {
     throw new TypeError(`Preset viewer ${record.id} has an unsupported readiness signal.`);
   }
+  if (!SURFACE_FAMILIES.has(record.surfaceFamily)) {
+    throw new TypeError(`Preset viewer ${record.id} has an unsupported surface family.`);
+  }
+  if (
+    !Array.isArray(record.surfaceTraits)
+    || record.surfaceTraits.some((trait) => !SURFACE_TRAITS.has(trait))
+    || new Set(record.surfaceTraits).size !== record.surfaceTraits.length
+  ) {
+    throw new TypeError(`Preset viewer ${record.id} has unsupported or repeated surface traits.`);
+  }
   if (record.capability === "edit" && record.source === "none") {
     throw new TypeError(`Editable preset viewer ${record.id} must receive content or a resource.`);
   }
@@ -142,6 +172,8 @@ function parseDefinition(input, index) {
     runtime: record.runtime,
     surfacePreparation: record.surfacePreparation,
     readinessSignal: record.readinessSignal,
+    surfaceFamily: record.surfaceFamily,
+    surfaceTraits: Object.freeze([...record.surfaceTraits]),
   });
 }
 

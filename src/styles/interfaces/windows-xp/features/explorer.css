@@ -1,0 +1,271 @@
+/* Explorer tree: dotted hierarchy, square disclosure controls, and native
+ * small-size artwork. This module is a skin projection over the shared tree's
+ * public classes, ARIA states, and semantic file-kind hook; editor surfaces
+ * and file-icon theme implementations stay outside this cascade boundary. */
+:root[data-interface-style="windows-xp"] .explorer-tree-shell {
+  --xp-tree-dot-step: 4px;
+  --xp-tree-branch-y: calc((var(--tree-row-height) + 1px) / 2);
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .explorer-tree-motion-shell:not([data-depth="0"])::before {
+  background-image: radial-gradient(
+    circle at 0.5px 1.5px,
+    var(--po-tree-guide) 0 0.5px,
+    transparent 0.51px
+  );
+  background-repeat: repeat;
+  background-position: 0 0;
+  background-size: var(--tree-row-indent) var(--xp-tree-dot-step);
+}
+
+/* Every non-root node gets the TreeView branch from its parent's guide into
+ * the current 18px icon column. The current icon/expander paints over the end
+ * of the branch, so it terminates cleanly at the glyph rather than through it. */
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .explorer-tree-motion-shell:not([data-depth="0"])::after {
+  position: absolute;
+  z-index: 0;
+  top: var(--xp-tree-branch-y);
+  left: calc(
+    var(--tree-row-content-left)
+    + var(--tree-icon-slot-size) / 2
+    + (var(--depth, 1) - 1) * var(--tree-row-indent)
+  );
+  width: var(--tree-row-indent);
+  height: 1px;
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--po-tree-guide) 0 1px,
+    transparent 1px var(--xp-tree-dot-step)
+  );
+  content: "";
+  pointer-events: none;
+}
+
+/* The expanded node owns the short downward stem from the minus box to the
+ * first child row; subsequent rows continue it on the exact same x anchor. */
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row.folder[aria-expanded="true"]::after {
+  position: absolute;
+  z-index: 0;
+  top: calc((var(--tree-row-height) - 1px) / 2);
+  bottom: calc(
+    -1 * (var(--tree-virtual-row-size) - var(--tree-row-height) - 1px)
+  );
+  left: calc(
+    var(--tree-row-content-left)
+    + var(--depth, 0) * var(--tree-row-indent)
+    + var(--tree-icon-slot-size) / 2
+  );
+  width: 1px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--po-tree-guide) 0 1px,
+    transparent 1px var(--xp-tree-dot-step)
+  );
+  content: "";
+  pointer-events: none;
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-icon-slot:has(.tree-disclosure-marker) {
+  position: relative;
+  width: var(--tree-icon-slot-size);
+  height: var(--tree-icon-slot-size);
+  margin: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #000000;
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-disclosure-marker {
+  opacity: 0;
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-icon-slot:has(.tree-disclosure-marker)::before,
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-icon-slot:has(.tree-disclosure-marker)::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  content: "";
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-icon-slot:has(.tree-disclosure-marker)::before {
+  width: 11px;
+  height: 11px;
+  box-sizing: border-box;
+  border: 1px solid #7f9db9;
+  background: #ffffff;
+  box-shadow: inset 1px 1px 0 #f4f4f4;
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-icon-slot:has(.tree-disclosure-marker)::after {
+  width: 5px;
+  height: 5px;
+  background:
+    linear-gradient(#1f1f1f, #1f1f1f) center / 5px 1px no-repeat,
+    linear-gradient(#1f1f1f, #1f1f1f) center / 1px 5px no-repeat;
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-icon-slot:has(.tree-disclosure-marker[data-expanded="true"])::after {
+  background: linear-gradient(#1f1f1f, #1f1f1f) center / 5px 1px no-repeat;
+}
+
+/* XP Explorer used separate, hand-tuned 16px bitmaps for closed and open
+ * folders. Keep the shared tree markup unchanged and switch the asset through
+ * its existing aria-expanded state. */
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell :where(.tree-row.folder, .tree-row.root) .tree-label {
+  align-items: center;
+}
+
+/* A 1px expander-to-label gap puts a folder icon on the next 18px tree
+ * column. It therefore shares an x center with the child file icons below. */
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell :where(.tree-row.folder, .tree-row.root) .tree-row-content {
+  gap: 1px;
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell :where(.tree-row.folder, .tree-row.root) .tree-label::before {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  background: center / 16px 16px no-repeat url("../assets/explorer-folder-closed.svg");
+  content: "";
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell
+  :where(.tree-row.folder, .tree-row.root)[aria-expanded="true"] .tree-label::before {
+  background-image: url("../assets/explorer-folder-open.svg");
+}
+
+/* Windows XP associated document types through hand-tuned 16px shell icons.
+ * Shared UI exposes only the semantic kind; the skin owns this visual map and
+ * hides the active user icon theme solely inside the Explorer tree. */
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row.file .tree-icon-slot {
+  background: #ffffff center / 16px 16px no-repeat url("../assets/explorer-file-generic.svg?inline");
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row.file .tree-icon-slot > svg {
+  opacity: 0;
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row.file .tree-icon-slot[data-file-kind="html"] {
+  background-image: url("../assets/explorer-file-html.svg?inline");
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row.file .tree-icon-slot[data-file-kind="image"] {
+  background-image: url("../assets/explorer-file-image.svg?inline");
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row.file .tree-icon-slot[data-file-kind="audio"] {
+  background-image: url("../assets/explorer-file-audio.svg?inline");
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row.file .tree-icon-slot[data-file-kind="video"] {
+  background-image: url("../assets/explorer-file-video.svg?inline");
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row.file .tree-icon-slot[data-file-kind="pdf"] {
+  background-image: url("../assets/explorer-file-pdf.svg?inline");
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row.file .tree-icon-slot[data-file-kind="archive"] {
+  background-image: url("../assets/explorer-file-archive.svg?inline");
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell
+  .tree-row.file .tree-icon-slot:is([data-file-kind="app"], [data-file-kind="binary"]) {
+  background-image: url("../assets/explorer-file-executable.svg?inline");
+}
+
+/* Native XP TreeView rows do not paint a modern full-width hover wash. */
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+  color: #000000;
+}
+
+/* Keep unrelated sidebar/review components on their established skin
+ * contract. Explorer's label-level selection is intentionally narrower. */
+:root[data-interface-style="windows-xp"]
+  :where(.po-sidebar-row, .review-row):hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--po-tree-row-hover-bg);
+  color: #000000;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.po-sidebar-row.active, .review-row.active) {
+  border-color: var(--xp-selection);
+  background: var(--po-tree-row-selected-bg);
+  color: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.po-sidebar-row.active, .review-row.active)
+  :where(span, svg) {
+  color: inherit;
+}
+
+/* Explorer selection follows the native TreeView model: the row remains
+ * transparent, while only its text label receives COLOR_HIGHLIGHT. Losing
+ * tree focus projects the classic COLOR_3DFACE selection instead. */
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row:is(.selected, .active) {
+  --xp-tree-label-selection-bg: var(--po-tree-row-selected-muted-bg);
+  --xp-tree-label-selection-fg: #000000;
+
+  border-color: transparent;
+  background: transparent;
+  color: #000000;
+  box-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .explorer-tree-scroll:focus-within .tree-row:is(.selected, .active),
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row:is(.selected, .active):focus {
+  --xp-tree-label-selection-bg: var(--po-tree-row-selected-bg);
+  --xp-tree-label-selection-fg: #ffffff;
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row:is(.selected, .active)
+  :where(.tree-label-primary, .tree-label-extension) {
+  background: var(--xp-tree-label-selection-bg);
+  color: var(--xp-tree-label-selection-fg);
+  box-shadow:
+    2px 0 0 var(--xp-tree-label-selection-bg),
+    -2px 0 0 var(--xp-tree-label-selection-bg);
+}
+
+:root[data-interface-style="windows-xp"]
+  .explorer-tree-shell .tree-row:is(.selected, .active):focus-visible .tree-label-primary {
+  outline: 1px dotted #000000;
+  outline-offset: 1px;
+}

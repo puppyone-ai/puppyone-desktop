@@ -102,6 +102,8 @@ describe("Markdown editor layout", () => {
     expect(contentRule).not.toMatch(/padding-(?:block|top):[^;]*content-gutter-inline/);
     expect(editorRule).toContain("container-type: inline-size;");
     expect(editorRule).toContain("--po-markdown-scroll-viewport-inline-size: 100cqw;");
+    expect(editorRule).toContain("-webkit-font-smoothing: antialiased;");
+    expect(editorRule).toContain("-moz-osx-font-smoothing: grayscale;");
     expect(scrollerRule).not.toContain("container-type: inline-size;");
   });
 
@@ -468,8 +470,11 @@ describe("Markdown table affordance layout", () => {
 
     expect(nativeDividerRule).toContain("background: var(--po-md-rule-color);");
     expect(htmlDividerRule).toContain("background: var(--po-md-rule-color);");
-    expect(viewportRule).toContain("--po-editable-table-border: var(--po-md-rule-color);");
-    expect(viewportRule).toContain("--po-editable-table-cell-border: var(--po-md-rule-color);");
+    expect(viewportRule).toContain(
+      "--po-editable-table-border: var(--po-surface-editable-table-border, var(--po-md-rule-color));",
+    );
+    expect(viewportRule).toContain("--po-surface-editable-table-cell-border");
+    expect(viewportRule).toContain("var(--po-md-rule-color)");
     expect(tableRule).toContain("border: 1px solid var(--po-editable-table-border);");
     expect(cellRule).toContain("border-right: 1px solid var(--po-editable-table-cell-border);");
     expect(cellRule).toContain("border-bottom: 1px solid var(--po-editable-table-cell-border);");

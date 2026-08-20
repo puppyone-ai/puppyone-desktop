@@ -1,0 +1,218 @@
+/* Dialogs and settings */
+:root[data-interface-style="windows-xp"] .desktop-dialog-surface {
+  overflow: hidden;
+  border: 2px solid var(--xp-titlebar-edge);
+  border-radius: 3px 3px 0 0;
+  background: #ece9d8;
+  box-shadow: 4px 5px 10px rgba(0, 0, 0, 0.36);
+  animation-duration: 0.06s;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header {
+  min-height: var(--desktop-chrome-height);
+  align-items: center;
+  padding: 3px 4px 3px 7px;
+  border-bottom: 1px solid var(--xp-titlebar-edge);
+  background-color: var(--xp-titlebar-background-color);
+  background-image: var(--xp-titlebar-background-image);
+  color: #ffffff;
+  text-shadow: 1px 1px 0 rgba(0, 35, 121, 0.86);
+  box-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header :where(h1, h2, span, svg, button) {
+  color: inherit;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-title-row {
+  align-items: center;
+  gap: 5px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-title-row h2 {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-leading {
+  width: 24px;
+  height: 24px;
+  border-radius: 0;
+  background: transparent;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-leading svg {
+  width: 18px;
+  height: 18px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-icon-button {
+  --desktop-dialog-caption-close-image: var(--xp-window-control-close-image);
+
+  appearance: none;
+  position: relative;
+  width: var(--desktop-chrome-control-size);
+  height: var(--desktop-chrome-control-size);
+  flex: 0 0 var(--desktop-chrome-control-size);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #ffffff;
+  box-shadow: none;
+  transform: none;
+  transition: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-icon-button::before {
+  position: absolute;
+  inset: 0;
+  background: transparent var(--desktop-dialog-caption-close-image) center / 100% 100% no-repeat;
+  content: "";
+  pointer-events: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-icon-button:hover:not(:disabled) {
+  --desktop-dialog-caption-close-image: var(--xp-window-control-close-hover-image);
+
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  box-shadow: none;
+  transform: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-icon-button:active:not(:disabled) {
+  --desktop-dialog-caption-close-image: var(--xp-window-control-close-active-image);
+
+  background: transparent;
+  transform: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-icon-button:focus-visible {
+  outline: 1px dotted #ffffff;
+  outline-offset: -4px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-icon-button svg {
+  display: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-body {
+  padding: 14px 16px 16px;
+  background: #ece9d8;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-settings-view {
+  background: #ece9d8;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-settings-row {
+  border-bottom: 1px solid #d4d0c8;
+  border-radius: 0;
+  background: #ffffff;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-theme-segment button {
+  border: 1px solid transparent;
+  border-radius: 1px;
+  color: #000000;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-theme-segment button + button {
+  border-inline-start-color: #aca899;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-theme-segment button:hover,
+:root[data-interface-style="windows-xp"] .desktop-theme-segment button.active {
+  border-color: var(--xp-default-ring);
+  background: linear-gradient(180deg, var(--xp-button-hover-start), var(--xp-button-hover-end));
+  color: #000000;
+  box-shadow: inset 1px 1px 0 #ffffff;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-settings-switch span::before {
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border: 1px solid #003c74;
+  border-radius: 0;
+  background: linear-gradient(180deg, #ffffff, #d4d0c8);
+  box-shadow: inset 1px 1px 0 #ffffff;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
+  :where(.desktop-settings-select, input:not([type="checkbox"]):not([type="radio"]), textarea, select) {
+  border: 1px solid var(--xp-field-border);
+  border-radius: 0;
+  background: #ffffff;
+  color: #000000;
+  box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.24), inset -1px -1px 0 #ffffff;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
+  :where(.desktop-settings-select, input:not([type="checkbox"]):not([type="radio"]), textarea, select):focus {
+  border-color: #0054e3;
+  outline: 1px solid #0054e3;
+  outline-offset: 0;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
+  input[type="checkbox"]:not([role="switch"]),
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
+  input[type="radio"] {
+  appearance: none;
+  box-sizing: border-box;
+  width: 13px;
+  height: 13px;
+  margin: 1px 4px 1px 0;
+  border: 1px solid var(--xp-field-border);
+  background: #ffffff;
+  box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.22), inset -1px -1px 0 #ffffff;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
+  input[type="checkbox"]:not([role="switch"]):checked {
+  background: #ffffff center / 11px 11px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 11'%3E%3Cpath d='m2 5.5 2.2 2.2L9 2.8' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='square' stroke-linejoin='miter'/%3E%3C/svg%3E");
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
+  input[type="radio"] {
+  border-radius: 50%;
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
+  input[type="radio"]:checked {
+  background: radial-gradient(circle, #000000 0 3px, #ffffff 3.5px);
+}
+
+:root[data-interface-style="windows-xp"]
+  :where(.desktop-settings-view, .desktop-dialog-surface, .onboarding-shell)
+  :where(input[type="checkbox"], input[type="radio"]):disabled {
+  border-color: #aca899;
+  background-color: #ece9d8;
+  opacity: 1;
+}
+
+/* The settings switch owns an invisible full-track input. Restore that hit
+ * target after the native checkbox treatment above. */
+:root[data-interface-style="windows-xp"] .desktop-settings-switch input[type="checkbox"] {
+  inset: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+}

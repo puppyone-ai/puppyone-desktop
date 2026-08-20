@@ -102,6 +102,19 @@ if (/desktop-settings-label-stack|<small>|AgentActivity|agentFileActivity|Hook/u
   errors.push("Local Agents must not own appearance, Hook enrollment, or descriptive row copy");
 }
 
+const passiveTerminalAgentDiscoveryFiles = [
+  "electron/main/terminal-agent/terminal-agent-locator.mjs",
+  "electron/main/terminal-agent/terminal-agent-candidate-resolver.mjs",
+  "src/features/desktop-terminal/controller/useTerminalAgentLocator.ts",
+  "src/features/desktop-terminal/infrastructure/electron/terminalAgentLocatorClient.ts",
+];
+const hookEnrollmentPattern = /(?:agent-activity:enrollment|terminal-agent\/activity|hook-registration|reconcileNativeActivityHooks|getAgentActivityEnrollment|setAgentActivityEnrollment)/u;
+for (const filePath of passiveTerminalAgentDiscoveryFiles) {
+  if (hookEnrollmentPattern.test(read(filePath))) {
+    errors.push(`${filePath} couples passive local Agent discovery to Hook enrollment`);
+  }
+}
+
 const settingsModel = read("src/features/settings/sidebar/settingsSidebarModel.ts");
 const desktopAppGroup = settingsModel.slice(
   settingsModel.indexOf('id: "desktop-app"'),

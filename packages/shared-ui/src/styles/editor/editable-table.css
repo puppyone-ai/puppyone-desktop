@@ -4,17 +4,38 @@
  * language so their density and states cannot drift independently.
  */
 :where(.markdown-codemirror-editor .cm-md-table-widget-wrap, .csv-table-editor) {
-  --po-editable-table-border: color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 10%);
-  --po-editable-table-cell-border: color-mix(in srgb, var(--po-divider) 92%, var(--po-text-muted) 8%);
-  --po-editable-table-radius: 4px;
-  --po-editable-table-background: color-mix(in srgb, var(--po-panel) 42%, transparent);
+  --po-editable-table-border: var(
+    --po-surface-editable-table-border,
+    color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 10%)
+  );
+  --po-editable-table-cell-border: var(
+    --po-surface-editable-table-cell-border,
+    color-mix(in srgb, var(--po-divider) 92%, var(--po-text-muted) 8%)
+  );
+  --po-editable-table-radius: var(--po-surface-editable-table-radius, 4px);
+  --po-editable-table-background: var(
+    --po-surface-editable-table-background,
+    color-mix(in srgb, var(--po-panel) 42%, transparent)
+  );
   --po-editable-table-color: color-mix(in srgb, var(--po-text) 82%, var(--po-text-muted));
-  --po-editable-table-header-background: color-mix(in srgb, var(--po-control) 46%, transparent);
-  --po-editable-table-sticky-header-background: color-mix(in srgb, var(--po-control) 46%, var(--po-editor-bg));
+  --po-editable-table-header-background: var(
+    --po-surface-editable-table-header-background,
+    color-mix(in srgb, var(--po-control) 46%, transparent)
+  );
+  --po-editable-table-sticky-header-background: var(
+    --po-surface-editable-table-sticky-header-background,
+    color-mix(in srgb, var(--po-control) 46%, var(--po-editor-bg))
+  );
   --po-editable-table-header-color: color-mix(in srgb, var(--po-text) 88%, var(--po-text-muted));
   --po-editable-table-body-color: color-mix(in srgb, var(--po-text) 72%, var(--po-text-muted));
-  --po-editable-table-cell-hover-background: color-mix(in srgb, var(--po-hover) 48%, transparent);
-  --po-editable-table-cell-focus-background: color-mix(in srgb, var(--po-selected) 58%, transparent);
+  --po-editable-table-cell-hover-background: var(
+    --po-surface-editable-table-cell-hover-background,
+    color-mix(in srgb, var(--po-hover) 48%, transparent)
+  );
+  --po-editable-table-cell-focus-background: var(
+    --po-surface-editable-table-cell-focus-background,
+    color-mix(in srgb, var(--po-selected) 58%, transparent)
+  );
   --po-editable-table-cell-focus-ring: color-mix(in srgb, var(--po-accent) 55%, transparent);
   --po-editable-table-header-focus-background: color-mix(
     in srgb,

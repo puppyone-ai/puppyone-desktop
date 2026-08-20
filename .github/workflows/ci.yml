@@ -46,3 +46,8 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Test representative Appearance matrix in Chromium
+        env:
+          ELECTRON_DISABLE_SANDBOX: "1"
+        run: xvfb-run --auto-servernum npm run smoke:appearance-visual

@@ -22,8 +22,17 @@ type LineGeometryScenario = {
   restored: LineGeometrySnapshot;
 };
 
+type MarkdownPresentationSnapshot = {
+  scrollerFontFamily: string;
+  scrollerLineHeight: number;
+  contentPaddingBlockStart: number;
+  contentPaddingInlineStart: number;
+  linePaddingInlineStart: number;
+};
+
 type MarkdownLineGeometrySmokeResult = {
   ok: true;
+  presentation: MarkdownPresentationSnapshot;
   scenarios: LineGeometryScenario[];
 } | {
   error: string;
@@ -105,12 +114,44 @@ async function openDocumentAndRunGeometrySmoke(
   );
   if (isCancelled() || startedRef.current) return;
   startedRef.current = true;
+  const presentation = readPresentationSnapshot(host);
+  assertPresentationContract(presentation);
   const scenarios = await runGeometrySmoke(host);
   if (isCancelled()) return;
   window.__PUPPYONE_MARKDOWN_LINE_GEOMETRY_SMOKE_RESULT__ = {
     ok: true,
+    presentation,
     scenarios,
   };
+}
+
+function readPresentationSnapshot(host: HTMLElement): MarkdownPresentationSnapshot {
+  const scroller = host.querySelector<HTMLElement>(".cm-scroller");
+  const content = host.querySelector<HTMLElement>(".cm-content");
+  const line = host.querySelector<HTMLElement>(".cm-line");
+  if (!scroller || !content || !line) {
+    throw new Error("Markdown presentation smoke could not resolve CodeMirror layout nodes.");
+  }
+  const scrollerStyle = getComputedStyle(scroller);
+  const contentStyle = getComputedStyle(content);
+  const lineStyle = getComputedStyle(line);
+  return {
+    scrollerFontFamily: scrollerStyle.fontFamily,
+    scrollerLineHeight: round(Number.parseFloat(scrollerStyle.lineHeight)),
+    contentPaddingBlockStart: round(Number.parseFloat(contentStyle.paddingBlockStart)),
+    contentPaddingInlineStart: round(Number.parseFloat(contentStyle.paddingInlineStart)),
+    linePaddingInlineStart: round(Number.parseFloat(lineStyle.paddingInlineStart)),
+  };
+}
+
+function assertPresentationContract(snapshot: MarkdownPresentationSnapshot) {
+  if (/monospace/i.test(snapshot.scrollerFontFamily)) {
+    throw new Error(`Markdown presentation fell back to CodeMirror monospace: ${snapshot.scrollerFontFamily}.`);
+  }
+  assertNear(snapshot.scrollerLineHeight, 24, "14px Markdown reading line height");
+  assertNear(snapshot.contentPaddingBlockStart, 64, "Markdown document block inset");
+  assertNear(snapshot.contentPaddingInlineStart, 64, "Markdown document minimum inline gutter");
+  assertNear(snapshot.linePaddingInlineStart, 0, "Markdown line inline padding");
 }
 
 async function runGeometrySmoke(host: HTMLElement): Promise<LineGeometryScenario[]> {

@@ -58,6 +58,8 @@ const FORMAT_CASES: readonly FormatCase[] = [
     applyLocalEdit: (container) => {
       const collapse = container.querySelector<HTMLButtonElement>(
         '.folder-relationship-group[data-node-path="alpha"] .folder-relationship-collapse',
+      ) ?? container.querySelector<HTMLButtonElement>(
+        'button.folder-relationship-card[data-node-path="alpha"][data-expanded="true"]',
       );
       const expand = container.querySelector<HTMLButtonElement>(
         'button.folder-relationship-card[data-node-path="human"]',
@@ -590,6 +592,8 @@ function readPuppyFlowMarker(container: HTMLElement): string | null {
 function readContextMapMarker(container: HTMLElement): string | null {
   const expanded = container.querySelector<HTMLElement>(
     ".folder-relationship-group[data-node-path]",
+  ) ?? container.querySelector<HTMLElement>(
+    '.folder-relationship-card[data-node-path][data-expanded="true"]',
   );
   return expanded ? markerFromText(expanded.dataset.nodePath ?? "") : null;
 }

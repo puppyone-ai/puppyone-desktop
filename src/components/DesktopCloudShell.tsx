@@ -11,6 +11,7 @@ import {
 import { PanelLeft } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
 import { AuxiliaryPanelHost } from "../features/app-shell/auxiliary";
+import { DesktopShellAccessoryProvider } from "../features/app-shell/DesktopShellAccessoryContext";
 import { DesktopPaneLayoutProvider } from "../features/app-shell/layout/DesktopPaneLayoutContext";
 import {
   DEFAULT_EXPLORER_WIDTH,
@@ -34,6 +35,8 @@ type DesktopCloudShellProps = {
   titlebarSidebarSlot?: ReactNode;
   titlebarEditorSlot?: ReactNode;
   titlebarActions?: ReactNode;
+  navigationToolbarActions?: ReactNode;
+  locationBar?: ReactNode;
   minimalMode?: boolean;
   minimalModeDock?: ReactNode;
   leftSidebarCollapsed?: boolean;
@@ -58,6 +61,8 @@ export function DesktopCloudShell({
   titlebarSidebarSlot,
   titlebarEditorSlot,
   titlebarActions,
+  navigationToolbarActions,
+  locationBar,
   minimalMode = false,
   minimalModeDock,
   leftSidebarCollapsed = false,
@@ -78,6 +83,7 @@ export function DesktopCloudShell({
 }: DesktopCloudShellProps) {
   const { t } = useLocalization();
   const bodyRef = useRef<HTMLDivElement>(null);
+  const [navigationToolbarHost, setNavigationToolbarHost] = useState<HTMLDivElement | null>(null);
   const bodyWidth = useObservedElementWidth(bodyRef);
   const paneLayout = useMemo(() => resolveDesktopPaneLayout({
     availableWidth: bodyWidth,
@@ -119,6 +125,9 @@ export function DesktopCloudShell({
     : paneLayout.explorer.collapsed
       ? "collapsed"
       : "expanded";
+  const shellStyle = {
+    "--desktop-shell-explorer-width": `${paneLayout.explorer.width}px`,
+  } as CSSProperties;
 
   useEffect(() => {
     publishWindowMinimumWidth(paneLayout.minimumWidth);
@@ -132,6 +141,7 @@ export function DesktopCloudShell({
     <div
       className={`desktop-shell ${minimalMode ? "is-minimal-mode" : ""}`}
       data-titlebar-sidebar-state={sidebarState}
+      style={shellStyle}
     >
       <DesktopWindowChrome
         context={(
@@ -163,27 +173,48 @@ export function DesktopCloudShell({
         minimalModeDock={minimalModeDock}
       />
 
-      <DesktopPaneLayoutProvider value={paneLayout}>
-        <div ref={bodyRef} className="desktop-shell-body" style={bodyStyle}>
-          <main className="desktop-surface" style={{ minWidth: paneLayout.surfaceMinWidth }}>
-            {children}
-          </main>
-          {rightSidebar && (
-            <AuxiliaryPanelHost
-              collapseThreshold={RIGHT_SIDEBAR_COLLAPSE_THRESHOLD}
-              open={paneLayout.rightSidebar.open}
-              width={paneLayout.rightSidebar.width}
-              minWidth={paneLayout.rightSidebar.minWidth}
-              maxWidth={paneLayout.rightSidebar.maxWidth}
-              resizable={resizableRightSidebar}
-              onOpenChange={onRightSidebarOpenChange}
-              onWidthChange={onRightSidebarWidthChange}
+      <DesktopShellAccessoryProvider navigationToolbarHost={navigationToolbarHost}>
+        <div
+          ref={setNavigationToolbarHost}
+          className="desktop-shell-navigation-toolbar-host"
+          data-window-no-drag="true"
+        >
+          {navigationToolbarActions && (
+            <div
+              className="desktop-shell-navigation-toolbar-actions desktop-shell-toolbar-section"
+              data-shell-toolbar-section="actions"
             >
-              {rightSidebar}
-            </AuxiliaryPanelHost>
+              {navigationToolbarActions}
+            </div>
           )}
         </div>
-      </DesktopPaneLayoutProvider>
+        {locationBar && (
+          <div className="desktop-shell-location-bar-host" data-window-no-drag="true">
+            {locationBar}
+          </div>
+        )}
+        <DesktopPaneLayoutProvider value={paneLayout}>
+          <div ref={bodyRef} className="desktop-shell-body" style={bodyStyle}>
+            <main className="desktop-surface" style={{ minWidth: paneLayout.surfaceMinWidth }}>
+              {children}
+            </main>
+            {rightSidebar && (
+              <AuxiliaryPanelHost
+                collapseThreshold={RIGHT_SIDEBAR_COLLAPSE_THRESHOLD}
+                open={paneLayout.rightSidebar.open}
+                width={paneLayout.rightSidebar.width}
+                minWidth={paneLayout.rightSidebar.minWidth}
+                maxWidth={paneLayout.rightSidebar.maxWidth}
+                resizable={resizableRightSidebar}
+                onOpenChange={onRightSidebarOpenChange}
+                onWidthChange={onRightSidebarWidthChange}
+              >
+                {rightSidebar}
+              </AuxiliaryPanelHost>
+            )}
+          </div>
+        </DesktopPaneLayoutProvider>
+      </DesktopShellAccessoryProvider>
     </div>
   );
 }

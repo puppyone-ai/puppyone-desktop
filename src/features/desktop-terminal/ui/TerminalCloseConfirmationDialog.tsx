@@ -32,7 +32,7 @@ export function TerminalCloseConfirmationDialog({
           <header className="desktop-dialog-header">
             <div className="desktop-dialog-title-row">
               <span
-                className="desktop-dialog-leading desktop-terminal-close-dialog-leading"
+                className="desktop-dialog-leading destructive"
                 aria-hidden="true"
               >
                 <SquareTerminal size={17} strokeWidth={1.8} />
@@ -63,7 +63,7 @@ export function TerminalCloseConfirmationDialog({
               {t("common.action.cancel")}
             </button>
             <button
-              className="desktop-dialog-button desktop-terminal-close-dialog-confirm"
+              className="desktop-dialog-button primary destructive"
               type="button"
               onClick={onConfirm}
             >

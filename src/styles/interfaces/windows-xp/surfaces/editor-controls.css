@@ -1,0 +1,15 @@
+/* Editor chrome consumes semantic component tokens. The XP Style never
+ * reaches into Viewer-owned class names. */
+:root[data-interface-style="windows-xp"][data-editor-presentation="follow-interface"]
+  .po-viewer-surface-boundary {
+  --po-surface-editor-mode-radius: 2px;
+  --po-surface-editor-mode-shadow: var(--interface-card-box-shadow);
+  --po-surface-editor-mode-button-border: var(--interface-icon-button-border);
+  --po-surface-editor-mode-button-radius: 2px;
+  --po-surface-editor-mode-button-active-border-color: var(--interface-icon-button-active-border-color);
+  --po-surface-editor-mode-button-active-background: var(--interface-icon-button-active-background);
+  --po-surface-editor-mode-button-active-color: var(--interface-icon-button-active-color);
+  --po-surface-editor-mode-button-active-shadow: var(--interface-icon-button-active-box-shadow);
+  --po-surface-editor-card-radius: 2px;
+  --po-surface-editor-card-shadow: var(--interface-card-box-shadow);
+}

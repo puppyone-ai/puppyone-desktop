@@ -4,7 +4,7 @@
  * registry; a viewer contribution only declares host capabilities.
  */
 
-export const PRESET_VIEWER_CONTRACT_VERSION = 3 as const;
+export const PRESET_VIEWER_CONTRACT_VERSION = 4 as const;
 
 export const PRESET_VIEWER_CAPABILITIES = ["edit", "preview", "placeholder"] as const;
 export type CoreViewerCapability = (typeof PRESET_VIEWER_CAPABILITIES)[number];
@@ -23,6 +23,30 @@ export type PresetViewerSource = (typeof PRESET_VIEWER_SOURCES)[number];
  */
 export const PRESET_VIEWER_RUNTIMES = ["eager", "lazy"] as const;
 export type PresetViewerRuntime = (typeof PRESET_VIEWER_RUNTIMES)[number];
+
+/** Stable visual families consumed by Interface Style surface adapters. */
+export const VIEWER_SURFACE_FAMILIES = [
+  "document",
+  "code",
+  "grid",
+  "canvas",
+  "media",
+  "embedded",
+  "fallback",
+] as const;
+export type ViewerSurfaceFamily = (typeof VIEWER_SURFACE_FAMILIES)[number];
+
+/** Appearance-relevant traits only; capabilities and runtime stay separate. */
+export const VIEWER_SURFACE_TRAITS = [
+  "rich-text",
+  "monospace",
+  "tabular",
+  "scrollable",
+  "zoomable",
+  "paginated",
+  "sandboxed",
+] as const;
+export type ViewerSurfaceTrait = (typeof VIEWER_SURFACE_TRAITS)[number];
 
 /**
  * Whether a Viewer can create its first trustworthy frame while its DOM slot

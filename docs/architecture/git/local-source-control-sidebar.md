@@ -99,7 +99,8 @@ expansion and resize presentation state, but it does not own Git truth.
 
 Depending on repository and hosting state, the sidebar can render:
 
-- hosting identity or PuppyOne Cloud provider state
+- GitHub repository identity with its incoming-update body, or PuppyOne Cloud
+  provider state
 - incoming or remote synchronization state
 - merge/conflict resources
 - committed-but-not-pushed resources
@@ -113,6 +114,38 @@ Both modes must derive from the same snapshot and view model.
 
 The navigation badge and titlebar branch indicator also consume the active
 snapshot. A stale snapshot therefore affects more than the visible Git sidebar.
+
+### GitHub incoming-update contract
+
+GitHub hosting keeps one stable provider section in the fixed sidebar region.
+The repository identity row remains the header. Its body is intentionally
+quiet: it renders the canonical section `Empty` state when the tracked remote
+branch has no incoming net changes. It must not grow a second card, banner, or
+GitHub-specific control scale.
+
+After a targeted background fetch reports `remote.behind > 0`, the same row
+gains the accent count and the canonical `24px` Pull action. The body reuses
+`SourceControlPreviewResourceList` to show the bounded net file comparison from
+`remote.incomingPreview`. Selecting a file opens the existing `remote` diff
+scope; it does not create a second preview route. Pull completion publishes the
+returned snapshot and refreshes workspace content, so the provider naturally
+returns to `Empty` when the local branch catches up.
+
+```text
+GitHub repository row
+       |
+       +-- behind = 0 ----------> Empty
+       |
+       +-- behind > 0 ----------> count + Pull
+                                      |
+                                      +-- incoming net-file preview
+```
+
+Automatic detection is **fetch-only**. The repository lifecycle may refresh
+remote-tracking refs while the window is foregrounded, but only an explicit
+user action may Pull and change the worktree. Divergence and merge-conflict
+states disable the one-click path rather than disguising a reconciliation as a
+safe fast-forward.
 
 ### Version-control opt-in setup state
 
@@ -299,6 +332,9 @@ history lazily. See
   - creates the controller and connects workspace file-watch refreshes
 - `src/features/source-control/useDesktopGitController.ts`
   - owns renderer status, selection, detail, and operation state
+- `src/features/source-control/githubRemoteRefreshPolicy.ts`
+  - identifies the effective GitHub fetch target and owns foreground/cadence
+    policy without executing network operations
 - `src/features/source-control/viewModel.ts`
   - derives product-facing sections and actions
 - `src/features/source-control/SourceControlSidebar.tsx`
@@ -346,6 +382,10 @@ watcher recovery, and refresh ordering belong to the lifecycle test matrix in
 - A displayed snapshot always belongs to the active workspace path.
 - Git truth comes from a fresh Git query, never directly from a watcher payload.
 - View-model rules live outside presentational components.
+- GitHub background refresh targets only the effective hosting remote, runs
+  from repository lifecycle rather than a sidebar component, and never pulls.
+- The GitHub provider body is stable: `Empty` when synchronized, incoming net
+  files when behind, with the same row and action tokens as every Git section.
 - Renderer code does not execute shell commands or grant itself workspace
   authority.
 - Application-initiated mutations reconcile status as part of operation

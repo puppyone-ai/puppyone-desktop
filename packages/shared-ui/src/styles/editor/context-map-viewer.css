@@ -46,6 +46,7 @@
 }
 
 .folder-relationship-view {
+  position: relative;
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -88,6 +89,201 @@
 
 .folder-relationship-canvas[data-panning="true"] {
   cursor: grabbing;
+}
+
+.folder-relationship-radial-canvas {
+  min-height: 100%;
+  background-image: none;
+}
+
+.folder-relationship-radial-world {
+  position: absolute;
+  will-change: transform;
+}
+
+.folder-relationship-radial-lines {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.folder-relationship-radial-hierarchy path,
+.folder-relationship-radial-references path {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.folder-relationship-radial-hierarchy path {
+  stroke: color-mix(in srgb, var(--po-accent) 40%, var(--po-text-subtle));
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.4px;
+  transition: opacity 140ms ease, stroke 140ms ease, stroke-width 140ms ease;
+}
+
+.folder-relationship-radial-hierarchy path[data-focused="true"] {
+  stroke: color-mix(in srgb, var(--po-accent) 72%, var(--po-text));
+  stroke-width: 5.2px;
+}
+
+.folder-relationship-radial-references path {
+  opacity: 0.42;
+  stroke: color-mix(in srgb, var(--po-warning) 46%, var(--po-text-subtle));
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+  stroke-width: 2.2px;
+  transition: opacity 140ms ease, stroke 140ms ease;
+}
+
+.folder-relationship-radial-references path[data-bidirectional="true"] {
+  opacity: 0.44;
+  stroke: color-mix(in srgb, var(--po-warning) 52%, var(--po-text-muted));
+  stroke-dasharray: 7 5;
+}
+
+.folder-relationship-radial-references path[data-focused="true"] {
+  opacity: 0.86;
+  stroke: color-mix(in srgb, var(--po-warning) 72%, var(--po-text-muted));
+}
+
+.folder-relationship-reference-arrow {
+  fill: color-mix(in srgb, var(--po-warning) 72%, var(--po-text-muted));
+}
+
+.folder-relationship-card.folder-relationship-radial-node {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -22px);
+}
+
+.folder-relationship-radial-node > .folder-relationship-card-hitarea {
+  cursor: default;
+}
+
+button.folder-relationship-radial-node > .folder-relationship-card-hitarea {
+  cursor: pointer;
+}
+
+.folder-relationship-radial-node[data-root="true"] {
+  color: var(--po-text);
+  transform: translate(-50%, -50%);
+}
+
+.folder-relationship-radial-node[data-root="true"]
+  > .folder-relationship-card-hitarea {
+  width: 88px;
+  min-width: 88px;
+  height: 88px;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px;
+  border-radius: 999px;
+  background: var(--po-surface-elevated);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--po-text-muted) 32%, transparent),
+    var(--po-shadow-sm);
+}
+
+.folder-relationship-radial-node[data-root="true"]
+  .folder-relationship-card-copy strong {
+  font-weight: var(--po-text-weight-semibold);
+}
+
+.folder-relationship-layered-canvas {
+  min-height: 100%;
+}
+
+.folder-relationship-layered-world {
+  position: absolute;
+  will-change: transform;
+}
+
+.folder-relationship-layered-lines {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.folder-relationship-layered-hierarchy path,
+.folder-relationship-layered-references path {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.folder-relationship-layered-hierarchy path {
+  stroke: color-mix(in srgb, var(--po-accent) 40%, var(--po-text-subtle));
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.4px;
+  transition: opacity 140ms ease, stroke 140ms ease, stroke-width 140ms ease;
+}
+
+.folder-relationship-layered-hierarchy path[data-focused="true"] {
+  stroke: color-mix(in srgb, var(--po-accent) 72%, var(--po-text));
+  stroke-width: 5.2px;
+}
+
+.folder-relationship-layered-references path {
+  opacity: 0.42;
+  stroke: color-mix(in srgb, var(--po-warning) 46%, var(--po-text-subtle));
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+  stroke-width: 2.2px;
+  transition: opacity 140ms ease, stroke 140ms ease;
+}
+
+.folder-relationship-layered-references path[data-bidirectional="true"] {
+  opacity: 0.44;
+  stroke: color-mix(in srgb, var(--po-warning) 52%, var(--po-text-muted));
+  stroke-dasharray: 7 5;
+}
+
+.folder-relationship-layered-references path[data-focused="true"] {
+  opacity: 0.86;
+  stroke: color-mix(in srgb, var(--po-warning) 72%, var(--po-text-muted));
+}
+
+.folder-relationship-card.folder-relationship-layered-node {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -22px);
+}
+
+.folder-relationship-layered-node > .folder-relationship-card-hitarea {
+  cursor: default;
+}
+
+button.folder-relationship-layered-node > .folder-relationship-card-hitarea {
+  cursor: pointer;
+}
+
+.folder-relationship-layered-node[data-root="true"] {
+  color: var(--po-text);
+  transform: translate(-50%, -50%);
+}
+
+.folder-relationship-layered-node[data-root="true"]
+  > .folder-relationship-card-hitarea {
+  width: 88px;
+  min-width: 88px;
+  height: 88px;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px;
+  border-radius: 999px;
+  background: var(--po-surface-elevated);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--po-text-muted) 32%, transparent),
+    var(--po-shadow-sm);
+}
+
+.folder-relationship-layered-node[data-root="true"]
+  .folder-relationship-card-copy strong {
+  font-weight: var(--po-text-weight-semibold);
 }
 
 .folder-relationship-world {
@@ -328,6 +524,27 @@
 .folder-relationship-card:focus-visible .folder-relationship-card-hitarea {
   outline: 1px solid var(--po-focus-ring);
   outline-offset: 2px;
+}
+
+.folder-relationship-card.folder-relationship-radial-node:focus-visible,
+.folder-relationship-card.folder-relationship-layered-node:focus-visible {
+  color: color-mix(in srgb, var(--po-accent) 72%, var(--po-text));
+}
+
+.folder-relationship-card.folder-relationship-radial-node:focus-visible
+  > .folder-relationship-card-hitarea,
+.folder-relationship-card.folder-relationship-layered-node:focus-visible
+  > .folder-relationship-card-hitarea {
+  outline: none;
+}
+
+.folder-relationship-card.folder-relationship-radial-node:focus-visible
+  .folder-relationship-card-copy strong,
+.folder-relationship-card.folder-relationship-layered-node:focus-visible
+  .folder-relationship-card-copy strong {
+  text-decoration: underline;
+  text-decoration-color: var(--po-focus-ring);
+  text-underline-offset: 3px;
 }
 
 .folder-relationship-group {
@@ -576,6 +793,11 @@
   .folder-relationship-line-core,
   .folder-relationship-group,
   .folder-relationship-group::before {
+    transition: none;
+  }
+
+  .folder-relationship-radial-hierarchy path,
+  .folder-relationship-radial-references path {
     transition: none;
   }
 

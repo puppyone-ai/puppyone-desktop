@@ -1,0 +1,6 @@
+/* Sandboxed documents are never injected with Style CSS. */
+:root[data-interface-style="windows-xp"][data-editor-presentation="follow-interface"]
+  .po-viewer-surface-boundary[data-viewer-surface-family="embedded"] {
+  --po-panel: #ece9d8;
+  --po-border: #7697c5;
+}

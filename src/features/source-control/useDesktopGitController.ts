@@ -74,7 +74,11 @@ export function useDesktopGitController({
     refreshGitStatus,
     refreshGitStatusWithFetch,
     reportGitStatusError,
-  } = useGitRepositoryLifecycle({ workspace, onWorkspaceContentChanged });
+  } = useGitRepositoryLifecycle({
+    workspace,
+    remoteUpdatesActive: gitViewActive,
+    onWorkspaceContentChanged,
+  });
   const historyRequestRef = useRef(0);
   const workingDiffRequestRef = useRef(0);
   const branchSwitcherRef = useRef<HTMLDivElement>(null);

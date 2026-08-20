@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="22" viewBox="0 0 24 22" fill="none">
+  <defs>
+    <radialGradient id="glass" cx="0" cy="0" r="1" gradientTransform="translate(8 5) rotate(48) scale(16 15)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EAF8FF"/>
+      <stop offset=".34" stop-color="#8CCBFF"/>
+      <stop offset=".7" stop-color="#3179D3"/>
+      <stop offset="1" stop-color="#153B92"/>
+    </radialGradient>
+    <linearGradient id="fur" x1="12" y1="6" x2="12" y2="18" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE68B"/>
+      <stop offset=".45" stop-color="#F6A62B"/>
+      <stop offset="1" stop-color="#C96208"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="12" cy="11" rx="10" ry="9" fill="#103C90" stroke="#fff"/>
+  <ellipse cx="12" cy="10.5" rx="9" ry="8.5" fill="url(#glass)" stroke="#174DAD"/>
+  <path d="M5 6.5 8.2 7l1.1 2.2h5.4L15.8 7l3.2-.5-1 4.1v3.2c0 2.5-2.7 4.4-6 4.4s-6-1.9-6-4.4v-3.2L5 6.5Z" fill="url(#fur)" stroke="#843A06" stroke-linejoin="round"/>
+  <path d="M7 7.3 8.5 8 7.4 9.6 7 7.3ZM17 7.3 15.5 8l1.1 1.6.4-2.3Z" fill="#FFF0A9"/>
+  <path d="M9 12.2h.1M15 12.2h.1" stroke="#3A1A05" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="m10.2 14.2 1.8 1 1.8-1" stroke="#6A2C05" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M5.1 5.3c2.2-2.1 6.2-3 9.7-2.1" stroke="#fff" stroke-width="1.2" stroke-linecap="round" stroke-opacity=".8"/>
+</svg>

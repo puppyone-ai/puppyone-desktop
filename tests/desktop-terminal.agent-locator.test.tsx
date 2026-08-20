@@ -20,6 +20,30 @@ afterEach(() => {
 });
 
 describe("Terminal Agent locator controller", () => {
+  it("detects local Agents without reading or changing activity Hook enrollment", async () => {
+    const locate = vi.fn(async () => snapshot(["codex"]));
+    const getAgentActivityEnrollment = vi.fn();
+    const setAgentActivityEnrollment = vi.fn();
+    installBridge(locate, {
+      getAgentActivityEnrollment,
+      setAgentActivityEnrollment,
+    });
+    let latest: LocatorView | null = null;
+    mount((value) => { latest = value; });
+
+    await vi.waitFor(() => expect(latest?.phase).toBe("ready"));
+    expect(latest?.ids).toEqual(["codex"]);
+    expect(getAgentActivityEnrollment).not.toHaveBeenCalled();
+    expect(setAgentActivityEnrollment).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await latest?.refresh();
+    });
+    expect(locate).toHaveBeenCalledTimes(2);
+    expect(getAgentActivityEnrollment).not.toHaveBeenCalled();
+    expect(setAgentActivityEnrollment).not.toHaveBeenCalled();
+  });
+
   it("ignores an older discovery response after a forced refresh", async () => {
     const first = deferred<unknown>();
     const second = deferred<unknown>();
@@ -125,7 +149,10 @@ function Harness({ onValue }: { onValue: (value: LocatorView) => void }) {
   return null;
 }
 
-function installBridge(locate: ReturnType<typeof vi.fn>) {
+function installBridge(
+  locate: ReturnType<typeof vi.fn>,
+  additionalBridgeMethods: Record<string, unknown> = {},
+) {
   let progressCallback: ((event: unknown) => void) | null = null;
   Object.defineProperty(window, "puppyoneDesktop", {
     configurable: true,
@@ -135,6 +162,7 @@ function installBridge(locate: ReturnType<typeof vi.fn>) {
         progressCallback = callback;
         return () => { progressCallback = null; };
       }),
+      ...additionalBridgeMethods,
     },
   });
   return {

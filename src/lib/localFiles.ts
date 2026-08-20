@@ -653,8 +653,11 @@ export async function createWorkspaceGitBranch(rootPath: string, branchName: str
   return getDesktopBridge().createGitBranch({ rootPath, branchName });
 }
 
-export async function fetchWorkspaceGit(rootPath: string): Promise<GitStatusSnapshot> {
-  return getDesktopBridge().fetchGit({ rootPath });
+export async function fetchWorkspaceGit(
+  rootPath: string,
+  options: { remoteName?: string | null } = {},
+): Promise<GitStatusSnapshot> {
+  return getDesktopBridge().fetchGit({ rootPath, remoteName: options.remoteName ?? undefined });
 }
 
 export async function pullWorkspaceGit(

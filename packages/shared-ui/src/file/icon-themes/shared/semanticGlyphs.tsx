@@ -24,6 +24,44 @@ export function WorkflowGlyph({ color, size }: FileIconRenderContext): ReactNode
   return <Workflow size={size} color={color} strokeWidth={1.9} aria-hidden="true" />;
 }
 
+/** Product mark for Context Map documents: a folded game-style treasure map
+ * with a dotted trail and destination cross, kept legible at explorer size. */
+export function TreasureMapGlyph({ color, size }: FileIconRenderContext): ReactNode {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 18 18"
+      fill="none"
+      aria-hidden
+      data-file-icon-complexity="minimal"
+      data-file-icon-product="context-map"
+      data-file-icon-shape="treasure-map"
+    >
+      <path
+        d="M2.9 4.6 6.7 3l4.6 1.6L15.1 3v10.4L11.3 15l-4.6-1.6L2.9 15V4.6Z"
+        stroke={color}
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4.8 11.8c1.15-2.8 3.35.65 4.55-1.75.55-1.1 1.1-1.65 2.05-1.85"
+        stroke={color}
+        strokeWidth="1.1"
+        strokeLinecap="round"
+        strokeDasharray="1 1.55"
+        data-file-icon-route="treasure-trail"
+      />
+      <path
+        d="m11.7 5.5 1.9 1.9m0-1.9-1.9 1.9"
+        stroke={color}
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function SpreadsheetGridGlyph({
   color,
   fill,

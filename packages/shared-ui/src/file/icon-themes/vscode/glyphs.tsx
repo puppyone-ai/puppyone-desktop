@@ -12,6 +12,7 @@ import {
   ExcelSpreadsheetGlyph,
   PresentationDocumentGlyph,
   SpreadsheetGridGlyph,
+  TreasureMapGlyph,
   WordDocumentGlyph,
 } from "../shared/semanticGlyphs";
 
@@ -24,6 +25,9 @@ export function renderVsCodeGlyph(
 
   if (context.kind === "folder") {
     return <VsCodeFolderGlyph size={context.size} />;
+  }
+  if (context.kind === "context-map") {
+    return <TreasureMapGlyph {...context} color={color} />;
   }
   if (context.kind === "spreadsheet") {
     return (

@@ -27,12 +27,16 @@ import type {
   PuppyoneWorkspaceConfig,
 } from "../../types/electron";
 import { SettingsView } from "./SettingsView";
+import type { ResolvedAppearance } from "../appearance/resolveAppearance";
+import type { EditorPresentation } from "../appearance/interfaceStyles";
 import { SettingsSidebar } from "./sidebar";
 import type { SettingsSection } from "./types";
 
 export type SettingsPreferencesPort = {
   themeMode: ThemeMode;
   interfaceStyle: InterfaceStyle;
+  editorPresentation: EditorPresentation;
+  resolvedAppearance: ResolvedAppearance;
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
   loadingAnimationPreset: LoadingAnimationPreset;
@@ -56,6 +60,7 @@ export type SettingsPreferencesPort = {
   aiEditAssistEnabled: boolean;
   setThemeMode: (value: ThemeMode) => void;
   setInterfaceStyle: (value: InterfaceStyle) => void;
+  setEditorPresentation: (value: EditorPresentation) => void;
   setLightThemePreset: (value: LightThemePreset) => void;
   setDarkThemePreset: (value: DarkThemePreset) => void;
   setLoadingAnimationPreset: (value: LoadingAnimationPreset) => void;
@@ -134,6 +139,7 @@ export function createSettingsWorkspaceSurface({
         gitStatusError={git.error}
         themeMode={preferences.themeMode}
         interfaceStyle={preferences.interfaceStyle}
+        resolvedAppearance={preferences.resolvedAppearance}
         lightThemePreset={preferences.lightThemePreset}
         darkThemePreset={preferences.darkThemePreset}
         loadingAnimationPreset={preferences.loadingAnimationPreset}
@@ -166,6 +172,7 @@ export function createSettingsWorkspaceSurface({
         updateState={updates.state}
         onThemeModeChange={preferences.setThemeMode}
         onInterfaceStyleChange={preferences.setInterfaceStyle}
+        onEditorPresentationChange={preferences.setEditorPresentation}
         onLightThemePresetChange={preferences.setLightThemePreset}
         onDarkThemePresetChange={preferences.setDarkThemePreset}
         onLoadingAnimationPresetChange={preferences.setLoadingAnimationPreset}

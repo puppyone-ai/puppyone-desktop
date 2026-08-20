@@ -1,8 +1,11 @@
 .markdown-codemirror-editor .cm-md-table-widget-wrap {
   --cm-md-table-handle-gutter: var(--po-editable-table-handle-gutter);
   --cm-md-table-interaction-gutter: var(--po-editable-table-interaction-gutter);
-  --po-editable-table-border: var(--po-md-rule-color);
-  --po-editable-table-cell-border: var(--po-md-rule-color);
+  --po-editable-table-border: var(--po-surface-editable-table-border, var(--po-md-rule-color));
+  --po-editable-table-cell-border: var(
+    --po-surface-editable-table-cell-border,
+    var(--po-md-rule-color)
+  );
   position: relative;
   display: block;
   box-sizing: border-box;

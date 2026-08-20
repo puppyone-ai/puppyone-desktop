@@ -125,6 +125,7 @@ describe("Desktop Terminal architecture boundaries", () => {
   it("keeps terminal presentation styles co-located with the feature", () => {
     const panel = source("src/features/desktop-terminal/ui/RightTerminalPanel.tsx");
     const css = source("src/features/desktop-terminal/ui/desktop-terminal.css");
+    const sessionView = source("src/features/desktop-terminal/ui/TerminalSessionView.tsx");
     const launcher = source("src/features/desktop-terminal/ui/TerminalLauncher.tsx");
     const launcherCss = source("src/features/desktop-terminal/ui/terminal-launcher.css");
     const launcherIconCss = source(
@@ -160,6 +161,7 @@ describe("Desktop Terminal architecture boundaries", () => {
     const headerCss = source(
       "src/features/desktop-terminal/ui/session-header/terminal-session-header.css",
     );
+    const xpTokensCss = source("src/styles/interfaces/windows-xp/tokens.css");
     const terminalActivity = source(
       "src/features/desktop-terminal/runtime/terminalActivity.ts",
     );
@@ -236,7 +238,11 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(headerCss).not.toContain("desktop-terminal-tab-activity-dot");
     expect(panel).not.toContain("<SquareTerminal");
     expect(headerCss).toContain("border-radius: var(--desktop-toolbar-action-radius);");
-    expect(headerCss).toContain("background: var(--po-selected);");
+    expect(headerCss).not.toContain("background: var(--po-selected);");
+    expect(headerCss).toContain(
+      "background: var(--desktop-terminal-tab-active-background, var(--po-control));",
+    );
+    expect(headerCss).not.toContain("--desktop-terminal-tab-active-indicator");
     expect(headerCss).not.toContain(".desktop-terminal-tab::after");
     expect(headerCss).not.toContain(".desktop-terminal-tab-shell");
     expect(headerLayout).toContain("tabBounds");
@@ -270,11 +276,14 @@ describe("Desktop Terminal architecture boundaries", () => {
     );
     expect(headerCss).not.toMatch(/\.desktop-terminal-tab-select\s*\{[^}]*font-size:\s*11px;/s);
     expect(headerCss).toMatch(
-      /\.desktop-terminal-subheader\s*\{[^}]*background:\s*var\(--po-terminal-bg\);/s,
+      /\.desktop-terminal-subheader\s*\{[^}]*border-block-end:\s*1px solid var\(--desktop-terminal-tab-bar-border, var\(--po-divider\)\);[^}]*background:\s*var\(--desktop-terminal-tab-bar-background, var\(--po-panel\)\);/s,
     );
-    expect(headerCss).not.toMatch(/\.desktop-terminal-subheader\s*\{[^}]*box-shadow:/s);
     expect(headerCss).not.toContain(".desktop-terminal-subheader::after");
-    expect(headerCss).not.toMatch(/\.desktop-terminal-subheader\s*\{[^}]*border-bottom:/s);
+    expect(xpTokensCss).toContain("--desktop-terminal-tab-bar-background: #f5f4ee;");
+    expect(xpTokensCss).toContain("--desktop-terminal-tab-active-background: #ddd9cf;");
+    expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-indicator");
+    expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-background: #1059c9;");
+    expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-background: #316ac5;");
     expect(css).not.toContain(".desktop-terminal-subheader");
     expect(css).toContain("text-spacing-trim: space-all");
     expect(css).toContain(
@@ -294,8 +303,18 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(css).toContain("--po-scrollbar-presentation-thumb,");
     expect(css).toContain(".desktop-terminal-xterm.po-scrollbar-active");
     expect(css).not.toContain(".desktop-terminal-xterm:focus-within");
-    expect(runtime).toContain("terminal.onScroll(() => this.markScrollbarActive())");
+    expect(runtime).toContain("terminal.onScroll(() => {");
+    expect(runtime).toContain("this.markScrollbarActive();");
+    expect(runtime).toContain("this.syncScrollbarPresentation();");
     expect(runtime).toContain('container.classList.add("po-scrollbar-active")');
+    expect(runtime).toContain("this.terminal?.scrollLines(direction)");
+    expect(runtime).toContain("terminal.scrollToLine(nextViewportY)");
+    expect(sessionView).toContain("desktop-terminal-classic-scrollbar-controls");
+    expect(sessionView).toContain("desktop-terminal-classic-scrollbar-button");
+    expect(sessionView).not.toContain("po-classic-scrollbar-button");
+    expect(sessionView).toContain("runtime.subscribeScrollbar(setScrollbarState)");
+    expect(css).toContain(".desktop-terminal-classic-scrollbar-track");
+    expect(css).toContain(".desktop-terminal-classic-scrollbar-thumb");
     expect(css).toMatch(
       /\.xterm-scrollable-element > \.scrollbar\.vertical\s*\{[^}]*width:\s*var\(--desktop-terminal-scrollbar-track-size\) !important;/s,
     );

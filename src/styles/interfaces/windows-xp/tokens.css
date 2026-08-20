@@ -1,0 +1,397 @@
+/*
+ * Windows XP Luna Blue skin.
+ *
+ * Luna is not a pale-blue modern theme. Its identity comes from saturated
+ * blue window chrome, warm #ece9d8 tool surfaces, white sunken work areas,
+ * compact Tahoma typography, hard one-pixel state changes, and classic
+ * scrollbars. Structural differences are expressed through registered App
+ * Shell composition slots; editors and Shared UI stay style-agnostic.
+ */
+
+:root[data-interface-style="windows-xp"]
+  :where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface) {
+  color-scheme: light;
+
+  --po-font-sans: Tahoma, "Segoe UI", Arial, sans-serif;
+  --po-font-size-chrome: 12px;
+  --po-font-weight-chrome: 700;
+  --desktop-control-radius: 2px;
+  --desktop-toolbar-action-radius: 2px;
+  --desktop-chrome-height: 36px;
+  --desktop-chrome-control-size: 26px;
+  --desktop-titlebar-control-height: 26px;
+  --desktop-titlebar-tool-action-width: 29px;
+  --desktop-sidebar-control-size: 32px;
+  --desktop-sidebar-nav-gap: 4px;
+  --desktop-sidebar-toolbar-height: 30px;
+  --desktop-sidebar-toolbar-padding-start: 8px;
+  --desktop-sidebar-toolbar-padding-end: 5px;
+  --desktop-sidebar-row-height: 25px;
+  --desktop-sidebar-row-radius: 0px;
+  --desktop-sidebar-row-left-gap: 5px;
+  /* Classic scrollbars consume layout width. Keeping this equal to the XP
+   * scrollbar width makes the shared gutter compensation resolve to zero. */
+  --desktop-sidebar-row-right-gap: 17px;
+  --desktop-sidebar-row-content-left: 4px;
+  --desktop-sidebar-row-content-right: 4px;
+  --desktop-sidebar-list-padding-block: 4px;
+  --desktop-sidebar-section-top-gap: 3px;
+  --desktop-sidebar-section-bottom-gap: 4px;
+  --desktop-sidebar-navigation-fade-size: 0px;
+  /* Session tabs use Explorer's warm command-surface hierarchy. Blue stays
+   * reserved for window chrome, list selection and live runtime status. */
+  --desktop-terminal-tab-bar-background: #f5f4ee;
+  --desktop-terminal-tab-bar-border: #aca899;
+  --desktop-terminal-tab-idle-color: #343434;
+  --desktop-terminal-tab-hover-background: #ebe9e2;
+  --desktop-terminal-tab-hover-border: #c7c4ba;
+  --desktop-terminal-tab-active-background: #ddd9cf;
+  --desktop-terminal-tab-active-border: #9d9a90;
+  --desktop-terminal-tab-active-color: #000000;
+  --desktop-terminal-tab-control-hover-background: #e7e4dc;
+  --desktop-terminal-tab-control-hover-border: #bbb8ae;
+  --desktop-utility-page-padding-top: 18px;
+  --desktop-utility-page-padding-inline: 20px;
+  --desktop-utility-page-padding-bottom: 28px;
+  --po-menu-radius: 0px;
+  --po-menu-padding: 2px;
+  --po-menu-item-radius: 0px;
+  --po-menu-item-height: 25px;
+  --po-menu-item-padding-inline: 6px;
+  --po-menu-item-gap: 6px;
+  --po-scrollbar-size: 17px;
+  --po-scrollbar-thumb-size: 15px;
+  --po-scrollbar-thumb-active-size: 15px;
+  --po-scrollbar-thumb-inset: 1px;
+  --po-scrollbar-thumb-active-inset: 1px;
+  --po-scrollbar-radius: 0px;
+  --po-scrollbar-transition: 0s;
+  --po-tree-row-height: 25px;
+  --po-tree-row-radius: 0px;
+  --po-tree-row-left-gap: 5px;
+  --po-tree-row-right-gap: 17px;
+  --po-tree-row-content-left: 4px;
+  --po-tree-row-content-right: 4px;
+  --po-tree-row-indent: 18px;
+  --po-tree-row-icon-label-gap: 4px;
+  --po-tree-root-top-gap: 3px;
+  --po-tree-no-root-top-gap: 4px;
+  --po-tree-list-bottom-gap: 4px;
+
+  --po-surface-canvas: #ffffff;
+  --po-surface-chrome: #ece9d8;
+  --po-surface-panel: #ece9d8;
+  --po-surface-panel-raised: #ffffff;
+  --po-surface-overlay: #ece9d8;
+  --po-surface-inset: #d4d0c8;
+  --po-surface-editor: #ffffff;
+  --po-surface-terminal: #ffffff;
+
+  --po-canvas: var(--po-surface-editor);
+  --po-header: var(--po-surface-chrome);
+  --po-sidebar: #ffffff;
+  --po-chrome: var(--po-surface-chrome);
+  --po-panel: var(--po-surface-panel);
+  --po-panel-raised: var(--po-surface-panel-raised);
+  --po-overlay: var(--po-surface-overlay);
+  --po-inset: var(--po-surface-inset);
+  --po-editor-bg: var(--po-surface-editor);
+  --po-jsoneditor-bg: var(--po-surface-editor);
+  --po-jsoneditor-toolbar-bg: var(--po-surface-panel);
+  --po-terminal-bg: var(--po-surface-terminal);
+
+  --po-text: #000000;
+  --po-text-muted: #1f1f1f;
+  --po-text-subtle: #5d5d5d;
+  --po-text-disabled: #aca899;
+  --po-text-inverse: #ffffff;
+  --po-border: #aca899;
+  --po-border-subtle: #d4d0c8;
+  --po-border-strong: #7697c5;
+  --po-divider: #aca899;
+  --po-shell-divider: #c9c7be;
+  --po-sidebar-divider: #7697c5;
+  --po-header-divider: #003c74;
+  --po-hover: #eaf2ff;
+  --po-active: #c1d2ee;
+  --po-selected: #1059c9;
+  --po-control: #ece9d8;
+  --po-control-hover: #fff4ce;
+  --po-focus-ring: #000080;
+  --po-shadow: rgba(0, 0, 0, 0.28);
+  --po-backdrop: rgba(0, 0, 0, 0.22);
+  --po-backdrop-strong: rgba(0, 0, 0, 0.38);
+  --po-accent: #0054e3;
+  --po-accent-text: #003399;
+  --po-success: #27862a;
+  --po-success-contrast: #ffffff;
+  --po-warning: #c65d05;
+  --po-danger: #c42b1c;
+  --po-info: #0066cc;
+  --po-purple: #6d3ca5;
+  --po-switch-border-on: #003c74;
+  --po-switch-border-off: #7f9db9;
+  --po-switch-track-on: #316ac5;
+  --po-switch-track-off: #d4d0c8;
+  --po-switch-thumb: #ffffff;
+  --po-switch-thumb-shadow: rgba(0, 0, 0, 0.28);
+  --po-tree-guide: #808080;
+  --po-tree-row-hover-bg: #e8f2ff;
+  --po-tree-row-selected-bg: #316ac5;
+  --po-tree-row-selected-muted-bg: #d4d0c8;
+  --po-tree-folder-drop-bg: #c6d7ef;
+  --po-editor-line: #d4d0c8;
+  --po-menu-bg: #ffffff;
+  --po-menu-border: #0a4ca5;
+  --po-menu-shadow: 2px 2px 5px rgba(0, 0, 0, 0.32);
+  --po-scrollbar-thumb: #c4d3f8;
+  --po-scrollbar-thumb-hover: #b9caf4;
+  --po-terminal-fg: #000000;
+  --po-terminal-cursor: #000080;
+  --po-terminal-selection: rgba(49, 106, 197, 0.28);
+
+  /* File colors stay compatible with every existing icon theme while moving
+   * the catalog toward XP Explorer's warm yellow and saturated type accents. */
+  --po-file-icon-body: #fffdf1;
+  --po-file-icon-fold: #f4e7bc;
+  --po-file-icon-stroke: #8b6d24;
+  --po-file-icon-shadow: rgba(82, 59, 8, 0.22);
+  --po-file-accent-default: #d28a12;
+  --po-file-accent-markdown: #2f6fa8;
+  --po-file-accent-json: #9a7500;
+  --po-file-accent-html: #d25b22;
+  --po-file-accent-pdf: #c42b1c;
+  --po-file-accent-image: #6f55a1;
+  --po-file-accent-audio: #6f55a1;
+  --po-file-accent-video: #227b91;
+  --po-file-accent-code: #227b91;
+  --po-file-accent-word: #245edb;
+  --po-file-accent-sheet: #2f7d32;
+  --po-file-accent-presentation: #d25b22;
+
+  /* Scalable Luna caption anchors. They retain the characteristic cobalt
+   * identity while adding enough neutral red/green to avoid neon banding on
+   * modern high-DPI displays. */
+  --xp-titlebar-top: #4a9af5;
+  --xp-titlebar-start: #0d73ed;
+  --xp-titlebar-mid: #0757d7;
+  --xp-titlebar-end: #0968e5;
+  --xp-titlebar-edge: #073eac;
+  --xp-titlebar-text: #ffffff;
+  --xp-titlebar-muted: #ffffff;
+  --xp-titlebar-background-color: var(--xp-titlebar-mid);
+  --xp-titlebar-background-image:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, transparent 24%, rgba(0, 31, 104, 0.07) 100%),
+    linear-gradient(
+      180deg,
+      #0758d7 0%,
+      var(--xp-titlebar-top) 5%,
+      #2d87ef 10%,
+      var(--xp-titlebar-start) 18%,
+      var(--xp-titlebar-mid) 42%,
+      #0754d4 58%,
+      var(--xp-titlebar-end) 82%,
+      #0757d5 92%,
+      var(--xp-titlebar-edge) 100%
+    );
+  --xp-window-control-minimize-image: url("./assets/window-control-minimize.svg");
+  --xp-window-control-minimize-hover-image: url("./assets/window-control-minimize-hover.svg");
+  --xp-window-control-minimize-active-image: url("./assets/window-control-minimize-active.svg");
+  --xp-window-control-maximize-image: url("./assets/window-control-maximize.svg");
+  --xp-window-control-maximize-hover-image: url("./assets/window-control-maximize-hover.svg");
+  --xp-window-control-maximize-active-image: url("./assets/window-control-maximize-active.svg");
+  --xp-window-control-close-image: url("./assets/window-control-close.svg");
+  --xp-window-control-close-hover-image: url("./assets/window-control-close-hover.svg");
+  --xp-window-control-close-active-image: url("./assets/window-control-close-active.svg");
+  --xp-pane-caption-start: #71a1ef;
+  --xp-pane-caption-mid: #3676da;
+  --xp-pane-caption-end: #0a59cc;
+  --xp-toolbar-start: #f8f6ec;
+  --xp-toolbar-mid: #f0ede0;
+  --xp-toolbar-end: #eae7d9;
+  --xp-button-start: #ffffff;
+  --xp-button-mid: #ecebe6;
+  --xp-button-end: #d6d0c5;
+  --xp-button-hover-start: #fffef4;
+  --xp-button-hover-end: #f4dda1;
+  --xp-button-active-start: #d6d0c5;
+  --xp-button-active-end: #f7f5ed;
+  --xp-control-border: #003c74;
+  --xp-field-border: #7697c5;
+  --xp-selection: #316ac5;
+  --xp-default-ring: #e68b2c;
+  --xp-highlight: #ffffff;
+  --xp-scroll-track-light: #f3f1ec;
+  --xp-scroll-track-dark: #fefefc;
+  --xp-scroll-thumb-light: #cbd7f8;
+  --xp-scroll-thumb-mid: #c4d3f8;
+  --xp-scroll-thumb-dark: #b9ccf6;
+
+  /* Explorer command-band state model. Warm gold is hot tracking only;
+   * persistent routes and open tools use the native checked blue treatment. */
+  --interface-shell-toolbar-button-hover-border-color: var(--xp-default-ring);
+  --interface-shell-toolbar-button-hover-background: linear-gradient(
+    180deg,
+    var(--xp-button-hover-start) 0%,
+    #fff3ca 52%,
+    var(--xp-button-hover-end) 100%
+  );
+  --interface-shell-toolbar-button-hover-box-shadow: inset 0 1px 0 #ffffff;
+  --interface-shell-toolbar-button-checked-border-color: #7f9db9;
+  --interface-shell-toolbar-button-checked-background: linear-gradient(
+    180deg,
+    #eef4ff 0%,
+    #dce9fb 52%,
+    #cbdcf4 100%
+  );
+  --interface-shell-toolbar-button-checked-color: #000000;
+  --interface-shell-toolbar-button-checked-box-shadow:
+    inset 1px 1px 1px rgba(49, 106, 197, 0.18),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.82);
+  --interface-shell-toolbar-button-pressed-border-color: var(--xp-selection);
+  --interface-shell-toolbar-button-pressed-background: linear-gradient(
+    180deg,
+    #c3d5f1 0%,
+    #d2e1f7 52%,
+    #e7effc 100%
+  );
+  --interface-shell-toolbar-button-pressed-box-shadow:
+    inset 1px 1px 2px rgba(35, 78, 142, 0.34),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.62);
+
+  /* Shared component contract. */
+  --interface-typography-webkit-font-smoothing: auto;
+  --interface-typography-moz-osx-font-smoothing: auto;
+  --interface-shell-box-shadow: none;
+  --interface-titlebar-context-desktop-titlebar-bg: transparent;
+  --interface-titlebar-context-desktop-titlebar-text: var(--xp-titlebar-text);
+  --interface-titlebar-context-desktop-titlebar-text-muted: var(--xp-titlebar-muted);
+  --interface-titlebar-context-desktop-titlebar-text-disabled: rgba(255, 255, 255, 0.58);
+  --interface-titlebar-context-desktop-titlebar-hover: rgba(255, 255, 255, 0.18);
+  --interface-titlebar-context-desktop-titlebar-active: rgba(0, 35, 121, 0.38);
+  --interface-titlebar-context-desktop-titlebar-focus: #ffffff;
+  --interface-titlebar-context-desktop-titlebar-divider: rgba(255, 255, 255, 0.62);
+  --interface-titlebar-control-border: 1px solid transparent;
+  --interface-titlebar-control-border-radius: 2px;
+  --interface-titlebar-control-active-border-color: rgba(255, 255, 255, 0.82);
+  --interface-titlebar-control-active-background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(0, 44, 145, 0.35));
+  --interface-titlebar-control-active-color: #ffffff;
+  --interface-titlebar-control-active-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.52);
+  --interface-toolbar-border-bottom: 1px solid var(--po-border);
+  --interface-toolbar-background: linear-gradient(180deg, var(--xp-toolbar-start), var(--xp-toolbar-mid) 55%, var(--xp-toolbar-end));
+  --interface-toolbar-box-shadow: inset 0 1px 0 var(--xp-highlight);
+  --interface-sidebar-surface-background: #ffffff;
+  --interface-row-base-border: 1px solid transparent;
+  --interface-neutral-button-hover-border-color: var(--xp-default-ring);
+  --interface-neutral-button-hover-background: linear-gradient(180deg, var(--xp-button-hover-start), var(--xp-button-hover-end));
+  --interface-neutral-button-hover-color: #000000;
+  --interface-icon-button-border: 1px solid transparent;
+  --interface-icon-button-border-radius: 2px;
+  --interface-icon-button-active-border-color: var(--xp-default-ring);
+  --interface-icon-button-active-background: linear-gradient(180deg, var(--xp-button-hover-start), var(--xp-button-hover-end));
+  --interface-icon-button-active-color: #000000;
+  --interface-icon-button-active-box-shadow: inset 0 1px 0 #ffffff;
+  --interface-menu-border: 1px solid var(--po-menu-border);
+  --interface-menu-border-radius: 0px;
+  --interface-menu-background: var(--po-menu-bg);
+  --interface-menu-box-shadow: var(--po-menu-shadow);
+  --interface-menu-backdrop-filter: none;
+  --interface-dialog-backdrop-backdrop-filter: none;
+  --interface-dialog-backdrop-webkit-backdrop-filter: none;
+  --interface-dialog-footer-padding: 9px 12px 11px;
+  --interface-dialog-footer-border-top: 1px solid #ffffff;
+  --interface-dialog-footer-background: #ece9d8;
+  --interface-dialog-callout-border-radius: 0px;
+  --interface-settings-list-gap: 0;
+  --interface-settings-list-overflow: hidden;
+  --interface-settings-list-border: 1px solid var(--xp-field-border);
+  --interface-settings-list-border-radius: 0px;
+  --interface-settings-list-background: #ffffff;
+  --interface-settings-list-box-shadow: inset 1px 1px 0 #f3f3f3;
+  --interface-settings-last-row-border-bottom: 0;
+  --interface-segmented-control-gap: 0;
+  --interface-segmented-control-padding: 2px;
+  --interface-segmented-control-border: 1px solid var(--xp-field-border);
+  --interface-segmented-control-border-radius: 0px;
+  --interface-segmented-control-background: #ece9d8;
+  --interface-segmented-control-box-shadow: inset 1px 1px 0 #aca899;
+  --interface-theme-choice-border-color: #aca899;
+  --interface-theme-choice-border-radius: 2px;
+  --interface-theme-choice-background: linear-gradient(180deg, var(--xp-button-start), var(--xp-button-end));
+  --interface-theme-choice-active-border-color: var(--xp-control-border);
+  --interface-theme-choice-active-background: linear-gradient(180deg, #eef5ff, #bdd4f3);
+  --interface-theme-choice-active-box-shadow: inset 0 1px 0 #ffffff, 0 0 0 1px var(--xp-default-ring);
+  --interface-preview-border-radius: 2px;
+  --interface-switch-width: 34px;
+  --interface-switch-height: 18px;
+  --interface-switch-track-border-color: var(--xp-field-border);
+  --interface-switch-track-border-radius: 1px;
+  --interface-switch-track-background: #d4d0c8;
+  --interface-switch-track-box-shadow: inset 1px 1px 1px #808080, inset -1px -1px 0 #ffffff;
+  --interface-switch-track-on-border-color: var(--xp-control-border);
+  --interface-switch-track-on-background: #316ac5;
+  --interface-switch-thumb-on-transform: translateX(16px);
+  --interface-card-border-radius: 2px;
+  --interface-card-box-shadow: inset 1px 1px 0 #ffffff;
+  --interface-footer-border-color: #aca899;
+  --interface-footer-background: linear-gradient(180deg, #fffef8 0%, #f1efe3 28%, #e8e5d8 100%);
+  --interface-scrollbar-width: var(--po-scrollbar-size);
+  --interface-scrollbar-height: var(--po-scrollbar-size);
+  --interface-scrollbar-background: #f7f5ef;
+  --interface-scrollbar-track-border: 1px solid #ebe8df;
+  --interface-scrollbar-track-background: linear-gradient(90deg, var(--xp-scroll-track-light) 0%, #f8f7f3 46%, var(--xp-scroll-track-dark) 100%);
+  --interface-scrollbar-track-background-horizontal: linear-gradient(180deg, var(--xp-scroll-track-light) 0%, #f8f7f3 46%, var(--xp-scroll-track-dark) 100%);
+  --interface-scrollbar-thumb-min-inline-size: 24px;
+  --interface-scrollbar-thumb-min-block-size: 24px;
+  --interface-scrollbar-thumb-border: 1px solid #b1bed7;
+  --interface-scrollbar-thumb-border-radius: 2px;
+  --interface-scrollbar-thumb-background:
+    linear-gradient(#9eb4e3, #9eb4e3) center calc(50% - 3px) / 7px 1px no-repeat,
+    linear-gradient(#eef2fc, #eef2fc) center calc(50% - 2px) / 7px 1px no-repeat,
+    linear-gradient(#9eb4e3, #9eb4e3) center / 7px 1px no-repeat,
+    linear-gradient(#eef2fc, #eef2fc) center calc(50% + 1px) / 7px 1px no-repeat,
+    linear-gradient(#9eb4e3, #9eb4e3) center calc(50% + 3px) / 7px 1px no-repeat,
+    linear-gradient(90deg, #eef2fc 0%, var(--xp-scroll-thumb-light) 16%, var(--xp-scroll-thumb-mid) 52%, var(--xp-scroll-thumb-dark) 82%, #edf1fb 100%);
+  --interface-scrollbar-thumb-background-clip: padding-box;
+  --interface-scrollbar-thumb-box-shadow: inset 1px 1px 0 #f9faff, inset -1px -1px 0 #aebbd0;
+  --interface-scrollbar-thumb-background-horizontal:
+    linear-gradient(90deg, #9eb4e3, #9eb4e3) calc(50% - 3px) center / 1px 7px no-repeat,
+    linear-gradient(90deg, #eef2fc, #eef2fc) calc(50% - 2px) center / 1px 7px no-repeat,
+    linear-gradient(90deg, #9eb4e3, #9eb4e3) center / 1px 7px no-repeat,
+    linear-gradient(90deg, #eef2fc, #eef2fc) calc(50% + 1px) center / 1px 7px no-repeat,
+    linear-gradient(90deg, #9eb4e3, #9eb4e3) calc(50% + 3px) center / 1px 7px no-repeat,
+    linear-gradient(180deg, #eef2fc 0%, var(--xp-scroll-thumb-light) 16%, var(--xp-scroll-thumb-mid) 52%, var(--xp-scroll-thumb-dark) 82%, #edf1fb 100%);
+  --interface-scrollbar-thumb-hover-background:
+    linear-gradient(#8fa7dc, #8fa7dc) center calc(50% - 3px) / 7px 1px no-repeat,
+    linear-gradient(#f4f6fd, #f4f6fd) center calc(50% - 2px) / 7px 1px no-repeat,
+    linear-gradient(#8fa7dc, #8fa7dc) center / 7px 1px no-repeat,
+    linear-gradient(#f4f6fd, #f4f6fd) center calc(50% + 1px) / 7px 1px no-repeat,
+    linear-gradient(#8fa7dc, #8fa7dc) center calc(50% + 3px) / 7px 1px no-repeat,
+    linear-gradient(90deg, #e8edfb 0%, #c4d2f7 16%, #bdcdf5 52%, #b1c5f1 82%, #e8edfa 100%);
+  --interface-scrollbar-thumb-hover-background-clip: padding-box;
+  --interface-scrollbar-thumb-hover-background-horizontal:
+    linear-gradient(90deg, #8fa7dc, #8fa7dc) calc(50% - 3px) center / 1px 7px no-repeat,
+    linear-gradient(90deg, #f4f6fd, #f4f6fd) calc(50% - 2px) center / 1px 7px no-repeat,
+    linear-gradient(90deg, #8fa7dc, #8fa7dc) center / 1px 7px no-repeat,
+    linear-gradient(90deg, #f4f6fd, #f4f6fd) calc(50% + 1px) center / 1px 7px no-repeat,
+    linear-gradient(90deg, #8fa7dc, #8fa7dc) calc(50% + 3px) center / 1px 7px no-repeat,
+    linear-gradient(180deg, #e8edfb 0%, #c4d2f7 16%, #bdcdf5 52%, #b1c5f1 82%, #e8edfa 100%);
+  --interface-scrollbar-button-display: block;
+  --interface-scrollbar-button-size: 17px;
+  --interface-directional-arrow-size: 7px;
+  --interface-scrollbar-button-border-color: #b3bfd6;
+  --interface-scrollbar-button-border: 1px solid var(--interface-scrollbar-button-border-color);
+  --interface-scrollbar-button-background-color: #c7d4f6;
+  --interface-scrollbar-button-background-image: linear-gradient(90deg, #f8fafe 0%, #d5dffa 9%, #cbd6f8 19%, #c0cff7 61%, #b7c7f2 78%, #dbe3f6 92%, #f6f7fc 100%);
+  --interface-scrollbar-button-background-image-horizontal: linear-gradient(180deg, #f8fafe 0%, #d5dffa 9%, #cbd6f8 19%, #c0cff7 61%, #b7c7f2 78%, #dbe3f6 92%, #f6f7fc 100%);
+  --interface-scrollbar-button-box-shadow: inset 1px 1px 0 #f9faff, inset -1px -1px 0 #aebbd0;
+  --interface-scrollbar-button-hover-border-color: #9eacd0;
+  --interface-scrollbar-button-hover-background-color: #bfcef4;
+  --interface-scrollbar-button-up-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'%3E%3Cpath d='M3 1h1v1H3zM2 2h3v1H2zM1 3h2v1H1zm3 0h2v1H4zM0 4h2v1H0zm5 0h2v1H5z' fill='%23566789'/%3E%3C/svg%3E");
+  --interface-scrollbar-button-down-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'%3E%3Cpath d='M3 1h1v1H3zM2 2h3v1H2zM1 3h2v1H1zm3 0h2v1H4zM0 4h2v1H0zm5 0h2v1H5z' fill='%23566789' transform='rotate(180 3.5 3.5)'/%3E%3C/svg%3E");
+  --interface-scrollbar-button-left-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'%3E%3Cpath d='M3 1h1v1H3zM2 2h3v1H2zM1 3h2v1H1zm3 0h2v1H4zM0 4h2v1H0zm5 0h2v1H5z' fill='%23566789' transform='rotate(-90 3.5 3.5)'/%3E%3C/svg%3E");
+  --interface-scrollbar-button-right-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'%3E%3Cpath d='M3 1h1v1H3zM2 2h3v1H2zM1 3h2v1H1zm3 0h2v1H4zM0 4h2v1H0zm5 0h2v1H5z' fill='%23566789' transform='rotate(90 3.5 3.5)'/%3E%3C/svg%3E");
+  --interface-terminal-classic-scrollbar-display: block;
+  --interface-terminal-native-scrollbar-opacity: 0;
+  --interface-terminal-native-scrollbar-pointer-events: none;
+}

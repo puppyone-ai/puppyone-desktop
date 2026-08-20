@@ -18,6 +18,10 @@
   background: var(--po-editor-bg);
   color: var(--po-text);
   cursor: text;
+  /* Document rasterization is content presentation, not interface chrome.
+     Keep historical shell smoothing choices from leaking into editable text. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .markdown-codemirror-editor .cm-editor {

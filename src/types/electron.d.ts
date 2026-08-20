@@ -709,7 +709,14 @@ export type PuppyoneWorkspaceConfig = {
 declare global {
   interface Window {
     puppyoneDesktop?: {
-      getWindowChromeState: () => Promise<{ fullScreen: boolean }>;
+      getWindowChromeState: () => Promise<{ fullScreen: boolean; maximized: boolean }>;
+      setWindowChromeProfile: (request: { titlebar: string }) => Promise<{
+        applied: boolean;
+        customControls?: boolean;
+      }>;
+      performWindowAction: (request: {
+        action: "minimize" | "toggle-maximize" | "close";
+      }) => Promise<{ applied: boolean }>;
       onWindowChromeStateChanged: (
         callback: (state: { fullScreen: boolean }) => void,
       ) => () => void;
@@ -1086,6 +1093,7 @@ declare global {
       }) => Promise<GitStatusSnapshot>;
       fetchGit: (request: {
         rootPath: string;
+        remoteName?: string;
       }) => Promise<GitStatusSnapshot>;
       pullGit: (request: {
         rootPath: string;

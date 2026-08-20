@@ -9,7 +9,8 @@
   flex: 0 0 38px;
   padding: 4px 6px 5px;
   box-sizing: border-box;
-  background: var(--po-terminal-bg);
+  border-block-end: 1px solid var(--desktop-terminal-tab-bar-border, var(--po-divider));
+  background: var(--desktop-terminal-tab-bar-background, var(--po-panel));
   color: var(--po-text-muted);
 }
 
@@ -51,13 +52,15 @@
   inset-block-start: 0;
   inset-inline-start: var(--desktop-terminal-tab-inline-start);
   display: flex;
+  box-sizing: border-box;
   width: var(--desktop-terminal-tab-resolved-width);
   height: var(--desktop-terminal-tab-control-height);
   align-items: center;
   overflow: hidden;
-  border: 0;
+  border: 1px solid var(--desktop-terminal-tab-idle-border, transparent);
   border-radius: var(--desktop-toolbar-action-radius);
-  background: transparent;
+  background: var(--desktop-terminal-tab-idle-background, transparent);
+  color: var(--desktop-terminal-tab-idle-color, var(--po-text-muted));
 }
 
 .desktop-terminal-tab.is-compact .desktop-terminal-tab-title {
@@ -70,7 +73,9 @@
   transition:
     inset-inline-start var(--desktop-terminal-tab-activation-motion) cubic-bezier(0.2, 0, 0, 1),
     width var(--desktop-terminal-tab-activation-motion) cubic-bezier(0.2, 0, 0, 1),
-    background-color 120ms ease;
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
 .desktop-terminal-tab-rail[data-activation-motion="true"] .desktop-terminal-tab-title {
@@ -78,8 +83,9 @@
 }
 
 .desktop-terminal-tab.is-active {
-  background: var(--po-selected);
-  color: var(--po-text);
+  border-color: var(--desktop-terminal-tab-active-border, var(--po-border));
+  background: var(--desktop-terminal-tab-active-background, var(--po-control));
+  color: var(--desktop-terminal-tab-active-color, var(--po-text));
 }
 
 .desktop-terminal-tab-select {
@@ -102,7 +108,11 @@
 }
 
 .desktop-terminal-tab:not(.is-active):hover {
-  background: var(--po-hover);
+  border-color: var(
+    --desktop-terminal-tab-hover-border,
+    color-mix(in srgb, var(--po-border) 72%, transparent)
+  );
+  background: var(--desktop-terminal-tab-hover-background, var(--po-control-hover));
   color: var(--po-text);
 }
 
@@ -171,6 +181,7 @@
   opacity: 0;
   pointer-events: none;
   transform: translateY(-50%);
+  color: var(--po-text-subtle);
 }
 
 .desktop-terminal-tab.is-active .desktop-terminal-tab-close,
@@ -185,6 +196,16 @@
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
+}
+
+.desktop-terminal-tab-close:hover:not(:disabled),
+.desktop-terminal-tab-close:focus-visible:not(:disabled) {
+  border-color: var(
+    --desktop-terminal-tab-control-hover-border,
+    color-mix(in srgb, var(--po-border) 72%, transparent)
+  );
+  background: var(--desktop-terminal-tab-control-hover-background, var(--po-control-hover));
+  color: var(--po-text);
 }
 
 .desktop-terminal-subheader-new {
@@ -203,6 +224,7 @@
 .desktop-terminal-tab-overflow-trigger {
   width: 100%;
   height: 100%;
+  border: 1px solid transparent;
   border-radius: var(--desktop-toolbar-action-radius);
   color: var(--po-text-muted);
 }
@@ -210,7 +232,11 @@
 .desktop-terminal-tab-overflow-trigger:hover:not(:disabled),
 .desktop-terminal-tab-overflow-trigger:focus-visible:not(:disabled),
 .desktop-terminal-tab-overflow-trigger[aria-expanded="true"] {
-  background: var(--po-hover);
+  border-color: var(
+    --desktop-terminal-tab-control-hover-border,
+    color-mix(in srgb, var(--po-border) 72%, transparent)
+  );
+  background: var(--desktop-terminal-tab-control-hover-background, var(--po-control-hover));
   color: var(--po-text);
 }
 
@@ -259,13 +285,19 @@
 .desktop-terminal-new-button {
   width: var(--desktop-terminal-tab-control-height);
   height: var(--desktop-terminal-tab-control-height);
+  border: 1px solid transparent;
   border-radius: var(--desktop-toolbar-action-radius);
   color: var(--po-text-muted);
 }
 
 .desktop-terminal-new-button:hover:not(:disabled),
 .desktop-terminal-new-button:focus-visible:not(:disabled) {
-  background: var(--po-hover);
+  border-color: var(
+    --desktop-terminal-tab-control-hover-border,
+    color-mix(in srgb, var(--po-border) 72%, transparent)
+  );
+  background: var(--desktop-terminal-tab-control-hover-background, var(--po-control-hover));
+  color: var(--po-text);
 }
 
 @media (prefers-reduced-motion: reduce) {

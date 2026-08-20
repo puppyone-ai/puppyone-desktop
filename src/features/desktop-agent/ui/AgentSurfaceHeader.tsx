@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CircleAlert, MoreHorizontal, Plus, RotateCcw } from "lucide-react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
+import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../../components/DesktopMenu";
 
 type AgentSurfaceHeaderProps = {
@@ -61,6 +62,14 @@ export function AgentSurfaceHeader({
   return (
     <header className="desktop-agent-session-header">
       <div className="desktop-agent-session-identity">
+        <span className="desktop-agent-surface-brand" aria-label={t("agent.name")}>
+          <img
+            src={resolveRendererPublicAssetUrl("PuppyAgentLOGO.png")}
+            alt=""
+            draggable={false}
+          />
+          <span>{t("agent.name")}</span>
+        </span>
         {agentSelector && <div className="desktop-agent-session-agent-selector">{agentSelector}</div>}
       </div>
       <div className="desktop-agent-session-heading">

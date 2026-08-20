@@ -45,10 +45,19 @@ function createRuntime(): TerminalRuntimeHandle {
   return {
     activity: false,
     ready: true,
+    scrollbarState: {
+      visible: false,
+      canDecrement: false,
+      canIncrement: false,
+      position: 0,
+      viewportRatio: 1,
+    },
     applyAppearance: vi.fn(),
     dispose: vi.fn(),
     focus: vi.fn(),
     mount: vi.fn(),
+    scrollLines: vi.fn(),
+    scrollToRatio: vi.fn(),
     unmount: vi.fn(),
     setActive: vi.fn(),
     subscribeActivity: vi.fn((listener) => {
@@ -59,6 +68,7 @@ function createRuntime(): TerminalRuntimeHandle {
       listener(true);
       return () => undefined;
     }),
+    subscribeScrollbar: vi.fn(() => () => undefined),
     write: vi.fn(),
   };
 }

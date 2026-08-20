@@ -6,12 +6,16 @@ import {
   PRESET_VIEWER_SOURCES,
   VIEWER_SURFACE_PREPARATIONS,
   VIEWER_SURFACE_READINESS_SIGNALS,
+  VIEWER_SURFACE_FAMILIES,
+  VIEWER_SURFACE_TRAITS,
   type CoreViewerCapability,
   type PresetViewerContractVersion,
   type PresetViewerRuntime,
   type PresetViewerSource,
   type ViewerSurfacePreparation,
   type ViewerSurfaceReadinessSignal,
+  type ViewerSurfaceFamily,
+  type ViewerSurfaceTrait,
 } from "./viewerContract";
 
 export type PresetViewerDefinition = Readonly<{
@@ -23,6 +27,8 @@ export type PresetViewerDefinition = Readonly<{
   runtime: PresetViewerRuntime;
   surfacePreparation: ViewerSurfacePreparation;
   readinessSignal: ViewerSurfaceReadinessSignal;
+  surfaceFamily: ViewerSurfaceFamily;
+  surfaceTraits: readonly ViewerSurfaceTrait[];
 }>;
 
 export type PresetViewerManifest = Readonly<{
@@ -41,6 +47,8 @@ const DEFINITION_KEYS = new Set([
   "runtime",
   "surfacePreparation",
   "readinessSignal",
+  "surfaceFamily",
+  "surfaceTraits",
 ]);
 
 export const PRESET_VIEWER_MANIFEST = parsePresetViewerManifest(manifestJson);
@@ -158,6 +166,17 @@ function parseDefinition(input: unknown, index: number): PresetViewerDefinition 
   if (!VIEWER_SURFACE_READINESS_SIGNALS.includes(record.readinessSignal as never)) {
     throw new TypeError(`Preset viewer ${record.id} has an unsupported readiness signal.`);
   }
+  if (!VIEWER_SURFACE_FAMILIES.includes(record.surfaceFamily as never)) {
+    throw new TypeError(`Preset viewer ${record.id} has an unsupported surface family.`);
+  }
+  if (!Array.isArray(record.surfaceTraits) || record.surfaceTraits.some(
+    (trait) => !VIEWER_SURFACE_TRAITS.includes(trait as never),
+  )) {
+    throw new TypeError(`Preset viewer ${record.id} has unsupported surface traits.`);
+  }
+  if (new Set(record.surfaceTraits).size !== record.surfaceTraits.length) {
+    throw new TypeError(`Preset viewer ${record.id} repeats a surface trait.`);
+  }
 
   const capability = record.capability as CoreViewerCapability;
   const source = record.source as PresetViewerSource;
@@ -180,6 +199,8 @@ function parseDefinition(input: unknown, index: number): PresetViewerDefinition 
     runtime: record.runtime as PresetViewerRuntime,
     surfacePreparation: record.surfacePreparation as ViewerSurfacePreparation,
     readinessSignal: record.readinessSignal as ViewerSurfaceReadinessSignal,
+    surfaceFamily: record.surfaceFamily as ViewerSurfaceFamily,
+    surfaceTraits: Object.freeze([...record.surfaceTraits]) as readonly ViewerSurfaceTrait[],
   });
 }
 
