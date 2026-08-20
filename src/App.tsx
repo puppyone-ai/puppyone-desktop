@@ -109,6 +109,7 @@ function AppContent() {
   const desktopUpdates = useDesktopUpdates();
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
+  const { setRightSidebarOpen } = preferences;
   const fontCatalog = useTypographyCatalog();
   const typography = useTypographyRuntime(
     preferences.typographyPreferences,
@@ -149,7 +150,8 @@ function AppContent() {
     onWorkspaceActivated: useCallback(() => {
       setActiveView("data");
       setSwitcherOpen(false);
-    }, []),
+      setRightSidebarOpen(true);
+    }, [setRightSidebarOpen]),
     onWorkspaceCleared: useCallback(() => {
       setActiveView("data");
       setSwitcherOpen(false);
@@ -196,7 +198,6 @@ function AppContent() {
     setExplorerWidth,
     setFileIconTheme,
     setFilesVisibilitySettings,
-    setRightSidebarOpen,
     setRightSidebarToolsSettings,
     setRightSidebarWidth,
     setRightSidebarSurface,
