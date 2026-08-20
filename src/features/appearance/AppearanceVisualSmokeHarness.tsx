@@ -246,6 +246,7 @@ function SmokeNavigation({ shellToolbar = false }: { shellToolbar?: boolean }) {
             <button
               className={`desktop-sidebar-top-navigation-button${shellToolbar ? " desktop-shell-toolbar-button" : ""}${dataItem === "cloud" ? " active" : ""}`}
               data-navigation-item={dataItem}
+              aria-current={dataItem === "cloud" ? "page" : undefined}
               type="button"
               key={dataItem}
             >

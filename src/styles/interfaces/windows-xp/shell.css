@@ -280,38 +280,30 @@
 
 :root[data-interface-style="windows-xp"]
   .desktop-shell-navigation-toolbar-host
-  .desktop-shell-toolbar-button:hover:not(:disabled) {
-  border-color: #e6a640;
-  background: linear-gradient(180deg, #fffdf5 0%, #fff3ca 52%, #f7df9e 100%);
+  .desktop-shell-toolbar-button:hover:not(:disabled):where(:not(.active):not([aria-current="page"]):not([aria-pressed="true"])) {
+  border-color: var(--interface-shell-toolbar-button-hover-border-color);
+  background: var(--interface-shell-toolbar-button-hover-background);
   color: #000000;
-  box-shadow: inset 0 1px 0 #ffffff;
+  box-shadow: var(--interface-shell-toolbar-button-hover-box-shadow);
 }
 
 :root[data-interface-style="windows-xp"]
-  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-button.active,
-:root[data-interface-style="windows-xp"]
-  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-button.active:hover,
-:root[data-interface-style="windows-xp"]
-  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-button[aria-pressed="true"] {
-  border-color: #c98518;
-  background: linear-gradient(180deg, #efd080 0%, #f8df9d 50%, #ffedb5 100%);
-  color: #4a4338;
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-button:is(.active, [aria-current="page"], [aria-pressed="true"]) {
+  border-color: var(--interface-shell-toolbar-button-checked-border-color);
+  background: var(--interface-shell-toolbar-button-checked-background);
+  color: var(--interface-shell-toolbar-button-checked-color);
   text-shadow: none;
-  box-shadow:
-    inset 1px 1px 1px rgba(113, 74, 8, 0.28),
-    inset -1px -1px 0 rgba(255, 255, 255, 0.72);
+  box-shadow: var(--interface-shell-toolbar-button-checked-box-shadow);
 }
 
-:root[data-interface-style="windows-xp"]
-  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-button[aria-pressed="true"]:hover:not(:disabled),
 :root[data-interface-style="windows-xp"]
   .desktop-shell-navigation-toolbar-host
   .desktop-shell-toolbar-button:active:not(:disabled) {
-  border-color: #b67610;
-  background: linear-gradient(180deg, #e7c36d 0%, #f2d183 52%, #ffe4a0 100%);
-  box-shadow:
-    inset 1px 1px 2px rgba(91, 57, 3, 0.34),
-    inset -1px -1px 0 rgba(255, 255, 255, 0.58);
+  border-color: var(--interface-shell-toolbar-button-pressed-border-color);
+  background: var(--interface-shell-toolbar-button-pressed-background);
+  color: #000000;
+  box-shadow: var(--interface-shell-toolbar-button-pressed-box-shadow);
 }
 
 :root[data-interface-style="windows-xp"]
@@ -474,10 +466,28 @@
 }
 
 :root[data-interface-style="windows-xp"]
-  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-menu-trigger:hover:not(:disabled) {
-  border-color: #d6ad63;
-  background: #fff8e4;
+  .desktop-shell-navigation-toolbar-host
+  .desktop-shell-toolbar-menu-trigger:hover:not(:disabled):where(:not([aria-expanded="true"])) {
+  border-color: var(--interface-shell-toolbar-button-hover-border-color);
+  background: var(--interface-shell-toolbar-button-hover-background);
   color: #000000;
+  box-shadow: var(--interface-shell-toolbar-button-hover-box-shadow);
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-menu-trigger[aria-expanded="true"] {
+  border-color: var(--interface-shell-toolbar-button-checked-border-color);
+  background: var(--interface-shell-toolbar-button-checked-background);
+  color: var(--interface-shell-toolbar-button-checked-color);
+  box-shadow: var(--interface-shell-toolbar-button-checked-box-shadow);
+}
+
+:root[data-interface-style="windows-xp"]
+  .desktop-shell-navigation-toolbar-host .desktop-shell-toolbar-menu-trigger:active:not(:disabled) {
+  border-color: var(--interface-shell-toolbar-button-pressed-border-color);
+  background: var(--interface-shell-toolbar-button-pressed-background);
+  color: #000000;
+  box-shadow: var(--interface-shell-toolbar-button-pressed-box-shadow);
 }
 
 /* Explorer address band is a Shell composition slot. It reads workspace

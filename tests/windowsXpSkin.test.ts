@@ -303,9 +303,14 @@ describe("Interface style registry", () => {
     expect(xp).toContain("border: 1px solid #7f9db9;");
     expect(xp).toContain("--interface-scrollbar-button-background-image:");
     expect(xp).toContain("height: 56px;");
-    expect(xp).toContain("border-color: #c98518;");
-    expect(xp).toContain("color: #4a4338;");
-    expect(xp).toContain("inset 1px 1px 1px rgba(113, 74, 8, 0.28)");
+    expect(xp).toContain("--interface-shell-toolbar-button-hover-border-color: var(--xp-default-ring);");
+    expect(xp).toContain("--interface-shell-toolbar-button-checked-border-color: #7f9db9;");
+    expect(xp).toContain("--interface-shell-toolbar-button-pressed-border-color: var(--xp-selection);");
+    expect(toolbarCss).toContain(":where(:not(.active):not([aria-current=\"page\"]):not([aria-pressed=\"true\"]))");
+    expect(toolbarCss).toContain(":is(.active, [aria-current=\"page\"], [aria-pressed=\"true\"])");
+    expect(toolbarCss).toContain(".desktop-shell-toolbar-menu-trigger[aria-expanded=\"true\"]");
+    expect(toolbarCss).not.toContain("#c98518");
+    expect(toolbarCss).not.toContain("#efd080");
     expect(xp).not.toContain("inset 0 -2px 0 #ef921c");
     expect(xp).toMatch(
       /\.desktop-shell-navigation-toolbar-host\s*\{[^}]*background:\s*#f5f4ee;[^}]*box-shadow:\s*none;/s,
