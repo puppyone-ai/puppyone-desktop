@@ -9,32 +9,79 @@
 }
 
 :root[data-interface-style="windows-xp"] .desktop-dialog-header {
-  padding: 7px 10px;
+  min-height: var(--desktop-chrome-height);
+  align-items: center;
+  padding: 3px 4px 3px 7px;
   border-bottom: 1px solid var(--xp-titlebar-edge);
-  background: linear-gradient(180deg, var(--xp-titlebar-top), var(--xp-titlebar-mid) 52%, var(--xp-titlebar-end));
+  background-color: var(--xp-titlebar-background-color);
+  background-image: var(--xp-titlebar-background-image);
   color: #ffffff;
   text-shadow: 1px 1px 0 rgba(0, 35, 121, 0.86);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.44);
+  box-shadow: none;
 }
 
 :root[data-interface-style="windows-xp"] .desktop-dialog-header :where(h1, h2, span, svg, button) {
   color: inherit;
 }
 
-:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-icon-button {
-  width: 22px;
-  height: 22px;
-  border: 1px solid #ffffff;
-  border-radius: 3px;
-  background: linear-gradient(135deg, #f58b5a 0%, #e84a22 46%, #bd280f 100%);
+:root[data-interface-style="windows-xp"] .desktop-dialog-title-row {
+  align-items: center;
+  gap: 5px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-title-row h2 {
   color: #ffffff;
-  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.58), inset -1px -1px 0 rgba(122, 20, 4, 0.62);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-leading {
+  width: 24px;
+  height: 24px;
+  border-radius: 0;
+  background: transparent;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-leading svg {
+  width: 18px;
+  height: 18px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-icon-button {
+  appearance: none;
+  width: var(--desktop-chrome-control-size);
+  height: var(--desktop-chrome-control-size);
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  background-image: var(--xp-window-control-close-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: var(--desktop-chrome-control-size) var(--desktop-chrome-control-size);
+  color: #ffffff;
+  box-shadow: none;
 }
 
 :root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-icon-button:hover:not(:disabled) {
-  border-color: #ffffff;
-  background: linear-gradient(135deg, #ffab78 0%, #f05a2e 46%, #c52b10 100%);
+  border: 0;
+  background-color: transparent;
+  background-image: var(--xp-window-control-close-hover-image);
   color: #ffffff;
+  box-shadow: none;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-icon-button:active:not(:disabled) {
+  background-image: var(--xp-window-control-close-active-image);
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-icon-button:focus-visible {
+  outline: 1px dotted #ffffff;
+  outline-offset: -4px;
+}
+
+:root[data-interface-style="windows-xp"] .desktop-dialog-header .desktop-dialog-icon-button svg {
+  display: none;
 }
 
 :root[data-interface-style="windows-xp"] .desktop-dialog-body {

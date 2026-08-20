@@ -179,6 +179,21 @@
   --xp-titlebar-edge: #073eac;
   --xp-titlebar-text: #ffffff;
   --xp-titlebar-muted: #ffffff;
+  --xp-titlebar-background-color: var(--xp-titlebar-mid);
+  --xp-titlebar-background-image:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, transparent 24%, rgba(0, 31, 104, 0.07) 100%),
+    linear-gradient(
+      180deg,
+      #0758d7 0%,
+      var(--xp-titlebar-top) 5%,
+      #2d87ef 10%,
+      var(--xp-titlebar-start) 18%,
+      var(--xp-titlebar-mid) 42%,
+      #0754d4 58%,
+      var(--xp-titlebar-end) 82%,
+      #0757d5 92%,
+      var(--xp-titlebar-edge) 100%
+    );
   --xp-window-control-minimize-image: url("./assets/window-control-minimize.svg");
   --xp-window-control-minimize-hover-image: url("./assets/window-control-minimize-hover.svg");
   --xp-window-control-minimize-active-image: url("./assets/window-control-minimize-active.svg");

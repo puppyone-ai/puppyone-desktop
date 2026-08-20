@@ -614,13 +614,100 @@ async function runSmoke() {
     }
     window.hide();
     }
-    console.log(`appearance visual smoke passed: ${styles.length} Styles × ${expectedFamilies.length} Surface Families`);
+    await runDialogSmoke();
+    console.log(`appearance visual smoke passed: ${styles.length} Styles × ${expectedFamilies.length} Surface Families + XP dialog`);
   } finally {
     for (const window of windows) {
       if (!window.isDestroyed()) window.destroy();
     }
   }
   app.quit();
+}
+
+async function runDialogSmoke() {
+  const window = new BrowserWindow({
+    show: true,
+    width: 960,
+    height: 620,
+    frame: false,
+    backgroundColor: "#ffffff",
+    webPreferences: {
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+    },
+  });
+  windows.push(window);
+  const url = pathToFileURL(rendererPath);
+  url.searchParams.set("style", "windows-xp");
+  url.searchParams.set("dialog", "terminal-close");
+  url.hash = "appearance-visual-smoke";
+  await window.loadURL(url.href);
+  await waitForReady(window);
+  await waitForSelector(window, ".desktop-terminal-close-dialog");
+  await window.webContents.executeJavaScript(
+    "new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))",
+    true,
+  );
+  await new Promise((resolve) => setTimeout(resolve, 180));
+
+  const snapshot = await window.webContents.executeJavaScript(`(() => {
+    const titlebar = document.querySelector('.desktop-titlebar');
+    const dialog = document.querySelector('.desktop-terminal-close-dialog');
+    const header = dialog.querySelector('.desktop-dialog-header');
+    const leading = dialog.querySelector('.desktop-dialog-leading');
+    const close = dialog.querySelector('.desktop-dialog-icon-button');
+    const shellClose = document.querySelector('.desktop-window-control.is-close');
+    const cancel = [...dialog.querySelectorAll('.desktop-dialog-button')]
+      .find((button) => button.textContent.trim() === 'Cancel');
+    const confirm = [...dialog.querySelectorAll('.desktop-dialog-button')]
+      .find((button) => button.textContent.trim() === 'Close terminal');
+    const rect = (element) => {
+      const value = element.getBoundingClientRect();
+      return { width: Math.round(value.width), height: Math.round(value.height) };
+    };
+    const paint = (element) => {
+      const value = getComputedStyle(element);
+      return {
+        backgroundColor: value.backgroundColor,
+        backgroundImage: value.backgroundImage,
+        borderColor: value.borderTopColor,
+        boxShadow: value.boxShadow,
+        color: value.color,
+      };
+    };
+    return {
+      titlebar: { ...rect(titlebar), ...paint(titlebar) },
+      header: { ...rect(header), ...paint(header) },
+      close: { ...rect(close), ...paint(close) },
+      shellClose: { ...rect(shellClose), ...paint(shellClose) },
+      closeSvgDisplay: getComputedStyle(close.querySelector('svg')).display,
+      leadingBackground: getComputedStyle(leading).backgroundColor,
+      cancel: paint(cancel),
+      confirm: paint(confirm),
+      confirmClasses: [...confirm.classList],
+    };
+  })()`, true);
+
+  assert(snapshot.header.height === snapshot.titlebar.height, `XP dialog: caption is ${snapshot.header.height}px high, Shell titlebar is ${snapshot.titlebar.height}px`);
+  assert(snapshot.header.backgroundImage === snapshot.titlebar.backgroundImage, "XP dialog: caption does not share the Shell titlebar paint");
+  assert(snapshot.close.width === 26 && snapshot.close.height === 26, `XP dialog: close control has the wrong geometry (${JSON.stringify(snapshot.close)})`);
+  assert(snapshot.close.backgroundImage === snapshot.shellClose.backgroundImage, "XP dialog: close control does not share the Shell close asset");
+  assert(snapshot.closeSvgDisplay === "none", `XP dialog: fallback close glyph is still visible (${snapshot.closeSvgDisplay})`);
+  assert(snapshot.leadingBackground === "rgba(0, 0, 0, 0)", `XP dialog: leading icon retained a modern tile (${snapshot.leadingBackground})`);
+  assert(snapshot.confirmClasses.includes("primary") && snapshot.confirmClasses.includes("destructive"), "XP dialog: destructive action lost its semantic modifiers");
+  assert(snapshot.confirm.backgroundImage === snapshot.cancel.backgroundImage, "XP dialog: destructive action bypasses Windows button chrome");
+  assert(snapshot.confirm.color === "rgb(0, 0, 0)", `XP dialog: destructive action kept modern inverse text (${snapshot.confirm.color})`);
+  assert(snapshot.confirm.boxShadow !== snapshot.cancel.boxShadow, "XP dialog: default action lost its Windows focus ring");
+
+  const capture = await window.capturePage();
+  assert(!capture.isEmpty(), "XP dialog: screenshot capture was empty");
+  assert(hasVisualDiversity(capture), "XP dialog: screenshot capture was visually blank");
+  if (screenshotDirectory) {
+    await writeFile(path.join(screenshotDirectory, "appearance-windows-xp-dialog.png"), capture.toPNG());
+  }
+  window.hide();
 }
 
 app.whenReady().then(runSmoke).catch((error) => {
@@ -638,6 +725,18 @@ async function waitForReady(window) {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   throw new Error("Appearance visual fixture did not become ready.");
+}
+
+async function waitForSelector(window, selector) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const ready = await window.webContents.executeJavaScript(
+      `Boolean(document.querySelector(${JSON.stringify(selector)}))`,
+      true,
+    );
+    if (ready) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Appearance visual fixture did not mount ${selector}.`);
 }
 
 function assert(condition, message) {

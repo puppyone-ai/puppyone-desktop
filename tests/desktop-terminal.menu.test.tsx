@@ -546,6 +546,10 @@ describe("Desktop Terminal titlebar session manager", () => {
     expect(dialog?.textContent).toContain(
       "This will stop the shell and any command running in this terminal.",
     );
+    const confirmButton = Array.from(dialog?.querySelectorAll("button") ?? [])
+      .find((button) => button.textContent?.trim() === "Close terminal");
+    expect(confirmButton?.classList.contains("primary")).toBe(true);
+    expect(confirmButton?.classList.contains("destructive")).toBe(true);
     expect(document.activeElement?.textContent).toBe("Cancel");
 
     clickButton(overlayRoot!, "Cancel");

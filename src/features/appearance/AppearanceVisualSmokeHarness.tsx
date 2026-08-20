@@ -1,5 +1,6 @@
 import { DesktopWindowChrome } from "../../components/DesktopWindowChrome";
 import { DesktopShellLocationBar } from "../app-shell/DesktopShellLocationBar";
+import { TerminalCloseConfirmationDialog } from "../desktop-terminal/ui/TerminalCloseConfirmationDialog";
 import { useLocalization } from "@puppyone/localization/react";
 import {
   ExplorerTree,
@@ -15,6 +16,7 @@ import {
 import "./appearance-visual-smoke.css";
 
 const style = parseInterfaceStyle(new URLSearchParams(window.location.search).get("style"));
+const dialogFixture = new URLSearchParams(window.location.search).get("dialog");
 const profile = getInterfaceStyleDefinition(style);
 const root = document.documentElement;
 root.dataset.interfaceStyle = style;
@@ -159,6 +161,13 @@ export function AppearanceVisualSmokeHarness() {
           </section>
         </div>
       </div>
+      {dialogFixture === "terminal-close" && (
+        <TerminalCloseConfirmationDialog
+          title={t("terminal.sessionTitle", { number: 1 })}
+          onCancel={() => undefined}
+          onConfirm={() => undefined}
+        />
+      )}
     </main>
   );
 }

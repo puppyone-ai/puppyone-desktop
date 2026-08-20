@@ -90,6 +90,11 @@
   color: var(--po-accent);
 }
 
+.desktop-dialog-leading.destructive {
+  background: color-mix(in srgb, var(--po-danger) 11%, transparent);
+  color: var(--po-danger);
+}
+
 .desktop-dialog-spinner {
   animation: desktop-dialog-spin 0.9s linear infinite;
 }
@@ -262,6 +267,21 @@
   border-color: color-mix(in srgb, var(--po-text) 88%, var(--po-panel) 12%);
   background: color-mix(in srgb, var(--po-text) 88%, var(--po-panel) 12%);
   color: var(--po-text-inverse);
+}
+
+.desktop-dialog-button.destructive {
+  border-color: color-mix(in srgb, var(--po-danger) 72%, var(--po-border));
+  background: var(--po-danger);
+  color: var(--po-text-inverse);
+  font-weight: 600;
+}
+
+.desktop-dialog-button.destructive:hover:not(:disabled),
+.desktop-dialog-button.destructive:focus-visible:not(:disabled) {
+  border-color: color-mix(in srgb, var(--po-danger) 86%, var(--po-text) 14%);
+  background: color-mix(in srgb, var(--po-danger) 86%, var(--po-text) 14%);
+  color: var(--po-text-inverse);
+  outline: none;
 }
 
 .desktop-dialog-button:disabled {

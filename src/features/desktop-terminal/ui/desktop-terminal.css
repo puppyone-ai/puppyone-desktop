@@ -10,29 +10,9 @@
   color: var(--po-terminal-fg);
 }
 
-.desktop-terminal-close-dialog-leading {
-  background: color-mix(in srgb, var(--po-danger) 11%, transparent);
-  color: var(--po-danger);
-}
-
 .desktop-terminal-close-dialog-detail {
   margin: 0;
   color: var(--po-text-muted);
-}
-
-.desktop-terminal-close-dialog-confirm {
-  border-color: color-mix(in srgb, var(--po-danger) 72%, var(--po-border));
-  background: var(--po-danger);
-  color: var(--po-text-inverse);
-  font-weight: 600;
-}
-
-.desktop-terminal-close-dialog-confirm:hover:not(:disabled),
-.desktop-terminal-close-dialog-confirm:focus-visible:not(:disabled) {
-  border-color: color-mix(in srgb, var(--po-danger) 86%, var(--po-text) 14%);
-  background: color-mix(in srgb, var(--po-danger) 86%, var(--po-text) 14%);
-  color: var(--po-text-inverse);
-  outline: none;
 }
 
 .desktop-terminal-body {

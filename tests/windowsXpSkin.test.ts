@@ -215,6 +215,16 @@ describe("Interface style registry", () => {
     const xp = windowsXpStylePack();
     expect(xp).toContain("--xp-titlebar-start:");
     expect(xp).toContain("--xp-button-hover-start:");
+    expect(xp).toContain("--xp-titlebar-background-image:");
+    expect(xp).toMatch(
+      /\.desktop-titlebar\s*\{[^}]*background-image:\s*var\(--xp-titlebar-background-image\)/s,
+    );
+    expect(xp).toMatch(
+      /\.desktop-dialog-header\s*\{[^}]*min-height:\s*var\(--desktop-chrome-height\);[^}]*background-image:\s*var\(--xp-titlebar-background-image\)/s,
+    );
+    expect(xp).toMatch(
+      /\.desktop-dialog-header \.desktop-dialog-icon-button\s*\{[^}]*var\(--xp-window-control-close-image\)/s,
+    );
   });
 
   it("keeps Luna paint authentic and delegates structure to the profile", () => {
