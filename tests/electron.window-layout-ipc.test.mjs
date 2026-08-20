@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { registerWindowLayoutIpcHandlers } from "../electron/main/ipc/window-layout-ipc.mjs";
+import { reapplyWindowChromeProfile } from "../electron/main/window-chrome-profile.mjs";
 
 describe("native window layout IPC", () => {
   it("raises the native minimum and expands an already narrower window", () => {
@@ -77,6 +78,20 @@ describe("native window layout IPC", () => {
       titlebar: "unknown-titlebar-v1",
     })).toEqual({ applied: true, customControls: false });
     expect(ownerWindow.setWindowButtonPosition).toHaveBeenLastCalledWith({ x: 13, y: 12 });
+  });
+
+  it("keeps native traffic lights hidden when macOS recreates window chrome", () => {
+    const ownerWindow = createWindow();
+    const handlers = registerHandlers(ownerWindow);
+
+    handlers.get("window-layout:set-chrome-profile")(createEvent(), {
+      titlebar: "windows-xp-luna-titlebar-v1",
+    });
+    ownerWindow.setWindowButtonVisibility.mockClear();
+
+    expect(reapplyWindowChromeProfile(ownerWindow)).toMatchObject({ customControls: true });
+    expect(ownerWindow.setWindowButtonVisibility).toHaveBeenCalledExactlyOnceWith(false);
+    expect(ownerWindow.setWindowButtonPosition).not.toHaveBeenCalled();
   });
 
   it("executes only allowlisted renderer window actions", () => {

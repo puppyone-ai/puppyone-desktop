@@ -22,6 +22,7 @@ const WINDOW_CHROME_PROFILES = new Map([
     }),
   ],
 ]);
+const activeWindowChromeProfiles = new WeakMap();
 
 export function resolveWindowChromeProfile(titlebar) {
   return WINDOW_CHROME_PROFILES.get(titlebar) ?? DEFAULT_WINDOW_CHROME_PROFILE;
@@ -29,11 +30,23 @@ export function resolveWindowChromeProfile(titlebar) {
 
 export function applyWindowChromeProfile(ownerWindow, titlebar) {
   const profile = resolveWindowChromeProfile(titlebar);
+  activeWindowChromeProfiles.set(ownerWindow, profile);
+  synchronizeWindowChromeProfile(ownerWindow, profile);
+  return profile;
+}
+
+export function reapplyWindowChromeProfile(ownerWindow) {
+  const profile = activeWindowChromeProfiles.get(ownerWindow);
+  if (!profile) return null;
+  synchronizeWindowChromeProfile(ownerWindow, profile);
+  return profile;
+}
+
+function synchronizeWindowChromeProfile(ownerWindow, profile) {
   ownerWindow.setWindowButtonVisibility?.(!profile.customControls);
   if (!profile.customControls && profile.windowButtonPosition) {
     // AppKit may recreate the native traffic-light controls after they have
     // been hidden. Reapply the reviewed position after restoring visibility.
     ownerWindow.setWindowButtonPosition?.({ ...profile.windowButtonPosition });
   }
-  return profile;
 }
