@@ -909,8 +909,9 @@ function AppContent() {
   const locationBarVisible = !minimalMode
     && resolvedAppearance.composition.locationBar === "workspace-path-v1";
   const locationBarPath = resolveDesktopShellLocationPath({
-    activePath: activeDataNode?.path ?? activeDataPath,
-    activePathIsFolder: activeDataNode?.type === "folder",
+    // The address bar describes the content surface. Keep the active editor
+    // authoritative even if explorer selection state is briefly catching up.
+    activePath: activeDataPath ?? activeDataNode?.path ?? null,
     dataViewActive: activeView === "data",
     workspacePath: workspace.path,
   });

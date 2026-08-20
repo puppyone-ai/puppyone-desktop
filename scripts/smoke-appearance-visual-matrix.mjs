@@ -324,8 +324,8 @@ async function runSmoke() {
       assert(snapshot.locationBarValueOutline === "none", `XP: path input retained an outline (${snapshot.locationBarValueOutline})`);
       assert(snapshot.locationBarValueShadow === "none", `XP: path input retained a shadow (${snapshot.locationBarValueShadow})`);
       assert(
-        /My Documents[\\\\/]+PuppyOne$/.test(snapshot.locationBarPath ?? ""),
-        `XP: address bar lost its path (${snapshot.locationBarPath})`,
+        /My Documents[\\\\/]+PuppyOne[\\\\/]+README\.md$/.test(snapshot.locationBarPath ?? ""),
+        `XP: address bar lost its active file path (${snapshot.locationBarPath})`,
       );
       assert(snapshot.locationBarFontSize === "13px", `XP: address text is ${snapshot.locationBarFontSize}, expected 13px`);
       assert(snapshot.locationBarHasDropdown, "XP: address field lost its dropdown affordance");

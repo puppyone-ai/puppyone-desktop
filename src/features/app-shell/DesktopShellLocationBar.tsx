@@ -9,7 +9,6 @@ type DesktopShellLocationBarProps = {
 
 type ResolveDesktopShellLocationPathInput = {
   activePath: string | null;
-  activePathIsFolder: boolean;
   dataViewActive: boolean;
   workspacePath: string;
 };
@@ -64,16 +63,13 @@ export function DesktopShellLocationBar({ onNavigate, path }: DesktopShellLocati
 
 export function resolveDesktopShellLocationPath({
   activePath,
-  activePathIsFolder,
   dataViewActive,
   workspacePath,
 }: ResolveDesktopShellLocationPathInput) {
   const workspaceRoot = trimTrailingPathSeparators(workspacePath);
   if (!dataViewActive || !activePath) return workspaceRoot;
 
-  const selectedLocation = activePathIsFolder
-    ? trimTrailingPathSeparators(activePath)
-    : getParentPath(activePath);
+  const selectedLocation = trimTrailingPathSeparators(activePath);
   if (!selectedLocation) return workspaceRoot;
   if (isPathInsideWorkspace(selectedLocation, workspaceRoot)) return selectedLocation;
   if (isWorkspaceRelativePath(selectedLocation)) {
@@ -95,14 +91,6 @@ export function resolveDesktopShellWorkspaceEntryPath(path: string, workspacePat
 function trimTrailingPathSeparators(path: string) {
   const trimmed = path.replace(/[\\/]+$/, "");
   return trimmed || path;
-}
-
-function getParentPath(path: string) {
-  const normalized = trimTrailingPathSeparators(path);
-  const separatorIndex = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
-  if (separatorIndex < 0) return "";
-  if (separatorIndex === 0) return normalized.slice(0, 1);
-  return normalized.slice(0, separatorIndex);
 }
 
 function isPathInsideWorkspace(path: string, workspaceRoot: string) {

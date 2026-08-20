@@ -110,7 +110,7 @@ export function AppearanceVisualSmokeHarness() {
         {hasLocationBar && (
           <div className="desktop-shell-location-bar-host" data-window-no-drag="true">
             <DesktopShellLocationBar
-              path={"C:\\Documents and Settings\\Amanda\\My Documents\\PuppyOne"}
+              path={"C:\\Documents and Settings\\Amanda\\My Documents\\PuppyOne\\README.md"}
               onNavigate={() => undefined}
             />
           </div>
