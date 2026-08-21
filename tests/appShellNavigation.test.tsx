@@ -151,7 +151,7 @@ describe("DesktopSidebarFooterNavigation", () => {
 });
 
 describe("DesktopSidebarRailNavigation local Cloud hub", () => {
-  it("keeps Changes on Local projects and places Cloud after Settings", () => {
+  it("uses a dot without a count for local workspace changes", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -175,8 +175,39 @@ describe("DesktopSidebarRailNavigation local Cloud hub", () => {
 
     expect(
       Array.from(container.querySelectorAll("button"), (button) => button.getAttribute("aria-label")),
-    ).toEqual(["Files, workspace changes detected", "Changes, 2 workspace changes", "Settings", "Cloud"]);
+    ).toEqual(["Files, workspace changes detected", "Changes, workspace changes detected", "Settings", "Cloud"]);
+    const badge = container.querySelector('[data-navigation-item="git"] .desktop-sidebar-nav-badge');
+    expect(badge?.classList.contains("workspace")).toBe(true);
+    expect(badge?.textContent).toBe("");
     expect(container.querySelector('button[aria-label="History"]')).toBeNull();
     expect(container.querySelector(".desktop-sidebar-nav-cloud-dot")).toBeNull();
+  });
+
+  it("shows only the incoming cloud count when local and remote changes coexist", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <DesktopSidebarRailNavigation
+        activeView="git"
+        cloudHubEnabled
+        gitEnabled
+        pluginsEnabled={false}
+        gitIncomingCount={17}
+        gitOperationLoading={null}
+        gitStatus={null}
+        workspaceChangeCount={65}
+        onNavigate={vi.fn()}
+        onOpenSettings={vi.fn()}
+      />,
+    ));
+
+    const gitButton = container.querySelector('[data-navigation-item="git"]');
+    const badge = gitButton?.querySelector(".desktop-sidebar-nav-badge");
+    expect(gitButton?.getAttribute("aria-label")).toBe("Changes, 17 remote changes to pull");
+    expect(badge?.classList.contains("remote")).toBe(true);
+    expect(badge?.classList.contains("workspace")).toBe(false);
+    expect(badge?.textContent).toBe("17");
   });
 });
