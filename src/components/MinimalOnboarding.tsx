@@ -214,9 +214,9 @@ export function MinimalOnboarding({
             <div className="onboarding-folder-action-wrap">
               <div className={`folder-drop-zone ${folderDrop.dragging ? "dragging" : ""} ${busy ? "is-disabled" : ""}`}>
                 <svg className="folder-drop-outline" viewBox="0 0 260 260" preserveAspectRatio="none" aria-hidden="true">
-                  <path className="folder-drop-shadow" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-                  <path className="folder-drop-fill" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-                  <path className="folder-drop-border" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
+                  <rect className="folder-drop-shadow" x="0.5" y="0.5" width="259" height="259" />
+                  <rect className="folder-drop-fill" x="0.5" y="0.5" width="259" height="259" />
+                  <rect className="folder-drop-border" x="0.5" y="0.5" width="259" height="259" />
                 </svg>
                 <button
                   className="folder-drop-primary-action"

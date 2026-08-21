@@ -128,7 +128,11 @@ describe("project folder home", () => {
     expectBrandLockup(container);
     expect(container.querySelectorAll(".folder-drop-zone")).toHaveLength(1);
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
-    expect(container.querySelector(".folder-drop-outline")).not.toBeNull();
+    const outline = container.querySelector(".folder-drop-outline");
+    expect(outline).not.toBeNull();
+    expect(outline?.querySelectorAll("rect")).toHaveLength(3);
+    expect(outline?.querySelector("path")).toBeNull();
+    expect(outline?.querySelector("[rx]")).toBeNull();
     expect(container.querySelector(".folder-drop-icon.lucide-folder-open")).not.toBeNull();
     expect(css).toMatch(/\.folder-drop-border\s*\{[^}]*stroke-dasharray:\s*4 4;[^}]*stroke-width:\s*1;/s);
   });
