@@ -125,8 +125,8 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*60px;[^}]*height:\s*60px;/s);
     expect(css).not.toContain(".onboarding-brand-version");
     expect(css).toMatch(/\.onboarding-primary-area\s*\{[^}]*justify-items:\s*center;/s);
-    expect(css).toMatch(/\.onboarding-folder-action-wrap\s*\{[^}]*width:\s*min\(156px, 100%\);/s);
-    expect(css).toMatch(/\.folder-drop-zone\s*\{[^}]*height:\s*44px;[^}]*border:\s*1px solid var\(--po-border\);[^}]*border-radius:\s*6px;[^}]*background:\s*var\(--po-panel\);[^}]*text-align:\s*center;/s);
+    expect(css).toMatch(/\.onboarding-folder-action-wrap\s*\{[^}]*width:\s*min\(176px, 100%\);/s);
+    expect(css).toMatch(/\.folder-drop-zone\s*\{[^}]*aspect-ratio:\s*1 \/ 1;[^}]*border:\s*1px dashed var\(--po-border\);[^}]*border-radius:\s*0;[^}]*background:\s*transparent;[^}]*text-align:\s*center;/s);
     expect(css).not.toContain(".folder-drop-icon-frame");
   });
 
