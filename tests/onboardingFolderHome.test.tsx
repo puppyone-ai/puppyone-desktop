@@ -109,24 +109,26 @@ describe("project folder home", () => {
     expect(onChooseWorkspace).toHaveBeenCalledTimes(1);
   });
 
-  it("uses one centered text-only folder action when there are no projects", () => {
+  it("restores the original floating folder action when there are no projects", () => {
     const css = readFileSync(`${process.cwd()}/src/styles/onboarding.css`, "utf8");
     const container = renderHome();
 
     expectBrandLockup(container);
     expect(container.querySelectorAll(".folder-drop-zone")).toHaveLength(1);
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
-    expect(container.querySelector(".folder-drop-outline")).toBeNull();
-    expect(container.querySelector(".folder-drop-icon")).toBeNull();
-    expect(container.querySelector(".folder-drop-copy")?.textContent).toBe("Open folder");
+    const outline = container.querySelector(".folder-drop-outline");
+    expect(outline?.querySelectorAll("path")).toHaveLength(3);
+    expect(container.querySelector(".folder-drop-icon.lucide-folder-open")).not.toBeNull();
+    expect(container.querySelector(".folder-drop-copy")?.textContent).toBe("open or drop a folder");
     expect(css).toMatch(/\.onboarding-homepage\s*\{[^}]*width:\s*min\(480px, 100%\);[^}]*align-content:\s*start;[^}]*gap:\s*30px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*center;[^}]*justify-self:\s*center;[^}]*gap:\s*12px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*color:\s*var\(--po-text-muted\);/s);
     expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*60px;[^}]*height:\s*60px;/s);
     expect(css).not.toContain(".onboarding-brand-version");
     expect(css).toMatch(/\.onboarding-primary-area\s*\{[^}]*justify-items:\s*center;/s);
-    expect(css).toMatch(/\.onboarding-folder-action-wrap\s*\{[^}]*width:\s*min\(176px, 100%\);/s);
-    expect(css).toMatch(/\.folder-drop-zone\s*\{[^}]*aspect-ratio:\s*1 \/ 1;[^}]*border:\s*1px dashed var\(--po-border\);[^}]*border-radius:\s*0;[^}]*background:\s*transparent;[^}]*text-align:\s*center;/s);
+    expect(css).toMatch(/\.onboarding-folder-action-wrap\s*\{[^}]*width:\s*min\(260px, 100%\);/s);
+    expect(css).toMatch(/\.folder-drop-zone\s*\{[^}]*max-width:\s*260px;[^}]*max-height:\s*260px;[^}]*aspect-ratio:\s*1 \/ 1;[^}]*border:\s*0;[^}]*background:\s*transparent;[^}]*text-align:\s*center;/s);
+    expect(css).toMatch(/\.folder-drop-border\s*\{[^}]*stroke-dasharray:\s*4 4;[^}]*stroke-width:\s*2;/s);
     expect(css).not.toContain(".folder-drop-icon-frame");
   });
 

@@ -1,6 +1,6 @@
 import { resolveRendererPublicAssetUrl, type Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
-import { AlertTriangle, Folder, Plus, Unlink } from "lucide-react";
+import { AlertTriangle, Folder, FolderOpen, Plus, Unlink } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -215,20 +215,26 @@ export function MinimalOnboarding({
           <div className="onboarding-primary-area">
             <div className="onboarding-folder-action-wrap">
               <div className={`folder-drop-zone ${folderDrop.dragging ? "dragging" : ""} ${busy ? "is-disabled" : ""}`}>
+                <svg className="folder-drop-outline" viewBox="0 0 260 260" preserveAspectRatio="none" aria-hidden="true">
+                  <path className="folder-drop-shadow" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
+                  <path className="folder-drop-fill" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
+                  <path className="folder-drop-border" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
+                </svg>
                 <button
                   className="folder-drop-primary-action"
                   type="button"
                   disabled={busy}
                   aria-busy={openingPath === "__new__" || undefined}
-                  aria-label={t("onboarding.action.openFolder")}
+                  aria-label={t("onboarding.action.openLocalFolder")}
                   onClick={() => void chooseFolder()}
                 />
                 <span className="folder-drop-body">
                   {openingPath === "__new__" ? (
                     <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
                   ) : (
-                    <span className="folder-drop-copy"><strong>{t("onboarding.action.openFolder")}</strong></span>
+                    <FolderOpen className="folder-drop-icon" size={25} strokeWidth={1.75} />
                   )}
+                  <span className="folder-drop-copy"><strong>{t("onboarding.action.openOrDropLocalFolder")}</strong></span>
                 </span>
               </div>
             </div>
