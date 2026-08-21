@@ -105,6 +105,15 @@ function validateSummary(summary) {
   if (large.virtualRowStartAfterScroll <= 0) {
     throw new Error("Large CSV row window did not advance after scrolling.");
   }
+  if (large.rapidScrollSamples < 24 || large.rapidScrollCoverageMisses > 0) {
+    throw new Error(`Large CSV rapid-scroll coverage failed: ${JSON.stringify(large)}.`);
+  }
+  if (large.rapidScrollPeakMountedCells > 2_000) {
+    throw new Error(`Large CSV rapid-scroll cell budget failed: ${JSON.stringify(large)}.`);
+  }
+  if (large.rapidScrollPeakMountedCells <= large.mountedCells) {
+    throw new Error(`Large CSV rapid-scroll buffer did not contract: ${JSON.stringify(large)}.`);
+  }
   if (wide.logicalColumns !== 100 || wide.mountedColumns >= 100 || wide.mountedCells > 2_000) {
     throw new Error(`Wide CSV structural bound failed: ${JSON.stringify(wide)}.`);
   }

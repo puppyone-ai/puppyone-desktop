@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildTabularProjectionItems,
   calculateFixedTabularWindow,
+  calculateVelocityAwareTabularOverscan,
   calculateVariableTabularWindow,
   createTabularOffsets,
 } from "../packages/shared-ui/src/editor/table/tabularWindow";
@@ -62,6 +63,89 @@ describe("bounded tabular projection", () => {
       scrollOffset: 0,
       viewportSize: 700,
     })).toEqual({ start: 0, end: 11 });
+  });
+
+  it("allocates a directional row buffer without crossing the mounted-row cap", () => {
+    const range = calculateFixedTabularWindow({
+      count: 10_000,
+      itemSize: 31,
+      maximumItems: 80,
+      overscanAfterItems: 20,
+      overscanBeforeItems: 4,
+      overscanItems: 4,
+      scrollOffset: 300 * 31,
+      viewportSize: 310,
+    });
+
+    expect(range).toEqual({ start: 296, end: 330 });
+    expect(range.end - range.start).toBeLessThanOrEqual(80);
+  });
+
+  it("predicts two paint intervals in the scroll direction and clamps extreme velocity", () => {
+    const forward = calculateVelocityAwareTabularOverscan({
+      baseItems: 4,
+      deltaOffset: 155,
+      elapsedMs: 16,
+      itemSize: 31,
+      maximumLeadItems: 32,
+      minimumLeadItems: 10,
+      predictionHorizonMs: 32,
+    });
+    const backward = calculateVelocityAwareTabularOverscan({
+      baseItems: 4,
+      deltaOffset: -310,
+      elapsedMs: 16,
+      itemSize: 31,
+      maximumLeadItems: 32,
+      minimumLeadItems: 10,
+      predictionHorizonMs: 32,
+    });
+    const extreme = calculateVelocityAwareTabularOverscan({
+      baseItems: 4,
+      deltaOffset: 10_000,
+      elapsedMs: 4,
+      itemSize: 31,
+      maximumLeadItems: 32,
+      minimumLeadItems: 10,
+      predictionHorizonMs: 32,
+    });
+
+    expect(forward).toEqual({ beforeItems: 4, afterItems: 20 });
+    expect(backward).toEqual({ beforeItems: 30, afterItems: 4 });
+    expect(extreme).toEqual({ beforeItems: 4, afterItems: 32 });
+  });
+
+  it("keeps the next fast-scroll viewport inside the predicted render envelope", () => {
+    const itemSize = 31;
+    const viewportSize = 26 * itemSize;
+    const currentOffset = 100 * itemSize;
+    const nextFrameDelta = 20 * itemSize;
+    const overscan = calculateVelocityAwareTabularOverscan({
+      baseItems: 4,
+      deltaOffset: nextFrameDelta,
+      elapsedMs: 16,
+      itemSize,
+      maximumLeadItems: 32,
+      minimumLeadItems: 10,
+      predictionHorizonMs: 32,
+    });
+    const rendered = calculateFixedTabularWindow({
+      count: 10_000,
+      itemSize,
+      maximumItems: 80,
+      overscanAfterItems: overscan.afterItems,
+      overscanBeforeItems: overscan.beforeItems,
+      overscanItems: 4,
+      scrollOffset: currentOffset,
+      viewportSize,
+    });
+    const nextVisibleStart = Math.floor((currentOffset + nextFrameDelta) / itemSize);
+    const nextVisibleEnd = Math.ceil(
+      (currentOffset + nextFrameDelta + viewportSize) / itemSize,
+    );
+
+    expect(rendered.start).toBeLessThanOrEqual(nextVisibleStart);
+    expect(rendered.end).toBeGreaterThanOrEqual(nextVisibleEnd);
   });
 
   it("represents offscreen geometry as gaps and keeps a pinned interaction item", () => {

@@ -9,8 +9,10 @@ import {
 import {
   buildTabularProjectionItems,
   calculateFixedTabularWindow,
+  calculateVelocityAwareTabularOverscan,
   calculateVariableTabularWindow,
   createTabularOffsets,
+  type TabularDirectionalOverscan,
   type TabularProjectionItem,
   type TabularWindowRange,
 } from "./tabularWindow";
@@ -18,7 +20,11 @@ import {
 const DEFAULT_ROW_SIZE = 31;
 const DEFAULT_VIEWPORT_BLOCK_SIZE = 620;
 const DEFAULT_VIEWPORT_INLINE_SIZE = 1_200;
-const ROW_OVERSCAN = 4;
+const BASE_ROW_OVERSCAN = 4;
+const MINIMUM_SCROLL_LEAD_ROWS = 10;
+const MAXIMUM_SCROLL_LEAD_ROWS = 32;
+const SCROLL_PREDICTION_HORIZON_MS = 32;
+const SCROLL_END_DELAY_MS = 150;
 const COLUMN_OVERSCAN_PX = 280;
 
 export const TABULAR_VIEWPORT_MOUNTED_ROW_CAP = 80;
@@ -74,7 +80,7 @@ export function useTabularViewport({
     count: rowCount,
     itemSize: DEFAULT_ROW_SIZE,
     maximumItems: maximumWindowRows,
-    overscanItems: ROW_OVERSCAN,
+    overscanItems: BASE_ROW_OVERSCAN,
     scrollOffset: 0,
     viewportSize: DEFAULT_VIEWPORT_BLOCK_SIZE - (hasHeader ? DEFAULT_ROW_SIZE : 0),
   });
@@ -105,11 +111,17 @@ export function useTabularViewport({
     surfaceInlineOffset: 0,
   });
   const frameRef = useRef<number | null>(null);
+  const rowOverscanRef = useRef<TabularDirectionalOverscan>({
+    afterItems: BASE_ROW_OVERSCAN,
+    beforeItems: BASE_ROW_OVERSCAN,
+  });
+  const scrollSampleRef = useRef<{ offset: number; timestamp: number } | null>(null);
+  const scrollEndTimerRef = useRef<number | null>(null);
 
   rowRangeRef.current = rowRange;
   columnRangeRef.current = columnRange;
 
-  const updateWindow = useCallback(() => {
+  const updateWindow = useCallback((rowOverscan = rowOverscanRef.current) => {
     const scroll = scrollRef.current;
     const metrics = metricsRef.current;
     const viewportBlockSize = scroll?.clientHeight || DEFAULT_VIEWPORT_BLOCK_SIZE;
@@ -126,7 +138,9 @@ export function useTabularViewport({
       count: rowCount,
       itemSize: metrics.rowSize,
       maximumItems: maximumWindowRows,
-      overscanItems: ROW_OVERSCAN,
+      overscanAfterItems: rowOverscan.afterItems,
+      overscanBeforeItems: rowOverscan.beforeItems,
+      overscanItems: BASE_ROW_OVERSCAN,
       scrollOffset: rowScrollOffset,
       viewportSize: Math.max(metrics.rowSize, viewportBlockSize - headerSize),
     });
@@ -182,6 +196,48 @@ export function useTabularViewport({
     });
   }, [updateWindow]);
 
+  const handleScroll = useCallback(() => {
+    const scroll = scrollRef.current;
+    if (!scroll) {
+      updateWindow();
+      return;
+    }
+    const timestamp = now();
+    const offset = scroll.scrollTop;
+    const previous = scrollSampleRef.current;
+    const rowOverscan = calculateVelocityAwareTabularOverscan({
+      baseItems: BASE_ROW_OVERSCAN,
+      deltaOffset: previous ? offset - previous.offset : 0,
+      elapsedMs: previous ? timestamp - previous.timestamp : 16,
+      itemSize: metricsRef.current.rowSize,
+      maximumLeadItems: MAXIMUM_SCROLL_LEAD_ROWS,
+      minimumLeadItems: MINIMUM_SCROLL_LEAD_ROWS,
+      predictionHorizonMs: SCROLL_PREDICTION_HORIZON_MS,
+    });
+    scrollSampleRef.current = { offset, timestamp };
+    rowOverscanRef.current = rowOverscan;
+    // Scroll math is sub-millisecond and must run in the native event task so
+    // React can commit before paint. Resize work remains frame-coalesced.
+    updateWindow(rowOverscan);
+
+    if (scrollEndTimerRef.current !== null) {
+      window.clearTimeout(scrollEndTimerRef.current);
+    }
+    scrollEndTimerRef.current = window.setTimeout(() => {
+      scrollEndTimerRef.current = null;
+      scrollSampleRef.current = {
+        offset: scroll.scrollTop,
+        timestamp: now(),
+      };
+      const restingOverscan = {
+        afterItems: BASE_ROW_OVERSCAN,
+        beforeItems: BASE_ROW_OVERSCAN,
+      };
+      rowOverscanRef.current = restingOverscan;
+      updateWindow(restingOverscan);
+    }, SCROLL_END_DELAY_MS);
+  }, [scrollRef, updateWindow]);
+
   useLayoutEffect(() => {
     const scroll = scrollRef.current;
     const surface = surfaceRef.current;
@@ -199,6 +255,10 @@ export function useTabularViewport({
         rowSize: measuredRowSize > 0 ? measuredRowSize : DEFAULT_ROW_SIZE,
         surfaceBlockOffset: surface.offsetTop,
         surfaceInlineOffset: surface.offsetLeft,
+      };
+      scrollSampleRef.current = {
+        offset: scroll.scrollTop,
+        timestamp: now(),
       };
       updateWindow();
     };
@@ -219,6 +279,8 @@ export function useTabularViewport({
   useLayoutEffect(() => () => {
     if (frameRef.current !== null) cancelFrame(frameRef.current);
     frameRef.current = null;
+    if (scrollEndTimerRef.current !== null) window.clearTimeout(scrollEndTimerRef.current);
+    scrollEndTimerRef.current = null;
   }, []);
 
   const revealCell = useCallback((dataRowIndex: number, columnIndex: number) => {
@@ -262,7 +324,16 @@ export function useTabularViewport({
       const nextLogicalScroll = metrics.surfaceInlineOffset + recordGutterSize + nextColumnOffset;
       scroll.scrollLeft = direction === "rtl" ? -nextLogicalScroll : nextLogicalScroll;
     }
-    updateWindow();
+    const restingOverscan = {
+      afterItems: BASE_ROW_OVERSCAN,
+      beforeItems: BASE_ROW_OVERSCAN,
+    };
+    rowOverscanRef.current = restingOverscan;
+    scrollSampleRef.current = {
+      offset: scroll.scrollTop,
+      timestamp: now(),
+    };
+    updateWindow(restingOverscan);
   }, [
     columnOffsets,
     columnWidths.length,
@@ -292,7 +363,7 @@ export function useTabularViewport({
   return {
     columnItems,
     columnRange,
-    handleScroll: scheduleWindowUpdate,
+    handleScroll,
     mountedCellCount: mountedRowCount * mountedColumnCount,
     mountedColumnCount,
     mountedRowCount,
@@ -323,4 +394,8 @@ function requestFrame(callback: FrameRequestCallback): number {
 function cancelFrame(handle: number): void {
   if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(handle);
   else window.clearTimeout(handle);
+}
+
+function now(): number {
+  return typeof performance === "undefined" ? Date.now() : performance.now();
 }

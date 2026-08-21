@@ -92,6 +92,34 @@ describe("CSV bounded renderer performance", () => {
     expect(Number(table.dataset.csvMountedRows)).toBeLessThanOrEqual(80);
   });
 
+  it("leads a fast vertical scroll and contracts to the resting buffer", async () => {
+    await renderCsv(500, 20, "velocity-window.csv");
+    const table = required<HTMLTableElement>(container, ".csv-table-editor__table");
+    const scroll = required<HTMLDivElement>(container, ".csv-table-editor__scroll");
+    Object.defineProperty(scroll, "clientHeight", { configurable: true, value: 310 });
+
+    await act(async () => {
+      scroll.scrollTop = 300 * 31;
+      scroll.dispatchEvent(new Event("scroll"));
+      await Promise.resolve();
+    });
+
+    const fastStart = Number(table.dataset.csvVirtualRowStart);
+    const fastEnd = Number(table.dataset.csvVirtualRowEnd);
+    expect(fastStart).toBeLessThanOrEqual(300);
+    expect(fastEnd).toBeGreaterThanOrEqual(342);
+    expect(Number(table.dataset.csvMountedRows)).toBeLessThanOrEqual(80);
+    expect(Number(table.dataset.csvMountedCells)).toBeLessThanOrEqual(2_000);
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 170));
+    });
+
+    const restingEnd = Number(table.dataset.csvVirtualRowEnd);
+    expect(restingEnd).toBeGreaterThanOrEqual(310);
+    expect(restingEnd).toBeLessThan(fastEnd);
+  });
+
   it("adapts to a 100-column table without crossing the mounted-cell budget", async () => {
     await renderCsv(500, 100, "column-window.csv");
     const table = required<HTMLTableElement>(container, ".csv-table-editor__table");

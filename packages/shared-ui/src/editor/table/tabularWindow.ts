@@ -3,6 +3,11 @@ export type TabularWindowRange = Readonly<{
   end: number;
 }>;
 
+export type TabularDirectionalOverscan = Readonly<{
+  afterItems: number;
+  beforeItems: number;
+}>;
+
 export type TabularProjectionItem =
   | Readonly<{ kind: "item"; index: number }>
   | Readonly<{ kind: "gap"; start: number; end: number; size: number }>;
@@ -11,6 +16,8 @@ export function calculateFixedTabularWindow(options: Readonly<{
   count: number;
   itemSize: number;
   maximumItems: number;
+  overscanAfterItems?: number;
+  overscanBeforeItems?: number;
   overscanItems: number;
   scrollOffset: number;
   viewportSize: number;
@@ -23,24 +30,92 @@ export function calculateFixedTabularWindow(options: Readonly<{
   const viewportSize = positiveFinite(options.viewportSize, itemSize);
   const scrollOffset = Math.max(0, finite(options.scrollOffset, 0));
   const overscan = toNonNegativeInteger(options.overscanItems);
+  const overscanBefore = options.overscanBeforeItems == null
+    ? overscan
+    : toNonNegativeInteger(options.overscanBeforeItems);
+  const overscanAfter = options.overscanAfterItems == null
+    ? overscan
+    : toNonNegativeInteger(options.overscanAfterItems);
   const visibleStart = clampInteger(Math.floor(scrollOffset / itemSize), 0, count - 1);
   const visibleEnd = clampInteger(
     Math.ceil((scrollOffset + viewportSize) / itemSize),
     visibleStart + 1,
     count,
   );
-  let start = Math.max(0, visibleStart - overscan);
-  let end = Math.min(count, visibleEnd + overscan);
+  let start = Math.max(0, visibleStart - overscanBefore);
+  let end = Math.min(count, visibleEnd + overscanAfter);
 
   if (end - start > maximumItems) {
-    const visibleLength = Math.min(maximumItems, visibleEnd - visibleStart);
-    const remaining = maximumItems - visibleLength;
-    start = Math.max(0, visibleStart - Math.floor(remaining / 2));
-    end = Math.min(count, start + maximumItems);
-    start = Math.max(0, end - maximumItems);
+    const visibleLength = visibleEnd - visibleStart;
+    if (visibleLength >= maximumItems) {
+      start = visibleStart;
+      end = Math.min(count, start + maximumItems);
+    } else {
+      const remaining = maximumItems - visibleLength;
+      const desiredBefore = visibleStart - start;
+      const desiredAfter = end - visibleEnd;
+      const desiredTotal = desiredBefore + desiredAfter;
+      let allocatedBefore = desiredTotal > 0
+        ? Math.min(desiredBefore, Math.floor(remaining * desiredBefore / desiredTotal))
+        : 0;
+      let allocatedAfter = Math.min(desiredAfter, remaining - allocatedBefore);
+      const unallocated = remaining - allocatedBefore - allocatedAfter;
+      if (unallocated > 0) {
+        const beforeRoom = desiredBefore - allocatedBefore;
+        const extraBefore = Math.min(beforeRoom, unallocated);
+        allocatedBefore += extraBefore;
+        allocatedAfter += Math.min(
+          desiredAfter - allocatedAfter,
+          unallocated - extraBefore,
+        );
+      }
+      start = visibleStart - allocatedBefore;
+      end = visibleEnd + allocatedAfter;
+    }
   }
 
   return { start, end };
+}
+
+/**
+ * Predict enough rows in the direction of travel to cover the next two paint
+ * intervals while retaining a small reverse buffer for direction changes.
+ */
+export function calculateVelocityAwareTabularOverscan(options: Readonly<{
+  baseItems: number;
+  deltaOffset: number;
+  elapsedMs: number;
+  itemSize: number;
+  maximumLeadItems: number;
+  minimumLeadItems: number;
+  predictionHorizonMs: number;
+}>): TabularDirectionalOverscan {
+  const baseItems = toNonNegativeInteger(options.baseItems);
+  if (options.deltaOffset === 0) {
+    return { beforeItems: baseItems, afterItems: baseItems };
+  }
+  const itemSize = positiveFinite(options.itemSize, 1);
+  const elapsedMs = Math.min(32, Math.max(4, positiveFinite(options.elapsedMs, 16)));
+  const predictionHorizonMs = Math.max(
+    elapsedMs,
+    positiveFinite(options.predictionHorizonMs, elapsedMs),
+  );
+  const predictedItems = Math.ceil(
+    Math.abs(options.deltaOffset) / elapsedMs * predictionHorizonMs / itemSize,
+  );
+  const minimumLeadItems = Math.max(baseItems, toNonNegativeInteger(options.minimumLeadItems));
+  const maximumLeadItems = Math.max(
+    minimumLeadItems,
+    toNonNegativeInteger(options.maximumLeadItems),
+  );
+  const leadItems = clampInteger(
+    minimumLeadItems + predictedItems,
+    minimumLeadItems,
+    maximumLeadItems,
+  );
+  return options.deltaOffset > 0
+    ? { beforeItems: baseItems, afterItems: leadItems }
+    : { beforeItems: leadItems, afterItems: baseItems };
 }
 
 export function calculateVariableTabularWindow(options: Readonly<{

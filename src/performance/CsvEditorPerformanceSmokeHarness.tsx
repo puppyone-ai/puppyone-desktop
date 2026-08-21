@@ -22,6 +22,9 @@ type CsvStructuralResult = Readonly<{
   mountedCells: number;
   mountedColumns: number;
   mountedRows: number;
+  rapidScrollCoverageMisses: number;
+  rapidScrollPeakMountedCells: number;
+  rapidScrollSamples: number;
   virtualColumnStartAfterScroll: number;
   virtualRowStartAfterScroll: number;
 }>;
@@ -175,19 +178,80 @@ async function inspectFixture(path: string, axis: "row" | "column"): Promise<Csv
   await waitForAnimationFrames(2);
   const scroll = table.closest(".csv-table-editor__scroll");
   if (!(scroll instanceof HTMLElement)) throw new Error(`CSV scroll owner is unavailable for ${path}.`);
-  if (axis === "row") scroll.scrollTop = Math.max(0, scroll.scrollHeight * 0.62);
-  else scroll.scrollLeft = Math.max(0, scroll.scrollWidth * 0.62);
-  scroll.dispatchEvent(new Event("scroll"));
-  await waitForAnimationFrames(3);
+  const rapidScroll = axis === "row"
+    ? await inspectRapidVerticalScroll(table, scroll)
+    : { coverageMisses: 0, peakMountedCells: 0, samples: 0 };
+  if (axis === "column") {
+    scroll.scrollLeft = Math.max(0, scroll.scrollWidth * 0.62);
+    scroll.dispatchEvent(new Event("scroll"));
+    await waitForAnimationFrames(3);
+  }
   return {
     logicalColumns: Number(table.getAttribute("aria-colcount")) - 1,
     logicalRows: Number(table.getAttribute("aria-rowcount")),
     mountedCells: Number(table.dataset.csvMountedCells),
     mountedColumns: Number(table.dataset.csvMountedColumns),
     mountedRows: Number(table.dataset.csvMountedRows),
+    rapidScrollCoverageMisses: rapidScroll.coverageMisses,
+    rapidScrollPeakMountedCells: rapidScroll.peakMountedCells,
+    rapidScrollSamples: rapidScroll.samples,
     virtualColumnStartAfterScroll: Number(table.dataset.csvVirtualColumnStart),
     virtualRowStartAfterScroll: Number(table.dataset.csvVirtualRowStart),
   };
+}
+
+async function inspectRapidVerticalScroll(
+  table: HTMLTableElement,
+  scroll: HTMLElement,
+): Promise<{ coverageMisses: number; peakMountedCells: number; samples: number }> {
+  const surface = table.closest(".csv-table-editor__surface");
+  if (!(surface instanceof HTMLElement)) throw new Error("CSV virtual surface is unavailable.");
+  const rowSize = Number.parseFloat(
+    getComputedStyle(surface).getPropertyValue("--po-editable-table-row-min-height"),
+  ) || 31;
+  const hasHeader = surface.hasAttribute("data-header-enabled");
+  const headerSize = hasHeader ? rowSize : 0;
+  const logicalDataRows = Number(table.getAttribute("aria-rowcount")) - (hasHeader ? 1 : 0);
+  const maximumScrollTop = Math.max(0, scroll.scrollHeight - scroll.clientHeight);
+  let coverageMisses = 0;
+  let peakMountedCells = 0;
+  let samples = 0;
+
+  scroll.scrollTop = 0;
+  scroll.dispatchEvent(new Event("scroll"));
+  await waitForAnimationFrames(2);
+  const rapidRowTargets = [
+    ...Array.from({ length: 18 }, (_, index) => (index + 1) * 28),
+    ...Array.from({ length: 6 }, (_, index) => (17 - index) * 28),
+  ];
+  for (const rowTarget of rapidRowTargets) {
+    scroll.scrollTop = Math.min(maximumScrollTop, rowTarget * rowSize);
+    scroll.dispatchEvent(new Event("scroll"));
+    await waitForAnimationFrames(1);
+
+    const rowScrollOffset = Math.max(
+      0,
+      scroll.scrollTop - surface.offsetTop - headerSize,
+    );
+    const visibleStart = Math.floor(rowScrollOffset / rowSize);
+    const visibleEnd = Math.min(
+      logicalDataRows,
+      Math.ceil(
+        (rowScrollOffset + Math.max(rowSize, scroll.clientHeight - headerSize)) / rowSize,
+      ),
+    );
+    const renderedStart = Number(table.dataset.csvVirtualRowStart);
+    const renderedEnd = Number(table.dataset.csvVirtualRowEnd);
+    if (renderedStart > visibleStart || renderedEnd < visibleEnd) coverageMisses += 1;
+    peakMountedCells = Math.max(
+      peakMountedCells,
+      Number(table.dataset.csvMountedCells),
+    );
+    samples += 1;
+  }
+  await new Promise((resolve) => window.setTimeout(resolve, 170));
+  await waitForAnimationFrames(2);
+  return { coverageMisses, peakMountedCells, samples };
 }
 
 async function waitForElement<ElementType extends Element>(selector: string): Promise<ElementType> {

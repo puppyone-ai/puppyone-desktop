@@ -399,7 +399,9 @@ export function CsvTableEditor({
               aria-colcount={columnCount + (rowNumbersVisible ? 1 : 0)}
               aria-rowcount={modelSnapshot.rows.length}
               data-csv-virtual-row-start={viewport.rowRange.start}
+              data-csv-virtual-row-end={viewport.rowRange.end}
               data-csv-virtual-column-start={viewport.columnRange.start}
+              data-csv-virtual-column-end={viewport.columnRange.end}
               data-csv-mounted-rows={viewport.mountedRowCount}
               data-csv-mounted-columns={viewport.mountedColumnCount}
               data-csv-mounted-cells={viewport.mountedCellCount}
