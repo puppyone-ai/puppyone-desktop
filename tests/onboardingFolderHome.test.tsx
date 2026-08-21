@@ -122,6 +122,7 @@ describe("project folder home", () => {
   });
 
   it("keeps the original folder action centered when there are no projects", () => {
+    const css = readFileSync(`${process.cwd()}/src/styles/onboarding.css`, "utf8");
     const container = renderHome();
 
     expectBrandLockup(container);
@@ -129,6 +130,7 @@ describe("project folder home", () => {
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
     expect(container.querySelector(".folder-drop-outline")).not.toBeNull();
     expect(container.querySelector(".folder-drop-icon.lucide-folder-open")).not.toBeNull();
+    expect(css).toMatch(/\.folder-drop-border\s*\{[^}]*stroke-dasharray:\s*4 4;[^}]*stroke-width:\s*1;/s);
   });
 
   it("shows project-opening progress only inside the project row", async () => {

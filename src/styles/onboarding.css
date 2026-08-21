@@ -149,7 +149,7 @@
   stroke-dasharray: 4 4;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2;
+  stroke-width: 1;
   vector-effect: non-scaling-stroke;
   transition: stroke 150ms ease-out;
 }
