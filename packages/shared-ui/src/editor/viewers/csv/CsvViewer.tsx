@@ -1,4 +1,5 @@
 import { CsvTableEditor } from "./CsvTableEditor";
+import { CsvSourceEditor } from "./CsvSourceEditor";
 import type { PresetViewerRenderContext } from "../../registry/viewerTypes";
 import { TextEditorFrame } from "../shared/TextEditorFrame";
 import { getDelimitedTableDelimiter } from "../shared/viewerUtils";
@@ -22,6 +23,7 @@ export function CsvViewer(context: CsvViewerProps) {
       canEdit={context.canEdit}
       hideSourceView={context.hideSourceView}
       liveScrollOwner="viewer"
+      sourceSnapshotMode
       renderLive={(value, controls) => (
         <CsvTableEditor
           documentId={context.document.path}
@@ -29,7 +31,17 @@ export function CsvViewer(context: CsvViewerProps) {
           nodeName={context.document.name}
           delimiter={getDelimitedTableDelimiter(context.document)}
           readOnly={!controls.canEdit}
-          onChange={controls.canEdit ? controls.onChange : undefined}
+          onSourceRevisionChange={controls.onSourceRevisionChange}
+          onSnapshotPortChange={controls.onSnapshotPortChange}
+        />
+      )}
+      renderSource={(value, controls) => (
+        <CsvSourceEditor
+          content={value}
+          nodeName={context.document.name}
+          readOnly={!controls.canEdit}
+          onSourceRevisionChange={controls.onSourceRevisionChange}
+          onSnapshotPortChange={controls.onSnapshotPortChange}
         />
       )}
     />

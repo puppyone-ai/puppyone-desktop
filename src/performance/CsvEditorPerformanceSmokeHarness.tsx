@@ -1,0 +1,246 @@
+import { useEffect, useMemo } from "react";
+import type { DataNode, DataPort, Workspace } from "@puppyone/shared-ui";
+import { DataWorkspace } from "@puppyone/shared-ui";
+
+const SAMPLE_COUNT = readSampleTarget();
+const WARMUP_COUNT = 4;
+const FILE_A = "performance-a.csv";
+const FILE_B = "performance-b.csv";
+const LARGE_FILE = "performance-10000x20.csv";
+const WIDE_FILE = "performance-500x100.csv";
+
+type Distribution = Readonly<{
+  maximum: number;
+  p50: number;
+  p95: number;
+  samples: number;
+}>;
+
+type CsvStructuralResult = Readonly<{
+  logicalColumns: number;
+  logicalRows: number;
+  mountedCells: number;
+  mountedColumns: number;
+  mountedRows: number;
+  virtualColumnStartAfterScroll: number;
+  virtualRowStartAfterScroll: number;
+}>;
+
+type CsvPerformanceSmokeResult = Readonly<{
+  inputTransactions: Distribution;
+  longTasks: { over50ms: number; total: number };
+  openToProjection: Distribution;
+  structural: {
+    large: CsvStructuralResult;
+    wide: CsvStructuralResult;
+  };
+}>;
+
+declare global {
+  interface Window {
+    __PUPPYONE_CSV_PERFORMANCE_SMOKE_RESULT__?: CsvPerformanceSmokeResult | { error: string };
+  }
+}
+
+export function CsvEditorPerformanceSmokeHarness() {
+  const fixtures = useMemo(() => new Map([
+    [FILE_A, makeCsv(500, 20)],
+    [FILE_B, makeCsv(500, 20)],
+    [LARGE_FILE, makeCsv(10_000, 20)],
+    [WIDE_FILE, makeCsv(500, 100)],
+  ]), []);
+  const nodes = useMemo<DataNode[]>(() => [...fixtures.keys()].map((path) => ({
+    id: path,
+    name: path,
+    path,
+    type: "spreadsheet",
+    mimeType: "text/csv",
+  })), [fixtures]);
+  const workspace = useMemo<Workspace>(() => ({
+    id: "csv-performance-smoke",
+    name: "CSV performance smoke",
+    path: "/csv-performance-smoke",
+    status: "recording",
+  }), []);
+  const dataPort = useMemo<DataPort>(() => ({
+    listChildren: async (folderPath) => folderPath ? [] : nodes,
+    readFile: async (path) => ({
+      path,
+      name: path,
+      type: "spreadsheet",
+      mimeType: "text/csv",
+      content: fixtures.get(path) ?? "",
+      version: "fixture-v1",
+    }),
+    documentPersistence: {
+      kind: "local-fs",
+      storageIdentity: "csv-performance-smoke",
+      persist: async (request) => ({ ok: true, version: request.revision }),
+    },
+  }), [fixtures, nodes]);
+
+  useEffect(() => {
+    let stopped = false;
+    const longTasks: number[] = [];
+    const observer = typeof PerformanceObserver === "undefined"
+      ? null
+      : new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) longTasks.push(entry.duration);
+        });
+    try {
+      observer?.observe({ entryTypes: ["longtask"] });
+    } catch {
+      // Older Chromium builds may not expose Long Tasks to local file pages.
+    }
+
+    const run = async () => {
+      const openDurations: number[] = [];
+      const inputDurations: number[] = [];
+      let nextFile = FILE_A;
+      for (let sample = 0; sample < WARMUP_COUNT + SAMPLE_COUNT; sample += 1) {
+        nextFile = nextFile === FILE_A ? FILE_B : FILE_A;
+        const button = await waitForElement<HTMLButtonElement>(`[data-explorer-path="${nextFile}"]`);
+        const openedAt = performance.now();
+        button.click();
+        const table = await waitForElement<HTMLTableElement>(
+          `.csv-table-editor__table[aria-label="${nextFile}"]`,
+        );
+        await waitForAnimationFrames(1);
+        const openDuration = performance.now() - openedAt;
+        const input = table.querySelector<HTMLInputElement>(
+          'input[data-csv-row="250"][data-csv-column="10"]',
+        ) ?? table.querySelector<HTMLInputElement>("input[data-csv-row][data-csv-column]");
+        if (!input || input.readOnly) throw new Error(`Editable CSV input is unavailable for ${nextFile}.`);
+        const inputStartedAt = performance.now();
+        setNativeInputValue(input, sample % 2 === 0 ? "edited-a" : "edited-b");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        const inputDuration = performance.now() - inputStartedAt;
+        if (sample >= WARMUP_COUNT) {
+          openDurations.push(openDuration);
+          inputDurations.push(inputDuration);
+        }
+      }
+
+      const large = await inspectFixture(LARGE_FILE, "row");
+      const wide = await inspectFixture(WIDE_FILE, "column");
+      if (stopped) return;
+      window.__PUPPYONE_CSV_PERFORMANCE_SMOKE_RESULT__ = {
+        inputTransactions: summarize(inputDurations),
+        longTasks: {
+          over50ms: longTasks.filter((duration) => duration > 50).length,
+          total: longTasks.length,
+        },
+        openToProjection: summarize(openDurations),
+        structural: { large, wide },
+      };
+    };
+
+    void run().catch((error: unknown) => {
+      if (stopped) return;
+      window.__PUPPYONE_CSV_PERFORMANCE_SMOKE_RESULT__ = {
+        error: error instanceof Error ? error.message : String(error),
+      };
+    });
+    return () => {
+      stopped = true;
+      observer?.disconnect();
+    };
+  }, []);
+
+  return (
+    <div style={{ width: "1280px", height: "800px" }}>
+      <DataWorkspace
+        workspace={workspace}
+        dataPort={dataPort}
+        capabilities={{ write: true }}
+        showHeader={false}
+        showExplorerRoot={false}
+        showExplorerToolbar={false}
+        showPreviewHeader={false}
+        hidePreviewSourceView
+        editorSaveMode="manual"
+        defaultExplorerWidth={320}
+        enableMarkdownLinkContentIndexing={false}
+      />
+    </div>
+  );
+}
+
+async function inspectFixture(path: string, axis: "row" | "column"): Promise<CsvStructuralResult> {
+  const button = await waitForElement<HTMLButtonElement>(`[data-explorer-path="${path}"]`);
+  button.click();
+  const table = await waitForElement<HTMLTableElement>(
+    `.csv-table-editor__table[aria-label="${path}"]`,
+  );
+  await waitForAnimationFrames(2);
+  const scroll = table.closest(".csv-table-editor__scroll");
+  if (!(scroll instanceof HTMLElement)) throw new Error(`CSV scroll owner is unavailable for ${path}.`);
+  if (axis === "row") scroll.scrollTop = Math.max(0, scroll.scrollHeight * 0.62);
+  else scroll.scrollLeft = Math.max(0, scroll.scrollWidth * 0.62);
+  scroll.dispatchEvent(new Event("scroll"));
+  await waitForAnimationFrames(3);
+  return {
+    logicalColumns: Number(table.getAttribute("aria-colcount")) - 1,
+    logicalRows: Number(table.getAttribute("aria-rowcount")),
+    mountedCells: Number(table.dataset.csvMountedCells),
+    mountedColumns: Number(table.dataset.csvMountedColumns),
+    mountedRows: Number(table.dataset.csvMountedRows),
+    virtualColumnStartAfterScroll: Number(table.dataset.csvVirtualColumnStart),
+    virtualRowStartAfterScroll: Number(table.dataset.csvVirtualRowStart),
+  };
+}
+
+async function waitForElement<ElementType extends Element>(selector: string): Promise<ElementType> {
+  for (let attempt = 0; attempt < 1_200; attempt += 1) {
+    const element = document.querySelector<ElementType>(selector);
+    if (element) return element;
+    await waitForAnimationFrames(1);
+  }
+  throw new Error(`Timed out waiting for ${selector}.`);
+}
+
+function summarize(values: readonly number[]): Distribution {
+  const sorted = [...values].sort((left, right) => left - right);
+  return {
+    maximum: sorted.at(-1) ?? 0,
+    p50: percentile(sorted, 0.5),
+    p95: percentile(sorted, 0.95),
+    samples: sorted.length,
+  };
+}
+
+function percentile(sorted: readonly number[], percentileValue: number): number {
+  if (sorted.length === 0) return 0;
+  return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * percentileValue) - 1)];
+}
+
+function makeCsv(rowCount: number, columnCount: number): string {
+  return Array.from({ length: rowCount }, (_, rowIndex) => (
+    Array.from({ length: columnCount }, (_, columnIndex) => `r${rowIndex}c${columnIndex}`).join(",")
+  )).join("\n");
+}
+
+function setNativeInputValue(input: HTMLInputElement, value: string): void {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, value);
+}
+
+function waitForAnimationFrames(count: number): Promise<void> {
+  return new Promise((resolve) => {
+    const next = (remaining: number) => {
+      if (remaining <= 0) {
+        resolve();
+        return;
+      }
+      window.requestAnimationFrame(() => next(remaining - 1));
+    };
+    next(count);
+  });
+}
+
+function readSampleTarget(): number {
+  const requested = Number.parseInt(
+    new URLSearchParams(window.location.search).get("csvPerformanceSamples") ?? "",
+    10,
+  );
+  return Number.isFinite(requested) && requested > 0 ? requested : 30;
+}

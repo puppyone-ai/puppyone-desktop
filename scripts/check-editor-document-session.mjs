@@ -57,6 +57,28 @@ if (/\bonChange=\{controls\.canEdit\s*\?\s*controls\.onChange/.test(codeViewerSo
   errors.push(`${relative(codeViewerPath)} stringifies canonical code source through the compatibility callback`);
 }
 
+const csvViewerPath = path.join(sharedEditorRoot, "viewers/csv/CsvViewer.tsx");
+const csvViewerSource = readFileSync(csvViewerPath, "utf8");
+if (!/\bsourceSnapshotMode\b/.test(csvViewerSource)) {
+  errors.push(`${relative(csvViewerPath)} does not keep canonical CSV source behind a snapshot port`);
+}
+for (const callback of ["onSourceRevisionChange", "onSnapshotPortChange"]) {
+  if (!new RegExp(`\\b${callback}\\b`).test(csvViewerSource)) {
+    errors.push(`${relative(csvViewerPath)} does not connect ${callback} to the shared edit boundary`);
+  }
+}
+if (/\bonChange=\{controls\.canEdit\s*\?\s*controls\.onChange/.test(csvViewerSource)) {
+  errors.push(`${relative(csvViewerPath)} serializes the complete CSV source through React on every cell edit`);
+}
+const csvTableEditorPath = path.join(sharedEditorRoot, "viewers/csv/CsvTableEditor.tsx");
+const csvTableEditorSource = readFileSync(csvTableEditorPath, "utf8");
+if (/\bstringifyDelimitedText\b/.test(csvTableEditorSource)) {
+  errors.push(`${relative(csvTableEditorPath)} owns full-source serialization in the mounted projection`);
+}
+if (!/\buseTabularViewport\b/.test(csvTableEditorSource)) {
+  errors.push(`${relative(csvTableEditorPath)} does not use the bounded tabular projection`);
+}
+
 const sessionSource = readFileSync(sessionKernel, "utf8");
 if (/from\s+["'][^"']*(?:electron|localFiles|cloudDataPort|node:fs)[^"']*["']/.test(sessionSource)) {
   errors.push(`${relative(sessionKernel)} imports a storage implementation`);
@@ -169,6 +191,8 @@ for (const relativeAdapterPath of [
   "viewers/shared/TextEditorFrame.tsx",
   "viewers/code/CodeMirrorCodeEditor.tsx",
   "markdown/MarkdownCodeMirrorEditor.tsx",
+  "viewers/csv/CsvTableEditor.tsx",
+  "viewers/csv/CsvSourceEditor.tsx",
   "viewers/puppyflow/PuppyFlowViewer.tsx",
 ]) {
   const adapterPath = path.join(sharedEditorRoot, relativeAdapterPath);

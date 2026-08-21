@@ -15,11 +15,14 @@ export function getCsvFindMatchKey(match: CsvFindMatch): string {
 }
 
 export function useCsvFindAdapter(
-  matrix: readonly (readonly string[])[],
+  rows: readonly Readonly<{ cells: readonly string[] }>[],
   tableRef: RefObject<HTMLTableElement>,
+  onReveal?: (match: CsvFindMatch, focus: boolean) => void,
 ) {
-  const matrixRef = useRef(matrix);
-  matrixRef.current = matrix;
+  const rowsRef = useRef(rows);
+  const onRevealRef = useRef(onReveal);
+  rowsRef.current = rows;
+  onRevealRef.current = onReveal;
   const [matches, setMatches] = useState<readonly CsvFindMatch[]>([]);
   const [current, setCurrent] = useState(-1);
   const matchesRef = useRef<readonly CsvFindMatch[]>([]);
@@ -37,20 +40,25 @@ export function useCsvFindAdapter(
     return result;
   }, []);
 
-  const reveal = useCallback((match: CsvFindMatch | undefined) => {
+  const reveal = useCallback((match: CsvFindMatch | undefined, focus = false) => {
     if (!match) return;
+    if (onRevealRef.current) {
+      onRevealRef.current(match, focus);
+      return;
+    }
     const input = tableRef.current?.querySelector<HTMLInputElement>(
       `input[data-csv-row="${match.rowIndex}"][data-csv-column="${match.columnIndex}"]`,
     );
-    input?.scrollIntoView({ block: "center", inline: "center" });
+    if (focus) input?.focus();
+    else input?.scrollIntoView({ block: "center", inline: "center" });
   }, [tableRef]);
 
   const refresh = useCallback((selectFirst: boolean) => {
     const normalizedQuery = queryRef.current.toLocaleLowerCase();
     if (!normalizedQuery) return apply([], -1);
     const nextMatches: CsvFindMatch[] = [];
-    matrixRef.current.forEach((row, rowIndex) => {
-      row.forEach((value, columnIndex) => {
+    rowsRef.current.forEach((row, rowIndex) => {
+      row.cells.forEach((value, columnIndex) => {
         if (value.toLocaleLowerCase().includes(normalizedQuery)) {
           nextMatches.push({ columnIndex, rowIndex });
         }
@@ -85,6 +93,10 @@ export function useCsvFindAdapter(
     },
     focusEditor() {
       const match = matchesRef.current[currentRef.current];
+      if (match && onRevealRef.current) {
+        reveal(match, true);
+        return;
+      }
       const selector = match
         ? `input[data-csv-row="${match.rowIndex}"][data-csv-column="${match.columnIndex}"]`
         : "input[data-csv-row][data-csv-column]";
@@ -98,12 +110,14 @@ export function useCsvFindAdapter(
 
   useEffect(() => {
     if (queryRef.current) refresh(false);
-  }, [matrix, refresh]);
+  }, [refresh, rows]);
+
+  const matchKeys = useMemo(() => new Set(matches.map(getCsvFindMatchKey)), [matches]);
 
   return {
     adapter,
     currentMatch: current >= 0 ? matches[current] : null,
-    matchKeys: new Set(matches.map(getCsvFindMatchKey)),
+    matchKeys,
   };
 }
 

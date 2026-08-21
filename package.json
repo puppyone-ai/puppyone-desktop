@@ -66,6 +66,7 @@
     "audit:viewer-gpu": "electron scripts/audit-viewer-gpu.mjs",
     "smoke:renderer-performance": "npm run build && node scripts/run-renderer-performance-smoke.mjs",
     "smoke:renderer-cold-performance": "npm run build && node scripts/run-renderer-performance-smoke.mjs --cold --visible --with-link-index",
+    "smoke:csv-performance": "npm run build && node scripts/run-csv-editor-performance-smoke.mjs",
     "start": "node scripts/start-electron.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
