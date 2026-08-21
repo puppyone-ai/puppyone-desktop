@@ -58,7 +58,7 @@
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  justify-self: start;
+  justify-self: center;
   gap: 10px;
   color: var(--po-text-muted);
   line-height: 1;
@@ -81,8 +81,19 @@
   line-height: 1;
 }
 
+.onboarding-brand-version {
+  align-self: flex-end;
+  padding-bottom: 1px;
+  color: var(--po-text-subtle);
+  font-family: var(--po-font-sans);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .onboarding-homepage.has-projects .onboarding-brand-lockup {
-  width: min(680px, 100%);
   justify-self: center;
 }
 

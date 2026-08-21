@@ -1,6 +1,7 @@
 import { resolveRendererPublicAssetUrl, type Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
 import { AlertTriangle, Folder, FolderOpen, Plus, Unlink } from "lucide-react";
+import packageMetadata from "../../package.json";
 import {
   useEffect,
   useMemo,
@@ -20,6 +21,7 @@ import type {
   ThemeMode,
 } from "../preferences";
 import { useWorkspaceFolderDrop } from "../features/app-shell/useWorkspaceFolderDrop";
+import { useDesktopBuildInfo } from "../features/build-info/useDesktopBuildInfo";
 import { getWorkspaceParentPathForDisplay } from "../features/app-shell/workspaceHomeModel";
 import { writeClipboardText } from "../features/settings/utils";
 import { DesktopMenuIconButton, DesktopMenuItem } from "./DesktopMenu";
@@ -83,6 +85,7 @@ export function MinimalOnboarding({
   cornerSlot,
 }: MinimalOnboardingProps) {
   const { t, formatRelativeTime } = useLocalization();
+  const buildInfo = useDesktopBuildInfo();
   const [error, setError] = useState<string | null>(initialError);
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const [removingPath, setRemovingPath] = useState<string | null>(null);
@@ -207,6 +210,7 @@ export function MinimalOnboarding({
             draggable={false}
           />
           <span className="onboarding-brand-name">{t("onboarding.brand.name")}</span>
+          <span className="onboarding-brand-version" dir="ltr">v{buildInfo?.version ?? packageMetadata.version}</span>
         </div>
 
         {!hasProjects && (

@@ -6,6 +6,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import packageMetadata from "../package.json";
 import { MinimalOnboarding, type MinimalOnboardingProps } from "../src/components/MinimalOnboarding";
 import {
   DEFAULT_TYPOGRAPHY_PREFERENCES,
@@ -119,8 +120,9 @@ describe("project folder home", () => {
     expect(container.querySelector(".folder-drop-outline")).toBeNull();
     expect(container.querySelector(".folder-drop-icon.lucide-folder-open")).not.toBeNull();
     expect(css).toMatch(/\.onboarding-homepage\s*\{[^}]*width:\s*min\(480px, 100%\);[^}]*align-content:\s*start;[^}]*gap:\s*30px;/s);
-    expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*justify-self:\s*start;[^}]*gap:\s*10px;/s);
+    expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*justify-self:\s*center;[^}]*gap:\s*10px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*color:\s*var\(--po-text-muted\);/s);
+    expect(css).toMatch(/\.onboarding-brand-version\s*\{[^}]*color:\s*var\(--po-text-subtle\);[^}]*font-size:\s*10\.5px;/s);
     expect(css).toMatch(/\.onboarding-folder-action-wrap\s*\{[^}]*width:\s*min\(238px, 100%\);/s);
     expect(css).toMatch(/\.folder-drop-zone\s*\{[^}]*height:\s*48px;[^}]*border:\s*0;[^}]*background:\s*transparent;/s);
     expect(css).toMatch(/\.folder-drop-icon-frame\s*\{[^}]*width:\s*48px;[^}]*height:\s*48px;[^}]*border:\s*1px dashed var\(--po-border\);[^}]*background:\s*var\(--po-canvas\);/s);
@@ -335,6 +337,7 @@ function expectBrandLockup(container: HTMLElement) {
   expect(mark?.getAttribute("src")).toContain("logo-square-v0.1.3-dark.png");
   expect(mark?.getAttribute("alt")).toBe("");
   expect(lockup?.querySelector(".onboarding-brand-name")?.textContent).toBe("puppyone");
+  expect(lockup?.querySelector(".onboarding-brand-version")?.textContent).toBe(`v${packageMetadata.version}`);
   expect(container.querySelector(".onboarding-brand-context")).toBeNull();
 }
 
