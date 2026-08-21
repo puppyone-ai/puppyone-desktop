@@ -209,8 +209,10 @@ export function MinimalOnboarding({
             aria-hidden="true"
             draggable={false}
           />
-          <span className="onboarding-brand-name">{t("onboarding.brand.name")}</span>
-          <span className="onboarding-brand-version" dir="ltr">v{buildInfo?.version ?? packageMetadata.version}</span>
+          <span className="onboarding-brand-identity">
+            <span className="onboarding-brand-name">{t("onboarding.brand.name")}</span>
+            <span className="onboarding-brand-version" dir="ltr">v{buildInfo?.version ?? packageMetadata.version}</span>
+          </span>
         </div>
 
         {!hasProjects && (

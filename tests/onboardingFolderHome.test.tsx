@@ -120,8 +120,10 @@ describe("project folder home", () => {
     expect(container.querySelector(".folder-drop-outline")).toBeNull();
     expect(container.querySelector(".folder-drop-icon.lucide-folder-open")).not.toBeNull();
     expect(css).toMatch(/\.onboarding-homepage\s*\{[^}]*width:\s*min\(480px, 100%\);[^}]*align-content:\s*start;[^}]*gap:\s*30px;/s);
-    expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*justify-self:\s*center;[^}]*gap:\s*10px;/s);
+    expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*center;[^}]*justify-self:\s*center;[^}]*gap:\s*10px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*color:\s*var\(--po-text-muted\);/s);
+    expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*52px;[^}]*height:\s*52px;/s);
+    expect(css).toMatch(/\.onboarding-brand-identity\s*\{[^}]*align-items:\s*baseline;[^}]*justify-content:\s*center;[^}]*gap:\s*6px;[^}]*text-align:\s*center;/s);
     expect(css).toMatch(/\.onboarding-brand-version\s*\{[^}]*color:\s*var\(--po-text-subtle\);[^}]*font-size:\s*10\.5px;/s);
     expect(css).toMatch(/\.onboarding-folder-action-wrap\s*\{[^}]*width:\s*min\(238px, 100%\);/s);
     expect(css).toMatch(/\.folder-drop-zone\s*\{[^}]*height:\s*48px;[^}]*border:\s*0;[^}]*background:\s*transparent;/s);
