@@ -179,7 +179,7 @@ describe("source-control visual architecture", () => {
     ));
     const emptyStateSources = `${sourceControlSidebarSource}\n${sourceControlSidebarSectionsSource}`;
 
-    expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(3);
+    expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(2);
     expect(emptyStateSources).not.toMatch(/desktop-git-empty-(?:remote|committed|stage|changes)/);
     expect(sourceControlComponentsSource).toContain("<ChevronRight size={14}");
     expect(sidebarBaseCss).toContain("--git-section-leading-slot-size: 14px;");
@@ -223,10 +223,8 @@ describe("source-control visual architecture", () => {
       'className="desktop-git-cloud-provider-section desktop-git-github-provider-section"',
     );
     expect(sourceControlSidebarSectionsSource).toContain("<GitHostingIdentityRow");
+    expect(sourceControlSidebarSectionsSource).toContain("<SourceControlResourceSummary");
     expect(sourceControlSidebarSectionsSource).toContain("<SourceControlPreviewResourceList");
-    expect(sourceControlSidebarSectionsSource).toContain(
-      't("source-control.status.empty")',
-    );
     expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-update-card");
   });
 

@@ -68,11 +68,11 @@ export function GitSidebar({
 }: GitSidebarProps) {
   const { t, formatNumber } = useLocalization();
   const [backupCardDismissed, setBackupCardDismissed] = useState(false);
-  const [remoteExpanded, setRemoteExpanded] = useState(true);
-  const [mergeExpanded, setMergeExpanded] = useState(true);
-  const [committedExpanded, setCommittedExpanded] = useState(true);
-  const [stagedExpanded, setStagedExpanded] = useState(true);
-  const [workingExpanded, setWorkingExpanded] = useState(true);
+  const [remoteExpanded, setRemoteExpanded] = useState(false);
+  const [mergeExpanded, setMergeExpanded] = useState(false);
+  const [committedExpanded, setCommittedExpanded] = useState(false);
+  const [stagedExpanded, setStagedExpanded] = useState(false);
+  const [workingExpanded, setWorkingExpanded] = useState(false);
   const sourceControl = status?.sourceControl ?? null;
   const historyCommits = status?.allCommits ?? status?.commits ?? [];
   const currentBranch = status?.branches.find((branch) => branch.current) ?? null;
@@ -127,11 +127,13 @@ export function GitSidebar({
     <PuppyoneCloudProviderSection
       status={status}
       mergeCount={mergeResources.length}
+      expanded={remoteExpanded}
       fileIconTheme={fileIconTheme}
       selectedWorkingFile={selectedWorkingFile}
       disabled={disabled}
       operationLoading={operationLoading}
       primaryAction={primaryActionSlot === "sync"}
+      onToggleExpanded={() => setRemoteExpanded((expanded) => !expanded)}
       onSelectWorkingFile={onSelectWorkingFile}
       onPull={onPull}
     />
@@ -140,11 +142,13 @@ export function GitSidebar({
       identity={hostingIdentity}
       section={githubSection}
       mergeCount={mergeResources.length}
+      expanded={remoteExpanded}
       fileIconTheme={fileIconTheme}
       selectedWorkingFile={selectedWorkingFile}
       disabled={disabled}
       operationLoading={operationLoading}
       primaryAction={primaryActionSlot === "sync"}
+      onToggleExpanded={() => setRemoteExpanded((expanded) => !expanded)}
       onSelectWorkingFile={onSelectWorkingFile}
       onPull={onPull}
     />
@@ -217,6 +221,7 @@ export function GitSidebar({
           <SourceControlSectionHeader
             title={t("source-control.section.merge")}
             count={mergeResources.length}
+            summaryResources={mergeResources}
             expanded={mergeExpanded}
             onToggle={() => setMergeExpanded((expanded) => !expanded)}
           />
@@ -249,6 +254,7 @@ export function GitSidebar({
           <SourceControlSectionHeader
             title={t("source-control.section.committed")}
             count={committedCount}
+            summaryResources={committedResources}
             highlightCount={committedCount > 0}
             expanded={committedExpanded}
             onToggle={() => setCommittedExpanded((expanded) => !expanded)}
@@ -305,6 +311,7 @@ export function GitSidebar({
           <SourceControlSectionHeader
             title={t("source-control.section.staged")}
             count={stagedResources.length}
+            summaryResources={stagedResources}
             expanded={stagedExpanded}
             onToggle={() => setStagedExpanded((expanded) => !expanded)}
             action={stagedPrimaryAction ? (
@@ -358,6 +365,7 @@ export function GitSidebar({
           <SourceControlSectionHeader
             title={t("source-control.section.unstaged")}
             count={localChangeResources.length}
+            summaryResources={localChangeResources}
             expanded={workingExpanded}
             onToggle={() => setWorkingExpanded((expanded) => !expanded)}
             action={professionalMode ? (
@@ -467,7 +475,7 @@ export function GitSidebar({
             <div className="desktop-git-resizable-stack">
               {panels.map((panel, index) => (
                 <Fragment key={panel.id}>
-                  {index > 0 && (
+                  {index > 0 && panels[index - 1].expanded && panel.expanded && (
                     <GitSidebarSectionResizer
                       previous={panels[index - 1].id}
                       next={panel.id}

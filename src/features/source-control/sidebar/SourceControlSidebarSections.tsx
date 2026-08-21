@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ArrowUpRight, Clock3, Cloud, Github, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpRight, ChevronRight, Clock3, Cloud, Github, Plus, X } from "lucide-react";
 import {
   SidebarEmptyState,
   SidebarResizeHandle,
@@ -7,10 +7,11 @@ import {
 } from "@puppyone/shared-ui";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useLocalization, type MessageFormatter } from "@puppyone/localization";
-import type { GitStatusSnapshot } from "../../../types/electron";
+import type { GitSourceControlResource, GitStatusSnapshot } from "../../../types/electron";
 import { openExternalUrl } from "../../../lib/localFiles";
 import {
   SourceControlPreviewResourceList,
+  SourceControlResourceSummary,
   SourceControlSectionHeader,
 } from "../components";
 import type {
@@ -34,21 +35,25 @@ export function GitSectionCollapse({ expanded, children }: { expanded: boolean; 
 export function PuppyoneCloudProviderSection({
   status,
   mergeCount,
+  expanded,
   fileIconTheme,
   selectedWorkingFile,
   disabled,
   operationLoading,
   primaryAction,
+  onToggleExpanded,
   onSelectWorkingFile,
   onPull,
 }: {
   status: GitStatusSnapshot | null;
   mergeCount: number;
+  expanded: boolean;
   fileIconTheme: FileIconThemeId;
   selectedWorkingFile: GitWorkingSelection | null;
   disabled: boolean;
   operationLoading: string | null;
   primaryAction: boolean;
+  onToggleExpanded: () => void;
   onSelectWorkingFile: (selection: GitWorkingSelection) => void;
   onPull: () => Promise<boolean>;
 }) {
@@ -69,8 +74,11 @@ export function PuppyoneCloudProviderSection({
       <SourceControlSectionHeader
         title="PuppyOne Cloud"
         count={cloudUpdateCount}
+        summaryResources={cloudPreviewResources}
         highlightCount={cloudUpdateCount > 0}
         leadingIcon={<Cloud size={14} strokeWidth={2} />}
+        expanded={expanded}
+        onToggle={cloudUpdateCount > 0 ? onToggleExpanded : undefined}
         action={(
           <GitOperationButton
             className="desktop-git-commit-push-action"
@@ -88,21 +96,23 @@ export function PuppyoneCloudProviderSection({
       />
       <div className="desktop-git-cloud-provider-body">
         {cloudPreviewResources.length > 0 ? (
-          <SourceControlPreviewResourceList
-            resources={cloudPreviewResources}
-            fileIconTheme={fileIconTheme}
-            selectedWorkingFile={selectedWorkingFile}
-            origin="remote"
-            ariaLabel={t("source-control.preview.cloud")}
-            onSelectWorkingFile={onSelectWorkingFile}
-          />
-        ) : (
-          <SidebarEmptyState compact className="desktop-git-section-empty">
-            {cloudUpdateCount > 0
-              ? t("source-control.cloud.updateCount", { count: cloudUpdateCount })
-              : t("source-control.status.empty")}
-          </SidebarEmptyState>
-        )}
+          <GitSectionCollapse expanded={expanded}>
+            <SourceControlPreviewResourceList
+              resources={cloudPreviewResources}
+              fileIconTheme={fileIconTheme}
+              selectedWorkingFile={selectedWorkingFile}
+              origin="remote"
+              ariaLabel={t("source-control.preview.cloud")}
+              onSelectWorkingFile={onSelectWorkingFile}
+            />
+          </GitSectionCollapse>
+        ) : cloudUpdateCount > 0 ? (
+          <GitSectionCollapse expanded={expanded}>
+            <SidebarEmptyState compact className="desktop-git-section-empty">
+              {t("source-control.cloud.updateCount", { count: cloudUpdateCount })}
+            </SidebarEmptyState>
+          </GitSectionCollapse>
+        ) : null}
       </div>
     </section>
   );
@@ -114,44 +124,61 @@ export function getCommittedSummary(count: number, actionLabel: string, t: Messa
 
 export function GitHostingIdentityRow({
   identity,
-  count = 0,
+  resources,
+  expanded,
+  onToggleExpanded,
   action = null,
 }: {
   identity: GitHostingIdentity;
-  count?: number;
+  resources: readonly GitSourceControlResource[];
+  expanded: boolean;
+  onToggleExpanded: () => void;
   action?: ReactNode;
 }) {
   const { t } = useLocalization();
   const { label, href } = identity;
-  const countBadge = count > 0
-    ? <small className="desktop-git-section-count-badge">{count}</small>
-    : null;
   return (
-    <div className="desktop-git-section-row desktop-git-hosting-identity-row" aria-label={t("source-control.hosting.repository")}>
-      {href ? (
-        <a
-          className="desktop-git-section-title desktop-git-hosting-identity-link"
-          href={href}
-          title={href}
-          onClick={(event) => {
-            event.preventDefault();
-            void openExternalUrl(href).catch((error) => console.warn("Unable to open GitHub repository:", error));
-          }}
-        >
-          <span className="desktop-git-section-leading-icon"><Github size={14} strokeWidth={2} aria-hidden="true" /></span>
-          <bdi>{label}</bdi>
-          {countBadge}
-          <ArrowUpRight size={12} aria-hidden="true" />
-        </a>
-      ) : (
+    <>
+      <div className="desktop-git-section-row desktop-git-hosting-identity-row">
         <div className="desktop-git-section-title desktop-git-hosting-identity-text">
           <span className="desktop-git-section-leading-icon"><Github size={14} strokeWidth={2} aria-hidden="true" /></span>
-          <bdi>{label}</bdi>
-          {countBadge}
+          <span>GitHub</span>
         </div>
-      )}
-      {action}
-    </div>
+        {action}
+      </div>
+      <div className="desktop-git-section-row desktop-git-hosting-repository-row" aria-label={t("source-control.hosting.repository")}>
+        {resources.length > 0 && (
+          <button
+            className="desktop-git-hosting-repository-disclosure"
+            type="button"
+            aria-expanded={expanded}
+            onClick={onToggleExpanded}
+          >
+            <ChevronRight size={14} className={`po-disclosure-icon ${expanded ? "expanded" : ""}`} />
+          </button>
+        )}
+        {resources.length === 0 && <span className="desktop-git-hosting-repository-disclosure-spacer" />}
+        {href ? (
+          <a
+            className="desktop-git-hosting-repository-link"
+            href={href}
+            title={label}
+            onClick={(event) => {
+              event.preventDefault();
+              void openExternalUrl(href).catch((error) => console.warn("Unable to open GitHub repository:", error));
+            }}
+          >
+            <bdi>{label}</bdi>
+            <ArrowUpRight size={12} aria-hidden="true" />
+          </a>
+        ) : (
+          <div className="desktop-git-hosting-repository-text" title={label}>
+            <bdi>{label}</bdi>
+          </div>
+        )}
+        {resources.length > 0 && <SourceControlResourceSummary resources={resources} />}
+      </div>
+    </>
   );
 }
 
@@ -159,22 +186,26 @@ export function GitHubProviderSection({
   identity,
   section,
   mergeCount,
+  expanded,
   fileIconTheme,
   selectedWorkingFile,
   disabled,
   operationLoading,
   primaryAction,
+  onToggleExpanded,
   onSelectWorkingFile,
   onPull,
 }: {
   identity: GitHostingIdentity;
   section: GitScmSyncSection;
   mergeCount: number;
+  expanded: boolean;
   fileIconTheme: FileIconThemeId;
   selectedWorkingFile: GitWorkingSelection | null;
   disabled: boolean;
   operationLoading: string | null;
   primaryAction: boolean;
+  onToggleExpanded: () => void;
   onSelectWorkingFile: (selection: GitWorkingSelection) => void;
   onPull: () => Promise<boolean>;
 }) {
@@ -186,7 +217,9 @@ export function GitHubProviderSection({
     <section className="desktop-git-cloud-provider-section desktop-git-github-provider-section">
       <GitHostingIdentityRow
         identity={identity}
-        count={section.copy.count}
+        resources={section.previewResources}
+        expanded={expanded}
+        onToggleExpanded={onToggleExpanded}
         action={pullAction ? (
           <GitOperationButton
             className="desktop-git-remote-action"
@@ -206,22 +239,24 @@ export function GitHubProviderSection({
       />
       <div className="desktop-git-cloud-provider-body desktop-git-github-provider-body">
         {section.previewResources.length > 0 ? (
-          <SourceControlPreviewResourceList
-            resources={section.previewResources}
-            fileIconTheme={fileIconTheme}
-            selectedWorkingFile={selectedWorkingFile}
-            origin="remote"
-            ariaLabel={t("source-control.preview.remote")}
-            onSelectWorkingFile={onSelectWorkingFile}
-          />
+          <GitSectionCollapse expanded={expanded}>
+            <SourceControlPreviewResourceList
+              resources={section.previewResources}
+              fileIconTheme={fileIconTheme}
+              selectedWorkingFile={selectedWorkingFile}
+              origin="remote"
+              ariaLabel={t("source-control.preview.remote")}
+              onSelectWorkingFile={onSelectWorkingFile}
+            />
+          </GitSectionCollapse>
         ) : section.fallbackSummary ? (
-          <div className="desktop-git-preview-summary" data-po-scrollbar="sidebar">
-            {section.fallbackSummary}
-          </div>
+          <GitSectionCollapse expanded={expanded}>
+            <div className="desktop-git-preview-summary" data-po-scrollbar="sidebar">
+              {section.fallbackSummary}
+            </div>
+          </GitSectionCollapse>
         ) : (
-          <SidebarEmptyState compact className="desktop-git-section-empty">
-            {t("source-control.status.empty")}
-          </SidebarEmptyState>
+          null
         )}
       </div>
     </section>
@@ -350,6 +385,7 @@ export function GitScmSyncRow({
       <SourceControlSectionHeader
         title={section.copy.title}
         count={section.copy.count}
+        summaryResources={section.previewResources}
         highlightCount={section.copy.count > 0}
         expanded={expanded}
         onToggle={onToggleExpanded}
