@@ -109,27 +109,45 @@ describe("project folder home", () => {
     expect(onChooseWorkspace).toHaveBeenCalledTimes(1);
   });
 
-  it("restores the original floating folder action when there are no projects", () => {
+  it("uses a restrained three-action launcher when there are no projects", async () => {
     const css = readFileSync(`${process.cwd()}/src/styles/onboarding.css`, "utf8");
-    const container = renderHome();
+    const onChooseWorkspace = vi.fn(async () => undefined);
+    const onCreateProject = vi.fn(async () => undefined);
+    const onCloneRepository = vi.fn(async () => undefined);
+    const container = renderHome({ onChooseWorkspace, onCreateProject, onCloneRepository });
 
     expectBrandLockup(container);
-    expect(container.querySelectorAll(".folder-drop-zone")).toHaveLength(1);
+    const actions = [...container.querySelectorAll<HTMLButtonElement>(".onboarding-entry-action")];
+    expect(actions).toHaveLength(3);
+    expect(actions.map((action) => action.textContent)).toEqual([
+      "Open local folder",
+      "Create new",
+      "Clone from GitHub",
+    ]);
+    expect(actions[0]?.classList.contains("onboarding-entry-action-primary")).toBe(true);
+    expect(actions[0]?.querySelector(".lucide-folder-open")).not.toBeNull();
+    expect(actions[1]?.querySelector(".onboarding-entry-create-icon")).not.toBeNull();
+    expect(actions[2]?.querySelector(".onboarding-entry-github-icon")).not.toBeNull();
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
-    const outline = container.querySelector(".folder-drop-outline");
-    expect(outline?.querySelectorAll("path")).toHaveLength(3);
-    expect(container.querySelector(".folder-drop-icon.lucide-folder-open")).not.toBeNull();
-    expect(container.querySelector(".folder-drop-copy")?.textContent).toBe("open or drop a folder");
     expect(css).toMatch(/\.onboarding-homepage\s*\{[^}]*width:\s*min\(480px, 100%\);[^}]*align-content:\s*start;[^}]*gap:\s*30px;/s);
+    expect(css).toMatch(/\.onboarding-homepage\.is-empty\s*\{[^}]*width:\s*min\(450px, 100%\);[^}]*gap:\s*42px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*center;[^}]*justify-self:\s*center;[^}]*gap:\s*12px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*color:\s*var\(--po-text-muted\);/s);
     expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*60px;[^}]*height:\s*60px;/s);
     expect(css).not.toContain(".onboarding-brand-version");
     expect(css).toMatch(/\.onboarding-primary-area\s*\{[^}]*justify-items:\s*center;/s);
-    expect(css).toMatch(/\.onboarding-folder-action-wrap\s*\{[^}]*width:\s*min\(260px, 100%\);/s);
-    expect(css).toMatch(/\.folder-drop-zone\s*\{[^}]*max-width:\s*260px;[^}]*max-height:\s*260px;[^}]*aspect-ratio:\s*1 \/ 1;[^}]*border:\s*0;[^}]*background:\s*transparent;[^}]*text-align:\s*center;/s);
-    expect(css).toMatch(/\.folder-drop-border\s*\{[^}]*stroke-dasharray:\s*4 4;[^}]*stroke-width:\s*2;/s);
-    expect(css).not.toContain(".folder-drop-icon-frame");
+    expect(css).toMatch(/\.onboarding-entry-launcher\s*\{[^}]*width:\s*min\(300px, 100%\);[^}]*gap:\s*10px;/s);
+    expect(css).toMatch(/\.onboarding-entry-action\s*\{[^}]*height:\s*58px;[^}]*border:\s*1px solid var\(--po-border-strong\);[^}]*font-size:\s*14px;/s);
+    expect(css).toMatch(/\.onboarding-entry-action-primary\s*\{[^}]*height:\s*66px;[^}]*background:\s*var\(--po-text\);[^}]*font-size:\s*15\.5px;/s);
+    expect(css).toMatch(/\.onboarding-entry-action-secondary\s*\{[^}]*opacity:\s*0\.62;/s);
+    expect(css).not.toContain(".folder-drop-zone");
+
+    await act(async () => actions[0]?.click());
+    await act(async () => actions[1]?.click());
+    await act(async () => actions[2]?.click());
+    expect(onChooseWorkspace).toHaveBeenCalledTimes(1);
+    expect(onCreateProject).toHaveBeenCalledTimes(1);
+    expect(onCloneRepository).toHaveBeenCalledTimes(1);
   });
 
   it("shows project-opening progress only inside the project row", async () => {
@@ -267,18 +285,18 @@ describe("project folder home", () => {
     expect(row?.parentElement?.classList.contains("is-dragging")).toBe(false);
   });
 
-  it("uses the compact folder action for drag feedback", () => {
+  it("highlights the primary folder action for drag feedback", () => {
     const container = renderHome();
     const surface = requireSurface(container);
     const folder = new File([], "Notes");
     const transfer = createTransfer([folder], [{ isDirectory: true }]);
 
     act(() => surface.dispatchEvent(createDragEvent("dragenter", transfer)));
-    expect(container.querySelector(".folder-drop-zone")?.classList.contains("dragging")).toBe(true);
+    expect(container.querySelector(".onboarding-entry-action-primary")?.classList.contains("is-dragging")).toBe(true);
     expect(container.querySelector(".onboarding-folder-drop-overlay")).toBeNull();
 
     act(() => surface.dispatchEvent(createDragEvent("dragleave", transfer)));
-    expect(container.querySelector(".folder-drop-zone")?.classList.contains("dragging")).toBe(false);
+    expect(container.querySelector(".onboarding-entry-action-primary")?.classList.contains("is-dragging")).toBe(false);
   });
 
   it("hands one folder File to the native workspace boundary", async () => {

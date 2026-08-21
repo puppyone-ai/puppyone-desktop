@@ -1,6 +1,6 @@
 import { resolveRendererPublicAssetUrl, type Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
-import { AlertTriangle, Folder, FolderOpen, Plus, Unlink } from "lucide-react";
+import { AlertTriangle, FilePlus2, Folder, FolderOpen, Github, Plus, Unlink } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -45,6 +45,8 @@ export type OnboardingOperationStatus = {
 
 export type MinimalOnboardingProps = {
   onChooseWorkspace: () => Promise<void>;
+  onCreateProject?: () => Promise<void>;
+  onCloneRepository?: () => Promise<void>;
   onOpenWorkspacePath: (path: string) => Promise<void>;
   onOpenDroppedWorkspace: (folder: File) => Promise<void>;
   onRemoveProject?: (path: string) => Promise<void>;
@@ -66,6 +68,8 @@ export type MinimalOnboardingProps = {
 /** Local repository entrypoint. Cloud is entered from an open repository only. */
 export function MinimalOnboarding({
   onChooseWorkspace,
+  onCreateProject,
+  onCloneRepository,
   onOpenWorkspacePath,
   onOpenDroppedWorkspace,
   onRemoveProject,
@@ -118,6 +122,22 @@ export function MinimalOnboarding({
     setOpeningPath("__new__");
     try {
       await onChooseWorkspace();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
+    } finally {
+      setOpeningPath(null);
+    }
+  };
+
+  const runEntryAction = async (
+    actionKey: "__create__" | "__clone__",
+    action: (() => Promise<void>) | undefined,
+  ) => {
+    if (!action || openingPath) return;
+    setError(null);
+    setOpeningPath(actionKey);
+    try {
+      await action();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
     } finally {
@@ -213,30 +233,45 @@ export function MinimalOnboarding({
 
         {!hasProjects && (
           <div className="onboarding-primary-area">
-            <div className="onboarding-folder-action-wrap">
-              <div className={`folder-drop-zone ${folderDrop.dragging ? "dragging" : ""} ${busy ? "is-disabled" : ""}`}>
-                <svg className="folder-drop-outline" viewBox="0 0 260 260" preserveAspectRatio="none" aria-hidden="true">
-                  <path className="folder-drop-shadow" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-                  <path className="folder-drop-fill" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-                  <path className="folder-drop-border" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-                </svg>
-                <button
-                  className="folder-drop-primary-action"
-                  type="button"
-                  disabled={busy}
-                  aria-busy={openingPath === "__new__" || undefined}
-                  aria-label={t("onboarding.action.openLocalFolder")}
-                  onClick={() => void chooseFolder()}
-                />
-                <span className="folder-drop-body">
-                  {openingPath === "__new__" ? (
-                    <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
-                  ) : (
-                    <FolderOpen className="folder-drop-icon" size={25} strokeWidth={1.75} />
-                  )}
-                  <span className="folder-drop-copy"><strong>{t("onboarding.action.openOrDropLocalFolder")}</strong></span>
-                </span>
-              </div>
+            <div className="onboarding-entry-launcher" role="group" aria-label={t("onboarding.projects.title")}>
+              <button
+                className={`onboarding-entry-action onboarding-entry-action-primary ${folderDrop.dragging ? "is-dragging" : ""}`}
+                type="button"
+                disabled={busy}
+                aria-busy={openingPath === "__new__" || undefined}
+                onClick={() => void chooseFolder()}
+              >
+                {openingPath === "__new__"
+                  ? <InlineLoading label={null} size="sm" tone="neutral" />
+                  : <FolderOpen aria-hidden="true" />}
+                <span>{t("onboarding.action.openFolder")}</span>
+              </button>
+
+              <button
+                className="onboarding-entry-action onboarding-entry-action-secondary"
+                type="button"
+                disabled={busy || !onCreateProject}
+                aria-busy={openingPath === "__create__" || undefined}
+                onClick={() => void runEntryAction("__create__", onCreateProject)}
+              >
+                {openingPath === "__create__"
+                  ? <InlineLoading label={null} size="xs" tone="neutral" />
+                  : <FilePlus2 className="onboarding-entry-create-icon" aria-hidden="true" />}
+                <span>{t("onboarding.action.createNew")}</span>
+              </button>
+
+              <button
+                className="onboarding-entry-action onboarding-entry-action-secondary"
+                type="button"
+                disabled={busy || !onCloneRepository}
+                aria-busy={openingPath === "__clone__" || undefined}
+                onClick={() => void runEntryAction("__clone__", onCloneRepository)}
+              >
+                {openingPath === "__clone__"
+                  ? <InlineLoading label={null} size="xs" tone="neutral" />
+                  : <Github className="onboarding-entry-github-icon" aria-hidden="true" />}
+                <span>{t("onboarding.action.cloneFromGitHub")}</span>
+              </button>
             </div>
           </div>
         )}
