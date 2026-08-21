@@ -1,6 +1,6 @@
 import { resolveRendererPublicAssetUrl, type Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
-import { AlertTriangle, Folder, FolderOpen, Unlink } from "lucide-react";
+import { AlertTriangle, Folder, FolderOpen, Plus, Unlink } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -209,30 +209,32 @@ export function MinimalOnboarding({
           <span className="onboarding-brand-name">{t("onboarding.brand.name")}</span>
         </div>
 
-        <div className="onboarding-primary-area">
-          <div className="onboarding-folder-action-wrap">
-            <div className={`folder-drop-zone ${folderDrop.dragging ? "dragging" : ""} ${busy ? "is-disabled" : ""}`}>
-              <button
-                className="folder-drop-primary-action"
-                type="button"
-                disabled={busy}
-                aria-busy={openingPath === "__new__" || undefined}
-                aria-label={t("onboarding.action.openLocalFolder")}
-                onClick={() => void chooseFolder()}
-              />
-              <span className="folder-drop-body">
-                <span className="folder-drop-icon-frame" aria-hidden="true">
-                  {openingPath === "__new__" ? (
-                    <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
-                  ) : (
-                    <FolderOpen className="folder-drop-icon" size={19} strokeWidth={1.8} />
-                  )}
+        {!hasProjects && (
+          <div className="onboarding-primary-area">
+            <div className="onboarding-folder-action-wrap">
+              <div className={`folder-drop-zone ${folderDrop.dragging ? "dragging" : ""} ${busy ? "is-disabled" : ""}`}>
+                <button
+                  className="folder-drop-primary-action"
+                  type="button"
+                  disabled={busy}
+                  aria-busy={openingPath === "__new__" || undefined}
+                  aria-label={t("onboarding.action.openLocalFolder")}
+                  onClick={() => void chooseFolder()}
+                />
+                <span className="folder-drop-body">
+                  <span className="folder-drop-icon-frame" aria-hidden="true">
+                    {openingPath === "__new__" ? (
+                      <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
+                    ) : (
+                      <FolderOpen className="folder-drop-icon" size={19} strokeWidth={1.8} />
+                    )}
+                  </span>
+                  <span className="folder-drop-copy"><strong>{t("onboarding.action.openLocalFolder")}</strong></span>
                 </span>
-                <span className="folder-drop-copy"><strong>{t("onboarding.action.openLocalFolder")}</strong></span>
-              </span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {hasProjects && (
           <div className="onboarding-projects-layout">
@@ -283,6 +285,19 @@ export function MinimalOnboarding({
                   );
                 })}
               </div>
+              <div className="onboarding-project-add">
+                <DesktopMenuItem
+                  className="onboarding-project-add-action"
+                  role="button"
+                  icon={openingPath === "__new__"
+                    ? <InlineLoading label={null} size="xs" tone="neutral" />
+                    : <ProjectFolderAddIcon />}
+                  label={t("onboarding.action.openLocalFolder")}
+                  disabled={busy}
+                  aria-busy={openingPath === "__new__" || undefined}
+                  onClick={() => void chooseFolder()}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -291,6 +306,15 @@ export function MinimalOnboarding({
       </section>
       {cornerSlot}
     </main>
+  );
+}
+
+function ProjectFolderAddIcon() {
+  return (
+    <span className="onboarding-project-folder-add-icon" aria-hidden="true">
+      <Folder size={14} strokeWidth={1.85} />
+      <Plus size={6} strokeWidth={4} />
+    </span>
   );
 }
 

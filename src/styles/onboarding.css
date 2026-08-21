@@ -49,8 +49,9 @@
 }
 
 .onboarding-homepage.has-projects {
+  width: min(760px, 100%);
   height: fit-content;
-  gap: 24px;
+  gap: 40px;
 }
 
 .onboarding-brand-lockup {
@@ -59,7 +60,7 @@
   align-items: center;
   justify-self: start;
   gap: 10px;
-  color: var(--po-text);
+  color: var(--po-text-muted);
   line-height: 1;
   user-select: none;
 }
@@ -75,9 +76,24 @@
 .onboarding-brand-name {
   font-family: var(--po-font-sans);
   font-size: 22px;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.035em;
   line-height: 1;
+}
+
+.onboarding-homepage.has-projects .onboarding-brand-lockup {
+  width: min(680px, 100%);
+  justify-self: center;
+}
+
+.onboarding-homepage.has-projects .onboarding-brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+
+.onboarding-homepage.has-projects .onboarding-brand-name {
+  font-size: 18px;
 }
 
 .onboarding-primary-area {
@@ -232,23 +248,23 @@
 
 .onboarding-projects-layout {
   display: grid;
-  width: 100%;
+  width: min(680px, 100%);
   height: fit-content;
   max-height: 100%;
   min-width: 0;
   min-height: 0;
-  justify-self: start;
+  justify-self: center;
 }
 
 .onboarding-recent-projects {
   position: relative;
   box-sizing: border-box;
   display: grid;
-  width: 100%;
+  width: min(680px, 100%);
   min-width: 0;
   max-height: min(332px, calc(100vh - 430px));
   grid-template-rows: auto minmax(0, 1fr);
-  justify-self: start;
+  justify-self: center;
   gap: 8px;
   padding: 18px;
   border: 1px solid var(--po-border);
@@ -261,10 +277,10 @@
   width: 100%;
   height: fit-content;
   min-height: 0;
-  max-height: min(332px, calc(100vh - 360px));
+  max-height: none;
   flex-direction: column;
   align-self: start;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .onboarding-recent-header {
@@ -294,8 +310,44 @@
   white-space: nowrap;
 }
 
+.onboarding-project-add {
+  display: grid;
+  min-width: 0;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--po-divider);
+}
+
+.onboarding-project-add-action {
+  width: 100%;
+  color: var(--po-text-subtle);
+}
+
+.onboarding-project-folder-add-icon {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.onboarding-project-folder-add-icon > .lucide-folder {
+  position: absolute;
+  inset: 0;
+}
+
+.onboarding-project-folder-add-icon > .lucide-plus {
+  position: absolute;
+  top: 5px;
+  left: 4px;
+}
+
 .onboarding-shell.dragging .onboarding-recent-projects {
   border-color: var(--po-border-strong);
+}
+
+.onboarding-shell.dragging .onboarding-project-add-action:not(:disabled) {
+  background: var(--po-hover);
+  color: var(--po-text);
 }
 
 .onboarding-project-list {
@@ -316,7 +368,7 @@
 
 .onboarding-homepage.has-projects .onboarding-project-list {
   flex: 0 1 auto;
-  max-height: clamp(112px, calc(100vh - 420px), 306px);
+  max-height: clamp(112px, calc(100vh - 324px), 446px);
 }
 
 .onboarding-project-row {
@@ -587,7 +639,7 @@
   }
 
   .onboarding-homepage.has-projects {
-    gap: 20px;
+    gap: 30px;
   }
 
   .onboarding-project-list {
@@ -606,7 +658,7 @@
   }
 
   .onboarding-homepage.has-projects {
-    gap: 18px;
+    gap: 22px;
   }
 
   .onboarding-brand-mark {
@@ -617,6 +669,16 @@
 
   .onboarding-brand-name {
     font-size: 20px;
+  }
+
+  .onboarding-homepage.has-projects .onboarding-brand-mark {
+    width: 25px;
+    height: 25px;
+    border-radius: 6px;
+  }
+
+  .onboarding-homepage.has-projects .onboarding-brand-name {
+    font-size: 17px;
   }
 
   .onboarding-project-list {
