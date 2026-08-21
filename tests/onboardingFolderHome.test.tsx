@@ -109,7 +109,7 @@ describe("project folder home", () => {
     expect(onChooseWorkspace).toHaveBeenCalledTimes(1);
   });
 
-  it("uses a compact left-aligned action card when there are no projects", () => {
+  it("uses one centered text-only folder action when there are no projects", () => {
     const css = readFileSync(`${process.cwd()}/src/styles/onboarding.css`, "utf8");
     const container = renderHome();
 
@@ -117,15 +117,17 @@ describe("project folder home", () => {
     expect(container.querySelectorAll(".folder-drop-zone")).toHaveLength(1);
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
     expect(container.querySelector(".folder-drop-outline")).toBeNull();
-    expect(container.querySelector(".folder-drop-icon.lucide-folder-open")).not.toBeNull();
+    expect(container.querySelector(".folder-drop-icon")).toBeNull();
+    expect(container.querySelector(".folder-drop-copy")?.textContent).toBe("Open folder");
     expect(css).toMatch(/\.onboarding-homepage\s*\{[^}]*width:\s*min\(480px, 100%\);[^}]*align-content:\s*start;[^}]*gap:\s*30px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*center;[^}]*justify-self:\s*center;[^}]*gap:\s*12px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*color:\s*var\(--po-text-muted\);/s);
     expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*60px;[^}]*height:\s*60px;/s);
     expect(css).not.toContain(".onboarding-brand-version");
-    expect(css).toMatch(/\.onboarding-folder-action-wrap\s*\{[^}]*width:\s*min\(238px, 100%\);/s);
-    expect(css).toMatch(/\.folder-drop-zone\s*\{[^}]*height:\s*48px;[^}]*border:\s*0;[^}]*background:\s*transparent;/s);
-    expect(css).toMatch(/\.folder-drop-icon-frame\s*\{[^}]*width:\s*48px;[^}]*height:\s*48px;[^}]*border:\s*1px dashed var\(--po-border\);[^}]*background:\s*var\(--po-canvas\);/s);
+    expect(css).toMatch(/\.onboarding-primary-area\s*\{[^}]*justify-items:\s*center;/s);
+    expect(css).toMatch(/\.onboarding-folder-action-wrap\s*\{[^}]*width:\s*min\(156px, 100%\);/s);
+    expect(css).toMatch(/\.folder-drop-zone\s*\{[^}]*height:\s*44px;[^}]*border:\s*1px solid var\(--po-border\);[^}]*border-radius:\s*6px;[^}]*background:\s*var\(--po-panel\);[^}]*text-align:\s*center;/s);
+    expect(css).not.toContain(".folder-drop-icon-frame");
   });
 
   it("shows project-opening progress only inside the project row", async () => {

@@ -1,6 +1,6 @@
 import { resolveRendererPublicAssetUrl, type Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
-import { AlertTriangle, Folder, FolderOpen, Plus, Unlink } from "lucide-react";
+import { AlertTriangle, Folder, Plus, Unlink } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -218,18 +218,15 @@ export function MinimalOnboarding({
                   type="button"
                   disabled={busy}
                   aria-busy={openingPath === "__new__" || undefined}
-                  aria-label={t("onboarding.action.openLocalFolder")}
+                  aria-label={t("onboarding.action.openFolder")}
                   onClick={() => void chooseFolder()}
                 />
                 <span className="folder-drop-body">
-                  <span className="folder-drop-icon-frame" aria-hidden="true">
-                    {openingPath === "__new__" ? (
-                      <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
-                    ) : (
-                      <FolderOpen className="folder-drop-icon" size={19} strokeWidth={1.8} />
-                    )}
-                  </span>
-                  <span className="folder-drop-copy"><strong>{t("onboarding.action.openLocalFolder")}</strong></span>
+                  {openingPath === "__new__" ? (
+                    <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
+                  ) : (
+                    <span className="folder-drop-copy"><strong>{t("onboarding.action.openFolder")}</strong></span>
+                  )}
                 </span>
               </div>
             </div>

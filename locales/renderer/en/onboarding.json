@@ -8,6 +8,7 @@
   "projects.untitled": "Untitled Project",
   "action.createCloudProject": "Create cloud project",
   "action.openLocalFolder": "Open local folder",
+  "action.openFolder": "Open folder",
   "action.openOrDropLocalFolder": "open or drop a folder",
   "action.switchTo": "switch to",
   "action.switchToCloud": "Switch to cloud project",

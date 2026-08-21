@@ -98,30 +98,34 @@
 
 .onboarding-primary-area {
   display: grid;
-  justify-items: start;
+  justify-items: center;
 }
 
 .onboarding-folder-action-wrap {
   position: relative;
   display: grid;
   justify-items: center;
-  width: min(238px, 100%);
+  width: min(156px, 100%);
 }
 
 .folder-drop-zone {
   position: relative;
   display: grid;
   width: 100%;
-  height: 48px;
+  height: 44px;
   margin: 0;
   padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--po-text);
-  text-align: start;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: var(--po-panel);
+  color: var(--po-text-muted);
+  text-align: center;
   cursor: var(--po-clickable-cursor, pointer);
   transition:
-    color 150ms ease-out;
+    background-color 120ms ease-out,
+    border-color 120ms ease-out,
+    color 120ms ease-out,
+    transform 120ms ease-out;
 }
 
 .folder-drop-primary-action {
@@ -139,7 +143,8 @@
 }
 
 .folder-drop-zone:has(.folder-drop-primary-action:focus-visible) {
-  outline: none;
+  outline: 1px solid var(--po-border-strong);
+  outline-offset: 2px;
 }
 
 .folder-drop-body {
@@ -151,8 +156,7 @@
   min-width: 0;
   flex-direction: row;
   align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
+  justify-content: center;
   padding: 0;
   border: 0;
   background: transparent;
@@ -160,12 +164,19 @@
 }
 
 .folder-drop-zone:hover {
+  border-color: var(--po-border-strong);
+  background: var(--po-hover);
   color: var(--po-text);
+  transform: translateY(-1px);
 }
 
 .folder-drop-zone.dragging,
 .onboarding-shell.dragging .folder-drop-zone {
+  border-color: var(--po-border-strong);
+  border-style: dashed;
+  background: var(--po-hover);
   color: var(--po-text);
+  transform: translateY(-1px);
 }
 
 .folder-drop-zone.is-disabled {
@@ -174,7 +185,10 @@
 }
 
 .folder-drop-zone.is-disabled:hover {
-  color: var(--po-text);
+  border-color: var(--po-border);
+  background: var(--po-panel);
+  color: var(--po-text-muted);
+  transform: none;
 }
 
 .folder-drop-primary-action:disabled {
@@ -185,42 +199,6 @@
   height: 19px;
   align-items: center;
   justify-content: center;
-}
-
-.folder-drop-icon-frame {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
-  place-items: center;
-  border: 1px dashed var(--po-border);
-  background: var(--po-canvas);
-  color: var(--po-text-muted);
-  transition:
-    background-color 120ms ease-out,
-    border-color 120ms ease-out,
-    color 120ms ease-out,
-    transform 120ms ease-out,
-    box-shadow 120ms ease-out;
-}
-
-.folder-drop-zone:has(.folder-drop-primary-action:focus-visible) .folder-drop-icon-frame,
-.folder-drop-zone:hover .folder-drop-icon-frame,
-.folder-drop-zone.dragging .folder-drop-icon-frame,
-.onboarding-shell.dragging .folder-drop-zone .folder-drop-icon-frame {
-  border-color: var(--po-border-strong);
-  background: var(--po-hover);
-  color: var(--po-text);
-  box-shadow: 4px 4px 0 var(--po-shadow);
-  transform: translate(-1px, -1px);
-}
-
-.folder-drop-zone.is-disabled:hover .folder-drop-icon-frame {
-  border-color: var(--po-border);
-  background: var(--po-canvas);
-  color: var(--po-text-muted);
-  box-shadow: none;
-  transform: none;
 }
 
 .folder-drop-copy {
@@ -236,14 +214,6 @@
   font-weight: 600;
   line-height: 1.25;
   transition: color 150ms ease-out;
-}
-
-.folder-drop-icon {
-  color: currentColor;
-  pointer-events: none;
-  transition:
-    color 150ms ease-out,
-    transform 150ms ease-out;
 }
 
 .onboarding-projects-layout {
@@ -601,7 +571,7 @@
   }
 
   .onboarding-folder-action-wrap {
-    width: min(238px, 100%);
+    width: min(156px, 100%);
   }
 
   .onboarding-recent-header {

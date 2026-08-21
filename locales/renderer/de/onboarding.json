@@ -8,6 +8,7 @@
   "projects.untitled": "Unbenanntes Projekt",
   "action.createCloudProject": "Cloud-Projekt erstellen",
   "action.openLocalFolder": "Lokalen Ordner öffnen",
+  "action.openFolder": "Ordner öffnen",
   "action.openOrDropLocalFolder": "Ordner öffnen oder ablegen",
   "action.switchTo": "wechseln zu",
   "action.switchToCloud": "Zum Cloud-Projekt wechseln",
