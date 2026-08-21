@@ -1,4 +1,4 @@
-import { resolveRendererPublicAssetUrl, type Workspace } from "@puppyone/shared-ui";
+import { Button, resolveRendererPublicAssetUrl, type Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
 import { AlertTriangle, FilePlus2, Folder, FolderOpen, Github, Plus, Unlink } from "lucide-react";
 import {
@@ -234,44 +234,44 @@ export function MinimalOnboarding({
         {!hasProjects && (
           <div className="onboarding-primary-area">
             <div className="onboarding-entry-launcher" role="group" aria-label={t("onboarding.projects.title")}>
-              <button
+              <Button
                 className={`onboarding-entry-action onboarding-entry-action-primary ${folderDrop.dragging ? "is-dragging" : ""}`}
-                type="button"
+                tone="primary"
                 disabled={busy}
                 aria-busy={openingPath === "__new__" || undefined}
-                onClick={() => void chooseFolder()}
-              >
-                {openingPath === "__new__"
+                leadingIcon={openingPath === "__new__"
                   ? <InlineLoading label={null} size="sm" tone="neutral" />
                   : <FolderOpen aria-hidden="true" />}
-                <span>{t("onboarding.action.openFolder")}</span>
-              </button>
+                onClick={() => void chooseFolder()}
+              >
+                {t("onboarding.action.openFolder")}
+              </Button>
 
-              <button
+              <Button
                 className="onboarding-entry-action onboarding-entry-action-secondary"
-                type="button"
+                tone="neutral"
                 disabled={busy || !onCreateProject}
                 aria-busy={openingPath === "__create__" || undefined}
-                onClick={() => void runEntryAction("__create__", onCreateProject)}
-              >
-                {openingPath === "__create__"
+                leadingIcon={openingPath === "__create__"
                   ? <InlineLoading label={null} size="xs" tone="neutral" />
                   : <FilePlus2 className="onboarding-entry-create-icon" aria-hidden="true" />}
-                <span>{t("onboarding.action.createNew")}</span>
-              </button>
+                onClick={() => void runEntryAction("__create__", onCreateProject)}
+              >
+                {t("onboarding.action.createNew")}
+              </Button>
 
-              <button
+              <Button
                 className="onboarding-entry-action onboarding-entry-action-secondary"
-                type="button"
+                tone="neutral"
                 disabled={busy || !onCloneRepository}
                 aria-busy={openingPath === "__clone__" || undefined}
-                onClick={() => void runEntryAction("__clone__", onCloneRepository)}
-              >
-                {openingPath === "__clone__"
+                leadingIcon={openingPath === "__clone__"
                   ? <InlineLoading label={null} size="xs" tone="neutral" />
                   : <Github className="onboarding-entry-github-icon" aria-hidden="true" />}
-                <span>{t("onboarding.action.cloneFromGitHub")}</span>
-              </button>
+                onClick={() => void runEntryAction("__clone__", onCloneRepository)}
+              >
+                {t("onboarding.action.cloneFromGitHub")}
+              </Button>
             </div>
           </div>
         )}

@@ -124,6 +124,10 @@ describe("project folder home", () => {
       "Create new",
       "Clone from GitHub",
     ]);
+    expect(actions.every((action) => action.classList.contains("po-button"))).toBe(true);
+    expect(actions[0]?.classList.contains("po-button--primary")).toBe(true);
+    expect(actions[1]?.classList.contains("po-button--neutral")).toBe(true);
+    expect(actions[2]?.classList.contains("po-button--neutral")).toBe(true);
     expect(actions[0]?.classList.contains("onboarding-entry-action-primary")).toBe(true);
     expect(actions[0]?.querySelector(".lucide-folder-open")).not.toBeNull();
     expect(actions[1]?.querySelector(".onboarding-entry-create-icon")).not.toBeNull();
@@ -136,10 +140,10 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*60px;[^}]*height:\s*60px;/s);
     expect(css).not.toContain(".onboarding-brand-version");
     expect(css).toMatch(/\.onboarding-primary-area\s*\{[^}]*justify-items:\s*center;/s);
-    expect(css).toMatch(/\.onboarding-entry-launcher\s*\{[^}]*width:\s*min\(300px, 100%\);[^}]*gap:\s*10px;/s);
-    expect(css).toMatch(/\.onboarding-entry-action\s*\{[^}]*height:\s*58px;[^}]*border:\s*1px solid var\(--po-border-strong\);[^}]*font-size:\s*14px;/s);
-    expect(css).toMatch(/\.onboarding-entry-action-primary\s*\{[^}]*height:\s*66px;[^}]*background:\s*var\(--po-text\);[^}]*font-size:\s*15\.5px;/s);
-    expect(css).toMatch(/\.onboarding-entry-action-secondary\s*\{[^}]*opacity:\s*0\.62;/s);
+    expect(css).toMatch(/\.onboarding-entry-launcher\s*\{[^}]*width:\s*min\(330px, 100%\);[^}]*gap:\s*8px;/s);
+    expect(css).toMatch(/\.onboarding-entry-action\s*\{[^}]*width:\s*100%;[^}]*height:\s*50px;[^}]*min-height:\s*50px;[^}]*border-radius:\s*var\(--desktop-control-radius\);[^}]*font-size:\s*var\(--po-text-size-body-lg, 14px\);[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);/s);
+    expect(css).toMatch(/\.onboarding-entry-action-primary\s*\{[^}]*background:\s*var\(--po-text\);[^}]*color:\s*var\(--po-text-inverse\);[^}]*font-weight:\s*var\(--po-text-weight-semibold, 600\);/s);
+    expect(css).toMatch(/\.onboarding-entry-action-secondary\s*\{[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-subtle\);/s);
     expect(css).not.toContain(".folder-drop-zone");
 
     await act(async () => actions[0]?.click());
