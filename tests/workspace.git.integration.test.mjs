@@ -405,6 +405,10 @@ describe("targeted remote fetch", { timeout: 30_000 }, () => {
       expect(status.sourceControl.remote.incomingPreview).toEqual(expect.arrayContaining([
         expect.objectContaining({ path: "policy.md", status: "modified" }),
       ]));
+      expect(status.sourceControl.remote.incomingFileSummary).toMatchObject({
+        total: 1,
+        modified: 1,
+      });
       expect(execFileSync(
         "git",
         ["-C", root, "rev-parse", `refs/remotes/archive/${branch}`],

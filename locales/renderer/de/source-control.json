@@ -27,6 +27,7 @@
   "cloud.upToDate": "Die Cloud ist bereits aktuell.",
   "cloud.updateCount": "{count, plural, one {# Update verfügbar} other {# Updates verfügbar}}",
   "commit.filesChanged": "{count, plural, one {# Datei geändert} other {# Dateien geändert}}",
+  "commit.commits": "{count, plural, one {# Commit} other {# Commits}}",
   "commit.noFileChanges": "Dieser Commit enthält keine Dateiänderungen.",
   "commit.noMessage": "(keine Nachricht)",
   "commit.parentCount": "{count, plural, one {# Vorgänger} other {# Vorgänger}}",

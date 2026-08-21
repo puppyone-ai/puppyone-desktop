@@ -19,22 +19,22 @@ afterEach(() => {
 });
 
 describe("GitHub provider section", () => {
-  it("keeps a calm two-line identity when the tracked branch has no incoming updates", () => {
+  it("uses the GitHub label as the repository link when there are no incoming updates", () => {
     const surface = renderProvider(createSection());
 
     expect(surface.textContent).toContain("GitHub");
-    expect(surface.textContent).toContain("owner/repository");
+    expect(surface.textContent).not.toContain("owner/repository");
     expect(surface.textContent).not.toContain("Empty");
     expect(surface.querySelector(".desktop-git-section-count-badge")).toBeNull();
     expect(surface.querySelector(".desktop-git-remote-action")).toBeNull();
     expect(surface.querySelector(".desktop-git-hosting-identity-row")).not.toBeNull();
-    expect(surface.querySelector(".desktop-git-hosting-repository-row")).not.toBeNull();
+    expect(surface.querySelector<HTMLAnchorElement>(".desktop-git-hosting-identity-link")?.href)
+      .toBe("https://github.com/owner/repository");
+    expect(surface.querySelector(".desktop-git-hosting-repository-row")).toBeNull();
   });
 
-  it("summarizes incoming file states, discloses files, and pulls in one click", async () => {
+  it("makes the file total primary and keeps commit and status totals supplemental", async () => {
     const onPull = vi.fn(async () => true);
-    const onSelectWorkingFile = vi.fn();
-    const onToggleExpanded = vi.fn();
     const surface = renderProvider(createSection({
       copy: { title: "Remote Changes", count: 2, detail: "origin/main", tone: "warning" },
       action: {
@@ -67,33 +67,39 @@ describe("GitHub provider section", () => {
           letter: "A",
         },
       ],
-    }), { expanded: true, onPull, onSelectWorkingFile, onToggleExpanded });
+    }), {
+      onPull,
+      incomingFileSummary: {
+        total: 96,
+        added: 4,
+        modified: 89,
+        deleted: 2,
+        renamed: 1,
+        copied: 0,
+        changed: 0,
+      },
+    });
 
-    expect(surface.querySelector(".desktop-git-resource-summary-total")?.textContent).toBe("2");
-    expect(surface.querySelector('[data-resource-status="added"]')?.textContent).toBe("A1");
-    expect(surface.querySelector('[data-resource-status="modified"]')?.textContent).toBe("M1");
-    expect(surface.querySelector('[data-resource-status="modified"]')?.getAttribute("aria-label")).toContain("policy.md");
-    expect(surface.textContent).toContain("policy.md");
+    expect(surface.querySelector(".desktop-git-github-change-card")).not.toBeNull();
+    expect(surface.textContent).toContain("2 commits");
+    expect(surface.textContent).toContain("96 files changed");
+    expect(surface.querySelector(".desktop-git-github-commit-count")?.textContent).toBe("2 commits");
+    expect(surface.querySelector(".desktop-git-github-file-total")?.textContent).toBe("96 files changed");
+    expect(surface.querySelector(".desktop-git-github-file-stats")?.textContent).toBe("4902");
+    expect(surface.querySelector(".desktop-git-github-file-stats .added")?.getAttribute("aria-label")).toBe("Added: 4");
+    expect(surface.querySelector(".desktop-git-github-file-stats .modified")?.getAttribute("aria-label")).toBe("Modified: 90");
+    expect(surface.querySelector(".desktop-git-github-file-stats .deleted")?.getAttribute("aria-label")).toBe("Deleted: 2");
+    expect(surface.querySelector(".desktop-git-github-file-stats .renamed")).toBeNull();
+    expect(surface.textContent).not.toContain("Update policy");
+    expect(surface.textContent).not.toContain("Add guide");
+    expect(surface.querySelector("[data-resource-status]")).toBeNull();
+    expect(surface.querySelector(".desktop-working-tree-main")).toBeNull();
     expect(surface.textContent).not.toContain("Empty");
 
     const pullButton = surface.querySelector<HTMLButtonElement>(".desktop-git-remote-action");
-    const disclosureButton = surface.querySelector<HTMLButtonElement>(".desktop-git-hosting-repository-disclosure");
-    const fileButton = surface.querySelector<HTMLButtonElement>(".desktop-working-tree-main");
-    const modifiedSummary = surface.querySelector<HTMLElement>('[data-resource-status="modified"]');
-    act(() => modifiedSummary?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })));
-    expect(document.body.querySelector(".desktop-git-resource-tooltip")?.textContent).toContain("policy.md");
     await act(async () => pullButton?.click());
-    act(() => disclosureButton?.click());
-    act(() => fileButton?.click());
 
     expect(onPull).toHaveBeenCalledTimes(1);
-    expect(onToggleExpanded).toHaveBeenCalledTimes(1);
-    expect(onSelectWorkingFile).toHaveBeenCalledWith({
-      path: "policy.md",
-      status: "modified",
-      staged: false,
-      origin: "remote",
-    });
   });
 });
 
@@ -110,10 +116,16 @@ function createSection(overrides: Partial<GitScmSyncSection> = {}): GitScmSyncSe
 function renderProvider(
   section: GitScmSyncSection,
   callbacks: {
-    expanded?: boolean;
+    incomingFileSummary?: {
+      total: number;
+      added: number;
+      modified: number;
+      deleted: number;
+      renamed: number;
+      copied: number;
+      changed: number;
+    };
     onPull?: () => Promise<boolean>;
-    onSelectWorkingFile?: ReturnType<typeof vi.fn>;
-    onToggleExpanded?: ReturnType<typeof vi.fn>;
   } = {},
 ) {
   const container = document.createElement("div");
@@ -122,17 +134,21 @@ function renderProvider(
   roots.push(root);
   act(() => root.render(withTestLocalization(
     <GitHubProviderSection
-      identity={{ provider: "github", label: "owner/repository", href: null }}
+      identity={{ provider: "github", label: "owner/repository", href: "https://github.com/owner/repository" }}
       section={section}
+      incomingFileSummary={callbacks.incomingFileSummary ?? {
+        total: 0,
+        added: 0,
+        modified: 0,
+        deleted: 0,
+        renamed: 0,
+        copied: 0,
+        changed: 0,
+      }}
       mergeCount={0}
-      expanded={callbacks.expanded ?? false}
-      fileIconTheme="default"
-      selectedWorkingFile={null}
       disabled={false}
       operationLoading={null}
       primaryAction={true}
-      onToggleExpanded={callbacks.onToggleExpanded ?? vi.fn()}
-      onSelectWorkingFile={callbacks.onSelectWorkingFile ?? vi.fn()}
       onPull={callbacks.onPull ?? (async () => true)}
     />,
   )));

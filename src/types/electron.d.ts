@@ -215,6 +215,16 @@ export type GitRemoteSummary = {
   branches: string[];
 };
 
+export type GitFileChangeSummary = {
+  total: number;
+  added: number;
+  modified: number;
+  deleted: number;
+  renamed: number;
+  copied: number;
+  changed: number;
+};
+
 export type GitSyncTargetSummary = {
   remote: string | null;
   branch: string | null;
@@ -222,6 +232,7 @@ export type GitSyncTargetSummary = {
   exists: boolean;
   ahead: number;
   behind: number;
+  incomingFileSummary?: GitFileChangeSummary;
   incomingPreview: GitSourceControlResource[];
   outgoingPreview: GitSourceControlResource[];
 };
@@ -232,6 +243,7 @@ export type GitSourceControlRemoteSummary = {
   upstream: string | null;
   ahead: number;
   behind: number;
+  incomingFileSummary?: GitFileChangeSummary;
   incomingPreview: GitSourceControlResource[];
   outgoingPreview: GitSourceControlResource[];
   canPull: boolean;

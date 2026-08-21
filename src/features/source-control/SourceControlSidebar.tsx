@@ -141,15 +141,19 @@ export function GitSidebar({
     <GitHubProviderSection
       identity={hostingIdentity}
       section={githubSection}
+      incomingFileSummary={status?.sourceControl.remote.incomingFileSummary ?? {
+        total: 0,
+        added: 0,
+        modified: 0,
+        deleted: 0,
+        renamed: 0,
+        copied: 0,
+        changed: 0,
+      }}
       mergeCount={mergeResources.length}
-      expanded={remoteExpanded}
-      fileIconTheme={fileIconTheme}
-      selectedWorkingFile={selectedWorkingFile}
       disabled={disabled}
       operationLoading={operationLoading}
       primaryAction={primaryActionSlot === "sync"}
-      onToggleExpanded={() => setRemoteExpanded((expanded) => !expanded)}
-      onSelectWorkingFile={onSelectWorkingFile}
       onPull={onPull}
     />
   ) : null;

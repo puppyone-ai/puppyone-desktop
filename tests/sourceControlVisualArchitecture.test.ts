@@ -108,13 +108,14 @@ const diffCss = readFileSync(
 );
 
 describe("source-control visual architecture", () => {
-  it("keeps repository identity text inside the shared sidebar type scale", () => {
+  it("keeps the clickable GitHub identity inside the shared sidebar type scale", () => {
     const sectionTitle = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-section-title",
     ));
 
-    expect(sourceControlSidebarSectionsSource).toContain("<bdi>{label}</bdi>");
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-hosting-identity-link");
+    expect(sourceControlSidebarSectionsSource).toContain("<span>GitHub</span>");
     expect(sectionTitle).toContain(
       "font-size: var(--desktop-sidebar-section-title-font-size, var(--git-font-small));",
     );
@@ -217,15 +218,19 @@ describe("source-control visual architecture", () => {
     );
   });
 
-  it("keeps GitHub incoming updates inside the canonical provider row and file list", () => {
+  it("keeps GitHub incoming updates inside the canonical provider and compact change card", () => {
     expect(sourceControlSidebarSource).toContain("<GitHubProviderSection");
     expect(sourceControlSidebarSectionsSource).toContain(
       'className="desktop-git-cloud-provider-section desktop-git-github-provider-section"',
     );
     expect(sourceControlSidebarSectionsSource).toContain("<GitHostingIdentityRow");
-    expect(sourceControlSidebarSectionsSource).toContain("<SourceControlResourceSummary");
-    expect(sourceControlSidebarSectionsSource).toContain("<SourceControlPreviewResourceList");
-    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-update-card");
+    expect(sourceControlSidebarSectionsSource).toContain("<GitHubIncomingCommitsCard");
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-change-card");
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-commit-count");
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-file-total");
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-file-stats");
+    expect(sourceControlSidebarSectionsSource).toContain("source-control.commit.filesChanged");
+    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-provider-body");
   });
 
   it("keeps GitHub Fetch lifecycle out of the presentational sidebar", () => {

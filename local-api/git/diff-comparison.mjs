@@ -3,6 +3,7 @@ import { gitStatusLabelToLetter } from "./source-control-model.mjs";
 
 const GIT_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 const GIT_PREVIEW_MAX_BYTES = 256 * 1024;
+const GIT_SUMMARY_MAX_BYTES = 4 * 1024 * 1024;
 const VALID_PREVIEW_GROUPS = new Set(["remote", "committed"]);
 
 /**
@@ -134,6 +135,62 @@ export function parseGitNameStatusPreview(output, group, limit = 12) {
   }
 
   return resources;
+}
+
+/** Reads aggregate file-status totals without loading names into the UI model. */
+export async function readGitComparisonFileSummary(rootPath, comparison, { signal } = {}) {
+  if (!comparison?.range) {
+    throw new TypeError("A trusted Git comparison range is required.");
+  }
+
+  const result = await execGitStreaming(rootPath, [
+    "diff",
+    "--name-status",
+    "-z",
+    "--find-renames",
+    "--no-ext-diff",
+    comparison.range,
+  ], {
+    optionalLocks: false,
+    signal,
+    maxBytes: GIT_SUMMARY_MAX_BYTES,
+  }).catch(() => {
+    throwIfAborted(signal);
+    return { stdout: "" };
+  });
+
+  return parseGitComparisonFileSummary(result.stdout);
+}
+
+export function parseGitComparisonFileSummary(output) {
+  const summary = {
+    total: 0,
+    added: 0,
+    modified: 0,
+    deleted: 0,
+    renamed: 0,
+    copied: 0,
+    changed: 0,
+  };
+  const tokens = String(output ?? "").split("\0").filter(Boolean);
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const statusCode = tokens[index]?.[0] ?? "";
+    if (!statusCode) continue;
+    if (statusCode === "R" || statusCode === "C") {
+      if (!tokens[index + 1] || !tokens[index + 2]) break;
+      index += 2;
+    } else {
+      if (!tokens[index + 1]) break;
+      index += 1;
+    }
+
+    const status = gitNameStatusCodeToLabel(statusCode);
+    summary.total += 1;
+    summary[status] += 1;
+  }
+
+  return summary;
 }
 
 function createComparison(direction, beforeRef, afterRef, strategy) {

@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ArrowUpRight, ChevronRight, Clock3, Cloud, Github, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpRight, Clock3, Cloud, Github, Minus, Pencil, Plus, X } from "lucide-react";
 import {
   SidebarEmptyState,
   SidebarResizeHandle,
@@ -7,11 +7,10 @@ import {
 } from "@puppyone/shared-ui";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { useLocalization, type MessageFormatter } from "@puppyone/localization";
-import type { GitSourceControlResource, GitStatusSnapshot } from "../../../types/electron";
+import type { GitFileChangeSummary, GitStatusSnapshot } from "../../../types/electron";
 import { openExternalUrl } from "../../../lib/localFiles";
 import {
   SourceControlPreviewResourceList,
-  SourceControlResourceSummary,
   SourceControlSectionHeader,
 } from "../components";
 import type {
@@ -124,89 +123,116 @@ export function getCommittedSummary(count: number, actionLabel: string, t: Messa
 
 export function GitHostingIdentityRow({
   identity,
-  resources,
-  expanded,
-  onToggleExpanded,
   action = null,
 }: {
   identity: GitHostingIdentity;
-  resources: readonly GitSourceControlResource[];
-  expanded: boolean;
-  onToggleExpanded: () => void;
   action?: ReactNode;
 }) {
   const { t } = useLocalization();
   const { label, href } = identity;
   return (
-    <>
-      <div className="desktop-git-section-row desktop-git-hosting-identity-row">
+    <div className="desktop-git-section-row desktop-git-hosting-identity-row">
+      {href ? (
+        <a
+          className="desktop-git-section-title desktop-git-hosting-identity-link"
+          href={href}
+          title={label}
+          aria-label={`${t("source-control.hosting.repository")}: ${label}`}
+          onClick={(event) => {
+            event.preventDefault();
+            void openExternalUrl(href).catch((error) => console.warn("Unable to open GitHub repository:", error));
+          }}
+        >
+          <span className="desktop-git-section-leading-icon"><Github size={14} strokeWidth={2} aria-hidden="true" /></span>
+          <span>GitHub</span>
+          <ArrowUpRight size={12} aria-hidden="true" />
+        </a>
+      ) : (
         <div className="desktop-git-section-title desktop-git-hosting-identity-text">
           <span className="desktop-git-section-leading-icon"><Github size={14} strokeWidth={2} aria-hidden="true" /></span>
           <span>GitHub</span>
         </div>
-        {action}
-      </div>
-      <div className="desktop-git-section-row desktop-git-hosting-repository-row" aria-label={t("source-control.hosting.repository")}>
-        {resources.length > 0 && (
-          <button
-            className="desktop-git-hosting-repository-disclosure"
-            type="button"
-            aria-expanded={expanded}
-            onClick={onToggleExpanded}
-          >
-            <ChevronRight size={14} className={`po-disclosure-icon ${expanded ? "expanded" : ""}`} />
-          </button>
-        )}
-        {resources.length === 0 && <span className="desktop-git-hosting-repository-disclosure-spacer" />}
-        {href ? (
-          <a
-            className="desktop-git-hosting-repository-link"
-            href={href}
-            title={label}
-            onClick={(event) => {
-              event.preventDefault();
-              void openExternalUrl(href).catch((error) => console.warn("Unable to open GitHub repository:", error));
-            }}
-          >
-            <bdi>{label}</bdi>
-            <ArrowUpRight size={12} aria-hidden="true" />
-          </a>
-        ) : (
-          <div className="desktop-git-hosting-repository-text" title={label}>
-            <bdi>{label}</bdi>
+      )}
+      {action}
+    </div>
+  );
+}
+
+function GitHubIncomingCommitsCard({
+  commitCount,
+  fileSummary,
+}: {
+  commitCount: number;
+  fileSummary: GitFileChangeSummary;
+}) {
+  const { t, formatNumber } = useLocalization();
+  const statusStats = [
+    {
+      status: "added",
+      count: fileSummary.added + fileSummary.copied,
+      icon: <Plus size={10} strokeWidth={2.4} aria-hidden="true" />,
+    },
+    {
+      status: "modified",
+      count: fileSummary.modified + fileSummary.changed + fileSummary.renamed,
+      icon: <Pencil size={9} strokeWidth={2.2} aria-hidden="true" />,
+    },
+    {
+      status: "deleted",
+      count: fileSummary.deleted,
+      icon: <Minus size={10} strokeWidth={2.4} aria-hidden="true" />,
+    },
+  ].filter(({ count }) => count > 0);
+
+  return (
+    <div className="desktop-git-github-change-card">
+      <strong className="desktop-git-github-file-total">
+        {t("source-control.commit.filesChanged", { count: fileSummary.total })}
+      </strong>
+      <div className="desktop-git-github-change-meta">
+        <small className="desktop-git-github-commit-count">
+          {t("source-control.commit.commits", { count: commitCount })}
+        </small>
+        {statusStats.length > 0 && (
+          <div className="desktop-git-github-file-stats">
+            {statusStats.map(({ status, count, icon }) => {
+              const label = t(`source-control.diff.change.${status}`);
+              return (
+                <span
+                  key={status}
+                  className={status}
+                  title={`${label}: ${formatNumber(count)}`}
+                  aria-label={`${label}: ${formatNumber(count)}`}
+                >
+                  {icon}
+                  <b>{formatNumber(count)}</b>
+                </span>
+              );
+            })}
           </div>
         )}
-        {resources.length > 0 && <SourceControlResourceSummary resources={resources} />}
       </div>
-    </>
+    </div>
   );
 }
 
 export function GitHubProviderSection({
   identity,
   section,
+  incomingFileSummary,
   mergeCount,
-  expanded,
-  fileIconTheme,
-  selectedWorkingFile,
   disabled,
   operationLoading,
   primaryAction,
-  onToggleExpanded,
-  onSelectWorkingFile,
   onPull,
 }: {
   identity: GitHostingIdentity;
   section: GitScmSyncSection;
+  incomingFileSummary: GitFileChangeSummary;
   mergeCount: number;
-  expanded: boolean;
-  fileIconTheme: FileIconThemeId;
-  selectedWorkingFile: GitWorkingSelection | null;
   disabled: boolean;
   operationLoading: string | null;
   primaryAction: boolean;
-  onToggleExpanded: () => void;
-  onSelectWorkingFile: (selection: GitWorkingSelection) => void;
   onPull: () => Promise<boolean>;
 }) {
   const { t } = useLocalization();
@@ -217,9 +243,6 @@ export function GitHubProviderSection({
     <section className="desktop-git-cloud-provider-section desktop-git-github-provider-section">
       <GitHostingIdentityRow
         identity={identity}
-        resources={section.previewResources}
-        expanded={expanded}
-        onToggleExpanded={onToggleExpanded}
         action={pullAction ? (
           <GitOperationButton
             className="desktop-git-remote-action"
@@ -237,28 +260,12 @@ export function GitHubProviderSection({
           />
         ) : null}
       />
-      <div className="desktop-git-cloud-provider-body desktop-git-github-provider-body">
-        {section.previewResources.length > 0 ? (
-          <GitSectionCollapse expanded={expanded}>
-            <SourceControlPreviewResourceList
-              resources={section.previewResources}
-              fileIconTheme={fileIconTheme}
-              selectedWorkingFile={selectedWorkingFile}
-              origin="remote"
-              ariaLabel={t("source-control.preview.remote")}
-              onSelectWorkingFile={onSelectWorkingFile}
-            />
-          </GitSectionCollapse>
-        ) : section.fallbackSummary ? (
-          <GitSectionCollapse expanded={expanded}>
-            <div className="desktop-git-preview-summary" data-po-scrollbar="sidebar">
-              {section.fallbackSummary}
-            </div>
-          </GitSectionCollapse>
-        ) : (
-          null
-        )}
-      </div>
+      {section.copy.count > 0 && (
+        <GitHubIncomingCommitsCard
+          commitCount={section.copy.count}
+          fileSummary={incomingFileSummary}
+        />
+      )}
     </section>
   );
 }

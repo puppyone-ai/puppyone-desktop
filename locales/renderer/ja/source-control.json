@@ -27,6 +27,7 @@
   "cloud.upToDate": "Cloud はすでに最新です。",
   "cloud.updateCount": "{count, plural, other {# 件のアップデートを利用できます}}",
   "commit.filesChanged": "{count, plural, other {# ファイルを変更}}",
+  "commit.commits": "{count, plural, other {# 件のコミット}}",
   "commit.noFileChanges": "このコミットにはファイルの変更がありません。",
   "commit.noMessage": "（メッセージなし）",
   "commit.parentCount": "{count, plural, other {親 # 件}}",

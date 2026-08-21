@@ -34,6 +34,7 @@ import {
 } from "./git/runner.mjs";
 import { createWorkspaceCloudRemoteActions } from "./git/cloud-remote.mjs";
 import {
+  readGitComparisonFileSummary,
   readGitComparisonPreview,
   resolveGitRemoteDiffComparisons,
 } from "./git/diff-comparison.mjs";
@@ -2252,6 +2253,7 @@ async function readGitSyncTarget(
       exists: false,
       ahead: 0,
       behind: 0,
+      incomingFileSummary: createEmptyGitFileSummary(),
       incomingPreview: [],
       outgoingPreview: [],
     };
@@ -2277,6 +2279,7 @@ async function readGitSyncTarget(
       exists: false,
       ahead: 0,
       behind: 0,
+      incomingFileSummary: createEmptyGitFileSummary(),
       incomingPreview: [],
       outgoingPreview: [],
     };
@@ -2291,7 +2294,7 @@ async function readGitSyncTarget(
       hasHead: Boolean(headCommitId),
     })
     : null;
-  const [incomingPreview, outgoingPreview] = await Promise.all([
+  const [incomingPreview, outgoingPreview, incomingFileSummary] = await Promise.all([
     counts.behind > 0
       ? readGitComparisonPreview(rootPath, comparisons.incoming, "remote", {
         signal,
@@ -2304,6 +2307,9 @@ async function readGitSyncTarget(
         limit: GIT_REMOTE_PREVIEW_LIMIT,
       })
       : [],
+    counts.behind > 0
+      ? readGitComparisonFileSummary(rootPath, comparisons.incoming, { signal })
+      : createEmptyGitFileSummary(),
   ]);
 
   return {
@@ -2313,8 +2319,21 @@ async function readGitSyncTarget(
     exists: true,
     ahead: counts.ahead,
     behind: counts.behind,
+    incomingFileSummary,
     incomingPreview,
     outgoingPreview,
+  };
+}
+
+function createEmptyGitFileSummary() {
+  return {
+    total: 0,
+    added: 0,
+    modified: 0,
+    deleted: 0,
+    renamed: 0,
+    copied: 0,
+    changed: 0,
   };
 }
 

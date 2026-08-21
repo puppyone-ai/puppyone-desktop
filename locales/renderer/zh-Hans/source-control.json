@@ -27,6 +27,7 @@
   "cloud.upToDate": "云端已是最新。",
   "cloud.updateCount": "{count, plural, other {有 # 项更新可用}}",
   "commit.filesChanged": "{count, plural, other {# 个文件已更改}}",
+  "commit.commits": "{count, plural, other {# 个提交}}",
   "commit.noFileChanges": "此提交中没有文件更改。",
   "commit.noMessage": "（无消息）",
   "commit.parentCount": "{count, plural, other {# 个父提交}}",

@@ -5,11 +5,10 @@ import {
   shouldVirtualizeSidebarList,
   type FileIconThemeId,
 } from "@puppyone/shared-ui";
-import { Fragment, useId, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { Fragment, type ReactNode } from "react";
 import type { GitSourceControlResource } from "../../types/electron";
 import type { GitWorkingSelection } from "./types";
-import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
+import { bidiIsolate, useLocalization } from "@puppyone/localization";
 
 export function SourceControlSectionHeader({
   title,
@@ -61,145 +60,19 @@ export function SourceControlSectionHeader({
   );
 }
 
-type SourceControlResourceSummaryBucket = {
-  key: "conflict" | "added" | "modified" | "deleted" | "renamed" | "copied";
-  letter: "!" | "A" | "M" | "D" | "R" | "C";
-  resources: readonly GitSourceControlResource[];
-};
-
-const SOURCE_CONTROL_RESOURCE_SUMMARY_ORDER = [
-  ["conflict", "!"],
-  ["added", "A"],
-  ["modified", "M"],
-  ["deleted", "D"],
-  ["renamed", "R"],
-  ["copied", "C"],
-] as const;
-
 export function SourceControlResourceSummary({
   resources,
 }: {
   resources: readonly GitSourceControlResource[];
 }) {
-  const { t, formatNumber } = useLocalization();
-  const tooltipId = useId();
-  const [tooltip, setTooltip] = useState<{
-    bucket: SourceControlResourceSummaryBucket;
-    left: number;
-    top: number;
-  } | null>(null);
-  const buckets = getSourceControlResourceSummaryBuckets(resources);
-  const summaryLabel = buckets
-    .map((bucket) => `${getSourceControlSummaryStatusLabel(bucket.key, t)} ${formatNumber(bucket.resources.length)}`)
-    .join(", ");
+  const { t } = useLocalization();
+  const label = t("source-control.commit.filesChanged", { count: resources.length });
 
   return (
-    <span
-      className="desktop-git-resource-summary"
-      aria-label={`${t("source-control.commit.filesChanged", { count: resources.length })}. ${summaryLabel}`}
-    >
-      <small
-        className="desktop-git-resource-summary-total"
-        title={t("source-control.commit.filesChanged", { count: resources.length })}
-      >
-        {formatNumber(resources.length)}
-      </small>
-      {buckets.map((bucket) => (
-        <small
-          className={`desktop-git-resource-summary-chip ${bucket.key}`}
-          aria-label={getSourceControlSummaryTooltip(bucket, t, formatNumber)}
-          data-resource-status={bucket.key}
-          aria-describedby={tooltip?.bucket.key === bucket.key ? tooltipId : undefined}
-          onMouseEnter={(event) => setTooltip(getSourceControlSummaryTooltipPosition(event, bucket))}
-          onMouseLeave={() => setTooltip(null)}
-          key={bucket.key}
-        >
-          <b>{bucket.letter}</b>
-          <span>{formatNumber(bucket.resources.length)}</span>
-        </small>
-      ))}
-      {tooltip && createPortal(
-        <div
-          id={tooltipId}
-          className={`desktop-git-resource-tooltip ${tooltip.bucket.key}`}
-          role="tooltip"
-          style={{ left: tooltip.left, top: tooltip.top }}
-        >
-          <strong>
-            <span>{getSourceControlSummaryStatusLabel(tooltip.bucket.key, t)}</span>
-            <small>{formatNumber(tooltip.bucket.resources.length)}</small>
-          </strong>
-          <div>
-            {tooltip.bucket.resources.slice(0, 8).map((resource) => (
-              <bdi key={resource.id}>{getGitDisplayPath(resource)}</bdi>
-            ))}
-            {tooltip.bucket.resources.length > 8 && (
-              <small>+{formatNumber(tooltip.bucket.resources.length - 8)}</small>
-            )}
-          </div>
-        </div>,
-        document.querySelector(".app-shell") ?? document.body,
-      )}
-    </span>
+    <small className="desktop-git-resource-summary" title={label}>
+      {label}
+    </small>
   );
-}
-
-function getSourceControlSummaryTooltipPosition(
-  event: ReactMouseEvent<HTMLElement>,
-  bucket: SourceControlResourceSummaryBucket,
-) {
-  const rect = event.currentTarget.getBoundingClientRect();
-  const width = 260;
-  const height = Math.min(220, 44 + (Math.min(bucket.resources.length, 8) * 22));
-  const viewportWidth = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
-  const viewportHeight = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
-  const preferredLeft = rect.right + 8;
-  const left = preferredLeft + width <= viewportWidth - 8
-    ? preferredLeft
-    : Math.max(8, rect.left - width - 8);
-  const top = Math.min(Math.max(8, rect.top), Math.max(8, viewportHeight - height - 8));
-  return { bucket, left, top };
-}
-
-export function getSourceControlResourceSummaryBuckets(
-  resources: readonly GitSourceControlResource[],
-): SourceControlResourceSummaryBucket[] {
-  return SOURCE_CONTROL_RESOURCE_SUMMARY_ORDER.flatMap(([key, letter]) => {
-    const matching = resources.filter((resource) => getSourceControlSummaryStatus(resource.status) === key);
-    return matching.length > 0 ? [{ key, letter, resources: matching }] : [];
-  });
-}
-
-function getSourceControlSummaryStatus(status: GitSourceControlResource["status"]): SourceControlResourceSummaryBucket["key"] {
-  if (status === "conflict") return "conflict";
-  if (status === "added" || status === "untracked") return "added";
-  if (status === "deleted") return "deleted";
-  if (status === "renamed") return "renamed";
-  if (status === "copied") return "copied";
-  return "modified";
-}
-
-function getSourceControlSummaryStatusLabel(
-  status: SourceControlResourceSummaryBucket["key"],
-  t: MessageFormatter,
-) {
-  if (status === "conflict") return t("source-control.section.merge");
-  return t(`source-control.diff.change.${status}`);
-}
-
-function getSourceControlSummaryTooltip(
-  bucket: SourceControlResourceSummaryBucket,
-  t: MessageFormatter,
-  formatNumber: (value: number) => string,
-) {
-  const label = getSourceControlSummaryStatusLabel(bucket.key, t);
-  const visiblePaths = bucket.resources.slice(0, 8).map((resource) => getGitDisplayPath(resource));
-  const hiddenCount = bucket.resources.length - visiblePaths.length;
-  return [
-    `${label} · ${formatNumber(bucket.resources.length)}`,
-    ...visiblePaths,
-    ...(hiddenCount > 0 ? [`+${formatNumber(hiddenCount)}`] : []),
-  ].join("\n");
 }
 
 export function SourceControlPreviewResourceList({
