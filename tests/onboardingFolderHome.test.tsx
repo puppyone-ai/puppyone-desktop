@@ -64,7 +64,7 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-homepage\.has-projects \.onboarding-recent-projects\s*\{[^}]*height:\s*fit-content;[^}]*max-height:\s*none;[^}]*align-self:\s*start;[^}]*overflow:\s*visible;/s);
     expect(css).toMatch(/\.onboarding-recent-heading\s*\{[^}]*background:\s*var\(--po-canvas\);[^}]*color:\s*var\(--po-text-subtle\);[^}]*font-family:\s*var\(--po-font-sans\);[^}]*font-size:\s*11\.5px;[^}]*font-weight:\s*500;/s);
     expect(css).toMatch(/\.onboarding-recent-header\s*\{[^}]*inset-inline:\s*22px 6px;/s);
-    expect(css).toMatch(/\.onboarding-homepage\.has-projects\s*\{[^}]*width:\s*min\(760px, 100%\);[^}]*height:\s*fit-content;[^}]*gap:\s*72px;/s);
+    expect(css).toMatch(/\.onboarding-homepage\.has-projects\s*\{[^}]*width:\s*min\(760px, 100%\);[^}]*height:\s*fit-content;[^}]*gap:\s*16px;/s);
     expect(css).toMatch(/\.onboarding-projects-layout\s*\{[^}]*width:\s*min\(680px, 100%\);[^}]*height:\s*fit-content;[^}]*max-height:\s*100%;[^}]*justify-self:\s*center;/s);
     expect(css).toMatch(/\.onboarding-project-add\s*\{[^}]*margin-top:\s*8px;[^}]*padding-top:\s*8px;[^}]*border-top:\s*1px solid var\(--po-divider\);/s);
     expect(css).toMatch(/\.onboarding-project-add-action\s*\{[^}]*width:\s*100%;[^}]*color:\s*var\(--po-text-subtle\);/s);
@@ -90,7 +90,7 @@ describe("project folder home", () => {
     });
 
     expect(container.querySelectorAll(".folder-drop-zone")).toHaveLength(0);
-    expectBrandLockup(container, { withMark: false });
+    expect(container.querySelector(".onboarding-brand-lockup")).toBeNull();
     const panel = container.querySelector(".onboarding-recent-projects");
     expect(panel?.lastElementChild?.classList.contains("onboarding-project-add")).toBe(true);
     const projectFolder = container.querySelector(".onboarding-project-row .lucide-folder");
@@ -113,7 +113,7 @@ describe("project folder home", () => {
     const css = readFileSync(`${process.cwd()}/src/styles/onboarding.css`, "utf8");
     const container = renderHome();
 
-    expectBrandLockup(container, { withMark: true });
+    expectBrandLockup(container);
     expect(container.querySelectorAll(".folder-drop-zone")).toHaveLength(1);
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
     expect(container.querySelector(".folder-drop-outline")).toBeNull();
@@ -333,15 +333,11 @@ function renderHome(overrides: Partial<MinimalOnboardingProps> = {}) {
   return container;
 }
 
-function expectBrandLockup(container: HTMLElement, { withMark }: { withMark: boolean }) {
+function expectBrandLockup(container: HTMLElement) {
   const lockup = container.querySelector(".onboarding-brand-lockup");
   const mark = lockup?.querySelector<HTMLImageElement>(".onboarding-brand-mark");
-  if (withMark) {
-    expect(mark?.getAttribute("src")).toContain("logo-square-v0.1.4-dark.png");
-    expect(mark?.getAttribute("alt")).toBe("");
-  } else {
-    expect(mark).toBeNull();
-  }
+  expect(mark?.getAttribute("src")).toContain("logo-square-v0.1.4-dark.png");
+  expect(mark?.getAttribute("alt")).toBe("");
   expect(lockup?.querySelector(".onboarding-brand-name")?.textContent).toBe("puppyone");
   expect(lockup?.querySelector(".onboarding-brand-version")).toBeNull();
   expect(container.querySelector(".onboarding-brand-context")).toBeNull();

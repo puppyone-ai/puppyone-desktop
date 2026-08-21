@@ -198,8 +198,8 @@ export function MinimalOnboarding({
     >
       <DesktopWindowDragRegion className="onboarding-titlebar" />
       <section className={`onboarding-homepage ${hasProjects ? "has-projects" : "is-empty"}`} aria-label={t(hasProjects ? "onboarding.projects.localTitle" : "onboarding.projects.title")}>
-        <div className="onboarding-brand-lockup">
-          {!hasProjects && (
+        {!hasProjects && (
+          <div className="onboarding-brand-lockup">
             <img
               className="onboarding-brand-mark"
               src={resolveRendererPublicAssetUrl("logo-square-v0.1.4-dark.png")}
@@ -207,9 +207,9 @@ export function MinimalOnboarding({
               aria-hidden="true"
               draggable={false}
             />
-          )}
-          <span className="onboarding-brand-name">{t("onboarding.brand.name")}</span>
-        </div>
+            <span className="onboarding-brand-name">{t("onboarding.brand.name")}</span>
+          </div>
+        )}
 
         {!hasProjects && (
           <div className="onboarding-primary-area">

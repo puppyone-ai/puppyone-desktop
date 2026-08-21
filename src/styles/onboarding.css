@@ -51,7 +51,7 @@
 .onboarding-homepage.has-projects {
   width: min(760px, 100%);
   height: fit-content;
-  gap: 72px;
+  gap: 16px;
 }
 
 .onboarding-brand-lockup {
@@ -80,14 +80,6 @@
   font-weight: 600;
   letter-spacing: -0.035em;
   line-height: 1;
-}
-
-.onboarding-homepage.has-projects .onboarding-brand-lockup {
-  justify-self: center;
-}
-
-.onboarding-homepage.has-projects .onboarding-brand-name {
-  font-size: 18px;
 }
 
 .onboarding-primary-area {
@@ -598,7 +590,7 @@
   }
 
   .onboarding-homepage.has-projects {
-    gap: 54px;
+    gap: 14px;
   }
 
   .onboarding-project-list {
@@ -617,7 +609,7 @@
   }
 
   .onboarding-homepage.has-projects {
-    gap: 38px;
+    gap: 12px;
   }
 
   .onboarding-brand-mark {
@@ -628,10 +620,6 @@
 
   .onboarding-brand-name {
     font-size: 20px;
-  }
-
-  .onboarding-homepage.has-projects .onboarding-brand-name {
-    font-size: 17px;
   }
 
   .onboarding-project-list {
