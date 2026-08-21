@@ -60,7 +60,7 @@
   flex-direction: column;
   align-items: center;
   justify-self: center;
-  gap: 10px;
+  gap: 12px;
   color: var(--po-text-muted);
   line-height: 1;
   user-select: none;
@@ -68,18 +68,19 @@
 
 .onboarding-brand-mark {
   display: block;
-  width: 52px;
-  height: 52px;
+  width: 60px;
+  height: 60px;
   flex: 0 0 auto;
-  border-radius: 12px;
+  border-radius: 14px;
 }
 
 .onboarding-brand-identity {
   display: inline-flex;
   min-width: 0;
-  align-items: baseline;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 7px;
   text-align: center;
 }
 
@@ -106,9 +107,9 @@
 }
 
 .onboarding-homepage.has-projects .onboarding-brand-mark {
-  width: 46px;
-  height: 46px;
-  border-radius: 11px;
+  width: 54px;
+  height: 54px;
+  border-radius: 13px;
 }
 
 .onboarding-homepage.has-projects .onboarding-brand-name {
@@ -681,9 +682,9 @@
   }
 
   .onboarding-brand-mark {
-    width: 42px;
-    height: 42px;
-    border-radius: 10px;
+    width: 48px;
+    height: 48px;
+    border-radius: 11px;
   }
 
   .onboarding-brand-name {
@@ -691,9 +692,9 @@
   }
 
   .onboarding-homepage.has-projects .onboarding-brand-mark {
-    width: 38px;
-    height: 38px;
-    border-radius: 9px;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
   }
 
   .onboarding-homepage.has-projects .onboarding-brand-name {
