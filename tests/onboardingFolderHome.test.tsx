@@ -6,7 +6,6 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import packageMetadata from "../package.json";
 import { MinimalOnboarding, type MinimalOnboardingProps } from "../src/components/MinimalOnboarding";
 import {
   DEFAULT_TYPOGRAPHY_PREFERENCES,
@@ -123,8 +122,7 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*center;[^}]*justify-self:\s*center;[^}]*gap:\s*12px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*color:\s*var\(--po-text-muted\);/s);
     expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*60px;[^}]*height:\s*60px;/s);
-    expect(css).toMatch(/\.onboarding-brand-identity\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;[^}]*gap:\s*7px;[^}]*text-align:\s*center;/s);
-    expect(css).toMatch(/\.onboarding-brand-version\s*\{[^}]*color:\s*var\(--po-text-subtle\);[^}]*font-size:\s*10\.5px;/s);
+    expect(css).not.toContain(".onboarding-brand-version");
     expect(css).toMatch(/\.onboarding-folder-action-wrap\s*\{[^}]*width:\s*min\(238px, 100%\);/s);
     expect(css).toMatch(/\.folder-drop-zone\s*\{[^}]*height:\s*48px;[^}]*border:\s*0;[^}]*background:\s*transparent;/s);
     expect(css).toMatch(/\.folder-drop-icon-frame\s*\{[^}]*width:\s*48px;[^}]*height:\s*48px;[^}]*border:\s*1px dashed var\(--po-border\);[^}]*background:\s*var\(--po-canvas\);/s);
@@ -339,7 +337,7 @@ function expectBrandLockup(container: HTMLElement) {
   expect(mark?.getAttribute("src")).toContain("logo-square-v0.1.3-dark.png");
   expect(mark?.getAttribute("alt")).toBe("");
   expect(lockup?.querySelector(".onboarding-brand-name")?.textContent).toBe("puppyone");
-  expect(lockup?.querySelector(".onboarding-brand-version")?.textContent).toBe(`v${packageMetadata.version}`);
+  expect(lockup?.querySelector(".onboarding-brand-version")).toBeNull();
   expect(container.querySelector(".onboarding-brand-context")).toBeNull();
 }
 

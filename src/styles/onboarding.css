@@ -74,32 +74,12 @@
   border-radius: 14px;
 }
 
-.onboarding-brand-identity {
-  display: inline-flex;
-  min-width: 0;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  text-align: center;
-}
-
 .onboarding-brand-name {
   font-family: var(--po-font-sans);
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.035em;
   line-height: 1;
-}
-
-.onboarding-brand-version {
-  color: var(--po-text-subtle);
-  font-family: var(--po-font-sans);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0;
-  line-height: 1;
-  white-space: nowrap;
 }
 
 .onboarding-homepage.has-projects .onboarding-brand-lockup {
