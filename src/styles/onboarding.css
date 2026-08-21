@@ -37,23 +37,35 @@
 
 .onboarding-homepage {
   display: grid;
-  width: min(760px, 100%);
+  width: min(480px, 100%);
   max-height: 100%;
   min-height: 0;
-  gap: 48px;
+  align-content: start;
+  gap: 30px;
+}
+
+.onboarding-homepage.is-empty {
+  min-height: min(430px, 100%);
 }
 
 .onboarding-homepage.has-projects {
   height: fit-content;
-  gap: 40px;
+  gap: 24px;
+}
+
+.onboarding-brand-block {
+  display: grid;
+  min-width: 0;
+  justify-self: start;
+  gap: 7px;
 }
 
 .onboarding-brand-lockup {
   display: inline-flex;
   min-width: 0;
   align-items: center;
-  justify-self: center;
-  gap: 14px;
+  justify-self: start;
+  gap: 10px;
   color: var(--po-text);
   line-height: 1;
   user-select: none;
@@ -61,47 +73,57 @@
 
 .onboarding-brand-mark {
   display: block;
-  width: 46px;
-  height: 46px;
+  width: 36px;
+  height: 36px;
   flex: 0 0 auto;
-  border-radius: 11px;
+  border-radius: 9px;
 }
 
 .onboarding-brand-name {
   font-family: var(--po-font-sans);
-  font-size: 30px;
-  font-weight: 720;
+  font-size: 27px;
+  font-weight: 700;
   letter-spacing: -0.035em;
   line-height: 1;
 }
 
+.onboarding-brand-context {
+  margin-inline-start: 46px;
+  color: var(--po-text-subtle);
+  font-family: var(--po-font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
 .onboarding-primary-area {
   display: grid;
-  justify-items: center;
+  justify-items: start;
 }
 
 .onboarding-folder-action-wrap {
   position: relative;
   display: grid;
   justify-items: center;
-  width: min(260px, 100%);
+  width: min(238px, 100%);
 }
 
 .folder-drop-zone {
   position: relative;
   display: grid;
   width: 100%;
-  max-width: 260px;
-  max-height: 260px;
-  aspect-ratio: 1 / 1;
-  margin: 0 auto;
+  height: 68px;
+  margin: 0;
   padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--po-text-muted);
-  text-align: center;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: var(--po-panel);
+  color: var(--po-text);
+  text-align: start;
   cursor: var(--po-clickable-cursor, pointer);
   transition:
+    background-color 120ms ease-out,
+    border-color 120ms ease-out,
     color 150ms ease-out,
     transform 150ms ease-out;
 }
@@ -120,38 +142,9 @@
   outline: none;
 }
 
-.folder-drop-zone:has(.folder-drop-primary-action:focus-visible) .folder-drop-border {
-  stroke: var(--po-border-strong);
-}
-
-.folder-drop-outline {
-  position: absolute;
-  inset: 0;
-  overflow: visible;
-  pointer-events: none;
-  transition: stroke 150ms ease-out;
-}
-
-.folder-drop-shadow {
-  fill: var(--po-shadow);
-  opacity: 0;
-  transform: translate(7px, 8px);
-  transition: opacity 150ms ease-out;
-}
-
-.folder-drop-fill {
-  fill: var(--po-canvas);
-}
-
-.folder-drop-border {
-  fill: none;
-  stroke: var(--po-border);
-  stroke-dasharray: 4 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-  transition: stroke 150ms ease-out;
+.folder-drop-zone:has(.folder-drop-primary-action:focus-visible) {
+  outline: 1px solid var(--po-border-strong);
+  outline-offset: 2px;
 }
 
 .folder-drop-body {
@@ -162,36 +155,29 @@
   height: 100%;
   min-width: 0;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  gap: 12px;
-  padding-top: 28px;
+  gap: 9px;
+  padding: 12px 16px;
   border: 0;
   background: transparent;
   pointer-events: none;
 }
 
 .folder-drop-zone:hover {
+  border-color: var(--po-border-strong);
+  background: var(--po-hover);
   color: var(--po-text);
-  transform: translateY(-4px);
-}
-
-.folder-drop-zone:hover .folder-drop-border,
-.folder-drop-zone.dragging .folder-drop-border,
-.onboarding-shell.dragging .folder-drop-zone .folder-drop-border {
-  stroke: var(--po-border-strong);
-}
-
-.folder-drop-zone:hover .folder-drop-shadow,
-.folder-drop-zone.dragging .folder-drop-shadow,
-.onboarding-shell.dragging .folder-drop-zone .folder-drop-shadow {
-  opacity: 1;
+  transform: translateY(-1px);
 }
 
 .folder-drop-zone.dragging,
 .onboarding-shell.dragging .folder-drop-zone {
+  border-color: var(--po-border-strong);
+  border-style: dashed;
+  background: var(--po-hover);
   color: var(--po-text);
-  transform: translateY(-4px);
+  transform: translateY(-1px);
 }
 
 .folder-drop-zone.is-disabled {
@@ -200,16 +186,10 @@
 }
 
 .folder-drop-zone.is-disabled:hover {
-  color: var(--po-text-muted);
+  border-color: var(--po-border);
+  background: var(--po-panel);
+  color: var(--po-text);
   transform: none;
-}
-
-.folder-drop-zone.is-disabled:hover .folder-drop-border {
-  stroke: var(--po-border);
-}
-
-.folder-drop-zone.is-disabled:hover .folder-drop-shadow {
-  opacity: 0;
 }
 
 .folder-drop-primary-action:disabled {
@@ -217,7 +197,7 @@
 }
 
 .folder-drop-loading {
-  height: 25px;
+  height: 19px;
   align-items: center;
   justify-content: center;
 }
@@ -231,8 +211,8 @@
 .folder-drop-zone strong {
   margin: 0;
   color: currentColor;
-  font-size: 12.5px;
-  font-weight: 620;
+  font-size: 14px;
+  font-weight: 600;
   line-height: 1.25;
   transition: color 150ms ease-out;
 }
@@ -245,31 +225,25 @@
     transform 150ms ease-out;
 }
 
-.folder-drop-zone:hover .folder-drop-icon,
-.folder-drop-zone.dragging .folder-drop-icon,
-.onboarding-shell.dragging .folder-drop-zone .folder-drop-icon {
-  transform: translateY(-1px);
-}
-
 .onboarding-projects-layout {
   display: grid;
-  width: min(680px, 100%);
+  width: 100%;
   height: fit-content;
   max-height: 100%;
   min-width: 0;
   min-height: 0;
-  justify-self: center;
+  justify-self: start;
 }
 
 .onboarding-recent-projects {
   position: relative;
   box-sizing: border-box;
   display: grid;
-  width: min(680px, 100%);
+  width: 100%;
   min-width: 0;
   max-height: min(332px, calc(100vh - 430px));
   grid-template-rows: auto minmax(0, 1fr);
-  justify-self: center;
+  justify-self: start;
   gap: 8px;
   padding: 18px;
   border: 1px solid var(--po-border);
@@ -282,10 +256,10 @@
   width: 100%;
   height: fit-content;
   min-height: 0;
-  max-height: none;
+  max-height: min(332px, calc(100vh - 360px));
   flex-direction: column;
   align-self: start;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .onboarding-recent-header {
@@ -315,45 +289,8 @@
   white-space: nowrap;
 }
 
-.onboarding-project-add {
-  display: grid;
-  min-width: 0;
-  min-width: 0;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--po-divider);
-}
-
-.onboarding-project-add-action {
-  width: 100%;
-  color: var(--po-text-subtle);
-}
-
-.onboarding-project-folder-add-icon {
-  position: relative;
-  display: block;
-  width: 14px;
-  height: 14px;
-}
-
-.onboarding-project-folder-add-icon > .lucide-folder {
-  position: absolute;
-  inset: 0;
-}
-
-.onboarding-project-folder-add-icon > .lucide-plus {
-  position: absolute;
-  top: 5px;
-  left: 4px;
-}
-
 .onboarding-shell.dragging .onboarding-recent-projects {
   border-color: var(--po-border-strong);
-}
-
-.onboarding-shell.dragging .onboarding-project-add-action:not(:disabled) {
-  background: var(--po-hover);
-  color: var(--po-text);
 }
 
 .onboarding-project-list {
@@ -374,7 +311,7 @@
 
 .onboarding-homepage.has-projects .onboarding-project-list {
   flex: 0 1 auto;
-  max-height: clamp(112px, calc(100vh - 324px), 446px);
+  max-height: clamp(112px, calc(100vh - 420px), 306px);
 }
 
 .onboarding-project-row {
@@ -607,7 +544,7 @@
   }
 
   .onboarding-folder-action-wrap {
-    width: min(260px, 100%);
+    width: min(238px, 100%);
   }
 
   .onboarding-recent-header {
@@ -641,16 +578,11 @@
 
 @media (max-height: 760px) {
   .onboarding-homepage {
-    gap: 34px;
+    gap: 24px;
   }
 
   .onboarding-homepage.has-projects {
-    gap: 30px;
-  }
-
-  .onboarding-folder-action-wrap,
-  .folder-drop-zone {
-    width: min(220px, 100%);
+    gap: 20px;
   }
 
   .onboarding-project-list {
@@ -665,26 +597,25 @@
   }
 
   .onboarding-homepage {
-    gap: 26px;
+    gap: 20px;
   }
 
   .onboarding-homepage.has-projects {
-    gap: 22px;
+    gap: 18px;
   }
 
   .onboarding-brand-mark {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
   }
 
   .onboarding-brand-name {
-    font-size: 27px;
+    font-size: 25px;
   }
 
-  .onboarding-folder-action-wrap,
-  .folder-drop-zone {
-    width: min(190px, 100%);
+  .onboarding-brand-context {
+    margin-inline-start: 42px;
   }
 
   .onboarding-project-list {

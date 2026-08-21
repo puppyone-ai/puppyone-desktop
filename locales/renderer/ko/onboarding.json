@@ -1,5 +1,7 @@
 {
   "projects.title": "프로젝트",
+  "brand.name": "puppyone",
+  "brand.localEditor": "로컬 에디터",
   "projects.localTitle": "로컬 프로젝트",
   "projects.open": "{project} 열기",
   "projects.removeFor": "로컬 프로젝트에서 {project} 제거",

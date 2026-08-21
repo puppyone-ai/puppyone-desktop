@@ -1,6 +1,6 @@
 import { resolveRendererPublicAssetUrl, type Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
-import { AlertTriangle, Folder, FolderOpen, Plus, Unlink } from "lucide-react";
+import { AlertTriangle, Folder, FolderOpen, Unlink } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -198,46 +198,42 @@ export function MinimalOnboarding({
     >
       <DesktopWindowDragRegion className="onboarding-titlebar" />
       <section className={`onboarding-homepage ${hasProjects ? "has-projects" : "is-empty"}`} aria-label={t(hasProjects ? "onboarding.projects.localTitle" : "onboarding.projects.title")}>
-        <div className="onboarding-brand-lockup">
-          <img
-            className="onboarding-brand-mark"
-            src={resolveRendererPublicAssetUrl("puppyone-logo.svg")}
-            alt=""
-            aria-hidden="true"
-            draggable={false}
-          />
-          <span className="onboarding-brand-name">puppyone</span>
+        <div className="onboarding-brand-block">
+          <div className="onboarding-brand-lockup">
+            <img
+              className="onboarding-brand-mark"
+              src={resolveRendererPublicAssetUrl("puppyone-logo.svg")}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+            />
+            <span className="onboarding-brand-name">{t("onboarding.brand.name")}</span>
+          </div>
+          <div className="onboarding-brand-context">{t("onboarding.brand.localEditor")}</div>
         </div>
 
-        {!hasProjects && (
-          <div className="onboarding-primary-area">
-            <div className="onboarding-folder-action-wrap">
-              <div className={`folder-drop-zone ${folderDrop.dragging ? "dragging" : ""} ${busy ? "is-disabled" : ""}`}>
-                <svg className="folder-drop-outline" viewBox="0 0 260 260" preserveAspectRatio="none" aria-hidden="true">
-                  <rect className="folder-drop-shadow" x="0.5" y="0.5" width="259" height="259" />
-                  <rect className="folder-drop-fill" x="0.5" y="0.5" width="259" height="259" />
-                  <rect className="folder-drop-border" x="0.5" y="0.5" width="259" height="259" />
-                </svg>
-                <button
-                  className="folder-drop-primary-action"
-                  type="button"
-                  disabled={busy}
-                  aria-busy={openingPath === "__new__" || undefined}
-                  aria-label={t("onboarding.action.openLocalFolder")}
-                  onClick={() => void chooseFolder()}
-                />
-                <span className="folder-drop-body">
-                  {openingPath === "__new__" ? (
-                    <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
-                  ) : (
-                    <FolderOpen className="folder-drop-icon" size={25} strokeWidth={1.75} />
-                  )}
-                  <span className="folder-drop-copy"><strong>{t("onboarding.action.openOrDropLocalFolder")}</strong></span>
-                </span>
-              </div>
+        <div className="onboarding-primary-area">
+          <div className="onboarding-folder-action-wrap">
+            <div className={`folder-drop-zone ${folderDrop.dragging ? "dragging" : ""} ${busy ? "is-disabled" : ""}`}>
+              <button
+                className="folder-drop-primary-action"
+                type="button"
+                disabled={busy}
+                aria-busy={openingPath === "__new__" || undefined}
+                aria-label={t("onboarding.action.openLocalFolder")}
+                onClick={() => void chooseFolder()}
+              />
+              <span className="folder-drop-body">
+                {openingPath === "__new__" ? (
+                  <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
+                ) : (
+                  <FolderOpen className="folder-drop-icon" size={19} strokeWidth={1.8} />
+                )}
+                <span className="folder-drop-copy"><strong>{t("onboarding.action.openLocalFolder")}</strong></span>
+              </span>
             </div>
           </div>
-        )}
+        </div>
 
         {hasProjects && (
           <div className="onboarding-projects-layout">
@@ -288,19 +284,6 @@ export function MinimalOnboarding({
                   );
                 })}
               </div>
-              <div className="onboarding-project-add">
-                <DesktopMenuItem
-                  className="onboarding-project-add-action"
-                  role="button"
-                  icon={openingPath === "__new__"
-                    ? <InlineLoading label={null} size="xs" tone="neutral" />
-                    : <ProjectFolderAddIcon />}
-                  label={t("onboarding.action.openLocalFolder")}
-                  disabled={busy}
-                  aria-busy={openingPath === "__new__" || undefined}
-                  onClick={() => void chooseFolder()}
-                />
-              </div>
             </div>
           </div>
         )}
@@ -309,15 +292,6 @@ export function MinimalOnboarding({
       </section>
       {cornerSlot}
     </main>
-  );
-}
-
-function ProjectFolderAddIcon() {
-  return (
-    <span className="onboarding-project-folder-add-icon" aria-hidden="true">
-      <Folder size={14} strokeWidth={1.85} />
-      <Plus size={6} strokeWidth={4} />
-    </span>
   );
 }
 
