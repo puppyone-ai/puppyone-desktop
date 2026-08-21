@@ -1,7 +1,6 @@
 {
   "projects.title": "プロジェクト",
   "brand.name": "puppyone",
-  "brand.localEditor": "ローカルエディター",
   "projects.localTitle": "ローカルプロジェクト",
   "projects.open": "{project} を開く",
   "projects.removeFor": "{project} をローカルプロジェクトから削除",

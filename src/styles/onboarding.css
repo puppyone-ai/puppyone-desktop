@@ -53,13 +53,6 @@
   gap: 24px;
 }
 
-.onboarding-brand-block {
-  display: grid;
-  min-width: 0;
-  justify-self: start;
-  gap: 7px;
-}
-
 .onboarding-brand-lockup {
   display: inline-flex;
   min-width: 0;
@@ -73,27 +66,18 @@
 
 .onboarding-brand-mark {
   display: block;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   flex: 0 0 auto;
-  border-radius: 9px;
+  border-radius: 8px;
 }
 
 .onboarding-brand-name {
   font-family: var(--po-font-sans);
-  font-size: 27px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 650;
   letter-spacing: -0.035em;
   line-height: 1;
-}
-
-.onboarding-brand-context {
-  margin-inline-start: 46px;
-  color: var(--po-text-subtle);
-  font-family: var(--po-font-sans);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.25;
 }
 
 .onboarding-primary-area {
@@ -112,20 +96,16 @@
   position: relative;
   display: grid;
   width: 100%;
-  height: 68px;
+  height: 48px;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--po-border);
-  border-radius: 6px;
-  background: var(--po-panel);
+  border: 0;
+  background: transparent;
   color: var(--po-text);
   text-align: start;
   cursor: var(--po-clickable-cursor, pointer);
   transition:
-    background-color 120ms ease-out,
-    border-color 120ms ease-out,
-    color 150ms ease-out,
-    transform 150ms ease-out;
+    color 150ms ease-out;
 }
 
 .folder-drop-primary-action {
@@ -143,8 +123,7 @@
 }
 
 .folder-drop-zone:has(.folder-drop-primary-action:focus-visible) {
-  outline: 1px solid var(--po-border-strong);
-  outline-offset: 2px;
+  outline: none;
 }
 
 .folder-drop-body {
@@ -154,30 +133,23 @@
   width: 100%;
   height: 100%;
   min-width: 0;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 9px;
-  padding: 12px 16px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0;
   border: 0;
   background: transparent;
   pointer-events: none;
 }
 
 .folder-drop-zone:hover {
-  border-color: var(--po-border-strong);
-  background: var(--po-hover);
   color: var(--po-text);
-  transform: translateY(-1px);
 }
 
 .folder-drop-zone.dragging,
 .onboarding-shell.dragging .folder-drop-zone {
-  border-color: var(--po-border-strong);
-  border-style: dashed;
-  background: var(--po-hover);
   color: var(--po-text);
-  transform: translateY(-1px);
 }
 
 .folder-drop-zone.is-disabled {
@@ -186,10 +158,7 @@
 }
 
 .folder-drop-zone.is-disabled:hover {
-  border-color: var(--po-border);
-  background: var(--po-panel);
   color: var(--po-text);
-  transform: none;
 }
 
 .folder-drop-primary-action:disabled {
@@ -200,6 +169,42 @@
   height: 19px;
   align-items: center;
   justify-content: center;
+}
+
+.folder-drop-icon-frame {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  place-items: center;
+  border: 1px dashed var(--po-border);
+  background: var(--po-canvas);
+  color: var(--po-text-muted);
+  transition:
+    background-color 120ms ease-out,
+    border-color 120ms ease-out,
+    color 120ms ease-out,
+    transform 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+.folder-drop-zone:has(.folder-drop-primary-action:focus-visible) .folder-drop-icon-frame,
+.folder-drop-zone:hover .folder-drop-icon-frame,
+.folder-drop-zone.dragging .folder-drop-icon-frame,
+.onboarding-shell.dragging .folder-drop-zone .folder-drop-icon-frame {
+  border-color: var(--po-border-strong);
+  background: var(--po-hover);
+  color: var(--po-text);
+  box-shadow: 4px 4px 0 var(--po-shadow);
+  transform: translate(-1px, -1px);
+}
+
+.folder-drop-zone.is-disabled:hover .folder-drop-icon-frame {
+  border-color: var(--po-border);
+  background: var(--po-canvas);
+  color: var(--po-text-muted);
+  box-shadow: none;
+  transform: none;
 }
 
 .folder-drop-copy {
@@ -605,17 +610,13 @@
   }
 
   .onboarding-brand-mark {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
   }
 
   .onboarding-brand-name {
-    font-size: 25px;
-  }
-
-  .onboarding-brand-context {
-    margin-inline-start: 42px;
+    font-size: 20px;
   }
 
   .onboarding-project-list {

@@ -1,7 +1,6 @@
 {
   "projects.title": "Projects",
   "brand.name": "puppyone",
-  "brand.localEditor": "Local editor",
   "projects.localTitle": "Local Projects",
   "projects.open": "Open {project}",
   "projects.removeFor": "Remove {project} from Local Projects",

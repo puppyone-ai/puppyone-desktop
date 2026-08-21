@@ -115,7 +115,8 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-homepage\s*\{[^}]*width:\s*min\(480px, 100%\);[^}]*align-content:\s*start;[^}]*gap:\s*30px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*justify-self:\s*start;[^}]*gap:\s*10px;/s);
     expect(css).toMatch(/\.onboarding-folder-action-wrap\s*\{[^}]*width:\s*min\(238px, 100%\);/s);
-    expect(css).toMatch(/\.folder-drop-zone\s*\{[^}]*height:\s*68px;[^}]*border:\s*1px solid var\(--po-border\);[^}]*border-radius:\s*6px;[^}]*background:\s*var\(--po-panel\);/s);
+    expect(css).toMatch(/\.folder-drop-zone\s*\{[^}]*height:\s*48px;[^}]*border:\s*0;[^}]*background:\s*transparent;/s);
+    expect(css).toMatch(/\.folder-drop-icon-frame\s*\{[^}]*width:\s*48px;[^}]*height:\s*48px;[^}]*border:\s*1px dashed var\(--po-border\);[^}]*background:\s*var\(--po-canvas\);/s);
   });
 
   it("shows project-opening progress only inside the project row", async () => {
@@ -325,10 +326,10 @@ function renderHome(overrides: Partial<MinimalOnboardingProps> = {}) {
 function expectBrandLockup(container: HTMLElement) {
   const lockup = container.querySelector(".onboarding-brand-lockup");
   const mark = lockup?.querySelector<HTMLImageElement>(".onboarding-brand-mark");
-  expect(mark?.getAttribute("src")).toContain("puppyone-logo.svg");
+  expect(mark?.getAttribute("src")).toContain("logo-square-v0.1.3-dark.png");
   expect(mark?.getAttribute("alt")).toBe("");
   expect(lockup?.querySelector(".onboarding-brand-name")?.textContent).toBe("puppyone");
-  expect(container.querySelector(".onboarding-brand-context")?.textContent).toBe("Local editor");
+  expect(container.querySelector(".onboarding-brand-context")).toBeNull();
 }
 
 function requireSurface(container: HTMLElement): HTMLElement {

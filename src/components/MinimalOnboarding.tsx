@@ -198,18 +198,15 @@ export function MinimalOnboarding({
     >
       <DesktopWindowDragRegion className="onboarding-titlebar" />
       <section className={`onboarding-homepage ${hasProjects ? "has-projects" : "is-empty"}`} aria-label={t(hasProjects ? "onboarding.projects.localTitle" : "onboarding.projects.title")}>
-        <div className="onboarding-brand-block">
-          <div className="onboarding-brand-lockup">
-            <img
-              className="onboarding-brand-mark"
-              src={resolveRendererPublicAssetUrl("puppyone-logo.svg")}
-              alt=""
-              aria-hidden="true"
-              draggable={false}
-            />
-            <span className="onboarding-brand-name">{t("onboarding.brand.name")}</span>
-          </div>
-          <div className="onboarding-brand-context">{t("onboarding.brand.localEditor")}</div>
+        <div className="onboarding-brand-lockup">
+          <img
+            className="onboarding-brand-mark"
+            src={resolveRendererPublicAssetUrl("logo-square-v0.1.3-dark.png")}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+          />
+          <span className="onboarding-brand-name">{t("onboarding.brand.name")}</span>
         </div>
 
         <div className="onboarding-primary-area">
@@ -224,11 +221,13 @@ export function MinimalOnboarding({
                 onClick={() => void chooseFolder()}
               />
               <span className="folder-drop-body">
-                {openingPath === "__new__" ? (
-                  <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
-                ) : (
-                  <FolderOpen className="folder-drop-icon" size={19} strokeWidth={1.8} />
-                )}
+                <span className="folder-drop-icon-frame" aria-hidden="true">
+                  {openingPath === "__new__" ? (
+                    <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
+                  ) : (
+                    <FolderOpen className="folder-drop-icon" size={19} strokeWidth={1.8} />
+                  )}
+                </span>
                 <span className="folder-drop-copy"><strong>{t("onboarding.action.openLocalFolder")}</strong></span>
               </span>
             </div>

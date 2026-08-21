@@ -1,7 +1,6 @@
 {
   "projects.title": "项目",
   "brand.name": "puppyone",
-  "brand.localEditor": "本地编辑器",
   "projects.localTitle": "本地项目",
   "projects.open": "打开 {project}",
   "projects.removeFor": "从本地项目中移除 {project}",
