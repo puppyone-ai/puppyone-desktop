@@ -51,7 +51,7 @@
 .onboarding-homepage.has-projects {
   width: min(760px, 100%);
   height: fit-content;
-  gap: 40px;
+  gap: 56px;
 }
 
 .onboarding-brand-lockup {
@@ -639,7 +639,7 @@
   }
 
   .onboarding-homepage.has-projects {
-    gap: 30px;
+    gap: 42px;
   }
 
   .onboarding-project-list {
@@ -658,7 +658,7 @@
   }
 
   .onboarding-homepage.has-projects {
-    gap: 22px;
+    gap: 30px;
   }
 
   .onboarding-brand-mark {
