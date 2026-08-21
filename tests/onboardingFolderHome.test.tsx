@@ -64,7 +64,7 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-homepage\.has-projects \.onboarding-recent-projects\s*\{[^}]*height:\s*fit-content;[^}]*max-height:\s*none;[^}]*align-self:\s*start;[^}]*overflow:\s*visible;/s);
     expect(css).toMatch(/\.onboarding-recent-heading\s*\{[^}]*background:\s*var\(--po-canvas\);[^}]*color:\s*var\(--po-text-subtle\);[^}]*font-family:\s*var\(--po-font-sans\);[^}]*font-size:\s*11\.5px;[^}]*font-weight:\s*500;/s);
     expect(css).toMatch(/\.onboarding-recent-header\s*\{[^}]*inset-inline:\s*22px 6px;/s);
-    expect(css).toMatch(/\.onboarding-homepage\.has-projects\s*\{[^}]*height:\s*fit-content;[^}]*gap:\s*0;/s);
+    expect(css).toMatch(/\.onboarding-homepage\.has-projects\s*\{[^}]*height:\s*fit-content;[^}]*gap:\s*40px;/s);
     expect(css).toMatch(/\.onboarding-projects-layout\s*\{[^}]*height:\s*fit-content;[^}]*max-height:\s*100%;[^}]*justify-self:\s*center;/s);
     expect(css).toMatch(/\.onboarding-project-add\s*\{[^}]*margin-top:\s*8px;[^}]*padding-top:\s*8px;[^}]*border-top:\s*1px solid var\(--po-divider\);/s);
     expect(css).toMatch(/\.onboarding-project-add-action\s*\{[^}]*width:\s*100%;[^}]*color:\s*var\(--po-text-subtle\);/s);
@@ -90,6 +90,7 @@ describe("project folder home", () => {
     });
 
     expect(container.querySelectorAll(".folder-drop-zone")).toHaveLength(0);
+    expectBrandLockup(container);
     expect(container.querySelector(".onboarding-folder-compact-action")).toBeNull();
     const panel = container.querySelector(".onboarding-recent-projects");
     expect(panel?.lastElementChild?.classList.contains("onboarding-project-add")).toBe(true);
@@ -123,6 +124,7 @@ describe("project folder home", () => {
   it("keeps the original folder action centered when there are no projects", () => {
     const container = renderHome();
 
+    expectBrandLockup(container);
     expect(container.querySelectorAll(".folder-drop-zone")).toHaveLength(1);
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
     expect(container.querySelector(".folder-drop-outline")).not.toBeNull();
@@ -330,6 +332,14 @@ function renderHome(overrides: Partial<MinimalOnboardingProps> = {}) {
   };
   act(() => renderWithTestLocalization(root, React.createElement(MinimalOnboarding, props)));
   return container;
+}
+
+function expectBrandLockup(container: HTMLElement) {
+  const lockup = container.querySelector(".onboarding-brand-lockup");
+  const mark = lockup?.querySelector<HTMLImageElement>(".onboarding-brand-mark");
+  expect(mark?.getAttribute("src")).toContain("puppyone-logo.svg");
+  expect(mark?.getAttribute("alt")).toBe("");
+  expect(lockup?.querySelector(".onboarding-brand-name")?.textContent).toBe("puppyone");
 }
 
 function requireSurface(container: HTMLElement): HTMLElement {

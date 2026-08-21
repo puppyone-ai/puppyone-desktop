@@ -40,12 +40,39 @@
   width: min(760px, 100%);
   max-height: 100%;
   min-height: 0;
-  gap: 42px;
+  gap: 48px;
 }
 
 .onboarding-homepage.has-projects {
   height: fit-content;
-  gap: 0;
+  gap: 40px;
+}
+
+.onboarding-brand-lockup {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-self: center;
+  gap: 14px;
+  color: var(--po-text);
+  line-height: 1;
+  user-select: none;
+}
+
+.onboarding-brand-mark {
+  display: block;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  border-radius: 11px;
+}
+
+.onboarding-brand-name {
+  font-family: var(--po-font-sans);
+  font-size: 30px;
+  font-weight: 720;
+  letter-spacing: -0.035em;
+  line-height: 1;
 }
 
 .onboarding-primary-area {
@@ -614,6 +641,10 @@
 
 @media (max-height: 760px) {
   .onboarding-homepage {
+    gap: 34px;
+  }
+
+  .onboarding-homepage.has-projects {
     gap: 30px;
   }
 
@@ -634,7 +665,21 @@
   }
 
   .onboarding-homepage {
+    gap: 26px;
+  }
+
+  .onboarding-homepage.has-projects {
     gap: 22px;
+  }
+
+  .onboarding-brand-mark {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+
+  .onboarding-brand-name {
+    font-size: 27px;
   }
 
   .onboarding-folder-action-wrap,

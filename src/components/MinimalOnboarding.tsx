@@ -1,4 +1,4 @@
-import type { Workspace } from "@puppyone/shared-ui";
+import { resolveRendererPublicAssetUrl, type Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
 import { AlertTriangle, Folder, FolderOpen, Plus, Unlink } from "lucide-react";
 import {
@@ -198,6 +198,17 @@ export function MinimalOnboarding({
     >
       <DesktopWindowDragRegion className="onboarding-titlebar" />
       <section className={`onboarding-homepage ${hasProjects ? "has-projects" : "is-empty"}`} aria-label={t(hasProjects ? "onboarding.projects.localTitle" : "onboarding.projects.title")}>
+        <div className="onboarding-brand-lockup">
+          <img
+            className="onboarding-brand-mark"
+            src={resolveRendererPublicAssetUrl("puppyone-logo.svg")}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+          />
+          <span className="onboarding-brand-name">puppyone</span>
+        </div>
+
         {!hasProjects && (
           <div className="onboarding-primary-area">
             <div className="onboarding-folder-action-wrap">
