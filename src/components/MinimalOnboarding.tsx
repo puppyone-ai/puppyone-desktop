@@ -201,7 +201,7 @@ export function MinimalOnboarding({
         <div className="onboarding-brand-lockup">
           <img
             className="onboarding-brand-mark"
-            src={resolveRendererPublicAssetUrl("logo-square-v0.1.3-dark.png")}
+            src={resolveRendererPublicAssetUrl("logo-square-v0.1.4-dark.png")}
             alt=""
             aria-hidden="true"
             draggable={false}

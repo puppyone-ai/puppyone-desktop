@@ -334,7 +334,7 @@ function renderHome(overrides: Partial<MinimalOnboardingProps> = {}) {
 function expectBrandLockup(container: HTMLElement) {
   const lockup = container.querySelector(".onboarding-brand-lockup");
   const mark = lockup?.querySelector<HTMLImageElement>(".onboarding-brand-mark");
-  expect(mark?.getAttribute("src")).toContain("logo-square-v0.1.3-dark.png");
+  expect(mark?.getAttribute("src")).toContain("logo-square-v0.1.4-dark.png");
   expect(mark?.getAttribute("alt")).toBe("");
   expect(lockup?.querySelector(".onboarding-brand-name")?.textContent).toBe("puppyone");
   expect(lockup?.querySelector(".onboarding-brand-version")).toBeNull();
