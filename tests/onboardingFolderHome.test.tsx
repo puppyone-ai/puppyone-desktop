@@ -90,7 +90,7 @@ describe("project folder home", () => {
     });
 
     expect(container.querySelectorAll(".folder-drop-zone")).toHaveLength(0);
-    expectBrandLockup(container);
+    expectBrandLockup(container, { withMark: false });
     const panel = container.querySelector(".onboarding-recent-projects");
     expect(panel?.lastElementChild?.classList.contains("onboarding-project-add")).toBe(true);
     const projectFolder = container.querySelector(".onboarding-project-row .lucide-folder");
@@ -113,7 +113,7 @@ describe("project folder home", () => {
     const css = readFileSync(`${process.cwd()}/src/styles/onboarding.css`, "utf8");
     const container = renderHome();
 
-    expectBrandLockup(container);
+    expectBrandLockup(container, { withMark: true });
     expect(container.querySelectorAll(".folder-drop-zone")).toHaveLength(1);
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
     expect(container.querySelector(".folder-drop-outline")).toBeNull();
@@ -333,11 +333,15 @@ function renderHome(overrides: Partial<MinimalOnboardingProps> = {}) {
   return container;
 }
 
-function expectBrandLockup(container: HTMLElement) {
+function expectBrandLockup(container: HTMLElement, { withMark }: { withMark: boolean }) {
   const lockup = container.querySelector(".onboarding-brand-lockup");
   const mark = lockup?.querySelector<HTMLImageElement>(".onboarding-brand-mark");
-  expect(mark?.getAttribute("src")).toContain("logo-square-v0.1.4-dark.png");
-  expect(mark?.getAttribute("alt")).toBe("");
+  if (withMark) {
+    expect(mark?.getAttribute("src")).toContain("logo-square-v0.1.4-dark.png");
+    expect(mark?.getAttribute("alt")).toBe("");
+  } else {
+    expect(mark).toBeNull();
+  }
   expect(lockup?.querySelector(".onboarding-brand-name")?.textContent).toBe("puppyone");
   expect(lockup?.querySelector(".onboarding-brand-version")).toBeNull();
   expect(container.querySelector(".onboarding-brand-context")).toBeNull();
