@@ -178,6 +178,7 @@ export function useWorkspaceSurfaceContent({
     workspace,
     puppyoneConfig,
     gitDisplayMode: preferences.gitDisplayMode,
+    gitSidebarLayout: preferences.gitSidebarLayout,
     fileIconTheme: preferences.fileIconTheme,
     cloudBackup: {
       loading: cloud.backupLoading || cloud.backupPending,

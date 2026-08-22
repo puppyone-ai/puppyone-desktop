@@ -11,6 +11,7 @@ import type {
   GitWorkingSelection,
   SourceControlSidebarModel,
 } from "../types";
+import type { GitSidebarLayout } from "../../../preferences";
 import {
   getCommittedSummary,
   type SourceControlPrimaryActionSlot,
@@ -25,6 +26,7 @@ import type { GitSidebarExpansionState } from "./useGitSidebarExpansionState";
 // The status card owns a 36px context/action row and 8px bottom inset outside
 // the row-based file list. Keep that fixed chrome out of list row arithmetic.
 const STATUS_CARD_CHROME_PX = 44;
+const STATUS_CARD_DIVIDER_PREAMBLE_PX = 30;
 
 type LocalPanelActions = Pick<
   GitSidebarActions,
@@ -46,6 +48,7 @@ type LocalPanelActions = Pick<
 /** Builds only local/committed status panels; provider and remote policy stay in the sidebar orchestrator. */
 export function createGitLocalStatusPanels({
   model,
+  layout,
   expanded,
   disabled,
   operationLoading,
@@ -58,6 +61,7 @@ export function createGitLocalStatusPanels({
   onToggle,
 }: {
   model: SourceControlSidebarModel;
+  layout: GitSidebarLayout;
   expanded: GitSidebarExpansionState;
   disabled: boolean;
   operationLoading: string | null;
@@ -92,6 +96,7 @@ export function createGitLocalStatusPanels({
           title={t(model.repositoryOperation ? "source-control.section.operation" : "source-control.section.merge")}
           count={model.mergeResources.length}
           context={model.sectionContext.merge}
+          layout={layout}
           expanded={expanded.merge}
           onToggle={() => onToggle("merge")}
           action={model.repositoryOperation ? (
@@ -153,7 +158,8 @@ export function createGitLocalStatusPanels({
       expanded: expanded.committed,
       headerRows: 0,
       bodyRows: getGitSidebarPanelBodyRows(model.committedResources.length, true),
-      bodyChromePx: STATUS_CARD_CHROME_PX,
+      bodyChromePx: STATUS_CARD_CHROME_PX
+        + (layout === "dividers" ? STATUS_CARD_DIVIDER_PREAMBLE_PX : 0),
       content: (
         <GitStatusCardSection
           title={t("source-control.section.committed")}
@@ -161,6 +167,7 @@ export function createGitLocalStatusPanels({
           context={model.sectionContext.committed}
           contextIcon={<Folder size={14} strokeWidth={2} />}
           contextVariant="group"
+          layout={layout}
           expanded={expanded.committed}
           onToggle={() => onToggle("committed")}
           showHeader={false}
@@ -216,6 +223,7 @@ export function createGitLocalStatusPanels({
           title={t("source-control.section.staged")}
           count={model.stagedResources.length}
           context={model.sectionContext.staged}
+          layout={layout}
           expanded={expanded.staged}
           onToggle={() => onToggle("staged")}
           action={action ? (
@@ -263,6 +271,7 @@ export function createGitLocalStatusPanels({
           title={t("source-control.section.unstaged")}
           count={model.localChangeResources.length}
           context={model.sectionContext.unstaged}
+          layout={layout}
           expanded={expanded.unstaged}
           onToggle={() => onToggle("unstaged")}
           action={createUnstagedActions({ model, disabled, operationLoading, actions, primaryActionSlot, t })}

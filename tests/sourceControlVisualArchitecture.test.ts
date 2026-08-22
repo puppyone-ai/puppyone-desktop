@@ -255,8 +255,10 @@ describe("source-control visual architecture", () => {
     ));
     expect(sourceControlSidebarSource).toContain("<GitHubProviderSection");
     expect(sourceControlSidebarSectionsSource).toContain(
-      'className="desktop-git-cloud-provider-section desktop-git-github-provider-section"',
+      'desktop-git-cloud-provider-section desktop-git-github-provider-section${layout === "dividers"',
     );
+    expect(sourceControlSidebarSectionsSource).toContain('layout === "dividers" && (');
+    expect(sourceControlSidebarSectionsSource).toContain('layout === "cards" && <GitHubRepositoryLink');
     expect(sourceControlSidebarSectionsSource).toContain("<GitHubRepositoryLink");
     expect(sourceControlSidebarSectionsSource).toContain("<GitHubChangesCard");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-change-card");
@@ -331,8 +333,12 @@ describe("source-control visual architecture", () => {
     ));
 
     expect(sourceControlSidebarSectionsSource).toContain(
-      'className="desktop-git-status-card"',
+      'className={`desktop-git-status-card${separateIdentity ? " is-divider-layout" : ""}`}',
     );
+    expect(sourceControlSidebarSectionsSource).toContain(
+      'const separateIdentity = layout === "dividers" && contextVariant === "group";',
+    );
+    expect(sourceControlSidebarSectionsSource).toContain('className="desktop-git-card-divider"');
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context-row");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context");
     expect(sourceControlSidebarSectionsSource).toContain("contextIcon={<Folder size={14} strokeWidth={2} />}");

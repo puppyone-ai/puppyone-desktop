@@ -56,6 +56,7 @@ export function SettingsView({
   rightSidebarToolsSettings,
   titlebarActionsSettings,
   terminalSessionLayout,
+  gitSidebarLayout,
   aiEditAssistEnabled,
   cloudEnabled,
   cloudSession,
@@ -89,6 +90,7 @@ export function SettingsView({
   onRightSidebarToolsSettingsChange,
   onTitlebarActionsSettingsChange,
   onTerminalSessionLayoutChange,
+  onGitSidebarLayoutChange,
   onAiEditAssistEnabledChange,
   onCloudSessionChange,
   onPuppyoneConfigChange,
@@ -356,6 +358,26 @@ export function SettingsView({
                 {fileIconDecision.reasonKey && (
                   <small className="desktop-appearance-policy-reason">{t(fileIconDecision.reasonKey)}</small>
                 )}
+              </div>
+              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
+                <span>{t("settings.appearance.gitSidebarLayout.title")}</span>
+                <div
+                  className="desktop-theme-segment desktop-appearance-option-segment"
+                  aria-label={t("settings.appearance.gitSidebarLayout.ariaLabel")}
+                >
+                  {(["cards", "dividers"] as const).map((layout) => (
+                    <button
+                      key={layout}
+                      className={gitSidebarLayout === layout ? "active" : ""}
+                      type="button"
+                      title={t(`settings.appearance.gitSidebarLayout.${layout}.description`)}
+                      aria-pressed={gitSidebarLayout === layout}
+                      onClick={() => onGitSidebarLayoutChange(layout)}
+                    >
+                      <span>{t(`settings.appearance.gitSidebarLayout.${layout}.label`)}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.navigation.title")}</span>

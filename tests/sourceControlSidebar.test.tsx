@@ -96,6 +96,26 @@ describe("Git sidebar status cards", () => {
     expect(stageAndCommit).toHaveBeenCalledTimes(1);
   });
 
+  it("moves repository and commit identity outside while keeping sync actions on cards", () => {
+    const surface = renderSidebar({
+      gitSidebarLayout: "dividers",
+      status: createDivergedGitHubStatus(),
+    });
+    const githubSection = surface.querySelector<HTMLElement>(".desktop-git-github-provider-section");
+    const githubCard = githubSection?.querySelector<HTMLElement>(".desktop-git-github-change-card");
+    const committedSection = surface.querySelector<HTMLElement>(".desktop-git-resizable-section-committed");
+    const committedCard = committedSection?.querySelector<HTMLElement>(".desktop-git-status-card");
+
+    expect(githubSection?.classList.contains("is-divider-layout")).toBe(true);
+    expect(githubSection?.querySelector(".desktop-git-card-divider .desktop-git-github-identity")).not.toBeNull();
+    expect(githubCard?.querySelector(".desktop-git-github-identity")).toBeNull();
+    expect(githubCard?.querySelector('button[aria-label="Pull"]')).not.toBeNull();
+    expect(committedSection?.querySelector(".desktop-git-card-divider .desktop-git-status-card-context-copy")?.textContent)
+      .toBe("1 commit");
+    expect(committedCard?.querySelector(".desktop-git-status-card-context-copy")).toBeNull();
+    expect(committedCard?.querySelector('button[aria-label="Push"]')).not.toBeNull();
+  });
+
   it("renders merge conflicts through the same default-expanded card contract", () => {
     const status = createGitStatus();
     status.sourceControl.groups.unshift({
@@ -195,6 +215,7 @@ describe("Git sidebar status cards", () => {
 
 function renderSidebar(options: Partial<{
   gitDisplayMode: "simple" | "professional";
+  gitSidebarLayout: "cards" | "dividers";
   onCommit: () => Promise<boolean>;
   onContinue: () => Promise<boolean>;
   onDiscardAll: () => Promise<boolean>;
@@ -216,6 +237,7 @@ function renderSidebar(options: Partial<{
         status: options.status ?? createGitStatus(),
         puppyoneConfig: null,
         gitDisplayMode: options.gitDisplayMode ?? "professional",
+        gitSidebarLayout: options.gitSidebarLayout ?? "cards",
         fileIconTheme: "default",
       }}
       view={{

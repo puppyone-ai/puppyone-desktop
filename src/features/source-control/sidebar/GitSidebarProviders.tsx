@@ -2,6 +2,7 @@ import { ArrowUpRight, Cloud, Github } from "lucide-react";
 import { SidebarEmptyState, type FileIconThemeId } from "@puppyone/shared-ui";
 import { useId, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization";
+import type { GitSidebarLayout } from "../../../preferences";
 import type { GitFileChangeSummary, GitStatusSnapshot } from "../../../types/electron";
 import { openExternalUrl } from "../../../lib/localFiles";
 import {
@@ -106,6 +107,7 @@ export function PuppyoneCloudProviderSection({
 export function GitHubProviderSection({
   identity,
   section,
+  layout,
   incomingFileSummary,
   incomingUpdatedAt,
   mergeCount,
@@ -116,6 +118,7 @@ export function GitHubProviderSection({
 }: {
   identity: GitHostingIdentity;
   section: GitScmSyncSection;
+  layout: GitSidebarLayout;
   incomingFileSummary: GitFileChangeSummary;
   incomingUpdatedAt: string | null;
   mergeCount: number;
@@ -129,9 +132,15 @@ export function GitHubProviderSection({
   const pullBlockedByConflicts = mergeCount > 0;
 
   return (
-    <section className="desktop-git-cloud-provider-section desktop-git-github-provider-section">
+    <section className={`desktop-git-cloud-provider-section desktop-git-github-provider-section${layout === "dividers" ? " is-divider-layout" : ""}`}>
+      {layout === "dividers" && (
+        <div className="desktop-git-card-divider">
+          <GitHubRepositoryLink identity={identity} />
+        </div>
+      )}
       <GitHubChangesCard
         identity={identity}
+        layout={layout}
         hasIncomingChanges={section.copy.count > 0}
         fileSummary={incomingFileSummary}
         incomingUpdatedAt={incomingUpdatedAt}
@@ -193,12 +202,14 @@ function getGitHubRepositoryName(label: string) {
 
 function GitHubChangesCard({
   identity,
+  layout,
   hasIncomingChanges,
   fileSummary,
   incomingUpdatedAt,
   action,
 }: {
   identity: GitHostingIdentity;
+  layout: GitSidebarLayout;
   hasIncomingChanges: boolean;
   fileSummary: GitFileChangeSummary;
   incomingUpdatedAt: string | null;
@@ -208,8 +219,8 @@ function GitHubChangesCard({
   const updateAge = formatGitRemoteUpdateAge(incomingUpdatedAt, formatRelativeTime);
 
   return (
-    <div className="desktop-git-github-change-card">
-      <GitHubRepositoryLink identity={identity} />
+    <div className={`desktop-git-github-change-card${layout === "dividers" ? " is-divider-layout" : ""}`}>
+      {layout === "cards" && <GitHubRepositoryLink identity={identity} />}
       <span className="desktop-git-github-summary">
         {hasIncomingChanges ? (
           <>

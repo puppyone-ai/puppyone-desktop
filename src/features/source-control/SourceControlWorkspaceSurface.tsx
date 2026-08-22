@@ -1,5 +1,5 @@
 import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
-import type { GitDisplayMode } from "../../preferences";
+import type { GitDisplayMode, GitSidebarLayout } from "../../preferences";
 import type { PuppyoneWorkspaceConfig } from "../../types/electron";
 import { GitStatusView } from "./GitStatusView";
 import { GitSidebar } from "./SourceControlSidebar";
@@ -11,6 +11,7 @@ export type SourceControlWorkspaceSurfaceProps = {
   workspace: Workspace;
   puppyoneConfig: PuppyoneWorkspaceConfig | null;
   gitDisplayMode: GitDisplayMode;
+  gitSidebarLayout: GitSidebarLayout;
   fileIconTheme: FileIconThemeId;
   cloudBackup: GitSidebarCloudBackup;
   onOpenFile: (path: string) => void;
@@ -21,6 +22,7 @@ export function createSourceControlWorkspaceSurface({
   controller,
   fileIconTheme,
   gitDisplayMode,
+  gitSidebarLayout,
   onOpenFile,
   puppyoneConfig,
   workspace,
@@ -32,6 +34,7 @@ export function createSourceControlWorkspaceSurface({
           status: controller.activeGitStatus,
           puppyoneConfig,
           gitDisplayMode,
+          gitSidebarLayout,
           fileIconTheme,
         }}
         view={{

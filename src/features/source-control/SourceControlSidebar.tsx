@@ -39,7 +39,7 @@ import {
 export type { GitSidebarProps } from "./sidebar/sourceControlSidebarTypes";
 
 export function GitSidebar({ repository, view, actions, cloudBackup }: GitSidebarProps) {
-  const { status, puppyoneConfig, gitDisplayMode, fileIconTheme } = repository;
+  const { status, puppyoneConfig, gitDisplayMode, gitSidebarLayout, fileIconTheme } = repository;
   const {
     activePanel,
     selectedWorkingFile,
@@ -115,6 +115,7 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
     <GitHubProviderSection
       identity={hostingIdentity}
       section={githubSection}
+      layout={gitSidebarLayout}
       incomingUpdatedAt={githubIncomingUpdatedAt}
       incomingFileSummary={status?.sourceControl.remote.incomingFileSummary ?? emptyFileChangeSummary()}
       mergeCount={sidebarModel.mergeResources.length}
@@ -172,6 +173,7 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
 
   panels.push(...createGitLocalStatusPanels({
     model: sidebarModel,
+    layout: gitSidebarLayout,
     expanded,
     disabled,
     operationLoading,

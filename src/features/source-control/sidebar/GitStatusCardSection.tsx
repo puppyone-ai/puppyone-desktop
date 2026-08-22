@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from "react";
+import type { GitSidebarLayout } from "../../../preferences";
 import { SourceControlSectionHeader } from "../components";
 import { GitSectionCollapse } from "./GitSidebarPrimitives";
 
@@ -9,6 +10,7 @@ export function GitStatusCardSection({
   context,
   contextIcon,
   contextVariant = "status",
+  layout,
   expanded,
   action,
   children,
@@ -20,6 +22,7 @@ export function GitStatusCardSection({
   context: string;
   contextIcon?: ReactNode;
   contextVariant?: "status" | "group";
+  layout: GitSidebarLayout;
   expanded: boolean;
   action?: ReactNode;
   children: ReactNode;
@@ -27,6 +30,20 @@ export function GitStatusCardSection({
   showHeader?: boolean;
 }) {
   const bodyId = useId();
+  const separateIdentity = layout === "dividers" && contextVariant === "group";
+  const contextContent = (
+    <span className={`desktop-git-status-card-context${contextVariant === "group" ? " is-group-label" : ""}`}>
+      {contextIcon && (
+        <span
+          className="desktop-git-status-card-context-icon desktop-git-identity-icon-slot"
+          aria-hidden="true"
+        >
+          {contextIcon}
+        </span>
+      )}
+      <span className="desktop-git-status-card-context-copy">{context}</span>
+    </span>
+  );
 
   return (
     <>
@@ -40,24 +57,19 @@ export function GitStatusCardSection({
           onToggle={onToggle}
         />
       )}
+      {separateIdentity && (
+        <div className="desktop-git-card-divider">
+          {contextContent}
+        </div>
+      )}
       <GitSectionCollapse
         id={showHeader ? bodyId : undefined}
         expanded={expanded}
-        className="desktop-git-status-card"
+        className={`desktop-git-status-card${separateIdentity ? " is-divider-layout" : ""}`}
         ariaLabel={showHeader ? undefined : title}
       >
-        <div className="desktop-git-status-card-context-row">
-          <span className={`desktop-git-status-card-context${contextVariant === "group" ? " is-group-label" : ""}`}>
-            {contextIcon && (
-              <span
-                className="desktop-git-status-card-context-icon desktop-git-identity-icon-slot"
-                aria-hidden="true"
-              >
-                {contextIcon}
-              </span>
-            )}
-            <span className="desktop-git-status-card-context-copy">{context}</span>
-          </span>
+        <div className={`desktop-git-status-card-context-row${separateIdentity ? " is-action-only" : ""}`}>
+          {!separateIdentity && contextContent}
           {action}
         </div>
         {children}

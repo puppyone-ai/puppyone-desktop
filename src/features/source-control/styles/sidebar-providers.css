@@ -161,6 +161,20 @@
   background: var(--git-card-background);
 }
 
+.desktop-git-github-change-card.is-divider-layout {
+  grid-template-rows: auto;
+  padding: 6px 10px;
+}
+
+.desktop-git-github-change-card.is-divider-layout .desktop-git-github-summary,
+.desktop-git-github-change-card.is-divider-layout .desktop-git-github-card-action {
+  grid-row: 1;
+}
+
+.desktop-git-github-change-card.is-divider-layout .desktop-git-github-summary {
+  grid-column: 1;
+}
+
 .desktop-git-github-identity {
   grid-column: 1;
   grid-row: 1;

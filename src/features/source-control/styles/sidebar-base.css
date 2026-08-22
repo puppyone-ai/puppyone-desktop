@@ -56,6 +56,18 @@
   flex: 0 0 auto;
 }
 
+.desktop-git-card-divider {
+  display: flex;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 30px;
+  flex: 0 0 30px;
+  align-items: center;
+  margin-inline:
+    calc(var(--git-sidebar-control-left-gap) + 10px)
+    calc(var(--git-sidebar-control-right-gap) + 10px);
+}
+
 .desktop-git-sidebar-empty-history {
   display: flex;
   align-items: flex-start;
