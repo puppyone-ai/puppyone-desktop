@@ -24,7 +24,7 @@ import type { GitSidebarExpansionState } from "./useGitSidebarExpansionState";
 
 // Includes the context line and the status card's inset bottom padding so a
 // fitted list does not produce fractional overflow or a phantom scrollbar.
-const STATUS_CARD_CONTEXT_ROWS = 1.2;
+const STATUS_CARD_CONTEXT_ROWS = 1.3;
 
 type LocalPanelActions = Pick<
   GitSidebarActions,

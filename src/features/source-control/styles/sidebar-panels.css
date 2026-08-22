@@ -83,10 +83,25 @@
   padding-inline: 0;
 }
 
-.desktop-git-status-card .desktop-working-tree-row:hover,
-.desktop-git-status-card .desktop-working-tree-row.active,
-.desktop-git-status-card .desktop-working-tree-row.active:hover {
+.desktop-git-status-card .desktop-working-tree-row {
+  width: calc(100% - 8px);
+  margin-inline: 4px;
+}
+
+.desktop-git-status-card .desktop-working-tree-main {
+  padding-inline-start: 6px;
+}
+
+.desktop-git-status-card .desktop-working-tree-row.active {
   background: transparent;
+  color: var(--po-text);
+}
+
+.desktop-git-status-card .desktop-working-tree-row:hover,
+.desktop-git-status-card .desktop-working-tree-row:focus-within,
+.desktop-git-status-card .desktop-working-tree-row.active:hover {
+  background: var(--po-hover);
+  color: var(--po-text);
 }
 
 .desktop-git-section-collapse {

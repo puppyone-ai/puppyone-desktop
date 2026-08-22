@@ -300,6 +300,14 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-status-card-context.is-group-label",
     ));
+    const statusCardResourceRow = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-status-card .desktop-working-tree-row",
+    ));
+    const statusCardResourceMain = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-status-card .desktop-working-tree-main",
+    ));
     const resizer = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-section-resizer::after",
@@ -312,6 +320,7 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context");
     expect(sourceControlSidebarSectionsSource).toContain("contextIcon={<Folder size={14} strokeWidth={2} />}");
     expect(sourceControlSidebarSectionsSource).toContain('contextVariant="group"');
+    expect(sourceControlSidebarSectionsSource).toContain("const STATUS_CARD_CONTEXT_ROWS = 1.3;");
     expect(sourceControlSidebarSectionsSource).toContain("showHeader={false}");
     expect(sourceControlSidebarSource).not.toContain("desktop-git-status-card-summary");
     expect(sourceControlSidebarSource).not.toContain("source-control.commit.filesChanged");
@@ -339,6 +348,17 @@ describe("source-control visual architecture", () => {
     expect(statusCardGroupLabel).toContain(
       "font-size: var(--desktop-sidebar-section-title-font-size, var(--po-text-size-meta, 12px));",
     );
+    expect(statusCardResourceRow).toContain("width: calc(100% - 8px);");
+    expect(statusCardResourceRow).toContain("margin-inline: 4px;");
+    expect(statusCardResourceMain).toContain("padding-inline-start: 6px;");
+    expect(compact(sidebarResourcesCss)).toContain(compact(`
+      .desktop-git-status-card .desktop-working-tree-row:hover,
+      .desktop-git-status-card .desktop-working-tree-row:focus-within,
+      .desktop-git-status-card .desktop-working-tree-row.active:hover {
+        background: var(--po-hover);
+        color: var(--po-text);
+      }
+    `));
     expect(compact(sidebarResourcesCss)).toContain(compact(`
       .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-working-tree-list,
       .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-git-remote-preview {
