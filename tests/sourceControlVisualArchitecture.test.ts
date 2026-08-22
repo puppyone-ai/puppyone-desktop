@@ -308,6 +308,13 @@ describe("source-control visual architecture", () => {
     expect(statusCardContext).toContain("color: var(--po-text-muted);");
     expect(statusCardContext).toContain("font-size: var(--git-font-main);");
     expect(compact(sidebarResourcesCss)).toContain(compact(`
+      .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-working-tree-list,
+      .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-git-remote-preview {
+        padding-block: var(--git-section-body-top-gap) 8px;
+        padding-inline: 8px;
+      }
+    `));
+    expect(compact(sidebarResourcesCss)).toContain(compact(`
       .desktop-git-status-card .desktop-working-tree-list,
       .desktop-git-status-card .desktop-git-remote-preview {
         overflow-y: hidden;

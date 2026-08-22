@@ -48,10 +48,13 @@
   margin-inline-start: auto;
 }
 
-/* The card margin replaces the list's normal outer sidebar gutter. */
+/* Status rows are supporting content inside the card, not a second edge-to-edge
+   surface. Keep their hover/selection fill inside the card's padding and leave
+   enough bottom space for the outer radius to remain visible. */
 .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-working-tree-list,
 .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-git-remote-preview {
-  padding-inline: 0;
+  padding-block: var(--git-section-body-top-gap) 8px;
+  padding-inline: 8px;
 }
 
 .desktop-git-section-collapse {

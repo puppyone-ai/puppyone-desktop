@@ -22,7 +22,9 @@ import { GitStatusCardSection } from "./GitStatusCardSection";
 import { getGitSidebarPanelBodyRows } from "./useGitSidebarPanelLayout";
 import type { GitSidebarExpansionState } from "./useGitSidebarExpansionState";
 
-const STATUS_CARD_CONTEXT_ROWS = 1.1;
+// Includes the context line and the status card's inset bottom padding so a
+// fitted list does not produce fractional overflow or a phantom scrollbar.
+const STATUS_CARD_CONTEXT_ROWS = 1.2;
 
 type LocalPanelActions = Pick<
   GitSidebarActions,
