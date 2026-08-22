@@ -111,13 +111,14 @@ describe("Git sidebar status cards", () => {
     expect(githubCard?.querySelector(".desktop-git-github-identity")).toBeNull();
     expect(githubCard?.querySelector('button[aria-label="Pull"]')).not.toBeNull();
     const committedToggle = committedSection?.querySelector<HTMLButtonElement>(
-      ".desktop-git-card-divider-header .desktop-git-section-title",
+      ".desktop-git-section-row .desktop-git-section-title",
     );
     expect(committedToggle?.textContent)
       .toBe("Committed Changes");
     expect(committedToggle?.querySelector(".po-disclosure-icon")).not.toBeNull();
     expect(committedToggle?.querySelectorAll("svg")).toHaveLength(1);
     expect(committedToggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(committedSection?.querySelector(".desktop-git-card-divider-header")).toBeNull();
     expect(committedCard?.querySelector(".desktop-git-status-card-context-copy")?.textContent).toBe("1 commit");
     expect(committedCard?.querySelector(".desktop-git-status-card-context-icon")).toBeNull();
     expect(committedCard?.querySelector('button[aria-label="Push"]')).not.toBeNull();

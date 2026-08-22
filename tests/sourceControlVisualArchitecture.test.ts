@@ -340,10 +340,6 @@ describe("source-control visual architecture", () => {
       sidebarBaseCss,
       ".desktop-git-card-divider .desktop-git-identity-icon-slot",
     ));
-    const cardDividerHeader = compact(readCssBlock(
-      sidebarBaseCss,
-      ".desktop-git-section-row.desktop-git-card-divider-header",
-    ));
     const sectionTitle = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-section-title",
@@ -371,9 +367,7 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSectionsSource).toContain(
       'const separateIdentity = layout === "dividers" && contextVariant === "group";',
     );
-    expect(sourceControlSidebarSectionsSource).toContain(
-      'className={separateIdentity ? "desktop-git-card-divider-header" : undefined}',
-    );
+    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-card-divider-header");
     expect(sourceControlSidebarSectionsSource).toContain("controlsId={bodyId}");
     expect(sourceControlSidebarSectionsSource).toContain("{contextContent}");
     expect(sourceControlSidebarSectionsSource).not.toContain("is-action-only");
@@ -410,10 +404,7 @@ describe("source-control visual architecture", () => {
       "margin-inline: calc(var(--git-sidebar-control-left-gap) + 10px) var(--git-sidebar-control-right-gap);",
     );
     expect(cardDividerIcon).toContain("padding-inline-start: 0;");
-    expect(cardDividerHeader).toContain(
-      "margin-inline: calc(var(--git-sidebar-control-left-gap) + 10px) var(--git-sidebar-control-right-gap);",
-    );
-    expect(cardDividerHeader).toContain("padding-inline: 0;");
+    expect(sidebarBaseCss).not.toContain(".desktop-git-section-row.desktop-git-card-divider-header");
     expect(sectionTitle).toContain(
       "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",
     );

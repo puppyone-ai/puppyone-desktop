@@ -51,7 +51,6 @@ export function GitStatusCardSection({
         <SourceControlSectionHeader
           title={title}
           count={count}
-          className={separateIdentity ? "desktop-git-card-divider-header" : undefined}
           showCount={false}
           controlsId={bodyId}
           expanded={expanded}

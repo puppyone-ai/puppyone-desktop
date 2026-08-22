@@ -72,19 +72,6 @@
   padding-inline-start: 0;
 }
 
-.desktop-git-section-row.desktop-git-card-divider-header {
-  width: auto;
-  min-height: 30px;
-  margin-inline:
-    calc(var(--git-sidebar-control-left-gap) + 10px)
-    var(--git-sidebar-control-right-gap);
-  padding-inline: 0;
-}
-
-.desktop-git-card-divider-header .desktop-git-section-title {
-  padding-inline: 0;
-}
-
 .desktop-git-sidebar-empty-history {
   display: flex;
   align-items: flex-start;
