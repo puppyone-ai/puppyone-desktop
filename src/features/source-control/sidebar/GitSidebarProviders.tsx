@@ -130,7 +130,6 @@ export function GitHubProviderSection({
   const { t } = useLocalization();
   const pullAction = section.action?.kind === "pull" ? section.action : null;
   const pullBlockedByConflicts = mergeCount > 0;
-  const hasIncomingChanges = section.copy.count > 0;
 
   return (
     <section className={`desktop-git-cloud-provider-section desktop-git-github-provider-section${layout === "dividers" ? " is-divider-layout" : ""}`}>
@@ -139,31 +138,29 @@ export function GitHubProviderSection({
           <GitHubRepositoryLink identity={identity} />
         </div>
       )}
-      {(layout === "cards" || hasIncomingChanges) && (
-        <GitHubChangesCard
-          identity={identity}
-          layout={layout}
-          hasIncomingChanges={hasIncomingChanges}
-          fileSummary={incomingFileSummary}
-          incomingUpdatedAt={incomingUpdatedAt}
-          action={pullAction ? (
-            <GitOperationButton
-              className="desktop-git-remote-action desktop-git-github-card-action"
-              disabled={disabled || pullBlockedByConflicts || pullAction.disabled}
-              title={pullBlockedByConflicts
-                ? t("source-control.cloud.resolveBeforeDownload")
-                : pullAction.title}
-              icon={pullAction.icon}
-              label={t("source-control.sync.pull")}
-              loadingKey={pullAction.kind}
-              loadingLabel={pullAction.loadingLabel}
-              operationLoading={operationLoading}
-              primary={primaryAction}
-              onClick={() => void onPull()}
-            />
-          ) : null}
-        />
-      )}
+      <GitHubChangesCard
+        identity={identity}
+        layout={layout}
+        hasIncomingChanges={section.copy.count > 0}
+        fileSummary={incomingFileSummary}
+        incomingUpdatedAt={incomingUpdatedAt}
+        action={pullAction ? (
+          <GitOperationButton
+            className="desktop-git-remote-action desktop-git-github-card-action"
+            disabled={disabled || pullBlockedByConflicts || pullAction.disabled}
+            title={pullBlockedByConflicts
+              ? t("source-control.cloud.resolveBeforeDownload")
+              : pullAction.title}
+            icon={pullAction.icon}
+            label={t("source-control.sync.pull")}
+            loadingKey={pullAction.kind}
+            loadingLabel={pullAction.loadingLabel}
+            operationLoading={operationLoading}
+            primary={primaryAction}
+            onClick={() => void onPull()}
+          />
+        ) : null}
+      />
     </section>
   );
 }

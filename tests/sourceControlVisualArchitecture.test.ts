@@ -249,6 +249,10 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-github-change-card.is-divider-layout",
     ));
+    const dividerProvider = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-provider-section.is-divider-layout",
+    ));
     const updateAge = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-github-change-card .desktop-git-github-update-age",
@@ -263,7 +267,6 @@ describe("source-control visual architecture", () => {
     );
     expect(sourceControlSidebarSectionsSource).toContain('layout === "dividers" && (');
     expect(sourceControlSidebarSectionsSource).toContain('layout === "cards" && <GitHubRepositoryLink');
-    expect(sourceControlSidebarSectionsSource).toContain('(layout === "cards" || hasIncomingChanges) && (');
     expect(sourceControlSidebarSectionsSource).toContain("<GitHubRepositoryLink");
     expect(sourceControlSidebarSectionsSource).toContain("<GitHubChangesCard");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-change-card");
@@ -293,6 +296,7 @@ describe("source-control visual architecture", () => {
     expect(card).toContain("background: var(--git-card-background);");
     expect(dividerCard).toContain("min-height: 52px;");
     expect(dividerCard).toContain("padding: 10px;");
+    expect(dividerProvider).toContain("border-bottom: 0;");
     expect(updateAge).toContain("color: inherit;");
     expect(updateAge).toContain("cursor: default;");
     expect(summary).toContain("grid-row: 2;");
@@ -389,9 +393,8 @@ describe("source-control visual architecture", () => {
     expect(statusCardContext).toContain("gap: 2px;");
     expect(statusCardContextIcon).toContain("color: inherit;");
     expect(cardDivider).toContain(
-      "margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);",
+      "margin-inline: calc(var(--git-sidebar-control-left-gap) + 10px) var(--git-sidebar-control-right-gap);",
     );
-    expect(cardDivider).not.toContain("+ 10px");
     expect(cardDividerIcon).toContain("padding-inline-start: 0;");
     expect(statusCardGroupLabel).toContain(
       "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",

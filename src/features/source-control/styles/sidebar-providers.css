@@ -32,6 +32,10 @@
   border-bottom: 1px solid var(--po-sidebar-divider, var(--po-divider));
 }
 
+.desktop-git-github-provider-section.is-divider-layout {
+  border-bottom: 0;
+}
+
 .desktop-git-cloud-provider-body {
   min-width: 0;
 }

@@ -64,7 +64,7 @@
   flex: 0 0 30px;
   align-items: center;
   margin-inline:
-    var(--git-sidebar-control-left-gap)
+    calc(var(--git-sidebar-control-left-gap) + 10px)
     var(--git-sidebar-control-right-gap);
 }
 

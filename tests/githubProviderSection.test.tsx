@@ -42,12 +42,14 @@ describe("GitHub provider section", () => {
     expect(surface.querySelector(".desktop-git-hosting-repository-row")).toBeNull();
   });
 
-  it("hides the up-to-date status card in Dividers while retaining repository identity", () => {
+  it("keeps the up-to-date status card in Dividers while moving repository identity outside", () => {
     const surface = renderProvider(createSection(), { layout: "dividers" });
 
     expect(surface.querySelector(".desktop-git-card-divider .desktop-git-hosting-identity-link")).not.toBeNull();
-    expect(surface.querySelector(".desktop-git-github-change-card")).toBeNull();
-    expect(surface.textContent).not.toContain("Already up to date.");
+    const card = surface.querySelector(".desktop-git-github-change-card");
+    expect(card).not.toBeNull();
+    expect(card?.querySelector(".desktop-git-hosting-identity-link")).toBeNull();
+    expect(card?.textContent).toContain("Already up to date.");
   });
 
   it("renders the update age as static, non-interactive information", async () => {
