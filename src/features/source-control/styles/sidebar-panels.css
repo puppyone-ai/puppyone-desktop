@@ -32,13 +32,33 @@
 }
 
 .desktop-git-status-card-context {
+  display: inline-flex;
   min-width: 0;
   flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
   overflow: hidden;
   color: var(--po-text-muted);
   font-size: var(--git-font-main);
   font-weight: var(--git-weight-regular);
   line-height: var(--git-line-height);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-git-status-card-context-icon {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+
+.desktop-git-status-card-context-copy {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

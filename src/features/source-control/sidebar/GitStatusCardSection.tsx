@@ -7,6 +7,7 @@ export function GitStatusCardSection({
   title,
   count,
   context,
+  contextIcon,
   expanded,
   action,
   children,
@@ -16,6 +17,7 @@ export function GitStatusCardSection({
   title: string;
   count: number;
   context: string;
+  contextIcon?: ReactNode;
   expanded: boolean;
   action?: ReactNode;
   children: ReactNode;
@@ -43,7 +45,14 @@ export function GitStatusCardSection({
         ariaLabel={showHeader ? undefined : title}
       >
         <div className="desktop-git-status-card-context-row">
-          <span className="desktop-git-status-card-context">{context}</span>
+          <span className="desktop-git-status-card-context">
+            {contextIcon && (
+              <span className="desktop-git-status-card-context-icon" aria-hidden="true">
+                {contextIcon}
+              </span>
+            )}
+            <span className="desktop-git-status-card-context-copy">{context}</span>
+          </span>
           {action}
         </div>
         {children}

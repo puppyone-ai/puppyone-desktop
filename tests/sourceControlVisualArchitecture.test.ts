@@ -124,6 +124,10 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-github-identity",
     ));
+    const identityIcon = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-identity > svg",
+    ));
 
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-hosting-identity-link");
     expect(sourceControlSidebarSectionsSource).toContain("<span>GitHub</span>");
@@ -131,6 +135,7 @@ describe("source-control visual architecture", () => {
     expect(identity).toContain("font-size: var(--git-font-main);");
     expect(identity).toContain("font-weight: var(--git-weight-regular);");
     expect(identity).toContain("line-height: var(--git-line-height);");
+    expect(identityIcon).toContain("color: inherit;");
   });
 
   it("keeps the Cloud publish reminder in reading and action order", () => {
@@ -278,6 +283,10 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-status-card-context",
     ));
+    const statusCardContextIcon = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-status-card-context-icon",
+    ));
     const resizer = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-section-resizer::after",
@@ -288,6 +297,7 @@ describe("source-control visual architecture", () => {
     );
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context-row");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context");
+    expect(sourceControlSidebarSectionsSource).toContain("contextIcon={<Folder size={14} strokeWidth={2} />}");
     expect(sourceControlSidebarSectionsSource).toContain("showHeader={false}");
     expect(sourceControlSidebarSource).not.toContain("desktop-git-status-card-summary");
     expect(sourceControlSidebarSource).not.toContain("source-control.commit.filesChanged");
@@ -307,6 +317,8 @@ describe("source-control visual architecture", () => {
     expect(statusCardContextRow).toContain("padding: 10px 10px 2px;");
     expect(statusCardContext).toContain("color: var(--po-text-muted);");
     expect(statusCardContext).toContain("font-size: var(--git-font-main);");
+    expect(statusCardContext).toContain("gap: 6px;");
+    expect(statusCardContextIcon).toContain("color: inherit;");
     expect(compact(sidebarResourcesCss)).toContain(compact(`
       .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-working-tree-list,
       .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-git-remote-preview {

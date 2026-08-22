@@ -182,7 +182,7 @@
 
 .desktop-git-github-identity > svg {
   flex: 0 0 auto;
-  color: var(--po-text-disabled);
+  color: inherit;
 }
 
 .desktop-git-github-summary {
