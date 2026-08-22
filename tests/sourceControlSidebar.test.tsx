@@ -96,7 +96,7 @@ describe("Git sidebar status cards", () => {
     expect(stageAndCommit).toHaveBeenCalledTimes(1);
   });
 
-  it("moves repository and commit identity outside while keeping sync actions on cards", () => {
+  it("moves group identity outside while keeping commit count and sync actions on cards", () => {
     const surface = renderSidebar({
       gitSidebarLayout: "dividers",
       status: createDivergedGitHubStatus(),
@@ -111,8 +111,9 @@ describe("Git sidebar status cards", () => {
     expect(githubCard?.querySelector(".desktop-git-github-identity")).toBeNull();
     expect(githubCard?.querySelector('button[aria-label="Pull"]')).not.toBeNull();
     expect(committedSection?.querySelector(".desktop-git-card-divider .desktop-git-status-card-context-copy")?.textContent)
-      .toBe("1 commit");
-    expect(committedCard?.querySelector(".desktop-git-status-card-context-copy")).toBeNull();
+      .toBe("Committed Changes");
+    expect(committedCard?.querySelector(".desktop-git-status-card-context-copy")?.textContent).toBe("1 commit");
+    expect(committedCard?.querySelector(".desktop-git-status-card-context-icon")).toBeNull();
     expect(committedCard?.querySelector('button[aria-label="Push"]')).not.toBeNull();
   });
 

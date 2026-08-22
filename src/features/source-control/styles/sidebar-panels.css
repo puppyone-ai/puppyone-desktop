@@ -70,10 +70,6 @@
   margin-inline-start: auto;
 }
 
-.desktop-git-status-card-context-row.is-action-only {
-  justify-content: flex-end;
-}
-
 /* Status rows are supporting content on the card's single continuous surface,
    not nested cards. */
 .desktop-git-status-card > .desktop-git-section-collapse-inner {

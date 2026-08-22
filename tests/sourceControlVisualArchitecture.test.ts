@@ -315,6 +315,14 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-status-card-context.is-group-label",
     ));
+    const cardDivider = compact(readCssBlock(
+      sidebarBaseCss,
+      ".desktop-git-card-divider",
+    ));
+    const cardDividerIcon = compact(readCssBlock(
+      sidebarBaseCss,
+      ".desktop-git-card-divider .desktop-git-identity-icon-slot",
+    ));
     const statusCardResourceRow = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-status-card .desktop-working-tree-row",
@@ -339,6 +347,11 @@ describe("source-control visual architecture", () => {
       'const separateIdentity = layout === "dividers" && contextVariant === "group";',
     );
     expect(sourceControlSidebarSectionsSource).toContain('className="desktop-git-card-divider"');
+    expect(sourceControlSidebarSectionsSource).toContain(
+      '<span className="desktop-git-status-card-context-copy">{title}</span>',
+    );
+    expect(sourceControlSidebarSectionsSource).toContain("{contextContent}");
+    expect(sourceControlSidebarSectionsSource).not.toContain("is-action-only");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context-row");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context");
     expect(sourceControlSidebarSectionsSource).toContain("contextIcon={<Folder size={14} strokeWidth={2} />}");
@@ -368,6 +381,11 @@ describe("source-control visual architecture", () => {
     expect(statusCardContext).toContain("font-size: var(--git-font-main);");
     expect(statusCardContext).toContain("gap: 2px;");
     expect(statusCardContextIcon).toContain("color: inherit;");
+    expect(cardDivider).toContain(
+      "margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);",
+    );
+    expect(cardDivider).not.toContain("+ 10px");
+    expect(cardDividerIcon).toContain("padding-inline-start: 0;");
     expect(statusCardGroupLabel).toContain(
       "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",
     );

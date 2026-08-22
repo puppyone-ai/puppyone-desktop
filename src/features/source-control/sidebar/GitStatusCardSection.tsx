@@ -32,8 +32,8 @@ export function GitStatusCardSection({
   const bodyId = useId();
   const separateIdentity = layout === "dividers" && contextVariant === "group";
   const contextContent = (
-    <span className={`desktop-git-status-card-context${contextVariant === "group" ? " is-group-label" : ""}`}>
-      {contextIcon && (
+    <span className={`desktop-git-status-card-context${contextVariant === "group" && !separateIdentity ? " is-group-label" : ""}`}>
+      {contextIcon && !separateIdentity && (
         <span
           className="desktop-git-status-card-context-icon desktop-git-identity-icon-slot"
           aria-hidden="true"
@@ -59,7 +59,17 @@ export function GitStatusCardSection({
       )}
       {separateIdentity && (
         <div className="desktop-git-card-divider">
-          {contextContent}
+          <span className="desktop-git-status-card-context is-group-label">
+            {contextIcon && (
+              <span
+                className="desktop-git-status-card-context-icon desktop-git-identity-icon-slot"
+                aria-hidden="true"
+              >
+                {contextIcon}
+              </span>
+            )}
+            <span className="desktop-git-status-card-context-copy">{title}</span>
+          </span>
         </div>
       )}
       <GitSectionCollapse
@@ -68,8 +78,8 @@ export function GitStatusCardSection({
         className={`desktop-git-status-card${separateIdentity ? " is-divider-layout" : ""}`}
         ariaLabel={showHeader ? undefined : title}
       >
-        <div className={`desktop-git-status-card-context-row${separateIdentity ? " is-action-only" : ""}`}>
-          {!separateIdentity && contextContent}
+        <div className="desktop-git-status-card-context-row">
+          {contextContent}
           {action}
         </div>
         {children}

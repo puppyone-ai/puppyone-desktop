@@ -64,8 +64,12 @@
   flex: 0 0 30px;
   align-items: center;
   margin-inline:
-    calc(var(--git-sidebar-control-left-gap) + 10px)
-    calc(var(--git-sidebar-control-right-gap) + 10px);
+    var(--git-sidebar-control-left-gap)
+    var(--git-sidebar-control-right-gap);
+}
+
+.desktop-git-card-divider .desktop-git-identity-icon-slot {
+  padding-inline-start: 0;
 }
 
 .desktop-git-sidebar-empty-history {
