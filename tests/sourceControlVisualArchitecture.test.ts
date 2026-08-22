@@ -119,7 +119,7 @@ const diffCss = readFileSync(
 );
 
 describe("source-control visual architecture", () => {
-  it("keeps the clickable GitHub identity inside the card type scale", () => {
+  it("keeps the clickable repository identity quiet inside the GitHub card", () => {
     const identity = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-github-identity",
@@ -130,11 +130,22 @@ describe("source-control visual architecture", () => {
     ));
 
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-hosting-identity-link");
-    expect(sourceControlSidebarSectionsSource).toContain("<span>GitHub</span>");
+    expect(sourceControlSidebarSectionsSource).toContain("<span>{repositoryName}</span>");
+    expect(sourceControlSidebarSectionsSource).toContain("getGitHubRepositoryName(label)");
+    expect(sourceControlSidebarSectionsSource).not.toContain("title={label}");
     expect(identity).toContain("grid-row: 1;");
-    expect(identity).toContain("font-size: var(--git-font-main);");
-    expect(identity).toContain("font-weight: var(--git-weight-regular);");
-    expect(identity).toContain("line-height: var(--git-line-height);");
+    expect(identity).toContain(
+      "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",
+    );
+    expect(identity).toContain(
+      "font-size: var(--desktop-sidebar-section-title-font-size, var(--po-text-size-meta, 12px));",
+    );
+    expect(identity).toContain(
+      "font-weight: var(--desktop-sidebar-section-title-font-weight, var(--po-text-weight-medium, 500));",
+    );
+    expect(identity).toContain(
+      "line-height: var(--desktop-sidebar-section-title-line-height, 18px);",
+    );
     expect(identityIcon).toContain("color: inherit;");
   });
 
@@ -263,10 +274,8 @@ describe("source-control visual architecture", () => {
     expect(updateAge).toContain("color: inherit;");
     expect(updateAge).toContain("cursor: default;");
     expect(summary).toContain("grid-row: 2;");
-    expect(summary).toContain(
-      "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",
-    );
-    expect(summary).toContain("font-size: var(--git-font-small);");
+    expect(summary).toContain("color: var(--po-text-muted);");
+    expect(summary).toContain("font-size: var(--git-font-main);");
     expect(sidebarResourcesCss).not.toContain("desktop-git-github-update-tooltip");
   });
 

@@ -19,10 +19,11 @@ afterEach(() => {
 });
 
 describe("GitHub provider section", () => {
-  it("keeps the GitHub repository link inside an up-to-date card", () => {
+  it("keeps the repository identity link inside an up-to-date card", () => {
     const surface = renderProvider(createSection());
 
-    expect(surface.textContent).toContain("GitHub");
+    expect(surface.textContent).toContain("repository");
+    expect(surface.textContent).not.toContain("GitHub");
     expect(surface.textContent).toContain("Already up to date.");
     expect(surface.textContent).not.toContain("owner/repository");
     expect(surface.textContent).not.toContain("Empty");
@@ -30,8 +31,10 @@ describe("GitHub provider section", () => {
     expect(surface.querySelector(".desktop-git-remote-action")).toBeNull();
     expect(surface.querySelector(".desktop-git-github-change-card")).not.toBeNull();
     expect(surface.querySelector(".desktop-git-hosting-identity-row")).toBeNull();
-    expect(surface.querySelector<HTMLAnchorElement>(".desktop-git-hosting-identity-link")?.href)
-      .toBe("https://github.com/owner/repository");
+    const identityLink = surface.querySelector<HTMLAnchorElement>(".desktop-git-hosting-identity-link");
+    expect(identityLink?.href).toBe("https://github.com/owner/repository");
+    expect(identityLink?.getAttribute("title")).toBeNull();
+    expect(identityLink?.getAttribute("aria-label")).toContain("owner/repository");
     expect(surface.querySelector(".desktop-git-github-change-card")?.contains(
       surface.querySelector(".desktop-git-hosting-identity-link"),
     )).toBe(true);

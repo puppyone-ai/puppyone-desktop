@@ -159,10 +159,11 @@ export function GitHubProviderSection({
 function GitHubRepositoryLink({ identity }: { identity: GitHostingIdentity }) {
   const { t } = useLocalization();
   const { label, href } = identity;
+  const repositoryName = getGitHubRepositoryName(label);
   const content = (
     <>
       <Github size={14} strokeWidth={2} aria-hidden="true" />
-      <span>GitHub</span>
+      <span>{repositoryName}</span>
       {href && <ArrowUpRight size={12} aria-hidden="true" />}
     </>
   );
@@ -172,7 +173,6 @@ function GitHubRepositoryLink({ identity }: { identity: GitHostingIdentity }) {
     <a
       className="desktop-git-github-identity desktop-git-hosting-identity-link"
       href={href}
-      title={label}
       aria-label={`${t("source-control.hosting.repository")}: ${label}`}
       onClick={(event) => {
         event.preventDefault();
@@ -182,6 +182,11 @@ function GitHubRepositoryLink({ identity }: { identity: GitHostingIdentity }) {
       {content}
     </a>
   );
+}
+
+function getGitHubRepositoryName(label: string) {
+  const normalized = label.trim().replace(/\/+$/, "").replace(/\.git$/i, "");
+  return normalized.split("/").filter(Boolean).at(-1) || label;
 }
 
 function GitHubChangesCard({

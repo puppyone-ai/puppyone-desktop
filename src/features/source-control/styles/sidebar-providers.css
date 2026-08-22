@@ -67,7 +67,7 @@
   border: 0;
   border-radius: var(--git-row-radius);
   background: transparent;
-  color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));
+  color: var(--po-text-muted);
   font-size: var(--desktop-sidebar-section-title-font-size, var(--git-font-small));
   font-weight: var(--desktop-sidebar-section-title-font-weight, var(--git-weight-regular));
   line-height: var(--desktop-sidebar-section-title-line-height, var(--git-line-height));
@@ -89,7 +89,7 @@
   flex: 0 0 18px;
   align-items: center;
   justify-content: center;
-  color: var(--po-text-muted);
+  color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));
 }
 
 .desktop-git-section-leading-icon img {
@@ -169,15 +169,15 @@
   align-items: center;
   justify-self: start;
   gap: 6px;
-  color: var(--po-text-muted);
-  font-size: var(--git-font-main);
-  font-weight: var(--git-weight-regular);
-  line-height: var(--git-line-height);
+  color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));
+  font-size: var(--desktop-sidebar-section-title-font-size, var(--po-text-size-meta, 12px));
+  font-weight: var(--desktop-sidebar-section-title-font-weight, var(--po-text-weight-medium, 500));
+  line-height: var(--desktop-sidebar-section-title-line-height, 18px);
   text-decoration: none;
 }
 
 .desktop-git-github-identity:hover {
-  color: var(--po-text);
+  color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));
 }
 
 .desktop-git-github-identity > svg {
@@ -189,8 +189,8 @@
   grid-column: 1 / -1;
   grid-row: 2;
   overflow: hidden;
-  color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));
-  font-size: var(--git-font-small);
+  color: var(--po-text-muted);
+  font-size: var(--git-font-main);
   font-weight: var(--git-weight-regular);
   line-height: var(--git-line-height);
   text-overflow: ellipsis;
