@@ -4,7 +4,6 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createProjectEntryService,
-  requireGitImportProvider,
   requireGitRepository,
   requireProjectName,
 } from "../electron/main/project-entry-service.mjs";
@@ -90,7 +89,8 @@ describe("project entry service", () => {
       .toThrow(/GitHub/);
     expect(() => requireGitRepository("https://github.com/owner/repository.git", "gitlab"))
       .toThrow(/GitLab/);
-    expect(() => requireGitImportProvider("bitbucket")).toThrow(/GitHub or GitLab/);
+    expect(() => requireGitRepository("https://github.com/owner/repository.git", "bitbucket"))
+      .toThrow(/GitHub or GitLab/);
   });
 
   it("keeps the final path absent while cloning, then publishes the completed result", async () => {

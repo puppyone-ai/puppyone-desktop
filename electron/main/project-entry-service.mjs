@@ -109,7 +109,12 @@ export function requireProjectName(value) {
 }
 
 export function requireGitRepository(value, expectedProvider = null) {
-  if (expectedProvider !== null) requireGitImportProvider(expectedProvider);
+  if (expectedProvider !== null && !getProviderLabel(expectedProvider)) {
+    throw projectEntryError(
+      "INVALID_REPOSITORY_PROVIDER",
+      "Choose GitHub or GitLab as the repository source.",
+    );
+  }
   const expectedProviderLabel = getProviderLabel(expectedProvider);
   if (typeof value !== "string" || !value.trim()) {
     throw projectEntryError(
@@ -191,14 +196,6 @@ function buildRepositoryResult({ repositoryUrl, provider, expectedProvider, segm
     namespace: namespaceSegments.join("/"),
     name: requireRepositoryName(repositorySegment, expectedProvider ?? provider),
   };
-}
-
-export function requireGitImportProvider(value) {
-  if (value === "github" || value === "gitlab") return value;
-  throw projectEntryError(
-    "INVALID_REPOSITORY_PROVIDER",
-    "Choose GitHub or GitLab as the repository source.",
-  );
 }
 
 function requireRepositoryName(value, provider = null) {

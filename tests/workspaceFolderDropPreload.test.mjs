@@ -35,11 +35,9 @@ describe("workspace folder drop preload boundary", () => {
       locationGrantId: "location-1",
     });
     await bridge.cloneRepository({
-      provider: "github",
       repositoryUrl: "https://github.com/owner/repository.git",
     });
     expect(invoke).toHaveBeenCalledWith("workspace:clone-repository-current", {
-      provider: "github",
       repositoryUrl: "https://github.com/owner/repository.git",
     });
   });

@@ -568,10 +568,7 @@ export type WorkspaceProjectLocationGrant = {
 
 export type WorkspaceCloneRepositoryRequest = {
   repositoryUrl: string;
-  provider: WorkspaceGitImportProvider;
 };
-
-export type WorkspaceGitImportProvider = "github" | "gitlab";
 
 export type WorkspaceCreateEntryKind = "file" | "folder";
 

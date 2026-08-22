@@ -106,7 +106,7 @@
   display: grid;
   width: 100%;
   min-width: 0;
-  gap: 22px;
+  gap: 18px;
 }
 
 .onboarding-entry-actions {
@@ -206,70 +206,17 @@
   color: var(--po-text-inverse);
 }
 
-.onboarding-provider-strip {
-  display: flex;
+.onboarding-clone-entry {
+  display: grid;
   width: 100%;
   min-width: 0;
-  box-sizing: border-box;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 7px;
-  padding-inline: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--po-divider);
+}
+
+.onboarding-clone-action {
+  width: 100%;
   color: var(--po-text-subtle);
-}
-
-.onboarding-provider-label {
-  flex: 0 0 auto;
-  color: var(--po-text-subtle);
-  font-family: var(--po-font-sans);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-}
-
-.onboarding-provider-sources {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 4px;
-}
-
-.onboarding-provider-source {
-  display: grid;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 auto;
-  padding: 0;
-  place-items: center;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--po-text-subtle);
-  cursor: var(--po-clickable-cursor, pointer);
-  transition: background 130ms ease-out, color 130ms ease-out, opacity 130ms ease-out;
-}
-
-.onboarding-provider-source:hover:not(:disabled),
-.onboarding-provider-source:focus-visible:not(:disabled) {
-  background: var(--po-hover);
-  color: var(--po-text);
-  outline: none;
-}
-
-.onboarding-provider-source:focus-visible:not(:disabled) {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--po-accent) 28%, transparent);
-}
-
-.onboarding-provider-source:disabled {
-  color: var(--po-text-disabled);
-  cursor: default;
-  opacity: 0.42;
-}
-
-.onboarding-provider-mark {
-  display: block;
-  width: 16px;
-  height: 16px;
 }
 
 .onboarding-entry-dialog {
