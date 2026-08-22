@@ -7,7 +7,7 @@
   "projects.removeHint": "Seule cette inscription est retirée. Les fichiers locaux ne sont pas supprimés.",
   "projects.untitled": "Projet sans titre",
   "action.createCloudProject": "Créer un projet Cloud",
-  "action.openFolder": "Ouvrir un dossier",
+  "action.openFolder": "Ouvrir ou déposer un dossier",
   "action.createLocalProject": "Nouveau projet",
   "action.cloneRepository": "Cloner le dépôt",
   "entry.create.title": "Créer un projet local",

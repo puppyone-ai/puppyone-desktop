@@ -7,7 +7,7 @@
   "projects.removeHint": "登録のみを削除します。ローカルファイルは削除されません。",
   "projects.untitled": "名称未設定のプロジェクト",
   "action.createCloudProject": "Cloud プロジェクトを作成",
-  "action.openFolder": "フォルダを開く",
+  "action.openFolder": "フォルダを開くかドロップ",
   "action.createLocalProject": "新しいプロジェクト",
   "action.cloneRepository": "リポジトリをクローン",
   "entry.create.title": "ローカルプロジェクトを作成",

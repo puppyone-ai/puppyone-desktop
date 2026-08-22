@@ -7,7 +7,7 @@
   "projects.removeHint": "仅移除此注册记录，不会删除本地文件。",
   "projects.untitled": "未命名项目",
   "action.createCloudProject": "创建云端项目",
-  "action.openFolder": "打开文件夹",
+  "action.openFolder": "打开或拖入文件夹",
   "action.createLocalProject": "新建项目",
   "action.cloneRepository": "克隆仓库",
   "entry.create.title": "创建本地项目",

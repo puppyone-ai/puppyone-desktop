@@ -7,7 +7,7 @@
   "projects.removeHint": "Remove apenas este registro. Os arquivos locais não são excluídos.",
   "projects.untitled": "Projeto sem título",
   "action.createCloudProject": "Criar projeto na Cloud",
-  "action.openFolder": "Abrir pasta",
+  "action.openFolder": "Abrir ou soltar uma pasta",
   "action.createLocalProject": "Novo projeto",
   "action.cloneRepository": "Clonar repositório",
   "entry.create.title": "Criar um projeto local",

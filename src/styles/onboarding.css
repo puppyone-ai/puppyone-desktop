@@ -59,7 +59,7 @@
 
 .onboarding-brand-lockup {
   display: flex;
-  width: min(324px, 100%);
+  width: min(320px, 100%);
   min-width: 0;
   box-sizing: border-box;
   flex-direction: row;
@@ -91,12 +91,12 @@
 
 .onboarding-primary-area {
   display: grid;
-  width: min(324px, 100%);
+  width: min(320px, 100%);
   min-width: 0;
   box-sizing: border-box;
   justify-self: center;
   justify-items: center;
-  padding: 0;
+  padding: 18px;
   border: 0;
   background: transparent;
 }
@@ -109,15 +109,6 @@
 
 .onboarding-entry-actions {
   display: grid;
-  justify-items: center;
-  gap: 16px;
-}
-
-.onboarding-entry-secondary-row {
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -168,47 +159,18 @@
 }
 
 .onboarding-entry-action-primary {
-  border-color: var(--po-border-strong);
-  background: transparent;
-  color: var(--po-text);
+  border-color: var(--po-text);
+  background: var(--po-text);
+  color: var(--po-text-inverse);
   font-weight: var(--po-text-weight-semibold, 600);
-}
-
-.onboarding-entry-action-folder {
-  width: 100%;
-  height: auto;
-  min-height: 0;
-  aspect-ratio: 1;
-  flex-direction: column;
-  justify-content: center;
-  gap: 14px;
-  padding: 0;
-  text-align: center;
-}
-
-.onboarding-entry-action-folder .po-button__icon {
-  width: 30px;
-  height: 30px;
-}
-
-.onboarding-entry-action-folder .po-button__icon > svg {
-  width: 28px;
-  height: 28px;
-  stroke-width: 1.6;
-}
-
-.onboarding-entry-secondary-row .onboarding-entry-action {
-  gap: 8px;
-  padding-inline: 10px;
-  font-size: 12px;
 }
 
 .onboarding-entry-action-primary:hover:not(:disabled),
 .onboarding-entry-action-primary.is-dragging,
 .onboarding-shell.dragging .onboarding-entry-action-primary {
-  border-color: color-mix(in srgb, var(--po-text) 54%, var(--po-border-strong));
-  background: var(--po-hover);
-  color: var(--po-text);
+  border-color: color-mix(in srgb, var(--po-text) 88%, var(--po-panel) 12%);
+  background: color-mix(in srgb, var(--po-text) 88%, var(--po-panel) 12%);
+  color: var(--po-text-inverse);
 }
 
 .onboarding-entry-action-secondary {
@@ -237,9 +199,9 @@
 }
 
 .onboarding-entry-action-primary:disabled[aria-busy="true"] {
-  border-color: var(--po-border-strong);
-  background: transparent;
-  color: var(--po-text-muted);
+  border-color: var(--po-text);
+  background: var(--po-text);
+  color: var(--po-text-inverse);
 }
 
 .onboarding-entry-dialog {

@@ -7,7 +7,7 @@
   "projects.removeHint": "Removes this registration only. Local files are not deleted.",
   "projects.untitled": "Untitled Project",
   "action.createCloudProject": "Create cloud project",
-  "action.openFolder": "Open folder",
+  "action.openFolder": "Open or drop a folder",
   "action.createLocalProject": "Create new project",
   "action.cloneRepository": "Clone repository",
   "entry.create.title": "Create a local project",
