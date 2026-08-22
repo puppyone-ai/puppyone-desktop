@@ -158,7 +158,9 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-entry-action\s*\{[^}]*width:\s*100%;[^}]*height:\s*38px;[^}]*min-height:\s*38px;[^}]*justify-content:\s*flex-start;[^}]*border-radius:\s*var\(--desktop-control-radius\);[^}]*font-size:\s*var\(--po-text-size-body, 13px\);[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);[^}]*text-align:\s*start;/s);
     expect(css).toMatch(/\.onboarding-entry-action-primary\s*\{[^}]*background:\s*var\(--po-text\);[^}]*color:\s*var\(--po-text-inverse\);[^}]*font-weight:\s*var\(--po-text-weight-semibold, 600\);/s);
     expect(css).toMatch(/\.onboarding-entry-action-secondary\s*\{[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-subtle\);/s);
-    expect(css).toMatch(/\.onboarding-clone-entry\s*\{[^}]*width:\s*100%;[^}]*padding-top:\s*12px;[^}]*border-top:\s*1px solid var\(--po-divider\);/s);
+    expect(css).toMatch(/\.onboarding-clone-entry\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/s);
+    expect(css).not.toMatch(/\.onboarding-clone-entry\s*\{[^}]*border(?:-top)?:/s);
+    expect(css).not.toMatch(/\.onboarding-clone-entry\s*\{[^}]*padding-top:/s);
     expect(css).toMatch(/\.onboarding-clone-action\s*\{[^}]*width:\s*100%;[^}]*color:\s*var\(--po-text-subtle\);/s);
     expect(css).toMatch(/\.onboarding-entry-create-row\s*\{[^}]*min-height:\s*52px;[^}]*grid-template-columns:\s*104px minmax\(0, 1fr\);[^}]*gap:\s*16px;/s);
     expect(css).toMatch(/\.onboarding-entry-dialog \.desktop-dialog-button\.primary\.file:disabled\s*\{[^}]*border-color:\s*var\(--po-border-subtle\);[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-disabled\);/s);
