@@ -318,6 +318,21 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSource).toContain("source-control.commit.commits");
     expect(sourceControlSidebarSource).toContain("source-control.commit.files");
     expect(sourceControlSidebarSource).toContain("source-control.commit.conflicts");
+    expect(sourceControlSidebarSource).toContain(
+      "const [remoteExpanded, setRemoteExpanded] = useState(true);",
+    );
+    expect(sourceControlSidebarSource).toContain(
+      "const [mergeExpanded, setMergeExpanded] = useState(true);",
+    );
+    expect(sourceControlSidebarSource).toContain(
+      "const [committedExpanded, setCommittedExpanded] = useState(true);",
+    );
+    expect(sourceControlSidebarSource).toContain(
+      "const [stagedExpanded, setStagedExpanded] = useState(true);",
+    );
+    expect(sourceControlSidebarSource).toContain(
+      "const [workingExpanded, setWorkingExpanded] = useState(true);",
+    );
     expect(sourceControlSidebarSource).toContain("showCount={false}");
     expect(statusCard).toContain(
       "margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);",

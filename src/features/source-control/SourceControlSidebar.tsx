@@ -71,11 +71,11 @@ export function GitSidebar({
 }: GitSidebarProps) {
   const { t, formatNumber } = useLocalization();
   const [backupCardDismissed, setBackupCardDismissed] = useState(false);
-  const [remoteExpanded, setRemoteExpanded] = useState(false);
-  const [mergeExpanded, setMergeExpanded] = useState(false);
-  const [committedExpanded, setCommittedExpanded] = useState(false);
-  const [stagedExpanded, setStagedExpanded] = useState(false);
-  const [workingExpanded, setWorkingExpanded] = useState(false);
+  const [remoteExpanded, setRemoteExpanded] = useState(true);
+  const [mergeExpanded, setMergeExpanded] = useState(true);
+  const [committedExpanded, setCommittedExpanded] = useState(true);
+  const [stagedExpanded, setStagedExpanded] = useState(true);
+  const [workingExpanded, setWorkingExpanded] = useState(true);
   const sourceControl = status?.sourceControl ?? null;
   const historyCommits = status?.allCommits ?? status?.commits ?? [];
   const currentBranch = status?.branches.find((branch) => branch.current) ?? null;
