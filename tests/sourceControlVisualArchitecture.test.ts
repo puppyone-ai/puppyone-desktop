@@ -325,9 +325,8 @@ describe("source-control visual architecture", () => {
     );
     expect(statusCard).toContain("border: 0;");
     expect(statusCard).toContain("border-radius: var(--git-control-radius);");
-    expect(statusCard).toContain(
-      "background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));",
-    );
+    expect(statusCard).toContain("background: transparent;");
+    expect(statusCard).not.toContain("var(--po-sidebar)");
     expect(statusCardContextRow).toContain("padding: 10px 10px 2px;");
     expect(statusCardContext).toContain("color: var(--po-text-muted);");
     expect(statusCardContext).toContain("font-size: var(--git-font-main);");

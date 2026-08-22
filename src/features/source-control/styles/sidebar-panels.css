@@ -18,7 +18,7 @@
   margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);
   border: 0;
   border-radius: var(--git-control-radius);
-  background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));
+  background: transparent;
 }
 
 .desktop-git-status-card-context-row {
