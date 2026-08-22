@@ -323,7 +323,17 @@ describe("source-control visual architecture", () => {
       .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-working-tree-list,
       .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-git-remote-preview {
         padding-block: var(--git-section-body-top-gap) 8px;
-        padding-inline: 8px;
+        padding-inline: 0;
+      }
+    `));
+    expect(compact(sidebarResourcesCss)).toContain(compact(`
+      .desktop-git-status-card .desktop-working-tree-row::before {
+        position: absolute;
+        z-index: 0;
+        inset: 0 8px;
+        border-radius: var(--git-inner-radius);
+        content: "";
+        pointer-events: none;
       }
     `));
     expect(compact(sidebarResourcesCss)).toContain(compact(`

@@ -74,7 +74,38 @@
 .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-working-tree-list,
 .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-git-remote-preview {
   padding-block: var(--git-section-body-top-gap) 8px;
-  padding-inline: 8px;
+  padding-inline: 0;
+}
+
+/* Keep row content on the same vertical axis as the card identity while
+   containing hover and selection fills inside the card. */
+.desktop-git-status-card .desktop-working-tree-row::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0 8px;
+  border-radius: var(--git-inner-radius);
+  content: "";
+  pointer-events: none;
+}
+
+.desktop-git-status-card .desktop-working-tree-row:hover,
+.desktop-git-status-card .desktop-working-tree-row.active,
+.desktop-git-status-card .desktop-working-tree-row.active:hover {
+  background: transparent;
+}
+
+.desktop-git-status-card .desktop-working-tree-row:hover::before,
+.desktop-git-status-card .desktop-working-tree-row.active::before {
+  background: var(--po-hover);
+}
+
+.desktop-git-status-card .desktop-working-tree-row.active:hover::before {
+  background: var(--po-selected);
+}
+
+.desktop-git-status-card .desktop-working-tree-row > * {
+  position: relative;
+  z-index: 1;
 }
 
 .desktop-git-section-collapse {
