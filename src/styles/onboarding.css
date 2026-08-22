@@ -206,7 +206,7 @@
 .onboarding-provider-label {
   flex: 0 0 auto;
   font-family: var(--po-font-sans);
-  font-size: 11.5px;
+  font-size: var(--po-text-size-body, 13px);
   font-weight: 500;
   line-height: 1;
 }
@@ -232,19 +232,18 @@
   flex: 0 0 auto;
   padding: 0;
   place-items: center;
-  border: 1px solid var(--po-border);
-  border-radius: 7px;
+  border: 0;
+  border-radius: 4px;
   background: transparent;
   color: var(--po-text-muted);
   cursor: var(--po-clickable-cursor, pointer);
-  transition: border-color 130ms ease-out, background 130ms ease-out, color 130ms ease-out;
+  transition: color 130ms ease-out, opacity 130ms ease-out, transform 130ms ease-out;
 }
 
 .onboarding-provider-action:hover:not(:disabled),
 .onboarding-provider-action:focus-visible:not(:disabled) {
-  border-color: var(--po-border-strong);
-  background: var(--po-hover);
   color: var(--po-text);
+  transform: translateY(-1px);
   outline: none;
 }
 
@@ -253,17 +252,16 @@
 }
 
 .onboarding-provider-action:disabled {
-  border-color: var(--po-border-subtle);
   color: var(--po-text-disabled);
   cursor: default;
-  opacity: 0.52;
+  opacity: 0.42;
 }
 
 .onboarding-provider-action svg,
 .onboarding-provider-action img {
   display: block;
-  width: 15px;
-  height: 15px;
+  width: 17px;
+  height: 17px;
 }
 
 .onboarding-provider-action img {

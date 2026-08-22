@@ -130,7 +130,7 @@ describe("project folder home", () => {
     expect(actions[0]?.querySelector(".lucide-folder-open")).not.toBeNull();
     expect(actions[1]?.querySelector(".onboarding-entry-create-icon")).not.toBeNull();
     const providers = [...container.querySelectorAll<HTMLButtonElement>(".onboarding-provider-action")];
-    expect(container.querySelector(".onboarding-provider-label")?.textContent).toBe("Clone from");
+    expect(container.querySelector(".onboarding-provider-label")?.textContent).toBe("Import from");
     expect(container.querySelector(".onboarding-provider-arrow")).not.toBeNull();
     expect(providers.map((provider) => provider.dataset.provider)).toEqual(["github", "gitlab", "notion"]);
     expect(providers[0]?.disabled).toBe(false);
@@ -152,7 +152,8 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-entry-action\s*\{[^}]*width:\s*100%;[^}]*height:\s*38px;[^}]*min-height:\s*38px;[^}]*justify-content:\s*flex-start;[^}]*border-radius:\s*var\(--desktop-control-radius\);[^}]*font-size:\s*var\(--po-text-size-body, 13px\);[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);[^}]*text-align:\s*start;/s);
     expect(css).toMatch(/\.onboarding-entry-action-primary\s*\{[^}]*background:\s*var\(--po-text\);[^}]*color:\s*var\(--po-text-inverse\);[^}]*font-weight:\s*var\(--po-text-weight-semibold, 600\);/s);
     expect(css).toMatch(/\.onboarding-entry-action-secondary\s*\{[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-subtle\);/s);
-    expect(css).toMatch(/\.onboarding-provider-action\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;[^}]*border:\s*1px solid var\(--po-border\);/s);
+    expect(css).toMatch(/\.onboarding-provider-label\s*\{[^}]*font-size:\s*var\(--po-text-size-body, 13px\);/s);
+    expect(css).toMatch(/\.onboarding-provider-action\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;[^}]*border:\s*0;[^}]*background:\s*transparent;/s);
     expect(css).not.toContain(".folder-drop-zone");
 
     await act(async () => actions[0]?.click());
@@ -161,7 +162,7 @@ describe("project folder home", () => {
     expect(onCloneRepository).not.toHaveBeenCalled();
   });
 
-  it("collects one focused value for Create New and Clone from GitHub", async () => {
+  it("collects one focused value for Create New and Import from GitHub", async () => {
     const onCreateProject = vi.fn(async () => true);
     const onCloneRepository = vi.fn(async () => true);
     const container = renderHome({ onCreateProject, onCloneRepository });
@@ -183,7 +184,7 @@ describe("project folder home", () => {
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".onboarding-provider-action[data-provider='github']")?.click();
     });
-    expect(container.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe("Clone from GitHub");
+    expect(container.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe("Import from GitHub");
     const repositoryUrl = container.querySelector<HTMLInputElement>(".onboarding-entry-dialog input");
     expect(repositoryUrl?.inputMode).toBe("url");
     setInputValue(repositoryUrl, "https://github.com/puppyone-ai/puppyone.git");
