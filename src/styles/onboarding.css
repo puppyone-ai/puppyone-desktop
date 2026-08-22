@@ -187,6 +187,20 @@
   color: var(--po-text);
 }
 
+.onboarding-entry-action-secondary.onboarding-clone-action {
+  border-color: transparent;
+  background: transparent;
+  color: color-mix(in srgb, var(--po-text-subtle) 72%, transparent);
+  font-weight: var(--po-text-weight-medium, 500);
+}
+
+.onboarding-entry-action-secondary.onboarding-clone-action:hover:not(:disabled),
+.onboarding-entry-action-secondary.onboarding-clone-action:focus-visible {
+  border-color: transparent;
+  background: var(--po-hover);
+  color: var(--po-text-muted);
+}
+
 .onboarding-entry-action:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--po-accent) 36%, transparent);
   outline-offset: 2px;
