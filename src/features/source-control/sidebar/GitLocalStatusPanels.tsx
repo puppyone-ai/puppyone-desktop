@@ -158,6 +158,7 @@ export function createGitLocalStatusPanels({
           count={model.committedCount}
           context={model.sectionContext.committed}
           contextIcon={<Folder size={14} strokeWidth={2} />}
+          contextVariant="group"
           expanded={expanded.committed}
           onToggle={() => onToggle("committed")}
           showHeader={false}

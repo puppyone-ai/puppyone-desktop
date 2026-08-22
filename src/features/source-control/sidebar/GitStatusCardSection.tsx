@@ -8,6 +8,7 @@ export function GitStatusCardSection({
   count,
   context,
   contextIcon,
+  contextVariant = "status",
   expanded,
   action,
   children,
@@ -18,6 +19,7 @@ export function GitStatusCardSection({
   count: number;
   context: string;
   contextIcon?: ReactNode;
+  contextVariant?: "status" | "group";
   expanded: boolean;
   action?: ReactNode;
   children: ReactNode;
@@ -45,7 +47,7 @@ export function GitStatusCardSection({
         ariaLabel={showHeader ? undefined : title}
       >
         <div className="desktop-git-status-card-context-row">
-          <span className="desktop-git-status-card-context">
+          <span className={`desktop-git-status-card-context${contextVariant === "group" ? " is-group-label" : ""}`}>
             {contextIcon && (
               <span className="desktop-git-status-card-context-icon" aria-hidden="true">
                 {contextIcon}

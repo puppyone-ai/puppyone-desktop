@@ -66,6 +66,8 @@ describe("Git sidebar status cards", () => {
     const committedCard = committedSection?.querySelector<HTMLElement>(".desktop-git-status-card");
     expect(committedCard?.classList.contains("expanded")).toBe(true);
     expect(committedCard?.getAttribute("aria-label")).toBe("Committed Changes");
+    expect(committedCard?.querySelector(".desktop-git-status-card-context")?.classList.contains("is-group-label"))
+      .toBe(true);
     expect(committedCard?.querySelector(".desktop-git-status-card-context-icon svg")).not.toBeNull();
     expect(committedCard?.querySelector(".desktop-git-status-card-context-copy")?.textContent).toBe("2 commits");
     expect(committedSection?.querySelector(".desktop-git-section-title")).toBeNull();

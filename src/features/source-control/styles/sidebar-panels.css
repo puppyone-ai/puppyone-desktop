@@ -46,6 +46,13 @@
   white-space: nowrap;
 }
 
+.desktop-git-status-card-context.is-group-label {
+  color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));
+  font-size: var(--desktop-sidebar-section-title-font-size, var(--po-text-size-meta, 12px));
+  font-weight: var(--desktop-sidebar-section-title-font-weight, var(--po-text-weight-medium, 500));
+  line-height: var(--desktop-sidebar-section-title-line-height, 18px);
+}
+
 .desktop-git-status-card-context-icon {
   display: inline-flex;
   width: 14px;
