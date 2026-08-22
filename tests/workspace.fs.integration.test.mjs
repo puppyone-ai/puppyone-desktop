@@ -20,6 +20,7 @@ import {
   createWorkspaceEntry,
   renameWorkspaceEntry,
   resolveExistingWorkspaceDisplayPath,
+  resolveWorkspaceNode,
   moveWorkspaceEntry,
   copyWorkspaceEntry,
   deleteWorkspaceEntry,
@@ -453,6 +454,31 @@ describe("listFolderChildren", () => {
     const nodes = await listFolderChildren(root, null);
     expect(nodes.map((n) => n.name)).toContain("real.txt");
     expect(nodes.map((n) => n.name)).not.toContain("link.txt");
+  });
+});
+
+describe("resolveWorkspaceNode", () => {
+  it("classifies one file or folder without loading preview content", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "docs", kind: "folder" });
+    await createWorkspaceEntry(root, {
+      parentPath: null,
+      name: "table.csv",
+      kind: "file",
+      content: "a,b\n1,2",
+    });
+
+    await expect(resolveWorkspaceNode(root, "docs")).resolves.toMatchObject({
+      path: "docs",
+      type: "folder",
+      content: null,
+      preview: null,
+    });
+    await expect(resolveWorkspaceNode(root, "table.csv")).resolves.toMatchObject({
+      path: "table.csv",
+      type: "spreadsheet",
+      content: null,
+      preview: null,
+    });
   });
 });
 

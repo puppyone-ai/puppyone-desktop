@@ -49,6 +49,7 @@ export function createLocalDocumentStorageIdentity(rootPath: string): string {
 export function createLocalDataPort(rootPath: string): DataPort {
   return {
     listChildren: (folderPath) => loadFolderChildren(rootPath, folderPath),
+    resolveNode: (path) => getDesktopBridge().resolveNode({ rootPath, path }),
     // Text/content reads do not mint a browser capability URL. Resource URLs
     // have their own mounted-preview lifecycle and are revoked separately.
     readFile: async (path, options) => {

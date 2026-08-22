@@ -1,6 +1,6 @@
 import type {
   AppPreviewController,
-  DataNode,
+  DocumentDataNode,
   DocumentPersistencePort,
   FileContent,
   OfficeDocumentConverter,
@@ -24,7 +24,7 @@ import type { ViewerExtensionHostAdapter } from "../registry/viewerHostAdapters"
 import type { DocumentPersistedCommit } from "../document-session/types";
 
 export type DataNodeEditorHostProps = {
-  node: DataNode;
+  node: DocumentDataNode;
   fileContent?: FileContent | null;
   fileUrl?: string | null;
   fileUrlLoading?: boolean;

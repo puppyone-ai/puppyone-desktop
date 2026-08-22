@@ -946,6 +946,10 @@ declare global {
         rootPath: string;
         folderPath: string | null;
       }) => Promise<DataNode[]>;
+      resolveNode: (request: {
+        rootPath: string;
+        path: string;
+      }) => Promise<DataNode>;
       readFile: (request: {
         rootPath: string;
         path: string;

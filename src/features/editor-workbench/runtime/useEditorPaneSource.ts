@@ -4,15 +4,15 @@ import {
   shouldReadEditorContent,
   useFileResourceLease,
   workspaceContentChangeMatchesPath,
-  type DataNode,
   type DataPort,
+  type DocumentDataNode,
   type DocumentPersistedCommit,
   type FileContent,
   type WorkspaceContentChange,
 } from "@puppyone/shared-ui";
 
 export function useEditorPaneSource(
-  node: DataNode | null,
+  node: DocumentDataNode | null,
   dataPort: DataPort,
   refreshKey?: WorkspaceContentChange,
 ) {

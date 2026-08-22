@@ -157,7 +157,12 @@ if (!/await onActivePathChange/.test(dataWorkspaceSource)) {
 }
 const desktopAppShellPath = path.join(repoRoot, "src/App.tsx");
 const desktopAppShellSource = readFileSync(desktopAppShellPath, "utf8");
-if (!/handleActiveDataPathChange[\s\S]*editorWorkbench\.open/.test(desktopAppShellSource)) {
+if (
+  !/activateDataNode[\s\S]*isDocumentDataNode\(node\)[\s\S]*editorWorkbench\.openDocument\(node\)/.test(
+    desktopAppShellSource,
+  )
+  || !/handleActiveDataPathChange[\s\S]*activateDataNode\(resolvedNode\)/.test(desktopAppShellSource)
+) {
   errors.push(`${relative(desktopAppShellPath)} does not own Editor Group activation`);
 }
 if (!/DesktopWorkspaceContent[\s\S]*editorWorkbench=\{editorWorkbench\}/.test(desktopAppShellSource)) {

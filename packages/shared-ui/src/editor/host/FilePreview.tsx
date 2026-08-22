@@ -3,7 +3,7 @@ import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type {
   AppPreviewController,
-  DataNode,
+  DocumentDataNode,
   DocumentPersistencePort,
   FileContent,
   OfficeDocumentConverter,
@@ -30,7 +30,7 @@ import type { DocumentPersistedCommit } from "../document-session/types";
 import { resolveViewerSurfacePreparationForDocument } from "../registry/viewerPackAdapter";
 
 export type FilePreviewProps = {
-  node: DataNode | null;
+  node: DocumentDataNode | null;
   fileContent?: FileContent | null;
   fileUrl?: string | null;
   fileUrlLoading?: boolean;
@@ -40,7 +40,7 @@ export type FilePreviewProps = {
   aiEditFile?: AiEditFile | null;
   showHeader?: boolean;
   emptySlot?: ReactNode;
-  actionSlot?: ReactNode | ((node: DataNode) => ReactNode);
+  actionSlot?: ReactNode | ((node: DocumentDataNode) => ReactNode);
   documentPersistence?: DocumentPersistencePort | null;
   onDocumentPersisted?: (commit: DocumentPersistedCommit) => void;
   hideSourceView?: boolean;

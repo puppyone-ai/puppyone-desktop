@@ -251,6 +251,39 @@ export async function listFolderChildren(rootPath, folderPath) {
   return nodes;
 }
 
+/**
+ * Resolve one entry for command admission and session restoration. Unlike a
+ * folder listing this does not enumerate siblings or read preview content.
+ */
+export async function resolveWorkspaceNode(rootPath, relativePath) {
+  const normalizedPath = normalizeRelativePath(relativePath);
+  if (!normalizedPath) throw new Error("Workspace root is not a document.");
+  const entryPath = await resolveExistingWorkspacePath(rootPath, normalizedPath);
+  const metadata = await fs.lstat(entryPath).catch((error) => {
+    throw new Error(`Unable to read workspace entry metadata: ${error.message}`);
+  });
+  if (metadata.isSymbolicLink()) {
+    throw new Error("Symbolic links cannot be opened through the document workbench.");
+  }
+
+  const isFolder = metadata.isDirectory();
+  const name = path.basename(normalizedPath);
+  return {
+    id: normalizedPath,
+    name,
+    path: normalizedPath,
+    type: isFolder ? "folder" : classifyFile(name),
+    mimeType: isFolder ? null : getMimeType(entryPath),
+    size: isFolder ? null : formatFileSize(metadata.size),
+    modified: Number.isFinite(metadata.mtimeMs)
+      ? String(Math.floor(metadata.mtimeMs / 1000))
+      : null,
+    preview: null,
+    content: null,
+    children: null,
+  };
+}
+
 export async function readWorkspaceFile(rootPath, relativePath, options = undefined) {
   const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
   const metadata = await fs.stat(filePath).catch((error) => {

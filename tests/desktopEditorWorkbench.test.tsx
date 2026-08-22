@@ -3,7 +3,7 @@ import React, { useEffect } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
-import type { Workspace } from "@puppyone/shared-ui";
+import type { DataNode, DocumentDataNode, Workspace } from "@puppyone/shared-ui";
 import {
   useDesktopEditorWorkbench,
   type DesktopEditorWorkbenchController,
@@ -53,7 +53,7 @@ describe("useDesktopEditorWorkbench", () => {
     expect(JSON.parse(window.localStorage.getItem(storageKey) ?? "null").activeEditorId).toBe("b.md");
   });
 
-  it("persists pane assignments with the v2 workbench record", async () => {
+  it("persists pane assignments with the v3 workbench record", async () => {
     const workspace: Workspace = {
       id: "workspace-id",
       name: "Workspace",
@@ -71,14 +71,13 @@ describe("useDesktopEditorWorkbench", () => {
     });
     await act(async () => {
       const controller = snapshots.at(-1)!;
-      controller.open("a.md");
+      controller.openDocument(documentNode("a.md"));
       await Promise.resolve();
     });
     await act(async () => {
       const controller = snapshots.at(-1)!;
-      controller.openAtPaneEdge(
-        "b.md",
-        "b.md",
+      controller.openDocumentAtPaneEdge(
+        documentNode("b.md"),
         controller.activePaneId,
         "horizontal",
         "second",
@@ -87,7 +86,7 @@ describe("useDesktopEditorWorkbench", () => {
     });
     act(() => window.dispatchEvent(new Event("pagehide")));
 
-    const storageKey = "puppyone.desktop.editor-workbench.v2:workspace-id:/workspace";
+    const storageKey = "puppyone.desktop.editor-workbench.v3:workspace-id:/workspace";
     const stored = JSON.parse(window.localStorage.getItem(storageKey) ?? "null");
     expect(stored.group.editors.map(({ id }: { id: string }) => id)).toEqual(["a.md", "b.md"]);
     expect(stored.layout).toMatchObject({
@@ -160,14 +159,13 @@ describe("useDesktopEditorWorkbench", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      snapshots.at(-1)!.open("a.md");
+      snapshots.at(-1)!.openDocument(documentNode("a.md"));
       await Promise.resolve();
     });
     await act(async () => {
       const controller = snapshots.at(-1)!;
-      controller.openAtPaneEdge(
-        "a.md",
-        "a.md",
+      controller.openDocumentAtPaneEdge(
+        documentNode("a.md"),
         controller.activePaneId,
         "horizontal",
         "second",
@@ -198,16 +196,16 @@ describe("useDesktopEditorWorkbench", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      snapshots.at(-1)!.open("a.md");
+      snapshots.at(-1)!.openDocument(documentNode("a.md"));
       await Promise.resolve();
     });
     await act(async () => {
       const controller = snapshots.at(-1)!;
-      controller.openAtPaneEdge("b.md", "b.md", controller.activePaneId, "horizontal", "second");
+      controller.openDocumentAtPaneEdge(documentNode("b.md"), controller.activePaneId, "horizontal", "second");
       await Promise.resolve();
     });
     await act(async () => {
-      snapshots.at(-1)!.open("a.md");
+      snapshots.at(-1)!.openDocument(documentNode("a.md"));
       await Promise.resolve();
     });
 
@@ -237,7 +235,7 @@ describe("useDesktopEditorWorkbench", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      snapshots.at(-1)!.open("a.md");
+      snapshots.at(-1)!.openDocument(documentNode("a.md"));
       await Promise.resolve();
     });
     await act(async () => {
@@ -274,12 +272,12 @@ describe("useDesktopEditorWorkbench", () => {
       await Promise.resolve();
     });
     await act(async () => {
-      snapshots.at(-1)!.open("a.md");
+      snapshots.at(-1)!.openDocument(documentNode("a.md"));
       await Promise.resolve();
     });
     await act(async () => {
       const controller = snapshots.at(-1)!;
-      controller.openAtPaneEdge("b.md", "b.md", controller.activePaneId, "horizontal", "second");
+      controller.openDocumentAtPaneEdge(documentNode("b.md"), controller.activePaneId, "horizontal", "second");
       await Promise.resolve();
     });
     const originalRootId = snapshots.at(-1)!.paneLayout.root.id;
@@ -306,18 +304,113 @@ describe("useDesktopEditorWorkbench", () => {
     });
     expect(controller.activePath).toBe("b.md");
   });
+
+  it("rejects a folder descriptor at the public workbench boundary", async () => {
+    const workspace: Workspace = {
+      id: "workspace-id",
+      name: "Workspace",
+      path: "/workspace",
+      status: "recording",
+    };
+    const snapshots: DesktopEditorWorkbenchController[] = [];
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(<Probe workspace={workspace} onChange={(controller) => snapshots.push(controller)} />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      snapshots.at(-1)!.openDocument({
+        id: "docs",
+        name: "docs",
+        path: "docs",
+        type: "folder",
+      } as unknown as DocumentDataNode);
+      await Promise.resolve();
+    });
+
+    expect(snapshots.at(-1)!.state.editors).toEqual([]);
+    expect(snapshots.at(-1)!.activePath).toBeNull();
+  });
+
+  it("validates restored inputs and removes directories before exposing the workbench", async () => {
+    const workspace: Workspace = {
+      id: "workspace-id",
+      name: "Workspace",
+      path: "/workspace",
+      status: "recording",
+    };
+    const storageKey = "puppyone.desktop.editor-workbench.v2:workspace-id:/workspace";
+    window.localStorage.setItem(storageKey, JSON.stringify({
+      group: {
+        editors: [
+          { id: "docs", resource: "docs", label: "docs" },
+          { id: "a.md", resource: "a.md", label: "a.md" },
+        ],
+        activeEditorId: "docs",
+        mostRecentlyUsed: ["docs", "a.md"],
+      },
+      layout: {
+        activePaneId: "editor-pane-1",
+        root: { kind: "pane", id: "editor-pane-1", editorId: "docs" },
+      },
+    }));
+    const snapshots: DesktopEditorWorkbenchController[] = [];
+    const resolveNode = async (path: string): Promise<DataNode> => path === "docs"
+      ? { id: path, name: path, path, type: "folder" }
+      : documentNode(path);
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <Probe
+          workspace={workspace}
+          resolveNode={resolveNode}
+          onChange={(controller) => snapshots.push(controller)}
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(snapshots.some(({ state }) => state.editors.some(({ id }) => id === "docs"))).toBe(false);
+    expect(snapshots.at(-1)!.state.editors.map(({ id }) => id)).toEqual(["a.md"]);
+    expect(snapshots.at(-1)!.activePath).toBe("a.md");
+  });
 });
 
 function Probe({
   workspace,
   onChange,
+  resolveNode,
 }: {
   workspace: Workspace;
   onChange: (controller: DesktopEditorWorkbenchController) => void;
+  resolveNode?: (path: string) => Promise<DataNode | null>;
 }) {
-  const controller = useDesktopEditorWorkbench(workspace);
+  const controller = useDesktopEditorWorkbench(
+    workspace,
+    resolveNode ?? resolveDocumentNode,
+  );
   useEffect(() => {
     onChange(controller);
   }, [controller, onChange]);
   return null;
+}
+
+function documentNode(path: string): DocumentDataNode {
+  return {
+    id: path,
+    name: path.split("/").at(-1) ?? path,
+    path,
+    type: "markdown",
+  };
+}
+
+async function resolveDocumentNode(path: string): Promise<DocumentDataNode> {
+  return documentNode(path);
 }

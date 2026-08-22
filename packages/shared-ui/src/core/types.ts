@@ -2,6 +2,9 @@ import type { FileSemanticKind } from "./fileFormats";
 
 export type DataNodeKind = FileSemanticKind;
 
+/** Semantic kinds that can be admitted into the document workbench. */
+export type DocumentDataNodeKind = Exclude<DataNodeKind, "folder">;
+
 export type DataNodeStatus = "clean" | "modified" | "created" | "deleted" | "moved";
 
 export type DataSourceKind =
@@ -57,10 +60,22 @@ export type DataNode = {
   source?: DataSourceKind;
 };
 
+/**
+ * A tree node whose identity has been resolved as a document, not a container.
+ * Editor APIs accept this narrowed descriptor instead of an unclassified path.
+ */
+export type DocumentDataNode = DataNode & {
+  type: DocumentDataNodeKind;
+};
+
+export function isDocumentDataNode(node: DataNode | null | undefined): node is DocumentDataNode {
+  return Boolean(node && node.type !== "folder");
+}
+
 export type FileContent = {
   path: string;
   name: string;
-  type: DataNodeKind;
+  type: DocumentDataNodeKind;
   content?: string | null;
   mimeType?: string | null;
   size?: string | null;
@@ -260,6 +275,8 @@ export type DataCapabilities = {
 
 export type DataPort = {
   listChildren: (folderPath: string | null) => Promise<DataNode[]>;
+  /** Resolve one workspace-relative entry without enumerating or previewing its siblings. */
+  resolveNode?: (path: string) => Promise<DataNode | null>;
   readFile?: (path: string, options?: DataReadOptions) => Promise<FileContent>;
   getFileUrl?: (path: string, options?: DataFileUrlOptions) => string | Promise<string>;
   revokeFileUrl?: (url: string) => void | Promise<void>;
