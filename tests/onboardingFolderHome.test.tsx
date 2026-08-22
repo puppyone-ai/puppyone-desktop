@@ -109,7 +109,7 @@ describe("project folder home", () => {
     expect(onChooseWorkspace).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps clone as a quiet footer action inside the empty project frame", async () => {
+  it("uses one square primary action above two compact secondary actions", async () => {
     const css = readFileSync(`${process.cwd()}/src/styles/onboarding.css`, "utf8");
     const onChooseWorkspace = vi.fn(async () => undefined);
     const onChooseProjectLocation = vi.fn(async () => ({
@@ -129,36 +129,41 @@ describe("project folder home", () => {
     const actions = [...container.querySelectorAll<HTMLButtonElement>(".onboarding-entry-action")];
     expect(actions).toHaveLength(3);
     expect(actions.map((action) => action.textContent)).toEqual([
-      "Open local folder",
-      "Create local project",
-      "Clone repository…",
+      "Open folder",
+      "Create new project",
+      "Clone repository",
     ]);
     expect(actions.every((action) => action.classList.contains("po-button"))).toBe(true);
     expect(actions[0]?.classList.contains("po-button--primary")).toBe(true);
     expect(actions[1]?.classList.contains("po-button--neutral")).toBe(true);
     expect(actions[0]?.classList.contains("onboarding-entry-action-primary")).toBe(true);
+    expect(actions[0]?.classList.contains("onboarding-entry-action-folder")).toBe(true);
     expect(actions[0]?.querySelector(".lucide-folder-open")).not.toBeNull();
     expect(actions[1]?.querySelector(".onboarding-entry-create-icon")).not.toBeNull();
     expect(actions[2]?.classList.contains("onboarding-entry-action-secondary")).toBe(true);
     expect(actions[2]?.querySelector(".lucide-git-fork")).not.toBeNull();
     expect(actions[2]?.disabled).toBe(false);
+    const secondaryRow = container.querySelector(".onboarding-entry-secondary-row");
+    expect(secondaryRow?.querySelectorAll(".onboarding-entry-action")).toHaveLength(2);
     expect(container.querySelector(".onboarding-provider-strip")).toBeNull();
     expect(container.querySelector(".onboarding-provider-source")).toBeNull();
     expect(container.querySelector("[data-provider='notion']")).toBeNull();
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
     expect(css).toMatch(/\.onboarding-homepage\s*\{[^}]*width:\s*min\(480px, 100%\);[^}]*align-content:\s*start;[^}]*gap:\s*30px;/s);
     expect(css).toMatch(/\.onboarding-homepage\.is-empty\s*\{[^}]*width:\s*min\(450px, 100%\);[^}]*min-height:\s*min\(430px, 100%\);[^}]*align-content:\s*center;[^}]*gap:\s*48px;/s);
-    expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*width:\s*min\(320px, 100%\);[^}]*flex-direction:\s*row;[^}]*align-items:\s*center;[^}]*justify-self:\s*center;[^}]*justify-content:\s*flex-start;[^}]*gap:\s*10px;/s);
+    expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*width:\s*min\(360px, 100%\);[^}]*flex-direction:\s*row;[^}]*align-items:\s*center;[^}]*justify-self:\s*center;[^}]*justify-content:\s*flex-start;[^}]*gap:\s*10px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*color:\s*var\(--po-text-muted\);/s);
     expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*40px;[^}]*height:\s*40px;/s);
     expect(css).not.toContain(".onboarding-brand-version");
-    expect(css).toMatch(/\.onboarding-primary-area\s*\{[^}]*width:\s*min\(320px, 100%\);[^}]*justify-self:\s*center;[^}]*justify-items:\s*center;[^}]*padding:\s*18px;[^}]*border:\s*1px solid var\(--po-border\);[^}]*border-radius:\s*0;[^}]*background:\s*transparent;/s);
+    expect(css).toMatch(/\.onboarding-primary-area\s*\{[^}]*width:\s*min\(360px, 100%\);[^}]*justify-self:\s*center;[^}]*justify-items:\s*center;[^}]*padding:\s*18px;[^}]*border:\s*1px solid var\(--po-border\);[^}]*border-radius:\s*0;[^}]*background:\s*transparent;/s);
     expect(css).toMatch(/\.onboarding-entry-launcher\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/s);
-    expect(css).toMatch(/\.onboarding-entry-actions\s*\{[^}]*gap:\s*12px;/s);
+    expect(css).toMatch(/\.onboarding-entry-actions\s*\{[^}]*justify-items:\s*center;[^}]*gap:\s*16px;/s);
+    expect(css).toMatch(/\.onboarding-entry-secondary-row\s*\{[^}]*width:\s*100%;[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);[^}]*gap:\s*12px;/s);
     expect(css).toMatch(/\.onboarding-entry-action\s*\{[^}]*width:\s*100%;[^}]*height:\s*38px;[^}]*min-height:\s*38px;[^}]*justify-content:\s*flex-start;[^}]*border-radius:\s*var\(--desktop-control-radius\);[^}]*font-size:\s*var\(--po-text-size-body, 13px\);[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);[^}]*text-align:\s*start;/s);
     expect(css).toMatch(/\.onboarding-entry-action-primary\s*\{[^}]*background:\s*var\(--po-text\);[^}]*color:\s*var\(--po-text-inverse\);[^}]*font-weight:\s*var\(--po-text-weight-semibold, 600\);/s);
+    expect(css).toMatch(/\.onboarding-entry-action-folder\s*\{[^}]*width:\s*180px;[^}]*height:\s*180px;[^}]*min-height:\s*180px;[^}]*flex-direction:\s*column;[^}]*justify-content:\s*center;[^}]*gap:\s*14px;[^}]*text-align:\s*center;/s);
     expect(css).toMatch(/\.onboarding-entry-action-secondary\s*\{[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-subtle\);/s);
-    expect(css).toMatch(/\.onboarding-entry-action-secondary\.onboarding-clone-action\s*\{[^}]*border-color:\s*transparent;[^}]*background:\s*transparent;[^}]*color:\s*color-mix\(in srgb, var\(--po-text-subtle\) 72%, transparent\);[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);/s);
+    expect(css).not.toContain(".onboarding-entry-action-secondary.onboarding-clone-action");
     expect(css).not.toContain(".onboarding-clone-entry");
     expect(css).toMatch(/\.onboarding-entry-create-row\s*\{[^}]*min-height:\s*52px;[^}]*grid-template-columns:\s*104px minmax\(0, 1fr\);[^}]*gap:\s*16px;/s);
     expect(css).toMatch(/\.onboarding-entry-dialog \.desktop-dialog-button\.primary\.file:disabled\s*\{[^}]*border-color:\s*var\(--po-border-subtle\);[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-disabled\);/s);

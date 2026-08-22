@@ -237,7 +237,7 @@ export function MinimalOnboarding({
             <div className="onboarding-entry-launcher" role="group" aria-label={t("onboarding.projects.title")}>
               <div className="onboarding-entry-actions">
                 <Button
-                  className={`onboarding-entry-action onboarding-entry-action-primary ${folderDrop.dragging ? "is-dragging" : ""}`}
+                  className={`onboarding-entry-action onboarding-entry-action-primary onboarding-entry-action-folder ${folderDrop.dragging ? "is-dragging" : ""}`}
                   tone="primary"
                   disabled={busy}
                   aria-busy={openingPath === "__new__" || undefined}
@@ -249,25 +249,27 @@ export function MinimalOnboarding({
                   {t("onboarding.action.openFolder")}
                 </Button>
 
-                <Button
-                  className="onboarding-entry-action onboarding-entry-action-secondary"
-                  tone="neutral"
-                  disabled={busy || !onCreateProject || !onChooseProjectLocation}
-                  leadingIcon={<FilePlus2 className="onboarding-entry-create-icon" aria-hidden="true" />}
-                  onClick={() => setEntryDialog("create")}
-                >
-                  {t("onboarding.action.createLocalProject")}
-                </Button>
+                <div className="onboarding-entry-secondary-row">
+                  <Button
+                    className="onboarding-entry-action onboarding-entry-action-secondary"
+                    tone="neutral"
+                    disabled={busy || !onCreateProject || !onChooseProjectLocation}
+                    leadingIcon={<FilePlus2 className="onboarding-entry-create-icon" aria-hidden="true" />}
+                    onClick={() => setEntryDialog("create")}
+                  >
+                    {t("onboarding.action.createLocalProject")}
+                  </Button>
 
-                <Button
-                  className="onboarding-entry-action onboarding-entry-action-secondary onboarding-clone-action"
-                  tone="neutral"
-                  disabled={busy || !onCloneRepository}
-                  leadingIcon={<GitFork aria-hidden="true" />}
-                  onClick={() => setEntryDialog("clone")}
-                >
-                  {t("onboarding.action.cloneRepository")}
-                </Button>
+                  <Button
+                    className="onboarding-entry-action onboarding-entry-action-secondary onboarding-clone-action"
+                    tone="neutral"
+                    disabled={busy || !onCloneRepository}
+                    leadingIcon={<GitFork aria-hidden="true" />}
+                    onClick={() => setEntryDialog("clone")}
+                  >
+                    {t("onboarding.action.cloneRepository")}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
