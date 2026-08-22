@@ -112,9 +112,18 @@ describe("project folder home", () => {
   it("uses two compact actions and a separate clone-provider strip when there are no projects", async () => {
     const css = readFileSync(`${process.cwd()}/src/styles/onboarding.css`, "utf8");
     const onChooseWorkspace = vi.fn(async () => undefined);
+    const onChooseProjectLocation = vi.fn(async () => ({
+      grantId: "location-1",
+      path: "/Users/example/Desktop",
+    }));
     const onCreateProject = vi.fn(async () => true);
     const onCloneRepository = vi.fn(async () => true);
-    const container = renderHome({ onChooseWorkspace, onCreateProject, onCloneRepository });
+    const container = renderHome({
+      onChooseWorkspace,
+      onChooseProjectLocation,
+      onCreateProject,
+      onCloneRepository,
+    });
 
     expectBrandLockup(container);
     const actions = [...container.querySelectorAll<HTMLButtonElement>(".onboarding-entry-action")];
@@ -152,6 +161,7 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-entry-action-secondary\s*\{[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-subtle\);/s);
     expect(css).toMatch(/\.onboarding-provider-label\s*\{[^}]*font-size:\s*var\(--po-text-size-body, 13px\);/s);
     expect(css).toMatch(/\.onboarding-provider-action\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;[^}]*border:\s*0;[^}]*background:\s*transparent;/s);
+    expect(css).toMatch(/\.onboarding-entry-create-row\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 180px;/s);
     expect(css).not.toContain(".folder-drop-zone");
 
     await act(async () => actions[0]?.click());
@@ -160,10 +170,18 @@ describe("project folder home", () => {
     expect(onCloneRepository).not.toHaveBeenCalled();
   });
 
-  it("collects one focused value for Create New and Import from GitHub", async () => {
+  it("collects a project name and an explicitly browsed Location before creating", async () => {
+    const onChooseProjectLocation = vi.fn(async () => ({
+      grantId: "location-1",
+      path: "/Users/example/Desktop",
+    }));
     const onCreateProject = vi.fn(async () => true);
     const onCloneRepository = vi.fn(async () => true);
-    const container = renderHome({ onCreateProject, onCloneRepository });
+    const container = renderHome({
+      onChooseProjectLocation,
+      onCreateProject,
+      onCloneRepository,
+    });
 
     await act(async () => {
       container.querySelectorAll<HTMLButtonElement>(".onboarding-entry-action")[1]?.click();
@@ -171,13 +189,31 @@ describe("project folder home", () => {
     expect(container.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe("Create a local project");
     const projectName = container.querySelector<HTMLInputElement>(".onboarding-entry-dialog input");
     expect(projectName?.placeholder).toBe("My project");
+    const createButton = container.querySelector<HTMLButtonElement>(".onboarding-entry-dialog button[type='submit']");
+    expect(createButton?.disabled).toBe(true);
     setInputValue(projectName, "Knowledge Base");
+    expect(createButton?.disabled).toBe(true);
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".onboarding-entry-dialog button[type='submit']")?.click();
+      container.querySelector<HTMLButtonElement>(".onboarding-entry-browse-button")?.click();
       await Promise.resolve();
     });
-    expect(onCreateProject).toHaveBeenCalledWith({ name: "Knowledge Base" });
+    expect(onChooseProjectLocation).toHaveBeenCalledOnce();
+    expect(container.querySelector(".onboarding-entry-location-path")?.textContent).toBe("/Users/example/Desktop");
+    expect(createButton?.disabled).toBe(false);
+    await act(async () => {
+      createButton?.click();
+      await Promise.resolve();
+    });
+    expect(onCreateProject).toHaveBeenCalledWith({
+      name: "Knowledge Base",
+      locationGrantId: "location-1",
+    });
     expect(container.querySelector(".onboarding-entry-dialog")).toBeNull();
+  });
+
+  it("collects one focused value for Import from GitHub", async () => {
+    const onCloneRepository = vi.fn(async () => true);
+    const container = renderHome({ onCloneRepository });
 
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".onboarding-provider-action[data-provider='github']")?.click();

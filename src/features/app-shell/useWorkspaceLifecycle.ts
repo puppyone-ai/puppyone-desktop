@@ -12,12 +12,14 @@ import {
   createLocalProjectTarget,
   openDroppedWorkspaceTarget,
   openWorkspaceTarget,
+  selectLocalProjectLocationTarget,
   selectLocalWorkspaceFolder,
 } from "../../lib/workspaceOpening";
 import type {
   WorkspaceCloneRepositoryRequest,
   WorkspaceCreateProjectRequest,
   WorkspaceOpenResult,
+  WorkspaceProjectLocationGrant,
 } from "../../types/electron";
 import {
   getRecentWorkspaceItems,
@@ -120,6 +122,10 @@ export function useWorkspaceLifecycle({
     return result !== null;
   }, [handleWorkspaceOpenResult]);
 
+  const chooseProjectLocation = useCallback(async (): Promise<WorkspaceProjectLocationGrant | null> => {
+    return selectLocalProjectLocationTarget();
+  }, []);
+
   const cloneRepository = useCallback(async (request: WorkspaceCloneRepositoryRequest) => {
     const result = await cloneGitHubRepositoryTarget(request);
     handleWorkspaceOpenResult(result);
@@ -202,6 +208,7 @@ export function useWorkspaceLifecycle({
   return {
     activateWorkspace,
     clearWorkspace,
+    chooseProjectLocation,
     cloneRepository,
     createProject,
     forgetActiveWorkspace,

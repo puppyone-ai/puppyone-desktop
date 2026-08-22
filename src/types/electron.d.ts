@@ -547,6 +547,12 @@ export type WorkspaceOpenResult = {
 
 export type WorkspaceCreateProjectRequest = {
   name: string;
+  locationGrantId: string;
+};
+
+export type WorkspaceProjectLocationGrant = {
+  grantId: string;
+  path: string;
 };
 
 export type WorkspaceCloneRepositoryRequest = {
@@ -901,6 +907,7 @@ declare global {
       openDroppedWorkspaceInCurrentWindow: (folder: File) => Promise<WorkspaceOpenResult>;
       selectFolder: () => Promise<WorkspaceOpenResult | null>;
       selectFolderInNewWindow: () => Promise<WorkspaceOpenResult | null>;
+      selectLocalProjectLocation: () => Promise<WorkspaceProjectLocationGrant | null>;
       createLocalProject: (
         request: WorkspaceCreateProjectRequest,
       ) => Promise<WorkspaceOpenResult | null>;

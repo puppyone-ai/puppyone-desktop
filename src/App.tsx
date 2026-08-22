@@ -131,6 +131,7 @@ function AppContent() {
   const [activeCloudSection, setActiveCloudSection] = useState<CloudWorkspaceSection>("initialize");
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const {
+    chooseProjectLocation,
     clearWorkspace,
     cloneRepository,
     createProject,
@@ -849,6 +850,7 @@ function AppContent() {
     return (
       <Homepage
         onChooseWorkspace={openFolder}
+        onChooseProjectLocation={chooseProjectLocation}
         onCreateProject={createProject}
         onCloneRepository={cloneRepository}
         onOpenDroppedWorkspace={openDroppedWorkspace}

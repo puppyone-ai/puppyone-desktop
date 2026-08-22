@@ -1,6 +1,7 @@
 import { FolderPlus, Github } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useLocalization } from "@puppyone/localization";
+import type { WorkspaceProjectLocationGrant } from "../types/electron";
 import {
   DesktopDialogCloseButton,
   DesktopDialogRoot,
@@ -11,17 +12,22 @@ export type OnboardingProjectEntryKind = "create" | "clone";
 export function OnboardingProjectEntryDialog({
   kind,
   onClose,
+  onChooseLocation,
   onSubmit,
 }: {
   kind: OnboardingProjectEntryKind;
   onClose: () => void;
-  onSubmit: (value: string) => Promise<boolean>;
+  onChooseLocation?: () => Promise<WorkspaceProjectLocationGrant | null>;
+  onSubmit: (value: string, locationGrantId: string | null) => Promise<boolean>;
 }) {
   const { t } = useLocalization();
   const [value, setValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [choosingLocation, setChoosingLocation] = useState(false);
+  const [location, setLocation] = useState<WorkspaceProjectLocationGrant | null>(null);
   const [error, setError] = useState<string | null>(null);
   const create = kind === "create";
+  const busy = submitting || choosingLocation;
   const title = t(create
     ? "onboarding.entry.create.title"
     : "onboarding.entry.clone.title");
@@ -29,11 +35,11 @@ export function OnboardingProjectEntryDialog({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalizedValue = value.trim();
-    if (!normalizedValue || submitting) return;
+    if (!normalizedValue || busy || (create && !location)) return;
     setError(null);
     setSubmitting(true);
     try {
-      const opened = await onSubmit(normalizedValue);
+      const opened = await onSubmit(normalizedValue, location?.grantId ?? null);
       if (opened) {
         onClose();
         return;
@@ -44,14 +50,28 @@ export function OnboardingProjectEntryDialog({
     setSubmitting(false);
   };
 
+  const chooseLocation = async () => {
+    if (!onChooseLocation || busy) return;
+    setError(null);
+    setChoosingLocation(true);
+    try {
+      const nextLocation = await onChooseLocation();
+      if (nextLocation) setLocation(nextLocation);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : String(nextError));
+    } finally {
+      setChoosingLocation(false);
+    }
+  };
+
   return (
     <DesktopDialogRoot
-      onClose={submitting ? undefined : onClose}
-      dismissOnBackdrop={!submitting}
+      onClose={busy ? undefined : onClose}
+      dismissOnBackdrop={!busy}
       className="onboarding-entry-dialog-root"
     >
       <form
-        className="desktop-dialog-surface desktop-file-dialog onboarding-entry-dialog"
+        className={`desktop-dialog-surface desktop-file-dialog onboarding-entry-dialog ${create ? "is-create" : "is-import"}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -69,39 +89,94 @@ export function OnboardingProjectEntryDialog({
           </div>
           <DesktopDialogCloseButton
             title={t("common.action.close")}
-            disabled={submitting}
+            disabled={busy}
             onClick={onClose}
           />
         </header>
 
         <div className="desktop-dialog-body desktop-file-dialog-body onboarding-entry-dialog-body">
-          <label className="desktop-dialog-field">
-            <span>{t(create
-              ? "onboarding.entry.create.nameLabel"
-              : "onboarding.entry.clone.urlLabel")}</span>
-            <input
-              value={value}
-              type="text"
-              inputMode={create ? "text" : "url"}
-              maxLength={create ? 120 : undefined}
-              autoCapitalize="none"
-              autoCorrect="off"
-              autoComplete="off"
-              spellCheck={false}
-              disabled={submitting}
-              data-desktop-dialog-initial-focus="true"
-              placeholder={t(create
-                ? "onboarding.entry.create.namePlaceholder"
-                : "onboarding.entry.clone.urlPlaceholder")}
-              onChange={(event) => {
-                setValue(event.target.value);
-                setError(null);
-              }}
-            />
-          </label>
-          <p className="desktop-dialog-note onboarding-entry-dialog-note">
-            {t("onboarding.entry.chooseLocationHint")}
-          </p>
+          {create ? (
+            <div className="onboarding-entry-create-fields">
+              <label className="onboarding-entry-create-row">
+                <span className="onboarding-entry-create-copy">
+                  <span className="onboarding-entry-create-label">
+                    {t("onboarding.entry.create.nameLabel")}
+                  </span>
+                  <span className="onboarding-entry-create-detail">
+                    {t("onboarding.entry.create.nameHint")}
+                  </span>
+                </span>
+                <input
+                  className="onboarding-entry-create-input"
+                  value={value}
+                  type="text"
+                  inputMode="text"
+                  maxLength={120}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={busy}
+                  data-desktop-dialog-initial-focus="true"
+                  placeholder={t("onboarding.entry.create.namePlaceholder")}
+                  onChange={(event) => {
+                    setValue(event.target.value);
+                    setError(null);
+                  }}
+                />
+              </label>
+              <div className="onboarding-entry-create-row">
+                <span className="onboarding-entry-create-copy">
+                  <span className="onboarding-entry-create-label">
+                    {t("onboarding.entry.create.locationLabel")}
+                  </span>
+                  <bdi
+                    className={`onboarding-entry-create-detail onboarding-entry-location-path ${location ? "is-selected" : ""}`}
+                    dir={location ? "ltr" : undefined}
+                    title={location?.path}
+                    aria-live="polite"
+                  >
+                    {location?.path ?? t("onboarding.entry.create.locationHint")}
+                  </bdi>
+                </span>
+                <button
+                  className="desktop-dialog-button onboarding-entry-browse-button"
+                  type="button"
+                  disabled={busy || !onChooseLocation}
+                  onClick={() => void chooseLocation()}
+                >
+                  {t(choosingLocation
+                    ? "onboarding.entry.create.browsing"
+                    : "onboarding.entry.create.browse")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <label className="desktop-dialog-field">
+                <span>{t("onboarding.entry.clone.urlLabel")}</span>
+                <input
+                  value={value}
+                  type="text"
+                  inputMode="url"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={busy}
+                  data-desktop-dialog-initial-focus="true"
+                  placeholder={t("onboarding.entry.clone.urlPlaceholder")}
+                  onChange={(event) => {
+                    setValue(event.target.value);
+                    setError(null);
+                  }}
+                />
+              </label>
+              <p className="desktop-dialog-note onboarding-entry-dialog-note">
+                {t("onboarding.entry.chooseLocationHint")}
+              </p>
+            </>
+          )}
           {error && <p className="desktop-dialog-error" role="alert">{error}</p>}
         </div>
 
@@ -109,7 +184,7 @@ export function OnboardingProjectEntryDialog({
           <button
             className="desktop-dialog-button"
             type="button"
-            disabled={submitting}
+            disabled={busy}
             onClick={onClose}
           >
             {t("common.action.cancel")}
@@ -117,7 +192,7 @@ export function OnboardingProjectEntryDialog({
           <button
             className="desktop-dialog-button primary file"
             type="submit"
-            disabled={submitting || !value.trim()}
+            disabled={busy || !value.trim() || (create && !location)}
           >
             {t(submitting
               ? create

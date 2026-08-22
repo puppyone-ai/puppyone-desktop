@@ -2,6 +2,7 @@ import type {
   WorkspaceCloneRepositoryRequest,
   WorkspaceCreateProjectRequest,
   WorkspaceOpenResult,
+  WorkspaceProjectLocationGrant,
 } from "../types/electron";
 import {
   cloneGitHubRepository as cloneGitHubRepositoryBridge,
@@ -9,6 +10,7 @@ import {
   openDroppedWorkspaceInCurrentWindow as openDroppedWorkspaceInCurrentWindowBridge,
   openWorkspaceInCurrentWindow as openWorkspaceInCurrentWindowBridge,
   openWorkspaceInNewWindow as openWorkspaceInNewWindowBridge,
+  selectLocalProjectLocation as selectLocalProjectLocationBridge,
   selectWorkspaceFolder as selectWorkspaceFolderBridge,
   selectWorkspaceFolderInNewWindow as selectWorkspaceFolderInNewWindowBridge,
 } from "./localFiles";
@@ -37,6 +39,10 @@ export async function createLocalProjectTarget(
   request: WorkspaceCreateProjectRequest,
 ): Promise<WorkspaceOpenResult | null> {
   return createLocalProjectBridge(request);
+}
+
+export async function selectLocalProjectLocationTarget(): Promise<WorkspaceProjectLocationGrant | null> {
+  return selectLocalProjectLocationBridge();
 }
 
 export async function cloneGitHubRepositoryTarget(

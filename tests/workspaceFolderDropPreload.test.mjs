@@ -23,12 +23,17 @@ describe("workspace folder drop preload boundary", () => {
     expect(invoke).not.toHaveBeenCalled();
   });
 
-  it("exposes narrow create and clone requests without accepting a renderer path", async () => {
+  it("exposes a location grant and narrow create/clone requests without accepting a renderer path", async () => {
     const invoke = vi.fn(async () => ({ status: "opened-current" }));
     const bridge = await loadPreloadBridge({ invoke, getPathForFile: () => "" });
 
-    await bridge.createLocalProject({ name: "Notes" });
-    expect(invoke).toHaveBeenCalledWith("workspace:create-project-current", { name: "Notes" });
+    await bridge.selectLocalProjectLocation();
+    expect(invoke).toHaveBeenCalledWith("workspace:select-project-location-current");
+    await bridge.createLocalProject({ name: "Notes", locationGrantId: "location-1" });
+    expect(invoke).toHaveBeenCalledWith("workspace:create-project-current", {
+      name: "Notes",
+      locationGrantId: "location-1",
+    });
     await bridge.cloneGitHubRepository({ repositoryUrl: "https://github.com/owner/repository.git" });
     expect(invoke).toHaveBeenCalledWith("workspace:clone-repository-current", {
       repositoryUrl: "https://github.com/owner/repository.git",

@@ -86,6 +86,7 @@ import {
   requireGitHubRepository,
   requireProjectName,
 } from "./main/project-entry-service.mjs";
+import { createProjectLocationGrantStore } from "./main/project-location-grants.mjs";
 import { createDesktopLocaleService } from "./main/localization/desktop-locale-service.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
@@ -274,6 +275,7 @@ const workspaceStateStore = createWorkspaceStateStore({
 });
 const projectEntryService = createProjectEntryService();
 const projectEntryOperationSenders = new Set();
+const projectLocationGrants = createProjectLocationGrantStore();
 const cloudAuthService = createCloudAuthService({
   app,
   requestCloudApi,
@@ -752,6 +754,7 @@ function registerIpcHandlers() {
     openWorkspaceInNewWindow,
     createProjectForCurrentWindow,
     cloneRepositoryForCurrentWindow,
+    selectProjectLocationForCurrentWindow,
     selectWorkspaceForCurrentWindow,
     selectWorkspaceForNewWindow,
   });
@@ -999,13 +1002,22 @@ async function showWorkspaceOpenDialog(ownerWindow) {
 async function createProjectForCurrentWindow(sender, request) {
   const name = requireProjectName(request?.name);
   return runProjectEntryOperation(sender, async () => {
-    const parentPath = await selectProjectParentDirectory(sender, "create");
-    if (!parentPath) return null;
+    const parentPath = projectLocationGrants.resolve(sender, request?.locationGrantId);
     const project = await projectEntryService.createProject({
       parentPath,
       name,
     });
+    projectLocationGrants.revoke(sender, request.locationGrantId);
     return openWorkspaceInCurrentWindow(sender, project.path);
+  });
+}
+
+async function selectProjectLocationForCurrentWindow(sender) {
+  return runProjectEntryOperation(sender, async () => {
+    const parentPath = await selectProjectParentDirectory(sender, "create");
+    if (!parentPath) return null;
+    const canonicalPath = await fs.promises.realpath(parentPath);
+    return projectLocationGrants.issue(sender, canonicalPath);
   });
 }
 

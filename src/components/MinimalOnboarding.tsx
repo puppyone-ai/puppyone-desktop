@@ -34,6 +34,7 @@ import { writeClipboardText } from "../features/settings/utils";
 import type {
   WorkspaceCloneRepositoryRequest,
   WorkspaceCreateProjectRequest,
+  WorkspaceProjectLocationGrant,
 } from "../types/electron";
 import { DesktopMenuIconButton, DesktopMenuItem } from "./DesktopMenu";
 import { InlineLoading } from "./loading";
@@ -59,6 +60,7 @@ export type OnboardingOperationStatus = {
 
 export type MinimalOnboardingProps = {
   onChooseWorkspace: () => Promise<void>;
+  onChooseProjectLocation?: () => Promise<WorkspaceProjectLocationGrant | null>;
   onCreateProject?: (request: WorkspaceCreateProjectRequest) => Promise<boolean>;
   onCloneRepository?: (request: WorkspaceCloneRepositoryRequest) => Promise<boolean>;
   onOpenWorkspacePath: (path: string) => Promise<void>;
@@ -82,6 +84,7 @@ export type MinimalOnboardingProps = {
 /** Local repository entrypoint. Cloud is entered from an open repository only. */
 export function MinimalOnboarding({
   onChooseWorkspace,
+  onChooseProjectLocation,
   onCreateProject,
   onCloneRepository,
   onOpenWorkspacePath,
@@ -250,7 +253,7 @@ export function MinimalOnboarding({
                 <Button
                   className="onboarding-entry-action onboarding-entry-action-secondary"
                   tone="neutral"
-                  disabled={busy || !onCreateProject}
+                  disabled={busy || !onCreateProject || !onChooseProjectLocation}
                   leadingIcon={<FilePlus2 className="onboarding-entry-create-icon" aria-hidden="true" />}
                   onClick={() => setEntryDialog("create")}
                 >
@@ -347,11 +350,15 @@ export function MinimalOnboarding({
 
         {error && <div className="onboarding-error onboarding-homepage-error" role="alert"><AlertTriangle size={15} /><span>{error}</span></div>}
       </section>
-      {entryDialog === "create" && onCreateProject && (
+      {entryDialog === "create" && onCreateProject && onChooseProjectLocation && (
         <OnboardingProjectEntryDialog
           kind="create"
           onClose={() => setEntryDialog(null)}
-          onSubmit={(value) => onCreateProject({ name: value })}
+          onChooseLocation={onChooseProjectLocation}
+          onSubmit={(value, locationGrantId) => onCreateProject({
+            name: value,
+            locationGrantId: locationGrantId ?? "",
+          })}
         />
       )}
       {entryDialog === "clone" && onCloneRepository && (

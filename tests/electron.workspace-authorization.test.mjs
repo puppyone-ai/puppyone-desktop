@@ -217,6 +217,10 @@ describe("recent workspace authorization", () => {
     const openWorkspaceInNewWindow = vi.fn(async () => ({ status: "opened-new" }));
     const createProjectForCurrentWindow = vi.fn(async () => ({ status: "created-current" }));
     const cloneRepositoryForCurrentWindow = vi.fn(async () => ({ status: "cloned-current" }));
+    const selectProjectLocationForCurrentWindow = vi.fn(async () => ({
+      grantId: "location-1",
+      path: root,
+    }));
     registerWorkspaceNavigationIpcHandlers({
       ipcMain,
       workspaceStateStore: stateStore,
@@ -227,6 +231,7 @@ describe("recent workspace authorization", () => {
       openWorkspaceInNewWindow,
       createProjectForCurrentWindow,
       cloneRepositoryForCurrentWindow,
+      selectProjectLocationForCurrentWindow,
       createCloudWorkspaceFromRequest: vi.fn(),
       openVirtualWorkspaceInNewWindow: vi.fn(),
       selectWorkspaceForCurrentWindow: vi.fn(),
@@ -254,9 +259,18 @@ describe("recent workspace authorization", () => {
     expect(openWorkspaceInCurrentWindow).toHaveBeenCalledWith(event.sender, otherRoot);
     await expect(handlers.get("workspace:open-dropped-current")(event, "  ")).rejects.toThrow(/path is required/i);
 
-    await expect(handlers.get("workspace:create-project-current")(event, { name: "Notes" }))
+    await expect(handlers.get("workspace:select-project-location-current")(event))
+      .resolves.toEqual({ grantId: "location-1", path: root });
+    expect(selectProjectLocationForCurrentWindow).toHaveBeenCalledWith(event.sender);
+    await expect(handlers.get("workspace:create-project-current")(event, {
+      name: "Notes",
+      locationGrantId: "location-1",
+    }))
       .resolves.toEqual({ status: "created-current" });
-    expect(createProjectForCurrentWindow).toHaveBeenCalledWith(event.sender, { name: "Notes" });
+    expect(createProjectForCurrentWindow).toHaveBeenCalledWith(event.sender, {
+      name: "Notes",
+      locationGrantId: "location-1",
+    });
     await expect(handlers.get("workspace:clone-repository-current")(event, {
       repositoryUrl: "https://github.com/owner/repository.git",
     })).resolves.toEqual({ status: "cloned-current" });

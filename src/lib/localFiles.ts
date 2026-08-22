@@ -27,6 +27,7 @@ import type {
   WorkspaceOpenEntryExternalRequest,
   WorkspaceImportEntriesResult,
   WorkspaceOpenResult,
+  WorkspaceProjectLocationGrant,
   WorkspaceResolveExternalOpenTargetRequest,
 } from "../types/electron";
 import {
@@ -329,6 +330,10 @@ export async function createLocalProject(
   request: WorkspaceCreateProjectRequest,
 ): Promise<WorkspaceOpenResult | null> {
   return getDesktopBridge().createLocalProject(request);
+}
+
+export async function selectLocalProjectLocation(): Promise<WorkspaceProjectLocationGrant | null> {
+  return getDesktopBridge().selectLocalProjectLocation();
 }
 
 export async function cloneGitHubRepository(

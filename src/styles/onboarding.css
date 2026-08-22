@@ -268,6 +268,10 @@
   width: min(380px, calc(100vw - 32px));
 }
 
+.onboarding-entry-dialog.is-create {
+  width: min(480px, calc(100vw - 32px));
+}
+
 .onboarding-entry-dialog .desktop-dialog-header {
   padding-block: var(--onboarding-entry-inset) 10px;
   padding-inline: var(--onboarding-entry-inset);
@@ -277,6 +281,92 @@
   gap: 8px;
   padding-block: 8px 16px;
   padding-inline: var(--onboarding-entry-inset);
+}
+
+.onboarding-entry-dialog.is-create .onboarding-entry-dialog-body {
+  gap: 0;
+  padding-block: 2px 14px;
+}
+
+.onboarding-entry-create-fields {
+  display: grid;
+  min-width: 0;
+}
+
+.onboarding-entry-create-row {
+  display: grid;
+  min-width: 0;
+  min-height: 68px;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  align-items: center;
+  gap: 20px;
+  padding-block: 10px;
+}
+
+.onboarding-entry-create-row + .onboarding-entry-create-row {
+  border-top: 1px solid var(--po-divider);
+}
+
+.onboarding-entry-create-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.onboarding-entry-create-label {
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.onboarding-entry-create-detail {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--po-text-subtle);
+  font-size: 12px;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.onboarding-entry-location-path.is-selected {
+  color: var(--po-text-muted);
+}
+
+.onboarding-entry-create-input {
+  width: 100%;
+  height: 32px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--po-border-strong);
+  border-radius: 6px;
+  background: var(--po-panel-raised);
+  color: var(--po-text);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  outline: none;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.onboarding-entry-create-input:focus {
+  border-color: var(--po-focus-ring);
+}
+
+.onboarding-entry-create-input:disabled {
+  color: var(--po-text-disabled);
+  cursor: default;
+  opacity: 0.68;
+}
+
+.onboarding-entry-browse-button {
+  width: 96px;
+  justify-self: end;
+}
+
+.onboarding-entry-dialog.is-create .desktop-dialog-error {
+  margin-top: 8px;
 }
 
 .onboarding-entry-dialog .desktop-dialog-footer {
