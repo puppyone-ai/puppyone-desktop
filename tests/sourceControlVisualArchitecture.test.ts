@@ -263,6 +263,7 @@ describe("source-control visual architecture", () => {
     );
     expect(sourceControlSidebarSectionsSource).toContain('layout === "dividers" && (');
     expect(sourceControlSidebarSectionsSource).toContain('layout === "cards" && <GitHubRepositoryLink');
+    expect(sourceControlSidebarSectionsSource).toContain('(layout === "cards" || hasIncomingChanges) && (');
     expect(sourceControlSidebarSectionsSource).toContain("<GitHubRepositoryLink");
     expect(sourceControlSidebarSectionsSource).toContain("<GitHubChangesCard");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-change-card");

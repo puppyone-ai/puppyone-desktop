@@ -7,6 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GitHubProviderSection } from "../src/features/source-control/sidebar/GitSidebarProviders";
 import type { GitScmSyncSection } from "../src/features/source-control/types";
+import type { GitSidebarLayout } from "../src/preferences";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -19,7 +20,7 @@ afterEach(() => {
 });
 
 describe("GitHub provider section", () => {
-  it("keeps the repository identity link inside an up-to-date card", () => {
+  it("keeps the repository identity link inside an up-to-date Cards surface", () => {
     const surface = renderProvider(createSection());
 
     expect(surface.textContent).toContain("repository");
@@ -39,6 +40,14 @@ describe("GitHub provider section", () => {
       surface.querySelector(".desktop-git-hosting-identity-link"),
     )).toBe(true);
     expect(surface.querySelector(".desktop-git-hosting-repository-row")).toBeNull();
+  });
+
+  it("hides the up-to-date status card in Dividers while retaining repository identity", () => {
+    const surface = renderProvider(createSection(), { layout: "dividers" });
+
+    expect(surface.querySelector(".desktop-git-card-divider .desktop-git-hosting-identity-link")).not.toBeNull();
+    expect(surface.querySelector(".desktop-git-github-change-card")).toBeNull();
+    expect(surface.textContent).not.toContain("Already up to date.");
   });
 
   it("renders the update age as static, non-interactive information", async () => {
@@ -154,6 +163,7 @@ function createSection(overrides: Partial<GitScmSyncSection> = {}): GitScmSyncSe
 function renderProvider(
   section: GitScmSyncSection,
   callbacks: {
+    layout?: GitSidebarLayout;
     incomingUpdatedAt?: string;
     incomingFileSummary?: {
       total: number;
@@ -176,6 +186,7 @@ function renderProvider(
     <GitHubProviderSection
       identity={{ provider: "github", label: "owner/repository", href: "https://github.com/owner/repository" }}
       section={section}
+      layout={callbacks.layout ?? "cards"}
       incomingUpdatedAt={callbacks.incomingUpdatedAt ?? null}
       incomingFileSummary={callbacks.incomingFileSummary ?? {
         total: 0,
