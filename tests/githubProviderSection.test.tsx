@@ -96,7 +96,11 @@ describe("GitHub provider section", () => {
     expect(surface.querySelector(".desktop-working-tree-main")).toBeNull();
     expect(surface.textContent).not.toContain("Empty");
 
+    const card = surface.querySelector(".desktop-git-github-change-card");
+    const identityRow = surface.querySelector(".desktop-git-hosting-identity-row");
     const pullButton = surface.querySelector<HTMLButtonElement>(".desktop-git-remote-action");
+    expect(card?.contains(pullButton ?? null)).toBe(true);
+    expect(identityRow?.contains(pullButton ?? null)).toBe(false);
     await act(async () => pullButton?.click());
 
     expect(onPull).toHaveBeenCalledTimes(1);

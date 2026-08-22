@@ -123,10 +123,8 @@ export function getCommittedSummary(count: number, actionLabel: string, t: Messa
 
 export function GitHostingIdentityRow({
   identity,
-  action = null,
 }: {
   identity: GitHostingIdentity;
-  action?: ReactNode;
 }) {
   const { t } = useLocalization();
   const { label, href } = identity;
@@ -153,7 +151,6 @@ export function GitHostingIdentityRow({
           <span>GitHub</span>
         </div>
       )}
-      {action}
     </div>
   );
 }
@@ -161,9 +158,11 @@ export function GitHostingIdentityRow({
 function GitHubIncomingCommitsCard({
   commitCount,
   fileSummary,
+  action,
 }: {
   commitCount: number;
   fileSummary: GitFileChangeSummary;
+  action: ReactNode;
 }) {
   const { t, formatNumber } = useLocalization();
   const statusStats = [
@@ -212,6 +211,7 @@ function GitHubIncomingCommitsCard({
           </div>
         )}
       </div>
+      {action}
     </div>
   );
 }
@@ -241,11 +241,14 @@ export function GitHubProviderSection({
 
   return (
     <section className="desktop-git-cloud-provider-section desktop-git-github-provider-section">
-      <GitHostingIdentityRow
-        identity={identity}
-        action={pullAction ? (
+      <GitHostingIdentityRow identity={identity} />
+      {section.copy.count > 0 && (
+        <GitHubIncomingCommitsCard
+          commitCount={section.copy.count}
+          fileSummary={incomingFileSummary}
+          action={pullAction ? (
           <GitOperationButton
-            className="desktop-git-remote-action"
+            className="desktop-git-remote-action desktop-git-github-card-action"
             disabled={disabled || pullBlockedByConflicts || pullAction.disabled}
             title={pullBlockedByConflicts
               ? t("source-control.cloud.resolveBeforeDownload")
@@ -259,11 +262,6 @@ export function GitHubProviderSection({
             onClick={() => void onPull()}
           />
         ) : null}
-      />
-      {section.copy.count > 0 && (
-        <GitHubIncomingCommitsCard
-          commitCount={section.copy.count}
-          fileSummary={incomingFileSummary}
         />
       )}
     </section>

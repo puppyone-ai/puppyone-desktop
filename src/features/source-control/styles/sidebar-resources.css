@@ -695,31 +695,40 @@ body.desktop-git-sidebar-resizing {
 }
 
 .desktop-git-github-change-card {
-  display: flex;
+  display: grid;
   box-sizing: border-box;
   width: var(--git-sidebar-control-width);
-  flex-direction: column;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 6px 8px;
   margin: 7px var(--git-sidebar-control-right-gap) 4px var(--git-sidebar-control-left-gap);
-  padding: 10px 11px 9px;
-  border: 1px solid var(--po-border-subtle);
+  padding: 10px 10px 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--po-accent) 24%, var(--po-border));
   border-radius: var(--git-control-radius);
-  background: transparent;
+  background: color-mix(in srgb, var(--po-control) 56%, var(--po-sidebar));
 }
 
 .desktop-git-github-file-total {
+  grid-column: 1;
+  grid-row: 1;
+  overflow: hidden;
   color: var(--po-text);
   font-size: var(--git-font-main);
-  font-weight: var(--git-weight-strong);
+  font-weight: var(--git-weight-regular);
   line-height: var(--git-line-height);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desktop-git-github-change-meta {
   display: flex;
   min-width: 0;
+  grid-column: 1 / -1;
+  grid-row: 2;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 5px;
 }
 
 .desktop-git-github-commit-count {
@@ -737,7 +746,7 @@ body.desktop-git-sidebar-resizing {
   min-width: 0;
   flex: 0 0 auto;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   color: var(--po-text-muted);
   font-size: var(--git-font-small);
   line-height: 14px;
@@ -765,6 +774,11 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-git-github-file-stats .deleted svg {
   color: var(--po-danger);
+}
+
+.desktop-git-github-card-action {
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .desktop-git-scm-sync .desktop-git-section-title small.desktop-git-section-count-badge {
