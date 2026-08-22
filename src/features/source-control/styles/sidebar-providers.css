@@ -1,0 +1,271 @@
+.desktop-git-operation-error {
+  width: var(--git-sidebar-control-width);
+  margin-block: 0 8px;
+  margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--po-danger) 22%, transparent);
+  border-radius: var(--git-control-radius);
+  background: color-mix(in srgb, var(--po-danger) 8%, transparent);
+  color: var(--po-danger);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.desktop-git-status-limit-warning {
+  width: var(--git-sidebar-control-width);
+  margin-block: 0 8px;
+  margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--po-warning) 28%, transparent);
+  border-radius: var(--git-control-radius);
+  background: color-mix(in srgb, var(--po-warning) 10%, transparent);
+  color: color-mix(in srgb, var(--po-warning) 72%, var(--po-text));
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.desktop-git-hosting-identity-row {
+  margin: 0;
+  border-bottom: 0;
+}
+
+.desktop-git-hosting-identity-link,
+.desktop-git-hosting-identity-text {
+  text-decoration: none;
+}
+
+.desktop-git-hosting-identity-link:hover {
+  background: transparent;
+  color: var(--po-text);
+}
+
+.desktop-git-hosting-identity-link > svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  color: var(--po-text-disabled);
+}
+
+.desktop-git-cloud-provider-section {
+  min-width: 0;
+  margin-top: 0;
+  margin-bottom: calc(var(--git-section-divider-height) - var(--git-section-divider-line-offset));
+  padding-bottom: var(--git-section-divider-line-offset);
+  border-bottom: 1px solid var(--po-sidebar-divider, var(--po-divider));
+}
+
+.desktop-git-cloud-provider-body {
+  min-width: 0;
+}
+
+.desktop-git-section-row {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  width: 100%;
+  min-height: var(--desktop-sidebar-row-height);
+  padding-block: 0;
+  padding-inline: var(--git-sidebar-left-gap) var(--git-sidebar-right-gap);
+  gap: 4px;
+}
+
+.desktop-git-section-row.desktop-git-hosting-identity-row {
+  padding-bottom: var(--git-section-divider-line-offset);
+}
+
+.desktop-git-github-provider-section .desktop-git-section-row.desktop-git-hosting-identity-row {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.desktop-git-fixed-region > .desktop-git-section-row {
+  margin-top: 0;
+}
+
+.desktop-git-changes-scroll > .desktop-git-section-row {
+  margin-top: 12px;
+}
+
+.desktop-git-section-title {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: var(--git-section-title-gap);
+  height: var(--desktop-sidebar-row-height);
+  padding-block: 0;
+  padding-inline: var(--git-sidebar-content-left) var(--git-sidebar-content-right);
+  border: 0;
+  border-radius: var(--git-row-radius);
+  background: transparent;
+  color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));
+  font-size: var(--desktop-sidebar-section-title-font-size, var(--git-font-small));
+  font-weight: var(--desktop-sidebar-section-title-font-weight, var(--git-weight-regular));
+  line-height: var(--desktop-sidebar-section-title-line-height, var(--git-line-height));
+  text-align: start;
+}
+
+.desktop-git-section-title svg {
+  width: var(--git-section-leading-slot-size);
+  height: var(--git-section-leading-slot-size);
+  flex: 0 0 auto;
+  color: var(--po-text-disabled);
+  transition: transform 150ms ease;
+}
+
+.desktop-git-section-leading-icon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  align-items: center;
+  justify-content: center;
+  color: var(--po-text-muted);
+}
+
+.desktop-git-section-leading-icon img {
+  display: block;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 0.94;
+}
+
+.desktop-git-section-leading-icon svg {
+  width: 14px;
+  height: 14px;
+  color: var(--po-text-muted);
+  transition: none;
+}
+
+.desktop-git-section-title svg.expanded {
+  transform: rotate(90deg);
+}
+
+.desktop-git-section-title span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--desktop-sidebar-section-title-font-size, var(--git-font-small));
+  font-weight: var(--desktop-sidebar-section-title-font-weight, var(--git-weight-regular));
+  line-height: var(--desktop-sidebar-section-title-line-height, var(--git-line-height));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-git-section-title small {
+  color: var(--po-text-disabled);
+  font-size: var(--git-font-small);
+  font-weight: var(--git-weight-regular);
+}
+
+.desktop-git-section-title small.desktop-git-section-count-badge {
+  color: var(--po-text-disabled);
+  font-size: var(--git-font-small);
+  font-weight: var(--git-weight-regular);
+}
+
+.desktop-git-resource-summary {
+  min-width: 0;
+  flex: 0 1 auto !important;
+  margin-inline-start: auto;
+  overflow: hidden;
+  color: var(--po-text-disabled) !important;
+  font-size: 10.5px !important;
+  font-weight: var(--git-weight-regular) !important;
+  line-height: 16px !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-git-github-change-card {
+  position: relative;
+  display: grid;
+  box-sizing: border-box;
+  width: var(--git-sidebar-control-width);
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 2px var(--git-sidebar-control-right-gap) 4px var(--git-sidebar-control-left-gap);
+  padding: 10px 10px 9px 11px;
+  border: 0;
+  border-radius: var(--git-control-radius);
+  background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));
+}
+
+.desktop-git-github-file-total,
+.desktop-git-github-update-age {
+  overflow: hidden;
+  font-weight: var(--git-weight-regular);
+  line-height: var(--git-line-height);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-git-github-file-total {
+  grid-column: 1;
+  grid-row: 2;
+  color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));
+  font-size: var(--git-font-small);
+}
+
+.desktop-git-github-change-card .desktop-git-github-update-age {
+  grid-column: 1;
+  grid-row: 1;
+  color: var(--po-text-muted);
+  border-radius: 3px;
+  cursor: help;
+  font-size: var(--git-font-main);
+  outline: 0;
+}
+
+.desktop-git-github-change-card .desktop-git-github-update-age:focus-visible {
+  outline: 1px solid var(--po-focus-ring);
+  outline-offset: 2px;
+}
+
+.desktop-git-github-change-card.is-age-unavailable .desktop-git-github-file-total {
+  grid-row: 1;
+  color: var(--po-text-muted);
+  font-size: var(--git-font-main);
+}
+
+.desktop-git-github-update-tooltip {
+  position: absolute;
+  z-index: 70;
+  top: calc(100% + 6px);
+  inset-inline-start: 11px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100% - 22px);
+  padding: 5px 7px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 5px;
+  background: var(--po-overlay);
+  box-shadow: var(--po-elevation-popover);
+  color: var(--po-text-muted);
+  font-size: var(--git-font-small);
+  font-weight: var(--git-weight-regular);
+  line-height: var(--git-line-height);
+  opacity: 0;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.desktop-git-github-update-age:hover ~ .desktop-git-github-update-tooltip,
+.desktop-git-github-update-age:focus ~ .desktop-git-github-update-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.desktop-git-github-card-action {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.desktop-git-scm-sync .desktop-git-section-title small.desktop-git-section-count-badge {
+  color: var(--desktop-git-primary-bg);
+  font-weight: var(--git-weight-strong);
+}

@@ -19,6 +19,7 @@ export function SourceControlSectionHeader({
   leadingIcon,
   action,
   className,
+  controlsId,
   expanded = true,
   onToggle,
 }: {
@@ -30,6 +31,7 @@ export function SourceControlSectionHeader({
   leadingIcon?: ReactNode;
   action?: ReactNode;
   className?: string;
+  controlsId?: string;
   expanded?: boolean;
   onToggle?: () => void;
 }) {
@@ -51,7 +53,13 @@ export function SourceControlSectionHeader({
   return (
     <div className={`desktop-git-section-row ${className ?? ""}`}>
       {onToggle ? (
-        <button className="desktop-git-section-title" type="button" onClick={onToggle}>
+        <button
+          className="desktop-git-section-title"
+          type="button"
+          aria-controls={controlsId}
+          aria-expanded={expanded}
+          onClick={onToggle}
+        >
           {titleContent}
         </button>
       ) : (

@@ -1,0 +1,338 @@
+.desktop-git-backup-card {
+  display: grid;
+  grid-template-areas:
+    "copy copy"
+    "dismiss action";
+  grid-template-columns: var(--git-action-size) minmax(0, 1fr);
+  gap: 8px 6px;
+  align-items: start;
+  width: var(--git-sidebar-control-width);
+  margin-block: var(--desktop-sidebar-section-top-gap) 10px;
+  margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);
+  padding: 8px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: var(--git-control-radius);
+  background: color-mix(in srgb, var(--po-control) 36%, transparent);
+}
+
+.desktop-git-backup-copy {
+  grid-area: copy;
+  display: grid;
+  min-width: 0;
+}
+
+.desktop-git-backup-copy span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--po-text-muted);
+  font-size: var(--git-font-main);
+  font-weight: var(--git-weight-regular);
+  line-height: 1.4;
+}
+
+.desktop-git-backup-card.is-error .desktop-git-backup-copy span {
+  color: var(--po-danger);
+}
+
+.desktop-git-backup-action {
+  grid-area: action;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  gap: 5px;
+  height: var(--git-action-size);
+  min-width: 82px;
+  padding: 0 var(--git-action-padding-inline);
+  border: 1px solid color-mix(in srgb, var(--po-text) 32%, var(--po-border));
+  border-radius: var(--git-action-radius);
+  background: var(--po-text);
+  color: var(--po-text-inverse);
+  font-size: var(--git-font-main);
+  font-weight: var(--git-weight-strong);
+}
+
+.desktop-git-backup-action:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--po-text) 42%, var(--po-border));
+  background: color-mix(in srgb, var(--po-text) 90%, var(--po-accent) 10%);
+  color: var(--po-text-inverse);
+}
+
+.desktop-git-backup-action:disabled {
+  border-color: var(--po-border-subtle);
+  background: var(--po-control);
+  color: var(--po-text-disabled);
+}
+
+.desktop-git-backup-dismiss {
+  grid-area: dismiss;
+  display: inline-flex;
+  width: var(--git-action-size);
+  height: var(--git-action-size);
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  justify-self: start;
+  border: 0;
+  border-radius: var(--git-action-radius);
+  background: transparent;
+  color: var(--po-text-disabled);
+}
+
+.desktop-git-backup-dismiss:hover:not(:disabled) {
+  background: var(--po-hover);
+  color: var(--po-text-subtle);
+}
+
+.desktop-git-backup-dismiss:disabled {
+  opacity: 0.46;
+}
+
+.desktop-git-remote-prompt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  width: var(--git-sidebar-control-width);
+  margin-block: var(--desktop-sidebar-section-top-gap) 10px;
+  margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--po-sidebar-divider, var(--po-divider));
+}
+
+.desktop-git-remote-prompt.compact {
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  padding-bottom: 8px;
+}
+
+.desktop-git-remote-prompt > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.desktop-git-remote-prompt span,
+.desktop-git-remote-prompt small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-git-remote-prompt > div:first-child > span {
+  color: var(--po-text);
+  font-size: 12.5px;
+  font-weight: 680;
+}
+
+.desktop-git-remote-prompt small {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-weight: 540;
+}
+
+.desktop-git-remote-prompt button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: var(--git-section-action-size);
+  min-width: 0;
+  padding: 0 var(--git-action-padding-inline);
+  border: 1px solid var(--po-border-subtle);
+  border-radius: var(--git-action-radius);
+  background: var(--po-control);
+  color: var(--po-text-muted);
+  font-size: var(--git-action-font-size);
+  font-weight: 650;
+}
+
+.desktop-git-remote-prompt button.primary {
+  border-color: color-mix(in srgb, var(--po-accent) 28%, var(--po-border-subtle));
+  background: color-mix(in srgb, var(--po-accent) 9%, var(--po-control));
+  color: var(--po-accent);
+}
+
+.desktop-git-remote-prompt button:hover:not(:disabled) {
+  background: var(--po-control-hover);
+  color: var(--po-text);
+}
+
+.desktop-git-remote-prompt button.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--po-accent) 14%, var(--po-control));
+  color: var(--po-accent);
+}
+
+.desktop-git-remote-prompt button:disabled {
+  background: transparent;
+  color: var(--po-text-disabled);
+}
+
+.desktop-git-remote-status {
+  display: block;
+  min-width: 0;
+  margin: var(--desktop-sidebar-section-top-gap) 0 12px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--po-sidebar-divider, var(--po-divider));
+}
+
+.desktop-git-sidebar {
+  --desktop-git-primary-bg: var(--po-accent);
+  --desktop-git-primary-bg-hover: color-mix(in srgb, var(--po-accent) 86%, var(--po-text) 14%);
+  --desktop-git-primary-bg-disabled: color-mix(in srgb, var(--po-accent) 12%, var(--po-control));
+  --desktop-git-primary-border: transparent;
+  --desktop-git-primary-border-hover: transparent;
+  --desktop-git-primary-fg: var(--po-text-inverse);
+  --desktop-git-primary-fg-disabled: var(--po-text-disabled);
+}
+
+.app-shell:not(.dark) .desktop-git-sidebar {
+  --desktop-git-primary-bg: #4599df;
+  --desktop-git-primary-bg-hover: #3489d0;
+  --desktop-git-primary-bg-disabled: color-mix(in srgb, #4599df 12%, var(--po-control));
+  --desktop-git-primary-border: transparent;
+  --desktop-git-primary-border-hover: transparent;
+  --desktop-git-primary-fg: var(--po-text-inverse);
+  --desktop-git-primary-fg-disabled: var(--po-text-disabled);
+}
+
+.desktop-git-operation-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: var(--git-action-size);
+  min-width: 0;
+  padding: 0 var(--git-action-padding-inline);
+  border: 0;
+  border-radius: var(--git-action-radius);
+  /* Non-primary ops (Push, Stage & Commit, …) keep visible gray chrome. */
+  background: var(--po-control);
+  color: var(--po-text-muted);
+  font-size: var(--git-action-font-size);
+  font-weight: var(--git-weight-regular);
+}
+
+.desktop-git-operation-button.is-primary {
+  background: var(--desktop-git-primary-bg);
+  color: var(--desktop-git-primary-fg);
+}
+
+.desktop-git-stage-commit-action:not(.is-primary) {
+  gap: 4px;
+  padding: 0 var(--git-action-padding-inline);
+}
+
+.desktop-git-operation-button:hover:not(:disabled) {
+  background: var(--po-control-hover);
+  color: var(--po-text);
+}
+
+.desktop-git-operation-button.is-primary:hover:not(:disabled) {
+  background: var(--desktop-git-primary-bg-hover);
+  color: var(--desktop-git-primary-fg);
+}
+
+.desktop-git-operation-button:disabled {
+  background: transparent;
+  color: var(--po-text-disabled);
+  opacity: 1;
+}
+
+.desktop-git-operation-button.is-primary:disabled {
+  background: var(--desktop-git-primary-bg-disabled);
+  color: var(--desktop-git-primary-fg-disabled);
+}
+
+.desktop-git-operation-button.is-primary.is-loading:disabled {
+  background: var(--desktop-git-primary-bg);
+  color: var(--desktop-git-primary-fg);
+  opacity: 0.78;
+}
+
+.desktop-git-operation-button.is-primary .desktop-git-loading-dots {
+  color: currentColor;
+}
+
+.desktop-git-operation-button:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-text-muted) 34%, transparent);
+}
+
+.desktop-git-action-arrow {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+}
+
+.desktop-git-loading-dots {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  color: var(--po-accent);
+  vertical-align: middle;
+}
+
+.desktop-git-loading-dots span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: puppy-dot-bounce 1.2s ease-in-out infinite;
+}
+
+.desktop-git-loading-dots span:nth-child(2) {
+  animation-delay: 160ms;
+}
+
+.desktop-git-loading-dots span:nth-child(3) {
+  animation-delay: 320ms;
+}
+
+.desktop-git-section-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.desktop-git-section-actions .po-sidebar-icon-button {
+  width: var(--git-section-action-size);
+  height: var(--git-section-action-size);
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--po-text-muted);
+}
+
+.desktop-git-section-actions .po-sidebar-icon-button:hover:not(:disabled) {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+/* Bulk Stage all is a secondary control: visible gray chrome, never accent primary. */
+.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-all-action {
+  background: var(--po-control);
+  color: var(--po-text-muted);
+}
+
+.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-all-action:hover:not(:disabled) {
+  background: var(--po-control-hover);
+  color: var(--po-text);
+}
+
+.desktop-git-section-actions .po-sidebar-icon-button.danger {
+  color: color-mix(in srgb, var(--po-danger) 72%, var(--po-text-muted));
+}
+
+.desktop-git-section-actions .po-sidebar-icon-button.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--po-danger) 10%, transparent);
+  color: var(--po-danger);
+}
+
+.desktop-git-section-actions .po-sidebar-icon-button:disabled {
+  background: transparent;
+  color: var(--po-text-disabled);
+}

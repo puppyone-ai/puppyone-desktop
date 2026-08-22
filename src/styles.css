@@ -37,5 +37,4 @@
 @import "./ai-edits/ai-edits.css" layer(features);
 @import "./features/changes/changes.css" layer(features);
 @import "./styles/utility-screens.css" layer(features);
-@import "./features/source-control/source-control-overrides.css" layer(features);
 @import "./styles/interface-styles.generated.css";

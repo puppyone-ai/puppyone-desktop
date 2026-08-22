@@ -263,7 +263,17 @@ export function buildSourceControlSidebarModel({
     showUnstagedSection: localChangeResources.length > 0,
     stagedPrimaryAction,
     showSimpleChangeAction: !professionalMode && localChangeResources.length > 0,
+    sectionContext: {
+      merge: t("source-control.commit.conflicts", { count: mergeResources.length }),
+      committed: t("source-control.commit.commits", { count: committedCount }),
+      staged: t("source-control.commit.files", { count: stagedResources.length }),
+      unstaged: t("source-control.commit.files", { count: localChangeResources.length }),
+    },
   };
+}
+
+export function getCommittedSummary(count: number, actionLabel: string, t: MessageFormatter) {
+  return t("source-control.committed.ready", { count, action: actionLabel });
 }
 
 export type SourceControlPrimaryActionSlot = "staged" | "sync" | "committed" | "simple" | null;

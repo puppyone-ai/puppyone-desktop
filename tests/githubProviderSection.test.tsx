@@ -5,7 +5,7 @@ import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GitHubProviderSection } from "../src/features/source-control/sidebar/SourceControlSidebarSections";
+import { GitHubProviderSection } from "../src/features/source-control/sidebar/GitSidebarProviders";
 import type { GitScmSyncSection } from "../src/features/source-control/types";
 import { withTestLocalization } from "./testLocalization";
 
@@ -119,6 +119,25 @@ describe("GitHub provider section", () => {
 
     expect(onPull).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps Pull visible but disabled while local merge conflicts exist", () => {
+    const surface = renderProvider(createSection({
+      copy: { title: "Remote Changes", count: 1, detail: "origin/main", tone: "warning" },
+      action: {
+        kind: "pull",
+        label: "Pull",
+        loadingLabel: "Pulling…",
+        title: "Pull 1 commit from origin/main.",
+        disabled: false,
+        icon: "download",
+      },
+    }), { mergeCount: 1 });
+    const pullButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Pull"]');
+
+    expect(pullButton).not.toBeNull();
+    expect(pullButton?.disabled).toBe(true);
+    expect(pullButton?.title).toBe("Resolve local conflicts before downloading cloud changes.");
+  });
 });
 
 function createSection(overrides: Partial<GitScmSyncSection> = {}): GitScmSyncSection {
@@ -144,6 +163,7 @@ function renderProvider(
       copied: number;
       changed: number;
     };
+    mergeCount?: number;
     onPull?: () => Promise<boolean>;
   } = {},
 ) {
@@ -165,7 +185,7 @@ function renderProvider(
         copied: 0,
         changed: 0,
       }}
-      mergeCount={0}
+      mergeCount={callbacks.mergeCount ?? 0}
       disabled={false}
       operationLoading={null}
       primaryAction={true}

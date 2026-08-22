@@ -10,6 +10,7 @@ describe("renderer style architecture", () => {
     const cascade = source("src/styles/cascade.css");
     const entry = source("src/main.tsx");
     const styles = source("src/styles.css");
+    const sourceControlStyles = source("src/features/source-control/source-control.css");
     const tailwindConfig = source("tailwind.config.cjs");
 
     expect(cascade.trim()).toBe("@layer reset, tokens, primitives, patterns, features, interface-style, accessibility, overrides;");
@@ -19,9 +20,15 @@ describe("renderer style architecture", () => {
       'import "./styles.css";',
     ]);
     expect(entry).toMatch(/^import "\.\/styles\/cascade\.css";\nimport "\.\/cloud-globals\.css";\nimport "\.\/styles\.css";\n/);
-    expectInOrder(styles, [
-      '@import "./features/source-control/source-control.css" layer(features);',
-      '@import "./features/source-control/source-control-overrides.css" layer(features);',
+    expect(styles).toContain('@import "./features/source-control/source-control.css" layer(features);');
+    expect(styles).not.toContain("source-control-overrides.css");
+    expectInOrder(sourceControlStyles, [
+      '@import "./styles/sidebar-base.css";',
+      '@import "./styles/sidebar-layout.css";',
+      '@import "./styles/sidebar-panels.css";',
+      '@import "./styles/sidebar-actions.css";',
+      '@import "./styles/sidebar-providers.css";',
+      '@import "./styles/sidebar-resources.css";',
     ]);
     expect(styles).toContain('@import "./styles/base.css" layer(reset);');
     expect(styles).toContain('@import "@puppyone/shared-ui/shared-ui-patterns.css" layer(patterns);');

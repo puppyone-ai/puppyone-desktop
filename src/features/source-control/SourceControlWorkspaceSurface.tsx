@@ -3,6 +3,7 @@ import type { GitDisplayMode } from "../../preferences";
 import type { PuppyoneWorkspaceConfig } from "../../types/electron";
 import { GitStatusView } from "./GitStatusView";
 import { GitSidebar } from "./SourceControlSidebar";
+import type { GitSidebarCloudBackup } from "./sidebar/sourceControlSidebarTypes";
 import type { DesktopGitController } from "./useDesktopGitController";
 
 export type SourceControlWorkspaceSurfaceProps = {
@@ -11,12 +12,7 @@ export type SourceControlWorkspaceSurfaceProps = {
   puppyoneConfig: PuppyoneWorkspaceConfig | null;
   gitDisplayMode: GitDisplayMode;
   fileIconTheme: FileIconThemeId;
-  cloudBackup: {
-    loading: boolean;
-    error: string | null;
-    enabled: boolean;
-    start: () => void;
-  };
+  cloudBackup: GitSidebarCloudBackup;
   onOpenFile: (path: string) => void;
 };
 
@@ -32,33 +28,36 @@ export function createSourceControlWorkspaceSurface({
   return {
     sidebar: (
       <GitSidebar
-        status={controller.activeGitStatus}
-        puppyoneConfig={puppyoneConfig}
-        gitDisplayMode={gitDisplayMode}
-        fileIconTheme={fileIconTheme}
-        activePanel={controller.gitMainPanel}
-        loading={controller.gitStatusLoading}
-        error={controller.gitStatusError}
-        selectedWorkingFile={controller.selectedGitWorkingFile}
-        operationLoading={controller.gitOperationLoading}
-        operationError={null}
-        onSelectPanel={controller.selectGitMainPanel}
-        onSelectWorkingFile={controller.selectGitWorkingFile}
-        onStagePaths={controller.handleStageGitPaths}
-        onStageAll={controller.handleStageAllGitChanges}
-        onUnstagePaths={controller.handleUnstageGitPaths}
-        onDiscardPaths={controller.handleDiscardGitPaths}
-        onDiscardAll={controller.handleDiscardAllGitChanges}
-        onStageAndCommit={controller.handleStageAndCommitGit}
-        onCommit={controller.handleCommitGit}
-        onCommitAndPush={controller.handleCommitAndPushGit}
-        onPull={controller.handlePullGit}
-        onPush={controller.handlePushGit}
-        onPublish={controller.handlePublishGitBranch}
-        cloudBackupLoading={cloudBackup.loading}
-        cloudBackupError={cloudBackup.error}
-        cloudEnabled={cloudBackup.enabled}
-        onStartPuppyoneBackup={cloudBackup.start}
+        repository={{
+          status: controller.activeGitStatus,
+          puppyoneConfig,
+          gitDisplayMode,
+          fileIconTheme,
+        }}
+        view={{
+          activePanel: controller.gitMainPanel,
+          selectedWorkingFile: controller.selectedGitWorkingFile,
+          operationLoading: controller.gitOperationLoading,
+          operationError: null,
+          loading: controller.gitStatusLoading,
+          error: controller.gitStatusError,
+        }}
+        actions={{
+          selectPanel: controller.selectGitMainPanel,
+          selectWorkingFile: controller.selectGitWorkingFile,
+          stagePaths: controller.handleStageGitPaths,
+          stageAll: controller.handleStageAllGitChanges,
+          unstagePaths: controller.handleUnstageGitPaths,
+          discardPaths: controller.handleDiscardGitPaths,
+          discardAll: controller.handleDiscardAllGitChanges,
+          stageAndCommit: controller.handleStageAndCommitGit,
+          commit: controller.handleCommitGit,
+          commitAndPush: controller.handleCommitAndPushGit,
+          pull: controller.handlePullGit,
+          push: controller.handlePushGit,
+          publish: controller.handlePublishGitBranch,
+        }}
+        cloudBackup={cloudBackup}
       />
     ),
     main: (

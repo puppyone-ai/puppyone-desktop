@@ -18,8 +18,18 @@ const sourceControlSidebarSource = readFileSync(
   new URL("../src/features/source-control/SourceControlSidebar.tsx", import.meta.url),
   "utf8",
 );
-const sourceControlSidebarSectionsSource = readFileSync(
-  new URL("../src/features/source-control/sidebar/SourceControlSidebarSections.tsx", import.meta.url),
+const sourceControlSidebarSectionsSource = [
+  "GitSidebarProviders.tsx",
+  "GitRemoteSections.tsx",
+  "GitSidebarPrimitives.tsx",
+  "GitStatusCardSection.tsx",
+  "GitLocalStatusPanels.tsx",
+].map((fileName) => readFileSync(
+  new URL(`../src/features/source-control/sidebar/${fileName}`, import.meta.url),
+  "utf8",
+)).join("\n");
+const sourceControlExpansionStateSource = readFileSync(
+  new URL("../src/features/source-control/sidebar/useGitSidebarExpansionState.ts", import.meta.url),
   "utf8",
 );
 const versionControlSetupSource = readFileSync(
@@ -82,14 +92,15 @@ const sidebarBaseCss = readFileSync(
   new URL("../src/features/source-control/styles/sidebar-base.css", import.meta.url),
   "utf8",
 );
-const sidebarResourcesCss = readFileSync(
-  new URL("../src/features/source-control/styles/sidebar-resources.css", import.meta.url),
+const sidebarResourcesCss = [
+  "sidebar-panels.css",
+  "sidebar-actions.css",
+  "sidebar-providers.css",
+  "sidebar-resources.css",
+].map((fileName) => readFileSync(
+  new URL(`../src/features/source-control/styles/${fileName}`, import.meta.url),
   "utf8",
-);
-const sourceControlOverridesCss = readFileSync(
-  new URL("../src/features/source-control/source-control-overrides.css", import.meta.url),
-  "utf8",
-);
+)).join("\n");
 const gitControllerSource = readFileSync(
   new URL("../src/features/source-control/useDesktopGitController.ts", import.meta.url),
   "utf8",
@@ -174,10 +185,6 @@ describe("source-control visual architecture", () => {
       sidebarBaseCss,
       ".desktop-git-sidebar .po-sidebar-empty.desktop-git-section-empty",
     ));
-    const sectionEmptyOverride = compact(readCssBlock(
-      sourceControlOverridesCss,
-      ".desktop-git-sidebar .po-sidebar-empty.desktop-git-section-empty",
-    ));
     const emptyStateSources = `${sourceControlSidebarSource}\n${sourceControlSidebarSectionsSource}`;
 
     expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(2);
@@ -193,15 +200,6 @@ describe("source-control visual architecture", () => {
     expect(sectionEmpty).toContain("min-height: 26px;");
     expect(sectionEmpty).toContain("margin-block: var(--git-section-body-top-gap) 0;");
     expect(sectionEmpty).toContain(compact(`
-      padding-inline: calc(
-        var(--git-sidebar-left-gap)
-        + var(--git-sidebar-content-left)
-        + var(--git-section-leading-slot-size)
-        + var(--git-section-title-gap)
-      )
-      calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right));
-    `));
-    expect(sectionEmptyOverride).toContain(compact(`
       padding-inline: calc(
         var(--git-sidebar-left-gap)
         + var(--git-sidebar-content-left)
@@ -308,32 +306,20 @@ describe("source-control visual architecture", () => {
       ".desktop-git-section-resizer::after",
     ));
 
-    expect(sourceControlSidebarSource).toContain(
+    expect(sourceControlSidebarSectionsSource).toContain(
       'className="desktop-git-status-card"',
     );
-    expect(sourceControlSidebarSource).toContain("desktop-git-status-card-context-row");
-    expect(sourceControlSidebarSource).toContain("desktop-git-status-card-context");
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context-row");
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context");
     expect(sourceControlSidebarSource).not.toContain("desktop-git-status-card-summary");
     expect(sourceControlSidebarSource).not.toContain("source-control.commit.filesChanged");
-    expect(sourceControlSidebarSource).toContain("source-control.commit.commits");
-    expect(sourceControlSidebarSource).toContain("source-control.commit.files");
-    expect(sourceControlSidebarSource).toContain("source-control.commit.conflicts");
-    expect(sourceControlSidebarSource).toContain(
-      "const [remoteExpanded, setRemoteExpanded] = useState(true);",
-    );
-    expect(sourceControlSidebarSource).toContain(
-      "const [mergeExpanded, setMergeExpanded] = useState(true);",
-    );
-    expect(sourceControlSidebarSource).toContain(
-      "const [committedExpanded, setCommittedExpanded] = useState(true);",
-    );
-    expect(sourceControlSidebarSource).toContain(
-      "const [stagedExpanded, setStagedExpanded] = useState(true);",
-    );
-    expect(sourceControlSidebarSource).toContain(
-      "const [workingExpanded, setWorkingExpanded] = useState(true);",
-    );
-    expect(sourceControlSidebarSource).toContain("showCount={false}");
+    expect(sourceControlSidebarSectionsSource.match(/<GitStatusCardSection/g)).toHaveLength(4);
+    for (const panel of ["remote", "merge", "committed", "staged", "unstaged"]) {
+      expect(sourceControlExpansionStateSource).toContain(`${panel}: true`);
+    }
+    expect(sourceControlSidebarSectionsSource).toContain("showCount={false}");
+    expect(sourceControlSidebarSectionsSource).toContain("aria-hidden={expanded ? undefined : true}");
+    expect(sourceControlSidebarSectionsSource).toContain('const inertWhenCollapsed = expanded ? {} : { inert: "" };');
     expect(statusCard).toContain(
       "margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);",
     );

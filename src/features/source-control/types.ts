@@ -89,4 +89,10 @@ export type SourceControlSidebarModel = {
   showUnstagedSection: boolean;
   stagedPrimaryAction: GitSidebarPrimaryAction | null;
   showSimpleChangeAction: boolean;
+  sectionContext: {
+    merge: string;
+    committed: string;
+    staged: string;
+    unstaged: string;
+  };
 };
