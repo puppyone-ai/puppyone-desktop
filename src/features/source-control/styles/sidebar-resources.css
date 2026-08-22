@@ -35,8 +35,8 @@
   min-width: 0;
   flex: 1 1 auto;
   overflow: hidden;
-  color: var(--po-text-disabled);
-  font-size: var(--git-font-small);
+  color: var(--po-text-muted);
+  font-size: var(--git-font-main);
   font-weight: var(--git-weight-regular);
   line-height: var(--git-line-height);
   text-overflow: ellipsis;

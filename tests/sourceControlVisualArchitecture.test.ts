@@ -295,6 +295,10 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-section-collapse.desktop-git-status-card",
     ));
+    const statusCardSummary = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-status-card-summary",
+    ));
     const resizer = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-section-resizer::after",
@@ -313,6 +317,10 @@ describe("source-control visual architecture", () => {
     expect(statusCard).toContain(
       "background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));",
     );
+    expect(statusCardSummary).toContain("color: var(--po-text-muted);");
+    expect(statusCardSummary).toContain("font-size: var(--git-font-main);");
+    expect(statusCardSummary).toContain("font-weight: var(--git-weight-regular);");
+    expect(statusCardSummary).toContain("line-height: var(--git-line-height);");
     expect(resizer).toContain("background: transparent;");
   });
 
