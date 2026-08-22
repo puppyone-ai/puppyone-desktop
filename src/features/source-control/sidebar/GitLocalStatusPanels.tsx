@@ -148,6 +148,7 @@ export function createGitLocalStatusPanels({
       className: "committed",
       grow: 1.05,
       expanded: expanded.committed,
+      headerRows: 0,
       bodyRows: getGitSidebarPanelBodyRows(model.committedResources.length, true) + STATUS_CARD_CONTEXT_ROWS,
       content: (
         <GitStatusCardSection
@@ -156,6 +157,7 @@ export function createGitLocalStatusPanels({
           context={model.sectionContext.committed}
           expanded={expanded.committed}
           onToggle={() => onToggle("committed")}
+          showHeader={false}
           action={action ? (
             <GitOperationButton
               className="desktop-git-commit-push-action"

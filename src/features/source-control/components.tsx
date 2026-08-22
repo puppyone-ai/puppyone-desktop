@@ -170,11 +170,9 @@ function SourceControlPreviewResourceRow({
         </span>
         <span className="desktop-working-tree-copy">
           <span className="desktop-working-tree-name">{displayName}</span>
+          <GitResourceStatusMarker resource={resource} />
         </span>
       </button>
-      <div className="desktop-working-tree-state-slot">
-        <span className={`desktop-working-tree-state ${resource.status}`}>{resource.letter}</span>
-      </div>
     </div>
   );
 }
@@ -203,7 +201,6 @@ export function SourceControlWorkingTreeRow({
   const commandPaths = getGitResourceCommandPaths(resource);
   const displayPath = getGitDisplayPath(resource);
   const displayName = getGitDisplayName(displayPath);
-  const statusCode = resource.letter;
   const staged = resource.group === "index";
 
   return (
@@ -221,6 +218,7 @@ export function SourceControlWorkingTreeRow({
         </span>
         <span className="desktop-working-tree-copy">
           <span className="desktop-working-tree-name">{displayName}</span>
+          <GitResourceStatusMarker resource={resource} />
         </span>
       </button>
       {!staged && (
@@ -235,8 +233,7 @@ export function SourceControlWorkingTreeRow({
           <Undo2 size={13} />
         </button>
       )}
-      <div className="desktop-working-tree-state-slot">
-        <span className={`desktop-working-tree-state ${resource.status}`}>{statusCode}</span>
+      <div className="desktop-working-tree-action-slot">
         {staged ? (
           <button
             className="po-sidebar-icon-button desktop-working-tree-state-action"
@@ -262,6 +259,17 @@ export function SourceControlWorkingTreeRow({
         )}
       </div>
     </div>
+  );
+}
+
+function GitResourceStatusMarker({ resource }: { resource: GitSourceControlResource }) {
+  return (
+    <span
+      className={`desktop-working-tree-state ${resource.status}`}
+      aria-label={resource.status}
+    >
+      {resource.letter}
+    </span>
   );
 }
 

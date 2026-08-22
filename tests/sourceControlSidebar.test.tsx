@@ -30,6 +30,7 @@ describe("Git sidebar status cards", () => {
     expect(cards).toHaveLength(3);
     expect(cards.every((card) => card.classList.contains("expanded"))).toBe(true);
     expect(surface.textContent).toContain("2 commits");
+    expect(surface.textContent).not.toContain("Committed Changes");
     expect(surface.textContent?.match(/1 file/g)).toHaveLength(2);
 
     const commitButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Commit"]');
@@ -54,27 +55,26 @@ describe("Git sidebar status cards", () => {
     expect(onDiscardAll).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps each card independently collapsible after the default-expanded render", () => {
+  it("removes the redundant committed heading while keeping titled cards collapsible", () => {
     const surface = renderSidebar();
     const committedSection = surface.querySelector<HTMLElement>(".desktop-git-resizable-section-committed");
-    const committedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
-      .find((button) => button.textContent?.includes("Committed Changes"));
+    const stagedSection = surface.querySelector<HTMLElement>(".desktop-git-resizable-section-staged");
+    const stagedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
+      .find((button) => button.textContent?.includes("Staged Changes"));
 
     expect(committedSection?.classList.contains("expanded")).toBe(true);
     const committedCard = committedSection?.querySelector<HTMLElement>(".desktop-git-status-card");
     expect(committedCard?.classList.contains("expanded")).toBe(true);
-    expect(committedToggle?.getAttribute("aria-expanded")).toBe("true");
-    expect(committedToggle?.getAttribute("aria-controls")).toBe(committedCard?.id);
-    expect(committedCard?.hasAttribute("inert")).toBe(false);
+    expect(committedCard?.getAttribute("aria-label")).toBe("Committed Changes");
+    expect(committedSection?.querySelector(".desktop-git-section-title")).toBeNull();
+    expect(stagedToggle?.getAttribute("aria-expanded")).toBe("true");
 
-    act(() => committedToggle?.click());
+    act(() => stagedToggle?.click());
 
-    expect(committedSection?.classList.contains("collapsed")).toBe(true);
-    expect(committedCard?.classList.contains("collapsed")).toBe(true);
-    expect(committedToggle?.getAttribute("aria-expanded")).toBe("false");
-    expect(committedCard?.getAttribute("aria-hidden")).toBe("true");
-    expect(committedCard?.hasAttribute("inert")).toBe(true);
-    expect(surface.querySelector(".desktop-git-resizable-section-staged")?.classList.contains("expanded")).toBe(true);
+    expect(committedSection?.classList.contains("expanded")).toBe(true);
+    expect(committedCard?.classList.contains("expanded")).toBe(true);
+    expect(stagedSection?.classList.contains("collapsed")).toBe(true);
+    expect(stagedToggle?.getAttribute("aria-expanded")).toBe("false");
     expect(surface.querySelector(".desktop-git-resizable-section-unstaged")?.classList.contains("expanded")).toBe(true);
   });
 

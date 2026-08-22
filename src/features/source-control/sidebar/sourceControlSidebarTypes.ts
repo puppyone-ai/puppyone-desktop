@@ -59,6 +59,7 @@ export type GitSidebarRenderPanel = {
   className: string;
   grow: number;
   expanded: boolean;
+  headerRows?: 0 | 1;
   bodyRows: number;
   content: ReactNode;
 };

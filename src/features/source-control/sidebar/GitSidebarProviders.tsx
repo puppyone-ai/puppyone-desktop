@@ -130,68 +130,69 @@ export function GitHubProviderSection({
 
   return (
     <section className="desktop-git-cloud-provider-section desktop-git-github-provider-section">
-      <GitHostingIdentityRow identity={identity} />
-      {section.copy.count > 0 && (
-        <GitHubIncomingChangesCard
-          fileSummary={incomingFileSummary}
-          incomingUpdatedAt={incomingUpdatedAt}
-          action={pullAction ? (
-            <GitOperationButton
-              className="desktop-git-remote-action desktop-git-github-card-action"
-              disabled={disabled || pullBlockedByConflicts || pullAction.disabled}
-              title={pullBlockedByConflicts
-                ? t("source-control.cloud.resolveBeforeDownload")
-                : pullAction.title}
-              icon={pullAction.icon}
-              label={t("source-control.sync.pull")}
-              loadingKey={pullAction.kind}
-              loadingLabel={pullAction.loadingLabel}
-              operationLoading={operationLoading}
-              primary={primaryAction}
-              onClick={() => void onPull()}
-            />
-          ) : null}
-        />
-      )}
+      <GitHubChangesCard
+        identity={identity}
+        hasIncomingChanges={section.copy.count > 0}
+        fileSummary={incomingFileSummary}
+        incomingUpdatedAt={incomingUpdatedAt}
+        action={pullAction ? (
+          <GitOperationButton
+            className="desktop-git-remote-action desktop-git-github-card-action"
+            disabled={disabled || pullBlockedByConflicts || pullAction.disabled}
+            title={pullBlockedByConflicts
+              ? t("source-control.cloud.resolveBeforeDownload")
+              : pullAction.title}
+            icon={pullAction.icon}
+            label={t("source-control.sync.pull")}
+            loadingKey={pullAction.kind}
+            loadingLabel={pullAction.loadingLabel}
+            operationLoading={operationLoading}
+            primary={primaryAction}
+            onClick={() => void onPull()}
+          />
+        ) : null}
+      />
     </section>
   );
 }
 
-function GitHostingIdentityRow({ identity }: { identity: GitHostingIdentity }) {
+function GitHubRepositoryLink({ identity }: { identity: GitHostingIdentity }) {
   const { t } = useLocalization();
   const { label, href } = identity;
+  const content = (
+    <>
+      <Github size={14} strokeWidth={2} aria-hidden="true" />
+      <span>GitHub</span>
+      {href && <ArrowUpRight size={12} aria-hidden="true" />}
+    </>
+  );
+  if (!href) return <div className="desktop-git-github-identity">{content}</div>;
+
   return (
-    <div className="desktop-git-section-row desktop-git-hosting-identity-row">
-      {href ? (
-        <a
-          className="desktop-git-section-title desktop-git-hosting-identity-link"
-          href={href}
-          title={label}
-          aria-label={`${t("source-control.hosting.repository")}: ${label}`}
-          onClick={(event) => {
-            event.preventDefault();
-            void openExternalUrl(href).catch((error) => console.warn("Unable to open GitHub repository:", error));
-          }}
-        >
-          <span className="desktop-git-section-leading-icon"><Github size={14} strokeWidth={2} aria-hidden="true" /></span>
-          <span>GitHub</span>
-          <ArrowUpRight size={12} aria-hidden="true" />
-        </a>
-      ) : (
-        <div className="desktop-git-section-title desktop-git-hosting-identity-text">
-          <span className="desktop-git-section-leading-icon"><Github size={14} strokeWidth={2} aria-hidden="true" /></span>
-          <span>GitHub</span>
-        </div>
-      )}
-    </div>
+    <a
+      className="desktop-git-github-identity desktop-git-hosting-identity-link"
+      href={href}
+      title={label}
+      aria-label={`${t("source-control.hosting.repository")}: ${label}`}
+      onClick={(event) => {
+        event.preventDefault();
+        void openExternalUrl(href).catch((error) => console.warn("Unable to open GitHub repository:", error));
+      }}
+    >
+      {content}
+    </a>
   );
 }
 
-function GitHubIncomingChangesCard({
+function GitHubChangesCard({
+  identity,
+  hasIncomingChanges,
   fileSummary,
   incomingUpdatedAt,
   action,
 }: {
+  identity: GitHostingIdentity;
+  hasIncomingChanges: boolean;
   fileSummary: GitFileChangeSummary;
   incomingUpdatedAt: string | null;
   action: ReactNode;
@@ -200,17 +201,25 @@ function GitHubIncomingChangesCard({
   const updateAge = formatGitRemoteUpdateAge(incomingUpdatedAt, formatRelativeTime);
 
   return (
-    <div className={`desktop-git-github-change-card${updateAge ? "" : " is-age-unavailable"}`}>
-      {updateAge && (
-        <time
-          className="desktop-git-github-update-age"
-          dateTime={incomingUpdatedAt ?? undefined}
-        >
-          {updateAge}
-        </time>
-      )}
-      <span className="desktop-git-github-file-total">
-        {t("source-control.commit.changes", { count: fileSummary.total })}
+    <div className="desktop-git-github-change-card">
+      <GitHubRepositoryLink identity={identity} />
+      <span className="desktop-git-github-summary">
+        {hasIncomingChanges ? (
+          <>
+            {t("source-control.commit.changes", { count: fileSummary.total })}
+            {updateAge && (
+              <>
+                <span aria-hidden="true"> · </span>
+                <time
+                  className="desktop-git-github-update-age"
+                  dateTime={incomingUpdatedAt ?? undefined}
+                >
+                  {updateAge}
+                </time>
+              </>
+            )}
+          </>
+        ) : t("source-control.sync.upToDate")}
       </span>
       {action}
     </div>

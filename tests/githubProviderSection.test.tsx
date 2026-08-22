@@ -19,17 +19,22 @@ afterEach(() => {
 });
 
 describe("GitHub provider section", () => {
-  it("uses the GitHub label as the repository link when there are no incoming updates", () => {
+  it("keeps the GitHub repository link inside an up-to-date card", () => {
     const surface = renderProvider(createSection());
 
     expect(surface.textContent).toContain("GitHub");
+    expect(surface.textContent).toContain("Already up to date.");
     expect(surface.textContent).not.toContain("owner/repository");
     expect(surface.textContent).not.toContain("Empty");
     expect(surface.querySelector(".desktop-git-section-count-badge")).toBeNull();
     expect(surface.querySelector(".desktop-git-remote-action")).toBeNull();
-    expect(surface.querySelector(".desktop-git-hosting-identity-row")).not.toBeNull();
+    expect(surface.querySelector(".desktop-git-github-change-card")).not.toBeNull();
+    expect(surface.querySelector(".desktop-git-hosting-identity-row")).toBeNull();
     expect(surface.querySelector<HTMLAnchorElement>(".desktop-git-hosting-identity-link")?.href)
       .toBe("https://github.com/owner/repository");
+    expect(surface.querySelector(".desktop-git-github-change-card")?.contains(
+      surface.querySelector(".desktop-git-hosting-identity-link"),
+    )).toBe(true);
     expect(surface.querySelector(".desktop-git-hosting-repository-row")).toBeNull();
   });
 
@@ -92,7 +97,8 @@ describe("GitHub provider section", () => {
     expect(updateAge?.tabIndex).toBe(-1);
     expect(updateAge?.hasAttribute("aria-describedby")).toBe(false);
     expect(updateTooltip).toBeNull();
-    expect(surface.querySelector(".desktop-git-github-file-total")?.textContent).toBe("96 changes");
+    expect(surface.querySelector(".desktop-git-github-summary")?.textContent).toBe("96 changes · 2 hours ago");
+    expect(surface.querySelector(".desktop-git-github-file-total")).toBeNull();
     expect(surface.querySelector(".desktop-git-github-file-stats")).toBeNull();
     expect(surface.textContent).not.toContain("Update policy");
     expect(surface.textContent).not.toContain("Add guide");
@@ -101,15 +107,12 @@ describe("GitHub provider section", () => {
     expect(surface.textContent).not.toContain("Empty");
 
     const card = surface.querySelector(".desktop-git-github-change-card");
-    const identityRow = surface.querySelector(".desktop-git-hosting-identity-row");
+    const identityLink = surface.querySelector(".desktop-git-hosting-identity-link");
     const pullButton = surface.querySelector<HTMLButtonElement>(".desktop-git-remote-action");
     expect(pullButton?.textContent).toBe("Pull");
-    expect(Array.from(card?.children ?? []).slice(0, 2).map((child) => child.className)).toEqual([
-      "desktop-git-github-update-age",
-      "desktop-git-github-file-total",
-    ]);
+    expect(card?.firstElementChild).toBe(identityLink);
     expect(card?.contains(pullButton ?? null)).toBe(true);
-    expect(identityRow?.contains(pullButton ?? null)).toBe(false);
+    expect(card?.contains(identityLink ?? null)).toBe(true);
     await act(async () => pullButton?.click());
 
     expect(onPull).toHaveBeenCalledTimes(1);

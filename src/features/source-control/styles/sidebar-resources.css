@@ -76,7 +76,7 @@
 }
 
 .desktop-git-remote-preview-row {
-  grid-template-columns: minmax(0, 1fr) var(--git-working-tree-state-width);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .desktop-working-tree-row:hover,
@@ -125,7 +125,7 @@
   display: flex;
   min-width: 0;
   align-items: baseline;
-  gap: 6px;
+  gap: 5px;
   overflow: hidden;
 }
 
@@ -141,34 +141,13 @@
 }
 
 .desktop-working-tree-state {
-  display: inline-flex;
-  width: var(--git-working-tree-status-size);
-  height: var(--git-working-tree-status-size);
-  align-items: center;
-  justify-content: center;
-  justify-self: center;
-  color: var(--po-text-subtle);
-  font-size: var(--git-font-small);
-  font-weight: var(--git-weight-regular);
+  display: inline-block;
+  flex: 0 0 auto;
+  color: var(--po-text-disabled);
+  font-size: 10px;
+  font-weight: var(--po-text-weight-regular, 400);
   line-height: 1;
-}
-
-.desktop-git-remote-preview-row .desktop-working-tree-state-slot {
-  grid-column: 2;
-}
-
-.desktop-working-tree-state.modified {
-  color: var(--po-warning);
-}
-
-.desktop-working-tree-state.added,
-.desktop-working-tree-state.untracked {
-  color: var(--po-success);
-}
-
-.desktop-working-tree-state.deleted,
-.desktop-working-tree-state.conflict {
-  color: var(--po-danger);
+  letter-spacing: 0.01em;
 }
 
 .desktop-working-tree-revert-action {
@@ -179,7 +158,7 @@
   pointer-events: none;
 }
 
-.desktop-working-tree-state-slot {
+.desktop-working-tree-action-slot {
   position: relative;
   grid-column: 3;
   grid-row: 1;
@@ -189,11 +168,11 @@
   place-items: center;
 }
 
-.desktop-working-tree-row.is-staged .desktop-working-tree-state-slot {
+.desktop-working-tree-row.is-staged .desktop-working-tree-action-slot {
   grid-column: 2;
 }
 
-.desktop-working-tree-state-slot > * {
+.desktop-working-tree-action-slot > * {
   grid-column: 1;
   grid-row: 1;
 }
@@ -215,12 +194,6 @@
 .desktop-working-tree-row:focus-within .desktop-working-tree-state-action {
   opacity: 1;
   pointer-events: auto;
-}
-
-.desktop-working-tree-row:hover .desktop-working-tree-state,
-.desktop-working-tree-row:focus-within .desktop-working-tree-state {
-  opacity: 0;
-  pointer-events: none;
 }
 
 .desktop-working-tree-revert-action:hover,

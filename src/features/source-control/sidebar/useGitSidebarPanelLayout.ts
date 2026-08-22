@@ -17,6 +17,7 @@ export type GitSidebarLayoutPanel = {
   id: GitSidebarPanelId;
   grow: number;
   expanded: boolean;
+  headerRows?: 0 | 1;
   bodyRows: number;
 };
 
@@ -135,10 +136,11 @@ export function useGitSidebarPanelLayout(revision: unknown) {
         minHeight: "var(--desktop-sidebar-row-height)",
       };
     }
+    const headerRows = panel.headerRows ?? 1;
     const visibleBodyRows = clampNumber(panel.bodyRows, 0, MAX_VISIBLE_ROWS);
     const maxHeight = visibleBodyRows > 0
-      ? `calc(var(--desktop-sidebar-row-height) * ${visibleBodyRows + 1} + var(--git-section-body-top-gap) + ${visibleBodyRows * ROW_VERTICAL_MARGIN_PX}px)`
-      : "var(--desktop-sidebar-row-height)";
+      ? `calc(var(--desktop-sidebar-row-height) * ${visibleBodyRows + headerRows} + var(--git-section-body-top-gap) + ${visibleBodyRows * ROW_VERTICAL_MARGIN_PX}px)`
+      : headerRows > 0 ? "var(--desktop-sidebar-row-height)" : "0px";
     const minHeight = `min(${PANEL_MIN_HEIGHT[panel.id]}px, ${maxHeight})`;
     const height = panelHeights[panel.id];
     return typeof height === "number"

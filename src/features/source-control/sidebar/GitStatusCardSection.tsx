@@ -11,6 +11,7 @@ export function GitStatusCardSection({
   action,
   children,
   onToggle,
+  showHeader = true,
 }: {
   title: string;
   count: number;
@@ -19,20 +20,28 @@ export function GitStatusCardSection({
   action?: ReactNode;
   children: ReactNode;
   onToggle: () => void;
+  showHeader?: boolean;
 }) {
   const bodyId = useId();
 
   return (
     <>
-      <SourceControlSectionHeader
-        title={title}
-        count={count}
-        showCount={false}
-        controlsId={bodyId}
+      {showHeader && (
+        <SourceControlSectionHeader
+          title={title}
+          count={count}
+          showCount={false}
+          controlsId={bodyId}
+          expanded={expanded}
+          onToggle={onToggle}
+        />
+      )}
+      <GitSectionCollapse
+        id={showHeader ? bodyId : undefined}
         expanded={expanded}
-        onToggle={onToggle}
-      />
-      <GitSectionCollapse id={bodyId} expanded={expanded} className="desktop-git-status-card">
+        className="desktop-git-status-card"
+        ariaLabel={showHeader ? undefined : title}
+      >
         <div className="desktop-git-status-card-context-row">
           <span className="desktop-git-status-card-context">{context}</span>
           {action}

@@ -19,7 +19,6 @@
   --git-working-tree-action-size: var(--git-action-size);
   --git-working-tree-secondary-action-width: var(--git-working-tree-action-size);
   --git-working-tree-state-width: var(--git-working-tree-action-size);
-  --git-working-tree-status-size: 22px;
   --git-section-body-top-gap: 2px;
   --git-section-leading-slot-size: 14px;
   --git-section-title-gap: 6px;

@@ -13,11 +13,13 @@ export function GitSectionCollapse({
   expanded,
   children,
   className,
+  ariaLabel,
 }: {
   id?: string;
   expanded: boolean;
   children: ReactNode;
   className?: string;
+  ariaLabel?: string;
 }) {
   // React 18 types `inert` as a boolean but its DOM renderer only emits the
   // standards-compliant empty-string attribute without a warning.
@@ -26,6 +28,7 @@ export function GitSectionCollapse({
     <div
       id={id}
       className={`desktop-git-section-collapse${className ? ` ${className}` : ""} ${expanded ? "expanded" : "collapsed"}`}
+      aria-label={ariaLabel}
       aria-hidden={expanded ? undefined : true}
       {...inertWhenCollapsed}
     >
