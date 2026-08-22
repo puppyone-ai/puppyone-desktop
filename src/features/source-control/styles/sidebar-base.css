@@ -28,6 +28,7 @@
   --git-control-radius: 8px;
   --git-inner-radius: 6px;
   --git-row-radius: var(--desktop-sidebar-row-radius);
+  --git-card-background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));
   /* Mirror Data explorer row typography via the shared desktop sidebar contract. */
   --git-font-main: var(--desktop-sidebar-font-size, var(--po-text-size-sidebar, 13px));
   --git-font-small: var(--desktop-sidebar-font-size-meta, var(--po-text-size-meta, 12px));

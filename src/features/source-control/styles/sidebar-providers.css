@@ -190,7 +190,7 @@
   padding: 10px 10px 9px 11px;
   border: 0;
   border-radius: var(--git-control-radius);
-  background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));
+  background: var(--git-card-background);
 }
 
 .desktop-git-github-file-total,

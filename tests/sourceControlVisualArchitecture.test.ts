@@ -259,9 +259,10 @@ describe("source-control visual architecture", () => {
       "margin: 2px var(--git-sidebar-control-right-gap) 4px var(--git-sidebar-control-left-gap);",
     );
     expect(card).toContain("border: 0;");
-    expect(card).toContain(
-      "background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));",
+    expect(sidebarBaseCss).toContain(
+      "--git-card-background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));",
     );
+    expect(card).toContain("background: var(--git-card-background);");
     expect(updateAge).toContain(
       "grid-row: 1;",
     );
@@ -313,8 +314,7 @@ describe("source-control visual architecture", () => {
     );
     expect(statusCard).toContain("border: 0;");
     expect(statusCard).toContain("border-radius: var(--git-control-radius);");
-    expect(statusCard).toContain("background: transparent;");
-    expect(statusCard).not.toContain("var(--po-sidebar)");
+    expect(statusCard).toContain("background: var(--git-card-background);");
     expect(statusCardContextRow).toContain("padding: 10px 10px 2px;");
     expect(statusCardContext).toContain("color: var(--po-text-muted);");
     expect(statusCardContext).toContain("font-size: var(--git-font-main);");
