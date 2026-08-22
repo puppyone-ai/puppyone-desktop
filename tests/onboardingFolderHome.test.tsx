@@ -141,7 +141,7 @@ describe("project folder home", () => {
     expect(providers[2]?.querySelector("img")?.getAttribute("src")).toContain("icons/notion.svg");
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
     expect(css).toMatch(/\.onboarding-homepage\s*\{[^}]*width:\s*min\(480px, 100%\);[^}]*align-content:\s*start;[^}]*gap:\s*30px;/s);
-    expect(css).toMatch(/\.onboarding-homepage\.is-empty\s*\{[^}]*width:\s*min\(450px, 100%\);[^}]*gap:\s*42px;/s);
+    expect(css).toMatch(/\.onboarding-homepage\.is-empty\s*\{[^}]*width:\s*min\(450px, 100%\);[^}]*min-height:\s*min\(430px, 100%\);[^}]*align-content:\s*center;[^}]*gap:\s*42px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*center;[^}]*justify-self:\s*center;[^}]*gap:\s*12px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*color:\s*var\(--po-text-muted\);/s);
     expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*60px;[^}]*height:\s*60px;/s);
@@ -149,7 +149,7 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-primary-area\s*\{[^}]*justify-items:\s*center;/s);
     expect(css).toMatch(/\.onboarding-entry-launcher\s*\{[^}]*width:\s*min\(272px, 100%\);[^}]*gap:\s*18px;/s);
     expect(css).toMatch(/\.onboarding-entry-actions\s*\{[^}]*gap:\s*10px;/s);
-    expect(css).toMatch(/\.onboarding-entry-action\s*\{[^}]*width:\s*100%;[^}]*height:\s*38px;[^}]*min-height:\s*38px;[^}]*justify-content:\s*center;[^}]*border-radius:\s*var\(--desktop-control-radius\);[^}]*font-size:\s*var\(--po-text-size-body, 13px\);[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);[^}]*text-align:\s*center;/s);
+    expect(css).toMatch(/\.onboarding-entry-action\s*\{[^}]*width:\s*100%;[^}]*height:\s*38px;[^}]*min-height:\s*38px;[^}]*justify-content:\s*flex-start;[^}]*border-radius:\s*var\(--desktop-control-radius\);[^}]*font-size:\s*var\(--po-text-size-body, 13px\);[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);[^}]*text-align:\s*start;/s);
     expect(css).toMatch(/\.onboarding-entry-action-primary\s*\{[^}]*background:\s*var\(--po-text\);[^}]*color:\s*var\(--po-text-inverse\);[^}]*font-weight:\s*var\(--po-text-weight-semibold, 600\);/s);
     expect(css).toMatch(/\.onboarding-entry-action-secondary\s*\{[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-subtle\);/s);
     expect(css).toMatch(/\.onboarding-provider-action\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;[^}]*border:\s*1px solid var\(--po-border\);/s);
