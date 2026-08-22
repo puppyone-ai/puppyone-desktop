@@ -545,6 +545,14 @@ export type WorkspaceOpenResult = {
   workspace: Workspace | null;
 };
 
+export type WorkspaceCreateProjectRequest = {
+  name: string;
+};
+
+export type WorkspaceCloneRepositoryRequest = {
+  repositoryUrl: string;
+};
+
 export type WorkspaceCreateEntryKind = "file" | "folder";
 
 export type WorkspaceCreateEntryRequest = {
@@ -893,6 +901,12 @@ declare global {
       openDroppedWorkspaceInCurrentWindow: (folder: File) => Promise<WorkspaceOpenResult>;
       selectFolder: () => Promise<WorkspaceOpenResult | null>;
       selectFolderInNewWindow: () => Promise<WorkspaceOpenResult | null>;
+      createLocalProject: (
+        request: WorkspaceCreateProjectRequest,
+      ) => Promise<WorkspaceOpenResult | null>;
+      cloneGitHubRepository: (
+        request: WorkspaceCloneRepositoryRequest,
+      ) => Promise<WorkspaceOpenResult | null>;
       getPathForFile: (file: File) => string;
       stageAgentAttachments: (request: {
         rootPath: string;

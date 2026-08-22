@@ -18,6 +18,8 @@ import type {
   PuppyoneWorkspaceConfig,
   RecentWorkspacesResult,
   WorkspaceChooseExternalAppRequest,
+  WorkspaceCloneRepositoryRequest,
+  WorkspaceCreateProjectRequest,
   WorkspaceCreateEntryKind,
   WorkspaceCreateEntryResult,
   WorkspaceInstantiateTemplateResult,
@@ -321,6 +323,18 @@ export async function selectWorkspaceFolder(): Promise<WorkspaceOpenResult | nul
 
 export async function selectWorkspaceFolderInNewWindow(): Promise<WorkspaceOpenResult | null> {
   return getDesktopBridge().selectFolderInNewWindow();
+}
+
+export async function createLocalProject(
+  request: WorkspaceCreateProjectRequest,
+): Promise<WorkspaceOpenResult | null> {
+  return getDesktopBridge().createLocalProject(request);
+}
+
+export async function cloneGitHubRepository(
+  request: WorkspaceCloneRepositoryRequest,
+): Promise<WorkspaceOpenResult | null> {
+  return getDesktopBridge().cloneGitHubRepository(request);
 }
 
 export async function createWorkspaceEntry(

@@ -1,0 +1,225 @@
+import fs from "node:fs";
+import path from "node:path";
+import { cloneGitRepository } from "../../local-api/git/runner.mjs";
+
+const PROJECT_NAME_MAX_LENGTH = 120;
+const WINDOWS_RESERVED_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+
+export function createProjectEntryService({
+  fsPromises = fs.promises,
+  pathModule = path,
+  cloneGit = cloneGitRepository,
+} = {}) {
+  return Object.freeze({
+    async createProject({ parentPath, name }) {
+      const projectName = requireProjectName(name);
+      const canonicalParent = await requireDirectory(parentPath, fsPromises, pathModule);
+      const projectPath = resolveChildPath(canonicalParent, projectName, pathModule);
+      try {
+        await fsPromises.mkdir(projectPath, { recursive: false });
+      } catch (error) {
+        if (error?.code === "EEXIST") {
+          throw projectEntryError(
+            "PROJECT_ALREADY_EXISTS",
+            `A file or folder named “${projectName}” already exists in that location.`,
+          );
+        }
+        throw error;
+      }
+      return { path: projectPath, name: projectName };
+    },
+
+    async cloneRepository({ parentPath, repositoryUrl, signal }) {
+      const repository = requireGitHubRepository(repositoryUrl);
+      const canonicalParent = await requireDirectory(parentPath, fsPromises, pathModule);
+      const projectPath = resolveChildPath(canonicalParent, repository.name, pathModule);
+      await requireMissingPath(projectPath, repository.name, fsPromises);
+
+      const temporaryPath = await fsPromises.mkdtemp(
+        pathModule.join(canonicalParent, `.puppyone-clone-${repository.name}-`),
+      );
+      let ownsProjectPath = false;
+      try {
+        await cloneGit(temporaryPath, repository.url, { signal });
+        try {
+          // Claim the final path exclusively after the network operation. This
+          // prevents rename() from replacing a directory created by another
+          // process while the clone was running.
+          await fsPromises.mkdir(projectPath, { recursive: false });
+          ownsProjectPath = true;
+        } catch (error) {
+          if (error?.code === "EEXIST") {
+            throw projectEntryError(
+              "PROJECT_ALREADY_EXISTS",
+              `A file or folder named “${repository.name}” already exists in that location.`,
+            );
+          }
+          throw error;
+        }
+        const entries = await fsPromises.readdir(temporaryPath);
+        for (const entry of entries) {
+          await fsPromises.rename(
+            pathModule.join(temporaryPath, entry),
+            pathModule.join(projectPath, entry),
+          );
+        }
+        await fsPromises.rmdir(temporaryPath);
+      } catch (error) {
+        await fsPromises.rm(temporaryPath, { recursive: true, force: true }).catch(() => undefined);
+        if (ownsProjectPath) {
+          await fsPromises.rm(projectPath, { recursive: true, force: true }).catch(() => undefined);
+        }
+        throw normalizeCloneError(error);
+      }
+
+      return {
+        path: projectPath,
+        name: repository.name,
+        repositoryUrl: repository.url,
+      };
+    },
+  });
+}
+
+export function requireProjectName(value) {
+  if (typeof value !== "string") {
+    throw projectEntryError("INVALID_PROJECT_NAME", "Enter a project name.");
+  }
+  const name = value.trim();
+  if (!name) throw projectEntryError("INVALID_PROJECT_NAME", "Enter a project name.");
+  if (name.length > PROJECT_NAME_MAX_LENGTH) {
+    throw projectEntryError(
+      "INVALID_PROJECT_NAME",
+      `Project names must be ${PROJECT_NAME_MAX_LENGTH} characters or fewer.`,
+    );
+  }
+  if (
+    name === "."
+    || name === ".."
+    || /[<>:"/\\|?*\u0000-\u001f\u007f]/.test(name)
+    || /[. ]$/.test(name)
+    || WINDOWS_RESERVED_NAME.test(name)
+  ) {
+    throw projectEntryError(
+      "INVALID_PROJECT_NAME",
+      "Use a project name without slashes, reserved characters, or a trailing period.",
+    );
+  }
+  return name;
+}
+
+export function requireGitHubRepository(value) {
+  if (typeof value !== "string" || !value.trim()) {
+    throw projectEntryError("INVALID_REPOSITORY_URL", "Enter a GitHub repository URL.");
+  }
+  const repositoryUrl = value.trim();
+  if (/^[\u0000-\u001f\u007f-]/.test(repositoryUrl)) {
+    throw projectEntryError("INVALID_REPOSITORY_URL", "Enter a valid GitHub repository URL.");
+  }
+
+  const scpMatch = /^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i.exec(repositoryUrl);
+  if (scpMatch) {
+    return {
+      url: repositoryUrl,
+      owner: scpMatch[1],
+      name: requireRepositoryName(scpMatch[2]),
+    };
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(repositoryUrl);
+  } catch {
+    throw projectEntryError("INVALID_REPOSITORY_URL", "Enter a valid GitHub repository URL.");
+  }
+
+  const protocolAllowed = parsed.protocol === "https:" || parsed.protocol === "ssh:";
+  const hostAllowed = parsed.hostname.toLowerCase() === "github.com";
+  const credentialsAllowed = parsed.protocol === "ssh:"
+    ? (!parsed.password && (!parsed.username || parsed.username === "git"))
+    : !parsed.username && !parsed.password;
+  const segments = parsed.pathname.split("/").filter(Boolean);
+  if (
+    !protocolAllowed
+    || !hostAllowed
+    || !credentialsAllowed
+    || parsed.search
+    || parsed.hash
+    || segments.length !== 2
+  ) {
+    throw projectEntryError(
+      "INVALID_REPOSITORY_URL",
+      "Use an HTTPS or SSH URL for a GitHub repository.",
+    );
+  }
+
+  const owner = segments[0];
+  const repositorySegment = segments[1].replace(/\.git$/i, "");
+  if (!/^[A-Za-z0-9_.-]+$/.test(owner)) {
+    throw projectEntryError("INVALID_REPOSITORY_URL", "Enter a valid GitHub repository URL.");
+  }
+  return {
+    url: repositoryUrl,
+    owner,
+    name: requireRepositoryName(repositorySegment),
+  };
+}
+
+function requireRepositoryName(value) {
+  if (!value || !/^[A-Za-z0-9_.-]+$/.test(value) || value === "." || value === "..") {
+    throw projectEntryError("INVALID_REPOSITORY_URL", "Enter a valid GitHub repository URL.");
+  }
+  return requireProjectName(value);
+}
+
+async function requireDirectory(value, fsPromises, pathModule) {
+  if (typeof value !== "string" || !value.trim()) {
+    throw projectEntryError("INVALID_PARENT_DIRECTORY", "Choose a folder for the project.");
+  }
+  const resolved = pathModule.resolve(value.trim());
+  const canonical = await fsPromises.realpath(resolved);
+  const stats = await fsPromises.stat(canonical);
+  if (!stats.isDirectory()) {
+    throw projectEntryError("INVALID_PARENT_DIRECTORY", "Choose a folder for the project.");
+  }
+  return canonical;
+}
+
+function resolveChildPath(parentPath, name, pathModule) {
+  const childPath = pathModule.resolve(parentPath, name);
+  if (pathModule.dirname(childPath) !== parentPath) {
+    throw projectEntryError("INVALID_PROJECT_NAME", "Enter a valid project name.");
+  }
+  return childPath;
+}
+
+async function requireMissingPath(targetPath, projectName, fsPromises) {
+  try {
+    await fsPromises.lstat(targetPath);
+  } catch (error) {
+    if (error?.code === "ENOENT") return;
+    throw error;
+  }
+  throw projectEntryError(
+    "PROJECT_ALREADY_EXISTS",
+    `A file or folder named “${projectName}” already exists in that location.`,
+  );
+}
+
+function normalizeCloneError(error) {
+  if (error?.name === "AbortError" || error?.code === "ABORT_ERR") {
+    return projectEntryError("CLONE_CANCELLED", "Repository cloning was cancelled.");
+  }
+  if (typeof error?.code === "string" && error.code.startsWith("PROJECT_")) return error;
+  const diagnostic = typeof error?.stderr === "string" ? error.stderr.trim() : "";
+  const message = diagnostic
+    ? diagnostic.split(/\r?\n/).filter(Boolean).at(-1)
+    : error instanceof Error ? error.message : String(error);
+  return projectEntryError("CLONE_FAILED", message || "Unable to clone that repository.");
+}
+
+function projectEntryError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}

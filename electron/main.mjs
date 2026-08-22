@@ -81,6 +81,11 @@ import { createDefaultTerminalAgentActivityHost } from "./main/terminal-agent/ac
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
+import {
+  createProjectEntryService,
+  requireGitHubRepository,
+  requireProjectName,
+} from "./main/project-entry-service.mjs";
 import { createDesktopLocaleService } from "./main/localization/desktop-locale-service.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
@@ -267,6 +272,8 @@ const workspaceStateStore = createWorkspaceStateStore({
   workspaceFromPath,
   resolveWorkspaceIdentity: resolveLocalWorkspaceIdentity,
 });
+const projectEntryService = createProjectEntryService();
+const projectEntryOperationSenders = new Set();
 const cloudAuthService = createCloudAuthService({
   app,
   requestCloudApi,
@@ -743,6 +750,8 @@ function registerIpcHandlers() {
     showHomepageForCurrentWindow,
     openWorkspaceInCurrentWindow,
     openWorkspaceInNewWindow,
+    createProjectForCurrentWindow,
+    cloneRepositoryForCurrentWindow,
     selectWorkspaceForCurrentWindow,
     selectWorkspaceForNewWindow,
   });
@@ -985,6 +994,66 @@ async function showWorkspaceOpenDialog(ownerWindow) {
   return ownerWindow && !ownerWindow.isDestroyed()
     ? dialog.showOpenDialog(ownerWindow, options)
     : dialog.showOpenDialog(options);
+}
+
+async function createProjectForCurrentWindow(sender, request) {
+  const name = requireProjectName(request?.name);
+  return runProjectEntryOperation(sender, async () => {
+    const parentPath = await selectProjectParentDirectory(sender, "create");
+    if (!parentPath) return null;
+    const project = await projectEntryService.createProject({
+      parentPath,
+      name,
+    });
+    return openWorkspaceInCurrentWindow(sender, project.path);
+  });
+}
+
+async function cloneRepositoryForCurrentWindow(sender, request) {
+  const repository = requireGitHubRepository(request?.repositoryUrl);
+  return runProjectEntryOperation(sender, async () => {
+    const parentPath = await selectProjectParentDirectory(sender, "clone");
+    if (!parentPath) return null;
+    const project = await projectEntryService.cloneRepository({
+      parentPath,
+      repositoryUrl: repository.url,
+    });
+    return openWorkspaceInCurrentWindow(sender, project.path);
+  });
+}
+
+async function selectProjectParentDirectory(sender, kind) {
+  const ownerWindow = getDialogOwnerWindow(sender);
+  const create = kind === "create";
+  const options = {
+    title: localeService.t(create
+      ? "native.workspace.create.chooseParent"
+      : "native.workspace.clone.chooseParent"),
+    buttonLabel: localeService.t(create
+      ? "native.workspace.create.chooseParentButton"
+      : "native.workspace.clone.chooseParentButton"),
+    defaultPath: app.getPath("documents"),
+    properties: ["openDirectory", "createDirectory"],
+  };
+  const result = ownerWindow && !ownerWindow.isDestroyed()
+    ? await dialog.showOpenDialog(ownerWindow, options)
+    : await dialog.showOpenDialog(options);
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0];
+}
+
+async function runProjectEntryOperation(sender, operation) {
+  const senderId = sender?.id;
+  if (!Number.isInteger(senderId)) throw new Error("No active window is available for this project operation.");
+  if (projectEntryOperationSenders.has(senderId)) {
+    throw new Error("Another project operation is already in progress.");
+  }
+  projectEntryOperationSenders.add(senderId);
+  try {
+    return await operation();
+  } finally {
+    projectEntryOperationSenders.delete(senderId);
+  }
 }
 
 async function openWorkspaceInCurrentWindow(sender, folderPath, options = {}) {

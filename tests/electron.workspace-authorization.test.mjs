@@ -215,6 +215,8 @@ describe("recent workspace authorization", () => {
     const { ipcMain, handlers } = createIpcHarness();
     const openWorkspaceInCurrentWindow = vi.fn(async () => ({ status: "opened-current" }));
     const openWorkspaceInNewWindow = vi.fn(async () => ({ status: "opened-new" }));
+    const createProjectForCurrentWindow = vi.fn(async () => ({ status: "created-current" }));
+    const cloneRepositoryForCurrentWindow = vi.fn(async () => ({ status: "cloned-current" }));
     registerWorkspaceNavigationIpcHandlers({
       ipcMain,
       workspaceStateStore: stateStore,
@@ -223,6 +225,8 @@ describe("recent workspace authorization", () => {
       showHomepageForCurrentWindow: vi.fn(),
       openWorkspaceInCurrentWindow,
       openWorkspaceInNewWindow,
+      createProjectForCurrentWindow,
+      cloneRepositoryForCurrentWindow,
       createCloudWorkspaceFromRequest: vi.fn(),
       openVirtualWorkspaceInNewWindow: vi.fn(),
       selectWorkspaceForCurrentWindow: vi.fn(),
@@ -249,6 +253,16 @@ describe("recent workspace authorization", () => {
     await expect(handlers.get("workspace:open-dropped-current")(event, otherRoot)).resolves.toEqual({ status: "opened-current" });
     expect(openWorkspaceInCurrentWindow).toHaveBeenCalledWith(event.sender, otherRoot);
     await expect(handlers.get("workspace:open-dropped-current")(event, "  ")).rejects.toThrow(/path is required/i);
+
+    await expect(handlers.get("workspace:create-project-current")(event, { name: "Notes" }))
+      .resolves.toEqual({ status: "created-current" });
+    expect(createProjectForCurrentWindow).toHaveBeenCalledWith(event.sender, { name: "Notes" });
+    await expect(handlers.get("workspace:clone-repository-current")(event, {
+      repositoryUrl: "https://github.com/owner/repository.git",
+    })).resolves.toEqual({ status: "cloned-current" });
+    expect(cloneRepositoryForCurrentWindow).toHaveBeenCalledWith(event.sender, {
+      repositoryUrl: "https://github.com/owner/repository.git",
+    });
     expect(handlers.has("workspace:remember-last")).toBe(false);
     expect(handlers.has("workspace:from-path")).toBe(false);
   });

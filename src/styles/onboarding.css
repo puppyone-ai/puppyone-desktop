@@ -188,6 +188,37 @@
   color: var(--po-text-inverse);
 }
 
+.onboarding-entry-dialog {
+  --onboarding-entry-inset: 20px;
+  width: min(380px, calc(100vw - 32px));
+}
+
+.onboarding-entry-dialog .desktop-dialog-header {
+  padding-block: var(--onboarding-entry-inset) 10px;
+  padding-inline: var(--onboarding-entry-inset);
+}
+
+.onboarding-entry-dialog-body {
+  gap: 8px;
+  padding-block: 8px 16px;
+  padding-inline: var(--onboarding-entry-inset);
+}
+
+.onboarding-entry-dialog .desktop-dialog-footer {
+  padding-inline: var(--onboarding-entry-inset);
+  padding-block-end: var(--onboarding-entry-inset);
+}
+
+.onboarding-entry-dialog-note,
+.onboarding-entry-dialog .desktop-dialog-error {
+  margin: 0;
+}
+
+.onboarding-entry-dialog .desktop-dialog-error {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .onboarding-projects-layout {
   display: grid;
   width: min(680px, 100%);

@@ -132,6 +132,8 @@ function AppContent() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const {
     clearWorkspace,
+    cloneRepository,
+    createProject,
     forgetActiveWorkspace,
     handleWorkspaceOpenResult,
     openDroppedWorkspace,
@@ -847,6 +849,8 @@ function AppContent() {
     return (
       <Homepage
         onChooseWorkspace={openFolder}
+        onCreateProject={createProject}
+        onCloneRepository={cloneRepository}
         onOpenDroppedWorkspace={openDroppedWorkspace}
         onOpenWorkspacePath={openWorkspacePath}
         onRemoveProject={removeWorkspaceFromRecents}

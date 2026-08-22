@@ -6,6 +6,8 @@ export function registerWorkspaceNavigationIpcHandlers({
   showHomepageForCurrentWindow,
   openWorkspaceInCurrentWindow,
   openWorkspaceInNewWindow,
+  createProjectForCurrentWindow,
+  cloneRepositoryForCurrentWindow,
   selectWorkspaceForCurrentWindow,
   selectWorkspaceForNewWindow,
 }) {
@@ -58,6 +60,14 @@ export function registerWorkspaceNavigationIpcHandlers({
   ipcMain.handle("workspace:open-new-window", async (_event, folderPath) => {
     const persistedPath = await workspaceStateStore.requireRecentWorkspacePath(folderPath);
     return openWorkspaceInNewWindow(persistedPath);
+  });
+
+  ipcMain.handle("workspace:create-project-current", async (event, request) => {
+    return createProjectForCurrentWindow(event.sender, request);
+  });
+
+  ipcMain.handle("workspace:clone-repository-current", async (event, request) => {
+    return cloneRepositoryForCurrentWindow(event.sender, request);
   });
 
   ipcMain.handle("workspace:select-folder", async (event) => {

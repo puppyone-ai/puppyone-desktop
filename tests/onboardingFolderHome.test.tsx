@@ -112,8 +112,8 @@ describe("project folder home", () => {
   it("uses a restrained three-action launcher when there are no projects", async () => {
     const css = readFileSync(`${process.cwd()}/src/styles/onboarding.css`, "utf8");
     const onChooseWorkspace = vi.fn(async () => undefined);
-    const onCreateProject = vi.fn(async () => undefined);
-    const onCloneRepository = vi.fn(async () => undefined);
+    const onCreateProject = vi.fn(async () => true);
+    const onCloneRepository = vi.fn(async () => true);
     const container = renderHome({ onChooseWorkspace, onCreateProject, onCloneRepository });
 
     expectBrandLockup(container);
@@ -147,11 +147,45 @@ describe("project folder home", () => {
     expect(css).not.toContain(".folder-drop-zone");
 
     await act(async () => actions[0]?.click());
-    await act(async () => actions[1]?.click());
-    await act(async () => actions[2]?.click());
     expect(onChooseWorkspace).toHaveBeenCalledTimes(1);
-    expect(onCreateProject).toHaveBeenCalledTimes(1);
-    expect(onCloneRepository).toHaveBeenCalledTimes(1);
+    expect(onCreateProject).not.toHaveBeenCalled();
+    expect(onCloneRepository).not.toHaveBeenCalled();
+  });
+
+  it("collects one focused value for Create New and Clone from GitHub", async () => {
+    const onCreateProject = vi.fn(async () => true);
+    const onCloneRepository = vi.fn(async () => true);
+    const container = renderHome({ onCreateProject, onCloneRepository });
+
+    await act(async () => {
+      container.querySelectorAll<HTMLButtonElement>(".onboarding-entry-action")[1]?.click();
+    });
+    expect(container.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe("Create a project");
+    const projectName = container.querySelector<HTMLInputElement>(".onboarding-entry-dialog input");
+    expect(projectName?.placeholder).toBe("My project");
+    setInputValue(projectName, "Knowledge Base");
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".onboarding-entry-dialog button[type='submit']")?.click();
+      await Promise.resolve();
+    });
+    expect(onCreateProject).toHaveBeenCalledWith({ name: "Knowledge Base" });
+    expect(container.querySelector(".onboarding-entry-dialog")).toBeNull();
+
+    await act(async () => {
+      container.querySelectorAll<HTMLButtonElement>(".onboarding-entry-action")[2]?.click();
+    });
+    expect(container.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe("Clone from GitHub");
+    const repositoryUrl = container.querySelector<HTMLInputElement>(".onboarding-entry-dialog input");
+    expect(repositoryUrl?.inputMode).toBe("url");
+    setInputValue(repositoryUrl, "https://github.com/puppyone-ai/puppyone.git");
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".onboarding-entry-dialog button[type='submit']")?.click();
+      await Promise.resolve();
+    });
+    expect(onCloneRepository).toHaveBeenCalledWith({
+      repositoryUrl: "https://github.com/puppyone-ai/puppyone.git",
+    });
+    expect(container.querySelector(".onboarding-entry-dialog")).toBeNull();
   });
 
   it("shows project-opening progress only inside the project row", async () => {
@@ -418,4 +452,13 @@ function createTextTransfer(): DataTransfer {
       values.set(type, value);
     },
   } as unknown as DataTransfer;
+}
+
+function setInputValue(input: HTMLInputElement | null, value: string) {
+  if (!input) throw new Error("Project entry input is missing.");
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
 }

@@ -8,11 +8,17 @@ import {
   removeRecentWorkspace,
 } from "../../lib/localFiles";
 import {
+  cloneGitHubRepositoryTarget,
+  createLocalProjectTarget,
   openDroppedWorkspaceTarget,
   openWorkspaceTarget,
   selectLocalWorkspaceFolder,
 } from "../../lib/workspaceOpening";
-import type { WorkspaceOpenResult } from "../../types/electron";
+import type {
+  WorkspaceCloneRepositoryRequest,
+  WorkspaceCreateProjectRequest,
+  WorkspaceOpenResult,
+} from "../../types/electron";
 import {
   getRecentWorkspaceItems,
   mergeWorkspaceLists,
@@ -108,6 +114,18 @@ export function useWorkspaceLifecycle({
     handleWorkspaceOpenResult(result);
   }, [handleWorkspaceOpenResult, workspace]);
 
+  const createProject = useCallback(async (request: WorkspaceCreateProjectRequest) => {
+    const result = await createLocalProjectTarget(request);
+    handleWorkspaceOpenResult(result);
+    return result !== null;
+  }, [handleWorkspaceOpenResult]);
+
+  const cloneRepository = useCallback(async (request: WorkspaceCloneRepositoryRequest) => {
+    const result = await cloneGitHubRepositoryTarget(request);
+    handleWorkspaceOpenResult(result);
+    return result !== null;
+  }, [handleWorkspaceOpenResult]);
+
   const removeWorkspaceFromRecents = useCallback(async (folderPath: string) => {
     await removeRecentWorkspace(folderPath);
     recentWorkspaceRequestRef.current += 1;
@@ -184,6 +202,8 @@ export function useWorkspaceLifecycle({
   return {
     activateWorkspace,
     clearWorkspace,
+    cloneRepository,
+    createProject,
     forgetActiveWorkspace,
     handleWorkspaceOpenResult,
     openDroppedWorkspace,

@@ -12,6 +12,8 @@ export const GIT_READ_TIMEOUT_MS = 5_000;
 export const GIT_MUTATION_TIMEOUT_MS = 120_000;
 /** Network-bound operations (fetch/push/pull/publish). */
 export const GIT_NETWORK_TIMEOUT_MS = 60_000;
+/** Initial clones can legitimately take longer than an ordinary fetch. */
+export const GIT_CLONE_TIMEOUT_MS = 10 * 60_000;
 
 /** @deprecated Prefer GIT_READ_TIMEOUT_MS; kept for existing call sites. */
 export const GIT_DEFAULT_TIMEOUT_MS = GIT_READ_TIMEOUT_MS;
@@ -29,6 +31,26 @@ export function execGit(rootPath, args, options = {}) {
     ? execFilePromise("git", commandArgs, execOptions)
     : execFilePromiseWithInput("git", commandArgs, execOptions, options.input);
   return execution.catch((error) => {
+    annotateGitError(error, args, timeout);
+    throw error;
+  });
+}
+
+/**
+ * Clone into an existing empty directory. This deliberately does not accept a
+ * shell command and never enables terminal prompting; configured credential
+ * helpers and SSH agents may still satisfy authentication non-interactively.
+ */
+export function cloneGitRepository(targetPath, repositoryUrl, options = {}) {
+  const timeout = options.timeout ?? GIT_CLONE_TIMEOUT_MS;
+  const args = ["clone", "--progress", repositoryUrl, "."];
+  return execFilePromise("git", args, {
+    cwd: targetPath,
+    timeout,
+    maxBuffer: options.maxBuffer ?? GIT_MAX_BUFFER,
+    signal: options.signal,
+    env: buildGitEnvironment(),
+  }).catch((error) => {
     annotateGitError(error, args, timeout);
     throw error;
   });

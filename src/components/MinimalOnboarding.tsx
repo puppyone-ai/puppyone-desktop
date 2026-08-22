@@ -22,9 +22,14 @@ import type {
 import { useWorkspaceFolderDrop } from "../features/app-shell/useWorkspaceFolderDrop";
 import { getWorkspaceParentPathForDisplay } from "../features/app-shell/workspaceHomeModel";
 import { writeClipboardText } from "../features/settings/utils";
+import type {
+  WorkspaceCloneRepositoryRequest,
+  WorkspaceCreateProjectRequest,
+} from "../types/electron";
 import { DesktopMenuIconButton, DesktopMenuItem } from "./DesktopMenu";
 import { InlineLoading } from "./loading";
 import { DesktopWindowDragRegion } from "./DesktopWindowChrome";
+import { OnboardingProjectEntryDialog } from "./OnboardingProjectEntryDialog";
 
 export type RecentWorkspaceHomeItem = {
   workspace: Workspace;
@@ -45,8 +50,8 @@ export type OnboardingOperationStatus = {
 
 export type MinimalOnboardingProps = {
   onChooseWorkspace: () => Promise<void>;
-  onCreateProject?: () => Promise<void>;
-  onCloneRepository?: () => Promise<void>;
+  onCreateProject?: (request: WorkspaceCreateProjectRequest) => Promise<boolean>;
+  onCloneRepository?: (request: WorkspaceCloneRepositoryRequest) => Promise<boolean>;
   onOpenWorkspacePath: (path: string) => Promise<void>;
   onOpenDroppedWorkspace: (folder: File) => Promise<void>;
   onRemoveProject?: (path: string) => Promise<void>;
@@ -91,6 +96,7 @@ export function MinimalOnboarding({
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const [removingPath, setRemovingPath] = useState<string | null>(null);
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
+  const [entryDialog, setEntryDialog] = useState<"create" | "clone" | null>(null);
   const items = useMemo(
     () => (projectItems ?? recentWorkspaces.map(({ workspace, lastOpenedAt }) => ({
       id: workspace.id,
@@ -122,22 +128,6 @@ export function MinimalOnboarding({
     setOpeningPath("__new__");
     try {
       await onChooseWorkspace();
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : String(nextError));
-    } finally {
-      setOpeningPath(null);
-    }
-  };
-
-  const runEntryAction = async (
-    actionKey: "__create__" | "__clone__",
-    action: (() => Promise<void>) | undefined,
-  ) => {
-    if (!action || openingPath) return;
-    setError(null);
-    setOpeningPath(actionKey);
-    try {
-      await action();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : String(nextError));
     } finally {
@@ -251,11 +241,8 @@ export function MinimalOnboarding({
                 className="onboarding-entry-action onboarding-entry-action-secondary"
                 tone="neutral"
                 disabled={busy || !onCreateProject}
-                aria-busy={openingPath === "__create__" || undefined}
-                leadingIcon={openingPath === "__create__"
-                  ? <InlineLoading label={null} size="xs" tone="neutral" />
-                  : <FilePlus2 className="onboarding-entry-create-icon" aria-hidden="true" />}
-                onClick={() => void runEntryAction("__create__", onCreateProject)}
+                leadingIcon={<FilePlus2 className="onboarding-entry-create-icon" aria-hidden="true" />}
+                onClick={() => setEntryDialog("create")}
               >
                 {t("onboarding.action.createNew")}
               </Button>
@@ -264,11 +251,8 @@ export function MinimalOnboarding({
                 className="onboarding-entry-action onboarding-entry-action-secondary"
                 tone="neutral"
                 disabled={busy || !onCloneRepository}
-                aria-busy={openingPath === "__clone__" || undefined}
-                leadingIcon={openingPath === "__clone__"
-                  ? <InlineLoading label={null} size="xs" tone="neutral" />
-                  : <Github className="onboarding-entry-github-icon" aria-hidden="true" />}
-                onClick={() => void runEntryAction("__clone__", onCloneRepository)}
+                leadingIcon={<Github className="onboarding-entry-github-icon" aria-hidden="true" />}
+                onClick={() => setEntryDialog("clone")}
               >
                 {t("onboarding.action.cloneFromGitHub")}
               </Button>
@@ -344,6 +328,20 @@ export function MinimalOnboarding({
 
         {error && <div className="onboarding-error onboarding-homepage-error" role="alert"><AlertTriangle size={15} /><span>{error}</span></div>}
       </section>
+      {entryDialog === "create" && onCreateProject && (
+        <OnboardingProjectEntryDialog
+          kind="create"
+          onClose={() => setEntryDialog(null)}
+          onSubmit={(value) => onCreateProject({ name: value })}
+        />
+      )}
+      {entryDialog === "clone" && onCloneRepository && (
+        <OnboardingProjectEntryDialog
+          kind="clone"
+          onClose={() => setEntryDialog(null)}
+          onSubmit={(value) => onCloneRepository({ repositoryUrl: value })}
+        />
+      )}
       {cornerSlot}
     </main>
   );

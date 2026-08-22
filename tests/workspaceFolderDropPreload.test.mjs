@@ -22,6 +22,18 @@ describe("workspace folder drop preload boundary", () => {
     await expect(bridge.openDroppedWorkspaceInCurrentWindow({ name: "Notes" })).rejects.toThrow(/could not be resolved/i);
     expect(invoke).not.toHaveBeenCalled();
   });
+
+  it("exposes narrow create and clone requests without accepting a renderer path", async () => {
+    const invoke = vi.fn(async () => ({ status: "opened-current" }));
+    const bridge = await loadPreloadBridge({ invoke, getPathForFile: () => "" });
+
+    await bridge.createLocalProject({ name: "Notes" });
+    expect(invoke).toHaveBeenCalledWith("workspace:create-project-current", { name: "Notes" });
+    await bridge.cloneGitHubRepository({ repositoryUrl: "https://github.com/owner/repository.git" });
+    expect(invoke).toHaveBeenCalledWith("workspace:clone-repository-current", {
+      repositoryUrl: "https://github.com/owner/repository.git",
+    });
+  });
 });
 
 async function loadPreloadBridge({ invoke, getPathForFile }) {
