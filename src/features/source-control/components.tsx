@@ -15,6 +15,7 @@ export function SourceControlSectionHeader({
   count,
   summaryResources,
   highlightCount = false,
+  showCount = true,
   leadingIcon,
   action,
   className,
@@ -25,6 +26,7 @@ export function SourceControlSectionHeader({
   count: number;
   summaryResources?: readonly GitSourceControlResource[];
   highlightCount?: boolean;
+  showCount?: boolean;
   leadingIcon?: ReactNode;
   action?: ReactNode;
   className?: string;
@@ -36,11 +38,13 @@ export function SourceControlSectionHeader({
       {onToggle && <ChevronRight size={14} className={`po-disclosure-icon ${expanded ? "expanded" : ""}`} />}
       {leadingIcon && <span className="desktop-git-section-leading-icon">{leadingIcon}</span>}
       <span>{title}</span>
-      {summaryResources && summaryResources.length > 0 ? (
-        <SourceControlResourceSummary resources={summaryResources} />
-      ) : (
-        <small className={highlightCount ? "desktop-git-section-count-badge" : undefined}>{count}</small>
-      )}
+      {showCount ? (
+        summaryResources && summaryResources.length > 0 ? (
+          <SourceControlResourceSummary resources={summaryResources} />
+        ) : (
+          <small className={highlightCount ? "desktop-git-section-count-badge" : undefined}>{count}</small>
+        )
+      ) : null}
     </>
   );
 

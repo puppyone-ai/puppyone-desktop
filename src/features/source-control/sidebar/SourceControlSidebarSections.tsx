@@ -23,9 +23,17 @@ import type {
 import { getGitScmSyncSection } from "../viewModel";
 import type { GitSidebarPanelId } from "./useGitSidebarPanelLayout";
 
-export function GitSectionCollapse({ expanded, children }: { expanded: boolean; children: ReactNode }) {
+export function GitSectionCollapse({
+  expanded,
+  children,
+  className,
+}: {
+  expanded: boolean;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className={`desktop-git-section-collapse ${expanded ? "expanded" : "collapsed"}`}>
+    <div className={`desktop-git-section-collapse${className ? ` ${className}` : ""} ${expanded ? "expanded" : "collapsed"}`}>
       <div className="desktop-git-section-collapse-inner">{children}</div>
     </div>
   );
@@ -181,7 +189,7 @@ function GitHubIncomingChangesCard({
           tabIndex={0}
           aria-describedby={updateTooltipId}
         >
-          {t("source-control.github.updatedRelative", { relativeTime: updateAge })}
+          {updateAge}
         </time>
       )}
       <span className="desktop-git-github-file-total">
@@ -265,7 +273,7 @@ export function GitHubProviderSection({
                 ? t("source-control.cloud.resolveBeforeDownload")
                 : pullAction.title}
               icon={pullAction.icon}
-              label={pullAction.label}
+              label={t("source-control.sync.pull")}
               loadingKey={pullAction.kind}
               loadingLabel={pullAction.loadingLabel}
               operationLoading={operationLoading}

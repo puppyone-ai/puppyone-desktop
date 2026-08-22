@@ -253,8 +253,10 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-file-total");
     expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-file-stats");
     expect(sourceControlSidebarSectionsSource).toContain("source-control.commit.changes");
-    expect(sourceControlSidebarSectionsSource).toContain("source-control.github.updatedRelative");
+    expect(sourceControlSidebarSectionsSource).not.toContain("source-control.github.updatedRelative");
+    expect(sourceControlSidebarSectionsSource).toContain("{updateAge}");
     expect(sourceControlSidebarSectionsSource).toContain("source-control.github.latestIncomingCommitAt");
+    expect(sourceControlSidebarSectionsSource).toContain('label={t("source-control.sync.pull")}');
     expect(sourceControlSidebarSectionsSource).toContain("aria-describedby={updateTooltipId}");
     expect(sourceControlSidebarSectionsSource).toContain('role="tooltip"');
     expect(sourceControlSidebarSource).toContain("lastCommitDate");
@@ -286,6 +288,32 @@ describe("source-control visual architecture", () => {
     expect(sidebarResourcesCss).toContain(
       ".desktop-git-github-update-age:focus ~ .desktop-git-github-update-tooltip",
     );
+  });
+
+  it("groups local source-control sections into quiet card surfaces", () => {
+    const statusCard = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-section-collapse.desktop-git-status-card",
+    ));
+    const resizer = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-section-resizer::after",
+    ));
+
+    expect(sourceControlSidebarSource).toContain(
+      'className="desktop-git-status-card"',
+    );
+    expect(sourceControlSidebarSource).toContain("desktop-git-status-card-summary");
+    expect(sourceControlSidebarSource).toContain("showCount={false}");
+    expect(statusCard).toContain(
+      "margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);",
+    );
+    expect(statusCard).toContain("border: 0;");
+    expect(statusCard).toContain("border-radius: var(--git-control-radius);");
+    expect(statusCard).toContain(
+      "background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));",
+    );
+    expect(resizer).toContain("background: transparent;");
   });
 
   it("keeps GitHub Fetch lifecycle out of the presentational sidebar", () => {
