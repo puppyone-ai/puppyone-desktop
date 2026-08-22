@@ -25,7 +25,6 @@ export function GitLocalStatusSection({
       <SourceControlSectionHeader
         title={title}
         count={count}
-        showCount={false}
         controlsId={bodyId}
         expanded={expanded}
         onToggle={onToggle}

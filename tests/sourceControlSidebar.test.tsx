@@ -28,11 +28,10 @@ describe("Git sidebar status groups", () => {
 
     expect(surface.querySelector(".desktop-git-status-card")).toBeNull();
     expect(surface.querySelectorAll(".desktop-git-local-section-body.expanded")).toHaveLength(3);
-    expect(surface.textContent).toContain("Committed Changes");
-    for (const group of ["committed", "staged", "unstaged"]) {
-      expect(surface.querySelector(`.desktop-git-resizable-section-${group} .desktop-git-section-title small`))
-        .toBeNull();
-    }
+    expect(surface.textContent).toContain("Committed");
+    const localCounts = Array.from(surface.querySelectorAll(".desktop-git-section-title small"))
+      .map((node) => node.textContent);
+    expect(localCounts).toEqual(expect.arrayContaining(["2", "1", "1"]));
 
     const commitButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Commit"]');
     const pushButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Push"]');
@@ -62,15 +61,15 @@ describe("Git sidebar status groups", () => {
     const committedSection = surface.querySelector<HTMLElement>(".desktop-git-resizable-section-committed");
     const stagedSection = surface.querySelector<HTMLElement>(".desktop-git-resizable-section-staged");
     const committedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
-      .find((button) => button.textContent?.includes("Committed Changes"));
+      .find((button) => button.textContent?.includes("Committed"));
     const stagedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
-      .find((button) => button.textContent?.includes("Staged Changes"));
+      .find((button) => button.textContent?.includes("Staged"));
 
     expect(committedSection?.classList.contains("expanded")).toBe(true);
     expect(committedSection?.querySelector(".desktop-git-status-card")).toBeNull();
     expect(committedSection?.querySelector(".desktop-git-local-section-body")?.classList.contains("expanded"))
       .toBe(true);
-    expect(committedToggle?.querySelector("small")).toBeNull();
+    expect(committedToggle?.querySelector("small")?.textContent).toBe("2");
     expect(committedToggle?.getAttribute("aria-expanded")).toBe("true");
     expect(stagedToggle?.getAttribute("aria-expanded")).toBe("true");
 
@@ -87,11 +86,11 @@ describe("Git sidebar status groups", () => {
     const stageAndCommit = vi.fn(async () => true);
     const surface = renderSidebar({ gitDisplayMode: "simple", stageAndCommit });
 
-    expect(surface.textContent).not.toContain("Staged Changes");
-    expect(surface.textContent).toContain("Unstaged Changes");
+    expect(surface.textContent).not.toContain("Staged");
+    expect(surface.textContent).toContain("Unstaged");
     const unstagedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
-      .find((button) => button.textContent?.includes("Unstaged Changes"));
-    expect(unstagedToggle?.querySelector("small")).toBeNull();
+      .find((button) => button.textContent?.includes("Unstaged"));
+    expect(unstagedToggle?.querySelector("small")?.textContent).toBe("2");
     const action = surface.querySelector<HTMLButtonElement>('button[aria-label="Stage & Commit"]');
     expect(action?.closest(".desktop-git-resizable-section-unstaged")).not.toBeNull();
 
@@ -115,11 +114,11 @@ describe("Git sidebar status groups", () => {
     const committedToggle = committedSection?.querySelector<HTMLButtonElement>(
       ".desktop-git-section-row .desktop-git-section-title",
     );
-    expect(committedToggle?.querySelector("span")?.textContent).toBe("Committed Changes");
+    expect(committedToggle?.querySelector("span")?.textContent).toBe("Committed");
     expect(committedToggle?.querySelector(".po-disclosure-icon")).not.toBeNull();
     expect(committedToggle?.querySelectorAll("svg")).toHaveLength(1);
     expect(committedToggle?.getAttribute("aria-expanded")).toBe("true");
-    expect(committedToggle?.querySelector("small")).toBeNull();
+    expect(committedToggle?.querySelector("small")?.textContent).toBe("1");
     expect(committedSection?.querySelector(".desktop-git-status-card")).toBeNull();
     expect(committedSection?.querySelector('.desktop-git-section-row button[aria-label="Push"]')).not.toBeNull();
 
@@ -141,7 +140,7 @@ describe("Git sidebar status groups", () => {
     const mergeSection = surface.querySelector<HTMLElement>(".desktop-git-resizable-section-merge");
 
     expect(mergeSection?.textContent).toContain("Merge Changes");
-    expect(mergeSection?.querySelector(".desktop-git-section-title small")).toBeNull();
+    expect(mergeSection?.querySelector(".desktop-git-section-title small")?.textContent).toBe("1");
     expect(mergeSection?.querySelector(".desktop-git-status-card")).toBeNull();
     expect(mergeSection?.querySelector(".desktop-git-local-section-body")?.classList.contains("expanded")).toBe(true);
   });
