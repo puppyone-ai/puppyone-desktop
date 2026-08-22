@@ -171,6 +171,10 @@
   padding: 10px;
 }
 
+.desktop-git-github-change-card.is-divider-layout.is-up-to-date {
+  min-height: 48px;
+}
+
 .desktop-git-github-change-card.is-divider-layout .desktop-git-github-summary,
 .desktop-git-github-change-card.is-divider-layout .desktop-git-github-card-action {
   grid-row: 1;

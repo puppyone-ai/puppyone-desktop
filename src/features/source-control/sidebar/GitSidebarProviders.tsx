@@ -219,7 +219,9 @@ function GitHubChangesCard({
   const updateAge = formatGitRemoteUpdateAge(incomingUpdatedAt, formatRelativeTime);
 
   return (
-    <div className={`desktop-git-github-change-card${layout === "dividers" ? " is-divider-layout" : ""}`}>
+    <div
+      className={`desktop-git-github-change-card${layout === "dividers" ? " is-divider-layout" : ""}${hasIncomingChanges ? "" : " is-up-to-date"}`}
+    >
       {layout === "cards" && <GitHubRepositoryLink identity={identity} />}
       <span className="desktop-git-github-summary">
         {hasIncomingChanges ? (

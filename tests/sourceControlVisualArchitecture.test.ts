@@ -249,6 +249,10 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-github-change-card.is-divider-layout",
     ));
+    const upToDateDividerCard = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-change-card.is-divider-layout.is-up-to-date",
+    ));
     const dividerProvider = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-github-provider-section.is-divider-layout",
@@ -270,6 +274,7 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSectionsSource).toContain("<GitHubRepositoryLink");
     expect(sourceControlSidebarSectionsSource).toContain("<GitHubChangesCard");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-change-card");
+    expect(sourceControlSidebarSectionsSource).toContain('hasIncomingChanges ? "" : " is-up-to-date"');
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-card-action");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-update-age");
     expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-update-tooltip");
@@ -296,6 +301,7 @@ describe("source-control visual architecture", () => {
     expect(card).toContain("background: var(--git-card-background);");
     expect(dividerCard).toContain("min-height: 52px;");
     expect(dividerCard).toContain("padding: 10px;");
+    expect(upToDateDividerCard).toContain("min-height: 48px;");
     expect(dividerProvider).toContain("border-bottom: 0;");
     expect(updateAge).toContain("color: inherit;");
     expect(updateAge).toContain("cursor: default;");

@@ -48,6 +48,7 @@ describe("GitHub provider section", () => {
     expect(surface.querySelector(".desktop-git-card-divider .desktop-git-hosting-identity-link")).not.toBeNull();
     const card = surface.querySelector(".desktop-git-github-change-card");
     expect(card).not.toBeNull();
+    expect(card?.classList.contains("is-up-to-date")).toBe(true);
     expect(card?.querySelector(".desktop-git-hosting-identity-link")).toBeNull();
     expect(card?.textContent).toContain("Already up to date.");
   });
@@ -124,6 +125,7 @@ describe("GitHub provider section", () => {
     const identityLink = surface.querySelector(".desktop-git-hosting-identity-link");
     const pullButton = surface.querySelector<HTMLButtonElement>(".desktop-git-remote-action");
     expect(pullButton?.textContent).toBe("Pull");
+    expect(card?.classList.contains("is-up-to-date")).toBe(false);
     expect(card?.firstElementChild).toBe(identityLink);
     expect(card?.contains(pullButton ?? null)).toBe(true);
     expect(card?.contains(identityLink ?? null)).toBe(true);
