@@ -10,7 +10,6 @@
   "action.openFolder": "打开本地文件夹",
   "action.createNew": "新建项目",
   "action.importFrom": "导入自",
-  "provider.comingSoon": "{provider} — 即将推出",
   "entry.create.title": "新建项目",
   "entry.create.nameLabel": "项目名称",
   "entry.create.namePlaceholder": "我的项目",

@@ -10,7 +10,6 @@
   "action.openFolder": "Open local folder",
   "action.createNew": "Create new",
   "action.importFrom": "Import from",
-  "provider.comingSoon": "{provider} — Coming soon",
   "entry.create.title": "Create a project",
   "entry.create.nameLabel": "Project name",
   "entry.create.namePlaceholder": "My project",

@@ -10,7 +10,6 @@
   "action.openFolder": "Abrir carpeta local",
   "action.createNew": "Crear nuevo",
   "action.importFrom": "Importar desde",
-  "provider.comingSoon": "{provider} — Próximamente",
   "entry.create.title": "Crear un proyecto",
   "entry.create.nameLabel": "Nombre del proyecto",
   "entry.create.namePlaceholder": "Mi proyecto",

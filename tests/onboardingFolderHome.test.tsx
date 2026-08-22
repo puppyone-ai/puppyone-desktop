@@ -132,13 +132,11 @@ describe("project folder home", () => {
     const providers = [...container.querySelectorAll<HTMLButtonElement>(".onboarding-provider-action")];
     expect(container.querySelector(".onboarding-provider-label")?.textContent).toBe("Import from");
     expect(container.querySelector(".onboarding-provider-arrow")).not.toBeNull();
-    expect(providers.map((provider) => provider.dataset.provider)).toEqual(["github", "gitlab", "notion"]);
+    expect(providers.map((provider) => provider.dataset.provider)).toEqual(["github"]);
     expect(providers[0]?.disabled).toBe(false);
     expect(providers[0]?.querySelector(".lucide-github")).not.toBeNull();
-    expect(providers[1]?.disabled).toBe(true);
-    expect(providers[1]?.querySelector(".lucide-gitlab")).not.toBeNull();
-    expect(providers[2]?.disabled).toBe(true);
-    expect(providers[2]?.querySelector("img")?.getAttribute("src")).toContain("icons/notion.svg");
+    expect(container.querySelector("[data-provider='gitlab']")).toBeNull();
+    expect(container.querySelector("[data-provider='notion']")).toBeNull();
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
     expect(css).toMatch(/\.onboarding-homepage\s*\{[^}]*width:\s*min\(480px, 100%\);[^}]*align-content:\s*start;[^}]*gap:\s*30px;/s);
     expect(css).toMatch(/\.onboarding-homepage\.is-empty\s*\{[^}]*width:\s*min\(450px, 100%\);[^}]*min-height:\s*min\(430px, 100%\);[^}]*align-content:\s*center;[^}]*gap:\s*42px;/s);

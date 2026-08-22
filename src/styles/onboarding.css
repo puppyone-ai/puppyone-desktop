@@ -257,16 +257,10 @@
   opacity: 0.42;
 }
 
-.onboarding-provider-action svg,
-.onboarding-provider-action img {
+.onboarding-provider-action svg {
   display: block;
   width: 17px;
   height: 17px;
-}
-
-.onboarding-provider-action img {
-  border-radius: 2px;
-  filter: grayscale(1);
 }
 
 .onboarding-entry-dialog {

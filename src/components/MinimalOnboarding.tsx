@@ -7,7 +7,6 @@ import {
   Folder,
   FolderOpen,
   Github,
-  Gitlab,
   Plus,
   Unlink,
 } from "lucide-react";
@@ -273,31 +272,6 @@ export function MinimalOnboarding({
                     onClick={() => setEntryDialog("clone")}
                   >
                     <Github aria-hidden="true" />
-                  </button>
-                  <button
-                    className="onboarding-provider-action"
-                    type="button"
-                    data-provider="gitlab"
-                    disabled
-                    aria-label={t("onboarding.provider.comingSoon", { provider: "GitLab" })}
-                    title={t("onboarding.provider.comingSoon", { provider: "GitLab" })}
-                  >
-                    <Gitlab aria-hidden="true" />
-                  </button>
-                  <button
-                    className="onboarding-provider-action"
-                    type="button"
-                    data-provider="notion"
-                    disabled
-                    aria-label={t("onboarding.provider.comingSoon", { provider: "Notion" })}
-                    title={t("onboarding.provider.comingSoon", { provider: "Notion" })}
-                  >
-                    <img
-                      src={resolveRendererPublicAssetUrl("icons/notion.svg")}
-                      alt=""
-                      aria-hidden="true"
-                      draggable={false}
-                    />
                   </button>
                 </div>
               </div>

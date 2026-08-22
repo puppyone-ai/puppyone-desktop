@@ -10,7 +10,6 @@
   "action.openFolder": "ローカルフォルダを開く",
   "action.createNew": "新規作成",
   "action.importFrom": "インポート元",
-  "provider.comingSoon": "{provider} — 近日公開",
   "entry.create.title": "プロジェクトを作成",
   "entry.create.nameLabel": "プロジェクト名",
   "entry.create.namePlaceholder": "マイプロジェクト",
