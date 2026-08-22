@@ -123,6 +123,9 @@ export function GitSidebar({
     hasCommittedAction: Boolean(committedPrimaryAction && !committedPrimaryAction.disabled),
     hasSimpleAction: !professionalMode && showSimpleChangeAction,
   });
+  const githubIncomingUpdatedAt = status?.branches.find(
+    (branch) => branch.remote && branch.name === status.sourceControl.remote.target?.ref,
+  )?.lastCommitDate ?? null;
   const providerSlot = hostingMode === "puppyone-cloud" ? (
     <PuppyoneCloudProviderSection
       status={status}
@@ -141,6 +144,7 @@ export function GitSidebar({
     <GitHubProviderSection
       identity={hostingIdentity}
       section={githubSection}
+      incomingUpdatedAt={githubIncomingUpdatedAt}
       incomingFileSummary={status?.sourceControl.remote.incomingFileSummary ?? {
         total: 0,
         added: 0,

@@ -224,13 +224,14 @@ describe("source-control visual architecture", () => {
       'className="desktop-git-cloud-provider-section desktop-git-github-provider-section"',
     );
     expect(sourceControlSidebarSectionsSource).toContain("<GitHostingIdentityRow");
-    expect(sourceControlSidebarSectionsSource).toContain("<GitHubIncomingCommitsCard");
+    expect(sourceControlSidebarSectionsSource).toContain("<GitHubIncomingChangesCard");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-change-card");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-card-action");
-    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-commit-count");
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-update-age");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-file-total");
-    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-file-stats");
-    expect(sourceControlSidebarSectionsSource).toContain("source-control.commit.filesChanged");
+    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-file-stats");
+    expect(sourceControlSidebarSectionsSource).toContain("source-control.commit.changes");
+    expect(sourceControlSidebarSource).toContain("lastCommitDate");
     expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-provider-body");
   });
 

@@ -704,16 +704,15 @@ body.desktop-git-sidebar-resizing {
   gap: 6px 8px;
   margin: 7px var(--git-sidebar-control-right-gap) 4px var(--git-sidebar-control-left-gap);
   padding: 10px 10px 9px 11px;
-  border: 1px solid color-mix(in srgb, var(--po-accent) 24%, var(--po-border));
+  border: 0;
   border-radius: var(--git-control-radius);
   background: color-mix(in srgb, var(--po-control) 56%, var(--po-sidebar));
 }
 
-.desktop-git-github-file-total {
-  grid-column: 1;
-  grid-row: 1;
+.desktop-git-github-file-total,
+.desktop-git-github-update-age {
   overflow: hidden;
-  color: var(--po-text);
+  color: var(--po-text-muted);
   font-size: var(--git-font-main);
   font-weight: var(--git-weight-regular);
   line-height: var(--git-line-height);
@@ -721,59 +720,15 @@ body.desktop-git-sidebar-resizing {
   white-space: nowrap;
 }
 
-.desktop-git-github-change-meta {
-  display: flex;
-  min-width: 0;
-  grid-column: 1 / -1;
+.desktop-git-github-file-total {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.desktop-git-github-update-age {
+  grid-column: 1;
   grid-row: 2;
-  align-items: center;
-  justify-content: space-between;
-  gap: 5px;
-}
-
-.desktop-git-github-commit-count {
-  overflow: hidden;
-  color: var(--po-text-disabled);
   font-size: var(--git-font-small);
-  font-weight: var(--git-weight-regular);
-  line-height: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-git-github-file-stats {
-  display: flex;
-  min-width: 0;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 5px;
-  color: var(--po-text-muted);
-  font-size: var(--git-font-small);
-  line-height: 14px;
-}
-
-.desktop-git-github-file-stats > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  white-space: nowrap;
-}
-
-.desktop-git-github-file-stats b {
-  color: var(--po-text-muted);
-  font-weight: var(--git-weight-regular);
-}
-
-.desktop-git-github-file-stats .added svg {
-  color: var(--po-success);
-}
-
-.desktop-git-github-file-stats .modified svg {
-  color: var(--po-warning);
-}
-
-.desktop-git-github-file-stats .deleted svg {
-  color: var(--po-danger);
 }
 
 .desktop-git-github-card-action {

@@ -27,6 +27,7 @@
   "cloud.upToDate": "A Cloud já está atualizada.",
   "cloud.updateCount": "{count, plural, one {# atualização disponível} other {# atualizações disponíveis}}",
   "commit.filesChanged": "{count, plural, one {# arquivo alterado} other {# arquivos alterados}}",
+  "commit.changes": "{count, plural, one {# alteração} other {# alterações}}",
   "commit.commits": "{count, plural, one {# commit} other {# commits}}",
   "commit.noFileChanges": "Nenhum arquivo foi alterado neste commit.",
   "commit.noMessage": "(sem mensagem)",

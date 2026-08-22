@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ArrowUpRight, Clock3, Cloud, Github, Minus, Pencil, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpRight, Clock3, Cloud, Github, Plus, X } from "lucide-react";
 import {
   SidebarEmptyState,
   SidebarResizeHandle,
@@ -155,71 +155,62 @@ export function GitHostingIdentityRow({
   );
 }
 
-function GitHubIncomingCommitsCard({
-  commitCount,
+function GitHubIncomingChangesCard({
   fileSummary,
+  incomingUpdatedAt,
   action,
 }: {
-  commitCount: number;
   fileSummary: GitFileChangeSummary;
+  incomingUpdatedAt: string | null;
   action: ReactNode;
 }) {
-  const { t, formatNumber } = useLocalization();
-  const statusStats = [
-    {
-      status: "added",
-      count: fileSummary.added + fileSummary.copied,
-      icon: <Plus size={10} strokeWidth={2.4} aria-hidden="true" />,
-    },
-    {
-      status: "modified",
-      count: fileSummary.modified + fileSummary.changed + fileSummary.renamed,
-      icon: <Pencil size={9} strokeWidth={2.2} aria-hidden="true" />,
-    },
-    {
-      status: "deleted",
-      count: fileSummary.deleted,
-      icon: <Minus size={10} strokeWidth={2.4} aria-hidden="true" />,
-    },
-  ].filter(({ count }) => count > 0);
+  const { t, formatRelativeTime } = useLocalization();
+  const updateAge = formatGitRemoteUpdateAge(incomingUpdatedAt, formatRelativeTime);
 
   return (
     <div className="desktop-git-github-change-card">
       <strong className="desktop-git-github-file-total">
-        {t("source-control.commit.filesChanged", { count: fileSummary.total })}
+        {t("source-control.commit.changes", { count: fileSummary.total })}
       </strong>
-      <div className="desktop-git-github-change-meta">
-        <small className="desktop-git-github-commit-count">
-          {t("source-control.commit.commits", { count: commitCount })}
-        </small>
-        {statusStats.length > 0 && (
-          <div className="desktop-git-github-file-stats">
-            {statusStats.map(({ status, count, icon }) => {
-              const label = t(`source-control.diff.change.${status}`);
-              return (
-                <span
-                  key={status}
-                  className={status}
-                  title={`${label}: ${formatNumber(count)}`}
-                  aria-label={`${label}: ${formatNumber(count)}`}
-                >
-                  {icon}
-                  <b>{formatNumber(count)}</b>
-                </span>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {updateAge && (
+        <time className="desktop-git-github-update-age" dateTime={incomingUpdatedAt ?? undefined}>
+          {updateAge}
+        </time>
+      )}
       {action}
     </div>
   );
+}
+
+function formatGitRemoteUpdateAge(
+  value: string | null,
+  formatRelativeTime: ReturnType<typeof useLocalization>["formatRelativeTime"],
+) {
+  const timestamp = value ? Date.parse(value) : Number.NaN;
+  if (!Number.isFinite(timestamp)) return null;
+
+  const elapsedMs = Math.max(0, Date.now() - timestamp);
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const week = 7 * day;
+  const month = 30 * day;
+  const year = 365 * day;
+
+  if (elapsedMs < minute) return formatRelativeTime(0, "second", { numeric: "auto" });
+  if (elapsedMs < hour) return formatRelativeTime(-Math.floor(elapsedMs / minute), "minute", { numeric: "auto" });
+  if (elapsedMs < day) return formatRelativeTime(-Math.floor(elapsedMs / hour), "hour", { numeric: "auto" });
+  if (elapsedMs < week) return formatRelativeTime(-Math.floor(elapsedMs / day), "day", { numeric: "auto" });
+  if (elapsedMs < month) return formatRelativeTime(-Math.floor(elapsedMs / week), "week", { numeric: "auto" });
+  if (elapsedMs < year) return formatRelativeTime(-Math.floor(elapsedMs / month), "month", { numeric: "auto" });
+  return formatRelativeTime(-Math.floor(elapsedMs / year), "year", { numeric: "auto" });
 }
 
 export function GitHubProviderSection({
   identity,
   section,
   incomingFileSummary,
+  incomingUpdatedAt,
   mergeCount,
   disabled,
   operationLoading,
@@ -229,6 +220,7 @@ export function GitHubProviderSection({
   identity: GitHostingIdentity;
   section: GitScmSyncSection;
   incomingFileSummary: GitFileChangeSummary;
+  incomingUpdatedAt: string | null;
   mergeCount: number;
   disabled: boolean;
   operationLoading: string | null;
@@ -243,25 +235,25 @@ export function GitHubProviderSection({
     <section className="desktop-git-cloud-provider-section desktop-git-github-provider-section">
       <GitHostingIdentityRow identity={identity} />
       {section.copy.count > 0 && (
-        <GitHubIncomingCommitsCard
-          commitCount={section.copy.count}
+        <GitHubIncomingChangesCard
           fileSummary={incomingFileSummary}
+          incomingUpdatedAt={incomingUpdatedAt}
           action={pullAction ? (
-          <GitOperationButton
-            className="desktop-git-remote-action desktop-git-github-card-action"
-            disabled={disabled || pullBlockedByConflicts || pullAction.disabled}
-            title={pullBlockedByConflicts
-              ? t("source-control.cloud.resolveBeforeDownload")
-              : pullAction.title}
-            icon={pullAction.icon}
-            label={pullAction.label}
-            loadingKey={pullAction.kind}
-            loadingLabel={pullAction.loadingLabel}
-            operationLoading={operationLoading}
-            primary={primaryAction}
-            onClick={() => void onPull()}
-          />
-        ) : null}
+            <GitOperationButton
+              className="desktop-git-remote-action desktop-git-github-card-action"
+              disabled={disabled || pullBlockedByConflicts || pullAction.disabled}
+              title={pullBlockedByConflicts
+                ? t("source-control.cloud.resolveBeforeDownload")
+                : pullAction.title}
+              icon={pullAction.icon}
+              label={pullAction.label}
+              loadingKey={pullAction.kind}
+              loadingLabel={pullAction.loadingLabel}
+              operationLoading={operationLoading}
+              primary={primaryAction}
+              onClick={() => void onPull()}
+            />
+          ) : null}
         />
       )}
     </section>
