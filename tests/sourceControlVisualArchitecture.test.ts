@@ -219,6 +219,19 @@ describe("source-control visual architecture", () => {
   });
 
   it("keeps GitHub incoming updates inside the canonical provider and compact change card", () => {
+    const identityRow = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-provider-section .desktop-git-section-row.desktop-git-hosting-identity-row",
+    ));
+    const card = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-change-card",
+    ));
+    const updateAge = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-change-card .desktop-git-github-update-age",
+    ));
+
     expect(sourceControlSidebarSource).toContain("<GitHubProviderSection");
     expect(sourceControlSidebarSectionsSource).toContain(
       'className="desktop-git-cloud-provider-section desktop-git-github-provider-section"',
@@ -233,6 +246,17 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSectionsSource).toContain("source-control.commit.changes");
     expect(sourceControlSidebarSource).toContain("lastCommitDate");
     expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-provider-body");
+    expect(identityRow).toContain("padding-bottom: 0;");
+    expect(card).toContain(
+      "margin: 2px var(--git-sidebar-control-right-gap) 4px var(--git-sidebar-control-left-gap);",
+    );
+    expect(card).toContain("border: 0;");
+    expect(card).toContain(
+      "background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));",
+    );
+    expect(updateAge).toContain(
+      "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",
+    );
   });
 
   it("keeps GitHub Fetch lifecycle out of the presentational sidebar", () => {
