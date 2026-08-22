@@ -135,4 +135,56 @@ describe("云端协同 (cloud <-> local collaboration)", () => {
       await cleanup();
     }
   }, TIMEOUT);
+
+  it("rebases local commits before pushing a diverged branch", async () => {
+    const { workA, workB, cleanup } = await setupCollab();
+    try {
+      await createWorkspaceEntry(workA, {
+        parentPath: null,
+        name: "local-a.md",
+        kind: "file",
+        content: "local A\n",
+      });
+      await stageAllWorkspaceGitChanges(workA);
+      await commitWorkspaceGit(workA, "local: add A");
+
+      await createWorkspaceEntry(workB, {
+        parentPath: null,
+        name: "remote-b.md",
+        kind: "file",
+        content: "remote B\n",
+      });
+      await stageAllWorkspaceGitChanges(workB);
+      await commitWorkspaceGit(workB, "remote: add B");
+      await pushWorkspaceGit(workB);
+
+      const diverged = await fetchWorkspaceGit(workA);
+      expect(diverged.sourceControl.remote).toMatchObject({
+        state: "diverged",
+        ahead: 1,
+        behind: 1,
+        canPull: true,
+        canPush: false,
+      });
+
+      const integrated = await pullWorkspaceGit(workA);
+      expect(integrated.sourceControl.remote).toMatchObject({
+        state: "outgoing",
+        behind: 0,
+        canPush: true,
+      });
+      expect(await readContent(workA, "local-a.md")).toBe("local A\n");
+      expect(await readContent(workA, "remote-b.md")).toBe("remote B\n");
+      expect(git(workA, "log", "--merges", "--oneline")).toBe("");
+
+      await pushWorkspaceGit(workA);
+      expect((await getWorkspaceGitStatus(workA)).sourceControl.remote).toMatchObject({
+        state: "synced",
+        ahead: 0,
+        behind: 0,
+      });
+    } finally {
+      await cleanup();
+    }
+  }, TIMEOUT);
 });

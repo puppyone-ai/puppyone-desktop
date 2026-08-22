@@ -107,12 +107,35 @@ describe("Git sidebar status cards", () => {
     expect(mergeSection?.textContent).toContain("1 conflict");
     expect(mergeSection?.querySelector(".desktop-git-status-card")?.classList.contains("expanded")).toBe(true);
   });
+
+  it("recommends Pull and blocks Push while the GitHub branch is diverged", async () => {
+    const onPull = vi.fn(async () => true);
+    const onPush = vi.fn(async () => true);
+    const status = createDivergedGitHubStatus();
+    const surface = renderSidebar({ onPull, onPush, status });
+    const pullButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Pull"]');
+    const pushButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Push"]');
+
+    expect(pullButton?.disabled).toBe(false);
+    expect(pullButton?.classList.contains("is-primary")).toBe(true);
+    expect(pushButton?.disabled).toBe(true);
+    expect(pushButton?.classList.contains("is-primary")).toBe(false);
+
+    await act(async () => {
+      pullButton?.click();
+      pushButton?.click();
+    });
+
+    expect(onPull).toHaveBeenCalledTimes(1);
+    expect(onPush).not.toHaveBeenCalled();
+  });
 });
 
 function renderSidebar(options: Partial<{
   gitDisplayMode: "simple" | "professional";
   onCommit: () => Promise<boolean>;
   onDiscardAll: () => Promise<boolean>;
+  onPull: () => Promise<boolean>;
   onPush: () => Promise<boolean>;
   onStageAll: () => Promise<boolean>;
   stageAndCommit: () => Promise<boolean>;
@@ -151,7 +174,7 @@ function renderSidebar(options: Partial<{
         stageAndCommit: options.stageAndCommit ?? succeed,
         commit: options.onCommit ?? succeed,
         commitAndPush: succeed,
-        pull: succeed,
+        pull: options.onPull ?? succeed,
         push: options.onPush ?? succeed,
         publish: succeed,
       }}
@@ -239,6 +262,79 @@ function createGitStatus(): GitStatusSnapshot {
     statusLimit: 10_000,
     didHitStatusLimit: false,
   };
+}
+
+function createDivergedGitHubStatus(): GitStatusSnapshot {
+  const status = createGitStatus();
+  const incoming = resource("workingTree", "remote.md", "added", "A");
+  const outgoing = resource("workingTree", "committed.md", "modified", "M");
+  const target = {
+    remote: "origin",
+    branch: "main",
+    ref: "origin/main",
+    exists: true,
+    ahead: 1,
+    behind: 1,
+    incomingPreview: [incoming],
+    outgoingPreview: [outgoing],
+  } as const;
+
+  status.syncTarget = target;
+  status.effectiveHosting = {
+    kind: "github",
+    remoteName: "origin",
+    branchName: "main",
+    ref: "origin/main",
+    ready: true,
+    reason: "remote-detected",
+    identity: {
+      provider: "github",
+      label: "puppyone-ai/X-influencer",
+      href: "https://github.com/puppyone-ai/X-influencer",
+    },
+  };
+  status.branches = [
+    {
+      ...status.branches[0],
+      ahead: 1,
+      behind: 1,
+    },
+    {
+      name: "origin/main",
+      current: false,
+      remote: true,
+      upstream: null,
+      ahead: 0,
+      behind: 0,
+      lastCommitId: "remote-head",
+      lastCommitMessage: "Remote update",
+      lastCommitDate: "2026-08-20T08:00:00.000Z",
+    },
+  ];
+  status.sourceControl.groups = [];
+  status.sourceControl.remote = {
+    ...status.sourceControl.remote,
+    target,
+    ahead: 1,
+    behind: 1,
+    incomingFileSummary: {
+      total: 1,
+      added: 1,
+      modified: 0,
+      deleted: 0,
+      renamed: 0,
+      copied: 0,
+      changed: 0,
+    },
+    incomingPreview: [incoming],
+    outgoingPreview: [outgoing],
+    canPull: true,
+    canPush: true,
+    canSync: true,
+    canPublish: false,
+    state: "diverged",
+  };
+  return status;
 }
 
 function resource(

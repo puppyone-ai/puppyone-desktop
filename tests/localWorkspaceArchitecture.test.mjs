@@ -63,6 +63,23 @@ describe("source-control presentation model", () => {
     });
     expect(snapshot.remote).toMatchObject({ state: "outgoing", canPush: true, canSync: true });
   });
+
+  it("requires incoming commits to be integrated before a diverged branch can push", () => {
+    const snapshot = buildGitSourceControlSnapshot({
+      entries: [],
+      branchName: "main",
+      syncTarget: { remote: "origin", branch: "main", exists: true, ahead: 1, behind: 1 },
+      currentBranch: null,
+      headCommitId: "abc123",
+    });
+
+    expect(snapshot.remote).toMatchObject({
+      state: "diverged",
+      canPull: true,
+      canPush: false,
+      canSync: true,
+    });
+  });
 });
 
 describe("workspace config normalization", () => {

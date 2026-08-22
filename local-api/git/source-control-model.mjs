@@ -125,7 +125,7 @@ function buildGitSourceControlRemoteSummary({ branchName, syncTarget, currentBra
   const upstream = syncTarget?.ref ?? currentBranch?.upstream ?? null;
   const canPublish = hasBranch && hasTarget && !remoteExists && Boolean(headCommitId);
   const canPull = remoteExists && behind > 0;
-  const canPush = remoteExists && ahead > 0;
+  const canPush = remoteExists && ahead > 0 && behind === 0;
   const canSync = canPublish || (remoteExists && (ahead > 0 || behind > 0));
 
   let state = "synced";

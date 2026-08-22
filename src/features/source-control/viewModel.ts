@@ -119,7 +119,7 @@ export function getGitSyncState(
           : t("source-control.sync.noRemoteBranch", { target: bidiIsolate(publishTargetLabel) }),
         pullDisabled: !targetExists || targetBehind === 0,
         pushDisabled: targetExists
-          ? targetAhead === 0
+          ? targetAhead === 0 || targetBehind > 0
           : !status.headCommitId,
         pullLabel: t("source-control.sync.pullRemote"),
         pullTitle: targetExists
@@ -204,7 +204,7 @@ export function getGitSyncState(
     ahead,
     pullDetail,
     pullDisabled: behind === 0,
-    pushDisabled: ahead === 0,
+    pushDisabled: ahead === 0 || behind > 0,
     pullLabel: behind > 0 ? t("source-control.sync.pullCount", { count: behind }) : t("source-control.sync.pullRemote"),
     pullTitle: behind === 0
       ? t("source-control.sync.upToDate")
@@ -456,10 +456,10 @@ export function getGitScmSyncAction(
   if (remote.state === "diverged") {
     return {
       kind: "pull",
-      label: t("source-control.sync.resolve"),
-      loadingLabel: t("source-control.sync.resolving"),
-      title: t("source-control.sync.resolveTitle"),
-      disabled: true,
+      label: t("source-control.sync.pull"),
+      loadingLabel: t("source-control.sync.pulling"),
+      title: state.pullTitle,
+      disabled: state.pullDisabled,
       icon: "download",
     };
   }
@@ -525,7 +525,7 @@ export function getCommittedPrimaryAction(
     return {
       label: state.pushLabel,
       title: state.pushTitle,
-      disabled: false,
+      disabled: true,
       kind: "push",
       loadingKey: "push",
       loadingLabel: t("source-control.sync.pushing"),
@@ -537,7 +537,7 @@ export function getCommittedPrimaryAction(
     return {
       label: state.pushLabel,
       title: state.pushTitle,
-      disabled: false,
+      disabled: state.pushDisabled,
       kind: "push",
       loadingKey: "push",
       loadingLabel: t("source-control.sync.pushing"),

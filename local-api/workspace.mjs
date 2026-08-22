@@ -2068,7 +2068,7 @@ async function buildDefaultPullArgs(rootPath) {
   const upstream = await execGit(rootPath, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
     .then((result) => result.stdout.trim())
     .catch(() => "");
-  if (upstream && !puppyoneHostingActive) return ["pull", "--ff-only"];
+  if (upstream && !puppyoneHostingActive) return ["pull", "--rebase", "--autostash"];
 
   const branch = await execGit(rootPath, ["branch", "--show-current"])
     .then((result) => result.stdout.trim())
@@ -2082,8 +2082,8 @@ async function buildDefaultPullArgs(rootPath) {
   const remoteName = target.remote;
   const branchName = target.branch;
 
-  if (remoteName && branchName) return ["pull", "--ff-only", remoteName, branchName];
-  return ["pull", "--ff-only"];
+  if (remoteName && branchName) return ["pull", "--rebase", "--autostash", remoteName, branchName];
+  return ["pull", "--rebase", "--autostash"];
 }
 
 async function pushWorkspaceGitWithDefaultUpstream(rootPath, requestedRemoteName = null) {
