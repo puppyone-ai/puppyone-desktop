@@ -1,4 +1,4 @@
-import { FolderPlus, GitFork } from "lucide-react";
+import { CircleCheck, FolderPlus, GitFork, Github, Gitlab, ScanSearch } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useLocalization } from "@puppyone/localization";
 import type { WorkspaceProjectLocationGrant } from "../types/electron";
@@ -8,6 +8,20 @@ import {
 } from "./DesktopDialog";
 
 export type OnboardingProjectEntryKind = "create" | "clone";
+
+type RepositorySource = "github" | "gitlab";
+
+function detectRepositorySource(value: string): RepositorySource | null {
+  const repositoryUrl = value.trim().toLowerCase();
+  if (!repositoryUrl) return null;
+  if (/^(?:(?:https?|ssh|git):\/\/(?:git@)?|git@)?github\.com[/:]/.test(repositoryUrl)) {
+    return "github";
+  }
+  if (/^(?:(?:https?|ssh|git):\/\/(?:git@)?|git@)?gitlab\.com[/:]/.test(repositoryUrl)) {
+    return "gitlab";
+  }
+  return null;
+}
 
 export function OnboardingProjectEntryDialog({
   kind,
@@ -27,6 +41,7 @@ export function OnboardingProjectEntryDialog({
   const [location, setLocation] = useState<WorkspaceProjectLocationGrant | null>(null);
   const [error, setError] = useState<string | null>(null);
   const create = kind === "create";
+  const repositorySource = create ? null : detectRepositorySource(value);
   const busy = submitting || choosingLocation;
   const title = t(create
     ? "onboarding.entry.create.title"
@@ -35,7 +50,7 @@ export function OnboardingProjectEntryDialog({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalizedValue = value.trim();
-    if (!normalizedValue || busy || (create && !location)) return;
+    if (!normalizedValue || busy || (create && !location) || (!create && !repositorySource)) return;
     setError(null);
     setSubmitting(true);
     try {
@@ -80,7 +95,7 @@ export function OnboardingProjectEntryDialog({
       >
         <header className="desktop-dialog-header">
           <div className="desktop-dialog-title-row">
-            <span className="desktop-dialog-leading file" aria-hidden="true">
+            <span className={`desktop-dialog-leading ${create ? "file" : "repository"}`} aria-hidden="true">
               {create
                 ? <FolderPlus size={16} strokeWidth={1.8} />
                 : <GitFork size={16} strokeWidth={1.8} />}
@@ -149,30 +164,74 @@ export function OnboardingProjectEntryDialog({
               </div>
             </div>
           ) : (
-            <>
-              <label className="desktop-dialog-field">
-                <span>{t("onboarding.entry.clone.urlLabel")}</span>
-                <input
-                  value={value}
-                  type="text"
-                  inputMode="url"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  autoComplete="off"
-                  spellCheck={false}
-                  disabled={busy}
-                  data-desktop-dialog-initial-focus="true"
-                  placeholder={t("onboarding.entry.clone.urlPlaceholder")}
-                  onChange={(event) => {
-                    setValue(event.target.value);
-                    setError(null);
-                  }}
-                />
-              </label>
-              <p className="desktop-dialog-note onboarding-entry-dialog-note">
-                {t("onboarding.entry.chooseLocationHint")}
-              </p>
-            </>
+            <div className="onboarding-clone-layout">
+              <section
+                className="onboarding-clone-sources"
+                aria-label={t("onboarding.entry.clone.sourceLabel")}
+              >
+                <div className="onboarding-clone-section-label">
+                  {t("onboarding.entry.clone.sourceLabel")}
+                </div>
+                <div className="onboarding-clone-provider-list">
+                  <div
+                    className={`onboarding-clone-provider is-github ${repositorySource === "github" ? "is-detected" : ""}`}
+                    data-repository-source="github"
+                  >
+                    <Github aria-hidden="true" />
+                    <span>{t("onboarding.entry.clone.provider.github")}</span>
+                  </div>
+                  <div
+                    className={`onboarding-clone-provider is-gitlab ${repositorySource === "gitlab" ? "is-detected" : ""}`}
+                    data-repository-source="gitlab"
+                  >
+                    <Gitlab aria-hidden="true" />
+                    <span>{t("onboarding.entry.clone.provider.gitlab")}</span>
+                  </div>
+                </div>
+              </section>
+
+              <div className="onboarding-clone-workflow">
+                <label className="desktop-dialog-field onboarding-clone-url-field">
+                  <span>{t("onboarding.entry.clone.urlLabel")}</span>
+                  <input
+                    value={value}
+                    type="text"
+                    inputMode="url"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    autoComplete="off"
+                    spellCheck={false}
+                    disabled={busy}
+                    data-desktop-dialog-initial-focus="true"
+                    placeholder={t("onboarding.entry.clone.urlPlaceholder")}
+                    onChange={(event) => {
+                      setValue(event.target.value);
+                      setError(null);
+                    }}
+                  />
+                </label>
+                <p className="desktop-dialog-note onboarding-entry-dialog-note onboarding-clone-supported-hint">
+                  {t("onboarding.entry.clone.supportedHint")}
+                </p>
+                <div
+                  className={`onboarding-clone-source-status ${repositorySource ? "is-detected" : value.trim() ? "is-unsupported" : ""}`}
+                  aria-live="polite"
+                >
+                  {repositorySource
+                    ? <CircleCheck aria-hidden="true" />
+                    : <ScanSearch aria-hidden="true" />}
+                  <span>
+                    {t(repositorySource === "github"
+                      ? "onboarding.entry.clone.sourceGithubDetected"
+                      : repositorySource === "gitlab"
+                        ? "onboarding.entry.clone.sourceGitlabDetected"
+                        : value.trim()
+                          ? "onboarding.entry.clone.sourceUnsupported"
+                          : "onboarding.entry.clone.sourceAuto")}
+                  </span>
+                </div>
+              </div>
+            </div>
           )}
           {error && <p className="desktop-dialog-error" role="alert">{error}</p>}
         </div>
@@ -189,7 +248,7 @@ export function OnboardingProjectEntryDialog({
           <button
             className="desktop-dialog-button primary file"
             type="submit"
-            disabled={busy || !value.trim() || (create && !location)}
+            disabled={busy || !value.trim() || (create && !location) || (!create && !repositorySource)}
           >
             {t(submitting
               ? create

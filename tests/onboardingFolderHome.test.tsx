@@ -220,7 +220,8 @@ describe("project folder home", () => {
     expect(container.querySelector(".onboarding-entry-dialog")).toBeNull();
   });
 
-  it("clones a GitHub repository from the quiet footer action", async () => {
+  it("clones a GitHub repository from the provider-aware clone dialog", async () => {
+    const css = readFileSync(`${process.cwd()}/src/styles/onboarding.css`, "utf8");
     const onCloneRepository = vi.fn(async () => true);
     const container = renderHome({ onCloneRepository });
 
@@ -228,11 +229,29 @@ describe("project folder home", () => {
       container.querySelector<HTMLButtonElement>(".onboarding-clone-action")?.click();
     });
     expect(container.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe("Clone repository");
+    expect(container.querySelector(".onboarding-entry-dialog")?.classList.contains("is-import")).toBe(true);
+    expect(container.querySelector(".onboarding-clone-sources")?.getAttribute("aria-label")).toBe("Clone from");
+    expect([...container.querySelectorAll(".onboarding-clone-provider")].map((provider) => provider.textContent)).toEqual([
+      "GitHub",
+      "GitLab",
+    ]);
+    expect(container.querySelector(".onboarding-clone-provider.is-detected")).toBeNull();
+    expect(container.querySelector(".onboarding-clone-source-status")?.textContent).toBe("Source is detected automatically from the URL.");
     const repositoryUrl = container.querySelector<HTMLInputElement>(".onboarding-entry-dialog input");
     expect(repositoryUrl?.inputMode).toBe("url");
+    const submitButton = container.querySelector<HTMLButtonElement>(".onboarding-entry-dialog button[type='submit']");
+    expect(submitButton?.textContent).toBe("Clone repository");
+    expect(submitButton?.disabled).toBe(true);
     setInputValue(repositoryUrl, "https://github.com/puppyone-ai/puppyone.git");
+    expect(container.querySelector("[data-repository-source='github']")?.classList.contains("is-detected")).toBe(true);
+    expect(container.querySelector("[data-repository-source='gitlab']")?.classList.contains("is-detected")).toBe(false);
+    expect(container.querySelector(".onboarding-clone-source-status")?.textContent).toBe("GitHub source detected");
+    expect(submitButton?.disabled).toBe(false);
+    expect(css).toMatch(/\.onboarding-entry-dialog\.is-import\s*\{[^}]*width:\s*min\(620px, calc\(100vw - 32px\)\);/s);
+    expect(css).toMatch(/\.onboarding-clone-layout\s*\{[^}]*grid-template-columns:\s*150px minmax\(0, 1fr\);[^}]*gap:\s*24px;/s);
+    expect(css).not.toMatch(/\.onboarding-clone-layout\s*\{[^}]*border/s);
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".onboarding-entry-dialog button[type='submit']")?.click();
+      submitButton?.click();
       await Promise.resolve();
     });
     expect(onCloneRepository).toHaveBeenCalledWith({
@@ -252,6 +271,9 @@ describe("project folder home", () => {
     const repositoryUrl = container.querySelector<HTMLInputElement>(".onboarding-entry-dialog input");
     expect(repositoryUrl?.placeholder).toBe("https://github.com/owner/repository.git");
     setInputValue(repositoryUrl, "git@gitlab.com:puppyone/data/knowledge-base.git");
+    expect(container.querySelector("[data-repository-source='github']")?.classList.contains("is-detected")).toBe(false);
+    expect(container.querySelector("[data-repository-source='gitlab']")?.classList.contains("is-detected")).toBe(true);
+    expect(container.querySelector(".onboarding-clone-source-status")?.textContent).toBe("GitLab source detected");
     await act(async () => {
       container.querySelector<HTMLButtonElement>(".onboarding-entry-dialog button[type='submit']")?.click();
       await Promise.resolve();
@@ -259,6 +281,23 @@ describe("project folder home", () => {
     expect(onCloneRepository).toHaveBeenCalledWith({
       repositoryUrl: "git@gitlab.com:puppyone/data/knowledge-base.git",
     });
+  });
+
+  it("keeps clone disabled for unsupported repository URLs", async () => {
+    const onCloneRepository = vi.fn(async () => true);
+    const container = renderHome({ onCloneRepository });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".onboarding-clone-action")?.click();
+    });
+    const repositoryUrl = container.querySelector<HTMLInputElement>(".onboarding-entry-dialog input");
+    const submitButton = container.querySelector<HTMLButtonElement>(".onboarding-entry-dialog button[type='submit']");
+    setInputValue(repositoryUrl, "https://example.com/owner/repository.git");
+
+    expect(container.querySelector(".onboarding-clone-source-status")?.classList.contains("is-unsupported")).toBe(true);
+    expect(container.querySelector(".onboarding-clone-source-status")?.textContent).toBe("Enter a GitHub or GitLab repository URL.");
+    expect(submitButton?.disabled).toBe(true);
+    expect(onCloneRepository).not.toHaveBeenCalled();
   });
 
   it("shows project-opening progress only inside the project row", async () => {

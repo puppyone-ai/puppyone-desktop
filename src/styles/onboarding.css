@@ -213,6 +213,10 @@
   width: min(480px, calc(100vw - 32px));
 }
 
+.onboarding-entry-dialog.is-import {
+  width: min(620px, calc(100vw - 32px));
+}
+
 .onboarding-entry-dialog .desktop-dialog-header {
   padding-block: var(--onboarding-entry-inset) 10px;
   padding-inline: var(--onboarding-entry-inset);
@@ -231,6 +235,133 @@
 .onboarding-entry-dialog.is-create .onboarding-entry-dialog-body {
   gap: 0;
   padding-block: 2px 14px;
+}
+
+.onboarding-entry-dialog.is-import .onboarding-entry-dialog-body {
+  gap: 12px;
+  padding-block: 16px 24px;
+}
+
+.onboarding-entry-dialog .desktop-dialog-leading.repository {
+  background: color-mix(in srgb, var(--po-text) 7%, transparent);
+  color: var(--po-text-muted);
+}
+
+.onboarding-clone-layout {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.onboarding-clone-sources,
+.onboarding-clone-workflow {
+  display: grid;
+  min-width: 0;
+}
+
+.onboarding-clone-section-label,
+.onboarding-clone-url-field {
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 18px;
+  text-transform: none;
+}
+
+.onboarding-clone-provider-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.onboarding-clone-provider {
+  display: flex;
+  height: 42px;
+  min-width: 0;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 10px;
+  padding-inline: 11px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--po-text-subtle);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.onboarding-clone-provider svg {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  stroke-width: 1.75;
+}
+
+.onboarding-clone-provider.is-github svg {
+  color: var(--po-text-muted);
+}
+
+.onboarding-clone-provider.is-gitlab svg {
+  color: color-mix(in srgb, #fc6d26 82%, var(--po-text-muted));
+}
+
+.onboarding-clone-provider.is-detected {
+  border-color: var(--po-border-strong);
+  background: color-mix(in srgb, var(--po-text) 7%, transparent);
+  color: var(--po-text);
+}
+
+.onboarding-clone-url-field input {
+  height: 38px;
+  margin-top: 10px;
+  padding-inline: 12px;
+  border-radius: 7px;
+}
+
+.onboarding-clone-supported-hint {
+  margin-top: 8px;
+}
+
+.onboarding-clone-source-status {
+  display: flex;
+  min-height: 42px;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 9px;
+  margin-top: 16px;
+  padding: 9px 11px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--po-text) 3%, transparent);
+  color: var(--po-text-subtle);
+  font-size: 12px;
+  line-height: 17px;
+}
+
+.onboarding-clone-source-status svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  stroke-width: 1.8;
+}
+
+.onboarding-clone-source-status.is-detected {
+  border-color: color-mix(in srgb, var(--po-success) 24%, var(--po-border-subtle));
+  color: var(--po-text-muted);
+}
+
+.onboarding-clone-source-status.is-detected svg {
+  color: var(--po-success);
+}
+
+.onboarding-clone-source-status.is-unsupported {
+  border-color: color-mix(in srgb, var(--po-warning) 24%, var(--po-border-subtle));
+  color: var(--po-warning);
 }
 
 .onboarding-entry-create-fields {
@@ -700,6 +831,15 @@
 
   .onboarding-project-row .desktop-menu-item-trailing {
     max-width: 76px;
+  }
+
+  .onboarding-clone-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .onboarding-clone-provider-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
