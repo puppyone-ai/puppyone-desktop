@@ -330,6 +330,18 @@ describe("source-control visual architecture", () => {
     expect(statusCardContextRow).toContain("padding: 10px 10px 2px;");
     expect(statusCardContext).toContain("color: var(--po-text-muted);");
     expect(statusCardContext).toContain("font-size: var(--git-font-main);");
+    expect(compact(sidebarResourcesCss)).toContain(compact(`
+      .desktop-git-status-card .desktop-working-tree-list,
+      .desktop-git-status-card .desktop-git-remote-preview {
+        overflow-y: hidden;
+      }
+    `));
+    expect(compact(sidebarResourcesCss)).toContain(compact(`
+      .desktop-git-status-card .desktop-working-tree-list.is-scrollable,
+      .desktop-git-status-card .desktop-git-remote-preview.is-scrollable {
+        overflow-y: auto;
+      }
+    `));
     expect(resizer).toContain("background: transparent;");
   });
 

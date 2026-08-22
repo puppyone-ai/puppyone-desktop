@@ -96,6 +96,18 @@
   scrollbar-gutter: stable;
 }
 
+/* A one-pixel fractional layout remainder is not real overflow. Keep card
+   lists quiet until the shared scroll observer marks them as scrollable. */
+.desktop-git-status-card .desktop-working-tree-list,
+.desktop-git-status-card .desktop-git-remote-preview {
+  overflow-y: hidden;
+}
+
+.desktop-git-status-card .desktop-working-tree-list.is-scrollable,
+.desktop-git-status-card .desktop-git-remote-preview.is-scrollable {
+  overflow-y: auto;
+}
+
 .desktop-git-resizable-section .desktop-git-remote-preview {
   max-height: none;
 }
