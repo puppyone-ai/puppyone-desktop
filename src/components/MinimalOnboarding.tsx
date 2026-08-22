@@ -258,17 +258,16 @@ export function MinimalOnboarding({
                 >
                   {t("onboarding.action.createLocalProject")}
                 </Button>
-              </div>
 
-              <div className="onboarding-clone-entry">
-                <DesktopMenuItem
-                  className="onboarding-clone-action"
-                  role="button"
-                  icon={<GitFork size={14} strokeWidth={1.85} />}
-                  label={t("onboarding.action.cloneRepository")}
+                <Button
+                  className="onboarding-entry-action onboarding-entry-action-secondary onboarding-clone-action"
+                  tone="neutral"
                   disabled={busy || !onCloneRepository}
+                  leadingIcon={<GitFork aria-hidden="true" />}
                   onClick={() => setEntryDialog("clone")}
-                />
+                >
+                  {t("onboarding.action.cloneRepository")}
+                </Button>
               </div>
             </div>
           </div>

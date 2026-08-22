@@ -106,7 +106,6 @@
   display: grid;
   width: 100%;
   min-width: 0;
-  gap: 18px;
 }
 
 .onboarding-entry-actions {
@@ -204,17 +203,6 @@
   border-color: var(--po-text);
   background: var(--po-text);
   color: var(--po-text-inverse);
-}
-
-.onboarding-clone-entry {
-  display: grid;
-  width: 100%;
-  min-width: 0;
-}
-
-.onboarding-clone-action {
-  width: 100%;
-  color: var(--po-text-subtle);
 }
 
 .onboarding-entry-dialog {
