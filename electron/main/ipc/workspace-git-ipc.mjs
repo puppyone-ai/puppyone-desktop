@@ -1,8 +1,10 @@
 import path from "node:path";
 import {
+  abortWorkspaceGitOperation,
   checkoutWorkspaceGitBranch,
   commitAndCheckoutWorkspaceGitBranch,
   commitWorkspaceGit,
+  continueWorkspaceGitOperation,
   createWorkspaceGitBranch,
   discardAllWorkspaceGitChanges,
   discardWorkspaceGitPaths,
@@ -318,6 +320,14 @@ export function registerWorkspaceGitIpcHandlers({
 
   ipcMain.handle("workspace:git-commit", withAuthorizedWorktreeMutation((rootPath, request) => (
     commitWorkspaceGit(rootPath, request?.message)
+  )));
+
+  ipcMain.handle("workspace:git-operation-continue", withAuthorizedRepositoryMutation((rootPath) => (
+    continueWorkspaceGitOperation(rootPath)
+  )));
+
+  ipcMain.handle("workspace:git-operation-abort", withAuthorizedRepositoryMutation((rootPath) => (
+    abortWorkspaceGitOperation(rootPath)
   )));
 
   ipcMain.handle("workspace:git-checkout-branch", withAuthorizedRepositoryMutation((rootPath, request) => (

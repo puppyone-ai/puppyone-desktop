@@ -60,6 +60,8 @@ describe("source-control presentation model", () => {
       canUnstageAll: true,
       canDiscardAll: true,
       canCommit: true,
+      canContinue: false,
+      canAbort: false,
     });
     expect(snapshot.remote).toMatchObject({ state: "outgoing", canPush: true, canSync: true });
   });
@@ -79,6 +81,32 @@ describe("source-control presentation model", () => {
       canPush: false,
       canSync: true,
     });
+  });
+
+  it("fails closed while a repository operation is waiting for conflict resolution", () => {
+    const conflicted = buildGitSourceControlSnapshot({
+      entries: [{ path: "shared.md", staged: "U", unstaged: "U", conflict: true }],
+      branchName: "main",
+      syncTarget: { remote: "origin", branch: "main", exists: true, ahead: 1, behind: 1 },
+      currentBranch: null,
+      headCommitId: "abc123",
+      repositoryOperation: "rebase",
+    });
+
+    expect(conflicted.operation).toEqual({ kind: "rebase", canContinue: false, canAbort: true });
+    expect(conflicted.actions).toMatchObject({ canCommit: false, canContinue: false, canAbort: true });
+    expect(conflicted.remote).toMatchObject({ canPull: false, canPush: false, canPublish: false, canSync: false });
+
+    const resolved = buildGitSourceControlSnapshot({
+      entries: [{ path: "shared.md", staged: "M", unstaged: "." }],
+      branchName: "main",
+      syncTarget: { remote: "origin", branch: "main", exists: true, ahead: 1, behind: 1 },
+      currentBranch: null,
+      headCommitId: "abc123",
+      repositoryOperation: "rebase",
+    });
+    expect(resolved.operation).toEqual({ kind: "rebase", canContinue: true, canAbort: true });
+    expect(resolved.actions).toMatchObject({ canCommit: false, canContinue: true, canAbort: true });
   });
 });
 

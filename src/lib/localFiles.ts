@@ -644,6 +644,14 @@ export async function commitWorkspaceGit(rootPath: string, message: string): Pro
   return getDesktopBridge().commitGit({ rootPath, message });
 }
 
+export async function continueWorkspaceGitOperation(rootPath: string): Promise<GitStatusSnapshot> {
+  return getDesktopBridge().continueGitOperation({ rootPath });
+}
+
+export async function abortWorkspaceGitOperation(rootPath: string): Promise<GitStatusSnapshot> {
+  return getDesktopBridge().abortGitOperation({ rootPath });
+}
+
 export async function checkoutWorkspaceGitBranch(
   rootPath: string,
   branchName: string,

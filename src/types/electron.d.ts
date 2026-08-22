@@ -261,18 +261,29 @@ export type GitSourceControlRemoteSummary = {
     | "synced";
 };
 
+export type GitRepositoryOperationKind = "merge" | "rebase" | "cherry-pick" | "revert";
+
+export type GitRepositoryOperationState = {
+  kind: GitRepositoryOperationKind;
+  canContinue: boolean;
+  canAbort: boolean;
+};
+
 export type GitSourceControlSnapshot = {
   input: {
     placeholder: string;
     defaultMessage: string;
   };
   groups: GitSourceControlResourceGroup[];
+  operation?: GitRepositoryOperationState | null;
   remote: GitSourceControlRemoteSummary;
   actions: {
     canStageAll: boolean;
     canUnstageAll: boolean;
     canDiscardAll: boolean;
     canCommit: boolean;
+    canContinue?: boolean;
+    canAbort?: boolean;
   };
 };
 
@@ -1104,6 +1115,12 @@ declare global {
       commitGit: (request: {
         rootPath: string;
         message: string;
+      }) => Promise<GitStatusSnapshot>;
+      continueGitOperation: (request: {
+        rootPath: string;
+      }) => Promise<GitStatusSnapshot>;
+      abortGitOperation: (request: {
+        rootPath: string;
       }) => Promise<GitStatusSnapshot>;
       checkoutGitBranch: (request: {
         rootPath: string;

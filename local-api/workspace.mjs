@@ -1110,7 +1110,7 @@ async function readFastWorkspaceGitStatus(root, options = {}) {
   const signal = options.signal;
   const statusLimit = options.statusLimit ?? GIT_STATUS_ENTRY_LIMIT;
   throwIfGitStatusAborted(signal);
-  const [statusResult, branches, remotes] = await Promise.all([
+  const [statusResult, branches, remotes, repositoryOperation] = await Promise.all([
     // Explicit untracked policy: never inherit status.showUntrackedFiles=no from
     // the user's global Git config — the desktop model must see all untracked paths.
     execGitStreaming(root, [
@@ -1129,6 +1129,7 @@ async function readFastWorkspaceGitStatus(root, options = {}) {
     }),
     readGitBranches(root, { signal }),
     readGitRemotes(root, { signal }),
+    readGitRepositoryOperationKind(root, { signal }),
   ]);
   throwIfGitStatusAborted(signal);
   const parsedStatus = parseGitPorcelainV2Status(statusResult.stdout);
@@ -1201,6 +1202,7 @@ async function readFastWorkspaceGitStatus(root, options = {}) {
     syncTarget,
     currentBranch,
     headCommitId: headCommitId || null,
+    repositoryOperation,
   });
   const effectiveHosting = resolveGitEffectiveHosting({
     remotes: normalizedRemotes,
@@ -1291,6 +1293,38 @@ export async function readGitConsistencyFingerprint(rootPath, options = {}) {
     symbolicResult.stdout.trim() || "detached",
     indexFingerprint,
   ].join("|");
+}
+
+async function readGitRepositoryOperationKind(rootPath, options = {}) {
+  const signal = options.signal;
+  throwIfGitStatusAborted(signal);
+  const result = await execGit(rootPath, [
+    "rev-parse",
+    "--git-path", "rebase-merge",
+    "--git-path", "rebase-apply",
+    "--git-path", "MERGE_HEAD",
+    "--git-path", "CHERRY_PICK_HEAD",
+    "--git-path", "REVERT_HEAD",
+  ], { optionalLocks: false, signal }).catch(() => {
+    throwIfGitStatusAborted(signal);
+    return { stdout: "" };
+  });
+  const resolvedPaths = result.stdout
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .map((value) => value ? (path.isAbsolute(value) ? value : path.resolve(rootPath, value)) : null);
+  const candidates = [
+    { kind: "rebase", path: resolvedPaths[0] },
+    { kind: "rebase", path: resolvedPaths[1] },
+    { kind: "merge", path: resolvedPaths[2] },
+    { kind: "cherry-pick", path: resolvedPaths[3] },
+    { kind: "revert", path: resolvedPaths[4] },
+  ];
+  const existence = await Promise.all(candidates.map(({ path: candidatePath }) => (
+    candidatePath ? fs.stat(candidatePath).then(() => true).catch(() => false) : false
+  )));
+  throwIfGitStatusAborted(signal);
+  return candidates.find((_, index) => existence[index])?.kind ?? null;
 }
 
 export async function getWorkspaceGitBranchGraph(rootPath) {
@@ -1630,6 +1664,41 @@ export async function commitWorkspaceGit(rootPath, message) {
   return getWorkspaceGitStatus(root);
 }
 
+export async function continueWorkspaceGitOperation(rootPath) {
+  const root = resolveWorkspacePath(rootPath, null);
+  const status = await getWorkspaceGitStatus(root);
+  const operation = status.sourceControl.operation;
+  if (!operation) {
+    throw new Error("Unable to continue Git operation: no merge, rebase, cherry-pick, or revert is in progress.");
+  }
+  if (!operation.canContinue) {
+    throw new Error("Unable to continue Git operation: resolve and stage all conflicted files first.");
+  }
+
+  await execGit(root, ["-c", "core.editor=true", operation.kind, "--continue"], {
+    timeout: GIT_MUTATION_TIMEOUT_MS,
+  }).catch((error) => {
+    throw new Error(`Unable to continue ${operation.kind}: ${getGitErrorOutput(error)}`);
+  });
+  return getWorkspaceGitStatus(root);
+}
+
+export async function abortWorkspaceGitOperation(rootPath) {
+  const root = resolveWorkspacePath(rootPath, null);
+  const status = await getWorkspaceGitStatus(root);
+  const operation = status.sourceControl.operation;
+  if (!operation) {
+    throw new Error("Unable to abort Git operation: no merge, rebase, cherry-pick, or revert is in progress.");
+  }
+
+  await execGit(root, [operation.kind, "--abort"], {
+    timeout: GIT_MUTATION_TIMEOUT_MS,
+  }).catch((error) => {
+    throw new Error(`Unable to abort ${operation.kind}: ${getGitErrorOutput(error)}`);
+  });
+  return getWorkspaceGitStatus(root);
+}
+
 export async function checkoutWorkspaceGitBranch(rootPath, branchName, options = {}) {
   const root = resolveWorkspacePath(rootPath, null);
   const normalizedBranch = await normalizeGitBranchName(root, branchName);
@@ -1753,6 +1822,8 @@ export async function fetchWorkspaceGit(rootPath, options = {}) {
 
 export async function pullWorkspaceGit(rootPath) {
   const root = resolveWorkspacePath(rootPath, null);
+  const currentStatus = await getWorkspaceGitStatus(root);
+  assertNoInProgressGitOperation(currentStatus, "pull");
   const config = await readPuppyoneWorkspaceConfig(root).catch(() => null);
   const remotes = await readGitRemotes(root);
   if (hasEffectivePuppyoneHostingTarget(remotes, config)) {
@@ -1785,6 +1856,8 @@ export async function pullWorkspaceGit(rootPath) {
 
 export async function pushWorkspaceGit(rootPath) {
   const root = resolveWorkspacePath(rootPath, null);
+  const currentStatus = await getWorkspaceGitStatus(root);
+  assertNoInProgressGitOperation(currentStatus, "push");
   const config = await readPuppyoneWorkspaceConfig(root).catch(() => null);
   const remotes = await readGitRemotes(root);
   if (hasEffectivePuppyoneHostingTarget(remotes, config)) {
@@ -1889,6 +1962,8 @@ export async function pushWorkspaceGitCommitToRemote(rootPath, request = {}) {
 
 export async function publishWorkspaceGitBranch(rootPath, remoteName = null) {
   const root = resolveWorkspacePath(rootPath, null);
+  const status = await getWorkspaceGitStatus(root);
+  assertNoInProgressGitOperation(status, "publish");
   await pushWorkspaceGitWithDefaultUpstream(root, remoteName);
   return getWorkspaceGitStatus(root);
 }
@@ -1900,6 +1975,7 @@ export async function syncWorkspaceGit(rootPath) {
   if (!status.isRepo) {
     throw new Error("Current workspace is not a Git repository.");
   }
+  assertNoInProgressGitOperation(status, "sync");
   if (status.sourceControl.remote.canPublish) {
     await pushWorkspaceGitWithDefaultUpstream(root);
     return getWorkspaceGitStatus(root);
@@ -2059,6 +2135,23 @@ function isGitTimeoutError(error) {
 function isMissingUpstreamError(error) {
   const message = getGitErrorOutput(error);
   return /no upstream branch|has no upstream branch|--set-upstream/i.test(message);
+}
+
+function assertNoInProgressGitOperation(status, requestedOperation) {
+  const operation = status?.sourceControl?.operation;
+  if (operation) {
+    throw new Error(
+      `Unable to ${requestedOperation} changes while ${operation.kind} is in progress. Resolve and continue it, or abort it first.`,
+    );
+  }
+  const conflictCount = status?.sourceControl?.groups
+    ?.find((group) => group.id === "merge")
+    ?.resources?.length ?? 0;
+  if (conflictCount > 0) {
+    throw new Error(
+      `Unable to ${requestedOperation} changes while unresolved file conflicts remain. Resolve and stage them first.`,
+    );
+  }
 }
 
 async function buildDefaultPullArgs(rootPath) {
