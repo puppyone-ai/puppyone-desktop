@@ -164,7 +164,9 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-entry-action-secondary\s*\{[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-subtle\);/s);
     expect(css).not.toContain(".onboarding-entry-action-secondary.onboarding-clone-action");
     expect(css).not.toContain(".onboarding-clone-entry");
+    expect(css).toMatch(/\.onboarding-entry-dialog \.desktop-dialog-title-row\s*\{[^}]*align-items:\s*center;/s);
     expect(css).toMatch(/\.onboarding-entry-create-row\s*\{[^}]*min-height:\s*52px;[^}]*grid-template-columns:\s*104px minmax\(0, 1fr\);[^}]*gap:\s*16px;/s);
+    expect(css).not.toContain(".onboarding-entry-create-row + .onboarding-entry-create-row");
     expect(css).toMatch(/\.onboarding-entry-dialog \.desktop-dialog-button\.primary\.file:disabled\s*\{[^}]*border-color:\s*var\(--po-border-subtle\);[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-disabled\);/s);
     expect(css).not.toContain(".folder-drop-zone");
 
@@ -191,6 +193,7 @@ describe("project folder home", () => {
       container.querySelectorAll<HTMLButtonElement>(".onboarding-entry-action")[1]?.click();
     });
     expect(container.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe("Create a local project");
+    expect(container.querySelector(".desktop-dialog-title-row > h2")?.textContent).toBe("Create a local project");
     const projectName = container.querySelector<HTMLInputElement>(".onboarding-entry-dialog input");
     expect(projectName?.placeholder).toBe("My project");
     expect(container.textContent).not.toContain("Choose a name for your project.");

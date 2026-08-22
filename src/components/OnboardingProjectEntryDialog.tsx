@@ -85,7 +85,7 @@ export function OnboardingProjectEntryDialog({
                 ? <FolderPlus size={16} strokeWidth={1.8} />
                 : <GitFork size={16} strokeWidth={1.8} />}
             </span>
-            <div><h2>{title}</h2></div>
+            <h2>{title}</h2>
           </div>
           <DesktopDialogCloseButton
             title={t("common.action.close")}

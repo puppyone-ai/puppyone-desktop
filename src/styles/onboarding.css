@@ -218,6 +218,10 @@
   padding-inline: var(--onboarding-entry-inset);
 }
 
+.onboarding-entry-dialog .desktop-dialog-title-row {
+  align-items: center;
+}
+
 .onboarding-entry-dialog-body {
   gap: 8px;
   padding-block: 8px 16px;
@@ -242,10 +246,6 @@
   align-items: center;
   gap: 16px;
   padding-block: 8px;
-}
-
-.onboarding-entry-create-row + .onboarding-entry-create-row {
-  border-top: 1px solid var(--po-divider);
 }
 
 .onboarding-entry-create-label {
