@@ -140,8 +140,8 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*60px;[^}]*height:\s*60px;/s);
     expect(css).not.toContain(".onboarding-brand-version");
     expect(css).toMatch(/\.onboarding-primary-area\s*\{[^}]*justify-items:\s*center;/s);
-    expect(css).toMatch(/\.onboarding-entry-launcher\s*\{[^}]*width:\s*min\(330px, 100%\);[^}]*gap:\s*8px;/s);
-    expect(css).toMatch(/\.onboarding-entry-action\s*\{[^}]*width:\s*100%;[^}]*height:\s*50px;[^}]*min-height:\s*50px;[^}]*border-radius:\s*var\(--desktop-control-radius\);[^}]*font-size:\s*var\(--po-text-size-body-lg, 14px\);[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);/s);
+    expect(css).toMatch(/\.onboarding-entry-launcher\s*\{[^}]*width:\s*min\(330px, 100%\);[^}]*gap:\s*6px;/s);
+    expect(css).toMatch(/\.onboarding-entry-action\s*\{[^}]*width:\s*100%;[^}]*height:\s*38px;[^}]*min-height:\s*38px;[^}]*border-radius:\s*var\(--desktop-control-radius\);[^}]*font-size:\s*var\(--po-text-size-body, 13px\);[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);/s);
     expect(css).toMatch(/\.onboarding-entry-action-primary\s*\{[^}]*background:\s*var\(--po-text\);[^}]*color:\s*var\(--po-text-inverse\);[^}]*font-weight:\s*var\(--po-text-weight-semibold, 600\);/s);
     expect(css).toMatch(/\.onboarding-entry-action-secondary\s*\{[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-subtle\);/s);
     expect(css).not.toContain(".folder-drop-zone");
