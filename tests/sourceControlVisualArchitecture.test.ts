@@ -245,6 +245,10 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-github-change-card",
     ));
+    const dividerCard = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-change-card.is-divider-layout",
+    ));
     const updateAge = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-github-change-card .desktop-git-github-update-age",
@@ -286,6 +290,8 @@ describe("source-control visual architecture", () => {
       "--git-card-background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));",
     );
     expect(card).toContain("background: var(--git-card-background);");
+    expect(dividerCard).toContain("min-height: 52px;");
+    expect(dividerCard).toContain("padding: 10px;");
     expect(updateAge).toContain("color: inherit;");
     expect(updateAge).toContain("cursor: default;");
     expect(summary).toContain("grid-row: 2;");
