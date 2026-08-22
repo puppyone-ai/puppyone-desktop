@@ -9,6 +9,7 @@
   "action.createCloudProject": "Cloud 프로젝트 만들기",
   "action.openFolder": "로컬 폴더 열기",
   "action.createLocalProject": "로컬 프로젝트 만들기",
+  "action.import": "가져오기",
   "action.importFrom": "다음에서 가져오기",
   "entry.create.title": "로컬 프로젝트 만들기",
   "entry.create.nameLabel": "프로젝트 이름",

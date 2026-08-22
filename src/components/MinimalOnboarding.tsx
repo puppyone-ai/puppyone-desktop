@@ -2,7 +2,6 @@ import { Button, resolveRendererPublicAssetUrl, type Workspace } from "@puppyone
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
 import {
   AlertTriangle,
-  Download,
   FilePlus2,
   Folder,
   FolderOpen,
@@ -262,10 +261,18 @@ export function MinimalOnboarding({
               </div>
 
               <div className="onboarding-provider-strip" aria-label={t("onboarding.action.importFrom")}>
-                <Download className="onboarding-provider-import-icon" aria-hidden="true" />
-                <span className="onboarding-provider-label">{t("onboarding.action.importFrom")}</span>
+                <div className="onboarding-provider-sources">
+                  <span
+                    className="onboarding-provider-source"
+                    data-provider="github"
+                    aria-label="GitHub"
+                    title="GitHub"
+                  >
+                    <Github className="onboarding-provider-mark" aria-hidden="true" />
+                  </span>
+                </div>
                 <button
-                  className="onboarding-provider-action"
+                  className="onboarding-provider-import-action"
                   type="button"
                   data-provider="github"
                   disabled={busy || !onCloneRepository}
@@ -273,7 +280,7 @@ export function MinimalOnboarding({
                   title={t("onboarding.entry.clone.title")}
                   onClick={() => setEntryDialog("clone")}
                 >
-                  <Github className="onboarding-provider-mark" aria-hidden="true" />
+                  {t("onboarding.action.import")}
                 </button>
               </div>
             </div>

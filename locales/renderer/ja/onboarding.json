@@ -9,6 +9,7 @@
   "action.createCloudProject": "Cloud プロジェクトを作成",
   "action.openFolder": "ローカルフォルダを開く",
   "action.createLocalProject": "ローカルプロジェクトを作成",
+  "action.import": "インポート",
   "action.importFrom": "インポート元",
   "entry.create.title": "ローカルプロジェクトを作成",
   "entry.create.nameLabel": "プロジェクト名",

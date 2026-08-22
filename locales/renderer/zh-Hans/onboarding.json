@@ -9,6 +9,7 @@
   "action.createCloudProject": "创建云端项目",
   "action.openFolder": "打开本地文件夹",
   "action.createLocalProject": "创建本地项目",
+  "action.import": "导入",
   "action.importFrom": "导入自",
   "entry.create.title": "创建本地项目",
   "entry.create.nameLabel": "项目名称",
