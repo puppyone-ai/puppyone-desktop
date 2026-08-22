@@ -1,13 +1,16 @@
-import { FolderPlus, Github } from "lucide-react";
+import { FolderPlus, Github, Gitlab } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useLocalization } from "@puppyone/localization";
-import type { WorkspaceProjectLocationGrant } from "../types/electron";
+import type {
+  WorkspaceGitImportProvider,
+  WorkspaceProjectLocationGrant,
+} from "../types/electron";
 import {
   DesktopDialogCloseButton,
   DesktopDialogRoot,
 } from "./DesktopDialog";
 
-export type OnboardingProjectEntryKind = "create" | "clone";
+export type OnboardingProjectEntryKind = "create" | WorkspaceGitImportProvider;
 
 export function OnboardingProjectEntryDialog({
   kind,
@@ -27,10 +30,12 @@ export function OnboardingProjectEntryDialog({
   const [location, setLocation] = useState<WorkspaceProjectLocationGrant | null>(null);
   const [error, setError] = useState<string | null>(null);
   const create = kind === "create";
+  const provider = create ? null : kind;
+  const providerName = provider === "gitlab" ? "GitLab" : "GitHub";
   const busy = submitting || choosingLocation;
   const title = t(create
     ? "onboarding.entry.create.title"
-    : "onboarding.entry.clone.title");
+    : "onboarding.entry.clone.title", create ? undefined : { provider: providerName });
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -83,7 +88,9 @@ export function OnboardingProjectEntryDialog({
             <span className="desktop-dialog-leading file" aria-hidden="true">
               {create
                 ? <FolderPlus size={16} strokeWidth={1.8} />
-                : <Github size={16} strokeWidth={1.8} />}
+                : provider === "gitlab"
+                  ? <Gitlab size={16} strokeWidth={1.8} />
+                  : <Github size={16} strokeWidth={1.8} />}
             </span>
             <div><h2>{title}</h2></div>
           </div>
@@ -162,7 +169,9 @@ export function OnboardingProjectEntryDialog({
                   spellCheck={false}
                   disabled={busy}
                   data-desktop-dialog-initial-focus="true"
-                  placeholder={t("onboarding.entry.clone.urlPlaceholder")}
+                  placeholder={t(provider === "gitlab"
+                    ? "onboarding.entry.clone.urlPlaceholderGitLab"
+                    : "onboarding.entry.clone.urlPlaceholderGitHub")}
                   onChange={(event) => {
                     setValue(event.target.value);
                     setError(null);

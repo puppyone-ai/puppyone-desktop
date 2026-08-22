@@ -83,7 +83,8 @@ import { createSenderWorkspaceAuthorization } from "./main/workspace-authorizati
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
 import {
   createProjectEntryService,
-  requireGitHubRepository,
+  requireGitImportProvider,
+  requireGitRepository,
   requireProjectName,
 } from "./main/project-entry-service.mjs";
 import { createProjectLocationGrantStore } from "./main/project-location-grants.mjs";
@@ -1022,7 +1023,8 @@ async function selectProjectLocationForCurrentWindow(sender) {
 }
 
 async function cloneRepositoryForCurrentWindow(sender, request) {
-  const repository = requireGitHubRepository(request?.repositoryUrl);
+  const provider = requireGitImportProvider(request?.provider);
+  const repository = requireGitRepository(request?.repositoryUrl, provider);
   return runProjectEntryOperation(sender, async () => {
     const parentPath = await selectProjectParentDirectory(sender, "clone");
     if (!parentPath) return null;

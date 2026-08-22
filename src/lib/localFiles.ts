@@ -336,10 +336,10 @@ export async function selectLocalProjectLocation(): Promise<WorkspaceProjectLoca
   return getDesktopBridge().selectLocalProjectLocation();
 }
 
-export async function cloneGitHubRepository(
+export async function cloneRepository(
   request: WorkspaceCloneRepositoryRequest,
 ): Promise<WorkspaceOpenResult | null> {
-  return getDesktopBridge().cloneGitHubRepository(request);
+  return getDesktopBridge().cloneRepository(request);
 }
 
 export async function createWorkspaceEntry(

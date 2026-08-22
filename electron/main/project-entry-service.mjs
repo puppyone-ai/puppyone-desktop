@@ -30,7 +30,7 @@ export function createProjectEntryService({
     },
 
     async cloneRepository({ parentPath, repositoryUrl, signal }) {
-      const repository = requireGitHubRepository(repositoryUrl);
+      const repository = requireGitRepository(repositoryUrl);
       const canonicalParent = await requireDirectory(parentPath, fsPromises, pathModule);
       const projectPath = resolveChildPath(canonicalParent, repository.name, pathModule);
       await requireMissingPath(projectPath, repository.name, fsPromises);
@@ -69,7 +69,7 @@ export function createProjectEntryService({
         if (ownsProjectPath) {
           await fsPromises.rm(projectPath, { recursive: true, force: true }).catch(() => undefined);
         }
-        throw normalizeCloneError(error);
+        throw normalizeCloneError(error, repository.provider);
       }
 
       return {
@@ -108,68 +108,128 @@ export function requireProjectName(value) {
   return name;
 }
 
-export function requireGitHubRepository(value) {
+export function requireGitRepository(value, expectedProvider = null) {
+  if (expectedProvider !== null) requireGitImportProvider(expectedProvider);
+  const expectedProviderLabel = getProviderLabel(expectedProvider);
   if (typeof value !== "string" || !value.trim()) {
-    throw projectEntryError("INVALID_REPOSITORY_URL", "Enter a GitHub repository URL.");
+    throw projectEntryError(
+      "INVALID_REPOSITORY_URL",
+      expectedProviderLabel
+        ? `Enter a ${expectedProviderLabel} repository URL.`
+        : "Enter a GitHub or GitLab repository URL.",
+    );
   }
   const repositoryUrl = value.trim();
   if (/^[\u0000-\u001f\u007f-]/.test(repositoryUrl)) {
-    throw projectEntryError("INVALID_REPOSITORY_URL", "Enter a valid GitHub repository URL.");
+    throw invalidRepositoryUrl(expectedProvider);
   }
 
-  const scpMatch = /^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/i.exec(repositoryUrl);
+  const scpMatch = /^git@(github\.com|gitlab\.com):([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+?)(?:\.git)?\/?$/i.exec(repositoryUrl);
   if (scpMatch) {
-    return {
-      url: repositoryUrl,
-      owner: scpMatch[1],
-      name: requireRepositoryName(scpMatch[2]),
-    };
+    const provider = getProviderForHost(scpMatch[1]);
+    return buildRepositoryResult({
+      repositoryUrl,
+      provider,
+      expectedProvider,
+      segments: scpMatch[2].split("/"),
+    });
   }
 
   let parsed;
   try {
     parsed = new URL(repositoryUrl);
   } catch {
-    throw projectEntryError("INVALID_REPOSITORY_URL", "Enter a valid GitHub repository URL.");
+    throw invalidRepositoryUrl(expectedProvider);
   }
 
   const protocolAllowed = parsed.protocol === "https:" || parsed.protocol === "ssh:";
-  const hostAllowed = parsed.hostname.toLowerCase() === "github.com";
+  const provider = getProviderForHost(parsed.hostname);
   const credentialsAllowed = parsed.protocol === "ssh:"
     ? (!parsed.password && (!parsed.username || parsed.username === "git"))
     : !parsed.username && !parsed.password;
   const segments = parsed.pathname.split("/").filter(Boolean);
   if (
     !protocolAllowed
-    || !hostAllowed
+    || !provider
     || !credentialsAllowed
+    || parsed.port
     || parsed.search
     || parsed.hash
-    || segments.length !== 2
   ) {
-    throw projectEntryError(
-      "INVALID_REPOSITORY_URL",
-      "Use an HTTPS or SSH URL for a GitHub repository.",
-    );
+    throw invalidRepositoryUrl(expectedProvider, true);
   }
 
-  const owner = segments[0];
-  const repositorySegment = segments[1].replace(/\.git$/i, "");
-  if (!/^[A-Za-z0-9_.-]+$/.test(owner)) {
-    throw projectEntryError("INVALID_REPOSITORY_URL", "Enter a valid GitHub repository URL.");
+  return buildRepositoryResult({
+    repositoryUrl,
+    provider,
+    expectedProvider,
+    segments,
+  });
+}
+
+function buildRepositoryResult({ repositoryUrl, provider, expectedProvider, segments }) {
+  if (!provider || (expectedProvider && provider !== expectedProvider)) {
+    throw invalidRepositoryUrl(expectedProvider, true);
   }
+  const segmentCountAllowed = provider === "github"
+    ? segments.length === 2
+    : segments.length >= 2;
+  if (!segmentCountAllowed || segments.some((segment) => (
+    !/^[A-Za-z0-9_.-]+$/.test(segment)
+    || segment === "."
+    || segment === ".."
+  ))) {
+    throw invalidRepositoryUrl(expectedProvider ?? provider);
+  }
+
+  const repositorySegment = segments.at(-1)?.replace(/\.git$/i, "") ?? "";
+  const namespaceSegments = segments.slice(0, -1);
   return {
     url: repositoryUrl,
-    owner,
-    name: requireRepositoryName(repositorySegment),
+    provider,
+    owner: namespaceSegments.join("/"),
+    namespace: namespaceSegments.join("/"),
+    name: requireRepositoryName(repositorySegment, expectedProvider ?? provider),
   };
 }
 
-function requireRepositoryName(value) {
+export function requireGitImportProvider(value) {
+  if (value === "github" || value === "gitlab") return value;
+  throw projectEntryError(
+    "INVALID_REPOSITORY_PROVIDER",
+    "Choose GitHub or GitLab as the repository source.",
+  );
+}
+
+function requireRepositoryName(value, provider = null) {
   if (!value || !/^[A-Za-z0-9_.-]+$/.test(value) || value === "." || value === "..") {
-    throw projectEntryError("INVALID_REPOSITORY_URL", "Enter a valid GitHub repository URL.");
+    throw invalidRepositoryUrl(provider);
   }
   return requireProjectName(value);
+}
+
+function getProviderForHost(value) {
+  const host = typeof value === "string" ? value.toLowerCase() : "";
+  if (host === "github.com") return "github";
+  if (host === "gitlab.com") return "gitlab";
+  return null;
+}
+
+function getProviderLabel(provider) {
+  if (provider === "github") return "GitHub";
+  if (provider === "gitlab") return "GitLab";
+  return null;
+}
+
+function invalidRepositoryUrl(provider, describeAllowedForm = false) {
+  const providerLabel = getProviderLabel(provider);
+  const target = providerLabel ? `${providerLabel} repository` : "GitHub or GitLab repository";
+  return projectEntryError(
+    "INVALID_REPOSITORY_URL",
+    describeAllowedForm
+      ? `Use an HTTPS or SSH URL for a ${target}.`
+      : `Enter a valid ${target} URL.`,
+  );
 }
 
 async function requireDirectory(value, fsPromises, pathModule) {
@@ -206,12 +266,19 @@ async function requireMissingPath(targetPath, projectName, fsPromises) {
   );
 }
 
-function normalizeCloneError(error) {
+function normalizeCloneError(error, provider) {
   if (error?.name === "AbortError" || error?.code === "ABORT_ERR") {
     return projectEntryError("CLONE_CANCELLED", "Repository cloning was cancelled.");
   }
   if (typeof error?.code === "string" && error.code.startsWith("PROJECT_")) return error;
   const diagnostic = typeof error?.stderr === "string" ? error.stderr.trim() : "";
+  if (/authentication failed|could not read username|permission denied \(publickey\)|terminal prompts disabled/i.test(diagnostic)) {
+    const providerLabel = getProviderLabel(provider) ?? "Git provider";
+    return projectEntryError(
+      "CLONE_AUTHENTICATION_FAILED",
+      `${providerLabel} authentication failed. Use an SSH URL with a configured key or sign in with your Git credential helper.`,
+    );
+  }
   const message = diagnostic
     ? diagnostic.split(/\r?\n/).filter(Boolean).at(-1)
     : error instanceof Error ? error.message : String(error);

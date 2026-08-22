@@ -5,7 +5,7 @@ import type {
   WorkspaceProjectLocationGrant,
 } from "../types/electron";
 import {
-  cloneGitHubRepository as cloneGitHubRepositoryBridge,
+  cloneRepository as cloneRepositoryBridge,
   createLocalProject as createLocalProjectBridge,
   openDroppedWorkspaceInCurrentWindow as openDroppedWorkspaceInCurrentWindowBridge,
   openWorkspaceInCurrentWindow as openWorkspaceInCurrentWindowBridge,
@@ -45,10 +45,10 @@ export async function selectLocalProjectLocationTarget(): Promise<WorkspaceProje
   return selectLocalProjectLocationBridge();
 }
 
-export async function cloneGitHubRepositoryTarget(
+export async function cloneRepositoryTarget(
   request: WorkspaceCloneRepositoryRequest,
 ): Promise<WorkspaceOpenResult | null> {
-  return cloneGitHubRepositoryBridge(request);
+  return cloneRepositoryBridge(request);
 }
 
 export async function selectLocalWorkspaceFolder({

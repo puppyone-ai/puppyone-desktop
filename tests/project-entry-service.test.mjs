@@ -4,7 +4,8 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createProjectEntryService,
-  requireGitHubRepository,
+  requireGitImportProvider,
+  requireGitRepository,
   requireProjectName,
 } from "../electron/main/project-entry-service.mjs";
 
@@ -34,35 +35,62 @@ describe("project entry service", () => {
     });
   });
 
-  it("rejects traversal, reserved names, and malformed GitHub URLs", () => {
+  it("rejects traversal, credentials in URLs, unsupported hosts, and malformed repository URLs", () => {
     for (const value of ["", ".", "..", "../escape", "bad/name", "CON", "trailing."]) {
       expect(() => requireProjectName(value)).toThrow();
     }
     for (const value of [
       "",
-      "https://gitlab.com/owner/repo.git",
       "http://github.com/owner/repo.git",
       "https://token@github.com/owner/repo.git",
       "https://github.com/owner/repo/tree/main",
+      "https://bitbucket.org/owner/repo.git",
       "--upload-pack=malicious",
     ]) {
-      expect(() => requireGitHubRepository(value)).toThrow();
+      expect(() => requireGitRepository(value)).toThrow();
     }
   });
 
   it("accepts GitHub HTTPS and SSH forms and derives the local folder name", () => {
-    expect(requireGitHubRepository("https://github.com/puppyone-ai/puppyone-desktop.git")).toMatchObject({
+    expect(requireGitRepository("https://github.com/puppyone-ai/puppyone-desktop.git", "github")).toMatchObject({
+      provider: "github",
       owner: "puppyone-ai",
       name: "puppyone-desktop",
     });
-    expect(requireGitHubRepository("git@github.com:puppyone-ai/puppyone-desktop.git")).toMatchObject({
+    expect(requireGitRepository("git@github.com:puppyone-ai/puppyone-desktop.git", "github")).toMatchObject({
       owner: "puppyone-ai",
       name: "puppyone-desktop",
     });
-    expect(requireGitHubRepository("ssh://git@github.com/puppyone-ai/puppyone-desktop.git")).toMatchObject({
+    expect(requireGitRepository("ssh://git@github.com/puppyone-ai/puppyone-desktop.git", "github")).toMatchObject({
       owner: "puppyone-ai",
       name: "puppyone-desktop",
     });
+  });
+
+  it("accepts GitLab groups and subgroups over HTTPS and SSH", () => {
+    expect(requireGitRepository("https://gitlab.com/puppyone/data/knowledge-base.git", "gitlab")).toMatchObject({
+      provider: "gitlab",
+      namespace: "puppyone/data",
+      name: "knowledge-base",
+    });
+    expect(requireGitRepository("git@gitlab.com:puppyone/data/knowledge-base.git", "gitlab")).toMatchObject({
+      provider: "gitlab",
+      namespace: "puppyone/data",
+      name: "knowledge-base",
+    });
+    expect(requireGitRepository("ssh://git@gitlab.com/puppyone/data/knowledge-base.git", "gitlab")).toMatchObject({
+      provider: "gitlab",
+      namespace: "puppyone/data",
+      name: "knowledge-base",
+    });
+  });
+
+  it("keeps provider-specific entry points scoped to their selected host", () => {
+    expect(() => requireGitRepository("https://gitlab.com/owner/repository.git", "github"))
+      .toThrow(/GitHub/);
+    expect(() => requireGitRepository("https://github.com/owner/repository.git", "gitlab"))
+      .toThrow(/GitLab/);
+    expect(() => requireGitImportProvider("bitbucket")).toThrow(/GitHub or GitLab/);
   });
 
   it("keeps the final path absent while cloning, then publishes the completed result", async () => {
@@ -119,5 +147,23 @@ describe("project entry service", () => {
     await expect(readFile(path.join(parentPath, "keep.txt"), "utf8")).resolves.toBe("keep");
     const remaining = await readdir(parentPath);
     expect(remaining).toEqual(["keep.txt"]);
+  });
+
+  it("turns non-interactive credential failures into an actionable provider message", async () => {
+    const service = createProjectEntryService({
+      cloneGit: vi.fn(async () => {
+        const error = new Error("clone failed");
+        error.stderr = "fatal: could not read Username for 'https://gitlab.com': terminal prompts disabled";
+        throw error;
+      }),
+    });
+
+    await expect(service.cloneRepository({
+      parentPath,
+      repositoryUrl: "https://gitlab.com/owner/repository.git",
+    })).rejects.toMatchObject({
+      code: "CLONE_AUTHENTICATION_FAILED",
+      message: expect.stringMatching(/GitLab authentication failed/),
+    });
   });
 });

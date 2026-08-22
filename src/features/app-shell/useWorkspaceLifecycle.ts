@@ -8,7 +8,7 @@ import {
   removeRecentWorkspace,
 } from "../../lib/localFiles";
 import {
-  cloneGitHubRepositoryTarget,
+  cloneRepositoryTarget,
   createLocalProjectTarget,
   openDroppedWorkspaceTarget,
   openWorkspaceTarget,
@@ -127,7 +127,7 @@ export function useWorkspaceLifecycle({
   }, []);
 
   const cloneRepository = useCallback(async (request: WorkspaceCloneRepositoryRequest) => {
-    const result = await cloneGitHubRepositoryTarget(request);
+    const result = await cloneRepositoryTarget(request);
     handleWorkspaceOpenResult(result);
     return result !== null;
   }, [handleWorkspaceOpenResult]);

@@ -141,19 +141,20 @@ describe("project folder home", () => {
     const providers = [...container.querySelectorAll<HTMLButtonElement>(".onboarding-provider-source")];
     expect(container.querySelector(".onboarding-provider-label")?.textContent).toBe("import from");
     expect(container.querySelector(".onboarding-provider-arrow")).toBeNull();
-    expect(providers.map((provider) => provider.dataset.provider)).toEqual(["github"]);
-    expect(providers[0]?.disabled).toBe(false);
+    expect(providers.map((provider) => provider.dataset.provider)).toEqual(["github", "gitlab"]);
+    expect(providers.every((provider) => !provider.disabled)).toBe(true);
     expect(providers[0]?.getAttribute("aria-label")).toBe("Import from GitHub");
+    expect(providers[1]?.getAttribute("aria-label")).toBe("Import from GitLab");
     expect(providers[0]?.querySelector(".onboarding-provider-mark.lucide-github")).not.toBeNull();
+    expect(providers[1]?.querySelector(".onboarding-provider-mark.lucide-gitlab")).not.toBeNull();
     expect(container.querySelector(".onboarding-provider-import-action")).toBeNull();
-    expect(container.querySelector("[data-provider='gitlab']")).toBeNull();
     expect(container.querySelector("[data-provider='notion']")).toBeNull();
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
     expect(css).toMatch(/\.onboarding-homepage\s*\{[^}]*width:\s*min\(480px, 100%\);[^}]*align-content:\s*start;[^}]*gap:\s*30px;/s);
-    expect(css).toMatch(/\.onboarding-homepage\.is-empty\s*\{[^}]*width:\s*min\(450px, 100%\);[^}]*min-height:\s*min\(430px, 100%\);[^}]*align-content:\s*center;[^}]*gap:\s*42px;/s);
-    expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*flex-direction:\s*column;[^}]*align-items:\s*center;[^}]*justify-self:\s*center;[^}]*gap:\s*12px;/s);
+    expect(css).toMatch(/\.onboarding-homepage\.is-empty\s*\{[^}]*width:\s*min\(450px, 100%\);[^}]*min-height:\s*min\(430px, 100%\);[^}]*align-content:\s*center;[^}]*gap:\s*26px;/s);
+    expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*width:\s*min\(272px, 100%\);[^}]*flex-direction:\s*row;[^}]*align-items:\s*center;[^}]*justify-self:\s*center;[^}]*justify-content:\s*flex-start;[^}]*gap:\s*10px;/s);
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*color:\s*var\(--po-text-muted\);/s);
-    expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*60px;[^}]*height:\s*60px;/s);
+    expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*40px;[^}]*height:\s*40px;/s);
     expect(css).not.toContain(".onboarding-brand-version");
     expect(css).toMatch(/\.onboarding-primary-area\s*\{[^}]*justify-items:\s*center;/s);
     expect(css).toMatch(/\.onboarding-entry-launcher\s*\{[^}]*width:\s*min\(272px, 100%\);[^}]*gap:\s*18px;/s);
@@ -233,9 +234,31 @@ describe("project folder home", () => {
       await Promise.resolve();
     });
     expect(onCloneRepository).toHaveBeenCalledWith({
+      provider: "github",
       repositoryUrl: "https://github.com/puppyone-ai/puppyone.git",
     });
     expect(container.querySelector(".onboarding-entry-dialog")).toBeNull();
+  });
+
+  it("collects a GitLab URL from the GitLab provider entry", async () => {
+    const onCloneRepository = vi.fn(async () => true);
+    const container = renderHome({ onCloneRepository });
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".onboarding-provider-source[data-provider='gitlab']")?.click();
+    });
+    expect(container.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe("Import from GitLab");
+    const repositoryUrl = container.querySelector<HTMLInputElement>(".onboarding-entry-dialog input");
+    expect(repositoryUrl?.placeholder).toBe("https://gitlab.com/group/repository.git");
+    setInputValue(repositoryUrl, "git@gitlab.com:puppyone/data/knowledge-base.git");
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".onboarding-entry-dialog button[type='submit']")?.click();
+      await Promise.resolve();
+    });
+    expect(onCloneRepository).toHaveBeenCalledWith({
+      provider: "gitlab",
+      repositoryUrl: "git@gitlab.com:puppyone/data/knowledge-base.git",
+    });
   });
 
   it("shows project-opening progress only inside the project row", async () => {

@@ -568,7 +568,10 @@ export type WorkspaceProjectLocationGrant = {
 
 export type WorkspaceCloneRepositoryRequest = {
   repositoryUrl: string;
+  provider: WorkspaceGitImportProvider;
 };
+
+export type WorkspaceGitImportProvider = "github" | "gitlab";
 
 export type WorkspaceCreateEntryKind = "file" | "folder";
 
@@ -922,7 +925,7 @@ declare global {
       createLocalProject: (
         request: WorkspaceCreateProjectRequest,
       ) => Promise<WorkspaceOpenResult | null>;
-      cloneGitHubRepository: (
+      cloneRepository: (
         request: WorkspaceCloneRepositoryRequest,
       ) => Promise<WorkspaceOpenResult | null>;
       getPathForFile: (file: File) => string;

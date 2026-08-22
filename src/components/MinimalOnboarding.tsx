@@ -6,6 +6,7 @@ import {
   Folder,
   FolderOpen,
   Github,
+  Gitlab,
   Plus,
   Unlink,
 } from "lucide-react";
@@ -33,6 +34,7 @@ import { writeClipboardText } from "../features/settings/utils";
 import type {
   WorkspaceCloneRepositoryRequest,
   WorkspaceCreateProjectRequest,
+  WorkspaceGitImportProvider,
   WorkspaceProjectLocationGrant,
 } from "../types/electron";
 import { DesktopMenuIconButton, DesktopMenuItem } from "./DesktopMenu";
@@ -107,7 +109,7 @@ export function MinimalOnboarding({
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const [removingPath, setRemovingPath] = useState<string | null>(null);
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
-  const [entryDialog, setEntryDialog] = useState<"create" | "clone" | null>(null);
+  const [entryDialog, setEntryDialog] = useState<"create" | WorkspaceGitImportProvider | null>(null);
   const items = useMemo(
     () => (projectItems ?? recentWorkspaces.map(({ workspace, lastOpenedAt }) => ({
       id: workspace.id,
@@ -270,11 +272,22 @@ export function MinimalOnboarding({
                     type="button"
                     data-provider="github"
                     disabled={busy || !onCloneRepository}
-                    aria-label={t("onboarding.entry.clone.title")}
-                    title={t("onboarding.entry.clone.title")}
-                    onClick={() => setEntryDialog("clone")}
+                    aria-label={t("onboarding.entry.clone.title", { provider: "GitHub" })}
+                    title={t("onboarding.entry.clone.title", { provider: "GitHub" })}
+                    onClick={() => setEntryDialog("github")}
                   >
                     <Github className="onboarding-provider-mark" aria-hidden="true" />
+                  </button>
+                  <button
+                    className="onboarding-provider-source"
+                    type="button"
+                    data-provider="gitlab"
+                    disabled={busy || !onCloneRepository}
+                    aria-label={t("onboarding.entry.clone.title", { provider: "GitLab" })}
+                    title={t("onboarding.entry.clone.title", { provider: "GitLab" })}
+                    onClick={() => setEntryDialog("gitlab")}
+                  >
+                    <Gitlab className="onboarding-provider-mark" aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -361,11 +374,14 @@ export function MinimalOnboarding({
           })}
         />
       )}
-      {entryDialog === "clone" && onCloneRepository && (
+      {(entryDialog === "github" || entryDialog === "gitlab") && onCloneRepository && (
         <OnboardingProjectEntryDialog
-          kind="clone"
+          kind={entryDialog}
           onClose={() => setEntryDialog(null)}
-          onSubmit={(value) => onCloneRepository({ repositoryUrl: value })}
+          onSubmit={(value) => onCloneRepository({
+            repositoryUrl: value,
+            provider: entryDialog,
+          })}
         />
       )}
       {cornerSlot}
