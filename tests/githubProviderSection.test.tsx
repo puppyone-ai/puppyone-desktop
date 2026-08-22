@@ -33,7 +33,7 @@ describe("GitHub provider section", () => {
     expect(surface.querySelector(".desktop-git-hosting-repository-row")).toBeNull();
   });
 
-  it("makes the update age primary and exposes the exact incoming commit time", async () => {
+  it("renders the update age as static, non-interactive information", async () => {
     const onPull = vi.fn(async () => true);
     const incomingUpdatedAt = new Date(Date.now() - ((2 * 60 * 60 * 1000) + 10_000)).toISOString();
     const surface = renderProvider(createSection({
@@ -87,16 +87,11 @@ describe("GitHub provider section", () => {
     expect(surface.textContent).toContain("96 changes");
     const updateAge = surface.querySelector<HTMLElement>(".desktop-git-github-update-age");
     const updateTooltip = surface.querySelector<HTMLElement>(".desktop-git-github-update-tooltip");
-    const exactUpdateTime = new Intl.DateTimeFormat("en", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date(incomingUpdatedAt));
     expect(updateAge?.textContent).toBe("2 hours ago");
     expect(updateAge?.getAttribute("datetime")).toBe(incomingUpdatedAt);
-    expect(updateAge?.tabIndex).toBe(0);
-    expect(updateAge?.getAttribute("aria-describedby")).toBe(updateTooltip?.id);
-    expect(updateTooltip?.getAttribute("role")).toBe("tooltip");
-    expect(updateTooltip?.textContent).toBe(`Latest incoming commit · ${exactUpdateTime}`);
+    expect(updateAge?.tabIndex).toBe(-1);
+    expect(updateAge?.hasAttribute("aria-describedby")).toBe(false);
+    expect(updateTooltip).toBeNull();
     expect(surface.querySelector(".desktop-git-github-file-total")?.textContent).toBe("96 changes");
     expect(surface.querySelector(".desktop-git-github-file-stats")).toBeNull();
     expect(surface.textContent).not.toContain("Update policy");

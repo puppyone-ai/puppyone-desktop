@@ -196,22 +196,15 @@ function GitHubIncomingChangesCard({
   incomingUpdatedAt: string | null;
   action: ReactNode;
 }) {
-  const { t, formatDate, formatRelativeTime } = useLocalization();
-  const updateTooltipId = useId();
-  const updateTimestamp = incomingUpdatedAt ? Date.parse(incomingUpdatedAt) : Number.NaN;
+  const { t, formatRelativeTime } = useLocalization();
   const updateAge = formatGitRemoteUpdateAge(incomingUpdatedAt, formatRelativeTime);
-  const exactUpdateTime = Number.isFinite(updateTimestamp)
-    ? formatDate(updateTimestamp, { dateStyle: "medium", timeStyle: "short" })
-    : null;
 
   return (
     <div className={`desktop-git-github-change-card${updateAge ? "" : " is-age-unavailable"}`}>
-      {updateAge && exactUpdateTime && (
+      {updateAge && (
         <time
           className="desktop-git-github-update-age"
           dateTime={incomingUpdatedAt ?? undefined}
-          tabIndex={0}
-          aria-describedby={updateTooltipId}
         >
           {updateAge}
         </time>
@@ -220,11 +213,6 @@ function GitHubIncomingChangesCard({
         {t("source-control.commit.changes", { count: fileSummary.total })}
       </span>
       {action}
-      {updateAge && exactUpdateTime && (
-        <span id={updateTooltipId} className="desktop-git-github-update-tooltip" role="tooltip">
-          {t("source-control.github.latestIncomingCommitAt", { timestamp: exactUpdateTime })}
-        </span>
-      )}
     </div>
   );
 }
