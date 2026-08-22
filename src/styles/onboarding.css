@@ -48,7 +48,7 @@
   width: min(450px, 100%);
   min-height: min(430px, 100%);
   align-content: center;
-  gap: 26px;
+  gap: 48px;
 }
 
 .onboarding-homepage.has-projects {
@@ -59,7 +59,7 @@
 
 .onboarding-brand-lockup {
   display: flex;
-  width: min(272px, 100%);
+  width: min(320px, 100%);
   min-width: 0;
   box-sizing: border-box;
   flex-direction: row;
@@ -91,19 +91,27 @@
 
 .onboarding-primary-area {
   display: grid;
-  width: 100%;
+  width: min(320px, 100%);
+  min-width: 0;
+  box-sizing: border-box;
+  justify-self: center;
   justify-items: center;
+  padding: 18px;
+  border: 1px solid var(--po-border);
+  border-radius: 0;
+  background: transparent;
 }
 
 .onboarding-entry-launcher {
   display: grid;
-  width: min(272px, 100%);
-  gap: 18px;
+  width: 100%;
+  min-width: 0;
+  gap: 22px;
 }
 
 .onboarding-entry-actions {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .onboarding-entry-action {
