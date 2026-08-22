@@ -38,7 +38,7 @@ import { SourceControlWorkingResourceList } from "./sidebar/SourceControlResourc
 import type { GitSidebarPanel, GitSidebarProps } from "./sidebar/sourceControlSidebarTypes";
 export type { GitSidebarProps } from "./sidebar/sourceControlSidebarTypes";
 
-const STATUS_CARD_SUMMARY_ROWS = 1.1;
+const STATUS_CARD_ACTION_ROWS = 1.1;
 
 export function GitSidebar({
   status,
@@ -126,6 +126,9 @@ export function GitSidebar({
     hasCommittedAction: Boolean(committedPrimaryAction && !committedPrimaryAction.disabled),
     hasSimpleAction: !professionalMode && showSimpleChangeAction,
   });
+  const showUnstagedCardActions = professionalMode
+    ? workingResources.length > 0
+    : showSimpleChangeAction;
   const githubIncomingUpdatedAt = status?.branches.find(
     (branch) => branch.remote && branch.name === status.sourceControl.remote.target?.ref,
   )?.lastCommitDate ?? null;
@@ -226,7 +229,7 @@ export function GitSidebar({
       className: "merge",
       grow: 0.9,
       expanded: mergeExpanded,
-      bodyRows: getGitSidebarPanelBodyRows(mergeResources.length) + STATUS_CARD_SUMMARY_ROWS,
+      bodyRows: getGitSidebarPanelBodyRows(mergeResources.length),
       content: (
         <>
           <SourceControlSectionHeader
@@ -237,11 +240,6 @@ export function GitSidebar({
             onToggle={() => setMergeExpanded((expanded) => !expanded)}
           />
           <GitSectionCollapse expanded={mergeExpanded} className="desktop-git-status-card">
-            <div className="desktop-git-status-card-summary-row">
-              <div className="desktop-git-status-card-summary">
-                {t("source-control.commit.filesChanged", { count: mergeResources.length })}
-              </div>
-            </div>
             <SourceControlWorkingResourceList
               resources={mergeResources}
               selectedWorkingFile={selectedWorkingFile}
@@ -265,7 +263,7 @@ export function GitSidebar({
       grow: 1.05,
       expanded: committedExpanded,
       bodyRows: getGitSidebarPanelBodyRows(committedResources.length, true)
-        + (committedResources.length > 0 ? STATUS_CARD_SUMMARY_ROWS : 0),
+        + (committedPrimaryAction ? STATUS_CARD_ACTION_ROWS : 0),
       content: (
         <>
           <SourceControlSectionHeader
@@ -276,30 +274,23 @@ export function GitSidebar({
             onToggle={() => setCommittedExpanded((expanded) => !expanded)}
           />
           <GitSectionCollapse expanded={committedExpanded} className="desktop-git-status-card">
-            {(committedResources.length > 0 || committedPrimaryAction) && (
-              <div className="desktop-git-status-card-summary-row">
-                {committedResources.length > 0 && (
-                  <div className="desktop-git-status-card-summary">
-                    {t("source-control.commit.filesChanged", { count: committedResources.length })}
-                  </div>
-                )}
-                {committedPrimaryAction && (
-                  <GitOperationButton
-                    className="desktop-git-commit-push-action"
-                    title={committedPrimaryAction.title}
-                    disabled={disabled || committedPrimaryAction.disabled}
-                    icon={committedPrimaryAction.icon}
-                    label={committedPrimaryAction.label}
-                    loadingKey={committedPrimaryAction.loadingKey}
-                    loadingLabel={committedPrimaryAction.loadingLabel}
-                    operationLoading={operationLoading}
-                    primary={primaryActionSlot === "committed"}
-                    onClick={() => {
-                      if (committedPrimaryAction.kind === "push") void onPush();
-                      if (committedPrimaryAction.kind === "publish") void onPublish();
-                    }}
-                  />
-                )}
+            {committedPrimaryAction && (
+              <div className="desktop-git-status-card-action-row">
+                <GitOperationButton
+                  className="desktop-git-commit-push-action"
+                  title={committedPrimaryAction.title}
+                  disabled={disabled || committedPrimaryAction.disabled}
+                  icon={committedPrimaryAction.icon}
+                  label={committedPrimaryAction.label}
+                  loadingKey={committedPrimaryAction.loadingKey}
+                  loadingLabel={committedPrimaryAction.loadingLabel}
+                  operationLoading={operationLoading}
+                  primary={primaryActionSlot === "committed"}
+                  onClick={() => {
+                    if (committedPrimaryAction.kind === "push") void onPush();
+                    if (committedPrimaryAction.kind === "publish") void onPublish();
+                  }}
+                />
               </div>
             )}
             {committedCount === 0 ? (
@@ -330,7 +321,8 @@ export function GitSidebar({
       className: "staged",
       grow: 0.9,
       expanded: stagedExpanded,
-      bodyRows: getGitSidebarPanelBodyRows(stagedResources.length, true) + STATUS_CARD_SUMMARY_ROWS,
+      bodyRows: getGitSidebarPanelBodyRows(stagedResources.length, true)
+        + (stagedPrimaryAction ? STATUS_CARD_ACTION_ROWS : 0),
       content: (
         <>
           <SourceControlSectionHeader
@@ -341,11 +333,8 @@ export function GitSidebar({
             onToggle={() => setStagedExpanded((expanded) => !expanded)}
           />
           <GitSectionCollapse expanded={stagedExpanded} className="desktop-git-status-card">
-            <div className="desktop-git-status-card-summary-row">
-              <div className="desktop-git-status-card-summary">
-                {t("source-control.commit.filesChanged", { count: stagedResources.length })}
-              </div>
-              {stagedPrimaryAction && (
+            {stagedPrimaryAction && (
+              <div className="desktop-git-status-card-action-row">
                 <div className="desktop-git-section-actions">
                   <GitOperationButton
                     className="desktop-git-commit-push-action"
@@ -365,8 +354,8 @@ export function GitSidebar({
                     }}
                   />
                 </div>
-              )}
-            </div>
+              </div>
+            )}
             <SourceControlWorkingResourceList
               resources={stagedResources}
               selectedWorkingFile={selectedWorkingFile}
@@ -389,7 +378,8 @@ export function GitSidebar({
       className: "unstaged",
       grow: 1.15,
       expanded: workingExpanded,
-      bodyRows: getGitSidebarPanelBodyRows(localChangeResources.length, true) + STATUS_CARD_SUMMARY_ROWS,
+      bodyRows: getGitSidebarPanelBodyRows(localChangeResources.length, true)
+        + (showUnstagedCardActions ? STATUS_CARD_ACTION_ROWS : 0),
       content: (
         <>
           <SourceControlSectionHeader
@@ -400,10 +390,8 @@ export function GitSidebar({
             onToggle={() => setWorkingExpanded((expanded) => !expanded)}
           />
           <GitSectionCollapse expanded={workingExpanded} className="desktop-git-status-card">
-            <div className="desktop-git-status-card-summary-row">
-              <div className="desktop-git-status-card-summary">
-                {t("source-control.commit.filesChanged", { count: localChangeResources.length })}
-              </div>
+            {showUnstagedCardActions && (
+              <div className="desktop-git-status-card-action-row">
               {professionalMode ? (
                 workingResources.length > 0 ? (
                   <div className="desktop-git-section-actions">
@@ -450,7 +438,8 @@ export function GitSidebar({
                   />
                 </div>
               ) : null}
-            </div>
+              </div>
+            )}
             <SourceControlWorkingResourceList
               resources={localChangeResources}
               selectedWorkingFile={selectedWorkingFile}

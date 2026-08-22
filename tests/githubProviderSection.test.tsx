@@ -91,7 +91,7 @@ describe("GitHub provider section", () => {
       dateStyle: "medium",
       timeStyle: "short",
     }).format(new Date(incomingUpdatedAt));
-    expect(updateAge?.textContent).toBe("Updated 2 hours ago");
+    expect(updateAge?.textContent).toBe("2 hours ago");
     expect(updateAge?.getAttribute("datetime")).toBe(incomingUpdatedAt);
     expect(updateAge?.tabIndex).toBe(0);
     expect(updateAge?.getAttribute("aria-describedby")).toBe(updateTooltip?.id);
@@ -108,6 +108,7 @@ describe("GitHub provider section", () => {
     const card = surface.querySelector(".desktop-git-github-change-card");
     const identityRow = surface.querySelector(".desktop-git-hosting-identity-row");
     const pullButton = surface.querySelector<HTMLButtonElement>(".desktop-git-remote-action");
+    expect(pullButton?.textContent).toBe("Pull");
     expect(Array.from(card?.children ?? []).slice(0, 2).map((child) => child.className)).toEqual([
       "desktop-git-github-update-age",
       "desktop-git-github-file-total",

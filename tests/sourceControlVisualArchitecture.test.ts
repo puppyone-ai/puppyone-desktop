@@ -295,9 +295,9 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-section-collapse.desktop-git-status-card",
     ));
-    const statusCardSummary = compact(readCssBlock(
+    const statusCardActionRow = compact(readCssBlock(
       sidebarResourcesCss,
-      ".desktop-git-status-card-summary",
+      ".desktop-git-status-card-action-row",
     ));
     const resizer = compact(readCssBlock(
       sidebarResourcesCss,
@@ -307,7 +307,9 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSource).toContain(
       'className="desktop-git-status-card"',
     );
-    expect(sourceControlSidebarSource).toContain("desktop-git-status-card-summary");
+    expect(sourceControlSidebarSource).toContain("desktop-git-status-card-action-row");
+    expect(sourceControlSidebarSource).not.toContain("desktop-git-status-card-summary");
+    expect(sourceControlSidebarSource).not.toContain("source-control.commit.filesChanged");
     expect(sourceControlSidebarSource).toContain("showCount={false}");
     expect(statusCard).toContain(
       "margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);",
@@ -317,10 +319,8 @@ describe("source-control visual architecture", () => {
     expect(statusCard).toContain(
       "background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));",
     );
-    expect(statusCardSummary).toContain("color: var(--po-text-muted);");
-    expect(statusCardSummary).toContain("font-size: var(--git-font-main);");
-    expect(statusCardSummary).toContain("font-weight: var(--git-weight-regular);");
-    expect(statusCardSummary).toContain("line-height: var(--git-line-height);");
+    expect(statusCardActionRow).toContain("justify-content: flex-end;");
+    expect(statusCardActionRow).toContain("padding: 10px 10px 2px;");
     expect(resizer).toContain("background: transparent;");
   });
 
