@@ -85,6 +85,8 @@
   "diff.truncatedCount": "Diferencia truncada. {count, plural, one {Se ocultó # línea más.} other {Se ocultaron # líneas más.}}",
   "empty.initializeDetail": "Inicializa un repositorio Git para empezar a seguir los cambios de este espacio de trabajo.",
   "empty.notControlled": "Esta carpeta no está bajo control de versiones.",
+  "github.latestIncomingCommitAt": "Último commit entrante · {timestamp}",
+  "github.updatedRelative": "Actualizado {relativeTime}",
   "history.ariaLabel": "Historial de Git",
   "history.branchEmpty": "{branch} aún no tiene historial.",
   "history.firstCommit": "La primera confirmación de {branch} aparecerá aquí.",

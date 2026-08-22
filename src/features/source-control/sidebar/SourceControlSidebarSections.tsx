@@ -5,7 +5,7 @@ import {
   type FileIconThemeId,
   type SidebarResizeIntent,
 } from "@puppyone/shared-ui";
-import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import { useId, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { useLocalization, type MessageFormatter } from "@puppyone/localization";
 import type { GitFileChangeSummary, GitStatusSnapshot } from "../../../types/electron";
 import { openExternalUrl } from "../../../lib/localFiles";
@@ -164,20 +164,39 @@ function GitHubIncomingChangesCard({
   incomingUpdatedAt: string | null;
   action: ReactNode;
 }) {
-  const { t, formatRelativeTime } = useLocalization();
+  const { t, formatDate, formatRelativeTime } = useLocalization();
+  const updateTooltipId = useId();
+  const updateTimestamp = incomingUpdatedAt ? Date.parse(incomingUpdatedAt) : Number.NaN;
   const updateAge = formatGitRemoteUpdateAge(incomingUpdatedAt, formatRelativeTime);
+  const exactUpdateTime = Number.isFinite(updateTimestamp)
+    ? formatDate(updateTimestamp, { dateStyle: "medium", timeStyle: "short" })
+    : null;
 
   return (
     <div className={`desktop-git-github-change-card${updateAge ? "" : " is-age-unavailable"}`}>
-      {updateAge && (
-        <time className="desktop-git-github-update-age" dateTime={incomingUpdatedAt ?? undefined}>
-          {updateAge}
+      {updateAge && exactUpdateTime && (
+        <time
+          className="desktop-git-github-update-age"
+          dateTime={incomingUpdatedAt ?? undefined}
+          tabIndex={0}
+          aria-describedby={updateTooltipId}
+        >
+          {t("source-control.github.updatedRelative", { relativeTime: updateAge })}
         </time>
       )}
       <span className="desktop-git-github-file-total">
         {t("source-control.commit.changes", { count: fileSummary.total })}
       </span>
       {action}
+      {updateAge && exactUpdateTime && (
+        <span
+          id={updateTooltipId}
+          className="desktop-git-github-update-tooltip"
+          role="tooltip"
+        >
+          {t("source-control.github.latestIncomingCommitAt", { timestamp: exactUpdateTime })}
+        </span>
+      )}
     </div>
   );
 }

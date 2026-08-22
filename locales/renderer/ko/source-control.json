@@ -85,6 +85,8 @@
   "diff.truncatedCount": "비교가 일부만 표시됩니다. 추가로 {count, number}개 행이 숨겨졌습니다.",
   "empty.initializeDetail": "Git 저장소를 초기화하여 이 워크스페이스의 변경 사항 추적을 시작하세요.",
   "empty.notControlled": "이 폴더는 소스 제어 대상이 아닙니다.",
+  "github.latestIncomingCommitAt": "최신 수신 커밋 · {timestamp}",
+  "github.updatedRelative": "{relativeTime} 업데이트됨",
   "history.ariaLabel": "Git 기록",
   "history.branchEmpty": "{branch}에 아직 기록이 없습니다.",
   "history.firstCommit": "{branch}의 첫 커밋이 여기에 표시됩니다.",

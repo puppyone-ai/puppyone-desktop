@@ -85,6 +85,8 @@
   "diff.truncatedCount": "差分は途中までです。さらに {count, number} 行が非表示になっています。",
   "empty.initializeDetail": "Git リポジトリを初期化して、このワークスペースの変更を追跡します。",
   "empty.notControlled": "このフォルダはソース管理されていません。",
+  "github.latestIncomingCommitAt": "最新の受信コミット · {timestamp}",
+  "github.updatedRelative": "{relativeTime}に更新",
   "history.ariaLabel": "Git 履歴",
   "history.branchEmpty": "{branch} にはまだ履歴がありません。",
   "history.firstCommit": "{branch} の最初のコミットがここに表示されます。",

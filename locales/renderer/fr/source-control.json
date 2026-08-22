@@ -85,6 +85,8 @@
   "diff.truncatedCount": "Diff tronqué. {count, plural, one {# plus de ligne masquée.} other {# plus de lignes masquées.}}",
   "empty.initializeDetail": "Initialisez un dépôt Git pour commencer à suivre les modifications dans cet espace de travail.",
   "empty.notControlled": "Ce dossier n’est pas sous contrôle de code source.",
+  "github.latestIncomingCommitAt": "Dernier commit entrant · {timestamp}",
+  "github.updatedRelative": "Mis à jour {relativeTime}",
   "history.ariaLabel": "Historique Git",
   "history.branchEmpty": "{branch} n’a pas encore d’historique.",
   "history.firstCommit": "Le premier commit sur {branch} apparaîtra ici.",

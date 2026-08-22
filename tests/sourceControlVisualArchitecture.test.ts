@@ -235,6 +235,10 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-github-file-total",
     ));
+    const updateTooltip = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-update-tooltip",
+    ));
 
     expect(sourceControlSidebarSource).toContain("<GitHubProviderSection");
     expect(sourceControlSidebarSectionsSource).toContain(
@@ -245,9 +249,14 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-change-card");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-card-action");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-update-age");
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-update-tooltip");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-file-total");
     expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-file-stats");
     expect(sourceControlSidebarSectionsSource).toContain("source-control.commit.changes");
+    expect(sourceControlSidebarSectionsSource).toContain("source-control.github.updatedRelative");
+    expect(sourceControlSidebarSectionsSource).toContain("source-control.github.latestIncomingCommitAt");
+    expect(sourceControlSidebarSectionsSource).toContain("aria-describedby={updateTooltipId}");
+    expect(sourceControlSidebarSectionsSource).toContain('role="tooltip"');
     expect(sourceControlSidebarSource).toContain("lastCommitDate");
     expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-provider-body");
     expect(identityRow).toContain("padding-bottom: 0;");
@@ -268,6 +277,15 @@ describe("source-control visual architecture", () => {
       "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",
     );
     expect(fileTotal).toContain("font-size: var(--git-font-small);");
+    expect(updateTooltip).toContain("position: absolute;");
+    expect(updateTooltip).toContain("opacity: 0;");
+    expect(updateTooltip).toContain("visibility: hidden;");
+    expect(sidebarResourcesCss).toContain(
+      ".desktop-git-github-update-age:hover ~ .desktop-git-github-update-tooltip",
+    );
+    expect(sidebarResourcesCss).toContain(
+      ".desktop-git-github-update-age:focus ~ .desktop-git-github-update-tooltip",
+    );
   });
 
   it("keeps GitHub Fetch lifecycle out of the presentational sidebar", () => {

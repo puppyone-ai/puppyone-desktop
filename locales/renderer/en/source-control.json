@@ -85,6 +85,8 @@
   "diff.truncatedCount": "Diff truncated. {count, plural, one {# more line hidden.} other {# more lines hidden.}}",
   "empty.initializeDetail": "Initialize a Git repository to start tracking changes in this workspace.",
   "empty.notControlled": "This folder is not under source control.",
+  "github.latestIncomingCommitAt": "Latest incoming commit · {timestamp}",
+  "github.updatedRelative": "Updated {relativeTime}",
   "history.ariaLabel": "Git history",
   "history.branchEmpty": "{branch} has no history yet.",
   "history.firstCommit": "The first commit on {branch} will appear here.",

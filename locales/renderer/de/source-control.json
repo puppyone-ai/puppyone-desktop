@@ -85,6 +85,8 @@
   "diff.truncatedCount": "Vergleich gekürzt. {count, plural, one {# weitere Zeile wurde ausgeblendet.} other {# weitere Zeilen wurden ausgeblendet.}}",
   "empty.initializeDetail": "Initialisiere ein Git-Repository, um Änderungen in diesem Arbeitsbereich zu verfolgen.",
   "empty.notControlled": "Dieser Ordner steht nicht unter Versionskontrolle.",
+  "github.latestIncomingCommitAt": "Letzter eingehender Commit · {timestamp}",
+  "github.updatedRelative": "Aktualisiert {relativeTime}",
   "history.ariaLabel": "Git-Verlauf",
   "history.branchEmpty": "{branch} hat noch keinen Verlauf.",
   "history.firstCommit": "Der erste Commit auf {branch} wird hier angezeigt.",

@@ -33,7 +33,7 @@ describe("GitHub provider section", () => {
     expect(surface.querySelector(".desktop-git-hosting-repository-row")).toBeNull();
   });
 
-  it("makes the change total primary and shows the remote update age", async () => {
+  it("makes the update age primary and exposes the exact incoming commit time", async () => {
     const onPull = vi.fn(async () => true);
     const incomingUpdatedAt = new Date(Date.now() - ((2 * 60 * 60 * 1000) + 10_000)).toISOString();
     const surface = renderProvider(createSection({
@@ -85,8 +85,18 @@ describe("GitHub provider section", () => {
     expect(surface.querySelector(".desktop-git-github-change-card")).not.toBeNull();
     expect(surface.textContent).not.toContain("2 commits");
     expect(surface.textContent).toContain("96 changes");
-    expect(surface.querySelector(".desktop-git-github-update-age")?.textContent).toBe("2 hours ago");
-    expect(surface.querySelector(".desktop-git-github-update-age")?.getAttribute("datetime")).toBe(incomingUpdatedAt);
+    const updateAge = surface.querySelector<HTMLElement>(".desktop-git-github-update-age");
+    const updateTooltip = surface.querySelector<HTMLElement>(".desktop-git-github-update-tooltip");
+    const exactUpdateTime = new Intl.DateTimeFormat("en", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(incomingUpdatedAt));
+    expect(updateAge?.textContent).toBe("Updated 2 hours ago");
+    expect(updateAge?.getAttribute("datetime")).toBe(incomingUpdatedAt);
+    expect(updateAge?.tabIndex).toBe(0);
+    expect(updateAge?.getAttribute("aria-describedby")).toBe(updateTooltip?.id);
+    expect(updateTooltip?.getAttribute("role")).toBe("tooltip");
+    expect(updateTooltip?.textContent).toBe(`Latest incoming commit · ${exactUpdateTime}`);
     expect(surface.querySelector(".desktop-git-github-file-total")?.textContent).toBe("96 changes");
     expect(surface.querySelector(".desktop-git-github-file-stats")).toBeNull();
     expect(surface.textContent).not.toContain("Update policy");
