@@ -162,7 +162,9 @@ function GitHubRepositoryLink({ identity }: { identity: GitHostingIdentity }) {
   const repositoryName = getGitHubRepositoryName(label);
   const content = (
     <>
-      <Github size={14} strokeWidth={2} aria-hidden="true" />
+      <span className="desktop-git-identity-icon-slot" aria-hidden="true">
+        <Github size={14} strokeWidth={2} />
+      </span>
       <span>{repositoryName}</span>
       {href && <ArrowUpRight size={12} aria-hidden="true" />}
     </>

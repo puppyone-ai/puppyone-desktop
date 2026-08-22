@@ -132,8 +132,13 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-github-identity > svg",
     ));
+    const identityIconSlot = compact(readCssBlock(
+      sidebarBaseCss,
+      ".desktop-git-identity-icon-slot",
+    ));
 
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-hosting-identity-link");
+    expect(sourceControlSidebarSectionsSource).toContain('className="desktop-git-identity-icon-slot"');
     expect(sourceControlSidebarSectionsSource).toContain("<span>{repositoryName}</span>");
     expect(sourceControlSidebarSectionsSource).toContain("getGitHubRepositoryName(label)");
     expect(sourceControlSidebarSectionsSource).not.toContain("title={label}");
@@ -150,6 +155,10 @@ describe("source-control visual architecture", () => {
     expect(identity).toContain(
       "line-height: var(--desktop-sidebar-section-title-line-height, 18px);",
     );
+    expect(identity).toContain("gap: 2px;");
+    expect(identityIconSlot).toContain("width: 18px;");
+    expect(identityIconSlot).toContain("flex: 0 0 18px;");
+    expect(identityIconSlot).toContain("padding-inline-start: 2px;");
     expect(identityIcon).toContain("color: inherit;");
   });
 
@@ -351,7 +360,7 @@ describe("source-control visual architecture", () => {
     expect(statusCardContextRow).toContain("min-height: 36px;");
     expect(statusCardContext).toContain("color: var(--po-text-muted);");
     expect(statusCardContext).toContain("font-size: var(--git-font-main);");
-    expect(statusCardContext).toContain("gap: 6px;");
+    expect(statusCardContext).toContain("gap: 2px;");
     expect(statusCardContextIcon).toContain("color: inherit;");
     expect(statusCardGroupLabel).toContain(
       "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",

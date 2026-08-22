@@ -49,7 +49,10 @@ export function GitStatusCardSection({
         <div className="desktop-git-status-card-context-row">
           <span className={`desktop-git-status-card-context${contextVariant === "group" ? " is-group-label" : ""}`}>
             {contextIcon && (
-              <span className="desktop-git-status-card-context-icon" aria-hidden="true">
+              <span
+                className="desktop-git-status-card-context-icon desktop-git-identity-icon-slot"
+                aria-hidden="true"
+              >
                 {contextIcon}
               </span>
             )}

@@ -37,6 +37,25 @@
   --git-icon-label-gap: var(--desktop-sidebar-icon-label-gap, 4px);
 }
 
+/* Provider and local-group marks share one optical slot. The 14px glyph sits
+   2px into an 18px slot, while the following 2px gap preserves the existing
+   text baseline (18 + 2 equals the old 14 + 6 rhythm). */
+.desktop-git-identity-icon-slot {
+  display: inline-flex;
+  box-sizing: border-box;
+  width: 18px;
+  height: 14px;
+  flex: 0 0 18px;
+  align-items: center;
+  justify-content: flex-start;
+  padding-inline-start: 2px;
+  color: inherit;
+}
+
+.desktop-git-identity-icon-slot > svg {
+  flex: 0 0 auto;
+}
+
 .desktop-git-sidebar-empty-history {
   display: flex;
   align-items: flex-start;
