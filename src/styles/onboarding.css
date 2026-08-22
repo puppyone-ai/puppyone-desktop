@@ -196,32 +196,49 @@
 
 .onboarding-provider-strip {
   display: flex;
+  width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding-inline: 14px;
+  color: var(--po-text-subtle);
+}
+
+.onboarding-provider-import-icon {
+  display: block;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  stroke-width: 1.65;
+}
+
+.onboarding-provider-label {
+  flex: 0 0 auto;
+  font-family: var(--po-font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
 }
 
 .onboarding-provider-action {
-  display: inline-flex;
-  width: 52px;
+  display: grid;
+  width: 28px;
   height: 28px;
   flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
   padding: 0;
-  border: 1px solid var(--po-border-subtle);
-  border-radius: 999px;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
   background: transparent;
-  color: var(--po-text-subtle);
+  color: var(--po-text-muted);
   cursor: var(--po-clickable-cursor, pointer);
-  transition: background 130ms ease-out, border-color 130ms ease-out, color 130ms ease-out, opacity 130ms ease-out, transform 130ms ease-out;
+  transition: color 130ms ease-out, opacity 130ms ease-out, transform 130ms ease-out;
 }
 
 .onboarding-provider-action:hover:not(:disabled),
 .onboarding-provider-action:focus-visible:not(:disabled) {
-  border-color: var(--po-border-strong);
-  background: var(--po-hover);
   color: var(--po-text);
   transform: translateY(-1px);
   outline: none;
@@ -232,17 +249,9 @@
 }
 
 .onboarding-provider-action:disabled {
-  border-color: var(--po-border-subtle);
   color: var(--po-text-disabled);
   cursor: default;
   opacity: 0.42;
-}
-
-.onboarding-provider-import-arrow {
-  display: block;
-  width: 13px;
-  height: 13px;
-  stroke-width: 1.7;
 }
 
 .onboarding-provider-mark {

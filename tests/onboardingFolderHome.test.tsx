@@ -139,12 +139,12 @@ describe("project folder home", () => {
     expect(actions[0]?.querySelector(".lucide-folder-open")).not.toBeNull();
     expect(actions[1]?.querySelector(".onboarding-entry-create-icon")).not.toBeNull();
     const providers = [...container.querySelectorAll<HTMLButtonElement>(".onboarding-provider-action")];
-    expect(container.querySelector(".onboarding-provider-label")).toBeNull();
+    expect(container.querySelector(".onboarding-provider-label")?.textContent).toBe("Import from");
     expect(container.querySelector(".onboarding-provider-arrow")).toBeNull();
+    expect(container.querySelector(".onboarding-provider-import-icon.lucide-download")).not.toBeNull();
     expect(providers.map((provider) => provider.dataset.provider)).toEqual(["github"]);
     expect(providers[0]?.disabled).toBe(false);
     expect(providers[0]?.getAttribute("aria-label")).toBe("Import from GitHub");
-    expect(providers[0]?.querySelector(".onboarding-provider-import-arrow.lucide-arrow-down")).not.toBeNull();
     expect(providers[0]?.querySelector(".onboarding-provider-mark.lucide-github")).not.toBeNull();
     expect(container.querySelector("[data-provider='gitlab']")).toBeNull();
     expect(container.querySelector("[data-provider='notion']")).toBeNull();
@@ -161,7 +161,9 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-entry-action\s*\{[^}]*width:\s*100%;[^}]*height:\s*38px;[^}]*min-height:\s*38px;[^}]*justify-content:\s*flex-start;[^}]*border-radius:\s*var\(--desktop-control-radius\);[^}]*font-size:\s*var\(--po-text-size-body, 13px\);[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);[^}]*text-align:\s*start;/s);
     expect(css).toMatch(/\.onboarding-entry-action-primary\s*\{[^}]*background:\s*var\(--po-text\);[^}]*color:\s*var\(--po-text-inverse\);[^}]*font-weight:\s*var\(--po-text-weight-semibold, 600\);/s);
     expect(css).toMatch(/\.onboarding-entry-action-secondary\s*\{[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-subtle\);/s);
-    expect(css).toMatch(/\.onboarding-provider-action\s*\{[^}]*width:\s*52px;[^}]*height:\s*28px;[^}]*gap:\s*7px;[^}]*border:\s*1px solid var\(--po-border-subtle\);[^}]*border-radius:\s*999px;[^}]*background:\s*transparent;/s);
+    expect(css).toMatch(/\.onboarding-provider-strip\s*\{[^}]*width:\s*100%;[^}]*justify-content:\s*flex-start;[^}]*gap:\s*8px;[^}]*padding-inline:\s*14px;/s);
+    expect(css).toMatch(/\.onboarding-provider-label\s*\{[^}]*font-size:\s*12px;/s);
+    expect(css).toMatch(/\.onboarding-provider-action\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;[^}]*border:\s*0;[^}]*background:\s*transparent;/s);
     expect(css).toMatch(/\.onboarding-entry-create-row\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 180px;/s);
     expect(css).not.toContain(".folder-drop-zone");
 

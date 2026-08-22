@@ -2,7 +2,7 @@ import { Button, resolveRendererPublicAssetUrl, type Workspace } from "@puppyone
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
 import {
   AlertTriangle,
-  ArrowDown,
+  Download,
   FilePlus2,
   Folder,
   FolderOpen,
@@ -261,7 +261,9 @@ export function MinimalOnboarding({
                 </Button>
               </div>
 
-              <div className="onboarding-provider-strip">
+              <div className="onboarding-provider-strip" aria-label={t("onboarding.action.importFrom")}>
+                <Download className="onboarding-provider-import-icon" aria-hidden="true" />
+                <span className="onboarding-provider-label">{t("onboarding.action.importFrom")}</span>
                 <button
                   className="onboarding-provider-action"
                   type="button"
@@ -271,7 +273,6 @@ export function MinimalOnboarding({
                   title={t("onboarding.entry.clone.title")}
                   onClick={() => setEntryDialog("clone")}
                 >
-                  <ArrowDown className="onboarding-provider-import-arrow" aria-hidden="true" />
                   <Github className="onboarding-provider-mark" aria-hidden="true" />
                 </button>
               </div>
