@@ -13,97 +13,6 @@
   flex: 0 0 auto;
 }
 
-.desktop-git-section-collapse.desktop-git-status-card {
-  box-sizing: border-box;
-  margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);
-  border: 0;
-  border-radius: var(--git-control-radius);
-  background: var(--git-card-background);
-}
-
-.desktop-git-status-card-context-row {
-  display: flex;
-  box-sizing: border-box;
-  min-height: 36px;
-  min-width: 0;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 10px 2px;
-}
-
-.desktop-git-status-card-context {
-  display: inline-flex;
-  min-width: 0;
-  flex: 1 1 auto;
-  align-items: center;
-  gap: 2px;
-  overflow: hidden;
-  color: var(--po-text-muted);
-  font-size: var(--git-font-main);
-  font-weight: var(--git-weight-regular);
-  line-height: var(--git-line-height);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-git-status-card-context.is-group-label {
-  color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));
-  font-size: var(--desktop-sidebar-section-title-font-size, var(--po-text-size-meta, 12px));
-  font-weight: var(--desktop-sidebar-section-title-font-weight, var(--po-text-weight-medium, 500));
-  line-height: var(--desktop-sidebar-section-title-line-height, 18px);
-}
-
-.desktop-git-status-card-context-icon {
-  color: inherit;
-}
-
-.desktop-git-status-card-context-copy {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-git-status-card-context-row > .desktop-git-operation-button,
-.desktop-git-status-card-context-row > .desktop-git-section-actions {
-  margin-inline-start: auto;
-}
-
-/* Status rows are supporting content on the card's single continuous surface,
-   not nested cards. */
-.desktop-git-status-card > .desktop-git-section-collapse-inner {
-  box-sizing: border-box;
-  padding-bottom: 8px;
-}
-
-.desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-working-tree-list,
-.desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-git-remote-preview {
-  padding-block: var(--git-section-body-top-gap) 0;
-  padding-inline: 0;
-}
-
-.desktop-git-status-card .desktop-working-tree-row {
-  width: calc(100% - 8px);
-  margin-inline: 4px;
-}
-
-.desktop-git-status-card .desktop-working-tree-main {
-  padding-inline-start: 6px;
-}
-
-.desktop-git-status-card .desktop-working-tree-row.active {
-  background: transparent;
-  color: var(--po-text);
-}
-
-.desktop-git-status-card .desktop-working-tree-row:hover,
-.desktop-git-status-card .desktop-working-tree-row:focus-within,
-.desktop-git-status-card .desktop-working-tree-row.active:hover {
-  background: var(--po-hover);
-  color: var(--po-text);
-}
-
 .desktop-git-section-collapse {
   display: grid;
   flex: 1 1 auto;
@@ -146,18 +55,20 @@
   scrollbar-gutter: stable;
 }
 
-/* A one-pixel fractional layout remainder is not real overflow. Keep card
+/* A one-pixel fractional layout remainder is not real overflow. Keep local
    lists quiet until the shared scroll observer marks them as scrollable. */
-.desktop-git-status-card .desktop-working-tree-list,
-.desktop-git-status-card .desktop-git-remote-preview {
+.desktop-git-local-section-body .desktop-working-tree-list,
+.desktop-git-local-section-body .desktop-git-remote-preview {
   overflow-y: hidden;
   scrollbar-gutter: auto;
+  padding-inline-end: var(--git-sidebar-right-gap);
 }
 
-.desktop-git-status-card .desktop-working-tree-list.is-scrollable,
-.desktop-git-status-card .desktop-git-remote-preview.is-scrollable {
+.desktop-git-local-section-body .desktop-working-tree-list.is-scrollable,
+.desktop-git-local-section-body .desktop-git-remote-preview.is-scrollable {
   overflow-y: auto;
   scrollbar-gutter: stable;
+  padding-inline-end: calc(var(--git-sidebar-right-gap) - var(--git-sidebar-scrollbar-width));
 }
 
 .desktop-git-resizable-section .desktop-git-remote-preview {
@@ -262,8 +173,7 @@ body.desktop-git-sidebar-resizing {
   font-weight: 520;
 }
 
-/* Panel-owned empty states align with the disclosure label, then reset to the
-   card's inner coordinate system when they live inside a status card. */
+/* Panel-owned empty states align with the disclosure label. */
 .desktop-git-sidebar .desktop-git-section-collapse-inner > .po-sidebar-empty.desktop-git-section-empty,
 .desktop-git-sidebar .desktop-git-resizable-section > .po-sidebar-empty.desktop-git-section-empty {
   flex: 0 0 auto;
@@ -281,23 +191,4 @@ body.desktop-git-sidebar-resizing {
   calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right));
   overflow: visible;
   text-align: start;
-}
-
-.desktop-git-sidebar .desktop-git-status-card .desktop-git-section-collapse-inner > .po-sidebar-empty.desktop-git-section-empty {
-  padding-inline: calc(
-    var(--git-sidebar-content-left)
-    + var(--git-section-leading-slot-size)
-    + var(--git-section-title-gap)
-  )
-  var(--git-sidebar-content-right);
-}
-
-.desktop-git-status-card .desktop-git-committed-summary,
-.desktop-git-status-card .desktop-git-preview-summary {
-  padding-inline: calc(
-    var(--git-sidebar-content-left)
-    + var(--git-section-leading-slot-size)
-    + var(--git-section-title-gap)
-  )
-  var(--git-sidebar-content-right);
 }

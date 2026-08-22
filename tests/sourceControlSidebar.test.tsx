@@ -18,20 +18,20 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("Git sidebar status cards", () => {
-  it("renders local cards expanded with their contextual counts and actions inside the cards", async () => {
+describe("Git sidebar status groups", () => {
+  it("renders local groups expanded and flat while keeping their counts and actions in the headers", async () => {
     const onCommit = vi.fn(async () => true);
     const onPush = vi.fn(async () => true);
     const onStageAll = vi.fn(async () => true);
     const onDiscardAll = vi.fn(async () => true);
     const surface = renderSidebar({ onCommit, onDiscardAll, onPush, onStageAll });
 
-    const cards = Array.from(surface.querySelectorAll<HTMLElement>(".desktop-git-status-card"));
-    expect(cards).toHaveLength(3);
-    expect(cards.every((card) => card.classList.contains("expanded"))).toBe(true);
-    expect(surface.textContent).toContain("2 commits");
-    expect(surface.textContent).not.toContain("Committed Changes");
-    expect(surface.textContent?.match(/1 file/g)).toHaveLength(2);
+    expect(surface.querySelector(".desktop-git-status-card")).toBeNull();
+    expect(surface.querySelectorAll(".desktop-git-local-section-body.expanded")).toHaveLength(3);
+    expect(surface.textContent).toContain("Committed Changes");
+    const localCounts = Array.from(surface.querySelectorAll(".desktop-git-section-title small"))
+      .map((node) => node.textContent);
+    expect(localCounts).toEqual(expect.arrayContaining(["2", "1", "1"]));
 
     const commitButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Commit"]');
     const pushButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Push"]');
@@ -39,7 +39,8 @@ describe("Git sidebar status cards", () => {
     const discardAllButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Discard all"]');
 
     for (const button of [commitButton, pushButton, stageAllButton, discardAllButton]) {
-      expect(button?.closest(".desktop-git-status-card")).not.toBeNull();
+      expect(button?.closest(".desktop-git-section-row")).not.toBeNull();
+      expect(button?.closest(".desktop-git-status-card")).toBeNull();
     }
 
     await act(async () => {
@@ -55,40 +56,41 @@ describe("Git sidebar status cards", () => {
     expect(onDiscardAll).toHaveBeenCalledTimes(1);
   });
 
-  it("removes the redundant committed heading while keeping titled cards collapsible", () => {
+  it("keeps every local group on the same collapsible flat-section contract", () => {
     const surface = renderSidebar();
     const committedSection = surface.querySelector<HTMLElement>(".desktop-git-resizable-section-committed");
     const stagedSection = surface.querySelector<HTMLElement>(".desktop-git-resizable-section-staged");
+    const committedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
+      .find((button) => button.textContent?.includes("Committed Changes"));
     const stagedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
       .find((button) => button.textContent?.includes("Staged Changes"));
 
     expect(committedSection?.classList.contains("expanded")).toBe(true);
-    const committedCard = committedSection?.querySelector<HTMLElement>(".desktop-git-status-card");
-    expect(committedCard?.classList.contains("expanded")).toBe(true);
-    expect(committedCard?.getAttribute("aria-label")).toBe("Committed Changes");
-    expect(committedCard?.querySelector(".desktop-git-status-card-context")?.classList.contains("is-group-label"))
+    expect(committedSection?.querySelector(".desktop-git-status-card")).toBeNull();
+    expect(committedSection?.querySelector(".desktop-git-local-section-body")?.classList.contains("expanded"))
       .toBe(true);
-    expect(committedCard?.querySelector(".desktop-git-status-card-context-icon svg")).toBeNull();
-    expect(committedCard?.querySelector(".desktop-git-status-card-context-copy")?.textContent).toBe("2 commits");
-    expect(committedSection?.querySelector(".desktop-git-section-title")).toBeNull();
+    expect(committedToggle?.querySelector("small")?.textContent).toBe("2");
+    expect(committedToggle?.getAttribute("aria-expanded")).toBe("true");
     expect(stagedToggle?.getAttribute("aria-expanded")).toBe("true");
 
     act(() => stagedToggle?.click());
 
     expect(committedSection?.classList.contains("expanded")).toBe(true);
-    expect(committedCard?.classList.contains("expanded")).toBe(true);
+    expect(committedToggle?.getAttribute("aria-expanded")).toBe("true");
     expect(stagedSection?.classList.contains("collapsed")).toBe(true);
     expect(stagedToggle?.getAttribute("aria-expanded")).toBe("false");
     expect(surface.querySelector(".desktop-git-resizable-section-unstaged")?.classList.contains("expanded")).toBe(true);
   });
 
-  it("keeps simple mode as one combined local-change card with one primary action", async () => {
+  it("keeps simple mode as one combined flat local-change group with one primary action", async () => {
     const stageAndCommit = vi.fn(async () => true);
     const surface = renderSidebar({ gitDisplayMode: "simple", stageAndCommit });
 
     expect(surface.textContent).not.toContain("Staged Changes");
     expect(surface.textContent).toContain("Unstaged Changes");
-    expect(surface.textContent).toContain("2 files");
+    const unstagedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
+      .find((button) => button.textContent?.includes("Unstaged Changes"));
+    expect(unstagedToggle?.querySelector("small")?.textContent).toBe("2");
     const action = surface.querySelector<HTMLButtonElement>('button[aria-label="Stage & Commit"]');
     expect(action?.closest(".desktop-git-resizable-section-unstaged")).not.toBeNull();
 
@@ -96,7 +98,7 @@ describe("Git sidebar status cards", () => {
     expect(stageAndCommit).toHaveBeenCalledTimes(1);
   });
 
-  it("moves group identity outside while keeping commit count and sync actions on cards", () => {
+  it("keeps the provider layout preference separate from the flat local groups", () => {
     const surface = renderSidebar({
       gitSidebarLayout: "dividers",
       status: createDivergedGitHubStatus(),
@@ -104,7 +106,6 @@ describe("Git sidebar status cards", () => {
     const githubSection = surface.querySelector<HTMLElement>(".desktop-git-github-provider-section");
     const githubCard = githubSection?.querySelector<HTMLElement>(".desktop-git-github-change-card");
     const committedSection = surface.querySelector<HTMLElement>(".desktop-git-resizable-section-committed");
-    const committedCard = committedSection?.querySelector<HTMLElement>(".desktop-git-status-card");
 
     expect(githubSection?.classList.contains("is-divider-layout")).toBe(true);
     expect(githubSection?.querySelector(".desktop-git-card-divider .desktop-git-github-identity")).not.toBeNull();
@@ -113,15 +114,13 @@ describe("Git sidebar status cards", () => {
     const committedToggle = committedSection?.querySelector<HTMLButtonElement>(
       ".desktop-git-section-row .desktop-git-section-title",
     );
-    expect(committedToggle?.textContent)
-      .toBe("Committed Changes");
+    expect(committedToggle?.querySelector("span")?.textContent).toBe("Committed Changes");
     expect(committedToggle?.querySelector(".po-disclosure-icon")).not.toBeNull();
     expect(committedToggle?.querySelectorAll("svg")).toHaveLength(1);
     expect(committedToggle?.getAttribute("aria-expanded")).toBe("true");
-    expect(committedSection?.querySelector(".desktop-git-card-divider-header")).toBeNull();
-    expect(committedCard?.querySelector(".desktop-git-status-card-context-copy")?.textContent).toBe("1 commit");
-    expect(committedCard?.querySelector(".desktop-git-status-card-context-icon")).toBeNull();
-    expect(committedCard?.querySelector('button[aria-label="Push"]')).not.toBeNull();
+    expect(committedToggle?.querySelector("small")?.textContent).toBe("1");
+    expect(committedSection?.querySelector(".desktop-git-status-card")).toBeNull();
+    expect(committedSection?.querySelector('.desktop-git-section-row button[aria-label="Push"]')).not.toBeNull();
 
     act(() => committedToggle?.click());
 
@@ -129,7 +128,7 @@ describe("Git sidebar status cards", () => {
     expect(committedSection?.classList.contains("collapsed")).toBe(true);
   });
 
-  it("renders merge conflicts through the same default-expanded card contract", () => {
+  it("renders merge conflicts through the same default-expanded flat contract", () => {
     const status = createGitStatus();
     status.sourceControl.groups.unshift({
       id: "merge",
@@ -141,8 +140,9 @@ describe("Git sidebar status cards", () => {
     const mergeSection = surface.querySelector<HTMLElement>(".desktop-git-resizable-section-merge");
 
     expect(mergeSection?.textContent).toContain("Merge Changes");
-    expect(mergeSection?.textContent).toContain("1 conflict");
-    expect(mergeSection?.querySelector(".desktop-git-status-card")?.classList.contains("expanded")).toBe(true);
+    expect(mergeSection?.querySelector(".desktop-git-section-title small")?.textContent).toBe("1");
+    expect(mergeSection?.querySelector(".desktop-git-status-card")).toBeNull();
+    expect(mergeSection?.querySelector(".desktop-git-local-section-body")?.classList.contains("expanded")).toBe(true);
   });
 
   it("recommends Pull and blocks Push while the GitHub branch is diverged", async () => {

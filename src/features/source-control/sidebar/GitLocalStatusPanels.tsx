@@ -11,7 +11,6 @@ import type {
   GitWorkingSelection,
   SourceControlSidebarModel,
 } from "../types";
-import type { GitSidebarLayout } from "../../../preferences";
 import {
   getCommittedSummary,
   type SourceControlPrimaryActionSlot,
@@ -19,14 +18,9 @@ import {
 import type { GitSidebarActions, GitSidebarRenderPanel } from "./sourceControlSidebarTypes";
 import { SourceControlWorkingResourceList } from "./SourceControlResourceLists";
 import { GitOperationButton } from "./GitSidebarPrimitives";
-import { GitStatusCardSection } from "./GitStatusCardSection";
+import { GitLocalStatusSection } from "./GitLocalStatusSection";
 import { getGitSidebarPanelBodyRows } from "./useGitSidebarPanelLayout";
 import type { GitSidebarExpansionState } from "./useGitSidebarExpansionState";
-
-// The status card owns a 36px context/action row and 8px bottom inset outside
-// the row-based file list. Keep that fixed chrome out of list row arithmetic.
-const STATUS_CARD_CHROME_PX = 44;
-const STATUS_CARD_DIVIDER_PREAMBLE_PX = 30;
 
 type LocalPanelActions = Pick<
   GitSidebarActions,
@@ -48,7 +42,6 @@ type LocalPanelActions = Pick<
 /** Builds only local/committed status panels; provider and remote policy stay in the sidebar orchestrator. */
 export function createGitLocalStatusPanels({
   model,
-  layout,
   expanded,
   disabled,
   operationLoading,
@@ -61,7 +54,6 @@ export function createGitLocalStatusPanels({
   onToggle,
 }: {
   model: SourceControlSidebarModel;
-  layout: GitSidebarLayout;
   expanded: GitSidebarExpansionState;
   disabled: boolean;
   operationLoading: string | null;
@@ -90,13 +82,10 @@ export function createGitLocalStatusPanels({
       grow: 0.9,
       expanded: expanded.merge,
       bodyRows: getGitSidebarPanelBodyRows(model.mergeResources.length),
-      bodyChromePx: STATUS_CARD_CHROME_PX,
       content: (
-        <GitStatusCardSection
+        <GitLocalStatusSection
           title={t(model.repositoryOperation ? "source-control.section.operation" : "source-control.section.merge")}
           count={model.mergeResources.length}
-          context={model.sectionContext.merge}
-          layout={layout}
           expanded={expanded.merge}
           onToggle={() => onToggle("merge")}
           action={model.repositoryOperation ? (
@@ -144,7 +133,7 @@ export function createGitLocalStatusPanels({
               onDiscardPaths={actions.discardPaths}
             />
           ) : null}
-        </GitStatusCardSection>
+        </GitLocalStatusSection>
       ),
     });
   }
@@ -156,20 +145,13 @@ export function createGitLocalStatusPanels({
       className: "committed",
       grow: 1.05,
       expanded: expanded.committed,
-      headerRows: 0,
       bodyRows: getGitSidebarPanelBodyRows(model.committedResources.length, true),
-      bodyChromePx: STATUS_CARD_CHROME_PX
-        + (layout === "dividers" ? STATUS_CARD_DIVIDER_PREAMBLE_PX : 0),
       content: (
-        <GitStatusCardSection
+        <GitLocalStatusSection
           title={t("source-control.section.committed")}
           count={model.committedCount}
-          context={model.sectionContext.committed}
-          contextVariant="group"
-          layout={layout}
           expanded={expanded.committed}
           onToggle={() => onToggle("committed")}
-          showHeader={false}
           action={action ? (
             <GitOperationButton
               className="desktop-git-commit-push-action"
@@ -203,7 +185,7 @@ export function createGitLocalStatusPanels({
               {getCommittedSummary(model.committedCount, action?.label ?? syncPushLabel, t)}
             </div>
           )}
-        </GitStatusCardSection>
+        </GitLocalStatusSection>
       ),
     });
   }
@@ -216,13 +198,10 @@ export function createGitLocalStatusPanels({
       grow: 0.9,
       expanded: expanded.staged,
       bodyRows: getGitSidebarPanelBodyRows(model.stagedResources.length, true),
-      bodyChromePx: STATUS_CARD_CHROME_PX,
       content: (
-        <GitStatusCardSection
+        <GitLocalStatusSection
           title={t("source-control.section.staged")}
           count={model.stagedResources.length}
-          context={model.sectionContext.staged}
-          layout={layout}
           expanded={expanded.staged}
           onToggle={() => onToggle("staged")}
           action={action ? (
@@ -252,7 +231,7 @@ export function createGitLocalStatusPanels({
             onUnstagePaths={actions.unstagePaths}
             onDiscardPaths={actions.discardPaths}
           />
-        </GitStatusCardSection>
+        </GitLocalStatusSection>
       ),
     });
   }
@@ -264,13 +243,10 @@ export function createGitLocalStatusPanels({
       grow: 1.15,
       expanded: expanded.unstaged,
       bodyRows: getGitSidebarPanelBodyRows(model.localChangeResources.length, true),
-      bodyChromePx: STATUS_CARD_CHROME_PX,
       content: (
-        <GitStatusCardSection
+        <GitLocalStatusSection
           title={t("source-control.section.unstaged")}
           count={model.localChangeResources.length}
-          context={model.sectionContext.unstaged}
-          layout={layout}
           expanded={expanded.unstaged}
           onToggle={() => onToggle("unstaged")}
           action={createUnstagedActions({ model, disabled, operationLoading, actions, primaryActionSlot, t })}
@@ -285,7 +261,7 @@ export function createGitLocalStatusPanels({
             onUnstagePaths={actions.unstagePaths}
             onDiscardPaths={actions.discardPaths}
           />
-        </GitStatusCardSection>
+        </GitLocalStatusSection>
       ),
     });
   }

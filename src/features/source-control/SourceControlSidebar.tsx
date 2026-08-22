@@ -173,7 +173,6 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
 
   panels.push(...createGitLocalStatusPanels({
     model: sidebarModel,
-    layout: gitSidebarLayout,
     expanded,
     disabled,
     operationLoading,

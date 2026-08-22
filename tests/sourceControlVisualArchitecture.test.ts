@@ -22,7 +22,7 @@ const sourceControlSidebarSectionsSource = [
   "GitSidebarProviders.tsx",
   "GitRemoteSections.tsx",
   "GitSidebarPrimitives.tsx",
-  "GitStatusCardSection.tsx",
+  "GitLocalStatusSection.tsx",
   "GitLocalStatusPanels.tsx",
 ].map((fileName) => readFileSync(
   new URL(`../src/features/source-control/sidebar/${fileName}`, import.meta.url),
@@ -30,10 +30,6 @@ const sourceControlSidebarSectionsSource = [
 )).join("\n");
 const sourceControlExpansionStateSource = readFileSync(
   new URL("../src/features/source-control/sidebar/useGitSidebarExpansionState.ts", import.meta.url),
-  "utf8",
-);
-const sourceControlPanelLayoutSource = readFileSync(
-  new URL("../src/features/source-control/sidebar/useGitSidebarPanelLayout.ts", import.meta.url),
   "utf8",
 );
 const versionControlSetupSource = readFileSync(
@@ -311,146 +307,58 @@ describe("source-control visual architecture", () => {
     expect(sidebarResourcesCss).not.toContain("desktop-git-github-update-tooltip");
   });
 
-  it("groups local source-control sections into quiet card surfaces", () => {
-    const statusCard = compact(readCssBlock(
-      sidebarResourcesCss,
-      ".desktop-git-section-collapse.desktop-git-status-card",
-    ));
-    const statusCardContextRow = compact(readCssBlock(
-      sidebarResourcesCss,
-      ".desktop-git-status-card-context-row",
-    ));
-    const statusCardContext = compact(readCssBlock(
-      sidebarResourcesCss,
-      ".desktop-git-status-card-context",
-    ));
-    const statusCardContextIcon = compact(readCssBlock(
-      sidebarResourcesCss,
-      ".desktop-git-status-card-context-icon",
-    ));
-    const statusCardGroupLabel = compact(readCssBlock(
-      sidebarResourcesCss,
-      ".desktop-git-status-card-context.is-group-label",
-    ));
-    const cardDivider = compact(readCssBlock(
-      sidebarBaseCss,
-      ".desktop-git-card-divider",
-    ));
-    const cardDividerIcon = compact(readCssBlock(
-      sidebarBaseCss,
-      ".desktop-git-card-divider .desktop-git-identity-icon-slot",
-    ));
+  it("reserves card surfaces for providers and keeps local source-control groups flat", () => {
     const sectionTitle = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-section-title",
     ));
-    const statusCardResourceRow = compact(readCssBlock(
+    const workingTreeRow = compact(readCssBlock(
       sidebarResourcesCss,
-      ".desktop-git-status-card .desktop-working-tree-row",
-    ));
-    const statusCardInner = compact(readCssBlock(
-      sidebarResourcesCss,
-      ".desktop-git-status-card > .desktop-git-section-collapse-inner",
-    ));
-    const statusCardResourceMain = compact(readCssBlock(
-      sidebarResourcesCss,
-      ".desktop-git-status-card .desktop-working-tree-main",
+      ".desktop-working-tree-row",
     ));
     const resizer = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-section-resizer::after",
     ));
 
-    expect(sourceControlSidebarSectionsSource).toContain(
-      'className={`desktop-git-status-card${separateIdentity ? " is-divider-layout" : ""}`}',
-    );
-    expect(sourceControlSidebarSectionsSource).toContain(
-      'const separateIdentity = layout === "dividers" && contextVariant === "group";',
-    );
-    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-card-divider-header");
+    expect(sourceControlSidebarSectionsSource).toContain("export function GitLocalStatusSection");
+    expect(sourceControlSidebarSectionsSource).toContain('className="desktop-git-local-section-body"');
     expect(sourceControlSidebarSectionsSource).toContain("controlsId={bodyId}");
-    expect(sourceControlSidebarSectionsSource).toContain("{contextContent}");
-    expect(sourceControlSidebarSectionsSource).not.toContain("is-action-only");
-    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context-row");
-    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context");
-    expect(sourceControlSidebarSectionsSource).not.toContain("contextIcon={<Folder");
-    expect(sourceControlSidebarSectionsSource).toContain('contextVariant="group"');
-    expect(sourceControlSidebarSectionsSource).toContain("const STATUS_CARD_CHROME_PX = 44;");
-    expect(sourceControlSidebarSectionsSource).toContain("bodyChromePx: STATUS_CARD_CHROME_PX");
-    expect(sourceControlPanelLayoutSource).toContain("visibleBodyRows * ROW_VERTICAL_MARGIN_PX + bodyChromePx");
-    expect(sourceControlSidebarSectionsSource).toContain("showHeader={false}");
-    expect(sourceControlSidebarSource).not.toContain("desktop-git-status-card-summary");
-    expect(sourceControlSidebarSource).not.toContain("source-control.commit.filesChanged");
-    expect(sourceControlSidebarSectionsSource.match(/<GitStatusCardSection/g)).toHaveLength(4);
+    expect(sourceControlSidebarSectionsSource).toContain("count={model.committedCount}");
+    expect(sourceControlSidebarSectionsSource).not.toContain("countLabel");
+    expect(sourceControlSidebarSectionsSource.match(/<GitLocalStatusSection/g)).toHaveLength(4);
+    expect(sourceControlSidebarSource).not.toContain("layout: gitSidebarLayout,");
     for (const panel of ["remote", "merge", "committed", "staged", "unstaged"]) {
       expect(sourceControlExpansionStateSource).toContain(`${panel}: true`);
     }
-    expect(sourceControlSidebarSectionsSource).toContain("showCount={false}");
     expect(sourceControlSidebarSectionsSource).toContain("aria-hidden={expanded ? undefined : true}");
     expect(sourceControlSidebarSectionsSource).toContain('const inertWhenCollapsed = expanded ? {} : { inert: "" };');
-    expect(statusCard).toContain(
-      "margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);",
-    );
-    expect(statusCard).toContain("border: 0;");
-    expect(statusCard).toContain("border-radius: var(--git-control-radius);");
-    expect(statusCard).toContain("background: var(--git-card-background);");
-    expect(statusCardContextRow).toContain("padding: 10px 10px 2px;");
-    expect(statusCardContextRow).toContain("min-height: 36px;");
-    expect(statusCardContext).toContain("color: var(--po-text-muted);");
-    expect(statusCardContext).toContain("font-size: var(--git-font-main);");
-    expect(statusCardContext).toContain("gap: 2px;");
-    expect(statusCardContextIcon).toContain("color: inherit;");
-    expect(cardDivider).toContain(
-      "margin-inline: calc(var(--git-sidebar-control-left-gap) + 10px) var(--git-sidebar-control-right-gap);",
-    );
-    expect(cardDividerIcon).toContain("padding-inline-start: 0;");
-    expect(sidebarBaseCss).not.toContain(".desktop-git-section-row.desktop-git-card-divider-header");
+    expect(sourceControlSidebarSectionsSource).not.toContain("GitStatusCardSection");
+    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-status-card");
+    expect(sourceControlSidebarSectionsSource).not.toContain("STATUS_CARD_CHROME_PX");
+    expect(sidebarResourcesCss).not.toContain("desktop-git-status-card");
     expect(sectionTitle).toContain(
       "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",
     );
-    expect(statusCardGroupLabel).toContain(
-      "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",
-    );
-    expect(statusCardGroupLabel).toContain(
-      "font-size: var(--desktop-sidebar-section-title-font-size, var(--po-text-size-meta, 12px));",
-    );
-    expect(statusCardResourceRow).toContain("width: calc(100% - 8px);");
-    expect(statusCardResourceRow).toContain("margin-inline: 4px;");
-    expect(statusCardResourceMain).toContain("padding-inline-start: 6px;");
-    expect(statusCardInner).toContain("box-sizing: border-box;");
-    expect(statusCardInner).toContain("padding-bottom: 8px;");
+    expect(workingTreeRow).toContain("width: 100%;");
+    expect(workingTreeRow).not.toContain("background");
     expect(compact(sidebarResourcesCss)).toContain(compact(`
-      .desktop-git-status-card .desktop-working-tree-row:hover,
-      .desktop-git-status-card .desktop-working-tree-row:focus-within,
-      .desktop-git-status-card .desktop-working-tree-row.active:hover {
-        background: var(--po-hover);
-        color: var(--po-text);
-      }
-    `));
-    expect(compact(sidebarResourcesCss)).toContain(compact(`
-      .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-working-tree-list,
-      .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-git-remote-preview {
-        padding-block: var(--git-section-body-top-gap) 0;
-        padding-inline: 0;
-      }
-    `));
-    expect(sidebarResourcesCss).not.toContain(
-      ".desktop-git-status-card .desktop-working-tree-row::before",
-    );
-    expect(compact(sidebarResourcesCss)).toContain(compact(`
-      .desktop-git-status-card .desktop-working-tree-list,
-      .desktop-git-status-card .desktop-git-remote-preview {
+      .desktop-git-local-section-body .desktop-working-tree-list,
+      .desktop-git-local-section-body .desktop-git-remote-preview {
         overflow-y: hidden;
         scrollbar-gutter: auto;
+        padding-inline-end: var(--git-sidebar-right-gap);
       }
     `));
     expect(compact(sidebarResourcesCss)).toContain(compact(`
-      .desktop-git-status-card .desktop-working-tree-list.is-scrollable,
-      .desktop-git-status-card .desktop-git-remote-preview.is-scrollable {
+      .desktop-git-local-section-body .desktop-working-tree-list.is-scrollable,
+      .desktop-git-local-section-body .desktop-git-remote-preview.is-scrollable {
         overflow-y: auto;
         scrollbar-gutter: stable;
+        padding-inline-end: calc(var(--git-sidebar-right-gap) - var(--git-sidebar-scrollbar-width));
       }
     `));
+    expect(sidebarResourcesCss).toContain(".desktop-working-tree-row:hover,");
     expect(resizer).toContain("background: transparent;");
   });
 

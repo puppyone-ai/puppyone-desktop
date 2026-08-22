@@ -26,7 +26,7 @@ for (const requiredPath of [
   "src/features/source-control/sidebar/GitRemoteSections.tsx",
   "src/features/source-control/sidebar/GitSidebarPrimitives.tsx",
   "src/features/source-control/sidebar/GitSidebarProviders.tsx",
-  "src/features/source-control/sidebar/GitStatusCardSection.tsx",
+  "src/features/source-control/sidebar/GitLocalStatusSection.tsx",
   "src/features/source-control/sidebar/useGitSidebarExpansionState.ts",
   "src/features/source-control/styles/sidebar-actions.css",
   "src/features/source-control/styles/sidebar-panels.css",
@@ -38,6 +38,7 @@ for (const requiredPath of [
 for (const retiredPath of [
   "src/styles/sidebar-primitives.css",
   "src/features/source-control/sidebar/SourceControlSidebarSections.tsx",
+  "src/features/source-control/sidebar/GitStatusCardSection.tsx",
   "src/features/source-control/source-control-overrides.css",
 ]) {
   if (existsSync(absolute(retiredPath))) errors.push(`retired Sidebar ownership path must not return: ${retiredPath}`);
@@ -143,10 +144,17 @@ if (!virtualizationPolicy.includes("SIDEBAR_VIRTUALIZATION_THRESHOLD = 200")) {
 
 const gitSidebarSource = read(absolute("src/features/source-control/SourceControlSidebar.tsx"));
 if (!gitSidebarSource.includes("createGitLocalStatusPanels")) {
-  errors.push("Git Sidebar must delegate local status-card presentation to GitLocalStatusPanels.");
+  errors.push("Git Sidebar must delegate local status-group presentation to GitLocalStatusPanels.");
 }
 if (gitSidebarSource.includes("desktop-git-status-card")) {
-  errors.push("Git Sidebar orchestration must not own status-card markup directly.");
+  errors.push("Git Sidebar orchestration must not own retired local status-card markup.");
+}
+const gitLocalStatusSource = read(absolute("src/features/source-control/sidebar/GitLocalStatusPanels.tsx"));
+if (!gitLocalStatusSource.includes("GitLocalStatusSection")) {
+  errors.push("Local Git panels must consume the shared flat GitLocalStatusSection contract.");
+}
+if (gitLocalStatusSource.includes("desktop-git-status-card")) {
+  errors.push("Local Git panels must remain flat and must not restore a status-card surface.");
 }
 
 const auxiliarySource = read(absolute("src/features/app-shell/auxiliary/AuxiliaryPanelHost.tsx"));

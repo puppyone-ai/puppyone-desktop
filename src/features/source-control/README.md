@@ -25,9 +25,10 @@ contracts here.
 - `VersionControlIcon.tsx` owns the canonical Version Control icon shared by navigation, menus, and the opt-in state.
 - `VersionControlSetupState.tsx` owns the full-page opt-in state for a local workspace that has not enabled version control.
 - `SourceControlSidebar.tsx` composes the sidebar flow and wires user actions to the view model.
-- `sidebar/GitStatusCardSection.tsx` owns the shared local status-card and
-  disclosure contract; committed, staged, unstaged, and merge sections compose
-  their domain-specific contents through it.
+- `sidebar/GitLocalStatusSection.tsx` owns the shared flat local disclosure
+  contract; committed, staged, unstaged, and merge sections compose their
+  domain-specific contents through it. Local work must not reuse the provider
+  status-card surface.
 - `sidebar/GitLocalStatusPanels.tsx` owns those four local panel configurations,
   resource bodies, and action placement so `SourceControlSidebar.tsx` remains
   an orchestration boundary rather than a second presentation module.
