@@ -109,7 +109,7 @@ describe("project folder home", () => {
     expect(onChooseWorkspace).toHaveBeenCalledTimes(1);
   });
 
-  it("uses a restrained three-action launcher when there are no projects", async () => {
+  it("uses two compact actions and a separate clone-provider strip when there are no projects", async () => {
     const css = readFileSync(`${process.cwd()}/src/styles/onboarding.css`, "utf8");
     const onChooseWorkspace = vi.fn(async () => undefined);
     const onCreateProject = vi.fn(async () => true);
@@ -118,20 +118,27 @@ describe("project folder home", () => {
 
     expectBrandLockup(container);
     const actions = [...container.querySelectorAll<HTMLButtonElement>(".onboarding-entry-action")];
-    expect(actions).toHaveLength(3);
+    expect(actions).toHaveLength(2);
     expect(actions.map((action) => action.textContent)).toEqual([
       "Open local folder",
       "Create new",
-      "Clone from GitHub",
     ]);
     expect(actions.every((action) => action.classList.contains("po-button"))).toBe(true);
     expect(actions[0]?.classList.contains("po-button--primary")).toBe(true);
     expect(actions[1]?.classList.contains("po-button--neutral")).toBe(true);
-    expect(actions[2]?.classList.contains("po-button--neutral")).toBe(true);
     expect(actions[0]?.classList.contains("onboarding-entry-action-primary")).toBe(true);
     expect(actions[0]?.querySelector(".lucide-folder-open")).not.toBeNull();
     expect(actions[1]?.querySelector(".onboarding-entry-create-icon")).not.toBeNull();
-    expect(actions[2]?.querySelector(".onboarding-entry-github-icon")).not.toBeNull();
+    const providers = [...container.querySelectorAll<HTMLButtonElement>(".onboarding-provider-action")];
+    expect(container.querySelector(".onboarding-provider-label")?.textContent).toBe("Clone from");
+    expect(container.querySelector(".onboarding-provider-arrow")).not.toBeNull();
+    expect(providers.map((provider) => provider.dataset.provider)).toEqual(["github", "gitlab", "notion"]);
+    expect(providers[0]?.disabled).toBe(false);
+    expect(providers[0]?.querySelector(".lucide-github")).not.toBeNull();
+    expect(providers[1]?.disabled).toBe(true);
+    expect(providers[1]?.querySelector(".lucide-gitlab")).not.toBeNull();
+    expect(providers[2]?.disabled).toBe(true);
+    expect(providers[2]?.querySelector("img")?.getAttribute("src")).toContain("icons/notion.svg");
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
     expect(css).toMatch(/\.onboarding-homepage\s*\{[^}]*width:\s*min\(480px, 100%\);[^}]*align-content:\s*start;[^}]*gap:\s*30px;/s);
     expect(css).toMatch(/\.onboarding-homepage\.is-empty\s*\{[^}]*width:\s*min\(450px, 100%\);[^}]*gap:\s*42px;/s);
@@ -140,10 +147,12 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*60px;[^}]*height:\s*60px;/s);
     expect(css).not.toContain(".onboarding-brand-version");
     expect(css).toMatch(/\.onboarding-primary-area\s*\{[^}]*justify-items:\s*center;/s);
-    expect(css).toMatch(/\.onboarding-entry-launcher\s*\{[^}]*width:\s*min\(330px, 100%\);[^}]*gap:\s*6px;/s);
+    expect(css).toMatch(/\.onboarding-entry-launcher\s*\{[^}]*width:\s*min\(272px, 100%\);[^}]*gap:\s*18px;/s);
+    expect(css).toMatch(/\.onboarding-entry-actions\s*\{[^}]*gap:\s*10px;/s);
     expect(css).toMatch(/\.onboarding-entry-action\s*\{[^}]*width:\s*100%;[^}]*height:\s*38px;[^}]*min-height:\s*38px;[^}]*border-radius:\s*var\(--desktop-control-radius\);[^}]*font-size:\s*var\(--po-text-size-body, 13px\);[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);/s);
     expect(css).toMatch(/\.onboarding-entry-action-primary\s*\{[^}]*background:\s*var\(--po-text\);[^}]*color:\s*var\(--po-text-inverse\);[^}]*font-weight:\s*var\(--po-text-weight-semibold, 600\);/s);
     expect(css).toMatch(/\.onboarding-entry-action-secondary\s*\{[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-subtle\);/s);
+    expect(css).toMatch(/\.onboarding-provider-action\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;[^}]*border:\s*1px solid var\(--po-border\);/s);
     expect(css).not.toContain(".folder-drop-zone");
 
     await act(async () => actions[0]?.click());
@@ -172,7 +181,7 @@ describe("project folder home", () => {
     expect(container.querySelector(".onboarding-entry-dialog")).toBeNull();
 
     await act(async () => {
-      container.querySelectorAll<HTMLButtonElement>(".onboarding-entry-action")[2]?.click();
+      container.querySelector<HTMLButtonElement>(".onboarding-provider-action[data-provider='github']")?.click();
     });
     expect(container.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe("Clone from GitHub");
     const repositoryUrl = container.querySelector<HTMLInputElement>(".onboarding-entry-dialog input");

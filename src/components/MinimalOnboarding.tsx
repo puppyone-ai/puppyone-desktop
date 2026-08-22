@@ -1,6 +1,16 @@
 import { Button, resolveRendererPublicAssetUrl, type Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
-import { AlertTriangle, FilePlus2, Folder, FolderOpen, Github, Plus, Unlink } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  FilePlus2,
+  Folder,
+  FolderOpen,
+  Github,
+  Gitlab,
+  Plus,
+  Unlink,
+} from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -224,38 +234,73 @@ export function MinimalOnboarding({
         {!hasProjects && (
           <div className="onboarding-primary-area">
             <div className="onboarding-entry-launcher" role="group" aria-label={t("onboarding.projects.title")}>
-              <Button
-                className={`onboarding-entry-action onboarding-entry-action-primary ${folderDrop.dragging ? "is-dragging" : ""}`}
-                tone="primary"
-                disabled={busy}
-                aria-busy={openingPath === "__new__" || undefined}
-                leadingIcon={openingPath === "__new__"
-                  ? <InlineLoading label={null} size="sm" tone="neutral" />
-                  : <FolderOpen aria-hidden="true" />}
-                onClick={() => void chooseFolder()}
-              >
-                {t("onboarding.action.openFolder")}
-              </Button>
+              <div className="onboarding-entry-actions">
+                <Button
+                  className={`onboarding-entry-action onboarding-entry-action-primary ${folderDrop.dragging ? "is-dragging" : ""}`}
+                  tone="primary"
+                  disabled={busy}
+                  aria-busy={openingPath === "__new__" || undefined}
+                  leadingIcon={openingPath === "__new__"
+                    ? <InlineLoading label={null} size="sm" tone="neutral" />
+                    : <FolderOpen aria-hidden="true" />}
+                  onClick={() => void chooseFolder()}
+                >
+                  {t("onboarding.action.openFolder")}
+                </Button>
 
-              <Button
-                className="onboarding-entry-action onboarding-entry-action-secondary"
-                tone="neutral"
-                disabled={busy || !onCreateProject}
-                leadingIcon={<FilePlus2 className="onboarding-entry-create-icon" aria-hidden="true" />}
-                onClick={() => setEntryDialog("create")}
-              >
-                {t("onboarding.action.createNew")}
-              </Button>
+                <Button
+                  className="onboarding-entry-action onboarding-entry-action-secondary"
+                  tone="neutral"
+                  disabled={busy || !onCreateProject}
+                  leadingIcon={<FilePlus2 className="onboarding-entry-create-icon" aria-hidden="true" />}
+                  onClick={() => setEntryDialog("create")}
+                >
+                  {t("onboarding.action.createNew")}
+                </Button>
+              </div>
 
-              <Button
-                className="onboarding-entry-action onboarding-entry-action-secondary"
-                tone="neutral"
-                disabled={busy || !onCloneRepository}
-                leadingIcon={<Github className="onboarding-entry-github-icon" aria-hidden="true" />}
-                onClick={() => setEntryDialog("clone")}
-              >
-                {t("onboarding.action.cloneFromGitHub")}
-              </Button>
+              <div className="onboarding-provider-strip" aria-label={t("onboarding.action.cloneFrom")}>
+                <span className="onboarding-provider-label">{t("onboarding.action.cloneFrom")}</span>
+                <ArrowRight className="onboarding-provider-arrow" aria-hidden="true" />
+                <div className="onboarding-provider-actions">
+                  <button
+                    className="onboarding-provider-action"
+                    type="button"
+                    data-provider="github"
+                    disabled={busy || !onCloneRepository}
+                    aria-label="GitHub"
+                    title="GitHub"
+                    onClick={() => setEntryDialog("clone")}
+                  >
+                    <Github aria-hidden="true" />
+                  </button>
+                  <button
+                    className="onboarding-provider-action"
+                    type="button"
+                    data-provider="gitlab"
+                    disabled
+                    aria-label={t("onboarding.provider.comingSoon", { provider: "GitLab" })}
+                    title={t("onboarding.provider.comingSoon", { provider: "GitLab" })}
+                  >
+                    <Gitlab aria-hidden="true" />
+                  </button>
+                  <button
+                    className="onboarding-provider-action"
+                    type="button"
+                    data-provider="notion"
+                    disabled
+                    aria-label={t("onboarding.provider.comingSoon", { provider: "Notion" })}
+                    title={t("onboarding.provider.comingSoon", { provider: "Notion" })}
+                  >
+                    <img
+                      src={resolveRendererPublicAssetUrl("icons/notion.svg")}
+                      alt=""
+                      aria-hidden="true"
+                      draggable={false}
+                    />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -10,6 +10,8 @@
   "action.openFolder": "로컬 폴더 열기",
   "action.createNew": "새로 만들기",
   "action.cloneFromGitHub": "GitHub에서 복제",
+  "action.cloneFrom": "복제 원본",
+  "provider.comingSoon": "{provider} — 출시 예정",
   "entry.create.title": "프로젝트 만들기",
   "entry.create.nameLabel": "프로젝트 이름",
   "entry.create.namePlaceholder": "내 프로젝트",

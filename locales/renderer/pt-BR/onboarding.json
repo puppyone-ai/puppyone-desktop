@@ -10,6 +10,8 @@
   "action.openFolder": "Abrir pasta local",
   "action.createNew": "Criar novo",
   "action.cloneFromGitHub": "Clonar do GitHub",
+  "action.cloneFrom": "Clonar de",
+  "provider.comingSoon": "{provider} — Em breve",
   "entry.create.title": "Criar um projeto",
   "entry.create.nameLabel": "Nome do projeto",
   "entry.create.namePlaceholder": "Meu projeto",
