@@ -138,15 +138,14 @@ describe("project folder home", () => {
     expect(actions[0]?.classList.contains("onboarding-entry-action-primary")).toBe(true);
     expect(actions[0]?.querySelector(".lucide-folder-open")).not.toBeNull();
     expect(actions[1]?.querySelector(".onboarding-entry-create-icon")).not.toBeNull();
-    const providers = [...container.querySelectorAll<HTMLElement>(".onboarding-provider-source")];
-    expect(container.querySelector(".onboarding-provider-label")).toBeNull();
+    const providers = [...container.querySelectorAll<HTMLButtonElement>(".onboarding-provider-source")];
+    expect(container.querySelector(".onboarding-provider-label")?.textContent).toBe("or import from");
     expect(container.querySelector(".onboarding-provider-arrow")).toBeNull();
     expect(providers.map((provider) => provider.dataset.provider)).toEqual(["github"]);
+    expect(providers[0]?.disabled).toBe(false);
+    expect(providers[0]?.getAttribute("aria-label")).toBe("Import from GitHub");
     expect(providers[0]?.querySelector(".onboarding-provider-mark.lucide-github")).not.toBeNull();
-    const importAction = container.querySelector<HTMLButtonElement>(".onboarding-provider-import-action");
-    expect(importAction?.textContent).toBe("Import");
-    expect(importAction?.disabled).toBe(false);
-    expect(importAction?.getAttribute("aria-label")).toBe("Import from GitHub");
+    expect(container.querySelector(".onboarding-provider-import-action")).toBeNull();
     expect(container.querySelector("[data-provider='gitlab']")).toBeNull();
     expect(container.querySelector("[data-provider='notion']")).toBeNull();
     expect(container.querySelector(".onboarding-project-add-action")).toBeNull();
@@ -162,9 +161,9 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-entry-action\s*\{[^}]*width:\s*100%;[^}]*height:\s*38px;[^}]*min-height:\s*38px;[^}]*justify-content:\s*flex-start;[^}]*border-radius:\s*var\(--desktop-control-radius\);[^}]*font-size:\s*var\(--po-text-size-body, 13px\);[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);[^}]*text-align:\s*start;/s);
     expect(css).toMatch(/\.onboarding-entry-action-primary\s*\{[^}]*background:\s*var\(--po-text\);[^}]*color:\s*var\(--po-text-inverse\);[^}]*font-weight:\s*var\(--po-text-weight-semibold, 600\);/s);
     expect(css).toMatch(/\.onboarding-entry-action-secondary\s*\{[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-subtle\);/s);
-    expect(css).toMatch(/\.onboarding-provider-strip\s*\{[^}]*width:\s*100%;[^}]*justify-content:\s*space-between;[^}]*gap:\s*12px;[^}]*padding-inline:\s*14px;/s);
-    expect(css).toMatch(/\.onboarding-provider-source\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;/s);
-    expect(css).toMatch(/\.onboarding-provider-import-action\s*\{[^}]*height:\s*28px;[^}]*padding:\s*0;[^}]*border:\s*0;[^}]*background:\s*transparent;[^}]*font-size:\s*12px;/s);
+    expect(css).toMatch(/\.onboarding-provider-strip\s*\{[^}]*width:\s*100%;[^}]*justify-content:\s*flex-start;[^}]*gap:\s*7px;[^}]*padding-inline:\s*14px;/s);
+    expect(css).toMatch(/\.onboarding-provider-label\s*\{[^}]*font-size:\s*12px;/s);
+    expect(css).toMatch(/\.onboarding-provider-source\s*\{[^}]*width:\s*24px;[^}]*height:\s*24px;[^}]*padding:\s*0;[^}]*border:\s*0;[^}]*background:\s*transparent;/s);
     expect(css).toMatch(/\.onboarding-entry-create-row\s*\{[^}]*min-height:\s*52px;[^}]*grid-template-columns:\s*104px minmax\(0, 1fr\);[^}]*gap:\s*16px;/s);
     expect(css).toMatch(/\.onboarding-entry-dialog \.desktop-dialog-button\.primary\.file:disabled\s*\{[^}]*border-color:\s*var\(--po-border-subtle\);[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-disabled\);/s);
     expect(css).not.toContain(".folder-drop-zone");
@@ -223,7 +222,7 @@ describe("project folder home", () => {
     const container = renderHome({ onCloneRepository });
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".onboarding-provider-import-action[data-provider='github']")?.click();
+      container.querySelector<HTMLButtonElement>(".onboarding-provider-source[data-provider='github']")?.click();
     });
     expect(container.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe("Import from GitHub");
     const repositoryUrl = container.querySelector<HTMLInputElement>(".onboarding-entry-dialog input");

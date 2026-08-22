@@ -260,28 +260,23 @@ export function MinimalOnboarding({
                 </Button>
               </div>
 
-              <div className="onboarding-provider-strip" aria-label={t("onboarding.action.importFrom")}>
+              <div className="onboarding-provider-strip" aria-label={t("onboarding.action.orImportFrom")}>
+                <span className="onboarding-provider-label">
+                  {t("onboarding.action.orImportFrom")}
+                </span>
                 <div className="onboarding-provider-sources">
-                  <span
+                  <button
                     className="onboarding-provider-source"
+                    type="button"
                     data-provider="github"
-                    aria-label="GitHub"
-                    title="GitHub"
+                    disabled={busy || !onCloneRepository}
+                    aria-label={t("onboarding.entry.clone.title")}
+                    title={t("onboarding.entry.clone.title")}
+                    onClick={() => setEntryDialog("clone")}
                   >
                     <Github className="onboarding-provider-mark" aria-hidden="true" />
-                  </span>
+                  </button>
                 </div>
-                <button
-                  className="onboarding-provider-import-action"
-                  type="button"
-                  data-provider="github"
-                  disabled={busy || !onCloneRepository}
-                  aria-label={t("onboarding.entry.clone.title")}
-                  title={t("onboarding.entry.clone.title")}
-                  onClick={() => setEntryDialog("clone")}
-                >
-                  {t("onboarding.action.import")}
-                </button>
               </div>
             </div>
           </div>

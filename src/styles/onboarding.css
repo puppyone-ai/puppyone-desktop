@@ -200,58 +200,55 @@
   min-width: 0;
   box-sizing: border-box;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 7px;
   padding-inline: 14px;
   color: var(--po-text-subtle);
+}
+
+.onboarding-provider-label {
+  flex: 0 0 auto;
+  color: var(--po-text-subtle);
+  font-family: var(--po-font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
 }
 
 .onboarding-provider-sources {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .onboarding-provider-source {
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   flex: 0 0 auto;
-  place-items: center;
-  color: var(--po-text-subtle);
-}
-
-.onboarding-provider-import-action {
-  display: inline-flex;
-  height: 28px;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
   padding: 0;
+  place-items: center;
   border: 0;
-  border-radius: 3px;
+  border-radius: 4px;
   background: transparent;
   color: var(--po-text-subtle);
-  font-family: var(--po-font-sans);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
   cursor: var(--po-clickable-cursor, pointer);
-  transition: color 130ms ease-out, opacity 130ms ease-out;
+  transition: background 130ms ease-out, color 130ms ease-out, opacity 130ms ease-out;
 }
 
-.onboarding-provider-import-action:hover:not(:disabled),
-.onboarding-provider-import-action:focus-visible:not(:disabled) {
+.onboarding-provider-source:hover:not(:disabled),
+.onboarding-provider-source:focus-visible:not(:disabled) {
+  background: var(--po-hover);
   color: var(--po-text);
   outline: none;
 }
 
-.onboarding-provider-import-action:focus-visible:not(:disabled) {
+.onboarding-provider-source:focus-visible:not(:disabled) {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--po-accent) 28%, transparent);
 }
 
-.onboarding-provider-import-action:disabled {
+.onboarding-provider-source:disabled {
   color: var(--po-text-disabled);
   cursor: default;
   opacity: 0.42;
@@ -259,8 +256,8 @@
 
 .onboarding-provider-mark {
   display: block;
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
 }
 
 .onboarding-entry-dialog {
