@@ -98,13 +98,8 @@ export function OnboardingProjectEntryDialog({
           {create ? (
             <div className="onboarding-entry-create-fields">
               <label className="onboarding-entry-create-row">
-                <span className="onboarding-entry-create-copy">
-                  <span className="onboarding-entry-create-label">
-                    {t("onboarding.entry.create.nameLabel")}
-                  </span>
-                  <span className="onboarding-entry-create-detail">
-                    {t("onboarding.entry.create.nameHint")}
-                  </span>
+                <span className="onboarding-entry-create-label">
+                  {t("onboarding.entry.create.nameLabel")}
                 </span>
                 <input
                   className="onboarding-entry-create-input"
@@ -126,29 +121,31 @@ export function OnboardingProjectEntryDialog({
                 />
               </label>
               <div className="onboarding-entry-create-row">
-                <span className="onboarding-entry-create-copy">
-                  <span className="onboarding-entry-create-label">
-                    {t("onboarding.entry.create.locationLabel")}
-                  </span>
-                  <bdi
-                    className={`onboarding-entry-create-detail onboarding-entry-location-path ${location ? "is-selected" : ""}`}
-                    dir={location ? "ltr" : undefined}
-                    title={location?.path}
-                    aria-live="polite"
-                  >
-                    {location?.path ?? t("onboarding.entry.create.locationHint")}
-                  </bdi>
+                <span className="onboarding-entry-create-label">
+                  {t("onboarding.entry.create.locationLabel")}
                 </span>
-                <button
-                  className="desktop-dialog-button onboarding-entry-browse-button"
-                  type="button"
-                  disabled={busy || !onChooseLocation}
-                  onClick={() => void chooseLocation()}
-                >
-                  {t(choosingLocation
-                    ? "onboarding.entry.create.browsing"
-                    : "onboarding.entry.create.browse")}
-                </button>
+                <div className="onboarding-entry-location-controls">
+                  {location && (
+                    <bdi
+                      className="onboarding-entry-location-path"
+                      dir="ltr"
+                      title={location.path}
+                      aria-live="polite"
+                    >
+                      {location.path}
+                    </bdi>
+                  )}
+                  <button
+                    className="desktop-dialog-button onboarding-entry-browse-button"
+                    type="button"
+                    disabled={busy || !onChooseLocation}
+                    onClick={() => void chooseLocation()}
+                  >
+                    {t(choosingLocation
+                      ? "onboarding.entry.create.browsing"
+                      : "onboarding.entry.create.browse")}
+                  </button>
+                </div>
               </div>
             </div>
           ) : (

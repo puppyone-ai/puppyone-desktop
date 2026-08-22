@@ -296,42 +296,42 @@
 .onboarding-entry-create-row {
   display: grid;
   min-width: 0;
-  min-height: 68px;
-  grid-template-columns: minmax(0, 1fr) 180px;
+  min-height: 52px;
+  grid-template-columns: 104px minmax(0, 1fr);
   align-items: center;
-  gap: 20px;
-  padding-block: 10px;
+  gap: 16px;
+  padding-block: 8px;
 }
 
 .onboarding-entry-create-row + .onboarding-entry-create-row {
   border-top: 1px solid var(--po-divider);
 }
 
-.onboarding-entry-create-copy {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-}
-
 .onboarding-entry-create-label {
   color: var(--po-text);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 18px;
 }
 
-.onboarding-entry-create-detail {
+.onboarding-entry-location-controls {
+  display: flex;
   min-width: 0;
-  overflow: hidden;
-  color: var(--po-text-subtle);
-  font-size: 12px;
-  line-height: 17px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
-.onboarding-entry-location-path.is-selected {
+.onboarding-entry-location-path {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
   color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 17px;
+  text-align: end;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .onboarding-entry-create-input {
@@ -361,8 +361,8 @@
 }
 
 .onboarding-entry-browse-button {
-  width: 96px;
-  justify-self: end;
+  width: 88px;
+  flex: 0 0 auto;
 }
 
 .onboarding-entry-dialog.is-create .desktop-dialog-error {

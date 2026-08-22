@@ -165,7 +165,7 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-provider-strip\s*\{[^}]*width:\s*100%;[^}]*justify-content:\s*space-between;[^}]*gap:\s*12px;[^}]*padding-inline:\s*14px;/s);
     expect(css).toMatch(/\.onboarding-provider-source\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;/s);
     expect(css).toMatch(/\.onboarding-provider-import-action\s*\{[^}]*height:\s*28px;[^}]*padding:\s*0;[^}]*border:\s*0;[^}]*background:\s*transparent;[^}]*font-size:\s*12px;/s);
-    expect(css).toMatch(/\.onboarding-entry-create-row\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 180px;/s);
+    expect(css).toMatch(/\.onboarding-entry-create-row\s*\{[^}]*min-height:\s*52px;[^}]*grid-template-columns:\s*104px minmax\(0, 1fr\);[^}]*gap:\s*16px;/s);
     expect(css).not.toContain(".folder-drop-zone");
 
     await act(async () => actions[0]?.click());
@@ -193,6 +193,8 @@ describe("project folder home", () => {
     expect(container.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe("Create a local project");
     const projectName = container.querySelector<HTMLInputElement>(".onboarding-entry-dialog input");
     expect(projectName?.placeholder).toBe("My project");
+    expect(container.textContent).not.toContain("Choose a name for your project.");
+    expect(container.textContent).not.toContain("Choose where the project folder will be created.");
     const createButton = container.querySelector<HTMLButtonElement>(".onboarding-entry-dialog button[type='submit']");
     expect(createButton?.disabled).toBe(true);
     setInputValue(projectName, "Knowledge Base");
