@@ -2,7 +2,7 @@ import { Button, resolveRendererPublicAssetUrl, type Workspace } from "@puppyone
 import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
 import {
   AlertTriangle,
-  ArrowRight,
+  ArrowDown,
   FilePlus2,
   Folder,
   FolderOpen,
@@ -261,22 +261,19 @@ export function MinimalOnboarding({
                 </Button>
               </div>
 
-              <div className="onboarding-provider-strip" aria-label={t("onboarding.action.importFrom")}>
-                <span className="onboarding-provider-label">{t("onboarding.action.importFrom")}</span>
-                <ArrowRight className="onboarding-provider-arrow" aria-hidden="true" />
-                <div className="onboarding-provider-actions">
-                  <button
-                    className="onboarding-provider-action"
-                    type="button"
-                    data-provider="github"
-                    disabled={busy || !onCloneRepository}
-                    aria-label="GitHub"
-                    title="GitHub"
-                    onClick={() => setEntryDialog("clone")}
-                  >
-                    <Github aria-hidden="true" />
-                  </button>
-                </div>
+              <div className="onboarding-provider-strip">
+                <button
+                  className="onboarding-provider-action"
+                  type="button"
+                  data-provider="github"
+                  disabled={busy || !onCloneRepository}
+                  aria-label={t("onboarding.entry.clone.title")}
+                  title={t("onboarding.entry.clone.title")}
+                  onClick={() => setEntryDialog("clone")}
+                >
+                  <ArrowDown className="onboarding-provider-import-arrow" aria-hidden="true" />
+                  <Github className="onboarding-provider-mark" aria-hidden="true" />
+                </button>
               </div>
             </div>
           </div>

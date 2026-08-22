@@ -199,49 +199,29 @@
   min-width: 0;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  color: var(--po-text-subtle);
-}
-
-.onboarding-provider-label {
-  flex: 0 0 auto;
-  font-family: var(--po-font-sans);
-  font-size: var(--po-text-size-body, 13px);
-  font-weight: 500;
-  line-height: 1;
-}
-
-.onboarding-provider-arrow {
-  width: 13px;
-  height: 13px;
-  flex: 0 0 auto;
-  stroke-width: 1.6;
-}
-
-.onboarding-provider-actions {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 7px;
 }
 
 .onboarding-provider-action {
-  display: grid;
-  width: 28px;
+  display: inline-flex;
+  width: 52px;
   height: 28px;
   flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   padding: 0;
-  place-items: center;
-  border: 0;
-  border-radius: 4px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 999px;
   background: transparent;
-  color: var(--po-text-muted);
+  color: var(--po-text-subtle);
   cursor: var(--po-clickable-cursor, pointer);
-  transition: color 130ms ease-out, opacity 130ms ease-out, transform 130ms ease-out;
+  transition: background 130ms ease-out, border-color 130ms ease-out, color 130ms ease-out, opacity 130ms ease-out, transform 130ms ease-out;
 }
 
 .onboarding-provider-action:hover:not(:disabled),
 .onboarding-provider-action:focus-visible:not(:disabled) {
+  border-color: var(--po-border-strong);
+  background: var(--po-hover);
   color: var(--po-text);
   transform: translateY(-1px);
   outline: none;
@@ -252,12 +232,20 @@
 }
 
 .onboarding-provider-action:disabled {
+  border-color: var(--po-border-subtle);
   color: var(--po-text-disabled);
   cursor: default;
   opacity: 0.42;
 }
 
-.onboarding-provider-action svg {
+.onboarding-provider-import-arrow {
+  display: block;
+  width: 13px;
+  height: 13px;
+  stroke-width: 1.7;
+}
+
+.onboarding-provider-mark {
   display: block;
   width: 17px;
   height: 17px;
