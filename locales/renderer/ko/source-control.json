@@ -27,6 +27,8 @@
   "cloud.upToDate": "Cloud가 이미 최신 상태입니다.",
   "cloud.updateCount": "{count, plural, other {업데이트 #개 사용 가능}}",
   "commit.filesChanged": "{count, plural, other {파일 #개 변경됨}}",
+  "commit.files": "{count, plural, other {파일 #개}}",
+  "commit.conflicts": "{count, plural, other {충돌 #개}}",
   "commit.changes": "{count, plural, other {변경 #건}}",
   "commit.commits": "{count, plural, other {커밋 #개}}",
   "commit.noFileChanges": "이 커밋에는 파일 변경 사항이 없습니다.",

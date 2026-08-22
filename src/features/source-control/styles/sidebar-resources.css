@@ -21,15 +21,31 @@
   background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));
 }
 
-.desktop-git-status-card-action-row {
+.desktop-git-status-card-context-row {
   display: flex;
   box-sizing: border-box;
   min-width: 0;
   flex: 0 0 auto;
   align-items: center;
-  justify-content: flex-end;
   gap: 8px;
   padding: 10px 10px 2px;
+}
+
+.desktop-git-status-card-context {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--po-text-muted);
+  font-size: var(--git-font-main);
+  font-weight: var(--git-weight-regular);
+  line-height: var(--git-line-height);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-git-status-card-context-row > .desktop-git-operation-button,
+.desktop-git-status-card-context-row > .desktop-git-section-actions {
+  margin-inline-start: auto;
 }
 
 /* The card margin replaces the list's normal outer sidebar gutter. */

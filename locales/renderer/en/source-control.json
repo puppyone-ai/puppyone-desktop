@@ -27,6 +27,8 @@
   "cloud.upToDate": "Cloud is already up to date.",
   "cloud.updateCount": "{count, plural, one {# update available} other {# updates available}}",
   "commit.filesChanged": "{count, plural, one {# file changed} other {# files changed}}",
+  "commit.files": "{count, plural, one {# file} other {# files}}",
+  "commit.conflicts": "{count, plural, one {# conflict} other {# conflicts}}",
   "commit.changes": "{count, plural, one {# change} other {# changes}}",
   "commit.commits": "{count, plural, one {# commit} other {# commits}}",
   "commit.noFileChanges": "No file changes in this commit.",

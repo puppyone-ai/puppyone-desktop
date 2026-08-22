@@ -295,9 +295,13 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-section-collapse.desktop-git-status-card",
     ));
-    const statusCardActionRow = compact(readCssBlock(
+    const statusCardContextRow = compact(readCssBlock(
       sidebarResourcesCss,
-      ".desktop-git-status-card-action-row",
+      ".desktop-git-status-card-context-row",
+    ));
+    const statusCardContext = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-status-card-context",
     ));
     const resizer = compact(readCssBlock(
       sidebarResourcesCss,
@@ -307,9 +311,13 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSource).toContain(
       'className="desktop-git-status-card"',
     );
-    expect(sourceControlSidebarSource).toContain("desktop-git-status-card-action-row");
+    expect(sourceControlSidebarSource).toContain("desktop-git-status-card-context-row");
+    expect(sourceControlSidebarSource).toContain("desktop-git-status-card-context");
     expect(sourceControlSidebarSource).not.toContain("desktop-git-status-card-summary");
     expect(sourceControlSidebarSource).not.toContain("source-control.commit.filesChanged");
+    expect(sourceControlSidebarSource).toContain("source-control.commit.commits");
+    expect(sourceControlSidebarSource).toContain("source-control.commit.files");
+    expect(sourceControlSidebarSource).toContain("source-control.commit.conflicts");
     expect(sourceControlSidebarSource).toContain("showCount={false}");
     expect(statusCard).toContain(
       "margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);",
@@ -319,8 +327,9 @@ describe("source-control visual architecture", () => {
     expect(statusCard).toContain(
       "background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));",
     );
-    expect(statusCardActionRow).toContain("justify-content: flex-end;");
-    expect(statusCardActionRow).toContain("padding: 10px 10px 2px;");
+    expect(statusCardContextRow).toContain("padding: 10px 10px 2px;");
+    expect(statusCardContext).toContain("color: var(--po-text-muted);");
+    expect(statusCardContext).toContain("font-size: var(--git-font-main);");
     expect(resizer).toContain("background: transparent;");
   });
 
