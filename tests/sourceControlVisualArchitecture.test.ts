@@ -326,26 +326,21 @@ describe("source-control visual architecture", () => {
         padding-inline: 0;
       }
     `));
-    expect(compact(sidebarResourcesCss)).toContain(compact(`
-      .desktop-git-status-card .desktop-working-tree-row::before {
-        position: absolute;
-        z-index: 0;
-        inset: 0 8px;
-        border-radius: var(--git-inner-radius);
-        content: "";
-        pointer-events: none;
-      }
-    `));
+    expect(sidebarResourcesCss).not.toContain(
+      ".desktop-git-status-card .desktop-working-tree-row::before",
+    );
     expect(compact(sidebarResourcesCss)).toContain(compact(`
       .desktop-git-status-card .desktop-working-tree-list,
       .desktop-git-status-card .desktop-git-remote-preview {
         overflow-y: hidden;
+        scrollbar-gutter: auto;
       }
     `));
     expect(compact(sidebarResourcesCss)).toContain(compact(`
       .desktop-git-status-card .desktop-working-tree-list.is-scrollable,
       .desktop-git-status-card .desktop-git-remote-preview.is-scrollable {
         overflow-y: auto;
+        scrollbar-gutter: stable;
       }
     `));
     expect(resizer).toContain("background: transparent;");

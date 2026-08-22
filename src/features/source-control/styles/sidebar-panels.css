@@ -68,44 +68,18 @@
   margin-inline-start: auto;
 }
 
-/* Status rows are supporting content inside the card, not a second edge-to-edge
-   surface. Keep their hover/selection fill inside the card's padding and leave
-   enough bottom space for the outer radius to remain visible. */
+/* Status rows are supporting content on the card's single continuous surface,
+   not nested cards. */
 .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-working-tree-list,
 .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-git-remote-preview {
   padding-block: var(--git-section-body-top-gap) 8px;
   padding-inline: 0;
 }
 
-/* Keep row content on the same vertical axis as the card identity while
-   containing hover and selection fills inside the card. */
-.desktop-git-status-card .desktop-working-tree-row::before {
-  position: absolute;
-  z-index: 0;
-  inset: 0 8px;
-  border-radius: var(--git-inner-radius);
-  content: "";
-  pointer-events: none;
-}
-
 .desktop-git-status-card .desktop-working-tree-row:hover,
 .desktop-git-status-card .desktop-working-tree-row.active,
 .desktop-git-status-card .desktop-working-tree-row.active:hover {
   background: transparent;
-}
-
-.desktop-git-status-card .desktop-working-tree-row:hover::before,
-.desktop-git-status-card .desktop-working-tree-row.active::before {
-  background: var(--po-hover);
-}
-
-.desktop-git-status-card .desktop-working-tree-row.active:hover::before {
-  background: var(--po-selected);
-}
-
-.desktop-git-status-card .desktop-working-tree-row > * {
-  position: relative;
-  z-index: 1;
 }
 
 .desktop-git-section-collapse {
@@ -155,11 +129,13 @@
 .desktop-git-status-card .desktop-working-tree-list,
 .desktop-git-status-card .desktop-git-remote-preview {
   overflow-y: hidden;
+  scrollbar-gutter: auto;
 }
 
 .desktop-git-status-card .desktop-working-tree-list.is-scrollable,
 .desktop-git-status-card .desktop-git-remote-preview.is-scrollable {
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .desktop-git-resizable-section .desktop-git-remote-preview {
