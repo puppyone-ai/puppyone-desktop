@@ -32,6 +32,10 @@ const sourceControlExpansionStateSource = readFileSync(
   new URL("../src/features/source-control/sidebar/useGitSidebarExpansionState.ts", import.meta.url),
   "utf8",
 );
+const sourceControlPanelLayoutSource = readFileSync(
+  new URL("../src/features/source-control/sidebar/useGitSidebarPanelLayout.ts", import.meta.url),
+  "utf8",
+);
 const versionControlSetupSource = readFileSync(
   new URL("../src/features/source-control/VersionControlSetupState.tsx", import.meta.url),
   "utf8",
@@ -304,6 +308,10 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-status-card .desktop-working-tree-row",
     ));
+    const statusCardInner = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-status-card > .desktop-git-section-collapse-inner",
+    ));
     const statusCardResourceMain = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-status-card .desktop-working-tree-main",
@@ -320,7 +328,9 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context");
     expect(sourceControlSidebarSectionsSource).toContain("contextIcon={<Folder size={14} strokeWidth={2} />}");
     expect(sourceControlSidebarSectionsSource).toContain('contextVariant="group"');
-    expect(sourceControlSidebarSectionsSource).toContain("const STATUS_CARD_CONTEXT_ROWS = 1.3;");
+    expect(sourceControlSidebarSectionsSource).toContain("const STATUS_CARD_CHROME_PX = 44;");
+    expect(sourceControlSidebarSectionsSource).toContain("bodyChromePx: STATUS_CARD_CHROME_PX");
+    expect(sourceControlPanelLayoutSource).toContain("visibleBodyRows * ROW_VERTICAL_MARGIN_PX + bodyChromePx");
     expect(sourceControlSidebarSectionsSource).toContain("showHeader={false}");
     expect(sourceControlSidebarSource).not.toContain("desktop-git-status-card-summary");
     expect(sourceControlSidebarSource).not.toContain("source-control.commit.filesChanged");
@@ -338,6 +348,7 @@ describe("source-control visual architecture", () => {
     expect(statusCard).toContain("border-radius: var(--git-control-radius);");
     expect(statusCard).toContain("background: var(--git-card-background);");
     expect(statusCardContextRow).toContain("padding: 10px 10px 2px;");
+    expect(statusCardContextRow).toContain("min-height: 36px;");
     expect(statusCardContext).toContain("color: var(--po-text-muted);");
     expect(statusCardContext).toContain("font-size: var(--git-font-main);");
     expect(statusCardContext).toContain("gap: 6px;");
@@ -348,9 +359,11 @@ describe("source-control visual architecture", () => {
     expect(statusCardGroupLabel).toContain(
       "font-size: var(--desktop-sidebar-section-title-font-size, var(--po-text-size-meta, 12px));",
     );
-    expect(statusCardResourceRow).toContain("width: calc(100% - 8px);");
-    expect(statusCardResourceRow).toContain("margin-inline: 4px;");
-    expect(statusCardResourceMain).toContain("padding-inline-start: 6px;");
+    expect(statusCardResourceRow).toContain("width: calc(100% - 16px);");
+    expect(statusCardResourceRow).toContain("margin-inline: 8px;");
+    expect(statusCardResourceMain).toContain("padding-inline-start: 0;");
+    expect(statusCardInner).toContain("box-sizing: border-box;");
+    expect(statusCardInner).toContain("padding-bottom: 8px;");
     expect(compact(sidebarResourcesCss)).toContain(compact(`
       .desktop-git-status-card .desktop-working-tree-row:hover,
       .desktop-git-status-card .desktop-working-tree-row:focus-within,
@@ -362,7 +375,7 @@ describe("source-control visual architecture", () => {
     expect(compact(sidebarResourcesCss)).toContain(compact(`
       .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-working-tree-list,
       .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-git-remote-preview {
-        padding-block: var(--git-section-body-top-gap) 8px;
+        padding-block: var(--git-section-body-top-gap) 0;
         padding-inline: 0;
       }
     `));

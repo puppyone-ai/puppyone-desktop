@@ -24,6 +24,7 @@
 .desktop-git-status-card-context-row {
   display: flex;
   box-sizing: border-box;
+  min-height: 36px;
   min-width: 0;
   flex: 0 0 auto;
   align-items: center;
@@ -77,19 +78,24 @@
 
 /* Status rows are supporting content on the card's single continuous surface,
    not nested cards. */
+.desktop-git-status-card > .desktop-git-section-collapse-inner {
+  box-sizing: border-box;
+  padding-bottom: 8px;
+}
+
 .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-working-tree-list,
 .desktop-git-status-card .desktop-git-section-collapse-inner > .desktop-git-remote-preview {
-  padding-block: var(--git-section-body-top-gap) 8px;
+  padding-block: var(--git-section-body-top-gap) 0;
   padding-inline: 0;
 }
 
 .desktop-git-status-card .desktop-working-tree-row {
-  width: calc(100% - 8px);
-  margin-inline: 4px;
+  width: calc(100% - 16px);
+  margin-inline: 8px;
 }
 
 .desktop-git-status-card .desktop-working-tree-main {
-  padding-inline-start: 6px;
+  padding-inline-start: 0;
 }
 
 .desktop-git-status-card .desktop-working-tree-row.active {

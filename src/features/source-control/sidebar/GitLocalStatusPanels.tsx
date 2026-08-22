@@ -22,9 +22,9 @@ import { GitStatusCardSection } from "./GitStatusCardSection";
 import { getGitSidebarPanelBodyRows } from "./useGitSidebarPanelLayout";
 import type { GitSidebarExpansionState } from "./useGitSidebarExpansionState";
 
-// Includes the context line and the status card's inset bottom padding so a
-// fitted list does not produce fractional overflow or a phantom scrollbar.
-const STATUS_CARD_CONTEXT_ROWS = 1.3;
+// The status card owns a 36px context/action row and 8px bottom inset outside
+// the row-based file list. Keep that fixed chrome out of list row arithmetic.
+const STATUS_CARD_CHROME_PX = 44;
 
 type LocalPanelActions = Pick<
   GitSidebarActions,
@@ -85,7 +85,8 @@ export function createGitLocalStatusPanels({
       className: "merge",
       grow: 0.9,
       expanded: expanded.merge,
-      bodyRows: getGitSidebarPanelBodyRows(model.mergeResources.length) + STATUS_CARD_CONTEXT_ROWS,
+      bodyRows: getGitSidebarPanelBodyRows(model.mergeResources.length),
+      bodyChromePx: STATUS_CARD_CHROME_PX,
       content: (
         <GitStatusCardSection
           title={t(model.repositoryOperation ? "source-control.section.operation" : "source-control.section.merge")}
@@ -151,7 +152,8 @@ export function createGitLocalStatusPanels({
       grow: 1.05,
       expanded: expanded.committed,
       headerRows: 0,
-      bodyRows: getGitSidebarPanelBodyRows(model.committedResources.length, true) + STATUS_CARD_CONTEXT_ROWS,
+      bodyRows: getGitSidebarPanelBodyRows(model.committedResources.length, true),
+      bodyChromePx: STATUS_CARD_CHROME_PX,
       content: (
         <GitStatusCardSection
           title={t("source-control.section.committed")}
@@ -207,7 +209,8 @@ export function createGitLocalStatusPanels({
       className: "staged",
       grow: 0.9,
       expanded: expanded.staged,
-      bodyRows: getGitSidebarPanelBodyRows(model.stagedResources.length, true) + STATUS_CARD_CONTEXT_ROWS,
+      bodyRows: getGitSidebarPanelBodyRows(model.stagedResources.length, true),
+      bodyChromePx: STATUS_CARD_CHROME_PX,
       content: (
         <GitStatusCardSection
           title={t("source-control.section.staged")}
@@ -253,7 +256,8 @@ export function createGitLocalStatusPanels({
       className: "unstaged",
       grow: 1.15,
       expanded: expanded.unstaged,
-      bodyRows: getGitSidebarPanelBodyRows(model.localChangeResources.length, true) + STATUS_CARD_CONTEXT_ROWS,
+      bodyRows: getGitSidebarPanelBodyRows(model.localChangeResources.length, true),
+      bodyChromePx: STATUS_CARD_CHROME_PX,
       content: (
         <GitStatusCardSection
           title={t("source-control.section.unstaged")}
