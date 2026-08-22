@@ -106,7 +106,7 @@
   width: 100%;
   height: 38px;
   min-height: 38px;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 10px;
   padding: 0 14px;
   border: 1px solid var(--po-border);
@@ -117,7 +117,7 @@
   font-size: var(--po-text-size-body, 13px);
   font-weight: var(--po-text-weight-medium, 500);
   line-height: 1;
-  text-align: start;
+  text-align: center;
   cursor: var(--po-clickable-cursor, pointer);
   transition:
     border-color 130ms ease-out,
