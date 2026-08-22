@@ -96,7 +96,7 @@
   box-sizing: border-box;
   justify-self: center;
   justify-items: center;
-  padding: 18px;
+  padding: 0;
   border: 0;
   background: transparent;
 }

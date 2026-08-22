@@ -154,7 +154,7 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-brand-lockup\s*\{[^}]*color:\s*var\(--po-text-muted\);/s);
     expect(css).toMatch(/\.onboarding-brand-mark\s*\{[^}]*width:\s*40px;[^}]*height:\s*40px;/s);
     expect(css).not.toContain(".onboarding-brand-version");
-    expect(css).toMatch(/\.onboarding-primary-area\s*\{[^}]*width:\s*min\(320px, 100%\);[^}]*justify-self:\s*center;[^}]*justify-items:\s*center;[^}]*padding:\s*18px;[^}]*border:\s*0;[^}]*background:\s*transparent;/s);
+    expect(css).toMatch(/\.onboarding-primary-area\s*\{[^}]*width:\s*min\(320px, 100%\);[^}]*justify-self:\s*center;[^}]*justify-items:\s*center;[^}]*padding:\s*0;[^}]*border:\s*0;[^}]*background:\s*transparent;/s);
     expect(css).toMatch(/\.onboarding-entry-launcher\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/s);
     expect(css).toMatch(/\.onboarding-entry-actions\s*\{[^}]*display:\s*grid;[^}]*gap:\s*12px;/s);
     expect(css).not.toContain(".onboarding-entry-secondary-row");
