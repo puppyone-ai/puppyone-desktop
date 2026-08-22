@@ -712,8 +712,6 @@ body.desktop-git-sidebar-resizing {
 .desktop-git-github-file-total,
 .desktop-git-github-update-age {
   overflow: hidden;
-  color: var(--po-text-muted);
-  font-size: var(--git-font-main);
   font-weight: var(--git-weight-regular);
   line-height: var(--git-line-height);
   text-overflow: ellipsis;
@@ -722,14 +720,22 @@ body.desktop-git-sidebar-resizing {
 
 .desktop-git-github-file-total {
   grid-column: 1;
-  grid-row: 1;
+  grid-row: 2;
+  color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));
+  font-size: var(--git-font-small);
 }
 
 .desktop-git-github-change-card .desktop-git-github-update-age {
   grid-column: 1;
-  grid-row: 2;
-  color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));
-  font-size: var(--git-font-small);
+  grid-row: 1;
+  color: var(--po-text-muted);
+  font-size: var(--git-font-main);
+}
+
+.desktop-git-github-change-card.is-age-unavailable .desktop-git-github-file-total {
+  grid-row: 1;
+  color: var(--po-text-muted);
+  font-size: var(--git-font-main);
 }
 
 .desktop-git-github-card-action {

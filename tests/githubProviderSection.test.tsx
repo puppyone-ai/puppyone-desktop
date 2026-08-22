@@ -98,6 +98,10 @@ describe("GitHub provider section", () => {
     const card = surface.querySelector(".desktop-git-github-change-card");
     const identityRow = surface.querySelector(".desktop-git-hosting-identity-row");
     const pullButton = surface.querySelector<HTMLButtonElement>(".desktop-git-remote-action");
+    expect(Array.from(card?.children ?? []).slice(0, 2).map((child) => child.className)).toEqual([
+      "desktop-git-github-update-age",
+      "desktop-git-github-file-total",
+    ]);
     expect(card?.contains(pullButton ?? null)).toBe(true);
     expect(identityRow?.contains(pullButton ?? null)).toBe(false);
     await act(async () => pullButton?.click());

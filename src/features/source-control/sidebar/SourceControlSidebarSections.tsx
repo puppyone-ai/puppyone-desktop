@@ -168,15 +168,15 @@ function GitHubIncomingChangesCard({
   const updateAge = formatGitRemoteUpdateAge(incomingUpdatedAt, formatRelativeTime);
 
   return (
-    <div className="desktop-git-github-change-card">
-      <strong className="desktop-git-github-file-total">
-        {t("source-control.commit.changes", { count: fileSummary.total })}
-      </strong>
+    <div className={`desktop-git-github-change-card${updateAge ? "" : " is-age-unavailable"}`}>
       {updateAge && (
         <time className="desktop-git-github-update-age" dateTime={incomingUpdatedAt ?? undefined}>
           {updateAge}
         </time>
       )}
+      <span className="desktop-git-github-file-total">
+        {t("source-control.commit.changes", { count: fileSummary.total })}
+      </span>
       {action}
     </div>
   );

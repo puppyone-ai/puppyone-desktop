@@ -231,6 +231,10 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-github-change-card .desktop-git-github-update-age",
     ));
+    const fileTotal = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-file-total",
+    ));
 
     expect(sourceControlSidebarSource).toContain("<GitHubProviderSection");
     expect(sourceControlSidebarSectionsSource).toContain(
@@ -255,8 +259,15 @@ describe("source-control visual architecture", () => {
       "background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));",
     );
     expect(updateAge).toContain(
+      "grid-row: 1;",
+    );
+    expect(updateAge).toContain("color: var(--po-text-muted);");
+    expect(updateAge).toContain("font-size: var(--git-font-main);");
+    expect(fileTotal).toContain("grid-row: 2;");
+    expect(fileTotal).toContain(
       "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",
     );
+    expect(fileTotal).toContain("font-size: var(--git-font-small);");
   });
 
   it("keeps GitHub Fetch lifecycle out of the presentational sidebar", () => {
