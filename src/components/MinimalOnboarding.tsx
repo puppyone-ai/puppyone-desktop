@@ -260,9 +260,9 @@ export function MinimalOnboarding({
                 </Button>
               </div>
 
-              <div className="onboarding-provider-strip" aria-label={t("onboarding.action.orImportFrom")}>
+              <div className="onboarding-provider-strip" aria-label={t("onboarding.action.importFrom")}>
                 <span className="onboarding-provider-label">
-                  {t("onboarding.action.orImportFrom")}
+                  {t("onboarding.action.importFrom")}
                 </span>
                 <div className="onboarding-provider-sources">
                   <button

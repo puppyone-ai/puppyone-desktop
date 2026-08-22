@@ -9,7 +9,7 @@
   "action.createCloudProject": "Crear proyecto en Cloud",
   "action.openFolder": "Abrir carpeta local",
   "action.createLocalProject": "Crear proyecto local",
-  "action.orImportFrom": "o importar desde",
+  "action.importFrom": "importar desde",
   "entry.create.title": "Crear un proyecto local",
   "entry.create.nameLabel": "Nombre del proyecto",
   "entry.create.namePlaceholder": "Mi proyecto",

@@ -139,7 +139,7 @@ describe("project folder home", () => {
     expect(actions[0]?.querySelector(".lucide-folder-open")).not.toBeNull();
     expect(actions[1]?.querySelector(".onboarding-entry-create-icon")).not.toBeNull();
     const providers = [...container.querySelectorAll<HTMLButtonElement>(".onboarding-provider-source")];
-    expect(container.querySelector(".onboarding-provider-label")?.textContent).toBe("or import from");
+    expect(container.querySelector(".onboarding-provider-label")?.textContent).toBe("import from");
     expect(container.querySelector(".onboarding-provider-arrow")).toBeNull();
     expect(providers.map((provider) => provider.dataset.provider)).toEqual(["github"]);
     expect(providers[0]?.disabled).toBe(false);
