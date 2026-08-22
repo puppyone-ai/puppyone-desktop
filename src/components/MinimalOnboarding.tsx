@@ -254,7 +254,7 @@ export function MinimalOnboarding({
                   leadingIcon={<FilePlus2 className="onboarding-entry-create-icon" aria-hidden="true" />}
                   onClick={() => setEntryDialog("create")}
                 >
-                  {t("onboarding.action.createNew")}
+                  {t("onboarding.action.createLocalProject")}
                 </Button>
               </div>
 

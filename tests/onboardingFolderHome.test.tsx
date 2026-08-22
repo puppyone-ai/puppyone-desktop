@@ -121,7 +121,7 @@ describe("project folder home", () => {
     expect(actions).toHaveLength(2);
     expect(actions.map((action) => action.textContent)).toEqual([
       "Open local folder",
-      "Create new",
+      "Create local project",
     ]);
     expect(actions.every((action) => action.classList.contains("po-button"))).toBe(true);
     expect(actions[0]?.classList.contains("po-button--primary")).toBe(true);
@@ -168,7 +168,7 @@ describe("project folder home", () => {
     await act(async () => {
       container.querySelectorAll<HTMLButtonElement>(".onboarding-entry-action")[1]?.click();
     });
-    expect(container.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe("Create a project");
+    expect(container.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe("Create a local project");
     const projectName = container.querySelector<HTMLInputElement>(".onboarding-entry-dialog input");
     expect(projectName?.placeholder).toBe("My project");
     setInputValue(projectName, "Knowledge Base");
