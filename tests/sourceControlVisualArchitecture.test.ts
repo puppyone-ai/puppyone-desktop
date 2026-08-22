@@ -340,6 +340,14 @@ describe("source-control visual architecture", () => {
       sidebarBaseCss,
       ".desktop-git-card-divider .desktop-git-identity-icon-slot",
     ));
+    const cardDividerHeader = compact(readCssBlock(
+      sidebarBaseCss,
+      ".desktop-git-section-row.desktop-git-card-divider-header",
+    ));
+    const sectionTitle = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-section-title",
+    ));
     const statusCardResourceRow = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-status-card .desktop-working-tree-row",
@@ -363,15 +371,15 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSectionsSource).toContain(
       'const separateIdentity = layout === "dividers" && contextVariant === "group";',
     );
-    expect(sourceControlSidebarSectionsSource).toContain('className="desktop-git-card-divider"');
     expect(sourceControlSidebarSectionsSource).toContain(
-      '<span className="desktop-git-status-card-context-copy">{title}</span>',
+      'className={separateIdentity ? "desktop-git-card-divider-header" : undefined}',
     );
+    expect(sourceControlSidebarSectionsSource).toContain("controlsId={bodyId}");
     expect(sourceControlSidebarSectionsSource).toContain("{contextContent}");
     expect(sourceControlSidebarSectionsSource).not.toContain("is-action-only");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context-row");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-status-card-context");
-    expect(sourceControlSidebarSectionsSource).toContain("contextIcon={<Folder size={14} strokeWidth={2} />}");
+    expect(sourceControlSidebarSectionsSource).not.toContain("contextIcon={<Folder");
     expect(sourceControlSidebarSectionsSource).toContain('contextVariant="group"');
     expect(sourceControlSidebarSectionsSource).toContain("const STATUS_CARD_CHROME_PX = 44;");
     expect(sourceControlSidebarSectionsSource).toContain("bodyChromePx: STATUS_CARD_CHROME_PX");
@@ -402,6 +410,13 @@ describe("source-control visual architecture", () => {
       "margin-inline: calc(var(--git-sidebar-control-left-gap) + 10px) var(--git-sidebar-control-right-gap);",
     );
     expect(cardDividerIcon).toContain("padding-inline-start: 0;");
+    expect(cardDividerHeader).toContain(
+      "margin-inline: calc(var(--git-sidebar-control-left-gap) + 10px) var(--git-sidebar-control-right-gap);",
+    );
+    expect(cardDividerHeader).toContain("padding-inline: 0;");
+    expect(sectionTitle).toContain(
+      "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",
+    );
     expect(statusCardGroupLabel).toContain(
       "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",
     );

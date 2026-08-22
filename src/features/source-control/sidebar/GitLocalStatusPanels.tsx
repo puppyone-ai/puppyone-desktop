@@ -1,4 +1,4 @@
-import { Folder, Plus, Undo2 } from "lucide-react";
+import { Plus, Undo2 } from "lucide-react";
 import {
   SidebarEmptyState,
   SidebarIconButton,
@@ -165,7 +165,6 @@ export function createGitLocalStatusPanels({
           title={t("source-control.section.committed")}
           count={model.committedCount}
           context={model.sectionContext.committed}
-          contextIcon={<Folder size={14} strokeWidth={2} />}
           contextVariant="group"
           layout={layout}
           expanded={expanded.committed}

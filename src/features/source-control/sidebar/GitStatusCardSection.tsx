@@ -47,36 +47,22 @@ export function GitStatusCardSection({
 
   return (
     <>
-      {showHeader && (
+      {(showHeader || separateIdentity) && (
         <SourceControlSectionHeader
           title={title}
           count={count}
+          className={separateIdentity ? "desktop-git-card-divider-header" : undefined}
           showCount={false}
           controlsId={bodyId}
           expanded={expanded}
           onToggle={onToggle}
         />
       )}
-      {separateIdentity && (
-        <div className="desktop-git-card-divider">
-          <span className="desktop-git-status-card-context is-group-label">
-            {contextIcon && (
-              <span
-                className="desktop-git-status-card-context-icon desktop-git-identity-icon-slot"
-                aria-hidden="true"
-              >
-                {contextIcon}
-              </span>
-            )}
-            <span className="desktop-git-status-card-context-copy">{title}</span>
-          </span>
-        </div>
-      )}
       <GitSectionCollapse
-        id={showHeader ? bodyId : undefined}
+        id={showHeader || separateIdentity ? bodyId : undefined}
         expanded={expanded}
         className={`desktop-git-status-card${separateIdentity ? " is-divider-layout" : ""}`}
-        ariaLabel={showHeader ? undefined : title}
+        ariaLabel={showHeader || separateIdentity ? undefined : title}
       >
         <div className="desktop-git-status-card-context-row">
           {contextContent}

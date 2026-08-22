@@ -68,7 +68,7 @@ describe("Git sidebar status cards", () => {
     expect(committedCard?.getAttribute("aria-label")).toBe("Committed Changes");
     expect(committedCard?.querySelector(".desktop-git-status-card-context")?.classList.contains("is-group-label"))
       .toBe(true);
-    expect(committedCard?.querySelector(".desktop-git-status-card-context-icon svg")).not.toBeNull();
+    expect(committedCard?.querySelector(".desktop-git-status-card-context-icon svg")).toBeNull();
     expect(committedCard?.querySelector(".desktop-git-status-card-context-copy")?.textContent).toBe("2 commits");
     expect(committedSection?.querySelector(".desktop-git-section-title")).toBeNull();
     expect(stagedToggle?.getAttribute("aria-expanded")).toBe("true");
@@ -110,11 +110,22 @@ describe("Git sidebar status cards", () => {
     expect(githubSection?.querySelector(".desktop-git-card-divider .desktop-git-github-identity")).not.toBeNull();
     expect(githubCard?.querySelector(".desktop-git-github-identity")).toBeNull();
     expect(githubCard?.querySelector('button[aria-label="Pull"]')).not.toBeNull();
-    expect(committedSection?.querySelector(".desktop-git-card-divider .desktop-git-status-card-context-copy")?.textContent)
+    const committedToggle = committedSection?.querySelector<HTMLButtonElement>(
+      ".desktop-git-card-divider-header .desktop-git-section-title",
+    );
+    expect(committedToggle?.textContent)
       .toBe("Committed Changes");
+    expect(committedToggle?.querySelector(".po-disclosure-icon")).not.toBeNull();
+    expect(committedToggle?.querySelectorAll("svg")).toHaveLength(1);
+    expect(committedToggle?.getAttribute("aria-expanded")).toBe("true");
     expect(committedCard?.querySelector(".desktop-git-status-card-context-copy")?.textContent).toBe("1 commit");
     expect(committedCard?.querySelector(".desktop-git-status-card-context-icon")).toBeNull();
     expect(committedCard?.querySelector('button[aria-label="Push"]')).not.toBeNull();
+
+    act(() => committedToggle?.click());
+
+    expect(committedToggle?.getAttribute("aria-expanded")).toBe("false");
+    expect(committedSection?.classList.contains("collapsed")).toBe(true);
   });
 
   it("renders merge conflicts through the same default-expanded card contract", () => {
