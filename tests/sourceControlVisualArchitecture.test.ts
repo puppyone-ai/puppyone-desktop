@@ -324,6 +324,7 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSectionsSource).toContain("export function GitLocalStatusSection");
     expect(sourceControlSidebarSectionsSource).toContain('className="desktop-git-local-section-body"');
     expect(sourceControlSidebarSectionsSource).toContain("controlsId={bodyId}");
+    expect(sourceControlSidebarSectionsSource).toContain("showCount={false}");
     expect(sourceControlSidebarSectionsSource).toContain("count={model.committedCount}");
     expect(sourceControlSidebarSectionsSource).not.toContain("countLabel");
     expect(sourceControlSidebarSectionsSource.match(/<GitLocalStatusSection/g)).toHaveLength(4);
