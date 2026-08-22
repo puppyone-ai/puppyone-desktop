@@ -166,6 +166,7 @@ describe("project folder home", () => {
     expect(css).toMatch(/\.onboarding-provider-source\s*\{[^}]*width:\s*28px;[^}]*height:\s*28px;/s);
     expect(css).toMatch(/\.onboarding-provider-import-action\s*\{[^}]*height:\s*28px;[^}]*padding:\s*0;[^}]*border:\s*0;[^}]*background:\s*transparent;[^}]*font-size:\s*12px;/s);
     expect(css).toMatch(/\.onboarding-entry-create-row\s*\{[^}]*min-height:\s*52px;[^}]*grid-template-columns:\s*104px minmax\(0, 1fr\);[^}]*gap:\s*16px;/s);
+    expect(css).toMatch(/\.onboarding-entry-dialog \.desktop-dialog-button\.primary\.file:disabled\s*\{[^}]*border-color:\s*var\(--po-border-subtle\);[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-disabled\);/s);
     expect(css).not.toContain(".folder-drop-zone");
 
     await act(async () => actions[0]?.click());

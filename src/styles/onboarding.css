@@ -369,6 +369,12 @@
   margin-top: 8px;
 }
 
+.onboarding-entry-dialog .desktop-dialog-button.primary.file:disabled {
+  border-color: var(--po-border-subtle);
+  background: transparent;
+  color: var(--po-text-disabled);
+}
+
 .onboarding-entry-dialog .desktop-dialog-footer {
   padding-inline: var(--onboarding-entry-inset);
   padding-block-end: var(--onboarding-entry-inset);
