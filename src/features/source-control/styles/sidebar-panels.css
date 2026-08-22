@@ -84,12 +84,12 @@
 }
 
 .desktop-git-status-card .desktop-working-tree-row {
-  width: calc(100% - 16px);
-  margin-inline: 8px;
+  width: calc(100% - 8px);
+  margin-inline: 4px;
 }
 
 .desktop-git-status-card .desktop-working-tree-main {
-  padding-inline-start: 0;
+  padding-inline-start: 6px;
 }
 
 .desktop-git-status-card .desktop-working-tree-row.active {

@@ -368,9 +368,9 @@ describe("source-control visual architecture", () => {
     expect(statusCardGroupLabel).toContain(
       "font-size: var(--desktop-sidebar-section-title-font-size, var(--po-text-size-meta, 12px));",
     );
-    expect(statusCardResourceRow).toContain("width: calc(100% - 16px);");
-    expect(statusCardResourceRow).toContain("margin-inline: 8px;");
-    expect(statusCardResourceMain).toContain("padding-inline-start: 0;");
+    expect(statusCardResourceRow).toContain("width: calc(100% - 8px);");
+    expect(statusCardResourceRow).toContain("margin-inline: 4px;");
+    expect(statusCardResourceMain).toContain("padding-inline-start: 6px;");
     expect(statusCardInner).toContain("box-sizing: border-box;");
     expect(statusCardInner).toContain("padding-bottom: 8px;");
     expect(compact(sidebarResourcesCss)).toContain(compact(`
