@@ -1,4 +1,13 @@
 {
+  "section.operation": "Git-Vorgang",
+  "error.pull-conflict": "Der Pull wurde wegen Dateikonflikten angehalten. Löse und stage die Konflikte und setze den Git-Vorgang fort oder brich ihn ab.",
+  "dialog.abortOperation": "Aktuellen Git-Vorgang abbrechen und den vorherigen Branch-Zustand wiederherstellen?",
+  "sync.abort": "Abbrechen",
+  "sync.continue": "Fortsetzen",
+  "sync.continueTitle": "Setze den laufenden Git-Vorgang fort, nachdem alle Konflikte gelöst und gestagt wurden.",
+  "sync.continuing": "Wird fortgesetzt…",
+  "sync.readyToContinue": "Bereit zum Fortsetzen",
+  "sync.resolveBeforeSync": "Löse zuerst den aktuellen Git-Vorgang, bevor du abrufst, überträgst, veröffentlichst oder committest.",
   "action.committing": "Commit wird erstellt…",
   "action.discard": "Verwerfen",
   "action.discardAll": "Alle verwerfen",

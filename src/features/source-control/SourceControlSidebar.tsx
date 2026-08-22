@@ -70,10 +70,10 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
     t,
   });
   const remoteSection = showRemoteSyncSection && !syncState.setupRequired
-    ? getGitScmSyncSection(status, syncState, t)
+    ? getGitScmSyncSection(status, syncState, t, { blockedByConflicts: sidebarModel.hasConflicts })
     : null;
   const githubSection = hostingMode === "github" && !syncState.setupRequired
-    ? getGitScmSyncSection(status, syncState, t)
+    ? getGitScmSyncSection(status, syncState, t, { blockedByConflicts: sidebarModel.hasConflicts })
     : null;
   const cloudSyncActionAvailable = hostingMode === "puppyone-cloud"
     && status?.sourceControl.remote?.canPull === true
@@ -82,6 +82,8 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
     && githubSection.action.disabled === false
     && sidebarModel.mergeResources.length === 0;
   const primaryActionSlot = getSourceControlPrimaryActionSlot({
+    hasConflicts: sidebarModel.hasConflicts,
+    hasOperationAction: Boolean(sidebarModel.operationPrimaryAction),
     hasStagedAction: sidebarModel.professionalMode
       && Boolean(sidebarModel.stagedPrimaryAction && !sidebarModel.stagedPrimaryAction.disabled),
     hasSyncAction: cloudSyncActionAvailable
@@ -162,6 +164,7 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
           onPull={pull}
           onPush={push}
           onPublish={publish}
+          blockedByConflicts={sidebarModel.hasConflicts}
         />
       ),
     });

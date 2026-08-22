@@ -1,4 +1,13 @@
 {
+  "section.operation": "Git 작업",
+  "error.pull-conflict": "파일 충돌로 가져오기가 일시 중지되었습니다. 충돌을 해결하고 스테이징한 뒤 Git 작업을 계속하거나 중단하세요.",
+  "dialog.abortOperation": "현재 Git 작업을 중단하고 브랜치를 이전 상태로 복원하시겠습니까?",
+  "sync.abort": "중단",
+  "sync.continue": "계속",
+  "sync.continueTitle": "모든 충돌을 해결하고 스테이징한 후 진행 중인 Git 작업을 계속합니다.",
+  "sync.continuing": "계속하는 중…",
+  "sync.readyToContinue": "계속할 준비가 됨",
+  "sync.resolveBeforeSync": "가져오기, 푸시, 게시 또는 커밋 전에 현재 Git 작업을 먼저 해결하세요.",
   "action.committing": "커밋 중…",
   "action.discard": "취소",
   "action.discardAll": "모두 취소",

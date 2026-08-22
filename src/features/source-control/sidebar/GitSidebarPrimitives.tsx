@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Clock3, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Clock3, Plus } from "lucide-react";
 import {
   SidebarResizeHandle,
   type SidebarResizeIntent,
@@ -148,6 +148,7 @@ export function SourceControlDots() {
 }
 
 function renderGitActionIcon(icon: GitActionIconKind) {
+  if (icon === "check") return <Check size={15} strokeWidth={2.25} aria-hidden="true" />;
   if (icon === "plus") return <Plus size={15} strokeWidth={2.25} aria-hidden="true" />;
   const Icon = icon === "upload" ? ArrowUp : ArrowDown;
   return <Icon className="desktop-git-action-arrow" size={15} strokeWidth={2.25} aria-hidden="true" />;

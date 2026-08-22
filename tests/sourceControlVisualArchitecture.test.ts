@@ -585,6 +585,8 @@ describe("source-control visual architecture", () => {
     ));
     const select = (overrides: Partial<Parameters<typeof getSourceControlPrimaryActionSlot>[0]> = {}) => (
       getSourceControlPrimaryActionSlot({
+        hasConflicts: false,
+        hasOperationAction: false,
         hasStagedAction: false,
         hasSyncAction: false,
         hasCommittedAction: false,
@@ -599,7 +601,9 @@ describe("source-control visual architecture", () => {
     expect(primary).toContain("color: var(--desktop-git-primary-fg);");
     expect(stageAll).toContain("background: var(--po-control);");
     expect(stageAll).not.toContain("var(--desktop-git-primary-bg)");
-    expect(select({ hasStagedAction: true, hasSyncAction: true, hasCommittedAction: true })).toBe("staged");
+    expect(select({ hasStagedAction: true, hasSyncAction: true, hasCommittedAction: true })).toBe("sync");
+    expect(select({ hasConflicts: true, hasStagedAction: true, hasSyncAction: true, hasCommittedAction: true })).toBeNull();
+    expect(select({ hasOperationAction: true, hasSyncAction: true })).toBe("operation");
     expect(select({ hasSyncAction: true, hasCommittedAction: true })).toBe("sync");
     expect(select({ hasCommittedAction: true, hasSimpleAction: true })).toBe("committed");
     expect(select({ hasSimpleAction: true })).toBe("simple");

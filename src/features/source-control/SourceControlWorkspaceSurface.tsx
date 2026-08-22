@@ -53,6 +53,8 @@ export function createSourceControlWorkspaceSurface({
           stageAndCommit: controller.handleStageAndCommitGit,
           commit: controller.handleCommitGit,
           commitAndPush: controller.handleCommitAndPushGit,
+          continueOperation: controller.handleContinueGitOperation,
+          abortOperation: controller.handleAbortGitOperation,
           pull: controller.handlePullGit,
           push: controller.handlePushGit,
           publish: controller.handlePublishGitBranch,

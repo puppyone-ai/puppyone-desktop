@@ -35,6 +35,8 @@ type LocalPanelActions = Pick<
   | "stageAndCommit"
   | "commit"
   | "commitAndPush"
+  | "continueOperation"
+  | "abortOperation"
   | "push"
   | "publish"
 >;
@@ -69,11 +71,13 @@ export function createGitLocalStatusPanels({
   const primaryActionHandlers: Record<GitSidebarPrimaryActionKind, () => Promise<boolean>> = {
     commit: actions.commit,
     "commit-push": actions.commitAndPush,
+    continue: actions.continueOperation,
     push: actions.push,
     publish: actions.publish,
   };
 
-  if (model.mergeResources.length > 0) {
+  if (model.hasConflicts || model.repositoryOperation) {
+    const operationAction = model.operationPrimaryAction;
     panels.push({
       id: "merge",
       className: "merge",
@@ -82,22 +86,56 @@ export function createGitLocalStatusPanels({
       bodyRows: getGitSidebarPanelBodyRows(model.mergeResources.length) + STATUS_CARD_CONTEXT_ROWS,
       content: (
         <GitStatusCardSection
-          title={t("source-control.section.merge")}
+          title={t(model.repositoryOperation ? "source-control.section.operation" : "source-control.section.merge")}
           count={model.mergeResources.length}
           context={model.sectionContext.merge}
           expanded={expanded.merge}
           onToggle={() => onToggle("merge")}
+          action={model.repositoryOperation ? (
+            <div className="desktop-git-section-actions">
+              {model.repositoryOperation.canAbort && (
+                <SidebarIconButton
+                  className="desktop-git-abort-operation-action"
+                  tone="danger"
+                  label={t("source-control.sync.abort")}
+                  disabled={disabled}
+                  onClick={() => {
+                    if (window.confirm(t("source-control.dialog.abortOperation"))) {
+                      void actions.abortOperation();
+                    }
+                  }}
+                  icon={<Undo2 size={13} />}
+                />
+              )}
+              {operationAction && (
+                <GitOperationButton
+                  className="desktop-git-continue-operation-action"
+                  title={operationAction.title}
+                  disabled={disabled || operationAction.disabled}
+                  icon={operationAction.icon}
+                  label={operationAction.label}
+                  loadingKey={operationAction.loadingKey}
+                  loadingLabel={operationAction.loadingLabel}
+                  operationLoading={operationLoading}
+                  primary={primaryActionSlot === "operation"}
+                  onClick={() => void primaryActionHandlers[operationAction.kind]()}
+                />
+              )}
+            </div>
+          ) : undefined}
         >
-          <SourceControlWorkingResourceList
-            resources={model.mergeResources}
-            selectedWorkingFile={selectedWorkingFile}
-            operationLoading={operationLoading}
-            fileIconTheme={fileIconTheme}
-            onSelectWorkingFile={actions.selectWorkingFile}
-            onStagePaths={actions.stagePaths}
-            onUnstagePaths={actions.unstagePaths}
-            onDiscardPaths={actions.discardPaths}
-          />
+          {model.mergeResources.length > 0 ? (
+            <SourceControlWorkingResourceList
+              resources={model.mergeResources}
+              selectedWorkingFile={selectedWorkingFile}
+              operationLoading={operationLoading}
+              fileIconTheme={fileIconTheme}
+              onSelectWorkingFile={actions.selectWorkingFile}
+              onStagePaths={actions.stagePaths}
+              onUnstagePaths={actions.unstagePaths}
+              onDiscardPaths={actions.discardPaths}
+            />
+          ) : null}
         </GitStatusCardSection>
       ),
     });

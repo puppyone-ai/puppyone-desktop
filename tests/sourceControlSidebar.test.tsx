@@ -129,11 +129,70 @@ describe("Git sidebar status cards", () => {
     expect(onPull).toHaveBeenCalledTimes(1);
     expect(onPush).not.toHaveBeenCalled();
   });
+
+  it("keeps Pull primary when incoming commits and staged files exist together", () => {
+    const status = createDivergedGitHubStatus();
+    status.sourceControl.groups = [{
+      id: "index",
+      label: "Staged Changes",
+      resources: [resource("index", "staged.md", "modified", "M")],
+    }];
+    status.sourceControl.actions.canCommit = true;
+    const surface = renderSidebar({ status });
+    const pullButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Pull"]');
+    const commitButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Commit"]');
+
+    expect(pullButton?.classList.contains("is-primary")).toBe(true);
+    expect(commitButton?.disabled).toBe(false);
+    expect(commitButton?.classList.contains("is-primary")).toBe(false);
+  });
+
+  it("blocks sync actions until working-tree conflicts are resolved", async () => {
+    const onPush = vi.fn(async () => true);
+    const status = createGitStatus();
+    status.sourceControl.groups.unshift({
+      id: "merge",
+      label: "Merge Changes",
+      resources: [resource("merge", "conflicted.md", "conflict", "!")],
+    });
+    status.sourceControl.actions.canCommit = false;
+    const surface = renderSidebar({ onPush, status });
+    const pushButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Push"]');
+
+    expect(pushButton?.disabled).toBe(true);
+    expect(pushButton?.classList.contains("is-primary")).toBe(false);
+    await act(async () => pushButton?.click());
+    expect(onPush).not.toHaveBeenCalled();
+  });
+
+  it("makes Continue the only primary action after rebase conflicts are staged", async () => {
+    const onContinue = vi.fn(async () => true);
+    const onPush = vi.fn(async () => true);
+    const status = createGitStatus();
+    status.sourceControl.operation = { kind: "rebase", canContinue: true, canAbort: true };
+    status.sourceControl.actions.canCommit = false;
+    const surface = renderSidebar({ onContinue, onPush, status });
+    const continueButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Continue"]');
+    const abortButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Abort"]');
+    const pushButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Push"]');
+
+    expect(surface.textContent).toContain("Git Operation");
+    expect(continueButton?.disabled).toBe(false);
+    expect(continueButton?.classList.contains("is-primary")).toBe(true);
+    expect(abortButton?.disabled).toBe(false);
+    expect(pushButton?.disabled).toBe(true);
+    expect(pushButton?.classList.contains("is-primary")).toBe(false);
+
+    await act(async () => continueButton?.click());
+    expect(onContinue).toHaveBeenCalledTimes(1);
+    expect(onPush).not.toHaveBeenCalled();
+  });
 });
 
 function renderSidebar(options: Partial<{
   gitDisplayMode: "simple" | "professional";
   onCommit: () => Promise<boolean>;
+  onContinue: () => Promise<boolean>;
   onDiscardAll: () => Promise<boolean>;
   onPull: () => Promise<boolean>;
   onPush: () => Promise<boolean>;
@@ -174,6 +233,8 @@ function renderSidebar(options: Partial<{
         stageAndCommit: options.stageAndCommit ?? succeed,
         commit: options.onCommit ?? succeed,
         commitAndPush: succeed,
+        continueOperation: options.onContinue ?? succeed,
+        abortOperation: succeed,
         pull: options.onPull ?? succeed,
         push: options.onPush ?? succeed,
         publish: succeed,

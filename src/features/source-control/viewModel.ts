@@ -237,6 +237,9 @@ export function buildSourceControlSidebarModel({
   const sourceControl = status?.sourceControl ?? null;
   const groupById = new Map((sourceControl?.groups ?? []).map((group) => [group.id, group.resources]));
   const mergeResources = groupById.get("merge") ?? [];
+  const repositoryOperation = sourceControl?.operation ?? null;
+  const hasConflicts = mergeResources.length > 0;
+  const syncBlocked = hasConflicts || Boolean(repositoryOperation);
   const stagedResources = groupById.get("index") ?? [];
   const workingResources = [
     ...(groupById.get("workingTree") ?? []),
@@ -245,12 +248,31 @@ export function buildSourceControlSidebarModel({
   const professionalMode = displayMode === "professional";
   const committedCount = sourceControl?.remote.ahead ?? 0;
   const committedResources = sourceControl?.remote.outgoingPreview ?? [];
-  const committedPrimaryAction = getCommittedPrimaryAction(status, syncState, t);
-  const stagedPrimaryAction = getStagedPrimaryAction(status, syncState, stagedResources.length, canCommit, professionalMode, t);
+  const committedPrimaryAction = getCommittedPrimaryAction(status, syncState, syncBlocked, t);
+  const stagedPrimaryAction = repositoryOperation ? null : getStagedPrimaryAction(
+    status,
+    syncState,
+    stagedResources.length,
+    canCommit,
+    professionalMode,
+    hasConflicts,
+    t,
+  );
+  const operationPrimaryAction = repositoryOperation?.canContinue ? {
+    label: t("source-control.sync.continue"),
+    title: t("source-control.sync.continueTitle"),
+    disabled: false,
+    kind: "continue" as const,
+    loadingKey: "continue",
+    loadingLabel: t("source-control.sync.continuing"),
+    icon: "check" as const,
+  } : null;
   const localChangeResources = professionalMode ? workingResources : [...stagedResources, ...workingResources];
 
   return {
     professionalMode,
+    repositoryOperation,
+    hasConflicts,
     mergeResources,
     stagedResources,
     workingResources,
@@ -258,13 +280,16 @@ export function buildSourceControlSidebarModel({
     committedCount,
     committedResources,
     committedPrimaryAction,
+    operationPrimaryAction,
     showCommittedSection: committedCount > 0 || Boolean(committedPrimaryAction),
     showStagedSection: professionalMode && stagedResources.length > 0,
     showUnstagedSection: localChangeResources.length > 0,
     stagedPrimaryAction,
-    showSimpleChangeAction: !professionalMode && localChangeResources.length > 0,
+    showSimpleChangeAction: !professionalMode && localChangeResources.length > 0 && !hasConflicts && !repositoryOperation,
     sectionContext: {
-      merge: t("source-control.commit.conflicts", { count: mergeResources.length }),
+      merge: hasConflicts
+        ? t("source-control.commit.conflicts", { count: mergeResources.length })
+        : t("source-control.sync.readyToContinue"),
       committed: t("source-control.commit.commits", { count: committedCount }),
       staged: t("source-control.commit.files", { count: stagedResources.length }),
       unstaged: t("source-control.commit.files", { count: localChangeResources.length }),
@@ -276,21 +301,27 @@ export function getCommittedSummary(count: number, actionLabel: string, t: Messa
   return t("source-control.committed.ready", { count, action: actionLabel });
 }
 
-export type SourceControlPrimaryActionSlot = "staged" | "sync" | "committed" | "simple" | null;
+export type SourceControlPrimaryActionSlot = "operation" | "staged" | "sync" | "committed" | "simple" | null;
 
 export function getSourceControlPrimaryActionSlot({
+  hasConflicts,
+  hasOperationAction,
   hasStagedAction,
   hasSyncAction,
   hasCommittedAction,
   hasSimpleAction,
 }: {
+  hasConflicts: boolean;
+  hasOperationAction: boolean;
   hasStagedAction: boolean;
   hasSyncAction: boolean;
   hasCommittedAction: boolean;
   hasSimpleAction: boolean;
 }): SourceControlPrimaryActionSlot {
-  if (hasStagedAction) return "staged";
+  if (hasConflicts) return null;
+  if (hasOperationAction) return "operation";
   if (hasSyncAction) return "sync";
+  if (hasStagedAction) return "staged";
   if (hasCommittedAction) return "committed";
   if (hasSimpleAction) return "simple";
   return null;
@@ -431,10 +462,13 @@ export function getGitScmSyncSection(
   status: GitStatusSnapshot | null,
   state: GitSyncState,
   t: MessageFormatter,
+  options: { blockedByConflicts?: boolean } = {},
 ): GitScmSyncSection {
   const remote = status?.sourceControl.remote;
   const copy = getGitScmSyncCopy(status, state, t);
-  const action = getGitScmSyncAction(remote, state, t);
+  const action = getGitScmSyncAction(remote, state, t, {
+    blocked: Boolean(status?.sourceControl.operation) || options.blockedByConflicts === true,
+  });
   const previewResources = remote && remote.behind > 0 ? remote.incomingPreview : [];
   const fallbackSummary = getGitScmSyncFallbackSummary(remote, copy, state, previewResources.length, t);
 
@@ -450,8 +484,20 @@ export function getGitScmSyncAction(
   remote: GitStatusSnapshot["sourceControl"]["remote"] | undefined,
   state: GitSyncState,
   t: MessageFormatter,
+  options: { blocked?: boolean } = {},
 ): GitScmSyncAction | null {
   if (!remote) return null;
+
+  if (options.blocked && remote.behind > 0) {
+    return {
+      kind: "pull",
+      label: t("source-control.sync.pull"),
+      loadingLabel: t("source-control.sync.pulling"),
+      title: t("source-control.sync.resolveBeforeSync"),
+      disabled: true,
+      icon: "download",
+    };
+  }
 
   if (remote.state === "diverged") {
     return {
@@ -504,6 +550,7 @@ function getGitScmSyncFallbackSummary(
 export function getCommittedPrimaryAction(
   status: GitStatusSnapshot | null,
   state: GitSyncState,
+  syncBlocked: boolean,
   t: MessageFormatter,
 ): GitSidebarPrimaryAction | null {
   const remote = status?.sourceControl.remote;
@@ -512,8 +559,8 @@ export function getCommittedPrimaryAction(
   if (remote.canPublish) {
     return {
       label: t("source-control.sync.publish"),
-      title: state.pushTitle,
-      disabled: false,
+      disabled: syncBlocked,
+      title: syncBlocked ? t("source-control.sync.resolveBeforeSync") : state.pushTitle,
       kind: "publish",
       loadingKey: "publish",
       loadingLabel: t("source-control.sync.publishing"),
@@ -536,8 +583,8 @@ export function getCommittedPrimaryAction(
   if (remote.canPush) {
     return {
       label: state.pushLabel,
-      title: state.pushTitle,
-      disabled: state.pushDisabled,
+      title: syncBlocked ? t("source-control.sync.resolveBeforeSync") : state.pushTitle,
+      disabled: syncBlocked || state.pushDisabled,
       kind: "push",
       loadingKey: "push",
       loadingLabel: t("source-control.sync.pushing"),
@@ -554,6 +601,7 @@ export function getStagedPrimaryAction(
   stagedCount: number,
   canCommit: boolean,
   professionalMode: boolean,
+  hasConflicts: boolean,
   t: MessageFormatter,
 ): GitSidebarPrimaryAction | null {
   const remote = status?.sourceControl.remote;
@@ -576,7 +624,7 @@ export function getStagedPrimaryAction(
   if (!canCommit) {
     return {
       label: t("source-control.sync.commit"),
-      title: t("source-control.sync.stageBeforeCommit"),
+      title: t(hasConflicts ? "source-control.sync.resolveBeforeSync" : "source-control.sync.stageBeforeCommit"),
       disabled: true,
       kind: "commit",
       loadingKey: "commit",

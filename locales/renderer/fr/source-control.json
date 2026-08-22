@@ -1,4 +1,13 @@
 {
+  "section.operation": "Opération Git",
+  "error.pull-conflict": "La récupération est suspendue à cause de conflits. Résolvez et indexez les fichiers, puis continuez ou abandonnez l’opération Git.",
+  "dialog.abortOperation": "Abandonner l’opération Git en cours et restaurer l’état précédent de la branche ?",
+  "sync.abort": "Abandonner",
+  "sync.continue": "Continuer",
+  "sync.continueTitle": "Continuez l’opération Git après avoir résolu et indexé tous les conflits.",
+  "sync.continuing": "Continuation…",
+  "sync.readyToContinue": "Prêt à continuer",
+  "sync.resolveBeforeSync": "Résolvez d’abord l’opération Git en cours avant de récupérer, envoyer, publier ou créer un commit.",
   "action.committing": "Création du commit…",
   "action.discard": "Annuler les modifications",
   "action.discardAll": "Tout annuler",

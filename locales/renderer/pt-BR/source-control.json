@@ -1,4 +1,13 @@
 {
+  "section.operation": "Operação do Git",
+  "error.pull-conflict": "O download foi pausado por conflitos de arquivos. Resolva e prepare os conflitos e continue ou aborte a operação do Git.",
+  "dialog.abortOperation": "Abortar a operação atual do Git e restaurar o estado anterior da branch?",
+  "sync.abort": "Abortar",
+  "sync.continue": "Continuar",
+  "sync.continueTitle": "Continue a operação do Git depois de resolver e preparar todos os conflitos.",
+  "sync.continuing": "Continuando…",
+  "sync.readyToContinue": "Pronto para continuar",
+  "sync.resolveBeforeSync": "Resolva primeiro a operação atual do Git antes de baixar, enviar, publicar ou confirmar.",
   "action.committing": "Fazendo commit…",
   "action.discard": "Descartar",
   "action.discardAll": "Descartar tudo",

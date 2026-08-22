@@ -1,4 +1,13 @@
 {
+  "section.operation": "Git 操作",
+  "error.pull-conflict": "拉取已因文件冲突暂停。请解决并暂存冲突文件，然后继续或中止当前 Git 操作。",
+  "dialog.abortOperation": "要中止当前 Git 操作并将分支恢复到操作前的状态吗？",
+  "sync.abort": "中止",
+  "sync.continue": "继续",
+  "sync.continueTitle": "解决并暂存所有冲突后，继续当前 Git 操作。",
+  "sync.continuing": "正在继续…",
+  "sync.readyToContinue": "可以继续",
+  "sync.resolveBeforeSync": "请先解决当前 Git 操作，再拉取、推送、发布或提交。",
   "action.committing": "正在提交…",
   "action.discard": "放弃",
   "action.discardAll": "全部放弃",

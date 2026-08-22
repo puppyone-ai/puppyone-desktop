@@ -1193,6 +1193,10 @@ function AppContent() {
             <GitOperationErrorDialog
               error={gitOperationError}
               onClose={dismissGitOperationError}
+              onPull={() => {
+                dismissGitOperationError();
+                void handlePullGit();
+              }}
             />
           )}
           {createEntryDraft && (

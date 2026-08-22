@@ -1,4 +1,13 @@
 {
+  "section.operation": "Git Operation",
+  "error.pull-conflict": "Pull paused because files conflict. Resolve the conflicted files, stage them, then continue or abort the Git operation.",
+  "dialog.abortOperation": "Abort the current Git operation and restore the branch to its previous state?",
+  "sync.abort": "Abort",
+  "sync.continue": "Continue",
+  "sync.continueTitle": "Continue the in-progress Git operation after resolving and staging all conflicts.",
+  "sync.continuing": "Continuing…",
+  "sync.readyToContinue": "Ready to continue",
+  "sync.resolveBeforeSync": "Resolve the current Git operation before pulling, pushing, publishing, or committing.",
   "action.committing": "Committing…",
   "action.discard": "Discard",
   "action.discardAll": "Discard all",

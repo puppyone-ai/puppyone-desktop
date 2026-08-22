@@ -81,6 +81,7 @@ export function GitScmSyncRow({
   onPull,
   onPush,
   onPublish,
+  blockedByConflicts,
 }: {
   status: GitStatusSnapshot | null;
   state: GitSyncState;
@@ -95,10 +96,11 @@ export function GitScmSyncRow({
   onPull: () => Promise<boolean>;
   onPush: () => Promise<boolean>;
   onPublish: () => Promise<boolean>;
+  blockedByConflicts: boolean;
 }) {
   const { t } = useLocalization();
   const bodyId = useId();
-  const section = getGitScmSyncSection(status, state, t);
+  const section = getGitScmSyncSection(status, state, t, { blockedByConflicts });
   const hasBody = section.previewResources.length > 0 || Boolean(section.fallbackSummary);
   return (
     <section className={`desktop-git-remote-status desktop-git-scm-sync ${section.copy.tone}`}>

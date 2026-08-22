@@ -1,4 +1,13 @@
 {
+  "section.operation": "Git 操作",
+  "error.pull-conflict": "ファイルの競合によりプルが一時停止しました。競合を解決してステージし、Git 操作を続行または中止してください。",
+  "dialog.abortOperation": "現在の Git 操作を中止し、ブランチを以前の状態に戻しますか？",
+  "sync.abort": "中止",
+  "sync.continue": "続行",
+  "sync.continueTitle": "すべての競合を解決してステージした後、進行中の Git 操作を続行します。",
+  "sync.continuing": "続行中…",
+  "sync.readyToContinue": "続行できます",
+  "sync.resolveBeforeSync": "プル、プッシュ、公開、コミットの前に、現在の Git 操作を解決してください。",
   "action.committing": "コミットしています…",
   "action.discard": "破棄",
   "action.discardAll": "すべて破棄",

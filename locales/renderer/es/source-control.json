@@ -1,4 +1,13 @@
 {
+  "section.operation": "Operación de Git",
+  "error.pull-conflict": "La descarga se detuvo por conflictos de archivos. Resuélvelos, prepáralos y continúa o aborta la operación de Git.",
+  "dialog.abortOperation": "¿Abortar la operación de Git actual y restaurar el estado anterior de la rama?",
+  "sync.abort": "Abortar",
+  "sync.continue": "Continuar",
+  "sync.continueTitle": "Continúa la operación de Git después de resolver y preparar todos los conflictos.",
+  "sync.continuing": "Continuando…",
+  "sync.readyToContinue": "Listo para continuar",
+  "sync.resolveBeforeSync": "Resuelve primero la operación de Git actual antes de descargar, subir, publicar o confirmar.",
   "action.committing": "Confirmando…",
   "action.discard": "Descartar",
   "action.discardAll": "Descartar todo",
