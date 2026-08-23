@@ -27,6 +27,7 @@ afterEach(async () => {
   document.body.replaceChildren();
   window.localStorage.clear();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe("CSV bounded renderer performance", () => {
@@ -93,6 +94,7 @@ describe("CSV bounded renderer performance", () => {
   });
 
   it("leads a fast vertical scroll and contracts to the resting buffer", async () => {
+    vi.useFakeTimers();
     await renderCsv(500, 20, "velocity-window.csv");
     const table = required<HTMLTableElement>(container, ".csv-table-editor__table");
     const scroll = required<HTMLDivElement>(container, ".csv-table-editor__scroll");
@@ -118,7 +120,7 @@ describe("CSV bounded renderer performance", () => {
     expect(Number(table.dataset.csvMountedCells)).toBeLessThanOrEqual(2_000);
 
     await act(async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 170));
+      await vi.advanceTimersByTimeAsync(170);
     });
 
     const restingEnd = Number(table.dataset.csvVirtualRowEnd);
