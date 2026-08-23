@@ -21,19 +21,20 @@ export function estimateEditableTableColumnWidths<Row>(
     ...sampledCells.map((cells) => cells.length),
   );
 
-  return Array.from({ length: columnCount }, (_, columnIndex) => {
-    let visualUnits = 0;
-    for (const cells of sampledCells) {
-      visualUnits = Math.max(
-        visualUnits,
-        estimateMaxLineVisualUnits(cells[columnIndex] ?? ""),
-      );
-    }
-    return Math.max(
-      EDITABLE_TABLE_COLUMN_MIN_WIDTH,
-      Math.min(EDITABLE_TABLE_COLUMN_MAX_WIDTH, 28 + visualUnits * 7),
-    );
-  });
+  return Array.from(
+    { length: columnCount },
+    (_, columnIndex) => estimateSampledColumnWidth(sampledCells, columnIndex),
+  );
+}
+
+/** Recompute one width after a cell transaction without scanning every column. */
+export function estimateEditableTableColumnWidth<Row>(
+  rows: readonly Row[],
+  columnIndex: number,
+  getCells: (row: Row) => readonly string[],
+): number {
+  const sampledCells = sampleTableRows(rows, EDITABLE_TABLE_COLUMN_WIDTH_SAMPLE_ROWS).map(getCells);
+  return estimateSampledColumnWidth(sampledCells, columnIndex);
 }
 
 function sampleTableRows<Row>(rows: readonly Row[], maximum: number): readonly Row[] {
@@ -63,4 +64,21 @@ function estimateMaxLineVisualUnits(text: string): number {
     }
   }
   return Math.max(maximum, current);
+}
+
+function estimateSampledColumnWidth(
+  sampledCells: readonly (readonly string[])[],
+  columnIndex: number,
+): number {
+  let visualUnits = 0;
+  for (const cells of sampledCells) {
+    visualUnits = Math.max(
+      visualUnits,
+      estimateMaxLineVisualUnits(cells[columnIndex] ?? ""),
+    );
+  }
+  return Math.max(
+    EDITABLE_TABLE_COLUMN_MIN_WIDTH,
+    Math.min(EDITABLE_TABLE_COLUMN_MAX_WIDTH, 28 + visualUnits * 7),
+  );
 }

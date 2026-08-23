@@ -66,7 +66,6 @@ export type ExplorerTreeProps = {
   rootError?: string | null;
   rootLabel?: string;
   showRoot?: boolean;
-  emptyLabel?: string;
   loadingLabel?: string;
   fileIconTheme?: FileIconThemeId;
   /** Stable workspace identity embedded in outbound reference drags. */
@@ -134,7 +133,6 @@ export function ExplorerTree({
   rootError = null,
   rootLabel,
   showRoot = true,
-  emptyLabel,
   loadingLabel,
   fileIconTheme = "default",
   dragWorkspaceId = "",
@@ -159,7 +157,6 @@ export function ExplorerTree({
 }: ExplorerTreeProps) {
   const { direction, t } = useLocalization();
   const resolvedRootLabel = rootLabel ?? t("shared-ui.explorer.root");
-  const resolvedEmptyLabel = emptyLabel ?? t("shared-ui.explorer.emptyFolder");
   const resolvedLoadingLabel = loadingLabel ?? t("shared-ui.loading");
   const scrollRef = useRef<HTMLDivElement>(null);
   // Native dragenter/dragleave events fire for descendants too. The target is
@@ -177,9 +174,8 @@ export function ExplorerTree({
   const visibleModel = useMemo(() => buildExplorerVisibleModel(nodes, {
     expandedPaths,
     loadingPaths: resolvedLoadingPaths,
-    emptyLabel: resolvedEmptyLabel,
     loadingLabel: resolvedLoadingLabel,
-  }), [expandedPaths, nodes, resolvedEmptyLabel, resolvedLoadingLabel, resolvedLoadingPaths]);
+  }), [expandedPaths, nodes, resolvedLoadingLabel, resolvedLoadingPaths]);
   const nodeIndex = useMemo(() => buildExplorerNodeIndex(nodes), [nodes]);
   const selectedDragNodes = useMemo(
     () => collectTopLevelSelectedNodes(nodeIndex, selectedPaths),
@@ -623,9 +619,7 @@ export function ExplorerTree({
             <ExplorerTreeMetaRow depth={0}>{rootError}</ExplorerTreeMetaRow>
           ) : rootLoading && nodes.length === 0 ? (
             <ExplorerTreeMetaRow depth={0} loading>{resolvedLoadingLabel}</ExplorerTreeMetaRow>
-          ) : nodes.length === 0 ? (
-            <ExplorerTreeMetaRow depth={0}>{resolvedEmptyLabel}</ExplorerTreeMetaRow>
-          ) : (
+          ) : nodes.length > 0 ? (
             <div
               className="explorer-tree-virtual-canvas"
               style={{ height: `${virtualWindow.totalHeight}px` }}
@@ -693,7 +687,7 @@ export function ExplorerTree({
                 </div>
               ))}
             </div>
-          )}
+          ) : null}
           {renderListEnd && (
             <ExplorerListEndMotionShell
               generation={motionPlan?.generation ?? 0}

@@ -1,6 +1,5 @@
-import type { Workspace } from "@puppyone/shared-ui";
-import { bidiIsolate, useLocalization, type MessageFormatter } from "@puppyone/localization";
-import { AlertTriangle, Folder, FolderOpen, Plus, Unlink } from "lucide-react";
+import { bidiIsolate, useLocalization } from "@puppyone/localization";
+import { AlertTriangle } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -20,23 +19,25 @@ import type {
   ThemeMode,
 } from "../preferences";
 import { useWorkspaceFolderDrop } from "../features/app-shell/useWorkspaceFolderDrop";
-import { getWorkspaceParentPathForDisplay } from "../features/app-shell/workspaceHomeModel";
+import {
+  getProjectName,
+  type ProjectHomeItem,
+  type RecentWorkspaceHomeItem,
+} from "../features/app-shell/workspaceHomeModel";
 import { writeClipboardText } from "../features/settings/utils";
-import { DesktopMenuIconButton, DesktopMenuItem } from "./DesktopMenu";
-import { InlineLoading } from "./loading";
+import type {
+  WorkspaceCloneRepositoryRequest,
+  WorkspaceCreateProjectRequest,
+  WorkspaceProjectLocationGrant,
+} from "../types/electron";
 import { DesktopWindowDragRegion } from "./DesktopWindowChrome";
+import { OnboardingProjectEntryDialog } from "./OnboardingProjectEntryDialog";
+import { OnboardingBrandLockup } from "./onboarding/OnboardingBrandLockup";
+import { OnboardingEntryActions } from "./onboarding/OnboardingEntryActions";
+import { OnboardingProjectList } from "./onboarding/OnboardingProjectList";
+import type { OnboardingHomeState } from "./onboarding/types";
 
-export type RecentWorkspaceHomeItem = {
-  workspace: Workspace;
-  lastOpenedAt?: string | null;
-};
-
-export type ProjectHomeItem = {
-  id: string;
-  label: string;
-  localPath: string;
-  lastOpenedAt?: string | null;
-};
+export type { ProjectHomeItem, RecentWorkspaceHomeItem } from "../features/app-shell/workspaceHomeModel";
 
 export type OnboardingOperationStatus = {
   title: string;
@@ -45,6 +46,9 @@ export type OnboardingOperationStatus = {
 
 export type MinimalOnboardingProps = {
   onChooseWorkspace: () => Promise<void>;
+  onChooseProjectLocation?: () => Promise<WorkspaceProjectLocationGrant | null>;
+  onCreateProject?: (request: WorkspaceCreateProjectRequest) => Promise<boolean>;
+  onCloneRepository?: (request: WorkspaceCloneRepositoryRequest) => Promise<boolean>;
   onOpenWorkspacePath: (path: string) => Promise<void>;
   onOpenDroppedWorkspace: (folder: File) => Promise<void>;
   onRemoveProject?: (path: string) => Promise<void>;
@@ -66,6 +70,9 @@ export type MinimalOnboardingProps = {
 /** Local repository entrypoint. Cloud is entered from an open repository only. */
 export function MinimalOnboarding({
   onChooseWorkspace,
+  onChooseProjectLocation,
+  onCreateProject,
+  onCloneRepository,
   onOpenWorkspacePath,
   onOpenDroppedWorkspace,
   onRemoveProject,
@@ -82,11 +89,12 @@ export function MinimalOnboarding({
   resolvedTheme,
   cornerSlot,
 }: MinimalOnboardingProps) {
-  const { t, formatRelativeTime } = useLocalization();
+  const { t } = useLocalization();
   const [error, setError] = useState<string | null>(initialError);
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const [removingPath, setRemovingPath] = useState<string | null>(null);
   const [draggingPath, setDraggingPath] = useState<string | null>(null);
+  const [entryDialog, setEntryDialog] = useState<"create" | "clone" | null>(null);
   const items = useMemo(
     () => (projectItems ?? recentWorkspaces.map(({ workspace, lastOpenedAt }) => ({
       id: workspace.id,
@@ -176,10 +184,12 @@ export function MinimalOnboarding({
   });
 
   const hasProjects = items.length > 0;
+  const onboardingState: OnboardingHomeState = hasProjects ? "projects" : "empty";
 
   return (
     <main
-      className={`onboarding-shell onboarding-homepage-shell ${hasProjects ? "has-projects" : "is-empty"} ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "dragging" : ""}`}
+      className={`onboarding-shell onboarding-homepage-shell ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "dragging" : ""}`}
+      data-onboarding-state={onboardingState}
       data-po-scrollbar="content"
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}
@@ -197,143 +207,59 @@ export function MinimalOnboarding({
       onDrop={folderDrop.onDrop}
     >
       <DesktopWindowDragRegion className="onboarding-titlebar" />
-      <section className={`onboarding-homepage ${hasProjects ? "has-projects" : "is-empty"}`} aria-label={t(hasProjects ? "onboarding.projects.localTitle" : "onboarding.projects.title")}>
-        {!hasProjects && (
-          <div className="onboarding-primary-area">
-            <div className="onboarding-folder-action-wrap">
-              <div className={`folder-drop-zone ${folderDrop.dragging ? "dragging" : ""} ${busy ? "is-disabled" : ""}`}>
-                <svg className="folder-drop-outline" viewBox="0 0 260 260" preserveAspectRatio="none" aria-hidden="true">
-                  <path className="folder-drop-shadow" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-                  <path className="folder-drop-fill" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-                  <path className="folder-drop-border" d="M9 2H62C68 2 72 6 72 12V38H251C255 38 258 41 258 45V251C258 255 255 258 251 258H9C5 258 2 255 2 251V9C2 5 5 2 9 2Z" />
-                </svg>
-                <button
-                  className="folder-drop-primary-action"
-                  type="button"
-                  disabled={busy}
-                  aria-busy={openingPath === "__new__" || undefined}
-                  aria-label={t("onboarding.action.openLocalFolder")}
-                  onClick={() => void chooseFolder()}
-                />
-                <span className="folder-drop-body">
-                  {openingPath === "__new__" ? (
-                    <InlineLoading label={null} size="sm" tone="neutral" className="folder-drop-loading" />
-                  ) : (
-                    <FolderOpen className="folder-drop-icon" size={25} strokeWidth={1.75} />
-                  )}
-                  <span className="folder-drop-copy"><strong>{t("onboarding.action.openOrDropLocalFolder")}</strong></span>
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
+      <section
+        className="onboarding-homepage"
+        aria-label={t("onboarding.projects.title")}
+      >
+        <OnboardingBrandLockup state={onboardingState} />
 
         {hasProjects && (
-          <div className="onboarding-projects-layout">
-            <div className="onboarding-recent-projects">
-              <div className="onboarding-recent-header">
-                <div className="onboarding-recent-heading">{t("onboarding.projects.localTitle")}</div>
-              </div>
-              <div className="onboarding-project-list" data-po-scrollbar="menu">
-                {items.map((item) => {
-                  const name = getProjectName(item, t("onboarding.projects.untitled"));
-                  const parentPath = getWorkspaceParentPathForDisplay(item.localPath);
-                  const removing = removingPath === item.localPath;
-                  const dragging = draggingPath === item.localPath;
-                  return (
-                    <div className={`onboarding-project-row-wrap ${removing ? "is-removing" : ""} ${dragging ? "is-dragging" : ""}`} key={item.id}>
-                      <DesktopMenuItem
-                        className="onboarding-project-row"
-                        role="button"
-                        icon={<Folder size={14} strokeWidth={1.85} />}
-                        label={<bdi>{name}</bdi>}
-                        detail={parentPath ? <bdi dir="ltr" title={item.localPath}>{parentPath}</bdi> : undefined}
-                        trailing={openingPath === item.localPath
-                          ? <InlineLoading label={t("onboarding.status.opening")} size="xs" tone="neutral" />
-                          : formatRecentWorkspaceTime(item.lastOpenedAt, t, formatRelativeTime)}
-                        disabled={busy}
-                        aria-busy={openingPath === item.localPath || undefined}
-                        aria-label={t("onboarding.projects.open", { project: bidiIsolate(name) })}
-                        title={item.localPath}
-                        draggable={!busy}
-                        onClick={() => void openPath(item.localPath)}
-                        onDragStart={(event) => startProjectDrag(event, item)}
-                        onDragEnd={() => setDraggingPath(null)}
-                      />
-                      {onRemoveProject && (
-                        <DesktopMenuIconButton
-                          className="onboarding-project-remove"
-                          disabled={busy && !removing}
-                          aria-busy={removing || undefined}
-                          label={t("onboarding.projects.removeFor", { project: bidiIsolate(name) })}
-                          title={t("onboarding.projects.removeHint")}
-                          onClick={() => void removeProject(item)}
-                          icon={removing
-                            ? <InlineLoading label={null} size="xs" tone="neutral" />
-                            : <Unlink size={14} aria-hidden="true" />}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="onboarding-project-add">
-                <DesktopMenuItem
-                  className="onboarding-project-add-action"
-                  role="button"
-                  icon={openingPath === "__new__"
-                    ? <InlineLoading label={null} size="xs" tone="neutral" />
-                    : <ProjectFolderAddIcon />}
-                  label={t("onboarding.action.openLocalFolder")}
-                  disabled={busy}
-                  aria-busy={openingPath === "__new__" || undefined}
-                  onClick={() => void chooseFolder()}
-                />
-              </div>
-            </div>
-          </div>
+          <OnboardingProjectList
+            items={items}
+            busy={busy}
+            openingPath={openingPath}
+            removingPath={removingPath}
+            draggingPath={draggingPath}
+            onOpen={(path) => void openPath(path)}
+            onRemove={onRemoveProject ? (item) => void removeProject(item) : undefined}
+            onDragStart={startProjectDrag}
+            onDragEnd={() => setDraggingPath(null)}
+          />
         )}
+
+        <OnboardingEntryActions
+          state={onboardingState}
+          busy={busy}
+          openingFolder={openingPath === "__new__"}
+          draggingFolder={folderDrop.dragging}
+          canCreateProject={Boolean(onCreateProject && onChooseProjectLocation)}
+          canCloneRepository={Boolean(onCloneRepository)}
+          onOpenFolder={() => void chooseFolder()}
+          onCreateProject={() => setEntryDialog("create")}
+          onCloneRepository={() => setEntryDialog("clone")}
+        />
 
         {error && <div className="onboarding-error onboarding-homepage-error" role="alert"><AlertTriangle size={15} /><span>{error}</span></div>}
       </section>
+      {entryDialog === "create" && onCreateProject && onChooseProjectLocation && (
+        <OnboardingProjectEntryDialog
+          kind="create"
+          onClose={() => setEntryDialog(null)}
+          onChooseLocation={onChooseProjectLocation}
+          onSubmit={(value, locationGrantId) => onCreateProject({
+            name: value,
+            locationGrantId: locationGrantId ?? "",
+          })}
+        />
+      )}
+      {entryDialog === "clone" && onCloneRepository && (
+        <OnboardingProjectEntryDialog
+          kind="clone"
+          onClose={() => setEntryDialog(null)}
+          onSubmit={(value) => onCloneRepository({ repositoryUrl: value })}
+        />
+      )}
       {cornerSlot}
     </main>
   );
-}
-
-function ProjectFolderAddIcon() {
-  return (
-    <span className="onboarding-project-folder-add-icon" aria-hidden="true">
-      <Folder size={14} strokeWidth={1.85} />
-      <Plus size={6} strokeWidth={4} />
-    </span>
-  );
-}
-
-function getProjectName(item: ProjectHomeItem, fallback: string) {
-  const label = item.label.trim();
-  if (label && label !== item.localPath) return label;
-
-  const normalizedPath = item.localPath.length > 1
-    ? item.localPath.replace(/\/+$/, "")
-    : item.localPath;
-  return normalizedPath.split("/").at(-1) || label || fallback;
-}
-
-function formatRecentWorkspaceTime(
-  value: string | null | undefined,
-  t: MessageFormatter,
-  formatRelativeTime: (value: number, unit: Intl.RelativeTimeFormatUnit, options?: Intl.RelativeTimeFormatOptions) => string,
-) {
-  if (!value) return t("onboarding.time.previouslyOpened");
-  const timestamp = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) return t("onboarding.time.previouslyOpened");
-  const elapsed = Math.max(0, Date.now() - timestamp);
-  const minute = 60_000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-  if (elapsed < minute) return t("onboarding.time.justNow");
-  if (elapsed < hour) return formatRelativeTime(-Math.max(1, Math.floor(elapsed / minute)), "minute", { numeric: "always" });
-  if (elapsed < day) return formatRelativeTime(-Math.max(1, Math.floor(elapsed / hour)), "hour", { numeric: "always" });
-  return formatRelativeTime(-Math.max(1, Math.floor(elapsed / day)), "day", { numeric: "always" });
 }

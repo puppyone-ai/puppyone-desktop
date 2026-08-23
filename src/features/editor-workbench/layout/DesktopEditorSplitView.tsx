@@ -13,6 +13,7 @@ import {
   type AiEditRequest,
   type DataNode,
   type DataPort,
+  type DocumentDataNode,
   type EditorGroupState,
   type EditorFindCommand,
   type EditorInteractionPreferences,
@@ -74,8 +75,7 @@ export type DesktopEditorSplitViewProps = Readonly<{
     placement: NonNullable<EditorPaneSplitOptions["placement"]>,
   ) => void;
   onOpenAtPaneEdge: (
-    path: string,
-    label: string,
+    node: DocumentDataNode,
     targetPaneId: string,
     direction: EditorSplitDirection,
     placement: NonNullable<EditorPaneSplitOptions["placement"]>,

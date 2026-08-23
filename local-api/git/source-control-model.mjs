@@ -8,7 +8,14 @@ const GIT_RESOURCE_GROUPS = Object.freeze([
   { id: "untracked", label: "Untracked Changes" },
 ]);
 
-export function buildGitSourceControlSnapshot({ entries, branchName, syncTarget, currentBranch, headCommitId }) {
+export function buildGitSourceControlSnapshot({
+  entries,
+  branchName,
+  syncTarget,
+  currentBranch,
+  headCommitId,
+  repositoryOperation = null,
+}) {
   const resourcesByGroup = new Map(GIT_RESOURCE_GROUPS.map((group) => [group.id, []]));
 
   for (const entry of entries) {
@@ -26,6 +33,11 @@ export function buildGitSourceControlSnapshot({ entries, branchName, syncTarget,
   const stagedCount = resourcesByGroup.get("index")?.length ?? 0;
   const workingCount = (resourcesByGroup.get("workingTree")?.length ?? 0) + (resourcesByGroup.get("untracked")?.length ?? 0);
   const mergeCount = resourcesByGroup.get("merge")?.length ?? 0;
+  const operation = repositoryOperation ? {
+    kind: repositoryOperation,
+    canContinue: mergeCount === 0,
+    canAbort: true,
+  } : null;
 
   return {
     input: {
@@ -35,12 +47,21 @@ export function buildGitSourceControlSnapshot({ entries, branchName, syncTarget,
       defaultMessage: buildDefaultCommitMessageFromResources(resourcesByGroup.get("index") ?? []),
     },
     groups,
-    remote: buildGitSourceControlRemoteSummary({ branchName, syncTarget, currentBranch, headCommitId }),
+    operation,
+    remote: buildGitSourceControlRemoteSummary({
+      branchName,
+      syncTarget,
+      currentBranch,
+      headCommitId,
+      operationInProgress: Boolean(operation),
+    }),
     actions: {
       canStageAll: workingCount > 0 || mergeCount > 0,
       canUnstageAll: stagedCount > 0,
       canDiscardAll: workingCount > 0 || mergeCount > 0,
-      canCommit: stagedCount > 0 && mergeCount === 0,
+      canCommit: stagedCount > 0 && mergeCount === 0 && !operation,
+      canContinue: operation?.canContinue === true,
+      canAbort: operation?.canAbort === true,
     },
   };
 }
@@ -116,17 +137,23 @@ function buildGitSourceControlResource(entry, group, status) {
   };
 }
 
-function buildGitSourceControlRemoteSummary({ branchName, syncTarget, currentBranch, headCommitId }) {
+function buildGitSourceControlRemoteSummary({
+  branchName,
+  syncTarget,
+  currentBranch,
+  headCommitId,
+  operationInProgress,
+}) {
   const ahead = syncTarget?.ahead ?? currentBranch?.ahead ?? 0;
   const behind = syncTarget?.behind ?? currentBranch?.behind ?? 0;
   const hasBranch = Boolean(branchName && branchName !== "detached");
   const hasTarget = Boolean(syncTarget?.remote && syncTarget?.branch);
   const remoteExists = syncTarget?.exists === true;
   const upstream = syncTarget?.ref ?? currentBranch?.upstream ?? null;
-  const canPublish = hasBranch && hasTarget && !remoteExists && Boolean(headCommitId);
-  const canPull = remoteExists && behind > 0;
-  const canPush = remoteExists && ahead > 0;
-  const canSync = canPublish || (remoteExists && (ahead > 0 || behind > 0));
+  const canPublish = !operationInProgress && hasBranch && hasTarget && !remoteExists && Boolean(headCommitId);
+  const canPull = !operationInProgress && remoteExists && behind > 0;
+  const canPush = !operationInProgress && remoteExists && ahead > 0 && behind === 0;
+  const canSync = !operationInProgress && (canPublish || (remoteExists && (ahead > 0 || behind > 0)));
 
   let state = "synced";
   if (branchName == null && !headCommitId && !syncTarget) {
@@ -151,6 +178,15 @@ function buildGitSourceControlRemoteSummary({ branchName, syncTarget, currentBra
     upstream,
     ahead,
     behind,
+    incomingFileSummary: syncTarget?.incomingFileSummary ?? {
+      total: 0,
+      added: 0,
+      modified: 0,
+      deleted: 0,
+      renamed: 0,
+      copied: 0,
+      changed: 0,
+    },
     incomingPreview: syncTarget?.incomingPreview ?? [],
     outgoingPreview: syncTarget?.outgoingPreview ?? [],
     canPull,

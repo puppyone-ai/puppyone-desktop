@@ -17,11 +17,12 @@ import type {
   DataCapabilities,
   DataNode,
   DataPort,
+  DocumentDataNode,
   FileContent,
   Workspace,
   WorkspaceContentChange,
 } from "../core/types";
-import { defaultDataCapabilities } from "../core/types";
+import { defaultDataCapabilities, isDocumentDataNode } from "../core/types";
 import { preloadPresetViewer } from "../editor/host/PresetViewerRenderer";
 import {
   getEditorSourceRequirement,
@@ -503,7 +504,7 @@ export function DataWorkspace({
     [expandedFolderPaths, tree],
   );
   const currentFolderPath = activeNode?.type === "folder" ? activeNode.path : getParentPath(resolvedActivePath);
-  const selectedFile = activeNode?.type !== "folder" ? activeNode : null;
+  const selectedFile = isDocumentDataNode(activeNode) ? activeNode : null;
   const selectedFileViewer = useMemo(() => selectedFile
     ? resolveEditorViewer({
         path: selectedFile.path,
@@ -1003,7 +1004,7 @@ export function DataWorkspace({
     [folderExpansionStrategy, loadFolder, loadingFolderPaths],
   );
 
-  const applyPersistedFileContent = (node: DataNode, commit: DocumentPersistedCommit) => {
+  const applyPersistedFileContent = (node: DocumentDataNode, commit: DocumentPersistedCommit) => {
     if (commit.documentId !== node.path) return;
     const existingContent = fileContent?.path === node.path
       ? fileContent

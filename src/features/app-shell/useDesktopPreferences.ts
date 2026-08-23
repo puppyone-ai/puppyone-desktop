@@ -23,6 +23,7 @@ import {
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
   GIT_DISPLAY_MODE_STORAGE_KEY,
+  GIT_SIDEBAR_LAYOUT_STORAGE_KEY,
   INTERFACE_STYLE_STORAGE_KEY,
   DARK_THEME_PRESET_STORAGE_KEY,
   LIGHT_THEME_PRESET_STORAGE_KEY,
@@ -48,6 +49,7 @@ import {
   type ExperimentalSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
+  type GitSidebarLayout,
   type InterfaceStyle,
   type LoadingAnimationPreset,
   type LocalAgentsSettings,
@@ -78,6 +80,7 @@ import {
   readInitialFileIconTheme,
   readInitialFilesVisibilitySettings,
   readInitialGitDisplayMode,
+  readInitialGitSidebarLayout,
   readInitialInterfaceStyle,
   readInitialRightSidebarToolsSettings,
   readInitialRightSidebarWidth,
@@ -143,6 +146,7 @@ export function useDesktopPreferences() {
     () => readInitialSidebarNavigationVisibilitySettings(),
   );
   const [gitDisplayMode, setGitDisplayMode] = useState<GitDisplayMode>(() => readInitialGitDisplayMode());
+  const [gitSidebarLayout, setGitSidebarLayout] = useState<GitSidebarLayout>(() => readInitialGitSidebarLayout());
   const [filesVisibilitySettings, setFilesVisibilitySettings] = useState<FilesVisibilitySettings>(() => readInitialFilesVisibilitySettings());
   const [externalAppsSettings, setExternalAppsSettings] = useState<ExternalAppsSettings>(() => readInitialExternalAppsSettings());
   const [createNewMenuSettings, setCreateNewMenuSettings] = useState<CreateNewMenuSettings>(
@@ -329,6 +333,10 @@ export function useDesktopPreferences() {
   }, [gitDisplayMode]);
 
   useEffect(() => {
+    window.localStorage.setItem(GIT_SIDEBAR_LAYOUT_STORAGE_KEY, gitSidebarLayout);
+  }, [gitSidebarLayout]);
+
+  useEffect(() => {
     window.localStorage.setItem(FILES_VISIBILITY_STORAGE_KEY, JSON.stringify(filesVisibilitySettings));
   }, [filesVisibilitySettings]);
 
@@ -434,6 +442,7 @@ export function useDesktopPreferences() {
     editorPresentation,
     filesVisibilitySettings,
     gitDisplayMode,
+    gitSidebarLayout,
     interfaceStyle,
     resolvedAppearance,
     resolvedTheme,
@@ -473,6 +482,7 @@ export function useDesktopPreferences() {
     setEditorPresentation,
     setFilesVisibilitySettings,
     setGitDisplayMode,
+    setGitSidebarLayout,
     setInterfaceStyle,
     setRightSidebarOpen,
     setRightSidebarToolsSettings,

@@ -1,9 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   closeAllDocumentWorkingCopies,
   closeDocumentWorkingCopy,
   closeDocumentWorkingCopiesUnderResource,
   flushActiveDocumentSessions,
+  isDocumentDataNode,
   type DataNode,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
@@ -131,7 +132,10 @@ function AppContent() {
   const [activeCloudSection, setActiveCloudSection] = useState<CloudWorkspaceSection>("initialize");
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const {
+    chooseProjectLocation,
     clearWorkspace,
+    cloneRepository,
+    createProject,
     forgetActiveWorkspace,
     handleWorkspaceOpenResult,
     openDroppedWorkspace,
@@ -226,23 +230,16 @@ function AppContent() {
     sequence: 0,
     paths: null as readonly string[] | null,
   });
-  const editorWorkbench = useDesktopEditorWorkbench(workspace);
-  const activeDataPath = editorWorkbench.activePath;
-  const setActiveDataPath = useCallback<Dispatch<SetStateAction<string | null>>>((update) => {
-    if (typeof update !== "function") {
-      if (update) editorWorkbench.open(update);
-      else editorWorkbench.clear();
-      return;
-    }
-    const nextPath = update(activeDataPath);
-    if (nextPath === activeDataPath) return;
-    if (activeDataPath && nextPath) {
-      editorWorkbench.rebaseResource(activeDataPath, nextPath);
-      return;
-    }
-    if (nextPath) editorWorkbench.open(nextPath);
-    else if (activeDataPath) editorWorkbench.closeUnderResource(activeDataPath);
-  }, [activeDataPath, editorWorkbench]);
+  const localDataPort = useMemo(
+    () => (workspace ? createLocalDataPort(workspace.path) : null),
+    [workspace],
+  );
+  const dataPort = useMemo(
+    () => (localDataPort ? createExplorerDataPort(localDataPort, filesVisibilitySettings) : null),
+    [filesVisibilitySettings, localDataPort],
+  );
+  const editorWorkbench = useDesktopEditorWorkbench(workspace, dataPort?.resolveNode ?? null);
+  const activeDocumentPath = editorWorkbench.activePath;
   const handleResourceMoved = useCallback(async (previousPath: string, nextPath: string) => {
     if (documentStorageIdentity) {
       await closeDocumentWorkingCopiesUnderResource(documentStorageIdentity, previousPath);
@@ -255,7 +252,12 @@ function AppContent() {
     }
     editorWorkbench.closeUnderResource(path);
   }, [documentStorageIdentity, editorWorkbench]);
-  const [activeDataNode, setActiveDataNode] = useState<DataNode | null>(null);
+  const [activeExplorerNode, setActiveExplorerNode] = useState<DataNode | null>(null);
+  const activeExplorerPath = activeExplorerNode?.path ?? activeDocumentPath;
+  const activateDataNode = useCallback((node: DataNode) => {
+    setActiveExplorerNode(node);
+    if (isDocumentDataNode(node)) editorWorkbench.openDocument(node);
+  }, [editorWorkbench]);
   const [documentNavigationError, setDocumentNavigationError] = useState<string | null>(null);
   const documentNavigationRequestRef = useRef(0);
   const desktopViewNavigationRequestRef = useRef(0);
@@ -379,14 +381,6 @@ function AppContent() {
     () => isCloudSessionForApiBase(cloudSession, desktopCloudApiBaseUrl) ? cloudSession : null,
     [cloudSession, desktopCloudApiBaseUrl],
   );
-  const localDataPort = useMemo(
-    () => (workspace ? createLocalDataPort(workspace.path) : null),
-    [workspace],
-  );
-  const dataPort = useMemo(
-    () => (localDataPort ? createExplorerDataPort(localDataPort, filesVisibilitySettings) : null),
-    [filesVisibilitySettings, localDataPort],
-  );
   const latestAiEditRequest = useAiEditReviewRequest({
     aiEditAssistEnabled,
     onWorkspaceContentChanged: refreshWorkspaceContent,
@@ -422,8 +416,8 @@ function AppContent() {
     onWorkspaceContentChanged: refreshWorkspaceContent,
     onResourceDeleted: handleResourceDeleted,
     onResourceMoved: handleResourceMoved,
-    setActiveDataNode,
-    setActiveDataPath,
+    onActivateNode: activateDataNode,
+    setActiveExplorerNode,
     workspace,
   });
 
@@ -455,7 +449,7 @@ function AppContent() {
     setGitOperationLoading(null);
     setActiveSettingsSection("general");
     setBranchSwitcherOpen(false);
-    setActiveDataNode(null);
+    setActiveExplorerNode(null);
     resetDataNodeActions();
   }, [resetDataNodeActions, setBranchSwitcherOpen, setGitOperationError, setGitOperationLoading, workspace?.path]);
 
@@ -606,11 +600,24 @@ function AppContent() {
     const requestId = ++documentNavigationRequestRef.current;
     if (requestId !== documentNavigationRequestRef.current) return;
     setDocumentNavigationError(null);
-    if (path && node?.type !== "folder") {
-      editorWorkbench.open(path, node);
+    if (!path) {
+      setActiveExplorerNode(null);
+      return;
     }
-    setActiveDataNode(node);
-  }, [editorWorkbench]);
+    try {
+      const resolvedNode = node ?? await dataPort?.resolveNode?.(path) ?? null;
+      if (requestId !== documentNavigationRequestRef.current) return;
+      if (!resolvedNode) {
+        setDocumentNavigationError(`Unable to resolve workspace entry: ${path}`);
+        return;
+      }
+      activateDataNode(resolvedNode);
+    } catch (error) {
+      if (requestId === documentNavigationRequestRef.current) {
+        setDocumentNavigationError(error instanceof Error ? error.message : String(error));
+      }
+    }
+  }, [activateDataNode, dataPort]);
   const handleEditorClose = useCallback(async (editorId: string) => {
     try {
       if (documentStorageIdentity) {
@@ -648,7 +655,7 @@ function AppContent() {
     return () => window.removeEventListener("keydown", handleEditorShortcut, true);
   }, [activeView, editorWorkbench, handleEditorClose]);
   const handleActiveDataNodeChange = useCallback((node: DataNode | null) => {
-    setActiveDataNode((current) => (
+    setActiveExplorerNode((current) => (
       hasSameActiveDataNodeIdentity(current, node) ? current : node
     ));
   }, []);
@@ -812,15 +819,12 @@ function AppContent() {
     navigateDesktopView("data");
     const entryPath = resolveDesktopShellWorkspaceEntryPath(displayPath, workspace.path);
     if (entryPath === undefined || entryPath === null || !dataPort) {
-      if (entryPath === null) setActiveDataNode(null);
+      if (entryPath === null) setActiveExplorerNode(null);
       return;
     }
 
-    const separatorIndex = entryPath.lastIndexOf("/");
-    const parentPath = separatorIndex < 0 ? null : entryPath.slice(0, separatorIndex) || null;
     try {
-      const siblings = await dataPort.listChildren(parentPath);
-      const node = siblings.find((candidate) => candidate.path === entryPath);
+      const node = await dataPort.resolveNode?.(entryPath) ?? null;
       if (node) await handleActiveDataPathChange(node.path, node);
     } catch {
       // The workspace surface already owns filesystem error presentation. An
@@ -847,6 +851,9 @@ function AppContent() {
     return (
       <Homepage
         onChooseWorkspace={openFolder}
+        onChooseProjectLocation={chooseProjectLocation}
+        onCreateProject={createProject}
+        onCloneRepository={cloneRepository}
         onOpenDroppedWorkspace={openDroppedWorkspace}
         onOpenWorkspacePath={openWorkspacePath}
         onRemoveProject={removeWorkspaceFromRecents}
@@ -912,7 +919,7 @@ function AppContent() {
   const locationBarPath = resolveDesktopShellLocationPath({
     // The address bar describes the content surface. Keep the active editor
     // authoritative even if explorer selection state is briefly catching up.
-    activePath: activeDataPath ?? activeDataNode?.path ?? null,
+    activePath: activeDocumentPath ?? activeExplorerNode?.path ?? null,
     dataViewActive: activeView === "data",
     workspacePath: workspace.path,
   });
@@ -1089,7 +1096,8 @@ function AppContent() {
       >
         <DesktopWorkspaceContent
           activeAiEditRequest={activeAiEditRequest}
-          activeDataPath={activeDataPath}
+          activeDocumentPath={activeDocumentPath}
+          activeExplorerPath={activeExplorerPath}
           activeView={activeView}
           cloud={{
             activeSection: activeCloudSection,
@@ -1187,6 +1195,10 @@ function AppContent() {
             <GitOperationErrorDialog
               error={gitOperationError}
               onClose={dismissGitOperationError}
+              onPull={() => {
+                dismissGitOperationError();
+                void handlePullGit();
+              }}
             />
           )}
           {createEntryDraft && (

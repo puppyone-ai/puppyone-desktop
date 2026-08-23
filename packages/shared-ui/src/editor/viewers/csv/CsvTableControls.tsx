@@ -102,6 +102,7 @@ export function CsvTableControls({
     if (!table || !surface || !columnHandle || !rowHandle || !dropIndicator) return;
 
     let disposed = false;
+    let positionFrame: number | null = null;
     let dockedHeaderCell: HTMLTableCellElement | null = null;
     let dockedRecordIndexCell: HTMLTableCellElement | null = null;
     const scrollContainer = surface.closest<HTMLElement>(".csv-table-editor__scroll");
@@ -114,9 +115,11 @@ export function CsvTableControls({
       return referenceRow
         ? Array.from(referenceRow.querySelectorAll<HTMLTableCellElement>(
             "th[data-csv-column], td[data-csv-column]",
-          ))
+          )).sort((left, right) => Number(left.dataset.csvColumn) - Number(right.dataset.csvColumn))
         : [];
     };
+    const getColumnCell = (columnIndex: number) => getColumnCells()
+      .find((cell) => Number(cell.dataset.csvColumn) === columnIndex) ?? null;
     const setHandleVisible = (handle: HTMLElement, visible: boolean) => {
       handle.classList.toggle("is-visible", visible);
     };
@@ -153,10 +156,18 @@ export function CsvTableControls({
     };
     const positionHandles = () => {
       if (disposed || !surface.isConnected) return;
+      const columnIndex = hoverRef.current.columnIndex;
+      const rowIndex = hoverRef.current.rowIndex;
+      if (columnIndex == null && rowIndex == null) {
+        setColumnHandleDocked(null, false);
+        setRowHandleDocked(null, false);
+        setHandleVisible(columnHandle, false);
+        setHandleVisible(rowHandle, false);
+        return;
+      }
       const surfaceRect = surface.getBoundingClientRect();
       const scrollRect = scrollContainer?.getBoundingClientRect();
-      const columnIndex = hoverRef.current.columnIndex;
-      const columnCell = columnIndex == null ? null : getColumnCells()[columnIndex] ?? null;
+      const columnCell = columnIndex == null ? null : getColumnCell(columnIndex);
       if (columnCell && columnIndex != null) {
         const rect = columnCell.getBoundingClientRect();
         const headerCell = headerEnabled && columnCell.closest("thead")
@@ -182,7 +193,6 @@ export function CsvTableControls({
         setHandleVisible(columnHandle, false);
       }
 
-      const rowIndex = hoverRef.current.rowIndex;
       const row = rowIndex == null || rowIndex < firstMovableRow
         ? null
         : getBodyRows().find((candidate) => Number(candidate.dataset.csvRow) === rowIndex) ?? null;
@@ -228,6 +238,13 @@ export function CsvTableControls({
       }
     };
     positionHandlesRef.current = positionHandles;
+    const schedulePositionHandles = () => {
+      if (disposed || positionFrame !== null) return;
+      positionFrame = requestAnimationFrame(() => {
+        positionFrame = null;
+        positionHandles();
+      });
+    };
 
     const openMenu = (kind: CsvTableDragKind, sourceIndex: number, handle: HTMLButtonElement) => {
       closeMenu(false);
@@ -238,7 +255,7 @@ export function CsvTableControls({
       const anchor = handle.querySelector<HTMLElement>(".po-editable-table-drag-handle-visual") ?? handle;
       const rect = anchor.getBoundingClientRect();
       const dockedColumnCellRect = kind === "column" && handle.classList.contains("is-block-docked")
-        ? getColumnCells()[sourceIndex]?.getBoundingClientRect()
+        ? getColumnCell(sourceIndex)?.getBoundingClientRect()
         : null;
       const nextTarget: CsvTableMenuTarget = {
         clientX: kind === "row"
@@ -334,8 +351,11 @@ export function CsvTableControls({
       }
 
       const columnCells = getColumnCells();
-      const finalIndex = boundary > sourceIndex ? boundary - 1 : boundary;
-      if (finalIndex === sourceIndex || columnCells.length === 0) {
+      const sourcePosition = columnCells.findIndex(
+        (cell) => Number(cell.dataset.csvColumn) === sourceIndex,
+      );
+      const finalPosition = boundary > sourcePosition ? boundary - 1 : boundary;
+      if (sourcePosition < 0 || finalPosition === sourcePosition || columnCells.length === 0) {
         dropIndicator.hidden = true;
         return;
       }
@@ -398,7 +418,11 @@ export function CsvTableControls({
       const applyMove = () => {
         if (dropBoundary == null) return;
         if (kind === "column") {
-          const targetColumnIndex = dropBoundary > sourceIndex ? dropBoundary - 1 : dropBoundary;
+          const columnCells = getColumnCells();
+          const targetBoundary = dropBoundary < columnCells.length
+            ? Number(columnCells[dropBoundary]?.dataset.csvColumn)
+            : Number(columnCells[columnCells.length - 1]?.dataset.csvColumn) + 1;
+          const targetColumnIndex = targetBoundary > sourceIndex ? targetBoundary - 1 : targetBoundary;
           if (targetColumnIndex === sourceIndex) return;
           onOperationRef.current({
             type: "move-column-to",
@@ -411,8 +435,10 @@ export function CsvTableControls({
         const bodyRows = getBodyRows();
         const sourcePosition = bodyRows.findIndex((row) => Number(row.dataset.csvRow) === sourceIndex);
         if (sourcePosition < 0) return;
-        const targetPosition = dropBoundary > sourcePosition ? dropBoundary - 1 : dropBoundary;
-        const targetRowIndex = Number(bodyRows[targetPosition]?.dataset.csvRow);
+        const targetBoundary = dropBoundary < bodyRows.length
+          ? Number(bodyRows[dropBoundary]?.dataset.csvRow)
+          : Number(bodyRows[bodyRows.length - 1]?.dataset.csvRow) + 1;
+        const targetRowIndex = targetBoundary > sourceIndex ? targetBoundary - 1 : targetBoundary;
         if (!Number.isInteger(targetRowIndex) || targetRowIndex === sourceIndex) return;
         onOperationRef.current({
           type: "move-row-to",
@@ -497,8 +523,10 @@ export function CsvTableControls({
     table.addEventListener("pointerover", updateHoverFromEvent);
     table.addEventListener("contextmenu", openCellMenu);
     surface.addEventListener("pointerleave", clearHover);
+    // No layout is read when no handle is active; an active handle stays
+    // pixel-synchronous with the existing sticky interaction contract.
     scrollContainer?.addEventListener("scroll", positionHandles, { passive: true });
-    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(positionHandles);
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedulePositionHandles);
     resizeObserver?.observe(table);
     positionHandles();
 
@@ -510,6 +538,8 @@ export function CsvTableControls({
       table.removeEventListener("contextmenu", openCellMenu);
       surface.removeEventListener("pointerleave", clearHover);
       scrollContainer?.removeEventListener("scroll", positionHandles);
+      if (positionFrame !== null) cancelAnimationFrame(positionFrame);
+      positionFrame = null;
       resizeObserver?.disconnect();
       setColumnHandleDocked(null, false);
       setRowHandleDocked(null, false);

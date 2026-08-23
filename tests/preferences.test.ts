@@ -12,6 +12,7 @@ import {
   parseExternalAppsSettings,
   parseExperimentalSettings,
   parseLoadingAnimationPreset,
+  parseGitSidebarLayout,
   parseLocalAgentsSettings,
   parseAgentFileActivityIndicatorsEnabled,
   parsePointerCursors,
@@ -19,6 +20,15 @@ import {
   parseTerminalSessionLayout,
   parseTextSize,
 } from "../src/preferences";
+
+describe("Git sidebar layout preferences", () => {
+  it("defaults to cards and accepts only the two comparison layouts", () => {
+    expect(parseGitSidebarLayout(null)).toBe("cards");
+    expect(parseGitSidebarLayout("cards")).toBe("cards");
+    expect(parseGitSidebarLayout("dividers")).toBe("dividers");
+    expect(parseGitSidebarLayout("unknown")).toBe("cards");
+  });
+});
 
 describe("create new menu preferences", () => {
   it("migrates the legacy default while preserving explicit order and visibility", () => {

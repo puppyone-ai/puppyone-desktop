@@ -1,8 +1,16 @@
-import type { WorkspaceOpenResult } from "../types/electron";
+import type {
+  WorkspaceCloneRepositoryRequest,
+  WorkspaceCreateProjectRequest,
+  WorkspaceOpenResult,
+  WorkspaceProjectLocationGrant,
+} from "../types/electron";
 import {
+  cloneRepository as cloneRepositoryBridge,
+  createLocalProject as createLocalProjectBridge,
   openDroppedWorkspaceInCurrentWindow as openDroppedWorkspaceInCurrentWindowBridge,
   openWorkspaceInCurrentWindow as openWorkspaceInCurrentWindowBridge,
   openWorkspaceInNewWindow as openWorkspaceInNewWindowBridge,
+  selectLocalProjectLocation as selectLocalProjectLocationBridge,
   selectWorkspaceFolder as selectWorkspaceFolderBridge,
   selectWorkspaceFolderInNewWindow as selectWorkspaceFolderInNewWindowBridge,
 } from "./localFiles";
@@ -25,6 +33,22 @@ export async function openWorkspaceTarget(target: WorkspaceOpenTarget): Promise<
 
 export async function openDroppedWorkspaceTarget(folder: File): Promise<WorkspaceOpenResult> {
   return openDroppedWorkspaceInCurrentWindowBridge(folder);
+}
+
+export async function createLocalProjectTarget(
+  request: WorkspaceCreateProjectRequest,
+): Promise<WorkspaceOpenResult | null> {
+  return createLocalProjectBridge(request);
+}
+
+export async function selectLocalProjectLocationTarget(): Promise<WorkspaceProjectLocationGrant | null> {
+  return selectLocalProjectLocationBridge();
+}
+
+export async function cloneRepositoryTarget(
+  request: WorkspaceCloneRepositoryRequest,
+): Promise<WorkspaceOpenResult | null> {
+  return cloneRepositoryBridge(request);
 }
 
 export async function selectLocalWorkspaceFolder({

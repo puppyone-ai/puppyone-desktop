@@ -240,6 +240,25 @@
   transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 
+/* Synthetic tracks preserve the complete table geometry without mounting
+   offscreen semantic rows or cells. They do not alter existing cell pixels. */
+.csv-table-editor__table .csv-table-editor__virtual-column-spacer {
+  min-width: 0;
+  max-width: none;
+  padding: 0;
+  pointer-events: none;
+}
+
+.csv-table-editor__table .csv-table-editor__virtual-row-spacer > td {
+  height: inherit;
+  min-width: 0;
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
 .csv-table-editor__record-index-column {
   width: var(--csv-table-record-index-width);
 }

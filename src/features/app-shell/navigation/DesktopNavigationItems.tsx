@@ -6,6 +6,7 @@ import {
   getDesktopGitNavSummary,
   getDesktopNavigationBadge,
   getDesktopNavigationLabel,
+  type DesktopNavigationBadge,
   type DesktopGitNavSummary,
 } from "./navigationModel";
 import type { DesktopNavigationItem, DesktopNavigationRuntime } from "./types";
@@ -62,7 +63,7 @@ export function DesktopNavigationItems({
                 {itemLabel}
               </span>
             )}
-            {!shellToolbar && <DesktopNavBadge count={badge.count} tone={badge.tone} />}
+            {!shellToolbar && <DesktopNavBadge badge={badge} />}
             {gitSummary && <DesktopGitNavBubble summary={gitSummary} />}
           </button>
         );
@@ -111,19 +112,17 @@ export function DesktopSidebarSettingsButton({
 }
 
 function DesktopNavBadge({
-  count,
-  tone,
+  badge,
 }: {
-  count: number;
-  tone: "remote" | "workspace";
+  badge: DesktopNavigationBadge;
 }) {
-  if (count <= 0) return null;
+  if (badge.kind === "none") return null;
   return (
     <em
-      className={`desktop-sidebar-nav-badge ${tone}`}
+      className={`desktop-sidebar-nav-badge ${badge.tone}`}
       aria-hidden="true"
     >
-      {count > 99 ? "99+" : count}
+      {badge.kind === "remote" ? (badge.count > 99 ? "99+" : badge.count) : null}
     </em>
   );
 }

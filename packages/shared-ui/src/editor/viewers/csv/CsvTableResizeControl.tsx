@@ -195,7 +195,11 @@ export function CsvTableResizeControl({
     onPreviewChange(null);
 
     const surface = event.currentTarget.closest<HTMLElement>(".csv-table-editor__surface");
-    const referenceRow = surface?.querySelector<HTMLTableRowElement>("tbody tr:last-child, thead tr:last-child");
+    const mountedRows = surface
+      ? Array.from(surface.querySelectorAll<HTMLTableRowElement>("tbody tr[data-csv-row]"))
+      : [];
+    const referenceRow = mountedRows[mountedRows.length - 1]
+      ?? surface?.querySelector<HTMLTableRowElement>("thead tr:last-child");
     const measuredRowHeight = referenceRow?.getBoundingClientRect().height ?? 0;
     const rowHeight = measuredRowHeight > 0 ? measuredRowHeight : FALLBACK_ROW_HEIGHT;
     const scrollContainer = surface?.closest<HTMLElement>(".csv-table-editor__scroll");

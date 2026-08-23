@@ -8,6 +8,7 @@ import type {
   ExternalAppsSettings,
   FilesVisibilitySettings,
   InterfaceStyle,
+  GitSidebarLayout,
   LightThemePreset,
   LoadingAnimationPreset,
   LocalAgentsSettings,
@@ -57,6 +58,7 @@ export type SettingsPreferencesPort = {
   rightSidebarToolsSettings: RightSidebarToolsSettings;
   titlebarActionsSettings: TitlebarActionsSettings;
   terminalSessionLayout: TerminalSessionLayout;
+  gitSidebarLayout: GitSidebarLayout;
   aiEditAssistEnabled: boolean;
   setThemeMode: (value: ThemeMode) => void;
   setInterfaceStyle: (value: InterfaceStyle) => void;
@@ -80,6 +82,7 @@ export type SettingsPreferencesPort = {
   setRightSidebarToolsSettings: (value: RightSidebarToolsSettings) => void;
   setTitlebarActionsSettings: (value: TitlebarActionsSettings) => void;
   setTerminalSessionLayout: (value: TerminalSessionLayout) => void;
+  setGitSidebarLayout: (value: GitSidebarLayout) => void;
   setAiEditAssistEnabled: (value: boolean) => void;
 };
 
@@ -160,6 +163,7 @@ export function createSettingsWorkspaceSurface({
         rightSidebarToolsSettings={preferences.rightSidebarToolsSettings}
         titlebarActionsSettings={preferences.titlebarActionsSettings}
         terminalSessionLayout={preferences.terminalSessionLayout}
+        gitSidebarLayout={preferences.gitSidebarLayout}
         aiEditAssistEnabled={preferences.aiEditAssistEnabled}
         cloudEnabled={cloud.enabled}
         cloudSession={cloud.session}
@@ -193,6 +197,7 @@ export function createSettingsWorkspaceSurface({
         onRightSidebarToolsSettingsChange={preferences.setRightSidebarToolsSettings}
         onTitlebarActionsSettingsChange={preferences.setTitlebarActionsSettings}
         onTerminalSessionLayoutChange={preferences.setTerminalSessionLayout}
+        onGitSidebarLayoutChange={preferences.setGitSidebarLayout}
         onAiEditAssistEnabledChange={preferences.setAiEditAssistEnabled}
         onCloudSessionChange={cloud.onSessionChange}
         onPuppyoneConfigChange={workspaceConfig.change}

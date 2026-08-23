@@ -1,12 +1,13 @@
 /**
  * @vitest-environment happy-dom
  */
-import React, { useState } from "react";
+import React, { useRef } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CsvTableEditor } from "../packages/shared-ui/src/editor/viewers/csv/CsvTableEditor";
 import { CsvTableResizeControl } from "../packages/shared-ui/src/editor/viewers/csv/CsvTableResizeControl";
+import type { EditorSourceSnapshotPort } from "../packages/shared-ui/src/editor/sourceSnapshot";
 import { testT, withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -658,17 +659,21 @@ describe("CSV table interactions", () => {
 });
 
 function Harness({ documentId = "table.csv" }: { documentId?: string }) {
-  const [content, setContent] = useState(latestSnapshot);
+  const initialContentRef = useRef(latestSnapshot);
+  const snapshotPortRef = useRef<EditorSourceSnapshotPort | null>(null);
   return (
     <CsvTableEditor
-      content={content}
+      content={initialContentRef.current}
       documentId={documentId}
       nodeName="table.csv"
       readOnly={false}
-      onChange={(next) => {
+      onSnapshotPortChange={(port) => {
+        snapshotPortRef.current = port;
+      }}
+      onSourceRevisionChange={(revision) => {
+        if (revision.origin !== "local-edit") return;
         changeCount += 1;
-        latestSnapshot = next;
-        setContent(next);
+        latestSnapshot = snapshotPortRef.current?.readSnapshot().content ?? latestSnapshot;
       }}
     />
   );

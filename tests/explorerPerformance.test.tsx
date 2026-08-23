@@ -43,7 +43,6 @@ describe("Explorer bounded rendering", () => {
     }];
     const model = buildExplorerVisibleModel(nodes, {
       expandedPaths: new Set(["folder"]),
-      emptyLabel: "empty",
       loadingLabel: "loading",
     });
 
@@ -54,6 +53,37 @@ describe("Explorer bounded rendering", () => {
     ]);
     expect(model.pathToIndex.get("folder/b.md")).toBe(2);
     expect(model.pathToNode.get("folder/a.md")?.name).toBe("a.md");
+  });
+
+  it("keeps expanded empty folders structural while retaining explicit loading rows", () => {
+    const emptyFolder: DataNode = {
+      id: "empty-folder",
+      name: "empty-folder",
+      path: "empty-folder",
+      type: "folder",
+      children: [],
+    };
+    const tail: DataNode = { id: "tail", name: "tail.md", path: "tail.md", type: "markdown" };
+    const expanded = buildExplorerVisibleModel([emptyFolder, tail], {
+      expandedPaths: new Set([emptyFolder.path]),
+      loadingLabel: "loading",
+    });
+    const loading = buildExplorerVisibleModel([emptyFolder, tail], {
+      expandedPaths: new Set([emptyFolder.path]),
+      loadingPaths: new Set([emptyFolder.path]),
+      loadingLabel: "loading",
+    });
+
+    expect(expanded.rows.map((row) => row.kind === "node" ? row.path : row.key)).toEqual([
+      emptyFolder.path,
+      tail.path,
+    ]);
+    expect(expanded.pathToIndex.get(tail.path)).toBe(1);
+    expect(loading.rows.map((row) => row.kind === "node" ? row.path : row.key)).toEqual([
+      emptyFolder.path,
+      `${emptyFolder.path}:loading`,
+      tail.path,
+    ]);
   });
 
   it("mounts at most the hard row limit for 1,000 visible nodes", () => {
@@ -82,12 +112,10 @@ describe("Explorer bounded rendering", () => {
     const tail: DataNode = { id: "tail", name: "tail.md", path: "tail.md", type: "markdown" };
     const collapsed = buildExplorerVisibleModel([folder, tail], {
       expandedPaths: new Set(),
-      emptyLabel: "empty",
       loadingLabel: "loading",
     });
     const expanded = buildExplorerVisibleModel([folder, tail], {
       expandedPaths: new Set([folder.path]),
-      emptyLabel: "empty",
       loadingLabel: "loading",
     });
     const enterPlan = createExplorerMotionPlan({

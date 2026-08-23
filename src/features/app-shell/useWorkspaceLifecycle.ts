@@ -8,16 +8,24 @@ import {
   removeRecentWorkspace,
 } from "../../lib/localFiles";
 import {
+  cloneRepositoryTarget,
+  createLocalProjectTarget,
   openDroppedWorkspaceTarget,
   openWorkspaceTarget,
+  selectLocalProjectLocationTarget,
   selectLocalWorkspaceFolder,
 } from "../../lib/workspaceOpening";
-import type { WorkspaceOpenResult } from "../../types/electron";
+import type {
+  WorkspaceCloneRepositoryRequest,
+  WorkspaceCreateProjectRequest,
+  WorkspaceOpenResult,
+  WorkspaceProjectLocationGrant,
+} from "../../types/electron";
 import {
   getRecentWorkspaceItems,
   mergeWorkspaceLists,
 } from "./workspaceHomeModel";
-import type { RecentWorkspaceHomeItem } from "../../components/MinimalOnboarding";
+import type { RecentWorkspaceHomeItem } from "./workspaceHomeModel";
 
 export function useWorkspaceLifecycle({
   onWorkspaceActivated,
@@ -108,6 +116,22 @@ export function useWorkspaceLifecycle({
     handleWorkspaceOpenResult(result);
   }, [handleWorkspaceOpenResult, workspace]);
 
+  const createProject = useCallback(async (request: WorkspaceCreateProjectRequest) => {
+    const result = await createLocalProjectTarget(request);
+    handleWorkspaceOpenResult(result);
+    return result !== null;
+  }, [handleWorkspaceOpenResult]);
+
+  const chooseProjectLocation = useCallback(async (): Promise<WorkspaceProjectLocationGrant | null> => {
+    return selectLocalProjectLocationTarget();
+  }, []);
+
+  const cloneRepository = useCallback(async (request: WorkspaceCloneRepositoryRequest) => {
+    const result = await cloneRepositoryTarget(request);
+    handleWorkspaceOpenResult(result);
+    return result !== null;
+  }, [handleWorkspaceOpenResult]);
+
   const removeWorkspaceFromRecents = useCallback(async (folderPath: string) => {
     await removeRecentWorkspace(folderPath);
     recentWorkspaceRequestRef.current += 1;
@@ -184,6 +208,9 @@ export function useWorkspaceLifecycle({
   return {
     activateWorkspace,
     clearWorkspace,
+    chooseProjectLocation,
+    cloneRepository,
+    createProject,
     forgetActiveWorkspace,
     handleWorkspaceOpenResult,
     openDroppedWorkspace,

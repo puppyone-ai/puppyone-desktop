@@ -30,6 +30,56 @@ const errors = inspectMacReleaseReadiness({
 });
 
 const scripts = packageMetadata.scripts ?? {};
+if (packageMetadata.build?.afterPack !== "scripts/after-pack-flat-macos-icon.mjs") {
+  errors.push("macOS packaging must replace the generated ICNS with the canonical flat PNG");
+}
+const canonicalStableLogo = readFileSync(path.join(repoRoot, "public", "logo-square.png"));
+const approvedFlatStableLogo = readFileSync(
+  path.join(repoRoot, "public", "logo-square-v0.1.3-dark.png"),
+);
+const canonicalDevelopmentLogo = readFileSync(
+  path.join(repoRoot, "public", "logo-square-dev.png"),
+);
+const approvedFlatDevelopmentLogo = readFileSync(
+  path.join(repoRoot, "public", "logo-square-v0.1.3-dark-dev.png"),
+);
+if (!canonicalStableLogo.equals(approvedFlatStableLogo)) {
+  errors.push("the canonical Stable logo must match the approved flat v0.1.3-dark asset");
+}
+if (!canonicalDevelopmentLogo.equals(approvedFlatDevelopmentLogo)) {
+  errors.push("the canonical Development logo must match the approved flat badged asset");
+}
+if (packageMetadata.build?.mac?.icon !== "public/logo-square.png") {
+  errors.push("the macOS application icon must use the canonical flat logo source");
+}
+const dmg = packageMetadata.build?.dmg ?? {};
+const expectedDmgContents = [
+  { x: 200, y: 204 },
+  { x: 520, y: 204, type: "link", path: "/Applications" },
+];
+if (dmg.title !== "${productName} Installer") {
+  errors.push("the macOS installer volume must use the channel-aware product name");
+}
+if (dmg.background !== "build/dmg-background.tiff") {
+  errors.push("the macOS installer must use the PuppyOne onboarding background");
+}
+if (dmg.iconSize !== 128 || dmg.iconTextSize !== 14) {
+  errors.push("the macOS installer icons must retain the approved visual scale");
+}
+if (dmg.window?.width !== 720 || dmg.window?.height !== 440) {
+  errors.push("the macOS installer must retain the approved 720x440 composition");
+}
+if (JSON.stringify(dmg.contents) !== JSON.stringify(expectedDmgContents)) {
+  errors.push("the macOS installer must keep the app and Applications drop target aligned with the paw trail");
+}
+try {
+  readFileSync(path.join(repoRoot, dmg.background));
+} catch {
+  errors.push("the rendered macOS installer background is missing; run npm run generate:dmg-background");
+}
+if (!scripts["generate:dmg-background"]?.includes("render-dmg-background.mjs")) {
+  errors.push("the macOS installer background must have a reproducible renderer");
+}
 if (!scripts["dist:mac"]?.includes("prepare:desktop-build:dev")) {
   errors.push("local macOS packaging must resolve Development Build Identity before packaging");
 }

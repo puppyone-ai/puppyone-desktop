@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="public/logo-square-v0.1.4-dark.png" alt="puppyone Logo" width="72" height="72" />
+  <img src="public/logo-square.png" alt="puppyone Logo" width="72" height="72" />
 
   <h1>puppyone</h1>
 

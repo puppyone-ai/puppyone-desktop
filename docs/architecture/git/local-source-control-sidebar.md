@@ -85,6 +85,8 @@ The raw snapshot contains both low-level status collections and a
 - `untrackedEntries`: untracked working-tree files
 - `branches`, `remotes`, `syncTarget`, and current HEAD data
 - `sourceControl.groups`: merge, index, working-tree, and untracked resources
+- `sourceControl.operation`: an in-progress merge, rebase, cherry-pick, or
+  revert, including whether it can continue or abort
 - `sourceControl.remote`: ahead/behind state and incoming/outgoing previews
 
 `src/features/source-control/viewModel.ts` is the durable derivation boundary.
@@ -144,8 +146,9 @@ GitHub repository row
 Automatic detection is **fetch-only**. The repository lifecycle may refresh
 remote-tracking refs while the window is foregrounded, but only an explicit
 user action may Pull and change the worktree. Divergence and merge-conflict
-states disable the one-click path rather than disguising a reconciliation as a
-safe fast-forward.
+states are distinct: divergence recommends an explicit Pull with rebase and
+autostash, while unresolved file conflicts disable Pull, Push, Publish, and
+Commit until the repository operation is continued or aborted.
 
 ### Version-control opt-in setup state
 
@@ -192,6 +195,31 @@ valid.
 An application mutation must not depend solely on a filesystem watcher to learn
 its result. The operation response or a guaranteed post-operation reconcile is
 the authoritative completion path.
+
+Pull uses rebase with autostash so committed local work is replayed after the
+remote branch while staged, unstaged, and untracked drafts are preserved. If
+Git pauses on a content conflict, the next status snapshot exposes the active
+repository operation. The sidebar then follows this fail-closed sequence:
+
+```text
+conflicted files
+  -> Pull / Push / Publish / Commit disabled
+  -> user resolves and stages every conflict
+  -> Continue becomes the only primary action
+  -> Continue succeeds: normal ahead/behind policy resumes
+  -> Abort succeeds: Git restores the pre-operation branch state
+```
+
+Autostash restoration can also conflict after the remote commit has already
+fast-forwarded. That case has conflict resources but no active rebase; sync
+actions remain blocked, and resolving, staging, and committing the restored
+working-tree changes completes the flow.
+
+Failed mutations trigger an immediate status reconciliation. Push rejection
+also fetches the remote target so a race with another collaborator changes the
+visible recommendation from Push to Pull. The recovery dialog may emphasize
+Pull for that expected collaboration race; a dismiss-only button must not use
+primary emphasis.
 
 ## Diff and History Detail
 
@@ -293,8 +321,10 @@ actions. The surrounding sidebar rows remain `30px` high; action density must
 not shrink row hit areas or body typography.
 
 Only one available workflow action receives solid primary emphasis at a time.
-The priority is staged Commit, incoming Pull or Download, outgoing Push or
-Publish, then the simple-mode combined Stage & Commit action. Non-primary
+The priority is: continue a resolved repository operation; incoming Pull or
+Download; staged Commit; outgoing Push or Publish; then the simple-mode
+combined Stage & Commit action. Unresolved conflicts deliberately have no
+primary operation until their files are resolved. Non-primary
 operation buttons (including Push when Commit owns primary) use neutral gray
 control chrome (`--po-control`); only `is-primary` uses the accent fill.
 Unavailable operations stay muted. This is a state-machine decision expressed
@@ -390,6 +420,10 @@ watcher recovery, and refresh ordering belong to the lifecycle test matrix in
   authority.
 - Application-initiated mutations reconcile status as part of operation
   completion.
+- Pull, Push, Publish, Sync, and Commit fail closed while unresolved repository
+  conflicts remain; renderer button state is not the only safety boundary.
+- Rebase, merge, cherry-pick, and revert continuation/abort state comes from
+  repository metadata in the snapshot, never from a renderer guess.
 - Incoming/outgoing sidebar resources and their opened patches use the same net
   comparison strategy; commit-log path events must not label aggregate diffs.
 - Selection is cleared when its file or commit no longer exists in the active

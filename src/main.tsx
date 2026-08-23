@@ -78,6 +78,9 @@ async function renderApplication() {
   } else if (window.location.hash === "#renderer-performance-smoke") {
     const { RendererPerformanceSmokeHarness } = await import("./performance/RendererPerformanceSmokeHarness");
     surface = <RendererPerformanceSmokeHarness />;
+  } else if (window.location.hash === "#csv-editor-performance-smoke") {
+    const { CsvEditorPerformanceSmokeHarness } = await import("./performance/CsvEditorPerformanceSmokeHarness");
+    surface = <CsvEditorPerformanceSmokeHarness />;
   } else if (window.location.hash === "#markdown-line-geometry-smoke") {
     const { MarkdownLineGeometrySmokeHarness } = await import("./performance/MarkdownLineGeometrySmokeHarness");
     surface = <MarkdownLineGeometrySmokeHarness />;

@@ -1,6 +1,10 @@
 "use client";
 
-import { getResolvedFileExtension, resolveFileFormat } from "../../core/fileFormats";
+import {
+  getFileSemanticKind,
+  getResolvedFileExtension,
+  resolveFileFormat,
+} from "../../core/fileFormats";
 import type {
   EditorDocument,
   EditorSourceRequirement,
@@ -103,10 +107,12 @@ export function getEditorSourceRequirement(input: {
   type?: string | null;
   mimeType?: string | null;
 }): EditorSourceRequirement {
+  const semanticKind = getFileSemanticKind(input.name, input.type);
+  if (semanticKind === "folder") return "none";
   const { viewer } = resolveEditorViewer({
     path: input.name,
     name: input.name,
-    type: input.type ?? "file",
+    type: semanticKind,
     mimeType: input.mimeType ?? null,
   });
   return viewer.source;

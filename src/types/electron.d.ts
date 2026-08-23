@@ -215,6 +215,16 @@ export type GitRemoteSummary = {
   branches: string[];
 };
 
+export type GitFileChangeSummary = {
+  total: number;
+  added: number;
+  modified: number;
+  deleted: number;
+  renamed: number;
+  copied: number;
+  changed: number;
+};
+
 export type GitSyncTargetSummary = {
   remote: string | null;
   branch: string | null;
@@ -222,6 +232,7 @@ export type GitSyncTargetSummary = {
   exists: boolean;
   ahead: number;
   behind: number;
+  incomingFileSummary?: GitFileChangeSummary;
   incomingPreview: GitSourceControlResource[];
   outgoingPreview: GitSourceControlResource[];
 };
@@ -232,6 +243,7 @@ export type GitSourceControlRemoteSummary = {
   upstream: string | null;
   ahead: number;
   behind: number;
+  incomingFileSummary?: GitFileChangeSummary;
   incomingPreview: GitSourceControlResource[];
   outgoingPreview: GitSourceControlResource[];
   canPull: boolean;
@@ -249,18 +261,29 @@ export type GitSourceControlRemoteSummary = {
     | "synced";
 };
 
+export type GitRepositoryOperationKind = "merge" | "rebase" | "cherry-pick" | "revert";
+
+export type GitRepositoryOperationState = {
+  kind: GitRepositoryOperationKind;
+  canContinue: boolean;
+  canAbort: boolean;
+};
+
 export type GitSourceControlSnapshot = {
   input: {
     placeholder: string;
     defaultMessage: string;
   };
   groups: GitSourceControlResourceGroup[];
+  operation?: GitRepositoryOperationState | null;
   remote: GitSourceControlRemoteSummary;
   actions: {
     canStageAll: boolean;
     canUnstageAll: boolean;
     canDiscardAll: boolean;
     canCommit: boolean;
+    canContinue?: boolean;
+    canAbort?: boolean;
   };
 };
 
@@ -531,6 +554,20 @@ export type WorkspaceOpenResult = {
   status: "opened-current" | "opened-new-window" | "focused-existing";
   path: string | null;
   workspace: Workspace | null;
+};
+
+export type WorkspaceCreateProjectRequest = {
+  name: string;
+  locationGrantId: string;
+};
+
+export type WorkspaceProjectLocationGrant = {
+  grantId: string;
+  path: string;
+};
+
+export type WorkspaceCloneRepositoryRequest = {
+  repositoryUrl: string;
 };
 
 export type WorkspaceCreateEntryKind = "file" | "folder";
@@ -881,6 +918,13 @@ declare global {
       openDroppedWorkspaceInCurrentWindow: (folder: File) => Promise<WorkspaceOpenResult>;
       selectFolder: () => Promise<WorkspaceOpenResult | null>;
       selectFolderInNewWindow: () => Promise<WorkspaceOpenResult | null>;
+      selectLocalProjectLocation: () => Promise<WorkspaceProjectLocationGrant | null>;
+      createLocalProject: (
+        request: WorkspaceCreateProjectRequest,
+      ) => Promise<WorkspaceOpenResult | null>;
+      cloneRepository: (
+        request: WorkspaceCloneRepositoryRequest,
+      ) => Promise<WorkspaceOpenResult | null>;
       getPathForFile: (file: File) => string;
       stageAgentAttachments: (request: {
         rootPath: string;
@@ -902,6 +946,10 @@ declare global {
         rootPath: string;
         folderPath: string | null;
       }) => Promise<DataNode[]>;
+      resolveNode: (request: {
+        rootPath: string;
+        path: string;
+      }) => Promise<DataNode>;
       readFile: (request: {
         rootPath: string;
         path: string;
@@ -1071,6 +1119,12 @@ declare global {
       commitGit: (request: {
         rootPath: string;
         message: string;
+      }) => Promise<GitStatusSnapshot>;
+      continueGitOperation: (request: {
+        rootPath: string;
+      }) => Promise<GitStatusSnapshot>;
+      abortGitOperation: (request: {
+        rootPath: string;
       }) => Promise<GitStatusSnapshot>;
       checkoutGitBranch: (request: {
         rootPath: string;

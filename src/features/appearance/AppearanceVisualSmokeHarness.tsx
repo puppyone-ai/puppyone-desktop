@@ -262,7 +262,7 @@ function SmokeNavigation({ shellToolbar = false }: { shellToolbar?: boolean }) {
               <i className={`desktop-sidebar-nav-icon-wrap${shellToolbar ? " desktop-shell-toolbar-button-icon" : ""}`} aria-hidden="true"><Icon size={16} /></i>
               <span className={`desktop-sidebar-nav-label${shellToolbar ? " desktop-shell-toolbar-button-label" : ""}`}>{t(labelKey)}</span>
               {dataItem === "git" && !shellToolbar && (
-                <em className="desktop-sidebar-nav-badge workspace">65</em>
+                <em className="desktop-sidebar-nav-badge workspace" aria-hidden="true" />
               )}
             </button>
           ))}

@@ -18,11 +18,13 @@ import os from "node:os";
 import path from "node:path";
 import {
   getWorkspaceGitStatus,
+  abortWorkspaceGitOperation,
   createWorkspaceEntry,
   writeWorkspaceTextFile,
   readWorkspaceTextFile,
   stageAllWorkspaceGitChanges,
   commitWorkspaceGit,
+  continueWorkspaceGitOperation,
   pushWorkspaceGit,
   pullWorkspaceGit,
   fetchWorkspaceGit,
@@ -131,6 +133,173 @@ describe("云端协同 (cloud <-> local collaboration)", () => {
       const synced = await getWorkspaceGitStatus(workA);
       expect(synced.sourceControl.remote.behind).toBe(0);
       expect(await readContent(workA, "note.txt")).toBe("b1\n");
+    } finally {
+      await cleanup();
+    }
+  }, TIMEOUT);
+
+  it("rebases local commits before pushing a diverged branch", async () => {
+    const { workA, workB, cleanup } = await setupCollab();
+    try {
+      await createWorkspaceEntry(workA, {
+        parentPath: null,
+        name: "local-a.md",
+        kind: "file",
+        content: "local A\n",
+      });
+      await stageAllWorkspaceGitChanges(workA);
+      await commitWorkspaceGit(workA, "local: add A");
+
+      await createWorkspaceEntry(workB, {
+        parentPath: null,
+        name: "remote-b.md",
+        kind: "file",
+        content: "remote B\n",
+      });
+      await stageAllWorkspaceGitChanges(workB);
+      await commitWorkspaceGit(workB, "remote: add B");
+      await pushWorkspaceGit(workB);
+
+      const diverged = await fetchWorkspaceGit(workA);
+      expect(diverged.sourceControl.remote).toMatchObject({
+        state: "diverged",
+        ahead: 1,
+        behind: 1,
+        canPull: true,
+        canPush: false,
+      });
+
+      const integrated = await pullWorkspaceGit(workA);
+      expect(integrated.sourceControl.remote).toMatchObject({
+        state: "outgoing",
+        behind: 0,
+        canPush: true,
+      });
+      expect(await readContent(workA, "local-a.md")).toBe("local A\n");
+      expect(await readContent(workA, "remote-b.md")).toBe("remote B\n");
+      expect(git(workA, "log", "--merges", "--oneline")).toBe("");
+
+      await pushWorkspaceGit(workA);
+      expect((await getWorkspaceGitStatus(workA)).sourceControl.remote).toMatchObject({
+        state: "synced",
+        ahead: 0,
+        behind: 0,
+      });
+    } finally {
+      await cleanup();
+    }
+  }, TIMEOUT);
+
+  it("preserves uncommitted files while pulling a non-overlapping remote commit", async () => {
+    const { workA, workB, cleanup } = await setupCollab();
+    try {
+      await createWorkspaceEntry(workA, {
+        parentPath: null,
+        name: "local-staged.md",
+        kind: "file",
+        content: "staged but not committed\n",
+      });
+      await stageAllWorkspaceGitChanges(workA);
+      await createWorkspaceEntry(workA, {
+        parentPath: null,
+        name: "local-draft.md",
+        kind: "file",
+        content: "not staged\n",
+      });
+      await createWorkspaceEntry(workB, {
+        parentPath: null,
+        name: "remote-commit.md",
+        kind: "file",
+        content: "committed remotely\n",
+      });
+      await stageAllWorkspaceGitChanges(workB);
+      await commitWorkspaceGit(workB, "remote: add committed file");
+      await pushWorkspaceGit(workB);
+
+      const pulled = await pullWorkspaceGit(workA);
+      expect(pulled.sourceControl.remote).toMatchObject({ state: "synced", behind: 0 });
+      expect(await readContent(workA, "local-staged.md")).toBe("staged but not committed\n");
+      expect(await readContent(workA, "local-draft.md")).toBe("not staged\n");
+      expect(await readContent(workA, "remote-commit.md")).toBe("committed remotely\n");
+      expect(pulled.untrackedEntries).toEqual(expect.arrayContaining([
+        expect.objectContaining({ path: "local-draft.md" }),
+      ]));
+      expect(pulled.stagedEntries).toEqual(expect.arrayContaining([
+        expect.objectContaining({ path: "local-staged.md" }),
+      ]));
+    } finally {
+      await cleanup();
+    }
+  }, TIMEOUT);
+
+  it("surfaces and completes a rebase conflict before allowing Push", async () => {
+    const { workA, workB, cleanup } = await setupCollab();
+    try {
+      await writeWorkspaceTextFile(workA, "shared.txt", "local version\n");
+      await stageAllWorkspaceGitChanges(workA);
+      await commitWorkspaceGit(workA, "local: edit shared file");
+
+      await writeWorkspaceTextFile(workB, "shared.txt", "remote version\n");
+      await stageAllWorkspaceGitChanges(workB);
+      await commitWorkspaceGit(workB, "remote: edit shared file");
+      await pushWorkspaceGit(workB);
+
+      await expect(pullWorkspaceGit(workA)).rejects.toThrow(/conflict|could not apply/i);
+      const conflicted = await getWorkspaceGitStatus(workA);
+      expect(conflicted.sourceControl.operation).toMatchObject({
+        kind: "rebase",
+        canContinue: false,
+        canAbort: true,
+      });
+      expect(conflicted.sourceControl.groups.find((group) => group.id === "merge")?.resources).toHaveLength(1);
+      expect(conflicted.sourceControl.remote.canPush).toBe(false);
+      await expect(pushWorkspaceGit(workA)).rejects.toThrow(/rebase is in progress/i);
+      await expect(pullWorkspaceGit(workA)).rejects.toThrow(/rebase is in progress/i);
+
+      const aborted = await abortWorkspaceGitOperation(workA);
+      expect(aborted.sourceControl.operation).toBeNull();
+      expect(aborted.sourceControl.remote).toMatchObject({ state: "diverged", canPull: true, canPush: false });
+      await expect(pullWorkspaceGit(workA)).rejects.toThrow(/conflict|could not apply/i);
+
+      await writeWorkspaceTextFile(workA, "shared.txt", "resolved version\n");
+      await stageAllWorkspaceGitChanges(workA);
+      const ready = await getWorkspaceGitStatus(workA);
+      expect(ready.sourceControl.operation).toMatchObject({ kind: "rebase", canContinue: true });
+
+      const continued = await continueWorkspaceGitOperation(workA);
+      expect(continued.sourceControl.operation).toBeNull();
+      expect(continued.sourceControl.remote).toMatchObject({ state: "outgoing", behind: 0, canPush: true });
+      expect(await readContent(workA, "shared.txt")).toBe("resolved version\n");
+      expect(git(workA, "log", "--merges", "--oneline")).toBe("");
+    } finally {
+      await cleanup();
+    }
+  }, TIMEOUT);
+
+  it("surfaces an autostash conflict without losing an uncommitted edit", async () => {
+    const { workA, workB, cleanup } = await setupCollab();
+    try {
+      await writeWorkspaceTextFile(workA, "shared.txt", "uncommitted local version\n");
+      await writeWorkspaceTextFile(workB, "shared.txt", "committed remote version\n");
+      await stageAllWorkspaceGitChanges(workB);
+      await commitWorkspaceGit(workB, "remote: replace shared file");
+      await pushWorkspaceGit(workB);
+
+      await pullWorkspaceGit(workA).catch(() => null);
+      const conflicted = await getWorkspaceGitStatus(workA);
+      const shared = await readContent(workA, "shared.txt");
+      expect(conflicted.sourceControl.operation).toBeNull();
+      expect(conflicted.sourceControl.groups.find((group) => group.id === "merge")?.resources).toHaveLength(1);
+      expect(conflicted.sourceControl.remote).toMatchObject({ behind: 0, canPush: false });
+      expect(shared).toContain("uncommitted local version");
+      expect(shared).toContain("committed remote version");
+      await expect(pushWorkspaceGit(workA)).rejects.toThrow(/unresolved file conflicts/i);
+
+      await writeWorkspaceTextFile(workA, "shared.txt", "resolved autostash version\n");
+      await stageAllWorkspaceGitChanges(workA);
+      await commitWorkspaceGit(workA, "resolve: autostash conflict");
+      await pushWorkspaceGit(workA);
+      expect((await getWorkspaceGitStatus(workA)).sourceControl.remote.state).toBe("synced");
     } finally {
       await cleanup();
     }

@@ -27,7 +27,7 @@ const cloudSidebarSource = readFileSync(
 );
 const agentFoundationCss = readCss("../src/features/desktop-agent/ui/styles/foundation.css");
 const gitLayoutCss = readCss("../src/features/source-control/styles/sidebar-layout.css");
-const gitResourcesCss = readCss("../src/features/source-control/styles/sidebar-resources.css");
+const gitResourcesCss = readCss("../src/features/source-control/styles/sidebar-providers.css");
 const gitHistoryCss = readCss("../src/features/source-control/styles/history-list.css");
 const settingsCss = readCss("../src/styles/settings-view.css");
 const cloudSidebarCss = readCss("../src/features/cloud/styles/sidebar-shell.css");

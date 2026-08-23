@@ -18,7 +18,9 @@ import {
   removeEditorFromPanes,
   splitEditorPane,
   updateEditorSplitRatio,
+  isDocumentDataNode,
   type DataNode,
+  type DocumentDataNode,
   type EditorGroupState,
   type EditorPaneLayoutState,
   type EditorPaneSplitOptions,
@@ -29,6 +31,7 @@ import {
   EDITOR_WORKBENCH_STORAGE_PREFIX,
   EMPTY_EDITOR_WORKBENCH,
   LEGACY_EDITOR_GROUP_STORAGE_PREFIX,
+  LEGACY_EDITOR_WORKBENCH_STORAGE_PREFIX,
   createEditorWorkbenchState,
   readStoredEditorWorkbench,
   type DesktopEditorWorkbenchState,
@@ -40,10 +43,9 @@ export type DesktopEditorWorkbenchController = Readonly<{
   paneLayout: EditorPaneLayoutState;
   activePath: string | null;
   activePaneId: string;
-  open: (path: string, node?: DataNode | null) => void;
-  openAtPaneEdge: (
-    path: string,
-    label: string,
+  openDocument: (node: DocumentDataNode) => void;
+  openDocumentAtPaneEdge: (
+    node: DocumentDataNode,
     targetPaneId: string,
     direction: EditorSplitDirection,
     placement: NonNullable<EditorPaneSplitOptions["placement"]>,
@@ -69,18 +71,29 @@ export type DesktopEditorWorkbenchController = Readonly<{
   clear: () => void;
 }>;
 
-export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopEditorWorkbenchController {
+export type EditorDocumentNodeResolver = (path: string) => Promise<DataNode | null>;
+
+export function useDesktopEditorWorkbench(
+  workspace: Workspace | null,
+  resolveNode: EditorDocumentNodeResolver | null,
+): DesktopEditorWorkbenchController {
   const storageKey = workspace
     ? `${EDITOR_WORKBENCH_STORAGE_PREFIX}:${workspace.id}:${workspace.path}`
     : null;
-  const legacyStorageKey = workspace
+  const legacyWorkbenchStorageKey = workspace
+    ? `${LEGACY_EDITOR_WORKBENCH_STORAGE_PREFIX}:${workspace.id}:${workspace.path}`
+    : null;
+  const legacyGroupStorageKey = workspace
     ? `${LEGACY_EDITOR_GROUP_STORAGE_PREFIX}:${workspace.id}:${workspace.path}`
     : null;
   const [record, setRecord] = useState<{
     storageKey: string | null;
     workbench: DesktopEditorWorkbenchState;
-  }>({ storageKey: null, workbench: EMPTY_EDITOR_WORKBENCH });
+    hydrated: boolean;
+  }>({ storageKey: null, workbench: EMPTY_EDITOR_WORKBENCH, hydrated: false });
   const persistenceRef = useRef<EditorWorkbenchPersistenceScheduler | null>(null);
+  const hydrationGenerationRef = useRef(0);
+  const interactionGenerationRef = useRef(0);
   persistenceRef.current ??= new EditorWorkbenchPersistenceScheduler(
     window.localStorage,
     window,
@@ -88,16 +101,47 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
   const workbench = record.storageKey === storageKey ? record.workbench : EMPTY_EDITOR_WORKBENCH;
 
   useEffect(() => {
-    setRecord({
+    const generation = hydrationGenerationRef.current + 1;
+    hydrationGenerationRef.current = generation;
+    const interactionGeneration = interactionGenerationRef.current;
+    if (!storageKey) {
+      setRecord({ storageKey: null, workbench: EMPTY_EDITOR_WORKBENCH, hydrated: true });
+      return undefined;
+    }
+
+    const stored = readStoredEditorWorkbench(
       storageKey,
-      workbench: storageKey
-        ? readStoredEditorWorkbench(storageKey, legacyStorageKey)
-        : EMPTY_EDITOR_WORKBENCH,
+      legacyWorkbenchStorageKey,
+      legacyGroupStorageKey,
+    );
+    if (!resolveNode) {
+      // A workspace session without a metadata resolver cannot prove that its
+      // persisted paths are documents. Fail closed instead of trusting storage.
+      setRecord({ storageKey, workbench: EMPTY_EDITOR_WORKBENCH, hydrated: true });
+      return undefined;
+    }
+
+    // Restored paths are untrusted until the storage boundary proves they are
+    // documents. Keep the workbench empty so a stale folder tab cannot flash.
+    setRecord({ storageKey, workbench: EMPTY_EDITOR_WORKBENCH, hydrated: false });
+    let cancelled = false;
+    void retainResolvedDocuments(stored, resolveNode).then((validated) => {
+      if (
+        cancelled
+        || hydrationGenerationRef.current !== generation
+        || interactionGenerationRef.current !== interactionGeneration
+      ) return;
+      setRecord((current) => current.storageKey === storageKey
+        ? { storageKey, workbench: validated, hydrated: true }
+        : current);
     });
-  }, [legacyStorageKey, storageKey]);
+    return () => {
+      cancelled = true;
+    };
+  }, [legacyGroupStorageKey, legacyWorkbenchStorageKey, resolveNode, storageKey]);
 
   useEffect(() => {
-    if (!storageKey || record.storageKey !== storageKey) return;
+    if (!storageKey || record.storageKey !== storageKey || !record.hydrated) return;
     persistenceRef.current?.schedule(storageKey, record.workbench);
   }, [record, storageKey]);
 
@@ -113,20 +157,19 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
   const updateWorkbench = useCallback((
     update: (current: DesktopEditorWorkbenchState) => DesktopEditorWorkbenchState,
   ) => {
+    interactionGenerationRef.current += 1;
     setRecord((current) => {
       const currentWorkbench = current.storageKey === storageKey
         ? current.workbench
-        : storageKey
-          ? readStoredEditorWorkbench(storageKey, legacyStorageKey)
-          : EMPTY_EDITOR_WORKBENCH;
-      return { storageKey, workbench: update(currentWorkbench) };
+        : EMPTY_EDITOR_WORKBENCH;
+      return { storageKey, workbench: update(currentWorkbench), hydrated: true };
     });
-  }, [legacyStorageKey, storageKey]);
+  }, [storageKey]);
 
-  const open = useCallback((path: string, node?: DataNode | null) => {
-    if (!path || node?.type === "folder") return;
+  const openDocument = useCallback((node: DocumentDataNode) => {
+    if (!isDocumentDataNode(node) || !node.path) return;
     updateWorkbench((current) => {
-      const input = createEditorInput(path, node?.name);
+      const input = createEditorInput(node.path, node.name);
       const group = openEditor(current.group, input);
       const visiblePane = getEditorPanes(current.layout).find((pane) => pane.editorId === input.id);
       const layout = visiblePane
@@ -148,16 +191,15 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
     });
   }, [updateWorkbench]);
 
-  const openAtPaneEdge = useCallback((
-    path: string,
-    label: string,
+  const openDocumentAtPaneEdge = useCallback((
+    node: DocumentDataNode,
     targetPaneId: string,
     direction: EditorSplitDirection,
     placement: NonNullable<EditorPaneSplitOptions["placement"]>,
   ) => {
-    if (!path) return;
+    if (!isDocumentDataNode(node) || !node.path) return;
     updateWorkbench((current) => {
-      const input = createEditorInput(path, label);
+      const input = createEditorInput(node.path, node.name);
       const visiblePane = getEditorPanes(current.layout).find((pane) => pane.editorId === input.id);
       const group = openEditor(current.group, input);
       if (visiblePane) {
@@ -275,8 +317,8 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
     paneLayout: workbench.layout,
     activePath: activePane.editorId,
     activePaneId: activePane.id,
-    open,
-    openAtPaneEdge,
+    openDocument,
+    openDocumentAtPaneEdge,
     splitPane,
     activate,
     focusPane,
@@ -297,12 +339,36 @@ export function useDesktopEditorWorkbench(workspace: Workspace | null): DesktopE
     closeUnderResource,
     focusPane,
     movePane,
-    open,
-    openAtPaneEdge,
+    openDocument,
+    openDocumentAtPaneEdge,
     splitPane,
     rebaseResource,
     resizeSplit,
     workbench.group,
     workbench.layout,
   ]);
+}
+
+async function retainResolvedDocuments(
+  workbench: DesktopEditorWorkbenchState,
+  resolveNode: EditorDocumentNodeResolver,
+): Promise<DesktopEditorWorkbenchState> {
+  const resolved = await Promise.all(workbench.group.editors.map(async (editor) => {
+    const node = await resolveNode(editor.resource).catch(() => null);
+    return { editorId: editor.id, admitted: isDocumentDataNode(node) };
+  }));
+  const rejectedEditorIds = resolved
+    .filter(({ admitted }) => !admitted)
+    .map(({ editorId }) => editorId);
+  if (rejectedEditorIds.length === 0) return workbench;
+
+  const group = rejectedEditorIds.reduce(
+    (current, editorId) => closeEditor(current, editorId),
+    workbench.group,
+  );
+  const layout = rejectedEditorIds.reduce(
+    (current, editorId) => removeEditorFromPanes(current, editorId, group.activeEditorId),
+    workbench.layout,
+  );
+  return createEditorWorkbenchState(group, layout);
 }

@@ -34,7 +34,8 @@ import type { DesktopEditorWorkbenchController } from "../editor-workbench/contr
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopWorkspaceContentProps = {
   activeAiEditRequest: AiEditRequest | null;
-  activeDataPath: string | null;
+  activeDocumentPath: string | null;
+  activeExplorerPath: string | null;
   activeView: DesktopView;
   cloud: DesktopWorkspaceCloudSurfaceController;
   dataPort: DataWorkspacePort | null;
@@ -78,7 +79,8 @@ type DesktopWorkspaceContentProps = {
 
 export function DesktopWorkspaceContent({
   activeAiEditRequest,
-  activeDataPath,
+  activeDocumentPath,
+  activeExplorerPath,
   activeView,
   cloud,
   dataPort,
@@ -176,7 +178,8 @@ export function DesktopWorkspaceContent({
   return (
     <DesktopDataWorkspaceSurface
       activeAiEditRequest={activeAiEditRequest}
-      activeDataPath={activeDataPath}
+      activeDocumentPath={activeDocumentPath}
+      activeExplorerPath={activeExplorerPath}
       dataPort={dataPort}
       editorWorkbench={editorWorkbench}
       externalOpen={externalOpen}

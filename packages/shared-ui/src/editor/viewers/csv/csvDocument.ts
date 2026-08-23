@@ -76,7 +76,7 @@ export function parseDelimitedText(
 
 /** Serialize the complete structured model into the canonical file snapshot. */
 export function stringifyDelimitedText(
-  rows: string[][],
+  rows: readonly (readonly string[])[],
   delimiter: DelimitedTextDelimiter,
   layout: DelimitedTextLayout = DEFAULT_LAYOUT,
   options: StringifyDelimitedTextOptions = {},

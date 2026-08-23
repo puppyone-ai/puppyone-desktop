@@ -26,6 +26,76 @@ afterEach(() => {
 });
 
 describe("ExplorerTree interactive semantics", () => {
+  it("renders an empty root as zero rows so the list-end action starts the content", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <ExplorerTree
+        nodes={[]}
+        activePath={null}
+        expandedPaths={new Set()}
+        showRoot={false}
+        onSelectNode={vi.fn()}
+        renderListEnd={() => <button type="button">Create New</button>}
+      />,
+    ));
+
+    const list = container.querySelector<HTMLElement>(".explorer-tree-list");
+    expect(list?.querySelector(".tree-meta-row")).toBeNull();
+    expect(list?.firstElementChild?.classList.contains("explorer-tree-list-end-motion")).toBe(true);
+    expect(list?.textContent).toBe("Create New");
+  });
+
+  it("keeps an empty folder expanded without inserting a child placeholder row", () => {
+    const folder: DataNode = {
+      id: "empty-folder",
+      name: "empty-folder",
+      path: "empty-folder",
+      type: "folder",
+      children: [],
+    };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <ExplorerTree
+        nodes={[folder]}
+        activePath={folder.path}
+        expandedPaths={new Set([folder.path])}
+        showRoot={false}
+        onSelectNode={vi.fn()}
+      />,
+    ));
+
+    const folderRow = container.querySelector<HTMLElement>(`[data-explorer-path="${folder.path}"]`);
+    expect(folderRow?.getAttribute("aria-expanded")).toBe("true");
+    expect(container.querySelector(".tree-meta-row")).toBeNull();
+    expect(container.querySelector(".explorer-tree-virtual-canvas")?.getAttribute("data-visible-row-count")).toBe("1");
+  });
+
+  it("retains explicit root loading feedback", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <ExplorerTree
+        nodes={[]}
+        activePath={null}
+        expandedPaths={new Set()}
+        rootLoading
+        showRoot={false}
+        loadingLabel="Loading workspace"
+        onSelectNode={vi.fn()}
+      />,
+    ));
+
+    expect(container.querySelector(".tree-meta-row.loading")?.textContent).toContain("Loading workspace");
+  });
+
   it("keeps row actions outside button ancestry and preserves keyboard activation", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const onSelectNode = vi.fn();

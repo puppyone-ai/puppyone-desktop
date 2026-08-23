@@ -12,6 +12,7 @@ import {
   renameWorkspaceEntry,
   resolveExistingWorkspaceDisplayPath,
   resolveExistingWorkspacePath,
+  resolveWorkspaceNode,
   writeWorkspaceTextFile,
 } from "../../../local-api/workspace.mjs";
 import { absorbWorkspaceEditReviewPath } from "../../../local-api/edit-review.mjs";
@@ -76,6 +77,11 @@ export function registerWorkspaceFileIpcHandlers({
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const folderPath = request?.folderPath ?? null;
     return listFolderChildren(rootPath, folderPath);
+  });
+
+  ipcMain.handle("workspace:resolve-node", async (event, request) => {
+    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
+    return resolveWorkspaceNode(rootPath, request?.path);
   });
 
   ipcMain.handle("workspace:read-file", async (event, request) => {

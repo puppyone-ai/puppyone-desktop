@@ -18,8 +18,18 @@ const sourceControlSidebarSource = readFileSync(
   new URL("../src/features/source-control/SourceControlSidebar.tsx", import.meta.url),
   "utf8",
 );
-const sourceControlSidebarSectionsSource = readFileSync(
-  new URL("../src/features/source-control/sidebar/SourceControlSidebarSections.tsx", import.meta.url),
+const sourceControlSidebarSectionsSource = [
+  "GitSidebarProviders.tsx",
+  "GitRemoteSections.tsx",
+  "GitSidebarPrimitives.tsx",
+  "GitLocalStatusSection.tsx",
+  "GitLocalStatusPanels.tsx",
+].map((fileName) => readFileSync(
+  new URL(`../src/features/source-control/sidebar/${fileName}`, import.meta.url),
+  "utf8",
+)).join("\n");
+const sourceControlExpansionStateSource = readFileSync(
+  new URL("../src/features/source-control/sidebar/useGitSidebarExpansionState.ts", import.meta.url),
   "utf8",
 );
 const versionControlSetupSource = readFileSync(
@@ -82,14 +92,15 @@ const sidebarBaseCss = readFileSync(
   new URL("../src/features/source-control/styles/sidebar-base.css", import.meta.url),
   "utf8",
 );
-const sidebarResourcesCss = readFileSync(
-  new URL("../src/features/source-control/styles/sidebar-resources.css", import.meta.url),
+const sidebarResourcesCss = [
+  "sidebar-panels.css",
+  "sidebar-actions.css",
+  "sidebar-providers.css",
+  "sidebar-resources.css",
+].map((fileName) => readFileSync(
+  new URL(`../src/features/source-control/styles/${fileName}`, import.meta.url),
   "utf8",
-);
-const sourceControlOverridesCss = readFileSync(
-  new URL("../src/features/source-control/source-control-overrides.css", import.meta.url),
-  "utf8",
-);
+)).join("\n");
 const gitControllerSource = readFileSync(
   new URL("../src/features/source-control/useDesktopGitController.ts", import.meta.url),
   "utf8",
@@ -108,22 +119,43 @@ const diffCss = readFileSync(
 );
 
 describe("source-control visual architecture", () => {
-  it("keeps repository identity text inside the shared sidebar type scale", () => {
-    const sectionTitle = compact(readCssBlock(
+  it("keeps the clickable repository identity quiet inside the GitHub card", () => {
+    const identity = compact(readCssBlock(
       sidebarResourcesCss,
-      ".desktop-git-section-title",
+      ".desktop-git-github-identity",
+    ));
+    const identityIcon = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-identity > svg",
+    ));
+    const identityIconSlot = compact(readCssBlock(
+      sidebarBaseCss,
+      ".desktop-git-identity-icon-slot",
     ));
 
-    expect(sourceControlSidebarSectionsSource).toContain("<bdi>{label}</bdi>");
-    expect(sectionTitle).toContain(
-      "font-size: var(--desktop-sidebar-section-title-font-size, var(--git-font-small));",
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-hosting-identity-link");
+    expect(sourceControlSidebarSectionsSource).toContain('className="desktop-git-identity-icon-slot"');
+    expect(sourceControlSidebarSectionsSource).toContain("<span>{repositoryName}</span>");
+    expect(sourceControlSidebarSectionsSource).toContain("getGitHubRepositoryName(label)");
+    expect(sourceControlSidebarSectionsSource).not.toContain("title={label}");
+    expect(identity).toContain("grid-row: 1;");
+    expect(identity).toContain(
+      "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",
     );
-    expect(sectionTitle).toContain(
-      "font-weight: var(--desktop-sidebar-section-title-font-weight, var(--git-weight-regular));",
+    expect(identity).toContain(
+      "font-size: var(--desktop-sidebar-section-title-font-size, var(--po-text-size-meta, 12px));",
     );
-    expect(sectionTitle).toContain(
-      "line-height: var(--desktop-sidebar-section-title-line-height, var(--git-line-height));",
+    expect(identity).toContain(
+      "font-weight: var(--desktop-sidebar-section-title-font-weight, var(--po-text-weight-medium, 500));",
     );
+    expect(identity).toContain(
+      "line-height: var(--desktop-sidebar-section-title-line-height, 18px);",
+    );
+    expect(identity).toContain("gap: 2px;");
+    expect(identityIconSlot).toContain("width: 18px;");
+    expect(identityIconSlot).toContain("flex: 0 0 18px;");
+    expect(identityIconSlot).toContain("padding-inline-start: 2px;");
+    expect(identityIcon).toContain("color: inherit;");
   });
 
   it("keeps the Cloud publish reminder in reading and action order", () => {
@@ -173,13 +205,9 @@ describe("source-control visual architecture", () => {
       sidebarBaseCss,
       ".desktop-git-sidebar .po-sidebar-empty.desktop-git-section-empty",
     ));
-    const sectionEmptyOverride = compact(readCssBlock(
-      sourceControlOverridesCss,
-      ".desktop-git-sidebar .po-sidebar-empty.desktop-git-section-empty",
-    ));
     const emptyStateSources = `${sourceControlSidebarSource}\n${sourceControlSidebarSectionsSource}`;
 
-    expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(3);
+    expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(2);
     expect(emptyStateSources).not.toMatch(/desktop-git-empty-(?:remote|committed|stage|changes)/);
     expect(sourceControlComponentsSource).toContain("<ChevronRight size={14}");
     expect(sidebarBaseCss).toContain("--git-section-leading-slot-size: 14px;");
@@ -200,15 +228,6 @@ describe("source-control visual architecture", () => {
       )
       calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right));
     `));
-    expect(sectionEmptyOverride).toContain(compact(`
-      padding-inline: calc(
-        var(--git-sidebar-left-gap)
-        + var(--git-sidebar-content-left)
-        + var(--git-section-leading-slot-size)
-        + var(--git-section-title-gap)
-      )
-      calc(var(--git-sidebar-right-gap) + var(--git-sidebar-content-right));
-    `));
     expect(sidebarResourcesCss).toContain(
       ".po-sidebar-empty.compact:not(.desktop-git-section-empty)",
     );
@@ -217,17 +236,130 @@ describe("source-control visual architecture", () => {
     );
   });
 
-  it("keeps GitHub incoming updates inside the canonical provider row and file list", () => {
+  it("keeps GitHub incoming updates inside the canonical provider and compact change card", () => {
+    const card = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-change-card",
+    ));
+    const dividerCard = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-change-card.is-divider-layout",
+    ));
+    const upToDateDividerCard = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-change-card.is-divider-layout.is-up-to-date",
+    ));
+    const dividerProvider = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-provider-section.is-divider-layout",
+    ));
+    const updateAge = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-change-card .desktop-git-github-update-age",
+    ));
+    const summary = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-github-summary",
+    ));
     expect(sourceControlSidebarSource).toContain("<GitHubProviderSection");
     expect(sourceControlSidebarSectionsSource).toContain(
-      'className="desktop-git-cloud-provider-section desktop-git-github-provider-section"',
+      'desktop-git-cloud-provider-section desktop-git-github-provider-section${layout === "dividers"',
     );
-    expect(sourceControlSidebarSectionsSource).toContain("<GitHostingIdentityRow");
-    expect(sourceControlSidebarSectionsSource).toContain("<SourceControlPreviewResourceList");
-    expect(sourceControlSidebarSectionsSource).toContain(
-      't("source-control.status.empty")',
+    expect(sourceControlSidebarSectionsSource).toContain('layout === "dividers" && (');
+    expect(sourceControlSidebarSectionsSource).toContain('layout === "cards" && <GitHubRepositoryLink');
+    expect(sourceControlSidebarSectionsSource).toContain("<GitHubRepositoryLink");
+    expect(sourceControlSidebarSectionsSource).toContain("<GitHubChangesCard");
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-change-card");
+    expect(sourceControlSidebarSectionsSource).toContain('hasIncomingChanges ? "" : " is-up-to-date"');
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-card-action");
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-update-age");
+    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-update-tooltip");
+    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-summary");
+    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-file-total");
+    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-file-stats");
+    expect(sourceControlSidebarSectionsSource).toContain("source-control.commit.changes");
+    expect(sourceControlSidebarSectionsSource).not.toContain("source-control.github.updatedRelative");
+    expect(sourceControlSidebarSectionsSource).toContain("{updateAge}");
+    expect(sourceControlSidebarSectionsSource).toContain('t("source-control.sync.upToDate")');
+    expect(sourceControlSidebarSectionsSource).not.toContain("source-control.github.latestIncomingCommitAt");
+    expect(sourceControlSidebarSectionsSource).toContain('label={t("source-control.sync.pull")}');
+    expect(sourceControlSidebarSectionsSource).not.toContain("aria-describedby");
+    expect(sourceControlSidebarSectionsSource).not.toContain('role="tooltip"');
+    expect(sourceControlSidebarSource).toContain("lastCommitDate");
+    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-provider-body");
+    expect(card).toContain(
+      "margin: 0 var(--git-sidebar-control-right-gap) 4px var(--git-sidebar-control-left-gap);",
     );
-    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-update-card");
+    expect(card).toContain("border: 0;");
+    expect(sidebarBaseCss).toContain(
+      "--git-card-background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));",
+    );
+    expect(card).toContain("background: var(--git-card-background);");
+    expect(dividerCard).toContain("min-height: 52px;");
+    expect(dividerCard).toContain("padding: 10px;");
+    expect(upToDateDividerCard).toContain("min-height: 48px;");
+    expect(dividerProvider).toContain("border-bottom: 0;");
+    expect(updateAge).toContain("color: inherit;");
+    expect(updateAge).toContain("cursor: default;");
+    expect(summary).toContain("grid-row: 2;");
+    expect(summary).toContain("color: var(--po-text-muted);");
+    expect(summary).toContain("font-size: var(--git-font-main);");
+    expect(sidebarResourcesCss).not.toContain("desktop-git-github-update-tooltip");
+  });
+
+  it("reserves card surfaces for providers and keeps local source-control groups flat", () => {
+    const sectionTitle = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-section-title",
+    ));
+    const workingTreeRow = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-working-tree-row",
+    ));
+    const resizer = compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-section-resizer::after",
+    ));
+
+    expect(sourceControlSidebarSectionsSource).toContain("export function GitLocalStatusSection");
+    expect(sourceControlSidebarSectionsSource).toContain('className="desktop-git-local-section-body"');
+    expect(sourceControlSidebarSectionsSource).toContain("controlsId={bodyId}");
+    expect(sourceControlSidebarSectionsSource).toContain("count={model.committedCount}");
+    expect(sourceControlSidebarSectionsSource).not.toContain("countLabel");
+    expect(sourceControlSidebarSectionsSource.match(/<GitLocalStatusSection/g)).toHaveLength(4);
+    expect(sourceControlSidebarSource).not.toContain("layout: gitSidebarLayout,");
+    for (const panel of ["remote", "merge", "committed", "staged", "unstaged"]) {
+      expect(sourceControlExpansionStateSource).toContain(`${panel}: true`);
+    }
+    expect(sourceControlSidebarSectionsSource).toContain("aria-hidden={expanded ? undefined : true}");
+    expect(sourceControlSidebarSectionsSource).toContain('const inertWhenCollapsed = expanded ? {} : { inert: "" };');
+    expect(sourceControlSidebarSectionsSource).not.toContain("GitStatusCardSection");
+    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-status-card");
+    expect(sourceControlSidebarSectionsSource).not.toContain("STATUS_CARD_CHROME_PX");
+    expect(sidebarResourcesCss).not.toContain("desktop-git-status-card");
+    expect(sectionTitle).toContain(
+      "color: var(--desktop-sidebar-section-title-color, var(--po-text-subtle));",
+    );
+    expect(workingTreeRow).toContain("width: 100%;");
+    expect(workingTreeRow).not.toContain("background");
+    expect(compact(sidebarResourcesCss)).toContain(compact(`
+      .desktop-git-local-section-body .desktop-working-tree-list,
+      .desktop-git-local-section-body .desktop-git-remote-preview {
+        overflow-y: hidden;
+        scrollbar-gutter: auto;
+        padding-inline-end: var(--git-sidebar-right-gap);
+      }
+    `));
+    expect(compact(sidebarResourcesCss)).toContain(compact(`
+      .desktop-git-local-section-body .desktop-working-tree-list.is-scrollable,
+      .desktop-git-local-section-body .desktop-git-remote-preview.is-scrollable {
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+        padding-inline-end: calc(var(--git-sidebar-right-gap) - var(--git-sidebar-scrollbar-width));
+      }
+    `));
+    expect(sidebarResourcesCss).toContain(".desktop-working-tree-row:hover,");
+    expect(resizer).toContain("background: transparent;");
   });
 
   it("keeps GitHub Fetch lifecycle out of the presentational sidebar", () => {
@@ -242,21 +374,23 @@ describe("source-control visual architecture", () => {
     );
   });
 
-  it("swaps each working-tree status in place without moving destructive actions under the pointer", () => {
+  it("keeps file status as a quiet inline marker without moving row actions", () => {
     const stagedGrid = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-working-tree-row.is-staged",
     ));
-    const stateSlot = compact(readCssBlock(
+    const actionSlot = compact(readCssBlock(
       sidebarResourcesCss,
-      ".desktop-working-tree-state-slot",
+      ".desktop-working-tree-action-slot",
     ));
     const state = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-working-tree-state",
     ));
 
-    expect(sourceControlComponentsSource).toContain('className="desktop-working-tree-state-slot"');
+    expect(sourceControlComponentsSource).toContain("<GitResourceStatusMarker resource={resource} />");
+    expect(sourceControlComponentsSource).toContain('className="desktop-working-tree-action-slot"');
+    expect(sourceControlComponentsSource).not.toContain('className="desktop-working-tree-state-slot"');
     expect(sourceControlComponentsSource).toContain("desktop-working-tree-revert-action");
     expect(sourceControlComponentsSource).toContain("desktop-working-tree-state-action");
     expect(sidebarBaseCss).toContain(
@@ -265,21 +399,26 @@ describe("source-control visual architecture", () => {
     expect(sidebarBaseCss).toContain(
       "--git-working-tree-state-width: var(--git-working-tree-action-size);",
     );
-    expect(sidebarBaseCss).toContain("--git-working-tree-status-size: 22px;");
+    expect(sidebarBaseCss).not.toContain("--git-working-tree-status-size");
     expect(stagedGrid).toContain(
       "grid-template-columns: minmax(0, 1fr) var(--git-working-tree-state-width);",
     );
-    expect(stateSlot).toContain("grid-column: 3;");
-    expect(stateSlot).toContain("place-items: center;");
-    expect(state).toContain("width: var(--git-working-tree-status-size);");
-    expect(state).toContain("height: var(--git-working-tree-status-size);");
-    expect(state).toContain("justify-self: center;");
-    expect(sourceControlComponentsSource.match(/desktop-working-tree-state-slot/g)).toHaveLength(2);
+    expect(actionSlot).toContain("grid-column: 3;");
+    expect(actionSlot).toContain("place-items: center;");
+    expect(state).toContain("flex: 0 0 auto;");
+    expect(state).toContain("color: var(--po-text-disabled);");
+    expect(state).toContain("font-size: 10px;");
+    expect(state).toContain("font-weight: var(--po-text-weight-regular, 400);");
+    expect(state).not.toContain("var(--po-success)");
+    expect(state).not.toContain("var(--po-warning)");
+    expect(state).not.toContain("var(--po-danger)");
+    expect(sourceControlComponentsSource.match(/desktop-working-tree-action-slot/g)).toHaveLength(1);
+    expect(sourceControlComponentsSource.match(/<GitResourceStatusMarker resource=\{resource\} \/>/g)).toHaveLength(2);
     expect(sidebarResourcesCss).toContain(
       ".desktop-working-tree-row:hover .desktop-working-tree-state-action",
     );
-    expect(sidebarResourcesCss).toContain(
-      ".desktop-working-tree-row:hover .desktop-working-tree-state",
+    expect(sidebarResourcesCss).not.toContain(
+      ".desktop-working-tree-row:hover .desktop-working-tree-state,",
     );
     expect(sourceControlSidebarSource).not.toContain("source-control.action.unstageAll");
     expect(gitControllerSource).toContain("const handleDiscardGitPaths = useCallback");
@@ -482,6 +621,8 @@ describe("source-control visual architecture", () => {
     ));
     const select = (overrides: Partial<Parameters<typeof getSourceControlPrimaryActionSlot>[0]> = {}) => (
       getSourceControlPrimaryActionSlot({
+        hasConflicts: false,
+        hasOperationAction: false,
         hasStagedAction: false,
         hasSyncAction: false,
         hasCommittedAction: false,
@@ -496,7 +637,9 @@ describe("source-control visual architecture", () => {
     expect(primary).toContain("color: var(--desktop-git-primary-fg);");
     expect(stageAll).toContain("background: var(--po-control);");
     expect(stageAll).not.toContain("var(--desktop-git-primary-bg)");
-    expect(select({ hasStagedAction: true, hasSyncAction: true, hasCommittedAction: true })).toBe("staged");
+    expect(select({ hasStagedAction: true, hasSyncAction: true, hasCommittedAction: true })).toBe("sync");
+    expect(select({ hasConflicts: true, hasStagedAction: true, hasSyncAction: true, hasCommittedAction: true })).toBeNull();
+    expect(select({ hasOperationAction: true, hasSyncAction: true })).toBe("operation");
     expect(select({ hasSyncAction: true, hasCommittedAction: true })).toBe("sync");
     expect(select({ hasCommittedAction: true, hasSimpleAction: true })).toBe("committed");
     expect(select({ hasSimpleAction: true })).toBe("simple");

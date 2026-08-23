@@ -34,6 +34,7 @@ import {
 } from "./git/runner.mjs";
 import { createWorkspaceCloudRemoteActions } from "./git/cloud-remote.mjs";
 import {
+  readGitComparisonFileSummary,
   readGitComparisonPreview,
   resolveGitRemoteDiffComparisons,
 } from "./git/diff-comparison.mjs";
@@ -248,6 +249,39 @@ export async function listFolderChildren(rootPath, folderPath) {
   });
 
   return nodes;
+}
+
+/**
+ * Resolve one entry for command admission and session restoration. Unlike a
+ * folder listing this does not enumerate siblings or read preview content.
+ */
+export async function resolveWorkspaceNode(rootPath, relativePath) {
+  const normalizedPath = normalizeRelativePath(relativePath);
+  if (!normalizedPath) throw new Error("Workspace root is not a document.");
+  const entryPath = await resolveExistingWorkspacePath(rootPath, normalizedPath);
+  const metadata = await fs.lstat(entryPath).catch((error) => {
+    throw new Error(`Unable to read workspace entry metadata: ${error.message}`);
+  });
+  if (metadata.isSymbolicLink()) {
+    throw new Error("Symbolic links cannot be opened through the document workbench.");
+  }
+
+  const isFolder = metadata.isDirectory();
+  const name = path.basename(normalizedPath);
+  return {
+    id: normalizedPath,
+    name,
+    path: normalizedPath,
+    type: isFolder ? "folder" : classifyFile(name),
+    mimeType: isFolder ? null : getMimeType(entryPath),
+    size: isFolder ? null : formatFileSize(metadata.size),
+    modified: Number.isFinite(metadata.mtimeMs)
+      ? String(Math.floor(metadata.mtimeMs / 1000))
+      : null,
+    preview: null,
+    content: null,
+    children: null,
+  };
 }
 
 export async function readWorkspaceFile(rootPath, relativePath, options = undefined) {
@@ -1109,7 +1143,7 @@ async function readFastWorkspaceGitStatus(root, options = {}) {
   const signal = options.signal;
   const statusLimit = options.statusLimit ?? GIT_STATUS_ENTRY_LIMIT;
   throwIfGitStatusAborted(signal);
-  const [statusResult, branches, remotes] = await Promise.all([
+  const [statusResult, branches, remotes, repositoryOperation] = await Promise.all([
     // Explicit untracked policy: never inherit status.showUntrackedFiles=no from
     // the user's global Git config — the desktop model must see all untracked paths.
     execGitStreaming(root, [
@@ -1128,6 +1162,7 @@ async function readFastWorkspaceGitStatus(root, options = {}) {
     }),
     readGitBranches(root, { signal }),
     readGitRemotes(root, { signal }),
+    readGitRepositoryOperationKind(root, { signal }),
   ]);
   throwIfGitStatusAborted(signal);
   const parsedStatus = parseGitPorcelainV2Status(statusResult.stdout);
@@ -1200,6 +1235,7 @@ async function readFastWorkspaceGitStatus(root, options = {}) {
     syncTarget,
     currentBranch,
     headCommitId: headCommitId || null,
+    repositoryOperation,
   });
   const effectiveHosting = resolveGitEffectiveHosting({
     remotes: normalizedRemotes,
@@ -1290,6 +1326,38 @@ export async function readGitConsistencyFingerprint(rootPath, options = {}) {
     symbolicResult.stdout.trim() || "detached",
     indexFingerprint,
   ].join("|");
+}
+
+async function readGitRepositoryOperationKind(rootPath, options = {}) {
+  const signal = options.signal;
+  throwIfGitStatusAborted(signal);
+  const result = await execGit(rootPath, [
+    "rev-parse",
+    "--git-path", "rebase-merge",
+    "--git-path", "rebase-apply",
+    "--git-path", "MERGE_HEAD",
+    "--git-path", "CHERRY_PICK_HEAD",
+    "--git-path", "REVERT_HEAD",
+  ], { optionalLocks: false, signal }).catch(() => {
+    throwIfGitStatusAborted(signal);
+    return { stdout: "" };
+  });
+  const resolvedPaths = result.stdout
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .map((value) => value ? (path.isAbsolute(value) ? value : path.resolve(rootPath, value)) : null);
+  const candidates = [
+    { kind: "rebase", path: resolvedPaths[0] },
+    { kind: "rebase", path: resolvedPaths[1] },
+    { kind: "merge", path: resolvedPaths[2] },
+    { kind: "cherry-pick", path: resolvedPaths[3] },
+    { kind: "revert", path: resolvedPaths[4] },
+  ];
+  const existence = await Promise.all(candidates.map(({ path: candidatePath }) => (
+    candidatePath ? fs.stat(candidatePath).then(() => true).catch(() => false) : false
+  )));
+  throwIfGitStatusAborted(signal);
+  return candidates.find((_, index) => existence[index])?.kind ?? null;
 }
 
 export async function getWorkspaceGitBranchGraph(rootPath) {
@@ -1629,6 +1697,41 @@ export async function commitWorkspaceGit(rootPath, message) {
   return getWorkspaceGitStatus(root);
 }
 
+export async function continueWorkspaceGitOperation(rootPath) {
+  const root = resolveWorkspacePath(rootPath, null);
+  const status = await getWorkspaceGitStatus(root);
+  const operation = status.sourceControl.operation;
+  if (!operation) {
+    throw new Error("Unable to continue Git operation: no merge, rebase, cherry-pick, or revert is in progress.");
+  }
+  if (!operation.canContinue) {
+    throw new Error("Unable to continue Git operation: resolve and stage all conflicted files first.");
+  }
+
+  await execGit(root, ["-c", "core.editor=true", operation.kind, "--continue"], {
+    timeout: GIT_MUTATION_TIMEOUT_MS,
+  }).catch((error) => {
+    throw new Error(`Unable to continue ${operation.kind}: ${getGitErrorOutput(error)}`);
+  });
+  return getWorkspaceGitStatus(root);
+}
+
+export async function abortWorkspaceGitOperation(rootPath) {
+  const root = resolveWorkspacePath(rootPath, null);
+  const status = await getWorkspaceGitStatus(root);
+  const operation = status.sourceControl.operation;
+  if (!operation) {
+    throw new Error("Unable to abort Git operation: no merge, rebase, cherry-pick, or revert is in progress.");
+  }
+
+  await execGit(root, [operation.kind, "--abort"], {
+    timeout: GIT_MUTATION_TIMEOUT_MS,
+  }).catch((error) => {
+    throw new Error(`Unable to abort ${operation.kind}: ${getGitErrorOutput(error)}`);
+  });
+  return getWorkspaceGitStatus(root);
+}
+
 export async function checkoutWorkspaceGitBranch(rootPath, branchName, options = {}) {
   const root = resolveWorkspacePath(rootPath, null);
   const normalizedBranch = await normalizeGitBranchName(root, branchName);
@@ -1752,6 +1855,8 @@ export async function fetchWorkspaceGit(rootPath, options = {}) {
 
 export async function pullWorkspaceGit(rootPath) {
   const root = resolveWorkspacePath(rootPath, null);
+  const currentStatus = await getWorkspaceGitStatus(root);
+  assertNoInProgressGitOperation(currentStatus, "pull");
   const config = await readPuppyoneWorkspaceConfig(root).catch(() => null);
   const remotes = await readGitRemotes(root);
   if (hasEffectivePuppyoneHostingTarget(remotes, config)) {
@@ -1784,6 +1889,8 @@ export async function pullWorkspaceGit(rootPath) {
 
 export async function pushWorkspaceGit(rootPath) {
   const root = resolveWorkspacePath(rootPath, null);
+  const currentStatus = await getWorkspaceGitStatus(root);
+  assertNoInProgressGitOperation(currentStatus, "push");
   const config = await readPuppyoneWorkspaceConfig(root).catch(() => null);
   const remotes = await readGitRemotes(root);
   if (hasEffectivePuppyoneHostingTarget(remotes, config)) {
@@ -1888,6 +1995,8 @@ export async function pushWorkspaceGitCommitToRemote(rootPath, request = {}) {
 
 export async function publishWorkspaceGitBranch(rootPath, remoteName = null) {
   const root = resolveWorkspacePath(rootPath, null);
+  const status = await getWorkspaceGitStatus(root);
+  assertNoInProgressGitOperation(status, "publish");
   await pushWorkspaceGitWithDefaultUpstream(root, remoteName);
   return getWorkspaceGitStatus(root);
 }
@@ -1899,6 +2008,7 @@ export async function syncWorkspaceGit(rootPath) {
   if (!status.isRepo) {
     throw new Error("Current workspace is not a Git repository.");
   }
+  assertNoInProgressGitOperation(status, "sync");
   if (status.sourceControl.remote.canPublish) {
     await pushWorkspaceGitWithDefaultUpstream(root);
     return getWorkspaceGitStatus(root);
@@ -2060,6 +2170,23 @@ function isMissingUpstreamError(error) {
   return /no upstream branch|has no upstream branch|--set-upstream/i.test(message);
 }
 
+function assertNoInProgressGitOperation(status, requestedOperation) {
+  const operation = status?.sourceControl?.operation;
+  if (operation) {
+    throw new Error(
+      `Unable to ${requestedOperation} changes while ${operation.kind} is in progress. Resolve and continue it, or abort it first.`,
+    );
+  }
+  const conflictCount = status?.sourceControl?.groups
+    ?.find((group) => group.id === "merge")
+    ?.resources?.length ?? 0;
+  if (conflictCount > 0) {
+    throw new Error(
+      `Unable to ${requestedOperation} changes while unresolved file conflicts remain. Resolve and stage them first.`,
+    );
+  }
+}
+
 async function buildDefaultPullArgs(rootPath) {
   const config = await readPuppyoneWorkspaceConfig(rootPath).catch(() => null);
   const remotes = await readGitRemotes(rootPath);
@@ -2067,7 +2194,7 @@ async function buildDefaultPullArgs(rootPath) {
   const upstream = await execGit(rootPath, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
     .then((result) => result.stdout.trim())
     .catch(() => "");
-  if (upstream && !puppyoneHostingActive) return ["pull", "--ff-only"];
+  if (upstream && !puppyoneHostingActive) return ["pull", "--rebase", "--autostash"];
 
   const branch = await execGit(rootPath, ["branch", "--show-current"])
     .then((result) => result.stdout.trim())
@@ -2081,8 +2208,8 @@ async function buildDefaultPullArgs(rootPath) {
   const remoteName = target.remote;
   const branchName = target.branch;
 
-  if (remoteName && branchName) return ["pull", "--ff-only", remoteName, branchName];
-  return ["pull", "--ff-only"];
+  if (remoteName && branchName) return ["pull", "--rebase", "--autostash", remoteName, branchName];
+  return ["pull", "--rebase", "--autostash"];
 }
 
 async function pushWorkspaceGitWithDefaultUpstream(rootPath, requestedRemoteName = null) {
@@ -2252,6 +2379,7 @@ async function readGitSyncTarget(
       exists: false,
       ahead: 0,
       behind: 0,
+      incomingFileSummary: createEmptyGitFileSummary(),
       incomingPreview: [],
       outgoingPreview: [],
     };
@@ -2277,6 +2405,7 @@ async function readGitSyncTarget(
       exists: false,
       ahead: 0,
       behind: 0,
+      incomingFileSummary: createEmptyGitFileSummary(),
       incomingPreview: [],
       outgoingPreview: [],
     };
@@ -2291,7 +2420,7 @@ async function readGitSyncTarget(
       hasHead: Boolean(headCommitId),
     })
     : null;
-  const [incomingPreview, outgoingPreview] = await Promise.all([
+  const [incomingPreview, outgoingPreview, incomingFileSummary] = await Promise.all([
     counts.behind > 0
       ? readGitComparisonPreview(rootPath, comparisons.incoming, "remote", {
         signal,
@@ -2304,6 +2433,9 @@ async function readGitSyncTarget(
         limit: GIT_REMOTE_PREVIEW_LIMIT,
       })
       : [],
+    counts.behind > 0
+      ? readGitComparisonFileSummary(rootPath, comparisons.incoming, { signal })
+      : createEmptyGitFileSummary(),
   ]);
 
   return {
@@ -2313,8 +2445,21 @@ async function readGitSyncTarget(
     exists: true,
     ahead: counts.ahead,
     behind: counts.behind,
+    incomingFileSummary,
     incomingPreview,
     outgoingPreview,
+  };
+}
+
+function createEmptyGitFileSummary() {
+  return {
+    total: 0,
+    added: 0,
+    modified: 0,
+    deleted: 0,
+    renamed: 0,
+    copied: 0,
+    changed: 0,
   };
 }
 

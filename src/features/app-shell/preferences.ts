@@ -19,6 +19,7 @@ import {
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
   GIT_DISPLAY_MODE_STORAGE_KEY,
+  GIT_SIDEBAR_LAYOUT_STORAGE_KEY,
   INTERFACE_STYLE_STORAGE_KEY,
   DARK_THEME_PRESET_STORAGE_KEY,
   LEGACY_THEME_PRESET_STORAGE_KEY,
@@ -44,6 +45,7 @@ import {
   parseExternalAppsSettings,
   parseFilesVisibilitySettings,
   parseGitDisplayMode,
+  parseGitSidebarLayout,
   parseInterfaceStyle,
   parseLightThemePreset,
   parseLoadingAnimationPreset,
@@ -65,6 +67,7 @@ import {
   type ExternalAppsSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
+  type GitSidebarLayout,
   type InterfaceStyle,
   type LightThemePreset,
   type LoadingAnimationPreset,
@@ -161,6 +164,11 @@ export function readInitialSidebarNavigationVisibilitySettings(): SidebarNavigat
 export function readInitialGitDisplayMode(): GitDisplayMode {
   if (typeof window === "undefined") return parseGitDisplayMode(null);
   return parseGitDisplayMode(window.localStorage.getItem(GIT_DISPLAY_MODE_STORAGE_KEY));
+}
+
+export function readInitialGitSidebarLayout(): GitSidebarLayout {
+  if (typeof window === "undefined") return parseGitSidebarLayout(null);
+  return parseGitSidebarLayout(window.localStorage.getItem(GIT_SIDEBAR_LAYOUT_STORAGE_KEY));
 }
 
 export function readInitialFilesVisibilitySettings(): FilesVisibilitySettings {

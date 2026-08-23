@@ -32,8 +32,8 @@ describe("Slides create action", () => {
     originalDesktopBridge = window.puppyoneDesktop;
     window.puppyoneDesktop = { instantiateTemplate } as Window["puppyoneDesktop"];
     const dataPort = createLocalDataPort("/workspace");
-    const setActiveDataPath = vi.fn();
-    const setActiveDataNode = vi.fn();
+    const onActivateNode = vi.fn();
+    const setActiveExplorerNode = vi.fn();
     const onWorkspaceContentChanged = vi.fn();
     const onLocalWorkspaceContentChanged = vi.fn();
     let actions: ReturnType<typeof useDataNodeActions> | null = null;
@@ -45,8 +45,8 @@ describe("Slides create action", () => {
         onEnterDataView: vi.fn(),
         onLocalWorkspaceContentChanged,
         onWorkspaceContentChanged,
-        setActiveDataPath,
-        setActiveDataNode,
+        onActivateNode,
+        setActiveExplorerNode,
         workspace: { id: "workspace", name: "Workspace", path: "/workspace", status: "recording" },
       });
       return null;
@@ -69,9 +69,51 @@ describe("Slides create action", () => {
       name: "Untitled Slides",
     });
     expect(instantiateTemplate).toHaveBeenCalledOnce();
-    expect(setActiveDataPath).toHaveBeenCalledWith("Untitled Slides/Untitled Slides.puppyoneapp");
-    expect(setActiveDataNode).toHaveBeenCalledWith(null);
+    expect(onActivateNode).toHaveBeenCalledWith(expect.objectContaining({
+      path: "Untitled Slides/Untitled Slides.puppyoneapp",
+      type: "app",
+    }));
+    expect(setActiveExplorerNode).not.toHaveBeenCalled();
     expect(onWorkspaceContentChanged).toHaveBeenCalledOnce();
     expect(onLocalWorkspaceContentChanged).toHaveBeenCalledOnce();
+  });
+
+  it("returns a created folder as an Explorer node instead of a document path", async () => {
+    const createFolder = vi.fn(async () => undefined);
+    const onActivateNode = vi.fn();
+    let actions: ReturnType<typeof useDataNodeActions> | null = null;
+
+    function Harness() {
+      actions = useDataNodeActions({
+        dataPort: { listChildren: async () => [], createFolder, createFile: vi.fn() },
+        externalAppsSettings: DEFAULT_EXTERNAL_APPS_SETTINGS,
+        onEnterDataView: vi.fn(),
+        onLocalWorkspaceContentChanged: vi.fn(),
+        onWorkspaceContentChanged: vi.fn(),
+        onActivateNode,
+        setActiveExplorerNode: vi.fn(),
+        workspace: { id: "workspace", name: "Workspace", path: "/workspace", status: "recording" },
+      });
+      return null;
+    }
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => root?.render(withTestLocalization(<Harness />)));
+    act(() => actions?.openCreateEntryMenu(null, {
+      left: 0, top: 0, right: 20, bottom: 20, width: 20, height: 20,
+    }));
+    act(() => actions?.selectCreateEntryKind("folder"));
+    await act(async () => actions?.createEntryFromMenu());
+
+    expect(createFolder).toHaveBeenCalledWith("Untitled Folder");
+    expect(onActivateNode).toHaveBeenCalledWith({
+      id: "Untitled Folder",
+      name: "Untitled Folder",
+      path: "Untitled Folder",
+      type: "folder",
+      children: null,
+    });
   });
 });
