@@ -11,12 +11,14 @@ export type FileTransferFailure = {
 export type FilePasteResult = {
   completedSourcePaths: string[];
   destinationPaths: string[];
+  destinationNodes: DataNode[];
   failures: FileTransferFailure[];
 };
 
 export type FileDuplicateResult = {
   sourceCount: number;
   destinationPaths: string[];
+  destinationNodes: DataNode[];
   failures: FileTransferFailure[];
 };
 
@@ -39,12 +41,14 @@ export async function executeFileClipboardPaste(
 
   const completedSourcePaths: string[] = [];
   const destinationPaths: string[] = [];
+  const destinationNodes: DataNode[] = [];
   const failures: FileTransferFailure[] = [];
 
   for (const node of clipboard.nodes) {
     if (clipboard.mode === "cut" && isSameDataPath(getDataParentPath(node.path), targetFolderPath)) {
       completedSourcePaths.push(node.path);
       destinationPaths.push(node.path);
+      destinationNodes.push(moveNodeDescriptor(node, node.path));
       continue;
     }
 
@@ -52,10 +56,12 @@ export async function executeFileClipboardPaste(
       if (clipboard.mode === "copy") {
         const result = await dataPort.copyNode!(node.path, targetFolderPath);
         destinationPaths.push(result.path);
+        destinationNodes.push(moveNodeDescriptor(node, result.path));
       } else {
         const nextPath = joinDataPath(targetFolderPath, node.name);
         await dataPort.moveNode!(node.path, nextPath);
         destinationPaths.push(nextPath);
+        destinationNodes.push(moveNodeDescriptor(node, nextPath));
       }
       completedSourcePaths.push(node.path);
     } catch (error) {
@@ -67,7 +73,7 @@ export async function executeFileClipboardPaste(
     }
   }
 
-  return { completedSourcePaths, destinationPaths, failures };
+  return { completedSourcePaths, destinationPaths, destinationNodes, failures };
 }
 
 export async function executeFileDuplicate(
@@ -77,6 +83,7 @@ export async function executeFileDuplicate(
   if (!dataPort.copyNode) throw new Error("Copy is not available for this workspace.");
   const sourceNodes = collapseNestedNodes(nodes);
   const destinationPaths: string[] = [];
+  const destinationNodes: DataNode[] = [];
   const failures: FileTransferFailure[] = [];
 
   for (const node of sourceNodes) {
@@ -85,6 +92,7 @@ export async function executeFileDuplicate(
         forceDuplicateName: true,
       });
       destinationPaths.push(result.path);
+      destinationNodes.push(moveNodeDescriptor(node, result.path));
     } catch (error) {
       failures.push({
         path: node.path,
@@ -94,7 +102,24 @@ export async function executeFileDuplicate(
     }
   }
 
-  return { sourceCount: sourceNodes.length, destinationPaths, failures };
+  return { sourceCount: sourceNodes.length, destinationPaths, destinationNodes, failures };
+}
+
+function moveNodeDescriptor(node: DataNode, nextPath: string): DataNode {
+  const name = nextPath.split("/").filter(Boolean).at(-1) ?? node.name;
+  const descriptor: DataNode = {
+    ...node,
+    id: nextPath,
+    name,
+    path: nextPath,
+  };
+  if (node.type === "folder") {
+    // A copied or moved directory must reload descendants at their new paths.
+    descriptor.children = null;
+  } else {
+    delete descriptor.children;
+  }
+  return descriptor;
 }
 
 function toErrorMessage(error: unknown): string {

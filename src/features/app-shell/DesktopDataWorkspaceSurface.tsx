@@ -48,7 +48,8 @@ type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 
 export type DesktopDataWorkspaceSurfaceProps = {
   activeAiEditRequest: AiEditRequest | null;
-  activeDataPath: string | null;
+  activeDocumentPath: string | null;
+  activeExplorerPath: string | null;
   dataPort: NonNullable<DataWorkspaceProps["dataPort"]>;
   editorWorkbench: DesktopEditorWorkbenchController;
   externalOpen: Readonly<{
@@ -94,7 +95,8 @@ export type DesktopDataWorkspaceSurfaceProps = {
 
 export function DesktopDataWorkspaceSurface({
   activeAiEditRequest,
-  activeDataPath,
+  activeDocumentPath,
+  activeExplorerPath,
   dataPort,
   editorWorkbench,
   externalOpen,
@@ -187,7 +189,7 @@ export function DesktopDataWorkspaceSurface({
         workspace={workspace}
         labels={{ root: workspace.name }}
         dataPort={dataPort}
-        activePath={activeDataPath}
+        activePath={activeExplorerPath}
         onResourceMove={onResourceMove}
         onActivePathChange={onActiveDataPathChange}
         onActiveNodeChange={onActiveDataNodeChange}
@@ -320,7 +322,7 @@ export function DesktopDataWorkspaceSurface({
                 onClosePane={editorWorkbench.closePane}
                 onFocusPane={editorWorkbench.focusPane}
                 onMovePane={editorWorkbench.movePane}
-                onOpenAtPaneEdge={editorWorkbench.openAtPaneEdge}
+                onOpenAtPaneEdge={editorWorkbench.openDocumentAtPaneEdge}
                 onResizeSplit={editorWorkbench.resizeSplit}
                 onSplitPane={editorWorkbench.splitPane}
               />
@@ -346,7 +348,7 @@ export function DesktopDataWorkspaceSurface({
         <div className="desktop-ai-edit-review-floating">
           <AiResponseChangesCard
             request={activeAiEditRequest}
-            activePath={activeDataPath}
+            activePath={activeDocumentPath}
             onOpenFile={onActiveDataPathChange}
           />
         </div>

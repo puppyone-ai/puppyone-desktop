@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushActiveDocumentSessions, type DataNode, type DataPort, type Workspace } from "@puppyone/shared-ui";
 import {
   collapseNestedNodes,
@@ -62,8 +62,7 @@ export function useFileClipboard({
   onLocalWorkspaceContentChanged,
   onWorkspaceContentChanged,
   onResourceMoved,
-  setActiveDataPath,
-  setActiveDataNode,
+  onActivateNode,
   workspace,
 }: {
   dataPort: DataPort | null;
@@ -71,8 +70,7 @@ export function useFileClipboard({
   onLocalWorkspaceContentChanged: () => void;
   onWorkspaceContentChanged: () => void;
   onResourceMoved?: (previousPath: string, nextPath: string) => void | Promise<void>;
-  setActiveDataPath: Dispatch<SetStateAction<string | null>>;
-  setActiveDataNode: Dispatch<SetStateAction<DataNode | null>>;
+  onActivateNode: (node: DataNode) => void;
   workspace: Workspace | null;
 }): FileClipboardController {
   const [clipboard, setClipboard] = useState<FileClipboardState | null>(null);
@@ -200,10 +198,7 @@ export function useFileClipboard({
         setClipboard(nextClipboard);
       }
 
-      if (result.destinationPaths.length > 0) {
-        setActiveDataPath(result.destinationPaths[0]);
-        setActiveDataNode(null);
-      }
+      if (result.destinationNodes[0]) onActivateNode(result.destinationNodes[0]);
       if (completedSourcePaths.size > 0 || result.failures.length > 0) {
         onWorkspaceContentChanged();
         onLocalWorkspaceContentChanged();
@@ -257,8 +252,7 @@ export function useFileClipboard({
     onLocalWorkspaceContentChanged,
     onWorkspaceContentChanged,
     onResourceMoved,
-    setActiveDataNode,
-    setActiveDataPath,
+    onActivateNode,
     workspace,
     workspaceKey,
   ]);
@@ -292,10 +286,7 @@ export function useFileClipboard({
       ) return;
       const firstFailure = result.failures[0];
 
-      if (result.destinationPaths.length > 0) {
-        setActiveDataPath(result.destinationPaths[0]);
-        setActiveDataNode(null);
-      }
+      if (result.destinationNodes[0]) onActivateNode(result.destinationNodes[0]);
       onWorkspaceContentChanged();
       onLocalWorkspaceContentChanged();
 
@@ -332,8 +323,7 @@ export function useFileClipboard({
     onEnterDataView,
     onLocalWorkspaceContentChanged,
     onWorkspaceContentChanged,
-    setActiveDataNode,
-    setActiveDataPath,
+    onActivateNode,
     workspace,
     workspaceKey,
   ]);

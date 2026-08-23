@@ -291,8 +291,8 @@ describe("Markdown HTML cross-surface conformance", () => {
     const resolverCalls: Array<{ documentPath: string; href: string }> = [];
     const resolver: MarkdownAssetUrlResolver = async (documentPath, href) => {
       resolverCalls.push({ documentPath, href });
-      if (href !== "public/logo-square-v0.1.4-dark.png") return null;
-      return "puppyone-local://file/token/markdown-asset/root/public/logo-square-v0.1.4-dark.png";
+      if (href !== "public/logo-square.png") return null;
+      return "puppyone-local://file/token/markdown-asset/root/public/logo-square.png";
     };
     const view = mountLive(CENTERED_README_HEADER, false, resolver, "README.md");
 
@@ -307,13 +307,13 @@ describe("Markdown HTML cross-surface conformance", () => {
     const badges = images.filter((image) => image.src.startsWith("https://img.shields.io/"));
 
     expect(logo?.getAttribute("src")).toBe(
-      "puppyone-local://file/token/markdown-asset/root/public/logo-square-v0.1.4-dark.png",
+      "puppyone-local://file/token/markdown-asset/root/public/logo-square.png",
     );
     expect(logo?.width).toBe(72);
     expect(logo?.height).toBe(72);
     expect(resolverCalls).toEqual([{
       documentPath: "README.md",
-      href: "public/logo-square-v0.1.4-dark.png",
+      href: "public/logo-square.png",
     }]);
     expect(badges).toHaveLength(4);
     for (const badge of badges) {

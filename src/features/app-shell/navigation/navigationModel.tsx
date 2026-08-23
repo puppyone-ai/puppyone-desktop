@@ -44,11 +44,10 @@ export function resolveNavigationItems({
   };
 }
 
-export type DesktopNavigationBadge = {
-  count: number;
-  tone: "remote" | "workspace";
-  kind: "remote" | "workspace" | "none";
-};
+export type DesktopNavigationBadge =
+  | { count: 0; tone: "remote"; kind: "none" }
+  | { count: 0; tone: "workspace"; kind: "workspace" }
+  | { count: number; tone: "remote"; kind: "remote" };
 
 export function getDesktopNavigationBadge(
   view: DesktopView,
@@ -56,11 +55,11 @@ export function getDesktopNavigationBadge(
   workspaceChangeCount: number,
 ): DesktopNavigationBadge {
   if (view !== "git") return { count: 0, tone: "remote", kind: "none" };
-  if (workspaceChangeCount > 0) {
-    return { count: workspaceChangeCount, tone: "workspace", kind: "workspace" };
-  }
   if (gitIncomingCount > 0) {
     return { count: gitIncomingCount, tone: "remote", kind: "remote" };
+  }
+  if (workspaceChangeCount > 0) {
+    return { count: 0, tone: "workspace", kind: "workspace" };
   }
   return { count: 0, tone: "remote", kind: "none" };
 }
@@ -75,11 +74,13 @@ export function getDesktopNavigationLabel(
   if (view === "data" && workspaceChangeCount > 0) {
     return t("shell.navigation.workspaceChangesDetected", { label });
   }
-  if (badge.count <= 0) return label;
   if (badge.kind === "workspace") {
-    return t("shell.navigation.workspaceChangeCount", { label, count: badge.count });
+    return t("shell.navigation.workspaceChangesDetected", { label });
   }
-  return t("shell.navigation.remoteChangeCount", { label, count: badge.count });
+  if (badge.kind === "remote") {
+    return t("shell.navigation.remoteChangeCount", { label, count: badge.count });
+  }
+  return label;
 }
 
 export type DesktopGitNavSummary = {

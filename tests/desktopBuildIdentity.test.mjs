@@ -208,7 +208,7 @@ describe("desktop build identity", () => {
       packageMetadata: {
         build: {
           extraResources: [{ from: "public/logo-square.png", to: "logo-square.png" }],
-          mac: { icon: "build/icon.icns" },
+          mac: { icon: "public/logo-square.png" },
         },
       },
     });
@@ -221,7 +221,7 @@ describe("desktop build identity", () => {
       { from: "public/logo-square-v0.1.3-light-dev.png", to: "dock-icon-light-dev.png" },
       { from: "public/logo-square-v0.1.3-dark-dev.png", to: "dock-icon-matte-dev.png" },
     ]));
-    expect(stable.mac.icon).toBe("build/icon.icns");
+    expect(stable.mac.icon).toBe("public/logo-square.png");
     expect(stable.extraResources).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ to: "logo-square-dev.png" }),
     ]));

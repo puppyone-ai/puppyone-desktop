@@ -1,7 +1,7 @@
 import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import type { CreateNewMenuSettings, DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, LocalAgentsSettings, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TerminalSessionLayout, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
+import type { CreateNewMenuSettings, DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, GitSidebarLayout, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, LocalAgentsSettings, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TerminalSessionLayout, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
 import type { EditorPresentation } from "../appearance/interfaceStyles";
 
@@ -36,6 +36,7 @@ export type SettingsViewProps = {
   rightSidebarToolsSettings: RightSidebarToolsSettings;
   titlebarActionsSettings: TitlebarActionsSettings;
   terminalSessionLayout: TerminalSessionLayout;
+  gitSidebarLayout: GitSidebarLayout;
   aiEditAssistEnabled: boolean;
   cloudEnabled: boolean;
   cloudSession: DesktopCloudSession | null;
@@ -69,6 +70,7 @@ export type SettingsViewProps = {
   onRightSidebarToolsSettingsChange: (settings: RightSidebarToolsSettings) => void;
   onTitlebarActionsSettingsChange: (settings: TitlebarActionsSettings) => void;
   onTerminalSessionLayoutChange: (layout: TerminalSessionLayout) => void;
+  onGitSidebarLayoutChange: (layout: GitSidebarLayout) => void;
   onAiEditAssistEnabledChange: (enabled: boolean) => void;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onPuppyoneConfigChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;

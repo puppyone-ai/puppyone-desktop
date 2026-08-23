@@ -1,5 +1,8 @@
 @import "./styles/sidebar-base.css";
 @import "./styles/sidebar-layout.css";
+@import "./styles/sidebar-panels.css";
+@import "./styles/sidebar-actions.css";
+@import "./styles/sidebar-providers.css";
 @import "./styles/sidebar-resources.css";
 @import "./styles/history-list.css";
 @import "./styles/history-detail.css";

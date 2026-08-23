@@ -29,6 +29,7 @@ import {
 } from "@puppyone/shared-ui";
 import { DesktopEditorSplitView } from "../src/features/editor-workbench/layout/DesktopEditorSplitView";
 import {
+  EditorPaneDocumentRuntime,
   areEditorPaneDocumentRuntimePropsEqual,
   type EditorPaneDocumentRuntimeProps,
 } from "../src/features/editor-workbench/runtime/EditorPaneDocumentRuntime";
@@ -123,8 +124,12 @@ describe("DesktopEditorSplitView", () => {
 
     act(() => pane.dispatchEvent(dragEvent("drop", transfer, 790, 300)));
     expect(onOpenAtPaneEdge).toHaveBeenCalledWith(
-      "b.md",
-      "b.md",
+      {
+        id: "b.md",
+        name: "b.md",
+        path: "b.md",
+        type: "markdown",
+      },
       "editor-pane-1",
       "horizontal",
       "second",
@@ -1025,6 +1030,27 @@ describe("DesktopEditorSplitView", () => {
       runtimeProps(markdown, runtimeEnvironment(7)),
       runtimeProps({ ...markdown }, runtimeEnvironment(7)),
     )).toBe(true);
+  });
+
+  it("never routes a directory node through the unknown-document fallback", () => {
+    const folder: DataNode = {
+      id: "docs",
+      name: "docs",
+      path: "docs",
+      type: "folder",
+      children: [],
+    };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => root?.render(withTestLocalization(
+      <EditorPaneDocumentRuntime {...runtimeProps(folder, runtimeEnvironment(0))} />,
+    )));
+
+    expect(container.querySelector(".document-preview")).toBeNull();
+    expect(container.textContent).not.toContain("Binary file");
+    expect(container.textContent).not.toContain("folder file");
   });
 });
 

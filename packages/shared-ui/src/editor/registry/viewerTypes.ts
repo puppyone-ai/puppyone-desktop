@@ -1,5 +1,10 @@
 import type { ComponentType, ReactNode } from "react";
-import type { AppPreviewController, DataPort, OfficeDocumentConverter } from "../../core/types";
+import type {
+  AppPreviewController,
+  DataPort,
+  DocumentDataNodeKind,
+  OfficeDocumentConverter,
+} from "../../core/types";
 import type { FileFormat } from "../../core/fileFormats";
 import type { FileIconThemeId } from "../../file/fileIcons";
 import type { AiEditFile } from "../ai-edits/types";
@@ -9,24 +14,7 @@ import type { PresetViewerDefinition } from "./presetViewerManifest";
 
 export type { DocumentSourceKind } from "../documentSource";
 
-export type EditorDocumentKind =
-  | "folder"
-  | "app"
-  | "markdown"
-  | "json"
-  | "html"
-  | "image"
-  | "audio"
-  | "pdf"
-  | "video"
-  | "spreadsheet"
-  | "archive"
-  | "document"
-  | "binary"
-  | "code"
-  | "text"
-  | "file"
-  | string;
+export type EditorDocumentKind = DocumentDataNodeKind;
 
 export type EditorDocument = {
   path: string;

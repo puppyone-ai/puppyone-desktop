@@ -1,9 +1,11 @@
 import { memo, useMemo } from "react";
 import {
   FilePreview,
+  isDocumentDataNode,
   type AiEditFile,
   type DataNode,
   type DataPort,
+  type DocumentDataNode,
   type ContextMapWorkspaceEnvironment,
   type EditorGroupState,
   type EditorInteractionPreferences,
@@ -82,11 +84,12 @@ function RegularEditorPaneDocumentRuntime({
   workspaceRoot,
   markdownDialect,
 }: RegularEditorPaneDocumentRuntimeProps) {
+  const invalidTreeNode = Boolean(treeNode && !isDocumentDataNode(treeNode));
   const fallbackNode = useMemo(
-    () => editor ? createFallbackNode(editor.resource, editor.label) : null,
-    [editor],
+    () => editor && !invalidTreeNode ? createFallbackNode(editor.resource, editor.label) : null,
+    [editor, invalidTreeNode],
   );
-  const sourceNode = treeNode ?? fallbackNode;
+  const sourceNode = isDocumentDataNode(treeNode) ? treeNode : fallbackNode;
   const source = useEditorPaneSource(sourceNode, dataPort, refreshKey);
   const node = useMemo(() => (
     source.content ? mergeNodeWithContent(sourceNode, source.content) : sourceNode
@@ -100,6 +103,10 @@ function RegularEditorPaneDocumentRuntime({
     node,
     editor?.resource ?? null,
   );
+
+  // A directory discovered after an editor was restored is invalid workbench
+  // state. Never route it through the unknown-file fallback viewer.
+  if (invalidTreeNode) return null;
 
   return (
     <FilePreview
@@ -244,7 +251,7 @@ function sameDocumentDescriptor(previous: DataNode | null, next: DataNode | null
   );
 }
 
-function createFallbackNode(path: string, label: string): DataNode {
+function createFallbackNode(path: string, label: string): DocumentDataNode {
   return {
     id: path,
     name: label,
@@ -254,7 +261,10 @@ function createFallbackNode(path: string, label: string): DataNode {
   };
 }
 
-function mergeNodeWithContent(node: DataNode | null, content: FileContent): DataNode {
+function mergeNodeWithContent(
+  node: DocumentDataNode | null,
+  content: FileContent,
+): DocumentDataNode {
   return {
     ...(node ?? createFallbackNode(content.path, content.name)),
     name: content.name,

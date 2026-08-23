@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
 import {
+  abortWorkspaceGitOperation,
   checkoutWorkspaceGitBranch,
   cancelWorkspaceGitFileDiff,
   commitAndCheckoutWorkspaceGitBranch,
   commitWorkspaceGit,
+  continueWorkspaceGitOperation,
   discardAllWorkspaceGitChanges,
   discardWorkspaceGitPaths,
   getWorkspaceGitBranchGraph,
@@ -312,6 +314,13 @@ export function useDesktopGitController({
       if (isGitRepositoryContextCurrent(context) && options.showRendererError !== false) {
         setGitOperationError(createGitOperationErrorState(error, label, context.rootPath));
       }
+      if (isGitRepositoryContextCurrent(context)) {
+        if (label === "push" || label === "publish") {
+          await refreshGitStatusWithFetch({ silent: true, detail: `${label}-failed` });
+        } else {
+          void refreshGitStatus(`${label}-failed`);
+        }
+      }
       return false;
     } finally {
       if (isGitRepositoryContextCurrent(context)) setGitOperationLoading(null);
@@ -321,6 +330,8 @@ export function useDesktopGitController({
     captureGitRepositoryContext,
     isGitRepositoryContextCurrent,
     onWorkspaceContentChanged,
+    refreshGitStatus,
+    refreshGitStatusWithFetch,
     workspace,
   ]);
 
@@ -505,6 +516,7 @@ export function useDesktopGitController({
     } catch (error) {
       if (isGitRepositoryContextCurrent(context)) {
         setGitOperationError(createGitOperationErrorState(error, "commit-push", context.rootPath));
+        await refreshGitStatusWithFetch({ silent: true, detail: "commit-push-failed" });
       }
       return false;
     } finally {
@@ -517,6 +529,7 @@ export function useDesktopGitController({
     clearGitSelection,
     isGitRepositoryContextCurrent,
     onWorkspaceContentChanged,
+    refreshGitStatusWithFetch,
     workspace,
   ]);
 
@@ -530,6 +543,14 @@ export function useDesktopGitController({
 
   const handlePublishGitBranch = useCallback(() => {
     return runGitOperation("publish", (rootPath) => publishWorkspaceGitBranch(rootPath));
+  }, [runGitOperation]);
+
+  const handleContinueGitOperation = useCallback(() => {
+    return runGitOperation("continue", (rootPath) => continueWorkspaceGitOperation(rootPath));
+  }, [runGitOperation]);
+
+  const handleAbortGitOperation = useCallback(() => {
+    return runGitOperation("abort", (rootPath) => abortWorkspaceGitOperation(rootPath));
   }, [runGitOperation]);
 
   const handleCheckoutGitBranch = useCallback(async (branchName: string, remote: boolean) => {
@@ -711,6 +732,8 @@ export function useDesktopGitController({
     clearGitSelection,
     dismissGitOperationError: () => setGitOperationError(null),
     handleCheckoutGitBranch,
+    handleContinueGitOperation,
+    handleAbortGitOperation,
     handleCommitAndCheckoutBranch,
     handleCommitAndPushGit,
     handleCommitGit,

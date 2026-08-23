@@ -13,6 +13,7 @@ export type GitOperationErrorCode =
   | "checkout"
   | "init"
   | "pull-diverged"
+  | "pull-conflict"
   | "pull"
   | "push-rejected"
   | "push"
@@ -89,6 +90,9 @@ export function classifyGitOperationError(
   }
 
   if (operation === "pull") {
+    if (/\bconflict\b|could not apply|resolve all conflicts manually/i.test(message)) {
+      return { code: "pull-conflict", detail: null };
+    }
     if (/not possible to fast-forward|diverging branches|diverged|non-fast-forward/i.test(message)) {
       return { code: "pull-diverged", detail: null };
     }
@@ -245,14 +249,21 @@ export function BranchSwitchConflictDialog({
 export function GitOperationErrorDialog({
   error,
   onClose,
+  onPull,
 }: {
   error: GitOperationErrorState;
   onClose: () => void;
+  onPull?: () => void;
 }) {
   const { t } = useLocalization();
   const [copied, setCopied] = useState(false);
   const message = formatGitOperationErrorState(error, t);
   const prompt = buildGitFixPrompt(error, message, t);
+  const recommendsPull = [
+    "push-rejected",
+    "commit-push-rejected",
+    "commit-push-needs-pull",
+  ].includes(error.code) && Boolean(onPull);
 
   const copyPrompt = async () => {
     try {
@@ -300,9 +311,15 @@ export function GitOperationErrorDialog({
           <button className="desktop-dialog-button" type="button" onClick={() => void copyPrompt()}>
             {t(copied ? "common.action.copied" : "source-control.dialog.error.copyPrompt")}
           </button>
-          <button className="desktop-dialog-button primary" type="button" onClick={onClose}>
-            {t("common.action.confirm")}
-          </button>
+          {recommendsPull ? (
+            <button className="desktop-dialog-button primary" type="button" onClick={onPull}>
+              {t("source-control.sync.pull")}
+            </button>
+          ) : (
+            <button className="desktop-dialog-button" type="button" onClick={onClose}>
+              {t("common.action.close")}
+            </button>
+          )}
         </footer>
       </section>
     </DesktopDialogRoot>

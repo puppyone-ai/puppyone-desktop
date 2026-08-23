@@ -40,7 +40,6 @@ export type ExplorerVisibleModel = {
 export type BuildExplorerVisibleModelOptions = {
   expandedPaths: ReadonlySet<string>;
   loadingPaths?: ReadonlySet<string>;
-  emptyLabel: string;
   loadingLabel: string;
 };
 
@@ -57,7 +56,6 @@ export function buildExplorerVisibleModel(
   {
     expandedPaths,
     loadingPaths = EMPTY_PATH_SET,
-    emptyLabel,
     loadingLabel,
   }: BuildExplorerVisibleModelOptions,
 ): ExplorerVisibleModel {
@@ -109,15 +107,6 @@ export function buildExplorerVisibleModel(
           index: rows.length,
           label: loadingLabel,
           loading: true,
-        });
-      } else if (Array.isArray(node.children)) {
-        rows.push({
-          kind: "meta",
-          key: `${node.path}:empty`,
-          depth: depth + 1,
-          index: rows.length,
-          label: emptyLabel,
-          loading: false,
         });
       }
     }

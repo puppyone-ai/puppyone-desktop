@@ -227,8 +227,9 @@ describe("settings visual architecture", () => {
     expect(controls).toMatch(/\.desktop-theme-segment\s*{[^}]*border-radius:\s*7px;/s);
     expect(controls).toMatch(/\.desktop-theme-segment button\s*{[^}]*height:\s*26px;[^}]*border-radius:\s*5px;/s);
     expect(controls).toMatch(/\.desktop-appearance-option-segment\s*{[^}]*width:\s*min\(100%, 360px\);[^}]*grid-auto-columns:\s*minmax\(0, 1fr\);/s);
-    expect(view.match(/desktop-theme-segment desktop-appearance-option-segment/g)).toHaveLength(6);
+    expect(view.match(/desktop-theme-segment desktop-appearance-option-segment/g)).toHaveLength(7);
     expect(view).toContain("settings.appearance.editorPresentation.title");
+    expect(view).toContain("settings.appearance.gitSidebarLayout.title");
     expect(controls).not.toContain(".desktop-loading-animation-segment");
     expect(controls).not.toContain(".desktop-text-size-segment");
     expect(controls).not.toContain(".desktop-sidebar-layout-segment");

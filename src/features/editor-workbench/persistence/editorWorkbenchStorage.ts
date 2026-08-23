@@ -11,7 +11,8 @@ import {
   type EditorPaneLayoutState,
 } from "@puppyone/shared-ui";
 
-export const EDITOR_WORKBENCH_STORAGE_PREFIX = "puppyone.desktop.editor-workbench.v2";
+export const EDITOR_WORKBENCH_STORAGE_PREFIX = "puppyone.desktop.editor-workbench.v3";
+export const LEGACY_EDITOR_WORKBENCH_STORAGE_PREFIX = "puppyone.desktop.editor-workbench.v2";
 export const LEGACY_EDITOR_GROUP_STORAGE_PREFIX = "puppyone.desktop.editor-group.v1";
 
 export type DesktopEditorWorkbenchState = Readonly<{
@@ -26,10 +27,12 @@ export const EMPTY_EDITOR_WORKBENCH: DesktopEditorWorkbenchState = createEditorW
 
 export function readStoredEditorWorkbench(
   storageKey: string,
-  legacyStorageKey: string | null,
+  legacyWorkbenchStorageKey: string | null,
+  legacyGroupStorageKey: string | null,
 ): DesktopEditorWorkbenchState {
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    const raw = window.localStorage.getItem(storageKey)
+      ?? (legacyWorkbenchStorageKey ? window.localStorage.getItem(legacyWorkbenchStorageKey) : null);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<DesktopEditorWorkbenchState>;
       const group = parseEditorGroupState(parsed.group);
@@ -43,7 +46,7 @@ export function readStoredEditorWorkbench(
         layout,
       );
     }
-    const legacyRaw = legacyStorageKey ? window.localStorage.getItem(legacyStorageKey) : null;
+    const legacyRaw = legacyGroupStorageKey ? window.localStorage.getItem(legacyGroupStorageKey) : null;
     const group = legacyRaw ? parseEditorGroupState(JSON.parse(legacyRaw)) : EMPTY_EDITOR_GROUP;
     return createEditorWorkbenchState(group, createEditorPaneLayout(group.activeEditorId));
   } catch {

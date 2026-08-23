@@ -1,4 +1,8 @@
-import type { GitSourceControlResource, GitSourceControlResourceStatus } from "../../types/electron";
+import type {
+  GitRepositoryOperationState,
+  GitSourceControlResource,
+  GitSourceControlResourceStatus,
+} from "../../types/electron";
 
 export type GitWorkingSelection = {
   path: string;
@@ -17,9 +21,9 @@ export type GitHostingIdentity = {
   href: string | null;
 };
 
-export type GitActionIconKind = "download" | "upload" | "plus";
+export type GitActionIconKind = "check" | "download" | "upload" | "plus";
 
-export type GitSidebarPrimaryActionKind = "commit" | "commit-push" | "push" | "publish";
+export type GitSidebarPrimaryActionKind = "commit" | "commit-push" | "continue" | "push" | "publish";
 
 export type GitSidebarPrimaryAction = {
   label: string;
@@ -77,6 +81,8 @@ export type SourceControlDisplayMode = "simple" | "professional";
 
 export type SourceControlSidebarModel = {
   professionalMode: boolean;
+  repositoryOperation: GitRepositoryOperationState | null;
+  hasConflicts: boolean;
   mergeResources: GitSourceControlResource[];
   stagedResources: GitSourceControlResource[];
   workingResources: GitSourceControlResource[];
@@ -84,9 +90,16 @@ export type SourceControlSidebarModel = {
   committedCount: number;
   committedResources: GitSourceControlResource[];
   committedPrimaryAction: GitSidebarPrimaryAction | null;
+  operationPrimaryAction: GitSidebarPrimaryAction | null;
   showCommittedSection: boolean;
   showStagedSection: boolean;
   showUnstagedSection: boolean;
   stagedPrimaryAction: GitSidebarPrimaryAction | null;
   showSimpleChangeAction: boolean;
+  sectionContext: {
+    merge: string;
+    committed: string;
+    staged: string;
+    unstaged: string;
+  };
 };

@@ -28,6 +28,7 @@ describe("workspace file IPC authorization", () => {
     const event = { sender: { id: 7 } };
     const requests = new Map([
       ["workspace:list-folder-children", { rootPath: otherRoot, folderPath: null }],
+      ["workspace:resolve-node", { rootPath: otherRoot, path: "secret.txt" }],
       ["workspace:read-file", { rootPath: otherRoot, path: "secret.txt" }],
       ["workspace:get-file-url", { rootPath: otherRoot, path: "secret.txt" }],
       ["workspace:convert-office-docx", { rootPath: otherRoot, path: "secret.rtf" }],

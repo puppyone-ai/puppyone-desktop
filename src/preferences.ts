@@ -47,6 +47,7 @@ export type TextSize = "small" | "default" | "large";
 export type DockIcon = "polished" | "light" | "matte";
 export type DiffMarkers = "color" | "symbols";
 export type GitDisplayMode = "simple" | "professional";
+export type GitSidebarLayout = "cards" | "dividers";
 export type LoadingAnimationPreset = PulseGridPresetId;
 
 export type SidebarNavigationLayout =
@@ -134,6 +135,7 @@ export const LOCAL_AGENTS_STORAGE_KEY = "puppyone.desktop.localAgents";
 export const AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY = "puppyone.desktop.agentFileActivityIndicators";
 export const AI_EDIT_ASSIST_STORAGE_KEY = "puppyone.desktop.aiEditAssist";
 export const GIT_DISPLAY_MODE_STORAGE_KEY = "puppyone.desktop.gitDisplayMode";
+export const GIT_SIDEBAR_LAYOUT_STORAGE_KEY = "puppyone.desktop.gitSidebarLayout";
 export const EXPERIMENTAL_SETTINGS_STORAGE_KEY = "puppyone.desktop.experimental";
 export const CREATE_NEW_MENU_STORAGE_KEY = "puppyone.desktop.createNewMenu";
 
@@ -147,6 +149,7 @@ export const DEFAULT_LOADING_ANIMATION_PRESET: LoadingAnimationPreset = "ikun";
 export const DEFAULT_DOCK_ICON: DockIcon = "polished";
 export const DEFAULT_DIFF_MARKERS: DiffMarkers = "color";
 export const DEFAULT_GIT_DISPLAY_MODE: GitDisplayMode = "simple";
+export const DEFAULT_GIT_SIDEBAR_LAYOUT: GitSidebarLayout = "cards";
 export const DEFAULT_SIDEBAR_NAVIGATION_LAYOUT: SidebarNavigationLayout = "bottom-horizontal";
 export const DEFAULT_SIDEBAR_NAVIGATION_VISIBILITY_SETTINGS: SidebarNavigationVisibilitySettings = {
   enabled: {
@@ -437,6 +440,10 @@ export function parseDiffMarkers(value: string | null | undefined): DiffMarkers 
 
 export function parseGitDisplayMode(value: string | null | undefined): GitDisplayMode {
   return value === "professional" || value === "simple" ? value : DEFAULT_GIT_DISPLAY_MODE;
+}
+
+export function parseGitSidebarLayout(value: string | null | undefined): GitSidebarLayout {
+  return value === "dividers" || value === "cards" ? value : DEFAULT_GIT_SIDEBAR_LAYOUT;
 }
 
 export function parseSidebarNavigationLayout(value: string | null | undefined): SidebarNavigationLayout {

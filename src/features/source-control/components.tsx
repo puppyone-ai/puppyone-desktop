@@ -13,19 +13,25 @@ import { bidiIsolate, useLocalization } from "@puppyone/localization";
 export function SourceControlSectionHeader({
   title,
   count,
+  summaryResources,
   highlightCount = false,
+  showCount = true,
   leadingIcon,
   action,
   className,
+  controlsId,
   expanded = true,
   onToggle,
 }: {
   title: string;
   count: number;
+  summaryResources?: readonly GitSourceControlResource[];
   highlightCount?: boolean;
+  showCount?: boolean;
   leadingIcon?: ReactNode;
   action?: ReactNode;
   className?: string;
+  controlsId?: string;
   expanded?: boolean;
   onToggle?: () => void;
 }) {
@@ -34,14 +40,26 @@ export function SourceControlSectionHeader({
       {onToggle && <ChevronRight size={14} className={`po-disclosure-icon ${expanded ? "expanded" : ""}`} />}
       {leadingIcon && <span className="desktop-git-section-leading-icon">{leadingIcon}</span>}
       <span>{title}</span>
-      <small className={highlightCount ? "desktop-git-section-count-badge" : undefined}>{count}</small>
+      {showCount ? (
+        summaryResources && summaryResources.length > 0 ? (
+          <SourceControlResourceSummary resources={summaryResources} />
+        ) : (
+          <small className={highlightCount ? "desktop-git-section-count-badge" : undefined}>{count}</small>
+        )
+      ) : null}
     </>
   );
 
   return (
     <div className={`desktop-git-section-row ${className ?? ""}`}>
       {onToggle ? (
-        <button className="desktop-git-section-title" type="button" onClick={onToggle}>
+        <button
+          className="desktop-git-section-title"
+          type="button"
+          aria-controls={controlsId}
+          aria-expanded={expanded}
+          onClick={onToggle}
+        >
           {titleContent}
         </button>
       ) : (
@@ -51,6 +69,21 @@ export function SourceControlSectionHeader({
       )}
       {action}
     </div>
+  );
+}
+
+export function SourceControlResourceSummary({
+  resources,
+}: {
+  resources: readonly GitSourceControlResource[];
+}) {
+  const { t } = useLocalization();
+  const label = t("source-control.commit.filesChanged", { count: resources.length });
+
+  return (
+    <small className="desktop-git-resource-summary" title={label}>
+      {label}
+    </small>
   );
 }
 
@@ -137,11 +170,9 @@ function SourceControlPreviewResourceRow({
         </span>
         <span className="desktop-working-tree-copy">
           <span className="desktop-working-tree-name">{displayName}</span>
+          <GitResourceStatusMarker resource={resource} />
         </span>
       </button>
-      <div className="desktop-working-tree-state-slot">
-        <span className={`desktop-working-tree-state ${resource.status}`}>{resource.letter}</span>
-      </div>
     </div>
   );
 }
@@ -170,7 +201,6 @@ export function SourceControlWorkingTreeRow({
   const commandPaths = getGitResourceCommandPaths(resource);
   const displayPath = getGitDisplayPath(resource);
   const displayName = getGitDisplayName(displayPath);
-  const statusCode = resource.letter;
   const staged = resource.group === "index";
 
   return (
@@ -188,6 +218,7 @@ export function SourceControlWorkingTreeRow({
         </span>
         <span className="desktop-working-tree-copy">
           <span className="desktop-working-tree-name">{displayName}</span>
+          <GitResourceStatusMarker resource={resource} />
         </span>
       </button>
       {!staged && (
@@ -202,8 +233,7 @@ export function SourceControlWorkingTreeRow({
           <Undo2 size={13} />
         </button>
       )}
-      <div className="desktop-working-tree-state-slot">
-        <span className={`desktop-working-tree-state ${resource.status}`}>{statusCode}</span>
+      <div className="desktop-working-tree-action-slot">
         {staged ? (
           <button
             className="po-sidebar-icon-button desktop-working-tree-state-action"
@@ -229,6 +259,17 @@ export function SourceControlWorkingTreeRow({
         )}
       </div>
     </div>
+  );
+}
+
+function GitResourceStatusMarker({ resource }: { resource: GitSourceControlResource }) {
+  return (
+    <span
+      className={`desktop-working-tree-state ${resource.status}`}
+      aria-label={resource.status}
+    >
+      {resource.letter}
+    </span>
   );
 }
 

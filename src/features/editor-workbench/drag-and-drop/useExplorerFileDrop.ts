@@ -8,7 +8,9 @@ import {
 } from "react";
 import {
   EXPLORER_REFERENCE_DRAG_TYPE,
+  getFileSemanticKind,
   parseExplorerReferenceDrag,
+  type DocumentDataNode,
   type EditorPaneSplitOptions,
   type EditorSplitDirection,
 } from "@puppyone/shared-ui";
@@ -28,8 +30,7 @@ import {
 } from "./paneDropGeometry";
 
 export type EditorFileDropHandler = (
-  path: string,
-  label: string,
+  node: DocumentDataNode,
   targetPaneId: string,
   direction: EditorSplitDirection,
   placement: NonNullable<EditorPaneSplitOptions["placement"]>,
@@ -139,7 +140,14 @@ export function useExplorerFileDrop(
     finishFileDrag("drop");
     if (!entry || entry.entryType !== "file") return;
     const { direction, placement } = paneSplitDefinition(edge);
-    onOpenAtPaneEdge(entry.path, entry.name, paneId, direction, placement);
+    const type = getFileSemanticKind(entry.name, "file");
+    if (type === "folder") return;
+    onOpenAtPaneEdge({
+      id: entry.path,
+      name: entry.name,
+      path: entry.path,
+      type,
+    }, paneId, direction, placement);
   }, [finishFileDrag, onOpenAtPaneEdge, workspaceId]);
 
   const dropIntent = preview?.intent ?? null;

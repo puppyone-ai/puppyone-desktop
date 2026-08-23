@@ -18,6 +18,8 @@ import type {
   PuppyoneWorkspaceConfig,
   RecentWorkspacesResult,
   WorkspaceChooseExternalAppRequest,
+  WorkspaceCloneRepositoryRequest,
+  WorkspaceCreateProjectRequest,
   WorkspaceCreateEntryKind,
   WorkspaceCreateEntryResult,
   WorkspaceInstantiateTemplateResult,
@@ -25,6 +27,7 @@ import type {
   WorkspaceOpenEntryExternalRequest,
   WorkspaceImportEntriesResult,
   WorkspaceOpenResult,
+  WorkspaceProjectLocationGrant,
   WorkspaceResolveExternalOpenTargetRequest,
 } from "../types/electron";
 import {
@@ -46,6 +49,7 @@ export function createLocalDocumentStorageIdentity(rootPath: string): string {
 export function createLocalDataPort(rootPath: string): DataPort {
   return {
     listChildren: (folderPath) => loadFolderChildren(rootPath, folderPath),
+    resolveNode: (path) => getDesktopBridge().resolveNode({ rootPath, path }),
     // Text/content reads do not mint a browser capability URL. Resource URLs
     // have their own mounted-preview lifecycle and are revoked separately.
     readFile: async (path, options) => {
@@ -321,6 +325,22 @@ export async function selectWorkspaceFolder(): Promise<WorkspaceOpenResult | nul
 
 export async function selectWorkspaceFolderInNewWindow(): Promise<WorkspaceOpenResult | null> {
   return getDesktopBridge().selectFolderInNewWindow();
+}
+
+export async function createLocalProject(
+  request: WorkspaceCreateProjectRequest,
+): Promise<WorkspaceOpenResult | null> {
+  return getDesktopBridge().createLocalProject(request);
+}
+
+export async function selectLocalProjectLocation(): Promise<WorkspaceProjectLocationGrant | null> {
+  return getDesktopBridge().selectLocalProjectLocation();
+}
+
+export async function cloneRepository(
+  request: WorkspaceCloneRepositoryRequest,
+): Promise<WorkspaceOpenResult | null> {
+  return getDesktopBridge().cloneRepository(request);
 }
 
 export async function createWorkspaceEntry(
@@ -623,6 +643,14 @@ export async function discardAllWorkspaceGitChanges(rootPath: string): Promise<G
 
 export async function commitWorkspaceGit(rootPath: string, message: string): Promise<GitStatusSnapshot> {
   return getDesktopBridge().commitGit({ rootPath, message });
+}
+
+export async function continueWorkspaceGitOperation(rootPath: string): Promise<GitStatusSnapshot> {
+  return getDesktopBridge().continueGitOperation({ rootPath });
+}
+
+export async function abortWorkspaceGitOperation(rootPath: string): Promise<GitStatusSnapshot> {
+  return getDesktopBridge().abortGitOperation({ rootPath });
 }
 
 export async function checkoutWorkspaceGitBranch(

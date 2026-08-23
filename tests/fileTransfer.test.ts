@@ -23,6 +23,7 @@ describe("file clipboard batch execution", () => {
     await expect(executeFileClipboardPaste({ copyNode }, clipboard, "docs")).resolves.toEqual({
       completedSourcePaths: ["report.md"],
       destinationPaths: ["docs/report copy.md"],
+      destinationNodes: [node("docs/report copy.md", "markdown")],
       failures: [],
     });
     expect(copyNode).toHaveBeenCalledWith("report.md", "docs");
@@ -41,6 +42,7 @@ describe("file clipboard batch execution", () => {
     await expect(executeFileClipboardPaste({ moveNode }, clipboard, "docs")).resolves.toEqual({
       completedSourcePaths: ["docs/a.md", "other/c.md"],
       destinationPaths: ["docs/a.md", "docs/c.md"],
+      destinationNodes: [node("docs/a.md", "markdown"), node("docs/c.md", "markdown")],
       failures: [{ path: "archive/b.md", name: "b.md", message: "target exists" }],
     });
     expect(moveNode).toHaveBeenCalledTimes(2);
@@ -55,7 +57,12 @@ describe("file clipboard batch execution", () => {
 
     const result = await executeFileDuplicate({ copyNode }, [child, folder]);
 
-    expect(result).toEqual({ sourceCount: 1, destinationPaths: ["docs copy"], failures: [] });
+    expect(result).toEqual({
+      sourceCount: 1,
+      destinationPaths: ["docs copy"],
+      destinationNodes: [{ ...node("docs copy", "folder"), children: null }],
+      failures: [],
+    });
     expect(copyNode).toHaveBeenCalledWith("docs", null, {
       forceDuplicateName: true,
     });

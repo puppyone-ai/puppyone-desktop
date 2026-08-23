@@ -1,5 +1,11 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
-import { flushActiveDocumentSessions, type DataNode, type DataPort, type Workspace } from "@puppyone/shared-ui";
+import {
+  flushActiveDocumentSessions,
+  getFileSemanticKind,
+  type DataNode,
+  type DataPort,
+  type Workspace,
+} from "@puppyone/shared-ui";
 import {
   openWorkspaceEntryExternal,
   revealWorkspaceEntryInFinder,
@@ -44,8 +50,8 @@ export function useDataNodeActions({
   onWorkspaceContentChanged,
   onResourceDeleted,
   onResourceMoved,
-  setActiveDataPath,
-  setActiveDataNode,
+  onActivateNode,
+  setActiveExplorerNode,
   workspace,
 }: {
   dataPort: DataPort | null;
@@ -55,8 +61,8 @@ export function useDataNodeActions({
   onWorkspaceContentChanged: () => void;
   onResourceDeleted?: (path: string) => void | Promise<void>;
   onResourceMoved?: (previousPath: string, nextPath: string) => void | Promise<void>;
-  setActiveDataPath: Dispatch<SetStateAction<string | null>>;
-  setActiveDataNode: Dispatch<SetStateAction<DataNode | null>>;
+  onActivateNode: (node: DataNode) => void;
+  setActiveExplorerNode: Dispatch<SetStateAction<DataNode | null>>;
   workspace: Workspace | null;
 }) {
   const { t } = useLocalization();
@@ -67,8 +73,7 @@ export function useDataNodeActions({
     onEnterDataView,
     onLocalWorkspaceContentChanged,
     onWorkspaceContentChanged,
-    setActiveDataNode,
-    setActiveDataPath,
+    onActivateNode,
     workspace,
     onResourceMoved,
   });
@@ -153,6 +158,7 @@ export function useDataNodeActions({
     setCreateEntryDraft((current) => current ? { ...current, creatingKind: kind, error: null } : current);
     try {
       let nextPath: string;
+      let nextNode: DataNode;
       if (kind === "slides") {
         const result = await dataPort.instantiateTemplate!({
           templateId: "slides.default",
@@ -160,12 +166,20 @@ export function useDataNodeActions({
           name: requestedName,
         });
         nextPath = result.openPath;
+        const name = nextPath.split("/").filter(Boolean).at(-1) ?? nextPath;
+        nextNode = {
+          id: nextPath,
+          name,
+          path: nextPath,
+          type: getFileSemanticKind(name, "file"),
+        };
       } else {
         const existingChildren = await dataPort.listChildren(createEntryDraft.parentPath).catch(() => []);
         const name = uniqueCreateEntryName(requestedName, new Set(existingChildren.map((node) => node.name)));
         nextPath = joinDataPath(createEntryDraft.parentPath, name);
         if (kind === "folder") {
           await dataPort.createFolder!(nextPath);
+          nextNode = { id: nextPath, name, path: nextPath, type: "folder", children: null };
         } else {
           await dataPort.createFile!(nextPath, getCreateEntryInitialContent(kind, {
             csvHeaders: [
@@ -181,13 +195,18 @@ export function useDataNodeActions({
               ],
             },
           }));
+          nextNode = {
+            id: nextPath,
+            name,
+            path: nextPath,
+            type: getFileSemanticKind(name, "file"),
+          };
         }
       }
       setCreateEntryDraft(null);
       setNodeActionMenu(null);
       onEnterDataView();
-      setActiveDataPath(nextPath);
-      setActiveDataNode(null);
+      onActivateNode(nextNode);
       onWorkspaceContentChanged();
       onLocalWorkspaceContentChanged();
     } catch (error) {
@@ -203,8 +222,7 @@ export function useDataNodeActions({
     onEnterDataView,
     onLocalWorkspaceContentChanged,
     onWorkspaceContentChanged,
-    setActiveDataNode,
-    setActiveDataPath,
+    onActivateNode,
     workspace,
     t,
   ]);
@@ -251,8 +269,7 @@ export function useDataNodeActions({
       await dataPort.renameNode(previousPath, nextName);
       await onResourceMoved?.(previousPath, nextPath);
       setNodeActionMenu(null);
-      setActiveDataPath((current) => remapActivePathAfterRename(current, previousPath, nextPath));
-      setActiveDataNode((current) => (
+      setActiveExplorerNode((current) => (
         current?.path === previousPath
           ? { ...current, name: nextName, path: nextPath }
           : current?.path.startsWith(`${previousPath}/`)
@@ -274,8 +291,7 @@ export function useDataNodeActions({
     onLocalWorkspaceContentChanged,
     onWorkspaceContentChanged,
     onResourceMoved,
-    setActiveDataNode,
-    setActiveDataPath,
+    setActiveExplorerNode,
     t,
   ]);
 
@@ -316,10 +332,7 @@ export function useDataNodeActions({
     }
 
     if (deletedNodes.length > 0) {
-      setActiveDataPath((current) => (
-        deletedNodes.some((node) => current === node.path || current?.startsWith(`${node.path}/`)) ? null : current
-      ));
-      setActiveDataNode((current) => (
+      setActiveExplorerNode((current) => (
         deletedNodes.some((node) => current?.path === node.path || current?.path.startsWith(`${node.path}/`)) ? null : current
       ));
       onWorkspaceContentChanged();
@@ -351,8 +364,7 @@ export function useDataNodeActions({
     onLocalWorkspaceContentChanged,
     onWorkspaceContentChanged,
     onResourceDeleted,
-    setActiveDataNode,
-    setActiveDataPath,
+    setActiveExplorerNode,
     t,
   ]);
 

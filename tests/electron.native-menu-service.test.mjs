@@ -6,12 +6,14 @@ function createHarness({ platform = "darwin" } = {}) {
     buildFromTemplate: vi.fn((template) => ({ template })),
     setApplicationMenu: vi.fn(),
   };
-  const app = { dock: { setMenu: vi.fn() } };
+  const app = { name: "puppyone", dock: { setMenu: vi.fn() } };
   const actions = {
+    checkForUpdates: vi.fn(),
     newWindow: vi.fn(),
   };
   const labels = {
     "native.menu.file": "File",
+    "native.menu.checkForUpdates": "Check for Updates…",
     "native.dock.newWindow": "New Window",
   };
   const service = createDesktopNativeMenuService({
@@ -19,6 +21,7 @@ function createHarness({ platform = "darwin" } = {}) {
     Menu,
     platform,
     t: (messageId) => labels[messageId] ?? messageId,
+    onCheckForUpdates: actions.checkForUpdates,
     onNewWindow: actions.newWindow,
   });
   return { actions, app, Menu, service };
@@ -34,13 +37,30 @@ describe("DesktopNativeMenuService", () => {
 
     const applicationTemplate = Menu.buildFromTemplate.mock.calls[0][0];
     expect(applicationTemplate.map((item) => item.role ?? item.label)).toEqual([
-      "appMenu",
+      "puppyone",
       "File",
       "editMenu",
       "viewMenu",
       "windowMenu",
       "help",
     ]);
+
+    const appItems = applicationTemplate[0].submenu;
+    const checkForUpdates = appItems.find((item) => item.id === "app.checkForUpdates");
+    expect(appItems.map((item) => item.role ?? item.id ?? item.type)).toEqual([
+      "about",
+      "separator",
+      "app.checkForUpdates",
+      "separator",
+      "services",
+      "separator",
+      "hide",
+      "hideOthers",
+      "unhide",
+      "separator",
+      "quit",
+    ]);
+    expect(checkForUpdates).toMatchObject({ label: "Check for Updates…" });
 
     const fileItems = applicationTemplate[1].submenu;
     const newWindow = fileItems.find((item) => item.id === "file.newWindow");
@@ -50,11 +70,13 @@ describe("DesktopNativeMenuService", () => {
     expect(fileItems.at(-1)).toEqual({ role: "close" });
 
     newWindow.click();
+    checkForUpdates.click();
     Menu.buildFromTemplate.mock.calls[1][0][0].click();
     await Promise.resolve();
     await Promise.resolve();
 
     expect(actions.newWindow).toHaveBeenCalledTimes(2);
+    expect(actions.checkForUpdates).toHaveBeenCalledOnce();
   });
 
   it("does not replace native menus outside macOS", () => {

@@ -62,6 +62,7 @@ import { createExternalNavigationService } from "./main/external-navigation-serv
 import { createNativeSurfaceOcclusionCoordinator } from "./main/native-surfaces/occlusion-coordinator.mjs";
 import { createNativeSurfacePointerPassthroughCoordinator } from "./main/native-surfaces/pointer-passthrough-coordinator.mjs";
 import { createDesktopNativeMenuService } from "./main/native-menu-service.mjs";
+import { createNativeUpdateMenuAction } from "./main/native-update-menu-action.mjs";
 import { registerFeedbackIpcHandlers } from "./main/ipc/feedback-ipc.mjs";
 import { registerSystemIpcHandlers } from "./main/ipc/system-ipc.mjs";
 import { resolveDockIconResource } from "./main/dock-icon-resources.mjs";
@@ -81,6 +82,12 @@ import { createDefaultTerminalAgentActivityHost } from "./main/terminal-agent/ac
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
+import {
+  createProjectEntryService,
+  requireGitRepository,
+  requireProjectName,
+} from "./main/project-entry-service.mjs";
+import { createProjectLocationGrantStore } from "./main/project-location-grants.mjs";
 import { createDesktopLocaleService } from "./main/localization/desktop-locale-service.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
@@ -207,11 +214,19 @@ const localeService = createDesktopLocaleService({
   app,
   getWindows: () => BrowserWindow.getAllWindows(),
 });
+const checkForUpdatesFromNativeMenu = createNativeUpdateMenuAction({
+  appName,
+  dialog,
+  getOwnerWindow: () => getLastFocusedWindow(),
+  getUpdateService: () => updateService,
+  t: (messageId, values) => localeService.t(messageId, values),
+});
 const nativeMenuService = createDesktopNativeMenuService({
   app,
   Menu,
   t: (messageId, values) => localeService.t(messageId, values),
   onNewWindow: () => createWindow(),
+  onCheckForUpdates: checkForUpdatesFromNativeMenu,
 });
 const applicationQuitIntent = createApplicationQuitIntent({ app });
 const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({
@@ -267,6 +282,9 @@ const workspaceStateStore = createWorkspaceStateStore({
   workspaceFromPath,
   resolveWorkspaceIdentity: resolveLocalWorkspaceIdentity,
 });
+const projectEntryService = createProjectEntryService();
+const projectEntryOperationSenders = new Set();
+const projectLocationGrants = createProjectLocationGrantStore();
 const cloudAuthService = createCloudAuthService({
   app,
   requestCloudApi,
@@ -537,7 +555,6 @@ function resolveAppIconPath() {
     path.join(process.resourcesPath ?? projectRoot, resourceFilename),
     path.join(projectRoot, "dist", sourceFilename),
     path.join(projectRoot, "public", sourceFilename),
-    path.join(process.resourcesPath ?? projectRoot, "icon.icns"),
   ];
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
 }
@@ -580,6 +597,14 @@ app.on("second-instance", (_event, argv, workingDirectory, launchIntent) => {
 
 app.whenReady().then(async () => {
   await localeService.initialize();
+  updateService = createUpdateService({
+    app,
+    buildInfo: desktopBuildInfo,
+    ipcMain: trustedIpcMain,
+    getWindows: () => BrowserWindow.getAllWindows(),
+    getRestartBlockers: getUpdateRestartBlockers,
+    confirmRestartWithBlockers: confirmUpdateRestartWithBlockers,
+  });
   stopLocaleNativeRefresh = localeService.onDidChange(() => {
     nativeMenuService.refresh();
   });
@@ -598,14 +623,6 @@ app.whenReady().then(async () => {
     isOpenWorkspaceRoot,
     resolveCapability: localFileCapabilities.resolve,
     applicationUrl: rendererApplicationUrl,
-  });
-  updateService = createUpdateService({
-    app,
-    buildInfo: desktopBuildInfo,
-    ipcMain: trustedIpcMain,
-    getWindows: () => BrowserWindow.getAllWindows(),
-    getRestartBlockers: getUpdateRestartBlockers,
-    confirmRestartWithBlockers: confirmUpdateRestartWithBlockers,
   });
   const appPreviewProcessRuntime = createAppPreviewRuntime({
     app,
@@ -743,6 +760,9 @@ function registerIpcHandlers() {
     showHomepageForCurrentWindow,
     openWorkspaceInCurrentWindow,
     openWorkspaceInNewWindow,
+    createProjectForCurrentWindow,
+    cloneRepositoryForCurrentWindow,
+    selectProjectLocationForCurrentWindow,
     selectWorkspaceForCurrentWindow,
     selectWorkspaceForNewWindow,
   });
@@ -985,6 +1005,75 @@ async function showWorkspaceOpenDialog(ownerWindow) {
   return ownerWindow && !ownerWindow.isDestroyed()
     ? dialog.showOpenDialog(ownerWindow, options)
     : dialog.showOpenDialog(options);
+}
+
+async function createProjectForCurrentWindow(sender, request) {
+  const name = requireProjectName(request?.name);
+  return runProjectEntryOperation(sender, async () => {
+    const parentPath = projectLocationGrants.resolve(sender, request?.locationGrantId);
+    const project = await projectEntryService.createProject({
+      parentPath,
+      name,
+    });
+    projectLocationGrants.revoke(sender, request.locationGrantId);
+    return openWorkspaceInCurrentWindow(sender, project.path);
+  });
+}
+
+async function selectProjectLocationForCurrentWindow(sender) {
+  return runProjectEntryOperation(sender, async () => {
+    const parentPath = await selectProjectParentDirectory(sender, "create");
+    if (!parentPath) return null;
+    const canonicalPath = await fs.promises.realpath(parentPath);
+    return projectLocationGrants.issue(sender, canonicalPath);
+  });
+}
+
+async function cloneRepositoryForCurrentWindow(sender, request) {
+  const repository = requireGitRepository(request?.repositoryUrl);
+  return runProjectEntryOperation(sender, async () => {
+    const parentPath = await selectProjectParentDirectory(sender, "clone");
+    if (!parentPath) return null;
+    const project = await projectEntryService.cloneRepository({
+      parentPath,
+      repositoryUrl: repository.url,
+    });
+    return openWorkspaceInCurrentWindow(sender, project.path);
+  });
+}
+
+async function selectProjectParentDirectory(sender, kind) {
+  const ownerWindow = getDialogOwnerWindow(sender);
+  const create = kind === "create";
+  const options = {
+    title: localeService.t(create
+      ? "native.workspace.create.chooseParent"
+      : "native.workspace.clone.chooseParent"),
+    buttonLabel: localeService.t(create
+      ? "native.workspace.create.chooseParentButton"
+      : "native.workspace.clone.chooseParentButton"),
+    defaultPath: app.getPath("documents"),
+    properties: ["openDirectory", "createDirectory"],
+  };
+  const result = ownerWindow && !ownerWindow.isDestroyed()
+    ? await dialog.showOpenDialog(ownerWindow, options)
+    : await dialog.showOpenDialog(options);
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0];
+}
+
+async function runProjectEntryOperation(sender, operation) {
+  const senderId = sender?.id;
+  if (!Number.isInteger(senderId)) throw new Error("No active window is available for this project operation.");
+  if (projectEntryOperationSenders.has(senderId)) {
+    throw new Error("Another project operation is already in progress.");
+  }
+  projectEntryOperationSenders.add(senderId);
+  try {
+    return await operation();
+  } finally {
+    projectEntryOperationSenders.delete(senderId);
+  }
 }
 
 async function openWorkspaceInCurrentWindow(sender, folderPath, options = {}) {

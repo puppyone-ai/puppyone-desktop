@@ -22,12 +22,24 @@ for (const requiredPath of [
   "src/features/app-shell/auxiliary/AuxiliaryPanelHost.tsx",
   "src/features/settings/sidebar/SettingsSidebar.tsx",
   "src/features/settings/sidebar/settingsSidebarModel.ts",
+  "src/features/source-control/sidebar/GitLocalStatusPanels.tsx",
+  "src/features/source-control/sidebar/GitRemoteSections.tsx",
+  "src/features/source-control/sidebar/GitSidebarPrimitives.tsx",
+  "src/features/source-control/sidebar/GitSidebarProviders.tsx",
+  "src/features/source-control/sidebar/GitLocalStatusSection.tsx",
+  "src/features/source-control/sidebar/useGitSidebarExpansionState.ts",
+  "src/features/source-control/styles/sidebar-actions.css",
+  "src/features/source-control/styles/sidebar-panels.css",
+  "src/features/source-control/styles/sidebar-providers.css",
 ]) {
   if (!existsSync(absolute(requiredPath))) errors.push(`required Sidebar architecture path is missing: ${requiredPath}`);
 }
 
 for (const retiredPath of [
   "src/styles/sidebar-primitives.css",
+  "src/features/source-control/sidebar/SourceControlSidebarSections.tsx",
+  "src/features/source-control/sidebar/GitStatusCardSection.tsx",
+  "src/features/source-control/source-control-overrides.css",
 ]) {
   if (existsSync(absolute(retiredPath))) errors.push(`retired Sidebar ownership path must not return: ${retiredPath}`);
 }
@@ -128,6 +140,21 @@ for (const [relativePath, token] of virtualizationRequirements) {
 const virtualizationPolicy = read(absolute("packages/shared-ui/src/sidebar/virtualizationPolicy.ts"));
 if (!virtualizationPolicy.includes("SIDEBAR_VIRTUALIZATION_THRESHOLD = 200")) {
   errors.push("Shared Sidebar virtualization policy must activate at 200 rows.");
+}
+
+const gitSidebarSource = read(absolute("src/features/source-control/SourceControlSidebar.tsx"));
+if (!gitSidebarSource.includes("createGitLocalStatusPanels")) {
+  errors.push("Git Sidebar must delegate local status-group presentation to GitLocalStatusPanels.");
+}
+if (gitSidebarSource.includes("desktop-git-status-card")) {
+  errors.push("Git Sidebar orchestration must not own retired local status-card markup.");
+}
+const gitLocalStatusSource = read(absolute("src/features/source-control/sidebar/GitLocalStatusPanels.tsx"));
+if (!gitLocalStatusSource.includes("GitLocalStatusSection")) {
+  errors.push("Local Git panels must consume the shared flat GitLocalStatusSection contract.");
+}
+if (gitLocalStatusSource.includes("desktop-git-status-card")) {
+  errors.push("Local Git panels must remain flat and must not restore a status-card surface.");
 }
 
 const auxiliarySource = read(absolute("src/features/app-shell/auxiliary/AuxiliaryPanelHost.tsx"));
