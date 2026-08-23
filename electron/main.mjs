@@ -62,6 +62,7 @@ import { createExternalNavigationService } from "./main/external-navigation-serv
 import { createNativeSurfaceOcclusionCoordinator } from "./main/native-surfaces/occlusion-coordinator.mjs";
 import { createNativeSurfacePointerPassthroughCoordinator } from "./main/native-surfaces/pointer-passthrough-coordinator.mjs";
 import { createDesktopNativeMenuService } from "./main/native-menu-service.mjs";
+import { createNativeUpdateMenuAction } from "./main/native-update-menu-action.mjs";
 import { registerFeedbackIpcHandlers } from "./main/ipc/feedback-ipc.mjs";
 import { registerSystemIpcHandlers } from "./main/ipc/system-ipc.mjs";
 import { resolveDockIconResource } from "./main/dock-icon-resources.mjs";
@@ -213,11 +214,19 @@ const localeService = createDesktopLocaleService({
   app,
   getWindows: () => BrowserWindow.getAllWindows(),
 });
+const checkForUpdatesFromNativeMenu = createNativeUpdateMenuAction({
+  appName,
+  dialog,
+  getOwnerWindow: () => getLastFocusedWindow(),
+  getUpdateService: () => updateService,
+  t: (messageId, values) => localeService.t(messageId, values),
+});
 const nativeMenuService = createDesktopNativeMenuService({
   app,
   Menu,
   t: (messageId, values) => localeService.t(messageId, values),
   onNewWindow: () => createWindow(),
+  onCheckForUpdates: checkForUpdatesFromNativeMenu,
 });
 const applicationQuitIntent = createApplicationQuitIntent({ app });
 const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({
@@ -546,7 +555,6 @@ function resolveAppIconPath() {
     path.join(process.resourcesPath ?? projectRoot, resourceFilename),
     path.join(projectRoot, "dist", sourceFilename),
     path.join(projectRoot, "public", sourceFilename),
-    path.join(process.resourcesPath ?? projectRoot, "icon.icns"),
   ];
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
 }
@@ -589,6 +597,14 @@ app.on("second-instance", (_event, argv, workingDirectory, launchIntent) => {
 
 app.whenReady().then(async () => {
   await localeService.initialize();
+  updateService = createUpdateService({
+    app,
+    buildInfo: desktopBuildInfo,
+    ipcMain: trustedIpcMain,
+    getWindows: () => BrowserWindow.getAllWindows(),
+    getRestartBlockers: getUpdateRestartBlockers,
+    confirmRestartWithBlockers: confirmUpdateRestartWithBlockers,
+  });
   stopLocaleNativeRefresh = localeService.onDidChange(() => {
     nativeMenuService.refresh();
   });
@@ -607,14 +623,6 @@ app.whenReady().then(async () => {
     isOpenWorkspaceRoot,
     resolveCapability: localFileCapabilities.resolve,
     applicationUrl: rendererApplicationUrl,
-  });
-  updateService = createUpdateService({
-    app,
-    buildInfo: desktopBuildInfo,
-    ipcMain: trustedIpcMain,
-    getWindows: () => BrowserWindow.getAllWindows(),
-    getRestartBlockers: getUpdateRestartBlockers,
-    confirmRestartWithBlockers: confirmUpdateRestartWithBlockers,
   });
   const appPreviewProcessRuntime = createAppPreviewRuntime({
     app,

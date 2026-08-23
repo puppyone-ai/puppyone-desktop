@@ -25,7 +25,7 @@ import {
   getRecentWorkspaceItems,
   mergeWorkspaceLists,
 } from "./workspaceHomeModel";
-import type { RecentWorkspaceHomeItem } from "../../components/MinimalOnboarding";
+import type { RecentWorkspaceHomeItem } from "./workspaceHomeModel";
 
 export function useWorkspaceLifecycle({
   onWorkspaceActivated,

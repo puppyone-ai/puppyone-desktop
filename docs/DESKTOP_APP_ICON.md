@@ -1,66 +1,53 @@
 # Desktop App Icon
 
-## Purpose
+## Flat-only policy
 
-This document defines the PuppyOne Desktop app icon source of truth, generated
-assets, packaging rules, and verification steps.
+PuppyOne uses flat artwork for every desktop icon entry point. Do not add
+metallic rims, bevels, specular highlights, gradients, drop shadows, or a
+separately styled platform icon source.
 
-The important rule is that the packaged app must carry both:
-
-- `Contents/Resources/icon.icns` for macOS bundle metadata, Finder, and
-  LaunchServices.
-- `Contents/Resources/logo-square.png` for the runtime Dock icon.
-
-The runtime Dock icon should use the raw PNG, not the generated `.icns` slots.
-This avoids visual drift where downscaled `.icns` sizes can make the icon look
-more metallic or shaded than the source image.
-
-## Source Of Truth
-
-The active desktop icon master is:
+The canonical Stable source is:
 
 ```text
 public/logo-square.png
 ```
 
-Versioned source exports can live next to it, for example:
+It must be byte-identical to the approved flat export:
 
 ```text
-public/logo-square-v0.1.4-dark.png
-```
-
-When updating the icon, copy the selected versioned PNG into
-`public/logo-square.png`. The active master must be a 1024 x 1024 RGBA PNG.
-
-The generated bundle icon lives at:
-
-```text
-build/icon.icns
-```
-
-The Appearance settings surface also exposes two curated runtime alternatives:
-
-```text
-public/logo-square-v0.1.3-light.png
 public/logo-square-v0.1.3-dark.png
 ```
 
-They are packaged as `dock-icon-light.png` and `dock-icon-matte.png`. These
-alternatives affect the macOS Dock at runtime only; the bundle metadata and
-Finder icon continue to use `build/icon.icns`.
-
-These PNG files must have the same hash after an icon update:
+The canonical Development source is:
 
 ```text
-public/logo-square-v0.1.4-dark.png
-public/logo-square.png
+public/logo-square-dev.png
 ```
 
-## Packaged App Contract
+It must be byte-identical to the approved flat, badged export:
 
-Electron Builder packages the icon in two ways.
+```text
+public/logo-square-v0.1.3-dark-dev.png
+```
 
-`package.json` must include the raw PNG as an extra resource:
+## Packaging contract
+
+`package.json` points the macOS application icon directly at the canonical flat
+PNG:
+
+```json
+"mac": {
+  "icon": "public/logo-square.png"
+}
+```
+
+Electron Builder initially generates its platform icon, then
+`scripts/after-pack-flat-macos-icon.mjs` removes that generated ICNS before
+signing and points `CFBundleIconFile` directly at `logo-square.png`. Finder and
+the runtime therefore consume the same flat PNG.
+
+The Stable raw PNG is also copied to the app resources for the runtime Dock
+icon:
 
 ```json
 "extraResources": [
@@ -71,147 +58,45 @@ Electron Builder packages the icon in two ways.
 ]
 ```
 
-This produces:
+The main process resolves only canonical PNG sources. It must not fall back to
+a repository or packaged `icon.icns` file.
+
+## Curated Dock alternatives
+
+The Appearance settings may expose these flat PNG alternatives:
 
 ```text
-release/mac-arm64/puppyone.app/Contents/Resources/logo-square.png
+public/logo-square-v0.1.3-light.png
+public/logo-square-v0.1.3-dark.png
 ```
 
-The two curated alternatives are copied beside it as:
-
-```text
-release/mac-arm64/puppyone.app/Contents/Resources/dock-icon-light.png
-release/mac-arm64/puppyone.app/Contents/Resources/dock-icon-matte.png
-```
-
-The macOS bundle icon remains:
-
-```json
-"mac": {
-  "icon": "build/icon.icns"
-}
-```
-
-This produces:
-
-```text
-release/mac-arm64/puppyone.app/Contents/Resources/icon.icns
-```
-
-The main process must prefer the raw PNG at runtime:
-
-```text
-process.resourcesPath/logo-square.png
-```
-
-It may fall back to `dist/logo-square.png`, `public/logo-square.png`, or
-`icon.icns` only when running outside the packaged app.
-
-Do not rely on `dist/logo-square.png` in packaged builds. It is inside
-`app.asar`, and using it as a filesystem path is not a stable Dock icon path.
-
-## Why Raw PNG For The Dock
-
-macOS `.icns` files contain multiple resized slots. Mechanical downscaling can
-change the visual weight of antialiasing, rim light, and soft edges. For this
-icon, those generated slots can make the Dock version appear more metallic than
-the 1024 PNG source.
-
-Using `Contents/Resources/logo-square.png` for `app.dock.setIcon()` keeps the
-runtime Dock icon tied to the master PNG. The `.icns` still exists for the app
-bundle, Finder, and installer metadata.
-
-## Regeneration Steps
-
-Run these commands from the desktop project root.
-
-Copy the selected source PNG into the active masters:
-
-```bash
-ditto public/logo-square-v0.1.4-dark.png public/logo-square.png
-```
-
-Generate the macOS iconset:
-
-```bash
-mkdir -p /private/tmp/puppyone-logo.iconset
-sips -z 16 16 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/icon_16x16.png
-sips -z 32 32 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/icon_16x16@2x.png
-sips -z 32 32 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/icon_32x32.png
-sips -z 64 64 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/icon_32x32@2x.png
-sips -z 128 128 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/icon_128x128.png
-sips -z 256 256 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/icon_128x128@2x.png
-sips -z 256 256 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/icon_256x256.png
-sips -z 512 512 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/icon_256x256@2x.png
-sips -z 512 512 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/icon_512x512.png
-sips -z 1024 1024 public/logo-square.png --out /private/tmp/puppyone-logo.iconset/icon_512x512@2x.png
-iconutil -c icns /private/tmp/puppyone-logo.iconset -o build/icon.icns
-```
-
-Build the macOS package:
-
-```bash
-npm run dist:mac
-```
+Development builds use their matching flat, badged exports. These alternatives
+must remain free of relief effects.
 
 ## Verification
 
-Confirm the active PNGs are identical:
+Run the release configuration guard:
+
+```bash
+node scripts/check-macos-release-config.mjs
+```
+
+Confirm the canonical files match their approved flat exports:
 
 ```bash
 shasum -a 256 \
-  public/logo-square-v0.1.4-dark.png \
   public/logo-square.png \
-  dist/logo-square.png
+  public/logo-square-v0.1.3-dark.png
+
+shasum -a 256 \
+  public/logo-square-dev.png \
+  public/logo-square-v0.1.3-dark-dev.png
 ```
 
-Confirm the packaged raw PNG is present and identical:
+After packaging, confirm that the bundled raw PNG matches the canonical source:
 
 ```bash
-file release/mac-arm64/puppyone.app/Contents/Resources/logo-square.png
 shasum -a 256 \
   public/logo-square.png \
   release/mac-arm64/puppyone.app/Contents/Resources/logo-square.png
 ```
-
-Confirm the packaged `.icns` matches the generated one:
-
-```bash
-shasum -a 256 \
-  build/icon.icns \
-  release/mac-arm64/puppyone.app/Contents/Resources/icon.icns
-```
-
-Confirm `app.asar` also contains the active runtime PNG:
-
-```bash
-node -e 'const asar=require("@electron/asar"); const fs=require("fs"); const data=asar.extractFile("release/mac-arm64/puppyone.app/Contents/Resources/app.asar","dist/logo-square.png"); fs.writeFileSync("/private/tmp/puppyone-packaged-logo-square.png", data);'
-shasum -a 256 public/logo-square.png /private/tmp/puppyone-packaged-logo-square.png
-```
-
-Before visually checking the Dock icon, stop old PuppyOne instances, touch the
-bundle resources, then launch a fresh packaged app:
-
-```bash
-pgrep -fl "release/mac-arm64/puppyone.app|mac-arm64/puppyone.app|Contents/MacOS/puppyone"
-touch release/mac-arm64/puppyone.app
-touch release/mac-arm64/puppyone.app/Contents/Resources/logo-square.png
-touch release/mac-arm64/puppyone.app/Contents/Resources/icon.icns
-open -n release/mac-arm64/puppyone.app
-```
-
-If the Dock still shows an older icon, it is likely LaunchServices or Dock cache.
-Do not change the source asset to compensate for cache behavior. First verify
-the hashes above, then restart the Dock or relaunch the packaged app.
-
-## Common Failure Modes
-
-- The Dock icon looks more metallic than the source PNG.
-  Usually the app is displaying `.icns` slots or a cached bundle icon instead of
-  `Contents/Resources/logo-square.png`.
-- The source PNG changed but the packaged app did not.
-  Rebuild with `npm run dist:mac`, then verify `Resources/logo-square.png`.
-- Finder and Dock do not match exactly.
-  Finder may use `icon.icns`; runtime Dock should use `logo-square.png`.
-- A screenshot appears to show an older icon.
-  Check whether an old packaged app or dev Electron instance is still running.

@@ -31,6 +31,7 @@
 @import "./styles/menus.css" layer(features);
 @import "./features/data-workspace/data-shell.css" layer(features);
 @import "./styles/onboarding.css" layer(features);
+@import "./styles/onboarding-entry-dialog.css" layer(features);
 @import "./styles/asset-library-home.css" layer(features);
 @import "./features/data-workspace/browser.css" layer(features);
 @import "./features/plugins/plugins.css" layer(features);

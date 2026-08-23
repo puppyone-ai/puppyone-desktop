@@ -1,7 +1,18 @@
 import type { Workspace } from "@puppyone/shared-ui";
-import type { RecentWorkspaceHomeItem } from "../../components/MinimalOnboarding";
 import type { DesktopWorkspaceSwitcherItem } from "./DesktopWorkspaceSwitcher";
 import type { getRecentWorkspaces } from "../../lib/localFiles";
+
+export type RecentWorkspaceHomeItem = {
+  workspace: Workspace;
+  lastOpenedAt?: string | null;
+};
+
+export type ProjectHomeItem = {
+  id: string;
+  label: string;
+  localPath: string;
+  lastOpenedAt?: string | null;
+};
 
 export function mergeWorkspaceLists(current: Workspace[], incoming: Workspace[]) {
   const byLocation = new Map<string, Workspace>();
@@ -51,4 +62,14 @@ export function getWorkspaceParentPathForDisplay(workspacePath: string): string 
     : normalizedPath.slice(0, separatorIndex);
   if (/^\/Users\/[^/]+$/.test(parentPath)) return "~";
   return parentPath.replace(/^\/Users\/[^/]+(?=\/)/, "~");
+}
+
+export function getProjectName(item: ProjectHomeItem, fallback: string): string {
+  const label = item.label.trim();
+  if (label && label !== item.localPath) return label;
+
+  const normalizedPath = item.localPath.length > 1
+    ? item.localPath.replace(/\/+$/, "")
+    : item.localPath;
+  return normalizedPath.split("/").at(-1) || label || fallback;
 }

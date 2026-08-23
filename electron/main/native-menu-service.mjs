@@ -12,6 +12,7 @@ export function createDesktopNativeMenuService({
   platform = process.platform,
   t,
   onNewWindow,
+  onCheckForUpdates,
   logger = console,
 }) {
   if (!app) throw new TypeError("An Electron app is required.");
@@ -20,6 +21,9 @@ export function createDesktopNativeMenuService({
   }
   if (typeof t !== "function") throw new TypeError("A native menu translator is required.");
   if (typeof onNewWindow !== "function") throw new TypeError("onNewWindow must be a function.");
+  if (typeof onCheckForUpdates !== "function") {
+    throw new TypeError("onCheckForUpdates must be a function.");
+  }
 
   const action = (actionId, handler) => () => runMenuAction(actionId, handler, logger);
 
@@ -37,8 +41,29 @@ export function createDesktopNativeMenuService({
     ],
   });
 
+  const createAppMenu = () => ({
+    label: app.name,
+    submenu: [
+      { role: "about" },
+      { type: "separator" },
+      {
+        id: "app.checkForUpdates",
+        label: t("native.menu.checkForUpdates"),
+        click: action("app.checkForUpdates", onCheckForUpdates),
+      },
+      { type: "separator" },
+      { role: "services" },
+      { type: "separator" },
+      { role: "hide" },
+      { role: "hideOthers" },
+      { role: "unhide" },
+      { type: "separator" },
+      { role: "quit" },
+    ],
+  });
+
   const createApplicationMenuTemplate = () => [
-    { role: "appMenu" },
+    createAppMenu(),
     createFileMenu(),
     { role: "editMenu" },
     { role: "viewMenu" },
