@@ -99,6 +99,11 @@ describe("CSV bounded renderer performance", () => {
     Object.defineProperty(scroll, "clientHeight", { configurable: true, value: 310 });
 
     await act(async () => {
+      // Establish a deterministic baseline sample before the large jump. The
+      // browser may emit an initial scroll sample at different points in the
+      // mount lifecycle, while velocity-aware overscan requires two samples.
+      scroll.scrollTop = 0;
+      scroll.dispatchEvent(new Event("scroll"));
       scroll.scrollTop = 300 * 31;
       scroll.dispatchEvent(new Event("scroll"));
       await Promise.resolve();
