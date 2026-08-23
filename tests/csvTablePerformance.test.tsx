@@ -106,6 +106,7 @@ describe("CSV bounded renderer performance", () => {
       scroll.dispatchEvent(new Event("scroll"));
       scroll.scrollTop = 300 * 31;
       scroll.dispatchEvent(new Event("scroll"));
+      scroll.dispatchEvent(new Event("scroll"));
       await Promise.resolve();
     });
 

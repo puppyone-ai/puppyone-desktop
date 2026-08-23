@@ -205,15 +205,21 @@ export function useTabularViewport({
     const timestamp = now();
     const offset = scroll.scrollTop;
     const previous = scrollSampleRef.current;
-    const rowOverscan = calculateVelocityAwareTabularOverscan({
-      baseItems: BASE_ROW_OVERSCAN,
-      deltaOffset: previous ? offset - previous.offset : 0,
-      elapsedMs: previous ? timestamp - previous.timestamp : 16,
-      itemSize: metricsRef.current.rowSize,
-      maximumLeadItems: MAXIMUM_SCROLL_LEAD_ROWS,
-      minimumLeadItems: MINIMUM_SCROLL_LEAD_ROWS,
-      predictionHorizonMs: SCROLL_PREDICTION_HORIZON_MS,
-    });
+    const deltaOffset = previous ? offset - previous.offset : 0;
+    // Browsers may deliver more than one scroll event for the same position.
+    // Keep the active directional lead until the scroll-end timer contracts it;
+    // otherwise a duplicate event can discard the buffer before the next paint.
+    const rowOverscan = previous && deltaOffset === 0
+      ? rowOverscanRef.current
+      : calculateVelocityAwareTabularOverscan({
+        baseItems: BASE_ROW_OVERSCAN,
+        deltaOffset,
+        elapsedMs: previous ? timestamp - previous.timestamp : 16,
+        itemSize: metricsRef.current.rowSize,
+        maximumLeadItems: MAXIMUM_SCROLL_LEAD_ROWS,
+        minimumLeadItems: MINIMUM_SCROLL_LEAD_ROWS,
+        predictionHorizonMs: SCROLL_PREDICTION_HORIZON_MS,
+      });
     scrollSampleRef.current = { offset, timestamp };
     rowOverscanRef.current = rowOverscan;
     // Scroll math is sub-millisecond and must run in the native event task so
