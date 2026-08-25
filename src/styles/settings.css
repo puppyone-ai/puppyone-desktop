@@ -184,8 +184,13 @@
 }
 
 .desktop-local-agent-hooks-section {
-  padding-top: 4px;
+  gap: 0;
+  padding-top: 10px;
   border-top: 1px solid var(--po-border-subtle);
+}
+
+.desktop-settings-section + .desktop-local-agent-hooks-section {
+  margin-top: 10px;
 }
 
 .desktop-local-agent-hooks-disclosure {
@@ -194,11 +199,11 @@
 
 .desktop-local-agent-hooks-disclosure > summary {
   display: flex;
-  min-height: 42px;
+  min-height: 34px;
   align-items: center;
-  gap: 10px;
-  padding: 4px 10px;
-  border-radius: 7px;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 6px;
   color: var(--po-text-muted);
   cursor: pointer;
   list-style: none;
@@ -214,12 +219,12 @@
 
 .desktop-local-agent-hooks-icon {
   display: grid;
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
   place-items: center;
   color: var(--po-text-subtle);
-  opacity: 0.74;
+  opacity: 0.72;
 }
 
 .desktop-local-agent-hooks-summary-copy {
@@ -230,9 +235,10 @@
 }
 
 .desktop-local-agent-hooks-summary-copy strong {
-  color: var(--po-text-muted);
+  color: var(--po-text-subtle);
   font-size: 12.5px;
-  font-weight: 550;
+  font-weight: var(--po-text-weight-medium, 500);
+  line-height: 18px;
 }
 
 .desktop-local-agent-hooks-summary-copy small,
@@ -242,29 +248,35 @@
   font-weight: 400;
 }
 
-.desktop-local-agent-hooks-manage {
+.desktop-local-agent-hooks-chevron {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  place-items: center;
   color: var(--po-text-subtle);
-  font-size: 11px;
-  font-weight: 500;
+  opacity: 0.7;
+  transition: transform 140ms ease;
 }
 
-.desktop-local-agent-hooks-disclosure[open] .desktop-local-agent-hooks-manage {
-  opacity: 0;
+.desktop-local-agent-hooks-disclosure[open] .desktop-local-agent-hooks-chevron {
+  transform: rotate(180deg);
 }
 
 .desktop-local-agent-hooks-panel {
   display: grid;
-  gap: 6px;
-  padding: 6px 0 0 30px;
+  gap: 2px;
+  padding: 4px 0 0;
 }
 
 .desktop-local-agent-hooks-toolbar {
   display: flex;
-  min-height: 24px;
+  min-height: 30px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 10px;
+  padding-block: 0;
+  padding-inline: 36px 10px;
 }
 
 .desktop-local-agent-hooks-toolbar .desktop-settings-row-action {
@@ -289,6 +301,12 @@
   margin: 0;
   accent-color: var(--po-accent);
   cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-local-agent-hooks-chevron {
+    transition: none;
+  }
 }
 
 .desktop-settings-code {

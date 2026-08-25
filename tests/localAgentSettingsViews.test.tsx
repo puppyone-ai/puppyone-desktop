@@ -76,6 +76,8 @@ describe("Local Agent settings views", () => {
     expect(document.querySelectorAll(".desktop-utility-view")).toHaveLength(1);
     expect(document.querySelector(".desktop-local-agent-hooks-section")).not.toBeNull();
     expect(document.querySelector(".desktop-local-agent-hooks-disclosure")).not.toBeNull();
+    expect(document.querySelector(".desktop-local-agent-hooks-chevron")).not.toBeNull();
+    expect(document.querySelector(".desktop-local-agent-hooks-manage")).toBeNull();
     expect(document.querySelectorAll(".desktop-local-agent-hook-option")).toHaveLength(2);
     expect(document.querySelector(".desktop-local-agent-row-copy small")).toBeNull();
 

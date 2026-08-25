@@ -1,4 +1,4 @@
-import { RefreshCw, Webhook } from "lucide-react";
+import { ChevronDown, RefreshCw, Webhook } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocalization, type MessageFormatter } from "@puppyone/localization";
 import type {
@@ -101,8 +101,8 @@ export function LocalAgentHooksSettingsSection({
           <span className="desktop-local-agent-hooks-summary-copy">
             <strong>{t("settings.localAgentHooks.title")}</strong>
           </span>
-          <span className="desktop-local-agent-hooks-manage">
-            {t("settings.localAgentHooks.manage")}
+          <span className="desktop-local-agent-hooks-chevron" aria-hidden="true">
+            <ChevronDown size={14} strokeWidth={1.7} />
           </span>
         </summary>
         <div className="desktop-local-agent-hooks-panel">
