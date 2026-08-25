@@ -137,7 +137,22 @@
   white-space: nowrap;
 }
 
-.desktop-settings-row > .desktop-local-agent-row-copy {
+.desktop-local-agent-identity {
+  display: inline-flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.desktop-local-agent-identity > .desktop-terminal-launcher-icon {
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+  opacity: 0.82;
+}
+
+.desktop-settings-row .desktop-local-agent-row-copy {
   display: grid;
   min-width: 0;
   flex: 1 1 auto;
@@ -157,6 +172,114 @@
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.desktop-local-agent-hooks-section {
+  padding-top: 4px;
+  border-top: 1px solid var(--po-border-subtle);
+}
+
+.desktop-local-agent-hooks-disclosure {
+  width: 100%;
+}
+
+.desktop-local-agent-hooks-disclosure > summary {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  color: var(--po-text-muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.desktop-local-agent-hooks-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.desktop-local-agent-hooks-disclosure > summary:hover {
+  background: var(--po-hover);
+}
+
+.desktop-local-agent-hooks-icon {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  place-items: center;
+  color: var(--po-text-subtle);
+  opacity: 0.74;
+}
+
+.desktop-local-agent-hooks-summary-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 2px;
+}
+
+.desktop-local-agent-hooks-summary-copy strong {
+  color: var(--po-text-muted);
+  font-size: 12.5px;
+  font-weight: 550;
+}
+
+.desktop-local-agent-hooks-summary-copy small,
+.desktop-local-agent-hooks-toolbar {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.desktop-local-agent-hooks-manage {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.desktop-local-agent-hooks-disclosure[open] .desktop-local-agent-hooks-manage {
+  opacity: 0;
+}
+
+.desktop-local-agent-hooks-panel {
+  display: grid;
+  gap: 6px;
+  padding: 6px 0 0 30px;
+}
+
+.desktop-local-agent-hooks-toolbar {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 10px;
+}
+
+.desktop-local-agent-hooks-toolbar .desktop-settings-row-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.desktop-local-agent-hook-option {
+  cursor: pointer;
+}
+
+.desktop-local-agent-hook-option:has(.desktop-local-agent-hook-checkbox:disabled) {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.desktop-local-agent-hook-checkbox {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  margin: 0;
+  accent-color: var(--po-accent);
+  cursor: pointer;
 }
 
 .desktop-settings-code {

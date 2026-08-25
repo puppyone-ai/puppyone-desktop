@@ -74,6 +74,16 @@ Hook registration service ---> Terminal Agent Hook adapters
    rendering or launching a Terminal Agent.
 5. The Editor provider picker is independent of this preference and continues
    using the native runtime catalog.
+6. Agent identity is logo-first in both launcher visibility and Hook selection
+   rows, reusing the Terminal launcher's provider marks.
+
+### Hooks subsection
+
+The Hooks subsection is subordinate and collapsed by default. It does not
+mirror the entire Agent registry. It shows a checkbox only when an Agent is
+detected and its Hook can be configured safely, while already installed or
+repairable Hooks remain selectable even if the CLI later disappears. Manual or
+unsupported providers are not promoted into the default settings hierarchy.
 
 ### Settings source layout
 

@@ -33,12 +33,17 @@ describe("settings visual architecture", () => {
     expect(localAgents).toContain('settings.localAgents.title');
     expect(localAgents).toContain("useTerminalAgentLocator");
     expect(localAgents).toContain("DESKTOP_TERMINAL_LAUNCHERS");
+    expect(localAgents).toContain("<TerminalLauncherIcon");
     expect(localAgents).toContain("desktop-settings-switch");
     expect(localAgents).toContain("setTerminalAgentVisible");
     expect(localAgents).toContain("<LocalAgentHooksSettingsSection");
     expect(localAgentHooks).toContain("getAgentActivityEnrollment");
     expect(localAgentHooks).toContain("setAgentActivityEnrollment");
-    expect(localAgentHooks).toContain("providers.map");
+    expect(localAgentHooks).toContain("selectableProviders.map");
+    expect(localAgentHooks).toContain("provider.configurable");
+    expect(localAgentHooks).toContain("<TerminalLauncherIcon");
+    expect(localAgentHooks).toContain("<details");
+    expect(localAgentHooks).not.toContain("<SettingsSectionHeader");
     expect(view).not.toContain("<LocalAgentHooksSettingsView");
     expect(localAgentHooks).not.toContain("desktop-utility-view");
     expect(view).not.toContain("<AgentFileActivityAppearanceSetting");
@@ -89,6 +94,8 @@ describe("settings visual architecture", () => {
       expect(catalog["localAgents.detail"], locale).toBeTruthy();
       expect(catalog["localAgents.toggle"], locale).toBeTruthy();
       expect(catalog["localAgentHooks.title"], locale).toBeTruthy();
+      expect(catalog["localAgentHooks.manage"], locale).toBeTruthy();
+      expect(catalog["localAgentHooks.choose"], locale).toBeTruthy();
       expect(catalog["localAgentHooks.status.installed"], locale).toBeTruthy();
       expect(catalog["appearance.agentFileActivity.title"], locale).toBeTruthy();
       for (const key of [

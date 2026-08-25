@@ -1,4 +1,4 @@
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Webhook } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocalization, type MessageFormatter } from "@puppyone/localization";
 import type {
@@ -6,7 +6,11 @@ import type {
   AgentActivityProviderStatus,
 } from "../../../../shared/agent-activity-contract/types";
 import type { TerminalAgentDiscoveryPhase } from "../../desktop-terminal/model/terminalAgentAvailability";
-import { SettingsSectionHeader } from "../../settings/components";
+import {
+  DESKTOP_TERMINAL_LAUNCHERS,
+  type DesktopTerminalLauncherId,
+} from "../../desktop-terminal/model/terminalLaunchers";
+import { TerminalLauncherIcon } from "../../desktop-terminal/ui/TerminalLauncherIcon";
 
 type EnrollmentPhase = "loading" | "ready" | "error";
 
@@ -79,66 +83,88 @@ export function LocalAgentHooksSettingsSection({
   }, [onActivityIndicatorsEnabledChange, pendingProviderId, readEnrollment]);
 
   const loading = phase === "loading" || agentPhase === "idle" || agentPhase === "loading";
+  const selectableProviders = useMemo(() => providers.filter((provider) => (
+    provider.configurable
+      && (
+        detected.has(provider.providerId)
+        || provider.enrollment === "enabled"
+        || provider.enrollment === "needs-repair"
+      )
+  )), [detected, providers]);
+  const configuredCount = selectableProviders.filter(
+    (provider) => provider.enrollment === "enabled" || provider.enrollment === "needs-repair",
+  ).length;
 
   return (
     <div className="desktop-settings-section desktop-local-agent-hooks-section">
-      <div className="desktop-settings-heading-row">
-        <SettingsSectionHeader
-          title={t("settings.localAgentHooks.title")}
-          detail={t("settings.localAgentHooks.detail")}
-        />
-        <button
-          className="desktop-settings-action"
-          type="button"
-          aria-label={t("settings.localAgentHooks.refresh")}
-          title={t("settings.localAgentHooks.refresh")}
-          disabled={loading || pendingProviderId !== null}
-          onClick={() => void refresh()}
-        >
-          <RefreshCw size={14} className={loading ? "spin" : undefined} aria-hidden="true" />
-          <span>{t("settings.localAgentHooks.refresh")}</span>
-        </button>
-      </div>
-      <div className="desktop-settings-list">
-            {providers.map((provider) => {
+      <details className="desktop-local-agent-hooks-disclosure">
+        <summary>
+          <span className="desktop-local-agent-hooks-icon" aria-hidden="true">
+            <Webhook size={14} strokeWidth={1.6} />
+          </span>
+          <span className="desktop-local-agent-hooks-summary-copy">
+            <strong>{t("settings.localAgentHooks.title")}</strong>
+            <small>{configuredCount > 0
+              ? t("settings.localAgentHooks.configured", { count: configuredCount })
+              : t("settings.localAgentHooks.detail")}</small>
+          </span>
+          <span className="desktop-local-agent-hooks-manage">
+            {t("settings.localAgentHooks.manage")}
+          </span>
+        </summary>
+        <div className="desktop-local-agent-hooks-panel">
+          <div className="desktop-local-agent-hooks-toolbar">
+            <span>{t("settings.localAgentHooks.choose")}</span>
+            <button
+              className="desktop-settings-row-action"
+              type="button"
+              aria-label={t("settings.localAgentHooks.refresh")}
+              title={t("settings.localAgentHooks.refresh")}
+              disabled={loading || pendingProviderId !== null}
+              onClick={() => void refresh()}
+            >
+              <RefreshCw size={12} className={loading ? "spin" : undefined} aria-hidden="true" />
+              <span>{t("settings.localAgentHooks.refresh")}</span>
+            </button>
+          </div>
+          <div className="desktop-settings-list">
+            {selectableProviders.map((provider) => {
               const agentDetected = detected.has(provider.providerId);
               const installed = provider.enrollment === "enabled";
-              const canToggle = provider.configurable
-                && (agentDetected || provider.enrollment === "enabled" || provider.enrollment === "needs-repair");
               const providerPending = pendingProviderId === provider.providerId;
               const providerError = mutationError === provider.providerId;
               const status = providerError
                 ? t("settings.localAgentHooks.status.error")
                 : hookStatus(provider, agentDetected, t);
               return (
-                <div className="desktop-settings-row desktop-settings-row-control" key={provider.providerId}>
-                  <span className="desktop-local-agent-row-copy">
-                    <strong>{provider.displayName}</strong>
-                    <small>{status}</small>
-                  </span>
-                  {provider.configurable ? (
-                    <label className="desktop-settings-switch" title={status}>
-                      <input
-                        type="checkbox"
-                        checked={installed}
-                        disabled={!canToggle || providerPending}
-                        aria-label={t("settings.localAgentHooks.toggle", { agent: provider.displayName })}
-                        aria-description={status}
-                        onChange={(event) => void setEnabled(provider.providerId, event.target.checked)}
-                      />
-                      <span aria-hidden="true" />
-                    </label>
-                  ) : (
-                    <span className="desktop-settings-badge">
-                      {t("settings.localAgentHooks.manual")}
+                <label className="desktop-settings-row desktop-settings-row-control desktop-local-agent-hook-option" key={provider.providerId}>
+                  <span className="desktop-local-agent-identity">
+                    <TerminalLauncherIcon launcherId={providerLauncherId(provider.providerId)} />
+                    <span className="desktop-local-agent-row-copy">
+                      <strong>{provider.displayName}</strong>
+                      <small>{status}</small>
                     </span>
-                  )}
-                </div>
+                  </span>
+                  <input
+                    className="desktop-local-agent-hook-checkbox"
+                    type="checkbox"
+                    checked={installed}
+                    disabled={providerPending}
+                    aria-label={t("settings.localAgentHooks.toggle", { agent: provider.displayName })}
+                    aria-description={status}
+                    onChange={(event) => void setEnabled(provider.providerId, event.target.checked)}
+                  />
+                </label>
               );
             })}
-            {loading && providers.length === 0 && (
+            {loading && selectableProviders.length === 0 && (
               <div className="desktop-settings-row" role="status">
                 <span>{t("settings.localAgentHooks.loading")}</span>
+              </div>
+            )}
+            {phase === "ready" && !loading && selectableProviders.length === 0 && (
+              <div className="desktop-settings-row">
+                <span>{t("settings.localAgentHooks.empty")}</span>
               </div>
             )}
             {phase === "error" && (
@@ -149,9 +175,17 @@ export function LocalAgentHooksSettingsSection({
                 </button>
               </div>
             )}
-      </div>
+          </div>
+        </div>
+      </details>
     </div>
   );
+}
+
+function providerLauncherId(providerId: string): DesktopTerminalLauncherId | null {
+  return DESKTOP_TERMINAL_LAUNCHERS.find(
+    (launcher) => launcher.id !== "shell" && launcher.id === providerId,
+  )?.id ?? null;
 }
 
 function hasEnabledHook(snapshot: AgentActivityEnrollmentSnapshot) {

@@ -32,6 +32,8 @@ describe("Local Agent settings views", () => {
 
     await vi.waitFor(() => expect(document.body.textContent).toContain("Codex"));
     expect(document.body.textContent).toContain("Pi Agent");
+    expect(document.querySelectorAll(".desktop-local-agent-identity > .desktop-terminal-launcher-icon").length)
+      .toBeGreaterThanOrEqual(2);
     const codexSwitch = checkbox("Show Codex in Terminal");
     expect(codexSwitch.checked).toBe(true);
 
@@ -66,9 +68,11 @@ describe("Local Agent settings views", () => {
 
     await vi.waitFor(() => expect(document.body.textContent).toContain("PuppyOne Hook not installed"));
     expect(document.body.textContent).toContain("PuppyOne Hook installed");
-    expect(document.body.textContent).toContain("Manual Hook setup");
+    expect(document.body.textContent).not.toContain("Manual Hook setup");
     expect(document.querySelectorAll(".desktop-utility-view")).toHaveLength(1);
     expect(document.querySelector(".desktop-local-agent-hooks-section")).not.toBeNull();
+    expect(document.querySelector(".desktop-local-agent-hooks-disclosure")).not.toBeNull();
+    expect(document.querySelectorAll(".desktop-local-agent-hook-option")).toHaveLength(2);
 
     await act(async () => {
       checkbox("Install the PuppyOne Hook for Codex").click();

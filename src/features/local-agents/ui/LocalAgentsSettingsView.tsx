@@ -4,6 +4,7 @@ import { useLocalization } from "@puppyone/localization";
 import type { LocalAgentsSettings } from "../../../preferences";
 import { useTerminalAgentLocator } from "../../desktop-terminal/controller/useTerminalAgentLocator";
 import { DESKTOP_TERMINAL_LAUNCHERS } from "../../desktop-terminal/model/terminalLaunchers";
+import { TerminalLauncherIcon } from "../../desktop-terminal/ui/TerminalLauncherIcon";
 import { SettingsSectionHeader } from "../../settings/components";
 import {
   isTerminalAgentVisible,
@@ -61,11 +62,14 @@ export function LocalAgentsSettingsView({
               const displayName = t(launcher.nameMessage);
               return (
                 <div className="desktop-settings-row desktop-settings-row-control" key={launcher.id}>
-                  <span className="desktop-local-agent-row-copy">
-                    <strong>{displayName}</strong>
-                    <small>{t(visible
-                      ? "settings.localAgents.visible"
-                      : "settings.localAgents.hidden")}</small>
+                  <span className="desktop-local-agent-identity">
+                    <TerminalLauncherIcon launcherId={launcher.id} />
+                    <span className="desktop-local-agent-row-copy">
+                      <strong>{displayName}</strong>
+                      <small>{t(visible
+                        ? "settings.localAgents.visible"
+                        : "settings.localAgents.hidden")}</small>
+                    </span>
                   </span>
                   <label
                     className="desktop-settings-switch"
