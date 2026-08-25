@@ -11,7 +11,6 @@ import {
   AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY,
   CREATE_NEW_MENU_STORAGE_KEY,
   DIFF_MARKERS_STORAGE_KEY,
-  DOCK_ICON_STORAGE_KEY,
   DEFAULT_SIDEBAR_NAVIGATION_LAYOUT,
   DEFAULT_THEME_MODE,
   EXPERIMENTAL_SETTINGS_STORAGE_KEY,
@@ -40,7 +39,6 @@ import {
   parseCreateNewMenuSettings,
   parseDarkThemePreset,
   parseDiffMarkers,
-  parseDockIcon,
   parseExperimentalSettings,
   parseExternalAppsSettings,
   parseFilesVisibilitySettings,
@@ -62,7 +60,6 @@ import {
   type DarkThemePreset,
   type CreateNewMenuSettings,
   type DiffMarkers,
-  type DockIcon,
   type ExperimentalSettings,
   type ExternalAppsSettings,
   type FilesVisibilitySettings,
@@ -131,11 +128,6 @@ export function readInitialPointerCursors(): boolean {
 export function readInitialLoadingAnimationPreset(): LoadingAnimationPreset {
   if (typeof window === "undefined") return parseLoadingAnimationPreset(null);
   return parseLoadingAnimationPreset(window.localStorage.getItem(LOADING_ANIMATION_STORAGE_KEY));
-}
-
-export function readInitialDockIcon(): DockIcon {
-  if (typeof window === "undefined") return parseDockIcon(null);
-  return parseDockIcon(window.localStorage.getItem(DOCK_ICON_STORAGE_KEY));
 }
 
 export function readInitialDiffMarkers(): DiffMarkers {

@@ -1,7 +1,6 @@
 import { isFileIconThemeId, type FileIconThemeId } from "@puppyone/shared-ui";
 import {
   parseDarkThemePreset,
-  parseDockIcon,
   parseLightThemePreset,
   parseLoadingAnimationPreset,
   parsePointerCursors,
@@ -10,7 +9,6 @@ import {
   parseThemeMode,
   parseTypography,
   type DarkThemePreset,
-  type DockIcon,
   type LightThemePreset,
   type LoadingAnimationPreset,
   type SidebarNavigationLayout,
@@ -36,7 +34,6 @@ export type AppearanceSharedPreferences = Readonly<{
   typography: TypographyPreferences;
   pointerCursors: boolean;
   loadingAnimationPreset: LoadingAnimationPreset;
-  dockIcon: DockIcon;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
 }>;
@@ -64,7 +61,6 @@ export type LegacyAppearanceSnapshot = Readonly<{
   typography: TypographyPreferences;
   pointerCursors: boolean;
   loadingAnimationPreset: LoadingAnimationPreset;
-  dockIcon: DockIcon;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
 }>;
@@ -137,7 +133,6 @@ function fromLegacy(legacy: LegacyAppearanceSnapshot): AppearancePreferencesV2 {
       typography: legacy.typography,
       pointerCursors: legacy.pointerCursors,
       loadingAnimationPreset: legacy.loadingAnimationPreset,
-      dockIcon: legacy.dockIcon,
       fileIconTheme: legacy.fileIconTheme,
       sidebarNavigationLayout: legacy.sidebarNavigationLayout,
     },
@@ -188,7 +183,6 @@ function normalizeV2(
       loadingAnimationPreset: parseLoadingAnimationPreset(
         asString(shared.loadingAnimationPreset) ?? legacy.loadingAnimationPreset,
       ),
-      dockIcon: parseDockIcon(asString(shared.dockIcon) ?? legacy.dockIcon),
       fileIconTheme: rawFileIconTheme && isFileIconThemeId(rawFileIconTheme)
         ? rawFileIconTheme
         : legacy.fileIconTheme,

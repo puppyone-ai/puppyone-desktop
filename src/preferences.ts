@@ -15,10 +15,7 @@ import {
   type InterfaceStyle,
   type ThemeMode,
 } from "./features/appearance/interfaceStyles";
-import {
-  resolveRendererPublicAssetUrl,
-  type PulseGridPresetId,
-} from "@puppyone/shared-ui";
+import type { PulseGridPresetId } from "@puppyone/shared-ui";
 import {
   CREATE_NEW_ITEM_IDS,
   getCreateEntryMenuItem,
@@ -44,7 +41,6 @@ export type { CreateNewItemId };
 export type LightThemePreset = "neutral" | "warm" | "graphite";
 export type DarkThemePreset = "default" | "warm" | "graphite";
 export type TextSize = "small" | "default" | "large";
-export type DockIcon = "polished" | "light" | "matte";
 export type DiffMarkers = "color" | "symbols";
 export type GitDisplayMode = "simple" | "professional";
 export type GitSidebarLayout = "cards" | "dividers";
@@ -121,7 +117,6 @@ export const TYPOGRAPHY_STORAGE_KEY = "puppyone.desktop.typography";
 export const POINTER_CURSORS_STORAGE_KEY = "puppyone.desktop.pointerCursors";
 export const LOADING_ANIMATION_STORAGE_KEY = "puppyone.desktop.loadingAnimation";
 export const LOADING_ANIMATION_CHANGE_EVENT = "puppyone:loading-animation-change";
-export const DOCK_ICON_STORAGE_KEY = "puppyone.desktop.dockIcon";
 export const DIFF_MARKERS_STORAGE_KEY = "puppyone.desktop.diffMarkers";
 export const FILE_ICON_THEME_STORAGE_KEY = "puppyone.desktop.fileIconTheme";
 export const SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY = "puppyone.desktop.sidebarNavigationLayout";
@@ -146,7 +141,6 @@ export const DEFAULT_TEXT_SIZE: TextSize = "default";
 export { DEFAULT_TYPOGRAPHY_PREFERENCES };
 export const DEFAULT_POINTER_CURSORS = false;
 export const DEFAULT_LOADING_ANIMATION_PRESET: LoadingAnimationPreset = "ikun";
-export const DEFAULT_DOCK_ICON: DockIcon = "polished";
 export const DEFAULT_DIFF_MARKERS: DiffMarkers = "color";
 export const DEFAULT_GIT_DISPLAY_MODE: GitDisplayMode = "simple";
 export const DEFAULT_GIT_SIDEBAR_LAYOUT: GitSidebarLayout = "cards";
@@ -364,32 +358,6 @@ export const TEXT_SIZE_PRESETS = [
   };
 }>;
 
-export const DOCK_ICON_OPTIONS = [
-  {
-    id: "polished",
-    label: "Polished",
-    description: "The current high-contrast PuppyOne icon.",
-    previewSrc: resolveRendererPublicAssetUrl("logo-square.png"),
-  },
-  {
-    id: "light",
-    label: "Light",
-    description: "A warm light icon with a quiet outline.",
-    previewSrc: resolveRendererPublicAssetUrl("logo-square-v0.1.3-light.png"),
-  },
-  {
-    id: "matte",
-    label: "Matte",
-    description: "A flat dark icon without the metallic rim.",
-    previewSrc: resolveRendererPublicAssetUrl("logo-square-v0.1.3-dark.png"),
-  },
-] as const satisfies ReadonlyArray<{
-  id: DockIcon;
-  label: string;
-  description: string;
-  previewSrc: string;
-}>;
-
 export function parseThemeMode(value: string | null | undefined): ThemeMode {
   return value === "light" || value === "dark" || value === "system" ? value : DEFAULT_THEME_MODE;
 }
@@ -428,10 +396,6 @@ export function parseLoadingAnimationPreset(
   value: string | null | undefined,
 ): LoadingAnimationPreset {
   return value === "ymca" || value === "siu" || value === "ikun" ? value : DEFAULT_LOADING_ANIMATION_PRESET;
-}
-
-export function parseDockIcon(value: string | null | undefined): DockIcon {
-  return value === "light" || value === "matte" || value === "polished" ? value : DEFAULT_DOCK_ICON;
 }
 
 export function parseDiffMarkers(value: string | null | undefined): DiffMarkers {

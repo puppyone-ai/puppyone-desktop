@@ -1,8 +1,6 @@
-export function registerSystemIpcHandlers({ ipcMain, externalNavigation, setDockIcon }) {
+export function registerSystemIpcHandlers({ ipcMain, externalNavigation }) {
   ipcMain.handle("system:open-external-url", async (_event, href) => {
     await externalNavigation.open(href);
     return { ok: true };
   });
-
-  ipcMain.handle("system:set-dock-icon", (_event, iconId) => setDockIcon(iconId));
 }

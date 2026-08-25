@@ -16,7 +16,6 @@ import {
   AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY,
   CREATE_NEW_MENU_STORAGE_KEY,
   DIFF_MARKERS_STORAGE_KEY,
-  DOCK_ICON_STORAGE_KEY,
   EXPERIMENTAL_SETTINGS_STORAGE_KEY,
   EXTERNAL_APPS_STORAGE_KEY,
   FILES_VISIBILITY_STORAGE_KEY,
@@ -44,7 +43,6 @@ import {
   type ExternalAppsSettings,
   type CreateNewMenuSettings,
   type DiffMarkers,
-  type DockIcon,
   type ExperimentalSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
@@ -90,7 +88,6 @@ import {
   readInitialTitlebarActionsSettings,
   readInitialDarkThemePreset,
   readInitialDiffMarkers,
-  readInitialDockIcon,
   readInitialLightThemePreset,
   readInitialLoadingAnimationPreset,
   readInitialLocalAgentsSettings,
@@ -114,7 +111,6 @@ export function useDesktopPreferences() {
       typography: readInitialTypographyPreferences(),
       pointerCursors: readInitialPointerCursors(),
       loadingAnimationPreset: readInitialLoadingAnimationPreset(),
-      dockIcon: readInitialDockIcon(),
       fileIconTheme: readInitialFileIconTheme(),
       sidebarNavigationLayout: readInitialSidebarNavigationLayout(),
     },
@@ -132,7 +128,6 @@ export function useDesktopPreferences() {
   const [loadingAnimationPreset, setLoadingAnimationPreset] = useState<LoadingAnimationPreset>(
     initialAppearance.shared.loadingAnimationPreset,
   );
-  const [dockIcon, setDockIcon] = useState<DockIcon>(initialAppearance.shared.dockIcon);
   const [diffMarkers, setDiffMarkers] = useState<DiffMarkers>(() => readInitialDiffMarkers());
   const [fileIconTheme, setFileIconTheme] = useState<FileIconThemeId>(initialAppearance.shared.fileIconTheme);
   const [sidebarNavigationLayout, setSidebarNavigationLayout] = useState<SidebarNavigationLayout>(
@@ -257,11 +252,6 @@ export function useDesktopPreferences() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(DOCK_ICON_STORAGE_KEY, dockIcon);
-    void window.puppyoneDesktop?.setDockIcon?.(dockIcon).catch(() => undefined);
-  }, [dockIcon]);
-
-  useEffect(() => {
     window.localStorage.setItem(DIFF_MARKERS_STORAGE_KEY, diffMarkers);
   }, [diffMarkers]);
 
@@ -285,7 +275,6 @@ export function useDesktopPreferences() {
         typography: typographyPreferences,
         pointerCursors,
         loadingAnimationPreset,
-        dockIcon,
         fileIconTheme,
         sidebarNavigationLayout,
       },
@@ -299,7 +288,6 @@ export function useDesktopPreferences() {
     );
   }, [
     darkThemePreset,
-    dockIcon,
     fileIconTheme,
     initialAppearance,
     initialAppearanceRead.writable,
@@ -425,7 +413,6 @@ export function useDesktopPreferences() {
     aiEditAssistEnabled,
     activeThemeMode,
     diffMarkers,
-    dockIcon,
     explorerWidth,
     createNewMenuSettings,
     externalAppsSettings,
@@ -464,7 +451,6 @@ export function useDesktopPreferences() {
     setAiEditAssistEnabled,
     setDarkThemePreset,
     setDiffMarkers,
-    setDockIcon,
     setExplorerWidth,
     setCreateNewMenuSettings,
     setExternalAppsSettings,

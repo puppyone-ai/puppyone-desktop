@@ -380,14 +380,3 @@
   flex: 0 0 17px;
   place-items: center;
 }
-
-.desktop-dock-icon-segment img {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  object-fit: contain;
-}
-
-.desktop-dock-icon-segment span {
-  color: inherit;
-}

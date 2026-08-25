@@ -61,17 +61,13 @@ icon:
 The main process resolves only canonical PNG sources. It must not fall back to
 a repository or packaged `icon.icns` file.
 
-## Curated Dock alternatives
+## Fixed Dock icon policy
 
-The Appearance settings may expose these flat PNG alternatives:
-
-```text
-public/logo-square-v0.1.3-light.png
-public/logo-square-v0.1.3-dark.png
-```
-
-Development builds use their matching flat, badged exports. These alternatives
-must remain free of relief effects.
+The runtime Dock icon is the canonical Polished source above. Appearance does
+not expose a Dock icon preference, the preload does not expose a switching IPC,
+and packaging does not copy Light or Matte artwork as native Dock resources.
+Alternative source art may remain in the repository or Renderer public output
+for design reference, but it is not part of the runtime Dock icon contract.
 
 ## Verification
 

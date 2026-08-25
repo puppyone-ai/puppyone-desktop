@@ -9,10 +9,9 @@ import {
 
 const { extractFile } = asarPackage;
 const { parse: parsePlist } = plistPackage;
-const packagedDockIconAssets = Object.freeze({
-  "logo-square.png": "dist/logo-square.png",
-  "dock-icon-light.png": "dist/logo-square-v0.1.3-light.png",
-  "dock-icon-matte.png": "dist/logo-square-v0.1.3-dark.png",
+const canonicalDockIconAsset = Object.freeze({
+  resourceFilename: "logo-square.png",
+  rendererAssetPath: "dist/logo-square.png",
 });
 
 export async function verifyPackagedDesktopBuild({
@@ -53,26 +52,25 @@ export async function verifyPackagedDesktopBuild({
       );
     }
 
-    for (const [resourceFilename, rendererAssetPath] of Object.entries(packagedDockIconAssets)) {
-      const nativeIcon = await fs.readFile(path.join(resourcesDirectory, resourceFilename)).catch((error) => {
-        if (error?.code === "ENOENT") {
-          throw new Error(`${path.basename(application.path)} is missing Dock icon resource ${resourceFilename}.`);
-        }
-        throw error;
-      });
-      assertPng(nativeIcon, `${path.basename(application.path)} ${resourceFilename}`);
-
-      let rendererIcon;
-      try {
-        rendererIcon = extractFile(
-          path.join(resourcesDirectory, "app.asar"),
-          rendererAssetPath,
-        );
-      } catch {
-        throw new Error(`${path.basename(application.path)} is missing renderer Dock icon ${rendererAssetPath}.`);
+    const { resourceFilename, rendererAssetPath } = canonicalDockIconAsset;
+    const nativeIcon = await fs.readFile(path.join(resourcesDirectory, resourceFilename)).catch((error) => {
+      if (error?.code === "ENOENT") {
+        throw new Error(`${path.basename(application.path)} is missing Dock icon resource ${resourceFilename}.`);
       }
-      assertPng(rendererIcon, `${path.basename(application.path)} ${rendererAssetPath}`);
+      throw error;
+    });
+    assertPng(nativeIcon, `${path.basename(application.path)} ${resourceFilename}`);
+
+    let rendererIcon;
+    try {
+      rendererIcon = extractFile(
+        path.join(resourcesDirectory, "app.asar"),
+        rendererAssetPath,
+      );
+    } catch {
+      throw new Error(`${path.basename(application.path)} is missing renderer Dock icon ${rendererAssetPath}.`);
     }
+    assertPng(rendererIcon, `${path.basename(application.path)} ${rendererAssetPath}`);
 
     const plist = parsePlist(
       await fs.readFile(path.join(application.path, "Contents", "Info.plist"), "utf8"),

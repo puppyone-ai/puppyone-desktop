@@ -7,7 +7,7 @@ import {
   FileGlyphIcon,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
-import { DOCK_ICON_OPTIONS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, TEXT_SIZE_PRESETS } from "../../preferences";
+import { SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, TEXT_SIZE_PRESETS } from "../../preferences";
 import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements";
 import {
   isAppearanceDecisionLocked,
@@ -45,7 +45,6 @@ export function SettingsView({
   agentFileActivityIndicatorsEnabled,
   typographyPreferences,
   pointerCursors,
-  dockIcon,
   diffMarkers,
   fileIconTheme,
   sidebarNavigationVisibilitySettings,
@@ -77,7 +76,6 @@ export function SettingsView({
   onTextSizeChange,
   onTypographyPreferencesChange,
   onPointerCursorsChange,
-  onDockIconChange,
   onDiffMarkersChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
@@ -525,29 +523,6 @@ export function SettingsView({
                 workspaceRoot={workspace.path}
                 onChange={onAgentFileActivityIndicatorsEnabledChange}
               />
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-                <span id="desktop-dock-icon-label">{t("settings.appearance.dockIcon.title")}</span>
-                <div
-                  className="desktop-theme-segment desktop-appearance-option-segment desktop-dock-icon-segment"
-                  aria-labelledby="desktop-dock-icon-label"
-                >
-                  {DOCK_ICON_OPTIONS.map((option) => (
-                    <button
-                      key={option.id}
-                      className={dockIcon === option.id ? "active" : ""}
-                      type="button"
-                      title={t(`settings.appearance.dockIcon.${option.id}.description`)}
-                      aria-label={t(`settings.appearance.dockIcon.${option.id}.label`)}
-                      aria-description={t(`settings.appearance.dockIcon.${option.id}.description`)}
-                      aria-pressed={dockIcon === option.id}
-                      onClick={() => onDockIconChange(option.id)}
-                    >
-                      <img src={option.previewSrc} alt="" />
-                      <span>{t(`settings.appearance.dockIcon.${option.id}.label`)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         </div>

@@ -3,7 +3,6 @@ import type {
   DarkThemePreset,
   CreateNewMenuSettings,
   DiffMarkers,
-  DockIcon,
   ExperimentalSettings,
   ExternalAppsSettings,
   FilesVisibilitySettings,
@@ -44,7 +43,6 @@ export type SettingsPreferencesPort = {
   textSize: TextSize;
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
-  dockIcon: DockIcon;
   diffMarkers: DiffMarkers;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
@@ -68,7 +66,6 @@ export type SettingsPreferencesPort = {
   setTextSize: (value: TextSize) => void;
   setTypographyPreferences: (value: TypographyPreferences) => void;
   setPointerCursors: (value: boolean) => void;
-  setDockIcon: (value: DockIcon) => void;
   setDiffMarkers: (value: DiffMarkers) => void;
   setFileIconTheme: (value: FileIconThemeId) => void;
   setSidebarNavigationLayout: (value: SidebarNavigationLayout) => void;
@@ -148,7 +145,6 @@ export function createSettingsWorkspaceSurface({
         textSize={preferences.textSize}
         typographyPreferences={preferences.typographyPreferences}
         pointerCursors={preferences.pointerCursors}
-        dockIcon={preferences.dockIcon}
         diffMarkers={preferences.diffMarkers}
         fileIconTheme={preferences.fileIconTheme}
         sidebarNavigationLayout={preferences.sidebarNavigationLayout}
@@ -181,7 +177,6 @@ export function createSettingsWorkspaceSurface({
         onTextSizeChange={preferences.setTextSize}
         onTypographyPreferencesChange={preferences.setTypographyPreferences}
         onPointerCursorsChange={preferences.setPointerCursors}
-        onDockIconChange={preferences.setDockIcon}
         onDiffMarkersChange={preferences.setDiffMarkers}
         onFileIconThemeChange={preferences.setFileIconTheme}
         onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}

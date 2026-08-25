@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_DARK_THEME_PRESET,
-  DEFAULT_DOCK_ICON,
   DEFAULT_LIGHT_THEME_PRESET,
   DEFAULT_LOADING_ANIMATION_PRESET,
   DEFAULT_POINTER_CURSORS,
@@ -161,9 +160,31 @@ describe("appearance profile architecture", () => {
     expect(settings).toContain("resolvedAppearance.decisions.fileIconTheme");
     expect(settings).not.toContain("editorPresentation");
     expect(preferences).not.toContain("editorPresentation");
+    expect(settings).not.toContain("dockIcon");
+    expect(preferences).not.toContain("dockIcon");
     expect(shell).toContain("preferences.sidebarNavigationPlacement");
     expect(settings).not.toMatch(/interfaceStyle\s*===\s*["']windows-xp["']/);
     expect(shell).not.toMatch(/interfaceStyle\s*===\s*["']windows-xp["']/);
+  });
+
+  it("keeps the Dock icon fixed to the canonical product asset", () => {
+    const main = source("electron/main.mjs");
+    const systemIpc = source("electron/main/ipc/system-ipc.mjs");
+    const preload = source("electron/preload.cjs");
+    const packageMetadata = source("package.json");
+    const buildPreparation = source("scripts/release-support/desktop-build-preparation.mjs");
+    const packagedVerifier = source("scripts/release-support/packaged-desktop-build-verifier.mjs");
+
+    expect(main).toContain("function setDefaultDockIcon()");
+    expect(main).toContain("setDefaultDockIcon();");
+    expect(systemIpc).not.toContain("set-dock-icon");
+    expect(preload).not.toContain("setDockIcon");
+    expect(packageMetadata).not.toContain("dock-icon-light");
+    expect(packageMetadata).not.toContain("dock-icon-matte");
+    expect(buildPreparation).not.toContain("dock-icon-light");
+    expect(buildPreparation).not.toContain("dock-icon-matte");
+    expect(packagedVerifier).not.toContain("dock-icon-light");
+    expect(packagedVerifier).not.toContain("dock-icon-matte");
   });
 
   it("loads the XP pack as modules in the dedicated cascade layer", () => {
@@ -229,7 +250,6 @@ function legacySnapshot(): LegacyAppearanceSnapshot {
     typography: DEFAULT_TYPOGRAPHY_PREFERENCES,
     pointerCursors: DEFAULT_POINTER_CURSORS,
     loadingAnimationPreset: DEFAULT_LOADING_ANIMATION_PRESET,
-    dockIcon: DEFAULT_DOCK_ICON,
     fileIconTheme: "default",
     sidebarNavigationLayout: "bottom-horizontal",
   };

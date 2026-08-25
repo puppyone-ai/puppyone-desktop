@@ -146,7 +146,6 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     setBounds: (request) => ipcRenderer.invoke("markdown-web-embed:set-bounds", request),
     destroy: (request) => ipcRenderer.invoke("markdown-web-embed:destroy", request),
   },
-  setDockIcon: (iconId) => ipcRenderer.invoke("system:set-dock-icon", iconId),
   getInitialWorkspace: () => ipcRenderer.invoke("window:get-initial-workspace"),
   getLastWorkspace: () => ipcRenderer.invoke("workspace:get-last"),
   getRecentWorkspaces: () => ipcRenderer.invoke("workspace:get-recent"),

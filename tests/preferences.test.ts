@@ -8,7 +8,6 @@ import {
   parseCreateNewMenuSettings,
   parseDarkThemePreset,
   parseDiffMarkers,
-  parseDockIcon,
   parseExternalAppsSettings,
   parseExperimentalSettings,
   parseLoadingAnimationPreset,
@@ -236,8 +235,6 @@ describe("appearance preferences", () => {
     expect(parseTextSize("17px")).toBe("default");
     expect(parseDarkThemePreset("warm")).toBe("warm");
     expect(parseDarkThemePreset("custom")).toBe("default");
-    expect(parseDockIcon("matte")).toBe("matte");
-    expect(parseDockIcon("/tmp/icon.png")).toBe("polished");
     expect(parseDiffMarkers("symbols")).toBe("symbols");
     expect(parseDiffMarkers("both")).toBe("color");
     expect(parseLoadingAnimationPreset("ikun")).toBe("ikun");

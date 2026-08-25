@@ -897,11 +897,6 @@ declare global {
         }) => Promise<{ ok?: boolean; visible?: boolean } | void>;
         destroy: (request: { id: string }) => Promise<{ ok?: boolean } | void>;
       };
-      setDockIcon: (iconId: "polished" | "light" | "matte") => Promise<{
-        supported: boolean;
-        iconId: "polished" | "light" | "matte";
-        applied?: boolean;
-      }>;
       getInitialWorkspace: () => Promise<LastWorkspaceResult>;
       getLastWorkspace: () => Promise<LastWorkspaceResult>;
       getRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
