@@ -126,7 +126,8 @@
   align-items: center;
   gap: 8px;
   height: 30px;
-  padding: 0 4px 0 8px;
+  padding-block: 0;
+  padding-inline: 8px 0;
   border: 1px solid transparent;
   border-radius: 6px;
   color: var(--po-text-muted);
