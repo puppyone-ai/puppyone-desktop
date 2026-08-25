@@ -189,8 +189,10 @@ describe("settings visual architecture", () => {
     expect(components).toContain("SettingsSubsection");
     expect(components).toContain("SettingsValueRow");
     expect(settingsImplementation).not.toMatch(/Settings(?:Group|Line)/);
+    expect(settingsImplementation).not.toContain("desktop-settings-label-stack");
     expect(settings).not.toContain(".desktop-settings-group");
     expect(settings).not.toContain(".desktop-settings-line");
+    expect(settings).not.toContain(".desktop-settings-label-stack");
     expect(settings).toMatch(/\.desktop-settings-subsection-body\s*{[^}]*display:\s*grid;/s);
     expect(settings).toMatch(/\.desktop-settings-subsection-title\s*{[^}]*font-size:\s*12px;[^}]*font-weight:\s*500;/s);
 
@@ -217,13 +219,17 @@ describe("settings visual architecture", () => {
     const language = source("src/styles/settings-view.css");
 
     expect(settings).toMatch(/--desktop-settings-content-max-width:\s*1040px/);
-    expect(settings).toMatch(/\.desktop-settings-section-header h2\s*{[^}]*font-size:\s*14px;[^}]*font-weight:\s*720;/s);
+    expect(settings).toMatch(/\.desktop-settings-heading-row\s*{[^}]*padding-inline:\s*10px;/s);
+    expect(settings).toMatch(/\.desktop-settings-section-header\s*{[^}]*padding-inline:\s*10px;/s);
+    expect(settings).toMatch(/\.desktop-settings-heading-row \.desktop-settings-section-header\s*{[^}]*padding-inline:\s*0;/s);
+    expect(settings).toMatch(/\.desktop-settings-section-header h2\s*{[^}]*font-size:\s*14px;[^}]*font-weight:\s*600;/s);
     expect(settings).toMatch(/\.desktop-settings-row\s*{[^}]*gap:\s*18px;[^}]*padding:\s*0 10px;/s);
     expect(controls).toMatch(/\.desktop-settings-row-control\s*{[^}]*min-height:\s*42px;/s);
     expect(controls).not.toContain("min-height: 38px");
     expect(settings).toMatch(/\.desktop-settings-value-row\s*{[^}]*min-height:\s*30px;/s);
     expect(settings).toMatch(/\.desktop-settings-select,[\s\S]*?height:\s*28px;[\s\S]*?border-radius:\s*6px;/);
     expect(controls).toMatch(/\.desktop-settings-action\s*{[^}]*height:\s*28px;[^}]*border-radius:\s*6px;[^}]*font-size:\s*12px;[^}]*font-weight:\s*650;/s);
+    expect(controls).toMatch(/\.desktop-build-version-text\s*{[^}]*font-weight:\s*400;/s);
     expect(controls).toMatch(/\.desktop-theme-segment\s*{[^}]*border-radius:\s*7px;/s);
     expect(controls).toMatch(/\.desktop-theme-segment button\s*{[^}]*height:\s*26px;[^}]*border-radius:\s*5px;/s);
     expect(controls).toMatch(/\.desktop-appearance-option-segment\s*{[^}]*width:\s*min\(100%, 360px\);[^}]*grid-auto-columns:\s*minmax\(0, 1fr\);/s);
@@ -240,7 +246,8 @@ describe("settings visual architecture", () => {
     expect(language).not.toContain("min-height: 32px");
     expect(language).not.toContain("border-radius: 8px");
     expect(language).not.toContain("var(--po-panel-raised)");
-    expect(language).toContain("width: min(100%, 220px)");
+    expect(language).toMatch(/\.desktop-language-setting-control\s*{[^}]*width:\s*fit-content;[^}]*max-width:\s*100%;/s);
+    expect(language).toMatch(/\.desktop-language-setting-select\s*{[^}]*width:\s*fit-content;[^}]*field-sizing:\s*content;/s);
   });
 
   it("keeps hover feedback on interactive controls rather than layout rows", () => {

@@ -55,13 +55,13 @@ export function FilesSettingsView({
               </label>
             </div>
             <div className="desktop-settings-row desktop-settings-pattern-editor desktop-files-pattern-editor">
-              <span className="desktop-settings-label-stack">
-                <strong>{t("settings.files.excludePatterns")}</strong>
-                <small>{t("settings.files.patternCount", { count: normalizedDraft.length })}</small>
+              <span title={t("settings.files.patternCount", { count: normalizedDraft.length })}>
+                {t("settings.files.excludePatterns")}
               </span>
               <div className="desktop-settings-pattern-control">
                 <textarea
                   aria-label={t("settings.files.excludePatterns")}
+                  aria-description={t("settings.files.patternCount", { count: normalizedDraft.length })}
                   value={patternDraft}
                   spellCheck={false}
                   onChange={(event) => setPatternDraft(event.target.value)}
@@ -134,24 +134,23 @@ export function DefaultAppsSettingsView({
               action={<span className="desktop-settings-badge connected">{t("settings.defaultApps.system")}</span>}
             />
             <div className="desktop-settings-row desktop-settings-row-control">
-              <span className="desktop-settings-label-stack">
-                <strong>{t("settings.defaultApps.executableProtection.title")}</strong>
-                <small>{t("settings.defaultApps.executableProtection.detail")}</small>
+              <span title={t("settings.defaultApps.executableProtection.detail")}>
+                {t("settings.defaultApps.executableProtection.title")}
               </span>
               <span className="desktop-settings-badge connected">{t("settings.defaultApps.alwaysOn")}</span>
             </div>
           </SettingsSubsection>
           <SettingsSubsection title={t("settings.defaultApps.fileTypeDefaults")}>
             <div className="desktop-settings-row desktop-settings-row-control desktop-settings-default-app-add">
-              <span className="desktop-settings-label-stack">
-                <strong>{t("settings.defaultApps.addFileType.title")}</strong>
-                <small>{t("settings.defaultApps.addFileType.detail")}</small>
+              <span title={t("settings.defaultApps.addFileType.detail")}>
+                {t("settings.defaultApps.addFileType.title")}
               </span>
               <div className="desktop-settings-value">
                 <input
                   className="desktop-settings-text-input desktop-settings-extension-input"
                   type="text"
                   aria-label={t("settings.defaultApps.addFileType.title")}
+                  aria-description={t("settings.defaultApps.addFileType.detail")}
                   spellCheck={false}
                   placeholder="md"
                   value={extensionDraft}
@@ -181,9 +180,12 @@ export function DefaultAppsSettingsView({
                       iconDataUrl={override.iconDataUrl}
                       loadingClassName="desktop-settings-external-app-loader"
                     />
-                    <span className="desktop-settings-label-stack">
-                      <strong>.{override.extension}</strong>
-                      <small dir="auto">{getExternalAppOverrideLabel(override.appPath, override.appName, t("settings.defaultApps.customApp"))}</small>
+                    <span
+                      className="desktop-settings-external-app-label"
+                      dir="auto"
+                      title={getExternalAppOverrideLabel(override.appPath, override.appName, t("settings.defaultApps.customApp"))}
+                    >
+                      .{override.extension} · {getExternalAppOverrideLabel(override.appPath, override.appName, t("settings.defaultApps.customApp"))}
                     </span>
                     <span className="desktop-settings-row-action-group">
                       <button

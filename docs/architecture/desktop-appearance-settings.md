@@ -78,7 +78,8 @@ Apps Settings page; the Header must not expose an app-picker dropdown.
 
 Language is an application preference rather than an Appearance customization.
 It lives as a first-class page under `Desktop App`, between General and
-Appearance. Its compact select applies immediately through the localization
+Appearance. Its compact select hugs the current localized value, with the page
+width acting only as a maximum, and applies immediately through the localization
 runtime; do not add a separate Change or Save step or re-embed it in Appearance.
 
 Light theme, dark theme, Text size, Content font, File icons, Navigation, and
@@ -96,10 +97,10 @@ accessible description without changing the page hierarchy.
 
 Appearance defines the visual grammar for every Desktop Settings page. Page
 content is capped at `1040px` with `24px 28px 40px` padding. Page titles use
-`14px / 720`, descriptions use `12px / 1.35`, ordinary labels use `12.5px`,
-and label descriptions use `11px / 520`. Interactive rows are at least `42px`;
-read-only rows are at least `30px`; both use `10px` inline padding and an
-`18px` gap.
+`14px / 600`, descriptions use `12px / 1.35`, ordinary labels use `12.5px`,
+and label descriptions use `11px / 520`. Titles, descriptions, and rows share
+the same `10px` inline inset. Interactive rows are at least `42px`; read-only
+rows are at least `30px`; rows use an `18px` gap.
 
 Ordinary rows and subsections remain transparent and have no outer border or
 row-level hover. Borders belong only to actual inputs, actions, and Theme

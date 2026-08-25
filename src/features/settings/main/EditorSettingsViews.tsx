@@ -21,22 +21,26 @@ export function EditorSettingsView({
           <SettingsSectionHeader title={t("settings.editor.title")} detail={t("settings.editor.detail")} />
           <div className="desktop-settings-list">
             <div className="desktop-settings-row desktop-settings-row-control">
-              <span className="desktop-settings-label-stack">
-                <strong>{t("settings.editor.aiAssist.title")}</strong>
-                <small>{t("settings.editor.aiAssist.detail")}</small>
+              <span title={t("settings.editor.aiAssist.detail")}>
+                {t("settings.editor.aiAssist.title")}
               </span>
               <SettingsToggle
                 label={t("settings.editor.aiAssist.title")}
+                description={t("settings.editor.aiAssist.detail")}
                 checked={aiEditAssistEnabled}
                 onChange={onAiEditAssistEnabledChange}
               />
             </div>
             <div className="desktop-settings-row desktop-settings-row-control">
-              <span className="desktop-settings-label-stack">
-                <strong>{t("settings.editor.diffMarkers.title")}</strong>
-                <small>{t("settings.editor.diffMarkers.detail")}</small>
+              <span title={t("settings.editor.diffMarkers.detail")}>
+                {t("settings.editor.diffMarkers.title")}
               </span>
-              <div className="desktop-theme-segment" aria-label={t("settings.editor.diffMarkers.ariaLabel")}>
+              <div
+                className="desktop-theme-segment"
+                aria-label={t("settings.editor.diffMarkers.ariaLabel")}
+                aria-description={t("settings.editor.diffMarkers.detail")}
+                title={t("settings.editor.diffMarkers.detail")}
+              >
                 <button
                   type="button"
                   className={diffMarkers === "color" ? "active" : ""}
@@ -104,12 +108,12 @@ export function ExperimentalSettingsView({
           <div className="desktop-settings-list">
             {rows.map(({ messageKey, settingKey }) => (
               <div className="desktop-settings-row desktop-settings-row-control" key={settingKey}>
-                <span className="desktop-settings-label-stack">
-                  <strong>{t(`settings.experimental.${messageKey}.title`)}</strong>
-                  <small>{t(`settings.experimental.${messageKey}.detail`)}</small>
+                <span title={t(`settings.experimental.${messageKey}.detail`)}>
+                  {t(`settings.experimental.${messageKey}.title`)}
                 </span>
                 <SettingsToggle
                   label={t(`settings.experimental.${messageKey}.title`)}
+                  description={t(`settings.experimental.${messageKey}.detail`)}
                   checked={settings[settingKey]}
                   onChange={(checked) => onChange({ ...settings, [settingKey]: checked })}
                 />
@@ -124,18 +128,21 @@ export function ExperimentalSettingsView({
 
 function SettingsToggle({
   checked,
+  description,
   label,
   onChange,
 }: {
   checked: boolean;
+  description: string;
   label: string;
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="desktop-settings-switch">
+    <label className="desktop-settings-switch" title={description}>
       <input
         type="checkbox"
         aria-label={label}
+        aria-description={description}
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
       />

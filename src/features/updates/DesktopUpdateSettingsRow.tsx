@@ -21,14 +21,12 @@ export function DesktopUpdateSettingsRow({
 
   return (
     <div className="desktop-settings-row desktop-settings-row-control">
-      <div className="desktop-settings-label-stack">
-        <strong>{t("updates.settings.title")}</strong>
-        <small aria-live="polite">{detail}</small>
-      </div>
+      <span>{t("updates.settings.title")}</span>
       <button
         className={`desktop-settings-action ${action.primary ? "primary" : ""}`}
         type="button"
         title={detail}
+        aria-label={`${action.label}. ${detail}`}
         disabled={action.disabled}
         onClick={action.kind === "check" ? onCheckForUpdates : onUpdateNow}
       >

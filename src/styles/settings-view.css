@@ -22,13 +22,16 @@
 
 .desktop-language-setting-control {
   display: grid;
-  width: min(100%, 220px);
+  width: fit-content;
+  max-width: 100%;
   min-width: 0;
   gap: 6px;
 }
 
 .desktop-language-setting-select {
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
+  field-sizing: content;
 }
 
 .desktop-language-setting-status,

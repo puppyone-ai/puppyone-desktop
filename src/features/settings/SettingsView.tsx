@@ -444,14 +444,17 @@ export function SettingsView({
               </div>
               {experimentalSettings.enableViewerPlugins && (
                 <div className="desktop-settings-row desktop-settings-row-control">
-                  <span className="desktop-settings-label-stack">
-                    <strong>{t("settings.appearance.pluginsShortcut.title")}</strong>
-                    <small>{t("settings.appearance.pluginsShortcut.detail")}</small>
+                  <span title={t("settings.appearance.pluginsShortcut.detail")}>
+                    {t("settings.appearance.pluginsShortcut.title")}
                   </span>
-                  <label className="desktop-settings-switch">
+                  <label
+                    className="desktop-settings-switch"
+                    title={t("settings.appearance.pluginsShortcut.detail")}
+                  >
                     <input
                       type="checkbox"
                       aria-label={t("settings.appearance.pluginsShortcut.title")}
+                      aria-description={t("settings.appearance.pluginsShortcut.detail")}
                       checked={sidebarNavigationVisibilitySettings.enabled.plugins}
                       onChange={(event) => onSidebarNavigationVisibilitySettingsChange({
                         ...sidebarNavigationVisibilitySettings,

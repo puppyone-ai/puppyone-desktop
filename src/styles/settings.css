@@ -80,19 +80,25 @@
   width: 100%;
   gap: 14px;
   max-width: none;
+  padding-inline: 10px;
 }
 
 .desktop-settings-section-header {
   display: grid;
   min-width: 0;
   gap: 3px;
+  padding-inline: 10px;
+}
+
+.desktop-settings-heading-row .desktop-settings-section-header {
+  padding-inline: 0;
 }
 
 .desktop-settings-section-header h2 {
   margin: 0;
   color: var(--po-text);
   font-size: 14px;
-  font-weight: 720;
+  font-weight: 600;
   line-height: normal;
 }
 
@@ -118,28 +124,6 @@
 .desktop-settings-row > span {
   flex: 0 0 auto;
   color: var(--po-text-subtle);
-}
-
-.desktop-settings-row .desktop-settings-label-stack {
-  display: grid;
-  min-width: 0;
-  flex: 1 1 auto;
-  gap: 2px;
-}
-
-.desktop-settings-row .desktop-settings-label-stack strong {
-  color: var(--po-text);
-  font-size: 12.5px;
-  font-weight: 620;
-  line-height: 1.25;
-  text-align: start;
-}
-
-.desktop-settings-row .desktop-settings-label-stack small {
-  color: var(--po-text-subtle);
-  font-size: 11px;
-  font-weight: 520;
-  line-height: 1.35;
 }
 
 .desktop-settings-row strong {
@@ -476,6 +460,16 @@
   font-size: 10px;
   font-weight: 650;
   line-height: 1;
+}
+
+.desktop-settings-external-app-label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--po-text-subtle);
+  font-size: 12.5px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desktop-settings-external-app-icon img {
