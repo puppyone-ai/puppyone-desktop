@@ -5,14 +5,20 @@ import type {
   AgentActivityEnrollmentSnapshot,
   AgentActivityProviderStatus,
 } from "../../../../shared/agent-activity-contract/types";
-import { useTerminalAgentLocator } from "../../desktop-terminal/controller/useTerminalAgentLocator";
+import type { TerminalAgentDiscoveryPhase } from "../../desktop-terminal/model/terminalAgentAvailability";
 import { SettingsSectionHeader } from "../../settings/components";
 
 type EnrollmentPhase = "loading" | "ready" | "error";
 
-export function LocalAgentHooksSettingsView({
+export function LocalAgentHooksSettingsSection({
+  detectedAgentIds,
+  agentPhase,
+  onRefreshAgents,
   onActivityIndicatorsEnabledChange,
 }: {
+  detectedAgentIds: readonly string[];
+  agentPhase: TerminalAgentDiscoveryPhase;
+  onRefreshAgents: () => Promise<void>;
   onActivityIndicatorsEnabledChange: (enabled: boolean) => void;
 }) {
   const { t } = useLocalization();
@@ -20,11 +26,6 @@ export function LocalAgentHooksSettingsView({
   const [phase, setPhase] = useState<EnrollmentPhase>("loading");
   const [pendingProviderId, setPendingProviderId] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const {
-    ids: detectedAgentIds,
-    phase: agentPhase,
-    refresh: refreshAgents,
-  } = useTerminalAgentLocator({ enabled: true });
   const detected = useMemo(() => new Set<string>(detectedAgentIds), [detectedAgentIds]);
 
   const readEnrollment = useCallback(async () => {
@@ -54,12 +55,12 @@ export function LocalAgentHooksSettingsView({
     setPhase("loading");
     setMutationError(null);
     try {
-      await Promise.all([refreshAgents(), readEnrollment()]);
+      await Promise.all([onRefreshAgents(), readEnrollment()]);
       setPhase("ready");
     } catch {
       setPhase("error");
     }
-  }, [readEnrollment, refreshAgents]);
+  }, [onRefreshAgents, readEnrollment]);
 
   const setEnabled = useCallback(async (providerId: string, enabled: boolean) => {
     const setEnrollment = window.puppyoneDesktop?.setAgentActivityEnrollment;
@@ -80,27 +81,25 @@ export function LocalAgentHooksSettingsView({
   const loading = phase === "loading" || agentPhase === "idle" || agentPhase === "loading";
 
   return (
-    <section className="desktop-utility-view desktop-settings-view">
-      <div className="desktop-utility-body desktop-settings-body" data-po-scrollbar="content">
-        <div className="desktop-settings-section">
-          <div className="desktop-settings-heading-row">
-            <SettingsSectionHeader
-              title={t("settings.localAgentHooks.title")}
-              detail={t("settings.localAgentHooks.detail")}
-            />
-            <button
-              className="desktop-settings-action"
-              type="button"
-              aria-label={t("settings.localAgentHooks.refresh")}
-              title={t("settings.localAgentHooks.refresh")}
-              disabled={loading || pendingProviderId !== null}
-              onClick={() => void refresh()}
-            >
-              <RefreshCw size={14} className={loading ? "spin" : undefined} aria-hidden="true" />
-              <span>{t("settings.localAgentHooks.refresh")}</span>
-            </button>
-          </div>
-          <div className="desktop-settings-list">
+    <div className="desktop-settings-section desktop-local-agent-hooks-section">
+      <div className="desktop-settings-heading-row">
+        <SettingsSectionHeader
+          title={t("settings.localAgentHooks.title")}
+          detail={t("settings.localAgentHooks.detail")}
+        />
+        <button
+          className="desktop-settings-action"
+          type="button"
+          aria-label={t("settings.localAgentHooks.refresh")}
+          title={t("settings.localAgentHooks.refresh")}
+          disabled={loading || pendingProviderId !== null}
+          onClick={() => void refresh()}
+        >
+          <RefreshCw size={14} className={loading ? "spin" : undefined} aria-hidden="true" />
+          <span>{t("settings.localAgentHooks.refresh")}</span>
+        </button>
+      </div>
+      <div className="desktop-settings-list">
             {providers.map((provider) => {
               const agentDetected = detected.has(provider.providerId);
               const installed = provider.enrollment === "enabled";
@@ -150,10 +149,8 @@ export function LocalAgentHooksSettingsView({
                 </button>
               </div>
             )}
-          </div>
-        </div>
       </div>
-    </section>
+    </div>
   );
 }
 

@@ -14,12 +14,13 @@ describe("settings visual architecture", () => {
     const language = source("src/features/settings/LanguageSetting.tsx");
 
     expect(types).toContain('"general" | "local-project"');
-    expect(types).toContain('"appearance" | "local-agents" | "local-agent-hooks"');
+    expect(types).toContain('"appearance" | "local-agents" | "external-apps"');
+    expect(types).not.toContain('"local-agent-hooks"');
     expect(types).not.toContain('| "language"');
     expect(types).not.toContain('"workspace"');
     expect(view).toContain('if (activeSection === "general")');
     expect(view).toContain('if (activeSection === "local-agents")');
-    expect(view).toContain('if (activeSection === "local-agent-hooks")');
+    expect(view).not.toContain('if (activeSection === "local-agent-hooks")');
     expect(view).toContain('if (activeSection === "local-project")');
     expect(view).not.toContain('activeSection === "language"');
     expect(general).toContain("<LanguageSettingRow />");
@@ -34,11 +35,12 @@ describe("settings visual architecture", () => {
     expect(localAgents).toContain("DESKTOP_TERMINAL_LAUNCHERS");
     expect(localAgents).toContain("desktop-settings-switch");
     expect(localAgents).toContain("setTerminalAgentVisible");
-    expect(localAgents).not.toMatch(/AgentActivity|ActivityHook|agentFileActivity/u);
+    expect(localAgents).toContain("<LocalAgentHooksSettingsSection");
     expect(localAgentHooks).toContain("getAgentActivityEnrollment");
     expect(localAgentHooks).toContain("setAgentActivityEnrollment");
     expect(localAgentHooks).toContain("providers.map");
-    expect(view).toContain("<LocalAgentHooksSettingsView");
+    expect(view).not.toContain("<LocalAgentHooksSettingsView");
+    expect(localAgentHooks).not.toContain("desktop-utility-view");
     expect(view).not.toContain("<AgentFileActivityAppearanceSetting");
     expect(app).not.toContain("enabledRuntimeIds={enabledAgentRuntimeIds}");
     expect(localProject).toContain("settings.localProject.path");
@@ -54,12 +56,12 @@ describe("settings visual architecture", () => {
       'labelId: "settings.sidebar.general"',
       'labelId: "settings.sidebar.appearance"',
       'labelId: "settings.sidebar.localAgents"',
-      'labelId: "settings.sidebar.localAgentHooks"',
       'labelId: "settings.sidebar.defaultApps"',
       'labelId: "settings.sidebar.editor"',
       'labelId: "settings.sidebar.experimental"',
     ]);
     expect(desktopAppItems).not.toContain("settings.sidebar.language");
+    expect(desktopAppItems).not.toContain("settings.sidebar.localAgentHooks");
     expect(sidebarModel).toContain('labelId: "settings.sidebar.localProject"');
     expect(sidebarModel).toContain('labelId: "settings.sidebar.projectInfo"');
 
@@ -80,7 +82,7 @@ describe("settings visual architecture", () => {
       expect(catalog["sidebar.localProject"], locale).toBeTruthy();
       expect(catalog["sidebar.projectInfo"], locale).toBeTruthy();
       expect(catalog["sidebar.localAgents"], locale).toBeTruthy();
-      expect(catalog["sidebar.localAgentHooks"], locale).toBeTruthy();
+      expect(catalog["sidebar.localAgentHooks"], locale).toBeUndefined();
       expect(catalog["general.title"], locale).toBeTruthy();
       expect(catalog["general.detail"], locale).toBeTruthy();
       expect(catalog["localAgents.title"], locale).toBeTruthy();

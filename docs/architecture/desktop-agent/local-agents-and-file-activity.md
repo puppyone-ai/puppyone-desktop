@@ -38,8 +38,8 @@ Terminal Agent locator ---> Terminal launcher ---> verified CLI launch
 
 
                 +-------------------------------+
-                | Local Agent Hooks             |
-                | one enrollment row per Agent  |
+                | Local Agents > Hooks          |
+                | subordinate enrollment rows   |
                 +---------------+---------------+
                                 |
                                 | explicit per-Agent mutation
@@ -80,8 +80,8 @@ Hook registration service ---> Terminal Agent Hook adapters
 ```text
 src/features/local-agents/
   model/localAgentSelection.ts            pure Terminal visibility decisions
-  ui/LocalAgentsSettingsView.tsx          CLI scan + launcher switches
-  ui/LocalAgentHooksSettingsView.tsx      per-provider Hook enrollment
+  ui/LocalAgentsSettingsView.tsx          CLI scan + launcher switches + Hooks subsection
+  ui/LocalAgentHooksSettingsView.tsx      embedded per-provider Hook enrollment
 
 src/features/desktop-terminal/
   controller/useTerminalAgentLocator.ts   shared Renderer discovery controller
@@ -271,7 +271,7 @@ src/features/desktop-agent-presence/
   ui/AgentFilePresence.tsx               eye/hand presentation
 
 src/features/local-agents/
-  ui/LocalAgentHooksSettingsView.tsx     per-Agent Hook status and enrollment
+  ui/LocalAgentHooksSettingsView.tsx     embedded per-Agent Hook status and enrollment
 ```
 
 To add another Agent Hook, implement one adapter descriptor at the Terminal

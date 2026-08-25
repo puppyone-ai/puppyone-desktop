@@ -9,13 +9,16 @@ import {
   isTerminalAgentVisible,
   setTerminalAgentVisible,
 } from "../model/localAgentSelection";
+import { LocalAgentHooksSettingsSection } from "./LocalAgentHooksSettingsView";
 
 export function LocalAgentsSettingsView({
   settings,
   onChange,
+  onActivityIndicatorsEnabledChange,
 }: {
   settings: LocalAgentsSettings;
   onChange: (settings: LocalAgentsSettings) => void;
+  onActivityIndicatorsEnabledChange: (enabled: boolean) => void;
 }) {
   const { t } = useLocalization();
   const {
@@ -103,6 +106,12 @@ export function LocalAgentsSettingsView({
             )}
           </div>
         </div>
+        <LocalAgentHooksSettingsSection
+          detectedAgentIds={detectedAgentIds}
+          agentPhase={phase}
+          onRefreshAgents={refresh}
+          onActivityIndicatorsEnabledChange={onActivityIndicatorsEnabledChange}
+        />
       </div>
     </section>
   );

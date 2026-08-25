@@ -98,8 +98,8 @@ if (!localAgentsSettings.includes("useTerminalAgentLocator")
     || !localAgentsSettings.includes("setTerminalAgentVisible")) {
   errors.push("Local Agents must use Terminal CLI discovery and compact launcher visibility rows");
 }
-if (/AgentActivity|getAgentActivityEnrollment|setAgentActivityEnrollment|Hook/u.test(localAgentsSettings)) {
-  errors.push("Local Agents must not own Hook enrollment or activity configuration");
+if (/getAgentActivityEnrollment|setAgentActivityEnrollment/u.test(localAgentsSettings)) {
+  errors.push("The Local Agents page may compose Hooks but must not directly own native enrollment");
 }
 
 const passiveTerminalAgentDiscoveryFiles = [
@@ -123,16 +123,17 @@ const desktopAppGroup = settingsModel.slice(
 if (!desktopAppGroup.includes('id: "local-agents"')) {
   errors.push("Local Agents must remain a first-class Desktop App settings page");
 }
-const localAgentsIndex = desktopAppGroup.indexOf('id: "local-agents"');
 const localAgentHooksIndex = desktopAppGroup.indexOf('id: "local-agent-hooks"');
-if (localAgentHooksIndex < localAgentsIndex) {
-  errors.push("Local Agent Hooks must appear immediately after Local Agents in Desktop App settings");
+if (localAgentHooksIndex >= 0) {
+  errors.push("Local Agent Hooks must be a subsection of Local Agents, not a separate settings page");
 }
 
 const settingsView = read("src/features/settings/SettingsView.tsx");
-if (!settingsView.includes("<LocalAgentHooksSettingsView")
+const localAgentsPage = read("src/features/local-agents/ui/LocalAgentsSettingsView.tsx");
+if (!localAgentsPage.includes("<LocalAgentHooksSettingsSection")
+    || settingsView.includes('activeSection === "local-agent-hooks"')
     || settingsView.includes("<AgentFileActivityAppearanceSetting")) {
-  errors.push("Native Hook enrollment must live on the dedicated Local Agent Hooks page");
+  errors.push("Native Hook enrollment must live under the Local Agents settings page");
 }
 
 const localAgentHooksSettings = read("src/features/local-agents/ui/LocalAgentHooksSettingsView.tsx");

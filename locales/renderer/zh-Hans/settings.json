@@ -288,7 +288,6 @@
   "sidebar.general": "通用",
   "sidebar.appearance": "外观",
   "sidebar.localAgents": "本地 Agent",
-  "sidebar.localAgentHooks": "本地 Agent Hooks",
   "sidebar.defaultApps": "默认应用",
   "sidebar.editor": "编辑器",
   "sidebar.createNew": "新建",

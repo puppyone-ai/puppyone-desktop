@@ -14,7 +14,7 @@ import {
   isAppearanceValueAllowed,
 } from "../appearance/resolveAppearance";
 import { useFeatureFlag } from "../flags";
-import { LocalAgentHooksSettingsView, LocalAgentsSettingsView } from "../local-agents";
+import { LocalAgentsSettingsView } from "../local-agents";
 import { SettingsSectionHeader } from "./components";
 import { ContentFontSetting } from "./ContentFontSetting";
 import { AccountSettingsView } from "./main/AccountSettingsView";
@@ -114,13 +114,6 @@ export function SettingsView({
       <LocalAgentsSettingsView
         settings={localAgentsSettings}
         onChange={onLocalAgentsSettingsChange}
-      />
-    );
-  }
-
-  if (activeSection === "local-agent-hooks") {
-    return (
-      <LocalAgentHooksSettingsView
         onActivityIndicatorsEnabledChange={onAgentFileActivityIndicatorsEnabledChange}
       />
     );

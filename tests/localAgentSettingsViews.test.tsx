@@ -4,7 +4,7 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LocalAgentHooksSettingsView, LocalAgentsSettingsView } from "../src/features/local-agents";
+import { LocalAgentsSettingsView } from "../src/features/local-agents";
 import type { AgentActivityProviderStatus } from "../shared/agent-activity-contract/types";
 import { withTestLocalization } from "./testLocalization";
 
@@ -27,6 +27,7 @@ describe("Local Agent settings views", () => {
     render(<LocalAgentsSettingsView
       settings={{ hiddenTerminalAgentIds: [] }}
       onChange={onChange}
+      onActivityIndicatorsEnabledChange={vi.fn()}
     />);
 
     await vi.waitFor(() => expect(document.body.textContent).toContain("Codex"));
@@ -38,7 +39,7 @@ describe("Local Agent settings views", () => {
     expect(onChange).toHaveBeenCalledWith({ hiddenTerminalAgentIds: ["codex"] });
   });
 
-  it("shows Hook enrollment separately and installs one provider at a time", async () => {
+  it("shows Hook enrollment below Local Agents and installs one provider at a time", async () => {
     const initial = [
       provider("codex", "Codex", true, "not-configured"),
       provider("claude", "Claude Code", true, "enabled"),
@@ -57,13 +58,17 @@ describe("Local Agent settings views", () => {
       setEnrollment,
     });
     const onActivityIndicatorsEnabledChange = vi.fn();
-    render(<LocalAgentHooksSettingsView
+    render(<LocalAgentsSettingsView
+      settings={{ hiddenTerminalAgentIds: [] }}
+      onChange={vi.fn()}
       onActivityIndicatorsEnabledChange={onActivityIndicatorsEnabledChange}
     />);
 
     await vi.waitFor(() => expect(document.body.textContent).toContain("PuppyOne Hook not installed"));
     expect(document.body.textContent).toContain("PuppyOne Hook installed");
     expect(document.body.textContent).toContain("Manual Hook setup");
+    expect(document.querySelectorAll(".desktop-utility-view")).toHaveLength(1);
+    expect(document.querySelector(".desktop-local-agent-hooks-section")).not.toBeNull();
 
     await act(async () => {
       checkbox("Install the PuppyOne Hook for Codex").click();
