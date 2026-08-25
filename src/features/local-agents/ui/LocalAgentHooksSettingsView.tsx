@@ -91,10 +91,6 @@ export function LocalAgentHooksSettingsSection({
         || provider.enrollment === "needs-repair"
       )
   )), [detected, providers]);
-  const configuredCount = selectableProviders.filter(
-    (provider) => provider.enrollment === "enabled" || provider.enrollment === "needs-repair",
-  ).length;
-
   return (
     <div className="desktop-settings-section desktop-local-agent-hooks-section">
       <details className="desktop-local-agent-hooks-disclosure">
@@ -104,9 +100,6 @@ export function LocalAgentHooksSettingsSection({
           </span>
           <span className="desktop-local-agent-hooks-summary-copy">
             <strong>{t("settings.localAgentHooks.title")}</strong>
-            <small>{configuredCount > 0
-              ? t("settings.localAgentHooks.configured", { count: configuredCount })
-              : t("settings.localAgentHooks.detail")}</small>
           </span>
           <span className="desktop-local-agent-hooks-manage">
             {t("settings.localAgentHooks.manage")}
@@ -142,7 +135,6 @@ export function LocalAgentHooksSettingsSection({
                     <TerminalLauncherIcon launcherId={providerLauncherId(provider.providerId)} />
                     <span className="desktop-local-agent-row-copy">
                       <strong>{provider.displayName}</strong>
-                      <small>{status}</small>
                     </span>
                   </span>
                   <input

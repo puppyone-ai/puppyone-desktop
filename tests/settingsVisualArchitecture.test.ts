@@ -31,6 +31,7 @@ describe("settings visual architecture", () => {
     expect(general).not.toContain("AgentActivity");
     expect(general).not.toContain("localAgents");
     expect(localAgents).toContain('settings.localAgents.title');
+    expect(localAgents).not.toContain('detail={t("settings.localAgents.detail")}');
     expect(localAgents).toContain("useTerminalAgentLocator");
     expect(localAgents).toContain("DESKTOP_TERMINAL_LAUNCHERS");
     expect(localAgents).toContain("<TerminalLauncherIcon");
@@ -44,6 +45,9 @@ describe("settings visual architecture", () => {
     expect(localAgentHooks).toContain("<TerminalLauncherIcon");
     expect(localAgentHooks).toContain("<details");
     expect(localAgentHooks).not.toContain("<SettingsSectionHeader");
+    expect(localAgentHooks).not.toContain("<small>{status}</small>");
+    expect(localAgents).not.toContain("settings.localAgents.visible");
+    expect(localAgents).not.toContain("settings.localAgents.hidden");
     expect(view).not.toContain("<LocalAgentHooksSettingsView");
     expect(localAgentHooks).not.toContain("desktop-utility-view");
     expect(view).not.toContain("<AgentFileActivityAppearanceSetting");

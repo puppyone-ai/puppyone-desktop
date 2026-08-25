@@ -66,13 +66,15 @@ describe("Local Agent settings views", () => {
       onActivityIndicatorsEnabledChange={onActivityIndicatorsEnabledChange}
     />);
 
-    await vi.waitFor(() => expect(document.body.textContent).toContain("PuppyOne Hook not installed"));
-    expect(document.body.textContent).toContain("PuppyOne Hook installed");
+    await vi.waitFor(() => expect(document.querySelectorAll(".desktop-local-agent-hook-option")).toHaveLength(2));
+    expect(document.body.textContent).not.toContain("PuppyOne Hook installed");
+    expect(document.body.textContent).not.toContain("PuppyOne Hook not installed");
     expect(document.body.textContent).not.toContain("Manual Hook setup");
     expect(document.querySelectorAll(".desktop-utility-view")).toHaveLength(1);
     expect(document.querySelector(".desktop-local-agent-hooks-section")).not.toBeNull();
     expect(document.querySelector(".desktop-local-agent-hooks-disclosure")).not.toBeNull();
     expect(document.querySelectorAll(".desktop-local-agent-hook-option")).toHaveLength(2);
+    expect(document.querySelector(".desktop-local-agent-row-copy small")).toBeNull();
 
     await act(async () => {
       checkbox("Install the PuppyOne Hook for Codex").click();
