@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 
 import {
   DEFAULT_EXPERIMENTAL_SETTINGS,
+  DEFAULT_CREATE_NEW_MENU_SETTINGS,
   TEXT_SIZE_PRESETS,
-  getVisibleCreateNewItems,
   parseCreateNewMenuSettings,
   parseDarkThemePreset,
   parseDiffMarkers,
@@ -17,6 +17,7 @@ import {
   parsePointerCursors,
   parseSidebarNavigationVisibilitySettings,
   parseTextSize,
+  resolveVisibleCreateNewMenuItems,
 } from "../src/preferences";
 
 describe("Git sidebar layout preferences", () => {
@@ -29,42 +30,29 @@ describe("Git sidebar layout preferences", () => {
 });
 
 describe("create new menu preferences", () => {
-  it("migrates the legacy default while preserving explicit order and visibility", () => {
-    expect(parseCreateNewMenuSettings(null)).toEqual({
-      version: 3,
-      items: [
-        { kind: "markdown", enabled: true },
-        { kind: "contextMap", enabled: true },
-        { kind: "csv", enabled: true },
-        { kind: "html", enabled: true },
-        { kind: "slides", enabled: true },
-      ],
-    });
+  it("defaults to a complete v4 menu with explicit main and submenu placements", () => {
+    expect(parseCreateNewMenuSettings(null)).toEqual(DEFAULT_CREATE_NEW_MENU_SETTINGS);
+  });
+
+  it("migrates old settings while preserving explicit order and visibility", () => {
     expect(parseCreateNewMenuSettings(JSON.stringify({
+      version: 3,
       items: [
         { kind: "json", enabled: false },
         { kind: "text", enabled: true },
       ],
     }))).toEqual({
-      version: 3,
+      version: 4,
       items: [
-        { kind: "json", enabled: false },
-        { kind: "text", enabled: true },
-      ],
-    });
-    expect(parseCreateNewMenuSettings(JSON.stringify({
-      items: [
-        { kind: "markdown", enabled: true },
-        { kind: "csv", enabled: true },
-      ],
-    }))).toEqual({
-      version: 3,
-      items: [
-        { kind: "markdown", enabled: true },
-        { kind: "contextMap", enabled: true },
-        { kind: "csv", enabled: true },
-        { kind: "html", enabled: true },
-        { kind: "slides", enabled: true },
+        { kind: "json", enabled: false, placement: "submenu" },
+        { kind: "text", enabled: true, placement: "submenu" },
+        { kind: "markdown", enabled: false, placement: "main" },
+        { kind: "csv", enabled: false, placement: "main" },
+        { kind: "html", enabled: false, placement: "main" },
+        { kind: "contextMap", enabled: false, placement: "submenu" },
+        { kind: "slides", enabled: false, placement: "submenu" },
+        { kind: "app", enabled: false, placement: "submenu" },
+        { kind: "puppyflow", enabled: false, placement: "submenu" },
       ],
     });
     expect(parseCreateNewMenuSettings(JSON.stringify({
@@ -73,67 +61,65 @@ describe("create new menu preferences", () => {
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
       ],
-    }))).toEqual({
-      version: 3,
-      items: [
-        { kind: "markdown", enabled: true },
-        { kind: "contextMap", enabled: true },
-        { kind: "csv", enabled: true },
-        { kind: "html", enabled: true },
-        { kind: "slides", enabled: true },
-      ],
-    });
+    }))).toEqual(DEFAULT_CREATE_NEW_MENU_SETTINGS);
     expect(parseCreateNewMenuSettings(JSON.stringify({
       version: 3,
       items: [
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
       ],
-    }))).toEqual({
-      version: 3,
+    }))).toEqual(DEFAULT_CREATE_NEW_MENU_SETTINGS);
+  });
+
+  it("preserves v4 placements and deduplicates valid file types", () => {
+    expect(parseCreateNewMenuSettings(JSON.stringify({
+      version: 4,
       items: [
-        { kind: "markdown", enabled: true },
-        { kind: "csv", enabled: true },
+        { kind: "json", enabled: true, placement: "main" },
+        { kind: "json", enabled: false, placement: "submenu" },
+        { kind: "text", enabled: false, placement: "invalid" },
+        { kind: "not-a-file-type", enabled: true, placement: "main" },
+      ],
+    }))).toEqual({
+      version: 4,
+      items: [
+        { kind: "json", enabled: true, placement: "main" },
+        { kind: "text", enabled: false, placement: "submenu" },
+        { kind: "markdown", enabled: false, placement: "main" },
+        { kind: "csv", enabled: false, placement: "main" },
+        { kind: "html", enabled: false, placement: "main" },
+        { kind: "contextMap", enabled: false, placement: "submenu" },
+        { kind: "slides", enabled: false, placement: "submenu" },
+        { kind: "app", enabled: false, placement: "submenu" },
+        { kind: "puppyflow", enabled: false, placement: "submenu" },
       ],
     });
   });
 
-  it("deduplicates valid file types and recovers from malformed persisted values", () => {
-    expect(parseCreateNewMenuSettings(JSON.stringify({
-      items: [
-        { kind: "json", enabled: true },
-        { kind: "json", enabled: false },
-        { kind: "not-a-file-type", enabled: true },
-      ],
-    }))).toEqual({
-      version: 3,
-      items: [{ kind: "json", enabled: true }],
-    });
+  it("recovers from malformed persisted values", () => {
     expect(parseCreateNewMenuSettings(JSON.stringify({
       items: [{ kind: "not-a-file-type" }],
-    }))).toEqual({
-      version: 3,
-      items: [
-        { kind: "markdown", enabled: true },
-        { kind: "contextMap", enabled: true },
-        { kind: "csv", enabled: true },
-        { kind: "html", enabled: true },
-        { kind: "slides", enabled: true },
-      ],
+    }))).toEqual(DEFAULT_CREATE_NEW_MENU_SETTINGS);
+    expect(parseCreateNewMenuSettings(JSON.stringify({ items: [] }))).toEqual({
+      version: 4,
+      items: DEFAULT_CREATE_NEW_MENU_SETTINGS.items.map((item) => ({ ...item, enabled: false })),
     });
-    expect(parseCreateNewMenuSettings(JSON.stringify({ items: [] }))).toEqual({ version: 3, items: [] });
   });
 
-  it("shows only enabled and currently available file types", () => {
+  it("resolves enabled and available items into their configured menu groups", () => {
     const settings = {
-      version: 3,
+      version: 4,
       items: [
-        { kind: "app", enabled: true },
-        { kind: "json", enabled: false },
-        { kind: "csv", enabled: true },
+        { kind: "app", enabled: true, placement: "main" },
+        { kind: "json", enabled: false, placement: "main" },
+        { kind: "csv", enabled: true, placement: "submenu" },
+        { kind: "contextMap", enabled: true, placement: "submenu" },
       ],
     } as const;
-    expect(getVisibleCreateNewItems(settings, DEFAULT_EXPERIMENTAL_SETTINGS)).toEqual(["app", "csv"]);
+    expect(resolveVisibleCreateNewMenuItems(settings, DEFAULT_EXPERIMENTAL_SETTINGS)).toEqual({
+      main: ["app"],
+      submenu: ["csv"],
+    });
   });
 });
 

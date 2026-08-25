@@ -21,6 +21,7 @@ import {
   getCreateEntryMenuItem,
   getDefaultCreateNewMenuItems,
   type CreateNewItemId,
+  type CreateNewMenuPlacement,
 } from "./features/create-new/createEntryMenuRegistry";
 
 export type { TypographyPreferences } from "./features/typography/fontCatalog";
@@ -36,7 +37,7 @@ export {
 };
 export type { InterfaceStyle, ThemeMode };
 export { CREATE_NEW_ITEM_IDS };
-export type { CreateNewItemId };
+export type { CreateNewItemId, CreateNewMenuPlacement };
 
 export type LightThemePreset = "neutral" | "warm" | "graphite";
 export type DarkThemePreset = "default" | "warm" | "graphite";
@@ -101,10 +102,11 @@ export type ExperimentalSettings = {
   enableViewerPlugins: boolean;
 };
 
-export const CREATE_NEW_MENU_VERSION = 3 as const;
+export const CREATE_NEW_MENU_VERSION = 4 as const;
 export type CreateNewMenuItem = {
   kind: CreateNewItemId;
   enabled: boolean;
+  placement: CreateNewMenuPlacement;
 };
 export type CreateNewMenuSettings = {
   version: typeof CREATE_NEW_MENU_VERSION;
@@ -600,6 +602,9 @@ export function parseCreateNewMenuSettings(value: string | null | undefined): Cr
       items.push({
         kind,
         enabled: !("enabled" in item) || item.enabled !== false,
+        placement: "placement" in item && isCreateNewMenuPlacement(item.placement)
+          ? item.placement
+          : getCreateEntryMenuItem(kind).defaultPlacement,
       });
     }
 
@@ -611,6 +616,10 @@ export function parseCreateNewMenuSettings(value: string | null | undefined): Cr
         || matchesEnabledCreateMenu(items, ["markdown", "csv", "html", "slides"]));
     if (isLegacyDefault) {
       return cloneDefaultCreateNewMenuSettings();
+    }
+    for (const defaultItem of getDefaultCreateNewMenuItems()) {
+      if (seen.has(defaultItem.kind)) continue;
+      items.push({ ...defaultItem, enabled: false });
     }
     return { version: CREATE_NEW_MENU_VERSION, items };
   } catch {
@@ -630,6 +639,10 @@ export function isCreateNewItemId(value: unknown): value is CreateNewItemId {
     && CREATE_NEW_ITEM_IDS.includes(value as CreateNewItemId);
 }
 
+export function isCreateNewMenuPlacement(value: unknown): value is CreateNewMenuPlacement {
+  return value === "main" || value === "submenu";
+}
+
 export function isCreateNewItemAvailable(
   kind: CreateNewItemId,
   experimentalSettings: ExperimentalSettings,
@@ -646,13 +659,17 @@ function matchesEnabledCreateMenu(
     && items.every((item, index) => item.enabled && item.kind === kinds[index]);
 }
 
-export function getVisibleCreateNewItems(
+export function resolveVisibleCreateNewMenuItems(
   settings: CreateNewMenuSettings,
   experimentalSettings: ExperimentalSettings,
-): CreateNewItemId[] {
-  return settings.items
-    .filter((item) => item.enabled && isCreateNewItemAvailable(item.kind, experimentalSettings))
-    .map((item) => item.kind);
+): Readonly<{ main: CreateNewItemId[]; submenu: CreateNewItemId[] }> {
+  const visible = settings.items.filter((item) => (
+    item.enabled && isCreateNewItemAvailable(item.kind, experimentalSettings)
+  ));
+  return {
+    main: visible.filter((item) => item.placement === "main").map((item) => item.kind),
+    submenu: visible.filter((item) => item.placement === "submenu").map((item) => item.kind),
+  };
 }
 
 function normalizeExternalAppOverrides(value: unknown): ExternalAppOverride[] {

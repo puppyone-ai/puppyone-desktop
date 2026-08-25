@@ -1,18 +1,13 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type DragEvent,
-} from "react";
+import { useMemo, useState, type DragEvent } from "react";
 import {
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
-  CircleMinus,
   GripVertical,
   LockKeyhole,
-  Plus,
   RotateCcw,
+  Workflow,
 } from "lucide-react";
 import {
   FileGlyphIcon,
@@ -20,13 +15,13 @@ import {
   type FileIconThemeId,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
-import { DesktopMenuItem, DesktopMenuSurface } from "../../../components/DesktopMenu";
 import {
-  CREATE_NEW_ITEM_IDS,
   CREATE_NEW_MENU_VERSION,
   cloneDefaultCreateNewMenuSettings,
   isCreateNewItemAvailable,
   type CreateNewItemId,
+  type CreateNewMenuItem,
+  type CreateNewMenuPlacement,
   type CreateNewMenuSettings,
   type ExperimentalSettings,
 } from "../../../preferences";
@@ -36,6 +31,7 @@ import { SettingsSectionHeader } from "../components";
 type DragTarget = {
   edge: "before" | "after";
   kind: CreateNewItemId;
+  placement: CreateNewMenuPlacement;
 };
 
 export function CreateNewSettingsView({
@@ -50,87 +46,72 @@ export function CreateNewSettingsView({
   onChange: (settings: CreateNewMenuSettings) => void;
 }) {
   const { t } = useLocalization();
-  const addMenuRef = useRef<HTMLDivElement>(null);
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [draggedKind, setDraggedKind] = useState<CreateNewItemId | null>(null);
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
-  const presentKinds = useMemo(
-    () => new Set(settings.items.map((item) => item.kind)),
-    [settings.items],
-  );
-  const addableKinds = CREATE_NEW_ITEM_IDS.filter((kind) => (
-    !presentKinds.has(kind) && isCreateNewItemAvailable(kind, experimentalSettings)
+  const defaultSettings = useMemo(() => cloneDefaultCreateNewMenuSettings(), []);
+  const mainItems = settings.items.filter((item) => item.placement === "main");
+  const submenuItems = settings.items.filter((item) => item.placement === "submenu");
+  const visibleSubmenu = submenuItems.some((item) => (
+    item.enabled && isCreateNewItemAvailable(item.kind, experimentalSettings)
   ));
-  const defaultsRestored = settings.items.length === 5
-    && settings.items[0]?.kind === "markdown"
-    && settings.items[0]?.enabled
-    && settings.items[1]?.kind === "contextMap"
-    && settings.items[1]?.enabled
-    && settings.items[2]?.kind === "csv"
-    && settings.items[2]?.enabled
-    && settings.items[3]?.kind === "html"
-    && settings.items[3]?.enabled
-    && settings.items[4]?.kind === "slides"
-    && settings.items[4]?.enabled;
+  const defaultsRestored = menuSettingsEqual(settings, defaultSettings);
 
-  useEffect(() => {
-    if (!addMenuOpen) return;
-
-    const frame = window.requestAnimationFrame(() => {
-      addMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
-    });
-    const handlePointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && addMenuRef.current?.contains(event.target)) return;
-      setAddMenuOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setAddMenuOpen(false);
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [addMenuOpen]);
-
-  useEffect(() => {
-    if (addableKinds.length === 0) setAddMenuOpen(false);
-  }, [addableKinds.length]);
-
-  const updateEnabled = (kind: CreateNewItemId, enabled: boolean) => {
+  const commitItems = (items: CreateNewMenuItem[]) => {
     onChange({
       version: CREATE_NEW_MENU_VERSION,
-      items: settings.items.map((item) => (
-        item.kind === kind ? { ...item, enabled } : item
-      )),
+      items: groupItemsByPlacement(items),
     });
   };
 
-  const moveItem = (kind: CreateNewItemId, offset: -1 | 1) => {
-    const sourceIndex = settings.items.findIndex((item) => item.kind === kind);
-    const targetIndex = sourceIndex + offset;
-    if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= settings.items.length) return;
-    const items = [...settings.items];
-    const [item] = items.splice(sourceIndex, 1);
+  const updateEnabled = (kind: CreateNewItemId, enabled: boolean) => {
+    commitItems(settings.items.map((item) => (
+      item.kind === kind ? { ...item, enabled } : item
+    )));
+  };
+
+  const moveWithinGroup = (kind: CreateNewItemId, offset: -1 | 1) => {
+    const item = settings.items.find((candidate) => candidate.kind === kind);
     if (!item) return;
-    items.splice(targetIndex, 0, item);
-    onChange({ version: CREATE_NEW_MENU_VERSION, items });
+    const group = settings.items.filter((candidate) => candidate.placement === item.placement);
+    const sourceIndex = group.findIndex((candidate) => candidate.kind === kind);
+    const targetIndex = sourceIndex + offset;
+    if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= group.length) return;
+    const reordered = [...group];
+    const [source] = reordered.splice(sourceIndex, 1);
+    if (!source) return;
+    reordered.splice(targetIndex, 0, source);
+    commitItems([
+      ...settings.items.filter((candidate) => candidate.placement !== item.placement),
+      ...reordered,
+    ]);
+  };
+
+  const moveToPlacement = (kind: CreateNewItemId, placement: CreateNewMenuPlacement) => {
+    const source = settings.items.find((item) => item.kind === kind);
+    if (!source || source.placement === placement) return;
+    commitItems([
+      ...settings.items.filter((item) => item.kind !== kind),
+      { ...source, placement },
+    ]);
   };
 
   const dropItem = (sourceKind: CreateNewItemId, target: DragTarget) => {
     if (sourceKind === target.kind) return;
-    const sourceIndex = settings.items.findIndex((item) => item.kind === sourceKind);
-    if (sourceIndex < 0) return;
-
-    const items = [...settings.items];
-    const [item] = items.splice(sourceIndex, 1);
-    if (!item) return;
-    const targetIndex = items.findIndex((candidate) => candidate.kind === target.kind);
+    const source = settings.items.find((item) => item.kind === sourceKind);
+    if (!source) return;
+    const remaining = settings.items.filter((item) => item.kind !== sourceKind);
+    const targetGroup = remaining.filter((item) => item.placement === target.placement);
+    const targetIndex = targetGroup.findIndex((item) => item.kind === target.kind);
     if (targetIndex < 0) return;
-    items.splice(target.edge === "before" ? targetIndex : targetIndex + 1, 0, item);
-    onChange({ version: CREATE_NEW_MENU_VERSION, items });
+    targetGroup.splice(
+      target.edge === "before" ? targetIndex : targetIndex + 1,
+      0,
+      { ...source, placement: target.placement },
+    );
+    commitItems([
+      ...remaining.filter((item) => item.placement !== target.placement),
+      ...targetGroup,
+    ]);
   };
 
   const handleDragStart = (
@@ -144,6 +125,7 @@ export function CreateNewSettingsView({
 
   const handleDragOver = (
     event: DragEvent<HTMLDivElement>,
+    placement: CreateNewMenuPlacement,
     kind: CreateNewItemId,
   ) => {
     if (!draggedKind || draggedKind === kind) return;
@@ -151,7 +133,7 @@ export function CreateNewSettingsView({
     event.dataTransfer.dropEffect = "move";
     const bounds = event.currentTarget.getBoundingClientRect();
     const edge = event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
-    setDragTarget({ kind, edge });
+    setDragTarget({ kind, edge, placement });
   };
 
   const clearDragState = () => {
@@ -159,9 +141,113 @@ export function CreateNewSettingsView({
     setDragTarget(null);
   };
 
-  const addType = (kind: CreateNewItemId) => {
-    onChange({ version: CREATE_NEW_MENU_VERSION, items: [...settings.items, { kind, enabled: true }] });
-    setAddMenuOpen(false);
+  const renderItem = (
+    item: CreateNewMenuItem,
+    index: number,
+    group: readonly CreateNewMenuItem[],
+  ) => {
+    const visual = getCreateEntryMenuItem(item.kind);
+    const label = t(`workspace.node.create.kind.${item.kind}.label`);
+    const available = isCreateNewItemAvailable(item.kind, experimentalSettings);
+    const moveTarget: CreateNewMenuPlacement = item.placement === "main" ? "submenu" : "main";
+    const moveLabel = t(
+      item.placement === "main"
+        ? "settings.createNew.moveToSubmenu"
+        : "settings.createNew.moveToMainMenu",
+      { type: label },
+    );
+    const dragBefore = dragTarget?.kind === item.kind && dragTarget.edge === "before";
+    const dragAfter = dragTarget?.kind === item.kind && dragTarget.edge === "after";
+    return (
+      <div
+        className="desktop-create-new-row desktop-create-new-file-row"
+        data-drag-before={dragBefore || undefined}
+        data-drag-after={dragAfter || undefined}
+        data-dragging={draggedKind === item.kind || undefined}
+        data-unavailable={!available || undefined}
+        key={item.kind}
+        role="listitem"
+        onDragOver={(event) => handleDragOver(event, item.placement, item.kind)}
+        onDrop={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const sourceKind = event.dataTransfer.getData("text/plain") as CreateNewItemId;
+          const target = dragTarget ?? {
+            kind: item.kind,
+            edge: "before" as const,
+            placement: item.placement,
+          };
+          dropItem(sourceKind, target);
+          clearDragState();
+        }}
+      >
+        <button
+          className="desktop-create-new-drag-handle"
+          type="button"
+          draggable
+          aria-label={t("settings.createNew.dragToReorder", { type: label })}
+          title={t("settings.createNew.dragToReorder", { type: label })}
+          onDragStart={(event) => handleDragStart(event, item.kind)}
+          onDragEnd={clearDragState}
+        >
+          <GripVertical size={14} aria-hidden="true" />
+        </button>
+        <CreateNewGlyph
+          iconName={visual.iconName}
+          iconType={visual.iconType}
+          theme={fileIconTheme}
+        />
+        <span className="desktop-create-new-row-label">{label}</span>
+        <div className="desktop-create-new-row-controls">
+          <button
+            className="desktop-create-new-placement-button"
+            type="button"
+            aria-label={moveLabel}
+            title={moveLabel}
+            onClick={() => moveToPlacement(item.kind, moveTarget)}
+          >
+            {item.placement === "main" ? (
+              <ChevronRight className="po-directional-icon" size={14} aria-hidden="true" />
+            ) : (
+              <ChevronLeft className="po-directional-icon" size={14} aria-hidden="true" />
+            )}
+          </button>
+          <span className="desktop-create-new-order-controls">
+            <button
+              type="button"
+              disabled={index === 0}
+              aria-label={t("settings.createNew.moveUp", { type: label })}
+              title={t("settings.createNew.moveUp", { type: label })}
+              onClick={() => moveWithinGroup(item.kind, -1)}
+            >
+              <ChevronUp size={13} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              disabled={index === group.length - 1}
+              aria-label={t("settings.createNew.moveDown", { type: label })}
+              title={t("settings.createNew.moveDown", { type: label })}
+              onClick={() => moveWithinGroup(item.kind, 1)}
+            >
+              <ChevronDown size={13} aria-hidden="true" />
+            </button>
+          </span>
+          <label
+            className="desktop-settings-switch"
+            title={!available ? t("settings.createNew.unavailable") : undefined}
+          >
+            <input
+              type="checkbox"
+              checked={item.enabled}
+              disabled={!available}
+              aria-label={t("settings.createNew.enable", { type: label })}
+              onChange={(event) => updateEnabled(item.kind, event.target.checked)}
+            />
+            <span aria-hidden="true" />
+          </label>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -174,185 +260,89 @@ export function CreateNewSettingsView({
           />
 
           <div className="desktop-create-new-layout">
-            <section
-              className="desktop-create-new-card desktop-create-new-editor"
-              aria-labelledby="desktop-create-new-items-title"
-            >
-              <header className="desktop-create-new-card-header">
-                <strong id="desktop-create-new-items-title">
-                  {t("settings.createNew.fileTypes.title")}
-                </strong>
+            <section className="desktop-create-new-menu-editor">
+              <header className="desktop-create-new-group-header">
+                <strong>{t("settings.createNew.mainMenu.title")}</strong>
+                <span>{t("settings.createNew.mainMenu.detail")}</span>
               </header>
-
-              <div className="desktop-create-new-list">
-                <div className="desktop-create-new-row desktop-create-new-row-fixed">
+              <div className="desktop-create-new-menu-list" role="list">
+                <div className="desktop-create-new-row desktop-create-new-row-fixed" role="listitem">
                   <span className="desktop-create-new-fixed-marker" aria-hidden="true">
                     <LockKeyhole size={12} />
                   </span>
-                  <CreateNewGlyph
-                    iconName="folder"
-                    iconType="folder"
-                    theme={fileIconTheme}
-                  />
+                  <CreateNewGlyph iconName="folder" iconType="folder" theme={fileIconTheme} />
                   <span className="desktop-create-new-row-label">
-                    <strong>{t("workspace.node.create.kind.folder.label")}</strong>
+                    {t("workspace.node.create.kind.folder.label")}
+                  </span>
+                  <span className="desktop-create-new-fixed-label">
+                    {t("settings.createNew.fixed")}
                   </span>
                 </div>
-
-                <div className="desktop-create-new-file-list" role="list">
-                  {settings.items.map((item, index) => {
-                    const visual = getCreateEntryMenuItem(item.kind);
-                    const label = t(`workspace.node.create.kind.${item.kind}.label`);
-                    const available = isCreateNewItemAvailable(item.kind, experimentalSettings);
-                    const dragBefore = dragTarget?.kind === item.kind && dragTarget.edge === "before";
-                    const dragAfter = dragTarget?.kind === item.kind && dragTarget.edge === "after";
-                    return (
-                      <div
-                        className="desktop-create-new-row desktop-create-new-file-row"
-                        data-drag-before={dragBefore || undefined}
-                        data-drag-after={dragAfter || undefined}
-                        data-dragging={draggedKind === item.kind || undefined}
-                        data-unavailable={!available || undefined}
-                        key={item.kind}
-                        role="listitem"
-                        onDragOver={(event) => handleDragOver(event, item.kind)}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          const sourceKind = event.dataTransfer.getData("text/plain") as CreateNewItemId;
-                          const target = dragTarget ?? { kind: item.kind, edge: "before" };
-                          if (CREATE_NEW_ITEM_IDS.includes(sourceKind)) dropItem(sourceKind, target);
-                          clearDragState();
-                        }}
-                      >
-                        <button
-                          className="desktop-create-new-drag-handle"
-                          type="button"
-                          draggable
-                          aria-label={t("settings.createNew.dragToReorder", { type: label })}
-                          title={t("settings.createNew.dragToReorder", { type: label })}
-                          onDragStart={(event) => handleDragStart(event, item.kind)}
-                          onDragEnd={clearDragState}
-                        >
-                          <GripVertical size={14} aria-hidden="true" />
-                        </button>
-                        <CreateNewGlyph
-                          iconName={visual.iconName}
-                          iconType={visual.iconType}
-                          theme={fileIconTheme}
-                        />
-                        <span className="desktop-create-new-row-label">
-                          <strong>{label}</strong>
-                        </span>
-                        <div className="desktop-create-new-row-controls">
-                          <label
-                            className="desktop-settings-switch desktop-create-new-switch"
-                            title={!available ? t("settings.createNew.unavailable") : undefined}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={item.enabled}
-                              disabled={!available}
-                              aria-label={t("settings.createNew.enable", { type: label })}
-                              onChange={(event) => updateEnabled(item.kind, event.target.checked)}
-                            />
-                            <span aria-hidden="true" />
-                          </label>
-                          <span className="desktop-create-new-order-controls">
-                            <button
-                              type="button"
-                              disabled={index === 0}
-                              aria-label={t("settings.createNew.moveUp", { type: label })}
-                              title={t("settings.createNew.moveUp", { type: label })}
-                              onClick={() => moveItem(item.kind, -1)}
-                            >
-                              <ChevronUp size={13} aria-hidden="true" />
-                            </button>
-                            <button
-                              type="button"
-                              disabled={index === settings.items.length - 1}
-                              aria-label={t("settings.createNew.moveDown", { type: label })}
-                              title={t("settings.createNew.moveDown", { type: label })}
-                              onClick={() => moveItem(item.kind, 1)}
-                            >
-                              <ChevronDown size={13} aria-hidden="true" />
-                            </button>
-                          </span>
-                          <button
-                            className="desktop-create-new-remove-button"
-                            type="button"
-                            aria-label={t("settings.createNew.remove", { type: label })}
-                            title={t("settings.createNew.remove", { type: label })}
-                            onClick={() => onChange({
-                              version: CREATE_NEW_MENU_VERSION,
-                              items: settings.items.filter((candidate) => candidate.kind !== item.kind),
-                            })}
-                          >
-                            <CircleMinus size={15} aria-hidden="true" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <div className="desktop-create-new-menu-divider" aria-hidden="true" />
+                {mainItems.map((item, index) => renderItem(item, index, mainItems))}
+                {visibleSubmenu && (
+                  <div className="desktop-create-new-row desktop-create-new-submenu-link" role="listitem">
+                    <span aria-hidden="true" />
+                    <span className="desktop-create-new-submenu-glyph" aria-hidden="true">
+                      <Workflow size={15} />
+                    </span>
+                    <span className="desktop-create-new-row-label">
+                      {t("workspace.node.customFiles")}
+                    </span>
+                    <ChevronRight className="po-directional-icon" size={14} aria-hidden="true" />
+                  </div>
+                )}
               </div>
-
-              <footer className="desktop-create-new-card-footer">
-                <div className="desktop-create-new-add-control" ref={addMenuRef}>
-                  <button
-                    className="desktop-settings-action desktop-create-new-add-button"
-                    type="button"
-                    disabled={addableKinds.length === 0}
-                    aria-haspopup="menu"
-                    aria-expanded={addMenuOpen}
-                    title={addableKinds.length === 0 ? t("settings.createNew.addEmpty") : undefined}
-                    onClick={() => setAddMenuOpen((open) => !open)}
-                  >
-                    <Plus size={13} aria-hidden="true" />
-                    <span>{t("settings.createNew.add")}</span>
-                  </button>
-                  {addMenuOpen && (
-                    <DesktopMenuSurface
-                      className="desktop-create-new-add-menu"
-                      ariaLabel={t("settings.createNew.addMenu")}
-                    >
-                      {addableKinds.map((kind) => {
-                        const visual = getCreateEntryMenuItem(kind);
-                        return (
-                          <DesktopMenuItem
-                            key={kind}
-                            icon={(
-                              <CreateNewGlyph
-                                iconName={visual.iconName}
-                                iconType={visual.iconType}
-                                theme={fileIconTheme}
-                                size={16}
-                              />
-                            )}
-                            label={t(`workspace.node.create.kind.${kind}.label`)}
-                            detail={visual.extension}
-                            onClick={() => addType(kind)}
-                          />
-                        );
-                      })}
-                    </DesktopMenuSurface>
-                  )}
-                </div>
-                <button
-                  className="desktop-settings-action"
-                  type="button"
-                  disabled={defaultsRestored}
-                  onClick={() => onChange(cloneDefaultCreateNewMenuSettings())}
-                >
-                  <RotateCcw size={13} aria-hidden="true" />
-                  <span>{t("settings.createNew.restoreDefaults")}</span>
-                </button>
-              </footer>
             </section>
+
+            <section className="desktop-create-new-menu-editor">
+              <header className="desktop-create-new-group-header">
+                <strong>{t("settings.createNew.submenu.title")}</strong>
+                <span>{t("settings.createNew.submenu.detail")}</span>
+              </header>
+              <div className="desktop-create-new-menu-list" role="list">
+                {submenuItems.map((item, index) => renderItem(item, index, submenuItems))}
+                {submenuItems.length === 0 && (
+                  <div className="desktop-create-new-empty">
+                    {t("settings.createNew.submenu.empty")}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <footer className="desktop-create-new-footer">
+              <button
+                className="desktop-settings-action"
+                type="button"
+                disabled={defaultsRestored}
+                onClick={() => onChange(cloneDefaultCreateNewMenuSettings())}
+              >
+                <RotateCcw size={13} aria-hidden="true" />
+                <span>{t("settings.createNew.restoreDefaults")}</span>
+              </button>
+            </footer>
           </div>
         </div>
       </div>
     </section>
   );
+}
+
+function groupItemsByPlacement(items: readonly CreateNewMenuItem[]): CreateNewMenuItem[] {
+  return [
+    ...items.filter((item) => item.placement === "main"),
+    ...items.filter((item) => item.placement === "submenu"),
+  ];
+}
+
+function menuSettingsEqual(left: CreateNewMenuSettings, right: CreateNewMenuSettings): boolean {
+  return left.items.length === right.items.length
+    && left.items.every((item, index) => {
+      const candidate = right.items[index];
+      return candidate?.kind === item.kind
+        && candidate.enabled === item.enabled
+        && candidate.placement === item.placement;
+    });
 }
 
 function CreateNewGlyph({

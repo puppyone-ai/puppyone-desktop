@@ -130,13 +130,15 @@ export function DesktopExplorerRowActions({
 
 export function DesktopCreateEntryMenu({
   draft,
-  itemKinds,
+  mainItemKinds,
+  submenuItemKinds,
   fileIconTheme,
   onCancel,
   onSelectKind,
 }: {
   draft: DesktopCreateEntryDraft;
-  itemKinds: readonly CreateNewItemId[];
+  mainItemKinds: readonly CreateNewItemId[];
+  submenuItemKinds: readonly CreateNewItemId[];
   fileIconTheme?: FileIconThemeId | null;
   onCancel: () => void;
   onSelectKind: (kind: DesktopCreateEntryKind) => void;
@@ -145,16 +147,16 @@ export function DesktopCreateEntryMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const submenuCloseTimerRef = useRef<number | null>(null);
   const suppressSubmenuFocusOpenRef = useRef(false);
-  const [customMenuOpen, setCustomMenuOpen] = useState(false);
-  const primaryOptions = getConfiguredCreateEntryMenuItems(itemKinds, "primary");
-  const customOptions = getConfiguredCreateEntryMenuItems(itemKinds, "custom");
+  const [submenuOpen, setSubmenuOpen] = useState(false);
+  const mainOptions = getConfiguredCreateEntryMenuItems(mainItemKinds);
+  const submenuOptions = getConfiguredCreateEntryMenuItems(submenuItemKinds);
   const sidebarLauncher = draft.anchor.placement === "auto-end";
   const menuWidth = sidebarLauncher
     ? Math.max(CREATE_ENTRY_MENU_WIDTH, draft.anchor.width)
     : CREATE_ENTRY_MENU_WIDTH;
-  const menuRowCount = 1 + primaryOptions.length + (customOptions.length > 0 ? 1 : 0);
-  const separatorCount = Number(primaryOptions.length > 0 || customOptions.length > 0)
-    + Number(primaryOptions.length > 0 && customOptions.length > 0);
+  const menuRowCount = 1 + mainOptions.length + (submenuOptions.length > 0 ? 1 : 0);
+  const separatorCount = Number(mainOptions.length > 0 || submenuOptions.length > 0)
+    + Number(mainOptions.length > 0 && submenuOptions.length > 0);
   const estimatedHeight = 8 + (menuRowCount * 30) + (separatorCount * 9);
   const position = getCreateEntryMenuPosition(draft.anchor, menuWidth, estimatedHeight);
   const documentDirection = document.documentElement.dir === "rtl" ? "rtl" : "ltr";
@@ -176,30 +178,30 @@ export function DesktopCreateEntryMenu({
     window.clearTimeout(submenuCloseTimerRef.current);
     submenuCloseTimerRef.current = null;
   };
-  const openCustomMenu = () => {
+  const openSubmenu = () => {
     clearSubmenuCloseTimer();
-    setCustomMenuOpen(true);
+    setSubmenuOpen(true);
   };
-  const closeCustomMenu = () => {
+  const closeSubmenu = () => {
     clearSubmenuCloseTimer();
-    setCustomMenuOpen(false);
+    setSubmenuOpen(false);
   };
-  const scheduleCloseCustomMenu = () => {
+  const scheduleCloseSubmenu = () => {
     clearSubmenuCloseTimer();
     submenuCloseTimerRef.current = window.setTimeout(() => {
       submenuCloseTimerRef.current = null;
-      setCustomMenuOpen(false);
+      setSubmenuOpen(false);
     }, 180);
   };
-  const focusCustomMenu = () => {
-    openCustomMenu();
+  const focusSubmenu = () => {
+    openSubmenu();
     window.requestAnimationFrame(() => {
       menuRef.current
         ?.querySelector<HTMLButtonElement>(".desktop-create-entry-submenu button:not(:disabled)")
         ?.focus();
     });
   };
-  const focusCustomMenuTrigger = () => {
+  const focusSubmenuTrigger = () => {
     const trigger = menuRef.current
       ?.querySelector<HTMLButtonElement>(".desktop-create-entry-submenu-trigger");
     if (!trigger) return;
@@ -231,13 +233,13 @@ export function DesktopCreateEntryMenu({
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (customMenuOpen) {
+      if (submenuOpen) {
         event.preventDefault();
         if (submenuCloseTimerRef.current !== null) {
           window.clearTimeout(submenuCloseTimerRef.current);
           submenuCloseTimerRef.current = null;
         }
-        setCustomMenuOpen(false);
+        setSubmenuOpen(false);
         const trigger = menuRef.current
           ?.querySelector<HTMLButtonElement>(".desktop-create-entry-submenu-trigger");
         if (trigger && document.activeElement !== trigger) {
@@ -262,7 +264,7 @@ export function DesktopCreateEntryMenu({
       window.removeEventListener("resize", handleViewportChange);
       window.removeEventListener("scroll", handleViewportChange, true);
     };
-  }, [customMenuOpen, onCancel]);
+  }, [submenuOpen, onCancel]);
 
   return (
     <DesktopMenuSurface
@@ -280,8 +282,8 @@ export function DesktopCreateEntryMenu({
         label={getCreateEntryOptionLabel("folder", t)}
         onClick={() => onSelectKind("folder")}
       />
-      {(primaryOptions.length > 0 || customOptions.length > 0) && <DesktopMenuSeparator />}
-      {primaryOptions.map((option) => (
+      {(mainOptions.length > 0 || submenuOptions.length > 0) && <DesktopMenuSeparator />}
+      {mainOptions.map((option) => (
         <DesktopNodeActionMenuItem
           key={option.kind}
           icon={<CreateEntryGlyph option={option} theme={fileIconTheme} />}
@@ -289,25 +291,25 @@ export function DesktopCreateEntryMenu({
           onClick={() => onSelectKind(option.kind)}
         />
       ))}
-      {primaryOptions.length > 0 && customOptions.length > 0 && <DesktopMenuSeparator />}
-      {customOptions.length > 0 && (
+      {mainOptions.length > 0 && submenuOptions.length > 0 && <DesktopMenuSeparator />}
+      {submenuOptions.length > 0 && (
         <div
           className="desktop-create-entry-submenu-wrap"
-          data-open={customMenuOpen ? "true" : "false"}
+          data-open={submenuOpen ? "true" : "false"}
           data-submenu-side={submenuSide}
-          onPointerEnter={openCustomMenu}
-          onPointerLeave={scheduleCloseCustomMenu}
+          onPointerEnter={openSubmenu}
+          onPointerLeave={scheduleCloseSubmenu}
           onFocus={() => {
             if (suppressSubmenuFocusOpenRef.current) {
               suppressSubmenuFocusOpenRef.current = false;
               return;
             }
-            openCustomMenu();
+            openSubmenu();
           }}
           onBlur={(event) => {
             const relatedTarget = event.relatedTarget;
             if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) return;
-            scheduleCloseCustomMenu();
+            scheduleCloseSubmenu();
           }}
         >
           <DesktopMenuItem
@@ -317,17 +319,17 @@ export function DesktopCreateEntryMenu({
             trailing={<ChevronRight className="po-directional-icon" size={14} />}
             aria-controls="desktop-create-entry-custom-submenu"
             aria-haspopup="menu"
-            aria-expanded={customMenuOpen}
+            aria-expanded={submenuOpen}
             onKeyDown={(event) => {
               if (event.key !== "ArrowRight") return;
               event.preventDefault();
               event.stopPropagation();
-              focusCustomMenu();
+              focusSubmenu();
             }}
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
-              openCustomMenu();
+              openSubmenu();
             }}
           />
           <DesktopMenuSurface
@@ -338,11 +340,11 @@ export function DesktopCreateEntryMenu({
               if (event.key !== "ArrowLeft") return;
               event.preventDefault();
               event.stopPropagation();
-              closeCustomMenu();
-              focusCustomMenuTrigger();
+              closeSubmenu();
+              focusSubmenuTrigger();
             }}
           >
-            {customOptions.map((option) => (
+            {submenuOptions.map((option) => (
               <DesktopNodeActionMenuItem
                 key={option.kind}
                 icon={<CreateEntryGlyph option={option} theme={fileIconTheme} />}

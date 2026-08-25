@@ -35,7 +35,7 @@ import {
   type DesktopCloudSession,
 } from "./lib/cloudApi";
 import {
-  getVisibleCreateNewItems,
+  resolveVisibleCreateNewMenuItems,
   type FilesVisibilitySettings,
 } from "./preferences";
 import type { PuppyoneWorkspaceConfig } from "./types/electron";
@@ -207,7 +207,7 @@ function AppContent() {
     setThemeMode,
   } = preferences;
   const createNewItems = useMemo(
-    () => getVisibleCreateNewItems(createNewMenuSettings, experimentalSettings),
+    () => resolveVisibleCreateNewMenuItems(createNewMenuSettings, experimentalSettings),
     [createNewMenuSettings, experimentalSettings],
   );
   const minimalMode = experimentalSettings.enableMinimalMode;
@@ -1174,7 +1174,8 @@ function AppContent() {
             ) : (
               <DesktopCreateEntryMenu
                 draft={createEntryDraft}
-                itemKinds={createNewItems}
+                mainItemKinds={createNewItems.main}
+                submenuItemKinds={createNewItems.submenu}
                 fileIconTheme={fileIconTheme}
                 onCancel={() => setCreateEntryDraft(null)}
                 onSelectKind={selectCreateEntryKind}
