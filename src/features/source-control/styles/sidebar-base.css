@@ -7,8 +7,6 @@
 }
 
 .desktop-git-sidebar {
-  container-name: git-sidebar;
-  container-type: inline-size;
   --git-sidebar-left-gap: var(--desktop-sidebar-row-left-gap);
   --git-sidebar-right-gap: var(--desktop-sidebar-row-right-gap);
   --git-sidebar-scrollbar-width: var(--desktop-sidebar-scrollbar-width, 12px);

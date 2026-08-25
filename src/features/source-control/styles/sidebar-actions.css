@@ -203,6 +203,7 @@
   gap: 5px;
   height: var(--git-action-size);
   min-width: 0;
+  max-width: 100%;
   padding: 0 var(--git-action-padding-inline);
   border: 0;
   border-radius: var(--git-action-radius);
@@ -211,6 +212,13 @@
   color: var(--po-text-muted);
   font-size: var(--git-action-font-size);
   font-weight: var(--git-weight-regular);
+}
+
+.desktop-git-operation-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desktop-git-operation-button.is-primary {
@@ -292,7 +300,9 @@
 
 .desktop-git-section-actions {
   display: inline-flex;
-  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
   align-items: center;
   gap: 2px;
   white-space: nowrap;
@@ -335,17 +345,4 @@
 .desktop-git-section-actions .po-sidebar-icon-button:disabled {
   background: transparent;
   color: var(--po-text-disabled);
-}
-
-@container git-sidebar (max-width: 300px) {
-  .desktop-git-operation-button {
-    width: var(--git-action-size);
-    flex: 0 0 var(--git-action-size);
-    gap: 0;
-    padding-inline: 0;
-  }
-
-  .desktop-git-operation-button .desktop-git-operation-label {
-    display: none;
-  }
 }

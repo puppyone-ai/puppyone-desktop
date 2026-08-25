@@ -604,11 +604,17 @@ describe("source-control visual architecture", () => {
     expect(operation).toContain("height: var(--git-action-size);");
     expect(operation).toContain("padding: 0 var(--git-action-padding-inline);");
     expect(operation).not.toContain("height: 28px;");
-    expect(sidebarBaseCss).toContain("container-name: git-sidebar;");
-    expect(sidebarResourcesCss).toContain("@container git-sidebar (max-width: 300px)");
-    expect(sidebarResourcesCss).toContain(
-      ".desktop-git-operation-button .desktop-git-operation-label",
-    );
+    expect(operation).toContain("max-width: 100%;");
+    expect(sidebarBaseCss).not.toContain("container-name: git-sidebar;");
+    expect(sidebarResourcesCss).not.toContain("@container git-sidebar");
+    expect(compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-operation-label",
+    ))).toContain("min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;");
+    expect(compact(readCssBlock(
+      sidebarResourcesCss,
+      ".desktop-git-section-actions",
+    ))).toContain("min-width: 0; max-width: 100%; flex: 0 1 auto;");
     expect(sourceControlSidebarSectionsSource).toContain(
       'const Icon = icon === "upload" ? ArrowUp : ArrowDown;',
     );
