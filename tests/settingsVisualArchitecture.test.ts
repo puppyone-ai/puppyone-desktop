@@ -65,6 +65,7 @@ describe("settings visual architecture", () => {
       'labelId: "settings.sidebar.general"',
       'labelId: "settings.sidebar.appearance"',
       'labelId: "settings.sidebar.localAgents"',
+      'labelId: "settings.sidebar.createNew"',
       'labelId: "settings.sidebar.defaultApps"',
       'labelId: "settings.sidebar.editor"',
       'labelId: "settings.sidebar.experimental"',
@@ -91,6 +92,7 @@ describe("settings visual architecture", () => {
       expect(catalog["sidebar.localProject"], locale).toBeTruthy();
       expect(catalog["sidebar.projectInfo"], locale).toBeTruthy();
       expect(catalog["sidebar.localAgents"], locale).toBeTruthy();
+      expect(catalog["sidebar.createNew"], locale).toBeTruthy();
       expect(catalog["sidebar.localAgentHooks"], locale).toBeUndefined();
       expect(catalog["general.title"], locale).toBeTruthy();
       expect(catalog["general.detail"], locale).toBeTruthy();
