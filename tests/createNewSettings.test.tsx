@@ -28,8 +28,10 @@ describe("Create New settings", () => {
   it("renders one connected hierarchy with a nested submenu and a Not shown group", () => {
     const container = render(defaultSettings(), vi.fn());
 
-    expect(container.textContent).toContain("Menu structure");
+    expect(container.textContent).toContain("Main menu");
     expect(container.textContent).toContain("Not shown");
+    expect(container.textContent).not.toContain("Folder stays fixed");
+    expect(container.textContent).not.toContain("Items here do not appear");
     expect(container.querySelectorAll(".desktop-settings-switch")).toHaveLength(0);
     expect(readEntries(container, "main")).toEqual([
       "markdown",

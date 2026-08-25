@@ -268,9 +268,8 @@ export function CreateNewSettingsView({
             <section className="desktop-create-new-editor">
               <header className="desktop-create-new-group-header">
                 <span className="desktop-create-new-group-title">
-                  {t("settings.createNew.mainMenu.title")}
+                  {t("settings.createNew.location.main")}
                 </span>
-                <span>{t("settings.createNew.mainMenu.detail")}</span>
               </header>
               <div className="desktop-create-new-tree" role="list">
                 <div className="desktop-create-new-row desktop-create-new-row-fixed" role="listitem">
@@ -313,7 +312,6 @@ export function CreateNewSettingsView({
                 <span className="desktop-create-new-group-title">
                   {t("settings.createNew.hidden.title")}
                 </span>
-                <span>{t("settings.createNew.hidden.detail")}</span>
               </header>
               <div
                 className="desktop-create-new-hidden-list"
