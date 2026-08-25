@@ -250,11 +250,8 @@ export function buildSourceControlSidebarModel({
   const committedResources = sourceControl?.remote.outgoingPreview ?? [];
   const committedPrimaryAction = getCommittedPrimaryAction(status, syncState, syncBlocked, t);
   const stagedPrimaryAction = repositoryOperation ? null : getStagedPrimaryAction(
-    status,
-    syncState,
     stagedResources.length,
     canCommit,
-    professionalMode,
     hasConflicts,
     t,
   );
@@ -267,7 +264,7 @@ export function buildSourceControlSidebarModel({
     loadingLabel: t("source-control.sync.continuing"),
     icon: "check" as const,
   } : null;
-  const localChangeResources = professionalMode ? workingResources : [...stagedResources, ...workingResources];
+  const localChangeResources = workingResources;
 
   return {
     professionalMode,
@@ -282,10 +279,10 @@ export function buildSourceControlSidebarModel({
     committedPrimaryAction,
     operationPrimaryAction,
     showCommittedSection: committedCount > 0 || Boolean(committedPrimaryAction),
-    showStagedSection: professionalMode && stagedResources.length > 0,
+    showStagedSection: stagedResources.length > 0,
     showUnstagedSection: localChangeResources.length > 0,
     stagedPrimaryAction,
-    showSimpleChangeAction: !professionalMode && localChangeResources.length > 0 && !hasConflicts && !repositoryOperation,
+    showStageAndCommitAction: localChangeResources.length > 0 && !hasConflicts && !repositoryOperation,
     sectionContext: {
       merge: hasConflicts
         ? t("source-control.commit.conflicts", { count: mergeResources.length })
@@ -301,7 +298,7 @@ export function getCommittedSummary(count: number, actionLabel: string, t: Messa
   return t("source-control.committed.ready", { count, action: actionLabel });
 }
 
-export type SourceControlPrimaryActionSlot = "operation" | "staged" | "sync" | "committed" | "simple" | null;
+export type SourceControlPrimaryActionSlot = "operation" | "staged" | "sync" | "committed" | "stage-and-commit" | null;
 
 export function getSourceControlPrimaryActionSlot({
   hasConflicts,
@@ -309,21 +306,21 @@ export function getSourceControlPrimaryActionSlot({
   hasStagedAction,
   hasSyncAction,
   hasCommittedAction,
-  hasSimpleAction,
+  hasStageAndCommitAction,
 }: {
   hasConflicts: boolean;
   hasOperationAction: boolean;
   hasStagedAction: boolean;
   hasSyncAction: boolean;
   hasCommittedAction: boolean;
-  hasSimpleAction: boolean;
+  hasStageAndCommitAction: boolean;
 }): SourceControlPrimaryActionSlot {
   if (hasConflicts) return null;
   if (hasOperationAction) return "operation";
   if (hasSyncAction) return "sync";
   if (hasStagedAction) return "staged";
   if (hasCommittedAction) return "committed";
-  if (hasSimpleAction) return "simple";
+  if (hasStageAndCommitAction) return "stage-and-commit";
   return null;
 }
 
@@ -596,17 +593,11 @@ export function getCommittedPrimaryAction(
 }
 
 export function getStagedPrimaryAction(
-  status: GitStatusSnapshot | null,
-  state: GitSyncState,
   stagedCount: number,
   canCommit: boolean,
-  professionalMode: boolean,
   hasConflicts: boolean,
   t: MessageFormatter,
 ): GitSidebarPrimaryAction | null {
-  const remote = status?.sourceControl.remote;
-  const publish = remote?.state === "publish" || remote?.canPublish === true;
-  const label = t(publish ? "source-control.sync.commitPublish" : "source-control.sync.commitPush");
   const commitOnly: GitSidebarPrimaryAction = {
     label: t("source-control.sync.commit"),
     title: t("source-control.sync.commitStaged"),
@@ -633,30 +624,5 @@ export function getStagedPrimaryAction(
     };
   }
 
-  if (professionalMode) {
-    return commitOnly;
-  }
-
-  if (!remote?.target && !remote?.upstream) {
-    return commitOnly;
-  }
-
-  if (remote.behind > 0) {
-    return {
-      ...commitOnly,
-      title: t("source-control.sync.commitThenPull"),
-    };
-  }
-
-  return {
-    label,
-    title: publish
-      ? t("source-control.sync.commitThenPublish", { branch: bidiIsolate(state.branchLabel) })
-      : t("source-control.sync.commitThenPush", { target: bidiIsolate(remote.target?.ref ?? remote.upstream ?? state.upstreamLabel) }),
-    disabled: false,
-    kind: "commit-push",
-    loadingKey: "commit-push",
-    loadingLabel: t(publish ? "source-control.sync.publishing" : "source-control.sync.pushing"),
-    icon: "upload",
-  };
+  return commitOnly;
 }
