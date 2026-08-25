@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Download, RefreshCw, RotateCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, Info, RefreshCw, RotateCw } from "lucide-react";
 import { useLocalization, type MessageFormatter } from "@puppyone/localization";
 import type { DesktopUpdateState, DesktopUpdateStatus } from "../../types/electron";
 
@@ -38,8 +38,9 @@ export function DesktopUpdateSettingsRow({
 }
 
 function getUpdateIcon(status: DesktopUpdateStatus) {
+  if (status === "disabled") return Info;
   if (status === "downloaded" || status === "installing") return RotateCw;
-  if (status === "checking" || status === "downloading") return RefreshCw;
+  if (status === "idle" || status === "checking" || status === "downloading") return RefreshCw;
   if (status === "error" || status === "blocked") return AlertTriangle;
   if (status === "not-available") return CheckCircle2;
   return Download;
@@ -57,10 +58,19 @@ function getSettingsAction(
   primary: boolean;
 } {
   if (state.status === "disabled") {
-    return { kind: "check", label: t("updates.action.unavailable"), disabled: true, spinning: false, primary: false };
+    return {
+      kind: "check",
+      label: t(state.channel === "dev" ? "updates.action.developmentBuild" : "updates.action.unavailable"),
+      disabled: true,
+      spinning: false,
+      primary: false,
+    };
   }
   if (state.status === "checking") {
     return { kind: "check", label: t("updates.action.checking"), disabled: true, spinning: true, primary: false };
+  }
+  if (state.status === "not-available") {
+    return { kind: "check", label: t("updates.action.upToDate"), disabled: true, spinning: false, primary: false };
   }
   if (state.status === "downloading") {
     return {

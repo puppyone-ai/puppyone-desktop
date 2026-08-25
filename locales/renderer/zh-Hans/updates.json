@@ -1,6 +1,8 @@
 {
   "settings.title": "应用更新",
   "action.unavailable": "不可用",
+  "action.developmentBuild": "开发版本",
+  "action.upToDate": "已是最新版本",
   "action.checking": "正在检查",
   "action.restarting": "正在重启",
   "action.restart": "重启以更新",

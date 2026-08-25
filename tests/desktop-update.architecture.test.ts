@@ -26,6 +26,9 @@ describe("Desktop update interaction boundaries", () => {
     expect(settingsRow).toContain(
       'state.status === "downloaded" || state.status === "blocked"',
     );
+    expect(settingsRow).toContain('state.status === "not-available"');
+    expect(settingsRow).toContain('t("updates.action.upToDate")');
+    expect(settingsRow).toContain('state.channel === "dev" ? "updates.action.developmentBuild"');
     expect(service).toContain("BACKGROUND_UPDATE_INITIAL_DELAY_MS");
     expect(service).toContain("BACKGROUND_UPDATE_INTERVAL_MS");
     expect(service).toContain("scheduleBackgroundCheck");

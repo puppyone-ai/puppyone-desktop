@@ -1,6 +1,8 @@
 {
   "settings.title": "App-Updates",
   "action.unavailable": "Nicht verfügbar",
+  "action.developmentBuild": "Entwicklungsversion",
+  "action.upToDate": "Bereits aktuell",
   "action.checking": "Wird geprüft",
   "action.restarting": "Wird neu gestartet",
   "action.restart": "Zum Aktualisieren neu starten",

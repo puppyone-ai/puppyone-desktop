@@ -1,6 +1,8 @@
 {
   "settings.title": "Atualizações do aplicativo",
   "action.unavailable": "Indisponível",
+  "action.developmentBuild": "Versão de desenvolvimento",
+  "action.upToDate": "Já está atualizado",
   "action.checking": "Verificando",
   "action.restarting": "Reiniciando",
   "action.restart": "Reiniciar para atualizar",

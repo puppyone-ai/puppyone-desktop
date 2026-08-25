@@ -1,6 +1,8 @@
 {
   "settings.title": "App updates",
   "action.unavailable": "Unavailable",
+  "action.developmentBuild": "Development build",
+  "action.upToDate": "Already up to date",
   "action.checking": "Checking",
   "action.restarting": "Restarting",
   "action.restart": "Restart to update",
