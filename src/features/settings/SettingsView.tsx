@@ -269,7 +269,7 @@ export function SettingsView({
               />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.textSize.title")}</span>
-                <div className="desktop-theme-segment desktop-appearance-option-segment" aria-label={t("settings.appearance.textSize.ariaLabel")}>
+                <div className="desktop-theme-segment desktop-appearance-option-segment desktop-appearance-hug-segment" aria-label={t("settings.appearance.textSize.ariaLabel")}>
                   {TEXT_SIZE_PRESETS.map((option) => (
                     <button
                       key={option.value}
@@ -329,7 +329,7 @@ export function SettingsView({
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.gitSidebarLayout.title")}</span>
                 <div
-                  className="desktop-theme-segment desktop-appearance-option-segment"
+                  className="desktop-theme-segment desktop-appearance-option-segment desktop-appearance-hug-segment"
                   aria-label={t("settings.appearance.gitSidebarLayout.ariaLabel")}
                 >
                   {(["cards", "dividers"] as const).map((layout) => (
@@ -348,7 +348,7 @@ export function SettingsView({
               </div>
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.navigation.title")}</span>
-                <div className="desktop-theme-segment desktop-appearance-option-segment" aria-label={t("settings.appearance.navigation.ariaLabel")}>
+                <div className="desktop-theme-segment desktop-appearance-option-segment desktop-appearance-hug-segment" aria-label={t("settings.appearance.navigation.ariaLabel")}>
                   {SIDEBAR_NAVIGATION_LAYOUT_OPTIONS.map((option) => {
                     const Icon = option.placement === "top"
                       ? PanelTop
@@ -384,7 +384,7 @@ export function SettingsView({
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.loadingAnimation.title")}</span>
                 <div
-                  className="desktop-theme-segment desktop-appearance-option-segment"
+                  className="desktop-theme-segment desktop-appearance-option-segment desktop-appearance-hug-segment"
                   aria-label={t("settings.appearance.loadingAnimation.ariaLabel")}
                 >
                   {PULSE_GRID_PRESET_IDS.map((presetId) => (

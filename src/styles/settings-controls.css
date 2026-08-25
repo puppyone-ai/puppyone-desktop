@@ -333,6 +333,12 @@
   grid-auto-flow: column;
 }
 
+.desktop-appearance-option-segment.desktop-appearance-hug-segment {
+  width: fit-content;
+  max-width: 100%;
+  grid-auto-columns: max-content;
+}
+
 .desktop-appearance-option-segment button {
   min-width: 0;
   padding-inline: 6px;
