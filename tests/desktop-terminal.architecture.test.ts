@@ -233,10 +233,10 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(headerCss).toContain(
       "background: var(--desktop-terminal-tab-active-background, var(--po-control));",
     );
-    expect(headerCss).toMatch(/\.desktop-terminal-tab\s*\{[^}]*border:\s*0;/s);
+    expect(headerCss).toMatch(
+      /\.desktop-terminal-tab\s*\{[^}]*border:\s*var\(--desktop-terminal-tab-border, 0\);/s,
+    );
     expect(headerCss).not.toContain("--desktop-terminal-tab-idle-border");
-    expect(headerCss).not.toContain("--desktop-terminal-tab-hover-border");
-    expect(headerCss).not.toContain("--desktop-terminal-tab-active-border");
     expect(headerCss).not.toContain("--desktop-terminal-tab-active-indicator");
     expect(headerCss).not.toContain(".desktop-terminal-tab::after");
     expect(headerCss).not.toContain(".desktop-terminal-tab-shell");
@@ -271,16 +271,17 @@ describe("Desktop Terminal architecture boundaries", () => {
     );
     expect(headerCss).not.toMatch(/\.desktop-terminal-tab-select\s*\{[^}]*font-size:\s*11px;/s);
     expect(headerCss).toMatch(
-      /\.desktop-terminal-subheader\s*\{[^}]*background:\s*var\(--po-terminal-bg\);/s,
+      /\.desktop-terminal-subheader\s*\{[^}]*border-block-end:\s*var\(--desktop-terminal-tab-bar-divider, 0\);[^}]*background:\s*var\(--desktop-terminal-tab-bar-background, var\(--po-terminal-bg\)\);/s,
     );
-    expect(headerCss).not.toContain("border-block-end");
-    expect(headerCss).not.toContain("--desktop-terminal-tab-bar-background");
     expect(headerCss).not.toContain(".desktop-terminal-subheader::after");
-    expect(xpTokensCss).not.toContain("--desktop-terminal-tab-bar-background");
+    expect(xpTokensCss).toContain("--desktop-terminal-tab-bar-padding-end: 5px;");
+    expect(xpTokensCss).toContain("--desktop-terminal-tab-bar-divider: 1px solid #aca899;");
+    expect(xpTokensCss).toContain("--desktop-terminal-tab-bar-background: #f5f4ee;");
+    expect(xpTokensCss).toContain("--desktop-terminal-tab-border: 1px solid transparent;");
     expect(xpTokensCss).not.toContain("--desktop-terminal-tab-bar-border");
     expect(xpTokensCss).toContain("--desktop-terminal-tab-active-background: #ddd9cf;");
-    expect(xpTokensCss).not.toContain("--desktop-terminal-tab-hover-border");
-    expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-border");
+    expect(xpTokensCss).toContain("--desktop-terminal-tab-hover-border: #c7c4ba;");
+    expect(xpTokensCss).toContain("--desktop-terminal-tab-active-border: #9d9a90;");
     expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-indicator");
     expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-background: #1059c9;");
     expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-background: #316ac5;");

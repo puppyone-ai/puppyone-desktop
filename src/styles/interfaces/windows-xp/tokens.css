@@ -40,9 +40,15 @@
   --desktop-sidebar-navigation-fade-size: 0px;
   /* Session tabs use Explorer's warm command-surface hierarchy. Blue stays
    * reserved for window chrome, list selection and live runtime status. */
+  --desktop-terminal-tab-bar-padding-end: 5px;
+  --desktop-terminal-tab-bar-divider: 1px solid #aca899;
+  --desktop-terminal-tab-bar-background: #f5f4ee;
+  --desktop-terminal-tab-border: 1px solid transparent;
   --desktop-terminal-tab-idle-color: #343434;
   --desktop-terminal-tab-hover-background: #ebe9e2;
+  --desktop-terminal-tab-hover-border: #c7c4ba;
   --desktop-terminal-tab-active-background: #ddd9cf;
+  --desktop-terminal-tab-active-border: #9d9a90;
   --desktop-terminal-tab-active-color: #000000;
   --desktop-terminal-tab-control-hover-background: #e7e4dc;
   --desktop-terminal-tab-control-hover-border: #bbb8ae;
