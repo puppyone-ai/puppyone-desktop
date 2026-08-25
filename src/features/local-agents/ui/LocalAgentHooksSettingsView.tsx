@@ -130,11 +130,14 @@ export function LocalAgentHooksSettingsSection({
                 ? t("settings.localAgentHooks.status.error")
                 : hookStatus(provider, agentDetected, t);
               return (
-                <label className="desktop-settings-row desktop-settings-row-control desktop-local-agent-hook-option" key={provider.providerId}>
+                <label
+                  className="desktop-settings-row desktop-settings-row-control desktop-local-agent-row desktop-local-agent-hook-option"
+                  key={provider.providerId}
+                >
                   <span className="desktop-local-agent-identity">
                     <TerminalLauncherIcon launcherId={providerLauncherId(provider.providerId)} />
                     <span className="desktop-local-agent-row-copy">
-                      <strong>{provider.displayName}</strong>
+                      <span className="desktop-local-agent-name">{provider.displayName}</span>
                     </span>
                   </span>
                   <input

@@ -137,19 +137,23 @@
   white-space: nowrap;
 }
 
+.desktop-local-agent-row {
+  min-height: 30px;
+}
+
 .desktop-local-agent-identity {
   display: inline-flex;
   min-width: 0;
   flex: 1 1 auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .desktop-local-agent-identity > .desktop-terminal-launcher-icon {
-  width: 20px;
-  height: 20px;
-  flex-basis: 20px;
-  opacity: 0.82;
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+  opacity: 0.72;
 }
 
 .desktop-settings-row .desktop-local-agent-row-copy {
@@ -159,9 +163,14 @@
   gap: 2px;
 }
 
-.desktop-local-agent-row-copy strong {
-  font-weight: 500;
-  text-align: start;
+.desktop-local-agent-name {
+  overflow: hidden;
+  color: var(--po-text-subtle);
+  font-size: 12.5px;
+  font-weight: var(--po-text-weight-regular, 400);
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desktop-local-agent-row-copy small {

@@ -31,9 +31,12 @@ describe("Local Agent settings views", () => {
     />);
 
     await vi.waitFor(() => expect(document.body.textContent).toContain("Codex"));
+    expect(document.body.textContent).toContain("Detected local CLIs available from the Terminal launcher.");
     expect(document.body.textContent).toContain("Pi Agent");
     expect(document.querySelectorAll(".desktop-local-agent-identity > .desktop-terminal-launcher-icon").length)
       .toBeGreaterThanOrEqual(2);
+    expect(document.querySelectorAll(".desktop-local-agent-name")).toHaveLength(2);
+    expect(document.querySelector(".desktop-local-agent-row-copy strong")).toBeNull();
     const codexSwitch = checkbox("Show Codex in Terminal");
     expect(codexSwitch.checked).toBe(true);
 

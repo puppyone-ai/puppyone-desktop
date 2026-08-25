@@ -42,6 +42,7 @@ export function LocalAgentsSettingsView({
           <div className="desktop-settings-heading-row">
             <SettingsSectionHeader
               title={t("settings.localAgents.title")}
+              detail={t("settings.localAgents.detail")}
             />
             <button
               className="desktop-settings-action"
@@ -60,11 +61,14 @@ export function LocalAgentsSettingsView({
               const visible = isTerminalAgentVisible(settings, launcher.id);
               const displayName = t(launcher.nameMessage);
               return (
-                <div className="desktop-settings-row desktop-settings-row-control" key={launcher.id}>
+                <div
+                  className="desktop-settings-row desktop-settings-row-control desktop-local-agent-row"
+                  key={launcher.id}
+                >
                   <span className="desktop-local-agent-identity">
                     <TerminalLauncherIcon launcherId={launcher.id} />
                     <span className="desktop-local-agent-row-copy">
-                      <strong>{displayName}</strong>
+                      <span className="desktop-local-agent-name">{displayName}</span>
                     </span>
                   </span>
                   <label
