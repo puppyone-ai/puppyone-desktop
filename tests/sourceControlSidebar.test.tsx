@@ -23,8 +23,7 @@ describe("Git sidebar status groups", () => {
     const onCommit = vi.fn(async () => true);
     const onPush = vi.fn(async () => true);
     const stageAndCommit = vi.fn(async () => true);
-    const onDiscardAll = vi.fn(async () => true);
-    const surface = renderSidebar({ onCommit, onDiscardAll, onPush, stageAndCommit });
+    const surface = renderSidebar({ onCommit, onPush, stageAndCommit });
 
     expect(surface.querySelector(".desktop-git-status-card")).toBeNull();
     expect(surface.querySelectorAll(".desktop-git-local-section-body.expanded")).toHaveLength(3);
@@ -36,11 +35,10 @@ describe("Git sidebar status groups", () => {
     const commitButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Commit"]');
     const pushButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Push"]');
     const stageAndCommitButton = surface.querySelector<HTMLButtonElement>(
-      'button[aria-label="Stage and Commit"]',
+      'button[aria-label="Stage · Commit"]',
     );
-    const discardAllButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Discard all"]');
 
-    for (const button of [commitButton, pushButton, stageAndCommitButton, discardAllButton]) {
+    for (const button of [commitButton, pushButton, stageAndCommitButton]) {
       expect(button?.closest(".desktop-git-section-row")).not.toBeNull();
       expect(button?.closest(".desktop-git-status-card")).toBeNull();
     }
@@ -49,13 +47,11 @@ describe("Git sidebar status groups", () => {
       commitButton?.click();
       pushButton?.click();
       stageAndCommitButton?.click();
-      discardAllButton?.click();
     });
 
     expect(onCommit).toHaveBeenCalledTimes(1);
     expect(onPush).toHaveBeenCalledTimes(1);
     expect(stageAndCommit).toHaveBeenCalledTimes(1);
-    expect(onDiscardAll).toHaveBeenCalledTimes(1);
   });
 
   it("keeps every local group on the same collapsible flat-section contract", () => {
@@ -93,7 +89,7 @@ describe("Git sidebar status groups", () => {
     const unstagedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
       .find((button) => button.textContent?.includes("Unstaged"));
     expect(unstagedToggle?.querySelector("small")?.textContent).toBe("1");
-    const action = surface.querySelector<HTMLButtonElement>('button[aria-label="Stage and Commit"]');
+    const action = surface.querySelector<HTMLButtonElement>('button[aria-label="Stage · Commit"]');
     expect(action?.closest(".desktop-git-resizable-section-unstaged")).not.toBeNull();
 
     await act(async () => action?.click());

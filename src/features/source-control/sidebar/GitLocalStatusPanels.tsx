@@ -310,16 +310,6 @@ function createUnstagedActions({
 
   return (
     <div className="desktop-git-section-actions">
-      {model.workingResources.length > 0 && (
-        <SidebarIconButton
-          className="desktop-working-tree-revert-action"
-          tone="danger"
-          label={t("source-control.action.discardAll")}
-          disabled={disabled}
-          onClick={() => void actions.discardAll()}
-          icon={<Undo2 size={13} />}
-        />
-      )}
       <GitOperationButton
         className="desktop-git-commit-push-action desktop-git-stage-commit-action"
         title={t("source-control.action.stageCommitTitle")}
