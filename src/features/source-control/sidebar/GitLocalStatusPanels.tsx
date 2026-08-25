@@ -284,8 +284,9 @@ function createUnstagedActions({
   primaryActionSlot: SourceControlPrimaryActionSlot;
   t: MessageFormatter;
 }) {
-  if (model.professionalMode) {
-    if (model.workingResources.length === 0) return undefined;
+  if (model.workingResources.length === 0) return undefined;
+
+  if (!model.showStageAndCommitAction) {
     return (
       <div className="desktop-git-section-actions">
         <SidebarIconButton
@@ -307,7 +308,6 @@ function createUnstagedActions({
     );
   }
 
-  if (!model.showSimpleChangeAction) return undefined;
   return (
     <div className="desktop-git-section-actions">
       {model.workingResources.length > 0 && (
@@ -329,7 +329,7 @@ function createUnstagedActions({
         loadingKey="stage-commit"
         loadingLabel={t("source-control.action.committing")}
         operationLoading={operationLoading}
-        primary={primaryActionSlot === "simple"}
+        primary={primaryActionSlot === "stage-and-commit"}
         onClick={() => void actions.stageAndCommit()}
       />
     </div>

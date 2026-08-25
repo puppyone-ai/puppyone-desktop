@@ -626,7 +626,7 @@ describe("source-control visual architecture", () => {
         hasStagedAction: false,
         hasSyncAction: false,
         hasCommittedAction: false,
-        hasSimpleAction: false,
+        hasStageAndCommitAction: false,
         ...overrides,
       })
     );
@@ -641,8 +641,8 @@ describe("source-control visual architecture", () => {
     expect(select({ hasConflicts: true, hasStagedAction: true, hasSyncAction: true, hasCommittedAction: true })).toBeNull();
     expect(select({ hasOperationAction: true, hasSyncAction: true })).toBe("operation");
     expect(select({ hasSyncAction: true, hasCommittedAction: true })).toBe("sync");
-    expect(select({ hasCommittedAction: true, hasSimpleAction: true })).toBe("committed");
-    expect(select({ hasSimpleAction: true })).toBe("simple");
+    expect(select({ hasCommittedAction: true, hasStageAndCommitAction: true })).toBe("committed");
+    expect(select({ hasStageAndCommitAction: true })).toBe("stage-and-commit");
     expect(select()).toBeNull();
   });
 

@@ -84,15 +84,16 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
   const primaryActionSlot = getSourceControlPrimaryActionSlot({
     hasConflicts: sidebarModel.hasConflicts,
     hasOperationAction: Boolean(sidebarModel.operationPrimaryAction),
-    hasStagedAction: sidebarModel.professionalMode
-      && Boolean(sidebarModel.stagedPrimaryAction && !sidebarModel.stagedPrimaryAction.disabled),
+    hasStagedAction: Boolean(
+      sidebarModel.stagedPrimaryAction && !sidebarModel.stagedPrimaryAction.disabled,
+    ),
     hasSyncAction: cloudSyncActionAvailable
       || githubSyncActionAvailable
       || Boolean(remoteSection?.action && !remoteSection.action.disabled),
     hasCommittedAction: Boolean(
       sidebarModel.committedPrimaryAction && !sidebarModel.committedPrimaryAction.disabled,
     ),
-    hasSimpleAction: !sidebarModel.professionalMode && sidebarModel.showSimpleChangeAction,
+    hasStageAndCommitAction: sidebarModel.showStageAndCommitAction,
   });
   const githubIncomingUpdatedAt = status?.branches.find(
     (branch) => branch.remote && branch.name === status.sourceControl.remote.target?.ref,

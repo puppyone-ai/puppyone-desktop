@@ -206,7 +206,7 @@
   padding: 0 var(--git-action-padding-inline);
   border: 0;
   border-radius: var(--git-action-radius);
-  /* Non-primary ops (Push, Stage & Commit, …) keep visible gray chrome. */
+  /* Non-primary ops (Push, Stage and Commit, …) keep visible gray chrome. */
   background: var(--po-control);
   color: var(--po-text-muted);
   font-size: var(--git-action-font-size);
