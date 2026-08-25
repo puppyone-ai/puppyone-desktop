@@ -71,6 +71,14 @@ Navigation, Header elements,
 Pointer cursors, Agent file activity, Dock icon). It must fit in roughly one screen. Do not adopt grouped-card layouts
 while the list stays this small.
 
+Interface Style is the single presentation owner for both application chrome
+and product-owned Editor chrome. Do not add an independent Editor appearance
+preference, policy, DOM attribute, or fallback projection. A historical Style
+such as Windows XP projects its semantic tokens directly at Viewer surface
+boundaries; the Default Style leaves those surfaces on the canonical PuppyOne
+tokens. Authored PDF, Office, image, and embedded document content remains
+untouched by either Style.
+
 Header elements are visibility controls, not configuration surfaces. The
 external-open Header element executes the current system or extension-specific
 default directly. Application selection belongs only to the separate Default

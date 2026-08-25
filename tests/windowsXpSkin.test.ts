@@ -49,6 +49,7 @@ describe("Interface style registry", () => {
     expect(bootstrapIndex).toBeGreaterThan(0);
     expect(resolverIndex).toBeGreaterThan(bootstrapIndex);
     expect(initialTheme).not.toContain('"windows-xp"');
+    expect(initialTheme).not.toContain("editorPresentation");
 
     for (const style of INTERFACE_STYLES) {
       const requestedMode = "dark";
@@ -67,25 +68,11 @@ describe("Interface style registry", () => {
       expect(result.dataset.interfaceStyleFamily).toBe(style.profile.family);
       expect(result.dataset.interfaceStyleVariant).toBe(style.profile.variant);
       expect(result.dataset.interfaceStylePalette).toBe(style.profile.palette);
-      expect(result.dataset.editorPresentation).toBe("follow-interface");
+      expect(result.dataset).not.toHaveProperty("editorPresentation");
       expect(result.dataset.initialTheme).toBe(resolvedTheme);
       expect(result.properties["--initial-shell-background"]).toBe(expectedPaint.background);
       expect(result.properties["--initial-shell-color-scheme"]).toBe(expectedPaint.colorScheme);
     }
-  });
-
-  it("applies persisted Editor presentation before React without routing an Editor", () => {
-    const result = runFirstPaint({
-      bootstrap: source("public/interface-style-bootstrap.js"),
-      initialTheme: source("public/initial-theme.js"),
-      interfaceStyle: "windows-xp",
-      themeMode: "light",
-      editorPresentation: "product-default",
-      systemDark: false,
-    });
-
-    expect(result.dataset.editorPresentation).toBe("product-default");
-    expect(result.dataset.interfaceStyleFamily).toBe("windows-xp");
   });
 
   it("keeps the native window underlay on the generated first-paint contract", () => {
@@ -529,7 +516,6 @@ function runFirstPaint({
   lightThemePreset,
   darkThemePreset,
   legacyThemePreset,
-  editorPresentation,
   systemDark,
 }: {
   bootstrap: string;
@@ -539,7 +525,6 @@ function runFirstPaint({
   lightThemePreset?: string;
   darkThemePreset?: string;
   legacyThemePreset?: string;
-  editorPresentation?: "follow-interface" | "product-default";
   systemDark: boolean;
 }) {
   const dataset: Record<string, string> = {};
@@ -552,12 +537,6 @@ function runFirstPaint({
   if (lightThemePreset) values.set("puppyone.desktop.lightThemePreset", lightThemePreset);
   if (darkThemePreset) values.set("puppyone.desktop.darkThemePreset", darkThemePreset);
   if (legacyThemePreset) values.set("puppyone.desktop.themePreset", legacyThemePreset);
-  if (editorPresentation) {
-    values.set("puppyone.desktop.appearance.v2", JSON.stringify({
-      schemaVersion: 2,
-      shared: { editorPresentation },
-    }));
-  }
   const context = {
     window: {
       localStorage: { getItem: (key: string) => values.get(key) ?? null },

@@ -13,7 +13,6 @@ const tailwindEntry = read("src/cloud-globals.css");
 const tailwindConfig = read("tailwind.config.cjs");
 const windowChromeStyles = read("src/styles/window-chrome.css");
 const interfaceSkinContractStyles = read("src/styles/interface-skin-contract.css");
-const productDefaultViewerProjection = read("src/styles/viewer-product-default.css");
 const windowChromeOwner = path.join(repoRoot, "src", "styles", "window-chrome.css");
 const sharedUiRoot = path.join(repoRoot, "packages", "shared-ui", "src");
 const interfaceStyleRoot = path.join(repoRoot, "src", "styles", "interfaces");
@@ -76,10 +75,6 @@ if (!productStyles.includes('@import "./styles/window-chrome.css" layer(features
   errors.push("Desktop product styles must load the dedicated native window chrome contract.");
 }
 
-if (!productStyles.includes('@import "./styles/viewer-product-default.css" layer(features);')) {
-  errors.push("Desktop product styles must load the explicit Product Default Viewer projection.");
-}
-
 if (
   !windowChromeStyles.includes('[data-window-drag-region="true"]')
   || !windowChromeStyles.includes("-webkit-app-region: drag;")
@@ -127,6 +122,9 @@ for (const filePath of rendererSourceRoots.flatMap(walkRendererSource)) {
       errors.push(`${relativePath} uses root-relative renderer assets (${rootRelativeAssets.join(", ")}); use resolveRendererPublicAssetUrl().`);
     }
   }
+  if (/editorPresentation|data-editor-presentation|follow-interface|product-default/.test(source)) {
+    errors.push(`${relativePath} retains the retired Editor presentation override; Interface Style must directly own Editor presentation.`);
+  }
 }
 
 for (const filePath of walkRendererSource(sharedUiRoot)) {
@@ -152,7 +150,7 @@ for (const filePath of interfaceStyleFiles) {
   }
   validateOwnedFormControlSelectors(relativePath, source);
   if (filePath.includes(`${path.sep}surfaces${path.sep}`)) {
-    validateSurfaceTokenProjection(relativePath, source, "follow-interface");
+    validateSurfaceTokenProjection(relativePath, source);
   }
 }
 
@@ -160,11 +158,6 @@ if (editorInternalSelectorPattern.test(interfaceSkinContractStyles)) {
   errors.push("src/styles/interface-skin-contract.css targets Editor internals; project semantic custom properties at a Viewer surface boundary instead.");
 }
 validateOwnedFormControlSelectors("src/styles/interface-skin-contract.css", interfaceSkinContractStyles);
-validateSurfaceTokenProjection(
-  "src/styles/viewer-product-default.css",
-  productDefaultViewerProjection,
-  "product-default",
-);
 
 for (const filePath of walkRendererSource(path.join(repoRoot, "src", "features", "appearance"))) {
   if (/surfaceAdapters|SurfaceAdapter/.test(readAbsolute(filePath))) {
@@ -204,12 +197,12 @@ function walkCss(directory) {
   });
 }
 
-function validateSurfaceTokenProjection(relativePath, source, presentationMode) {
+function validateSurfaceTokenProjection(relativePath, source) {
   if (!source.includes(".po-viewer-surface-boundary")) {
     errors.push(`${relativePath} is a Viewer surface pack but does not scope tokens to .po-viewer-surface-boundary.`);
   }
-  if (!source.includes(`[data-editor-presentation="${presentationMode}"]`)) {
-    errors.push(`${relativePath} does not honor the ${presentationMode} Editor presentation boundary.`);
+  if (!source.includes("[data-interface-style=")) {
+    errors.push(`${relativePath} does not bind its Viewer projection directly to an Interface Style.`);
   }
   for (const match of source.matchAll(/\{([^{}]*)\}/gs)) {
     const declarations = match[1]

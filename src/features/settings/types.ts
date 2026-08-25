@@ -3,7 +3,6 @@ import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
 import type { CreateNewMenuSettings, DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, GitSidebarLayout, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, LocalAgentsSettings, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TerminalSessionLayout, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
-import type { EditorPresentation } from "../appearance/interfaceStyles";
 
 export type SettingsSection = "general" | "local-project" | "appearance" | "local-agents" | "external-apps" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
 
@@ -49,7 +48,6 @@ export type SettingsViewProps = {
   updateState: DesktopUpdateState;
   onThemeModeChange: (mode: ThemeMode) => void;
   onInterfaceStyleChange: (style: InterfaceStyle) => void;
-  onEditorPresentationChange: (presentation: EditorPresentation) => void;
   onLightThemePresetChange: (preset: LightThemePreset) => void;
   onDarkThemePresetChange: (preset: DarkThemePreset) => void;
   onLoadingAnimationPresetChange: (preset: LoadingAnimationPreset) => void;

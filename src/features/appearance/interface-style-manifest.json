@@ -31,8 +31,7 @@
         "themeMode": { "mode": "inherit" },
         "sidebarNavigationLayout": { "mode": "inherit" },
         "textSize": { "mode": "inherit" },
-        "fileIconTheme": { "mode": "inherit" },
-        "editorPresentation": { "mode": "inherit" }
+        "fileIconTheme": { "mode": "inherit" }
       },
       "palette": {
         "kind": "adaptive",
@@ -120,12 +119,7 @@
           "reasonKey": "settings.appearance.controlledBy.windowsXpNavigation"
         },
         "textSize": { "mode": "inherit" },
-        "fileIconTheme": { "mode": "inherit" },
-        "editorPresentation": {
-          "mode": "allow",
-          "values": ["follow-interface", "product-default"],
-          "default": "follow-interface"
-        }
+        "fileIconTheme": { "mode": "inherit" }
       },
       "palette": {
         "kind": "fixed",

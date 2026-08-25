@@ -3,7 +3,6 @@ import type { FileIconThemeId } from "@puppyone/shared-ui";
 import {
   getInterfaceStyleFirstPaint,
   supportsThemePreset,
-  type EditorPresentation,
 } from "../appearance/interfaceStyles";
 import {
   APPEARANCE_PREFERENCES_STORAGE_KEY,
@@ -123,9 +122,6 @@ export function useDesktopPreferences() {
   const initialAppearance = initialAppearanceRead.preferences;
   const [themeMode, setThemeMode] = useState<ThemeMode>(initialAppearance.shared.themeMode);
   const [interfaceStyle, setInterfaceStyle] = useState<InterfaceStyle>(initialAppearance.activeStyle);
-  const [editorPresentation, setEditorPresentation] = useState<EditorPresentation>(
-    initialAppearance.shared.editorPresentation,
-  );
   const [lightThemePreset, setLightThemePreset] = useState(initialAppearance.shared.lightThemePreset);
   const [darkThemePreset, setDarkThemePreset] = useState(initialAppearance.shared.darkThemePreset);
   const [textSize, setTextSize] = useState<TextSize>(initialAppearance.shared.textSize);
@@ -179,8 +175,7 @@ export function useDesktopPreferences() {
     sidebarNavigationLayout,
     textSize,
     fileIconTheme,
-    editorPresentation,
-  }), [editorPresentation, fileIconTheme, interfaceStyle, sidebarNavigationLayout, textSize, themeMode]);
+  }), [fileIconTheme, interfaceStyle, sidebarNavigationLayout, textSize, themeMode]);
   const activeThemeMode = resolvedAppearance.themeMode;
   const resolvedTheme = activeThemeMode === "system" ? (systemDark ? "dark" : "light") : activeThemeMode;
   const activeThemePreset = resolvedTheme === "light" ? lightThemePreset : darkThemePreset;
@@ -197,7 +192,6 @@ export function useDesktopPreferences() {
     root.dataset.interfaceStyleFamily = resolvedAppearance.profile.family;
     root.dataset.interfaceStyleVariant = resolvedAppearance.profile.variant;
     root.dataset.interfaceStylePalette = resolvedAppearance.profile.palette;
-    root.dataset.editorPresentation = resolvedAppearance.editorPresentation;
     root.dataset.appearanceTokenSet = resolvedAppearance.tokenSet;
     root.dataset.shellComposition = resolvedAppearance.composition.shell;
     root.dataset.titlebarComposition = resolvedAppearance.composition.titlebar;
@@ -294,7 +288,6 @@ export function useDesktopPreferences() {
         dockIcon,
         fileIconTheme,
         sidebarNavigationLayout,
-        editorPresentation,
       },
       byStyle: initialAppearance.byStyle,
       bySurface: initialAppearance.bySurface,
@@ -307,7 +300,6 @@ export function useDesktopPreferences() {
   }, [
     darkThemePreset,
     dockIcon,
-    editorPresentation,
     fileIconTheme,
     initialAppearance,
     initialAppearanceRead.writable,
@@ -439,7 +431,6 @@ export function useDesktopPreferences() {
     externalAppsSettings,
     experimentalSettings,
     fileIconTheme: resolvedAppearance.fileIconTheme,
-    editorPresentation,
     filesVisibilitySettings,
     gitDisplayMode,
     gitSidebarLayout,
@@ -479,7 +470,6 @@ export function useDesktopPreferences() {
     setExternalAppsSettings,
     setExperimentalSettings,
     setFileIconTheme,
-    setEditorPresentation,
     setFilesVisibilitySettings,
     setGitDisplayMode,
     setGitSidebarLayout,

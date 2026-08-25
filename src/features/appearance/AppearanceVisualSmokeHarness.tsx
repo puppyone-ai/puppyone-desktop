@@ -23,7 +23,6 @@ root.dataset.interfaceStyle = style;
 root.dataset.interfaceStyleFamily = profile.profile.family;
 root.dataset.interfaceStyleVariant = profile.profile.variant;
 root.dataset.interfaceStylePalette = profile.profile.palette;
-root.dataset.editorPresentation = "follow-interface";
 root.dataset.initialTheme = "light";
 root.dataset.appearanceTokenSet = profile.tokenSet;
 root.dataset.shellComposition = profile.composition.shell;

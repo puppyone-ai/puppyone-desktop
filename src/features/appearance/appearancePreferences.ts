@@ -20,9 +20,7 @@ import {
 } from "../../preferences";
 import {
   APPEARANCE_PREFERENCES_STORAGE_KEY,
-  parseEditorPresentation,
   parseInterfaceStyle,
-  type EditorPresentation,
   type InterfaceStyle,
 } from "./interfaceStyles";
 
@@ -41,7 +39,6 @@ export type AppearanceSharedPreferences = Readonly<{
   dockIcon: DockIcon;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
-  editorPresentation: EditorPresentation;
 }>;
 
 export type AppearanceScopedOptions = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
@@ -70,7 +67,6 @@ export type LegacyAppearanceSnapshot = Readonly<{
   dockIcon: DockIcon;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
-  editorPresentation?: EditorPresentation;
 }>;
 
 export type AppearancePreferencesReadResult = Readonly<{
@@ -144,7 +140,6 @@ function fromLegacy(legacy: LegacyAppearanceSnapshot): AppearancePreferencesV2 {
       dockIcon: legacy.dockIcon,
       fileIconTheme: legacy.fileIconTheme,
       sidebarNavigationLayout: legacy.sidebarNavigationLayout,
-      editorPresentation: parseEditorPresentation(legacy.editorPresentation),
     },
   });
 }
@@ -199,9 +194,6 @@ function normalizeV2(
         : legacy.fileIconTheme,
       sidebarNavigationLayout: parseSidebarNavigationLayout(
         asString(shared.sidebarNavigationLayout) ?? legacy.sidebarNavigationLayout,
-      ),
-      editorPresentation: parseEditorPresentation(
-        asString(shared.editorPresentation) ?? legacy.editorPresentation,
       ),
     },
     byStyle: readScopedOptions(record.byStyle),

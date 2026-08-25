@@ -221,7 +221,7 @@
 
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar {
   width: var(--interface-scrollbar-width);
   height: var(--interface-scrollbar-height);
   background: var(--interface-scrollbar-background);
@@ -229,23 +229,23 @@
 
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-track,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-track,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-corner {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-corner {
   border: var(--interface-scrollbar-track-border);
   background: var(--interface-scrollbar-track-background);
 }
 
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-track:horizontal {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-track:horizontal {
   background: var(--interface-scrollbar-track-background-horizontal);
 }
 
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-thumb {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb {
   min-width: var(--interface-scrollbar-thumb-min-inline-size);
   min-height: var(--interface-scrollbar-thumb-min-block-size);
   border: var(--interface-scrollbar-thumb-border);
@@ -257,21 +257,21 @@
 
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-thumb:horizontal {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb:horizontal {
   background: var(--interface-scrollbar-thumb-background-horizontal);
   background-clip: var(--interface-scrollbar-thumb-background-clip);
 }
 
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-thumb:hover {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb:hover {
   background: var(--interface-scrollbar-thumb-hover-background);
   background-clip: var(--interface-scrollbar-thumb-hover-background-clip);
 }
 
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-thumb:horizontal:hover {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb:horizontal:hover {
   background: var(--interface-scrollbar-thumb-hover-background-horizontal);
   background-clip: var(--interface-scrollbar-thumb-hover-background-clip);
 }
@@ -282,31 +282,31 @@
  * the start/end directional forms are the canonical selectors. */
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:vertical:start:decrement,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:vertical:start:decrement,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:vertical:end:increment,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:vertical:end:increment,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:horizontal:start:decrement,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:horizontal:start:decrement,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:horizontal:end:increment,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:horizontal:end:increment,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:vertical:decrement,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:vertical:decrement,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:vertical:increment,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:vertical:increment,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:horizontal:decrement,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:horizontal:decrement,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:horizontal:increment,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:horizontal:increment,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:single-button {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:single-button {
   display: var(--interface-scrollbar-button-display);
   width: var(--interface-scrollbar-button-size);
   height: var(--interface-scrollbar-button-size);
@@ -320,71 +320,71 @@
 
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:vertical:start:decrement:hover,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:vertical:start:decrement:hover,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:vertical:end:increment:hover,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:vertical:end:increment:hover,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:horizontal:start:decrement:hover,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:horizontal:start:decrement:hover,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:horizontal:end:increment:hover,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:horizontal:end:increment:hover,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:single-button:hover {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:single-button:hover {
   border-color: var(--interface-scrollbar-button-hover-border-color);
   background-color: var(--interface-scrollbar-button-hover-background-color);
 }
 
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:vertical:start:decrement,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:vertical:start:decrement,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:vertical:decrement,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:vertical:decrement,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:single-button:vertical:decrement {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:single-button:vertical:decrement {
   background-image: var(--interface-scrollbar-button-up-image),
     var(--interface-scrollbar-button-background-image);
 }
 
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:vertical:end:increment,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:vertical:end:increment,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:vertical:increment,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:vertical:increment,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:single-button:vertical:increment {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:single-button:vertical:increment {
   background-image: var(--interface-scrollbar-button-down-image),
     var(--interface-scrollbar-button-background-image);
 }
 
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:horizontal:start:decrement,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:horizontal:start:decrement,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:horizontal:decrement,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:horizontal:decrement,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:single-button:horizontal:decrement {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:single-button:horizontal:decrement {
   background-image: var(--interface-scrollbar-button-left-image),
     var(--interface-scrollbar-button-background-image-horizontal);
 }
 
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:horizontal:end:increment,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:horizontal:end:increment,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:horizontal:increment,
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:horizontal:increment,
 :root[data-interface-style]:not([data-interface-style="default"])[data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-button:single-button:horizontal:increment {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-button:single-button:horizontal:increment {
   background-image: var(--interface-scrollbar-button-right-image),
     var(--interface-scrollbar-button-background-image-horizontal);
 }
@@ -395,7 +395,7 @@
  * real controls inside the owner's local pane, never at viewport level. */
 :root[data-scrollbar-composition="windows-xp-classic-v1"][data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar {
   background-color: var(--interface-scrollbar-background);
   background-image:
     url("./interfaces/windows-xp/assets/scrollbar-up.svg"),
@@ -408,13 +408,13 @@
 
 :root[data-scrollbar-composition="windows-xp-classic-v1"][data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-track {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-track {
   margin-block: 17px;
 }
 
 :root[data-scrollbar-composition="windows-xp-classic-v1"][data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar:horizontal {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar:horizontal {
   background-image:
     url("./interfaces/windows-xp/assets/scrollbar-left.svg"),
     url("./interfaces/windows-xp/assets/scrollbar-right.svg"),
@@ -424,7 +424,7 @@
 
 :root[data-scrollbar-composition="windows-xp-classic-v1"][data-po-scrollbar-mode="product"]
   :where(.app-shell, .onboarding-shell, .desktop-overlay-root)
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"])):not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)::-webkit-scrollbar-track:horizontal {
+  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-track:horizontal {
   margin-block: 0;
   margin-inline: 17px;
 }

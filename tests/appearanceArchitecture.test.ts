@@ -41,7 +41,6 @@ describe("appearance profile architecture", () => {
       sidebarNavigationLayout: requested,
       textSize: "large",
       fileIconTheme: "material",
-      editorPresentation: "follow-interface",
     });
 
     expect(xp.decisions.sidebarNavigationLayout).toMatchObject({
@@ -63,7 +62,6 @@ describe("appearance profile architecture", () => {
       sidebarNavigationLayout: requested,
       textSize: "large",
       fileIconTheme: "material",
-      editorPresentation: "follow-interface",
     });
     expect(restored.sidebarNavigationLayout).toBe(requested);
     expect(restored.composition.locationBar).toBe("none");
@@ -97,19 +95,20 @@ describe("appearance profile architecture", () => {
       .toEqual(new Set(VIEWER_SURFACE_FAMILIES));
   });
 
-  it("keeps Editor presentation orthogonal to Style and exposes only effective data", () => {
+  it("makes Interface Style the only owner of Editor presentation", () => {
     const xp = resolveAppearance({
       interfaceStyle: "windows-xp",
       themeMode: "light",
       sidebarNavigationLayout: "bottom-horizontal",
       textSize: "medium",
       fileIconTheme: "default",
-      editorPresentation: "product-default",
     });
 
     expect(xp.profile).toEqual({ family: "windows-xp", variant: "luna", palette: "blue" });
-    expect(xp.editorPresentation).toBe("product-default");
-    expect(xp.decisions.editorPresentation.requestedValue).toBe("product-default");
+    expect(xp).not.toHaveProperty("editorPresentation");
+    expect(xp.decisions).not.toHaveProperty("editorPresentation");
+    expect(INTERFACE_STYLES.find(({ id }) => id === "windows-xp")?.policies)
+      .not.toHaveProperty("editorPresentation");
     expect(xp).not.toHaveProperty("surfaceAdapters");
   });
 
@@ -129,7 +128,7 @@ describe("appearance profile architecture", () => {
     expect(result.preferences.schemaVersion).toBe(APPEARANCE_PREFERENCES_SCHEMA_VERSION);
     expect(result.preferences.activeStyle).toBe("windows-xp");
     expect(result.preferences.shared.sidebarNavigationLayout).toBe("left-vertical");
-    expect(result.preferences.shared.editorPresentation).toBe("follow-interface");
+    expect(result.preferences.shared).not.toHaveProperty("editorPresentation");
     expect(result.preferences.byStyle["windows-xp"]).toEqual({ fidelity: "authentic" });
     expect(result.preferences.bySurface.code).toEqual({ fontLigatures: false });
 
@@ -160,7 +159,8 @@ describe("appearance profile architecture", () => {
     expect(settings).toContain("resolvedAppearance.decisions.sidebarNavigationLayout");
     expect(settings).toContain("resolvedAppearance.decisions.textSize");
     expect(settings).toContain("resolvedAppearance.decisions.fileIconTheme");
-    expect(settings).toContain("resolvedAppearance.decisions.editorPresentation");
+    expect(settings).not.toContain("editorPresentation");
+    expect(preferences).not.toContain("editorPresentation");
     expect(shell).toContain("preferences.sidebarNavigationPlacement");
     expect(settings).not.toMatch(/interfaceStyle\s*===\s*["']windows-xp["']/);
     expect(shell).not.toMatch(/interfaceStyle\s*===\s*["']windows-xp["']/);

@@ -1,6 +1,6 @@
 /* Grid work-area tokens only. Editable table component tokens live in the
  * separate cross-surface projection next to this file. */
-:root[data-interface-style="windows-xp"][data-editor-presentation="follow-interface"]
+:root[data-interface-style="windows-xp"]
   .po-viewer-surface-boundary[data-viewer-surface-family="grid"] {
   --po-canvas: #ffffff;
   --po-panel: #ece9d8;

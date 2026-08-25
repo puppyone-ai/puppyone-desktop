@@ -5,7 +5,6 @@
 @import "./styles/base.css" layer(reset);
 @import "./styles/scrollbars.css" layer(primitives);
 @import "@puppyone/shared-ui/shared-ui-patterns.css" layer(patterns);
-@import "./styles/viewer-product-default.css" layer(features);
 /* CodeMirror mounts its base theme as unlayered runtime CSS. The Viewer-owned
    editor authority must share that origin tier or CodeMirror's monospace,
    4px-padding defaults outrank PuppyOne's Markdown presentation contract. */

@@ -23,7 +23,6 @@ const STYLE_POLICY_KEYS = [
   "sidebarNavigationLayout",
   "textSize",
   "fileIconTheme",
-  "editorPresentation",
 ];
 const STYLE_PROFILE_KEYS = ["family", "variant", "palette"];
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

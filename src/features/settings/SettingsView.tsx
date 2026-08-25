@@ -69,7 +69,6 @@ export function SettingsView({
   updateState,
   onThemeModeChange,
   onInterfaceStyleChange,
-  onEditorPresentationChange,
   onLightThemePresetChange,
   onDarkThemePresetChange,
   onLoadingAnimationPresetChange,
@@ -246,11 +245,9 @@ export function SettingsView({
     const textSizeDecision = resolvedAppearance.decisions.textSize;
     const fileIconDecision = resolvedAppearance.decisions.fileIconTheme;
     const navigationDecision = resolvedAppearance.decisions.sidebarNavigationLayout;
-    const editorPresentationDecision = resolvedAppearance.decisions.editorPresentation;
     const textSizeLocked = isAppearanceDecisionLocked(textSizeDecision);
     const fileIconLocked = isAppearanceDecisionLocked(fileIconDecision);
     const navigationLocked = isAppearanceDecisionLocked(navigationDecision);
-    const editorPresentationLocked = isAppearanceDecisionLocked(editorPresentationDecision);
     return (
       <section className="desktop-utility-view desktop-settings-view">
         <div className="desktop-utility-body desktop-settings-body" data-po-scrollbar="content">
@@ -270,36 +267,6 @@ export function SettingsView({
                 onLightThemePresetChange={onLightThemePresetChange}
                 onDarkThemePresetChange={onDarkThemePresetChange}
               />
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-                <span>{t("settings.appearance.editorPresentation.title")}</span>
-                <div
-                  className="desktop-theme-segment desktop-appearance-option-segment"
-                  aria-label={t("settings.appearance.editorPresentation.ariaLabel")}
-                >
-                  {(["follow-interface", "product-default"] as const).map((presentation) => (
-                    <button
-                      key={presentation}
-                      className={`${editorPresentationDecision.effectiveValue === presentation ? "active" : ""}${editorPresentationLocked || !isAppearanceValueAllowed(editorPresentationDecision, presentation) ? " is-policy-controlled" : ""}`}
-                      type="button"
-                      title={editorPresentationDecision.reasonKey
-                        ? t(editorPresentationDecision.reasonKey)
-                        : t(`settings.appearance.editorPresentation.${presentation}.description`)}
-                      aria-disabled={editorPresentationLocked || !isAppearanceValueAllowed(editorPresentationDecision, presentation)}
-                      aria-pressed={editorPresentationDecision.effectiveValue === presentation}
-                      onClick={() => {
-                        if (!editorPresentationLocked && isAppearanceValueAllowed(editorPresentationDecision, presentation)) {
-                          onEditorPresentationChange(presentation);
-                        }
-                      }}
-                    >
-                      <span>{t(`settings.appearance.editorPresentation.${presentation}.label`)}</span>
-                    </button>
-                  ))}
-                </div>
-                {editorPresentationDecision.reasonKey && (
-                  <small className="desktop-appearance-policy-reason">{t(editorPresentationDecision.reasonKey)}</small>
-                )}
-              </div>
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.textSize.title")}</span>
                 <div className="desktop-theme-segment desktop-appearance-option-segment" aria-label={t("settings.appearance.textSize.ariaLabel")}>

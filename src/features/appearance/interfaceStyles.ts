@@ -2,7 +2,6 @@ import { INTERFACE_STYLE_MANIFEST } from "./interfaceStyles.generated";
 
 export type ThemeMode = "system" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
-export type EditorPresentation = "follow-interface" | "product-default";
 export type InterfaceStyle = typeof INTERFACE_STYLE_MANIFEST.styles[number]["id"];
 export type InterfaceStyleDefinition = typeof INTERFACE_STYLE_MANIFEST.styles[number];
 export type InterfaceStylePalette = InterfaceStyleDefinition["palette"];
@@ -12,7 +11,6 @@ export type InterfaceStyleFirstPaint = {
 };
 
 export const INTERFACE_STYLES = INTERFACE_STYLE_MANIFEST.styles;
-export const EDITOR_PRESENTATIONS = ["follow-interface", "product-default"] as const;
 export const DEFAULT_INTERFACE_STYLE: InterfaceStyle = INTERFACE_STYLE_MANIFEST.defaultStyle;
 export const INTERFACE_STYLE_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.interfaceStyle;
 export const APPEARANCE_PREFERENCES_STORAGE_KEY = INTERFACE_STYLE_MANIFEST.storage.appearancePreferences;
@@ -27,12 +25,6 @@ export function isInterfaceStyle(value: string | null | undefined): value is Int
 
 export function parseInterfaceStyle(value: string | null | undefined): InterfaceStyle {
   return isInterfaceStyle(value) ? value : DEFAULT_INTERFACE_STYLE;
-}
-
-export function parseEditorPresentation(value: string | null | undefined): EditorPresentation {
-  return EDITOR_PRESENTATIONS.includes(value as EditorPresentation)
-    ? value as EditorPresentation
-    : "follow-interface";
 }
 
 export function getInterfaceStyleDefinition(style: InterfaceStyle): InterfaceStyleDefinition {

@@ -1007,7 +1007,6 @@ function AppContent() {
       data-interface-style-family={resolvedAppearance.profile.family}
       data-interface-style-variant={resolvedAppearance.profile.variant}
       data-interface-style-palette={resolvedAppearance.profile.palette}
-      data-editor-presentation={resolvedAppearance.editorPresentation}
       data-appearance-token-set={resolvedAppearance.tokenSet}
       data-shell-composition={resolvedAppearance.composition.shell}
       data-titlebar-composition={resolvedAppearance.composition.titlebar}
