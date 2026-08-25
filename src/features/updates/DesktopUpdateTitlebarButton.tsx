@@ -28,6 +28,13 @@ export function DesktopUpdateTitlebarButton({
           ? t("updates.detail.blocked")
           : t("updates.detail.downloaded", { version })
         : t("updates.detail.installing");
+  const buttonLabel = presentation.kind === "available"
+    ? t("updates.action.updateNow")
+    : presentation.kind === "downloading"
+      ? t("updates.title.downloading", { progress })
+      : presentation.kind === "ready"
+        ? t("updates.action.restart")
+        : t("updates.action.restarting");
   const Icon = presentation.kind === "available"
     ? Download
     : presentation.kind === "ready"
@@ -52,7 +59,7 @@ export function DesktopUpdateTitlebarButton({
           : undefined}
         aria-hidden="true"
       />
-      <span className="desktop-titlebar-update-dot" aria-hidden="true" />
+      <span className="desktop-titlebar-update-label">{buttonLabel}</span>
     </button>
   );
 }

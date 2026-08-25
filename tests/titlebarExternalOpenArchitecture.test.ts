@@ -29,13 +29,12 @@ describe("pane-scoped external-open architecture", () => {
     );
     expect(updateButton).toContain("if (!presentation) return null");
     expect(updateButton).toContain("strokeWidth={2.3}");
+    expect(updateButton).toContain('className="desktop-titlebar-update-label"');
     expect(titlebarCss).toMatch(
-      /\.desktop-titlebar-update\s*\{[^}]*width:\s*var\(--desktop-titlebar-control-height\);[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-inverse\);[^}]*\}/s,
+      /\.desktop-titlebar-update\s*\{[^}]*width:\s*auto;[^}]*border:\s*1px solid[^}]*border-radius:\s*6px;[^}]*background:\s*color-mix[^}]*color:\s*var\(--desktop-titlebar-text\);[^}]*\}/s,
     );
-    expect(titlebarCss).toMatch(
-      /\.desktop-titlebar-update::before\s*\{[^}]*inset:\s*2px;[^}]*border-radius:\s*50%;[^}]*background:\s*var\(--po-accent\);[^}]*\}/s,
-    );
-    expect(titlebarCss).toContain(".desktop-titlebar-update-dot");
+    expect(titlebarCss).toContain(".desktop-titlebar-update-label");
+    expect(titlebarCss).not.toContain(".desktop-titlebar-update-dot");
   });
 
   it("keeps application choice in Default Apps settings", () => {
