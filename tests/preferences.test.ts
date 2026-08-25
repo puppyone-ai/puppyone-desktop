@@ -30,11 +30,17 @@ describe("Git sidebar layout preferences", () => {
 });
 
 describe("create new menu preferences", () => {
-  it("defaults to a complete v4 menu with explicit main and submenu placements", () => {
+  it("defaults to a complete v5 hierarchy with a first-class submenu node", () => {
     expect(parseCreateNewMenuSettings(null)).toEqual(DEFAULT_CREATE_NEW_MENU_SETTINGS);
+    expect(DEFAULT_CREATE_NEW_MENU_SETTINGS).toEqual({
+      version: 5,
+      main: ["markdown", "csv", "html", "customFiles"],
+      submenu: ["contextMap", "slides"],
+      hidden: ["text", "json", "app", "puppyflow"],
+    });
   });
 
-  it("migrates old settings while preserving explicit order and visibility", () => {
+  it("migrates old enabled and placement fields into the three menu groups", () => {
     expect(parseCreateNewMenuSettings(JSON.stringify({
       version: 3,
       items: [
@@ -42,18 +48,10 @@ describe("create new menu preferences", () => {
         { kind: "text", enabled: true },
       ],
     }))).toEqual({
-      version: 4,
-      items: [
-        { kind: "json", enabled: false, placement: "submenu" },
-        { kind: "text", enabled: true, placement: "submenu" },
-        { kind: "markdown", enabled: false, placement: "main" },
-        { kind: "csv", enabled: false, placement: "main" },
-        { kind: "html", enabled: false, placement: "main" },
-        { kind: "contextMap", enabled: false, placement: "submenu" },
-        { kind: "slides", enabled: false, placement: "submenu" },
-        { kind: "app", enabled: false, placement: "submenu" },
-        { kind: "puppyflow", enabled: false, placement: "submenu" },
-      ],
+      version: 5,
+      main: ["customFiles"],
+      submenu: ["text"],
+      hidden: ["json", "markdown", "contextMap", "csv", "html", "slides", "app", "puppyflow"],
     });
     expect(parseCreateNewMenuSettings(JSON.stringify({
       version: 2,
@@ -71,7 +69,7 @@ describe("create new menu preferences", () => {
     }))).toEqual(DEFAULT_CREATE_NEW_MENU_SETTINGS);
   });
 
-  it("preserves v4 placements and deduplicates valid file types", () => {
+  it("migrates v4 placements, deduplicates items, and moves disabled items to Not shown", () => {
     expect(parseCreateNewMenuSettings(JSON.stringify({
       version: 4,
       items: [
@@ -81,18 +79,24 @@ describe("create new menu preferences", () => {
         { kind: "not-a-file-type", enabled: true, placement: "main" },
       ],
     }))).toEqual({
-      version: 4,
-      items: [
-        { kind: "json", enabled: true, placement: "main" },
-        { kind: "text", enabled: false, placement: "submenu" },
-        { kind: "markdown", enabled: false, placement: "main" },
-        { kind: "csv", enabled: false, placement: "main" },
-        { kind: "html", enabled: false, placement: "main" },
-        { kind: "contextMap", enabled: false, placement: "submenu" },
-        { kind: "slides", enabled: false, placement: "submenu" },
-        { kind: "app", enabled: false, placement: "submenu" },
-        { kind: "puppyflow", enabled: false, placement: "submenu" },
-      ],
+      version: 5,
+      main: ["json", "customFiles"],
+      submenu: [],
+      hidden: ["text", "markdown", "contextMap", "csv", "html", "slides", "app", "puppyflow"],
+    });
+  });
+
+  it("normalizes v5 hierarchy data without losing the submenu's position", () => {
+    expect(parseCreateNewMenuSettings(JSON.stringify({
+      version: 5,
+      main: ["html", "customFiles", "markdown", "html", "invalid"],
+      submenu: ["json", "markdown"],
+      hidden: ["text", "json"],
+    }))).toEqual({
+      version: 5,
+      main: ["html", "customFiles", "markdown"],
+      submenu: ["json"],
+      hidden: ["text", "contextMap", "csv", "slides", "app", "puppyflow"],
     });
   });
 
@@ -101,23 +105,22 @@ describe("create new menu preferences", () => {
       items: [{ kind: "not-a-file-type" }],
     }))).toEqual(DEFAULT_CREATE_NEW_MENU_SETTINGS);
     expect(parseCreateNewMenuSettings(JSON.stringify({ items: [] }))).toEqual({
-      version: 4,
-      items: DEFAULT_CREATE_NEW_MENU_SETTINGS.items.map((item) => ({ ...item, enabled: false })),
+      version: 5,
+      main: ["customFiles"],
+      submenu: [],
+      hidden: ["markdown", "contextMap", "text", "json", "csv", "html", "slides", "app", "puppyflow"],
     });
   });
 
-  it("resolves enabled and available items into their configured menu groups", () => {
+  it("resolves available items while preserving the submenu node's main-menu position", () => {
     const settings = {
-      version: 4,
-      items: [
-        { kind: "app", enabled: true, placement: "main" },
-        { kind: "json", enabled: false, placement: "main" },
-        { kind: "csv", enabled: true, placement: "submenu" },
-        { kind: "contextMap", enabled: true, placement: "submenu" },
-      ],
+      version: 5,
+      main: ["app", "customFiles", "contextMap"],
+      submenu: ["csv", "puppyflow"],
+      hidden: ["json", "text", "markdown", "html", "slides"],
     } as const;
     expect(resolveVisibleCreateNewMenuItems(settings, DEFAULT_EXPERIMENTAL_SETTINGS)).toEqual({
-      main: ["app"],
+      main: ["app", "customFiles"],
       submenu: ["csv"],
     });
   });

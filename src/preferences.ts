@@ -18,10 +18,13 @@ import {
 import type { PulseGridPresetId } from "@puppyone/shared-ui";
 import {
   CREATE_NEW_ITEM_IDS,
+  CREATE_NEW_SUBMENU_ID,
   getCreateEntryMenuItem,
-  getDefaultCreateNewMenuItems,
+  getDefaultCreateNewMenuLayout,
+  type CreateNewMainMenuEntry,
   type CreateNewItemId,
   type CreateNewMenuPlacement,
+  type CreateNewSubmenuId,
 } from "./features/create-new/createEntryMenuRegistry";
 
 export type { TypographyPreferences } from "./features/typography/fontCatalog";
@@ -36,8 +39,13 @@ export {
   resolveActiveThemeMode,
 };
 export type { InterfaceStyle, ThemeMode };
-export { CREATE_NEW_ITEM_IDS };
-export type { CreateNewItemId, CreateNewMenuPlacement };
+export { CREATE_NEW_ITEM_IDS, CREATE_NEW_SUBMENU_ID };
+export type {
+  CreateNewItemId,
+  CreateNewMainMenuEntry,
+  CreateNewMenuPlacement,
+  CreateNewSubmenuId,
+};
 
 export type LightThemePreset = "neutral" | "warm" | "graphite";
 export type DarkThemePreset = "default" | "warm" | "graphite";
@@ -102,15 +110,12 @@ export type ExperimentalSettings = {
   enableViewerPlugins: boolean;
 };
 
-export const CREATE_NEW_MENU_VERSION = 4 as const;
-export type CreateNewMenuItem = {
-  kind: CreateNewItemId;
-  enabled: boolean;
-  placement: CreateNewMenuPlacement;
-};
+export const CREATE_NEW_MENU_VERSION = 5 as const;
 export type CreateNewMenuSettings = {
   version: typeof CREATE_NEW_MENU_VERSION;
-  items: CreateNewMenuItem[];
+  main: CreateNewMainMenuEntry[];
+  submenu: CreateNewItemId[];
+  hidden: CreateNewItemId[];
 };
 
 export const TEXT_SIZE_STORAGE_KEY = "puppyone.desktop.textSize";
@@ -192,9 +197,12 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enablePuppyFlowFiles: false,
   enableViewerPlugins: false,
 };
+const DEFAULT_CREATE_NEW_MENU_LAYOUT = getDefaultCreateNewMenuLayout();
 export const DEFAULT_CREATE_NEW_MENU_SETTINGS: CreateNewMenuSettings = {
   version: CREATE_NEW_MENU_VERSION,
-  items: getDefaultCreateNewMenuItems(),
+  main: DEFAULT_CREATE_NEW_MENU_LAYOUT.main,
+  submenu: DEFAULT_CREATE_NEW_MENU_LAYOUT.submenu,
+  hidden: DEFAULT_CREATE_NEW_MENU_LAYOUT.hidden,
 };
 
 export const SIDEBAR_NAVIGATION_LAYOUT_OPTIONS = [
@@ -587,41 +595,63 @@ export function parseCreateNewMenuSettings(value: string | null | undefined): Cr
   if (!value) return cloneDefaultCreateNewMenuSettings();
 
   try {
-    const parsed = JSON.parse(value) as (Partial<CreateNewMenuSettings> & { version?: unknown }) | null;
-    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.items)) {
+    const parsed = JSON.parse(value) as Record<string, unknown> | null;
+    if (!parsed || typeof parsed !== "object") {
       return cloneDefaultCreateNewMenuSettings();
     }
 
-    const items: CreateNewMenuItem[] = [];
+    if (parsed.version === CREATE_NEW_MENU_VERSION) {
+      return normalizeCreateNewMenuLayout(parsed.main, parsed.submenu, parsed.hidden);
+    }
+
+    if (!Array.isArray(parsed.items)) {
+      return cloneDefaultCreateNewMenuSettings();
+    }
+
+    const legacyItems: Array<{
+      kind: CreateNewItemId;
+      enabled: boolean;
+      placement: Exclude<CreateNewMenuPlacement, "hidden">;
+    }> = [];
     const seen = new Set<CreateNewItemId>();
-    for (const item of parsed.items) {
-      if (!item || typeof item !== "object") continue;
-      const kind = "kind" in item ? item.kind : null;
+    for (const rawItem of parsed.items) {
+      if (!rawItem || typeof rawItem !== "object") continue;
+      const kind = "kind" in rawItem ? rawItem.kind : null;
       if (!isCreateNewItemId(kind) || seen.has(kind)) continue;
       seen.add(kind);
-      items.push({
+      const placement = "placement" in rawItem && (
+        rawItem.placement === "main" || rawItem.placement === "submenu"
+      )
+        ? rawItem.placement
+        : getCreateEntryMenuItem(kind).defaultPlacement;
+      legacyItems.push({
         kind,
-        enabled: !("enabled" in item) || item.enabled !== false,
-        placement: "placement" in item && isCreateNewMenuPlacement(item.placement)
-          ? item.placement
-          : getCreateEntryMenuItem(kind).defaultPlacement,
+        enabled: !("enabled" in rawItem) || rawItem.enabled !== false,
+        placement,
       });
     }
 
-    if (parsed.items.length > 0 && items.length === 0) {
+    if (parsed.items.length > 0 && legacyItems.length === 0) {
       return cloneDefaultCreateNewMenuSettings();
     }
-    const isLegacyDefault = parsed.version !== CREATE_NEW_MENU_VERSION
-      && (matchesEnabledCreateMenu(items, ["markdown", "csv"])
-        || matchesEnabledCreateMenu(items, ["markdown", "csv", "html", "slides"]));
-    if (isLegacyDefault) {
+    if (isLegacyCreateNewDefault(legacyItems)) {
       return cloneDefaultCreateNewMenuSettings();
     }
-    for (const defaultItem of getDefaultCreateNewMenuItems()) {
-      if (seen.has(defaultItem.kind)) continue;
-      items.push({ ...defaultItem, enabled: false });
+
+    const main: CreateNewMainMenuEntry[] = legacyItems
+      .filter((item) => item.enabled && item.placement === "main")
+      .map((item) => item.kind);
+    main.push(CREATE_NEW_SUBMENU_ID);
+    const submenu = legacyItems
+      .filter((item) => item.enabled && item.placement === "submenu")
+      .map((item) => item.kind);
+    const hidden = legacyItems
+      .filter((item) => !item.enabled)
+      .map((item) => item.kind);
+    for (const kind of CREATE_NEW_ITEM_IDS) {
+      if (!seen.has(kind)) hidden.push(kind);
     }
-    return { version: CREATE_NEW_MENU_VERSION, items };
+    return { version: CREATE_NEW_MENU_VERSION, main, submenu, hidden };
   } catch {
     return cloneDefaultCreateNewMenuSettings();
   }
@@ -630,7 +660,9 @@ export function parseCreateNewMenuSettings(value: string | null | undefined): Cr
 export function cloneDefaultCreateNewMenuSettings(): CreateNewMenuSettings {
   return {
     version: CREATE_NEW_MENU_VERSION,
-    items: DEFAULT_CREATE_NEW_MENU_SETTINGS.items.map((item) => ({ ...item })),
+    main: [...DEFAULT_CREATE_NEW_MENU_SETTINGS.main],
+    submenu: [...DEFAULT_CREATE_NEW_MENU_SETTINGS.submenu],
+    hidden: [...DEFAULT_CREATE_NEW_MENU_SETTINGS.hidden],
   };
 }
 
@@ -640,7 +672,7 @@ export function isCreateNewItemId(value: unknown): value is CreateNewItemId {
 }
 
 export function isCreateNewMenuPlacement(value: unknown): value is CreateNewMenuPlacement {
-  return value === "main" || value === "submenu";
+  return value === "main" || value === "submenu" || value === "hidden";
 }
 
 export function isCreateNewItemAvailable(
@@ -651,24 +683,77 @@ export function isCreateNewItemAvailable(
   return !experimentalSetting || experimentalSettings[experimentalSetting];
 }
 
-function matchesEnabledCreateMenu(
-  items: readonly CreateNewMenuItem[],
-  kinds: readonly CreateNewItemId[],
-): boolean {
-  return items.length === kinds.length
-    && items.every((item, index) => item.enabled && item.kind === kinds[index]);
+function normalizeCreateNewMenuLayout(
+  rawMain: unknown,
+  rawSubmenu: unknown,
+  rawHidden: unknown,
+): CreateNewMenuSettings {
+  const main: CreateNewMainMenuEntry[] = [];
+  const submenu: CreateNewItemId[] = [];
+  const hidden: CreateNewItemId[] = [];
+  const seenItems = new Set<CreateNewItemId>();
+  let submenuSeen = false;
+
+  if (Array.isArray(rawMain)) {
+    for (const entry of rawMain) {
+      if (entry === CREATE_NEW_SUBMENU_ID && !submenuSeen) {
+        main.push(entry);
+        submenuSeen = true;
+      } else if (isCreateNewItemId(entry) && !seenItems.has(entry)) {
+        main.push(entry);
+        seenItems.add(entry);
+      }
+    }
+  }
+  if (!submenuSeen) main.push(CREATE_NEW_SUBMENU_ID);
+
+  for (const [source, target] of [
+    [rawSubmenu, submenu],
+    [rawHidden, hidden],
+  ] as const) {
+    if (!Array.isArray(source)) continue;
+    for (const entry of source) {
+      if (!isCreateNewItemId(entry) || seenItems.has(entry)) continue;
+      target.push(entry);
+      seenItems.add(entry);
+    }
+  }
+
+  for (const kind of CREATE_NEW_ITEM_IDS) {
+    if (!seenItems.has(kind)) hidden.push(kind);
+  }
+  return { version: CREATE_NEW_MENU_VERSION, main, submenu, hidden };
+}
+
+function isLegacyCreateNewDefault(items: readonly {
+  kind: CreateNewItemId;
+  enabled: boolean;
+}[]): boolean {
+  const enabledKinds = items.filter((item) => item.enabled).map((item) => item.kind);
+  return [
+    ["markdown", "csv"],
+    ["markdown", "csv", "html", "slides"],
+    ["markdown", "contextMap", "csv", "html", "slides"],
+  ].some((expected) => (
+    enabledKinds.length === expected.length
+    && enabledKinds.every((kind, index) => kind === expected[index])
+  ));
 }
 
 export function resolveVisibleCreateNewMenuItems(
   settings: CreateNewMenuSettings,
   experimentalSettings: ExperimentalSettings,
-): Readonly<{ main: CreateNewItemId[]; submenu: CreateNewItemId[] }> {
-  const visible = settings.items.filter((item) => (
-    item.enabled && isCreateNewItemAvailable(item.kind, experimentalSettings)
+): Readonly<{ main: CreateNewMainMenuEntry[]; submenu: CreateNewItemId[] }> {
+  const submenu = settings.submenu.filter((kind) => (
+    isCreateNewItemAvailable(kind, experimentalSettings)
   ));
   return {
-    main: visible.filter((item) => item.placement === "main").map((item) => item.kind),
-    submenu: visible.filter((item) => item.placement === "submenu").map((item) => item.kind),
+    main: settings.main.filter((entry) => (
+      entry === CREATE_NEW_SUBMENU_ID
+        ? submenu.length > 0
+        : isCreateNewItemAvailable(entry, experimentalSettings)
+    )),
+    submenu,
   };
 }
 

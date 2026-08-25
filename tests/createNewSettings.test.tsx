@@ -3,6 +3,7 @@
  */
 import React, { useState } from "react";
 import { act } from "react";
+import { readFileSync } from "node:fs";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CreateNewSettingsView } from "../src/features/settings/main/CreateNewSettingsView";
@@ -24,90 +25,105 @@ afterEach(() => {
 });
 
 describe("Create New settings", () => {
-  it("uses the shared switch and renders the actual main-menu and submenu structure", () => {
+  it("renders one connected hierarchy with a nested submenu and a Not shown group", () => {
     const container = render(defaultSettings(), vi.fn());
 
-    expect(container.textContent).toContain("Main menu");
-    expect(container.textContent).toContain("Submenu items");
-    expect(container.querySelector(".desktop-create-new-preview-card")).toBeNull();
-    expect(container.querySelector(".desktop-create-new-switch")).toBeNull();
-    expect(container.querySelectorAll(".desktop-settings-switch")).toHaveLength(9);
-    expect(readLabels(container, ".desktop-create-new-menu-editor:first-of-type .desktop-create-new-row-label"))
-      .toEqual(["Folder", "Markdown file", "CSV file", "HTML file", "Custom files"]);
-    expect(readLabels(container, ".desktop-create-new-menu-editor:nth-of-type(2) .desktop-create-new-row-label"))
-      .toEqual(["Context Map", "Text file", "JSON file", "Slides", "PuppyOne app", "PuppyFlow file"]);
+    expect(container.textContent).toContain("Menu structure");
+    expect(container.textContent).toContain("Not shown");
+    expect(container.querySelectorAll(".desktop-settings-switch")).toHaveLength(0);
+    expect(readEntries(container, "main")).toEqual([
+      "markdown",
+      "csv",
+      "html",
+      "customFiles",
+    ]);
+    expect(readEntries(container, "submenu")).toEqual(["contextMap", "slides"]);
+    expect(readEntries(container, "hidden")).toEqual(["text", "json", "app", "puppyflow"]);
+
+    const submenuNode = container.querySelector('[data-entry="customFiles"]')
+      ?.closest(".desktop-create-new-submenu-node");
+    expect(submenuNode?.querySelector('[data-entry="contextMap"]')).not.toBeNull();
+    expect(submenuNode?.querySelector('[data-entry="slides"]')).not.toBeNull();
   });
 
-  it("moves a main-menu item into the submenu and persists the placement", () => {
+  it("moves the Custom files node relative to ordinary main-menu items", () => {
     const onChange = vi.fn();
     const container = render(defaultSettings(), onChange);
 
-    click(container.querySelector('[aria-label="Move CSV file to submenu"]'));
+    click(container.querySelector('[aria-label="Move Custom files up"]'));
 
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
-      version: 4,
-      items: expect.arrayContaining([
-        expect.objectContaining({ kind: "csv", enabled: true, placement: "submenu" }),
-      ]),
-    }));
-    expect(readLabels(container, ".desktop-create-new-menu-editor:first-of-type .desktop-create-new-row-label"))
-      .toEqual(["Folder", "Markdown file", "HTML file", "Custom files"]);
-    expect(readLabels(container, ".desktop-create-new-menu-editor:nth-of-type(2) .desktop-create-new-row-label"))
-      .toEqual([
-        "Context Map",
-        "Text file",
-        "JSON file",
-        "Slides",
-        "PuppyOne app",
-        "PuppyFlow file",
-        "CSV file",
-      ]);
+    expect(onChange).toHaveBeenLastCalledWith({
+      version: 5,
+      main: ["markdown", "csv", "customFiles", "html"],
+      submenu: ["contextMap", "slides"],
+      hidden: ["text", "json", "app", "puppyflow"],
+    });
+    expect(readEntries(container, "main")).toEqual([
+      "markdown",
+      "csv",
+      "customFiles",
+      "html",
+    ]);
   });
 
-  it("moves a submenu item into the main menu", () => {
+  it("moves an item between menu levels with the accessible location control", () => {
     const onChange = vi.fn();
     const container = render(defaultSettings(), onChange);
 
-    click(container.querySelector('[aria-label="Move Context Map to main menu"]'));
+    changeSelect(container.querySelector('[aria-label="Location for CSV file"]'), "hidden");
 
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
-      items: expect.arrayContaining([
-        expect.objectContaining({ kind: "contextMap", placement: "main" }),
-      ]),
-    }));
-    expect(readLabels(container, ".desktop-create-new-menu-editor:first-of-type .desktop-create-new-row-label"))
-      .toEqual(["Folder", "Markdown file", "CSV file", "HTML file", "Context Map", "Custom files"]);
+    expect(onChange).toHaveBeenLastCalledWith({
+      version: 5,
+      main: ["markdown", "html", "customFiles"],
+      submenu: ["contextMap", "slides"],
+      hidden: ["text", "json", "app", "puppyflow", "csv"],
+    });
+    expect(readEntries(container, "main")).toEqual(["markdown", "html", "customFiles"]);
+    expect(readEntries(container, "hidden")).toEqual(["text", "json", "app", "puppyflow", "csv"]);
   });
 
-  it("keeps ordering and visibility controls within each menu group", () => {
+  it("drags an item directly from Not shown into the Custom files submenu", () => {
     const onChange = vi.fn();
     const container = render(defaultSettings(), onChange);
-
-    click(container.querySelector('[aria-label="Move CSV file up"]'));
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
-      items: expect.arrayContaining([
-        expect.objectContaining({ kind: "csv", placement: "main" }),
-      ]),
-    }));
-    expect(readLabels(container, ".desktop-create-new-menu-editor:first-of-type .desktop-create-new-row-label"))
-      .toEqual(["Folder", "CSV file", "Markdown file", "HTML file", "Custom files"]);
-
-    click(container.querySelector('[aria-label="Show Markdown file in the New menu"]'));
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
-      items: expect.arrayContaining([
-        { kind: "markdown", enabled: false, placement: "main" },
-      ]),
-    }));
-  });
-
-  it("keeps experimental types visible but unavailable until their feature is enabled", () => {
-    const container = render(defaultSettings(), vi.fn());
-    const puppyflow = container.querySelector<HTMLInputElement>(
-      '[aria-label="Show PuppyFlow file in the New menu"]',
+    const dragHandle = container.querySelector('[data-entry="text"] .desktop-create-new-drag-handle');
+    const submenuDropZone = container.querySelector(
+      '.desktop-create-new-submenu-children .desktop-create-new-drop-zone[data-group="submenu"]',
     );
+    if (!(dragHandle instanceof HTMLElement) || !(submenuDropZone instanceof HTMLElement)) {
+      throw new Error("Expected drag source and submenu drop target");
+    }
+    const dataTransfer = createDataTransfer();
 
-    expect(puppyflow?.disabled).toBe(true);
-    expect(puppyflow?.closest(".desktop-create-new-row")?.dataset.unavailable).toBe("true");
+    act(() => dragHandle.dispatchEvent(createDragEvent("dragstart", dataTransfer)));
+    act(() => submenuDropZone.dispatchEvent(createDragEvent("dragover", dataTransfer)));
+    act(() => submenuDropZone.dispatchEvent(createDragEvent("drop", dataTransfer)));
+
+    expect(onChange).toHaveBeenLastCalledWith({
+      version: 5,
+      main: ["markdown", "csv", "html", "customFiles"],
+      submenu: ["contextMap", "slides", "text"],
+      hidden: ["json", "app", "puppyflow"],
+    });
+    expect(readEntries(container, "submenu")).toEqual(["contextMap", "slides", "text"]);
+    expect(readEntries(container, "hidden")).toEqual(["json", "app", "puppyflow"]);
+  });
+
+  it("keeps unavailable experimental types visible in the hierarchy", () => {
+    const container = render(defaultSettings(), vi.fn());
+    const puppyflow = container.querySelector<HTMLElement>('[data-entry="puppyflow"]');
+
+    expect(puppyflow?.dataset.group).toBe("hidden");
+    expect(puppyflow?.dataset.unavailable).toBe("true");
+  });
+
+  it("uses Settings surface tokens instead of popup-menu colors and shadows", () => {
+    const css = readFileSync("src/styles/settings-new-menu.css", "utf8");
+
+    expect(css).toContain("padding-inline: 10px");
+    expect(css).toContain("background: var(--po-panel)");
+    expect(css).toContain("border: 1px solid var(--po-border-subtle)");
+    expect(css).not.toContain("var(--po-menu-bg)");
+    expect(css).not.toContain("var(--po-menu-shadow");
   });
 });
 
@@ -140,10 +156,42 @@ function click(target: Element | null) {
   act(() => target.click());
 }
 
-function readLabels(container: HTMLElement, selector: string): string[] {
-  return Array.from(container.querySelectorAll(selector), (element) => element.textContent?.trim() ?? "");
+function changeSelect(target: Element | null, value: string) {
+  if (!(target instanceof HTMLSelectElement)) throw new Error("Expected a select element");
+  act(() => {
+    target.value = value;
+    target.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+
+function readEntries(container: HTMLElement, group: "main" | "submenu" | "hidden"): string[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(`.desktop-create-new-row[data-group="${group}"]`),
+    (element) => element.dataset.entry ?? "",
+  );
 }
 
 function defaultSettings(): CreateNewMenuSettings {
   return cloneDefaultCreateNewMenuSettings();
+}
+
+function createDataTransfer() {
+  const values = new Map<string, string>();
+  return {
+    dropEffect: "none",
+    effectAllowed: "all",
+    getData(type: string) {
+      return values.get(type) ?? "";
+    },
+    setData(type: string, value: string) {
+      values.set(type, value);
+    },
+  } as DataTransfer;
+}
+
+function createDragEvent(type: string, dataTransfer: DataTransfer): DragEvent {
+  const event = new Event(type, { bubbles: true, cancelable: true }) as DragEvent;
+  Object.defineProperty(event, "dataTransfer", { value: dataTransfer });
+  Object.defineProperty(event, "clientY", { value: 0 });
+  return event;
 }

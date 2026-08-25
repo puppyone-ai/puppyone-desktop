@@ -1174,7 +1174,7 @@ function AppContent() {
             ) : (
               <DesktopCreateEntryMenu
                 draft={createEntryDraft}
-                mainItemKinds={createNewItems.main}
+                mainEntries={createNewItems.main}
                 submenuItemKinds={createNewItems.submenu}
                 fileIconTheme={fileIconTheme}
                 onCancel={() => setCreateEntryDraft(null)}

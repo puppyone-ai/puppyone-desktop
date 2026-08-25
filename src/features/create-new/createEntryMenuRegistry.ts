@@ -12,13 +12,16 @@ export const CREATE_NEW_ITEM_IDS = [
   "puppyflow",
 ] as const;
 export type CreateNewItemId = typeof CREATE_NEW_ITEM_IDS[number];
+export const CREATE_NEW_SUBMENU_ID = "customFiles" as const;
+export type CreateNewSubmenuId = typeof CREATE_NEW_SUBMENU_ID;
+export type CreateNewMainMenuEntry = CreateNewItemId | CreateNewSubmenuId;
 
 export type CreateEntryMenuItemKind = "folder" | CreateNewItemId;
-export type CreateNewMenuPlacement = "main" | "submenu";
+export type CreateNewMenuPlacement = "main" | "submenu" | "hidden";
 
 export type CreateEntryMenuItemDefinition = Readonly<{
   kind: CreateEntryMenuItemKind;
-  defaultPlacement: CreateNewMenuPlacement;
+  defaultPlacement: Exclude<CreateNewMenuPlacement, "hidden">;
   order: number;
   defaultEnabled: boolean;
   experimentalSetting?: "enableContextMaps" | "enablePuppyFlowFiles";
@@ -128,24 +131,33 @@ export function getCreateEntryMenuItem(
   return CREATE_ENTRY_MENU_ITEM_REGISTRY[kind];
 }
 
-export function getDefaultCreateNewMenuItems(): Array<{
-  kind: CreateNewItemId;
-  enabled: boolean;
-  placement: CreateNewMenuPlacement;
+export function getDefaultCreateNewMenuLayout(): Readonly<{
+  main: CreateNewMainMenuEntry[];
+  submenu: CreateNewItemId[];
+  hidden: CreateNewItemId[];
 }> {
-  return CREATE_NEW_ITEM_IDS
+  const definitions = CREATE_NEW_ITEM_IDS
     .map((kind) => CREATE_ENTRY_MENU_ITEM_REGISTRY[kind])
     .sort((left, right) => {
       if (left.defaultPlacement !== right.defaultPlacement) {
         return left.defaultPlacement === "main" ? -1 : 1;
       }
       return left.order - right.order;
-    })
-    .map((item) => ({
-      kind: item.kind,
-      enabled: item.defaultEnabled,
-      placement: item.defaultPlacement,
-    }));
+    });
+  return {
+    main: [
+      ...definitions
+        .filter((item) => item.defaultEnabled && item.defaultPlacement === "main")
+        .map((item) => item.kind),
+      CREATE_NEW_SUBMENU_ID,
+    ],
+    submenu: definitions
+      .filter((item) => item.defaultEnabled && item.defaultPlacement === "submenu")
+      .map((item) => item.kind),
+    hidden: definitions
+      .filter((item) => !item.defaultEnabled)
+      .map((item) => item.kind),
+  };
 }
 
 export function getConfiguredCreateEntryMenuItems(

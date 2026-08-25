@@ -30,7 +30,12 @@ import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core"
 import { useLocalization } from "@puppyone/localization/react";
 import { DesktopDialogCloseButton, DesktopDialogRoot } from "../../components/DesktopDialog";
 import { DesktopMenuItem, DesktopMenuSeparator, DesktopMenuSurface } from "../../components/DesktopMenu";
-import type { CreateNewItemId, ExperimentalSettings } from "../../preferences";
+import {
+  CREATE_NEW_SUBMENU_ID,
+  type CreateNewItemId,
+  type CreateNewMainMenuEntry,
+  type ExperimentalSettings,
+} from "../../preferences";
 import { createUnconfiguredAppPreviewManifestContent } from "../../../shared/appPreviewManifest.js";
 import {
   getConfiguredCreateEntryMenuItems,
@@ -130,14 +135,14 @@ export function DesktopExplorerRowActions({
 
 export function DesktopCreateEntryMenu({
   draft,
-  mainItemKinds,
+  mainEntries,
   submenuItemKinds,
   fileIconTheme,
   onCancel,
   onSelectKind,
 }: {
   draft: DesktopCreateEntryDraft;
-  mainItemKinds: readonly CreateNewItemId[];
+  mainEntries: readonly CreateNewMainMenuEntry[];
   submenuItemKinds: readonly CreateNewItemId[];
   fileIconTheme?: FileIconThemeId | null;
   onCancel: () => void;
@@ -148,15 +153,13 @@ export function DesktopCreateEntryMenu({
   const submenuCloseTimerRef = useRef<number | null>(null);
   const suppressSubmenuFocusOpenRef = useRef(false);
   const [submenuOpen, setSubmenuOpen] = useState(false);
-  const mainOptions = getConfiguredCreateEntryMenuItems(mainItemKinds);
   const submenuOptions = getConfiguredCreateEntryMenuItems(submenuItemKinds);
   const sidebarLauncher = draft.anchor.placement === "auto-end";
   const menuWidth = sidebarLauncher
     ? Math.max(CREATE_ENTRY_MENU_WIDTH, draft.anchor.width)
     : CREATE_ENTRY_MENU_WIDTH;
-  const menuRowCount = 1 + mainOptions.length + (submenuOptions.length > 0 ? 1 : 0);
-  const separatorCount = Number(mainOptions.length > 0 || submenuOptions.length > 0)
-    + Number(mainOptions.length > 0 && submenuOptions.length > 0);
+  const menuRowCount = 1 + mainEntries.length;
+  const separatorCount = Number(mainEntries.length > 0);
   const estimatedHeight = 8 + (menuRowCount * 30) + (separatorCount * 9);
   const position = getCreateEntryMenuPosition(draft.anchor, menuWidth, estimatedHeight);
   const documentDirection = document.documentElement.dir === "rtl" ? "rtl" : "ltr";
@@ -282,79 +285,84 @@ export function DesktopCreateEntryMenu({
         label={getCreateEntryOptionLabel("folder", t)}
         onClick={() => onSelectKind("folder")}
       />
-      {(mainOptions.length > 0 || submenuOptions.length > 0) && <DesktopMenuSeparator />}
-      {mainOptions.map((option) => (
-        <DesktopNodeActionMenuItem
-          key={option.kind}
-          icon={<CreateEntryGlyph option={option} theme={fileIconTheme} />}
-          label={getCreateEntryOptionLabel(option.kind, t)}
-          onClick={() => onSelectKind(option.kind)}
-        />
-      ))}
-      {mainOptions.length > 0 && submenuOptions.length > 0 && <DesktopMenuSeparator />}
-      {submenuOptions.length > 0 && (
-        <div
-          className="desktop-create-entry-submenu-wrap"
-          data-open={submenuOpen ? "true" : "false"}
-          data-submenu-side={submenuSide}
-          onPointerEnter={openSubmenu}
-          onPointerLeave={scheduleCloseSubmenu}
-          onFocus={() => {
-            if (suppressSubmenuFocusOpenRef.current) {
-              suppressSubmenuFocusOpenRef.current = false;
-              return;
-            }
-            openSubmenu();
-          }}
-          onBlur={(event) => {
-            const relatedTarget = event.relatedTarget;
-            if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) return;
-            scheduleCloseSubmenu();
-          }}
-        >
-          <DesktopMenuItem
-            className="desktop-node-action-menu-item desktop-create-entry-submenu-trigger"
-            icon={<Workflow size={14} />}
-            label={t("workspace.node.customFiles")}
-            trailing={<ChevronRight className="po-directional-icon" size={14} />}
-            aria-controls="desktop-create-entry-custom-submenu"
-            aria-haspopup="menu"
-            aria-expanded={submenuOpen}
-            onKeyDown={(event) => {
-              if (event.key !== "ArrowRight") return;
-              event.preventDefault();
-              event.stopPropagation();
-              focusSubmenu();
-            }}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
+      {mainEntries.length > 0 && <DesktopMenuSeparator />}
+      {mainEntries.map((entry) => {
+        if (entry !== CREATE_NEW_SUBMENU_ID) {
+          const option = getCreateEntryMenuItem(entry);
+          return (
+            <DesktopNodeActionMenuItem
+              key={option.kind}
+              icon={<CreateEntryGlyph option={option} theme={fileIconTheme} />}
+              label={getCreateEntryOptionLabel(option.kind, t)}
+              onClick={() => onSelectKind(option.kind)}
+            />
+          );
+        }
+        return (
+          <div
+            className="desktop-create-entry-submenu-wrap"
+            data-open={submenuOpen ? "true" : "false"}
+            data-submenu-side={submenuSide}
+            key={entry}
+            onPointerEnter={openSubmenu}
+            onPointerLeave={scheduleCloseSubmenu}
+            onFocus={() => {
+              if (suppressSubmenuFocusOpenRef.current) {
+                suppressSubmenuFocusOpenRef.current = false;
+                return;
+              }
               openSubmenu();
             }}
-          />
-          <DesktopMenuSurface
-            id="desktop-create-entry-custom-submenu"
-            className="desktop-create-entry-submenu"
-            ariaLabel={t("workspace.node.createCustomFile")}
-            onKeyDown={(event) => {
-              if (event.key !== "ArrowLeft") return;
-              event.preventDefault();
-              event.stopPropagation();
-              closeSubmenu();
-              focusSubmenuTrigger();
+            onBlur={(event) => {
+              const relatedTarget = event.relatedTarget;
+              if (relatedTarget instanceof Node && event.currentTarget.contains(relatedTarget)) return;
+              scheduleCloseSubmenu();
             }}
           >
-            {submenuOptions.map((option) => (
-              <DesktopNodeActionMenuItem
-                key={option.kind}
-                icon={<CreateEntryGlyph option={option} theme={fileIconTheme} />}
-                label={getCreateEntryOptionLabel(option.kind, t)}
-                onClick={() => onSelectKind(option.kind)}
-              />
-            ))}
-          </DesktopMenuSurface>
-        </div>
-      )}
+            <DesktopMenuItem
+              className="desktop-node-action-menu-item desktop-create-entry-submenu-trigger"
+              icon={<Workflow size={14} />}
+              label={t("workspace.node.customFiles")}
+              trailing={<ChevronRight className="po-directional-icon" size={14} />}
+              aria-controls="desktop-create-entry-custom-submenu"
+              aria-haspopup="menu"
+              aria-expanded={submenuOpen}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowRight") return;
+                event.preventDefault();
+                event.stopPropagation();
+                focusSubmenu();
+              }}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                openSubmenu();
+              }}
+            />
+            <DesktopMenuSurface
+              id="desktop-create-entry-custom-submenu"
+              className="desktop-create-entry-submenu"
+              ariaLabel={t("workspace.node.createCustomFile")}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowLeft") return;
+                event.preventDefault();
+                event.stopPropagation();
+                closeSubmenu();
+                focusSubmenuTrigger();
+              }}
+            >
+              {submenuOptions.map((option) => (
+                <DesktopNodeActionMenuItem
+                  key={option.kind}
+                  icon={<CreateEntryGlyph option={option} theme={fileIconTheme} />}
+                  label={getCreateEntryOptionLabel(option.kind, t)}
+                  onClick={() => onSelectKind(option.kind)}
+                />
+              ))}
+            </DesktopMenuSurface>
+          </div>
+        );
+      })}
     </DesktopMenuSurface>
   );
 }

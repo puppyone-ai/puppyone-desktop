@@ -38,7 +38,7 @@ describe("create entry menu", () => {
     const container = render(
       <DesktopCreateEntryMenu
         draft={draft}
-        mainItemKinds={["markdown", "csv"]}
+        mainEntries={["markdown", "csv"]}
         submenuItemKinds={[]}
         onCancel={vi.fn()}
         onSelectKind={vi.fn()}
@@ -53,12 +53,12 @@ describe("create entry menu", () => {
       .toBeLessThan(draft.anchor.top);
   });
 
-  it("renders configured main items and a hoverable submenu in their exact order", () => {
+  it("renders the draggable submenu node at its configured main-menu position", () => {
     const onSelectKind = vi.fn();
     const container = render(
       <DesktopCreateEntryMenu
         draft={createDraft()}
-        mainItemKinds={["html", "markdown", "csv"]}
+        mainEntries={["html", "customFiles", "markdown", "csv"]}
         submenuItemKinds={["app", "contextMap", "slides"]}
         onCancel={vi.fn()}
         onSelectKind={onSelectKind}
@@ -70,10 +70,9 @@ describe("create entry menu", () => {
       "Folder",
       "divider",
       "HTML file",
+      "Custom files",
       "Markdown file",
       "CSV file",
-      "divider",
-      "Custom files",
     ]);
 
     expect(container.textContent).not.toContain("Paste");
@@ -103,7 +102,7 @@ describe("create entry menu", () => {
     const container = render(
       <DesktopCreateEntryMenu
         draft={createDraft()}
-        mainItemKinds={["markdown"]}
+        mainEntries={["markdown", "customFiles"]}
         submenuItemKinds={["json"]}
         onCancel={vi.fn()}
         onSelectKind={vi.fn()}
@@ -114,7 +113,6 @@ describe("create entry menu", () => {
       "Folder",
       "divider",
       "Markdown file",
-      "divider",
       "Custom files",
     ]);
     expect(container.querySelector(
@@ -135,7 +133,7 @@ describe("create entry menu", () => {
     const container = render(
       <DesktopCreateEntryMenu
         draft={draft}
-        mainItemKinds={["markdown"]}
+        mainEntries={["markdown", "customFiles"]}
         submenuItemKinds={["contextMap"]}
         onCancel={vi.fn()}
         onSelectKind={vi.fn()}
@@ -150,7 +148,7 @@ describe("create entry menu", () => {
     const container = render(
       <DesktopCreateEntryMenu
         draft={createDraft()}
-        mainItemKinds={["markdown"]}
+        mainEntries={["markdown", "customFiles"]}
         submenuItemKinds={["contextMap"]}
         onCancel={vi.fn()}
         onSelectKind={vi.fn()}
@@ -177,7 +175,7 @@ describe("create entry menu", () => {
     const container = render(
       <DesktopCreateEntryMenu
         draft={createDraft()}
-        mainItemKinds={[]}
+        mainEntries={[]}
         submenuItemKinds={[]}
         onCancel={vi.fn()}
         onSelectKind={vi.fn()}

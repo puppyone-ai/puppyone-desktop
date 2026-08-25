@@ -1,7 +1,6 @@
 import { useMemo, useState, type DragEvent } from "react";
 import {
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   ChevronUp,
   GripVertical,
@@ -17,21 +16,25 @@ import {
 import { useLocalization } from "@puppyone/localization";
 import {
   CREATE_NEW_MENU_VERSION,
+  CREATE_NEW_SUBMENU_ID,
   cloneDefaultCreateNewMenuSettings,
   isCreateNewItemAvailable,
+  isCreateNewItemId,
   type CreateNewItemId,
-  type CreateNewMenuItem,
+  type CreateNewMainMenuEntry,
   type CreateNewMenuPlacement,
   type CreateNewMenuSettings,
+  type CreateNewSubmenuId,
   type ExperimentalSettings,
 } from "../../../preferences";
 import { getCreateEntryMenuItem } from "../../create-new/createEntryMenuRegistry";
 import { SettingsSectionHeader } from "../components";
 
+type CreateNewDraggableEntry = CreateNewItemId | CreateNewSubmenuId;
+type MenuGroup = CreateNewMenuPlacement;
 type DragTarget = {
-  edge: "before" | "after";
-  kind: CreateNewItemId;
-  placement: CreateNewMenuPlacement;
+  group: MenuGroup;
+  index: number;
 };
 
 export function CreateNewSettingsView({
@@ -46,140 +49,124 @@ export function CreateNewSettingsView({
   onChange: (settings: CreateNewMenuSettings) => void;
 }) {
   const { t } = useLocalization();
-  const [draggedKind, setDraggedKind] = useState<CreateNewItemId | null>(null);
+  const [draggedEntry, setDraggedEntry] = useState<CreateNewDraggableEntry | null>(null);
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
   const defaultSettings = useMemo(() => cloneDefaultCreateNewMenuSettings(), []);
-  const mainItems = settings.items.filter((item) => item.placement === "main");
-  const submenuItems = settings.items.filter((item) => item.placement === "submenu");
-  const visibleSubmenu = submenuItems.some((item) => (
-    item.enabled && isCreateNewItemAvailable(item.kind, experimentalSettings)
-  ));
   const defaultsRestored = menuSettingsEqual(settings, defaultSettings);
 
-  const commitItems = (items: CreateNewMenuItem[]) => {
-    onChange({
-      version: CREATE_NEW_MENU_VERSION,
-      items: groupItemsByPlacement(items),
-    });
-  };
-
-  const updateEnabled = (kind: CreateNewItemId, enabled: boolean) => {
-    commitItems(settings.items.map((item) => (
-      item.kind === kind ? { ...item, enabled } : item
-    )));
-  };
-
-  const moveWithinGroup = (kind: CreateNewItemId, offset: -1 | 1) => {
-    const item = settings.items.find((candidate) => candidate.kind === kind);
-    if (!item) return;
-    const group = settings.items.filter((candidate) => candidate.placement === item.placement);
-    const sourceIndex = group.findIndex((candidate) => candidate.kind === kind);
-    const targetIndex = sourceIndex + offset;
-    if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= group.length) return;
-    const reordered = [...group];
-    const [source] = reordered.splice(sourceIndex, 1);
-    if (!source) return;
-    reordered.splice(targetIndex, 0, source);
-    commitItems([
-      ...settings.items.filter((candidate) => candidate.placement !== item.placement),
-      ...reordered,
-    ]);
-  };
-
-  const moveToPlacement = (kind: CreateNewItemId, placement: CreateNewMenuPlacement) => {
-    const source = settings.items.find((item) => item.kind === kind);
-    if (!source || source.placement === placement) return;
-    commitItems([
-      ...settings.items.filter((item) => item.kind !== kind),
-      { ...source, placement },
-    ]);
-  };
-
-  const dropItem = (sourceKind: CreateNewItemId, target: DragTarget) => {
-    if (sourceKind === target.kind) return;
-    const source = settings.items.find((item) => item.kind === sourceKind);
-    if (!source) return;
-    const remaining = settings.items.filter((item) => item.kind !== sourceKind);
-    const targetGroup = remaining.filter((item) => item.placement === target.placement);
-    const targetIndex = targetGroup.findIndex((item) => item.kind === target.kind);
-    if (targetIndex < 0) return;
-    targetGroup.splice(
-      target.edge === "before" ? targetIndex : targetIndex + 1,
-      0,
-      { ...source, placement: target.placement },
-    );
-    commitItems([
-      ...remaining.filter((item) => item.placement !== target.placement),
-      ...targetGroup,
-    ]);
+  const clearDragState = () => {
+    setDraggedEntry(null);
+    setDragTarget(null);
   };
 
   const handleDragStart = (
     event: DragEvent<HTMLButtonElement>,
-    kind: CreateNewItemId,
+    entry: CreateNewDraggableEntry,
   ) => {
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", kind);
-    setDraggedKind(kind);
+    event.dataTransfer.setData("text/plain", entry);
+    setDraggedEntry(entry);
   };
 
-  const handleDragOver = (
-    event: DragEvent<HTMLDivElement>,
-    placement: CreateNewMenuPlacement,
-    kind: CreateNewItemId,
-  ) => {
-    if (!draggedKind || draggedKind === kind) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const edge = event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
-    setDragTarget({ kind, edge, placement });
-  };
-
-  const clearDragState = () => {
-    setDraggedKind(null);
-    setDragTarget(null);
-  };
-
-  const renderItem = (
-    item: CreateNewMenuItem,
+  const setDropTarget = (
+    event: DragEvent<HTMLElement>,
+    group: MenuGroup,
     index: number,
-    group: readonly CreateNewMenuItem[],
   ) => {
-    const visual = getCreateEntryMenuItem(item.kind);
-    const label = t(`workspace.node.create.kind.${item.kind}.label`);
-    const available = isCreateNewItemAvailable(item.kind, experimentalSettings);
-    const moveTarget: CreateNewMenuPlacement = item.placement === "main" ? "submenu" : "main";
-    const moveLabel = t(
-      item.placement === "main"
-        ? "settings.createNew.moveToSubmenu"
-        : "settings.createNew.moveToMainMenu",
-      { type: label },
-    );
-    const dragBefore = dragTarget?.kind === item.kind && dragTarget.edge === "before";
-    const dragAfter = dragTarget?.kind === item.kind && dragTarget.edge === "after";
+    if (!draggedEntry || (draggedEntry === CREATE_NEW_SUBMENU_ID && group !== "main")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    setDragTarget({ group, index });
+  };
+
+  const setRowDropTarget = (
+    event: DragEvent<HTMLDivElement>,
+    group: MenuGroup,
+    index: number,
+    entry: CreateNewDraggableEntry,
+  ) => {
+    if (!draggedEntry || draggedEntry === entry) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const pointerRatio = bounds.height > 0
+      ? (event.clientY - bounds.top) / bounds.height
+      : 0;
+    if (
+      entry === CREATE_NEW_SUBMENU_ID
+      && draggedEntry !== CREATE_NEW_SUBMENU_ID
+      && pointerRatio >= 0.25
+      && pointerRatio <= 0.75
+    ) {
+      setDropTarget(event, "submenu", settings.submenu.length);
+      return;
+    }
+    setDropTarget(event, group, index + (pointerRatio >= 0.5 ? 1 : 0));
+  };
+
+  const completeDrop = (
+    event: DragEvent<HTMLElement>,
+    fallbackTarget: DragTarget,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const rawEntry = event.dataTransfer.getData("text/plain");
+    if (!isCreateNewDraggableEntry(rawEntry)) {
+      clearDragState();
+      return;
+    }
+    const target = dragTarget ?? fallbackTarget;
+    onChange(moveEntry(settings, rawEntry, target.group, target.index));
+    clearDragState();
+  };
+
+  const moveWithinGroup = (
+    entry: CreateNewDraggableEntry,
+    group: MenuGroup,
+    offset: -1 | 1,
+  ) => {
+    const entries = getGroupEntries(settings, group);
+    const sourceIndex = entries.indexOf(entry);
+    const targetIndex = sourceIndex + offset;
+    if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= entries.length) return;
+    const reordered = [...entries];
+    const [source] = reordered.splice(sourceIndex, 1);
+    if (!source) return;
+    reordered.splice(targetIndex, 0, source);
+    onChange(replaceGroup(settings, group, reordered));
+  };
+
+  const moveToGroup = (kind: CreateNewItemId, group: MenuGroup) => {
+    onChange(moveEntry(settings, kind, group, getGroupEntries(settings, group).length));
+  };
+
+  const renderRow = (
+    entry: CreateNewDraggableEntry,
+    group: MenuGroup,
+    index: number,
+    groupLength: number,
+  ) => {
+    const isSubmenu = entry === CREATE_NEW_SUBMENU_ID;
+    const label = isSubmenu
+      ? t("workspace.node.customFiles")
+      : t(`workspace.node.create.kind.${entry}.label`);
+    const available = isSubmenu || isCreateNewItemAvailable(entry, experimentalSettings);
+    const dragBefore = dragTarget?.group === group && dragTarget.index === index;
+    const dragAfter = dragTarget?.group === group && dragTarget.index === index + 1;
+
     return (
       <div
-        className="desktop-create-new-row desktop-create-new-file-row"
+        className={`desktop-create-new-row ${isSubmenu ? "desktop-create-new-submenu-row" : "desktop-create-new-file-row"}`}
         data-drag-before={dragBefore || undefined}
         data-drag-after={dragAfter || undefined}
-        data-dragging={draggedKind === item.kind || undefined}
+        data-dragging={draggedEntry === entry || undefined}
+        data-entry={entry}
+        data-group={group}
         data-unavailable={!available || undefined}
-        key={item.kind}
+        key={entry}
         role="listitem"
-        onDragOver={(event) => handleDragOver(event, item.placement, item.kind)}
-        onDrop={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          const sourceKind = event.dataTransfer.getData("text/plain") as CreateNewItemId;
-          const target = dragTarget ?? {
-            kind: item.kind,
-            edge: "before" as const,
-            placement: item.placement,
-          };
-          dropItem(sourceKind, target);
-          clearDragState();
-        }}
+        title={!available ? t("settings.createNew.unavailable") : undefined}
+        onDragOver={(event) => setRowDropTarget(event, group, index, entry)}
+        onDrop={(event) => completeDrop(event, { group, index })}
       >
         <button
           className="desktop-create-new-drag-handle"
@@ -187,68 +174,86 @@ export function CreateNewSettingsView({
           draggable
           aria-label={t("settings.createNew.dragToReorder", { type: label })}
           title={t("settings.createNew.dragToReorder", { type: label })}
-          onDragStart={(event) => handleDragStart(event, item.kind)}
+          onDragStart={(event) => handleDragStart(event, entry)}
           onDragEnd={clearDragState}
         >
           <GripVertical size={14} aria-hidden="true" />
         </button>
-        <CreateNewGlyph
-          iconName={visual.iconName}
-          iconType={visual.iconType}
-          theme={fileIconTheme}
-        />
+        {isSubmenu ? (
+          <span className="desktop-create-new-submenu-glyph" aria-hidden="true">
+            <Workflow size={15} />
+          </span>
+        ) : (
+          <CreateNewGlyph
+            iconName={getCreateEntryMenuItem(entry).iconName}
+            iconType={getCreateEntryMenuItem(entry).iconType}
+            theme={fileIconTheme}
+          />
+        )}
         <span className="desktop-create-new-row-label">{label}</span>
         <div className="desktop-create-new-row-controls">
-          <button
-            className="desktop-create-new-placement-button"
-            type="button"
-            aria-label={moveLabel}
-            title={moveLabel}
-            onClick={() => moveToPlacement(item.kind, moveTarget)}
-          >
-            {item.placement === "main" ? (
+          {isSubmenu ? (
+            <>
+              <span className="desktop-create-new-submenu-badge">
+                {t("settings.createNew.submenu.badge")}
+              </span>
               <ChevronRight className="po-directional-icon" size={14} aria-hidden="true" />
-            ) : (
-              <ChevronLeft className="po-directional-icon" size={14} aria-hidden="true" />
-            )}
-          </button>
+            </>
+          ) : (
+            <select
+              className="desktop-create-new-location-select"
+              value={group}
+              aria-label={t("settings.createNew.location.ariaLabel", { type: label })}
+              onChange={(event) => moveToGroup(entry, event.target.value as MenuGroup)}
+            >
+              <option value="main">{t("settings.createNew.location.main")}</option>
+              <option value="submenu">{t("settings.createNew.location.submenu")}</option>
+              <option value="hidden">{t("settings.createNew.location.hidden")}</option>
+            </select>
+          )}
           <span className="desktop-create-new-order-controls">
             <button
               type="button"
               disabled={index === 0}
               aria-label={t("settings.createNew.moveUp", { type: label })}
               title={t("settings.createNew.moveUp", { type: label })}
-              onClick={() => moveWithinGroup(item.kind, -1)}
+              onClick={() => moveWithinGroup(entry, group, -1)}
             >
               <ChevronUp size={13} aria-hidden="true" />
             </button>
             <button
               type="button"
-              disabled={index === group.length - 1}
+              disabled={index === groupLength - 1}
               aria-label={t("settings.createNew.moveDown", { type: label })}
               title={t("settings.createNew.moveDown", { type: label })}
-              onClick={() => moveWithinGroup(item.kind, 1)}
+              onClick={() => moveWithinGroup(entry, group, 1)}
             >
               <ChevronDown size={13} aria-hidden="true" />
             </button>
           </span>
-          <label
-            className="desktop-settings-switch"
-            title={!available ? t("settings.createNew.unavailable") : undefined}
-          >
-            <input
-              type="checkbox"
-              checked={item.enabled}
-              disabled={!available}
-              aria-label={t("settings.createNew.enable", { type: label })}
-              onChange={(event) => updateEnabled(item.kind, event.target.checked)}
-            />
-            <span aria-hidden="true" />
-          </label>
         </div>
       </div>
     );
   };
+
+  const renderDropZone = (group: MenuGroup, index: number, empty: boolean) => (
+    <div
+      className="desktop-create-new-drop-zone"
+      data-active={dragTarget?.group === group && dragTarget.index === index || undefined}
+      data-empty={empty || undefined}
+      data-group={group}
+      onDragOver={(event) => setDropTarget(event, group, index)}
+      onDrop={(event) => completeDrop(event, { group, index })}
+    >
+      {empty && (
+        <span>
+          {group === "submenu"
+            ? t("settings.createNew.submenu.empty")
+            : t("settings.createNew.hidden.empty")}
+        </span>
+      )}
+    </div>
+  );
 
   return (
     <section className="desktop-utility-view desktop-settings-view">
@@ -260,12 +265,14 @@ export function CreateNewSettingsView({
           />
 
           <div className="desktop-create-new-layout">
-            <section className="desktop-create-new-menu-editor">
+            <section className="desktop-create-new-editor">
               <header className="desktop-create-new-group-header">
-                <strong>{t("settings.createNew.mainMenu.title")}</strong>
+                <span className="desktop-create-new-group-title">
+                  {t("settings.createNew.mainMenu.title")}
+                </span>
                 <span>{t("settings.createNew.mainMenu.detail")}</span>
               </header>
-              <div className="desktop-create-new-menu-list" role="list">
+              <div className="desktop-create-new-tree" role="list">
                 <div className="desktop-create-new-row desktop-create-new-row-fixed" role="listitem">
                   <span className="desktop-create-new-fixed-marker" aria-hidden="true">
                     <LockKeyhole size={12} />
@@ -278,35 +285,45 @@ export function CreateNewSettingsView({
                     {t("settings.createNew.fixed")}
                   </span>
                 </div>
-                <div className="desktop-create-new-menu-divider" aria-hidden="true" />
-                {mainItems.map((item, index) => renderItem(item, index, mainItems))}
-                {visibleSubmenu && (
-                  <div className="desktop-create-new-row desktop-create-new-submenu-link" role="listitem">
-                    <span aria-hidden="true" />
-                    <span className="desktop-create-new-submenu-glyph" aria-hidden="true">
-                      <Workflow size={15} />
-                    </span>
-                    <span className="desktop-create-new-row-label">
-                      {t("workspace.node.customFiles")}
-                    </span>
-                    <ChevronRight className="po-directional-icon" size={14} aria-hidden="true" />
-                  </div>
-                )}
+                <div className="desktop-create-new-divider" aria-hidden="true" />
+                {settings.main.map((entry, index) => (
+                  entry === CREATE_NEW_SUBMENU_ID ? (
+                    <div className="desktop-create-new-submenu-node" key={entry}>
+                      {renderRow(entry, "main", index, settings.main.length)}
+                      <div
+                        className="desktop-create-new-submenu-children"
+                        data-drop-active={dragTarget?.group === "submenu" || undefined}
+                        role="group"
+                        aria-label={t("settings.createNew.submenu.title")}
+                      >
+                        {settings.submenu.map((kind, childIndex) => (
+                          renderRow(kind, "submenu", childIndex, settings.submenu.length)
+                        ))}
+                        {renderDropZone("submenu", settings.submenu.length, settings.submenu.length === 0)}
+                      </div>
+                    </div>
+                  ) : renderRow(entry, "main", index, settings.main.length)
+                ))}
+                {renderDropZone("main", settings.main.length, false)}
               </div>
             </section>
 
-            <section className="desktop-create-new-menu-editor">
+            <section className="desktop-create-new-hidden-section">
               <header className="desktop-create-new-group-header">
-                <strong>{t("settings.createNew.submenu.title")}</strong>
-                <span>{t("settings.createNew.submenu.detail")}</span>
+                <span className="desktop-create-new-group-title">
+                  {t("settings.createNew.hidden.title")}
+                </span>
+                <span>{t("settings.createNew.hidden.detail")}</span>
               </header>
-              <div className="desktop-create-new-menu-list" role="list">
-                {submenuItems.map((item, index) => renderItem(item, index, submenuItems))}
-                {submenuItems.length === 0 && (
-                  <div className="desktop-create-new-empty">
-                    {t("settings.createNew.submenu.empty")}
-                  </div>
-                )}
+              <div
+                className="desktop-create-new-hidden-list"
+                data-drop-active={dragTarget?.group === "hidden" || undefined}
+                role="list"
+              >
+                {settings.hidden.map((kind, index) => (
+                  renderRow(kind, "hidden", index, settings.hidden.length)
+                ))}
+                {renderDropZone("hidden", settings.hidden.length, settings.hidden.length === 0)}
               </div>
             </section>
 
@@ -328,21 +345,63 @@ export function CreateNewSettingsView({
   );
 }
 
-function groupItemsByPlacement(items: readonly CreateNewMenuItem[]): CreateNewMenuItem[] {
-  return [
-    ...items.filter((item) => item.placement === "main"),
-    ...items.filter((item) => item.placement === "submenu"),
-  ];
+function isCreateNewDraggableEntry(value: unknown): value is CreateNewDraggableEntry {
+  return value === CREATE_NEW_SUBMENU_ID || isCreateNewItemId(value);
+}
+
+function getGroupEntries(
+  settings: CreateNewMenuSettings,
+  group: MenuGroup,
+): readonly CreateNewDraggableEntry[] {
+  if (group === "main") return settings.main;
+  return settings[group];
+}
+
+function replaceGroup(
+  settings: CreateNewMenuSettings,
+  group: MenuGroup,
+  entries: readonly CreateNewDraggableEntry[],
+): CreateNewMenuSettings {
+  if (group === "main") {
+    return { ...settings, version: CREATE_NEW_MENU_VERSION, main: entries as CreateNewMainMenuEntry[] };
+  }
+  const itemEntries = entries.filter(isCreateNewItemId);
+  return { ...settings, version: CREATE_NEW_MENU_VERSION, [group]: itemEntries };
+}
+
+function moveEntry(
+  settings: CreateNewMenuSettings,
+  entry: CreateNewDraggableEntry,
+  targetGroup: MenuGroup,
+  requestedIndex: number,
+): CreateNewMenuSettings {
+  if (entry === CREATE_NEW_SUBMENU_ID && targetGroup !== "main") return settings;
+
+  const sourceGroup = (["main", "submenu", "hidden"] as const)
+    .find((group) => getGroupEntries(settings, group).includes(entry));
+  if (!sourceGroup) return settings;
+  const sourceIndex = getGroupEntries(settings, sourceGroup).indexOf(entry);
+  const withoutEntry = replaceGroup(
+    settings,
+    sourceGroup,
+    getGroupEntries(settings, sourceGroup).filter((candidate) => candidate !== entry),
+  );
+  const targetEntries = [...getGroupEntries(withoutEntry, targetGroup)];
+  const adjustedIndex = sourceGroup === targetGroup && sourceIndex < requestedIndex
+    ? requestedIndex - 1
+    : requestedIndex;
+  targetEntries.splice(Math.max(0, Math.min(adjustedIndex, targetEntries.length)), 0, entry);
+  return replaceGroup(withoutEntry, targetGroup, targetEntries);
 }
 
 function menuSettingsEqual(left: CreateNewMenuSettings, right: CreateNewMenuSettings): boolean {
-  return left.items.length === right.items.length
-    && left.items.every((item, index) => {
-      const candidate = right.items[index];
-      return candidate?.kind === item.kind
-        && candidate.enabled === item.enabled
-        && candidate.placement === item.placement;
-    });
+  return groupsEqual(left.main, right.main)
+    && groupsEqual(left.submenu, right.submenu)
+    && groupsEqual(left.hidden, right.hidden);
+}
+
+function groupsEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((entry, index) => entry === right[index]);
 }
 
 function CreateNewGlyph({

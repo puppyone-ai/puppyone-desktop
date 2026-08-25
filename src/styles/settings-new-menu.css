@@ -4,61 +4,62 @@
 
 .desktop-create-new-layout {
   display: grid;
+  box-sizing: border-box;
   width: 100%;
+  max-width: 720px;
   min-width: 0;
-  max-width: 680px;
-  gap: 22px;
+  gap: 20px;
+  padding-inline: 10px;
 }
 
-.desktop-create-new-menu-editor {
+.desktop-create-new-editor,
+.desktop-create-new-hidden-section {
   display: grid;
   min-width: 0;
-  gap: 8px;
+  gap: 7px;
 }
 
 .desktop-create-new-group-header {
   display: grid;
   min-width: 0;
-  gap: 3px;
-  padding-inline: 2px;
+  gap: 2px;
 }
 
-.desktop-create-new-group-header strong {
-  color: var(--po-text);
-  font-size: 13px;
-  font-weight: var(--po-text-weight-medium, 500);
+.desktop-create-new-group-header > span {
+  color: var(--po-text-subtle);
+  font-size: 11.5px;
+  font-weight: var(--po-text-weight-regular, 400);
+  line-height: 16px;
+}
+
+.desktop-create-new-group-header > .desktop-create-new-group-title {
+  color: var(--po-text-muted);
+  font-size: 12.5px;
   line-height: 18px;
 }
 
-.desktop-create-new-group-header span {
-  color: var(--po-text-subtle);
-  font-size: 12px;
-  font-weight: var(--po-text-weight-regular, 400);
-  line-height: 17px;
-}
-
-.desktop-create-new-menu-list {
+.desktop-create-new-tree,
+.desktop-create-new-hidden-list {
   display: grid;
   min-width: 0;
-  padding: var(--po-menu-padding);
-  border: 1px solid var(--po-menu-border);
-  border-radius: var(--po-menu-radius);
-  background: var(--po-menu-bg);
-  box-shadow: var(--po-menu-shadow-compact, var(--po-menu-shadow));
+  padding: 4px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 7px;
+  background: var(--po-panel);
 }
 
 .desktop-create-new-row {
   position: relative;
   display: grid;
   min-width: 0;
-  min-height: var(--po-menu-item-height);
+  min-height: 34px;
   grid-template-columns: 24px 20px minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--po-menu-item-gap);
-  padding-inline: var(--po-menu-item-padding-inline);
-  border-radius: var(--po-menu-item-radius);
+  gap: 7px;
+  padding-inline: 8px;
+  border-radius: 6px;
   color: var(--po-text-muted);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: var(--po-text-weight-regular, 400);
   line-height: 18px;
 }
@@ -71,6 +72,11 @@
   white-space: nowrap;
 }
 
+.desktop-create-new-file-row:hover,
+.desktop-create-new-submenu-row:hover {
+  background: var(--po-hover);
+}
+
 .desktop-create-new-row-fixed {
   color: var(--po-text-subtle);
 }
@@ -79,6 +85,8 @@
 .desktop-create-new-glyph,
 .desktop-create-new-submenu-glyph {
   display: inline-flex;
+  width: 20px;
+  height: 20px;
   align-items: center;
   justify-content: center;
 }
@@ -87,64 +95,77 @@
   opacity: 0.58;
 }
 
-.desktop-create-new-glyph,
-.desktop-create-new-submenu-glyph {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 auto;
-}
-
-.desktop-create-new-fixed-label {
+.desktop-create-new-fixed-label,
+.desktop-create-new-submenu-badge {
   padding-inline: 7px;
   color: var(--po-text-subtle);
-  font-size: 11.5px;
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
 }
 
-.desktop-create-new-menu-divider {
+.desktop-create-new-submenu-badge {
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 999px;
+  background: var(--po-control);
+  line-height: 19px;
+}
+
+.desktop-create-new-divider {
   height: 1px;
-  margin: var(--po-menu-separator-margin-block, 4px) 6px;
-  background: var(--po-menu-separator, var(--po-divider));
+  margin: 3px 8px;
+  background: var(--po-divider);
 }
 
-.desktop-create-new-file-row:hover,
-.desktop-create-new-submenu-link {
-  background: var(--po-menu-item-hover-bg, var(--po-hover));
-  color: var(--po-text);
+.desktop-create-new-submenu-node {
+  display: grid;
+  min-width: 0;
 }
 
-.desktop-create-new-submenu-link {
-  pointer-events: none;
+.desktop-create-new-submenu-children {
+  display: grid;
+  min-width: 0;
+  margin: 1px 6px 3px 20px;
+  padding: 3px 0 3px 9px;
+  border-inline-start: 1px solid var(--po-divider);
+  border-radius: 0 5px 5px 0;
+  background: color-mix(in srgb, var(--po-panel-raised) 34%, transparent);
+}
+
+.desktop-create-new-submenu-children[data-drop-active],
+.desktop-create-new-hidden-list[data-drop-active] {
+  border-color: color-mix(in srgb, var(--po-accent) 46%, var(--po-border-subtle));
+  background: color-mix(in srgb, var(--po-selected) 36%, var(--po-panel));
 }
 
 .desktop-create-new-file-row[data-unavailable] {
-  opacity: 0.58;
+  opacity: 0.52;
 }
 
-.desktop-create-new-file-row[data-dragging] {
-  opacity: 0.42;
+.desktop-create-new-row[data-dragging] {
+  opacity: 0.38;
 }
 
-.desktop-create-new-file-row[data-drag-before]::before,
-.desktop-create-new-file-row[data-drag-after]::after {
+.desktop-create-new-row[data-drag-before]::before,
+.desktop-create-new-row[data-drag-after]::after {
   position: absolute;
-  z-index: 1;
-  inset-inline: var(--po-menu-item-padding-inline);
+  z-index: 2;
+  inset-inline: 8px;
   height: 2px;
   border-radius: 2px;
   background: var(--po-accent);
   content: "";
 }
 
-.desktop-create-new-file-row[data-drag-before]::before {
+.desktop-create-new-row[data-drag-before]::before {
   inset-block-start: -1px;
 }
 
-.desktop-create-new-file-row[data-drag-after]::after {
+.desktop-create-new-row[data-drag-after]::after {
   inset-block-end: -1px;
 }
 
 .desktop-create-new-drag-handle,
-.desktop-create-new-placement-button,
 .desktop-create-new-order-controls button {
   display: inline-flex;
   width: 24px;
@@ -154,7 +175,7 @@
   justify-content: center;
   padding: 0;
   border: 0;
-  border-radius: var(--desktop-toolbar-action-radius);
+  border-radius: 5px;
   background: transparent;
   color: var(--po-text-subtle);
 }
@@ -169,7 +190,6 @@
 }
 
 .desktop-create-new-drag-handle:hover,
-.desktop-create-new-placement-button:hover,
 .desktop-create-new-order-controls button:hover:not(:disabled) {
   background: var(--po-hover);
   color: var(--po-text);
@@ -177,8 +197,8 @@
 }
 
 .desktop-create-new-drag-handle:focus-visible,
-.desktop-create-new-placement-button:focus-visible,
-.desktop-create-new-order-controls button:focus-visible {
+.desktop-create-new-order-controls button:focus-visible,
+.desktop-create-new-location-select:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--po-accent) 36%, transparent);
   outline-offset: 1px;
 }
@@ -191,7 +211,7 @@
 }
 
 .desktop-create-new-row-controls {
-  gap: 6px;
+  gap: 5px;
 }
 
 .desktop-create-new-order-controls {
@@ -199,18 +219,51 @@
 }
 
 .desktop-create-new-order-controls button:disabled {
-  opacity: 0.25;
+  opacity: 0.24;
 }
 
-.desktop-create-new-empty {
-  display: grid;
-  min-height: 48px;
-  place-items: center;
-  padding: 8px 12px;
+.desktop-create-new-location-select {
+  width: auto;
+  max-width: 116px;
+  height: 24px;
+  padding: 0 24px 0 7px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background-color: transparent;
   color: var(--po-text-subtle);
-  font-size: 12px;
-  line-height: 17px;
+  font: inherit;
+  font-size: 11.5px;
+}
+
+.desktop-create-new-row:hover .desktop-create-new-location-select,
+.desktop-create-new-location-select:focus-visible {
+  border-color: var(--po-border);
+  background-color: var(--po-control);
+  color: var(--po-text);
+}
+
+.desktop-create-new-drop-zone {
+  display: grid;
+  min-height: 6px;
+  place-items: center;
+  margin: 0 8px;
+  border-radius: 5px;
+  color: var(--po-text-subtle);
+  font-size: 11.5px;
+  line-height: 16px;
   text-align: center;
+}
+
+.desktop-create-new-drop-zone[data-empty] {
+  min-height: 38px;
+  margin: 0;
+  padding: 5px 10px;
+}
+
+.desktop-create-new-drop-zone[data-active] {
+  min-height: 10px;
+  background: color-mix(in srgb, var(--po-accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-accent) 32%, transparent);
 }
 
 .desktop-create-new-footer {
@@ -224,15 +277,20 @@
   .desktop-create-new-row {
     grid-template-columns: 20px 20px minmax(0, 1fr) auto;
     gap: 5px;
+    padding-inline: 5px;
   }
 
   .desktop-create-new-order-controls {
     display: none;
   }
+
+  .desktop-create-new-location-select {
+    max-width: 92px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .desktop-create-new-file-row,
+  .desktop-create-new-row,
   .desktop-create-new-drag-handle {
     transition: none;
   }
