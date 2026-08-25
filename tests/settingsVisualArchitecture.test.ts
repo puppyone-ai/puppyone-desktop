@@ -239,7 +239,7 @@ describe("settings visual architecture", () => {
     expect(settings).toMatch(/\.desktop-settings-heading-row\s*{[^}]*padding-inline:\s*10px;/s);
     expect(settings).toMatch(/\.desktop-settings-section-header\s*{[^}]*padding-inline:\s*10px;/s);
     expect(settings).toMatch(/\.desktop-settings-heading-row \.desktop-settings-section-header\s*{[^}]*padding-inline:\s*0;/s);
-    expect(settings).toMatch(/\.desktop-settings-section-header h2\s*{[^}]*font-size:\s*14px;[^}]*font-weight:\s*600;/s);
+    expect(settings).toMatch(/\.desktop-settings-section-header h2\s*{[^}]*font-size:\s*15px;[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);[^}]*line-height:\s*20px;/s);
     expect(settings).toMatch(/\.desktop-settings-row\s*{[^}]*gap:\s*18px;[^}]*padding:\s*0 10px;/s);
     expect(controls).toMatch(/\.desktop-settings-row-control\s*{[^}]*min-height:\s*42px;/s);
     expect(controls).not.toContain("min-height: 38px");
