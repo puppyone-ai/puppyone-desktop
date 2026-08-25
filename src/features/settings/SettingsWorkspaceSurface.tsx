@@ -40,7 +40,6 @@ export type SettingsPreferencesPort = {
   darkThemePreset: DarkThemePreset;
   loadingAnimationPreset: LoadingAnimationPreset;
   localAgentsSettings: LocalAgentsSettings;
-  agentFileActivityIndicatorsEnabled: boolean;
   textSize: TextSize;
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
@@ -144,7 +143,6 @@ export function createSettingsWorkspaceSurface({
         darkThemePreset={preferences.darkThemePreset}
         loadingAnimationPreset={preferences.loadingAnimationPreset}
         localAgentsSettings={preferences.localAgentsSettings}
-        agentFileActivityIndicatorsEnabled={preferences.agentFileActivityIndicatorsEnabled}
         textSize={preferences.textSize}
         typographyPreferences={preferences.typographyPreferences}
         pointerCursors={preferences.pointerCursors}

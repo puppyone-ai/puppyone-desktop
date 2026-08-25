@@ -14,8 +14,7 @@ import {
   isAppearanceValueAllowed,
 } from "../appearance/resolveAppearance";
 import { useFeatureFlag } from "../flags";
-import { AgentFileActivityAppearanceSetting } from "../desktop-agent-presence";
-import { LocalAgentsSettingsView } from "../local-agents";
+import { LocalAgentHooksSettingsView, LocalAgentsSettingsView } from "../local-agents";
 import { SettingsSectionHeader } from "./components";
 import { ContentFontSetting } from "./ContentFontSetting";
 import { AccountSettingsView } from "./main/AccountSettingsView";
@@ -42,7 +41,6 @@ export function SettingsView({
   darkThemePreset,
   loadingAnimationPreset,
   localAgentsSettings,
-  agentFileActivityIndicatorsEnabled,
   typographyPreferences,
   pointerCursors,
   dockIcon,
@@ -118,9 +116,16 @@ export function SettingsView({
   if (activeSection === "local-agents") {
     return (
       <LocalAgentsSettingsView
-        workspaceRoot={workspace.path}
         settings={localAgentsSettings}
         onChange={onLocalAgentsSettingsChange}
+      />
+    );
+  }
+
+  if (activeSection === "local-agent-hooks") {
+    return (
+      <LocalAgentHooksSettingsView
+        onActivityIndicatorsEnabledChange={onAgentFileActivityIndicatorsEnabledChange}
       />
     );
   }
@@ -520,11 +525,6 @@ export function SettingsView({
                   <span aria-hidden="true" />
                 </label>
               </div>
-              <AgentFileActivityAppearanceSetting
-                enabled={agentFileActivityIndicatorsEnabled}
-                workspaceRoot={workspace.path}
-                onChange={onAgentFileActivityIndicatorsEnabledChange}
-              />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span id="desktop-dock-icon-label">{t("settings.appearance.dockIcon.title")}</span>
                 <div

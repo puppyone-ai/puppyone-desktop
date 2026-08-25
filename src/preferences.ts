@@ -92,7 +92,7 @@ export type TitlebarActionsSettings = {
 };
 export type TerminalSessionLayout = "menu" | "tabs";
 export type LocalAgentsSettings = {
-  enabledAgentIds: string[];
+  hiddenTerminalAgentIds: string[];
 };
 export type ExperimentalSettings = {
   enableAgentChat: boolean;
@@ -185,7 +185,7 @@ export const DEFAULT_TITLEBAR_ACTIONS_SETTINGS: TitlebarActionsSettings = {
   order: [...TITLEBAR_ACTION_IDS],
 };
 export const DEFAULT_TERMINAL_SESSION_LAYOUT: TerminalSessionLayout = "tabs";
-export const DEFAULT_LOCAL_AGENTS_SETTINGS: LocalAgentsSettings = { enabledAgentIds: [] };
+export const DEFAULT_LOCAL_AGENTS_SETTINGS: LocalAgentsSettings = { hiddenTerminalAgentIds: [] };
 export const DEFAULT_AGENT_FILE_ACTIVITY_INDICATORS_ENABLED = false;
 export const DEFAULT_AI_EDIT_ASSIST_ENABLED = false;
 export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
@@ -570,12 +570,17 @@ export function parseLocalAgentsSettings(
 ): LocalAgentsSettings {
   if (!value) return DEFAULT_LOCAL_AGENTS_SETTINGS;
   try {
-    const parsed = JSON.parse(value) as { enabledAgentIds?: unknown } | null;
-    if (!parsed || !Array.isArray(parsed.enabledAgentIds)) return DEFAULT_LOCAL_AGENTS_SETTINGS;
-    const enabledAgentIds = Array.from(new Set(parsed.enabledAgentIds.filter(
+    const parsed = JSON.parse(value) as {
+      hiddenTerminalAgentIds?: unknown;
+      enabledAgentIds?: unknown;
+    } | null;
+    // The legacy enabledAgentIds field controlled Editor provider visibility.
+    // It must not silently hide Terminal launchers after the preference changes meaning.
+    if (!parsed || !Array.isArray(parsed.hiddenTerminalAgentIds)) return DEFAULT_LOCAL_AGENTS_SETTINGS;
+    const hiddenTerminalAgentIds = Array.from(new Set(parsed.hiddenTerminalAgentIds.filter(
       (id): id is string => typeof id === "string" && /^[a-z0-9][a-z0-9._-]{0,79}$/u.test(id),
     ))).slice(0, 16);
-    return { enabledAgentIds };
+    return { hiddenTerminalAgentIds };
   } catch {
     return DEFAULT_LOCAL_AGENTS_SETTINGS;
   }

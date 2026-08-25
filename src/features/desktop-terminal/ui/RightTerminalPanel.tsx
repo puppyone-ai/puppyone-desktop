@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   type ForwardedRef,
 } from "react";
@@ -29,6 +30,7 @@ type RightTerminalPanelProps = {
   workspace: Workspace;
   active: boolean;
   sessionLayout: TerminalSessionLayout;
+  hiddenAgentIds: readonly string[];
   onSessionsChange: (snapshot: DesktopTerminalSessionSnapshot) => void;
 };
 
@@ -39,7 +41,7 @@ export type RightTerminalPanelHandle = {
 };
 
 function RightTerminalPanelComponent(
-  { workspace, active, sessionLayout, onSessionsChange }: RightTerminalPanelProps,
+  { workspace, active, sessionLayout, hiddenAgentIds, onSessionsChange }: RightTerminalPanelProps,
   ref: ForwardedRef<RightTerminalPanelHandle>,
 ) {
   const { t } = useLocalization();
@@ -75,9 +77,13 @@ function RightTerminalPanelComponent(
   } = useTerminalAgentLocator({
     enabled: launcherVisible,
   });
+  const visibleAgentIds = useMemo(() => {
+    const hidden = new Set(hiddenAgentIds);
+    return availableAgentIds.filter((agentId) => !hidden.has(agentId));
+  }, [availableAgentIds, hiddenAgentIds]);
   const canLaunch = useCallback((launcherId: DesktopTerminalLauncherId) => (
-    launcherId === "shell" || availableAgentIds.includes(launcherId)
-  ), [availableAgentIds]);
+    launcherId === "shell" || visibleAgentIds.includes(launcherId)
+  ), [visibleAgentIds]);
   const createDetectedSession = useCallback((launcherId: DesktopTerminalLauncherId) => {
     if (!canLaunch(launcherId)) return;
     createSession(launcherId);
@@ -123,7 +129,7 @@ function RightTerminalPanelComponent(
         {sessions.length === 0 ? (
           <TerminalLauncher
             discoveryPhase={agentDiscoveryPhase}
-            availableAgentIds={availableAgentIds}
+            availableAgentIds={visibleAgentIds}
             onLaunch={createDetectedSession}
             onRefresh={() => void refreshAvailableAgents()}
           />
@@ -139,7 +145,7 @@ function RightTerminalPanelComponent(
               >
                 <TerminalLauncher
                   discoveryPhase={agentDiscoveryPhase}
-                  availableAgentIds={availableAgentIds}
+                  availableAgentIds={visibleAgentIds}
                   launchError={session.launchError}
                   onLaunch={(launcherId) => launchDetectedSession(session.id, launcherId)}
                   onRefresh={() => void refreshAvailableAgents()}
@@ -151,7 +157,7 @@ function RightTerminalPanelComponent(
               key={session.id}
               active={active && activeSessionId === session.id}
               discoveryPhase={agentDiscoveryPhase}
-              availableAgentIds={availableAgentIds}
+              availableAgentIds={visibleAgentIds}
               labelledBy={sessionLayout === "tabs" ? terminalTabId(session.id) : undefined}
               onLaunch={(launcherId) => launchDetectedSession(session.id, launcherId)}
               onRefresh={() => void refreshAvailableAgents()}

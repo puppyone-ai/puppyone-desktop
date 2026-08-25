@@ -4,7 +4,7 @@ import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } f
 import type { CreateNewMenuSettings, DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, GitSidebarLayout, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, LocalAgentsSettings, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TerminalSessionLayout, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
 
-export type SettingsSection = "general" | "local-project" | "appearance" | "local-agents" | "external-apps" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
+export type SettingsSection = "general" | "local-project" | "appearance" | "local-agents" | "local-agent-hooks" | "external-apps" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
 
 export type SettingsViewProps = {
   workspace: Workspace;
@@ -19,7 +19,6 @@ export type SettingsViewProps = {
   darkThemePreset: DarkThemePreset;
   loadingAnimationPreset: LoadingAnimationPreset;
   localAgentsSettings: LocalAgentsSettings;
-  agentFileActivityIndicatorsEnabled: boolean;
   textSize: TextSize;
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
