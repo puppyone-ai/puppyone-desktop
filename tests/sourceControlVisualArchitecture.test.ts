@@ -604,6 +604,14 @@ describe("source-control visual architecture", () => {
     expect(operation).toContain("height: var(--git-action-size);");
     expect(operation).toContain("padding: 0 var(--git-action-padding-inline);");
     expect(operation).not.toContain("height: 28px;");
+    expect(sidebarBaseCss).toContain("container-name: git-sidebar;");
+    expect(sidebarResourcesCss).toContain("@container git-sidebar (max-width: 300px)");
+    expect(sidebarResourcesCss).toContain(
+      ".desktop-git-operation-button .desktop-git-operation-label",
+    );
+    expect(sourceControlSidebarSectionsSource).toContain(
+      'const Icon = icon === "upload" ? ArrowUp : ArrowDown;',
+    );
   });
 
   it("assigns solid emphasis to only the next workflow action", () => {
