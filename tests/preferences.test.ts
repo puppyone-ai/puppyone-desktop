@@ -300,7 +300,6 @@ describe("experimental preferences", () => {
       enableCloudWorkspace: false,
       enableEditorSaveStatus: false,
       enableMarkdownBlockDrag: false,
-      enableMinimalMode: false,
       enablePuppyFlowFiles: false,
       enableViewerPlugins: false,
     });
@@ -328,11 +327,9 @@ describe("experimental preferences", () => {
       .not.toHaveProperty("enableContextMaps");
   });
 
-  it("keeps Minimal Mode off unless the user explicitly opts in", () => {
-    expect(parseExperimentalSettings(null).enableMinimalMode).toBe(false);
-    expect(parseExperimentalSettings("not-json").enableMinimalMode).toBe(false);
-    expect(parseExperimentalSettings(JSON.stringify({ enableMinimalMode: false })).enableMinimalMode).toBe(false);
-    expect(parseExperimentalSettings(JSON.stringify({ enableMinimalMode: true })).enableMinimalMode).toBe(true);
+  it("ignores retired Minimal Mode experiment values", () => {
+    expect(parseExperimentalSettings(JSON.stringify({ enableMinimalMode: true })))
+      .not.toHaveProperty("enableMinimalMode");
   });
 
   it("keeps Markdown block drag handles off unless the user explicitly opts in", () => {

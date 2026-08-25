@@ -123,8 +123,6 @@
   "experimental.officeEditing.detail": "Edite arquivos .docx, .xlsx e .pptx com o ONLYOFFICE Document Server configurado. Quando desativado, os arquivos do Office permanecem na visualização somente leitura.",
   "experimental.markdownBlockDrag.detail": "Ativa a reorganização experimental de blocos no mesmo documento na Visualização ao Vivo de Markdown.",
   "experimental.markdownBlockDrag.title": "Alças para arrastar blocos Markdown",
-  "experimental.minimalMode.detail": "Substitui a interface persistente do aplicativo por uma barra flutuante centralizada, mantendo disponíveis as ações de projeto, Git, Chat e Terminal.",
-  "experimental.minimalMode.title": "Modo mínimo",
   "experimental.viewerPlugins.title": "Plugins de visualização",
   "experimental.viewerPlugins.detail": "Ative a página experimental de Plugins somente local e seu atalho de navegação opcional.",
   "experimental.editorSaveStatus.title": "Status de salvamento do editor",

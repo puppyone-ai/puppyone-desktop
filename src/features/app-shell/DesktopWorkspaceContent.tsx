@@ -47,7 +47,6 @@ type DesktopWorkspaceContentProps = {
   fileClipboardController: FileClipboardController;
   desktopUpdates: DesktopUpdatesController;
   git: DesktopGitController;
-  minimalMode?: boolean;
   navigationComposition: string;
   onActiveDataPathChange: (
     path: string | null,
@@ -89,7 +88,6 @@ export function DesktopWorkspaceContent({
   fileClipboardController,
   desktopUpdates,
   git,
-  minimalMode = false,
   navigationComposition,
   onActiveDataPathChange,
   onActiveDataNodeChange,
@@ -186,7 +184,6 @@ export function DesktopWorkspaceContent({
       editorInteractionPreferences={editorInteractionPreferences}
       fileClipboardController={fileClipboardController}
       fileOperationNotice={fileOperationNotice}
-      minimalMode={minimalMode}
       navigation={{
         activeView: resolvedActiveView,
         availableSurfaceIds,

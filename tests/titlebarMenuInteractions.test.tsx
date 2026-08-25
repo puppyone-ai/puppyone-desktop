@@ -42,7 +42,6 @@ describe("titlebar Portal menu interactions", () => {
     await act(async () => {
       root?.render(withTestLocalization(
         <DesktopWorkspaceSwitcher
-          compact={false}
           open
           refObject={anchorRef}
           titlebarLabel={workspace.name}
@@ -80,7 +79,6 @@ describe("titlebar Portal menu interactions", () => {
     await act(async () => {
       root?.render(withTestLocalization(
         <DesktopWorkspaceSwitcher
-          compact={false}
           open
           refObject={createRef<HTMLDivElement>()}
           titlebarLabel="Workspace one"
@@ -122,7 +120,6 @@ describe("titlebar Portal menu interactions", () => {
           activeGitStatus={createGitStatus()}
           branchSwitcherOpen
           branchSwitcherRef={createRef<HTMLDivElement>()}
-          compact={false}
           gitStatusLoading={false}
           gitOperationLoading={null}
           localBranches={[branch]}

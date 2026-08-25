@@ -92,9 +92,6 @@ import {
 } from "./features/typography";
 import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
 
-const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMinimalModeDock").then((module) => ({
-  default: module.DesktopMinimalModeDock,
-})));
 const RightAgentPanel = lazy(loadRightAgentPanel);
 
 export function App() {
@@ -210,7 +207,6 @@ function AppContent() {
     () => resolveVisibleCreateNewMenuItems(createNewMenuSettings, experimentalSettings),
     [createNewMenuSettings, experimentalSettings],
   );
-  const minimalMode = experimentalSettings.enableMinimalMode;
   const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
     available: assetLibraryHomeAvailable,
     optedIn: experimentalSettings.enableAssetLibraryHome,
@@ -875,7 +871,6 @@ function AppContent() {
       activeGitStatus={activeGitStatus}
       branchSwitcherOpen={branchSwitcherOpen}
       branchSwitcherRef={branchSwitcherRef}
-      compact={minimalMode}
       gitStatusLoading={gitStatusLoading}
       gitOperationLoading={gitOperationLoading}
       localBranches={localBranches}
@@ -895,10 +890,8 @@ function AppContent() {
     />
   );
 
-  const toolsInNavigationToolbar = !minimalMode
-    && resolvedAppearance.composition.navigation === "sidebar-top-toolbar";
-  const locationBarVisible = !minimalMode
-    && resolvedAppearance.composition.locationBar === "workspace-path-v1";
+  const toolsInNavigationToolbar = resolvedAppearance.composition.navigation === "sidebar-top-toolbar";
+  const locationBarVisible = resolvedAppearance.composition.locationBar === "workspace-path-v1";
   const locationBarPath = resolveDesktopShellLocationPath({
     // The address bar describes the content surface. Keep the active editor
     // authoritative even if explorer selection state is briefly catching up.
@@ -942,33 +935,9 @@ function AppContent() {
     />
   ) : undefined;
 
-  const minimalModeDock = minimalMode ? (
-    <Suspense fallback={null}>
-      <DesktopMinimalModeDock
-        activeView={activeView}
-        cloudHubEnabled={cloudEnabled}
-        contextMenuOpen={switcherOpen || branchSwitcherOpen}
-        contextSlot={(
-          titlebarSidebarSlot
-        )}
-        pluginsEnabled={
-          experimentalSettings.enableViewerPlugins
-          && preferences.sidebarNavigationVisibilitySettings.enabled.plugins
-        }
-        titlebarActions={titlebarActions}
-        onNavigate={navigateDesktopView}
-        onExitMinimalMode={() => preferences.setExperimentalSettings({
-          ...experimentalSettings,
-          enableMinimalMode: false,
-        })}
-      />
-    </Suspense>
-  ) : undefined;
-
   return (
     <div
       className={`app-shell cloud-runtime ${resolvedTheme === "dark" ? "dark" : ""}`}
-      data-minimal-mode={minimalMode ? "true" : undefined}
       data-theme-mode={activeThemeMode}
       data-interface-style={interfaceStyle}
       data-interface-style-family={resolvedAppearance.profile.family}
@@ -995,8 +964,6 @@ function AppContent() {
           leftSidebarCollapsed={sidebarCollapsed}
           leftSidebarPresent={Boolean(dataPort)}
           leftSidebarWidth={explorerWidth}
-          minimalMode={minimalMode}
-          minimalModeDock={minimalModeDock}
           titlebarSidebarSlot={titlebarSidebarSlot}
           titlebarActions={titlebarActions}
           navigationToolbarActions={navigationToolbarActions}
@@ -1035,7 +1002,6 @@ function AppContent() {
                   <RightAgentPanel
                     workspace={workspace}
                     active={rightSidebarOpen && rightSidebarSurface === "chat"}
-                    minimalMode={minimalMode}
                     preferredRuntimeId={agentPreferredRuntime}
                     onPreferredRuntimeChange={setAgentPreferredRuntime}
                     preferredModel={agentPreferredModel}
@@ -1089,7 +1055,6 @@ function AppContent() {
           externalOpen={externalFileOpen}
           desktopUpdates={desktopUpdates}
           git={git}
-          minimalMode={minimalMode}
           navigationComposition={resolvedAppearance.composition.navigation}
           onActiveDataNodeChange={handleActiveDataNodeChange}
           onActiveDataPathChange={handleActiveDataPathChange}

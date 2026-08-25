@@ -59,7 +59,6 @@ export type DesktopDataWorkspaceSurfaceProps = {
   editorInteractionPreferences: NonNullable<DataWorkspaceProps["editorInteractionPreferences"]>;
   fileClipboardController: FileClipboardController;
   fileOperationNotice: string | null;
-  minimalMode: boolean;
   navigation: {
     activeView: DesktopView;
     availableSurfaceIds: readonly DesktopView[];
@@ -103,7 +102,6 @@ export function DesktopDataWorkspaceSurface({
   editorInteractionPreferences,
   fileClipboardController,
   fileOperationNotice,
-  minimalMode,
   navigation,
   navigationComposition,
   onActiveDataNodeChange,
@@ -147,10 +145,9 @@ export function DesktopDataWorkspaceSurface({
     onNavigate: navigation.onNavigate,
     onOpenSettings: navigation.onOpenSettings,
   } as const;
-  const shellHostedTopNavigation = !minimalMode
-    && navigationComposition === "sidebar-top-toolbar"
+  const shellHostedTopNavigation = navigationComposition === "sidebar-top-toolbar"
     && preferences.sidebarNavigationPlacement === "top";
-  const topNavigation = !minimalMode && preferences.sidebarNavigationPlacement === "top" ? (
+  const topNavigation = preferences.sidebarNavigationPlacement === "top" ? (
     <DesktopSidebarTopNavigation
       {...navigationCommon}
       orientation={preferences.sidebarNavigationOrientation}
@@ -162,8 +159,7 @@ export function DesktopDataWorkspaceSurface({
   return (
     <div
       className="desktop-data-workspace-wrap"
-      data-minimal-mode={minimalMode ? "true" : undefined}
-      data-sidebar-navigation-placement={minimalMode ? undefined : preferences.sidebarNavigationPlacement}
+      data-sidebar-navigation-placement={preferences.sidebarNavigationPlacement}
     >
       {shellHostedTopNavigation && topNavigation && (
         <DesktopShellNavigationToolbarPortal>
@@ -257,7 +253,7 @@ export function DesktopDataWorkspaceSurface({
         )}
         showExplorerToolbar={!shellHostedTopNavigation && Boolean(topNavigation)}
         explorerToolbarSlot={shellHostedTopNavigation ? undefined : (topNavigation ?? undefined)}
-        explorerRailSlot={!minimalMode && preferences.sidebarNavigationPlacement === "left" ? (
+        explorerRailSlot={preferences.sidebarNavigationPlacement === "left" ? (
           <DesktopSidebarRailNavigation {...navigationCommon} />
         ) : undefined}
         showPreviewHeader={false}
@@ -301,7 +297,7 @@ export function DesktopDataWorkspaceSurface({
         explorerSlot={resolvedSurface.id === "data"
           ? undefined
           : <WorkspaceSurfaceOutlet region="sidebar" surface={resolvedSurface} />}
-        explorerFooterSlot={!minimalMode && preferences.sidebarNavigationPlacement === "bottom"
+        explorerFooterSlot={preferences.sidebarNavigationPlacement === "bottom"
           ? <DesktopSidebarFooterNavigation {...navigationCommon} />
           : undefined}
         mainSlot={resolvedSurface.id === "data"

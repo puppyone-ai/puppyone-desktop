@@ -5,8 +5,6 @@ import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 type DesktopWindowChromeProps = {
   context?: ReactNode;
   actions?: ReactNode;
-  minimalMode?: boolean;
-  minimalModeDock?: ReactNode;
 };
 
 /**
@@ -19,20 +17,9 @@ type DesktopWindowChromeProps = {
 export function DesktopWindowChrome({
   context,
   actions,
-  minimalMode = false,
-  minimalModeDock,
 }: DesktopWindowChromeProps) {
   const { t } = useLocalization();
   const fullScreen = useWindowFullScreenState();
-
-  if (minimalMode) {
-    return (
-      <>
-        <DesktopWindowDragRegion className="desktop-minimal-mode-drag-region" />
-        {minimalModeDock}
-      </>
-    );
-  }
 
   return (
     <header

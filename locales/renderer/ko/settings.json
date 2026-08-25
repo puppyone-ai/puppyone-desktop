@@ -123,8 +123,6 @@
   "experimental.officeEditing.detail": "구성된 ONLYOFFICE Document Server로 .docx, .xlsx 및 .pptx 파일을 편집합니다. 끄면 Office 파일은 읽기 전용 미리 보기로 유지됩니다.",
   "experimental.markdownBlockDrag.detail": "Markdown 라이브 미리보기에서 같은 문서 안의 블록을 재배치하는 초기 기능을 사용합니다.",
   "experimental.markdownBlockDrag.title": "Markdown 블록 드래그 핸들",
-  "experimental.minimalMode.detail": "항상 표시되는 앱 UI를 중앙의 플로팅 도크로 바꾸고 프로젝트, Git, 채팅, 터미널 작업은 계속 사용할 수 있습니다.",
-  "experimental.minimalMode.title": "최소 모드",
   "experimental.viewerPlugins.title": "뷰어 플러그인",
   "experimental.viewerPlugins.detail": "로컬 전용 실험적 플러그인 페이지와 선택적 탐색 바로가기를 활성화합니다.",
   "experimental.editorSaveStatus.title": "편집기 저장 상태",

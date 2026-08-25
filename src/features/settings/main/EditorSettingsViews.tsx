@@ -82,7 +82,6 @@ export function ExperimentalSettingsView({
     messageKey: string;
     settingKey: keyof ExperimentalSettings;
   }> = [
-    { messageKey: "minimalMode", settingKey: "enableMinimalMode" },
     { messageKey: "viewerPlugins", settingKey: "enableViewerPlugins" },
     { messageKey: "editorSaveStatus", settingKey: "enableEditorSaveStatus" },
     { messageKey: "markdownBlockDrag", settingKey: "enableMarkdownBlockDrag" },

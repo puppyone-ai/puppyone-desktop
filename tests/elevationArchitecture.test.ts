@@ -5,7 +5,6 @@ const readSource = (path: string) => readFileSync(new URL(path, import.meta.url)
 
 const tokens = readSource("../src/styles/tokens.css");
 const menus = readSource("../src/styles/menus.css");
-const minimalMode = readSource("../src/styles/minimal-mode.css");
 const helpLauncher = readSource("../src/features/app-shell/desktop-help-launcher.css");
 const fileActions = readSource("../src/styles/file-actions.css");
 const plugins = readSource("../src/features/plugins/plugins.css");
@@ -51,14 +50,11 @@ describe("desktop elevation architecture", () => {
     )).toContain("box-shadow: none;");
     expect(readCssBlock(accessMethodCard, ".desktop-cloud-access-method-copy-button"))
       .toContain("box-shadow: none;");
-    expect(minimalMode).not.toContain("0 12px 34px");
     expect(helpLauncher).not.toContain("0 2px 8px");
     expect(assetLibrary).not.toContain("6px 7px 0");
   });
 
   it("routes small floating UI through the shared low or popover elevations", () => {
-    expect(readCssBlock(minimalMode, ".desktop-minimal-mode-dock"))
-      .toContain("box-shadow: var(--po-elevation-low);");
     expect(readCssBlock(editorFind, ".editor-find-widget"))
       .toContain("box-shadow: var(--po-elevation-low);");
     expect(readCssBlock(editorChrome, ".editor-mode-toggle"))

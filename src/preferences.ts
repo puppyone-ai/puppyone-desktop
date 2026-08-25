@@ -104,7 +104,6 @@ export type ExperimentalSettings = {
   enableCloudWorkspace: boolean;
   enableEditorSaveStatus: boolean;
   enableMarkdownBlockDrag: boolean;
-  enableMinimalMode: boolean;
   enablePuppyFlowFiles: boolean;
   enableViewerPlugins: boolean;
 };
@@ -191,7 +190,6 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableCloudWorkspace: false,
   enableEditorSaveStatus: false,
   enableMarkdownBlockDrag: false,
-  enableMinimalMode: false,
   enablePuppyFlowFiles: false,
   enableViewerPlugins: false,
 };
@@ -577,7 +575,6 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
       enableCloudWorkspace: parsed.enableCloudWorkspace === true,
       enableEditorSaveStatus: parsed.enableEditorSaveStatus === true,
       enableMarkdownBlockDrag: parsed.enableMarkdownBlockDrag === true,
-      enableMinimalMode: parsed.enableMinimalMode === true,
       enablePuppyFlowFiles: parsed.enablePuppyFlowFiles === true,
       enableViewerPlugins: parsed.enableViewerPlugins === true,
     };
