@@ -39,6 +39,8 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(panel).not.toContain("new Terminal(");
     expect(panel).not.toContain("window.puppyoneDesktop");
     expect(panel).toContain("useTerminalAgentLocator");
+    expect(panel).toContain("hiddenAgentIds");
+    expect(panel).toContain("availableAgentIds.filter");
     expect(panel).not.toContain("useInstalledTerminalAgents");
     expect(agentLocatorController).toContain("locateTerminalAgents");
     expect(agentLocatorController).not.toContain("discoverLocalTerminalAgents");
@@ -107,6 +109,9 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(app).not.toContain("terminalSnapshot");
     expect(app).not.toContain("onSessionsChange");
     expect(controller).not.toContain("onSessionsChange");
+    expect(app).toContain("hiddenAgentIds={localAgentsSettings.hiddenTerminalAgentIds}");
+    expect(app).not.toContain("enabledLocalAgentRuntimeIds");
+    expect(app).not.toContain("isLocalAgentRuntimeEnabled");
     expect(titlebar).not.toContain("Clear Terminal");
     expect(titlebar).not.toContain("Reset Terminal");
     expect(titlebar).not.toContain("has-menu");

@@ -1,42 +1,18 @@
-import type { AgentLocalConnection } from "../../../../shared/agent-contract/types";
 import type { LocalAgentsSettings } from "../../../preferences";
 
-const RUNTIME_ID_BY_LOCAL_AGENT_ID: Readonly<Record<string, string>> = {
-  "cursor-agent": "cursor",
-  opencode: "opencode-native",
-};
-
-const ACTIVITY_PROVIDER_ID_BY_LOCAL_AGENT_ID: Readonly<Record<string, string>> = {
-  "cursor-agent": "cursor",
-};
-
-export function installedLocalAgents(connections: readonly AgentLocalConnection[]) {
-  return connections.filter((connection) => connection.installation !== "not-found");
-}
-
-export function setLocalAgentEnabled(
+export function setTerminalAgentVisible(
   settings: LocalAgentsSettings,
   agentId: string,
-  enabled: boolean,
+  visible: boolean,
 ): LocalAgentsSettings {
-  const current = new Set(settings.enabledAgentIds);
-  if (enabled) current.add(agentId);
-  else current.delete(agentId);
-  return { enabledAgentIds: Array.from(current).sort((left, right) => left.localeCompare(right)) };
+  const hidden = new Set(settings.hiddenTerminalAgentIds);
+  if (visible) hidden.delete(agentId);
+  else hidden.add(agentId);
+  return {
+    hiddenTerminalAgentIds: Array.from(hidden).sort((left, right) => left.localeCompare(right)),
+  };
 }
 
-export function isLocalAgentEnabled(settings: LocalAgentsSettings, agentId: string) {
-  return settings.enabledAgentIds.includes(agentId);
-}
-
-export function enabledLocalAgentRuntimeIds(settings: LocalAgentsSettings) {
-  return settings.enabledAgentIds.map((agentId) => RUNTIME_ID_BY_LOCAL_AGENT_ID[agentId] ?? agentId);
-}
-
-export function isLocalAgentRuntimeEnabled(settings: LocalAgentsSettings, runtimeId: string) {
-  return enabledLocalAgentRuntimeIds(settings).includes(runtimeId);
-}
-
-export function localAgentActivityProviderId(localAgentId: string) {
-  return ACTIVITY_PROVIDER_ID_BY_LOCAL_AGENT_ID[localAgentId] ?? localAgentId;
+export function isTerminalAgentVisible(settings: LocalAgentsSettings, agentId: string) {
+  return !settings.hiddenTerminalAgentIds.includes(agentId);
 }

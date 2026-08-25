@@ -91,7 +91,6 @@ import {
   useTypographyRuntime,
 } from "./features/typography";
 import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
-import { enabledLocalAgentRuntimeIds, isLocalAgentRuntimeEnabled } from "./features/local-agents";
 
 const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMinimalModeDock").then((module) => ({
   default: module.DesktopMinimalModeDock,
@@ -210,10 +209,6 @@ function AppContent() {
   const createNewItems = useMemo(
     () => getVisibleCreateNewItems(createNewMenuSettings, experimentalSettings),
     [createNewMenuSettings, experimentalSettings],
-  );
-  const enabledAgentRuntimeIds = useMemo(
-    () => enabledLocalAgentRuntimeIds(localAgentsSettings),
-    [localAgentsSettings],
   );
   const minimalMode = experimentalSettings.enableMinimalMode;
   const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
@@ -1027,6 +1022,7 @@ function AppContent() {
                 <RightTerminalPanel
                   workspace={workspace}
                   active={rightSidebarOpen && rightSidebarSurface === "terminal"}
+                  hiddenAgentIds={localAgentsSettings.hiddenTerminalAgentIds}
                 />
               </div>
             )}
@@ -1040,10 +1036,7 @@ function AppContent() {
                     workspace={workspace}
                     active={rightSidebarOpen && rightSidebarSurface === "chat"}
                     minimalMode={minimalMode}
-                    preferredRuntimeId={agentPreferredRuntime && isLocalAgentRuntimeEnabled(localAgentsSettings, agentPreferredRuntime)
-                      ? agentPreferredRuntime
-                      : null}
-                    enabledRuntimeIds={enabledAgentRuntimeIds}
+                    preferredRuntimeId={agentPreferredRuntime}
                     onPreferredRuntimeChange={setAgentPreferredRuntime}
                     preferredModel={agentPreferredModel}
                     onPreferredModelChange={setAgentPreferredModel}

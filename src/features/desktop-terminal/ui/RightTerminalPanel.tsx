@@ -1,4 +1,9 @@
-import { useCallback, useEffect, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
 import { useTerminalAgentLocator } from "../controller/useTerminalAgentLocator";
@@ -19,9 +24,10 @@ import "./desktop-terminal.css";
 type RightTerminalPanelProps = {
   workspace: Workspace;
   active: boolean;
+  hiddenAgentIds: readonly string[];
 };
 
-export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProps) {
+export function RightTerminalPanel({ workspace, active, hiddenAgentIds }: RightTerminalPanelProps) {
   const { t } = useLocalization();
   const panelRef = useRef<HTMLElement>(null);
   const {
@@ -54,9 +60,13 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
   } = useTerminalAgentLocator({
     enabled: launcherVisible,
   });
+  const visibleAgentIds = useMemo(() => {
+    const hidden = new Set(hiddenAgentIds);
+    return availableAgentIds.filter((agentId) => !hidden.has(agentId));
+  }, [availableAgentIds, hiddenAgentIds]);
   const canLaunch = useCallback((launcherId: DesktopTerminalLauncherId) => (
-    launcherId === "shell" || availableAgentIds.includes(launcherId)
-  ), [availableAgentIds]);
+    launcherId === "shell" || visibleAgentIds.includes(launcherId)
+  ), [visibleAgentIds]);
   const createDetectedSession = useCallback((launcherId: DesktopTerminalLauncherId) => {
     if (!canLaunch(launcherId)) return;
     createSession(launcherId);
@@ -96,7 +106,7 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
         {sessions.length === 0 ? (
           <TerminalLauncher
             discoveryPhase={agentDiscoveryPhase}
-            availableAgentIds={availableAgentIds}
+            availableAgentIds={visibleAgentIds}
             onLaunch={createDetectedSession}
             onRefresh={() => void refreshAvailableAgents()}
           />
@@ -112,7 +122,7 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
               >
                 <TerminalLauncher
                   discoveryPhase={agentDiscoveryPhase}
-                  availableAgentIds={availableAgentIds}
+                  availableAgentIds={visibleAgentIds}
                   launchError={session.launchError}
                   onLaunch={(launcherId) => launchDetectedSession(session.id, launcherId)}
                   onRefresh={() => void refreshAvailableAgents()}
@@ -124,7 +134,7 @@ export function RightTerminalPanel({ workspace, active }: RightTerminalPanelProp
               key={session.id}
               active={active && activeSessionId === session.id}
               discoveryPhase={agentDiscoveryPhase}
-              availableAgentIds={availableAgentIds}
+              availableAgentIds={visibleAgentIds}
               labelledBy={terminalTabId(session.id)}
               onLaunch={(launcherId) => launchDetectedSession(session.id, launcherId)}
               onRefresh={() => void refreshAvailableAgents()}

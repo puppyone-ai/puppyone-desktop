@@ -8,122 +8,93 @@ ownership and code dependencies.
 
 `Local Agents` answers one user question:
 
-> Which coding Agents installed on this computer should be available as
-> compute choices in the Editor?
+> Which Agent CLIs are installed on this computer, and which should appear in
+> PuppyOne's Terminal launcher?
 
-`Appearance > Agent file activity` answers a different question:
+`Local Agent Hooks` is the adjacent, lower-priority settings page:
 
-> Should the Editor show an eye while an Agent reads a file and a hand while
-> an Agent writes it?
+> Which PuppyOne-owned local Hooks are installed for each Agent CLI?
 
-Local Agents is therefore an inventory and selection surface. It never exposes
-Hook installation, terminal event transport, read/write icons, activity status
-or display configuration. Agent file activity is a global visual preference;
-its native Hook enrollment is an implementation detail owned by the presence
-feature.
-
-The bundled PuppyOne Agent remains an internal/default runtime and is not a
-locally installed Agent choice. The Local Agents list currently recognizes
-Codex, Claude Code, OpenCode and Cursor Agent through the Editor's canonical
-local inventory.
+CLI availability and Hook enrollment are deliberately separate. Finding an
+executable never mutates its configuration. Hiding an Agent from the Terminal
+launcher never removes its Hook. Installing a Hook never changes the Editor
+Agent provider picker; Editor runtimes retain their own readiness, sign-in and
+capability checks.
 
 ## 2. System map
 
 ```text
-                          Desktop Settings
-                 +-------------------------------+
-                 | Local Agents                  |
-                 | installed products + switches |
-                 +---------------+---------------+
-                                 |
-                                 | enabled product IDs
-                                 v
-Local Agent inventory ---> Editor Agent picker ---> selected native runtime
-  bounded probes             only installed +       Codex / Claude /
-  sanitized cache            explicitly enabled     OpenCode / Cursor gate
+                         Desktop Settings
+                +-------------------------------+
+                | Local Agents                  |
+                | detected CLI + Terminal switch|
+                +---------------+---------------+
+                                |
+                                | hidden launcher IDs
+                                v
+Terminal Agent locator ---> Terminal launcher ---> verified CLI launch
+ filesystem only           visible detected IDs    Codex / Claude / Cursor /
+ 5-minute cache                                    OpenCode / Pi / Hermes
 
 
-                 +-------------------------------+
-                 | Appearance                    |
-                 | Agent file activity switch    |
-                 +---------------+---------------+
-                                 |
-                  one consent    |    atomic native enrollment
-                       +---------+---------+
-                       v                   v
-             Editor presence layer    Terminal Agent Hook adapters
-             eye = read claim         Codex / Claude / Cursor CLI
-             hand = write claim                 |
-                       ^                         v
-                       +------ neutral activity broker
+                +-------------------------------+
+                | Local Agent Hooks             |
+                | one enrollment row per Agent  |
+                +---------------+---------------+
+                                |
+                                | explicit per-Agent mutation
+                                v
+Hook registration service ---> Terminal Agent Hook adapters
+ Codex / Claude / Cursor                 |
+ configurable; others manual             v
+                              neutral activity broker
                               authenticated, normalized,
                               workspace-confined events
+                                         |
+                                         v
+                              Editor presence layer
+                              eye = read, hand = write
 ```
-
-The two branches meet only at stable Agent product identities and at the final
-Editor surface. Selecting an Agent does not enable its activity visualization.
-Enabling activity visualization does not add that Agent to the Editor picker.
 
 ## 3. Local Agents architecture
 
-### Discovery and selection flow
+### Discovery and launcher visibility
 
-1. Opening Local Agents calls the existing `discoverLocalAgentConnections`
-   bridge. It does not use the Terminal launcher catalog or inspect terminal
-   text.
-2. Main-process inventory probes resolve a bounded product registry, return a
-   sanitized `AgentLocalConnection` snapshot and reuse the existing TTL cache.
-3. The page displays only products whose installation is not `not-found`.
-   Readiness details stay in accessible metadata/tooltips; each visible product
-   remains a compact name-and-switch row.
-4. `puppyone.desktop.localAgents` stores explicitly enabled inventory product
-   IDs. The default is empty, so a local Agent appears in the Editor only after
-   the user selects it.
-5. The Editor provider picker intersects the enabled product IDs with the live
-   runtime catalog and current installation readiness. Sign-in, compatibility
-   and capability gates remain owned by each runtime.
+1. Opening Local Agents uses the same `terminal:agents-locate` bridge as the
+   Terminal launcher. The locator performs bounded filesystem-only executable
+   discovery; it never runs an Agent, reads accounts, lists models or changes
+   Hook enrollment.
+2. The shared catalog recognizes Codex, Claude Code, Cursor Agent, OpenCode,
+   Pi Agent and Hermes Agent. Only detected CLIs are shown.
+3. Every detected CLI is visible in Terminal by default.
+   `puppyone.desktop.localAgents` stores only `hiddenTerminalAgentIds`, so the
+   previous Editor visibility preference cannot accidentally hide launchers
+   during migration.
+4. `RightTerminalPanel` intersects detected IDs with this hidden set before
+   rendering or launching a Terminal Agent.
+5. The Editor provider picker is independent of this preference and continues
+   using the native runtime catalog.
 
-Inventory IDs describe installed products; runtime IDs describe concrete
-execution routes; activity provider IDs describe Hook normalization adapters.
-They are equal except where one product has an explicitly named route. Current
-aliases are centralized as follows:
-
-```text
-inventory product ID  runtime route ID  activity provider ID
-cursor-agent          cursor            cursor
-opencode              opencode-native   opencode
-```
-
-This mapping is centralized in
-`src/features/local-agents/model/localAgentSelection.ts`. Do not scatter
-aliases through settings UI or persist runtime implementation names in the
-Local Agents preference.
-
-### Source layout
+### Settings source layout
 
 ```text
 src/features/local-agents/
-  index.ts
-  model/
-    localAgentSelection.ts              pure installed/selected decisions
-  infrastructure/electron/
-    localAgentInventoryClient.ts        narrow preload client
-  ui/
-    LocalAgentsSettingsView.tsx         scan + compact selection rows
+  model/localAgentSelection.ts            pure Terminal visibility decisions
+  ui/LocalAgentsSettingsView.tsx          CLI scan + launcher switches
+  ui/LocalAgentHooksSettingsView.tsx      per-provider Hook enrollment
 
-src/features/desktop-agent/
-  domain/agent-backend-routing.ts       generic enabled-runtime filter
-  ui/RightAgentPanel.tsx                provider picker consumer
+src/features/desktop-terminal/
+  controller/useTerminalAgentLocator.ts   shared Renderer discovery controller
+  ui/RightTerminalPanel.tsx               launcher visibility consumer
 
-electron/main/agent/connections/
-  local-agent-inventory.mjs             bounded orchestration + safe cache
-  tools/                                 extensible product descriptors
+electron/main/terminal-agent/
+  terminal-agent-locator.mjs              bounded filesystem-only locator
+  activity/registration/                  Hook inspection and mutation
 ```
 
-To add a locally selectable Agent, add its inventory tool descriptor and its
-native runtime adapter/readiness contract. Add one centralized ID mapping only
-when its inventory product ID intentionally differs from its runtime route ID.
-The settings page must not grow provider-specific branches.
+To add a Terminal Agent, extend the catalog and the authoritative launch
+resolver together. Hook support is a separate descriptor/registration decision
+and must not be inferred merely because an executable exists.
 
 ## 4. Agent file activity architecture
 
@@ -217,25 +188,26 @@ The installed Hook bridge is a derived runtime artifact, not the source of
 truth. Before every enrolled Terminal session, the Registrar compares every
 installed bridge module with the app-bundled source and atomically refreshes an
 outdated or incomplete copy. Hook configuration remains stable across app
-updates, and users do not need to toggle the Appearance setting to receive a
-bridge fix.
+updates; an enrolled Terminal session receives current bridge code without a
+remove/reinstall cycle.
 
-`puppyone.desktop.agentFileActivityIndicators` is opt-in and globally controls
-whether `.desktop-agent-file-presence` is rendered. Turning the Appearance
-switch on opens one concise permission dialog for the whole feature; it does
-not expose per-Agent permissions. Confirming it discovers locally installed
-Agents and reconciles all supported, safely configurable Hooks as one batch.
-The visual preference is enabled only after that batch succeeds. Canceling or
-failing the flow leaves the preference off, and a partial mutation is rolled
-back. Turning the preference off removes PuppyOne-owned configurable Hooks
-before hiding the visual treatment.
+`Local Agent Hooks` reads the registration service's provider snapshot. Codex,
+Claude Code and Cursor expose safely reversible switches. OpenCode, Pi and
+Hermes are shown as manual integrations until an owned, reversible installer
+exists. Missing CLIs cannot be newly enrolled, while an orphaned existing Hook
+can still be removed. `needs-repair` remains visible and re-enabling the row
+repairs the owned bridge/configuration.
 
-This dialog records PuppyOne's product-level consent; it does not bypass an
-Agent's own security boundary. In particular, Codex can require one native
-`/hooks` review for the exact Hook definition. PuppyOne never passes a Hook
-trust-bypass flag and never edits another Agent's internal trust store. A
-provider-native review may therefore appear once when that Agent next starts.
-Hook controls and provider-specific trust state never move into Local Agents.
+`puppyone.desktop.agentFileActivityIndicators` globally controls whether
+`.desktop-agent-file-presence` is rendered. The Hook page updates that visual
+preference only after a per-provider enrollment mutation succeeds, and turns
+it off only when no configurable PuppyOne Hook remains enabled.
+
+An explicit per-Agent switch records PuppyOne's product-level consent; it does
+not bypass an Agent's own security boundary. In particular, Codex can require
+one native `/hooks` review for the exact Hook definition. PuppyOne never passes
+a Hook trust-bypass flag and never edits another Agent's internal trust store.
+A provider-native review may therefore appear once when that Agent next starts.
 
 ### Cursor Agent CLI enrollment
 
@@ -297,10 +269,9 @@ src/features/desktop-agent-presence/
   application/                          client/store lifecycle
   infrastructure/electron/              public bridge adapter
   ui/AgentFilePresence.tsx               eye/hand presentation
-  ui/AgentFileActivityAppearanceSetting.tsx
-                                        Appearance + enrollment reconciliation
-  ui/AgentFileActivityPermissionDialog.tsx
-                                        one product-level consent step
+
+src/features/local-agents/
+  ui/LocalAgentHooksSettingsView.tsx     per-Agent Hook status and enrollment
 ```
 
 To add another Agent Hook, implement one adapter descriptor at the Terminal
@@ -327,13 +298,16 @@ sufficient evidence that an installed Terminal Hook works.
 
 ## 5. Invariants
 
-- Local Agents always means installed Editor compute choices, never appearance.
-- Agent file activity always lives in Appearance, never General or Local Agents.
-- Its enable flow is one batch permission action; successful Hook enrollment
-  precedes the persisted visual preference, while cancel/failure changes nothing.
-- The Local Agents UI shows a product name and one switch, with no visible
-  description paragraph beneath the name.
-- Inventory probes and runtime readiness remain main-process concerns; the
+- Local Agents always means detected Terminal CLI launchers, never Editor
+  provider selection or Hook enrollment.
+- Local Agent Hooks is a separate Desktop App settings page immediately below
+  Local Agents.
+- Hook enrollment is explicit and per provider. A successful native mutation
+  precedes the persisted activity-visibility preference.
+- Every detected CLI is visible in Terminal by default; the preference stores
+  only hidden launcher IDs.
+- Terminal CLI discovery is filesystem-only and never reads or changes Hooks.
+- Native discovery and Hook registration remain main-process concerns; the
   Renderer receives sanitized DTOs only.
 - Terminal output parsing is not an activity source. Hook support is explicit,
   provider-scoped and best effort.
@@ -355,4 +329,5 @@ sufficient evidence that an installed Terminal Hook works.
 - Completed or failed claims remain visible for the shared four-second
   perception window.
 - Adding a provider extends descriptor registries and edge adapters; it does
-  not add product branches to neutral services or settings UI.
+  not add product branches to neutral services. Settings renders provider
+  snapshots generically.

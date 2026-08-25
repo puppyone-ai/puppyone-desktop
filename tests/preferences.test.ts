@@ -251,12 +251,15 @@ describe("appearance preferences", () => {
 });
 
 describe("local Agent preferences", () => {
-  it("keeps only bounded, unique local Agent ids", () => {
-    expect(parseLocalAgentsSettings(null)).toEqual({ enabledAgentIds: [] });
+  it("keeps only bounded, unique hidden Terminal Agent ids", () => {
+    expect(parseLocalAgentsSettings(null)).toEqual({ hiddenTerminalAgentIds: [] });
     expect(parseLocalAgentsSettings(JSON.stringify({
-      enabledAgentIds: ["codex", "claude", "codex", "../../bad", 7],
-    }))).toEqual({ enabledAgentIds: ["codex", "claude"] });
-    expect(parseLocalAgentsSettings("invalid")).toEqual({ enabledAgentIds: [] });
+      hiddenTerminalAgentIds: ["codex", "claude", "codex", "../../bad", 7],
+    }))).toEqual({ hiddenTerminalAgentIds: ["codex", "claude"] });
+    expect(parseLocalAgentsSettings(JSON.stringify({
+      enabledAgentIds: ["codex"],
+    }))).toEqual({ hiddenTerminalAgentIds: [] });
+    expect(parseLocalAgentsSettings("invalid")).toEqual({ hiddenTerminalAgentIds: [] });
   });
 });
 
