@@ -169,6 +169,8 @@
 }
 
 .desktop-titlebar-update {
+  --desktop-titlebar-update-accent: #2563eb;
+
   width: auto;
   max-width: min(220px, 34vw);
   min-width: 0;
@@ -177,29 +179,40 @@
   padding: 0 6px;
   border: 0;
   border-radius: var(--desktop-toolbar-action-radius);
-  background: color-mix(in srgb, var(--po-accent) 12%, transparent);
-  color: color-mix(in srgb, var(--po-accent) 72%, var(--desktop-titlebar-text));
+  background: color-mix(in srgb, var(--desktop-titlebar-update-accent) 12%, transparent);
+  color: var(--desktop-titlebar-text-muted);
   white-space: nowrap;
+}
+
+.app-shell.dark .desktop-titlebar-update {
+  --desktop-titlebar-update-accent: #60a5fa;
 }
 
 .desktop-titlebar-update > svg {
   flex: 0 0 auto;
+  color: var(--desktop-titlebar-update-accent);
 }
 
 .desktop-titlebar-action.desktop-titlebar-update:hover,
 .desktop-titlebar-action.desktop-titlebar-update:focus-visible {
-  background: color-mix(in srgb, var(--po-accent) 18%, var(--desktop-titlebar-hover));
-  color: color-mix(in srgb, var(--po-accent) 58%, var(--desktop-titlebar-text));
+  background: color-mix(in srgb, var(--desktop-titlebar-update-accent) 18%, var(--desktop-titlebar-hover));
+  color: var(--desktop-titlebar-text);
 }
 
 .desktop-titlebar-update-label {
   min-width: 0;
   max-width: 180px;
   overflow: hidden;
+  color: color-mix(in srgb, var(--desktop-titlebar-update-accent) 72%, var(--desktop-titlebar-text));
   font-size: var(--po-font-size-chrome, 13px);
-  font-weight: var(--po-font-weight-chrome, 500);
+  font-weight: var(--po-text-weight-regular, 400);
   line-height: 18px;
   text-overflow: ellipsis;
+}
+
+.desktop-titlebar-action.desktop-titlebar-update:hover .desktop-titlebar-update-label,
+.desktop-titlebar-action.desktop-titlebar-update:focus-visible .desktop-titlebar-update-label {
+  color: color-mix(in srgb, var(--desktop-titlebar-update-accent) 86%, var(--desktop-titlebar-text));
 }
 
 .desktop-titlebar-actions .desktop-titlebar-terminal,
