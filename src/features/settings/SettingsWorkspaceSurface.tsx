@@ -4,7 +4,6 @@ import type {
   CreateNewMenuSettings,
   DiffMarkers,
   ExperimentalSettings,
-  ExternalAppsSettings,
   FilesVisibilitySettings,
   InterfaceStyle,
   GitSidebarLayout,
@@ -46,7 +45,6 @@ export type SettingsPreferencesPort = {
   sidebarNavigationLayout: SidebarNavigationLayout;
   sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
   filesVisibilitySettings: FilesVisibilitySettings;
-  externalAppsSettings: ExternalAppsSettings;
   createNewMenuSettings: CreateNewMenuSettings;
   experimentalSettings: ExperimentalSettings;
   rightSidebarToolsSettings: RightSidebarToolsSettings;
@@ -67,7 +65,6 @@ export type SettingsPreferencesPort = {
   setFileIconTheme: (value: FileIconThemeId) => void;
   setSidebarNavigationLayout: (value: SidebarNavigationLayout) => void;
   setSidebarNavigationVisibilitySettings: (value: SidebarNavigationVisibilitySettings) => void;
-  setExternalAppsSettings: (value: ExternalAppsSettings) => void;
   setCreateNewMenuSettings: (value: CreateNewMenuSettings) => void;
   setExperimentalSettings: (value: ExperimentalSettings) => void;
   setRightSidebarToolsSettings: (value: RightSidebarToolsSettings) => void;
@@ -151,7 +148,6 @@ export function createSettingsWorkspaceSurface({
         sidebarNavigationLayout={preferences.sidebarNavigationLayout}
         sidebarNavigationVisibilitySettings={preferences.sidebarNavigationVisibilitySettings}
         filesVisibilitySettings={preferences.filesVisibilitySettings}
-        externalAppsSettings={preferences.externalAppsSettings}
         createNewMenuSettings={preferences.createNewMenuSettings}
         experimentalSettings={preferences.experimentalSettings}
         rightSidebarToolsSettings={preferences.rightSidebarToolsSettings}
@@ -182,7 +178,6 @@ export function createSettingsWorkspaceSurface({
         onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
         onSidebarNavigationVisibilitySettingsChange={preferences.setSidebarNavigationVisibilitySettings}
         onFilesVisibilitySettingsChange={onFilesVisibilitySettingsChange}
-        onExternalAppsSettingsChange={preferences.setExternalAppsSettings}
         onCreateNewMenuSettingsChange={preferences.setCreateNewMenuSettings}
         onExperimentalSettingsChange={preferences.setExperimentalSettings}
         onRightSidebarToolsSettingsChange={preferences.setRightSidebarToolsSettings}

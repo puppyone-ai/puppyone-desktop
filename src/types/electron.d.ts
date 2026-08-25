@@ -660,30 +660,6 @@ export type WorkspaceConvertOfficeDocumentToDocxResult = {
 export type WorkspaceOpenEntryExternalRequest = {
   rootPath: string;
   path: string;
-  strategy?: "system" | "app";
-  appPath?: string | null;
-};
-
-export type WorkspaceExternalOpenTargetSource = "system" | "override" | "candidate" | "unknown";
-
-export type WorkspaceExternalOpenTarget = {
-  appName: string | null;
-  appPath: string | null;
-  bundleId: string | null;
-  extension: string | null;
-  iconDataUrl: string | null;
-  source: WorkspaceExternalOpenTargetSource;
-};
-
-export type WorkspaceResolveExternalOpenTargetRequest = {
-  rootPath: string;
-  path: string;
-  extension?: string | null;
-  overrideAppPath?: string | null;
-};
-
-export type WorkspaceChooseExternalAppRequest = {
-  extension?: string | null;
 };
 
 export type DesktopStoredCloudSession = {
@@ -978,9 +954,6 @@ declare global {
       deleteEntry: (request: WorkspaceDeleteEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       revealEntryInFinder: (request: WorkspaceRevealEntryRequest) => Promise<{ ok: boolean }>;
       openEntryExternal: (request: WorkspaceOpenEntryExternalRequest) => Promise<{ ok: boolean; cancelled?: boolean }>;
-      resolveExternalOpenTarget: (request: WorkspaceResolveExternalOpenTargetRequest) => Promise<WorkspaceExternalOpenTarget>;
-      listExternalOpenTargets: (request: WorkspaceResolveExternalOpenTargetRequest) => Promise<WorkspaceExternalOpenTarget[]>;
-      chooseExternalApp: (request: WorkspaceChooseExternalAppRequest) => Promise<WorkspaceExternalOpenTarget | null>;
       startAppPreview: (request: {
         rootPath: string;
         path: string;

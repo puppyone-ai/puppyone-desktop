@@ -13,7 +13,6 @@ import { EditorPaneActionsMenu } from "./EditorPaneActionsMenu";
 export type EditorPaneChromeProps = Readonly<{
   actionsOpen: boolean;
   editorLabel: string | null;
-  externalOpenAppName: string | null;
   findCommand: EditorFindCommand | null;
   menuContribution: EditorPaneMenuContribution | null;
   pane: EditorPaneLayoutLeaf;
@@ -36,7 +35,6 @@ export type EditorPaneChromeProps = Readonly<{
 export function EditorPaneChrome({
   actionsOpen,
   editorLabel,
-  externalOpenAppName,
   findCommand,
   menuContribution,
   pane,
@@ -129,7 +127,6 @@ export function EditorPaneChrome({
       <EditorPaneActionsMenu
         anchorRef={handleRef}
         editorLabel={editorLabel}
-        externalOpenAppName={externalOpenAppName}
         findCommand={findCommand}
         menuContribution={menuContribution}
         open={actionsOpen}

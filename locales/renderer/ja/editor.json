@@ -338,7 +338,6 @@
   "panes.empty": "空のエディター",
   "panes.fileActions": "ファイル",
   "panes.label": "{name} エディターペイン",
-  "panes.openInApp": "{app} で開く",
   "panes.paneActions": "ペイン",
   "panes.resize": "エディターペインのサイズを変更",
   "panes.splitDown": "エディターを下に分割",

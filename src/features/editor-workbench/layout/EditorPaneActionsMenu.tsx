@@ -40,7 +40,6 @@ const PANE_DIVIDER_INLINE_MARGIN = 3;
 export type EditorPaneActionsMenuProps = Readonly<{
   anchorRef: RefObject<HTMLElement | null>;
   editorLabel: string | null;
-  externalOpenAppName: string | null;
   findCommand: EditorFindCommand | null;
   menuContribution: EditorPaneMenuContribution | null;
   open: boolean;
@@ -57,7 +56,6 @@ export type EditorPaneActionsMenuProps = Readonly<{
 export function EditorPaneActionsMenu({
   anchorRef,
   editorLabel,
-  externalOpenAppName,
   findCommand,
   menuContribution,
   open,
@@ -151,9 +149,7 @@ export function EditorPaneActionsMenu({
     onCloseMenu();
     void action();
   };
-  const openExternalLabel = externalOpenAppName
-    ? t("editor.panes.openInApp", { app: externalOpenAppName })
-    : t("editor.openDefaultApp");
+  const openExternalLabel = t("editor.openDefaultApp");
   const menuStyle = overlayPosition
     ? {
         left: overlayPosition.left,

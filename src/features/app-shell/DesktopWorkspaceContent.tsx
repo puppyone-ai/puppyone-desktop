@@ -41,7 +41,6 @@ type DesktopWorkspaceContentProps = {
   dataPort: DataWorkspacePort | null;
   editorWorkbench: DesktopEditorWorkbenchController;
   externalOpen: Readonly<{
-    getAppName: (path: string) => string | null;
     open: (path: string) => void | Promise<void>;
   }>;
   fileClipboardController: FileClipboardController;

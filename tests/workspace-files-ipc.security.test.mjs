@@ -42,8 +42,6 @@ describe("workspace file IPC authorization", () => {
       ["workspace:delete-entry", { rootPath: otherRoot, path: "secret.txt" }],
       ["workspace:reveal-entry-in-finder", { rootPath: otherRoot, path: "secret.txt" }],
       ["workspace:open-entry-external", { rootPath: otherRoot, path: "secret.txt" }],
-      ["workspace:resolve-external-open-target", { rootPath: otherRoot, path: "secret.txt" }],
-      ["workspace:list-external-open-targets", { rootPath: otherRoot, path: "secret.txt" }],
     ]);
 
     await writeFile(path.join(otherRoot, "secret.txt"), "secret");
@@ -256,6 +254,24 @@ describe("workspace file IPC authorization", () => {
       { rootPath: root, fromPath: "source.txt", targetFolderPath: null },
     )).resolves.toEqual({ path: "source copy.txt" });
     expect(await readFile(path.join(root, "source copy.txt"), "utf8")).toBe("inside");
+  });
+
+  it("always delegates external file opening to the system default app", async () => {
+    const notePath = path.join(root, "note.txt");
+    await writeFile(notePath, "inside");
+    const { handlers, shell } = createHarness(() => root);
+
+    await expect(handlers.get("workspace:open-entry-external")(
+      { sender: { id: 102 } },
+      {
+        rootPath: root,
+        path: "note.txt",
+        // Retired override fields from an older renderer must be inert.
+        strategy: "app",
+        appPath: "/Applications/Other.app",
+      },
+    )).resolves.toEqual({ ok: true });
+    expect(shell.openPath).toHaveBeenCalledExactlyOnceWith(await fs.promises.realpath(notePath));
   });
 
   it("cannot bypass executable confirmation and revalidates after the dialog", async () => {

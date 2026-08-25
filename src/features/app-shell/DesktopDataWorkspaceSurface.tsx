@@ -53,7 +53,6 @@ export type DesktopDataWorkspaceSurfaceProps = {
   dataPort: NonNullable<DataWorkspaceProps["dataPort"]>;
   editorWorkbench: DesktopEditorWorkbenchController;
   externalOpen: Readonly<{
-    getAppName: (path: string) => string | null;
     open: (path: string) => void | Promise<void>;
   }>;
   editorInteractionPreferences: NonNullable<DataWorkspaceProps["editorInteractionPreferences"]>;

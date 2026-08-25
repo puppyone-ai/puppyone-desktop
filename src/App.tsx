@@ -166,7 +166,6 @@ function AppContent() {
     createNewMenuSettings,
     explorerWidth,
     experimentalSettings,
-    externalAppsSettings,
     fileIconTheme,
     filesVisibilitySettings,
     interfaceStyle,
@@ -393,7 +392,6 @@ function AppContent() {
     openNodeInDefaultAppFromMenu,
   } = useDataNodeActions({
     dataPort,
-    externalAppsSettings,
     onEnterDataView: enterDataView,
     onLocalWorkspaceContentChanged: refreshGitStatus,
     onWorkspaceContentChanged: refreshWorkspaceContent,
@@ -669,7 +667,6 @@ function AppContent() {
     setSwitcherOpen(false);
   }, []);
   const externalFileOpen = useExternalFileOpen({
-    externalAppsSettings,
     onActionSettled: closeSwitcher,
     onError: setWorkspaceSurfaceError,
     workspace,

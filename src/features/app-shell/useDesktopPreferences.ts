@@ -17,7 +17,6 @@ import {
   CREATE_NEW_MENU_STORAGE_KEY,
   DIFF_MARKERS_STORAGE_KEY,
   EXPERIMENTAL_SETTINGS_STORAGE_KEY,
-  EXTERNAL_APPS_STORAGE_KEY,
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
   GIT_DISPLAY_MODE_STORAGE_KEY,
@@ -39,7 +38,6 @@ import {
   parseLoadingAnimationPreset,
   parseCreateNewMenuSettings,
   parseTypography,
-  type ExternalAppsSettings,
   type CreateNewMenuSettings,
   type DiffMarkers,
   type ExperimentalSettings,
@@ -71,7 +69,6 @@ import {
   readInitialCreateNewMenuSettings,
   readInitialExperimentalSettings,
   readInitialExplorerWidth,
-  readInitialExternalAppsSettings,
   readInitialFileIconTheme,
   readInitialFilesVisibilitySettings,
   readInitialGitDisplayMode,
@@ -136,7 +133,6 @@ export function useDesktopPreferences() {
   const [gitDisplayMode, setGitDisplayMode] = useState<GitDisplayMode>(() => readInitialGitDisplayMode());
   const [gitSidebarLayout, setGitSidebarLayout] = useState<GitSidebarLayout>(() => readInitialGitSidebarLayout());
   const [filesVisibilitySettings, setFilesVisibilitySettings] = useState<FilesVisibilitySettings>(() => readInitialFilesVisibilitySettings());
-  const [externalAppsSettings, setExternalAppsSettings] = useState<ExternalAppsSettings>(() => readInitialExternalAppsSettings());
   const [createNewMenuSettings, setCreateNewMenuSettings] = useState<CreateNewMenuSettings>(
     () => readInitialCreateNewMenuSettings(),
   );
@@ -315,8 +311,10 @@ export function useDesktopPreferences() {
   }, [filesVisibilitySettings]);
 
   useEffect(() => {
-    window.localStorage.setItem(EXTERNAL_APPS_STORAGE_KEY, JSON.stringify(externalAppsSettings));
-  }, [externalAppsSettings]);
+    // Retired per-file-type overrides must not continue to shadow the system
+    // default after the setting has been removed.
+    window.localStorage.removeItem("puppyone.desktop.externalApps");
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(CREATE_NEW_MENU_STORAGE_KEY, JSON.stringify(createNewMenuSettings));
@@ -405,7 +403,6 @@ export function useDesktopPreferences() {
     diffMarkers,
     explorerWidth,
     createNewMenuSettings,
-    externalAppsSettings,
     experimentalSettings,
     fileIconTheme: resolvedAppearance.fileIconTheme,
     filesVisibilitySettings,
@@ -442,7 +439,6 @@ export function useDesktopPreferences() {
     setDiffMarkers,
     setExplorerWidth,
     setCreateNewMenuSettings,
-    setExternalAppsSettings,
     setExperimentalSettings,
     setFileIconTheme,
     setFilesVisibilitySettings,

@@ -6,7 +6,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useDataNodeActions } from "../src/features/data-workspace/useDataNodeActions";
 import { createLocalDataPort } from "../src/lib/localFiles";
-import { DEFAULT_EXTERNAL_APPS_SETTINGS } from "../src/preferences";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -41,7 +40,6 @@ describe("Slides create action", () => {
     function Harness() {
       actions = useDataNodeActions({
         dataPort,
-        externalAppsSettings: DEFAULT_EXTERNAL_APPS_SETTINGS,
         onEnterDataView: vi.fn(),
         onLocalWorkspaceContentChanged,
         onWorkspaceContentChanged,
@@ -86,7 +84,6 @@ describe("Slides create action", () => {
     function Harness() {
       actions = useDataNodeActions({
         dataPort: { listChildren: async () => [], createFolder, createFile: vi.fn() },
-        externalAppsSettings: DEFAULT_EXTERNAL_APPS_SETTINGS,
         onEnterDataView: vi.fn(),
         onLocalWorkspaceContentChanged: vi.fn(),
         onWorkspaceContentChanged: vi.fn(),

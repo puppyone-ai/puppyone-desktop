@@ -71,18 +71,6 @@ export type FilesVisibilitySettings = {
   showHiddenFiles: boolean;
   excludePatterns: string[];
 };
-export type ExternalAppOpenMode = "system";
-export type ExternalAppOverride = {
-  extension: string;
-  appPath: string;
-  appName?: string | null;
-  bundleId?: string | null;
-  iconDataUrl?: string | null;
-};
-export type ExternalAppsSettings = {
-  openMode: ExternalAppOpenMode;
-  overrides: ExternalAppOverride[];
-};
 export const RIGHT_SIDEBAR_TOOL_IDS = ["terminal"] as const;
 export type RightSidebarToolId = typeof RIGHT_SIDEBAR_TOOL_IDS[number];
 export type RightSidebarToolsSettings = {
@@ -126,7 +114,6 @@ export const FILE_ICON_THEME_STORAGE_KEY = "puppyone.desktop.fileIconTheme";
 export const SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY = "puppyone.desktop.sidebarNavigationLayout";
 export const SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY = "puppyone.desktop.sidebarNavigationVisibility";
 export const FILES_VISIBILITY_STORAGE_KEY = "puppyone.desktop.filesVisibility";
-export const EXTERNAL_APPS_STORAGE_KEY = "puppyone.desktop.externalApps";
 export const RIGHT_SIDEBAR_TOOLS_STORAGE_KEY = "puppyone.desktop.rightSidebarTools";
 export const TITLEBAR_ACTIONS_STORAGE_KEY = "puppyone.desktop.titlebarActions";
 export const LOCAL_AGENTS_STORAGE_KEY = "puppyone.desktop.localAgents";
@@ -164,10 +151,6 @@ export const DEFAULT_EXPLORER_EXCLUDE_PATTERNS = [
 export const DEFAULT_FILES_VISIBILITY_SETTINGS: FilesVisibilitySettings = {
   showHiddenFiles: false,
   excludePatterns: [...DEFAULT_EXPLORER_EXCLUDE_PATTERNS],
-};
-export const DEFAULT_EXTERNAL_APPS_SETTINGS: ExternalAppsSettings = {
-  openMode: "system",
-  overrides: [],
 };
 export const DEFAULT_RIGHT_SIDEBAR_TOOLS_SETTINGS: RightSidebarToolsSettings = {
   enabled: {
@@ -472,22 +455,6 @@ export function parseFilesVisibilitySettings(value: string | null | undefined): 
   }
 }
 
-export function parseExternalAppsSettings(value: string | null | undefined): ExternalAppsSettings {
-  if (!value) return DEFAULT_EXTERNAL_APPS_SETTINGS;
-
-  try {
-    const parsed = JSON.parse(value) as Partial<ExternalAppsSettings> | null;
-    if (!parsed || typeof parsed !== "object") return DEFAULT_EXTERNAL_APPS_SETTINGS;
-
-    return {
-      openMode: "system",
-      overrides: normalizeExternalAppOverrides(parsed.overrides),
-    };
-  } catch {
-    return DEFAULT_EXTERNAL_APPS_SETTINGS;
-  }
-}
-
 export function parseRightSidebarToolsSettings(value: string | null | undefined): RightSidebarToolsSettings {
   if (!value) return DEFAULT_RIGHT_SIDEBAR_TOOLS_SETTINGS;
 
@@ -747,112 +714,6 @@ export function resolveVisibleCreateNewMenuItems(
     )),
     submenu,
   };
-}
-
-function normalizeExternalAppOverrides(value: unknown): ExternalAppOverride[] {
-  if (!Array.isArray(value)) return [];
-
-  const overrides: ExternalAppOverride[] = [];
-  const seen = new Set<string>();
-  for (const item of value) {
-    if (!item || typeof item !== "object") continue;
-    const rawExtension = "extension" in item ? item.extension : null;
-    const rawAppPath = "appPath" in item ? item.appPath : null;
-    if (typeof rawExtension !== "string" || typeof rawAppPath !== "string") continue;
-
-    const extension = normalizeExternalAppExtension(rawExtension);
-    const appPath = rawAppPath.trim();
-    if (!extension || !appPath || seen.has(extension)) continue;
-
-    const appName = readOptionalTrimmedString("appName" in item ? item.appName : null);
-    const bundleId = readOptionalTrimmedString("bundleId" in item ? item.bundleId : null);
-    const iconDataUrl = readOptionalDataImageUrl("iconDataUrl" in item ? item.iconDataUrl : null);
-
-    seen.add(extension);
-    overrides.push({
-      extension,
-      appPath,
-      ...(appName ? { appName } : {}),
-      ...(bundleId ? { bundleId } : {}),
-      ...(iconDataUrl ? { iconDataUrl } : {}),
-    });
-  }
-  return overrides;
-}
-
-export function getExternalAppExtension(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const leafName = value.replace(/\\/g, "/").split("/").pop() ?? value;
-  const dotIndex = leafName.lastIndexOf(".");
-  if (dotIndex <= 0 || dotIndex === leafName.length - 1) return null;
-  const extension = normalizeExternalAppExtension(leafName.slice(dotIndex + 1));
-  return extension || null;
-}
-
-export function getExternalAppOverrideForExtension(
-  settings: ExternalAppsSettings,
-  extension: string | null | undefined,
-): ExternalAppOverride | null {
-  const normalizedExtension = normalizeExternalAppExtension(extension ?? "");
-  if (!normalizedExtension) return null;
-  return settings.overrides.find((override) => override.extension === normalizedExtension) ?? null;
-}
-
-export function upsertExternalAppOverride(
-  settings: ExternalAppsSettings,
-  override: ExternalAppOverride,
-): ExternalAppsSettings {
-  const extension = normalizeExternalAppExtension(override.extension);
-  const appPath = override.appPath.trim();
-  if (!extension || !appPath) return settings;
-  const appName = override.appName?.trim();
-  const bundleId = override.bundleId?.trim();
-  const iconDataUrl = readOptionalDataImageUrl(override.iconDataUrl);
-
-  const nextOverride: ExternalAppOverride = {
-    extension,
-    appPath,
-    ...(appName ? { appName } : {}),
-    ...(bundleId ? { bundleId } : {}),
-    ...(iconDataUrl ? { iconDataUrl } : {}),
-  };
-
-  return {
-    ...settings,
-    overrides: [
-      nextOverride,
-      ...settings.overrides.filter((item) => item.extension !== extension),
-    ],
-  };
-}
-
-export function removeExternalAppOverride(
-  settings: ExternalAppsSettings,
-  extension: string | null | undefined,
-): ExternalAppsSettings {
-  const normalizedExtension = normalizeExternalAppExtension(extension ?? "");
-  if (!normalizedExtension) return settings;
-  return {
-    ...settings,
-    overrides: settings.overrides.filter((item) => item.extension !== normalizedExtension),
-  };
-}
-
-export function normalizeExternalAppExtension(value: string): string {
-  const normalized = value.trim().toLowerCase().replace(/^\*?\./, "");
-  return /^[a-z0-9][a-z0-9_-]{0,31}$/.test(normalized) ? normalized : "";
-}
-
-function readOptionalTrimmedString(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed || null;
-}
-
-function readOptionalDataImageUrl(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return /^data:image\/[a-z0-9.+-]+;base64,/i.test(trimmed) ? trimmed : null;
 }
 
 function readRightSidebarToolEnabled(

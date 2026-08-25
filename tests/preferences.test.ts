@@ -8,7 +8,6 @@ import {
   parseCreateNewMenuSettings,
   parseDarkThemePreset,
   parseDiffMarkers,
-  parseExternalAppsSettings,
   parseExperimentalSettings,
   parseLoadingAnimationPreset,
   parseGitSidebarLayout,
@@ -267,28 +266,6 @@ function readCssBlock(css: string, selector: string): string {
   if (end < 0) throw new Error(`Unclosed CSS block for ${selector}`);
   return css.slice(bodyStart, end);
 }
-
-describe("external app preferences", () => {
-  it("drops the legacy renderer-controlled executable confirmation preference", () => {
-    const settings = parseExternalAppsSettings(JSON.stringify({
-      openMode: "system",
-      confirmExecutableFiles: false,
-      overrides: [{
-        extension: "PDF",
-        appPath: " /Applications/Preview.app ",
-      }],
-    }));
-
-    expect(settings).toEqual({
-      openMode: "system",
-      overrides: [{
-        extension: "pdf",
-        appPath: "/Applications/Preview.app",
-      }],
-    });
-    expect(settings).not.toHaveProperty("confirmExecutableFiles");
-  });
-});
 
 describe("experimental preferences", () => {
   it("keeps Agent Chat off unless the user explicitly opts in", () => {

@@ -62,7 +62,6 @@ export type DesktopEditorSplitViewProps = Readonly<{
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   workspace: Workspace;
   externalOpen?: Readonly<{
-    getAppName: (path: string) => string | null;
     open: (path: string) => void | Promise<void>;
   }>;
   onClosePane: (paneId: string) => void;
@@ -309,7 +308,6 @@ function EditorPane({
       actionsOpen={actionsOpen}
       agentPresencePath={agentPresencePath}
       editorLabel={editor?.label ?? null}
-      externalOpenAppName={externalOpenPath ? externalOpen?.getAppName(externalOpenPath) ?? null : null}
       findCommand={findCommand}
       fileDrop={fileDrop}
       pane={pane}

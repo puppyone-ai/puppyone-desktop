@@ -11,11 +11,6 @@ import {
   revealWorkspaceEntryInFinder,
 } from "../../lib/localFiles";
 import {
-  getExternalAppExtension,
-  getExternalAppOverrideForExtension,
-  type ExternalAppsSettings,
-} from "../../preferences";
-import {
   defaultCreateName,
   formatDesktopExtensionLabel,
   getCreateEntryInitialContent,
@@ -44,7 +39,6 @@ import { bidiIsolate } from "@puppyone/localization/core";
 
 export function useDataNodeActions({
   dataPort,
-  externalAppsSettings,
   onEnterDataView,
   onLocalWorkspaceContentChanged,
   onWorkspaceContentChanged,
@@ -55,7 +49,6 @@ export function useDataNodeActions({
   workspace,
 }: {
   dataPort: DataPort | null;
-  externalAppsSettings: ExternalAppsSettings;
   onEnterDataView: () => void;
   onLocalWorkspaceContentChanged: () => void;
   onWorkspaceContentChanged: () => void;
@@ -390,13 +383,9 @@ export function useDataNodeActions({
 
     setNodeActionMenu((current) => current ? { ...current, operation: "open", error: null } : current);
     try {
-      const extension = getExternalAppExtension(nodeActionMenu.node.path);
-      const override = getExternalAppOverrideForExtension(externalAppsSettings, extension);
       await openWorkspaceEntryExternal({
         rootPath: workspace.path,
         path: nodeActionMenu.node.path,
-        strategy: override ? "app" : externalAppsSettings.openMode,
-        appPath: override?.appPath ?? null,
       });
       setNodeActionMenu(null);
     } catch (error) {
@@ -407,7 +396,6 @@ export function useDataNodeActions({
       } : current);
     }
   }, [
-    externalAppsSettings,
     nodeActionMenu,
     workspace,
   ]);

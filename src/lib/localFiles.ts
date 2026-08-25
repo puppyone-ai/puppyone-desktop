@@ -17,18 +17,15 @@ import type {
   LastWorkspaceResult,
   PuppyoneWorkspaceConfig,
   RecentWorkspacesResult,
-  WorkspaceChooseExternalAppRequest,
   WorkspaceCloneRepositoryRequest,
   WorkspaceCreateProjectRequest,
   WorkspaceCreateEntryKind,
   WorkspaceCreateEntryResult,
   WorkspaceInstantiateTemplateResult,
-  WorkspaceExternalOpenTarget,
   WorkspaceOpenEntryExternalRequest,
   WorkspaceImportEntriesResult,
   WorkspaceOpenResult,
   WorkspaceProjectLocationGrant,
-  WorkspaceResolveExternalOpenTargetRequest,
 } from "../types/electron";
 import {
   createAppPreviewManifestContentFromSetup,
@@ -285,18 +282,6 @@ export async function openWorkspaceEntryExternal(
   request: WorkspaceOpenEntryExternalRequest,
 ): Promise<{ ok: boolean; cancelled?: boolean }> {
   return getDesktopBridge().openEntryExternal(request);
-}
-
-export async function resolveWorkspaceExternalOpenTarget(
-  request: WorkspaceResolveExternalOpenTargetRequest,
-): Promise<WorkspaceExternalOpenTarget> {
-  return getDesktopBridge().resolveExternalOpenTarget(request);
-}
-
-export async function chooseWorkspaceExternalApp(
-  request: WorkspaceChooseExternalAppRequest,
-): Promise<WorkspaceExternalOpenTarget | null> {
-  return getDesktopBridge().chooseExternalApp(request);
 }
 
 export async function forgetLastWorkspace(): Promise<void> {

@@ -1,7 +1,6 @@
 import {
   Bot,
   Cloud,
-  ExternalLink,
   FileText,
   FlaskConical,
   FolderCog,
@@ -42,7 +41,6 @@ export const SETTINGS_SIDEBAR_GROUPS = [
       { id: "appearance", labelId: "settings.sidebar.appearance", icon: Monitor, disabled: false },
       { id: "local-agents", labelId: "settings.sidebar.localAgents", icon: Bot, disabled: false },
       { id: "new-menu", labelId: "settings.sidebar.createNew", icon: ListPlus, disabled: false },
-      { id: "external-apps", labelId: "settings.sidebar.defaultApps", icon: ExternalLink, disabled: false },
       { id: "editor", labelId: "settings.sidebar.editor", icon: Pencil, disabled: false },
       { id: "experimental", labelId: "settings.sidebar.experimental", icon: FlaskConical, disabled: false },
     ],

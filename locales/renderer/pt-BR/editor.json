@@ -338,7 +338,6 @@
   "panes.empty": "Editor vazio",
   "panes.fileActions": "Arquivo",
   "panes.label": "Painel do editor {name}",
-  "panes.openInApp": "Abrir em {app}",
   "panes.paneActions": "Painel",
   "panes.resize": "Redimensionar painéis do editor",
   "panes.splitDown": "Dividir editor para baixo",

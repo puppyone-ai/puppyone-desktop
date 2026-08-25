@@ -19,7 +19,7 @@ import { SettingsSectionHeader } from "./components";
 import { ContentFontSetting } from "./ContentFontSetting";
 import { AccountSettingsView } from "./main/AccountSettingsView";
 import { EditorSettingsView, ExperimentalSettingsView } from "./main/EditorSettingsViews";
-import { DefaultAppsSettingsView, FilesSettingsView } from "./main/FileSettingsViews";
+import { FilesSettingsView } from "./main/FileSettingsViews";
 import { GeneralSettingsView } from "./main/GeneralSettingsView";
 import { LocalProjectSettingsView } from "./main/LocalProjectSettingsView";
 import { InterfacePaletteSettings } from "./main/InterfacePaletteSettings";
@@ -48,7 +48,6 @@ export function SettingsView({
   fileIconTheme,
   sidebarNavigationVisibilitySettings,
   filesVisibilitySettings,
-  externalAppsSettings,
   createNewMenuSettings,
   experimentalSettings,
   rightSidebarToolsSettings,
@@ -79,7 +78,6 @@ export function SettingsView({
   onSidebarNavigationLayoutChange,
   onSidebarNavigationVisibilitySettingsChange,
   onFilesVisibilitySettingsChange,
-  onExternalAppsSettingsChange,
   onCreateNewMenuSettingsChange,
   onExperimentalSettingsChange,
   onRightSidebarToolsSettingsChange,
@@ -200,15 +198,6 @@ export function SettingsView({
       <FilesSettingsView
         settings={filesVisibilitySettings}
         onChange={onFilesVisibilitySettingsChange}
-      />
-    );
-  }
-
-  if (activeSection === "external-apps") {
-    return (
-      <DefaultAppsSettingsView
-        settings={externalAppsSettings}
-        onChange={onExternalAppsSettingsChange}
       />
     );
   }

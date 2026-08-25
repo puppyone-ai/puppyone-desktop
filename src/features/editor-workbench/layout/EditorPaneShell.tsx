@@ -22,7 +22,6 @@ export type EditorPaneShellProps = Readonly<{
   agentPresencePath: string | null;
   children: ReactNode;
   editorLabel: string | null;
-  externalOpenAppName: string | null;
   fileDrop: EditorFileDropController;
   findCommand: EditorFindCommand | null;
   menuContribution: EditorPaneMenuContribution | null;
@@ -46,7 +45,6 @@ export function EditorPaneShell({
   agentPresencePath,
   children,
   editorLabel,
-  externalOpenAppName,
   fileDrop,
   findCommand,
   menuContribution,
@@ -103,7 +101,6 @@ export function EditorPaneShell({
       <EditorPaneChrome
         actionsOpen={actionsOpen}
         editorLabel={editorLabel}
-        externalOpenAppName={externalOpenAppName}
         findCommand={findCommand}
         menuContribution={menuContribution}
         pane={pane}

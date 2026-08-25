@@ -60,7 +60,7 @@ describe("Markdown pane mode menu", () => {
             markdownBlockDragEnabled: false,
           }}
           editorTree={[node]}
-          externalOpen={{ getAppName: () => "Terminal", open: vi.fn() }}
+          externalOpen={{ open: vi.fn() }}
           fileIconTheme="default"
           layout={createEditorPaneLayout(path)}
           markdownEnvironment={workspaceState(node).markdownEnvironment}

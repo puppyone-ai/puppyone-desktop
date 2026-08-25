@@ -11,7 +11,6 @@
   "action.clear": "Effacer",
   "action.copied": "Copié",
   "action.change": "Modifier",
-  "action.chooseApp": "Choisir l’application",
   "action.save": "Enregistrer",
   "status.loading": "Chargement…"
 }

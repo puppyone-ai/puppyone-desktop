@@ -14,7 +14,8 @@ describe("settings visual architecture", () => {
     const language = source("src/features/settings/LanguageSetting.tsx");
 
     expect(types).toContain('"general" | "local-project"');
-    expect(types).toContain('"appearance" | "local-agents" | "external-apps"');
+    expect(types).toContain('"appearance" | "local-agents" | "editor"');
+    expect(types).not.toContain('"external-apps"');
     expect(types).not.toContain('"local-agent-hooks"');
     expect(types).not.toContain('| "language"');
     expect(types).not.toContain('"workspace"');
@@ -66,7 +67,6 @@ describe("settings visual architecture", () => {
       'labelId: "settings.sidebar.appearance"',
       'labelId: "settings.sidebar.localAgents"',
       'labelId: "settings.sidebar.createNew"',
-      'labelId: "settings.sidebar.defaultApps"',
       'labelId: "settings.sidebar.editor"',
       'labelId: "settings.sidebar.experimental"',
     ]);
@@ -93,6 +93,7 @@ describe("settings visual architecture", () => {
       expect(catalog["sidebar.projectInfo"], locale).toBeTruthy();
       expect(catalog["sidebar.localAgents"], locale).toBeTruthy();
       expect(catalog["sidebar.createNew"], locale).toBeTruthy();
+      expect(catalog["sidebar.defaultApps"], locale).toBeUndefined();
       expect(catalog["sidebar.localAgentHooks"], locale).toBeUndefined();
       expect(catalog["general.title"], locale).toBeTruthy();
       expect(catalog["general.detail"], locale).toBeTruthy();
@@ -223,7 +224,6 @@ describe("settings visual architecture", () => {
       "settings.editor.detail",
       "settings.experimental.detail",
       "settings.files.detail",
-      "settings.defaultApps.detail",
       "settings.cloud.detail",
       "settings.git.detail",
     ]) {

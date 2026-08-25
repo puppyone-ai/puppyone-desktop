@@ -14,7 +14,6 @@ import {
   DEFAULT_SIDEBAR_NAVIGATION_LAYOUT,
   DEFAULT_THEME_MODE,
   EXPERIMENTAL_SETTINGS_STORAGE_KEY,
-  EXTERNAL_APPS_STORAGE_KEY,
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
   GIT_DISPLAY_MODE_STORAGE_KEY,
@@ -39,7 +38,6 @@ import {
   parseDarkThemePreset,
   parseDiffMarkers,
   parseExperimentalSettings,
-  parseExternalAppsSettings,
   parseFilesVisibilitySettings,
   parseGitDisplayMode,
   parseGitSidebarLayout,
@@ -59,7 +57,6 @@ import {
   type CreateNewMenuSettings,
   type DiffMarkers,
   type ExperimentalSettings,
-  type ExternalAppsSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
   type GitSidebarLayout,
@@ -163,11 +160,6 @@ export function readInitialGitSidebarLayout(): GitSidebarLayout {
 export function readInitialFilesVisibilitySettings(): FilesVisibilitySettings {
   if (typeof window === "undefined") return parseFilesVisibilitySettings(null);
   return parseFilesVisibilitySettings(window.localStorage.getItem(FILES_VISIBILITY_STORAGE_KEY));
-}
-
-export function readInitialExternalAppsSettings(): ExternalAppsSettings {
-  if (typeof window === "undefined") return parseExternalAppsSettings(null);
-  return parseExternalAppsSettings(window.localStorage.getItem(EXTERNAL_APPS_STORAGE_KEY));
 }
 
 export function readInitialCreateNewMenuSettings(): CreateNewMenuSettings {
