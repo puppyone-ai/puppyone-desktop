@@ -4,6 +4,7 @@
   "action.checking": "Vérification",
   "action.restarting": "Redémarrage",
   "action.restart": "Redémarrer pour mettre à jour",
+  "action.download": "Télécharger la mise à jour",
   "action.updateNow": "Mettre à jour maintenant",
   "action.tryAgain": "Réessayer",
   "action.check": "Vérifier les mises à jour",

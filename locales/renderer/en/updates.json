@@ -4,6 +4,7 @@
   "action.checking": "Checking",
   "action.restarting": "Restarting",
   "action.restart": "Restart to update",
+  "action.download": "Download update",
   "action.updateNow": "Update now",
   "action.tryAgain": "Try again",
   "action.check": "Check for updates",

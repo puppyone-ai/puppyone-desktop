@@ -4,6 +4,7 @@
   "action.checking": "正在检查",
   "action.restarting": "正在重启",
   "action.restart": "重启以更新",
+  "action.download": "下载更新",
   "action.updateNow": "立即更新",
   "action.tryAgain": "重试",
   "action.check": "检查更新",

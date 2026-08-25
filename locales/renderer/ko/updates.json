@@ -4,6 +4,7 @@
   "action.checking": "확인 중",
   "action.restarting": "다시 시작 중",
   "action.restart": "다시 시작하여 업데이트",
+  "action.download": "업데이트 다운로드",
   "action.updateNow": "지금 업데이트",
   "action.tryAgain": "다시 시도",
   "action.check": "업데이트 확인",

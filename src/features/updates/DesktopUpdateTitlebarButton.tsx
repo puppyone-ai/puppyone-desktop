@@ -29,7 +29,7 @@ export function DesktopUpdateTitlebarButton({
           : t("updates.detail.downloaded", { version })
         : t("updates.detail.installing");
   const buttonLabel = presentation.kind === "available"
-    ? t("updates.action.updateNow")
+    ? t("updates.action.download")
     : presentation.kind === "downloading"
       ? t("updates.title.downloading", { progress })
       : presentation.kind === "ready"

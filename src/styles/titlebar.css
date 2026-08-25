@@ -174,16 +174,12 @@
   min-width: 0;
   flex: 0 0 auto;
   gap: 6px;
-  padding: 0 9px;
-  border: 1px solid color-mix(in srgb, var(--desktop-titlebar-text-muted) 32%, transparent);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--desktop-titlebar-text) 4%, transparent);
-  color: var(--desktop-titlebar-text);
-  font-size: var(--po-font-size-chrome, 13px);
-  font-weight: var(--po-font-weight-chrome, 500);
-  line-height: 1;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--desktop-toolbar-action-radius);
+  background: color-mix(in srgb, var(--po-accent) 12%, transparent);
+  color: color-mix(in srgb, var(--po-accent) 72%, var(--desktop-titlebar-text));
   white-space: nowrap;
-  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .desktop-titlebar-update > svg {
@@ -192,23 +188,17 @@
 
 .desktop-titlebar-action.desktop-titlebar-update:hover,
 .desktop-titlebar-action.desktop-titlebar-update:focus-visible {
-  border-color: color-mix(in srgb, var(--desktop-titlebar-text-muted) 56%, transparent);
-  background: var(--desktop-titlebar-hover);
-  color: var(--desktop-titlebar-text);
-}
-
-.desktop-titlebar-action.desktop-titlebar-update:focus-visible {
-  box-shadow: 0 0 0 2px var(--desktop-titlebar-focus);
-}
-
-.desktop-titlebar-action.desktop-titlebar-update:disabled {
-  opacity: 0.72;
+  background: color-mix(in srgb, var(--po-accent) 18%, var(--desktop-titlebar-hover));
+  color: color-mix(in srgb, var(--po-accent) 58%, var(--desktop-titlebar-text));
 }
 
 .desktop-titlebar-update-label {
   min-width: 0;
   max-width: 180px;
   overflow: hidden;
+  font-size: var(--po-font-size-chrome, 13px);
+  font-weight: var(--po-font-weight-chrome, 500);
+  line-height: 18px;
   text-overflow: ellipsis;
 }
 

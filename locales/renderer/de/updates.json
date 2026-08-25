@@ -4,6 +4,7 @@
   "action.checking": "Wird geprüft",
   "action.restarting": "Wird neu gestartet",
   "action.restart": "Zum Aktualisieren neu starten",
+  "action.download": "Update herunterladen",
   "action.updateNow": "Jetzt aktualisieren",
   "action.tryAgain": "Erneut versuchen",
   "action.check": "Nach Updates suchen",

@@ -30,8 +30,9 @@ describe("pane-scoped external-open architecture", () => {
     expect(updateButton).toContain("if (!presentation) return null");
     expect(updateButton).toContain("strokeWidth={2.3}");
     expect(updateButton).toContain('className="desktop-titlebar-update-label"');
+    expect(updateButton).toContain('t("updates.action.download")');
     expect(titlebarCss).toMatch(
-      /\.desktop-titlebar-update\s*\{[^}]*width:\s*auto;[^}]*border:\s*1px solid[^}]*border-radius:\s*6px;[^}]*background:\s*color-mix[^}]*color:\s*var\(--desktop-titlebar-text\);[^}]*\}/s,
+      /\.desktop-titlebar-update\s*\{[^}]*width:\s*auto;[^}]*padding:\s*0 6px;[^}]*border:\s*0;[^}]*border-radius:\s*var\(--desktop-toolbar-action-radius\);[^}]*background:\s*color-mix[^}]*\}/s,
     );
     expect(titlebarCss).toContain(".desktop-titlebar-update-label");
     expect(titlebarCss).not.toContain(".desktop-titlebar-update-dot");
