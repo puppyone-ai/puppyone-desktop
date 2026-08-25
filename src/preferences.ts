@@ -102,7 +102,6 @@ export type ExperimentalSettings = {
   enableAgentChat: boolean;
   enableAssetLibraryHome: boolean;
   enableCloudWorkspace: boolean;
-  enableContextMaps: boolean;
   enableEditorSaveStatus: boolean;
   enableMarkdownBlockDrag: boolean;
   enableMinimalMode: boolean;
@@ -190,7 +189,6 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableAgentChat: false,
   enableAssetLibraryHome: false,
   enableCloudWorkspace: false,
-  enableContextMaps: true,
   enableEditorSaveStatus: false,
   enableMarkdownBlockDrag: false,
   enableMinimalMode: false,
@@ -572,16 +570,11 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
 
     const legacy = parsed as typeof parsed & {
       enableAgentCompanion?: unknown;
-      enableFolderRelationships?: unknown;
     };
-    const persistedContextMaps = parsed.enableContextMaps ?? legacy.enableFolderRelationships;
     return {
       enableAgentChat: parsed.enableAgentChat === true || legacy.enableAgentCompanion === true,
       enableAssetLibraryHome: parsed.enableAssetLibraryHome === true,
       enableCloudWorkspace: parsed.enableCloudWorkspace === true,
-      enableContextMaps: typeof persistedContextMaps === "boolean"
-        ? persistedContextMaps
-        : DEFAULT_EXPERIMENTAL_SETTINGS.enableContextMaps,
       enableEditorSaveStatus: parsed.enableEditorSaveStatus === true,
       enableMarkdownBlockDrag: parsed.enableMarkdownBlockDrag === true,
       enableMinimalMode: parsed.enableMinimalMode === true,

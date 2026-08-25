@@ -24,7 +24,7 @@ export type CreateEntryMenuItemDefinition = Readonly<{
   defaultPlacement: Exclude<CreateNewMenuPlacement, "hidden">;
   order: number;
   defaultEnabled: boolean;
-  experimentalSetting?: "enableContextMaps" | "enablePuppyFlowFiles";
+  experimentalSetting?: "enablePuppyFlowFiles";
   extension: string;
   iconName: string;
   iconType: DataNode["type"];
@@ -72,7 +72,6 @@ const CREATE_ENTRY_MENU_ITEM_REGISTRY = {
     defaultPlacement: "submenu",
     order: 10,
     defaultEnabled: true,
-    experimentalSetting: "enableContextMaps",
     extension: ".contextmap",
     iconName: "Untitled.contextmap",
     iconType: "context-map",

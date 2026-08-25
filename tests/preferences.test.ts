@@ -321,15 +321,11 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(JSON.stringify({ enableEditorSaveStatus: true })).enableEditorSaveStatus).toBe(true);
   });
 
-  it("keeps Context Maps on by default while respecting explicit and legacy settings", () => {
-    expect(parseExperimentalSettings(null).enableContextMaps).toBe(true);
-    expect(parseExperimentalSettings(JSON.stringify({})).enableContextMaps).toBe(true);
-    expect(parseExperimentalSettings(JSON.stringify({ enableContextMaps: false })).enableContextMaps)
-      .toBe(false);
-    expect(parseExperimentalSettings(JSON.stringify({ enableContextMaps: true })).enableContextMaps)
-      .toBe(true);
-    expect(parseExperimentalSettings(JSON.stringify({ enableFolderRelationships: true })).enableContextMaps)
-      .toBe(true);
+  it("ignores retired Context Map experiment values now that the feature is always available", () => {
+    expect(parseExperimentalSettings(JSON.stringify({ enableContextMaps: false })))
+      .not.toHaveProperty("enableContextMaps");
+    expect(parseExperimentalSettings(JSON.stringify({ enableFolderRelationships: false })))
+      .not.toHaveProperty("enableContextMaps");
   });
 
   it("keeps Minimal Mode off unless the user explicitly opts in", () => {

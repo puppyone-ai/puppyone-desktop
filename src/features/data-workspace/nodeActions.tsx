@@ -954,7 +954,7 @@ type DesktopFileTypeOption = {
 const DESKTOP_FILE_TYPE_OPTIONS = [
   { id: "none", extension: "" },
   { id: "markdown", extension: ".md" },
-  { id: "contextMap", extension: ".contextmap", experimentalSetting: "enableContextMaps" },
+  { id: "contextMap", extension: ".contextmap" },
   { id: "json", extension: ".json" },
   { id: "jsonLines", extension: ".jsonl" },
   { id: "text", extension: ".txt" },
