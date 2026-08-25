@@ -25,7 +25,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("Desktop Terminal titlebar session manager", () => {
+describe("Desktop Terminal tab session manager", () => {
   it("presents the terminal launcher as Agent in the workspace toolbar", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -36,16 +36,10 @@ describe("Desktop Terminal titlebar session manager", () => {
         titlebarActionsSettings={DEFAULT_TITLEBAR_ACTIONS_SETTINGS}
         terminalSidebarOpen={false}
         terminalToolEnabled
-        terminalSessionLayout="menu"
-        terminalSessions={[]}
-        activeTerminalSessionId={null}
         agentChatEnabled
         agentChatSidebarOpen={false}
         placement="toolbar"
         visibleGroups={["right-sidebar"]}
-        onCreateTerminal={vi.fn()}
-        onActivateTerminal={vi.fn()}
-        onCloseTerminal={vi.fn()}
         onToggleAgentChat={vi.fn()}
         onToggleTerminal={vi.fn()}
       />,
@@ -67,65 +61,10 @@ describe("Desktop Terminal titlebar session manager", () => {
     expect(agent?.querySelector(".desktop-shell-toolbar-button-label")).not.toBeNull();
     expect(Array.from(container.querySelectorAll("[data-toolbar-action]"), (item) => item.textContent))
       .toEqual(["Chat", "Agent"]);
+    expect(container.querySelector('[aria-label="Terminal actions"]')).toBeNull();
   });
 
-  it("lets the user create, switch, and close explicit terminal sessions", () => {
-    const onCreateTerminal = vi.fn();
-    const onActivateTerminal = vi.fn();
-    const onCloseTerminal = vi.fn();
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    act(() => root?.render(withTestLocalization(
-      <DesktopTitlebarActions
-        titlebarActionsSettings={DEFAULT_TITLEBAR_ACTIONS_SETTINGS}
-        terminalSidebarOpen
-        terminalToolEnabled
-        terminalSessionLayout="menu"
-        terminalSessions={[
-          { id: "terminal-a", ordinal: 1, shell: "zsh", status: "running" },
-          { id: "terminal-b", ordinal: 2, shell: null, status: "exited" },
-        ]}
-        activeTerminalSessionId="terminal-a"
-        agentChatEnabled={false}
-        agentChatSidebarOpen={false}
-        onCreateTerminal={onCreateTerminal}
-        onActivateTerminal={onActivateTerminal}
-        onCloseTerminal={onCloseTerminal}
-        onToggleAgentChat={vi.fn()}
-        onToggleTerminal={vi.fn()}
-      />,
-    )));
-
-    openTerminalMenu(container);
-    expect(container.querySelectorAll(".desktop-menu-separator")).toHaveLength(1);
-    expect(container.textContent).not.toContain("Open terminals");
-    expect(container.textContent).not.toContain("Restart");
-    expect(container.textContent).toContain("zsh");
-    expect(container.textContent).toContain("Running");
-    expect(container.textContent).toContain("Exited");
-    expect(container.textContent).not.toContain("Terminal 1");
-    expect(container.textContent).not.toContain("Terminal 2");
-    expect(container.querySelector('[role="menuitemradio"][aria-checked="true"]')?.textContent)
-      .toContain("zsh");
-
-    clickButton(container, "Close Terminal 2");
-    expect(onCloseTerminal).toHaveBeenCalledWith("terminal-b");
-    expect(container.querySelector('[role="menu"]')).toBeNull();
-
-    openTerminalMenu(container);
-    clickButton(container, "Terminal 2 — Exited");
-    expect(onActivateTerminal).toHaveBeenCalledWith("terminal-b");
-    expect(container.querySelector('[role="menu"]')).toBeNull();
-
-    openTerminalMenu(container);
-    clickButton(container, "New terminal");
-    expect(onCreateTerminal).toHaveBeenCalledOnce();
-
-  });
-
-  it("moves session management into the Terminal subheader in tabs mode", () => {
+  it("manages sessions from the Terminal tab bar", () => {
     const onActivate = vi.fn();
     const onClose = vi.fn();
     const onCreate = vi.fn();
@@ -560,11 +499,6 @@ describe("Desktop Terminal titlebar session manager", () => {
     expect(onConfirm).toHaveBeenCalledOnce();
   });
 });
-
-function openTerminalMenu(container: HTMLElement) {
-  clickButton(container, "Terminal actions");
-  expect(container.querySelector('[role="menu"]')).not.toBeNull();
-}
 
 function clickButton(container: HTMLElement, accessibleName: string) {
   const button = container.querySelector<HTMLButtonElement>(`button[aria-label="${accessibleName}"]`)

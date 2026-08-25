@@ -86,7 +86,6 @@ export type TitlebarActionsSettings = {
   enabled: Record<TitlebarActionId, boolean>;
   order: TitlebarActionId[];
 };
-export type TerminalSessionLayout = "menu" | "tabs";
 export type LocalAgentsSettings = {
   enabledAgentIds: string[];
 };
@@ -125,7 +124,6 @@ export const FILES_VISIBILITY_STORAGE_KEY = "puppyone.desktop.filesVisibility";
 export const EXTERNAL_APPS_STORAGE_KEY = "puppyone.desktop.externalApps";
 export const RIGHT_SIDEBAR_TOOLS_STORAGE_KEY = "puppyone.desktop.rightSidebarTools";
 export const TITLEBAR_ACTIONS_STORAGE_KEY = "puppyone.desktop.titlebarActions";
-export const TERMINAL_SESSION_LAYOUT_STORAGE_KEY = "puppyone.desktop.terminalSessionLayout";
 export const LOCAL_AGENTS_STORAGE_KEY = "puppyone.desktop.localAgents";
 export const AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY = "puppyone.desktop.agentFileActivityIndicators";
 export const AI_EDIT_ASSIST_STORAGE_KEY = "puppyone.desktop.aiEditAssist";
@@ -178,7 +176,6 @@ export const DEFAULT_TITLEBAR_ACTIONS_SETTINGS: TitlebarActionsSettings = {
   },
   order: [...TITLEBAR_ACTION_IDS],
 };
-export const DEFAULT_TERMINAL_SESSION_LAYOUT: TerminalSessionLayout = "tabs";
 export const DEFAULT_LOCAL_AGENTS_SETTINGS: LocalAgentsSettings = { enabledAgentIds: [] };
 export const DEFAULT_AGENT_FILE_ACTIVITY_INDICATORS_ENABLED = false;
 export const DEFAULT_AI_EDIT_ASSIST_ENABLED = false;
@@ -519,14 +516,6 @@ export function parseTitlebarActionsSettings(value: string | null | undefined): 
   } catch {
     return DEFAULT_TITLEBAR_ACTIONS_SETTINGS;
   }
-}
-
-export function parseTerminalSessionLayout(
-  value: string | null | undefined,
-): TerminalSessionLayout {
-  return value === "tabs" || value === "menu"
-    ? value
-    : DEFAULT_TERMINAL_SESSION_LAYOUT;
 }
 
 export function parseLocalAgentsSettings(

@@ -16,7 +16,6 @@ import {
   parseAgentFileActivityIndicatorsEnabled,
   parsePointerCursors,
   parseSidebarNavigationVisibilitySettings,
-  parseTerminalSessionLayout,
   parseTextSize,
 } from "../src/preferences";
 
@@ -247,13 +246,6 @@ describe("appearance preferences", () => {
     expect(parsePointerCursors("true")).toBe(true);
     expect(parsePointerCursors("false")).toBe(false);
     expect(parsePointerCursors(null)).toBe(false);
-  });
-
-  it("keeps Terminal sessions in the visible tab bar by default and accepts the header menu layout", () => {
-    expect(parseTerminalSessionLayout(null)).toBe("tabs");
-    expect(parseTerminalSessionLayout("menu")).toBe("menu");
-    expect(parseTerminalSessionLayout("tabs")).toBe("tabs");
-    expect(parseTerminalSessionLayout("floating")).toBe("tabs");
   });
 
 });

@@ -35,7 +35,6 @@ import {
   TEXT_SIZE_STORAGE_KEY,
   TYPOGRAPHY_STORAGE_KEY,
   THEME_STORAGE_KEY,
-  TERMINAL_SESSION_LAYOUT_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
   parseLoadingAnimationPreset,
   parseCreateNewMenuSettings,
@@ -55,7 +54,6 @@ import {
   type SidebarNavigationVisibilitySettings,
   type ThemeMode,
   type TextSize,
-  type TerminalSessionLayout,
   type TypographyPreferences,
   type TitlebarActionsSettings,
 } from "../../preferences";
@@ -93,7 +91,6 @@ import {
   readInitialLocalAgentsSettings,
   readInitialPointerCursors,
   readInitialTextSize,
-  readInitialTerminalSessionLayout,
   readInitialTypographyPreferences,
   readInitialThemeMode,
   readSystemDarkMode,
@@ -146,9 +143,6 @@ export function useDesktopPreferences() {
   const [experimentalSettings, setExperimentalSettings] = useState<ExperimentalSettings>(() => readInitialExperimentalSettings());
   const [rightSidebarToolsSettings, setRightSidebarToolsSettings] = useState<RightSidebarToolsSettings>(() => readInitialRightSidebarToolsSettings());
   const [titlebarActionsSettings, setTitlebarActionsSettings] = useState<TitlebarActionsSettings>(() => readInitialTitlebarActionsSettings());
-  const [terminalSessionLayout, setTerminalSessionLayout] = useState<TerminalSessionLayout>(
-    () => readInitialTerminalSessionLayout(),
-  );
   const [localAgentsSettings, setLocalAgentsSettings] = useState<LocalAgentsSettings>(
     () => readInitialLocalAgentsSettings(),
   );
@@ -350,10 +344,6 @@ export function useDesktopPreferences() {
   }, [titlebarActionsSettings]);
 
   useEffect(() => {
-    window.localStorage.setItem(TERMINAL_SESSION_LAYOUT_STORAGE_KEY, terminalSessionLayout);
-  }, [terminalSessionLayout]);
-
-  useEffect(() => {
     window.localStorage.setItem(LOCAL_AGENTS_STORAGE_KEY, JSON.stringify(localAgentsSettings));
   }, [localAgentsSettings]);
 
@@ -438,7 +428,6 @@ export function useDesktopPreferences() {
     sidebarNavigationPlacement,
     sidebarNavigationVisibilitySettings,
     terminalToolEnabled,
-    terminalSessionLayout,
     titlebarActionsSettings,
     darkThemePreset,
     lightThemePreset,
@@ -476,7 +465,6 @@ export function useDesktopPreferences() {
     setLocalAgentsSettings,
     setPointerCursors,
     setTextSize,
-    setTerminalSessionLayout,
     setThemeMode,
     setTypographyPreferences,
   };

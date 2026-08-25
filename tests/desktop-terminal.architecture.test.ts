@@ -62,13 +62,12 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(controller).toContain("runtimeRegistry.ensure(sessionId, launcherId)");
     expect(controller).toContain("runtimeRegistry.close(sessionId)");
     expect(controller).toContain("pendingCloseSessionId");
-    expect(panel).toContain("close: requestCloseSession");
+    expect(panel).not.toContain("useImperativeHandle");
     expect(panel).toContain("onClose={requestCloseSession}");
     expect(panel).toContain("<TerminalCloseConfirmationDialog");
     expect(closeDialog).toContain("<DesktopOverlayLayer>");
     expect(closeDialog).toContain("<DesktopDialogRoot");
     expect(panel).toContain("<TerminalLauncher");
-    expect(panel).toContain("create: createLauncher");
     expect(panel).toContain("onCreate={createLauncher}");
     expect(panel).not.toContain('createSession("shell")');
     expect(panel).toContain('session.status === "selecting"');
@@ -94,28 +93,20 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(registry).toContain("runtime.dispose()");
     expect(registry).toContain("this.disposeTimer = setTimeout");
     expect(panel).not.toContain("handleClearTerminal");
-    expect(panel).toContain("useImperativeHandle");
+    expect(panel).toContain('role="tabpanel"');
+    expect(panel).toContain("aria-labelledby={terminalTabId(session.id)}");
     expect(runtime).toContain('import { WebLinksAddon } from "@xterm/addon-web-links"');
     expect(runtime).toContain("linkHandler:");
     expect(runtime).toContain("allowNonHttpProtocols: false");
     expect(runtime).toContain("terminal.loadAddon(new WebLinksAddon");
     expect(runtime).toContain("bridge.openExternalUrl(href)");
-    expect(titlebarActions).toContain('aria-haspopup="menu"');
-    expect(titlebarActions).toContain('t("terminal.actions")');
-    expect(titlebarActions).toContain('t("terminal.closeSession"');
-    expect(titlebarActions).toContain('t("terminal.new")');
-    expect(titlebarActions).not.toContain('t("terminal.openSessions")');
-    expect(titlebarActions).not.toContain('t("terminal.restart")');
-    expect(titlebarActions).not.toContain('t("terminal.clear")');
-    expect(titlebarActions).not.toContain('t("terminal.reset")');
+    expect(titlebarActions).not.toContain('t("terminal.actions")');
+    expect(titlebarActions).not.toContain("TerminalTitlebarMenu");
     expect(app).not.toContain("terminalSessionResetToken");
-    expect(app).toContain("terminalPanelRef");
-    expect(app).toContain("terminalPanelRef.current?.create()");
-    expect(app).not.toContain("currentTerminalSnapshot.sessions.length === 0");
-    expect(app).toContain("terminalPanelRef.current?.activate(sessionId)");
-    expect(app).toContain("terminalPanelRef.current?.close(sessionId)");
-    expect(app).not.toContain("terminalPanelRef.current?.restartActive()");
-    expect(app).toContain("onSessionsChange={setTerminalSnapshot}");
+    expect(app).not.toContain("terminalPanelRef");
+    expect(app).not.toContain("terminalSnapshot");
+    expect(app).not.toContain("onSessionsChange");
+    expect(controller).not.toContain("onSessionsChange");
     expect(titlebar).not.toContain("Clear Terminal");
     expect(titlebar).not.toContain("Reset Terminal");
     expect(titlebar).not.toContain("has-menu");
@@ -337,8 +328,9 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(globalLayout).not.toContain(".desktop-terminal-");
   });
 
-  it("keeps Terminal visibility separate from its explicit session manager", () => {
+  it("keeps Terminal visibility separate from its tabs-only session manager", () => {
     const titlebarActions = source("src/features/app-shell/DesktopTitlebarActions.tsx");
+    const panel = source("src/features/desktop-terminal/ui/RightTerminalPanel.tsx");
     const header = source(
       "src/features/desktop-terminal/ui/session-header/TerminalSessionHeader.tsx",
     );
@@ -346,52 +338,25 @@ describe("Desktop Terminal architecture boundaries", () => {
       "src/features/desktop-terminal/ui/session-header/TerminalSessionTab.tsx",
     );
     const settings = source("src/features/settings/SettingsView.tsx");
+    const preferences = source("src/preferences.ts");
+    const desktopPreferences = source("src/features/app-shell/useDesktopPreferences.ts");
     const titlebarCss = source("src/styles/titlebar.css");
-    expect(titlebarActions).toContain("TerminalTitlebarMenu");
-    expect(titlebarActions).not.toContain("DesktopMenuSection");
-    expect(titlebarActions).toContain("sessions.length > 0 && <DesktopMenuSeparator />");
-    expect(titlebarActions).toContain("onCreateTerminal");
-    expect(titlebarActions).toContain("onActivateTerminal");
-    expect(titlebarActions).toContain("onCloseTerminal");
-    expect(titlebarActions).not.toContain("onRestartTerminal");
-    expect(titlebarActions).not.toContain("onClearTerminal");
-    expect(titlebarActions).not.toContain("onResetTerminal");
     expect(titlebarActions).toContain("onToggleTerminal");
-    expect(titlebarActions).toContain('id: "terminal-menu"');
-    expect(titlebarActions).not.toContain('id: "terminal-close"');
-    expect(titlebarActions).not.toContain("TerminalTitlebarCloseButton");
-    expect(titlebarActions).not.toContain("desktop-titlebar-terminal-cluster");
-    expect(titlebarActions).toContain("desktop-titlebar-terminal-session-row");
-    expect(titlebarActions).toContain("DesktopMenuIconButton");
-    expect(titlebarActions).toContain('role="menuitemradio"');
-    expect(titlebarActions).toContain('terminalSessionLayout === "menu"');
+    expect(titlebarActions).not.toContain("TerminalTitlebarMenu");
+    expect(titlebarActions).not.toContain('id: "terminal-menu"');
+    expect(titlebarActions).not.toContain("terminalSessionLayout");
     expect(header).toContain('role="tablist"');
     expect(tab).toContain('role="tab"');
     expect(tab).toContain("onActivate(session.id)");
     expect(tab).toContain("onClose(session.id)");
     expect(header).toContain("onCreate");
-    expect(settings).toContain("desktop-terminal-layout-segment");
-    expect(settings).toContain('(["menu", "tabs"] as const)');
-    expect(settings).not.toContain("settings.appearance.terminalTabs");
-    expect(titlebarActions).toContain(
-      'className="desktop-titlebar-menu desktop-titlebar-terminal-menu"',
-    );
-    expect(titlebarCss).not.toContain(".desktop-titlebar-terminal-cluster");
-    expect(titlebarCss).toContain(".desktop-titlebar-terminal-menu");
-    expect(titlebarCss).toContain("width: var(--desktop-titlebar-control-height);");
-    expect(titlebarCss).toContain("height: var(--desktop-titlebar-control-height);");
-    expect(titlebarCss).toContain("background: var(--desktop-titlebar-hover);");
-    expect(titlebarCss.indexOf(".desktop-titlebar-terminal-menu {")).toBeGreaterThan(
-      titlebarCss.indexOf(".desktop-titlebar-menu {"),
-    );
-    expect(titlebarCss).toMatch(
-      /\.desktop-titlebar-terminal-menu\s*\{[^}]*inset-inline-start:\s*auto;[^}]*inset-inline-end:\s*0;[^}]*\}/s,
-    );
-    expect(titlebarCss).toMatch(
-      /\.desktop-titlebar-terminal-menu\s*\{[^}]*width:\s*min\(248px, calc\(100vw - 32px\)\);[^}]*\}/s,
-    );
-    expect(titlebarCss).toContain(".desktop-titlebar-terminal-session-list");
-    expect(titlebarCss).toContain(".desktop-titlebar-terminal-session-close");
+    expect(panel).toContain("{sessions.length > 0 && (");
+    expect(panel).not.toContain("sessionLayout");
+    expect(settings).not.toContain("terminalLayout");
+    expect(preferences).not.toContain("TerminalSessionLayout");
+    expect(preferences).not.toContain("terminalSessionLayout");
+    expect(desktopPreferences).not.toContain("terminalSessionLayout");
+    expect(titlebarCss).not.toContain(".desktop-titlebar-terminal-menu");
   });
 });
 

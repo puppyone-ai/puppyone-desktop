@@ -220,33 +220,6 @@
   width: var(--desktop-titlebar-tool-action-width);
 }
 
-.desktop-titlebar-terminal-menu-wrap {
-  position: relative;
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  overflow: visible;
-}
-
-/* Standalone square ⋯ button, separate from the Terminal control. */
-.desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger {
-  width: var(--desktop-titlebar-control-height);
-  height: var(--desktop-titlebar-control-height);
-  flex: 0 0 var(--desktop-titlebar-control-height);
-  box-sizing: border-box;
-  border-radius: var(--desktop-toolbar-action-radius);
-  background: var(--desktop-titlebar-hover);
-  color: var(--desktop-titlebar-text-muted);
-}
-
-.desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger:hover,
-.desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger:focus-visible,
-.desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger[aria-expanded="true"] {
-  background: var(--desktop-titlebar-active);
-  box-shadow: none;
-  color: var(--desktop-titlebar-text);
-}
-
 .desktop-titlebar-action:hover {
   background: var(--desktop-titlebar-hover);
   color: var(--desktop-titlebar-text-muted);
@@ -396,58 +369,6 @@
 .desktop-titlebar-menu.desktop-titlebar-menu-overlay {
   position: fixed;
   inset-inline-start: auto;
-}
-
-/* Keep the shared titlebar-menu treatment; only reverse its anchor near the window edge. */
-.desktop-titlebar-terminal-menu {
-  inset-inline-start: auto;
-  inset-inline-end: 0;
-  display: grid;
-  gap: 2px;
-  width: min(248px, calc(100vw - 32px));
-  padding: var(--po-menu-padding);
-}
-
-.desktop-titlebar-terminal-session-list {
-  display: grid;
-  gap: 2px;
-  max-height: min(320px, 50vh);
-  min-width: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-
-.desktop-titlebar-terminal-session-row {
-  position: relative;
-  min-width: 0;
-}
-
-.desktop-titlebar-terminal-session-select {
-  padding-inline-end: calc(var(--po-menu-item-padding-inline) + 26px);
-}
-
-.desktop-titlebar-terminal-session-row:hover .desktop-titlebar-terminal-session-select {
-  background: var(--po-hover);
-  color: var(--po-text);
-}
-
-.desktop-titlebar-terminal-session-close {
-  position: absolute;
-  z-index: 1;
-  inset-block-start: 50%;
-  inset-inline-end: 5px;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-50%);
-  transition: opacity 0.12s ease;
-}
-
-.desktop-titlebar-terminal-session-row.is-active .desktop-titlebar-terminal-session-close,
-.desktop-titlebar-terminal-session-row:hover .desktop-titlebar-terminal-session-close,
-.desktop-titlebar-terminal-session-row:focus-within .desktop-titlebar-terminal-session-close,
-.desktop-titlebar-terminal-session-close:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .desktop-titlebar-branch-wrap {

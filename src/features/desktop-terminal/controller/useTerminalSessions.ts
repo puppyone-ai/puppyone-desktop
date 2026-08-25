@@ -1,31 +1,25 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useReducer,
   useRef,
   useState,
 } from "react";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import {
-  createDesktopTerminalSessionSnapshot,
   createDesktopTerminalSessionsState,
-  createEmptyDesktopTerminalSessionSnapshot,
   desktopTerminalSessionsReducer,
-  type DesktopTerminalSessionSnapshot,
 } from "../model/terminalSessions";
 import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
 import { TerminalRuntimeRegistry } from "../runtime/terminalRuntimeRegistry";
 
 type UseTerminalSessionsOptions = {
   messageFormatter: MessageFormatter;
-  onSessionsChange: (snapshot: DesktopTerminalSessionSnapshot) => void;
   workspacePath: string;
 };
 
 export function useTerminalSessions({
   messageFormatter,
-  onSessionsChange,
   workspacePath,
 }: UseTerminalSessionsOptions) {
   const [state, dispatch] = useReducer(
@@ -35,10 +29,7 @@ export function useTerminalSessions({
   );
   const [pendingCloseSessionId, setPendingCloseSessionId] = useState<string | null>(null);
   const messageFormatterRef = useRef(messageFormatter);
-  const onSessionsChangeRef = useRef(onSessionsChange);
-  const snapshotCleanupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   messageFormatterRef.current = messageFormatter;
-  onSessionsChangeRef.current = onSessionsChange;
 
   const [runtimeRegistry] = useState(() => {
     const registry = new TerminalRuntimeRegistry({
@@ -105,15 +96,6 @@ export function useTerminalSessions({
     setPendingCloseSessionId(null);
   }, [closeSession, pendingCloseSessionId]);
 
-  const snapshot = useMemo(
-    () => createDesktopTerminalSessionSnapshot(workspacePath, state),
-    [state, workspacePath],
-  );
-
-  useEffect(() => {
-    onSessionsChangeRef.current(snapshot);
-  }, [snapshot]);
-
   useEffect(() => {
     state.sessions.forEach((session) => {
       if (session.status === "selecting" && session.launchError) {
@@ -123,19 +105,11 @@ export function useTerminalSessions({
   }, [runtimeRegistry, state.sessions]);
 
   useEffect(() => {
-    if (snapshotCleanupTimerRef.current !== null) {
-      clearTimeout(snapshotCleanupTimerRef.current);
-      snapshotCleanupTimerRef.current = null;
-    }
     runtimeRegistry.retain();
     return () => {
       runtimeRegistry.release();
-      snapshotCleanupTimerRef.current = setTimeout(() => {
-        snapshotCleanupTimerRef.current = null;
-        onSessionsChangeRef.current(createEmptyDesktopTerminalSessionSnapshot(workspacePath));
-      }, 0);
     };
-  }, [runtimeRegistry, workspacePath]);
+  }, [runtimeRegistry]);
 
   const pendingCloseSession = state.sessions.find(
     (session) => session.id === pendingCloseSessionId,

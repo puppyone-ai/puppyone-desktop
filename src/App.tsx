@@ -17,11 +17,8 @@ import {
 import { AssetLibraryHome } from "./components/AssetLibraryHome";
 import { isDesktopAgentChatEnabled, loadRightAgentPanel } from "./features/desktop-agent/lazy";
 import {
-  createEmptyDesktopTerminalSessionSnapshot,
   isDesktopTerminalEnabled,
   RightTerminalPanel,
-  type DesktopTerminalSessionSnapshot,
-  type RightTerminalPanelHandle,
 } from "./features/desktop-terminal";
 import { useDesktopUpdates } from "./features/updates";
 import {
@@ -191,7 +188,6 @@ function AppContent() {
     sidebarNavigationOrientation,
     sidebarNavigationPlacement,
     terminalToolEnabled,
-    terminalSessionLayout,
     titlebarActionsSettings,
     darkThemePreset,
     diffMarkers,
@@ -272,10 +268,6 @@ function AppContent() {
     }
   }, []);
   const switcherRef = useRef<HTMLDivElement>(null);
-  const terminalPanelRef = useRef<RightTerminalPanelHandle>(null);
-  const [terminalSnapshot, setTerminalSnapshot] = useState<DesktopTerminalSessionSnapshot>(
-    () => createEmptyDesktopTerminalSessionSnapshot(),
-  );
   const desktopTerminalEnabled = isDesktopTerminalEnabled({ terminalToolEnabled });
   const desktopAgentChatEnabled = isDesktopAgentChatEnabled({
     available: agentChatAvailable,
@@ -883,10 +875,6 @@ function AppContent() {
   }
 
   const workspaceSwitcherItems = getWorkspaceSwitcherItems({ workspaces });
-  const currentTerminalSnapshot = terminalSnapshot.workspacePath === workspace.path
-    ? terminalSnapshot
-    : createEmptyDesktopTerminalSessionSnapshot(workspace.path);
-
   const titlebarSidebarSlot = (
     <DesktopTitlebarContext
       activeGitStatus={activeGitStatus}
@@ -928,25 +916,9 @@ function AppContent() {
     titlebarActionsSettings,
     terminalSidebarOpen: rightSidebarOpen && desktopTerminalEnabled && rightSidebarSurface === "terminal",
     terminalToolEnabled: desktopTerminalEnabled,
-    terminalSessionLayout,
-    terminalSessions: currentTerminalSnapshot.sessions,
-    activeTerminalSessionId: currentTerminalSnapshot.activeSessionId,
     agentChatEnabled: desktopAgentChatEnabled,
     agentChatSidebarOpen: rightSidebarOpen && desktopAgentChatEnabled && rightSidebarSurface === "chat",
     onUpdateNow: () => void desktopUpdates.updateNow(),
-    onCreateTerminal: () => {
-      terminalPanelRef.current?.create();
-      setRightSidebarSurface("terminal");
-      setRightSidebarOpen(true);
-      setSwitcherOpen(false);
-    },
-    onActivateTerminal: (sessionId: string) => {
-      terminalPanelRef.current?.activate(sessionId);
-      setRightSidebarSurface("terminal");
-      setRightSidebarOpen(true);
-      setSwitcherOpen(false);
-    },
-    onCloseTerminal: (sessionId: string) => terminalPanelRef.current?.close(sessionId),
     onToggleTerminal: () => {
       const terminalIsOpen = rightSidebarOpen && rightSidebarSurface === "terminal";
       setRightSidebarSurface("terminal");
@@ -1053,11 +1025,8 @@ function AppContent() {
                 aria-hidden={rightSidebarSurface !== "terminal"}
               >
                 <RightTerminalPanel
-                  ref={terminalPanelRef}
                   workspace={workspace}
                   active={rightSidebarOpen && rightSidebarSurface === "terminal"}
-                  sessionLayout={terminalSessionLayout}
-                  onSessionsChange={setTerminalSnapshot}
                 />
               </div>
             )}

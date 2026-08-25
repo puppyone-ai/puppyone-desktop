@@ -163,8 +163,7 @@
     .desktop-titlebar-context-item,
     .desktop-titlebar-context-name,
     .desktop-titlebar-context-item svg,
-    .desktop-titlebar-action,
-    .desktop-titlebar-actions .desktop-titlebar-terminal-menu-trigger
+    .desktop-titlebar-action
   ) {
   color: #ffffff;
 }
