@@ -33,6 +33,7 @@ describe("Create New settings", () => {
     expect(container.textContent).not.toContain("Folder stays fixed");
     expect(container.textContent).not.toContain("Items here do not appear");
     expect(container.querySelectorAll(".desktop-settings-switch")).toHaveLength(0);
+    expect(container.querySelector(".desktop-create-new-location-select")).toBeNull();
     expect(readEntries(container, "main")).toEqual([
       "markdown",
       "csv",
@@ -78,11 +79,21 @@ describe("Create New settings", () => {
     ]);
   });
 
-  it("moves an item between menu levels with the accessible location control", () => {
+  it("moves an item from the main menu to Not shown by dragging", () => {
     const onChange = vi.fn();
     const container = render(defaultSettings(), onChange);
+    const dragHandle = container.querySelector('[data-entry="csv"] .desktop-create-new-drag-handle');
+    const hiddenDropZone = container.querySelector(
+      '.desktop-create-new-hidden-list .desktop-create-new-drop-zone[data-group="hidden"]',
+    );
+    if (!(dragHandle instanceof HTMLElement) || !(hiddenDropZone instanceof HTMLElement)) {
+      throw new Error("Expected drag source and Not shown drop target");
+    }
+    const dataTransfer = createDataTransfer();
 
-    changeSelect(container.querySelector('[aria-label="Location for CSV file"]'), "hidden");
+    act(() => dragHandle.dispatchEvent(createDragEvent("dragstart", dataTransfer)));
+    act(() => hiddenDropZone.dispatchEvent(createDragEvent("dragover", dataTransfer)));
+    act(() => hiddenDropZone.dispatchEvent(createDragEvent("drop", dataTransfer)));
 
     expect(onChange).toHaveBeenLastCalledWith({
       version: 5,
@@ -161,14 +172,6 @@ function render(settings: CreateNewMenuSettings, onChange: (settings: CreateNewM
   root = createRoot(container);
   act(() => root?.render(withTestLocalization(<Harness />)));
   return container;
-}
-
-function changeSelect(target: Element | null, value: string) {
-  if (!(target instanceof HTMLSelectElement)) throw new Error("Expected a select element");
-  act(() => {
-    target.value = value;
-    target.dispatchEvent(new Event("change", { bubbles: true }));
-  });
 }
 
 function readEntries(container: HTMLElement, group: "main" | "submenu" | "hidden"): string[] {

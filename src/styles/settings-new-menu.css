@@ -187,8 +187,7 @@
   opacity: 1;
 }
 
-.desktop-create-new-drag-handle:focus-visible,
-.desktop-create-new-location-select:focus-visible {
+.desktop-create-new-drag-handle:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--po-accent) 36%, transparent);
   outline-offset: 1px;
 }
@@ -197,30 +196,7 @@
   display: inline-flex;
   min-width: 0;
   align-items: center;
-}
-
-.desktop-create-new-row-controls {
   gap: 5px;
-}
-
-.desktop-create-new-location-select {
-  width: auto;
-  max-width: 116px;
-  height: 24px;
-  padding: 0 24px 0 7px;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  background-color: transparent;
-  color: var(--po-text-subtle);
-  font: inherit;
-  font-size: 11.5px;
-}
-
-.desktop-create-new-row:hover .desktop-create-new-location-select,
-.desktop-create-new-location-select:focus-visible {
-  border-color: var(--po-border);
-  background-color: var(--po-control);
-  color: var(--po-text);
 }
 
 .desktop-create-new-drop-zone {
@@ -259,10 +235,6 @@
     grid-template-columns: 20px 20px minmax(0, 1fr) auto;
     gap: 5px;
     padding-inline: 5px;
-  }
-
-  .desktop-create-new-location-select {
-    max-width: 92px;
   }
 }
 

@@ -117,10 +117,6 @@ export function CreateNewSettingsView({
     clearDragState();
   };
 
-  const moveToGroup = (kind: CreateNewItemId, group: MenuGroup) => {
-    onChange(moveEntry(settings, kind, group, getGroupEntries(settings, group).length));
-  };
-
   const renderRow = (
     entry: CreateNewDraggableEntry,
     group: MenuGroup,
@@ -172,27 +168,14 @@ export function CreateNewSettingsView({
           />
         )}
         <span className="desktop-create-new-row-label">{label}</span>
-        <div className="desktop-create-new-row-controls">
-          {isSubmenu ? (
-            <>
-              <span className="desktop-create-new-submenu-badge">
-                {t("settings.createNew.submenu.badge")}
-              </span>
-              <ChevronRight className="po-directional-icon" size={14} aria-hidden="true" />
-            </>
-          ) : (
-            <select
-              className="desktop-create-new-location-select"
-              value={group}
-              aria-label={t("settings.createNew.location.ariaLabel", { type: label })}
-              onChange={(event) => moveToGroup(entry, event.target.value as MenuGroup)}
-            >
-              <option value="main">{t("settings.createNew.location.main")}</option>
-              <option value="submenu">{t("settings.createNew.location.submenu")}</option>
-              <option value="hidden">{t("settings.createNew.location.hidden")}</option>
-            </select>
-          )}
-        </div>
+        {isSubmenu && (
+          <div className="desktop-create-new-row-controls">
+            <span className="desktop-create-new-submenu-badge">
+              {t("settings.createNew.submenu.badge")}
+            </span>
+            <ChevronRight className="po-directional-icon" size={14} aria-hidden="true" />
+          </div>
+        )}
       </div>
     );
   };
