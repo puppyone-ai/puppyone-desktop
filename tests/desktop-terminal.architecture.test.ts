@@ -233,6 +233,10 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(headerCss).toContain(
       "background: var(--desktop-terminal-tab-active-background, var(--po-control));",
     );
+    expect(headerCss).toMatch(/\.desktop-terminal-tab\s*\{[^}]*border:\s*0;/s);
+    expect(headerCss).not.toContain("--desktop-terminal-tab-idle-border");
+    expect(headerCss).not.toContain("--desktop-terminal-tab-hover-border");
+    expect(headerCss).not.toContain("--desktop-terminal-tab-active-border");
     expect(headerCss).not.toContain("--desktop-terminal-tab-active-indicator");
     expect(headerCss).not.toContain(".desktop-terminal-tab::after");
     expect(headerCss).not.toContain(".desktop-terminal-tab-shell");
@@ -267,11 +271,15 @@ describe("Desktop Terminal architecture boundaries", () => {
     );
     expect(headerCss).not.toMatch(/\.desktop-terminal-tab-select\s*\{[^}]*font-size:\s*11px;/s);
     expect(headerCss).toMatch(
-      /\.desktop-terminal-subheader\s*\{[^}]*border-block-end:\s*1px solid var\(--desktop-terminal-tab-bar-border, var\(--po-divider\)\);[^}]*background:\s*var\(--desktop-terminal-tab-bar-background, var\(--po-panel\)\);/s,
+      /\.desktop-terminal-subheader\s*\{[^}]*background:\s*var\(--desktop-terminal-tab-bar-background, var\(--po-panel\)\);/s,
     );
+    expect(headerCss).not.toContain("border-block-end");
     expect(headerCss).not.toContain(".desktop-terminal-subheader::after");
     expect(xpTokensCss).toContain("--desktop-terminal-tab-bar-background: #f5f4ee;");
+    expect(xpTokensCss).not.toContain("--desktop-terminal-tab-bar-border");
     expect(xpTokensCss).toContain("--desktop-terminal-tab-active-background: #ddd9cf;");
+    expect(xpTokensCss).not.toContain("--desktop-terminal-tab-hover-border");
+    expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-border");
     expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-indicator");
     expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-background: #1059c9;");
     expect(xpTokensCss).not.toContain("--desktop-terminal-tab-active-background: #316ac5;");
