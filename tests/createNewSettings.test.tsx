@@ -37,13 +37,12 @@ describe("Create New settings", () => {
       "html",
       "customFiles",
     ]);
-    expect(readEntries(container, "submenu")).toEqual(["contextMap", "slides"]);
-    expect(readEntries(container, "hidden")).toEqual(["text", "json", "app", "puppyflow"]);
+    expect(readEntries(container, "submenu")).toEqual(["contextMap"]);
+    expect(readEntries(container, "hidden")).toEqual(["text", "json", "slides", "app", "puppyflow"]);
 
     const submenuNode = container.querySelector('[data-entry="customFiles"]')
       ?.closest(".desktop-create-new-submenu-node");
     expect(submenuNode?.querySelector('[data-entry="contextMap"]')).not.toBeNull();
-    expect(submenuNode?.querySelector('[data-entry="slides"]')).not.toBeNull();
   });
 
   it("moves the Custom files node relative to ordinary main-menu items", () => {
@@ -55,8 +54,8 @@ describe("Create New settings", () => {
     expect(onChange).toHaveBeenLastCalledWith({
       version: 5,
       main: ["markdown", "csv", "customFiles", "html"],
-      submenu: ["contextMap", "slides"],
-      hidden: ["text", "json", "app", "puppyflow"],
+      submenu: ["contextMap"],
+      hidden: ["text", "json", "slides", "app", "puppyflow"],
     });
     expect(readEntries(container, "main")).toEqual([
       "markdown",
@@ -75,11 +74,11 @@ describe("Create New settings", () => {
     expect(onChange).toHaveBeenLastCalledWith({
       version: 5,
       main: ["markdown", "html", "customFiles"],
-      submenu: ["contextMap", "slides"],
-      hidden: ["text", "json", "app", "puppyflow", "csv"],
+      submenu: ["contextMap"],
+      hidden: ["text", "json", "slides", "app", "puppyflow", "csv"],
     });
     expect(readEntries(container, "main")).toEqual(["markdown", "html", "customFiles"]);
-    expect(readEntries(container, "hidden")).toEqual(["text", "json", "app", "puppyflow", "csv"]);
+    expect(readEntries(container, "hidden")).toEqual(["text", "json", "slides", "app", "puppyflow", "csv"]);
   });
 
   it("drags an item directly from Not shown into the Custom files submenu", () => {
@@ -101,11 +100,11 @@ describe("Create New settings", () => {
     expect(onChange).toHaveBeenLastCalledWith({
       version: 5,
       main: ["markdown", "csv", "html", "customFiles"],
-      submenu: ["contextMap", "slides", "text"],
-      hidden: ["json", "app", "puppyflow"],
+      submenu: ["contextMap", "text"],
+      hidden: ["json", "slides", "app", "puppyflow"],
     });
-    expect(readEntries(container, "submenu")).toEqual(["contextMap", "slides", "text"]);
-    expect(readEntries(container, "hidden")).toEqual(["json", "app", "puppyflow"]);
+    expect(readEntries(container, "submenu")).toEqual(["contextMap", "text"]);
+    expect(readEntries(container, "hidden")).toEqual(["json", "slides", "app", "puppyflow"]);
   });
 
   it("keeps unavailable experimental types visible in the hierarchy", () => {

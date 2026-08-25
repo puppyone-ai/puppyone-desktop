@@ -12,8 +12,8 @@ describe("create entry menu registry", () => {
       .toEqual(CREATE_NEW_ITEM_IDS);
     expect(getDefaultCreateNewMenuLayout()).toEqual({
       main: ["markdown", "csv", "html", "customFiles"],
-      submenu: ["contextMap", "slides"],
-      hidden: ["text", "json", "app", "puppyflow"],
+      submenu: ["contextMap"],
+      hidden: ["text", "json", "slides", "app", "puppyflow"],
     });
   });
 

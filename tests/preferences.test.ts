@@ -35,8 +35,15 @@ describe("create new menu preferences", () => {
     expect(DEFAULT_CREATE_NEW_MENU_SETTINGS).toEqual({
       version: 5,
       main: ["markdown", "csv", "html", "customFiles"],
-      submenu: ["contextMap", "slides"],
-      hidden: ["text", "json", "app", "puppyflow"],
+      submenu: ["contextMap"],
+      hidden: ["text", "json", "slides", "app", "puppyflow"],
+    });
+    expect(resolveVisibleCreateNewMenuItems(
+      DEFAULT_CREATE_NEW_MENU_SETTINGS,
+      DEFAULT_EXPERIMENTAL_SETTINGS,
+    )).toEqual({
+      main: ["markdown", "csv", "html", "customFiles"],
+      submenu: ["contextMap"],
     });
   });
 
@@ -120,7 +127,7 @@ describe("create new menu preferences", () => {
       hidden: ["json", "text", "markdown", "html", "slides"],
     } as const;
     expect(resolveVisibleCreateNewMenuItems(settings, DEFAULT_EXPERIMENTAL_SETTINGS)).toEqual({
-      main: ["app", "customFiles"],
+      main: ["app", "customFiles", "contextMap"],
       submenu: ["csv"],
     });
   });
@@ -314,8 +321,11 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(JSON.stringify({ enableEditorSaveStatus: true })).enableEditorSaveStatus).toBe(true);
   });
 
-  it("keeps Context Maps experimental and migrates the former relationship flag", () => {
-    expect(parseExperimentalSettings(null).enableContextMaps).toBe(false);
+  it("keeps Context Maps on by default while respecting explicit and legacy settings", () => {
+    expect(parseExperimentalSettings(null).enableContextMaps).toBe(true);
+    expect(parseExperimentalSettings(JSON.stringify({})).enableContextMaps).toBe(true);
+    expect(parseExperimentalSettings(JSON.stringify({ enableContextMaps: false })).enableContextMaps)
+      .toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableContextMaps: true })).enableContextMaps)
       .toBe(true);
     expect(parseExperimentalSettings(JSON.stringify({ enableFolderRelationships: true })).enableContextMaps)

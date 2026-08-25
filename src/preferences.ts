@@ -190,7 +190,7 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableAgentChat: false,
   enableAssetLibraryHome: false,
   enableCloudWorkspace: false,
-  enableContextMaps: false,
+  enableContextMaps: true,
   enableEditorSaveStatus: false,
   enableMarkdownBlockDrag: false,
   enableMinimalMode: false,
@@ -574,12 +574,14 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
       enableAgentCompanion?: unknown;
       enableFolderRelationships?: unknown;
     };
+    const persistedContextMaps = parsed.enableContextMaps ?? legacy.enableFolderRelationships;
     return {
       enableAgentChat: parsed.enableAgentChat === true || legacy.enableAgentCompanion === true,
       enableAssetLibraryHome: parsed.enableAssetLibraryHome === true,
       enableCloudWorkspace: parsed.enableCloudWorkspace === true,
-      enableContextMaps: parsed.enableContextMaps === true
-        || legacy.enableFolderRelationships === true,
+      enableContextMaps: typeof persistedContextMaps === "boolean"
+        ? persistedContextMaps
+        : DEFAULT_EXPERIMENTAL_SETTINGS.enableContextMaps,
       enableEditorSaveStatus: parsed.enableEditorSaveStatus === true,
       enableMarkdownBlockDrag: parsed.enableMarkdownBlockDrag === true,
       enableMinimalMode: parsed.enableMinimalMode === true,

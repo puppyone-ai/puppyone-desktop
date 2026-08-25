@@ -99,7 +99,7 @@ const CREATE_ENTRY_MENU_ITEM_REGISTRY = {
     kind: "slides",
     defaultPlacement: "submenu",
     order: 40,
-    defaultEnabled: true,
+    defaultEnabled: false,
     extension: ".puppyoneapp",
     iconName: "Untitled Slides.puppyoneapp",
     iconType: "app",
