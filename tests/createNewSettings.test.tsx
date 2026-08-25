@@ -47,11 +47,22 @@ describe("Create New settings", () => {
     expect(submenuNode?.querySelector('[data-entry="contextMap"]')).not.toBeNull();
   });
 
-  it("moves the Custom files node relative to ordinary main-menu items", () => {
+  it("reorders the Custom files node by dragging without move buttons", () => {
     const onChange = vi.fn();
     const container = render(defaultSettings(), onChange);
+    const dragHandle = container.querySelector(
+      '[data-entry="customFiles"] .desktop-create-new-drag-handle',
+    );
+    const htmlRow = container.querySelector('[data-entry="html"]');
+    if (!(dragHandle instanceof HTMLElement) || !(htmlRow instanceof HTMLElement)) {
+      throw new Error("Expected drag source and target");
+    }
+    const dataTransfer = createDataTransfer();
 
-    click(container.querySelector('[aria-label="Move Custom files up"]'));
+    expect(container.querySelector(".desktop-create-new-order-controls")).toBeNull();
+    act(() => dragHandle.dispatchEvent(createDragEvent("dragstart", dataTransfer)));
+    act(() => htmlRow.dispatchEvent(createDragEvent("dragover", dataTransfer)));
+    act(() => htmlRow.dispatchEvent(createDragEvent("drop", dataTransfer)));
 
     expect(onChange).toHaveBeenLastCalledWith({
       version: 5,
@@ -150,11 +161,6 @@ function render(settings: CreateNewMenuSettings, onChange: (settings: CreateNewM
   root = createRoot(container);
   act(() => root?.render(withTestLocalization(<Harness />)));
   return container;
-}
-
-function click(target: Element | null) {
-  if (!(target instanceof HTMLElement)) throw new Error("Expected a clickable element");
-  act(() => target.click());
 }
 
 function changeSelect(target: Element | null, value: string) {

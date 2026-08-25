@@ -1,8 +1,6 @@
 import { useMemo, useState, type DragEvent } from "react";
 import {
-  ChevronDown,
   ChevronRight,
-  ChevronUp,
   GripVertical,
   LockKeyhole,
   RotateCcw,
@@ -119,22 +117,6 @@ export function CreateNewSettingsView({
     clearDragState();
   };
 
-  const moveWithinGroup = (
-    entry: CreateNewDraggableEntry,
-    group: MenuGroup,
-    offset: -1 | 1,
-  ) => {
-    const entries = getGroupEntries(settings, group);
-    const sourceIndex = entries.indexOf(entry);
-    const targetIndex = sourceIndex + offset;
-    if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= entries.length) return;
-    const reordered = [...entries];
-    const [source] = reordered.splice(sourceIndex, 1);
-    if (!source) return;
-    reordered.splice(targetIndex, 0, source);
-    onChange(replaceGroup(settings, group, reordered));
-  };
-
   const moveToGroup = (kind: CreateNewItemId, group: MenuGroup) => {
     onChange(moveEntry(settings, kind, group, getGroupEntries(settings, group).length));
   };
@@ -143,7 +125,6 @@ export function CreateNewSettingsView({
     entry: CreateNewDraggableEntry,
     group: MenuGroup,
     index: number,
-    groupLength: number,
   ) => {
     const isSubmenu = entry === CREATE_NEW_SUBMENU_ID;
     const label = isSubmenu
@@ -211,26 +192,6 @@ export function CreateNewSettingsView({
               <option value="hidden">{t("settings.createNew.location.hidden")}</option>
             </select>
           )}
-          <span className="desktop-create-new-order-controls">
-            <button
-              type="button"
-              disabled={index === 0}
-              aria-label={t("settings.createNew.moveUp", { type: label })}
-              title={t("settings.createNew.moveUp", { type: label })}
-              onClick={() => moveWithinGroup(entry, group, -1)}
-            >
-              <ChevronUp size={13} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              disabled={index === groupLength - 1}
-              aria-label={t("settings.createNew.moveDown", { type: label })}
-              title={t("settings.createNew.moveDown", { type: label })}
-              onClick={() => moveWithinGroup(entry, group, 1)}
-            >
-              <ChevronDown size={13} aria-hidden="true" />
-            </button>
-          </span>
         </div>
       </div>
     );
@@ -288,7 +249,7 @@ export function CreateNewSettingsView({
                 {settings.main.map((entry, index) => (
                   entry === CREATE_NEW_SUBMENU_ID ? (
                     <div className="desktop-create-new-submenu-node" key={entry}>
-                      {renderRow(entry, "main", index, settings.main.length)}
+                      {renderRow(entry, "main", index)}
                       <div
                         className="desktop-create-new-submenu-children"
                         data-drop-active={dragTarget?.group === "submenu" || undefined}
@@ -296,12 +257,12 @@ export function CreateNewSettingsView({
                         aria-label={t("settings.createNew.submenu.title")}
                       >
                         {settings.submenu.map((kind, childIndex) => (
-                          renderRow(kind, "submenu", childIndex, settings.submenu.length)
+                          renderRow(kind, "submenu", childIndex)
                         ))}
                         {renderDropZone("submenu", settings.submenu.length, settings.submenu.length === 0)}
                       </div>
                     </div>
-                  ) : renderRow(entry, "main", index, settings.main.length)
+                  ) : renderRow(entry, "main", index)
                 ))}
                 {renderDropZone("main", settings.main.length, false)}
               </div>
@@ -319,7 +280,7 @@ export function CreateNewSettingsView({
                 role="list"
               >
                 {settings.hidden.map((kind, index) => (
-                  renderRow(kind, "hidden", index, settings.hidden.length)
+                  renderRow(kind, "hidden", index)
                 ))}
                 {renderDropZone("hidden", settings.hidden.length, settings.hidden.length === 0)}
               </div>

@@ -158,8 +158,7 @@
   inset-block-end: -1px;
 }
 
-.desktop-create-new-drag-handle,
-.desktop-create-new-order-controls button {
+.desktop-create-new-drag-handle {
   display: inline-flex;
   width: 24px;
   height: 24px;
@@ -182,22 +181,19 @@
   cursor: grabbing;
 }
 
-.desktop-create-new-drag-handle:hover,
-.desktop-create-new-order-controls button:hover:not(:disabled) {
+.desktop-create-new-drag-handle:hover {
   background: var(--po-hover);
   color: var(--po-text);
   opacity: 1;
 }
 
 .desktop-create-new-drag-handle:focus-visible,
-.desktop-create-new-order-controls button:focus-visible,
 .desktop-create-new-location-select:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--po-accent) 36%, transparent);
   outline-offset: 1px;
 }
 
-.desktop-create-new-row-controls,
-.desktop-create-new-order-controls {
+.desktop-create-new-row-controls {
   display: inline-flex;
   min-width: 0;
   align-items: center;
@@ -205,14 +201,6 @@
 
 .desktop-create-new-row-controls {
   gap: 5px;
-}
-
-.desktop-create-new-order-controls {
-  gap: 1px;
-}
-
-.desktop-create-new-order-controls button:disabled {
-  opacity: 0.24;
 }
 
 .desktop-create-new-location-select {
@@ -271,10 +259,6 @@
     grid-template-columns: 20px 20px minmax(0, 1fr) auto;
     gap: 5px;
     padding-inline: 5px;
-  }
-
-  .desktop-create-new-order-controls {
-    display: none;
   }
 
   .desktop-create-new-location-select {
