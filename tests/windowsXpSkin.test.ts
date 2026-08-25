@@ -96,7 +96,7 @@ describe("Interface style registry", () => {
     expect(main).toContain("DEFAULT_INTERFACE_STYLE_FIRST_PAINT");
     expect(main).not.toContain('backgroundColor: "#f1eadf"');
     expect(preload).toContain('ipcRenderer.send("appearance:set-window-background"');
-    expect(nativeFirstPaint).toContain('"background": "#fbfaf7"');
+    expect(nativeFirstPaint).toContain('"background": "#fafafa"');
     expect(nativeFirstPaint).toContain('"background": "#161413"');
   });
 
@@ -104,8 +104,15 @@ describe("Interface style registry", () => {
     const tokens = source("src/styles/tokens.css");
     const rootBlock = tokens.match(/^:root \{([\s\S]*?)^\}/m)?.[1] ?? "";
 
-    expect(rootBlock).toContain("--po-surface-panel: #fbfaf7");
+    expect(rootBlock).toContain("--po-surface-panel: #fafafa");
     expect(rootBlock).not.toContain("--po-surface-panel: #fbf6ed");
+    expect(tokens).toContain("--po-header: #ebebeb;");
+    expect(tokens).toContain("--po-sidebar: #ebebeb;");
+    expect(tokens).toContain("--po-surface-panel: #fbfaf7;");
+    expect(tokens).toContain("--po-header: #f1eee8;");
+    expect(tokens).toContain("--po-sidebar: #f1eee8;");
+    expect(tokens).not.toContain("#f1eadf");
+    expect(tokens).not.toContain("#fbf6ed");
     expect(tokens).toContain(
       ':where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface)[data-light-theme-preset="warm"]:not(.dark)',
     );
@@ -116,15 +123,15 @@ describe("Interface style registry", () => {
     const initialTheme = source("public/initial-theme.js");
     const initialShell = source("public/initial-shell.css");
     const cases = [
-      { themeMode: "light", preset: "neutral", expected: "#fbfaf7" },
-      { themeMode: "light", preset: "warm", expected: "#fbf6ed" },
+      { themeMode: "light", preset: "neutral", expected: "#fafafa" },
+      { themeMode: "light", preset: "warm", expected: "#fbfaf7" },
       { themeMode: "light", preset: "graphite", expected: "#fbfbfc" },
       { themeMode: "dark", preset: "default", expected: "#161413" },
       { themeMode: "dark", preset: "warm", expected: "#18130f" },
       { themeMode: "dark", preset: "graphite", expected: "#17181c" },
     ] as const;
 
-    expect(initialShell).toContain("--initial-shell-background: #fbfaf7");
+    expect(initialShell).toContain("--initial-shell-background: #fafafa");
     expect(initialShell).not.toContain("--initial-shell-background: #f1eadf");
 
     for (const item of cases) {
@@ -152,7 +159,7 @@ describe("Interface style registry", () => {
       systemDark: false,
     });
     expect(defaultLight.dataset.initialThemePreset).toBe("neutral");
-    expect(defaultLight.properties["--initial-shell-background"]).toBe("#fbfaf7");
+    expect(defaultLight.properties["--initial-shell-background"]).toBe("#fafafa");
 
     const invalidPreset = runFirstPaint({
       bootstrap,
@@ -163,7 +170,7 @@ describe("Interface style registry", () => {
       systemDark: false,
     });
     expect(invalidPreset.dataset.initialThemePreset).toBe("neutral");
-    expect(invalidPreset.properties["--initial-shell-background"]).toBe("#fbfaf7");
+    expect(invalidPreset.properties["--initial-shell-background"]).toBe("#fafafa");
   });
 
   it("honors the legacy light-preset key during first-paint migration", () => {
@@ -177,7 +184,7 @@ describe("Interface style registry", () => {
     });
 
     expect(result.dataset.initialThemePreset).toBe("warm");
-    expect(result.properties["--initial-shell-background"]).toBe("#fbf6ed");
+    expect(result.properties["--initial-shell-background"]).toBe("#fbfaf7");
   });
 
   it("generates deterministic skin imports and enforces one shared component contract", () => {

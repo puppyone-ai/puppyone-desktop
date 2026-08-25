@@ -66,6 +66,16 @@ describe("project folder home", () => {
     expect(projects?.compareDocumentPosition(launcher as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("uses the light onboarding mark only when the resolved theme is light", () => {
+    const container = renderHome({ resolvedTheme: "light" });
+
+    expectBrandLockup(
+      container,
+      "empty",
+      "assets/brand/puppyone-onboarding-light.svg",
+    );
+  });
+
   it("exposes one vertical projects-state contract", () => {
     const container = renderHome({
       projectItems: [{
@@ -482,19 +492,23 @@ function renderHome(overrides: Partial<MinimalOnboardingProps> = {}) {
   return container;
 }
 
-function expectBrandLockup(container: HTMLElement, state: "empty" | "projects" = "empty") {
+function expectBrandLockup(
+  container: HTMLElement,
+  state: "empty" | "projects" = "empty",
+  expectedMarkAsset = "logo-square.png",
+) {
   const lockup = container.querySelector(".onboarding-brand-lockup");
   const mark = lockup?.querySelector<HTMLImageElement>(".onboarding-brand-mark");
-  expect(mark?.getAttribute("src")).toContain("logo-square.png");
+  expect(mark?.getAttribute("src")).toContain(expectedMarkAsset);
   expect(mark?.getAttribute("alt")).toBe("");
   if (state === "projects") {
     expect(lockup?.querySelector(".onboarding-brand-prompt")?.textContent).toBe("Which project do you want to start with?");
     expect(lockup?.querySelector(".onboarding-brand-name")).toBeNull();
-    expect(lockup?.querySelector(".onboarding-brand-description")?.textContent).toBe("Your file base for AI");
+    expect(lockup?.querySelector(".onboarding-brand-description")?.textContent).toBe("Your file base for agents");
   } else {
     expect(lockup?.querySelector(".onboarding-brand-prompt")).toBeNull();
     expect(lockup?.querySelector(".onboarding-brand-name")?.textContent).toBe("puppyone");
-    expect(lockup?.querySelector(".onboarding-brand-description")?.textContent).toBe("Your file base for AI");
+    expect(lockup?.querySelector(".onboarding-brand-description")?.textContent).toBe("Your file base for agents");
   }
   expect(lockup?.querySelector(".onboarding-brand-version")).toBeNull();
   expect(container.querySelector(".onboarding-brand-context")).toBeNull();

@@ -244,8 +244,8 @@ export const LIGHT_THEME_PRESETS = [
   {
     id: "warm",
     label: "Warm",
-    description: "The original Puppyone warm desktop palette.",
-    swatches: ["#f1eadf", "#fbf6ed", "#b45309"],
+    description: "The original Puppyone default desktop palette.",
+    swatches: ["#f1eee8", "#fbfaf7", "#2563eb"],
   },
   {
     id: "graphite",

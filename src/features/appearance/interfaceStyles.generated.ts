@@ -61,7 +61,7 @@ export const INTERFACE_STYLE_MANIFEST = {
       },
       "firstPaint": {
         "light": {
-          "background": "#fbfaf7",
+          "background": "#fafafa",
           "colorScheme": "light"
         },
         "dark": {
@@ -74,11 +74,11 @@ export const INTERFACE_STYLE_MANIFEST = {
           "defaultPreset": "neutral",
           "values": {
             "neutral": {
-              "background": "#fbfaf7",
+              "background": "#fafafa",
               "colorScheme": "light"
             },
             "warm": {
-              "background": "#fbf6ed",
+              "background": "#fbfaf7",
               "colorScheme": "light"
             },
             "graphite": {

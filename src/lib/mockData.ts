@@ -338,7 +338,7 @@ export const fileTrees: Record<string, FileNode[]> = {
           status: "modified",
           preview: "Cloud-compatible design tokens.",
           content:
-            ":root {\n  --po-canvas: #f1eadf;\n  --po-sidebar: #e8dfd2;\n  --po-panel: #fbf6ed;\n}\n\n.app-shell { height: 100vh; }",
+            ":root {\n  --po-canvas: #fbfaf7;\n  --po-sidebar: #f1eee8;\n  --po-panel: #fbfaf7;\n}\n\n.app-shell { height: 100vh; }",
         },
       ],
     },
@@ -358,7 +358,7 @@ export const fileTrees: Record<string, FileNode[]> = {
           modified: "Today",
           status: "clean",
           preview: "Puppyone Cloud theme tokens.",
-          content: "--po-canvas: #f1eadf;\n--po-sidebar: #e8dfd2;\n--po-panel: #fbf6ed;",
+          content: "--po-canvas: #fbfaf7;\n--po-sidebar: #f1eee8;\n--po-panel: #fbfaf7;",
         },
       ],
     },

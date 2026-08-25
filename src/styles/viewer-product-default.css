@@ -12,11 +12,11 @@
   .po-viewer-surface-boundary {
   --po-surface-canvas: #f5f4f0;
   --po-surface-chrome: #ece9e2;
-  --po-surface-panel: #fbfaf7;
+  --po-surface-panel: #fafafa;
   --po-surface-panel-raised: #ffffff;
   --po-surface-overlay: #fffdf9;
   --po-surface-inset: #e7e3db;
-  --po-surface-editor: #fbfaf7;
+  --po-surface-editor: #fafafa;
   --po-canvas: var(--po-surface-editor);
   --po-panel: var(--po-surface-panel);
   --po-panel-raised: var(--po-surface-panel-raised);
