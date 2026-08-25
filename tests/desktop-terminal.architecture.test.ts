@@ -271,11 +271,12 @@ describe("Desktop Terminal architecture boundaries", () => {
     );
     expect(headerCss).not.toMatch(/\.desktop-terminal-tab-select\s*\{[^}]*font-size:\s*11px;/s);
     expect(headerCss).toMatch(
-      /\.desktop-terminal-subheader\s*\{[^}]*background:\s*var\(--desktop-terminal-tab-bar-background, var\(--po-panel\)\);/s,
+      /\.desktop-terminal-subheader\s*\{[^}]*background:\s*var\(--po-terminal-bg\);/s,
     );
     expect(headerCss).not.toContain("border-block-end");
+    expect(headerCss).not.toContain("--desktop-terminal-tab-bar-background");
     expect(headerCss).not.toContain(".desktop-terminal-subheader::after");
-    expect(xpTokensCss).toContain("--desktop-terminal-tab-bar-background: #f5f4ee;");
+    expect(xpTokensCss).not.toContain("--desktop-terminal-tab-bar-background");
     expect(xpTokensCss).not.toContain("--desktop-terminal-tab-bar-border");
     expect(xpTokensCss).toContain("--desktop-terminal-tab-active-background: #ddd9cf;");
     expect(xpTokensCss).not.toContain("--desktop-terminal-tab-hover-border");

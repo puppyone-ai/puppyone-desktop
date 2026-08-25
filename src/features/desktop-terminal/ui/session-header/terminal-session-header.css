@@ -9,7 +9,7 @@
   flex: 0 0 38px;
   padding: 4px 6px 6px;
   box-sizing: border-box;
-  background: var(--desktop-terminal-tab-bar-background, var(--po-panel));
+  background: var(--po-terminal-bg);
   color: var(--po-text-muted);
 }
 

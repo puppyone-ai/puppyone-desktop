@@ -40,7 +40,6 @@
   --desktop-sidebar-navigation-fade-size: 0px;
   /* Session tabs use Explorer's warm command-surface hierarchy. Blue stays
    * reserved for window chrome, list selection and live runtime status. */
-  --desktop-terminal-tab-bar-background: #f5f4ee;
   --desktop-terminal-tab-idle-color: #343434;
   --desktop-terminal-tab-hover-background: #ebe9e2;
   --desktop-terminal-tab-active-background: #ddd9cf;
