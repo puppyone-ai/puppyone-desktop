@@ -122,7 +122,13 @@ export function createSettingsWorkspaceSurface({
   workspaceConfig,
 }: SettingsWorkspaceSurfaceProps) {
   return {
-    sidebar: <SettingsSidebar activeSection={activeSection} onSelectSection={onSelectSection} />,
+    sidebar: (
+      <SettingsSidebar
+        activeSection={activeSection}
+        cloudEnabled={cloud.enabled}
+        onSelectSection={onSelectSection}
+      />
+    ),
     main: (
       <SettingsView
         workspace={workspace}

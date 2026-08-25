@@ -27,6 +27,7 @@ import { InterfaceStyleSetting } from "./main/InterfaceStyleSetting";
 import { CreateNewSettingsView } from "./main/CreateNewSettingsView";
 import { PulseGrid } from "../../components/loading";
 import { CloudHostingSettingsView, GitSettingsView } from "./main/RepositorySettingsViews";
+import { isSettingsSectionAvailable } from "./sidebar/settingsSidebarModel";
 import type { SettingsViewProps } from "./types";
 import { writeClipboardText } from "./utils";
 export function SettingsView({
@@ -98,6 +99,16 @@ export function SettingsView({
   const [copiedRemoteKey, setCopiedRemoteKey] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
   const orderedHeaderElements = getOrderedHeaderElementDefinitions(titlebarActionsSettings.order);
+
+  if (!isSettingsSectionAvailable(activeSection, { cloudEnabled })) {
+    return (
+      <GeneralSettingsView
+        updateState={updateState}
+        onCheckForUpdates={onCheckForUpdates}
+        onUpdateNow={onUpdateNow}
+      />
+    );
+  }
 
   if (activeSection === "general") {
     return (

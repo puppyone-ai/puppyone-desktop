@@ -9,7 +9,7 @@ import {
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import { DesktopCloudShell, type DesktopView } from "./components/DesktopCloudShell";
-import type { SettingsSection } from "./features/settings";
+import { isSettingsSectionAvailable, type SettingsSection } from "./features/settings";
 import { type CloudWorkspaceSection } from "./features/cloud";
 import {
   MinimalOnboarding,
@@ -413,6 +413,12 @@ function AppContent() {
       setActiveCloudSection("initialize");
     }
   }, [activeView, cloudEnabled, experimentalSettings.enableViewerPlugins]);
+
+  useEffect(() => {
+    if (!isSettingsSectionAvailable(activeSettingsSection, { cloudEnabled })) {
+      setActiveSettingsSection("general");
+    }
+  }, [activeSettingsSection, cloudEnabled]);
 
   useEffect(() => {
     const preventFileDropNavigation = (event: DragEvent) => {

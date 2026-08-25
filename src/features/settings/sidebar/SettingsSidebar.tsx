@@ -2,15 +2,16 @@ import { SidebarRoot, SidebarRow, SidebarScrollArea } from "@puppyone/shared-ui"
 import { useLocalization } from "@puppyone/localization";
 import { SidebarGroup } from "../../../components/sidebar";
 import type { SettingsSidebarProps } from "../types";
-import { SETTINGS_SIDEBAR_GROUPS } from "./settingsSidebarModel";
+import { resolveSettingsSidebarGroups } from "./settingsSidebarModel";
 
-export function SettingsSidebar({ activeSection, onSelectSection }: SettingsSidebarProps) {
+export function SettingsSidebar({ activeSection, cloudEnabled, onSelectSection }: SettingsSidebarProps) {
   const { t } = useLocalization();
+  const groups = resolveSettingsSidebarGroups({ cloudEnabled });
 
   return (
     <SidebarRoot className="desktop-settings-sidebar" aria-label={t("settings.sidebar.desktopApp")}>
       <SidebarScrollArea>
-        {SETTINGS_SIDEBAR_GROUPS.map((group) => (
+        {groups.map((group) => (
           <SidebarGroup title={t(group.labelId)} key={group.id}>
             {group.items.map((section) => {
               const Icon = section.icon;

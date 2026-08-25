@@ -75,5 +75,6 @@ export type SettingsViewProps = {
 
 export type SettingsSidebarProps = {
   activeSection: SettingsSection;
+  cloudEnabled: boolean;
   onSelectSection: (section: SettingsSection) => void;
 };

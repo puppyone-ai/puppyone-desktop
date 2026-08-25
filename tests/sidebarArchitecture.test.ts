@@ -62,8 +62,9 @@ describe("Sidebar architecture", () => {
     expect(auxiliaryHostSource).toContain("SidebarResizeHandle");
     expect(auxiliaryHostSource).toContain("useCollapsiblePaneResize");
     expect(auxiliaryHostSource).toContain('orientation="vertical"');
-    expect(settingsSidebarSource).toContain("SETTINGS_SIDEBAR_GROUPS.map");
+    expect(settingsSidebarSource).toContain("resolveSettingsSidebarGroups({ cloudEnabled })");
     expect(settingsModelSource).toContain("SETTINGS_SIDEBAR_GROUPS");
+    expect(settingsModelSource).toContain("requiresCloud: true");
   });
 
   it("collapses panes through animated resize tracks without expanded-state toggle buttons", () => {

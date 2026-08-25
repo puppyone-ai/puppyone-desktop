@@ -26,6 +26,11 @@ export type SettingsSidebarGroupModel = {
   id: string;
   labelId: string;
   items: readonly SettingsSidebarItem[];
+  requiresCloud?: boolean;
+};
+
+export type SettingsVisibilityContext = {
+  cloudEnabled: boolean;
 };
 
 export const SETTINGS_SIDEBAR_GROUPS = [
@@ -54,9 +59,25 @@ export const SETTINGS_SIDEBAR_GROUPS = [
   {
     id: "cloud",
     labelId: "settings.sidebar.cloud",
+    requiresCloud: true,
     items: [
       { id: "account", labelId: "settings.sidebar.account", icon: UserRound, disabled: false },
       { id: "cloud", labelId: "settings.sidebar.cloudHosting", icon: Cloud, disabled: false },
     ],
   },
 ] satisfies readonly SettingsSidebarGroupModel[];
+
+export function resolveSettingsSidebarGroups({
+  cloudEnabled,
+}: SettingsVisibilityContext): readonly SettingsSidebarGroupModel[] {
+  return SETTINGS_SIDEBAR_GROUPS.filter((group) => !group.requiresCloud || cloudEnabled);
+}
+
+export function isSettingsSectionAvailable(
+  section: SettingsSection,
+  context: SettingsVisibilityContext,
+): boolean {
+  return resolveSettingsSidebarGroups(context).some((group) => (
+    group.items.some((item) => item.id === section)
+  ));
+}
