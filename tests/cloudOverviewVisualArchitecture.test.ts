@@ -21,13 +21,15 @@ describe("Cloud Overview visual architecture", () => {
     expect(overviewSource).toContain("desktop-cloud-overview-header-facts");
   });
 
-  it("uses a minimal open file list without controls or a surrounding frame", () => {
+  it("uses one rounded file frame without filters or extra headers", () => {
     const files = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-files"));
 
-    expect(files).not.toContain("border:");
-    expect(files).not.toContain("border-radius:");
+    expect(files).toContain("border: 1px solid var(--po-border-strong);");
+    expect(files).toContain("border-radius: 10px;");
+    expect(files).toContain("overflow: hidden;");
     expect(resourceCss).toContain(".desktop-cloud-overview-file-row {\n  min-height: 36px;");
     expect(resourceCss).toContain("min-height: 36px;\n  border-bottom: 1px solid var(--po-border-subtle);");
+    expect(resourceCss).toContain(".desktop-cloud-overview-file-row:last-child");
     expect(dashboardSource).not.toContain("desktop-cloud-overview-file-toolbar");
     expect(dashboardSource).not.toContain("desktop-cloud-overview-file-column-labels");
     expect(dashboardSource).not.toContain("OverviewFileSortKey");

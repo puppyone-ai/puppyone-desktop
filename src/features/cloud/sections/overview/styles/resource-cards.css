@@ -1,7 +1,10 @@
-/* Drive-style project file table: open edges, quiet horizontal dividers. */
+/* One quiet project-file frame with compact rows inside. */
 .desktop-cloud-overview-files {
   min-width: 0;
-  overflow: visible;
+  overflow: hidden;
+  border: 1px solid var(--po-border-strong);
+  border-radius: 10px;
+  background: var(--po-canvas);
 }
 
 .desktop-cloud-overview-file-table {
@@ -16,6 +19,10 @@
   align-items: center;
   column-gap: 12px;
   padding: 0 10px;
+}
+
+.desktop-cloud-overview-file-row:last-child {
+  border-bottom: 0;
 }
 
 .desktop-cloud-overview-file-row {
