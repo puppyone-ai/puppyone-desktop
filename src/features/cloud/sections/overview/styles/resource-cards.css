@@ -2,7 +2,7 @@
 .desktop-cloud-overview-files {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--po-border-strong);
+  border: 1px solid var(--po-border-subtle);
   border-radius: 10px;
   background: var(--po-canvas);
 }

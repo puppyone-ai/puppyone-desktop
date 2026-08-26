@@ -26,7 +26,7 @@ describe("Cloud Overview visual architecture", () => {
   it("uses one rounded file frame without filters or extra headers", () => {
     const files = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-files"));
 
-    expect(files).toContain("border: 1px solid var(--po-border-strong);");
+    expect(files).toContain("border: 1px solid var(--po-border-subtle);");
     expect(files).toContain("border-radius: 10px;");
     expect(files).toContain("overflow: hidden;");
     expect(resourceCss).toContain(".desktop-cloud-overview-file-row {\n  min-height: 36px;");
