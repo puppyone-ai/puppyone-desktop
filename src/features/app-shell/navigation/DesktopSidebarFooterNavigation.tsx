@@ -38,14 +38,14 @@ export function DesktopSidebarFooterNavigation({
     >
       <div className="desktop-sidebar-footer-actions desktop-sidebar-footer-actions-left">
         <DesktopNavigationItems {...runtime} buttonClassName="desktop-sidebar-footer-button" items={localItems} />
+        {cloudHubItems.length > 0 && (
+          <DesktopNavigationItems {...runtime} buttonClassName="desktop-sidebar-footer-button" items={cloudHubItems} />
+        )}
         <DesktopSidebarSettingsButton
           activeView={activeView}
           buttonClassName="desktop-sidebar-footer-button"
           onOpenSettings={onOpenSettings}
         />
-        {cloudHubItems.length > 0 && (
-          <DesktopNavigationItems {...runtime} buttonClassName="desktop-sidebar-footer-button" items={cloudHubItems} />
-        )}
       </div>
     </div>
   );
