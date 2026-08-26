@@ -69,4 +69,49 @@ describe("simple Cloud publish onboarding", () => {
 
     act(() => root.unmount());
   });
+
+  it("reduces the first upload to one vertical five-step task list", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => root.render(withTestLocalization(
+      <CloudLocalOnlyWorkspace
+        workspace={{ id: "local-notes", name: "Local Notes", path: "/tmp/local-notes" }}
+        accountEmail="dev@example.com"
+        branchName="main"
+        totalCommits={1}
+        localChangeCount={0}
+        publishReadiness="ready"
+        isGitRepository
+        hasHeadCommit
+        hasCurrentBranch
+        publishLoading
+        publishProgress={{
+          rootPath: "/tmp/local-notes",
+          operationId: "publish-1",
+          stage: "uploading",
+          state: null,
+          updatedAt: "2026-08-27T00:00:00.000Z",
+        }}
+        organizations={[{ id: "org-1", name: "PuppyOne" }]}
+        selectedOrganizationId="org-1"
+        organizationStatus="ready"
+        onPublishWorkspace={vi.fn()}
+      />,
+    )));
+
+    const tasks = Array.from(container.querySelectorAll(".desktop-cloud-publish-progress li"));
+    expect(tasks).toHaveLength(5);
+    expect(tasks.slice(0, 3).every((task) => task.classList.contains("done"))).toBe(true);
+    expect(tasks[3]?.classList.contains("current")).toBe(true);
+    expect(tasks[3]?.textContent).toContain("Upload");
+    expect(tasks[3]?.textContent).toContain("Uploading and publishing files…");
+    expect(tasks[4]?.className).toBe("");
+    expect(container.querySelector(".desktop-cloud-publish-hero")).toBeNull();
+    expect(container.querySelector(".desktop-cloud-publish-summary")).toBeNull();
+    expect(container.querySelector(".desktop-cloud-publish-primary")).toBeNull();
+
+    act(() => root.unmount());
+  });
 });

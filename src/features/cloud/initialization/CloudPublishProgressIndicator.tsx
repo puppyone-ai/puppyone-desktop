@@ -1,3 +1,4 @@
+import { Check, LoaderCircle } from "lucide-react";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import type { CloudPublishProgressStage } from "../../../types/electron";
 
@@ -20,15 +21,6 @@ export function CloudPublishProgressIndicator({
   const completed = stage === "completed";
   return (
     <div className="desktop-cloud-publish-progress" data-stage={stage}>
-      <div
-        className="desktop-cloud-publish-progress-current"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        <span className="desktop-cloud-publish-progress-pulse" aria-hidden="true" />
-        <strong>{getCloudPublishProgressLabel(stage, t)}</strong>
-      </div>
       <ol aria-label={t("cloud.initialize.progress.stepsLabel")}>
         {CLOUD_PUBLISH_PROGRESS_STEPS.map((step, index) => {
           const isDone = completed || index < activeIndex;
@@ -39,8 +31,21 @@ export function CloudPublishProgressIndicator({
               aria-current={isCurrent ? "step" : undefined}
               key={step}
             >
-              <span className="desktop-cloud-publish-progress-marker" aria-hidden="true" />
-              <span>{t(`cloud.initialize.progress.step.${step}`)}</span>
+              <span className="desktop-cloud-publish-progress-marker" aria-hidden="true">
+                {isDone
+                  ? <Check size={14} strokeWidth={2.2} />
+                  : isCurrent
+                    ? <LoaderCircle size={14} strokeWidth={2} className="spin" />
+                    : <span>{index + 1}</span>}
+              </span>
+              <span className="desktop-cloud-publish-progress-task">
+                <strong>{t(`cloud.initialize.progress.step.${step}`)}</strong>
+                {isCurrent && (
+                  <small role="status" aria-live="polite" aria-atomic="true">
+                    {getCloudPublishProgressLabel(stage, t)}
+                  </small>
+                )}
+              </span>
             </li>
           );
         })}

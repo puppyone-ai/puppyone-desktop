@@ -121,17 +121,14 @@ export function CloudLocalOnlyWorkspace({
     ? Boolean(pushAction)
     : readyToPush && organizationReady;
   const showPublishSummary = Boolean(
-    activeProgressStage
-    || publishState
+    publishState
     || readinessMessage
     || organizationStatus === "selection-required"
     || organizationError,
   );
   const destinationBranchName = PUPPYONE_CLOUD_DEFAULT_BRANCH;
   const visiblePublishError = publishError;
-  const cloudStatus = activeProgressStage
-    ? getCloudPublishProgressLabel(activeProgressStage, t)
-    : publishState
+  const cloudStatus = publishState
     ? getCloudInitializationStatusLabel(publishState, t)
     : t(waitingForSignIn
       ? "cloud.initialize.waitingForSignIn"
@@ -155,6 +152,29 @@ export function CloudLocalOnlyWorkspace({
         onRetryOrganizations={onRetryOrganizations}
         onPublishWorkspace={onPublishWorkspace}
       />
+    );
+  }
+
+  if (activeProgressStage) {
+    return (
+      <div className="desktop-cloud-publish-container">
+        {waitingForSignIn && (
+          <div className="desktop-cloud-main-alert info" role="status">
+            {t("cloud.state.publishSignInPending")}
+          </div>
+        )}
+        {visiblePublishError && (
+          <div className="desktop-cloud-main-alert" role="alert">
+            {formatCloudPublishFailure(visiblePublishError, t)}
+          </div>
+        )}
+        <section
+          className="desktop-cloud-publish-running"
+          aria-label={t("cloud.initialize.progress.stepsLabel")}
+        >
+          <CloudPublishProgressIndicator stage={activeProgressStage} t={t} />
+        </section>
+      </div>
     );
   }
 
@@ -296,9 +316,7 @@ export function CloudLocalOnlyWorkspace({
 
         {showPublishSummary && (
           <div className={`desktop-cloud-publish-summary ${readinessMessage ? "blocked" : ""}`} role={readinessMessage ? "alert" : undefined}>
-            {activeProgressStage ? (
-              <CloudPublishProgressIndicator stage={activeProgressStage} t={t} />
-            ) : publishState ? (
+            {publishState ? (
               <>
                 <strong>{getCloudInitializationStatusLabel(publishState, t)}</strong>
                 <p>{getCloudInitializationDescription(publishState, t)}</p>
