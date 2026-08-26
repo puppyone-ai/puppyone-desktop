@@ -330,6 +330,122 @@
   opacity: 0.76;
 }
 
+.desktop-remote-update-notice {
+  display: grid;
+  gap: 5px;
+  margin: 0 0 9px;
+  padding: 9px 9px 8px;
+  border: 1px solid color-mix(in srgb, var(--po-accent) 36%, var(--po-divider));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-accent) 9%, var(--po-sidebar));
+  color: var(--po-text);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--po-accent) 9%, transparent);
+}
+
+.desktop-remote-update-notice[data-diverged="true"] {
+  border-color: color-mix(in srgb, var(--po-warning) 42%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-warning) 8%, var(--po-sidebar));
+}
+
+.desktop-remote-update-notice-heading {
+  display: grid;
+  grid-template-columns: 17px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.desktop-remote-update-notice-heading strong {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: var(--po-text-weight-semibold, 600);
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-remote-update-notice-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in srgb, var(--po-accent) 72%, var(--po-text));
+}
+
+.desktop-remote-update-notice-pull {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--po-accent) 32%, var(--po-divider));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--po-canvas) 82%, transparent);
+  color: color-mix(in srgb, var(--po-accent) 68%, var(--po-text));
+  font: inherit;
+  font-size: 11px;
+  font-weight: var(--po-text-weight-semibold, 600);
+  line-height: 16px;
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.desktop-remote-update-notice-pull:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--po-accent) 52%, var(--po-divider));
+  background: color-mix(in srgb, var(--po-accent) 13%, var(--po-canvas));
+}
+
+.desktop-remote-update-notice-pull:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--po-accent) 42%, transparent);
+  outline-offset: 1px;
+}
+
+.desktop-remote-update-notice-pull:disabled {
+  color: var(--po-text-disabled);
+  cursor: default;
+  opacity: 0.72;
+}
+
+.desktop-remote-update-notice-files,
+.desktop-remote-update-notice-meta,
+.desktop-remote-update-notice-diverged {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-remote-update-notice-files {
+  color: var(--po-text-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.desktop-remote-update-notice-meta,
+.desktop-remote-update-notice-diverged {
+  color: var(--po-text-subtle);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.desktop-remote-update-notice-diverged {
+  color: color-mix(in srgb, var(--po-warning) 74%, var(--po-text));
+  white-space: normal;
+}
+
+.desktop-remote-update-notice-spinner {
+  animation: desktop-remote-update-notice-spin 800ms linear infinite;
+}
+
+@keyframes desktop-remote-update-notice-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-remote-update-notice-spinner {
+    animation: none;
+  }
+}
+
 .app-shell.dark .desktop-data-workspace-wrap .explorer-column {
   --po-text: #d2cec5;
   --po-text-muted: #b9b6ae;

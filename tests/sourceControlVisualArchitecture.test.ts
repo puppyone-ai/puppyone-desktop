@@ -362,13 +362,13 @@ describe("source-control visual architecture", () => {
     expect(resizer).toContain("background: transparent;");
   });
 
-  it("keeps GitHub Fetch lifecycle out of the presentational sidebar", () => {
+  it("keeps remote Fetch lifecycle out of the presentational sidebar", () => {
     const sidebarPresentation = `${sourceControlSidebarSource}\n${sourceControlSidebarSectionsSource}`;
 
     expect(sidebarPresentation).not.toContain("fetchWorkspaceGit");
     expect(sidebarPresentation).not.toContain("setInterval");
-    expect(gitRepositoryLifecycleSource).toContain("getGitHubRemoteFetchTarget(activeGitStatus)");
-    expect(gitRepositoryLifecycleSource).toContain("GITHUB_REMOTE_FETCH_INTERVAL_MS");
+    expect(gitRepositoryLifecycleSource).toContain("getRemoteFetchTarget(activeGitStatus)");
+    expect(gitRepositoryLifecycleSource).toContain("REMOTE_FETCH_INTERVAL_MS");
     expect(gitRepositoryLifecycleSource).toContain(
       "fetchWorkspaceGit(context.rootPath, { remoteName })",
     );

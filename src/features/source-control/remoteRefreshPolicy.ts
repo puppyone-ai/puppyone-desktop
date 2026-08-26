@@ -1,20 +1,30 @@
 import type { GitStatusSnapshot } from "../../types/electron";
 
-export const GITHUB_REMOTE_FETCH_INTERVAL_MS = 180_000;
-export const GITHUB_REMOTE_FETCH_FOCUS_STALE_MS = 60_000;
-export const GITHUB_REMOTE_FETCH_MIN_GAP_MS = 15_000;
+export const REMOTE_FETCH_INTERVAL_MS = 180_000;
+export const REMOTE_FETCH_FOCUS_STALE_MS = 60_000;
+export const REMOTE_FETCH_MIN_GAP_MS = 15_000;
 
-export type GitHubRemoteFetchTarget = Readonly<{
+export type RemoteFetchTarget = Readonly<{
   remoteName: string;
   branchName: string | null;
   key: string;
 }>;
 
-export function getGitHubRemoteFetchTarget(
+/**
+ * Resolve the one effective sync remote selected by the repository model.
+ * This intentionally works for GitHub, PuppyOne Cloud, and generic Git hosts;
+ * local-only repositories never trigger network traffic.
+ */
+export function getRemoteFetchTarget(
   status: GitStatusSnapshot | null,
-): GitHubRemoteFetchTarget | null {
+): RemoteFetchTarget | null {
   const hosting = status?.effectiveHosting;
-  if (!status?.isRepo || hosting?.kind !== "github" || !hosting.ready || !hosting.remoteName) {
+  if (
+    !status?.isRepo
+    || !hosting?.ready
+    || hosting.kind === "local-only"
+    || !hosting.remoteName
+  ) {
     return null;
   }
   return {
@@ -24,7 +34,7 @@ export function getGitHubRemoteFetchTarget(
   };
 }
 
-export function shouldFetchGitHubRemote({
+export function shouldFetchRemote({
   focused,
   online,
   now,

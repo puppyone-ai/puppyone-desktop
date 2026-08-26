@@ -43,6 +43,7 @@ import {
   toWorkspaceRelativePath,
 } from "../desktop-agent-presence";
 import { DesktopShellNavigationToolbarPortal } from "./DesktopShellAccessoryContext";
+import { RemoteUpdateNotice } from "../data-workspace/RemoteUpdateNotice";
 
 type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 
@@ -70,6 +71,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
     workspaceChangeCount: number;
     onNavigate: (view: DesktopView) => void;
     onOpenSettings: () => void;
+    onPullGit: () => Promise<boolean>;
   };
   navigationComposition: string;
   onActiveDataPathChange: (
@@ -222,6 +224,13 @@ export function DesktopDataWorkspaceSurface({
         onCutNodes={fileClipboardController.cutNodes}
         onPasteNodes={fileClipboardController.pasteNodes}
         onDuplicateNodes={fileClipboardController.duplicateNodes}
+        explorerListStartSlot={(
+          <RemoteUpdateNotice
+            status={navigation.gitStatus}
+            operationLoading={navigation.gitOperationLoading}
+            onPull={navigation.onPullGit}
+          />
+        )}
         explorerListEndSlot={(
           <div
             className="desktop-explorer-list-end-create"

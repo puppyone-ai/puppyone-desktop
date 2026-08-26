@@ -15,12 +15,12 @@ import {
   type GitRepositoryContext,
 } from "./gitRefreshScheduler";
 import {
-  getGitHubRemoteFetchTarget,
-  GITHUB_REMOTE_FETCH_FOCUS_STALE_MS,
-  GITHUB_REMOTE_FETCH_INTERVAL_MS,
-  GITHUB_REMOTE_FETCH_MIN_GAP_MS,
-  shouldFetchGitHubRemote,
-} from "./githubRemoteRefreshPolicy";
+  getRemoteFetchTarget,
+  REMOTE_FETCH_FOCUS_STALE_MS,
+  REMOTE_FETCH_INTERVAL_MS,
+  REMOTE_FETCH_MIN_GAP_MS,
+  shouldFetchRemote,
+} from "./remoteRefreshPolicy";
 import {
   createRepositoryRefreshReason,
   mergePreservedHistory,
@@ -215,12 +215,12 @@ export function useGitRepositoryLifecycle({
     return request;
   }, [applyGitStatus, captureGitRepositoryContext, reportGitStatusError, workspace]);
 
-  const githubFetchTarget = getGitHubRemoteFetchTarget(activeGitStatus);
-  const githubFetchTargetKey = githubFetchTarget?.key ?? null;
+  const remoteFetchTarget = getRemoteFetchTarget(activeGitStatus);
+  const remoteFetchTargetKey = remoteFetchTarget?.key ?? null;
 
   useEffect(() => {
     const rootPath = workspace?.path ?? null;
-    const remoteName = githubFetchTarget?.remoteName ?? null;
+    const remoteName = remoteFetchTarget?.remoteName ?? null;
     if (!rootPath || !remoteName) return undefined;
 
     const fetchIdentity = `${rootPath}:${remoteName}`;
@@ -235,7 +235,7 @@ export function useGitRepositoryLifecycle({
     const requestFetch = (detail: string, minimumGapMs: number) => {
       const now = Date.now();
       const lastAttemptAt = lastRemoteFetchAttemptRef.current.get(fetchIdentity) ?? null;
-      if (!shouldFetchGitHubRemote({
+      if (!shouldFetchRemote({
         focused: isForeground(),
         online: isOnline(),
         now,
@@ -251,15 +251,15 @@ export function useGitRepositoryLifecycle({
     };
 
     requestFetch(
-      remoteUpdatesActive ? "github-sidebar" : "github-target",
-      GITHUB_REMOTE_FETCH_MIN_GAP_MS,
+      remoteUpdatesActive ? "remote-sidebar" : "remote-target",
+      REMOTE_FETCH_MIN_GAP_MS,
     );
 
     const interval = window.setInterval(() => {
-      requestFetch("github-interval", GITHUB_REMOTE_FETCH_INTERVAL_MS);
-    }, GITHUB_REMOTE_FETCH_INTERVAL_MS);
-    const handleFocus = () => requestFetch("github-focus", GITHUB_REMOTE_FETCH_FOCUS_STALE_MS);
-    const handleOnline = () => requestFetch("github-online", GITHUB_REMOTE_FETCH_MIN_GAP_MS);
+      requestFetch("remote-interval", REMOTE_FETCH_INTERVAL_MS);
+    }, REMOTE_FETCH_INTERVAL_MS);
+    const handleFocus = () => requestFetch("remote-focus", REMOTE_FETCH_FOCUS_STALE_MS);
+    const handleOnline = () => requestFetch("remote-online", REMOTE_FETCH_MIN_GAP_MS);
     window.addEventListener("focus", handleFocus);
     window.addEventListener("online", handleOnline);
 
@@ -269,8 +269,8 @@ export function useGitRepositoryLifecycle({
       window.removeEventListener("online", handleOnline);
     };
   }, [
-    githubFetchTarget?.remoteName,
-    githubFetchTargetKey,
+    remoteFetchTarget?.remoteName,
+    remoteFetchTargetKey,
     refreshGitStatusWithFetch,
     remoteUpdatesActive,
     workspace?.path,

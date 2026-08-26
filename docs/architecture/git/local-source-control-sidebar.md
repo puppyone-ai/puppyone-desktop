@@ -362,8 +362,8 @@ history lazily. See
   - creates the controller and connects workspace file-watch refreshes
 - `src/features/source-control/useDesktopGitController.ts`
   - owns renderer status, selection, detail, and operation state
-- `src/features/source-control/githubRemoteRefreshPolicy.ts`
-  - identifies the effective GitHub fetch target and owns foreground/cadence
+- `src/features/source-control/remoteRefreshPolicy.ts`
+  - identifies the effective GitHub, PuppyOne Cloud, or generic Git fetch target and owns foreground/cadence
     policy without executing network operations
 - `src/features/source-control/viewModel.ts`
   - derives product-facing sections and actions

@@ -12,9 +12,9 @@ contracts here.
 - `viewModel.ts` derives source-control state from the raw Git snapshot. Keep button labels, enabled states, display modes, and remote/commit counts here instead of inside TSX views.
 - `gitRefreshScheduler.ts` owns cancellable single-flight reads, root epochs,
   generation ordering, retry and focus reconciliation.
-- `githubRemoteRefreshPolicy.ts` derives the effective GitHub fetch target and
-  foreground refresh cadence. It is pure policy; timers and IPC stay in the
-  repository lifecycle.
+- `remoteRefreshPolicy.ts` derives the effective GitHub, PuppyOne Cloud, or
+  generic Git fetch target and foreground refresh cadence. It is pure policy;
+  timers and IPC stay in the repository lifecycle.
 - `repositoryRefreshPolicy.ts` maps structured repository-change causes to
   history invalidation without encoding semantics in log strings.
 - `useGitRepositoryLifecycle.ts` owns watcher bootstrap, repository contexts,

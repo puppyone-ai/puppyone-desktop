@@ -195,6 +195,7 @@ export function DesktopWorkspaceContent({
         workspaceChangeCount,
         onNavigate,
         onOpenSettings,
+        onPullGit: git.handlePullGit,
       }}
       navigationComposition={navigationComposition}
       onActiveDataNodeChange={onActiveDataNodeChange}
