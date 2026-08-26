@@ -26,11 +26,9 @@ export function RemoteUpdateNotice({
   operationLoading: string | null;
   onPull: () => Promise<boolean>;
 }) {
-  const { t, formatRelativeTime } = useLocalization();
+  const { t } = useLocalization();
   const model = getRemoteUpdateNoticeModel(status);
   if (!model) return null;
-
-  const updateAge = formatRemoteUpdateAge(model.updatedAt, formatRelativeTime);
 
   return (
     <aside
@@ -46,11 +44,6 @@ export function RemoteUpdateNotice({
             : t("source-control.notice.filesChanged")}
         </span>
       </div>
-      {updateAge && (
-        <div className="desktop-remote-update-notice-meta">
-          <span className="desktop-remote-update-notice-age">{updateAge}</span>
-        </div>
-      )}
       <GitOperationButton
         className="desktop-remote-update-notice-pull"
         title={t("source-control.notice.getChangesTitle")}
@@ -112,29 +105,4 @@ function getRemoteFileChangeCounts(
     if (file.status === "deleted") return { ...counts, deleted: counts.deleted + 1 };
     return { ...counts, modified: counts.modified + 1 };
   }, { added: 0, modified: 0, deleted: 0 });
-}
-
-function formatRemoteUpdateAge(
-  value: string | null,
-  formatRelativeTime: ReturnType<typeof useLocalization>["formatRelativeTime"],
-) {
-  const timestamp = value ? Date.parse(value) : Number.NaN;
-  if (!Number.isFinite(timestamp)) return null;
-
-  const elapsedMs = Math.max(0, Date.now() - timestamp);
-  const minute = 60_000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-  const week = 7 * day;
-  const month = 30 * day;
-  const year = 365 * day;
-
-  const options = { numeric: "auto", style: "short" } as const;
-  if (elapsedMs < minute) return formatRelativeTime(0, "second", options);
-  if (elapsedMs < hour) return formatRelativeTime(-Math.floor(elapsedMs / minute), "minute", options);
-  if (elapsedMs < day) return formatRelativeTime(-Math.floor(elapsedMs / hour), "hour", options);
-  if (elapsedMs < week) return formatRelativeTime(-Math.floor(elapsedMs / day), "day", options);
-  if (elapsedMs < month) return formatRelativeTime(-Math.floor(elapsedMs / week), "week", options);
-  if (elapsedMs < year) return formatRelativeTime(-Math.floor(elapsedMs / month), "month", options);
-  return formatRelativeTime(-Math.floor(elapsedMs / year), "year", options);
 }
