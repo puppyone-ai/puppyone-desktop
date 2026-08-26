@@ -17,7 +17,6 @@ import type {
   DesktopCloudTree,
 } from "../../../../lib/cloudApi";
 import type { DesktopCloudHistory } from "../../../../lib/cloudHistoryApi";
-import { CloudWorkspaceLoadingState } from "../../components/shared";
 import { getCloudRoute } from "../../routes/cloudRoutes";
 import type { CloudWorkspaceSection } from "../../types";
 import {
@@ -86,9 +85,7 @@ export function CloudRepositoryOverview({
     || connectors.length > 0
     || mcpEndpoints.length > 0,
   );
-  if (loading && !hasOverviewData) {
-    return <CloudWorkspaceLoadingState label={t("cloud.loading.project")} />;
-  }
+  const initialLoading = loading && !hasOverviewData;
 
   return (
     <section className="desktop-cloud-overview-page" aria-label={t("cloud.overview.ariaLabel")}>
@@ -123,7 +120,7 @@ export function CloudRepositoryOverview({
               </div>
             </div>
 
-            <CloudOverviewStorageMeter usage={storageUsage} loading={loading} />
+            <CloudOverviewStorageMeter usage={storageUsage} loading={initialLoading} />
 
             <div className="desktop-cloud-overview-header-side">
               <div className="desktop-cloud-overview-header-facts">
@@ -134,15 +131,17 @@ export function CloudRepositoryOverview({
                     ? formatFullTime(latestUpdateAt, localization.formatDate)
                     : undefined}
                   ariaLabel={t("cloud.overview.viewHistory")}
+                  loading={initialLoading}
                   onClick={() => onSelectSection("history")}
                 />
                 <CloudOverviewHeaderFact
                   label={t("cloud.overview.activeConnections")}
                   value={formatNumber(overviewMetrics.activeAccessPointCount)}
                   ariaLabel={t("cloud.overview.manageAccessPoints")}
+                  loading={initialLoading}
                   onClick={() => onSelectSection("access")}
                 />
-                <CloudOverviewPathFact value={gitRemoteUrl} />
+                <CloudOverviewPathFact value={gitRemoteUrl} loading={initialLoading} />
               </div>
             </div>
           </header>
@@ -159,7 +158,13 @@ export function CloudRepositoryOverview({
   );
 }
 
-function CloudOverviewPathFact({ value }: { value: string | null }) {
+function CloudOverviewPathFact({
+  value,
+  loading,
+}: {
+  value: string | null;
+  loading: boolean;
+}) {
   const { t } = useLocalization();
   const [copied, setCopied] = useState(false);
   const label = copied
@@ -177,19 +182,26 @@ function CloudOverviewPathFact({ value }: { value: string | null }) {
     <button
       className="desktop-cloud-overview-header-fact desktop-cloud-overview-header-fact--interactive desktop-cloud-overview-path-fact"
       type="button"
-      aria-label={value ? label : t("cloud.common.path")}
+      aria-label={loading ? t("cloud.common.loading") : value ? label : t("cloud.common.path")}
+      aria-busy={loading}
       title={value ?? undefined}
       disabled={!value}
       onClick={() => void handleCopy()}
     >
       <span className="desktop-cloud-overview-header-fact-label">{t("cloud.common.path")}</span>
       <strong>
-        <code dir="ltr">{value ?? "—"}</code>
-        {value ? (
-          <span className="desktop-cloud-overview-path-copy" aria-hidden="true">
-            {copied ? <Check size={12} /> : <Copy size={12} />}
-          </span>
-        ) : null}
+        {loading ? (
+          <span className="desktop-cloud-overview-value-skeleton" aria-hidden="true" />
+        ) : (
+          <>
+            <code dir="ltr">{value ?? "—"}</code>
+            {value ? (
+              <span className="desktop-cloud-overview-path-copy" aria-hidden="true">
+                {copied ? <Check size={12} /> : <Copy size={12} />}
+              </span>
+            ) : null}
+          </>
+        )}
       </strong>
     </button>
   );
@@ -200,12 +212,14 @@ function CloudOverviewHeaderFact({
   value,
   valueTitle,
   ariaLabel,
+  loading,
   onClick,
 }: {
   label: string;
   value: string;
   valueTitle?: string;
   ariaLabel: string;
+  loading: boolean;
   onClick: () => void;
 }) {
   return (
@@ -213,10 +227,15 @@ function CloudOverviewHeaderFact({
       className="desktop-cloud-overview-header-fact desktop-cloud-overview-header-fact--interactive"
       type="button"
       aria-label={ariaLabel}
+      aria-busy={loading}
       onClick={onClick}
     >
       <span className="desktop-cloud-overview-header-fact-label">{label}</span>
-      <strong title={valueTitle}>{value}</strong>
+      <strong title={valueTitle}>
+        {loading
+          ? <span className="desktop-cloud-overview-value-skeleton" aria-hidden="true" />
+          : value}
+      </strong>
     </button>
   );
 }
@@ -230,6 +249,7 @@ function CloudOverviewStorageMeter({
 }) {
   const localization = useLocalization();
   const { t } = localization;
+  const pending = loading && usage.bytes === null;
   const used = usage.bytes === null
     ? loading ? t("cloud.common.loading") : "—"
     : `${formatBytes(usage.bytes, localization)}${usage.isLowerBound ? "+" : ""}`;
@@ -250,7 +270,11 @@ function CloudOverviewStorageMeter({
       };
 
   return (
-    <div className="desktop-cloud-overview-project-storage" title={detail}>
+    <div
+      className={`desktop-cloud-overview-project-storage${pending ? " is-loading" : ""}`}
+      title={pending ? t("cloud.common.loading") : detail}
+      aria-busy={pending}
+    >
       <span className="desktop-cloud-overview-project-storage-track" {...progressProps}>
         {usage.percent !== null ? (
           <span style={{ width: `${usage.percent}%` }} />

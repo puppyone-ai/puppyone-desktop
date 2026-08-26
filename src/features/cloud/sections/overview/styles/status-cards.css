@@ -66,6 +66,15 @@
   line-height: 18px;
 }
 
+.desktop-cloud-overview-value-skeleton {
+  display: block;
+  width: min(112px, 72%);
+  height: 11px;
+  border-radius: 999px;
+  background: var(--po-skeleton-base);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
 .desktop-cloud-overview-project-storage {
   width: 100%;
   min-width: 0;
@@ -85,4 +94,9 @@
   height: 100%;
   border-radius: inherit;
   background: var(--po-accent);
+}
+
+.desktop-cloud-overview-project-storage.is-loading .desktop-cloud-overview-project-storage-track {
+  background: var(--po-skeleton-base);
+  animation: pulse 1.6s ease-in-out infinite;
 }

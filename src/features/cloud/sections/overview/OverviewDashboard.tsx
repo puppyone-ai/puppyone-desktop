@@ -30,6 +30,7 @@ export function CloudOverviewDashboard({
   const entries = getCloudOverviewRootEntries(tree);
   const storedFileCount = dashboard?.nodes.files
     ?? entries.filter((entry) => entry.type !== "folder").length;
+  const showSkeleton = loading && entries.length === 0;
 
   return (
     <section
@@ -41,9 +42,25 @@ export function CloudOverviewDashboard({
         <div
           className="desktop-cloud-overview-file-table"
           role="list"
-          aria-label={`${t("cloud.overview.fileListAria")} · ${t("cloud.history.fileCount", { count: storedFileCount })}`}
+          aria-label={showSkeleton
+            ? t("cloud.loading.project")
+            : `${t("cloud.overview.fileListAria")} · ${t("cloud.history.fileCount", { count: storedFileCount })}`}
         >
-          {entries.length > 0 ? entries.map((entry) => {
+          {showSkeleton ? (
+            Array.from({ length: 4 }, (_, index) => (
+              <div
+                className="desktop-cloud-overview-file-row skeleton"
+                aria-hidden="true"
+                key={index}
+              >
+                <span className="desktop-cloud-overview-file-primary">
+                  <span className="desktop-cloud-overview-file-skeleton-icon" />
+                  <span className="desktop-cloud-overview-file-skeleton-name" />
+                </span>
+                <span className="desktop-cloud-overview-file-skeleton-time" />
+              </div>
+            ))
+          ) : entries.length > 0 ? entries.map((entry) => {
             const updatedAt = getCloudOverviewEntryUpdatedAt(entry, history);
             return (
               <div

@@ -37,6 +37,40 @@
   color: var(--po-text);
 }
 
+.desktop-cloud-overview-file-row.skeleton {
+  pointer-events: none;
+}
+
+.desktop-cloud-overview-file-skeleton-icon,
+.desktop-cloud-overview-file-skeleton-name,
+.desktop-cloud-overview-file-skeleton-time {
+  display: block;
+  border-radius: 999px;
+  background: var(--po-skeleton-base);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.desktop-cloud-overview-file-skeleton-icon {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+}
+
+.desktop-cloud-overview-file-skeleton-name {
+  width: min(180px, 54%);
+  height: 10px;
+}
+
+.desktop-cloud-overview-file-row.skeleton:nth-child(even) .desktop-cloud-overview-file-skeleton-name {
+  width: min(132px, 42%);
+}
+
+.desktop-cloud-overview-file-skeleton-time {
+  width: 54px;
+  height: 9px;
+  justify-self: end;
+}
+
 .desktop-cloud-overview-file-primary {
   display: grid;
   min-width: 0;
