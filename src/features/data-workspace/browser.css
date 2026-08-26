@@ -368,6 +368,9 @@
 .desktop-remote-update-notice-heading {
   grid-column: 1;
   grid-row: 1;
+  display: flex;
+  align-items: center;
+  height: var(--git-action-size);
   min-width: 0;
   overflow: hidden;
 }
@@ -378,6 +381,7 @@
   font-size: var(--desktop-sidebar-font-size, 13px);
   font-weight: var(--desktop-sidebar-font-weight, var(--po-text-weight-medium, 500));
   line-height: var(--desktop-sidebar-line-height, 18px);
+  transform: translateY(-1px);
   white-space: nowrap;
 }
 
