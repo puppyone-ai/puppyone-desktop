@@ -25,7 +25,6 @@ export function CloudRouter({
   projectContext = null,
   activeSection,
   accountEmail,
-  accountConnected,
   loading,
   onSessionChange,
   onOpenProject,
@@ -44,7 +43,6 @@ export function CloudRouter({
   projectContext?: ProjectCloudContext | null;
   activeSection: CloudWorkspaceSection;
   accountEmail: string | null;
-  accountConnected: boolean;
   loading: boolean;
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
@@ -109,16 +107,13 @@ export function CloudRouter({
       status={status}
       cloudSession={cloudSession}
       cloudApiBaseUrl={cloudApiBaseUrl}
-      cloudRemote={cloudRemote}
       cloudData={cloudData}
       projectId={projectId}
       project={cloudData.project ?? { id: projectId, name: workspace.name }}
       loading={loading}
-      accountConnected={accountConnected}
       onSessionChange={onSessionChange}
       onSelectSection={onSelectSection}
       onOpenProject={onOpenProject}
-      onOpenGitSettings={onOpenGitSettings}
       onRefresh={cloudData.reload}
       onRemoveCloudRemote={projectContext?.status === "resolved" ? onRemoveCloudRemote : undefined}
     />

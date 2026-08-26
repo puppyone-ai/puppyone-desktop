@@ -1,6 +1,7 @@
 import { Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocalization } from "@puppyone/localization/react";
+import "./access.css";
 import type {
   DesktopCloudConnector,
   DesktopCloudCreateMcpEndpointRequest,
@@ -14,17 +15,21 @@ import {
   updateCloudConnector,
   updateCloudMcpEndpoint,
 } from "../../../../lib/cloudApi";
-import { getCloudAccessAggregate, type CloudAccessSurface } from "../../model";
+import {
+  buildAccessPointsForScope,
+  getAccessPointAggregate,
+  isAccessPointPlaceholder,
+  type AccessPoint,
+} from "../../access-points/model";
+import { formatAccessPointAggregate } from "../../access-points/presentation";
 import {
   cloudMessage,
-  formatCloudAccessAggregate,
   formatCloudMessage,
   type CloudMessageDescriptor,
 } from "../../cloudPresentation";
 import {
   getScopeDisplayName,
   getScopePathLabel,
-  normalizeProviderKey,
 } from "../../utils";
 import { DesktopCloudAccessMethodCard } from "./AccessMethodCard";
 import {
@@ -33,12 +38,7 @@ import {
   buildMcpToolsConfig,
   sortCliCommands,
 } from "./AccessMethodPermissions";
-import { CloudScopeSettingsBlock } from "./CloudScopeDetail";
-import {
-  buildDesktopCloudAccessSurfacesForScope,
-  getDesktopCloudAccessSurfaceContext,
-  isDesktopAccessPlaceholderSurface,
-} from "./accessSurfaceModel";
+import { CloudScopeSettingsBlock } from "./ScopeSettingsBlock";
 
 export function DesktopCloudScopeAccessDetail({
   projectId,
@@ -46,7 +46,7 @@ export function DesktopCloudScopeAccessDetail({
   onCloudSessionChange,
   apiBaseUrl,
   scope,
-  activeSurfaceId,
+  activeAccessPointId,
   identity,
   connectors,
   mcpEndpoints,
@@ -58,7 +58,7 @@ export function DesktopCloudScopeAccessDetail({
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   apiBaseUrl: string | null;
   scope: DesktopCloudRepositoryView;
-  activeSurfaceId?: string | null;
+  activeAccessPointId?: string | null;
   identity: DesktopCloudRepoIdentity | null;
   connectors: DesktopCloudConnector[];
   mcpEndpoints: DesktopCloudMcpEndpoint[];
@@ -67,48 +67,43 @@ export function DesktopCloudScopeAccessDetail({
 }) {
   const { t } = useLocalization();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [expandedSurfaceId, setExpandedSurfaceId] = useState<string | null>(null);
+  const [expandedAccessPointId, setExpandedAccessPointId] = useState<string | null>(null);
   const [creatingMcp, setCreatingMcp] = useState(false);
   const [mcpError, setMcpError] = useState<CloudMessageDescriptor | null>(null);
-  const [surfaceConfigBusyId, setSurfaceConfigBusyId] = useState<string | null>(null);
-  const [surfaceConfigError, setSurfaceConfigError] = useState<CloudMessageDescriptor | null>(null);
+  const [accessPointConfigBusyId, setAccessPointConfigBusyId] = useState<string | null>(null);
+  const [accessPointConfigError, setAccessPointConfigError] = useState<CloudMessageDescriptor | null>(null);
 
   useEffect(() => {
     setSettingsOpen(false);
-    setExpandedSurfaceId(activeSurfaceId ?? null);
+    setExpandedAccessPointId(activeAccessPointId ?? null);
     setMcpError(null);
-    setSurfaceConfigBusyId(null);
-    setSurfaceConfigError(null);
-  }, [activeSurfaceId, scope.id]);
+    setAccessPointConfigBusyId(null);
+    setAccessPointConfigError(null);
+  }, [activeAccessPointId, scope.id]);
 
-  const accessContext = useMemo(() => getDesktopCloudAccessSurfaceContext({
-    scope,
-    identity,
-    apiBaseUrl,
-  }), [apiBaseUrl, identity, scope]);
   const scopeName = getScopeDisplayName(scope, t);
-  const surfaces = useMemo(() => buildDesktopCloudAccessSurfacesForScope({
+  const accessPoints = useMemo(() => buildAccessPointsForScope({
     scope,
     identity,
     apiBaseUrl,
     connectors,
     mcpEndpoints,
-    includePlaceholders: true,
+    placeholderKinds: ["mcp", "vm"],
   }), [apiBaseUrl, connectors, identity, mcpEndpoints, scope]);
-  const selectedSurface = activeSurfaceId
-    ? surfaces.find((surface) => surface.id === activeSurfaceId) ?? null
+  const selectedAccessPoint = activeAccessPointId
+    ? accessPoints.find((accessPoint) => accessPoint.id === activeAccessPointId) ?? null
     : null;
-  const detailSurfaces = activeSurfaceId
-    ? (selectedSurface ? [selectedSurface] : [])
-    : surfaces;
-  const aggregateSourceSurfaces = detailSurfaces.length > 0 ? detailSurfaces : surfaces;
-  const aggregateSurfaces = aggregateSourceSurfaces.filter((surface) => !isDesktopAccessPlaceholderSurface(surface));
-  const aggregateInputSurfaces = aggregateSurfaces.length > 0 ? aggregateSurfaces : aggregateSourceSurfaces;
-  const aggregate = aggregateInputSurfaces.length > 0
-    ? getCloudAccessAggregate(aggregateInputSurfaces)
+  const detailAccessPoints = activeAccessPointId
+    ? (selectedAccessPoint ? [selectedAccessPoint] : [])
+    : accessPoints;
+  const aggregateSource = detailAccessPoints.length > 0 ? detailAccessPoints : accessPoints;
+  const configuredAccessPoints = aggregateSource.filter((accessPoint) => !isAccessPointPlaceholder(accessPoint));
+  const aggregateInput = configuredAccessPoints.length > 0 ? configuredAccessPoints : aggregateSource;
+  const aggregate = aggregateInput.length > 0
+    ? getAccessPointAggregate(aggregateInput)
     : { code: "paused", tone: "" } as const;
   const aggregateTone = aggregate.tone === "ready" ? "ready" : aggregate.tone === "warning" ? "warning" : "muted";
-  const aggregateConnectorCount = aggregateSurfaces.length;
+  const aggregateConnectorCount = configuredAccessPoints.length;
   const scopePath = getScopePathLabel(scope);
   const modeLabel = t(scope.max_mode === "rw" ? "cloud.scope.readWrite" : "cloud.scope.readOnly");
 
@@ -132,24 +127,23 @@ export function DesktopCloudScopeAccessDetail({
     }
   };
 
-  const handleUpdateSurfacePermissions = async (surface: CloudAccessSurface, allowedKeys: ReadonlySet<string>) => {
-    if (surfaceConfigBusyId || !canManage) return;
-    const provider = normalizeProviderKey(surface.provider);
-    setSurfaceConfigBusyId(surface.id);
-    setSurfaceConfigError(null);
+  const handleUpdateAccessPointPermissions = async (accessPoint: AccessPoint, allowedKeys: ReadonlySet<string>) => {
+    if (accessPointConfigBusyId || !canManage) return;
+    setAccessPointConfigBusyId(accessPoint.id);
+    setAccessPointConfigError(null);
     try {
-      if (provider === "cli") {
-        if (!surface.connector) {
-          setSurfaceConfigError(cloudMessage("cli-unavailable"));
+      if (accessPoint.kind === "cli") {
+        if (!accessPoint.connector) {
+          setAccessPointConfigError(cloudMessage("cli-unavailable"));
           return;
         }
         await updateCloudConnector(
           cloudSession,
           projectId,
-          surface.connector.id,
+          accessPoint.connector.id,
           {
             config: {
-              ...(surface.connector.config ?? {}),
+              ...(accessPoint.connector.config ?? {}),
               [CLI_PERMISSION_CONFIG_KEY]: {
                 allowed: Array.from(allowedKeys).filter((key) => CLI_VALID_COMMANDS.has(key)).sort(sortCliCommands),
               },
@@ -158,16 +152,16 @@ export function DesktopCloudScopeAccessDetail({
           onCloudSessionChange,
           apiBaseUrl,
         );
-      } else if (provider === "mcp" || provider === "mcp_endpoint") {
-        if (!surface.endpoint) {
-          setSurfaceConfigError(cloudMessage("mcp-unavailable"));
+      } else if (accessPoint.kind === "mcp") {
+        if (!accessPoint.endpoint) {
+          setAccessPointConfigError(cloudMessage("mcp-unavailable"));
           return;
         }
         await updateCloudMcpEndpoint(
           cloudSession,
-          surface.endpoint.id,
+          accessPoint.endpoint.id,
           {
-            tools_config: buildMcpToolsConfig(surface.endpoint.tools_config, allowedKeys),
+            tools_config: buildMcpToolsConfig(accessPoint.endpoint.tools_config, allowedKeys),
           },
           onCloudSessionChange,
           apiBaseUrl,
@@ -175,9 +169,9 @@ export function DesktopCloudScopeAccessDetail({
       }
       await onRefresh();
     } catch (error) {
-      setSurfaceConfigError(cloudMessage("update-config-failed", undefined, error instanceof Error ? error.message : undefined));
+      setAccessPointConfigError(cloudMessage("update-config-failed", undefined, error instanceof Error ? error.message : undefined));
     } finally {
-      setSurfaceConfigBusyId(null);
+      setAccessPointConfigBusyId(null);
     }
   };
 
@@ -193,7 +187,7 @@ export function DesktopCloudScopeAccessDetail({
             <h1 title={scopeName}>{scopeName}</h1>
             <div className={`desktop-cloud-access-web-aggregate ${aggregateTone}`}>
               <span className={`desktop-cloud-web-status-dot ${aggregateTone === "ready" ? "ready" : aggregateTone === "warning" ? "warning" : ""}`} aria-hidden="true" />
-              <strong>{formatCloudAccessAggregate(aggregate.code, t)}</strong>
+              <strong>{formatAccessPointAggregate(aggregate.code, t)}</strong>
               <span aria-hidden="true">·</span>
               <em>{t("cloud.access.connectorCount", { count: aggregateConnectorCount })}</em>
             </div>
@@ -233,19 +227,19 @@ export function DesktopCloudScopeAccessDetail({
         )}
 
         <section className="desktop-cloud-access-method-list" aria-label={t("cloud.access.methods")}>
-          {detailSurfaces.map((surface) => (
+          {detailAccessPoints.map((accessPoint) => (
             <DesktopCloudAccessMethodCard
-              key={surface.id}
+              key={accessPoint.id}
               scope={scope}
-              surface={surface}
-              expanded={expandedSurfaceId === surface.id}
+              accessPoint={accessPoint}
+              expanded={expandedAccessPointId === accessPoint.id}
               creatingMcp={creatingMcp}
               mcpError={mcpError ? formatCloudMessage(mcpError, t) : null}
-              configPending={surfaceConfigBusyId === surface.id}
-              configError={expandedSurfaceId === surface.id && surfaceConfigError ? formatCloudMessage(surfaceConfigError, t) : null}
-              onToggle={() => setExpandedSurfaceId((current) => (current === surface.id ? null : surface.id))}
+              configPending={accessPointConfigBusyId === accessPoint.id}
+              configError={expandedAccessPointId === accessPoint.id && accessPointConfigError ? formatCloudMessage(accessPointConfigError, t) : null}
+              onToggle={() => setExpandedAccessPointId((current) => (current === accessPoint.id ? null : accessPoint.id))}
               onCreateMcpEndpoint={handleCreateMcpEndpoint}
-              onUpdatePermissions={(nextAllowedKeys) => handleUpdateSurfacePermissions(surface, nextAllowedKeys)}
+              onUpdatePermissions={(nextAllowedKeys) => handleUpdateAccessPointPermissions(accessPoint, nextAllowedKeys)}
               canManage={canManage}
             />
           ))}

@@ -68,23 +68,6 @@
   min-height: 420px;
 }
 
-.desktop-cloud-web-detail {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  background: var(--po-canvas);
-}
-
-.desktop-cloud-scope-row strong {
-  overflow: hidden;
-  color: currentColor;
-  font-size: 12.5px;
-  font-weight: 650;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .desktop-cloud-web-status-dot {
   display: inline-block;
   width: 7px;
@@ -101,89 +84,6 @@
 .desktop-cloud-web-status-dot.warning {
   background: var(--po-warning);
   box-shadow: 0 0 6px color-mix(in srgb, var(--po-warning) 35%, transparent);
-}
-
-.desktop-cloud-scope-row {
-  display: grid;
-  min-height: 58px;
-  grid-template-columns: 32px minmax(0, 1fr);
-  align-items: center;
-  gap: 9px;
-  margin: 0 0 7px;
-  padding: 8px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--po-control) 28%, transparent);
-  color: var(--po-text-muted);
-  text-align: start;
-  cursor: default;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
-}
-
-.desktop-cloud-scope-row:hover {
-  border-color: var(--po-border-subtle);
-  background: color-mix(in srgb, var(--po-control) 62%, transparent);
-  color: var(--po-text);
-}
-
-.desktop-cloud-scope-row.active {
-  border-color: color-mix(in srgb, var(--po-accent) 36%, var(--po-border-subtle));
-  background: color-mix(in srgb, var(--po-accent) 15%, var(--po-control) 85%);
-  color: var(--po-text);
-  box-shadow: inset 3px 0 0 var(--po-accent);
-}
-
-.desktop-cloud-scope-row.compact {
-  min-height: 42px;
-  grid-template-columns: 1fr;
-  justify-items: center;
-  padding: 5px;
-  box-shadow: none;
-}
-
-.desktop-cloud-scope-row > div {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 7px;
-}
-
-.desktop-cloud-scope-row > div:last-child {
-  gap: 8px;
-}
-
-.desktop-cloud-scope-row code {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--po-text-subtle);
-  font-family: var(--po-font-mono);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-cloud-scope-signals {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 4px;
-}
-
-.desktop-cloud-scope-signals em {
-  display: inline-flex;
-  height: 18px;
-  align-items: center;
-  justify-content: center;
-  padding: 0 5px;
-  border: 1px solid var(--po-border);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--po-hover) 55%, transparent);
-  color: var(--po-text-subtle);
-  font-size: 9.5px;
-  font-style: normal;
-  font-weight: 720;
-  line-height: 1;
 }
 
 .desktop-cloud-section-label {
@@ -208,68 +108,6 @@
   font-weight: 650;
 }
 
-.desktop-cloud-file-change-list,
-.desktop-cloud-method-endpoint-list {
-  display: grid;
-  min-width: 0;
-  gap: 7px;
-}
-
-.desktop-cloud-file-change-row {
-  display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) max-content;
-  align-items: center;
-  gap: 9px;
-  min-height: 42px;
-  padding: 7px 9px;
-  border: 1px solid var(--po-divider);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--po-panel-raised) 62%, transparent);
-}
-
-.desktop-cloud-file-change-icon {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--po-border);
-  border-radius: 6px;
-  background: var(--po-control);
-  color: var(--po-text-muted);
-}
-
-.desktop-cloud-file-change-row > div {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.desktop-cloud-file-change-row strong {
-  overflow: hidden;
-  color: var(--po-text);
-  font-size: 12.5px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-cloud-file-change-row small {
-  overflow: hidden;
-  color: var(--po-text-subtle);
-  font-size: 11.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-cloud-file-change-row em {
-  color: var(--po-text-subtle);
-  font-size: 11px;
-  font-style: normal;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
 .desktop-cloud-web-empty {
 
   display: grid;
@@ -282,10 +120,6 @@
   border: 1px dashed var(--po-border);
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-panel-raised) 52%, transparent);
-}
-
-.desktop-cloud-method-section > .desktop-cloud-web-empty {
-  margin: 0;
 }
 
 .desktop-cloud-web-empty > span {

@@ -7,14 +7,19 @@ import {
 import { McpLogoIcon } from "../src/features/cloud/components/McpLogoIcon";
 
 describe("Cloud navigation information architecture", () => {
-  it("keeps only the four primary Project capabilities in navigation", () => {
+  it("keeps Project work separate from the three first-class Connections", () => {
     expect(CLOUD_PROJECT_SIDEBAR_ROUTES.map((route) => route.id)).toEqual([
       "contents",
-      "mcp-cli",
       "automation",
-      "access",
+      "mcp",
+      "cli",
+      "git-sync",
     ]);
-    expect(getCloudRoute("mcp-cli").icon).toBe(McpLogoIcon);
+    expect(getCloudRoute("mcp").icon).toBe(McpLogoIcon);
+    expect(getCloudRoute("mcp").navigationGroup).toBe("connections");
+    expect(getCloudRoute("cli").navigationGroup).toBe("connections");
+    expect(getCloudRoute("git-sync").navigationGroup).toBe("connections");
+    expect(getCloudRoute("access").showInSidebar).toBe(false);
     expect(getCloudRoute("history").showInSidebar).toBe(false);
     expect(getCloudRoute("settings").showInSidebar).toBe(false);
   });

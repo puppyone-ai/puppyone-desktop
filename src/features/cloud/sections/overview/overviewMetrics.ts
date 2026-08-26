@@ -10,9 +10,9 @@ import type {
 import type { DesktopCloudHistory } from "../../../../lib/cloudHistoryApi";
 import { buildCloudAutomationRows } from "../../../automation/automationDomain";
 import {
-  buildDesktopCloudAccessRows,
-  isCloudAccessNavigationResource,
-} from "../access/accessRows";
+  buildAccessPointRows,
+  isAccessPointNavigationResource,
+} from "../../access-points/model";
 import { getCloudScopeRows, normalizeCloudEntryPath } from "../../utils";
 
 export const CLOUD_OVERVIEW_ACTIVITY_WINDOW_DAYS = 7;
@@ -35,13 +35,13 @@ export function getCloudOverviewMetrics({
   identity: DesktopCloudRepoIdentity | null;
 }) {
   const scopeRows = getCloudScopeRows(scopes, identity);
-  const accessRows = buildDesktopCloudAccessRows({
+  const accessRows = buildAccessPointRows({
     scopeRows,
     connectors,
     mcpEndpoints,
     identity,
     apiBaseUrl: null,
-  }).filter(isCloudAccessNavigationResource);
+  }).filter(isAccessPointNavigationResource);
   const automationRows = buildCloudAutomationRows({
     scopes: scopeRows,
     connectors,

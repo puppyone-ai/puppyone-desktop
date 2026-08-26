@@ -31,7 +31,12 @@ describe("Cloud route architecture", () => {
     expect(getCloudProjectDetailResources("automation")).toEqual(
       getCloudProjectDetailResources("access"),
     );
-    expect(getCloudProjectDetailResources("git-sync")).toEqual(["identity"]);
+    expect(getCloudProjectDetailResources("cli")).toEqual(
+      getCloudProjectDetailResources("access"),
+    );
+    expect(getCloudProjectDetailResources("git-sync")).toEqual(
+      getCloudProjectDetailResources("access"),
+    );
     expect(getCloudProjectDetailResources("history")).toEqual([]);
     expect(getCloudProjectDetailResources("settings")).toEqual([]);
   });
