@@ -431,6 +431,13 @@
   white-space: nowrap;
 }
 
+.desktop-remote-update-notice-facts {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
 .desktop-remote-update-notice-age {
   flex: 0 0 auto;
 }

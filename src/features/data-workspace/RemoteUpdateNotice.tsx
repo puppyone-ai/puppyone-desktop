@@ -31,9 +31,6 @@ export function RemoteUpdateNotice({
   if (!model) return null;
 
   const updateAge = formatRemoteUpdateAge(model.updatedAt, formatRelativeTime);
-  const pullLabel = model.fileCount > 0
-    ? t("source-control.notice.pullFiles", { count: model.fileCount })
-    : t("source-control.sync.pull");
 
   return (
     <aside
@@ -44,12 +41,20 @@ export function RemoteUpdateNotice({
     >
       <div className="desktop-remote-update-notice-heading">
         <span className="desktop-remote-update-notice-summary">
-          {t("source-control.notice.updatesAvailable")}
+          {t("source-control.notice.filesChangedElsewhere")}
         </span>
       </div>
-      {(updateAge || hasFileChangeCounts(model.fileChanges)) && (
+      {(model.fileCount > 0 || updateAge || hasFileChangeCounts(model.fileChanges)) && (
         <div className="desktop-remote-update-notice-meta">
-          {updateAge && <span className="desktop-remote-update-notice-age">{updateAge}</span>}
+          {(model.fileCount > 0 || updateAge) && (
+            <span className="desktop-remote-update-notice-facts">
+              {model.fileCount > 0 && (
+                <span>{t("source-control.commit.files", { count: model.fileCount })}</span>
+              )}
+              {model.fileCount > 0 && updateAge && <span aria-hidden="true">·</span>}
+              {updateAge && <span className="desktop-remote-update-notice-age">{updateAge}</span>}
+            </span>
+          )}
           {hasFileChangeCounts(model.fileChanges) && (
             <span className="desktop-remote-update-notice-change-counts">
               <RemoteUpdateChangeCount
@@ -76,12 +81,12 @@ export function RemoteUpdateNotice({
       )}
       <GitOperationButton
         className="desktop-remote-update-notice-pull"
-        title={t("source-control.notice.pullTitle")}
+        title={t("source-control.notice.getChangesTitle")}
         disabled={operationLoading !== null || !model.canPull}
         icon="download"
-        label={pullLabel}
+        label={t("source-control.notice.getChanges")}
         loadingKey="pull"
-        loadingLabel={t("source-control.sync.pulling")}
+        loadingLabel={t("source-control.notice.gettingChanges")}
         operationLoading={operationLoading}
         primary
         onClick={() => void onPull()}
