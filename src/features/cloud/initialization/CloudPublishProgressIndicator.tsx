@@ -1,4 +1,4 @@
-import { Check, LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import type { CloudPublishProgressStage } from "../../../types/electron";
 
@@ -32,17 +32,14 @@ export function CloudPublishProgressIndicator({
               key={step}
             >
               <span className="desktop-cloud-publish-progress-marker" aria-hidden="true">
-                {isDone
-                  ? <Check size={14} strokeWidth={2.2} />
-                  : isCurrent
-                    ? <LoaderCircle size={14} strokeWidth={2} className="spin" />
-                    : <span>{index + 1}</span>}
+                {index + 1}
               </span>
               <span className="desktop-cloud-publish-progress-task">
                 <strong>{t(`cloud.initialize.progress.step.${step}`)}</strong>
                 {isCurrent && (
                   <small role="status" aria-live="polite" aria-atomic="true">
-                    {getCloudPublishProgressLabel(stage, t)}
+                    <LoaderCircle size={12} strokeWidth={2} className="spin" aria-hidden="true" />
+                    <span>{getCloudPublishProgressLabel(stage, t)}</span>
                   </small>
                 )}
               </span>

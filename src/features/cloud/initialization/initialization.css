@@ -427,13 +427,14 @@
 }
 
 .desktop-cloud-publish-progress li.done .desktop-cloud-publish-progress-marker {
-  border-color: var(--po-success);
-  background: var(--po-success);
-  color: var(--po-canvas);
+  border-color: color-mix(in srgb, var(--po-success) 66%, var(--po-border));
+  background: color-mix(in srgb, var(--po-success) 10%, var(--po-canvas));
+  color: color-mix(in srgb, var(--po-success) 82%, var(--po-text));
 }
 
 .desktop-cloud-publish-progress li.current .desktop-cloud-publish-progress-marker {
   border-color: color-mix(in srgb, var(--po-accent) 74%, var(--po-text));
+  background: color-mix(in srgb, var(--po-accent) 8%, var(--po-canvas));
   color: color-mix(in srgb, var(--po-accent) 82%, var(--po-text));
   box-shadow: 0 0 0 4px var(--po-canvas);
 }
@@ -458,9 +459,16 @@
 }
 
 .desktop-cloud-publish-progress-task small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--po-text-subtle);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.desktop-cloud-publish-progress-task small svg {
+  flex: 0 0 auto;
 }
 
 .desktop-cloud-publish-progress p {

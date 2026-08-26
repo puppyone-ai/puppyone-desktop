@@ -103,6 +103,8 @@ describe("simple Cloud publish onboarding", () => {
 
     const tasks = Array.from(container.querySelectorAll(".desktop-cloud-publish-progress li"));
     expect(tasks).toHaveLength(5);
+    expect(Array.from(container.querySelectorAll(".desktop-cloud-publish-progress-marker"))
+      .map((marker) => marker.textContent)).toEqual(["1", "2", "3", "4", "5"]);
     expect(tasks.slice(0, 3).every((task) => task.classList.contains("done"))).toBe(true);
     expect(tasks[3]?.classList.contains("current")).toBe(true);
     expect(tasks[3]?.textContent).toContain("Upload");
