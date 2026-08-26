@@ -8,10 +8,9 @@ import {
 import { McpLogoIcon } from "../src/features/cloud/components/McpLogoIcon";
 
 describe("Cloud navigation information architecture", () => {
-  it("keeps Project state, Connections, and Automation as separate product groups", () => {
+  it("keeps Homepage, Connections, and Automation as separate product groups", () => {
     expect(CLOUD_PROJECT_SIDEBAR_ROUTES.map((route) => route.id)).toEqual([
       "contents",
-      "history",
       "mcp",
       "cli",
       "git-sync",
@@ -22,14 +21,13 @@ describe("Cloud navigation information architecture", () => {
     expect(getCloudRoute("cli").navigationGroup).toBe("connections");
     expect(getCloudRoute("git-sync").navigationGroup).toBe("connections");
     expect(getCloudRoute("access").showInSidebar).toBe(false);
-    expect(getCloudRoute("history").showInSidebar).toBe(true);
-    expect(getCloudRoute("history").navigationGroup).toBe("project");
+    expect(getCloudRoute("history").showInSidebar).toBe(false);
     expect(getCloudRoute("automation").navigationGroup).toBe("automation");
     expect(getCloudRoute("settings").showInSidebar).toBe(false);
   });
 
-  it("keeps History first-class while Settings remains a Homepage drill-down", () => {
-    expect(getCloudSidebarActiveSection("history")).toBe("history");
+  it("keeps History and Settings as Homepage drill-downs", () => {
+    expect(getCloudSidebarActiveSection("history")).toBe("contents");
     expect(getCloudSidebarActiveSection("settings")).toBe("contents");
     expect(getCloudRoute("history").surface).toBe("history");
     expect(getCloudRoute("settings").surface).toBe("landing");
