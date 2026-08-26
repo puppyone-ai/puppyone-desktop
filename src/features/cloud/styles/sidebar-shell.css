@@ -39,6 +39,7 @@
 }
 
 .desktop-cloud-main-view {
+  --desktop-cloud-content-max-width: 900px;
   position: relative;
   display: flex;
   flex: 1;
@@ -58,7 +59,7 @@
 
 .desktop-cloud-page-shell {
   display: grid;
-  width: min(100%, 1040px);
+  width: min(100%, var(--desktop-cloud-content-max-width));
   min-height: 100%;
   margin: 0 auto;
   align-content: start;

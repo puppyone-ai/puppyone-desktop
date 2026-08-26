@@ -1,7 +1,7 @@
 @layer features {
   .desktop-cloud-mcp-activation {
     display: grid;
-    width: min(100%, 960px);
+    width: min(100%, var(--desktop-cloud-content-max-width, 900px));
     min-width: 0;
     grid-template-columns: minmax(340px, 360px) 300px;
     align-items: center;
@@ -14,7 +14,7 @@
   }
 
   .desktop-cloud-mcp-activation.desktop-cloud-git-prerequisite {
-    width: min(100%, 960px);
+    width: min(100%, var(--desktop-cloud-content-max-width, 900px));
     grid-template-columns: minmax(340px, 360px) 300px;
     justify-items: stretch;
     gap: 72px;

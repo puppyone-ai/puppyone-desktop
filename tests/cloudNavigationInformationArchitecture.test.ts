@@ -24,7 +24,7 @@ describe("Cloud navigation information architecture", () => {
     expect(getCloudRoute("settings").showInSidebar).toBe(false);
   });
 
-  it("treats History and Settings as Overview drill-downs without removing their routes", () => {
+  it("treats History and Settings as Homepage drill-downs without removing their routes", () => {
     expect(getCloudSidebarActiveSection("history")).toBe("contents");
     expect(getCloudSidebarActiveSection("settings")).toBe("contents");
     expect(getCloudRoute("history").surface).toBe("history");

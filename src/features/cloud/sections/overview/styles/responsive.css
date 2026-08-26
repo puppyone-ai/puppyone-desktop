@@ -11,6 +11,15 @@
     padding: 2px 10px;
   }
 
+  .desktop-cloud-overview-file-toolbar {
+    align-items: stretch;
+  }
+
+  .desktop-cloud-overview-file-search {
+    width: auto;
+    flex: 1;
+  }
+
   .desktop-cloud-overview-file-row {
     grid-template-columns: minmax(180px, 1fr) 110px;
     column-gap: 10px;

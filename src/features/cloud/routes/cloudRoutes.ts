@@ -258,7 +258,7 @@ export function getCloudSignedOutSection(
 /**
  * Low-frequency Project detail routes remain addressable without becoming
  * first-class navigation destinations. History and Project Settings are
- * drill-downs from Overview, so Overview stays selected on those surfaces.
+ * drill-downs from Homepage, so Homepage stays selected on those surfaces.
  */
 export function getCloudSidebarActiveSection(
   section: CloudWorkspaceSection | string,

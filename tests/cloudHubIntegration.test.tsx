@@ -41,7 +41,7 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(labels(container)).toEqual([
-      "Overview", "Automation", "MCP", "CLI", "Git", "Team", "Billing",
+      "Homepage", "Automation", "MCP", "CLI", "Git", "Team", "Billing",
     ]);
     expect(groupLabels(container)).toEqual(["Cloud Project", "Connections", "Organization"]);
     expect(labels(container)).not.toContain("History");
@@ -61,7 +61,7 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(labels(container)).toEqual([
-      "Overview", "Automation", "MCP", "CLI", "Git", "Team", "Billing",
+      "Homepage", "Automation", "MCP", "CLI", "Git", "Team", "Billing",
     ]);
     expect(labels(container)).not.toContain("History");
     expect(labels(container)).not.toContain("Settings");

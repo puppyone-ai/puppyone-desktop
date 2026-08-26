@@ -21,21 +21,28 @@ describe("Cloud Overview visual architecture", () => {
     expect(overviewSource).toContain("desktop-cloud-overview-header-facts");
   });
 
-  it("starts with a GitHub-style latest-commit summary inside one emphasized frame", () => {
+  it("uses a Drive-style open list with sortable columns and functional filters", () => {
     const files = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-files"));
-    const activityHeader = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-activity-header"));
+    const toolbar = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-file-toolbar"));
+    const search = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-file-search"));
+    const columns = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-column-labels"));
 
-    expect(files).toContain("border: 1px solid var(--po-border-strong);");
-    expect(files).toContain("border-radius: 10px;");
-    expect(activityHeader).toContain("min-height: 38px;");
-    expect(activityHeader).toContain("padding: 0 10px;");
-    expect(activityHeader).toContain("border-bottom: 1px solid var(--po-border);");
-    expect(activityHeader).toContain("background: var(--po-active);");
+    expect(files).not.toContain("border:");
+    expect(files).not.toContain("border-radius:");
+    expect(toolbar).toContain("justify-content: flex-start;");
+    expect(toolbar).toContain("margin-bottom: 8px;");
+    expect(search).toContain("height: 28px;");
+    expect(columns).toContain("border-bottom: 1px solid var(--po-border-strong);");
     expect(resourceCss).toContain(".desktop-cloud-overview-file-row {\n  min-height: 36px;");
     expect(resourceCss).toContain("min-height: 36px;\n  border-bottom: 1px solid var(--po-border-subtle);");
-    expect(dashboardSource).toContain("desktop-cloud-overview-file-activity-header");
-    expect(dashboardSource).toContain("getLatestCloudCommit(history)");
-    expect(dashboardSource).toContain("desktop-cloud-overview-visually-hidden");
+    expect(dashboardSource).toContain("desktop-cloud-overview-file-toolbar");
+    expect(dashboardSource).toContain("desktop-cloud-overview-file-type-filter");
+    expect(dashboardSource).toContain("desktop-cloud-overview-file-modified-filter");
+    expect(dashboardSource).toContain("changeSort(\"name\")");
+    expect(dashboardSource).toContain("changeSort(\"modified\")");
+    expect(dashboardSource).not.toContain("desktop-cloud-overview-visually-hidden");
+    expect(dashboardSource).not.toContain("desktop-cloud-overview-file-activity-header");
+    expect(resourceCss).not.toContain("desktop-cloud-overview-file-activity-header");
     expect(dashboardSource).not.toContain("desktop-cloud-overview-files-header");
     expect(dashboardSource).not.toContain("cloud.overview.filesLabel");
   });

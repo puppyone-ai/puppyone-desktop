@@ -19,7 +19,7 @@
 
 .desktop-cloud-settings-catalog {
   display: grid;
-  width: min(100%, 1760px);
+  width: min(100%, var(--desktop-cloud-content-max-width, 900px));
   min-width: 0;
   box-sizing: border-box;
   margin: 0 auto;
