@@ -23,7 +23,10 @@
   min-width: 0;
   box-sizing: border-box;
   margin: 0 auto;
-  padding: 44px clamp(28px, 4.6vw, 44px) 56px;
+  padding:
+    var(--desktop-cloud-page-padding-top)
+    var(--desktop-cloud-page-padding-inline)
+    var(--desktop-cloud-page-padding-bottom);
 }
 
 .desktop-cloud-overview-landing-header {

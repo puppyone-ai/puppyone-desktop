@@ -1,8 +1,4 @@
 @media (max-width: 760px) {
-  .desktop-cloud-overview-catalog {
-    padding: 32px 24px 44px;
-  }
-
   .desktop-cloud-overview-header-facts {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

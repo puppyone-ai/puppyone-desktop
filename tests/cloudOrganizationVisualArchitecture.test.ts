@@ -13,7 +13,7 @@ describe("Cloud organization visual architecture", () => {
     const content = compact(readCssBlock(styles, ".desktop-cloud-org-content"));
 
     expect(shell).toContain("width: min(100%, 1760px);");
-    expect(shell).toContain("padding: 44px clamp(28px, 4.6vw, 44px) 56px;");
+    expect(shell).toContain("padding: var(--desktop-cloud-catalog-padding-top) var(--desktop-cloud-page-padding-inline) var(--desktop-cloud-page-padding-bottom);");
     expect(title).toContain("font-size: var(--po-text-size-page-title, 20px);");
     expect(title).toContain("font-weight: 500;");
     expect(description).toContain("font-size: var(--po-text-size-body-lg, 14px);");

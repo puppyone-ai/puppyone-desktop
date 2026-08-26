@@ -32,7 +32,7 @@ describe("Cloud Connections visual architecture", () => {
     const header = compact(readCssBlock(catalogCss, ".desktop-cloud-access-landing-header"));
     const title = compact(readCssBlock(catalogCss, ".desktop-cloud-access-landing-copy h1"));
 
-    expect(catalog).toContain("padding: 44px clamp(28px, 4.6vw, 44px) 56px;");
+    expect(catalog).toContain("padding: var(--desktop-cloud-page-padding-top) var(--desktop-cloud-page-padding-inline) var(--desktop-cloud-page-padding-bottom);");
     expect(header).toContain("align-items: flex-start;");
     expect(header).toContain("padding: 0 8px;");
     expect(title).toContain("font-size: var(--po-text-size-page-title, 20px);");

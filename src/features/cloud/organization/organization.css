@@ -24,7 +24,10 @@
   width: min(100%, 1760px);
   min-width: 0;
   margin: 0 auto;
-  padding: 44px clamp(28px, 4.6vw, 44px) 56px;
+  padding:
+    var(--desktop-cloud-catalog-padding-top)
+    var(--desktop-cloud-page-padding-inline)
+    var(--desktop-cloud-page-padding-bottom);
   box-sizing: border-box;
 }
 
@@ -851,10 +854,6 @@
 }
 
 @media (max-width: 720px) {
-  .desktop-cloud-org-shell {
-    padding: 32px 24px 44px;
-  }
-
   .desktop-cloud-org-header,
   .desktop-cloud-org-actions {
     align-items: stretch;
