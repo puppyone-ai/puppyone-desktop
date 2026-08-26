@@ -1,7 +1,5 @@
-import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { SidebarRoot, SidebarRow, SidebarScrollArea } from "@puppyone/shared-ui";
-import { ChevronRight } from "lucide-react";
 import { SidebarGroup } from "../../components/sidebar";
 import type { CloudServiceSidebarProps, CloudWorkspaceSection } from "./types";
 import { getCloudAuthSession } from "./auth";
@@ -13,7 +11,6 @@ import {
   type CloudRouteNavigationGroup,
   type CloudRouteDescriptor,
 } from "./routes/cloudRoutes";
-import { formatSidebarAccount, getAccountInitial } from "./utils";
 import { useFeatureFlag } from "../flags";
 
 type CloudSidebarNavEntry = {
@@ -37,16 +34,12 @@ export function CloudServiceSidebar({
   activeSection,
   projectAvailable = false,
   projectCapabilities = [],
-  onOpenAccount,
   onSelectSection,
 }: CloudServiceSidebarProps) {
   const { t } = useLocalization();
   const billingEnabled = useFeatureFlag("cloudBilling");
   const normalizedActiveSection = normalizeCloudSection(activeSection);
-  const effectiveCloudSession = getCloudAuthSession(cloudAuthState);
-  const accountEmail = effectiveCloudSession?.user_email ?? null;
-  const accountLabel = formatSidebarAccount(accountEmail, t);
-  const signedIn = Boolean(effectiveCloudSession);
+  const signedIn = Boolean(getCloudAuthSession(cloudAuthState));
   const visibleActiveSection = getCloudSidebarActiveSection(
     signedIn
       ? normalizedActiveSection
@@ -93,26 +86,6 @@ export function CloudServiceSidebar({
           })}
         </nav>
       </SidebarScrollArea>
-
-      {signedIn && (
-        <div className="desktop-cloud-sidebar-footer">
-          <button
-            className="desktop-cloud-sidebar-account"
-            type="button"
-            title={accountEmail ? bidiIsolate(accountEmail) : t("cloud.common.account")}
-            aria-label={`${t("cloud.common.account")}: ${accountLabel}`}
-            onClick={onOpenAccount}
-          >
-            <span className="desktop-cloud-sidebar-footer-avatar" aria-hidden="true">
-              {getAccountInitial(accountEmail)}
-            </span>
-            <span className="desktop-cloud-sidebar-account-name" dir="auto">
-              {accountLabel}
-            </span>
-            <ChevronRight className="desktop-cloud-sidebar-account-chevron po-directional-icon" size={13} aria-hidden="true" />
-          </button>
-        </div>
-      )}
     </SidebarRoot>
   );
 }

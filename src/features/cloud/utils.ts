@@ -249,20 +249,6 @@ export function formatGitSyncState(state: string, t: MessageFormatter) {
   return t(`cloud.git.state.${code}`);
 }
 
-export function getAccountInitial(email: string | null) {
-  const value = email?.trim();
-  if (!value) return "P";
-  return value[0]?.toUpperCase() ?? "P";
-}
-
-export function formatSidebarAccount(email: string | null, t: MessageFormatter) {
-  if (!email) return t("cloud.account.notSignedIn");
-  const [name, domain] = email.split("@");
-  if (!name || !domain) return email;
-  const shortName = name.length > 12 ? `${name.slice(0, 10)}...` : name;
-  return `${shortName}@${domain}`;
-}
-
 export function shortCommit(commitId: string) {
   return commitId.slice(0, 8);
 }

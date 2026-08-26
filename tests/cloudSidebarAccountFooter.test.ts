@@ -14,29 +14,21 @@ const workspaceSurfaceSource = readFileSync(
   "utf8",
 );
 
-describe("Cloud account footer architecture", () => {
-  it("presents the signed-in identity as an actionable application account row", () => {
-    expect(sidebarSource).toContain('className="desktop-cloud-sidebar-account"');
-    expect(sidebarSource).toContain("formatSidebarAccount(accountEmail, t)");
-    expect(sidebarSource).toContain("onClick={onOpenAccount}");
-    expect(sidebarSource).toContain('t("cloud.common.account")');
-    expect(sidebarSource).not.toContain("desktop-cloud-sidebar-account-context");
-    expect(sidebarSource).not.toContain('role="img"');
+describe("Cloud account ownership", () => {
+  it("does not duplicate the application account inside the Cloud sidebar", () => {
+    expect(sidebarSource).not.toContain("desktop-cloud-sidebar-account");
+    expect(sidebarSource).not.toContain("desktop-cloud-sidebar-footer");
+    expect(sidebarSource).not.toContain("onOpenAccount");
+    expect(sidebarSource).not.toContain("formatSidebarAccount");
   });
 
-  it("routes the global account affordance to Account Settings", () => {
-    expect(workspaceSurfaceSource).toContain('onSelectSettingsSection("account")');
-    expect(workspaceSurfaceSource).toContain('onNavigate("settings")');
+  it("keeps Account Settings owned by the global Settings surface", () => {
+    expect(workspaceSurfaceSource).not.toContain("onOpenAccount");
+    expect(workspaceSurfaceSource).not.toContain('onSelectSettingsSection("account")');
   });
 
-  it("uses shared sidebar tokens instead of a floating avatar treatment", () => {
-    expect(sidebarCss).toContain("border-top: 1px solid var(--po-sidebar-divider, var(--po-divider));");
-    expect(sidebarCss).toContain("border-radius: var(--desktop-sidebar-row-radius);");
-    expect(sidebarCss).toContain("background: var(--po-hover);");
-    expect(sidebarCss).toContain("font-weight: var(--po-text-weight-regular, 400);");
-    expect(sidebarCss).not.toContain(".desktop-cloud-sidebar-account-context");
-    expect(sidebarCss).not.toContain(".desktop-cloud-sidebar-account-copy");
-    expect(sidebarCss).not.toContain("font-weight: 700;");
-    expect(sidebarCss).not.toContain("box-shadow: 0 0 0 2px");
+  it("removes the obsolete footer styling instead of leaving dormant CSS", () => {
+    expect(sidebarCss).not.toContain(".desktop-cloud-sidebar-account");
+    expect(sidebarCss).not.toContain(".desktop-cloud-sidebar-footer");
   });
 });
