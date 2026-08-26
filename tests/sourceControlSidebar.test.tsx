@@ -88,7 +88,7 @@ describe("Git sidebar status groups", () => {
     expect(surface.querySelector(".desktop-git-resizable-section-unstaged")?.classList.contains("expanded")).toBe(true);
   });
 
-  it("keeps the staged destination visible and disables Commit until files are staged", () => {
+  it("hides Staged Changes until files are actually staged", () => {
     const status = createGitStatus();
     status.sourceControl.groups = status.sourceControl.groups.filter((group) => group.id !== "index");
     status.sourceControl.actions.canCommit = false;
@@ -98,15 +98,10 @@ describe("Git sidebar status groups", () => {
     const unstagedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
       .find((button) => button.textContent?.includes("Unstaged"));
     expect(unstagedToggle?.querySelector("small")?.textContent).toBe("1");
-    expect(surface.textContent).toContain("Staged");
-    const stagedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
-      .find((button) => button.textContent?.includes("Staged Changes"));
     const action = surface.querySelector<HTMLButtonElement>(".desktop-git-commit-staged-action");
     const stageAndCommit = surface.querySelector<HTMLButtonElement>(".desktop-git-stage-commit-action");
-    expect(stagedToggle?.getAttribute("aria-expanded")).toBe("true");
-    expect(stagedToggle?.querySelector(".po-disclosure-icon")).not.toBeNull();
-    expect(action?.closest(".desktop-git-resizable-section-staged")).not.toBeNull();
-    expect(action?.disabled).toBe(true);
+    expect(surface.querySelector(".desktop-git-resizable-section-staged")).toBeNull();
+    expect(action).toBeNull();
     expect(stageAndCommit?.closest(".desktop-git-resizable-section-unstaged")).not.toBeNull();
   });
 
@@ -184,7 +179,7 @@ describe("Git sidebar status groups", () => {
     expect(surface.textContent).not.toContain("No commits yet");
   });
 
-  it("keeps a disabled Commit action first when the working tree is clean", () => {
+  it("does not render empty local change sections when the working tree is clean", () => {
     const status = createGitStatus();
     status.entries = [];
     status.stagedEntries = [];
@@ -208,12 +203,11 @@ describe("Git sidebar status groups", () => {
     status.branches = status.branches.map((branch) => ({ ...branch, ahead: 0 }));
 
     const surface = renderSidebar({ status });
-    const firstPanel = surface.querySelector<HTMLElement>(".desktop-git-resizable-section");
     const commitButton = surface.querySelector<HTMLButtonElement>(".desktop-git-commit-staged-action");
 
-    expect(firstPanel?.classList.contains("desktop-git-resizable-section-staged")).toBe(true);
-    expect(commitButton?.disabled).toBe(true);
-    expect(commitButton?.closest(".desktop-git-resizable-section-staged")).not.toBeNull();
+    expect(surface.querySelector(".desktop-git-resizable-section-staged")).toBeNull();
+    expect(surface.querySelector(".desktop-git-resizable-section-unstaged")).toBeNull();
+    expect(commitButton).toBeNull();
     expect(surface.textContent).not.toContain("Clean working tree");
   });
 

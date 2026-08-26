@@ -16,7 +16,7 @@ export function GitLocalStatusSection({
   expanded: boolean;
   action?: ReactNode;
   children: ReactNode;
-  onToggle?: () => void;
+  onToggle: () => void;
 }) {
   const bodyId = useId();
 

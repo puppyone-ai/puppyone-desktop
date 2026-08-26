@@ -275,7 +275,7 @@ export function buildSourceControlSidebarModel({
     committedPrimaryAction,
     operationPrimaryAction,
     showCommittedSection: committedCount > 0 || Boolean(committedPrimaryAction),
-    showStagedSection: status?.isRepo === true,
+    showStagedSection: stagedResources.length > 0,
     showUnstagedSection: localChangeResources.length > 0,
     stagedPrimaryAction,
     showStageAndCommitAction: localChangeResources.length > 0 && !hasConflicts && !repositoryOperation,
