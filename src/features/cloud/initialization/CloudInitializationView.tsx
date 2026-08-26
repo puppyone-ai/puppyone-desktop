@@ -29,7 +29,6 @@ import {
   getCloudInitializationDescription,
   getCloudInitializationStatusLabel,
   getCloudPushAction,
-  isCloudPublishPrerequisiteFailure,
 } from "./cloudInitializationModel";
 
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
@@ -59,7 +58,6 @@ export function CloudLocalOnlyWorkspace({
   onRetryOrganizations,
   onAbandonPublish,
   onOpenSourceControl,
-  onRefresh,
   onPublishWorkspace,
 }: {
   workspace: Workspace;
@@ -86,7 +84,6 @@ export function CloudLocalOnlyWorkspace({
   onRetryOrganizations?: () => void;
   onAbandonPublish?: () => void;
   onOpenSourceControl?: () => void;
-  onRefresh?: () => void;
   onPublishWorkspace: (organizationId?: string) => void;
 }) {
   const { t } = useLocalization();
@@ -130,13 +127,7 @@ export function CloudLocalOnlyWorkspace({
     || organizationError,
   );
   const destinationBranchName = PUPPYONE_CLOUD_DEFAULT_BRANCH;
-  const visiblePublishError = publishError && (
-    publishState
-    || activeProgressStage
-    || !isCloudPublishPrerequisiteFailure(publishError.code)
-  )
-    ? publishError
-    : null;
+  const visiblePublishError = publishError;
   const cloudStatus = activeProgressStage
     ? getCloudPublishProgressLabel(activeProgressStage, t)
     : publishState
@@ -149,15 +140,24 @@ export function CloudLocalOnlyWorkspace({
 
   if (
     resolvedReadiness !== "ready"
-    && !activeProgressStage
     && !publishState
-    && !publishStateLoading
   ) {
     return (
       <CloudGitPrerequisite
+        workspaceName={workspace.name}
         readiness={resolvedReadiness}
+        publishBusy={publishBusy}
+        publishEnabled={organizationReady}
+        publishError={visiblePublishError}
+        progressStage={activeProgressStage}
+        organizations={organizations}
+        selectedOrganizationId={selectedOrganizationId}
+        organizationStatus={organizationStatus}
+        organizationError={organizationError}
+        onSelectOrganization={onSelectOrganization}
+        onRetryOrganizations={onRetryOrganizations}
         onOpenSourceControl={onOpenSourceControl}
-        onRefresh={onRefresh}
+        onPublishWorkspace={onPublishWorkspace}
       />
     );
   }

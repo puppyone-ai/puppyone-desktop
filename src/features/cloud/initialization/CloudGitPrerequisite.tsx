@@ -1,91 +1,129 @@
-import { GitBranch, RefreshCw } from "lucide-react";
+import { CloudUpload, RefreshCw } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
+import type {
+  CloudPublishErrorCode,
+  CloudPublishProgressStage,
+} from "../../../types/electron";
+import { formatCloudPublishFailure } from "../cloudPresentation";
 import type { CloudPublishReadiness } from "../workspace/cloudPublishReadiness";
+import { getCloudPublishProgressLabel } from "./CloudPublishProgressIndicator";
 
 export function CloudGitPrerequisite({
+  workspaceName,
   readiness,
+  publishBusy,
+  publishEnabled,
+  publishError,
+  progressStage,
+  organizations,
+  selectedOrganizationId,
+  organizationStatus,
+  organizationError,
+  onSelectOrganization,
+  onRetryOrganizations,
   onOpenSourceControl,
-  onRefresh,
+  onPublishWorkspace,
 }: {
+  workspaceName: string;
   readiness: Exclude<CloudPublishReadiness, "ready">;
+  publishBusy: boolean;
+  publishEnabled: boolean;
+  publishError: { code: CloudPublishErrorCode; retryable: boolean } | null;
+  progressStage: CloudPublishProgressStage | null;
+  organizations: readonly { id: string; name: string }[];
+  selectedOrganizationId: string | null;
+  organizationStatus: "signed-out" | "loading" | "selection-required" | "ready" | "none" | "error";
+  organizationError: string | null;
+  onSelectOrganization?: (organizationId: string) => void;
+  onRetryOrganizations?: () => void;
   onOpenSourceControl?: () => void;
-  onRefresh?: () => void;
+  onPublishWorkspace: (organizationId?: string) => void;
 }) {
   const { t } = useLocalization();
-  const title = readiness === "repository-required"
-    ? t("cloud.initialize.repositorySetupTitle")
-    : readiness === "commit-required"
-      ? t("cloud.initialize.commitSetupTitle")
-      : t("cloud.initialize.branchSetupTitle");
-  const description = readiness === "repository-required"
-    ? t("cloud.initialize.repositorySetupDescription")
-    : readiness === "commit-required"
-      ? t("cloud.initialize.commitSetupDescription")
-      : t("cloud.initialize.branchSetupDescription");
-  const steps: Array<{
-    id: string;
-    label: string;
-    state: "complete" | "current" | "upcoming";
-  }> = readiness === "repository-required"
-    ? [
-        { id: "repository", label: t("cloud.initialize.stepVersionControl"), state: "current" },
-        { id: "commit", label: t("cloud.initialize.stepFirstCommit"), state: "upcoming" },
-        { id: "publish", label: t("cloud.initialize.stepPublish"), state: "upcoming" },
-      ]
-    : readiness === "commit-required"
-      ? [
-          { id: "repository", label: t("cloud.initialize.stepVersionControl"), state: "complete" },
-          { id: "commit", label: t("cloud.initialize.stepFirstCommit"), state: "current" },
-          { id: "publish", label: t("cloud.initialize.stepPublish"), state: "upcoming" },
-        ]
-      : [
-          { id: "repository", label: t("cloud.initialize.stepVersionControl"), state: "complete" },
-          { id: "commit", label: t("cloud.initialize.stepFirstCommit"), state: "complete" },
-          { id: "branch", label: t("cloud.initialize.stepBranch"), state: "current" },
-        ];
 
   return (
     <div className="desktop-cloud-publish-container">
       <section
         className="desktop-cloud-git-prerequisite"
+        data-readiness={readiness}
         aria-labelledby="desktop-cloud-git-prerequisite-title"
       >
         <div className="desktop-cloud-git-prerequisite-mark" aria-hidden="true">
-          <GitBranch size={38} strokeWidth={1.45} />
+          <CloudUpload size={40} strokeWidth={1.35} />
         </div>
         <header className="desktop-cloud-git-prerequisite-header">
-          <h1 id="desktop-cloud-git-prerequisite-title">{title}</h1>
-          <p>{description}</p>
+          <h1 id="desktop-cloud-git-prerequisite-title">
+            {t("cloud.initialize.publishFolderTitle", { folder: workspaceName })}
+          </h1>
+          <p>{t("cloud.initialize.publishFolderDescription")}</p>
         </header>
-        <ol
-          className="desktop-cloud-git-prerequisite-steps"
-          aria-label={t("cloud.initialize.prerequisiteStepsLabel")}
-        >
-          {steps.map((step, index) => (
-            <li className={step.state} key={step.id} aria-current={step.state === "current" ? "step" : undefined}>
-              <span className="desktop-cloud-git-prerequisite-step-marker" aria-hidden="true">
-                {index + 1}
-              </span>
-              <span>{step.label}</span>
-            </li>
-          ))}
-        </ol>
+
+        {publishError && (
+          <div className="desktop-cloud-git-prerequisite-error" role="alert">
+            {formatCloudPublishFailure(publishError, t)}
+          </div>
+        )}
+
+        {organizationStatus !== "signed-out" && (
+          <div className="desktop-cloud-git-prerequisite-organization">
+            {organizationStatus === "loading" ? (
+              <span>{t("cloud.common.loading")}</span>
+            ) : organizationStatus === "none" ? (
+              <span>{t("cloud.initialize.noOrganization")}</span>
+            ) : organizationStatus === "error" ? (
+              <>
+                <span>{organizationError ?? t("cloud.message.organization-load-failed")}</span>
+                {onRetryOrganizations && (
+                  <button type="button" onClick={onRetryOrganizations}>
+                    {t("cloud.common.retry")}
+                  </button>
+                )}
+              </>
+            ) : organizations.length > 1 ? (
+              <label>
+                <span>{t("cloud.organization.selectLabel")}</span>
+                <select
+                  aria-label={t("cloud.organization.selectLabel")}
+                  value={selectedOrganizationId ?? ""}
+                  onChange={(event) => onSelectOrganization?.(event.target.value)}
+                >
+                  <option value="" disabled>{t("cloud.organization.selectPlaceholder")}</option>
+                  {organizations.map((organization) => (
+                    <option value={organization.id} key={organization.id}>{organization.name}</option>
+                  ))}
+                </select>
+              </label>
+            ) : organizations[0] ? (
+              <span>{organizations[0].name}</span>
+            ) : null}
+          </div>
+        )}
+
         <div className="desktop-cloud-publish-actions desktop-cloud-git-prerequisite-actions">
-          {onOpenSourceControl && (
+          <button
+            className="desktop-cloud-row-action primary desktop-cloud-publish-primary"
+            type="button"
+            aria-busy={publishBusy || undefined}
+            disabled={publishBusy || !publishEnabled}
+            onClick={() => onPublishWorkspace(selectedOrganizationId ?? undefined)}
+          >
+            {publishBusy && <RefreshCw size={14} className="spin" aria-hidden="true" />}
+            <span>
+              {progressStage
+                ? getCloudPublishProgressLabel(progressStage, t)
+                : t("cloud.initialize.enableGitAndPublish")}
+            </span>
+          </button>
+          {onOpenSourceControl && !publishBusy && (
             <button
-              className="desktop-cloud-row-action primary desktop-cloud-publish-primary"
+              className="desktop-cloud-git-prerequisite-review"
               type="button"
               onClick={onOpenSourceControl}
             >
-              {t("cloud.initialize.openSourceControl")}
+              {t("cloud.initialize.reviewFilesBeforePublishing")}
             </button>
           )}
-          {onRefresh && (
-            <button className="desktop-cloud-row-action" type="button" onClick={onRefresh}>
-              <RefreshCw size={13} aria-hidden="true" />
-              <span>{t("cloud.initialize.checkAgain")}</span>
-            </button>
-          )}
+          <small>{t("cloud.initialize.gitIgnoreNote")}</small>
         </div>
       </section>
     </div>

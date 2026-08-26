@@ -109,7 +109,6 @@ export function CloudInitializationRoute({
           publishStateLoading={cloudPublishStateLoading}
           onAbandonPublish={onAbandonPublish}
           onOpenSourceControl={onOpenSourceControl}
-          onRefresh={onRefresh}
           onPublishWorkspace={onPublishWorkspace}
         />
       ) : (
@@ -127,7 +126,6 @@ export function CloudInitializationRoute({
           publishProgress={cloudPublishProgress}
           onSessionChange={onSessionChange}
           onOpenSourceControl={onOpenSourceControl}
-          onRefresh={onRefresh}
           onPublishWorkspace={onPublishWorkspace}
           onAbandonPublish={onAbandonPublish}
         />
@@ -161,7 +159,6 @@ function AuthenticatedCloudInitialize({
   publishProgress,
   onSessionChange,
   onOpenSourceControl,
-  onRefresh,
   onPublishWorkspace,
   onAbandonPublish,
 }: {
@@ -178,7 +175,6 @@ function AuthenticatedCloudInitialize({
   publishProgress: CloudServiceMainViewProps["cloudPublishProgress"];
   onSessionChange: CloudServiceMainViewProps["onCloudSessionChange"];
   onOpenSourceControl: () => void;
-  onRefresh: CloudServiceMainViewProps["onRefresh"];
   onPublishWorkspace: CloudServiceMainViewProps["onStartPuppyoneBackup"];
   onAbandonPublish: CloudServiceMainViewProps["onAbandonPuppyoneBackup"];
 }) {
@@ -233,7 +229,6 @@ function AuthenticatedCloudInitialize({
       publishProgress={publishProgress}
       onAbandonPublish={onAbandonPublish}
       onOpenSourceControl={onOpenSourceControl}
-      onRefresh={onRefresh}
       organizations={organizationData.organizations}
       selectedOrganizationId={organizationData.selectedOrganizationId}
       organizationStatus={organizationData.status === "partial" ? "ready" : organizationData.status}
