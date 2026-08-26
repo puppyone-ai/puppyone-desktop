@@ -78,6 +78,18 @@ export const CLOUD_ROUTES = [
     webPath: () => "/billing",
   },
   {
+    id: "mcp-cli",
+    labelId: "cloud.route.mcp-cli.label",
+    titleId: "cloud.route.mcp-cli.title",
+    descriptionId: "cloud.route.mcp-cli.description",
+    icon: SquareTerminal,
+    context: "project",
+    surface: "landing",
+    resources: ACCESS_PROJECT_RESOURCES,
+    showInSidebar: true,
+    webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
+  },
+  {
     id: "contents",
     labelId: "cloud.route.contents.label",
     titleId: "cloud.route.contents.title",
@@ -138,18 +150,6 @@ export const CLOUD_ROUTES = [
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
   },
   {
-    id: "mcp-cli",
-    labelId: "cloud.route.mcp-cli.label",
-    titleId: "cloud.route.mcp-cli.title",
-    descriptionId: "cloud.route.mcp-cli.description",
-    icon: SquareTerminal,
-    context: "project",
-    surface: "landing",
-    resources: ACCESS_PROJECT_RESOURCES,
-    showInSidebar: false,
-    webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
-  },
-  {
     id: "git-sync",
     labelId: "cloud.route.git-sync.label",
     titleId: "cloud.route.git-sync.title",
@@ -205,10 +205,18 @@ export const CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES = [
 export function normalizeCloudSection(
   section: CloudWorkspaceSection | string,
 ): CloudWorkspaceSection {
-  if (section === "mcp-cli" || section === "git-sync") return "access";
+  if (section === "git-sync") return "access";
   return CLOUD_ROUTE_BY_ID.has(section as CloudWorkspaceSection)
     ? section as CloudWorkspaceSection
     : "contents";
+}
+
+/** Use the primary product capability as the first signed-out Cloud destination. */
+export function getCloudSignedOutSection(
+  section: CloudWorkspaceSection | string,
+): CloudWorkspaceSection {
+  const normalizedSection = normalizeCloudSection(section);
+  return normalizedSection === "initialize" ? "mcp-cli" : normalizedSection;
 }
 
 export function getCloudRoute(section: CloudWorkspaceSection): CloudRouteDescriptor {

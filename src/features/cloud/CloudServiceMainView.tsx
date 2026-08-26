@@ -15,6 +15,7 @@ import {
   getCloudProjectDetailResources,
   getCloudRouteSurface,
   getCloudRouteWebPath,
+  getCloudSignedOutSection,
   isCloudOrganizationSection,
   normalizeCloudSection,
 } from "./routes/cloudRoutes";
@@ -123,6 +124,7 @@ export function CloudServiceMainView({
   if (!effectiveCloudSession) {
     return (
       <CloudSignedOutRoute
+        activeSection={getCloudSignedOutSection(routedSection)}
         authState={cloudAuthState}
         apiBaseUrl={cloudApiBaseUrl}
         loadingLabel={t("cloud.loading.session")}

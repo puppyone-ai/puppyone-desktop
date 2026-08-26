@@ -6,6 +6,7 @@ import type { CloudServiceSidebarProps, CloudWorkspaceSection } from "./types";
 import { getCloudAuthSession } from "./auth";
 import {
   CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES,
+  getCloudSignedOutSection,
   normalizeCloudSection,
   type CloudRouteDescriptor,
 } from "./routes/cloudRoutes";
@@ -40,13 +41,17 @@ export function CloudServiceSidebar({
   const effectiveCloudSession = getCloudAuthSession(cloudAuthState);
   const accountEmail = effectiveCloudSession?.user_email ?? null;
   const signedIn = Boolean(effectiveCloudSession);
+  const visibleActiveSection = signedIn
+    ? normalizedActiveSection
+    : getCloudSignedOutSection(normalizedActiveSection);
   const navItems: CloudSidebarNavEntry[] = CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES.map((route: CloudRouteDescriptor) => ({
     ...route,
     locked: route.context === "project"
-      ? !signedIn
-        || !projectAvailable
+      ? signedIn && (
+        !projectAvailable
         || Boolean(route.requiredCapability && !projectCapabilities.includes(route.requiredCapability))
-      : !signedIn,
+      )
+      : false,
   })).filter((item) => (
     item.id !== "cloud-billing" || billingEnabled
   ));
@@ -70,8 +75,8 @@ export function CloudServiceSidebar({
                     item={item}
                     lockedReason={!signedIn ? "sign-in" : "initialize"}
                     active={
-                      !item.locked && signedIn && (
-                        normalizedActiveSection === item.id
+                      !item.locked && (
+                        visibleActiveSection === item.id
                       )
                     }
                     onSelect={onSelectSection}

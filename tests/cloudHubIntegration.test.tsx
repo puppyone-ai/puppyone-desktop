@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { CloudServiceSidebar } from "../src/features/cloud/CloudServiceSidebar";
+import { CloudSignedOutRoute } from "../src/features/cloud/auth/CloudSignedOutRoute";
 import type { CloudAuthState } from "../src/features/cloud/auth";
 import { FeatureFlagsProvider } from "../src/features/flags";
 import type { DesktopCloudSession } from "../src/lib/cloudApi";
@@ -35,13 +36,17 @@ describe("current-repository Cloud navigation", () => {
 
     renderSidebar(root, {
       authState: { status: "signed-out", apiBaseUrl: session.api_base_url },
+      activeSection: "initialize",
       projectAvailable: false,
       onSelectSection,
     });
     expect(labels(container)).toEqual([
-      "Overview", "History", "Automation", "Access", "Settings", "Team", "Billing",
+      "MCP and CLI", "Overview", "History", "Automation", "Access", "Settings", "Team", "Billing",
     ]);
-    expect(rows(container).every((row) => row.getAttribute("aria-disabled") === "true")).toBe(true);
+    expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
+    expect(rows(container)[0]?.getAttribute("aria-current")).toBe("page");
+    act(() => rows(container)[0]?.click());
+    expect(onSelectSection).toHaveBeenCalledWith("mcp-cli");
 
     renderSidebar(root, {
       authState: signedInState(),
@@ -49,10 +54,10 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(labels(container)).toEqual([
-      "Overview", "History", "Automation", "Access", "Settings", "Team", "Billing",
+      "MCP and CLI", "Overview", "History", "Automation", "Access", "Settings", "Team", "Billing",
     ]);
-    expect(rows(container).slice(0, 5).every((row) => row.getAttribute("aria-disabled") === "true")).toBe(true);
-    expect(rows(container).slice(5).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
+    expect(rows(container).slice(0, 6).every((row) => row.getAttribute("aria-disabled") === "true")).toBe(true);
+    expect(rows(container).slice(6).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
 
     renderSidebar(root, {
       authState: signedInState(),
@@ -61,18 +66,43 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
-    act(() => rows(container)[1]?.click());
+    act(() => rows(container)[2]?.click());
     expect(onSelectSection).toHaveBeenCalledWith("history");
+  });
+
+  it("explains the selected Cloud capability before asking the user to sign in", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <CloudSignedOutRoute
+        activeSection="mcp-cli"
+        authState={{ status: "signed-out", apiBaseUrl: session.api_base_url }}
+        apiBaseUrl={session.api_base_url}
+        loadingLabel="Restoring Cloud session…"
+        onSessionChange={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    ));
+
+    expect(container.querySelector("h1")?.textContent).toBe("MCP and CLI");
+    expect(container.querySelector(".desktop-entry-state-description")?.textContent)
+      .toBe("Configure programmatic access to this project.");
+    expect(container.querySelector(".desktop-cloud-auth-submit")?.textContent)
+      .toBe("Sign in to continue");
   });
 });
 
 function renderSidebar(root: Root, {
   authState,
+  activeSection = "contents",
   projectAvailable,
   projectCapabilities = [],
   onSelectSection,
 }: {
   authState: CloudAuthState;
+  activeSection?: Parameters<typeof CloudServiceSidebar>[0]["activeSection"];
   projectAvailable: boolean;
   projectCapabilities?: string[];
   onSelectSection: (section: Parameters<typeof CloudServiceSidebar>[0]["activeSection"]) => void;
@@ -86,7 +116,7 @@ function renderSidebar(root: Root, {
     }}>
       <CloudServiceSidebar
         cloudAuthState={authState}
-        activeSection="contents"
+        activeSection={activeSection}
         projectAvailable={projectAvailable}
         projectCapabilities={projectCapabilities}
         onSelectSection={onSelectSection}
