@@ -16,6 +16,7 @@ function incomingStatus(overrides: Partial<GitStatusSnapshot["sourceControl"]["r
       name: "origin/main",
       remote: true,
       lastCommitDate: "2026-08-27T01:30:00.000Z",
+      lastCommitAuthorName: "Preview Collaborator",
     }],
     sourceControl: {
       remote: {
@@ -42,9 +43,8 @@ describe("remote update notice model", () => {
       providerKind: "github",
       behind: 3,
       fileCount: 4,
-      fileNames: ["brief.md", "notes.md"],
-      hiddenFileCount: 2,
       updatedAt: "2026-08-27T01:30:00.000Z",
+      authorName: "Preview Collaborator",
       canPull: true,
       diverged: false,
     });

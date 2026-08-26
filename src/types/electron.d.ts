@@ -206,6 +206,7 @@ export type GitBranchSummary = {
   lastCommitId: string | null;
   lastCommitMessage: string | null;
   lastCommitDate: string | null;
+  lastCommitAuthorName?: string | null;
 };
 
 export type GitRemoteSummary = {

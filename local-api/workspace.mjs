@@ -2323,7 +2323,7 @@ async function readGitBranches(rootPath, options = {}) {
     "for-each-ref",
     "refs/heads",
     "refs/remotes",
-    "--format=%(refname)%09%(refname:short)%09%(HEAD)%09%(upstream:short)%09%(upstream:track,nobracket)%09%(objectname:short)%09%(contents:subject)%09%(committerdate:iso-strict)",
+    "--format=%(refname)%09%(refname:short)%09%(HEAD)%09%(upstream:short)%09%(upstream:track,nobracket)%09%(objectname:short)%09%(contents:subject)%09%(committerdate:iso-strict)%09%(authorname)",
   ], { optionalLocks: false, signal }).catch(() => {
     throwIfGitStatusAborted(signal);
     return { stdout: "" };
@@ -2361,6 +2361,7 @@ function normalizeGitBranches(branches, currentBranchName, headCommitId) {
       lastCommitId: headCommitId || null,
       lastCommitMessage: null,
       lastCommitDate: null,
+      lastCommitAuthorName: null,
     },
     ...normalized,
   ];
@@ -2866,6 +2867,7 @@ function parseGitBranchLine(line) {
     lastCommitId,
     lastCommitMessage,
     lastCommitDate,
+    lastCommitAuthorName,
   ] = line.split("\t");
 
   if (!refName || !shortName) return null;
@@ -2884,6 +2886,7 @@ function parseGitBranchLine(line) {
     lastCommitId: lastCommitId || null,
     lastCommitMessage: lastCommitMessage || null,
     lastCommitDate: lastCommitDate || null,
+    lastCommitAuthorName: lastCommitAuthorName || null,
   };
 }
 

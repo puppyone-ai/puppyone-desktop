@@ -1,17 +1,14 @@
-import { Cloud, Download, GitBranch, Github, LoaderCircle } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
 import type { GitEffectiveHostingKind, GitStatusSnapshot } from "../../types/electron";
-
-const MAX_VISIBLE_FILE_NAMES = 2;
+import { GitOperationButton } from "../source-control/sidebar/GitSidebarPrimitives";
 
 export type RemoteUpdateNoticeModel = Readonly<{
   provider: string;
   providerKind: GitEffectiveHostingKind;
   behind: number;
   fileCount: number;
-  fileNames: readonly string[];
-  hiddenFileCount: number;
   updatedAt: string | null;
+  authorName: string | null;
   canPull: boolean;
   diverged: boolean;
 }>;
@@ -30,16 +27,14 @@ export function RemoteUpdateNotice({
   if (!model) return null;
 
   const updateAge = formatRemoteUpdateAge(model.updatedAt, formatRelativeTime);
-  const pulling = operationLoading === "pull";
-  const busy = operationLoading !== null;
-  const fileSummary = model.fileNames.length > 0
-    ? t("source-control.notice.fileNames", {
-        files: model.fileNames.join(", "),
-        hidden: model.hiddenFileCount,
-      })
-    : model.fileCount > 0
-      ? t("source-control.notice.fileCount", { count: model.fileCount })
-      : t("source-control.notice.changesAvailable");
+  const summary = model.fileCount > 0
+    ? updateAge
+      ? t("source-control.notice.summary", { relativeTime: updateAge, count: model.fileCount })
+      : t("source-control.notice.fileCount", { count: model.fileCount })
+    : updateAge
+      ? t("source-control.notice.commitSummary", { relativeTime: updateAge, count: model.behind })
+      : t("source-control.commit.commits", { count: model.behind });
+  const attribution = model.authorName ?? model.provider;
 
   return (
     <aside
@@ -48,43 +43,30 @@ export function RemoteUpdateNotice({
       role="status"
       aria-live="polite"
     >
-      <div className="desktop-remote-update-notice-heading">
-        <span className="desktop-remote-update-notice-icon" aria-hidden="true">
-          <RemoteProviderIcon kind={model.providerKind} />
-        </span>
-        <strong>{t("source-control.notice.title")}</strong>
-        <button
-          className="desktop-remote-update-notice-pull"
-          type="button"
-          disabled={busy || !model.canPull}
-          title={t("source-control.notice.pullTitle")}
-          onClick={() => void onPull()}
-        >
-          {pulling
-            ? <LoaderCircle className="desktop-remote-update-notice-spinner" size={13} aria-hidden="true" />
-            : <Download size={13} strokeWidth={2.2} aria-hidden="true" />}
-          <span>{t(pulling ? "source-control.sync.pulling" : "source-control.sync.pull")}</span>
-        </button>
-      </div>
-      <p className="desktop-remote-update-notice-files" title={model.fileNames.join("\n") || undefined}>
-        {fileSummary}
-      </p>
+      <strong className="desktop-remote-update-notice-summary">{summary}</strong>
       <p className="desktop-remote-update-notice-meta">
-        <span>{model.provider}</span>
-        {updateAge && (
+        <span>{t("source-control.commit.commits", { count: model.behind })}</span>
+        <span aria-hidden="true"> · </span>
+        <span>{attribution}</span>
+        {model.diverged && (
           <>
             <span aria-hidden="true"> · </span>
-            <time dateTime={model.updatedAt ?? undefined}>{updateAge}</time>
+            <span>{t("source-control.notice.localChanges")}</span>
           </>
         )}
-        <span aria-hidden="true"> · </span>
-        <span>{t("source-control.commit.commits", { count: model.behind })}</span>
       </p>
-      {model.diverged && (
-        <p className="desktop-remote-update-notice-diverged">
-          {t("source-control.notice.diverged")}
-        </p>
-      )}
+      <GitOperationButton
+        className="desktop-remote-update-notice-pull"
+        title={t("source-control.notice.pullTitle")}
+        disabled={operationLoading !== null || !model.canPull}
+        icon="download"
+        label={t("source-control.sync.pull")}
+        loadingKey="pull"
+        loadingLabel={t("source-control.sync.pulling")}
+        operationLoading={operationLoading}
+        primary
+        onClick={() => void onPull()}
+      />
     </aside>
   );
 }
@@ -98,33 +80,23 @@ export function getRemoteUpdateNoticeModel(
     return null;
   }
 
-  const previewPaths = Array.from(new Set(remote.incomingPreview.map(({ path }) => path).filter(Boolean)));
-  const fileCount = Math.max(remote.incomingFileSummary?.total ?? 0, previewPaths.length);
-  const fileNames = previewPaths
-    .slice(0, MAX_VISIBLE_FILE_NAMES)
-    .map(toDisplayFileName);
+  const previewPaths = new Set(remote.incomingPreview.map(({ path }) => path).filter(Boolean));
+  const fileCount = Math.max(remote.incomingFileSummary?.total ?? 0, previewPaths.size);
   const targetRef = remote.target?.ref ?? status.effectiveHosting.ref;
-  const updatedAt = status.branches.find(
+  const remoteBranch = status.branches.find(
     (branch) => branch.remote && branch.name === targetRef,
-  )?.lastCommitDate ?? null;
+  ) ?? null;
 
   return {
     provider: getRemoteProviderLabel(status),
     providerKind: status.effectiveHosting.kind,
     behind: remote.behind,
     fileCount,
-    fileNames,
-    hiddenFileCount: Math.max(0, fileCount - fileNames.length),
-    updatedAt,
+    updatedAt: remoteBranch?.lastCommitDate ?? null,
+    authorName: remoteBranch?.lastCommitAuthorName?.trim() || null,
     canPull: remote.canPull,
     diverged: remote.state === "diverged",
   };
-}
-
-function RemoteProviderIcon({ kind }: { kind: GitEffectiveHostingKind }) {
-  if (kind === "github") return <Github size={14} strokeWidth={2} />;
-  if (kind === "puppyone-cloud") return <Cloud size={14} strokeWidth={2} />;
-  return <GitBranch size={14} strokeWidth={2} />;
 }
 
 function getRemoteProviderLabel(status: GitStatusSnapshot) {
@@ -133,10 +105,6 @@ function getRemoteProviderLabel(status: GitStatusSnapshot) {
   const remoteName = status.sourceControl.remote.target?.remote?.trim();
   if (remoteName?.toLowerCase() === "puppyone") return "PuppyOne";
   return remoteName || "Git remote";
-}
-
-function toDisplayFileName(path: string) {
-  return path.replace(/\\/g, "/").split("/").filter(Boolean).at(-1) || path;
 }
 
 function formatRemoteUpdateAge(
@@ -154,11 +122,12 @@ function formatRemoteUpdateAge(
   const month = 30 * day;
   const year = 365 * day;
 
-  if (elapsedMs < minute) return formatRelativeTime(0, "second", { numeric: "auto" });
-  if (elapsedMs < hour) return formatRelativeTime(-Math.floor(elapsedMs / minute), "minute", { numeric: "auto" });
-  if (elapsedMs < day) return formatRelativeTime(-Math.floor(elapsedMs / hour), "hour", { numeric: "auto" });
-  if (elapsedMs < week) return formatRelativeTime(-Math.floor(elapsedMs / day), "day", { numeric: "auto" });
-  if (elapsedMs < month) return formatRelativeTime(-Math.floor(elapsedMs / week), "week", { numeric: "auto" });
-  if (elapsedMs < year) return formatRelativeTime(-Math.floor(elapsedMs / month), "month", { numeric: "auto" });
-  return formatRelativeTime(-Math.floor(elapsedMs / year), "year", { numeric: "auto" });
+  const options = { numeric: "auto", style: "short" } as const;
+  if (elapsedMs < minute) return formatRelativeTime(0, "second", options);
+  if (elapsedMs < hour) return formatRelativeTime(-Math.floor(elapsedMs / minute), "minute", options);
+  if (elapsedMs < day) return formatRelativeTime(-Math.floor(elapsedMs / hour), "hour", options);
+  if (elapsedMs < week) return formatRelativeTime(-Math.floor(elapsedMs / day), "day", options);
+  if (elapsedMs < month) return formatRelativeTime(-Math.floor(elapsedMs / week), "week", options);
+  if (elapsedMs < year) return formatRelativeTime(-Math.floor(elapsedMs / month), "month", options);
+  return formatRelativeTime(-Math.floor(elapsedMs / year), "year", options);
 }
