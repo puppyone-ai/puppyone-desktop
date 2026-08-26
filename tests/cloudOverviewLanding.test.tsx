@@ -194,19 +194,10 @@ describe("CloudRepositoryOverview landing page", () => {
     expect(headerFacts[2]?.textContent).toContain("https://cloud.example/git/project-1.git");
     expect(dashboard?.textContent).not.toContain("Automation");
     expect(dashboard?.querySelector(".desktop-cloud-overview-files-header")).toBeNull();
-    expect(dashboard?.querySelector(".desktop-cloud-overview-file-column-labels")?.textContent).toBe("NameModified");
-    expect(dashboard?.querySelector(".desktop-cloud-overview-file-column-labels")?.classList.contains("desktop-cloud-overview-visually-hidden")).toBe(false);
-    expect(dashboard?.querySelectorAll("[role='columnheader']")).toHaveLength(2);
+    expect(dashboard?.querySelector(".desktop-cloud-overview-file-column-labels")).toBeNull();
+    expect(dashboard?.querySelector(".desktop-cloud-overview-file-toolbar")).toBeNull();
+    expect(dashboard?.querySelector("[role='list']")).not.toBeNull();
     expect(dashboard?.querySelector(".desktop-cloud-overview-file-activity-header")).toBeNull();
-    const fileSearch = dashboard?.querySelector<HTMLInputElement>(".desktop-cloud-overview-file-search input");
-    const typeFilter = dashboard?.querySelector<HTMLSelectElement>(".desktop-cloud-overview-file-type-filter");
-    const modifiedFilter = dashboard?.querySelector<HTMLSelectElement>(".desktop-cloud-overview-file-modified-filter");
-    const columnHeaders = dashboard?.querySelectorAll<HTMLElement>("[role='columnheader']");
-    expect(fileSearch?.placeholder).toBe("Filter by name");
-    expect(typeFilter?.textContent).toBe("AllFoldersFiles");
-    expect(modifiedFilter?.textContent).toBe("Any timeLast 24 hoursLast 7 daysLast 30 days");
-    expect(columnHeaders?.[0]?.getAttribute("aria-sort")).toBe("ascending");
-    expect(columnHeaders?.[1]?.getAttribute("aria-sort")).toBe("none");
     expect(fileRows).toHaveLength(5);
     expect(fileRows?.[0]?.textContent).toContain("assets");
     expect(fileRows?.[1]?.textContent).toContain("docs");
@@ -214,43 +205,6 @@ describe("CloudRepositoryOverview landing page", () => {
     expect(usersRow?.textContent).toContain("yesterday");
     expect(usersRow?.textContent).not.toContain("2 KB");
     expect(dashboard?.querySelectorAll(".desktop-cloud-overview-file-icon svg")).toHaveLength(5);
-
-    act(() => columnHeaders?.[1]?.querySelector("button")?.click());
-    expect(columnHeaders?.[0]?.getAttribute("aria-sort")).toBe("none");
-    expect(columnHeaders?.[1]?.getAttribute("aria-sort")).toBe("descending");
-    expect(dashboard?.querySelector(".desktop-cloud-overview-file-row")?.textContent).toContain("users.csv");
-
-    act(() => columnHeaders?.[0]?.querySelector("button")?.click());
-    expect(columnHeaders?.[0]?.getAttribute("aria-sort")).toBe("ascending");
-
-    act(() => {
-      if (!fileSearch) return;
-      setInputValue(fileSearch, "read");
-      fileSearch.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    expect(dashboard?.querySelectorAll(".desktop-cloud-overview-file-row")).toHaveLength(1);
-    expect(dashboard?.querySelector(".desktop-cloud-overview-file-row")?.textContent).toContain("README.md");
-
-    act(() => {
-      if (!fileSearch || !typeFilter) return;
-      setInputValue(fileSearch, "");
-      fileSearch.dispatchEvent(new Event("input", { bubbles: true }));
-      typeFilter.value = "folder";
-      typeFilter.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    expect(dashboard?.querySelectorAll(".desktop-cloud-overview-file-row")).toHaveLength(2);
-
-    act(() => {
-      if (!typeFilter || !modifiedFilter) return;
-      typeFilter.value = "all";
-      typeFilter.dispatchEvent(new Event("change", { bubbles: true }));
-      modifiedFilter.value = "week";
-      modifiedFilter.dispatchEvent(new Event("change", { bubbles: true }));
-    });
-    expect(dashboard?.querySelectorAll(".desktop-cloud-overview-file-row")).toHaveLength(2);
-    expect(dashboard?.textContent).toContain("README.md");
-    expect(dashboard?.textContent).toContain("users.csv");
-    expect(dashboard?.textContent).not.toContain("app.ts");
     expect(container.querySelector(".desktop-cloud-source-pill")).toBeNull();
     expect(container.querySelector(".desktop-cloud-overview-landing-mark")).toBeNull();
     expect(container.querySelector(".desktop-cloud-overview-deployment-board")).toBeNull();
@@ -285,10 +239,6 @@ describe("CloudRepositoryOverview landing page", () => {
 function findButton(container: HTMLElement, label: string) {
   return Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
     .find((button) => button.textContent?.includes(label) || button.getAttribute("aria-label") === label);
-}
-
-function setInputValue(input: HTMLInputElement, value: string) {
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, value);
 }
 
 const WORKSPACE = {

@@ -21,26 +21,17 @@ describe("Cloud Overview visual architecture", () => {
     expect(overviewSource).toContain("desktop-cloud-overview-header-facts");
   });
 
-  it("uses a Drive-style open list with sortable columns and functional filters", () => {
+  it("uses a minimal open file list without controls or a surrounding frame", () => {
     const files = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-files"));
-    const toolbar = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-file-toolbar"));
-    const search = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-file-search"));
-    const columns = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-column-labels"));
 
     expect(files).not.toContain("border:");
     expect(files).not.toContain("border-radius:");
-    expect(toolbar).toContain("justify-content: flex-start;");
-    expect(toolbar).toContain("margin-bottom: 8px;");
-    expect(search).toContain("height: 28px;");
-    expect(columns).toContain("border-bottom: 1px solid var(--po-border-strong);");
     expect(resourceCss).toContain(".desktop-cloud-overview-file-row {\n  min-height: 36px;");
     expect(resourceCss).toContain("min-height: 36px;\n  border-bottom: 1px solid var(--po-border-subtle);");
-    expect(dashboardSource).toContain("desktop-cloud-overview-file-toolbar");
-    expect(dashboardSource).toContain("desktop-cloud-overview-file-type-filter");
-    expect(dashboardSource).toContain("desktop-cloud-overview-file-modified-filter");
-    expect(dashboardSource).toContain("changeSort(\"name\")");
-    expect(dashboardSource).toContain("changeSort(\"modified\")");
-    expect(dashboardSource).not.toContain("desktop-cloud-overview-visually-hidden");
+    expect(dashboardSource).not.toContain("desktop-cloud-overview-file-toolbar");
+    expect(dashboardSource).not.toContain("desktop-cloud-overview-file-column-labels");
+    expect(dashboardSource).not.toContain("OverviewFileSortKey");
+    expect(dashboardCss).not.toContain("desktop-cloud-overview-file-search");
     expect(dashboardSource).not.toContain("desktop-cloud-overview-file-activity-header");
     expect(resourceCss).not.toContain("desktop-cloud-overview-file-activity-header");
     expect(dashboardSource).not.toContain("desktop-cloud-overview-files-header");
