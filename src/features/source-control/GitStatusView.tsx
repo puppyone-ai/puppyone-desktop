@@ -1,12 +1,6 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
-import { GitBranch, GripVertical, RefreshCw } from "lucide-react";
-import {
-  SidebarResizeHandle,
-  VirtualSidebarList,
-  usePaneResizeDrag,
-  type SidebarResizeIntent,
-  type Workspace,
-} from "@puppyone/shared-ui";
+import type { ReactNode } from "react";
+import { GitBranch, RefreshCw } from "lucide-react";
+import type { Workspace } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
 import type { GitCommitDetail, GitCommitSummary, GitStatusSnapshot } from "../../types/electron";
 import type { GitMainPanel, GitWorkingSelection } from "./types";
@@ -32,21 +26,12 @@ type GitStatusViewProps = {
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
-  onSelectCommit: (commitId: string) => void;
   onStagePaths: (paths: string[]) => Promise<boolean>;
   onUnstagePaths: (paths: string[]) => Promise<boolean>;
   onDiscardPaths: (paths: string[]) => Promise<boolean>;
   onOpenWorkingFile: (path: string) => void;
   onInitializeRepository: () => Promise<boolean>;
 };
-
-const HISTORY_TREE_MIN_WIDTH = 180;
-const HISTORY_TREE_DEFAULT_WIDTH = 320;
-const HISTORY_TREE_MAX_WIDTH = 520;
-
-function clampHistoryTreeWidth(width: number) {
-  return Math.min(Math.max(width, HISTORY_TREE_MIN_WIDTH), HISTORY_TREE_MAX_WIDTH);
-}
 
 export function GitStatusView({
   workspace,
@@ -65,7 +50,6 @@ export function GitStatusView({
   loading,
   error,
   onRefresh,
-  onSelectCommit,
   onStagePaths,
   onUnstagePaths,
   onDiscardPaths,
@@ -102,7 +86,6 @@ export function GitStatusView({
       <GitHistoryPanel
         commits={historyCommits}
         selectedCommit={selectedCommit}
-        selectedCommitId={selectedCommitId ?? selectedCommit?.commit_id ?? null}
         headCommitId={status?.headCommitId ?? null}
         commitDetail={commitDetail}
         commitDetailLoading={commitDetailLoading}
@@ -111,7 +94,6 @@ export function GitStatusView({
         operationError={operationError}
         loading={loading}
         onRefresh={onRefresh}
-        onSelectCommit={onSelectCommit}
       />
     );
   }
@@ -145,56 +127,9 @@ export function GitStatusView({
   );
 }
 
-function SidebarHistoryRow({
-  commit,
-  isHead,
-  isSelected,
-  hasPrevious,
-  hasNext,
-  onClick,
-}: {
-  commit: GitCommitSummary;
-  isHead: boolean;
-  isSelected: boolean;
-  hasPrevious: boolean;
-  hasNext: boolean;
-  onClick: () => void;
-}) {
-  const { t, formatNumber } = useLocalization();
-  const totals = getChangeTotals(commit.changes);
-
-  return (
-    <button
-      className={`desktop-history-row ${isSelected ? "active" : ""}`}
-      type="button"
-      onClick={onClick}
-      title={commit.message}
-    >
-      <span className="desktop-history-graph" aria-hidden="true" dir="ltr">
-        {hasPrevious && <i className="before" />}
-        {hasNext && <i className="after" />}
-        <i className="dot" />
-      </span>
-      <span className="desktop-history-row-main">
-        <span className="desktop-history-row-title">
-          {isHead && <span className="desktop-head-badge">HEAD</span>}
-          <bdi className="desktop-history-row-message">
-            {commit.message || t("source-control.commit.noMessage")}
-          </bdi>
-        </span>
-        <span className="desktop-history-row-stat">
-          <span className="added">+{formatNumber(totals.additions)}</span>
-          <span className="deleted">-{formatNumber(totals.deletions)}</span>
-        </span>
-      </span>
-    </button>
-  );
-}
-
 function GitHistoryPanel({
   commits,
   selectedCommit,
-  selectedCommitId,
   headCommitId,
   commitDetail,
   commitDetailLoading,
@@ -203,11 +138,9 @@ function GitHistoryPanel({
   operationError,
   loading,
   onRefresh,
-  onSelectCommit,
 }: {
   commits: GitCommitSummary[];
   selectedCommit: GitCommitSummary | null;
-  selectedCommitId: string | null;
   headCommitId: string | null;
   commitDetail: GitCommitDetail | null;
   commitDetailLoading: boolean;
@@ -216,46 +149,7 @@ function GitHistoryPanel({
   operationError: string | null;
   loading: boolean;
   onRefresh: () => void;
-  onSelectCommit: (commitId: string) => void;
 }) {
-  const { direction, t } = useLocalization();
-  const [treeWidth, setTreeWidth] = useState<number | null>(null);
-
-  const beginTreeResize = usePaneResizeDrag({
-    bodyClassName: "desktop-history-resizing",
-    onDragStart: (event) => {
-      const treeElement = event.currentTarget.previousElementSibling;
-      const startWidth = treeElement instanceof HTMLElement
-        ? treeElement.getBoundingClientRect().width
-        : treeWidth ?? HISTORY_TREE_DEFAULT_WIDTH;
-      const startX = event.clientX;
-      const maxWidth = Math.min(
-        HISTORY_TREE_MAX_WIDTH,
-        Math.max(HISTORY_TREE_MIN_WIDTH, window.innerWidth * 0.55),
-      );
-      return {
-        onMove: (point) => {
-          const pointerDelta = (point.clientX - startX) * (direction === "rtl" ? -1 : 1);
-          setTreeWidth(Math.round(Math.min(
-            Math.max(startWidth + pointerDelta, HISTORY_TREE_MIN_WIDTH),
-            maxWidth,
-          )));
-        },
-      };
-    },
-  });
-
-  const resizeTreeByKeyboard = (intent: SidebarResizeIntent, accelerated: boolean) => {
-    if (intent === "minimum" || intent === "maximum") {
-      setTreeWidth(intent === "minimum" ? HISTORY_TREE_MIN_WIDTH : HISTORY_TREE_MAX_WIDTH);
-      return;
-    }
-    const step = accelerated ? 32 : 16;
-    const logicalDelta = intent === "decrease" ? -step : step;
-    const delta = direction === "rtl" ? -logicalDelta : logicalDelta;
-    setTreeWidth((width) => clampHistoryTreeWidth((width ?? HISTORY_TREE_DEFAULT_WIDTH) + delta));
-  };
-
   if (commits.length === 0) {
     return (
       <section className="desktop-utility-view desktop-history-detail-view">
@@ -267,70 +161,22 @@ function GitHistoryPanel({
   }
 
   return (
-    <section
-      className="desktop-utility-view desktop-history-detail-view desktop-history-panel"
-      style={getHistoryTreeStyle(treeWidth)}
-    >
-      <aside
-        className="desktop-history-panel-tree"
-        aria-label={t("source-control.history.ariaLabel")}
-      >
-        <VirtualSidebarList
-          className="desktop-history-list desktop-history-virtual-list"
-          ariaLabel={t("source-control.history.ariaLabel")}
-          items={commits}
-          rowSize={32}
-          activeIndex={commits.findIndex((commit) => commit.commit_id === selectedCommitId)}
-          getKey={(commit) => commit.commit_id}
-          renderRow={(commit, index) => (
-            <SidebarHistoryRow
-              commit={commit}
-              isHead={commit.commit_id === headCommitId}
-              isSelected={commit.commit_id === selectedCommitId}
-              hasPrevious={index > 0}
-              hasNext={index < commits.length - 1}
-              onClick={() => onSelectCommit(commit.commit_id)}
-            />
-          )}
-        />
-      </aside>
-      <SidebarResizeHandle
-        className="desktop-history-panel-tree-resizer"
-        paneEdge
-        label={t("source-control.history.resizeAriaLabel")}
-        orientation="vertical"
-        min={HISTORY_TREE_MIN_WIDTH}
-        max={HISTORY_TREE_MAX_WIDTH}
-        value={treeWidth ?? HISTORY_TREE_DEFAULT_WIDTH}
-        title={t("source-control.history.resizeTitle")}
-        onPointerDown={beginTreeResize}
-        onKeyboardResize={resizeTreeByKeyboard}
-        onDoubleClick={() => setTreeWidth(null)}
-      >
-        <GripVertical size={12} aria-hidden="true" />
-      </SidebarResizeHandle>
-      <div className="desktop-history-panel-detail">
-        <div className="desktop-history-detail-scroll" data-po-scrollbar="content">
-          {selectedCommit ? (
-            <CommitDetail
-              commit={selectedCommit}
-              detail={commitDetail}
-              loading={commitDetailLoading}
-              error={commitDetailError}
-              isHead={selectedCommit.commit_id === headCommitId}
-            />
-          ) : (
-            <EmptyGitHistoryState status={status} operationError={operationError} onRefresh={onRefresh} loading={loading} />
-          )}
-        </div>
+    <section className="desktop-utility-view desktop-history-detail-view">
+      <div className="desktop-history-detail-scroll" data-po-scrollbar="content">
+        {selectedCommit ? (
+          <CommitDetail
+            commit={selectedCommit}
+            detail={commitDetail}
+            loading={commitDetailLoading}
+            error={commitDetailError}
+            isHead={selectedCommit.commit_id === headCommitId}
+          />
+        ) : (
+          <EmptyGitHistoryState status={status} operationError={operationError} onRefresh={onRefresh} loading={loading} />
+        )}
       </div>
     </section>
   );
-}
-
-function getHistoryTreeStyle(width: number | null): CSSProperties | undefined {
-  if (width === null) return undefined;
-  return { "--desktop-history-tree-width": `${width}px` } as CSSProperties;
 }
 
 function CommitDetail({
@@ -573,21 +419,6 @@ function EmptyGitHistoryState({
             : t("source-control.history.initialize")}
         </p>
         {operationError && <div className="desktop-initial-repo-status danger">{operationError}</div>}
-      </div>
-    </div>
-  );
-}
-
-function SidebarEmptyHistory({ status }: { status: GitStatusSnapshot | null }) {
-  const { t } = useLocalization();
-  return (
-    <div className="desktop-git-sidebar-empty-history">
-      <GitBranch size={14} />
-      <div>
-        <strong>{t("source-control.history.noCommits")}</strong>
-        <span>{status?.isRepo
-          ? t("source-control.history.branchEmpty", { branch: bidiIsolate(displayGitBranch(status, t("source-control.branch.initial"))) })
-          : t("source-control.history.notInitialized")}</span>
       </div>
     </div>
   );

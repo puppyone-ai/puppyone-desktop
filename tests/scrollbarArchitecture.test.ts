@@ -24,8 +24,8 @@ const sidebarResizeHandleSource = readCss(
 const auxiliaryPanelSource = readCss(
   "src/features/app-shell/auxiliary/AuxiliaryPanelHost.tsx",
 );
-const gitStatusSource = readCss("src/features/source-control/GitStatusView.tsx");
-const historyDetailCss = readCss("src/features/source-control/styles/history-detail.css");
+const gitSidebarSource = readCss("src/features/source-control/SourceControlSidebar.tsx");
+const gitSidebarPanelsCss = readCss("src/features/source-control/styles/sidebar-panels.css");
 const layoutCss = readCss("src/styles/layout.css");
 const baseCss = readCss("src/styles/base.css");
 const markdownEditorCss = readCss("packages/shared-ui/src/styles/editor/markdown-editor.css");
@@ -247,21 +247,17 @@ describe("scrollbar architecture", () => {
     expect(dataWorkspaceSource).toContain("ref={explorerResizeHandleRef}");
   });
 
-  it("keeps the History pane resizer after its sidebar scroll lane", () => {
+  it("keeps the History divider between the Git changes and history panes", () => {
     const historyResizerRule = readRule(
-      historyDetailCss,
-      ".desktop-history-panel-tree-resizer",
+      gitSidebarPanelsCss,
+      ".desktop-git-history-resizer::after",
     );
     expect(historyResizerRule).toContain(
-      "inset-inline-start: var(--desktop-history-tree-width, clamp(260px, 28vw, 380px));",
+      "inset-inline: var(--git-sidebar-left-gap) var(--git-sidebar-right-gap);",
     );
-    expect(historyResizerRule).not.toContain("inset-inline-end:");
     expect(historyResizerRule).not.toContain("transform:");
-    expect(gitStatusSource).toMatch(
-      /<\/aside>\s+<SidebarResizeHandle\s+className="desktop-history-panel-tree-resizer"\s+paneEdge/,
-    );
-    expect(gitStatusSource).toContain(
-      "const treeElement = event.currentTarget.previousElementSibling;",
+    expect(gitSidebarSource).toMatch(
+      /className="desktop-git-changes-pane"[\s\S]+<GitSidebarHistoryResizer[\s\S]+className="desktop-git-history-pane"/,
     );
     expect(baseCss).not.toContain('[dir="rtl"] .data-explorer-resizer');
   });

@@ -14,6 +14,24 @@
   min-width: 0;
 }
 
+.desktop-git-changes-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 144px;
+  flex: 1 1 64%;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.desktop-git-history-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 104px;
+  max-height: 60%;
+  flex: 0 1 36%;
+  overflow: hidden;
+}
+
 .desktop-git-resizable-stack {
   display: flex;
   flex: 1 1 auto;

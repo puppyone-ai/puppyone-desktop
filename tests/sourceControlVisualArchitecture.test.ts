@@ -20,6 +20,7 @@ const sourceControlSidebarSource = readFileSync(
 );
 const sourceControlSidebarSectionsSource = [
   "GitRemoteSections.tsx",
+  "GitSidebarHistoryPanel.tsx",
   "GitSidebarPrimitives.tsx",
   "GitLocalStatusSection.tsx",
   "GitLocalStatusPanels.tsx",
@@ -207,6 +208,16 @@ describe("source-control visual architecture", () => {
     expect(sidebarResourcesCss).not.toContain("desktop-git-github-");
     expect(sidebarResourcesCss).not.toContain("desktop-git-cloud-provider-section");
     expect(sidebarResourcesCss).not.toContain("desktop-git-remote-status");
+  });
+
+  it("keeps History visible as a first-level resizable Git sidebar pane", () => {
+    expect(sourceControlSidebarSource).toContain("<GitSidebarHistoryResizer");
+    expect(sourceControlSidebarSource).toContain('className="desktop-git-history-pane"');
+    expect(sourceControlSidebarSource).toContain("<GitSidebarHistoryPanel");
+    expect(sourceControlSidebarSource).not.toContain("GitHistoryShortcut");
+    expect(sourceControlSidebarSectionsSource).toContain("<VirtualSidebarList");
+    expect(viewSource).not.toContain("<VirtualSidebarList");
+    expect(gitControllerSource).not.toContain('gitMainPanel !== "history"');
   });
 
   it("reserves card surfaces for providers and keeps local source-control groups flat", () => {
@@ -653,7 +664,7 @@ describe("source-control visual architecture", () => {
     const title = compact(readCssBlock(historyListCss, ".desktop-history-row-title"));
     const message = compact(readCssBlock(historyListCss, ".desktop-history-row-message"));
 
-    expect(viewSource).toContain('className="desktop-history-row-message"');
+    expect(sourceControlSidebarSectionsSource).toContain('className="desktop-history-row-message"');
     expect(row).toContain("height: var(--desktop-sidebar-row-height);");
     expect(row).toContain("overflow: hidden;");
     expect(main).toContain("min-width: 0;");

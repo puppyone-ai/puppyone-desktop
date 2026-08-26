@@ -344,7 +344,7 @@ describe("sidebar spacing architecture", () => {
     expect(wrapper).toContain("padding-block: var(--desktop-sidebar-list-padding-block) 0;");
     expect(wrapper).toContain("padding-inline: 0;");
     expect(wrapper).toContain("scrollbar-gutter: auto;");
-    expect(footer).toContain("padding-block: 3px var(--desktop-sidebar-list-padding-block);");
+    expect(footer).toContain("padding-block: 0 var(--desktop-sidebar-list-padding-block);");
     expect(footer).toContain(
       "padding-inline: var(--git-sidebar-left-gap) var(--git-sidebar-right-gap);",
     );

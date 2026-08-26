@@ -132,10 +132,10 @@ export function useDesktopGitController({
     setPendingBranchSwitch(null);
   }, [workspace?.path]);
 
-  // Lazy-load history/graph when the History surface is active, or when HEAD/refs
-  // change while History is already open (cached history was cleared).
+  // The Git sidebar owns an always-visible History pane, so load its graph as
+  // soon as the Source Control surface is active and refresh it after ref changes.
   useEffect(() => {
-    if (!gitViewActive || gitMainPanel !== "history" || !workspace || !activeGitStatus?.isRepo) {
+    if (!gitViewActive || !workspace || !activeGitStatus?.isRepo) {
       return undefined;
     }
 
@@ -174,7 +174,6 @@ export function useDesktopGitController({
     activeGitStatus?.isRepo,
     applyGitHistory,
     captureGitRepositoryContext,
-    gitMainPanel,
     gitViewActive,
     historyEpoch,
     reportGitStatusError,
@@ -346,17 +345,6 @@ export function useDesktopGitController({
     setSelectedGitWorkingFile(selection);
     setSelectedGitCommitId(null);
   }, []);
-
-  const selectGitMainPanel = useCallback((panel: GitMainPanel) => {
-    setGitMainPanel(panel);
-    if (panel === "changes") {
-      setSelectedGitCommitId(null);
-    } else {
-      const historyCommits = activeGitStatus?.allCommits ?? activeGitStatus?.commits ?? [];
-      setSelectedGitWorkingFile(null);
-      setSelectedGitCommitId((current) => current ?? historyCommits[0]?.commit_id ?? null);
-    }
-  }, [activeGitStatus]);
 
   const handleStageGitPaths = useCallback((paths: string[]) => {
     return runGitOperation("stage", (rootPath) => stageWorkspaceGitPaths(rootPath, paths));
@@ -754,7 +742,6 @@ export function useDesktopGitController({
     refreshGitStatus,
     refreshGitStatusWithFetch,
     selectGitCommit,
-    selectGitMainPanel,
     selectGitWorkingFile,
     setBranchSwitcherOpen,
     setGitOperationError,

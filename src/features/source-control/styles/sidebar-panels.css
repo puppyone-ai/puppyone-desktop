@@ -92,6 +92,30 @@
   background: var(--po-border);
 }
 
+.desktop-git-history-resizer {
+  position: relative;
+  flex: 0 0 var(--git-section-divider-height);
+  border: 0;
+  background: transparent;
+  cursor: row-resize;
+}
+
+.desktop-git-history-resizer::after {
+  position: absolute;
+  top: var(--git-section-divider-line-offset);
+  inset-inline: var(--git-sidebar-left-gap) var(--git-sidebar-right-gap);
+  height: 1px;
+  border-radius: 999px;
+  background: var(--po-border-subtle);
+  content: "";
+}
+
+.desktop-git-history-resizer:hover::after,
+.desktop-git-history-resizer.active::after,
+.desktop-git-history-resizer:focus-visible::after {
+  background: var(--po-border);
+}
+
 body.desktop-git-sidebar-resizing {
   cursor: row-resize;
   user-select: none;

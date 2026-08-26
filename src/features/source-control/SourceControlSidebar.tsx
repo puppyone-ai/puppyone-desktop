@@ -13,9 +13,10 @@ import {
 } from "./viewModel";
 import { createGitLocalStatusPanels } from "./sidebar/GitLocalStatusPanels";
 import {
-  GitHistoryShortcut,
+  GitSidebarHistoryResizer,
   GitSidebarSectionResizer,
 } from "./sidebar/GitSidebarPrimitives";
+import { GitSidebarHistoryPanel } from "./sidebar/GitSidebarHistoryPanel";
 import { GitRemotePrompt } from "./sidebar/GitRemoteSections";
 import type {
   GitSidebarProps,
@@ -32,14 +33,14 @@ export type { GitSidebarProps } from "./sidebar/sourceControlSidebarTypes";
 export function GitSidebar({ repository, view, actions, cloudBackup }: GitSidebarProps) {
   const { status, puppyoneConfig, gitDisplayMode, fileIconTheme } = repository;
   const {
-    activePanel,
+    selectedCommitId,
     selectedWorkingFile,
     operationLoading,
     operationError,
     loading,
     error,
   } = view;
-  const { selectPanel, selectWorkingFile } = actions;
+  const { selectCommit, selectWorkingFile } = actions;
   const { t, formatNumber } = useLocalization();
   const [backupCardDismissed, setBackupCardDismissed] = useState(false);
   const { expanded, toggle } = useGitSidebarExpansionState();
@@ -49,7 +50,6 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
   const syncState = getGitSyncState(status, currentBranch, puppyoneConfig, t);
   const hostingMode = getGitHostingMode(status, puppyoneConfig);
   const professionalDisplayMode = hostingMode === "github" || hostingMode === "puppyone-cloud";
-  const historyCount = historyCommits.length || status?.totalCommits || 0;
   const disabled = Boolean(operationLoading) || loading || !status?.isRepo;
   const sidebarModel = buildSourceControlSidebarModel({
     status,
@@ -76,8 +76,15 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
   );
   const {
     activeResizeSplit,
+    beginHistoryResize,
     beginPanelResize,
+    changesPaneRef,
+    getHistoryPaneStyle,
     getPanelStyle,
+    historyPaneHeight,
+    historyPaneRef,
+    resetHistoryPaneHeight,
+    resizeHistoryByKeyboard,
     resizePanelsByKeyboard,
     setPanelRef,
     sidebarListRef,
@@ -110,55 +117,72 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
           <SidebarEmptyState>{t("source-control.status.readingGit")}</SidebarEmptyState>
         ) : (
           <>
-            <div className="desktop-git-fixed-region">
-              <GitRemotePrompt
-                state={syncState}
-                disabled={disabled}
-                cloudBackupLoading={cloudBackup.loading}
-                cloudBackupError={cloudBackup.error}
-                dismissed={backupCardDismissed}
-                cloudEnabled={cloudBackup.enabled ?? true}
-                onDismiss={() => setBackupCardDismissed(true)}
-                onStartPuppyoneBackup={cloudBackup.start}
-              />
-              {operationError && (
-                <div className="desktop-git-operation-error" role="alert">{operationError}</div>
-              )}
-              {status?.didHitStatusLimit && (
-                <div className="desktop-git-status-limit-warning" role="status">
-                  {t("source-control.status.limit", { count: formatNumber(status.statusLimit) })}
-                </div>
-              )}
-            </div>
-
-            <div className="desktop-git-resizable-stack">
-              {panels.map((panel, index) => (
-                <Fragment key={panel.id}>
-                  {index > 0 && panels[index - 1].expanded && panel.expanded && (
-                    <GitSidebarSectionResizer
-                      previous={panels[index - 1].id}
-                      next={panel.id}
-                      active={activeResizeSplit === `${panels[index - 1].id}:${panel.id}`}
-                      onPointerDown={beginPanelResize}
-                      onKeyboardResize={resizePanelsByKeyboard}
-                    />
-                  )}
-                  <div
-                    ref={(node) => setPanelRef(panel.id, node)}
-                    className={`desktop-git-resizable-section desktop-git-resizable-section-${panel.className} ${panel.expanded ? "expanded" : "collapsed"}`}
-                    style={getPanelStyle(panel)}
-                  >
-                    {panel.content}
+            <div ref={changesPaneRef} className="desktop-git-changes-pane">
+              <div className="desktop-git-fixed-region">
+                <GitRemotePrompt
+                  state={syncState}
+                  disabled={disabled}
+                  cloudBackupLoading={cloudBackup.loading}
+                  cloudBackupError={cloudBackup.error}
+                  dismissed={backupCardDismissed}
+                  cloudEnabled={cloudBackup.enabled ?? true}
+                  onDismiss={() => setBackupCardDismissed(true)}
+                  onStartPuppyoneBackup={cloudBackup.start}
+                />
+                {operationError && (
+                  <div className="desktop-git-operation-error" role="alert">{operationError}</div>
+                )}
+                {status?.didHitStatusLimit && (
+                  <div className="desktop-git-status-limit-warning" role="status">
+                    {t("source-control.status.limit", { count: formatNumber(status.statusLimit) })}
                   </div>
-                </Fragment>
-              ))}
+                )}
+              </div>
+
+              <div className="desktop-git-resizable-stack">
+                {panels.map((panel, index) => (
+                  <Fragment key={panel.id}>
+                    {index > 0 && panels[index - 1].expanded && panel.expanded && (
+                      <GitSidebarSectionResizer
+                        previous={panels[index - 1].id}
+                        next={panel.id}
+                        active={activeResizeSplit === `${panels[index - 1].id}:${panel.id}`}
+                        onPointerDown={beginPanelResize}
+                        onKeyboardResize={resizePanelsByKeyboard}
+                      />
+                    )}
+                    <div
+                      ref={(node) => setPanelRef(panel.id, node)}
+                      className={`desktop-git-resizable-section desktop-git-resizable-section-${panel.className} ${panel.expanded ? "expanded" : "collapsed"}`}
+                      style={getPanelStyle(panel)}
+                    >
+                      {panel.content}
+                    </div>
+                  </Fragment>
+                ))}
+              </div>
             </div>
 
-            <GitHistoryShortcut
-              active={activePanel === "history"}
-              count={historyCount}
-              onSelect={() => selectPanel("history")}
+            <GitSidebarHistoryResizer
+              active={activeResizeSplit === "changes:history"}
+              value={historyPaneHeight}
+              onPointerDown={beginHistoryResize}
+              onKeyboardResize={resizeHistoryByKeyboard}
+              onReset={resetHistoryPaneHeight}
             />
+
+            <section
+              ref={historyPaneRef}
+              className="desktop-git-history-pane"
+              style={getHistoryPaneStyle()}
+            >
+              <GitSidebarHistoryPanel
+                commits={historyCommits}
+                selectedCommitId={selectedCommitId}
+                status={status}
+                onSelectCommit={selectCommit}
+              />
+            </section>
           </>
         )}
       </SidebarScrollArea>

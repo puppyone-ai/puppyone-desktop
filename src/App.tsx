@@ -343,7 +343,6 @@ function AppContent() {
     refreshGitStatus,
     refreshGitStatusWithFetch,
     selectGitCommit,
-    selectGitMainPanel,
     selectGitWorkingFile,
     setBranchSwitcherOpen,
     setGitOperationError,

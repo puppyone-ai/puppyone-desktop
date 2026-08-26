@@ -123,6 +123,39 @@ describe("Git sidebar status groups", () => {
     expect(committedSection?.classList.contains("collapsed")).toBe(true);
   });
 
+  it("renders History as a first-level resizable pane and opens commits from it", async () => {
+    const onSelectCommit = vi.fn();
+    const status = createGitStatus();
+    const commit = {
+      commit_id: "head",
+      parent_ids: [],
+      author_name: "PuppyOne",
+      author_email: "hello@puppyone.ai",
+      created_at: "2026-08-27T00:00:00.000Z",
+      message: "Keep history in the sidebar",
+      changes: [{
+        path: "README.md",
+        oldPath: null,
+        status: "modified" as const,
+        additions: 3,
+        deletions: 1,
+      }],
+    };
+    status.commits = [commit];
+    status.allCommits = [commit];
+    const surface = renderSidebar({ onSelectCommit, status });
+
+    expect(surface.querySelector(".desktop-git-history-resizer")).not.toBeNull();
+    expect(surface.querySelector(".desktop-git-history-pane")).not.toBeNull();
+    expect(surface.querySelector(".desktop-git-history-drawer-header button")).toBeNull();
+    const row = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-history-row"))
+      .find((button) => button.textContent?.includes("Keep history in the sidebar"));
+    expect(row).not.toBeNull();
+
+    await act(async () => row?.click());
+    expect(onSelectCommit).toHaveBeenCalledWith("head");
+  });
+
   it.each([
     "generic-git",
     "puppyone-cloud",
@@ -244,6 +277,7 @@ function renderSidebar(options: Partial<{
   onDiscardAll: () => Promise<boolean>;
   onPull: () => Promise<boolean>;
   onPush: () => Promise<boolean>;
+  onSelectCommit: (commitId: string) => void;
   onStageAll: () => Promise<boolean>;
   stageAndCommit: () => Promise<boolean>;
   status: GitStatusSnapshot;
@@ -264,7 +298,7 @@ function renderSidebar(options: Partial<{
         fileIconTheme: "default",
       }}
       view={{
-        activePanel: "changes",
+        selectedCommitId: null,
         selectedWorkingFile: null,
         operationLoading: null,
         operationError: null,
@@ -272,7 +306,7 @@ function renderSidebar(options: Partial<{
         error: null,
       }}
       actions={{
-        selectPanel: vi.fn(),
+        selectCommit: options.onSelectCommit ?? vi.fn(),
         selectWorkingFile: vi.fn(),
         stagePaths: succeed,
         stageAll: options.onStageAll ?? succeed,

@@ -2,13 +2,12 @@
   display: flex;
   box-sizing: border-box;
   min-height: 0;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   flex-direction: column;
   margin-top: 0;
-  padding-block: 3px var(--desktop-sidebar-list-padding-block);
+  padding-block: 0 var(--desktop-sidebar-list-padding-block);
   padding-inline: var(--git-sidebar-left-gap) var(--git-sidebar-right-gap);
-  border-top: 1px solid color-mix(in srgb, var(--po-border-subtle) 76%, transparent);
-  background: color-mix(in srgb, var(--po-sidebar) 94%, var(--po-panel));
+  background: var(--po-sidebar);
 }
 
 .desktop-git-history-drawer-header {
@@ -18,7 +17,7 @@
   gap: 6px;
   width: 100%;
   height: var(--desktop-sidebar-row-height);
-  margin: 1px 0;
+  margin: 0 0 1px;
   padding-block: 0;
   padding-inline: var(--git-sidebar-content-left) var(--git-sidebar-content-right);
   border: 0;
@@ -26,16 +25,6 @@
   background: transparent;
   color: var(--po-text-subtle);
   text-align: start;
-}
-
-.desktop-git-history-drawer-header:hover {
-  background: var(--po-hover);
-  color: var(--po-text-muted);
-}
-
-.desktop-git-history-drawer-header.active {
-  background: var(--po-selected);
-  color: var(--po-text);
 }
 
 .desktop-git-history-drawer-header svg {
@@ -64,7 +53,8 @@
 }
 
 .desktop-git-history-drawer > .desktop-history-list {
-  max-height: min(360px, 42vh);
+  flex: 1 1 auto;
+  max-height: none;
   min-height: 0;
   overflow: auto;
   overflow-x: hidden;
