@@ -132,7 +132,8 @@ export const CLOUD_ROUTES = [
     context: "project",
     surface: "history",
     resources: NO_PROJECT_RESOURCES,
-    showInSidebar: false,
+    showInSidebar: true,
+    navigationGroup: "project",
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/changes`,
   },
   {
@@ -221,6 +222,7 @@ export const CLOUD_ORGANIZATION_ROUTES = CLOUD_ROUTES.filter((route) => route.co
 export const CLOUD_PROJECT_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "project");
 const CLOUD_PROJECT_SIDEBAR_ORDER: readonly CloudWorkspaceSection[] = [
   "contents",
+  "history",
   "automation",
   "mcp",
   "cli",
@@ -256,15 +258,14 @@ export function getCloudSignedOutSection(
 }
 
 /**
- * Low-frequency Project detail routes remain addressable without becoming
- * first-class navigation destinations. History and Project Settings are
- * drill-downs from Homepage, so Homepage stays selected on those surfaces.
+ * Project Settings remains a low-frequency Homepage drill-down. History is a
+ * first-class project destination and therefore keeps its own active state.
  */
 export function getCloudSidebarActiveSection(
   section: CloudWorkspaceSection | string,
 ): CloudWorkspaceSection {
   const normalizedSection = normalizeCloudSection(section);
-  return ["history", "settings"].includes(normalizedSection)
+  return normalizedSection === "settings"
     ? "contents"
     : normalizedSection;
 }
