@@ -6,13 +6,38 @@
 
 .desktop-cloud-sidebar-footer {
   display: flex;
-  height: var(--desktop-sidebar-nav-height);
-  min-height: var(--desktop-sidebar-nav-height);
+  min-width: 0;
+  flex: 0 0 auto;
   align-items: center;
-  justify-content: start;
-  padding: 3px 9px 4px;
-  border-top: 1px solid transparent;
+  padding: 7px var(--desktop-sidebar-row-left-gap) 4px;
+  border-top: 1px solid var(--po-sidebar-divider, var(--po-divider));
   box-sizing: border-box;
+}
+
+.desktop-cloud-sidebar-account {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px var(--desktop-sidebar-row-content-right) 6px var(--desktop-sidebar-row-content-left);
+  border: 0;
+  border-radius: var(--desktop-sidebar-row-radius);
+  background: transparent;
+  color: var(--po-text-muted);
+  text-align: start;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.desktop-cloud-sidebar-account:hover {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-sidebar-account:focus-visible {
+  outline: 2px solid var(--po-accent);
+  outline-offset: -2px;
 }
 
 .desktop-cloud-sidebar-footer-avatar {
@@ -28,14 +53,41 @@
   background: var(--po-control);
   color: var(--po-text);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: var(--po-text-weight-medium, 500);
   text-transform: uppercase;
-  transition: background 150ms ease, box-shadow 150ms ease;
 }
 
-.desktop-cloud-sidebar-footer-avatar:hover {
-  background: var(--po-selected);
-  box-shadow: 0 0 0 2px var(--po-hover);
+.desktop-cloud-sidebar-account-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 1px;
+}
+
+.desktop-cloud-sidebar-account-name,
+.desktop-cloud-sidebar-account-context {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-sidebar-account-name {
+  color: var(--po-text);
+  font-size: var(--desktop-sidebar-font-size, var(--po-text-size-sidebar, 13px));
+  font-weight: var(--desktop-sidebar-font-weight, var(--po-text-weight-medium, 500));
+  line-height: 17px;
+}
+
+.desktop-cloud-sidebar-account-context {
+  color: var(--po-text-subtle);
+  font-size: var(--desktop-sidebar-font-size-meta, var(--po-text-size-meta, 11px));
+  font-weight: var(--po-text-weight-regular, 400);
+  line-height: 14px;
+}
+
+.desktop-cloud-sidebar-account-chevron {
+  flex: 0 0 auto;
+  color: var(--po-text-subtle);
 }
 
 .desktop-cloud-main-view {
