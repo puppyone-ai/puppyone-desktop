@@ -381,38 +381,13 @@
   white-space: nowrap;
 }
 
-.desktop-remote-update-notice-change-counts {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.desktop-remote-update-notice-change-count {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  color: var(--po-warning);
-  font-size: var(--desktop-sidebar-font-size-meta, 11px);
-  font-variant-numeric: tabular-nums;
-  font-weight: var(--desktop-sidebar-font-weight-emphasis, 650);
-  line-height: 16px;
-}
-
-.desktop-remote-update-notice-change-count[data-status="added"] {
-  color: var(--po-success);
-}
-
-.desktop-remote-update-notice-change-count[data-status="deleted"] {
-  color: var(--po-danger);
-}
-
 .desktop-remote-update-notice-pull {
   grid-column: 2;
   grid-row: 1;
 }
 
 .desktop-remote-update-notice-meta {
-  grid-column: 1 / -1;
+  grid-column: 1;
   grid-row: 2;
   display: flex;
   align-items: center;
@@ -429,7 +404,6 @@
 
 .desktop-remote-update-notice-age {
   flex: 0 0 auto;
-  margin-inline-start: auto;
 }
 
 .app-shell.dark .desktop-data-workspace-wrap .explorer-column {

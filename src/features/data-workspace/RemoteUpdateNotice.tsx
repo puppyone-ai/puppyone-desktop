@@ -41,37 +41,14 @@ export function RemoteUpdateNotice({
     >
       <div className="desktop-remote-update-notice-heading">
         <span className="desktop-remote-update-notice-summary">
-          {t("source-control.notice.filesChanged")}
+          {model.fileCount > 0
+            ? t("source-control.commit.filesChanged", { count: model.fileCount })
+            : t("source-control.notice.filesChanged")}
         </span>
       </div>
-      {(model.fileCount > 0 || updateAge || hasFileChangeCounts(model.fileChanges)) && (
+      {updateAge && (
         <div className="desktop-remote-update-notice-meta">
-          {model.fileCount > 0 && (
-            <span>{t("source-control.commit.files", { count: model.fileCount })}</span>
-          )}
-          {hasFileChangeCounts(model.fileChanges) && (
-            <span className="desktop-remote-update-notice-change-counts">
-              <RemoteUpdateChangeCount
-                count={model.fileChanges.added}
-                code="+"
-                label={t("source-control.diff.change.added")}
-                status="added"
-              />
-              <RemoteUpdateChangeCount
-                count={model.fileChanges.modified}
-                code="~"
-                label={t("source-control.diff.change.modified")}
-                status="modified"
-              />
-              <RemoteUpdateChangeCount
-                count={model.fileChanges.deleted}
-                code="−"
-                label={t("source-control.diff.change.deleted")}
-                status="deleted"
-              />
-            </span>
-          )}
-          {updateAge && <span className="desktop-remote-update-notice-age">{updateAge}</span>}
+          <span className="desktop-remote-update-notice-age">{updateAge}</span>
         </div>
       )}
       <GitOperationButton
@@ -116,30 +93,6 @@ export function getRemoteUpdateNoticeModel(
   };
 }
 
-function RemoteUpdateChangeCount({
-  count,
-  code,
-  label,
-  status,
-}: {
-  count: number;
-  code: string;
-  label: string;
-  status: "added" | "modified" | "deleted";
-}) {
-  if (count <= 0) return null;
-  return (
-    <span
-      className="desktop-remote-update-notice-change-count"
-      data-status={status}
-      title={`${label}: ${count}`}
-    >
-      <span aria-hidden="true">{code}</span>
-      {count}
-    </span>
-  );
-}
-
 function getRemoteFileChangeCounts(
   remote: GitStatusSnapshot["sourceControl"]["remote"],
 ): RemoteUpdateFileChangeCounts {
@@ -159,10 +112,6 @@ function getRemoteFileChangeCounts(
     if (file.status === "deleted") return { ...counts, deleted: counts.deleted + 1 };
     return { ...counts, modified: counts.modified + 1 };
   }, { added: 0, modified: 0, deleted: 0 });
-}
-
-function hasFileChangeCounts(counts: RemoteUpdateFileChangeCounts) {
-  return counts.added > 0 || counts.modified > 0 || counts.deleted > 0;
 }
 
 function formatRemoteUpdateAge(
