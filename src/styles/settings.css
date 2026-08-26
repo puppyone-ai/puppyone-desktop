@@ -60,7 +60,7 @@
 }
 
 .desktop-settings-section {
-  --desktop-settings-content-max-width: 1040px;
+  --desktop-settings-content-max-width: var(--po-reading-content-width, 724px);
 
   display: grid;
   width: 100%;

@@ -1,7 +1,3 @@
-.desktop-create-new-settings {
-  --desktop-settings-content-max-width: 760px;
-}
-
 .desktop-create-new-layout {
   display: grid;
   box-sizing: border-box;

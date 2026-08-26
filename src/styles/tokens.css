@@ -92,6 +92,7 @@
   --desktop-utility-page-padding-top: 24px;
   --desktop-utility-page-padding-inline: 28px;
   --desktop-utility-page-padding-bottom: 40px;
+  --po-reading-content-width: 724px;
 
   /* The attribute-free fallback must match the product's default Light/Neutral preset. */
   --po-surface-canvas: #f5f4f0;
