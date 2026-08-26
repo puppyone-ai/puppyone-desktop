@@ -6,15 +6,12 @@ import type {
   DesktopCloudSession,
 } from "../../../lib/cloudApi";
 import type { GitStatusSnapshot } from "../../../types/electron";
-import type { getCanonicalPuppyoneRemote } from "../../source-control/remotes";
 import type { DesktopCloudDataState } from "../data";
 import type { CloudWorkspaceSection } from "../types";
 import { CloudWorkspaceLoadingState } from "../components/shared";
 import { CloudAutomationRouteSection } from "../sections/AutomationRouteSection";
 import { CloudBranchesSection } from "../sections/branches";
-import { CloudGitSyncSection } from "../sections/GitSyncSection";
 import { CloudHistorySection } from "../sections/HistorySection";
-import { CloudMcpCliSection } from "../sections/McpCliSection";
 import { CloudAccessSection } from "../sections/access/AccessSection";
 import { CloudRepositoryOverview } from "../sections/overview";
 import { CloudProjectSettingsSection } from "../sections/settings";
@@ -28,16 +25,13 @@ export function CloudProjectRouteOutlet({
   status,
   cloudSession,
   cloudApiBaseUrl,
-  cloudRemote,
   cloudData,
   projectId,
   project,
   loading,
-  accountConnected,
   onSessionChange,
   onSelectSection,
   onOpenProject,
-  onOpenGitSettings,
   onRefresh,
   onRemoveCloudRemote,
 }: {
@@ -46,16 +40,13 @@ export function CloudProjectRouteOutlet({
   status: GitStatusSnapshot | null;
   cloudSession: DesktopCloudSession;
   cloudApiBaseUrl: string | null;
-  cloudRemote: ReturnType<typeof getCanonicalPuppyoneRemote>;
   cloudData: DesktopCloudDataState;
   projectId: string;
   project: DesktopCloudProject;
   loading: boolean;
-  accountConnected: boolean;
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onSelectSection: (section: CloudWorkspaceSection) => void;
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
-  onOpenGitSettings: () => void;
   onRefresh: () => Promise<void>;
   onRemoveCloudRemote?: () => void;
 }) {
@@ -67,6 +58,7 @@ export function CloudProjectRouteOutlet({
         workspace={workspace}
         project={project}
         dashboard={cloudData.dashboard}
+        tree={cloudData.tree}
         history={cloudData.history}
         scopes={cloudData.scopes}
         connectors={cloudData.connectors}
@@ -118,34 +110,12 @@ export function CloudProjectRouteOutlet({
     );
   }
 
-  if (activeSection === "mcp-cli") {
-    return (
-      <CloudMcpCliSection
-        projectId={projectId}
-        identity={cloudData.identity}
-        scopes={getCloudScopeRows(cloudData.scopes, cloudData.identity)}
-        mcpEndpoints={cloudData.mcpEndpoints}
-        loading={cloudData.loading}
-        onOpenProject={onOpenProject}
-      />
-    );
-  }
-
-  if (activeSection === "git-sync") {
-    return (
-      <CloudGitSyncSection
-        workspace={workspace}
-        status={status}
-        identity={cloudData.identity}
-        cloudRemote={cloudRemote}
-        accountConnected={accountConnected}
-        onOpenGitSettings={onOpenGitSettings}
-        onRefresh={onOpenGitSettings}
-      />
-    );
-  }
-
-  if (activeSection === "access") {
+  if (
+    activeSection === "mcp"
+    || activeSection === "cli"
+    || activeSection === "git-sync"
+    || activeSection === "access"
+  ) {
     const repositoryViews = getCloudScopeRows(cloudData.scopes, cloudData.identity);
     const connectorsByTarget = new Map<string, typeof cloudData.connectors>();
     for (const connector of cloudData.connectors) {
@@ -161,6 +131,29 @@ export function CloudProjectRouteOutlet({
         cloudData.mcpEndpoints.filter((endpoint) => scopeMatchesMcpEndpoint(view, endpoint)),
       );
     }
+    const focusedFilter = activeSection === "mcp"
+      ? "mcp"
+      : activeSection === "cli"
+        ? "cli"
+        : activeSection === "git-sync"
+          ? "git"
+          : "all";
+    const focusedTitle = activeSection === "mcp"
+      ? t("cloud.route.mcp.title")
+      : activeSection === "cli"
+        ? t("cloud.route.cli.title")
+        : activeSection === "git-sync"
+          ? t("cloud.route.git-sync.title")
+          : undefined;
+    const focusedDescription = activeSection === "mcp"
+      ? t("cloud.route.mcp.description")
+      : activeSection === "cli"
+        ? t("cloud.route.cli.description")
+        : activeSection === "git-sync"
+          ? t("cloud.route.git-sync.description")
+          : undefined;
+    const focused = activeSection !== "access";
+
     return (
       <CloudAccessSection
         projectId={projectId}
@@ -172,12 +165,25 @@ export function CloudProjectRouteOutlet({
         connectorsByTarget={connectorsByTarget}
         mcpEndpoints={cloudData.mcpEndpoints}
         mcpEndpointsByTarget={mcpEndpointsByTarget}
+        filter={focusedFilter}
         activeAccessRowId={null}
         loading={cloudData.loading}
         onCloudSessionChange={onSessionChange}
         onRefresh={onRefresh}
         onOpenProject={onOpenProject}
         canManage={project.capabilities?.includes("access_surface.manage") === true}
+        catalogTitle={focusedTitle}
+        catalogDescription={focusedDescription}
+        catalogFilterLocked={focused}
+        catalogHeaderAction={focused ? (
+          <button
+            className="desktop-cloud-access-new-button"
+            type="button"
+            onClick={() => onOpenProject(projectId, "access")}
+          >
+            {t("cloud.access.open")}
+          </button>
+        ) : undefined}
       />
     );
   }

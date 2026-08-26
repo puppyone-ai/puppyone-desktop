@@ -9,6 +9,7 @@ import {
   getCloudSidebarActiveSection,
   getCloudSignedOutSection,
   normalizeCloudSection,
+  type CloudRouteNavigationGroup,
   type CloudRouteDescriptor,
 } from "./routes/cloudRoutes";
 import { getAccountInitial } from "./utils";
@@ -20,12 +21,13 @@ type CloudSidebarNavEntry = {
   icon: CloudRouteDescriptor["icon"];
   context: CloudRouteDescriptor["context"];
   requiredCapability?: string;
+  navigationGroup?: CloudRouteNavigationGroup;
   locked?: boolean;
 };
 
 type CloudSidebarNavGroup = {
-  id: "project" | "organization";
-  labelId: "cloud.sidebar.projectGroup" | "cloud.sidebar.organizationGroup";
+  id: CloudRouteNavigationGroup;
+  labelId: "cloud.sidebar.projectGroup" | "cloud.sidebar.connectionsGroup" | "cloud.sidebar.organizationGroup";
   items: CloudSidebarNavEntry[];
 };
 
@@ -138,12 +140,17 @@ function buildCloudSidebarNavGroups(items: readonly CloudSidebarNavEntry[]): Clo
     {
       id: "project",
       labelId: "cloud.sidebar.projectGroup",
-      items: items.filter((item) => item.context !== "organization"),
+      items: items.filter((item) => item.navigationGroup === "project"),
+    },
+    {
+      id: "connections",
+      labelId: "cloud.sidebar.connectionsGroup",
+      items: items.filter((item) => item.navigationGroup === "connections"),
     },
     {
       id: "organization",
       labelId: "cloud.sidebar.organizationGroup",
-      items: items.filter((item) => item.context === "organization"),
+      items: items.filter((item) => item.navigationGroup === "organization"),
     },
   ];
 

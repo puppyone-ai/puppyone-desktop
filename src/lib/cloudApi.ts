@@ -304,6 +304,10 @@ export type DesktopCloudDashboard = {
     total: number;
     folders: number;
     files: number;
+    /** Logical bytes in the current project tree when supplied by Cloud. */
+    storage_bytes?: number | null;
+    /** Optional project storage allowance; omitted when Cloud has no project-level limit. */
+    storage_limit_bytes?: number | null;
   };
   connections: DesktopCloudDashboardConnection[];
   tools: Array<{

@@ -6,13 +6,13 @@
   }
 
   .desktop-cloud-overview-dashboard-card--storage {
-    width: min(100%, 340px);
     grid-row: auto;
   }
 
   .desktop-cloud-overview-dashboard-card--interactive {
-    min-height: 104px;
+    min-height: 96px;
   }
+
 }
 
 @media (max-width: 680px) {
@@ -24,13 +24,10 @@
     gap: 14px;
   }
 
-  .desktop-cloud-overview-storage-body {
-    padding: 18px;
-  }
-
-  .desktop-cloud-overview-storage-preview {
-    gap: 8px;
-    margin-top: 18px;
+  .desktop-cloud-overview-updated-value {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
   }
 }
 

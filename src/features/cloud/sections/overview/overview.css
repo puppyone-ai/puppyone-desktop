@@ -2,4 +2,5 @@
 @import "./styles/project-identity.css" layer(features);
 @import "./styles/dashboard-grid.css" layer(features);
 @import "./styles/resource-cards.css" layer(features);
+@import "./styles/status-cards.css" layer(features);
 @import "./styles/responsive.css" layer(features);

@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, Settings, ShieldCheck, Users } from "lucide-react";
+import { Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import { getCloudAutomationWebPath } from "../../automation/automationDomain";
 import { McpLogoIcon } from "../components/McpLogoIcon";
@@ -8,6 +8,7 @@ import type { CloudWorkspaceSection } from "./cloudRouteIds";
 
 export type CloudRouteContext = "initialization" | "project" | "organization";
 export type CloudRouteSurface = "standard" | "landing" | "history" | "automation";
+export type CloudRouteNavigationGroup = "project" | "connections" | "organization";
 export type CloudRouteIcon = ComponentType<{
   className?: string;
   size?: number | string;
@@ -23,6 +24,7 @@ export type CloudRouteDescriptor = {
   surface: CloudRouteSurface;
   resources: readonly CloudProjectDetailResource[];
   showInSidebar: boolean;
+  navigationGroup?: CloudRouteNavigationGroup;
   requiredCapability?: string;
   webPath: (projectId?: string) => string;
 };
@@ -30,6 +32,7 @@ export type CloudRouteDescriptor = {
 const NO_PROJECT_RESOURCES = [] as const satisfies readonly CloudProjectDetailResource[];
 const OVERVIEW_PROJECT_RESOURCES = [
   "dashboard",
+  "tree",
   "history",
   "scopes",
   "connectors",
@@ -42,10 +45,6 @@ const ACCESS_PROJECT_RESOURCES = [
   "mcp-endpoints",
   "identity",
 ] as const satisfies readonly CloudProjectDetailResource[];
-const GIT_SYNC_PROJECT_RESOURCES = [
-  "identity",
-] as const satisfies readonly CloudProjectDetailResource[];
-
 export const CLOUD_ROUTES = [
   {
     id: "initialize",
@@ -69,6 +68,7 @@ export const CLOUD_ROUTES = [
     surface: "standard",
     resources: NO_PROJECT_RESOURCES,
     showInSidebar: true,
+    navigationGroup: "organization",
     webPath: () => "/team",
   },
   {
@@ -81,6 +81,7 @@ export const CLOUD_ROUTES = [
     surface: "standard",
     resources: NO_PROJECT_RESOURCES,
     showInSidebar: true,
+    navigationGroup: "organization",
     webPath: () => "/billing",
   },
   {
@@ -93,18 +94,33 @@ export const CLOUD_ROUTES = [
     surface: "landing",
     resources: OVERVIEW_PROJECT_RESOURCES,
     showInSidebar: true,
+    navigationGroup: "project",
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/data`,
   },
   {
-    id: "mcp-cli",
-    labelId: "cloud.route.mcp-cli.label",
-    titleId: "cloud.route.mcp-cli.title",
-    descriptionId: "cloud.route.mcp-cli.description",
+    id: "mcp",
+    labelId: "cloud.route.mcp.label",
+    titleId: "cloud.route.mcp.title",
+    descriptionId: "cloud.route.mcp.description",
     icon: McpLogoIcon,
     context: "project",
     surface: "landing",
     resources: ACCESS_PROJECT_RESOURCES,
     showInSidebar: true,
+    navigationGroup: "connections",
+    webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
+  },
+  {
+    id: "cli",
+    labelId: "cloud.route.cli.label",
+    titleId: "cloud.route.cli.title",
+    descriptionId: "cloud.route.cli.description",
+    icon: SquareTerminal,
+    context: "project",
+    surface: "landing",
+    resources: ACCESS_PROJECT_RESOURCES,
+    showInSidebar: true,
+    navigationGroup: "connections",
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
   },
   {
@@ -141,6 +157,7 @@ export const CLOUD_ROUTES = [
     surface: "automation",
     resources: ACCESS_PROJECT_RESOURCES,
     showInSidebar: true,
+    navigationGroup: "project",
     webPath: (projectId?: string) => getCloudAutomationWebPath(requireProjectId(projectId)),
   },
   {
@@ -152,7 +169,7 @@ export const CLOUD_ROUTES = [
     context: "project",
     surface: "landing",
     resources: ACCESS_PROJECT_RESOURCES,
-    showInSidebar: true,
+    showInSidebar: false,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
   },
   {
@@ -163,8 +180,9 @@ export const CLOUD_ROUTES = [
     icon: GitBranch,
     context: "project",
     surface: "landing",
-    resources: GIT_SYNC_PROJECT_RESOURCES,
-    showInSidebar: false,
+    resources: ACCESS_PROJECT_RESOURCES,
+    showInSidebar: true,
+    navigationGroup: "connections",
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
   },
   {
@@ -203,9 +221,10 @@ export const CLOUD_ORGANIZATION_ROUTES = CLOUD_ROUTES.filter((route) => route.co
 export const CLOUD_PROJECT_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "project");
 const CLOUD_PROJECT_SIDEBAR_ORDER: readonly CloudWorkspaceSection[] = [
   "contents",
-  "mcp-cli",
   "automation",
-  "access",
+  "mcp",
+  "cli",
+  "git-sync",
 ];
 export const CLOUD_PROJECT_SIDEBAR_ROUTES = CLOUD_PROJECT_ROUTES
   .filter((route) => route.showInSidebar)
@@ -222,7 +241,7 @@ export const CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES = [
 export function normalizeCloudSection(
   section: CloudWorkspaceSection | string,
 ): CloudWorkspaceSection {
-  if (section === "git-sync") return "access";
+  if (section === "mcp-cli") return "mcp";
   return CLOUD_ROUTE_BY_ID.has(section as CloudWorkspaceSection)
     ? section as CloudWorkspaceSection
     : "contents";
@@ -233,7 +252,7 @@ export function getCloudSignedOutSection(
   section: CloudWorkspaceSection | string,
 ): CloudWorkspaceSection {
   const normalizedSection = normalizeCloudSection(section);
-  return normalizedSection === "initialize" ? "mcp-cli" : normalizedSection;
+  return normalizedSection === "initialize" ? "mcp" : normalizedSection;
 }
 
 /**

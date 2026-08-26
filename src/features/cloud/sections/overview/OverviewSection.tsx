@@ -1,8 +1,6 @@
 import {
   Check,
-  Cloud,
   Copy,
-  GitBranch,
   RefreshCw,
   Settings,
 } from "lucide-react";
@@ -17,18 +15,27 @@ import type {
   DesktopCloudProject,
   DesktopCloudRepoIdentity,
   DesktopCloudScope,
+  DesktopCloudTree,
 } from "../../../../lib/cloudApi";
 import type { DesktopCloudHistory } from "../../../../lib/cloudHistoryApi";
 import type { CloudWorkspaceSection } from "../../types";
+import { getCloudRoute } from "../../routes/cloudRoutes";
 import { CloudWorkspaceLoadingState } from "../../components/shared";
 import { copyText } from "../../utils";
 import { CloudOverviewDashboard } from "./OverviewDashboard";
-import { getCloudOverviewMetrics } from "./overviewMetrics";
+import { CloudOverviewStorageMeter } from "./CloudOverviewStorageMeter";
+import {
+  getCloudOverviewMetrics,
+  getCloudOverviewStorageUsage,
+} from "./overviewMetrics";
+
+const GitRemoteIcon = getCloudRoute("git-sync").icon;
 
 export function CloudRepositoryOverview({
   workspace,
   project,
   dashboard,
+  tree,
   history,
   scopes,
   connectors,
@@ -41,6 +48,7 @@ export function CloudRepositoryOverview({
   workspace: Workspace;
   project: DesktopCloudProject | null;
   dashboard: DesktopCloudDashboard | null;
+  tree: DesktopCloudTree | null;
   history: DesktopCloudHistory | null;
   scopes: DesktopCloudScope[];
   connectors: DesktopCloudConnector[];
@@ -61,8 +69,10 @@ export function CloudRepositoryOverview({
     mcpEndpoints,
     identity,
   });
+  const storageUsage = getCloudOverviewStorageUsage(dashboard, tree);
   const hasOverviewData = Boolean(
     dashboard
+    || tree
     || history
     || identity
     || scopes.length > 0
@@ -78,21 +88,18 @@ export function CloudRepositoryOverview({
       <main className="desktop-cloud-overview-canvas" data-po-scrollbar="content">
         <div className="desktop-cloud-overview-catalog">
           <header className="desktop-cloud-overview-landing-header">
-            <div className="desktop-cloud-overview-landing-identity">
-              <span
-                className="desktop-cloud-overview-landing-mark"
-                aria-label={t("cloud.common.cloudSource")}
-                title={t("cloud.common.cloudSource")}
-              >
-                <Cloud size={20} />
-              </span>
-              <div className="desktop-cloud-overview-landing-copy">
-                <div className="desktop-cloud-overview-landing-title-row">
-                  <h1 dir="auto">{projectName}</h1>
-                </div>
-                {projectDescription ? <p dir="auto">{projectDescription}</p> : null}
-                {gitRemoteUrl ? <CloudOverviewGitRemote value={gitRemoteUrl} /> : null}
-              </div>
+            <div className="desktop-cloud-overview-landing-copy">
+              <h1 dir="auto">{projectName}</h1>
+              {gitRemoteUrl
+                ? <CloudOverviewGitRemote value={gitRemoteUrl} />
+                : projectDescription ? <p dir="auto">{projectDescription}</p> : null}
+              <CloudOverviewStorageMeter
+                bytes={storageUsage.bytes}
+                limitBytes={storageUsage.limitBytes}
+                percent={storageUsage.percent}
+                isLowerBound={storageUsage.isLowerBound}
+                loading={loading}
+              />
             </div>
             <div className="desktop-cloud-overview-header-actions">
               {project?.capabilities?.includes("project.settings.manage") === true && (
@@ -119,10 +126,11 @@ export function CloudRepositoryOverview({
           </header>
 
           <CloudOverviewDashboard
+            projectUpdatedAt={project?.updated_at ?? null}
             history={history}
             dashboard={dashboard}
-            accessRows={overviewMetrics.accessRows}
-            automationRows={overviewMetrics.automationRows}
+            tree={tree}
+            accessPointCount={overviewMetrics.accessPointCount}
             loading={loading}
             onSelectSection={onSelectSection}
           />
@@ -147,7 +155,7 @@ function CloudOverviewGitRemote({ value }: { value: string }) {
 
   return (
     <div className="desktop-cloud-overview-git-remote">
-      <GitBranch size={13} aria-hidden="true" />
+      <GitRemoteIcon size={13} aria-hidden="true" />
       <code dir="ltr" title={value}>{value}</code>
       <button
         type="button"

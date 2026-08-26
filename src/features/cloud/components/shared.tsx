@@ -1,4 +1,4 @@
-import { Check, ChevronRight, Cloud, Copy, ExternalLink, FileText, FolderOpen, GitBranch, RefreshCw, Server } from "lucide-react";
+import { Check, ChevronRight, Cloud, Copy, ExternalLink, FileText, FolderOpen, GitBranch, RefreshCw } from "lucide-react";
 import {
   FilePreviewIcon,
   resolveRendererPublicAssetUrl,
@@ -11,7 +11,6 @@ import "./web-page.css";
 import { useState, type ReactNode } from "react";
 import type {
   DesktopCloudDashboard,
-  DesktopCloudMcpEndpoint,
   DesktopCloudProject,
   DesktopCloudTreeEntry,
 } from "../../../lib/cloudApi";
@@ -357,88 +356,6 @@ export function CloudCommandBlock({
         </button>
       </div>
       <pre>{value}</pre>
-    </div>
-  );
-}
-
-export function CloudMethodSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  const { t } = useLocalization();
-  return (
-    <section className="desktop-cloud-method-section">
-      <CloudSectionLabel>{title}</CloudSectionLabel>
-      {children}
-    </section>
-  );
-}
-
-export function CloudMethodCard({
-  icon: Icon,
-  subtitle,
-  active,
-  children,
-}: {
-  icon: typeof Cloud;
-  subtitle: string;
-  active: boolean;
-  children: ReactNode;
-}) {
-  const { t } = useLocalization();
-  return (
-    <div className={`desktop-cloud-method-card ${active ? "active" : ""}`}>
-      <div className="desktop-cloud-method-card-header">
-        <span><Icon size={16} /></span>
-        <strong>{subtitle}</strong>
-        <em>{t(active ? "cloud.status.active" : "cloud.status.needs-key")}</em>
-      </div>
-      {active && <div className="desktop-cloud-method-card-body">{children}</div>}
-      {!active && <div className="desktop-cloud-method-card-body">{children}</div>}
-    </div>
-  );
-}
-
-export function CloudMcpEndpointCard({
-  endpoint,
-  apiBase,
-  onOpen,
-  compact = false,
-}: {
-  endpoint: DesktopCloudMcpEndpoint;
-  apiBase: string;
-  onOpen: () => void;
-  compact?: boolean;
-}) {
-  const localization = useLocalization();
-  const { t } = localization;
-  const serverUrl = endpoint.api_key && apiBase ? `${apiBase}/api/v1/mcp/server/${endpoint.api_key}` : "";
-  const accessLabel = endpoint.accesses?.length
-    ? endpoint.accesses.map((access) => access.path || "/").join(", ")
-    : endpoint.path || "/";
-
-  return (
-    <div className={`desktop-cloud-mcp-card${compact ? " desktop-cloud-mcp-card--compact" : ""}`}>
-      <div className="desktop-cloud-mcp-card-header">
-        <span><Server size={15} /></span>
-        <div>
-          <strong dir="auto">{endpoint.name || t("cloud.access.surface.mcp.endpoint")}</strong>
-          <small><bdi>{accessLabel}</bdi> · {formatStatusLabel(endpoint.status || "active", t)}</small>
-        </div>
-        <button className="desktop-cloud-row-action" type="button" onClick={onOpen}>{t("cloud.common.open")}</button>
-      </div>
-      {serverUrl ? (
-        <CloudCommandBlock label={t("cloud.access.command.server-url")} value={serverUrl} />
-      ) : (
-        <div className="desktop-cloud-mcp-key-hint">
-          <span>{t("cloud.common.apiKey")}</span>
-          <strong>{endpoint.api_key_hint || t("cloud.common.hidden")}</strong>
-        </div>
-      )}
-      {!compact && endpoint.description && <p>{endpoint.description}</p>}
     </div>
   );
 }

@@ -184,7 +184,6 @@ export function CloudServiceMainView({
     }
   };
 
-  const accountConnected = Boolean(accountEmail);
   const routeSurface = getCloudRouteSurface(routedSection);
   const activeSurface = routeSurface === "landing" && !contextProjectId
     ? "standard"
@@ -218,7 +217,6 @@ export function CloudServiceMainView({
           projectContext={projectContext}
           activeSection={routedSection}
           accountEmail={accountEmail}
-          accountConnected={accountConnected}
           loading={loading}
           onSessionChange={onCloudSessionChange}
           onOpenProject={handleOpenProject}

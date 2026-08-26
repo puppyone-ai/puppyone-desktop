@@ -35,7 +35,7 @@ import {
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
 
 export function CloudLocalOnlyWorkspace({
-  activeSection = "mcp-cli",
+  activeSection = "mcp",
   workspace,
   accountEmail,
   branchName,

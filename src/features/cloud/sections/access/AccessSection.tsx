@@ -1,5 +1,5 @@
 import { ChevronRight, Plus, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import "./access.css";
@@ -66,6 +66,10 @@ export function CloudAccessSection({
   onOpenProject,
   sidebarOwnsHeader = false,
   canManage = false,
+  catalogTitle,
+  catalogDescription,
+  catalogFilterLocked = false,
+  catalogHeaderAction,
 }: {
   projectId: string;
   cloudSession: DesktopCloudSession;
@@ -85,6 +89,10 @@ export function CloudAccessSection({
   onOpenProject: (projectId: string, section?: CloudWorkspaceSection) => void;
   sidebarOwnsHeader?: boolean;
   canManage?: boolean;
+  catalogTitle?: string;
+  catalogDescription?: string;
+  catalogFilterLocked?: boolean;
+  catalogHeaderAction?: ReactNode;
 }) {
   const localization = useLocalization();
   const { locale, t } = localization;
@@ -95,12 +103,14 @@ export function CloudAccessSection({
     mcpEndpoints,
     identity,
     apiBaseUrl,
-  }), [apiBaseUrl, connectors, identity, mcpEndpoints, scopeRows]);
+    includePlaceholders: catalogFilterLocked,
+  }), [apiBaseUrl, catalogFilterLocked, connectors, identity, mcpEndpoints, scopeRows]);
   const [createAccessOpen, setCreateAccessOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<CloudAccessFilter>(filter);
   const [statusFilter, setStatusFilter] = useState<CloudAccessStatusFilter>("all");
   const [query, setQuery] = useState("");
   const [selectedCatalogRowId, setSelectedCatalogRowId] = useState<string | null>(activeAccessRowId);
+  const resolvedFilter = catalogFilterLocked ? filter : activeFilter;
 
   useEffect(() => setActiveFilter(filter), [filter]);
   useEffect(() => {
@@ -110,7 +120,7 @@ export function CloudAccessSection({
   const visibleAccessRows = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase(locale);
     return accessRows.filter((row) => {
-      if (!cloudAccessRowMatchesFilter(row, activeFilter)) return false;
+      if (!cloudAccessRowMatchesFilter(row, resolvedFilter)) return false;
       const active = isConnectorActiveStatus(row.surface.status);
       if (statusFilter === "active" && !active) return false;
       if (statusFilter === "inactive" && active) return false;
@@ -123,9 +133,9 @@ export function CloudAccessSection({
         getScopePathLabel(row.scope),
       ].join(" ").toLocaleLowerCase(locale).includes(normalizedQuery);
     });
-  }, [accessRows, activeFilter, locale, query, statusFilter, t]);
+  }, [accessRows, locale, query, resolvedFilter, statusFilter, t]);
 
-  const filterDescriptor = getCloudAccessFilterPresentation(activeFilter, t);
+  const filterDescriptor = getCloudAccessFilterPresentation(resolvedFilter, t);
   const selectedCatalogRow = accessRows.find((row) => row.id === selectedCatalogRowId) ?? null;
   const handleAccessCreated = async (created: DesktopCloudCreateAccessCreated) => {
     await onRefresh();
@@ -206,44 +216,46 @@ export function CloudAccessSection({
   return (
     <section className="desktop-cloud-access-page desktop-cloud-access-catalog-page">
       <main className="desktop-cloud-access-canvas" data-po-scrollbar="content">
-        <div className="desktop-cloud-access-catalog">
+        <div className={`desktop-cloud-access-catalog${catalogFilterLocked ? " focused" : ""}`}>
           <header className="desktop-cloud-access-landing-header">
             <div className="desktop-cloud-access-landing-copy">
-              <h1>{t("cloud.access.resources")}</h1>
-              <p>{t("cloud.route.access.description")}</p>
+              <h1>{catalogTitle ?? t("cloud.access.resources")}</h1>
+              <p>{catalogDescription ?? t("cloud.route.access.description")}</p>
             </div>
-            {canManage && (
+            {catalogHeaderAction ?? (canManage && (
               <button className="desktop-cloud-access-new-button" type="button" onClick={() => setCreateAccessOpen(true)}>
                 <Plus size={14} />
                 <span>{t("cloud.access.new")}</span>
               </button>
-            )}
+            ))}
           </header>
 
-          <div className="desktop-cloud-access-toolbar">
-            <nav
-              className="desktop-cloud-access-category-tabs"
-              data-po-scrollbar="hidden"
-              aria-label={t("cloud.access.filterAria")}
-              role="tablist"
-            >
-              {CLOUD_ACCESS_FILTERS.map((item) => {
-                const presentation = getCloudAccessFilterPresentation(item.id, t);
-                const active = activeFilter === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    className={active ? "active" : undefined}
-                    onClick={() => setActiveFilter(item.id)}
-                  >
-                    {presentation.label}
-                  </button>
-                );
-              })}
-            </nav>
+          <div className={`desktop-cloud-access-toolbar${catalogFilterLocked ? " focused" : ""}`}>
+            {!catalogFilterLocked && (
+              <nav
+                className="desktop-cloud-access-category-tabs"
+                data-po-scrollbar="hidden"
+                aria-label={t("cloud.access.filterAria")}
+                role="tablist"
+              >
+                {CLOUD_ACCESS_FILTERS.map((item) => {
+                  const presentation = getCloudAccessFilterPresentation(item.id, t);
+                  const active = resolvedFilter === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      className={active ? "active" : undefined}
+                      onClick={() => setActiveFilter(item.id)}
+                    >
+                      {presentation.label}
+                    </button>
+                  );
+                })}
+              </nav>
+            )}
             <div className="desktop-cloud-access-filter-controls">
               <label className="desktop-cloud-access-catalog-search">
                 <Search size={14} aria-hidden="true" />

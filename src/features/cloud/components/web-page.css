@@ -68,13 +68,6 @@
   min-height: 420px;
 }
 
-.desktop-cloud-web-detail {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  background: var(--po-canvas);
-}
-
 .desktop-cloud-scope-row strong {
   overflow: hidden;
   color: currentColor;
@@ -208,68 +201,6 @@
   font-weight: 650;
 }
 
-.desktop-cloud-file-change-list,
-.desktop-cloud-method-endpoint-list {
-  display: grid;
-  min-width: 0;
-  gap: 7px;
-}
-
-.desktop-cloud-file-change-row {
-  display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) max-content;
-  align-items: center;
-  gap: 9px;
-  min-height: 42px;
-  padding: 7px 9px;
-  border: 1px solid var(--po-divider);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--po-panel-raised) 62%, transparent);
-}
-
-.desktop-cloud-file-change-icon {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--po-border);
-  border-radius: 6px;
-  background: var(--po-control);
-  color: var(--po-text-muted);
-}
-
-.desktop-cloud-file-change-row > div {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.desktop-cloud-file-change-row strong {
-  overflow: hidden;
-  color: var(--po-text);
-  font-size: 12.5px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-cloud-file-change-row small {
-  overflow: hidden;
-  color: var(--po-text-subtle);
-  font-size: 11.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-cloud-file-change-row em {
-  color: var(--po-text-subtle);
-  font-size: 11px;
-  font-style: normal;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
 .desktop-cloud-web-empty {
 
   display: grid;
@@ -282,10 +213,6 @@
   border: 1px dashed var(--po-border);
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-panel-raised) 52%, transparent);
-}
-
-.desktop-cloud-method-section > .desktop-cloud-web-empty {
-  margin: 0;
 }
 
 .desktop-cloud-web-empty > span {

@@ -53,6 +53,7 @@ const lineBudgets = new Map([
   ["src/features/cloud/sections/overview/styles/project-identity.css", 90],
   ["src/features/cloud/sections/overview/styles/dashboard-grid.css", 180],
   ["src/features/cloud/sections/overview/styles/resource-cards.css", 170],
+  ["src/features/cloud/sections/overview/styles/status-cards.css", 170],
   ["src/features/cloud/sections/overview/styles/responsive.css", 150],
 ]);
 for (const [relativePath, maximumLines] of lineBudgets) {
@@ -110,7 +111,16 @@ for (const requiredRouteContract of [
     errors.push(`Cloud route descriptors are missing ${requiredRouteContract}`);
   }
 }
-for (const stableSection of ['id: "contents"', 'id: "history"', 'id: "automation"', 'id: "access"', 'id: "settings"']) {
+for (const stableSection of [
+  'id: "contents"',
+  'id: "history"',
+  'id: "automation"',
+  'id: "mcp"',
+  'id: "cli"',
+  'id: "git-sync"',
+  'id: "access"',
+  'id: "settings"',
+]) {
   if (!routeDefinitions.includes(stableSection)) {
     errors.push(`stable current-Project navigation is missing ${stableSection}`);
   }
@@ -203,8 +213,6 @@ const ownedStyles = [
   ["src/features/cloud/sections/settings/SettingsSection.tsx", 'import "./settings.css";'],
   ["src/features/cloud/sections/access/AccessSection.tsx", 'import "./access.css";'],
   ["src/features/cloud/sections/branches/BranchesSection.tsx", 'import "./branches.css";'],
-  ["src/features/cloud/sections/McpCliSection.tsx", 'import "./methods-sync.css";'],
-  ["src/features/cloud/sections/GitSyncSection.tsx", 'import "./methods-sync.css";'],
   ["src/features/cloud/history/CloudHistoryView.tsx", 'import "./history.css";'],
   ["src/features/cloud/initialization/CloudInitializationView.tsx", 'import "./initialization.css";'],
 ];
@@ -225,7 +233,6 @@ for (const relativePath of [
   "src/features/cloud/initialization/initialization.css",
   "src/features/cloud/organization/organization.css",
   "src/features/cloud/sections/branches/branches.css",
-  "src/features/cloud/sections/methods-sync.css",
   "src/features/cloud/sections/settings/settings.css",
 ]) {
   if (!read(relativePath).includes("@layer features {")) {
@@ -238,6 +245,7 @@ const expectedOverviewStyleManifest = [
   '@import "./styles/project-identity.css" layer(features);',
   '@import "./styles/dashboard-grid.css" layer(features);',
   '@import "./styles/resource-cards.css" layer(features);',
+  '@import "./styles/status-cards.css" layer(features);',
   '@import "./styles/responsive.css" layer(features);',
 ].join("\n");
 if (read("src/features/cloud/sections/overview/overview.css").trim() !== expectedOverviewStyleManifest) {
