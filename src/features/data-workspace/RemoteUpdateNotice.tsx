@@ -1,16 +1,17 @@
 import { useLocalization } from "@puppyone/localization";
-import type { GitSourceControlResourceStatus, GitStatusSnapshot } from "../../types/electron";
+import type { GitStatusSnapshot } from "../../types/electron";
 import { GitOperationButton } from "../source-control/sidebar/GitSidebarPrimitives";
 
-type RemoteUpdateFilePreview = Readonly<{
-  path: string;
-  status: GitSourceControlResourceStatus;
+type RemoteUpdateFileChangeCounts = Readonly<{
+  added: number;
+  modified: number;
+  deleted: number;
 }>;
 
 export type RemoteUpdateNoticeModel = Readonly<{
   behind: number;
   fileCount: number;
-  filePreviews: ReadonlyArray<RemoteUpdateFilePreview>;
+  fileChanges: RemoteUpdateFileChangeCounts;
   updatedAt: string | null;
   canPull: boolean;
   diverged: boolean;
@@ -44,27 +45,29 @@ export function RemoteUpdateNotice({
       <div className="desktop-remote-update-notice-heading">
         <span className="desktop-remote-update-notice-summary">{summary}</span>
       </div>
-      {(updateAge || model.filePreviews.length > 0) && (
+      {(updateAge || hasFileChangeCounts(model.fileChanges)) && (
         <div className="desktop-remote-update-notice-meta">
           {updateAge && <span className="desktop-remote-update-notice-age">{updateAge}</span>}
-          {model.filePreviews.length > 0 && (
-            <span className="desktop-remote-update-notice-file-previews">
-              {model.filePreviews.map((file) => {
-                const statusLabel = t(`source-control.diff.change.${normalizePreviewStatus(file.status)}`);
-                const fileName = getFileName(file.path);
-                const displayName = getFileDisplayName(fileName);
-                return (
-                  <span
-                    key={`${file.status}:${file.path}`}
-                    className="desktop-remote-update-notice-file-preview"
-                    data-status={file.status}
-                    title={`${fileName} · ${statusLabel}`}
-                  >
-                    <span className="desktop-remote-update-notice-file-dot" aria-hidden="true" />
-                    <span className="desktop-remote-update-notice-file-name">{displayName}</span>
-                  </span>
-                );
-              })}
+          {hasFileChangeCounts(model.fileChanges) && (
+            <span className="desktop-remote-update-notice-change-counts">
+              <RemoteUpdateChangeCount
+                count={model.fileChanges.added}
+                code="+"
+                label={t("source-control.diff.change.added")}
+                status="added"
+              />
+              <RemoteUpdateChangeCount
+                count={model.fileChanges.modified}
+                code="~"
+                label={t("source-control.diff.change.modified")}
+                status="modified"
+              />
+              <RemoteUpdateChangeCount
+                count={model.fileChanges.deleted}
+                code="−"
+                label={t("source-control.diff.change.deleted")}
+                status="deleted"
+              />
             </span>
           )}
         </div>
@@ -104,26 +107,60 @@ export function getRemoteUpdateNoticeModel(
   return {
     behind: remote.behind,
     fileCount,
-    filePreviews: remote.incomingPreview.slice(0, 3).map(({ path, status }) => ({ path, status })),
+    fileChanges: getRemoteFileChangeCounts(remote),
     updatedAt: remoteBranch?.lastCommitDate ?? null,
     canPull: remote.canPull,
     diverged: remote.state === "diverged",
   };
 }
 
-function getFileName(path: string) {
-  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
+function RemoteUpdateChangeCount({
+  count,
+  code,
+  label,
+  status,
+}: {
+  count: number;
+  code: string;
+  label: string;
+  status: "added" | "modified" | "deleted";
+}) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className="desktop-remote-update-notice-change-count"
+      data-status={status}
+      title={`${label}: ${count}`}
+    >
+      <span aria-hidden="true">{code}</span>
+      {count}
+    </span>
+  );
 }
 
-function getFileDisplayName(fileName: string) {
-  const extensionIndex = fileName.lastIndexOf(".");
-  return extensionIndex > 0 ? fileName.slice(0, extensionIndex) : fileName;
+function getRemoteFileChangeCounts(
+  remote: GitStatusSnapshot["sourceControl"]["remote"],
+): RemoteUpdateFileChangeCounts {
+  const summary = remote.incomingFileSummary;
+  if (summary) {
+    return {
+      added: (summary.added ?? 0) + (summary.copied ?? 0),
+      modified: (summary.modified ?? 0) + (summary.changed ?? 0) + (summary.renamed ?? 0),
+      deleted: summary.deleted ?? 0,
+    };
+  }
+
+  return remote.incomingPreview.reduce<RemoteUpdateFileChangeCounts>((counts, file) => {
+    if (file.status === "added" || file.status === "untracked" || file.status === "copied") {
+      return { ...counts, added: counts.added + 1 };
+    }
+    if (file.status === "deleted") return { ...counts, deleted: counts.deleted + 1 };
+    return { ...counts, modified: counts.modified + 1 };
+  }, { added: 0, modified: 0, deleted: 0 });
 }
 
-function normalizePreviewStatus(status: GitSourceControlResourceStatus) {
-  if (status === "untracked") return "added";
-  if (status === "conflict") return "changed";
-  return status;
+function hasFileChangeCounts(counts: RemoteUpdateFileChangeCounts) {
+  return counts.added > 0 || counts.modified > 0 || counts.deleted > 0;
 }
 
 function formatRemoteUpdateAge(

@@ -49,11 +49,7 @@ describe("remote update notice model", () => {
     expect(getRemoteUpdateNoticeModel(incomingStatus())).toEqual({
       behind: 3,
       fileCount: 4,
-      filePreviews: [
-        { path: "docs/brief.md", status: "modified" },
-        { path: "research/notes.md", status: "modified" },
-        { path: "assets/chart.png", status: "added" },
-      ],
+      fileChanges: { added: 1, modified: 2, deleted: 1 },
       updatedAt: "2026-08-27T01:30:00.000Z",
       canPull: true,
       diverged: false,
@@ -65,8 +61,9 @@ describe("remote update notice model", () => {
     expect(getRemoteUpdateNoticeModel(incomingStatus({ state: "synced", behind: 0 }))).toBeNull();
   });
 
-  it("limits file previews so the sidebar notice stays compact", () => {
+  it("falls back to the incoming preview when the aggregate summary is unavailable", () => {
     const status = incomingStatus({
+      incomingFileSummary: undefined,
       incomingPreview: [
         { path: "one.md", status: "added" },
         { path: "two.md", status: "modified" },
@@ -74,6 +71,10 @@ describe("remote update notice model", () => {
         { path: "four.md", status: "renamed" },
       ],
     });
-    expect(getRemoteUpdateNoticeModel(status)?.filePreviews).toHaveLength(3);
+    expect(getRemoteUpdateNoticeModel(status)?.fileChanges).toEqual({
+      added: 1,
+      modified: 2,
+      deleted: 1,
+    });
   });
 });

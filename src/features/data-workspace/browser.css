@@ -381,59 +381,29 @@
   white-space: nowrap;
 }
 
-.desktop-remote-update-notice-file-previews {
+.desktop-remote-update-notice-change-counts {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-width: 0;
-  overflow: hidden;
 }
 
-.desktop-remote-update-notice-file-preview {
+.desktop-remote-update-notice-change-count {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: 3px;
-  color: var(--po-text-subtle);
+  color: var(--po-warning);
   font-size: var(--desktop-sidebar-font-size-meta, 11px);
-  font-weight: var(--desktop-sidebar-font-weight, 500);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--desktop-sidebar-font-weight-emphasis, 650);
   line-height: 16px;
 }
 
-.desktop-remote-update-notice-file-dot {
-  width: 5px;
-  height: 5px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--po-warning);
+.desktop-remote-update-notice-change-count[data-status="added"] {
+  color: var(--po-success);
 }
 
-.desktop-remote-update-notice-file-preview[data-status="added"]
-  .desktop-remote-update-notice-file-dot,
-.desktop-remote-update-notice-file-preview[data-status="untracked"]
-  .desktop-remote-update-notice-file-dot {
-  background: var(--po-success);
-}
-
-.desktop-remote-update-notice-file-preview[data-status="deleted"]
-  .desktop-remote-update-notice-file-dot,
-.desktop-remote-update-notice-file-preview[data-status="conflict"]
-  .desktop-remote-update-notice-file-dot {
-  background: var(--po-danger);
-}
-
-.desktop-remote-update-notice-file-preview[data-status="renamed"]
-  .desktop-remote-update-notice-file-dot,
-.desktop-remote-update-notice-file-preview[data-status="copied"]
-  .desktop-remote-update-notice-file-dot {
-  background: var(--po-info);
-}
-
-.desktop-remote-update-notice-file-name {
-  max-width: 52px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.desktop-remote-update-notice-change-count[data-status="deleted"] {
+  color: var(--po-danger);
 }
 
 .desktop-remote-update-notice-pull {
