@@ -156,6 +156,18 @@ describe("Git sidebar status groups", () => {
     expect(onSelectCommit).toHaveBeenCalledWith("head");
   });
 
+  it("keeps the History body blank while known commits are still loading", () => {
+    const status = createGitStatus();
+    expect(status.totalCommits).toBeGreaterThan(0);
+    expect(status.allCommits).toHaveLength(0);
+
+    const surface = renderSidebar({ status });
+
+    expect(surface.querySelector(".desktop-git-history-pane")).not.toBeNull();
+    expect(surface.querySelector(".desktop-git-sidebar-empty-history")).toBeNull();
+    expect(surface.textContent).not.toContain("No commits yet");
+  });
+
   it.each([
     "generic-git",
     "puppyone-cloud",

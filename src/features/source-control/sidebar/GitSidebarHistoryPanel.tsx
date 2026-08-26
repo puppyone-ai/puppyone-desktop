@@ -16,6 +16,7 @@ export function GitSidebarHistoryPanel({
   onSelectCommit: (commitId: string) => void;
 }) {
   const { t, formatNumber } = useLocalization();
+  const historyIsConfirmedEmpty = status?.isRepo === true && status.totalCommits === 0;
 
   return (
     <section className="desktop-git-history-drawer">
@@ -44,9 +45,9 @@ export function GitSidebarHistoryPanel({
             />
           )}
         />
-      ) : (
+      ) : historyIsConfirmedEmpty ? (
         <SidebarEmptyHistory status={status} />
-      )}
+      ) : null}
     </section>
   );
 }
