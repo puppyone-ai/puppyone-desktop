@@ -21,29 +21,28 @@ describe("Cloud Overview visual architecture", () => {
     expect(overviewSource).toContain("desktop-cloud-overview-header-facts");
   });
 
-  it("starts directly with table columns inside one emphasized frame", () => {
+  it("starts with a GitHub-style latest-commit summary inside one emphasized frame", () => {
     const files = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-files"));
-    const columns = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-columns"));
+    const activityHeader = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-activity-header"));
 
     expect(files).toContain("border: 1px solid var(--po-border-strong);");
     expect(files).toContain("border-radius: 10px;");
-    expect(columns).toContain("min-height: 34px;");
-    expect(columns).toContain("border-bottom: 1px solid var(--po-border);");
-    expect(columns).toContain("background: var(--po-active);");
-    expect(resourceCss).toContain(".desktop-cloud-overview-file-row {\n  min-height: 40px;");
-    expect(resourceCss).toContain("min-height: 40px;\n  border-bottom: 1px solid var(--po-border-subtle);");
-    expect(dashboardSource).toContain("desktop-cloud-overview-file-columns");
+    expect(activityHeader).toContain("min-height: 38px;");
+    expect(activityHeader).toContain("padding: 0 10px;");
+    expect(activityHeader).toContain("border-bottom: 1px solid var(--po-border);");
+    expect(activityHeader).toContain("background: var(--po-active);");
+    expect(resourceCss).toContain(".desktop-cloud-overview-file-row {\n  min-height: 36px;");
+    expect(resourceCss).toContain("min-height: 36px;\n  border-bottom: 1px solid var(--po-border-subtle);");
+    expect(dashboardSource).toContain("desktop-cloud-overview-file-activity-header");
+    expect(dashboardSource).toContain("getLatestCloudCommit(history)");
     expect(dashboardSource).toContain("desktop-cloud-overview-visually-hidden");
     expect(dashboardSource).not.toContain("desktop-cloud-overview-files-header");
     expect(dashboardSource).not.toContain("cloud.overview.filesLabel");
   });
 
-  it("renders real entries, modification time, and size with product file icons", () => {
+  it("renders compact entries with modification time and product file icons", () => {
     const name = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-name"));
-    const metadata = compact(readCssBlock(
-      resourceCss,
-      ".desktop-cloud-overview-file-modified,\n.desktop-cloud-overview-file-size",
-    ));
+    const metadata = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-modified"));
 
     expect(name).toContain("font-size: 12px;");
     expect(name).toContain("font-weight: 500;");
@@ -51,7 +50,8 @@ describe("Cloud Overview visual architecture", () => {
     expect(metadata).toContain("font-weight: 400;");
     expect(dashboardSource).toContain("FileGlyphIcon");
     expect(dashboardSource).toContain("getCloudOverviewEntryUpdatedAt(entry, history)");
-    expect(dashboardSource).toContain("formatBytes(entry.size_bytes");
+    expect(dashboardSource).not.toContain("formatBytes(entry.size_bytes");
+    expect(dashboardSource).not.toContain("desktop-cloud-overview-file-size");
     expect(dashboardSource).not.toMatch(/\bFile\b.*from "lucide-react"/);
     expect(dashboardSource).not.toMatch(/\bFolder\b.*from "lucide-react"/);
   });

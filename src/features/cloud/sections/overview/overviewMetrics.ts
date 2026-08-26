@@ -90,6 +90,20 @@ export function getLatestCloudUpdateAt(
   return new Date(Math.max(...candidates)).toISOString();
 }
 
+export function getLatestCloudCommit(history: DesktopCloudHistory | null) {
+  if (!history || history.commits.length === 0) return null;
+  const head = history.head_commit_id
+    ? history.commits.find((commit) => commit.commit_id === history.head_commit_id)
+    : null;
+  if (head) return head;
+
+  return history.commits.reduce((latest, commit) => {
+    const latestAt = latest.created_at ? Date.parse(latest.created_at) : Number.NEGATIVE_INFINITY;
+    const commitAt = commit.created_at ? Date.parse(commit.created_at) : Number.NEGATIVE_INFINITY;
+    return commitAt > latestAt ? commit : latest;
+  });
+}
+
 export function getCloudOverviewRootEntries(tree: DesktopCloudTree | null) {
   if (!tree) return [];
   const root = normalizeCloudEntryPath(tree.path);

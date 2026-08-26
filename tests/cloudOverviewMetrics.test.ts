@@ -5,6 +5,7 @@ import {
   getCloudOverviewMetrics,
   getCloudOverviewRootEntries,
   getCloudOverviewStorageUsage,
+  getLatestCloudCommit,
 } from "../src/features/cloud/sections/overview/overviewMetrics";
 
 describe("Cloud Overview metrics", () => {
@@ -46,6 +47,26 @@ describe("Cloud Overview metrics", () => {
       "assets",
       "zeta.md",
     ]);
+  });
+
+  it("uses the repository head for the latest-commit summary", () => {
+    const olderHead = createHistoryCommit("a", "2026-07-18T12:00:00.000Z");
+    const newerNonHead = createHistoryCommit("b", "2026-07-19T12:00:00.000Z");
+
+    expect(getLatestCloudCommit({
+      project_id: "project-1",
+      commits: [newerNonHead, olderHead],
+      topology_available: true,
+      head_commit_id: olderHead.commit_id,
+      refs: [],
+      refs_included: true,
+      snapshot_id: "c".repeat(64),
+      next_cursor: null,
+      has_more: false,
+      total: 2,
+      graph_health: "complete",
+      unreadable_commit_ids: [],
+    })).toBe(olderHead);
   });
 
   it("uses authoritative project storage and quota when the dashboard provides them", () => {
@@ -134,5 +155,21 @@ function createDashboard(nodes: Partial<DesktopCloudDashboard["nodes"]>): Deskto
     connections: [],
     tools: [],
     uploads: [],
+  };
+}
+
+function createHistoryCommit(id: string, createdAt: string) {
+  return {
+    commit_id: id.repeat(40),
+    parent_ids: [],
+    who: "Ada",
+    message: `Commit ${id}`,
+    changes: [],
+    conflicts: [],
+    root_hash: "root",
+    scope_hash: "scope",
+    scope_path: "",
+    created_at: createdAt,
+    audit_detail: null,
   };
 }

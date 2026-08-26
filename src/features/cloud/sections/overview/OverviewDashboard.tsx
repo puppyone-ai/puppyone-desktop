@@ -6,12 +6,12 @@ import type {
 } from "../../../../lib/cloudApi";
 import type { DesktopCloudHistory } from "../../../../lib/cloudHistoryApi";
 import {
-  formatBytes,
   formatFullTime,
   formatRelativeTime,
 } from "../../utils";
 import {
   getCloudOverviewEntryUpdatedAt,
+  getLatestCloudCommit,
   getCloudOverviewRootEntries,
 } from "./overviewMetrics";
 
@@ -31,6 +31,14 @@ export function CloudOverviewDashboard({
   const entries = getCloudOverviewRootEntries(tree);
   const storedFileCount = dashboard?.nodes.files
     ?? entries.filter((entry) => entry.type !== "folder").length;
+  const latestCommit = getLatestCloudCommit(history);
+  const latestCommitTime = latestCommit?.created_at
+    ? formatRelativeTime(latestCommit.created_at, localization)
+    : "—";
+  const latestCommitTitle = latestCommit?.created_at
+    ? formatFullTime(latestCommit.created_at, localization.formatDate)
+    : undefined;
+  const authorInitial = latestCommit?.who.trim().charAt(0).toLocaleUpperCase() || "—";
 
   return (
     <section
@@ -45,19 +53,43 @@ export function CloudOverviewDashboard({
           aria-label={`${t("cloud.overview.fileListAria")} · ${t("cloud.history.fileCount", { count: storedFileCount })}`}
           aria-rowcount={entries.length + 1}
         >
-          <div className="desktop-cloud-overview-file-columns" role="row">
-            <span role="columnheader">
-              <span className="desktop-cloud-overview-visually-hidden">{t("cloud.common.name")}</span>
-            </span>
+          <header className={`desktop-cloud-overview-file-activity-header${latestCommit ? "" : " desktop-cloud-overview-file-activity-header--empty"}`}>
+            {latestCommit ? (
+              <>
+                <span className="desktop-cloud-overview-commit-author-mark" aria-hidden="true">
+                  {authorInitial}
+                </span>
+                <strong className="desktop-cloud-overview-commit-author" dir="auto">
+                  {latestCommit.who.trim() || "—"}
+                </strong>
+                <span className="desktop-cloud-overview-commit-message" dir="auto">
+                  {latestCommit.message || t("cloud.history.unknownCommit")}
+                </span>
+                <time
+                  className="desktop-cloud-overview-commit-time"
+                  dateTime={latestCommit.created_at ?? undefined}
+                  title={latestCommitTitle}
+                >
+                  {latestCommitTime}
+                </time>
+              </>
+            ) : (
+              <>
+                <span className="desktop-cloud-overview-commit-message">
+                  {t("cloud.history.noCommits")}
+                </span>
+                <span className="desktop-cloud-overview-commit-time">—</span>
+              </>
+            )}
+          </header>
+
+          <div className="desktop-cloud-overview-file-column-labels desktop-cloud-overview-visually-hidden" role="row">
+            <span role="columnheader">{t("cloud.common.name")}</span>
             <span role="columnheader">{t("cloud.status.modified")}</span>
-            <span role="columnheader">{t("cloud.overview.fileSize")}</span>
           </div>
 
           {entries.length > 0 ? entries.map((entry) => {
             const updatedAt = getCloudOverviewEntryUpdatedAt(entry, history);
-            const size = entry.type === "folder"
-              ? "—"
-              : formatBytes(entry.size_bytes, localization) || "—";
             return (
               <div
                 className="desktop-cloud-overview-file-row"
@@ -67,7 +99,7 @@ export function CloudOverviewDashboard({
               >
                 <span className="desktop-cloud-overview-file-primary" role="cell">
                   <span className="desktop-cloud-overview-file-icon" aria-hidden="true">
-                    <FileGlyphIcon name={entry.name} type={entry.type} size={16} />
+                    <FileGlyphIcon name={entry.name} type={entry.type} size={15} />
                   </span>
                   <strong className="desktop-cloud-overview-file-name" dir="auto">{entry.name}</strong>
                 </span>
@@ -81,7 +113,6 @@ export function CloudOverviewDashboard({
                     </time>
                   ) : "—"}
                 </span>
-                <span className="desktop-cloud-overview-file-size" role="cell">{size}</span>
               </div>
             );
           }) : (

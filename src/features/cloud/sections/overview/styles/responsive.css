@@ -36,15 +36,9 @@
     width: auto;
   }
 
-  .desktop-cloud-overview-file-columns,
   .desktop-cloud-overview-file-row {
     grid-template-columns: minmax(180px, 1fr) 110px;
-    column-gap: 16px;
-  }
-
-  .desktop-cloud-overview-file-columns > span:last-child,
-  .desktop-cloud-overview-file-size {
-    display: none;
+    column-gap: 10px;
   }
 }
 
