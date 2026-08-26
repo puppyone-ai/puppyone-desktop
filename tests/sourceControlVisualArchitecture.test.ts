@@ -536,8 +536,26 @@ describe("source-control visual architecture", () => {
     expect(operation).toContain("padding: 0 var(--git-action-padding-inline);");
     expect(operation).not.toContain("height: 28px;");
     expect(operation).toContain("max-width: 100%;");
-    expect(sidebarBaseCss).not.toContain("container-name: git-sidebar;");
-    expect(sidebarResourcesCss).not.toContain("@container git-sidebar");
+    expect(sidebarBaseCss).toContain("container-name: git-sidebar;");
+    expect(sidebarBaseCss).toContain("container-type: inline-size;");
+    expect(sidebarResourcesCss).toContain("@container git-sidebar (max-width: 300px)");
+    expect(sidebarResourcesCss).toContain(
+      ".desktop-git-section-actions .desktop-git-operation-label",
+    );
+    expect(compact(sidebarResourcesCss)).toContain(compact(`
+      @container git-sidebar (max-width: 300px) {
+        .desktop-git-section-actions .desktop-git-operation-button {
+          width: var(--git-action-size);
+          flex: 0 0 var(--git-action-size);
+          gap: 0;
+          padding-inline: 0;
+        }
+
+        .desktop-git-section-actions .desktop-git-operation-label {
+          display: none;
+        }
+      }
+    `));
     expect(compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-operation-label",
@@ -560,10 +578,6 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-operation-button.is-primary",
     ));
-    const stageAndCommit = compact(readCssBlock(
-      sidebarResourcesCss,
-      ".desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-commit-action",
-    ));
     const select = (overrides: Partial<Parameters<typeof getSourceControlPrimaryActionSlot>[0]> = {}) => (
       getSourceControlPrimaryActionSlot({
         hasConflicts: false,
@@ -580,8 +594,10 @@ describe("source-control visual architecture", () => {
     expect(operation).not.toContain("background: transparent;");
     expect(primary).toContain("background: var(--desktop-git-primary-bg);");
     expect(primary).toContain("color: var(--desktop-git-primary-fg);");
-    expect(stageAndCommit).toContain("background: var(--po-control);");
-    expect(stageAndCommit).not.toContain("var(--desktop-git-primary-bg)");
+    expect(sourceControlSidebarSectionsSource).toContain(
+      'className="desktop-git-stage-commit-action"',
+    );
+    expect(sourceControlSidebarSectionsSource).toContain('icon="plus"');
     expect(select({ hasStagedAction: true, hasSyncAction: true, hasCommittedAction: true })).toBe("sync");
     expect(select({ hasConflicts: true, hasStagedAction: true, hasSyncAction: true, hasCommittedAction: true })).toBeNull();
     expect(select({ hasOperationAction: true, hasSyncAction: true })).toBe("operation");

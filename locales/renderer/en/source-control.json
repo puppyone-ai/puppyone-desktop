@@ -21,7 +21,7 @@
   "action.refreshGit": "Refresh Git",
   "action.stage": "Stage",
   "action.stageAll": "Stage all",
-  "action.stageCommit": "Stage · Commit",
+  "action.stageCommit": "Stage and Commit",
   "action.stageCommitTitle": "Stage all local changes and commit them.",
   "action.stagePath": "Stage {path}",
   "action.unstage": "Unstage",

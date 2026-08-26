@@ -69,7 +69,7 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
     hasCommittedAction: Boolean(
       sidebarModel.committedPrimaryAction && !sidebarModel.committedPrimaryAction.disabled,
     ),
-    hasStageAndCommitAction: false,
+    hasStageAndCommitAction: sidebarModel.showStageAndCommitAction,
   });
   const scrollableContentRevision = useMemo(
     () => ({ expanded, loading, status }),

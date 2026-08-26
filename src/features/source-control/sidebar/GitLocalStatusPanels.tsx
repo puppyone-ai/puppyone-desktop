@@ -1,4 +1,4 @@
-import { Check, GitCommitHorizontal, Undo2 } from "lucide-react";
+import { Undo2 } from "lucide-react";
 import {
   SidebarEmptyState,
   SidebarIconButton,
@@ -17,7 +17,7 @@ import {
 } from "../viewModel";
 import type { GitSidebarActions, GitSidebarRenderPanel } from "./sourceControlSidebarTypes";
 import { SourceControlWorkingResourceList } from "./SourceControlResourceLists";
-import { GitOperationButton, SourceControlDots } from "./GitSidebarPrimitives";
+import { GitOperationButton } from "./GitSidebarPrimitives";
 import { GitLocalStatusSection } from "./GitLocalStatusSection";
 import { getGitSidebarPanelBodyRows } from "./useGitSidebarPanelLayout";
 import type { GitSidebarExpansionState } from "./useGitSidebarExpansionState";
@@ -192,7 +192,6 @@ export function createGitLocalStatusPanels({
 
   if (model.showStagedSection) {
     const action = model.stagedPrimaryAction;
-    const commitLoading = operationLoading === "commit";
     panels.push({
       id: "staged",
       className: "staged",
@@ -207,14 +206,17 @@ export function createGitLocalStatusPanels({
           onToggle={() => onToggle("staged")}
           action={(
             <div className="desktop-git-section-actions">
-              <SidebarIconButton
+              <GitOperationButton
                 className="desktop-git-commit-staged-action"
-                label={commitLoading
-                  ? t("source-control.action.committing")
-                  : t("source-control.sync.commitStaged")}
+                title={action?.title ?? t("source-control.sync.commitStaged")}
                 disabled={disabled || !action || action.disabled}
+                icon={action?.icon ?? "plus"}
+                label={action?.label ?? t("source-control.sync.commit")}
+                loadingKey={action?.loadingKey ?? "commit"}
+                loadingLabel={action?.loadingLabel ?? t("source-control.action.committing")}
+                operationLoading={operationLoading}
+                primary={primaryActionSlot === "staged"}
                 onClick={() => void actions.commit()}
-                icon={commitLoading ? <SourceControlDots /> : <Check size={13} />}
               />
             </div>
           )}
@@ -247,7 +249,7 @@ export function createGitLocalStatusPanels({
           count={model.localChangeResources.length}
           expanded={expanded.unstaged}
           onToggle={() => onToggle("unstaged")}
-          action={createUnstagedActions({ model, disabled, operationLoading, actions, t })}
+          action={createUnstagedActions({ model, disabled, operationLoading, primaryActionSlot, actions, t })}
         >
           <SourceControlWorkingResourceList
             resources={model.localChangeResources}
@@ -272,12 +274,14 @@ function createUnstagedActions({
   model,
   disabled,
   operationLoading,
+  primaryActionSlot,
   actions,
   t,
 }: {
   model: SourceControlSidebarModel;
   disabled: boolean;
   operationLoading: string | null;
+  primaryActionSlot: SourceControlPrimaryActionSlot;
   actions: LocalPanelActions;
   t: MessageFormatter;
 }) {
@@ -285,24 +289,19 @@ function createUnstagedActions({
 
   return (
     <div className="desktop-git-section-actions">
-      <SidebarIconButton
-        className="desktop-working-tree-revert-action"
-        tone="danger"
-        label={t("source-control.action.discardAll")}
-        disabled={disabled}
-        onClick={() => void actions.discardAll()}
-        icon={<Undo2 size={13} />}
-      />
-      <SidebarIconButton
+      <GitOperationButton
         className="desktop-git-stage-commit-action"
-        label={operationLoading === "stage-commit"
-          ? t("source-control.action.committing")
-          : t("source-control.action.stageCommitTitle")}
-        disabled={disabled}
+        title={model.showStageAndCommitAction
+          ? t("source-control.action.stageCommitTitle")
+          : t("source-control.sync.resolveBeforeSync")}
+        disabled={disabled || !model.showStageAndCommitAction}
+        icon="plus"
+        label={t("source-control.action.stageCommit")}
+        loadingKey="stage-commit"
+        loadingLabel={t("source-control.action.committing")}
+        operationLoading={operationLoading}
+        primary={primaryActionSlot === "stage-and-commit"}
         onClick={() => void actions.stageAndCommit()}
-        icon={operationLoading === "stage-commit"
-          ? <SourceControlDots />
-          : <GitCommitHorizontal size={13} />}
       />
     </div>
   );

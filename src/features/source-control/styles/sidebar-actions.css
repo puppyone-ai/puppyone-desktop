@@ -314,28 +314,6 @@
   color: var(--po-text);
 }
 
-/* Stage + Commit stays a visible section-owned control without competing
-   with the staged Commit action. */
-.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-commit-action {
-  background: var(--po-control);
-  color: var(--po-text-muted);
-}
-
-.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-commit-action:hover:not(:disabled) {
-  background: var(--po-control-hover);
-  color: var(--po-text);
-}
-
-.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-commit-staged-action:not(:disabled) {
-  background: var(--desktop-git-primary-bg);
-  color: var(--desktop-git-primary-fg);
-}
-
-.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-commit-staged-action:hover:not(:disabled) {
-  background: var(--desktop-git-primary-bg-hover);
-  color: var(--desktop-git-primary-fg);
-}
-
 .desktop-git-section-actions .po-sidebar-icon-button.danger {
   color: color-mix(in srgb, var(--po-danger) 72%, var(--po-text-muted));
 }
@@ -348,4 +326,17 @@
 .desktop-git-section-actions .po-sidebar-icon-button:disabled {
   background: transparent;
   color: var(--po-text-disabled);
+}
+
+@container git-sidebar (max-width: 300px) {
+  .desktop-git-section-actions .desktop-git-operation-button {
+    width: var(--git-action-size);
+    flex: 0 0 var(--git-action-size);
+    gap: 0;
+    padding-inline: 0;
+  }
+
+  .desktop-git-section-actions .desktop-git-operation-label {
+    display: none;
+  }
 }

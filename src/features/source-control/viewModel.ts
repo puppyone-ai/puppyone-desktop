@@ -278,6 +278,7 @@ export function buildSourceControlSidebarModel({
     showStagedSection: status?.isRepo === true,
     showUnstagedSection: localChangeResources.length > 0,
     stagedPrimaryAction,
+    showStageAndCommitAction: localChangeResources.length > 0 && !hasConflicts && !repositoryOperation,
     sectionContext: {
       merge: hasConflicts
         ? t("source-control.commit.conflicts", { count: mergeResources.length })

@@ -43,7 +43,12 @@ describe("Git sidebar status groups", () => {
     expect(surface.querySelectorAll(".desktop-git-section-resizer")).toHaveLength(2);
     expect(commitButton?.closest(".desktop-git-resizable-section-staged")).not.toBeNull();
     expect(commitButton?.closest(".desktop-git-section-row")).not.toBeNull();
+    expect(commitButton?.querySelector(".lucide-plus")).not.toBeNull();
+    expect(commitButton?.querySelector(".desktop-git-operation-label")?.textContent).toBe("Commit");
     expect(stageAndCommitButton?.closest(".desktop-git-resizable-section-unstaged")).not.toBeNull();
+    expect(stageAndCommitButton?.querySelector(".lucide-plus")).not.toBeNull();
+    expect(stageAndCommitButton?.querySelector(".desktop-git-operation-label")?.textContent)
+      .toBe("Stage and Commit");
     expect(pushButton?.closest(".desktop-git-section-row")).not.toBeNull();
 
     await act(async () => {
