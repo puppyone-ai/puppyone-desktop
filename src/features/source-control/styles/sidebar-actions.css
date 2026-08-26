@@ -314,13 +314,14 @@
   color: var(--po-text);
 }
 
-/* Bulk Stage all is a secondary control: visible gray chrome, never accent primary. */
-.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-all-action {
+/* Stage + Commit stays a visible section-owned control without competing
+   with the staged Commit action. */
+.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-commit-action {
   background: var(--po-control);
   color: var(--po-text-muted);
 }
 
-.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-all-action:hover:not(:disabled) {
+.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-commit-action:hover:not(:disabled) {
   background: var(--po-control-hover);
   color: var(--po-text);
 }

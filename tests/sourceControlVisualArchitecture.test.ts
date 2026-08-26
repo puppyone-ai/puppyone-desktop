@@ -233,7 +233,8 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSectionsSource).toContain('className="desktop-git-commit-staged-action"');
     expect(sourceControlSidebarSectionsSource).toContain('t("source-control.sync.commitStaged")');
     expect(sourceControlSidebarSectionsSource).toContain("disabled={disabled || !action || action.disabled}");
-    expect(sourceControlSidebarSectionsSource).not.toContain('label={t("source-control.action.stageCommit")}');
+    expect(sourceControlSidebarSectionsSource).toContain('className="desktop-git-stage-commit-action"');
+    expect(sourceControlSidebarSectionsSource).toContain('t("source-control.action.stageCommitTitle")');
   });
 
   it("reserves card surfaces for providers and keeps local source-control groups flat", () => {
@@ -289,7 +290,7 @@ describe("source-control visual architecture", () => {
       }
     `));
     expect(sidebarResourcesCss).toContain(".desktop-working-tree-row:hover,");
-    expect(resizer).toContain("background: transparent;");
+    expect(resizer).toContain("background: var(--po-sidebar-divider, var(--po-divider));");
   });
 
   it("keeps remote Fetch lifecycle out of the presentational sidebar", () => {
@@ -559,9 +560,9 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-operation-button.is-primary",
     ));
-    const stageAll = compact(readCssBlock(
+    const stageAndCommit = compact(readCssBlock(
       sidebarResourcesCss,
-      ".desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-all-action",
+      ".desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-commit-action",
     ));
     const select = (overrides: Partial<Parameters<typeof getSourceControlPrimaryActionSlot>[0]> = {}) => (
       getSourceControlPrimaryActionSlot({
@@ -579,8 +580,8 @@ describe("source-control visual architecture", () => {
     expect(operation).not.toContain("background: transparent;");
     expect(primary).toContain("background: var(--desktop-git-primary-bg);");
     expect(primary).toContain("color: var(--desktop-git-primary-fg);");
-    expect(stageAll).toContain("background: var(--po-control);");
-    expect(stageAll).not.toContain("var(--desktop-git-primary-bg)");
+    expect(stageAndCommit).toContain("background: var(--po-control);");
+    expect(stageAndCommit).not.toContain("var(--desktop-git-primary-bg)");
     expect(select({ hasStagedAction: true, hasSyncAction: true, hasCommittedAction: true })).toBe("sync");
     expect(select({ hasConflicts: true, hasStagedAction: true, hasSyncAction: true, hasCommittedAction: true })).toBeNull();
     expect(select({ hasOperationAction: true, hasSyncAction: true })).toBe("operation");

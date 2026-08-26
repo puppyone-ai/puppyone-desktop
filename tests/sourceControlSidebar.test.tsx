@@ -22,7 +22,8 @@ describe("Git sidebar status groups", () => {
   it("renders local groups expanded and flat while keeping their counts and actions in the headers", async () => {
     const onCommit = vi.fn(async () => true);
     const onPush = vi.fn(async () => true);
-    const surface = renderSidebar({ onCommit, onPush });
+    const onStageAndCommit = vi.fn(async () => true);
+    const surface = renderSidebar({ onCommit, onPush, onStageAndCommit });
 
     expect(surface.querySelector(".desktop-git-status-card")).toBeNull();
     expect(surface.querySelectorAll(".desktop-git-local-section-body.expanded")).toHaveLength(3);
@@ -32,19 +33,27 @@ describe("Git sidebar status groups", () => {
     expect(localCounts).toEqual(expect.arrayContaining(["2", "1", "1"]));
 
     const commitButton = surface.querySelector<HTMLButtonElement>(".desktop-git-commit-staged-action");
+    const stageAndCommitButton = surface.querySelector<HTMLButtonElement>(".desktop-git-stage-commit-action");
     const pushButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Push"]');
+    const panelOrder = Array.from(surface.querySelectorAll<HTMLElement>(".desktop-git-resizable-section"))
+      .map((section) => section.className.match(/desktop-git-resizable-section-(committed|staged|unstaged)/)?.[1])
+      .filter(Boolean);
 
+    expect(panelOrder).toEqual(["committed", "staged", "unstaged"]);
+    expect(surface.querySelectorAll(".desktop-git-section-resizer")).toHaveLength(2);
     expect(commitButton?.closest(".desktop-git-resizable-section-staged")).not.toBeNull();
     expect(commitButton?.closest(".desktop-git-section-row")).not.toBeNull();
+    expect(stageAndCommitButton?.closest(".desktop-git-resizable-section-unstaged")).not.toBeNull();
     expect(pushButton?.closest(".desktop-git-section-row")).not.toBeNull();
-    expect(surface.querySelector('button[aria-label="Stage · Commit"]')).toBeNull();
 
     await act(async () => {
       commitButton?.click();
+      stageAndCommitButton?.click();
       pushButton?.click();
     });
 
     expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onStageAndCommit).toHaveBeenCalledTimes(1);
     expect(onPush).toHaveBeenCalledTimes(1);
   });
 
@@ -85,10 +94,15 @@ describe("Git sidebar status groups", () => {
       .find((button) => button.textContent?.includes("Unstaged"));
     expect(unstagedToggle?.querySelector("small")?.textContent).toBe("1");
     expect(surface.textContent).toContain("Staged");
+    const stagedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
+      .find((button) => button.textContent?.includes("Staged Changes"));
     const action = surface.querySelector<HTMLButtonElement>(".desktop-git-commit-staged-action");
+    const stageAndCommit = surface.querySelector<HTMLButtonElement>(".desktop-git-stage-commit-action");
+    expect(stagedToggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(stagedToggle?.querySelector(".po-disclosure-icon")).not.toBeNull();
     expect(action?.closest(".desktop-git-resizable-section-staged")).not.toBeNull();
     expect(action?.disabled).toBe(true);
-    expect(surface.querySelector('button[aria-label="Stage · Commit"]')).toBeNull();
+    expect(stageAndCommit?.closest(".desktop-git-resizable-section-unstaged")).not.toBeNull();
   });
 
   it("keeps local groups flat without rendering a remote provider surface", () => {
@@ -321,6 +335,7 @@ function renderSidebar(options: Partial<{
   onPush: () => Promise<boolean>;
   onSelectCommit: (commitId: string) => void;
   onStageAll: () => Promise<boolean>;
+  onStageAndCommit: () => Promise<boolean>;
   historyLoading: boolean;
   status: GitStatusSnapshot;
 }> = {}) {
@@ -356,6 +371,7 @@ function renderSidebar(options: Partial<{
         unstagePaths: succeed,
         discardPaths: succeed,
         discardAll: options.onDiscardAll ?? succeed,
+        stageAndCommit: options.onStageAndCommit ?? succeed,
         commit: options.onCommit ?? succeed,
         commitAndPush: succeed,
         continueOperation: options.onContinue ?? succeed,

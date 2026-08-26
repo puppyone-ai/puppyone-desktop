@@ -120,7 +120,7 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
               <div className="desktop-git-resizable-stack">
                 {panels.map((panel, index) => (
                   <Fragment key={panel.id}>
-                    {index > 0 && panels[index - 1].expanded && panel.expanded && (
+                    {index > 0 && (
                       <GitSidebarSectionResizer
                         previous={panels[index - 1].id}
                         next={panel.id}

@@ -82,7 +82,7 @@
   inset-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);
   height: 1px;
   border-radius: 999px;
-  background: transparent;
+  background: var(--po-sidebar-divider, var(--po-divider));
   content: "";
 }
 

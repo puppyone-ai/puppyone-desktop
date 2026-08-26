@@ -31,6 +31,7 @@ export type GitSidebarActions = {
   unstagePaths: (paths: string[]) => Promise<boolean>;
   discardPaths: (paths: string[]) => Promise<boolean>;
   discardAll: () => Promise<boolean>;
+  stageAndCommit: () => Promise<boolean>;
   commit: () => Promise<boolean>;
   commitAndPush: () => Promise<boolean>;
   continueOperation: () => Promise<boolean>;
