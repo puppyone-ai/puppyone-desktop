@@ -71,6 +71,13 @@
   gap: 8px;
 }
 
+.desktop-cloud-overview-header-side {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 14px;
+}
+
 .desktop-cloud-overview-refresh-button,
 .desktop-cloud-overview-settings-button {
   display: inline-flex;

@@ -94,7 +94,7 @@ describe("CloudRepositoryOverview landing page", () => {
             parent_ids: [PARENT_COMMIT_ID],
             who: "Ada",
             message: "Ship the project dashboard",
-            changes: [{ path: "dashboard.md", op: "modified" }],
+            changes: [{ path: "users.csv", op: "modified" }],
             conflicts: [],
             root_hash: "root-1",
             scope_hash: "scope-1",
@@ -182,19 +182,24 @@ describe("CloudRepositoryOverview landing page", () => {
 
     expect(container.querySelector(".desktop-cloud-overview-catalog")).not.toBeNull();
     const dashboard = container.querySelector(".desktop-cloud-overview-dashboard");
-    const summaryCards = dashboard?.querySelectorAll(".desktop-cloud-overview-summary-card");
+    const headerFacts = container.querySelectorAll(".desktop-cloud-overview-header-fact");
     const fileRows = dashboard?.querySelectorAll(".desktop-cloud-overview-file-row");
     expect(dashboard).not.toBeNull();
-    expect(summaryCards).toHaveLength(2);
-    expect(summaryCards?.[0]?.textContent).toContain("History");
-    expect(summaryCards?.[0]?.textContent).toContain("1 hour ago");
-    expect(summaryCards?.[1]?.textContent).toContain("Access points");
-    expect(summaryCards?.[1]?.textContent).toContain("5");
+    expect(headerFacts).toHaveLength(3);
+    expect(headerFacts[0]?.textContent).toContain("Last updated");
+    expect(headerFacts[0]?.textContent).toContain("1 hour ago");
+    expect(headerFacts[1]?.textContent).toContain("Storage");
+    expect(headerFacts[2]?.textContent).toContain("Access points");
+    expect(headerFacts[2]?.textContent).toContain("5");
     expect(dashboard?.textContent).not.toContain("Automation");
-    expect(dashboard?.querySelector(".desktop-cloud-overview-files")?.textContent).toContain("5 files");
+    expect(dashboard?.querySelector(".desktop-cloud-overview-files-header")).toBeNull();
+    expect(dashboard?.querySelector(".desktop-cloud-overview-file-columns")?.textContent).toBe("NameModifiedFile size");
     expect(fileRows).toHaveLength(5);
     expect(fileRows?.[0]?.textContent).toContain("assets");
     expect(fileRows?.[1]?.textContent).toContain("docs");
+    const usersRow = Array.from(fileRows ?? []).find((row) => row.textContent?.includes("users.csv"));
+    expect(usersRow?.textContent).toContain("yesterday");
+    expect(usersRow?.textContent).toContain("2 KB");
     expect(dashboard?.querySelectorAll(".desktop-cloud-overview-file-icon svg")).toHaveLength(5);
     expect(container.querySelector(".desktop-cloud-source-pill")).toBeNull();
     expect(container.querySelector(".desktop-cloud-overview-landing-mark")).toBeNull();

@@ -443,6 +443,7 @@
   "overview.filesLabel": "파일",
   "overview.fileListAria": "프로젝트 파일",
   "overview.lastUpdated": "마지막 업데이트",
+  "overview.fileSize": "파일 크기",
   "overview.storageUsed": "사용한 저장 공간",
   "overview.accessPointListAria": "액세스 포인트 활동",
   "overview.moreItems": "{count}개 더",

@@ -17,14 +17,20 @@ import type {
   DesktopCloudTree,
 } from "../../../../lib/cloudApi";
 import type { DesktopCloudHistory } from "../../../../lib/cloudHistoryApi";
-import type { CloudWorkspaceSection } from "../../types";
 import { CloudWorkspaceLoadingState } from "../../components/shared";
 import { getCloudRoute } from "../../routes/cloudRoutes";
-import { copyText, formatBytes } from "../../utils";
+import type { CloudWorkspaceSection } from "../../types";
+import {
+  copyText,
+  formatBytes,
+  formatFullTime,
+  formatRelativeTime,
+} from "../../utils";
 import { CloudOverviewDashboard } from "./OverviewDashboard";
 import {
   getCloudOverviewMetrics,
   getCloudOverviewStorageUsage,
+  getLatestCloudUpdateAt,
   type CloudOverviewStorageUsage,
 } from "./overviewMetrics";
 
@@ -56,7 +62,7 @@ export function CloudRepositoryOverview({
   onRefresh: () => Promise<void>;
 }) {
   const localization = useLocalization();
-  const { t } = localization;
+  const { formatNumber, t } = localization;
   const projectName = project?.name ?? workspace.name;
   const projectDescription = project?.description?.trim() || null;
   const gitRemoteUrl = identity?.url?.trim() || null;
@@ -67,9 +73,14 @@ export function CloudRepositoryOverview({
     identity,
   });
   const storageUsage = getCloudOverviewStorageUsage(dashboard, tree);
+  const latestUpdateAt = getLatestCloudUpdateAt(project?.updated_at ?? null, history);
+  const latestUpdate = latestUpdateAt
+    ? formatRelativeTime(latestUpdateAt, localization)
+    : "—";
   const SettingsIcon = getCloudRoute("settings").icon;
   const hasOverviewData = Boolean(
     dashboard
+    || tree
     || history
     || identity
     || scopes.length > 0
@@ -92,40 +103,58 @@ export function CloudRepositoryOverview({
                 : projectDescription
                   ? <p dir="auto">{projectDescription}</p>
                   : null}
-              <CloudOverviewStorageMeter usage={storageUsage} loading={loading} />
             </div>
-            <div className="desktop-cloud-overview-header-actions">
-              {project?.capabilities?.includes("project.settings.manage") === true && (
+
+            <div className="desktop-cloud-overview-header-side">
+              <div className="desktop-cloud-overview-header-facts">
+                <CloudOverviewHeaderFact
+                  label={t("cloud.overview.lastUpdated")}
+                  value={latestUpdate}
+                  valueTitle={latestUpdateAt
+                    ? formatFullTime(latestUpdateAt, localization.formatDate)
+                    : undefined}
+                  ariaLabel={t("cloud.overview.viewHistory")}
+                  onClick={() => onSelectSection("history")}
+                />
+                <CloudOverviewStorageMeter usage={storageUsage} loading={loading} />
+                <CloudOverviewHeaderFact
+                  label={t("cloud.access.resources")}
+                  value={formatNumber(overviewMetrics.accessPointCount)}
+                  ariaLabel={t("cloud.overview.manageAccessPoints")}
+                  onClick={() => onSelectSection("access")}
+                />
+              </div>
+
+              <div className="desktop-cloud-overview-header-actions">
+                {project?.capabilities?.includes("project.settings.manage") === true && (
+                  <button
+                    className="desktop-cloud-overview-settings-button"
+                    type="button"
+                    aria-label={t("cloud.route.settings.title")}
+                    title={t("cloud.route.settings.title")}
+                    onClick={() => onSelectSection("settings")}
+                  >
+                    <SettingsIcon size={14} />
+                  </button>
+                )}
                 <button
-                  className="desktop-cloud-overview-settings-button"
+                  className="desktop-cloud-overview-refresh-button"
                   type="button"
-                  aria-label={t("cloud.route.settings.title")}
-                  title={t("cloud.route.settings.title")}
-                  onClick={() => onSelectSection("settings")}
+                  aria-label={t("cloud.common.refresh")}
+                  title={t("cloud.common.refresh")}
+                  onClick={() => void onRefresh()}
                 >
-                  <SettingsIcon size={14} />
+                  <RefreshCw size={14} className={loading ? "spin" : undefined} />
                 </button>
-              )}
-              <button
-                className="desktop-cloud-overview-refresh-button"
-                type="button"
-                aria-label={t("cloud.common.refresh")}
-                title={t("cloud.common.refresh")}
-                onClick={() => void onRefresh()}
-              >
-                <RefreshCw size={14} className={loading ? "spin" : undefined} />
-              </button>
+              </div>
             </div>
           </header>
 
           <CloudOverviewDashboard
-            projectUpdatedAt={project?.updated_at ?? null}
             history={history}
             dashboard={dashboard}
             tree={tree}
-            accessPointCount={overviewMetrics.accessPointCount}
             loading={loading}
-            onSelectSection={onSelectSection}
           />
         </div>
       </main>
@@ -139,13 +168,13 @@ function CloudOverviewGitRemote({ value }: { value: string }) {
   const label = copied
     ? t("cloud.common.copied")
     : `${t("cloud.common.copyValue")}: ${t("cloud.overview.repositoryRemote")}`;
+  const GitRemoteIcon = getCloudRoute("git-sync").icon;
 
   const handleCopy = async () => {
     await copyText(value);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1400);
   };
-  const GitRemoteIcon = getCloudRoute("git-sync").icon;
 
   return (
     <div className="desktop-cloud-overview-git-remote">
@@ -160,6 +189,32 @@ function CloudOverviewGitRemote({ value }: { value: string }) {
         {copied ? <Check size={13} /> : <Copy size={13} />}
       </button>
     </div>
+  );
+}
+
+function CloudOverviewHeaderFact({
+  label,
+  value,
+  valueTitle,
+  ariaLabel,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  valueTitle?: string;
+  ariaLabel: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className="desktop-cloud-overview-header-fact desktop-cloud-overview-header-fact--interactive"
+      type="button"
+      aria-label={ariaLabel}
+      onClick={onClick}
+    >
+      <span className="desktop-cloud-overview-header-fact-label">{label}</span>
+      <strong title={valueTitle}>{value}</strong>
+    </button>
   );
 }
 
@@ -191,11 +246,9 @@ function CloudOverviewStorageMeter({
       };
 
   return (
-    <div className="desktop-cloud-overview-project-storage">
-      <div className="desktop-cloud-overview-project-storage-copy">
-        <span>{t("cloud.billing.storageUsage")}</span>
-        <strong>{detail}</strong>
-      </div>
+    <div className="desktop-cloud-overview-header-fact desktop-cloud-overview-project-storage">
+      <span className="desktop-cloud-overview-header-fact-label">{t("cloud.billing.storageUsage")}</span>
+      <strong>{detail}</strong>
       <span className="desktop-cloud-overview-project-storage-track" {...progressProps}>
         {usage.percent !== null ? (
           <span style={{ width: `${usage.percent}%` }} />

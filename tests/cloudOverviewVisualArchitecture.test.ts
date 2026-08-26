@@ -8,65 +8,62 @@ const dashboardSource = readSource("../src/features/cloud/sections/overview/Over
 const overviewSource = readSource("../src/features/cloud/sections/overview/OverviewSection.tsx");
 
 describe("Cloud Overview visual architecture", () => {
-  it("uses one cloud-drive file preview with two summaries below it", () => {
+  it("makes the file table the full-width primary Overview surface", () => {
     const layout = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-dashboard"));
-    const summaries = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-summary-grid"));
 
-    expect(layout).toContain("width: min(100%, 920px);");
-    expect(layout).toContain("gap: 16px;");
-    expect(layout).not.toContain("grid-template-columns:");
-    expect(summaries).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
-    expect(dashboardSource.match(/<OverviewSummaryCard/g)).toHaveLength(2);
-    expect(dashboardSource).not.toContain("automationRows");
-    expect(dashboardSource).not.toContain("manageAutomations");
+    expect(layout).toContain("display: block;");
+    expect(layout).toContain("width: 100%;");
+    expect(layout).toContain("margin-top: 30px;");
+    expect(dashboardSource).not.toContain("OverviewSummaryCard");
+    expect(dashboardSource).not.toContain("desktop-cloud-overview-summary-grid");
+    expect(overviewSource).toContain("desktop-cloud-overview-header-facts");
   });
 
-  it("renders real tree entries with the product file icon component", () => {
+  it("starts directly with table columns inside one emphasized frame", () => {
     const files = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-files"));
-    const header = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-files-header"));
-    const row = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-row"));
-    const name = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-name"));
+    const columns = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-columns"));
 
-    expect(files).toContain("border: 1px solid var(--po-border-subtle);");
-    expect(files).toContain("border-radius: 9px;");
-    expect(header).toContain("height: 42px;");
-    expect(row).toContain("min-height: 34px;");
-    expect(row).toContain("border-radius: 6px;");
-    expect(row).not.toContain("border:");
+    expect(files).toContain("border: 1px solid var(--po-border-strong);");
+    expect(files).toContain("border-radius: 10px;");
+    expect(columns).toContain("min-height: 38px;");
+    expect(columns).toContain("border-bottom: 1px solid var(--po-border);");
+    expect(resourceCss).toContain(".desktop-cloud-overview-file-row {\n  min-height: 48px;");
+    expect(resourceCss).toContain("min-height: 48px;\n  border-bottom: 1px solid var(--po-border-subtle);");
+    expect(dashboardSource).toContain("desktop-cloud-overview-file-columns");
+    expect(dashboardSource).not.toContain("desktop-cloud-overview-files-header");
+    expect(dashboardSource).not.toContain("cloud.overview.filesLabel");
+  });
+
+  it("renders real entries, modification time, and size with product file icons", () => {
+    const name = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-name"));
+    const metadata = compact(readCssBlock(
+      resourceCss,
+      ".desktop-cloud-overview-file-modified,\n.desktop-cloud-overview-file-size",
+    ));
+
     expect(name).toContain("font-size: 13px;");
     expect(name).toContain("font-weight: 500;");
+    expect(metadata).toContain("font-size: 12px;");
+    expect(metadata).toContain("font-weight: 400;");
     expect(dashboardSource).toContain("FileGlyphIcon");
-    expect(dashboardSource).toContain("getCloudOverviewRootEntries(tree)");
+    expect(dashboardSource).toContain("getCloudOverviewEntryUpdatedAt(entry, history)");
+    expect(dashboardSource).toContain("formatBytes(entry.size_bytes");
     expect(dashboardSource).not.toMatch(/\bFile\b.*from "lucide-react"/);
     expect(dashboardSource).not.toMatch(/\bFolder\b.*from "lucide-react"/);
   });
 
-  it("keeps project storage in the identity header as a Drive-style meter", () => {
+  it("keeps update, storage, and access as quiet header facts", () => {
+    const facts = compact(readCssBlock(statusCss, ".desktop-cloud-overview-header-facts"));
+    const fact = compact(readCssBlock(statusCss, ".desktop-cloud-overview-header-fact"));
     const storage = compact(readCssBlock(statusCss, ".desktop-cloud-overview-project-storage"));
     const track = compact(readCssBlock(statusCss, ".desktop-cloud-overview-project-storage-track"));
 
-    expect(storage).toContain("width: min(100%, 340px);");
-    expect(storage).toContain("margin-top: 7px;");
+    expect(facts).toContain("grid-auto-flow: column;");
+    expect(fact).toContain("border-inline-start: 1px solid var(--po-border-subtle);");
+    expect(storage).toContain("width: 176px;");
     expect(track).toContain("height: 3px;");
-    expect(track).toContain("border-radius: 999px;");
+    expect(overviewSource.match(/<CloudOverviewHeaderFact/g)).toHaveLength(2);
     expect(overviewSource).toContain("<CloudOverviewStorageMeter");
-    expect(dashboardSource).not.toContain("CloudOverviewStorageMeter");
-    expect(dashboardSource).not.toContain("desktop-cloud-overview-storage-");
-  });
-
-  it("uses route-owned icons and the same restrained typography throughout", () => {
-    const label = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-summary-label"));
-    const value = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-summary-copy strong"));
-    const detail = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-detail"));
-
-    expect(label).toContain("font-size: 12px;");
-    expect(label).toContain("font-weight: 400;");
-    expect(value).toContain("font-size: 16px;");
-    expect(value).toContain("font-weight: 500;");
-    expect(detail).toContain("font-size: 12px;");
-    expect(detail).toContain("font-weight: 400;");
-    expect(dashboardSource).toContain("getCloudRoute(\"history\").icon");
-    expect(dashboardSource).toContain("getCloudRoute(\"access\").icon");
     expect(overviewSource).toContain("getCloudRoute(\"git-sync\").icon");
     expect(overviewSource).not.toContain("desktop-cloud-overview-landing-mark");
   });

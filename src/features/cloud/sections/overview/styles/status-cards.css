@@ -1,37 +1,70 @@
-/* Project-level storage belongs with the Project identity, not the file preview. */
-.desktop-cloud-overview-project-storage {
+/* Secondary project facts live in the header and never compete with the file table. */
+.desktop-cloud-overview-header-facts {
   display: grid;
-  width: min(100%, 340px);
-  min-width: 220px;
-  gap: 6px;
-  margin-top: 7px;
-}
-
-.desktop-cloud-overview-project-storage-copy {
-  display: flex;
   min-width: 0;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(112px, auto);
+  align-items: stretch;
 }
 
-.desktop-cloud-overview-project-storage-copy span,
-.desktop-cloud-overview-project-storage-copy strong {
+.desktop-cloud-overview-header-fact {
+  display: grid;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  align-content: center;
+  gap: 3px;
+  padding: 2px 16px;
+  border: 0;
+  border-inline-start: 1px solid var(--po-border-subtle);
+  background: transparent;
+  color: var(--po-text);
+  font: inherit;
+  text-align: start;
+}
+
+.desktop-cloud-overview-header-fact--interactive {
+  border-radius: 7px;
+  cursor: var(--po-clickable-cursor, pointer);
+  transition: background 100ms ease;
+}
+
+.desktop-cloud-overview-header-fact--interactive:hover {
+  background: var(--po-hover);
+}
+
+.desktop-cloud-overview-header-fact--interactive:focus-visible {
+  outline: 2px solid var(--po-focus-ring);
+  outline-offset: 1px;
+}
+
+.desktop-cloud-overview-header-fact-label,
+.desktop-cloud-overview-header-fact > strong {
+  min-width: 0;
   overflow: hidden;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.desktop-cloud-overview-project-storage-copy span {
-  color: var(--po-text-muted);
+.desktop-cloud-overview-header-fact-label {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 14px;
 }
 
-.desktop-cloud-overview-project-storage-copy strong {
-  color: var(--po-text-subtle);
+.desktop-cloud-overview-header-fact > strong {
+  color: var(--po-text);
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.desktop-cloud-overview-project-storage {
+  width: 176px;
+  grid-template-rows: auto auto 3px;
+  gap: 2px;
 }
 
 .desktop-cloud-overview-project-storage-track {
