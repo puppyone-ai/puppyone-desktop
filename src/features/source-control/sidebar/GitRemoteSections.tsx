@@ -1,17 +1,11 @@
 import { Cloud, X } from "lucide-react";
-import type { FileIconThemeId } from "@puppyone/shared-ui";
-import { useId } from "react";
 import { useLocalization } from "@puppyone/localization";
 import type { GitStatusSnapshot } from "../../../types/electron";
-import {
-  SourceControlPreviewResourceList,
-  SourceControlSectionHeader,
-} from "../components";
-import type { GitSyncState, GitWorkingSelection } from "../types";
+import { SourceControlSectionHeader } from "../components";
+import type { GitSyncState } from "../types";
 import { getGitScmSyncSection } from "../viewModel";
 import {
   GitOperationButton,
-  GitSectionCollapse,
   SourceControlDots,
 } from "./GitSidebarPrimitives";
 
@@ -70,14 +64,9 @@ export function GitRemotePrompt({
 export function GitScmSyncRow({
   status,
   state,
-  fileIconTheme,
-  expanded,
-  selectedWorkingFile,
   disabled,
   operationLoading,
   primaryAction,
-  onToggleExpanded,
-  onSelectWorkingFile,
   onPull,
   onPush,
   onPublish,
@@ -85,33 +74,22 @@ export function GitScmSyncRow({
 }: {
   status: GitStatusSnapshot | null;
   state: GitSyncState;
-  fileIconTheme: FileIconThemeId;
-  expanded: boolean;
-  selectedWorkingFile: GitWorkingSelection | null;
   disabled: boolean;
   operationLoading: string | null;
   primaryAction: boolean;
-  onToggleExpanded: () => void;
-  onSelectWorkingFile: (selection: GitWorkingSelection) => void;
   onPull: () => Promise<boolean>;
   onPush: () => Promise<boolean>;
   onPublish: () => Promise<boolean>;
   blockedByConflicts: boolean;
 }) {
   const { t } = useLocalization();
-  const bodyId = useId();
   const section = getGitScmSyncSection(status, state, t, { blockedByConflicts });
-  const hasBody = section.previewResources.length > 0 || Boolean(section.fallbackSummary);
   return (
     <section className={`desktop-git-remote-status desktop-git-scm-sync ${section.copy.tone}`}>
       <SourceControlSectionHeader
         title={section.copy.title}
         count={section.copy.count}
-        summaryResources={section.previewResources}
         highlightCount={section.copy.count > 0}
-        controlsId={hasBody ? bodyId : undefined}
-        expanded={expanded}
-        onToggle={hasBody ? onToggleExpanded : undefined}
         action={section.action ? (
           <GitOperationButton
             className="desktop-git-remote-action"
@@ -131,25 +109,6 @@ export function GitScmSyncRow({
           />
         ) : null}
       />
-      {section.previewResources.length > 0 && (
-        <GitSectionCollapse id={bodyId} expanded={expanded}>
-          <SourceControlPreviewResourceList
-            resources={section.previewResources}
-            fileIconTheme={fileIconTheme}
-            selectedWorkingFile={selectedWorkingFile}
-            origin="remote"
-            ariaLabel={t("source-control.preview.remote")}
-            onSelectWorkingFile={onSelectWorkingFile}
-          />
-        </GitSectionCollapse>
-      )}
-      {section.previewResources.length === 0 && section.fallbackSummary && (
-        <GitSectionCollapse id={bodyId} expanded={expanded}>
-          <div className="desktop-git-preview-summary" data-po-scrollbar="sidebar">
-            {section.fallbackSummary}
-          </div>
-        </GitSectionCollapse>
-      )}
     </section>
   );
 }

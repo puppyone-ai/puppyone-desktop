@@ -53,9 +53,8 @@ describe("GitHub provider section", () => {
     expect(card?.textContent).toContain("Already up to date.");
   });
 
-  it("renders the update age as static, non-interactive information", async () => {
+  it("keeps sync status and Pull without repeating remote file details", async () => {
     const onPull = vi.fn(async () => true);
-    const incomingUpdatedAt = new Date(Date.now() - ((2 * 60 * 60 * 1000) + 10_000)).toISOString();
     const surface = renderProvider(createSection({
       copy: { title: "Remote Changes", count: 2, detail: "origin/main", tone: "warning" },
       action: {
@@ -66,53 +65,15 @@ describe("GitHub provider section", () => {
         disabled: false,
         icon: "download",
       },
-      previewResources: [
-        {
-          id: "remote::policy.md:modified",
-          group: "workingTree",
-          path: "policy.md",
-          oldPath: null,
-          status: "modified",
-          staged: false,
-          conflict: false,
-          letter: "M",
-        },
-        {
-          id: "remote::guide.md:added",
-          group: "workingTree",
-          path: "guide.md",
-          oldPath: null,
-          status: "added",
-          staged: false,
-          conflict: false,
-          letter: "A",
-        },
-      ],
     }), {
       onPull,
-      incomingUpdatedAt,
-      incomingFileSummary: {
-        total: 96,
-        added: 4,
-        modified: 89,
-        deleted: 2,
-        renamed: 1,
-        copied: 0,
-        changed: 0,
-      },
     });
 
     expect(surface.querySelector(".desktop-git-github-change-card")).not.toBeNull();
     expect(surface.textContent).not.toContain("2 commits");
-    expect(surface.textContent).toContain("96 changes");
-    const updateAge = surface.querySelector<HTMLElement>(".desktop-git-github-update-age");
-    const updateTooltip = surface.querySelector<HTMLElement>(".desktop-git-github-update-tooltip");
-    expect(updateAge?.textContent).toBe("2 hours ago");
-    expect(updateAge?.getAttribute("datetime")).toBe(incomingUpdatedAt);
-    expect(updateAge?.tabIndex).toBe(-1);
-    expect(updateAge?.hasAttribute("aria-describedby")).toBe(false);
-    expect(updateTooltip).toBeNull();
-    expect(surface.querySelector(".desktop-git-github-summary")?.textContent).toBe("96 changes · 2 hours ago");
+    expect(surface.textContent).not.toContain("96 changes");
+    expect(surface.querySelector(".desktop-git-github-update-age")).toBeNull();
+    expect(surface.querySelector(".desktop-git-github-summary")?.textContent).toBe("Remote Changes");
     expect(surface.querySelector(".desktop-git-github-file-total")).toBeNull();
     expect(surface.querySelector(".desktop-git-github-file-stats")).toBeNull();
     expect(surface.textContent).not.toContain("Update policy");
@@ -158,8 +119,6 @@ function createSection(overrides: Partial<GitScmSyncSection> = {}): GitScmSyncSe
   return {
     copy: { title: "Remote Changes", count: 0, detail: "origin/main", tone: "ready" },
     action: null,
-    previewResources: [],
-    fallbackSummary: null,
     ...overrides,
   };
 }
@@ -168,16 +127,6 @@ function renderProvider(
   section: GitScmSyncSection,
   callbacks: {
     layout?: GitSidebarLayout;
-    incomingUpdatedAt?: string;
-    incomingFileSummary?: {
-      total: number;
-      added: number;
-      modified: number;
-      deleted: number;
-      renamed: number;
-      copied: number;
-      changed: number;
-    };
     mergeCount?: number;
     onPull?: () => Promise<boolean>;
   } = {},
@@ -191,16 +140,6 @@ function renderProvider(
       identity={{ provider: "github", label: "owner/repository", href: "https://github.com/owner/repository" }}
       section={section}
       layout={callbacks.layout ?? "cards"}
-      incomingUpdatedAt={callbacks.incomingUpdatedAt ?? null}
-      incomingFileSummary={callbacks.incomingFileSummary ?? {
-        total: 0,
-        added: 0,
-        modified: 0,
-        deleted: 0,
-        renamed: 0,
-        copied: 0,
-        changed: 0,
-      }}
       mergeCount={callbacks.mergeCount ?? 0}
       disabled={false}
       operationLoading={null}

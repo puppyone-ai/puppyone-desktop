@@ -1,51 +1,34 @@
 import { ArrowUpRight, Cloud, Github } from "lucide-react";
-import { SidebarEmptyState, type FileIconThemeId } from "@puppyone/shared-ui";
-import { useId, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization";
 import type { GitSidebarLayout } from "../../../preferences";
-import type { GitFileChangeSummary, GitStatusSnapshot } from "../../../types/electron";
+import type { GitStatusSnapshot } from "../../../types/electron";
 import { openExternalUrl } from "../../../lib/localFiles";
-import {
-  SourceControlPreviewResourceList,
-  SourceControlSectionHeader,
-} from "../components";
+import { SourceControlSectionHeader } from "../components";
 import type {
   GitHostingIdentity,
   GitScmSyncSection,
-  GitWorkingSelection,
 } from "../types";
-import { GitOperationButton, GitSectionCollapse } from "./GitSidebarPrimitives";
+import { GitOperationButton } from "./GitSidebarPrimitives";
 
 export function PuppyoneCloudProviderSection({
   status,
   mergeCount,
-  expanded,
-  fileIconTheme,
-  selectedWorkingFile,
   disabled,
   operationLoading,
   primaryAction,
-  onToggleExpanded,
-  onSelectWorkingFile,
   onPull,
 }: {
   status: GitStatusSnapshot | null;
   mergeCount: number;
-  expanded: boolean;
-  fileIconTheme: FileIconThemeId;
-  selectedWorkingFile: GitWorkingSelection | null;
   disabled: boolean;
   operationLoading: string | null;
   primaryAction: boolean;
-  onToggleExpanded: () => void;
-  onSelectWorkingFile: (selection: GitWorkingSelection) => void;
   onPull: () => Promise<boolean>;
 }) {
   const { t } = useLocalization();
-  const bodyId = useId();
   const remote = status?.sourceControl.remote ?? null;
   const cloudUpdateCount = remote?.behind ?? 0;
-  const cloudPreviewResources = cloudUpdateCount > 0 ? remote?.incomingPreview ?? [] : [];
   const downloadBlockedByConflicts = mergeCount > 0;
   const canDownload = Boolean(remote?.canPull) && !downloadBlockedByConflicts;
   const downloadTitle = downloadBlockedByConflicts
@@ -59,12 +42,8 @@ export function PuppyoneCloudProviderSection({
       <SourceControlSectionHeader
         title="PuppyOne Cloud"
         count={cloudUpdateCount}
-        summaryResources={cloudPreviewResources}
         highlightCount={cloudUpdateCount > 0}
         leadingIcon={<Cloud size={14} strokeWidth={2} />}
-        controlsId={cloudUpdateCount > 0 ? bodyId : undefined}
-        expanded={expanded}
-        onToggle={cloudUpdateCount > 0 ? onToggleExpanded : undefined}
         action={(
           <GitOperationButton
             className="desktop-git-commit-push-action"
@@ -80,26 +59,6 @@ export function PuppyoneCloudProviderSection({
           />
         )}
       />
-      <div className="desktop-git-cloud-provider-body">
-        {cloudPreviewResources.length > 0 ? (
-          <GitSectionCollapse id={bodyId} expanded={expanded}>
-            <SourceControlPreviewResourceList
-              resources={cloudPreviewResources}
-              fileIconTheme={fileIconTheme}
-              selectedWorkingFile={selectedWorkingFile}
-              origin="remote"
-              ariaLabel={t("source-control.preview.cloud")}
-              onSelectWorkingFile={onSelectWorkingFile}
-            />
-          </GitSectionCollapse>
-        ) : cloudUpdateCount > 0 ? (
-          <GitSectionCollapse id={bodyId} expanded={expanded}>
-            <SidebarEmptyState compact className="desktop-git-section-empty">
-              {t("source-control.cloud.updateCount", { count: cloudUpdateCount })}
-            </SidebarEmptyState>
-          </GitSectionCollapse>
-        ) : null}
-      </div>
     </section>
   );
 }
@@ -108,8 +67,6 @@ export function GitHubProviderSection({
   identity,
   section,
   layout,
-  incomingFileSummary,
-  incomingUpdatedAt,
   mergeCount,
   disabled,
   operationLoading,
@@ -119,8 +76,6 @@ export function GitHubProviderSection({
   identity: GitHostingIdentity;
   section: GitScmSyncSection;
   layout: GitSidebarLayout;
-  incomingFileSummary: GitFileChangeSummary;
-  incomingUpdatedAt: string | null;
   mergeCount: number;
   disabled: boolean;
   operationLoading: string | null;
@@ -142,8 +97,7 @@ export function GitHubProviderSection({
         identity={identity}
         layout={layout}
         hasIncomingChanges={section.copy.count > 0}
-        fileSummary={incomingFileSummary}
-        incomingUpdatedAt={incomingUpdatedAt}
+        incomingLabel={section.copy.title}
         action={pullAction ? (
           <GitOperationButton
             className="desktop-git-remote-action desktop-git-github-card-action"
@@ -204,19 +158,16 @@ function GitHubChangesCard({
   identity,
   layout,
   hasIncomingChanges,
-  fileSummary,
-  incomingUpdatedAt,
+  incomingLabel,
   action,
 }: {
   identity: GitHostingIdentity;
   layout: GitSidebarLayout;
   hasIncomingChanges: boolean;
-  fileSummary: GitFileChangeSummary;
-  incomingUpdatedAt: string | null;
+  incomingLabel: string;
   action: ReactNode;
 }) {
-  const { t, formatRelativeTime } = useLocalization();
-  const updateAge = formatGitRemoteUpdateAge(incomingUpdatedAt, formatRelativeTime);
+  const { t } = useLocalization();
 
   return (
     <div
@@ -224,48 +175,9 @@ function GitHubChangesCard({
     >
       {layout === "cards" && <GitHubRepositoryLink identity={identity} />}
       <span className="desktop-git-github-summary">
-        {hasIncomingChanges ? (
-          <>
-            {t("source-control.commit.changes", { count: fileSummary.total })}
-            {updateAge && (
-              <>
-                <span aria-hidden="true"> · </span>
-                <time
-                  className="desktop-git-github-update-age"
-                  dateTime={incomingUpdatedAt ?? undefined}
-                >
-                  {updateAge}
-                </time>
-              </>
-            )}
-          </>
-        ) : t("source-control.sync.upToDate")}
+        {hasIncomingChanges ? incomingLabel : t("source-control.sync.upToDate")}
       </span>
       {action}
     </div>
   );
-}
-
-function formatGitRemoteUpdateAge(
-  value: string | null,
-  formatRelativeTime: ReturnType<typeof useLocalization>["formatRelativeTime"],
-) {
-  const timestamp = value ? Date.parse(value) : Number.NaN;
-  if (!Number.isFinite(timestamp)) return null;
-
-  const elapsedMs = Math.max(0, Date.now() - timestamp);
-  const minute = 60_000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-  const week = 7 * day;
-  const month = 30 * day;
-  const year = 365 * day;
-
-  if (elapsedMs < minute) return formatRelativeTime(0, "second", { numeric: "auto" });
-  if (elapsedMs < hour) return formatRelativeTime(-Math.floor(elapsedMs / minute), "minute", { numeric: "auto" });
-  if (elapsedMs < day) return formatRelativeTime(-Math.floor(elapsedMs / hour), "hour", { numeric: "auto" });
-  if (elapsedMs < week) return formatRelativeTime(-Math.floor(elapsedMs / day), "day", { numeric: "auto" });
-  if (elapsedMs < month) return formatRelativeTime(-Math.floor(elapsedMs / week), "week", { numeric: "auto" });
-  if (elapsedMs < year) return formatRelativeTime(-Math.floor(elapsedMs / month), "month", { numeric: "auto" });
-  return formatRelativeTime(-Math.floor(elapsedMs / year), "year", { numeric: "auto" });
 }

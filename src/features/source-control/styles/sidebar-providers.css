@@ -36,10 +36,6 @@
   border-bottom: 0;
 }
 
-.desktop-git-cloud-provider-body {
-  min-width: 0;
-}
-
 .desktop-git-section-row {
   display: flex;
   box-sizing: border-box;
@@ -218,11 +214,6 @@
   line-height: var(--git-line-height);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.desktop-git-github-change-card .desktop-git-github-update-age {
-  color: inherit;
-  cursor: default;
 }
 
 .desktop-git-github-card-action {

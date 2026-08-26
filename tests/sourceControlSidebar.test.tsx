@@ -126,6 +126,25 @@ describe("Git sidebar status groups", () => {
     expect(committedSection?.classList.contains("collapsed")).toBe(true);
   });
 
+  it.each([
+    ["generic-git", ".desktop-git-resizable-section-remote", "Pull"],
+    ["puppyone-cloud", ".desktop-git-cloud-provider-section", "Download"],
+  ] as const)("keeps %s sync controls without rendering remote files", (kind, selector, actionLabel) => {
+    const status = createDivergedGitHubStatus();
+    status.effectiveHosting = {
+      ...status.effectiveHosting,
+      kind,
+      identity: null,
+    };
+    const surface = renderSidebar({ status });
+    const remoteSurface = surface.querySelector<HTMLElement>(selector);
+
+    expect(remoteSurface).not.toBeNull();
+    expect(remoteSurface?.textContent).not.toContain("remote.md");
+    expect(remoteSurface?.querySelector('[data-resource-status]')).toBeNull();
+    expect(remoteSurface?.querySelector(`button[aria-label="${actionLabel}"]`)).not.toBeNull();
+  });
+
   it("renders merge conflicts through the same default-expanded flat contract", () => {
     const status = createGitStatus();
     status.sourceControl.groups.unshift({

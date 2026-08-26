@@ -207,7 +207,7 @@ describe("source-control visual architecture", () => {
     ));
     const emptyStateSources = `${sourceControlSidebarSource}\n${sourceControlSidebarSectionsSource}`;
 
-    expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(2);
+    expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(1);
     expect(emptyStateSources).not.toMatch(/desktop-git-empty-(?:remote|committed|stage|changes)/);
     expect(sourceControlComponentsSource).toContain("<ChevronRight size={14}");
     expect(sidebarBaseCss).toContain("--git-section-leading-slot-size: 14px;");
@@ -236,7 +236,7 @@ describe("source-control visual architecture", () => {
     );
   });
 
-  it("keeps GitHub incoming updates inside the canonical provider and compact change card", () => {
+  it("keeps GitHub sync controls without repeating remote file details", () => {
     const card = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-github-change-card",
@@ -253,10 +253,6 @@ describe("source-control visual architecture", () => {
       sidebarResourcesCss,
       ".desktop-git-github-provider-section.is-divider-layout",
     ));
-    const updateAge = compact(readCssBlock(
-      sidebarResourcesCss,
-      ".desktop-git-github-change-card .desktop-git-github-update-age",
-    ));
     const summary = compact(readCssBlock(
       sidebarResourcesCss,
       ".desktop-git-github-summary",
@@ -272,20 +268,21 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-change-card");
     expect(sourceControlSidebarSectionsSource).toContain('hasIncomingChanges ? "" : " is-up-to-date"');
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-card-action");
-    expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-update-age");
-    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-update-tooltip");
+    expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-update-age");
     expect(sourceControlSidebarSectionsSource).toContain("desktop-git-github-summary");
     expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-file-total");
     expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-file-stats");
-    expect(sourceControlSidebarSectionsSource).toContain("source-control.commit.changes");
+    expect(sourceControlSidebarSectionsSource).not.toContain("source-control.commit.changes");
     expect(sourceControlSidebarSectionsSource).not.toContain("source-control.github.updatedRelative");
-    expect(sourceControlSidebarSectionsSource).toContain("{updateAge}");
+    expect(sourceControlSidebarSectionsSource).toContain("{hasIncomingChanges ? incomingLabel");
     expect(sourceControlSidebarSectionsSource).toContain('t("source-control.sync.upToDate")');
     expect(sourceControlSidebarSectionsSource).not.toContain("source-control.github.latestIncomingCommitAt");
     expect(sourceControlSidebarSectionsSource).toContain('label={t("source-control.sync.pull")}');
     expect(sourceControlSidebarSectionsSource).not.toContain("aria-describedby");
     expect(sourceControlSidebarSectionsSource).not.toContain('role="tooltip"');
-    expect(sourceControlSidebarSource).toContain("lastCommitDate");
+    expect(sourceControlSidebarSource).not.toContain("lastCommitDate");
+    expect(sourceControlSidebarSource).not.toContain("incomingFileSummary");
+    expect(sourceControlSidebarSectionsSource).not.toContain('origin="remote"');
     expect(sourceControlSidebarSectionsSource).not.toContain("desktop-git-github-provider-body");
     expect(card).toContain(
       "margin: 0 var(--git-sidebar-control-right-gap) 4px var(--git-sidebar-control-left-gap);",
@@ -299,12 +296,10 @@ describe("source-control visual architecture", () => {
     expect(dividerCard).toContain("padding: 10px;");
     expect(upToDateDividerCard).toContain("min-height: 48px;");
     expect(dividerProvider).toContain("border-bottom: 0;");
-    expect(updateAge).toContain("color: inherit;");
-    expect(updateAge).toContain("cursor: default;");
     expect(summary).toContain("grid-row: 2;");
     expect(summary).toContain("color: var(--po-text-muted);");
     expect(summary).toContain("font-size: var(--git-font-main);");
-    expect(sidebarResourcesCss).not.toContain("desktop-git-github-update-tooltip");
+    expect(sidebarResourcesCss).not.toContain("desktop-git-github-update-age");
   });
 
   it("reserves card surfaces for providers and keeps local source-control groups flat", () => {

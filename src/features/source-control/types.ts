@@ -54,8 +54,6 @@ export type GitScmSyncCopy = {
 export type GitScmSyncSection = {
   copy: GitScmSyncCopy;
   action: GitScmSyncAction | null;
-  previewResources: GitSourceControlResource[];
-  fallbackSummary: string | null;
 };
 
 export type GitSyncState = {

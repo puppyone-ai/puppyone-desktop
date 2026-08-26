@@ -95,21 +95,13 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
     ),
     hasStageAndCommitAction: sidebarModel.showStageAndCommitAction,
   });
-  const githubIncomingUpdatedAt = status?.branches.find(
-    (branch) => branch.remote && branch.name === status.sourceControl.remote.target?.ref,
-  )?.lastCommitDate ?? null;
   const providerSlot = hostingMode === "puppyone-cloud" ? (
     <PuppyoneCloudProviderSection
       status={status}
       mergeCount={sidebarModel.mergeResources.length}
-      expanded={expanded.remote}
-      fileIconTheme={fileIconTheme}
-      selectedWorkingFile={selectedWorkingFile}
       disabled={disabled}
       operationLoading={operationLoading}
       primaryAction={primaryActionSlot === "sync"}
-      onToggleExpanded={() => toggle("remote")}
-      onSelectWorkingFile={selectWorkingFile}
       onPull={pull}
     />
   ) : hostingMode === "github" && hostingIdentity && githubSection ? (
@@ -117,8 +109,6 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
       identity={hostingIdentity}
       section={githubSection}
       layout={gitSidebarLayout}
-      incomingUpdatedAt={githubIncomingUpdatedAt}
-      incomingFileSummary={status?.sourceControl.remote.incomingFileSummary ?? emptyFileChangeSummary()}
       mergeCount={sidebarModel.mergeResources.length}
       disabled={disabled}
       operationLoading={operationLoading}
@@ -147,22 +137,14 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
       className: "remote",
       grow: 1.05,
       expanded: expanded.remote,
-      bodyRows: getGitSidebarPanelBodyRows(
-        remoteSection.previewResources.length,
-        Boolean(remoteSection.fallbackSummary),
-      ),
+      bodyRows: getGitSidebarPanelBodyRows(0),
       content: (
         <GitScmSyncRow
           status={status}
           state={syncState}
-          fileIconTheme={fileIconTheme}
-          expanded={expanded.remote}
-          selectedWorkingFile={selectedWorkingFile}
           disabled={disabled}
           operationLoading={operationLoading}
           primaryAction={primaryActionSlot === "sync"}
-          onToggleExpanded={() => toggle("remote")}
-          onSelectWorkingFile={selectWorkingFile}
           onPull={pull}
           onPush={push}
           onPublish={publish}
@@ -255,16 +237,4 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
       </SidebarScrollArea>
     </SidebarRoot>
   );
-}
-
-function emptyFileChangeSummary() {
-  return {
-    total: 0,
-    added: 0,
-    modified: 0,
-    deleted: 0,
-    renamed: 0,
-    copied: 0,
-    changed: 0,
-  };
 }
