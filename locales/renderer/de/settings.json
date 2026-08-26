@@ -133,6 +133,8 @@
   "experimental.agentChat.detail": "Zeigt das experimentelle Chat-Symbol in der Kopfzeile. Das Terminal bleibt eine eigene Schaltfläche und bei deaktivierter Option verfügbar.",
   "experimental.cloudWorkspace.title": "PuppyOne Cloud",
   "experimental.cloudWorkspace.detail": "Zeigt den Cloud-Eintrag in der Navigation und die Cloud-Veröffentlichungserinnerung in der Quellcodeverwaltung.",
+  "experimental.cloudAutomation.title": "Automation",
+  "experimental.cloudAutomation.detail": "Zeigt den experimentellen Automation-Arbeitsbereich für geplante Abläufe und verbundene Datenquellen.",
   "experimental.appFiles.title": "PuppyOne-App-Dateien",
   "experimental.appFiles.detail": "Zeigt PuppyOne App unter Neu > Benutzerdefinierte Dateien.",
   "experimental.flowFiles.title": "PuppyFlow-Dateien",

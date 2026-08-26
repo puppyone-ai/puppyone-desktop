@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CLOUD_PROJECT_SIDEBAR_ROUTES,
+  getAvailableCloudSection,
   getCloudRoute,
   getCloudSidebarActiveSection,
 } from "../src/features/cloud/routes/cloudRoutes";
@@ -32,5 +33,11 @@ describe("Cloud navigation information architecture", () => {
     expect(getCloudSidebarActiveSection("settings")).toBe("contents");
     expect(getCloudRoute("history").surface).toBe("history");
     expect(getCloudRoute("settings").surface).toBe("landing");
+  });
+
+  it("falls back to Homepage when the Automation experiment is disabled", () => {
+    expect(getAvailableCloudSection("automation", { automationEnabled: false })).toBe("contents");
+    expect(getAvailableCloudSection("automation", { automationEnabled: true })).toBe("automation");
+    expect(getAvailableCloudSection("mcp", { automationEnabled: false })).toBe("mcp");
   });
 });

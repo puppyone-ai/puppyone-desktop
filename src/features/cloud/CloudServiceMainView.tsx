@@ -13,10 +13,10 @@ import { CloudRouter } from "./routes/CloudRouter";
 import { CloudSurfaceFrame } from "./shell/CloudSurfaceFrame";
 import {
   getCloudProjectDetailResources,
+  getAvailableCloudSection,
   getCloudRouteSurface,
   getCloudRouteWebPath,
   isCloudOrganizationSection,
-  normalizeCloudSection,
 } from "./routes/cloudRoutes";
 import {
   cloudMessage,
@@ -38,6 +38,7 @@ export function CloudServiceMainView({
   projectContext = null,
   onCloudSessionChange,
   activeSection,
+  automationEnabled,
   loading,
   error,
   cloudBackupLoading,
@@ -57,7 +58,7 @@ export function CloudServiceMainView({
   const { t } = useLocalization();
   const cloudRemote = cloudEnvironment.cloudRemote;
   const cloudApiBaseUrl = cloudEnvironment.apiBaseUrl;
-  const routedSection = normalizeCloudSection(activeSection);
+  const routedSection = getAvailableCloudSection(activeSection, { automationEnabled });
   const inOrganizationSection = isCloudOrganizationSection(routedSection);
   const localOnlyContext = !inOrganizationSection && (
       projectContext?.status === "local-only"
@@ -90,11 +91,11 @@ export function CloudServiceMainView({
   }, [workspace.path, accountEmail, cloudApiBaseUrl]);
 
   useEffect(() => {
-    const normalizedSection = normalizeCloudSection(activeSection);
+    const normalizedSection = getAvailableCloudSection(activeSection, { automationEnabled });
     if (normalizedSection !== activeSection) {
       onSelectSection(normalizedSection);
     }
-  }, [activeSection, onSelectSection]);
+  }, [activeSection, automationEnabled, onSelectSection]);
 
   const cloudPublishErrorMessage = cloudPublishError
     ? formatCloudPublishFailure(cloudPublishError, t)

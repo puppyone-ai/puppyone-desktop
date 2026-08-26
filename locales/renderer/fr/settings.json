@@ -133,6 +133,8 @@
   "experimental.agentChat.detail": "Afficher l’icône de discussion expérimentale dans l’en-tête. Le terminal reste un bouton séparé et reste disponible lorsqu’il est désactivé.",
   "experimental.cloudWorkspace.title": "PuppyOne Cloud",
   "experimental.cloudWorkspace.detail": "Afficher l’entrée Cloud dans la navigation et le rappel de publication Cloud dans le contrôle de source.",
+  "experimental.cloudAutomation.title": "Automation",
+  "experimental.cloudAutomation.detail": "Afficher l’espace de travail Automation expérimental pour les exécutions planifiées et les sources de données connectées.",
   "experimental.appFiles.title": "Fichiers d’application PuppyOne",
   "experimental.appFiles.detail": "Afficher l’application PuppyOne dans Nouveau > Fichiers personnalisés.",
   "experimental.flowFiles.title": "Fichiers PuppyFlow",

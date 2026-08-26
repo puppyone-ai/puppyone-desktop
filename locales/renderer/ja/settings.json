@@ -133,6 +133,8 @@
   "experimental.agentChat.detail": "ヘッダーに実験的なチャットアイコンを表示します。ターミナルは独立したボタンのままで、この設定がオフでも利用できます。",
   "experimental.cloudWorkspace.title": "PuppyOne Cloud",
   "experimental.cloudWorkspace.detail": "ナビゲーションの Cloud 項目と、ソース管理の Cloud 公開リマインダーを表示します。",
+  "experimental.cloudAutomation.title": "Automation",
+  "experimental.cloudAutomation.detail": "スケジュール実行と接続済みデータソースのための実験的な Automation ワークスペースを表示します。",
   "experimental.appFiles.title": "PuppyOne App ファイル",
   "experimental.appFiles.detail": "新規 > カスタムファイルに PuppyOne App を表示します。",
   "experimental.flowFiles.title": "PuppyFlow ファイル",

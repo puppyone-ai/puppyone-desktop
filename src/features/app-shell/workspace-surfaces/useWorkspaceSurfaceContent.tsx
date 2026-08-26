@@ -246,6 +246,7 @@ export function useWorkspaceSurfaceContent({
       <CloudServiceSidebar
         cloudAuthState={cloudAuthState}
         activeSection={cloud.activeSection}
+        automationEnabled={preferences.experimentalSettings.enableCloudAutomation}
         projectAvailable={cloudContextHasProject(projectContext)}
         projectCapabilities={projectContext.status === "resolved"
           ? projectContext.capabilities ?? []
@@ -262,6 +263,7 @@ export function useWorkspaceSurfaceContent({
         projectContext={projectContext}
         onCloudSessionChange={cloud.onCloudSessionChange}
         activeSection={cloud.activeSection}
+        automationEnabled={preferences.experimentalSettings.enableCloudAutomation}
         loading={git.gitStatusLoading}
         error={git.gitStatusError}
         cloudBackupLoading={cloud.backupLoading}

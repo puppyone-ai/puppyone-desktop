@@ -41,9 +41,9 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(labels(container)).toEqual([
-      "Homepage", "History", "MCP", "CLI", "Git", "Automation", "Team", "Billing",
+      "Homepage", "History", "MCP", "CLI", "Git", "Team", "Billing",
     ]);
-    expect(groupLabels(container)).toEqual(["Cloud Project", "Connections", "Automation", "Organization"]);
+    expect(groupLabels(container)).toEqual(["Cloud Project", "Connections", "Organization"]);
     expect(labels(container)).not.toContain("Settings");
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
     expect(rows(container)[2]?.getAttribute("aria-current")).toBe("page");
@@ -62,7 +62,7 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(labels(container)).toEqual([
-      "Homepage", "History", "MCP", "CLI", "Git", "Automation", "Team", "Billing",
+      "Homepage", "History", "MCP", "CLI", "Git", "Team", "Billing",
     ]);
     expect(labels(container)).not.toContain("Settings");
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
@@ -103,6 +103,22 @@ describe("current-repository Cloud navigation", () => {
     });
     expect(rows(container)[0]?.getAttribute("aria-current")).toBe("page");
     expect(labels(container)).not.toContain("Settings");
+  });
+
+  it("shows Automation only after the experiment is enabled", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    renderSidebar(root, {
+      authState: signedInState(),
+      automationEnabled: true,
+      projectAvailable: true,
+      onSelectSection: vi.fn(),
+    });
+
+    expect(labels(container)).toContain("Automation");
+    expect(groupLabels(container)).toContain("Automation");
   });
 
   it("keeps the signed-out Cloud entry focused on one activation action", () => {
@@ -173,12 +189,14 @@ describe("current-repository Cloud navigation", () => {
 function renderSidebar(root: Root, {
   authState,
   activeSection = "contents",
+  automationEnabled = false,
   projectAvailable,
   projectCapabilities = [],
   onSelectSection,
 }: {
   authState: CloudAuthState;
   activeSection?: Parameters<typeof CloudServiceSidebar>[0]["activeSection"];
+  automationEnabled?: boolean;
   projectAvailable: boolean;
   projectCapabilities?: string[];
   onSelectSection: (section: Parameters<typeof CloudServiceSidebar>[0]["activeSection"]) => void;
@@ -193,6 +211,7 @@ function renderSidebar(root: Root, {
       <CloudServiceSidebar
         cloudAuthState={authState}
         activeSection={activeSection}
+        automationEnabled={automationEnabled}
         projectAvailable={projectAvailable}
         projectCapabilities={projectCapabilities}
         onSelectSection={onSelectSection}

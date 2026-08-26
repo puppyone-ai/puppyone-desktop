@@ -133,6 +133,8 @@
   "experimental.agentChat.detail": "在标题栏显示实验性聊天图标。终端仍是独立按钮，关闭此选项后仍可使用。",
   "experimental.cloudWorkspace.title": "PuppyOne Cloud",
   "experimental.cloudWorkspace.detail": "在导航中显示 Cloud 入口，并在源代码管理中显示 Cloud 发布提醒。",
+  "experimental.cloudAutomation.title": "Automation",
+  "experimental.cloudAutomation.detail": "显示实验性的 Automation 工作区，用于定时运行任务和连接外部数据源。",
   "experimental.appFiles.title": "PuppyOne App 文件",
   "experimental.appFiles.detail": "在“新建 > 自定义文件”中显示 PuppyOne App。",
   "experimental.flowFiles.title": "PuppyFlow 文件",

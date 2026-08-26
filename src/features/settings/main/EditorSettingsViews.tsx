@@ -92,6 +92,7 @@ export function ExperimentalSettingsView({
       ? [{ messageKey: "agentChat", settingKey: "enableAgentChat" as const }]
       : []),
     { messageKey: "cloudWorkspace", settingKey: "enableCloudWorkspace" },
+    { messageKey: "cloudAutomation", settingKey: "enableCloudAutomation" },
     { messageKey: "flowFiles", settingKey: "enablePuppyFlowFiles" },
   ];
 

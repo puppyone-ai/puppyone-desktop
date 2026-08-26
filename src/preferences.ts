@@ -89,6 +89,7 @@ export type LocalAgentsSettings = {
 export type ExperimentalSettings = {
   enableAgentChat: boolean;
   enableAssetLibraryHome: boolean;
+  enableCloudAutomation: boolean;
   enableCloudWorkspace: boolean;
   enableEditorSaveStatus: boolean;
   enableMarkdownBlockDrag: boolean;
@@ -170,6 +171,7 @@ export const DEFAULT_AI_EDIT_ASSIST_ENABLED = false;
 export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableAgentChat: false,
   enableAssetLibraryHome: false,
+  enableCloudAutomation: false,
   enableCloudWorkspace: false,
   enableEditorSaveStatus: false,
   enableMarkdownBlockDrag: false,
@@ -539,6 +541,7 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
     return {
       enableAgentChat: parsed.enableAgentChat === true || legacy.enableAgentCompanion === true,
       enableAssetLibraryHome: parsed.enableAssetLibraryHome === true,
+      enableCloudAutomation: parsed.enableCloudAutomation === true,
       enableCloudWorkspace: parsed.enableCloudWorkspace === true,
       enableEditorSaveStatus: parsed.enableEditorSaveStatus === true,
       enableMarkdownBlockDrag: parsed.enableMarkdownBlockDrag === true,

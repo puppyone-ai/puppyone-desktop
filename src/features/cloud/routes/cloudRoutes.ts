@@ -249,6 +249,16 @@ export function normalizeCloudSection(
     : "contents";
 }
 
+export function getAvailableCloudSection(
+  section: CloudWorkspaceSection | string,
+  { automationEnabled }: { automationEnabled: boolean },
+): CloudWorkspaceSection {
+  const normalizedSection = normalizeCloudSection(section);
+  return normalizedSection === "automation" && !automationEnabled
+    ? "contents"
+    : normalizedSection;
+}
+
 /** Use the primary product capability as the first signed-out Cloud destination. */
 export function getCloudSignedOutSection(
   section: CloudWorkspaceSection | string,

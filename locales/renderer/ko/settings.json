@@ -133,6 +133,8 @@
   "experimental.agentChat.detail": "헤더에 실험적 채팅 아이콘을 표시합니다. 터미널은 별도 버튼으로 유지되며 이 옵션을 꺼도 사용할 수 있습니다.",
   "experimental.cloudWorkspace.title": "PuppyOne Cloud",
   "experimental.cloudWorkspace.detail": "탐색의 Cloud 항목과 소스 제어의 Cloud 게시 알림을 표시합니다.",
+  "experimental.cloudAutomation.title": "Automation",
+  "experimental.cloudAutomation.detail": "예약 실행 및 연결된 데이터 소스를 위한 실험적인 Automation 작업 공간을 표시합니다.",
   "experimental.appFiles.title": "PuppyOne App 파일",
   "experimental.appFiles.detail": "새로 만들기 > 사용자 지정 파일에 PuppyOne App을 표시합니다.",
   "experimental.flowFiles.title": "PuppyFlow 파일",

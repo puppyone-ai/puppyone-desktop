@@ -133,6 +133,8 @@
   "experimental.agentChat.detail": "Show the experimental Chat icon in the header. Terminal remains a separate button and stays available when this is off.",
   "experimental.cloudWorkspace.title": "PuppyOne Cloud",
   "experimental.cloudWorkspace.detail": "Show the Cloud navigation entry and the Cloud publish reminder in Source Control.",
+  "experimental.cloudAutomation.title": "Automation",
+  "experimental.cloudAutomation.detail": "Show the experimental Automation workspace for scheduled runs and connected data sources.",
   "experimental.appFiles.title": "PuppyOne App files",
   "experimental.appFiles.detail": "Show PuppyOne App in New > Custom files.",
   "experimental.flowFiles.title": "PuppyFlow files",

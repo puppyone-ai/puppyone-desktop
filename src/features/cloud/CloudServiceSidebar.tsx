@@ -7,7 +7,7 @@ import {
   CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES,
   getCloudSidebarActiveSection,
   getCloudSignedOutSection,
-  normalizeCloudSection,
+  getAvailableCloudSection,
   type CloudRouteNavigationGroup,
   type CloudRouteDescriptor,
 } from "./routes/cloudRoutes";
@@ -36,13 +36,14 @@ type CloudSidebarNavGroup = {
 export function CloudServiceSidebar({
   cloudAuthState,
   activeSection,
+  automationEnabled,
   projectAvailable = false,
   projectCapabilities = [],
   onSelectSection,
 }: CloudServiceSidebarProps) {
   const { t } = useLocalization();
   const billingEnabled = useFeatureFlag("cloudBilling");
-  const normalizedActiveSection = normalizeCloudSection(activeSection);
+  const normalizedActiveSection = getAvailableCloudSection(activeSection, { automationEnabled });
   const signedIn = Boolean(getCloudAuthSession(cloudAuthState));
   const visibleActiveSection = getCloudSidebarActiveSection(
     signedIn
@@ -56,7 +57,8 @@ export function CloudServiceSidebar({
         && Boolean(route.requiredCapability && !projectCapabilities.includes(route.requiredCapability))
       : false,
   })).filter((item) => (
-    item.id !== "cloud-billing" || billingEnabled
+    (item.id !== "cloud-billing" || billingEnabled)
+    && (item.id !== "automation" || automationEnabled)
   ));
   const navGroups = buildCloudSidebarNavGroups(navItems);
 

@@ -274,6 +274,7 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(JSON.stringify({ enableAgentChat: true }))).toMatchObject({
       enableAgentChat: true,
       enableAssetLibraryHome: false,
+      enableCloudAutomation: false,
       enableCloudWorkspace: false,
       enableEditorSaveStatus: false,
       enableMarkdownBlockDrag: false,
@@ -288,6 +289,13 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings("not-json").enableCloudWorkspace).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableCloudWorkspace: false })).enableCloudWorkspace).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableCloudWorkspace: true })).enableCloudWorkspace).toBe(true);
+  });
+
+  it("keeps Cloud Automation off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableCloudAutomation).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableCloudAutomation).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableCloudAutomation: false })).enableCloudAutomation).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableCloudAutomation: true })).enableCloudAutomation).toBe(true);
   });
 
   it("keeps the editor save status hidden unless the user explicitly opts in", () => {
