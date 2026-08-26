@@ -31,9 +31,9 @@ export function RemoteUpdateNotice({
   if (!model) return null;
 
   const updateAge = formatRemoteUpdateAge(model.updatedAt, formatRelativeTime);
-  const summary = model.fileCount > 0
-    ? t("source-control.notice.fileCount", { count: model.fileCount })
-    : t("source-control.commit.changes", { count: model.behind });
+  const pullLabel = model.fileCount > 0
+    ? t("source-control.notice.pullFiles", { count: model.fileCount })
+    : t("source-control.sync.pull");
 
   return (
     <aside
@@ -43,7 +43,9 @@ export function RemoteUpdateNotice({
       aria-live="polite"
     >
       <div className="desktop-remote-update-notice-heading">
-        <span className="desktop-remote-update-notice-summary">{summary}</span>
+        <span className="desktop-remote-update-notice-summary">
+          {t("source-control.notice.updatesAvailable")}
+        </span>
       </div>
       {(updateAge || hasFileChangeCounts(model.fileChanges)) && (
         <div className="desktop-remote-update-notice-meta">
@@ -77,7 +79,7 @@ export function RemoteUpdateNotice({
         title={t("source-control.notice.pullTitle")}
         disabled={operationLoading !== null || !model.canPull}
         icon="download"
-        label={t("source-control.sync.pull")}
+        label={pullLabel}
         loadingKey="pull"
         loadingLabel={t("source-control.sync.pulling")}
         operationLoading={operationLoading}
