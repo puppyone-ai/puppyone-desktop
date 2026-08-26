@@ -370,9 +370,9 @@
   grid-row: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--po-text);
+  color: var(--po-text-muted);
   font-size: var(--desktop-sidebar-font-size, 13px);
-  font-weight: var(--desktop-sidebar-font-weight-emphasis, 650);
+  font-weight: var(--desktop-sidebar-font-weight, var(--po-text-weight-medium, 500));
   line-height: var(--desktop-sidebar-line-height, 18px);
   text-overflow: ellipsis;
   white-space: nowrap;
