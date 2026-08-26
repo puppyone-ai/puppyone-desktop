@@ -1,6 +1,6 @@
 import { useLocalization } from "@puppyone/localization";
 import type { GitStatusSnapshot } from "../../types/electron";
-import { GitOperationButton } from "../source-control/sidebar/GitSidebarPrimitives";
+import { GitOperationButton } from "../source-control";
 
 type RemoteUpdateFileChangeCounts = Readonly<{
   added: number;
