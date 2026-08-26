@@ -47,10 +47,8 @@ export function CloudServiceSidebar({
   const navItems: CloudSidebarNavEntry[] = CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES.map((route: CloudRouteDescriptor) => ({
     ...route,
     locked: route.context === "project"
-      ? signedIn && (
-        !projectAvailable
-        || Boolean(route.requiredCapability && !projectCapabilities.includes(route.requiredCapability))
-      )
+      ? projectAvailable
+        && Boolean(route.requiredCapability && !projectCapabilities.includes(route.requiredCapability))
       : false,
   })).filter((item) => (
     item.id !== "cloud-billing" || billingEnabled

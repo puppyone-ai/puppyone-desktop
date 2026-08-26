@@ -56,7 +56,17 @@ describe("current-repository Cloud navigation", () => {
     expect(labels(container)).toEqual([
       "MCP and CLI", "Overview", "History", "Automation", "Access", "Settings", "Team", "Billing",
     ]);
-    expect(rows(container).slice(0, 6).every((row) => row.getAttribute("aria-disabled") === "true")).toBe(true);
+    expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
+    act(() => rows(container)[2]?.click());
+    expect(onSelectSection).toHaveBeenCalledWith("history");
+
+    renderSidebar(root, {
+      authState: signedInState(),
+      projectAvailable: true,
+      onSelectSection,
+    });
+    expect(rows(container).slice(0, 5).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
+    expect(rows(container)[5]?.getAttribute("aria-disabled")).toBe("true");
     expect(rows(container).slice(6).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
 
     renderSidebar(root, {
