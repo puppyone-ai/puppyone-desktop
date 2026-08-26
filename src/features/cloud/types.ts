@@ -36,6 +36,8 @@ export type CloudServiceSidebarProps = {
   /** True only when the current repository's canonical remote is authorized. */
   projectAvailable?: boolean;
   projectCapabilities?: readonly string[];
+  /** Open the application-level account settings for the signed-in Cloud user. */
+  onOpenAccount: () => void;
   onSelectSection: (section: CloudWorkspaceSection) => void;
 };
 

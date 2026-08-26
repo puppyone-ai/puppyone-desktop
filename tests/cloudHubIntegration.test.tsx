@@ -33,13 +33,16 @@ describe("current-repository Cloud navigation", () => {
     document.body.appendChild(container);
     root = createRoot(container);
     const onSelectSection = vi.fn();
+    const onOpenAccount = vi.fn();
 
     renderSidebar(root, {
       authState: { status: "signed-out", apiBaseUrl: session.api_base_url },
       activeSection: "initialize",
       projectAvailable: false,
+      onOpenAccount,
       onSelectSection,
     });
+    expect(container.querySelector(".desktop-cloud-sidebar-account")).toBeNull();
     expect(labels(container)).toEqual([
       "Homepage", "Automation", "MCP", "CLI", "Git", "Team", "Billing",
     ]);
@@ -58,6 +61,7 @@ describe("current-repository Cloud navigation", () => {
     renderSidebar(root, {
       authState: signedInState(),
       projectAvailable: false,
+      onOpenAccount,
       onSelectSection,
     });
     expect(labels(container)).toEqual([
@@ -66,6 +70,11 @@ describe("current-repository Cloud navigation", () => {
     expect(labels(container)).not.toContain("History");
     expect(labels(container)).not.toContain("Settings");
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
+    const accountButton = container.querySelector<HTMLButtonElement>(".desktop-cloud-sidebar-account");
+    expect(accountButton?.textContent).toContain("owner@example.com");
+    expect(accountButton?.textContent).toContain("Account");
+    act(() => accountButton?.click());
+    expect(onOpenAccount).toHaveBeenCalledTimes(1);
     act(() => rows(container)[2]?.click());
     expect(onSelectSection).toHaveBeenCalledWith("mcp");
 
@@ -175,12 +184,14 @@ function renderSidebar(root: Root, {
   activeSection = "contents",
   projectAvailable,
   projectCapabilities = [],
+  onOpenAccount = vi.fn(),
   onSelectSection,
 }: {
   authState: CloudAuthState;
   activeSection?: Parameters<typeof CloudServiceSidebar>[0]["activeSection"];
   projectAvailable: boolean;
   projectCapabilities?: string[];
+  onOpenAccount?: () => void;
   onSelectSection: (section: Parameters<typeof CloudServiceSidebar>[0]["activeSection"]) => void;
 }) {
   act(() => renderWithTestLocalization(root,
@@ -195,6 +206,7 @@ function renderSidebar(root: Root, {
         activeSection={activeSection}
         projectAvailable={projectAvailable}
         projectCapabilities={projectCapabilities}
+        onOpenAccount={onOpenAccount}
         onSelectSection={onSelectSection}
       />
     </FeatureFlagsProvider>,
