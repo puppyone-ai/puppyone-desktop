@@ -1,0 +1,103 @@
+/* File preview follows the same typography and row rhythm as the product sidebar. */
+.desktop-cloud-overview-files {
+  display: grid;
+  min-width: 0;
+  gap: 9px;
+}
+
+.desktop-cloud-overview-file-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 8px;
+}
+
+.desktop-cloud-overview-file-header h2 {
+  margin: 0;
+  color: var(--po-text);
+  font-size: var(--po-text-size-body, 13px);
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.desktop-cloud-overview-file-header > span {
+  flex: 0 0 auto;
+  color: var(--po-text-muted);
+  font-size: var(--po-text-size-body-sm, 12px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  line-height: 17px;
+}
+
+.desktop-cloud-overview-file-list {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 9px;
+  background: transparent;
+}
+
+.desktop-cloud-overview-file-row {
+  display: grid;
+  min-width: 0;
+  min-height: 34px;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-overview-file-row:hover {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-overview-file-icon {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+}
+
+.desktop-cloud-overview-file-row > strong,
+.desktop-cloud-overview-file-row > small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-overview-file-row > strong {
+  color: inherit;
+  font-size: var(--po-text-size-body, 13px);
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.desktop-cloud-overview-file-row > small {
+  max-width: 180px;
+  color: var(--po-text-muted);
+  font-size: var(--po-text-size-body-sm, 12px);
+  font-weight: 400;
+  line-height: 17px;
+}
+
+.desktop-cloud-overview-file-empty,
+.desktop-cloud-overview-file-more {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  padding: 0 8px;
+  color: var(--po-text-muted);
+  font-size: var(--po-text-size-body-sm, 12px);
+  font-weight: 400;
+  line-height: 17px;
+}

@@ -1,31 +1,12 @@
-/* Last-update and access-point status detail. */
-.desktop-cloud-overview-updated-value {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  align-items: flex-end;
-  margin-top: 8px;
-}
-
-.desktop-cloud-overview-updated-value time {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--po-text);
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 550;
-  letter-spacing: -0.025em;
-  line-height: 24px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+/* Storage is Project metadata, not part of the file preview card. */
 .desktop-cloud-overview-storage-meter {
   display: grid;
-  gap: 7px;
-  padding: 11px 16px 12px;
-  border-top: 1px solid var(--po-divider);
+  width: min(100%, 340px);
+  min-width: 220px;
+  gap: 6px;
+  margin-top: 7px;
 }
+
 .desktop-cloud-overview-storage-meter-copy {
   display: flex;
   min-width: 0;
@@ -33,123 +14,33 @@
   justify-content: space-between;
   gap: 16px;
 }
+
 .desktop-cloud-overview-storage-meter-copy strong,
 .desktop-cloud-overview-storage-meter-copy small {
   overflow: hidden;
+  color: var(--po-text-muted);
+  font-size: var(--po-text-size-body-sm, 12px);
+  font-weight: 400;
+  line-height: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.desktop-cloud-overview-storage-meter-copy strong {
-  color: var(--po-text-muted);
-  font-size: 10px;
-  font-weight: 570;
-}
+
 .desktop-cloud-overview-storage-meter-copy small {
   color: var(--po-text-subtle);
-  font-size: 9px;
   font-variant-numeric: tabular-nums;
 }
+
 .desktop-cloud-overview-storage-meter-track {
   height: 3px;
   overflow: hidden;
-  border-radius: 2px;
+  border-radius: 999px;
   background: var(--po-divider);
 }
+
 .desktop-cloud-overview-storage-meter-track > span {
   display: block;
   height: 100%;
   border-radius: inherit;
   background: var(--po-accent);
-}
-.desktop-cloud-overview-access-list {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  margin-top: 10px;
-  border-top: 1px solid var(--po-divider);
-}
-.desktop-cloud-overview-access-row {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 9px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--po-divider);
-}
-.desktop-cloud-overview-access-icon {
-  display: inline-flex;
-  width: 24px;
-  height: 24px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--po-border-subtle);
-  border-radius: 6px;
-  background: var(--po-panel);
-  color: var(--po-text-muted);
-}
-.desktop-cloud-overview-access-copy {
-  display: grid;
-  min-width: 0;
-  gap: 1px;
-}
-
-.desktop-cloud-overview-access-copy strong,
-.desktop-cloud-overview-access-copy small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-cloud-overview-access-copy strong {
-  color: var(--po-text);
-  font-size: 11px;
-  font-weight: 580;
-  line-height: 15px;
-}
-
-.desktop-cloud-overview-access-copy small {
-  color: var(--po-text-subtle);
-  font-size: 9px;
-  line-height: 12px;
-}
-
-.desktop-cloud-overview-access-status {
-  display: inline-flex;
-  max-width: 104px;
-  align-items: center;
-  gap: 5px;
-  overflow: hidden;
-  color: var(--po-text-subtle);
-  font-size: 9px;
-  font-weight: 520;
-  line-height: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-cloud-overview-access-status > span {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 6px;
-  border-radius: 50%;
-  background: var(--po-text-disabled);
-}
-
-.desktop-cloud-overview-access-status.is-active > span {
-  background: var(--po-success, #2da44e);
-}
-
-.desktop-cloud-overview-access-status.is-error > span {
-  background: var(--po-danger, #cf222e);
-}
-
-.desktop-cloud-overview-access-empty,
-.desktop-cloud-overview-access-more {
-  display: flex;
-  min-height: 42px;
-  align-items: center;
-  color: var(--po-text-subtle);
-  font-size: 10px;
 }
