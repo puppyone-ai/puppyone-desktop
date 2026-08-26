@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
+import { Clock3, Cloud, CreditCard, GitBranch, Grid2X2, House, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import { getCloudAutomationWebPath } from "../../automation/automationDomain";
 import { McpLogoIcon } from "../components/McpLogoIcon";
@@ -89,7 +89,7 @@ export const CLOUD_ROUTES = [
     labelId: "cloud.route.contents.label",
     titleId: "cloud.route.contents.title",
     descriptionId: "cloud.route.contents.description",
-    icon: FileText,
+    icon: House,
     context: "project",
     surface: "landing",
     resources: OVERVIEW_PROJECT_RESOURCES,

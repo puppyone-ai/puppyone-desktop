@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { House } from "lucide-react";
 import {
   CLOUD_PROJECT_SIDEBAR_ROUTES,
   getAvailableCloudSection,
@@ -16,6 +17,7 @@ describe("Cloud navigation information architecture", () => {
       "git-sync",
       "automation",
     ]);
+    expect(getCloudRoute("contents").icon).toBe(House);
     expect(getCloudRoute("mcp").icon).toBe(McpLogoIcon);
     expect(getCloudRoute("mcp").navigationGroup).toBe("connections");
     expect(getCloudRoute("cli").navigationGroup).toBe("connections");
