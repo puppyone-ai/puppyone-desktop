@@ -1689,7 +1689,17 @@ export async function discardAllWorkspaceGitChanges(rootPath) {
 export async function commitWorkspaceGit(rootPath, message, options = {}) {
   const root = resolveWorkspacePath(rootPath, null);
   const normalizedMessage = await normalizeCommitMessage(root, message);
-  const args = ["commit"];
+  const authorName = normalizeOneShotGitIdentity(options.authorName);
+  const authorEmail = normalizeOneShotGitIdentity(options.authorEmail);
+  const args = [];
+  if (authorName && authorEmail) {
+    args.push(
+      "-c", `user.name=${authorName}`,
+      "-c", `user.email=${authorEmail}`,
+      "-c", "commit.gpgsign=false",
+    );
+  }
+  args.push("commit");
   if (options.allowEmpty === true) args.push("--allow-empty");
   args.push("-m", normalizedMessage);
   await execGit(root, args, {
@@ -3351,6 +3361,13 @@ async function normalizeCommitMessage(rootPath, message) {
   const normalized = typeof message === "string" ? message.trim() : "";
   if (normalized) return normalized;
   return buildDefaultCommitMessage(rootPath);
+}
+
+function normalizeOneShotGitIdentity(value) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized || normalized.length > 254 || /[\0\r\n]/.test(normalized)) return null;
+  return normalized;
 }
 
 async function buildDefaultCommitMessage(rootPath) {

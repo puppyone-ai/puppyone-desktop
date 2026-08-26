@@ -58,7 +58,13 @@ export function getCloudPublishProgressLabel(
 }
 
 function getCloudPublishProgressStepIndex(stage: CloudPublishProgressStage): number {
-  if (stage === "validating" || stage === "creating-project") return 0;
+  if (
+    stage === "enabling-version-control"
+    || stage === "creating-snapshot"
+    || stage === "creating-branch"
+    || stage === "validating"
+    || stage === "creating-project"
+  ) return 0;
   if (stage === "securing-credential") return 1;
   if (stage === "configuring-remote" || stage === "checking-remote") return 2;
   if (stage === "uploading" || stage === "confirming") return 3;

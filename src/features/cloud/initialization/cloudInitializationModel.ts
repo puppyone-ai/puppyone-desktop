@@ -1,16 +1,7 @@
 import type { MessageFormatter } from "@puppyone/localization/core";
-import type {
-  CloudPublishErrorCode,
-  CloudPublishState,
-} from "../../../types/electron";
+import type { CloudPublishState } from "../../../types/electron";
 
 export type CloudPushAction = "retry-push" | "push-latest" | "choose-source" | "reconcile";
-
-export function isCloudPublishPrerequisiteFailure(code: CloudPublishErrorCode): boolean {
-  return code === "REPOSITORY_REQUIRED"
-    || code === "COMMIT_REQUIRED"
-    || code === "BRANCH_REQUIRED";
-}
 
 export function getCloudInitializationStatusLabel(
   state: CloudPublishState,

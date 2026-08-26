@@ -1088,6 +1088,8 @@ declare global {
         rootPath: string;
         message: string;
         allowEmpty?: boolean;
+        authorName?: string;
+        authorEmail?: string;
       }) => Promise<GitStatusSnapshot>;
       continueGitOperation: (request: {
         rootPath: string;

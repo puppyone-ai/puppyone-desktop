@@ -83,92 +83,82 @@
   line-height: 1.5;
 }
 
-.desktop-cloud-git-prerequisite-steps {
-  display: grid;
-  width: min(100%, 560px);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  margin: 4px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.desktop-cloud-git-prerequisite-steps li {
-  position: relative;
-  display: grid;
-  min-width: 0;
-  justify-items: center;
-  gap: 9px;
-  padding: 0 10px;
-  color: var(--po-text-subtle);
-  font-size: 11.5px;
-  font-weight: 560;
-  line-height: 1.35;
-  text-align: center;
-}
-
-.desktop-cloud-git-prerequisite-steps li:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  z-index: 0;
-  top: 13px;
-  inset-inline-start: calc(50% + 17px);
-  width: calc(100% - 34px);
-  height: 1px;
-  background: var(--po-divider);
-}
-
-.desktop-cloud-git-prerequisite-steps li.current {
-  color: var(--po-text);
-  font-weight: 620;
-}
-
-.desktop-cloud-git-prerequisite-steps li.complete {
-  color: var(--po-text-muted);
-}
-
-.desktop-cloud-git-prerequisite-steps li.upcoming {
-  opacity: 0.72;
-}
-
-.desktop-cloud-git-prerequisite-step-marker {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  width: 26px;
-  height: 26px;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--po-divider);
-  border-radius: 50%;
-  background: var(--po-panel);
-  color: var(--po-text-subtle);
-  font-size: 11px;
-  font-weight: 650;
-}
-
-.desktop-cloud-git-prerequisite-steps li.current .desktop-cloud-git-prerequisite-step-marker {
-  border-color: var(--po-border-strong);
-  background: var(--po-control);
-  color: var(--po-text);
-}
-
-.desktop-cloud-git-prerequisite-steps li.complete .desktop-cloud-git-prerequisite-step-marker {
-  border-color: var(--po-border);
-  background: var(--po-control);
-  color: var(--po-text-muted);
-}
-
 .desktop-cloud-git-prerequisite-actions {
-  margin-top: 0;
+  display: grid;
+  width: min(100%, 520px);
+  justify-items: center;
+  gap: 8px;
+  margin-top: 2px;
 }
 
-.desktop-cloud-git-prerequisite-actions .desktop-cloud-row-action {
+.desktop-cloud-git-prerequisite-actions .desktop-cloud-publish-primary {
   display: inline-flex;
+  width: 100%;
+  height: 36px;
   align-items: center;
   justify-content: center;
   gap: 7px;
+}
+
+.desktop-cloud-git-prerequisite-review,
+.desktop-cloud-git-prerequisite-organization button {
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.desktop-cloud-git-prerequisite-review:hover,
+.desktop-cloud-git-prerequisite-organization button:hover {
+  color: var(--po-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.desktop-cloud-git-prerequisite-actions small,
+.desktop-cloud-git-prerequisite-organization {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.desktop-cloud-git-prerequisite-error {
+  width: min(100%, 520px);
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--po-danger) 26%, var(--po-divider));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--po-danger) 5%, transparent);
+  color: var(--po-danger);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: start;
+}
+
+.desktop-cloud-git-prerequisite-organization {
+  display: flex;
+  width: min(100%, 520px);
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.desktop-cloud-git-prerequisite-organization label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-cloud-git-prerequisite-organization select {
+  height: 28px;
+  max-width: 240px;
+  border: 1px solid var(--po-divider);
+  border-radius: 6px;
+  background: var(--po-control);
+  color: var(--po-text);
+  font: inherit;
 }
 
 .desktop-cloud-publish-status-error {
@@ -687,6 +677,11 @@
   opacity: 0.82;
 }
 
+.desktop-cloud-git-prerequisite-actions .desktop-cloud-publish-primary {
+  width: 100%;
+  height: 36px;
+}
+
 @container cloud-publish (max-width: 720px) {
   .desktop-cloud-git-prerequisite {
     gap: 22px;
@@ -754,6 +749,11 @@
     justify-self: center;
   }
 
+  .desktop-cloud-git-prerequisite-actions .desktop-cloud-publish-primary {
+    width: 100%;
+    height: 36px;
+  }
+
   .desktop-cloud-publish-progress li > span:last-child {
     font-size: 9px;
   }
@@ -768,34 +768,17 @@
 }
 
 @container cloud-publish (max-width: 460px) {
-  .desktop-cloud-git-prerequisite-steps {
-    width: min(100%, 280px);
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
-  }
-
-  .desktop-cloud-git-prerequisite-steps li {
-    grid-template-columns: 26px minmax(0, 1fr);
-    align-items: center;
-    justify-items: start;
-    padding: 0;
-    text-align: start;
-  }
-
-  .desktop-cloud-git-prerequisite-steps li:not(:last-child)::after {
-    top: 28px;
-    inset-inline-start: 12.5px;
-    width: 1px;
-    height: 10px;
-  }
-
   .desktop-cloud-git-prerequisite-actions {
     width: 100%;
-    flex-direction: column;
   }
 
-  .desktop-cloud-git-prerequisite-actions .desktop-cloud-row-action {
+  .desktop-cloud-git-prerequisite-actions .desktop-cloud-publish-primary {
     width: 100%;
+  }
+
+  .desktop-cloud-git-prerequisite-organization label {
+    width: 100%;
+    flex-direction: column;
   }
 }
 
@@ -822,5 +805,3 @@
 }
 
 }
-
-

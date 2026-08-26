@@ -260,7 +260,11 @@ export function useCloudInitialization({
             freshStatus = await commitWorkspaceGit(
               workspace.path,
               "Initial snapshot",
-              { allowEmpty: true },
+              {
+                allowEmpty: true,
+                authorName: activeCloudSession.user_email,
+                authorEmail: activeCloudSession.user_email,
+              },
             );
           }
           if (!normalizeBranch(freshStatus.branch)) {

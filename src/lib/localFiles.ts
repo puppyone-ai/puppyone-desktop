@@ -629,12 +629,14 @@ export async function discardAllWorkspaceGitChanges(rootPath: string): Promise<G
 export async function commitWorkspaceGit(
   rootPath: string,
   message: string,
-  options: { allowEmpty?: boolean } = {},
+  options: { allowEmpty?: boolean; authorName?: string; authorEmail?: string } = {},
 ): Promise<GitStatusSnapshot> {
   return getDesktopBridge().commitGit({
     rootPath,
     message,
     ...(options.allowEmpty ? { allowEmpty: true } : {}),
+    ...(options.authorName ? { authorName: options.authorName } : {}),
+    ...(options.authorEmail ? { authorEmail: options.authorEmail } : {}),
   });
 }
 
