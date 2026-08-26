@@ -218,6 +218,10 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSectionsSource).toContain("<VirtualSidebarList");
     expect(viewSource).not.toContain("<VirtualSidebarList");
     expect(gitControllerSource).not.toContain('gitMainPanel !== "history"');
+    expect(readFileSync(
+      new URL("../src/features/source-control/sidebar/useGitSidebarPanelLayout.ts", import.meta.url),
+      "utf8",
+    )).toContain("flex: `0 0 ${historyPaneHeight}px`");
   });
 
   it("reserves card surfaces for providers and keeps local source-control groups flat", () => {

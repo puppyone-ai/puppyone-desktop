@@ -207,8 +207,7 @@ export function useGitSidebarPanelLayout(revision: unknown) {
   const getHistoryPaneStyle = useCallback((): CSSProperties | undefined => {
     if (historyPaneHeight === null) return undefined;
     return {
-      flexBasis: `${historyPaneHeight}px`,
-      height: `${historyPaneHeight}px`,
+      flex: `0 0 ${historyPaneHeight}px`,
     };
   }, [historyPaneHeight]);
 
