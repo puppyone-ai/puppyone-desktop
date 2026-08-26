@@ -44,18 +44,19 @@ describe("current-repository Cloud navigation", () => {
     });
     expect(container.querySelector(".desktop-cloud-sidebar-account")).toBeNull();
     expect(labels(container)).toEqual([
-      "Homepage", "Automation", "MCP", "CLI", "Git", "Team", "Billing",
+      "Homepage", "History", "Automation", "MCP", "CLI", "Git", "Team", "Billing",
     ]);
     expect(groupLabels(container)).toEqual(["Cloud Project", "Connections", "Organization"]);
-    expect(labels(container)).not.toContain("History");
     expect(labels(container)).not.toContain("Settings");
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
-    expect(rows(container)[2]?.getAttribute("aria-current")).toBe("page");
-    act(() => rows(container)[2]?.click());
-    expect(onSelectSection).toHaveBeenCalledWith("mcp");
+    expect(rows(container)[3]?.getAttribute("aria-current")).toBe("page");
+    act(() => rows(container)[1]?.click());
+    expect(onSelectSection).toHaveBeenCalledWith("history");
     act(() => rows(container)[3]?.click());
-    expect(onSelectSection).toHaveBeenCalledWith("cli");
+    expect(onSelectSection).toHaveBeenCalledWith("mcp");
     act(() => rows(container)[4]?.click());
+    expect(onSelectSection).toHaveBeenCalledWith("cli");
+    act(() => rows(container)[5]?.click());
     expect(onSelectSection).toHaveBeenCalledWith("git-sync");
 
     renderSidebar(root, {
@@ -65,9 +66,8 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(labels(container)).toEqual([
-      "Homepage", "Automation", "MCP", "CLI", "Git", "Team", "Billing",
+      "Homepage", "History", "Automation", "MCP", "CLI", "Git", "Team", "Billing",
     ]);
-    expect(labels(container)).not.toContain("History");
     expect(labels(container)).not.toContain("Settings");
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
     const accountButton = container.querySelector<HTMLButtonElement>(".desktop-cloud-sidebar-account");
@@ -76,7 +76,7 @@ describe("current-repository Cloud navigation", () => {
     expect(accountButton?.querySelector(".desktop-cloud-sidebar-account-context")).toBeNull();
     act(() => accountButton?.click());
     expect(onOpenAccount).toHaveBeenCalledTimes(1);
-    act(() => rows(container)[2]?.click());
+    act(() => rows(container)[3]?.click());
     expect(onSelectSection).toHaveBeenCalledWith("mcp");
 
     renderSidebar(root, {
@@ -101,8 +101,8 @@ describe("current-repository Cloud navigation", () => {
       projectCapabilities: ["project.settings.manage"],
       onSelectSection,
     });
-    expect(rows(container)[0]?.getAttribute("aria-current")).toBe("page");
-    expect(labels(container)).not.toContain("History");
+    expect(rows(container)[1]?.getAttribute("aria-current")).toBe("page");
+    expect(labels(container)).toContain("History");
 
     renderSidebar(root, {
       authState: signedInState(),

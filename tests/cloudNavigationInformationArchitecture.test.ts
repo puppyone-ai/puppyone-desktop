@@ -10,6 +10,7 @@ describe("Cloud navigation information architecture", () => {
   it("keeps Project work separate from the three first-class Connections", () => {
     expect(CLOUD_PROJECT_SIDEBAR_ROUTES.map((route) => route.id)).toEqual([
       "contents",
+      "history",
       "automation",
       "mcp",
       "cli",
@@ -20,12 +21,13 @@ describe("Cloud navigation information architecture", () => {
     expect(getCloudRoute("cli").navigationGroup).toBe("connections");
     expect(getCloudRoute("git-sync").navigationGroup).toBe("connections");
     expect(getCloudRoute("access").showInSidebar).toBe(false);
-    expect(getCloudRoute("history").showInSidebar).toBe(false);
+    expect(getCloudRoute("history").showInSidebar).toBe(true);
+    expect(getCloudRoute("history").navigationGroup).toBe("project");
     expect(getCloudRoute("settings").showInSidebar).toBe(false);
   });
 
-  it("treats History and Settings as Homepage drill-downs without removing their routes", () => {
-    expect(getCloudSidebarActiveSection("history")).toBe("contents");
+  it("keeps History first-class while Settings remains a Homepage drill-down", () => {
+    expect(getCloudSidebarActiveSection("history")).toBe("history");
     expect(getCloudSidebarActiveSection("settings")).toBe("contents");
     expect(getCloudRoute("history").surface).toBe("history");
     expect(getCloudRoute("settings").surface).toBe("landing");
