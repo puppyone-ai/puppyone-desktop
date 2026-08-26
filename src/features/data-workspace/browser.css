@@ -351,11 +351,11 @@
   padding: 9px 9px 8px 10px;
   border: 0;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--po-text) 9%, var(--po-sidebar));
+  background: color-mix(in srgb, var(--po-text) 11%, var(--po-sidebar));
 }
 
 .desktop-remote-update-notice[data-diverged="true"] {
-  background: color-mix(in srgb, var(--po-text) 11%, var(--po-sidebar));
+  background: color-mix(in srgb, var(--po-text) 13%, var(--po-sidebar));
 }
 
 .app-shell:not(.dark) .desktop-remote-update-notice {
