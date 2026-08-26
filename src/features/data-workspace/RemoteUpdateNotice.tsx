@@ -41,19 +41,13 @@ export function RemoteUpdateNotice({
     >
       <div className="desktop-remote-update-notice-heading">
         <span className="desktop-remote-update-notice-summary">
-          {t("source-control.notice.filesChangedElsewhere")}
+          {t("source-control.notice.filesChanged")}
         </span>
       </div>
       {(model.fileCount > 0 || updateAge || hasFileChangeCounts(model.fileChanges)) && (
         <div className="desktop-remote-update-notice-meta">
-          {(model.fileCount > 0 || updateAge) && (
-            <span className="desktop-remote-update-notice-facts">
-              {model.fileCount > 0 && (
-                <span>{t("source-control.commit.files", { count: model.fileCount })}</span>
-              )}
-              {model.fileCount > 0 && updateAge && <span aria-hidden="true">·</span>}
-              {updateAge && <span className="desktop-remote-update-notice-age">{updateAge}</span>}
-            </span>
+          {model.fileCount > 0 && (
+            <span>{t("source-control.commit.files", { count: model.fileCount })}</span>
           )}
           {hasFileChangeCounts(model.fileChanges) && (
             <span className="desktop-remote-update-notice-change-counts">
@@ -77,6 +71,7 @@ export function RemoteUpdateNotice({
               />
             </span>
           )}
+          {updateAge && <span className="desktop-remote-update-notice-age">{updateAge}</span>}
         </div>
       )}
       <GitOperationButton
@@ -84,7 +79,7 @@ export function RemoteUpdateNotice({
         title={t("source-control.notice.getChangesTitle")}
         disabled={operationLoading !== null || !model.canPull}
         icon="download"
-        label={t("source-control.notice.getChanges")}
+        label={t("source-control.notice.get")}
         loadingKey="pull"
         loadingLabel={t("source-control.notice.gettingChanges")}
         operationLoading={operationLoading}
