@@ -96,19 +96,16 @@ describe("Git sidebar status groups", () => {
     expect(stageAndCommit).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the provider layout preference separate from the flat local groups", () => {
+  it("keeps local groups flat without rendering a remote provider surface", () => {
     const surface = renderSidebar({
       gitSidebarLayout: "dividers",
       status: createDivergedGitHubStatus(),
     });
-    const githubSection = surface.querySelector<HTMLElement>(".desktop-git-github-provider-section");
-    const githubCard = githubSection?.querySelector<HTMLElement>(".desktop-git-github-change-card");
     const committedSection = surface.querySelector<HTMLElement>(".desktop-git-resizable-section-committed");
 
-    expect(githubSection?.classList.contains("is-divider-layout")).toBe(true);
-    expect(githubSection?.querySelector(".desktop-git-card-divider .desktop-git-github-identity")).not.toBeNull();
-    expect(githubCard?.querySelector(".desktop-git-github-identity")).toBeNull();
-    expect(githubCard?.querySelector('button[aria-label="Pull"]')).not.toBeNull();
+    expect(surface.querySelector(".desktop-git-github-provider-section")).toBeNull();
+    expect(surface.querySelector(".desktop-git-github-change-card")).toBeNull();
+    expect(surface.querySelector('button[aria-label="Pull"]')).toBeNull();
     const committedToggle = committedSection?.querySelector<HTMLButtonElement>(
       ".desktop-git-section-row .desktop-git-section-title",
     );
@@ -127,22 +124,24 @@ describe("Git sidebar status groups", () => {
   });
 
   it.each([
-    ["generic-git", ".desktop-git-resizable-section-remote", "Pull"],
-    ["puppyone-cloud", ".desktop-git-cloud-provider-section", "Download"],
-  ] as const)("keeps %s sync controls without rendering remote files", (kind, selector, actionLabel) => {
+    "generic-git",
+    "puppyone-cloud",
+    "github",
+  ] as const)("omits the %s remote region from the Git sidebar", (kind) => {
     const status = createDivergedGitHubStatus();
     status.effectiveHosting = {
       ...status.effectiveHosting,
       kind,
-      identity: null,
+      identity: kind === "github" ? status.effectiveHosting.identity : null,
     };
     const surface = renderSidebar({ status });
-    const remoteSurface = surface.querySelector<HTMLElement>(selector);
 
-    expect(remoteSurface).not.toBeNull();
-    expect(remoteSurface?.textContent).not.toContain("remote.md");
-    expect(remoteSurface?.querySelector('[data-resource-status]')).toBeNull();
-    expect(remoteSurface?.querySelector(`button[aria-label="${actionLabel}"]`)).not.toBeNull();
+    expect(surface.textContent).not.toContain("remote.md");
+    expect(surface.querySelector(".desktop-git-resizable-section-remote")).toBeNull();
+    expect(surface.querySelector(".desktop-git-cloud-provider-section")).toBeNull();
+    expect(surface.querySelector(".desktop-git-github-provider-section")).toBeNull();
+    expect(surface.querySelector('button[aria-label="Pull"]')).toBeNull();
+    expect(surface.querySelector('button[aria-label="Download"]')).toBeNull();
   });
 
   it("renders merge conflicts through the same default-expanded flat contract", () => {
@@ -162,29 +161,23 @@ describe("Git sidebar status groups", () => {
     expect(mergeSection?.querySelector(".desktop-git-local-section-body")?.classList.contains("expanded")).toBe(true);
   });
 
-  it("recommends Pull and blocks Push while the GitHub branch is diverged", async () => {
-    const onPull = vi.fn(async () => true);
+  it("keeps remote Pull out of the sidebar and blocks Push while the branch is diverged", async () => {
     const onPush = vi.fn(async () => true);
     const status = createDivergedGitHubStatus();
-    const surface = renderSidebar({ onPull, onPush, status });
+    const surface = renderSidebar({ onPush, status });
     const pullButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Pull"]');
     const pushButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Push"]');
 
-    expect(pullButton?.disabled).toBe(false);
-    expect(pullButton?.classList.contains("is-primary")).toBe(true);
+    expect(pullButton).toBeNull();
     expect(pushButton?.disabled).toBe(true);
     expect(pushButton?.classList.contains("is-primary")).toBe(false);
 
-    await act(async () => {
-      pullButton?.click();
-      pushButton?.click();
-    });
+    await act(async () => pushButton?.click());
 
-    expect(onPull).toHaveBeenCalledTimes(1);
     expect(onPush).not.toHaveBeenCalled();
   });
 
-  it("keeps Pull primary when incoming commits and staged files exist together", () => {
+  it("keeps Commit primary when incoming commits and staged files exist together", () => {
     const status = createDivergedGitHubStatus();
     status.sourceControl.groups = [{
       id: "index",
@@ -196,9 +189,9 @@ describe("Git sidebar status groups", () => {
     const pullButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Pull"]');
     const commitButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Commit"]');
 
-    expect(pullButton?.classList.contains("is-primary")).toBe(true);
+    expect(pullButton).toBeNull();
     expect(commitButton?.disabled).toBe(false);
-    expect(commitButton?.classList.contains("is-primary")).toBe(false);
+    expect(commitButton?.classList.contains("is-primary")).toBe(true);
   });
 
   it("blocks sync actions until working-tree conflicts are resolved", async () => {

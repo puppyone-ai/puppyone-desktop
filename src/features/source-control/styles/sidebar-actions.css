@@ -168,14 +168,6 @@
   color: var(--po-text-disabled);
 }
 
-.desktop-git-remote-status {
-  display: block;
-  min-width: 0;
-  margin: var(--desktop-sidebar-section-top-gap) 0 12px;
-  padding-bottom: 7px;
-  border-bottom: 1px solid var(--po-sidebar-divider, var(--po-divider));
-}
-
 .desktop-git-sidebar {
   --desktop-git-primary-bg: var(--po-accent);
   --desktop-git-primary-bg-hover: color-mix(in srgb, var(--po-accent) 86%, var(--po-text) 14%);

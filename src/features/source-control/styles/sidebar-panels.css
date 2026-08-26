@@ -1,14 +1,3 @@
-.desktop-git-resizable-section .desktop-git-remote-status {
-  display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
-  flex-direction: column;
-  margin: 0;
-  padding-bottom: 0;
-  border-bottom: 0;
-  overflow: hidden;
-}
-
 .desktop-git-resizable-section .desktop-git-section-row {
   flex: 0 0 auto;
 }

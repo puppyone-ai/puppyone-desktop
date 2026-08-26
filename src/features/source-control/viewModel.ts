@@ -2,10 +2,6 @@ import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/ele
 import { getPuppyoneRemote, parsePuppyoneRemote } from "./remotes";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization";
 import type {
-  GitScmSyncAction,
-  GitScmSyncCopy,
-  GitScmSyncSection,
-  GitHostingIdentity,
   GitHostingMode,
   GitSidebarPrimaryAction,
   GitSyncState,
@@ -353,17 +349,6 @@ function hasConfiguredPuppyoneCloudIntent(config: PuppyoneWorkspaceConfig | null
   return configuredRemoteName?.toLowerCase() === "puppyone";
 }
 
-export function getGitHostingIdentity(
-  status: GitStatusSnapshot | null,
-  _puppyoneConfig: PuppyoneWorkspaceConfig | null = null,
-): GitHostingIdentity | null {
-  if (status?.effectiveHosting?.identity) {
-    return status.effectiveHosting.identity;
-  }
-
-  return null;
-}
-
 function getUpstreamRemoteName(upstream: string) {
   const slashIndex = upstream.indexOf("/");
   return slashIndex > 0 ? upstream.slice(0, slashIndex) : upstream;
@@ -381,140 +366,6 @@ function getPreferredGitRemote(status: GitStatusSnapshot | null, config: Puppyon
     ?? remotes.find((remote) => remote.name.toLowerCase() === "puppyone")
     ?? remotes[0]
     ?? null;
-}
-
-export function getGitScmSyncCopy(
-  status: GitStatusSnapshot | null,
-  state: GitSyncState,
-  t: MessageFormatter,
-): GitScmSyncCopy {
-  const remote = status?.sourceControl.remote;
-  const target = remote?.target?.ref ?? state.upstreamLabel;
-  if (!remote) {
-    return {
-      title: t("source-control.sync.remoteChanges"),
-      count: 0,
-      detail: t("source-control.sync.readingState"),
-      tone: "muted",
-    };
-  }
-
-  if (remote.state === "publish") {
-    return {
-      title: t("source-control.sync.remoteBranch"),
-      count: 0,
-      detail: t("source-control.sync.publishBranch", {
-        branch: bidiIsolate(state.branchLabel),
-        target: bidiIsolate(target),
-      }),
-      tone: "pending",
-    };
-  }
-
-  if (remote.state === "diverged") {
-    return {
-      title: t("source-control.sync.conflict"),
-      count: remote.behind,
-      detail: t("source-control.sync.incomingOutgoing", { incoming: remote.behind, outgoing: remote.ahead }),
-      tone: "warning",
-    };
-  }
-
-  if (remote.state === "incoming") {
-    return {
-      title: t("source-control.sync.remoteChanges"),
-      count: remote.behind,
-      detail: target,
-      tone: "warning",
-    };
-  }
-
-  if (remote.state === "outgoing") {
-    return {
-      title: t("source-control.sync.remoteChanges"),
-      count: 0,
-      detail: target,
-      tone: "ready",
-    };
-  }
-
-  if (remote.state === "no-remote") {
-    return {
-      title: t("source-control.sync.remoteChanges"),
-      count: 0,
-      detail: t("source-control.sync.connectRemote"),
-      tone: "muted",
-    };
-  }
-
-  return {
-    title: t("source-control.sync.remoteChanges"),
-    count: 0,
-    detail: target,
-    tone: "ready",
-  };
-}
-
-export function getGitScmSyncSection(
-  status: GitStatusSnapshot | null,
-  state: GitSyncState,
-  t: MessageFormatter,
-  options: { blockedByConflicts?: boolean } = {},
-): GitScmSyncSection {
-  const remote = status?.sourceControl.remote;
-  const copy = getGitScmSyncCopy(status, state, t);
-  const action = getGitScmSyncAction(remote, state, t, {
-    blocked: Boolean(status?.sourceControl.operation) || options.blockedByConflicts === true,
-  });
-
-  return {
-    copy,
-    action,
-  };
-}
-
-export function getGitScmSyncAction(
-  remote: GitStatusSnapshot["sourceControl"]["remote"] | undefined,
-  state: GitSyncState,
-  t: MessageFormatter,
-  options: { blocked?: boolean } = {},
-): GitScmSyncAction | null {
-  if (!remote) return null;
-
-  if (options.blocked && remote.behind > 0) {
-    return {
-      kind: "pull",
-      label: t("source-control.sync.pull"),
-      loadingLabel: t("source-control.sync.pulling"),
-      title: t("source-control.sync.resolveBeforeSync"),
-      disabled: true,
-      icon: "download",
-    };
-  }
-
-  if (remote.state === "diverged") {
-    return {
-      kind: "pull",
-      label: t("source-control.sync.pull"),
-      loadingLabel: t("source-control.sync.pulling"),
-      title: state.pullTitle,
-      disabled: state.pullDisabled,
-      icon: "download",
-    };
-  }
-
-  if (remote.canPull) {
-    return {
-      kind: "pull",
-      label: t("source-control.sync.pull"),
-      loadingLabel: t("source-control.sync.pulling"),
-      title: state.pullTitle,
-      disabled: false,
-      icon: "download",
-    };
-  }
-
-  return null;
 }
 
 export function getCommittedPrimaryAction(

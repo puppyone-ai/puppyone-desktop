@@ -11,7 +11,7 @@ import {
   type CSSProperties,
 } from "react";
 
-export type GitSidebarPanelId = "remote" | "merge" | "committed" | "staged" | "unstaged";
+export type GitSidebarPanelId = "merge" | "committed" | "staged" | "unstaged";
 
 export type GitSidebarLayoutPanel = {
   id: GitSidebarPanelId;
@@ -34,7 +34,6 @@ const SCROLLABLE_LIST_SELECTOR = [
   ".desktop-git-history-scroll",
 ].join(",");
 const PANEL_MIN_HEIGHT: Record<GitSidebarPanelId, number> = {
-  remote: 72,
   merge: 72,
   committed: 72,
   staged: 72,
