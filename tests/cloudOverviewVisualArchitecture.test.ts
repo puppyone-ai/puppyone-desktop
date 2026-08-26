@@ -19,6 +19,8 @@ describe("Cloud Overview visual architecture", () => {
     expect(dashboardSource).not.toContain("OverviewSummaryCard");
     expect(dashboardSource).not.toContain("desktop-cloud-overview-summary-grid");
     expect(overviewSource).toContain("desktop-cloud-overview-header-facts");
+    expect(overviewSource).not.toContain("CloudWorkspaceLoadingState");
+    expect(overviewSource).toContain("const initialLoading = loading && !hasOverviewData;");
   });
 
   it("uses one rounded file frame without filters or extra headers", () => {
@@ -38,6 +40,8 @@ describe("Cloud Overview visual architecture", () => {
     expect(resourceCss).not.toContain("desktop-cloud-overview-file-activity-header");
     expect(dashboardSource).not.toContain("desktop-cloud-overview-files-header");
     expect(dashboardSource).not.toContain("cloud.overview.filesLabel");
+    expect(dashboardSource).toContain("desktop-cloud-overview-file-row skeleton");
+    expect(resourceCss).toContain("desktop-cloud-overview-file-skeleton-name");
   });
 
   it("renders compact entries with modification time and product file icons", () => {
@@ -72,6 +76,8 @@ describe("Cloud Overview visual architecture", () => {
     expect(fact).toContain("border-inline-start: 1px solid var(--po-border-subtle);");
     expect(storage).toContain("width: 100%;");
     expect(track).toContain("height: 5px;");
+    expect(statusCss).toContain("desktop-cloud-overview-value-skeleton");
+    expect(statusCss).toContain("desktop-cloud-overview-project-storage.is-loading");
     expect(path).toContain("width: auto;");
     expect(titleRow).toContain("align-items: center;");
     expect(overviewSource.match(/<CloudOverviewHeaderFact/g)).toHaveLength(2);

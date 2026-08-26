@@ -21,6 +21,47 @@ afterEach(() => {
 });
 
 describe("CloudRepositoryOverview landing page", () => {
+  it("renders the Homepage shell immediately and replaces inline skeletons in place", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const renderOverview = (loading: boolean, tree: null | { path: string; entries: [] }) => withTestLocalization(
+      <CloudRepositoryOverview
+        workspace={WORKSPACE}
+        project={null}
+        dashboard={null}
+        tree={tree}
+        history={null}
+        scopes={[]}
+        connectors={[]}
+        mcpEndpoints={[]}
+        identity={null}
+        loading={loading}
+        onSelectSection={vi.fn()}
+        onRefresh={vi.fn(async () => undefined)}
+      />,
+    );
+
+    act(() => root?.render(renderOverview(true, null)));
+
+    const title = container.querySelector(".desktop-cloud-overview-landing-copy h1");
+    expect(title?.textContent).toBe("Atlas");
+    expect(container.querySelector(".desktop-cloud-loading-state")).toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-project-storage.is-loading")).not.toBeNull();
+    expect(container.querySelectorAll(".desktop-cloud-overview-value-skeleton")).toHaveLength(3);
+    expect(container.querySelectorAll(".desktop-cloud-overview-file-row.skeleton")).toHaveLength(4);
+    expect(container.querySelector(".desktop-cloud-overview-dashboard")?.getAttribute("aria-busy")).toBe("true");
+    expect(container.querySelector(".desktop-cloud-overview-refresh-button .spin")).not.toBeNull();
+
+    act(() => root?.render(renderOverview(false, { path: "", entries: [] })));
+
+    expect(container.querySelector(".desktop-cloud-overview-landing-copy h1")).toBe(title);
+    expect(container.querySelector(".desktop-cloud-overview-project-storage.is-loading")).toBeNull();
+    expect(container.querySelectorAll(".desktop-cloud-overview-value-skeleton")).toHaveLength(0);
+    expect(container.querySelectorAll(".desktop-cloud-overview-file-row.skeleton")).toHaveLength(0);
+    expect(container.textContent).toContain("No files stored yet");
+  });
+
   it("uses an in-app action dashboard without promoting the web route", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-19T12:00:00.000Z"));
