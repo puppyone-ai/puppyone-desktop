@@ -44,6 +44,7 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
   const { selectCommit, selectWorkingFile } = actions;
   const { t, formatNumber } = useLocalization();
   const [backupCardDismissed, setBackupCardDismissed] = useState(false);
+  const [historyExpanded, setHistoryExpanded] = useState(true);
   const { expanded, toggle } = useGitSidebarExpansionState();
   const sourceControl = status?.sourceControl ?? null;
   const historyCommits = status?.allCommits ?? status?.commits ?? [];
@@ -72,8 +73,8 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
     hasStageAndCommitAction: sidebarModel.showStageAndCommitAction,
   });
   const scrollableContentRevision = useMemo(
-    () => ({ expanded, loading, status }),
-    [expanded, loading, status],
+    () => ({ expanded, historyExpanded, loading, status }),
+    [expanded, historyExpanded, loading, status],
   );
   const {
     activeResizeSplit,
@@ -164,24 +165,33 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
               </div>
             </div>
 
-            <GitSidebarHistoryResizer
-              active={activeResizeSplit === "changes:history"}
-              value={historyPaneHeight}
-              onPointerDown={beginHistoryResize}
-              onKeyboardResize={resizeHistoryByKeyboard}
-              onReset={resetHistoryPaneHeight}
-            />
+            {historyExpanded ? (
+              <GitSidebarHistoryResizer
+                active={activeResizeSplit === "changes:history"}
+                value={historyPaneHeight}
+                onPointerDown={beginHistoryResize}
+                onKeyboardResize={resizeHistoryByKeyboard}
+                onReset={resetHistoryPaneHeight}
+              />
+            ) : (
+              <div
+                className="desktop-git-history-resizer is-static"
+                aria-hidden="true"
+              />
+            )}
 
             <section
               ref={historyPaneRef}
-              className="desktop-git-history-pane"
-              style={getHistoryPaneStyle()}
+              className={`desktop-git-history-pane ${historyExpanded ? "expanded" : "collapsed"}`}
+              style={historyExpanded ? getHistoryPaneStyle() : undefined}
             >
               <GitSidebarHistoryPanel
                 commits={historyCommits}
                 selectedCommitId={selectedCommitId}
                 status={status}
                 loading={historyLoading || (loading && !status)}
+                expanded={historyExpanded}
+                onToggle={() => setHistoryExpanded((current) => !current)}
                 onSelectCommit={selectCommit}
               />
             </section>

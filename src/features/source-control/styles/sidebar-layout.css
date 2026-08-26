@@ -31,6 +31,12 @@
   overflow: hidden;
 }
 
+.desktop-git-history-pane.collapsed {
+  min-height: calc(var(--desktop-sidebar-section-top-gap) + var(--desktop-sidebar-row-height));
+  max-height: calc(var(--desktop-sidebar-section-top-gap) + var(--desktop-sidebar-row-height));
+  flex: 0 0 calc(var(--desktop-sidebar-section-top-gap) + var(--desktop-sidebar-row-height));
+}
+
 .desktop-git-resizable-stack {
   display: flex;
   flex: 1 1 auto;

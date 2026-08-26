@@ -5,9 +5,13 @@
   flex: 1 1 auto;
   flex-direction: column;
   margin-top: 0;
-  padding-block: 0 var(--desktop-sidebar-list-padding-block);
+  padding-block: var(--desktop-sidebar-section-top-gap) var(--desktop-sidebar-list-padding-block);
   padding-inline: var(--git-sidebar-left-gap) var(--git-sidebar-right-gap);
   background: var(--po-sidebar);
+}
+
+.desktop-git-history-drawer.collapsed {
+  padding-bottom: 0;
 }
 
 .desktop-git-history-drawer-header {
@@ -27,16 +31,29 @@
   text-align: start;
 }
 
-.desktop-git-history-drawer-header svg {
-  color: var(--po-text-disabled);
+.desktop-git-history-drawer-header:hover {
+  color: var(--po-text-muted);
 }
 
-.desktop-git-history-drawer-header svg.expanded {
+.desktop-git-history-drawer-header:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--po-text-muted) 42%, transparent);
+  outline-offset: -1px;
+}
+
+.desktop-git-history-drawer-header .po-disclosure-icon {
+  width: var(--git-section-leading-slot-size);
+  height: var(--git-section-leading-slot-size);
+  flex: 0 0 auto;
+  color: var(--po-text-disabled);
+  transition: transform 150ms ease;
+}
+
+.desktop-git-history-drawer-header .po-disclosure-icon.expanded {
   transform: rotate(90deg);
 }
 
 .desktop-git-history-drawer-header span {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   font-size: var(--desktop-sidebar-section-title-font-size, var(--git-font-small));
@@ -48,11 +65,18 @@
 
 .desktop-git-history-drawer-header small {
   color: var(--po-text-disabled);
-  font-size: 11px;
-  font-weight: 540;
+  font-size: var(--git-font-small);
+  font-weight: var(--git-weight-regular);
 }
 
-.desktop-git-history-drawer > .desktop-history-list {
+.desktop-git-history-drawer-content {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.desktop-git-history-drawer-content > .desktop-history-list {
   flex: 1 1 auto;
   max-height: none;
   min-height: 0;

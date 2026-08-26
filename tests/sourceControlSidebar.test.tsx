@@ -132,7 +132,7 @@ describe("Git sidebar status groups", () => {
     expect(committedSection?.classList.contains("collapsed")).toBe(true);
   });
 
-  it("renders History as a first-level resizable pane and opens commits from it", async () => {
+  it("renders History as a collapsible first-level pane and opens commits from it", async () => {
     const onSelectCommit = vi.fn();
     const status = createGitStatus();
     const commit = {
@@ -154,16 +154,37 @@ describe("Git sidebar status groups", () => {
     status.allCommits = [commit];
     const surface = renderSidebar({ onSelectCommit, status });
 
+    const historyPane = surface.querySelector<HTMLElement>(".desktop-git-history-pane");
+    const historyToggle = surface.querySelector<HTMLButtonElement>(
+      "button.desktop-git-history-drawer-header",
+    );
     expect(surface.querySelector(".desktop-git-history-resizer")).not.toBeNull();
-    expect(surface.querySelector(".desktop-git-history-pane")).not.toBeNull();
-    expect(surface.querySelector(".desktop-git-history-drawer-header button")).toBeNull();
-    const row = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-history-row"))
+    expect(historyPane?.classList.contains("expanded")).toBe(true);
+    expect(historyToggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(historyToggle?.querySelector(".po-disclosure-icon.expanded")).not.toBeNull();
+    expect(historyToggle?.querySelector("span")?.textContent).toBe("History");
+    expect(historyToggle?.querySelector("small")?.textContent).toBe("1");
+    let row = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-history-row"))
       .find((button) => button.textContent?.includes("Keep history in the sidebar"));
     expect(row).not.toBeNull();
     expect(row?.querySelector(".desktop-history-row-stat")?.textContent).toBe("+8.3K-3.1K");
     expect(row?.querySelector(".desktop-history-row-stat")?.getAttribute("title"))
       .toBe("+8,254 -3,075");
 
+    act(() => historyToggle?.click());
+
+    expect(historyToggle?.getAttribute("aria-expanded")).toBe("false");
+    expect(historyPane?.classList.contains("collapsed")).toBe(true);
+    expect(surface.querySelector(".desktop-git-history-resizer.is-static")).not.toBeNull();
+    expect(surface.querySelector(".desktop-history-row")).toBeNull();
+
+    act(() => historyToggle?.click());
+    row = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-history-row"))
+      .find((button) => button.textContent?.includes("Keep history in the sidebar"));
+
+    expect(historyToggle?.getAttribute("aria-expanded")).toBe("true");
+    expect(historyPane?.classList.contains("expanded")).toBe(true);
+    expect(surface.querySelector(".desktop-git-history-resizer.is-static")).toBeNull();
     await act(async () => row?.click());
     expect(onSelectCommit).toHaveBeenCalledWith("head");
   });

@@ -210,10 +210,28 @@ describe("source-control visual architecture", () => {
     expect(sidebarResourcesCss).not.toContain("desktop-git-remote-status");
   });
 
-  it("keeps History visible as a first-level resizable Git sidebar pane", () => {
+  it("keeps History collapsible as a first-level resizable Git sidebar pane", () => {
+    const historyDrawer = compact(readCssBlock(
+      historyListCss,
+      ".desktop-git-history-drawer",
+    ));
+    const historyTitle = compact(readCssBlock(
+      historyListCss,
+      ".desktop-git-history-drawer-header span",
+    ));
     expect(sourceControlSidebarSource).toContain("<GitSidebarHistoryResizer");
-    expect(sourceControlSidebarSource).toContain('className="desktop-git-history-pane"');
+    expect(sourceControlSidebarSource).toContain("historyExpanded, setHistoryExpanded");
+    expect(sourceControlSidebarSource).toContain('className={`desktop-git-history-pane ${historyExpanded ? "expanded" : "collapsed"}`}');
+    expect(sourceControlSidebarSource).toContain("style={historyExpanded ? getHistoryPaneStyle() : undefined}");
     expect(sourceControlSidebarSource).toContain("<GitSidebarHistoryPanel");
+    expect(sourceControlSidebarSource).toContain("expanded={historyExpanded}");
+    expect(sourceControlSidebarSectionsSource).toContain("aria-expanded={expanded}");
+    expect(sourceControlSidebarSectionsSource).toContain("onClick={onToggle}");
+    expect(historyDrawer).toContain(
+      "padding-block: var(--desktop-sidebar-section-top-gap) var(--desktop-sidebar-list-padding-block);",
+    );
+    expect(historyTitle).toContain("flex: 0 1 auto;");
+    expect(historyTitle).not.toContain("flex: 1;");
     expect(sourceControlSidebarSource).not.toContain("GitHistoryShortcut");
     expect(sourceControlSidebarSectionsSource).toContain("<VirtualSidebarList");
     expect(viewSource).not.toContain("<VirtualSidebarList");

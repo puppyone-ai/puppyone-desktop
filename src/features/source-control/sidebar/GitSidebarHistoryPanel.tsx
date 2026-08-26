@@ -1,6 +1,7 @@
-import { Clock3, GitBranch } from "lucide-react";
+import { ChevronRight, GitBranch } from "lucide-react";
 import { VirtualSidebarList } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
+import { useId } from "react";
 import type { GitCommitSummary, GitStatusSnapshot } from "../../../types/electron";
 import { displayGitBranch } from "../viewModel";
 import { SourceControlDots } from "./GitSidebarPrimitives";
@@ -10,52 +11,67 @@ export function GitSidebarHistoryPanel({
   selectedCommitId,
   status,
   loading,
+  expanded,
+  onToggle,
   onSelectCommit,
 }: {
   commits: GitCommitSummary[];
   selectedCommitId: string | null;
   status: GitStatusSnapshot | null;
   loading: boolean;
+  expanded: boolean;
+  onToggle: () => void;
   onSelectCommit: (commitId: string) => void;
 }) {
   const { t, formatNumber } = useLocalization();
+  const historyContentId = useId();
   const historyIsConfirmedEmpty = status?.isRepo === true && status.totalCommits === 0;
 
   return (
-    <section className="desktop-git-history-drawer">
-      <div className="desktop-git-history-drawer-header">
-        <Clock3 size={13} />
+    <section className={`desktop-git-history-drawer ${expanded ? "expanded" : "collapsed"}`}>
+      <button
+        className="desktop-git-history-drawer-header"
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={historyContentId}
+        onClick={onToggle}
+      >
+        <ChevronRight className={`po-disclosure-icon ${expanded ? "expanded" : ""}`} />
         <span>{t("source-control.history.title")}</span>
         <small>{formatNumber(commits.length || status?.totalCommits || 0)}</small>
-      </div>
+      </button>
 
-      {commits.length > 0 ? (
-        <VirtualSidebarList
-          className="desktop-history-list desktop-history-virtual-list"
-          ariaLabel={t("source-control.history.ariaLabel")}
-          items={commits}
-          rowSize={32}
-          activeIndex={commits.findIndex((commit) => commit.commit_id === selectedCommitId)}
-          getKey={(commit) => commit.commit_id}
-          renderRow={(commit, index) => (
-            <SidebarHistoryRow
-              commit={commit}
-              isHead={commit.commit_id === status?.headCommitId}
-              isSelected={commit.commit_id === selectedCommitId}
-              hasPrevious={index > 0}
-              hasNext={index < commits.length - 1}
-              onClick={() => onSelectCommit(commit.commit_id)}
+      {expanded && (
+        <div id={historyContentId} className="desktop-git-history-drawer-content">
+          {commits.length > 0 ? (
+            <VirtualSidebarList
+              className="desktop-history-list desktop-history-virtual-list"
+              ariaLabel={t("source-control.history.ariaLabel")}
+              items={commits}
+              rowSize={32}
+              activeIndex={commits.findIndex((commit) => commit.commit_id === selectedCommitId)}
+              getKey={(commit) => commit.commit_id}
+              renderRow={(commit, index) => (
+                <SidebarHistoryRow
+                  commit={commit}
+                  isHead={commit.commit_id === status?.headCommitId}
+                  isSelected={commit.commit_id === selectedCommitId}
+                  hasPrevious={index > 0}
+                  hasNext={index < commits.length - 1}
+                  onClick={() => onSelectCommit(commit.commit_id)}
+                />
+              )}
             />
-          )}
-        />
-      ) : loading ? (
-        <div className="desktop-git-history-loading">
-          <SourceControlDots />
-          <span>{t("source-control.status.readingHistory")}</span>
+          ) : loading ? (
+            <div className="desktop-git-history-loading">
+              <SourceControlDots />
+              <span>{t("source-control.status.readingHistory")}</span>
+            </div>
+          ) : historyIsConfirmedEmpty ? (
+            <SidebarEmptyHistory status={status} />
+          ) : null}
         </div>
-      ) : historyIsConfirmedEmpty ? (
-        <SidebarEmptyHistory status={status} />
-      ) : null}
+      )}
     </section>
   );
 }

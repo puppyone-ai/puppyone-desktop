@@ -115,6 +115,14 @@
   background: var(--po-border);
 }
 
+.desktop-git-history-resizer.is-static {
+  cursor: default;
+}
+
+.desktop-git-history-resizer.is-static:hover::after {
+  background: var(--po-sidebar-divider, var(--po-divider));
+}
+
 body.desktop-git-sidebar-resizing {
   cursor: row-resize;
   user-select: none;

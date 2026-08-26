@@ -261,7 +261,7 @@ describe("scrollbar architecture", () => {
     expect(readRule(gitSidebarLayoutCss, ".desktop-git-history-pane"))
       .not.toContain("max-height:");
     expect(gitSidebarSource).toMatch(
-      /className="desktop-git-changes-pane"[\s\S]+<GitSidebarHistoryResizer[\s\S]+className="desktop-git-history-pane"/,
+      /className="desktop-git-changes-pane"[\s\S]+<GitSidebarHistoryResizer[\s\S]+className=\{`desktop-git-history-pane/,
     );
     expect(baseCss).not.toContain('[dir="rtl"] .data-explorer-resizer');
   });
