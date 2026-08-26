@@ -67,6 +67,7 @@ export function CloudProjectRouteOutlet({
         workspace={workspace}
         project={project}
         dashboard={cloudData.dashboard}
+        tree={cloudData.tree}
         history={cloudData.history}
         scopes={cloudData.scopes}
         connectors={cloudData.connectors}

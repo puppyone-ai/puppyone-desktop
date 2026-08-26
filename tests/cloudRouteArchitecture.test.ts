@@ -15,6 +15,7 @@ describe("Cloud route architecture", () => {
   it("keeps route-owned data plans out of the view orchestrator", () => {
     expect(getCloudProjectDetailResources("contents")).toEqual([
       "dashboard",
+      "tree",
       "history",
       "scopes",
       "connectors",

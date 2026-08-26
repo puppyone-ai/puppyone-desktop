@@ -30,6 +30,7 @@ export type CloudRouteDescriptor = {
 const NO_PROJECT_RESOURCES = [] as const satisfies readonly CloudProjectDetailResource[];
 const OVERVIEW_PROJECT_RESOURCES = [
   "dashboard",
+  "tree",
   "history",
   "scopes",
   "connectors",

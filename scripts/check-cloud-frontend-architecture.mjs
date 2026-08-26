@@ -51,6 +51,7 @@ const lineBudgets = new Map([
   ["src/features/cloud/sections/overview/overview.css", 10],
   ["src/features/cloud/sections/overview/styles/base.css", 180],
   ["src/features/cloud/sections/overview/styles/project-identity.css", 90],
+  ["src/features/cloud/sections/overview/styles/status-cards.css", 100],
   ["src/features/cloud/sections/overview/styles/dashboard-grid.css", 180],
   ["src/features/cloud/sections/overview/styles/resource-cards.css", 170],
   ["src/features/cloud/sections/overview/styles/responsive.css", 150],
@@ -236,6 +237,7 @@ for (const relativePath of [
 const expectedOverviewStyleManifest = [
   '@import "./styles/base.css" layer(features);',
   '@import "./styles/project-identity.css" layer(features);',
+  '@import "./styles/status-cards.css" layer(features);',
   '@import "./styles/dashboard-grid.css" layer(features);',
   '@import "./styles/resource-cards.css" layer(features);',
   '@import "./styles/responsive.css" layer(features);',

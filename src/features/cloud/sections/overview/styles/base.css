@@ -19,11 +19,11 @@
 
 .desktop-cloud-overview-catalog {
   display: grid;
-  width: min(100%, 1480px);
+  width: min(100%, 1760px);
   min-width: 0;
   box-sizing: border-box;
   margin: 0 auto;
-  padding: 44px clamp(28px, 4.6vw, 56px) 56px;
+  padding: 44px clamp(28px, 4.6vw, 44px) 56px;
 }
 
 .desktop-cloud-overview-landing-header {
@@ -32,7 +32,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  padding: 0 4px;
+  padding: 0 8px;
 }
 
 .desktop-cloud-overview-landing-copy {
@@ -41,26 +41,18 @@
   gap: 5px;
 }
 
-.desktop-cloud-overview-landing-title-row {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.desktop-cloud-overview-landing-title-row h1,
+.desktop-cloud-overview-landing-copy h1,
 .desktop-cloud-overview-landing-copy p {
   margin: 0;
 }
 
-.desktop-cloud-overview-landing-title-row h1 {
+.desktop-cloud-overview-landing-copy h1 {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--po-text);
   font-size: var(--po-text-size-page-title, 20px);
-  font-weight: 540;
-  letter-spacing: -0.014em;
+  font-weight: 500;
+  letter-spacing: -0.012em;
   line-height: 1.25;
 }
 

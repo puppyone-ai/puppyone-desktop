@@ -1,10 +1,7 @@
 import {
   Check,
-  Cloud,
   Copy,
-  GitBranch,
   RefreshCw,
-  Settings,
 } from "lucide-react";
 import { useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
@@ -17,18 +14,25 @@ import type {
   DesktopCloudProject,
   DesktopCloudRepoIdentity,
   DesktopCloudScope,
+  DesktopCloudTree,
 } from "../../../../lib/cloudApi";
 import type { DesktopCloudHistory } from "../../../../lib/cloudHistoryApi";
 import type { CloudWorkspaceSection } from "../../types";
 import { CloudWorkspaceLoadingState } from "../../components/shared";
-import { copyText } from "../../utils";
+import { getCloudRoute } from "../../routes/cloudRoutes";
+import { copyText, formatBytes } from "../../utils";
 import { CloudOverviewDashboard } from "./OverviewDashboard";
-import { getCloudOverviewMetrics } from "./overviewMetrics";
+import {
+  getCloudOverviewMetrics,
+  getCloudOverviewStorageUsage,
+  type CloudOverviewStorageUsage,
+} from "./overviewMetrics";
 
 export function CloudRepositoryOverview({
   workspace,
   project,
   dashboard,
+  tree,
   history,
   scopes,
   connectors,
@@ -41,6 +45,7 @@ export function CloudRepositoryOverview({
   workspace: Workspace;
   project: DesktopCloudProject | null;
   dashboard: DesktopCloudDashboard | null;
+  tree: DesktopCloudTree | null;
   history: DesktopCloudHistory | null;
   scopes: DesktopCloudScope[];
   connectors: DesktopCloudConnector[];
@@ -61,6 +66,8 @@ export function CloudRepositoryOverview({
     mcpEndpoints,
     identity,
   });
+  const storageUsage = getCloudOverviewStorageUsage(dashboard, tree);
+  const SettingsIcon = getCloudRoute("settings").icon;
   const hasOverviewData = Boolean(
     dashboard
     || history
@@ -78,21 +85,14 @@ export function CloudRepositoryOverview({
       <main className="desktop-cloud-overview-canvas" data-po-scrollbar="content">
         <div className="desktop-cloud-overview-catalog">
           <header className="desktop-cloud-overview-landing-header">
-            <div className="desktop-cloud-overview-landing-identity">
-              <span
-                className="desktop-cloud-overview-landing-mark"
-                aria-label={t("cloud.common.cloudSource")}
-                title={t("cloud.common.cloudSource")}
-              >
-                <Cloud size={20} />
-              </span>
-              <div className="desktop-cloud-overview-landing-copy">
-                <div className="desktop-cloud-overview-landing-title-row">
-                  <h1 dir="auto">{projectName}</h1>
-                </div>
-                {projectDescription ? <p dir="auto">{projectDescription}</p> : null}
-                {gitRemoteUrl ? <CloudOverviewGitRemote value={gitRemoteUrl} /> : null}
-              </div>
+            <div className="desktop-cloud-overview-landing-copy">
+              <h1 dir="auto">{projectName}</h1>
+              {gitRemoteUrl
+                ? <CloudOverviewGitRemote value={gitRemoteUrl} />
+                : projectDescription
+                  ? <p dir="auto">{projectDescription}</p>
+                  : null}
+              <CloudOverviewStorageMeter usage={storageUsage} loading={loading} />
             </div>
             <div className="desktop-cloud-overview-header-actions">
               {project?.capabilities?.includes("project.settings.manage") === true && (
@@ -103,7 +103,7 @@ export function CloudRepositoryOverview({
                   title={t("cloud.route.settings.title")}
                   onClick={() => onSelectSection("settings")}
                 >
-                  <Settings size={14} />
+                  <SettingsIcon size={14} />
                 </button>
               )}
               <button
@@ -119,10 +119,11 @@ export function CloudRepositoryOverview({
           </header>
 
           <CloudOverviewDashboard
+            projectUpdatedAt={project?.updated_at ?? null}
             history={history}
             dashboard={dashboard}
-            accessRows={overviewMetrics.accessRows}
-            automationRows={overviewMetrics.automationRows}
+            tree={tree}
+            accessPointCount={overviewMetrics.accessPointCount}
             loading={loading}
             onSelectSection={onSelectSection}
           />
@@ -144,10 +145,11 @@ function CloudOverviewGitRemote({ value }: { value: string }) {
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1400);
   };
+  const GitRemoteIcon = getCloudRoute("git-sync").icon;
 
   return (
     <div className="desktop-cloud-overview-git-remote">
-      <GitBranch size={13} aria-hidden="true" />
+      <GitRemoteIcon size={13} aria-hidden="true" />
       <code dir="ltr" title={value}>{value}</code>
       <button
         type="button"
@@ -157,6 +159,48 @@ function CloudOverviewGitRemote({ value }: { value: string }) {
       >
         {copied ? <Check size={13} /> : <Copy size={13} />}
       </button>
+    </div>
+  );
+}
+
+function CloudOverviewStorageMeter({
+  usage,
+  loading,
+}: {
+  usage: CloudOverviewStorageUsage;
+  loading: boolean;
+}) {
+  const localization = useLocalization();
+  const { t } = localization;
+  const used = usage.bytes === null
+    ? loading ? t("cloud.common.loading") : "—"
+    : `${formatBytes(usage.bytes, localization)}${usage.isLowerBound ? "+" : ""}`;
+  const detail = usage.limitBytes === null
+    ? used
+    : `${used} ${t("cloud.billing.storageLimit", {
+      limit: formatBytes(usage.limitBytes, localization),
+    })}`;
+  const progressProps = usage.percent === null
+    ? { "aria-hidden": true as const }
+    : {
+        role: "progressbar" as const,
+        "aria-label": t("cloud.billing.storageUsage"),
+        "aria-valuemin": 0,
+        "aria-valuemax": 100,
+        "aria-valuenow": Math.round(usage.percent),
+      };
+
+  return (
+    <div className="desktop-cloud-overview-project-storage">
+      <div className="desktop-cloud-overview-project-storage-copy">
+        <span>{t("cloud.billing.storageUsage")}</span>
+        <strong>{detail}</strong>
+      </div>
+      <span className="desktop-cloud-overview-project-storage-track" {...progressProps}>
+        {usage.percent !== null ? (
+          <span style={{ width: `${usage.percent}%` }} />
+        ) : null}
+      </span>
     </div>
   );
 }
