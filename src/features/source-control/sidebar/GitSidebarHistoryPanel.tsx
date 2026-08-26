@@ -3,16 +3,19 @@ import { VirtualSidebarList } from "@puppyone/shared-ui";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
 import type { GitCommitSummary, GitStatusSnapshot } from "../../../types/electron";
 import { displayGitBranch } from "../viewModel";
+import { SourceControlDots } from "./GitSidebarPrimitives";
 
 export function GitSidebarHistoryPanel({
   commits,
   selectedCommitId,
   status,
+  loading,
   onSelectCommit,
 }: {
   commits: GitCommitSummary[];
   selectedCommitId: string | null;
   status: GitStatusSnapshot | null;
+  loading: boolean;
   onSelectCommit: (commitId: string) => void;
 }) {
   const { t, formatNumber } = useLocalization();
@@ -45,6 +48,11 @@ export function GitSidebarHistoryPanel({
             />
           )}
         />
+      ) : loading ? (
+        <div className="desktop-git-history-loading">
+          <SourceControlDots />
+          <span>{t("source-control.status.readingHistory")}</span>
+        </div>
       ) : historyIsConfirmedEmpty ? (
         <SidebarEmptyHistory status={status} />
       ) : null}

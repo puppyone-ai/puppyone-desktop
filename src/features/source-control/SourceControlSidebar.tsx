@@ -17,6 +17,7 @@ import {
   GitSidebarSectionResizer,
 } from "./sidebar/GitSidebarPrimitives";
 import { GitSidebarHistoryPanel } from "./sidebar/GitSidebarHistoryPanel";
+import { GitSidebarCommitBar } from "./sidebar/GitSidebarCommitBar";
 import { GitRemotePrompt } from "./sidebar/GitRemoteSections";
 import type {
   GitSidebarProps,
@@ -35,6 +36,7 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
   const {
     selectedCommitId,
     selectedWorkingFile,
+    historyLoading,
     operationLoading,
     operationError,
     loading,
@@ -113,22 +115,31 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
             <span>{t("source-control.status.noRepository")}</span>
             {operationError && <small className="po-sidebar-error-text">{operationError}</small>}
           </SidebarEmptyState>
-        ) : loading && !status ? (
-          <SidebarEmptyState>{t("source-control.status.readingGit")}</SidebarEmptyState>
         ) : (
           <>
             <div ref={changesPaneRef} className="desktop-git-changes-pane">
               <div className="desktop-git-fixed-region">
-                <GitRemotePrompt
-                  state={syncState}
+                <GitSidebarCommitBar
+                  model={sidebarModel}
+                  repositoryReady={status?.isRepo === true}
                   disabled={disabled}
-                  cloudBackupLoading={cloudBackup.loading}
-                  cloudBackupError={cloudBackup.error}
-                  dismissed={backupCardDismissed}
-                  cloudEnabled={cloudBackup.enabled ?? true}
-                  onDismiss={() => setBackupCardDismissed(true)}
-                  onStartPuppyoneBackup={cloudBackup.start}
+                  operationLoading={operationLoading}
+                  primaryActionSlot={primaryActionSlot}
+                  actions={actions}
+                  t={t}
                 />
+                {status && (
+                  <GitRemotePrompt
+                    state={syncState}
+                    disabled={disabled}
+                    cloudBackupLoading={cloudBackup.loading}
+                    cloudBackupError={cloudBackup.error}
+                    dismissed={backupCardDismissed}
+                    cloudEnabled={cloudBackup.enabled ?? true}
+                    onDismiss={() => setBackupCardDismissed(true)}
+                    onStartPuppyoneBackup={cloudBackup.start}
+                  />
+                )}
                 {operationError && (
                   <div className="desktop-git-operation-error" role="alert">{operationError}</div>
                 )}
@@ -180,6 +191,7 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
                 commits={historyCommits}
                 selectedCommitId={selectedCommitId}
                 status={status}
+                loading={historyLoading || (loading && !status)}
                 onSelectCommit={selectCommit}
               />
             </section>

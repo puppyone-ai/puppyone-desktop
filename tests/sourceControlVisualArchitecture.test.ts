@@ -20,6 +20,7 @@ const sourceControlSidebarSource = readFileSync(
 );
 const sourceControlSidebarSectionsSource = [
   "GitRemoteSections.tsx",
+  "GitSidebarCommitBar.tsx",
   "GitSidebarHistoryPanel.tsx",
   "GitSidebarPrimitives.tsx",
   "GitLocalStatusSection.tsx",
@@ -222,6 +223,21 @@ describe("source-control visual architecture", () => {
       new URL("../src/features/source-control/sidebar/useGitSidebarPanelLayout.ts", import.meta.url),
       "utf8",
     )).toContain("flex: `0 0 ${historyPaneHeight}px`");
+  });
+
+  it("keeps main-panel loading quiet while Commit and History own their local states", () => {
+    const commitIndex = sourceControlSidebarSource.indexOf("<GitSidebarCommitBar");
+    const remoteIndex = sourceControlSidebarSource.indexOf("<GitRemotePrompt");
+    const panelsIndex = sourceControlSidebarSource.indexOf('className="desktop-git-resizable-stack"');
+
+    expect(viewSource).toContain('t("source-control.overview.selectPreview")');
+    expect(viewSource).not.toContain("loading && !status");
+    expect(sourceControlSidebarSectionsSource).toContain('className="desktop-git-history-loading"');
+    expect(sourceControlSidebarSectionsSource).toContain('t("source-control.status.readingHistory")');
+    expect(commitIndex).toBeGreaterThan(-1);
+    expect(commitIndex).toBeLessThan(remoteIndex);
+    expect(commitIndex).toBeLessThan(panelsIndex);
+    expect(sourceControlSidebarSectionsSource).not.toContain('label={t("source-control.action.stageCommit")}');
   });
 
   it("reserves card surfaces for providers and keeps local source-control groups flat", () => {

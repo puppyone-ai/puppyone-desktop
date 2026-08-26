@@ -130,6 +130,7 @@
   "label.staged": "ステージ済み",
   "overview.backup": "PuppyOne が変更をバックアップします",
   "overview.selectChange": "変更を選択してプレビュー",
+  "overview.selectPreview": "変更されたファイルまたはコミットを選択してプレビュー",
   "preview.cloud": "Cloud 変更のプレビュー",
   "preview.committed": "コミット済み変更のプレビュー",
   "preview.remote": "リモート変更のプレビュー",

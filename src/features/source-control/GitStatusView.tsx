@@ -1,16 +1,13 @@
 import type { ReactNode } from "react";
-import { GitBranch, RefreshCw } from "lucide-react";
-import type { Workspace } from "@puppyone/shared-ui";
-import { bidiIsolate, useLocalization } from "@puppyone/localization";
+import { RefreshCw } from "lucide-react";
+import { useLocalization } from "@puppyone/localization";
 import type { GitCommitDetail, GitCommitSummary, GitStatusSnapshot } from "../../types/electron";
 import type { GitMainPanel, GitWorkingSelection } from "./types";
-import { displayGitBranch } from "./viewModel";
 import { GitFileDiffSurface } from "./diff/GitFileDiffSurface";
 import { WorkingFileDetail } from "./WorkingFileDetail";
 import { VersionControlSetupState } from "./VersionControlSetupState";
 
 type GitStatusViewProps = {
-  workspace: Workspace;
   status: GitStatusSnapshot | null;
   activePanel: GitMainPanel;
   selectedCommitId: string | null;
@@ -34,7 +31,6 @@ type GitStatusViewProps = {
 };
 
 export function GitStatusView({
-  workspace,
   status,
   activePanel,
   selectedCommitId,
@@ -60,8 +56,7 @@ export function GitStatusView({
   const commits = status?.commits ?? [];
   const historyCommits = status?.allCommits ?? commits;
   const selectedCommit =
-    historyCommits.find((commit) => commit.commit_id === selectedCommitId) ??
-    (activePanel === "history" ? historyCommits[0] ?? null : null);
+    historyCommits.find((commit) => commit.commit_id === selectedCommitId) ?? null;
 
   if (error) {
     return <UtilityEmptyState tone="danger" message={error} onRefresh={onRefresh} loading={loading} />;
@@ -77,23 +72,14 @@ export function GitStatusView({
     );
   }
 
-  if (loading && !status) {
-    return <UtilityEmptyState message={t("source-control.status.readingHistory")} loading={loading} />;
-  }
-
   if (activePanel === "history") {
     return (
       <GitHistoryPanel
-        commits={historyCommits}
         selectedCommit={selectedCommit}
         headCommitId={status?.headCommitId ?? null}
         commitDetail={commitDetail}
         commitDetailLoading={commitDetailLoading}
         commitDetailError={commitDetailError}
-        status={status}
-        operationError={operationError}
-        loading={loading}
-        onRefresh={onRefresh}
       />
     );
   }
@@ -115,65 +101,34 @@ export function GitStatusView({
     );
   }
 
-  return (
-    <GitOverview
-      workspace={workspace}
-      status={status}
-      loading={loading}
-      operationLoading={operationLoading}
-      operationError={operationError}
-      onRefresh={onRefresh}
-    />
-  );
+  return <GitPreviewEmptyState />;
 }
 
 function GitHistoryPanel({
-  commits,
   selectedCommit,
   headCommitId,
   commitDetail,
   commitDetailLoading,
   commitDetailError,
-  status,
-  operationError,
-  loading,
-  onRefresh,
 }: {
-  commits: GitCommitSummary[];
   selectedCommit: GitCommitSummary | null;
   headCommitId: string | null;
   commitDetail: GitCommitDetail | null;
   commitDetailLoading: boolean;
   commitDetailError: string | null;
-  status: GitStatusSnapshot | null;
-  operationError: string | null;
-  loading: boolean;
-  onRefresh: () => void;
 }) {
-  if (commits.length === 0) {
-    return (
-      <section className="desktop-utility-view desktop-history-detail-view">
-        <div className="desktop-history-detail-scroll" data-po-scrollbar="content">
-          <EmptyGitHistoryState status={status} operationError={operationError} onRefresh={onRefresh} loading={loading} />
-        </div>
-      </section>
-    );
-  }
+  if (!selectedCommit) return <GitPreviewEmptyState />;
 
   return (
     <section className="desktop-utility-view desktop-history-detail-view">
       <div className="desktop-history-detail-scroll" data-po-scrollbar="content">
-        {selectedCommit ? (
-          <CommitDetail
-            commit={selectedCommit}
-            detail={commitDetail}
-            loading={commitDetailLoading}
-            error={commitDetailError}
-            isHead={selectedCommit.commit_id === headCommitId}
-          />
-        ) : (
-          <EmptyGitHistoryState status={status} operationError={operationError} onRefresh={onRefresh} loading={loading} />
-        )}
+        <CommitDetail
+          commit={selectedCommit}
+          detail={commitDetail}
+          loading={commitDetailLoading}
+          error={commitDetailError}
+          isHead={selectedCommit.commit_id === headCommitId}
+        />
       </div>
     </section>
   );
@@ -249,178 +204,15 @@ function CommitDetail({
   );
 }
 
-function GitOverview({
-  workspace,
-  status,
-  loading,
-  operationLoading,
-  operationError,
-  onRefresh,
-}: {
-  workspace: Workspace;
-  status: GitStatusSnapshot | null;
-  loading: boolean;
-  operationLoading: string | null;
-  operationError: string | null;
-  onRefresh: () => void;
-}) {
+function GitPreviewEmptyState() {
   const { t } = useLocalization();
-  if (status && isEmptyGitRepository(status)) {
-    return (
-      <InitialGitRepositoryState
-        workspace={workspace}
-        status={status}
-        loading={loading}
-        operationLoading={operationLoading}
-        operationError={operationError}
-        onRefresh={onRefresh}
-      />
-    );
-  }
-
-  const sourceControl = status?.sourceControl ?? null;
-  const groups = sourceControl?.groups ?? [];
-  const stagedCount = groups.find((group) => group.id === "index")?.resources.length ?? status?.stagedEntries.length ?? 0;
-  const workingCount = (
-    (groups.find((group) => group.id === "workingTree")?.resources.length ?? status?.unstagedEntries.length ?? 0) +
-    (groups.find((group) => group.id === "untracked")?.resources.length ?? status?.untrackedEntries.length ?? 0)
-  );
-  const mergeCount = groups.find((group) => group.id === "merge")?.resources.length ?? 0;
-  const remote = sourceControl?.remote ?? null;
-  const incomingCount = remote?.behind ?? 0;
-  const committedCount = remote?.ahead ?? 0;
-  const hasChanges = incomingCount + committedCount + stagedCount + workingCount + mergeCount > 0;
 
   return (
     <section className="desktop-utility-view desktop-history-detail-view">
-      <div className="desktop-git-default-state">
-        <div className="desktop-git-default-copy">
-          <span>{t(hasChanges ? "source-control.overview.selectChange" : "source-control.overview.backup")}</span>
-        </div>
-        {operationError && (
-          <div className="desktop-git-default-status danger">
-            {operationError}
-          </div>
-        )}
+      <div className="empty-preview">
+        <span>{t("source-control.overview.selectPreview")}</span>
       </div>
     </section>
-  );
-}
-
-function InitialGitRepositoryState({
-  workspace,
-  status,
-  loading,
-  operationLoading,
-  operationError,
-  onRefresh,
-}: {
-  workspace: Workspace;
-  status: GitStatusSnapshot;
-  loading: boolean;
-  operationLoading: string | null;
-  operationError: string | null;
-  onRefresh: () => void;
-}) {
-  const { t, formatNumber } = useLocalization();
-  const stagedCount = status.stagedEntries.length;
-  const workingCount = status.unstagedEntries.length + status.untrackedEntries.length;
-  const branchName = displayGitBranch(status, t("source-control.branch.initial"));
-  const readyForCommit = stagedCount > 0;
-  const hasWorkingFiles = workingCount > 0;
-  const stateLabel = t(readyForCommit
-    ? "source-control.initial.ready"
-    : hasWorkingFiles ? "source-control.initial.notStaged" : "source-control.initial.clean");
-  const stateDetail = readyForCommit
-    ? t("source-control.initial.readyDetail")
-    : hasWorkingFiles
-      ? t("source-control.initial.notStagedDetail")
-      : t("source-control.initial.cleanDetail");
-
-  return (
-    <section className="desktop-utility-view desktop-history-detail-view">
-      <div className="desktop-history-detail-scroll" data-po-scrollbar="content">
-        <div className="desktop-initial-repo-state">
-          <div className="desktop-initial-repo-card">
-            <div className="desktop-initial-repo-header">
-              <span className="desktop-initial-repo-icon" aria-hidden>
-                <GitBranch size={17} />
-              </span>
-              <div>
-                <span>{t("source-control.initial.initialized")}</span>
-                <strong>{stateLabel}</strong>
-              </div>
-              <button className="desktop-utility-icon-button" type="button" onClick={onRefresh} aria-label={t("source-control.action.refreshGit")}>
-                <RefreshCw size={15} className={loading ? "spin" : undefined} />
-              </button>
-            </div>
-
-            <p>
-              {t("source-control.initial.description", { workspace: bidiIsolate(workspace.name), detail: stateDetail })}
-            </p>
-
-            <div className="desktop-initial-repo-metrics">
-              <div>
-                <span>{t("source-control.label.branch")}</span>
-                <strong><bdi>{branchName}</bdi></strong>
-              </div>
-              <div>
-                <span>{t("source-control.label.staged")}</span>
-                <strong>{formatNumber(stagedCount)}</strong>
-              </div>
-              <div>
-                <span>{t("source-control.label.changes")}</span>
-                <strong>{formatNumber(workingCount)}</strong>
-              </div>
-            </div>
-
-            {operationError && (
-              <div className="desktop-initial-repo-status danger">
-                {operationError}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function EmptyGitHistoryState({
-  status,
-  operationError,
-  onRefresh,
-  loading,
-}: {
-  status: GitStatusSnapshot | null;
-  operationError: string | null;
-  onRefresh: () => void;
-  loading: boolean;
-}) {
-  const { t } = useLocalization();
-  return (
-    <div className="desktop-initial-repo-state desktop-initial-repo-state--compact">
-      <div className="desktop-initial-repo-card">
-        <div className="desktop-initial-repo-header">
-          <span className="desktop-initial-repo-icon" aria-hidden>
-            <GitBranch size={17} />
-          </span>
-          <div>
-            <span>{t("source-control.history.title")}</span>
-            <strong>{t("source-control.history.noCommitsYet")}</strong>
-          </div>
-          <button className="desktop-utility-icon-button" type="button" onClick={onRefresh} aria-label={t("source-control.action.refreshGit")}>
-            <RefreshCw size={15} className={loading ? "spin" : undefined} />
-          </button>
-        </div>
-        <p>
-          {status?.isRepo
-            ? t("source-control.history.firstCommit", { branch: bidiIsolate(displayGitBranch(status, t("source-control.branch.initial"))) })
-            : t("source-control.history.initialize")}
-        </p>
-        {operationError && <div className="desktop-initial-repo-status danger">{operationError}</div>}
-      </div>
-    </div>
   );
 }
 
@@ -468,10 +260,6 @@ function getChangeTotals(changes: Array<{ additions: number | null; deletions: n
     }),
     { files: 0, additions: 0, deletions: 0 },
   );
-}
-
-function isEmptyGitRepository(status: GitStatusSnapshot) {
-  return status.isRepo && !status.headCommitId && status.totalCommits === 0;
 }
 
 function shortCommit(commitId: string) {

@@ -64,6 +64,18 @@
   scrollbar-gutter: stable;
 }
 
+.desktop-git-history-loading {
+  display: flex;
+  min-height: var(--desktop-sidebar-row-height);
+  align-items: center;
+  gap: 6px;
+  padding-inline: var(--git-sidebar-content-left) var(--git-sidebar-content-right);
+  color: var(--po-text-subtle);
+  font-size: var(--git-font-small);
+  font-weight: var(--git-weight-regular);
+  line-height: var(--git-line-height);
+}
+
 .desktop-history-list {
   display: grid;
   gap: 0;

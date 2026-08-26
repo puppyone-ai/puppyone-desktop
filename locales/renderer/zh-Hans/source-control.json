@@ -130,6 +130,7 @@
   "label.staged": "已暂存",
   "overview.backup": "PuppyOne 会备份你的更改",
   "overview.selectChange": "选择一项更改以预览",
+  "overview.selectPreview": "选择一个更改文件或提交以预览",
   "preview.cloud": "云端更改预览",
   "preview.committed": "已提交更改预览",
   "preview.remote": "远端更改预览",

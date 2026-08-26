@@ -130,6 +130,7 @@
   "label.staged": "Gestaged",
   "overview.backup": "PuppyOne sichert deine Änderungen",
   "overview.selectChange": "Wähle eine Änderung für die Vorschau",
+  "overview.selectPreview": "Wähle eine geänderte Datei oder einen Commit für die Vorschau aus",
   "preview.cloud": "Vorschau der Cloud-Änderungen",
   "preview.committed": "Vorschau der committeten Änderungen",
   "preview.remote": "Vorschau der Remote-Änderungen",

@@ -130,6 +130,7 @@
   "label.staged": "Staged",
   "overview.backup": "PuppyOne backs up your changes",
   "overview.selectChange": "Select a change to preview",
+  "overview.selectPreview": "Select a changed file or commit to preview",
   "preview.cloud": "Cloud change preview",
   "preview.committed": "Committed change preview",
   "preview.remote": "Remote change preview",

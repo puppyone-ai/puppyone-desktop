@@ -22,8 +22,7 @@ describe("Git sidebar status groups", () => {
   it("renders local groups expanded and flat while keeping their counts and actions in the headers", async () => {
     const onCommit = vi.fn(async () => true);
     const onPush = vi.fn(async () => true);
-    const stageAndCommit = vi.fn(async () => true);
-    const surface = renderSidebar({ onCommit, onPush, stageAndCommit });
+    const surface = renderSidebar({ onCommit, onPush });
 
     expect(surface.querySelector(".desktop-git-status-card")).toBeNull();
     expect(surface.querySelectorAll(".desktop-git-local-section-body.expanded")).toHaveLength(3);
@@ -34,24 +33,19 @@ describe("Git sidebar status groups", () => {
 
     const commitButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Commit"]');
     const pushButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Push"]');
-    const stageAndCommitButton = surface.querySelector<HTMLButtonElement>(
-      'button[aria-label="Stage · Commit"]',
-    );
 
-    for (const button of [commitButton, pushButton, stageAndCommitButton]) {
-      expect(button?.closest(".desktop-git-section-row")).not.toBeNull();
-      expect(button?.closest(".desktop-git-status-card")).toBeNull();
-    }
+    expect(commitButton?.closest(".desktop-git-commit-bar")).not.toBeNull();
+    expect(commitButton?.closest(".desktop-git-section-row")).toBeNull();
+    expect(pushButton?.closest(".desktop-git-section-row")).not.toBeNull();
+    expect(surface.querySelector('button[aria-label="Stage · Commit"]')).toBeNull();
 
     await act(async () => {
       commitButton?.click();
       pushButton?.click();
-      stageAndCommitButton?.click();
     });
 
     expect(onCommit).toHaveBeenCalledTimes(1);
     expect(onPush).toHaveBeenCalledTimes(1);
-    expect(stageAndCommit).toHaveBeenCalledTimes(1);
   });
 
   it("keeps every local group on the same collapsible flat-section contract", () => {
@@ -82,15 +76,18 @@ describe("Git sidebar status groups", () => {
 
   it("keeps staged changes separate while offering one-click stage and commit", async () => {
     const stageAndCommit = vi.fn(async () => true);
-    const surface = renderSidebar({ gitDisplayMode: "simple", stageAndCommit });
+    const status = createGitStatus();
+    status.sourceControl.groups = status.sourceControl.groups.filter((group) => group.id !== "index");
+    status.sourceControl.actions.canCommit = false;
+    const surface = renderSidebar({ gitDisplayMode: "simple", stageAndCommit, status });
 
-    expect(surface.textContent).toContain("Staged");
     expect(surface.textContent).toContain("Unstaged");
     const unstagedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
       .find((button) => button.textContent?.includes("Unstaged"));
     expect(unstagedToggle?.querySelector("small")?.textContent).toBe("1");
-    const action = surface.querySelector<HTMLButtonElement>('button[aria-label="Stage · Commit"]');
-    expect(action?.closest(".desktop-git-resizable-section-unstaged")).not.toBeNull();
+    const action = surface.querySelector<HTMLButtonElement>('button[aria-label="Commit"]');
+    expect(action?.closest(".desktop-git-commit-bar")).not.toBeNull();
+    expect(surface.querySelector('button[aria-label="Stage · Commit"]')).toBeNull();
 
     await act(async () => action?.click());
     expect(stageAndCommit).toHaveBeenCalledTimes(1);
@@ -156,16 +153,51 @@ describe("Git sidebar status groups", () => {
     expect(onSelectCommit).toHaveBeenCalledWith("head");
   });
 
-  it("keeps the History body blank while known commits are still loading", () => {
+  it("shows History loading only inside the History pane while known commits load", () => {
     const status = createGitStatus();
     expect(status.totalCommits).toBeGreaterThan(0);
     expect(status.allCommits).toHaveLength(0);
 
-    const surface = renderSidebar({ status });
+    const surface = renderSidebar({ historyLoading: true, status });
 
     expect(surface.querySelector(".desktop-git-history-pane")).not.toBeNull();
+    expect(surface.querySelector(".desktop-git-history-loading")).not.toBeNull();
+    expect(surface.textContent).toContain("Reading Git history");
     expect(surface.querySelector(".desktop-git-sidebar-empty-history")).toBeNull();
     expect(surface.textContent).not.toContain("No commits yet");
+  });
+
+  it("keeps a disabled Commit action first when the working tree is clean", () => {
+    const status = createGitStatus();
+    status.entries = [];
+    status.stagedEntries = [];
+    status.unstagedEntries = [];
+    status.untrackedEntries = [];
+    status.sourceControl.groups = [];
+    status.sourceControl.actions.canCommit = false;
+    status.sourceControl.remote = {
+      ...status.sourceControl.remote,
+      ahead: 0,
+      outgoingPreview: [],
+      canPush: false,
+      canSync: false,
+      state: "synced",
+    };
+    status.syncTarget = status.syncTarget ? {
+      ...status.syncTarget,
+      ahead: 0,
+      outgoingPreview: [],
+    } : null;
+    status.branches = status.branches.map((branch) => ({ ...branch, ahead: 0 }));
+
+    const surface = renderSidebar({ status });
+    const firstButton = surface.querySelector<HTMLButtonElement>("button");
+    const commitButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Commit"]');
+
+    expect(firstButton).toBe(commitButton);
+    expect(commitButton?.disabled).toBe(true);
+    expect(commitButton?.closest(".desktop-git-fixed-region")).not.toBeNull();
+    expect(surface.textContent).toContain("Clean working tree");
   });
 
   it.each([
@@ -292,6 +324,7 @@ function renderSidebar(options: Partial<{
   onSelectCommit: (commitId: string) => void;
   onStageAll: () => Promise<boolean>;
   stageAndCommit: () => Promise<boolean>;
+  historyLoading: boolean;
   status: GitStatusSnapshot;
 }> = {}) {
   const container = document.createElement("div");
@@ -312,6 +345,7 @@ function renderSidebar(options: Partial<{
       view={{
         selectedCommitId: null,
         selectedWorkingFile: null,
+        historyLoading: options.historyLoading ?? false,
         operationLoading: null,
         operationError: null,
         loading: false,

@@ -16,6 +16,7 @@ export type GitSidebarRepositoryState = {
 export type GitSidebarViewState = {
   selectedCommitId: string | null;
   selectedWorkingFile: GitWorkingSelection | null;
+  historyLoading: boolean;
   operationLoading: string | null;
   operationError: string | null;
   loading: boolean;

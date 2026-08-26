@@ -15,6 +15,35 @@
   background: color-mix(in srgb, var(--po-control) 36%, transparent);
 }
 
+.desktop-git-commit-bar {
+  display: grid;
+  gap: 4px;
+  width: var(--git-sidebar-control-width);
+  margin-block: var(--desktop-sidebar-section-top-gap) 8px;
+  margin-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);
+}
+
+.desktop-git-primary-commit-action {
+  width: 100%;
+}
+
+.desktop-git-operation-button.desktop-git-primary-commit-action:disabled {
+  background: var(--po-control);
+  color: var(--po-text-disabled);
+}
+
+.desktop-git-working-tree-clean {
+  min-width: 0;
+  overflow: hidden;
+  padding-inline: 2px;
+  color: var(--po-text-subtle);
+  font-size: var(--git-font-small);
+  font-weight: var(--git-weight-regular);
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .desktop-git-backup-copy {
   grid-area: copy;
   display: grid;

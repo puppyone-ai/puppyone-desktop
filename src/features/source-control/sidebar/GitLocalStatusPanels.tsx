@@ -191,7 +191,6 @@ export function createGitLocalStatusPanels({
   }
 
   if (model.showStagedSection) {
-    const action = model.stagedPrimaryAction;
     panels.push({
       id: "staged",
       className: "staged",
@@ -204,22 +203,6 @@ export function createGitLocalStatusPanels({
           count={model.stagedResources.length}
           expanded={expanded.staged}
           onToggle={() => onToggle("staged")}
-          action={action ? (
-            <div className="desktop-git-section-actions">
-              <GitOperationButton
-                className="desktop-git-commit-push-action"
-                title={action.title}
-                disabled={disabled || action.disabled}
-                icon={action.icon}
-                label={action.label}
-                loadingKey={action.loadingKey}
-                loadingLabel={action.loadingLabel}
-                operationLoading={operationLoading}
-                primary={primaryActionSlot === "staged"}
-                onClick={() => void primaryActionHandlers[action.kind]()}
-              />
-            </div>
-          ) : undefined}
         >
           <SourceControlWorkingResourceList
             resources={model.stagedResources}
@@ -249,7 +232,7 @@ export function createGitLocalStatusPanels({
           count={model.localChangeResources.length}
           expanded={expanded.unstaged}
           onToggle={() => onToggle("unstaged")}
-          action={createUnstagedActions({ model, disabled, operationLoading, actions, primaryActionSlot, t })}
+          action={createUnstagedActions({ model, disabled, actions, t })}
         >
           <SourceControlWorkingResourceList
             resources={model.localChangeResources}
@@ -272,55 +255,32 @@ export function createGitLocalStatusPanels({
 function createUnstagedActions({
   model,
   disabled,
-  operationLoading,
   actions,
-  primaryActionSlot,
   t,
 }: {
   model: SourceControlSidebarModel;
   disabled: boolean;
-  operationLoading: string | null;
   actions: LocalPanelActions;
-  primaryActionSlot: SourceControlPrimaryActionSlot;
   t: MessageFormatter;
 }) {
   if (model.workingResources.length === 0) return undefined;
 
-  if (!model.showStageAndCommitAction) {
-    return (
-      <div className="desktop-git-section-actions">
-        <SidebarIconButton
-          className="desktop-working-tree-revert-action"
-          tone="danger"
-          label={t("source-control.action.discardAll")}
-          disabled={disabled}
-          onClick={() => void actions.discardAll()}
-          icon={<Undo2 size={13} />}
-        />
-        <SidebarIconButton
-          className="desktop-git-stage-all-action"
-          label={t("source-control.action.stageAll")}
-          disabled={disabled}
-          onClick={() => void actions.stageAll()}
-          icon={<Plus size={13} />}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="desktop-git-section-actions">
-      <GitOperationButton
-        className="desktop-git-commit-push-action desktop-git-stage-commit-action"
-        title={t("source-control.action.stageCommitTitle")}
+      <SidebarIconButton
+        className="desktop-working-tree-revert-action"
+        tone="danger"
+        label={t("source-control.action.discardAll")}
         disabled={disabled}
-        icon="plus"
-        label={t("source-control.action.stageCommit")}
-        loadingKey="stage-commit"
-        loadingLabel={t("source-control.action.committing")}
-        operationLoading={operationLoading}
-        primary={primaryActionSlot === "stage-and-commit"}
-        onClick={() => void actions.stageAndCommit()}
+        onClick={() => void actions.discardAll()}
+        icon={<Undo2 size={13} />}
+      />
+      <SidebarIconButton
+        className="desktop-git-stage-all-action"
+        label={t("source-control.action.stageAll")}
+        disabled={disabled}
+        onClick={() => void actions.stageAll()}
+        icon={<Plus size={13} />}
       />
     </div>
   );

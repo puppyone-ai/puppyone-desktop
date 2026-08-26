@@ -87,6 +87,7 @@ export function useDesktopGitController({
   const [selectedGitCommitId, setSelectedGitCommitId] = useState<string | null>(null);
   const [selectedGitWorkingFile, setSelectedGitWorkingFile] = useState<GitWorkingSelection | null>(null);
   const [gitMainPanel, setGitMainPanel] = useState<GitMainPanel>("changes");
+  const [gitHistoryLoading, setGitHistoryLoading] = useState(false);
   const [gitCommitDetail, setGitCommitDetail] = useState<GitCommitDetail | null>(null);
   const [gitCommitDetailLoading, setGitCommitDetailLoading] = useState(false);
   const [gitCommitDetailError, setGitCommitDetailError] = useState<string | null>(null);
@@ -120,6 +121,7 @@ export function useDesktopGitController({
     clearFormatAwareDiffCaches();
     setSelectedGitCommitId(null);
     setSelectedGitWorkingFile(null);
+    setGitHistoryLoading(false);
     setGitCommitDetail(null);
     setGitCommitDetailError(null);
     setGitCommitDetailLoading(false);
@@ -136,6 +138,7 @@ export function useDesktopGitController({
   // soon as the Source Control surface is active and refresh it after ref changes.
   useEffect(() => {
     if (!gitViewActive || !workspace || !activeGitStatus?.isRepo) {
+      setGitHistoryLoading(false);
       return undefined;
     }
 
@@ -146,10 +149,14 @@ export function useDesktopGitController({
     const alreadyLoaded = (activeGitStatus.allCommits?.length ?? 0) > 0
       || (activeGitStatus.commits?.length ?? 0) > 0;
     // If we already have history for this HEAD + history epoch, keep it.
-    if (alreadyLoaded) return undefined;
+    if (alreadyLoaded || activeGitStatus.totalCommits === 0) {
+      setGitHistoryLoading(false);
+      return undefined;
+    }
 
     const requestId = `history-${++historyRequestRef.current}`;
     let cancelled = false;
+    setGitHistoryLoading(true);
     void getWorkspaceGitBranchGraph(context.rootPath, { requestId })
       .then((graph) => {
         if (cancelled) return;
@@ -160,10 +167,14 @@ export function useDesktopGitController({
         const message = error instanceof Error ? error.message : String(error);
         if (/cancelled|ABORT_ERR/i.test(message)) return;
         reportGitStatusError(context, error);
+      })
+      .finally(() => {
+        if (!cancelled) setGitHistoryLoading(false);
       });
 
     return () => {
       cancelled = true;
+      setGitHistoryLoading(false);
       void cancelWorkspaceGitBranchGraph(requestId);
     };
   }, [
@@ -172,6 +183,7 @@ export function useDesktopGitController({
     activeGitStatus?.commits?.length,
     activeGitStatus?.headCommitId,
     activeGitStatus?.isRepo,
+    activeGitStatus?.totalCommits,
     applyGitHistory,
     captureGitRepositoryContext,
     gitViewActive,
@@ -699,6 +711,7 @@ export function useDesktopGitController({
     gitCommitDetail,
     gitCommitDetailError,
     gitCommitDetailLoading,
+    gitHistoryLoading,
     gitIncomingCount,
     gitMainPanel,
     gitOperationError,
