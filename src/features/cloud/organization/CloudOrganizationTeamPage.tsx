@@ -178,18 +178,20 @@ export function CloudOrganizationPageShell({
   children: ReactNode;
 }) {
   return (
-    <div className="desktop-cloud-org-page" data-po-scrollbar="content">
-      <div className="desktop-cloud-org-shell">
-        <div className="desktop-cloud-org-header">
-          <div>
-            <h1>{title}</h1>
-            <p>{description}</p>
-          </div>
-          {actions && <div className="desktop-cloud-org-actions">{actions}</div>}
+    <section className="desktop-cloud-org-page" aria-label={title}>
+      <main className="desktop-cloud-org-canvas" data-po-scrollbar="content">
+        <div className="desktop-cloud-org-shell">
+          <header className="desktop-cloud-org-header">
+            <div className="desktop-cloud-org-header-copy">
+              <h1>{title}</h1>
+              <p>{description}</p>
+            </div>
+            {actions && <div className="desktop-cloud-org-actions">{actions}</div>}
+          </header>
+          <div className="desktop-cloud-org-content">{children}</div>
         </div>
-        {children}
-      </div>
-    </div>
+      </main>
+    </section>
   );
 }
 
