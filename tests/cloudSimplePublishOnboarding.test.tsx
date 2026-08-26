@@ -41,17 +41,30 @@ describe("simple Cloud publish onboarding", () => {
       />,
     )));
 
-    expect(container.textContent).toContain("Activate Cloud Hosting & Enable MCP");
+    expect(container.textContent).toContain("Use your local files with any AI, anywhere.");
+    expect(container.textContent).toContain("ChatGPT");
+    expect(container.textContent).toContain("Claude");
+    expect(container.textContent).toContain("Cursor");
+    expect(container.textContent).toContain("Manus");
+    expect(container.textContent).toContain("Hermes");
+    expect(container.textContent).toContain("Grok");
     expect(container.textContent).toContain("Get Started");
-    expect(container.textContent).toContain("may upload");
+    expect(container.textContent).not.toContain("May upload");
     expect(container.textContent).not.toContain("19 commits");
     expect(container.textContent).not.toContain("New Cloud project");
     expect(container.querySelector(".desktop-cloud-publish-hero")).toBeNull();
     expect(container.querySelector(".desktop-cloud-git-prerequisite-steps")).toBeNull();
+    expect(container.querySelector(".desktop-cloud-mcp-illustration")).not.toBeNull();
     const primary = container.querySelector<HTMLButtonElement>(".desktop-cloud-publish-primary");
     expect(primary).not.toBeNull();
 
     act(() => primary?.click());
+    expect(container.querySelector("[role='dialog']")?.textContent).toContain("May upload");
+    expect(onPublishWorkspace).not.toHaveBeenCalled();
+
+    const confirm = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent === "Confirm");
+    act(() => confirm?.click());
     expect(onPublishWorkspace).toHaveBeenCalledWith("org-1");
 
     act(() => root.unmount());

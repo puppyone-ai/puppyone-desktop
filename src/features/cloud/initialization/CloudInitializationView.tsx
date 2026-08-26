@@ -18,6 +18,7 @@ import {
   CloudPublishFolderMark,
 } from "../components/CloudPublishHeroMarks";
 import type { CloudPublishReadiness } from "../workspace/cloudPublishReadiness";
+import type { CloudWorkspaceSection } from "../types";
 import { formatCloudPublishFailure } from "../cloudPresentation";
 import { CloudGitPrerequisite } from "./CloudGitPrerequisite";
 import {
@@ -34,6 +35,7 @@ import {
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
 
 export function CloudLocalOnlyWorkspace({
+  activeSection = "mcp-cli",
   workspace,
   accountEmail,
   branchName,
@@ -59,6 +61,7 @@ export function CloudLocalOnlyWorkspace({
   onAbandonPublish,
   onPublishWorkspace,
 }: {
+  activeSection?: CloudWorkspaceSection;
   workspace: Workspace;
   accountEmail: string | null;
   branchName: string;
@@ -139,6 +142,7 @@ export function CloudLocalOnlyWorkspace({
   if (!activeProgressStage && !publishState && !publishStateLoading) {
     return (
       <CloudGitPrerequisite
+        activeSection={activeSection}
         publishBusy={publishBusy}
         publishEnabled={organizationReady}
         publishError={visiblePublishError}

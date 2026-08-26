@@ -72,7 +72,15 @@
   line-height: 20px;
 }
 
-.desktop-cloud-overview-refresh-button {
+.desktop-cloud-overview-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-cloud-overview-refresh-button,
+.desktop-cloud-overview-settings-button {
   display: inline-flex;
   width: 30px;
   height: 30px;
@@ -88,7 +96,8 @@
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
-.desktop-cloud-overview-refresh-button:hover {
+.desktop-cloud-overview-refresh-button:hover,
+.desktop-cloud-overview-settings-button:hover {
   border-color: var(--po-border-strong);
   background: var(--po-hover);
   color: var(--po-text);

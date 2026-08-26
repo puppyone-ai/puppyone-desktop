@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
 import type {
@@ -5,10 +6,13 @@ import type {
   CloudPublishProgressStage,
 } from "../../../types/electron";
 import { formatCloudPublishFailure } from "../cloudPresentation";
-import { CloudPublishCloudMark } from "../components/CloudPublishHeroMarks";
+import type { CloudWorkspaceSection } from "../types";
+import { CloudActivationHero } from "../components/CloudActivationHero";
+import { CloudPublishConfirmationDialog } from "./CloudPublishConfirmationDialog";
 import { getCloudPublishProgressLabel } from "./CloudPublishProgressIndicator";
 
 export function CloudGitPrerequisite({
+  activeSection,
   publishBusy,
   publishEnabled,
   publishError,
@@ -21,6 +25,7 @@ export function CloudGitPrerequisite({
   onRetryOrganizations,
   onPublishWorkspace,
 }: {
+  activeSection: CloudWorkspaceSection;
   publishBusy: boolean;
   publishEnabled: boolean;
   publishError: { code: CloudPublishErrorCode; retryable: boolean } | null;
@@ -34,80 +39,92 @@ export function CloudGitPrerequisite({
   onPublishWorkspace: (organizationId?: string) => void;
 }) {
   const { t } = useLocalization();
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+
+  const showOrganizationSupplemental = [
+    "selection-required",
+    "none",
+    "error",
+  ].includes(organizationStatus);
+  const supplemental = publishError || showOrganizationSupplemental ? (
+    <>
+      {publishError && (
+        <div className="desktop-cloud-git-prerequisite-error" role="alert">
+          {formatCloudPublishFailure(publishError, t)}
+        </div>
+      )}
+
+      {showOrganizationSupplemental && (
+        <div className="desktop-cloud-git-prerequisite-organization">
+          {organizationStatus === "none" ? (
+            <span>{t("cloud.initialize.noOrganization")}</span>
+          ) : organizationStatus === "error" ? (
+            <>
+              <span>{organizationError ?? t("cloud.message.organization-load-failed")}</span>
+              {onRetryOrganizations && (
+                <button type="button" onClick={onRetryOrganizations}>
+                  {t("cloud.common.retry")}
+                </button>
+              )}
+            </>
+          ) : organizations.length > 1 ? (
+            <label>
+              <span>{t("cloud.organization.selectLabel")}</span>
+              <select
+                aria-label={t("cloud.organization.selectLabel")}
+                value={selectedOrganizationId ?? ""}
+                onChange={(event) => onSelectOrganization?.(event.target.value)}
+              >
+                <option value="" disabled>{t("cloud.organization.selectPlaceholder")}</option>
+                {organizations.map((organization) => (
+                  <option value={organization.id} key={organization.id}>{organization.name}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
+      )}
+    </>
+  ) : undefined;
 
   return (
-    <div className="desktop-cloud-publish-container">
-      <section
-        className="desktop-cloud-git-prerequisite"
-        aria-labelledby="desktop-cloud-git-prerequisite-title"
-      >
-        <div className="desktop-cloud-git-prerequisite-mark" aria-hidden="true">
-          <CloudPublishCloudMark className="desktop-cloud-git-prerequisite-icon" />
-        </div>
-        <header className="desktop-cloud-git-prerequisite-header">
-          <h1 id="desktop-cloud-git-prerequisite-title">
-            {t("cloud.initialize.publishFolderTitle")}
-          </h1>
-          <p>{t("cloud.initialize.publishFolderDescription")}</p>
-        </header>
+    <>
+      <div className="desktop-cloud-publish-container">
+        <CloudActivationHero
+          activeSection={activeSection}
+          className="desktop-cloud-git-prerequisite"
+          ariaLabel={t("cloud.initialize.publishFolderTitle")}
+          titleId="desktop-cloud-git-prerequisite-title"
+          supplemental={supplemental}
+          action={(
+            <button
+              className="desktop-cloud-row-action primary desktop-cloud-publish-primary"
+              type="button"
+              aria-busy={publishBusy || undefined}
+              aria-haspopup="dialog"
+              disabled={publishBusy || !publishEnabled}
+              onClick={() => setConfirmationOpen(true)}
+            >
+              {publishBusy && <RefreshCw size={14} className="spin" aria-hidden="true" />}
+              <span>
+                {progressStage
+                  ? getCloudPublishProgressLabel(progressStage, t)
+                  : t("cloud.initialize.enableGitAndPublish")}
+              </span>
+            </button>
+          )}
+        />
+      </div>
 
-        {publishError && (
-          <div className="desktop-cloud-git-prerequisite-error" role="alert">
-            {formatCloudPublishFailure(publishError, t)}
-          </div>
-        )}
-
-        {organizationStatus !== "signed-out" && organizationStatus !== "ready" && (
-          <div className="desktop-cloud-git-prerequisite-organization">
-            {organizationStatus === "loading" ? (
-              <span>{t("cloud.common.loading")}</span>
-            ) : organizationStatus === "none" ? (
-              <span>{t("cloud.initialize.noOrganization")}</span>
-            ) : organizationStatus === "error" ? (
-              <>
-                <span>{organizationError ?? t("cloud.message.organization-load-failed")}</span>
-                {onRetryOrganizations && (
-                  <button type="button" onClick={onRetryOrganizations}>
-                    {t("cloud.common.retry")}
-                  </button>
-                )}
-              </>
-            ) : organizations.length > 1 ? (
-              <label>
-                <span>{t("cloud.organization.selectLabel")}</span>
-                <select
-                  aria-label={t("cloud.organization.selectLabel")}
-                  value={selectedOrganizationId ?? ""}
-                  onChange={(event) => onSelectOrganization?.(event.target.value)}
-                >
-                  <option value="" disabled>{t("cloud.organization.selectPlaceholder")}</option>
-                  {organizations.map((organization) => (
-                    <option value={organization.id} key={organization.id}>{organization.name}</option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-          </div>
-        )}
-
-        <div className="desktop-cloud-publish-actions desktop-cloud-git-prerequisite-actions">
-          <button
-            className="desktop-cloud-row-action primary desktop-cloud-publish-primary"
-            type="button"
-            aria-busy={publishBusy || undefined}
-            disabled={publishBusy || !publishEnabled}
-            onClick={() => onPublishWorkspace(selectedOrganizationId ?? undefined)}
-          >
-            {publishBusy && <RefreshCw size={14} className="spin" aria-hidden="true" />}
-            <span>
-              {progressStage
-                ? getCloudPublishProgressLabel(progressStage, t)
-                : t("cloud.initialize.enableGitAndPublish")}
-            </span>
-          </button>
-          <small>{t("cloud.initialize.gitIgnoreNote")}</small>
-        </div>
-      </section>
-    </div>
+      {confirmationOpen && (
+        <CloudPublishConfirmationDialog
+          onCancel={() => setConfirmationOpen(false)}
+          onConfirm={() => {
+            setConfirmationOpen(false);
+            onPublishWorkspace(selectedOrganizationId ?? undefined);
+          }}
+        />
+      )}
+    </>
   );
 }

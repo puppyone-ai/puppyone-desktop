@@ -6,19 +6,21 @@ import {
 } from "../src/features/cloud/routes/cloudRoutes";
 
 describe("Cloud navigation information architecture", () => {
-  it("keeps Overview first, MCP second, and History out of primary navigation", () => {
+  it("keeps only the four primary Project capabilities in navigation", () => {
     expect(CLOUD_PROJECT_SIDEBAR_ROUTES.map((route) => route.id)).toEqual([
-      "contents",
       "mcp-cli",
       "automation",
+      "contents",
       "access",
-      "settings",
     ]);
     expect(getCloudRoute("history").showInSidebar).toBe(false);
+    expect(getCloudRoute("settings").showInSidebar).toBe(false);
   });
 
-  it("treats History as an Overview drill-down without removing its route", () => {
+  it("treats History and Settings as Overview drill-downs without removing their routes", () => {
     expect(getCloudSidebarActiveSection("history")).toBe("contents");
+    expect(getCloudSidebarActiveSection("settings")).toBe("contents");
     expect(getCloudRoute("history").surface).toBe("history");
+    expect(getCloudRoute("settings").surface).toBe("landing");
   });
 });

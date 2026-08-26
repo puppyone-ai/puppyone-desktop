@@ -183,7 +183,7 @@ export const CLOUD_ROUTES = [
     context: "project",
     surface: "landing",
     resources: NO_PROJECT_RESOURCES,
-    showInSidebar: true,
+    showInSidebar: false,
     requiredCapability: "project.settings.manage",
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/settings`,
   },
@@ -195,7 +195,18 @@ const CLOUD_ROUTE_BY_ID = new Map<CloudWorkspaceSection, CloudRouteDescriptor>(
 
 export const CLOUD_ORGANIZATION_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "organization" && route.showInSidebar);
 export const CLOUD_PROJECT_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "project");
-export const CLOUD_PROJECT_SIDEBAR_ROUTES = CLOUD_PROJECT_ROUTES.filter((route) => route.showInSidebar);
+const CLOUD_PROJECT_SIDEBAR_ORDER: readonly CloudWorkspaceSection[] = [
+  "mcp-cli",
+  "automation",
+  "contents",
+  "access",
+];
+export const CLOUD_PROJECT_SIDEBAR_ROUTES = CLOUD_PROJECT_ROUTES
+  .filter((route) => route.showInSidebar)
+  .sort((left, right) => (
+    CLOUD_PROJECT_SIDEBAR_ORDER.indexOf(left.id)
+    - CLOUD_PROJECT_SIDEBAR_ORDER.indexOf(right.id)
+  ));
 /** Stable repository-context shell: current Project sections + Organization destinations. */
 export const CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES = [
   ...CLOUD_PROJECT_SIDEBAR_ROUTES,
@@ -221,14 +232,16 @@ export function getCloudSignedOutSection(
 
 /**
  * Low-frequency Project detail routes remain addressable without becoming
- * first-class navigation destinations. History is a drill-down from Overview,
- * so Overview stays selected while the history surface is open.
+ * first-class navigation destinations. History and Project Settings are
+ * drill-downs from Overview, so Overview stays selected on those surfaces.
  */
 export function getCloudSidebarActiveSection(
   section: CloudWorkspaceSection | string,
 ): CloudWorkspaceSection {
   const normalizedSection = normalizeCloudSection(section);
-  return normalizedSection === "history" ? "contents" : normalizedSection;
+  return ["history", "settings"].includes(normalizedSection)
+    ? "contents"
+    : normalizedSection;
 }
 
 export function getCloudRoute(section: CloudWorkspaceSection): CloudRouteDescriptor {

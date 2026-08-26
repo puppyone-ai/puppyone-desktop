@@ -36,6 +36,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .desktop-cloud-overview-refresh-button,
+  .desktop-cloud-overview-settings-button,
   .desktop-cloud-overview-dashboard-card--interactive,
   .desktop-cloud-overview-dashboard-card-header > .po-directional-icon {
     transition: none;

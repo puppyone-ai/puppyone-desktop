@@ -458,7 +458,7 @@ describe("source-control visual architecture", () => {
     expect(cloudSignInCss).toContain("font-size: var(--po-text-size-meta);");
   });
 
-  it("centers Cloud and Version Control in one full-surface coordinate system", () => {
+  it("keeps Cloud and Version Control in one full-surface coordinate system", () => {
     const root = compact(readCssBlock(desktopEntryStateCss, ".desktop-entry-state"));
     const body = compact(readCssBlock(desktopEntryStateCss, ".desktop-entry-state-body"));
     const cloudMain = compact(readCssBlock(
@@ -471,7 +471,7 @@ describe("source-control visual architecture", () => {
     ));
 
     expect(versionControlSetupSource).toContain("<DesktopEntryState");
-    expect(cloudSignInSource).toContain("<DesktopEntryState");
+    expect(cloudSignInSource).toContain("<CloudActivationHero");
     expect(readFileSync(
       new URL("../src/features/cloud/auth/CloudSignedOutRoute.tsx", import.meta.url),
       "utf8",

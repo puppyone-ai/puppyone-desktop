@@ -122,6 +122,7 @@ export function CloudServiceMainView({
   if (!effectiveCloudSession) {
     return (
       <CloudSignedOutRoute
+        activeSection={routedSection}
         authState={cloudAuthState}
         apiBaseUrl={cloudApiBaseUrl}
         loadingLabel={t("cloud.loading.session")}
@@ -134,6 +135,7 @@ export function CloudServiceMainView({
   if (localOnlyContext) {
     return (
       <CloudInitializationRoute
+        activeSection={routedSection}
         workspace={workspace}
         status={status}
         session={effectiveCloudSession}

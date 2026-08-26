@@ -15,6 +15,7 @@ import {
 import { CloudLocalGitStatusError } from "./CloudLocalGitStatusError";
 
 export function CloudInitializationRoute({
+  activeSection,
   workspace,
   status,
   session,
@@ -35,6 +36,7 @@ export function CloudInitializationRoute({
   onRefresh,
   onPublishWorkspace,
 }: {
+  activeSection: CloudServiceMainViewProps["activeSection"];
   workspace: CloudServiceMainViewProps["workspace"];
   status: CloudServiceMainViewProps["status"];
   session: DesktopCloudSession;
@@ -89,6 +91,7 @@ export function CloudInitializationRoute({
       )}
       {cloudPublishState || cloudPublishStateLoading ? (
         <CloudLocalOnlyWorkspace
+          activeSection={activeSection}
           workspace={workspace}
           accountEmail={accountEmail}
           branchName={branchName}
@@ -110,6 +113,7 @@ export function CloudInitializationRoute({
         />
       ) : (
         <AuthenticatedCloudInitialize
+          activeSection={activeSection}
           workspace={workspace}
           status={status}
           session={session}
@@ -142,6 +146,7 @@ function CloudInitializationFrame({ children }: { children: ReactNode }) {
 }
 
 function AuthenticatedCloudInitialize({
+  activeSection,
   workspace,
   status,
   session,
@@ -157,6 +162,7 @@ function AuthenticatedCloudInitialize({
   onPublishWorkspace,
   onAbandonPublish,
 }: {
+  activeSection: CloudServiceMainViewProps["activeSection"];
   workspace: CloudServiceMainViewProps["workspace"];
   status: NonNullable<CloudServiceMainViewProps["status"]>;
   session: DesktopCloudSession;
@@ -207,6 +213,7 @@ function AuthenticatedCloudInitialize({
 
   return (
     <CloudLocalOnlyWorkspace
+      activeSection={activeSection}
       workspace={workspace}
       accountEmail={accountEmail}
       branchName={branchName}

@@ -4,6 +4,7 @@ import {
   Copy,
   GitBranch,
   RefreshCw,
+  Settings,
 } from "lucide-react";
 import { useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
@@ -93,15 +94,28 @@ export function CloudRepositoryOverview({
                 {gitRemoteUrl ? <CloudOverviewGitRemote value={gitRemoteUrl} /> : null}
               </div>
             </div>
-            <button
-              className="desktop-cloud-overview-refresh-button"
-              type="button"
-              aria-label={t("cloud.common.refresh")}
-              title={t("cloud.common.refresh")}
-              onClick={() => void onRefresh()}
-            >
-              <RefreshCw size={14} className={loading ? "spin" : undefined} />
-            </button>
+            <div className="desktop-cloud-overview-header-actions">
+              {project?.capabilities?.includes("project.settings.manage") === true && (
+                <button
+                  className="desktop-cloud-overview-settings-button"
+                  type="button"
+                  aria-label={t("cloud.route.settings.title")}
+                  title={t("cloud.route.settings.title")}
+                  onClick={() => onSelectSection("settings")}
+                >
+                  <Settings size={14} />
+                </button>
+              )}
+              <button
+                className="desktop-cloud-overview-refresh-button"
+                type="button"
+                aria-label={t("cloud.common.refresh")}
+                title={t("cloud.common.refresh")}
+                onClick={() => void onRefresh()}
+              >
+                <RefreshCw size={14} className={loading ? "spin" : undefined} />
+              </button>
+            </div>
           </header>
 
           <CloudOverviewDashboard
