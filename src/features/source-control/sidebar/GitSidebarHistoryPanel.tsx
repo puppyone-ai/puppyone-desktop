@@ -77,6 +77,18 @@ function SidebarHistoryRow({
 }) {
   const { t, formatNumber } = useLocalization();
   const totals = getChangeTotals(commit.changes);
+  const hasAdditions = totals.additions > 0;
+  const hasDeletions = totals.deletions > 0;
+  const hasStats = hasAdditions || hasDeletions;
+  const exactStats = [
+    hasAdditions ? `+${formatNumber(totals.additions)}` : null,
+    hasDeletions ? `-${formatNumber(totals.deletions)}` : null,
+  ].filter(Boolean).join(" ");
+  const compactNumber = (value: number) => formatNumber(value, {
+    notation: "compact",
+    compactDisplay: "short",
+    maximumFractionDigits: 1,
+  });
 
   return (
     <button
@@ -97,10 +109,12 @@ function SidebarHistoryRow({
             {commit.message || t("source-control.commit.noMessage")}
           </bdi>
         </span>
-        <span className="desktop-history-row-stat">
-          <span className="added">+{formatNumber(totals.additions)}</span>
-          <span className="deleted">-{formatNumber(totals.deletions)}</span>
-        </span>
+        {hasStats && (
+          <span className="desktop-history-row-stat" title={exactStats} aria-label={exactStats}>
+            {hasAdditions && <span className="added">+{compactNumber(totals.additions)}</span>}
+            {hasDeletions && <span className="deleted">-{compactNumber(totals.deletions)}</span>}
+          </span>
+        )}
       </span>
     </button>
   );

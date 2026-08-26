@@ -146,8 +146,8 @@ describe("Git sidebar status groups", () => {
         path: "README.md",
         oldPath: null,
         status: "modified" as const,
-        additions: 3,
-        deletions: 1,
+        additions: 8_254,
+        deletions: 3_075,
       }],
     };
     status.commits = [commit];
@@ -160,6 +160,9 @@ describe("Git sidebar status groups", () => {
     const row = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-history-row"))
       .find((button) => button.textContent?.includes("Keep history in the sidebar"));
     expect(row).not.toBeNull();
+    expect(row?.querySelector(".desktop-history-row-stat")?.textContent).toBe("+8.3K-3.1K");
+    expect(row?.querySelector(".desktop-history-row-stat")?.getAttribute("title"))
+      .toBe("+8,254 -3,075");
 
     await act(async () => row?.click());
     expect(onSelectCommit).toHaveBeenCalledWith("head");

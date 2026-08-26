@@ -693,19 +693,34 @@ describe("source-control visual architecture", () => {
 
   it("clips history messages to one line inside the fixed-height timeline row", () => {
     const row = compact(readCssBlock(historyListCss, ".desktop-history-row"));
+    const graph = compact(readCssBlock(historyListCss, ".desktop-history-graph"));
     const main = compact(readCssBlock(historyListCss, ".desktop-history-row-main"));
     const title = compact(readCssBlock(historyListCss, ".desktop-history-row-title"));
     const message = compact(readCssBlock(historyListCss, ".desktop-history-row-message"));
+    const stat = compact(readCssBlock(historyListCss, ".desktop-history-row-stat"));
+    const added = compact(readCssBlock(historyListCss, ".desktop-history-row-stat .added"));
+    const deleted = compact(readCssBlock(historyListCss, ".desktop-history-row-stat .deleted"));
+    const head = compact(readCssBlock(historyListCss, ".desktop-head-badge"));
 
     expect(sourceControlSidebarSectionsSource).toContain('className="desktop-history-row-message"');
     expect(row).toContain("height: var(--desktop-sidebar-row-height);");
     expect(row).toContain("overflow: hidden;");
+    expect(graph).toContain("width: 20px;");
+    expect(graph).toContain("flex: 0 0 20px;");
+    expect(main).toContain("grid-template-columns: minmax(0, 1fr) max-content;");
     expect(main).toContain("min-width: 0;");
     expect(main).toContain("overflow: hidden;");
     expect(title).toContain("white-space: nowrap;");
     expect(message).toContain("overflow: hidden;");
     expect(message).toContain("text-overflow: ellipsis;");
     expect(message).toContain("white-space: nowrap;");
+    expect(stat).toContain("font-size: 10px;");
+    expect(stat).toContain("font-variant-numeric: tabular-nums;");
+    expect(added).toContain("var(--po-success) 48%");
+    expect(deleted).toContain("var(--po-danger) 48%");
+    expect(head).toContain("font-size: 9px;");
+    expect(sourceControlSidebarSectionsSource).toContain('notation: "compact"');
+    expect(sourceControlSidebarSectionsSource).toContain("maximumFractionDigits: 1");
     expect(historyListCss).not.toContain(".desktop-history-row-title > span:last-child");
   });
 });

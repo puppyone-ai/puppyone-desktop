@@ -129,14 +129,14 @@
   position: relative;
   display: block;
   align-self: stretch;
-  width: 24px;
-  flex: 0 0 24px;
+  width: 20px;
+  flex: 0 0 20px;
 }
 
 .desktop-history-graph .before,
 .desktop-history-graph .after {
   position: absolute;
-  left: 11px;
+  left: 9px;
   width: 1.5px;
   background: var(--po-filetree-rail);
   content: "";
@@ -155,7 +155,7 @@
 .desktop-history-graph .dot {
   position: absolute;
   top: 50%;
-  left: 8px;
+  left: 6px;
   width: 7px;
   height: 7px;
   border: 1.5px solid var(--po-text-disabled);
@@ -171,12 +171,12 @@
 
 .desktop-history-row-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 76px;
+  grid-template-columns: minmax(0, 1fr) max-content;
   flex: 1;
   min-width: 0;
   overflow: hidden;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   padding-block: 0;
   padding-inline: 0 var(--git-sidebar-content-right);
 }
@@ -208,19 +208,21 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: flex-end;
-  gap: 5px;
+  gap: 4px;
   color: var(--po-text-subtle);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: var(--po-text-weight-regular, 400);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
 .desktop-history-row-stat .added {
-  color: var(--po-success);
+  color: color-mix(in srgb, var(--po-success) 48%, var(--po-text-subtle));
 }
 
 .desktop-history-row-stat .deleted {
-  color: var(--po-danger);
+  color: color-mix(in srgb, var(--po-danger) 48%, var(--po-text-subtle));
 }
 
 .desktop-head-badge {
@@ -229,10 +231,10 @@
   height: 16px;
   flex: 0 0 auto;
   padding: 0 4px;
-  border: 1px solid color-mix(in srgb, var(--po-success) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--po-success) 20%, transparent);
   border-radius: 3px;
-  background: color-mix(in srgb, var(--po-success) 12%, transparent);
-  color: var(--po-success);
+  background: color-mix(in srgb, var(--po-success) 7%, transparent);
+  color: color-mix(in srgb, var(--po-success) 52%, var(--po-text-muted));
   font-size: 9px;
   font-weight: 620;
   line-height: 1;
@@ -282,9 +284,7 @@
   .desktop-git-remote-prompt small,
   .desktop-git-remote-detail,
   .desktop-git-section-title small,
-  .desktop-git-history-drawer-header small,
-  .desktop-history-row-stat,
-  .desktop-head-badge
+  .desktop-git-history-drawer-header small
 ) {
   font-size: var(--git-font-small);
   font-weight: var(--git-weight-regular);
