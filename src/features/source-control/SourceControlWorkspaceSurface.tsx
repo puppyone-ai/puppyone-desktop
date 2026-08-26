@@ -53,7 +53,6 @@ export function createSourceControlWorkspaceSurface({
           unstagePaths: controller.handleUnstageGitPaths,
           discardPaths: controller.handleDiscardGitPaths,
           discardAll: controller.handleDiscardAllGitChanges,
-          stageAndCommit: controller.handleStageAndCommitGit,
           commit: controller.handleCommitGit,
           commitAndPush: controller.handleCommitAndPushGit,
           continueOperation: controller.handleContinueGitOperation,

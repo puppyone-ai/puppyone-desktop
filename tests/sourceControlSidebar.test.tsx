@@ -31,11 +31,11 @@ describe("Git sidebar status groups", () => {
       .map((node) => node.textContent);
     expect(localCounts).toEqual(expect.arrayContaining(["2", "1", "1"]));
 
-    const commitButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Commit"]');
+    const commitButton = surface.querySelector<HTMLButtonElement>(".desktop-git-commit-staged-action");
     const pushButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Push"]');
 
-    expect(commitButton?.closest(".desktop-git-commit-bar")).not.toBeNull();
-    expect(commitButton?.closest(".desktop-git-section-row")).toBeNull();
+    expect(commitButton?.closest(".desktop-git-resizable-section-staged")).not.toBeNull();
+    expect(commitButton?.closest(".desktop-git-section-row")).not.toBeNull();
     expect(pushButton?.closest(".desktop-git-section-row")).not.toBeNull();
     expect(surface.querySelector('button[aria-label="Stage · Commit"]')).toBeNull();
 
@@ -74,23 +74,21 @@ describe("Git sidebar status groups", () => {
     expect(surface.querySelector(".desktop-git-resizable-section-unstaged")?.classList.contains("expanded")).toBe(true);
   });
 
-  it("keeps staged changes separate while offering one-click stage and commit", async () => {
-    const stageAndCommit = vi.fn(async () => true);
+  it("keeps the staged destination visible and disables Commit until files are staged", () => {
     const status = createGitStatus();
     status.sourceControl.groups = status.sourceControl.groups.filter((group) => group.id !== "index");
     status.sourceControl.actions.canCommit = false;
-    const surface = renderSidebar({ gitDisplayMode: "simple", stageAndCommit, status });
+    const surface = renderSidebar({ gitDisplayMode: "simple", status });
 
     expect(surface.textContent).toContain("Unstaged");
     const unstagedToggle = Array.from(surface.querySelectorAll<HTMLButtonElement>(".desktop-git-section-title"))
       .find((button) => button.textContent?.includes("Unstaged"));
     expect(unstagedToggle?.querySelector("small")?.textContent).toBe("1");
-    const action = surface.querySelector<HTMLButtonElement>('button[aria-label="Commit"]');
-    expect(action?.closest(".desktop-git-commit-bar")).not.toBeNull();
+    expect(surface.textContent).toContain("Staged");
+    const action = surface.querySelector<HTMLButtonElement>(".desktop-git-commit-staged-action");
+    expect(action?.closest(".desktop-git-resizable-section-staged")).not.toBeNull();
+    expect(action?.disabled).toBe(true);
     expect(surface.querySelector('button[aria-label="Stage · Commit"]')).toBeNull();
-
-    await act(async () => action?.click());
-    expect(stageAndCommit).toHaveBeenCalledTimes(1);
   });
 
   it("keeps local groups flat without rendering a remote provider surface", () => {
@@ -191,13 +189,13 @@ describe("Git sidebar status groups", () => {
     status.branches = status.branches.map((branch) => ({ ...branch, ahead: 0 }));
 
     const surface = renderSidebar({ status });
-    const firstButton = surface.querySelector<HTMLButtonElement>("button");
-    const commitButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Commit"]');
+    const firstPanel = surface.querySelector<HTMLElement>(".desktop-git-resizable-section");
+    const commitButton = surface.querySelector<HTMLButtonElement>(".desktop-git-commit-staged-action");
 
-    expect(firstButton).toBe(commitButton);
+    expect(firstPanel?.classList.contains("desktop-git-resizable-section-staged")).toBe(true);
     expect(commitButton?.disabled).toBe(true);
-    expect(commitButton?.closest(".desktop-git-fixed-region")).not.toBeNull();
-    expect(surface.textContent).toContain("Clean working tree");
+    expect(commitButton?.closest(".desktop-git-resizable-section-staged")).not.toBeNull();
+    expect(surface.textContent).not.toContain("Clean working tree");
   });
 
   it.each([
@@ -264,11 +262,11 @@ describe("Git sidebar status groups", () => {
     status.sourceControl.actions.canCommit = true;
     const surface = renderSidebar({ status });
     const pullButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Pull"]');
-    const commitButton = surface.querySelector<HTMLButtonElement>('button[aria-label="Commit"]');
+    const commitButton = surface.querySelector<HTMLButtonElement>(".desktop-git-commit-staged-action");
 
     expect(pullButton).toBeNull();
     expect(commitButton?.disabled).toBe(false);
-    expect(commitButton?.classList.contains("is-primary")).toBe(true);
+    expect(commitButton?.classList.contains("desktop-git-commit-staged-action")).toBe(true);
   });
 
   it("blocks sync actions until working-tree conflicts are resolved", async () => {
@@ -323,7 +321,6 @@ function renderSidebar(options: Partial<{
   onPush: () => Promise<boolean>;
   onSelectCommit: (commitId: string) => void;
   onStageAll: () => Promise<boolean>;
-  stageAndCommit: () => Promise<boolean>;
   historyLoading: boolean;
   status: GitStatusSnapshot;
 }> = {}) {
@@ -359,7 +356,6 @@ function renderSidebar(options: Partial<{
         unstagePaths: succeed,
         discardPaths: succeed,
         discardAll: options.onDiscardAll ?? succeed,
-        stageAndCommit: options.stageAndCommit ?? succeed,
         commit: options.onCommit ?? succeed,
         commitAndPush: succeed,
         continueOperation: options.onContinue ?? succeed,

@@ -1,4 +1,4 @@
-import { Plus, Undo2 } from "lucide-react";
+import { Check, Plus, Undo2 } from "lucide-react";
 import {
   SidebarEmptyState,
   SidebarIconButton,
@@ -17,7 +17,7 @@ import {
 } from "../viewModel";
 import type { GitSidebarActions, GitSidebarRenderPanel } from "./sourceControlSidebarTypes";
 import { SourceControlWorkingResourceList } from "./SourceControlResourceLists";
-import { GitOperationButton } from "./GitSidebarPrimitives";
+import { GitOperationButton, SourceControlDots } from "./GitSidebarPrimitives";
 import { GitLocalStatusSection } from "./GitLocalStatusSection";
 import { getGitSidebarPanelBodyRows } from "./useGitSidebarPanelLayout";
 import type { GitSidebarExpansionState } from "./useGitSidebarExpansionState";
@@ -30,7 +30,6 @@ type LocalPanelActions = Pick<
   | "unstagePaths"
   | "discardPaths"
   | "discardAll"
-  | "stageAndCommit"
   | "commit"
   | "commitAndPush"
   | "continueOperation"
@@ -191,18 +190,34 @@ export function createGitLocalStatusPanels({
   }
 
   if (model.showStagedSection) {
+    const action = model.stagedPrimaryAction;
+    const hasStagedResources = model.stagedResources.length > 0;
+    const commitLoading = operationLoading === "commit";
     panels.push({
       id: "staged",
       className: "staged",
       grow: 0.9,
-      expanded: expanded.staged,
-      bodyRows: getGitSidebarPanelBodyRows(model.stagedResources.length, true),
+      expanded: hasStagedResources && expanded.staged,
+      bodyRows: getGitSidebarPanelBodyRows(model.stagedResources.length),
       content: (
         <GitLocalStatusSection
           title={t("source-control.section.staged")}
           count={model.stagedResources.length}
-          expanded={expanded.staged}
-          onToggle={() => onToggle("staged")}
+          expanded={hasStagedResources && expanded.staged}
+          onToggle={hasStagedResources ? () => onToggle("staged") : undefined}
+          action={(
+            <div className="desktop-git-section-actions">
+              <SidebarIconButton
+                className="desktop-git-commit-staged-action"
+                label={commitLoading
+                  ? t("source-control.action.committing")
+                  : t("source-control.sync.commitStaged")}
+                disabled={disabled || !action || action.disabled}
+                onClick={() => void actions.commit()}
+                icon={commitLoading ? <SourceControlDots /> : <Check size={13} />}
+              />
+            </div>
+          )}
         >
           <SourceControlWorkingResourceList
             resources={model.stagedResources}
@@ -249,7 +264,8 @@ export function createGitLocalStatusPanels({
     });
   }
 
-  return panels;
+  const panelOrder = { merge: 0, staged: 1, unstaged: 2, committed: 3 } as const;
+  return panels.sort((left, right) => panelOrder[left.id] - panelOrder[right.id]);
 }
 
 function createUnstagedActions({

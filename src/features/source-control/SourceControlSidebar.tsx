@@ -17,7 +17,6 @@ import {
   GitSidebarSectionResizer,
 } from "./sidebar/GitSidebarPrimitives";
 import { GitSidebarHistoryPanel } from "./sidebar/GitSidebarHistoryPanel";
-import { GitSidebarCommitBar } from "./sidebar/GitSidebarCommitBar";
 import { GitRemotePrompt } from "./sidebar/GitRemoteSections";
 import type {
   GitSidebarProps,
@@ -70,7 +69,7 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
     hasCommittedAction: Boolean(
       sidebarModel.committedPrimaryAction && !sidebarModel.committedPrimaryAction.disabled,
     ),
-    hasStageAndCommitAction: sidebarModel.showStageAndCommitAction,
+    hasStageAndCommitAction: false,
   });
   const scrollableContentRevision = useMemo(
     () => ({ expanded, loading, status }),
@@ -118,38 +117,6 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
         ) : (
           <>
             <div ref={changesPaneRef} className="desktop-git-changes-pane">
-              <div className="desktop-git-fixed-region">
-                <GitSidebarCommitBar
-                  model={sidebarModel}
-                  repositoryReady={status?.isRepo === true}
-                  disabled={disabled}
-                  operationLoading={operationLoading}
-                  primaryActionSlot={primaryActionSlot}
-                  actions={actions}
-                  t={t}
-                />
-                {status && (
-                  <GitRemotePrompt
-                    state={syncState}
-                    disabled={disabled}
-                    cloudBackupLoading={cloudBackup.loading}
-                    cloudBackupError={cloudBackup.error}
-                    dismissed={backupCardDismissed}
-                    cloudEnabled={cloudBackup.enabled ?? true}
-                    onDismiss={() => setBackupCardDismissed(true)}
-                    onStartPuppyoneBackup={cloudBackup.start}
-                  />
-                )}
-                {operationError && (
-                  <div className="desktop-git-operation-error" role="alert">{operationError}</div>
-                )}
-                {status?.didHitStatusLimit && (
-                  <div className="desktop-git-status-limit-warning" role="status">
-                    {t("source-control.status.limit", { count: formatNumber(status.statusLimit) })}
-                  </div>
-                )}
-              </div>
-
               <div className="desktop-git-resizable-stack">
                 {panels.map((panel, index) => (
                   <Fragment key={panel.id}>
@@ -171,6 +138,29 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
                     </div>
                   </Fragment>
                 ))}
+              </div>
+
+              <div className="desktop-git-fixed-region">
+                {status && (
+                  <GitRemotePrompt
+                    state={syncState}
+                    disabled={disabled}
+                    cloudBackupLoading={cloudBackup.loading}
+                    cloudBackupError={cloudBackup.error}
+                    dismissed={backupCardDismissed}
+                    cloudEnabled={cloudBackup.enabled ?? true}
+                    onDismiss={() => setBackupCardDismissed(true)}
+                    onStartPuppyoneBackup={cloudBackup.start}
+                  />
+                )}
+                {operationError && (
+                  <div className="desktop-git-operation-error" role="alert">{operationError}</div>
+                )}
+                {status?.didHitStatusLimit && (
+                  <div className="desktop-git-status-limit-warning" role="status">
+                    {t("source-control.status.limit", { count: formatNumber(status.statusLimit) })}
+                  </div>
+                )}
               </div>
             </div>
 

@@ -335,7 +335,6 @@ function AppContent() {
     handlePullGit,
     handlePushGit,
     handleStageAllGitChanges,
-    handleStageAndCommitGit,
     handleStageGitPaths,
     handleStashAndCheckoutBranch,
     handleUnstageGitPaths,
