@@ -103,10 +103,9 @@
 .desktop-git-history-resizer::after {
   position: absolute;
   top: var(--git-section-divider-line-offset);
-  inset-inline: var(--git-sidebar-left-gap) var(--git-sidebar-right-gap);
+  inset-inline: 0;
   height: 1px;
-  border-radius: 999px;
-  background: var(--po-border-subtle);
+  background: var(--po-sidebar-divider, var(--po-divider));
   content: "";
 }
 

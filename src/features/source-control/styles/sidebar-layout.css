@@ -27,7 +27,6 @@
   display: flex;
   min-width: 0;
   min-height: 104px;
-  max-height: 60%;
   flex: 0 1 36%;
   overflow: hidden;
 }

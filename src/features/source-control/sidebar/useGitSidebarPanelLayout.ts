@@ -28,7 +28,6 @@ const EMPTY_BODY_ROWS = 1.5;
 const ROW_VERTICAL_MARGIN_PX = 2;
 const CHANGES_PANE_MIN_HEIGHT = 144;
 const HISTORY_PANE_MIN_HEIGHT = 104;
-const HISTORY_PANE_MAX_RATIO = 0.6;
 const SCROLLABLE_LIST_SELECTOR = [
   ".desktop-working-tree-list",
   ".desktop-git-remote-preview",
@@ -112,7 +111,9 @@ export function useGitSidebarPanelLayout(revision: unknown) {
       const changesStart = changesNode.getBoundingClientRect().height;
       const historyStart = historyNode.getBoundingClientRect().height;
       const totalHeight = changesStart + historyStart;
-      const { historyMin, historyMax } = getHistoryPaneBounds(totalHeight);
+      const changesMin = getPanelComputedMinHeight(changesNode, CHANGES_PANE_MIN_HEIGHT);
+      const historyMin = getPanelComputedMinHeight(historyNode, HISTORY_PANE_MIN_HEIGHT);
+      const historyMax = Math.max(historyMin, totalHeight - changesMin);
       const startY = event.clientY;
       setActiveResizeSplit("changes:history");
 
@@ -168,7 +169,9 @@ export function useGitSidebarPanelLayout(revision: unknown) {
     const totalHeight = changesNode.getBoundingClientRect().height
       + historyNode.getBoundingClientRect().height;
     const currentHeight = historyNode.getBoundingClientRect().height;
-    const { historyMin, historyMax } = getHistoryPaneBounds(totalHeight);
+    const changesMin = getPanelComputedMinHeight(changesNode, CHANGES_PANE_MIN_HEIGHT);
+    const historyMin = getPanelComputedMinHeight(historyNode, HISTORY_PANE_MIN_HEIGHT);
+    const historyMax = Math.max(historyMin, totalHeight - changesMin);
     const step = accelerated ? 32 : 8;
     const requested = intent === "minimum"
       ? historyMax
@@ -231,15 +234,6 @@ export function useGitSidebarPanelLayout(revision: unknown) {
     setPanelRef,
     sidebarListRef,
   };
-}
-
-function getHistoryPaneBounds(totalHeight: number) {
-  const historyMax = Math.max(
-    0,
-    Math.min(totalHeight * HISTORY_PANE_MAX_RATIO, totalHeight - CHANGES_PANE_MIN_HEIGHT),
-  );
-  const historyMin = Math.min(HISTORY_PANE_MIN_HEIGHT, historyMax);
-  return { historyMin, historyMax: Math.max(historyMin, historyMax) };
 }
 
 function clampNumber(value: number, min: number, max: number) {

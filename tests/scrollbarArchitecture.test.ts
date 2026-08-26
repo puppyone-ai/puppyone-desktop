@@ -25,6 +25,7 @@ const auxiliaryPanelSource = readCss(
   "src/features/app-shell/auxiliary/AuxiliaryPanelHost.tsx",
 );
 const gitSidebarSource = readCss("src/features/source-control/SourceControlSidebar.tsx");
+const gitSidebarLayoutCss = readCss("src/features/source-control/styles/sidebar-layout.css");
 const gitSidebarPanelsCss = readCss("src/features/source-control/styles/sidebar-panels.css");
 const layoutCss = readCss("src/styles/layout.css");
 const baseCss = readCss("src/styles/base.css");
@@ -252,10 +253,13 @@ describe("scrollbar architecture", () => {
       gitSidebarPanelsCss,
       ".desktop-git-history-resizer::after",
     );
+    expect(historyResizerRule).toContain("inset-inline: 0;");
     expect(historyResizerRule).toContain(
-      "inset-inline: var(--git-sidebar-left-gap) var(--git-sidebar-right-gap);",
+      "background: var(--po-sidebar-divider, var(--po-divider));",
     );
     expect(historyResizerRule).not.toContain("transform:");
+    expect(readRule(gitSidebarLayoutCss, ".desktop-git-history-pane"))
+      .not.toContain("max-height:");
     expect(gitSidebarSource).toMatch(
       /className="desktop-git-changes-pane"[\s\S]+<GitSidebarHistoryResizer[\s\S]+className="desktop-git-history-pane"/,
     );
