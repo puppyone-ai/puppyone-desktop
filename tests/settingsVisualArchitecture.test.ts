@@ -258,7 +258,9 @@ describe("settings visual architecture", () => {
     expect(controls).toMatch(/\.desktop-theme-segment button\s*{[^}]*height:\s*26px;[^}]*border-radius:\s*5px;/s);
     expect(controls).toMatch(/\.desktop-appearance-option-segment\s*{[^}]*width:\s*min\(100%, 360px\);[^}]*grid-auto-columns:\s*minmax\(0, 1fr\);/s);
     expect(controls).toMatch(/\.desktop-appearance-option-segment\.desktop-appearance-hug-segment\s*{[^}]*width:\s*fit-content;[^}]*max-width:\s*100%;[^}]*grid-auto-columns:\s*max-content;/s);
-    expect(controls).toMatch(/\.desktop-settings-tool-item\s*{[^}]*padding-inline:\s*8px 0;/s);
+    expect(controls).toMatch(/\.desktop-settings-tool-list\s*{[^}]*width:\s*fit-content;[^}]*max-width:\s*100%;/s);
+    expect(controls).toMatch(/\.desktop-settings-tool-item\s*{[^}]*grid-template-columns:\s*minmax\(0, max-content\) auto;[^}]*gap:\s*8px;[^}]*padding-inline:\s*8px 0;/s);
+    expect(settings).not.toContain(".desktop-settings-wide-control-row > .desktop-settings-tool-list");
     expect(view.match(/desktop-theme-segment desktop-appearance-option-segment/g)).toHaveLength(5);
     expect(view.match(/desktop-appearance-hug-segment/g)).toHaveLength(4);
     expect(view).not.toContain("settings.appearance.editorPresentation");

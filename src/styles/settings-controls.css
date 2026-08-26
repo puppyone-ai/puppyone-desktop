@@ -116,13 +116,14 @@
 
 .desktop-settings-tool-list {
   display: grid;
-  width: min(100%, 300px);
+  width: fit-content;
+  max-width: 100%;
   gap: 2px;
 }
 
 .desktop-settings-tool-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, max-content) auto;
   align-items: center;
   gap: 8px;
   height: 30px;
