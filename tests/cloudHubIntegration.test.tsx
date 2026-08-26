@@ -41,13 +41,13 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(labels(container)).toEqual([
-      "MCP", "Automation", "Overview", "Access", "Team", "Billing",
+      "Overview", "MCP", "Automation", "Access", "Team", "Billing",
     ]);
     expect(labels(container)).not.toContain("History");
     expect(labels(container)).not.toContain("Settings");
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
-    expect(rows(container)[0]?.getAttribute("aria-current")).toBe("page");
-    act(() => rows(container)[0]?.click());
+    expect(rows(container)[1]?.getAttribute("aria-current")).toBe("page");
+    act(() => rows(container)[1]?.click());
     expect(onSelectSection).toHaveBeenCalledWith("mcp-cli");
 
     renderSidebar(root, {
@@ -56,12 +56,12 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(labels(container)).toEqual([
-      "MCP", "Automation", "Overview", "Access", "Team", "Billing",
+      "Overview", "MCP", "Automation", "Access", "Team", "Billing",
     ]);
     expect(labels(container)).not.toContain("History");
     expect(labels(container)).not.toContain("Settings");
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
-    act(() => rows(container)[0]?.click());
+    act(() => rows(container)[1]?.click());
     expect(onSelectSection).toHaveBeenCalledWith("mcp-cli");
 
     renderSidebar(root, {
@@ -86,7 +86,7 @@ describe("current-repository Cloud navigation", () => {
       projectCapabilities: ["project.settings.manage"],
       onSelectSection,
     });
-    expect(rows(container)[2]?.getAttribute("aria-current")).toBe("page");
+    expect(rows(container)[0]?.getAttribute("aria-current")).toBe("page");
     expect(labels(container)).not.toContain("History");
 
     renderSidebar(root, {
@@ -96,7 +96,7 @@ describe("current-repository Cloud navigation", () => {
       projectCapabilities: ["project.settings.manage"],
       onSelectSection,
     });
-    expect(rows(container)[2]?.getAttribute("aria-current")).toBe("page");
+    expect(rows(container)[0]?.getAttribute("aria-current")).toBe("page");
     expect(labels(container)).not.toContain("Settings");
   });
 

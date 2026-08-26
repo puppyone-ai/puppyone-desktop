@@ -1,18 +1,24 @@
-import { Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, Settings, ShieldCheck, SquareTerminal, Users } from "lucide-react";
+import type { ComponentType } from "react";
+import { Clock3, Cloud, CreditCard, FileText, GitBranch, Grid2X2, Settings, ShieldCheck, Users } from "lucide-react";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import { getCloudAutomationWebPath } from "../../automation/automationDomain";
+import { McpLogoIcon } from "../components/McpLogoIcon";
 import type { CloudProjectDetailResource } from "../data/cloudProjectDetails";
 import type { CloudWorkspaceSection } from "./cloudRouteIds";
 
 export type CloudRouteContext = "initialization" | "project" | "organization";
 export type CloudRouteSurface = "standard" | "landing" | "history" | "automation";
+export type CloudRouteIcon = ComponentType<{
+  className?: string;
+  size?: number | string;
+}>;
 
 export type CloudRouteDescriptor = {
   id: CloudWorkspaceSection;
   labelId: string;
   titleId: string;
   descriptionId: string;
-  icon: typeof Cloud;
+  icon: CloudRouteIcon;
   context: CloudRouteContext;
   surface: CloudRouteSurface;
   resources: readonly CloudProjectDetailResource[];
@@ -94,7 +100,7 @@ export const CLOUD_ROUTES = [
     labelId: "cloud.route.mcp-cli.label",
     titleId: "cloud.route.mcp-cli.title",
     descriptionId: "cloud.route.mcp-cli.description",
-    icon: SquareTerminal,
+    icon: McpLogoIcon,
     context: "project",
     surface: "landing",
     resources: ACCESS_PROJECT_RESOURCES,
@@ -196,9 +202,9 @@ const CLOUD_ROUTE_BY_ID = new Map<CloudWorkspaceSection, CloudRouteDescriptor>(
 export const CLOUD_ORGANIZATION_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "organization" && route.showInSidebar);
 export const CLOUD_PROJECT_ROUTES = CLOUD_ROUTES.filter((route) => route.context === "project");
 const CLOUD_PROJECT_SIDEBAR_ORDER: readonly CloudWorkspaceSection[] = [
+  "contents",
   "mcp-cli",
   "automation",
-  "contents",
   "access",
 ];
 export const CLOUD_PROJECT_SIDEBAR_ROUTES = CLOUD_PROJECT_ROUTES

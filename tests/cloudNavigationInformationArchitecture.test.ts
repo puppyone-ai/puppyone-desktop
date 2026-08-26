@@ -4,15 +4,17 @@ import {
   getCloudRoute,
   getCloudSidebarActiveSection,
 } from "../src/features/cloud/routes/cloudRoutes";
+import { McpLogoIcon } from "../src/features/cloud/components/McpLogoIcon";
 
 describe("Cloud navigation information architecture", () => {
   it("keeps only the four primary Project capabilities in navigation", () => {
     expect(CLOUD_PROJECT_SIDEBAR_ROUTES.map((route) => route.id)).toEqual([
+      "contents",
       "mcp-cli",
       "automation",
-      "contents",
       "access",
     ]);
+    expect(getCloudRoute("mcp-cli").icon).toBe(McpLogoIcon);
     expect(getCloudRoute("history").showInSidebar).toBe(false);
     expect(getCloudRoute("settings").showInSidebar).toBe(false);
   });
