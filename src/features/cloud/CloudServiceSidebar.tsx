@@ -106,13 +106,8 @@ export function CloudServiceSidebar({
             <span className="desktop-cloud-sidebar-footer-avatar" aria-hidden="true">
               {getAccountInitial(accountEmail)}
             </span>
-            <span className="desktop-cloud-sidebar-account-copy">
-              <span className="desktop-cloud-sidebar-account-name" dir="auto">
-                {accountLabel}
-              </span>
-              <span className="desktop-cloud-sidebar-account-context">
-                {t("cloud.common.account")}
-              </span>
+            <span className="desktop-cloud-sidebar-account-name" dir="auto">
+              {accountLabel}
             </span>
             <ChevronRight className="desktop-cloud-sidebar-account-chevron po-directional-icon" size={13} aria-hidden="true" />
           </button>

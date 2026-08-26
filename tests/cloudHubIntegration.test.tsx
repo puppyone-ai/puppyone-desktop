@@ -72,7 +72,8 @@ describe("current-repository Cloud navigation", () => {
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
     const accountButton = container.querySelector<HTMLButtonElement>(".desktop-cloud-sidebar-account");
     expect(accountButton?.textContent).toContain("owner@example.com");
-    expect(accountButton?.textContent).toContain("Account");
+    expect(accountButton?.textContent).not.toContain("Account");
+    expect(accountButton?.querySelector(".desktop-cloud-sidebar-account-context")).toBeNull();
     act(() => accountButton?.click());
     expect(onOpenAccount).toHaveBeenCalledTimes(1);
     act(() => rows(container)[2]?.click());
