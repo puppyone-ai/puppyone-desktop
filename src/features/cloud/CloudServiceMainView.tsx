@@ -15,7 +15,6 @@ import {
   getCloudProjectDetailResources,
   getCloudRouteSurface,
   getCloudRouteWebPath,
-  getCloudSignedOutSection,
   isCloudOrganizationSection,
   normalizeCloudSection,
 } from "./routes/cloudRoutes";
@@ -54,7 +53,6 @@ export function CloudServiceMainView({
   onSelectSection,
   onRefresh,
   onOpenGitSettings,
-  onOpenSourceControl,
 }: CloudServiceMainViewProps) {
   const { t } = useLocalization();
   const cloudRemote = cloudEnvironment.cloudRemote;
@@ -124,7 +122,6 @@ export function CloudServiceMainView({
   if (!effectiveCloudSession) {
     return (
       <CloudSignedOutRoute
-        activeSection={getCloudSignedOutSection(routedSection)}
         authState={cloudAuthState}
         apiBaseUrl={cloudApiBaseUrl}
         loadingLabel={t("cloud.loading.session")}
@@ -154,7 +151,6 @@ export function CloudServiceMainView({
         cloudPublishStateLoading={cloudPublishStateLoading}
         onSessionChange={onCloudSessionChange}
         onAbandonPublish={onAbandonPuppyoneBackup}
-        onOpenSourceControl={onOpenSourceControl ?? onOpenGitSettings}
         onRefresh={onRefresh}
         onPublishWorkspace={onStartPuppyoneBackup}
       />

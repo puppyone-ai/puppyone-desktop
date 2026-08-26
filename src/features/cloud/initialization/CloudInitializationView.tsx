@@ -57,7 +57,6 @@ export function CloudLocalOnlyWorkspace({
   onSelectOrganization,
   onRetryOrganizations,
   onAbandonPublish,
-  onOpenSourceControl,
   onPublishWorkspace,
 }: {
   workspace: Workspace;
@@ -83,7 +82,6 @@ export function CloudLocalOnlyWorkspace({
   onSelectOrganization?: (organizationId: string) => void;
   onRetryOrganizations?: () => void;
   onAbandonPublish?: () => void;
-  onOpenSourceControl?: () => void;
   onPublishWorkspace: (organizationId?: string) => void;
 }) {
   const { t } = useLocalization();
@@ -138,14 +136,9 @@ export function CloudLocalOnlyWorkspace({
         ? "cloud.initialize.initializing"
         : "cloud.initialize.notInitialized");
 
-  if (
-    resolvedReadiness !== "ready"
-    && !publishState
-  ) {
+  if (!activeProgressStage && !publishState && !publishStateLoading) {
     return (
       <CloudGitPrerequisite
-        workspaceName={workspace.name}
-        readiness={resolvedReadiness}
         publishBusy={publishBusy}
         publishEnabled={organizationReady}
         publishError={visiblePublishError}
@@ -156,7 +149,6 @@ export function CloudLocalOnlyWorkspace({
         organizationError={organizationError}
         onSelectOrganization={onSelectOrganization}
         onRetryOrganizations={onRetryOrganizations}
-        onOpenSourceControl={onOpenSourceControl}
         onPublishWorkspace={onPublishWorkspace}
       />
     );

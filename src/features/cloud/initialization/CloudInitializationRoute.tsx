@@ -32,7 +32,6 @@ export function CloudInitializationRoute({
   cloudPublishStateLoading,
   onSessionChange,
   onAbandonPublish,
-  onOpenSourceControl,
   onRefresh,
   onPublishWorkspace,
 }: {
@@ -53,7 +52,6 @@ export function CloudInitializationRoute({
   cloudPublishStateLoading: boolean;
   onSessionChange: CloudServiceMainViewProps["onCloudSessionChange"];
   onAbandonPublish: CloudServiceMainViewProps["onAbandonPuppyoneBackup"];
-  onOpenSourceControl: () => void;
   onRefresh: CloudServiceMainViewProps["onRefresh"];
   onPublishWorkspace: CloudServiceMainViewProps["onStartPuppyoneBackup"];
 }) {
@@ -108,7 +106,6 @@ export function CloudInitializationRoute({
           publishState={cloudPublishState}
           publishStateLoading={cloudPublishStateLoading}
           onAbandonPublish={onAbandonPublish}
-          onOpenSourceControl={onOpenSourceControl}
           onPublishWorkspace={onPublishWorkspace}
         />
       ) : (
@@ -125,7 +122,6 @@ export function CloudInitializationRoute({
           publishError={cloudPublishError}
           publishProgress={cloudPublishProgress}
           onSessionChange={onSessionChange}
-          onOpenSourceControl={onOpenSourceControl}
           onPublishWorkspace={onPublishWorkspace}
           onAbandonPublish={onAbandonPublish}
         />
@@ -158,7 +154,6 @@ function AuthenticatedCloudInitialize({
   publishError,
   publishProgress,
   onSessionChange,
-  onOpenSourceControl,
   onPublishWorkspace,
   onAbandonPublish,
 }: {
@@ -174,7 +169,6 @@ function AuthenticatedCloudInitialize({
   publishError: CloudServiceMainViewProps["cloudPublishError"];
   publishProgress: CloudServiceMainViewProps["cloudPublishProgress"];
   onSessionChange: CloudServiceMainViewProps["onCloudSessionChange"];
-  onOpenSourceControl: () => void;
   onPublishWorkspace: CloudServiceMainViewProps["onStartPuppyoneBackup"];
   onAbandonPublish: CloudServiceMainViewProps["onAbandonPuppyoneBackup"];
 }) {
@@ -228,7 +222,6 @@ function AuthenticatedCloudInitialize({
       publishError={publishError}
       publishProgress={publishProgress}
       onAbandonPublish={onAbandonPublish}
-      onOpenSourceControl={onOpenSourceControl}
       organizations={organizationData.organizations}
       selectedOrganizationId={organizationData.selectedOrganizationId}
       organizationStatus={organizationData.status === "partial" ? "ready" : organizationData.status}

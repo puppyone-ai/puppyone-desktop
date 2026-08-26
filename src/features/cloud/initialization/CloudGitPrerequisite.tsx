@@ -1,16 +1,14 @@
-import { CloudUpload, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
 import type {
   CloudPublishErrorCode,
   CloudPublishProgressStage,
 } from "../../../types/electron";
 import { formatCloudPublishFailure } from "../cloudPresentation";
-import type { CloudPublishReadiness } from "../workspace/cloudPublishReadiness";
+import { CloudPublishCloudMark } from "../components/CloudPublishHeroMarks";
 import { getCloudPublishProgressLabel } from "./CloudPublishProgressIndicator";
 
 export function CloudGitPrerequisite({
-  workspaceName,
-  readiness,
   publishBusy,
   publishEnabled,
   publishError,
@@ -21,11 +19,8 @@ export function CloudGitPrerequisite({
   organizationError,
   onSelectOrganization,
   onRetryOrganizations,
-  onOpenSourceControl,
   onPublishWorkspace,
 }: {
-  workspaceName: string;
-  readiness: Exclude<CloudPublishReadiness, "ready">;
   publishBusy: boolean;
   publishEnabled: boolean;
   publishError: { code: CloudPublishErrorCode; retryable: boolean } | null;
@@ -36,7 +31,6 @@ export function CloudGitPrerequisite({
   organizationError: string | null;
   onSelectOrganization?: (organizationId: string) => void;
   onRetryOrganizations?: () => void;
-  onOpenSourceControl?: () => void;
   onPublishWorkspace: (organizationId?: string) => void;
 }) {
   const { t } = useLocalization();
@@ -45,15 +39,14 @@ export function CloudGitPrerequisite({
     <div className="desktop-cloud-publish-container">
       <section
         className="desktop-cloud-git-prerequisite"
-        data-readiness={readiness}
         aria-labelledby="desktop-cloud-git-prerequisite-title"
       >
         <div className="desktop-cloud-git-prerequisite-mark" aria-hidden="true">
-          <CloudUpload size={40} strokeWidth={1.35} />
+          <CloudPublishCloudMark className="desktop-cloud-git-prerequisite-icon" />
         </div>
         <header className="desktop-cloud-git-prerequisite-header">
           <h1 id="desktop-cloud-git-prerequisite-title">
-            {t("cloud.initialize.publishFolderTitle", { folder: workspaceName })}
+            {t("cloud.initialize.publishFolderTitle")}
           </h1>
           <p>{t("cloud.initialize.publishFolderDescription")}</p>
         </header>
@@ -64,7 +57,7 @@ export function CloudGitPrerequisite({
           </div>
         )}
 
-        {organizationStatus !== "signed-out" && (
+        {organizationStatus !== "signed-out" && organizationStatus !== "ready" && (
           <div className="desktop-cloud-git-prerequisite-organization">
             {organizationStatus === "loading" ? (
               <span>{t("cloud.common.loading")}</span>
@@ -93,8 +86,6 @@ export function CloudGitPrerequisite({
                   ))}
                 </select>
               </label>
-            ) : organizations[0] ? (
-              <span>{organizations[0].name}</span>
             ) : null}
           </div>
         )}
@@ -114,15 +105,6 @@ export function CloudGitPrerequisite({
                 : t("cloud.initialize.enableGitAndPublish")}
             </span>
           </button>
-          {onOpenSourceControl && !publishBusy && (
-            <button
-              className="desktop-cloud-git-prerequisite-review"
-              type="button"
-              onClick={onOpenSourceControl}
-            >
-              {t("cloud.initialize.reviewFilesBeforePublishing")}
-            </button>
-          )}
           <small>{t("cloud.initialize.gitIgnoreNote")}</small>
         </div>
       </section>

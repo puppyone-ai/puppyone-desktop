@@ -80,14 +80,13 @@ describe("current-repository Cloud navigation", () => {
     expect(onSelectSection).toHaveBeenCalledWith("history");
   });
 
-  it("explains the selected Cloud capability before asking the user to sign in", () => {
+  it("keeps the signed-out Cloud entry focused on one activation action", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
 
     act(() => renderWithTestLocalization(root,
       <CloudSignedOutRoute
-        activeSection="mcp-cli"
         authState={{ status: "signed-out", apiBaseUrl: session.api_base_url }}
         apiBaseUrl={session.api_base_url}
         loadingLabel="Restoring Cloud session…"
@@ -96,11 +95,13 @@ describe("current-repository Cloud navigation", () => {
       />,
     ));
 
-    expect(container.querySelector("h1")?.textContent).toBe("MCP and CLI");
+    expect(container.querySelector("h1")?.textContent).toBe("Activate Cloud Hosting & Enable MCP");
     expect(container.querySelector(".desktop-entry-state-description")?.textContent)
-      .toBe("Configure programmatic access to this project.");
+      .toBe("Cloud sync with MCP access.");
     expect(container.querySelector(".desktop-cloud-auth-submit")?.textContent)
-      .toBe("Sign in to continue");
+      .toBe("Get Started");
+    expect(container.querySelector(".desktop-cloud-activation-note")?.textContent)
+      .toContain("may upload");
   });
 });
 
