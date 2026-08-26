@@ -9,10 +9,6 @@ const resourceCss = readFileSync(
   new URL("../src/features/cloud/sections/overview/styles/resource-cards.css", import.meta.url),
   "utf8",
 );
-const statusCss = readFileSync(
-  new URL("../src/features/cloud/sections/overview/styles/status-cards.css", import.meta.url),
-  "utf8",
-);
 const identityCss = readFileSync(
   new URL("../src/features/cloud/sections/overview/styles/project-identity.css", import.meta.url),
   "utf8",
@@ -21,22 +17,21 @@ const identityCss = readFileSync(
 describe("Cloud Overview visual architecture", () => {
   it("uses a real file list beside two compact project facts", () => {
     const layout = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-dashboard"));
-    const card = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-dashboard-card"));
-    const storage = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-dashboard-card--storage"));
+    const summaryGrid = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-summary-grid"));
+    const card = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-summary-card"));
+    const fileList = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-list"));
     const fileRow = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-row"));
 
     expect(layout).toContain("width: min(100%, 900px);");
-    expect(layout).toContain("grid-template-columns: minmax(360px, 1.15fr) minmax(280px, 0.85fr);");
-    expect(layout).toContain("grid-template-rows: auto auto;");
-    expect(layout).toContain("align-items: start;");
+    expect(layout).toContain("gap: 24px;");
     expect(layout).not.toContain("border:");
     expect(layout).not.toContain("background:");
+    expect(summaryGrid).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
     expect(card).toContain("border: 1px solid var(--po-border-subtle);");
-    expect(card).toContain("border-radius: 10px;");
-    expect(card).toContain("box-shadow: none;");
-    expect(storage).toContain("grid-row: 1 / span 2;");
+    expect(card).toContain("border-radius: 9px;");
+    expect(fileList).toContain("border: 1px solid var(--po-border-subtle);");
     expect(fileRow).toContain("grid-template-columns: 24px minmax(0, 1fr) auto;");
-    expect(fileRow).toContain("border-bottom: 1px solid var(--po-divider);");
+    expect(fileRow).not.toContain("border-bottom:");
   });
 
   it("renders actual Cloud tree and access rows instead of decorative previews", () => {
@@ -47,8 +42,8 @@ describe("Cloud Overview visual architecture", () => {
 
     expect(overviewSource).toContain("tree: DesktopCloudTree | null;");
     expect(overviewSource).toContain("desktop-cloud-overview-file-row");
-    expect(overviewSource).toContain("desktop-cloud-overview-access-row");
-    expect(overviewSource).toContain("CloudOverviewStorageMeter");
+    expect(overviewSource).toContain("desktop-cloud-overview-summary-card");
+    expect(overviewSource).toContain("accessPointCount");
     expect(overviewSource).not.toContain("desktop-cloud-overview-dashboard-card--usage");
     expect(overviewSource).toContain("const FILE_LIST_LIMIT = 9;");
     expect(overviewSource).not.toContain("storage-preview");
@@ -56,7 +51,7 @@ describe("Cloud Overview visual architecture", () => {
     expect(overviewSource).not.toContain("commitWindow");
   });
 
-  it("keeps the Project Git remote compact and moves Cloud status into the identity mark", () => {
+  it("keeps the Project Git remote compact without a decorative identity badge", () => {
     const remote = compact(readCssBlock(identityCss, ".desktop-cloud-overview-git-remote code"));
     const overviewSource = readFileSync(
       new URL("../src/features/cloud/sections/overview/OverviewSection.tsx", import.meta.url),
@@ -74,8 +69,9 @@ describe("Cloud Overview visual architecture", () => {
     expect(remote).toContain("text-overflow: ellipsis;");
     expect(remote).toContain("white-space: nowrap;");
     expect(overviewSource).not.toContain("desktop-cloud-source-pill");
-    expect(overviewSource).toContain("aria-label={t(\"cloud.common.cloudSource\")}");
-    expect(identityCss).toContain(".desktop-cloud-overview-landing-mark::after");
+    expect(overviewSource).toContain("<h1 dir=\"auto\">{projectName}</h1>");
+    expect(overviewSource).not.toContain("desktop-cloud-overview-landing-mark");
+    expect(identityCss).not.toContain("desktop-cloud-overview-landing-mark");
   });
 
   it("uses namespaced modifiers so legacy utility classes cannot collapse the cards", () => {
@@ -83,17 +79,17 @@ describe("Cloud Overview visual architecture", () => {
       new URL("../src/features/cloud/sections/overview/OverviewDashboard.tsx", import.meta.url),
       "utf8",
     );
-    const updatedValue = compact(readCssBlock(
-      statusCss,
-      ".desktop-cloud-overview-updated-value",
+    const summaryCopy = compact(readCssBlock(
+      dashboardCss,
+      ".desktop-cloud-overview-summary-copy",
     ));
     const literalClassTokens = [...overviewSource.matchAll(/className="([^"]+)"/g)]
       .flatMap((match) => match[1].split(/\s+/));
 
-    expect(overviewSource).toContain("desktop-cloud-overview-dashboard-card--updated");
+    expect(overviewSource).toContain("desktop-cloud-overview-summary-card");
     expect(literalClassTokens).not.toContain("compact");
     expect(literalClassTokens).not.toContain("interactive");
-    expect(updatedValue).toContain("flex: 1;");
+    expect(summaryCopy).toContain("display: grid;");
   });
 });
 

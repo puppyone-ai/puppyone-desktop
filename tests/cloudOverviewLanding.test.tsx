@@ -189,39 +189,27 @@ describe("CloudRepositoryOverview landing page", () => {
 
     expect(container.querySelector(".desktop-cloud-overview-catalog")).not.toBeNull();
     const dashboard = container.querySelector(".desktop-cloud-overview-dashboard");
-    const updatedCard = dashboard?.querySelector(".desktop-cloud-overview-dashboard-card--updated");
-    const accessCard = dashboard?.querySelector(".desktop-cloud-overview-dashboard-card--access");
-    const automationCard = dashboard?.querySelector(".desktop-cloud-overview-dashboard-card--automation");
-    const storageCard = dashboard?.querySelector(".desktop-cloud-overview-dashboard-card--storage");
+    const summaryCards = dashboard?.querySelectorAll(".desktop-cloud-overview-summary-card") ?? [];
+    const updatedCard = summaryCards[0];
+    const accessCard = summaryCards[1];
+    const files = dashboard?.querySelector(".desktop-cloud-overview-files");
+    const storageMeter = container.querySelector(".desktop-cloud-overview-storage-meter");
     expect(dashboard).not.toBeNull();
-    expect(dashboard?.querySelectorAll(".desktop-cloud-overview-dashboard-card")).toHaveLength(3);
+    expect(summaryCards).toHaveLength(2);
     expect(updatedCard?.textContent).toContain("Last updated");
     expect(updatedCard?.textContent).toContain("2 hours ago");
     expect(accessCard?.textContent).toContain("5");
-    expect(accessCard?.querySelectorAll(".desktop-cloud-overview-access-row")).toHaveLength(5);
-    expect(accessCard?.textContent).toContain("MCP");
-    expect(accessCard?.textContent).toContain("Git");
-    expect(accessCard?.textContent).toContain("CLI");
-    expect(accessCard?.textContent).toContain("Active");
-    expect(automationCard).toBeNull();
-    expect(storageCard?.textContent).toContain("5 files");
-    expect(storageCard?.textContent).toContain("Files");
-    expect(storageCard?.textContent).toContain("README.md");
-    expect(storageCard?.textContent).toContain("package.json");
-    expect(storageCard?.textContent).not.toContain("guide.md");
-    expect(storageCard?.textContent).toContain("Storage used");
-    expect(storageCard?.textContent).toContain("128 KB");
-    expect(storageCard?.querySelector("[role=progressbar]")?.getAttribute("aria-valuenow")).toBe("13");
-    expect(storageCard?.textContent).toContain("3");
-    expect(storageCard?.textContent).toContain("folders");
-    expect(storageCard?.querySelectorAll(".desktop-cloud-overview-file-row")).toHaveLength(5);
-    expect(storageCard?.querySelectorAll(".desktop-cloud-overview-file-row .is-folder")).toHaveLength(3);
-    const dashboardCards = dashboard
-      ? Array.from(dashboard.querySelectorAll(".desktop-cloud-overview-dashboard-card"))
-      : [];
-    expect(dashboardCards[0]).toBe(storageCard);
+    expect(files?.textContent).toContain("5 files");
+    expect(files?.textContent).toContain("Files");
+    expect(files?.textContent).toContain("README.md");
+    expect(files?.textContent).toContain("package.json");
+    expect(files?.textContent).not.toContain("guide.md");
+    expect(files?.querySelectorAll(".desktop-cloud-overview-file-row")).toHaveLength(5);
+    expect(storageMeter?.textContent).toContain("Storage used");
+    expect(storageMeter?.textContent).toContain("128 KB");
+    expect(storageMeter?.querySelector("[role=progressbar]")?.getAttribute("aria-valuenow")).toBe("13");
     expect(container.querySelector(".desktop-cloud-source-pill")).toBeNull();
-    expect(container.querySelector(".desktop-cloud-overview-landing-mark")?.getAttribute("aria-label")).toBe("Cloud source");
+    expect(container.querySelector(".desktop-cloud-overview-landing-mark")).toBeNull();
     expect(container.querySelector(".desktop-cloud-overview-deployment-board")).toBeNull();
     const gitRemote = container.querySelector<HTMLElement>(".desktop-cloud-overview-git-remote code");
     expect(gitRemote?.textContent).toBe("https://cloud.example/git/project-1.git");
@@ -229,7 +217,7 @@ describe("CloudRepositoryOverview landing page", () => {
     expect(dashboard?.textContent).not.toContain("https://cloud.example/git/project-1.git");
     expect(dashboard?.textContent).not.toContain("release");
     expect(dashboard?.textContent).not.toContain("Private");
-    expect(container.textContent).toContain("Shared product research");
+    expect(container.textContent).not.toContain("Shared product research");
     expect(findButton(container, "Open on web")).toBeUndefined();
     expect(container.querySelector(".desktop-project-folder-card")).toBeNull();
 

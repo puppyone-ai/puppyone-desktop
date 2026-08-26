@@ -5,14 +5,6 @@
     grid-template-rows: auto;
   }
 
-  .desktop-cloud-overview-dashboard-card--storage {
-    grid-row: auto;
-  }
-
-  .desktop-cloud-overview-dashboard-card--interactive {
-    min-height: 96px;
-  }
-
 }
 
 @media (max-width: 680px) {
@@ -24,18 +16,11 @@
     gap: 14px;
   }
 
-  .desktop-cloud-overview-updated-value {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 2px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .desktop-cloud-overview-refresh-button,
-  .desktop-cloud-overview-settings-button,
-  .desktop-cloud-overview-dashboard-card--interactive,
-  .desktop-cloud-overview-dashboard-card-header > .po-directional-icon {
+  .desktop-cloud-overview-settings-button {
     transition: none;
   }
 }
