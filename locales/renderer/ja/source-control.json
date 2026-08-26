@@ -37,7 +37,7 @@
   "cloud.updateCount": "{count, plural, other {# 件のアップデートを利用できます}}",
   "notice.summary": "{count, plural, other {# ファイル}} · {relativeTime}",
   "notice.commitSummary": "{count, plural, other {# コミット}} · {relativeTime}",
-  "notice.fileCount": "{count, plural, other {リモートで # ファイルが変更されました}}",
+  "notice.fileCount": "{count, plural, other {# 件のファイル変更}}",
   "notice.localChanges": "ローカルにも変更あり",
   "notice.pullTitle": "リモートの変更をこのフォルダーに取り込みます。ローカル編集は自動的に保持されます。",
   "commit.filesChanged": "{count, plural, other {# ファイルを変更}}",

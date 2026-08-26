@@ -37,7 +37,7 @@
   "cloud.updateCount": "{count, plural, other {有 # 项更新可用}}",
   "notice.summary": "{count, plural, other {# 个文件}} · {relativeTime}",
   "notice.commitSummary": "{count, plural, other {# 个提交}} · {relativeTime}",
-  "notice.fileCount": "{count, plural, other {云端有 # 个文件发生变更}}",
+  "notice.fileCount": "{count, plural, other {# 个文件变更}}",
   "notice.localChanges": "本地也有改动",
   "notice.pullTitle": "将云端变更拉取到此文件夹。本地编辑会自动保留。",
   "commit.filesChanged": "{count, plural, other {# 个文件已更改}}",

@@ -24,11 +24,19 @@ function incomingStatus(overrides: Partial<GitStatusSnapshot["sourceControl"]["r
         behind: 3,
         canPull: true,
         target: { remote: "origin", ref: "origin/main" },
-        incomingFileSummary: { total: 4 },
+        incomingFileSummary: {
+          total: 4,
+          added: 1,
+          modified: 2,
+          deleted: 1,
+          renamed: 0,
+          copied: 0,
+          changed: 0,
+        },
         incomingPreview: [
-          { path: "docs/brief.md" },
-          { path: "research/notes.md" },
-          { path: "assets/chart.png" },
+          { path: "docs/brief.md", status: "modified" },
+          { path: "research/notes.md", status: "modified" },
+          { path: "assets/chart.png", status: "added" },
         ],
         ...overrides,
       },
@@ -37,14 +45,16 @@ function incomingStatus(overrides: Partial<GitStatusSnapshot["sourceControl"]["r
 }
 
 describe("remote update notice model", () => {
-  it("summarizes the remote source, changed files, commit count, and update time", () => {
+  it("summarizes changed files, previews, and update time", () => {
     expect(getRemoteUpdateNoticeModel(incomingStatus())).toEqual({
-      provider: "GitHub",
-      providerKind: "github",
       behind: 3,
       fileCount: 4,
+      filePreviews: [
+        { path: "docs/brief.md", status: "modified" },
+        { path: "research/notes.md", status: "modified" },
+        { path: "assets/chart.png", status: "added" },
+      ],
       updatedAt: "2026-08-27T01:30:00.000Z",
-      authorName: "Preview Collaborator",
       canPull: true,
       diverged: false,
     });
@@ -55,14 +65,15 @@ describe("remote update notice model", () => {
     expect(getRemoteUpdateNoticeModel(incomingStatus({ state: "synced", behind: 0 }))).toBeNull();
   });
 
-  it("labels PuppyOne Cloud and generic remotes without special-casing the UI", () => {
-    const cloud = incomingStatus();
-    cloud.effectiveHosting.kind = "puppyone-cloud";
-    expect(getRemoteUpdateNoticeModel(cloud)?.provider).toBe("PuppyOne Cloud");
-
-    const generic = incomingStatus();
-    generic.effectiveHosting.kind = "generic-git";
-    generic.sourceControl.remote.target!.remote = "company";
-    expect(getRemoteUpdateNoticeModel(generic)?.provider).toBe("company");
+  it("limits file previews so the sidebar notice stays compact", () => {
+    const status = incomingStatus({
+      incomingPreview: [
+        { path: "one.md", status: "added" },
+        { path: "two.md", status: "modified" },
+        { path: "three.md", status: "deleted" },
+        { path: "four.md", status: "renamed" },
+      ],
+    });
+    expect(getRemoteUpdateNoticeModel(status)?.filePreviews).toHaveLength(3);
   });
 });

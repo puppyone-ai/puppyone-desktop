@@ -37,7 +37,7 @@
   "cloud.updateCount": "{count, plural, one {# update available} other {# updates available}}",
   "notice.summary": "{count, plural, one {# file} other {# files}} · {relativeTime}",
   "notice.commitSummary": "{count, plural, one {# commit} other {# commits}} · {relativeTime}",
-  "notice.fileCount": "{count, plural, one {# remote file changed} other {# remote files changed}}",
+  "notice.fileCount": "{count, plural, one {# file change} other {# file changes}}",
   "notice.localChanges": "local changes too",
   "notice.pullTitle": "Pull remote changes into this folder. Local edits are preserved automatically.",
   "commit.filesChanged": "{count, plural, one {# file changed} other {# files changed}}",

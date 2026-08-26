@@ -1,14 +1,17 @@
 import { useLocalization } from "@puppyone/localization";
-import type { GitEffectiveHostingKind, GitStatusSnapshot } from "../../types/electron";
+import type { GitSourceControlResourceStatus, GitStatusSnapshot } from "../../types/electron";
 import { GitOperationButton } from "../source-control/sidebar/GitSidebarPrimitives";
 
+type RemoteUpdateFilePreview = Readonly<{
+  path: string;
+  status: GitSourceControlResourceStatus;
+}>;
+
 export type RemoteUpdateNoticeModel = Readonly<{
-  provider: string;
-  providerKind: GitEffectiveHostingKind;
   behind: number;
   fileCount: number;
+  filePreviews: ReadonlyArray<RemoteUpdateFilePreview>;
   updatedAt: string | null;
-  authorName: string | null;
   canPull: boolean;
   diverged: boolean;
 }>;
@@ -28,13 +31,8 @@ export function RemoteUpdateNotice({
 
   const updateAge = formatRemoteUpdateAge(model.updatedAt, formatRelativeTime);
   const summary = model.fileCount > 0
-    ? updateAge
-      ? t("source-control.notice.summary", { relativeTime: updateAge, count: model.fileCount })
-      : t("source-control.notice.fileCount", { count: model.fileCount })
-    : updateAge
-      ? t("source-control.notice.commitSummary", { relativeTime: updateAge, count: model.behind })
-      : t("source-control.commit.commits", { count: model.behind });
-  const attribution = model.authorName ?? model.provider;
+    ? t("source-control.notice.fileCount", { count: model.fileCount })
+    : t("source-control.commit.changes", { count: model.behind });
 
   return (
     <aside
@@ -43,18 +41,34 @@ export function RemoteUpdateNotice({
       role="status"
       aria-live="polite"
     >
-      <strong className="desktop-remote-update-notice-summary">{summary}</strong>
-      <p className="desktop-remote-update-notice-meta">
-        <span>{t("source-control.commit.commits", { count: model.behind })}</span>
-        <span aria-hidden="true"> · </span>
-        <span>{attribution}</span>
-        {model.diverged && (
-          <>
-            <span aria-hidden="true"> · </span>
-            <span>{t("source-control.notice.localChanges")}</span>
-          </>
-        )}
-      </p>
+      <div className="desktop-remote-update-notice-heading">
+        <span className="desktop-remote-update-notice-summary">{summary}</span>
+      </div>
+      {(updateAge || model.filePreviews.length > 0) && (
+        <div className="desktop-remote-update-notice-meta">
+          {updateAge && <span className="desktop-remote-update-notice-age">{updateAge}</span>}
+          {model.filePreviews.length > 0 && (
+            <span className="desktop-remote-update-notice-file-previews">
+              {model.filePreviews.map((file) => {
+                const statusLabel = t(`source-control.diff.change.${normalizePreviewStatus(file.status)}`);
+                const fileName = getFileName(file.path);
+                const displayName = getFileDisplayName(fileName);
+                return (
+                  <span
+                    key={`${file.status}:${file.path}`}
+                    className="desktop-remote-update-notice-file-preview"
+                    data-status={file.status}
+                    title={`${fileName} · ${statusLabel}`}
+                  >
+                    <span className="desktop-remote-update-notice-file-dot" aria-hidden="true" />
+                    <span className="desktop-remote-update-notice-file-name">{displayName}</span>
+                  </span>
+                );
+              })}
+            </span>
+          )}
+        </div>
+      )}
       <GitOperationButton
         className="desktop-remote-update-notice-pull"
         title={t("source-control.notice.pullTitle")}
@@ -88,23 +102,28 @@ export function getRemoteUpdateNoticeModel(
   ) ?? null;
 
   return {
-    provider: getRemoteProviderLabel(status),
-    providerKind: status.effectiveHosting.kind,
     behind: remote.behind,
     fileCount,
+    filePreviews: remote.incomingPreview.slice(0, 3).map(({ path, status }) => ({ path, status })),
     updatedAt: remoteBranch?.lastCommitDate ?? null,
-    authorName: remoteBranch?.lastCommitAuthorName?.trim() || null,
     canPull: remote.canPull,
     diverged: remote.state === "diverged",
   };
 }
 
-function getRemoteProviderLabel(status: GitStatusSnapshot) {
-  if (status.effectiveHosting.kind === "github") return "GitHub";
-  if (status.effectiveHosting.kind === "puppyone-cloud") return "PuppyOne Cloud";
-  const remoteName = status.sourceControl.remote.target?.remote?.trim();
-  if (remoteName?.toLowerCase() === "puppyone") return "PuppyOne";
-  return remoteName || "Git remote";
+function getFileName(path: string) {
+  return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
+}
+
+function getFileDisplayName(fileName: string) {
+  const extensionIndex = fileName.lastIndexOf(".");
+  return extensionIndex > 0 ? fileName.slice(0, extensionIndex) : fileName;
+}
+
+function normalizePreviewStatus(status: GitSourceControlResourceStatus) {
+  if (status === "untracked") return "added";
+  if (status === "conflict") return "changed";
+  return status;
 }
 
 function formatRemoteUpdateAge(
