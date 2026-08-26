@@ -55,7 +55,7 @@ describe("RTL architecture", () => {
     expect(read("../src/features/settings/main/RepositorySettingsViews.tsx"))
       .toContain('<code dir="ltr" title={copyUrl ?? ""}>');
     expect(read("../src/features/settings/main/LocalProjectSettingsView.tsx"))
-      .toContain('<strong dir="ltr" title={workspace.path}>{workspace.path}</strong>');
+      .toContain('className="desktop-settings-row-value" dir="ltr" title={workspace.path}');
   });
 });
 

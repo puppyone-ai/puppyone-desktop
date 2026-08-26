@@ -44,7 +44,7 @@ describe("Settings primitives", () => {
     const heading = subsection?.querySelector("h3");
     expect(heading?.textContent).toBe("اللغة");
     expect(subsection?.getAttribute("aria-labelledby")).toBe(heading?.id);
-    expect(host.querySelector(".desktop-settings-value strong")?.getAttribute("dir")).toBe("auto");
+    expect(host.querySelector(".desktop-settings-value-text")?.getAttribute("dir")).toBe("auto");
     expect(host.querySelector(".desktop-settings-group")).toBeNull();
   });
 
@@ -74,6 +74,6 @@ describe("Settings primitives", () => {
       root?.render(<SettingsValueRow label="Service" value="https://api.example.test/v1" monospace />);
     });
 
-    expect(host.querySelector(".desktop-settings-value strong")?.getAttribute("dir")).toBe("ltr");
+    expect(host.querySelector(".desktop-settings-value-text")?.getAttribute("dir")).toBe("ltr");
   });
 });

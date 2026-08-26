@@ -151,7 +151,7 @@ export function PuppyoneWorkspaceConfigSettings({
                   title={option.detail}
                   onClick={() => selectSourceService(option.value)}
                 >
-                  <strong>{option.label}</strong>
+                  <span>{option.label}</span>
                 </button>
               ))}
             </div>

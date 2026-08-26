@@ -17,7 +17,7 @@
   background: transparent;
   color: var(--po-text-muted);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-medium, 500);
 }
 
 .desktop-settings-action span {
@@ -141,7 +141,7 @@
   gap: 7px;
   color: var(--po-text-muted);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-regular, 400);
 }
 
 .desktop-settings-tool-label > svg {
@@ -179,13 +179,17 @@
   background: transparent;
   color: var(--po-text-muted);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-regular, 400);
 }
 
 .desktop-theme-segment button:hover,
 .desktop-theme-segment button.active {
   background: var(--po-selected);
   color: var(--po-text);
+}
+
+.desktop-theme-segment button.active {
+  font-weight: var(--po-text-weight-medium, 500);
 }
 
 .desktop-interface-style-segment button {
@@ -219,7 +223,7 @@
   background: color-mix(in srgb, var(--po-panel-raised) 82%, transparent);
   color: var(--po-text-muted);
   font-size: 11.5px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-regular, 400);
   text-align: start;
 }
 
@@ -231,6 +235,7 @@
 }
 
 .desktop-theme-choice.active {
+  font-weight: var(--po-text-weight-medium, 500);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-accent) 26%, transparent);
 }
 

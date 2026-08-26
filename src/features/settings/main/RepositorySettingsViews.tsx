@@ -184,7 +184,7 @@ export function GitSettingsView({
                   return (
                     <div className="desktop-settings-remote-setting" key={remote.name}>
                       <div className="desktop-settings-remote-setting-main">
-                        <strong dir="auto">{remote.name}</strong>
+                        <span className="desktop-settings-remote-setting-name" dir="auto">{remote.name}</span>
                         <span className={`desktop-settings-badge ${remoteInfo ? "connected" : ""}`}>
                           {remoteInfo ? "puppyone" : remoteKindLabel(copyUrl)}
                         </span>

@@ -42,22 +42,22 @@ export function LocalProjectSettingsView({
           <div className="desktop-settings-list">
             <div className="desktop-settings-row">
               <span>{t("settings.localProject.name")}</span>
-              <strong dir="auto" title={workspace.name}>{workspace.name}</strong>
+              <span className="desktop-settings-row-value" dir="auto" title={workspace.name}>{workspace.name}</span>
             </div>
             <div className="desktop-settings-row">
               <span>{t("settings.localProject.path")}</span>
-              <strong dir="ltr" title={workspace.path}>{workspace.path}</strong>
+              <span className="desktop-settings-row-value" dir="ltr" title={workspace.path}>{workspace.path}</span>
             </div>
             <div className="desktop-settings-row">
               <span>{t("settings.localProject.mode")}</span>
-              <strong>{t("settings.localProject.modeLocal")}</strong>
+              <span className="desktop-settings-row-value">{t("settings.localProject.modeLocal")}</span>
             </div>
             <div className="desktop-settings-row">
               <span>{t("settings.localProject.status")}</span>
-              <strong className="desktop-settings-status">
+              <span className="desktop-settings-row-value desktop-settings-status">
                 <ShieldCheck size={14} />
                 {t("settings.localProject.protected")}
-              </strong>
+              </span>
             </div>
             <div className="desktop-settings-row desktop-settings-row-control">
               <span>{t("settings.localProject.recentWorkspace")}</span>

@@ -236,6 +236,8 @@ describe("settings visual architecture", () => {
     const settings = source("src/styles/settings.css");
     const controls = source("src/styles/settings-controls.css");
     const language = source("src/styles/settings-view.css");
+    const localProject = source("src/features/settings/main/LocalProjectSettingsView.tsx");
+    const repository = source("src/features/settings/main/RepositorySettingsViews.tsx");
 
     expect(settings).toMatch(/--desktop-settings-content-max-width:\s*1040px/);
     expect(settings).toMatch(/\.desktop-settings-heading-row\s*{[^}]*padding-inline:\s*10px;/s);
@@ -243,11 +245,14 @@ describe("settings visual architecture", () => {
     expect(settings).toMatch(/\.desktop-settings-heading-row \.desktop-settings-section-header\s*{[^}]*padding-inline:\s*0;/s);
     expect(settings).toMatch(/\.desktop-settings-section-header h2\s*{[^}]*font-size:\s*15px;[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);[^}]*line-height:\s*20px;/s);
     expect(settings).toMatch(/\.desktop-settings-row\s*{[^}]*gap:\s*18px;[^}]*padding:\s*0 10px;/s);
+    expect(settings).toMatch(/\.desktop-settings-row > \.desktop-settings-row-value\s*{[^}]*font-weight:\s*var\(--po-text-weight-regular, 400\);/s);
+    expect(settings).toMatch(/\.desktop-settings-value-text\s*{[^}]*font-weight:\s*var\(--po-text-weight-regular, 400\);/s);
+    expect(settings).toMatch(/\.desktop-settings-remote-setting-name\s*{[^}]*font-weight:\s*var\(--po-text-weight-regular, 400\);/s);
     expect(controls).toMatch(/\.desktop-settings-row-control\s*{[^}]*min-height:\s*42px;/s);
     expect(controls).not.toContain("min-height: 38px");
     expect(settings).toMatch(/\.desktop-settings-value-row\s*{[^}]*min-height:\s*30px;/s);
-    expect(settings).toMatch(/\.desktop-settings-select,[\s\S]*?height:\s*28px;[\s\S]*?border-radius:\s*6px;/);
-    expect(controls).toMatch(/\.desktop-settings-action\s*{[^}]*height:\s*28px;[^}]*border-radius:\s*6px;[^}]*font-size:\s*12px;[^}]*font-weight:\s*650;/s);
+    expect(settings).toMatch(/\.desktop-settings-select,[\s\S]*?height:\s*28px;[\s\S]*?border-radius:\s*6px;[\s\S]*?font-weight:\s*var\(--po-text-weight-regular, 400\);/);
+    expect(controls).toMatch(/\.desktop-settings-action\s*{[^}]*height:\s*28px;[^}]*border-radius:\s*6px;[^}]*font-size:\s*12px;[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);/s);
     expect(controls).toMatch(/\.desktop-build-version-text\s*{[^}]*font-weight:\s*400;/s);
     expect(controls).toMatch(/\.desktop-theme-segment\s*{[^}]*border-radius:\s*7px;/s);
     expect(controls).toMatch(/\.desktop-theme-segment button\s*{[^}]*height:\s*26px;[^}]*border-radius:\s*5px;/s);
@@ -258,6 +263,8 @@ describe("settings visual architecture", () => {
     expect(view.match(/desktop-appearance-hug-segment/g)).toHaveLength(4);
     expect(view).not.toContain("settings.appearance.editorPresentation");
     expect(view).not.toContain("settings.appearance.dockIcon");
+    expect(localProject).not.toContain("<strong");
+    expect(repository).not.toContain("<strong");
     expect(controls).not.toContain("desktop-dock-icon-segment");
     expect(view).toContain("settings.appearance.gitSidebarLayout.title");
     expect(controls).not.toContain(".desktop-loading-animation-segment");

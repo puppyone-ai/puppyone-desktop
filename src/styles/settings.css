@@ -126,12 +126,12 @@
   color: var(--po-text-subtle);
 }
 
-.desktop-settings-row strong {
+.desktop-settings-row > .desktop-settings-row-value {
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: var(--po-text-weight-regular, 400);
   text-align: end;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -349,18 +349,18 @@
   gap: 8px;
 }
 
-.desktop-settings-value strong {
+.desktop-settings-value-text {
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
   font-size: 12.5px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-regular, 400);
   text-align: end;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.desktop-settings-value strong.success {
+.desktop-settings-value-text.success {
   color: var(--po-success);
 }
 
@@ -375,7 +375,7 @@
   padding: 6px 10px;
   color: var(--po-text-subtle);
   font-size: 11.5px;
-  font-weight: 520;
+  font-weight: var(--po-text-weight-regular, 400);
 }
 
 .desktop-settings-account-feedback.success {
@@ -399,7 +399,7 @@
   background: transparent;
   color: var(--po-text-muted);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-medium, 500);
 }
 
 .desktop-settings-row-action:hover:not(:disabled) {
@@ -445,7 +445,7 @@
   color: var(--po-text);
   font: inherit;
   font-size: 12px;
-  font-weight: 560;
+  font-weight: var(--po-text-weight-regular, 400);
   outline: none;
 }
 
@@ -631,16 +631,20 @@
   opacity: 0.62;
 }
 
-.desktop-hosting-service-option > strong {
+.desktop-hosting-service-option > span {
   min-width: 0;
   overflow: hidden;
   color: inherit;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-regular, 400);
   line-height: 1;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.desktop-hosting-service-option.active > span {
+  font-weight: var(--po-text-weight-medium, 500);
 }
 
 .desktop-puppyone-config-row {
@@ -696,12 +700,12 @@
   gap: 8px;
 }
 
-.desktop-settings-remote-setting-main strong {
+.desktop-settings-remote-setting-name {
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
   font-size: 12.5px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-regular, 400);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -736,7 +740,7 @@
   color: var(--po-text);
   font-family: var(--po-font-mono);
   font-size: 11.5px;
-  font-weight: 560;
+  font-weight: var(--po-text-weight-regular, 400);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -745,7 +749,7 @@
   color: var(--po-text-subtle);
   font-family: inherit;
   font-size: 11.5px;
-  font-weight: 520;
+  font-weight: var(--po-text-weight-regular, 400);
 }
 
 .desktop-settings-badge {
@@ -760,7 +764,7 @@
   background: var(--po-control);
   color: var(--po-text-subtle);
   font-size: 11px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-medium, 500);
   text-transform: none;
 }
 
