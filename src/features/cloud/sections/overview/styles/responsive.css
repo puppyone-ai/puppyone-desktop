@@ -29,7 +29,7 @@
   }
 
   .desktop-cloud-overview-project-storage {
-    width: auto;
+    width: min(100%, 420px);
   }
 
   .desktop-cloud-overview-path-fact {

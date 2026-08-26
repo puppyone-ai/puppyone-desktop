@@ -186,9 +186,10 @@ describe("CloudRepositoryOverview landing page", () => {
     const fileRows = dashboard?.querySelectorAll(".desktop-cloud-overview-file-row");
     expect(dashboard).not.toBeNull();
     expect(headerFacts).toHaveLength(3);
-    expect(headerFacts[0]?.textContent).toContain("Storage");
-    expect(headerFacts[1]?.textContent).toContain("Last updated");
-    expect(headerFacts[1]?.textContent).toContain("1 hour ago");
+    expect(headerFacts[0]?.textContent).toContain("Last updated");
+    expect(headerFacts[0]?.textContent).toContain("1 hour ago");
+    expect(headerFacts[1]?.textContent).toContain("Active connections");
+    expect(headerFacts[1]?.textContent).toContain("3");
     expect(headerFacts[2]?.textContent).toContain("Path");
     expect(headerFacts[2]?.textContent).toContain("https://cloud.example/git/project-1.git");
     expect(dashboard?.textContent).not.toContain("Automation");
@@ -216,6 +217,8 @@ describe("CloudRepositoryOverview landing page", () => {
     expect(storage?.textContent).toContain("Storage");
     expect(storage?.textContent).toContain("100 MB of 500 MB");
     expect(storage?.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")).toBe("20");
+    expect(storage?.parentElement?.classList.contains("desktop-cloud-overview-landing-copy")).toBe(true);
+    expect(container.querySelector(".desktop-cloud-overview-header-facts .desktop-cloud-overview-project-storage")).toBeNull();
     expect(dashboard?.querySelector(".desktop-cloud-overview-project-storage")).toBeNull();
     expect(findButton(container, "Open on web")).toBeUndefined();
     expect(container.querySelector(".desktop-project-folder-card")).toBeNull();
@@ -224,7 +227,8 @@ describe("CloudRepositoryOverview landing page", () => {
     expect(onRefresh).toHaveBeenCalledOnce();
 
     act(() => findButton(container, "View history")?.click());
-    expect(onSelectSection.mock.calls).toEqual([["history"]]);
+    act(() => findButton(container, "Manage access points")?.click());
+    expect(onSelectSection.mock.calls).toEqual([["history"], ["access"]]);
   });
 });
 

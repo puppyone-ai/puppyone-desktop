@@ -443,6 +443,7 @@
   "overview.filesLabel": "ファイル",
   "overview.fileListAria": "プロジェクトファイル",
   "overview.lastUpdated": "最終更新",
+  "overview.activeConnections": "有効な接続",
   "overview.fileSize": "ファイルサイズ",
   "overview.storageUsed": "使用済みストレージ",
   "overview.accessPointListAria": "アクセスポイントの状態",

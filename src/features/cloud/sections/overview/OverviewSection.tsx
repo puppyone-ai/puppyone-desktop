@@ -28,6 +28,7 @@ import {
 } from "../../utils";
 import { CloudOverviewDashboard } from "./OverviewDashboard";
 import {
+  getCloudOverviewMetrics,
   getCloudOverviewStorageUsage,
   getLatestCloudUpdateAt,
   type CloudOverviewStorageUsage,
@@ -61,10 +62,15 @@ export function CloudRepositoryOverview({
   onRefresh: () => Promise<void>;
 }) {
   const localization = useLocalization();
-  const { t } = localization;
+  const { formatNumber, t } = localization;
   const projectName = project?.name ?? workspace.name;
-  const projectDescription = project?.description?.trim() || null;
   const gitRemoteUrl = identity?.url?.trim() || null;
+  const overviewMetrics = getCloudOverviewMetrics({
+    scopes,
+    connectors,
+    mcpEndpoints,
+    identity,
+  });
   const storageUsage = getCloudOverviewStorageUsage(dashboard, tree);
   const latestUpdateAt = getLatestCloudUpdateAt(project?.updated_at ?? null, history);
   const latestUpdate = latestUpdateAt
@@ -115,12 +121,11 @@ export function CloudRepositoryOverview({
                   </button>
                 </div>
               </div>
-              {!gitRemoteUrl && projectDescription ? <p dir="auto">{projectDescription}</p> : null}
+              <CloudOverviewStorageMeter usage={storageUsage} loading={loading} />
             </div>
 
             <div className="desktop-cloud-overview-header-side">
               <div className="desktop-cloud-overview-header-facts">
-                <CloudOverviewStorageMeter usage={storageUsage} loading={loading} />
                 <CloudOverviewHeaderFact
                   label={t("cloud.overview.lastUpdated")}
                   value={latestUpdate}
@@ -129,6 +134,12 @@ export function CloudRepositoryOverview({
                     : undefined}
                   ariaLabel={t("cloud.overview.viewHistory")}
                   onClick={() => onSelectSection("history")}
+                />
+                <CloudOverviewHeaderFact
+                  label={t("cloud.overview.activeConnections")}
+                  value={formatNumber(overviewMetrics.activeAccessPointCount)}
+                  ariaLabel={t("cloud.overview.manageAccessPoints")}
+                  onClick={() => onSelectSection("access")}
                 />
                 <CloudOverviewPathFact value={gitRemoteUrl} />
               </div>
@@ -237,9 +248,11 @@ function CloudOverviewStorageMeter({
       };
 
   return (
-    <div className="desktop-cloud-overview-header-fact desktop-cloud-overview-project-storage">
-      <span className="desktop-cloud-overview-header-fact-label">{t("cloud.billing.storageUsage")}</span>
-      <strong>{detail}</strong>
+    <div className="desktop-cloud-overview-project-storage">
+      <div className="desktop-cloud-overview-project-storage-summary">
+        <span>{t("cloud.billing.storageUsage")}</span>
+        <strong>{detail}</strong>
+      </div>
       <span className="desktop-cloud-overview-project-storage-track" {...progressProps}>
         {usage.percent !== null ? (
           <span style={{ width: `${usage.percent}%` }} />

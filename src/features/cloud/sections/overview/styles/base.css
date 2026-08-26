@@ -37,8 +37,10 @@
 
 .desktop-cloud-overview-landing-copy {
   display: grid;
+  width: min(100%, 440px);
   min-width: 0;
-  gap: 5px;
+  flex: 1 1 360px;
+  gap: 7px;
 }
 
 .desktop-cloud-overview-title-row {

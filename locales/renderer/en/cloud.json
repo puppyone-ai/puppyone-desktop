@@ -418,6 +418,7 @@
   "overview.filesLabel": "Files",
   "overview.fileListAria": "Project files",
   "overview.lastUpdated": "Last updated",
+  "overview.activeConnections": "Active connections",
   "overview.fileSize": "File size",
   "overview.storageUsed": "Storage used",
   "overview.accessPointListAria": "Access point activity",

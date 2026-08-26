@@ -443,6 +443,7 @@
   "overview.filesLabel": "文件",
   "overview.fileListAria": "项目文件",
   "overview.lastUpdated": "最近更新",
+  "overview.activeConnections": "已激活连接",
   "overview.fileSize": "文件大小",
   "overview.storageUsed": "已用存储空间",
   "overview.accessPointListAria": "访问点活跃状态",

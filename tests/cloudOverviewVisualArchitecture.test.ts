@@ -56,7 +56,7 @@ describe("Cloud Overview visual architecture", () => {
     expect(dashboardSource).not.toMatch(/\bFolder\b.*from "lucide-react"/);
   });
 
-  it("keeps storage, update, and copyable path as quiet header facts", () => {
+  it("gives storage a long description strip and keeps three quiet facts beside it", () => {
     const facts = compact(readCssBlock(statusCss, ".desktop-cloud-overview-header-facts"));
     const fact = compact(readCssBlock(statusCss, ".desktop-cloud-overview-header-fact"));
     const storage = compact(readCssBlock(statusCss, ".desktop-cloud-overview-project-storage"));
@@ -66,15 +66,16 @@ describe("Cloud Overview visual architecture", () => {
 
     expect(facts).toContain("grid-auto-flow: column;");
     expect(fact).toContain("border-inline-start: 1px solid var(--po-border-subtle);");
-    expect(storage).toContain("width: 188px;");
-    expect(track).toContain("height: 3px;");
+    expect(storage).toContain("width: min(100%, 420px);");
+    expect(track).toContain("height: 4px;");
     expect(path).toContain("width: clamp(150px, 17vw, 220px);");
     expect(titleRow).toContain("align-items: center;");
-    expect(overviewSource.match(/<CloudOverviewHeaderFact/g)).toHaveLength(1);
+    expect(overviewSource.match(/<CloudOverviewHeaderFact/g)).toHaveLength(2);
     expect(overviewSource).toContain("<CloudOverviewStorageMeter");
+    expect(overviewSource).toContain('label={t("cloud.overview.activeConnections")}');
     expect(overviewSource).toContain("<CloudOverviewPathFact");
     expect(overviewSource.indexOf("<CloudOverviewStorageMeter")).toBeLessThan(
-      overviewSource.indexOf("<CloudOverviewHeaderFact"),
+      overviewSource.indexOf("desktop-cloud-overview-header-side"),
     );
     expect(overviewSource).toContain("desktop-cloud-overview-title-row");
     expect(overviewSource).not.toContain("getCloudRoute(\"git-sync\").icon");

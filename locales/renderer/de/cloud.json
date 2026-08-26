@@ -443,6 +443,7 @@
   "overview.filesLabel": "Dateien",
   "overview.fileListAria": "Projektdateien",
   "overview.lastUpdated": "Zuletzt aktualisiert",
+  "overview.activeConnections": "Aktive Verbindungen",
   "overview.fileSize": "Dateigröße",
   "overview.storageUsed": "Belegter Speicher",
   "overview.accessPointListAria": "Aktivität der Zugriffspunkte",

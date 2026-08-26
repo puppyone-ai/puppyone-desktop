@@ -12,6 +12,7 @@ import { buildCloudAutomationRows } from "../../../automation/automationDomain";
 import {
   buildAccessPointRows,
   isAccessPointNavigationResource,
+  isAccessPointReady,
 } from "../../access-points/model";
 import { getCloudScopeRows, normalizeCloudEntryPath } from "../../utils";
 
@@ -47,7 +48,12 @@ export function getCloudOverviewMetrics({
     connectors,
   });
 
-  return { accessPointCount: accessRows.length, accessRows, automationRows };
+  return {
+    accessPointCount: accessRows.length,
+    activeAccessPointCount: accessRows.filter((row) => isAccessPointReady(row.accessPoint)).length,
+    accessRows,
+    automationRows,
+  };
 }
 
 export function getRecentCloudCommitActivity(

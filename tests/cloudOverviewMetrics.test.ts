@@ -2,11 +2,28 @@ import { describe, expect, it } from "vitest";
 import type { DesktopCloudDashboard, DesktopCloudTree } from "../src/lib/cloudApi";
 import {
   getCloudOverviewEntryUpdatedAt,
+  getCloudOverviewMetrics,
   getCloudOverviewRootEntries,
   getCloudOverviewStorageUsage,
 } from "../src/features/cloud/sections/overview/overviewMetrics";
 
 describe("Cloud Overview metrics", () => {
+  it("separates active connections from the total access-point inventory", () => {
+    const metrics = getCloudOverviewMetrics({
+      scopes: [],
+      connectors: [],
+      mcpEndpoints: [],
+      identity: {
+        project_id: "project-1",
+        url: "https://cloud.example/git/project-1.git",
+        scopes: [],
+      },
+    });
+
+    expect(metrics.accessPointCount).toBe(2);
+    expect(metrics.activeAccessPointCount).toBe(1);
+  });
+
   it("keeps only direct children and orders product folders before files", () => {
     const tree: DesktopCloudTree = {
       path: "docs",
