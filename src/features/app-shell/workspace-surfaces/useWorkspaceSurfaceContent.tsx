@@ -250,10 +250,6 @@ export function useWorkspaceSurfaceContent({
         projectCapabilities={projectContext.status === "resolved"
           ? projectContext.capabilities ?? []
           : []}
-        onOpenAccount={() => {
-          onSelectSettingsSection("account");
-          onNavigate("settings");
-        }}
         onSelectSection={cloud.onSelectSection}
       />
     ),
