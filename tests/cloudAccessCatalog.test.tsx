@@ -12,7 +12,7 @@ import type {
   DesktopCloudScope,
   DesktopCloudSession,
 } from "../src/lib/cloudApi";
-import { CloudAccessSection } from "../src/features/cloud/sections/access/AccessSection";
+import { AccessPointRoutePage } from "../src/features/cloud/access-points";
 import { withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -25,7 +25,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("CloudAccessSection catalog", () => {
+describe("AccessPointRoutePage catalog", () => {
   it("filters access points by method, status, and search and opens the selected point", () => {
     const container = renderCatalog();
 
@@ -79,24 +79,17 @@ function renderCatalog() {
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => root?.render(withTestLocalization(
-    <CloudAccessSection
+    <AccessPointRoutePage
+      kind="all"
       projectId="project-1"
       cloudSession={SESSION}
       apiBaseUrl={SESSION.api_base_url}
       identity={IDENTITY}
       scopes={SCOPES}
       connectors={CONNECTORS}
-      connectorsByTarget={new Map([
-        ["project:project-1", [CONNECTORS[0]]],
-        ["scope:scope-docs", [CONNECTORS[1]]],
-      ])}
       mcpEndpoints={MCP_ENDPOINTS}
-      mcpEndpointsByTarget={new Map([
-        ["project:project-1", []],
-        ["scope:scope-docs", MCP_ENDPOINTS],
-      ])}
-      activeAccessRowId={null}
       loading={false}
+      canManage
       onCloudSessionChange={vi.fn()}
       onRefresh={vi.fn(async () => undefined)}
       onOpenProject={vi.fn()}

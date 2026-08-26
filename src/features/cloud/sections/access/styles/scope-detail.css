@@ -1,8 +1,4 @@
 /* Scope detail layout. */
-.desktop-cloud-access-scope-page > .desktop-cloud-access-detail {
-  overflow: hidden;
-}
-
 .desktop-cloud-access-web-detail {
   flex: 1;
   min-width: 0;

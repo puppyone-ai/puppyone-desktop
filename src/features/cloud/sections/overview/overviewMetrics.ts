@@ -8,9 +8,9 @@ import type {
 } from "../../../../lib/cloudApi";
 import type { DesktopCloudHistory } from "../../../../lib/cloudHistoryApi";
 import {
-  buildDesktopCloudAccessRows,
-  isCloudAccessNavigationResource,
-} from "../access/accessRows";
+  buildAccessPointRows,
+  isAccessPointNavigationResource,
+} from "../../access-points/model";
 import { getCloudScopeRows, normalizeCloudEntryPath } from "../../utils";
 
 /**
@@ -30,13 +30,13 @@ export function getCloudOverviewMetrics({
   identity: DesktopCloudRepoIdentity | null;
 }) {
   const scopeRows = getCloudScopeRows(scopes, identity);
-  const accessRows = buildDesktopCloudAccessRows({
+  const accessRows = buildAccessPointRows({
     scopeRows,
     connectors,
     mcpEndpoints,
     identity,
     apiBaseUrl: null,
-  }).filter(isCloudAccessNavigationResource);
+  }).filter(isAccessPointNavigationResource);
   return { accessPointCount: accessRows.length, accessRows };
 }
 

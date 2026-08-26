@@ -1,0 +1,275 @@
+/* Access Point list, row, status, loading, and responsive presentation. */
+@layer features {
+.desktop-cloud-access-point-list {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 7px;
+}
+
+.desktop-cloud-access-point-row {
+  display: grid;
+  min-width: 0;
+  min-height: 54px;
+  grid-template-columns: 30px minmax(0, 1fr) minmax(260px, 330px);
+  align-items: center;
+  gap: 11px;
+  box-sizing: border-box;
+  padding: 8px 9px 8px 11px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel) 42%, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: var(--po-clickable-cursor, pointer);
+  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.desktop-cloud-access-point-row:hover {
+  border-color: var(--po-border);
+  background: color-mix(in srgb, var(--po-panel) 62%, transparent);
+}
+
+.desktop-cloud-access-point-row.selected {
+  border-color: var(--po-border-strong, var(--po-border));
+  background: color-mix(in srgb, var(--po-panel) 62%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-border) 70%, transparent);
+}
+
+.desktop-cloud-access-point-icon {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--po-border);
+  border-radius: 7px;
+  background: var(--po-hover);
+  color: var(--po-text-muted);
+}
+
+.desktop-cloud-access-point-icon.cli {
+  border-color: var(--po-accent);
+  background: var(--po-accent);
+  color: var(--po-text-inverse);
+}
+
+.desktop-cloud-access-point-icon.git {
+  border-color: color-mix(in srgb, #ef4a37 24%, var(--po-border-subtle) 76%);
+  background: color-mix(in srgb, #ef4a37 10%, var(--po-panel) 90%);
+  color: #d94939;
+}
+
+.desktop-cloud-access-point-icon .desktop-cloud-access-git-brand-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+.desktop-cloud-access-point-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.desktop-cloud-access-point-copy > strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-access-point-copy > span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.desktop-cloud-access-point-copy > span > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-access-point-copy code {
+  max-width: 180px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--po-text-subtle);
+  font-family: var(--po-font-mono);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-access-point-right {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 14px;
+}
+
+.desktop-cloud-access-point-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.desktop-cloud-access-point-meta > span:not(:first-child)::before {
+  content: "·";
+  padding-inline-end: 7px;
+  color: var(--po-text-disabled, var(--po-text-subtle));
+}
+
+.desktop-cloud-access-point-status {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.desktop-cloud-access-point-status > span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 1.5px;
+  background: currentColor;
+}
+
+.desktop-cloud-access-point-status.success {
+  color: var(--po-success);
+  font-weight: 500;
+}
+
+.desktop-cloud-access-point-status.danger {
+  color: var(--po-danger);
+}
+
+.desktop-cloud-access-point-status.muted {
+  color: var(--po-text-disabled);
+}
+
+.desktop-cloud-access-point-manage {
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 8px 0 9px;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.desktop-cloud-access-point-row:hover .desktop-cloud-access-point-manage {
+  border-color: var(--po-border-strong, var(--po-border));
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-point-row.skeleton {
+  pointer-events: none;
+}
+
+.desktop-cloud-access-point-row.skeleton > span {
+  display: block;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--po-skeleton-base), var(--po-skeleton-shimmer), var(--po-skeleton-base));
+  background-size: 180% 100%;
+  animation: desktop-project-folder-skeleton 1.4s ease-in-out infinite;
+}
+
+.desktop-cloud-access-point-row.skeleton > span:first-child {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+}
+
+.desktop-cloud-access-point-row.skeleton > span:nth-child(2) {
+  width: min(220px, 72%);
+}
+
+.desktop-cloud-access-point-row.skeleton > span:last-child {
+  width: min(240px, 80%);
+  justify-self: end;
+}
+
+.desktop-cloud-access-list-section > .desktop-cloud-web-empty {
+  width: min(100%, 680px);
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.desktop-cloud-access-new-button:focus-visible,
+.desktop-cloud-access-category-tabs button:focus-visible,
+.desktop-cloud-access-point-row:focus-visible {
+  outline: 2px solid var(--po-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (max-width: 820px) {
+  .desktop-cloud-access-point-row {
+    grid-template-columns: 30px minmax(0, 1fr) minmax(210px, 260px);
+  }
+
+  .desktop-cloud-access-point-meta > span:last-child {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .desktop-cloud-access-point-row {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .desktop-cloud-access-point-right {
+    grid-column: 2;
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+
+  .desktop-cloud-access-point-meta {
+    justify-content: flex-start;
+  }
+
+  .desktop-cloud-access-point-row.skeleton > span:last-child {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 460px) {
+  .desktop-cloud-access-point-right {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 7px;
+  }
+
+  .desktop-cloud-access-point-manage {
+    justify-self: start;
+  }
+}
+}

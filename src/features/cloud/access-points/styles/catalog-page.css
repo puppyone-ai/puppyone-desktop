@@ -1,0 +1,254 @@
+/* Access Point catalog page shell, heading, filters, and layout. */
+@layer features {
+.desktop-cloud-access-page {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.desktop-cloud-access-catalog-page {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--po-canvas);
+  box-shadow: none;
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-canvas {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.desktop-cloud-access-catalog {
+  display: grid;
+  width: min(100%, 1760px);
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 44px clamp(28px, 4.6vw, 44px) 56px;
+}
+
+.desktop-cloud-access-landing-header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 8px;
+}
+
+.desktop-cloud-access-landing-copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.desktop-cloud-access-landing-copy h1,
+.desktop-cloud-access-landing-copy p {
+  margin: 0;
+}
+
+.desktop-cloud-access-landing-copy h1 {
+  color: var(--po-text);
+  font-size: var(--po-text-size-page-title, 20px);
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  line-height: 1.25;
+}
+
+.desktop-cloud-access-landing-copy p {
+  max-width: 680px;
+  color: var(--po-text-muted);
+  font-size: var(--po-text-size-body-lg, 14px);
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.desktop-cloud-access-new-button {
+  display: inline-flex;
+  height: 30px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid var(--po-text);
+  border-radius: 7px;
+  background: var(--po-text);
+  color: var(--po-text-inverse);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  cursor: var(--po-clickable-cursor, pointer);
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+}
+
+.desktop-cloud-access-new-button:hover {
+  background: color-mix(in srgb, var(--po-text) 88%, var(--po-panel) 12%);
+}
+
+.desktop-cloud-access-new-button:active {
+  transform: translateY(1px);
+}
+
+.desktop-cloud-access-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 26px;
+}
+
+.desktop-cloud-access-toolbar.focused {
+  justify-content: flex-end;
+}
+
+.desktop-cloud-access-category-tabs {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+  overflow-x: auto;
+}
+
+.desktop-cloud-access-category-tabs button {
+  display: inline-flex;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: var(--po-clickable-cursor, pointer);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.desktop-cloud-access-category-tabs button:hover {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-category-tabs button.active {
+  background: var(--po-active);
+  color: var(--po-text);
+}
+
+.desktop-cloud-access-filter-controls {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-cloud-access-catalog-search {
+  display: flex;
+  width: clamp(170px, 20vw, 240px);
+  height: 30px;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  box-sizing: border-box;
+  padding: 0 9px;
+  border: 1px solid var(--po-border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--po-text-subtle);
+}
+
+.desktop-cloud-access-catalog-search:focus-within {
+  border-color: var(--po-border-strong);
+  box-shadow: 0 0 0 2px var(--po-focus-ring);
+}
+
+.desktop-cloud-access-catalog-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--po-text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.desktop-cloud-access-catalog-search input::placeholder {
+  color: var(--po-text-subtle);
+}
+
+.desktop-cloud-access-status-filter {
+  height: 30px;
+  box-sizing: border-box;
+  padding-block: 0;
+  padding-inline: 9px 26px;
+  border: 1px solid var(--po-border);
+  border-radius: 7px;
+  outline: 0;
+  background-color: transparent;
+  color: var(--po-text-muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: var(--po-clickable-cursor, pointer);
+}
+
+.desktop-cloud-access-status-filter:focus {
+  border-color: var(--po-border-strong);
+  box-shadow: 0 0 0 2px var(--po-focus-ring);
+}
+
+.desktop-cloud-access-list-section {
+  display: grid;
+  width: min(100%, 980px);
+  min-width: 0;
+  margin-top: 11px;
+}
+
+@media (max-width: 720px) {
+  .desktop-cloud-access-catalog {
+    padding: 32px 24px 44px;
+  }
+
+  .desktop-cloud-access-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .desktop-cloud-access-filter-controls {
+    width: 100%;
+  }
+
+  .desktop-cloud-access-catalog-search {
+    width: auto;
+    flex: 1;
+  }
+}
+
+@media (max-width: 460px) {
+  .desktop-cloud-access-landing-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .desktop-cloud-access-new-button {
+    align-self: flex-start;
+  }
+}
+}

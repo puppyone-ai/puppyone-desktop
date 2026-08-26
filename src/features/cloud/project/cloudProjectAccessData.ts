@@ -6,7 +6,7 @@ import type {
   DesktopCloudScope,
 } from "../../../lib/cloudApi";
 import type { CloudMessageDescriptor } from "../cloudPresentation";
-import type { CloudAccessSurfaceRow } from "../sections/access/accessRows";
+import type { AccessPointRow } from "../access-points/model";
 
 /** Route-local projection shared by the current Project Access and Automation UI. */
 export type CloudProjectAccessData = {
@@ -16,11 +16,10 @@ export type CloudProjectAccessData = {
   connectorsByTarget: Map<string, DesktopCloudConnector[]>;
   mcpEndpoints: DesktopCloudMcpEndpoint[];
   mcpEndpointsByTarget: Map<string, DesktopCloudMcpEndpoint[]>;
-  accessRows: CloudAccessSurfaceRow[];
+  accessPointRows: AccessPointRow[];
   identity: DesktopCloudRepoIdentity | null;
   loading: boolean;
   error: CloudMessageDescriptor | null;
   warning: CloudMessageDescriptor | null;
   reload: () => Promise<void>;
 };
-

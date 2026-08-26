@@ -8,16 +8,17 @@ import type {
 import type { GitStatusSnapshot } from "../../../types/electron";
 import type { DesktopCloudDataState } from "../data";
 import type { CloudWorkspaceSection } from "../types";
+import {
+  AccessPointRoutePage,
+  getAccessPointCatalogKindForSection,
+} from "../access-points";
 import { CloudWorkspaceLoadingState } from "../components/shared";
 import { CloudAutomationRouteSection } from "../sections/AutomationRouteSection";
 import { CloudBranchesSection } from "../sections/branches";
 import { CloudHistorySection } from "../sections/HistorySection";
-import { CloudAccessSection } from "../sections/access/AccessSection";
 import { CloudRepositoryOverview } from "../sections/overview";
 import { CloudProjectSettingsSection } from "../sections/settings";
 import { CloudProjectWebSection } from "../states/CloudProjectWebSection";
-import { repositoryTargetKey } from "../repositoryTarget";
-import { getCloudScopeRows, scopeMatchesMcpEndpoint } from "../utils";
 
 export function CloudProjectRouteOutlet({
   activeSection,
@@ -110,80 +111,23 @@ export function CloudProjectRouteOutlet({
     );
   }
 
-  if (
-    activeSection === "mcp"
-    || activeSection === "cli"
-    || activeSection === "git-sync"
-    || activeSection === "access"
-  ) {
-    const repositoryViews = getCloudScopeRows(cloudData.scopes, cloudData.identity);
-    const connectorsByTarget = new Map<string, typeof cloudData.connectors>();
-    for (const connector of cloudData.connectors) {
-      const key = repositoryTargetKey(connector.target);
-      const group = connectorsByTarget.get(key) ?? [];
-      group.push(connector);
-      connectorsByTarget.set(key, group);
-    }
-    const mcpEndpointsByTarget = new Map<string, typeof cloudData.mcpEndpoints>();
-    for (const view of repositoryViews) {
-      mcpEndpointsByTarget.set(
-        repositoryTargetKey(view.target),
-        cloudData.mcpEndpoints.filter((endpoint) => scopeMatchesMcpEndpoint(view, endpoint)),
-      );
-    }
-    const focusedFilter = activeSection === "mcp"
-      ? "mcp"
-      : activeSection === "cli"
-        ? "cli"
-        : activeSection === "git-sync"
-          ? "git"
-          : "all";
-    const focusedTitle = activeSection === "mcp"
-      ? t("cloud.route.mcp.title")
-      : activeSection === "cli"
-        ? t("cloud.route.cli.title")
-        : activeSection === "git-sync"
-          ? t("cloud.route.git-sync.title")
-          : undefined;
-    const focusedDescription = activeSection === "mcp"
-      ? t("cloud.route.mcp.description")
-      : activeSection === "cli"
-        ? t("cloud.route.cli.description")
-        : activeSection === "git-sync"
-          ? t("cloud.route.git-sync.description")
-          : undefined;
-    const focused = activeSection !== "access";
-
+  const accessPointCatalogKind = getAccessPointCatalogKindForSection(activeSection);
+  if (accessPointCatalogKind) {
     return (
-      <CloudAccessSection
+      <AccessPointRoutePage
+        kind={accessPointCatalogKind}
         projectId={projectId}
         cloudSession={cloudSession}
         apiBaseUrl={cloudApiBaseUrl}
         identity={cloudData.identity}
         scopes={cloudData.scopes}
         connectors={cloudData.connectors}
-        connectorsByTarget={connectorsByTarget}
         mcpEndpoints={cloudData.mcpEndpoints}
-        mcpEndpointsByTarget={mcpEndpointsByTarget}
-        filter={focusedFilter}
-        activeAccessRowId={null}
         loading={cloudData.loading}
         onCloudSessionChange={onSessionChange}
         onRefresh={onRefresh}
         onOpenProject={onOpenProject}
         canManage={project.capabilities?.includes("access_surface.manage") === true}
-        catalogTitle={focusedTitle}
-        catalogDescription={focusedDescription}
-        catalogFilterLocked={focused}
-        catalogHeaderAction={focused ? (
-          <button
-            className="desktop-cloud-access-new-button"
-            type="button"
-            onClick={() => onOpenProject(projectId, "access")}
-          >
-            {t("cloud.access.open")}
-          </button>
-        ) : undefined}
       />
     );
   }

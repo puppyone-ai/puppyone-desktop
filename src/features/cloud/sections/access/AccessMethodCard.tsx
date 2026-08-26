@@ -7,19 +7,27 @@ import {
   CloudAuthorityCell,
   CloudCommandBlock,
 } from "../../components/shared";
-import type { CloudAccessSurface } from "../../model";
 import {
-  formatCloudAccessCommandLabel,
-  formatCloudAccessSurfacePrompt,
-  formatCloudAccessSurfaceTitle,
-} from "../../cloudPresentation";
+  type AccessPoint,
+} from "../../access-points/model";
+import {
+  AccessPointIcon,
+  formatAccessPointCommandLabel,
+  formatAccessPointPrompt,
+  formatAccessPointTitle,
+  getAccessPointUiDefinition,
+  getAccessPointMethodMeta,
+} from "../../access-points/presentation";
+import {
+  isMcpAccessPointPlaceholder,
+  isVmAccessPointPlaceholder,
+} from "../../access-points/model";
 import {
   copyText,
   formatProviderLabel,
   formatStatusLabel,
   getScopeDisplayName,
   getScopePathLabel,
-  isConnectorActiveStatus,
 } from "../../utils";
 import {
   DesktopCloudPermissionPanel,
@@ -29,22 +37,10 @@ import {
   parseCliCommandPermissions,
   parseMcpToolPermissions,
 } from "./AccessMethodPermissions";
-import {
-  DesktopCloudProviderIcon,
-  getAccessMethodIconSize,
-  getAccessMethodTileProvider,
-  getDesktopCloudAccessMethodMeta,
-} from "./accessProviders";
-import {
-  isCliAccessSurface,
-  isDesktopMcpPlaceholderSurface,
-  isDesktopVmPlaceholderSurface,
-  isMcpAccessSurface,
-} from "./accessSurfaceModel";
 
 export function DesktopCloudAccessMethodCard({
   scope,
-  surface,
+  accessPoint,
   expanded,
   creatingMcp,
   mcpError,
@@ -56,7 +52,7 @@ export function DesktopCloudAccessMethodCard({
   canManage = false,
 }: {
   scope: DesktopCloudRepositoryView;
-  surface: CloudAccessSurface;
+  accessPoint: AccessPoint;
   expanded: boolean;
   creatingMcp: boolean;
   mcpError: string | null;
@@ -68,15 +64,15 @@ export function DesktopCloudAccessMethodCard({
   canManage?: boolean;
 }) {
   const { t } = useLocalization();
-  const meta = getDesktopCloudAccessMethodMeta(surface, t);
-  const live = isConnectorActiveStatus(surface.status);
-  const tileProvider = getAccessMethodTileProvider(surface.provider);
-  const promptText = getDesktopCloudAccessPromptText(scope, surface, t);
-  const mcpPlaceholder = isDesktopMcpPlaceholderSurface(surface);
-  const vmPlaceholder = isDesktopVmPlaceholderSurface(surface);
+  const meta = getAccessPointMethodMeta(accessPoint, t);
+  const live = accessPoint.status.kind === "ready";
+  const definition = getAccessPointUiDefinition(accessPoint.kind);
+  const promptText = getAccessPointPromptText(scope, accessPoint, t);
+  const mcpPlaceholder = isMcpAccessPointPlaceholder(accessPoint);
+  const vmPlaceholder = isVmAccessPointPlaceholder(accessPoint);
 
   if (vmPlaceholder) {
-    return <DesktopCloudRemoteWorkspaceCard surface={surface} canManage={canManage} />;
+    return <DesktopCloudRemoteWorkspaceCard accessPoint={accessPoint} canManage={canManage} />;
   }
 
   if (mcpPlaceholder) {
@@ -84,7 +80,7 @@ export function DesktopCloudAccessMethodCard({
       <article className="desktop-cloud-access-method-card remote mcp-placeholder">
         <div className="desktop-cloud-access-method-info">
           <span className="desktop-cloud-access-method-icon mcp" aria-hidden="true">
-            <DesktopCloudProviderIcon provider={surface.provider} size={19} />
+            <AccessPointIcon accessPoint={accessPoint} size={19} />
           </span>
           <div className="desktop-cloud-access-method-main">
             <div className="desktop-cloud-access-method-title-line">
@@ -113,8 +109,8 @@ export function DesktopCloudAccessMethodCard({
   return (
     <article className={`desktop-cloud-access-method-card ${expanded ? "expanded" : ""}`}>
       <div className="desktop-cloud-access-method-info">
-        <span className={`desktop-cloud-access-method-icon ${tileProvider}`} aria-hidden="true">
-          <DesktopCloudProviderIcon provider={surface.provider} size={getAccessMethodIconSize(surface.provider)} />
+        <span className={`desktop-cloud-access-method-icon ${definition.tileProvider}`} aria-hidden="true">
+          <AccessPointIcon accessPoint={accessPoint} size={definition.iconSize} />
         </span>
         <div className="desktop-cloud-access-method-main">
           <div className="desktop-cloud-access-method-title-line">
@@ -122,7 +118,7 @@ export function DesktopCloudAccessMethodCard({
             <span aria-hidden="true">·</span>
             <span className={`desktop-cloud-access-method-status ${live ? "active" : ""}`}>
               <span className={`desktop-cloud-web-status-dot ${live ? "ready" : ""}`} aria-hidden="true" />
-              {formatStatusLabel(live ? "active" : surface.status, t)}
+              {formatStatusLabel(live ? "active" : accessPoint.status.code, t)}
             </span>
           </div>
           <p>{meta.description}</p>
@@ -146,7 +142,7 @@ export function DesktopCloudAccessMethodCard({
       />
       {expanded && (
         <DesktopCloudAccessMethodExpandedDetail
-          surface={surface}
+          accessPoint={accessPoint}
           scope={scope}
           pending={configPending}
           error={configError}
@@ -159,10 +155,10 @@ export function DesktopCloudAccessMethodCard({
 }
 
 export function DesktopCloudRemoteWorkspaceCard({
-  surface,
+  accessPoint,
   canManage = false,
 }: {
-  surface?: CloudAccessSurface;
+  accessPoint?: AccessPoint;
   canManage?: boolean;
 }) {
   const { t } = useLocalization();
@@ -170,18 +166,18 @@ export function DesktopCloudRemoteWorkspaceCard({
     <article className="desktop-cloud-access-method-card remote">
       <div className="desktop-cloud-access-method-info">
         <span className="desktop-cloud-access-method-icon vm" aria-hidden="true">
-          {surface ? <DesktopCloudProviderIcon provider={surface.provider} size={18} /> : <Monitor size={18} />}
+          {accessPoint ? <AccessPointIcon accessPoint={accessPoint} size={18} /> : <Monitor size={18} />}
         </span>
         <div className="desktop-cloud-access-method-main">
           <div className="desktop-cloud-access-method-title-line">
-            <h2>{surface ? formatCloudAccessSurfaceTitle(surface, t) : t("cloud.access.surface.vm.title")}</h2>
+            <h2>{accessPoint ? formatAccessPointTitle(accessPoint, t) : t("cloud.access.surface.vm.title")}</h2>
             <span aria-hidden="true">·</span>
             <span className="desktop-cloud-access-method-status off">
               <span className="desktop-cloud-web-status-dot muted" aria-hidden="true" />
-              {formatStatusLabel(surface?.status || "off", t)}
+              {formatStatusLabel(accessPoint?.status.code || "off", t)}
             </span>
           </div>
-          <p>{surface ? formatCloudAccessSurfacePrompt(surface, t("cloud.scope.workspaceRoot"), t) : t("cloud.access.surface.vm.prompt")}</p>
+          <p>{accessPoint ? formatAccessPointPrompt(accessPoint, t("cloud.scope.workspaceRoot"), t) : t("cloud.access.surface.vm.prompt")}</p>
         </div>
       </div>
       {canManage && <button className="desktop-cloud-access-method-remote-button" type="button">
@@ -193,14 +189,14 @@ export function DesktopCloudRemoteWorkspaceCard({
 }
 
 function DesktopCloudAccessMethodExpandedDetail({
-  surface,
+  accessPoint,
   scope,
   pending,
   error,
   onUpdatePermissions,
   canManage,
 }: {
-  surface: CloudAccessSurface;
+  accessPoint: AccessPoint;
   scope: DesktopCloudRepositoryView;
   pending: boolean;
   error: string | null;
@@ -208,33 +204,33 @@ function DesktopCloudAccessMethodExpandedDetail({
   canManage: boolean;
 }) {
   const { t } = useLocalization();
-  if (isCliAccessSurface(surface.provider)) {
+  if (accessPoint.kind === "cli") {
     return (
       <div className="desktop-cloud-access-method-expanded-detail">
         <DesktopCloudPermissionPanel
           title={t("cloud.access.permissions.title")}
           groups={getDesktopCliPermissionGroups(scope)}
-          allowedKeys={parseCliCommandPermissions(surface.connector?.config)}
+          allowedKeys={parseCliCommandPermissions(accessPoint.connector?.config)}
           pending={pending}
           error={error}
-          canUpdate={canManage && !!surface.connector}
+          canUpdate={canManage && !!accessPoint.connector}
           unavailableLabel={t("cloud.access.permissions.cliUnavailable")}
           onUpdate={onUpdatePermissions}
         />
       </div>
     );
   }
-  if (isMcpAccessSurface(surface.provider)) {
-    const writable = getDesktopMcpWritable(surface.endpoint, scope);
+  if (accessPoint.kind === "mcp") {
+    const writable = getDesktopMcpWritable(accessPoint.endpoint, scope);
     return (
       <div className="desktop-cloud-access-method-expanded-detail">
         <DesktopCloudPermissionPanel
           title={t("cloud.access.permissions.mcpTools")}
           groups={getDesktopMcpPermissionGroups(writable)}
-          allowedKeys={parseMcpToolPermissions(surface.endpoint?.tools_config)}
+          allowedKeys={parseMcpToolPermissions(accessPoint.endpoint?.tools_config)}
           pending={pending}
           error={error}
-          canUpdate={canManage && !!surface.endpoint}
+          canUpdate={canManage && !!accessPoint.endpoint}
           unavailableLabel={t("cloud.access.permissions.mcpUnavailable")}
           footer={t("cloud.access.permissions.mcpPolicyFooter")}
           onUpdate={onUpdatePermissions}
@@ -242,7 +238,7 @@ function DesktopCloudAccessMethodExpandedDetail({
       </div>
     );
   }
-  const commands = surface.commands?.filter((command) => command.value) ?? [];
+  const commands = accessPoint.commands?.filter((command) => command.value) ?? [];
   return (
     <div className="desktop-cloud-access-method-expanded-detail">
       {commands.length > 0 ? (
@@ -250,7 +246,7 @@ function DesktopCloudAccessMethodExpandedDetail({
           {commands.map((command) => (
             <CloudCommandBlock
               key={command.id}
-              label={formatCloudAccessCommandLabel(command, t)}
+              label={formatAccessPointCommandLabel(command, t)}
               value={command.value}
               disabled={command.disabled}
             />
@@ -258,16 +254,16 @@ function DesktopCloudAccessMethodExpandedDetail({
         </div>
       ) : (
         <p className="desktop-cloud-access-method-expanded-note">
-          {surface.endpoint?.description || formatCloudAccessSurfacePrompt(surface, getScopeDisplayName(scope, t), t)}
+          {accessPoint.endpoint?.description || formatAccessPointPrompt(accessPoint, getScopeDisplayName(scope, t), t)}
         </p>
       )}
       <div className="desktop-cloud-access-method-expanded-summary">
         <CloudAuthorityCell label={t("cloud.common.cloudPath")} value={getScopePathLabel(scope)} mono />
-        <CloudAuthorityCell label={t("cloud.common.type")} value={formatProviderLabel(surface.provider, t)} />
+        <CloudAuthorityCell label={t("cloud.common.type")} value={formatProviderLabel(accessPoint.sourceProvider, t)} />
         <CloudAuthorityCell
           label={t("cloud.common.status")}
-          value={formatStatusLabel(surface.status, t)}
-          tone={isConnectorActiveStatus(surface.status) ? "ready" : "warning"}
+          value={formatStatusLabel(accessPoint.status.code, t)}
+          tone={accessPoint.status.kind === "ready" ? "ready" : "warning"}
         />
       </div>
     </div>
@@ -309,14 +305,14 @@ function DesktopCloudAccessPromptPreview({
   );
 }
 
-function getDesktopCloudAccessPromptText(scope: DesktopCloudRepositoryView, surface: CloudAccessSurface, t: MessageFormatter) {
-  const commandText = surface.commands
+function getAccessPointPromptText(scope: DesktopCloudRepositoryView, accessPoint: AccessPoint, t: MessageFormatter) {
+  const commandText = accessPoint.commands
     ?.filter((command) => !command.disabled)
-    .map((command) => `${formatCloudAccessCommandLabel(command, t)}\n${command.value}`)
+    .map((command) => `${formatAccessPointCommandLabel(command, t)}\n${command.value}`)
     .join("\n\n") ?? "";
 
-  if (isMcpAccessSurface(surface.provider)) {
-    const endpoint = surface.endpoint;
+  if (accessPoint.kind === "mcp") {
+    const endpoint = accessPoint.endpoint;
     return [
       t("cloud.access.surface.mcp.title"),
       commandText || endpoint?.api_key_hint || t("cloud.access.connectionPreparing"),
@@ -326,7 +322,7 @@ function getDesktopCloudAccessPromptText(scope: DesktopCloudRepositoryView, surf
   }
 
   return [
-    formatCloudAccessSurfacePrompt(surface, getScopeDisplayName(scope, t), t),
+    formatAccessPointPrompt(accessPoint, getScopeDisplayName(scope, t), t),
     commandText,
     t("cloud.access.prompt.scope", { scope: bidiIsolate(getScopeDisplayName(scope, t)) }),
   ].filter(Boolean).join("\n\n");

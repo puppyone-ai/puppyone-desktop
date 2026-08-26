@@ -1,12 +1,24 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const accessCss = readFileSync(
-  new URL("../src/features/cloud/sections/access/styles/base.css", import.meta.url),
+const catalogCss = readFileSync(
+  new URL("../src/features/cloud/access-points/styles/catalog-page.css", import.meta.url),
   "utf8",
 );
-const accessSource = readFileSync(
-  new URL("../src/features/cloud/sections/access/AccessSection.tsx", import.meta.url),
+const accessPointListCss = readFileSync(
+  new URL("../src/features/cloud/access-points/styles/access-point-list.css", import.meta.url),
+  "utf8",
+);
+const catalogSource = readFileSync(
+  new URL("../src/features/cloud/access-points/components/AccessPointCatalogPage.tsx", import.meta.url),
+  "utf8",
+);
+const routePageSource = readFileSync(
+  new URL("../src/features/cloud/access-points/pages/AccessPointRoutePage.tsx", import.meta.url),
+  "utf8",
+);
+const routeRegistrySource = readFileSync(
+  new URL("../src/features/cloud/access-points/pages/accessPointRoutes.ts", import.meta.url),
   "utf8",
 );
 const routeOutletSource = readFileSync(
@@ -16,9 +28,9 @@ const routeOutletSource = readFileSync(
 
 describe("Cloud Connections visual architecture", () => {
   it("uses the same landing title system as Access and Automation", () => {
-    const catalog = compact(readCssBlock(accessCss, ".desktop-cloud-access-catalog"));
-    const header = compact(readCssBlock(accessCss, ".desktop-cloud-access-landing-header"));
-    const title = compact(readCssBlock(accessCss, ".desktop-cloud-access-landing-copy h1"));
+    const catalog = compact(readCssBlock(catalogCss, ".desktop-cloud-access-catalog"));
+    const header = compact(readCssBlock(catalogCss, ".desktop-cloud-access-landing-header"));
+    const title = compact(readCssBlock(catalogCss, ".desktop-cloud-access-landing-copy h1"));
 
     expect(catalog).toContain("padding: 44px clamp(28px, 4.6vw, 44px) 56px;");
     expect(header).toContain("align-items: flex-start;");
@@ -28,24 +40,26 @@ describe("Cloud Connections visual architecture", () => {
   });
 
   it("renders MCP, CLI, and Git through the exact Access Point list", () => {
-    const list = compact(readCssBlock(accessCss, ".desktop-cloud-access-point-list"));
-    const row = compact(readCssBlock(accessCss, ".desktop-cloud-access-point-row"));
+    const list = compact(readCssBlock(accessPointListCss, ".desktop-cloud-access-point-list"));
+    const row = compact(readCssBlock(accessPointListCss, ".desktop-cloud-access-point-row"));
 
     expect(list).toContain("gap: 7px;");
     expect(row).toContain("grid-template-columns: 30px minmax(0, 1fr) minmax(260px, 330px);");
     expect(row).toContain("border: 1px solid var(--po-border-subtle);");
-    expect(accessSource).toContain("catalogFilterLocked");
-    expect(accessSource).toContain("desktop-cloud-access-point-list");
-    expect(routeOutletSource).toContain('activeSection === "mcp"');
-    expect(routeOutletSource).toContain('activeSection === "cli"');
-    expect(routeOutletSource).toContain('activeSection === "git-sync"');
+    expect(catalogSource).toContain("AccessPointList");
+    expect(routeRegistrySource).toContain('mcp: "mcp"');
+    expect(routeRegistrySource).toContain('cli: "cli"');
+    expect(routeRegistrySource).toContain('"git-sync": "git"');
+    expect(routeOutletSource).toContain("getAccessPointCatalogKindForSection");
   });
 
   it("does not maintain a second visual implementation for Connection routes", () => {
     expect(routeOutletSource).not.toContain("CloudMcpSection");
     expect(routeOutletSource).not.toContain("CloudCliSection");
     expect(routeOutletSource).not.toContain("CloudGitSyncSection");
-    expect(accessSource).toContain("includePlaceholders: catalogFilterLocked");
+    expect(routePageSource).toContain("buildAccessPointProjection");
+    expect(routePageSource).not.toContain("catalogFilterLocked");
+    expect(routePageSource).not.toContain("catalogTitle");
   });
 });
 

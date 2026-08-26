@@ -1,0 +1,49 @@
+/* Access Point management dialog shell. */
+@layer features {
+.desktop-cloud-access-manage-dialog {
+  background: var(--po-overlay);
+}
+
+.desktop-cloud-access-manage-header {
+  align-items: center;
+  padding: 18px 20px 10px;
+}
+
+.desktop-cloud-access-manage-header .desktop-dialog-title-row h2 {
+  margin: 0;
+  color: var(--po-text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.desktop-cloud-access-manage-header .desktop-dialog-title-row p {
+  margin: 3px 0 0;
+  color: var(--po-text-muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.desktop-cloud-access-manage-body {
+  display: block;
+  padding: 0;
+}
+
+.desktop-cloud-access-manage-body .desktop-cloud-access-web-detail {
+  overflow: visible;
+}
+
+.desktop-cloud-access-manage-body .desktop-cloud-access-web-rail {
+  width: 100%;
+  padding: 12px 20px 22px;
+}
+
+.desktop-cloud-access-manage-body .desktop-cloud-access-web-scope-header {
+  margin-bottom: 18px;
+}
+
+.desktop-cloud-access-manage-body .desktop-cloud-access-method-list {
+  margin-bottom: 0;
+}
+}

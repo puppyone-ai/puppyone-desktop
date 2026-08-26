@@ -1,6 +1,4 @@
 /* Access section stylesheet manifest. */
-@import "./styles/base.css" layer(features);
-@import "./styles/access-detail.css" layer(features);
 @import "./styles/scope-settings.css" layer(features);
 @import "./styles/scope-detail.css" layer(features);
 @import "./styles/method-card.css" layer(features);

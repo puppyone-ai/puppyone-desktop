@@ -8,6 +8,7 @@ import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import "./shared.css";
 import "./web-page.css";
+import "./command-blocks.css";
 import { useState, type ReactNode } from "react";
 import type {
   DesktopCloudDashboard,
@@ -15,7 +16,6 @@ import type {
   DesktopCloudTreeEntry,
 } from "../../../lib/cloudApi";
 import type { DesktopCloudHistory } from "../../../lib/cloudHistoryApi";
-import type { CloudAccessIconComponent } from "../accessFilters";
 import type { CloudWorkspaceSection } from "../types";
 import { PageLoading } from "../../../components/loading";
 import {
@@ -27,6 +27,8 @@ import {
   normalizeCloudEntryPath,
   shortCommit,
 } from "../utils";
+
+type CloudEmptyStateIcon = (props: { size?: number; className?: string }) => ReactNode;
 
 export function CloudWorkspaceLoadingState({ label }: { label?: string }) {
   const { t } = useLocalization();
@@ -274,7 +276,7 @@ export function CloudWebEmpty({
   title,
   detail,
 }: {
-  icon: CloudAccessIconComponent;
+  icon: CloudEmptyStateIcon;
   title: string;
   detail: string;
 }) {
