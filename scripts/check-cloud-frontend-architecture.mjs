@@ -328,7 +328,6 @@ const expectedOverviewStyleManifest = [
   '@import "./styles/status-cards.css" layer(features);',
   '@import "./styles/dashboard-grid.css" layer(features);',
   '@import "./styles/resource-cards.css" layer(features);',
-  '@import "./styles/status-cards.css" layer(features);',
   '@import "./styles/responsive.css" layer(features);',
 ].join("\n");
 if (read("src/features/cloud/sections/overview/overview.css").trim() !== expectedOverviewStyleManifest) {

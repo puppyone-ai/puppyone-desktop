@@ -186,14 +186,15 @@ describe("CloudRepositoryOverview landing page", () => {
     const fileRows = dashboard?.querySelectorAll(".desktop-cloud-overview-file-row");
     expect(dashboard).not.toBeNull();
     expect(headerFacts).toHaveLength(3);
-    expect(headerFacts[0]?.textContent).toContain("Last updated");
-    expect(headerFacts[0]?.textContent).toContain("1 hour ago");
-    expect(headerFacts[1]?.textContent).toContain("Storage");
-    expect(headerFacts[2]?.textContent).toContain("Access points");
-    expect(headerFacts[2]?.textContent).toContain("5");
+    expect(headerFacts[0]?.textContent).toContain("Storage");
+    expect(headerFacts[1]?.textContent).toContain("Last updated");
+    expect(headerFacts[1]?.textContent).toContain("1 hour ago");
+    expect(headerFacts[2]?.textContent).toContain("Path");
+    expect(headerFacts[2]?.textContent).toContain("https://cloud.example/git/project-1.git");
     expect(dashboard?.textContent).not.toContain("Automation");
     expect(dashboard?.querySelector(".desktop-cloud-overview-files-header")).toBeNull();
     expect(dashboard?.querySelector(".desktop-cloud-overview-file-columns")?.textContent).toBe("NameModifiedFile size");
+    expect(dashboard?.querySelector(".desktop-cloud-overview-file-columns [role='columnheader']:first-child .desktop-cloud-overview-visually-hidden")?.textContent).toBe("Name");
     expect(fileRows).toHaveLength(5);
     expect(fileRows?.[0]?.textContent).toContain("assets");
     expect(fileRows?.[1]?.textContent).toContain("docs");
@@ -204,9 +205,9 @@ describe("CloudRepositoryOverview landing page", () => {
     expect(container.querySelector(".desktop-cloud-source-pill")).toBeNull();
     expect(container.querySelector(".desktop-cloud-overview-landing-mark")).toBeNull();
     expect(container.querySelector(".desktop-cloud-overview-deployment-board")).toBeNull();
-    const gitRemote = container.querySelector<HTMLElement>(".desktop-cloud-overview-git-remote code");
-    expect(gitRemote?.textContent).toBe("https://cloud.example/git/project-1.git");
-    expect(gitRemote?.title).toBe("https://cloud.example/git/project-1.git");
+    const pathFact = container.querySelector<HTMLElement>(".desktop-cloud-overview-path-fact");
+    expect(pathFact?.querySelector("code")?.textContent).toBe("https://cloud.example/git/project-1.git");
+    expect(pathFact?.title).toBe("https://cloud.example/git/project-1.git");
     expect(dashboard?.textContent).not.toContain("https://cloud.example/git/project-1.git");
     expect(dashboard?.textContent).not.toContain("release");
     expect(dashboard?.textContent).not.toContain("Private");
@@ -223,8 +224,7 @@ describe("CloudRepositoryOverview landing page", () => {
     expect(onRefresh).toHaveBeenCalledOnce();
 
     act(() => findButton(container, "View history")?.click());
-    act(() => findButton(container, "Manage access points")?.click());
-    expect(onSelectSection.mock.calls).toEqual([["history"], ["access"]]);
+    expect(onSelectSection.mock.calls).toEqual([["history"]]);
   });
 });
 

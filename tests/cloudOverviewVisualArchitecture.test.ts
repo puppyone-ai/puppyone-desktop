@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const dashboardCss = readSource("../src/features/cloud/sections/overview/styles/dashboard-grid.css");
+const baseCss = readSource("../src/features/cloud/sections/overview/styles/base.css");
+const projectIdentityCss = readSource("../src/features/cloud/sections/overview/styles/project-identity.css");
 const resourceCss = readSource("../src/features/cloud/sections/overview/styles/resource-cards.css");
 const statusCss = readSource("../src/features/cloud/sections/overview/styles/status-cards.css");
 const dashboardSource = readSource("../src/features/cloud/sections/overview/OverviewDashboard.tsx");
@@ -25,11 +27,13 @@ describe("Cloud Overview visual architecture", () => {
 
     expect(files).toContain("border: 1px solid var(--po-border-strong);");
     expect(files).toContain("border-radius: 10px;");
-    expect(columns).toContain("min-height: 38px;");
+    expect(columns).toContain("min-height: 34px;");
     expect(columns).toContain("border-bottom: 1px solid var(--po-border);");
-    expect(resourceCss).toContain(".desktop-cloud-overview-file-row {\n  min-height: 48px;");
-    expect(resourceCss).toContain("min-height: 48px;\n  border-bottom: 1px solid var(--po-border-subtle);");
+    expect(columns).toContain("background: var(--po-active);");
+    expect(resourceCss).toContain(".desktop-cloud-overview-file-row {\n  min-height: 40px;");
+    expect(resourceCss).toContain("min-height: 40px;\n  border-bottom: 1px solid var(--po-border-subtle);");
     expect(dashboardSource).toContain("desktop-cloud-overview-file-columns");
+    expect(dashboardSource).toContain("desktop-cloud-overview-visually-hidden");
     expect(dashboardSource).not.toContain("desktop-cloud-overview-files-header");
     expect(dashboardSource).not.toContain("cloud.overview.filesLabel");
   });
@@ -41,9 +45,9 @@ describe("Cloud Overview visual architecture", () => {
       ".desktop-cloud-overview-file-modified,\n.desktop-cloud-overview-file-size",
     ));
 
-    expect(name).toContain("font-size: 13px;");
+    expect(name).toContain("font-size: 12px;");
     expect(name).toContain("font-weight: 500;");
-    expect(metadata).toContain("font-size: 12px;");
+    expect(metadata).toContain("font-size: 11px;");
     expect(metadata).toContain("font-weight: 400;");
     expect(dashboardSource).toContain("FileGlyphIcon");
     expect(dashboardSource).toContain("getCloudOverviewEntryUpdatedAt(entry, history)");
@@ -52,19 +56,28 @@ describe("Cloud Overview visual architecture", () => {
     expect(dashboardSource).not.toMatch(/\bFolder\b.*from "lucide-react"/);
   });
 
-  it("keeps update, storage, and access as quiet header facts", () => {
+  it("keeps storage, update, and copyable path as quiet header facts", () => {
     const facts = compact(readCssBlock(statusCss, ".desktop-cloud-overview-header-facts"));
     const fact = compact(readCssBlock(statusCss, ".desktop-cloud-overview-header-fact"));
     const storage = compact(readCssBlock(statusCss, ".desktop-cloud-overview-project-storage"));
     const track = compact(readCssBlock(statusCss, ".desktop-cloud-overview-project-storage-track"));
+    const path = compact(readCssBlock(projectIdentityCss, ".desktop-cloud-overview-path-fact"));
+    const titleRow = compact(readCssBlock(baseCss, ".desktop-cloud-overview-title-row"));
 
     expect(facts).toContain("grid-auto-flow: column;");
     expect(fact).toContain("border-inline-start: 1px solid var(--po-border-subtle);");
-    expect(storage).toContain("width: 176px;");
+    expect(storage).toContain("width: 188px;");
     expect(track).toContain("height: 3px;");
-    expect(overviewSource.match(/<CloudOverviewHeaderFact/g)).toHaveLength(2);
+    expect(path).toContain("width: clamp(150px, 17vw, 220px);");
+    expect(titleRow).toContain("align-items: center;");
+    expect(overviewSource.match(/<CloudOverviewHeaderFact/g)).toHaveLength(1);
     expect(overviewSource).toContain("<CloudOverviewStorageMeter");
-    expect(overviewSource).toContain("getCloudRoute(\"git-sync\").icon");
+    expect(overviewSource).toContain("<CloudOverviewPathFact");
+    expect(overviewSource.indexOf("<CloudOverviewStorageMeter")).toBeLessThan(
+      overviewSource.indexOf("<CloudOverviewHeaderFact"),
+    );
+    expect(overviewSource).toContain("desktop-cloud-overview-title-row");
+    expect(overviewSource).not.toContain("getCloudRoute(\"git-sync\").icon");
     expect(overviewSource).not.toContain("desktop-cloud-overview-landing-mark");
   });
 });

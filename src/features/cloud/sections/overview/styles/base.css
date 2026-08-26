@@ -41,6 +41,13 @@
   gap: 5px;
 }
 
+.desktop-cloud-overview-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
 .desktop-cloud-overview-landing-copy h1,
 .desktop-cloud-overview-landing-copy p {
   margin: 0;
@@ -81,14 +88,14 @@
 .desktop-cloud-overview-refresh-button,
 .desktop-cloud-overview-settings-button {
   display: inline-flex;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
   align-items: center;
   justify-content: center;
   padding: 0;
   border: 1px solid var(--po-border);
-  border-radius: 7px;
+  border-radius: 6px;
   background: transparent;
   color: var(--po-text-muted);
   cursor: var(--po-clickable-cursor, pointer);

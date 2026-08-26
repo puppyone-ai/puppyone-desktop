@@ -16,30 +16,30 @@
 .desktop-cloud-overview-file-row {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(260px, 1fr) minmax(140px, 180px) 96px;
+  grid-template-columns: minmax(220px, 1fr) minmax(120px, 160px) 84px;
   align-items: center;
-  column-gap: 24px;
-  padding: 0 16px;
+  column-gap: 16px;
+  padding: 0 12px;
 }
 
 .desktop-cloud-overview-file-columns {
-  min-height: 38px;
+  min-height: 34px;
   border-bottom: 1px solid var(--po-border);
-  background: color-mix(in srgb, var(--po-panel) 54%, var(--po-canvas));
+  background: var(--po-active);
   color: var(--po-text-muted);
 }
 
 .desktop-cloud-overview-file-columns > span {
   overflow: hidden;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
-  line-height: 16px;
+  line-height: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .desktop-cloud-overview-file-row {
-  min-height: 48px;
+  min-height: 40px;
   border-bottom: 1px solid var(--po-border-subtle);
   color: var(--po-text-muted);
   transition: background 100ms ease, color 100ms ease;
@@ -57,15 +57,15 @@
 .desktop-cloud-overview-file-primary {
   display: grid;
   min-width: 0;
-  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-columns: 20px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .desktop-cloud-overview-file-icon {
   display: inline-flex;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   align-items: center;
   justify-content: center;
 }
@@ -74,9 +74,9 @@
   min-width: 0;
   overflow: hidden;
   color: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  line-height: 18px;
+  line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -85,11 +85,21 @@
 .desktop-cloud-overview-file-size {
   overflow: hidden;
   color: var(--po-text-subtle);
-  font-size: 12px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   font-weight: 400;
   line-height: 16px;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-cloud-overview-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 

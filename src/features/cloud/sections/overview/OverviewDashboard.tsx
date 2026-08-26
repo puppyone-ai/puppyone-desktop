@@ -46,7 +46,9 @@ export function CloudOverviewDashboard({
           aria-rowcount={entries.length + 1}
         >
           <div className="desktop-cloud-overview-file-columns" role="row">
-            <span role="columnheader">{t("cloud.common.name")}</span>
+            <span role="columnheader">
+              <span className="desktop-cloud-overview-visually-hidden">{t("cloud.common.name")}</span>
+            </span>
             <span role="columnheader">{t("cloud.status.modified")}</span>
             <span role="columnheader">{t("cloud.overview.fileSize")}</span>
           </div>
@@ -65,7 +67,7 @@ export function CloudOverviewDashboard({
               >
                 <span className="desktop-cloud-overview-file-primary" role="cell">
                   <span className="desktop-cloud-overview-file-icon" aria-hidden="true">
-                    <FileGlyphIcon name={entry.name} type={entry.type} size={18} />
+                    <FileGlyphIcon name={entry.name} type={entry.type} size={16} />
                   </span>
                   <strong className="desktop-cloud-overview-file-name" dir="auto">{entry.name}</strong>
                 </span>

@@ -32,6 +32,10 @@
     width: auto;
   }
 
+  .desktop-cloud-overview-path-fact {
+    width: auto;
+  }
+
   .desktop-cloud-overview-file-columns,
   .desktop-cloud-overview-file-row {
     grid-template-columns: minmax(180px, 1fr) 110px;

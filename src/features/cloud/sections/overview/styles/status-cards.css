@@ -3,7 +3,7 @@
   display: grid;
   min-width: 0;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(112px, auto);
+  grid-auto-columns: minmax(118px, auto);
   align-items: stretch;
 }
 
@@ -62,7 +62,7 @@
 }
 
 .desktop-cloud-overview-project-storage {
-  width: 176px;
+  width: 188px;
   grid-template-rows: auto auto 3px;
   gap: 2px;
 }
