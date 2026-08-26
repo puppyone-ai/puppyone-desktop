@@ -1087,6 +1087,7 @@ declare global {
       commitGit: (request: {
         rootPath: string;
         message: string;
+        allowEmpty?: boolean;
       }) => Promise<GitStatusSnapshot>;
       continueGitOperation: (request: {
         rootPath: string;

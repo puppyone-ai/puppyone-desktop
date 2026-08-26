@@ -1686,10 +1686,13 @@ export async function discardAllWorkspaceGitChanges(rootPath) {
   return getWorkspaceGitStatus(root);
 }
 
-export async function commitWorkspaceGit(rootPath, message) {
+export async function commitWorkspaceGit(rootPath, message, options = {}) {
   const root = resolveWorkspacePath(rootPath, null);
   const normalizedMessage = await normalizeCommitMessage(root, message);
-  await execGit(root, ["commit", "-m", normalizedMessage], {
+  const args = ["commit"];
+  if (options.allowEmpty === true) args.push("--allow-empty");
+  args.push("-m", normalizedMessage);
+  await execGit(root, args, {
     timeout: GIT_MUTATION_TIMEOUT_MS,
   }).catch((error) => {
     throw new Error(`Unable to commit changes: ${error.message}`);

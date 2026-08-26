@@ -43,6 +43,9 @@ export type CloudInitializationAction =
   | "finish-cleanup";
 
 export type CloudInitializationProgressStage =
+  | "enabling-version-control"
+  | "creating-snapshot"
+  | "creating-branch"
   | "validating"
   | "creating-project"
   | "securing-credential"

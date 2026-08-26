@@ -626,8 +626,16 @@ export async function discardAllWorkspaceGitChanges(rootPath: string): Promise<G
   return getDesktopBridge().discardAllGitChanges({ rootPath });
 }
 
-export async function commitWorkspaceGit(rootPath: string, message: string): Promise<GitStatusSnapshot> {
-  return getDesktopBridge().commitGit({ rootPath, message });
+export async function commitWorkspaceGit(
+  rootPath: string,
+  message: string,
+  options: { allowEmpty?: boolean } = {},
+): Promise<GitStatusSnapshot> {
+  return getDesktopBridge().commitGit({
+    rootPath,
+    message,
+    ...(options.allowEmpty ? { allowEmpty: true } : {}),
+  });
 }
 
 export async function continueWorkspaceGitOperation(rootPath: string): Promise<GitStatusSnapshot> {

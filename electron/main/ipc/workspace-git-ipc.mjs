@@ -319,7 +319,7 @@ export function registerWorkspaceGitIpcHandlers({
   )));
 
   ipcMain.handle("workspace:git-commit", withAuthorizedWorktreeMutation((rootPath, request) => (
-    commitWorkspaceGit(rootPath, request?.message)
+    commitWorkspaceGit(rootPath, request?.message, { allowEmpty: request?.allowEmpty === true })
   )));
 
   ipcMain.handle("workspace:git-operation-continue", withAuthorizedRepositoryMutation((rootPath) => (

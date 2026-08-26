@@ -2,8 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import {
   cleanupWorkspaceCloudInitialization,
+  commitWorkspaceGit,
+  createWorkspaceGitBranch,
   getWorkspaceCloudInitializationState,
   getWorkspaceGitStatus,
+  initializeWorkspaceGitRepository,
+  stageAllWorkspaceGitChanges,
   startWorkspaceCloudInitialization,
   subscribeWorkspaceCloudInitializationProgress,
 } from "../../../lib/localFiles";
@@ -141,7 +145,8 @@ export function useCloudInitialization({
         const published = isPublished(result.state);
         setState(published ? null : result.state);
         if (!result.ok) {
-          setError(toPublicFailure(result));
+          const failure = toPublicFailure(result);
+          setError(isLocalPreparationRequirement(failure.code) ? null : failure);
           return;
         }
         setError(null);
@@ -215,13 +220,7 @@ export function useCloudInitialization({
     try {
       const pending = state;
       const choosingSource = pending?.availableActions.includes("choose-source") === true;
-      const freshStatus = !pending || choosingSource
-        ? await getWorkspaceGitStatus(workspace.path)
-        : null;
       const selectedOrganizationId = pending?.organizationId ?? organizationId?.trim() ?? "";
-      const sourceBranch = choosingSource
-        ? normalizeBranch(freshStatus?.branch)
-        : pending?.selectedSourceBranch ?? normalizeBranch(freshStatus?.branch);
       if (!selectedOrganizationId) {
         setError({ code: "ORGANIZATION_REQUIRED", retryable: false });
         return;
@@ -234,6 +233,53 @@ export function useCloudInitialization({
         });
         return;
       }
+      let freshStatus = !pending || choosingSource
+        ? await getWorkspaceGitStatus(workspace.path)
+        : null;
+      if (!pending && freshStatus) {
+        let preparationFailure: CloudInitializationErrorCode = "REPOSITORY_REQUIRED";
+        const reportLocalProgress = (stage: CloudInitializationProgress["stage"]) => {
+          setProgress({
+            rootPath: currentIdentity.rootPath,
+            operationId: null,
+            stage,
+            state: null,
+            updatedAt: new Date().toISOString(),
+          });
+        };
+        try {
+          if (!freshStatus.isRepo) {
+            preparationFailure = "REPOSITORY_REQUIRED";
+            reportLocalProgress("enabling-version-control");
+            freshStatus = await initializeWorkspaceGitRepository(workspace.path);
+          }
+          if (!freshStatus.headCommitId || freshStatus.totalCommits < 1) {
+            preparationFailure = "COMMIT_REQUIRED";
+            reportLocalProgress("creating-snapshot");
+            freshStatus = await stageAllWorkspaceGitChanges(workspace.path);
+            freshStatus = await commitWorkspaceGit(
+              workspace.path,
+              "Initial snapshot",
+              { allowEmpty: true },
+            );
+          }
+          if (!normalizeBranch(freshStatus.branch)) {
+            preparationFailure = "BRANCH_REQUIRED";
+            reportLocalProgress("creating-branch");
+            freshStatus = await createWorkspaceGitBranch(
+              workspace.path,
+              resolveCloudPublishBranchName(freshStatus),
+            );
+          }
+        } catch {
+          setError({ code: preparationFailure, retryable: true });
+          return;
+        }
+        reportLocalProgress("validating");
+      }
+      const sourceBranch = choosingSource
+        ? normalizeBranch(freshStatus?.branch)
+        : pending?.selectedSourceBranch ?? normalizeBranch(freshStatus?.branch);
       const result = await startWorkspaceCloudInitialization({
         ...currentIdentity,
         organizationId: selectedOrganizationId,
@@ -352,6 +398,26 @@ function getInitializationIdentity({
 function normalizeBranch(value: string | null | undefined): string {
   const normalized = value?.trim() ?? "";
   return ["head", "detached"].includes(normalized.toLowerCase()) ? "" : normalized;
+}
+
+function resolveCloudPublishBranchName(status: GitStatusSnapshot): string {
+  const existing = new Set(
+    status.branches
+      .filter((branch) => !branch.remote)
+      .map((branch) => branch.name),
+  );
+  for (const candidate of ["main", "puppyone-publish"]) {
+    if (!existing.has(candidate)) return candidate;
+  }
+  let suffix = 2;
+  while (existing.has(`puppyone-publish-${suffix}`)) suffix += 1;
+  return `puppyone-publish-${suffix}`;
+}
+
+function isLocalPreparationRequirement(code: CloudInitializationErrorCode): boolean {
+  return code === "REPOSITORY_REQUIRED"
+    || code === "COMMIT_REQUIRED"
+    || code === "BRANCH_REQUIRED";
 }
 
 function selectPushAction(
