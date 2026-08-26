@@ -40,12 +40,15 @@ describe("current-repository Cloud navigation", () => {
       projectAvailable: false,
       onSelectSection,
     });
-    expect(labels(container)).toEqual([
-      "MCP and CLI", "Overview", "History", "Automation", "Access", "Settings", "Team", "Billing",
+    expect(labels(container)[0]).toBe("Overview");
+    expect(labels(container)[1]).toContain("MCP");
+    expect(labels(container).slice(2)).toEqual([
+      "Automation", "Access", "Settings", "Team", "Billing",
     ]);
+    expect(labels(container)).not.toContain("History");
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
-    expect(rows(container)[0]?.getAttribute("aria-current")).toBe("page");
-    act(() => rows(container)[0]?.click());
+    expect(rows(container)[1]?.getAttribute("aria-current")).toBe("page");
+    act(() => rows(container)[1]?.click());
     expect(onSelectSection).toHaveBeenCalledWith("mcp-cli");
 
     renderSidebar(root, {
@@ -53,21 +56,24 @@ describe("current-repository Cloud navigation", () => {
       projectAvailable: false,
       onSelectSection,
     });
-    expect(labels(container)).toEqual([
-      "MCP and CLI", "Overview", "History", "Automation", "Access", "Settings", "Team", "Billing",
+    expect(labels(container)[0]).toBe("Overview");
+    expect(labels(container)[1]).toContain("MCP");
+    expect(labels(container).slice(2)).toEqual([
+      "Automation", "Access", "Settings", "Team", "Billing",
     ]);
+    expect(labels(container)).not.toContain("History");
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
-    act(() => rows(container)[2]?.click());
-    expect(onSelectSection).toHaveBeenCalledWith("history");
+    act(() => rows(container)[1]?.click());
+    expect(onSelectSection).toHaveBeenCalledWith("mcp-cli");
 
     renderSidebar(root, {
       authState: signedInState(),
       projectAvailable: true,
       onSelectSection,
     });
-    expect(rows(container).slice(0, 5).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
-    expect(rows(container)[5]?.getAttribute("aria-disabled")).toBe("true");
-    expect(rows(container).slice(6).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
+    expect(rows(container).slice(0, 4).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
+    expect(rows(container)[4]?.getAttribute("aria-disabled")).toBe("true");
+    expect(rows(container).slice(5).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
 
     renderSidebar(root, {
       authState: signedInState(),
@@ -76,8 +82,16 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
-    act(() => rows(container)[2]?.click());
-    expect(onSelectSection).toHaveBeenCalledWith("history");
+
+    renderSidebar(root, {
+      authState: signedInState(),
+      activeSection: "history",
+      projectAvailable: true,
+      projectCapabilities: ["project.settings.manage"],
+      onSelectSection,
+    });
+    expect(rows(container)[0]?.getAttribute("aria-current")).toBe("page");
+    expect(labels(container)).not.toContain("History");
   });
 
   it("keeps the signed-out Cloud entry focused on one activation action", () => {

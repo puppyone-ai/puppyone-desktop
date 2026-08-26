@@ -78,18 +78,6 @@ export const CLOUD_ROUTES = [
     webPath: () => "/billing",
   },
   {
-    id: "mcp-cli",
-    labelId: "cloud.route.mcp-cli.label",
-    titleId: "cloud.route.mcp-cli.title",
-    descriptionId: "cloud.route.mcp-cli.description",
-    icon: SquareTerminal,
-    context: "project",
-    surface: "landing",
-    resources: ACCESS_PROJECT_RESOURCES,
-    showInSidebar: true,
-    webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
-  },
-  {
     id: "contents",
     labelId: "cloud.route.contents.label",
     titleId: "cloud.route.contents.title",
@@ -102,6 +90,18 @@ export const CLOUD_ROUTES = [
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/data`,
   },
   {
+    id: "mcp-cli",
+    labelId: "cloud.route.mcp-cli.label",
+    titleId: "cloud.route.mcp-cli.title",
+    descriptionId: "cloud.route.mcp-cli.description",
+    icon: SquareTerminal,
+    context: "project",
+    surface: "landing",
+    resources: ACCESS_PROJECT_RESOURCES,
+    showInSidebar: true,
+    webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/access`,
+  },
+  {
     id: "history",
     labelId: "cloud.route.history.label",
     titleId: "cloud.route.history.title",
@@ -110,7 +110,7 @@ export const CLOUD_ROUTES = [
     context: "project",
     surface: "history",
     resources: NO_PROJECT_RESOURCES,
-    showInSidebar: true,
+    showInSidebar: false,
     webPath: (projectId?: string) => `/projects/${requireProjectId(projectId)}/changes`,
   },
   {
@@ -217,6 +217,18 @@ export function getCloudSignedOutSection(
 ): CloudWorkspaceSection {
   const normalizedSection = normalizeCloudSection(section);
   return normalizedSection === "initialize" ? "mcp-cli" : normalizedSection;
+}
+
+/**
+ * Low-frequency Project detail routes remain addressable without becoming
+ * first-class navigation destinations. History is a drill-down from Overview,
+ * so Overview stays selected while the history surface is open.
+ */
+export function getCloudSidebarActiveSection(
+  section: CloudWorkspaceSection | string,
+): CloudWorkspaceSection {
+  const normalizedSection = normalizeCloudSection(section);
+  return normalizedSection === "history" ? "contents" : normalizedSection;
 }
 
 export function getCloudRoute(section: CloudWorkspaceSection): CloudRouteDescriptor {

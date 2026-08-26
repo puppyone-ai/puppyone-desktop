@@ -6,6 +6,7 @@ import type { CloudServiceSidebarProps, CloudWorkspaceSection } from "./types";
 import { getCloudAuthSession } from "./auth";
 import {
   CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES,
+  getCloudSidebarActiveSection,
   getCloudSignedOutSection,
   normalizeCloudSection,
   type CloudRouteDescriptor,
@@ -41,9 +42,11 @@ export function CloudServiceSidebar({
   const effectiveCloudSession = getCloudAuthSession(cloudAuthState);
   const accountEmail = effectiveCloudSession?.user_email ?? null;
   const signedIn = Boolean(effectiveCloudSession);
-  const visibleActiveSection = signedIn
-    ? normalizedActiveSection
-    : getCloudSignedOutSection(normalizedActiveSection);
+  const visibleActiveSection = getCloudSidebarActiveSection(
+    signedIn
+      ? normalizedActiveSection
+      : getCloudSignedOutSection(normalizedActiveSection),
+  );
   const navItems: CloudSidebarNavEntry[] = CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES.map((route: CloudRouteDescriptor) => ({
     ...route,
     locked: route.context === "project"
