@@ -239,7 +239,12 @@ describe("settings visual architecture", () => {
     const localProject = source("src/features/settings/main/LocalProjectSettingsView.tsx");
     const repository = source("src/features/settings/main/RepositorySettingsViews.tsx");
 
-    expect(settings).toMatch(/--desktop-settings-content-max-width:\s*1040px/);
+    expect(settings).toMatch(
+      /--desktop-settings-content-max-width:\s*var\(--po-reading-content-width, 724px\)/,
+    );
+    expect(source("src/styles/settings-new-menu.css")).not.toContain(
+      "--desktop-settings-content-max-width",
+    );
     expect(settings).toMatch(/\.desktop-settings-heading-row\s*{[^}]*padding-inline:\s*10px;/s);
     expect(settings).toMatch(/\.desktop-settings-section-header\s*{[^}]*padding-inline:\s*10px;/s);
     expect(settings).toMatch(/\.desktop-settings-heading-row \.desktop-settings-section-header\s*{[^}]*padding-inline:\s*0;/s);

@@ -466,14 +466,10 @@ export function getGitScmSyncSection(
   const action = getGitScmSyncAction(remote, state, t, {
     blocked: Boolean(status?.sourceControl.operation) || options.blockedByConflicts === true,
   });
-  const previewResources = remote && remote.behind > 0 ? remote.incomingPreview : [];
-  const fallbackSummary = getGitScmSyncFallbackSummary(remote, copy, state, previewResources.length, t);
 
   return {
     copy,
     action,
-    previewResources,
-    fallbackSummary,
   };
 }
 
@@ -516,29 +512,6 @@ export function getGitScmSyncAction(
       disabled: false,
       icon: "download",
     };
-  }
-
-  return null;
-}
-
-function getGitScmSyncFallbackSummary(
-  remote: GitStatusSnapshot["sourceControl"]["remote"] | undefined,
-  copy: GitScmSyncCopy,
-  state: GitSyncState,
-  previewCount: number,
-  t: MessageFormatter,
-) {
-  if (!remote || copy.count === 0 || previewCount > 0) return null;
-
-  if (remote.behind > 0) {
-    return t("source-control.sync.remoteReady", {
-      count: remote.behind,
-      target: bidiIsolate(remote.target?.ref ?? remote.upstream ?? state.upstreamLabel),
-    });
-  }
-
-  if (remote.ahead > 0) {
-    return t("source-control.sync.localReady", { count: remote.ahead, action: state.pushLabel });
   }
 
   return null;

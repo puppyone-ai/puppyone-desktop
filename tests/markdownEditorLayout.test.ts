@@ -43,6 +43,12 @@ const markdownCodeMirrorExtensionsSource = readFileSync(
 );
 
 describe("Markdown editor layout", () => {
+  it("shares its reading width with other document-like product surfaces", () => {
+    expect(markdownEditorCss).toContain(
+      "--po-markdown-editor-text-width: var(--po-reading-content-width, 724px);",
+    );
+  });
+
   it("keeps the centered reading rail invariant when stacked panes cross the overflow threshold", () => {
     const scrollerRule = readCssRule(
       markdownEditorCss,
