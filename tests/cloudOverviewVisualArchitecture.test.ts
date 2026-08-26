@@ -56,7 +56,8 @@ describe("Cloud Overview visual architecture", () => {
     expect(dashboardSource).not.toMatch(/\bFolder\b.*from "lucide-react"/);
   });
 
-  it("gives storage a long description strip and keeps three quiet facts beside it", () => {
+  it("gives storage a full-width unlabeled track above three quiet facts", () => {
+    const header = compact(readCssBlock(baseCss, ".desktop-cloud-overview-landing-header"));
     const facts = compact(readCssBlock(statusCss, ".desktop-cloud-overview-header-facts"));
     const fact = compact(readCssBlock(statusCss, ".desktop-cloud-overview-header-fact"));
     const storage = compact(readCssBlock(statusCss, ".desktop-cloud-overview-project-storage"));
@@ -64,11 +65,14 @@ describe("Cloud Overview visual architecture", () => {
     const path = compact(readCssBlock(projectIdentityCss, ".desktop-cloud-overview-path-fact"));
     const titleRow = compact(readCssBlock(baseCss, ".desktop-cloud-overview-title-row"));
 
-    expect(facts).toContain("grid-auto-flow: column;");
+    expect(header).toContain("display: grid;");
+    expect(header).toContain("width: 100%;");
+    expect(facts).toContain("width: 100%;");
+    expect(facts).toContain("grid-template-columns: repeat(3, minmax(0, 1fr));");
     expect(fact).toContain("border-inline-start: 1px solid var(--po-border-subtle);");
-    expect(storage).toContain("width: min(100%, 420px);");
-    expect(track).toContain("height: 4px;");
-    expect(path).toContain("width: clamp(150px, 17vw, 220px);");
+    expect(storage).toContain("width: 100%;");
+    expect(track).toContain("height: 5px;");
+    expect(path).toContain("width: auto;");
     expect(titleRow).toContain("align-items: center;");
     expect(overviewSource.match(/<CloudOverviewHeaderFact/g)).toHaveLength(2);
     expect(overviewSource).toContain("<CloudOverviewStorageMeter");
@@ -77,6 +81,7 @@ describe("Cloud Overview visual architecture", () => {
     expect(overviewSource.indexOf("<CloudOverviewStorageMeter")).toBeLessThan(
       overviewSource.indexOf("desktop-cloud-overview-header-side"),
     );
+    expect(overviewSource).not.toContain("desktop-cloud-overview-project-storage-summary");
     expect(overviewSource).toContain("desktop-cloud-overview-title-row");
     expect(overviewSource).not.toContain("getCloudRoute(\"git-sync\").icon");
     expect(overviewSource).not.toContain("desktop-cloud-overview-landing-mark");

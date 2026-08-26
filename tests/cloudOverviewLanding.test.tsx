@@ -217,11 +217,13 @@ describe("CloudRepositoryOverview landing page", () => {
     expect(dashboard?.textContent).not.toContain("release");
     expect(dashboard?.textContent).not.toContain("Private");
     expect(container.textContent).not.toContain("Shared product research");
-    const storage = container.querySelector(".desktop-cloud-overview-project-storage");
-    expect(storage?.textContent).toContain("Storage");
-    expect(storage?.textContent).toContain("100 MB of 500 MB");
+    const storage = container.querySelector<HTMLElement>(".desktop-cloud-overview-project-storage");
+    expect(storage?.textContent).toBe("");
+    expect(storage?.title).toBe("100 MB of 500 MB");
     expect(storage?.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")).toBe("20");
-    expect(storage?.parentElement?.classList.contains("desktop-cloud-overview-landing-copy")).toBe(true);
+    expect(storage?.querySelector('[role="progressbar"]')?.getAttribute("aria-valuetext")).toBe("100 MB of 500 MB");
+    expect(storage?.parentElement?.classList.contains("desktop-cloud-overview-landing-header")).toBe(true);
+    expect(storage?.querySelector(".desktop-cloud-overview-project-storage-summary")).toBeNull();
     expect(container.querySelector(".desktop-cloud-overview-header-facts .desktop-cloud-overview-project-storage")).toBeNull();
     expect(dashboard?.querySelector(".desktop-cloud-overview-project-storage")).toBeNull();
     expect(findButton(container, "Open on web")).toBeUndefined();

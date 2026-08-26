@@ -1,6 +1,6 @@
 /* The canonical project path is copyable, but deliberately reads as a quiet fact. */
 .desktop-cloud-overview-path-fact {
-  width: clamp(150px, 17vw, 220px);
+  width: auto;
 }
 
 .desktop-cloud-overview-path-fact > strong {

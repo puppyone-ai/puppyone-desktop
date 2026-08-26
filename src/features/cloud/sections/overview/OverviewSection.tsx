@@ -121,8 +121,9 @@ export function CloudRepositoryOverview({
                   </button>
                 </div>
               </div>
-              <CloudOverviewStorageMeter usage={storageUsage} loading={loading} />
             </div>
+
+            <CloudOverviewStorageMeter usage={storageUsage} loading={loading} />
 
             <div className="desktop-cloud-overview-header-side">
               <div className="desktop-cloud-overview-header-facts">
@@ -245,14 +246,11 @@ function CloudOverviewStorageMeter({
         "aria-valuemin": 0,
         "aria-valuemax": 100,
         "aria-valuenow": Math.round(usage.percent),
+        "aria-valuetext": detail,
       };
 
   return (
-    <div className="desktop-cloud-overview-project-storage">
-      <div className="desktop-cloud-overview-project-storage-summary">
-        <span>{t("cloud.billing.storageUsage")}</span>
-        <strong>{detail}</strong>
-      </div>
+    <div className="desktop-cloud-overview-project-storage" title={detail}>
       <span className="desktop-cloud-overview-project-storage-track" {...progressProps}>
         {usage.percent !== null ? (
           <span style={{ width: `${usage.percent}%` }} />
