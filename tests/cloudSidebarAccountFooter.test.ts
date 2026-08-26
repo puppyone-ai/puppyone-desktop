@@ -20,6 +20,7 @@ describe("Cloud account footer architecture", () => {
     expect(sidebarSource).toContain("formatSidebarAccount(accountEmail, t)");
     expect(sidebarSource).toContain("onClick={onOpenAccount}");
     expect(sidebarSource).toContain('t("cloud.common.account")');
+    expect(sidebarSource).not.toContain("desktop-cloud-sidebar-account-context");
     expect(sidebarSource).not.toContain('role="img"');
   });
 
@@ -32,7 +33,9 @@ describe("Cloud account footer architecture", () => {
     expect(sidebarCss).toContain("border-top: 1px solid var(--po-sidebar-divider, var(--po-divider));");
     expect(sidebarCss).toContain("border-radius: var(--desktop-sidebar-row-radius);");
     expect(sidebarCss).toContain("background: var(--po-hover);");
-    expect(sidebarCss).toContain("font-weight: var(--desktop-sidebar-font-weight");
+    expect(sidebarCss).toContain("font-weight: var(--po-text-weight-regular, 400);");
+    expect(sidebarCss).not.toContain(".desktop-cloud-sidebar-account-context");
+    expect(sidebarCss).not.toContain(".desktop-cloud-sidebar-account-copy");
     expect(sidebarCss).not.toContain("font-weight: 700;");
     expect(sidebarCss).not.toContain("box-shadow: 0 0 0 2px");
   });
