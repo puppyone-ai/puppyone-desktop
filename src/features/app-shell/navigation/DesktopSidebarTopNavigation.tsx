@@ -64,6 +64,15 @@ export function DesktopSidebarTopNavigation({
             shellToolbar={shellToolbar}
             showLabel
           />
+          {cloudHubItems.length > 0 && (
+            <DesktopNavigationItems
+              {...runtime}
+              buttonClassName={buttonClassName}
+              items={cloudHubItems}
+              shellToolbar={shellToolbar}
+              showLabel
+            />
+          )}
           <DesktopSidebarSettingsButton
             activeView={activeView}
             buttonClassName={buttonClassName}
@@ -71,15 +80,6 @@ export function DesktopSidebarTopNavigation({
             shellToolbar={shellToolbar}
             showLabel
           />
-          {cloudHubItems.length > 0 && (
-            <DesktopNavigationItems
-                {...runtime}
-                buttonClassName={buttonClassName}
-                items={cloudHubItems}
-                shellToolbar={shellToolbar}
-                showLabel
-            />
-          )}
         </div>
       </div>
     </div>

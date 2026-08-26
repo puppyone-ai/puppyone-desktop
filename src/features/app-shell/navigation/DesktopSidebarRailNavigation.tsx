@@ -38,14 +38,14 @@ export function DesktopSidebarRailNavigation({
         <DesktopNavigationItems {...runtime} buttonClassName="desktop-sidebar-rail-button" items={localItems} />
       </div>
       <div className="desktop-sidebar-rail-actions desktop-sidebar-rail-actions-end">
+        {cloudHubItems.length > 0 && (
+          <DesktopNavigationItems {...runtime} buttonClassName="desktop-sidebar-rail-button" items={cloudHubItems} />
+        )}
         <DesktopSidebarSettingsButton
           activeView={activeView}
           buttonClassName="desktop-sidebar-rail-button"
           onOpenSettings={onOpenSettings}
         />
-        {cloudHubItems.length > 0 && (
-          <DesktopNavigationItems {...runtime} buttonClassName="desktop-sidebar-rail-button" items={cloudHubItems} />
-        )}
       </div>
     </div>
   );
