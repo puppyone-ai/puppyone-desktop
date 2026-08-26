@@ -718,6 +718,7 @@
   "sidebar.organizationGroup": "Organización",
   "sidebar.projectGroup": "Proyecto en la nube",
   "sidebar.connectionsGroup": "Conexiones",
+  "sidebar.automationGroup": "Automatización",
   "sidebar.signInToUse": "Inicia sesión para usar Cloud",
   "sidebar.initializeToUse": "Inicializa un proyecto de Cloud para usar esto",
   "sidebar.projectSections": "Secciones del proyecto de Cloud",

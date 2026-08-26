@@ -718,6 +718,7 @@
   "sidebar.organizationGroup": "組織",
   "sidebar.projectGroup": "クラウドプロジェクト",
   "sidebar.connectionsGroup": "接続",
+  "sidebar.automationGroup": "自動化",
   "sidebar.signInToUse": "Cloud を使用するにはサインインしてください",
   "sidebar.initializeToUse": "Cloud プロジェクトを初期化すると使用できます",
   "sidebar.projectSections": "Cloud プロジェクトセクション",

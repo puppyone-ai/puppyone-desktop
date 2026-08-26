@@ -25,7 +25,11 @@ type CloudSidebarNavEntry = {
 
 type CloudSidebarNavGroup = {
   id: CloudRouteNavigationGroup;
-  labelId: "cloud.sidebar.projectGroup" | "cloud.sidebar.connectionsGroup" | "cloud.sidebar.organizationGroup";
+  labelId:
+    | "cloud.sidebar.projectGroup"
+    | "cloud.sidebar.connectionsGroup"
+    | "cloud.sidebar.automationGroup"
+    | "cloud.sidebar.organizationGroup";
   items: CloudSidebarNavEntry[];
 };
 
@@ -134,6 +138,11 @@ function buildCloudSidebarNavGroups(items: readonly CloudSidebarNavEntry[]): Clo
       id: "connections",
       labelId: "cloud.sidebar.connectionsGroup",
       items: items.filter((item) => item.navigationGroup === "connections"),
+    },
+    {
+      id: "automation",
+      labelId: "cloud.sidebar.automationGroup",
+      items: items.filter((item) => item.navigationGroup === "automation"),
     },
     {
       id: "organization",

@@ -718,6 +718,7 @@
   "sidebar.organizationGroup": "组织",
   "sidebar.projectGroup": "云项目",
   "sidebar.connectionsGroup": "连接",
+  "sidebar.automationGroup": "自动化",
   "sidebar.signInToUse": "登录以使用 Cloud",
   "sidebar.initializeToUse": "初始化 Cloud 项目后即可使用",
   "sidebar.projectSections": "Cloud 项目部分",

@@ -8,7 +8,7 @@ import type { CloudWorkspaceSection } from "./cloudRouteIds";
 
 export type CloudRouteContext = "initialization" | "project" | "organization";
 export type CloudRouteSurface = "standard" | "landing" | "history" | "automation";
-export type CloudRouteNavigationGroup = "project" | "connections" | "organization";
+export type CloudRouteNavigationGroup = "project" | "connections" | "automation" | "organization";
 export type CloudRouteIcon = ComponentType<{
   className?: string;
   size?: number | string;
@@ -158,7 +158,7 @@ export const CLOUD_ROUTES = [
     surface: "automation",
     resources: ACCESS_PROJECT_RESOURCES,
     showInSidebar: true,
-    navigationGroup: "project",
+    navigationGroup: "automation",
     webPath: (projectId?: string) => getCloudAutomationWebPath(requireProjectId(projectId)),
   },
   {
@@ -223,10 +223,10 @@ export const CLOUD_PROJECT_ROUTES = CLOUD_ROUTES.filter((route) => route.context
 const CLOUD_PROJECT_SIDEBAR_ORDER: readonly CloudWorkspaceSection[] = [
   "contents",
   "history",
-  "automation",
   "mcp",
   "cli",
   "git-sync",
+  "automation",
 ];
 export const CLOUD_PROJECT_SIDEBAR_ROUTES = CLOUD_PROJECT_ROUTES
   .filter((route) => route.showInSidebar)

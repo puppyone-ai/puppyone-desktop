@@ -718,6 +718,7 @@
   "sidebar.organizationGroup": "조직",
   "sidebar.projectGroup": "클라우드 프로젝트",
   "sidebar.connectionsGroup": "연결",
+  "sidebar.automationGroup": "자동화",
   "sidebar.signInToUse": "Cloud를 사용하려면 로그인하세요",
   "sidebar.initializeToUse": "Cloud 프로젝트를 초기화하면 사용할 수 있습니다",
   "sidebar.projectSections": "Cloud 프로젝트 섹션",

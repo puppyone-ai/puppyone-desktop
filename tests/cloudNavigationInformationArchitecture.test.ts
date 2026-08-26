@@ -7,14 +7,14 @@ import {
 import { McpLogoIcon } from "../src/features/cloud/components/McpLogoIcon";
 
 describe("Cloud navigation information architecture", () => {
-  it("keeps Project work separate from the three first-class Connections", () => {
+  it("keeps Project state, Connections, and Automation as separate product groups", () => {
     expect(CLOUD_PROJECT_SIDEBAR_ROUTES.map((route) => route.id)).toEqual([
       "contents",
       "history",
-      "automation",
       "mcp",
       "cli",
       "git-sync",
+      "automation",
     ]);
     expect(getCloudRoute("mcp").icon).toBe(McpLogoIcon);
     expect(getCloudRoute("mcp").navigationGroup).toBe("connections");
@@ -23,6 +23,7 @@ describe("Cloud navigation information architecture", () => {
     expect(getCloudRoute("access").showInSidebar).toBe(false);
     expect(getCloudRoute("history").showInSidebar).toBe(true);
     expect(getCloudRoute("history").navigationGroup).toBe("project");
+    expect(getCloudRoute("automation").navigationGroup).toBe("automation");
     expect(getCloudRoute("settings").showInSidebar).toBe(false);
   });
 

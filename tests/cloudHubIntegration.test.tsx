@@ -41,19 +41,19 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(labels(container)).toEqual([
-      "Homepage", "History", "Automation", "MCP", "CLI", "Git", "Team", "Billing",
+      "Homepage", "History", "MCP", "CLI", "Git", "Automation", "Team", "Billing",
     ]);
-    expect(groupLabels(container)).toEqual(["Cloud Project", "Connections", "Organization"]);
+    expect(groupLabels(container)).toEqual(["Cloud Project", "Connections", "Automation", "Organization"]);
     expect(labels(container)).not.toContain("Settings");
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
-    expect(rows(container)[3]?.getAttribute("aria-current")).toBe("page");
+    expect(rows(container)[2]?.getAttribute("aria-current")).toBe("page");
     act(() => rows(container)[1]?.click());
     expect(onSelectSection).toHaveBeenCalledWith("history");
-    act(() => rows(container)[3]?.click());
+    act(() => rows(container)[2]?.click());
     expect(onSelectSection).toHaveBeenCalledWith("mcp");
-    act(() => rows(container)[4]?.click());
+    act(() => rows(container)[3]?.click());
     expect(onSelectSection).toHaveBeenCalledWith("cli");
-    act(() => rows(container)[5]?.click());
+    act(() => rows(container)[4]?.click());
     expect(onSelectSection).toHaveBeenCalledWith("git-sync");
 
     renderSidebar(root, {
@@ -62,11 +62,11 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(labels(container)).toEqual([
-      "Homepage", "History", "Automation", "MCP", "CLI", "Git", "Team", "Billing",
+      "Homepage", "History", "MCP", "CLI", "Git", "Automation", "Team", "Billing",
     ]);
     expect(labels(container)).not.toContain("Settings");
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
-    act(() => rows(container)[3]?.click());
+    act(() => rows(container)[2]?.click());
     expect(onSelectSection).toHaveBeenCalledWith("mcp");
 
     renderSidebar(root, {

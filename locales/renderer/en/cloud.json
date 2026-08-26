@@ -636,6 +636,7 @@
   "sidebar.organizationGroup": "Organization",
   "sidebar.projectGroup": "Cloud Project",
   "sidebar.connectionsGroup": "Connections",
+  "sidebar.automationGroup": "Automation",
   "sidebar.signInToUse": "Sign in to use Cloud",
   "sidebar.initializeToUse": "Initialize a Cloud project to use this",
   "path.ariaLabel": "Cloud path",

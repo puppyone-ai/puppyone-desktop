@@ -636,6 +636,7 @@
   "sidebar.organizationGroup": "Organisation",
   "sidebar.projectGroup": "Projet Cloud",
   "sidebar.connectionsGroup": "Connexions",
+  "sidebar.automationGroup": "Automatisation",
   "sidebar.signInToUse": "Connectez-vous pour utiliser Cloud",
   "sidebar.initializeToUse": "Initialisez un projet Cloud pour utiliser ceci",
   "path.ariaLabel": "Chemin cloud",
