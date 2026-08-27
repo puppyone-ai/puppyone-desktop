@@ -203,7 +203,7 @@ describe("Git sidebar status groups", () => {
     expect(surface.textContent).not.toContain("No commits yet");
   });
 
-  it("does not render empty local change sections when the working tree is clean", () => {
+  it("renders one quiet Changes section when the working tree is clean", () => {
     const status = createGitStatus();
     status.entries = [];
     status.stagedEntries = [];
@@ -228,11 +228,21 @@ describe("Git sidebar status groups", () => {
 
     const surface = renderSidebar({ status });
     const commitButton = surface.querySelector<HTMLButtonElement>(".desktop-git-commit-staged-action");
+    const cleanSection = surface.querySelector<HTMLElement>(".desktop-git-resizable-section-changes");
+    const cleanToggle = cleanSection?.querySelector<HTMLButtonElement>(".desktop-git-section-title");
 
     expect(surface.querySelector(".desktop-git-resizable-section-staged")).toBeNull();
     expect(surface.querySelector(".desktop-git-resizable-section-unstaged")).toBeNull();
+    expect(cleanToggle?.querySelector("span")?.textContent).toBe("Changes");
+    expect(cleanToggle?.querySelector("small")).toBeNull();
+    expect(cleanSection?.textContent).toContain("No local changes");
     expect(commitButton).toBeNull();
     expect(surface.textContent).not.toContain("Clean working tree");
+
+    act(() => cleanToggle?.click());
+
+    expect(cleanSection?.classList.contains("collapsed")).toBe(true);
+    expect(cleanToggle?.getAttribute("aria-expanded")).toBe("false");
   });
 
   it.each([

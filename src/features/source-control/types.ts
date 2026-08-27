@@ -65,6 +65,7 @@ export type SourceControlSidebarModel = {
   showCommittedSection: boolean;
   showStagedSection: boolean;
   showUnstagedSection: boolean;
+  showCleanSection: boolean;
   stagedPrimaryAction: GitSidebarPrimaryAction | null;
   showStageAndCommitAction: boolean;
   sectionContext: {

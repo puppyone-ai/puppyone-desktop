@@ -140,6 +140,7 @@
   "section.unstaged": "未ステージの変更",
   "sidebar.resize": "Git サイドバーセクションのサイズを変更",
   "status.empty": "空",
+  "status.noLocalChanges": "ローカルの変更はありません",
   "status.limit": "最初の {count} 件の変更を表示しています。完全な結果を得るには、無視するファイルを調整するか、より小さいワークスペースを開いてください。",
   "status.loadingDiff": "差分を読み込んでいます…",
   "status.loadingDiffFor": "{path} の差分を読み込んでいます…",

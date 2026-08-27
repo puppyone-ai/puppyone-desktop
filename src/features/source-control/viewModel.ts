@@ -261,6 +261,9 @@ export function buildSourceControlSidebarModel({
     icon: "check" as const,
   } : null;
   const localChangeResources = workingResources;
+  const showCommittedSection = committedCount > 0 || Boolean(committedPrimaryAction);
+  const showStagedSection = stagedResources.length > 0;
+  const showUnstagedSection = localChangeResources.length > 0;
 
   return {
     professionalMode,
@@ -274,9 +277,15 @@ export function buildSourceControlSidebarModel({
     committedResources,
     committedPrimaryAction,
     operationPrimaryAction,
-    showCommittedSection: committedCount > 0 || Boolean(committedPrimaryAction),
-    showStagedSection: stagedResources.length > 0,
-    showUnstagedSection: localChangeResources.length > 0,
+    showCommittedSection,
+    showStagedSection,
+    showUnstagedSection,
+    showCleanSection: status?.isRepo === true
+      && !hasConflicts
+      && !repositoryOperation
+      && !showCommittedSection
+      && !showStagedSection
+      && !showUnstagedSection,
     stagedPrimaryAction,
     showStageAndCommitAction: localChangeResources.length > 0 && !hasConflicts && !repositoryOperation,
     sectionContext: {

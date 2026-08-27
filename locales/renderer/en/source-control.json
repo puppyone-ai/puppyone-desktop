@@ -140,6 +140,7 @@
   "section.unstaged": "Unstaged Changes",
   "sidebar.resize": "Resize Git sidebar sections",
   "status.empty": "Empty",
+  "status.noLocalChanges": "No local changes",
   "status.limit": "Showing the first {count} changes. Refine ignored files or open a smaller workspace for complete results.",
   "status.loadingDiff": "Loading diff…",
   "status.loadingDiffFor": "Loading diff for {path}…",

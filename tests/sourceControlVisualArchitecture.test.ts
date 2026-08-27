@@ -168,7 +168,9 @@ describe("source-control visual architecture", () => {
     ));
     const emptyStateSources = `${sourceControlSidebarSource}\n${sourceControlSidebarSectionsSource}`;
 
-    expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(1);
+    expect(emptyStateSources.match(/className="desktop-git-section-empty"/g)).toHaveLength(2);
+    expect(sourceControlSidebarSectionsSource).toContain('t("source-control.status.noLocalChanges")');
+    expect(sourceControlSidebarSectionsSource).toContain("showCount={false}");
     expect(emptyStateSources).not.toMatch(/desktop-git-empty-(?:remote|committed|stage|changes)/);
     expect(sourceControlComponentsSource).toContain("<ChevronRight size={14}");
     expect(sidebarBaseCss).toContain("--git-section-leading-slot-size: 14px;");
@@ -274,7 +276,9 @@ describe("source-control visual architecture", () => {
     expect(sourceControlSidebarSectionsSource).toContain("controlsId={bodyId}");
     expect(sourceControlSidebarSectionsSource).toContain("count={model.committedCount}");
     expect(sourceControlSidebarSectionsSource).not.toContain("countLabel");
-    expect(sourceControlSidebarSectionsSource.match(/<GitLocalStatusSection/g)).toHaveLength(4);
+    expect(sourceControlSidebarSectionsSource.match(/<GitLocalStatusSection/g)).toHaveLength(5);
+    expect(sourceControlSidebarSectionsSource).toContain("if (model.showCleanSection)");
+    expect(sourceControlSidebarSectionsSource).toContain('className: "changes"');
     expect(sourceControlSidebarSource).not.toContain("layout: gitSidebarLayout,");
     for (const panel of ["merge", "committed", "staged", "unstaged"]) {
       expect(sourceControlExpansionStateSource).toContain(`${panel}: true`);

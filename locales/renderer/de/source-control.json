@@ -140,6 +140,7 @@
   "section.unstaged": "Nicht gestagte Änderungen",
   "sidebar.resize": "Größe der Git-Seitenleistenabschnitte ändern",
   "status.empty": "Leer",
+  "status.noLocalChanges": "Keine lokalen Änderungen",
   "status.limit": "Die ersten {count} Änderungen werden angezeigt. Passe ignorierte Dateien an oder öffne einen kleineren Arbeitsbereich, um vollständige Ergebnisse zu erhalten.",
   "status.loadingDiff": "Diff wird geladen…",
   "status.loadingDiffFor": "Diff für {path} wird geladen…",

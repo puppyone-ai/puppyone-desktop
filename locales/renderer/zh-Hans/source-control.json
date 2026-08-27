@@ -140,6 +140,7 @@
   "section.unstaged": "未暂存的更改",
   "sidebar.resize": "调整 Git 侧边栏分区大小",
   "status.empty": "空",
+  "status.noLocalChanges": "没有本地更改",
   "status.limit": "正在显示前 {count} 项更改。请调整忽略文件，或打开较小的工作区以查看完整结果。",
   "status.loadingDiff": "正在加载差异…",
   "status.loadingDiffFor": "正在加载 {path} 的差异…",

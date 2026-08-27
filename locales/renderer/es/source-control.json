@@ -140,6 +140,7 @@
   "section.unstaged": "Cambios sin preparar",
   "sidebar.resize": "Cambiar tamaño de las secciones de Git",
   "status.empty": "Vacío",
+  "status.noLocalChanges": "No hay cambios locales",
   "status.limit": "Se muestran los primeros {count} cambios. Ajusta los archivos ignorados o abre un espacio de trabajo más pequeño para ver todos los resultados.",
   "status.loadingDiff": "Cargando diferencias…",
   "status.loadingDiffFor": "Cargando diferencias de {path}…",

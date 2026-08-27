@@ -266,6 +266,29 @@ export function createGitLocalStatusPanels({
     });
   }
 
+  if (model.showCleanSection) {
+    panels.push({
+      id: "unstaged",
+      className: "changes",
+      grow: 1,
+      expanded: expanded.unstaged,
+      bodyRows: getGitSidebarPanelBodyRows(0, true),
+      content: (
+        <GitLocalStatusSection
+          title={t("source-control.label.changes")}
+          count={0}
+          showCount={false}
+          expanded={expanded.unstaged}
+          onToggle={() => onToggle("unstaged")}
+        >
+          <SidebarEmptyState compact className="desktop-git-section-empty">
+            {t("source-control.status.noLocalChanges")}
+          </SidebarEmptyState>
+        </GitLocalStatusSection>
+      ),
+    });
+  }
+
   const panelOrder = { merge: 0, committed: 1, staged: 2, unstaged: 3 } as const;
   return panels.sort((left, right) => panelOrder[left.id] - panelOrder[right.id]);
 }

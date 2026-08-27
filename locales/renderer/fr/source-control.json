@@ -140,6 +140,7 @@
   "section.unstaged": "Modifications non indexées",
   "sidebar.resize": "Redimensionner les sections de la barre latérale Git",
   "status.empty": "Vide",
+  "status.noLocalChanges": "Aucune modification locale",
   "status.limit": "Affichage des premiers changements {count}. Affinez les fichiers ignorés ou ouvrez un espace de travail plus petit pour des résultats complets.",
   "status.loadingDiff": "Chargement du diff…",
   "status.loadingDiffFor": "Chargement du diff de {path}…",

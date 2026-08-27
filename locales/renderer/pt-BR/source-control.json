@@ -140,6 +140,7 @@
   "section.unstaged": "Alterações não preparadas",
   "sidebar.resize": "Redimensionar seções do Git",
   "status.empty": "Vazio",
+  "status.noLocalChanges": "Nenhuma alteração local",
   "status.limit": "Mostrando as primeiras {count} alterações. Ajuste os arquivos ignorados ou abra um workspace menor para ver todos os resultados.",
   "status.loadingDiff": "Carregando diferenças…",
   "status.loadingDiffFor": "Carregando diferenças de {path}…",
