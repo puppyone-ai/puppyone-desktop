@@ -7,6 +7,7 @@ const connections = readSource("../src/features/cloud/access-points/styles/catal
 const settings = readSource("../src/features/cloud/sections/settings/settings.css");
 const automation = readSource("../src/features/automation/styles/shell-and-catalog.css");
 const activation = readSource("../src/features/cloud/components/mcp-activation.css");
+const activationComponent = readSource("../src/features/cloud/components/CloudActivationHero.tsx");
 const cloudSignIn = readSource("../src/features/cloud/auth/cloud-sign-in.css");
 const organization = readSource("../src/features/cloud/organization/organization.css");
 
@@ -45,7 +46,7 @@ describe("Cloud content width architecture", () => {
     expect(cloudSignIn).toContain("container: cloud-auth / inline-size;");
     expect(activation).toContain(".desktop-cloud-mcp-activation.is-connection");
     expect(activation).toContain("--desktop-cloud-activation-max-width: 760px;");
-    expect(activation).toContain("--desktop-cloud-activation-artwork-slot-size: 240px;");
+    expect(activation).toContain("--desktop-cloud-activation-artwork-slot-size: 270px;");
     expect(activation).toContain("max-width: var(--desktop-cloud-activation-max-width);");
     expect(activation).toContain("grid-template-columns: minmax(0, 360px) var(--desktop-cloud-activation-artwork-slot-size);");
     expect(activation).toContain("gap: 44px;");
@@ -53,11 +54,11 @@ describe("Cloud content width architecture", () => {
     expect(activation).toContain("@container (max-width: 680px)");
     expect(activation).toContain("@container (max-width: 420px)");
     expect(activation).toContain(".desktop-cloud-activation-illustration-frame.is-connection");
-    expect(activation).toContain("--desktop-cloud-connection-art-scale: 0.58;");
+    expect(activation).toContain("--desktop-cloud-connection-art-scale: 0.66;");
     expect(activation).toContain("--desktop-cloud-overview-art-scale: 1;");
     expect(activation).toContain("--desktop-cloud-secondary-art-scale: 0.52;");
-    expect(activation).toContain("--desktop-cloud-activation-artwork-slot-size: 210px;");
-    expect(activation).toContain("--desktop-cloud-connection-art-scale: 0.51;");
+    expect(activation).toContain("--desktop-cloud-activation-artwork-slot-size: 260px;");
+    expect(activation).toContain("--desktop-cloud-connection-art-scale: 0.64;");
     expect(activation).toContain("aspect-ratio: 1;");
     expect(activation).toContain("overflow: hidden;");
     expect(activation).toContain("contain: layout paint;");
@@ -66,7 +67,7 @@ describe("Cloud content width architecture", () => {
     expect(activation).toContain("left: 50%;");
     expect(activation).toContain("top: 50%;");
     expect(activation).toContain("transform: translate(-50%, -50%) scale(var(--desktop-cloud-connection-art-scale));");
-    expect(activation).toContain("grid-template-columns: 166px 54px 166px;");
+    expect(activation).toContain("grid-template-columns: 166px 54px 180px;");
     expect(activation).toContain("grid-template-columns: 166px 54px 176px;");
     expect(activation).toContain("background: linear-gradient(to right, #d8d8d5 0%, #c9c9c6 78%, #bdbdb9 100%);");
     expect(activation).not.toContain("grid-template-rows: 146px 54px 226px;");
@@ -84,6 +85,9 @@ describe("Cloud content width architecture", () => {
     expect(activation).not.toMatch(/\.desktop-cloud-activation-illustration-frame\s*\{[^}]*place-items:/s);
     expect(activation).not.toContain("@media (max-width: 760px)");
     expect(activation).not.toContain("margin-bottom: -");
+    expect(activationComponent).toContain("desktop-cloud-mcp-phone-home-indicator");
+    expect(activation).toContain("border-radius: 28px;");
+    expect(activation).not.toMatch(/\.desktop-cloud-mcp-phone\s*\{[^}]*border-bottom:/s);
   });
 });
 

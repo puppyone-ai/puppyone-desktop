@@ -1,8 +1,8 @@
 @layer features {
   .desktop-cloud-mcp-activation {
     --desktop-cloud-activation-max-width: 760px;
-    --desktop-cloud-activation-artwork-slot-size: 240px;
-    --desktop-cloud-connection-art-scale: 0.58;
+    --desktop-cloud-activation-artwork-slot-size: 270px;
+    --desktop-cloud-connection-art-scale: 0.66;
     --desktop-cloud-overview-art-scale: 1;
     --desktop-cloud-secondary-art-scale: 0.52;
     display: grid;
@@ -370,9 +370,9 @@
   .desktop-cloud-mcp-illustration {
     position: relative;
     display: grid;
-    width: 386px;
-    height: 226px;
-    grid-template-columns: 166px 54px 166px;
+    width: 400px;
+    height: 246px;
+    grid-template-columns: 166px 54px 180px;
     align-items: center;
     justify-self: center;
     align-self: center;
@@ -416,13 +416,12 @@
 
   .desktop-cloud-mcp-phone {
     position: relative;
-    width: 166px;
-    height: 226px;
+    width: 180px;
+    height: 246px;
     overflow: hidden;
-    padding: 35px 10px 9px;
+    padding: 35px 10px 24px;
     border: 5px solid #181818;
-    border-bottom: 0;
-    border-radius: 28px 28px 0 0;
+    border-radius: 28px;
     background: #fafafa;
     box-shadow: 0 2px 3px rgba(0, 0, 0, 0.12), 0 10px 20px rgba(0, 0, 0, 0.08);
     box-sizing: border-box;
@@ -455,6 +454,17 @@
     height: 14px;
     border-radius: 0 0 10px 10px;
     background: #181818;
+    transform: translateX(-50%);
+  }
+
+  .desktop-cloud-mcp-phone-home-indicator {
+    position: absolute;
+    left: 50%;
+    bottom: 8px;
+    width: 42px;
+    height: 3px;
+    border-radius: 999px;
+    background: #1b1b1b;
     transform: translateX(-50%);
   }
 
@@ -728,10 +738,10 @@
 
   @container (max-width: 820px) {
     .desktop-cloud-mcp-activation {
-      --desktop-cloud-activation-artwork-slot-size: 210px;
-      --desktop-cloud-connection-art-scale: 0.51;
-      --desktop-cloud-overview-art-scale: 0.88;
-      --desktop-cloud-secondary-art-scale: 0.45;
+      --desktop-cloud-activation-artwork-slot-size: 260px;
+      --desktop-cloud-connection-art-scale: 0.64;
+      --desktop-cloud-overview-art-scale: 1;
+      --desktop-cloud-secondary-art-scale: 0.54;
       gap: 28px;
       padding-inline: 24px;
     }
@@ -743,10 +753,10 @@
 
   @container (max-width: 680px) {
     .desktop-cloud-mcp-activation {
-      --desktop-cloud-activation-artwork-slot-size: 180px;
-      --desktop-cloud-connection-art-scale: 0.43;
-      --desktop-cloud-overview-art-scale: 0.75;
-      --desktop-cloud-secondary-art-scale: 0.39;
+      --desktop-cloud-activation-artwork-slot-size: 230px;
+      --desktop-cloud-connection-art-scale: 0.56;
+      --desktop-cloud-overview-art-scale: 0.95;
+      --desktop-cloud-secondary-art-scale: 0.48;
       gap: 22px;
       padding: 32px 22px;
     }
@@ -758,10 +768,10 @@
 
   @container (max-width: 420px) {
     .desktop-cloud-mcp-activation {
-      --desktop-cloud-activation-artwork-slot-size: 145px;
-      --desktop-cloud-connection-art-scale: 0.35;
-      --desktop-cloud-overview-art-scale: 0.6;
-      --desktop-cloud-secondary-art-scale: 0.31;
+      --desktop-cloud-activation-artwork-slot-size: 180px;
+      --desktop-cloud-connection-art-scale: 0.44;
+      --desktop-cloud-overview-art-scale: 0.75;
+      --desktop-cloud-secondary-art-scale: 0.38;
       gap: 14px;
       padding: 26px 12px;
     }
