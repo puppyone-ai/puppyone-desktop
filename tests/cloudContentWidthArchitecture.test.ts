@@ -75,9 +75,12 @@ describe("Cloud content width architecture", () => {
     expect(activation).toContain("width: var(--desktop-cloud-activation-artwork-slot-size);");
     expect(activation).toContain("height: auto;");
     expect(activation).toContain("isolation: isolate;");
-    expect(activation).toContain("filter: drop-shadow(0 11px 17px rgba(79, 76, 68, 0.16));");
-    expect(activation).toContain("inset-inline-end: 6px;");
-    expect(activation).toContain("inset-inline-start: 4px;");
+    expect(activation).toContain("filter: drop-shadow(0 12px 18px rgba(68, 78, 92, 0.14));");
+    expect(activation).toContain(".desktop-cloud-activation-overview-art");
+    expect(activation).toContain("object-fit: contain;");
+    expect(activationComponent).toContain("assets/cloud/cloud-homepage-hosting-hero-v1.png");
+    expect(activationComponent).not.toContain("desktop-cloud-activation-overview-cloud");
+    expect(activationComponent).not.toContain("desktop-cloud-activation-overview-folder");
     expect(activation).not.toContain("desktop-cloud-activation-overview-link");
     expect(activation).not.toContain("grid-template-columns: minmax(0, 1fr) var(--desktop-cloud-activation-artwork-slot-size);");
     expect(activation).not.toContain("grid-template-columns: minmax(0, 430px);");
