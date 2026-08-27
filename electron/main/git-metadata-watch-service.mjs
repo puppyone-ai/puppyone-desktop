@@ -167,6 +167,34 @@ export function createGitMetadataWatchService({
     return pendingRoots.size;
   }
 
+  // Renderer-owned saves are intentionally suppressed from the generic
+  // workspace watcher so the editor does not reload its own write. Git still
+  // needs the durable write as an invalidation hint, so publish it through the
+  // repository-only channel instead.
+  function invalidateWorkingTree(rootPath) {
+    if (typeof rootPath !== "string" || rootPath.trim().length === 0) return 0;
+    const resolvedRoot = resolveCanonicalWatchPath(rootPath);
+    let invalidated = 0;
+
+    for (const repository of repositories.values()) {
+      const repositoryRoot = resolveCanonicalWatchPath(repository.identity.topLevel);
+      if (!isPathWithinRepository(resolvedRoot, repositoryRoot)) continue;
+      broadcastInvalidation(repository, "working-tree");
+      invalidated += 1;
+    }
+
+    return invalidated;
+  }
+
+  function resolveCanonicalWatchPath(value) {
+    const resolved = path.resolve(value);
+    try {
+      return path.resolve(fsModule.realpathSync(resolved));
+    } catch {
+      return resolved;
+    }
+  }
+
   function createRepositoryWatch(identity, identityKey) {
     return {
       identity,
@@ -599,6 +627,7 @@ export function createGitMetadataWatchService({
     stop,
     stopForWindow,
     closeAll,
+    invalidateWorkingTree,
     getWatcherCount,
     getPendingRootCount,
     // Test seam: force a pending root to re-check for repository creation.
@@ -606,6 +635,11 @@ export function createGitMetadataWatchService({
     // Test seam: inject watcher failure recovery without relying on OS fs.watch quirks.
     forceRearmForTests,
   };
+}
+
+function isPathWithinRepository(candidatePath, repositoryRoot) {
+  const relative = path.relative(path.resolve(repositoryRoot), candidatePath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 function buildIdentityKey(identity) {

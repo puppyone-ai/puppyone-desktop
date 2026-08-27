@@ -78,7 +78,11 @@ describe("workspace file IPC authorization", () => {
 
   it("attributes a successful editor write to its originating window", async () => {
     const workspaceWatchService = { noteInternalWrite: vi.fn() };
-    const { handlers } = createHarness(() => root, { workspaceWatchService });
+    const gitMetadataWatchService = { invalidateWorkingTree: vi.fn() };
+    const { handlers } = createHarness(() => root, {
+      gitMetadataWatchService,
+      workspaceWatchService,
+    });
     const notePath = path.join(root, "note.txt");
     await writeFile(notePath, "before");
 
@@ -95,10 +99,14 @@ describe("workspace file IPC authorization", () => {
       senderId: 80,
       version: result.version,
     });
+    expect(gitMetadataWatchService.invalidateWorkingTree).toHaveBeenCalledWith(
+      await fs.promises.realpath(root),
+    );
   });
 
   it("returns a structured conflict with the latest bytes instead of throwing Error metadata", async () => {
-    const { handlers } = createHarness(() => root);
+    const gitMetadataWatchService = { invalidateWorkingTree: vi.fn() };
+    const { handlers } = createHarness(() => root, { gitMetadataWatchService });
     const notePath = path.join(root, "note.txt");
     await writeFile(notePath, "base");
     const opened = await handlers.get("workspace:read-file")(
@@ -124,11 +132,16 @@ describe("workspace file IPC authorization", () => {
     });
     expect(result.version).toMatch(/^sha256:/);
     expect(await readFile(notePath, "utf8")).toBe("agent version");
+    expect(gitMetadataWatchService.invalidateWorkingTree).not.toHaveBeenCalled();
   });
 
   it("returns a structured not-found failure and never attributes a failed write", async () => {
     const workspaceWatchService = { noteInternalWrite: vi.fn() };
-    const { handlers } = createHarness(() => root, { workspaceWatchService });
+    const gitMetadataWatchService = { invalidateWorkingTree: vi.fn() };
+    const { handlers } = createHarness(() => root, {
+      gitMetadataWatchService,
+      workspaceWatchService,
+    });
 
     const result = await handlers.get("workspace:write-file")(
       { sender: { id: 82 } },
@@ -145,6 +158,7 @@ describe("workspace file IPC authorization", () => {
       kind: "not-found",
     });
     expect(workspaceWatchService.noteInternalWrite).not.toHaveBeenCalled();
+    expect(gitMetadataWatchService.invalidateWorkingTree).not.toHaveBeenCalled();
   });
 
   it("issues a sender-owned URL capability scoped to the exact file", async () => {
@@ -410,7 +424,7 @@ describe("workspace file IPC authorization", () => {
 
 function createHarness(
   getWorkspaceRootForSender,
-  { convertOfficeDocument, dialog, workspaceWatchService } = {},
+  { convertOfficeDocument, dialog, gitMetadataWatchService, workspaceWatchService } = {},
 ) {
   const handlers = new Map();
   const ipcMain = {
@@ -434,6 +448,7 @@ function createHarness(
       fsModule: fs,
     }),
     localFileCapabilities,
+    gitMetadataWatchService,
     workspaceWatchService,
     convertOfficeDocument,
   });

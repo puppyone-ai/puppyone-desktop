@@ -61,6 +61,7 @@ export function registerWorkspaceFileIpcHandlers({
   authorizeWorkspaceRoot,
   localFileCapabilities,
   workspaceWatchService = null,
+  gitMetadataWatchService = null,
   convertOfficeDocument = convertWorkspaceOfficeDocumentToDocx,
   t = defaultTranslate,
 }) {
@@ -222,6 +223,13 @@ export function registerWorkspaceFileIpcHandlers({
       // succeeds, attribution bookkeeping must never turn that durability
       // acknowledgement into a failed save.
       console.warn("Unable to attribute internal workspace write:", error);
+    }
+    try {
+      gitMetadataWatchService?.invalidateWorkingTree?.(rootPath);
+    } catch (error) {
+      // Git invalidation is a reconciliation hint. A durable file save must
+      // remain successful even if no repository watcher is currently active.
+      console.warn("Unable to invalidate Git after workspace write:", error);
     }
     await absorbWorkspaceEditReviewPath(rootPath, filePath);
     return { ok: true, version: result?.version ?? null };

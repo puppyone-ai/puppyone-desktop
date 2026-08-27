@@ -787,6 +787,7 @@ function registerIpcHandlers() {
     authorizeWorkspaceRoot,
     localFileCapabilities,
     workspaceWatchService,
+    gitMetadataWatchService,
     t: (messageId, values) => localeService.t(messageId, values),
   });
 

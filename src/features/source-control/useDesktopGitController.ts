@@ -134,6 +134,14 @@ export function useDesktopGitController({
     setPendingBranchSwitch(null);
   }, [workspace?.path]);
 
+  // Watchers keep the sidebar live while it is closed. Entering Source Control
+  // still performs an immediate reconciliation so a missed/coalesced native
+  // event can never leave the first visible frame stale.
+  useEffect(() => {
+    if (!gitViewActive || !workspace?.path) return;
+    void refreshGitStatus("working-tree");
+  }, [gitViewActive, refreshGitStatus, workspace?.path]);
+
   // The Git sidebar owns an always-visible History pane, so load its graph as
   // soon as the Source Control surface is active and refresh it after ref changes.
   useEffect(() => {

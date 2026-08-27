@@ -325,6 +325,7 @@ describe("source-control visual architecture", () => {
     expect(gitRepositoryLifecycleSource).toContain(
       "fetchWorkspaceGit(context.rootPath, { remoteName })",
     );
+    expect(gitControllerSource).toContain('void refreshGitStatus("working-tree")');
   });
 
   it("keeps file status as a quiet inline marker without moving row actions", () => {
