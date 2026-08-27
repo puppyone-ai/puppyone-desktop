@@ -207,6 +207,7 @@ function CloudMcpConnectionIllustration() {
           <AgentTile label="Hermes" kind="hermes" />
           <AgentTile label="Grok" kind="grok" />
         </div>
+        <span className="desktop-cloud-mcp-phone-home-indicator" />
       </div>
     </div>
   );
