@@ -164,6 +164,21 @@
     place-items: center;
   }
 
+  .desktop-cloud-activation-illustration-frame.is-connection {
+    --desktop-cloud-connection-art-scale: 0.46;
+    width: 84px;
+    height: 196px;
+    justify-self: start;
+  }
+
+  .desktop-cloud-activation-illustration-frame.is-connection > :is(
+    .desktop-cloud-mcp-illustration,
+    .desktop-cloud-channel-illustration
+  ) {
+    transform: scale(var(--desktop-cloud-connection-art-scale));
+    transform-origin: center;
+  }
+
   .desktop-cloud-activation-illustration {
     position: relative;
     display: flex;
@@ -735,12 +750,6 @@
       transform-origin: center;
     }
 
-    .desktop-cloud-mcp-illustration,
-    .desktop-cloud-channel-illustration {
-      width: 166px;
-      transform: scale(0.94);
-      transform-origin: center;
-    }
   }
 
   @container (max-width: 680px) {
@@ -770,15 +779,17 @@
     }
 
     .desktop-cloud-activation-illustration-frame.is-connection {
-      height: 350px;
+      width: 84px;
+      height: 196px;
+      justify-self: center;
     }
 
     .desktop-cloud-activation-illustration-frame.is-connection > :is(
       .desktop-cloud-mcp-illustration,
       .desktop-cloud-channel-illustration
     ) {
-      transform: scale(0.82);
-      transform-origin: top center;
+      transform: scale(var(--desktop-cloud-connection-art-scale));
+      transform-origin: center;
     }
 
     .desktop-cloud-activation-illustration-frame.is-overview {
@@ -811,14 +822,16 @@
     }
 
     .desktop-cloud-activation-illustration-frame.is-connection {
-      height: 307px;
+      --desktop-cloud-connection-art-scale: 0.4;
+      width: 72px;
+      height: 171px;
     }
 
     .desktop-cloud-activation-illustration-frame.is-connection > :is(
       .desktop-cloud-mcp-illustration,
       .desktop-cloud-channel-illustration
     ) {
-      transform: scale(0.72);
+      transform: scale(var(--desktop-cloud-connection-art-scale));
     }
 
     .desktop-cloud-activation-illustration-frame.is-overview {

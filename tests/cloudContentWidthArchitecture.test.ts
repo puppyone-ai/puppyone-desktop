@@ -50,7 +50,10 @@ describe("Cloud content width architecture", () => {
     expect(activation).toContain("@container (max-width: 680px)");
     expect(activation).toContain("@container (max-width: 420px)");
     expect(activation).toContain(".desktop-cloud-activation-illustration-frame.is-connection");
-    expect(activation).toContain("height: 350px;");
+    expect(activation).toContain("--desktop-cloud-connection-art-scale: 0.46;");
+    expect(activation).toContain("width: 84px;");
+    expect(activation).toContain("height: 196px;");
+    expect(activation).toContain("transform: scale(var(--desktop-cloud-connection-art-scale));");
     expect(activation).not.toContain("@media (max-width: 760px)");
     expect(activation).not.toContain("margin-bottom: -");
   });
