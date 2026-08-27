@@ -1,19 +1,21 @@
 @layer features {
   .desktop-cloud-mcp-activation {
+    --desktop-cloud-activation-max-width: 760px;
     --desktop-cloud-activation-artwork-slot-size: 200px;
     --desktop-cloud-connection-art-scale: 0.48;
     --desktop-cloud-overview-art-scale: 0.84;
     --desktop-cloud-secondary-art-scale: 0.44;
     display: grid;
     width: min(100%, var(--desktop-cloud-content-max-width, 900px));
+    max-width: var(--desktop-cloud-activation-max-width);
     height: auto;
     min-width: 0;
     min-height: 0;
     max-height: 100%;
-    grid-template-columns: minmax(0, 1fr) var(--desktop-cloud-activation-artwork-slot-size);
+    grid-template-columns: minmax(0, 360px) var(--desktop-cloud-activation-artwork-slot-size);
     align-items: center;
     align-content: center;
-    justify-content: stretch;
+    justify-content: center;
     gap: 48px;
     margin: auto;
     padding: clamp(32px, 7vh, 76px) 44px;
@@ -151,43 +153,40 @@
   }
 
   .desktop-cloud-activation-illustration-frame {
-    display: grid;
+    position: relative;
     width: var(--desktop-cloud-activation-artwork-slot-size);
     min-width: 0;
     aspect-ratio: 1;
     height: auto;
     overflow: hidden;
-    place-items: center;
+    contain: layout paint;
     justify-self: end;
   }
 
-  .desktop-cloud-activation-illustration-frame.is-connection {
-    width: var(--desktop-cloud-activation-artwork-slot-size);
-    height: auto;
-    justify-self: end;
+  .desktop-cloud-activation-illustration-frame > :is(
+    .desktop-cloud-mcp-illustration,
+    .desktop-cloud-channel-illustration,
+    .desktop-cloud-activation-illustration
+  ) {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform-origin: center;
   }
 
   .desktop-cloud-activation-illustration-frame.is-connection > :is(
     .desktop-cloud-mcp-illustration,
     .desktop-cloud-channel-illustration
   ) {
-    transform: scale(var(--desktop-cloud-connection-art-scale));
-    transform-origin: center;
-  }
-
-  .desktop-cloud-activation-illustration-frame.is-overview {
-    width: var(--desktop-cloud-activation-artwork-slot-size);
-    height: auto;
+    transform: translate(-50%, -50%) scale(var(--desktop-cloud-connection-art-scale));
   }
 
   .desktop-cloud-activation-illustration-frame.is-overview > .desktop-cloud-activation-illustration {
-    transform: scale(var(--desktop-cloud-overview-art-scale));
-    transform-origin: center;
+    transform: translate(-50%, -50%) scale(var(--desktop-cloud-overview-art-scale));
   }
 
   .desktop-cloud-activation-illustration-frame:not(.is-connection):not(.is-overview) > .desktop-cloud-activation-illustration {
-    transform: scale(var(--desktop-cloud-secondary-art-scale));
-    transform-origin: center;
+    transform: translate(-50%, -50%) scale(var(--desktop-cloud-secondary-art-scale));
   }
 
   .desktop-cloud-activation-illustration {
