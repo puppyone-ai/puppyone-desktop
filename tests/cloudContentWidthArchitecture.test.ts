@@ -44,14 +44,16 @@ describe("Cloud content width architecture", () => {
   it("keeps activation copy and artwork compact and responds to the content pane", () => {
     expect(cloudSignIn).toContain("container: cloud-auth / inline-size;");
     expect(activation).toContain(".desktop-cloud-mcp-activation.is-connection");
-    expect(activation).toContain("--desktop-cloud-activation-artwork-slot-size: 280px;");
-    expect(activation).toContain("grid-template-columns: minmax(320px, 1fr) var(--desktop-cloud-activation-artwork-slot-size);");
+    expect(activation).toContain("--desktop-cloud-activation-artwork-slot-size: 200px;");
+    expect(activation).toContain("grid-template-columns: minmax(0, 1fr) var(--desktop-cloud-activation-artwork-slot-size);");
     expect(activation).toContain("gap: 44px;");
     expect(activation).toContain("@container (max-width: 820px)");
     expect(activation).toContain("@container (max-width: 680px)");
     expect(activation).toContain("@container (max-width: 420px)");
     expect(activation).toContain(".desktop-cloud-activation-illustration-frame.is-connection");
-    expect(activation).toContain("--desktop-cloud-connection-art-scale: 0.68;");
+    expect(activation).toContain("--desktop-cloud-connection-art-scale: 0.48;");
+    expect(activation).toContain("--desktop-cloud-overview-art-scale: 0.84;");
+    expect(activation).toContain("--desktop-cloud-secondary-art-scale: 0.44;");
     expect(activation).toContain("aspect-ratio: 1;");
     expect(activation).toContain("overflow: hidden;");
     expect(activation).toContain("justify-self: end;");
@@ -68,6 +70,8 @@ describe("Cloud content width architecture", () => {
     expect(activation).toContain("inset-inline-end: 6px;");
     expect(activation).toContain("inset-inline-start: 4px;");
     expect(activation).not.toContain("desktop-cloud-activation-overview-link");
+    expect(activation).not.toContain("grid-template-columns: minmax(0, 430px);");
+    expect(activation).not.toContain("justify-items: center;");
     expect(activation).not.toContain("@media (max-width: 760px)");
     expect(activation).not.toContain("margin-bottom: -");
   });

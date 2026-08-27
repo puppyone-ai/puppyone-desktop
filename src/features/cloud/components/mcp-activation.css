@@ -1,14 +1,16 @@
 @layer features {
   .desktop-cloud-mcp-activation {
-    --desktop-cloud-activation-artwork-slot-size: 280px;
-    --desktop-cloud-connection-art-scale: 0.68;
+    --desktop-cloud-activation-artwork-slot-size: 200px;
+    --desktop-cloud-connection-art-scale: 0.48;
+    --desktop-cloud-overview-art-scale: 0.84;
+    --desktop-cloud-secondary-art-scale: 0.44;
     display: grid;
     width: min(100%, var(--desktop-cloud-content-max-width, 900px));
     height: auto;
     min-width: 0;
     min-height: 0;
     max-height: 100%;
-    grid-template-columns: minmax(320px, 1fr) var(--desktop-cloud-activation-artwork-slot-size);
+    grid-template-columns: minmax(0, 1fr) var(--desktop-cloud-activation-artwork-slot-size);
     align-items: center;
     align-content: center;
     justify-content: stretch;
@@ -25,16 +27,8 @@
   }
 
   .desktop-cloud-mcp-activation.desktop-cloud-git-prerequisite {
-    width: min(100%, var(--desktop-cloud-content-max-width, 900px));
-    grid-template-columns: minmax(320px, 1fr) var(--desktop-cloud-activation-artwork-slot-size);
     justify-items: stretch;
-    gap: 48px;
-    padding: clamp(32px, 7vh, 76px) 44px;
     text-align: start;
-  }
-
-  .desktop-cloud-mcp-activation.desktop-cloud-git-prerequisite.is-connection {
-    gap: 44px;
   }
 
   .desktop-cloud-mcp-activation-copy {
@@ -184,6 +178,16 @@
   .desktop-cloud-activation-illustration-frame.is-overview {
     width: var(--desktop-cloud-activation-artwork-slot-size);
     height: auto;
+  }
+
+  .desktop-cloud-activation-illustration-frame.is-overview > .desktop-cloud-activation-illustration {
+    transform: scale(var(--desktop-cloud-overview-art-scale));
+    transform-origin: center;
+  }
+
+  .desktop-cloud-activation-illustration-frame:not(.is-connection):not(.is-overview) > .desktop-cloud-activation-illustration {
+    transform: scale(var(--desktop-cloud-secondary-art-scale));
+    transform-origin: center;
   }
 
   .desktop-cloud-activation-illustration {
@@ -725,133 +729,50 @@
 
   @container (max-width: 820px) {
     .desktop-cloud-mcp-activation {
-      --desktop-cloud-activation-artwork-slot-size: 240px;
-      --desktop-cloud-connection-art-scale: 0.59;
-      grid-template-columns: minmax(280px, 1fr) var(--desktop-cloud-activation-artwork-slot-size);
-      gap: 32px;
+      --desktop-cloud-activation-artwork-slot-size: 180px;
+      --desktop-cloud-connection-art-scale: 0.43;
+      --desktop-cloud-overview-art-scale: 0.75;
+      --desktop-cloud-secondary-art-scale: 0.39;
+      gap: 28px;
       padding-inline: 24px;
     }
 
     .desktop-cloud-mcp-activation.is-connection {
-      gap: 32px;
-    }
-
-    .desktop-cloud-mcp-activation.desktop-cloud-git-prerequisite {
-      grid-template-columns: minmax(280px, 1fr) var(--desktop-cloud-activation-artwork-slot-size);
-      gap: 32px;
-      padding-inline: 24px;
-    }
-
-    .desktop-cloud-activation-illustration-frame.is-overview > .desktop-cloud-activation-illustration {
-      transform: scale(0.88);
-      transform-origin: center;
+      gap: 28px;
     }
   }
 
   @container (max-width: 680px) {
     .desktop-cloud-mcp-activation {
-      --desktop-cloud-activation-artwork-slot-size: 220px;
-      --desktop-cloud-connection-art-scale: 0.53;
-      grid-template-columns: minmax(0, 430px);
-      align-content: safe center;
-      justify-items: center;
-      gap: 24px;
+      --desktop-cloud-activation-artwork-slot-size: 150px;
+      --desktop-cloud-connection-art-scale: 0.36;
+      --desktop-cloud-overview-art-scale: 0.63;
+      --desktop-cloud-secondary-art-scale: 0.33;
+      gap: 22px;
       padding: 32px 22px;
     }
 
-    .desktop-cloud-mcp-activation.is-connection,
-    .desktop-cloud-mcp-activation:not(.is-connection) {
-      grid-template-columns: minmax(0, 430px);
-    }
-
-    .desktop-cloud-mcp-activation.desktop-cloud-git-prerequisite {
-      grid-template-columns: minmax(0, 430px);
-      justify-items: center;
-      gap: 24px;
-      padding: 32px 22px;
-      text-align: start;
-    }
-
-    .desktop-cloud-mcp-activation-copy {
-      width: min(100%, 430px);
-    }
-
-    .desktop-cloud-activation-illustration-frame.is-connection {
-      width: var(--desktop-cloud-activation-artwork-slot-size);
-      height: auto;
-      justify-self: center;
-    }
-
-    .desktop-cloud-activation-illustration-frame.is-connection > :is(
-      .desktop-cloud-mcp-illustration,
-      .desktop-cloud-channel-illustration
-    ) {
-      transform: scale(var(--desktop-cloud-connection-art-scale));
-      transform-origin: center;
-    }
-
-    .desktop-cloud-activation-illustration-frame.is-overview {
-      width: var(--desktop-cloud-activation-artwork-slot-size);
-      height: auto;
-      justify-self: center;
-    }
-
-    .desktop-cloud-activation-illustration-frame.is-overview > .desktop-cloud-activation-illustration {
-      transform: scale(0.78);
-      transform-origin: center;
-    }
-
-    .desktop-cloud-activation-illustration-frame:not(.is-connection):not(.is-overview) {
-      width: var(--desktop-cloud-activation-artwork-slot-size);
-      height: auto;
-      justify-self: center;
-    }
-
-    .desktop-cloud-activation-illustration-frame:not(.is-connection):not(.is-overview) > .desktop-cloud-activation-illustration {
-      transform: scale(0.84);
-      transform-origin: center;
+    .desktop-cloud-mcp-activation.is-connection {
+      gap: 22px;
     }
   }
 
   @container (max-width: 420px) {
     .desktop-cloud-mcp-activation {
-      --desktop-cloud-activation-artwork-slot-size: 190px;
-      --desktop-cloud-connection-art-scale: 0.46;
-      gap: 20px;
-      padding: 26px 18px;
+      --desktop-cloud-activation-artwork-slot-size: 120px;
+      --desktop-cloud-connection-art-scale: 0.29;
+      --desktop-cloud-overview-art-scale: 0.5;
+      --desktop-cloud-secondary-art-scale: 0.26;
+      gap: 14px;
+      padding: 26px 12px;
     }
 
     .desktop-cloud-mcp-activation-header h1 {
       font-size: 25px;
     }
 
-    .desktop-cloud-activation-illustration-frame.is-connection {
-      width: var(--desktop-cloud-activation-artwork-slot-size);
-      height: auto;
-    }
-
-    .desktop-cloud-activation-illustration-frame.is-connection > :is(
-      .desktop-cloud-mcp-illustration,
-      .desktop-cloud-channel-illustration
-    ) {
-      transform: scale(var(--desktop-cloud-connection-art-scale));
-    }
-
-    .desktop-cloud-activation-illustration-frame.is-overview {
-      width: var(--desktop-cloud-activation-artwork-slot-size);
-      height: auto;
-    }
-
-    .desktop-cloud-activation-illustration-frame.is-overview > .desktop-cloud-activation-illustration {
-      transform: scale(0.67);
-    }
-
-    .desktop-cloud-activation-illustration-frame:not(.is-connection):not(.is-overview) {
-      height: 170px;
-    }
-
-    .desktop-cloud-activation-illustration-frame:not(.is-connection):not(.is-overview) > .desktop-cloud-activation-illustration {
-      transform: scale(0.74);
+    .desktop-cloud-mcp-activation.is-connection {
+      gap: 14px;
     }
   }
 
