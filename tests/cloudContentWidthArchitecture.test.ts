@@ -45,7 +45,7 @@ describe("Cloud content width architecture", () => {
     expect(cloudSignIn).toContain("container: cloud-auth / inline-size;");
     expect(activation).toContain(".desktop-cloud-mcp-activation.is-connection");
     expect(activation).toContain("--desktop-cloud-activation-max-width: 760px;");
-    expect(activation).toContain("--desktop-cloud-activation-artwork-slot-size: 200px;");
+    expect(activation).toContain("--desktop-cloud-activation-artwork-slot-size: 240px;");
     expect(activation).toContain("max-width: var(--desktop-cloud-activation-max-width);");
     expect(activation).toContain("grid-template-columns: minmax(0, 360px) var(--desktop-cloud-activation-artwork-slot-size);");
     expect(activation).toContain("gap: 44px;");
@@ -53,9 +53,11 @@ describe("Cloud content width architecture", () => {
     expect(activation).toContain("@container (max-width: 680px)");
     expect(activation).toContain("@container (max-width: 420px)");
     expect(activation).toContain(".desktop-cloud-activation-illustration-frame.is-connection");
-    expect(activation).toContain("--desktop-cloud-connection-art-scale: 0.48;");
-    expect(activation).toContain("--desktop-cloud-overview-art-scale: 0.84;");
-    expect(activation).toContain("--desktop-cloud-secondary-art-scale: 0.44;");
+    expect(activation).toContain("--desktop-cloud-connection-art-scale: 0.58;");
+    expect(activation).toContain("--desktop-cloud-overview-art-scale: 1;");
+    expect(activation).toContain("--desktop-cloud-secondary-art-scale: 0.52;");
+    expect(activation).toContain("--desktop-cloud-activation-artwork-slot-size: 210px;");
+    expect(activation).toContain("--desktop-cloud-connection-art-scale: 0.51;");
     expect(activation).toContain("aspect-ratio: 1;");
     expect(activation).toContain("overflow: hidden;");
     expect(activation).toContain("contain: layout paint;");
