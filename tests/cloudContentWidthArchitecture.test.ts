@@ -51,11 +51,15 @@ describe("Cloud content width architecture", () => {
     expect(activation).toContain("@container (max-width: 680px)");
     expect(activation).toContain("@container (max-width: 420px)");
     expect(activation).toContain(".desktop-cloud-activation-illustration-frame.is-connection");
-    expect(activation).toContain("--desktop-cloud-connection-art-scale: 0.62;");
+    expect(activation).toContain("--desktop-cloud-connection-art-scale: 0.68;");
     expect(activation).toContain("aspect-ratio: 1;");
     expect(activation).toContain("overflow: hidden;");
     expect(activation).toContain("justify-self: end;");
     expect(activation).toContain("transform: scale(var(--desktop-cloud-connection-art-scale));");
+    expect(activation).toContain("grid-template-columns: 166px 54px 166px;");
+    expect(activation).toContain("grid-template-columns: 166px 54px 176px;");
+    expect(activation).toContain("background: linear-gradient(to right, #d8d8d5 0%, #c9c9c6 78%, #bdbdb9 100%);");
+    expect(activation).not.toContain("grid-template-rows: 146px 54px 226px;");
     expect(activation).toContain(".desktop-cloud-activation-illustration-frame.is-overview");
     expect(activation).toContain("width: var(--desktop-cloud-activation-artwork-slot-size);");
     expect(activation).toContain("height: auto;");
