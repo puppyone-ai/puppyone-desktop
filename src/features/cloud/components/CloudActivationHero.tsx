@@ -12,10 +12,7 @@ import { useId, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 import type { CloudWorkspaceSection } from "../types";
-import {
-  CloudPublishCloudMark,
-  CloudPublishFolderMark,
-} from "./CloudPublishHeroMarks";
+import { CloudPublishFolderMark } from "./CloudPublishHeroMarks";
 import "./mcp-activation.css";
 
 type CloudActivationKind = "overview" | "mcp" | "cli" | "git" | "automation" | "access";
@@ -149,12 +146,14 @@ function CloudActivationIllustration({ kind }: { kind: CloudActivationKind }) {
 function CloudOverviewActivationIllustration() {
   return (
     <div className="desktop-cloud-activation-illustration is-overview" aria-hidden="true">
-      <span className="desktop-cloud-activation-overview-cloud">
-        <CloudPublishCloudMark />
-      </span>
-      <span className="desktop-cloud-activation-overview-folder">
-        <CloudPublishFolderMark />
-      </span>
+      <img
+        className="desktop-cloud-activation-overview-art"
+        src={resolveRendererPublicAssetUrl("assets/cloud/cloud-homepage-hosting-hero-v1.png")}
+        alt=""
+        width={768}
+        height={768}
+        draggable={false}
+      />
     </div>
   );
 }
