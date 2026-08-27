@@ -85,9 +85,12 @@ describe("Cloud content width architecture", () => {
     expect(activation).not.toMatch(/\.desktop-cloud-activation-illustration-frame\s*\{[^}]*place-items:/s);
     expect(activation).not.toContain("@media (max-width: 760px)");
     expect(activation).not.toContain("margin-bottom: -");
-    expect(activationComponent).toContain("desktop-cloud-mcp-phone-home-indicator");
+    expect(activationComponent).toContain('desktop-cloud-mcp-phone is-cropped');
+    expect(activationComponent).not.toContain("desktop-cloud-mcp-phone-home-indicator");
     expect(activation).toContain("border-radius: 28px;");
-    expect(activation).not.toMatch(/\.desktop-cloud-mcp-phone\s*\{[^}]*border-bottom:/s);
+    expect(activation).toContain(".desktop-cloud-mcp-phone.is-cropped");
+    expect(activation).toContain("border-bottom: 0;");
+    expect(activation).toContain("border-radius: 28px 28px 0 0;");
   });
 });
 

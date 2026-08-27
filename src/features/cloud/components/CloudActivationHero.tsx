@@ -197,7 +197,7 @@ function CloudMcpConnectionIllustration() {
         <McpLogoIcon className="desktop-cloud-mcp-folder-logo" />
       </div>
       <span className="desktop-cloud-mcp-connector" />
-      <div className="desktop-cloud-mcp-phone">
+      <div className="desktop-cloud-mcp-phone is-cropped">
         <span className="desktop-cloud-mcp-phone-speaker" />
         <div className="desktop-cloud-mcp-agent-grid">
           <AgentTile label="ChatGPT" kind="chatgpt" />
@@ -207,7 +207,6 @@ function CloudMcpConnectionIllustration() {
           <AgentTile label="Hermes" kind="hermes" />
           <AgentTile label="Grok" kind="grok" />
         </div>
-        <span className="desktop-cloud-mcp-phone-home-indicator" />
       </div>
     </div>
   );
