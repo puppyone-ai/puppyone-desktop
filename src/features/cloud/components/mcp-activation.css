@@ -198,8 +198,10 @@
   }
 
   .desktop-cloud-activation-illustration.is-overview {
-    width: 260px;
-    height: 180px;
+    width: 232px;
+    height: 174px;
+    isolation: isolate;
+    filter: drop-shadow(0 11px 17px rgba(79, 76, 68, 0.16));
   }
 
   .desktop-cloud-activation-overview-cloud,
@@ -210,33 +212,31 @@
   }
 
   .desktop-cloud-activation-overview-cloud {
-    top: 0;
-    inset-inline-end: 0;
-    width: 156px;
-    height: 132px;
+    top: 4px;
+    inset-inline-end: 6px;
+    width: 170px;
+    height: 148px;
     z-index: 1;
   }
 
   .desktop-cloud-activation-overview-cloud > svg {
-    width: 156px;
-    height: 132px;
+    width: 170px;
+    height: 148px;
     overflow: visible;
-    filter: drop-shadow(0 9px 14px rgba(82, 112, 142, 0.14));
   }
 
   .desktop-cloud-activation-overview-folder {
-    inset-inline-start: 0;
+    inset-inline-start: 4px;
     bottom: 0;
-    width: 166px;
-    height: 146px;
+    width: 178px;
+    height: 156px;
     z-index: 2;
   }
 
   .desktop-cloud-activation-overview-folder > svg {
-    width: 166px;
-    height: 146px;
+    width: 178px;
+    height: 156px;
     overflow: visible;
-    filter: drop-shadow(0 8px 12px rgba(102, 70, 16, 0.16));
   }
 
   .desktop-cloud-activation-faux-copy {
