@@ -18,7 +18,7 @@
     text-align: start;
   }
 
-  .desktop-cloud-mcp-activation.is-mcp {
+  .desktop-cloud-mcp-activation.is-connection {
     grid-template-columns: minmax(320px, 360px) 220px;
     gap: 44px;
   }
@@ -30,6 +30,11 @@
     gap: 48px;
     padding: clamp(32px, 7vh, 76px) 44px;
     text-align: start;
+  }
+
+  .desktop-cloud-mcp-activation.desktop-cloud-git-prerequisite.is-connection {
+    grid-template-columns: minmax(320px, 360px) 220px;
+    gap: 44px;
   }
 
   .desktop-cloud-mcp-activation-copy {
@@ -170,43 +175,53 @@
     color: #676761;
   }
 
-  .desktop-cloud-activation-overview-card {
+  .desktop-cloud-activation-illustration.is-overview {
+    height: 320px;
+    flex-direction: column;
+  }
+
+  .desktop-cloud-activation-overview-cloud,
+  .desktop-cloud-activation-overview-folder {
     display: grid;
-    width: 250px;
-    padding: 13px 16px;
-    border: 1px solid #dededb;
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--po-canvas) 94%, white);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.055);
-    box-sizing: border-box;
+    width: 166px;
+    height: 132px;
+    flex: 0 0 132px;
+    place-items: center;
   }
 
-  .desktop-cloud-activation-overview-row {
-    display: grid;
-    height: 39px;
-    grid-template-columns: 28px 1fr 24px;
-    align-items: center;
-    gap: 10px;
+  .desktop-cloud-activation-overview-cloud > svg {
+    width: 156px;
+    height: 132px;
+    overflow: visible;
+    filter: drop-shadow(0 9px 14px rgba(82, 112, 142, 0.14));
   }
 
-  .desktop-cloud-activation-overview-row.is-project {
-    height: 47px;
-    margin-bottom: 4px;
-    border-bottom: 1px solid #ececea;
+  .desktop-cloud-activation-overview-folder > svg {
+    width: 166px;
+    height: 146px;
+    overflow: visible;
+    filter: drop-shadow(0 8px 12px rgba(102, 70, 16, 0.16));
   }
 
-  .desktop-cloud-activation-overview-row.is-project > svg {
-    color: #dba938;
-    fill: #e2b342;
-    stroke-width: 1.45;
+  .desktop-cloud-activation-overview-link {
+    position: relative;
+    display: block;
+    width: 2px;
+    height: 48px;
+    flex: 0 0 48px;
+    background: linear-gradient(to bottom, #b8c7d4 0%, #d0d0cc 100%);
   }
 
-  .desktop-cloud-activation-overview-row:not(.is-project) > svg {
-    padding: 4px;
-    border-radius: 999px;
-    background: #f0f0ee;
-    color: #868680;
-    box-sizing: content-box;
+  .desktop-cloud-activation-overview-link::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 50%;
+    top: -2px;
+    width: 7px;
+    height: 7px;
+    border-top: 2px solid #a8bac9;
+    border-left: 2px solid #a8bac9;
+    transform: translateX(-50%) rotate(45deg);
   }
 
   .desktop-cloud-activation-faux-copy {
@@ -225,22 +240,6 @@
   .desktop-cloud-activation-faux-copy i:last-child {
     width: 48px;
     background: #e9e9e7;
-  }
-
-  .desktop-cloud-activation-overview-row b {
-    justify-self: center;
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
-    background: #35aa5c;
-  }
-
-  .desktop-cloud-activation-overview-row em {
-    justify-self: end;
-    width: 20px;
-    height: 5px;
-    border-radius: 999px;
-    background: #e4e4e1;
   }
 
   .desktop-cloud-activation-illustration.is-automation {
@@ -533,6 +532,182 @@
     stroke-linejoin: round;
   }
 
+  .desktop-cloud-channel-illustration {
+    position: relative;
+    display: grid;
+    width: 180px;
+    height: 426px;
+    grid-template-rows: 146px 54px 226px;
+    justify-items: center;
+    justify-self: center;
+    align-self: center;
+  }
+
+  .desktop-cloud-channel-folder {
+    position: relative;
+    display: grid;
+    width: 166px;
+    height: 146px;
+    place-items: center;
+    z-index: 2;
+  }
+
+  .desktop-cloud-channel-folder-shape {
+    display: block;
+    width: 166px;
+    height: 146px;
+    overflow: visible;
+    filter: drop-shadow(0 8px 12px rgba(102, 70, 16, 0.16));
+  }
+
+  .desktop-cloud-channel-folder-icon {
+    position: absolute;
+    inset-inline-start: 50%;
+    top: 76px;
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    color: #181714;
+    transform: translateX(-50%);
+  }
+
+  .desktop-cloud-channel-folder-icon > svg {
+    width: 32px;
+    height: 32px;
+    stroke-width: 1.8;
+  }
+
+  .desktop-cloud-channel-connector {
+    display: block;
+    width: 2px;
+    height: 54px;
+    background: linear-gradient(to bottom, #d8d8d5 0%, #c9c9c6 78%, #bdbdb9 100%);
+    box-shadow: 1px 0 rgba(255, 255, 255, 0.9);
+  }
+
+  .desktop-cloud-channel-panel {
+    position: relative;
+    display: grid;
+    width: 176px;
+    height: 226px;
+    overflow: hidden;
+    padding: 22px 18px;
+    border-radius: 18px 18px 0 0;
+    box-sizing: border-box;
+  }
+
+  .desktop-cloud-channel-panel.is-terminal {
+    align-content: start;
+    gap: 16px;
+    border: 4px solid #1f1f1e;
+    border-bottom: 0;
+    background: #292927;
+    color: #f3f3ef;
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.12), 0 10px 20px rgba(0, 0, 0, 0.08);
+  }
+
+  .desktop-cloud-channel-panel-header {
+    display: flex;
+    gap: 5px;
+  }
+
+  .desktop-cloud-channel-panel-header i {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #74746f;
+  }
+
+  .desktop-cloud-channel-command {
+    display: grid;
+    grid-template-columns: 10px 1fr;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .desktop-cloud-channel-command b {
+    color: #85c8ff;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .desktop-cloud-channel-command i {
+    display: block;
+    width: 100%;
+    height: 5px;
+    border-radius: 999px;
+    background: #666661;
+  }
+
+  .desktop-cloud-channel-command:nth-child(3) i {
+    width: 72%;
+  }
+
+  .desktop-cloud-channel-command:nth-child(4) i {
+    width: 46%;
+  }
+
+  .desktop-cloud-channel-panel.is-git {
+    align-content: start;
+    gap: 15px;
+    border: 1px solid #dededb;
+    background: color-mix(in srgb, var(--po-canvas) 95%, white);
+    color: #555550;
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.05), 0 10px 20px rgba(0, 0, 0, 0.055);
+  }
+
+  .desktop-cloud-channel-git-heading {
+    display: grid;
+    grid-template-columns: 22px 1fr 7px;
+    align-items: center;
+    gap: 9px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e7e7e4;
+  }
+
+  .desktop-cloud-channel-git-heading > svg {
+    width: 19px;
+    height: 19px;
+    stroke-width: 1.8;
+  }
+
+  .desktop-cloud-channel-git-heading i,
+  .desktop-cloud-channel-commit b,
+  .desktop-cloud-channel-commit em {
+    display: block;
+    height: 5px;
+    border-radius: 999px;
+    background: #d4d4d0;
+  }
+
+  .desktop-cloud-channel-git-heading b {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #48a567;
+  }
+
+  .desktop-cloud-channel-commit {
+    display: grid;
+    grid-template-columns: 9px 1fr 30px;
+    align-items: center;
+    gap: 9px;
+  }
+
+  .desktop-cloud-channel-commit i {
+    width: 7px;
+    height: 7px;
+    border: 2px solid #a9a9a3;
+    border-radius: 999px;
+    box-sizing: border-box;
+  }
+
+  .desktop-cloud-channel-commit em {
+    background: #e6e6e3;
+  }
+
   @container (max-width: 820px) {
     .desktop-cloud-mcp-activation {
       grid-template-columns: minmax(280px, 330px) 270px;
@@ -540,7 +715,7 @@
       padding-inline: 24px;
     }
 
-    .desktop-cloud-mcp-activation.is-mcp {
+    .desktop-cloud-mcp-activation.is-connection {
       grid-template-columns: minmax(280px, 330px) 200px;
       gap: 32px;
     }
@@ -551,12 +726,17 @@
       padding-inline: 24px;
     }
 
+    .desktop-cloud-mcp-activation.desktop-cloud-git-prerequisite.is-connection {
+      grid-template-columns: minmax(280px, 330px) 200px;
+    }
+
     .desktop-cloud-activation-illustration {
       transform: scale(0.9);
       transform-origin: center;
     }
 
-    .desktop-cloud-mcp-illustration {
+    .desktop-cloud-mcp-illustration,
+    .desktop-cloud-channel-illustration {
       width: 166px;
       transform: scale(0.94);
       transform-origin: center;
@@ -572,8 +752,8 @@
       padding: 32px 22px;
     }
 
-    .desktop-cloud-mcp-activation.is-mcp,
-    .desktop-cloud-mcp-activation:not(.is-mcp) {
+    .desktop-cloud-mcp-activation.is-connection,
+    .desktop-cloud-mcp-activation:not(.is-connection) {
       grid-template-columns: minmax(0, 430px);
     }
 
@@ -589,20 +769,32 @@
       width: min(100%, 430px);
     }
 
-    .desktop-cloud-activation-illustration-frame.is-mcp {
+    .desktop-cloud-activation-illustration-frame.is-connection {
       height: 350px;
     }
 
-    .desktop-cloud-activation-illustration-frame.is-mcp > .desktop-cloud-mcp-illustration {
+    .desktop-cloud-activation-illustration-frame.is-connection > :is(
+      .desktop-cloud-mcp-illustration,
+      .desktop-cloud-channel-illustration
+    ) {
       transform: scale(0.82);
       transform-origin: top center;
     }
 
-    .desktop-cloud-activation-illustration-frame:not(.is-mcp) {
+    .desktop-cloud-activation-illustration-frame.is-overview {
+      height: 270px;
+    }
+
+    .desktop-cloud-activation-illustration-frame.is-overview > .desktop-cloud-activation-illustration {
+      transform: scale(0.84);
+      transform-origin: center;
+    }
+
+    .desktop-cloud-activation-illustration-frame:not(.is-connection):not(.is-overview) {
       height: 190px;
     }
 
-    .desktop-cloud-activation-illustration-frame:not(.is-mcp) > .desktop-cloud-activation-illustration {
+    .desktop-cloud-activation-illustration-frame:not(.is-connection):not(.is-overview) > .desktop-cloud-activation-illustration {
       transform: scale(0.84);
       transform-origin: center;
     }
@@ -618,19 +810,30 @@
       font-size: 25px;
     }
 
-    .desktop-cloud-activation-illustration-frame.is-mcp {
+    .desktop-cloud-activation-illustration-frame.is-connection {
       height: 307px;
     }
 
-    .desktop-cloud-activation-illustration-frame.is-mcp > .desktop-cloud-mcp-illustration {
+    .desktop-cloud-activation-illustration-frame.is-connection > :is(
+      .desktop-cloud-mcp-illustration,
+      .desktop-cloud-channel-illustration
+    ) {
       transform: scale(0.72);
     }
 
-    .desktop-cloud-activation-illustration-frame:not(.is-mcp) {
+    .desktop-cloud-activation-illustration-frame.is-overview {
+      height: 230px;
+    }
+
+    .desktop-cloud-activation-illustration-frame.is-overview > .desktop-cloud-activation-illustration {
+      transform: scale(0.72);
+    }
+
+    .desktop-cloud-activation-illustration-frame:not(.is-connection):not(.is-overview) {
       height: 170px;
     }
 
-    .desktop-cloud-activation-illustration-frame:not(.is-mcp) > .desktop-cloud-activation-illustration {
+    .desktop-cloud-activation-illustration-frame:not(.is-connection):not(.is-overview) > .desktop-cloud-activation-illustration {
       transform: scale(0.74);
     }
   }
