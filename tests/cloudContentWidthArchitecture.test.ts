@@ -43,13 +43,13 @@ describe("Cloud content width architecture", () => {
 
   it("keeps activation copy and artwork compact and responds to the content pane", () => {
     expect(cloudSignIn).toContain("container: cloud-auth / inline-size;");
-    expect(activation).toContain(".desktop-cloud-mcp-activation.is-mcp");
+    expect(activation).toContain(".desktop-cloud-mcp-activation.is-connection");
     expect(activation).toContain("grid-template-columns: minmax(320px, 360px) 220px;");
     expect(activation).toContain("gap: 44px;");
     expect(activation).toContain("@container (max-width: 820px)");
     expect(activation).toContain("@container (max-width: 680px)");
     expect(activation).toContain("@container (max-width: 420px)");
-    expect(activation).toContain(".desktop-cloud-activation-illustration-frame.is-mcp");
+    expect(activation).toContain(".desktop-cloud-activation-illustration-frame.is-connection");
     expect(activation).toContain("height: 350px;");
     expect(activation).not.toContain("@media (max-width: 760px)");
     expect(activation).not.toContain("margin-bottom: -");

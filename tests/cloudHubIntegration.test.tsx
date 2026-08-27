@@ -135,13 +135,39 @@ describe("current-repository Cloud navigation", () => {
       />,
     ));
 
-    expect(container.querySelector("h1")?.textContent).toBe("Use your local files with any AI, anywhere.");
+    expect(container.querySelector("h1")?.textContent).toBe("Use your project with any AI, anywhere.");
     expect(container.querySelector(".desktop-entry-state-description")?.textContent)
-      .toBe("Use these files in ChatGPT, Claude, and more.");
+      .toBe("Connect ChatGPT, Claude, and other MCP-compatible agents.");
     expect(container.querySelector(".desktop-cloud-auth-submit")?.textContent)
       .toBe("Get Started");
     expect(container.textContent).not.toContain("May upload");
     expect(container.querySelector(".desktop-cloud-mcp-illustration")).not.toBeNull();
+
+    act(() => renderWithTestLocalization(root,
+      <CloudSignedOutRoute
+        activeSection="cli"
+        authState={{ status: "signed-out", apiBaseUrl: session.api_base_url }}
+        apiBaseUrl={session.api_base_url}
+        loadingLabel="Restoring Cloud session…"
+        onSessionChange={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    ));
+    expect(container.querySelector("h1")?.textContent).toBe("Use your project from any terminal.");
+    expect(container.querySelector(".desktop-cloud-channel-illustration.is-cli")).not.toBeNull();
+
+    act(() => renderWithTestLocalization(root,
+      <CloudSignedOutRoute
+        activeSection="git-sync"
+        authState={{ status: "signed-out", apiBaseUrl: session.api_base_url }}
+        apiBaseUrl={session.api_base_url}
+        loadingLabel="Restoring Cloud session…"
+        onSessionChange={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    ));
+    expect(container.querySelector("h1")?.textContent).toBe("Clone, sync, and collaborate with Git.");
+    expect(container.querySelector(".desktop-cloud-channel-illustration.is-git")).not.toBeNull();
 
     act(() => renderWithTestLocalization(root,
       <CloudSignedOutRoute
@@ -166,8 +192,10 @@ describe("current-repository Cloud navigation", () => {
         onRefresh={vi.fn()}
       />,
     ));
-    expect(container.querySelector("h1")?.textContent).toBe("See your project from anywhere.");
+    expect(container.querySelector("h1")?.textContent).toBe("Host your project. Keep it available 24/7.");
     expect(container.querySelector(".desktop-cloud-activation-illustration.is-overview")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-activation-overview-cloud")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-activation-overview-folder")).not.toBeNull();
 
     act(() => renderWithTestLocalization(root,
       <CloudSignedOutRoute

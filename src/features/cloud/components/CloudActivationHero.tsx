@@ -1,9 +1,10 @@
 import {
   Clock3,
   FileText,
-  Folder,
+  GitBranch,
   ShieldCheck,
   Sparkles,
+  SquareTerminal,
   UserRound,
 } from "lucide-react";
 import { McpLogoIcon } from "./McpLogoIcon";
@@ -11,19 +12,30 @@ import { useId, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
 import type { CloudWorkspaceSection } from "../types";
-import { CloudPublishFolderMark } from "./CloudPublishHeroMarks";
+import {
+  CloudPublishCloudMark,
+  CloudPublishFolderMark,
+} from "./CloudPublishHeroMarks";
 import "./mcp-activation.css";
 
-type CloudActivationKind = "mcp" | "overview" | "automation" | "access";
+type CloudActivationKind = "overview" | "mcp" | "cli" | "git" | "automation" | "access";
 
 const ACTIVATION_COPY = {
-  mcp: {
-    titleId: "cloud.auth.getCloud",
-    descriptionId: "cloud.auth.shortDescription",
-  },
   overview: {
     titleId: "cloud.activation.overview.title",
     descriptionId: "cloud.activation.overview.description",
+  },
+  mcp: {
+    titleId: "cloud.activation.mcp.title",
+    descriptionId: "cloud.activation.mcp.description",
+  },
+  cli: {
+    titleId: "cloud.activation.cli.title",
+    descriptionId: "cloud.activation.cli.description",
+  },
+  git: {
+    titleId: "cloud.activation.git.title",
+    descriptionId: "cloud.activation.git.description",
   },
   automation: {
     titleId: "cloud.activation.automation.title",
@@ -54,11 +66,13 @@ export function CloudActivationHero({
   const generatedTitleId = useId();
   const resolvedTitleId = titleId ?? generatedTitleId;
   const kind = getCloudActivationKind(activeSection);
+  const connection = isConnectionActivationKind(kind);
   const copy = ACTIVATION_COPY[kind];
   const title = t(copy.titleId);
   const rootClassName = [
     "desktop-cloud-mcp-activation",
     `is-${kind}`,
+    connection && "is-connection",
     className,
   ].filter(Boolean).join(" ");
 
@@ -95,22 +109,36 @@ export function CloudActivationHero({
 function getCloudActivationKind(section: CloudWorkspaceSection): CloudActivationKind {
   if (section === "automation") return "automation";
   if (section === "access") return "access";
+  if (section === "cli") return "cli";
+  if (section === "git-sync") return "git";
   if (["contents", "history", "settings"].includes(section)) return "overview";
   return "mcp";
+}
+
+function isConnectionActivationKind(kind: CloudActivationKind): boolean {
+  return kind === "mcp" || kind === "cli" || kind === "git";
 }
 
 function CloudActivationIllustration({ kind }: { kind: CloudActivationKind }) {
   const illustration = kind === "overview"
     ? <CloudOverviewActivationIllustration />
-    : kind === "automation"
-      ? <CloudAutomationActivationIllustration />
-      : kind === "access"
-        ? <CloudAccessActivationIllustration />
-        : <CloudMcpConnectionIllustration />;
+    : kind === "cli"
+      ? <CloudCliConnectionIllustration />
+      : kind === "git"
+        ? <CloudGitConnectionIllustration />
+        : kind === "automation"
+          ? <CloudAutomationActivationIllustration />
+          : kind === "access"
+            ? <CloudAccessActivationIllustration />
+            : <CloudMcpConnectionIllustration />;
 
   return (
     <div
-      className={`desktop-cloud-activation-illustration-frame is-${kind}`}
+      className={[
+        "desktop-cloud-activation-illustration-frame",
+        `is-${kind}`,
+        isConnectionActivationKind(kind) && "is-connection",
+      ].filter(Boolean).join(" ")}
       aria-hidden="true"
     >
       {illustration}
@@ -121,23 +149,13 @@ function CloudActivationIllustration({ kind }: { kind: CloudActivationKind }) {
 function CloudOverviewActivationIllustration() {
   return (
     <div className="desktop-cloud-activation-illustration is-overview" aria-hidden="true">
-      <div className="desktop-cloud-activation-overview-card">
-        <span className="desktop-cloud-activation-overview-row is-project">
-          <Folder size={25} />
-          <span className="desktop-cloud-activation-faux-copy"><i /><i /></span>
-          <b />
-        </span>
-        <span className="desktop-cloud-activation-overview-row">
-          <FileText size={17} />
-          <span className="desktop-cloud-activation-faux-copy"><i /><i /></span>
-          <em />
-        </span>
-        <span className="desktop-cloud-activation-overview-row">
-          <UserRound size={17} />
-          <span className="desktop-cloud-activation-faux-copy"><i /><i /></span>
-          <em />
-        </span>
-      </div>
+      <span className="desktop-cloud-activation-overview-cloud">
+        <CloudPublishCloudMark />
+      </span>
+      <span className="desktop-cloud-activation-overview-link" />
+      <span className="desktop-cloud-activation-overview-folder">
+        <CloudPublishFolderMark />
+      </span>
     </div>
   );
 }
@@ -191,6 +209,49 @@ function CloudMcpConnectionIllustration() {
           <AgentTile label="Grok" kind="grok" />
         </div>
       </div>
+    </div>
+  );
+}
+
+function CloudCliConnectionIllustration() {
+  return (
+    <div className="desktop-cloud-channel-illustration is-cli" aria-hidden="true">
+      <CloudChannelFolder icon={<SquareTerminal />} />
+      <span className="desktop-cloud-channel-connector" />
+      <div className="desktop-cloud-channel-panel is-terminal">
+        <span className="desktop-cloud-channel-panel-header"><i /><i /><i /></span>
+        <span className="desktop-cloud-channel-command"><b>$</b><i /></span>
+        <span className="desktop-cloud-channel-command"><b>›</b><i /></span>
+        <span className="desktop-cloud-channel-command"><b>›</b><i /></span>
+      </div>
+    </div>
+  );
+}
+
+function CloudGitConnectionIllustration() {
+  return (
+    <div className="desktop-cloud-channel-illustration is-git" aria-hidden="true">
+      <CloudChannelFolder icon={<GitBranch />} />
+      <span className="desktop-cloud-channel-connector" />
+      <div className="desktop-cloud-channel-panel is-git">
+        <span className="desktop-cloud-channel-git-heading">
+          <GitBranch />
+          <i />
+          <b />
+        </span>
+        <span className="desktop-cloud-channel-commit"><i /><b /><em /></span>
+        <span className="desktop-cloud-channel-commit"><i /><b /><em /></span>
+        <span className="desktop-cloud-channel-commit"><i /><b /><em /></span>
+      </div>
+    </div>
+  );
+}
+
+function CloudChannelFolder({ icon }: { icon: ReactNode }) {
+  return (
+    <div className="desktop-cloud-channel-folder">
+      <CloudPublishFolderMark className="desktop-cloud-channel-folder-shape" />
+      <span className="desktop-cloud-channel-folder-icon">{icon}</span>
     </div>
   );
 }

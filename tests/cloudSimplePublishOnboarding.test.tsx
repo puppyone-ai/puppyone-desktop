@@ -41,7 +41,7 @@ describe("simple Cloud publish onboarding", () => {
       />,
     )));
 
-    expect(container.textContent).toContain("Use your local files with any AI, anywhere.");
+    expect(container.textContent).toContain("Use your project with any AI, anywhere.");
     expect(container.textContent).toContain("ChatGPT");
     expect(container.textContent).toContain("Claude");
     expect(container.textContent).toContain("Cursor");
