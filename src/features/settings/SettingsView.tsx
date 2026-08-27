@@ -18,7 +18,7 @@ import { LocalAgentsSettingsView } from "../local-agents";
 import { SettingsSectionHeader } from "./components";
 import { ContentFontSetting } from "./ContentFontSetting";
 import { AccountSettingsView } from "./main/AccountSettingsView";
-import { EditorSettingsView, ExperimentalSettingsView } from "./main/EditorSettingsViews";
+import { ExperimentalSettingsView } from "./main/ExperimentalSettingsView";
 import { FilesSettingsView } from "./main/FileSettingsViews";
 import { GeneralSettingsView } from "./main/GeneralSettingsView";
 import { LocalProjectSettingsView } from "./main/LocalProjectSettingsView";
@@ -44,7 +44,6 @@ export function SettingsView({
   localAgentsSettings,
   typographyPreferences,
   pointerCursors,
-  diffMarkers,
   fileIconTheme,
   sidebarNavigationVisibilitySettings,
   filesVisibilitySettings,
@@ -53,7 +52,6 @@ export function SettingsView({
   rightSidebarToolsSettings,
   titlebarActionsSettings,
   gitSidebarLayout,
-  aiEditAssistEnabled,
   cloudEnabled,
   cloudSession,
   cloudSessionRestoring,
@@ -73,7 +71,6 @@ export function SettingsView({
   onTextSizeChange,
   onTypographyPreferencesChange,
   onPointerCursorsChange,
-  onDiffMarkersChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
   onSidebarNavigationVisibilitySettingsChange,
@@ -83,7 +80,6 @@ export function SettingsView({
   onRightSidebarToolsSettingsChange,
   onTitlebarActionsSettingsChange,
   onGitSidebarLayoutChange,
-  onAiEditAssistEnabledChange,
   onCloudSessionChange,
   onPuppyoneConfigChange,
   onUnlinkWorkspace,
@@ -220,17 +216,6 @@ export function SettingsView({
         agentChatAvailable={agentChatAvailable}
         assetLibraryHomeAvailable={assetLibraryHomeAvailable}
         onChange={onExperimentalSettingsChange}
-      />
-    );
-  }
-
-  if (activeSection === "editor") {
-    return (
-      <EditorSettingsView
-        aiEditAssistEnabled={aiEditAssistEnabled}
-        diffMarkers={diffMarkers}
-        onAiEditAssistEnabledChange={onAiEditAssistEnabledChange}
-        onDiffMarkersChange={onDiffMarkersChange}
       />
     );
   }
