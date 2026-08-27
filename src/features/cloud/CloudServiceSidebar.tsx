@@ -1,4 +1,3 @@
-import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import { SidebarRoot, SidebarRow, SidebarScrollArea } from "@puppyone/shared-ui";
 import { SidebarGroup } from "../../components/sidebar";
@@ -6,10 +5,12 @@ import type { CloudServiceSidebarProps, CloudWorkspaceSection } from "./types";
 import { getCloudAuthSession } from "./auth";
 import {
   CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES,
-  normalizeCloudSection,
+  getCloudSidebarActiveSection,
+  getCloudSignedOutSection,
+  getAvailableCloudSection,
+  type CloudRouteNavigationGroup,
   type CloudRouteDescriptor,
 } from "./routes/cloudRoutes";
-import { getAccountInitial } from "./utils";
 import { useFeatureFlag } from "../flags";
 
 type CloudSidebarNavEntry = {
@@ -18,37 +19,46 @@ type CloudSidebarNavEntry = {
   icon: CloudRouteDescriptor["icon"];
   context: CloudRouteDescriptor["context"];
   requiredCapability?: string;
+  navigationGroup?: CloudRouteNavigationGroup;
   locked?: boolean;
 };
 
 type CloudSidebarNavGroup = {
-  id: "project" | "organization";
-  labelId: "cloud.sidebar.projectGroup" | "cloud.sidebar.organizationGroup";
+  id: CloudRouteNavigationGroup;
+  labelId:
+    | "cloud.sidebar.projectGroup"
+    | "cloud.sidebar.connectionsGroup"
+    | "cloud.sidebar.automationGroup"
+    | "cloud.sidebar.organizationGroup";
   items: CloudSidebarNavEntry[];
 };
 
 export function CloudServiceSidebar({
   cloudAuthState,
   activeSection,
+  automationEnabled,
   projectAvailable = false,
   projectCapabilities = [],
   onSelectSection,
 }: CloudServiceSidebarProps) {
   const { t } = useLocalization();
   const billingEnabled = useFeatureFlag("cloudBilling");
-  const normalizedActiveSection = normalizeCloudSection(activeSection);
-  const effectiveCloudSession = getCloudAuthSession(cloudAuthState);
-  const accountEmail = effectiveCloudSession?.user_email ?? null;
-  const signedIn = Boolean(effectiveCloudSession);
+  const normalizedActiveSection = getAvailableCloudSection(activeSection, { automationEnabled });
+  const signedIn = Boolean(getCloudAuthSession(cloudAuthState));
+  const visibleActiveSection = getCloudSidebarActiveSection(
+    signedIn
+      ? normalizedActiveSection
+      : getCloudSignedOutSection(normalizedActiveSection),
+  );
   const navItems: CloudSidebarNavEntry[] = CLOUD_BOUND_PROJECT_SIDEBAR_ROUTES.map((route: CloudRouteDescriptor) => ({
     ...route,
     locked: route.context === "project"
-      ? !signedIn
-        || !projectAvailable
-        || Boolean(route.requiredCapability && !projectCapabilities.includes(route.requiredCapability))
-      : !signedIn,
+      ? projectAvailable
+        && Boolean(route.requiredCapability && !projectCapabilities.includes(route.requiredCapability))
+      : false,
   })).filter((item) => (
-    item.id !== "cloud-billing" || billingEnabled
+    (item.id !== "cloud-billing" || billingEnabled)
+    && (item.id !== "automation" || automationEnabled)
   ));
   const navGroups = buildCloudSidebarNavGroups(navItems);
 
@@ -70,8 +80,8 @@ export function CloudServiceSidebar({
                     item={item}
                     lockedReason={!signedIn ? "sign-in" : "initialize"}
                     active={
-                      !item.locked && signedIn && (
-                        normalizedActiveSection === item.id
+                      !item.locked && (
+                        visibleActiveSection === item.id
                       )
                     }
                     onSelect={onSelectSection}
@@ -82,14 +92,6 @@ export function CloudServiceSidebar({
           })}
         </nav>
       </SidebarScrollArea>
-
-      {signedIn && (
-        <div className="desktop-cloud-sidebar-footer">
-          <div className="desktop-cloud-sidebar-footer-avatar" role="img" title={accountEmail ? bidiIsolate(accountEmail) : t("cloud.account.signedIn")} aria-label={t("cloud.account.ariaLabel")}>
-            {getAccountInitial(accountEmail)}
-          </div>
-        </div>
-      )}
     </SidebarRoot>
   );
 }
@@ -132,12 +134,22 @@ function buildCloudSidebarNavGroups(items: readonly CloudSidebarNavEntry[]): Clo
     {
       id: "project",
       labelId: "cloud.sidebar.projectGroup",
-      items: items.filter((item) => item.context !== "organization"),
+      items: items.filter((item) => item.navigationGroup === "project"),
+    },
+    {
+      id: "connections",
+      labelId: "cloud.sidebar.connectionsGroup",
+      items: items.filter((item) => item.navigationGroup === "connections"),
+    },
+    {
+      id: "automation",
+      labelId: "cloud.sidebar.automationGroup",
+      items: items.filter((item) => item.navigationGroup === "automation"),
     },
     {
       id: "organization",
       labelId: "cloud.sidebar.organizationGroup",
-      items: items.filter((item) => item.context === "organization"),
+      items: items.filter((item) => item.navigationGroup === "organization"),
     },
   ];
 

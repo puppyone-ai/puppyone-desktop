@@ -519,7 +519,6 @@ async function runSmoke() {
           root.dataset.interfaceStyleFamily = profile.profile.family;
           root.dataset.interfaceStyleVariant = profile.profile.variant;
           root.dataset.interfaceStylePalette = profile.profile.palette;
-          root.dataset.editorPresentation = 'follow-interface';
           root.dataset.appearanceTokenSet = profile.tokenSet;
           root.dataset.shellComposition = profile.composition.shell;
           root.dataset.titlebarComposition = profile.composition.titlebar;
@@ -539,21 +538,16 @@ async function runSmoke() {
             height: Math.round(titlebar.getBoundingClientRect().height),
             background: titlebarStyle.backgroundImage || titlebarStyle.backgroundColor,
             editorTableBorder: gridStyle.getPropertyValue('--po-surface-editable-table-border').trim(),
-            editorText: gridStyle.getPropertyValue('--po-text').trim(),
-            editorScrollbarSize: gridStyle.getPropertyValue('--po-scrollbar-size').trim(),
           };
         };
         const before = sample();
         applyStyle('windows-xp');
         await settle();
         const xp = sample();
-        root.dataset.editorPresentation = 'product-default';
-        await settle();
-        const xpProductDefault = sample();
         applyStyle('default');
         await settle();
         const after = sample();
-        return { before, xp, xpProductDefault, after };
+        return { before, xp, after };
       })()`, true);
       assert(
         JSON.stringify(roundTrip.before) === JSON.stringify(roundTrip.after),
@@ -561,18 +555,6 @@ async function runSmoke() {
       );
       assert(roundTrip.xp.style === "windows-xp", "Appearance round trip did not activate XP");
       assert(roundTrip.xp.editorTableBorder === "#86a5d4", "XP surface tokens did not reach the grid boundary");
-      assert(
-        roundTrip.xpProductDefault.editorTableBorder === "",
-        "Product-default Editor presentation still received XP component tokens",
-      );
-      assert(
-        roundTrip.xpProductDefault.editorText === "#292723",
-        `Product-default Editor presentation inherited XP text (${roundTrip.xpProductDefault.editorText})`,
-      );
-      assert(
-        roundTrip.xpProductDefault.editorScrollbarSize === "12px",
-        `Product-default Editor presentation inherited XP scrollbar geometry (${roundTrip.xpProductDefault.editorScrollbarSize})`,
-      );
     }
 
     if (style === "windows-xp") {

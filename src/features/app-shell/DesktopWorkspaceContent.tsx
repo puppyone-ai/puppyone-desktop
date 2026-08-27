@@ -41,13 +41,11 @@ type DesktopWorkspaceContentProps = {
   dataPort: DataWorkspacePort | null;
   editorWorkbench: DesktopEditorWorkbenchController;
   externalOpen: Readonly<{
-    getAppName: (path: string) => string | null;
     open: (path: string) => void | Promise<void>;
   }>;
   fileClipboardController: FileClipboardController;
   desktopUpdates: DesktopUpdatesController;
   git: DesktopGitController;
-  minimalMode?: boolean;
   navigationComposition: string;
   onActiveDataPathChange: (
     path: string | null,
@@ -89,7 +87,6 @@ export function DesktopWorkspaceContent({
   fileClipboardController,
   desktopUpdates,
   git,
-  minimalMode = false,
   navigationComposition,
   onActiveDataPathChange,
   onActiveDataNodeChange,
@@ -186,7 +183,6 @@ export function DesktopWorkspaceContent({
       editorInteractionPreferences={editorInteractionPreferences}
       fileClipboardController={fileClipboardController}
       fileOperationNotice={fileOperationNotice}
-      minimalMode={minimalMode}
       navigation={{
         activeView: resolvedActiveView,
         availableSurfaceIds,
@@ -199,6 +195,7 @@ export function DesktopWorkspaceContent({
         workspaceChangeCount,
         onNavigate,
         onOpenSettings,
+        onPullGit: git.handlePullGit,
       }}
       navigationComposition={navigationComposition}
       onActiveDataNodeChange={onActiveDataNodeChange}

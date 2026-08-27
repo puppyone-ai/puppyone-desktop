@@ -126,7 +126,7 @@ describe("titlebar typography architecture", () => {
     expect(titlebarContextSource).toContain("<GitBranch size={13}");
     expect(titlebarContextSource).not.toContain("desktop-titlebar-context-divider");
     expect(titlebarContextSource).not.toContain("VersionControlIcon");
-    expect(workspaceSwitcherSource).toContain("{compact && (");
+    expect(workspaceSwitcherSource).not.toContain("desktop-titlebar-workspace-mark");
     expect(context).toContain("gap: var(--desktop-titlebar-button-gap);");
     expect(projectName).toContain("color: var(--desktop-titlebar-text-muted);");
     expect(branchButton).toContain("color: var(--desktop-titlebar-text-muted);");

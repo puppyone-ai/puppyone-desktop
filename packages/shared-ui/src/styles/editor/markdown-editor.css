@@ -1,5 +1,5 @@
 .markdown-codemirror-editor {
-  --po-markdown-editor-text-width: 724px;
+  --po-markdown-editor-text-width: var(--po-reading-content-width, 724px);
   --po-markdown-editor-gutter-min: var(--po-editor-content-edge-inset, 64px);
   --po-markdown-editor-content-padding-block: var(--po-editor-content-edge-inset, 64px);
   /* Reading content stays on the centered text rail. Wide block viewports are

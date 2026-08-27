@@ -30,11 +30,14 @@
 
 .desktop-cloud-automation-catalog {
   display: grid;
-  width: min(100%, 1760px);
+  width: min(100%, var(--desktop-cloud-content-max-width, 900px));
   box-sizing: border-box;
   min-width: 0;
   margin: 0 auto;
-  padding: 44px clamp(28px, 4.6vw, 44px) 56px;
+  padding:
+    var(--desktop-cloud-page-padding-top)
+    var(--desktop-cloud-page-padding-inline)
+    var(--desktop-cloud-page-padding-bottom);
 }
 
 .desktop-cloud-automation-landing-header {

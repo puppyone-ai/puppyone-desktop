@@ -26,7 +26,8 @@ export function DesktopBuildVersionSettingsRow() {
     <div className="desktop-settings-row desktop-settings-row-control desktop-build-version-row">
       <span>{t("settings.general.version")}</span>
       <div className="desktop-build-version-value">
-        <strong
+        <span
+          className="desktop-build-version-text"
           data-build-channel={buildInfo.channel}
           dir="ltr"
           title={t("shell.build.version.title", {
@@ -38,7 +39,7 @@ export function DesktopBuildVersionSettingsRow() {
           <span dir="auto">{channel}</span>
           <span aria-hidden="true"> · </span>
           {buildInfo.version}
-        </strong>
+        </span>
         <button
           className="desktop-settings-action desktop-build-version-copy"
           type="button"

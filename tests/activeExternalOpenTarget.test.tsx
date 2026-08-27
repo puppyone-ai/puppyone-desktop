@@ -5,10 +5,6 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { Workspace } from "@puppyone/shared-ui";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  DEFAULT_EXTERNAL_APPS_SETTINGS,
-  type ExternalAppsSettings,
-} from "../src/preferences";
 import { useExternalFileOpen } from "../src/features/external-apps/useExternalFileOpen";
 import { openWorkspaceEntryExternal } from "../src/lib/localFiles";
 
@@ -35,43 +31,17 @@ afterEach(() => {
 });
 
 describe("pane-scoped external file opening", () => {
-  it("opens the exact pane resource with the configured app override", async () => {
-    const settings: ExternalAppsSettings = {
-      openMode: "system",
-      overrides: [{
-        extension: "md",
-        appPath: "/Applications/Obsidian.app",
-        appName: "Obsidian",
-      }],
-    };
-    const controller = await renderHarness(settings);
-
-    expect(controller.getAppName("notes.md")).toBe("Obsidian");
-    expect(controller.getAppName("data.csv")).toBeNull();
-
+  it("opens the exact pane resource with the system default app", async () => {
+    const controller = await renderHarness();
     await act(async () => controller.open("second-pane/notes.md"));
     expect(openWorkspaceEntryExternal).toHaveBeenCalledWith({
       rootPath: "/workspace",
       path: "second-pane/notes.md",
-      strategy: "app",
-      appPath: "/Applications/Obsidian.app",
-    });
-  });
-
-  it("uses the system default when the resource has no override", async () => {
-    const controller = await renderHarness(DEFAULT_EXTERNAL_APPS_SETTINGS);
-
-    await act(async () => controller.open("assets/photo.png"));
-    expect(openWorkspaceEntryExternal).toHaveBeenCalledWith({
-      rootPath: "/workspace",
-      path: "assets/photo.png",
-      strategy: "system",
-      appPath: null,
     });
   });
 });
 
-async function renderHarness(settings: ExternalAppsSettings) {
+async function renderHarness() {
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -79,7 +49,6 @@ async function renderHarness(settings: ExternalAppsSettings) {
 
   function Harness() {
     controller = useExternalFileOpen({
-      externalAppsSettings: settings,
       onError: vi.fn(),
       workspace,
     });

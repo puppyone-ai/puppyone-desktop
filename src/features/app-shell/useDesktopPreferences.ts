@@ -3,7 +3,6 @@ import type { FileIconThemeId } from "@puppyone/shared-ui";
 import {
   getInterfaceStyleFirstPaint,
   supportsThemePreset,
-  type EditorPresentation,
 } from "../appearance/interfaceStyles";
 import {
   APPEARANCE_PREFERENCES_STORAGE_KEY,
@@ -17,9 +16,7 @@ import {
   AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY,
   CREATE_NEW_MENU_STORAGE_KEY,
   DIFF_MARKERS_STORAGE_KEY,
-  DOCK_ICON_STORAGE_KEY,
   EXPERIMENTAL_SETTINGS_STORAGE_KEY,
-  EXTERNAL_APPS_STORAGE_KEY,
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
   GIT_DISPLAY_MODE_STORAGE_KEY,
@@ -37,15 +34,12 @@ import {
   TEXT_SIZE_STORAGE_KEY,
   TYPOGRAPHY_STORAGE_KEY,
   THEME_STORAGE_KEY,
-  TERMINAL_SESSION_LAYOUT_STORAGE_KEY,
   TITLEBAR_ACTIONS_STORAGE_KEY,
   parseLoadingAnimationPreset,
   parseCreateNewMenuSettings,
   parseTypography,
-  type ExternalAppsSettings,
   type CreateNewMenuSettings,
   type DiffMarkers,
-  type DockIcon,
   type ExperimentalSettings,
   type FilesVisibilitySettings,
   type GitDisplayMode,
@@ -58,7 +52,6 @@ import {
   type SidebarNavigationVisibilitySettings,
   type ThemeMode,
   type TextSize,
-  type TerminalSessionLayout,
   type TypographyPreferences,
   type TitlebarActionsSettings,
 } from "../../preferences";
@@ -76,7 +69,6 @@ import {
   readInitialCreateNewMenuSettings,
   readInitialExperimentalSettings,
   readInitialExplorerWidth,
-  readInitialExternalAppsSettings,
   readInitialFileIconTheme,
   readInitialFilesVisibilitySettings,
   readInitialGitDisplayMode,
@@ -91,13 +83,11 @@ import {
   readInitialTitlebarActionsSettings,
   readInitialDarkThemePreset,
   readInitialDiffMarkers,
-  readInitialDockIcon,
   readInitialLightThemePreset,
   readInitialLoadingAnimationPreset,
   readInitialLocalAgentsSettings,
   readInitialPointerCursors,
   readInitialTextSize,
-  readInitialTerminalSessionLayout,
   readInitialTypographyPreferences,
   readInitialThemeMode,
   readSystemDarkMode,
@@ -115,7 +105,6 @@ export function useDesktopPreferences() {
       typography: readInitialTypographyPreferences(),
       pointerCursors: readInitialPointerCursors(),
       loadingAnimationPreset: readInitialLoadingAnimationPreset(),
-      dockIcon: readInitialDockIcon(),
       fileIconTheme: readInitialFileIconTheme(),
       sidebarNavigationLayout: readInitialSidebarNavigationLayout(),
     },
@@ -123,9 +112,6 @@ export function useDesktopPreferences() {
   const initialAppearance = initialAppearanceRead.preferences;
   const [themeMode, setThemeMode] = useState<ThemeMode>(initialAppearance.shared.themeMode);
   const [interfaceStyle, setInterfaceStyle] = useState<InterfaceStyle>(initialAppearance.activeStyle);
-  const [editorPresentation, setEditorPresentation] = useState<EditorPresentation>(
-    initialAppearance.shared.editorPresentation,
-  );
   const [lightThemePreset, setLightThemePreset] = useState(initialAppearance.shared.lightThemePreset);
   const [darkThemePreset, setDarkThemePreset] = useState(initialAppearance.shared.darkThemePreset);
   const [textSize, setTextSize] = useState<TextSize>(initialAppearance.shared.textSize);
@@ -136,7 +122,6 @@ export function useDesktopPreferences() {
   const [loadingAnimationPreset, setLoadingAnimationPreset] = useState<LoadingAnimationPreset>(
     initialAppearance.shared.loadingAnimationPreset,
   );
-  const [dockIcon, setDockIcon] = useState<DockIcon>(initialAppearance.shared.dockIcon);
   const [diffMarkers, setDiffMarkers] = useState<DiffMarkers>(() => readInitialDiffMarkers());
   const [fileIconTheme, setFileIconTheme] = useState<FileIconThemeId>(initialAppearance.shared.fileIconTheme);
   const [sidebarNavigationLayout, setSidebarNavigationLayout] = useState<SidebarNavigationLayout>(
@@ -148,16 +133,12 @@ export function useDesktopPreferences() {
   const [gitDisplayMode, setGitDisplayMode] = useState<GitDisplayMode>(() => readInitialGitDisplayMode());
   const [gitSidebarLayout, setGitSidebarLayout] = useState<GitSidebarLayout>(() => readInitialGitSidebarLayout());
   const [filesVisibilitySettings, setFilesVisibilitySettings] = useState<FilesVisibilitySettings>(() => readInitialFilesVisibilitySettings());
-  const [externalAppsSettings, setExternalAppsSettings] = useState<ExternalAppsSettings>(() => readInitialExternalAppsSettings());
   const [createNewMenuSettings, setCreateNewMenuSettings] = useState<CreateNewMenuSettings>(
     () => readInitialCreateNewMenuSettings(),
   );
   const [experimentalSettings, setExperimentalSettings] = useState<ExperimentalSettings>(() => readInitialExperimentalSettings());
   const [rightSidebarToolsSettings, setRightSidebarToolsSettings] = useState<RightSidebarToolsSettings>(() => readInitialRightSidebarToolsSettings());
   const [titlebarActionsSettings, setTitlebarActionsSettings] = useState<TitlebarActionsSettings>(() => readInitialTitlebarActionsSettings());
-  const [terminalSessionLayout, setTerminalSessionLayout] = useState<TerminalSessionLayout>(
-    () => readInitialTerminalSessionLayout(),
-  );
   const [localAgentsSettings, setLocalAgentsSettings] = useState<LocalAgentsSettings>(
     () => readInitialLocalAgentsSettings(),
   );
@@ -179,8 +160,7 @@ export function useDesktopPreferences() {
     sidebarNavigationLayout,
     textSize,
     fileIconTheme,
-    editorPresentation,
-  }), [editorPresentation, fileIconTheme, interfaceStyle, sidebarNavigationLayout, textSize, themeMode]);
+  }), [fileIconTheme, interfaceStyle, sidebarNavigationLayout, textSize, themeMode]);
   const activeThemeMode = resolvedAppearance.themeMode;
   const resolvedTheme = activeThemeMode === "system" ? (systemDark ? "dark" : "light") : activeThemeMode;
   const activeThemePreset = resolvedTheme === "light" ? lightThemePreset : darkThemePreset;
@@ -197,7 +177,6 @@ export function useDesktopPreferences() {
     root.dataset.interfaceStyleFamily = resolvedAppearance.profile.family;
     root.dataset.interfaceStyleVariant = resolvedAppearance.profile.variant;
     root.dataset.interfaceStylePalette = resolvedAppearance.profile.palette;
-    root.dataset.editorPresentation = resolvedAppearance.editorPresentation;
     root.dataset.appearanceTokenSet = resolvedAppearance.tokenSet;
     root.dataset.shellComposition = resolvedAppearance.composition.shell;
     root.dataset.titlebarComposition = resolvedAppearance.composition.titlebar;
@@ -263,11 +242,6 @@ export function useDesktopPreferences() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(DOCK_ICON_STORAGE_KEY, dockIcon);
-    void window.puppyoneDesktop?.setDockIcon?.(dockIcon).catch(() => undefined);
-  }, [dockIcon]);
-
-  useEffect(() => {
     window.localStorage.setItem(DIFF_MARKERS_STORAGE_KEY, diffMarkers);
   }, [diffMarkers]);
 
@@ -291,10 +265,8 @@ export function useDesktopPreferences() {
         typography: typographyPreferences,
         pointerCursors,
         loadingAnimationPreset,
-        dockIcon,
         fileIconTheme,
         sidebarNavigationLayout,
-        editorPresentation,
       },
       byStyle: initialAppearance.byStyle,
       bySurface: initialAppearance.bySurface,
@@ -306,8 +278,6 @@ export function useDesktopPreferences() {
     );
   }, [
     darkThemePreset,
-    dockIcon,
-    editorPresentation,
     fileIconTheme,
     initialAppearance,
     initialAppearanceRead.writable,
@@ -341,8 +311,10 @@ export function useDesktopPreferences() {
   }, [filesVisibilitySettings]);
 
   useEffect(() => {
-    window.localStorage.setItem(EXTERNAL_APPS_STORAGE_KEY, JSON.stringify(externalAppsSettings));
-  }, [externalAppsSettings]);
+    // Retired per-file-type overrides must not continue to shadow the system
+    // default after the setting has been removed.
+    window.localStorage.removeItem("puppyone.desktop.externalApps");
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(CREATE_NEW_MENU_STORAGE_KEY, JSON.stringify(createNewMenuSettings));
@@ -368,10 +340,6 @@ export function useDesktopPreferences() {
   useEffect(() => {
     window.localStorage.setItem(TITLEBAR_ACTIONS_STORAGE_KEY, JSON.stringify(titlebarActionsSettings));
   }, [titlebarActionsSettings]);
-
-  useEffect(() => {
-    window.localStorage.setItem(TERMINAL_SESSION_LAYOUT_STORAGE_KEY, terminalSessionLayout);
-  }, [terminalSessionLayout]);
 
   useEffect(() => {
     window.localStorage.setItem(LOCAL_AGENTS_STORAGE_KEY, JSON.stringify(localAgentsSettings));
@@ -433,13 +401,10 @@ export function useDesktopPreferences() {
     aiEditAssistEnabled,
     activeThemeMode,
     diffMarkers,
-    dockIcon,
     explorerWidth,
     createNewMenuSettings,
-    externalAppsSettings,
     experimentalSettings,
     fileIconTheme: resolvedAppearance.fileIconTheme,
-    editorPresentation,
     filesVisibilitySettings,
     gitDisplayMode,
     gitSidebarLayout,
@@ -460,7 +425,6 @@ export function useDesktopPreferences() {
     sidebarNavigationPlacement,
     sidebarNavigationVisibilitySettings,
     terminalToolEnabled,
-    terminalSessionLayout,
     titlebarActionsSettings,
     darkThemePreset,
     lightThemePreset,
@@ -473,13 +437,10 @@ export function useDesktopPreferences() {
     setAiEditAssistEnabled,
     setDarkThemePreset,
     setDiffMarkers,
-    setDockIcon,
     setExplorerWidth,
     setCreateNewMenuSettings,
-    setExternalAppsSettings,
     setExperimentalSettings,
     setFileIconTheme,
-    setEditorPresentation,
     setFilesVisibilitySettings,
     setGitDisplayMode,
     setGitSidebarLayout,
@@ -500,7 +461,6 @@ export function useDesktopPreferences() {
     setLocalAgentsSettings,
     setPointerCursors,
     setTextSize,
-    setTerminalSessionLayout,
     setThemeMode,
     setTypographyPreferences,
   };

@@ -1,17 +1,33 @@
 /* Organization, Team, and Billing pages. */
 @layer features {
 .desktop-cloud-org-page {
+  display: flex;
+  width: 100%;
+  height: 100%;
   flex: 1;
   min-width: 0;
-  overflow-y: auto;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--po-canvas);
+  color: var(--po-text);
+}
+
+.desktop-cloud-org-canvas {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .desktop-cloud-org-shell {
-  width: 100%;
-  max-width: 900px;
+  display: grid;
+  width: min(100%, 1760px);
+  min-width: 0;
   margin: 0 auto;
-  padding: 32px 32px 96px;
+  padding:
+    var(--desktop-cloud-catalog-padding-top)
+    var(--desktop-cloud-page-padding-inline)
+    var(--desktop-cloud-page-padding-bottom);
   box-sizing: border-box;
 }
 
@@ -21,23 +37,38 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 32px;
+  padding: 0 8px;
 }
 
-.desktop-cloud-org-header h1 {
+.desktop-cloud-org-header-copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.desktop-cloud-org-header-copy h1 {
   margin: 0;
   color: var(--po-text);
-  font-size: 24px;
-  font-weight: 650;
-  letter-spacing: 0;
-  line-height: 1.2;
+  font-size: var(--po-text-size-page-title, 20px);
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  line-height: 1.25;
 }
 
-.desktop-cloud-org-header p {
-  margin: 6px 0 0;
+.desktop-cloud-org-header-copy p {
+  margin: 0;
+  max-width: 680px;
   color: var(--po-text-muted);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: var(--po-text-size-body-lg, 14px);
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.desktop-cloud-org-content {
+  display: grid;
+  width: min(100%, 980px);
+  min-width: 0;
+  margin-top: 26px;
 }
 
 .desktop-cloud-org-actions {
@@ -50,54 +81,72 @@
 
 .desktop-cloud-organization-selector {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   color: var(--po-text-muted);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
+  line-height: 14px;
 }
 
 .desktop-cloud-organization-selector select {
-  width: min(240px, 32vw);
-  height: 32px;
-  padding: 0 28px 0 10px;
+  width: min(220px, 32vw);
+  height: 30px;
+  box-sizing: border-box;
+  padding-block: 0;
+  padding-inline: 9px 28px;
   border: 1px solid var(--po-border);
-  border-radius: 6px;
-  background: var(--po-panel-raised);
+  border-radius: 7px;
+  background: transparent;
   color: var(--po-text);
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .desktop-cloud-org-primary-button,
 .desktop-cloud-org-secondary-button {
   display: inline-flex;
-  height: 32px;
+  height: 30px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 0 12px;
-  border-radius: 6px;
-  font-size: 14px;
+  gap: 6px;
+  padding: 0 11px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12px;
   font-weight: 500;
+  line-height: 18px;
   white-space: nowrap;
+  cursor: var(--po-clickable-cursor, pointer);
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.12s ease;
 }
 
 .desktop-cloud-org-primary-button {
-  border: 0;
+  border: 1px solid var(--po-text);
   background: var(--po-text);
   color: var(--po-text-inverse);
 }
 
 .desktop-cloud-org-secondary-button {
   border: 1px solid var(--po-border);
-  background: var(--po-panel-raised);
+  background: transparent;
   color: var(--po-text-muted);
 }
 
-.desktop-cloud-org-primary-button:hover,
-.desktop-cloud-org-secondary-button:hover {
-  opacity: 0.9;
+.desktop-cloud-org-primary-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--po-text) 88%, var(--po-panel) 12%);
+}
+
+.desktop-cloud-org-secondary-button:hover:not(:disabled) {
+  border-color: var(--po-border-strong);
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-org-primary-button:active:not(:disabled),
+.desktop-cloud-org-secondary-button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .desktop-cloud-org-primary-button:disabled,
@@ -110,43 +159,46 @@
 .desktop-cloud-billing-current,
 .desktop-cloud-billing-plan-card {
   overflow: hidden;
-  border: 1px solid var(--po-border);
-  border-radius: 8px;
-  background: var(--po-panel);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--po-shadow) 12%, transparent);
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 9px;
+  background: transparent;
 }
 
 .desktop-cloud-org-card-header {
   display: flex;
-  min-height: 68px;
+  min-height: 54px;
+  box-sizing: border-box;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--po-border);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--po-border-subtle);
 }
 
 .desktop-cloud-org-card-header h2 {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   color: var(--po-text);
-  font-size: 14px;
+  font-size: var(--po-text-size-body-lg, 14px);
   font-weight: 500;
-  letter-spacing: 0;
+  line-height: 19px;
 }
 
 .desktop-cloud-org-card-header p {
   margin: 0;
-  color: var(--po-text-subtle);
-  font-size: 13px;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
 }
 
 .desktop-cloud-team-row {
   display: flex;
-  min-height: 68px;
+  min-height: 56px;
+  box-sizing: border-box;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 16px 20px;
+  gap: 16px;
+  padding: 9px 14px;
 }
 
 .desktop-cloud-team-row + .desktop-cloud-team-row {
@@ -157,21 +209,21 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 16px;
+  gap: 11px;
 }
 
 .desktop-cloud-team-avatar {
   display: inline-flex;
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
   background: var(--po-control);
   color: var(--po-text-muted);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .desktop-cloud-team-avatar.image {
@@ -183,37 +235,37 @@
   align-items: center;
   gap: 8px;
   color: var(--po-text);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  line-height: 1.25;
+  line-height: 18px;
 }
 
 .desktop-cloud-team-member strong em {
   display: inline-flex;
   align-items: center;
-  border-radius: 4px;
+  border-radius: 999px;
   padding: 2px 6px;
   background: color-mix(in srgb, var(--po-warning) 12%, transparent);
   color: var(--po-warning);
   font-size: 10px;
   font-style: normal;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  line-height: 1;
-  text-transform: uppercase;
+  font-weight: 500;
+  line-height: 13px;
 }
 
 .desktop-cloud-team-member small {
   display: block;
-  margin-top: 2px;
+  margin-top: 1px;
   color: var(--po-text-subtle);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 17px;
 }
 
 .desktop-cloud-team-role {
   color: var(--po-text-subtle);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .desktop-cloud-team-role.owner {
@@ -222,11 +274,11 @@
 
 .desktop-cloud-org-card-footer {
   display: flex;
-  min-height: 44px;
+  min-height: 38px;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 10px 20px;
+  padding: 7px 14px;
   border-top: 1px solid var(--po-border-subtle);
   color: var(--po-text-subtle);
   font-size: 12px;
@@ -239,10 +291,10 @@
 
 .desktop-cloud-team-loading > div {
   display: flex;
-  min-height: 68px;
+  min-height: 56px;
   align-items: center;
-  gap: 16px;
-  padding: 16px 20px;
+  gap: 11px;
+  padding: 9px 14px;
   border-top: 1px solid var(--po-border-subtle);
 }
 
@@ -262,9 +314,9 @@
 }
 
 .desktop-cloud-team-loading span {
-  width: 36px;
-  height: 36px;
-  flex: 0 0 36px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
 }
 
 .desktop-cloud-team-loading div div {
@@ -286,20 +338,20 @@
 .desktop-cloud-org-inline-error {
   display: grid;
   gap: 3px;
-  padding: 12px 20px;
+  padding: 10px 14px;
   border-top: 1px solid color-mix(in srgb, var(--po-danger) 24%, transparent);
   background: color-mix(in srgb, var(--po-danger) 8%, transparent);
 }
 
 .desktop-cloud-org-inline-error.standalone {
   border: 1px solid color-mix(in srgb, var(--po-danger) 24%, transparent);
-  border-radius: 8px;
+  border-radius: 9px;
 }
 
 .desktop-cloud-org-inline-error strong {
   color: var(--po-danger);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .desktop-cloud-org-inline-error span {
@@ -312,7 +364,8 @@
   background: transparent;
   color: var(--po-text-muted);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-org-card-footer button:hover {
@@ -321,39 +374,37 @@
 
 .desktop-cloud-billing-stack {
   display: grid;
-  gap: 20px;
+  gap: 14px;
 }
 
 .desktop-cloud-billing-current-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 16px;
+  gap: 20px;
   align-items: start;
-  padding: 16px 20px;
+  padding: 14px 16px;
 }
 
 .desktop-cloud-billing-title-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
 }
 
 .desktop-cloud-billing-title-row > span,
 .desktop-cloud-billing-plan-heading span,
 .desktop-cloud-billing-title-row > em {
   display: inline-flex;
-  height: 24px;
+  height: 20px;
   align-items: center;
-  padding: 0 8px;
+  padding: 0 7px;
   border: 1px solid var(--po-border-subtle);
-  border-radius: 5px;
-  background: var(--po-control);
+  border-radius: 999px;
+  background: transparent;
   color: var(--po-text-muted);
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-weight: 500;
 }
 
 .desktop-cloud-billing-title-row > em {
@@ -371,17 +422,19 @@
 }
 
 .desktop-cloud-billing-current h2 {
-  font-size: 17px;
-  font-weight: 650;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 21px;
 }
 
 .desktop-cloud-billing-current p,
 .desktop-cloud-billing-options-header p,
 .desktop-cloud-billing-plan-card p {
-  margin: 8px 0 0;
+  margin: 5px 0 0;
   color: var(--po-text-muted);
   font-size: 13px;
-  line-height: 1.55;
+  font-weight: 400;
+  line-height: 19px;
 }
 
 .desktop-cloud-billing-price {
@@ -391,9 +444,9 @@
 .desktop-cloud-billing-price strong,
 .desktop-cloud-billing-plan-price strong {
   color: var(--po-text);
-  font-size: 28px;
-  font-weight: 650;
-  letter-spacing: 0;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 
@@ -415,8 +468,8 @@
 .desktop-cloud-billing-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 20px;
-  padding: 12px 20px;
+  gap: 7px 16px;
+  padding: 10px 16px;
   border-top: 1px solid var(--po-border-subtle);
 }
 
@@ -424,7 +477,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--po-text);
+  color: var(--po-text-muted);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -443,7 +496,7 @@
 }
 
 .desktop-cloud-plan-feature strong {
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .desktop-cloud-plan-feature .with-value {
@@ -452,7 +505,7 @@
 
 .desktop-cloud-billing-options {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .desktop-cloud-billing-options-header {
@@ -463,8 +516,9 @@
 }
 
 .desktop-cloud-billing-options-header h2 {
-  font-size: 15px;
-  font-weight: 650;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 19px;
 }
 
 .desktop-cloud-billing-options-header p {
@@ -480,14 +534,14 @@
 .desktop-cloud-billing-plan-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 
 .desktop-cloud-billing-plan-card {
   display: flex;
-  min-height: 430px;
+  min-height: 380px;
   flex-direction: column;
-  padding: 20px;
+  padding: 16px;
   box-sizing: border-box;
 }
 
@@ -503,41 +557,43 @@
 }
 
 .desktop-cloud-billing-plan-heading h3 {
-  font-size: 18px;
-  font-weight: 650;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 21px;
 }
 
 .desktop-cloud-billing-plan-price {
-  margin-top: 20px;
+  margin-top: 16px;
 }
 
 .desktop-cloud-billing-plan-price strong {
-  font-size: 34px;
+  font-size: 28px;
 }
 
 .desktop-cloud-billing-plan-features {
   display: grid;
-  gap: 10px;
-  margin-top: 20px;
-  padding-top: 16px;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
   border-top: 1px solid var(--po-border-subtle);
 }
 
 .desktop-cloud-billing-plan-card > button {
   display: inline-flex;
   width: 100%;
-  height: 34px;
+  height: 30px;
   align-items: center;
   justify-content: center;
   gap: 8px;
   margin-top: auto;
   padding: 0 12px;
   border: 1px solid var(--po-border);
-  border-radius: 6px;
-  background: var(--po-panel-raised);
+  border-radius: 7px;
+  background: transparent;
   color: var(--po-text-muted);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-billing-plan-card > button.primary {
@@ -562,22 +618,23 @@
   background: transparent;
   color: var(--po-text-muted);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-billing-usage-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 
 .desktop-cloud-billing-usage-card {
   display: grid;
   gap: 8px;
-  padding: 16px 20px;
-  border: 1px solid var(--po-border);
-  border-radius: 8px;
-  background: var(--po-panel);
+  padding: 14px 16px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 9px;
+  background: transparent;
 }
 
 .desktop-cloud-billing-usage-card.warning {
@@ -590,13 +647,13 @@
   gap: 8px;
   color: var(--po-text-muted);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .desktop-cloud-billing-usage-card > strong {
   color: var(--po-text);
-  font-size: 22px;
-  font-weight: 650;
+  font-size: 20px;
+  font-weight: 500;
 }
 
 .desktop-cloud-billing-usage-card > small {
@@ -606,7 +663,7 @@
 
 .desktop-cloud-billing-meter {
   width: 100%;
-  height: 5px;
+  height: 3px;
   overflow: hidden;
   border-radius: 999px;
   background: var(--po-control);
@@ -636,8 +693,8 @@
   height: 30px;
   box-sizing: border-box;
   border: 1px solid var(--po-border);
-  border-radius: 6px;
-  background: var(--po-control);
+  border-radius: 7px;
+  background: transparent;
   color: var(--po-text);
   padding: 0 8px;
 }
@@ -645,17 +702,18 @@
 .desktop-cloud-billing-seat-control button,
 .desktop-cloud-billing-quote > button {
   display: inline-flex;
-  height: 32px;
+  height: 30px;
   align-items: center;
   justify-content: center;
   gap: 7px;
   padding: 0 12px;
   border: 1px solid var(--po-border);
-  border-radius: 6px;
-  background: var(--po-panel-raised);
+  border-radius: 7px;
+  background: transparent;
   color: var(--po-text-muted);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-billing-notice {
@@ -664,8 +722,8 @@
   gap: 10px;
   padding: 12px 16px;
   border: 1px solid var(--po-border-subtle);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--po-panel) 65%, transparent);
+  border-radius: 9px;
+  background: transparent;
   color: var(--po-text-muted);
 }
 
@@ -677,7 +735,7 @@
 .desktop-cloud-billing-notice strong {
   color: var(--po-text);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .desktop-cloud-billing-notice span {
@@ -692,11 +750,12 @@
   margin-inline-start: auto;
   padding: 0 10px;
   border: 1px solid var(--po-border);
-  border-radius: 6px;
-  background: var(--po-panel-raised);
+  border-radius: 7px;
+  background: transparent;
   color: var(--po-text);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
+  cursor: var(--po-clickable-cursor, pointer);
 }
 
 .desktop-cloud-billing-notice > button:disabled {
@@ -709,24 +768,24 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 16px;
-  padding: 20px;
+  padding: 16px;
   border: 1px solid var(--po-border-strong);
-  border-radius: 8px;
-  background: var(--po-panel);
+  border-radius: 9px;
+  background: transparent;
 }
 
 .desktop-cloud-billing-quote > div:first-child > span {
   color: var(--po-text-subtle);
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-weight: 500;
 }
 
 .desktop-cloud-billing-quote h2 {
   margin: 5px 0 0;
   color: var(--po-text);
-  font-size: 17px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 21px;
 }
 
 .desktop-cloud-billing-quote p,
@@ -743,7 +802,9 @@
 
 .desktop-cloud-billing-quote-price strong {
   color: var(--po-text);
-  font-size: 28px;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
 
 .desktop-cloud-billing-quote-price > span {
@@ -757,11 +818,11 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: 7px;
   background: color-mix(in srgb, var(--po-warning) 12%, transparent);
   color: var(--po-warning);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .desktop-cloud-billing-quote > button {
@@ -779,8 +840,8 @@
   gap: 12px;
   padding: 12px 16px;
   border: 1px solid var(--po-border-subtle);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--po-panel) 55%, transparent);
+  border-radius: 9px;
+  background: transparent;
   color: var(--po-text-subtle);
   font-size: 12px;
 }
@@ -792,7 +853,7 @@
   color: var(--po-text-muted);
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 720px) {
   .desktop-cloud-org-header,
   .desktop-cloud-org-actions {
     align-items: stretch;
@@ -802,10 +863,6 @@
   .desktop-cloud-org-actions,
   .desktop-cloud-organization-selector select {
     width: 100%;
-  }
-
-  .desktop-cloud-billing-plan-grid {
-    grid-template-columns: 1fr;
   }
 
   .desktop-cloud-billing-plan-card {
@@ -820,6 +877,17 @@
   .desktop-cloud-billing-seat-control {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .desktop-cloud-billing-current-main,
+  .desktop-cloud-billing-quote {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .desktop-cloud-billing-price,
+  .desktop-cloud-billing-quote-price {
+    justify-items: start;
+    text-align: start;
   }
 }
 

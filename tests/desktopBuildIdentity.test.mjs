@@ -218,8 +218,6 @@ describe("desktop build identity", () => {
     expect(development.mac.icon).toBe("public/logo-square-dev.png");
     expect(development.extraResources).toEqual(expect.arrayContaining([
       { from: "public/logo-square-dev.png", to: "logo-square-dev.png" },
-      { from: "public/logo-square-v0.1.3-light-dev.png", to: "dock-icon-light-dev.png" },
-      { from: "public/logo-square-v0.1.3-dark-dev.png", to: "dock-icon-matte-dev.png" },
     ]));
     expect(stable.mac.icon).toBe("public/logo-square.png");
     expect(stable.extraResources).not.toEqual(expect.arrayContaining([

@@ -7,20 +7,19 @@ import {
   FileGlyphIcon,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
-import { DOCK_ICON_OPTIONS, SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, TEXT_SIZE_PRESETS } from "../../preferences";
+import { SIDEBAR_NAVIGATION_LAYOUT_OPTIONS, TEXT_SIZE_PRESETS } from "../../preferences";
 import { getOrderedHeaderElementDefinitions } from "../app-shell/headerElements";
 import {
   isAppearanceDecisionLocked,
   isAppearanceValueAllowed,
 } from "../appearance/resolveAppearance";
 import { useFeatureFlag } from "../flags";
-import { AgentFileActivityAppearanceSetting } from "../desktop-agent-presence";
 import { LocalAgentsSettingsView } from "../local-agents";
 import { SettingsSectionHeader } from "./components";
 import { ContentFontSetting } from "./ContentFontSetting";
 import { AccountSettingsView } from "./main/AccountSettingsView";
 import { EditorSettingsView, ExperimentalSettingsView } from "./main/EditorSettingsViews";
-import { DefaultAppsSettingsView, FilesSettingsView } from "./main/FileSettingsViews";
+import { FilesSettingsView } from "./main/FileSettingsViews";
 import { GeneralSettingsView } from "./main/GeneralSettingsView";
 import { LocalProjectSettingsView } from "./main/LocalProjectSettingsView";
 import { InterfacePaletteSettings } from "./main/InterfacePaletteSettings";
@@ -28,6 +27,7 @@ import { InterfaceStyleSetting } from "./main/InterfaceStyleSetting";
 import { CreateNewSettingsView } from "./main/CreateNewSettingsView";
 import { PulseGrid } from "../../components/loading";
 import { CloudHostingSettingsView, GitSettingsView } from "./main/RepositorySettingsViews";
+import { isSettingsSectionAvailable } from "./sidebar/settingsSidebarModel";
 import type { SettingsViewProps } from "./types";
 import { writeClipboardText } from "./utils";
 export function SettingsView({
@@ -42,20 +42,16 @@ export function SettingsView({
   darkThemePreset,
   loadingAnimationPreset,
   localAgentsSettings,
-  agentFileActivityIndicatorsEnabled,
   typographyPreferences,
   pointerCursors,
-  dockIcon,
   diffMarkers,
   fileIconTheme,
   sidebarNavigationVisibilitySettings,
   filesVisibilitySettings,
-  externalAppsSettings,
   createNewMenuSettings,
   experimentalSettings,
   rightSidebarToolsSettings,
   titlebarActionsSettings,
-  terminalSessionLayout,
   gitSidebarLayout,
   aiEditAssistEnabled,
   cloudEnabled,
@@ -69,7 +65,6 @@ export function SettingsView({
   updateState,
   onThemeModeChange,
   onInterfaceStyleChange,
-  onEditorPresentationChange,
   onLightThemePresetChange,
   onDarkThemePresetChange,
   onLoadingAnimationPresetChange,
@@ -78,18 +73,15 @@ export function SettingsView({
   onTextSizeChange,
   onTypographyPreferencesChange,
   onPointerCursorsChange,
-  onDockIconChange,
   onDiffMarkersChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
   onSidebarNavigationVisibilitySettingsChange,
   onFilesVisibilitySettingsChange,
-  onExternalAppsSettingsChange,
   onCreateNewMenuSettingsChange,
   onExperimentalSettingsChange,
   onRightSidebarToolsSettingsChange,
   onTitlebarActionsSettingsChange,
-  onTerminalSessionLayoutChange,
   onGitSidebarLayoutChange,
   onAiEditAssistEnabledChange,
   onCloudSessionChange,
@@ -106,6 +98,16 @@ export function SettingsView({
   const [copyError, setCopyError] = useState<string | null>(null);
   const orderedHeaderElements = getOrderedHeaderElementDefinitions(titlebarActionsSettings.order);
 
+  if (!isSettingsSectionAvailable(activeSection, { cloudEnabled })) {
+    return (
+      <GeneralSettingsView
+        updateState={updateState}
+        onCheckForUpdates={onCheckForUpdates}
+        onUpdateNow={onUpdateNow}
+      />
+    );
+  }
+
   if (activeSection === "general") {
     return (
       <GeneralSettingsView
@@ -119,9 +121,9 @@ export function SettingsView({
   if (activeSection === "local-agents") {
     return (
       <LocalAgentsSettingsView
-        workspaceRoot={workspace.path}
         settings={localAgentsSettings}
         onChange={onLocalAgentsSettingsChange}
+        onActivityIndicatorsEnabledChange={onAgentFileActivityIndicatorsEnabledChange}
       />
     );
   }
@@ -200,15 +202,6 @@ export function SettingsView({
     );
   }
 
-  if (activeSection === "external-apps") {
-    return (
-      <DefaultAppsSettingsView
-        settings={externalAppsSettings}
-        onChange={onExternalAppsSettingsChange}
-      />
-    );
-  }
-
   if (activeSection === "new-menu") {
     return (
       <CreateNewSettingsView
@@ -246,11 +239,9 @@ export function SettingsView({
     const textSizeDecision = resolvedAppearance.decisions.textSize;
     const fileIconDecision = resolvedAppearance.decisions.fileIconTheme;
     const navigationDecision = resolvedAppearance.decisions.sidebarNavigationLayout;
-    const editorPresentationDecision = resolvedAppearance.decisions.editorPresentation;
     const textSizeLocked = isAppearanceDecisionLocked(textSizeDecision);
     const fileIconLocked = isAppearanceDecisionLocked(fileIconDecision);
     const navigationLocked = isAppearanceDecisionLocked(navigationDecision);
-    const editorPresentationLocked = isAppearanceDecisionLocked(editorPresentationDecision);
     return (
       <section className="desktop-utility-view desktop-settings-view">
         <div className="desktop-utility-body desktop-settings-body" data-po-scrollbar="content">
@@ -271,38 +262,8 @@ export function SettingsView({
                 onDarkThemePresetChange={onDarkThemePresetChange}
               />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-                <span>{t("settings.appearance.editorPresentation.title")}</span>
-                <div
-                  className="desktop-theme-segment desktop-appearance-option-segment"
-                  aria-label={t("settings.appearance.editorPresentation.ariaLabel")}
-                >
-                  {(["follow-interface", "product-default"] as const).map((presentation) => (
-                    <button
-                      key={presentation}
-                      className={`${editorPresentationDecision.effectiveValue === presentation ? "active" : ""}${editorPresentationLocked || !isAppearanceValueAllowed(editorPresentationDecision, presentation) ? " is-policy-controlled" : ""}`}
-                      type="button"
-                      title={editorPresentationDecision.reasonKey
-                        ? t(editorPresentationDecision.reasonKey)
-                        : t(`settings.appearance.editorPresentation.${presentation}.description`)}
-                      aria-disabled={editorPresentationLocked || !isAppearanceValueAllowed(editorPresentationDecision, presentation)}
-                      aria-pressed={editorPresentationDecision.effectiveValue === presentation}
-                      onClick={() => {
-                        if (!editorPresentationLocked && isAppearanceValueAllowed(editorPresentationDecision, presentation)) {
-                          onEditorPresentationChange(presentation);
-                        }
-                      }}
-                    >
-                      <span>{t(`settings.appearance.editorPresentation.${presentation}.label`)}</span>
-                    </button>
-                  ))}
-                </div>
-                {editorPresentationDecision.reasonKey && (
-                  <small className="desktop-appearance-policy-reason">{t(editorPresentationDecision.reasonKey)}</small>
-                )}
-              </div>
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.textSize.title")}</span>
-                <div className="desktop-theme-segment desktop-appearance-option-segment" aria-label={t("settings.appearance.textSize.ariaLabel")}>
+                <div className="desktop-theme-segment desktop-appearance-option-segment desktop-appearance-hug-segment" aria-label={t("settings.appearance.textSize.ariaLabel")}>
                   {TEXT_SIZE_PRESETS.map((option) => (
                     <button
                       key={option.value}
@@ -362,7 +323,7 @@ export function SettingsView({
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.gitSidebarLayout.title")}</span>
                 <div
-                  className="desktop-theme-segment desktop-appearance-option-segment"
+                  className="desktop-theme-segment desktop-appearance-option-segment desktop-appearance-hug-segment"
                   aria-label={t("settings.appearance.gitSidebarLayout.ariaLabel")}
                 >
                   {(["cards", "dividers"] as const).map((layout) => (
@@ -381,7 +342,7 @@ export function SettingsView({
               </div>
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.navigation.title")}</span>
-                <div className="desktop-theme-segment desktop-appearance-option-segment" aria-label={t("settings.appearance.navigation.ariaLabel")}>
+                <div className="desktop-theme-segment desktop-appearance-option-segment desktop-appearance-hug-segment" aria-label={t("settings.appearance.navigation.ariaLabel")}>
                   {SIDEBAR_NAVIGATION_LAYOUT_OPTIONS.map((option) => {
                     const Icon = option.placement === "top"
                       ? PanelTop
@@ -417,7 +378,7 @@ export function SettingsView({
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.loadingAnimation.title")}</span>
                 <div
-                  className="desktop-theme-segment desktop-appearance-option-segment"
+                  className="desktop-theme-segment desktop-appearance-option-segment desktop-appearance-hug-segment"
                   aria-label={t("settings.appearance.loadingAnimation.ariaLabel")}
                 >
                   {PULSE_GRID_PRESET_IDS.map((presetId) => (
@@ -444,14 +405,17 @@ export function SettingsView({
               </div>
               {experimentalSettings.enableViewerPlugins && (
                 <div className="desktop-settings-row desktop-settings-row-control">
-                  <span className="desktop-settings-label-stack">
-                    <strong>{t("settings.appearance.pluginsShortcut.title")}</strong>
-                    <small>{t("settings.appearance.pluginsShortcut.detail")}</small>
+                  <span title={t("settings.appearance.pluginsShortcut.detail")}>
+                    {t("settings.appearance.pluginsShortcut.title")}
                   </span>
-                  <label className="desktop-settings-switch">
+                  <label
+                    className="desktop-settings-switch"
+                    title={t("settings.appearance.pluginsShortcut.detail")}
+                  >
                     <input
                       type="checkbox"
                       aria-label={t("settings.appearance.pluginsShortcut.title")}
+                      aria-description={t("settings.appearance.pluginsShortcut.detail")}
                       checked={sidebarNavigationVisibilitySettings.enabled.plugins}
                       onChange={(event) => onSidebarNavigationVisibilitySettingsChange({
                         ...sidebarNavigationVisibilitySettings,
@@ -515,26 +479,6 @@ export function SettingsView({
                   })}
                 </div>
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-                <span>{t("settings.appearance.terminalLayout.title")}</span>
-                <div
-                  className="desktop-theme-segment desktop-terminal-layout-segment"
-                  aria-label={t("settings.appearance.terminalLayout.ariaLabel")}
-                >
-                  {(["menu", "tabs"] as const).map((layout) => (
-                    <button
-                      key={layout}
-                      type="button"
-                      className={terminalSessionLayout === layout ? "active" : ""}
-                      aria-pressed={terminalSessionLayout === layout}
-                      title={t(`settings.appearance.terminalLayout.${layout}.description`)}
-                      onClick={() => onTerminalSessionLayoutChange(layout)}
-                    >
-                      <span>{t(`settings.appearance.terminalLayout.${layout}.label`)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
               <div className="desktop-settings-row desktop-settings-row-control">
                 <span id="desktop-pointer-cursors-label">{t("settings.appearance.pointerCursors.title")}</span>
                 <label
@@ -549,34 +493,6 @@ export function SettingsView({
                   />
                   <span aria-hidden="true" />
                 </label>
-              </div>
-              <AgentFileActivityAppearanceSetting
-                enabled={agentFileActivityIndicatorsEnabled}
-                workspaceRoot={workspace.path}
-                onChange={onAgentFileActivityIndicatorsEnabledChange}
-              />
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-                <span id="desktop-dock-icon-label">{t("settings.appearance.dockIcon.title")}</span>
-                <div
-                  className="desktop-theme-segment desktop-appearance-option-segment desktop-dock-icon-segment"
-                  aria-labelledby="desktop-dock-icon-label"
-                >
-                  {DOCK_ICON_OPTIONS.map((option) => (
-                    <button
-                      key={option.id}
-                      className={dockIcon === option.id ? "active" : ""}
-                      type="button"
-                      title={t(`settings.appearance.dockIcon.${option.id}.description`)}
-                      aria-label={t(`settings.appearance.dockIcon.${option.id}.label`)}
-                      aria-description={t(`settings.appearance.dockIcon.${option.id}.description`)}
-                      aria-pressed={dockIcon === option.id}
-                      onClick={() => onDockIconChange(option.id)}
-                    >
-                      <img src={option.previewSrc} alt="" />
-                      <span>{t(`settings.appearance.dockIcon.${option.id}.label`)}</span>
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
           </div>

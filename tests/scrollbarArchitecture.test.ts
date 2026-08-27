@@ -8,7 +8,6 @@ const indexHtml = readCss("index.html");
 const stylesEntry = readCss("src/styles.css");
 const tokensCss = readCss("src/styles/tokens.css");
 const scrollbarsCss = readCss("src/styles/scrollbars.css");
-const productDefaultViewerCss = readCss("src/styles/viewer-product-default.css");
 const scrollbarActivitySource = readCss("src/components/ScrollbarActivity.tsx");
 const terminalSessionSource = readCss(
   "src/features/desktop-terminal/ui/TerminalSessionView.tsx",
@@ -25,8 +24,9 @@ const sidebarResizeHandleSource = readCss(
 const auxiliaryPanelSource = readCss(
   "src/features/app-shell/auxiliary/AuxiliaryPanelHost.tsx",
 );
-const gitStatusSource = readCss("src/features/source-control/GitStatusView.tsx");
-const historyDetailCss = readCss("src/features/source-control/styles/history-detail.css");
+const gitSidebarSource = readCss("src/features/source-control/SourceControlSidebar.tsx");
+const gitSidebarLayoutCss = readCss("src/features/source-control/styles/sidebar-layout.css");
+const gitSidebarPanelsCss = readCss("src/features/source-control/styles/sidebar-panels.css");
 const layoutCss = readCss("src/styles/layout.css");
 const baseCss = readCss("src/styles/base.css");
 const markdownEditorCss = readCss("packages/shared-ui/src/styles/editor/markdown-editor.css");
@@ -76,15 +76,10 @@ describe("scrollbar architecture", () => {
     expect(scrollbarActivitySource).toContain("owner.scrollBy");
     expect(scrollbarActivitySource).not.toContain("position: fixed");
     expect(scrollbarActivitySource).not.toContain('data-interface-style="windows-xp"');
-    expect(scrollbarActivitySource).toContain('root.dataset.editorPresentation === "product-default"');
-    expect(scrollbarActivitySource).toContain('owner.closest(".po-viewer-surface-boundary")');
-    expect(interfaceSkinContractCss).toContain(
-      ':not(:root[data-editor-presentation="product-default"] .po-viewer-surface-boundary *)',
-    );
-    expect(productDefaultViewerCss).toContain("--po-scrollbar-size: 12px;");
-    expect(scrollbarsCss).toContain(
-      ':root[data-po-scrollbar-mode="product"][data-editor-presentation="product-default"]',
-    );
+    expect(scrollbarActivitySource).not.toContain("editorPresentation");
+    expect(scrollbarActivitySource).not.toContain('owner.closest(".po-viewer-surface-boundary")');
+    expect(interfaceSkinContractCss).not.toContain("data-editor-presentation");
+    expect(scrollbarsCss).not.toContain("data-editor-presentation");
     expect(readCss("packages/shared-ui/src/sidebar/SidebarScrollArea.tsx")).toContain(
       'data-po-scrollbar="sidebar"',
     );
@@ -253,21 +248,20 @@ describe("scrollbar architecture", () => {
     expect(dataWorkspaceSource).toContain("ref={explorerResizeHandleRef}");
   });
 
-  it("keeps the History pane resizer after its sidebar scroll lane", () => {
+  it("keeps the History divider between the Git changes and history panes", () => {
     const historyResizerRule = readRule(
-      historyDetailCss,
-      ".desktop-history-panel-tree-resizer",
+      gitSidebarPanelsCss,
+      ".desktop-git-history-resizer::after",
     );
+    expect(historyResizerRule).toContain("inset-inline: 0;");
     expect(historyResizerRule).toContain(
-      "inset-inline-start: var(--desktop-history-tree-width, clamp(260px, 28vw, 380px));",
+      "background: var(--po-sidebar-divider, var(--po-divider));",
     );
-    expect(historyResizerRule).not.toContain("inset-inline-end:");
     expect(historyResizerRule).not.toContain("transform:");
-    expect(gitStatusSource).toMatch(
-      /<\/aside>\s+<SidebarResizeHandle\s+className="desktop-history-panel-tree-resizer"\s+paneEdge/,
-    );
-    expect(gitStatusSource).toContain(
-      "const treeElement = event.currentTarget.previousElementSibling;",
+    expect(readRule(gitSidebarLayoutCss, ".desktop-git-history-pane"))
+      .not.toContain("max-height:");
+    expect(gitSidebarSource).toMatch(
+      /className="desktop-git-changes-pane"[\s\S]+<GitSidebarHistoryResizer[\s\S]+className=\{`desktop-git-history-pane/,
     );
     expect(baseCss).not.toContain('[dir="rtl"] .data-explorer-resizer');
   });

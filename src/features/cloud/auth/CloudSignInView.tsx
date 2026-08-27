@@ -1,15 +1,18 @@
-import { DesktopEntryState } from "../../../components/DesktopEntryState";
 import type { DesktopCloudSession } from "../../../lib/cloudApi";
 import { useLocalization } from "@puppyone/localization/react";
-import { CloudAuthCard, CloudProductMark } from "./CloudAuthCard";
+import type { CloudWorkspaceSection } from "../types";
+import { CloudActivationHero } from "../components/CloudActivationHero";
+import { CloudAuthCard } from "./CloudAuthCard";
 import { useCloudAuthController } from "../hooks/useCloudAuthController";
 import "./cloud-sign-in.css";
 
 export function CloudSignInView({
+  activeSection,
   apiBaseUrl,
   onSessionChange,
   onRefresh,
 }: {
+  activeSection: CloudWorkspaceSection;
   apiBaseUrl: string | null;
   onSessionChange: (session: DesktopCloudSession | null) => void;
   onRefresh: () => void | Promise<void>;
@@ -24,21 +27,15 @@ export function CloudSignInView({
   });
 
   return (
-    <DesktopEntryState
+    <CloudActivationHero
+      activeSection={activeSection}
       className="desktop-cloud-sign-in-entry"
       ariaLabel={t("cloud.auth.signInToCloud")}
-      visual={(
-        <div className="desktop-cloud-login-logo">
-          <CloudProductMark />
-        </div>
-      )}
-      title={t("cloud.productName")}
-      description={t("cloud.auth.description")}
       action={(
         <CloudAuthCard
           view={auth.signedInEmail ? "signedIn" : auth.view}
           signedInEmail={auth.signedInEmail}
-          signInLabel={t("cloud.auth.signInToCloud")}
+          signInLabel={t("cloud.auth.signInToContinue")}
           loading={auth.loading}
           signingOut={auth.signingOut}
           error={auth.error}

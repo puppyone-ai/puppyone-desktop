@@ -25,7 +25,6 @@ export function createSourceControlWorkspaceSurface({
   gitSidebarLayout,
   onOpenFile,
   puppyoneConfig,
-  workspace,
 }: SourceControlWorkspaceSurfaceProps) {
   return {
     sidebar: (
@@ -38,15 +37,16 @@ export function createSourceControlWorkspaceSurface({
           fileIconTheme,
         }}
         view={{
-          activePanel: controller.gitMainPanel,
+          selectedCommitId: controller.selectedGitCommitId,
           selectedWorkingFile: controller.selectedGitWorkingFile,
+          historyLoading: controller.gitHistoryLoading,
           operationLoading: controller.gitOperationLoading,
           operationError: null,
           loading: controller.gitStatusLoading,
           error: controller.gitStatusError,
         }}
         actions={{
-          selectPanel: controller.selectGitMainPanel,
+          selectCommit: controller.selectGitCommit,
           selectWorkingFile: controller.selectGitWorkingFile,
           stagePaths: controller.handleStageGitPaths,
           stageAll: controller.handleStageAllGitChanges,
@@ -67,7 +67,6 @@ export function createSourceControlWorkspaceSurface({
     ),
     main: (
       <GitStatusView
-        workspace={workspace}
         status={controller.activeGitStatus}
         activePanel={controller.gitMainPanel}
         selectedCommitId={controller.selectedGitCommitId}
@@ -83,7 +82,6 @@ export function createSourceControlWorkspaceSurface({
         loading={controller.gitStatusLoading}
         error={controller.gitStatusError}
         onRefresh={controller.refreshGitStatus}
-        onSelectCommit={controller.selectGitCommit}
         onStagePaths={controller.handleStageGitPaths}
         onUnstagePaths={controller.handleUnstageGitPaths}
         onDiscardPaths={controller.handleDiscardGitPaths}

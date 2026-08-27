@@ -1,4 +1,5 @@
 export { GitSidebar } from "./SourceControlSidebar";
+export { GitOperationButton } from "./sidebar/GitSidebarPrimitives";
 export { VersionControlIcon } from "./VersionControlIcon";
 export { GitStatusView } from "./GitStatusView";
 export { createSourceControlWorkspaceSurface } from "./SourceControlWorkspaceSurface";

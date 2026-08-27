@@ -1686,10 +1686,23 @@ export async function discardAllWorkspaceGitChanges(rootPath) {
   return getWorkspaceGitStatus(root);
 }
 
-export async function commitWorkspaceGit(rootPath, message) {
+export async function commitWorkspaceGit(rootPath, message, options = {}) {
   const root = resolveWorkspacePath(rootPath, null);
   const normalizedMessage = await normalizeCommitMessage(root, message);
-  await execGit(root, ["commit", "-m", normalizedMessage], {
+  const authorName = normalizeOneShotGitIdentity(options.authorName);
+  const authorEmail = normalizeOneShotGitIdentity(options.authorEmail);
+  const args = [];
+  if (authorName && authorEmail) {
+    args.push(
+      "-c", `user.name=${authorName}`,
+      "-c", `user.email=${authorEmail}`,
+      "-c", "commit.gpgsign=false",
+    );
+  }
+  args.push("commit");
+  if (options.allowEmpty === true) args.push("--allow-empty");
+  args.push("-m", normalizedMessage);
+  await execGit(root, args, {
     timeout: GIT_MUTATION_TIMEOUT_MS,
   }).catch((error) => {
     throw new Error(`Unable to commit changes: ${error.message}`);
@@ -2310,7 +2323,7 @@ async function readGitBranches(rootPath, options = {}) {
     "for-each-ref",
     "refs/heads",
     "refs/remotes",
-    "--format=%(refname)%09%(refname:short)%09%(HEAD)%09%(upstream:short)%09%(upstream:track,nobracket)%09%(objectname:short)%09%(contents:subject)%09%(committerdate:iso-strict)",
+    "--format=%(refname)%09%(refname:short)%09%(HEAD)%09%(upstream:short)%09%(upstream:track,nobracket)%09%(objectname:short)%09%(contents:subject)%09%(committerdate:iso-strict)%09%(authorname)",
   ], { optionalLocks: false, signal }).catch(() => {
     throwIfGitStatusAborted(signal);
     return { stdout: "" };
@@ -2348,6 +2361,7 @@ function normalizeGitBranches(branches, currentBranchName, headCommitId) {
       lastCommitId: headCommitId || null,
       lastCommitMessage: null,
       lastCommitDate: null,
+      lastCommitAuthorName: null,
     },
     ...normalized,
   ];
@@ -2853,6 +2867,7 @@ function parseGitBranchLine(line) {
     lastCommitId,
     lastCommitMessage,
     lastCommitDate,
+    lastCommitAuthorName,
   ] = line.split("\t");
 
   if (!refName || !shortName) return null;
@@ -2871,6 +2886,7 @@ function parseGitBranchLine(line) {
     lastCommitId: lastCommitId || null,
     lastCommitMessage: lastCommitMessage || null,
     lastCommitDate: lastCommitDate || null,
+    lastCommitAuthorName: lastCommitAuthorName || null,
   };
 }
 
@@ -3348,6 +3364,13 @@ async function normalizeCommitMessage(rootPath, message) {
   const normalized = typeof message === "string" ? message.trim() : "";
   if (normalized) return normalized;
   return buildDefaultCommitMessage(rootPath);
+}
+
+function normalizeOneShotGitIdentity(value) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized || normalized.length > 254 || /[\0\r\n]/.test(normalized)) return null;
+  return normalized;
 }
 
 async function buildDefaultCommitMessage(rootPath) {

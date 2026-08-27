@@ -1,4 +1,4 @@
-import { DesktopCloudProviderIcon } from "./accessProviders";
+import { AccessPointProviderIcon } from "../../access-points/presentation";
 import { useLocalization } from "@puppyone/localization/react";
 import { getAccessProviderLabel } from "./createAccessModel";
 
@@ -25,7 +25,7 @@ export function CreateAccessMethodRow({
   return (
     <div className={`desktop-cloud-create-access-method-row ${enabled ? "enabled" : ""} ${inactive ? "inactive" : ""}`}>
       <span className="desktop-cloud-create-access-method-icon" aria-hidden="true">
-        <DesktopCloudProviderIcon provider={provider} size={16} />
+        <AccessPointProviderIcon sourceProvider={provider} size={16} />
       </span>
       <div className="desktop-cloud-create-access-method-copy">
         <div>

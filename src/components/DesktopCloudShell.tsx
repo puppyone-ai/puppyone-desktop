@@ -37,8 +37,6 @@ type DesktopCloudShellProps = {
   titlebarActions?: ReactNode;
   navigationToolbarActions?: ReactNode;
   locationBar?: ReactNode;
-  minimalMode?: boolean;
-  minimalModeDock?: ReactNode;
   leftSidebarCollapsed?: boolean;
   leftSidebarMinWidth?: number;
   leftSidebarMaxWidth?: number;
@@ -63,8 +61,6 @@ export function DesktopCloudShell({
   titlebarActions,
   navigationToolbarActions,
   locationBar,
-  minimalMode = false,
-  minimalModeDock,
   leftSidebarCollapsed = false,
   leftSidebarMinWidth = MIN_EXPLORER_WIDTH,
   leftSidebarMaxWidth = MAX_EXPLORER_WIDTH,
@@ -139,7 +135,7 @@ export function DesktopCloudShell({
 
   return (
     <div
-      className={`desktop-shell ${minimalMode ? "is-minimal-mode" : ""}`}
+      className="desktop-shell"
       data-titlebar-sidebar-state={sidebarState}
       style={shellStyle}
     >
@@ -169,8 +165,6 @@ export function DesktopCloudShell({
           </>
         )}
         actions={titlebarActions}
-        minimalMode={minimalMode}
-        minimalModeDock={minimalModeDock}
       />
 
       <DesktopShellAccessoryProvider navigationToolbarHost={navigationToolbarHost}>

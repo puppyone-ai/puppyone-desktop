@@ -13,7 +13,7 @@ export {
   CloudProjectHistoryView,
   type CloudProjectHistoryProps,
 } from "./history";
-export type { CloudAccessFilter } from "./accessFilters";
+export type { AccessPointCatalogKind } from "./access-points";
 export { CloudServiceSidebar } from "./CloudServiceSidebar";
 export {
   getCloudAuthEmail,
@@ -37,5 +37,5 @@ export type { CloudEnvironment, CloudEnvironmentSource } from "./environment";
 export type { CloudRouteContext, CloudRouteDescriptor } from "./routes/cloudRoutes";
 export type { CloudWorkspaceSection } from "./types";
 export { formatCloudMessage } from "./cloudPresentation";
-export { isCloudAccessNavigationResource } from "./sections/access/accessRows";
+export { isAccessPointNavigationResource } from "./access-points";
 export { useCloudHistoryController } from "./history/useCloudHistoryController";

@@ -15,8 +15,12 @@ import type {
 
 const localFiles = vi.hoisted(() => ({
   cleanupWorkspaceCloudInitialization: vi.fn(),
+  commitWorkspaceGit: vi.fn(),
+  createWorkspaceGitBranch: vi.fn(),
   getWorkspaceCloudInitializationState: vi.fn(),
   getWorkspaceGitStatus: vi.fn(),
+  initializeWorkspaceGitRepository: vi.fn(),
+  stageAllWorkspaceGitChanges: vi.fn(),
   startWorkspaceCloudInitialization: vi.fn(),
   subscribeWorkspaceCloudInitializationProgress: vi.fn(() => () => {}),
 }));
@@ -59,6 +63,21 @@ const publishedStatus = {
     pushUrl: "https://cloud.example/git/project-1.git",
     branches: [],
   }],
+} as GitStatusSnapshot;
+
+const localFolderStatus = {
+  ...initialStatus,
+  isRepo: false,
+  branch: null,
+  totalCommits: 0,
+  headCommitId: null,
+  branches: [],
+} as unknown as GitStatusSnapshot;
+
+const emptyRepositoryStatus = {
+  ...localFolderStatus,
+  isRepo: true,
+  branch: "main",
 } as GitStatusSnapshot;
 
 const repositoryContext = { rootPath: "/tmp/local-notes" } as GitRepositoryContext;
@@ -159,6 +178,10 @@ describe("durable PuppyOne Cloud initialization renderer flow", () => {
     vi.clearAllMocks();
     localFiles.getWorkspaceCloudInitializationState.mockResolvedValue(okResult(null));
     localFiles.getWorkspaceGitStatus.mockResolvedValue(initialStatus);
+    localFiles.initializeWorkspaceGitRepository.mockResolvedValue(emptyRepositoryStatus);
+    localFiles.stageAllWorkspaceGitChanges.mockResolvedValue(emptyRepositoryStatus);
+    localFiles.commitWorkspaceGit.mockResolvedValue(initialStatus);
+    localFiles.createWorkspaceGitBranch.mockResolvedValue(initialStatus);
     localFiles.startWorkspaceCloudInitialization.mockResolvedValue(okResult(completedState, publishedStatus));
     localFiles.subscribeWorkspaceCloudInitializationProgress.mockImplementation(() => () => {});
     localFiles.cleanupWorkspaceCloudInitialization.mockResolvedValue(okResult(null, initialStatus));
@@ -214,6 +237,38 @@ describe("durable PuppyOne Cloud initialization renderer flow", () => {
     expect(actions.setActiveView).toHaveBeenCalledWith("cloud");
     expect(readOutput().dataset.push).toBe("");
     expect(readOutput().dataset.error).toBe("");
+  });
+
+  it("turns a local folder into one committed branch before starting the Cloud publish", async () => {
+    localFiles.getWorkspaceGitStatus.mockResolvedValue(localFolderStatus);
+    await render(<InitializationHarness activeSession={session} />);
+    await flushPromises();
+
+    await click("start");
+    await flushPromises();
+
+    expect(localFiles.initializeWorkspaceGitRepository).toHaveBeenCalledWith(repositoryContext.rootPath);
+    expect(localFiles.stageAllWorkspaceGitChanges).toHaveBeenCalledWith(repositoryContext.rootPath);
+    expect(localFiles.commitWorkspaceGit).toHaveBeenCalledWith(
+      repositoryContext.rootPath,
+      "Initial snapshot",
+      {
+        allowEmpty: true,
+        authorName: session.user_email,
+        authorEmail: session.user_email,
+      },
+    );
+    expect(localFiles.startWorkspaceCloudInitialization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rootPath: repositoryContext.rootPath,
+        sourceBranch: "main",
+        action: "initialize",
+      }),
+    );
+    expect(localFiles.initializeWorkspaceGitRepository.mock.invocationCallOrder[0])
+      .toBeLessThan(localFiles.startWorkspaceCloudInitialization.mock.invocationCallOrder[0]);
+    expect(localFiles.commitWorkspaceGit.mock.invocationCallOrder[0])
+      .toBeLessThan(localFiles.startWorkspaceCloudInitialization.mock.invocationCallOrder[0]);
   });
 
   it("applies main-process progress while the durable operation is running", async () => {

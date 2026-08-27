@@ -15,12 +15,6 @@ export type DesktopTerminalSessionSummary = {
   status: DesktopTerminalSessionStatus;
 };
 
-export type DesktopTerminalSessionSnapshot = {
-  workspacePath: string;
-  sessions: DesktopTerminalSessionSummary[];
-  activeSessionId: string | null;
-};
-
 export type DesktopTerminalSession = DesktopTerminalSessionSummary & {
   launchError: string | null;
 };
@@ -170,33 +164,6 @@ export function desktopTerminalSessionsReducer(
   }
 
   return state;
-}
-
-export function createDesktopTerminalSessionSnapshot(
-  workspacePath: string,
-  state: DesktopTerminalSessionsState,
-): DesktopTerminalSessionSnapshot {
-  return {
-    workspacePath,
-    sessions: state.sessions.map(({ id, launcherId, ordinal, shell, status }) => ({
-      id,
-      launcherId,
-      ordinal,
-      shell,
-      status,
-    })),
-    activeSessionId: state.activeSessionId,
-  };
-}
-
-export function createEmptyDesktopTerminalSessionSnapshot(
-  workspacePath = "",
-): DesktopTerminalSessionSnapshot {
-  return {
-    workspacePath,
-    sessions: [],
-    activeSessionId: null,
-  };
 }
 
 function createSession(

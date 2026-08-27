@@ -3,13 +3,11 @@ import { readFileSync } from "node:fs";
 
 import {
   DEFAULT_EXPERIMENTAL_SETTINGS,
+  DEFAULT_CREATE_NEW_MENU_SETTINGS,
   TEXT_SIZE_PRESETS,
-  getVisibleCreateNewItems,
   parseCreateNewMenuSettings,
   parseDarkThemePreset,
   parseDiffMarkers,
-  parseDockIcon,
-  parseExternalAppsSettings,
   parseExperimentalSettings,
   parseLoadingAnimationPreset,
   parseGitSidebarLayout,
@@ -17,8 +15,8 @@ import {
   parseAgentFileActivityIndicatorsEnabled,
   parsePointerCursors,
   parseSidebarNavigationVisibilitySettings,
-  parseTerminalSessionLayout,
   parseTextSize,
+  resolveVisibleCreateNewMenuItems,
 } from "../src/preferences";
 
 describe("Git sidebar layout preferences", () => {
@@ -31,43 +29,35 @@ describe("Git sidebar layout preferences", () => {
 });
 
 describe("create new menu preferences", () => {
-  it("migrates the legacy default while preserving explicit order and visibility", () => {
-    expect(parseCreateNewMenuSettings(null)).toEqual({
-      version: 3,
-      items: [
-        { kind: "markdown", enabled: true },
-        { kind: "contextMap", enabled: true },
-        { kind: "csv", enabled: true },
-        { kind: "html", enabled: true },
-        { kind: "slides", enabled: true },
-      ],
+  it("defaults to a complete v5 hierarchy with a first-class submenu node", () => {
+    expect(parseCreateNewMenuSettings(null)).toEqual(DEFAULT_CREATE_NEW_MENU_SETTINGS);
+    expect(DEFAULT_CREATE_NEW_MENU_SETTINGS).toEqual({
+      version: 5,
+      main: ["markdown", "csv", "html", "customFiles"],
+      submenu: ["contextMap"],
+      hidden: ["text", "json", "slides", "app", "puppyflow"],
     });
+    expect(resolveVisibleCreateNewMenuItems(
+      DEFAULT_CREATE_NEW_MENU_SETTINGS,
+      DEFAULT_EXPERIMENTAL_SETTINGS,
+    )).toEqual({
+      main: ["markdown", "csv", "html", "customFiles"],
+      submenu: ["contextMap"],
+    });
+  });
+
+  it("migrates old enabled and placement fields into the three menu groups", () => {
     expect(parseCreateNewMenuSettings(JSON.stringify({
+      version: 3,
       items: [
         { kind: "json", enabled: false },
         { kind: "text", enabled: true },
       ],
     }))).toEqual({
-      version: 3,
-      items: [
-        { kind: "json", enabled: false },
-        { kind: "text", enabled: true },
-      ],
-    });
-    expect(parseCreateNewMenuSettings(JSON.stringify({
-      items: [
-        { kind: "markdown", enabled: true },
-        { kind: "csv", enabled: true },
-      ],
-    }))).toEqual({
-      version: 3,
-      items: [
-        { kind: "markdown", enabled: true },
-        { kind: "contextMap", enabled: true },
-        { kind: "csv", enabled: true },
-        { kind: "html", enabled: true },
-        { kind: "slides", enabled: true },
-      ],
+      version: 5,
+      main: ["customFiles"],
+      submenu: ["text"],
+      hidden: ["json", "markdown", "contextMap", "csv", "html", "slides", "app", "puppyflow"],
     });
     expect(parseCreateNewMenuSettings(JSON.stringify({
       version: 2,
@@ -75,67 +65,70 @@ describe("create new menu preferences", () => {
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
       ],
-    }))).toEqual({
-      version: 3,
-      items: [
-        { kind: "markdown", enabled: true },
-        { kind: "contextMap", enabled: true },
-        { kind: "csv", enabled: true },
-        { kind: "html", enabled: true },
-        { kind: "slides", enabled: true },
-      ],
-    });
+    }))).toEqual(DEFAULT_CREATE_NEW_MENU_SETTINGS);
     expect(parseCreateNewMenuSettings(JSON.stringify({
       version: 3,
       items: [
         { kind: "markdown", enabled: true },
         { kind: "csv", enabled: true },
       ],
-    }))).toEqual({
-      version: 3,
+    }))).toEqual(DEFAULT_CREATE_NEW_MENU_SETTINGS);
+  });
+
+  it("migrates v4 placements, deduplicates items, and moves disabled items to Not shown", () => {
+    expect(parseCreateNewMenuSettings(JSON.stringify({
+      version: 4,
       items: [
-        { kind: "markdown", enabled: true },
-        { kind: "csv", enabled: true },
+        { kind: "json", enabled: true, placement: "main" },
+        { kind: "json", enabled: false, placement: "submenu" },
+        { kind: "text", enabled: false, placement: "invalid" },
+        { kind: "not-a-file-type", enabled: true, placement: "main" },
       ],
+    }))).toEqual({
+      version: 5,
+      main: ["json", "customFiles"],
+      submenu: [],
+      hidden: ["text", "markdown", "contextMap", "csv", "html", "slides", "app", "puppyflow"],
     });
   });
 
-  it("deduplicates valid file types and recovers from malformed persisted values", () => {
+  it("normalizes v5 hierarchy data without losing the submenu's position", () => {
     expect(parseCreateNewMenuSettings(JSON.stringify({
-      items: [
-        { kind: "json", enabled: true },
-        { kind: "json", enabled: false },
-        { kind: "not-a-file-type", enabled: true },
-      ],
+      version: 5,
+      main: ["html", "customFiles", "markdown", "html", "invalid"],
+      submenu: ["json", "markdown"],
+      hidden: ["text", "json"],
     }))).toEqual({
-      version: 3,
-      items: [{ kind: "json", enabled: true }],
+      version: 5,
+      main: ["html", "customFiles", "markdown"],
+      submenu: ["json"],
+      hidden: ["text", "contextMap", "csv", "slides", "app", "puppyflow"],
     });
+  });
+
+  it("recovers from malformed persisted values", () => {
     expect(parseCreateNewMenuSettings(JSON.stringify({
       items: [{ kind: "not-a-file-type" }],
-    }))).toEqual({
-      version: 3,
-      items: [
-        { kind: "markdown", enabled: true },
-        { kind: "contextMap", enabled: true },
-        { kind: "csv", enabled: true },
-        { kind: "html", enabled: true },
-        { kind: "slides", enabled: true },
-      ],
+    }))).toEqual(DEFAULT_CREATE_NEW_MENU_SETTINGS);
+    expect(parseCreateNewMenuSettings(JSON.stringify({ items: [] }))).toEqual({
+      version: 5,
+      main: ["customFiles"],
+      submenu: [],
+      hidden: ["markdown", "contextMap", "text", "json", "csv", "html", "slides", "app", "puppyflow"],
     });
-    expect(parseCreateNewMenuSettings(JSON.stringify({ items: [] }))).toEqual({ version: 3, items: [] });
   });
 
-  it("shows only enabled and currently available file types", () => {
+  it("resolves available items while preserving the submenu node's main-menu position", () => {
     const settings = {
-      version: 3,
-      items: [
-        { kind: "app", enabled: true },
-        { kind: "json", enabled: false },
-        { kind: "csv", enabled: true },
-      ],
+      version: 5,
+      main: ["app", "customFiles", "contextMap"],
+      submenu: ["csv", "puppyflow"],
+      hidden: ["json", "text", "markdown", "html", "slides"],
     } as const;
-    expect(getVisibleCreateNewItems(settings, DEFAULT_EXPERIMENTAL_SETTINGS)).toEqual(["app", "csv"]);
+    expect(resolveVisibleCreateNewMenuItems(settings, DEFAULT_EXPERIMENTAL_SETTINGS)).toEqual({
+      main: ["app", "customFiles", "contextMap"],
+      submenu: ["csv"],
+    });
   });
 });
 
@@ -236,8 +229,6 @@ describe("appearance preferences", () => {
     expect(parseTextSize("17px")).toBe("default");
     expect(parseDarkThemePreset("warm")).toBe("warm");
     expect(parseDarkThemePreset("custom")).toBe("default");
-    expect(parseDockIcon("matte")).toBe("matte");
-    expect(parseDockIcon("/tmp/icon.png")).toBe("polished");
     expect(parseDiffMarkers("symbols")).toBe("symbols");
     expect(parseDiffMarkers("both")).toBe("color");
     expect(parseLoadingAnimationPreset("ikun")).toBe("ikun");
@@ -252,22 +243,18 @@ describe("appearance preferences", () => {
     expect(parsePointerCursors(null)).toBe(false);
   });
 
-  it("keeps Terminal sessions in the visible tab bar by default and accepts the header menu layout", () => {
-    expect(parseTerminalSessionLayout(null)).toBe("tabs");
-    expect(parseTerminalSessionLayout("menu")).toBe("menu");
-    expect(parseTerminalSessionLayout("tabs")).toBe("tabs");
-    expect(parseTerminalSessionLayout("floating")).toBe("tabs");
-  });
-
 });
 
 describe("local Agent preferences", () => {
-  it("keeps only bounded, unique local Agent ids", () => {
-    expect(parseLocalAgentsSettings(null)).toEqual({ enabledAgentIds: [] });
+  it("keeps only bounded, unique hidden Terminal Agent ids", () => {
+    expect(parseLocalAgentsSettings(null)).toEqual({ hiddenTerminalAgentIds: [] });
     expect(parseLocalAgentsSettings(JSON.stringify({
-      enabledAgentIds: ["codex", "claude", "codex", "../../bad", 7],
-    }))).toEqual({ enabledAgentIds: ["codex", "claude"] });
-    expect(parseLocalAgentsSettings("invalid")).toEqual({ enabledAgentIds: [] });
+      hiddenTerminalAgentIds: ["codex", "claude", "codex", "../../bad", 7],
+    }))).toEqual({ hiddenTerminalAgentIds: ["codex", "claude"] });
+    expect(parseLocalAgentsSettings(JSON.stringify({
+      enabledAgentIds: ["codex"],
+    }))).toEqual({ hiddenTerminalAgentIds: [] });
+    expect(parseLocalAgentsSettings("invalid")).toEqual({ hiddenTerminalAgentIds: [] });
   });
 });
 
@@ -280,28 +267,6 @@ function readCssBlock(css: string, selector: string): string {
   return css.slice(bodyStart, end);
 }
 
-describe("external app preferences", () => {
-  it("drops the legacy renderer-controlled executable confirmation preference", () => {
-    const settings = parseExternalAppsSettings(JSON.stringify({
-      openMode: "system",
-      confirmExecutableFiles: false,
-      overrides: [{
-        extension: "PDF",
-        appPath: " /Applications/Preview.app ",
-      }],
-    }));
-
-    expect(settings).toEqual({
-      openMode: "system",
-      overrides: [{
-        extension: "pdf",
-        appPath: "/Applications/Preview.app",
-      }],
-    });
-    expect(settings).not.toHaveProperty("confirmExecutableFiles");
-  });
-});
-
 describe("experimental preferences", () => {
   it("keeps Agent Chat off unless the user explicitly opts in", () => {
     expect(parseExperimentalSettings(null).enableAgentChat).toBe(false);
@@ -309,10 +274,10 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(JSON.stringify({ enableAgentChat: true }))).toMatchObject({
       enableAgentChat: true,
       enableAssetLibraryHome: false,
+      enableCloudAutomation: false,
       enableCloudWorkspace: false,
       enableEditorSaveStatus: false,
       enableMarkdownBlockDrag: false,
-      enableMinimalMode: false,
       enablePuppyFlowFiles: false,
       enableViewerPlugins: false,
     });
@@ -326,6 +291,13 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(JSON.stringify({ enableCloudWorkspace: true })).enableCloudWorkspace).toBe(true);
   });
 
+  it("keeps Cloud Automation off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableCloudAutomation).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableCloudAutomation).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableCloudAutomation: false })).enableCloudAutomation).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableCloudAutomation: true })).enableCloudAutomation).toBe(true);
+  });
+
   it("keeps the editor save status hidden unless the user explicitly opts in", () => {
     expect(parseExperimentalSettings(null).enableEditorSaveStatus).toBe(false);
     expect(parseExperimentalSettings("not-json").enableEditorSaveStatus).toBe(false);
@@ -333,19 +305,16 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(JSON.stringify({ enableEditorSaveStatus: true })).enableEditorSaveStatus).toBe(true);
   });
 
-  it("keeps Context Maps experimental and migrates the former relationship flag", () => {
-    expect(parseExperimentalSettings(null).enableContextMaps).toBe(false);
-    expect(parseExperimentalSettings(JSON.stringify({ enableContextMaps: true })).enableContextMaps)
-      .toBe(true);
-    expect(parseExperimentalSettings(JSON.stringify({ enableFolderRelationships: true })).enableContextMaps)
-      .toBe(true);
+  it("ignores retired Context Map experiment values now that the feature is always available", () => {
+    expect(parseExperimentalSettings(JSON.stringify({ enableContextMaps: false })))
+      .not.toHaveProperty("enableContextMaps");
+    expect(parseExperimentalSettings(JSON.stringify({ enableFolderRelationships: false })))
+      .not.toHaveProperty("enableContextMaps");
   });
 
-  it("keeps Minimal Mode off unless the user explicitly opts in", () => {
-    expect(parseExperimentalSettings(null).enableMinimalMode).toBe(false);
-    expect(parseExperimentalSettings("not-json").enableMinimalMode).toBe(false);
-    expect(parseExperimentalSettings(JSON.stringify({ enableMinimalMode: false })).enableMinimalMode).toBe(false);
-    expect(parseExperimentalSettings(JSON.stringify({ enableMinimalMode: true })).enableMinimalMode).toBe(true);
+  it("ignores retired Minimal Mode experiment values", () => {
+    expect(parseExperimentalSettings(JSON.stringify({ enableMinimalMode: true })))
+      .not.toHaveProperty("enableMinimalMode");
   });
 
   it("keeps Markdown block drag handles off unless the user explicitly opts in", () => {

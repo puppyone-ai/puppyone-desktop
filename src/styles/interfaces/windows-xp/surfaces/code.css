@@ -1,4 +1,4 @@
-:root[data-interface-style="windows-xp"][data-editor-presentation="follow-interface"]
+:root[data-interface-style="windows-xp"]
   .po-viewer-surface-boundary[data-viewer-surface-family="code"] {
   --po-editor-bg: #ffffff;
   --po-jsoneditor-bg: #ffffff;

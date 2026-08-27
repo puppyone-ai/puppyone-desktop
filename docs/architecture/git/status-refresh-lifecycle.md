@@ -145,17 +145,17 @@ main process. Status/history reads wait for that operation coordinator to become
 idle. Mutation snapshots are accepted only when their captured repository
 context still matches the scheduler's current root and epoch.
 
-### GitHub remote freshness
+### Remote freshness
 
 Filesystem and metadata watchers can observe local ref changes, but they cannot
-discover a commit that exists only on GitHub. `useGitRepositoryLifecycle`
+discover a commit that exists only on a remote host. `useGitRepositoryLifecycle`
 therefore derives one target from `GitStatusSnapshot.effectiveHosting` and calls
-the authorized fetch bridge for that remote only. `githubRemoteRefreshPolicy.ts`
+the authorized fetch bridge for that remote only. `remoteRefreshPolicy.ts`
 keeps eligibility and timing pure/testable; the lifecycle owns timers,
 foreground checks, in-flight deduplication, and epoch-safe snapshot publication.
 
 ```text
-effectiveHosting(kind=github, remote=origin)
+effectiveHosting(kind=github|puppyone-cloud|generic-git, remote=origin)
                     |
                     v
 foreground cadence / sidebar entry / focus / online

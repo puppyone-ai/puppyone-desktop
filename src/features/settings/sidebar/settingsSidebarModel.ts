@@ -1,7 +1,6 @@
 import {
   Bot,
   Cloud,
-  ExternalLink,
   FileText,
   FlaskConical,
   FolderCog,
@@ -26,6 +25,11 @@ export type SettingsSidebarGroupModel = {
   id: string;
   labelId: string;
   items: readonly SettingsSidebarItem[];
+  requiresCloud?: boolean;
+};
+
+export type SettingsVisibilityContext = {
+  cloudEnabled: boolean;
 };
 
 export const SETTINGS_SIDEBAR_GROUPS = [
@@ -36,9 +40,8 @@ export const SETTINGS_SIDEBAR_GROUPS = [
       { id: "general", labelId: "settings.sidebar.general", icon: Settings, disabled: false },
       { id: "appearance", labelId: "settings.sidebar.appearance", icon: Monitor, disabled: false },
       { id: "local-agents", labelId: "settings.sidebar.localAgents", icon: Bot, disabled: false },
-      { id: "external-apps", labelId: "settings.sidebar.defaultApps", icon: ExternalLink, disabled: false },
-      { id: "editor", labelId: "settings.sidebar.editor", icon: Pencil, disabled: false },
       { id: "new-menu", labelId: "settings.sidebar.createNew", icon: ListPlus, disabled: false },
+      { id: "editor", labelId: "settings.sidebar.editor", icon: Pencil, disabled: false },
       { id: "experimental", labelId: "settings.sidebar.experimental", icon: FlaskConical, disabled: false },
     ],
   },
@@ -54,9 +57,25 @@ export const SETTINGS_SIDEBAR_GROUPS = [
   {
     id: "cloud",
     labelId: "settings.sidebar.cloud",
+    requiresCloud: true,
     items: [
       { id: "account", labelId: "settings.sidebar.account", icon: UserRound, disabled: false },
       { id: "cloud", labelId: "settings.sidebar.cloudHosting", icon: Cloud, disabled: false },
     ],
   },
 ] satisfies readonly SettingsSidebarGroupModel[];
+
+export function resolveSettingsSidebarGroups({
+  cloudEnabled,
+}: SettingsVisibilityContext): readonly SettingsSidebarGroupModel[] {
+  return SETTINGS_SIDEBAR_GROUPS.filter((group) => !group.requiresCloud || cloudEnabled);
+}
+
+export function isSettingsSectionAvailable(
+  section: SettingsSection,
+  context: SettingsVisibilityContext,
+): boolean {
+  return resolveSettingsSidebarGroups(context).some((group) => (
+    group.items.some((item) => item.id === section)
+  ));
+}

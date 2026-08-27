@@ -4,7 +4,6 @@ import type { GitSidebarPanelId } from "./useGitSidebarPanelLayout";
 export type GitSidebarExpansionState = Record<GitSidebarPanelId, boolean>;
 
 const DEFAULT_EXPANSION_STATE: GitSidebarExpansionState = {
-  remote: true,
   merge: true,
   committed: true,
   staged: true,

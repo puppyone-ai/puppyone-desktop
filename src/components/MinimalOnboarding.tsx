@@ -211,7 +211,7 @@ export function MinimalOnboarding({
         className="onboarding-homepage"
         aria-label={t("onboarding.projects.title")}
       >
-        <OnboardingBrandLockup state={onboardingState} />
+        <OnboardingBrandLockup state={onboardingState} resolvedTheme={resolvedTheme} />
 
         {hasProjects && (
           <OnboardingProjectList

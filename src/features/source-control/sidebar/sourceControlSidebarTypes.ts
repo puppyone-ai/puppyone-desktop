@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { FileIconThemeId } from "@puppyone/shared-ui";
 import type { GitDisplayMode, GitSidebarLayout } from "../../../preferences";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../../types/electron";
-import type { GitMainPanel, GitWorkingSelection } from "../types";
+import type { GitWorkingSelection } from "../types";
 import type { GitSidebarPanelId } from "./useGitSidebarPanelLayout";
 
 export type GitSidebarRepositoryState = {
@@ -14,8 +14,9 @@ export type GitSidebarRepositoryState = {
 };
 
 export type GitSidebarViewState = {
-  activePanel: GitMainPanel;
+  selectedCommitId: string | null;
   selectedWorkingFile: GitWorkingSelection | null;
+  historyLoading: boolean;
   operationLoading: string | null;
   operationError: string | null;
   loading: boolean;
@@ -23,7 +24,7 @@ export type GitSidebarViewState = {
 };
 
 export type GitSidebarActions = {
-  selectPanel: (panel: GitMainPanel) => void;
+  selectCommit: (commitId: string) => void;
   selectWorkingFile: (selection: GitWorkingSelection) => void;
   stagePaths: (paths: string[]) => Promise<boolean>;
   stageAll: () => Promise<boolean>;

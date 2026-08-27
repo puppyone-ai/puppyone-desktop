@@ -85,11 +85,10 @@ export function createDesktopElectronBuilderConfig({
     to: "build-info.json",
   });
   if (identity.channel === "dev") {
-    withoutGeneratedBuildInfo.push(
-      { from: "public/logo-square-dev.png", to: "logo-square-dev.png" },
-      { from: "public/logo-square-v0.1.3-light-dev.png", to: "dock-icon-light-dev.png" },
-      { from: "public/logo-square-v0.1.3-dark-dev.png", to: "dock-icon-matte-dev.png" },
-    );
+    withoutGeneratedBuildInfo.push({
+      from: "public/logo-square-dev.png",
+      to: "logo-square-dev.png",
+    });
   }
 
   const config = {

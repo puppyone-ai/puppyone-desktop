@@ -7,25 +7,17 @@ import { Fragment, useMemo, useState } from "react";
 import { useLocalization } from "@puppyone/localization";
 import {
   buildSourceControlSidebarModel,
-  getGitHostingIdentity,
   getGitHostingMode,
-  getGitScmSyncSection,
   getSourceControlPrimaryActionSlot,
   getGitSyncState,
 } from "./viewModel";
 import { createGitLocalStatusPanels } from "./sidebar/GitLocalStatusPanels";
 import {
-  GitHistoryShortcut,
+  GitSidebarHistoryResizer,
   GitSidebarSectionResizer,
 } from "./sidebar/GitSidebarPrimitives";
-import {
-  GitHubProviderSection,
-  PuppyoneCloudProviderSection,
-} from "./sidebar/GitSidebarProviders";
-import {
-  GitRemotePrompt,
-  GitScmSyncRow,
-} from "./sidebar/GitRemoteSections";
+import { GitSidebarHistoryPanel } from "./sidebar/GitSidebarHistoryPanel";
+import { GitRemotePrompt } from "./sidebar/GitRemoteSections";
 import type {
   GitSidebarProps,
   GitSidebarRenderPanel,
@@ -39,28 +31,27 @@ import {
 export type { GitSidebarProps } from "./sidebar/sourceControlSidebarTypes";
 
 export function GitSidebar({ repository, view, actions, cloudBackup }: GitSidebarProps) {
-  const { status, puppyoneConfig, gitDisplayMode, gitSidebarLayout, fileIconTheme } = repository;
+  const { status, puppyoneConfig, gitDisplayMode, fileIconTheme } = repository;
   const {
-    activePanel,
+    selectedCommitId,
     selectedWorkingFile,
+    historyLoading,
     operationLoading,
     operationError,
     loading,
     error,
   } = view;
-  const { selectPanel, selectWorkingFile, pull, push, publish } = actions;
+  const { selectCommit, selectWorkingFile } = actions;
   const { t, formatNumber } = useLocalization();
   const [backupCardDismissed, setBackupCardDismissed] = useState(false);
+  const [historyExpanded, setHistoryExpanded] = useState(true);
   const { expanded, toggle } = useGitSidebarExpansionState();
   const sourceControl = status?.sourceControl ?? null;
   const historyCommits = status?.allCommits ?? status?.commits ?? [];
   const currentBranch = status?.branches.find((branch) => branch.current) ?? null;
   const syncState = getGitSyncState(status, currentBranch, puppyoneConfig, t);
   const hostingMode = getGitHostingMode(status, puppyoneConfig);
-  const hostingIdentity = getGitHostingIdentity(status, puppyoneConfig);
-  const showRemoteSyncSection = hostingMode === "generic-git";
   const professionalDisplayMode = hostingMode === "github" || hostingMode === "puppyone-cloud";
-  const historyCount = historyCommits.length || status?.totalCommits || 0;
   const disabled = Boolean(operationLoading) || loading || !status?.isRepo;
   const sidebarModel = buildSourceControlSidebarModel({
     status,
@@ -69,109 +60,38 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
     canCommit: sourceControl?.actions.canCommit === true,
     t,
   });
-  const remoteSection = showRemoteSyncSection && !syncState.setupRequired
-    ? getGitScmSyncSection(status, syncState, t, { blockedByConflicts: sidebarModel.hasConflicts })
-    : null;
-  const githubSection = hostingMode === "github" && !syncState.setupRequired
-    ? getGitScmSyncSection(status, syncState, t, { blockedByConflicts: sidebarModel.hasConflicts })
-    : null;
-  const cloudSyncActionAvailable = hostingMode === "puppyone-cloud"
-    && status?.sourceControl.remote?.canPull === true
-    && sidebarModel.mergeResources.length === 0;
-  const githubSyncActionAvailable = githubSection?.action?.kind === "pull"
-    && githubSection.action.disabled === false
-    && sidebarModel.mergeResources.length === 0;
   const primaryActionSlot = getSourceControlPrimaryActionSlot({
     hasConflicts: sidebarModel.hasConflicts,
     hasOperationAction: Boolean(sidebarModel.operationPrimaryAction),
-    hasStagedAction: sidebarModel.professionalMode
-      && Boolean(sidebarModel.stagedPrimaryAction && !sidebarModel.stagedPrimaryAction.disabled),
-    hasSyncAction: cloudSyncActionAvailable
-      || githubSyncActionAvailable
-      || Boolean(remoteSection?.action && !remoteSection.action.disabled),
+    hasStagedAction: Boolean(
+      sidebarModel.stagedPrimaryAction && !sidebarModel.stagedPrimaryAction.disabled,
+    ),
+    hasSyncAction: false,
     hasCommittedAction: Boolean(
       sidebarModel.committedPrimaryAction && !sidebarModel.committedPrimaryAction.disabled,
     ),
-    hasSimpleAction: !sidebarModel.professionalMode && sidebarModel.showSimpleChangeAction,
+    hasStageAndCommitAction: sidebarModel.showStageAndCommitAction,
   });
-  const githubIncomingUpdatedAt = status?.branches.find(
-    (branch) => branch.remote && branch.name === status.sourceControl.remote.target?.ref,
-  )?.lastCommitDate ?? null;
-  const providerSlot = hostingMode === "puppyone-cloud" ? (
-    <PuppyoneCloudProviderSection
-      status={status}
-      mergeCount={sidebarModel.mergeResources.length}
-      expanded={expanded.remote}
-      fileIconTheme={fileIconTheme}
-      selectedWorkingFile={selectedWorkingFile}
-      disabled={disabled}
-      operationLoading={operationLoading}
-      primaryAction={primaryActionSlot === "sync"}
-      onToggleExpanded={() => toggle("remote")}
-      onSelectWorkingFile={selectWorkingFile}
-      onPull={pull}
-    />
-  ) : hostingMode === "github" && hostingIdentity && githubSection ? (
-    <GitHubProviderSection
-      identity={hostingIdentity}
-      section={githubSection}
-      layout={gitSidebarLayout}
-      incomingUpdatedAt={githubIncomingUpdatedAt}
-      incomingFileSummary={status?.sourceControl.remote.incomingFileSummary ?? emptyFileChangeSummary()}
-      mergeCount={sidebarModel.mergeResources.length}
-      disabled={disabled}
-      operationLoading={operationLoading}
-      primaryAction={primaryActionSlot === "sync"}
-      onPull={pull}
-    />
-  ) : null;
-
   const scrollableContentRevision = useMemo(
-    () => ({ expanded, loading, status }),
-    [expanded, loading, status],
+    () => ({ expanded, historyExpanded, loading, status }),
+    [expanded, historyExpanded, loading, status],
   );
   const {
     activeResizeSplit,
+    beginHistoryResize,
     beginPanelResize,
+    changesPaneRef,
+    getHistoryPaneStyle,
     getPanelStyle,
+    historyPaneHeight,
+    historyPaneRef,
+    resetHistoryPaneHeight,
+    resizeHistoryByKeyboard,
     resizePanelsByKeyboard,
     setPanelRef,
     sidebarListRef,
   } = useGitSidebarPanelLayout(scrollableContentRevision);
-  const panels: GitSidebarRenderPanel[] = [];
-
-  if (remoteSection) {
-    panels.push({
-      id: "remote",
-      className: "remote",
-      grow: 1.05,
-      expanded: expanded.remote,
-      bodyRows: getGitSidebarPanelBodyRows(
-        remoteSection.previewResources.length,
-        Boolean(remoteSection.fallbackSummary),
-      ),
-      content: (
-        <GitScmSyncRow
-          status={status}
-          state={syncState}
-          fileIconTheme={fileIconTheme}
-          expanded={expanded.remote}
-          selectedWorkingFile={selectedWorkingFile}
-          disabled={disabled}
-          operationLoading={operationLoading}
-          primaryAction={primaryActionSlot === "sync"}
-          onToggleExpanded={() => toggle("remote")}
-          onSelectWorkingFile={selectWorkingFile}
-          onPull={pull}
-          onPush={push}
-          onPublish={publish}
-          blockedByConflicts={sidebarModel.hasConflicts}
-        />
-      ),
-    });
-  }
-
-  panels.push(...createGitLocalStatusPanels({
+  const panels: GitSidebarRenderPanel[] = createGitLocalStatusPanels({
     model: sidebarModel,
     expanded,
     disabled,
@@ -183,7 +103,7 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
     actions,
     t,
     onToggle: toggle,
-  }));
+  });
 
   return (
     <SidebarRoot className="desktop-git-sidebar">
@@ -195,75 +115,89 @@ export function GitSidebar({ repository, view, actions, cloudBackup }: GitSideba
             <span>{t("source-control.status.noRepository")}</span>
             {operationError && <small className="po-sidebar-error-text">{operationError}</small>}
           </SidebarEmptyState>
-        ) : loading && !status ? (
-          <SidebarEmptyState>{t("source-control.status.readingGit")}</SidebarEmptyState>
         ) : (
           <>
-            <div className="desktop-git-fixed-region">
-              {providerSlot}
-              <GitRemotePrompt
-                state={syncState}
-                disabled={disabled}
-                cloudBackupLoading={cloudBackup.loading}
-                cloudBackupError={cloudBackup.error}
-                dismissed={backupCardDismissed}
-                cloudEnabled={cloudBackup.enabled ?? true}
-                onDismiss={() => setBackupCardDismissed(true)}
-                onStartPuppyoneBackup={cloudBackup.start}
-              />
-              {operationError && (
-                <div className="desktop-git-operation-error" role="alert">{operationError}</div>
-              )}
-              {status?.didHitStatusLimit && (
-                <div className="desktop-git-status-limit-warning" role="status">
-                  {t("source-control.status.limit", { count: formatNumber(status.statusLimit) })}
-                </div>
-              )}
-            </div>
+            <div ref={changesPaneRef} className="desktop-git-changes-pane">
+              <div className="desktop-git-resizable-stack">
+                {panels.map((panel, index) => (
+                  <Fragment key={panel.id}>
+                    {index > 0 && (
+                      <GitSidebarSectionResizer
+                        previous={panels[index - 1].id}
+                        next={panel.id}
+                        active={activeResizeSplit === `${panels[index - 1].id}:${panel.id}`}
+                        onPointerDown={beginPanelResize}
+                        onKeyboardResize={resizePanelsByKeyboard}
+                      />
+                    )}
+                    <div
+                      ref={(node) => setPanelRef(panel.id, node)}
+                      className={`desktop-git-resizable-section desktop-git-resizable-section-${panel.className} ${panel.expanded ? "expanded" : "collapsed"}`}
+                      style={getPanelStyle(panel)}
+                    >
+                      {panel.content}
+                    </div>
+                  </Fragment>
+                ))}
+              </div>
 
-            <div className="desktop-git-resizable-stack">
-              {panels.map((panel, index) => (
-                <Fragment key={panel.id}>
-                  {index > 0 && panels[index - 1].expanded && panel.expanded && (
-                    <GitSidebarSectionResizer
-                      previous={panels[index - 1].id}
-                      next={panel.id}
-                      active={activeResizeSplit === `${panels[index - 1].id}:${panel.id}`}
-                      onPointerDown={beginPanelResize}
-                      onKeyboardResize={resizePanelsByKeyboard}
-                    />
-                  )}
-                  <div
-                    ref={(node) => setPanelRef(panel.id, node)}
-                    className={`desktop-git-resizable-section desktop-git-resizable-section-${panel.className} ${panel.expanded ? "expanded" : "collapsed"}`}
-                    style={getPanelStyle(panel)}
-                  >
-                    {panel.content}
+              <div className="desktop-git-fixed-region">
+                {status && (
+                  <GitRemotePrompt
+                    state={syncState}
+                    disabled={disabled}
+                    cloudBackupLoading={cloudBackup.loading}
+                    cloudBackupError={cloudBackup.error}
+                    dismissed={backupCardDismissed}
+                    cloudEnabled={cloudBackup.enabled ?? true}
+                    onDismiss={() => setBackupCardDismissed(true)}
+                    onStartPuppyoneBackup={cloudBackup.start}
+                  />
+                )}
+                {operationError && (
+                  <div className="desktop-git-operation-error" role="alert">{operationError}</div>
+                )}
+                {status?.didHitStatusLimit && (
+                  <div className="desktop-git-status-limit-warning" role="status">
+                    {t("source-control.status.limit", { count: formatNumber(status.statusLimit) })}
                   </div>
-                </Fragment>
-              ))}
+                )}
+              </div>
             </div>
 
-            <GitHistoryShortcut
-              active={activePanel === "history"}
-              count={historyCount}
-              onSelect={() => selectPanel("history")}
-            />
+            {historyExpanded ? (
+              <GitSidebarHistoryResizer
+                active={activeResizeSplit === "changes:history"}
+                value={historyPaneHeight}
+                onPointerDown={beginHistoryResize}
+                onKeyboardResize={resizeHistoryByKeyboard}
+                onReset={resetHistoryPaneHeight}
+              />
+            ) : (
+              <div
+                className="desktop-git-history-resizer is-static"
+                aria-hidden="true"
+              />
+            )}
+
+            <section
+              ref={historyPaneRef}
+              className={`desktop-git-history-pane ${historyExpanded ? "expanded" : "collapsed"}`}
+              style={historyExpanded ? getHistoryPaneStyle() : undefined}
+            >
+              <GitSidebarHistoryPanel
+                commits={historyCommits}
+                selectedCommitId={selectedCommitId}
+                status={status}
+                loading={historyLoading || (loading && !status)}
+                expanded={historyExpanded}
+                onToggle={() => setHistoryExpanded((current) => !current)}
+                onSelectCommit={selectCommit}
+              />
+            </section>
           </>
         )}
       </SidebarScrollArea>
     </SidebarRoot>
   );
-}
-
-function emptyFileChangeSummary() {
-  return {
-    total: 0,
-    added: 0,
-    modified: 0,
-    deleted: 0,
-    renamed: 0,
-    copied: 0,
-    changed: 0,
-  };
 }

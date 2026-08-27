@@ -13,10 +13,10 @@ import { CloudRouter } from "./routes/CloudRouter";
 import { CloudSurfaceFrame } from "./shell/CloudSurfaceFrame";
 import {
   getCloudProjectDetailResources,
+  getAvailableCloudSection,
   getCloudRouteSurface,
   getCloudRouteWebPath,
   isCloudOrganizationSection,
-  normalizeCloudSection,
 } from "./routes/cloudRoutes";
 import {
   cloudMessage,
@@ -38,6 +38,7 @@ export function CloudServiceMainView({
   projectContext = null,
   onCloudSessionChange,
   activeSection,
+  automationEnabled,
   loading,
   error,
   cloudBackupLoading,
@@ -53,12 +54,11 @@ export function CloudServiceMainView({
   onSelectSection,
   onRefresh,
   onOpenGitSettings,
-  onOpenSourceControl,
 }: CloudServiceMainViewProps) {
   const { t } = useLocalization();
   const cloudRemote = cloudEnvironment.cloudRemote;
   const cloudApiBaseUrl = cloudEnvironment.apiBaseUrl;
-  const routedSection = normalizeCloudSection(activeSection);
+  const routedSection = getAvailableCloudSection(activeSection, { automationEnabled });
   const inOrganizationSection = isCloudOrganizationSection(routedSection);
   const localOnlyContext = !inOrganizationSection && (
       projectContext?.status === "local-only"
@@ -91,11 +91,11 @@ export function CloudServiceMainView({
   }, [workspace.path, accountEmail, cloudApiBaseUrl]);
 
   useEffect(() => {
-    const normalizedSection = normalizeCloudSection(activeSection);
+    const normalizedSection = getAvailableCloudSection(activeSection, { automationEnabled });
     if (normalizedSection !== activeSection) {
       onSelectSection(normalizedSection);
     }
-  }, [activeSection, onSelectSection]);
+  }, [activeSection, automationEnabled, onSelectSection]);
 
   const cloudPublishErrorMessage = cloudPublishError
     ? formatCloudPublishFailure(cloudPublishError, t)
@@ -123,6 +123,7 @@ export function CloudServiceMainView({
   if (!effectiveCloudSession) {
     return (
       <CloudSignedOutRoute
+        activeSection={routedSection}
         authState={cloudAuthState}
         apiBaseUrl={cloudApiBaseUrl}
         loadingLabel={t("cloud.loading.session")}
@@ -135,6 +136,7 @@ export function CloudServiceMainView({
   if (localOnlyContext) {
     return (
       <CloudInitializationRoute
+        activeSection={routedSection}
         workspace={workspace}
         status={status}
         session={effectiveCloudSession}
@@ -152,7 +154,6 @@ export function CloudServiceMainView({
         cloudPublishStateLoading={cloudPublishStateLoading}
         onSessionChange={onCloudSessionChange}
         onAbandonPublish={onAbandonPuppyoneBackup}
-        onOpenSourceControl={onOpenSourceControl ?? onOpenGitSettings}
         onRefresh={onRefresh}
         onPublishWorkspace={onStartPuppyoneBackup}
       />
@@ -184,7 +185,6 @@ export function CloudServiceMainView({
     }
   };
 
-  const accountConnected = Boolean(accountEmail);
   const routeSurface = getCloudRouteSurface(routedSection);
   const activeSurface = routeSurface === "landing" && !contextProjectId
     ? "standard"
@@ -218,7 +218,6 @@ export function CloudServiceMainView({
           projectContext={projectContext}
           activeSection={routedSection}
           accountEmail={accountEmail}
-          accountConnected={accountConnected}
           loading={loading}
           onSessionChange={onCloudSessionChange}
           onOpenProject={handleOpenProject}

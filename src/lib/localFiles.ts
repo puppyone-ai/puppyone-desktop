@@ -17,18 +17,15 @@ import type {
   LastWorkspaceResult,
   PuppyoneWorkspaceConfig,
   RecentWorkspacesResult,
-  WorkspaceChooseExternalAppRequest,
   WorkspaceCloneRepositoryRequest,
   WorkspaceCreateProjectRequest,
   WorkspaceCreateEntryKind,
   WorkspaceCreateEntryResult,
   WorkspaceInstantiateTemplateResult,
-  WorkspaceExternalOpenTarget,
   WorkspaceOpenEntryExternalRequest,
   WorkspaceImportEntriesResult,
   WorkspaceOpenResult,
   WorkspaceProjectLocationGrant,
-  WorkspaceResolveExternalOpenTargetRequest,
 } from "../types/electron";
 import {
   createAppPreviewManifestContentFromSetup,
@@ -285,18 +282,6 @@ export async function openWorkspaceEntryExternal(
   request: WorkspaceOpenEntryExternalRequest,
 ): Promise<{ ok: boolean; cancelled?: boolean }> {
   return getDesktopBridge().openEntryExternal(request);
-}
-
-export async function resolveWorkspaceExternalOpenTarget(
-  request: WorkspaceResolveExternalOpenTargetRequest,
-): Promise<WorkspaceExternalOpenTarget> {
-  return getDesktopBridge().resolveExternalOpenTarget(request);
-}
-
-export async function chooseWorkspaceExternalApp(
-  request: WorkspaceChooseExternalAppRequest,
-): Promise<WorkspaceExternalOpenTarget | null> {
-  return getDesktopBridge().chooseExternalApp(request);
 }
 
 export async function forgetLastWorkspace(): Promise<void> {
@@ -641,8 +626,18 @@ export async function discardAllWorkspaceGitChanges(rootPath: string): Promise<G
   return getDesktopBridge().discardAllGitChanges({ rootPath });
 }
 
-export async function commitWorkspaceGit(rootPath: string, message: string): Promise<GitStatusSnapshot> {
-  return getDesktopBridge().commitGit({ rootPath, message });
+export async function commitWorkspaceGit(
+  rootPath: string,
+  message: string,
+  options: { allowEmpty?: boolean; authorName?: string; authorEmail?: string } = {},
+): Promise<GitStatusSnapshot> {
+  return getDesktopBridge().commitGit({
+    rootPath,
+    message,
+    ...(options.allowEmpty ? { allowEmpty: true } : {}),
+    ...(options.authorName ? { authorName: options.authorName } : {}),
+    ...(options.authorEmail ? { authorEmail: options.authorEmail } : {}),
+  });
 }
 
 export async function continueWorkspaceGitOperation(rootPath: string): Promise<GitStatusSnapshot> {

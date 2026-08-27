@@ -61,7 +61,7 @@ describe("CSV pane-menu settings", () => {
           }}
           editorGroup={group}
           editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
-          externalOpen={{ getAppName: () => "Numbers", open: openExternal }}
+          externalOpen={{ open: openExternal }}
           editorTree={[node]}
           fileIconTheme="default"
           layout={createEditorPaneLayout(path)}
@@ -95,7 +95,7 @@ describe("CSV pane-menu settings", () => {
     expect(primaryActions).toHaveLength(3);
     expect(Array.from(primaryActions ?? []).map((item) => item.getAttribute("aria-label"))).toEqual([
       "Find in file",
-      "Open in Numbers",
+      "Open in default app",
       "Close editor pane",
     ]);
     expect(primaryActions?.item(primaryActions.length - 1).classList.contains(
@@ -130,7 +130,7 @@ describe("CSV pane-menu settings", () => {
     expect(document.querySelector('[role="menuitemcheckbox"]')?.getAttribute("aria-checked"))
       .toBe("false");
 
-    const externalItem = menu?.querySelector<HTMLButtonElement>('[aria-label="Open in Numbers"]');
+    const externalItem = menu?.querySelector<HTMLButtonElement>('[aria-label="Open in default app"]');
     await act(async () => externalItem?.click());
     expect(openExternal).toHaveBeenCalledWith(path);
     expect(document.querySelector(".desktop-editor-pane-menu")).toBeNull();
@@ -173,7 +173,7 @@ describe("CSV pane-menu settings", () => {
           }}
           editorGroup={group}
           editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
-          externalOpen={{ getAppName: () => null, open: openExternal }}
+          externalOpen={{ open: openExternal }}
           editorTree={nodes}
           fileIconTheme="default"
           layout={layout}
@@ -234,7 +234,7 @@ describe("CSV pane-menu settings", () => {
         }}
         editorGroup={group}
         editorInteractionPreferences={{ showSaveStatus: false, markdownBlockDragEnabled: false }}
-        externalOpen={{ getAppName: () => null, open: openExternal }}
+        externalOpen={{ open: openExternal }}
         editorTree={[node]}
         fileIconTheme="default"
         layout={createEditorPaneLayout(path)}

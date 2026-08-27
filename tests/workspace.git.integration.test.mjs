@@ -64,6 +64,19 @@ describe("repository detection", { timeout: 20_000 }, () => {
 });
 
 describe("stage → commit lifecycle", { timeout: 20_000 }, () => {
+  it("can create an empty first snapshot for one-click Cloud publishing", async () => {
+    await initializeWorkspaceGitRepository(root);
+
+    const status = await commitWorkspaceGit(root, "Initial snapshot", {
+      allowEmpty: true,
+      authorName: "dev@example.com",
+      authorEmail: "dev@example.com",
+    });
+
+    expect(status.headCommitId).toMatch(/^[0-9a-f]{40}$/);
+    expect(status.totalCommits).toBe(1);
+  });
+
   it("tracks a new file as untracked, then staged, then committed", async () => {
     await initRepoWithIdentity();
     await createWorkspaceEntry(root, { parentPath: null, name: "app.js", kind: "file", content: "console.log(1)\n" });

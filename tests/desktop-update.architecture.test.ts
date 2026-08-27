@@ -19,10 +19,16 @@ describe("Desktop update interaction boundaries", () => {
       "confirmRestartWithBlockers: confirmUpdateRestartWithBlockers",
     );
     expect(main).toContain("native.update.confirm.proceed");
-    expect(settingsRow).toContain('<small aria-live="polite">{detail}</small>');
+    expect(settingsRow).toContain('<span>{t("updates.settings.title")}</span>');
+    expect(settingsRow).toContain('aria-label={`${action.label}. ${detail}`}');
+    expect(settingsRow).not.toContain("desktop-settings-label-stack");
+    expect(settingsRow).not.toContain("<small");
     expect(settingsRow).toContain(
       'state.status === "downloaded" || state.status === "blocked"',
     );
+    expect(settingsRow).toContain('state.status === "not-available"');
+    expect(settingsRow).toContain('t("updates.action.upToDate")');
+    expect(settingsRow).toContain('state.channel === "dev" ? "updates.action.developmentBuild"');
     expect(service).toContain("BACKGROUND_UPDATE_INITIAL_DELAY_MS");
     expect(service).toContain("BACKGROUND_UPDATE_INTERVAL_MS");
     expect(service).toContain("scheduleBackgroundCheck");

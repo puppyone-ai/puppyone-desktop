@@ -2,10 +2,6 @@ import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/ele
 import { getPuppyoneRemote, parsePuppyoneRemote } from "./remotes";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization";
 import type {
-  GitScmSyncAction,
-  GitScmSyncCopy,
-  GitScmSyncSection,
-  GitHostingIdentity,
   GitHostingMode,
   GitSidebarPrimaryAction,
   GitSyncState,
@@ -250,11 +246,8 @@ export function buildSourceControlSidebarModel({
   const committedResources = sourceControl?.remote.outgoingPreview ?? [];
   const committedPrimaryAction = getCommittedPrimaryAction(status, syncState, syncBlocked, t);
   const stagedPrimaryAction = repositoryOperation ? null : getStagedPrimaryAction(
-    status,
-    syncState,
     stagedResources.length,
     canCommit,
-    professionalMode,
     hasConflicts,
     t,
   );
@@ -267,7 +260,10 @@ export function buildSourceControlSidebarModel({
     loadingLabel: t("source-control.sync.continuing"),
     icon: "check" as const,
   } : null;
-  const localChangeResources = professionalMode ? workingResources : [...stagedResources, ...workingResources];
+  const localChangeResources = workingResources;
+  const showCommittedSection = committedCount > 0 || Boolean(committedPrimaryAction);
+  const showStagedSection = stagedResources.length > 0;
+  const showUnstagedSection = localChangeResources.length > 0;
 
   return {
     professionalMode,
@@ -281,11 +277,17 @@ export function buildSourceControlSidebarModel({
     committedResources,
     committedPrimaryAction,
     operationPrimaryAction,
-    showCommittedSection: committedCount > 0 || Boolean(committedPrimaryAction),
-    showStagedSection: professionalMode && stagedResources.length > 0,
-    showUnstagedSection: localChangeResources.length > 0,
+    showCommittedSection,
+    showStagedSection,
+    showUnstagedSection,
+    showCleanSection: status?.isRepo === true
+      && !hasConflicts
+      && !repositoryOperation
+      && !showCommittedSection
+      && !showStagedSection
+      && !showUnstagedSection,
     stagedPrimaryAction,
-    showSimpleChangeAction: !professionalMode && localChangeResources.length > 0 && !hasConflicts && !repositoryOperation,
+    showStageAndCommitAction: localChangeResources.length > 0 && !hasConflicts && !repositoryOperation,
     sectionContext: {
       merge: hasConflicts
         ? t("source-control.commit.conflicts", { count: mergeResources.length })
@@ -301,7 +303,7 @@ export function getCommittedSummary(count: number, actionLabel: string, t: Messa
   return t("source-control.committed.ready", { count, action: actionLabel });
 }
 
-export type SourceControlPrimaryActionSlot = "operation" | "staged" | "sync" | "committed" | "simple" | null;
+export type SourceControlPrimaryActionSlot = "operation" | "staged" | "sync" | "committed" | "stage-and-commit" | null;
 
 export function getSourceControlPrimaryActionSlot({
   hasConflicts,
@@ -309,21 +311,21 @@ export function getSourceControlPrimaryActionSlot({
   hasStagedAction,
   hasSyncAction,
   hasCommittedAction,
-  hasSimpleAction,
+  hasStageAndCommitAction,
 }: {
   hasConflicts: boolean;
   hasOperationAction: boolean;
   hasStagedAction: boolean;
   hasSyncAction: boolean;
   hasCommittedAction: boolean;
-  hasSimpleAction: boolean;
+  hasStageAndCommitAction: boolean;
 }): SourceControlPrimaryActionSlot {
   if (hasConflicts) return null;
   if (hasOperationAction) return "operation";
   if (hasSyncAction) return "sync";
   if (hasStagedAction) return "staged";
   if (hasCommittedAction) return "committed";
-  if (hasSimpleAction) return "simple";
+  if (hasStageAndCommitAction) return "stage-and-commit";
   return null;
 }
 
@@ -356,17 +358,6 @@ function hasConfiguredPuppyoneCloudIntent(config: PuppyoneWorkspaceConfig | null
   return configuredRemoteName?.toLowerCase() === "puppyone";
 }
 
-export function getGitHostingIdentity(
-  status: GitStatusSnapshot | null,
-  _puppyoneConfig: PuppyoneWorkspaceConfig | null = null,
-): GitHostingIdentity | null {
-  if (status?.effectiveHosting?.identity) {
-    return status.effectiveHosting.identity;
-  }
-
-  return null;
-}
-
 function getUpstreamRemoteName(upstream: string) {
   const slashIndex = upstream.indexOf("/");
   return slashIndex > 0 ? upstream.slice(0, slashIndex) : upstream;
@@ -384,167 +375,6 @@ function getPreferredGitRemote(status: GitStatusSnapshot | null, config: Puppyon
     ?? remotes.find((remote) => remote.name.toLowerCase() === "puppyone")
     ?? remotes[0]
     ?? null;
-}
-
-export function getGitScmSyncCopy(
-  status: GitStatusSnapshot | null,
-  state: GitSyncState,
-  t: MessageFormatter,
-): GitScmSyncCopy {
-  const remote = status?.sourceControl.remote;
-  const target = remote?.target?.ref ?? state.upstreamLabel;
-  if (!remote) {
-    return {
-      title: t("source-control.sync.remoteChanges"),
-      count: 0,
-      detail: t("source-control.sync.readingState"),
-      tone: "muted",
-    };
-  }
-
-  if (remote.state === "publish") {
-    return {
-      title: t("source-control.sync.remoteBranch"),
-      count: 0,
-      detail: t("source-control.sync.publishBranch", {
-        branch: bidiIsolate(state.branchLabel),
-        target: bidiIsolate(target),
-      }),
-      tone: "pending",
-    };
-  }
-
-  if (remote.state === "diverged") {
-    return {
-      title: t("source-control.sync.conflict"),
-      count: remote.behind,
-      detail: t("source-control.sync.incomingOutgoing", { incoming: remote.behind, outgoing: remote.ahead }),
-      tone: "warning",
-    };
-  }
-
-  if (remote.state === "incoming") {
-    return {
-      title: t("source-control.sync.remoteChanges"),
-      count: remote.behind,
-      detail: target,
-      tone: "warning",
-    };
-  }
-
-  if (remote.state === "outgoing") {
-    return {
-      title: t("source-control.sync.remoteChanges"),
-      count: 0,
-      detail: target,
-      tone: "ready",
-    };
-  }
-
-  if (remote.state === "no-remote") {
-    return {
-      title: t("source-control.sync.remoteChanges"),
-      count: 0,
-      detail: t("source-control.sync.connectRemote"),
-      tone: "muted",
-    };
-  }
-
-  return {
-    title: t("source-control.sync.remoteChanges"),
-    count: 0,
-    detail: target,
-    tone: "ready",
-  };
-}
-
-export function getGitScmSyncSection(
-  status: GitStatusSnapshot | null,
-  state: GitSyncState,
-  t: MessageFormatter,
-  options: { blockedByConflicts?: boolean } = {},
-): GitScmSyncSection {
-  const remote = status?.sourceControl.remote;
-  const copy = getGitScmSyncCopy(status, state, t);
-  const action = getGitScmSyncAction(remote, state, t, {
-    blocked: Boolean(status?.sourceControl.operation) || options.blockedByConflicts === true,
-  });
-  const previewResources = remote && remote.behind > 0 ? remote.incomingPreview : [];
-  const fallbackSummary = getGitScmSyncFallbackSummary(remote, copy, state, previewResources.length, t);
-
-  return {
-    copy,
-    action,
-    previewResources,
-    fallbackSummary,
-  };
-}
-
-export function getGitScmSyncAction(
-  remote: GitStatusSnapshot["sourceControl"]["remote"] | undefined,
-  state: GitSyncState,
-  t: MessageFormatter,
-  options: { blocked?: boolean } = {},
-): GitScmSyncAction | null {
-  if (!remote) return null;
-
-  if (options.blocked && remote.behind > 0) {
-    return {
-      kind: "pull",
-      label: t("source-control.sync.pull"),
-      loadingLabel: t("source-control.sync.pulling"),
-      title: t("source-control.sync.resolveBeforeSync"),
-      disabled: true,
-      icon: "download",
-    };
-  }
-
-  if (remote.state === "diverged") {
-    return {
-      kind: "pull",
-      label: t("source-control.sync.pull"),
-      loadingLabel: t("source-control.sync.pulling"),
-      title: state.pullTitle,
-      disabled: state.pullDisabled,
-      icon: "download",
-    };
-  }
-
-  if (remote.canPull) {
-    return {
-      kind: "pull",
-      label: t("source-control.sync.pull"),
-      loadingLabel: t("source-control.sync.pulling"),
-      title: state.pullTitle,
-      disabled: false,
-      icon: "download",
-    };
-  }
-
-  return null;
-}
-
-function getGitScmSyncFallbackSummary(
-  remote: GitStatusSnapshot["sourceControl"]["remote"] | undefined,
-  copy: GitScmSyncCopy,
-  state: GitSyncState,
-  previewCount: number,
-  t: MessageFormatter,
-) {
-  if (!remote || copy.count === 0 || previewCount > 0) return null;
-
-  if (remote.behind > 0) {
-    return t("source-control.sync.remoteReady", {
-      count: remote.behind,
-      target: bidiIsolate(remote.target?.ref ?? remote.upstream ?? state.upstreamLabel),
-    });
-  }
-
-  if (remote.ahead > 0) {
-    return t("source-control.sync.localReady", { count: remote.ahead, action: state.pushLabel });
-  }
-
-  return null;
 }
 
 export function getCommittedPrimaryAction(
@@ -596,17 +426,11 @@ export function getCommittedPrimaryAction(
 }
 
 export function getStagedPrimaryAction(
-  status: GitStatusSnapshot | null,
-  state: GitSyncState,
   stagedCount: number,
   canCommit: boolean,
-  professionalMode: boolean,
   hasConflicts: boolean,
   t: MessageFormatter,
 ): GitSidebarPrimaryAction | null {
-  const remote = status?.sourceControl.remote;
-  const publish = remote?.state === "publish" || remote?.canPublish === true;
-  const label = t(publish ? "source-control.sync.commitPublish" : "source-control.sync.commitPush");
   const commitOnly: GitSidebarPrimaryAction = {
     label: t("source-control.sync.commit"),
     title: t("source-control.sync.commitStaged"),
@@ -633,30 +457,5 @@ export function getStagedPrimaryAction(
     };
   }
 
-  if (professionalMode) {
-    return commitOnly;
-  }
-
-  if (!remote?.target && !remote?.upstream) {
-    return commitOnly;
-  }
-
-  if (remote.behind > 0) {
-    return {
-      ...commitOnly,
-      title: t("source-control.sync.commitThenPull"),
-    };
-  }
-
-  return {
-    label,
-    title: publish
-      ? t("source-control.sync.commitThenPublish", { branch: bidiIsolate(state.branchLabel) })
-      : t("source-control.sync.commitThenPush", { target: bidiIsolate(remote.target?.ref ?? remote.upstream ?? state.upstreamLabel) }),
-    disabled: false,
-    kind: "commit-push",
-    loadingKey: "commit-push",
-    loadingLabel: t(publish ? "source-control.sync.publishing" : "source-control.sync.pushing"),
-    icon: "upload",
-  };
+  return commitOnly;
 }

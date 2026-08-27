@@ -168,14 +168,6 @@
   color: var(--po-text-disabled);
 }
 
-.desktop-git-remote-status {
-  display: block;
-  min-width: 0;
-  margin: var(--desktop-sidebar-section-top-gap) 0 12px;
-  padding-bottom: 7px;
-  border-bottom: 1px solid var(--po-sidebar-divider, var(--po-divider));
-}
-
 .desktop-git-sidebar {
   --desktop-git-primary-bg: var(--po-accent);
   --desktop-git-primary-bg-hover: color-mix(in srgb, var(--po-accent) 86%, var(--po-text) 14%);
@@ -203,14 +195,22 @@
   gap: 5px;
   height: var(--git-action-size);
   min-width: 0;
+  max-width: 100%;
   padding: 0 var(--git-action-padding-inline);
   border: 0;
   border-radius: var(--git-action-radius);
-  /* Non-primary ops (Push, Stage & Commit, …) keep visible gray chrome. */
+  /* Non-primary ops (Push, Stage · Commit, …) keep visible gray chrome. */
   background: var(--po-control);
   color: var(--po-text-muted);
   font-size: var(--git-action-font-size);
   font-weight: var(--git-weight-regular);
+}
+
+.desktop-git-operation-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desktop-git-operation-button.is-primary {
@@ -292,7 +292,9 @@
 
 .desktop-git-section-actions {
   display: inline-flex;
-  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
   align-items: center;
   gap: 2px;
   white-space: nowrap;
@@ -312,17 +314,6 @@
   color: var(--po-text);
 }
 
-/* Bulk Stage all is a secondary control: visible gray chrome, never accent primary. */
-.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-all-action {
-  background: var(--po-control);
-  color: var(--po-text-muted);
-}
-
-.desktop-git-section-actions .po-sidebar-icon-button.desktop-git-stage-all-action:hover:not(:disabled) {
-  background: var(--po-control-hover);
-  color: var(--po-text);
-}
-
 .desktop-git-section-actions .po-sidebar-icon-button.danger {
   color: color-mix(in srgb, var(--po-danger) 72%, var(--po-text-muted));
 }
@@ -335,4 +326,17 @@
 .desktop-git-section-actions .po-sidebar-icon-button:disabled {
   background: transparent;
   color: var(--po-text-disabled);
+}
+
+@container git-sidebar (max-width: 300px) {
+  .desktop-git-section-actions .desktop-git-operation-button {
+    width: var(--git-action-size);
+    flex: 0 0 var(--git-action-size);
+    gap: 0;
+    padding-inline: 0;
+  }
+
+  .desktop-git-section-actions .desktop-git-operation-label {
+    display: none;
+  }
 }

@@ -15,15 +15,16 @@ import {
   type InterfaceStyle,
   type ThemeMode,
 } from "./features/appearance/interfaceStyles";
-import {
-  resolveRendererPublicAssetUrl,
-  type PulseGridPresetId,
-} from "@puppyone/shared-ui";
+import type { PulseGridPresetId } from "@puppyone/shared-ui";
 import {
   CREATE_NEW_ITEM_IDS,
+  CREATE_NEW_SUBMENU_ID,
   getCreateEntryMenuItem,
-  getDefaultCreateNewMenuItems,
+  getDefaultCreateNewMenuLayout,
+  type CreateNewMainMenuEntry,
   type CreateNewItemId,
+  type CreateNewMenuPlacement,
+  type CreateNewSubmenuId,
 } from "./features/create-new/createEntryMenuRegistry";
 
 export type { TypographyPreferences } from "./features/typography/fontCatalog";
@@ -38,13 +39,17 @@ export {
   resolveActiveThemeMode,
 };
 export type { InterfaceStyle, ThemeMode };
-export { CREATE_NEW_ITEM_IDS };
-export type { CreateNewItemId };
+export { CREATE_NEW_ITEM_IDS, CREATE_NEW_SUBMENU_ID };
+export type {
+  CreateNewItemId,
+  CreateNewMainMenuEntry,
+  CreateNewMenuPlacement,
+  CreateNewSubmenuId,
+};
 
 export type LightThemePreset = "neutral" | "warm" | "graphite";
 export type DarkThemePreset = "default" | "warm" | "graphite";
 export type TextSize = "small" | "default" | "large";
-export type DockIcon = "polished" | "light" | "matte";
 export type DiffMarkers = "color" | "symbols";
 export type GitDisplayMode = "simple" | "professional";
 export type GitSidebarLayout = "cards" | "dividers";
@@ -66,18 +71,6 @@ export type FilesVisibilitySettings = {
   showHiddenFiles: boolean;
   excludePatterns: string[];
 };
-export type ExternalAppOpenMode = "system";
-export type ExternalAppOverride = {
-  extension: string;
-  appPath: string;
-  appName?: string | null;
-  bundleId?: string | null;
-  iconDataUrl?: string | null;
-};
-export type ExternalAppsSettings = {
-  openMode: ExternalAppOpenMode;
-  overrides: ExternalAppOverride[];
-};
 export const RIGHT_SIDEBAR_TOOL_IDS = ["terminal"] as const;
 export type RightSidebarToolId = typeof RIGHT_SIDEBAR_TOOL_IDS[number];
 export type RightSidebarToolsSettings = {
@@ -90,30 +83,26 @@ export type TitlebarActionsSettings = {
   enabled: Record<TitlebarActionId, boolean>;
   order: TitlebarActionId[];
 };
-export type TerminalSessionLayout = "menu" | "tabs";
 export type LocalAgentsSettings = {
-  enabledAgentIds: string[];
+  hiddenTerminalAgentIds: string[];
 };
 export type ExperimentalSettings = {
   enableAgentChat: boolean;
   enableAssetLibraryHome: boolean;
+  enableCloudAutomation: boolean;
   enableCloudWorkspace: boolean;
-  enableContextMaps: boolean;
   enableEditorSaveStatus: boolean;
   enableMarkdownBlockDrag: boolean;
-  enableMinimalMode: boolean;
   enablePuppyFlowFiles: boolean;
   enableViewerPlugins: boolean;
 };
 
-export const CREATE_NEW_MENU_VERSION = 3 as const;
-export type CreateNewMenuItem = {
-  kind: CreateNewItemId;
-  enabled: boolean;
-};
+export const CREATE_NEW_MENU_VERSION = 5 as const;
 export type CreateNewMenuSettings = {
   version: typeof CREATE_NEW_MENU_VERSION;
-  items: CreateNewMenuItem[];
+  main: CreateNewMainMenuEntry[];
+  submenu: CreateNewItemId[];
+  hidden: CreateNewItemId[];
 };
 
 export const TEXT_SIZE_STORAGE_KEY = "puppyone.desktop.textSize";
@@ -121,16 +110,13 @@ export const TYPOGRAPHY_STORAGE_KEY = "puppyone.desktop.typography";
 export const POINTER_CURSORS_STORAGE_KEY = "puppyone.desktop.pointerCursors";
 export const LOADING_ANIMATION_STORAGE_KEY = "puppyone.desktop.loadingAnimation";
 export const LOADING_ANIMATION_CHANGE_EVENT = "puppyone:loading-animation-change";
-export const DOCK_ICON_STORAGE_KEY = "puppyone.desktop.dockIcon";
 export const DIFF_MARKERS_STORAGE_KEY = "puppyone.desktop.diffMarkers";
 export const FILE_ICON_THEME_STORAGE_KEY = "puppyone.desktop.fileIconTheme";
 export const SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY = "puppyone.desktop.sidebarNavigationLayout";
 export const SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY = "puppyone.desktop.sidebarNavigationVisibility";
 export const FILES_VISIBILITY_STORAGE_KEY = "puppyone.desktop.filesVisibility";
-export const EXTERNAL_APPS_STORAGE_KEY = "puppyone.desktop.externalApps";
 export const RIGHT_SIDEBAR_TOOLS_STORAGE_KEY = "puppyone.desktop.rightSidebarTools";
 export const TITLEBAR_ACTIONS_STORAGE_KEY = "puppyone.desktop.titlebarActions";
-export const TERMINAL_SESSION_LAYOUT_STORAGE_KEY = "puppyone.desktop.terminalSessionLayout";
 export const LOCAL_AGENTS_STORAGE_KEY = "puppyone.desktop.localAgents";
 export const AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY = "puppyone.desktop.agentFileActivityIndicators";
 export const AI_EDIT_ASSIST_STORAGE_KEY = "puppyone.desktop.aiEditAssist";
@@ -146,7 +132,6 @@ export const DEFAULT_TEXT_SIZE: TextSize = "default";
 export { DEFAULT_TYPOGRAPHY_PREFERENCES };
 export const DEFAULT_POINTER_CURSORS = false;
 export const DEFAULT_LOADING_ANIMATION_PRESET: LoadingAnimationPreset = "ikun";
-export const DEFAULT_DOCK_ICON: DockIcon = "polished";
 export const DEFAULT_DIFF_MARKERS: DiffMarkers = "color";
 export const DEFAULT_GIT_DISPLAY_MODE: GitDisplayMode = "simple";
 export const DEFAULT_GIT_SIDEBAR_LAYOUT: GitSidebarLayout = "cards";
@@ -168,10 +153,6 @@ export const DEFAULT_FILES_VISIBILITY_SETTINGS: FilesVisibilitySettings = {
   showHiddenFiles: false,
   excludePatterns: [...DEFAULT_EXPLORER_EXCLUDE_PATTERNS],
 };
-export const DEFAULT_EXTERNAL_APPS_SETTINGS: ExternalAppsSettings = {
-  openMode: "system",
-  overrides: [],
-};
 export const DEFAULT_RIGHT_SIDEBAR_TOOLS_SETTINGS: RightSidebarToolsSettings = {
   enabled: {
     terminal: true,
@@ -184,24 +165,25 @@ export const DEFAULT_TITLEBAR_ACTIONS_SETTINGS: TitlebarActionsSettings = {
   },
   order: [...TITLEBAR_ACTION_IDS],
 };
-export const DEFAULT_TERMINAL_SESSION_LAYOUT: TerminalSessionLayout = "tabs";
-export const DEFAULT_LOCAL_AGENTS_SETTINGS: LocalAgentsSettings = { enabledAgentIds: [] };
+export const DEFAULT_LOCAL_AGENTS_SETTINGS: LocalAgentsSettings = { hiddenTerminalAgentIds: [] };
 export const DEFAULT_AGENT_FILE_ACTIVITY_INDICATORS_ENABLED = false;
 export const DEFAULT_AI_EDIT_ASSIST_ENABLED = false;
 export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableAgentChat: false,
   enableAssetLibraryHome: false,
+  enableCloudAutomation: false,
   enableCloudWorkspace: false,
-  enableContextMaps: false,
   enableEditorSaveStatus: false,
   enableMarkdownBlockDrag: false,
-  enableMinimalMode: false,
   enablePuppyFlowFiles: false,
   enableViewerPlugins: false,
 };
+const DEFAULT_CREATE_NEW_MENU_LAYOUT = getDefaultCreateNewMenuLayout();
 export const DEFAULT_CREATE_NEW_MENU_SETTINGS: CreateNewMenuSettings = {
   version: CREATE_NEW_MENU_VERSION,
-  items: getDefaultCreateNewMenuItems(),
+  main: DEFAULT_CREATE_NEW_MENU_LAYOUT.main,
+  submenu: DEFAULT_CREATE_NEW_MENU_LAYOUT.submenu,
+  hidden: DEFAULT_CREATE_NEW_MENU_LAYOUT.hidden,
 };
 
 export const SIDEBAR_NAVIGATION_LAYOUT_OPTIONS = [
@@ -244,8 +226,8 @@ export const LIGHT_THEME_PRESETS = [
   {
     id: "warm",
     label: "Warm",
-    description: "The original Puppyone warm desktop palette.",
-    swatches: ["#f1eadf", "#fbf6ed", "#b45309"],
+    description: "The original Puppyone default desktop palette.",
+    swatches: ["#f1eee8", "#fbfaf7", "#2563eb"],
   },
   {
     id: "graphite",
@@ -364,32 +346,6 @@ export const TEXT_SIZE_PRESETS = [
   };
 }>;
 
-export const DOCK_ICON_OPTIONS = [
-  {
-    id: "polished",
-    label: "Polished",
-    description: "The current high-contrast PuppyOne icon.",
-    previewSrc: resolveRendererPublicAssetUrl("logo-square.png"),
-  },
-  {
-    id: "light",
-    label: "Light",
-    description: "A warm light icon with a quiet outline.",
-    previewSrc: resolveRendererPublicAssetUrl("logo-square-v0.1.3-light.png"),
-  },
-  {
-    id: "matte",
-    label: "Matte",
-    description: "A flat dark icon without the metallic rim.",
-    previewSrc: resolveRendererPublicAssetUrl("logo-square-v0.1.3-dark.png"),
-  },
-] as const satisfies ReadonlyArray<{
-  id: DockIcon;
-  label: string;
-  description: string;
-  previewSrc: string;
-}>;
-
 export function parseThemeMode(value: string | null | undefined): ThemeMode {
   return value === "light" || value === "dark" || value === "system" ? value : DEFAULT_THEME_MODE;
 }
@@ -428,10 +384,6 @@ export function parseLoadingAnimationPreset(
   value: string | null | undefined,
 ): LoadingAnimationPreset {
   return value === "ymca" || value === "siu" || value === "ikun" ? value : DEFAULT_LOADING_ANIMATION_PRESET;
-}
-
-export function parseDockIcon(value: string | null | undefined): DockIcon {
-  return value === "light" || value === "matte" || value === "polished" ? value : DEFAULT_DOCK_ICON;
 }
 
 export function parseDiffMarkers(value: string | null | undefined): DiffMarkers {
@@ -505,22 +457,6 @@ export function parseFilesVisibilitySettings(value: string | null | undefined): 
   }
 }
 
-export function parseExternalAppsSettings(value: string | null | undefined): ExternalAppsSettings {
-  if (!value) return DEFAULT_EXTERNAL_APPS_SETTINGS;
-
-  try {
-    const parsed = JSON.parse(value) as Partial<ExternalAppsSettings> | null;
-    if (!parsed || typeof parsed !== "object") return DEFAULT_EXTERNAL_APPS_SETTINGS;
-
-    return {
-      openMode: "system",
-      overrides: normalizeExternalAppOverrides(parsed.overrides),
-    };
-  } catch {
-    return DEFAULT_EXTERNAL_APPS_SETTINGS;
-  }
-}
-
 export function parseRightSidebarToolsSettings(value: string | null | undefined): RightSidebarToolsSettings {
   if (!value) return DEFAULT_RIGHT_SIDEBAR_TOOLS_SETTINGS;
 
@@ -557,25 +493,22 @@ export function parseTitlebarActionsSettings(value: string | null | undefined): 
   }
 }
 
-export function parseTerminalSessionLayout(
-  value: string | null | undefined,
-): TerminalSessionLayout {
-  return value === "tabs" || value === "menu"
-    ? value
-    : DEFAULT_TERMINAL_SESSION_LAYOUT;
-}
-
 export function parseLocalAgentsSettings(
   value: string | null | undefined,
 ): LocalAgentsSettings {
   if (!value) return DEFAULT_LOCAL_AGENTS_SETTINGS;
   try {
-    const parsed = JSON.parse(value) as { enabledAgentIds?: unknown } | null;
-    if (!parsed || !Array.isArray(parsed.enabledAgentIds)) return DEFAULT_LOCAL_AGENTS_SETTINGS;
-    const enabledAgentIds = Array.from(new Set(parsed.enabledAgentIds.filter(
+    const parsed = JSON.parse(value) as {
+      hiddenTerminalAgentIds?: unknown;
+      enabledAgentIds?: unknown;
+    } | null;
+    // The legacy enabledAgentIds field controlled Editor provider visibility.
+    // It must not silently hide Terminal launchers after the preference changes meaning.
+    if (!parsed || !Array.isArray(parsed.hiddenTerminalAgentIds)) return DEFAULT_LOCAL_AGENTS_SETTINGS;
+    const hiddenTerminalAgentIds = Array.from(new Set(parsed.hiddenTerminalAgentIds.filter(
       (id): id is string => typeof id === "string" && /^[a-z0-9][a-z0-9._-]{0,79}$/u.test(id),
     ))).slice(0, 16);
-    return { enabledAgentIds };
+    return { hiddenTerminalAgentIds };
   } catch {
     return DEFAULT_LOCAL_AGENTS_SETTINGS;
   }
@@ -604,17 +537,14 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
 
     const legacy = parsed as typeof parsed & {
       enableAgentCompanion?: unknown;
-      enableFolderRelationships?: unknown;
     };
     return {
       enableAgentChat: parsed.enableAgentChat === true || legacy.enableAgentCompanion === true,
       enableAssetLibraryHome: parsed.enableAssetLibraryHome === true,
+      enableCloudAutomation: parsed.enableCloudAutomation === true,
       enableCloudWorkspace: parsed.enableCloudWorkspace === true,
-      enableContextMaps: parsed.enableContextMaps === true
-        || legacy.enableFolderRelationships === true,
       enableEditorSaveStatus: parsed.enableEditorSaveStatus === true,
       enableMarkdownBlockDrag: parsed.enableMarkdownBlockDrag === true,
-      enableMinimalMode: parsed.enableMinimalMode === true,
       enablePuppyFlowFiles: parsed.enablePuppyFlowFiles === true,
       enableViewerPlugins: parsed.enableViewerPlugins === true,
     };
@@ -627,34 +557,63 @@ export function parseCreateNewMenuSettings(value: string | null | undefined): Cr
   if (!value) return cloneDefaultCreateNewMenuSettings();
 
   try {
-    const parsed = JSON.parse(value) as (Partial<CreateNewMenuSettings> & { version?: unknown }) | null;
-    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.items)) {
+    const parsed = JSON.parse(value) as Record<string, unknown> | null;
+    if (!parsed || typeof parsed !== "object") {
       return cloneDefaultCreateNewMenuSettings();
     }
 
-    const items: CreateNewMenuItem[] = [];
+    if (parsed.version === CREATE_NEW_MENU_VERSION) {
+      return normalizeCreateNewMenuLayout(parsed.main, parsed.submenu, parsed.hidden);
+    }
+
+    if (!Array.isArray(parsed.items)) {
+      return cloneDefaultCreateNewMenuSettings();
+    }
+
+    const legacyItems: Array<{
+      kind: CreateNewItemId;
+      enabled: boolean;
+      placement: Exclude<CreateNewMenuPlacement, "hidden">;
+    }> = [];
     const seen = new Set<CreateNewItemId>();
-    for (const item of parsed.items) {
-      if (!item || typeof item !== "object") continue;
-      const kind = "kind" in item ? item.kind : null;
+    for (const rawItem of parsed.items) {
+      if (!rawItem || typeof rawItem !== "object") continue;
+      const kind = "kind" in rawItem ? rawItem.kind : null;
       if (!isCreateNewItemId(kind) || seen.has(kind)) continue;
       seen.add(kind);
-      items.push({
+      const placement = "placement" in rawItem && (
+        rawItem.placement === "main" || rawItem.placement === "submenu"
+      )
+        ? rawItem.placement
+        : getCreateEntryMenuItem(kind).defaultPlacement;
+      legacyItems.push({
         kind,
-        enabled: !("enabled" in item) || item.enabled !== false,
+        enabled: !("enabled" in rawItem) || rawItem.enabled !== false,
+        placement,
       });
     }
 
-    if (parsed.items.length > 0 && items.length === 0) {
+    if (parsed.items.length > 0 && legacyItems.length === 0) {
       return cloneDefaultCreateNewMenuSettings();
     }
-    const isLegacyDefault = parsed.version !== CREATE_NEW_MENU_VERSION
-      && (matchesEnabledCreateMenu(items, ["markdown", "csv"])
-        || matchesEnabledCreateMenu(items, ["markdown", "csv", "html", "slides"]));
-    if (isLegacyDefault) {
+    if (isLegacyCreateNewDefault(legacyItems)) {
       return cloneDefaultCreateNewMenuSettings();
     }
-    return { version: CREATE_NEW_MENU_VERSION, items };
+
+    const main: CreateNewMainMenuEntry[] = legacyItems
+      .filter((item) => item.enabled && item.placement === "main")
+      .map((item) => item.kind);
+    main.push(CREATE_NEW_SUBMENU_ID);
+    const submenu = legacyItems
+      .filter((item) => item.enabled && item.placement === "submenu")
+      .map((item) => item.kind);
+    const hidden = legacyItems
+      .filter((item) => !item.enabled)
+      .map((item) => item.kind);
+    for (const kind of CREATE_NEW_ITEM_IDS) {
+      if (!seen.has(kind)) hidden.push(kind);
+    }
+    return { version: CREATE_NEW_MENU_VERSION, main, submenu, hidden };
   } catch {
     return cloneDefaultCreateNewMenuSettings();
   }
@@ -663,13 +622,19 @@ export function parseCreateNewMenuSettings(value: string | null | undefined): Cr
 export function cloneDefaultCreateNewMenuSettings(): CreateNewMenuSettings {
   return {
     version: CREATE_NEW_MENU_VERSION,
-    items: DEFAULT_CREATE_NEW_MENU_SETTINGS.items.map((item) => ({ ...item })),
+    main: [...DEFAULT_CREATE_NEW_MENU_SETTINGS.main],
+    submenu: [...DEFAULT_CREATE_NEW_MENU_SETTINGS.submenu],
+    hidden: [...DEFAULT_CREATE_NEW_MENU_SETTINGS.hidden],
   };
 }
 
 export function isCreateNewItemId(value: unknown): value is CreateNewItemId {
   return typeof value === "string"
     && CREATE_NEW_ITEM_IDS.includes(value as CreateNewItemId);
+}
+
+export function isCreateNewMenuPlacement(value: unknown): value is CreateNewMenuPlacement {
+  return value === "main" || value === "submenu" || value === "hidden";
 }
 
 export function isCreateNewItemAvailable(
@@ -680,127 +645,78 @@ export function isCreateNewItemAvailable(
   return !experimentalSetting || experimentalSettings[experimentalSetting];
 }
 
-function matchesEnabledCreateMenu(
-  items: readonly CreateNewMenuItem[],
-  kinds: readonly CreateNewItemId[],
-): boolean {
-  return items.length === kinds.length
-    && items.every((item, index) => item.enabled && item.kind === kinds[index]);
+function normalizeCreateNewMenuLayout(
+  rawMain: unknown,
+  rawSubmenu: unknown,
+  rawHidden: unknown,
+): CreateNewMenuSettings {
+  const main: CreateNewMainMenuEntry[] = [];
+  const submenu: CreateNewItemId[] = [];
+  const hidden: CreateNewItemId[] = [];
+  const seenItems = new Set<CreateNewItemId>();
+  let submenuSeen = false;
+
+  if (Array.isArray(rawMain)) {
+    for (const entry of rawMain) {
+      if (entry === CREATE_NEW_SUBMENU_ID && !submenuSeen) {
+        main.push(entry);
+        submenuSeen = true;
+      } else if (isCreateNewItemId(entry) && !seenItems.has(entry)) {
+        main.push(entry);
+        seenItems.add(entry);
+      }
+    }
+  }
+  if (!submenuSeen) main.push(CREATE_NEW_SUBMENU_ID);
+
+  for (const [source, target] of [
+    [rawSubmenu, submenu],
+    [rawHidden, hidden],
+  ] as const) {
+    if (!Array.isArray(source)) continue;
+    for (const entry of source) {
+      if (!isCreateNewItemId(entry) || seenItems.has(entry)) continue;
+      target.push(entry);
+      seenItems.add(entry);
+    }
+  }
+
+  for (const kind of CREATE_NEW_ITEM_IDS) {
+    if (!seenItems.has(kind)) hidden.push(kind);
+  }
+  return { version: CREATE_NEW_MENU_VERSION, main, submenu, hidden };
 }
 
-export function getVisibleCreateNewItems(
+function isLegacyCreateNewDefault(items: readonly {
+  kind: CreateNewItemId;
+  enabled: boolean;
+}[]): boolean {
+  const enabledKinds = items.filter((item) => item.enabled).map((item) => item.kind);
+  return [
+    ["markdown", "csv"],
+    ["markdown", "csv", "html", "slides"],
+    ["markdown", "contextMap", "csv", "html", "slides"],
+  ].some((expected) => (
+    enabledKinds.length === expected.length
+    && enabledKinds.every((kind, index) => kind === expected[index])
+  ));
+}
+
+export function resolveVisibleCreateNewMenuItems(
   settings: CreateNewMenuSettings,
   experimentalSettings: ExperimentalSettings,
-): CreateNewItemId[] {
-  return settings.items
-    .filter((item) => item.enabled && isCreateNewItemAvailable(item.kind, experimentalSettings))
-    .map((item) => item.kind);
-}
-
-function normalizeExternalAppOverrides(value: unknown): ExternalAppOverride[] {
-  if (!Array.isArray(value)) return [];
-
-  const overrides: ExternalAppOverride[] = [];
-  const seen = new Set<string>();
-  for (const item of value) {
-    if (!item || typeof item !== "object") continue;
-    const rawExtension = "extension" in item ? item.extension : null;
-    const rawAppPath = "appPath" in item ? item.appPath : null;
-    if (typeof rawExtension !== "string" || typeof rawAppPath !== "string") continue;
-
-    const extension = normalizeExternalAppExtension(rawExtension);
-    const appPath = rawAppPath.trim();
-    if (!extension || !appPath || seen.has(extension)) continue;
-
-    const appName = readOptionalTrimmedString("appName" in item ? item.appName : null);
-    const bundleId = readOptionalTrimmedString("bundleId" in item ? item.bundleId : null);
-    const iconDataUrl = readOptionalDataImageUrl("iconDataUrl" in item ? item.iconDataUrl : null);
-
-    seen.add(extension);
-    overrides.push({
-      extension,
-      appPath,
-      ...(appName ? { appName } : {}),
-      ...(bundleId ? { bundleId } : {}),
-      ...(iconDataUrl ? { iconDataUrl } : {}),
-    });
-  }
-  return overrides;
-}
-
-export function getExternalAppExtension(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const leafName = value.replace(/\\/g, "/").split("/").pop() ?? value;
-  const dotIndex = leafName.lastIndexOf(".");
-  if (dotIndex <= 0 || dotIndex === leafName.length - 1) return null;
-  const extension = normalizeExternalAppExtension(leafName.slice(dotIndex + 1));
-  return extension || null;
-}
-
-export function getExternalAppOverrideForExtension(
-  settings: ExternalAppsSettings,
-  extension: string | null | undefined,
-): ExternalAppOverride | null {
-  const normalizedExtension = normalizeExternalAppExtension(extension ?? "");
-  if (!normalizedExtension) return null;
-  return settings.overrides.find((override) => override.extension === normalizedExtension) ?? null;
-}
-
-export function upsertExternalAppOverride(
-  settings: ExternalAppsSettings,
-  override: ExternalAppOverride,
-): ExternalAppsSettings {
-  const extension = normalizeExternalAppExtension(override.extension);
-  const appPath = override.appPath.trim();
-  if (!extension || !appPath) return settings;
-  const appName = override.appName?.trim();
-  const bundleId = override.bundleId?.trim();
-  const iconDataUrl = readOptionalDataImageUrl(override.iconDataUrl);
-
-  const nextOverride: ExternalAppOverride = {
-    extension,
-    appPath,
-    ...(appName ? { appName } : {}),
-    ...(bundleId ? { bundleId } : {}),
-    ...(iconDataUrl ? { iconDataUrl } : {}),
-  };
-
+): Readonly<{ main: CreateNewMainMenuEntry[]; submenu: CreateNewItemId[] }> {
+  const submenu = settings.submenu.filter((kind) => (
+    isCreateNewItemAvailable(kind, experimentalSettings)
+  ));
   return {
-    ...settings,
-    overrides: [
-      nextOverride,
-      ...settings.overrides.filter((item) => item.extension !== extension),
-    ],
+    main: settings.main.filter((entry) => (
+      entry === CREATE_NEW_SUBMENU_ID
+        ? submenu.length > 0
+        : isCreateNewItemAvailable(entry, experimentalSettings)
+    )),
+    submenu,
   };
-}
-
-export function removeExternalAppOverride(
-  settings: ExternalAppsSettings,
-  extension: string | null | undefined,
-): ExternalAppsSettings {
-  const normalizedExtension = normalizeExternalAppExtension(extension ?? "");
-  if (!normalizedExtension) return settings;
-  return {
-    ...settings,
-    overrides: settings.overrides.filter((item) => item.extension !== normalizedExtension),
-  };
-}
-
-export function normalizeExternalAppExtension(value: string): string {
-  const normalized = value.trim().toLowerCase().replace(/^\*?\./, "");
-  return /^[a-z0-9][a-z0-9_-]{0,31}$/.test(normalized) ? normalized : "";
-}
-
-function readOptionalTrimmedString(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed || null;
-}
-
-function readOptionalDataImageUrl(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return /^data:image\/[a-z0-9.+-]+;base64,/i.test(trimmed) ? trimmed : null;
 }
 
 function readRightSidebarToolEnabled(

@@ -15,6 +15,7 @@ import {
 import { CloudLocalGitStatusError } from "./CloudLocalGitStatusError";
 
 export function CloudInitializationRoute({
+  activeSection,
   workspace,
   status,
   session,
@@ -32,10 +33,10 @@ export function CloudInitializationRoute({
   cloudPublishStateLoading,
   onSessionChange,
   onAbandonPublish,
-  onOpenSourceControl,
   onRefresh,
   onPublishWorkspace,
 }: {
+  activeSection: CloudServiceMainViewProps["activeSection"];
   workspace: CloudServiceMainViewProps["workspace"];
   status: CloudServiceMainViewProps["status"];
   session: DesktopCloudSession;
@@ -53,7 +54,6 @@ export function CloudInitializationRoute({
   cloudPublishStateLoading: boolean;
   onSessionChange: CloudServiceMainViewProps["onCloudSessionChange"];
   onAbandonPublish: CloudServiceMainViewProps["onAbandonPuppyoneBackup"];
-  onOpenSourceControl: () => void;
   onRefresh: CloudServiceMainViewProps["onRefresh"];
   onPublishWorkspace: CloudServiceMainViewProps["onStartPuppyoneBackup"];
 }) {
@@ -91,6 +91,7 @@ export function CloudInitializationRoute({
       )}
       {cloudPublishState || cloudPublishStateLoading ? (
         <CloudLocalOnlyWorkspace
+          activeSection={activeSection}
           workspace={workspace}
           accountEmail={accountEmail}
           branchName={branchName}
@@ -108,12 +109,11 @@ export function CloudInitializationRoute({
           publishState={cloudPublishState}
           publishStateLoading={cloudPublishStateLoading}
           onAbandonPublish={onAbandonPublish}
-          onOpenSourceControl={onOpenSourceControl}
-          onRefresh={onRefresh}
           onPublishWorkspace={onPublishWorkspace}
         />
       ) : (
         <AuthenticatedCloudInitialize
+          activeSection={activeSection}
           workspace={workspace}
           status={status}
           session={session}
@@ -126,8 +126,6 @@ export function CloudInitializationRoute({
           publishError={cloudPublishError}
           publishProgress={cloudPublishProgress}
           onSessionChange={onSessionChange}
-          onOpenSourceControl={onOpenSourceControl}
-          onRefresh={onRefresh}
           onPublishWorkspace={onPublishWorkspace}
           onAbandonPublish={onAbandonPublish}
         />
@@ -148,6 +146,7 @@ function CloudInitializationFrame({ children }: { children: ReactNode }) {
 }
 
 function AuthenticatedCloudInitialize({
+  activeSection,
   workspace,
   status,
   session,
@@ -160,11 +159,10 @@ function AuthenticatedCloudInitialize({
   publishError,
   publishProgress,
   onSessionChange,
-  onOpenSourceControl,
-  onRefresh,
   onPublishWorkspace,
   onAbandonPublish,
 }: {
+  activeSection: CloudServiceMainViewProps["activeSection"];
   workspace: CloudServiceMainViewProps["workspace"];
   status: NonNullable<CloudServiceMainViewProps["status"]>;
   session: DesktopCloudSession;
@@ -177,8 +175,6 @@ function AuthenticatedCloudInitialize({
   publishError: CloudServiceMainViewProps["cloudPublishError"];
   publishProgress: CloudServiceMainViewProps["cloudPublishProgress"];
   onSessionChange: CloudServiceMainViewProps["onCloudSessionChange"];
-  onOpenSourceControl: () => void;
-  onRefresh: CloudServiceMainViewProps["onRefresh"];
   onPublishWorkspace: CloudServiceMainViewProps["onStartPuppyoneBackup"];
   onAbandonPublish: CloudServiceMainViewProps["onAbandonPuppyoneBackup"];
 }) {
@@ -217,6 +213,7 @@ function AuthenticatedCloudInitialize({
 
   return (
     <CloudLocalOnlyWorkspace
+      activeSection={activeSection}
       workspace={workspace}
       accountEmail={accountEmail}
       branchName={branchName}
@@ -232,8 +229,6 @@ function AuthenticatedCloudInitialize({
       publishError={publishError}
       publishProgress={publishProgress}
       onAbandonPublish={onAbandonPublish}
-      onOpenSourceControl={onOpenSourceControl}
-      onRefresh={onRefresh}
       organizations={organizationData.organizations}
       selectedOrganizationId={organizationData.selectedOrganizationId}
       organizationStatus={organizationData.status === "partial" ? "ready" : organizationData.status}

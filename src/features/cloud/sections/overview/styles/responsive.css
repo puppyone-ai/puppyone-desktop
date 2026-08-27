@@ -1,43 +1,23 @@
-@media (max-width: 900px) {
-  .desktop-cloud-overview-dashboard {
-    width: 100%;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto;
+@media (max-width: 760px) {
+  .desktop-cloud-overview-header-facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .desktop-cloud-overview-dashboard-card--storage {
-    width: min(100%, 340px);
-    grid-row: auto;
+  .desktop-cloud-overview-header-fact {
+    padding: 2px 10px;
   }
 
-  .desktop-cloud-overview-dashboard-card--interactive {
-    min-height: 104px;
-  }
-}
-
-@media (max-width: 680px) {
-  .desktop-cloud-overview-catalog {
-    padding: 32px 24px 44px;
-  }
-
-  .desktop-cloud-overview-landing-header {
-    gap: 14px;
-  }
-
-  .desktop-cloud-overview-storage-body {
-    padding: 18px;
-  }
-
-  .desktop-cloud-overview-storage-preview {
-    gap: 8px;
-    margin-top: 18px;
+  .desktop-cloud-overview-file-row {
+    grid-template-columns: minmax(180px, 1fr) 110px;
+    column-gap: 10px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .desktop-cloud-overview-refresh-button,
-  .desktop-cloud-overview-dashboard-card--interactive,
-  .desktop-cloud-overview-dashboard-card-header > .po-directional-icon {
+  .desktop-cloud-overview-settings-button,
+  .desktop-cloud-overview-header-fact--interactive,
+  .desktop-cloud-overview-file-row {
     transition: none;
   }
 }

@@ -111,7 +111,7 @@ describe("editor split-pane architecture", () => {
   it("keeps file selection out of the Header", () => {
     expect(appSource).not.toContain("DesktopEditorTabs");
     expect(appSource).not.toContain("titlebarEditorSlot");
-    expect(appSource).toContain("contextSlot={(\n          titlebarSidebarSlot\n        )}");
+    expect(appSource).toContain("titlebarSidebarSlot={titlebarSidebarSlot}");
   });
 
   it("projects the pane tree inside the Data editor region", () => {

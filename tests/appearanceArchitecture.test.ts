@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_DARK_THEME_PRESET,
-  DEFAULT_DOCK_ICON,
   DEFAULT_LIGHT_THEME_PRESET,
   DEFAULT_LOADING_ANIMATION_PRESET,
   DEFAULT_POINTER_CURSORS,
@@ -41,7 +40,6 @@ describe("appearance profile architecture", () => {
       sidebarNavigationLayout: requested,
       textSize: "large",
       fileIconTheme: "material",
-      editorPresentation: "follow-interface",
     });
 
     expect(xp.decisions.sidebarNavigationLayout).toMatchObject({
@@ -63,7 +61,6 @@ describe("appearance profile architecture", () => {
       sidebarNavigationLayout: requested,
       textSize: "large",
       fileIconTheme: "material",
-      editorPresentation: "follow-interface",
     });
     expect(restored.sidebarNavigationLayout).toBe(requested);
     expect(restored.composition.locationBar).toBe("none");
@@ -97,19 +94,20 @@ describe("appearance profile architecture", () => {
       .toEqual(new Set(VIEWER_SURFACE_FAMILIES));
   });
 
-  it("keeps Editor presentation orthogonal to Style and exposes only effective data", () => {
+  it("makes Interface Style the only owner of Editor presentation", () => {
     const xp = resolveAppearance({
       interfaceStyle: "windows-xp",
       themeMode: "light",
       sidebarNavigationLayout: "bottom-horizontal",
       textSize: "medium",
       fileIconTheme: "default",
-      editorPresentation: "product-default",
     });
 
     expect(xp.profile).toEqual({ family: "windows-xp", variant: "luna", palette: "blue" });
-    expect(xp.editorPresentation).toBe("product-default");
-    expect(xp.decisions.editorPresentation.requestedValue).toBe("product-default");
+    expect(xp).not.toHaveProperty("editorPresentation");
+    expect(xp.decisions).not.toHaveProperty("editorPresentation");
+    expect(INTERFACE_STYLES.find(({ id }) => id === "windows-xp")?.policies)
+      .not.toHaveProperty("editorPresentation");
     expect(xp).not.toHaveProperty("surfaceAdapters");
   });
 
@@ -129,7 +127,7 @@ describe("appearance profile architecture", () => {
     expect(result.preferences.schemaVersion).toBe(APPEARANCE_PREFERENCES_SCHEMA_VERSION);
     expect(result.preferences.activeStyle).toBe("windows-xp");
     expect(result.preferences.shared.sidebarNavigationLayout).toBe("left-vertical");
-    expect(result.preferences.shared.editorPresentation).toBe("follow-interface");
+    expect(result.preferences.shared).not.toHaveProperty("editorPresentation");
     expect(result.preferences.byStyle["windows-xp"]).toEqual({ fidelity: "authentic" });
     expect(result.preferences.bySurface.code).toEqual({ fontLigatures: false });
 
@@ -160,10 +158,33 @@ describe("appearance profile architecture", () => {
     expect(settings).toContain("resolvedAppearance.decisions.sidebarNavigationLayout");
     expect(settings).toContain("resolvedAppearance.decisions.textSize");
     expect(settings).toContain("resolvedAppearance.decisions.fileIconTheme");
-    expect(settings).toContain("resolvedAppearance.decisions.editorPresentation");
+    expect(settings).not.toContain("editorPresentation");
+    expect(preferences).not.toContain("editorPresentation");
+    expect(settings).not.toContain("dockIcon");
+    expect(preferences).not.toContain("dockIcon");
     expect(shell).toContain("preferences.sidebarNavigationPlacement");
     expect(settings).not.toMatch(/interfaceStyle\s*===\s*["']windows-xp["']/);
     expect(shell).not.toMatch(/interfaceStyle\s*===\s*["']windows-xp["']/);
+  });
+
+  it("keeps the Dock icon fixed to the canonical product asset", () => {
+    const main = source("electron/main.mjs");
+    const systemIpc = source("electron/main/ipc/system-ipc.mjs");
+    const preload = source("electron/preload.cjs");
+    const packageMetadata = source("package.json");
+    const buildPreparation = source("scripts/release-support/desktop-build-preparation.mjs");
+    const packagedVerifier = source("scripts/release-support/packaged-desktop-build-verifier.mjs");
+
+    expect(main).toContain("function setDefaultDockIcon()");
+    expect(main).toContain("setDefaultDockIcon();");
+    expect(systemIpc).not.toContain("set-dock-icon");
+    expect(preload).not.toContain("setDockIcon");
+    expect(packageMetadata).not.toContain("dock-icon-light");
+    expect(packageMetadata).not.toContain("dock-icon-matte");
+    expect(buildPreparation).not.toContain("dock-icon-light");
+    expect(buildPreparation).not.toContain("dock-icon-matte");
+    expect(packagedVerifier).not.toContain("dock-icon-light");
+    expect(packagedVerifier).not.toContain("dock-icon-matte");
   });
 
   it("loads the XP pack as modules in the dedicated cascade layer", () => {
@@ -229,7 +250,6 @@ function legacySnapshot(): LegacyAppearanceSnapshot {
     typography: DEFAULT_TYPOGRAPHY_PREFERENCES,
     pointerCursors: DEFAULT_POINTER_CURSORS,
     loadingAnimationPreset: DEFAULT_LOADING_ANIMATION_PRESET,
-    dockIcon: DEFAULT_DOCK_ICON,
     fileIconTheme: "default",
     sidebarNavigationLayout: "bottom-horizontal",
   };

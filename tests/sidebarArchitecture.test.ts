@@ -17,6 +17,7 @@ const collapsiblePaneResizeSource = read("../packages/shared-ui/src/primitives/u
 const settingsSidebarSource = read("../src/features/settings/sidebar/SettingsSidebar.tsx");
 const settingsModelSource = read("../src/features/settings/sidebar/settingsSidebarModel.ts");
 const sourceControlResourceLists = read("../src/features/source-control/sidebar/SourceControlResourceLists.tsx");
+const sourceControlHistory = read("../src/features/source-control/sidebar/GitSidebarHistoryPanel.tsx");
 const cloudHistorySidebar = read("../src/features/cloud/history/CloudHistorySidebar.tsx");
 const virtualizationPolicy = read("../packages/shared-ui/src/sidebar/virtualizationPolicy.ts");
 
@@ -62,8 +63,9 @@ describe("Sidebar architecture", () => {
     expect(auxiliaryHostSource).toContain("SidebarResizeHandle");
     expect(auxiliaryHostSource).toContain("useCollapsiblePaneResize");
     expect(auxiliaryHostSource).toContain('orientation="vertical"');
-    expect(settingsSidebarSource).toContain("SETTINGS_SIDEBAR_GROUPS.map");
+    expect(settingsSidebarSource).toContain("resolveSettingsSidebarGroups({ cloudEnabled })");
     expect(settingsModelSource).toContain("SETTINGS_SIDEBAR_GROUPS");
+    expect(settingsModelSource).toContain("requiresCloud: true");
   });
 
   it("collapses panes through animated resize tracks without expanded-state toggle buttons", () => {
@@ -132,6 +134,7 @@ describe("Sidebar architecture", () => {
     expect(virtualizationPolicy).toContain("SIDEBAR_VIRTUALIZATION_MAX_MOUNTED_ROWS = 120");
     expect(sourceControlResourceLists).toContain("shouldVirtualizeSidebarList");
     expect(sourceControlResourceLists).toContain("VirtualSidebarList");
+    expect(sourceControlHistory).toContain("VirtualSidebarList");
     expect(cloudHistorySidebar).toContain("VirtualSidebarList");
   });
 

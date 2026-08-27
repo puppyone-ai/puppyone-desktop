@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Check, Clock3, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Plus } from "lucide-react";
 import {
   SidebarResizeHandle,
   type SidebarResizeIntent,
@@ -69,6 +69,33 @@ export function GitSidebarSectionResizer({
   );
 }
 
+export function GitSidebarHistoryResizer({
+  active,
+  value,
+  onPointerDown,
+  onKeyboardResize,
+  onReset,
+}: {
+  active: boolean;
+  value: number | null;
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onKeyboardResize: (intent: SidebarResizeIntent, accelerated: boolean) => void;
+  onReset: () => void;
+}) {
+  const { t } = useLocalization();
+  return (
+    <SidebarResizeHandle
+      className={`desktop-git-history-resizer ${active ? "active" : ""}`}
+      orientation="horizontal"
+      label={t("source-control.sidebar.resize")}
+      value={value ?? undefined}
+      onPointerDown={onPointerDown}
+      onKeyboardResize={onKeyboardResize}
+      onDoubleClick={onReset}
+    />
+  );
+}
+
 export function GitOperationButton({
   className,
   title,
@@ -112,32 +139,6 @@ export function GitOperationButton({
       {loading ? <SourceControlDots /> : renderGitActionIcon(icon)}
       <span className="desktop-git-operation-label">{loading ? loadingLabel : label}</span>
     </button>
-  );
-}
-
-export function GitHistoryShortcut({
-  active,
-  count,
-  onSelect,
-}: {
-  active: boolean;
-  count: number;
-  onSelect: () => void;
-}) {
-  const { t, formatNumber } = useLocalization();
-  return (
-    <section className="desktop-git-history-drawer">
-      <button
-        className={`desktop-git-history-drawer-header ${active ? "active" : ""}`}
-        type="button"
-        aria-pressed={active}
-        onClick={onSelect}
-      >
-        <Clock3 size={13} />
-        <span>{t("source-control.history.title")}</span>
-        <small>{formatNumber(count)}</small>
-      </button>
-    </section>
   );
 }
 

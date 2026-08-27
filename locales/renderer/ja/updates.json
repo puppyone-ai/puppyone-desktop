@@ -1,9 +1,12 @@
 {
   "settings.title": "アプリのアップデート",
   "action.unavailable": "利用不可",
+  "action.developmentBuild": "開発ビルド",
+  "action.upToDate": "最新です",
   "action.checking": "確認しています",
   "action.restarting": "再起動しています",
   "action.restart": "再起動してアップデート",
+  "action.download": "アップデートをダウンロード",
   "action.updateNow": "今すぐアップデート",
   "action.tryAgain": "再試行",
   "action.check": "アップデートを確認",

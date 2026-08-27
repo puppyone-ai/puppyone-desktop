@@ -1,12 +1,10 @@
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
-import type { CloudAccessSurface } from "./model";
 import type {
   CloudBranchGraphDiagnostics,
   CloudBranchGraphLabel,
   CloudBranchGraphRow,
 } from "./graph/model";
 import type { CloudPublishErrorCode } from "../../types/electron";
-import { normalizeProviderKey } from "./utils";
 
 export type CloudMessageCode =
   | "project-linked"
@@ -112,53 +110,6 @@ export function formatCloudPublishFailure(
     return t("cloud.initialize.localRecoveryFailed");
   }
   return t("cloud.message.project-publish-failed");
-}
-
-export function formatCloudAccessSurfaceTitle(surface: CloudAccessSurface, t: MessageFormatter) {
-  if (surface.title) return surface.title;
-  const provider = normalizeProviderKey(surface.provider);
-  if (provider === "cli") return t("cloud.access.surface.cli.title");
-  if (provider === "filesystem" || provider === "git" || provider === "git_remote") return t("cloud.access.surface.git.title");
-  if (provider === "mcp" || provider === "mcp_endpoint") return t("cloud.access.surface.mcp.title");
-  if (provider === "vm" || provider === "remote_workspace" || provider === "sandbox") return t("cloud.access.surface.vm.title");
-  return surface.provider;
-}
-
-export function formatCloudAccessSurfaceSubtitle(surface: CloudAccessSurface, t: MessageFormatter) {
-  if (surface.subtitle) return surface.subtitle;
-  const provider = normalizeProviderKey(surface.provider);
-  if (provider === "cli") return t("cloud.access.surface.cli.subtitle");
-  if (provider === "filesystem" || provider === "git" || provider === "git_remote") return t("cloud.access.surface.git.subtitle");
-  return "";
-}
-
-export function formatCloudAccessSurfacePrompt(
-  surface: CloudAccessSurface,
-  scopeName: string,
-  t: MessageFormatter,
-) {
-  if (surface.prompt) return surface.prompt;
-  const provider = normalizeProviderKey(surface.provider);
-  if (provider === "cli") return t("cloud.access.surface.cli.prompt", { scope: bidiIsolate(scopeName) });
-  if (provider === "filesystem" || provider === "git" || provider === "git_remote") {
-    return t("cloud.access.surface.git.prompt");
-  }
-  if (provider === "mcp" || provider === "mcp_endpoint") return t("cloud.access.surface.mcp.prompt");
-  if (provider === "vm" || provider === "remote_workspace" || provider === "sandbox") {
-    return t("cloud.access.surface.vm.prompt");
-  }
-  return t("cloud.access.surface.generic.prompt");
-}
-
-export function formatCloudAccessCommandLabel(
-  command: NonNullable<CloudAccessSurface["commands"]>[number],
-  t: MessageFormatter,
-) {
-  return t(`cloud.access.command.${command.id}`);
-}
-
-export function formatCloudAccessAggregate(code: "error" | "syncing" | "active" | "mixed" | "paused", t: MessageFormatter) {
-  return t(`cloud.access.aggregate.${code}`);
 }
 
 export function formatCloudGraphRowMessage(row: CloudBranchGraphRow, t: MessageFormatter) {

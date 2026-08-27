@@ -60,7 +60,7 @@
 }
 
 .desktop-settings-section {
-  --desktop-settings-content-max-width: 1040px;
+  --desktop-settings-content-max-width: var(--po-reading-content-width, 724px);
 
   display: grid;
   width: 100%;
@@ -80,20 +80,26 @@
   width: 100%;
   gap: 14px;
   max-width: none;
+  padding-inline: 10px;
 }
 
 .desktop-settings-section-header {
   display: grid;
   min-width: 0;
   gap: 3px;
+  padding-inline: 10px;
+}
+
+.desktop-settings-heading-row .desktop-settings-section-header {
+  padding-inline: 0;
 }
 
 .desktop-settings-section-header h2 {
   margin: 0;
   color: var(--po-text);
-  font-size: 14px;
-  font-weight: 720;
-  line-height: normal;
+  font-size: 15px;
+  font-weight: var(--po-text-weight-medium, 500);
+  line-height: 20px;
 }
 
 .desktop-settings-section-header span {
@@ -120,37 +126,187 @@
   color: var(--po-text-subtle);
 }
 
-.desktop-settings-row .desktop-settings-label-stack {
+.desktop-settings-row > .desktop-settings-row-value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 12.5px;
+  font-weight: var(--po-text-weight-regular, 400);
+  text-align: end;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-local-agent-row {
+  min-height: 30px;
+}
+
+.desktop-local-agent-identity {
+  display: inline-flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-local-agent-identity > .desktop-terminal-launcher-icon {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+  opacity: 0.72;
+}
+
+.desktop-settings-row .desktop-local-agent-row-copy {
   display: grid;
   min-width: 0;
   flex: 1 1 auto;
   gap: 2px;
 }
 
-.desktop-settings-row .desktop-settings-label-stack strong {
-  color: var(--po-text);
-  font-size: 12.5px;
-  font-weight: 620;
-  line-height: 1.25;
-  text-align: start;
-}
-
-.desktop-settings-row .desktop-settings-label-stack small {
-  color: var(--po-text-subtle);
-  font-size: 11px;
-  font-weight: 520;
-  line-height: 1.35;
-}
-
-.desktop-settings-row strong {
-  min-width: 0;
+.desktop-local-agent-name {
   overflow: hidden;
-  color: var(--po-text);
+  color: var(--po-text-subtle);
   font-size: 12.5px;
-  font-weight: 600;
-  text-align: end;
+  font-weight: var(--po-text-weight-regular, 400);
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.desktop-local-agent-row-copy small {
+  overflow: hidden;
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-local-agent-hooks-section {
+  gap: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--po-border-subtle);
+}
+
+.desktop-settings-section + .desktop-local-agent-hooks-section {
+  margin-top: 10px;
+}
+
+.desktop-local-agent-hooks-disclosure {
+  width: 100%;
+}
+
+.desktop-local-agent-hooks-disclosure > summary {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--po-text-muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.desktop-local-agent-hooks-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.desktop-local-agent-hooks-disclosure > summary:hover {
+  background: var(--po-hover);
+}
+
+.desktop-local-agent-hooks-icon {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  place-items: center;
+  color: var(--po-text-subtle);
+  opacity: 0.72;
+}
+
+.desktop-local-agent-hooks-summary-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 2px;
+}
+
+.desktop-local-agent-hooks-summary-copy strong {
+  color: var(--po-text-subtle);
+  font-size: 12.5px;
+  font-weight: var(--po-text-weight-medium, 500);
+  line-height: 18px;
+}
+
+.desktop-local-agent-hooks-summary-copy small,
+.desktop-local-agent-hooks-toolbar {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.desktop-local-agent-hooks-chevron {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  place-items: center;
+  color: var(--po-text-subtle);
+  opacity: 0.7;
+  transition: transform 140ms ease;
+}
+
+.desktop-local-agent-hooks-disclosure[open] .desktop-local-agent-hooks-chevron {
+  transform: rotate(180deg);
+}
+
+.desktop-local-agent-hooks-panel {
+  display: grid;
+  gap: 2px;
+  padding: 4px 0 0;
+}
+
+.desktop-local-agent-hooks-toolbar {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 0;
+  padding-inline: 36px 10px;
+}
+
+.desktop-local-agent-hooks-toolbar .desktop-settings-row-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.desktop-local-agent-hook-option {
+  cursor: pointer;
+}
+
+.desktop-local-agent-hook-option:has(.desktop-local-agent-hook-checkbox:disabled) {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.desktop-local-agent-hook-checkbox {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  margin: 0;
+  accent-color: var(--po-accent);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-local-agent-hooks-chevron {
+    transition: none;
+  }
 }
 
 .desktop-settings-code {
@@ -193,18 +349,18 @@
   gap: 8px;
 }
 
-.desktop-settings-value strong {
+.desktop-settings-value-text {
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
   font-size: 12.5px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-regular, 400);
   text-align: end;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.desktop-settings-value strong.success {
+.desktop-settings-value-text.success {
   color: var(--po-success);
 }
 
@@ -219,7 +375,7 @@
   padding: 6px 10px;
   color: var(--po-text-subtle);
   font-size: 11.5px;
-  font-weight: 520;
+  font-weight: var(--po-text-weight-regular, 400);
 }
 
 .desktop-settings-account-feedback.success {
@@ -243,7 +399,7 @@
   background: transparent;
   color: var(--po-text-muted);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-medium, 500);
 }
 
 .desktop-settings-row-action:hover:not(:disabled) {
@@ -289,7 +445,7 @@
   color: var(--po-text);
   font: inherit;
   font-size: 12px;
-  font-weight: 560;
+  font-weight: var(--po-text-weight-regular, 400);
   outline: none;
 }
 
@@ -312,17 +468,6 @@
 .desktop-settings-text-input:disabled {
   color: var(--po-text-disabled);
   opacity: 0.62;
-}
-
-.desktop-settings-extension-input {
-  width: 86px;
-}
-
-.desktop-settings-row-action-group {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 6px;
 }
 
 .desktop-settings-switch {
@@ -442,57 +587,6 @@
   font-size: 12.5px;
 }
 
-.desktop-settings-external-app-list {
-  display: grid;
-}
-
-.desktop-settings-external-app-row {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  min-height: 48px;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--po-divider);
-}
-
-.desktop-settings-external-app-row:last-child {
-  border-bottom: 0;
-}
-
-.desktop-settings-external-app-icon {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  overflow: hidden;
-  border-radius: 5px;
-  color: var(--po-text-muted);
-}
-
-.desktop-settings-external-app-icon.fallback {
-  background: color-mix(in srgb, var(--po-text-muted) 13%, transparent);
-  color: var(--po-text);
-  font-size: 10px;
-  font-weight: 650;
-  line-height: 1;
-}
-
-.desktop-settings-external-app-icon img {
-  display: block;
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
-}
-
-.desktop-settings-external-app-loader {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  color: var(--po-text-muted);
-}
-
 .desktop-hosting-service-panel {
   min-height: 54px;
 }
@@ -537,16 +631,20 @@
   opacity: 0.62;
 }
 
-.desktop-hosting-service-option > strong {
+.desktop-hosting-service-option > span {
   min-width: 0;
   overflow: hidden;
   color: inherit;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-regular, 400);
   line-height: 1;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.desktop-hosting-service-option.active > span {
+  font-weight: var(--po-text-weight-medium, 500);
 }
 
 .desktop-puppyone-config-row {
@@ -602,12 +700,12 @@
   gap: 8px;
 }
 
-.desktop-settings-remote-setting-main strong {
+.desktop-settings-remote-setting-name {
   min-width: 0;
   overflow: hidden;
   color: var(--po-text);
   font-size: 12.5px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-regular, 400);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -642,7 +740,7 @@
   color: var(--po-text);
   font-family: var(--po-font-mono);
   font-size: 11.5px;
-  font-weight: 560;
+  font-weight: var(--po-text-weight-regular, 400);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -651,7 +749,7 @@
   color: var(--po-text-subtle);
   font-family: inherit;
   font-size: 11.5px;
-  font-weight: 520;
+  font-weight: var(--po-text-weight-regular, 400);
 }
 
 .desktop-settings-badge {
@@ -666,7 +764,7 @@
   background: var(--po-control);
   color: var(--po-text-subtle);
   font-size: 11px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-medium, 500);
   text-transform: none;
 }
 
@@ -700,7 +798,6 @@
   }
 
   .desktop-settings-wide-control-row,
-  .desktop-settings-default-app-add,
   .desktop-puppyone-config-row {
     align-items: stretch;
     flex-direction: column;
@@ -710,17 +807,11 @@
 
   .desktop-settings-wide-control-row > .desktop-theme-choice-list,
   .desktop-settings-wide-control-row > .desktop-theme-segment,
-  .desktop-settings-wide-control-row > .desktop-settings-tool-list,
-  .desktop-settings-default-app-add > .desktop-settings-value,
   .desktop-puppyone-config-row > .desktop-settings-select,
   .desktop-puppyone-config-row > .desktop-settings-text-input {
     width: 100%;
     max-width: none;
     justify-content: flex-start;
-  }
-
-  .desktop-settings-default-app-add > .desktop-settings-value {
-    flex-wrap: wrap;
   }
 
   .desktop-puppyone-config-row > .desktop-settings-switch,
@@ -806,13 +897,4 @@
     text-align: start;
   }
 
-  .desktop-settings-external-app-row {
-    grid-template-columns: 24px minmax(0, 1fr);
-    padding-block: 8px;
-  }
-
-  .desktop-settings-external-app-row > .desktop-settings-row-action-group {
-    grid-column: 2;
-    justify-self: start;
-  }
 }

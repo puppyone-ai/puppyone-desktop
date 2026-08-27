@@ -44,13 +44,13 @@ export function SettingsValueRow({
     <div className={`desktop-settings-row desktop-settings-value-row ${action ? "desktop-settings-row-control" : ""}`}>
       <span>{label}</span>
       <div className="desktop-settings-value">
-        <strong
-          className={`${monospace ? "desktop-settings-code" : ""} ${tone === "success" ? "success" : ""}`}
+        <span
+          className={`desktop-settings-value-text ${monospace ? "desktop-settings-code" : ""} ${tone === "success" ? "success" : ""}`}
           dir={monospace ? "ltr" : "auto"}
           title={title}
         >
           {value}
-        </strong>
+        </span>
         {action}
       </div>
     </div>

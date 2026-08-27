@@ -29,26 +29,34 @@ describe("pane-scoped external-open architecture", () => {
     );
     expect(updateButton).toContain("if (!presentation) return null");
     expect(updateButton).toContain("strokeWidth={2.3}");
+    expect(updateButton).toContain('className="desktop-titlebar-update-label"');
+    expect(updateButton).toContain('t("updates.action.download")');
     expect(titlebarCss).toMatch(
-      /\.desktop-titlebar-update\s*\{[^}]*width:\s*var\(--desktop-titlebar-control-height\);[^}]*background:\s*transparent;[^}]*color:\s*var\(--po-text-inverse\);[^}]*\}/s,
+      /\.desktop-titlebar-update\s*\{[^}]*width:\s*auto;[^}]*padding:\s*0 6px;[^}]*border:\s*0;[^}]*border-radius:\s*var\(--desktop-toolbar-action-radius\);[^}]*background:\s*color-mix[^}]*\}/s,
     );
-    expect(titlebarCss).toMatch(
-      /\.desktop-titlebar-update::before\s*\{[^}]*inset:\s*2px;[^}]*border-radius:\s*50%;[^}]*background:\s*var\(--po-accent\);[^}]*\}/s,
-    );
-    expect(titlebarCss).toContain(".desktop-titlebar-update-dot");
+    expect(titlebarCss).toContain(".desktop-titlebar-update-label");
+    expect(titlebarCss).not.toContain(".desktop-titlebar-update-dot");
   });
 
-  it("keeps application choice in Default Apps settings", () => {
+  it("delegates external file opening exclusively to the system default app", () => {
     const settings = source("src/features/settings/main/FileSettingsViews.tsx");
+    const sidebar = source("src/features/settings/sidebar/settingsSidebarModel.ts");
     const target = source("src/features/external-apps/useExternalFileOpen.ts");
+    const preferences = source("src/preferences.ts");
+    const preferenceController = source("src/features/app-shell/useDesktopPreferences.ts");
+    const preload = source("electron/preload.cjs");
+    const ipc = source("electron/main/ipc/workspace-files-ipc.mjs");
 
-    expect(settings).toContain("chooseWorkspaceExternalApp");
-    expect(settings).toContain("settings.defaultApps.fileTypeDefaults");
-    expect(settings).toContain("upsertExternalAppOverride");
-    expect(settings).toContain("removeExternalAppOverride");
+    expect(settings).not.toContain("DefaultAppsSettingsView");
+    expect(sidebar).not.toContain("external-apps");
+    expect(preferences).not.toContain("ExternalAppsSettings");
+    expect(preferenceController).toContain('localStorage.removeItem("puppyone.desktop.externalApps")');
     expect(target).toContain("openWorkspaceEntryExternal");
-    expect(target).toContain("getExternalAppOverrideForExtension");
-    expect(target).not.toContain("listWorkspaceExternalOpenTargets");
+    expect(target).not.toMatch(/strategy|appPath|getAppName/);
+    expect(preload).toContain("openEntryExternal:");
+    expect(preload).not.toMatch(/resolveExternalOpenTarget|listExternalOpenTargets|chooseExternalApp/);
+    expect(ipc).toContain("shell.openPath(targetPath)");
+    expect(ipc).not.toMatch(/openFileWithExternalApplication|workspace:choose-external-app/);
   });
 });
 

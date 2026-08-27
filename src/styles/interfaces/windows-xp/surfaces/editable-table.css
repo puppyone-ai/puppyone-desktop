@@ -1,7 +1,7 @@
 /* Markdown and grid editors share one table component contract. The Style
  * projects semantic values at the Viewer boundary and never targets either
  * editor's internal DOM. */
-:root[data-interface-style="windows-xp"][data-editor-presentation="follow-interface"]
+:root[data-interface-style="windows-xp"]
   .po-viewer-surface-boundary:is(
     [data-viewer-surface-family="document"],
     [data-viewer-surface-family="grid"]

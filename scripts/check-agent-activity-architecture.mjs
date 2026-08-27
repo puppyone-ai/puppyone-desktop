@@ -44,8 +44,7 @@ for (const filePath of sourceFiles(path.join(root, "src", "features", "editor-wo
 }
 
 requirePath("src/features/local-agents/ui/LocalAgentsSettingsView.tsx");
-requirePath("src/features/desktop-agent-presence/ui/AgentFileActivityAppearanceSetting.tsx");
-requirePath("src/features/desktop-agent-presence/ui/AgentFileActivityPermissionDialog.tsx");
+requirePath("src/features/local-agents/ui/LocalAgentHooksSettingsView.tsx");
 requirePath("electron/main/terminal-agent/activity/registration/cursor-cli-hook-config.mjs");
 requirePath("electron/main/terminal-agent/activity/bridge/shell-file-intent.mjs");
 requirePath("tests/fixtures/agent-activity/codex-0.147.0/pre-tool-use-bash-read.json");
@@ -93,13 +92,14 @@ if (/AgentActivity|agentFileActivity|localAgents/u.test(generalSettings)) {
 }
 
 const localAgentsSettings = read("src/features/local-agents/ui/LocalAgentsSettingsView.tsx");
-if (!localAgentsSettings.includes("connection.displayName")
+if (!localAgentsSettings.includes("useTerminalAgentLocator")
+    || !localAgentsSettings.includes("DESKTOP_TERMINAL_LAUNCHERS")
     || !localAgentsSettings.includes("desktop-settings-switch")
-    || !localAgentsSettings.includes("discoverLocalAgents")) {
-  errors.push("Local Agents must use the native inventory and compact selection row contract");
+    || !localAgentsSettings.includes("setTerminalAgentVisible")) {
+  errors.push("Local Agents must use Terminal CLI discovery and compact launcher visibility rows");
 }
-if (/desktop-settings-label-stack|<small>|AgentActivity|agentFileActivity|Hook/u.test(localAgentsSettings)) {
-  errors.push("Local Agents must not own appearance, Hook enrollment, or descriptive row copy");
+if (/getAgentActivityEnrollment|setAgentActivityEnrollment/u.test(localAgentsSettings)) {
+  errors.push("The Local Agents page may compose Hooks but must not directly own native enrollment");
 }
 
 const passiveTerminalAgentDiscoveryFiles = [
@@ -123,30 +123,34 @@ const desktopAppGroup = settingsModel.slice(
 if (!desktopAppGroup.includes('id: "local-agents"')) {
   errors.push("Local Agents must remain a first-class Desktop App settings page");
 }
+const localAgentHooksIndex = desktopAppGroup.indexOf('id: "local-agent-hooks"');
+if (localAgentHooksIndex >= 0) {
+  errors.push("Local Agent Hooks must be a subsection of Local Agents, not a separate settings page");
+}
 
 const settingsView = read("src/features/settings/SettingsView.tsx");
-if (!settingsView.includes("<AgentFileActivityAppearanceSetting")) {
-  errors.push("Agent file activity visibility must remain in Appearance");
+const localAgentsPage = read("src/features/local-agents/ui/LocalAgentsSettingsView.tsx");
+if (!localAgentsPage.includes("<LocalAgentHooksSettingsSection")
+    || settingsView.includes('activeSection === "local-agent-hooks"')
+    || settingsView.includes("<AgentFileActivityAppearanceSetting")) {
+  errors.push("Native Hook enrollment must live under the Local Agents settings page");
 }
 
-const activityAppearanceSetting = read("src/features/desktop-agent-presence/ui/AgentFileActivityAppearanceSetting.tsx");
-const enableReconcileIndex = activityAppearanceSetting.indexOf("await reconcileNativeActivityHooks({ enabled: true");
-const enablePreferenceIndex = activityAppearanceSetting.indexOf("onChange(true)", enableReconcileIndex);
-if (!activityAppearanceSetting.includes("<AgentFileActivityPermissionDialog")
-    || !activityAppearanceSetting.includes("setPermissionOpen(true)")) {
-  errors.push("Agent file activity opt-in must open the shared one-step permission dialog");
+const localAgentHooksSettings = read("src/features/local-agents/ui/LocalAgentHooksSettingsView.tsx");
+const enrollmentSetIndex = localAgentHooksSettings.indexOf("await setEnrollment");
+const activityPreferenceIndex = localAgentHooksSettings.indexOf(
+  "onActivityIndicatorsEnabledChange",
+  enrollmentSetIndex,
+);
+if (!localAgentHooksSettings.includes("getAgentActivityEnrollment")
+    || !localAgentHooksSettings.includes("setAgentActivityEnrollment")
+    || !localAgentHooksSettings.includes("selectableProviders.map")
+    || !localAgentHooksSettings.includes("provider.configurable")
+    || !localAgentHooksSettings.includes("<details")) {
+  errors.push("Local Agent Hooks must expose opt-in controls only for selectable detected providers");
 }
-if (enableReconcileIndex < 0 || enablePreferenceIndex < enableReconcileIndex) {
-  errors.push("Agent file activity must enroll native Hooks before enabling its visual preference");
-}
-
-const activityPermissionDialog = read("src/features/desktop-agent-presence/ui/AgentFileActivityPermissionDialog.tsx");
-if (!activityPermissionDialog.includes("DesktopDialogRoot")
-    || !activityPermissionDialog.includes("permission.accessTitle")) {
-  errors.push("Agent file activity permission must use the shared dialog and concise access summary");
-}
-if (/providerId|providers\.map|connection\.displayName|desktop-settings-switch/u.test(activityPermissionDialog)) {
-  errors.push("Agent file activity permission must remain one batch action, not per-Agent controls");
+if (enrollmentSetIndex < 0 || activityPreferenceIndex < enrollmentSetIndex) {
+  errors.push("Agent activity visibility must update only after native Hook enrollment succeeds");
 }
 
 const hookRegistrationService = read("electron/main/terminal-agent/activity/registration/hook-registration-service.mjs");

@@ -1,0 +1,109 @@
+@layer features {
+.desktop-cloud-prompt-block {
+  position: relative;
+  min-height: 132px;
+  overflow: hidden;
+  border: 1px solid var(--po-border);
+  border-radius: 8px;
+  background: var(--po-panel);
+}
+
+.desktop-cloud-prompt-block pre {
+  margin: 0;
+  padding: 12px 14px 58px;
+  color: var(--po-text-muted);
+  font-family: var(--po-font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.desktop-cloud-prompt-block::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 68px;
+  background: linear-gradient(180deg, transparent 0%, var(--po-panel) 100%);
+  pointer-events: none;
+}
+
+.desktop-cloud-prompt-block button {
+  position: absolute;
+  z-index: 1;
+  bottom: 10px;
+  left: 50%;
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  transform: translateX(-50%);
+  border: 1px solid color-mix(in srgb, var(--po-success) 38%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--po-success) 14%, var(--po-panel) 86%);
+  color: var(--po-success);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.desktop-cloud-prompt-block button:hover {
+  background: color-mix(in srgb, var(--po-success) 20%, var(--po-panel) 80%);
+}
+
+.desktop-cloud-command-block {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.desktop-cloud-command-block > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.desktop-cloud-command-block span {
+  color: var(--po-text-subtle);
+  font-size: 10px;
+  font-weight: 720;
+  text-transform: uppercase;
+}
+
+.desktop-cloud-command-block button {
+  display: inline-flex;
+  width: 24px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--po-text-subtle);
+}
+
+.desktop-cloud-command-block button:hover:not(:disabled) {
+  border-color: var(--po-border);
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-command-block pre {
+  overflow: auto;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--po-border);
+  border-radius: 6px;
+  background: var(--po-canvas);
+  color: var(--po-text-muted);
+  font-family: var(--po-font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+}

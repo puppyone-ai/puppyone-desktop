@@ -4,11 +4,9 @@ import type {
   DesktopCloudRepoIdentity,
   DesktopCloudScope,
 } from "../../../lib/cloudApi";
-import { buildDesktopCloudAccessRows } from "../sections/access/accessRows";
-import { getCloudScopeRows, scopeMatchesMcpEndpoint } from "../utils";
+import { buildAccessPointProjection } from "../access-points/model";
 import type { CloudProjectAccessData } from "../project/cloudProjectAccessData";
 import type { CloudMessageDescriptor } from "../cloudPresentation";
-import { repositoryTargetKey } from "../repositoryTarget";
 
 /** Adapt aggregate Cloud project details into Access/Automation view state without refetching. */
 export function adaptCloudAggregateToAccessData({
@@ -32,36 +30,22 @@ export function adaptCloudAggregateToAccessData({
   warning: CloudMessageDescriptor | null;
   reload: () => Promise<void>;
 }): CloudProjectAccessData {
-  const scopeRows = getCloudScopeRows(scopes, identity);
-  const connectorsByTarget = new Map<string, DesktopCloudConnector[]>();
-  for (const connector of connectors) {
-    const key = repositoryTargetKey(connector.target);
-    const list = connectorsByTarget.get(key) ?? [];
-    list.push(connector);
-    connectorsByTarget.set(key, list);
-  }
-  const mcpEndpointsByTarget = new Map<string, DesktopCloudMcpEndpoint[]>();
-  for (const scope of scopeRows) {
-    mcpEndpointsByTarget.set(
-      repositoryTargetKey(scope.target),
-      mcpEndpoints.filter((endpoint) => scopeMatchesMcpEndpoint(scope, endpoint)),
-    );
-  }
+  const projection = buildAccessPointProjection({
+    scopes,
+    connectors,
+    mcpEndpoints,
+    identity,
+    apiBaseUrl,
+  });
 
   return {
     scopes,
-    scopeRows,
+    scopeRows: projection.scopeRows,
     connectors,
-    connectorsByTarget,
+    connectorsByTarget: projection.connectorsByTarget,
     mcpEndpoints,
-    mcpEndpointsByTarget,
-    accessRows: buildDesktopCloudAccessRows({
-      scopeRows,
-      connectors,
-      mcpEndpoints,
-      identity,
-      apiBaseUrl,
-    }),
+    mcpEndpointsByTarget: projection.mcpEndpointsByTarget,
+    accessPointRows: projection.accessPointRows,
     identity,
     loading,
     error,

@@ -17,8 +17,8 @@ describe("single-branch collaboration UX policy", () => {
     },
     {
       name: "only uncommitted changes",
-      state: state({ hasSimpleAction: true }),
-      expected: "simple",
+      state: state({ hasStageAndCommitAction: true }),
+      expected: "stage-and-commit",
     },
     {
       name: "only staged changes",
@@ -37,7 +37,7 @@ describe("single-branch collaboration UX policy", () => {
     },
     {
       name: "incoming commits plus a dirty worktree",
-      state: state({ hasSyncAction: true, hasSimpleAction: true }),
+      state: state({ hasSyncAction: true, hasStageAndCommitAction: true }),
       expected: "sync",
     },
     {
@@ -84,7 +84,7 @@ function state(
     hasStagedAction: false,
     hasSyncAction: false,
     hasCommittedAction: false,
-    hasSimpleAction: false,
+    hasStageAndCommitAction: false,
     ...overrides,
   };
 }

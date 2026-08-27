@@ -328,6 +328,11 @@ body.data-sidebar-resizing .data-content:not([data-explorer-collapsed="true"]) {
   min-height: 0;
 }
 
+.explorer-tree-list-start {
+  position: relative;
+  width: 100%;
+}
+
 .explorer-tree-virtual-row {
   position: absolute;
   top: 0;

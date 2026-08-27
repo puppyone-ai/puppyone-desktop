@@ -48,6 +48,35 @@ describe("ExplorerTree interactive semantics", () => {
     expect(list?.textContent).toBe("Create New");
   });
 
+  it("renders list-start notices before the virtual file rows and list-end actions", () => {
+    const node: DataNode = {
+      id: "readme",
+      name: "README.md",
+      path: "README.md",
+      type: "markdown",
+    };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <ExplorerTree
+        nodes={[node]}
+        activePath={null}
+        expandedPaths={new Set()}
+        showRoot={false}
+        onSelectNode={vi.fn()}
+        renderListStart={() => <aside>Remote updates</aside>}
+        renderListEnd={() => <button type="button">Create New</button>}
+      />,
+    ));
+
+    const list = container.querySelector<HTMLElement>(".explorer-tree-list");
+    expect(list?.children[0]?.classList.contains("explorer-tree-list-start")).toBe(true);
+    expect(list?.children[1]?.classList.contains("explorer-tree-virtual-canvas")).toBe(true);
+    expect(list?.children[2]?.classList.contains("explorer-tree-list-end-motion")).toBe(true);
+  });
+
   it("keeps an empty folder expanded without inserting a child placeholder row", () => {
     const folder: DataNode = {
       id: "empty-folder",

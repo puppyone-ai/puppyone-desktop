@@ -11,7 +11,6 @@ import {
 } from "../../preferences";
 import {
   getInterfaceStyleDefinition,
-  type EditorPresentation,
   type InterfaceStyle,
 } from "./interfaceStyles";
 
@@ -45,7 +44,6 @@ export type AppearanceResolutionInput = Readonly<{
   sidebarNavigationLayout: SidebarNavigationLayout;
   textSize: TextSize;
   fileIconTheme: FileIconThemeId;
-  editorPresentation: EditorPresentation;
 }>;
 
 export type ResolvedAppearance = Readonly<{
@@ -58,7 +56,6 @@ export type ResolvedAppearance = Readonly<{
     sidebarNavigationLayout: AppearanceSettingDecision<SidebarNavigationLayout>;
     textSize: AppearanceSettingDecision<TextSize>;
     fileIconTheme: AppearanceSettingDecision<FileIconThemeId>;
-    editorPresentation: AppearanceSettingDecision<EditorPresentation>;
   }>;
   themeMode: ThemeMode;
   sidebarNavigationLayout: SidebarNavigationLayout;
@@ -66,7 +63,6 @@ export type ResolvedAppearance = Readonly<{
   sidebarNavigationOrientation: SidebarNavigationOrientation;
   textSize: TextSize;
   fileIconTheme: FileIconThemeId;
-  editorPresentation: EditorPresentation;
 }>;
 
 export function resolveAppearance(input: AppearanceResolutionInput): ResolvedAppearance {
@@ -91,12 +87,6 @@ export function resolveAppearance(input: AppearanceResolutionInput): ResolvedApp
     profile.policies.fileIconTheme as AppearancePolicy<FileIconThemeId>,
     input.fileIconTheme,
   );
-  const editorPresentation = resolveSetting(
-    input.editorPresentation,
-    profile.policies.editorPresentation as AppearancePolicy<EditorPresentation>,
-    input.editorPresentation,
-  );
-
   return Object.freeze({
     interfaceStyle: input.interfaceStyle,
     profile: profile.profile,
@@ -107,7 +97,6 @@ export function resolveAppearance(input: AppearanceResolutionInput): ResolvedApp
       sidebarNavigationLayout,
       textSize,
       fileIconTheme,
-      editorPresentation,
     }),
     themeMode: themeMode.effectiveValue,
     sidebarNavigationLayout: sidebarNavigationLayout.effectiveValue,
@@ -115,7 +104,6 @@ export function resolveAppearance(input: AppearanceResolutionInput): ResolvedApp
     sidebarNavigationOrientation: getSidebarNavigationOrientation(sidebarNavigationLayout.effectiveValue),
     textSize: textSize.effectiveValue,
     fileIconTheme: fileIconTheme.effectiveValue,
-    editorPresentation: editorPresentation.effectiveValue,
   });
 }
 

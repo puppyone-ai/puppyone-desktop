@@ -9,9 +9,9 @@ describe("native appearance IPC", () => {
     const ownerWindow = createWindow();
     const handler = register(ownerWindow);
 
-    handler(createEvent(), { background: "#fbfaf7" });
+    handler(createEvent(), { background: "#fafafa" });
 
-    expect(ownerWindow.setBackgroundColor).toHaveBeenCalledWith("#fbfaf7");
+    expect(ownerWindow.setBackgroundColor).toHaveBeenCalledWith("#fafafa");
   });
 
   it("rejects colors that are not owned by the interface-style manifest", () => {

@@ -84,6 +84,7 @@ export type ExplorerTreeProps = {
   onNodeContextMenu?: (node: DataNode, event: ReactMouseEvent<HTMLDivElement>) => void;
   onRootClick?: (event: ReactMouseEvent<HTMLElement>) => void;
   renderRootContent?: () => ReactNode;
+  renderListStart?: () => ReactNode;
   renderListEnd?: () => ReactNode;
   renderRootActions?: () => ReactNode;
   renderFolderActions?: (node: DataNode) => ReactNode;
@@ -150,6 +151,7 @@ export function ExplorerTree({
   onNodeContextMenu,
   onRootClick,
   renderRootContent,
+  renderListStart,
   renderListEnd,
   renderRootActions,
   renderFolderActions,
@@ -615,6 +617,11 @@ export function ExplorerTree({
         onScroll={virtualWindow.onScroll}
       >
         <div className="explorer-tree-list">
+          {renderListStart && (
+            <div className="explorer-tree-list-start">
+              {renderListStart()}
+            </div>
+          )}
           {rootError && nodes.length === 0 ? (
             <ExplorerTreeMetaRow depth={0}>{rootError}</ExplorerTreeMetaRow>
           ) : rootLoading && nodes.length === 0 ? (

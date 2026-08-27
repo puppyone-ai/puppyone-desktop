@@ -51,7 +51,7 @@ describe("DesktopSidebarTopNavigation", () => {
     expect(container.querySelectorAll(".desktop-sidebar-top-navigation-group")).toHaveLength(1);
   });
 
-  it("places Cloud hub after Settings in the left-aligned sequence and omits the linked dot", () => {
+  it("places Cloud hub before the terminal Settings action and omits the linked dot", () => {
     const onNavigate = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -76,7 +76,7 @@ describe("DesktopSidebarTopNavigation", () => {
 
     expect(
       Array.from(container.querySelectorAll("button"), (button) => button.getAttribute("aria-label")),
-    ).toEqual(["Files", "Changes", "Settings", "Cloud"]);
+    ).toEqual(["Files", "Changes", "Cloud", "Settings"]);
     expect(container.querySelectorAll(".desktop-sidebar-top-navigation-group")).toHaveLength(1);
     expect(container.querySelector(".desktop-sidebar-top-navigation-end")).toBeNull();
     expect(container.querySelector('[aria-label="Cloud"] .desktop-sidebar-nav-cloud-dot')).toBeNull();
@@ -122,7 +122,7 @@ describe("DesktopSidebarTopNavigation", () => {
 });
 
 describe("DesktopSidebarFooterNavigation", () => {
-  it("keeps Settings and Cloud in the same left-to-right action group", () => {
+  it("keeps Cloud before the terminal Settings action in one group", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -145,7 +145,7 @@ describe("DesktopSidebarFooterNavigation", () => {
 
     expect(
       Array.from(container.querySelectorAll("button"), (button) => button.getAttribute("aria-label")),
-    ).toEqual(["Files", "Changes", "Settings", "Cloud"]);
+    ).toEqual(["Files", "Changes", "Cloud", "Settings"]);
     expect(container.querySelectorAll(".desktop-sidebar-footer-actions")).toHaveLength(1);
   });
 });
@@ -175,7 +175,7 @@ describe("DesktopSidebarRailNavigation local Cloud hub", () => {
 
     expect(
       Array.from(container.querySelectorAll("button"), (button) => button.getAttribute("aria-label")),
-    ).toEqual(["Files, workspace changes detected", "Changes, workspace changes detected", "Settings", "Cloud"]);
+    ).toEqual(["Files, workspace changes detected", "Changes, workspace changes detected", "Cloud", "Settings"]);
     const badge = container.querySelector('[data-navigation-item="git"] .desktop-sidebar-nav-badge');
     expect(badge?.classList.contains("workspace")).toBe(true);
     expect(badge?.textContent).toBe("");

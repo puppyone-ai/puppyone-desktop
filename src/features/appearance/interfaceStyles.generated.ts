@@ -41,9 +41,6 @@ export const INTERFACE_STYLE_MANIFEST = {
         },
         "fileIconTheme": {
           "mode": "inherit"
-        },
-        "editorPresentation": {
-          "mode": "inherit"
         }
       },
       "palette": {
@@ -61,7 +58,7 @@ export const INTERFACE_STYLE_MANIFEST = {
       },
       "firstPaint": {
         "light": {
-          "background": "#fbfaf7",
+          "background": "#fafafa",
           "colorScheme": "light"
         },
         "dark": {
@@ -74,11 +71,11 @@ export const INTERFACE_STYLE_MANIFEST = {
           "defaultPreset": "neutral",
           "values": {
             "neutral": {
-              "background": "#fbfaf7",
+              "background": "#fafafa",
               "colorScheme": "light"
             },
             "warm": {
-              "background": "#fbf6ed",
+              "background": "#fbfaf7",
               "colorScheme": "light"
             },
             "graphite": {
@@ -140,14 +137,6 @@ export const INTERFACE_STYLE_MANIFEST = {
         },
         "fileIconTheme": {
           "mode": "inherit"
-        },
-        "editorPresentation": {
-          "mode": "allow",
-          "values": [
-            "follow-interface",
-            "product-default"
-          ],
-          "default": "follow-interface"
         }
       },
       "palette": {

@@ -19,48 +19,51 @@
 
 .desktop-cloud-overview-catalog {
   display: grid;
-  width: min(100%, 1480px);
+  width: min(100%, var(--desktop-cloud-content-max-width, 900px));
   min-width: 0;
   box-sizing: border-box;
   margin: 0 auto;
-  padding: 44px clamp(28px, 4.6vw, 56px) 56px;
+  padding:
+    var(--desktop-cloud-page-padding-top)
+    var(--desktop-cloud-page-padding-inline)
+    var(--desktop-cloud-page-padding-bottom);
 }
 
 .desktop-cloud-overview-landing-header {
-  display: flex;
+  display: grid;
+  width: 100%;
   min-width: 0;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 0 4px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 0 8px;
 }
 
 .desktop-cloud-overview-landing-copy {
   display: grid;
+  width: 100%;
   min-width: 0;
-  gap: 5px;
+  gap: 7px;
 }
 
-.desktop-cloud-overview-landing-title-row {
+.desktop-cloud-overview-title-row {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 9px;
 }
 
-.desktop-cloud-overview-landing-title-row h1,
+.desktop-cloud-overview-landing-copy h1,
 .desktop-cloud-overview-landing-copy p {
   margin: 0;
 }
 
-.desktop-cloud-overview-landing-title-row h1 {
+.desktop-cloud-overview-landing-copy h1 {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--po-text);
   font-size: var(--po-text-size-page-title, 20px);
-  font-weight: 540;
-  letter-spacing: -0.014em;
+  font-weight: 500;
+  letter-spacing: -0.012em;
   line-height: 1.25;
 }
 
@@ -72,23 +75,39 @@
   line-height: 20px;
 }
 
-.desktop-cloud-overview-refresh-button {
+.desktop-cloud-overview-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.desktop-cloud-overview-header-side {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: flex-start;
+}
+
+.desktop-cloud-overview-refresh-button,
+.desktop-cloud-overview-settings-button {
   display: inline-flex;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
   align-items: center;
   justify-content: center;
   padding: 0;
   border: 1px solid var(--po-border);
-  border-radius: 7px;
+  border-radius: 6px;
   background: transparent;
   color: var(--po-text-muted);
   cursor: var(--po-clickable-cursor, pointer);
   transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
-.desktop-cloud-overview-refresh-button:hover {
+.desktop-cloud-overview-refresh-button:hover,
+.desktop-cloud-overview-settings-button:hover {
   border-color: var(--po-border-strong);
   background: var(--po-hover);
   color: var(--po-text);

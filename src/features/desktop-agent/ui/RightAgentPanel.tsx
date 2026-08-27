@@ -23,7 +23,6 @@ export type RightAgentPanelHandle = { newSession: () => void };
 type RightAgentPanelProps = {
   workspace: Workspace;
   active: boolean;
-  minimalMode?: boolean;
   onViewChanges?: () => void;
   onOpenFile?: (path: string) => void;
   onRunningChange?: (running: boolean) => void;
@@ -34,7 +33,7 @@ type RightAgentPanelProps = {
   enabledRuntimeIds?: readonly string[] | null;
 };
 export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanelProps>(function RightAgentPanel({
-  workspace, active, minimalMode = false,
+  workspace, active,
   onViewChanges,
   onOpenFile,
   onRunningChange,
@@ -135,7 +134,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
       dropLabel={referenceIngestion.dropLabel} announcement={referenceIngestion.announcement}
       onDragEnter={referenceIngestion.onDragEnter} onDragOver={referenceIngestion.onDragOver}
       onDragLeave={referenceIngestion.onDragLeave} onDrop={referenceIngestion.onDrop}
-      header={minimalMode ? null : (
+      header={(
         <AgentSurfaceHeader
           title={state.session?.title || t("agent.header.newChat")}
           runtimeLabel={runtimeLabel}
@@ -206,7 +205,6 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
           submitting={submissionPending}
           placeholder={composerPlaceholder}
           runtimeLabel={runtimeLabel}
-          hideConfiguration={minimalMode && routingReady}
           configurationDisabled={loading || preparingSession || submissionPending}
           models={capabilities?.modelSelection ? providerModels : []}
           selectedModel={state.selectedModel}

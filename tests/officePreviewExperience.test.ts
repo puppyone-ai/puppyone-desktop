@@ -111,10 +111,10 @@ describe("lightweight Office preview experience", () => {
     );
     expect(officePreviewCss).toContain('.office-pptx-thumbnail__frame[data-render-state="error"]');
     expect(officePreviewCss).toContain("prefers-reduced-motion: reduce");
-    // Base Neutral plus every palette that intentionally changes file accents,
-    // including the now-explicit Light/Warm scope.
-    expect(tokenSource.match(/--po-file-accent-presentation:/g)).toHaveLength(6);
-    expect(tokenSource.match(/--po-file-accent-word:/g)).toHaveLength(6);
+    // Base Neutral plus every palette that intentionally changes file accents.
+    // Light/Warm inherits the default file accents instead of duplicating them.
+    expect(tokenSource.match(/--po-file-accent-presentation:/g)).toHaveLength(5);
+    expect(tokenSource.match(/--po-file-accent-word:/g)).toHaveLength(5);
     expect(officePreviewCss).not.toMatch(
       /\.office-pptx-workspace\s*\{[^}]*var\(--po-inset\)/s,
     );

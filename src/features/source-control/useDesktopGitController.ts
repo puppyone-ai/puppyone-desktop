@@ -87,6 +87,7 @@ export function useDesktopGitController({
   const [selectedGitCommitId, setSelectedGitCommitId] = useState<string | null>(null);
   const [selectedGitWorkingFile, setSelectedGitWorkingFile] = useState<GitWorkingSelection | null>(null);
   const [gitMainPanel, setGitMainPanel] = useState<GitMainPanel>("changes");
+  const [gitHistoryLoading, setGitHistoryLoading] = useState(false);
   const [gitCommitDetail, setGitCommitDetail] = useState<GitCommitDetail | null>(null);
   const [gitCommitDetailLoading, setGitCommitDetailLoading] = useState(false);
   const [gitCommitDetailError, setGitCommitDetailError] = useState<string | null>(null);
@@ -120,6 +121,7 @@ export function useDesktopGitController({
     clearFormatAwareDiffCaches();
     setSelectedGitCommitId(null);
     setSelectedGitWorkingFile(null);
+    setGitHistoryLoading(false);
     setGitCommitDetail(null);
     setGitCommitDetailError(null);
     setGitCommitDetailLoading(false);
@@ -132,10 +134,19 @@ export function useDesktopGitController({
     setPendingBranchSwitch(null);
   }, [workspace?.path]);
 
-  // Lazy-load history/graph when the History surface is active, or when HEAD/refs
-  // change while History is already open (cached history was cleared).
+  // Watchers keep the sidebar live while it is closed. Entering Source Control
+  // still performs an immediate reconciliation so a missed/coalesced native
+  // event can never leave the first visible frame stale.
   useEffect(() => {
-    if (!gitViewActive || gitMainPanel !== "history" || !workspace || !activeGitStatus?.isRepo) {
+    if (!gitViewActive || !workspace?.path) return;
+    void refreshGitStatus("working-tree");
+  }, [gitViewActive, refreshGitStatus, workspace?.path]);
+
+  // The Git sidebar owns an always-visible History pane, so load its graph as
+  // soon as the Source Control surface is active and refresh it after ref changes.
+  useEffect(() => {
+    if (!gitViewActive || !workspace || !activeGitStatus?.isRepo) {
+      setGitHistoryLoading(false);
       return undefined;
     }
 
@@ -146,10 +157,14 @@ export function useDesktopGitController({
     const alreadyLoaded = (activeGitStatus.allCommits?.length ?? 0) > 0
       || (activeGitStatus.commits?.length ?? 0) > 0;
     // If we already have history for this HEAD + history epoch, keep it.
-    if (alreadyLoaded) return undefined;
+    if (alreadyLoaded || activeGitStatus.totalCommits === 0) {
+      setGitHistoryLoading(false);
+      return undefined;
+    }
 
     const requestId = `history-${++historyRequestRef.current}`;
     let cancelled = false;
+    setGitHistoryLoading(true);
     void getWorkspaceGitBranchGraph(context.rootPath, { requestId })
       .then((graph) => {
         if (cancelled) return;
@@ -160,10 +175,14 @@ export function useDesktopGitController({
         const message = error instanceof Error ? error.message : String(error);
         if (/cancelled|ABORT_ERR/i.test(message)) return;
         reportGitStatusError(context, error);
+      })
+      .finally(() => {
+        if (!cancelled) setGitHistoryLoading(false);
       });
 
     return () => {
       cancelled = true;
+      setGitHistoryLoading(false);
       void cancelWorkspaceGitBranchGraph(requestId);
     };
   }, [
@@ -172,9 +191,9 @@ export function useDesktopGitController({
     activeGitStatus?.commits?.length,
     activeGitStatus?.headCommitId,
     activeGitStatus?.isRepo,
+    activeGitStatus?.totalCommits,
     applyGitHistory,
     captureGitRepositoryContext,
-    gitMainPanel,
     gitViewActive,
     historyEpoch,
     reportGitStatusError,
@@ -346,17 +365,6 @@ export function useDesktopGitController({
     setSelectedGitWorkingFile(selection);
     setSelectedGitCommitId(null);
   }, []);
-
-  const selectGitMainPanel = useCallback((panel: GitMainPanel) => {
-    setGitMainPanel(panel);
-    if (panel === "changes") {
-      setSelectedGitCommitId(null);
-    } else {
-      const historyCommits = activeGitStatus?.allCommits ?? activeGitStatus?.commits ?? [];
-      setSelectedGitWorkingFile(null);
-      setSelectedGitCommitId((current) => current ?? historyCommits[0]?.commit_id ?? null);
-    }
-  }, [activeGitStatus]);
 
   const handleStageGitPaths = useCallback((paths: string[]) => {
     return runGitOperation("stage", (rootPath) => stageWorkspaceGitPaths(rootPath, paths));
@@ -711,6 +719,7 @@ export function useDesktopGitController({
     gitCommitDetail,
     gitCommitDetailError,
     gitCommitDetailLoading,
+    gitHistoryLoading,
     gitIncomingCount,
     gitMainPanel,
     gitOperationError,
@@ -754,7 +763,6 @@ export function useDesktopGitController({
     refreshGitStatus,
     refreshGitStatusWithFetch,
     selectGitCommit,
-    selectGitMainPanel,
     selectGitWorkingFile,
     setBranchSwitcherOpen,
     setGitOperationError,

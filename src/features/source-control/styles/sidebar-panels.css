@@ -1,14 +1,3 @@
-.desktop-git-resizable-section .desktop-git-remote-status {
-  display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
-  flex-direction: column;
-  margin: 0;
-  padding-bottom: 0;
-  border-bottom: 0;
-  overflow: hidden;
-}
-
 .desktop-git-resizable-section .desktop-git-section-row {
   flex: 0 0 auto;
 }
@@ -93,7 +82,7 @@
   inset-inline: var(--git-sidebar-control-left-gap) var(--git-sidebar-control-right-gap);
   height: 1px;
   border-radius: 999px;
-  background: transparent;
+  background: var(--po-sidebar-divider, var(--po-divider));
   content: "";
 }
 
@@ -101,6 +90,37 @@
 .desktop-git-section-resizer.active::after,
 .desktop-git-section-resizer:focus-visible::after {
   background: var(--po-border);
+}
+
+.desktop-git-history-resizer {
+  position: relative;
+  flex: 0 0 var(--git-section-divider-height);
+  border: 0;
+  background: transparent;
+  cursor: row-resize;
+}
+
+.desktop-git-history-resizer::after {
+  position: absolute;
+  top: var(--git-section-divider-line-offset);
+  inset-inline: 0;
+  height: 1px;
+  background: var(--po-sidebar-divider, var(--po-divider));
+  content: "";
+}
+
+.desktop-git-history-resizer:hover::after,
+.desktop-git-history-resizer.active::after,
+.desktop-git-history-resizer:focus-visible::after {
+  background: var(--po-border);
+}
+
+.desktop-git-history-resizer.is-static {
+  cursor: default;
+}
+
+.desktop-git-history-resizer.is-static:hover::after {
+  background: var(--po-sidebar-divider, var(--po-divider));
 }
 
 body.desktop-git-sidebar-resizing {

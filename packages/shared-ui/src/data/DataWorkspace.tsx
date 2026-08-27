@@ -114,6 +114,7 @@ export type DataWorkspaceProps = {
   explorerSlot?: DataWorkspaceSlot;
   explorerFooterSlot?: DataWorkspaceSlot;
   collapsedExplorerSlot?: DataWorkspaceSlot;
+  explorerListStartSlot?: DataWorkspaceSlot;
   explorerListEndSlot?: DataWorkspaceSlot;
   showExplorerRoot?: boolean;
   explorerRootContentSlot?: DataWorkspaceSlot;
@@ -201,6 +202,7 @@ export function DataWorkspace({
   explorerSlot,
   explorerFooterSlot,
   collapsedExplorerSlot,
+  explorerListStartSlot,
   explorerListEndSlot,
   showExplorerRoot = true,
   explorerRootContentSlot,
@@ -1315,6 +1317,7 @@ export function DataWorkspace({
                       onRootContextMenu={onExplorerRootContextMenu ? (event) => onExplorerRootContextMenu(workspaceState, event) : undefined}
                       onNodeContextMenu={onExplorerNodeContextMenu ? (node, event) => onExplorerNodeContextMenu(workspaceState, node, event) : undefined}
                       renderRootContent={explorerRootContentSlot ? () => renderWorkspaceSlot(explorerRootContentSlot, workspaceState) : undefined}
+                      renderListStart={explorerListStartSlot ? () => renderWorkspaceSlot(explorerListStartSlot, workspaceState) : undefined}
                       renderListEnd={explorerListEndSlot ? () => renderWorkspaceSlot(explorerListEndSlot, workspaceState) : undefined}
                       renderRootActions={explorerRootActionSlot ? () => renderWorkspaceSlot(explorerRootActionSlot, workspaceState) : undefined}
                       renderFolderActions={explorerFolderActionSlot ? (folder) => renderWorkspaceFolderSlot(explorerFolderActionSlot, workspaceState, folder) : undefined}

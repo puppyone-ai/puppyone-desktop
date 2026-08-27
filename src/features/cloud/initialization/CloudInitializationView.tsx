@@ -18,6 +18,7 @@ import {
   CloudPublishFolderMark,
 } from "../components/CloudPublishHeroMarks";
 import type { CloudPublishReadiness } from "../workspace/cloudPublishReadiness";
+import type { CloudWorkspaceSection } from "../types";
 import { formatCloudPublishFailure } from "../cloudPresentation";
 import { CloudGitPrerequisite } from "./CloudGitPrerequisite";
 import {
@@ -29,12 +30,12 @@ import {
   getCloudInitializationDescription,
   getCloudInitializationStatusLabel,
   getCloudPushAction,
-  isCloudPublishPrerequisiteFailure,
 } from "./cloudInitializationModel";
 
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
 
 export function CloudLocalOnlyWorkspace({
+  activeSection = "mcp",
   workspace,
   accountEmail,
   branchName,
@@ -58,10 +59,9 @@ export function CloudLocalOnlyWorkspace({
   onSelectOrganization,
   onRetryOrganizations,
   onAbandonPublish,
-  onOpenSourceControl,
-  onRefresh,
   onPublishWorkspace,
 }: {
+  activeSection?: CloudWorkspaceSection;
   workspace: Workspace;
   accountEmail: string | null;
   branchName: string;
@@ -85,8 +85,6 @@ export function CloudLocalOnlyWorkspace({
   onSelectOrganization?: (organizationId: string) => void;
   onRetryOrganizations?: () => void;
   onAbandonPublish?: () => void;
-  onOpenSourceControl?: () => void;
-  onRefresh?: () => void;
   onPublishWorkspace: (organizationId?: string) => void;
 }) {
   const { t } = useLocalization();
@@ -123,23 +121,14 @@ export function CloudLocalOnlyWorkspace({
     ? Boolean(pushAction)
     : readyToPush && organizationReady;
   const showPublishSummary = Boolean(
-    activeProgressStage
-    || publishState
+    publishState
     || readinessMessage
     || organizationStatus === "selection-required"
     || organizationError,
   );
   const destinationBranchName = PUPPYONE_CLOUD_DEFAULT_BRANCH;
-  const visiblePublishError = publishError && (
-    publishState
-    || activeProgressStage
-    || !isCloudPublishPrerequisiteFailure(publishError.code)
-  )
-    ? publishError
-    : null;
-  const cloudStatus = activeProgressStage
-    ? getCloudPublishProgressLabel(activeProgressStage, t)
-    : publishState
+  const visiblePublishError = publishError;
+  const cloudStatus = publishState
     ? getCloudInitializationStatusLabel(publishState, t)
     : t(waitingForSignIn
       ? "cloud.initialize.waitingForSignIn"
@@ -147,18 +136,45 @@ export function CloudLocalOnlyWorkspace({
         ? "cloud.initialize.initializing"
         : "cloud.initialize.notInitialized");
 
-  if (
-    resolvedReadiness !== "ready"
-    && !activeProgressStage
-    && !publishState
-    && !publishStateLoading
-  ) {
+  if (!activeProgressStage && !publishState && !publishStateLoading) {
     return (
       <CloudGitPrerequisite
-        readiness={resolvedReadiness}
-        onOpenSourceControl={onOpenSourceControl}
-        onRefresh={onRefresh}
+        activeSection={activeSection}
+        publishBusy={publishBusy}
+        publishEnabled={organizationReady}
+        publishError={visiblePublishError}
+        progressStage={activeProgressStage}
+        organizations={organizations}
+        selectedOrganizationId={selectedOrganizationId}
+        organizationStatus={organizationStatus}
+        organizationError={organizationError}
+        onSelectOrganization={onSelectOrganization}
+        onRetryOrganizations={onRetryOrganizations}
+        onPublishWorkspace={onPublishWorkspace}
       />
+    );
+  }
+
+  if (activeProgressStage) {
+    return (
+      <div className="desktop-cloud-publish-container">
+        {waitingForSignIn && (
+          <div className="desktop-cloud-main-alert info" role="status">
+            {t("cloud.state.publishSignInPending")}
+          </div>
+        )}
+        {visiblePublishError && (
+          <div className="desktop-cloud-main-alert" role="alert">
+            {formatCloudPublishFailure(visiblePublishError, t)}
+          </div>
+        )}
+        <section
+          className="desktop-cloud-publish-running"
+          aria-label={t("cloud.initialize.progress.stepsLabel")}
+        >
+          <CloudPublishProgressIndicator stage={activeProgressStage} t={t} />
+        </section>
+      </div>
     );
   }
 
@@ -300,9 +316,7 @@ export function CloudLocalOnlyWorkspace({
 
         {showPublishSummary && (
           <div className={`desktop-cloud-publish-summary ${readinessMessage ? "blocked" : ""}`} role={readinessMessage ? "alert" : undefined}>
-            {activeProgressStage ? (
-              <CloudPublishProgressIndicator stage={activeProgressStage} t={t} />
-            ) : publishState ? (
+            {publishState ? (
               <>
                 <strong>{getCloudInitializationStatusLabel(publishState, t)}</strong>
                 <p>{getCloudInitializationDescription(publishState, t)}</p>

@@ -4,41 +4,15 @@
   flex-direction: column;
 }
 
-.desktop-cloud-sidebar-footer {
-  display: flex;
-  height: var(--desktop-sidebar-nav-height);
-  min-height: var(--desktop-sidebar-nav-height);
-  align-items: center;
-  justify-content: start;
-  padding: 3px 9px 4px;
-  border-top: 1px solid transparent;
-  box-sizing: border-box;
-}
-
-.desktop-cloud-sidebar-footer-avatar {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border: 0;
-  border-radius: 999px;
-  background: var(--po-control);
-  color: var(--po-text);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  transition: background 150ms ease, box-shadow 150ms ease;
-}
-
-.desktop-cloud-sidebar-footer-avatar:hover {
-  background: var(--po-selected);
-  box-shadow: 0 0 0 2px var(--po-hover);
-}
-
 .desktop-cloud-main-view {
+  --desktop-cloud-content-max-width: 900px;
+  --desktop-cloud-shell-padding-top: var(--desktop-utility-page-padding-top);
+  --desktop-cloud-catalog-padding-top: 44px;
+  --desktop-cloud-page-padding-top: calc(
+    var(--desktop-cloud-shell-padding-top) + var(--desktop-cloud-catalog-padding-top)
+  );
+  --desktop-cloud-page-padding-inline: clamp(28px, 4.6vw, 44px);
+  --desktop-cloud-page-padding-bottom: 56px;
   position: relative;
   display: flex;
   flex: 1;
@@ -49,7 +23,7 @@
   min-height: 0;
   overflow: auto;
   padding:
-    var(--desktop-utility-page-padding-top)
+    var(--desktop-cloud-shell-padding-top)
     var(--desktop-utility-page-padding-inline)
     var(--desktop-utility-page-padding-bottom);
   background: var(--po-canvas);
@@ -58,7 +32,7 @@
 
 .desktop-cloud-page-shell {
   display: grid;
-  width: min(100%, 1040px);
+  width: min(100%, var(--desktop-cloud-content-max-width));
   min-height: 100%;
   margin: 0 auto;
   align-content: start;
@@ -144,7 +118,14 @@
 }
 
 @media (max-width: 720px) {
-  .desktop-cloud-main-view:not(.desktop-cloud-history-main-view) {
+  .desktop-cloud-main-view {
+    --desktop-cloud-shell-padding-top: 14px;
+    --desktop-cloud-catalog-padding-top: 32px;
+    --desktop-cloud-page-padding-inline: 24px;
+    --desktop-cloud-page-padding-bottom: 44px;
+  }
+
+  .desktop-cloud-main-view:not(.desktop-cloud-history-main-view):not(.desktop-cloud-landing-main-view):not(.desktop-cloud-automation-main-view) {
     padding: 14px;
   }
 }

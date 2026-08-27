@@ -1,93 +1,130 @@
-import { GitBranch, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
-import type { CloudPublishReadiness } from "../workspace/cloudPublishReadiness";
+import type {
+  CloudPublishErrorCode,
+  CloudPublishProgressStage,
+} from "../../../types/electron";
+import { formatCloudPublishFailure } from "../cloudPresentation";
+import type { CloudWorkspaceSection } from "../types";
+import { CloudActivationHero } from "../components/CloudActivationHero";
+import { CloudPublishConfirmationDialog } from "./CloudPublishConfirmationDialog";
+import { getCloudPublishProgressLabel } from "./CloudPublishProgressIndicator";
 
 export function CloudGitPrerequisite({
-  readiness,
-  onOpenSourceControl,
-  onRefresh,
+  activeSection,
+  publishBusy,
+  publishEnabled,
+  publishError,
+  progressStage,
+  organizations,
+  selectedOrganizationId,
+  organizationStatus,
+  organizationError,
+  onSelectOrganization,
+  onRetryOrganizations,
+  onPublishWorkspace,
 }: {
-  readiness: Exclude<CloudPublishReadiness, "ready">;
-  onOpenSourceControl?: () => void;
-  onRefresh?: () => void;
+  activeSection: CloudWorkspaceSection;
+  publishBusy: boolean;
+  publishEnabled: boolean;
+  publishError: { code: CloudPublishErrorCode; retryable: boolean } | null;
+  progressStage: CloudPublishProgressStage | null;
+  organizations: readonly { id: string; name: string }[];
+  selectedOrganizationId: string | null;
+  organizationStatus: "signed-out" | "loading" | "selection-required" | "ready" | "none" | "error";
+  organizationError: string | null;
+  onSelectOrganization?: (organizationId: string) => void;
+  onRetryOrganizations?: () => void;
+  onPublishWorkspace: (organizationId?: string) => void;
 }) {
   const { t } = useLocalization();
-  const title = readiness === "repository-required"
-    ? t("cloud.initialize.repositorySetupTitle")
-    : readiness === "commit-required"
-      ? t("cloud.initialize.commitSetupTitle")
-      : t("cloud.initialize.branchSetupTitle");
-  const description = readiness === "repository-required"
-    ? t("cloud.initialize.repositorySetupDescription")
-    : readiness === "commit-required"
-      ? t("cloud.initialize.commitSetupDescription")
-      : t("cloud.initialize.branchSetupDescription");
-  const steps: Array<{
-    id: string;
-    label: string;
-    state: "complete" | "current" | "upcoming";
-  }> = readiness === "repository-required"
-    ? [
-        { id: "repository", label: t("cloud.initialize.stepVersionControl"), state: "current" },
-        { id: "commit", label: t("cloud.initialize.stepFirstCommit"), state: "upcoming" },
-        { id: "publish", label: t("cloud.initialize.stepPublish"), state: "upcoming" },
-      ]
-    : readiness === "commit-required"
-      ? [
-          { id: "repository", label: t("cloud.initialize.stepVersionControl"), state: "complete" },
-          { id: "commit", label: t("cloud.initialize.stepFirstCommit"), state: "current" },
-          { id: "publish", label: t("cloud.initialize.stepPublish"), state: "upcoming" },
-        ]
-      : [
-          { id: "repository", label: t("cloud.initialize.stepVersionControl"), state: "complete" },
-          { id: "commit", label: t("cloud.initialize.stepFirstCommit"), state: "complete" },
-          { id: "branch", label: t("cloud.initialize.stepBranch"), state: "current" },
-        ];
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+
+  const showOrganizationSupplemental = [
+    "selection-required",
+    "none",
+    "error",
+  ].includes(organizationStatus);
+  const supplemental = publishError || showOrganizationSupplemental ? (
+    <>
+      {publishError && (
+        <div className="desktop-cloud-git-prerequisite-error" role="alert">
+          {formatCloudPublishFailure(publishError, t)}
+        </div>
+      )}
+
+      {showOrganizationSupplemental && (
+        <div className="desktop-cloud-git-prerequisite-organization">
+          {organizationStatus === "none" ? (
+            <span>{t("cloud.initialize.noOrganization")}</span>
+          ) : organizationStatus === "error" ? (
+            <>
+              <span>{organizationError ?? t("cloud.message.organization-load-failed")}</span>
+              {onRetryOrganizations && (
+                <button type="button" onClick={onRetryOrganizations}>
+                  {t("cloud.common.retry")}
+                </button>
+              )}
+            </>
+          ) : organizations.length > 1 ? (
+            <label>
+              <span>{t("cloud.organization.selectLabel")}</span>
+              <select
+                aria-label={t("cloud.organization.selectLabel")}
+                value={selectedOrganizationId ?? ""}
+                onChange={(event) => onSelectOrganization?.(event.target.value)}
+              >
+                <option value="" disabled>{t("cloud.organization.selectPlaceholder")}</option>
+                {organizations.map((organization) => (
+                  <option value={organization.id} key={organization.id}>{organization.name}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
+      )}
+    </>
+  ) : undefined;
 
   return (
-    <div className="desktop-cloud-publish-container">
-      <section
-        className="desktop-cloud-git-prerequisite"
-        aria-labelledby="desktop-cloud-git-prerequisite-title"
-      >
-        <div className="desktop-cloud-git-prerequisite-mark" aria-hidden="true">
-          <GitBranch size={38} strokeWidth={1.45} />
-        </div>
-        <header className="desktop-cloud-git-prerequisite-header">
-          <h1 id="desktop-cloud-git-prerequisite-title">{title}</h1>
-          <p>{description}</p>
-        </header>
-        <ol
-          className="desktop-cloud-git-prerequisite-steps"
-          aria-label={t("cloud.initialize.prerequisiteStepsLabel")}
-        >
-          {steps.map((step, index) => (
-            <li className={step.state} key={step.id} aria-current={step.state === "current" ? "step" : undefined}>
-              <span className="desktop-cloud-git-prerequisite-step-marker" aria-hidden="true">
-                {index + 1}
-              </span>
-              <span>{step.label}</span>
-            </li>
-          ))}
-        </ol>
-        <div className="desktop-cloud-publish-actions desktop-cloud-git-prerequisite-actions">
-          {onOpenSourceControl && (
+    <>
+      <div className="desktop-cloud-publish-container">
+        <CloudActivationHero
+          activeSection={activeSection}
+          className="desktop-cloud-git-prerequisite"
+          ariaLabel={t("cloud.initialize.publishFolderTitle")}
+          titleId="desktop-cloud-git-prerequisite-title"
+          supplemental={supplemental}
+          action={(
             <button
               className="desktop-cloud-row-action primary desktop-cloud-publish-primary"
               type="button"
-              onClick={onOpenSourceControl}
+              aria-busy={publishBusy || undefined}
+              aria-haspopup="dialog"
+              disabled={publishBusy || !publishEnabled}
+              onClick={() => setConfirmationOpen(true)}
             >
-              {t("cloud.initialize.openSourceControl")}
+              {publishBusy && <RefreshCw size={14} className="spin" aria-hidden="true" />}
+              <span>
+                {progressStage
+                  ? getCloudPublishProgressLabel(progressStage, t)
+                  : t("cloud.initialize.enableGitAndPublish")}
+              </span>
             </button>
           )}
-          {onRefresh && (
-            <button className="desktop-cloud-row-action" type="button" onClick={onRefresh}>
-              <RefreshCw size={13} aria-hidden="true" />
-              <span>{t("cloud.initialize.checkAgain")}</span>
-            </button>
-          )}
-        </div>
-      </section>
-    </div>
+        />
+      </div>
+
+      {confirmationOpen && (
+        <CloudPublishConfirmationDialog
+          onCancel={() => setConfirmationOpen(false)}
+          onConfirm={() => {
+            setConfirmationOpen(false);
+            onPublishWorkspace(selectedOrganizationId ?? undefined);
+          }}
+        />
+      )}
+    </>
   );
 }

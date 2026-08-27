@@ -19,7 +19,6 @@ export type DesktopWorkspaceSwitcherItem = {
 };
 
 type DesktopWorkspaceSwitcherProps = {
-  compact: boolean;
   open: boolean;
   refObject: RefObject<HTMLDivElement>;
   titlebarLabel: string;
@@ -33,7 +32,6 @@ type DesktopWorkspaceSwitcherProps = {
 };
 
 export function DesktopWorkspaceSwitcher({
-  compact,
   open,
   refObject,
   titlebarLabel,
@@ -71,16 +69,13 @@ export function DesktopWorkspaceSwitcher({
         })}
         onClick={onToggle}
       >
-        {compact && (
-          <ProjectTypeMark className="desktop-titlebar-workspace-mark" />
-        )}
         <bdi className="desktop-titlebar-workspace-name">{titlebarLabel}</bdi>
       </button>
 
       <DesktopTitlebarMenuLayer
         anchorRef={refObject}
         className="desktop-project-menu"
-        gap={compact ? 8 : 4}
+        gap={4}
         onDismiss={onClose}
         open={open}
         preferredMaxHeight={520}

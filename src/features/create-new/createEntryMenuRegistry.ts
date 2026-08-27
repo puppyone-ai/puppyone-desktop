@@ -12,16 +12,19 @@ export const CREATE_NEW_ITEM_IDS = [
   "puppyflow",
 ] as const;
 export type CreateNewItemId = typeof CREATE_NEW_ITEM_IDS[number];
+export const CREATE_NEW_SUBMENU_ID = "customFiles" as const;
+export type CreateNewSubmenuId = typeof CREATE_NEW_SUBMENU_ID;
+export type CreateNewMainMenuEntry = CreateNewItemId | CreateNewSubmenuId;
 
 export type CreateEntryMenuItemKind = "folder" | CreateNewItemId;
-export type CreateEntryMenuGroup = "folder" | "primary" | "custom";
+export type CreateNewMenuPlacement = "main" | "submenu" | "hidden";
 
 export type CreateEntryMenuItemDefinition = Readonly<{
   kind: CreateEntryMenuItemKind;
-  group: CreateEntryMenuGroup;
+  defaultPlacement: Exclude<CreateNewMenuPlacement, "hidden">;
   order: number;
   defaultEnabled: boolean;
-  experimentalSetting?: "enableContextMaps" | "enablePuppyFlowFiles";
+  experimentalSetting?: "enablePuppyFlowFiles";
   extension: string;
   iconName: string;
   iconType: DataNode["type"];
@@ -30,7 +33,7 @@ export type CreateEntryMenuItemDefinition = Readonly<{
 const CREATE_ENTRY_MENU_ITEM_REGISTRY = {
   folder: {
     kind: "folder",
-    group: "folder",
+    defaultPlacement: "main",
     order: 0,
     defaultEnabled: true,
     extension: "",
@@ -39,7 +42,7 @@ const CREATE_ENTRY_MENU_ITEM_REGISTRY = {
   },
   markdown: {
     kind: "markdown",
-    group: "primary",
+    defaultPlacement: "main",
     order: 10,
     defaultEnabled: true,
     extension: ".md",
@@ -48,7 +51,7 @@ const CREATE_ENTRY_MENU_ITEM_REGISTRY = {
   },
   csv: {
     kind: "csv",
-    group: "primary",
+    defaultPlacement: "main",
     order: 20,
     defaultEnabled: true,
     extension: ".csv",
@@ -57,7 +60,7 @@ const CREATE_ENTRY_MENU_ITEM_REGISTRY = {
   },
   html: {
     kind: "html",
-    group: "primary",
+    defaultPlacement: "main",
     order: 30,
     defaultEnabled: true,
     extension: ".html",
@@ -66,17 +69,16 @@ const CREATE_ENTRY_MENU_ITEM_REGISTRY = {
   },
   contextMap: {
     kind: "contextMap",
-    group: "custom",
+    defaultPlacement: "submenu",
     order: 10,
     defaultEnabled: true,
-    experimentalSetting: "enableContextMaps",
     extension: ".contextmap",
     iconName: "Untitled.contextmap",
     iconType: "context-map",
   },
   text: {
     kind: "text",
-    group: "custom",
+    defaultPlacement: "submenu",
     order: 20,
     defaultEnabled: false,
     extension: ".txt",
@@ -85,7 +87,7 @@ const CREATE_ENTRY_MENU_ITEM_REGISTRY = {
   },
   json: {
     kind: "json",
-    group: "custom",
+    defaultPlacement: "submenu",
     order: 30,
     defaultEnabled: false,
     extension: ".json",
@@ -94,16 +96,16 @@ const CREATE_ENTRY_MENU_ITEM_REGISTRY = {
   },
   slides: {
     kind: "slides",
-    group: "custom",
+    defaultPlacement: "submenu",
     order: 40,
-    defaultEnabled: true,
+    defaultEnabled: false,
     extension: ".puppyoneapp",
     iconName: "Untitled Slides.puppyoneapp",
     iconType: "app",
   },
   app: {
     kind: "app",
-    group: "custom",
+    defaultPlacement: "submenu",
     order: 50,
     defaultEnabled: false,
     extension: ".puppyoneapp",
@@ -112,7 +114,7 @@ const CREATE_ENTRY_MENU_ITEM_REGISTRY = {
   },
   puppyflow: {
     kind: "puppyflow",
-    group: "custom",
+    defaultPlacement: "submenu",
     order: 60,
     defaultEnabled: false,
     experimentalSetting: "enablePuppyFlowFiles",
@@ -122,39 +124,43 @@ const CREATE_ENTRY_MENU_ITEM_REGISTRY = {
   },
 } as const satisfies Record<CreateEntryMenuItemKind, CreateEntryMenuItemDefinition>;
 
-export const PRIMARY_CREATE_ENTRY_KINDS = CREATE_NEW_ITEM_IDS
-  .filter((kind) => CREATE_ENTRY_MENU_ITEM_REGISTRY[kind].group === "primary")
-  .sort((left, right) => (
-    CREATE_ENTRY_MENU_ITEM_REGISTRY[left].order - CREATE_ENTRY_MENU_ITEM_REGISTRY[right].order
-  ));
-
 export function getCreateEntryMenuItem(
   kind: CreateEntryMenuItemKind,
 ): CreateEntryMenuItemDefinition {
   return CREATE_ENTRY_MENU_ITEM_REGISTRY[kind];
 }
 
-export function getDefaultCreateNewMenuItems(): Array<{
-  kind: CreateNewItemId;
-  enabled: true;
+export function getDefaultCreateNewMenuLayout(): Readonly<{
+  main: CreateNewMainMenuEntry[];
+  submenu: CreateNewItemId[];
+  hidden: CreateNewItemId[];
 }> {
-  return CREATE_NEW_ITEM_IDS.flatMap((kind) => (
-    CREATE_ENTRY_MENU_ITEM_REGISTRY[kind].defaultEnabled ? [{ kind, enabled: true }] : []
-  ));
+  const definitions = CREATE_NEW_ITEM_IDS
+    .map((kind) => CREATE_ENTRY_MENU_ITEM_REGISTRY[kind])
+    .sort((left, right) => {
+      if (left.defaultPlacement !== right.defaultPlacement) {
+        return left.defaultPlacement === "main" ? -1 : 1;
+      }
+      return left.order - right.order;
+    });
+  return {
+    main: [
+      ...definitions
+        .filter((item) => item.defaultEnabled && item.defaultPlacement === "main")
+        .map((item) => item.kind),
+      CREATE_NEW_SUBMENU_ID,
+    ],
+    submenu: definitions
+      .filter((item) => item.defaultEnabled && item.defaultPlacement === "submenu")
+      .map((item) => item.kind),
+    hidden: definitions
+      .filter((item) => !item.defaultEnabled)
+      .map((item) => item.kind),
+  };
 }
 
 export function getConfiguredCreateEntryMenuItems(
   kinds: readonly CreateNewItemId[],
-  group: Exclude<CreateEntryMenuGroup, "folder">,
 ): CreateEntryMenuItemDefinition[] {
-  const configuredKinds = new Set(kinds);
-  if (group === "primary") {
-    return PRIMARY_CREATE_ENTRY_KINDS
-      .filter((kind) => configuredKinds.has(kind))
-      .map((kind) => getCreateEntryMenuItem(kind));
-  }
-
-  return Array.from(configuredKinds)
-    .map((kind) => getCreateEntryMenuItem(kind))
-    .filter((item) => item.group === group);
+  return kinds.map((kind) => getCreateEntryMenuItem(kind));
 }

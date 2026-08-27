@@ -338,7 +338,6 @@
   "panes.empty": "Leerer Editor",
   "panes.fileActions": "Datei",
   "panes.label": "Editorbereich {name}",
-  "panes.openInApp": "In {app} öffnen",
   "panes.paneActions": "Bereich",
   "panes.resize": "Editorbereiche skalieren",
   "panes.splitDown": "Editor nach unten teilen",

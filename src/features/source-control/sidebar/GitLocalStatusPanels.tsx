@@ -1,4 +1,4 @@
-import { Plus, Undo2 } from "lucide-react";
+import { Undo2 } from "lucide-react";
 import {
   SidebarEmptyState,
   SidebarIconButton,
@@ -197,29 +197,29 @@ export function createGitLocalStatusPanels({
       className: "staged",
       grow: 0.9,
       expanded: expanded.staged,
-      bodyRows: getGitSidebarPanelBodyRows(model.stagedResources.length, true),
+      bodyRows: getGitSidebarPanelBodyRows(model.stagedResources.length),
       content: (
         <GitLocalStatusSection
           title={t("source-control.section.staged")}
           count={model.stagedResources.length}
           expanded={expanded.staged}
           onToggle={() => onToggle("staged")}
-          action={action ? (
+          action={(
             <div className="desktop-git-section-actions">
               <GitOperationButton
-                className="desktop-git-commit-push-action"
-                title={action.title}
-                disabled={disabled || action.disabled}
-                icon={action.icon}
-                label={action.label}
-                loadingKey={action.loadingKey}
-                loadingLabel={action.loadingLabel}
+                className="desktop-git-commit-staged-action"
+                title={action?.title ?? t("source-control.sync.commitStaged")}
+                disabled={disabled || !action || action.disabled}
+                icon={action?.icon ?? "plus"}
+                label={action?.label ?? t("source-control.sync.commit")}
+                loadingKey={action?.loadingKey ?? "commit"}
+                loadingLabel={action?.loadingLabel ?? t("source-control.action.committing")}
                 operationLoading={operationLoading}
                 primary={primaryActionSlot === "staged"}
-                onClick={() => void primaryActionHandlers[action.kind]()}
+                onClick={() => void actions.commit()}
               />
             </div>
-          ) : undefined}
+          )}
         >
           <SourceControlWorkingResourceList
             resources={model.stagedResources}
@@ -249,7 +249,7 @@ export function createGitLocalStatusPanels({
           count={model.localChangeResources.length}
           expanded={expanded.unstaged}
           onToggle={() => onToggle("unstaged")}
-          action={createUnstagedActions({ model, disabled, operationLoading, actions, primaryActionSlot, t })}
+          action={createUnstagedActions({ model, disabled, operationLoading, primaryActionSlot, actions, t })}
         >
           <SourceControlWorkingResourceList
             resources={model.localChangeResources}
@@ -266,70 +266,64 @@ export function createGitLocalStatusPanels({
     });
   }
 
-  return panels;
+  if (model.showCleanSection) {
+    panels.push({
+      id: "unstaged",
+      className: "changes",
+      grow: 1,
+      expanded: expanded.unstaged,
+      bodyRows: getGitSidebarPanelBodyRows(0, true),
+      content: (
+        <GitLocalStatusSection
+          title={t("source-control.label.changes")}
+          count={0}
+          showCount={false}
+          expanded={expanded.unstaged}
+          onToggle={() => onToggle("unstaged")}
+        >
+          <SidebarEmptyState compact className="desktop-git-section-empty">
+            {t("source-control.status.noLocalChanges")}
+          </SidebarEmptyState>
+        </GitLocalStatusSection>
+      ),
+    });
+  }
+
+  const panelOrder = { merge: 0, committed: 1, staged: 2, unstaged: 3 } as const;
+  return panels.sort((left, right) => panelOrder[left.id] - panelOrder[right.id]);
 }
 
 function createUnstagedActions({
   model,
   disabled,
   operationLoading,
-  actions,
   primaryActionSlot,
+  actions,
   t,
 }: {
   model: SourceControlSidebarModel;
   disabled: boolean;
   operationLoading: string | null;
-  actions: LocalPanelActions;
   primaryActionSlot: SourceControlPrimaryActionSlot;
+  actions: LocalPanelActions;
   t: MessageFormatter;
 }) {
-  if (model.professionalMode) {
-    if (model.workingResources.length === 0) return undefined;
-    return (
-      <div className="desktop-git-section-actions">
-        <SidebarIconButton
-          className="desktop-working-tree-revert-action"
-          tone="danger"
-          label={t("source-control.action.discardAll")}
-          disabled={disabled}
-          onClick={() => void actions.discardAll()}
-          icon={<Undo2 size={13} />}
-        />
-        <SidebarIconButton
-          className="desktop-git-stage-all-action"
-          label={t("source-control.action.stageAll")}
-          disabled={disabled}
-          onClick={() => void actions.stageAll()}
-          icon={<Plus size={13} />}
-        />
-      </div>
-    );
-  }
+  if (model.workingResources.length === 0) return undefined;
 
-  if (!model.showSimpleChangeAction) return undefined;
   return (
     <div className="desktop-git-section-actions">
-      {model.workingResources.length > 0 && (
-        <SidebarIconButton
-          className="desktop-working-tree-revert-action"
-          tone="danger"
-          label={t("source-control.action.discardAll")}
-          disabled={disabled}
-          onClick={() => void actions.discardAll()}
-          icon={<Undo2 size={13} />}
-        />
-      )}
       <GitOperationButton
-        className="desktop-git-commit-push-action desktop-git-stage-commit-action"
-        title={t("source-control.action.stageCommitTitle")}
-        disabled={disabled}
+        className="desktop-git-stage-commit-action"
+        title={model.showStageAndCommitAction
+          ? t("source-control.action.stageCommitTitle")
+          : t("source-control.sync.resolveBeforeSync")}
+        disabled={disabled || !model.showStageAndCommitAction}
         icon="plus"
         label={t("source-control.action.stageCommit")}
         loadingKey="stage-commit"
         loadingLabel={t("source-control.action.committing")}
         operationLoading={operationLoading}
-        primary={primaryActionSlot === "simple"}
+        primary={primaryActionSlot === "stage-and-commit"}
         onClick={() => void actions.stageAndCommit()}
       />
     </div>

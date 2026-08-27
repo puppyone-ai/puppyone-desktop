@@ -51,8 +51,10 @@ const lineBudgets = new Map([
   ["src/features/cloud/sections/overview/overview.css", 10],
   ["src/features/cloud/sections/overview/styles/base.css", 180],
   ["src/features/cloud/sections/overview/styles/project-identity.css", 90],
+  ["src/features/cloud/sections/overview/styles/status-cards.css", 100],
   ["src/features/cloud/sections/overview/styles/dashboard-grid.css", 180],
   ["src/features/cloud/sections/overview/styles/resource-cards.css", 170],
+  ["src/features/cloud/sections/overview/styles/status-cards.css", 170],
   ["src/features/cloud/sections/overview/styles/responsive.css", 150],
 ]);
 for (const [relativePath, maximumLines] of lineBudgets) {
@@ -110,7 +112,16 @@ for (const requiredRouteContract of [
     errors.push(`Cloud route descriptors are missing ${requiredRouteContract}`);
   }
 }
-for (const stableSection of ['id: "contents"', 'id: "history"', 'id: "automation"', 'id: "access"', 'id: "settings"']) {
+for (const stableSection of [
+  'id: "contents"',
+  'id: "history"',
+  'id: "automation"',
+  'id: "mcp"',
+  'id: "cli"',
+  'id: "git-sync"',
+  'id: "access"',
+  'id: "settings"',
+]) {
   if (!routeDefinitions.includes(stableSection)) {
     errors.push(`stable current-Project navigation is missing ${stableSection}`);
   }
@@ -127,6 +138,79 @@ for (const outlet of ["CloudOrganizationRouteOutlet", "CloudProjectRouteOutlet"]
 }
 if (cloudRouter.includes("../sections/") || cloudRouter.includes("ProjectBrowser")) {
   errors.push("CloudRouter must remain an orchestration boundary");
+}
+
+const accessPointDomainFiles = [
+  "src/features/cloud/access-points/model/accessPoint.ts",
+  "src/features/cloud/access-points/model/accessPointAdapters.ts",
+  "src/features/cloud/access-points/model/accessPointKindRegistry.ts",
+  "src/features/cloud/access-points/model/accessPointSelectors.ts",
+  "src/features/cloud/access-points/components/AccessPointCatalogPage.tsx",
+  "src/features/cloud/access-points/components/AccessPointList.tsx",
+  "src/features/cloud/access-points/components/AccessPointRow.tsx",
+  "src/features/cloud/access-points/components/AccessPointStatus.tsx",
+  "src/features/cloud/access-points/components/AccessPointManageDialog.tsx",
+  "src/features/cloud/access-points/pages/AccessPointRoutePage.tsx",
+  "src/features/cloud/access-points/pages/accessPointRoutes.ts",
+  "src/features/cloud/access-points/presentation/accessPointPresentation.ts",
+  "src/features/cloud/access-points/presentation/accessPointUiRegistry.tsx",
+];
+for (const accessPointFile of accessPointDomainFiles) read(accessPointFile);
+
+for (const obsoleteAccessFile of [
+  "src/features/cloud/accessFilters.tsx",
+  "src/features/cloud/sections/access/AccessSection.tsx",
+  "src/features/cloud/sections/access/accessRows.ts",
+  "src/features/cloud/sections/access/accessSurfaceModel.ts",
+  "src/features/cloud/sections/access/accessProviders.tsx",
+]) {
+  if (existsSync(resolve(obsoleteAccessFile))) {
+    errors.push(`obsolete pre-domain Access implementation returned: ${obsoleteAccessFile}`);
+  }
+}
+
+const accessPointRouteOutlet = read("src/features/cloud/routes/CloudProjectRouteOutlet.tsx");
+for (const obsoleteRouteToken of [
+  "catalogFilterLocked",
+  "catalogTitle",
+  "catalogDescription",
+  "focusedFilter",
+  'activeSection === "mcp"',
+  'activeSection === "cli"',
+  'activeSection === "git-sync"',
+]) {
+  if (accessPointRouteOutlet.includes(obsoleteRouteToken)) {
+    errors.push(`Cloud Project route must delegate Access Point intent instead of branching on ${obsoleteRouteToken}`);
+  }
+}
+if (!accessPointRouteOutlet.includes("getAccessPointCatalogKindForSection") || !accessPointRouteOutlet.includes("AccessPointRoutePage")) {
+  errors.push("Cloud Project route must delegate Connections through the Access Point route registry");
+}
+
+const accessPointUi = [
+  ...walkFiles(resolve("src/features/cloud/access-points/components")),
+  ...walkFiles(resolve("src/features/cloud/access-points/pages")),
+].filter((filePath) => /\.[jt]sx?$/.test(filePath)).map(readAbsolute).join("\n");
+for (const adapterLeak of ["normalizeProviderKey", "git_remote", "mcp_endpoint", "remote_workspace"]) {
+  if (accessPointUi.includes(adapterLeak)) {
+    errors.push(`Access Point UI must consume normalized domain data, not provider adapter detail ${adapterLeak}`);
+  }
+}
+
+const accessPointModel = read("src/features/cloud/access-points/model/accessPoint.ts");
+for (const modelContract of ["AccessPointKind", "AccessPointStatusKind", "AccessPoint", "AccessPointRow"]) {
+  if (!accessPointModel.includes(`type ${modelContract}`)) {
+    errors.push(`Access Point domain is missing ${modelContract}`);
+  }
+}
+const accessPointModelLayer = walkFiles(resolve("src/features/cloud/access-points/model"))
+  .filter((filePath) => /\.[jt]sx?$/.test(filePath))
+  .map(readAbsolute)
+  .join("\n");
+for (const uiDependency of ["react", "lucide-react", "@puppyone/shared-ui"]) {
+  if (accessPointModelLayer.includes(`from \"${uiDependency}\"`) || accessPointModelLayer.includes(`from '${uiDependency}'`)) {
+    errors.push(`Access Point model must stay UI-agnostic and cannot import ${uiDependency}`);
+  }
 }
 
 const mainView = read("src/features/cloud/CloudServiceMainView.tsx");
@@ -199,12 +283,14 @@ const ownedStyles = [
   ["src/features/cloud/organization/CloudOrganizationBillingPage.tsx", 'import "./organization.css";'],
   ["src/features/cloud/components/shared.tsx", 'import "./shared.css";'],
   ["src/features/cloud/components/shared.tsx", 'import "./web-page.css";'],
+  ["src/features/cloud/components/shared.tsx", 'import "./command-blocks.css";'],
   ["src/features/cloud/sections/overview/OverviewSection.tsx", 'import "./overview.css";'],
   ["src/features/cloud/sections/settings/SettingsSection.tsx", 'import "./settings.css";'],
-  ["src/features/cloud/sections/access/AccessSection.tsx", 'import "./access.css";'],
+  ["src/features/cloud/access-points/components/AccessPointCatalogPage.tsx", 'import "../styles/catalog-page.css";'],
+  ["src/features/cloud/access-points/components/AccessPointList.tsx", 'import "../styles/access-point-list.css";'],
+  ["src/features/cloud/access-points/components/AccessPointManageDialog.tsx", 'import "../styles/manage-dialog.css";'],
+  ["src/features/cloud/sections/access/ScopeAccessDetail.tsx", 'import "./access.css";'],
   ["src/features/cloud/sections/branches/BranchesSection.tsx", 'import "./branches.css";'],
-  ["src/features/cloud/sections/McpCliSection.tsx", 'import "./methods-sync.css";'],
-  ["src/features/cloud/sections/GitSyncSection.tsx", 'import "./methods-sync.css";'],
   ["src/features/cloud/history/CloudHistoryView.tsx", 'import "./history.css";'],
   ["src/features/cloud/initialization/CloudInitializationView.tsx", 'import "./initialization.css";'],
 ];
@@ -222,10 +308,13 @@ for (const relativePath of [
   "src/features/cloud/auth/cloud-sign-in.css",
   "src/features/cloud/components/shared.css",
   "src/features/cloud/components/web-page.css",
+  "src/features/cloud/components/command-blocks.css",
+  "src/features/cloud/access-points/styles/catalog-page.css",
+  "src/features/cloud/access-points/styles/access-point-list.css",
+  "src/features/cloud/access-points/styles/manage-dialog.css",
   "src/features/cloud/initialization/initialization.css",
   "src/features/cloud/organization/organization.css",
   "src/features/cloud/sections/branches/branches.css",
-  "src/features/cloud/sections/methods-sync.css",
   "src/features/cloud/sections/settings/settings.css",
 ]) {
   if (!read(relativePath).includes("@layer features {")) {
@@ -236,6 +325,7 @@ for (const relativePath of [
 const expectedOverviewStyleManifest = [
   '@import "./styles/base.css" layer(features);',
   '@import "./styles/project-identity.css" layer(features);',
+  '@import "./styles/status-cards.css" layer(features);',
   '@import "./styles/dashboard-grid.css" layer(features);',
   '@import "./styles/resource-cards.css" layer(features);',
   '@import "./styles/responsive.css" layer(features);',
@@ -265,6 +355,13 @@ for (const filePath of walkCss(resolve("src/features/cloud/sections/access/style
   const lines = countLines(readAbsolute(filePath));
   if (lines > 800) {
     errors.push(`${path.relative(repoRoot, filePath)} has ${lines} lines; split Access styles by component`);
+  }
+}
+
+for (const filePath of walkCss(resolve("src/features/cloud/access-points/styles"))) {
+  const lines = countLines(readAbsolute(filePath));
+  if (lines > 800) {
+    errors.push(`${path.relative(repoRoot, filePath)} has ${lines} lines; split Access Point styles by component`);
   }
 }
 

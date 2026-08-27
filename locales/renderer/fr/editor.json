@@ -338,7 +338,6 @@
   "panes.empty": "Éditeur vide",
   "panes.fileActions": "Fichier",
   "panes.label": "Volet d’éditeur {name}",
-  "panes.openInApp": "Ouvrir dans {app}",
   "panes.paneActions": "Volet",
   "panes.resize": "Redimensionner les volets d’éditeur",
   "panes.splitDown": "Diviser l’éditeur vers le bas",

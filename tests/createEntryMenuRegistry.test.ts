@@ -1,32 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { CREATE_NEW_ITEM_IDS } from "../src/preferences";
 import {
-  getDefaultCreateNewMenuItems,
+  getDefaultCreateNewMenuLayout,
   getConfiguredCreateEntryMenuItems,
   getCreateEntryMenuItem,
-  PRIMARY_CREATE_ENTRY_KINDS,
 } from "../src/features/create-new/createEntryMenuRegistry";
 
 describe("create entry menu registry", () => {
-  it("covers every configurable item and keeps the primary group ordered centrally", () => {
-    expect(PRIMARY_CREATE_ENTRY_KINDS).toEqual(["markdown", "csv", "html"]);
+  it("defines every configurable item and its default menu placement centrally", () => {
     expect(CREATE_NEW_ITEM_IDS.map((kind) => getCreateEntryMenuItem(kind).kind))
       .toEqual(CREATE_NEW_ITEM_IDS);
-    expect(getDefaultCreateNewMenuItems()).toEqual([
-      { kind: "markdown", enabled: true },
-      { kind: "contextMap", enabled: true },
-      { kind: "csv", enabled: true },
-      { kind: "html", enabled: true },
-      { kind: "slides", enabled: true },
-    ]);
+    expect(getCreateEntryMenuItem("contextMap").experimentalSetting).toBeUndefined();
+    expect(getDefaultCreateNewMenuLayout()).toEqual({
+      main: ["markdown", "csv", "html", "customFiles"],
+      submenu: ["contextMap"],
+      hidden: ["text", "json", "slides", "app", "puppyflow"],
+    });
   });
 
-  it("derives menu groups without losing the configured custom order", () => {
+  it("preserves configured order independently of an item's default placement", () => {
     const configured = ["app", "html", "contextMap", "markdown", "csv"] as const;
 
-    expect(getConfiguredCreateEntryMenuItems(configured, "primary").map((item) => item.kind))
-      .toEqual(["markdown", "csv", "html"]);
-    expect(getConfiguredCreateEntryMenuItems(configured, "custom").map((item) => item.kind))
-      .toEqual(["app", "contextMap"]);
+    expect(getConfiguredCreateEntryMenuItems(configured).map((item) => item.kind))
+      .toEqual(configured);
   });
 });

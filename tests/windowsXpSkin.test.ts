@@ -49,6 +49,7 @@ describe("Interface style registry", () => {
     expect(bootstrapIndex).toBeGreaterThan(0);
     expect(resolverIndex).toBeGreaterThan(bootstrapIndex);
     expect(initialTheme).not.toContain('"windows-xp"');
+    expect(initialTheme).not.toContain("editorPresentation");
 
     for (const style of INTERFACE_STYLES) {
       const requestedMode = "dark";
@@ -67,25 +68,11 @@ describe("Interface style registry", () => {
       expect(result.dataset.interfaceStyleFamily).toBe(style.profile.family);
       expect(result.dataset.interfaceStyleVariant).toBe(style.profile.variant);
       expect(result.dataset.interfaceStylePalette).toBe(style.profile.palette);
-      expect(result.dataset.editorPresentation).toBe("follow-interface");
+      expect(result.dataset).not.toHaveProperty("editorPresentation");
       expect(result.dataset.initialTheme).toBe(resolvedTheme);
       expect(result.properties["--initial-shell-background"]).toBe(expectedPaint.background);
       expect(result.properties["--initial-shell-color-scheme"]).toBe(expectedPaint.colorScheme);
     }
-  });
-
-  it("applies persisted Editor presentation before React without routing an Editor", () => {
-    const result = runFirstPaint({
-      bootstrap: source("public/interface-style-bootstrap.js"),
-      initialTheme: source("public/initial-theme.js"),
-      interfaceStyle: "windows-xp",
-      themeMode: "light",
-      editorPresentation: "product-default",
-      systemDark: false,
-    });
-
-    expect(result.dataset.editorPresentation).toBe("product-default");
-    expect(result.dataset.interfaceStyleFamily).toBe("windows-xp");
   });
 
   it("keeps the native window underlay on the generated first-paint contract", () => {
@@ -96,7 +83,7 @@ describe("Interface style registry", () => {
     expect(main).toContain("DEFAULT_INTERFACE_STYLE_FIRST_PAINT");
     expect(main).not.toContain('backgroundColor: "#f1eadf"');
     expect(preload).toContain('ipcRenderer.send("appearance:set-window-background"');
-    expect(nativeFirstPaint).toContain('"background": "#fbfaf7"');
+    expect(nativeFirstPaint).toContain('"background": "#fafafa"');
     expect(nativeFirstPaint).toContain('"background": "#161413"');
   });
 
@@ -104,8 +91,15 @@ describe("Interface style registry", () => {
     const tokens = source("src/styles/tokens.css");
     const rootBlock = tokens.match(/^:root \{([\s\S]*?)^\}/m)?.[1] ?? "";
 
-    expect(rootBlock).toContain("--po-surface-panel: #fbfaf7");
+    expect(rootBlock).toContain("--po-surface-panel: #fafafa");
     expect(rootBlock).not.toContain("--po-surface-panel: #fbf6ed");
+    expect(tokens).toContain("--po-header: #ebebeb;");
+    expect(tokens).toContain("--po-sidebar: #ebebeb;");
+    expect(tokens).toContain("--po-surface-panel: #fbfaf7;");
+    expect(tokens).toContain("--po-header: #f1eee8;");
+    expect(tokens).toContain("--po-sidebar: #f1eee8;");
+    expect(tokens).not.toContain("#f1eadf");
+    expect(tokens).not.toContain("#fbf6ed");
     expect(tokens).toContain(
       ':where(.app-shell, .onboarding-shell, .desktop-overlay-root, .desktop-theme-preview-surface)[data-light-theme-preset="warm"]:not(.dark)',
     );
@@ -116,15 +110,15 @@ describe("Interface style registry", () => {
     const initialTheme = source("public/initial-theme.js");
     const initialShell = source("public/initial-shell.css");
     const cases = [
-      { themeMode: "light", preset: "neutral", expected: "#fbfaf7" },
-      { themeMode: "light", preset: "warm", expected: "#fbf6ed" },
+      { themeMode: "light", preset: "neutral", expected: "#fafafa" },
+      { themeMode: "light", preset: "warm", expected: "#fbfaf7" },
       { themeMode: "light", preset: "graphite", expected: "#fbfbfc" },
       { themeMode: "dark", preset: "default", expected: "#161413" },
       { themeMode: "dark", preset: "warm", expected: "#18130f" },
       { themeMode: "dark", preset: "graphite", expected: "#17181c" },
     ] as const;
 
-    expect(initialShell).toContain("--initial-shell-background: #fbfaf7");
+    expect(initialShell).toContain("--initial-shell-background: #fafafa");
     expect(initialShell).not.toContain("--initial-shell-background: #f1eadf");
 
     for (const item of cases) {
@@ -152,7 +146,7 @@ describe("Interface style registry", () => {
       systemDark: false,
     });
     expect(defaultLight.dataset.initialThemePreset).toBe("neutral");
-    expect(defaultLight.properties["--initial-shell-background"]).toBe("#fbfaf7");
+    expect(defaultLight.properties["--initial-shell-background"]).toBe("#fafafa");
 
     const invalidPreset = runFirstPaint({
       bootstrap,
@@ -163,7 +157,7 @@ describe("Interface style registry", () => {
       systemDark: false,
     });
     expect(invalidPreset.dataset.initialThemePreset).toBe("neutral");
-    expect(invalidPreset.properties["--initial-shell-background"]).toBe("#fbfaf7");
+    expect(invalidPreset.properties["--initial-shell-background"]).toBe("#fafafa");
   });
 
   it("honors the legacy light-preset key during first-paint migration", () => {
@@ -177,7 +171,7 @@ describe("Interface style registry", () => {
     });
 
     expect(result.dataset.initialThemePreset).toBe("warm");
-    expect(result.properties["--initial-shell-background"]).toBe("#fbf6ed");
+    expect(result.properties["--initial-shell-background"]).toBe("#fbfaf7");
   });
 
   it("generates deterministic skin imports and enforces one shared component contract", () => {
@@ -522,7 +516,6 @@ function runFirstPaint({
   lightThemePreset,
   darkThemePreset,
   legacyThemePreset,
-  editorPresentation,
   systemDark,
 }: {
   bootstrap: string;
@@ -532,7 +525,6 @@ function runFirstPaint({
   lightThemePreset?: string;
   darkThemePreset?: string;
   legacyThemePreset?: string;
-  editorPresentation?: "follow-interface" | "product-default";
   systemDark: boolean;
 }) {
   const dataset: Record<string, string> = {};
@@ -545,12 +537,6 @@ function runFirstPaint({
   if (lightThemePreset) values.set("puppyone.desktop.lightThemePreset", lightThemePreset);
   if (darkThemePreset) values.set("puppyone.desktop.darkThemePreset", darkThemePreset);
   if (legacyThemePreset) values.set("puppyone.desktop.themePreset", legacyThemePreset);
-  if (editorPresentation) {
-    values.set("puppyone.desktop.appearance.v2", JSON.stringify({
-      schemaVersion: 2,
-      shared: { editorPresentation },
-    }));
-  }
   const context = {
     window: {
       localStorage: { getItem: (key: string) => values.get(key) ?? null },

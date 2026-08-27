@@ -65,7 +65,6 @@ import { createDesktopNativeMenuService } from "./main/native-menu-service.mjs";
 import { createNativeUpdateMenuAction } from "./main/native-update-menu-action.mjs";
 import { registerFeedbackIpcHandlers } from "./main/ipc/feedback-ipc.mjs";
 import { registerSystemIpcHandlers } from "./main/ipc/system-ipc.mjs";
-import { resolveDockIconResource } from "./main/dock-icon-resources.mjs";
 import { registerTerminalIpcHandlers } from "./main/ipc/terminal-ipc.mjs";
 import { registerWorkspaceFileIpcHandlers } from "./main/ipc/workspace-files-ipc.mjs";
 import { registerWorkspaceGitIpcHandlers } from "./main/ipc/workspace-git-ipc.mjs";
@@ -559,27 +558,14 @@ function resolveAppIconPath() {
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
 }
 
-function resolveDockIconPath(iconId) {
-  return resolveDockIconResource({
-    iconId,
-    developmentBuild: desktopBuildInfo.channel === "dev",
-    resourcesPath: process.resourcesPath,
-    projectRoot,
-  });
-}
-
-function setDockIcon(iconId = "polished") {
-  if (process.platform !== "darwin" || !app.dock) {
-    return { supported: false, iconId: "polished" };
-  }
-  const resolved = resolveDockIconPath(iconId);
-  if (!resolved.path) return { supported: true, iconId: resolved.iconId, applied: false };
+function setDefaultDockIcon() {
+  if (process.platform !== "darwin" || !app.dock) return;
+  const iconPath = resolveAppIconPath();
+  if (!iconPath) return;
   try {
-    app.dock.setIcon(resolved.path);
-    return { supported: true, iconId: resolved.iconId, applied: true };
+    app.dock.setIcon(iconPath);
   } catch (error) {
     console.warn("Unable to set puppyone dock icon:", error);
-    return { supported: true, iconId: resolved.iconId, applied: false };
   }
 }
 
@@ -609,7 +595,7 @@ app.whenReady().then(async () => {
     nativeMenuService.refresh();
   });
   if (process.platform === "darwin" && app.dock) {
-    setDockIcon();
+    setDefaultDockIcon();
   }
   nativeMenuService.refresh();
 
@@ -773,7 +759,7 @@ function registerIpcHandlers() {
     cloudGitConnectCoordinator,
     cloudPublishCoordinator,
   });
-  registerSystemIpcHandlers({ ipcMain: trustedIpcMain, externalNavigation, setDockIcon });
+  registerSystemIpcHandlers({ ipcMain: trustedIpcMain, externalNavigation });
   registerFeedbackIpcHandlers({
     ipcMain: trustedIpcMain,
     appVersion: desktopBuildInfo.version,
@@ -801,6 +787,7 @@ function registerIpcHandlers() {
     authorizeWorkspaceRoot,
     localFileCapabilities,
     workspaceWatchService,
+    gitMetadataWatchService,
     t: (messageId, values) => localeService.t(messageId, values),
   });
 

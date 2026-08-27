@@ -206,6 +206,7 @@ export type GitBranchSummary = {
   lastCommitId: string | null;
   lastCommitMessage: string | null;
   lastCommitDate: string | null;
+  lastCommitAuthorName?: string | null;
 };
 
 export type GitRemoteSummary = {
@@ -660,30 +661,6 @@ export type WorkspaceConvertOfficeDocumentToDocxResult = {
 export type WorkspaceOpenEntryExternalRequest = {
   rootPath: string;
   path: string;
-  strategy?: "system" | "app";
-  appPath?: string | null;
-};
-
-export type WorkspaceExternalOpenTargetSource = "system" | "override" | "candidate" | "unknown";
-
-export type WorkspaceExternalOpenTarget = {
-  appName: string | null;
-  appPath: string | null;
-  bundleId: string | null;
-  extension: string | null;
-  iconDataUrl: string | null;
-  source: WorkspaceExternalOpenTargetSource;
-};
-
-export type WorkspaceResolveExternalOpenTargetRequest = {
-  rootPath: string;
-  path: string;
-  extension?: string | null;
-  overrideAppPath?: string | null;
-};
-
-export type WorkspaceChooseExternalAppRequest = {
-  extension?: string | null;
 };
 
 export type DesktopStoredCloudSession = {
@@ -897,11 +874,6 @@ declare global {
         }) => Promise<{ ok?: boolean; visible?: boolean } | void>;
         destroy: (request: { id: string }) => Promise<{ ok?: boolean } | void>;
       };
-      setDockIcon: (iconId: "polished" | "light" | "matte") => Promise<{
-        supported: boolean;
-        iconId: "polished" | "light" | "matte";
-        applied?: boolean;
-      }>;
       getInitialWorkspace: () => Promise<LastWorkspaceResult>;
       getLastWorkspace: () => Promise<LastWorkspaceResult>;
       getRecentWorkspaces: () => Promise<RecentWorkspacesResult>;
@@ -983,9 +955,6 @@ declare global {
       deleteEntry: (request: WorkspaceDeleteEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       revealEntryInFinder: (request: WorkspaceRevealEntryRequest) => Promise<{ ok: boolean }>;
       openEntryExternal: (request: WorkspaceOpenEntryExternalRequest) => Promise<{ ok: boolean; cancelled?: boolean }>;
-      resolveExternalOpenTarget: (request: WorkspaceResolveExternalOpenTargetRequest) => Promise<WorkspaceExternalOpenTarget>;
-      listExternalOpenTargets: (request: WorkspaceResolveExternalOpenTargetRequest) => Promise<WorkspaceExternalOpenTarget[]>;
-      chooseExternalApp: (request: WorkspaceChooseExternalAppRequest) => Promise<WorkspaceExternalOpenTarget | null>;
       startAppPreview: (request: {
         rootPath: string;
         path: string;
@@ -1119,6 +1088,9 @@ declare global {
       commitGit: (request: {
         rootPath: string;
         message: string;
+        allowEmpty?: boolean;
+        authorName?: string;
+        authorEmail?: string;
       }) => Promise<GitStatusSnapshot>;
       continueGitOperation: (request: {
         rootPath: string;

@@ -1,18 +1,14 @@
 import {
-  forwardRef,
   useCallback,
   useEffect,
-  useImperativeHandle,
+  useMemo,
   useRef,
-  type ForwardedRef,
 } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
-import type { TerminalSessionLayout } from "../../../preferences";
 import { useTerminalAgentLocator } from "../controller/useTerminalAgentLocator";
 import { useTerminalSessions } from "../controller/useTerminalSessions";
 import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
-import type { DesktopTerminalSessionSnapshot } from "../model/terminalSessions";
 import { useTerminalAppearanceSync } from "../runtime/useTerminalAppearanceSync";
 import { TerminalCloseConfirmationDialog } from "./TerminalCloseConfirmationDialog";
 import { TerminalLauncher } from "./TerminalLauncher";
@@ -28,20 +24,10 @@ import "./desktop-terminal.css";
 type RightTerminalPanelProps = {
   workspace: Workspace;
   active: boolean;
-  sessionLayout: TerminalSessionLayout;
-  onSessionsChange: (snapshot: DesktopTerminalSessionSnapshot) => void;
+  hiddenAgentIds: readonly string[];
 };
 
-export type RightTerminalPanelHandle = {
-  create: () => void;
-  activate: (sessionId: string) => void;
-  close: (sessionId: string) => void;
-};
-
-function RightTerminalPanelComponent(
-  { workspace, active, sessionLayout, onSessionsChange }: RightTerminalPanelProps,
-  ref: ForwardedRef<RightTerminalPanelHandle>,
-) {
+export function RightTerminalPanel({ workspace, active, hiddenAgentIds }: RightTerminalPanelProps) {
   const { t } = useLocalization();
   const panelRef = useRef<HTMLElement>(null);
   const {
@@ -58,7 +44,6 @@ function RightTerminalPanelComponent(
     sessions,
   } = useTerminalSessions({
     messageFormatter: t,
-    onSessionsChange,
     workspacePath: workspace.path,
   });
   const activeSession = sessions.find((session) => session.id === activeSessionId) ?? null;
@@ -75,9 +60,13 @@ function RightTerminalPanelComponent(
   } = useTerminalAgentLocator({
     enabled: launcherVisible,
   });
+  const visibleAgentIds = useMemo(() => {
+    const hidden = new Set(hiddenAgentIds);
+    return availableAgentIds.filter((agentId) => !hidden.has(agentId));
+  }, [availableAgentIds, hiddenAgentIds]);
   const canLaunch = useCallback((launcherId: DesktopTerminalLauncherId) => (
-    launcherId === "shell" || availableAgentIds.includes(launcherId)
-  ), [availableAgentIds]);
+    launcherId === "shell" || visibleAgentIds.includes(launcherId)
+  ), [visibleAgentIds]);
   const createDetectedSession = useCallback((launcherId: DesktopTerminalLauncherId) => {
     if (!canLaunch(launcherId)) return;
     createSession(launcherId);
@@ -96,19 +85,13 @@ function RightTerminalPanelComponent(
   }, [activeSession?.launchError, refreshAvailableAgents]);
 
   useTerminalAppearanceSync(panelRef, runtimeRegistry);
-  useImperativeHandle(ref, () => ({
-    create: createLauncher,
-    activate: activateSession,
-    close: requestCloseSession,
-  }), [activateSession, createLauncher, requestCloseSession]);
-
   return (
     <section
       ref={panelRef}
       className="desktop-terminal-panel"
       aria-label={t("terminal.title")}
     >
-      {sessionLayout === "tabs" && sessions.length > 0 && (
+      {sessions.length > 0 && (
         <TerminalSessionHeader
           sessions={sessions}
           activeSessionId={activeSessionId}
@@ -123,7 +106,7 @@ function RightTerminalPanelComponent(
         {sessions.length === 0 ? (
           <TerminalLauncher
             discoveryPhase={agentDiscoveryPhase}
-            availableAgentIds={availableAgentIds}
+            availableAgentIds={visibleAgentIds}
             onLaunch={createDetectedSession}
             onRefresh={() => void refreshAvailableAgents()}
           />
@@ -131,15 +114,15 @@ function RightTerminalPanelComponent(
           session.status === "selecting" ? (
               <div
                 key={session.id}
-                id={sessionLayout === "tabs" ? terminalPanelId(session.id) : undefined}
+                id={terminalPanelId(session.id)}
                 className="desktop-terminal-launcher-tab"
-                role={sessionLayout === "tabs" ? "tabpanel" : undefined}
-                aria-labelledby={sessionLayout === "tabs" ? terminalTabId(session.id) : undefined}
+                role="tabpanel"
+                aria-labelledby={terminalTabId(session.id)}
                 hidden={!active || activeSessionId !== session.id}
               >
                 <TerminalLauncher
                   discoveryPhase={agentDiscoveryPhase}
-                  availableAgentIds={availableAgentIds}
+                  availableAgentIds={visibleAgentIds}
                   launchError={session.launchError}
                   onLaunch={(launcherId) => launchDetectedSession(session.id, launcherId)}
                   onRefresh={() => void refreshAvailableAgents()}
@@ -151,11 +134,11 @@ function RightTerminalPanelComponent(
               key={session.id}
               active={active && activeSessionId === session.id}
               discoveryPhase={agentDiscoveryPhase}
-              availableAgentIds={availableAgentIds}
-              labelledBy={sessionLayout === "tabs" ? terminalTabId(session.id) : undefined}
+              availableAgentIds={visibleAgentIds}
+              labelledBy={terminalTabId(session.id)}
               onLaunch={(launcherId) => launchDetectedSession(session.id, launcherId)}
               onRefresh={() => void refreshAvailableAgents()}
-              panelId={sessionLayout === "tabs" ? terminalPanelId(session.id) : undefined}
+              panelId={terminalPanelId(session.id)}
               runtime={runtimeRegistry.require(session.id)}
               session={session}
               workspacePath={workspace.path}
@@ -173,7 +156,3 @@ function RightTerminalPanelComponent(
     </section>
   );
 }
-
-export const RightTerminalPanel = forwardRef<RightTerminalPanelHandle, RightTerminalPanelProps>(
-  RightTerminalPanelComponent,
-);

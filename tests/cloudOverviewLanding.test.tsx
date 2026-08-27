@@ -21,6 +21,47 @@ afterEach(() => {
 });
 
 describe("CloudRepositoryOverview landing page", () => {
+  it("renders the Homepage shell immediately and replaces inline skeletons in place", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const renderOverview = (loading: boolean, tree: null | { path: string; entries: [] }) => withTestLocalization(
+      <CloudRepositoryOverview
+        workspace={WORKSPACE}
+        project={null}
+        dashboard={null}
+        tree={tree}
+        history={null}
+        scopes={[]}
+        connectors={[]}
+        mcpEndpoints={[]}
+        identity={null}
+        loading={loading}
+        onSelectSection={vi.fn()}
+        onRefresh={vi.fn(async () => undefined)}
+      />,
+    );
+
+    act(() => root?.render(renderOverview(true, null)));
+
+    const title = container.querySelector(".desktop-cloud-overview-landing-copy h1");
+    expect(title?.textContent).toBe("Atlas");
+    expect(container.querySelector(".desktop-cloud-loading-state")).toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-project-storage.is-loading")).not.toBeNull();
+    expect(container.querySelectorAll(".desktop-cloud-overview-value-skeleton")).toHaveLength(3);
+    expect(container.querySelectorAll(".desktop-cloud-overview-file-row.skeleton")).toHaveLength(4);
+    expect(container.querySelector(".desktop-cloud-overview-dashboard")?.getAttribute("aria-busy")).toBe("true");
+    expect(container.querySelector(".desktop-cloud-overview-refresh-button .spin")).not.toBeNull();
+
+    act(() => root?.render(renderOverview(false, { path: "", entries: [] })));
+
+    expect(container.querySelector(".desktop-cloud-overview-landing-copy h1")).toBe(title);
+    expect(container.querySelector(".desktop-cloud-overview-project-storage.is-loading")).toBeNull();
+    expect(container.querySelectorAll(".desktop-cloud-overview-value-skeleton")).toHaveLength(0);
+    expect(container.querySelectorAll(".desktop-cloud-overview-file-row.skeleton")).toHaveLength(0);
+    expect(container.textContent).toContain("No files stored yet");
+  });
+
   it("uses an in-app action dashboard without promoting the web route", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-19T12:00:00.000Z"));
@@ -39,6 +80,7 @@ describe("CloudRepositoryOverview landing page", () => {
           description: "Shared product research",
           visibility: "private",
           bound_git_branch: "release",
+          updated_at: "2026-07-19T11:00:00.000Z",
           access_point_count: 0,
         }}
         dashboard={{
@@ -51,11 +93,41 @@ describe("CloudRepositoryOverview landing page", () => {
             total: 8,
             folders: 3,
             files: 5,
+            storage_bytes: 104_857_600,
+            storage_limit_bytes: 524_288_000,
           },
           connections: [],
           tools: [],
           uploads: [],
         }}
+        tree={{
+          path: "",
+          entries: [{
+            name: "docs",
+            path: "docs",
+            type: "folder",
+            children_count: 2,
+          }, {
+            name: "assets",
+            path: "assets",
+            type: "folder",
+            children_count: 4,
+          }, {
+            name: "README.md",
+            path: "README.md",
+            type: "markdown",
+            size_bytes: 1_024,
+          }, {
+            name: "users.csv",
+            path: "users.csv",
+            type: "csv",
+            size_bytes: 2_048,
+          }, {
+            name: "app.ts",
+            path: "app.ts",
+            type: "typescript",
+            size_bytes: 4_096,
+          }]}}
         history={{
           project_id: "project-1",
           commits: [{
@@ -63,7 +135,7 @@ describe("CloudRepositoryOverview landing page", () => {
             parent_ids: [PARENT_COMMIT_ID],
             who: "Ada",
             message: "Ship the project dashboard",
-            changes: [{ path: "dashboard.md", op: "modified" }],
+            changes: [{ path: "users.csv", op: "modified" }],
             conflicts: [],
             root_hash: "root-1",
             scope_hash: "scope-1",
@@ -151,45 +223,48 @@ describe("CloudRepositoryOverview landing page", () => {
 
     expect(container.querySelector(".desktop-cloud-overview-catalog")).not.toBeNull();
     const dashboard = container.querySelector(".desktop-cloud-overview-dashboard");
-    const historyCard = dashboard?.querySelector(".desktop-cloud-overview-dashboard-card--history");
-    const accessCard = dashboard?.querySelector(".desktop-cloud-overview-dashboard-card--access");
-    const automationCard = dashboard?.querySelector(".desktop-cloud-overview-dashboard-card--automation");
-    const storageCard = dashboard?.querySelector(".desktop-cloud-overview-dashboard-card--storage");
+    const headerFacts = container.querySelectorAll(".desktop-cloud-overview-header-fact");
+    const fileRows = dashboard?.querySelectorAll(".desktop-cloud-overview-file-row");
     expect(dashboard).not.toBeNull();
-    expect(dashboard?.querySelectorAll(".desktop-cloud-overview-dashboard-card")).toHaveLength(4);
-    expect(historyCard?.querySelector(".desktop-cloud-overview-dashboard-hero strong")?.textContent).toBe("2");
-    expect(historyCard?.textContent).toContain("commits in the last 7 days");
-    expect(historyCard?.textContent).not.toContain("Ada");
-    expect(historyCard?.querySelector(".desktop-cloud-overview-history-preview-row")).toBeNull();
-    expect(accessCard?.textContent).toContain("5");
-    expect(accessCard?.textContent).toContain("access points");
-    expect(accessCard?.querySelector(".desktop-cloud-overview-access-row")).toBeNull();
-    expect(automationCard?.textContent).toContain("1");
-    expect(automationCard?.textContent).toContain("active automation");
-    expect(automationCard?.querySelector(".desktop-cloud-overview-automation-footer")).toBeNull();
-    expect(storageCard?.textContent).toContain("5 files");
-    expect(storageCard?.textContent).toContain("Stored in this project");
-    expect(storageCard?.textContent).toContain("3");
-    expect(storageCard?.textContent).toContain("folders");
-    expect(storageCard?.querySelectorAll(".desktop-cloud-overview-storage-preview-item")).toHaveLength(8);
-    expect(storageCard?.querySelectorAll(".desktop-cloud-overview-storage-preview-item--folder")).toHaveLength(3);
-    expect(storageCard?.querySelectorAll(
-      ".desktop-cloud-overview-storage-preview-item:not(.desktop-cloud-overview-storage-preview-item--folder)",
-    )).toHaveLength(5);
-    const dashboardCards = dashboard
-      ? Array.from(dashboard.querySelectorAll(".desktop-cloud-overview-dashboard-card"))
-      : [];
-    expect(dashboardCards[0]).toBe(storageCard);
+    expect(headerFacts).toHaveLength(3);
+    expect(headerFacts[0]?.textContent).toContain("Last updated");
+    expect(headerFacts[0]?.textContent).toContain("1 hour ago");
+    expect(headerFacts[1]?.textContent).toContain("Active connections");
+    expect(headerFacts[1]?.textContent).toContain("3");
+    expect(headerFacts[2]?.textContent).toContain("Path");
+    expect(headerFacts[2]?.textContent).toContain("https://cloud.example/git/project-1.git");
+    expect(dashboard?.textContent).not.toContain("Automation");
+    expect(dashboard?.querySelector(".desktop-cloud-overview-files-header")).toBeNull();
+    expect(dashboard?.querySelector(".desktop-cloud-overview-file-column-labels")).toBeNull();
+    expect(dashboard?.querySelector(".desktop-cloud-overview-file-toolbar")).toBeNull();
+    expect(dashboard?.querySelector("[role='list']")).not.toBeNull();
+    expect(dashboard?.querySelector(".desktop-cloud-overview-file-activity-header")).toBeNull();
+    expect(fileRows).toHaveLength(5);
+    expect(fileRows?.[0]?.textContent).toContain("assets");
+    expect(fileRows?.[1]?.textContent).toContain("docs");
+    const usersRow = Array.from(fileRows ?? []).find((row) => row.textContent?.includes("users.csv"));
+    expect(usersRow?.textContent).toContain("yesterday");
+    expect(usersRow?.textContent).not.toContain("2 KB");
+    expect(dashboard?.querySelectorAll(".desktop-cloud-overview-file-icon svg")).toHaveLength(5);
     expect(container.querySelector(".desktop-cloud-source-pill")).toBeNull();
-    expect(container.querySelector(".desktop-cloud-overview-landing-mark")?.getAttribute("aria-label")).toBe("Cloud source");
+    expect(container.querySelector(".desktop-cloud-overview-landing-mark")).toBeNull();
     expect(container.querySelector(".desktop-cloud-overview-deployment-board")).toBeNull();
-    const gitRemote = container.querySelector<HTMLElement>(".desktop-cloud-overview-git-remote code");
-    expect(gitRemote?.textContent).toBe("https://cloud.example/git/project-1.git");
-    expect(gitRemote?.title).toBe("https://cloud.example/git/project-1.git");
+    const pathFact = container.querySelector<HTMLElement>(".desktop-cloud-overview-path-fact");
+    expect(pathFact?.querySelector("code")?.textContent).toBe("https://cloud.example/git/project-1.git");
+    expect(pathFact?.title).toBe("https://cloud.example/git/project-1.git");
     expect(dashboard?.textContent).not.toContain("https://cloud.example/git/project-1.git");
     expect(dashboard?.textContent).not.toContain("release");
     expect(dashboard?.textContent).not.toContain("Private");
-    expect(container.textContent).toContain("Shared product research");
+    expect(container.textContent).not.toContain("Shared product research");
+    const storage = container.querySelector<HTMLElement>(".desktop-cloud-overview-project-storage");
+    expect(storage?.textContent).toBe("");
+    expect(storage?.title).toBe("100 MB of 500 MB");
+    expect(storage?.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")).toBe("20");
+    expect(storage?.querySelector('[role="progressbar"]')?.getAttribute("aria-valuetext")).toBe("100 MB of 500 MB");
+    expect(storage?.parentElement?.classList.contains("desktop-cloud-overview-landing-header")).toBe(true);
+    expect(storage?.querySelector(".desktop-cloud-overview-project-storage-summary")).toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-header-facts .desktop-cloud-overview-project-storage")).toBeNull();
+    expect(dashboard?.querySelector(".desktop-cloud-overview-project-storage")).toBeNull();
     expect(findButton(container, "Open on web")).toBeUndefined();
     expect(container.querySelector(".desktop-project-folder-card")).toBeNull();
 
@@ -198,8 +273,7 @@ describe("CloudRepositoryOverview landing page", () => {
 
     act(() => findButton(container, "View history")?.click());
     act(() => findButton(container, "Manage access points")?.click());
-    act(() => findButton(container, "Manage automations")?.click());
-    expect(onSelectSection.mock.calls).toEqual([["history"], ["access"], ["automation"]]);
+    expect(onSelectSection.mock.calls).toEqual([["history"], ["access"]]);
   });
 });
 

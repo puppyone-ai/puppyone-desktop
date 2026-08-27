@@ -19,11 +19,14 @@
 
 .desktop-cloud-settings-catalog {
   display: grid;
-  width: min(100%, 1760px);
+  width: min(100%, var(--desktop-cloud-content-max-width, 900px));
   min-width: 0;
   box-sizing: border-box;
   margin: 0 auto;
-  padding: 44px clamp(28px, 4.6vw, 44px) 56px;
+  padding:
+    var(--desktop-cloud-page-padding-top)
+    var(--desktop-cloud-page-padding-inline)
+    var(--desktop-cloud-page-padding-bottom);
 }
 
 .desktop-cloud-settings-landing-header {
@@ -535,10 +538,6 @@
 }
 
 @media (max-width: 680px) {
-  .desktop-cloud-settings-catalog {
-    padding: 32px 24px 44px;
-  }
-
   .desktop-cloud-settings-panel-header {
     align-items: stretch;
     flex-direction: column;

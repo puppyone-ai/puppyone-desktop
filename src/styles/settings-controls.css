@@ -17,7 +17,7 @@
   background: transparent;
   color: var(--po-text-muted);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-medium, 500);
 }
 
 .desktop-settings-action span {
@@ -78,6 +78,17 @@
   gap: 7px;
 }
 
+.desktop-build-version-text {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--po-text);
+  font-size: 12.5px;
+  font-weight: 400;
+  text-align: end;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .desktop-build-version-copy {
   width: 28px;
   flex: 0 0 28px;
@@ -105,17 +116,19 @@
 
 .desktop-settings-tool-list {
   display: grid;
-  width: min(100%, 300px);
+  width: fit-content;
+  max-width: 100%;
   gap: 2px;
 }
 
 .desktop-settings-tool-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, max-content) auto;
   align-items: center;
   gap: 8px;
   height: 30px;
-  padding: 0 4px 0 8px;
+  padding-block: 0;
+  padding-inline: 8px 0;
   border: 1px solid transparent;
   border-radius: 6px;
   color: var(--po-text-muted);
@@ -129,7 +142,7 @@
   gap: 7px;
   color: var(--po-text-muted);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-regular, 400);
 }
 
 .desktop-settings-tool-label > svg {
@@ -167,7 +180,7 @@
   background: transparent;
   color: var(--po-text-muted);
   font-size: 12px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-regular, 400);
 }
 
 .desktop-theme-segment button:hover,
@@ -176,11 +189,11 @@
   color: var(--po-text);
 }
 
-.desktop-interface-style-segment button {
-  min-width: 104px;
+.desktop-theme-segment button.active {
+  font-weight: var(--po-text-weight-medium, 500);
 }
 
-.desktop-terminal-layout-segment button {
+.desktop-interface-style-segment button {
   min-width: 104px;
 }
 
@@ -211,7 +224,7 @@
   background: color-mix(in srgb, var(--po-panel-raised) 82%, transparent);
   color: var(--po-text-muted);
   font-size: 11.5px;
-  font-weight: 650;
+  font-weight: var(--po-text-weight-regular, 400);
   text-align: start;
 }
 
@@ -223,6 +236,7 @@
 }
 
 .desktop-theme-choice.active {
+  font-weight: var(--po-text-weight-medium, 500);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-accent) 26%, transparent);
 }
 
@@ -322,6 +336,12 @@
   grid-auto-flow: column;
 }
 
+.desktop-appearance-option-segment.desktop-appearance-hug-segment {
+  width: fit-content;
+  max-width: 100%;
+  grid-auto-columns: max-content;
+}
+
 .desktop-appearance-option-segment button {
   min-width: 0;
   padding-inline: 6px;
@@ -362,15 +382,4 @@
   width: 17px;
   flex: 0 0 17px;
   place-items: center;
-}
-
-.desktop-dock-icon-segment img {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  object-fit: contain;
-}
-
-.desktop-dock-icon-segment span {
-  color: inherit;
 }

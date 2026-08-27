@@ -1,11 +1,10 @@
 import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import type { CreateNewMenuSettings, DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, GitSidebarLayout, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, LocalAgentsSettings, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TerminalSessionLayout, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
+import type { CreateNewMenuSettings, DarkThemePreset, DiffMarkers, ExperimentalSettings, FilesVisibilitySettings, GitSidebarLayout, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, LocalAgentsSettings, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
-import type { EditorPresentation } from "../appearance/interfaceStyles";
 
-export type SettingsSection = "general" | "local-project" | "appearance" | "local-agents" | "external-apps" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
+export type SettingsSection = "general" | "local-project" | "appearance" | "local-agents" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
 
 export type SettingsViewProps = {
   workspace: Workspace;
@@ -20,22 +19,18 @@ export type SettingsViewProps = {
   darkThemePreset: DarkThemePreset;
   loadingAnimationPreset: LoadingAnimationPreset;
   localAgentsSettings: LocalAgentsSettings;
-  agentFileActivityIndicatorsEnabled: boolean;
   textSize: TextSize;
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
-  dockIcon: DockIcon;
   diffMarkers: DiffMarkers;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
   sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
   filesVisibilitySettings: FilesVisibilitySettings;
-  externalAppsSettings: ExternalAppsSettings;
   createNewMenuSettings: CreateNewMenuSettings;
   experimentalSettings: ExperimentalSettings;
   rightSidebarToolsSettings: RightSidebarToolsSettings;
   titlebarActionsSettings: TitlebarActionsSettings;
-  terminalSessionLayout: TerminalSessionLayout;
   gitSidebarLayout: GitSidebarLayout;
   aiEditAssistEnabled: boolean;
   cloudEnabled: boolean;
@@ -49,7 +44,6 @@ export type SettingsViewProps = {
   updateState: DesktopUpdateState;
   onThemeModeChange: (mode: ThemeMode) => void;
   onInterfaceStyleChange: (style: InterfaceStyle) => void;
-  onEditorPresentationChange: (presentation: EditorPresentation) => void;
   onLightThemePresetChange: (preset: LightThemePreset) => void;
   onDarkThemePresetChange: (preset: DarkThemePreset) => void;
   onLoadingAnimationPresetChange: (preset: LoadingAnimationPreset) => void;
@@ -58,18 +52,15 @@ export type SettingsViewProps = {
   onTextSizeChange: (textSize: TextSize) => void;
   onTypographyPreferencesChange: (preferences: TypographyPreferences) => void;
   onPointerCursorsChange: (enabled: boolean) => void;
-  onDockIconChange: (icon: DockIcon) => void;
   onDiffMarkersChange: (markers: DiffMarkers) => void;
   onFileIconThemeChange: (theme: FileIconThemeId) => void;
   onSidebarNavigationLayoutChange: (layout: SidebarNavigationLayout) => void;
   onSidebarNavigationVisibilitySettingsChange: (settings: SidebarNavigationVisibilitySettings) => void;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
-  onExternalAppsSettingsChange: (settings: ExternalAppsSettings) => void;
   onCreateNewMenuSettingsChange: (settings: CreateNewMenuSettings) => void;
   onExperimentalSettingsChange: (settings: ExperimentalSettings) => void;
   onRightSidebarToolsSettingsChange: (settings: RightSidebarToolsSettings) => void;
   onTitlebarActionsSettingsChange: (settings: TitlebarActionsSettings) => void;
-  onTerminalSessionLayoutChange: (layout: TerminalSessionLayout) => void;
   onGitSidebarLayoutChange: (layout: GitSidebarLayout) => void;
   onAiEditAssistEnabledChange: (enabled: boolean) => void;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
@@ -82,5 +73,6 @@ export type SettingsViewProps = {
 
 export type SettingsSidebarProps = {
   activeSection: SettingsSection;
+  cloudEnabled: boolean;
   onSelectSection: (section: SettingsSection) => void;
 };

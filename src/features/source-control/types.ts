@@ -15,12 +15,6 @@ export type GitMainPanel = "changes" | "history";
 
 export type GitHostingMode = "github" | "puppyone-cloud" | "generic-git";
 
-export type GitHostingIdentity = {
-  provider: Extract<GitHostingMode, "github" | "puppyone-cloud">;
-  label: string;
-  href: string | null;
-};
-
 export type GitActionIconKind = "check" | "download" | "upload" | "plus";
 
 export type GitSidebarPrimaryActionKind = "commit" | "commit-push" | "continue" | "push" | "publish";
@@ -33,29 +27,6 @@ export type GitSidebarPrimaryAction = {
   loadingKey: string;
   loadingLabel: string;
   icon: GitActionIconKind;
-};
-
-export type GitScmSyncAction = {
-  kind: "pull" | "push" | "publish";
-  label: string;
-  loadingLabel: string;
-  title: string;
-  disabled: boolean;
-  icon: GitActionIconKind;
-};
-
-export type GitScmSyncCopy = {
-  title: string;
-  count: number;
-  detail: string;
-  tone: "ready" | "pending" | "warning" | "muted";
-};
-
-export type GitScmSyncSection = {
-  copy: GitScmSyncCopy;
-  action: GitScmSyncAction | null;
-  previewResources: GitSourceControlResource[];
-  fallbackSummary: string | null;
 };
 
 export type GitSyncState = {
@@ -94,8 +65,9 @@ export type SourceControlSidebarModel = {
   showCommittedSection: boolean;
   showStagedSection: boolean;
   showUnstagedSection: boolean;
+  showCleanSection: boolean;
   stagedPrimaryAction: GitSidebarPrimaryAction | null;
-  showSimpleChangeAction: boolean;
+  showStageAndCommitAction: boolean;
   sectionContext: {
     merge: string;
     committed: string;

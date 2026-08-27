@@ -6,6 +6,7 @@ import { GitSectionCollapse } from "./GitSidebarPrimitives";
 export function GitLocalStatusSection({
   title,
   count,
+  showCount = true,
   expanded,
   action,
   children,
@@ -13,6 +14,7 @@ export function GitLocalStatusSection({
 }: {
   title: string;
   count: number;
+  showCount?: boolean;
   expanded: boolean;
   action?: ReactNode;
   children: ReactNode;
@@ -25,6 +27,7 @@ export function GitLocalStatusSection({
       <SourceControlSectionHeader
         title={title}
         count={count}
+        showCount={showCount}
         controlsId={bodyId}
         expanded={expanded}
         onToggle={onToggle}

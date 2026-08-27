@@ -40,7 +40,7 @@ describe("Automation landing visual architecture", () => {
     const grid = compact(readCssBlock(automationCss, ".desktop-cloud-automation-template-grid"));
     const card = compact(readCssBlock(automationCss, ".desktop-cloud-automation-template-card"));
 
-    expect(catalog).toContain("padding: 44px clamp(28px, 4.6vw, 44px) 56px;");
+    expect(catalog).toContain("padding: var(--desktop-cloud-page-padding-top) var(--desktop-cloud-page-padding-inline) var(--desktop-cloud-page-padding-bottom);");
     expect(tabs).toContain("margin-top: 26px;");
     expect(grid).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
     expect(grid).toContain("gap: 14px;");

@@ -4,21 +4,24 @@ import { describe, expect, it } from "vitest";
 describe("settings visual architecture", () => {
   it("keeps General app-scoped and moves project identity into Local Project", () => {
     const view = source("src/features/settings/SettingsView.tsx");
+    const app = source("src/App.tsx");
     const sidebarModel = source("src/features/settings/sidebar/settingsSidebarModel.ts");
     const types = source("src/features/settings/types.ts");
     const general = source("src/features/settings/main/GeneralSettingsView.tsx");
     const localAgents = source("src/features/local-agents/ui/LocalAgentsSettingsView.tsx");
-    const activityAppearance = source("src/features/desktop-agent-presence/ui/AgentFileActivityAppearanceSetting.tsx");
-    const activityPermission = source("src/features/desktop-agent-presence/ui/AgentFileActivityPermissionDialog.tsx");
+    const localAgentHooks = source("src/features/local-agents/ui/LocalAgentHooksSettingsView.tsx");
     const localProject = source("src/features/settings/main/LocalProjectSettingsView.tsx");
     const language = source("src/features/settings/LanguageSetting.tsx");
 
     expect(types).toContain('"general" | "local-project"');
-    expect(types).toContain('"appearance" | "local-agents"');
+    expect(types).toContain('"appearance" | "local-agents" | "editor"');
+    expect(types).not.toContain('"external-apps"');
+    expect(types).not.toContain('"local-agent-hooks"');
     expect(types).not.toContain('| "language"');
     expect(types).not.toContain('"workspace"');
     expect(view).toContain('if (activeSection === "general")');
     expect(view).toContain('if (activeSection === "local-agents")');
+    expect(view).not.toContain('if (activeSection === "local-agent-hooks")');
     expect(view).toContain('if (activeSection === "local-project")');
     expect(view).not.toContain('activeSection === "language"');
     expect(general).toContain("<LanguageSettingRow />");
@@ -29,19 +32,27 @@ describe("settings visual architecture", () => {
     expect(general).not.toContain("AgentActivity");
     expect(general).not.toContain("localAgents");
     expect(localAgents).toContain('settings.localAgents.title');
-    expect(localAgents).toContain("connection.displayName");
+    expect(localAgents).toContain('detail={t("settings.localAgents.detail")}');
+    expect(localAgents).toContain("useTerminalAgentLocator");
+    expect(localAgents).toContain("DESKTOP_TERMINAL_LAUNCHERS");
+    expect(localAgents).toContain("<TerminalLauncherIcon");
     expect(localAgents).toContain("desktop-settings-switch");
-    expect(localAgents).toContain("discoverLocalAgents");
-    expect(localAgents).not.toMatch(/AgentActivity|ActivityHook|agentFileActivity/u);
-    expect(localAgents).not.toContain("desktop-settings-label-stack");
-    expect(localAgents).not.toContain("<small>");
-    expect(view).toContain("<AgentFileActivityAppearanceSetting");
-    expect(activityAppearance).toContain("<AgentFileActivityPermissionDialog");
-    expect(activityAppearance.indexOf("onChange(true)"))
-      .toBeGreaterThan(activityAppearance.indexOf("await reconcileNativeActivityHooks({ enabled: true"));
-    expect(activityPermission).toContain("DesktopDialogRoot");
-    expect(activityPermission).toContain("permission.accessTitle");
-    expect(activityPermission).not.toMatch(/providerId|providers\.map|connection\.displayName/u);
+    expect(localAgents).toContain("setTerminalAgentVisible");
+    expect(localAgents).toContain("<LocalAgentHooksSettingsSection");
+    expect(localAgentHooks).toContain("getAgentActivityEnrollment");
+    expect(localAgentHooks).toContain("setAgentActivityEnrollment");
+    expect(localAgentHooks).toContain("selectableProviders.map");
+    expect(localAgentHooks).toContain("provider.configurable");
+    expect(localAgentHooks).toContain("<TerminalLauncherIcon");
+    expect(localAgentHooks).toContain("<details");
+    expect(localAgentHooks).not.toContain("<SettingsSectionHeader");
+    expect(localAgentHooks).not.toContain("<small>{status}</small>");
+    expect(localAgents).not.toContain("settings.localAgents.visible");
+    expect(localAgents).not.toContain("settings.localAgents.hidden");
+    expect(view).not.toContain("<LocalAgentHooksSettingsView");
+    expect(localAgentHooks).not.toContain("desktop-utility-view");
+    expect(view).not.toContain("<AgentFileActivityAppearanceSetting");
+    expect(app).not.toContain("enabledRuntimeIds={enabledAgentRuntimeIds}");
     expect(localProject).toContain("settings.localProject.path");
     expect(localProject).toContain("onUnlinkWorkspace");
     expect(localProject).not.toContain("DesktopBuildVersionSettingsRow");
@@ -55,11 +66,12 @@ describe("settings visual architecture", () => {
       'labelId: "settings.sidebar.general"',
       'labelId: "settings.sidebar.appearance"',
       'labelId: "settings.sidebar.localAgents"',
-      'labelId: "settings.sidebar.defaultApps"',
+      'labelId: "settings.sidebar.createNew"',
       'labelId: "settings.sidebar.editor"',
       'labelId: "settings.sidebar.experimental"',
     ]);
     expect(desktopAppItems).not.toContain("settings.sidebar.language");
+    expect(desktopAppItems).not.toContain("settings.sidebar.localAgentHooks");
     expect(sidebarModel).toContain('labelId: "settings.sidebar.localProject"');
     expect(sidebarModel).toContain('labelId: "settings.sidebar.projectInfo"');
 
@@ -80,10 +92,18 @@ describe("settings visual architecture", () => {
       expect(catalog["sidebar.localProject"], locale).toBeTruthy();
       expect(catalog["sidebar.projectInfo"], locale).toBeTruthy();
       expect(catalog["sidebar.localAgents"], locale).toBeTruthy();
+      expect(catalog["sidebar.createNew"], locale).toBeTruthy();
+      expect(catalog["sidebar.defaultApps"], locale).toBeUndefined();
+      expect(catalog["sidebar.localAgentHooks"], locale).toBeUndefined();
       expect(catalog["general.title"], locale).toBeTruthy();
       expect(catalog["general.detail"], locale).toBeTruthy();
       expect(catalog["localAgents.title"], locale).toBeTruthy();
+      expect(catalog["localAgents.detail"], locale).toBeTruthy();
       expect(catalog["localAgents.toggle"], locale).toBeTruthy();
+      expect(catalog["localAgentHooks.title"], locale).toBeTruthy();
+      expect(catalog["localAgentHooks.manage"], locale).toBeTruthy();
+      expect(catalog["localAgentHooks.choose"], locale).toBeTruthy();
+      expect(catalog["localAgentHooks.status.installed"], locale).toBeTruthy();
       expect(catalog["appearance.agentFileActivity.title"], locale).toBeTruthy();
       for (const key of [
         "title",
@@ -189,8 +209,10 @@ describe("settings visual architecture", () => {
     expect(components).toContain("SettingsSubsection");
     expect(components).toContain("SettingsValueRow");
     expect(settingsImplementation).not.toMatch(/Settings(?:Group|Line)/);
+    expect(settingsImplementation).not.toContain("desktop-settings-label-stack");
     expect(settings).not.toContain(".desktop-settings-group");
     expect(settings).not.toContain(".desktop-settings-line");
+    expect(settings).not.toContain(".desktop-settings-label-stack");
     expect(settings).toMatch(/\.desktop-settings-subsection-body\s*{[^}]*display:\s*grid;/s);
     expect(settings).toMatch(/\.desktop-settings-subsection-title\s*{[^}]*font-size:\s*12px;[^}]*font-weight:\s*500;/s);
 
@@ -202,7 +224,6 @@ describe("settings visual architecture", () => {
       "settings.editor.detail",
       "settings.experimental.detail",
       "settings.files.detail",
-      "settings.defaultApps.detail",
       "settings.cloud.detail",
       "settings.git.detail",
     ]) {
@@ -215,20 +236,43 @@ describe("settings visual architecture", () => {
     const settings = source("src/styles/settings.css");
     const controls = source("src/styles/settings-controls.css");
     const language = source("src/styles/settings-view.css");
+    const localProject = source("src/features/settings/main/LocalProjectSettingsView.tsx");
+    const repository = source("src/features/settings/main/RepositorySettingsViews.tsx");
 
-    expect(settings).toMatch(/--desktop-settings-content-max-width:\s*1040px/);
-    expect(settings).toMatch(/\.desktop-settings-section-header h2\s*{[^}]*font-size:\s*14px;[^}]*font-weight:\s*720;/s);
+    expect(settings).toMatch(
+      /--desktop-settings-content-max-width:\s*var\(--po-reading-content-width, 724px\)/,
+    );
+    expect(source("src/styles/settings-new-menu.css")).not.toContain(
+      "--desktop-settings-content-max-width",
+    );
+    expect(settings).toMatch(/\.desktop-settings-heading-row\s*{[^}]*padding-inline:\s*10px;/s);
+    expect(settings).toMatch(/\.desktop-settings-section-header\s*{[^}]*padding-inline:\s*10px;/s);
+    expect(settings).toMatch(/\.desktop-settings-heading-row \.desktop-settings-section-header\s*{[^}]*padding-inline:\s*0;/s);
+    expect(settings).toMatch(/\.desktop-settings-section-header h2\s*{[^}]*font-size:\s*15px;[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);[^}]*line-height:\s*20px;/s);
     expect(settings).toMatch(/\.desktop-settings-row\s*{[^}]*gap:\s*18px;[^}]*padding:\s*0 10px;/s);
+    expect(settings).toMatch(/\.desktop-settings-row > \.desktop-settings-row-value\s*{[^}]*font-weight:\s*var\(--po-text-weight-regular, 400\);/s);
+    expect(settings).toMatch(/\.desktop-settings-value-text\s*{[^}]*font-weight:\s*var\(--po-text-weight-regular, 400\);/s);
+    expect(settings).toMatch(/\.desktop-settings-remote-setting-name\s*{[^}]*font-weight:\s*var\(--po-text-weight-regular, 400\);/s);
     expect(controls).toMatch(/\.desktop-settings-row-control\s*{[^}]*min-height:\s*42px;/s);
     expect(controls).not.toContain("min-height: 38px");
     expect(settings).toMatch(/\.desktop-settings-value-row\s*{[^}]*min-height:\s*30px;/s);
-    expect(settings).toMatch(/\.desktop-settings-select,[\s\S]*?height:\s*28px;[\s\S]*?border-radius:\s*6px;/);
-    expect(controls).toMatch(/\.desktop-settings-action\s*{[^}]*height:\s*28px;[^}]*border-radius:\s*6px;[^}]*font-size:\s*12px;[^}]*font-weight:\s*650;/s);
+    expect(settings).toMatch(/\.desktop-settings-select,[\s\S]*?height:\s*28px;[\s\S]*?border-radius:\s*6px;[\s\S]*?font-weight:\s*var\(--po-text-weight-regular, 400\);/);
+    expect(controls).toMatch(/\.desktop-settings-action\s*{[^}]*height:\s*28px;[^}]*border-radius:\s*6px;[^}]*font-size:\s*12px;[^}]*font-weight:\s*var\(--po-text-weight-medium, 500\);/s);
+    expect(controls).toMatch(/\.desktop-build-version-text\s*{[^}]*font-weight:\s*400;/s);
     expect(controls).toMatch(/\.desktop-theme-segment\s*{[^}]*border-radius:\s*7px;/s);
     expect(controls).toMatch(/\.desktop-theme-segment button\s*{[^}]*height:\s*26px;[^}]*border-radius:\s*5px;/s);
     expect(controls).toMatch(/\.desktop-appearance-option-segment\s*{[^}]*width:\s*min\(100%, 360px\);[^}]*grid-auto-columns:\s*minmax\(0, 1fr\);/s);
-    expect(view.match(/desktop-theme-segment desktop-appearance-option-segment/g)).toHaveLength(7);
-    expect(view).toContain("settings.appearance.editorPresentation.title");
+    expect(controls).toMatch(/\.desktop-appearance-option-segment\.desktop-appearance-hug-segment\s*{[^}]*width:\s*fit-content;[^}]*max-width:\s*100%;[^}]*grid-auto-columns:\s*max-content;/s);
+    expect(controls).toMatch(/\.desktop-settings-tool-list\s*{[^}]*width:\s*fit-content;[^}]*max-width:\s*100%;/s);
+    expect(controls).toMatch(/\.desktop-settings-tool-item\s*{[^}]*grid-template-columns:\s*minmax\(0, max-content\) auto;[^}]*gap:\s*8px;[^}]*padding-inline:\s*8px 0;/s);
+    expect(settings).not.toContain(".desktop-settings-wide-control-row > .desktop-settings-tool-list");
+    expect(view.match(/desktop-theme-segment desktop-appearance-option-segment/g)).toHaveLength(5);
+    expect(view.match(/desktop-appearance-hug-segment/g)).toHaveLength(4);
+    expect(view).not.toContain("settings.appearance.editorPresentation");
+    expect(view).not.toContain("settings.appearance.dockIcon");
+    expect(localProject).not.toContain("<strong");
+    expect(repository).not.toContain("<strong");
+    expect(controls).not.toContain("desktop-dock-icon-segment");
     expect(view).toContain("settings.appearance.gitSidebarLayout.title");
     expect(controls).not.toContain(".desktop-loading-animation-segment");
     expect(controls).not.toContain(".desktop-text-size-segment");
@@ -240,7 +284,8 @@ describe("settings visual architecture", () => {
     expect(language).not.toContain("min-height: 32px");
     expect(language).not.toContain("border-radius: 8px");
     expect(language).not.toContain("var(--po-panel-raised)");
-    expect(language).toContain("width: min(100%, 220px)");
+    expect(language).toMatch(/\.desktop-language-setting-control\s*{[^}]*width:\s*fit-content;[^}]*max-width:\s*100%;/s);
+    expect(language).toMatch(/\.desktop-language-setting-select\s*{[^}]*width:\s*fit-content;[^}]*field-sizing:\s*content;/s);
   });
 
   it("keeps hover feedback on interactive controls rather than layout rows", () => {

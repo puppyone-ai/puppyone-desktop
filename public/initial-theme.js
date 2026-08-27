@@ -34,29 +34,10 @@
       ?? style.firstPaint[resolvedTheme]
       ?? style.firstPaint.light
       ?? style.firstPaint.dark;
-    let appearancePreferences = null;
-    try {
-      appearancePreferences = manifest.storage.appearancePreferences
-        ? JSON.parse(window.localStorage.getItem(manifest.storage.appearancePreferences) ?? "null")
-        : null;
-    } catch {
-      // A malformed optional preference document must not block first paint.
-    }
-    const requestedEditorPresentation = appearancePreferences?.shared?.editorPresentation === "product-default"
-      ? "product-default"
-      : "follow-interface";
-    const editorPresentationPolicy = style.policies.editorPresentation ?? { mode: "inherit" };
-    const editorPresentation = editorPresentationPolicy.mode === "force"
-      ? editorPresentationPolicy.value
-      : editorPresentationPolicy.mode === "allow" && !editorPresentationPolicy.values.includes(requestedEditorPresentation)
-        ? editorPresentationPolicy.default ?? editorPresentationPolicy.values[0] ?? "follow-interface"
-        : requestedEditorPresentation;
-
     document.documentElement.dataset.interfaceStyle = style.id;
     document.documentElement.dataset.interfaceStyleFamily = style.profile?.family ?? style.id;
     document.documentElement.dataset.interfaceStyleVariant = style.profile?.variant ?? "product";
     document.documentElement.dataset.interfaceStylePalette = style.profile?.palette ?? "adaptive";
-    document.documentElement.dataset.editorPresentation = editorPresentation;
     document.documentElement.dataset.initialTheme = resolvedTheme;
     if (resolvedPreset) document.documentElement.dataset.initialThemePreset = resolvedPreset;
     if (firstPaint) {

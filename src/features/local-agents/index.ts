@@ -1,9 +1,6 @@
 export { LocalAgentsSettingsView } from "./ui/LocalAgentsSettingsView";
+export { LocalAgentHooksSettingsSection } from "./ui/LocalAgentHooksSettingsView";
 export {
-  enabledLocalAgentRuntimeIds,
-  installedLocalAgents,
-  isLocalAgentEnabled,
-  isLocalAgentRuntimeEnabled,
-  localAgentActivityProviderId,
-  setLocalAgentEnabled,
+  isTerminalAgentVisible,
+  setTerminalAgentVisible,
 } from "./model/localAgentSelection";

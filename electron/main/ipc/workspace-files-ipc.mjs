@@ -16,13 +16,6 @@ import {
   writeWorkspaceTextFile,
 } from "../../../local-api/workspace.mjs";
 import { absorbWorkspaceEditReviewPath } from "../../../local-api/edit-review.mjs";
-import {
-  chooseExternalApplication,
-  listExternalOpenTargets,
-  openFileWithExternalApplication,
-  resolveExternalOpenTarget,
-  validateExternalApplicationPath,
-} from "../external-apps.mjs";
 import { isPotentiallyExecutableFile } from "../security.mjs";
 import { buildLocalFileCapabilityUrl } from "../local-file-capabilities.mjs";
 import { parseLocalFileUrl } from "../local-file-protocol.mjs";
@@ -68,6 +61,7 @@ export function registerWorkspaceFileIpcHandlers({
   authorizeWorkspaceRoot,
   localFileCapabilities,
   workspaceWatchService = null,
+  gitMetadataWatchService = null,
   convertOfficeDocument = convertWorkspaceOfficeDocumentToDocx,
   t = defaultTranslate,
 }) {
@@ -230,6 +224,13 @@ export function registerWorkspaceFileIpcHandlers({
       // acknowledgement into a failed save.
       console.warn("Unable to attribute internal workspace write:", error);
     }
+    try {
+      gitMetadataWatchService?.invalidateWorkingTree?.(rootPath);
+    } catch (error) {
+      // Git invalidation is a reconciliation hint. A durable file save must
+      // remain successful even if no repository watcher is currently active.
+      console.warn("Unable to invalidate Git after workspace write:", error);
+    }
     await absorbWorkspaceEditReviewPath(rootPath, filePath);
     return { ok: true, version: result?.version ?? null };
   });
@@ -311,12 +312,8 @@ export function registerWorkspaceFileIpcHandlers({
   ipcMain.handle("workspace:open-entry-external", async (event, request) => {
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
     const entryPath = request?.path;
-    const strategy = request?.strategy ?? "system";
     if (typeof entryPath !== "string" || entryPath.trim().length === 0) {
       throw new Error("Entry path is required.");
-    }
-    if (strategy !== "system" && strategy !== "app") {
-      throw new Error("Unsupported external app opening strategy.");
     }
 
     let targetPath = await resolveExistingWorkspacePath(rootPath, entryPath);
@@ -357,14 +354,6 @@ export function registerWorkspaceFileIpcHandlers({
       throw new Error("Only files can be opened in another app.");
     }
 
-    if (strategy === "app") {
-      await openFileWithExternalApplication({
-        appPath: request?.appPath,
-        filePath: targetPath,
-      });
-      return { ok: true };
-    }
-
     const openError = await shell.openPath(targetPath);
     if (openError) {
       throw new Error(openError);
@@ -372,73 +361,6 @@ export function registerWorkspaceFileIpcHandlers({
     return { ok: true };
   });
 
-  ipcMain.handle("workspace:resolve-external-open-target", async (event, request) => {
-    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
-    const entryPath = request?.path;
-    const overrideAppPath = typeof request?.overrideAppPath === "string"
-      ? request.overrideAppPath.trim()
-      : "";
-    if (typeof entryPath !== "string" || entryPath.trim().length === 0) {
-      throw new Error("Entry path is required.");
-    }
-
-    const targetPath = await resolveExistingWorkspacePath(rootPath, entryPath);
-    const stats = await fs.promises.stat(targetPath).catch((error) => {
-      throw new Error(`Unable to resolve external app: ${error.message}`);
-    });
-    if (!stats.isFile()) {
-      throw new Error("Only files can be opened in another app.");
-    }
-
-    if (overrideAppPath) validateExternalApplicationPath(overrideAppPath);
-
-    return resolveExternalOpenTarget({
-      app,
-      appPath: overrideAppPath || null,
-      extension: normalizeFileExtension(request?.extension ?? path.extname(targetPath)),
-      filePath: targetPath,
-      source: overrideAppPath ? "override" : "system",
-    });
-  });
-
-  ipcMain.handle("workspace:list-external-open-targets", async (event, request) => {
-    const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
-    const entryPath = request?.path;
-    const overrideAppPath = typeof request?.overrideAppPath === "string"
-      ? request.overrideAppPath.trim()
-      : "";
-    if (typeof entryPath !== "string" || entryPath.trim().length === 0) {
-      throw new Error("Entry path is required.");
-    }
-
-    const targetPath = await resolveExistingWorkspacePath(rootPath, entryPath);
-    const stats = await fs.promises.stat(targetPath).catch((error) => {
-      throw new Error(`Unable to resolve external apps: ${error.message}`);
-    });
-    if (!stats.isFile()) {
-      throw new Error("Only files can be opened in another app.");
-    }
-
-    if (overrideAppPath) validateExternalApplicationPath(overrideAppPath);
-
-    return listExternalOpenTargets({
-      app,
-      appPath: overrideAppPath || null,
-      extension: normalizeFileExtension(request?.extension ?? path.extname(targetPath)),
-      filePath: targetPath,
-    });
-  });
-
-  ipcMain.handle("workspace:choose-external-app", async (event, request) => {
-    const extension = normalizeFileExtension(request?.extension);
-    return chooseExternalApplication({
-      app,
-      dialog,
-      ownerWindow: BrowserWindow.fromWebContents(event.sender),
-      extension,
-      t,
-    });
-  });
 }
 
 function requireOfficeConversionRequestId(value) {
@@ -460,10 +382,4 @@ function requireLocalFileCapabilityPurpose(value) {
   if (value === undefined || value === "file-preview") return "file-preview";
   if (value === "markdown-asset") return value;
   throw new Error("Local file capability purpose is invalid.");
-}
-
-function normalizeFileExtension(value) {
-  if (typeof value !== "string") return null;
-  const normalized = value.trim().toLowerCase().replace(/^\*?\./, "");
-  return /^[a-z0-9][a-z0-9_-]{0,31}$/.test(normalized) ? normalized : null;
 }

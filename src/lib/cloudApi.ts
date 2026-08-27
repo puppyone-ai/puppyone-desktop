@@ -304,6 +304,8 @@ export type DesktopCloudDashboard = {
     total: number;
     folders: number;
     files: number;
+    storage_bytes?: number | null;
+    storage_limit_bytes?: number | null;
   };
   connections: DesktopCloudDashboardConnection[];
   tools: Array<{

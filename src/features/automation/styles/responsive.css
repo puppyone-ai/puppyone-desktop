@@ -1,8 +1,4 @@
 @media (max-width: 720px) {
-  .desktop-cloud-automation-catalog {
-    padding: 32px 24px 44px;
-  }
-
   .desktop-cloud-automation-template-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -17,4 +13,3 @@
     max-width: 280px;
   }
 }
-

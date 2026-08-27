@@ -31,8 +31,7 @@
         "themeMode": { "mode": "inherit" },
         "sidebarNavigationLayout": { "mode": "inherit" },
         "textSize": { "mode": "inherit" },
-        "fileIconTheme": { "mode": "inherit" },
-        "editorPresentation": { "mode": "inherit" }
+        "fileIconTheme": { "mode": "inherit" }
       },
       "palette": {
         "kind": "adaptive",
@@ -45,7 +44,7 @@
       },
       "firstPaint": {
         "light": {
-          "background": "#fbfaf7",
+          "background": "#fafafa",
           "colorScheme": "light"
         },
         "dark": {
@@ -58,11 +57,11 @@
           "defaultPreset": "neutral",
           "values": {
             "neutral": {
-              "background": "#fbfaf7",
+              "background": "#fafafa",
               "colorScheme": "light"
             },
             "warm": {
-              "background": "#fbf6ed",
+              "background": "#fbfaf7",
               "colorScheme": "light"
             },
             "graphite": {
@@ -120,12 +119,7 @@
           "reasonKey": "settings.appearance.controlledBy.windowsXpNavigation"
         },
         "textSize": { "mode": "inherit" },
-        "fileIconTheme": { "mode": "inherit" },
-        "editorPresentation": {
-          "mode": "allow",
-          "values": ["follow-interface", "product-default"],
-          "default": "follow-interface"
-        }
+        "fileIconTheme": { "mode": "inherit" }
       },
       "palette": {
         "kind": "fixed",

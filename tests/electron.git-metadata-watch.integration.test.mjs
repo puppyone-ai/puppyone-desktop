@@ -94,6 +94,30 @@ describe("resolveGitRepositoryIdentity", { timeout: 30_000 }, () => {
 });
 
 describe("git metadata watch service", { timeout: 30_000 }, () => {
+  it("invalidates Git immediately after a renderer-owned working-tree write", async () => {
+    initRepoWithIdentity();
+    await writeFile(path.join(root, "tracked.txt"), "one\n");
+    git(["add", "tracked.txt"]);
+    git(["commit", "-m", "initial commit"]);
+
+    const service = trackService(createGitMetadataWatchService({ logger: silentLogger() }));
+    const { events, sender } = createRecordingSender(40);
+    const subscription = await service.start(sender, root);
+    const baseline = events.length;
+
+    expect(service.invalidateWorkingTree(root)).toBe(1);
+    expect(events).toHaveLength(baseline + 1);
+    expect(events.at(-1)).toMatchObject({
+      channel: GIT_REPOSITORY_INVALIDATED_CHANNEL,
+      payload: {
+        subscriptionId: subscription.subscriptionId,
+        reason: "working-tree",
+      },
+    });
+
+    service.stop(subscription.subscriptionId);
+  });
+
   it("delivers a metadata invalidation and converges to a clean snapshot with a new HEAD after an external add + commit", async () => {
     initRepoWithIdentity();
     await writeFile(path.join(root, "tracked.txt"), "one\n");

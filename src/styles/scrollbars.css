@@ -71,16 +71,6 @@
   background-color: transparent;
 }
 
-/* Product Default is an explicit Viewer presentation. When a historical
- * Interface Style is active, restore the canonical transient product thumb
- * inside the Viewer boundary instead of inheriting the skin's classic track,
- * arrows, or permanently visible thumb. */
-:root[data-po-scrollbar-mode="product"][data-editor-presentation="product-default"]
-  .po-viewer-surface-boundary
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb {
-  background-color: transparent;
-}
-
 :root[data-po-scrollbar-mode="product"][data-interface-style="default"]
   :where(
     [data-po-scrollbar]:not([data-po-scrollbar="hidden"]):hover,
@@ -90,27 +80,7 @@
   background-color: var(--po-scrollbar-presentation-thumb, var(--po-scrollbar-thumb));
 }
 
-:root[data-po-scrollbar-mode="product"][data-editor-presentation="product-default"]
-  .po-viewer-surface-boundary
-  :where(
-    [data-po-scrollbar]:not([data-po-scrollbar="hidden"]):hover,
-    [data-po-scrollbar].po-scrollbar-active
-  )::-webkit-scrollbar-thumb {
-  border-width: var(--po-scrollbar-thumb-active-inset, 2px);
-  background-color: var(--po-scrollbar-presentation-thumb, var(--po-scrollbar-thumb));
-}
-
 :root[data-po-scrollbar-mode="product"][data-interface-style="default"]
-  :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb:hover {
-  border-width: var(--po-scrollbar-thumb-active-inset, 2px);
-  background-color: var(
-    --po-scrollbar-presentation-thumb-hover,
-    var(--po-scrollbar-thumb-hover)
-  );
-}
-
-:root[data-po-scrollbar-mode="product"][data-editor-presentation="product-default"]
-  .po-viewer-surface-boundary
   :where([data-po-scrollbar]:not([data-po-scrollbar="hidden"]))::-webkit-scrollbar-thumb:hover {
   border-width: var(--po-scrollbar-thumb-active-inset, 2px);
   background-color: var(

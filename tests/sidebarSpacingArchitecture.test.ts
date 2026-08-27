@@ -32,7 +32,6 @@ const gitHistoryCss = readCss("../src/features/source-control/styles/history-lis
 const settingsCss = readCss("../src/styles/settings-view.css");
 const cloudSidebarCss = readCss("../src/features/cloud/styles/sidebar-shell.css");
 const cloudHistorySidebarCss = readCss("../src/features/cloud/history/styles/sidebar.css");
-const accessLegacyCss = readCss("../src/features/cloud/sections/access/styles/access-detail.css");
 const changesCss = readCss("../src/features/changes/changes.css");
 
 describe("sidebar spacing architecture", () => {
@@ -344,7 +343,9 @@ describe("sidebar spacing architecture", () => {
     expect(wrapper).toContain("padding-block: var(--desktop-sidebar-list-padding-block) 0;");
     expect(wrapper).toContain("padding-inline: 0;");
     expect(wrapper).toContain("scrollbar-gutter: auto;");
-    expect(footer).toContain("padding-block: 3px var(--desktop-sidebar-list-padding-block);");
+    expect(footer).toContain(
+      "padding-block: var(--desktop-sidebar-section-top-gap) var(--desktop-sidebar-list-padding-block);",
+    );
     expect(footer).toContain(
       "padding-inline: var(--git-sidebar-left-gap) var(--git-sidebar-right-gap);",
     );
@@ -352,7 +353,6 @@ describe("sidebar spacing architecture", () => {
 
   it("keeps every remaining page-level sidebar on the shared block edge", () => {
     expect(cloudSidebarCss).not.toContain(".desktop-cloud-sidebar-list");
-    expectBlockPadding(accessLegacyCss, ".desktop-cloud-access-scope-list", "8px");
     expectBlockPadding(changesCss, ".review-list", "0");
   });
 });

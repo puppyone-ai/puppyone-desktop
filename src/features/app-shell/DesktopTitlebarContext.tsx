@@ -15,7 +15,6 @@ export function DesktopTitlebarContext({
   activeGitStatus,
   branchSwitcherOpen,
   branchSwitcherRef,
-  compact,
   gitStatusLoading,
   gitOperationLoading,
   localBranches,
@@ -46,7 +45,6 @@ export function DesktopTitlebarContext({
   return (
     <div className="desktop-titlebar-context">
       <DesktopWorkspaceSwitcher
-        compact={compact}
         open={workspaceSwitcherOpen}
         refObject={workspaceSwitcherRef}
         titlebarLabel={workspaceTitlebarLabel}
@@ -59,7 +57,6 @@ export function DesktopTitlebarContext({
         onToggle={onToggleWorkspaceSwitcher}
       />
       <DesktopBranchSwitcher
-        compact={compact}
         open={branchSwitcherOpen}
         refObject={branchSwitcherRef}
         titlebarLabel={branchTitlebarLabel}
@@ -81,7 +78,6 @@ type DesktopTitlebarContextProps = {
   activeGitStatus: GitStatusSnapshot | null;
   branchSwitcherOpen: boolean;
   branchSwitcherRef: RefObject<HTMLDivElement>;
-  compact: boolean;
   gitStatusLoading: boolean;
   gitOperationLoading: string | null;
   localBranches: GitBranchSummary[];
@@ -102,7 +98,6 @@ type DesktopTitlebarContextProps = {
 
 function DesktopBranchSwitcher({
   branchLabel,
-  compact,
   disabled,
   loading,
   localBranches,
@@ -116,7 +111,6 @@ function DesktopBranchSwitcher({
   onToggle,
 }: {
   branchLabel: string;
-  compact: boolean;
   disabled: boolean;
   loading: boolean;
   localBranches: GitBranchSummary[];
@@ -153,7 +147,7 @@ function DesktopBranchSwitcher({
       <DesktopTitlebarMenuLayer
         anchorRef={refObject}
         className="desktop-branch-menu"
-        gap={compact ? 8 : 4}
+        gap={4}
         onDismiss={onDone}
         open={open && !disabled}
         preferredMaxHeight={440}

@@ -134,11 +134,14 @@ export function PuppyoneWorkspaceConfigSettings({
       ) : (
         <>
           <div className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row desktop-hosting-service-panel">
-            <span className="desktop-settings-label-stack">
-              <strong>{t("settings.workspaceConfig.sourceService.title")}</strong>
-              <small>{t("settings.workspaceConfig.sourceService.detail")}</small>
+            <span title={t("settings.workspaceConfig.sourceService.detail")}>
+              {t("settings.workspaceConfig.sourceService.title")}
             </span>
-            <div className="desktop-hosting-service-options" aria-label={t("settings.workspaceConfig.sourceService.ariaLabel")}>
+            <div
+              className="desktop-hosting-service-options"
+              aria-label={t("settings.workspaceConfig.sourceService.ariaLabel")}
+              aria-description={t("settings.workspaceConfig.sourceService.detail")}
+            >
               {sourceServiceOptions.filter((option) => option.available).map((option) => (
                 <button
                   className={`desktop-hosting-service-option ${sourceService === option.value ? "active" : ""}`}
@@ -148,7 +151,7 @@ export function PuppyoneWorkspaceConfigSettings({
                   title={option.detail}
                   onClick={() => selectSourceService(option.value)}
                 >
-                  <strong>{option.label}</strong>
+                  <span>{option.label}</span>
                 </button>
               ))}
             </div>
@@ -157,12 +160,12 @@ export function PuppyoneWorkspaceConfigSettings({
           {showSourceGitHints && (
             <>
               <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
-                <span className="desktop-settings-label-stack">
-                  <strong>{t("settings.workspaceConfig.gitRemote.title")}</strong>
-                  <small>{t("settings.workspaceConfig.gitRemote.detail")}</small>
+                <span title={t("settings.workspaceConfig.gitRemote.detail")}>
+                  {t("settings.workspaceConfig.gitRemote.title")}
                 </span>
                 <select
                   className="desktop-settings-select"
+                  aria-description={t("settings.workspaceConfig.gitRemote.detail")}
                   value={sourceRemoteValue}
                   disabled={saving}
                   onChange={(event) => updateSourceOfTruthConfig({ remote: normalizeSettingsText(event.target.value) })}
@@ -175,12 +178,12 @@ export function PuppyoneWorkspaceConfigSettings({
               </label>
 
               <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
-                <span className="desktop-settings-label-stack">
-                  <strong>{t("settings.workspaceConfig.gitBranch.title")}</strong>
-                  <small>{t("settings.workspaceConfig.gitBranch.detail")}</small>
+                <span title={t("settings.workspaceConfig.gitBranch.detail")}>
+                  {t("settings.workspaceConfig.gitBranch.title")}
                 </span>
                 <input
                   className="desktop-settings-text-input"
+                  aria-description={t("settings.workspaceConfig.gitBranch.detail")}
                   list={watchedBranchListId}
                   value={draft.sync.sourceOfTruth.branch ?? ""}
                   placeholder={currentBranchName && currentBranchName !== "detached" ? currentBranchName : t("settings.workspaceConfig.currentBranch")}
@@ -197,14 +200,14 @@ export function PuppyoneWorkspaceConfigSettings({
           )}
 
           <div className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
-            <span className="desktop-settings-label-stack">
-              <strong>{t("settings.workspaceConfig.backupEnabled.title")}</strong>
-              <small>{t("settings.workspaceConfig.backupEnabled.detail")}</small>
+            <span title={t("settings.workspaceConfig.backupEnabled.detail")}>
+              {t("settings.workspaceConfig.backupEnabled.title")}
             </span>
-            <label className="desktop-settings-switch">
+            <label className="desktop-settings-switch" title={t("settings.workspaceConfig.backupEnabled.detail")}>
               <input
                 type="checkbox"
                 aria-label={t("settings.workspaceConfig.backupEnabled.title")}
+                aria-description={t("settings.workspaceConfig.backupEnabled.detail")}
                 checked={draft.backup.enabled}
                 disabled={saving}
                 onChange={(event) => updateBackupConfig({ enabled: event.target.checked })}
@@ -216,12 +219,12 @@ export function PuppyoneWorkspaceConfigSettings({
           {showBackupDetails && (
             <>
               <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
-                <span className="desktop-settings-label-stack">
-                  <strong>{t("settings.workspaceConfig.backupTarget.title")}</strong>
-                  <small>{t("settings.workspaceConfig.backupTarget.detail")}</small>
+                <span title={t("settings.workspaceConfig.backupTarget.detail")}>
+                  {t("settings.workspaceConfig.backupTarget.title")}
                 </span>
                 <select
                   className="desktop-settings-select"
+                  aria-description={t("settings.workspaceConfig.backupTarget.detail")}
                   value={draft.backup.service}
                   disabled={saving}
                   onChange={(event) => {
@@ -240,12 +243,12 @@ export function PuppyoneWorkspaceConfigSettings({
               {draft.backup.service !== "puppyone" && (
                 <>
                   <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
-                    <span className="desktop-settings-label-stack">
-                      <strong>{t("settings.workspaceConfig.backupRemote.title")}</strong>
-                      <small>{t("settings.workspaceConfig.backupRemote.detail")}</small>
+                    <span title={t("settings.workspaceConfig.backupRemote.detail")}>
+                      {t("settings.workspaceConfig.backupRemote.title")}
                     </span>
                     <select
                       className="desktop-settings-select"
+                      aria-description={t("settings.workspaceConfig.backupRemote.detail")}
                       value={backupRemoteValue}
                       disabled={saving}
                       onChange={(event) => updateBackupConfig({ remote: normalizeSettingsText(event.target.value) })}
@@ -258,12 +261,12 @@ export function PuppyoneWorkspaceConfigSettings({
                   </label>
 
                   <label className="desktop-settings-row desktop-settings-row-control desktop-puppyone-config-row">
-                    <span className="desktop-settings-label-stack">
-                      <strong>{t("settings.workspaceConfig.backupBranch.title")}</strong>
-                      <small>{t("settings.workspaceConfig.backupBranch.detail")}</small>
+                    <span title={t("settings.workspaceConfig.backupBranch.detail")}>
+                      {t("settings.workspaceConfig.backupBranch.title")}
                     </span>
                     <input
                       className="desktop-settings-text-input"
+                      aria-description={t("settings.workspaceConfig.backupBranch.detail")}
                       list={backupBranchListId}
                       value={draft.backup.branch ?? ""}
                       placeholder={currentBranchName && currentBranchName !== "detached" ? currentBranchName : t("settings.workspaceConfig.currentBranch")}

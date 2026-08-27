@@ -122,12 +122,6 @@
     color: var(--po-success);
   }
 
-  .desktop-cloud-login-logo {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
   .desktop-cloud-product-mark {
     width: 94px;
     height: 68px;

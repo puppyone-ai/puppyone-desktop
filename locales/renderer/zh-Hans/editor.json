@@ -338,7 +338,6 @@
   "panes.empty": "空编辑器",
   "panes.fileActions": "文件",
   "panes.label": "{name} 编辑器分屏",
-  "panes.openInApp": "在 {app} 中打开",
   "panes.paneActions": "面板",
   "panes.resize": "调整编辑器分屏大小",
   "panes.splitDown": "向下拆分编辑器",

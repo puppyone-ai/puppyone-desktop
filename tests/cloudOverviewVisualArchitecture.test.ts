@@ -1,109 +1,102 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const dashboardCss = readFileSync(
-  new URL("../src/features/cloud/sections/overview/styles/dashboard-grid.css", import.meta.url),
-  "utf8",
-);
-const resourceCss = readFileSync(
-  new URL("../src/features/cloud/sections/overview/styles/resource-cards.css", import.meta.url),
-  "utf8",
-);
-const identityCss = readFileSync(
-  new URL("../src/features/cloud/sections/overview/styles/project-identity.css", import.meta.url),
-  "utf8",
-);
+const dashboardCss = readSource("../src/features/cloud/sections/overview/styles/dashboard-grid.css");
+const baseCss = readSource("../src/features/cloud/sections/overview/styles/base.css");
+const projectIdentityCss = readSource("../src/features/cloud/sections/overview/styles/project-identity.css");
+const resourceCss = readSource("../src/features/cloud/sections/overview/styles/resource-cards.css");
+const statusCss = readSource("../src/features/cloud/sections/overview/styles/status-cards.css");
+const dashboardSource = readSource("../src/features/cloud/sections/overview/OverviewDashboard.tsx");
+const overviewSource = readSource("../src/features/cloud/sections/overview/OverviewSection.tsx");
 
 describe("Cloud Overview visual architecture", () => {
-  it("uses one square file card beside three compact metrics", () => {
+  it("makes the file table the full-width primary Overview surface", () => {
     const layout = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-dashboard"));
-    const card = compact(readCssBlock(dashboardCss, ".desktop-cloud-overview-dashboard-card"));
-    const storage = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-dashboard-card--storage"));
-    const preview = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-storage-preview"));
 
-    expect(layout).toContain("width: min(100%, 840px);");
-    expect(layout).toContain("grid-template-columns: minmax(300px, 340px) minmax(260px, 1fr);");
-    expect(layout).toContain("grid-template-rows: repeat(3, minmax(0, 1fr));");
-    expect(layout).not.toContain("border:");
-    expect(layout).not.toContain("background:");
-    expect(card).toContain("border: 1px solid var(--po-border-subtle);");
-    expect(card).toContain("border-radius: 10px;");
-    expect(card).toContain("box-shadow: none;");
-    expect(storage).toContain("grid-row: 1 / span 3;");
-    expect(storage).toContain("aspect-ratio: 1;");
-    expect(preview).toContain("grid-template-columns: repeat(4, minmax(0, 1fr));");
+    expect(layout).toContain("display: block;");
+    expect(layout).toContain("width: 100%;");
+    expect(layout).toContain("margin-top: 30px;");
+    expect(dashboardSource).not.toContain("OverviewSummaryCard");
+    expect(dashboardSource).not.toContain("desktop-cloud-overview-summary-grid");
+    expect(overviewSource).toContain("desktop-cloud-overview-header-facts");
+    expect(overviewSource).not.toContain("CloudWorkspaceLoadingState");
+    expect(overviewSource).toContain("const initialLoading = loading && !hasOverviewData;");
   });
 
-  it("reimplements the archived Project folder construction without importing it", () => {
-    const tab = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-storage-tab"));
-    const body = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-storage-body"));
-    const overviewSource = readFileSync(
-      new URL("../src/features/cloud/sections/overview/OverviewDashboard.tsx", import.meta.url),
-      "utf8",
-    );
+  it("uses one rounded file frame without filters or extra headers", () => {
+    const files = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-files"));
 
-    expect(tab).toContain("border: 2px solid var(--po-border);");
-    expect(tab).toContain("border-bottom: 0;");
-    expect(tab).toContain("background: var(--po-project-card-tab);");
-    expect(body).toContain("margin-top: -2px;");
-    expect(body).toContain("border: 2px solid var(--po-border);");
-    expect(body).toContain("border-radius: 0 8px 8px 8px;");
-    expect(body).toContain("background: var(--po-project-card-bg);");
-    expect(overviewSource).not.toContain("ProjectFolderCard");
+    expect(files).toContain("border: 1px solid var(--po-border-subtle);");
+    expect(files).toContain("border-radius: 10px;");
+    expect(files).toContain("overflow: hidden;");
+    expect(resourceCss).toContain(".desktop-cloud-overview-file-row {\n  min-height: 36px;");
+    expect(resourceCss).toContain("min-height: 36px;\n  border-bottom: 1px solid var(--po-border-subtle);");
+    expect(resourceCss).toContain(".desktop-cloud-overview-file-row:last-child");
+    expect(dashboardSource).not.toContain("desktop-cloud-overview-file-toolbar");
+    expect(dashboardSource).not.toContain("desktop-cloud-overview-file-column-labels");
+    expect(dashboardSource).not.toContain("OverviewFileSortKey");
+    expect(dashboardCss).not.toContain("desktop-cloud-overview-file-search");
+    expect(dashboardSource).not.toContain("desktop-cloud-overview-file-activity-header");
+    expect(resourceCss).not.toContain("desktop-cloud-overview-file-activity-header");
+    expect(dashboardSource).not.toContain("desktop-cloud-overview-files-header");
+    expect(dashboardSource).not.toContain("cloud.overview.filesLabel");
+    expect(dashboardSource).toContain("desktop-cloud-overview-file-row skeleton");
+    expect(resourceCss).toContain("desktop-cloud-overview-file-skeleton-name");
   });
 
-  it("keeps the Project Git remote compact and moves Cloud status into the identity mark", () => {
-    const remote = compact(readCssBlock(identityCss, ".desktop-cloud-overview-git-remote code"));
-    const overviewSource = readFileSync(
-      new URL("../src/features/cloud/sections/overview/OverviewSection.tsx", import.meta.url),
-      "utf8",
-    );
+  it("renders compact entries with modification time and product file icons", () => {
+    const name = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-name"));
+    const metadata = compact(readCssBlock(resourceCss, ".desktop-cloud-overview-file-modified"));
 
-    expect(existsSync(new URL(
-      "../src/features/cloud/sections/overview/styles/deployment-board.css",
-      import.meta.url,
-    ))).toBe(false);
-    expect(existsSync(new URL(
-      "../src/features/cloud/sections/overview/styles/metric-rail.css",
-      import.meta.url,
-    ))).toBe(false);
-    expect(remote).toContain("text-overflow: ellipsis;");
-    expect(remote).toContain("white-space: nowrap;");
-    expect(overviewSource).not.toContain("desktop-cloud-source-pill");
-    expect(overviewSource).toContain("aria-label={t(\"cloud.common.cloudSource\")}");
-    expect(identityCss).toContain(".desktop-cloud-overview-landing-mark::after");
+    expect(name).toContain("font-size: 12px;");
+    expect(name).toContain("font-weight: 500;");
+    expect(metadata).toContain("font-size: 11px;");
+    expect(metadata).toContain("font-weight: 400;");
+    expect(dashboardSource).toContain("FileGlyphIcon");
+    expect(dashboardSource).toContain("getCloudOverviewEntryUpdatedAt(entry, history)");
+    expect(dashboardSource).not.toContain("formatBytes(entry.size_bytes");
+    expect(dashboardSource).not.toContain("desktop-cloud-overview-file-size");
+    expect(dashboardSource).not.toMatch(/\bFile\b.*from "lucide-react"/);
+    expect(dashboardSource).not.toMatch(/\bFolder\b.*from "lucide-react"/);
   });
 
-  it("keeps details out of the Overview summary", () => {
-    const overviewSource = readFileSync(
-      new URL("../src/features/cloud/sections/overview/OverviewDashboard.tsx", import.meta.url),
-      "utf8",
+  it("gives storage a full-width unlabeled track above three quiet facts", () => {
+    const header = compact(readCssBlock(baseCss, ".desktop-cloud-overview-landing-header"));
+    const facts = compact(readCssBlock(statusCss, ".desktop-cloud-overview-header-facts"));
+    const fact = compact(readCssBlock(statusCss, ".desktop-cloud-overview-header-fact"));
+    const storage = compact(readCssBlock(statusCss, ".desktop-cloud-overview-project-storage"));
+    const track = compact(readCssBlock(statusCss, ".desktop-cloud-overview-project-storage-track"));
+    const path = compact(readCssBlock(projectIdentityCss, ".desktop-cloud-overview-path-fact"));
+    const titleRow = compact(readCssBlock(baseCss, ".desktop-cloud-overview-title-row"));
+
+    expect(header).toContain("display: grid;");
+    expect(header).toContain("width: 100%;");
+    expect(facts).toContain("width: 100%;");
+    expect(facts).toContain("grid-template-columns: repeat(3, minmax(0, 1fr));");
+    expect(fact).toContain("border-inline-start: 1px solid var(--po-border-subtle);");
+    expect(storage).toContain("width: 100%;");
+    expect(track).toContain("height: 5px;");
+    expect(statusCss).toContain("desktop-cloud-overview-value-skeleton");
+    expect(statusCss).toContain("desktop-cloud-overview-project-storage.is-loading");
+    expect(path).toContain("width: auto;");
+    expect(titleRow).toContain("align-items: center;");
+    expect(overviewSource.match(/<CloudOverviewHeaderFact/g)).toHaveLength(2);
+    expect(overviewSource).toContain("<CloudOverviewStorageMeter");
+    expect(overviewSource).toContain('label={t("cloud.overview.activeConnections")}');
+    expect(overviewSource).toContain("<CloudOverviewPathFact");
+    expect(overviewSource.indexOf("<CloudOverviewStorageMeter")).toBeLessThan(
+      overviewSource.indexOf("desktop-cloud-overview-header-side"),
     );
-
-    expect(overviewSource).not.toContain("CloudOverviewHistoryPreview");
-    expect(overviewSource).not.toContain("desktop-cloud-overview-access-row");
-    expect(overviewSource).not.toContain("ProviderMark");
-    expect(overviewSource).toContain("const STORAGE_PREVIEW_LIMIT = 8;");
-  });
-
-  it("uses namespaced modifiers so legacy utility classes cannot collapse dashboard metrics", () => {
-    const overviewSource = readFileSync(
-      new URL("../src/features/cloud/sections/overview/OverviewDashboard.tsx", import.meta.url),
-      "utf8",
-    );
-    const metric = compact(readCssBlock(
-      dashboardCss,
-      ".desktop-cloud-overview-dashboard-hero",
-    ));
-    const literalClassTokens = [...overviewSource.matchAll(/className="([^"]+)"/g)]
-      .flatMap((match) => match[1].split(/\s+/));
-
-    expect(overviewSource).toContain("desktop-cloud-overview-dashboard-hero--metric");
-    expect(literalClassTokens).not.toContain("compact");
-    expect(literalClassTokens).not.toContain("interactive");
-    expect(metric).toContain("flex: 1 1 auto;");
+    expect(overviewSource).not.toContain("desktop-cloud-overview-project-storage-summary");
+    expect(overviewSource).toContain("desktop-cloud-overview-title-row");
+    expect(overviewSource).not.toContain("getCloudRoute(\"git-sync\").icon");
+    expect(overviewSource).not.toContain("desktop-cloud-overview-landing-mark");
   });
 });
+
+function readSource(path: string) {
+  return readFileSync(new URL(path, import.meta.url), "utf8");
+}
 
 function readCssBlock(css: string, selector: string): string {
   const marker = `${selector} {`;

@@ -97,10 +97,6 @@ function resolveHistoricalScrollbarControls(): HistoricalScrollbarControl[] {
 
   return Array.from(document.querySelectorAll<HTMLElement>(MANAGED_SCROLLBAR_SELECTOR))
     .filter((owner) => owner.dataset.poScrollbar !== "menu")
-    .filter((owner) => !(
-      root.dataset.editorPresentation === "product-default"
-      && owner.closest(".po-viewer-surface-boundary")
-    ))
     .flatMap((owner) => {
       const host = owner.parentElement;
       if (!host) return [];

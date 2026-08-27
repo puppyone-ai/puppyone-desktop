@@ -9,7 +9,7 @@ import {
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import { DesktopCloudShell, type DesktopView } from "./components/DesktopCloudShell";
-import type { SettingsSection } from "./features/settings";
+import { isSettingsSectionAvailable, type SettingsSection } from "./features/settings";
 import { type CloudWorkspaceSection } from "./features/cloud";
 import {
   MinimalOnboarding,
@@ -17,11 +17,8 @@ import {
 import { AssetLibraryHome } from "./components/AssetLibraryHome";
 import { isDesktopAgentChatEnabled, loadRightAgentPanel } from "./features/desktop-agent/lazy";
 import {
-  createEmptyDesktopTerminalSessionSnapshot,
   isDesktopTerminalEnabled,
   RightTerminalPanel,
-  type DesktopTerminalSessionSnapshot,
-  type RightTerminalPanelHandle,
 } from "./features/desktop-terminal";
 import { useDesktopUpdates } from "./features/updates";
 import {
@@ -38,7 +35,7 @@ import {
   type DesktopCloudSession,
 } from "./lib/cloudApi";
 import {
-  getVisibleCreateNewItems,
+  resolveVisibleCreateNewMenuItems,
   type FilesVisibilitySettings,
 } from "./preferences";
 import type { PuppyoneWorkspaceConfig } from "./types/electron";
@@ -94,11 +91,7 @@ import {
   useTypographyRuntime,
 } from "./features/typography";
 import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
-import { enabledLocalAgentRuntimeIds, isLocalAgentRuntimeEnabled } from "./features/local-agents";
 
-const DesktopMinimalModeDock = lazy(() => import("./features/app-shell/DesktopMinimalModeDock").then((module) => ({
-  default: module.DesktopMinimalModeDock,
-})));
 const RightAgentPanel = lazy(loadRightAgentPanel);
 
 export function App() {
@@ -173,7 +166,6 @@ function AppContent() {
     createNewMenuSettings,
     explorerWidth,
     experimentalSettings,
-    externalAppsSettings,
     fileIconTheme,
     filesVisibilitySettings,
     interfaceStyle,
@@ -191,7 +183,6 @@ function AppContent() {
     sidebarNavigationOrientation,
     sidebarNavigationPlacement,
     terminalToolEnabled,
-    terminalSessionLayout,
     titlebarActionsSettings,
     darkThemePreset,
     diffMarkers,
@@ -212,14 +203,9 @@ function AppContent() {
     setThemeMode,
   } = preferences;
   const createNewItems = useMemo(
-    () => getVisibleCreateNewItems(createNewMenuSettings, experimentalSettings),
+    () => resolveVisibleCreateNewMenuItems(createNewMenuSettings, experimentalSettings),
     [createNewMenuSettings, experimentalSettings],
   );
-  const enabledAgentRuntimeIds = useMemo(
-    () => enabledLocalAgentRuntimeIds(localAgentsSettings),
-    [localAgentsSettings],
-  );
-  const minimalMode = experimentalSettings.enableMinimalMode;
   const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
     available: assetLibraryHomeAvailable,
     optedIn: experimentalSettings.enableAssetLibraryHome,
@@ -272,10 +258,6 @@ function AppContent() {
     }
   }, []);
   const switcherRef = useRef<HTMLDivElement>(null);
-  const terminalPanelRef = useRef<RightTerminalPanelHandle>(null);
-  const [terminalSnapshot, setTerminalSnapshot] = useState<DesktopTerminalSessionSnapshot>(
-    () => createEmptyDesktopTerminalSessionSnapshot(),
-  );
   const desktopTerminalEnabled = isDesktopTerminalEnabled({ terminalToolEnabled });
   const desktopAgentChatEnabled = isDesktopAgentChatEnabled({
     available: agentChatAvailable,
@@ -361,7 +343,6 @@ function AppContent() {
     refreshGitStatus,
     refreshGitStatusWithFetch,
     selectGitCommit,
-    selectGitMainPanel,
     selectGitWorkingFile,
     setBranchSwitcherOpen,
     setGitOperationError,
@@ -410,7 +391,6 @@ function AppContent() {
     openNodeInDefaultAppFromMenu,
   } = useDataNodeActions({
     dataPort,
-    externalAppsSettings,
     onEnterDataView: enterDataView,
     onLocalWorkspaceContentChanged: refreshGitStatus,
     onWorkspaceContentChanged: refreshWorkspaceContent,
@@ -430,6 +410,12 @@ function AppContent() {
       setActiveCloudSection("initialize");
     }
   }, [activeView, cloudEnabled, experimentalSettings.enableViewerPlugins]);
+
+  useEffect(() => {
+    if (!isSettingsSectionAvailable(activeSettingsSection, { cloudEnabled })) {
+      setActiveSettingsSection("general");
+    }
+  }, [activeSettingsSection, cloudEnabled]);
 
   useEffect(() => {
     const preventFileDropNavigation = (event: DragEvent) => {
@@ -680,7 +666,6 @@ function AppContent() {
     setSwitcherOpen(false);
   }, []);
   const externalFileOpen = useExternalFileOpen({
-    externalAppsSettings,
     onActionSettled: closeSwitcher,
     onError: setWorkspaceSurfaceError,
     workspace,
@@ -883,16 +868,11 @@ function AppContent() {
   }
 
   const workspaceSwitcherItems = getWorkspaceSwitcherItems({ workspaces });
-  const currentTerminalSnapshot = terminalSnapshot.workspacePath === workspace.path
-    ? terminalSnapshot
-    : createEmptyDesktopTerminalSessionSnapshot(workspace.path);
-
   const titlebarSidebarSlot = (
     <DesktopTitlebarContext
       activeGitStatus={activeGitStatus}
       branchSwitcherOpen={branchSwitcherOpen}
       branchSwitcherRef={branchSwitcherRef}
-      compact={minimalMode}
       gitStatusLoading={gitStatusLoading}
       gitOperationLoading={gitOperationLoading}
       localBranches={localBranches}
@@ -912,10 +892,8 @@ function AppContent() {
     />
   );
 
-  const toolsInNavigationToolbar = !minimalMode
-    && resolvedAppearance.composition.navigation === "sidebar-top-toolbar";
-  const locationBarVisible = !minimalMode
-    && resolvedAppearance.composition.locationBar === "workspace-path-v1";
+  const toolsInNavigationToolbar = resolvedAppearance.composition.navigation === "sidebar-top-toolbar";
+  const locationBarVisible = resolvedAppearance.composition.locationBar === "workspace-path-v1";
   const locationBarPath = resolveDesktopShellLocationPath({
     // The address bar describes the content surface. Keep the active editor
     // authoritative even if explorer selection state is briefly catching up.
@@ -928,25 +906,9 @@ function AppContent() {
     titlebarActionsSettings,
     terminalSidebarOpen: rightSidebarOpen && desktopTerminalEnabled && rightSidebarSurface === "terminal",
     terminalToolEnabled: desktopTerminalEnabled,
-    terminalSessionLayout,
-    terminalSessions: currentTerminalSnapshot.sessions,
-    activeTerminalSessionId: currentTerminalSnapshot.activeSessionId,
     agentChatEnabled: desktopAgentChatEnabled,
     agentChatSidebarOpen: rightSidebarOpen && desktopAgentChatEnabled && rightSidebarSurface === "chat",
     onUpdateNow: () => void desktopUpdates.updateNow(),
-    onCreateTerminal: () => {
-      terminalPanelRef.current?.create();
-      setRightSidebarSurface("terminal");
-      setRightSidebarOpen(true);
-      setSwitcherOpen(false);
-    },
-    onActivateTerminal: (sessionId: string) => {
-      terminalPanelRef.current?.activate(sessionId);
-      setRightSidebarSurface("terminal");
-      setRightSidebarOpen(true);
-      setSwitcherOpen(false);
-    },
-    onCloseTerminal: (sessionId: string) => terminalPanelRef.current?.close(sessionId),
     onToggleTerminal: () => {
       const terminalIsOpen = rightSidebarOpen && rightSidebarSurface === "terminal";
       setRightSidebarSurface("terminal");
@@ -975,39 +937,14 @@ function AppContent() {
     />
   ) : undefined;
 
-  const minimalModeDock = minimalMode ? (
-    <Suspense fallback={null}>
-      <DesktopMinimalModeDock
-        activeView={activeView}
-        cloudHubEnabled={cloudEnabled}
-        contextMenuOpen={switcherOpen || branchSwitcherOpen}
-        contextSlot={(
-          titlebarSidebarSlot
-        )}
-        pluginsEnabled={
-          experimentalSettings.enableViewerPlugins
-          && preferences.sidebarNavigationVisibilitySettings.enabled.plugins
-        }
-        titlebarActions={titlebarActions}
-        onNavigate={navigateDesktopView}
-        onExitMinimalMode={() => preferences.setExperimentalSettings({
-          ...experimentalSettings,
-          enableMinimalMode: false,
-        })}
-      />
-    </Suspense>
-  ) : undefined;
-
   return (
     <div
       className={`app-shell cloud-runtime ${resolvedTheme === "dark" ? "dark" : ""}`}
-      data-minimal-mode={minimalMode ? "true" : undefined}
       data-theme-mode={activeThemeMode}
       data-interface-style={interfaceStyle}
       data-interface-style-family={resolvedAppearance.profile.family}
       data-interface-style-variant={resolvedAppearance.profile.variant}
       data-interface-style-palette={resolvedAppearance.profile.palette}
-      data-editor-presentation={resolvedAppearance.editorPresentation}
       data-appearance-token-set={resolvedAppearance.tokenSet}
       data-shell-composition={resolvedAppearance.composition.shell}
       data-titlebar-composition={resolvedAppearance.composition.titlebar}
@@ -1029,8 +966,6 @@ function AppContent() {
           leftSidebarCollapsed={sidebarCollapsed}
           leftSidebarPresent={Boolean(dataPort)}
           leftSidebarWidth={explorerWidth}
-          minimalMode={minimalMode}
-          minimalModeDock={minimalModeDock}
           titlebarSidebarSlot={titlebarSidebarSlot}
           titlebarActions={titlebarActions}
           navigationToolbarActions={navigationToolbarActions}
@@ -1054,11 +989,9 @@ function AppContent() {
                 aria-hidden={rightSidebarSurface !== "terminal"}
               >
                 <RightTerminalPanel
-                  ref={terminalPanelRef}
                   workspace={workspace}
                   active={rightSidebarOpen && rightSidebarSurface === "terminal"}
-                  sessionLayout={terminalSessionLayout}
-                  onSessionsChange={setTerminalSnapshot}
+                  hiddenAgentIds={localAgentsSettings.hiddenTerminalAgentIds}
                 />
               </div>
             )}
@@ -1071,11 +1004,7 @@ function AppContent() {
                   <RightAgentPanel
                     workspace={workspace}
                     active={rightSidebarOpen && rightSidebarSurface === "chat"}
-                    minimalMode={minimalMode}
-                    preferredRuntimeId={agentPreferredRuntime && isLocalAgentRuntimeEnabled(localAgentsSettings, agentPreferredRuntime)
-                      ? agentPreferredRuntime
-                      : null}
-                    enabledRuntimeIds={enabledAgentRuntimeIds}
+                    preferredRuntimeId={agentPreferredRuntime}
                     onPreferredRuntimeChange={setAgentPreferredRuntime}
                     preferredModel={agentPreferredModel}
                     onPreferredModelChange={setAgentPreferredModel}
@@ -1128,7 +1057,6 @@ function AppContent() {
           externalOpen={externalFileOpen}
           desktopUpdates={desktopUpdates}
           git={git}
-          minimalMode={minimalMode}
           navigationComposition={resolvedAppearance.composition.navigation}
           onActiveDataNodeChange={handleActiveDataNodeChange}
           onActiveDataPathChange={handleActiveDataPathChange}
@@ -1213,7 +1141,8 @@ function AppContent() {
             ) : (
               <DesktopCreateEntryMenu
                 draft={createEntryDraft}
-                itemKinds={createNewItems}
+                mainEntries={createNewItems.main}
+                submenuItemKinds={createNewItems.submenu}
                 fileIconTheme={fileIconTheme}
                 onCancel={() => setCreateEntryDraft(null)}
                 onSelectKind={selectCreateEntryKind}

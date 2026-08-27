@@ -1,159 +1,124 @@
-/*
- * Reimplements the archived ProjectFolderCard visual language for Overview.
- * This stays namespaced here so the archived component is not a dependency.
- */
-.desktop-cloud-overview-dashboard-card--storage {
-  position: relative;
-  display: flex;
-  width: 100%;
-  max-width: 340px;
-  grid-row: 1 / span 3;
-  aspect-ratio: 1;
-  flex-direction: column;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--po-text-muted);
-  box-shadow: none;
-}
-
-.desktop-cloud-overview-storage-tab {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  max-width: 75%;
-  height: 32px;
-  flex: 0 0 32px;
-  align-items: center;
-  gap: 8px;
-  align-self: flex-start;
-  padding: 0 14px;
-  border: 2px solid var(--po-border);
-  border-bottom: 0;
-  border-radius: 6px 6px 0 0;
-  background: var(--po-project-card-tab);
-  color: var(--po-text-muted);
-}
-
-.desktop-cloud-overview-storage-tab > svg {
-  flex: 0 0 auto;
-}
-
-.desktop-cloud-overview-storage-tab > span {
+/* One quiet project-file frame with compact rows inside. */
+.desktop-cloud-overview-files {
   min-width: 0;
   overflow: hidden;
-  color: var(--po-text-muted);
-  font-size: 13px;
-  font-weight: 660;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 10px;
+  background: var(--po-canvas);
 }
 
-.desktop-cloud-overview-storage-body {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  overflow: hidden;
-  margin-top: -2px;
-  padding: 18px 14px 42px;
-  border: 2px solid var(--po-border);
-  border-radius: 0 8px 8px 8px;
-  background: var(--po-project-card-bg);
-  box-shadow: none;
-}
-
-.desktop-cloud-overview-storage-metric {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--po-text);
-  font-size: 27px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 580;
-  letter-spacing: -0.035em;
-  line-height: 32px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-cloud-overview-storage-preview {
+.desktop-cloud-overview-file-table {
   display: grid;
-  width: 100%;
   min-width: 0;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  align-content: start;
-  gap: 16px 8px;
-  overflow: hidden;
-  margin-top: 22px;
 }
 
-.desktop-cloud-overview-storage-preview-item,
-.desktop-cloud-overview-storage-preview-more {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  width: 100%;
+.desktop-cloud-overview-file-row {
+  display: grid;
   min-width: 0;
-  max-width: 100%;
-  height: 38px;
+  grid-template-columns: minmax(220px, 1fr) minmax(112px, 144px);
+  align-items: center;
+  column-gap: 12px;
+  padding: 0 10px;
+}
+
+.desktop-cloud-overview-file-row:last-child {
+  border-bottom: 0;
+}
+
+.desktop-cloud-overview-file-row {
+  min-height: 36px;
+  border-bottom: 1px solid var(--po-border-subtle);
+  color: var(--po-text-muted);
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.desktop-cloud-overview-file-row:hover {
+  background: var(--po-hover);
+  color: var(--po-text);
+}
+
+.desktop-cloud-overview-file-row.skeleton {
+  pointer-events: none;
+}
+
+.desktop-cloud-overview-file-skeleton-icon,
+.desktop-cloud-overview-file-skeleton-name,
+.desktop-cloud-overview-file-skeleton-time {
+  display: block;
+  border-radius: 999px;
+  background: var(--po-skeleton-base);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.desktop-cloud-overview-file-skeleton-icon {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+}
+
+.desktop-cloud-overview-file-skeleton-name {
+  width: min(180px, 54%);
+  height: 10px;
+}
+
+.desktop-cloud-overview-file-row.skeleton:nth-child(even) .desktop-cloud-overview-file-skeleton-name {
+  width: min(132px, 42%);
+}
+
+.desktop-cloud-overview-file-skeleton-time {
+  width: 54px;
+  height: 9px;
+  justify-self: end;
+}
+
+.desktop-cloud-overview-file-primary {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.desktop-cloud-overview-file-icon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  color: var(--po-text-muted);
 }
 
-.desktop-cloud-overview-storage-preview-item--folder {
-  color: color-mix(in srgb, var(--po-accent) 76%, var(--po-text));
-}
-
-.desktop-cloud-overview-storage-preview-more {
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
-.desktop-cloud-overview-storage-stats {
-  position: absolute;
-  inset-inline-end: 0;
-  bottom: 0;
-  inset-inline-start: 0;
-  z-index: 3;
-  display: flex;
-  height: 30px;
-  min-width: 0;
-  align-items: center;
-  gap: 16px;
-  padding: 0 12px;
-  border-top: 1px solid var(--po-divider);
-  color: var(--po-text-subtle);
-}
-
-.desktop-cloud-overview-storage-stat {
-  display: inline-flex;
-  min-width: 0;
-  align-items: baseline;
-  gap: 5px;
-}
-
-.desktop-cloud-overview-storage-stat strong {
-  color: var(--po-text-muted);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 620;
-  line-height: 15px;
-}
-
-.desktop-cloud-overview-storage-stat small {
+.desktop-cloud-overview-file-name {
   min-width: 0;
   overflow: hidden;
-  color: var(--po-text-subtle);
-  font-size: 10px;
-  font-weight: 520;
-  line-height: 15px;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.desktop-cloud-overview-file-modified {
+  overflow: hidden;
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: end;
+}
+
+.desktop-cloud-overview-files-empty {
+  display: flex;
+  min-height: 180px;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: var(--po-text-subtle);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+  text-align: center;
 }

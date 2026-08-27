@@ -1,4 +1,5 @@
-import { DesktopCloudProviderIcon } from "./accessProviders";
+import { AccessPointProviderIcon } from "../../access-points/presentation";
+import { resolveAccessPointKind } from "../../access-points/model";
 import { useLocalization } from "@puppyone/localization/react";
 import {
   CREATE_ACCESS_INTENT_OPTIONS,
@@ -27,6 +28,7 @@ export function CreateAccessIntentPicker({
         {CREATE_ACCESS_INTENT_OPTIONS.map((option) => {
           const active = value === option.id;
           const preview = option.preview ?? t(option.previewId!);
+          const accessPointKind = resolveAccessPointKind(option.provider);
           return (
             <button
               key={option.id}
@@ -36,7 +38,11 @@ export function CreateAccessIntentPicker({
             >
               <span className="desktop-cloud-create-access-intent-title">
                 <span className={`desktop-cloud-create-access-provider-tile ${getCreateAccessTileProvider(option.provider)} ${active ? "active" : ""}`} aria-hidden="true">
-                  <DesktopCloudProviderIcon provider={option.provider} size={option.provider === "git_remote" ? 20 : 15} />
+                  <AccessPointProviderIcon
+                    kind={accessPointKind}
+                    sourceProvider={option.provider}
+                    size={accessPointKind === "git" ? 20 : 15}
+                  />
                 </span>
                 <span>{t(option.labelId)}</span>
               </span>

@@ -84,10 +84,11 @@ describe("data workspace localization boundaries", () => {
       .toBe("当前类型（⁨.custom⁩）");
     expect(chineseOptions.find(({ extension }) => extension === ".txt")?.label)
       .toBe("文本 (.txt)");
-    expect(getDesktopFileTypeOptions(".contextmap", english, {
-      ...DEFAULT_EXPERIMENTAL_SETTINGS,
-      enableContextMaps: true,
-    }).find(({ extension }) => extension === ".contextmap")?.label)
+    expect(getDesktopFileTypeOptions(
+      ".contextmap",
+      english,
+      DEFAULT_EXPERIMENTAL_SETTINGS,
+    ).find(({ extension }) => extension === ".contextmap")?.label)
       .toBe("Context Map (.contextmap)");
   });
 });

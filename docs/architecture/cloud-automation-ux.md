@@ -128,6 +128,18 @@ All Automation dialogs close on `Escape`, trap focus, receive initial focus,
 and keep a stable width across internal steps. Icon-only buttons carry
 accessible names and tooltips.
 
+### 2.10 Navigation ownership
+
+Automation is project-bound, but it is not project state and it is not a
+Connection transport. The Cloud sidebar therefore gives Automation its own
+product group after Connections and before Organization. `Cloud Project`
+contains Homepage and History; `Connections` contains MCP, CLI, and Git.
+
+The group is named `Automation`, not `Agents`: the current capability watches
+external sources and keeps project folders current. Agent creation, placement,
+and execution are a separate future product surface and must not be implied by
+this route.
+
 ## 3. Pre-ISSUE-031 implementation assessment
 
 Historical baseline: `src/features/automation/` before ISSUE-031. The first

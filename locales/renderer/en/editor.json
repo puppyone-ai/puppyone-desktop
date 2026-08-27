@@ -338,7 +338,6 @@
   "panes.empty": "Empty editor",
   "panes.fileActions": "File",
   "panes.label": "{name} editor pane",
-  "panes.openInApp": "Open in {app}",
   "panes.paneActions": "Pane",
   "panes.resize": "Resize editor panes",
   "panes.splitDown": "Split editor down",

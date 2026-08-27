@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   isSelectableAppLanguagePreference,
+  resolveSystemLocale,
   useLocalization,
   type AppLanguagePreference,
 } from "@puppyone/localization";
@@ -8,16 +9,17 @@ import {
 export function LanguageSettingRow() {
   const {
     preference,
-    locale,
     localeDescriptors,
+    systemLanguages,
     status,
     t,
     setLanguagePreference,
   } = useLocalization();
   const [changeFailed, setChangeFailed] = useState(false);
   const changing = status === "changing";
-  const resolvedLanguage = localeDescriptors.find((descriptor) => descriptor.locale === locale)?.label
-    ?? locale;
+  const systemLocale = resolveSystemLocale(systemLanguages);
+  const systemLanguage = localeDescriptors.find((descriptor) => descriptor.locale === systemLocale)?.label
+    ?? systemLocale;
 
   const changeLanguage = async (nextPreference: AppLanguagePreference) => {
     setChangeFailed(false);
@@ -45,7 +47,7 @@ export function LanguageSettingRow() {
           }}
         >
           <option value="system">
-            {t("settings.language.system", { language: resolvedLanguage })}
+            {t("settings.language.system", { language: systemLanguage })}
           </option>
           {localeDescriptors.filter((descriptor) => descriptor.productionReady).map((descriptor) => (
             <option

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  createDesktopTerminalSessionSnapshot,
   createDesktopTerminalSessionsState,
   desktopTerminalSessionsReducer,
 } from "../src/features/desktop-terminal/model/terminalSessions";
@@ -112,7 +111,7 @@ describe("Desktop Terminal session state", () => {
     expect(state.activeSessionId).toBeNull();
   });
 
-  it("publishes renderer-safe session status metadata", () => {
+  it("keeps renderer-safe session status metadata in state", () => {
     let state = createDesktopTerminalSessionsState("terminal-a");
     state = desktopTerminalSessionsReducer(state, {
       type: "create",
@@ -129,25 +128,5 @@ describe("Desktop Terminal session state", () => {
       { id: "terminal-a", launcherId: "shell", status: "starting" },
       { id: "terminal-b", launcherId: "claude", shell: "zsh", status: "running" },
     ]);
-    expect(createDesktopTerminalSessionSnapshot("/workspace", state)).toEqual({
-      workspacePath: "/workspace",
-      activeSessionId: "terminal-b",
-      sessions: [
-        {
-          id: "terminal-a",
-          launcherId: "shell",
-          ordinal: 1,
-          shell: null,
-          status: "starting",
-        },
-        {
-          id: "terminal-b",
-          launcherId: "claude",
-          ordinal: 2,
-          shell: "zsh",
-          status: "running",
-        },
-      ],
-    });
   });
 });

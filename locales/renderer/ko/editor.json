@@ -338,7 +338,6 @@
   "panes.empty": "빈 편집기",
   "panes.fileActions": "파일",
   "panes.label": "{name} 편집기 창",
-  "panes.openInApp": "{app}에서 열기",
   "panes.paneActions": "창",
   "panes.resize": "편집기 창 크기 조절",
   "panes.splitDown": "아래로 편집기 분할",

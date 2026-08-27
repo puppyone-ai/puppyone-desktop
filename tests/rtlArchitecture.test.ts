@@ -7,7 +7,12 @@ const logicalUiStyles = [
   "../src/features/cloud/organization/organization.css",
   "../src/features/cloud/auth/cloud-auth-card.css",
   "../src/features/cloud/auth/cloud-sign-in.css",
-  "../src/features/cloud/sections/access/styles/access-detail.css",
+  "../src/features/cloud/sections/access/styles/scope-settings.css",
+  "../src/features/cloud/sections/access/styles/scope-detail.css",
+  "../src/features/cloud/sections/access/styles/method-card.css",
+  "../src/features/cloud/sections/access/styles/permissions.css",
+  "../src/features/cloud/sections/access/styles/create-access-dialog.css",
+  "../src/features/cloud/sections/access/styles/responsive.css",
   "../src/features/desktop-agent/ui/styles/activities.css",
   "../src/features/desktop-agent/ui/styles/blocking.css",
   "../src/features/desktop-agent/ui/styles/composer.css",
@@ -48,14 +53,14 @@ describe("RTL architecture", () => {
       .toContain('dir="ltr"');
     expect(read("../src/features/source-control/diff/contributions/text-unified/TextUnifiedDiff.tsx"))
       .toContain('dir="ltr"');
-    expect(read("../src/features/source-control/GitStatusView.tsx"))
+    expect(read("../src/features/source-control/sidebar/GitSidebarHistoryPanel.tsx"))
       .toContain('className="desktop-history-graph" aria-hidden="true" dir="ltr"');
     expect(read("../src/features/cloud/history/CloudHistorySidebar.tsx"))
       .toMatch(/aria-hidden="true"\s+dir="ltr"/);
     expect(read("../src/features/settings/main/RepositorySettingsViews.tsx"))
       .toContain('<code dir="ltr" title={copyUrl ?? ""}>');
     expect(read("../src/features/settings/main/LocalProjectSettingsView.tsx"))
-      .toContain('<strong dir="ltr" title={workspace.path}>{workspace.path}</strong>');
+      .toContain('className="desktop-settings-row-value" dir="ltr" title={workspace.path}');
   });
 });
 

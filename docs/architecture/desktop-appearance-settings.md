@@ -42,7 +42,6 @@ deliberate ownership of knowledge content:
 | --- | --- |
 | Text size | One three-tier control (Small / Default / Large). `Default` is an exact identity state that preserves every hand-tuned component font size, line height, and spacing value. Small/Large may scale semantic typography tokens; never bulk-rewrite existing component CSS or introduce two free px inputs. |
 | Content font | One catalog-backed selector with an inline live content sample. Built-in entries are Geist, System, and Serif. Preferences store an opaque font ID rather than a CSS family or file path, so a future local imported-font catalog can extend the same surface without changing the preference schema. UI, code, and terminal fonts remain fixed until separately designed. |
-| Dock icon | Curated set of 2-3 official icons only, presented in the shared content-sized segmented control. No custom image upload. macOS only. |
 | Pointer cursors | Single toggle. Default off (macOS-native arrow cursor). |
 | Agent file activity | Single global toggle. Default off. Shows the Editor eye/hand presence treatment for Hook-observed reads/writes; Agent inventory and selection remain in Local Agents. |
 | Third dark preset | A warm dark preset pairing with the light `warm` preset, giving 3 light + 3 dark. |
@@ -62,14 +61,23 @@ Rejected, and why:
 | Translucent sidebar toggle | An opinionated product decides. Either vibrancy becomes the default design (all themes adapted) or we skip it. Not a toggle. |
 | Interface density | Backlog. Row heights are tokenized so it is cheap, but no real user demand yet, and each density tier multiplies visual QA. |
 | High contrast switch | Would ship as one more curated preset, not an independent switch. |
+| Dock icon variants | Deferred. The product uses the canonical Polished icon with no Renderer preference, storage key, or native switching IPC. Reintroduce alternatives only with a separately reviewed product requirement. |
 
 ### Page Shape
 
 The Appearance section stays a single flat list (Interface style, Light or
 Dark controls when supported, presets, Text size, Content font, File icons,
 Navigation, Header elements,
-Pointer cursors, Agent file activity, Dock icon). It must fit in roughly one screen. Do not adopt grouped-card layouts
+Pointer cursors, Agent file activity). It must fit in roughly one screen. Do not adopt grouped-card layouts
 while the list stays this small.
+
+Interface Style is the single presentation owner for both application chrome
+and product-owned Editor chrome. Do not add an independent Editor appearance
+preference, policy, DOM attribute, or fallback projection. A historical Style
+such as Windows XP projects its semantic tokens directly at Viewer surface
+boundaries; the Default Style leaves those surfaces on the canonical PuppyOne
+tokens. Authored PDF, Office, image, and embedded document content remains
+untouched by either Style.
 
 Header elements are visibility controls, not configuration surfaces. The
 external-open Header element executes the current system or extension-specific
@@ -78,17 +86,18 @@ Apps Settings page; the Header must not expose an app-picker dropdown.
 
 Language is an application preference rather than an Appearance customization.
 It lives as a first-class page under `Desktop App`, between General and
-Appearance. Its compact select applies immediately through the localization
+Appearance. Its compact select hugs the current localized value, with the page
+width acting only as a maximum, and applies immediately through the localization
 runtime; do not add a separate Change or Save step or re-embed it in Appearance.
 
-Light theme, dark theme, Text size, Content font, File icons, Navigation, and
-Dock icon reuse the same segmented-control surface. Buttons are content-sized
+Light theme, dark theme, Text size, Content font, File icons, and Navigation
+reuse the same segmented-control surface. Buttons are content-sized
 around their icon or palette glyph and label; do not add a fixed group width,
 equal-width flex growth, control-specific background, or control-specific
 active treatment.
 
 Every ordinary row uses the same single-line muted label treatment. Do not turn
-Pointer cursors or Dock icon into a separate subsection with a bold title and
+Pointer cursors into a separate subsection with a bold title and
 visible description. Explanatory copy may remain as a native tooltip and an
 accessible description without changing the page hierarchy.
 
@@ -96,10 +105,10 @@ accessible description without changing the page hierarchy.
 
 Appearance defines the visual grammar for every Desktop Settings page. Page
 content is capped at `1040px` with `24px 28px 40px` padding. Page titles use
-`14px / 720`, descriptions use `12px / 1.35`, ordinary labels use `12.5px`,
-and label descriptions use `11px / 520`. Interactive rows are at least `42px`;
-read-only rows are at least `30px`; both use `10px` inline padding and an
-`18px` gap.
+`14px / 600`, descriptions use `12px / 1.35`, ordinary labels use `12.5px`,
+and label descriptions use `11px / 520`. Titles, descriptions, and rows share
+the same `10px` inline inset. Interactive rows are at least `42px`; read-only
+rows are at least `30px`; rows use an `18px` gap.
 
 Ordinary rows and subsections remain transparent and have no outer border or
 row-level hover. Borders belong only to actual inputs, actions, and Theme
@@ -203,10 +212,12 @@ Implemented:
 6. **Pointer cursors.** `puppyone.desktop.pointerCursors` (default false)
    uses a root `data-pointer-cursors` attribute; CSS opts interactive elements
    into `cursor: pointer`.
-7. **Dock icon.** `puppyone.desktop.dockIcon` selects among packaged
-   official icons via `app.dock.setIcon()` in the main process. Follows the
-   packaging contract in [Desktop App Icon](../DESKTOP_APP_ICON.md) (raw PNG
-   resources, not `.icns` slots).
+7. **Dock icon.** Zero-UI. The main process applies the canonical Polished icon
+   at startup; Development builds apply its badged Polished counterpart. There
+   is no Renderer preference, local-storage key, switching IPC, or packaged
+   native Light/Matte Dock resource. Follows the packaging contract in
+   [Desktop App Icon](../DESKTOP_APP_ICON.md) (raw PNG resources, not `.icns`
+   slots).
 8. **Diff markers.** `puppyone.desktop.diffMarkers`
    (`color | symbols`) is rendered in compact AI review surfaces; its settings
    row lives in the Editor section. The full Git Changes review surface always
