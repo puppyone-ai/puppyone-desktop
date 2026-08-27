@@ -63,6 +63,10 @@ describe("Cloud content width architecture", () => {
     expect(activation).toContain(".desktop-cloud-activation-illustration-frame.is-overview");
     expect(activation).toContain("width: var(--desktop-cloud-activation-artwork-slot-size);");
     expect(activation).toContain("height: auto;");
+    expect(activation).toContain("isolation: isolate;");
+    expect(activation).toContain("filter: drop-shadow(0 11px 17px rgba(79, 76, 68, 0.16));");
+    expect(activation).toContain("inset-inline-end: 6px;");
+    expect(activation).toContain("inset-inline-start: 4px;");
     expect(activation).not.toContain("desktop-cloud-activation-overview-link");
     expect(activation).not.toContain("@media (max-width: 760px)");
     expect(activation).not.toContain("margin-bottom: -");
