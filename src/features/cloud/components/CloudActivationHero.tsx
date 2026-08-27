@@ -100,10 +100,22 @@ function getCloudActivationKind(section: CloudWorkspaceSection): CloudActivation
 }
 
 function CloudActivationIllustration({ kind }: { kind: CloudActivationKind }) {
-  if (kind === "overview") return <CloudOverviewActivationIllustration />;
-  if (kind === "automation") return <CloudAutomationActivationIllustration />;
-  if (kind === "access") return <CloudAccessActivationIllustration />;
-  return <CloudMcpConnectionIllustration />;
+  const illustration = kind === "overview"
+    ? <CloudOverviewActivationIllustration />
+    : kind === "automation"
+      ? <CloudAutomationActivationIllustration />
+      : kind === "access"
+        ? <CloudAccessActivationIllustration />
+        : <CloudMcpConnectionIllustration />;
+
+  return (
+    <div
+      className={`desktop-cloud-activation-illustration-frame is-${kind}`}
+      aria-hidden="true"
+    >
+      {illustration}
+    </div>
+  );
 }
 
 function CloudOverviewActivationIllustration() {

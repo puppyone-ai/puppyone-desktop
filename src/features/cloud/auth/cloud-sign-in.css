@@ -5,6 +5,7 @@
   }
 
   .desktop-cloud-auth-page-shell {
+    container: cloud-auth / inline-size;
     display: flex;
     flex: 1 1 auto;
     width: 100%;

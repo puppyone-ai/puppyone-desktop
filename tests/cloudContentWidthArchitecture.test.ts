@@ -7,6 +7,7 @@ const connections = readSource("../src/features/cloud/access-points/styles/catal
 const settings = readSource("../src/features/cloud/sections/settings/settings.css");
 const automation = readSource("../src/features/automation/styles/shell-and-catalog.css");
 const activation = readSource("../src/features/cloud/components/mcp-activation.css");
+const cloudSignIn = readSource("../src/features/cloud/auth/cloud-sign-in.css");
 const organization = readSource("../src/features/cloud/organization/organization.css");
 
 describe("Cloud content width architecture", () => {
@@ -38,6 +39,20 @@ describe("Cloud content width architecture", () => {
 
     expect(organization).toContain("var(--desktop-cloud-catalog-padding-top)");
     expect(sharedShell).toContain(":not(.desktop-cloud-landing-main-view):not(.desktop-cloud-automation-main-view)");
+  });
+
+  it("keeps activation copy and artwork compact and responds to the content pane", () => {
+    expect(cloudSignIn).toContain("container: cloud-auth / inline-size;");
+    expect(activation).toContain(".desktop-cloud-mcp-activation.is-mcp");
+    expect(activation).toContain("grid-template-columns: minmax(320px, 360px) 220px;");
+    expect(activation).toContain("gap: 44px;");
+    expect(activation).toContain("@container (max-width: 820px)");
+    expect(activation).toContain("@container (max-width: 680px)");
+    expect(activation).toContain("@container (max-width: 420px)");
+    expect(activation).toContain(".desktop-cloud-activation-illustration-frame.is-mcp");
+    expect(activation).toContain("height: 350px;");
+    expect(activation).not.toContain("@media (max-width: 760px)");
+    expect(activation).not.toContain("margin-bottom: -");
   });
 });
 
