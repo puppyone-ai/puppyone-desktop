@@ -54,6 +54,9 @@ describe("Cloud content width architecture", () => {
     expect(activation).toContain("width: 84px;");
     expect(activation).toContain("height: 196px;");
     expect(activation).toContain("transform: scale(var(--desktop-cloud-connection-art-scale));");
+    expect(activation).toContain(".desktop-cloud-activation-illustration-frame.is-overview");
+    expect(activation).toContain("height: 190px;");
+    expect(activation).not.toContain("desktop-cloud-activation-overview-link");
     expect(activation).not.toContain("@media (max-width: 760px)");
     expect(activation).not.toContain("margin-bottom: -");
   });

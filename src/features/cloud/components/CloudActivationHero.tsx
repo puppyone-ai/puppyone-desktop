@@ -152,7 +152,6 @@ function CloudOverviewActivationIllustration() {
       <span className="desktop-cloud-activation-overview-cloud">
         <CloudPublishCloudMark />
       </span>
-      <span className="desktop-cloud-activation-overview-link" />
       <span className="desktop-cloud-activation-overview-folder">
         <CloudPublishFolderMark />
       </span>

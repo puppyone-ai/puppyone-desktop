@@ -179,6 +179,10 @@
     transform-origin: center;
   }
 
+  .desktop-cloud-activation-illustration-frame.is-overview {
+    height: 190px;
+  }
+
   .desktop-cloud-activation-illustration {
     position: relative;
     display: flex;
@@ -191,17 +195,23 @@
   }
 
   .desktop-cloud-activation-illustration.is-overview {
-    height: 320px;
-    flex-direction: column;
+    width: 260px;
+    height: 180px;
   }
 
   .desktop-cloud-activation-overview-cloud,
   .desktop-cloud-activation-overview-folder {
+    position: absolute;
     display: grid;
-    width: 166px;
-    height: 132px;
-    flex: 0 0 132px;
     place-items: center;
+  }
+
+  .desktop-cloud-activation-overview-cloud {
+    top: 0;
+    inset-inline-end: 0;
+    width: 156px;
+    height: 132px;
+    z-index: 1;
   }
 
   .desktop-cloud-activation-overview-cloud > svg {
@@ -211,32 +221,19 @@
     filter: drop-shadow(0 9px 14px rgba(82, 112, 142, 0.14));
   }
 
+  .desktop-cloud-activation-overview-folder {
+    inset-inline-start: 0;
+    bottom: 0;
+    width: 166px;
+    height: 146px;
+    z-index: 2;
+  }
+
   .desktop-cloud-activation-overview-folder > svg {
     width: 166px;
     height: 146px;
     overflow: visible;
     filter: drop-shadow(0 8px 12px rgba(102, 70, 16, 0.16));
-  }
-
-  .desktop-cloud-activation-overview-link {
-    position: relative;
-    display: block;
-    width: 2px;
-    height: 48px;
-    flex: 0 0 48px;
-    background: linear-gradient(to bottom, #b8c7d4 0%, #d0d0cc 100%);
-  }
-
-  .desktop-cloud-activation-overview-link::before {
-    content: "";
-    position: absolute;
-    inset-inline-start: 50%;
-    top: -2px;
-    width: 7px;
-    height: 7px;
-    border-top: 2px solid #a8bac9;
-    border-left: 2px solid #a8bac9;
-    transform: translateX(-50%) rotate(45deg);
   }
 
   .desktop-cloud-activation-faux-copy {
@@ -793,7 +790,7 @@
     }
 
     .desktop-cloud-activation-illustration-frame.is-overview {
-      height: 270px;
+      height: 160px;
     }
 
     .desktop-cloud-activation-illustration-frame.is-overview > .desktop-cloud-activation-illustration {
@@ -835,7 +832,7 @@
     }
 
     .desktop-cloud-activation-illustration-frame.is-overview {
-      height: 230px;
+      height: 140px;
     }
 
     .desktop-cloud-activation-illustration-frame.is-overview > .desktop-cloud-activation-illustration {
