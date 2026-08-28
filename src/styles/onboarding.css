@@ -114,6 +114,13 @@
   pointer-events: none;
 }
 
+/* Keep the canonical brand asset intact while reducing its visual weight on
+ * dark onboarding surfaces. The transformed warm-white face resolves near
+ * the adjacent --po-text-muted silver; dark linework remains crisp. */
+.onboarding-shell.dark .onboarding-brand-mark-artwork {
+  filter: grayscale(1) brightness(0.7);
+}
+
 .onboarding-brand-name,
 .onboarding-brand-prompt {
   font-family: var(--po-font-sans);

@@ -1,6 +1,7 @@
 /**
  * @vitest-environment happy-dom
  */
+import { readFileSync } from "node:fs";
 import React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -22,6 +23,7 @@ import type { DesktopTelemetryState } from "../src/types/electron";
 let root: Root | null = null;
 const originalClipboard = navigator.clipboard;
 const originalConfirm = window.confirm;
+const onboardingCss = readFileSync("src/styles/onboarding.css", "utf8");
 
 afterEach(() => {
   act(() => root?.unmount());
@@ -173,6 +175,15 @@ describe("project folder home", () => {
       container,
       "empty",
       PUPPY_BRAND_MARK_ASSETS.lite,
+    );
+  });
+
+  it("tones the canonical Puppy mark down only on dark onboarding surfaces", () => {
+    expect(onboardingCss).toMatch(
+      /\.onboarding-shell\.dark \.onboarding-brand-mark-artwork\s*\{[^}]*filter:\s*grayscale\(1\) brightness\(0\.7\);/s,
+    );
+    expect(onboardingCss).not.toMatch(
+      /(?:^|\n)\.onboarding-brand-mark-artwork\s*\{[^}]*filter:/s,
     );
   });
 
