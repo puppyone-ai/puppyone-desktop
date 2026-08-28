@@ -3,6 +3,7 @@ import {
   THEME_LIST_CHANNEL,
   THEME_OPEN_DIRECTORY_CHANNEL,
   THEME_RELOAD_CHANNEL,
+  THEME_SYNC_NATIVE_MENU_CHANNEL,
   registerThemeIpcHandlers,
 } from "../electron/main/ipc/theme-ipc.mjs";
 
@@ -17,19 +18,29 @@ describe("CSS theme IPC", () => {
       listThemes: vi.fn(async () => snapshot),
       openDirectory: vi.fn(async () => ({ opened: true })),
     };
+    const onSyncNativeMenu = vi.fn();
 
-    registerThemeIpcHandlers({ ipcMain, themeService });
+    registerThemeIpcHandlers({ ipcMain, themeService, onSyncNativeMenu });
 
     expect([...handlers.keys()]).toEqual([
       THEME_LIST_CHANNEL,
       THEME_RELOAD_CHANNEL,
       THEME_OPEN_DIRECTORY_CHANNEL,
+      THEME_SYNC_NATIVE_MENU_CHANNEL,
     ]);
     await expect(handlers.get(THEME_LIST_CHANNEL)({})).resolves.toBe(snapshot);
     await expect(handlers.get(THEME_RELOAD_CHANNEL)({}, { ignoredPath: "/tmp" })).resolves.toBe(snapshot);
     await expect(handlers.get(THEME_OPEN_DIRECTORY_CHANNEL)({}, "/tmp")).resolves.toEqual({ opened: true });
     expect(themeService.listThemes).toHaveBeenCalledTimes(2);
     expect(themeService.openDirectory).toHaveBeenCalledExactlyOnceWith();
+    expect(handlers.get(THEME_SYNC_NATIVE_MENU_CHANNEL)({}, {
+      selection: { application: "default", markdown: "builtin.markdown.focus", csv: "unsafe/id" },
+      themes: [{ id: "builtin.markdown.focus", name: "Focus", targets: ["markdown", "invalid"] }],
+    })).toEqual({ synced: true });
+    expect(onSyncNativeMenu).toHaveBeenCalledWith({
+      selection: { application: "default", markdown: "builtin.markdown.focus", csv: "default" },
+      themes: [{ id: "builtin.markdown.focus", name: "Focus", targets: ["markdown"] }],
+    });
   });
 
   it("requires the trusted IPC and theme service ports", () => {

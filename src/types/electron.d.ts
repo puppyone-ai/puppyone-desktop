@@ -740,6 +740,14 @@ export type DesktopThemeSnapshot = Readonly<{
   themes: readonly DesktopThemeDefinition[];
   diagnostics: readonly DesktopThemeDiagnostic[];
 }>;
+export type DesktopThemeMenuState = Readonly<{
+  selection: Readonly<Record<DesktopThemeTarget, string>>;
+  themes: readonly Readonly<{
+    id: string;
+    name: string;
+    targets: readonly DesktopThemeTarget[];
+  }>[];
+}>;
 
 declare global {
   interface Window {
@@ -760,6 +768,11 @@ declare global {
         list: () => Promise<DesktopThemeSnapshot>;
         reload: () => Promise<DesktopThemeSnapshot>;
         openDirectory: () => Promise<{ opened: true }>;
+        syncNativeMenu: (request: DesktopThemeMenuState) => Promise<{ synced: true }>;
+        onSelectionRequested: (
+          callback: (request: { target: DesktopThemeTarget; themeId: string }) => void,
+        ) => () => void;
+        onReloadRequested: (callback: () => void) => () => void;
       };
       setWindowMinimumWidth: (request: { width: number }) => Promise<{
         applied: boolean;

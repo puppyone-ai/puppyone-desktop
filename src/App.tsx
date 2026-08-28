@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   closeAllDocumentWorkingCopies,
   closeDocumentWorkingCopy,
@@ -106,7 +106,10 @@ function AppContent() {
   const desktopUpdates = useDesktopUpdates();
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
-  const themeCatalog = useThemeCatalog();
+  const themeCatalog = useThemeCatalog({
+    preferences: preferences.surfaceThemePreferences,
+    onThemeChange: preferences.setSurfaceTheme,
+  });
   const { setRightSidebarOpen } = preferences;
   const fontCatalog = useTypographyCatalog();
   const typography = useTypographyRuntime(
@@ -822,8 +825,21 @@ function AppContent() {
     }
   }, [dataPort, handleActiveDataPathChange, navigateDesktopView, workspace]);
 
+  const themeRuntime = (content: ReactNode) => (
+    <ThemeSurfaceProvider value={surfaceThemePreferences}>
+      <ThemeStyleHost snapshot={themeCatalog.snapshot} preferences={surfaceThemePreferences} />
+      <div
+        className="desktop-theme-bootstrap-surface"
+        data-po-theme-surface="application"
+        data-po-theme-id={surfaceThemePreferences.application}
+      >
+        {content}
+      </div>
+    </ThemeSurfaceProvider>
+  );
+
   if (restoringWorkspace && !workspace) {
-    return (
+    return themeRuntime(
       <RestoringWorkspaceScreen
         themeMode={activeThemeMode}
         lightThemePreset={lightThemePreset}
@@ -833,12 +849,12 @@ function AppContent() {
         pointerCursors={pointerCursors}
         diffMarkers={diffMarkers}
         resolvedTheme={resolvedTheme}
-      />
+      />,
     );
   }
 
   if (!workspace) {
-    return (
+    return themeRuntime(
       <Homepage
         onChooseWorkspace={openFolder}
         onChooseProjectLocation={chooseProjectLocation}
@@ -868,7 +884,7 @@ function AppContent() {
         pointerCursors={pointerCursors}
         diffMarkers={diffMarkers}
         resolvedTheme={resolvedTheme}
-      />
+      />,
     );
   }
 

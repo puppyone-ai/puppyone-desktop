@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { DesktopThemeSnapshot } from "../../types/electron";
 import { createThemeCatalogSnapshot } from "./builtinSurfaceThemes";
 import type { ThemeCatalogState } from "./themeTypes";
+import type { SurfaceThemePreferences } from "./themePreferences";
+import type { ThemeTarget } from "./themeTypes";
 
 const EMPTY_HOST_SNAPSHOT: DesktopThemeSnapshot = Object.freeze({
   themes: Object.freeze([]),
@@ -13,7 +15,10 @@ export type ThemeCatalogController = ThemeCatalogState & Readonly<{
   openDirectory: () => Promise<{ opened: boolean }>;
 }>;
 
-export function useThemeCatalog(): ThemeCatalogController {
+export function useThemeCatalog(options: {
+  preferences?: SurfaceThemePreferences;
+  onThemeChange?: (target: ThemeTarget, themeId: string) => void;
+} = {}): ThemeCatalogController {
   const desktopThemes = window.puppyoneDesktop?.themes;
   const [state, setState] = useState<ThemeCatalogState>(() => ({
     snapshot: createThemeCatalogSnapshot(EMPTY_HOST_SNAPSHOT),
@@ -69,6 +74,28 @@ export function useThemeCatalog(): ThemeCatalogController {
     if (!desktopThemes) return { opened: false };
     return desktopThemes.openDirectory();
   }, [desktopThemes]);
+
+  useEffect(() => {
+    if (!desktopThemes?.syncNativeMenu || !options.preferences) return;
+    void desktopThemes.syncNativeMenu({
+      selection: options.preferences,
+      themes: state.snapshot.themes.map(({ id, name, targets }) => ({ id, name, targets })),
+    }).catch(() => undefined);
+  }, [desktopThemes, options.preferences, state.snapshot]);
+
+  useEffect(() => {
+    if (!desktopThemes?.onSelectionRequested || !options.onThemeChange) return undefined;
+    return desktopThemes.onSelectionRequested(({ target, themeId }) => {
+      options.onThemeChange?.(target, themeId);
+    });
+  }, [desktopThemes, options.onThemeChange]);
+
+  useEffect(() => {
+    if (!desktopThemes?.onReloadRequested) return undefined;
+    return desktopThemes.onReloadRequested(() => {
+      void reload();
+    });
+  }, [desktopThemes, reload]);
 
   return { ...state, reload, openDirectory };
 }

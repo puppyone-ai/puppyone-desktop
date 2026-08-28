@@ -28,6 +28,33 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     list: () => ipcRenderer.invoke("theme:list"),
     reload: () => ipcRenderer.invoke("theme:reload"),
     openDirectory: () => ipcRenderer.invoke("theme:open-directory"),
+    syncNativeMenu: (request) => ipcRenderer.invoke("theme:sync-native-menu", {
+      selection: request?.selection,
+      themes: Array.isArray(request?.themes) ? request.themes.map((theme) => ({
+        id: theme?.id,
+        name: theme?.name,
+        targets: theme?.targets,
+      })) : [],
+    }),
+    onSelectionRequested: (callback) => {
+      if (typeof callback !== "function") return () => {};
+      const listener = (_event, request) => {
+        const target = request?.target;
+        const themeId = request?.themeId;
+        if (
+          (target === "application" || target === "markdown" || target === "csv")
+          && typeof themeId === "string"
+        ) callback({ target, themeId });
+      };
+      ipcRenderer.on("theme:selection-requested", listener);
+      return () => ipcRenderer.removeListener("theme:selection-requested", listener);
+    },
+    onReloadRequested: (callback) => {
+      if (typeof callback !== "function") return () => {};
+      const listener = () => callback();
+      ipcRenderer.on("theme:reload-requested", listener);
+      return () => ipcRenderer.removeListener("theme:reload-requested", listener);
+    },
   },
   setWindowMinimumWidth: (request) => (
     ipcRenderer.invoke("window-layout:set-minimum-width", request)

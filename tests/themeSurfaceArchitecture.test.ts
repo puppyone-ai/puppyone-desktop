@@ -13,6 +13,8 @@ describe("scoped content theme surfaces", () => {
     expect(context).toContain("ThemeSurfaceProvider");
     expect(context).toContain("useThemeSurfaceId");
     expect(app).toContain("<ThemeSurfaceProvider");
+    expect(app).toContain("desktop-theme-bootstrap-surface");
+    expect(app).toContain("themeRuntime(");
     expect(app).toContain('data-po-theme-surface="application"');
     expect(app).toContain("data-po-theme-id={surfaceThemePreferences.application}");
     expect(markdown).toContain('data-po-theme-surface="markdown"');

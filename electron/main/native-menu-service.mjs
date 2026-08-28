@@ -13,6 +13,9 @@ export function createDesktopNativeMenuService({
   t,
   onNewWindow,
   onCheckForUpdates,
+  onSelectTheme = () => undefined,
+  onOpenThemesDirectory = () => undefined,
+  onReloadThemes = () => undefined,
   logger = console,
 }) {
   if (!app) throw new TypeError("An Electron app is required.");
@@ -24,6 +27,14 @@ export function createDesktopNativeMenuService({
   if (typeof onCheckForUpdates !== "function") {
     throw new TypeError("onCheckForUpdates must be a function.");
   }
+  if (typeof onSelectTheme !== "function") throw new TypeError("onSelectTheme must be a function.");
+  if (typeof onOpenThemesDirectory !== "function") throw new TypeError("onOpenThemesDirectory must be a function.");
+  if (typeof onReloadThemes !== "function") throw new TypeError("onReloadThemes must be a function.");
+
+  let themeState = {
+    selection: { application: "default", markdown: "default", csv: "default" },
+    themes: [{ id: "default", name: "Default", targets: ["application", "markdown", "csv"] }],
+  };
 
   const action = (actionId, handler) => () => runMenuAction(actionId, handler, logger);
 
@@ -62,11 +73,48 @@ export function createDesktopNativeMenuService({
     ],
   });
 
+  const createThemeGroup = (target, labelId) => ({
+    label: t(labelId),
+    submenu: themeState.themes
+      .filter((theme) => theme.targets.includes(target))
+      .map((theme) => ({
+        id: `theme.${target}.${theme.id}`,
+        label: theme.name,
+        type: "radio",
+        checked: themeState.selection[target] === theme.id,
+        click: action(`theme.${target}.${theme.id}`, () => (
+          onSelectTheme({ target, themeId: theme.id })
+        )),
+      })),
+  });
+
+  const createThemeMenu = () => ({
+    id: "themes",
+    label: t("native.menu.theme"),
+    submenu: [
+      createThemeGroup("application", "native.menu.theme.application"),
+      createThemeGroup("markdown", "native.menu.theme.markdown"),
+      createThemeGroup("csv", "native.menu.theme.csv"),
+      { type: "separator" },
+      {
+        id: "theme.openFolder",
+        label: t("native.menu.theme.openFolder"),
+        click: action("theme.openFolder", onOpenThemesDirectory),
+      },
+      {
+        id: "theme.reload",
+        label: t("native.menu.theme.reload"),
+        click: action("theme.reload", onReloadThemes),
+      },
+    ],
+  });
+
   const createApplicationMenuTemplate = () => [
     createAppMenu(),
     createFileMenu(),
     { role: "editMenu" },
     { role: "viewMenu" },
+    createThemeMenu(),
     { role: "windowMenu" },
     { role: "help" },
   ];
@@ -92,9 +140,37 @@ export function createDesktopNativeMenuService({
     return { supported: true };
   };
 
+  const setThemeState = (nextState) => {
+    themeState = normalizeThemeState(nextState);
+    refresh();
+  };
+
   return Object.freeze({
     createApplicationMenuTemplate,
     createDockMenuTemplate,
     refresh,
+    setThemeState,
   });
+}
+
+function normalizeThemeState(value) {
+  const validTargets = new Set(["application", "markdown", "csv"]);
+  const selection = {
+    application: typeof value?.selection?.application === "string" ? value.selection.application : "default",
+    markdown: typeof value?.selection?.markdown === "string" ? value.selection.markdown : "default",
+    csv: typeof value?.selection?.csv === "string" ? value.selection.csv : "default",
+  };
+  const themes = Array.isArray(value?.themes)
+    ? value.themes.flatMap((theme) => {
+      if (typeof theme?.id !== "string" || typeof theme?.name !== "string") return [];
+      const targets = Array.isArray(theme.targets)
+        ? theme.targets.filter((target) => validTargets.has(target))
+        : [];
+      return targets.length > 0 ? [{ id: theme.id, name: theme.name, targets }] : [];
+    })
+    : [];
+  if (!themes.some((theme) => theme.id === "default")) {
+    themes.unshift({ id: "default", name: "Default", targets: [...validTargets] });
+  }
+  return { selection, themes };
 }

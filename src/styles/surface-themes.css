@@ -1,6 +1,10 @@
 /* Built-in content themes use the same scoped host contract as local CSS
    themes. Theme authors can override these public --po-md-* and --po-csv-*
    tokens without depending on private component structure. */
+.desktop-theme-bootstrap-surface {
+  display: contents;
+}
+
 :where([data-po-theme-surface="markdown"][data-po-theme-id="builtin.markdown.newsprint"]) {
   --po-md-surface-background: #f6f1e7;
   --po-md-content-color: #342f29;

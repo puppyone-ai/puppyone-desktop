@@ -10,10 +10,19 @@ function createHarness({ platform = "darwin" } = {}) {
   const actions = {
     checkForUpdates: vi.fn(),
     newWindow: vi.fn(),
+    openThemesDirectory: vi.fn(),
+    reloadThemes: vi.fn(),
+    selectTheme: vi.fn(),
   };
   const labels = {
     "native.menu.file": "File",
     "native.menu.checkForUpdates": "Check for Updates…",
+    "native.menu.theme": "Theme",
+    "native.menu.theme.application": "Application",
+    "native.menu.theme.markdown": "Markdown",
+    "native.menu.theme.csv": "Table",
+    "native.menu.theme.openFolder": "Open Themes Folder",
+    "native.menu.theme.reload": "Reload Themes",
     "native.dock.newWindow": "New Window",
   };
   const service = createDesktopNativeMenuService({
@@ -23,6 +32,9 @@ function createHarness({ platform = "darwin" } = {}) {
     t: (messageId) => labels[messageId] ?? messageId,
     onCheckForUpdates: actions.checkForUpdates,
     onNewWindow: actions.newWindow,
+    onOpenThemesDirectory: actions.openThemesDirectory,
+    onReloadThemes: actions.reloadThemes,
+    onSelectTheme: actions.selectTheme,
   });
   return { actions, app, Menu, service };
 }
@@ -41,6 +53,7 @@ describe("DesktopNativeMenuService", () => {
       "File",
       "editMenu",
       "viewMenu",
+      "Theme",
       "windowMenu",
       "help",
     ]);
@@ -77,6 +90,45 @@ describe("DesktopNativeMenuService", () => {
 
     expect(actions.newWindow).toHaveBeenCalledTimes(2);
     expect(actions.checkForUpdates).toHaveBeenCalledOnce();
+  });
+
+  it("builds checked application, Markdown, and table theme groups", async () => {
+    const { actions, service } = createHarness();
+    service.setThemeState({
+      selection: {
+        application: "default",
+        markdown: "builtin.markdown.newsprint",
+        csv: "builtin.csv.ledger",
+      },
+      themes: [
+        { id: "default", name: "Default", targets: ["application", "markdown", "csv"] },
+        { id: "builtin.markdown.newsprint", name: "Newsprint", targets: ["markdown"] },
+        { id: "builtin.csv.ledger", name: "Ledger", targets: ["csv"] },
+      ],
+    });
+
+    const themeMenu = service.createApplicationMenuTemplate()
+      .find((item) => item.id === "themes");
+    expect(themeMenu.label).toBe("Theme");
+    expect(themeMenu.submenu.slice(0, 3).map((item) => item.label)).toEqual([
+      "Application",
+      "Markdown",
+      "Table",
+    ]);
+    expect(themeMenu.submenu[1].submenu.find((item) => item.label === "Newsprint"))
+      .toMatchObject({ type: "radio", checked: true });
+    expect(themeMenu.submenu[2].submenu.find((item) => item.label === "Ledger"))
+      .toMatchObject({ type: "radio", checked: true });
+
+    themeMenu.submenu[1].submenu.find((item) => item.label === "Default").click();
+    themeMenu.submenu.at(-2).click();
+    themeMenu.submenu.at(-1).click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(actions.selectTheme).toHaveBeenCalledWith({ target: "markdown", themeId: "default" });
+    expect(actions.openThemesDirectory).toHaveBeenCalledOnce();
+    expect(actions.reloadThemes).toHaveBeenCalledOnce();
   });
 
   it("does not replace native menus outside macOS", () => {

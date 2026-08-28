@@ -44,7 +44,11 @@ import {
 import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
 import { registerAgentActivityIpcHandlers } from "./main/ipc/agent-activity-ipc.mjs";
 import { registerAppearanceIpcHandlers } from "./main/ipc/appearance-ipc.mjs";
-import { registerThemeIpcHandlers } from "./main/ipc/theme-ipc.mjs";
+import {
+  registerThemeIpcHandlers,
+  THEME_RELOAD_REQUESTED_CHANNEL,
+  THEME_SELECTION_REQUESTED_CHANNEL,
+} from "./main/ipc/theme-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerBuildInfoIpcHandlers } from "./main/ipc/build-info-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
@@ -232,6 +236,17 @@ const nativeMenuService = createDesktopNativeMenuService({
   t: (messageId, values) => localeService.t(messageId, values),
   onNewWindow: () => createWindow(),
   onCheckForUpdates: checkForUpdatesFromNativeMenu,
+  onSelectTheme: (request) => {
+    const window = getLastFocusedWindow();
+    if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
+    window.webContents.send(THEME_SELECTION_REQUESTED_CHANNEL, request);
+  },
+  onOpenThemesDirectory: () => themeService.openDirectory(),
+  onReloadThemes: () => {
+    const window = getLastFocusedWindow();
+    if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
+    window.webContents.send(THEME_RELOAD_REQUESTED_CHANNEL);
+  },
 });
 const applicationQuitIntent = createApplicationQuitIntent({ app });
 const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({
@@ -720,6 +735,7 @@ function registerIpcHandlers() {
   registerThemeIpcHandlers({
     ipcMain: trustedIpcMain,
     themeService,
+    onSyncNativeMenu: (state) => nativeMenuService.setThemeState(state),
   });
   registerWindowLayoutIpcHandlers({
     ipcMain: trustedIpcMain,

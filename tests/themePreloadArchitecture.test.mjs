@@ -15,7 +15,7 @@ describe("CSS theme host bridge architecture", () => {
 
   it("registers one host-owned service through trusted IPC", () => {
     expect(main).toContain('import { createThemeService } from "./main/themes/theme-service.mjs";');
-    expect(main).toContain('import { registerThemeIpcHandlers } from "./main/ipc/theme-ipc.mjs";');
+    expect(main).toMatch(/import \{[\s\S]*registerThemeIpcHandlers,[\s\S]*\} from "\.\/main\/ipc\/theme-ipc\.mjs";/);
     expect(main).toMatch(/createThemeService\(\{[\s\S]*userDataPath:\s*app\.getPath\("userData"\)[\s\S]*shell/);
     expect(main).toMatch(/registerThemeIpcHandlers\(\{[\s\S]*ipcMain:\s*trustedIpcMain,[\s\S]*themeService/);
   });
