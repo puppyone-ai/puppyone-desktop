@@ -135,7 +135,7 @@ describe("current-repository Cloud navigation", () => {
       />,
     ));
 
-    expect(container.querySelector("h1")?.textContent).toBe("Use your project with any AI, anywhere.");
+    expect(container.querySelector("h1")?.textContent).toBe("MCP");
     expect(container.querySelector(".desktop-entry-state-description")?.textContent)
       .toBe("Connect ChatGPT, Claude, and other MCP-compatible agents.");
     expect(container.querySelector(".desktop-cloud-auth-submit")?.textContent)
@@ -153,7 +153,7 @@ describe("current-repository Cloud navigation", () => {
         onRefresh={vi.fn()}
       />,
     ));
-    expect(container.querySelector("h1")?.textContent).toBe("Use your project from any terminal.");
+    expect(container.querySelector("h1")?.textContent).toBe("CLI");
     expect(container.querySelector(".desktop-cloud-channel-illustration.is-cli")).not.toBeNull();
 
     act(() => renderWithTestLocalization(root,
@@ -166,7 +166,7 @@ describe("current-repository Cloud navigation", () => {
         onRefresh={vi.fn()}
       />,
     ));
-    expect(container.querySelector("h1")?.textContent).toBe("Clone, sync, and collaborate with Git.");
+    expect(container.querySelector("h1")?.textContent).toBe("Git");
     expect(container.querySelector(".desktop-cloud-channel-illustration.is-git")).not.toBeNull();
 
     act(() => renderWithTestLocalization(root,
@@ -179,7 +179,7 @@ describe("current-repository Cloud navigation", () => {
         onRefresh={vi.fn()}
       />,
     ));
-    expect(container.querySelector("h1")?.textContent).toBe("Run your agents on your schedule.");
+    expect(container.querySelector("h1")?.textContent).toBe("Automation");
     expect(container.querySelector(".desktop-cloud-activation-illustration.is-automation")).not.toBeNull();
 
     act(() => renderWithTestLocalization(root,
@@ -192,7 +192,7 @@ describe("current-repository Cloud navigation", () => {
         onRefresh={vi.fn()}
       />,
     ));
-    expect(container.querySelector("h1")?.textContent).toBe("Host your project. Keep it available 24/7.");
+    expect(container.querySelector("h1")?.textContent).toBe("PuppyOne Cloud");
     expect(container.querySelector(".desktop-cloud-activation-illustration.is-overview")).not.toBeNull();
     expect(container.querySelector(".desktop-cloud-overview-hosting-art")).not.toBeNull();
     expect(container.querySelector(".desktop-cloud-overview-hosting-cloud")).not.toBeNull();
@@ -210,7 +210,7 @@ describe("current-repository Cloud navigation", () => {
         onRefresh={vi.fn()}
       />,
     ));
-    expect(container.querySelector("h1")?.textContent).toBe("Share access, not your computer.");
+    expect(container.querySelector("h1")?.textContent).toBe("Permissions");
     expect(container.querySelector(".desktop-cloud-activation-illustration.is-access")).not.toBeNull();
   });
 });

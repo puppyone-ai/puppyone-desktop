@@ -41,7 +41,7 @@ describe("simple Cloud publish onboarding", () => {
       />,
     )));
 
-    expect(container.textContent).toContain("Use your project with any AI, anywhere.");
+    expect(container.querySelector("h1")?.textContent).toBe("MCP");
     expect(container.textContent).toContain("ChatGPT");
     expect(container.textContent).toContain("Claude");
     expect(container.textContent).toContain("Cursor");

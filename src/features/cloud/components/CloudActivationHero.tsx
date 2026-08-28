@@ -20,27 +20,27 @@ type CloudActivationKind = "overview" | "mcp" | "cli" | "git" | "automation" | "
 
 const ACTIVATION_COPY = {
   overview: {
-    titleId: "cloud.activation.overview.title",
+    titleId: "cloud.productName",
     descriptionId: "cloud.activation.overview.description",
   },
   mcp: {
-    titleId: "cloud.activation.mcp.title",
+    titleId: "cloud.route.mcp.title",
     descriptionId: "cloud.activation.mcp.description",
   },
   cli: {
-    titleId: "cloud.activation.cli.title",
+    titleId: "cloud.route.cli.title",
     descriptionId: "cloud.activation.cli.description",
   },
   git: {
-    titleId: "cloud.activation.git.title",
+    titleId: "cloud.route.git-sync.title",
     descriptionId: "cloud.activation.git.description",
   },
   automation: {
-    titleId: "cloud.activation.automation.title",
+    titleId: "cloud.route.automation.title",
     descriptionId: "cloud.activation.automation.description",
   },
   access: {
-    titleId: "cloud.activation.access.title",
+    titleId: "cloud.route.access.title",
     descriptionId: "cloud.activation.access.description",
   },
 } as const;
