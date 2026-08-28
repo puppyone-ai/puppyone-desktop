@@ -57,6 +57,10 @@ export function getThemesForTarget(
   return snapshot.themes.filter((theme) => theme.targets.includes(target));
 }
 
+export function getThemePacks(snapshot: ThemeCatalogSnapshot): readonly ThemeDefinition[] {
+  return snapshot.themes.filter((theme) => theme.id === "default" || theme.targets.length > 1);
+}
+
 function defineBuiltin({
   id,
   name,

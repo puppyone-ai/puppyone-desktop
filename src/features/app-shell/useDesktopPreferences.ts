@@ -13,9 +13,10 @@ import {
 import { resolveAppearance } from "../appearance/resolveAppearance";
 import {
   parseSurfaceThemePreferences,
+  selectThemePack,
   serializeSurfaceThemePreferences,
   SURFACE_THEME_PREFERENCES_STORAGE_KEY,
-  updateSurfaceThemePreference,
+  updateSurfaceThemeOverride,
 } from "../themes/themePreferences";
 import type { ThemeTarget } from "../themes/themeTypes";
 import {
@@ -426,9 +427,12 @@ export function useDesktopPreferences() {
   const sidebarNavigationPlacement = resolvedAppearance.sidebarNavigationPlacement;
   const sidebarNavigationOrientation = resolvedAppearance.sidebarNavigationOrientation;
   const terminalToolEnabled = rightSidebarToolsSettings.enabled.terminal;
-  const setSurfaceTheme = (target: ThemeTarget, themeId: string) => {
+  const setThemePack = (themeId: string) => {
+    setSurfaceThemePreferences((current) => selectThemePack(current, themeId));
+  };
+  const setSurfaceThemeOverride = (target: ThemeTarget, themeId: string | null) => {
     setSurfaceThemePreferences((current) => (
-      updateSurfaceThemePreference(current, target, themeId)
+      updateSurfaceThemeOverride(current, target, themeId)
     ));
   };
 
@@ -491,7 +495,8 @@ export function useDesktopPreferences() {
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setSidebarNavigationVisibilitySettings,
-    setSurfaceTheme,
+    setSurfaceThemeOverride,
+    setThemePack,
     setTitlebarActionsSettings,
     setLightThemePreset,
     setLoadingAnimationPreset,

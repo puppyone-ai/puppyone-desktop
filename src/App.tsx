@@ -107,8 +107,9 @@ function AppContent() {
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
   const themeCatalog = useThemeCatalog({
+    colorMode: preferences.resolvedTheme,
     preferences: preferences.surfaceThemePreferences,
-    onThemeChange: preferences.setSurfaceTheme,
+    onThemeChange: preferences.setSurfaceThemeOverride,
   });
   const { setRightSidebarOpen } = preferences;
   const fontCatalog = useTypographyCatalog();
@@ -826,12 +827,12 @@ function AppContent() {
   }, [dataPort, handleActiveDataPathChange, navigateDesktopView, workspace]);
 
   const themeRuntime = (content: ReactNode) => (
-    <ThemeSurfaceProvider value={surfaceThemePreferences}>
-      <ThemeStyleHost snapshot={themeCatalog.snapshot} preferences={surfaceThemePreferences} />
+    <ThemeSurfaceProvider value={themeCatalog.selection}>
+      <ThemeStyleHost snapshot={themeCatalog.snapshot} preferences={themeCatalog.selection} />
       <div
         className="desktop-theme-bootstrap-surface"
         data-po-theme-surface="application"
-        data-po-theme-id={surfaceThemePreferences.application}
+        data-po-theme-id={themeCatalog.selection.application}
       >
         {content}
       </div>
@@ -959,12 +960,12 @@ function AppContent() {
   ) : undefined;
 
   return (
-    <ThemeSurfaceProvider value={surfaceThemePreferences}>
-      <ThemeStyleHost snapshot={themeCatalog.snapshot} preferences={surfaceThemePreferences} />
+    <ThemeSurfaceProvider value={themeCatalog.selection}>
+      <ThemeStyleHost snapshot={themeCatalog.snapshot} preferences={themeCatalog.selection} />
       <div
       className={`app-shell cloud-runtime ${resolvedTheme === "dark" ? "dark" : ""}`}
       data-po-theme-surface="application"
-      data-po-theme-id={surfaceThemePreferences.application}
+      data-po-theme-id={themeCatalog.selection.application}
       data-theme-mode={activeThemeMode}
       data-interface-style={interfaceStyle}
       data-interface-style-family={resolvedAppearance.profile.family}

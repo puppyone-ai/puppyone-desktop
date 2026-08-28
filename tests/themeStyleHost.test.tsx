@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ThemeStyleHost } from "../src/features/themes/ThemeStyleHost";
 import { createThemeCatalogSnapshot } from "../src/features/themes/builtinSurfaceThemes";
 import type { ThemeDefinition } from "../src/features/themes/themeTypes";
-import type { SurfaceThemePreferences } from "../src/features/themes/themePreferences";
+import type { SurfaceThemeSelection } from "../src/features/themes/themePreferences";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -130,10 +130,9 @@ function externalTheme(overrides: Partial<ThemeDefinition> = {}): ThemeDefinitio
 }
 
 function selection(
-  overrides: Partial<SurfaceThemePreferences> = {},
-): SurfaceThemePreferences {
+  overrides: Partial<SurfaceThemeSelection> = {},
+): SurfaceThemeSelection {
   return {
-    version: 1,
     application: "default",
     markdown: "default",
     csv: "default",

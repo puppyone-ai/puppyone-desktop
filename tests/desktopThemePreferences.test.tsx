@@ -39,21 +39,29 @@ afterEach(() => {
 });
 
 describe("desktop surface theme preferences", () => {
-  it("persists independent selections and synchronizes storage changes", () => {
+  it("persists a theme pack plus advanced overrides and synchronizes storage changes", () => {
     act(() => root.render(<Harness />));
 
-    act(() => latest?.setSurfaceTheme("markdown", "local.css.newsprint"));
+    act(() => latest?.setThemePack("com.example.forest"));
+    act(() => latest?.setSurfaceThemeOverride("markdown", "local.css.newsprint"));
     expect(readStored()).toMatchObject({
-      application: "default",
-      markdown: "local.css.newsprint",
-      csv: "default",
+      version: 2,
+      pack: "com.example.forest",
+      overrides: {
+        application: null,
+        markdown: "local.css.newsprint",
+        csv: null,
+      },
     });
 
     const remote: SurfaceThemePreferences = {
-      version: 1,
-      application: "com.example.graphite",
-      markdown: "builtin.markdown.focus",
-      csv: "builtin.csv.ledger",
+      version: 2,
+      pack: "com.example.graphite",
+      overrides: {
+        application: null,
+        markdown: "builtin.markdown.focus",
+        csv: "builtin.csv.ledger",
+      },
     };
     act(() => window.dispatchEvent(new StorageEvent("storage", {
       key: SURFACE_THEME_PREFERENCES_STORAGE_KEY,

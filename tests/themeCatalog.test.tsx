@@ -4,6 +4,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useThemeCatalog, type ThemeCatalogController } from "../src/features/themes/useThemeCatalog";
+import { DEFAULT_SURFACE_THEME_PREFERENCES } from "../src/features/themes/themePreferences";
+import type { ThemeColorMode } from "../src/features/themes/themeTypes";
 import type { DesktopThemeSnapshot } from "../src/types/electron";
 
 let container: HTMLDivElement;
@@ -92,10 +94,59 @@ describe("renderer theme catalog", () => {
     expect(latest?.status).toBe("error");
     expect(latest?.error).toBe("Finder unavailable");
   });
+
+  it("exposes the effective selection for the active pack and color mode", async () => {
+    window.puppyoneDesktop = {
+      themes: {
+        list: vi.fn(async () => snapshot("com.example.first")),
+        reload: vi.fn(async () => snapshot("com.example.first")),
+        openDirectory: vi.fn(async () => ({ opened: true as const })),
+      },
+    } as typeof window.puppyoneDesktop;
+
+    await act(async () => {
+      root.render(
+        <Harness
+          colorMode="light"
+          preferences={{
+            ...DEFAULT_SURFACE_THEME_PREFERENCES,
+            pack: "com.example.first",
+          }}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    expect(latest?.selection).toEqual({
+      application: "default",
+      markdown: "com.example.first",
+      csv: "default",
+    });
+
+    await act(async () => {
+      root.render(
+        <Harness
+          colorMode="dark"
+          preferences={{
+            ...DEFAULT_SURFACE_THEME_PREFERENCES,
+            pack: "com.example.first",
+          }}
+        />,
+      );
+    });
+
+    expect(latest?.selection.markdown).toBe("default");
+  });
 });
 
-function Harness() {
-  latest = useThemeCatalog();
+function Harness({
+  colorMode = "light",
+  preferences = DEFAULT_SURFACE_THEME_PREFERENCES,
+}: {
+  colorMode?: ThemeColorMode;
+  preferences?: typeof DEFAULT_SURFACE_THEME_PREFERENCES;
+} = {}) {
+  latest = useThemeCatalog({ colorMode, preferences });
   return null;
 }
 

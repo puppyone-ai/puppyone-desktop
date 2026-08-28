@@ -1,27 +1,17 @@
 import { useLocalization } from "@puppyone/localization";
 import type { DiffMarkers, ExperimentalSettings } from "../../../preferences";
 import { SettingsSectionHeader } from "../components";
-import type { ThemeCatalogController } from "../../themes/useThemeCatalog";
-import type { SurfaceThemePreferences } from "../../themes/themePreferences";
-import type { ThemeTarget } from "../../themes/themeTypes";
-import { ThemeSettingsSection } from "./ThemeSettingsSection";
 
 export function EditorSettingsView({
   aiEditAssistEnabled,
   diffMarkers,
   onAiEditAssistEnabledChange,
   onDiffMarkersChange,
-  surfaceThemePreferences,
-  themeCatalog,
-  onSurfaceThemeChange,
 }: {
   aiEditAssistEnabled: boolean;
   diffMarkers: DiffMarkers;
   onAiEditAssistEnabledChange: (enabled: boolean) => void;
   onDiffMarkersChange: (markers: DiffMarkers) => void;
-  surfaceThemePreferences: SurfaceThemePreferences;
-  themeCatalog: ThemeCatalogController;
-  onSurfaceThemeChange: (target: ThemeTarget, themeId: string) => void;
 }) {
   const { t } = useLocalization();
   return (
@@ -70,11 +60,6 @@ export function EditorSettingsView({
               </div>
             </div>
           </div>
-          <ThemeSettingsSection
-            catalog={themeCatalog}
-            preferences={surfaceThemePreferences}
-            onThemeChange={onSurfaceThemeChange}
-          />
         </div>
       </div>
     </section>

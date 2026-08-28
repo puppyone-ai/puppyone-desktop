@@ -1,12 +1,12 @@
 import { createPortal } from "react-dom";
 import type { ThemeCatalogSnapshot } from "./themeTypes";
-import type { SurfaceThemePreferences } from "./themePreferences";
+import type { SurfaceThemeSelection } from "./themePreferences";
 
 export function ThemeStyleHost({
   preferences,
   snapshot,
 }: {
-  preferences: SurfaceThemePreferences;
+  preferences: SurfaceThemeSelection;
   snapshot: ThemeCatalogSnapshot;
 }) {
   if (typeof document === "undefined") return null;

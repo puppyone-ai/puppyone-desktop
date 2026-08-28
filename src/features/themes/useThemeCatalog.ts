@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DesktopThemeSnapshot } from "../../types/electron";
 import { createThemeCatalogSnapshot } from "./builtinSurfaceThemes";
 import type { ThemeCatalogState } from "./themeTypes";
 import type { SurfaceThemePreferences } from "./themePreferences";
-import type { ThemeTarget } from "./themeTypes";
+import {
+  DEFAULT_SURFACE_THEME_PREFERENCES,
+  resolveSurfaceThemeSelection,
+  type SurfaceThemeSelection,
+} from "./themePreferences";
+import type { ThemeColorMode, ThemeTarget } from "./themeTypes";
 
 const EMPTY_HOST_SNAPSHOT: DesktopThemeSnapshot = Object.freeze({
   themes: Object.freeze([]),
@@ -11,15 +16,21 @@ const EMPTY_HOST_SNAPSHOT: DesktopThemeSnapshot = Object.freeze({
 });
 
 export type ThemeCatalogController = ThemeCatalogState & Readonly<{
+  selection: SurfaceThemeSelection;
   reload: () => Promise<void>;
   openDirectory: () => Promise<{ opened: boolean }>;
 }>;
 
 export function useThemeCatalog(options: {
   preferences?: SurfaceThemePreferences;
+  colorMode?: ThemeColorMode;
   onThemeChange?: (target: ThemeTarget, themeId: string) => void;
 } = {}): ThemeCatalogController {
-  const { preferences, onThemeChange } = options;
+  const {
+    colorMode = "light",
+    preferences = DEFAULT_SURFACE_THEME_PREFERENCES,
+    onThemeChange,
+  } = options;
   const desktopThemes = window.puppyoneDesktop?.themes;
   const [state, setState] = useState<ThemeCatalogState>(() => ({
     snapshot: createThemeCatalogSnapshot(EMPTY_HOST_SNAPSHOT),
@@ -85,13 +96,18 @@ export function useThemeCatalog(options: {
     }
   }, [desktopThemes]);
 
+  const selection = useMemo(
+    () => resolveSurfaceThemeSelection(preferences, state.snapshot, colorMode),
+    [colorMode, preferences, state.snapshot],
+  );
+
   useEffect(() => {
-    if (!desktopThemes?.syncNativeMenu || !preferences) return;
+    if (!desktopThemes?.syncNativeMenu) return;
     void desktopThemes.syncNativeMenu({
-      selection: preferences,
+      selection,
       themes: state.snapshot.themes.map(({ id, name, targets }) => ({ id, name, targets })),
     }).catch(() => undefined);
-  }, [desktopThemes, preferences, state.snapshot]);
+  }, [desktopThemes, selection, state.snapshot]);
 
   useEffect(() => {
     if (!desktopThemes?.onSelectionRequested || !onThemeChange) return undefined;
@@ -107,5 +123,5 @@ export function useThemeCatalog(options: {
     });
   }, [desktopThemes, reload]);
 
-  return { ...state, reload, openDirectory };
+  return { ...state, selection, reload, openDirectory };
 }

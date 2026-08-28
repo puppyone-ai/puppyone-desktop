@@ -24,6 +24,7 @@ import { GeneralSettingsView } from "./main/GeneralSettingsView";
 import { LocalProjectSettingsView } from "./main/LocalProjectSettingsView";
 import { InterfacePaletteSettings } from "./main/InterfacePaletteSettings";
 import { InterfaceStyleSetting } from "./main/InterfaceStyleSetting";
+import { ThemeSettingsSection } from "./main/ThemeSettingsSection";
 import { CreateNewSettingsView } from "./main/CreateNewSettingsView";
 import { PulseGrid } from "../../components/loading";
 import { CloudHostingSettingsView, GitSettingsView } from "./main/RepositorySettingsViews";
@@ -86,7 +87,8 @@ export function SettingsView({
   onTitlebarActionsSettingsChange,
   onGitSidebarLayoutChange,
   onAiEditAssistEnabledChange,
-  onSurfaceThemeChange,
+  onThemePackChange,
+  onSurfaceThemeOverrideChange,
   onCloudSessionChange,
   onPuppyoneConfigChange,
   onUnlinkWorkspace,
@@ -232,11 +234,8 @@ export function SettingsView({
       <EditorSettingsView
         aiEditAssistEnabled={aiEditAssistEnabled}
         diffMarkers={diffMarkers}
-        surfaceThemePreferences={surfaceThemePreferences}
-        themeCatalog={themeCatalog}
         onAiEditAssistEnabledChange={onAiEditAssistEnabledChange}
         onDiffMarkersChange={onDiffMarkersChange}
-        onSurfaceThemeChange={onSurfaceThemeChange}
       />
     );
   }
@@ -266,6 +265,12 @@ export function SettingsView({
                 onThemeModeChange={onThemeModeChange}
                 onLightThemePresetChange={onLightThemePresetChange}
                 onDarkThemePresetChange={onDarkThemePresetChange}
+              />
+              <ThemeSettingsSection
+                catalog={themeCatalog}
+                preferences={surfaceThemePreferences}
+                onThemePackChange={onThemePackChange}
+                onThemeOverrideChange={onSurfaceThemeOverrideChange}
               />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.textSize.title")}</span>

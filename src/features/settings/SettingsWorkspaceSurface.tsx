@@ -75,7 +75,8 @@ export type SettingsPreferencesPort = {
   setTitlebarActionsSettings: (value: TitlebarActionsSettings) => void;
   setGitSidebarLayout: (value: GitSidebarLayout) => void;
   setAiEditAssistEnabled: (value: boolean) => void;
-  setSurfaceTheme: (target: ThemeTarget, themeId: string) => void;
+  setThemePack: (themeId: string) => void;
+  setSurfaceThemeOverride: (target: ThemeTarget, themeId: string | null) => void;
 };
 
 export type SettingsWorkspaceSurfaceProps = {
@@ -193,7 +194,8 @@ export function createSettingsWorkspaceSurface({
         onTitlebarActionsSettingsChange={preferences.setTitlebarActionsSettings}
         onGitSidebarLayoutChange={preferences.setGitSidebarLayout}
         onAiEditAssistEnabledChange={preferences.setAiEditAssistEnabled}
-        onSurfaceThemeChange={preferences.setSurfaceTheme}
+        onThemePackChange={preferences.setThemePack}
+        onSurfaceThemeOverrideChange={preferences.setSurfaceThemeOverride}
         onCloudSessionChange={cloud.onSessionChange}
         onPuppyoneConfigChange={workspaceConfig.change}
         onUnlinkWorkspace={workspaceConfig.unlink}
