@@ -106,6 +106,8 @@ describe("CSV pane-menu settings", () => {
     expect(menu?.querySelector('[aria-label="Find in file"]')).not.toBeNull();
     expect(menu?.textContent).toContain("Header row");
     expect(menu?.textContent).toContain("Row numbers");
+    expect(menu?.textContent).toContain("Fit columns to viewport");
+    expect(menu?.textContent).toContain("Reset column widths");
     expect(menu?.querySelector(".desktop-editor-pane-menu-action-divider")).toBeNull();
     expect(document.activeElement?.getAttribute("aria-label")).toBe("Find in file");
 
@@ -113,7 +115,7 @@ describe("CSV pane-menu settings", () => {
       key: "End",
       bubbles: true,
     })));
-    expect(document.activeElement?.textContent).toContain("Row numbers");
+    expect(document.activeElement?.textContent).toContain("Reset column widths");
     await act(async () => document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", {
       key: "Home",
       bubbles: true,

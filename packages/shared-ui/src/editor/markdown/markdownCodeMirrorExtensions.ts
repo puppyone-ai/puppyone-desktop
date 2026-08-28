@@ -28,6 +28,7 @@ import { getMarkdownEmbedHost, disposeMarkdownEmbedHost } from "./platform/codem
 import {
   markdownInlineViewportContinuityEffect,
   markdownInlineViewportHistoryExtension,
+  type EmbeddedInlineViewportTransactionMapping,
 } from "./platform/codemirror/embeddedInlineViewportSession";
 import { getDocRevision } from "./platform/brokers/transactionBroker";
 import {
@@ -183,12 +184,17 @@ const markdownEmbedHostLifecycle = ViewPlugin.fromClass(class {
           relocation,
           (pos, assoc) => transaction.changes.mapPos(pos, assoc),
         );
+        host.tableColumnLayouts.mapRangesWithRelocation(
+          relocation,
+          (pos, assoc) => transaction.changes.mapPos(pos, assoc),
+        );
       } else {
         host.editSessions.mapRanges((pos, assoc) => transaction.changes.mapPos(pos, assoc));
-        host.inlineViewports.mapTransaction({
-          continuities: transaction.effects
-            .filter((effect) => effect.is(markdownInlineViewportContinuityEffect))
-            .map((effect) => effect.value),
+        const continuities = transaction.effects
+          .filter((effect) => effect.is(markdownInlineViewportContinuityEffect))
+          .map((effect) => effect.value);
+        const tableMapping: EmbeddedInlineViewportTransactionMapping = {
+          continuities,
           mapPos: (pos, assoc) => transaction.changes.mapPos(pos, assoc),
           touchesRange: (range) => {
             let touched = false;
@@ -200,7 +206,9 @@ const markdownEmbedHostLifecycle = ViewPlugin.fromClass(class {
             });
             return touched;
           },
-        });
+        };
+        host.inlineViewports.mapTransaction(tableMapping);
+        host.tableColumnLayouts.mapTransaction(tableMapping);
       }
     }
     // Executable and native web-embed capabilities are revision-bound. Static

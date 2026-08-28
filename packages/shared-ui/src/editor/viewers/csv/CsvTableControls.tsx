@@ -22,6 +22,7 @@ type CsvTableControlsProps = Readonly<{
   direction: "ltr" | "rtl";
   headerEnabled: boolean;
   locale: string;
+  onAutoFitColumn: (columnIndex: number) => void;
   onOperation: (operation: CsvTableStructureOperation) => void;
   rowCount: number;
   rowNumbersVisible: boolean;
@@ -43,6 +44,7 @@ export function CsvTableControls({
   direction,
   headerEnabled,
   locale,
+  onAutoFitColumn,
   onOperation,
   rowCount,
   rowNumbersVisible,
@@ -620,6 +622,7 @@ export function CsvTableControls({
           direction={direction}
           headerEnabled={headerEnabled}
           locale={locale}
+          onAutoFitColumn={onAutoFitColumn}
           onClose={closeMenu}
           onOperation={onOperation}
           rowCount={rowCount}

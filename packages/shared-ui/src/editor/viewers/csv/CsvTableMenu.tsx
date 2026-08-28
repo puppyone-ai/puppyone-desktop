@@ -20,6 +20,7 @@ type CsvTableMenuProps = Readonly<{
   direction: "ltr" | "rtl";
   headerEnabled: boolean;
   locale: string;
+  onAutoFitColumn: (columnIndex: number) => void;
   onClose: (restoreFocus: boolean) => void;
   onOperation: (operation: CsvTableStructureOperation) => void;
   rowCount: number;
@@ -30,8 +31,10 @@ type CsvTableMenuProps = Readonly<{
 type CsvTableMenuItem = Readonly<{
   destructive?: boolean;
   disabled?: boolean;
+  id?: string;
   label: string;
-  operation: CsvTableStructureOperation;
+  operation?: CsvTableStructureOperation;
+  run?: () => void;
 }>;
 
 type CsvTableMenuSection = Readonly<{
@@ -45,6 +48,7 @@ export function CsvTableMenu({
   direction,
   headerEnabled,
   locale,
+  onAutoFitColumn,
   onClose,
   onOperation,
   rowCount,
@@ -86,6 +90,11 @@ export function CsvTableMenu({
         },
       ];
   const columnItems: readonly CsvTableMenuItem[] = [
+        {
+          id: "auto-fit-column",
+          label: t("editor.csv.autoFitColumn"),
+          run: () => onAutoFitColumn(target.columnIndex),
+        },
         {
           label: t(direction === "rtl"
             ? "editor.table.insertColumnRight"
@@ -209,7 +218,7 @@ export function CsvTableMenu({
           <div className="desktop-menu-section-list">
             {section.items.map((item) => (
               <button
-                key={item.operation.type}
+                key={item.id ?? item.operation?.type}
                 type="button"
                 role="menuitem"
                 className={`desktop-menu-item${item.destructive ? " danger" : ""}`}
@@ -220,7 +229,8 @@ export function CsvTableMenu({
                   event.stopPropagation();
                   if (item.disabled) return;
                   onClose(false);
-                  onOperation(item.operation);
+                  if (item.operation) onOperation(item.operation);
+                  else item.run?.();
                 }}
               >
                 <span className="desktop-menu-item-body">

@@ -18,10 +18,12 @@ import {
   getEditableTableDropBoundary,
 } from "../../../table/editableTableDrag";
 import type { MarkdownTableInlineViewportController } from "./tableInlineViewportController";
+import type { MarkdownTableColumnLayoutController } from "./tableColumnLayoutController";
 
 export type MarkdownTableDragHandleContext = {
   alignments: readonly MarkdownTableAlignment[];
   columnCount: number;
+  columnLayout: MarkdownTableColumnLayoutController | null;
   inlineViewport: MarkdownTableInlineViewportController;
   rows: readonly MarkdownTableRow[];
   table: HTMLTableElement;
@@ -199,6 +201,13 @@ export function createMarkdownTableDragLayer(context: MarkdownTableDragHandleCon
       clientY: kind === "row" ? rect.top : rect.bottom + 4,
       columnCount: context.columnCount,
       columnIndex: kind === "column" ? sourceIndex : hover.columnIndex ?? 0,
+      layoutActions: kind === "column" && context.columnLayout
+        ? {
+            autoFitColumn: () => context.columnLayout?.autoFitColumn(sourceIndex),
+            fitToViewport: () => context.columnLayout?.fitToViewport(),
+            resetColumnWidths: () => context.columnLayout?.resetColumnWidths(),
+          }
+        : undefined,
       onClose: () => {
         setDragSourceHighlight(kind, sourceIndex, false);
         handle.classList.remove("is-menu-active");
