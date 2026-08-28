@@ -5,17 +5,13 @@ export type MarkdownStrongColor = "default" | "accent" | "warm";
 export type MarkdownStrongWeight = "medium" | "semibold" | "bold" | "heavy";
 
 export type MarkdownPresentationSettings = Readonly<{
-  h1Scale: MarkdownHeadingScale;
-  h2Scale: MarkdownHeadingScale;
-  h3Scale: MarkdownHeadingScale;
+  headingScale: MarkdownHeadingScale;
   strongColor: MarkdownStrongColor;
   strongWeight: MarkdownStrongWeight;
 }>;
 
 export const DEFAULT_MARKDOWN_PRESENTATION_SETTINGS: MarkdownPresentationSettings = {
-  h1Scale: "default",
-  h2Scale: "default",
-  h3Scale: "default",
+  headingScale: "default",
   strongColor: "default",
   strongWeight: "semibold",
 };
@@ -55,22 +51,13 @@ export const MARKDOWN_STRONG_WEIGHT_OPTIONS = [
   { id: "heavy" as const, labelKey: "settings.editor.markdownPresentation.strongWeight.heavy.label" },
 ] satisfies readonly { id: MarkdownStrongWeight; labelKey: string }[];
 
-const MARKDOWN_H1_SIZE: Record<MarkdownHeadingScale, string> = {
-  compact: "1.75em",
-  default: "2em",
-  large: "2.25em",
-};
-
-const MARKDOWN_H2_SIZE: Record<MarkdownHeadingScale, string> = {
-  compact: "1.375em",
-  default: "1.5em",
-  large: "1.625em",
-};
-
-const MARKDOWN_H3_SIZE: Record<MarkdownHeadingScale, string> = {
-  compact: "1.125em",
-  default: "1.25em",
-  large: "1.375em",
+const MARKDOWN_HEADING_SIZE: Record<
+  MarkdownHeadingScale,
+  Readonly<{ h1: string; h2: string; h3: string }>
+> = {
+  compact: { h1: "1.75em", h2: "1.375em", h3: "1.125em" },
+  default: { h1: "2em", h2: "1.5em", h3: "1.25em" },
+  large: { h1: "2.25em", h2: "1.625em", h3: "1.375em" },
 };
 
 const MARKDOWN_STRONG_WEIGHT: Record<MarkdownStrongWeight, string> = {
@@ -108,12 +95,15 @@ export function parseMarkdownPresentationSettings(
   }
 
   try {
-    const parsed = JSON.parse(value) as Partial<MarkdownPresentationSettings> | null;
+    const parsed = JSON.parse(value) as (
+      Partial<MarkdownPresentationSettings>
+      & Partial<LegacyMarkdownPresentationSettings>
+    ) | null;
     if (!parsed || typeof parsed !== "object") return DEFAULT_MARKDOWN_PRESENTATION_SETTINGS;
     return {
-      h1Scale: isMarkdownHeadingScale(parsed.h1Scale) ? parsed.h1Scale : DEFAULT_MARKDOWN_PRESENTATION_SETTINGS.h1Scale,
-      h2Scale: isMarkdownHeadingScale(parsed.h2Scale) ? parsed.h2Scale : DEFAULT_MARKDOWN_PRESENTATION_SETTINGS.h2Scale,
-      h3Scale: isMarkdownHeadingScale(parsed.h3Scale) ? parsed.h3Scale : DEFAULT_MARKDOWN_PRESENTATION_SETTINGS.h3Scale,
+      headingScale: isMarkdownHeadingScale(parsed.headingScale)
+        ? parsed.headingScale
+        : resolveLegacyHeadingScale(parsed),
       strongColor: isMarkdownStrongColor(parsed.strongColor)
         ? parsed.strongColor
         : DEFAULT_MARKDOWN_PRESENTATION_SETTINGS.strongColor,
@@ -135,11 +125,31 @@ export function serializeMarkdownPresentationSettings(
 export function resolveMarkdownPresentationStyle(
   settings: MarkdownPresentationSettings,
 ): CSSProperties {
+  const headingSize = MARKDOWN_HEADING_SIZE[settings.headingScale];
   return {
-    "--po-md-h1-size": MARKDOWN_H1_SIZE[settings.h1Scale],
-    "--po-md-h2-size": MARKDOWN_H2_SIZE[settings.h2Scale],
-    "--po-md-h3-size": MARKDOWN_H3_SIZE[settings.h3Scale],
+    "--po-md-h1-size": headingSize.h1,
+    "--po-md-h2-size": headingSize.h2,
+    "--po-md-h3-size": headingSize.h3,
     "--po-md-strong-weight": MARKDOWN_STRONG_WEIGHT[settings.strongWeight],
     "--po-md-strong-color": MARKDOWN_STRONG_COLOR[settings.strongColor],
   } as CSSProperties;
+}
+
+type LegacyMarkdownPresentationSettings = Readonly<{
+  h1Scale: MarkdownHeadingScale;
+  h2Scale: MarkdownHeadingScale;
+  h3Scale: MarkdownHeadingScale;
+}>;
+
+function resolveLegacyHeadingScale(
+  settings: Partial<LegacyMarkdownPresentationSettings>,
+): MarkdownHeadingScale {
+  const legacyScales = [settings.h1Scale, settings.h2Scale, settings.h3Scale]
+    .filter(isMarkdownHeadingScale);
+  if (legacyScales.length === 0) return DEFAULT_MARKDOWN_PRESENTATION_SETTINGS.headingScale;
+
+  const firstScale = legacyScales[0];
+  return legacyScales.every((scale) => scale === firstScale)
+    ? firstScale
+    : DEFAULT_MARKDOWN_PRESENTATION_SETTINGS.headingScale;
 }

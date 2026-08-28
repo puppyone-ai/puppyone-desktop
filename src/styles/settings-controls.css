@@ -384,52 +384,62 @@
   place-items: center;
 }
 
-.desktop-markdown-presentation-preview {
+.desktop-markdown-presentation-layout {
   display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--po-border);
-  border-radius: 6px;
+  min-width: 0;
+  gap: 14px;
+  padding: 4px 10px 0;
+}
+
+.desktop-markdown-presentation-controls {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
   background: color-mix(in srgb, var(--po-panel) 72%, transparent);
-  color: var(--po-md-content-color, var(--po-text));
-  font-family: var(--po-md-content-font, var(--po-font-content, var(--po-font-sans)));
-  font-size: var(--po-md-content-size, 14px);
-  line-height: var(--po-md-content-line-height, 1.7142857143);
 }
 
-.desktop-markdown-presentation-preview__heading {
-  margin: 0;
-  color: var(--po-text);
-  font-weight: var(--po-md-heading-weight, 600);
-  line-height: var(--po-md-heading-line-height, 1.25);
+.desktop-markdown-presentation-setting {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: 18px;
+  grid-template-columns: minmax(150px, 1fr) minmax(0, 360px);
+  padding: 12px 14px;
 }
 
-.desktop-markdown-presentation-preview__h1 {
-  font-size: var(--po-md-h1-size, 2em);
-  font-weight: var(--po-md-h1-weight, 650);
+.desktop-markdown-presentation-setting + .desktop-markdown-presentation-setting {
+  border-top: 1px solid var(--po-border-subtle);
 }
 
-.desktop-markdown-presentation-preview__h2 {
-  font-size: var(--po-md-h2-size, 1.5em);
-  font-weight: var(--po-md-h2-weight, 625);
+.desktop-markdown-presentation-setting__copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
 }
 
-.desktop-markdown-presentation-preview__h3 {
-  font-size: var(--po-md-h3-size, 1.25em);
-  font-weight: var(--po-md-h3-weight, 600);
+.desktop-markdown-presentation-setting__copy > span {
+  color: var(--po-text-muted);
+  font-size: 12.5px;
+  font-weight: var(--po-text-weight-medium, 500);
+  line-height: 18px;
 }
 
-.desktop-markdown-presentation-preview__body {
-  margin: 0;
-  font-size: var(--po-md-content-size, 14px);
+.desktop-markdown-presentation-setting__copy > small {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
-.desktop-markdown-presentation-preview__body strong {
-  color: var(--po-md-strong-color, var(--po-text));
-  font-weight: var(--po-md-strong-weight, 600);
+.desktop-markdown-presentation-segment {
+  width: 100%;
+  max-width: none;
 }
 
-.desktop-settings-subsection .desktop-markdown-presentation-preview {
-  margin-inline-start: 10px;
+@media (max-width: 760px) {
+  .desktop-markdown-presentation-setting {
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

@@ -1,9 +1,11 @@
+import { MarkdownPresentationPreview } from "@puppyone/shared-ui/markdown-presentation-preview";
 import { useLocalization } from "@puppyone/localization";
+import { useId } from "react";
 import {
   MARKDOWN_HEADING_SCALE_OPTIONS,
   MARKDOWN_STRONG_COLOR_OPTIONS,
   MARKDOWN_STRONG_WEIGHT_OPTIONS,
-  type MarkdownHeadingScale,
+  resolveMarkdownPresentationStyle,
   type MarkdownPresentationSettings,
 } from "../../markdown/markdownPresentation";
 import { SettingsSectionHeader, SettingsSubsection } from "../components";
@@ -19,6 +21,12 @@ export function EditorSettingsView({
   const updatePresentation = (patch: Partial<MarkdownPresentationSettings>) => {
     onMarkdownPresentationChange({ ...markdownPresentation, ...patch });
   };
+  const previewValue = [
+    `# ${t("settings.editor.markdownPresentation.preview.h1")}`,
+    `## ${t("settings.editor.markdownPresentation.preview.h2")}`,
+    `### ${t("settings.editor.markdownPresentation.preview.h3")}`,
+    `${t("settings.editor.markdownPresentation.preview.lead")} **${t("settings.editor.markdownPresentation.preview.strong")}**${t("settings.editor.markdownPresentation.preview.tail")}`,
+  ].join("\n\n");
 
   return (
     <section className="desktop-utility-view desktop-settings-view">
@@ -27,57 +35,49 @@ export function EditorSettingsView({
           <SettingsSectionHeader title={t("settings.editor.title")} detail={t("settings.editor.detail")} />
           <div className="desktop-settings-list">
             <SettingsSubsection title={t("settings.editor.markdownPresentation.title")}>
-              <HeadingScaleRow
-                label={t("settings.editor.markdownPresentation.h1.title")}
-                detail={t("settings.editor.markdownPresentation.h1.detail")}
-                ariaLabel={t("settings.editor.markdownPresentation.h1.ariaLabel")}
-                value={markdownPresentation.h1Scale}
-                onChange={(h1Scale) => updatePresentation({ h1Scale })}
-              />
-              <HeadingScaleRow
-                label={t("settings.editor.markdownPresentation.h2.title")}
-                detail={t("settings.editor.markdownPresentation.h2.detail")}
-                ariaLabel={t("settings.editor.markdownPresentation.h2.ariaLabel")}
-                value={markdownPresentation.h2Scale}
-                onChange={(h2Scale) => updatePresentation({ h2Scale })}
-              />
-              <HeadingScaleRow
-                label={t("settings.editor.markdownPresentation.h3.title")}
-                detail={t("settings.editor.markdownPresentation.h3.detail")}
-                ariaLabel={t("settings.editor.markdownPresentation.h3.ariaLabel")}
-                value={markdownPresentation.h3Scale}
-                onChange={(h3Scale) => updatePresentation({ h3Scale })}
-              />
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-                <span title={t("settings.editor.markdownPresentation.strongColor.detail")}>
-                  {t("settings.editor.markdownPresentation.strongColor.title")}
-                </span>
-                <SegmentedControl
-                  ariaLabel={t("settings.editor.markdownPresentation.strongColor.ariaLabel")}
-                  options={MARKDOWN_STRONG_COLOR_OPTIONS.map((option) => ({
-                    id: option.id,
-                    label: t(option.labelKey),
-                    title: t(option.descriptionKey),
-                  }))}
-                  value={markdownPresentation.strongColor}
-                  onChange={(strongColor) => updatePresentation({ strongColor })}
+              <div className="desktop-markdown-presentation-layout">
+                <div className="desktop-markdown-presentation-controls">
+                  <PresentationSettingRow
+                    label={t("settings.editor.markdownPresentation.headingScale.title")}
+                    detail={t("settings.editor.markdownPresentation.headingScale.detail")}
+                    ariaLabel={t("settings.editor.markdownPresentation.headingScale.ariaLabel")}
+                    options={MARKDOWN_HEADING_SCALE_OPTIONS.map((option) => ({
+                      id: option.id,
+                      label: t(option.labelKey),
+                    }))}
+                    value={markdownPresentation.headingScale}
+                    onChange={(headingScale) => updatePresentation({ headingScale })}
+                  />
+                  <PresentationSettingRow
+                    label={t("settings.editor.markdownPresentation.strongColor.title")}
+                    detail={t("settings.editor.markdownPresentation.strongColor.detail")}
+                    ariaLabel={t("settings.editor.markdownPresentation.strongColor.ariaLabel")}
+                    options={MARKDOWN_STRONG_COLOR_OPTIONS.map((option) => ({
+                      id: option.id,
+                      label: t(option.labelKey),
+                      title: t(option.descriptionKey),
+                    }))}
+                    value={markdownPresentation.strongColor}
+                    onChange={(strongColor) => updatePresentation({ strongColor })}
+                  />
+                  <PresentationSettingRow
+                    label={t("settings.editor.markdownPresentation.strongWeight.title")}
+                    detail={t("settings.editor.markdownPresentation.strongWeight.detail")}
+                    ariaLabel={t("settings.editor.markdownPresentation.strongWeight.ariaLabel")}
+                    options={MARKDOWN_STRONG_WEIGHT_OPTIONS.map((option) => ({
+                      id: option.id,
+                      label: t(option.labelKey),
+                    }))}
+                    value={markdownPresentation.strongWeight}
+                    onChange={(strongWeight) => updatePresentation({ strongWeight })}
+                  />
+                </div>
+                <MarkdownPresentationPreview
+                  ariaLabel={t("settings.editor.markdownPresentation.preview.ariaLabel")}
+                  value={previewValue}
+                  style={resolveMarkdownPresentationStyle(markdownPresentation)}
                 />
               </div>
-              <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-                <span title={t("settings.editor.markdownPresentation.strongWeight.detail")}>
-                  {t("settings.editor.markdownPresentation.strongWeight.title")}
-                </span>
-                <SegmentedControl
-                  ariaLabel={t("settings.editor.markdownPresentation.strongWeight.ariaLabel")}
-                  options={MARKDOWN_STRONG_WEIGHT_OPTIONS.map((option) => ({
-                    id: option.id,
-                    label: t(option.labelKey),
-                  }))}
-                  value={markdownPresentation.strongWeight}
-                  onChange={(strongWeight) => updatePresentation({ strongWeight })}
-                />
-              </div>
-              <MarkdownPresentationPreview />
             </SettingsSubsection>
           </div>
         </div>
@@ -86,29 +86,32 @@ export function EditorSettingsView({
   );
 }
 
-function HeadingScaleRow({
+function PresentationSettingRow<T extends string>({
   label,
   detail,
   ariaLabel,
+  options,
   value,
   onChange,
 }: {
   label: string;
   detail: string;
   ariaLabel: string;
-  value: MarkdownHeadingScale;
-  onChange: (value: MarkdownHeadingScale) => void;
+  options: readonly { id: T; label: string; title?: string }[];
+  value: T;
+  onChange: (value: T) => void;
 }) {
-  const { t } = useLocalization();
+  const detailId = useId();
   return (
-    <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-      <span title={detail}>{label}</span>
+    <div className="desktop-markdown-presentation-setting">
+      <div className="desktop-markdown-presentation-setting__copy">
+        <span>{label}</span>
+        <small id={detailId}>{detail}</small>
+      </div>
       <SegmentedControl
         ariaLabel={ariaLabel}
-        options={MARKDOWN_HEADING_SCALE_OPTIONS.map((option) => ({
-          id: option.id,
-          label: t(option.labelKey),
-        }))}
+        describedBy={detailId}
+        options={options}
         value={value}
         onChange={onChange}
       />
@@ -118,19 +121,23 @@ function HeadingScaleRow({
 
 function SegmentedControl<T extends string>({
   ariaLabel,
+  describedBy,
   options,
   value,
   onChange,
 }: {
   ariaLabel: string;
+  describedBy: string;
   options: readonly { id: T; label: string; title?: string }[];
   value: T;
   onChange: (value: T) => void;
 }) {
   return (
     <div
-      className="desktop-theme-segment desktop-appearance-option-segment desktop-appearance-hug-segment"
+      className="desktop-theme-segment desktop-appearance-option-segment desktop-markdown-presentation-segment"
+      role="group"
       aria-label={ariaLabel}
+      aria-describedby={describedBy}
     >
       {options.map((option) => (
         <button
@@ -144,31 +151,6 @@ function SegmentedControl<T extends string>({
           <span>{option.label}</span>
         </button>
       ))}
-    </div>
-  );
-}
-
-function MarkdownPresentationPreview() {
-  const { t } = useLocalization();
-  return (
-    <div
-      className="desktop-markdown-presentation-preview"
-      aria-label={t("settings.editor.markdownPresentation.preview.ariaLabel")}
-    >
-      <p className="desktop-markdown-presentation-preview__heading desktop-markdown-presentation-preview__h1">
-        {t("settings.editor.markdownPresentation.preview.h1")}
-      </p>
-      <p className="desktop-markdown-presentation-preview__heading desktop-markdown-presentation-preview__h2">
-        {t("settings.editor.markdownPresentation.preview.h2")}
-      </p>
-      <p className="desktop-markdown-presentation-preview__heading desktop-markdown-presentation-preview__h3">
-        {t("settings.editor.markdownPresentation.preview.h3")}
-      </p>
-      <p className="desktop-markdown-presentation-preview__body">
-        {t("settings.editor.markdownPresentation.preview.lead")}{" "}
-        <strong>{t("settings.editor.markdownPresentation.preview.strong")}</strong>
-        {t("settings.editor.markdownPresentation.preview.tail")}
-      </p>
     </div>
   );
 }

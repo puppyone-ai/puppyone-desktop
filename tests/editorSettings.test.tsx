@@ -30,16 +30,30 @@ describe("Editor settings", () => {
       />,
     )));
 
-    const headingScale = host.querySelector<HTMLElement>('[aria-label="Heading 1 size"]');
+    const headingScale = host.querySelector<HTMLElement>('[aria-label="Heading size"]');
     const largeButton = Array.from(headingScale?.querySelectorAll("button") ?? [])
       .find((button) => button.textContent === "Large");
     expect(largeButton).toBeDefined();
+    expect(headingScale?.getAttribute("role")).toBe("group");
+    expect(document.getElementById(headingScale?.getAttribute("aria-describedby") ?? "")?.textContent)
+      .toBe("Scale all Markdown heading levels together.");
 
     act(() => largeButton?.click());
     expect(onChange).toHaveBeenCalledWith({
       ...DEFAULT_MARKDOWN_PRESENTATION_SETTINGS,
-      h1Scale: "large",
+      headingScale: "large",
     });
-    expect(host.querySelector('[aria-label="Markdown style preview"]')).not.toBeNull();
+
+    const weightLabels = Array.from(
+      host.querySelectorAll<HTMLElement>('[aria-label="Bold weight"] button'),
+      (button) => button.textContent,
+    );
+    expect(weightLabels).toEqual(["Medium", "Semibold", "Bold", "Heavy"]);
+
+    const preview = host.querySelector<HTMLElement>('[aria-label="Markdown style preview"]');
+    expect(preview?.classList.contains("markdown-presentation-preview")).toBe(true);
+    expect(preview?.querySelector(
+      '.markdown-codemirror-editor[data-live-preview="true"][data-readonly="true"]',
+    )).not.toBeNull();
   });
 });

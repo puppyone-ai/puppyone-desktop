@@ -94,7 +94,11 @@ describe("settings visual architecture", () => {
 
     expect(sidebarModel).toContain('id: "editor"');
     expect(settingsView).toContain("<EditorSettingsView");
+    expect(settingsView).toContain('import("./main/EditorSettingsView")');
     expect(editorSettings).toContain("markdownPresentation");
+    expect(editorSettings).toContain("<MarkdownPresentationPreview");
+    expect(editorSettings).toContain("markdownPresentation.headingScale");
+    expect(editorSettings).not.toContain("markdownPresentation.h1Scale");
     expect(editorSettings).not.toContain("aiEditAssistEnabled");
     expect(editorSettings).not.toContain("diffMarkers");
     expect(settingsView).not.toContain("onAiEditAssistEnabledChange");
