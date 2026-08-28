@@ -1,0 +1,44 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "puppyone-desktop-telemetry",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-08-27",
+  "workers_dev": true,
+  "send_metrics": false,
+  "dependencies_instrumentation": {
+    "enabled": false
+  },
+  "vars": {
+    // Safe deployment default. Change to "accept" only after every rollout gate
+    // in this directory's README has been completed.
+    "TELEMETRY_MODE": "paused"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "puppyone-desktop-telemetry",
+      "database_id": "ad49976b-2931-4844-a519-4b9302579e70",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "INGEST_RATE_LIMITER",
+      "namespace_id": "2026082701",
+      "simple": {
+        "limit": 12,
+        "period": 60
+      }
+    }
+  ],
+  "triggers": {
+    "crons": ["17 0 * * *"]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.01,
+    "logs": {
+      "invocation_logs": false
+    }
+  }
+}

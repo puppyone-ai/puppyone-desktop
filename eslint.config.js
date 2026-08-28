@@ -71,7 +71,7 @@ export default [
     },
   },
   {
-    files: ["electron/**/*.mjs", "local-api/**/*.mjs", "shared/**/*.{js,mjs}", "scripts/**/*.mjs", "tests/**/*.mjs"],
+    files: ["cloudflare/**/*.mjs", "electron/**/*.mjs", "local-api/**/*.mjs", "shared/**/*.{js,mjs}", "scripts/**/*.mjs", "tests/**/*.mjs"],
     languageOptions: { ecmaVersion: 2023, sourceType: "module", globals: { ...globals.node } },
     rules: coreBugRules,
   },

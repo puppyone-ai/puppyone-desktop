@@ -45,6 +45,19 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     });
   },
   getBuildInfo: () => ipcRenderer.invoke("build-info:get"),
+  getTelemetryState: () => ipcRenderer.invoke("telemetry:get-state"),
+  getTelemetryDisclosure: () => ipcRenderer.invoke("telemetry:get-disclosure"),
+  markTelemetryNoticeSeen: () => ipcRenderer.invoke("telemetry:mark-notice-seen"),
+  setTelemetryLevel: (request) => ipcRenderer.invoke("telemetry:set-level", {
+    level: request?.level,
+  }),
+  resetTelemetryIdentity: () => ipcRenderer.invoke("telemetry:reset-identity"),
+  onTelemetryStateChanged: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("telemetry:state-changed", listener);
+    return () => ipcRenderer.removeListener("telemetry:state-changed", listener);
+  },
   getLocalizationBootstrap: () => ipcRenderer.invoke("localization:get-bootstrap"),
   setLanguagePreference: (preference) => (
     ipcRenderer.invoke("localization:set-language-preference", preference)

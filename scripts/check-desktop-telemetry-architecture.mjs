@@ -1,0 +1,184 @@
+#!/usr/bin/env node
+
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  DESKTOP_TELEMETRY_DAILY_ACTIVE_EVENT,
+  DESKTOP_TELEMETRY_LEVELS,
+  getDesktopTelemetryDisclosure,
+} from "../shared/desktop-telemetry-contract.mjs";
+import { DESKTOP_STABLE_TELEMETRY_INGEST_URL } from "../shared/desktop-telemetry-distribution-contract.mjs";
+
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const errors = [];
+
+if (DESKTOP_TELEMETRY_LEVELS.join(",") !== "off,basic") {
+  errors.push("the default-on telemetry contract must remain limited to off and basic");
+}
+
+const disclosure = getDesktopTelemetryDisclosure();
+if (
+  disclosure.events.length !== 1
+  || disclosure.events[0]?.name !== DESKTOP_TELEMETRY_DAILY_ACTIVE_EVENT
+) {
+  errors.push("the basic level must disclose exactly one daily-active event");
+}
+if (
+  !disclosure.events[0]?.fields.includes("activity_day")
+  || disclosure.events[0]?.fields.includes("occurred_at")
+  || disclosure.events[0]?.fields.includes("properties.channel")
+) {
+  errors.push("the public event must expose only a calendar activity day and must not expose time-of-day or build channel");
+}
+
+if (DESKTOP_STABLE_TELEMETRY_INGEST_URL !== null) {
+  let endpoint;
+  try {
+    endpoint = new URL(DESKTOP_STABLE_TELEMETRY_INGEST_URL);
+  } catch {
+    errors.push("the Stable telemetry endpoint must be null or a valid URL");
+  }
+  if (
+    endpoint
+    && (
+      endpoint.protocol !== "https:"
+      || endpoint.username
+      || endpoint.password
+      || endpoint.search
+      || endpoint.hash
+      || !endpoint.hostname.endsWith(".puppyone.ai")
+    )
+  ) {
+    errors.push("the Stable telemetry endpoint must be a first-party HTTPS URL without credentials or URL parameters");
+  }
+}
+
+const mainSource = await readText("electron/main.mjs");
+requireSource(mainSource, "createDesktopTelemetryHost", "Electron main must own the telemetry host");
+requireSource(mainSource, "buildInfo: desktopBuildInfo", "telemetry eligibility must use packaged Desktop Build Identity");
+requireSource(mainSource, "await telemetryHost.start()", "telemetry must initialize before the first window can report activity");
+
+const serviceSource = await readText("electron/main/telemetry/application/desktop-telemetry-service.mjs");
+requireSource(serviceSource, 'identity.channel !== "stable"', "non-Stable builds must stay ineligible");
+requireSource(serviceSource, 'preference.level === "off"', "the application service must enforce the off level");
+requireSource(serviceSource, "notice_seen_version", "the current product notice must gate telemetry delivery");
+requireSource(serviceSource, "await queueStore.clear()", "switching off must delete queued events");
+requireSource(serviceSource, "await identityStore.clear()", "switching off must delete the local identity secret");
+
+const transportSource = await readText("electron/main/telemetry/infrastructure/telemetry-http-transport.mjs");
+requireSource(transportSource, 'credentials: "omit"', "telemetry requests must omit application and browser credentials");
+requireSource(transportSource, 'redirect: "error"', "telemetry requests must reject redirects");
+requireSource(transportSource, "events.every(isDesktopTelemetryEvent)", "the transport must reject non-allowlisted payloads");
+
+const eventSource = await readText("shared/desktop-telemetry-event.mjs");
+requireSource(eventSource, "activity_day", "the shared event validator must require the UTC calendar day");
+for (const forbidden of ["occurred_at", "properties.channel"]) {
+  if (eventSource.includes(forbidden)) errors.push(`the shared event validator must not expose ${forbidden}`);
+}
+
+const edgeSource = [
+  await readText("cloudflare/desktop-telemetry/src/worker.mjs"),
+  await readText("cloudflare/desktop-telemetry/src/ingest-contract.mjs"),
+  await readText("cloudflare/desktop-telemetry/src/d1-telemetry-repository.mjs"),
+].join("\n");
+requireSource(edgeSource, "parseDesktopTelemetryRequest", "the Cloudflare Worker must validate the shared event contract");
+requireSource(edgeSource, "INGEST_RATE_LIMITER", "the Cloudflare Worker must enforce a bounded ingest rate");
+requireSource(edgeSource, "telemetry_daily_active", "D1 must maintain the exact daily active set");
+requireSource(edgeSource, "telemetry_monthly_active", "D1 must maintain the exact calendar-month active set");
+requireSource(edgeSource, 'mode === "discard"', "the edge must retain an emergency privacy discard mode");
+for (const forbidden of ["cf-connecting-ip", "x-forwarded-for", "user-agent", "console.log", "console.error"]) {
+  if (edgeSource.toLowerCase().includes(forbidden)) {
+    errors.push(`the telemetry edge source must not read or log ${forbidden}`);
+  }
+}
+
+const migrationSource = await readText("cloudflare/desktop-telemetry/migrations/0001_initial.sql");
+requireSource(migrationSource, "PRIMARY KEY (activity_day, anonymous_id)", "D1 must deduplicate daily activity exactly");
+requireSource(migrationSource, "PRIMARY KEY (activity_month, anonymous_id)", "D1 must deduplicate calendar-month activity exactly");
+if (/ip_address|user_agent|email|account|workspace|repository/i.test(migrationSource)) {
+  errors.push("the telemetry D1 schema must not add network, account, or workspace identifiers");
+}
+
+const wranglerSource = await readText("cloudflare/desktop-telemetry/wrangler.jsonc");
+requireSource(wranglerSource, '"TELEMETRY_MODE": "paused"', "new telemetry edge deployments must default to paused");
+requireSource(wranglerSource, '"invocation_logs": false', "Cloudflare invocation logs must remain disabled");
+requireSource(wranglerSource, '"send_metrics": false', "project-scoped Wrangler usage telemetry must remain disabled");
+requireSource(wranglerSource, '"enabled": false', "Wrangler dependency instrumentation must remain disabled");
+requireSource(wranglerSource, '"binding": "DB"', "the edge must use an explicit D1 binding");
+if (DESKTOP_STABLE_TELEMETRY_INGEST_URL !== null && /"TELEMETRY_MODE"\s*:\s*"paused"/.test(wranglerSource)) {
+  errors.push("the Stable client endpoint must remain unset while the checked-in edge mode is paused");
+}
+
+const publicTelemetrySource = await readText("docs/telemetry.md");
+requireSource(
+  publicTelemetrySource,
+  "guanqun.real@puppyone.ai",
+  "the public telemetry disclosure must provide the monitored founder contact",
+);
+
+const ipcSource = await readText("electron/main/ipc/telemetry-ipc.mjs");
+const registeredChannels = [...ipcSource.matchAll(/ipcMain\.handle\("([^"]+)"/g)].map((match) => match[1]);
+const expectedChannels = [
+  "telemetry:get-state",
+  "telemetry:get-disclosure",
+  "telemetry:mark-notice-seen",
+  "telemetry:set-level",
+  "telemetry:reset-identity",
+];
+if (registeredChannels.sort().join(",") !== expectedChannels.sort().join(",")) {
+  errors.push("telemetry IPC must expose only state, disclosure, notice, level, and identity-reset controls");
+}
+
+const preloadSource = await readText("electron/preload.cjs");
+for (const forbidden of ["trackTelemetryEvent", "captureTelemetryEvent", "sendTelemetryEvent"]) {
+  if (preloadSource.includes(forbidden)) {
+    errors.push(`preload must not expose an arbitrary renderer telemetry method (${forbidden})`);
+  }
+}
+
+const noticeSource = await readText("src/features/telemetry/DesktopTelemetryNotice.tsx");
+requireSource(noticeSource, "state.transportConfigured", "the product notice must not appear before a Stable transport is configured");
+requireSource(noticeSource, "markTelemetryNoticeSeen", "the renderer must record consent through the bounded notice IPC");
+requireSource(noticeSource, "dismissedForSession", "Not now must remain a session-only renderer choice");
+requireSource(noticeSource, 't("telemetry.notice.understand")', "the notice acknowledgement must be labeled through the localized I understand contract");
+
+for (const sourceRoot of ["src", "packages/shared-ui/src"]) {
+  for (const filePath of await listSourceFiles(sourceRoot)) {
+    const source = await fs.readFile(filePath, "utf8");
+    if (/\b(?:posthog|mixpanel|amplitude)(?:-js)?\b/i.test(source)) {
+      errors.push(`${path.relative(repositoryRoot, filePath)} must not embed a renderer analytics SDK`);
+    }
+    if (/electron\/main\/telemetry|telemetry-http-transport/.test(source)) {
+      errors.push(`${path.relative(repositoryRoot, filePath)} must not import main-process telemetry infrastructure`);
+    }
+  }
+}
+
+if (errors.length > 0) {
+  console.error("Desktop telemetry architecture check failed:");
+  for (const error of errors) console.error(`- ${error}`);
+  process.exit(1);
+}
+
+console.log("Desktop telemetry architecture check passed.");
+
+function requireSource(source, snippet, message) {
+  if (!source.includes(snippet)) errors.push(message);
+}
+
+async function readText(relativePath) {
+  return fs.readFile(path.join(repositoryRoot, relativePath), "utf8");
+}
+
+async function listSourceFiles(relativeRoot) {
+  const root = path.join(repositoryRoot, relativeRoot);
+  const output = [];
+  const entries = await fs.readdir(root, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = path.join(root, entry.name);
+    if (entry.isDirectory()) output.push(...await listSourceFiles(path.relative(repositoryRoot, entryPath)));
+    else if (/\.(?:js|jsx|ts|tsx|mjs|cjs)$/.test(entry.name)) output.push(entryPath);
+  }
+  return output;
+}

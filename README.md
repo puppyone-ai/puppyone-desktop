@@ -39,5 +39,11 @@ puppyone
 
 Code is licensed under the [Apache License 2.0](LICENSE).
 
+## Privacy
+
+Desktop product analytics are currently disabled. The bounded event catalog,
+data exclusions, retention, and contact channel are published in
+[Product analytics](docs/telemetry.md).
+
 The puppyone name, logo, icons, and other brand assets are not granted under
 the Apache License. See [TRADEMARK.md](TRADEMARK.md).

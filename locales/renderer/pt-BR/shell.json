@@ -80,5 +80,13 @@
   "build.channel.stable": "Versão estável",
   "build.version.title": "{channel} · {version} · commit {commit}",
   "build.copy.action": "Copiar informações da versão",
-  "build.copy.copied": "Informações da versão copiadas"
+  "build.copy.copied": "Informações da versão copiadas",
+  "telemetry.notice.title": "Ajude a melhorar o puppyone",
+  "telemetry.notice.description": "Compartilhe atividade diária anônima — nunca arquivos ou prompts.",
+  "telemetry.notice.learnMore": "Detalhes",
+  "telemetry.notice.showLess": "Menos",
+  "telemetry.notice.details": "No máximo um registro de atividade anônimo é enviado por dia UTC. O identificador muda a cada mês do calendário.",
+  "telemetry.notice.notNow": "Depois",
+  "telemetry.notice.understand": "Entendi",
+  "telemetry.notice.error": "Não foi possível atualizar a preferência de análise. Tente novamente."
 }

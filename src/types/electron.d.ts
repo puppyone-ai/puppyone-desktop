@@ -448,6 +448,41 @@ export type DesktopUpdateStatus =
 
 export type DesktopBuildChannel = "dev" | "internal" | "stable";
 
+export type DesktopTelemetryLevel = "off" | "basic";
+
+export type DesktopTelemetryState = {
+  readonly schemaVersion: 1;
+  readonly defaultLevel: DesktopTelemetryLevel;
+  readonly level: DesktopTelemetryLevel;
+  readonly effectiveLevel: DesktopTelemetryLevel;
+  readonly enabled: boolean;
+  readonly eligible: boolean;
+  readonly disabledReason: string | null;
+  readonly noticeVersion: number;
+  readonly noticeSeenVersion: number;
+  readonly noticeRequired: boolean;
+  readonly transportConfigured: boolean;
+  readonly queuedEventCount: number;
+};
+
+export type DesktopTelemetryDisclosure = {
+  readonly schemaVersion: 1;
+  readonly noticeVersion: number;
+  readonly levels: ReadonlyArray<{
+    readonly id: DesktopTelemetryLevel;
+    readonly sendsData: boolean;
+    readonly description: string;
+  }>;
+  readonly events: ReadonlyArray<{
+    readonly name: string;
+    readonly purpose: string;
+    readonly maximumFrequency: string;
+    readonly identifierRotation: string;
+    readonly fields: ReadonlyArray<string>;
+  }>;
+  readonly neverCollected: ReadonlyArray<string>;
+};
+
 export type DesktopBuildInfo = {
   readonly schemaVersion: 1;
   readonly product: "puppyone-desktop";
@@ -758,6 +793,14 @@ declare global {
         regions: Array<{ x: number; y: number; width: number; height: number }>;
       }) => void;
       getBuildInfo: () => Promise<DesktopBuildInfo>;
+      getTelemetryState: () => Promise<DesktopTelemetryState>;
+      getTelemetryDisclosure: () => Promise<DesktopTelemetryDisclosure>;
+      markTelemetryNoticeSeen: () => Promise<DesktopTelemetryState>;
+      setTelemetryLevel: (request: { level: DesktopTelemetryLevel }) => Promise<DesktopTelemetryState>;
+      resetTelemetryIdentity: () => Promise<DesktopTelemetryState>;
+      onTelemetryStateChanged: (
+        callback: (state: DesktopTelemetryState) => void,
+      ) => () => void;
       getLocalizationBootstrap: () => Promise<LocaleState>;
       setLanguagePreference: (preference: AppLanguagePreference) => Promise<LocaleState>;
       onLocaleChanged: (callback: (state: LocaleState) => void) => () => void;

@@ -80,5 +80,13 @@
   "build.channel.stable": "Stable",
   "build.version.title": "{channel} · {version} · commit {commit}",
   "build.copy.action": "Copy version information",
-  "build.copy.copied": "Version information copied"
+  "build.copy.copied": "Version information copied",
+  "telemetry.notice.title": "Help improve puppyone",
+  "telemetry.notice.description": "Share anonymous daily activity—never files or prompts.",
+  "telemetry.notice.learnMore": "Details",
+  "telemetry.notice.showLess": "Less",
+  "telemetry.notice.details": "At most one anonymous activity record is sent per UTC day. The identifier changes every calendar month.",
+  "telemetry.notice.notNow": "Later",
+  "telemetry.notice.understand": "I understand",
+  "telemetry.notice.error": "Couldn’t update your analytics preference. Please try again."
 }
