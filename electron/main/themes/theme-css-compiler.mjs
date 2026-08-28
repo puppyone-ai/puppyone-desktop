@@ -1,4 +1,5 @@
 import postcss from "postcss";
+import path from "node:path";
 import { THEME_TARGETS } from "./theme-package-contract.mjs";
 
 const targetSet = new Set(THEME_TARGETS);
@@ -11,6 +12,7 @@ export async function compileThemeCss({
   css,
   themeId,
   target,
+  sourcePath = "theme.css",
   loadImport,
   resolveAssetUrl,
 }) {
@@ -18,7 +20,12 @@ export async function compileThemeCss({
   if (!themeIdPattern.test(themeId)) throw new TypeError("Theme id is invalid.");
   if (!targetSet.has(target)) throw new TypeError(`Unsupported theme target: ${String(target)}.`);
 
-  const root = await parseAndInlineImports(css, { loadImport, ancestry: [], depth: 0 });
+  const root = await parseAndInlineImports(css, {
+    sourcePath,
+    loadImport,
+    ancestry: [],
+    depth: 0,
+  });
   validateAtRules(root);
   scopeRules(root, { themeId, target });
   await rewriteAssetUrls(root, resolveAssetUrl);
@@ -31,11 +38,11 @@ export async function compileThemeCss({
   });
 }
 
-async function parseAndInlineImports(css, { loadImport, ancestry, depth }) {
+async function parseAndInlineImports(css, { sourcePath, loadImport, ancestry, depth }) {
   if (depth > 8) throw new TypeError("Theme CSS import depth exceeds the supported limit.");
   let root;
   try {
-    root = postcss.parse(css, { from: undefined });
+    root = postcss.parse(css, { from: sourcePath });
   } catch (error) {
     throw new TypeError(`Theme CSS could not be parsed: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -51,13 +58,16 @@ async function parseAndInlineImports(css, { loadImport, ancestry, depth }) {
     if (typeof loadImport !== "function") {
       throw new TypeError(`Theme CSS import cannot be loaded: ${specifier}.`);
     }
-    const importedCss = await loadImport(specifier);
-    if (typeof importedCss !== "string") {
+    const imported = await loadImport(specifier, sourcePath);
+    const importedCss = typeof imported === "string" ? imported : imported?.css;
+    const importedSourcePath = typeof imported === "string" ? specifier : imported?.sourcePath;
+    if (typeof importedCss !== "string" || typeof importedSourcePath !== "string") {
       throw new TypeError(`Theme CSS import did not return text: ${specifier}.`);
     }
     const importedRoot = await parseAndInlineImports(importedCss, {
+      sourcePath: importedSourcePath,
       loadImport,
-      ancestry: [...ancestry, specifier],
+      ancestry: [...ancestry, importedSourcePath],
       depth: depth + 1,
     });
     rule.replaceWith(...importedRoot.nodes.map((node) => node.clone()));
@@ -127,13 +137,21 @@ async function rewriteAssetUrls(root, resolveAssetUrl) {
       if (typeof resolveAssetUrl !== "function") {
         throw new TypeError(`Theme CSS asset cannot be resolved: ${specifier}.`);
       }
-      const resolved = await resolveAssetUrl(specifier);
+      const resolved = await resolveAssetUrl(
+        specifier,
+        normalizeSourcePath(declaration.source?.input?.file ?? "theme.css"),
+      );
       if (typeof resolved !== "string" || !allowedDataUrlPattern.test(resolved)) {
         throw new TypeError(`Theme CSS asset resolver returned an unsupported URL for ${specifier}.`);
       }
       return resolved;
     });
   }
+}
+
+function normalizeSourcePath(value) {
+  const normalized = path.isAbsolute(value) ? path.relative(process.cwd(), value) : value;
+  return normalized.split(path.sep).join("/");
 }
 
 function validateDeclarations(root, target) {
@@ -163,7 +181,7 @@ function isSafeRelativePath(value) {
   if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return false;
   const normalized = value.startsWith("./") ? value.slice(2) : value;
   const segments = normalized.split("/");
-  return segments.every((segment) => segment.length > 0 && segment !== "." && segment !== "..");
+  return segments.every((segment) => segment.length > 0);
 }
 
 function startsWithSelectorToken(selector, token) {

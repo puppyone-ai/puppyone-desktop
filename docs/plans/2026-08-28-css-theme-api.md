@@ -4,7 +4,7 @@
 
 **Goal:** Add a Typora-style CSS theme API that discovers local theme packages, safely scopes their CSS to application, Markdown, or CSV surfaces, and lets users select and reload themes.
 
-**Architecture:** Electron Main owns the per-device theme directory, package discovery, manifest validation, CSS parsing, selector scoping, and opening the directory. The renderer receives immutable compiled theme snapshots through trusted IPC, injects only compiled CSS, stores selected theme IDs in versioned local preferences, and marks stable surface roots with theme data attributes. Built-in surface themes use the same public token contract but ship as static product CSS.
+**Architecture:** Electron Main owns the per-device theme directory, package discovery, manifest validation, CSS parsing, selector scoping, package-local asset loading, and opening the directory. A top-level `*.css` file is recognized as a Markdown theme for a Typora-like authoring path; a directory with `theme.json` enables metadata and multiple targets. The renderer receives immutable compiled theme snapshots through trusted IPC, injects only compiled CSS, stores selected theme IDs in versioned local preferences, and marks stable surface roots with theme data attributes. Built-in surface themes use the same public token contract but ship as static product CSS.
 
 **Tech Stack:** Electron trusted IPC, Node filesystem APIs, PostCSS parser, React 18, TypeScript, CSS custom properties, Vitest, Testing Library.
 
@@ -42,7 +42,7 @@ Expected: PASS.
 
 **Step 5: Write failing CSS compiler tests**
 
-Require every selector to start at `.theme-root`; verify selector rewriting to target and theme-ID attributes; reject `@import`, remote/local `url()`, selectors that escape the root, fixed positioning, and non-token declarations for the application target. Verify ordinary Markdown and CSV presentation declarations remain supported.
+Verify `.theme-root` plus Typora-style `:root`, `html`, `body`, and `#write` aliases; automatically scope ordinary document selectors to target and theme-ID attributes; reject remote imports/URLs, selectors that escape the root, fixed positioning, and non-token declarations for the application target. Verify package-local imports and font/image assets resolve only through host callbacks.
 
 **Step 6: Run the compiler test and verify RED**
 
@@ -52,7 +52,7 @@ Expected: FAIL because the compiler module does not exist.
 
 **Step 7: Implement the compiler with PostCSS**
 
-Parse CSS with PostCSS rather than regular expressions. Permit nested `@media` rules, rewrite each comma-separated selector independently, and produce deterministic compiled CSS. Move `postcss` to production dependencies because Electron Main executes the parser in packaged builds.
+Parse CSS with PostCSS rather than regular expressions. Permit nested `@media` rules, inline bounded package-local imports, rewrite each comma-separated selector independently, rewrite local assets to validated data URLs, and produce deterministic compiled CSS. Move `postcss` to production dependencies because Electron Main executes the parser in packaged builds.
 
 **Step 8: Run compiler and contract tests**
 
@@ -74,7 +74,7 @@ Commit: `feat(theme): define safe CSS theme contract`
 
 **Step 1: Write failing service tests**
 
-Create temporary user-data directories containing valid, malformed, duplicate, and partially unreadable packages. Assert deterministic theme ordering, one package snapshot per manifest, isolated diagnostics, bounded file sizes, and a stable `${userData}/themes` root.
+Create temporary user-data directories containing Typora-style top-level CSS files plus valid, malformed, duplicate, and partially unreadable packages. Assert deterministic theme ordering, one package snapshot per manifest, local import/font resolution, isolated diagnostics, bounded file sizes, and a stable `${userData}/themes` root.
 
 **Step 2: Run the service test and verify RED**
 
@@ -84,7 +84,7 @@ Expected: FAIL because the service module does not exist.
 
 **Step 3: Implement minimal discovery**
 
-Create the theme root on demand, scan only direct child directories, read `theme.json`, compile declared CSS entrypoints, keep errors attached to the offending directory, and never expose absolute paths to the renderer.
+Create the theme root on demand, scan direct child `*.css` files as Markdown themes, scan direct child package directories for `theme.json`, compile declared CSS entrypoints, keep errors attached to the offending source, and never expose absolute paths to the renderer. Package CSS may navigate among files inside its own canonical package root but may not escape it through `..` or symlinks.
 
 **Step 4: Add open-directory and reload behavior**
 
@@ -340,4 +340,3 @@ Verify only theme-related paths are staged, generated files are current, no abso
 **Step 6: Commit documentation and integration fixes**
 
 Commit: `docs: document CSS theme API`
-
