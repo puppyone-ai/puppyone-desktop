@@ -201,11 +201,14 @@ export function useDesktopPreferences() {
     }
     root.style.setProperty("--initial-shell-background", firstPaint.background);
     root.style.setProperty("--initial-shell-color-scheme", firstPaint.colorScheme);
-    window.puppyoneDesktop?.setWindowBackground?.({ background: firstPaint.background });
+    window.puppyoneDesktop?.setWindowBackground?.({
+      background: firstPaint.background,
+      themeSource: activeThemeMode === "system" ? "system" : firstPaint.colorScheme,
+    });
     void window.puppyoneDesktop?.setWindowChromeProfile?.({
       titlebar: resolvedAppearance.composition.titlebar,
     }).catch(() => undefined);
-  }, [activeThemePreset, interfaceStyle, resolvedAppearance, resolvedTheme]);
+  }, [activeThemeMode, activeThemePreset, interfaceStyle, resolvedAppearance, resolvedTheme]);
 
   useEffect(() => {
     window.localStorage.setItem(LIGHT_THEME_PRESET_STORAGE_KEY, lightThemePreset);

@@ -710,6 +710,7 @@ function registerIpcHandlers() {
   registerAppearanceIpcHandlers({
     ipcMain: trustedIpcMain,
     BrowserWindow,
+    nativeTheme,
   });
   registerWindowLayoutIpcHandlers({
     ipcMain: trustedIpcMain,

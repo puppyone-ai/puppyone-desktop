@@ -734,7 +734,10 @@ declare global {
       onWindowChromeStateChanged: (
         callback: (state: { fullScreen: boolean }) => void,
       ) => () => void;
-      setWindowBackground: (request: { background: string }) => void;
+      setWindowBackground: (request: {
+        background: string;
+        themeSource: "system" | "light" | "dark";
+      }) => void;
       setWindowMinimumWidth: (request: { width: number }) => Promise<{
         applied: boolean;
         width?: number;
