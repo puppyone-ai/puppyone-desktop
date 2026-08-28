@@ -1,4 +1,6 @@
 .csv-table-editor {
+  --po-csv-surface-background: var(--po-editor-bg);
+  --po-csv-surface-color: var(--po-text);
   --csv-table-record-index-width: var(--po-editable-table-row-min-height);
   --csv-table-record-index-background: color-mix(in srgb, var(--po-control) 38%, var(--po-editor-bg));
   --csv-table-record-index-active-background: color-mix(in srgb, var(--po-hover) 58%, var(--po-editor-bg));
@@ -15,8 +17,8 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  background: var(--po-editor-bg);
-  color: var(--po-text);
+  background: var(--po-csv-surface-background);
+  color: var(--po-csv-surface-color);
 }
 
 /* The compact view control occupies the scrollable content inset. It leaves

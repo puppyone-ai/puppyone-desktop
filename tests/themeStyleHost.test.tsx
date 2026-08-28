@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ThemeStyleHost } from "../src/features/themes/ThemeStyleHost";
 import { createThemeCatalogSnapshot } from "../src/features/themes/builtinSurfaceThemes";
 import type { ThemeDefinition } from "../src/features/themes/themeTypes";
+import type { SurfaceThemePreferences } from "../src/features/themes/themePreferences";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -34,7 +35,12 @@ describe("renderer CSS theme style host", () => {
     });
     const snapshot = createThemeCatalogSnapshot({ themes: [installed], diagnostics: [] });
 
-    act(() => root.render(<ThemeStyleHost snapshot={snapshot} />));
+    act(() => root.render(
+      <ThemeStyleHost snapshot={snapshot} preferences={selection({
+        markdown: installed.id,
+        csv: installed.id,
+      })} />,
+    ));
 
     expect(snapshot.themes.some((theme) => theme.id === "builtin.markdown.newsprint")).toBe(true);
     const styles = [...document.head.querySelectorAll<HTMLStyleElement>("style[data-po-theme-style]")];
@@ -55,12 +61,29 @@ describe("renderer CSS theme style host", () => {
       themes: [externalTheme({ id: "com.example.second" })],
       diagnostics: [],
     });
-    act(() => root.render(<ThemeStyleHost snapshot={first} />));
+    act(() => root.render(
+      <ThemeStyleHost snapshot={first} preferences={selection({ markdown: "com.example.first" })} />,
+    ));
 
-    act(() => root.render(<ThemeStyleHost snapshot={second} />));
+    act(() => root.render(
+      <ThemeStyleHost snapshot={second} preferences={selection({ markdown: "com.example.second" })} />,
+    ));
 
     expect(document.head.querySelector('[data-po-theme-id="com.example.first"]')).toBeNull();
     expect(document.head.querySelector('[data-po-theme-id="com.example.second"]')).not.toBeNull();
+  });
+
+  it("does not inject installed themes that are not selected", () => {
+    const snapshot = createThemeCatalogSnapshot({
+      themes: [externalTheme({ id: "com.example.unselected" })],
+      diagnostics: [],
+    });
+
+    act(() => root.render(
+      <ThemeStyleHost snapshot={snapshot} preferences={selection()} />,
+    ));
+
+    expect(document.head.querySelector("[data-po-theme-style]")).toBeNull();
   });
 });
 
@@ -75,6 +98,18 @@ function externalTheme(overrides: Partial<ThemeDefinition> = {}): ThemeDefinitio
     compiledCss: {
       markdown: '[data-po-theme-id="com.example.reader"] { color: #222 }',
     },
+    ...overrides,
+  };
+}
+
+function selection(
+  overrides: Partial<SurfaceThemePreferences> = {},
+): SurfaceThemePreferences {
+  return {
+    version: 1,
+    application: "default",
+    markdown: "default",
+    csv: "default",
     ...overrides,
   };
 }

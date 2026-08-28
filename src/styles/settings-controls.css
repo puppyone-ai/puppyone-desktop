@@ -56,6 +56,41 @@
   animation: spin 0.85s linear infinite;
 }
 
+.desktop-theme-settings-section {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.desktop-theme-settings-detail,
+.desktop-theme-settings-error {
+  margin: 0;
+  color: var(--po-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.desktop-theme-settings-error {
+  color: var(--po-danger);
+}
+
+.desktop-theme-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.desktop-theme-settings-diagnostics {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-inline-start: 20px;
+  color: var(--po-text-muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
 .desktop-settings-action.danger {
   border-color: color-mix(in srgb, var(--po-danger) 22%, transparent);
   background: color-mix(in srgb, var(--po-danger) 7%, transparent);

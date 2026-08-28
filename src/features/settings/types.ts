@@ -3,6 +3,9 @@ import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
 import type { CreateNewMenuSettings, DarkThemePreset, DiffMarkers, ExperimentalSettings, FilesVisibilitySettings, GitSidebarLayout, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, LocalAgentsSettings, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
+import type { SurfaceThemePreferences } from "../themes/themePreferences";
+import type { ThemeTarget } from "../themes/themeTypes";
+import type { ThemeCatalogController } from "../themes/useThemeCatalog";
 
 export type SettingsSection = "general" | "local-project" | "appearance" | "local-agents" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
 
@@ -33,6 +36,8 @@ export type SettingsViewProps = {
   titlebarActionsSettings: TitlebarActionsSettings;
   gitSidebarLayout: GitSidebarLayout;
   aiEditAssistEnabled: boolean;
+  surfaceThemePreferences: SurfaceThemePreferences;
+  themeCatalog: ThemeCatalogController;
   cloudEnabled: boolean;
   cloudSession: DesktopCloudSession | null;
   cloudSessionRestoring: boolean;
@@ -63,6 +68,7 @@ export type SettingsViewProps = {
   onTitlebarActionsSettingsChange: (settings: TitlebarActionsSettings) => void;
   onGitSidebarLayoutChange: (layout: GitSidebarLayout) => void;
   onAiEditAssistEnabledChange: (enabled: boolean) => void;
+  onSurfaceThemeChange: (target: ThemeTarget, themeId: string) => void;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onPuppyoneConfigChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
   onUnlinkWorkspace: () => Promise<void>;

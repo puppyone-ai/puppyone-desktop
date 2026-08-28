@@ -30,6 +30,7 @@ import {
 import { useDesktopViewerPacks } from "../viewer-packs/host";
 import { DesktopDataWorkspaceSurface } from "./DesktopDataWorkspaceSurface";
 import type { DesktopEditorWorkbenchController } from "../editor-workbench/controller/useDesktopEditorWorkbench";
+import type { ThemeCatalogController } from "../themes/useThemeCatalog";
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopWorkspaceContentProps = {
@@ -68,6 +69,7 @@ type DesktopWorkspaceContentProps = {
   puppyoneConfigLoading: boolean;
   puppyoneConfigSaving: boolean;
   settingsSection: SettingsSection;
+  themeCatalog: ThemeCatalogController;
   workspace: Workspace;
   workspaceSurfaceError?: string | null;
   workspaceKey: string;
@@ -106,6 +108,7 @@ export function DesktopWorkspaceContent({
   puppyoneConfigLoading,
   puppyoneConfigSaving,
   settingsSection,
+  themeCatalog,
   workspace,
   workspaceSurfaceError = null,
   workspaceKey,
@@ -159,6 +162,7 @@ export function DesktopWorkspaceContent({
     puppyoneConfigLoading,
     puppyoneConfigSaving,
     settingsSection,
+    themeCatalog,
     viewerPacks: {
       hostAvailable: externalViewerPacksEnabled,
       refresh: refreshViewerPackSnapshot,

@@ -5,6 +5,7 @@ import {
   closeDocumentWorkingCopiesUnderResource,
   flushActiveDocumentSessions,
   isDocumentDataNode,
+  ThemeSurfaceProvider,
   type DataNode,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
@@ -91,6 +92,8 @@ import {
   useTypographyRuntime,
 } from "./features/typography";
 import { useDesktopEditorWorkbench } from "./features/editor-workbench/controller/useDesktopEditorWorkbench";
+import { ThemeStyleHost } from "./features/themes/ThemeStyleHost";
+import { useThemeCatalog } from "./features/themes/useThemeCatalog";
 
 const RightAgentPanel = lazy(loadRightAgentPanel);
 
@@ -103,6 +106,7 @@ function AppContent() {
   const desktopUpdates = useDesktopUpdates();
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
+  const themeCatalog = useThemeCatalog();
   const { setRightSidebarOpen } = preferences;
   const fontCatalog = useTypographyCatalog();
   const typography = useTypographyRuntime(
@@ -179,6 +183,7 @@ function AppContent() {
     agentPreferredModel,
     localAgentsSettings,
     sidebarCollapsed,
+    surfaceThemePreferences,
     sidebarNavigationLayout,
     sidebarNavigationOrientation,
     sidebarNavigationPlacement,
@@ -938,8 +943,12 @@ function AppContent() {
   ) : undefined;
 
   return (
-    <div
+    <ThemeSurfaceProvider value={surfaceThemePreferences}>
+      <ThemeStyleHost snapshot={themeCatalog.snapshot} preferences={surfaceThemePreferences} />
+      <div
       className={`app-shell cloud-runtime ${resolvedTheme === "dark" ? "dark" : ""}`}
+      data-po-theme-surface="application"
+      data-po-theme-id={surfaceThemePreferences.application}
       data-theme-mode={activeThemeMode}
       data-interface-style={interfaceStyle}
       data-interface-style-family={resolvedAppearance.profile.family}
@@ -1077,6 +1086,7 @@ function AppContent() {
           puppyoneConfigLoading={puppyoneConfigLoading}
           puppyoneConfigSaving={puppyoneConfigSaving}
           settingsSection={activeSettingsSection}
+          themeCatalog={themeCatalog}
           workspace={workspace}
           workspaceSurfaceError={documentNavigationError ?? workspaceSurfaceError}
           workspaceKey={workspaceKey}
@@ -1186,7 +1196,8 @@ function AppContent() {
           )}
         </>
       </DesktopOverlayPortal>
-    </div>
+      </div>
+    </ThemeSurfaceProvider>
   );
 }
 

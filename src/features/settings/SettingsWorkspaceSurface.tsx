@@ -28,6 +28,9 @@ import { SettingsView } from "./SettingsView";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
 import { SettingsSidebar } from "./sidebar";
 import type { SettingsSection } from "./types";
+import type { SurfaceThemePreferences } from "../themes/themePreferences";
+import type { ThemeTarget } from "../themes/themeTypes";
+import type { ThemeCatalogController } from "../themes/useThemeCatalog";
 
 export type SettingsPreferencesPort = {
   themeMode: ThemeMode;
@@ -51,6 +54,7 @@ export type SettingsPreferencesPort = {
   titlebarActionsSettings: TitlebarActionsSettings;
   gitSidebarLayout: GitSidebarLayout;
   aiEditAssistEnabled: boolean;
+  surfaceThemePreferences: SurfaceThemePreferences;
   setThemeMode: (value: ThemeMode) => void;
   setInterfaceStyle: (value: InterfaceStyle) => void;
   setLightThemePreset: (value: LightThemePreset) => void;
@@ -71,6 +75,7 @@ export type SettingsPreferencesPort = {
   setTitlebarActionsSettings: (value: TitlebarActionsSettings) => void;
   setGitSidebarLayout: (value: GitSidebarLayout) => void;
   setAiEditAssistEnabled: (value: boolean) => void;
+  setSurfaceTheme: (target: ThemeTarget, themeId: string) => void;
 };
 
 export type SettingsWorkspaceSurfaceProps = {
@@ -78,6 +83,7 @@ export type SettingsWorkspaceSurfaceProps = {
   activeSection: SettingsSection;
   onSelectSection: (section: SettingsSection) => void;
   preferences: SettingsPreferencesPort;
+  themeCatalog: ThemeCatalogController;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
   git: {
     status: GitStatusSnapshot | null;
@@ -114,6 +120,7 @@ export function createSettingsWorkspaceSurface({
   onFilesVisibilitySettingsChange,
   onSelectSection,
   preferences,
+  themeCatalog,
   updates,
   workspace,
   workspaceConfig,
@@ -154,6 +161,8 @@ export function createSettingsWorkspaceSurface({
         titlebarActionsSettings={preferences.titlebarActionsSettings}
         gitSidebarLayout={preferences.gitSidebarLayout}
         aiEditAssistEnabled={preferences.aiEditAssistEnabled}
+        surfaceThemePreferences={preferences.surfaceThemePreferences}
+        themeCatalog={themeCatalog}
         cloudEnabled={cloud.enabled}
         cloudSession={cloud.session}
         cloudSessionRestoring={cloud.sessionRestoring}
@@ -184,6 +193,7 @@ export function createSettingsWorkspaceSurface({
         onTitlebarActionsSettingsChange={preferences.setTitlebarActionsSettings}
         onGitSidebarLayoutChange={preferences.setGitSidebarLayout}
         onAiEditAssistEnabledChange={preferences.setAiEditAssistEnabled}
+        onSurfaceThemeChange={preferences.setSurfaceTheme}
         onCloudSessionChange={cloud.onSessionChange}
         onPuppyoneConfigChange={workspaceConfig.change}
         onUnlinkWorkspace={workspaceConfig.unlink}

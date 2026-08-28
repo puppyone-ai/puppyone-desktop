@@ -16,6 +16,14 @@ export type {
   TypographyChangeDetail,
   TypographyChangePhase,
 } from "./core/typography";
+export {
+  ThemeSurfaceProvider,
+  useThemeSurfaceId,
+} from "./core/theme/ThemeSurfaceContext";
+export type {
+  ThemeSurfaceSelection,
+  ThemeSurfaceTarget,
+} from "./core/theme/ThemeSurfaceContext";
 export type {
   FileCategory,
   FileFormat,

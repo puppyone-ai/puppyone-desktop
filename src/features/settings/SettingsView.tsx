@@ -54,6 +54,8 @@ export function SettingsView({
   titlebarActionsSettings,
   gitSidebarLayout,
   aiEditAssistEnabled,
+  surfaceThemePreferences,
+  themeCatalog,
   cloudEnabled,
   cloudSession,
   cloudSessionRestoring,
@@ -84,6 +86,7 @@ export function SettingsView({
   onTitlebarActionsSettingsChange,
   onGitSidebarLayoutChange,
   onAiEditAssistEnabledChange,
+  onSurfaceThemeChange,
   onCloudSessionChange,
   onPuppyoneConfigChange,
   onUnlinkWorkspace,
@@ -229,8 +232,11 @@ export function SettingsView({
       <EditorSettingsView
         aiEditAssistEnabled={aiEditAssistEnabled}
         diffMarkers={diffMarkers}
+        surfaceThemePreferences={surfaceThemePreferences}
+        themeCatalog={themeCatalog}
         onAiEditAssistEnabledChange={onAiEditAssistEnabledChange}
         onDiffMarkersChange={onDiffMarkersChange}
+        onSurfaceThemeChange={onSurfaceThemeChange}
       />
     );
   }

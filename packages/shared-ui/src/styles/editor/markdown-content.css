@@ -7,6 +7,7 @@
  */
 .markdown-codemirror-editor {
   --po-md-presentation-version: 2;
+  --po-md-surface-background: var(--po-editor-bg);
   --po-md-content-font: var(--po-font-content, var(--po-font-sans));
   --po-md-content-size: var(--po-text-size-content, 14px);
   --po-md-content-weight: var(--po-content-reading-weight, 450);
@@ -31,6 +32,8 @@
   --po-md-h4-size: 1em;
   --po-md-h5-size: 0.875em;
   --po-md-h6-size: 0.85em;
+  background: var(--po-md-surface-background);
+  color: var(--po-md-content-color);
 }
 
 /* Reverse-polarity text appears optically heavier. Keep the exact same font

@@ -25,6 +25,7 @@ import {
   type CsvFindMatch,
 } from "../../find/useCsvFindAdapter";
 import { useRegisterEditorFindAdapter } from "../../find/editorFind";
+import { useThemeSurfaceId } from "../../../core/theme/ThemeSurfaceContext";
 import { CsvTableControls } from "./CsvTableControls";
 import { CsvDocumentModel, type CsvModelRow } from "./CsvDocumentModel";
 import {
@@ -74,6 +75,7 @@ export function CsvTableEditor({
   onSourceRevisionChange,
   onSnapshotPortChange,
 }: CsvTableEditorProps) {
+  const themeId = useThemeSurfaceId("csv");
   const { direction, locale, t } = useLocalization();
   const resolvedDocumentId = documentId ?? (nodeName || "csv-document");
   const resolvedDelimiter = delimiter ?? inferDelimiter(nodeName, content);
@@ -364,6 +366,8 @@ export function CsvTableEditor({
   return (
     <section
       className="csv-table-editor"
+      data-po-theme-surface="csv"
+      data-po-theme-id={themeId}
       data-readonly={readOnly ? "true" : undefined}
       data-row-numbers-visible={rowNumbersVisible ? "true" : undefined}
     >

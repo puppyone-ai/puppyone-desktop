@@ -9,6 +9,7 @@
    editor authority must share that origin tier or CodeMirror's monospace,
    4px-padding defaults outrank PuppyOne's Markdown presentation contract. */
 @import "@puppyone/shared-ui/editor.css";
+@import "./styles/surface-themes.css";
 @import "./styles/animations.css" layer(accessibility);
 @import "./styles/shell.css" layer(features);
 @import "./styles/window-chrome.css" layer(features);
