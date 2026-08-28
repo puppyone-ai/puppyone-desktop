@@ -52,6 +52,7 @@
 
 /* Scoped built-in Markdown and CSV themes override the default editor tokens. */
 @import "./editor/content-themes.css";
+@import "./editor/theme-packs.css";
 
 /* Markdown uses a document-sized inset; wide tabular editors own their spacing. */
 .markdown-codemirror-editor {

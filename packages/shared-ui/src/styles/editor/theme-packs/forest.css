@@ -1,0 +1,56 @@
+[data-po-theme-surface="application"][data-po-theme-id="builtin.pack.forest"] {
+  --po-surface-canvas: #f1f7f4;
+  --po-surface-chrome: #e2efe9;
+  --po-surface-panel: #f9fcfa;
+  --po-surface-panel-raised: #ffffff;
+  --po-surface-overlay: #fbfefc;
+  --po-surface-inset: #d8e8e0;
+  --po-text: #24372f;
+  --po-text-muted: #587166;
+  --po-text-subtle: #789087;
+  --po-border: rgba(27, 77, 60, 0.18);
+  --po-divider: rgba(27, 77, 60, 0.14);
+  --po-hover: rgba(0, 153, 123, 0.09);
+  --po-selected: rgba(0, 153, 123, 0.14);
+  --po-accent: #00866d;
+  --po-accent-text: #006b58;
+}
+
+[data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.forest"] {
+  --po-md-surface-background: #fbfefc;
+  --po-md-content-color: #2f3f38;
+  --po-md-content-line-height: 1.76;
+  --po-md-heading-weight: 650;
+  --po-md-h1-weight: 680;
+  --po-md-h2-weight: 650;
+  --po-md-rule-color: #b6d2c6;
+  --po-markdown-editor-text-width: 700px;
+}
+
+[data-po-theme-surface="csv"][data-po-theme-id="builtin.pack.forest"] {
+  --po-csv-surface-background: #f7fbf9;
+  --po-csv-surface-color: #24372f;
+  --po-editable-table-border: #8fb8a7;
+  --po-editable-table-cell-border: #c6ddd3;
+  --po-editable-table-sticky-header-background: #dcece5;
+  --po-editable-table-cell-focus-ring: #00866d;
+}
+
+:where(.dark) [data-po-theme-surface="application"][data-po-theme-id="builtin.pack.forest"],
+:where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.forest"],
+:where(.dark) [data-po-theme-surface="csv"][data-po-theme-id="builtin.pack.forest"] {
+  --po-surface-canvas: #092d30;
+  --po-surface-chrome: #0b3837;
+  --po-surface-panel: #103f3b;
+  --po-surface-panel-raised: #164a44;
+  --po-text: #e0f1ea;
+  --po-text-muted: #9fc4b7;
+  --po-divider: rgba(190, 230, 215, 0.18);
+  --po-md-surface-background: #0b302f;
+  --po-md-content-color: #e0f1ea;
+  --po-md-rule-color: #35645a;
+  --po-csv-surface-background: #0b302f;
+  --po-csv-surface-color: #e0f1ea;
+  --po-editable-table-cell-border: #35645a;
+  --po-editable-table-sticky-header-background: #123e39;
+}

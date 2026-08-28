@@ -1,0 +1,37 @@
+[data-po-theme-surface="application"][data-po-theme-id="builtin.pack.night"] {
+  --po-surface-canvas: #292e33;
+  --po-surface-chrome: #25292e;
+  --po-surface-panel: #30363c;
+  --po-surface-panel-raised: #394047;
+  --po-surface-overlay: #343a40;
+  --po-surface-inset: #22272b;
+  --po-text: #e4e9ed;
+  --po-text-muted: #b2bbc2;
+  --po-text-subtle: #89949d;
+  --po-border: rgba(226, 232, 237, 0.17);
+  --po-divider: rgba(226, 232, 237, 0.13);
+  --po-hover: rgba(109, 193, 231, 0.10);
+  --po-selected: rgba(109, 193, 231, 0.17);
+  --po-accent: #6dc1e7;
+  --po-accent-text: #9ed8f2;
+}
+
+[data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.night"] {
+  --po-md-surface-background: #30363b;
+  --po-md-content-color: #d7dde2;
+  --po-md-content-line-height: 1.72;
+  --po-md-heading-weight: 620;
+  --po-md-h1-weight: 650;
+  --po-md-h2-weight: 630;
+  --po-md-rule-color: #555e66;
+  --po-markdown-editor-text-width: 720px;
+}
+
+[data-po-theme-surface="csv"][data-po-theme-id="builtin.pack.night"] {
+  --po-csv-surface-background: #2d3338;
+  --po-csv-surface-color: #d7dde2;
+  --po-editable-table-border: #66717a;
+  --po-editable-table-cell-border: #485159;
+  --po-editable-table-sticky-header-background: #3a4249;
+  --po-editable-table-cell-focus-ring: #6dc1e7;
+}

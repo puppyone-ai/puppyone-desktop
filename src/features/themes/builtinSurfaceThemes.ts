@@ -8,6 +8,26 @@ export const BUILTIN_SURFACE_THEMES: readonly ThemeDefinition[] = Object.freeze(
     targets: ["application", "markdown", "csv"],
   }),
   defineBuiltin({
+    id: "builtin.pack.github",
+    name: "GitHub",
+    targets: ["application", "markdown", "csv"],
+  }),
+  defineBuiltin({
+    id: "builtin.pack.forest",
+    name: "Forest",
+    targets: ["application", "markdown", "csv"],
+  }),
+  defineBuiltin({
+    id: "builtin.pack.night",
+    name: "Night",
+    targets: ["application", "markdown", "csv"],
+  }),
+  defineBuiltin({
+    id: "builtin.pack.rose",
+    name: "Rose",
+    targets: ["application", "markdown", "csv"],
+  }),
+  defineBuiltin({
     id: "builtin.markdown.newsprint",
     name: "Newsprint",
     targets: ["markdown"],

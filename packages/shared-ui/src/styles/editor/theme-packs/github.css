@@ -1,0 +1,56 @@
+[data-po-theme-surface="application"][data-po-theme-id="builtin.pack.github"] {
+  --po-surface-canvas: #f6f8fa;
+  --po-surface-chrome: #eef1f4;
+  --po-surface-panel: #ffffff;
+  --po-surface-panel-raised: #ffffff;
+  --po-surface-overlay: #ffffff;
+  --po-surface-inset: #eaeef2;
+  --po-text: #24292f;
+  --po-text-muted: #57606a;
+  --po-text-subtle: #6e7781;
+  --po-border: rgba(27, 31, 36, 0.15);
+  --po-divider: rgba(27, 31, 36, 0.12);
+  --po-hover: rgba(35, 134, 54, 0.08);
+  --po-selected: rgba(9, 105, 218, 0.12);
+  --po-accent: #0969da;
+  --po-accent-text: #0550ae;
+}
+
+[data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.github"] {
+  --po-md-surface-background: #ffffff;
+  --po-md-content-color: #24292f;
+  --po-md-content-line-height: 1.65;
+  --po-md-heading-weight: 600;
+  --po-md-h1-weight: 600;
+  --po-md-h2-weight: 600;
+  --po-md-rule-color: #d0d7de;
+  --po-markdown-editor-text-width: 760px;
+}
+
+[data-po-theme-surface="csv"][data-po-theme-id="builtin.pack.github"] {
+  --po-csv-surface-background: #ffffff;
+  --po-csv-surface-color: #24292f;
+  --po-editable-table-border: #afb8c1;
+  --po-editable-table-cell-border: #d0d7de;
+  --po-editable-table-sticky-header-background: #f6f8fa;
+  --po-editable-table-cell-focus-ring: #0969da;
+}
+
+:where(.dark) [data-po-theme-surface="application"][data-po-theme-id="builtin.pack.github"],
+:where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.github"],
+:where(.dark) [data-po-theme-surface="csv"][data-po-theme-id="builtin.pack.github"] {
+  --po-surface-canvas: #0d1117;
+  --po-surface-chrome: #161b22;
+  --po-surface-panel: #161b22;
+  --po-surface-panel-raised: #21262d;
+  --po-text: #e6edf3;
+  --po-text-muted: #8b949e;
+  --po-divider: #30363d;
+  --po-md-surface-background: #0d1117;
+  --po-md-content-color: #e6edf3;
+  --po-md-rule-color: #30363d;
+  --po-csv-surface-background: #0d1117;
+  --po-csv-surface-color: #e6edf3;
+  --po-editable-table-cell-border: #30363d;
+  --po-editable-table-sticky-header-background: #161b22;
+}

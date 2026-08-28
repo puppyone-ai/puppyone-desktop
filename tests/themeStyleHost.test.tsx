@@ -5,7 +5,10 @@ import { readFileSync } from "node:fs";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ThemeStyleHost } from "../src/features/themes/ThemeStyleHost";
-import { createThemeCatalogSnapshot } from "../src/features/themes/builtinSurfaceThemes";
+import {
+  BUILTIN_SURFACE_THEMES,
+  createThemeCatalogSnapshot,
+} from "../src/features/themes/builtinSurfaceThemes";
 import type { ThemeDefinition } from "../src/features/themes/themeTypes";
 import type { SurfaceThemeSelection } from "../src/features/themes/themePreferences";
 
@@ -25,6 +28,25 @@ afterEach(() => {
 });
 
 describe("renderer CSS theme style host", () => {
+  it("ships four coordinated three-surface theme packs as scoped CSS files", () => {
+    const packs = ["github", "forest", "night", "rose"];
+    for (const pack of packs) {
+      const id = `builtin.pack.${pack}`;
+      const definition = BUILTIN_SURFACE_THEMES.find((theme) => theme.id === id);
+      const css = readFileSync(
+        `${process.cwd()}/packages/shared-ui/src/styles/editor/theme-packs/${pack}.css`,
+        "utf8",
+      );
+
+      expect(definition?.targets).toEqual(["application", "markdown", "csv"]);
+      for (const target of ["application", "markdown", "csv"]) {
+        expect(css).toContain(`[data-po-theme-surface="${target}"][data-po-theme-id="${id}"]`);
+      }
+      expect(css).not.toContain("#write");
+      expect(css).not.toContain(".typora-");
+    }
+  });
+
   it("lets scoped built-in theme tokens override editor defaults", () => {
     const defaultCss = readFileSync(
       `${process.cwd()}/packages/shared-ui/src/styles/editor/markdown-content.css`,
