@@ -256,7 +256,7 @@
 }
 
 .markdown-codemirror-editor .cm-md-syntax-strong {
-  color: var(--po-text);
+  color: var(--po-md-strong-color, var(--po-text));
 }
 
 .markdown-codemirror-editor .cm-md-syntax-emphasis {

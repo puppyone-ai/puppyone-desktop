@@ -3,8 +3,9 @@ import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
 import type { CreateNewMenuSettings, DarkThemePreset, ExperimentalSettings, FilesVisibilitySettings, GitSidebarLayout, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, LocalAgentsSettings, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
+import type { MarkdownPresentationSettings } from "../markdown/markdownPresentation";
 
-export type SettingsSection = "general" | "local-project" | "appearance" | "local-agents" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
+export type SettingsSection = "general" | "local-project" | "appearance" | "local-agents" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
 
 export type SettingsViewProps = {
   workspace: Workspace;
@@ -22,6 +23,7 @@ export type SettingsViewProps = {
   textSize: TextSize;
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
+  markdownPresentation: MarkdownPresentationSettings;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
   sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
@@ -50,6 +52,7 @@ export type SettingsViewProps = {
   onTextSizeChange: (textSize: TextSize) => void;
   onTypographyPreferencesChange: (preferences: TypographyPreferences) => void;
   onPointerCursorsChange: (enabled: boolean) => void;
+  onMarkdownPresentationChange: (settings: MarkdownPresentationSettings) => void;
   onFileIconThemeChange: (theme: FileIconThemeId) => void;
   onSidebarNavigationLayoutChange: (layout: SidebarNavigationLayout) => void;
   onSidebarNavigationVisibilitySettingsChange: (settings: SidebarNavigationVisibilitySettings) => void;

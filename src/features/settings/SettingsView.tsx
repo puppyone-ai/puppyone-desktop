@@ -19,6 +19,7 @@ import { SettingsSectionHeader } from "./components";
 import { ContentFontSetting } from "./ContentFontSetting";
 import { AccountSettingsView } from "./main/AccountSettingsView";
 import { ExperimentalSettingsView } from "./main/ExperimentalSettingsView";
+import { EditorSettingsView } from "./main/EditorSettingsView";
 import { FilesSettingsView } from "./main/FileSettingsViews";
 import { GeneralSettingsView } from "./main/GeneralSettingsView";
 import { LocalProjectSettingsView } from "./main/LocalProjectSettingsView";
@@ -44,6 +45,7 @@ export function SettingsView({
   localAgentsSettings,
   typographyPreferences,
   pointerCursors,
+  markdownPresentation,
   fileIconTheme,
   sidebarNavigationVisibilitySettings,
   filesVisibilitySettings,
@@ -71,6 +73,7 @@ export function SettingsView({
   onTextSizeChange,
   onTypographyPreferencesChange,
   onPointerCursorsChange,
+  onMarkdownPresentationChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
   onSidebarNavigationVisibilitySettingsChange,
@@ -216,6 +219,15 @@ export function SettingsView({
         agentChatAvailable={agentChatAvailable}
         assetLibraryHomeAvailable={assetLibraryHomeAvailable}
         onChange={onExperimentalSettingsChange}
+      />
+    );
+  }
+
+  if (activeSection === "editor") {
+    return (
+      <EditorSettingsView
+        markdownPresentation={markdownPresentation}
+        onMarkdownPresentationChange={onMarkdownPresentationChange}
       />
     );
   }

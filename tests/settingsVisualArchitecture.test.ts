@@ -14,8 +14,8 @@ describe("settings visual architecture", () => {
     const language = source("src/features/settings/LanguageSetting.tsx");
 
     expect(types).toContain('"general" | "local-project"');
-    expect(types).toContain('"appearance" | "local-agents" | "new-menu"');
-    expect(types).not.toContain('| "editor"');
+    expect(types).toContain('"appearance" | "local-agents" | "editor" | "new-menu"');
+    expect(types).toContain('| "editor"');
     expect(types).not.toContain('"external-apps"');
     expect(types).not.toContain('"local-agent-hooks"');
     expect(types).not.toContain('| "language"');
@@ -68,9 +68,10 @@ describe("settings visual architecture", () => {
       'labelId: "settings.sidebar.appearance"',
       'labelId: "settings.sidebar.localAgents"',
       'labelId: "settings.sidebar.createNew"',
+      'labelId: "settings.sidebar.editor"',
       'labelId: "settings.sidebar.experimental"',
     ]);
-    expect(desktopAppItems).not.toContain("settings.sidebar.editor");
+    expect(desktopAppItems).toContain("settings.sidebar.editor");
     expect(desktopAppItems).not.toContain("settings.sidebar.language");
     expect(desktopAppItems).not.toContain("settings.sidebar.localAgentHooks");
     expect(sidebarModel).toContain('labelId: "settings.sidebar.localProject"');
@@ -82,16 +83,20 @@ describe("settings visual architecture", () => {
     expect(language).not.toContain("<button");
   });
 
-  it("hides unfinished AI review preferences without removing their runtime", () => {
+  it("exposes Markdown presentation without reviving unfinished AI review preferences", () => {
     const sidebarModel = source("src/features/settings/sidebar/settingsSidebarModel.ts");
     const settingsView = source("src/features/settings/SettingsView.tsx");
+    const editorSettings = source("src/features/settings/main/EditorSettingsView.tsx");
     const preferences = source("src/preferences.ts");
     const app = source("src/App.tsx");
     const reviewRuntime = source("src/features/data-workspace/useAiEditReviewRequest.ts");
     const reviewEngine = source("local-api/edit-review.mjs");
 
-    expect(sidebarModel).not.toContain('id: "editor"');
-    expect(settingsView).not.toContain("<EditorSettingsView");
+    expect(sidebarModel).toContain('id: "editor"');
+    expect(settingsView).toContain("<EditorSettingsView");
+    expect(editorSettings).toContain("markdownPresentation");
+    expect(editorSettings).not.toContain("aiEditAssistEnabled");
+    expect(editorSettings).not.toContain("diffMarkers");
     expect(settingsView).not.toContain("onAiEditAssistEnabledChange");
     expect(settingsView).not.toContain("onDiffMarkersChange");
     expect(preferences).toContain("AI_EDIT_ASSIST_STORAGE_KEY");

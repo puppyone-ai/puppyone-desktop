@@ -25,6 +25,7 @@ import type {
 } from "../../types/electron";
 import { SettingsView } from "./SettingsView";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
+import type { MarkdownPresentationSettings } from "../markdown/markdownPresentation";
 import { SettingsSidebar } from "./sidebar";
 import type { SettingsSection } from "./types";
 
@@ -39,6 +40,7 @@ export type SettingsPreferencesPort = {
   textSize: TextSize;
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
+  markdownPresentation: MarkdownPresentationSettings;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
   sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
@@ -58,6 +60,7 @@ export type SettingsPreferencesPort = {
   setTextSize: (value: TextSize) => void;
   setTypographyPreferences: (value: TypographyPreferences) => void;
   setPointerCursors: (value: boolean) => void;
+  setMarkdownPresentation: (value: MarkdownPresentationSettings) => void;
   setFileIconTheme: (value: FileIconThemeId) => void;
   setSidebarNavigationLayout: (value: SidebarNavigationLayout) => void;
   setSidebarNavigationVisibilitySettings: (value: SidebarNavigationVisibilitySettings) => void;
@@ -138,6 +141,7 @@ export function createSettingsWorkspaceSurface({
         textSize={preferences.textSize}
         typographyPreferences={preferences.typographyPreferences}
         pointerCursors={preferences.pointerCursors}
+        markdownPresentation={preferences.markdownPresentation}
         fileIconTheme={preferences.fileIconTheme}
         sidebarNavigationLayout={preferences.sidebarNavigationLayout}
         sidebarNavigationVisibilitySettings={preferences.sidebarNavigationVisibilitySettings}
@@ -166,6 +170,7 @@ export function createSettingsWorkspaceSurface({
         onTextSizeChange={preferences.setTextSize}
         onTypographyPreferencesChange={preferences.setTypographyPreferences}
         onPointerCursorsChange={preferences.setPointerCursors}
+        onMarkdownPresentationChange={preferences.setMarkdownPresentation}
         onFileIconThemeChange={preferences.setFileIconTheme}
         onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
         onSidebarNavigationVisibilitySettingsChange={preferences.setSidebarNavigationVisibilitySettings}

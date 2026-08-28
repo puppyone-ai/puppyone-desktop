@@ -16,6 +16,7 @@ import {
   AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY,
   CREATE_NEW_MENU_STORAGE_KEY,
   DIFF_MARKERS_STORAGE_KEY,
+  MARKDOWN_PRESENTATION_STORAGE_KEY,
   EXPERIMENTAL_SETTINGS_STORAGE_KEY,
   FILES_VISIBILITY_STORAGE_KEY,
   FILE_ICON_THEME_STORAGE_KEY,
@@ -56,6 +57,10 @@ import {
   type TitlebarActionsSettings,
 } from "../../preferences";
 import {
+  serializeMarkdownPresentationSettings,
+  type MarkdownPresentationSettings,
+} from "../markdown/markdownPresentation";
+import {
   AGENT_PREFERRED_RUNTIME_STORAGE_KEY,
   AGENT_PREFERRED_MODEL_STORAGE_KEY,
   EXPLORER_WIDTH_STORAGE_KEY,
@@ -83,6 +88,7 @@ import {
   readInitialTitlebarActionsSettings,
   readInitialDarkThemePreset,
   readInitialDiffMarkers,
+  readInitialMarkdownPresentationSettings,
   readInitialLightThemePreset,
   readInitialLoadingAnimationPreset,
   readInitialLocalAgentsSettings,
@@ -123,6 +129,9 @@ export function useDesktopPreferences() {
     initialAppearance.shared.loadingAnimationPreset,
   );
   const [diffMarkers, setDiffMarkers] = useState<DiffMarkers>(() => readInitialDiffMarkers());
+  const [markdownPresentation, setMarkdownPresentation] = useState<MarkdownPresentationSettings>(
+    () => readInitialMarkdownPresentationSettings(),
+  );
   const [fileIconTheme, setFileIconTheme] = useState<FileIconThemeId>(initialAppearance.shared.fileIconTheme);
   const [sidebarNavigationLayout, setSidebarNavigationLayout] = useState<SidebarNavigationLayout>(
     initialAppearance.shared.sidebarNavigationLayout,
@@ -244,6 +253,13 @@ export function useDesktopPreferences() {
   useEffect(() => {
     window.localStorage.setItem(DIFF_MARKERS_STORAGE_KEY, diffMarkers);
   }, [diffMarkers]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      MARKDOWN_PRESENTATION_STORAGE_KEY,
+      serializeMarkdownPresentationSettings(markdownPresentation),
+    );
+  }, [markdownPresentation]);
 
   useEffect(() => {
     window.localStorage.setItem(FILE_ICON_THEME_STORAGE_KEY, fileIconTheme);
@@ -401,6 +417,7 @@ export function useDesktopPreferences() {
     aiEditAssistEnabled,
     activeThemeMode,
     diffMarkers,
+    markdownPresentation,
     explorerWidth,
     createNewMenuSettings,
     experimentalSettings,
@@ -437,6 +454,7 @@ export function useDesktopPreferences() {
     setAiEditAssistEnabled,
     setDarkThemePreset,
     setDiffMarkers,
+    setMarkdownPresentation,
     setExplorerWidth,
     setCreateNewMenuSettings,
     setExperimentalSettings,

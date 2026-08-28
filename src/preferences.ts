@@ -111,6 +111,9 @@ export const POINTER_CURSORS_STORAGE_KEY = "puppyone.desktop.pointerCursors";
 export const LOADING_ANIMATION_STORAGE_KEY = "puppyone.desktop.loadingAnimation";
 export const LOADING_ANIMATION_CHANGE_EVENT = "puppyone:loading-animation-change";
 export const DIFF_MARKERS_STORAGE_KEY = "puppyone.desktop.diffMarkers";
+export const MARKDOWN_PRESENTATION_STORAGE_KEY = "puppyone.desktop.markdownPresentation";
+/** @deprecated Legacy single-value emphasis preset storage. */
+export const MARKDOWN_EMPHASIS_STORAGE_KEY = "puppyone.desktop.markdownEmphasis";
 export const FILE_ICON_THEME_STORAGE_KEY = "puppyone.desktop.fileIconTheme";
 export const SIDEBAR_NAVIGATION_LAYOUT_STORAGE_KEY = "puppyone.desktop.sidebarNavigationLayout";
 export const SIDEBAR_NAVIGATION_VISIBILITY_STORAGE_KEY = "puppyone.desktop.sidebarNavigationVisibility";
