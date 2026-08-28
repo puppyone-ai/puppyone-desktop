@@ -25,6 +25,7 @@ import type {
   GitStatusSnapshot,
   PuppyoneWorkspaceConfig,
 } from "../../types/electron";
+import type { MarkdownPresentationSettings } from "../markdown/markdownPresentation";
 import { SettingsView } from "./SettingsView";
 import { SettingsSidebar } from "./sidebar";
 import type { SettingsSection } from "./types";
@@ -40,6 +41,7 @@ export type SettingsPreferencesPort = {
   pointerCursors: boolean;
   dockIcon: DockIcon;
   diffMarkers: DiffMarkers;
+  markdownPresentation: MarkdownPresentationSettings;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
   sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
@@ -61,6 +63,7 @@ export type SettingsPreferencesPort = {
   setPointerCursors: (value: boolean) => void;
   setDockIcon: (value: DockIcon) => void;
   setDiffMarkers: (value: DiffMarkers) => void;
+  setMarkdownPresentation: (value: MarkdownPresentationSettings) => void;
   setFileIconTheme: (value: FileIconThemeId) => void;
   setSidebarNavigationLayout: (value: SidebarNavigationLayout) => void;
   setSidebarNavigationVisibilitySettings: (value: SidebarNavigationVisibilitySettings) => void;
@@ -137,6 +140,7 @@ export function createSettingsWorkspaceSurface({
         pointerCursors={preferences.pointerCursors}
         dockIcon={preferences.dockIcon}
         diffMarkers={preferences.diffMarkers}
+        markdownPresentation={preferences.markdownPresentation}
         fileIconTheme={preferences.fileIconTheme}
         sidebarNavigationLayout={preferences.sidebarNavigationLayout}
         sidebarNavigationVisibilitySettings={preferences.sidebarNavigationVisibilitySettings}
@@ -167,6 +171,7 @@ export function createSettingsWorkspaceSurface({
         onPointerCursorsChange={preferences.setPointerCursors}
         onDockIconChange={preferences.setDockIcon}
         onDiffMarkersChange={preferences.setDiffMarkers}
+        onMarkdownPresentationChange={preferences.setMarkdownPresentation}
         onFileIconThemeChange={preferences.setFileIconTheme}
         onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
         onSidebarNavigationVisibilitySettingsChange={preferences.setSidebarNavigationVisibilitySettings}

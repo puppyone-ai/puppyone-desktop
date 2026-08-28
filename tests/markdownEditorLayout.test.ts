@@ -176,7 +176,20 @@ describe("Markdown HTML media layout", () => {
     expect(profileRule).toContain("--po-md-h1-weight: 650;");
     expect(profileRule).toContain("--po-md-h2-weight: 625;");
     expect(profileRule).toContain("--po-md-h3-weight: 600;");
-    expect(profileRule).toContain("--po-md-strong-weight: 600;");
+    expect(profileRule).toContain("--po-md-h1-size: inherit;");
+    expect(profileRule).toContain("--po-md-strong-weight: inherit;");
+    expect(profileRule).toContain("--po-md-strong-color: inherit;");
+    const shellPresentationRule = readCssRule(
+      markdownContentCss,
+      ":where(.app-shell, .onboarding-shell, .desktop-overlay-root)",
+    );
+    expect(shellPresentationRule).toContain("--po-md-h1-size: 2em;");
+    expect(shellPresentationRule).toContain("--po-md-h2-size: 1.5em;");
+    expect(shellPresentationRule).toContain("--po-md-h3-size: 1.25em;");
+    expect(shellPresentationRule).toContain("--po-md-h4-size: 1em;");
+    expect(shellPresentationRule).toContain("--po-md-h5-size: 0.875em;");
+    expect(shellPresentationRule).toContain("--po-md-h6-size: 0.85em;");
+    expect(shellPresentationRule).toContain("--po-md-strong-weight: 600;");
     expect(profileRule).toContain(
       "--po-md-rule-color: color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 4%);",
     );

@@ -1,6 +1,11 @@
 import { isFileIconThemeId, type FileIconThemeId } from "@puppyone/shared-ui";
 import type { PuppyoneWorkspaceConfig } from "../../types/electron";
 import {
+  DEFAULT_MARKDOWN_PRESENTATION_SETTINGS,
+  parseMarkdownPresentationSettings,
+  type MarkdownPresentationSettings,
+} from "../markdown/markdownPresentation";
+import {
   DEFAULT_EXPLORER_WIDTH,
   DEFAULT_RIGHT_SIDEBAR_WIDTH,
   MIN_EXPLORER_WIDTH,
@@ -11,6 +16,8 @@ import {
   CREATE_NEW_MENU_STORAGE_KEY,
   DIFF_MARKERS_STORAGE_KEY,
   DOCK_ICON_STORAGE_KEY,
+  MARKDOWN_PRESENTATION_STORAGE_KEY,
+  MARKDOWN_EMPHASIS_STORAGE_KEY,
   DEFAULT_SIDEBAR_NAVIGATION_LAYOUT,
   DEFAULT_THEME_MODE,
   EXPERIMENTAL_SETTINGS_STORAGE_KEY,
@@ -133,6 +140,13 @@ export function readInitialDockIcon(): DockIcon {
 export function readInitialDiffMarkers(): DiffMarkers {
   if (typeof window === "undefined") return parseDiffMarkers(null);
   return parseDiffMarkers(window.localStorage.getItem(DIFF_MARKERS_STORAGE_KEY));
+}
+
+export function readInitialMarkdownPresentationSettings(): MarkdownPresentationSettings {
+  if (typeof window === "undefined") return DEFAULT_MARKDOWN_PRESENTATION_SETTINGS;
+  const stored = window.localStorage.getItem(MARKDOWN_PRESENTATION_STORAGE_KEY)
+    ?? window.localStorage.getItem(MARKDOWN_EMPHASIS_STORAGE_KEY);
+  return parseMarkdownPresentationSettings(stored);
 }
 
 export function readInitialFileIconTheme(): FileIconThemeId {

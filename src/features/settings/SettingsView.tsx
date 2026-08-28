@@ -40,6 +40,7 @@ export function SettingsView({
   pointerCursors,
   dockIcon,
   diffMarkers,
+  markdownPresentation,
   fileIconTheme,
   sidebarNavigationLayout,
   sidebarNavigationVisibilitySettings,
@@ -70,6 +71,7 @@ export function SettingsView({
   onPointerCursorsChange,
   onDockIconChange,
   onDiffMarkersChange,
+  onMarkdownPresentationChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
   onSidebarNavigationVisibilitySettingsChange,
@@ -213,8 +215,10 @@ export function SettingsView({
   if (activeSection === "editor") {
     return (
       <EditorSettingsView
+        markdownPresentation={markdownPresentation}
         aiEditAssistEnabled={aiEditAssistEnabled}
         diffMarkers={diffMarkers}
+        onMarkdownPresentationChange={onMarkdownPresentationChange}
         onAiEditAssistEnabledChange={onAiEditAssistEnabledChange}
         onDiffMarkersChange={onDiffMarkersChange}
       />

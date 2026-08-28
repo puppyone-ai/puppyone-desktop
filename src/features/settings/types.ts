@@ -2,6 +2,7 @@ import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
 import type { CreateNewMenuSettings, DarkThemePreset, DiffMarkers, DockIcon, ExperimentalSettings, ExternalAppsSettings, FilesVisibilitySettings, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TerminalSessionLayout, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
+import type { MarkdownPresentationSettings } from "../markdown/markdownPresentation";
 
 export type SettingsSection = "general" | "local-project" | "appearance" | "external-apps" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
 
@@ -21,6 +22,7 @@ export type SettingsViewProps = {
   pointerCursors: boolean;
   dockIcon: DockIcon;
   diffMarkers: DiffMarkers;
+  markdownPresentation: MarkdownPresentationSettings;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
   sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
@@ -51,6 +53,7 @@ export type SettingsViewProps = {
   onPointerCursorsChange: (enabled: boolean) => void;
   onDockIconChange: (icon: DockIcon) => void;
   onDiffMarkersChange: (markers: DiffMarkers) => void;
+  onMarkdownPresentationChange: (settings: MarkdownPresentationSettings) => void;
   onFileIconThemeChange: (theme: FileIconThemeId) => void;
   onSidebarNavigationLayoutChange: (layout: SidebarNavigationLayout) => void;
   onSidebarNavigationVisibilitySettingsChange: (settings: SidebarNavigationVisibilitySettings) => void;

@@ -18,15 +18,27 @@
   --po-md-h1-weight: 650;
   --po-md-h2-weight: 625;
   --po-md-h3-weight: 600;
-  --po-md-strong-weight: 600;
   --po-md-heading-line-height: 1.25;
   --po-md-rule-color: color-mix(in srgb, var(--po-divider) 96%, var(--po-text-muted) 4%);
+  --po-md-h1-size: inherit;
+  --po-md-h2-size: inherit;
+  --po-md-h3-size: inherit;
+  --po-md-h4-size: inherit;
+  --po-md-h5-size: inherit;
+  --po-md-h6-size: inherit;
+  --po-md-strong-weight: inherit;
+  --po-md-strong-color: inherit;
+}
+
+:where(.app-shell, .onboarding-shell, .desktop-overlay-root) {
   --po-md-h1-size: 2em;
   --po-md-h2-size: 1.5em;
   --po-md-h3-size: 1.25em;
   --po-md-h4-size: 1em;
   --po-md-h5-size: 0.875em;
   --po-md-h6-size: 0.85em;
+  --po-md-strong-weight: 600;
+  --po-md-strong-color: var(--po-text);
 }
 
 .markdown-codemirror-editor .cm-scroller {
@@ -183,6 +195,7 @@
 .markdown-codemirror-editor .cm-md-syntax-strong,
 .markdown-codemirror-editor :is(strong, b).cm-md-inline-html,
 .markdown-codemirror-editor .cm-md-html-rendered-surface :where(strong, b) {
+  color: var(--po-md-strong-color, var(--po-text));
   font-weight: var(--po-md-strong-weight);
 }
 

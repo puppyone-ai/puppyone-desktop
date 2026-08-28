@@ -55,6 +55,7 @@ import { DesktopHelpLauncher } from "./features/app-shell/DesktopHelpLauncher";
 import type { DesktopWorkspaceSwitcherItem } from "./features/app-shell/DesktopWorkspaceSwitcher";
 import { RestoringWorkspaceScreen } from "./features/app-shell/RestoringWorkspaceScreen";
 import { useDesktopPreferences } from "./features/app-shell/useDesktopPreferences";
+import { resolveMarkdownPresentationStyle } from "./features/markdown/markdownPresentation";
 import { isAssetLibraryHomeEnabled } from "./features/app-shell/homeFeatureGate";
 import { useWorkspaceLifecycle } from "./features/app-shell/useWorkspaceLifecycle";
 import { usePuppyoneConfig } from "./features/app-shell/usePuppyoneConfig";
@@ -177,6 +178,7 @@ function AppContent() {
     titlebarActionsSettings,
     darkThemePreset,
     diffMarkers,
+    markdownPresentation,
     lightThemePreset,
     pointerCursors,
     textSize,
@@ -199,6 +201,17 @@ function AppContent() {
     [createNewMenuSettings, experimentalSettings],
   );
   const minimalMode = experimentalSettings.enableMinimalMode;
+  const markdownPresentationStyle = useMemo(
+    () => ({
+      ...typographyRootProps.style,
+      ...resolveMarkdownPresentationStyle(markdownPresentation),
+    }),
+    [markdownPresentation, typographyRootProps],
+  );
+  const typographyRootDataProps = useMemo(() => {
+    const { style: _ignoredStyle, ...rest } = typographyRootProps;
+    return rest;
+  }, [typographyRootProps]);
   const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
     available: assetLibraryHomeAvailable,
     optedIn: experimentalSettings.enableAssetLibraryHome,
@@ -957,6 +970,7 @@ function AppContent() {
     <div
       className={`app-shell cloud-runtime ${resolvedTheme === "dark" ? "dark" : ""}`}
       data-minimal-mode={minimalMode ? "true" : undefined}
+      style={markdownPresentationStyle}
       data-theme-mode={activeThemeMode}
       data-interface-style={interfaceStyle}
       data-light-theme-preset={lightThemePreset}
@@ -964,7 +978,7 @@ function AppContent() {
       data-text-size={textSize}
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
-      {...typographyRootProps}
+      {...typographyRootDataProps}
     >
       <DesktopCloudShell
           leftSidebarCollapsed={sidebarCollapsed}
