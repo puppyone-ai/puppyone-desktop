@@ -1,6 +1,27 @@
 # CSS themes
 
-PuppyOne Desktop supports local CSS themes for the application shell, Markdown editor, and CSV table view. Open **Settings → Editor → CSS themes → Open Themes Folder** to reach the device-local theme directory, then use **Reload Themes** after editing a file.
+PuppyOne Desktop treats themes as part of Appearance. Open **Settings → Appearance → Theme** to choose one coordinated Theme Pack for the application shell, Markdown editor, and CSV table view. Expand **Advanced theme overrides and Custom CSS** only when one surface needs a different theme or hand-authored CSS.
+
+The visual precedence is Interface Style → resolved System/Light/Dark mode and base palette → Theme Pack → advanced per-surface override. Appearance continues to own navigation, file icons, motion, pointer behavior, and other interface preferences; theme CSS cannot change those product settings.
+
+PuppyOne ships Default, GitHub, Forest, Night, and Rose packs. GitHub, Forest, Night, and Rose are original PuppyOne implementations informed by common document-theme characteristics and use only PuppyOne's public scoped tokens.
+
+## Custom CSS editor
+
+The Advanced section contains a target-scoped editor for Application, Markdown, or CSV CSS. **Save and Apply** validates the source in Electron Main, atomically preserves it, reloads the catalog, and selects **My Custom CSS** as that surface's override. Invalid CSS is reported without replacing the last valid source.
+
+Managed sources live below Electron's platform-specific user-data directory:
+
+```text
+${app.getPath("userData")}/themes/puppyone-custom-css/
+├── theme.json
+├── application.css
+├── markdown.css
+├── csv.css
+└── assets/
+```
+
+Use **Open Themes Folder** for external editing, local assets/imports, complete packages, and Typora-style files. Do not place user themes in the application installation directory or source tree; the user-data directory survives application upgrades and maps correctly on macOS, Windows, and Linux.
 
 ## Typora-style Markdown theme
 
@@ -36,6 +57,7 @@ Use a directory containing `theme.json` to name a theme and target more than one
   "name": "Graphite",
   "version": "1.0.0",
   "modes": ["light", "dark"],
+  "targets": ["application", "markdown", "csv"],
   "entrypoints": {
     "application": "application.css",
     "markdown": "markdown.css",
@@ -44,14 +66,14 @@ Use a directory containing `theme.json` to name a theme and target more than one
 }
 ```
 
-An entrypoint may target any subset of `application`, `markdown`, and `csv`. Theme IDs use a lowercase reverse-domain form with at least three segments.
+An entrypoint may target any subset of `application`, `markdown`, and `csv`; `targets` and `entrypoints` must match. Packages with multiple targets appear in the primary Theme Pack selector. Single-target packages remain available as Advanced overrides. Theme IDs use a lowercase reverse-domain form with at least three segments.
 
 Application themes customize product tokens from their scoped root; arbitrary application selectors are intentionally not accepted:
 
 ```css
 .theme-root {
   --po-accent: #6b5dd3;
-  --po-panel: #18181b;
+  --po-surface-panel: #18181b;
   --po-control: #24242a;
   --po-text: #f4f4f5;
   --po-text-muted: #a1a1aa;
@@ -63,4 +85,4 @@ Markdown themes can use the public `--po-md-*` variables, including `--po-md-sur
 
 CSV themes can use `--po-csv-surface-background`, `--po-csv-surface-color`, and the shared `--po-editable-table-*` variables for borders, cell spacing, header styling, font sizing, and focus rings.
 
-Each entrypoint is parsed and compiled by the desktop host. Package manifests, entrypoints, imports, and assets must remain inside their canonical package directory; symlink escapes are rejected. Import counts plus aggregate CSS, compiled CSS, and asset sizes are bounded. Invalid packages are isolated and reported in Settings without preventing other themes from loading. Only the three selected theme entrypoints are injected into the renderer.
+Each entrypoint is parsed and compiled by the desktop host. Package manifests, entrypoints, imports, and assets must remain inside their canonical package directory; symlink escapes are rejected. Import counts plus aggregate CSS, compiled CSS, expanded assets, and source asset sizes are bounded. Invalid packages are isolated and reported in Appearance without preventing other themes from loading. Only the effective three selected theme entrypoints are injected into the renderer.

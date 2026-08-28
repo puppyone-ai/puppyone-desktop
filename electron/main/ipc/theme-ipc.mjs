@@ -50,6 +50,13 @@ function parseThemeTarget(value) {
 
 function parseThemeMenuState(value) {
   const targets = ["application", "markdown", "csv"];
+  const pack = parseThemeId(value?.pack) ?? "default";
+  const overrides = Object.fromEntries(targets.map((target) => [
+    target,
+    value?.overrides?.[target] === null
+      ? null
+      : parseThemeId(value?.overrides?.[target]),
+  ]));
   const selection = Object.fromEntries(targets.map((target) => [
     target,
     parseThemeId(value?.selection?.[target]) ?? "default",
@@ -67,6 +74,8 @@ function parseThemeMenuState(value) {
     themes.push(Object.freeze({ id, name, targets: Object.freeze(themeTargets) }));
   }
   return Object.freeze({
+    pack,
+    overrides: Object.freeze(overrides),
     selection: Object.freeze(selection),
     themes: Object.freeze(themes),
   });

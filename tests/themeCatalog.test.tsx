@@ -163,6 +163,48 @@ describe("renderer theme catalog", () => {
     expect(saveCustomCss).toHaveBeenCalledWith({ target: "markdown", css: "body { color: navy }" });
     expect(reload).toHaveBeenCalledOnce();
   });
+
+  it("syncs theme intent to the native menu and routes pack or override requests", async () => {
+    const syncNativeMenu = vi.fn(async () => ({ synced: true as const }));
+    let requestSelection: ((request: {
+      kind: "pack" | "override";
+      target?: "application" | "markdown" | "csv";
+      themeId: string | null;
+    }) => void) | undefined;
+    const onThemePackChange = vi.fn();
+    const onThemeOverrideChange = vi.fn();
+    window.puppyoneDesktop = {
+      themes: {
+        list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
+        reload: vi.fn(async () => ({ themes: [], diagnostics: [] })),
+        openDirectory: vi.fn(async () => ({ opened: true as const })),
+        syncNativeMenu,
+        onSelectionRequested: vi.fn((callback) => {
+          requestSelection = callback;
+          return () => undefined;
+        }),
+      },
+    } as typeof window.puppyoneDesktop;
+
+    await act(async () => {
+      root.render(
+        <NativeHarness
+          onThemePackChange={onThemePackChange}
+          onThemeOverrideChange={onThemeOverrideChange}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    expect(syncNativeMenu).toHaveBeenCalledWith(expect.objectContaining({
+      pack: "builtin.pack.forest",
+      overrides: expect.objectContaining({ markdown: "builtin.markdown.newsprint" }),
+    }));
+    act(() => requestSelection?.({ kind: "pack", themeId: "builtin.pack.github" }));
+    act(() => requestSelection?.({ kind: "override", target: "markdown", themeId: null }));
+    expect(onThemePackChange).toHaveBeenCalledWith("builtin.pack.github");
+    expect(onThemeOverrideChange).toHaveBeenCalledWith("markdown", null);
+  });
 });
 
 function Harness({
@@ -173,6 +215,30 @@ function Harness({
   preferences?: typeof DEFAULT_SURFACE_THEME_PREFERENCES;
 } = {}) {
   latest = useThemeCatalog({ colorMode, preferences });
+  return null;
+}
+
+function NativeHarness({
+  onThemePackChange,
+  onThemeOverrideChange,
+}: {
+  onThemePackChange: (themeId: string) => void;
+  onThemeOverrideChange: (target: "application" | "markdown" | "csv", themeId: string | null) => void;
+}) {
+  latest = useThemeCatalog({
+    colorMode: "light",
+    preferences: {
+      version: 2,
+      pack: "builtin.pack.forest",
+      overrides: {
+        application: null,
+        markdown: "builtin.markdown.newsprint",
+        csv: null,
+      },
+    },
+    onThemePackChange,
+    onThemeOverrideChange,
+  });
   return null;
 }
 

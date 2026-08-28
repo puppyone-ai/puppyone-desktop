@@ -26,12 +26,14 @@ export type ThemeCatalogController = ThemeCatalogState & Readonly<{
 export function useThemeCatalog(options: {
   preferences?: SurfaceThemePreferences;
   colorMode?: ThemeColorMode;
-  onThemeChange?: (target: ThemeTarget, themeId: string) => void;
+  onThemePackChange?: (themeId: string) => void;
+  onThemeOverrideChange?: (target: ThemeTarget, themeId: string | null) => void;
 } = {}): ThemeCatalogController {
   const {
     colorMode = "light",
     preferences = DEFAULT_SURFACE_THEME_PREFERENCES,
-    onThemeChange,
+    onThemePackChange,
+    onThemeOverrideChange,
   } = options;
   const desktopThemes = window.puppyoneDesktop?.themes;
   const [state, setState] = useState<ThemeCatalogState>(() => ({
@@ -137,17 +139,25 @@ export function useThemeCatalog(options: {
   useEffect(() => {
     if (!desktopThemes?.syncNativeMenu) return;
     void desktopThemes.syncNativeMenu({
+      pack: preferences.pack,
+      overrides: preferences.overrides,
       selection,
       themes: state.snapshot.themes.map(({ id, name, targets }) => ({ id, name, targets })),
     }).catch(() => undefined);
-  }, [desktopThemes, selection, state.snapshot]);
+  }, [desktopThemes, preferences.overrides, preferences.pack, selection, state.snapshot]);
 
   useEffect(() => {
-    if (!desktopThemes?.onSelectionRequested || !onThemeChange) return undefined;
-    return desktopThemes.onSelectionRequested(({ target, themeId }) => {
-      onThemeChange(target, themeId);
+    if (!desktopThemes?.onSelectionRequested) return undefined;
+    return desktopThemes.onSelectionRequested((request) => {
+      if (request.kind === "pack" && request.themeId) {
+        onThemePackChange?.(request.themeId);
+        return;
+      }
+      if (request.kind === "override" && request.target) {
+        onThemeOverrideChange?.(request.target, request.themeId);
+      }
     });
-  }, [desktopThemes, onThemeChange]);
+  }, [desktopThemes, onThemeOverrideChange, onThemePackChange]);
 
   useEffect(() => {
     if (!desktopThemes?.onReloadRequested) return undefined;

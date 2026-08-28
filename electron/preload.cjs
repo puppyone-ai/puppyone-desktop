@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
       css: request?.css,
     }),
     syncNativeMenu: (request) => ipcRenderer.invoke("theme:sync-native-menu", {
+      pack: request?.pack,
+      overrides: request?.overrides,
       selection: request?.selection,
       themes: Array.isArray(request?.themes) ? request.themes.map((theme) => ({
         id: theme?.id,
@@ -44,12 +46,16 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     onSelectionRequested: (callback) => {
       if (typeof callback !== "function") return () => {};
       const listener = (_event, request) => {
+        const kind = request?.kind;
         const target = request?.target;
         const themeId = request?.themeId;
-        if (
-          (target === "application" || target === "markdown" || target === "csv")
-          && typeof themeId === "string"
-        ) callback({ target, themeId });
+        if (kind === "pack" && typeof themeId === "string") {
+          callback({ kind, themeId });
+        } else if (
+          kind === "override"
+          && (themeId === null || typeof themeId === "string")
+          && (target === "application" || target === "markdown" || target === "csv")
+        ) callback({ kind, target, themeId });
       };
       ipcRenderer.on("theme:selection-requested", listener);
       return () => ipcRenderer.removeListener("theme:selection-requested", listener);

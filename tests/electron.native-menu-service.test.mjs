@@ -18,6 +18,9 @@ function createHarness({ platform = "darwin" } = {}) {
     "native.menu.file": "File",
     "native.menu.checkForUpdates": "Check for Updates…",
     "native.menu.theme": "Theme",
+    "native.menu.theme.pack": "Theme Pack",
+    "native.menu.theme.customize": "Customize",
+    "native.menu.theme.followPack": "Follow Theme Pack",
     "native.menu.theme.application": "Application",
     "native.menu.theme.markdown": "Markdown",
     "native.menu.theme.csv": "Table",
@@ -92,16 +95,23 @@ describe("DesktopNativeMenuService", () => {
     expect(actions.checkForUpdates).toHaveBeenCalledOnce();
   });
 
-  it("builds checked application, Markdown, and table theme groups", async () => {
+  it("builds a primary theme-pack group and advanced surface overrides", async () => {
     const { actions, service } = createHarness();
     service.setThemeState({
+      pack: "builtin.pack.forest",
+      overrides: {
+        application: null,
+        markdown: "builtin.markdown.newsprint",
+        csv: "builtin.csv.ledger",
+      },
       selection: {
-        application: "default",
+        application: "builtin.pack.forest",
         markdown: "builtin.markdown.newsprint",
         csv: "builtin.csv.ledger",
       },
       themes: [
         { id: "default", name: "Default", targets: ["application", "markdown", "csv"] },
+        { id: "builtin.pack.forest", name: "Forest", targets: ["application", "markdown", "csv"] },
         { id: "builtin.markdown.newsprint", name: "Newsprint", targets: ["markdown"] },
         { id: "builtin.csv.ledger", name: "Ledger", targets: ["csv"] },
       ],
@@ -110,23 +120,33 @@ describe("DesktopNativeMenuService", () => {
     const themeMenu = service.createApplicationMenuTemplate()
       .find((item) => item.id === "themes");
     expect(themeMenu.label).toBe("Theme");
-    expect(themeMenu.submenu.slice(0, 3).map((item) => item.label)).toEqual([
-      "Application",
-      "Markdown",
-      "Table",
+    expect(themeMenu.submenu.slice(0, 2).map((item) => item.label)).toEqual([
+      "Theme Pack",
+      "Customize",
     ]);
-    expect(themeMenu.submenu[1].submenu.find((item) => item.label === "Newsprint"))
+    expect(themeMenu.submenu[0].submenu.find((item) => item.label === "Forest"))
       .toMatchObject({ type: "radio", checked: true });
-    expect(themeMenu.submenu[2].submenu.find((item) => item.label === "Ledger"))
+    const customize = themeMenu.submenu[1].submenu;
+    expect(customize[1].submenu.find((item) => item.label === "Newsprint"))
+      .toMatchObject({ type: "radio", checked: true });
+    expect(customize[2].submenu.find((item) => item.label === "Ledger"))
+      .toMatchObject({ type: "radio", checked: true });
+    expect(customize[0].submenu.find((item) => item.label === "Follow Theme Pack"))
       .toMatchObject({ type: "radio", checked: true });
 
-    themeMenu.submenu[1].submenu.find((item) => item.label === "Default").click();
+    themeMenu.submenu[0].submenu.find((item) => item.label === "Default").click();
+    customize[1].submenu.find((item) => item.label === "Follow Theme Pack").click();
     themeMenu.submenu.at(-2).click();
     themeMenu.submenu.at(-1).click();
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(actions.selectTheme).toHaveBeenCalledWith({ target: "markdown", themeId: "default" });
+    expect(actions.selectTheme).toHaveBeenCalledWith({ kind: "pack", themeId: "default" });
+    expect(actions.selectTheme).toHaveBeenCalledWith({
+      kind: "override",
+      target: "markdown",
+      themeId: null,
+    });
     expect(actions.openThemesDirectory).toHaveBeenCalledOnce();
     expect(actions.reloadThemes).toHaveBeenCalledOnce();
   });

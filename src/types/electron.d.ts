@@ -741,6 +741,8 @@ export type DesktopThemeSnapshot = Readonly<{
   diagnostics: readonly DesktopThemeDiagnostic[];
 }>;
 export type DesktopThemeMenuState = Readonly<{
+  pack: string;
+  overrides: Readonly<Record<DesktopThemeTarget, string | null>>;
   selection: Readonly<Record<DesktopThemeTarget, string>>;
   themes: readonly Readonly<{
     id: string;
@@ -775,7 +777,10 @@ declare global {
         }) => Promise<{ saved: true }>;
         syncNativeMenu: (request: DesktopThemeMenuState) => Promise<{ synced: true }>;
         onSelectionRequested: (
-          callback: (request: { target: DesktopThemeTarget; themeId: string }) => void,
+          callback: (request:
+            | { kind: "pack"; themeId: string }
+            | { kind: "override"; target: DesktopThemeTarget; themeId: string | null }
+          ) => void,
         ) => () => void;
         onReloadRequested: (callback: () => void) => () => void;
       };

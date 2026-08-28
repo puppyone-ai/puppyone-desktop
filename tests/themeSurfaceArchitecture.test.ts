@@ -16,7 +16,8 @@ describe("scoped content theme surfaces", () => {
     expect(app).toContain("desktop-theme-bootstrap-surface");
     expect(app).toContain("themeRuntime(");
     expect(app).toContain('data-po-theme-surface="application"');
-    expect(app).toContain("data-po-theme-id={surfaceThemePreferences.application}");
+    expect(app).toContain("<ThemeSurfaceProvider value={themeCatalog.selection}>");
+    expect(app).toContain("data-po-theme-id={themeCatalog.selection.application}");
     expect(markdown).toContain('data-po-theme-surface="markdown"');
     expect(markdown).toContain("data-po-theme-id={themeId}");
     expect(csv).toContain('data-po-theme-surface="csv"');

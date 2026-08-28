@@ -109,7 +109,8 @@ function AppContent() {
   const themeCatalog = useThemeCatalog({
     colorMode: preferences.resolvedTheme,
     preferences: preferences.surfaceThemePreferences,
-    onThemeChange: preferences.setSurfaceThemeOverride,
+    onThemePackChange: preferences.setThemePack,
+    onThemeOverrideChange: preferences.setSurfaceThemeOverride,
   });
   const { setRightSidebarOpen } = preferences;
   const fontCatalog = useTypographyCatalog();

@@ -32,6 +32,8 @@ export function createDesktopNativeMenuService({
   if (typeof onReloadThemes !== "function") throw new TypeError("onReloadThemes must be a function.");
 
   let themeState = {
+    pack: "default",
+    overrides: { application: null, markdown: null, csv: null },
     selection: { application: "default", markdown: "default", csv: "default" },
     themes: [{ id: "default", name: "Default", targets: ["application", "markdown", "csv"] }],
   };
@@ -75,26 +77,61 @@ export function createDesktopNativeMenuService({
 
   const createThemeGroup = (target, labelId) => ({
     label: t(labelId),
-    submenu: themeState.themes
-      .filter((theme) => theme.targets.includes(target))
-      .map((theme) => ({
+    submenu: [
+      {
+        id: `theme.override.${target}.follow-pack`,
+        label: t("native.menu.theme.followPack"),
+        type: "radio",
+        checked: themeState.overrides[target] === null,
+        click: action(`theme.override.${target}.follow-pack`, () => (
+          onSelectTheme({ kind: "override", target, themeId: null })
+        )),
+      },
+      { type: "separator" },
+      ...themeState.themes
+        .filter((theme) => theme.targets.includes(target))
+        .map((theme) => ({
         id: `theme.${target}.${theme.id}`,
         label: theme.name,
         type: "radio",
-        checked: themeState.selection[target] === theme.id,
+        checked: themeState.overrides[target] === theme.id,
         click: action(`theme.${target}.${theme.id}`, () => (
-          onSelectTheme({ target, themeId: theme.id })
+          onSelectTheme({ kind: "override", target, themeId: theme.id })
+        )),
+        })),
+    ],
+  });
+
+  const createThemePackGroup = () => ({
+    label: t("native.menu.theme.pack"),
+    submenu: themeState.themes
+      .filter((theme) => theme.id === "default" || theme.targets.length > 1)
+      .map((theme) => ({
+        id: `theme.pack.${theme.id}`,
+        label: theme.name,
+        type: "radio",
+        checked: themeState.pack === theme.id,
+        click: action(`theme.pack.${theme.id}`, () => (
+          onSelectTheme({ kind: "pack", themeId: theme.id })
         )),
       })),
+  });
+
+  const createThemeCustomizeMenu = () => ({
+    label: t("native.menu.theme.customize"),
+    submenu: [
+      createThemeGroup("application", "native.menu.theme.application"),
+      createThemeGroup("markdown", "native.menu.theme.markdown"),
+      createThemeGroup("csv", "native.menu.theme.csv"),
+    ],
   });
 
   const createThemeMenu = () => ({
     id: "themes",
     label: t("native.menu.theme"),
     submenu: [
-      createThemeGroup("application", "native.menu.theme.application"),
-      createThemeGroup("markdown", "native.menu.theme.markdown"),
-      createThemeGroup("csv", "native.menu.theme.csv"),
+      createThemePackGroup(),
+      createThemeCustomizeMenu(),
       { type: "separator" },
       {
         id: "theme.openFolder",
@@ -160,6 +197,12 @@ function normalizeThemeState(value) {
     markdown: typeof value?.selection?.markdown === "string" ? value.selection.markdown : "default",
     csv: typeof value?.selection?.csv === "string" ? value.selection.csv : "default",
   };
+  const pack = typeof value?.pack === "string" ? value.pack : "default";
+  const overrides = {
+    application: typeof value?.overrides?.application === "string" ? value.overrides.application : null,
+    markdown: typeof value?.overrides?.markdown === "string" ? value.overrides.markdown : null,
+    csv: typeof value?.overrides?.csv === "string" ? value.overrides.csv : null,
+  };
   const themes = Array.isArray(value?.themes)
     ? value.themes.flatMap((theme) => {
       if (typeof theme?.id !== "string" || typeof theme?.name !== "string") return [];
@@ -172,5 +215,5 @@ function normalizeThemeState(value) {
   if (!themes.some((theme) => theme.id === "default")) {
     themes.unshift({ id: "default", name: "Default", targets: [...validTargets] });
   }
-  return { selection, themes };
+  return { pack, overrides, selection, themes };
 }

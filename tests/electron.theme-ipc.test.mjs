@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   THEME_LIST_CHANNEL,
   THEME_OPEN_DIRECTORY_CHANNEL,
+  THEME_READ_CUSTOM_CSS_CHANNEL,
   THEME_RELOAD_CHANNEL,
+  THEME_SAVE_CUSTOM_CSS_CHANNEL,
   THEME_SYNC_NATIVE_MENU_CHANNEL,
   registerThemeIpcHandlers,
 } from "../electron/main/ipc/theme-ipc.mjs";
@@ -17,6 +19,8 @@ describe("CSS theme IPC", () => {
     const themeService = {
       listThemes: vi.fn(async () => snapshot),
       openDirectory: vi.fn(async () => ({ opened: true })),
+      readCustomCss: vi.fn(async () => ({ css: "body {}" })),
+      saveCustomCss: vi.fn(async () => ({ saved: true })),
     };
     const onSyncNativeMenu = vi.fn();
 
@@ -26,6 +30,8 @@ describe("CSS theme IPC", () => {
       THEME_LIST_CHANNEL,
       THEME_RELOAD_CHANNEL,
       THEME_OPEN_DIRECTORY_CHANNEL,
+      THEME_READ_CUSTOM_CSS_CHANNEL,
+      THEME_SAVE_CUSTOM_CSS_CHANNEL,
       THEME_SYNC_NATIVE_MENU_CHANNEL,
     ]);
     await expect(handlers.get(THEME_LIST_CHANNEL)({})).resolves.toBe(snapshot);
@@ -33,11 +39,21 @@ describe("CSS theme IPC", () => {
     await expect(handlers.get(THEME_OPEN_DIRECTORY_CHANNEL)({}, "/tmp")).resolves.toEqual({ opened: true });
     expect(themeService.listThemes).toHaveBeenCalledTimes(2);
     expect(themeService.openDirectory).toHaveBeenCalledExactlyOnceWith();
+    await expect(handlers.get(THEME_READ_CUSTOM_CSS_CHANNEL)({}, { target: "markdown" }))
+      .resolves.toEqual({ css: "body {}" });
+    await expect(handlers.get(THEME_SAVE_CUSTOM_CSS_CHANNEL)({}, {
+      target: "markdown",
+      css: "body {}",
+    })).resolves.toEqual({ saved: true });
     expect(handlers.get(THEME_SYNC_NATIVE_MENU_CHANNEL)({}, {
+      pack: "builtin.pack.forest",
+      overrides: { application: null, markdown: "builtin.markdown.focus", csv: "unsafe/id" },
       selection: { application: "default", markdown: "builtin.markdown.focus", csv: "unsafe/id" },
       themes: [{ id: "builtin.markdown.focus", name: "Focus", targets: ["markdown", "invalid"] }],
     })).toEqual({ synced: true });
     expect(onSyncNativeMenu).toHaveBeenCalledWith({
+      pack: "builtin.pack.forest",
+      overrides: { application: null, markdown: "builtin.markdown.focus", csv: null },
       selection: { application: "default", markdown: "builtin.markdown.focus", csv: "default" },
       themes: [{ id: "builtin.markdown.focus", name: "Focus", targets: ["markdown"] }],
     });
