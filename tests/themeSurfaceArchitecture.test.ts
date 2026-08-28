@@ -26,8 +26,9 @@ describe("scoped content theme surfaces", () => {
   it("publishes semantic tokens and scoped built-in themes", () => {
     const markdownCss = source("packages/shared-ui/src/styles/editor/markdown-content.css");
     const csvCss = source("packages/shared-ui/src/styles/editor/csv-table-editor.css");
-    const themesCss = source("src/styles/surface-themes.css");
+    const themesCss = source("packages/shared-ui/src/styles/editor/content-themes.css");
     const styles = source("src/styles.css");
+    const editorStyles = source("packages/shared-ui/src/styles/editor.css");
 
     expect(markdownCss).toContain("--po-md-surface-background");
     expect(markdownCss).toContain("background: var(--po-md-surface-background)");
@@ -37,6 +38,7 @@ describe("scoped content theme surfaces", () => {
     expect(themesCss).toContain('[data-po-theme-id="builtin.markdown.focus"]');
     expect(themesCss).toContain('[data-po-theme-id="builtin.csv.spreadsheet"]');
     expect(themesCss).toContain('[data-po-theme-id="builtin.csv.ledger"]');
-    expect(styles).toContain('@import "./styles/surface-themes.css"');
+    expect(styles).not.toContain("surface-themes.css");
+    expect(editorStyles).toContain('@import "./editor/content-themes.css"');
   });
 });

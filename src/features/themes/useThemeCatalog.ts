@@ -19,6 +19,7 @@ export function useThemeCatalog(options: {
   preferences?: SurfaceThemePreferences;
   onThemeChange?: (target: ThemeTarget, themeId: string) => void;
 } = {}): ThemeCatalogController {
+  const { preferences, onThemeChange } = options;
   const desktopThemes = window.puppyoneDesktop?.themes;
   const [state, setState] = useState<ThemeCatalogState>(() => ({
     snapshot: createThemeCatalogSnapshot(EMPTY_HOST_SNAPSHOT),
@@ -76,19 +77,19 @@ export function useThemeCatalog(options: {
   }, [desktopThemes]);
 
   useEffect(() => {
-    if (!desktopThemes?.syncNativeMenu || !options.preferences) return;
+    if (!desktopThemes?.syncNativeMenu || !preferences) return;
     void desktopThemes.syncNativeMenu({
-      selection: options.preferences,
+      selection: preferences,
       themes: state.snapshot.themes.map(({ id, name, targets }) => ({ id, name, targets })),
     }).catch(() => undefined);
-  }, [desktopThemes, options.preferences, state.snapshot]);
+  }, [desktopThemes, preferences, state.snapshot]);
 
   useEffect(() => {
-    if (!desktopThemes?.onSelectionRequested || !options.onThemeChange) return undefined;
+    if (!desktopThemes?.onSelectionRequested || !onThemeChange) return undefined;
     return desktopThemes.onSelectionRequested(({ target, themeId }) => {
-      options.onThemeChange?.(target, themeId);
+      onThemeChange(target, themeId);
     });
-  }, [desktopThemes, options.onThemeChange]);
+  }, [desktopThemes, onThemeChange]);
 
   useEffect(() => {
     if (!desktopThemes?.onReloadRequested) return undefined;
