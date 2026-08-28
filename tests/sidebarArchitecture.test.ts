@@ -72,10 +72,15 @@ describe("Sidebar architecture", () => {
     expect(sharedSidebarCss).not.toContain(".po-pane-edge-toggle");
     expect(dataShellCss).not.toContain(".data-explorer-toggle");
     expect(layoutCss).not.toContain(".desktop-right-sidebar-toggle");
-    expect(dataShellCss).toContain("transition: grid-template-columns 260ms");
+    expect(sharedDataWorkspaceCss).toContain("transition: grid-template-columns 260ms");
+    expect(sharedDataWorkspaceCss).toMatch(
+      /body\.data-sidebar-resizing \.data-content:not\(\[data-explorer-collapsed="true"\]\)\s*\{[^}]*transition:\s*none;/s,
+    );
+    expect(dataShellCss).not.toContain("transition: grid-template-columns 260ms");
     expect(dataShellCss).not.toContain("transition: inset-inline-start 260ms");
     expect(layoutCss).toContain("flex-basis 260ms cubic-bezier");
     expect(collapsiblePaneResizeSource).toContain("minWidth - resolvedCollapsePullDistance");
+    expect(dataWorkspaceSource).toContain('widthChangeMode: "end"');
   });
 
   it("gives the collapsed explorer one Header-owned expansion action", () => {
