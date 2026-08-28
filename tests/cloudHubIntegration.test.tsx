@@ -196,7 +196,8 @@ describe("current-repository Cloud navigation", () => {
     expect(container.querySelector(".desktop-cloud-activation-illustration.is-overview")).not.toBeNull();
     expect(container.querySelector(".desktop-cloud-overview-hosting-art")).not.toBeNull();
     expect(container.querySelector(".desktop-cloud-overview-hosting-cloud")).not.toBeNull();
-    expect(container.querySelector(".desktop-cloud-overview-hosting-folder")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-hosting-folder-mark")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-hosting-folder-logo")).not.toBeNull();
     expect(container.querySelector(".desktop-cloud-overview-hosting-status")).not.toBeNull();
 
     act(() => renderWithTestLocalization(root,
