@@ -8,6 +8,9 @@ describe("scoped content theme surfaces", () => {
     const app = source("src/App.tsx");
     const markdown = source("packages/shared-ui/src/editor/markdown/MarkdownCodeMirrorEditor.tsx");
     const csv = source("packages/shared-ui/src/editor/viewers/csv/CsvTableEditor.tsx");
+    const onboarding = source("src/components/MinimalOnboarding.tsx");
+    const assetHome = source("src/components/AssetLibraryHome.tsx");
+    const restoring = source("src/features/app-shell/RestoringWorkspaceScreen.tsx");
     const context = source("packages/shared-ui/src/core/theme/ThemeSurfaceContext.tsx");
 
     expect(context).toContain("ThemeSurfaceProvider");
@@ -20,6 +23,10 @@ describe("scoped content theme surfaces", () => {
     expect(app).toContain("<ThemeSurfaceProvider value={themeCatalog.selection}>");
     expect(app).toContain("data-po-theme-id={themeCatalog.selection.application}");
     expect(app).toContain("applicationThemeId={themeCatalog.selection.application}");
+    for (const themedRoot of [onboarding, assetHome, restoring]) {
+      expect(themedRoot).toContain('data-po-theme-surface="application"');
+      expect(themedRoot).toContain("data-po-theme-id={applicationThemeId}");
+    }
     expect(markdown).toContain('data-po-theme-surface="markdown"');
     expect(markdown).toContain("data-po-theme-id={themeId}");
     expect(csv).toContain('data-po-theme-surface="csv"');

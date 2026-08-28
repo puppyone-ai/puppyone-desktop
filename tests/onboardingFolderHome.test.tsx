@@ -3,6 +3,7 @@
  */
 import React from "react";
 import { act } from "react";
+import { readFileSync } from "node:fs";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MinimalOnboarding, type MinimalOnboardingProps } from "../src/components/MinimalOnboarding";
@@ -34,6 +35,24 @@ afterEach(() => {
 });
 
 describe("project folder home", () => {
+  it("applies the effective application pack on the real onboarding theme root", () => {
+    const styles = document.createElement("style");
+    styles.textContent = [
+      readFileSync(`${process.cwd()}/src/styles/tokens.css`, "utf8"),
+      readFileSync(`${process.cwd()}/packages/shared-ui/src/styles/editor/theme-packs/forest.css`, "utf8"),
+    ].join("\n");
+    document.head.append(styles);
+
+    const container = renderHome({ applicationThemeId: "builtin.pack.forest" });
+    const surface = requireSurface(container);
+
+    expect(surface.dataset.poThemeSurface).toBe("application");
+    expect(surface.dataset.poThemeId).toBe("builtin.pack.forest");
+    expect(getComputedStyle(surface).getPropertyValue("--po-surface-canvas").trim())
+      .toBe("#092d30");
+    styles.remove();
+  });
+
   it("shows registered projects before neutral entry actions", () => {
     const container = renderHome({
       projectItems: [{
@@ -486,6 +505,7 @@ function renderHome(overrides: Partial<MinimalOnboardingProps> = {}) {
     pointerCursors: false,
     diffMarkers: "color",
     resolvedTheme: "dark",
+    applicationThemeId: "default",
     ...overrides,
   };
   act(() => renderWithTestLocalization(root, React.createElement(MinimalOnboarding, props)));

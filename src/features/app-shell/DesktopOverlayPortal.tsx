@@ -107,6 +107,7 @@ function applyDesktopOverlayTheme(
   root.dataset.themeMode = theme;
   root.dataset.poThemeSurface = "application";
   if (applicationThemeId) root.dataset.poThemeId = applicationThemeId;
+  else delete root.dataset.poThemeId;
   if (lightThemePreset) root.dataset.lightThemePreset = lightThemePreset;
   if (darkThemePreset) root.dataset.darkThemePreset = darkThemePreset;
   if (textSize) {

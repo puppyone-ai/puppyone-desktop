@@ -98,5 +98,11 @@ describe("native surface overlay lease", () => {
     });
     expect(overlayRoot?.dataset.poThemeSurface).toBe("application");
     expect(overlayRoot?.dataset.poThemeId).toBe("builtin.pack.forest");
+
+    act(() => root?.render(
+      <DesktopOverlayPortal theme="dark">Overlay host</DesktopOverlayPortal>,
+    ));
+    await act(async () => { await Promise.resolve(); });
+    expect(overlayRoot?.dataset.poThemeId).toBeUndefined();
   });
 });

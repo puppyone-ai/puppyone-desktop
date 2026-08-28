@@ -851,6 +851,7 @@ function AppContent() {
         pointerCursors={pointerCursors}
         diffMarkers={diffMarkers}
         resolvedTheme={resolvedTheme}
+        applicationThemeId={themeCatalog.selection.application}
       />,
     );
   }
@@ -870,6 +871,7 @@ function AppContent() {
         cornerSlot={(
           <DesktopHelpLauncher
             theme={resolvedTheme}
+            applicationThemeId={themeCatalog.selection.application}
             lightThemePreset={lightThemePreset}
             darkThemePreset={darkThemePreset}
             textSize={textSize}
@@ -886,6 +888,7 @@ function AppContent() {
         pointerCursors={pointerCursors}
         diffMarkers={diffMarkers}
         resolvedTheme={resolvedTheme}
+        applicationThemeId={themeCatalog.selection.application}
       />,
     );
   }
