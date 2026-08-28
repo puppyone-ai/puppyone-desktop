@@ -1,0 +1,98 @@
+import { describe, expect, it, vi } from "vitest";
+import { compileThemeCss } from "../electron/main/themes/theme-css-compiler.mjs";
+
+describe("CSS theme compiler", () => {
+  it("scopes Typora-style document selectors to one Markdown theme host", async () => {
+    const result = await compileThemeCss({
+      css: `
+        :root { --text-color: #222; }
+        html, body, #write { color: var(--text-color); }
+        h1, #write h2 { font-family: Georgia, serif; }
+      `,
+      themeId: "com.example.newsprint",
+      target: "markdown",
+    });
+
+    const host = ':where([data-po-theme-surface="markdown"][data-po-theme-id="com.example.newsprint"])';
+    expect(result.css).toContain(`${host} { --text-color: #222; }`);
+    expect(result.css).toContain(`${host}, ${host}, ${host} { color: var(--text-color); }`);
+    expect(result.css).toContain(`${host} h1, ${host} h2 { font-family: Georgia, serif; }`);
+  });
+
+  it("accepts the explicit theme-root authoring alias", async () => {
+    const result = await compileThemeCss({
+      css: ".theme-root { --po-md-content-color: #332f2a } .theme-root blockquote { font-style: italic }",
+      themeId: "com.example.newsprint",
+      target: "markdown",
+    });
+
+    expect(result.css).not.toContain(".theme-root");
+    expect(result.css).toContain('[data-po-theme-surface="markdown"]');
+    expect(result.css).toContain("blockquote");
+  });
+
+  it("inlines local imports and rewrites local asset URLs through host callbacks", async () => {
+    const loadImport = vi.fn(async (specifier) => {
+      expect(specifier).toBe("./shared.css");
+      return ".theme-root strong { color: #8b2f24 }";
+    });
+    const resolveAssetUrl = vi.fn(async (specifier) => {
+      expect(specifier).toBe("./fonts/reader.woff2");
+      return "data:font/woff2;base64,Zm9udA==";
+    });
+
+    const result = await compileThemeCss({
+      css: `
+        @import "./shared.css";
+        @font-face { font-family: Reader; src: url("./fonts/reader.woff2") format("woff2"); }
+        body { font-family: Reader, serif; }
+      `,
+      themeId: "com.example.newsprint",
+      target: "markdown",
+      loadImport,
+      resolveAssetUrl,
+    });
+
+    expect(loadImport).toHaveBeenCalledOnce();
+    expect(resolveAssetUrl).toHaveBeenCalledOnce();
+    expect(result.css).toContain("strong");
+    expect(result.css).toContain("data:font/woff2;base64,Zm9udA==");
+    expect(result.css).not.toContain("@import");
+  });
+
+  it.each([
+    '@import url("https://example.com/theme.css");',
+    '.theme-root { background: url("https://example.com/pixel.png") }',
+    '.theme-root { background: url("file:///tmp/private.png") }',
+    '.theme-root { position: fixed; inset: 0 }',
+    'html .theme-root { color: red }',
+    ':global(body) { color: red }',
+  ])("rejects CSS that can escape or load remote content: %s", async (css) => {
+    await expect(compileThemeCss({
+      css,
+      themeId: "com.example.newsprint",
+      target: "markdown",
+    })).rejects.toThrow();
+  });
+
+  it("limits application themes to root-level PuppyOne tokens", async () => {
+    const result = await compileThemeCss({
+      css: ".theme-root { --po-surface-canvas: #101114; --po-text: #f7f7f8 }",
+      themeId: "com.example.graphite",
+      target: "application",
+    });
+    expect(result.css).toContain("--po-surface-canvas: #101114");
+
+    await expect(compileThemeCss({
+      css: ".theme-root button { display: none }",
+      themeId: "com.example.graphite",
+      target: "application",
+    })).rejects.toThrow("Application themes may only declare root-level --po-* tokens");
+
+    await expect(compileThemeCss({
+      css: ".theme-root { background: red }",
+      themeId: "com.example.graphite",
+      target: "application",
+    })).rejects.toThrow("Application themes may only declare root-level --po-* tokens");
+  });
+});
