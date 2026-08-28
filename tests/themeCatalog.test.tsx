@@ -137,6 +137,32 @@ describe("renderer theme catalog", () => {
 
     expect(latest?.selection.markdown).toBe("default");
   });
+
+  it("loads and saves managed Custom CSS through the catalog controller", async () => {
+    const reload = vi.fn(async () => ({ themes: [], diagnostics: [] }));
+    const readCustomCss = vi.fn(async () => ({ css: "body { color: teal }" }));
+    const saveCustomCss = vi.fn(async () => ({ saved: true as const }));
+    window.puppyoneDesktop = {
+      themes: {
+        list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
+        reload,
+        openDirectory: vi.fn(async () => ({ opened: true as const })),
+        readCustomCss,
+        saveCustomCss,
+      },
+    } as typeof window.puppyoneDesktop;
+    await act(async () => {
+      root.render(<Harness />);
+      await Promise.resolve();
+    });
+
+    await expect(latest?.readCustomCss("markdown")).resolves.toBe("body { color: teal }");
+    await expect(latest?.saveCustomCss("markdown", "body { color: navy }")).resolves.toBe(true);
+
+    expect(readCustomCss).toHaveBeenCalledWith("markdown");
+    expect(saveCustomCss).toHaveBeenCalledWith({ target: "markdown", css: "body { color: navy }" });
+    expect(reload).toHaveBeenCalledOnce();
+  });
 });
 
 function Harness({

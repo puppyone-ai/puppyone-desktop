@@ -768,6 +768,11 @@ declare global {
         list: () => Promise<DesktopThemeSnapshot>;
         reload: () => Promise<DesktopThemeSnapshot>;
         openDirectory: () => Promise<{ opened: true }>;
+        readCustomCss: (target: DesktopThemeTarget) => Promise<{ css: string }>;
+        saveCustomCss: (request: {
+          target: DesktopThemeTarget;
+          css: string;
+        }) => Promise<{ saved: true }>;
         syncNativeMenu: (request: DesktopThemeMenuState) => Promise<{ synced: true }>;
         onSelectionRequested: (
           callback: (request: { target: DesktopThemeTarget; themeId: string }) => void,

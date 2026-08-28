@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -103,6 +103,50 @@ describe("host-owned CSS theme service", () => {
 
     expect(result).toEqual({ opened: true });
     expect(shell.openPath).toHaveBeenCalledExactlyOnceWith(path.join(userDataPath, "themes"));
+  });
+
+  it("persists valid managed Custom CSS and exposes it as a three-surface package", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const service = createThemeService({ userDataPath, shell: createShell() });
+
+    expect(await service.readCustomCss("markdown")).toEqual({ css: "" });
+    await service.saveCustomCss({
+      target: "markdown",
+      css: "body { color: #334155 }",
+    });
+
+    expect(await service.readCustomCss("markdown")).toEqual({
+      css: "body { color: #334155 }",
+    });
+    const custom = (await service.listThemes()).themes.find(
+      (theme) => theme.id === "local.puppyone.custom-css",
+    );
+    expect(custom).toMatchObject({
+      name: "My Custom CSS",
+      targets: ["application", "markdown", "csv"],
+    });
+    expect(custom.compiledCss.markdown).toContain('data-po-theme-surface="markdown"');
+  });
+
+  it("rejects invalid managed CSS without replacing the last valid source", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const service = createThemeService({ userDataPath, shell: createShell() });
+    const validCss = "body { color: #334155 }";
+    await service.saveCustomCss({ target: "markdown", css: validCss });
+
+    await expect(service.saveCustomCss({
+      target: "markdown",
+      css: 'body { background: url("https://example.com/pixel.png") }',
+    })).rejects.toThrow("cannot load external asset URL");
+    await expect(service.saveCustomCss({
+      target: "../../outside",
+      css: "body { color: red }",
+    })).rejects.toThrow("Custom CSS target is invalid");
+
+    expect(await readFile(
+      path.join(userDataPath, "themes", "puppyone-custom-css", "markdown.css"),
+      "utf8",
+    )).toBe(validCss);
   });
 
   it("rejects manifest entrypoint symlinks that escape a package", async () => {

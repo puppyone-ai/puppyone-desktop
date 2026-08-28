@@ -1,10 +1,14 @@
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import {
   mkdir,
   readFile,
   readdir,
   realpath,
+  rename,
   stat,
+  unlink,
+  writeFile,
 } from "node:fs/promises";
 import { compileThemeCss } from "./theme-css-compiler.mjs";
 import { parseThemeManifest } from "./theme-package-contract.mjs";
@@ -17,6 +21,9 @@ const MAX_THEME_CSS_BYTES = 4 * 1024 * 1024;
 const MAX_THEME_ASSET_BYTES = 8 * 1024 * 1024;
 const MAX_THEME_COMPILED_BYTES = 16 * 1024 * 1024;
 const MAX_THEME_IMPORTS = 64;
+const CUSTOM_THEME_DIRECTORY = "puppyone-custom-css";
+const CUSTOM_THEME_ID = "local.puppyone.custom-css";
+const themeTargets = Object.freeze(["application", "markdown", "csv"]);
 const assetMimeTypes = new Map([
   [".woff", "font/woff"],
   [".woff2", "font/woff2"],
@@ -90,7 +97,90 @@ export function createThemeService({ userDataPath, shell }) {
     return Object.freeze({ opened: true });
   };
 
-  return Object.freeze({ listThemes, openDirectory });
+  const readCustomCss = async (target) => {
+    requireThemeTarget(target);
+    const packageRoot = path.join(themeRoot, CUSTOM_THEME_DIRECTORY);
+    if (!await pathExists(packageRoot)) return Object.freeze({ css: "" });
+    const source = await resolvePackageFile(packageRoot, ".", `${target}.css`);
+    return Object.freeze({
+      css: await readBoundedText(source.absolutePath, MAX_CSS_BYTES, "Custom CSS"),
+    });
+  };
+
+  const saveCustomCss = async (request) => {
+    const target = request?.target;
+    const css = request?.css;
+    requireThemeTarget(target);
+    if (typeof css !== "string" || Buffer.byteLength(css, "utf8") > MAX_CSS_BYTES) {
+      throw new TypeError("Custom CSS exceeds the supported size limit.");
+    }
+    const packageRoot = await ensureManagedCustomPackage(themeRoot);
+    await compileThemeFile({
+      css,
+      sourcePath: `${target}.css`,
+      packageRoot,
+      themeId: CUSTOM_THEME_ID,
+      target,
+      budget: createCompilationBudget(),
+    });
+    await writeFileAtomic(packageRoot, `${target}.css`, css);
+    return Object.freeze({ saved: true });
+  };
+
+  return Object.freeze({ listThemes, openDirectory, readCustomCss, saveCustomCss });
+}
+
+async function ensureManagedCustomPackage(themeRoot) {
+  await mkdir(themeRoot, { recursive: true });
+  const canonicalThemeRoot = await realpath(themeRoot);
+  const packageRoot = path.join(canonicalThemeRoot, CUSTOM_THEME_DIRECTORY);
+  await mkdir(packageRoot, { recursive: true });
+  const canonicalPackageRoot = await realpath(packageRoot);
+  requireContainedPath(canonicalThemeRoot, canonicalPackageRoot);
+  await mkdir(path.join(canonicalPackageRoot, "assets"), { recursive: true });
+  const manifest = JSON.stringify({
+    schemaVersion: 1,
+    id: CUSTOM_THEME_ID,
+    name: "My Custom CSS",
+    version: "1.0.0",
+    author: "Local user",
+    modes: ["light", "dark"],
+    targets: themeTargets,
+    entrypoints: Object.fromEntries(themeTargets.map((target) => [target, `${target}.css`])),
+  }, null, 2);
+  await writeFileAtomic(canonicalPackageRoot, "theme.json", `${manifest}\n`);
+  await Promise.all(themeTargets.map(async (target) => {
+    const filename = `${target}.css`;
+    const filePath = path.join(canonicalPackageRoot, filename);
+    if (!await pathExists(filePath)) await writeFileAtomic(canonicalPackageRoot, filename, "");
+  }));
+  return canonicalPackageRoot;
+}
+
+async function writeFileAtomic(directory, filename, content) {
+  const tempPath = path.join(directory, `.${filename}.${randomUUID()}.tmp`);
+  try {
+    await writeFile(tempPath, content, { encoding: "utf8", flag: "wx" });
+    await rename(tempPath, path.join(directory, filename));
+  } finally {
+    await unlink(tempPath).catch((error) => {
+      if (error?.code !== "ENOENT") throw error;
+    });
+  }
+}
+
+async function pathExists(filePath) {
+  try {
+    await stat(filePath);
+    return true;
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+function requireThemeTarget(value) {
+  if (!themeTargets.includes(value)) throw new TypeError("Custom CSS target is invalid.");
 }
 
 async function loadStandaloneCssTheme(themeRoot, filename) {

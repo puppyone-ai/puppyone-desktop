@@ -28,6 +28,11 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     list: () => ipcRenderer.invoke("theme:list"),
     reload: () => ipcRenderer.invoke("theme:reload"),
     openDirectory: () => ipcRenderer.invoke("theme:open-directory"),
+    readCustomCss: (target) => ipcRenderer.invoke("theme:read-custom-css", { target }),
+    saveCustomCss: (request) => ipcRenderer.invoke("theme:save-custom-css", {
+      target: request?.target,
+      css: request?.css,
+    }),
     syncNativeMenu: (request) => ipcRenderer.invoke("theme:sync-native-menu", {
       selection: request?.selection,
       themes: Array.isArray(request?.themes) ? request.themes.map((theme) => ({

@@ -19,6 +19,8 @@ export type ThemeCatalogController = ThemeCatalogState & Readonly<{
   selection: SurfaceThemeSelection;
   reload: () => Promise<void>;
   openDirectory: () => Promise<{ opened: boolean }>;
+  readCustomCss: (target: ThemeTarget) => Promise<string>;
+  saveCustomCss: (target: ThemeTarget, css: string) => Promise<boolean>;
 }>;
 
 export function useThemeCatalog(options: {
@@ -101,6 +103,37 @@ export function useThemeCatalog(options: {
     [colorMode, preferences, state.snapshot],
   );
 
+  const readCustomCss = useCallback(async (target: ThemeTarget) => {
+    if (!desktopThemes?.readCustomCss) return "";
+    try {
+      const result = await desktopThemes.readCustomCss(target);
+      return result.css;
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+      }));
+      throw error;
+    }
+  }, [desktopThemes]);
+
+  const saveCustomCss = useCallback(async (target: ThemeTarget, css: string) => {
+    if (!desktopThemes?.saveCustomCss) return false;
+    try {
+      await desktopThemes.saveCustomCss({ target, css });
+      await reload();
+      return true;
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+      }));
+      return false;
+    }
+  }, [desktopThemes, reload]);
+
   useEffect(() => {
     if (!desktopThemes?.syncNativeMenu) return;
     void desktopThemes.syncNativeMenu({
@@ -123,5 +156,12 @@ export function useThemeCatalog(options: {
     });
   }, [desktopThemes, reload]);
 
-  return { ...state, selection, reload, openDirectory };
+  return {
+    ...state,
+    selection,
+    reload,
+    openDirectory,
+    readCustomCss,
+    saveCustomCss,
+  };
 }
