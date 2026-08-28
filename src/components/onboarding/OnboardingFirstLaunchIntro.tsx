@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useRef, type AnimationEvent } from "react";
 import {
-  FIRST_LAUNCH_INTRO_DURATION_MS,
+  useCallback,
+  useEffect,
+  useRef,
+  type AnimationEvent,
+} from "react";
+import {
+  FIRST_LAUNCH_INTRO_FALLBACK_TIMEOUT_MS,
   FIRST_LAUNCH_INTRO_REDUCED_MOTION_DURATION_MS,
 } from "./firstLaunchIntro";
 
@@ -21,8 +26,8 @@ export function OnboardingFirstLaunchIntro({ onComplete }: OnboardingFirstLaunch
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const duration = reducedMotion
       ? FIRST_LAUNCH_INTRO_REDUCED_MOTION_DURATION_MS
-      : FIRST_LAUNCH_INTRO_DURATION_MS;
-    const fallback = window.setTimeout(complete, duration + 80);
+      : FIRST_LAUNCH_INTRO_FALLBACK_TIMEOUT_MS;
+    const fallback = window.setTimeout(complete, duration);
     return () => window.clearTimeout(fallback);
   }, [complete]);
 

@@ -1,0 +1,124 @@
+/*
+ * The first-launch animation is intentionally independent from homepage
+ * layout. The aperture breathes before it expands; homepage chrome and
+ * content enter only after the opening is large enough to frame them.
+ */
+.onboarding-homepage-shell {
+  --onboarding-first-launch-breathe-duration: 1300ms;
+  --onboarding-first-launch-reveal-duration: 1150ms;
+  --onboarding-first-launch-settle-duration: 250ms;
+  --onboarding-first-launch-content-lag: 160ms;
+  --onboarding-first-launch-content-duration: 620ms;
+}
+
+.onboarding-first-launch-intro {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  overflow: hidden;
+  isolation: isolate;
+  cursor: default;
+  animation: onboarding-first-launch-intro-complete
+    calc(
+      var(--onboarding-first-launch-breathe-duration)
+      + var(--onboarding-first-launch-reveal-duration)
+      + var(--onboarding-first-launch-settle-duration)
+    )
+    linear
+    both;
+}
+
+@property --onboarding-first-launch-radius {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.onboarding-first-launch-reveal {
+  position: absolute;
+  inset: 0;
+  --onboarding-first-launch-radius: 0px;
+  background: #000;
+  pointer-events: none;
+  backface-visibility: hidden;
+  -webkit-mask-image: radial-gradient(
+    circle at 50% 50%,
+    transparent 0 var(--onboarding-first-launch-radius),
+    #000 calc(var(--onboarding-first-launch-radius) + 1px)
+  );
+  mask-image: radial-gradient(
+    circle at 50% 50%,
+    transparent 0 var(--onboarding-first-launch-radius),
+    #000 calc(var(--onboarding-first-launch-radius) + 1px)
+  );
+  will-change: mask-image;
+  animation:
+    onboarding-first-launch-breathe
+      var(--onboarding-first-launch-breathe-duration)
+      ease-in-out
+      both,
+    onboarding-first-launch-reveal
+      var(--onboarding-first-launch-reveal-duration)
+      cubic-bezier(0.2, 0.7, 0.2, 1)
+      var(--onboarding-first-launch-breathe-duration)
+      forwards;
+}
+
+.onboarding-homepage-shell.dark .onboarding-first-launch-reveal {
+  background: #fff;
+}
+
+.onboarding-homepage-shell.is-first-launch-intro > .onboarding-titlebar,
+.onboarding-homepage-shell.is-first-launch-intro > .onboarding-homepage {
+  opacity: 0;
+  will-change: opacity;
+  animation: onboarding-first-launch-content-enter
+    var(--onboarding-first-launch-content-duration)
+    cubic-bezier(0.2, 0.7, 0.2, 1)
+    calc(
+      var(--onboarding-first-launch-breathe-duration)
+      + var(--onboarding-first-launch-content-lag)
+    )
+    forwards;
+}
+
+@keyframes onboarding-first-launch-breathe {
+  0%,
+  48%,
+  100% {
+    --onboarding-first-launch-radius: 7px;
+  }
+  23% {
+    --onboarding-first-launch-radius: 10px;
+  }
+  72% {
+    --onboarding-first-launch-radius: 10.5px;
+  }
+}
+
+@keyframes onboarding-first-launch-reveal {
+  from {
+    --onboarding-first-launch-radius: 7px;
+  }
+  to {
+    --onboarding-first-launch-radius: 75vmax;
+  }
+}
+
+@keyframes onboarding-first-launch-intro-complete {
+  from {
+    visibility: visible;
+  }
+  to {
+    visibility: visible;
+  }
+}
+
+@keyframes onboarding-first-launch-content-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

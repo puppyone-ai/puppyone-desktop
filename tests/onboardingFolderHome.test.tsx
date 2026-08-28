@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MinimalOnboarding, type MinimalOnboardingProps } from "../src/components/MinimalOnboarding";
 import { PUPPY_BRAND_MARK_ASSETS } from "../src/components/brand/PuppyBrandMark";
 import {
-  FIRST_LAUNCH_INTRO_DURATION_MS,
+  FIRST_LAUNCH_INTRO_FALLBACK_TIMEOUT_MS,
   FIRST_LAUNCH_INTRO_STORAGE_KEY,
   FIRST_LAUNCH_INTRO_VERSION,
 } from "../src/components/onboarding/firstLaunchIntro";
@@ -46,13 +46,16 @@ describe("project folder home", () => {
     vi.useFakeTimers();
     const container = renderHome();
 
-    expect(container.querySelector("[data-onboarding-first-launch-intro]")).not.toBeNull();
-    expect(container.querySelector(".onboarding-first-launch-reveal")).not.toBeNull();
+    const intro = container.querySelector<HTMLElement>("[data-onboarding-first-launch-intro]");
+    const reveal = intro?.querySelector(".onboarding-first-launch-reveal");
+    expect(intro).not.toBeNull();
+    expect(reveal).not.toBeNull();
+    expect([...intro!.children]).toEqual([reveal]);
     expect(requireSurface(container).classList.contains("is-first-launch-intro")).toBe(true);
     expect(window.localStorage.getItem(FIRST_LAUNCH_INTRO_STORAGE_KEY)).toBeNull();
 
     await act(async () => {
-      vi.advanceTimersByTime(FIRST_LAUNCH_INTRO_DURATION_MS + 100);
+      vi.advanceTimersByTime(FIRST_LAUNCH_INTRO_FALLBACK_TIMEOUT_MS + 100);
     });
 
     expect(container.querySelector("[data-onboarding-first-launch-intro]")).toBeNull();
@@ -100,7 +103,7 @@ describe("project folder home", () => {
     expect(container.querySelector("[data-onboarding-first-launch-intro]")).not.toBeNull();
 
     await act(async () => {
-      vi.advanceTimersByTime(FIRST_LAUNCH_INTRO_DURATION_MS + 100);
+      vi.advanceTimersByTime(FIRST_LAUNCH_INTRO_FALLBACK_TIMEOUT_MS + 100);
     });
 
     expect(container.querySelector("[data-onboarding-first-launch-intro]")).toBeNull();
