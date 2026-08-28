@@ -60,10 +60,10 @@
     max-width: 360px;
     margin: 0;
     color: var(--po-text);
-    font-size: clamp(26px, 2.6vw, 31px);
-    font-weight: 610;
-    letter-spacing: -0.038em;
-    line-height: 1.2;
+    font-size: clamp(18px, 1.7vw, 20px);
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.3;
     text-align: start;
     text-wrap: balance;
   }
@@ -831,10 +831,6 @@
       grid-template-columns: minmax(0, 1fr);
       gap: 18px;
       padding: 26px 18px;
-    }
-
-    .desktop-cloud-mcp-activation-header h1 {
-      font-size: 25px;
     }
 
     .desktop-cloud-mcp-activation.is-connection {
