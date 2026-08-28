@@ -204,15 +204,57 @@
     width: 254px;
     height: 254px;
     isolation: isolate;
-    filter: drop-shadow(0 12px 18px rgba(68, 78, 92, 0.14));
   }
 
-  .desktop-cloud-activation-overview-art {
+  .desktop-cloud-overview-hosting-art {
     display: block;
     width: 100%;
     height: 100%;
-    object-fit: contain;
-    user-select: none;
+    overflow: visible;
+  }
+
+  .desktop-cloud-overview-hosting-cloud,
+  .desktop-cloud-overview-hosting-folder,
+  .desktop-cloud-overview-hosting-status {
+    stroke-linejoin: round;
+  }
+
+  .desktop-cloud-overview-hosting-cloud {
+    fill: color-mix(in srgb, var(--po-text) 3%, var(--po-canvas));
+    stroke: color-mix(in srgb, var(--po-text) 32%, transparent);
+    stroke-width: 5px;
+  }
+
+  .desktop-cloud-overview-hosting-folder {
+    fill: color-mix(in srgb, #d6aa50 14%, var(--po-canvas));
+    stroke: color-mix(in srgb, #d6aa50 78%, var(--po-text));
+    stroke-width: 4px;
+  }
+
+  .desktop-cloud-overview-hosting-folder-rim {
+    stroke: color-mix(in srgb, #d6aa50 68%, var(--po-text));
+    stroke-width: 3px;
+  }
+
+  .desktop-cloud-overview-hosting-connector {
+    stroke: color-mix(in srgb, var(--po-text) 30%, transparent);
+    stroke-width: 5px;
+  }
+
+  .desktop-cloud-overview-hosting-status {
+    fill: color-mix(in srgb, var(--po-text) 6%, var(--po-canvas));
+    stroke: color-mix(in srgb, var(--po-text) 30%, transparent);
+    stroke-width: 4px;
+  }
+
+  .desktop-cloud-overview-hosting-status-dot {
+    fill: color-mix(in srgb, var(--po-accent) 82%, white);
+  }
+
+  .desktop-cloud-overview-hosting-status-line {
+    stroke: color-mix(in srgb, var(--po-text) 30%, transparent);
+    stroke-width: 7px;
+    stroke-linecap: round;
   }
 
   .desktop-cloud-activation-faux-copy {
