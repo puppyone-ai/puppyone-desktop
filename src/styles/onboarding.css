@@ -143,7 +143,6 @@
 }
 
 .onboarding-shell[data-onboarding-state="empty"] .onboarding-homepage {
-  --onboarding-column-width: 248px;
   --onboarding-panel-padding: 28px;
   min-height: min(430px, 100%);
 }
