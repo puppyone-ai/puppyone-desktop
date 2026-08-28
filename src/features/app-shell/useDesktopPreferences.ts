@@ -12,6 +12,13 @@ import {
 } from "../appearance/appearancePreferences";
 import { resolveAppearance } from "../appearance/resolveAppearance";
 import {
+  parseSurfaceThemePreferences,
+  serializeSurfaceThemePreferences,
+  SURFACE_THEME_PREFERENCES_STORAGE_KEY,
+  updateSurfaceThemePreference,
+} from "../themes/themePreferences";
+import type { ThemeTarget } from "../themes/themeTypes";
+import {
   AI_EDIT_ASSIST_STORAGE_KEY,
   AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY,
   CREATE_NEW_MENU_STORAGE_KEY,
@@ -153,6 +160,11 @@ export function useDesktopPreferences() {
   const [rightSidebarSurface, setRightSidebarSurface] = useState(() => readInitialRightSidebarSurface());
   const [agentPreferredRuntime, setAgentPreferredRuntime] = useState<string | null>(() => readInitialAgentPreferredRuntime());
   const [agentPreferredModel, setAgentPreferredModel] = useState<string | null>(() => readInitialAgentPreferredModel());
+  const [surfaceThemePreferences, setSurfaceThemePreferences] = useState(() => (
+    parseSurfaceThemePreferences(
+      window.localStorage.getItem(SURFACE_THEME_PREFERENCES_STORAGE_KEY),
+    )
+  ));
   const [systemDark, setSystemDark] = useState(() => readSystemDarkMode());
   const resolvedAppearance = useMemo(() => resolveAppearance({
     interfaceStyle,
@@ -386,6 +398,24 @@ export function useDesktopPreferences() {
   }, [agentPreferredModel]);
 
   useEffect(() => {
+    window.localStorage.setItem(
+      SURFACE_THEME_PREFERENCES_STORAGE_KEY,
+      serializeSurfaceThemePreferences(surfaceThemePreferences),
+    );
+  }, [surfaceThemePreferences]);
+
+  useEffect(() => {
+    const syncSurfaceThemesAcrossWindows = (event: StorageEvent) => {
+      if (event.key !== SURFACE_THEME_PREFERENCES_STORAGE_KEY && event.key !== null) return;
+      setSurfaceThemePreferences(parseSurfaceThemePreferences(
+        event.key === null ? null : event.newValue,
+      ));
+    };
+    window.addEventListener("storage", syncSurfaceThemesAcrossWindows);
+    return () => window.removeEventListener("storage", syncSurfaceThemesAcrossWindows);
+  }, []);
+
+  useEffect(() => {
     const query = window.matchMedia("(prefers-color-scheme: dark)");
     const sync = () => setSystemDark(query.matches);
     sync();
@@ -396,6 +426,11 @@ export function useDesktopPreferences() {
   const sidebarNavigationPlacement = resolvedAppearance.sidebarNavigationPlacement;
   const sidebarNavigationOrientation = resolvedAppearance.sidebarNavigationOrientation;
   const terminalToolEnabled = rightSidebarToolsSettings.enabled.terminal;
+  const setSurfaceTheme = (target: ThemeTarget, themeId: string) => {
+    setSurfaceThemePreferences((current) => (
+      updateSurfaceThemePreference(current, target, themeId)
+    ));
+  };
 
   return {
     aiEditAssistEnabled,
@@ -424,6 +459,7 @@ export function useDesktopPreferences() {
     sidebarNavigationOrientation,
     sidebarNavigationPlacement,
     sidebarNavigationVisibilitySettings,
+    surfaceThemePreferences,
     terminalToolEnabled,
     titlebarActionsSettings,
     darkThemePreset,
@@ -455,6 +491,7 @@ export function useDesktopPreferences() {
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setSidebarNavigationVisibilitySettings,
+    setSurfaceTheme,
     setTitlebarActionsSettings,
     setLightThemePreset,
     setLoadingAnimationPreset,
