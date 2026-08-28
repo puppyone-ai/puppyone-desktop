@@ -5,6 +5,7 @@ import type {
 } from "./themeTypes";
 
 export const SURFACE_THEME_PREFERENCES_STORAGE_KEY = "puppyone.desktop.surfaceThemes";
+export const CUSTOM_CSS_THEME_ID = "local.puppyone.custom-css";
 
 export type SurfaceThemePreferences = Readonly<{
   version: 2;

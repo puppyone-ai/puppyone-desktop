@@ -1,7 +1,11 @@
+import { useEffect, useState } from "react";
 import { useLocalization } from "@puppyone/localization";
 import { getThemePacks, getThemesForTarget } from "../../themes/builtinSurfaceThemes";
 import type { ThemeCatalogController } from "../../themes/useThemeCatalog";
-import type { SurfaceThemePreferences } from "../../themes/themePreferences";
+import {
+  CUSTOM_CSS_THEME_ID,
+  type SurfaceThemePreferences,
+} from "../../themes/themePreferences";
 import type { ThemeTarget } from "../../themes/themeTypes";
 
 export function ThemeSettingsSection({
@@ -58,6 +62,10 @@ export function ThemeSettingsSection({
             {t("settings.appearance.themes.reload")}
           </button>
         </div>
+        <CustomCssEditor
+          catalog={catalog}
+          onThemeOverrideChange={onThemeOverrideChange}
+        />
         {catalog.error && <p className="desktop-theme-settings-error" role="alert">{catalog.error}</p>}
         {catalog.snapshot.diagnostics.length > 0 && (
           <ul className="desktop-theme-settings-diagnostics" aria-label={t("settings.appearance.themes.diagnostics")}>
@@ -69,6 +77,100 @@ export function ThemeSettingsSection({
           </ul>
         )}
       </details>
+    </div>
+  );
+}
+
+function CustomCssEditor({
+  catalog,
+  onThemeOverrideChange,
+}: {
+  catalog: ThemeCatalogController;
+  onThemeOverrideChange: (target: ThemeTarget, themeId: string | null) => void;
+}) {
+  const { t } = useLocalization();
+  const [target, setTarget] = useState<ThemeTarget>("markdown");
+  const [source, setSource] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const { readCustomCss, saveCustomCss } = catalog;
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setSaved(false);
+    void readCustomCss(target)
+      .then((css) => {
+        if (!cancelled) setSource(css);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [readCustomCss, target]);
+
+  const save = async () => {
+    setSaving(true);
+    setSaved(false);
+    const didSave = await saveCustomCss(target, source);
+    setSaving(false);
+    if (!didSave) return;
+    onThemeOverrideChange(target, CUSTOM_CSS_THEME_ID);
+    setSaved(true);
+  };
+
+  return (
+    <div className="desktop-theme-custom-css">
+      <div className="desktop-settings-subsection-title">
+        {t("settings.appearance.themes.customCss.title")}
+      </div>
+      <p className="desktop-theme-settings-detail">
+        {t("settings.appearance.themes.customCss.detail")}
+      </p>
+      <label className="desktop-settings-row desktop-settings-row-control">
+        <span>{t("settings.appearance.themes.customCss.target")}</span>
+        <select
+          className="desktop-settings-select"
+          value={target}
+          onChange={(event) => setTarget(event.currentTarget.value as ThemeTarget)}
+        >
+          <option value="application">{t("settings.appearance.themes.application")}</option>
+          <option value="markdown">{t("settings.appearance.themes.markdown")}</option>
+          <option value="csv">{t("settings.appearance.themes.csv")}</option>
+        </select>
+      </label>
+      <textarea
+        className="desktop-theme-custom-css-source"
+        aria-label={t("settings.appearance.themes.customCss.source")}
+        value={source}
+        disabled={loading}
+        spellCheck={false}
+        onChange={(event) => {
+          setSource(event.currentTarget.value);
+          setSaved(false);
+        }}
+      />
+      <div className="desktop-theme-settings-actions">
+        <button
+          className="desktop-settings-action desktop-theme-custom-css-save"
+          type="button"
+          disabled={loading || saving}
+          onClick={() => void save()}
+        >
+          {saving
+            ? t("settings.appearance.themes.customCss.saving")
+            : t("settings.appearance.themes.customCss.saveApply")}
+        </button>
+        {saved && (
+          <span className="desktop-theme-custom-css-saved" role="status">
+            {t("settings.appearance.themes.customCss.saved")}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
