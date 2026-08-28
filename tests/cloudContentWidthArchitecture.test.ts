@@ -8,6 +8,7 @@ const settings = readSource("../src/features/cloud/sections/settings/settings.cs
 const automation = readSource("../src/features/automation/styles/shell-and-catalog.css");
 const activation = readSource("../src/features/cloud/components/mcp-activation.css");
 const activationComponent = readSource("../src/features/cloud/components/CloudActivationHero.tsx");
+const overviewIllustration = readSource("../src/features/cloud/components/CloudOverviewHostingIllustration.tsx");
 const cloudSignIn = readSource("../src/features/cloud/auth/cloud-sign-in.css");
 const organization = readSource("../src/features/cloud/organization/organization.css");
 
@@ -75,12 +76,18 @@ describe("Cloud content width architecture", () => {
     expect(activation).toContain("width: var(--desktop-cloud-activation-artwork-slot-size);");
     expect(activation).toContain("height: auto;");
     expect(activation).toContain("isolation: isolate;");
-    expect(activation).toContain("filter: drop-shadow(0 12px 18px rgba(68, 78, 92, 0.14));");
-    expect(activation).toContain(".desktop-cloud-activation-overview-art");
-    expect(activation).toContain("object-fit: contain;");
-    expect(activationComponent).toContain("assets/cloud/cloud-homepage-hosting-hero-v1.png");
+    expect(activation).toContain(".desktop-cloud-overview-hosting-art");
+    expect(activation).toContain("color-mix(in srgb, var(--po-text) 32%, transparent)");
+    expect(activation).toContain("color-mix(in srgb, #d6aa50 14%, var(--po-canvas))");
+    expect(activationComponent).toContain("CloudOverviewHostingIllustration");
+    expect(overviewIllustration).toContain('viewBox="0 0 320 260"');
+    expect(overviewIllustration).toContain("desktop-cloud-overview-hosting-cloud");
+    expect(overviewIllustration).toContain("desktop-cloud-overview-hosting-folder");
+    expect(overviewIllustration).toContain("desktop-cloud-overview-hosting-status");
+    expect(overviewIllustration).not.toContain("linearGradient");
     expect(activationComponent).not.toContain("desktop-cloud-activation-overview-cloud");
     expect(activationComponent).not.toContain("desktop-cloud-activation-overview-folder");
+    expect(activationComponent).not.toContain("cloud-homepage-hosting-hero-v1.png");
     expect(activation).not.toContain("desktop-cloud-activation-overview-link");
     expect(activation).not.toContain("grid-template-columns: minmax(0, 1fr) var(--desktop-cloud-activation-artwork-slot-size);");
     expect(activation).not.toContain("grid-template-columns: minmax(0, 430px);");

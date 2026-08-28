@@ -194,8 +194,10 @@ describe("current-repository Cloud navigation", () => {
     ));
     expect(container.querySelector("h1")?.textContent).toBe("Host your project. Keep it available 24/7.");
     expect(container.querySelector(".desktop-cloud-activation-illustration.is-overview")).not.toBeNull();
-    expect(container.querySelector<HTMLImageElement>(".desktop-cloud-activation-overview-art")?.src)
-      .toContain("assets/cloud/cloud-homepage-hosting-hero-v1.png");
+    expect(container.querySelector(".desktop-cloud-overview-hosting-art")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-hosting-cloud")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-hosting-folder")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-hosting-status")).not.toBeNull();
 
     act(() => renderWithTestLocalization(root,
       <CloudSignedOutRoute

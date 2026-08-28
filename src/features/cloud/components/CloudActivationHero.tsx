@@ -8,6 +8,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { McpLogoIcon } from "./McpLogoIcon";
+import { CloudOverviewHostingIllustration } from "./CloudOverviewHostingIllustration";
 import { useId, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
@@ -146,14 +147,7 @@ function CloudActivationIllustration({ kind }: { kind: CloudActivationKind }) {
 function CloudOverviewActivationIllustration() {
   return (
     <div className="desktop-cloud-activation-illustration is-overview" aria-hidden="true">
-      <img
-        className="desktop-cloud-activation-overview-art"
-        src={resolveRendererPublicAssetUrl("assets/cloud/cloud-homepage-hosting-hero-v1.png")}
-        alt=""
-        width={768}
-        height={768}
-        draggable={false}
-      />
+      <CloudOverviewHostingIllustration />
     </div>
   );
 }
