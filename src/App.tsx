@@ -850,17 +850,6 @@ function AppContent() {
         onRemoveProject={removeWorkspaceFromRecents}
         recentWorkspaces={recentWorkspaceItems}
         initialError={restoreWorkspaceError}
-        cornerSlot={(
-          <DesktopHelpLauncher
-            theme={resolvedTheme}
-            lightThemePreset={lightThemePreset}
-            darkThemePreset={darkThemePreset}
-            textSize={textSize}
-            typography={typography}
-            pointerCursors={pointerCursors}
-            diffMarkers={diffMarkers}
-          />
-        )}
         themeMode={activeThemeMode}
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}

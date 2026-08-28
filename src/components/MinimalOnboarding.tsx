@@ -3,9 +3,9 @@ import { AlertTriangle } from "lucide-react";
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type DragEvent as ReactDragEvent,
-  type ReactNode,
 } from "react";
 import {
   createTypographyRootProps,
@@ -34,7 +34,12 @@ import { DesktopWindowDragRegion } from "./DesktopWindowChrome";
 import { OnboardingProjectEntryDialog } from "./OnboardingProjectEntryDialog";
 import { OnboardingBrandLockup } from "./onboarding/OnboardingBrandLockup";
 import { OnboardingEntryActions } from "./onboarding/OnboardingEntryActions";
+import { OnboardingFirstLaunchIntro } from "./onboarding/OnboardingFirstLaunchIntro";
 import { OnboardingProjectList } from "./onboarding/OnboardingProjectList";
+import {
+  markFirstLaunchIntroComplete,
+  shouldShowFirstLaunchIntro,
+} from "./onboarding/firstLaunchIntro";
 import type { OnboardingHomeState } from "./onboarding/types";
 
 export type { ProjectHomeItem, RecentWorkspaceHomeItem } from "../features/app-shell/workspaceHomeModel";
@@ -64,7 +69,6 @@ export type MinimalOnboardingProps = {
   pointerCursors: boolean;
   diffMarkers: DiffMarkers;
   resolvedTheme: "light" | "dark";
-  cornerSlot?: ReactNode;
 };
 
 /** Local repository entrypoint. Cloud is entered from an open repository only. */
@@ -87,7 +91,6 @@ export function MinimalOnboarding({
   pointerCursors,
   diffMarkers,
   resolvedTheme,
-  cornerSlot,
 }: MinimalOnboardingProps) {
   const { t } = useLocalization();
   const [error, setError] = useState<string | null>(initialError);
@@ -185,10 +188,55 @@ export function MinimalOnboarding({
 
   const hasProjects = items.length > 0;
   const onboardingState: OnboardingHomeState = hasProjects ? "projects" : "empty";
+  const [showFirstLaunchIntro, setShowFirstLaunchIntro] = useState(() => (
+    shouldShowFirstLaunchIntro({ hasProjects, storage: window.localStorage })
+  ));
+  const homepageRef = useRef<HTMLElement>(null);
+  const previewingFirstLaunchIntroRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasProjects) return;
+    markFirstLaunchIntroComplete(window.localStorage);
+    setShowFirstLaunchIntro(false);
+  }, [hasProjects]);
+
+  useEffect(() => {
+    if (homepageRef.current) homepageRef.current.inert = showFirstLaunchIntro;
+  }, [showFirstLaunchIntro]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined;
+
+    const replayFirstLaunchIntro = (event: KeyboardEvent) => {
+      if (
+        showFirstLaunchIntro
+        || event.code !== "KeyL"
+        || !event.altKey
+        || !event.shiftKey
+        || event.metaKey
+        || event.ctrlKey
+      ) return;
+
+      event.preventDefault();
+      previewingFirstLaunchIntroRef.current = true;
+      setShowFirstLaunchIntro(true);
+    };
+
+    window.addEventListener("keydown", replayFirstLaunchIntro);
+    return () => window.removeEventListener("keydown", replayFirstLaunchIntro);
+  }, [showFirstLaunchIntro]);
+
+  const completeFirstLaunchIntro = () => {
+    if (!previewingFirstLaunchIntroRef.current) {
+      markFirstLaunchIntroComplete(window.localStorage);
+    }
+    previewingFirstLaunchIntroRef.current = false;
+    setShowFirstLaunchIntro(false);
+  };
 
   return (
     <main
-      className={`onboarding-shell onboarding-homepage-shell ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "dragging" : ""}`}
+      className={`onboarding-shell onboarding-homepage-shell ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "dragging" : ""} ${showFirstLaunchIntro ? "is-first-launch-intro" : ""}`}
       data-onboarding-state={onboardingState}
       data-po-scrollbar="content"
       data-theme-mode={themeMode}
@@ -208,8 +256,10 @@ export function MinimalOnboarding({
     >
       <DesktopWindowDragRegion className="onboarding-titlebar" />
       <section
+        ref={homepageRef}
         className="onboarding-homepage"
         aria-label={t("onboarding.projects.title")}
+        aria-hidden={showFirstLaunchIntro || undefined}
       >
         <OnboardingBrandLockup state={onboardingState} resolvedTheme={resolvedTheme} />
 
@@ -259,7 +309,9 @@ export function MinimalOnboarding({
           onSubmit={(value) => onCloneRepository({ repositoryUrl: value })}
         />
       )}
-      {cornerSlot}
+      {showFirstLaunchIntro && (
+        <OnboardingFirstLaunchIntro onComplete={completeFirstLaunchIntro} />
+      )}
     </main>
   );
 }

@@ -6,6 +6,12 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MinimalOnboarding, type MinimalOnboardingProps } from "../src/components/MinimalOnboarding";
+import { PUPPY_BRAND_MARK_ASSETS } from "../src/components/brand/PuppyBrandMark";
+import {
+  FIRST_LAUNCH_INTRO_DURATION_MS,
+  FIRST_LAUNCH_INTRO_STORAGE_KEY,
+  FIRST_LAUNCH_INTRO_VERSION,
+} from "../src/components/onboarding/firstLaunchIntro";
 import {
   DEFAULT_TYPOGRAPHY_PREFERENCES,
   resolveTypography,
@@ -31,9 +37,76 @@ afterEach(() => {
     configurable: true,
     value: originalConfirm,
   });
+  window.localStorage.clear();
+  vi.useRealTimers();
 });
 
 describe("project folder home", () => {
+  it("plays and persists the first-launch light reveal only for an empty new profile", async () => {
+    vi.useFakeTimers();
+    const container = renderHome();
+
+    expect(container.querySelector("[data-onboarding-first-launch-intro]")).not.toBeNull();
+    expect(container.querySelector(".onboarding-first-launch-reveal")).not.toBeNull();
+    expect(requireSurface(container).classList.contains("is-first-launch-intro")).toBe(true);
+    expect(window.localStorage.getItem(FIRST_LAUNCH_INTRO_STORAGE_KEY)).toBeNull();
+
+    await act(async () => {
+      vi.advanceTimersByTime(FIRST_LAUNCH_INTRO_DURATION_MS + 100);
+    });
+
+    expect(container.querySelector("[data-onboarding-first-launch-intro]")).toBeNull();
+    expect(requireSurface(container).classList.contains("is-first-launch-intro")).toBe(false);
+    expect(window.localStorage.getItem(FIRST_LAUNCH_INTRO_STORAGE_KEY)).toBe(FIRST_LAUNCH_INTRO_VERSION);
+  });
+
+  it("skips the first-launch light reveal after it has been seen", () => {
+    window.localStorage.setItem(FIRST_LAUNCH_INTRO_STORAGE_KEY, FIRST_LAUNCH_INTRO_VERSION);
+    const container = renderHome();
+
+    expect(container.querySelector("[data-onboarding-first-launch-intro]")).toBeNull();
+  });
+
+  it("skips the first-launch light reveal when recent projects already exist", () => {
+    const container = renderHome({
+      projectItems: [{
+        id: "notes",
+        label: "Notes",
+        localPath: "/Users/example/Desktop/Notes",
+        lastOpenedAt: null,
+      }],
+    });
+
+    expect(container.querySelector("[data-onboarding-first-launch-intro]")).toBeNull();
+    expect(window.localStorage.getItem(FIRST_LAUNCH_INTRO_STORAGE_KEY)).toBe(FIRST_LAUNCH_INTRO_VERSION);
+  });
+
+  it("replays the first-launch light reveal from the development preview shortcut", async () => {
+    vi.useFakeTimers();
+    window.localStorage.setItem(FIRST_LAUNCH_INTRO_STORAGE_KEY, FIRST_LAUNCH_INTRO_VERSION);
+    const container = renderHome();
+
+    expect(container.querySelector("[data-onboarding-first-launch-intro]")).toBeNull();
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", {
+        bubbles: true,
+        code: "KeyL",
+        altKey: true,
+        shiftKey: true,
+      }));
+    });
+
+    expect(container.querySelector("[data-onboarding-first-launch-intro]")).not.toBeNull();
+
+    await act(async () => {
+      vi.advanceTimersByTime(FIRST_LAUNCH_INTRO_DURATION_MS + 100);
+    });
+
+    expect(container.querySelector("[data-onboarding-first-launch-intro]")).toBeNull();
+    expect(window.localStorage.getItem(FIRST_LAUNCH_INTRO_STORAGE_KEY)).toBe(FIRST_LAUNCH_INTRO_VERSION);
+  });
+
   it("shows registered projects before neutral entry actions", () => {
     const container = renderHome({
       projectItems: [{
@@ -66,13 +139,13 @@ describe("project folder home", () => {
     expect(projects?.compareDocumentPosition(launcher as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("uses the light onboarding mark only when the resolved theme is light", () => {
+  it("uses Puppy Lite only when the resolved theme is light", () => {
     const container = renderHome({ resolvedTheme: "light" });
 
     expectBrandLockup(
       container,
       "empty",
-      "assets/brand/puppyone-onboarding-light.svg",
+      PUPPY_BRAND_MARK_ASSETS.lite,
     );
   });
 
@@ -495,10 +568,10 @@ function renderHome(overrides: Partial<MinimalOnboardingProps> = {}) {
 function expectBrandLockup(
   container: HTMLElement,
   state: "empty" | "projects" = "empty",
-  expectedMarkAsset = "logo-square.png",
+  expectedMarkAsset = PUPPY_BRAND_MARK_ASSETS.dark,
 ) {
   const lockup = container.querySelector(".onboarding-brand-lockup");
-  const mark = lockup?.querySelector<HTMLImageElement>(".onboarding-brand-mark");
+  const mark = lockup?.querySelector<HTMLImageElement>(".onboarding-brand-mark-artwork");
   expect(mark?.getAttribute("src")).toContain(expectedMarkAsset);
   expect(mark?.getAttribute("alt")).toBe("");
   if (state === "projects") {
