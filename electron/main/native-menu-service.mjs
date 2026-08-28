@@ -105,7 +105,13 @@ export function createDesktopNativeMenuService({
   const createThemePackGroup = () => ({
     label: t("native.menu.theme.pack"),
     submenu: themeState.themes
-      .filter((theme) => theme.id === "default" || theme.targets.length > 1)
+      .filter((theme) => (
+        theme.id === "default"
+        || (
+          theme.id !== "local.puppyone.custom-css"
+          && ["application", "markdown", "csv"].every((target) => theme.targets.includes(target))
+        )
+      ))
       .map((theme) => ({
         id: `theme.pack.${theme.id}`,
         label: theme.name,

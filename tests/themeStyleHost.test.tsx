@@ -42,6 +42,9 @@ describe("renderer CSS theme style host", () => {
       for (const target of ["application", "markdown", "csv"]) {
         expect(css).toContain(`[data-po-theme-surface="${target}"][data-po-theme-id="${id}"]`);
       }
+      if (css.includes(":where(.dark) ")) {
+        expect(css).toContain(`:where(.dark)[data-po-theme-surface="application"][data-po-theme-id="${id}"]`);
+      }
       expect(css).not.toContain("#write");
       expect(css).not.toContain(".typora-");
     }
@@ -71,6 +74,28 @@ describe("renderer CSS theme style host", () => {
 
     expect(getComputedStyle(container.firstElementChild as Element)
       .getPropertyValue("--po-md-content-color").trim()).toBe("#342f29");
+    styles.remove();
+  });
+
+  it("applies dark application tokens when dark mode is on the theme root itself", () => {
+    const css = readFileSync(
+      `${process.cwd()}/packages/shared-ui/src/styles/editor/theme-packs/forest.css`,
+      "utf8",
+    );
+    const styles = document.createElement("style");
+    styles.textContent = css;
+    document.head.append(styles);
+
+    act(() => root.render(
+      <div
+        className="dark"
+        data-po-theme-surface="application"
+        data-po-theme-id="builtin.pack.forest"
+      />,
+    ));
+
+    expect(getComputedStyle(container.firstElementChild as Element)
+      .getPropertyValue("--po-surface-canvas").trim()).toBe("#092d30");
     styles.remove();
   });
   it("merges built-ins with installed themes and injects one style per compiled target", () => {

@@ -831,7 +831,7 @@ function AppContent() {
     <ThemeSurfaceProvider value={themeCatalog.selection}>
       <ThemeStyleHost snapshot={themeCatalog.snapshot} preferences={themeCatalog.selection} />
       <div
-        className="desktop-theme-bootstrap-surface"
+        className={`desktop-theme-bootstrap-surface ${resolvedTheme === "dark" ? "dark" : ""}`}
         data-po-theme-surface="application"
         data-po-theme-id={themeCatalog.selection.application}
       >
@@ -1117,6 +1117,7 @@ function AppContent() {
         />
         <DesktopHelpLauncher
           theme={resolvedTheme}
+          applicationThemeId={themeCatalog.selection.application}
           lightThemePreset={lightThemePreset}
           darkThemePreset={darkThemePreset}
           textSize={textSize}
@@ -1127,6 +1128,7 @@ function AppContent() {
       </DesktopCloudShell>
       <DesktopOverlayPortal
         theme={resolvedTheme}
+        applicationThemeId={themeCatalog.selection.application}
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}
         textSize={textSize}

@@ -44,19 +44,27 @@ export function createThemeService({ userDataPath, shell }) {
   if (!shell || typeof shell.openPath !== "function") {
     throw new TypeError("Electron shell.openPath is required for the theme service.");
   }
-  const themeRoot = path.join(path.resolve(userDataPath), "themes");
+  const resolvedUserDataPath = path.resolve(userDataPath);
+  const themeRoot = path.join(resolvedUserDataPath, "themes");
+  let managedWriteQueue = Promise.resolve();
 
   const ensureRoot = async () => {
+    await mkdir(resolvedUserDataPath, { recursive: true });
+    const canonicalUserDataPath = await realpath(resolvedUserDataPath);
     await mkdir(themeRoot, { recursive: true });
-    return themeRoot;
+    const canonicalThemeRoot = await realpath(themeRoot);
+    if (canonicalThemeRoot !== path.join(canonicalUserDataPath, "themes")) {
+      throw new TypeError("The theme root must remain inside the user-data directory.");
+    }
+    return canonicalThemeRoot;
   };
 
   const listThemes = async () => {
-    await ensureRoot();
+    const canonicalThemeRoot = await ensureRoot();
     const themes = [];
     const diagnostics = [];
     const ids = new Set();
-    const entries = (await readdir(themeRoot, { withFileTypes: true }))
+    const entries = (await readdir(canonicalThemeRoot, { withFileTypes: true }))
       .filter((entry) => !entry.isSymbolicLink())
       .sort((left, right) => left.name.localeCompare(right.name))
       .slice(0, MAX_THEME_ENTRIES);
@@ -64,9 +72,9 @@ export function createThemeService({ userDataPath, shell }) {
     for (const entry of entries) {
       try {
         const theme = entry.isFile() && entry.name.toLowerCase().endsWith(".css")
-          ? await loadStandaloneCssTheme(themeRoot, entry.name)
+          ? await loadStandaloneCssTheme(canonicalThemeRoot, entry.name)
           : entry.isDirectory()
-            ? await loadPackageTheme(path.join(themeRoot, entry.name))
+            ? await loadPackageTheme(path.join(canonicalThemeRoot, entry.name))
             : null;
         if (!theme) continue;
         if (ids.has(theme.id)) {
@@ -77,7 +85,7 @@ export function createThemeService({ userDataPath, shell }) {
       } catch (error) {
         diagnostics.push(Object.freeze({
           source: entry.name,
-          message: sanitizeError(error, themeRoot),
+          message: sanitizeError(error, canonicalThemeRoot),
         }));
       }
     }
@@ -99,8 +107,9 @@ export function createThemeService({ userDataPath, shell }) {
 
   const readCustomCss = async (target) => {
     requireThemeTarget(target);
-    const packageRoot = path.join(themeRoot, CUSTOM_THEME_DIRECTORY);
-    if (!await pathExists(packageRoot)) return Object.freeze({ css: "" });
+    const canonicalThemeRoot = await ensureRoot();
+    const packageRoot = await resolveManagedCustomPackage(canonicalThemeRoot, false);
+    if (!packageRoot) return Object.freeze({ css: "" });
     const source = await resolvePackageFile(packageRoot, ".", `${target}.css`);
     return Object.freeze({
       css: await readBoundedText(source.absolutePath, MAX_CSS_BYTES, "Custom CSS"),
@@ -114,29 +123,29 @@ export function createThemeService({ userDataPath, shell }) {
     if (typeof css !== "string" || Buffer.byteLength(css, "utf8") > MAX_CSS_BYTES) {
       throw new TypeError("Custom CSS exceeds the supported size limit.");
     }
-    const packageRoot = await ensureManagedCustomPackage(themeRoot);
-    await compileThemeFile({
-      css,
-      sourcePath: `${target}.css`,
-      packageRoot,
-      themeId: CUSTOM_THEME_ID,
-      target,
-      budget: createCompilationBudget(),
+    const operation = managedWriteQueue.then(async () => {
+      const canonicalThemeRoot = await ensureRoot();
+      const packageRoot = await ensureManagedCustomPackage(canonicalThemeRoot);
+      await compileThemeFile({
+        css,
+        sourcePath: `${target}.css`,
+        packageRoot,
+        themeId: CUSTOM_THEME_ID,
+        target,
+        budget: createCompilationBudget(),
+      });
+      await writeFileAtomic(packageRoot, `${target}.css`, css);
+      return Object.freeze({ saved: true });
     });
-    await writeFileAtomic(packageRoot, `${target}.css`, css);
-    return Object.freeze({ saved: true });
+    managedWriteQueue = operation.catch(() => undefined);
+    return operation;
   };
 
   return Object.freeze({ listThemes, openDirectory, readCustomCss, saveCustomCss });
 }
 
 async function ensureManagedCustomPackage(themeRoot) {
-  await mkdir(themeRoot, { recursive: true });
-  const canonicalThemeRoot = await realpath(themeRoot);
-  const packageRoot = path.join(canonicalThemeRoot, CUSTOM_THEME_DIRECTORY);
-  await mkdir(packageRoot, { recursive: true });
-  const canonicalPackageRoot = await realpath(packageRoot);
-  requireContainedPath(canonicalThemeRoot, canonicalPackageRoot);
+  const canonicalPackageRoot = await resolveManagedCustomPackage(themeRoot, true);
   await mkdir(path.join(canonicalPackageRoot, "assets"), { recursive: true });
   const manifest = JSON.stringify({
     schemaVersion: 1,
@@ -152,8 +161,26 @@ async function ensureManagedCustomPackage(themeRoot) {
   await Promise.all(themeTargets.map(async (target) => {
     const filename = `${target}.css`;
     const filePath = path.join(canonicalPackageRoot, filename);
-    if (!await pathExists(filePath)) await writeFileAtomic(canonicalPackageRoot, filename, "");
+    try {
+      await writeFile(filePath, "", { encoding: "utf8", flag: "wx" });
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+    }
   }));
+  return canonicalPackageRoot;
+}
+
+async function resolveManagedCustomPackage(canonicalThemeRoot, create) {
+  const expectedPackageRoot = path.join(canonicalThemeRoot, CUSTOM_THEME_DIRECTORY);
+  if (create) {
+    await mkdir(expectedPackageRoot, { recursive: true });
+  } else if (!await pathExists(expectedPackageRoot)) {
+    return null;
+  }
+  const canonicalPackageRoot = await realpath(expectedPackageRoot);
+  if (canonicalPackageRoot !== expectedPackageRoot) {
+    throw new TypeError("The managed theme directory cannot be redirected through a symbolic link.");
+  }
   return canonicalPackageRoot;
 }
 

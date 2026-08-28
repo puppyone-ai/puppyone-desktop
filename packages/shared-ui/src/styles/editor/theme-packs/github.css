@@ -36,6 +36,7 @@
   --po-editable-table-cell-focus-ring: #0969da;
 }
 
+:where(.dark)[data-po-theme-surface="application"][data-po-theme-id="builtin.pack.github"],
 :where(.dark) [data-po-theme-surface="application"][data-po-theme-id="builtin.pack.github"],
 :where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.github"],
 :where(.dark) [data-po-theme-surface="csv"][data-po-theme-id="builtin.pack.github"] {

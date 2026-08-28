@@ -7,6 +7,54 @@ const themeIdPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$/;
 const allowedContainerAtRules = new Set(["media", "supports"]);
 const allowedDataUrlPattern = /^data:(?:image\/(?:png|jpeg|gif|webp|svg\+xml)|font\/(?:woff2?|ttf|otf));/i;
 const rootAliases = [".theme-root", ":root", "html", "body", "#write"];
+const applicationColorTokens = new Set([
+  "--po-surface-canvas",
+  "--po-surface-chrome",
+  "--po-surface-panel",
+  "--po-surface-panel-raised",
+  "--po-surface-overlay",
+  "--po-surface-inset",
+  "--po-surface-editor",
+  "--po-surface-terminal",
+  "--po-canvas",
+  "--po-chrome",
+  "--po-panel",
+  "--po-panel-raised",
+  "--po-overlay",
+  "--po-inset",
+  "--po-header",
+  "--po-sidebar",
+  "--po-control",
+  "--po-control-hover",
+  "--po-text",
+  "--po-text-muted",
+  "--po-text-subtle",
+  "--po-text-disabled",
+  "--po-text-inverse",
+  "--po-border",
+  "--po-border-strong",
+  "--po-border-subtle",
+  "--po-divider",
+  "--po-shell-divider",
+  "--po-header-divider",
+  "--po-sidebar-divider",
+  "--po-hover",
+  "--po-selected",
+  "--po-active",
+  "--po-accent",
+  "--po-accent-text",
+  "--po-focus-ring",
+  "--po-danger",
+  "--po-info",
+  "--po-success",
+  "--po-success-contrast",
+  "--po-warning",
+  "--po-notification",
+  "--po-notification-text",
+  "--po-backdrop",
+  "--po-backdrop-strong",
+  "--po-shadow",
+]);
 
 export async function compileThemeCss({
   css,
@@ -163,6 +211,9 @@ function validateDeclarations(root, target) {
     const value = declaration.value.trim().toLowerCase();
     if (target === "application" && !property.startsWith("--po-")) {
       throw new TypeError("Application themes may only declare root-level --po-* tokens.");
+    }
+    if (target === "application" && !applicationColorTokens.has(property)) {
+      throw new TypeError("Application themes may only declare public color tokens.");
     }
     if (property === "position" && value === "fixed") {
       throw new TypeError("Theme CSS cannot use fixed positioning.");

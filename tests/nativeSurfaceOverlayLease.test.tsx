@@ -83,4 +83,20 @@ describe("native surface overlay lease", () => {
       expect(publish).toHaveBeenLastCalledWith({ occluded: false });
     });
   });
+
+  it("marks the overlay root with the effective application theme", async () => {
+    act(() => root?.render(
+      <DesktopOverlayPortal theme="dark" applicationThemeId="builtin.pack.forest">
+        Overlay host
+      </DesktopOverlayPortal>,
+    ));
+    await act(async () => { await Promise.resolve(); });
+
+    const overlayRoot = document.querySelector<HTMLElement>("#desktop-overlay-root");
+    expect(overlayRoot).toMatchObject({
+      className: "desktop-overlay-root dark",
+    });
+    expect(overlayRoot?.dataset.poThemeSurface).toBe("application");
+    expect(overlayRoot?.dataset.poThemeId).toBe("builtin.pack.forest");
+  });
 });

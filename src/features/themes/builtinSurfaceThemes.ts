@@ -1,5 +1,8 @@
 import type { DesktopThemeSnapshot } from "../../types/electron";
 import type { ThemeCatalogSnapshot, ThemeDefinition } from "./themeTypes";
+import { CUSTOM_CSS_THEME_ID } from "./themePreferences";
+
+const PACK_TARGETS = ["application", "markdown", "csv"] as const;
 
 export const BUILTIN_SURFACE_THEMES: readonly ThemeDefinition[] = Object.freeze([
   defineBuiltin({
@@ -78,7 +81,13 @@ export function getThemesForTarget(
 }
 
 export function getThemePacks(snapshot: ThemeCatalogSnapshot): readonly ThemeDefinition[] {
-  return snapshot.themes.filter((theme) => theme.id === "default" || theme.targets.length > 1);
+  return snapshot.themes.filter((theme) => (
+    theme.id === "default"
+    || (
+      theme.id !== CUSTOM_CSS_THEME_ID
+      && PACK_TARGETS.every((target) => theme.targets.includes(target))
+    )
+  ));
 }
 
 function defineBuiltin({

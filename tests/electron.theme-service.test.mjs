@@ -149,6 +149,55 @@ describe("host-owned CSS theme service", () => {
     )).toBe(validCss);
   });
 
+  it("rejects managed Custom CSS roots redirected through symlinks", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const themeRoot = path.join(userDataPath, "themes");
+    const outside = await createTemporaryDirectory();
+    await mkdir(themeRoot, { recursive: true });
+    await writeFile(path.join(outside, "markdown.css"), "body { color: red }", "utf8");
+    await symlink(outside, path.join(themeRoot, "puppyone-custom-css"));
+
+    const service = createThemeService({ userDataPath, shell: createShell() });
+
+    await expect(service.readCustomCss("markdown")).rejects.toThrow("managed theme directory");
+    await expect(service.saveCustomCss({ target: "markdown", css: "body { color: blue }" }))
+      .rejects.toThrow("managed theme directory");
+    expect(await readFile(path.join(outside, "markdown.css"), "utf8"))
+      .toBe("body { color: red }");
+  });
+
+  it("rejects a user-data theme root redirected through a symlink", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const outside = await createTemporaryDirectory();
+    await symlink(outside, path.join(userDataPath, "themes"));
+
+    const service = createThemeService({ userDataPath, shell: createShell() });
+
+    await expect(service.listThemes()).rejects.toThrow("theme root");
+    await expect(service.saveCustomCss({ target: "markdown", css: "body { color: blue }" }))
+      .rejects.toThrow("theme root");
+    await expect(readFile(path.join(outside, "markdown.css"), "utf8"))
+      .rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("preserves every target during concurrent first saves", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const service = createThemeService({ userDataPath, shell: createShell() });
+    const sources = {
+      application: ".theme-root { --po-accent: #2563eb }",
+      markdown: "body { color: #334155 }",
+      csv: ".theme-root { --po-csv-surface-color: #0f172a }",
+    };
+
+    await Promise.all(Object.entries(sources).map(([target, css]) => (
+      service.saveCustomCss({ target, css })
+    )));
+
+    await expect(service.readCustomCss("application")).resolves.toEqual({ css: sources.application });
+    await expect(service.readCustomCss("markdown")).resolves.toEqual({ css: sources.markdown });
+    await expect(service.readCustomCss("csv")).resolves.toEqual({ css: sources.csv });
+  });
+
   it("rejects manifest entrypoint symlinks that escape a package", async () => {
     const userDataPath = await createTemporaryDirectory();
     const themeRoot = path.join(userDataPath, "themes");

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CUSTOM_CSS_THEME_ID,
   DEFAULT_SURFACE_THEME_PREFERENCES,
   parseSurfaceThemePreferences,
   resolveSurfaceThemeSelection,
@@ -7,6 +8,7 @@ import {
   serializeSurfaceThemePreferences,
   updateSurfaceThemeOverride,
 } from "../src/features/themes/themePreferences";
+import { getThemePacks } from "../src/features/themes/builtinSurfaceThemes";
 import type { ThemeCatalogSnapshot, ThemeDefinition } from "../src/features/themes/themeTypes";
 
 describe("surface theme preferences", () => {
@@ -121,6 +123,20 @@ describe("surface theme preferences", () => {
       markdown: "default",
       csv: "default",
     });
+  });
+
+  it("keeps managed Custom CSS and incomplete packages out of the primary pack list", () => {
+    const snapshot = catalog([
+      theme("default", ["application", "markdown", "csv"], ["light", "dark"]),
+      theme("com.example.complete", ["application", "markdown", "csv"], ["light", "dark"]),
+      theme("com.example.partial", ["markdown", "csv"], ["light", "dark"]),
+      theme(CUSTOM_CSS_THEME_ID, ["application", "markdown", "csv"], ["light", "dark"]),
+    ]);
+
+    expect(getThemePacks(snapshot).map((item) => item.id)).toEqual([
+      "default",
+      "com.example.complete",
+    ]);
   });
 });
 

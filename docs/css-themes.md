@@ -66,9 +66,9 @@ Use a directory containing `theme.json` to name a theme and target more than one
 }
 ```
 
-An entrypoint may target any subset of `application`, `markdown`, and `csv`; `targets` and `entrypoints` must match. Packages with multiple targets appear in the primary Theme Pack selector. Single-target packages remain available as Advanced overrides. Theme IDs use a lowercase reverse-domain form with at least three segments.
+An entrypoint may target any subset of `application`, `markdown`, and `csv`; `targets` and `entrypoints` must match. Packages that cover all three targets appear in the primary Theme Pack selector. Partial packages and managed Custom CSS remain available only as Advanced overrides. Theme IDs use a lowercase reverse-domain form with at least three segments.
 
-Application themes customize product tokens from their scoped root; arbitrary application selectors are intentionally not accepted:
+Application themes customize the public color-token allowlist from their scoped root; arbitrary application selectors and structural typography, cursor, density, and layout tokens are intentionally not accepted:
 
 ```css
 .theme-root {

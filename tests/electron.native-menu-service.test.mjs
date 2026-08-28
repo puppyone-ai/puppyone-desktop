@@ -112,6 +112,7 @@ describe("DesktopNativeMenuService", () => {
       themes: [
         { id: "default", name: "Default", targets: ["application", "markdown", "csv"] },
         { id: "builtin.pack.forest", name: "Forest", targets: ["application", "markdown", "csv"] },
+        { id: "local.puppyone.custom-css", name: "My Custom CSS", targets: ["application", "markdown", "csv"] },
         { id: "builtin.markdown.newsprint", name: "Newsprint", targets: ["markdown"] },
         { id: "builtin.csv.ledger", name: "Ledger", targets: ["csv"] },
       ],
@@ -126,6 +127,8 @@ describe("DesktopNativeMenuService", () => {
     ]);
     expect(themeMenu.submenu[0].submenu.find((item) => item.label === "Forest"))
       .toMatchObject({ type: "radio", checked: true });
+    expect(themeMenu.submenu[0].submenu.find((item) => item.label === "My Custom CSS"))
+      .toBeUndefined();
     const customize = themeMenu.submenu[1].submenu;
     expect(customize[1].submenu.find((item) => item.label === "Newsprint"))
       .toMatchObject({ type: "radio", checked: true });

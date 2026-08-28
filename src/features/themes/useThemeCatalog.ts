@@ -17,7 +17,7 @@ const EMPTY_HOST_SNAPSHOT: DesktopThemeSnapshot = Object.freeze({
 
 export type ThemeCatalogController = ThemeCatalogState & Readonly<{
   selection: SurfaceThemeSelection;
-  reload: () => Promise<void>;
+  reload: () => Promise<ThemeCatalogState["snapshot"] | null>;
   openDirectory: () => Promise<{ opened: boolean }>;
   readCustomCss: (target: ThemeTarget) => Promise<string>;
   saveCustomCss: (target: ThemeTarget, css: string) => Promise<boolean>;
@@ -73,16 +73,18 @@ export function useThemeCatalog(options: {
   }, [desktopThemes]);
 
   const reload = useCallback(async () => {
-    if (!desktopThemes) return;
+    if (!desktopThemes) return null;
     try {
-      const snapshot = await desktopThemes.reload();
-      setState({ snapshot: createThemeCatalogSnapshot(snapshot), status: "ready", error: null });
+      const snapshot = createThemeCatalogSnapshot(await desktopThemes.reload());
+      setState({ snapshot, status: "ready", error: null });
+      return snapshot;
     } catch (error) {
       setState((current) => ({
         ...current,
         status: "error",
         error: error instanceof Error ? error.message : String(error),
       }));
+      return null;
     }
   }, [desktopThemes]);
 
@@ -124,7 +126,20 @@ export function useThemeCatalog(options: {
     if (!desktopThemes?.saveCustomCss) return false;
     try {
       await desktopThemes.saveCustomCss({ target, css });
-      await reload();
+      const snapshot = await reload();
+      if (!snapshot) return false;
+      const customTheme = snapshot.themes.find((theme) => theme.id === "local.puppyone.custom-css");
+      if (
+        !customTheme?.targets.includes(target)
+        || !Object.prototype.hasOwnProperty.call(customTheme.compiledCss, target)
+      ) {
+        setState((current) => ({
+          ...current,
+          status: "error",
+          error: "Custom CSS was saved but could not be loaded. Check the theme diagnostics.",
+        }));
+        return false;
+      }
       return true;
     } catch (error) {
       setState((current) => ({

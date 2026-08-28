@@ -109,5 +109,11 @@ describe("CSS theme compiler", () => {
       themeId: "com.example.graphite",
       target: "application",
     })).rejects.toThrow("Application themes may only declare root-level --po-* tokens");
+
+    await expect(compileThemeCss({
+      css: ".theme-root { --po-font-ui: Papyrus; --po-clickable-cursor: crosshair }",
+      themeId: "com.example.graphite",
+      target: "application",
+    })).rejects.toThrow("Application themes may only declare public color tokens");
   });
 });

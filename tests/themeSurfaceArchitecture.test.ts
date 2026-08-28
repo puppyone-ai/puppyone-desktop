@@ -14,10 +14,12 @@ describe("scoped content theme surfaces", () => {
     expect(context).toContain("useThemeSurfaceId");
     expect(app).toContain("<ThemeSurfaceProvider");
     expect(app).toContain("desktop-theme-bootstrap-surface");
+    expect(app).toContain('className={`desktop-theme-bootstrap-surface ${resolvedTheme === "dark" ? "dark" : ""}`}');
     expect(app).toContain("themeRuntime(");
     expect(app).toContain('data-po-theme-surface="application"');
     expect(app).toContain("<ThemeSurfaceProvider value={themeCatalog.selection}>");
     expect(app).toContain("data-po-theme-id={themeCatalog.selection.application}");
+    expect(app).toContain("applicationThemeId={themeCatalog.selection.application}");
     expect(markdown).toContain('data-po-theme-surface="markdown"');
     expect(markdown).toContain("data-po-theme-id={themeId}");
     expect(csv).toContain('data-po-theme-surface="csv"');

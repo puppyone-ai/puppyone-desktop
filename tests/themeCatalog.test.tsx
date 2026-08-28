@@ -139,7 +139,7 @@ describe("renderer theme catalog", () => {
   });
 
   it("loads and saves managed Custom CSS through the catalog controller", async () => {
-    const reload = vi.fn(async () => ({ themes: [], diagnostics: [] }));
+    const reload = vi.fn(async () => customCssSnapshot());
     const readCustomCss = vi.fn(async () => ({ css: "body { color: teal }" }));
     const saveCustomCss = vi.fn(async () => ({ saved: true as const }));
     window.puppyoneDesktop = {
@@ -162,6 +162,57 @@ describe("renderer theme catalog", () => {
     expect(readCustomCss).toHaveBeenCalledWith("markdown");
     expect(saveCustomCss).toHaveBeenCalledWith({ target: "markdown", css: "body { color: navy }" });
     expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it("does not report Custom CSS as applied when reload fails", async () => {
+    window.puppyoneDesktop = {
+      themes: {
+        list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
+        reload: vi.fn(async () => { throw new Error("reload failed"); }),
+        openDirectory: vi.fn(async () => ({ opened: true as const })),
+        saveCustomCss: vi.fn(async () => ({ saved: true as const })),
+      },
+    } as typeof window.puppyoneDesktop;
+    await act(async () => {
+      root.render(<Harness />);
+      await Promise.resolve();
+    });
+
+    let saved = true;
+    await act(async () => {
+      saved = await latest!.saveCustomCss("markdown", "body { color: navy }");
+    });
+
+    expect(saved).toBe(false);
+    expect(latest?.status).toBe("error");
+    expect(latest?.error).toBe("reload failed");
+  });
+
+  it("does not report Custom CSS as applied when the reloaded catalog rejects it", async () => {
+    window.puppyoneDesktop = {
+      themes: {
+        list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
+        reload: vi.fn(async () => ({
+          themes: [],
+          diagnostics: [{ source: "puppyone-custom-css", message: "invalid package" }],
+        })),
+        openDirectory: vi.fn(async () => ({ opened: true as const })),
+        saveCustomCss: vi.fn(async () => ({ saved: true as const })),
+      },
+    } as typeof window.puppyoneDesktop;
+    await act(async () => {
+      root.render(<Harness />);
+      await Promise.resolve();
+    });
+
+    let saved = true;
+    await act(async () => {
+      saved = await latest!.saveCustomCss("markdown", "body { color: navy }");
+    });
+
+    expect(saved).toBe(false);
+    expect(latest?.status).toBe("error");
+    expect(latest?.error).toContain("could not be loaded");
   });
 
   it("syncs theme intent to the native menu and routes pack or override requests", async () => {
@@ -252,6 +303,21 @@ function snapshot(id: string): DesktopThemeSnapshot {
       targets: ["markdown"],
       source: "local-package",
       compiledCss: { markdown: `[data-po-theme-id="${id}"] { color: red }` },
+    }],
+    diagnostics: [],
+  };
+}
+
+function customCssSnapshot(): DesktopThemeSnapshot {
+  return {
+    themes: [{
+      id: "local.puppyone.custom-css",
+      name: "My Custom CSS",
+      version: "1.0.0",
+      modes: ["light", "dark"],
+      targets: ["application", "markdown", "csv"],
+      source: "local-package",
+      compiledCss: { application: "", markdown: "", csv: "" },
     }],
     diagnostics: [],
   };
