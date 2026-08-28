@@ -5,15 +5,15 @@ import {
   type AnimationEvent,
 } from "react";
 import {
-  FIRST_LAUNCH_INTRO_FALLBACK_TIMEOUT_MS,
-  FIRST_LAUNCH_INTRO_REDUCED_MOTION_DURATION_MS,
-} from "./firstLaunchIntro";
+  EMPTY_STATE_INTRO_FALLBACK_TIMEOUT_MS,
+  EMPTY_STATE_INTRO_REDUCED_MOTION_DURATION_MS,
+} from "./emptyStateIntro";
 
-type OnboardingFirstLaunchIntroProps = {
+type OnboardingEmptyStateIntroProps = {
   onComplete: () => void;
 };
 
-export function OnboardingFirstLaunchIntro({ onComplete }: OnboardingFirstLaunchIntroProps) {
+export function OnboardingEmptyStateIntro({ onComplete }: OnboardingEmptyStateIntroProps) {
   const completedRef = useRef(false);
 
   const complete = useCallback(() => {
@@ -25,8 +25,8 @@ export function OnboardingFirstLaunchIntro({ onComplete }: OnboardingFirstLaunch
   useEffect(() => {
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const duration = reducedMotion
-      ? FIRST_LAUNCH_INTRO_REDUCED_MOTION_DURATION_MS
-      : FIRST_LAUNCH_INTRO_FALLBACK_TIMEOUT_MS;
+      ? EMPTY_STATE_INTRO_REDUCED_MOTION_DURATION_MS
+      : EMPTY_STATE_INTRO_FALLBACK_TIMEOUT_MS;
     const fallback = window.setTimeout(complete, duration);
     return () => window.clearTimeout(fallback);
   }, [complete]);
@@ -38,12 +38,12 @@ export function OnboardingFirstLaunchIntro({ onComplete }: OnboardingFirstLaunch
 
   return (
     <div
-      className="onboarding-first-launch-intro"
-      data-onboarding-first-launch-intro=""
+      className="onboarding-empty-state-intro"
+      data-onboarding-empty-state-intro=""
       aria-hidden="true"
       onAnimationEnd={finishAnimation}
     >
-      <span className="onboarding-first-launch-reveal" />
+      <span className="onboarding-empty-state-reveal" />
     </div>
   );
 }

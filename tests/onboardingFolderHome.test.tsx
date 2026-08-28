@@ -8,10 +8,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MinimalOnboarding, type MinimalOnboardingProps } from "../src/components/MinimalOnboarding";
 import { PUPPY_BRAND_MARK_ASSETS } from "../src/components/brand/PuppyBrandMark";
 import {
-  FIRST_LAUNCH_INTRO_FALLBACK_TIMEOUT_MS,
-  FIRST_LAUNCH_INTRO_STORAGE_KEY,
-  FIRST_LAUNCH_INTRO_VERSION,
-} from "../src/components/onboarding/firstLaunchIntro";
+  EMPTY_STATE_INTRO_FALLBACK_TIMEOUT_MS,
+} from "../src/components/onboarding/emptyStateIntro";
 import {
   DEFAULT_TYPOGRAPHY_PREFERENCES,
   resolveTypography,
@@ -42,35 +40,33 @@ afterEach(() => {
 });
 
 describe("project folder home", () => {
-  it("plays and persists the first-launch light reveal only for an empty new profile", async () => {
+  it("plays the reveal whenever project home mounts empty", async () => {
     vi.useFakeTimers();
     const container = renderHome();
 
-    const intro = container.querySelector<HTMLElement>("[data-onboarding-first-launch-intro]");
-    const reveal = intro?.querySelector(".onboarding-first-launch-reveal");
+    const intro = container.querySelector<HTMLElement>("[data-onboarding-empty-state-intro]");
+    const reveal = intro?.querySelector(".onboarding-empty-state-reveal");
     expect(intro).not.toBeNull();
     expect(reveal).not.toBeNull();
     expect([...intro!.children]).toEqual([reveal]);
-    expect(requireSurface(container).classList.contains("is-first-launch-intro")).toBe(true);
-    expect(window.localStorage.getItem(FIRST_LAUNCH_INTRO_STORAGE_KEY)).toBeNull();
+    expect(requireSurface(container).classList.contains("is-empty-state-intro")).toBe(true);
 
     await act(async () => {
-      vi.advanceTimersByTime(FIRST_LAUNCH_INTRO_FALLBACK_TIMEOUT_MS + 100);
+      vi.advanceTimersByTime(EMPTY_STATE_INTRO_FALLBACK_TIMEOUT_MS + 100);
     });
 
-    expect(container.querySelector("[data-onboarding-first-launch-intro]")).toBeNull();
-    expect(requireSurface(container).classList.contains("is-first-launch-intro")).toBe(false);
-    expect(window.localStorage.getItem(FIRST_LAUNCH_INTRO_STORAGE_KEY)).toBe(FIRST_LAUNCH_INTRO_VERSION);
+    expect(container.querySelector("[data-onboarding-empty-state-intro]")).toBeNull();
+    expect(requireSurface(container).classList.contains("is-empty-state-intro")).toBe(false);
   });
 
-  it("skips the first-launch light reveal after it has been seen", () => {
-    window.localStorage.setItem(FIRST_LAUNCH_INTRO_STORAGE_KEY, FIRST_LAUNCH_INTRO_VERSION);
+  it("ignores the legacy first-launch marker while project home is empty", () => {
+    window.localStorage.setItem("puppyone.desktop.onboardingIntro", "1");
     const container = renderHome();
 
-    expect(container.querySelector("[data-onboarding-first-launch-intro]")).toBeNull();
+    expect(container.querySelector("[data-onboarding-empty-state-intro]")).not.toBeNull();
   });
 
-  it("skips the first-launch light reveal when recent projects already exist", () => {
+  it("skips the empty-state reveal when recent projects already exist", () => {
     const container = renderHome({
       projectItems: [{
         id: "notes",
@@ -80,16 +76,21 @@ describe("project folder home", () => {
       }],
     });
 
-    expect(container.querySelector("[data-onboarding-first-launch-intro]")).toBeNull();
-    expect(window.localStorage.getItem(FIRST_LAUNCH_INTRO_STORAGE_KEY)).toBe(FIRST_LAUNCH_INTRO_VERSION);
+    expect(container.querySelector("[data-onboarding-empty-state-intro]")).toBeNull();
   });
 
-  it("replays the first-launch light reveal from the development preview shortcut", async () => {
+  it("replays the empty-state reveal from the development preview shortcut", async () => {
     vi.useFakeTimers();
-    window.localStorage.setItem(FIRST_LAUNCH_INTRO_STORAGE_KEY, FIRST_LAUNCH_INTRO_VERSION);
-    const container = renderHome();
+    const container = renderHome({
+      projectItems: [{
+        id: "notes",
+        label: "Notes",
+        localPath: "/Users/example/Desktop/Notes",
+        lastOpenedAt: null,
+      }],
+    });
 
-    expect(container.querySelector("[data-onboarding-first-launch-intro]")).toBeNull();
+    expect(container.querySelector("[data-onboarding-empty-state-intro]")).toBeNull();
 
     act(() => {
       window.dispatchEvent(new KeyboardEvent("keydown", {
@@ -100,14 +101,13 @@ describe("project folder home", () => {
       }));
     });
 
-    expect(container.querySelector("[data-onboarding-first-launch-intro]")).not.toBeNull();
+    expect(container.querySelector("[data-onboarding-empty-state-intro]")).not.toBeNull();
 
     await act(async () => {
-      vi.advanceTimersByTime(FIRST_LAUNCH_INTRO_FALLBACK_TIMEOUT_MS + 100);
+      vi.advanceTimersByTime(EMPTY_STATE_INTRO_FALLBACK_TIMEOUT_MS + 100);
     });
 
-    expect(container.querySelector("[data-onboarding-first-launch-intro]")).toBeNull();
-    expect(window.localStorage.getItem(FIRST_LAUNCH_INTRO_STORAGE_KEY)).toBe(FIRST_LAUNCH_INTRO_VERSION);
+    expect(container.querySelector("[data-onboarding-empty-state-intro]")).toBeNull();
   });
 
   it("shows registered projects before neutral entry actions", () => {

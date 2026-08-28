@@ -33,13 +33,9 @@ import type {
 import { DesktopWindowDragRegion } from "./DesktopWindowChrome";
 import { OnboardingProjectEntryDialog } from "./OnboardingProjectEntryDialog";
 import { OnboardingBrandLockup } from "./onboarding/OnboardingBrandLockup";
+import { OnboardingEmptyStateIntro } from "./onboarding/OnboardingEmptyStateIntro";
 import { OnboardingEntryActions } from "./onboarding/OnboardingEntryActions";
-import { OnboardingFirstLaunchIntro } from "./onboarding/OnboardingFirstLaunchIntro";
 import { OnboardingProjectList } from "./onboarding/OnboardingProjectList";
-import {
-  markFirstLaunchIntroComplete,
-  shouldShowFirstLaunchIntro,
-} from "./onboarding/firstLaunchIntro";
 import type { OnboardingHomeState } from "./onboarding/types";
 
 export type { ProjectHomeItem, RecentWorkspaceHomeItem } from "../features/app-shell/workspaceHomeModel";
@@ -188,28 +184,23 @@ export function MinimalOnboarding({
 
   const hasProjects = items.length > 0;
   const onboardingState: OnboardingHomeState = hasProjects ? "projects" : "empty";
-  const [showFirstLaunchIntro, setShowFirstLaunchIntro] = useState(() => (
-    shouldShowFirstLaunchIntro({ hasProjects, storage: window.localStorage })
-  ));
+  const [showEmptyStateIntro, setShowEmptyStateIntro] = useState(() => !hasProjects);
   const homepageRef = useRef<HTMLElement>(null);
-  const previewingFirstLaunchIntroRef = useRef(false);
 
   useEffect(() => {
-    if (!hasProjects) return;
-    markFirstLaunchIntroComplete(window.localStorage);
-    setShowFirstLaunchIntro(false);
+    setShowEmptyStateIntro(!hasProjects);
   }, [hasProjects]);
 
   useEffect(() => {
-    if (homepageRef.current) homepageRef.current.inert = showFirstLaunchIntro;
-  }, [showFirstLaunchIntro]);
+    if (homepageRef.current) homepageRef.current.inert = showEmptyStateIntro;
+  }, [showEmptyStateIntro]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return undefined;
 
-    const replayFirstLaunchIntro = (event: KeyboardEvent) => {
+    const replayEmptyStateIntro = (event: KeyboardEvent) => {
       if (
-        showFirstLaunchIntro
+        showEmptyStateIntro
         || event.code !== "KeyL"
         || !event.altKey
         || !event.shiftKey
@@ -218,25 +209,18 @@ export function MinimalOnboarding({
       ) return;
 
       event.preventDefault();
-      previewingFirstLaunchIntroRef.current = true;
-      setShowFirstLaunchIntro(true);
+      setShowEmptyStateIntro(true);
     };
 
-    window.addEventListener("keydown", replayFirstLaunchIntro);
-    return () => window.removeEventListener("keydown", replayFirstLaunchIntro);
-  }, [showFirstLaunchIntro]);
+    window.addEventListener("keydown", replayEmptyStateIntro);
+    return () => window.removeEventListener("keydown", replayEmptyStateIntro);
+  }, [showEmptyStateIntro]);
 
-  const completeFirstLaunchIntro = () => {
-    if (!previewingFirstLaunchIntroRef.current) {
-      markFirstLaunchIntroComplete(window.localStorage);
-    }
-    previewingFirstLaunchIntroRef.current = false;
-    setShowFirstLaunchIntro(false);
-  };
+  const completeEmptyStateIntro = () => setShowEmptyStateIntro(false);
 
   return (
     <main
-      className={`onboarding-shell onboarding-homepage-shell ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "dragging" : ""} ${showFirstLaunchIntro ? "is-first-launch-intro" : ""}`}
+      className={`onboarding-shell onboarding-homepage-shell ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "dragging" : ""} ${showEmptyStateIntro ? "is-empty-state-intro" : ""}`}
       data-onboarding-state={onboardingState}
       data-po-scrollbar="content"
       data-theme-mode={themeMode}
@@ -259,7 +243,7 @@ export function MinimalOnboarding({
         ref={homepageRef}
         className="onboarding-homepage"
         aria-label={t("onboarding.projects.title")}
-        aria-hidden={showFirstLaunchIntro || undefined}
+        aria-hidden={showEmptyStateIntro || undefined}
       >
         <OnboardingBrandLockup state={onboardingState} resolvedTheme={resolvedTheme} />
 
@@ -309,8 +293,8 @@ export function MinimalOnboarding({
           onSubmit={(value) => onCloneRepository({ repositoryUrl: value })}
         />
       )}
-      {showFirstLaunchIntro && (
-        <OnboardingFirstLaunchIntro onComplete={completeFirstLaunchIntro} />
+      {showEmptyStateIntro && (
+        <OnboardingEmptyStateIntro onComplete={completeEmptyStateIntro} />
       )}
     </main>
   );

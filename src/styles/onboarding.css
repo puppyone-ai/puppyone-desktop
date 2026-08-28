@@ -82,7 +82,7 @@
 }
 
 .onboarding-brand-mark {
-  --onboarding-brand-border: color-mix(in srgb, var(--po-text-subtle) 65%, transparent);
+  --onboarding-brand-border: color-mix(in srgb, var(--po-text-muted) 38%, transparent);
   display: grid;
   box-sizing: border-box;
   width: 40px;
@@ -92,7 +92,7 @@
   overflow: hidden;
   border: 1px solid var(--onboarding-brand-border);
   border-radius: 10px;
-  color: var(--po-text-subtle);
+  color: var(--po-text-muted);
 }
 
 .onboarding-brand-mark-artwork {

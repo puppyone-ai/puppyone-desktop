@@ -1,0 +1,124 @@
+/*
+ * The empty-state animation is intentionally independent from homepage
+ * layout. The aperture breathes before it expands; homepage chrome and
+ * content enter only after the opening is large enough to frame them.
+ */
+.onboarding-homepage-shell {
+  --onboarding-empty-state-breathe-duration: 1300ms;
+  --onboarding-empty-state-reveal-duration: 1150ms;
+  --onboarding-empty-state-settle-duration: 250ms;
+  --onboarding-empty-state-content-lag: 160ms;
+  --onboarding-empty-state-content-duration: 620ms;
+}
+
+.onboarding-empty-state-intro {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  overflow: hidden;
+  isolation: isolate;
+  cursor: default;
+  animation: onboarding-empty-state-intro-complete
+    calc(
+      var(--onboarding-empty-state-breathe-duration)
+      + var(--onboarding-empty-state-reveal-duration)
+      + var(--onboarding-empty-state-settle-duration)
+    )
+    linear
+    both;
+}
+
+@property --onboarding-empty-state-radius {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.onboarding-empty-state-reveal {
+  position: absolute;
+  inset: 0;
+  --onboarding-empty-state-radius: 0px;
+  background: #000;
+  pointer-events: none;
+  backface-visibility: hidden;
+  -webkit-mask-image: radial-gradient(
+    circle at 50% 50%,
+    transparent 0 var(--onboarding-empty-state-radius),
+    #000 calc(var(--onboarding-empty-state-radius) + 1px)
+  );
+  mask-image: radial-gradient(
+    circle at 50% 50%,
+    transparent 0 var(--onboarding-empty-state-radius),
+    #000 calc(var(--onboarding-empty-state-radius) + 1px)
+  );
+  will-change: mask-image;
+  animation:
+    onboarding-empty-state-breathe
+      var(--onboarding-empty-state-breathe-duration)
+      ease-in-out
+      both,
+    onboarding-empty-state-reveal
+      var(--onboarding-empty-state-reveal-duration)
+      cubic-bezier(0.2, 0.7, 0.2, 1)
+      var(--onboarding-empty-state-breathe-duration)
+      forwards;
+}
+
+.onboarding-homepage-shell.dark .onboarding-empty-state-reveal {
+  background: #fff;
+}
+
+.onboarding-homepage-shell.is-empty-state-intro > .onboarding-titlebar,
+.onboarding-homepage-shell.is-empty-state-intro > .onboarding-homepage {
+  opacity: 0;
+  will-change: opacity;
+  animation: onboarding-empty-state-content-enter
+    var(--onboarding-empty-state-content-duration)
+    cubic-bezier(0.2, 0.7, 0.2, 1)
+    calc(
+      var(--onboarding-empty-state-breathe-duration)
+      + var(--onboarding-empty-state-content-lag)
+    )
+    forwards;
+}
+
+@keyframes onboarding-empty-state-breathe {
+  0%,
+  48%,
+  100% {
+    --onboarding-empty-state-radius: 7px;
+  }
+  23% {
+    --onboarding-empty-state-radius: 10px;
+  }
+  72% {
+    --onboarding-empty-state-radius: 10.5px;
+  }
+}
+
+@keyframes onboarding-empty-state-reveal {
+  from {
+    --onboarding-empty-state-radius: 7px;
+  }
+  to {
+    --onboarding-empty-state-radius: 75vmax;
+  }
+}
+
+@keyframes onboarding-empty-state-intro-complete {
+  from {
+    visibility: visible;
+  }
+  to {
+    visibility: visible;
+  }
+}
+
+@keyframes onboarding-empty-state-content-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
