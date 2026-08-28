@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { act } from "react";
+import { readFileSync } from "node:fs";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ThemeStyleHost } from "../src/features/themes/ThemeStyleHost";
@@ -24,6 +25,32 @@ afterEach(() => {
 });
 
 describe("renderer CSS theme style host", () => {
+  it("lets scoped built-in theme tokens override editor defaults", () => {
+    const defaultCss = readFileSync(
+      `${process.cwd()}/packages/shared-ui/src/styles/editor/markdown-content.css`,
+      "utf8",
+    );
+    const themeCss = readFileSync(
+      `${process.cwd()}/packages/shared-ui/src/styles/editor/content-themes.css`,
+      "utf8",
+    );
+    const styles = document.createElement("style");
+    styles.dataset.testThemeCascade = "true";
+    styles.textContent = `${defaultCss}\n${themeCss}`;
+    document.head.append(styles);
+
+    act(() => root.render(
+      <div
+        className="markdown-codemirror-editor"
+        data-po-theme-surface="markdown"
+        data-po-theme-id="builtin.markdown.newsprint"
+      />,
+    ));
+
+    expect(getComputedStyle(container.firstElementChild as Element)
+      .getPropertyValue("--po-md-content-color").trim()).toBe("#342f29");
+    styles.remove();
+  });
   it("merges built-ins with installed themes and injects one style per compiled target", () => {
     const installed = externalTheme({
       id: "com.example.combo",

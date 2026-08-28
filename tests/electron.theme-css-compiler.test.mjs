@@ -13,7 +13,7 @@ describe("CSS theme compiler", () => {
       target: "markdown",
     });
 
-    const host = ':where([data-po-theme-surface="markdown"][data-po-theme-id="com.example.newsprint"])';
+    const host = '[data-po-theme-surface="markdown"][data-po-theme-id="com.example.newsprint"]';
     expect(result.css).toContain(`${host} { --text-color: #222; }`);
     expect(result.css).toContain(`${host}, ${host}, ${host} { color: var(--text-color); }`);
     expect(result.css).toContain(`${host} h1, ${host} h2 { font-family: Georgia, serif; }`);
@@ -58,6 +58,21 @@ describe("CSS theme compiler", () => {
     expect(result.css).toContain("strong");
     expect(result.css).toContain("data:font/woff2;base64,Zm9udA==");
     expect(result.css).not.toContain("@import");
+  });
+
+  it("accepts local url() imports and strips harmless charset declarations", async () => {
+    const loadImport = vi.fn(async () => "body { color: #222 }");
+    const result = await compileThemeCss({
+      css: '@charset "UTF-8"; @import url(./shared.css);',
+      themeId: "com.example.newsprint",
+      target: "markdown",
+      loadImport,
+    });
+
+    expect(loadImport).toHaveBeenCalledWith("./shared.css", "theme.css");
+    expect(result.css).not.toContain("@charset");
+    expect(result.css).not.toContain("@import");
+    expect(result.css).toContain('[data-po-theme-id="com.example.newsprint"]');
   });
 
   it.each([

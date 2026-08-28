@@ -1,7 +1,7 @@
 /* Built-in content themes use the same scoped host contract as local CSS
    themes. Theme authors can override these public --po-md-* and --po-csv-*
    tokens without depending on private component structure. */
-:where([data-po-theme-surface="markdown"][data-po-theme-id="builtin.markdown.newsprint"]) {
+[data-po-theme-surface="markdown"][data-po-theme-id="builtin.markdown.newsprint"] {
   --po-md-surface-background: #f6f1e7;
   --po-md-content-color: #342f29;
   --po-md-content-font: Charter, "Bitstream Charter", "Sitka Text", Georgia, serif;
@@ -13,7 +13,7 @@
   --po-markdown-editor-text-width: 680px;
 }
 
-:where([data-po-theme-surface="markdown"][data-po-theme-id="builtin.markdown.focus"]) {
+[data-po-theme-surface="markdown"][data-po-theme-id="builtin.markdown.focus"] {
   --po-md-surface-background: color-mix(in srgb, var(--po-editor-bg) 96%, var(--po-accent) 4%);
   --po-md-content-line-height: 1.85;
   --po-md-block-gap: 20px;
@@ -24,7 +24,7 @@
   --po-markdown-editor-text-width: 640px;
 }
 
-:where([data-po-theme-surface="csv"][data-po-theme-id="builtin.csv.spreadsheet"]) {
+[data-po-theme-surface="csv"][data-po-theme-id="builtin.csv.spreadsheet"] {
   --po-csv-surface-background: #f7fbf7;
   --po-csv-surface-color: #203329;
   --po-editable-table-border: #9db9a6;
@@ -34,7 +34,7 @@
   --po-editable-table-cell-focus-ring: #2e7d4f;
 }
 
-:where([data-po-theme-surface="csv"][data-po-theme-id="builtin.csv.ledger"]) {
+[data-po-theme-surface="csv"][data-po-theme-id="builtin.csv.ledger"] {
   --po-csv-surface-background: #f7f3e9;
   --po-csv-surface-color: #332f27;
   --po-editable-table-border: #aa9d82;
@@ -45,13 +45,13 @@
   --po-editable-table-font-size: 13px;
 }
 
-:where(.dark) :where([data-po-theme-surface="markdown"][data-po-theme-id="builtin.markdown.newsprint"]) {
+:where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="builtin.markdown.newsprint"] {
   --po-md-surface-background: #292722;
   --po-md-content-color: #e6dfd2;
   --po-md-rule-color: #665f54;
 }
 
-:where(.dark) :where([data-po-theme-surface="csv"][data-po-theme-id="builtin.csv.spreadsheet"], [data-po-theme-surface="csv"][data-po-theme-id="builtin.csv.ledger"]) {
+:where(.dark) :is([data-po-theme-surface="csv"][data-po-theme-id="builtin.csv.spreadsheet"], [data-po-theme-surface="csv"][data-po-theme-id="builtin.csv.ledger"]) {
   --po-csv-surface-background: var(--po-editor-bg);
   --po-csv-surface-color: var(--po-text);
 }

@@ -21,7 +21,9 @@ Place a CSS file directly in the themes directory:
 }
 ```
 
-Top-level CSS files appear as Markdown themes. PuppyOne treats Typora's `:root`, `html`, `body`, and `#write` selectors as aliases for the Markdown surface and scopes ordinary selectors so they cannot style another part of the application. Relative local `@import`, image, and font URLs are supported. Network and `file:` URLs are rejected.
+Top-level CSS files appear as Markdown themes. PuppyOne treats Typora's `:root`, `html`, `body`, and `#write` selectors as aliases for the Markdown surface and scopes ordinary selectors so they cannot style another part of the application. Relative local quoted imports and `@import url(...)`, images, fonts, and `@charset` are supported. Network and `file:` URLs are rejected.
+
+This is a restricted, safety-scoped Typora-style dialect rather than drop-in compatibility with every Typora theme. Container rules such as `@media` and `@supports` plus `@font-face` are supported; global rules such as `@keyframes`, `@page`, and plugin-specific Typora chrome selectors are rejected. Port those effects to scoped declarations and PuppyOne's public variables.
 
 ## Multi-surface theme package
 
@@ -61,4 +63,4 @@ Markdown themes can use the public `--po-md-*` variables, including `--po-md-sur
 
 CSV themes can use `--po-csv-surface-background`, `--po-csv-surface-color`, and the shared `--po-editable-table-*` variables for borders, cell spacing, header styling, font sizing, and focus rings.
 
-Each entrypoint is parsed and compiled by the desktop host. Invalid packages are isolated and reported in Settings without preventing other themes from loading. Only the three selected theme entrypoints are injected into the renderer.
+Each entrypoint is parsed and compiled by the desktop host. Package manifests, entrypoints, imports, and assets must remain inside their canonical package directory; symlink escapes are rejected. Import counts plus aggregate CSS, compiled CSS, and asset sizes are bounded. Invalid packages are isolated and reported in Settings without preventing other themes from loading. Only the three selected theme entrypoints are injected into the renderer.

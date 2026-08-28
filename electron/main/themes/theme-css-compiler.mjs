@@ -23,9 +23,10 @@ export async function compileThemeCss({
   const root = await parseAndInlineImports(css, {
     sourcePath,
     loadImport,
-    ancestry: [],
+    ancestry: [sourcePath],
     depth: 0,
   });
+  root.walkAtRules("charset", (rule) => rule.remove());
   validateAtRules(root);
   scopeRules(root, { themeId, target });
   await rewriteAssetUrls(root, resolveAssetUrl);
@@ -54,7 +55,6 @@ async function parseAndInlineImports(css, { sourcePath, loadImport, ancestry, de
     if (!specifier || !isSafeRelativePath(specifier) || !specifier.toLowerCase().endsWith(".css")) {
       throw new TypeError("Theme CSS imports must reference a package-local CSS file.");
     }
-    if (ancestry.includes(specifier)) throw new TypeError(`Theme CSS import cycle detected at ${specifier}.`);
     if (typeof loadImport !== "function") {
       throw new TypeError(`Theme CSS import cannot be loaded: ${specifier}.`);
     }
@@ -63,6 +63,9 @@ async function parseAndInlineImports(css, { sourcePath, loadImport, ancestry, de
     const importedSourcePath = typeof imported === "string" ? specifier : imported?.sourcePath;
     if (typeof importedCss !== "string" || typeof importedSourcePath !== "string") {
       throw new TypeError(`Theme CSS import did not return text: ${specifier}.`);
+    }
+    if (ancestry.includes(importedSourcePath)) {
+      throw new TypeError(`Theme CSS import cycle detected at ${importedSourcePath}.`);
     }
     const importedRoot = await parseAndInlineImports(importedCss, {
       sourcePath: importedSourcePath,
@@ -84,7 +87,7 @@ function validateAtRules(root) {
 }
 
 function scopeRules(root, { themeId, target }) {
-  const host = `:where([data-po-theme-surface="${target}"][data-po-theme-id="${themeId}"])`;
+  const host = `[data-po-theme-surface="${target}"][data-po-theme-id="${themeId}"]`;
   root.walkRules((rule) => {
     const selectors = splitSelectors(rule.selector);
     const scoped = selectors.map((selector) => scopeSelector(selector, host));
@@ -171,8 +174,11 @@ function validateDeclarations(root, target) {
 }
 
 function parseImportSpecifier(params) {
-  const match = params.trim().match(/^(?:"([^"]+)"|'([^']+)')$/);
-  return match ? match[1] ?? match[2] : null;
+  const value = params.trim();
+  const quoted = value.match(/^(?:"([^"]+)"|'([^']+)')$/);
+  if (quoted) return quoted[1] ?? quoted[2];
+  const url = value.match(/^url\(\s*(?:"([^"]+)"|'([^']+)'|([^\s"')]+))\s*\)$/i);
+  return url ? url[1] ?? url[2] ?? url[3] : null;
 }
 
 function isSafeRelativePath(value) {

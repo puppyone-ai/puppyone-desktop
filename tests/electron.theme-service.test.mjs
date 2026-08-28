@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -103,6 +103,97 @@ describe("host-owned CSS theme service", () => {
 
     expect(result).toEqual({ opened: true });
     expect(shell.openPath).toHaveBeenCalledExactlyOnceWith(path.join(userDataPath, "themes"));
+  });
+
+  it("rejects manifest entrypoint symlinks that escape a package", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const themeRoot = path.join(userDataPath, "themes");
+    const packagePath = path.join(themeRoot, "escaped");
+    await mkdir(packagePath, { recursive: true });
+    await writeJson(path.join(packagePath, "theme.json"), {
+      schemaVersion: 1,
+      id: "com.example.escaped",
+      name: "Escaped",
+      version: "1.0.0",
+      modes: ["light"],
+      targets: ["markdown"],
+      entrypoints: { markdown: "markdown.css" },
+    });
+    const outsideCss = path.join(userDataPath, "outside.css");
+    await writeFile(outsideCss, "body { color: red }", "utf8");
+    await symlink(outsideCss, path.join(packagePath, "markdown.css"));
+
+    const snapshot = await createThemeService({ userDataPath, shell: createShell() }).listThemes();
+
+    expect(snapshot.themes).toEqual([]);
+    expect(snapshot.diagnostics[0]).toMatchObject({ source: "escaped" });
+    expect(snapshot.diagnostics[0].message).toContain("escapes its package");
+  });
+
+  it("rejects manifest symlinks that escape a package", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const themeRoot = path.join(userDataPath, "themes");
+    const packagePath = path.join(themeRoot, "manifest-link");
+    await mkdir(packagePath, { recursive: true });
+    const outsideManifest = path.join(userDataPath, "outside-theme.json");
+    await writeJson(outsideManifest, {
+      schemaVersion: 1,
+      id: "com.example.manifest-link",
+      name: "Manifest Link",
+      version: "1.0.0",
+      modes: ["light"],
+      targets: ["markdown"],
+      entrypoints: { markdown: "markdown.css" },
+    });
+    await symlink(outsideManifest, path.join(packagePath, "theme.json"));
+
+    const snapshot = await createThemeService({ userDataPath, shell: createShell() }).listThemes();
+
+    expect(snapshot.themes).toEqual([]);
+    expect(snapshot.diagnostics[0].message).toContain("escapes its package");
+  });
+
+  it("rejects themes whose aggregate imported CSS exceeds the compilation budget", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const themeRoot = path.join(userDataPath, "themes");
+    const packagePath = path.join(themeRoot, "oversized");
+    await createPackage(themeRoot, "oversized", "com.example.oversized", "Oversized");
+    const largeComment = `/*${"x".repeat(1_500_000)}*/`;
+    await writeFile(
+      path.join(packagePath, "markdown.css"),
+      '@import "a.css"; @import "b.css"; @import "c.css";',
+      "utf8",
+    );
+    await Promise.all(["a.css", "b.css", "c.css"].map((filename) => (
+      writeFile(path.join(packagePath, filename), largeComment, "utf8")
+    )));
+
+    const snapshot = await createThemeService({ userDataPath, shell: createShell() }).listThemes();
+
+    expect(snapshot.themes).toEqual([]);
+    expect(snapshot.diagnostics[0].message).toContain("aggregate CSS size limit");
+  });
+
+  it("rejects repeated asset expansion before compiled CSS exceeds its output budget", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const themeRoot = path.join(userDataPath, "themes");
+    const packagePath = path.join(themeRoot, "expanded-asset");
+    await createPackage(themeRoot, "expanded-asset", "com.example.expanded-asset", "Expanded Asset");
+    await writeFile(path.join(packagePath, "background.png"), Buffer.alloc(5 * 1024 * 1024));
+    await writeFile(
+      path.join(packagePath, "markdown.css"),
+      [
+        '.one { background: url("./background.png") }',
+        '.two { background: url("./background.png") }',
+        '.three { background: url("./background.png") }',
+      ].join("\n"),
+      "utf8",
+    );
+
+    const snapshot = await createThemeService({ userDataPath, shell: createShell() }).listThemes();
+
+    expect(snapshot.themes).toEqual([]);
+    expect(snapshot.diagnostics[0].message).toContain("embedded asset expansion limit");
   });
 });
 

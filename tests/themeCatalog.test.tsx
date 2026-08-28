@@ -69,6 +69,29 @@ describe("renderer theme catalog", () => {
     expect(latest?.error).toBeNull();
     expect(latest?.snapshot.themes.some((theme) => theme.id === "builtin.csv.ledger")).toBe(true);
   });
+
+  it("surfaces failures while opening the themes directory", async () => {
+    window.puppyoneDesktop = {
+      themes: {
+        list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
+        reload: vi.fn(async () => ({ themes: [], diagnostics: [] })),
+        openDirectory: vi.fn(async () => { throw new Error("Finder unavailable"); }),
+      },
+    } as typeof window.puppyoneDesktop;
+    await act(async () => {
+      root.render(<Harness />);
+      await Promise.resolve();
+    });
+
+    let result: { opened: boolean } | undefined;
+    await act(async () => {
+      result = await latest?.openDirectory();
+    });
+
+    expect(result).toEqual({ opened: false });
+    expect(latest?.status).toBe("error");
+    expect(latest?.error).toBe("Finder unavailable");
+  });
 });
 
 function Harness() {

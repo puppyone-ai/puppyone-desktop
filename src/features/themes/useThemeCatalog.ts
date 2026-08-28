@@ -73,7 +73,16 @@ export function useThemeCatalog(options: {
 
   const openDirectory = useCallback(async () => {
     if (!desktopThemes) return { opened: false };
-    return desktopThemes.openDirectory();
+    try {
+      return await desktopThemes.openDirectory();
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+      }));
+      return { opened: false };
+    }
   }, [desktopThemes]);
 
   useEffect(() => {

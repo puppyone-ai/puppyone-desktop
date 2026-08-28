@@ -13,6 +13,10 @@ const MAX_THEME_ENTRIES = 200;
 const MAX_MANIFEST_BYTES = 64 * 1024;
 const MAX_CSS_BYTES = 2 * 1024 * 1024;
 const MAX_ASSET_BYTES = 8 * 1024 * 1024;
+const MAX_THEME_CSS_BYTES = 4 * 1024 * 1024;
+const MAX_THEME_ASSET_BYTES = 8 * 1024 * 1024;
+const MAX_THEME_COMPILED_BYTES = 16 * 1024 * 1024;
+const MAX_THEME_IMPORTS = 64;
 const assetMimeTypes = new Map([
   [".woff", "font/woff"],
   [".woff2", "font/woff2"],
@@ -93,12 +97,14 @@ async function loadStandaloneCssTheme(themeRoot, filename) {
   const slug = createSlug(path.basename(filename, path.extname(filename)));
   const id = `local.css.${slug}`;
   const css = await readBoundedText(path.join(themeRoot, filename), MAX_CSS_BYTES, "Theme CSS");
+  const budget = createCompilationBudget();
   const compiled = await compileThemeFile({
     css,
     sourcePath: filename,
     packageRoot: themeRoot,
     themeId: id,
     target: "markdown",
+    budget,
   });
   return freezeTheme({
     id,
@@ -112,8 +118,12 @@ async function loadStandaloneCssTheme(themeRoot, filename) {
 }
 
 async function loadPackageTheme(packageRoot) {
-  const manifestPath = path.join(packageRoot, "theme.json");
-  const manifestText = await readBoundedText(manifestPath, MAX_MANIFEST_BYTES, "Theme manifest");
+  const manifestFile = await resolvePackageFile(packageRoot, ".", "theme.json");
+  const manifestText = await readBoundedText(
+    manifestFile.absolutePath,
+    MAX_MANIFEST_BYTES,
+    "Theme manifest",
+  );
   let value;
   try {
     value = JSON.parse(manifestText);
@@ -122,15 +132,17 @@ async function loadPackageTheme(packageRoot) {
   }
   const manifest = parseThemeManifest(value);
   const compiledCss = {};
+  const budget = createCompilationBudget();
   for (const target of manifest.targets) {
-    const sourcePath = manifest.entrypoints[target];
-    const css = await readBoundedText(path.join(packageRoot, sourcePath), MAX_CSS_BYTES, "Theme CSS");
+    const entrypoint = await resolvePackageFile(packageRoot, ".", manifest.entrypoints[target]);
+    const css = await readBoundedText(entrypoint.absolutePath, MAX_CSS_BYTES, "Theme CSS");
     const compiled = await compileThemeFile({
       css,
-      sourcePath,
+      sourcePath: entrypoint.relativePath,
       packageRoot,
       themeId: manifest.id,
       target,
+      budget,
     });
     compiledCss[target] = compiled.css;
   }
@@ -146,21 +158,37 @@ async function loadPackageTheme(packageRoot) {
   });
 }
 
-async function compileThemeFile({ css, sourcePath, packageRoot, themeId, target }) {
-  return compileThemeCss({
+async function compileThemeFile({ css, sourcePath, packageRoot, themeId, target, budget }) {
+  reserveCssBytes(budget, css);
+  const compiled = await compileThemeCss({
     css,
     sourcePath,
     themeId,
     target,
     loadImport: async (specifier, importerPath) => {
+      budget.importCount += 1;
+      if (budget.importCount > MAX_THEME_IMPORTS) {
+        throw new TypeError("Theme exceeds the aggregate import count limit.");
+      }
       const resolved = await resolvePackageFile(packageRoot, importerPath, specifier);
+      const importedCss = await readBoundedText(
+        resolved.absolutePath,
+        MAX_CSS_BYTES,
+        "Theme CSS import",
+      );
+      reserveCssBytes(budget, importedCss);
       return {
-        css: await readBoundedText(resolved.absolutePath, MAX_CSS_BYTES, "Theme CSS import"),
+        css: importedCss,
         sourcePath: resolved.relativePath,
       };
     },
     resolveAssetUrl: async (specifier, importerPath) => {
       const resolved = await resolvePackageFile(packageRoot, importerPath, specifier);
+      const cached = budget.assetUrls.get(resolved.absolutePath);
+      if (cached) {
+        reserveEmbeddedAssetBytes(budget, cached);
+        return cached;
+      }
       const extension = path.extname(resolved.absolutePath).toLowerCase();
       const mimeType = assetMimeTypes.get(extension);
       if (!mimeType) throw new TypeError(`Unsupported theme asset type: ${extension || "unknown"}.`);
@@ -168,10 +196,47 @@ async function compileThemeFile({ css, sourcePath, packageRoot, themeId, target 
       if (!info.isFile() || info.size > MAX_ASSET_BYTES) {
         throw new TypeError("Theme asset exceeds the supported size limit.");
       }
+      budget.assetBytes += info.size;
+      if (budget.assetBytes > MAX_THEME_ASSET_BYTES) {
+        throw new TypeError("Theme exceeds the aggregate asset size limit.");
+      }
       const bytes = await readFile(resolved.absolutePath);
-      return `data:${mimeType};base64,${bytes.toString("base64")}`;
+      const dataUrl = `data:${mimeType};base64,${bytes.toString("base64")}`;
+      budget.assetUrls.set(resolved.absolutePath, dataUrl);
+      reserveEmbeddedAssetBytes(budget, dataUrl);
+      return dataUrl;
     },
   });
+  budget.compiledBytes += Buffer.byteLength(compiled.css, "utf8");
+  if (budget.compiledBytes > MAX_THEME_COMPILED_BYTES) {
+    throw new TypeError("Theme exceeds the aggregate compiled CSS size limit.");
+  }
+  return compiled;
+}
+
+function createCompilationBudget() {
+  return {
+    assetBytes: 0,
+    assetUrls: new Map(),
+    compiledBytes: 0,
+    cssBytes: 0,
+    embeddedAssetBytes: 0,
+    importCount: 0,
+  };
+}
+
+function reserveCssBytes(budget, css) {
+  budget.cssBytes += Buffer.byteLength(css, "utf8");
+  if (budget.cssBytes > MAX_THEME_CSS_BYTES) {
+    throw new TypeError("Theme exceeds the aggregate CSS size limit.");
+  }
+}
+
+function reserveEmbeddedAssetBytes(budget, dataUrl) {
+  budget.embeddedAssetBytes += Buffer.byteLength(dataUrl, "utf8");
+  if (budget.embeddedAssetBytes > MAX_THEME_COMPILED_BYTES) {
+    throw new TypeError("Theme exceeds the embedded asset expansion limit.");
+  }
 }
 
 async function resolvePackageFile(packageRoot, importerPath, specifier) {
