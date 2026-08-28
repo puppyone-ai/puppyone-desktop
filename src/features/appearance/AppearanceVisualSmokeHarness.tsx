@@ -1,10 +1,10 @@
 import { DesktopWindowChrome } from "../../components/DesktopWindowChrome";
+import { PuppyBrandMark } from "../../components/brand/PuppyBrandMark";
 import { DesktopShellLocationBar } from "../app-shell/DesktopShellLocationBar";
 import { TerminalCloseConfirmationDialog } from "../desktop-terminal/ui/TerminalCloseConfirmationDialog";
 import { useLocalization } from "@puppyone/localization/react";
 import {
   ExplorerTree,
-  resolveRendererPublicAssetUrl,
   type DataNode,
 } from "@puppyone/shared-ui";
 import { Cloud, FolderOpen, GitBranch, Settings, SquareTerminal } from "lucide-react";
@@ -208,10 +208,9 @@ function SmokeToolbarActions() {
           className="desktop-shell-toolbar-button-icon"
           aria-hidden="true"
         >
-          <img
+          <PuppyBrandMark
             className="desktop-shell-toolbar-agent-logo"
-            src={resolveRendererPublicAssetUrl("PuppyAgentLOGO.png")}
-            alt=""
+            tone="dark"
           />
         </i>
         <span className="desktop-shell-toolbar-button-label">

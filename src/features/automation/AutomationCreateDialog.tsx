@@ -8,7 +8,10 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { bidiIsolate, type MessageFormatter } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
-import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
+import {
+  RENDERER_ASSET_PATHS,
+  resolveRendererPublicAssetUrl,
+} from "@puppyone/shared-ui";
 import type {
   DesktopCloudAutomationOauthStatus,
   DesktopCloudAutomationProviderSpec,
@@ -412,7 +415,7 @@ export function CloudNewAutomationDialog({
                 </div>
                 <section className="desktop-cloud-automation-node">
                   <div className="desktop-cloud-automation-node-header">
-                    <span className="desktop-cloud-automation-node-icon"><img src={resolveRendererPublicAssetUrl("icons/folder.svg")} alt="" /></span>
+                    <span className="desktop-cloud-automation-node-icon"><img src={resolveRendererPublicAssetUrl(RENDERER_ASSET_PATHS.icons.ui.folder)} alt="" /></span>
                     <span dir="auto">/{normalizedTargetPath}</span>
                   </div>
                   <div className="desktop-cloud-automation-node-body">

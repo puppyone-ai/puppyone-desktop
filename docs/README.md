@@ -70,5 +70,7 @@ directly:
 
 - [Release](RELEASE.md) documents release setup, GitHub Actions secrets,
   internal ad-hoc macOS builds, and production signing.
-- [Desktop App Icon](DESKTOP_APP_ICON.md) documents the app icon source of
-  truth, generated assets, packaging rules, and Dock icon verification.
+- [Puppy Brand Assets](PUPPY_BRAND_ASSETS.md) documents the four Puppy image
+  sources of truth, Renderer boundary, packaging rules, and Dock verification.
+- [Renderer Image Assets](RENDERER_ASSETS.md) defines the external integration,
+  Agent, UI, media, naming, and typed-catalog boundaries.

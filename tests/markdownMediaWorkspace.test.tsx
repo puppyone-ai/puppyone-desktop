@@ -25,11 +25,11 @@ describe("Markdown workspace media integration", () => {
   it("hydrates the canonical README logo while keeping HTTPS badges out of the workspace resolver", async () => {
     const markdownPath = "README.md";
     const getFileUrl = vi.fn(async (path: string) => {
-      if (path === "public/logo-square.png") {
-        return "puppyone-local://file/token/markdown-asset/root/public/logo-square.png";
+      if (path === "public/assets/brand/puppy/puppy-dark.svg") {
+        return "puppyone-local://file/token/markdown-asset/root/public/assets/brand/puppy/puppy-dark.svg";
       }
-      if (path === "public/puppyone-overview.png") {
-        return "puppyone-local://file/token/markdown-asset/root/public/puppyone-overview.png";
+      if (path === "public/assets/media/screenshots/puppyone-editor-overview.png") {
+        return "puppyone-local://file/token/markdown-asset/root/public/assets/media/screenshots/puppyone-editor-overview.png";
       }
       return null;
     });
@@ -72,11 +72,11 @@ describe("Markdown workspace media integration", () => {
     // only when mounted. The header logo is visible immediately; remote badge
     // URLs must not be forwarded to the workspace filesystem capability.
     expect(getFileUrl.mock.calls).toEqual([
-      ["public/logo-square.png", { purpose: "markdown-asset" }],
+      ["public/assets/brand/puppy/puppy-dark.svg", { purpose: "markdown-asset" }],
     ]);
     expect(container.querySelector<HTMLImageElement>('.cm-md-html-rendered-surface img[alt="puppyone Logo"]')
       ?.getAttribute("src")).toBe(
-        "puppyone-local://file/token/markdown-asset/root/public/logo-square.png",
+        "puppyone-local://file/token/markdown-asset/root/public/assets/brand/puppy/puppy-dark.svg",
       );
     expect(container.querySelectorAll('.cm-md-html-rendered-surface img[src^="https://img.shields.io/"]'))
       .toHaveLength(4);

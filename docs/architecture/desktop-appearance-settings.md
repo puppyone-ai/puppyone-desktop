@@ -212,12 +212,11 @@ Implemented:
 6. **Pointer cursors.** `puppyone.desktop.pointerCursors` (default false)
    uses a root `data-pointer-cursors` attribute; CSS opts interactive elements
    into `cursor: pointer`.
-7. **Dock icon.** Zero-UI. The main process applies the canonical Polished icon
-   at startup; Development builds apply its badged Polished counterpart. There
-   is no Renderer preference, local-storage key, switching IPC, or packaged
-   native Light/Matte Dock resource. Follows the packaging contract in
-   [Desktop App Icon](../DESKTOP_APP_ICON.md) (raw PNG resources, not `.icns`
-   slots).
+7. **Dock icon.** Zero-UI. The main process applies the canonical authored App
+   Image at startup; Development uses its matching reflective variant with a
+   `D` badge. There is no Renderer preference, local-storage key, switching
+   IPC, or packaged native Puppy Dark/Lite resource. Follows the contract in
+   [Puppy Brand Assets](../PUPPY_BRAND_ASSETS.md).
 8. **Diff markers.** `puppyone.desktop.diffMarkers`
    (`color | symbols`) is rendered in compact AI review surfaces; its settings
    row lives in the Editor section. The full Git Changes review surface always

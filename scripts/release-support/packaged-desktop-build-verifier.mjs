@@ -10,8 +10,7 @@ import {
 const { extractFile } = asarPackage;
 const { parse: parsePlist } = plistPackage;
 const canonicalDockIconAsset = Object.freeze({
-  resourceFilename: "logo-square.png",
-  rendererAssetPath: "dist/logo-square.png",
+  resourceFilename: "puppy-app-image.png",
 });
 
 export async function verifyPackagedDesktopBuild({
@@ -52,7 +51,7 @@ export async function verifyPackagedDesktopBuild({
       );
     }
 
-    const { resourceFilename, rendererAssetPath } = canonicalDockIconAsset;
+    const { resourceFilename } = canonicalDockIconAsset;
     const nativeIcon = await fs.readFile(path.join(resourcesDirectory, resourceFilename)).catch((error) => {
       if (error?.code === "ENOENT") {
         throw new Error(`${path.basename(application.path)} is missing Dock icon resource ${resourceFilename}.`);
@@ -60,17 +59,6 @@ export async function verifyPackagedDesktopBuild({
       throw error;
     });
     assertPng(nativeIcon, `${path.basename(application.path)} ${resourceFilename}`);
-
-    let rendererIcon;
-    try {
-      rendererIcon = extractFile(
-        path.join(resourcesDirectory, "app.asar"),
-        rendererAssetPath,
-      );
-    } catch {
-      throw new Error(`${path.basename(application.path)} is missing renderer Dock icon ${rendererAssetPath}.`);
-    }
-    assertPng(rendererIcon, `${path.basename(application.path)} ${rendererAssetPath}`);
 
     const plist = parsePlist(
       await fs.readFile(path.join(application.path, "Contents", "Info.plist"), "utf8"),

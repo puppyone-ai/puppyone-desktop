@@ -11,7 +11,10 @@ import { McpLogoIcon } from "./McpLogoIcon";
 import { CloudOverviewHostingIllustration } from "./CloudOverviewHostingIllustration";
 import { useId, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
-import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
+import {
+  RENDERER_ASSET_PATHS,
+  resolveRendererPublicAssetUrl,
+} from "@puppyone/shared-ui";
 import type { CloudWorkspaceSection } from "../types";
 import { CloudPublishFolderMark } from "./CloudPublishHeroMarks";
 import "./mcp-activation.css";
@@ -262,17 +265,18 @@ function AgentTile({ label, kind }: { label: string; kind: AgentKind }) {
 }
 
 function AgentMark({ kind }: { kind: AgentKind }) {
+  const agents = RENDERER_ASSET_PATHS.icons.agents;
   if (kind === "chatgpt") {
-    return <img src={resolveRendererPublicAssetUrl("icons/ChatGPT_logo.png")} alt="" draggable={false} />;
+    return <img src={resolveRendererPublicAssetUrl(agents.chatgpt)} alt="" draggable={false} />;
   }
   if (kind === "claude") {
-    return <img src={resolveRendererPublicAssetUrl("icons/agent-claude-code.svg")} alt="" draggable={false} />;
+    return <img src={resolveRendererPublicAssetUrl(agents.claudeCode)} alt="" draggable={false} />;
   }
   if (kind === "cursor") {
-    return <img src={resolveRendererPublicAssetUrl("icons/agent-cursor.svg")} alt="" draggable={false} />;
+    return <img src={resolveRendererPublicAssetUrl(agents.cursor)} alt="" draggable={false} />;
   }
   if (kind === "manus") {
-    return <img src={resolveRendererPublicAssetUrl("icons/agent-manus.svg")} alt="" draggable={false} />;
+    return <img src={resolveRendererPublicAssetUrl(agents.manus)} alt="" draggable={false} />;
   }
   if (kind === "hermes") {
     return (

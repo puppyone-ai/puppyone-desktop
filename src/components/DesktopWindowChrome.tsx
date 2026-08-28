@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
-import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
+import { PuppyBrandMark } from "./brand/PuppyBrandMark";
 
 type DesktopWindowChromeProps = {
   context?: ReactNode;
@@ -30,11 +30,9 @@ export function DesktopWindowChrome({
       <div className="desktop-titlebar-layout">
         <div className="desktop-titlebar-left">
           <div className="desktop-titlebar-brand" aria-hidden="true">
-            <img
+            <PuppyBrandMark
               className="desktop-titlebar-brand-icon"
-              src={resolveRendererPublicAssetUrl("assets/brand/puppyone-xp.svg")}
-              alt=""
-              draggable={false}
+              tone="lite"
             />
             <strong className="desktop-titlebar-brand-name">{t("shell.brand.name")}</strong>
             <span className="desktop-titlebar-brand-separator">—</span>

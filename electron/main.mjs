@@ -547,13 +547,13 @@ function getLastFocusedWindow() {
 }
 
 function resolveAppIconPath() {
-  const developmentBuild = desktopBuildInfo.channel === "dev";
-  const resourceFilename = developmentBuild ? "logo-square-dev.png" : "logo-square.png";
-  const sourceFilename = developmentBuild ? "logo-square-dev.png" : "logo-square.png";
+  const resourceFilename = "puppy-app-image.png";
+  const sourceFilename = desktopBuildInfo.channel === "dev"
+    ? "puppy-app-image-dev.png"
+    : resourceFilename;
   const candidates = [
     path.join(process.resourcesPath ?? projectRoot, resourceFilename),
-    path.join(projectRoot, "dist", sourceFilename),
-    path.join(projectRoot, "public", sourceFilename),
+    path.join(projectRoot, "assets", "brand", "puppy", sourceFilename),
   ];
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
 }

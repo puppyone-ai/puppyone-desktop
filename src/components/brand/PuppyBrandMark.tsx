@@ -1,9 +1,9 @@
-import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
+import {
+  RENDERER_ASSET_PATHS,
+  resolveRendererPublicAssetUrl,
+} from "@puppyone/shared-ui";
 
-export const PUPPY_BRAND_MARK_ASSETS = Object.freeze({
-  dark: "assets/brand/puppy/puppy-dark.png",
-  lite: "assets/brand/puppy/puppy-lite.png",
-});
+export const PUPPY_BRAND_MARK_ASSETS = RENDERER_ASSET_PATHS.brand.puppy;
 
 export type PuppyBrandMarkTone = keyof typeof PUPPY_BRAND_MARK_ASSETS;
 
