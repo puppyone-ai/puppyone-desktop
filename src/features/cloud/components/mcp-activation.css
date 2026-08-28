@@ -28,6 +28,36 @@
     gap: 44px;
   }
 
+  /*
+   * MCP onboarding follows the same compact vertical reading order as Linear's
+   * empty states: illustration first, then one uninterrupted copy/action rail.
+   * Keep this scoped to MCP so CLI, Git, and project hosting retain their own
+   * purpose-built compositions.
+   */
+  .desktop-cloud-mcp-activation.is-mcp {
+    --desktop-cloud-activation-max-width: 520px;
+    --desktop-cloud-activation-artwork-slot-size: 236px;
+    --desktop-cloud-connection-art-scale: 0.56;
+    grid-template-columns: minmax(0, 440px);
+    grid-template-rows: 150px auto;
+    justify-items: start;
+    gap: 24px;
+    padding-inline: 40px;
+  }
+
+  .desktop-cloud-mcp-activation.is-mcp .desktop-cloud-mcp-activation-copy {
+    grid-row: 2;
+    width: 100%;
+  }
+
+  .desktop-cloud-mcp-activation.is-mcp .desktop-cloud-activation-illustration-frame {
+    grid-row: 1;
+    width: var(--desktop-cloud-activation-artwork-slot-size);
+    height: 150px;
+    aspect-ratio: auto;
+    justify-self: start;
+  }
+
   .desktop-cloud-mcp-activation.desktop-cloud-git-prerequisite {
     justify-items: stretch;
     text-align: start;
@@ -784,6 +814,15 @@
     .desktop-cloud-mcp-activation.is-connection {
       gap: 28px;
     }
+
+    .desktop-cloud-mcp-activation.is-mcp {
+      --desktop-cloud-activation-artwork-slot-size: 236px;
+      --desktop-cloud-connection-art-scale: 0.56;
+      grid-template-columns: minmax(0, 440px);
+      grid-template-rows: 150px auto;
+      gap: 24px;
+      padding-inline: 32px;
+    }
   }
 
   @container (max-width: 680px) {
@@ -798,6 +837,19 @@
 
     .desktop-cloud-mcp-activation.is-connection {
       gap: 22px;
+    }
+
+    .desktop-cloud-mcp-activation.is-mcp {
+      --desktop-cloud-activation-artwork-slot-size: 220px;
+      --desktop-cloud-connection-art-scale: 0.52;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: 140px auto;
+      gap: 22px;
+      padding-inline: 24px;
+    }
+
+    .desktop-cloud-mcp-activation.is-mcp .desktop-cloud-activation-illustration-frame {
+      height: 140px;
     }
   }
 
@@ -817,6 +869,19 @@
 
     .desktop-cloud-mcp-activation.is-connection {
       gap: 14px;
+    }
+
+    .desktop-cloud-mcp-activation.is-mcp {
+      --desktop-cloud-activation-artwork-slot-size: 190px;
+      --desktop-cloud-connection-art-scale: 0.45;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: 122px auto;
+      gap: 18px;
+      padding-inline: 18px;
+    }
+
+    .desktop-cloud-mcp-activation.is-mcp .desktop-cloud-activation-illustration-frame {
+      height: 122px;
     }
   }
 

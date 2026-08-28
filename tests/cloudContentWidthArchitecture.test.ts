@@ -51,6 +51,12 @@ describe("Cloud content width architecture", () => {
     expect(activation).toContain("max-width: var(--desktop-cloud-activation-max-width);");
     expect(activation).toContain("grid-template-columns: minmax(0, 360px) var(--desktop-cloud-activation-artwork-slot-size);");
     expect(activation).toContain("gap: 44px;");
+    expect(activation).toContain(".desktop-cloud-mcp-activation.is-mcp");
+    expect(activation).toContain("grid-template-columns: minmax(0, 440px);");
+    expect(activation).toContain("grid-template-rows: 150px auto;");
+    expect(activation).toContain("grid-row: 1;");
+    expect(activation).toContain("grid-row: 2;");
+    expect(activation).toContain("justify-self: start;");
     expect(activation).toContain("@container (max-width: 820px)");
     expect(activation).toContain("@container (max-width: 680px)");
     expect(activation).toContain("@container (max-width: 420px)");
