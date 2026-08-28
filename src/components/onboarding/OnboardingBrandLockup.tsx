@@ -23,7 +23,6 @@ export function OnboardingBrandLockup({ state, resolvedTheme }: OnboardingBrandL
         <span className={hasProjects ? "onboarding-brand-prompt" : "onboarding-brand-name"}>
           {t(hasProjects ? "onboarding.section.chooseProject" : "onboarding.brand.name")}
         </span>
-        <p className="onboarding-brand-description">{t("onboarding.brand.description")}</p>
       </div>
     </header>
   );

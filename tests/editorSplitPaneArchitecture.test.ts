@@ -428,13 +428,20 @@ describe("editor split-pane architecture", () => {
     expect(headerStyles).not.toContain("--desktop-titlebar-sidebar-width) - 1px");
   });
 
-  it("lets Header context grow independently of the Sidebar width", () => {
+  it("lets Header context grow independently without nested flex-shrink phases", () => {
+    const leadingContext = readCssBlock(
+      headerStyles,
+      ".desktop-titlebar-left:has(.desktop-titlebar-sidebar-context)",
+    );
     const sidebarContext = readCssBlock(headerStyles, ".desktop-titlebar-sidebar-context");
     const expandedContext = readCssBlock(
       headerStyles,
       '.desktop-titlebar-sidebar-context[data-sidebar-state="expanded"]',
     );
 
+    expect(leadingContext).toContain("min-width: 0;");
+    expect(leadingContext).toContain("overflow: hidden;");
+    expect(leadingContext).not.toContain("flex:");
     expect(sidebarContext).toContain("--desktop-titlebar-context-max-width: 440px;");
     expect(sidebarContext).toContain("max-width: 100%;");
     expect(sidebarContext).toContain("overflow: hidden;");
@@ -442,7 +449,9 @@ describe("editor split-pane architecture", () => {
     expect(expandedContext).toContain(
       "max-width: min(var(--desktop-titlebar-context-max-width), 100%);",
     );
+    expect(expandedContext).not.toContain("flex:");
     expect(headerStyles).not.toContain("--desktop-titlebar-sidebar-width");
+    expect(headerStyles).not.toContain("+ .desktop-titlebar-drag-fill");
   });
 
   it("shares neutral, hover, and active resize-boundary states across panes", () => {

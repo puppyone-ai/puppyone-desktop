@@ -5,22 +5,16 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  DesktopTelemetryNotice,
-  shouldShowDesktopTelemetryNotice,
-} from "../src/features/telemetry/DesktopTelemetryNotice";
+  OnboardingTelemetryDisclosure,
+  shouldShowOnboardingTelemetryDisclosure,
+} from "../src/components/onboarding/OnboardingTelemetryDisclosure";
 import type { DesktopTelemetryState } from "../src/types/electron";
 
 vi.mock("@puppyone/localization", () => ({
   useLocalization: () => ({
     t: (id: string) => ({
-      "telemetry.notice.title": "Help improve puppyone",
-      "telemetry.notice.description": "Anonymous daily activity only.",
-      "telemetry.notice.learnMore": "Details",
-      "telemetry.notice.showLess": "Less",
-      "telemetry.notice.details": "One record per UTC day.",
-      "telemetry.notice.notNow": "Later",
-      "telemetry.notice.understand": "I understand",
-      "telemetry.notice.error": "Try again.",
+      "onboarding.telemetry.notice": "Anonymous usage data helps us improve puppyone.",
+      "onboarding.telemetry.learnMore": "Learn more",
     }[id] ?? id),
   }),
 }));
@@ -31,7 +25,6 @@ let container: HTMLDivElement;
 let root: Root | null;
 
 beforeEach(() => {
-  window.location.hash = "";
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -46,75 +39,84 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-describe("DesktopTelemetryNotice", () => {
-  it("waits for an eligible Stable transport and a required notice", () => {
-    expect(shouldShowDesktopTelemetryNotice(null)).toBe(false);
-    expect(shouldShowDesktopTelemetryNotice(telemetryState({ transportConfigured: false }))).toBe(false);
-    expect(shouldShowDesktopTelemetryNotice(telemetryState({ noticeRequired: false }))).toBe(false);
-    expect(shouldShowDesktopTelemetryNotice(telemetryState())).toBe(true);
+describe("OnboardingTelemetryDisclosure", () => {
+  it("is limited to eligible first-launch basic analytics", () => {
+    expect(shouldShowOnboardingTelemetryDisclosure(null)).toBe(false);
+    expect(shouldShowOnboardingTelemetryDisclosure(telemetryState({ eligible: false }))).toBe(false);
+    expect(shouldShowOnboardingTelemetryDisclosure(telemetryState({ noticeRequired: false }))).toBe(false);
+    expect(shouldShowOnboardingTelemetryDisclosure(telemetryState({ level: "off" }))).toBe(false);
+    expect(shouldShowOnboardingTelemetryDisclosure(telemetryState({ transportConfigured: false }))).toBe(true);
+    expect(shouldShowOnboardingTelemetryDisclosure(telemetryState())).toBe(true);
   });
 
-  it("dismisses Later for the current renderer session without recording consent", async () => {
+  it("waits for the reveal, then persists the notice once and stays visible for this launch", async () => {
     const bridge = installTelemetryBridge();
-    act(() => root?.render(<DesktopTelemetryNotice />));
-    await vi.waitFor(() => expect(container.textContent).toContain("Help improve puppyone"));
+    act(() => root?.render(<OnboardingTelemetryDisclosure ready={false} />));
+    await act(async () => { await Promise.resolve(); });
 
-    await clickButton("Later");
-
-    expect(container.textContent).not.toContain("Help improve puppyone");
+    expect(container.querySelector("[data-onboarding-telemetry-disclosure]")).toBeNull();
     expect(bridge.markTelemetryNoticeSeen).not.toHaveBeenCalled();
-  });
 
-  it("records I understand through the bounded notice IPC and closes the card", async () => {
-    const bridge = installTelemetryBridge();
-    act(() => root?.render(<DesktopTelemetryNotice />));
-    await vi.waitFor(() => expect(container.textContent).toContain("Help improve puppyone"));
-
-    await clickButton("I understand");
+    act(() => root?.render(<OnboardingTelemetryDisclosure ready />));
 
     await vi.waitFor(() => expect(bridge.markTelemetryNoticeSeen).toHaveBeenCalledOnce());
-    await vi.waitFor(() => expect(container.textContent).not.toContain("Help improve puppyone"));
+    expect(container.textContent).toContain("Anonymous usage data helps us improve puppyone");
+    expect(container.querySelector("svg")).toBeNull();
   });
 
-  it("keeps disclosure details in the lightweight card", async () => {
-    installTelemetryBridge();
-    act(() => root?.render(<DesktopTelemetryNotice />));
-    await vi.waitFor(() => expect(container.textContent).toContain("Details"));
-
-    await clickButton("Details");
-
-    expect(container.textContent).toContain("One record per UTC day.");
-    expect(container.textContent).toContain("Less");
-  });
-});
-
-function installTelemetryBridge() {
-  const initial = telemetryState();
-  const bridge = {
-    getTelemetryState: vi.fn().mockResolvedValue(initial),
-    markTelemetryNoticeSeen: vi.fn().mockResolvedValue(telemetryState({
+  it("does not return on a later launch after this notice version was seen", async () => {
+    installTelemetryBridge(telemetryState({
       enabled: true,
       disabledReason: null,
       noticeRequired: false,
       noticeSeenVersion: 1,
-    })),
-    onTelemetryStateChanged: vi.fn(() => vi.fn()),
+    }));
+    act(() => root?.render(<OnboardingTelemetryDisclosure ready />));
+    await act(async () => { await Promise.resolve(); });
+
+    expect(container.querySelector("[data-onboarding-telemetry-disclosure]")).toBeNull();
+  });
+
+  it("opens the public disclosure outside the app", async () => {
+    const bridge = installTelemetryBridge();
+    act(() => root?.render(<OnboardingTelemetryDisclosure ready />));
+    await vi.waitFor(() => expect(container.textContent).toContain("Learn more"));
+
+    const disclosure = container.querySelector<HTMLAnchorElement>(".onboarding-telemetry-disclosure a");
+    expect(disclosure?.href).toBe("https://github.com/puppyone-ai/puppyone-desktop/blob/qubits/docs/telemetry.md");
+    await act(async () => disclosure?.click());
+
+    expect(bridge.openExternalUrl).toHaveBeenCalledWith(
+      "https://github.com/puppyone-ai/puppyone-desktop/blob/qubits/docs/telemetry.md",
+    );
+  });
+});
+
+function installTelemetryBridge(initial = telemetryState()) {
+  const listeners = new Set<(state: DesktopTelemetryState) => void>();
+  const seen = telemetryState({
+    enabled: initial.transportConfigured,
+    disabledReason: initial.transportConfigured ? null : "transport-unconfigured",
+    noticeRequired: false,
+    noticeSeenVersion: 1,
+  });
+  const bridge = {
+    getTelemetryState: vi.fn().mockResolvedValue(initial),
+    markTelemetryNoticeSeen: vi.fn(async () => {
+      listeners.forEach((listener) => listener(seen));
+      return seen;
+    }),
+    onTelemetryStateChanged: vi.fn((listener: (state: DesktopTelemetryState) => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    }),
+    openExternalUrl: vi.fn().mockResolvedValue({ ok: true }),
   };
   Object.defineProperty(window, "puppyoneDesktop", {
     configurable: true,
     value: bridge,
   });
   return bridge;
-}
-
-async function clickButton(label: string) {
-  const button = [...container.querySelectorAll("button")]
-    .find((candidate) => candidate.textContent?.trim() === label);
-  expect(button).toBeDefined();
-  await act(async () => {
-    button?.click();
-    await Promise.resolve();
-  });
 }
 
 function telemetryState(overrides: Partial<DesktopTelemetryState> = {}): DesktopTelemetryState {

@@ -137,11 +137,16 @@ for (const forbidden of ["trackTelemetryEvent", "captureTelemetryEvent", "sendTe
   }
 }
 
-const noticeSource = await readText("src/features/telemetry/DesktopTelemetryNotice.tsx");
-requireSource(noticeSource, "state.transportConfigured", "the product notice must not appear before a Stable transport is configured");
-requireSource(noticeSource, "markTelemetryNoticeSeen", "the renderer must record consent through the bounded notice IPC");
-requireSource(noticeSource, "dismissedForSession", "Not now must remain a session-only renderer choice");
-requireSource(noticeSource, 't("telemetry.notice.understand")', "the notice acknowledgement must be labeled through the localized I understand contract");
+const noticeSource = await readText("src/components/onboarding/OnboardingTelemetryDisclosure.tsx");
+requireSource(noticeSource, "state?.eligible", "the disclosure must remain limited to eligible Stable builds");
+requireSource(noticeSource, "markTelemetryNoticeSeen", "the renderer must persist the versioned first-launch disclosure through bounded IPC");
+requireSource(noticeSource, "shownForLaunch", "the disclosure must remain visible for the current onboarding after it is persisted");
+requireSource(noticeSource, 't("onboarding.telemetry.notice")', "the first-launch disclosure must use the localized onboarding contract");
+
+const appSource = await readText("src/App.tsx");
+if (appSource.includes("OnboardingTelemetryDisclosure")) {
+  errors.push("the first-launch telemetry disclosure must not be mounted in the workspace sidebar");
+}
 
 for (const sourceRoot of ["src", "packages/shared-ui/src"]) {
   for (const filePath of await listSourceFiles(sourceRoot)) {

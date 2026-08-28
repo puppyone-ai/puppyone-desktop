@@ -1,15 +1,11 @@
-/* Header context follows its content instead of inheriting the Sidebar width. */
+/* Header columns own explicit compression roles instead of sharing negative
+ * space through nested flex-shrink calculations. The outer titlebar grid
+ * compresses its drag track first; this leading context clips only after that
+ * track reaches its reviewed minimum. */
 
 .desktop-titlebar-left:has(.desktop-titlebar-sidebar-context) {
-  display: flex;
   min-width: 0;
-  flex: 1 1 auto;
-  overflow: visible;
-}
-
-.desktop-titlebar-left:has(.desktop-titlebar-sidebar-context) + .desktop-titlebar-drag-fill {
-  min-width: 32px;
-  flex: 0 10 120px;
+  overflow: hidden;
 }
 
 .desktop-titlebar-sidebar-context {
@@ -28,7 +24,6 @@
 .desktop-titlebar-sidebar-context[data-sidebar-state="expanded"] {
   width: fit-content;
   max-width: min(var(--desktop-titlebar-context-max-width), 100%);
-  flex: 0 1 auto;
   padding-inline-end: 8px;
 }
 

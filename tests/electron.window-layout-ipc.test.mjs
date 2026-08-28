@@ -89,6 +89,21 @@ describe("native window layout IPC", () => {
     expect(ownerWindow.setWindowButtonPosition).not.toHaveBeenCalled();
   });
 
+  it("repositions default traffic lights on focus without rebuilding their safe area", () => {
+    const ownerWindow = createWindow();
+    const handlers = registerHandlers(ownerWindow);
+
+    handlers.get("window-layout:set-chrome-profile")(createEvent(), {
+      titlebar: "default-titlebar-v1",
+    });
+    ownerWindow.setWindowButtonVisibility.mockClear();
+    ownerWindow.setWindowButtonPosition.mockClear();
+
+    expect(reapplyWindowChromeProfile(ownerWindow)).toMatchObject({ customControls: false });
+    expect(ownerWindow.setWindowButtonVisibility).not.toHaveBeenCalled();
+    expect(ownerWindow.setWindowButtonPosition).toHaveBeenCalledExactlyOnceWith({ x: 13, y: 12 });
+  });
+
   it("executes only allowlisted renderer window actions", () => {
     const ownerWindow = createWindow();
     const handlers = registerHandlers(ownerWindow);

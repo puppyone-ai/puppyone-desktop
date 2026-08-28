@@ -1,6 +1,7 @@
 import { Button } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import { FilePlus2, FolderOpen, GitFork } from "lucide-react";
+import type { ReactNode } from "react";
 import { InlineLoading } from "../loading";
 import type { OnboardingHomeState } from "./types";
 
@@ -11,6 +12,7 @@ type OnboardingEntryActionsProps = {
   draggingFolder: boolean;
   canCreateProject: boolean;
   canCloneRepository: boolean;
+  footer?: ReactNode;
   onOpenFolder: () => void;
   onCreateProject: () => void;
   onCloneRepository: () => void;
@@ -23,6 +25,7 @@ export function OnboardingEntryActions({
   draggingFolder,
   canCreateProject,
   canCloneRepository,
+  footer,
   onOpenFolder,
   onCreateProject,
   onCloneRepository,
@@ -35,9 +38,9 @@ export function OnboardingEntryActions({
       <div className="onboarding-entry-actions" role="group" aria-label={t("onboarding.projects.title")}>
         <div className="onboarding-entry-action-primary">
           <Button
-            className={`onboarding-entry-action ${firstRun ? "onboarding-entry-action-cta" : ""} ${draggingFolder ? "is-dragging" : ""}`}
+            className={`onboarding-entry-action ${firstRun ? "onboarding-entry-action-default" : ""} ${draggingFolder ? "is-dragging" : ""}`}
             data-onboarding-action="open"
-            tone={firstRun ? "primary" : "neutral"}
+            tone="neutral"
             disabled={busy}
             aria-busy={openingFolder || undefined}
             leadingIcon={openingFolder
@@ -74,7 +77,9 @@ export function OnboardingEntryActions({
             {t("onboarding.action.cloneRepository")}
           </Button>
         </div>
+
       </div>
+      {footer}
     </div>
   );
 }

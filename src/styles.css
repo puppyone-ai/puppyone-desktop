@@ -14,7 +14,6 @@
 @import "./styles/window-chrome.css" layer(features);
 @import "./styles/titlebar.css" layer(features);
 @import "./features/app-shell/header-editor-columns.css" layer(features);
-@import "./features/telemetry/desktop-telemetry-notice.css" layer(features);
 @import "./features/editor-workbench/layout/desktop-editor-split-view.css" layer(features);
 @import "./styles/dialogs.css" layer(features);
 @import "./styles/layout.css" layer(features);

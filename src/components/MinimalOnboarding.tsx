@@ -36,6 +36,7 @@ import { OnboardingBrandLockup } from "./onboarding/OnboardingBrandLockup";
 import { OnboardingEmptyStateIntro } from "./onboarding/OnboardingEmptyStateIntro";
 import { OnboardingEntryActions } from "./onboarding/OnboardingEntryActions";
 import { OnboardingProjectList } from "./onboarding/OnboardingProjectList";
+import { OnboardingTelemetryDisclosure } from "./onboarding/OnboardingTelemetryDisclosure";
 import type { OnboardingHomeState } from "./onboarding/types";
 
 export type { ProjectHomeItem, RecentWorkspaceHomeItem } from "../features/app-shell/workspaceHomeModel";
@@ -245,33 +246,38 @@ export function MinimalOnboarding({
         aria-label={t("onboarding.projects.title")}
         aria-hidden={showEmptyStateIntro || undefined}
       >
-        <OnboardingBrandLockup state={onboardingState} resolvedTheme={resolvedTheme} />
+        <div className="onboarding-launcher">
+          <OnboardingBrandLockup state={onboardingState} resolvedTheme={resolvedTheme} />
 
-        {hasProjects && (
-          <OnboardingProjectList
-            items={items}
+          {hasProjects && (
+            <OnboardingProjectList
+              items={items}
+              busy={busy}
+              openingPath={openingPath}
+              removingPath={removingPath}
+              draggingPath={draggingPath}
+              onOpen={(path) => void openPath(path)}
+              onRemove={onRemoveProject ? (item) => void removeProject(item) : undefined}
+              onDragStart={startProjectDrag}
+              onDragEnd={() => setDraggingPath(null)}
+            />
+          )}
+
+          <OnboardingEntryActions
+            state={onboardingState}
             busy={busy}
-            openingPath={openingPath}
-            removingPath={removingPath}
-            draggingPath={draggingPath}
-            onOpen={(path) => void openPath(path)}
-            onRemove={onRemoveProject ? (item) => void removeProject(item) : undefined}
-            onDragStart={startProjectDrag}
-            onDragEnd={() => setDraggingPath(null)}
+            openingFolder={openingPath === "__new__"}
+            draggingFolder={folderDrop.dragging}
+            canCreateProject={Boolean(onCreateProject && onChooseProjectLocation)}
+            canCloneRepository={Boolean(onCloneRepository)}
+            footer={onboardingState === "empty" ? (
+              <OnboardingTelemetryDisclosure ready={!showEmptyStateIntro} />
+            ) : undefined}
+            onOpenFolder={() => void chooseFolder()}
+            onCreateProject={() => setEntryDialog("create")}
+            onCloneRepository={() => setEntryDialog("clone")}
           />
-        )}
-
-        <OnboardingEntryActions
-          state={onboardingState}
-          busy={busy}
-          openingFolder={openingPath === "__new__"}
-          draggingFolder={folderDrop.dragging}
-          canCreateProject={Boolean(onCreateProject && onChooseProjectLocation)}
-          canCloneRepository={Boolean(onCloneRepository)}
-          onOpenFolder={() => void chooseFolder()}
-          onCreateProject={() => setEntryDialog("create")}
-          onCloneRepository={() => setEntryDialog("clone")}
-        />
+        </div>
 
         {error && <div className="onboarding-error onboarding-homepage-error" role="alert"><AlertTriangle size={15} /><span>{error}</span></div>}
       </section>

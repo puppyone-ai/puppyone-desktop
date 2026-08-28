@@ -55,7 +55,6 @@ import {
 } from "./features/app-shell/DesktopShellLocationBar";
 import { DesktopOverlayPortal } from "./features/app-shell/DesktopOverlayPortal";
 import { DesktopHelpLauncher } from "./features/app-shell/DesktopHelpLauncher";
-import { DesktopTelemetryNotice } from "./features/telemetry/DesktopTelemetryNotice";
 import type { DesktopWorkspaceSwitcherItem } from "./features/app-shell/DesktopWorkspaceSwitcher";
 import { RestoringWorkspaceScreen } from "./features/app-shell/RestoringWorkspaceScreen";
 import { useDesktopPreferences } from "./features/app-shell/useDesktopPreferences";
@@ -1074,7 +1073,6 @@ function AppContent() {
           puppyoneConfigLoading={puppyoneConfigLoading}
           puppyoneConfigSaving={puppyoneConfigSaving}
           settingsSection={activeSettingsSection}
-          sidebarCompanion={<DesktopTelemetryNotice />}
           workspace={workspace}
           workspaceSurfaceError={documentNavigationError ?? workspaceSurfaceError}
           workspaceKey={workspaceKey}

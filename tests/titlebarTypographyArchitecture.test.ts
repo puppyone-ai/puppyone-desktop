@@ -45,14 +45,18 @@ describe("titlebar typography architecture", () => {
     const titlebarLayoutRule = readCssBlock(titlebarCss, ".desktop-titlebar-layout");
     const dividerRule = readCssBlock(titlebarCss, ".desktop-titlebar::after");
 
-    expect(titlebarRule).toContain("--desktop-titlebar-safe-area-x: env(titlebar-area-x, 80px);");
+    expect(titlebarRule).toContain("--desktop-titlebar-native-controls-inset: 80px;");
     expect(titlebarRule).toContain(
-      "--desktop-titlebar-safe-area-width: env(titlebar-area-width, calc(100% - 80px));",
+      "--desktop-titlebar-safe-area-x: var(--desktop-titlebar-native-controls-inset);",
     );
+    expect(titlebarRule).toContain(
+      "--desktop-titlebar-safe-area-width: calc(100% - var(--desktop-titlebar-safe-area-x));",
+    );
+    expect(titlebarRule).not.toContain("env(titlebar-area-");
     expect(titlebarLayoutRule).toContain("margin-left: var(--desktop-titlebar-safe-area-x);");
     expect(titlebarLayoutRule).toContain("width: var(--desktop-titlebar-safe-area-width);");
     expect(titlebarLayoutRule).toContain(
-      "padding: 4px 6px 5px var(--desktop-titlebar-content-start);",
+      "padding: 0 6px 0 var(--desktop-titlebar-content-start);",
     );
     expect(fullScreenTitlebarRule).toContain(
       "var(--desktop-sidebar-row-left-gap) + var(--desktop-sidebar-row-content-left)",
@@ -132,14 +136,14 @@ describe("titlebar typography architecture", () => {
     expect(branchButton).toContain("color: var(--desktop-titlebar-text-muted);");
   });
 
-  it("spaces project, branch, and Header actions with one button-gap contract", () => {
+  it("keeps Header spacing invariant while the window crosses compact widths", () => {
     const context = readCssBlock(titlebarCss, ".desktop-titlebar-context");
     const actions = readCssBlock(titlebarCss, ".desktop-titlebar-actions");
-    const compactMediaRule = readCssMediaBlock(titlebarCss, "@media (max-width: 720px)");
 
     expect(context).toContain("gap: var(--desktop-titlebar-button-gap);");
     expect(actions).toContain("gap: var(--desktop-titlebar-button-gap);");
-    expect(compactMediaRule).toContain("--desktop-titlebar-button-gap: 1px;");
+    expect(titlebarCss).not.toContain("@media (max-width: 720px)");
+    expect(titlebarCss).not.toContain("--desktop-titlebar-button-gap: 1px;");
   });
 
   it("keeps branch-menu metadata quiet without introducing new type sizes", () => {
@@ -161,16 +165,31 @@ describe("titlebar typography architecture", () => {
     expect(titlebarCss).not.toContain(".desktop-branch-menu-label {");
   });
 
-  it("keeps project and branch intrinsically grouped at compact widths", () => {
-    const compactMediaRule = readCssMediaBlock(titlebarCss, "@media (max-width: 720px)");
+  it("uses explicit Header columns and deterministic context compression", () => {
+    const titlebar = readCssBlock(`\n${titlebarCss}`, ".desktop-titlebar");
+    const layout = readCssBlock(titlebarCss, ".desktop-titlebar-layout");
+    const context = readCssBlock(titlebarCss, ".desktop-titlebar-context");
+    const project = readCssBlock(titlebarCss, ".desktop-titlebar-workspace-wrap");
+    const branch = readCssBlock(titlebarCss, ".desktop-titlebar-branch-wrap");
+    const branchButton = readCssBlock(titlebarCss, ".desktop-titlebar-branch-button");
+    const drag = readCssBlock(titlebarCss, ".desktop-titlebar-drag-fill");
+    const trailing = readCssBlock(titlebarCss, ".desktop-titlebar-trailing");
 
-    expect(compactMediaRule).not.toContain("flex: 1 1 0;");
-    expect(compactMediaRule).not.toContain(".desktop-titlebar-workspace-wrap");
-    expect(compactMediaRule).not.toContain(".desktop-titlebar-branch-wrap");
-    expect(compactMediaRule).not.toContain(".desktop-titlebar-drag-fill");
-    expect(readCssBlock(titlebarCss, ".desktop-titlebar-drag-fill")).toContain(
-      "flex: 1 1 auto;",
-    );
+    expect(titlebar).toContain("--desktop-titlebar-drag-min-width: 32px;");
+    expect(layout).toContain("display: grid;");
+    expect(layout).toContain("minmax(0, max-content)");
+    expect(layout).toContain("minmax(var(--desktop-titlebar-drag-min-width), 1fr)");
+    expect(layout).toContain("max-content;");
+    expect(context).toContain("--desktop-titlebar-workspace-max-width: 220px;");
+    expect(context).toContain("--desktop-titlebar-branch-max-width: 200px;");
+    expect(project).toContain("width: max-content;");
+    expect(project).toContain("flex: 0 0 auto;");
+    expect(branch).toContain("width: max-content;");
+    expect(branch).toContain("min-width: var(--desktop-titlebar-tool-action-width);");
+    expect(branch).toContain("flex: 0 1 auto;");
+    expect(branchButton).toContain("width: 100%;");
+    expect(drag).toContain("width: 100%;");
+    expect(trailing).toContain("justify-content: end;");
   });
 });
 
@@ -182,17 +201,4 @@ function readCssBlock(css: string, selector: string): string {
   const end = css.indexOf("\n}", bodyStart);
   if (end < 0) throw new Error(`Unclosed CSS block for ${selector}`);
   return css.slice(bodyStart, end);
-}
-
-function readCssMediaBlock(css: string, query: string): string {
-  const start = css.indexOf(`${query} {`);
-  if (start < 0) throw new Error(`Missing CSS media block for ${query}`);
-  let depth = 0;
-  for (let index = start; index < css.length; index += 1) {
-    if (css[index] === "{") depth += 1;
-    if (css[index] !== "}") continue;
-    depth -= 1;
-    if (depth === 0) return css.slice(start, index + 1);
-  }
-  throw new Error(`Unclosed CSS media block for ${query}`);
 }
