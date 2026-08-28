@@ -24,6 +24,11 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
       background: request?.background,
     });
   },
+  themes: {
+    list: () => ipcRenderer.invoke("theme:list"),
+    reload: () => ipcRenderer.invoke("theme:reload"),
+    openDirectory: () => ipcRenderer.invoke("theme:open-directory"),
+  },
   setWindowMinimumWidth: (request) => (
     ipcRenderer.invoke("window-layout:set-minimum-width", request)
   ),

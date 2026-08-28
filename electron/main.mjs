@@ -44,6 +44,7 @@ import {
 import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
 import { registerAgentActivityIpcHandlers } from "./main/ipc/agent-activity-ipc.mjs";
 import { registerAppearanceIpcHandlers } from "./main/ipc/appearance-ipc.mjs";
+import { registerThemeIpcHandlers } from "./main/ipc/theme-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerBuildInfoIpcHandlers } from "./main/ipc/build-info-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
@@ -79,6 +80,7 @@ import { createTerminalService } from "./main/terminal-service.mjs";
 import { createTerminalAgentLocator } from "./main/terminal-agent/terminal-agent-locator.mjs";
 import { createDefaultTerminalAgentActivityHost } from "./main/terminal-agent/activity/bootstrap/create-terminal-agent-activity-host.mjs";
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
+import { createThemeService } from "./main/themes/theme-service.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
 import {
@@ -209,6 +211,10 @@ const nativeSurfacePointerPassthrough = createNativeSurfacePointerPassthroughCoo
   },
 });
 const externalNavigation = createExternalNavigationService({ shell });
+const themeService = createThemeService({
+  userDataPath: app.getPath("userData"),
+  shell,
+});
 const localeService = createDesktopLocaleService({
   app,
   getWindows: () => BrowserWindow.getAllWindows(),
@@ -710,6 +716,10 @@ function registerIpcHandlers() {
   registerAppearanceIpcHandlers({
     ipcMain: trustedIpcMain,
     BrowserWindow,
+  });
+  registerThemeIpcHandlers({
+    ipcMain: trustedIpcMain,
+    themeService,
   });
   registerWindowLayoutIpcHandlers({
     ipcMain: trustedIpcMain,

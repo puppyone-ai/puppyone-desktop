@@ -720,6 +720,27 @@ export type PuppyoneWorkspaceConfig = {
   updatedAt?: string;
 };
 
+export type DesktopThemeTarget = "application" | "markdown" | "csv";
+export type DesktopThemeColorMode = "light" | "dark";
+export type DesktopThemeDefinition = Readonly<{
+  id: string;
+  name: string;
+  version: string;
+  author?: string;
+  modes: readonly DesktopThemeColorMode[];
+  targets: readonly DesktopThemeTarget[];
+  source: "local-css" | "local-package";
+  compiledCss: Readonly<Partial<Record<DesktopThemeTarget, string>>>;
+}>;
+export type DesktopThemeDiagnostic = Readonly<{
+  source: string;
+  message: string;
+}>;
+export type DesktopThemeSnapshot = Readonly<{
+  themes: readonly DesktopThemeDefinition[];
+  diagnostics: readonly DesktopThemeDiagnostic[];
+}>;
+
 declare global {
   interface Window {
     puppyoneDesktop?: {
@@ -735,6 +756,11 @@ declare global {
         callback: (state: { fullScreen: boolean }) => void,
       ) => () => void;
       setWindowBackground: (request: { background: string }) => void;
+      themes: {
+        list: () => Promise<DesktopThemeSnapshot>;
+        reload: () => Promise<DesktopThemeSnapshot>;
+        openDirectory: () => Promise<{ opened: true }>;
+      };
       setWindowMinimumWidth: (request: { width: number }) => Promise<{
         applied: boolean;
         width?: number;
