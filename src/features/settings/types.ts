@@ -1,8 +1,9 @@
 import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type { DesktopCloudSession } from "../../lib/cloudApi";
 import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../types/electron";
-import type { CreateNewMenuSettings, DarkThemePreset, DiffMarkers, ExperimentalSettings, FilesVisibilitySettings, GitSidebarLayout, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, LocalAgentsSettings, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
+import type { CreateNewMenuSettings, DarkThemePreset, ExperimentalSettings, FilesVisibilitySettings, GitSidebarLayout, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, LocalAgentsSettings, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
+import type { MarkdownPresentationSettings } from "../markdown/markdownPresentation";
 
 export type SettingsSection = "general" | "local-project" | "appearance" | "local-agents" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
 
@@ -22,7 +23,7 @@ export type SettingsViewProps = {
   textSize: TextSize;
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
-  diffMarkers: DiffMarkers;
+  markdownPresentation: MarkdownPresentationSettings;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
   sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
@@ -32,7 +33,6 @@ export type SettingsViewProps = {
   rightSidebarToolsSettings: RightSidebarToolsSettings;
   titlebarActionsSettings: TitlebarActionsSettings;
   gitSidebarLayout: GitSidebarLayout;
-  aiEditAssistEnabled: boolean;
   cloudEnabled: boolean;
   cloudSession: DesktopCloudSession | null;
   cloudSessionRestoring: boolean;
@@ -52,7 +52,7 @@ export type SettingsViewProps = {
   onTextSizeChange: (textSize: TextSize) => void;
   onTypographyPreferencesChange: (preferences: TypographyPreferences) => void;
   onPointerCursorsChange: (enabled: boolean) => void;
-  onDiffMarkersChange: (markers: DiffMarkers) => void;
+  onMarkdownPresentationChange: (settings: MarkdownPresentationSettings) => void;
   onFileIconThemeChange: (theme: FileIconThemeId) => void;
   onSidebarNavigationLayoutChange: (layout: SidebarNavigationLayout) => void;
   onSidebarNavigationVisibilitySettingsChange: (settings: SidebarNavigationVisibilitySettings) => void;
@@ -62,7 +62,6 @@ export type SettingsViewProps = {
   onRightSidebarToolsSettingsChange: (settings: RightSidebarToolsSettings) => void;
   onTitlebarActionsSettingsChange: (settings: TitlebarActionsSettings) => void;
   onGitSidebarLayoutChange: (layout: GitSidebarLayout) => void;
-  onAiEditAssistEnabledChange: (enabled: boolean) => void;
   onCloudSessionChange: (session: DesktopCloudSession | null) => void;
   onPuppyoneConfigChange: (config: PuppyoneWorkspaceConfig) => Promise<PuppyoneWorkspaceConfig | null>;
   onUnlinkWorkspace: () => Promise<void>;

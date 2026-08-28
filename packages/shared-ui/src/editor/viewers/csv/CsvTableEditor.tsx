@@ -26,6 +26,8 @@ import {
 } from "../../find/useCsvFindAdapter";
 import { useRegisterEditorFindAdapter } from "../../find/editorFind";
 import { CsvTableControls } from "./CsvTableControls";
+import { CsvColumnResizeLayer } from "./CsvColumnResizeLayer";
+import { CsvColumnLayoutModel } from "./CsvColumnLayoutModel";
 import { CsvDocumentModel, type CsvModelRow } from "./CsvDocumentModel";
 import {
   CsvTableResizeControl,
@@ -39,7 +41,9 @@ import type {
 } from "./csvTableOperations";
 import {
   readCsvFirstRecordAsHeaderPreference,
+  readCsvColumnWidthsPreference,
   readCsvShowRowNumbersPreference,
+  writeCsvColumnWidthsPreference,
   writeCsvFirstRecordAsHeaderPreference,
   writeCsvShowRowNumbersPreference,
 } from "./csvViewPreferences";
@@ -55,6 +59,7 @@ export type CsvTableEditorProps = {
 };
 
 type ModelOwner = Readonly<{
+  columnLayout: CsvColumnLayoutModel;
   delimiter: "," | "\t";
   documentId: string;
   model: CsvDocumentModel;
@@ -83,17 +88,36 @@ export function CsvTableEditor({
     || modelOwnerRef.current.documentId !== resolvedDocumentId
     || modelOwnerRef.current.delimiter !== resolvedDelimiter
   ) {
+    const documentModel = new CsvDocumentModel(resolvedDocumentId, content, resolvedDelimiter);
     modelOwnerRef.current = {
+      columnLayout: new CsvColumnLayoutModel(documentModel, {
+        read: (columnCount) => readCsvColumnWidthsPreference(
+          documentId,
+          resolvedDelimiter,
+          columnCount,
+        ),
+        write: (widths) => writeCsvColumnWidthsPreference(
+          documentId,
+          resolvedDelimiter,
+          widths,
+        ),
+      }),
       delimiter: resolvedDelimiter,
       documentId: resolvedDocumentId,
-      model: new CsvDocumentModel(resolvedDocumentId, content, resolvedDelimiter),
+      model: documentModel,
     };
   }
   const model = modelOwnerRef.current.model;
+  const columnLayout = modelOwnerRef.current.columnLayout;
   const modelSnapshot = useSyncExternalStore(
     model.subscribe,
     model.getSnapshot,
     model.getSnapshot,
+  );
+  const columnLayoutSnapshot = useSyncExternalStore(
+    columnLayout.subscribe,
+    columnLayout.getSnapshot,
+    columnLayout.getSnapshot,
   );
   const callbacksRef = useRef({ onSnapshotPortChange, onSourceRevisionChange });
   const acceptedContentRef = useRef(content);
@@ -129,6 +153,8 @@ export function CsvTableEditor({
     });
     return () => callbacksRef.current.onSnapshotPortChange?.(null);
   }, [model]);
+
+  useLayoutEffect(() => () => columnLayout.dispose(), [columnLayout]);
 
   const [headerEnabled, setHeaderEnabled] = useState(modelSnapshot.suggestedHeader);
   const [rowNumbersVisible, setRowNumbersVisible] = useState(true);
@@ -196,7 +222,7 @@ export function CsvTableEditor({
     ? activeCell.rowIndex - headerRowCount
     : null;
   const viewport = useTabularViewport({
-    columnWidths: modelSnapshot.columnWidths,
+    columnWidths: columnLayoutSnapshot.widths,
     direction,
     hasHeader: headerEnabled,
     hasRowNumbers: rowNumbersVisible,
@@ -309,6 +335,25 @@ export function CsvTableEditor({
     writeCsvShowRowNumbersPreference(documentId, visible);
   }, [documentId]);
 
+  const autoFitColumn = useCallback((columnIndex: number) => {
+    columnLayout.autoFitColumn(columnIndex);
+  }, [columnLayout]);
+
+  const resetColumnWidths = useCallback(() => {
+    columnLayout.resetColumnWidths();
+  }, [columnLayout]);
+
+  const fitColumnsToViewport = useCallback(() => {
+    const scroll = scrollRef.current;
+    const surface = surfaceRef.current;
+    if (!scroll || !surface) return;
+    columnLayout.fitToViewport(getAvailableCsvColumnWidth(
+      scroll,
+      surface,
+      rowNumbersVisible,
+    ));
+  }, [columnLayout, rowNumbersVisible]);
+
   useLayoutEffect(() => {
     if (!publishPaneMenuContribution || !documentId) return undefined;
     publishPaneMenuContribution({
@@ -328,14 +373,28 @@ export function CsvTableEditor({
           checked: rowNumbersVisible,
           setChecked: setShowRowNumbers,
         },
+        {
+          kind: "command",
+          id: "csv-fit-columns-to-viewport",
+          label: t("editor.csv.fitToViewport"),
+          run: fitColumnsToViewport,
+        },
+        {
+          kind: "command",
+          id: "csv-reset-column-widths",
+          label: t("editor.csv.resetColumnWidths"),
+          run: resetColumnWidths,
+        },
       ],
     });
     return () => publishPaneMenuContribution(null);
   }, [
     documentId,
     headerEnabled,
+    fitColumnsToViewport,
     publishPaneMenuContribution,
     rowNumbersVisible,
+    resetColumnWidths,
     setFirstRecordAsHeader,
     setShowRowNumbers,
     t,
@@ -377,7 +436,9 @@ export function CsvTableEditor({
           <CsvViewSettings
             direction={direction}
             headerEnabled={headerEnabled}
+            onFitToViewport={fitColumnsToViewport}
             onHeaderChange={setFirstRecordAsHeader}
+            onResetColumnWidths={resetColumnWidths}
             onRowNumbersChange={setShowRowNumbers}
             rowNumbersVisible={rowNumbersVisible}
             t={t}
@@ -416,8 +477,9 @@ export function CsvTableEditor({
                   />
                 ) : (
                   <col
+                    data-csv-column={item.index}
                     key={modelSnapshot.columns[item.index]?.id ?? `column-${item.index}`}
-                    style={{ width: modelSnapshot.columnWidths[item.index] }}
+                    style={{ width: columnLayoutSnapshot.widths[item.index] }}
                   />
                 ))}
                 {Array.from({ length: previewAddedColumns }, (_, previewColumnIndex) => (
@@ -532,9 +594,20 @@ export function CsvTableEditor({
                   direction={direction}
                   headerEnabled={headerEnabled}
                   locale={locale}
+                  onAutoFitColumn={autoFitColumn}
                   onOperation={applyStructureOperation}
                   rowNumbersVisible={rowNumbersVisible}
                   rowCount={modelSnapshot.rows.length}
+                  surfaceRef={surfaceRef}
+                  tableRef={tableRef}
+                  t={t}
+                />
+                <CsvColumnResizeLayer
+                  columnWidths={columnLayoutSnapshot.widths}
+                  direction={direction}
+                  onAutoFitColumn={autoFitColumn}
+                  onColumnWidthChange={columnLayout.setColumnWidth}
+                  onColumnWidthsCommit={columnLayout.commitColumnWidths}
                   surfaceRef={surfaceRef}
                   tableRef={tableRef}
                   t={t}
@@ -730,3 +803,22 @@ const MemoCsvBodyRow = memo(function CsvBodyRow({
 });
 
 export default CsvTableEditor;
+
+function getAvailableCsvColumnWidth(
+  scroll: HTMLElement,
+  surface: HTMLElement,
+  rowNumbersVisible: boolean,
+): number {
+  const styles = getComputedStyle(surface);
+  const readPixels = (name: string) => {
+    const value = Number.parseFloat(styles.getPropertyValue(name));
+    return Number.isFinite(value) ? value : 0;
+  };
+  const contentInsets = readPixels("--csv-table-content-inline-start-inset")
+    + readPixels("--csv-table-content-inline-end-inset")
+    + readPixels("--po-editable-table-action-gutter");
+  const recordGutter = rowNumbersVisible
+    ? readPixels("--csv-table-record-index-width")
+    : 0;
+  return Math.max(0, scroll.clientWidth - contentInsets - recordGutter);
+}

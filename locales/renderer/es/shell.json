@@ -80,5 +80,13 @@
   "build.channel.stable": "Versión estable",
   "build.version.title": "{channel} · {version} · commit {commit}",
   "build.copy.action": "Copiar información de versión",
-  "build.copy.copied": "Información de versión copiada"
+  "build.copy.copied": "Información de versión copiada",
+  "telemetry.notice.title": "Ayuda a mejorar puppyone",
+  "telemetry.notice.description": "Comparte actividad diaria anónima; nunca archivos ni prompts.",
+  "telemetry.notice.learnMore": "Detalles",
+  "telemetry.notice.showLess": "Menos",
+  "telemetry.notice.details": "Se envía como máximo un registro de actividad anónimo por día UTC. El identificador cambia cada mes natural.",
+  "telemetry.notice.notNow": "Luego",
+  "telemetry.notice.understand": "Entendido",
+  "telemetry.notice.error": "No se pudo actualizar la preferencia de analíticas. Inténtalo de nuevo."
 }

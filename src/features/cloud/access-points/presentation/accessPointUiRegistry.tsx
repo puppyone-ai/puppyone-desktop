@@ -13,7 +13,10 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { MessageFormatter } from "@puppyone/localization/core";
-import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
+import {
+  RENDERER_ASSET_PATHS,
+  resolveRendererPublicAssetUrl,
+} from "@puppyone/shared-ui";
 import { formatProviderLabel, providerIcon } from "../../utils";
 import type { AccessPoint, AccessPointCatalogKind, AccessPointKind } from "../model/accessPoint";
 import { resolveAccessPointKind } from "../model/accessPointKindRegistry";
@@ -215,7 +218,7 @@ export function AccessPointProviderIcon({
     return (
       <img
         className="desktop-cloud-access-git-brand-icon"
-        src={resolveRendererPublicAssetUrl("assets/brand/git-icon-inverse.svg")}
+        src={resolveRendererPublicAssetUrl(RENDERER_ASSET_PATHS.icons.integrations.gitInverse)}
         alt=""
         width={resolvedSize}
         height={resolvedSize}

@@ -158,7 +158,7 @@
 .desktop-agent-brand-mark.is-fallback { border: 1px solid var(--agent-border-subtle); background: var(--agent-control-surface); color: var(--agent-text-muted); }
 
 .dark .desktop-agent-brand-mark.is-codex img {
-  content: url("/icons/agent-codex-dark.png");
+  content: url("/assets/icons/agents/codex-dark.png");
 }
 
 .desktop-agent-header-region {

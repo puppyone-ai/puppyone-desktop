@@ -1,9 +1,5 @@
 import type { EditorSourceSnapshot } from "../../sourceSnapshot";
 import {
-  estimateEditableTableColumnWidth,
-  estimateEditableTableColumnWidths,
-} from "../../table/editableTableLayout";
-import {
   normalizeRows,
   parseDelimitedText,
   inferHeaderRow,
@@ -28,7 +24,6 @@ export type CsvModelColumn = Readonly<{
 }>;
 
 export type CsvDocumentModelSnapshot = Readonly<{
-  columnWidths: readonly number[];
   columns: readonly CsvModelColumn[];
   epoch: number;
   hasSource: boolean;
@@ -112,17 +107,8 @@ export class CsvDocumentModel {
     nextCells[columnIndex] = value;
     const nextRows = [...this.state.rows];
     nextRows[rowIndex] = { id: row.id, cells: nextCells };
-    const nextColumnWidth = estimateEditableTableColumnWidth(
-      nextRows,
-      columnIndex,
-      (candidate) => candidate.cells,
-    );
-    const nextColumnWidths = nextColumnWidth === this.state.columnWidths[columnIndex]
-      ? this.state.columnWidths
-      : replaceAt(this.state.columnWidths, columnIndex, nextColumnWidth);
     this.commit({
       ...this.contentState(),
-      columnWidths: nextColumnWidths,
       hasSource: true,
       rows: nextRows,
     });
@@ -166,7 +152,6 @@ export class CsvDocumentModel {
     const nextColumns = nextColumnIds.map((id) => ({ id }));
     this.commit({
       ...this.contentState(),
-      columnWidths: estimateEditableTableColumnWidths(nextRows, nextColumns.length, (row) => row.cells),
       columns: nextColumns,
       hasSource: true,
       rows: nextRows,
@@ -231,7 +216,6 @@ export class CsvDocumentModel {
       id: this.createIdentity("column"),
     }));
     return {
-      columnWidths: estimateEditableTableColumnWidths(rows, columnCount, (row) => row.cells),
       columns,
       epoch,
       hasSource: content.length > 0,
@@ -334,12 +318,6 @@ function moveItem<Value>(items: Value[], sourceIndex: number, targetIndex: numbe
   if (sourceIndex === targetIndex || !items[sourceIndex]) return;
   const [item] = items.splice(sourceIndex, 1);
   items.splice(clampInteger(targetIndex, 0, items.length), 0, item);
-}
-
-function replaceAt<Value>(values: readonly Value[], index: number, value: Value): readonly Value[] {
-  const next = [...values];
-  next[index] = value;
-  return next;
 }
 
 function matricesEqual(

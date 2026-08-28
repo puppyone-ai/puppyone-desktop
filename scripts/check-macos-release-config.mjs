@@ -30,27 +30,20 @@ const errors = inspectMacReleaseReadiness({
 });
 
 const scripts = packageMetadata.scripts ?? {};
-if (packageMetadata.build?.afterPack !== "scripts/after-pack-flat-macos-icon.mjs") {
-  errors.push("macOS packaging must replace the generated ICNS with the canonical flat PNG");
+if (packageMetadata.build?.afterPack !== "scripts/after-pack-macos-app-image.mjs") {
+  errors.push("macOS packaging must install the canonical authored App Image");
 }
-const canonicalStableLogo = readFileSync(path.join(repoRoot, "public", "logo-square.png"));
-const approvedFlatStableLogo = readFileSync(
-  path.join(repoRoot, "public", "logo-square-v0.1.3-dark.png"),
-);
-const canonicalDevelopmentLogo = readFileSync(
-  path.join(repoRoot, "public", "logo-square-dev.png"),
-);
-const approvedFlatDevelopmentLogo = readFileSync(
-  path.join(repoRoot, "public", "logo-square-v0.1.3-dark-dev.png"),
-);
-if (!canonicalStableLogo.equals(approvedFlatStableLogo)) {
-  errors.push("the canonical Stable logo must match the approved flat v0.1.3-dark asset");
+const canonicalAppImagePath = "assets/brand/puppy/puppy-app-image.png";
+const developmentAppImagePath = "assets/brand/puppy/puppy-app-image-dev.png";
+readFileSync(path.join(repoRoot, canonicalAppImagePath));
+readFileSync(path.join(repoRoot, developmentAppImagePath));
+if (packageMetadata.build?.mac?.icon !== canonicalAppImagePath) {
+  errors.push("the macOS application icon must use the canonical authored App Image");
 }
-if (!canonicalDevelopmentLogo.equals(approvedFlatDevelopmentLogo)) {
-  errors.push("the canonical Development logo must match the approved flat badged asset");
-}
-if (packageMetadata.build?.mac?.icon !== "public/logo-square.png") {
-  errors.push("the macOS application icon must use the canonical flat logo source");
+if (!packageMetadata.build?.extraResources?.some((entry) => (
+  entry?.from === canonicalAppImagePath && entry?.to === "puppy-app-image.png"
+))) {
+  errors.push("the canonical App Image must be copied into native app resources");
 }
 const dmg = packageMetadata.build?.dmg ?? {};
 const expectedDmgContents = [

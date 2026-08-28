@@ -383,3 +383,63 @@
   flex: 0 0 17px;
   place-items: center;
 }
+
+.desktop-markdown-presentation-layout {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+  padding: 4px 10px 0;
+}
+
+.desktop-markdown-presentation-controls {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel) 72%, transparent);
+}
+
+.desktop-markdown-presentation-setting {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: 18px;
+  grid-template-columns: minmax(150px, 1fr) minmax(0, 360px);
+  padding: 12px 14px;
+}
+
+.desktop-markdown-presentation-setting + .desktop-markdown-presentation-setting {
+  border-top: 1px solid var(--po-border-subtle);
+}
+
+.desktop-markdown-presentation-setting__copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.desktop-markdown-presentation-setting__copy > span {
+  color: var(--po-text-muted);
+  font-size: 12.5px;
+  font-weight: var(--po-text-weight-medium, 500);
+  line-height: 18px;
+}
+
+.desktop-markdown-presentation-setting__copy > small {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.desktop-markdown-presentation-segment {
+  width: 100%;
+  max-width: none;
+}
+
+@media (max-width: 760px) {
+  .desktop-markdown-presentation-setting {
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

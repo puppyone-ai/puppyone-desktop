@@ -6,6 +6,9 @@
     --po-surface-editable-table-cell-border,
     var(--po-md-rule-color)
   );
+  /* 220px is the compact initial/reset cap. Explicit auto-fit and manual
+     resize may open a track to the shared readable maximum. */
+  --po-editable-table-cell-max-width: 560px;
   position: relative;
   display: block;
   box-sizing: border-box;
@@ -111,6 +114,58 @@
   min-width: max-content;
   margin-inline-start: 0;
   vertical-align: top;
+}
+
+.markdown-codemirror-editor .cm-md-table-column-resize-layer {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.markdown-codemirror-editor .cm-md-table-column-resize-handle {
+  position: absolute;
+  width: 9px;
+  min-height: var(--po-editable-table-row-min-height);
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  cursor: col-resize;
+  opacity: 0;
+  pointer-events: none;
+  touch-action: none;
+  transform: translateX(-50%);
+  transition: opacity 100ms ease;
+}
+
+.markdown-codemirror-editor .cm-md-table-column-resize-handle::before {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 4px;
+  width: 1px;
+  background: transparent;
+  content: "";
+  transition: background-color 100ms ease, box-shadow 100ms ease;
+}
+
+.markdown-codemirror-editor .cm-md-table-column-resize-handle.is-visible,
+.markdown-codemirror-editor .cm-md-table-column-resize-handle.is-resizing {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.markdown-codemirror-editor .cm-md-table-column-resize-handle:hover::before,
+.markdown-codemirror-editor .cm-md-table-column-resize-handle.is-resizing::before {
+  background: var(--po-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-accent) 18%, transparent);
+}
+
+.markdown-codemirror-editor .cm-md-table-widget-wrap.is-column-resizing,
+.markdown-codemirror-editor .cm-md-table-widget-wrap.is-column-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
 }
 
 .markdown-codemirror-editor .cm-md-table-widget {
@@ -425,6 +480,11 @@
   .markdown-codemirror-editor .cm-md-table-widget th,
   .markdown-codemirror-editor .cm-md-table-widget td,
   .markdown-codemirror-editor .cm-md-table-cell-content {
+    transition: none;
+  }
+
+  .markdown-codemirror-editor .cm-md-table-column-resize-handle,
+  .markdown-codemirror-editor .cm-md-table-column-resize-handle::before {
     transition: none;
   }
 

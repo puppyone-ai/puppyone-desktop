@@ -58,6 +58,7 @@ import { DesktopHelpLauncher } from "./features/app-shell/DesktopHelpLauncher";
 import type { DesktopWorkspaceSwitcherItem } from "./features/app-shell/DesktopWorkspaceSwitcher";
 import { RestoringWorkspaceScreen } from "./features/app-shell/RestoringWorkspaceScreen";
 import { useDesktopPreferences } from "./features/app-shell/useDesktopPreferences";
+import { resolveMarkdownPresentationStyle } from "./features/markdown/markdownPresentation";
 import { isAssetLibraryHomeEnabled } from "./features/app-shell/homeFeatureGate";
 import { useWorkspaceLifecycle } from "./features/app-shell/useWorkspaceLifecycle";
 import { usePuppyoneConfig } from "./features/app-shell/usePuppyoneConfig";
@@ -187,6 +188,7 @@ function AppContent() {
     darkThemePreset,
     diffMarkers,
     lightThemePreset,
+    markdownPresentation,
     pointerCursors,
     textSize,
     setAiEditAssistEnabled,
@@ -205,6 +207,10 @@ function AppContent() {
   const createNewItems = useMemo(
     () => resolveVisibleCreateNewMenuItems(createNewMenuSettings, experimentalSettings),
     [createNewMenuSettings, experimentalSettings],
+  );
+  const markdownPresentationStyle = useMemo(
+    () => resolveMarkdownPresentationStyle(markdownPresentation),
+    [markdownPresentation],
   );
   const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
     available: assetLibraryHomeAvailable,
@@ -844,17 +850,6 @@ function AppContent() {
         onRemoveProject={removeWorkspaceFromRecents}
         recentWorkspaces={recentWorkspaceItems}
         initialError={restoreWorkspaceError}
-        cornerSlot={(
-          <DesktopHelpLauncher
-            theme={resolvedTheme}
-            lightThemePreset={lightThemePreset}
-            darkThemePreset={darkThemePreset}
-            textSize={textSize}
-            typography={typography}
-            pointerCursors={pointerCursors}
-            diffMarkers={diffMarkers}
-          />
-        )}
         themeMode={activeThemeMode}
         lightThemePreset={lightThemePreset}
         darkThemePreset={darkThemePreset}
@@ -961,6 +956,7 @@ function AppContent() {
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
       {...typographyRootProps}
+      style={{ ...typographyRootProps.style, ...markdownPresentationStyle }}
     >
       <DesktopCloudShell
           leftSidebarCollapsed={sidebarCollapsed}

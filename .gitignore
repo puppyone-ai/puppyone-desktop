@@ -5,6 +5,7 @@ artifacts/terminal-preview/
 generated/
 .vite/
 .vite-temp/
+.wrangler/
 
 .DS_Store
 *.log

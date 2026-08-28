@@ -1,0 +1,87 @@
+import { useLocalization } from "@puppyone/localization";
+import type { ExperimentalSettings } from "../../../preferences";
+import { SettingsSectionHeader } from "../components";
+
+export function ExperimentalSettingsView({
+  settings,
+  agentChatAvailable,
+  assetLibraryHomeAvailable,
+  onChange,
+}: {
+  settings: ExperimentalSettings;
+  agentChatAvailable: boolean;
+  assetLibraryHomeAvailable: boolean;
+  onChange: (settings: ExperimentalSettings) => void;
+}) {
+  const { t } = useLocalization();
+  const rows: Array<{
+    messageKey: string;
+    settingKey: keyof ExperimentalSettings;
+  }> = [
+    { messageKey: "viewerPlugins", settingKey: "enableViewerPlugins" },
+    { messageKey: "editorSaveStatus", settingKey: "enableEditorSaveStatus" },
+    { messageKey: "markdownBlockDrag", settingKey: "enableMarkdownBlockDrag" },
+    ...(assetLibraryHomeAvailable
+      ? [{ messageKey: "projectsHome", settingKey: "enableAssetLibraryHome" as const }]
+      : []),
+    ...(agentChatAvailable
+      ? [{ messageKey: "agentChat", settingKey: "enableAgentChat" as const }]
+      : []),
+    { messageKey: "cloudWorkspace", settingKey: "enableCloudWorkspace" },
+    { messageKey: "cloudAutomation", settingKey: "enableCloudAutomation" },
+    { messageKey: "flowFiles", settingKey: "enablePuppyFlowFiles" },
+  ];
+
+  return (
+    <section className="desktop-utility-view desktop-settings-view">
+      <div className="desktop-utility-body desktop-settings-body" data-po-scrollbar="content">
+        <div className="desktop-settings-section">
+          <SettingsSectionHeader
+            title={t("settings.experimental.title")}
+            detail={t("settings.experimental.detail")}
+          />
+          <div className="desktop-settings-list">
+            {rows.map(({ messageKey, settingKey }) => (
+              <div className="desktop-settings-row desktop-settings-row-control" key={settingKey}>
+                <span title={t(`settings.experimental.${messageKey}.detail`)}>
+                  {t(`settings.experimental.${messageKey}.title`)}
+                </span>
+                <SettingsToggle
+                  label={t(`settings.experimental.${messageKey}.title`)}
+                  description={t(`settings.experimental.${messageKey}.detail`)}
+                  checked={settings[settingKey]}
+                  onChange={(checked) => onChange({ ...settings, [settingKey]: checked })}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SettingsToggle({
+  checked,
+  description,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  description: string;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="desktop-settings-switch" title={description}>
+      <input
+        type="checkbox"
+        aria-label={label}
+        aria-description={description}
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span aria-hidden="true" />
+    </label>
+  );
+}

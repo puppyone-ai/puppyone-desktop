@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="public/logo-square.png" alt="puppyone Logo" width="72" height="72" />
+  <img src="public/assets/brand/puppy/puppy-dark.svg" alt="puppyone Logo" width="72" height="72" />
 
   <h1>puppyone</h1>
 
@@ -13,7 +13,7 @@
   </p>
 </div>
 
-![puppyone editor overview](public/puppyone-overview.png)
+![puppyone editor overview](public/assets/media/screenshots/puppyone-editor-overview.png)
 ## Install
 
 ```bash
@@ -38,6 +38,12 @@ puppyone
 ## License
 
 Code is licensed under the [Apache License 2.0](LICENSE).
+
+## Privacy
+
+Desktop product analytics are currently disabled. The bounded event catalog,
+data exclusions, retention, and contact channel are published in
+[Product analytics](docs/telemetry.md).
 
 The puppyone name, logo, icons, and other brand assets are not granted under
 the Apache License. See [TRADEMARK.md](TRADEMARK.md).

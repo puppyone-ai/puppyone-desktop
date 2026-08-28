@@ -2,7 +2,7 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ExperimentalSettingsView } from "../src/features/settings/main/EditorSettingsViews";
+import { ExperimentalSettingsView } from "../src/features/settings/main/ExperimentalSettingsView";
 import { DEFAULT_EXPERIMENTAL_SETTINGS } from "../src/preferences";
 import { withTestLocalization } from "./testLocalization";
 

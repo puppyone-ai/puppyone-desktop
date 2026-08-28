@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { PanelBottom, PanelLeft, PanelTop } from "lucide-react";
 import {
   FILE_ICON_THEMES,
@@ -18,7 +18,7 @@ import { LocalAgentsSettingsView } from "../local-agents";
 import { SettingsSectionHeader } from "./components";
 import { ContentFontSetting } from "./ContentFontSetting";
 import { AccountSettingsView } from "./main/AccountSettingsView";
-import { EditorSettingsView, ExperimentalSettingsView } from "./main/EditorSettingsViews";
+import { ExperimentalSettingsView } from "./main/ExperimentalSettingsView";
 import { FilesSettingsView } from "./main/FileSettingsViews";
 import { GeneralSettingsView } from "./main/GeneralSettingsView";
 import { LocalProjectSettingsView } from "./main/LocalProjectSettingsView";
@@ -30,6 +30,12 @@ import { CloudHostingSettingsView, GitSettingsView } from "./main/RepositorySett
 import { isSettingsSectionAvailable } from "./sidebar/settingsSidebarModel";
 import type { SettingsViewProps } from "./types";
 import { writeClipboardText } from "./utils";
+
+const EditorSettingsView = lazy(async () => {
+  const module = await import("./main/EditorSettingsView");
+  return { default: module.EditorSettingsView };
+});
+
 export function SettingsView({
   workspace,
   activeSection,
@@ -44,7 +50,7 @@ export function SettingsView({
   localAgentsSettings,
   typographyPreferences,
   pointerCursors,
-  diffMarkers,
+  markdownPresentation,
   fileIconTheme,
   sidebarNavigationVisibilitySettings,
   filesVisibilitySettings,
@@ -53,7 +59,6 @@ export function SettingsView({
   rightSidebarToolsSettings,
   titlebarActionsSettings,
   gitSidebarLayout,
-  aiEditAssistEnabled,
   cloudEnabled,
   cloudSession,
   cloudSessionRestoring,
@@ -73,7 +78,7 @@ export function SettingsView({
   onTextSizeChange,
   onTypographyPreferencesChange,
   onPointerCursorsChange,
-  onDiffMarkersChange,
+  onMarkdownPresentationChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
   onSidebarNavigationVisibilitySettingsChange,
@@ -83,7 +88,6 @@ export function SettingsView({
   onRightSidebarToolsSettingsChange,
   onTitlebarActionsSettingsChange,
   onGitSidebarLayoutChange,
-  onAiEditAssistEnabledChange,
   onCloudSessionChange,
   onPuppyoneConfigChange,
   onUnlinkWorkspace,
@@ -226,12 +230,12 @@ export function SettingsView({
 
   if (activeSection === "editor") {
     return (
-      <EditorSettingsView
-        aiEditAssistEnabled={aiEditAssistEnabled}
-        diffMarkers={diffMarkers}
-        onAiEditAssistEnabledChange={onAiEditAssistEnabledChange}
-        onDiffMarkersChange={onDiffMarkersChange}
-      />
+      <Suspense fallback={null}>
+        <EditorSettingsView
+          markdownPresentation={markdownPresentation}
+          onMarkdownPresentationChange={onMarkdownPresentationChange}
+        />
+      </Suspense>
     );
   }
 

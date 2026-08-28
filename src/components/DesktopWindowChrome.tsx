@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
-import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
+import { PuppyBrandMark } from "./brand/PuppyBrandMark";
 
 type DesktopWindowChromeProps = {
   context?: ReactNode;
@@ -30,11 +30,9 @@ export function DesktopWindowChrome({
       <div className="desktop-titlebar-layout">
         <div className="desktop-titlebar-left">
           <div className="desktop-titlebar-brand" aria-hidden="true">
-            <img
+            <PuppyBrandMark
               className="desktop-titlebar-brand-icon"
-              src={resolveRendererPublicAssetUrl("assets/brand/puppyone-xp.svg")}
-              alt=""
-              draggable={false}
+              tone="lite"
             />
             <strong className="desktop-titlebar-brand-name">{t("shell.brand.name")}</strong>
             <span className="desktop-titlebar-brand-separator">—</span>
@@ -46,39 +44,41 @@ export function DesktopWindowChrome({
           data-window-drag-region="true"
           aria-hidden="true"
         />
-        {actions && (
-          <div className="desktop-titlebar-actions">
-            {actions}
+        <div className="desktop-titlebar-trailing">
+          {actions && (
+            <div className="desktop-titlebar-actions">
+              {actions}
+            </div>
+          )}
+          <div className="desktop-window-controls" data-window-no-drag="true">
+            <button
+              className="desktop-window-control is-minimize"
+              type="button"
+              aria-label={t("shell.windowControls.minimize")}
+              title={t("shell.windowControls.minimize")}
+              onClick={() => performWindowAction("minimize")}
+            >
+              <span aria-hidden="true" />
+            </button>
+            <button
+              className="desktop-window-control is-maximize"
+              type="button"
+              aria-label={t("shell.windowControls.maximize")}
+              title={t("shell.windowControls.maximize")}
+              onClick={() => performWindowAction("toggle-maximize")}
+            >
+              <span aria-hidden="true" />
+            </button>
+            <button
+              className="desktop-window-control is-close"
+              type="button"
+              aria-label={t("shell.windowControls.close")}
+              title={t("shell.windowControls.close")}
+              onClick={() => performWindowAction("close")}
+            >
+              <span aria-hidden="true" />
+            </button>
           </div>
-        )}
-        <div className="desktop-window-controls" data-window-no-drag="true">
-          <button
-            className="desktop-window-control is-minimize"
-            type="button"
-            aria-label={t("shell.windowControls.minimize")}
-            title={t("shell.windowControls.minimize")}
-            onClick={() => performWindowAction("minimize")}
-          >
-            <span aria-hidden="true" />
-          </button>
-          <button
-            className="desktop-window-control is-maximize"
-            type="button"
-            aria-label={t("shell.windowControls.maximize")}
-            title={t("shell.windowControls.maximize")}
-            onClick={() => performWindowAction("toggle-maximize")}
-          >
-            <span aria-hidden="true" />
-          </button>
-          <button
-            className="desktop-window-control is-close"
-            type="button"
-            aria-label={t("shell.windowControls.close")}
-            title={t("shell.windowControls.close")}
-            onClick={() => performWindowAction("close")}
-          >
-            <span aria-hidden="true" />
-          </button>
         </div>
       </div>
     </header>

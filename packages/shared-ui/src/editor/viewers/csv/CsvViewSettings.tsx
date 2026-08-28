@@ -7,7 +7,9 @@ import { useEffect, useId, useRef, useState } from "react";
 type CsvViewSettingsProps = Readonly<{
   direction: "ltr" | "rtl";
   headerEnabled: boolean;
+  onFitToViewport: () => void;
   onHeaderChange: (enabled: boolean) => void;
+  onResetColumnWidths: () => void;
   onRowNumbersChange: (visible: boolean) => void;
   rowNumbersVisible: boolean;
   t: MessageFormatter;
@@ -16,7 +18,9 @@ type CsvViewSettingsProps = Readonly<{
 export function CsvViewSettings({
   direction,
   headerEnabled,
+  onFitToViewport,
   onHeaderChange,
+  onResetColumnWidths,
   onRowNumbersChange,
   rowNumbersVisible,
   t,
@@ -115,6 +119,28 @@ export function CsvViewSettings({
             />
             <span className="csv-table-editor__view-toggle-track" aria-hidden="true" />
           </label>
+          <div className="csv-table-editor__view-actions" role="group">
+            <button
+              type="button"
+              className="csv-table-editor__view-action"
+              onClick={() => {
+                onFitToViewport();
+                setOpen(false);
+              }}
+            >
+              {t("editor.csv.fitToViewport")}
+            </button>
+            <button
+              type="button"
+              className="csv-table-editor__view-action"
+              onClick={() => {
+                onResetColumnWidths();
+                setOpen(false);
+              }}
+            >
+              {t("editor.csv.resetColumnWidths")}
+            </button>
+          </div>
         </div>
       )}
     </div>

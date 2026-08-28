@@ -53,13 +53,13 @@ describe("packaged Desktop Build Identity verification", () => {
       fixture.applicationPath,
       "Contents",
       "Resources",
-      "logo-square.png",
+      "puppy-app-image.png",
     ));
 
     await expect(verifyPackagedDesktopBuild({
       releaseDirectory: fixture.releaseDirectory,
       buildInfo: fixture.buildInfo,
-    })).rejects.toThrow(/missing Dock icon resource logo-square\.png/);
+    })).rejects.toThrow(/missing Dock icon resource puppy-app-image\.png/);
   });
 });
 
@@ -89,16 +89,9 @@ async function createFixture() {
     JSON.stringify({ name: "@puppyone/desktop", version: buildInfo.version }),
   );
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  for (const rendererAssetPath of [
-    "dist/logo-square.png",
-  ]) {
-    const target = path.join(sourceDirectory, rendererAssetPath);
-    await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.writeFile(target, png);
-  }
   await createPackage(sourceDirectory, path.join(resourcesDirectory, "app.asar"));
   for (const resourceFilename of [
-    "logo-square.png",
+    "puppy-app-image.png",
   ]) {
     await fs.writeFile(path.join(resourcesDirectory, resourceFilename), png);
   }

@@ -1,4 +1,9 @@
-import { useState, type ComponentProps, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useState,
+  type ComponentProps,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import { Plus } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
 import {
@@ -85,6 +90,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
   onNodeActionMenu: (node: DataNode, anchorRect: DOMRect, selectedNodes?: readonly DataNode[]) => void;
   preferences: DesktopPreferencesController;
   resolvedSurface: ResolvedWorkspaceSurface;
+  sidebarCompanion?: ReactNode;
   viewerExtensionAdapter: DataWorkspaceProps["viewerExtensionAdapter"];
   workspace: Workspace;
   workspaceKey: string;
@@ -113,6 +119,7 @@ export function DesktopDataWorkspaceSurface({
   onNodeActionMenu,
   preferences,
   resolvedSurface,
+  sidebarCompanion,
   viewerExtensionAdapter,
   workspace,
   workspaceKey,
@@ -305,8 +312,15 @@ export function DesktopDataWorkspaceSurface({
         explorerSlot={resolvedSurface.id === "data"
           ? undefined
           : <WorkspaceSurfaceOutlet region="sidebar" surface={resolvedSurface} />}
-        explorerFooterSlot={preferences.sidebarNavigationPlacement === "bottom"
-          ? <DesktopSidebarFooterNavigation {...navigationCommon} />
+        explorerFooterSlot={sidebarCompanion || preferences.sidebarNavigationPlacement === "bottom"
+          ? (
+              <div className="desktop-sidebar-companion-host">
+                {sidebarCompanion}
+                {preferences.sidebarNavigationPlacement === "bottom" && (
+                  <DesktopSidebarFooterNavigation {...navigationCommon} />
+                )}
+              </div>
+            )
           : undefined}
         mainSlot={resolvedSurface.id === "data"
           ? (state) => (

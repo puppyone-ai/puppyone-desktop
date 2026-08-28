@@ -1,7 +1,16 @@
 .csv-table-editor {
+  /* CSV is a data view, not a document card. Its viewport may fill the pane,
+     while the table keeps stable, content-owned tracks like a Notion view. */
+  --po-editable-table-cell-max-width: 560px;
+  --po-editable-table-row-min-height: 31px;
+  --po-editable-table-radius: 0px;
+  --po-editable-table-background: transparent;
+  --po-editable-table-header-background: transparent;
+  --po-editable-table-sticky-header-background: var(--po-editor-bg);
+  --po-editable-table-header-font-weight: 600;
   --csv-table-record-index-width: var(--po-editable-table-row-min-height);
-  --csv-table-record-index-background: color-mix(in srgb, var(--po-control) 38%, var(--po-editor-bg));
-  --csv-table-record-index-active-background: color-mix(in srgb, var(--po-hover) 58%, var(--po-editor-bg));
+  --csv-table-record-index-background: color-mix(in srgb, var(--po-control) 18%, var(--po-editor-bg));
+  --csv-table-record-index-active-background: color-mix(in srgb, var(--po-hover) 42%, var(--po-editor-bg));
   --csv-table-content-inline-start-inset: 32px;
   --csv-table-content-inline-end-inset: 32px;
   --csv-table-content-block-start-inset: 32px;
@@ -59,6 +68,34 @@
   inset-inline-end: 0;
   width: 196px;
   padding: 4px;
+}
+
+.csv-table-editor__view-actions {
+  display: grid;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--po-divider);
+}
+
+.csv-table-editor__view-action {
+  min-height: 32px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: color-mix(in srgb, var(--po-text-muted) 78%, var(--po-text));
+  cursor: var(--po-clickable-cursor, pointer);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: start;
+}
+
+.csv-table-editor__view-action:hover,
+.csv-table-editor__view-action:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--po-accent) 9%, var(--po-panel));
+  color: color-mix(in srgb, var(--po-accent) 70%, var(--po-text));
 }
 
 .csv-table-editor__view-toggle {
@@ -199,16 +236,16 @@
   vertical-align: top;
 }
 
-/* The semantic table owns one real outer frame, including its record-index
-   gutter. Cell borders are reserved for internal row and column separators. */
+/* A square, low-contrast data grid avoids the floating-card treatment. The
+   surrounding editor remains full width; this element owns only its tracks. */
 .csv-table-editor__table {
   width: max-content;
   min-width: 0;
   max-width: none;
   margin: 0;
   overflow: visible;
-  border: 1px solid var(--po-editable-table-border);
-  border-radius: var(--po-editable-table-radius);
+  border: 1px solid color-mix(in srgb, var(--po-editable-table-border) 72%, transparent);
+  border-radius: 0;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
@@ -223,6 +260,58 @@
   z-index: 5;
 }
 
+.csv-table-editor__column-resize-layer {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.csv-table-editor__column-resize-handle {
+  position: absolute;
+  width: 9px;
+  min-height: var(--po-editable-table-row-min-height);
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  cursor: col-resize;
+  opacity: 0;
+  pointer-events: none;
+  touch-action: none;
+  transform: translateX(-50%);
+  transition: opacity 100ms ease;
+}
+
+.csv-table-editor__column-resize-handle::before {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 4px;
+  width: 1px;
+  background: transparent;
+  content: "";
+  transition: background-color 100ms ease, box-shadow 100ms ease;
+}
+
+.csv-table-editor__column-resize-handle.is-visible,
+.csv-table-editor__column-resize-handle.is-resizing {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.csv-table-editor__column-resize-handle:hover::before,
+.csv-table-editor__column-resize-handle.is-resizing::before {
+  background: var(--po-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--po-accent) 18%, transparent);
+}
+
+.csv-table-editor__surface.is-column-resizing,
+.csv-table-editor__surface.is-column-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
 .csv-table-editor__table th,
 .csv-table-editor__table td {
   position: relative;
@@ -232,8 +321,8 @@
   max-width: var(--po-editable-table-cell-max-width);
   padding: 0;
   border: 0;
-  border-inline-end: 1px solid var(--po-editable-table-cell-border);
-  border-bottom: 1px solid var(--po-editable-table-cell-border);
+  border-inline-end: 1px solid color-mix(in srgb, var(--po-editable-table-cell-border) 78%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--po-editable-table-cell-border) 78%, transparent);
   text-align: start;
   vertical-align: top;
   white-space: normal;
@@ -392,12 +481,12 @@
 }
 
 .csv-table-editor__body-cell {
-  background: var(--po-editable-table-background);
+  background: transparent;
   color: var(--po-editable-table-body-color);
 }
 
 .csv-table-editor__table tbody td:hover {
-  background: var(--po-editable-table-cell-hover-background);
+  background: color-mix(in srgb, var(--po-editable-table-cell-hover-background) 72%, transparent);
 }
 
 .csv-table-editor__table th:focus-within,
@@ -710,6 +799,8 @@
   .csv-table-editor__view-toggle,
   .csv-table-editor__view-toggle-track,
   .csv-table-editor__view-toggle-track::after,
+  .csv-table-editor__column-resize-handle,
+  .csv-table-editor__column-resize-handle::before,
   .csv-table-editor__resize-handle,
   .csv-table-editor__resize-handle-visual {
     transition: none;

@@ -12,6 +12,11 @@ import {
 
 export const DEFAULT_BUILD_INFO_PATH = "generated/desktop-build-info.json";
 export const DEFAULT_BUILDER_CONFIG_PATH = "generated/electron-builder.json";
+const APP_IMAGE_SOURCE_BY_CHANNEL = Object.freeze({
+  dev: "assets/brand/puppy/puppy-app-image-dev.png",
+  internal: "assets/brand/puppy/puppy-app-image.png",
+  stable: "assets/brand/puppy/puppy-app-image.png",
+});
 
 export async function prepareDesktopBuild({
   repositoryRoot,
@@ -77,20 +82,18 @@ export function createDesktopElectronBuilderConfig({
   const extraResources = Array.isArray(baseBuild.extraResources)
     ? [...baseBuild.extraResources]
     : [];
-  const withoutGeneratedBuildInfo = extraResources.filter((entry) => (
-    entry?.to !== "build-info.json"
+  const appImageSource = APP_IMAGE_SOURCE_BY_CHANNEL[identity.channel];
+  const withoutManagedResources = extraResources.filter((entry) => (
+    entry?.to !== "build-info.json" && entry?.to !== "puppy-app-image.png"
   ));
-  withoutGeneratedBuildInfo.push({
+  withoutManagedResources.push({
+    from: appImageSource,
+    to: "puppy-app-image.png",
+  });
+  withoutManagedResources.push({
     from: buildInfoPath,
     to: "build-info.json",
   });
-  if (identity.channel === "dev") {
-    withoutGeneratedBuildInfo.push({
-      from: "public/logo-square-dev.png",
-      to: "logo-square-dev.png",
-    });
-  }
-
   const config = {
     ...baseBuild,
     appId: policy.applicationId,
@@ -102,7 +105,7 @@ export function createDesktopElectronBuilderConfig({
       ...(baseBuild.extraMetadata ?? {}),
       version: identity.version,
     },
-    extraResources: withoutGeneratedBuildInfo,
+    extraResources: withoutManagedResources,
     publish: policy.updateFeedUrl
       ? [{
           provider: "generic",
@@ -112,7 +115,7 @@ export function createDesktopElectronBuilderConfig({
       : [],
     mac: {
       ...(baseBuild.mac ?? {}),
-      ...(identity.channel === "dev" ? { icon: "public/logo-square-dev.png" } : {}),
+      icon: appImageSource,
       executableName: policy.applicationName,
       bundleShortVersion: identity.baseVersion,
       bundleVersion: identity.platformBuildNumber ?? identity.baseVersion,

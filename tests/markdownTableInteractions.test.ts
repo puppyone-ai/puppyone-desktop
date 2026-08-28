@@ -28,6 +28,7 @@ afterEach(() => {
   closeActiveMarkdownTableMenu();
   while (views.length > 0) views.pop()?.destroy();
   document.body.replaceChildren();
+  window.localStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -143,6 +144,107 @@ describe("Markdown table EditorView interactions", () => {
     firstCell.blur();
     expect(Array.from(table.querySelectorAll<HTMLTableColElement>("colgroup col"))
       .map((column) => column.style.width)).toEqual(widths);
+  });
+
+  it("caps compact initial tracks at 220px", () => {
+    const view = createTableView([
+      `| ${"wide ".repeat(80)} | B |`,
+      "| --- | --- |",
+      "| Alpha | Beta |",
+    ].join("\n"));
+    const widths = Array.from(
+      view.dom.querySelectorAll<HTMLTableColElement>(".cm-md-table-widget colgroup col"),
+      (column) => column.style.width,
+    );
+
+    expect(widths[0]).toBe("220px");
+    expect(Number.parseInt(widths[1] ?? "0", 10)).toBeLessThanOrEqual(220);
+
+    const firstHeader = view.dom.querySelector<HTMLTableCellElement>("thead th")!;
+    firstHeader.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    view.dom.querySelector<HTMLElement>(".cm-md-table-column-resize-handle")
+      ?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    expect(view.dom.querySelector<HTMLTableColElement>(
+      '.cm-md-table-widget col[data-md-table-column="0"]',
+    )?.style.width).toBe("280px");
+
+    const columnHandle = view.dom.querySelector<HTMLElement>(".cm-md-table-column-handle")!;
+    makeHandleCaptureSafe(columnHandle);
+    columnHandle.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true,
+      button: 0,
+      pointerId: 30,
+    }));
+    columnHandle.dispatchEvent(new PointerEvent("pointerup", {
+      bubbles: true,
+      button: 0,
+      pointerId: 30,
+    }));
+    Array.from(document.querySelectorAll<HTMLButtonElement>(
+      ".cm-md-table-context-menu button",
+    )).find((button) => button.textContent?.includes("Reset column widths"))?.click();
+    expect(view.dom.querySelector<HTMLTableColElement>(
+      '.cm-md-table-widget col[data-md-table-column="0"]',
+    )?.style.width).toBe("220px");
+  });
+
+  it("keeps a user-resized track stable across content commits and reopening", () => {
+    const view = createTableView();
+    const surface = view.dom.querySelector<HTMLElement>(".cm-md-table-surface")!;
+    const table = view.dom.querySelector<HTMLTableElement>(".cm-md-table-widget")!;
+    const firstHeader = table.querySelector<HTMLTableCellElement>("thead th")!;
+    const firstColumn = table.querySelector<HTMLTableColElement>(
+      'col[data-md-table-column="0"]',
+    )!;
+    const startWidth = Number.parseInt(firstColumn.style.width, 10);
+    mockRect(surface, rect(0, 0, 320, 140));
+    mockRect(table, rect(0, 20, 300, 110));
+    mockRect(firstHeader, rect(0, 20, startWidth, 31));
+
+    firstHeader.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    const resizeHandle = view.dom.querySelector<HTMLElement>(
+      ".cm-md-table-column-resize-handle",
+    )!;
+    expect(resizeHandle.classList.contains("is-visible")).toBe(true);
+    makeHandleCaptureSafe(resizeHandle);
+    resizeHandle.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true,
+      button: 0,
+      clientX: startWidth,
+      pointerId: 31,
+    }));
+    resizeHandle.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: startWidth + 84,
+      pointerId: 31,
+    }));
+    resizeHandle.dispatchEvent(new PointerEvent("pointerup", {
+      bubbles: true,
+      button: 0,
+      clientX: startWidth + 84,
+      pointerId: 31,
+    }));
+    const resizedWidth = startWidth + 84;
+    expect(firstColumn.style.width).toBe(`${resizedWidth}px`);
+
+    const firstBodyCell = view.dom.querySelector<HTMLElement>(
+      '.cm-md-table-cell-content[data-md-table-row="1"][data-md-table-column="0"]',
+    )!;
+    firstBodyCell.focus();
+    firstBodyCell.textContent = "a much longer value that must not resize the table geometry";
+    firstBodyCell.dispatchEvent(new InputEvent("input", { bubbles: true }));
+    firstBodyCell.blur();
+
+    const replacementRoot = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
+    expect(replacementRoot.dataset.mdTableColumnLayoutSession).toBeTruthy();
+    expect(replacementRoot.querySelector<HTMLTableColElement>(
+      'col[data-md-table-column="0"]',
+    )?.style.width).toBe(`${resizedWidth}px`);
+
+    const reopened = createTableView(source(view));
+    expect(reopened.dom.querySelector<HTMLTableColElement>(
+      '.cm-md-table-widget col[data-md-table-column="0"]',
+    )?.style.width).toBe(`${resizedWidth}px`);
   });
 
   it("renders adjacent prose as editor text instead of synthetic table rows", () => {
@@ -288,7 +390,13 @@ describe("Markdown table EditorView interactions", () => {
     const firstRoot = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
     const firstViewport = firstRoot.querySelector<HTMLElement>(".cm-md-table-scrollport")!;
     const firstSessionId = firstRoot.dataset.mdInlineViewportSession;
+    const firstColumnLayoutSessionId = firstRoot.dataset.mdTableColumnLayoutSession;
+    const firstColumnWidths = Array.from(
+      firstRoot.querySelectorAll<HTMLTableColElement>("colgroup col"),
+      (column) => column.style.width,
+    );
     expect(firstSessionId).toBeTruthy();
+    expect(firstColumnLayoutSessionId).toBeTruthy();
     expect(firstRoot.dataset.mdTableInlineViewport).toBe("true");
     expect(firstViewport.dataset.poScrollbar).toBe("hidden");
     expect(firstRoot.querySelector("[data-md-table-scroll-track='true']")).not.toBeNull();
@@ -305,18 +413,29 @@ describe("Markdown table EditorView interactions", () => {
     const replacementRoot = view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")!;
     expect(replacementRoot).not.toBe(firstRoot);
     expect(replacementRoot.dataset.mdInlineViewportSession).toBe(firstSessionId);
+    expect(replacementRoot.dataset.mdTableColumnLayoutSession).toBe(firstColumnLayoutSessionId);
+    expect(Array.from(
+      replacementRoot.querySelectorAll<HTMLTableColElement>("colgroup col"),
+      (column) => column.style.width,
+    ).slice(0, firstColumnWidths.length)).toEqual(firstColumnWidths);
 
     expect(undo(view)).toBe(true);
     await nextAnimationFrame();
     expect(
       view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")?.dataset.mdInlineViewportSession,
     ).toBe(firstSessionId);
+    expect(
+      view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")?.dataset.mdTableColumnLayoutSession,
+    ).toBe(firstColumnLayoutSessionId);
 
     expect(redo(view)).toBe(true);
     await nextAnimationFrame();
     expect(
       view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")?.dataset.mdInlineViewportSession,
     ).toBe(firstSessionId);
+    expect(
+      view.dom.querySelector<HTMLElement>(".cm-md-table-widget-wrap")?.dataset.mdTableColumnLayoutSession,
+    ).toBe(firstColumnLayoutSessionId);
   });
 
   it("syncs a reading-rail scrollbar with the wider table viewport", async () => {
@@ -605,6 +724,15 @@ describe("Markdown table EditorView interactions", () => {
     expect(defaultAlignment?.getAttribute("role")).toBe("menuitemradio");
     expect(defaultAlignment?.getAttribute("aria-checked")).toBe("true");
     expect(alignLeft?.getAttribute("aria-checked")).toBe("false");
+    expect(Array.from(
+      document.querySelectorAll<HTMLButtonElement>(".cm-md-table-context-menu button"),
+    ).some((button) => button.textContent?.includes("Auto fit column"))).toBe(true);
+    expect(Array.from(
+      document.querySelectorAll<HTMLButtonElement>(".cm-md-table-context-menu button"),
+    ).some((button) => button.textContent?.includes("Fit columns to viewport"))).toBe(true);
+    expect(Array.from(
+      document.querySelectorAll<HTMLButtonElement>(".cm-md-table-context-menu button"),
+    ).some((button) => button.textContent?.includes("Reset column widths"))).toBe(true);
 
     closeActiveMarkdownTableMenu();
     expect(handle.classList.contains("is-menu-active")).toBe(false);

@@ -23,22 +23,25 @@ export function resolveWindowChromeProfile(titlebar) {
 export function applyWindowChromeProfile(ownerWindow, titlebar) {
   const profile = resolveWindowChromeProfile(titlebar);
   activeWindowChromeProfiles.set(ownerWindow, profile);
-  synchronizeWindowChromeProfile(ownerWindow, profile);
+  synchronizeWindowChromeProfile(ownerWindow, profile, { applying: true });
   return profile;
 }
 
 export function reapplyWindowChromeProfile(ownerWindow) {
   const profile = activeWindowChromeProfiles.get(ownerWindow);
   if (!profile) return null;
-  synchronizeWindowChromeProfile(ownerWindow, profile);
+  synchronizeWindowChromeProfile(ownerWindow, profile, { applying: false });
   return profile;
 }
 
-function synchronizeWindowChromeProfile(ownerWindow, profile) {
-  ownerWindow.setWindowButtonVisibility?.(!profile.customControls);
+function synchronizeWindowChromeProfile(ownerWindow, profile, { applying }) {
+  if (applying || profile.customControls) {
+    ownerWindow.setWindowButtonVisibility?.(!profile.customControls);
+  }
   if (!profile.customControls && profile.windowButtonPosition) {
-    // AppKit may recreate the native traffic-light controls after they have
-    // been hidden. Reapply the reviewed position after restoring visibility.
+    // Native controls are already visible for the default profile. Reapplying
+    // visibility on every focus can rebuild their titlebar safe area and move
+    // renderer chrome; only their reviewed position needs to be restored.
     ownerWindow.setWindowButtonPosition?.({ ...profile.windowButtonPosition });
   }
 }

@@ -1179,6 +1179,7 @@ export function DataWorkspace({
     minWidth: minExplorerWidth,
     side: "inline-start",
     width: expandedExplorerWidth,
+    widthChangeMode: "end",
     onCollapsedChange: onExplorerCollapsedChange,
     onDragActiveChange: onExplorerResizeActiveChange,
     onWidthChange: setExplorerWidth,

@@ -2,7 +2,10 @@ import { ArrowRight, ChevronRight, RefreshCw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
-import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
+import {
+  RENDERER_ASSET_PATHS,
+  resolveRendererPublicAssetUrl,
+} from "@puppyone/shared-ui";
 import type {
   DesktopCloudAutomationProviderSpec,
   DesktopCloudRepositoryView,
@@ -389,7 +392,7 @@ function CloudAutomationAccessList({
                         </span>
                         <ArrowRight className="po-directional-icon" size={15} />
                         <span className="desktop-cloud-automation-path-trail">
-                          <img src={resolveRendererPublicAssetUrl("icons/folder.svg")} alt="" />
+                          <img src={resolveRendererPublicAssetUrl(RENDERER_ASSET_PATHS.icons.ui.folder)} alt="" />
                           <span>{targetPath}</span>
                         </span>
                       </span>

@@ -16,6 +16,7 @@
       "@puppyone/localization": ["packages/localization/src/index.ts"],
       "@puppyone/localization/*": ["packages/localization/src/*"],
       "@puppyone/shared-ui": ["packages/shared-ui/src/index.ts"],
+      "@puppyone/shared-ui/markdown-presentation-preview": ["packages/shared-ui/src/editor/markdown/MarkdownPresentationPreview.tsx"],
       "lucide-react": ["node_modules/lucide-react/dist/lucide-react.d.ts"],
       "react": ["node_modules/@types/react/index.d.ts"],
       "react/jsx-runtime": ["node_modules/@types/react/jsx-runtime.d.ts"]

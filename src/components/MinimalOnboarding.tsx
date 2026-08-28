@@ -3,9 +3,9 @@ import { AlertTriangle } from "lucide-react";
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type DragEvent as ReactDragEvent,
-  type ReactNode,
 } from "react";
 import {
   createTypographyRootProps,
@@ -33,8 +33,10 @@ import type {
 import { DesktopWindowDragRegion } from "./DesktopWindowChrome";
 import { OnboardingProjectEntryDialog } from "./OnboardingProjectEntryDialog";
 import { OnboardingBrandLockup } from "./onboarding/OnboardingBrandLockup";
+import { OnboardingEmptyStateIntro } from "./onboarding/OnboardingEmptyStateIntro";
 import { OnboardingEntryActions } from "./onboarding/OnboardingEntryActions";
 import { OnboardingProjectList } from "./onboarding/OnboardingProjectList";
+import { OnboardingTelemetryDisclosure } from "./onboarding/OnboardingTelemetryDisclosure";
 import type { OnboardingHomeState } from "./onboarding/types";
 
 export type { ProjectHomeItem, RecentWorkspaceHomeItem } from "../features/app-shell/workspaceHomeModel";
@@ -64,7 +66,6 @@ export type MinimalOnboardingProps = {
   pointerCursors: boolean;
   diffMarkers: DiffMarkers;
   resolvedTheme: "light" | "dark";
-  cornerSlot?: ReactNode;
 };
 
 /** Local repository entrypoint. Cloud is entered from an open repository only. */
@@ -87,7 +88,6 @@ export function MinimalOnboarding({
   pointerCursors,
   diffMarkers,
   resolvedTheme,
-  cornerSlot,
 }: MinimalOnboardingProps) {
   const { t } = useLocalization();
   const [error, setError] = useState<string | null>(initialError);
@@ -185,10 +185,43 @@ export function MinimalOnboarding({
 
   const hasProjects = items.length > 0;
   const onboardingState: OnboardingHomeState = hasProjects ? "projects" : "empty";
+  const [showEmptyStateIntro, setShowEmptyStateIntro] = useState(() => !hasProjects);
+  const homepageRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    setShowEmptyStateIntro(!hasProjects);
+  }, [hasProjects]);
+
+  useEffect(() => {
+    if (homepageRef.current) homepageRef.current.inert = showEmptyStateIntro;
+  }, [showEmptyStateIntro]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined;
+
+    const replayEmptyStateIntro = (event: KeyboardEvent) => {
+      if (
+        showEmptyStateIntro
+        || event.code !== "KeyL"
+        || !event.altKey
+        || !event.shiftKey
+        || event.metaKey
+        || event.ctrlKey
+      ) return;
+
+      event.preventDefault();
+      setShowEmptyStateIntro(true);
+    };
+
+    window.addEventListener("keydown", replayEmptyStateIntro);
+    return () => window.removeEventListener("keydown", replayEmptyStateIntro);
+  }, [showEmptyStateIntro]);
+
+  const completeEmptyStateIntro = () => setShowEmptyStateIntro(false);
 
   return (
     <main
-      className={`onboarding-shell onboarding-homepage-shell ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "dragging" : ""}`}
+      className={`onboarding-shell onboarding-homepage-shell ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "dragging" : ""} ${showEmptyStateIntro ? "is-empty-state-intro" : ""}`}
       data-onboarding-state={onboardingState}
       data-po-scrollbar="content"
       data-theme-mode={themeMode}
@@ -208,36 +241,43 @@ export function MinimalOnboarding({
     >
       <DesktopWindowDragRegion className="onboarding-titlebar" />
       <section
+        ref={homepageRef}
         className="onboarding-homepage"
         aria-label={t("onboarding.projects.title")}
+        aria-hidden={showEmptyStateIntro || undefined}
       >
-        <OnboardingBrandLockup state={onboardingState} resolvedTheme={resolvedTheme} />
+        <div className="onboarding-launcher">
+          <OnboardingBrandLockup state={onboardingState} resolvedTheme={resolvedTheme} />
 
-        {hasProjects && (
-          <OnboardingProjectList
-            items={items}
+          {hasProjects && (
+            <OnboardingProjectList
+              items={items}
+              busy={busy}
+              openingPath={openingPath}
+              removingPath={removingPath}
+              draggingPath={draggingPath}
+              onOpen={(path) => void openPath(path)}
+              onRemove={onRemoveProject ? (item) => void removeProject(item) : undefined}
+              onDragStart={startProjectDrag}
+              onDragEnd={() => setDraggingPath(null)}
+            />
+          )}
+
+          <OnboardingEntryActions
+            state={onboardingState}
             busy={busy}
-            openingPath={openingPath}
-            removingPath={removingPath}
-            draggingPath={draggingPath}
-            onOpen={(path) => void openPath(path)}
-            onRemove={onRemoveProject ? (item) => void removeProject(item) : undefined}
-            onDragStart={startProjectDrag}
-            onDragEnd={() => setDraggingPath(null)}
+            openingFolder={openingPath === "__new__"}
+            draggingFolder={folderDrop.dragging}
+            canCreateProject={Boolean(onCreateProject && onChooseProjectLocation)}
+            canCloneRepository={Boolean(onCloneRepository)}
+            footer={onboardingState === "empty" ? (
+              <OnboardingTelemetryDisclosure ready={!showEmptyStateIntro} />
+            ) : undefined}
+            onOpenFolder={() => void chooseFolder()}
+            onCreateProject={() => setEntryDialog("create")}
+            onCloneRepository={() => setEntryDialog("clone")}
           />
-        )}
-
-        <OnboardingEntryActions
-          state={onboardingState}
-          busy={busy}
-          openingFolder={openingPath === "__new__"}
-          draggingFolder={folderDrop.dragging}
-          canCreateProject={Boolean(onCreateProject && onChooseProjectLocation)}
-          canCloneRepository={Boolean(onCloneRepository)}
-          onOpenFolder={() => void chooseFolder()}
-          onCreateProject={() => setEntryDialog("create")}
-          onCloneRepository={() => setEntryDialog("clone")}
-        />
+        </div>
 
         {error && <div className="onboarding-error onboarding-homepage-error" role="alert"><AlertTriangle size={15} /><span>{error}</span></div>}
       </section>
@@ -259,7 +299,9 @@ export function MinimalOnboarding({
           onSubmit={(value) => onCloneRepository({ repositoryUrl: value })}
         />
       )}
-      {cornerSlot}
+      {showEmptyStateIntro && (
+        <OnboardingEmptyStateIntro onComplete={completeEmptyStateIntro} />
+      )}
     </main>
   );
 }

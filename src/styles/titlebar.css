@@ -7,9 +7,15 @@
   --desktop-titlebar-active: var(--po-selected);
   --desktop-titlebar-focus: var(--po-focus-ring);
   --desktop-titlebar-divider: var(--po-header-divider);
-  --desktop-titlebar-safe-area-x: env(titlebar-area-x, 80px);
-  --desktop-titlebar-safe-area-width: env(titlebar-area-width, calc(100% - 80px));
+  /* The native traffic lights use a fixed, profile-owned position. Derive
+   * both layout edges from the same stable inset instead of two independently
+   * refreshed titlebar-area environment values, which can change briefly when
+   * AppKit recreates window controls during focus/restore transitions. */
+  --desktop-titlebar-native-controls-inset: 80px;
+  --desktop-titlebar-safe-area-x: var(--desktop-titlebar-native-controls-inset);
+  --desktop-titlebar-safe-area-width: calc(100% - var(--desktop-titlebar-safe-area-x));
   --desktop-titlebar-content-start: 6px;
+  --desktop-titlebar-drag-min-width: 32px;
   position: relative;
   z-index: 40;
   box-sizing: border-box;
@@ -29,14 +35,21 @@
 }
 
 .desktop-titlebar-layout {
-  display: flex;
+  display: grid;
   box-sizing: border-box;
+  grid-template-columns:
+    minmax(0, max-content)
+    minmax(var(--desktop-titlebar-drag-min-width), 1fr)
+    max-content;
   align-items: center;
   gap: 6px;
   width: var(--desktop-titlebar-safe-area-width);
   height: 100%;
   margin-left: var(--desktop-titlebar-safe-area-x);
-  padding: 4px 6px 5px var(--desktop-titlebar-content-start);
+  /* The divider is absolutely positioned and consumes no layout space. Keep
+   * block insets symmetric so controls land on whole pixels at the default
+   * 38px/24px chrome geometry instead of being shifted by half a pixel. */
+  padding: 0 6px 0 var(--desktop-titlebar-content-start);
 }
 
 /* Keep the app-owned divider out of the native window frame's edge pixels. */
@@ -76,6 +89,8 @@
 }
 
 .desktop-titlebar-context {
+  --desktop-titlebar-workspace-max-width: 220px;
+  --desktop-titlebar-branch-max-width: 200px;
   display: flex;
   flex: 0 1 auto;
   height: 100%;
@@ -122,9 +137,17 @@
 }
 
 .desktop-titlebar-drag-fill {
-  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
   align-self: stretch;
+}
+
+.desktop-titlebar-trailing {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: end;
+  gap: 6px;
 }
 
 .desktop-titlebar-actions {
@@ -249,11 +272,12 @@
 .desktop-titlebar-workspace-wrap {
   position: relative;
   display: flex;
-  flex: 0 1 auto;
+  width: max-content;
+  max-width: var(--desktop-titlebar-workspace-max-width);
+  min-width: 0;
+  flex: 0 0 auto;
   height: 100%;
   align-items: center;
-  max-width: 100%;
-  min-width: 0;
 }
 
 .desktop-titlebar-workspace-button {
@@ -357,11 +381,12 @@
 .desktop-titlebar-branch-wrap {
   position: relative;
   display: flex;
+  width: max-content;
+  max-width: var(--desktop-titlebar-branch-max-width);
+  min-width: var(--desktop-titlebar-tool-action-width);
   flex: 0 1 auto;
   height: 100%;
   align-items: center;
-  min-width: 0;
-  max-width: 100%;
 }
 
 .desktop-titlebar-branch-button {
@@ -369,7 +394,7 @@
   align-items: center;
   gap: 6px;
   justify-content: start;
-  width: auto;
+  width: 100%;
   max-width: 100%;
   height: var(--desktop-titlebar-control-height);
   min-width: 0;
@@ -411,31 +436,6 @@
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/*
- * At the native minimum width the optional panes leave the workbench, while
- * titlebar tools stay reachable. Give the workspace/branch context the
- * remaining flexible space and truncate labels instead of overflowing tools.
- */
-@media (max-width: 720px) {
-  .desktop-titlebar {
-    --desktop-titlebar-button-gap: 1px;
-    gap: 2px;
-    padding-inline-end: 4px;
-  }
-
-  .desktop-titlebar-left {
-    overflow: hidden;
-  }
-
-  .desktop-titlebar-context {
-    overflow: hidden;
-  }
-
-  .desktop-titlebar-action-divider {
-    margin-inline: 1px;
-  }
 }
 
 .desktop-branch-menu {

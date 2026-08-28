@@ -3,7 +3,7 @@
  *
  * Desktop production uses a relative base because Electron loads the renderer
  * from `app.asar/dist/index.html`. Root-relative URLs would instead resolve to
- * the filesystem root (for example, `file:///icons/...`).
+ * the filesystem root (for example, `file:///assets/icons/...`).
  */
 export function resolveRendererPublicAssetUrl(
   assetPath: string,

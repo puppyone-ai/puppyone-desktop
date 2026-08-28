@@ -77,13 +77,13 @@
 }
 
 .dark .desktop-terminal-launcher-icon.is-cursor img {
-  content: url("/icons/agent-cursor-dark.svg");
+  content: url("/assets/icons/agents/cursor-dark.svg");
 }
 
 .dark .desktop-terminal-launcher-icon.is-codex img {
-  content: url("/icons/agent-codex-dark.png");
+  content: url("/assets/icons/agents/codex-dark.png");
 }
 
 .dark .desktop-terminal-launcher-icon.is-pi img {
-  content: url("/icons/agent-pi-dark.svg");
+  content: url("/assets/icons/agents/pi-dark.svg");
 }
