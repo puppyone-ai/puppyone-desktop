@@ -207,6 +207,14 @@
   }
 
   .desktop-cloud-overview-hosting-art {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .desktop-cloud-overview-hosting-backdrop {
+    position: absolute;
+    inset: 0;
     display: block;
     width: 100%;
     height: 100%;
@@ -214,7 +222,6 @@
   }
 
   .desktop-cloud-overview-hosting-cloud,
-  .desktop-cloud-overview-hosting-folder,
   .desktop-cloud-overview-hosting-status {
     stroke-linejoin: round;
   }
@@ -223,17 +230,6 @@
     fill: color-mix(in srgb, var(--po-text) 3%, var(--po-canvas));
     stroke: color-mix(in srgb, var(--po-text) 32%, transparent);
     stroke-width: 5px;
-  }
-
-  .desktop-cloud-overview-hosting-folder {
-    fill: color-mix(in srgb, #d6aa50 14%, var(--po-canvas));
-    stroke: color-mix(in srgb, #d6aa50 78%, var(--po-text));
-    stroke-width: 4px;
-  }
-
-  .desktop-cloud-overview-hosting-folder-rim {
-    stroke: color-mix(in srgb, #d6aa50 68%, var(--po-text));
-    stroke-width: 3px;
   }
 
   .desktop-cloud-overview-hosting-connector {
@@ -255,6 +251,36 @@
     stroke: color-mix(in srgb, var(--po-text) 30%, transparent);
     stroke-width: 7px;
     stroke-linecap: round;
+  }
+
+  .desktop-cloud-overview-hosting-folder-mark {
+    position: absolute;
+    inset-inline-start: 50%;
+    top: 48%;
+    display: grid;
+    width: 138px;
+    height: 121px;
+    place-items: center;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+  }
+
+  .desktop-cloud-overview-hosting-folder-shape {
+    display: block;
+    width: 138px;
+    height: 121px;
+    overflow: visible;
+    filter: drop-shadow(0 7px 11px rgba(102, 70, 16, 0.14));
+  }
+
+  .desktop-cloud-overview-hosting-folder-logo {
+    position: absolute;
+    inset-inline-start: 50%;
+    top: 63px;
+    width: 28px;
+    height: 28px;
+    color: #181714;
+    transform: translateX(-50%) rotate(-2deg);
   }
 
   .desktop-cloud-activation-faux-copy {

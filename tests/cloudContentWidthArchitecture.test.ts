@@ -78,11 +78,15 @@ describe("Cloud content width architecture", () => {
     expect(activation).toContain("isolation: isolate;");
     expect(activation).toContain(".desktop-cloud-overview-hosting-art");
     expect(activation).toContain("color-mix(in srgb, var(--po-text) 32%, transparent)");
-    expect(activation).toContain("color-mix(in srgb, #d6aa50 14%, var(--po-canvas))");
+    expect(activation).toContain(".desktop-cloud-overview-hosting-folder-mark");
+    expect(activation).toContain(".desktop-cloud-overview-hosting-folder-shape");
+    expect(activation).toContain(".desktop-cloud-overview-hosting-folder-logo");
     expect(activationComponent).toContain("CloudOverviewHostingIllustration");
     expect(overviewIllustration).toContain('viewBox="0 0 320 260"');
     expect(overviewIllustration).toContain("desktop-cloud-overview-hosting-cloud");
-    expect(overviewIllustration).toContain("desktop-cloud-overview-hosting-folder");
+    expect(overviewIllustration).toContain("CloudPublishFolderMark");
+    expect(overviewIllustration).toContain("McpLogoIcon");
+    expect(overviewIllustration).toContain("desktop-cloud-overview-hosting-folder-mark");
     expect(overviewIllustration).toContain("desktop-cloud-overview-hosting-status");
     expect(overviewIllustration).not.toContain("linearGradient");
     expect(activationComponent).not.toContain("desktop-cloud-activation-overview-cloud");
