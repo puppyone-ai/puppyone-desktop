@@ -512,13 +512,6 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   font-weight: 500;
 }
 
-.desktop-project-menu .desktop-menu-section-label {
-  padding: 0 var(--po-menu-item-padding-inline) 5px;
-  font-size: 10px;
-  font-weight: 650;
-  line-height: 14px;
-}
-
 .desktop-project-menu .desktop-menu-item-label {
   font-size: 13px;
   font-weight: 500;
@@ -531,20 +524,9 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
 
 .desktop-project-list {
   display: grid;
+  gap: 2px;
   min-height: 0;
   overflow: auto;
-}
-
-.desktop-project-section {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.desktop-project-section + .desktop-project-section {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--po-divider);
 }
 
 .desktop-project-mark {
@@ -557,28 +539,9 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   color: var(--po-text-muted);
 }
 
-.desktop-project-mark.linked {
-  color: color-mix(
-    in srgb,
-    color-mix(in oklab, var(--po-info) 78%, var(--po-accent)) 86%,
-    var(--po-text) 14%
-  );
-}
-
-.desktop-project-option:hover .desktop-project-mark,
 .desktop-project-option.selected .desktop-project-mark,
-.desktop-project-option-row.selected .desktop-project-mark,
-.desktop-project-option-row:hover .desktop-project-mark,
-.desktop-project-option-row:focus-within .desktop-project-mark {
+.desktop-project-option-row.selected .desktop-project-mark {
   color: var(--po-text);
-}
-
-.desktop-project-option:hover .desktop-project-mark.linked,
-.desktop-project-option.selected .desktop-project-mark.linked,
-.desktop-project-option-row.selected .desktop-project-mark.linked,
-.desktop-project-option-row:hover .desktop-project-mark.linked,
-.desktop-project-option-row:focus-within .desktop-project-mark.linked {
-  color: color-mix(in oklab, var(--po-info) 78%, var(--po-accent));
 }
 
 .desktop-project-option-row {
@@ -590,12 +553,10 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
 .desktop-project-option-row > .desktop-project-option {
   width: 100%;
   padding-inline-end: calc(var(--po-menu-item-padding-inline) + 26px);
+  cursor: default;
 }
 
-/* Match VS Code's single-line recent-workspace hierarchy: the project name is
-   primary and keeps its intrinsic width, while the parent path absorbs the
-   available-space truncation. Extremely long names remain bounded so the
-   location never disappears completely. */
+/* Keep the current project and its parent path on one quiet status row. */
 .desktop-project-option .desktop-menu-item-label {
   max-width: 65%;
   flex: 0 0 auto;
@@ -608,8 +569,6 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   text-align: start;
 }
 
-.desktop-project-option-row:hover > .desktop-project-option:not(:disabled),
-.desktop-project-option-row:focus-within > .desktop-project-option:not(:disabled),
 .desktop-project-option-row.selected > .desktop-project-option {
   background: var(--po-hover);
   color: var(--po-text);
@@ -627,36 +586,6 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   color: var(--po-text);
   pointer-events: none;
   transform: translateY(-50%);
-  transition: opacity 0.12s ease;
-}
-
-.desktop-project-copy-path {
-  position: absolute;
-  top: 50%;
-  inset-inline-end: 5px;
-  z-index: 1;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-50%);
-  transition: opacity 0.12s ease;
-}
-
-.desktop-project-option-row:hover .desktop-project-copy-path,
-.desktop-project-option-row:focus-within .desktop-project-copy-path,
-.desktop-project-copy-path.is-copied {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.desktop-project-option-row:hover .desktop-project-current-indicator,
-.desktop-project-option-row:focus-within .desktop-project-current-indicator {
-  opacity: 0;
-}
-
-.desktop-project-copy-path.is-copied,
-.desktop-project-copy-path.is-copied:hover {
-  background: color-mix(in srgb, var(--po-success) 14%, var(--po-control));
-  color: var(--po-success);
 }
 
 .desktop-project-actions {
@@ -667,9 +596,11 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   border-top: 1px solid var(--po-divider);
 }
 
-.desktop-project-home {
-  margin-top: 0;
-  margin-bottom: 10px;
+.desktop-project-home-group {
+  display: grid;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--po-divider);
 }
 
 .desktop-project-menu .desktop-project-add-folder:disabled {

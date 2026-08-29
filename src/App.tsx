@@ -55,7 +55,6 @@ import {
 } from "./features/app-shell/DesktopShellLocationBar";
 import { DesktopOverlayPortal } from "./features/app-shell/DesktopOverlayPortal";
 import { DesktopHelpLauncher } from "./features/app-shell/DesktopHelpLauncher";
-import type { DesktopWorkspaceSwitcherItem } from "./features/app-shell/DesktopWorkspaceSwitcher";
 import { RestoringWorkspaceScreen } from "./features/app-shell/RestoringWorkspaceScreen";
 import { useDesktopPreferences } from "./features/app-shell/useDesktopPreferences";
 import { resolveMarkdownPresentationStyle } from "./features/markdown/markdownPresentation";
@@ -451,28 +450,6 @@ function AppContent() {
     setActiveExplorerNode(null);
     resetDataNodeActions();
   }, [resetDataNodeActions, setBranchSwitcherOpen, setGitOperationError, setGitOperationLoading, workspace?.path]);
-
-  const openWorkspaceSwitcherItem = useCallback((item: DesktopWorkspaceSwitcherItem) => {
-    if (item.id === workspace?.id) {
-      setSwitcherOpen(false);
-      return;
-    }
-
-    void (async () => {
-      if (!await drainWorkspaceNavigation()) return;
-      await openWorkspaceTarget({
-        kind: "local",
-        path: item.workspace.path,
-      }).then(handleWorkspaceOpenResult);
-    })().catch((error) => {
-      setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
-    });
-  }, [
-    drainWorkspaceNavigation,
-    handleWorkspaceOpenResult,
-    setRestoreWorkspaceError,
-    workspace?.id,
-  ]);
 
   const cloudResolutionInputsLoading = shouldBlockWorkspaceCloudResolution({
     gitStatusError,
@@ -892,7 +869,6 @@ function AppContent() {
       onGoHome={() => void goToHomepage()}
       onCloseWorkspaceSwitcher={closeWorkspaceSwitcher}
       onOpenFolder={openFolder}
-      onOpenWorkspaceSwitcherItem={openWorkspaceSwitcherItem}
       onCloseBranchSwitcher={closeBranchSwitcher}
       onToggleBranchSwitcher={toggleBranchSwitcher}
       onToggleWorkspaceSwitcher={toggleWorkspaceSwitcher}

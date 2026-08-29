@@ -1,13 +1,8 @@
-import { useEffect, useRef, useState, type MouseEvent, type RefObject } from "react";
+import type { RefObject } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
-import { ArrowLeft, Check, Copy, Folder, FolderOpen, FolderPlus } from "lucide-react";
-import {
-  DesktopMenuIconButton,
-  DesktopMenuItem,
-  DesktopMenuSection,
-} from "../../components/DesktopMenu";
+import { ArrowLeft, Check, Folder, FolderOpen, FolderPlus } from "lucide-react";
+import { DesktopMenuItem } from "../../components/DesktopMenu";
 import { DesktopTitlebarMenuLayer } from "./DesktopTitlebarMenuLayer";
-import { writeClipboardText } from "../settings/utils";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
 
 export type DesktopWorkspaceSwitcherItem = {
@@ -27,7 +22,6 @@ type DesktopWorkspaceSwitcherProps = {
   onAddFolder?: () => void;
   onClose: () => void;
   onOpenFolder: () => void;
-  onOpenItem: (item: DesktopWorkspaceSwitcherItem) => void;
   onGoHome: () => void;
   onToggle: () => void;
 };
@@ -41,7 +35,6 @@ export function DesktopWorkspaceSwitcher({
   onAddFolder,
   onClose,
   onOpenFolder,
-  onOpenItem,
   onGoHome,
   onToggle,
 }: DesktopWorkspaceSwitcherProps) {
@@ -53,23 +46,12 @@ export function DesktopWorkspaceSwitcher({
     title: `${workspace.name} - ${workspace.path}`,
     workspace,
   };
-  const recentItems = items.filter((item) => item.id !== workspace.id);
-  const renderProjectRows = (projectItems: DesktopWorkspaceSwitcherItem[]) => projectItems.map((item) => (
-    <DesktopProjectMenuRow
-      key={item.id}
-      item={item}
-      selected={item.id === workspace.id}
-      onOpen={() => onOpenItem(item)}
-    />
-  ));
-
   return (
     <div className="desktop-titlebar-workspace-wrap" ref={refObject}>
       <button
         className="desktop-titlebar-workspace-button local"
         type="button"
-        aria-label={t("shell.workspaceSwitcher.switch", {
-          kind: t("shell.workspaceSwitcher.kind.local"),
+        aria-label={t("shell.workspaceSwitcher.openMenu", {
           workspace: bidiIsolate(workspace.name),
         })}
         aria-expanded={open}
@@ -90,38 +72,27 @@ export function DesktopWorkspaceSwitcher({
         open={open}
         preferredMaxHeight={520}
       >
-        <DesktopMenuItem
-          className="desktop-project-add desktop-project-home"
-          icon={<ArrowLeft className="po-directional-icon" size={15} strokeWidth={1.9} />}
-          label={t("shell.workspaceSwitcher.home")}
-          onClick={onGoHome}
-        />
+        <div className="desktop-project-home-group">
+          <DesktopMenuItem
+            className="desktop-project-add desktop-project-home"
+            icon={<ArrowLeft className="po-directional-icon" size={15} strokeWidth={1.9} />}
+            label={t("shell.workspaceSwitcher.home")}
+            onClick={onGoHome}
+          />
+        </div>
         <div
           className="desktop-project-list"
           data-po-scrollbar="menu"
-          data-workspace-menu-layout="project-switcher-v2"
+          data-workspace-menu-layout="project-context-v1"
         >
-          <DesktopMenuSection
-            className="desktop-project-section desktop-project-current-section"
-            label={t("shell.workspaceSwitcher.currentWorkspace")}
-          >
-            {renderProjectRows([currentItem])}
-            <DesktopMenuItem
-              className="desktop-project-add desktop-project-add-folder"
-              disabled={!onAddFolder}
-              icon={<FolderPlus size={15} strokeWidth={1.8} />}
-              label={t("shell.workspaceSwitcher.addProject")}
-              onClick={onAddFolder}
-            />
-          </DesktopMenuSection>
-          {recentItems.length > 0 ? (
-            <DesktopMenuSection
-              className="desktop-project-section desktop-project-recent-section"
-              label={t("shell.workspaceSwitcher.recentProjects")}
-            >
-              {renderProjectRows(recentItems)}
-            </DesktopMenuSection>
-          ) : null}
+          <DesktopProjectCurrentRow item={currentItem} />
+          <DesktopMenuItem
+            className="desktop-project-add desktop-project-add-folder"
+            disabled={!onAddFolder}
+            icon={<FolderPlus size={15} strokeWidth={1.8} />}
+            label={t("shell.workspaceSwitcher.addProject")}
+            onClick={onAddFolder}
+          />
         </div>
         <div className="desktop-project-actions">
           <DesktopMenuItem
@@ -136,50 +107,19 @@ export function DesktopWorkspaceSwitcher({
   );
 }
 
-function DesktopProjectMenuRow({
+function DesktopProjectCurrentRow({
   item,
-  selected,
-  onOpen,
 }: {
   item: DesktopWorkspaceSwitcherItem;
-  selected: boolean;
-  onOpen: () => void;
 }) {
-  const { t } = useLocalization();
-  const path = getProjectCopyPath(item);
-  const [copied, setCopied] = useState(false);
-  const copiedResetRef = useRef<number | null>(null);
-
-  useEffect(() => () => {
-    if (copiedResetRef.current !== null) window.clearTimeout(copiedResetRef.current);
-  }, []);
-
-  const handleCopyPath = async (event: MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!path) return;
-
-    try {
-      await writeClipboardText(path);
-      setCopied(true);
-      if (copiedResetRef.current !== null) window.clearTimeout(copiedResetRef.current);
-      copiedResetRef.current = window.setTimeout(() => {
-        setCopied(false);
-        copiedResetRef.current = null;
-      }, 1400);
-    } catch {
-      setCopied(false);
-    }
-  };
-
   return (
-    <div className={`desktop-project-option-row ${selected ? "selected" : ""}`}>
-      <button
-        className={`desktop-menu-item desktop-project-option ${selected ? "selected" : ""}`}
-        type="button"
+    <div className="desktop-project-option-row selected">
+      <div
+        className="desktop-menu-item desktop-project-option selected"
         role="menuitem"
+        aria-current="true"
+        aria-disabled="true"
         title={item.title}
-        onClick={onOpen}
       >
         <span className="desktop-menu-item-icon">
           <ProjectTypeMark className="desktop-project-mark" />
@@ -196,33 +136,12 @@ function DesktopProjectMenuRow({
             </bdi>
           )}
         </span>
-      </button>
-      {selected ? (
-        <span className="desktop-project-current-indicator" aria-hidden="true">
-          <Check size={14} strokeWidth={2.2} />
-        </span>
-      ) : null}
-      {path ? (
-        <DesktopMenuIconButton
-          className={`desktop-project-copy-path ${copied ? "is-copied" : ""}`}
-          label={copied
-            ? t("shell.workspaceSwitcher.pathCopied")
-            : t("shell.workspaceSwitcher.copyPathFor", { project: bidiIsolate(item.label) })}
-          title={t(copied ? "common.action.copied" : "shell.workspaceSwitcher.copyPath")}
-          icon={copied
-            ? <Check size={13} strokeWidth={2.2} aria-hidden="true" />
-            : <Copy size={13} strokeWidth={1.9} aria-hidden="true" />}
-          onClick={(event) => void handleCopyPath(event)}
-        />
-      ) : null}
+      </div>
+      <span className="desktop-project-current-indicator" aria-hidden="true">
+        <Check size={14} strokeWidth={2.2} />
+      </span>
     </div>
   );
-}
-
-export function getProjectCopyPath(item: DesktopWorkspaceSwitcherItem): string | null {
-  const path = item.workspace.path?.trim();
-  if (!path) return null;
-  return path;
 }
 
 function ProjectTypeMark({

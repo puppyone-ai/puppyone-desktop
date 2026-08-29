@@ -31,7 +31,6 @@ describe("titlebar Portal menu interactions", () => {
     const onClose = vi.fn();
     const onAddFolder = vi.fn();
     const onOpenFolder = vi.fn();
-    const onOpenItem = vi.fn();
     const workspace = createWorkspace("one", "Workspace one");
     const currentItem = {
       id: workspace.id,
@@ -40,7 +39,7 @@ describe("titlebar Portal menu interactions", () => {
       title: workspace.name,
       workspace,
     };
-    const item = {
+    const recentItem = {
       id: "two",
       label: "Workspace two",
       detail: "/tmp/two",
@@ -55,11 +54,10 @@ describe("titlebar Portal menu interactions", () => {
           refObject={anchorRef}
           titlebarLabel={workspace.name}
           workspace={workspace}
-          items={[currentItem, item]}
+          items={[currentItem, recentItem]}
           onAddFolder={onAddFolder}
           onClose={onClose}
           onOpenFolder={onOpenFolder}
-          onOpenItem={onOpenItem}
           onGoHome={onGoHome}
           onToggle={vi.fn()}
         />,
@@ -71,26 +69,27 @@ describe("titlebar Portal menu interactions", () => {
     expect(container.contains(menu)).toBe(false);
     expect(menu.dataset.windowNoDrag).toBe("true");
     expect(menu.style.width).toBe("300px");
-    expect(menu.querySelector("[data-workspace-menu-layout='project-switcher-v2']"))
+    expect(menu.querySelector("[data-workspace-menu-layout='project-context-v1']"))
       .not.toBeNull();
     expect(menu.textContent).toContain("Home");
-    expect(menu.textContent).toContain("Current workspace");
     expect(menu.textContent).toContain("Add Project…");
     expect(menu.textContent).toContain("Open Folder in New Window…");
-    expect(menu.textContent).toContain("Recent projects");
-    expect(menu.querySelector(".desktop-project-current-section .desktop-project-current-indicator"))
-      .not.toBeNull();
-    expect(menu.querySelector(".desktop-project-recent-section .desktop-project-current-indicator"))
-      .toBeNull();
+    expect(menu.textContent).toContain("Workspace one");
+    expect(menu.textContent).not.toContain("Current workspace");
+    expect(menu.textContent).not.toContain("Recent projects");
+    expect(menu.textContent).not.toContain("Workspace two");
+    expect(menu.querySelector(".desktop-project-home-group")).not.toBeNull();
+    expect(menu.querySelector(".desktop-project-current-indicator")).not.toBeNull();
+    expect(menu.querySelector(".desktop-project-copy-path")).toBeNull();
+    expect(menu.querySelector(".desktop-project-option")?.getAttribute("aria-disabled"))
+      .toBe("true");
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-home")?.click());
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-add-folder")?.click());
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-open-folder")?.click());
-    act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-recent-section .desktop-project-option")?.click());
 
     expect(onGoHome).toHaveBeenCalledOnce();
     expect(onAddFolder).toHaveBeenCalledOnce();
     expect(onOpenFolder).toHaveBeenCalledOnce();
-    expect(onOpenItem).toHaveBeenCalledWith(item);
   });
 
   it("dismisses a titlebar menu when the user points outside it", async () => {
@@ -111,7 +110,6 @@ describe("titlebar Portal menu interactions", () => {
           items={[]}
           onClose={onClose}
           onOpenFolder={vi.fn()}
-          onOpenItem={vi.fn()}
           onGoHome={vi.fn()}
           onToggle={vi.fn()}
         />,
@@ -160,7 +158,6 @@ describe("titlebar Portal menu interactions", () => {
           onCloseWorkspaceSwitcher={vi.fn()}
           onGoHome={vi.fn()}
           onOpenFolder={vi.fn()}
-          onOpenWorkspaceSwitcherItem={vi.fn()}
           onToggleBranchSwitcher={vi.fn()}
           onToggleWorkspaceSwitcher={vi.fn()}
         />,

@@ -36,7 +36,6 @@ export function WorkspaceMenuVisualSmokeHarness() {
             onAddFolder={() => undefined}
             onClose={() => undefined}
             onOpenFolder={() => undefined}
-            onOpenItem={() => undefined}
             onGoHome={() => undefined}
             onToggle={() => undefined}
           />

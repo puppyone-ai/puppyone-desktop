@@ -28,7 +28,6 @@ export function DesktopTitlebarContext({
   onCloseWorkspaceSwitcher,
   onGoHome,
   onOpenFolder,
-  onOpenWorkspaceSwitcherItem,
   onToggleBranchSwitcher,
   onToggleWorkspaceSwitcher,
 }: DesktopTitlebarContextProps) {
@@ -52,7 +51,6 @@ export function DesktopTitlebarContext({
         items={workspaceSwitcherItems}
         onClose={onCloseWorkspaceSwitcher}
         onOpenFolder={onOpenFolder}
-        onOpenItem={onOpenWorkspaceSwitcherItem}
         onGoHome={onGoHome}
         onToggle={onToggleWorkspaceSwitcher}
       />
@@ -91,7 +89,6 @@ type DesktopTitlebarContextProps = {
   onCloseWorkspaceSwitcher: () => void;
   onGoHome: () => void;
   onOpenFolder: () => void;
-  onOpenWorkspaceSwitcherItem: (item: DesktopWorkspaceSwitcherItem) => void;
   onToggleBranchSwitcher: () => void;
   onToggleWorkspaceSwitcher: () => void;
 };
