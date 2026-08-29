@@ -71,8 +71,8 @@ cloudflare/desktop-telemetry/
    into the telemetry envelope.
 7. The queue is bounded to 32 events and seven days. Retry logs contain only a
    status code and retryability flag, never the payload.
-8. The checked-in Cloudflare deployment defaults to `paused`; its D1 identifier
-   is a non-existent sentinel and the Stable client endpoint remains unset.
+8. The Stable client pins a first-party HTTPS endpoint, and the production edge
+   runs in `accept` mode. `discard` remains the emergency privacy kill switch.
 9. D1 stores no IP address, User-Agent, account, or workspace column. Worker
    invocation logs are disabled.
 
@@ -116,14 +116,13 @@ The client sends a bounded batch to a first-party HTTPS endpoint:
 }
 ```
 
-The edge service must validate the same schema, rate limit abusive clients,
+The edge service validates the same schema, rate limits abusive clients,
 discard raw IP addresses and user-agent strings before durable storage, and
 aggregate individual events on a documented retention schedule. The ingestion
-URL remains deliberately unset in
-`shared/desktop-telemetry-distribution-contract.mjs` until those controls are
-deployed. Open-source clients cannot hold a trustworthy secret, so telemetry is
-for product trends only and must never authorize access, drive billing, or act
-as a security signal.
+URL is pinned to the first-party production route in
+`shared/desktop-telemetry-distribution-contract.mjs`. Open-source clients cannot
+hold a trustworthy secret, so telemetry is for product trends only and must
+never authorize access, drive billing, or act as a security signal.
 
 ## Metrics
 

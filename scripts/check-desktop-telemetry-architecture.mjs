@@ -12,6 +12,7 @@ import { DESKTOP_STABLE_TELEMETRY_INGEST_URL } from "../shared/desktop-telemetry
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const errors = [];
+const expectedStableEndpoint = "https://telemetry.puppyone.ai/v1/desktop/events";
 
 if (DESKTOP_TELEMETRY_LEVELS.join(",") !== "off,basic") {
   errors.push("the default-on telemetry contract must remain limited to off and basic");
@@ -52,6 +53,9 @@ if (DESKTOP_STABLE_TELEMETRY_INGEST_URL !== null) {
   ) {
     errors.push("the Stable telemetry endpoint must be a first-party HTTPS URL without credentials or URL parameters");
   }
+}
+if (DESKTOP_STABLE_TELEMETRY_INGEST_URL !== expectedStableEndpoint) {
+  errors.push(`the active Stable telemetry endpoint must be pinned to ${expectedStableEndpoint}`);
 }
 
 const mainSource = await readText("electron/main.mjs");
@@ -101,13 +105,13 @@ if (/ip_address|user_agent|email|account|workspace|repository/i.test(migrationSo
 }
 
 const wranglerSource = await readText("cloudflare/desktop-telemetry/wrangler.jsonc");
-requireSource(wranglerSource, '"TELEMETRY_MODE": "paused"', "new telemetry edge deployments must default to paused");
+requireSource(wranglerSource, '"TELEMETRY_MODE": "accept"', "the production telemetry edge must accept Stable events");
 requireSource(wranglerSource, '"invocation_logs": false', "Cloudflare invocation logs must remain disabled");
 requireSource(wranglerSource, '"send_metrics": false', "project-scoped Wrangler usage telemetry must remain disabled");
 requireSource(wranglerSource, '"enabled": false', "Wrangler dependency instrumentation must remain disabled");
 requireSource(wranglerSource, '"binding": "DB"', "the edge must use an explicit D1 binding");
-if (DESKTOP_STABLE_TELEMETRY_INGEST_URL !== null && /"TELEMETRY_MODE"\s*:\s*"paused"/.test(wranglerSource)) {
-  errors.push("the Stable client endpoint must remain unset while the checked-in edge mode is paused");
+if (DESKTOP_STABLE_TELEMETRY_INGEST_URL !== null && !/"TELEMETRY_MODE"\s*:\s*"accept"/.test(wranglerSource)) {
+  errors.push("the configured Stable client endpoint requires an accepting production edge");
 }
 
 const publicTelemetrySource = await readText("docs/telemetry.md");

@@ -2,8 +2,8 @@
 
 PuppyOne Desktop is local-first. Basic product analytics are designed to count
 active Stable installations without collecting work content or account
-identity. The ingestion service is currently disabled: the Stable client has no
-configured telemetry endpoint, and the Cloudflare Worker defaults to `paused`.
+identity. Eligible Stable installations can send the single allowlisted event
+to PuppyOne's first-party ingestion service after the product notice is shown.
 
 For privacy-related questions, contact
 [`guanqun.real@puppyone.ai`](mailto:guanqun.real@puppyone.ai).
