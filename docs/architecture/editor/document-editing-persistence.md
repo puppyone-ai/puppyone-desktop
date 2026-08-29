@@ -47,3 +47,25 @@ stateDiagram-v2
 当前 Workbench 对同一路径的可见 Pane 去重。如果未来支持同一文档的并发多视图，必须先提供一对多模型广播和双向编辑测试，不能让最后附着的端口隐式成为权威。
 
 实现位于 `packages/shared-ui/src/editor/document-session/`、`src/features/editor-workbench/`、`src/lib/localFiles.ts` 与 `electron/main/ipc/workspace-files-ipc.mjs`。
+
+## Proposed：Auto Commit 持久化屏障
+
+[Experimental Git Auto Commit](../git/experimental-auto-commit.md) 在执行任何
+Git mutation 之前，必须复用 Document Session 的全窗口 drain 语义，将现有
+close-only 协调器泛化为 workspace-scoped `DocumentDurabilityCoordinator`。
+它不是第二套保存系统，也不能直接读取 Viewer 模型。
+
+屏障必须满足：
+
+- 只 drain 当前授权本地工作区对应的 Session；
+- 等待 Renderer 最新快照和 Main 文件写入队列都完成 durable acknowledgement；
+- conflict、保存失败、超时、Renderer 销毁或 workspace generation 改变时 fail
+  closed，且 Git index 尚未发生变化；
+- 返回后不冻结输入，因此 Main 还必须捕获 content epoch，并在移动 Git ref 前
+  验证期间没有新写入；
+- 新的 drain reason `git-auto-commit` 只表达 durability barrier，不能改变
+  Working Copy 的冲突、基线或保存优先级规则。
+
+在该屏障、content epoch 和失败矩阵实现并验证之前，Auto Commit 不能从
+**Proposed** 升级为 **Implemented**。外部 daemon 无法替代这一权威，因为
+PuppyOne 打开时只有 Renderer Document Session 持有最新编辑器快照。

@@ -54,6 +54,14 @@ same underlying folder.
 - Closing a repo window does not close terminals, watchers, or state owned by
   other repo windows.
 
+The proposed
+[Experimental Git Auto Commit](git/experimental-auto-commit.md) service follows
+the same ownership boundary. Main mounts at most one service runtime for the
+workspace assignment, independent of Source Control view visibility, and stops
+new scheduling when that assignment is released. A durable transaction that
+already changed the index must recover or settle before cleanup; window close
+must not strand an application-owned staged state.
+
 ## Main-Process Responsibilities
 
 Main owns the app-level invariant that a repo cannot be opened twice. Renderer
@@ -93,6 +101,10 @@ Window close cleanup is scoped by `webContents.id`:
 - unsubscribe that window from workspace watchers
 - close a workspace watcher only when it has no remaining clients
 - release that window's workspace ownership
+
+When experimental Auto Commit is implemented, cleanup also cancels its safe
+waiting/preflight phases and hands any journaled phase to bounded recovery. It
+does not transfer the workspace policy or active transaction to another window.
 
 App quit may still close all terminal sessions and all watchers.
 

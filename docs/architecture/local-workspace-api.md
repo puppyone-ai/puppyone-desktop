@@ -7,6 +7,11 @@
 - `local-api/workspace-config.mjs` owns `.puppyone/config.json` validation and atomic persistence.
 - `local-api/git/source-control-model.mjs` maps porcelain status data into renderer-neutral source-control groups and actions.
 - `local-api/git/cloud-remote.mjs` owns validated Cloud remote creation, update, and removal orchestration.
+- `local-api/git/auto-commit.mjs` is the **Proposed** home for the bounded,
+  exact-path Auto Commit kernel described in
+  [Experimental Git Auto Commit](git/experimental-auto-commit.md). Scheduling,
+  user consent, document durability, and journal lifecycle remain in Electron
+  main rather than the compatibility facade.
 - `local-api/git/runner.mjs`, `porcelain-v2.mjs`, `revision-pair.mjs`, and `revision-specs.mjs` continue to own Git execution and parsing concerns.
 
 The facade re-exports its historical public functions, so Electron callers do not need a coordinated migration. New behavior should be implemented in the narrowest owning module and composed by the facade.

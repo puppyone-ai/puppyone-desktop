@@ -38,6 +38,12 @@ described as current behavior before its implementation and verification land.
   - **Implemented** for text, DOCX, and metadata fallback.
   - Owns revision-pair authority, the built-in Diff Registry, resource-handle
     security, semantic provider lifecycle, and rich-diff extension rules.
+- [Experimental Git Auto Commit](experimental-auto-commit.md)
+  - **Proposed** and default-off behind release availability, global
+    experimental opt-in, and workspace-specific consent.
+  - Owns the main-process autonomous service decision, document durability
+    barrier, multi-domain Git coordination, exact-path transaction journal,
+    crash recovery, and the explicit no-daemon/no-auto-push boundary.
 
 ## Code Map
 
@@ -129,6 +135,9 @@ shared by more than Git:
   consumers and must not share an undifferentiated refresh path.
 - Application-initiated mutations reconcile status before the operation is
   considered settled.
+- Autonomous Git mutations, if enabled in the future, are main-owned,
+  workspace-authorized, journaled, and recoverable. A Renderer timer is not a
+  mutation authority.
 - External Git changes eventually reconcile without requiring a workspace
   reload.
 - History and graph loading must not make frequent working-tree refreshes

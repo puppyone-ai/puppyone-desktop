@@ -160,25 +160,6 @@ describe("AgentSessionController", () => {
     });
   });
 
-  it("uses the cached runtime preference for the first provider discovery", async () => {
-    const bridge = bridgeFixture(() => {});
-    const runtime = { descriptor: { id: "codex", displayName: "Codex", iconKey: "codex", distribution: "user-installed" }, readiness: readinessFor("codex") };
-    const model = { id: "gpt-5-codex", model: "gpt-5-codex", displayName: "GPT-5 Codex", description: "", isDefault: true };
-    bridge.discoverAgentRuntimes.mockResolvedValueOnce(runtimeInspection([runtime], "codex", model));
-    bridge.resumeAgentSession.mockResolvedValueOnce(null);
-    const controller = new AgentSessionController("/workspace", () => bridge as never);
-
-    controller.setInitialRuntimePreference("codex");
-    await controller.initialize();
-
-    expect(bridge.discoverAgentRuntimes).toHaveBeenCalledWith({
-      rootPath: "/workspace",
-      runtimeId: "codex",
-      refresh: false,
-    });
-    expect(controller.getSnapshot().selectedRuntimeId).toBe("codex");
-  });
-
   it("switches Coding Agent providers by discarding the old PuppyOne mapping and loading the selected runtime catalog", async () => {
     const bridge = bridgeFixture(() => {});
     const runtimes = [

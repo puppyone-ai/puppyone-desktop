@@ -75,6 +75,20 @@ source of truth.
 Window ownership and watcher cleanup remain governed by
 [Desktop Multi-Window Workspaces](../desktop-multi-window-workspaces.md).
 
+### Proposed autonomous mutation consumer
+
+[Experimental Git Auto Commit](experimental-auto-commit.md) may consume the
+same workspace activity as a scheduling hint, but it must perform a fresh,
+bounded status read under its complete mutation lease before deriving any
+candidate. It does not turn watcher paths into commit authority.
+
+Auto Commit is a main-process consumer, not another responsibility of
+`GitRefreshScheduler`. Its Git metadata writes produce one structured
+repository invalidation for the existing refresh lifecycle, while metadata
+events alone never mark Auto Commit content-dirty. This separation prevents an
+index/ref feedback loop and keeps the implemented read lifecycle independent
+from the proposed mutation scheduler.
+
 ## Current Architecture
 
 The lifecycle follows the repository-scoped design used by mature Git clients:
