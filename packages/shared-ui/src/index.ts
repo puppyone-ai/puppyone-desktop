@@ -134,6 +134,40 @@ export type {
 export { EditorDocumentHost } from "./editor/host/EditorDocumentHost";
 export type { EditorDocumentHostProps } from "./editor/host/EditorDocumentHost";
 export {
+  closestWorkbenchSplitDropEdge,
+  collectWorkbenchSplitLeaves,
+  createWorkbenchSplit,
+  extractWorkbenchSplitLeaf,
+  findDirectSiblingWorkbenchSplit,
+  findWorkbenchSplit,
+  findWorkbenchSplitLeaf,
+  insertWorkbenchSplitLeafAtEdge,
+  isWorkbenchSplit,
+  mapWorkbenchSplitLeaves,
+  mapWorkbenchSplitNodes,
+  moveWorkbenchSplitLeafToEdge,
+  nextWorkbenchSplitNumericId,
+  replaceWorkbenchSplitNode,
+  updateWorkbenchSplitRatio,
+  visitWorkbenchSplitNodes,
+  workbenchSplitDefinition,
+  workbenchSplitNodeMinimumSize,
+  workbenchSplitRatioBounds,
+} from "./workbench/split-tree";
+export type {
+  ExtractWorkbenchSplitLeafResult,
+  MoveWorkbenchSplitLeafResult,
+  WorkbenchSplit,
+  WorkbenchSplitDirection,
+  WorkbenchSplitDropDefinition,
+  WorkbenchSplitDropEdge,
+  WorkbenchSplitLeaf,
+  WorkbenchSplitMinimumSize,
+  WorkbenchSplitNode,
+  WorkbenchSplitPlacement,
+  WorkbenchSplitRatioBounds,
+} from "./workbench/split-tree";
+export {
   EMPTY_EDITOR_GROUP,
   activateEditor,
   closeEditor,

@@ -4,8 +4,11 @@ import { describe, expect, it } from "vitest";
 const fileDropSource = read("../src/features/editor-workbench/drag-and-drop/useExplorerFileDrop.ts");
 const paneMoveSource = read("../src/features/editor-workbench/drag-and-drop/usePaneMoveDrag.ts");
 const resizeSource = read("../src/features/editor-workbench/interactions/useSplitResizeGesture.ts");
-const terminationSource = read(
+const editorTerminationAdapterSource = read(
   "../src/features/editor-workbench/interactions/useInteractionTermination.ts",
+);
+const terminationSource = read(
+  "../src/features/workbench-interactions/useInteractionTermination.ts",
 );
 const nativeLeaseSource = read(
   "../src/features/native-surfaces/nativeSurfacePointerPassthrough.ts",
@@ -30,6 +33,9 @@ describe("editor interaction session architecture", () => {
     expect(terminationSource).toContain('document.addEventListener("visibilitychange"');
     expect(terminationSource).toContain('window.addEventListener("drop", handleDrop, true)');
     expect(terminationSource).toContain('terminate("unmount")');
+    expect(editorTerminationAdapterSource).toContain(
+      'from "../../workbench-interactions/useInteractionTermination"',
+    );
     expect(fileDropSource).toContain("useInteractionTermination");
     expect(paneMoveSource).toContain("useInteractionTermination");
     expect(resizeSource).toContain("useInteractionTermination");
