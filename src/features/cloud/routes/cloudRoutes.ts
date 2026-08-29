@@ -29,6 +29,9 @@ export type CloudRouteDescriptor = {
   webPath: (projectId?: string) => string;
 };
 
+/** Every Shell Cloud entry starts from the product Homepage. */
+export const CLOUD_HUB_ENTRY_SECTION = "contents" satisfies CloudWorkspaceSection;
+
 const NO_PROJECT_RESOURCES = [] as const satisfies readonly CloudProjectDetailResource[];
 const OVERVIEW_PROJECT_RESOURCES = [
   "dashboard",

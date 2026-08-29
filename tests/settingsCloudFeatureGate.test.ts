@@ -14,6 +14,8 @@ describe("Settings Cloud feature gate", () => {
     expect(sections).not.toContain("cloud");
     expect(isSettingsSectionAvailable("account", { cloudEnabled: false })).toBe(false);
     expect(isSettingsSectionAvailable("cloud", { cloudEnabled: false })).toBe(false);
+    expect(sections).toContain("privacy");
+    expect(isSettingsSectionAvailable("privacy", { cloudEnabled: false })).toBe(true);
     expect(isSettingsSectionAvailable("experimental", { cloudEnabled: false })).toBe(true);
   });
 

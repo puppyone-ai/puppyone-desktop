@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { House } from "lucide-react";
 import {
+  CLOUD_HUB_ENTRY_SECTION,
   CLOUD_PROJECT_SIDEBAR_ROUTES,
   getAvailableCloudSection,
   getCloudRoute,
@@ -9,6 +10,10 @@ import {
 import { McpLogoIcon } from "../src/features/cloud/components/McpLogoIcon";
 
 describe("Cloud navigation information architecture", () => {
+  it("enters Cloud through Homepage", () => {
+    expect(CLOUD_HUB_ENTRY_SECTION).toBe("contents");
+  });
+
   it("keeps Homepage, Connections, and Automation as separate product groups", () => {
     expect(CLOUD_PROJECT_SIDEBAR_ROUTES.map((route) => route.id)).toEqual([
       "contents",

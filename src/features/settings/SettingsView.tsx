@@ -22,6 +22,7 @@ import { ExperimentalSettingsView } from "./main/ExperimentalSettingsView";
 import { FilesSettingsView } from "./main/FileSettingsViews";
 import { GeneralSettingsView } from "./main/GeneralSettingsView";
 import { LocalProjectSettingsView } from "./main/LocalProjectSettingsView";
+import { PrivacySettingsView } from "./main/PrivacySettingsView";
 import { InterfacePaletteSettings } from "./main/InterfacePaletteSettings";
 import { InterfaceStyleSetting } from "./main/InterfaceStyleSetting";
 import { CreateNewSettingsView } from "./main/CreateNewSettingsView";
@@ -120,6 +121,10 @@ export function SettingsView({
         onUpdateNow={onUpdateNow}
       />
     );
+  }
+
+  if (activeSection === "privacy") {
+    return <PrivacySettingsView />;
   }
 
   if (activeSection === "local-agents") {

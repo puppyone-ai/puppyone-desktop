@@ -23,6 +23,7 @@ export {
 } from "./auth";
 export { resolveCloudEnvironment } from "./environment";
 export {
+  CLOUD_HUB_ENTRY_SECTION,
   CLOUD_ROUTES,
   getCloudRoute,
   getCloudRouteWebPath,

@@ -137,6 +137,69 @@
   white-space: nowrap;
 }
 
+.desktop-privacy-analytics-row {
+  min-height: 58px;
+  padding-block: 8px;
+}
+
+.desktop-privacy-setting-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 2px;
+}
+
+.desktop-privacy-setting-title {
+  color: var(--po-text);
+  font-size: 12.5px;
+  font-weight: var(--po-text-weight-medium, 500);
+  line-height: 18px;
+}
+
+.desktop-privacy-setting-detail,
+.desktop-privacy-setting-error {
+  max-width: 560px;
+  color: var(--po-text-subtle);
+  font-size: 11.5px;
+  font-weight: var(--po-text-weight-regular, 400);
+  line-height: 1.4;
+}
+
+.desktop-privacy-setting-detail a {
+  color: var(--po-text-muted);
+  text-decoration-color: color-mix(in srgb, currentColor 42%, transparent);
+  text-underline-offset: 2px;
+}
+
+.desktop-privacy-setting-detail a:hover {
+  color: var(--po-text);
+  text-decoration-color: currentColor;
+}
+
+.desktop-privacy-setting-detail a:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid color-mix(in srgb, var(--po-accent) 36%, transparent);
+  outline-offset: 2px;
+}
+
+.desktop-privacy-setting-error {
+  color: var(--po-danger);
+}
+
+.desktop-privacy-analytics-row[aria-busy="true"] .desktop-settings-switch {
+  cursor: wait;
+}
+
+@media (max-width: 640px) {
+  .desktop-privacy-analytics-row {
+    align-items: flex-start;
+  }
+
+  .desktop-privacy-analytics-row .desktop-settings-switch {
+    margin-top: 1px;
+  }
+}
+
 .desktop-local-agent-row {
   min-height: 30px;
 }
