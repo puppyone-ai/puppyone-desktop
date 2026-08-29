@@ -177,6 +177,7 @@ function AppContent() {
     rightSidebarWidth,
     rightSidebarSurface,
     agentPreferredRuntime,
+    agentPreferredRoute,
     agentPreferredModel,
     localAgentsSettings,
     sidebarCollapsed,
@@ -199,6 +200,7 @@ function AppContent() {
     setRightSidebarWidth,
     setRightSidebarSurface,
     setAgentPreferredRuntime,
+    setAgentPreferredRoute,
     setAgentPreferredModel,
     setSidebarCollapsed,
     setSidebarNavigationLayout,
@@ -1021,6 +1023,8 @@ function AppContent() {
                     active={rightSidebarOpen && rightSidebarSurface === "chat"}
                     preferredRuntimeId={agentPreferredRuntime}
                     onPreferredRuntimeChange={setAgentPreferredRuntime}
+                    preferredRoute={agentPreferredRoute}
+                    onPreferredRouteChange={setAgentPreferredRoute}
                     preferredModel={agentPreferredModel}
                     onPreferredModelChange={setAgentPreferredModel}
                     onViewChanges={() => {

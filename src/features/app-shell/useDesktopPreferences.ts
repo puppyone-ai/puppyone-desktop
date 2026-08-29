@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { FileIconThemeId } from "@puppyone/shared-ui";
 import {
   getInterfaceStyleFirstPaint,
@@ -61,6 +61,7 @@ import {
   type MarkdownPresentationSettings,
 } from "../markdown/markdownPresentation";
 import {
+  AGENT_ROUTING_PREFERENCES_STORAGE_KEY,
   AGENT_PREFERRED_RUNTIME_STORAGE_KEY,
   AGENT_PREFERRED_MODEL_STORAGE_KEY,
   EXPLORER_WIDTH_STORAGE_KEY,
@@ -98,6 +99,13 @@ import {
   readInitialThemeMode,
   readSystemDarkMode,
 } from "./preferences";
+import {
+  parseAgentRoutingPreferences,
+  selectAgentRuntime,
+  serializeAgentRoutingPreferences,
+  updateAgentRoutePreference,
+  type AgentRoutePreference,
+} from "./agentRoutingPreferences";
 
 export function useDesktopPreferences() {
   const [initialAppearanceRead] = useState(() => readAppearancePreferences(
@@ -160,8 +168,33 @@ export function useDesktopPreferences() {
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(() => readInitialRightSidebarWidth());
   const [rightSidebarSurface, setRightSidebarSurface] = useState(() => readInitialRightSidebarSurface());
-  const [agentPreferredRuntime, setAgentPreferredRuntime] = useState<string | null>(() => readInitialAgentPreferredRuntime());
-  const [agentPreferredModel, setAgentPreferredModel] = useState<string | null>(() => readInitialAgentPreferredModel());
+  const [agentRoutingPreferences, setAgentRoutingPreferences] = useState(() => (
+    parseAgentRoutingPreferences(
+      window.localStorage.getItem(AGENT_ROUTING_PREFERENCES_STORAGE_KEY),
+      {
+        legacyRuntimeId: readInitialAgentPreferredRuntime(),
+        legacyModelId: readInitialAgentPreferredModel(),
+      },
+    )
+  ));
+  const agentPreferredRuntime = agentRoutingPreferences.selectedRuntimeId;
+  const agentPreferredRoute = agentPreferredRuntime
+    ? agentRoutingPreferences.routes[agentPreferredRuntime] ?? {}
+    : {};
+  const agentPreferredModel = agentPreferredRoute.modelId ?? null;
+  const setAgentPreferredRuntime = useCallback((runtimeId: string | null) => {
+    setAgentRoutingPreferences((current) => selectAgentRuntime(current, runtimeId));
+  }, []);
+  const setAgentPreferredRoute = useCallback((patch: Partial<AgentRoutePreference>) => {
+    setAgentRoutingPreferences((current) => (
+      current.selectedRuntimeId
+        ? updateAgentRoutePreference(current, current.selectedRuntimeId, patch)
+        : current
+    ));
+  }, []);
+  const setAgentPreferredModel = useCallback((modelId: string | null) => {
+    setAgentPreferredRoute({ modelId: modelId ?? undefined });
+  }, [setAgentPreferredRoute]);
   const [systemDark, setSystemDark] = useState(() => readSystemDarkMode());
   const resolvedAppearance = useMemo(() => resolveAppearance({
     interfaceStyle,
@@ -395,14 +428,13 @@ export function useDesktopPreferences() {
   }, [rightSidebarSurface]);
 
   useEffect(() => {
-    if (agentPreferredRuntime) window.localStorage.setItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY, agentPreferredRuntime);
-    else window.localStorage.removeItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY);
-  }, [agentPreferredRuntime]);
-
-  useEffect(() => {
-    if (agentPreferredModel) window.localStorage.setItem(AGENT_PREFERRED_MODEL_STORAGE_KEY, agentPreferredModel);
-    else window.localStorage.removeItem(AGENT_PREFERRED_MODEL_STORAGE_KEY);
-  }, [agentPreferredModel]);
+    window.localStorage.setItem(
+      AGENT_ROUTING_PREFERENCES_STORAGE_KEY,
+      serializeAgentRoutingPreferences(agentRoutingPreferences),
+    );
+    window.localStorage.removeItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY);
+    window.localStorage.removeItem(AGENT_PREFERRED_MODEL_STORAGE_KEY);
+  }, [agentRoutingPreferences]);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-color-scheme: dark)");
@@ -436,7 +468,9 @@ export function useDesktopPreferences() {
     rightSidebarWidth,
     rightSidebarSurface,
     agentPreferredRuntime,
+    agentPreferredRoute,
     agentPreferredModel,
+    agentRoutingPreferences,
     agentFileActivityIndicatorsEnabled,
     sidebarCollapsed,
     sidebarNavigationLayout,
@@ -471,6 +505,7 @@ export function useDesktopPreferences() {
     setRightSidebarWidth,
     setRightSidebarSurface,
     setAgentPreferredRuntime,
+    setAgentPreferredRoute,
     setAgentPreferredModel,
     setAgentFileActivityIndicatorsEnabled,
     setSidebarCollapsed,

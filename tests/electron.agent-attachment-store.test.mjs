@@ -35,7 +35,8 @@ describe("Agent main-owned attachment staging", () => {
     await expect(store.authorize({ ownerId: 7, workspaceRoot: workspace, epoch: "draft-b", references: [draft] })).rejects.toThrow(/invalid|belongs/i);
 
     const [authorized] = await store.authorize({ ownerId: 7, workspaceRoot: workspace, epoch: "draft-a", references: [draft] });
-    expect(authorized.snapshotUrl).toBe(`data:image/png;base64,${original.toString("base64")}`);
+    expect(authorized).not.toHaveProperty("snapshotUrl");
+    expect(JSON.stringify(authorized)).not.toContain(original.toString("base64"));
     expect((await fs.promises.stat(authorized.path)).mode & 0o777).toBe(0o600);
     await store.close();
   });

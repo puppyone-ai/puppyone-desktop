@@ -200,10 +200,10 @@ export class AgentSessionController {
 
   private async runInitialize(refresh: boolean) {
     this.eventSynchronizer.connect();
-    const bridge = this.requireBridge("discoverAgentProviders", "resumeAgentSession");
+    const bridge = this.requireBridge("discoverAgentRuntimes", "resumeAgentSession");
     this.patch({ phase: "discovering", error: null });
     try {
-      const inspection = await bridge.discoverAgentProviders({
+      const inspection = await bridge.discoverAgentRuntimes({
         rootPath: this.workspaceRoot,
         runtimeId: this.state.selectedRuntimeId,
         refresh,

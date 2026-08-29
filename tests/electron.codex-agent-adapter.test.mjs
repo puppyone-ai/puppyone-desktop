@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
+  CODEX_CAPABILITIES,
   CodexAppServerAdapter,
   buildCodexTurnInput,
   normalizeCodexNotification,
@@ -188,7 +189,7 @@ describe("Codex app-server normalization", () => {
     adapter.dispose();
   });
 
-  it("offers only explicit durable decisions and fails unsupported requests closed", async () => {
+  it("offers only explicit durable decisions and maps native structured questions", async () => {
     const connection = new FakeConnection();
     const events = [];
     const adapter = new CodexAppServerAdapter({
@@ -282,10 +283,62 @@ describe("Codex app-server normalization", () => {
     connection.emit("request", {
       method: "item/tool/requestUserInput",
       id: 10,
-      params: { threadId: "thread-1", turnId: "turn-1", itemId: "item-2" },
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        itemId: "item-2",
+        questions: [{ id: "scope", header: "Scope", question: "Which scope?", options: [{ label: "Focused" }] }],
+      },
     });
-    expect(connection.errors.at(-1)).toMatchObject({ id: 10, code: -32601 });
-    expect(events.at(-1)).toMatchObject({ type: "provider.warning" });
+    const question = events.at(-1);
+    expect(question).toMatchObject({
+      type: "question.requested",
+      payload: { questions: [{ header: "Scope", question: "Which scope?" }] },
+    });
+    adapter.resolveQuestion({
+      requestId: question.payload.requestId,
+      answers: [["Focused"]],
+      rejected: false,
+      turnId: "turn-1",
+    });
+    expect(connection.responses.at(-1)).toEqual({
+      id: 10,
+      result: { answers: { scope: { answers: ["Focused"] } } },
+    });
+    adapter.dispose();
+  });
+
+  it("implements the advertised current app-server fork, steer and compaction operations", async () => {
+    const connection = new FakeConnection();
+    connection.results.set("turn/steer", {});
+    connection.results.set("thread/fork", { thread: { id: "thread-fork" } });
+    connection.results.set("thread/compact/start", {});
+    const adapter = new CodexAppServerAdapter({
+      executablePath: "/usr/local/bin/codex",
+      environment: {},
+      workspaceRoot: "/workspace",
+      appVersion: "test",
+      connectionFactory: () => connection,
+    });
+    await adapter.connect();
+    adapter.threadId = "thread-1";
+    adapter.activeTurnId = "turn-1";
+    await adapter.steerTurn({ turnId: "turn-1", message: "Focus on tests", references: [] });
+    adapter.activeTurnId = null;
+    await expect(adapter.forkSession({ messageId: "message-1" })).resolves.toEqual({ providerSessionId: "thread-fork" });
+    await adapter.compactSession();
+    expect(connection.requests).toEqual(expect.arrayContaining([
+      expect.objectContaining({ method: "turn/steer", params: expect.objectContaining({ threadId: "thread-1", turnId: "turn-1" }) }),
+      expect.objectContaining({ method: "thread/fork", params: { threadId: "thread-1", messageId: "message-1" } }),
+      expect.objectContaining({ method: "thread/compact/start", params: { threadId: "thread-1" } }),
+    ]));
+    expect(CODEX_CAPABILITIES).toMatchObject({
+      structuredQuestions: true,
+      fork: true,
+      steer: true,
+      compaction: true,
+      protocol: { name: "codex-app-server" },
+    });
     adapter.dispose();
   });
 

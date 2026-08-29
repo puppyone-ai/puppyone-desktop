@@ -1,5 +1,5 @@
 import { createAgentProjection } from "../domain/agent-projection";
-import { listAgentBackends } from "../domain/agent-backend-routing";
+import { listAgentRuntimes } from "../domain/agent-backend-routing";
 import type { AgentControllerState } from "./agent-controller-state";
 
 type AgentRuntimeSwitchPlan = {
@@ -20,7 +20,7 @@ export function planAgentRuntimeSwitch(
     || state.sessionPreparation === "preparing"
     || ["discovering", "restoring", "creating"].includes(state.phase)
   ) return null;
-  const backend = listAgentBackends(state.inspection)
+  const backend = listAgentRuntimes(state.inspection)
     .find((entry) => entry.descriptor.id === runtimeId);
   if (!backend) return null;
   if (runtimeId === state.selectedRuntimeId) return { alreadySelected: true, sessionId: state.session?.id ?? null, patch: {} };

@@ -22,6 +22,7 @@ assert(discovery.includes(`CLAUDE_AGENT_SDK_VERSION = "${version}"`), "Claude di
 assert(!manifest.build?.asarUnpack?.includes("node_modules/@anthropic-ai/claude-agent-sdk-*/**"), "Claude platform runtime must not inflate the base ASAR payload.");
 assert(manifest.build?.files?.includes("!node_modules/@anthropic-ai/claude-agent-sdk-*/**"), "Claude platform runtime must be excluded from the base application.");
 assert(adapter.includes('settingSources: ["user"]'), "Claude adapter must not load repository settings implicitly.");
+assert(adapter.includes(`revision: "claude-agent-sdk:${version}"`), "Claude capability revision must track the pinned SDK version.");
 assert(!adapter.includes("allowDangerouslySkipPermissions: true"), "Claude permission bypass is forbidden.");
 assert(adapter.includes("subscription OAuth cannot be used by a third-party product"), "Claude OAuth product-policy gate is missing.");
 assert(notices.includes(`@anthropic-ai/claude-agent-sdk@${version}`), "Claude SDK notice version drifted.");

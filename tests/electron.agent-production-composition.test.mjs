@@ -26,7 +26,7 @@ describe("Agent production composition", () => {
     expect(host.select(catalog)?.descriptor.id).toBe("puppyone-agent");
     expect(host.select(catalog, "codex")?.descriptor.id).toBe("codex");
     expect(host.select(catalog, "missing")).toBeNull();
-    expect(host.require("claude").descriptor.displayName).toBe("Claude Code");
+    expect(host.require("claude").descriptor.displayName).toBe("Claude Agent");
     await host.dispose();
   });
 

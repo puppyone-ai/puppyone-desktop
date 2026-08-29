@@ -126,7 +126,7 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(composer).not.toContain("AgentBackendPicker");
     expect(composer).not.toContain('is-backend');
     expect(composer).not.toContain("AgentProviderPicker");
-    expect(panel).toContain("agentSelector={<AgentProviderPicker");
+    expect(panel).toContain("agentSelector={<AgentRuntimePicker");
     expect(panel).toContain("t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID)");
     expect(composer).toContain('DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID = "agent.composer.placeholder.default"');
     expect(css).toMatch(/\.desktop-agent-picker\.is-header\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*100%/s);

@@ -143,7 +143,15 @@ function registerHandlers({ workspace, store, startTurn }) {
   const handlers = new Map();
   registerAgentIpcHandlers({
     ipcMain: { handle: (channel, listener) => handlers.set(channel, listener) },
-    agentService: { startTurn },
+    agentService: { startTurn, getReferenceInputCapabilities: () => ({
+      workspaceFiles: true,
+      workspaceDirectories: true,
+      images: "local-snapshot",
+      genericFiles: "local-snapshot",
+      maxReferences: 32,
+      maxReferenceBytes: 25 * 1024 * 1024,
+      maxTotalReferenceBytes: 25 * 1024 * 1024,
+    }) },
     localAgentInventory: {},
     attachmentStore: store,
     authorizeWorkspaceRoot: async (_event, requested) => {

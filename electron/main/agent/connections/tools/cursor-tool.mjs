@@ -5,5 +5,5 @@ export const CURSOR_LOCAL_TOOL = Object.freeze({
   displayName: "Cursor Agent",
   executableNames: Object.freeze(["cursor-agent", "agent", "cursor agent"]),
   probe: probeCursorLocal,
-  unavailableMessage: "PuppyOne will enable Cursor only after a stable supported Agent protocol is available.",
+  unavailableMessage: "Install Cursor Agent and sign in to use its native ACP harness.",
 });

@@ -13,12 +13,13 @@ const notice = await fs.promises.readFile(path.join(root, "THIRD_PARTY_NOTICES.m
 const license = await fs.promises.readFile(path.join(root, "vendor/opencode/LICENSE"), "utf8");
 const runtimeSource = await fs.promises.readFile(path.join(root, "electron/main/agent/runtimes/opencode-protocol/opencode-manifest.mjs"), "utf8");
 const adapterSource = await fs.promises.readFile(path.join(root, "electron/main/agent/runtimes/opencode-protocol/opencode-acp-adapter.mjs"), "utf8");
+const genericAdapterSource = await fs.promises.readFile(path.join(root, "electron/main/agent/protocols/acp/acp-runtime-adapter.mjs"), "utf8");
 const acpClientSource = await fs.promises.readFile(path.join(root, "electron/main/agent/protocols/acp/acp-client.mjs"), "utf8");
 
 assert(runtime.runtimeRelease.version === "1.17.18", "OpenCode runtime version drifted.");
 assert(!packageManifest.dependencies?.["@opencode-ai/sdk"], "The retired OpenCode HTTP SDK gateway must not remain in production dependencies.");
 assert(!packageLock.packages?.["node_modules/@opencode-ai/sdk"], "The retired OpenCode HTTP SDK gateway must not remain in the lockfile.");
-assert(adapterSource.includes('"acp"') && adapterSource.includes("AcpClient"), "OpenCode must use the provider-neutral ACP adapter.");
+assert(adapterSource.includes("extends AcpRuntimeAdapter") && genericAdapterSource.includes("AcpClient"), "OpenCode must wrap the provider-neutral ACP adapter.");
 assert(adapterSource.includes('"--hostname=127.0.0.1"') && adapterSource.includes('"--pure"'), "Managed OpenCode ACP must remain loopback-only and plugin-isolated.");
 assert(acpClientSource.includes("timeoutMs: 0"), "ACP prompt turns must not use an unsafe arbitrary request timeout.");
 assert(runtime.protocolFloor === runtime.runtimeRelease.version, "Unverified older OpenCode protocol floor is not allowed.");

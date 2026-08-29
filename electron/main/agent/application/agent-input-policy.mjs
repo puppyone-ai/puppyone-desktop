@@ -1,4 +1,4 @@
-const MAX_REFERENCE_SNAPSHOT_URL_LENGTH = Math.ceil(25 * 1024 * 1024 * 4 / 3) + 256;
+const MAX_REFERENCE_SNAPSHOT_URL_LENGTH = Math.ceil(512 * 1024 * 4 / 3) + 256;
 
 export function readinessWithAccountState(readiness, accountState, runtimeName = "Agent runtime") {
   if (readiness.status === "ready" && requiresRuntimeSetup(accountState)) {

@@ -17,7 +17,7 @@ transport, persistence and source-layout refinement of this product decision.
 
 PuppyOne is an Agent client and product control plane. It is not a universal
 Agent loop. Users may already have a native Agent product, login, subscription,
-history and permission model in Codex, Claude Code, Cursor Agent, OpenCode or a
+history and permission model in Codex, Claude Agent, Cursor Agent, OpenCode or a
 future compatible product. Forcing all of those users through one OpenCode
 harness would discard legitimate native behavior and make a bundled upstream
 component a prerequisite for the entire Chat product.
@@ -60,9 +60,9 @@ PuppyOne right-sidebar Chat
       |     API-key or supported cloud-provider credentials
       |     Claude Agent SDK plus Claude Code executable
       |
-      +-- cursor                                  CAPABILITY-GATED
-      |     user's Cursor Agent
-      |     enabled only after a stable supported protocol exists
+      +-- cursor
+      |     user's Cursor Agent login and entitlement
+      |     Cursor ACP (`agent acp`) over stdio JSON-RPC
       |
       +-- opencode-native
       |     user's OpenCode installation, profile and native sessions
@@ -72,7 +72,7 @@ PuppyOne right-sidebar Chat
 ```
 
 No backend wraps or invokes another backend's Agent loop. Selecting Codex does
-not run Codex inside OpenCode. Selecting Claude Code does not translate Claude
+not run Codex inside OpenCode. Selecting Claude Agent does not translate Claude
 credentials into an OpenCode provider. Selecting PuppyOne Agent uses the
 managed OpenCode kernel directly and does not expose OpenCode as a second
 session authority.
@@ -85,7 +85,8 @@ interchangeably.
 ```text
 Agent backend
   A user-selectable native Agent product integration. It owns one harness and
-  its native session. Examples: PuppyOne Agent, Codex, Claude Code, OpenCode.
+  its native session. Examples: PuppyOne Agent, Codex, Claude Agent, Cursor
+  Agent and OpenCode.
 
 Harness
   The backend-native loop that owns iterative reasoning, tool dispatch,
@@ -189,7 +190,7 @@ the kinds their native protocol actually accepts. The legacy
 projection during migration, but UI/application behavior cannot infer a
 transport from them or branch on a concrete backend ID. The normative model is
 [Agent Composer reference ingestion](composer-reference-ingestion.md), now
-implemented and verified by `ISSUE-404`.
+implemented and covered by architecture and ingestion regression tests.
 
 ## Backend matrix
 
@@ -197,15 +198,16 @@ implemented and verified by `ISSUE-404`.
 | --- | --- | --- | --- | --- | --- | --- |
 | `puppyone-agent` | PuppyOne Agent | ACP JSON-RPC 2.0 over stdio | managed OpenCode profile and supported provider flows | OpenCode session | bundled, pinned and verified by PuppyOne | implemented |
 | `codex` | Codex | `codex app-server` stdio JSON-RPC | Codex CLI | Codex thread | user-installed CLI | implemented |
-| `claude` | Claude Code | Claude Agent SDK plus user's Claude Code process | Anthropic API key or supported cloud provider | Claude session | SDK control layer bundled; user CLI required | implemented |
-| `cursor` | Cursor Agent | supported native protocol, not shell scraping | Cursor | Cursor session | user-installed product | inventory-only until protocol gate passes |
+| `claude` | Claude Agent | Claude Agent SDK plus user's local Claude executable | Anthropic API key or supported cloud provider | Claude session | SDK control layer bundled; user CLI required | implemented |
+| `cursor` | Cursor Agent | ACP JSON-RPC 2.0 over stdio via `agent acp` | user's Cursor login and entitlement | Cursor session | user-installed product | implemented |
 | `opencode-native` | OpenCode | ACP JSON-RPC 2.0 over stdio | user OpenCode profile | OpenCode session | user-installed CLI | implemented |
 | `pi` | Pi | `pi --mode rpc` | Pi/provider config | Pi session | user-installed CLI | optional future adapter |
 
 An executable-presence check is never enough to enable execution. An
 execution-ready backend must pass installation, version, protocol, authentication, model/tool
-capability, workspace and product-policy gates. Cursor remains visible as a
-detected local tool while its execution protocol is unavailable.
+capability, workspace and product-policy gates. The current Cursor route passes
+those gates through ACP; a failed handshake keeps the row inspectable but
+non-sendable instead of falling back to another harness.
 
 ## Selection and session semantics
 
@@ -215,14 +217,15 @@ The first composer choice is `Agent`, not an OpenCode inference provider.
 Agent
   PuppyOne Agent
   Codex
-  Claude Code
-  Cursor Agent          selectable row; execution gated until supported
+  Claude Agent
+  Cursor Agent
   OpenCode
 
 Backend-scoped controls
   PuppyOne Agent  -> Provider -> Model -> Variant -> Agent/Mode
   Codex           -> Model -> Reasoning -> Sandbox/Approval profile
-  Claude Code     -> Model -> Effort -> Permission mode
+  Claude Agent    -> Model -> Effort -> Permission mode
+  Cursor Agent    -> ACP-negotiated Model / Mode
   OpenCode        -> Provider -> Model -> Agent/Mode
 ```
 
@@ -352,20 +355,20 @@ chrome.
 
 ADR-004's bundling, integrity, rollback and repair rules apply only to
 `puppyone-agent`. A corrupt or missing managed OpenCode component disables
-PuppyOne Agent, not Codex, Claude Code or another healthy native backend.
+PuppyOne Agent, not Codex, Claude Agent or another healthy native backend.
 
 ## Migration closeout
 
 The OpenCode-only product composition has been retired:
 
 - production composition is multi-native and session-scoped;
-- Codex, Claude Code and user OpenCode use their native harness routes;
+- Codex, Claude Agent, Cursor Agent and user OpenCode use their native harness routes;
 - PuppyOne Agent alone uses the managed, pinned OpenCode kernel;
 - legacy PuppyOne transcript journals are deleted and never recreated;
 - the legacy `opencode` runtime-ID alias is input compatibility only and does
   not restore the former global routing model;
-- Cursor remains diagnostics-only until its native protocol and approval
-  contract pass the same gates.
+- Cursor uses the generic ACP adapter plus isolated Cursor extension handling;
+  failed future capability negotiation disables only that runtime.
 
 Current Renderer presentation work may evolve independently, but it cannot
 reintroduce global-harness selection, cross-Agent session migration or durable

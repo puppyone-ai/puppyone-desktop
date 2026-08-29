@@ -11,7 +11,7 @@ import { AgentChangesPill, summarizeAgentChanges } from "../src/features/desktop
 import { AgentComposer } from "../src/features/desktop-agent/ui/AgentComposer";
 import { AgentPanelLayout } from "../src/features/desktop-agent/ui/AgentPanelLayout";
 import { AgentPickerPopover } from "../src/features/desktop-agent/ui/AgentPickerPopover";
-import { AgentProviderPicker } from "../src/features/desktop-agent/ui/AgentProviderPicker";
+import { AgentRuntimePicker } from "../src/features/desktop-agent/ui/AgentRuntimePicker";
 import { AgentSurfaceHeader } from "../src/features/desktop-agent/ui/AgentSurfaceHeader";
 import { agentPickerLimits } from "../src/features/desktop-agent/ui/agent-picker-limits";
 import {
@@ -22,10 +22,10 @@ import {
 import { resolveAnchoredOverlayPosition } from "../src/features/app-shell/useAnchoredOverlayPosition";
 import { createAgentProjection } from "../src/features/desktop-agent/agentProjection";
 import {
-  listCodingAgentProviders,
-  listEnabledCodingAgentProviders,
+  listAgentRuntimes,
+  listEnabledAgentRuntimes,
 } from "../src/features/desktop-agent/domain/agent-backend-routing";
-import type { AgentProviderReadiness } from "../src/features/desktop-agent/agentTypes";
+import type { AgentRuntimeReadiness } from "../src/features/desktop-agent/agentTypes";
 import { stripBidiIsolation, testT, withTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -47,7 +47,7 @@ function render(node: React.ReactElement) {
   return container;
 }
 
-function codingProvider(id: string, displayName: string) {
+function runtimeEntry(id: string, displayName: string) {
   return {
     descriptor: { id, displayName, iconKey: id, distribution: "user-installed" },
     readiness: {
@@ -92,10 +92,10 @@ describe("Desktop Agent renderer surfaces", () => {
         loading: false,
         newSessionDisabled: false,
         onNewSession: vi.fn(),
-        agentSelector: React.createElement(AgentProviderPicker, {
-          agentProviders: [codingProvider("codex", "Codex")],
-          selectedAgentProviderId: "codex",
-          onSelectAgentProvider: vi.fn(),
+        agentSelector: React.createElement(AgentRuntimePicker, {
+          agentRuntimes: [runtimeEntry("codex", "Codex")],
+          selectedRuntimeId: "codex",
+          onSelectRuntime: vi.fn(),
         }),
       }),
       status: React.createElement("span", null, "Status"),
@@ -126,7 +126,7 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(window.getComputedStyle(dock).paddingRight).toBe("12px");
     expect(window.getComputedStyle(dock).paddingBottom).toBe("12px");
     expect(window.getComputedStyle(dock).paddingLeft).toBe("12px");
-    const providerControl = container.querySelector('button[aria-label="Coding agent provider"]') as HTMLElement;
+    const providerControl = container.querySelector('button[aria-label="Coding Agent"]') as HTMLElement;
     const modelControl = container.querySelector('button[aria-label="Agent model"]') as HTMLElement;
     const sendControl = container.querySelector('button[aria-label="Send message"]') as HTMLElement;
     const composerSurface = container.querySelector(".desktop-agent-composer") as HTMLElement;
@@ -367,11 +367,11 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.querySelector('button[aria-label="Send message"]')).not.toBeNull();
   });
 
-  it("keeps the session-level Provider in the header and only Model in the composer", () => {
-    const provider = React.createElement(AgentProviderPicker, {
-      agentProviders: [codingProvider("codex", "Codex")],
-      selectedAgentProviderId: "codex",
-      onSelectAgentProvider: vi.fn(),
+  it("keeps the session-level Agent in the header and only Model in the composer", () => {
+    const runtimePicker = React.createElement(AgentRuntimePicker, {
+      agentRuntimes: [runtimeEntry("codex", "Codex")],
+      selectedRuntimeId: "codex",
+      onSelectRuntime: vi.fn(),
     });
     const container = render(React.createElement("div", null,
       React.createElement(AgentSurfaceHeader, {
@@ -382,7 +382,7 @@ describe("Desktop Agent renderer surfaces", () => {
         loading: false,
         newSessionDisabled: false,
         onNewSession: vi.fn(),
-        agentSelector: provider,
+        agentSelector: runtimePicker,
       }),
       React.createElement(AgentComposer, {
         draft: "",
@@ -400,14 +400,14 @@ describe("Desktop Agent renderer surfaces", () => {
     ));
 
     expect(container.querySelector("select")).toBeNull();
-    const providerTrigger = container.querySelector('button[aria-label="Coding agent provider"]') as HTMLButtonElement;
+    const runtimeTrigger = container.querySelector('button[aria-label="Coding Agent"]') as HTMLButtonElement;
     const composer = container.querySelector(".desktop-agent-composer") as HTMLElement;
     expect(container.querySelector('button[aria-label="Agent backend"]')).toBeNull();
-    expect(providerTrigger.classList.contains("is-compact")).toBe(false);
-    expect(providerTrigger.title).toContain("Switching provider starts a new chat");
-    expect(providerTrigger.querySelector(".desktop-agent-brand-mark")).not.toBeNull();
-    expect(providerTrigger.textContent).toContain("Codex");
-    expect(composer.querySelector('button[aria-label="Coding agent provider"]')).toBeNull();
+    expect(runtimeTrigger.classList.contains("is-compact")).toBe(false);
+    expect(runtimeTrigger.title).toContain("Switching Agent starts a new chat");
+    expect(runtimeTrigger.querySelector(".desktop-agent-brand-mark")).not.toBeNull();
+    expect(runtimeTrigger.textContent).toContain("Codex");
+    expect(composer.querySelector('button[aria-label="Coding Agent"]')).toBeNull();
     expect(container.textContent).not.toContain("Google");
     expect(container.querySelector('button[aria-label="Agent model"]')?.textContent).toContain("GPT");
     expect(container.textContent).not.toContain("OpenCode runtime");
@@ -420,17 +420,17 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(container.querySelector('button[aria-label="Add context or change Agent mode"]')).toBeNull();
   });
 
-  it("exposes only external Coding Agent products in the header Provider catalog", () => {
-    const providers = listCodingAgentProviders({
+  it("exposes the managed Puppyone Agent and native Agent products in the Agent catalog", () => {
+    const providers = listAgentRuntimes({
       runtimes: [
         {
           descriptor: { id: "puppyone-agent", displayName: "PuppyOne Agent", distribution: "bundled" },
           readiness: { runtimeId: "puppyone-agent", provider: "puppyone-agent", status: "ready", version: "1.0.0", minimumVersion: null, message: "Ready" },
         },
-        codingProvider("codex", "Codex"),
-        codingProvider("claude", "Claude Code"),
-        codingProvider("opencode-native", "OpenCode"),
-        codingProvider("cursor", "Cursor Agent"),
+        runtimeEntry("codex", "Codex"),
+        runtimeEntry("claude", "Claude Agent"),
+        runtimeEntry("opencode-native", "OpenCode"),
+        runtimeEntry("cursor", "Cursor Agent"),
       ],
       selectedRuntimeId: "puppyone-agent",
       runtime: { id: "puppyone-agent", displayName: "PuppyOne Agent", distribution: "bundled" },
@@ -442,8 +442,9 @@ describe("Desktop Agent renderer surfaces", () => {
     });
 
     expect(providers.map((entry) => entry.descriptor.displayName)).toEqual([
+      "PuppyOne Agent",
       "Codex",
-      "Claude Code",
+      "Claude Agent",
       "OpenCode",
       "Cursor Agent",
     ]);
@@ -452,29 +453,29 @@ describe("Desktop Agent renderer surfaces", () => {
   it("shows only locally selected and still-installed Coding Agents", () => {
     const inspection = {
       runtimes: [
-        codingProvider("codex", "Codex"),
-        codingProvider("claude", "Claude Code"),
-        codingProvider("opencode-native", "OpenCode"),
+        runtimeEntry("codex", "Codex"),
+        runtimeEntry("claude", "Claude Agent"),
+        runtimeEntry("opencode-native", "OpenCode"),
         {
-          ...codingProvider("cursor", "Cursor Agent"),
+          ...runtimeEntry("cursor", "Cursor Agent"),
           readiness: {
-            ...codingProvider("cursor", "Cursor Agent").readiness,
+            ...runtimeEntry("cursor", "Cursor Agent").readiness,
             status: "not-installed" as const,
           },
         },
       ],
-      readiness: codingProvider("codex", "Codex").readiness,
+      readiness: runtimeEntry("codex", "Codex").readiness,
       account: null,
       models: [],
       capabilities: null,
       warnings: [],
     };
 
-    expect(listEnabledCodingAgentProviders(inspection, ["claude", "opencode-native", "cursor"])
+    expect(listEnabledAgentRuntimes(inspection, ["claude", "opencode-native", "cursor"])
       .map((entry) => entry.descriptor.id)).toEqual(["claude", "opencode-native"]);
   });
 
-  it("shows Provider in the header and withholds Model until a connected provider is selected", () => {
+  it("shows Agent in the header and withholds Model until a connected runtime is selected", () => {
     const container = render(React.createElement("div", null,
       React.createElement(AgentSurfaceHeader, {
         title: "New chat",
@@ -483,10 +484,10 @@ describe("Desktop Agent renderer surfaces", () => {
         loading: false,
         newSessionDisabled: true,
         onNewSession: vi.fn(),
-        agentSelector: React.createElement(AgentProviderPicker, {
-          agentProviders: [codingProvider("codex", "Codex"), codingProvider("claude", "Claude Code")],
-          selectedAgentProviderId: null,
-          onSelectAgentProvider: vi.fn(),
+        agentSelector: React.createElement(AgentRuntimePicker, {
+          agentRuntimes: [runtimeEntry("codex", "Codex"), runtimeEntry("claude", "Claude Agent")],
+          selectedRuntimeId: null,
+          onSelectRuntime: vi.fn(),
         }),
       }),
       React.createElement(AgentComposer, {
@@ -505,45 +506,45 @@ describe("Desktop Agent renderer surfaces", () => {
     ));
 
     expect(container.querySelector("select")).toBeNull();
-    expect(container.querySelector('button[aria-label="Coding agent provider"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="Coding Agent"]')).not.toBeNull();
     expect(container.querySelector('button[aria-label="Agent model"]')).toBeNull();
     expect(container.textContent).not.toContain("Agent model");
     expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("updates the visible Provider and Model labels after pointer selection", () => {
+  it("updates the visible Agent and Model labels after pointer selection", () => {
     const catalogs = {
       codex: [
         { id: "gpt-5", model: "gpt-5", displayName: "GPT-5", description: "Native Codex model", isDefault: true },
       ],
       claude: [
-        { id: "claude-sonnet", model: "claude-sonnet", displayName: "Claude Sonnet", description: "Native Claude Code model", isDefault: true },
-        { id: "claude-opus", model: "claude-opus", displayName: "Claude Opus", description: "Native Claude Code model", isDefault: false },
+        { id: "claude-sonnet", model: "claude-sonnet", displayName: "Claude Sonnet", description: "Native Claude Agent model", isDefault: true },
+        { id: "claude-opus", model: "claude-opus", displayName: "Claude Opus", description: "Native Claude Agent model", isDefault: false },
       ],
     };
 
     function StatefulSurface() {
-      const [provider, setProvider] = React.useState<keyof typeof catalogs>("codex");
+      const [runtime, setRuntime] = React.useState<keyof typeof catalogs>("codex");
       const [model, setModel] = React.useState(catalogs.codex[0].model);
-      const models = catalogs[provider];
-      const onSelectAgentProvider = (nextProvider: string) => {
-          const typedProvider = nextProvider as keyof typeof catalogs;
-          setProvider(typedProvider);
-          setModel(catalogs[typedProvider][0].model);
+      const models = catalogs[runtime];
+      const onSelectRuntime = (nextRuntime: string) => {
+          const typedRuntime = nextRuntime as keyof typeof catalogs;
+          setRuntime(typedRuntime);
+          setModel(catalogs[typedRuntime][0].model);
       };
       return React.createElement("div", null,
         React.createElement(AgentSurfaceHeader, {
           title: "New chat",
-          runtimeLabel: provider,
+          runtimeLabel: runtime,
           statusCode: "ready",
           statusLabel: "ready",
           loading: false,
           newSessionDisabled: false,
           onNewSession: vi.fn(),
-          agentSelector: React.createElement(AgentProviderPicker, {
-            agentProviders: [codingProvider("codex", "Codex"), codingProvider("claude", "Claude Code")],
-            selectedAgentProviderId: provider,
-            onSelectAgentProvider,
+          agentSelector: React.createElement(AgentRuntimePicker, {
+            agentRuntimes: [runtimeEntry("codex", "Codex"), runtimeEntry("claude", "Claude Agent")],
+            selectedRuntimeId: runtime,
+            onSelectRuntime,
           }),
         }),
         React.createElement(AgentComposer, {
@@ -564,13 +565,13 @@ describe("Desktop Agent renderer surfaces", () => {
     }
 
     const container = render(React.createElement(StatefulSurface));
-    const providerTrigger = container.querySelector('button[aria-label="Coding agent provider"]') as HTMLButtonElement;
-    expect(providerTrigger.textContent).toContain("Codex");
-    act(() => providerTrigger.click());
+    const runtimeTrigger = container.querySelector('button[aria-label="Coding Agent"]') as HTMLButtonElement;
+    expect(runtimeTrigger.textContent).toContain("Codex");
+    act(() => runtimeTrigger.click());
     const claude = Array.from(document.querySelectorAll('[role="option"]'))
-      .find((option) => option.textContent?.includes("Claude Code")) as HTMLButtonElement;
+      .find((option) => option.textContent?.includes("Claude Agent")) as HTMLButtonElement;
     act(() => claude.click());
-    expect(providerTrigger.textContent).toContain("Claude Code");
+    expect(runtimeTrigger.textContent).toContain("Claude Agent");
 
     const modelTrigger = container.querySelector('button[aria-label="Agent model"]') as HTMLButtonElement;
     expect(modelTrigger.textContent).toContain("Claude Sonnet");
@@ -613,8 +614,8 @@ describe("Desktop Agent renderer surfaces", () => {
 
   it("renders one flat coding-Agent menu and keeps detected runtimes selectable with one warning", () => {
     const onSelectRuntime = vi.fn();
-    const container = render(React.createElement(AgentProviderPicker, {
-      agentProviders: [
+    const container = render(React.createElement(AgentRuntimePicker, {
+      agentRuntimes: [
         {
           descriptor: { id: "codex", displayName: "Codex", iconKey: "codex", distribution: "user-installed" },
           readiness: { runtimeId: "codex", provider: "codex", status: "ready", version: "0.144.1", minimumVersion: null, message: "Native login ready", selectable: true },
@@ -624,11 +625,11 @@ describe("Desktop Agent renderer surfaces", () => {
           readiness: { runtimeId: "cursor", provider: "cursor", status: "protocol-unavailable", version: "1.0.0", minimumVersion: null, message: "Native protocol unavailable", selectable: false },
         },
       ],
-      selectedAgentProviderId: null,
-      onSelectAgentProvider: onSelectRuntime,
+      selectedRuntimeId: null,
+      onSelectRuntime: onSelectRuntime,
     }));
 
-    const trigger = container.querySelector('button[aria-label="Coding agent provider"]') as HTMLButtonElement;
+    const trigger = container.querySelector('button[aria-label="Coding Agent"]') as HTMLButtonElement;
     act(() => trigger.click());
     const popup = document.querySelector(".desktop-agent-picker-list[role='listbox']") as HTMLElement;
     expect(popup).not.toBeNull();
@@ -644,34 +645,34 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(popup.textContent).not.toContain("Native protocol unavailable");
     act(() => cursor.click());
     expect(onSelectRuntime).toHaveBeenCalledWith("cursor");
-    expect(document.querySelector('[role="listbox"][aria-label="Coding agent provider options"]')).toBeNull();
+    expect(document.querySelector('[role="listbox"][aria-label="Coding Agent options"]')).toBeNull();
   });
 
-  it("supports Arrow, Enter and Escape with focus return in the custom Provider picker", async () => {
-    const onSelectAgentProvider = vi.fn();
-    const container = render(React.createElement(AgentProviderPicker, {
-      agentProviders: [
-        codingProvider("codex", "Codex"),
-        codingProvider("claude", "Claude Code"),
+  it("supports Arrow, Enter and Escape with focus return in the custom Agent picker", async () => {
+    const onSelectRuntime = vi.fn();
+    const container = render(React.createElement(AgentRuntimePicker, {
+      agentRuntimes: [
+        runtimeEntry("codex", "Codex"),
+        runtimeEntry("claude", "Claude Agent"),
       ],
-      selectedAgentProviderId: null,
-      onSelectAgentProvider,
+      selectedRuntimeId: null,
+      onSelectRuntime,
     }));
-    const trigger = container.querySelector('button[aria-label="Coding agent provider"]') as HTMLButtonElement;
+    const trigger = container.querySelector('button[aria-label="Coding Agent"]') as HTMLButtonElement;
     act(() => trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })));
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
     expect((document.activeElement as HTMLElement).textContent).toContain("Codex");
     act(() => document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })));
-    expect((document.activeElement as HTMLElement).textContent).toContain("Claude Code");
+    expect((document.activeElement as HTMLElement).textContent).toContain("Claude Agent");
     act(() => document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
-    expect(onSelectAgentProvider).toHaveBeenCalledWith("claude");
+    expect(onSelectRuntime).toHaveBeenCalledWith("claude");
     expect(document.activeElement).toBe(trigger);
 
     act(() => trigger.click());
     act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
-    expect(document.querySelector('[role="listbox"][aria-label="Coding agent provider options"]')).toBeNull();
+    expect(document.querySelector('[role="listbox"][aria-label="Coding Agent options"]')).toBeNull();
     expect(document.activeElement).toBe(trigger);
   });
 
@@ -987,7 +988,7 @@ describe("Desktop Agent renderer surfaces", () => {
   });
 
   it("keeps incompatible runtime recovery product-owned", () => {
-    const readiness: AgentProviderReadiness = {
+    const readiness: AgentRuntimeReadiness = {
       runtimeId: "opencode",
       provider: "opencode",
       status: "unsupported-version",

@@ -23,9 +23,12 @@ import {
   loadDesktopBuildInfo,
 } from "./main/build-info-service.mjs";
 import { createEphemeralAgentSessionCache } from "./main/agent/cache/ephemeral-agent-session-cache.mjs";
+import { createAgentConversationCatalog } from "./main/agent/persistence/agent-conversation-catalog.mjs";
+import { createAgentSessionRepository } from "./main/agent/persistence/agent-session-repository.mjs";
+import { createAgentProcessSupervisor } from "./main/agent/application/processes/agent-process-supervisor.mjs";
 import { createAgentQuitCoordinator } from "./main/agent/agent-shutdown.mjs";
-import { createAgentService } from "./main/agent/agent-service.mjs";
-import { createAgentAttachmentStore } from "./main/agent/agent-attachment-store.mjs";
+import { createAgentService } from "./main/agent/application/agent-service.mjs";
+import { createAgentAttachmentStore } from "./main/agent/infrastructure/attachments/agent-attachment-store.mjs";
 import { createLocalAgentInventory } from "./main/agent/connections/local-agent-inventory.mjs";
 import { createDefaultAgentRuntimeHost } from "./main/agent/bootstrap/create-agent-runtime-host.mjs";
 import {
@@ -248,7 +251,15 @@ const terminalService = createTerminalService({
   terminalAgentActivityHost,
 });
 const terminalAgentLocator = createTerminalAgentLocator();
-const agentSessionCache = createEphemeralAgentSessionCache({ app });
+const agentEventCache = createEphemeralAgentSessionCache({ app });
+const agentConversationCatalog = createAgentConversationCatalog({
+  filePath: path.join(app.getPath("userData"), "agent-runtime", "conversations.json"),
+});
+const agentSessionRepository = createAgentSessionRepository({
+  eventCache: agentEventCache,
+  conversationCatalog: agentConversationCatalog,
+});
+const agentProcessSupervisor = createAgentProcessSupervisor({ maxConcurrentStarts: 2 });
 const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   appVersion: desktopBuildInfo.version,
   appPath: app.getAppPath(),
@@ -264,8 +275,9 @@ void agentAttachmentStore.initialize().catch((error) => {
 });
 const agentService = createAgentService({
   runtimeRegistry: agentRuntimeRegistry,
-  sessionCache: agentSessionCache,
+  sessionCache: agentSessionRepository,
   attachmentStore: agentAttachmentStore,
+  processSupervisor: agentProcessSupervisor,
 });
 const localAgentInventory = createLocalAgentInventory({
   appVersion: desktopBuildInfo.version,

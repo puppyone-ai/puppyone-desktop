@@ -6,6 +6,9 @@ const METHOD_CANDIDATES = Object.freeze({
   newSession: Object.freeze(["session/new", "newSession"]),
   loadSession: Object.freeze(["session/load", "loadSession"]),
   listSessions: Object.freeze(["session/list", "listSessions"]),
+  closeSession: Object.freeze(["session/close", "closeSession"]),
+  forkSession: Object.freeze(["session/fork", "forkSession"]),
+  deleteSession: Object.freeze(["session/delete", "deleteSession"]),
   prompt: Object.freeze(["session/prompt", "prompt"]),
   cancel: Object.freeze(["session/cancel", "cancel"]),
   setMode: Object.freeze(["session/set_mode", "setSessionMode"]),
@@ -30,4 +33,3 @@ export function acpMethodCandidates(logicalMethod, overrides = {}) {
   if (!candidates) throw new Error(`Unknown ACP logical method: ${logicalMethod}`);
   return [...candidates];
 }
-

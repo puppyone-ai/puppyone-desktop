@@ -32,6 +32,7 @@ export class AcpClient {
     this.methodCache = new Map();
     this.agentInfo = null;
     this.agentCapabilities = null;
+    this.protocolVersion = null;
     this.authMethods = [];
     this.disposed = false;
     this.onNotification = (message) => {
@@ -64,6 +65,9 @@ export class AcpClient {
     });
     this.agentInfo = recordOrNull(response?.agentInfo);
     this.agentCapabilities = recordOrNull(response?.agentCapabilities);
+    this.protocolVersion = Number.isSafeInteger(response?.protocolVersion)
+      ? response.protocolVersion
+      : ACP_PROTOCOL_VERSION;
     this.authMethods = Array.isArray(response?.authMethods) ? response.authMethods.slice(0, 32) : [];
     return response;
   }
@@ -72,6 +76,9 @@ export class AcpClient {
   newSession(params) { return this.#request("newSession", params); }
   loadSession(params) { return this.#request("loadSession", params); }
   listSessions(params = {}) { return this.#request("listSessions", params); }
+  closeSession(params) { return this.#request("closeSession", params); }
+  forkSession(params) { return this.#request("forkSession", params); }
+  deleteSession(params) { return this.#request("deleteSession", params); }
   setMode(params) { return this.#request("setMode", params); }
   setConfigOption(params) { return this.#request("setConfigOption", params); }
 
@@ -121,8 +128,11 @@ export class AcpClient {
 
   async #handleNotification(message) {
     if (this.disposed) return;
-    if (!ACP_SERVER_NOTIFICATION_ALIASES.sessionUpdate.includes(message?.method)) return;
-    await this.delegate.onSessionUpdate?.(message.params);
+    if (ACP_SERVER_NOTIFICATION_ALIASES.sessionUpdate.includes(message?.method)) {
+      await this.delegate.onSessionUpdate?.(message.params);
+      return;
+    }
+    await this.delegate.handleNotification?.(message?.method, message?.params);
   }
 
   async #handleRequest(message) {
@@ -152,6 +162,9 @@ export class AcpClient {
     }
     if (ACP_SERVER_REQUEST_ALIASES.writeTextFile.includes(method) && this.delegate.writeTextFile) {
       return (params) => this.delegate.writeTextFile(params);
+    }
+    if (this.delegate.handleRequest && this.delegate.canHandleRequest?.(method) !== false) {
+      return (params) => this.delegate.handleRequest(method, params);
     }
     return null;
   }

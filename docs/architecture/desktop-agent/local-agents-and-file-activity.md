@@ -18,7 +18,7 @@ ownership and code dependencies.
 CLI availability and Hook enrollment are deliberately separate. Finding an
 executable never mutates its configuration. Hiding an Agent from the Terminal
 launcher never removes its Hook. Installing a Hook never changes the Editor
-Agent provider picker; Editor runtimes retain their own readiness, sign-in and
+Agent runtime picker; Editor runtimes retain their own readiness, sign-in and
 capability checks.
 
 ## 2. System map
@@ -72,7 +72,7 @@ Hook registration service ---> Terminal Agent Hook adapters
    during migration.
 4. `RightTerminalPanel` intersects detected IDs with this hidden set before
    rendering or launching a Terminal Agent.
-5. The Editor provider picker is independent of this preference and continues
+5. The Editor Agent runtime picker is independent of this preference and continues
    using the native runtime catalog.
 6. Agent identity is logo-first in both launcher visibility and Hook selection
    rows, reusing the Terminal launcher's provider marks.

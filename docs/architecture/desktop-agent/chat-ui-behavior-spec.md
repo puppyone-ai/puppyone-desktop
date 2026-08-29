@@ -1,9 +1,7 @@
 # Cursor-style Agent Chat UI behavior specification
 
-Status: the Cursor-style conversation document, compact work evidence and
-Agent-first selection contract are implemented. Composer reference ingestion,
-including Explorer/Finder/paste acquisition, external staging and committed
-reference replay, is implemented under the canonical reference contract.
+Status: implemented normative Chat UI, compact work evidence, Agent-first
+selection, approvals, questions and Composer reference-ingestion contract.
 Multi-native capability work must preserve the native harness boundaries in
 ADR-005 and ADR-006.
 
@@ -15,7 +13,7 @@ the React port, design-token mapping, accessibility improvements and security bo
 provider/runtime/session code is not copied, but its native-backend separation is an architectural
 reference for [ADR-005](ADR-005-multi-native-agent-backends.md).
 The exact upstream-to-PuppyOne file map and MIT notice are in
-[`vendor/claudian/SOURCE_ADOPTION.md`](../../../vendor/claudian/SOURCE_ADOPTION.md).
+the source repository's `vendor/claudian/SOURCE_ADOPTION.md`.
 This file uses plain-text diagrams only.
 
 ## 1. Product contract
@@ -475,7 +473,7 @@ not a second navigation hierarchy.
 + Agent ----------------------------------+
 |  PuppyOne Agent                  check  |
 |  Codex                           0.144  |
-|  Claude Code                     warning|
+|  Claude Agent                    warning|
 |  OpenCode                        warning|
 |  Cursor Agent                    warning|
 +-----------------------------------------+
@@ -505,7 +503,7 @@ not a second navigation hierarchy.
 - The selected Agent trigger is a borderless sub-header control with its official mark, name and
   chevron. New Session and overflow sit immediately beside it. Model/backend-scoped triggers are
   borderless text controls in the composer and receive a quiet hover surface only while interacting.
-  The standard catalog names (`Codex`, `Claude Code`, `OpenCode`, `Cursor Agent`) remain fully
+  The standard catalog names (`Codex`, `Claude Agent`, `OpenCode`, `Cursor Agent`) remain fully
   visible even at the 420 px minimum. The identity first reserves the two header actions, then
   uses all remaining width; only longer third-party names ellipsize at that boundary. Open/selected
   state must not become a solid fill.

@@ -281,7 +281,7 @@ describe("Desktop Agent local-tool inventory", () => {
         : { code: 1, stdout: "", stderr: "Not authenticated. Run cursor-agent login." }),
     });
     expect(cursor).toMatchObject({ installation: "detected", authentication: "signed-out" });
-    expect(deriveLocalConnection(cursor)).toMatchObject({ integration: "protocol-unavailable", selectable: false });
+    expect(deriveLocalConnection(cursor)).toMatchObject({ integration: "setup-required", selectable: false });
   });
 
   it("derives native selectability from protocol, auth, model and workspace gates", () => {

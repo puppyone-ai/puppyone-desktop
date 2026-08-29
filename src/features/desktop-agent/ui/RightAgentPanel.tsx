@@ -7,17 +7,19 @@ import { AgentChangesPill } from "./AgentChangesPill";
 import { AgentComposer, DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID } from "./AgentComposer";
 import { AgentPanelLayout } from "./AgentPanelLayout";
 import { AgentPanelStatus } from "./AgentPanelStatus";
-import { AgentProviderPicker } from "./AgentProviderPicker";
+import { AgentRuntimePicker } from "./AgentRuntimePicker";
 import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
 import { AgentQuestionDock } from "./AgentQuestionDock";
 import { readinessLabel, readinessStatusCode, sessionStatusCode, sessionStatusLabel } from "./agentPanelPresentation";
 import { getAgentSessionController } from "../application/controllerRegistry";
 import type { AgentSubmissionStage } from "../application/agent-controller-state";
-import { listEnabledCodingAgentProviders } from "../domain/agent-backend-routing";
+import type { AgentRoutePreference } from "../domain/agent-route-preference";
+import { listEnabledAgentRuntimes } from "../domain/agent-backend-routing";
 import { getElectronAgentClient } from "../infrastructure/electron/electronAgentClient";
 import { useAgentSessionPreparation } from "./useAgentSessionPreparation";
 import { useAgentReferenceIngestion } from "./useAgentReferenceIngestion";
+import { useAgentRoutingPreferences } from "./useAgentRoutingPreferences";
 import "./desktop-agent.css";
 export type RightAgentPanelHandle = { newSession: () => void };
 type RightAgentPanelProps = {
@@ -28,7 +30,11 @@ type RightAgentPanelProps = {
   onRunningChange?: (running: boolean) => void;
   preferredRuntimeId?: string | null;
   onPreferredRuntimeChange?: (runtimeId: string) => void;
+  preferredRoute?: Readonly<AgentRoutePreference>;
+  onPreferredRouteChange?: (route: AgentRoutePreference) => void;
+  /** @deprecated Use preferredRoute.modelId. */
   preferredModel?: string | null;
+  /** @deprecated Use onPreferredRouteChange. */
   onPreferredModelChange?: (model: string) => void;
   enabledRuntimeIds?: readonly string[] | null;
 };
@@ -39,6 +45,8 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   onRunningChange,
   preferredRuntimeId = null,
   onPreferredRuntimeChange,
+  preferredRoute = {},
+  onPreferredRouteChange,
   preferredModel = null,
   onPreferredModelChange,
   enabledRuntimeIds = null,
@@ -47,23 +55,6 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   const controller = useMemo(() => getAgentSessionController(workspace.path, getElectronAgentClient), [workspace.path]);
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const referenceIngestion = useAgentReferenceIngestion({ controller, workspaceId: workspace.id, capabilities: state.inspection?.capabilities?.referenceInputs });
-  useEffect(() => {
-    if (!active) return;
-    controller.setInitialRuntimePreference(preferredRuntimeId);
-    void controller.initialize(false);
-  }, [active, controller, preferredRuntimeId]);
-  useEffect(() => {
-    if (!state.initialized || !state.selectedRuntimeId || state.selectedRuntimeId === preferredRuntimeId) return;
-    onPreferredRuntimeChange?.(state.selectedRuntimeId);
-  }, [onPreferredRuntimeChange, preferredRuntimeId, state.initialized, state.selectedRuntimeId]);
-  useEffect(() => {
-    if (
-      preferredModel
-      && !state.selectedModel
-      && state.inspection?.selectedRuntimeId === state.selectedRuntimeId
-      && state.inspection.models.some((model) => model.model === preferredModel)
-    ) controller.selectModel(preferredModel);
-  }, [controller, preferredModel, state.inspection, state.selectedModel, state.selectedRuntimeId]);
   useEffect(() => {
     onRunningChange?.(Boolean(state.projection.runningTurnId));
   }, [onRunningChange, state.projection.runningTurnId]);
@@ -83,14 +74,18 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   const startupLoading = active && (!state.initialized || loading) && !state.pendingPrompt && !hasCommittedTranscript;
   const sessionKey = state.session?.id || "new-agent-session";
   const viewport = useMemo(() => ({ sessionKey, value: controller.readViewport() }), [controller, sessionKey]).value;
-  const agentProviders = listEnabledCodingAgentProviders(inspection, enabledRuntimeIds);
-  const codingProviderSelected = agentProviders.some((entry) => entry.descriptor.id === state.selectedRuntimeId);
-  const providerModels = codingProviderSelected ? inspection?.models ?? [] : [];
+  const agentRuntimes = listEnabledAgentRuntimes(inspection, enabledRuntimeIds);
+  const agentRuntimeSelected = agentRuntimes.some((entry) => entry.descriptor.id === state.selectedRuntimeId);
+  const runtimeModels = agentRuntimeSelected ? inspection?.models ?? [] : [];
+  const routingPreferences = useAgentRoutingPreferences({
+    active, controller, state, runtimeModels, preferredRuntimeId, preferredRoute, preferredModel,
+    onPreferredRuntimeChange, onPreferredRouteChange, onPreferredModelChange,
+  });
   const modelSelectionAvailable = Boolean(capabilities?.modelSelection);
   const routingReady = Boolean(
-    codingProviderSelected
+    agentRuntimeSelected
     && (!modelSelectionAvailable || (
-      state.selectedModel && providerModels.some((model) => model.model === state.selectedModel)
+      state.selectedModel && runtimeModels.some((model) => model.model === state.selectedModel)
     )),
   );
   const preparingSession = state.sessionPreparation === "preparing";
@@ -101,7 +96,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   useAgentSessionPreparation(controller, state, active && routingReady);
   const composerPlaceholder = unavailable || failed
     ? t("agent.composer.placeholder.preparing")
-    : !codingProviderSelected
+    : !agentRuntimeSelected
       ? t("agent.composer.placeholder.chooseAgent")
       : modelSelectionAvailable && !state.selectedModel
         ? t("agent.composer.placeholder.chooseModel")
@@ -116,17 +111,6 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   }, [controller]);
   const handleDraftChange = useCallback((draft: string) => controller.setDraft(draft), [controller]);
   const handleSubmit = useCallback((prompt: string) => controller.submit(prompt), [controller]);
-  const handleSelectModel = useCallback((model: string) => {
-    controller.selectModel(model);
-    onPreferredModelChange?.(model);
-  }, [controller, onPreferredModelChange]);
-  const handleSelectRuntime = useCallback((providerId: string) => {
-    void controller.selectRuntime(providerId).then((switched) => {
-      const model = controller.getSnapshot().selectedModel;
-      if (switched) onPreferredRuntimeChange?.(providerId);
-      if (switched && model) onPreferredModelChange?.(model);
-    });
-  }, [controller, onPreferredModelChange, onPreferredRuntimeChange]);
   return (
     <AgentPanelLayout
       ariaLabel={t("agent.panel.chat", { agent: bidiIsolate(runtimeLabel) })}
@@ -143,11 +127,11 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
           loading={loading}
           newSessionDisabled={unavailable || !routingReady || preparingSession || submissionPending || Boolean(state.projection.runningTurnId)}
           onNewSession={() => void controller.newSession()}
-          agentSelector={<AgentProviderPicker
-            agentProviders={agentProviders}
-            selectedAgentProviderId={codingProviderSelected ? state.selectedRuntimeId : null}
+          agentSelector={<AgentRuntimePicker
+            agentRuntimes={agentRuntimes}
+            selectedRuntimeId={agentRuntimeSelected ? state.selectedRuntimeId : null}
             disabled={loading || preparingSession || submissionPending || Boolean(state.projection.runningTurnId)}
-            onSelectAgentProvider={handleSelectRuntime}
+            onSelectRuntime={routingPreferences.selectRuntime}
           />}
           diagnostic={readiness?.diagnostic || (inspection?.warnings.length ? inspection.warnings.join(" ") : null)}
           onCompactSession={capabilities?.compaction ? () => void controller.compactSession() : undefined}
@@ -206,9 +190,9 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
           placeholder={composerPlaceholder}
           runtimeLabel={runtimeLabel}
           configurationDisabled={loading || preparingSession || submissionPending}
-          models={capabilities?.modelSelection ? providerModels : []}
+          models={capabilities?.modelSelection ? runtimeModels : []}
           selectedModel={state.selectedModel}
-          onSelectModel={handleSelectModel}
+          onSelectModel={routingPreferences.selectModel}
           commands={capabilities?.slashCommands ? inspection?.commands ?? [] : []}
           references={state.references} referenceCapabilities={capabilities?.referenceInputs}
           steerAvailable={Boolean(capabilities?.steer)}

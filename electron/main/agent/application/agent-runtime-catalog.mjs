@@ -10,12 +10,16 @@ import {
   assertAgentRuntimeInspection,
   normalizeCapabilitySnapshot,
 } from "../runtime/agent-runtime-port.mjs";
+import { createAgentProcessSupervisor } from "./processes/agent-process-supervisor.mjs";
 
 const INSPECTION_CACHE_MS = 5 * 60_000;
 // Discovery/account/model inspection must never depend on process.cwd().
 const NEUTRAL_INSPECTION_ROOT = os.tmpdir();
 
-export function createAgentRuntimeCatalog({ runtimeRegistry }) {
+export function createAgentRuntimeCatalog({
+  runtimeRegistry,
+  processSupervisor = createAgentProcessSupervisor(),
+}) {
   const inspectionCache = new Map();
 
   async function discover(request = {}, workspaceRoot = null) {
@@ -109,7 +113,11 @@ export function createAgentRuntimeCatalog({ runtimeRegistry }) {
       onExit: () => {},
     });
     try {
-      const inspection = assertAgentRuntimeInspection(adapter, await adapter.inspect(), runtimeId);
+      const inspected = await processSupervisor.runStart(
+        { label: `${runtimeId}:catalog-inspect` },
+        () => adapter.inspect(),
+      );
+      const inspection = assertAgentRuntimeInspection(adapter, inspected, runtimeId);
       const value = {
         account: inspection.account ?? null,
         providers: Array.isArray(inspection.providers) ? inspection.providers : [],

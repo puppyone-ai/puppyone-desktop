@@ -18,9 +18,57 @@ The archived [Codex Implementation Brief](history/codex-vertical-slice.md)
 records the original direct-runtime slice. The authoritative target decision is
 [ADR-005](ADR-005-multi-native-agent-backends.md) and
 [ADR-006](ADR-006-native-harness-adapters-and-acp.md): PuppyOne presents one Chat
-surface over multiple session-scoped native Agent backends. PuppyOne Agent uses
-the managed OpenCode kernel; Codex, Claude Code and other supported products use
-their own harness and native session.
+surface over two execution families. PuppyOne Agent uses PuppyOne Managed
+Harness, whose current kernel is managed OpenCode. Codex, Claude Agent, Cursor
+Agent and user OpenCode use their own harness and native session.
+
+## Product topology
+
+This tree is the primary mental model for every Chat UI control and backend
+integration. The first choice is always **Agent**; Provider and Model are
+settings inside the selected Agent and never choose a different harness.
+
+```text
+PuppyOne Chat UI
+    |
+    +-- PuppyOne Agent
+    |     -> PuppyOne Managed Harness
+    |          +-- PuppyOne managed Gateway / credits
+    |          +-- OpenAI API
+    |          +-- Anthropic API
+    |          +-- OpenRouter
+    |          +-- enterprise Gateway
+    |          +-- explicitly configured BYO API Provider
+    |
+    +-- Native Agents
+          +-- Codex          -> Codex harness
+          +-- Claude Agent   -> Claude harness
+          +-- Cursor Agent   -> Cursor harness
+          +-- OpenCode       -> user's OpenCode harness
+```
+
+These branches are architecture capabilities. The selected backend's live
+catalog and entitlement checks determine which Provider/model routes are
+actually available in a given release and account.
+
+The product meaning is strict:
+
+- selecting `PuppyOne Agent` enters the first-party, multi-provider managed
+  route;
+- selecting a native Agent enters that named product's official/native harness
+  through its documented protocol or SDK;
+- `OpenAI API` inside PuppyOne Agent is not Codex, and `Anthropic API` inside
+  PuppyOne Agent is not Claude Agent or Claude Code;
+- native product subscriptions and private CLI credentials are never converted
+  into PuppyOne Agent Provider credentials; BYO means an explicitly configured
+  API key or enterprise Gateway;
+- switching Provider/model inside PuppyOne Agent may occur at a supported turn
+  boundary, while switching Agent always creates a new native session;
+- an unavailable route never silently falls back to another Agent.
+
+The complete ownership, authentication, billing and handoff rules are
+normative in the
+[Desktop Agent route-selection policy](README.md#route-selection-policy).
 
 ## Status
 
@@ -33,21 +81,19 @@ their own harness and native session.
   retains the selected surface, and keeps a running Agent turn alive while
   Chat is hidden. The experimental Chat feature is a lazy renderer chunk and
   does not inflate the default desktop entry bundle when the gate is off.
-- **Implemented runtime foundation:** PuppyOne Agent, Codex, Claude Code and user
+- **Implemented runtime foundation:** PuppyOne Agent, Codex, Claude Agent and user
   OpenCode native routes,
   connected-provider discovery, readiness/account/model/mode states, virtual transcript streaming, safe
   Markdown, part/tool registries, plan/tool/command/file activity, permission
   and structured-question docks, `/` commands, Stop, live-gap warning, and
-  Jump to latest.
-- **Implemented reference ingestion:** Explorer/Finder/picker/paste share one
-  typed acquisition path; external files use main-owned immutable staging;
-  runtime capabilities gate exact native mappings; immutable submission
-  intents and committed/replayed user turns preserve sanitized reference chips.
+  Jump to latest, add/drop/paste/file picking, immutable external staging,
+  workspace authorization and committed reference displays.
 - **Implemented by capability:** native interruption, approvals/questions,
   compaction, queue/steer controls, and model/mode selection. PuppyOne does not
   expose or persist Chat History; unsupported controls are omitted.
-- **Current boundary:** keep Cursor execution-disabled until a supported
-  protocol and approval contract exist.
+- **Current boundary:** Cursor uses its official ACP entry point. Shared ACP
+  behavior stays provider-neutral; Cursor questions/extensions remain isolated
+  in the Cursor adapter.
 - **Product gate:** a registered Agent row is selectable as an inspection scope.
   Send becomes enabled only after installation, version, authentication,
   protocol, model/tool, workspace and product-policy gates pass. Provider/Model
@@ -164,17 +210,22 @@ navigation and compact readiness warnings.
 Agent
   PuppyOne Agent
   Codex
-  Claude Code
-  Cursor Agent          selectable row; warning until protocol-ready
+  Claude Agent
+  Cursor Agent
   OpenCode
       |
       v
 backend-scoped controls
-  PuppyOne Agent  -> Provider -> Model -> Variant -> Agent/Mode
+  PuppyOne Agent  -> Provider -> Model -> Variant -> Profile/Mode
   Codex           -> Model -> Reasoning -> Sandbox/Approval profile
-  Claude Code     -> Model -> Effort -> Permission mode
-  OpenCode        -> Provider -> Model -> Agent/Mode
+  Claude Agent    -> Model -> Effort -> Permission mode
+  Cursor Agent    -> Cursor-native Model -> Mode/Permission options
+  OpenCode        -> Provider -> Model -> OpenCode Profile/Mode
 ```
+
+`Agent` is reserved for the top-level harness selector. When an upstream
+runtime uses “agent” for an internal persona/configuration, the shared UI calls
+that control `Profile` or `Mode`.
 
 The selected Agent controls which native harness and live connection will be created. Its
 prominent sub-header placement communicates that it is a session boundary rather than a model
@@ -187,8 +238,8 @@ does not offer the discarded projection as Chat History.
 | --- | --- |
 | PuppyOne Agent engine verified and provider/model connected | PuppyOne Agent is selectable. |
 | Codex CLI passes version, account, app-server and model/tool gates | Codex is selectable and uses its native thread. |
-| Claude Code passes SDK runtime, API/cloud credential and capability gates | Claude Code is selectable and uses its native session. |
-| Cursor Agent is installed but has no supported protocol | Allow scoped selection, show one warning icon and keep Send disabled; never fake support through shell output. |
+| Claude Agent passes SDK runtime, API/cloud credential and capability gates | Claude Agent is selectable and uses its native session; it is not a Claude Pro/Max subscription route. |
+| Cursor Agent passes executable, login, ACP and capability gates | Cursor Agent is selectable and uses its native Cursor session. |
 | User OpenCode passes its independent profile and protocol gates | OpenCode is selectable without using the PuppyOne Agent profile. |
 
 Executable presence alone never enables Send. Detailed candidate paths,
@@ -394,7 +445,7 @@ user message. Full data model, cleanup and adapter rules are defined in
 
 PuppyOne is a unified Agent UI and connection boundary, not a Chat History
 database. It does not persist, list, archive, fork, rename or delete prior
-conversations. If Codex, Claude Code, OpenCode or another native product keeps
+conversations. If Codex, Claude Agent, OpenCode or another native product keeps
 history, that history remains entirely under that product's storage and policy.
 
 ```text
@@ -531,6 +582,11 @@ Persisted sanitized discovery cache
   schema version + scan timestamp + 24-hour maximum age
   explicit Refresh bypasses and replaces the cache
 
+Persisted Conversation Catalog
+  product session id + workspace + immutable Agent runtime id
+  authoritative native session pointer + selected routing metadata
+  no prompts, responses, events, tool output, diffs or credentials
+
 Current-process presentation state only
   active application session id
   immutable Agent backend id
@@ -554,8 +610,9 @@ Provider-owned durable state
 ```
 
 React component unmount is never the authoritative signal that a native turn
-ended. The main process owns that live lifecycle, but no PuppyOne transcript or
-native session mapping survives application shutdown.
+ended. The main process owns that live lifecycle. No PuppyOne transcript
+survives application shutdown; only the metadata-only native session pointer
+needed to resume the harness is durable.
 
 ## Implemented component map
 
@@ -592,7 +649,7 @@ The implemented sidebar contract remains satisfied when:
 - PuppyOne exposes no Chat History list and writes no transcript/session journal;
 - a created session pins one Agent backend and switching Agent creates a new
   session rather than nesting or mutating native state;
-- PuppyOne Agent, Codex and Claude Code can fail independently without silent
+- PuppyOne Agent, Codex and Claude Agent can fail independently without silent
   fallback or global Chat disablement;
 - image-only, audio-only, Embedding, deprecated, and non-tool Agent models are
   absent when the selected backend requires text-and-tools capability;

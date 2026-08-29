@@ -4,6 +4,11 @@ Date: 2026-07-13. Status: accepted and implemented. This is the authoritative
 implementation decision for native harness routing; the canonical system map
 is mirrored in the Desktop Agent architecture README.
 
+Clarified: 2026-08-30. The clarification makes the PuppyOne-managed versus
+native-harness split explicit, separates Agent routes from inference Providers,
+distinguishes Claude Agent SDK auth from a Claude Code subscription route, and
+adopts the implemented Cursor ACP adapter as its native boundary.
+
 This decision refines
 [ADR-005](ADR-005-multi-native-agent-backends.md) and supersedes the transport
 choice in [ADR-001](ADR-001-opencode-sidecar.md),
@@ -13,46 +18,65 @@ sidecar scope narrowed by
 
 ## Decision
 
-PuppyOne is a multi-harness desktop client. It owns the product control plane,
-but it does not implement a universal agent loop. Every selectable Agent route
-has exactly one native harness owner and one explicit protocol adapter.
+PuppyOne is a multi-harness desktop client. It owns the product control plane
+and one first-party, multi-provider `PuppyOne Managed Harness` route. It does
+not use that route as a universal replacement for vendor Agent loops. Every
+selectable Agent route has exactly one harness authority and one explicit
+protocol adapter.
 
 <!-- agent-runtime-map:start -->
 ```text
-One PuppyOne Chat UI / product control plane
+PuppyOne Chat UI / product control plane
   workspace authority / typed IPC / normalized events / approvals / lifecycle
-        |
-        v
-AgentRuntimeRegistry                 one immutable route per live session
-  |
-  +-- Codex
-  |     -> codex app-server (JSONL-RPC over stdio)
-  |     -> Codex owns Agent loop, tools, login, models and thread
-  |
-  +-- Claude Code
-  |     -> official Claude Agent SDK + user's Claude Code executable
-  |     -> Claude owns Agent loop, tools, permissions and native session
-  |
-  +-- OpenCode
-  |     -> Agent Client Protocol (JSON-RPC 2.0 over stdio)
-  |     -> user's OpenCode executable, profile, auth and native session
   |
   +-- PuppyOne Agent
-  |     -> the same provider-neutral ACP adapter
-  |     -> PuppyOne-bundled and pinned OpenCode kernel
-  |     -> isolated PuppyOne profile; OpenCode owns the Agent loop
+  |     -> PuppyOne Managed Harness
+  |          -> PuppyOne-owned product policy, provider routing and support
+  |          -> current kernel: bundled, pinned OpenCode over ACP
+  |          -> isolated PuppyOne profile and native session
+  |          -> backend-scoped Provider / Model catalog
+  |               +-- PuppyOne managed Gateway / credits
+  |               +-- OpenAI API
+  |               +-- Anthropic API
+  |               +-- OpenRouter
+  |               +-- enterprise Gateway
+  |               +-- explicitly configured BYO API Provider
   |
-  +-- Cursor Agent
-        -> discovery and diagnostics only
-        -> not selectable until a supported native protocol and approval
-           contract pass the production gates
+  +-- Native Agents
+        +-- Codex
+        |     -> codex app-server -> Codex harness
+        |     -> user's Codex login, entitlement, models and thread
+        |
+        +-- Claude Agent
+        |     -> official Claude Agent SDK + local Claude executable
+        |     -> Claude harness; supported API/cloud credentials and session
+        |
+        +-- Cursor Agent
+        |     -> Cursor ACP (`agent acp`) -> Cursor harness
+        |     -> user's Cursor login, entitlement, models and session
+        |     -> negotiated ACP capabilities plus isolated Cursor extensions
+        |
+        +-- OpenCode
+              -> ACP -> user's OpenCode harness
+              -> user's executable, profile, auth, Providers and session
 ```
 <!-- agent-runtime-map:end -->
 
+The Provider branches are architecture capabilities. Runtime catalogs and
+entitlement gates remain authoritative for what a release/account can use.
+
 There is no harness nesting. Selecting Codex never means running Codex as a
-model provider inside OpenCode. Selecting Claude Code never sends its private
-credentials through PuppyOne Agent. `PuppyOne Agent` is the only route whose
-kernel is a PuppyOne-managed OpenCode build.
+model provider inside OpenCode. Selecting Claude Agent never sends its private
+credentials through PuppyOne Agent. `PuppyOne Agent` is the only route behind
+the PuppyOne Managed Harness boundary; its current kernel is a
+PuppyOne-managed OpenCode build.
+
+The Agent selector is the routing authority. Selecting `PuppyOne Agent` enters
+the managed multi-provider harness. Selecting `Codex`, `Claude Agent`, `Cursor
+Agent` or `OpenCode` enters that product's native harness. Provider/model names
+never select a different Agent implicitly. The complete normative routing,
+credential and switching rules are in the Desktop Agent architecture README's
+`Route-selection policy` section.
 
 ## Why this is the stable boundary
 
@@ -62,7 +86,7 @@ compaction policy, provider retry logic or native session semantics.
 
 The boundary therefore separates two kinds of responsibility:
 
-| PuppyOne control plane owns | Selected native harness owns |
+| PuppyOne control plane owns | Selected harness authority owns |
 | --- | --- |
 | public Agent selection | reasoning and agent loop |
 | canonical workspace root | tool scheduling and native tool semantics |
@@ -114,11 +138,11 @@ electron/main/agent/
   connections/                 lazy, cached local executable inventory
   runtimes/
     codex/                     Codex app-server adapter
-    claude/                    Agent SDK channel, discovery and spawn adapter
+    claude/                    Claude Agent SDK channel, discovery and spawn adapter
     opencode-protocol/         shared OpenCode ACP adapter
     opencode-native/           user-owned executable/profile composition
     puppyone-agent/            pinned managed kernel composition
-    cursor/                    diagnostics until protocol acceptance
+    cursor/                    Cursor ACP adapter and isolated extensions
   bootstrap/                   the only production composition root
 ```
 
@@ -177,12 +201,13 @@ The user OpenCode route preserves the user's own profile and native session
 authority. It never shares the managed profile or reclassifies a user session
 as a PuppyOne Agent session.
 
-## Claude Code route
+## Claude Agent route
 
 The official Agent SDK is the control layer and the user's canonical Claude
-Code executable is the native harness. A session keeps one SDK query/channel
-alive across follow-up messages; PuppyOne does not restart the harness for
-every turn.
+executable is the native harness. A session keeps one SDK query/channel alive
+across follow-up messages; PuppyOne does not restart the harness for every
+turn. The product label is `Claude Agent` because this route uses the Agent SDK;
+it must not be presented as a Claude Code subscription integration.
 
 Readiness is capability-based, not an arbitrary version comparison. Discovery
 requires the CLI flags that the secure SDK launch depends on, including
@@ -195,6 +220,22 @@ not executed implicitly; PuppyOne supplies its separately authorized project
 instruction snapshot. Permission bypass is prohibited. Subscription OAuth is
 not repurposed for a third-party client; the route accepts only credential
 forms supported by Anthropic for this integration.
+
+A future route that runs an unmodified Claude Code product with the user's
+native subscription login is a separate product integration. It requires an
+officially supported control surface, native login owned end to end by
+Anthropic, separate naming, and the same protocol, security and product-policy
+gates before it can become selectable.
+
+## Cursor Agent route
+
+Cursor now exposes an official ACP entry point through `agent acp`. That is the
+accepted native boundary: Cursor retains its harness, login, models,
+permissions and session while PuppyOne maps negotiated ACP capabilities and
+events into `AgentRuntimePort`. Cursor-specific questions remain in the Cursor
+adapter; standard session, permission, file and streaming behavior stays in the
+provider-neutral ACP core. The former conclusion that Cursor lacks a supported
+protocol is retired.
 
 ## Codex route
 
@@ -213,13 +254,14 @@ PuppyOne does not persist Chat transcripts or create a second history source.
 
 ```text
 Persisted by PuppyOne
-  selected Agent/model preference in Renderer preferences
+  versioned per-runtime routing preference in Renderer preferences
   sanitized local-runtime inventory with TTL and explicit Refresh invalidation
+  bounded Conversation Catalog metadata and native session pointers
 
 Process-local only
   live product session correlation
   bounded normalized event projection needed by the open window
-  native session ID needed to route the current process
+  bounded normalized events used for live replay
 
 Never written as PuppyOne Chat history
   user/assistant transcript
@@ -230,11 +272,10 @@ Never written as PuppyOne Chat history
 ```
 
 At app restart, the selected native product remains the UI preference and the
-inventory cache avoids an immediate full disk/process scan. Conversation
-recovery, when supported, belongs to the native product and requires an
-explicit future product surface; PuppyOne does not infer it from its live
-projection. Legacy `desktop-agent-sessions.json` data is deleted rather than
-continued as a hidden transcript store.
+metadata-only Conversation Catalog can resume the authoritative native session
+without copying its transcript. The inventory cache avoids an immediate full
+disk/process scan. Legacy `desktop-agent-sessions.json` transcript data is
+deleted rather than continued as a hidden history store.
 
 Switching Agent is a hard session boundary. The UI may preserve the unsent
 draft, but it creates a new native session and does not copy the old transcript
@@ -270,7 +311,8 @@ A new route is acceptable only when it has all of the following:
 10. registration in the single production composition root.
 
 Until every gate passes, detection may appear in diagnostics but selection and
-Send remain disabled. This is why Cursor is currently inventory-only.
+Send remain disabled. Cursor now passes these gates through the shared ACP core
+and its isolated extension adapter.
 
 ## Rejected alternatives
 
@@ -278,9 +320,10 @@ Send remain disabled. This is why Cursor is currently inventory-only.
 One OpenCode harness for every provider
   Rejected: changes native loop, permissions, billing and session ownership.
 
-One PuppyOne-authored universal harness
+One PuppyOne-authored harness replacing every native Agent
   Rejected: duplicates mature vendor loops and makes PuppyOne responsible for
-  model-specific tools, compaction and retry semantics.
+  model-specific tools, compaction and retry semantics. This does not reject
+  the first-party PuppyOne Managed Harness used only by PuppyOne Agent.
 
 UI-only shell command wrappers
   Rejected: no stable session, streaming, approval or cancellation contract.

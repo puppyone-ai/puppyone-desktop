@@ -1,7 +1,7 @@
 # OpenCode update and rollback runbook
 
 > Scope: this runbook governs the managed OpenCode kernel embedded behind the
-> `PuppyOne Agent` backend. It does not govern Codex, Claude Code, Cursor,
+> `PuppyOne Agent` backend. It does not govern Codex, Claude Agent, Cursor,
 > user-managed OpenCode or any other native Agent backend. Product-wide routing
 > and backend isolation are defined by
 > [ADR-005](ADR-005-multi-native-agent-backends.md).
@@ -42,7 +42,7 @@ PuppyOne Agent current slot fails integrity before spawn
 Other ready native Agent backends remain selectable throughout this flow.
 ```
 
-Never reinterpret a PuppyOne Agent session as a Codex, Claude Code, Cursor or
+Never reinterpret a PuppyOne Agent session as a Codex, Claude Agent, Cursor or
 user-OpenCode session. A session is pinned to one backend, so failover is only
 between verified managed OpenCode slots inside PuppyOne Agent. Provider and
 model availability for that backend is evaluated only after its verified kernel

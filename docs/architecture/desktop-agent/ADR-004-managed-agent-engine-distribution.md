@@ -6,7 +6,7 @@ Agent backend. Its former global Chat availability scope is superseded by
 
 The verified OpenCode component described here is the internal kernel of
 PuppyOne Agent. Its absence disables PuppyOne Agent only; it does not disable a
-healthy native Codex, Claude Code, user OpenCode or future backend.
+healthy native Codex, Claude Agent, Cursor Agent, user OpenCode or future backend.
 
 ## Context
 

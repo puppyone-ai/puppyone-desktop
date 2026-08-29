@@ -5,7 +5,7 @@ import { DesktopOverlayPortal } from "../../app-shell/DesktopOverlayPortal";
 import { AgentComposer } from "./AgentComposer";
 import { AgentChangesPill } from "./AgentChangesPill";
 import { AgentPanelLayout } from "./AgentPanelLayout";
-import { AgentProviderPicker } from "./AgentProviderPicker";
+import { AgentRuntimePicker } from "./AgentRuntimePicker";
 import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
 import { createAgentProjection } from "../domain/agent-projection";
@@ -17,14 +17,14 @@ import type {
 } from "../domain/agent-contract";
 import "./desktop-agent.css";
 
-const agentProviders: AgentRuntimeCatalogEntry[] = [
-  provider("codex", "Codex", "codex"),
-  provider("claude", "Claude Code", "claude"),
-  provider("opencode-native", "OpenCode", "opencode"),
-  detectedProvider("cursor", "Cursor Agent", "cursor"),
+const agentRuntimes: AgentRuntimeCatalogEntry[] = [
+  runtimeEntry("codex", "Codex", "codex"),
+  runtimeEntry("claude", "Claude Agent", "claude"),
+  runtimeEntry("opencode-native", "OpenCode", "opencode"),
+  runtimeEntry("cursor", "Cursor Agent", "cursor"),
 ];
 
-const modelsByProvider: Record<string, AgentModel[]> = {
+const modelsByRuntime: Record<string, AgentModel[]> = {
   codex: [model("gpt-5.4", "GPT-5.4", true), model("gpt-5.4-mini", "GPT-5.4 Mini")],
   claude: [model("claude-sonnet-4.5", "Claude Sonnet 4.5", true), model("claude-opus-4.1", "Claude Opus 4.1")],
   "opencode-native": [model("google/gemini-3-pro", "Gemini 3 Pro", true), model("openai/gpt-5.4", "GPT-5.4")],
@@ -77,13 +77,13 @@ const smokeReferences: AgentDraftReference[] = [
 export function AgentVisualSmokeHarness() {
   const { t } = useLocalization();
   const [draft, setDraft] = useState("");
-  const [providerId, setProviderId] = useState(agentProviders[0].descriptor.id);
-  const [selectedModel, setSelectedModel] = useState(modelsByProvider[providerId][0].model);
+  const [runtimeId, setRuntimeId] = useState(agentRuntimes[0].descriptor.id);
+  const [selectedModel, setSelectedModel] = useState(modelsByRuntime[runtimeId][0].model);
   const [references, setReferences] = useState(smokeReferences);
   const theme = new URLSearchParams(window.location.search).get("theme") === "light" ? "light" : "dark";
   const startupLoading = new URLSearchParams(window.location.search).get("state") === "loading";
-  const selectedProvider = agentProviders.find((entry) => entry.descriptor.id === providerId) ?? agentProviders[0];
-  const models = modelsByProvider[providerId];
+  const selectedRuntime = agentRuntimes.find((entry) => entry.descriptor.id === runtimeId) ?? agentRuntimes[0];
+  const models = modelsByRuntime[runtimeId];
   const startupProjection = useMemo(() => createAgentProjection(), []);
   const projection = useMemo(() => {
     const value = createAgentProjection();
@@ -248,25 +248,25 @@ export function AgentVisualSmokeHarness() {
     <>
       <main className={`desktop-agent-visual-smoke${theme === "dark" ? " dark" : ""}`} data-smoke-theme={theme}>
         <AgentPanelLayout
-          ariaLabel={t("agent.panel.chat", { agent: bidiIsolate(selectedProvider.descriptor.displayName) })}
+          ariaLabel={t("agent.panel.chat", { agent: bidiIsolate(selectedRuntime.descriptor.displayName) })}
           header={<AgentSurfaceHeader
             title={t("agent.visual.title")}
-            runtimeLabel={selectedProvider.descriptor.displayName}
+            runtimeLabel={selectedRuntime.descriptor.displayName}
             statusCode="ready"
             statusLabel={t("agent.header.status.ready")}
             loading={startupLoading}
             newSessionDisabled={false}
             onNewSession={() => {}}
-            agentSelector={<AgentProviderPicker
-              agentProviders={agentProviders}
-              selectedAgentProviderId={providerId}
-              onSelectAgentProvider={(nextProviderId) => {
-                setProviderId(nextProviderId);
-                setSelectedModel(modelsByProvider[nextProviderId][0].model);
+            agentSelector={<AgentRuntimePicker
+              agentRuntimes={agentRuntimes}
+              selectedRuntimeId={runtimeId}
+              onSelectRuntime={(nextRuntimeId) => {
+                setRuntimeId(nextRuntimeId);
+                setSelectedModel(modelsByRuntime[nextRuntimeId][0].model);
               }}
             />}
           />}
-          conversation={<AgentTranscript projection={visibleProjection} loading={startupLoading} runtimeLabel={selectedProvider.descriptor.displayName} />}
+          conversation={<AgentTranscript projection={visibleProjection} loading={startupLoading} runtimeLabel={selectedRuntime.descriptor.displayName} />}
           dock={startupLoading ? null : <>
             <AgentComposer
               floatingAccessory={<AgentChangesPill projection={visibleProjection} onViewChanges={() => {}} />}
@@ -278,7 +278,7 @@ export function AgentVisualSmokeHarness() {
               submitting={false}
               configurationDisabled={startupLoading}
               placeholder={t("agent.composer.placeholder.followUp")}
-              runtimeLabel={selectedProvider.descriptor.displayName}
+              runtimeLabel={selectedRuntime.descriptor.displayName}
               models={models}
               selectedModel={selectedModel}
               onSelectModel={setSelectedModel}
@@ -300,25 +300,10 @@ export function AgentVisualSmokeHarness() {
   );
 }
 
-function provider(id: string, displayName: string, iconKey: string): AgentRuntimeCatalogEntry {
+function runtimeEntry(id: string, displayName: string, iconKey: string): AgentRuntimeCatalogEntry {
   return {
     descriptor: { id, displayName, iconKey, distribution: "user-installed" },
     readiness: { runtimeId: id, provider: id, status: "ready", version: "1.0.0", minimumVersion: null, message: "Ready", selectable: true },
-  };
-}
-
-function detectedProvider(id: string, displayName: string, iconKey: string): AgentRuntimeCatalogEntry {
-  return {
-    descriptor: { id, displayName, iconKey, distribution: "user-installed" },
-    readiness: {
-      runtimeId: id,
-      provider: id,
-      status: "protocol-unavailable",
-      version: "2026.07.09-a3815c0",
-      minimumVersion: null,
-      message: "Cursor Agent is installed, but its native protocol is not available.",
-      selectable: false,
-    },
   };
 }
 

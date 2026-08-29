@@ -1,6 +1,6 @@
-import type { AgentDraftReference, AgentProviderInspection } from "../domain/agent-contract";
+import type { AgentDraftReference, AgentRuntimeInspection } from "../domain/agent-contract";
 
-export function chooseAgentMode(inspection: AgentProviderInspection | null, current: string | null) {
+export function chooseAgentMode(inspection: AgentRuntimeInspection | null, current: string | null) {
   const modes = inspection?.modes ?? [];
   if (current && modes.some((mode) => mode.id === current)) return current;
   return modes.find((mode) => mode.isDefault)?.id || modes[0]?.id || null;

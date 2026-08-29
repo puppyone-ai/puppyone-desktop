@@ -2,9 +2,8 @@
 
 Status: backend boundary implemented from
 [ADR-005](ADR-005-multi-native-agent-backends.md). PuppyOne Agent, Codex,
-Claude Code, user OpenCode and capability-gated Cursor are registered in the
-production runtime catalog. Agent-first presentation remains a separate UI
-migration.
+Claude Agent, Cursor Agent and user OpenCode are registered in the production
+runtime catalog and Agent-first selector.
 
 This document defines how PuppyOne discovers native Agent products without
 confusing an executable, harness, inference provider or model. It also defines
@@ -28,19 +27,19 @@ Agent backend inventory
 -----------------------
 PuppyOne Agent engine verified
 Codex CLI installed and signed in
-Claude Code installed and signed in
-Cursor Agent installed, protocol unavailable
+Claude executable installed; Agent SDK credential ready
+Cursor Agent installed, signed in and ACP-ready
 user OpenCode installed and signed in
           |
           | installation / version / auth / protocol / policy gates
           v
 Selectable Agent backends
           |
-          +-- PuppyOne Agent -> OpenCode connected Provider/Model catalog
+          +-- PuppyOne Agent -> managed Provider/Model catalog
           +-- Codex          -> Codex model/list and native capabilities
-          +-- Claude Code    -> Claude SDK/native model and mode metadata
+          +-- Claude Agent   -> Claude SDK/native model and mode metadata
           +-- OpenCode       -> user OpenCode Provider/Model catalog
-          +-- Cursor         -> no catalog until protocol gate passes
+          +-- Cursor Agent   -> negotiated Cursor ACP catalog
 ```
 
 One catalog never substitutes for the other. A Codex executable is not an
@@ -56,7 +55,8 @@ Local installation
 
 Agent backend
   A user-selectable native Agent integration that owns one harness and native
-  session. Examples: PuppyOne Agent, Codex, Claude Code and user OpenCode.
+  session. Examples: PuppyOne Agent, Codex, Claude Agent, Cursor Agent and user
+  OpenCode.
 
 Harness
   The selected backend's native reasoning/tool/context loop.
@@ -67,7 +67,7 @@ Inference provider
 
 Native protocol
   The supported interface used by an adapter: Codex app-server, Claude Agent
-  SDK, OpenCode server/ACP, Pi RPC or a future Cursor contract.
+  SDK, Cursor ACP, OpenCode ACP or Pi RPC.
 
 Selectable
   Every installation, version, authentication, protocol, capability,
@@ -185,7 +185,7 @@ product-ID branches.
 | Backend | Candidates | Notes |
 | --- | --- | --- |
 | Codex | `codex` and documented Codex.app helpers | Require bounded version and app-server probes. |
-| Claude Code | `claude`, native binary and documented Node package entrypoints | Resolve Node only when the entrypoint requires it. |
+| Claude Agent | `claude`, native binary and documented Node package entrypoints | The local executable participates in the Agent SDK route; resolve Node only when required. |
 | Cursor Agent | `cursor-agent`, `agent`, documented Cursor helper | `cursor` alone may be an IDE launcher; classify before use. |
 | user OpenCode | `opencode` | Keep user profile and data roots separate from PuppyOne Agent. |
 | Pi | `pi` | Enable only with an approved RPC adapter. |
@@ -247,11 +247,11 @@ including the stable stdio JSONL transport and native thread, turn, account,
 model, approval and event surfaces. Experimental WebSocket transport is not
 part of the PuppyOne production adapter contract.
 
-## 7. Claude Code readiness
+## 7. Claude Agent readiness
 
-Claude Code uses the official Claude Agent SDK and the user's native Claude
-Code installation. PuppyOne bundles the SDK control layer and passes the
-user's canonical Claude Code executable to it. Compatibility is
+Claude Agent uses the official Claude Agent SDK and the user's native Claude
+executable. PuppyOne bundles the SDK control layer and passes the user's
+canonical executable to it. Compatibility is
 capability-gated instead of inferred from an arbitrary minimum version. A CLI
 stays visible as installed but is non-selectable when the secure SDK launch
 flags it requires are absent.
@@ -262,7 +262,7 @@ Level 2  canonical user Claude executable + required protocol flags
 Level 3  SDK initialization/native session handshake
 Level 4  native authentication and model/capability inspection
 Level 5  permission/native-session/live-recovery contract accepted
-Level 6  execution-ready Claude Code backend
+Level 6  execution-ready Claude Agent backend
 ```
 
 Optional user-CLI resolution uses bounded deterministic categories:
@@ -279,7 +279,7 @@ reading, migrating or writing the user's real Claude profile. The resulting
 session environment still uses the user's configured profile; probe isolation
 is never persisted into runtime readiness.
 
-PuppyOne passes the resolved user executable to the SDK. Claude Code remains the
+PuppyOne passes the resolved user executable to the SDK. Claude remains the
 owner of its loop, tools, permission semantics and native session. PuppyOne
 normalizes SDK events and blocking requests but never polls or copies private
 credential files.
@@ -290,17 +290,22 @@ instruction snapshot. The native `claude_code` system-prompt preset remains
 authoritative, permission bypass is never enabled, and “allow for session”
 filters permission updates to the SDK's in-memory `session` destination.
 
+The user-facing route name is `Claude Agent`. Agent SDK traffic accepts an
+Anthropic API key or supported cloud-provider credential and must not reuse
+Claude Free/Pro/Max subscription OAuth. A future unmodified Claude Code
+subscription route is a separate integration with separate readiness gates.
+
 ## 8. Cursor Agent readiness
 
-Cursor remains capability-gated. Installation and authentication inventory may
-be shown before execution support exists.
+Cursor exposes an official ACP entry point through `agent acp`. Installation,
+authentication and the ACP handshake jointly determine execution readiness.
 
 ```text
 Level 1  canonical Cursor Agent executable + version
-Level 2  bounded native status/auth observation
-Level 3  stable documented streaming/session/approval protocol
+Level 2  ACP initialize and bounded native auth observation
+Level 3  session/new, session/load, prompt, update, permission and cancel mapping
 Level 4  explicit credential and billing contract
-Level 5  production security/native-session/live-recovery adapter accepted
+Level 5  extension isolation plus production security/live-recovery accepted
 Level 6  execution-ready Cursor backend
 ```
 
@@ -310,10 +315,14 @@ Rules:
 - Raw status output is reduced in main to a bounded auth state.
 - Local CLI login and an SDK/API-key product are different entitlement
   contracts unless Cursor explicitly guarantees reuse.
+- Standard ACP capabilities are negotiated. Cursor extension methods remain in
+  the Cursor adapter and never leak into shared application or Renderer code.
 - `--force`, unbounded shell output and simulated tool/approval semantics are
   prohibited.
-- Until Levels 3-5 pass, Cursor remains visible and selectable for inspection
-  with a protocol warning, while Send stays disabled.
+- The production adapter satisfies Levels 2-5. If a future Cursor build fails
+  any negotiated gate, its row remains inspectable while Send stays disabled.
+
+Reference: [official Cursor ACP documentation](https://cursor.com/docs/cli/acp).
 
 ## 9. PuppyOne Agent and user OpenCode
 
@@ -357,7 +366,7 @@ of unrelated Providers and local tools and not a readiness dashboard.
 + Agent -------------------------------------+
 |  PuppyOne Agent                     check  |
 |  Codex                              0.144  |
-|  Claude Code                        !      |
+|  Claude Agent                       !      |
 |  OpenCode                           !      |
 |  Cursor Agent                       !      |
 +--------------------------------------------+
@@ -373,7 +382,7 @@ of unrelated Providers and local tools and not a readiness dashboard.
   provider, variant and mode controls.
 - An existing session shows its pinned Agent. Selecting a different Agent
   starts a new session after an explicit boundary confirmation.
-- PuppyOne Agent may show Provider then Model. Native Codex or Claude Code may
+- PuppyOne Agent may show Provider then Model. Native Codex or Claude Agent may
   show Model directly when their native protocol has no separate Provider
   control.
 
@@ -421,9 +430,9 @@ shared/agent-contract/
 src/features/desktop-agent/
   application/                            backend-neutral controller
   domain/                                 Agent -> scoped routing policy
-  ui/AgentBackendPicker.tsx               accessible Agent selector
-  ui/AgentProviderPicker.tsx              optional backend-scoped Provider
+  ui/AgentRuntimePicker.tsx               accessible Agent selector
   ui/AgentModelPicker.tsx                 backend-scoped Model
+  ui/useAgentRoutingPreferences.ts        per-runtime route restoration
 ```
 
 The inventory layer must not import React or native runtime payloads. Runtime
@@ -459,7 +468,8 @@ Implementation is complete only when automated fixtures cover:
   cleanup for every backend probe;
 - Codex initialize/account/model and native session success/failure fixtures;
 - Claude executable/Node/SDK/auth/session and permission fixtures;
-- Cursor detected-but-unsupported behavior until its protocol contract passes;
+- Cursor ACP success, auth failure, extension isolation, permission, question,
+  cancellation and security behavior;
 - strict isolation between PuppyOne Agent and user OpenCode profiles/sessions;
 - no raw path/account/status/credential content crossing IPC;
 - Agent-first picker keyboard behavior and backend-scoped Model validation;

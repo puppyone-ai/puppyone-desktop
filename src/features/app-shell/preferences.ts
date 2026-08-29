@@ -84,7 +84,10 @@ export const EXPLORER_WIDTH_STORAGE_KEY = "puppyone.desktop.explorerWidth";
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = "puppyone.desktop.sidebarCollapsed";
 export const RIGHT_SIDEBAR_WIDTH_STORAGE_KEY = "puppyone.desktop.rightSidebarWidth";
 export const RIGHT_SIDEBAR_SURFACE_STORAGE_KEY = "puppyone.desktop.rightSidebarSurface";
+export const AGENT_ROUTING_PREFERENCES_STORAGE_KEY = "puppyone.desktop.agentRoutingPreferences.v1";
+/** @deprecated Migrated into AGENT_ROUTING_PREFERENCES_STORAGE_KEY. */
 export const AGENT_PREFERRED_RUNTIME_STORAGE_KEY = "puppyone.desktop.agentPreferredRuntime";
+/** @deprecated Migrated into AGENT_ROUTING_PREFERENCES_STORAGE_KEY. */
 export const AGENT_PREFERRED_MODEL_STORAGE_KEY = "puppyone.desktop.agentPreferredModel";
 export type RightSidebarSurface = "chat" | "terminal";
 

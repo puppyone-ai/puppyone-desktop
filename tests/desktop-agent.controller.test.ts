@@ -41,7 +41,7 @@ describe("AgentSessionController", () => {
 
   it("selects the backend catalog's first model and derives any internal inference route from the model", async () => {
     const bridge = bridgeFixture(() => {});
-    bridge.discoverAgentProviders.mockResolvedValueOnce({
+    bridge.discoverAgentRuntimes.mockResolvedValueOnce({
       runtimes: [{ descriptor: { id: "opencode", displayName: "OpenCode", priority: 100 }, readiness: readiness() }],
       selectedRuntimeId: "opencode",
       runtime: { id: "opencode", displayName: "OpenCode" },
@@ -66,11 +66,11 @@ describe("AgentSessionController", () => {
     await controller.initialize();
 
     expect(controller.getSnapshot()).toMatchObject({ selectedProviderId: "anthropic", selectedModel: "anthropic/claude-sonnet" });
-    const discoveryCalls = bridge.discoverAgentProviders.mock.calls.length;
+    const discoveryCalls = bridge.discoverAgentRuntimes.mock.calls.length;
     const resumeCalls = bridge.resumeAgentSession.mock.calls.length;
     controller.selectModel("openai/gpt-5");
     expect(controller.getSnapshot()).toMatchObject({ selectedProviderId: "openai", selectedModel: "openai/gpt-5" });
-    expect(bridge.discoverAgentProviders).toHaveBeenCalledTimes(discoveryCalls);
+    expect(bridge.discoverAgentRuntimes).toHaveBeenCalledTimes(discoveryCalls);
     expect(bridge.resumeAgentSession).toHaveBeenCalledTimes(resumeCalls);
     expect(bridge.createAgentSession).not.toHaveBeenCalled();
   });
@@ -81,7 +81,7 @@ describe("AgentSessionController", () => {
       { descriptor: { id: "opencode", displayName: "PuppyOne Agent", iconKey: "puppyone-agent" }, readiness: readinessFor("opencode") },
       { descriptor: { id: "codex", displayName: "Codex", iconKey: "codex" }, readiness: readinessFor("codex") },
     ];
-    bridge.discoverAgentProviders
+    bridge.discoverAgentRuntimes
       .mockResolvedValueOnce({
         runtimes,
         selectedRuntimeId: "opencode",
@@ -115,7 +115,7 @@ describe("AgentSessionController", () => {
     expect(controller.getSnapshot()).toMatchObject({ session: null, selectedRuntimeId: "opencode" });
 
     await expect(controller.selectRuntime("codex")).resolves.toBe(true);
-    expect(bridge.discoverAgentProviders).toHaveBeenLastCalledWith({ rootPath: "/workspace", runtimeId: "codex", refresh: false });
+    expect(bridge.discoverAgentRuntimes).toHaveBeenLastCalledWith({ rootPath: "/workspace", runtimeId: "codex", refresh: false });
     expect(controller.getSnapshot()).toMatchObject({
       selectedRuntimeId: "codex",
       selectedProviderId: null,
@@ -127,14 +127,14 @@ describe("AgentSessionController", () => {
     const bridge = bridgeFixture(() => {});
     const runtime = { descriptor: { id: "codex", displayName: "Codex", iconKey: "codex", distribution: "user-installed" }, readiness: readinessFor("codex") };
     const model = { id: "gpt-5-codex", model: "gpt-5-codex", displayName: "GPT-5 Codex", description: "", isDefault: true };
-    bridge.discoverAgentProviders.mockResolvedValueOnce(runtimeInspection([runtime], "codex", model));
+    bridge.discoverAgentRuntimes.mockResolvedValueOnce(runtimeInspection([runtime], "codex", model));
     bridge.resumeAgentSession.mockResolvedValueOnce(null);
     const controller = new AgentSessionController("/workspace", () => bridge as never);
 
     controller.setInitialRuntimePreference("codex");
     await controller.initialize();
 
-    expect(bridge.discoverAgentProviders).toHaveBeenCalledWith({
+    expect(bridge.discoverAgentRuntimes).toHaveBeenCalledWith({
       rootPath: "/workspace",
       runtimeId: "codex",
       refresh: false,
@@ -150,7 +150,7 @@ describe("AgentSessionController", () => {
     ];
     const codexModel = { id: "gpt-5-codex", model: "gpt-5-codex", displayName: "GPT-5 Codex", description: "Native Codex model", isDefault: true };
     const claudeModel = { id: "claude-sonnet", model: "claude-sonnet", displayName: "Claude Sonnet", description: "Native Claude model", isDefault: true };
-    bridge.discoverAgentProviders
+    bridge.discoverAgentRuntimes
       .mockResolvedValueOnce(runtimeInspection(runtimes, "codex", codexModel))
       .mockResolvedValueOnce(runtimeInspection(runtimes, "claude", claudeModel));
     bridge.resumeAgentSession
@@ -171,7 +171,7 @@ describe("AgentSessionController", () => {
       sessionId: "codex-session",
       removePersistence: true,
     });
-    expect(bridge.discoverAgentProviders).toHaveBeenLastCalledWith({ rootPath: "/workspace", runtimeId: "claude", refresh: false });
+    expect(bridge.discoverAgentRuntimes).toHaveBeenLastCalledWith({ rootPath: "/workspace", runtimeId: "claude", refresh: false });
     expect(controller.getSnapshot()).toMatchObject({
       selectedRuntimeId: "claude",
       selectedProviderId: null,
@@ -198,7 +198,7 @@ describe("AgentSessionController", () => {
         selectable: false,
       },
     };
-    bridge.discoverAgentProviders
+    bridge.discoverAgentRuntimes
       .mockResolvedValueOnce({
         runtimes: [ready, unavailable],
         selectedRuntimeId: "codex",
@@ -252,11 +252,11 @@ describe("AgentSessionController", () => {
 
     await controller.initialize();
     await controller.initialize();
-    expect(bridge.discoverAgentProviders).toHaveBeenCalledTimes(1);
+    expect(bridge.discoverAgentRuntimes).toHaveBeenCalledTimes(1);
 
     await controller.initialize(true);
-    expect(bridge.discoverAgentProviders).toHaveBeenCalledTimes(2);
-    expect(bridge.discoverAgentProviders).toHaveBeenLastCalledWith({
+    expect(bridge.discoverAgentRuntimes).toHaveBeenCalledTimes(2);
+    expect(bridge.discoverAgentRuntimes).toHaveBeenLastCalledWith({
       rootPath: "/workspace",
       runtimeId: "opencode",
       refresh: true,
@@ -406,9 +406,9 @@ describe("AgentSessionController", () => {
 
   it("does not publish late asynchronous state after renderer disposal", async () => {
     const bridge = bridgeFixture(() => {});
-    const inspection = await bridge.discoverAgentProviders();
+    const inspection = await bridge.discoverAgentRuntimes();
     let resolveDiscovery: ((value: typeof inspection) => void) | null = null;
-    bridge.discoverAgentProviders.mockImplementationOnce(() => new Promise((resolve) => { resolveDiscovery = resolve; }));
+    bridge.discoverAgentRuntimes.mockImplementationOnce(() => new Promise((resolve) => { resolveDiscovery = resolve; }));
     const controller = new AgentSessionController("/workspace", () => bridge as never);
     const listener = vi.fn();
     controller.subscribe(listener);
@@ -579,7 +579,7 @@ function bridgeFixture(
   capabilityOverrides: Partial<ReturnType<typeof capabilities>> = {},
 ) {
   return {
-    discoverAgentProviders: vi.fn(async () => ({
+    discoverAgentRuntimes: vi.fn(async () => ({
       runtimes: [{ descriptor: { id: "opencode", displayName: "OpenCode", priority: 100 }, readiness: readiness() }],
       selectedRuntimeId: "opencode",
       runtime: { id: "opencode", displayName: "OpenCode" },

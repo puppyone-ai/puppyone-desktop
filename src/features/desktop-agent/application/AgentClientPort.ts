@@ -7,7 +7,7 @@ import type {
   AgentLocalConnectionsSnapshot,
   AgentModel,
   AgentModelsListRequest,
-  AgentProviderInspection,
+  AgentRuntimeInspection,
   AgentQuestionResolution,
   AgentDraftReference,
   AgentReferenceRevokeRequest,
@@ -30,7 +30,7 @@ import type {
 
 /** Renderer-side port implemented by the typed Electron preload adapter. */
 export interface AgentClientPort {
-  discoverAgentProviders(request?: AgentRuntimeRequest): Promise<AgentProviderInspection>;
+  discoverAgentRuntimes(request?: AgentRuntimeRequest): Promise<AgentRuntimeInspection>;
   discoverLocalAgentConnections(request?: AgentLocalConnectionsRequest): Promise<AgentLocalConnectionsSnapshot>;
   listAgentModels(request?: AgentModelsListRequest): Promise<AgentModel[]>;
   readAgentAccount(request?: AgentAccountReadRequest): Promise<AgentAccountState | null>;

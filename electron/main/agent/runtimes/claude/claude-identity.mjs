@@ -1,7 +1,7 @@
 export const CLAUDE_RUNTIME_DESCRIPTOR = Object.freeze({
   id: "claude",
-  displayName: "Claude Code",
-  description: "The user's Claude Code harness, models, tools, permissions and sessions through the official Agent SDK.",
+  displayName: "Claude Agent",
+  description: "Anthropic's official Agent SDK runtime using separately configured API or supported cloud credentials.",
   kind: "native-sdk",
   iconKey: "claude",
   priority: 40,

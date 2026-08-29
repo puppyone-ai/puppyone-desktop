@@ -39,6 +39,14 @@ export const CLAUDE_CAPABILITIES = Object.freeze({
   mcp: true,
   skills: true,
   compaction: false,
+  revision: "claude-agent-sdk:0.3.159",
+  protocol: Object.freeze({ name: "claude-agent-sdk", version: "0.3.159" }),
+  constraints: Object.freeze({
+    modelSwitch: "turn-boundary",
+    modeSwitch: "turn-boundary",
+    forkRequiresIdle: true,
+    compactionRequiresIdle: true,
+  }),
   referenceInputs: Object.freeze({
     workspaceFiles: true,
     workspaceDirectories: true,

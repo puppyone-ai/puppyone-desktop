@@ -440,6 +440,10 @@ describe("Agent IPC workspace authorization", () => {
       archiveSession: vi.fn(),
       deleteSession: vi.fn(),
       compactSession: vi.fn(),
+      getReferenceInputCapabilities: vi.fn(() => ({
+        workspaceFiles: true, workspaceDirectories: true, images: "local-snapshot", genericFiles: "none",
+        maxReferences: 32, maxReferenceBytes: 25 * 1024 * 1024, maxTotalReferenceBytes: 25 * 1024 * 1024,
+      })),
     };
     const authorizeWorkspaceRoot = vi.fn(async (_event, requested) => {
       if (requested !== "/workspace") throw new Error("Requested workspace root does not match");
@@ -486,6 +490,10 @@ describe("Agent IPC workspace authorization", () => {
       archiveSession: vi.fn(),
       deleteSession: vi.fn(),
       compactSession: vi.fn(),
+      getReferenceInputCapabilities: vi.fn(() => ({
+        workspaceFiles: true, workspaceDirectories: true, images: "local-snapshot", genericFiles: "none",
+        maxReferences: 32, maxReferenceBytes: 25 * 1024 * 1024, maxTotalReferenceBytes: 25 * 1024 * 1024,
+      })),
     };
     registerAgentIpcHandlers({
       ipcMain: { handle: (channel, listener) => handlers.set(channel, listener) },

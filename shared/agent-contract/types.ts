@@ -24,7 +24,7 @@ export type AgentRuntimeDescriptor = {
   distribution?: "bundled" | "sdk-bundled" | "user-installed" | string;
 };
 
-export type AgentProviderReadiness = {
+export type AgentRuntimeReadiness = {
   runtimeId?: AgentRuntimeId;
   provider: AgentProviderId;
   status: AgentReadinessStatus;
@@ -37,12 +37,14 @@ export type AgentProviderReadiness = {
   selectable?: boolean;
 };
 
-/** Preferred product vocabulary; the provider-named type remains for compatibility. */
-export type AgentBackendReadiness = AgentProviderReadiness;
+/** @deprecated Use AgentRuntimeReadiness. */
+export type AgentProviderReadiness = AgentRuntimeReadiness;
+/** @deprecated Use AgentRuntimeReadiness. */
+export type AgentBackendReadiness = AgentRuntimeReadiness;
 
 export type AgentRuntimeCatalogEntry = {
   descriptor: AgentRuntimeDescriptor;
-  readiness: AgentProviderReadiness;
+  readiness: AgentRuntimeReadiness;
 };
 
 export type AgentReferenceTransport = "none" | "data-url" | "local-snapshot" | "resource";
@@ -84,6 +86,22 @@ export type AgentCapabilities = {
   mcp: boolean;
   skills: boolean;
   compaction: boolean;
+  /** Changes whenever the runtime's effective negotiated capability surface changes. */
+  revision?: string;
+  /** Versioned native protocol and explicitly negotiated extension metadata. */
+  protocol?: {
+    name: string;
+    version: string | number;
+    agentVersion?: string | null;
+    extensions?: Record<string, number>;
+  };
+  /** Operation timing rules that cannot be represented by compatibility booleans. */
+  constraints?: {
+    modelSwitch?: "turn-boundary" | "session-boundary" | "unsupported";
+    modeSwitch?: "turn-boundary" | "session-boundary" | "unsupported";
+    forkRequiresIdle?: boolean;
+    compactionRequiresIdle?: boolean;
+  };
   /** Fine-grained native input support. Legacy booleans remain a migration projection. */
   referenceInputs?: AgentReferenceInputCapabilities;
 };
@@ -255,11 +273,11 @@ export type AgentEvent<TType extends AgentEventType = AgentEventType> = TType ex
   ? AgentEventEnvelope<TType>
   : never;
 
-export type AgentProviderInspection = {
+export type AgentRuntimeInspection = {
   runtimes?: AgentRuntimeCatalogEntry[];
   selectedRuntimeId?: AgentRuntimeId | null;
   runtime?: AgentRuntimeDescriptor;
-  readiness: AgentProviderReadiness;
+  readiness: AgentRuntimeReadiness;
   account: AgentAccountState | null;
   providers?: AgentInferenceProvider[];
   models: AgentModel[];
@@ -268,6 +286,9 @@ export type AgentProviderInspection = {
   capabilities: AgentCapabilities | null;
   warnings: string[];
 };
+
+/** @deprecated Use AgentRuntimeInspection. */
+export type AgentProviderInspection = AgentRuntimeInspection;
 
 export type AgentLocalInstallationState = "not-found" | "detected" | "unsupported" | "broken";
 export type AgentLocalAuthenticationState = "unknown" | "signed-out" | "signed-in" | "expired" | "error";

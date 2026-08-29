@@ -40,10 +40,54 @@ export function assertAgentRuntimeCapabilities(adapter, capabilities, runtimeId 
 
 export function normalizeCapabilitySnapshot(value = {}) {
   const source = value && typeof value === "object" ? value : {};
+  const revision = boundedOptionalText(source.revision, 160);
+  const protocol = normalizeCapabilityProtocol(source.protocol);
+  const constraints = normalizeCapabilityConstraints(source.constraints);
   return {
     ...Object.fromEntries(AGENT_RUNTIME_CAPABILITIES.map((capability) => [capability, source[capability] === true])),
+    ...(revision ? { revision } : {}),
+    ...(protocol ? { protocol } : {}),
+    ...(constraints ? { constraints } : {}),
     referenceInputs: normalizeReferenceInputCapabilities(source.referenceInputs, source),
   };
+}
+
+function normalizeCapabilityProtocol(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const name = boundedOptionalText(value.name, 80);
+  const version = Number.isSafeInteger(value.version) && value.version >= 0
+    ? value.version
+    : boundedOptionalText(value.version, 80);
+  if (!name || version === "") return null;
+  const agentVersion = boundedOptionalText(value.agentVersion, 80);
+  const extensions = value.extensions && typeof value.extensions === "object" && !Array.isArray(value.extensions)
+    ? Object.fromEntries(Object.entries(value.extensions)
+      .filter(([key, entry]) => (
+        /^[A-Za-z0-9._/-]{1,120}$/.test(key)
+        && Number.isSafeInteger(entry)
+        && entry >= 0
+        && entry <= 1_000_000
+      ))
+      .slice(0, 64))
+    : {};
+  return {
+    name,
+    version,
+    ...(agentVersion ? { agentVersion } : {}),
+    ...(Object.keys(extensions).length > 0 ? { extensions } : {}),
+  };
+}
+
+function normalizeCapabilityConstraints(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const switches = new Set(["turn-boundary", "session-boundary", "unsupported"]);
+  const constraints = {
+    ...(switches.has(value.modelSwitch) ? { modelSwitch: value.modelSwitch } : {}),
+    ...(switches.has(value.modeSwitch) ? { modeSwitch: value.modeSwitch } : {}),
+    ...(typeof value.forkRequiresIdle === "boolean" ? { forkRequiresIdle: value.forkRequiresIdle } : {}),
+    ...(typeof value.compactionRequiresIdle === "boolean" ? { compactionRequiresIdle: value.compactionRequiresIdle } : {}),
+  };
+  return Object.keys(constraints).length > 0 ? constraints : null;
 }
 
 export function normalizeReferenceInputCapabilities(value, legacy = {}) {
