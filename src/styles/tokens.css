@@ -166,7 +166,9 @@
   --po-json-boolean: #b42318;
   --po-json-null: #6f6a60;
   --po-json-icon: #68645c;
-  --po-terminal-fg: #6d665d;
+  /* Plain terminal output sits between editor content and muted interface
+     copy. ANSI colors remain independent so command output keeps its tiers. */
+  --po-terminal-fg: #59544d;
   --po-terminal-cursor: #80786d;
   --po-terminal-selection: rgba(91, 82, 70, 0.14);
   --po-terminal-black: #5d574f;
@@ -415,7 +417,7 @@
   --po-json-boolean: #fb7185;
   --po-json-null: #94a3b8;
   --po-json-icon: #cbd5e1;
-  --po-terminal-fg: #b9b6ae;
+  --po-terminal-fg: #c8c5bd;
   --po-terminal-cursor: #d1cec6;
   --po-terminal-selection: rgba(211, 208, 197, 0.16);
   --po-terminal-black: #626059;

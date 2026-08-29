@@ -343,6 +343,21 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(globalLayout).not.toContain(".desktop-terminal-");
   });
 
+  it("keeps plain output between editor text and muted UI while preserving ANSI tiers", () => {
+    const tokens = source("src/styles/tokens.css");
+    const light = terminalNeutralTier(tokens, ":root");
+    const dark = terminalNeutralTier(tokens, ".dark");
+
+    expect(light.foreground).toBe("#59544d");
+    expect(dark.foreground).toBe("#c8c5bd");
+    expect(relativeLuminance(light.text)).toBeLessThan(relativeLuminance(light.foreground));
+    expect(relativeLuminance(light.foreground)).toBeLessThan(relativeLuminance(light.muted));
+    expect(relativeLuminance(dark.text)).toBeGreaterThan(relativeLuminance(dark.foreground));
+    expect(relativeLuminance(dark.foreground)).toBeGreaterThan(relativeLuminance(dark.muted));
+    expect(new Set(light.neutralAnsi).size).toBe(light.neutralAnsi.length);
+    expect(new Set(dark.neutralAnsi).size).toBe(dark.neutralAnsi.length);
+  });
+
   it("keeps Terminal visibility separate from its tabs-only session manager", () => {
     const titlebarActions = source("src/features/app-shell/DesktopTitlebarActions.tsx");
     const panel = source("src/features/desktop-terminal/ui/RightTerminalPanel.tsx");
@@ -377,4 +392,45 @@ describe("Desktop Terminal architecture boundaries", () => {
 
 function source(relativePath: string) {
   return readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
+}
+
+function terminalNeutralTier(stylesheet: string, selector: string) {
+  const block = cssSelectorBlock(stylesheet, selector);
+  return {
+    text: cssHexToken(block, "--po-text"),
+    muted: cssHexToken(block, "--po-text-muted"),
+    foreground: cssHexToken(block, "--po-terminal-fg"),
+    neutralAnsi: [
+      "--po-terminal-black",
+      "--po-terminal-bright-black",
+      "--po-terminal-white",
+      "--po-terminal-bright-white",
+      "--po-terminal-fg",
+    ].map((token) => cssHexToken(block, token)),
+  };
+}
+
+function cssSelectorBlock(stylesheet: string, selector: string) {
+  const start = stylesheet.indexOf(`${selector} {`);
+  if (start < 0) throw new Error(`Missing CSS selector: ${selector}`);
+  const end = stylesheet.indexOf("\n}", start);
+  if (end < 0) throw new Error(`Unterminated CSS selector: ${selector}`);
+  return stylesheet.slice(start, end);
+}
+
+function cssHexToken(block: string, token: string) {
+  const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = block.match(new RegExp(`${escapedToken}:\\s*(#[0-9a-f]{6});`, "i"));
+  if (!match) throw new Error(`Missing hexadecimal CSS token: ${token}`);
+  return match[1].toLowerCase();
+}
+
+function relativeLuminance(hex: string) {
+  const channels = [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
+  const linear = channels.map((channel) => (
+    channel <= 0.04045
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4
+  ));
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
 }
