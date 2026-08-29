@@ -469,11 +469,15 @@ Native operating-system `<select>` menus are not the target interaction. Use one
 anchored listbox/popover. The compact surface is deliberately flat: readiness is a row state,
 not a second navigation hierarchy.
 
-On first open, the trigger reads `Agent` and no row is selected. Discovery
-populates installed products only; it does not inspect a default harness,
-restore a session, or enable Send. A later launch may restore only a
-schema-valid preference produced by an explicit selection. Missing, legacy, or
-stale selection data returns to this neutral picker state.
+On first open, a dedicated pre-Chat launcher lists the available Agent rows.
+The session header, transcript and Composer are not mounted yet, so the user is
+choosing what to launch rather than repairing an already-open empty Chat.
+Discovery populates installed products only; it does not inspect a default
+harness or restore a session. Selecting a row launches that runtime and then
+reveals the ordinary Chat surface. After launch, the compact session-header
+picker remains available for explicit Agent switching. A later launch may
+restore only a schema-valid preference produced by an explicit selection.
+Missing, legacy, or stale selection data returns to the pre-Chat launcher.
 
 ```text
 + Agent ----------------------------------+

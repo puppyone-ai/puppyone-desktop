@@ -23,46 +23,77 @@ afterEach(() => {
 });
 
 describe("Desktop Agent panel lifecycle", () => {
-  it("opens on the installed-Agent picker without implicitly choosing Codex", async () => {
+  it("opens on an installed-Agent launcher before mounting an empty Chat", async () => {
     const harness = createBridgeHarness();
-    harness.bridge.discoverAgentProviders = vi.fn(async () => ({
-      runtimes: [
-        {
-          descriptor: { id: "codex", displayName: "Codex", kind: "harness" },
-          readiness: { ...readyInspection().readiness, runtimeId: "codex", provider: "codex" },
+    const runtimes = [
+      {
+        descriptor: { id: "codex", displayName: "Codex", kind: "harness" },
+        readiness: { ...readyInspection().readiness, runtimeId: "codex", provider: "codex" },
+      },
+      {
+        descriptor: { id: "claude", displayName: "Claude Agent", kind: "harness" },
+        readiness: { ...readyInspection().readiness, runtimeId: "claude", provider: "claude" },
+      },
+    ];
+    harness.bridge.discoverAgentProviders = vi.fn()
+      .mockResolvedValueOnce({
+        runtimes,
+        selectedRuntimeId: null,
+        readiness: null,
+        account: null,
+        providers: [],
+        models: [],
+        modes: [],
+        commands: [],
+        capabilities: null,
+        warnings: [],
+      })
+      .mockResolvedValueOnce({
+        ...readyInspection(),
+        runtimes,
+        selectedRuntimeId: "claude",
+        runtime: runtimes[1].descriptor,
+        readiness: runtimes[1].readiness,
+      });
+    harness.bridge.resumeAgentSession = vi.fn(async () => null);
+    harness.bridge.createAgentSession = vi.fn(async () => {
+      const created = snapshot([]);
+      return {
+        ...created,
+        runtime: runtimes[1].descriptor,
+        session: {
+          ...created.session,
+          runtimeId: "claude",
+          runtime: runtimes[1].descriptor,
+          provider: "claude",
         },
-        {
-          descriptor: { id: "claude", displayName: "Claude Agent", kind: "harness" },
-          readiness: { ...readyInspection().readiness, runtimeId: "claude", provider: "claude" },
-        },
-      ],
-      selectedRuntimeId: null,
-      readiness: null,
-      account: null,
-      providers: [],
-      models: [],
-      modes: [],
-      commands: [],
-      capabilities: null,
-      warnings: [],
-    }));
+      };
+    });
 
     const container = renderPanel(harness.bridge);
     await flushEffects();
 
-    const agentPicker = container.querySelector('button[aria-label="Coding Agent"]') as HTMLButtonElement;
-    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
-    expect(agentPicker.textContent).toContain("Agent");
-    expect(agentPicker.textContent).not.toContain("Codex");
-    expect(textarea.placeholder).toBe("Choose a coding Agent to start");
-    expect(textarea.disabled).toBe(false);
-    expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
+    const launcher = container.querySelector(".desktop-agent-runtime-launcher") as HTMLElement;
+    expect(launcher).not.toBeNull();
+    expect(launcher.textContent).toContain("Start with an Agent");
+    expect(launcher.textContent).toContain("Codex");
+    expect(launcher.textContent).toContain("Claude Agent");
+    expect(container.querySelector('.desktop-agent-header-region')).toBeNull();
+    expect(container.querySelector('button[aria-label="Coding Agent"]')).toBeNull();
+    expect(container.querySelector("textarea")).toBeNull();
     expect(harness.bridge.resumeAgentSession).not.toHaveBeenCalled();
     expect(harness.bridge.createAgentSession).not.toHaveBeenCalled();
 
-    act(() => agentPicker.click());
-    expect(document.querySelector('[role="listbox"]')?.textContent).toContain("Codex");
-    expect(document.querySelector('[role="listbox"]')?.textContent).toContain("Claude Agent");
+    act(() => (launcher.querySelector('button[aria-label="Claude Agent"]') as HTMLButtonElement).click());
+    await flushEffects();
+    await flushEffects();
+    expect(harness.bridge.discoverAgentProviders).toHaveBeenLastCalledWith({
+      rootPath: "/workspace",
+      runtimeId: "claude",
+      refresh: false,
+    });
+    expect(container.querySelector(".desktop-agent-runtime-launcher")).toBeNull();
+    expect(container.querySelector('button[aria-label="Coding Agent"]')?.textContent).toContain("Claude Agent");
   });
 
   it("uses one centered product loader while the chat runtime starts", async () => {

@@ -11,6 +11,7 @@ import { AgentRuntimePicker } from "./AgentRuntimePicker";
 import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
 import { AgentQuestionDock } from "./AgentQuestionDock";
+import { AgentRuntimeLauncher } from "./AgentRuntimeLauncher";
 import { readinessLabel, readinessStatusCode, sessionStatusCode, sessionStatusLabel } from "./agentPanelPresentation";
 import { getAgentSessionController } from "../application/controllerRegistry";
 import type { AgentSubmissionStage } from "../application/agent-controller-state";
@@ -111,6 +112,19 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
   }, [controller]);
   const handleDraftChange = useCallback((draft: string) => controller.setDraft(draft), [controller]);
   const handleSubmit = useCallback((prompt: string) => controller.submit(prompt), [controller]);
+  if (state.initialized && inspection && !agentRuntimeSelected && !loading && !failed) {
+    return (
+      <AgentPanelLayout
+        ariaLabel={t("agent.panel.chat", { agent: bidiIsolate(t("agent.name")) })}
+        phase="selecting-runtime"
+        conversation={<AgentRuntimeLauncher
+          agentRuntimes={agentRuntimes}
+          onLaunch={routingPreferences.selectRuntime}
+          onRefresh={() => void controller.initialize(true)}
+        />}
+      />
+    );
+  }
   return (
     <AgentPanelLayout
       ariaLabel={t("agent.panel.chat", { agent: bidiIsolate(runtimeLabel) })}

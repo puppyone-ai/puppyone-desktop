@@ -113,10 +113,13 @@ The selected **Agent**, not the requested model family, determines the harness:
 
 The following rules are normative:
 
-- First open is inventory-only. PuppyOne lists locally available Agent products
-  and keeps `selectedRuntimeId`, selected readiness, Provider and Model empty
-  until the user explicitly chooses a row. It never preselects Codex,
-  PuppyOne Agent, or the registry's internal default.
+- First open is inventory-only. A dedicated pre-Chat launcher lists locally
+  available Agent products, matching Terminal's choose-before-start lifecycle.
+  The transcript, Composer and session header are not mounted as an empty Chat.
+  PuppyOne keeps `selectedRuntimeId`, selected readiness, Provider and Model
+  empty until the user explicitly launches a row. It never preselects Codex,
+  PuppyOne Agent, or the registry's internal default. After Chat starts, the
+  compact header picker remains the explicit new-session switcher.
 - A version-2 preference written after an explicit picker action may restore
   that Agent on a later open. Legacy global runtime keys are not proof of user
   intent, and version 1 could contain an implicit controller default: migration
