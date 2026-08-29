@@ -498,9 +498,36 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
 }
 
 .desktop-project-menu {
+  --po-menu-item-height: 34px;
+  --po-menu-item-padding-inline: 10px;
+  --po-menu-item-gap: 9px;
+  --po-menu-item-radius: 8px;
+
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   max-height: min(520px, calc(100vh - 58px));
+}
+
+.desktop-project-menu .desktop-menu-item {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.desktop-project-menu .desktop-menu-section-label {
+  padding: 0 var(--po-menu-item-padding-inline) 5px;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 14px;
+}
+
+.desktop-project-menu .desktop-menu-item-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.desktop-project-menu .desktop-menu-item-detail {
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .desktop-project-list {
@@ -516,8 +543,8 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
 }
 
 .desktop-project-section + .desktop-project-section {
-  margin-top: 6px;
-  padding-top: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid var(--po-divider);
 }
 
@@ -589,6 +616,21 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   color: var(--po-text);
 }
 
+.desktop-project-current-indicator {
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 9px;
+  z-index: 1;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  color: var(--po-text);
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 0.12s ease;
+}
+
 .desktop-project-copy-path {
   position: absolute;
   top: 50%;
@@ -607,6 +649,11 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   pointer-events: auto;
 }
 
+.desktop-project-option-row:hover .desktop-project-current-indicator,
+.desktop-project-option-row:focus-within .desktop-project-current-indicator {
+  opacity: 0;
+}
+
 .desktop-project-copy-path.is-copied,
 .desktop-project-copy-path.is-copied:hover {
   background: color-mix(in srgb, var(--po-success) 14%, var(--po-control));
@@ -616,12 +663,19 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
 .desktop-project-actions {
   display: grid;
   gap: 2px;
-  margin-top: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--po-divider);
 }
 
 .desktop-project-home {
   margin-top: 0;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
+}
+
+.desktop-project-menu .desktop-project-add-folder:disabled {
+  color: var(--po-text-subtle);
+  opacity: 0.72;
 }
 
 .desktop-rail-nav {

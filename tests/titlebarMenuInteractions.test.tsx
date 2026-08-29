@@ -71,10 +71,17 @@ describe("titlebar Portal menu interactions", () => {
     expect(container.contains(menu)).toBe(false);
     expect(menu.dataset.windowNoDrag).toBe("true");
     expect(menu.style.width).toBe("300px");
+    expect(menu.querySelector("[data-workspace-menu-layout='project-switcher-v2']"))
+      .not.toBeNull();
+    expect(menu.textContent).toContain("Home");
     expect(menu.textContent).toContain("Current workspace");
-    expect(menu.textContent).toContain("Add Folder to Workspace…");
-    expect(menu.textContent).toContain("Open Folder…");
+    expect(menu.textContent).toContain("Add Project…");
+    expect(menu.textContent).toContain("Open Folder in New Window…");
     expect(menu.textContent).toContain("Recent projects");
+    expect(menu.querySelector(".desktop-project-current-section .desktop-project-current-indicator"))
+      .not.toBeNull();
+    expect(menu.querySelector(".desktop-project-recent-section .desktop-project-current-indicator"))
+      .toBeNull();
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-home")?.click());
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-add-folder")?.click());
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-open-folder")?.click());

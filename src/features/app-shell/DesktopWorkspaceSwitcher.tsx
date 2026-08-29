@@ -92,11 +92,15 @@ export function DesktopWorkspaceSwitcher({
       >
         <DesktopMenuItem
           className="desktop-project-add desktop-project-home"
-          icon={<ArrowLeft className="po-directional-icon" size={14} />}
+          icon={<ArrowLeft className="po-directional-icon" size={15} strokeWidth={1.9} />}
           label={t("shell.workspaceSwitcher.home")}
           onClick={onGoHome}
         />
-        <div className="desktop-project-list" data-po-scrollbar="menu">
+        <div
+          className="desktop-project-list"
+          data-po-scrollbar="menu"
+          data-workspace-menu-layout="project-switcher-v2"
+        >
           <DesktopMenuSection
             className="desktop-project-section desktop-project-current-section"
             label={t("shell.workspaceSwitcher.currentWorkspace")}
@@ -105,8 +109,8 @@ export function DesktopWorkspaceSwitcher({
             <DesktopMenuItem
               className="desktop-project-add desktop-project-add-folder"
               disabled={!onAddFolder}
-              icon={<FolderPlus size={14} />}
-              label={t("shell.workspaceSwitcher.addFolderToWorkspace")}
+              icon={<FolderPlus size={15} strokeWidth={1.8} />}
+              label={t("shell.workspaceSwitcher.addProject")}
               onClick={onAddFolder}
             />
           </DesktopMenuSection>
@@ -122,8 +126,8 @@ export function DesktopWorkspaceSwitcher({
         <div className="desktop-project-actions">
           <DesktopMenuItem
             className="desktop-project-add desktop-project-open-folder"
-            icon={<FolderOpen size={14} />}
-            label={t("shell.workspaceSwitcher.openFolder")}
+            icon={<FolderOpen size={15} strokeWidth={1.8} />}
+            label={t("shell.workspaceSwitcher.openFolderInNewWindow")}
             onClick={onOpenFolder}
           />
         </div>
@@ -193,6 +197,11 @@ function DesktopProjectMenuRow({
           )}
         </span>
       </button>
+      {selected ? (
+        <span className="desktop-project-current-indicator" aria-hidden="true">
+          <Check size={14} strokeWidth={2.2} />
+        </span>
+      ) : null}
       {path ? (
         <DesktopMenuIconButton
           className={`desktop-project-copy-path ${copied ? "is-copied" : ""}`}
