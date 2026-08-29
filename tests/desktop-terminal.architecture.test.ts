@@ -343,13 +343,15 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(globalLayout).not.toContain(".desktop-terminal-");
   });
 
-  it("keeps plain output between editor text and muted UI while preserving ANSI tiers", () => {
+  it("keeps plain output close to editor text while preserving ANSI tiers", () => {
     const tokens = source("src/styles/tokens.css");
     const light = terminalNeutralTier(tokens, ":root");
     const dark = terminalNeutralTier(tokens, ".dark");
 
-    expect(light.foreground).toBe("#59544d");
-    expect(dark.foreground).toBe("#c8c5bd");
+    expect(tokens).toMatch(
+      /--po-terminal-fg:\s*color-mix\(in srgb, var\(--po-text\) 70%, var\(--po-text-muted\)\);/,
+    );
+    expect(tokens.match(/--po-terminal-fg:/g)).toHaveLength(1);
     expect(relativeLuminance(light.text)).toBeLessThan(relativeLuminance(light.foreground));
     expect(relativeLuminance(light.foreground)).toBeLessThan(relativeLuminance(light.muted));
     expect(relativeLuminance(dark.text)).toBeGreaterThan(relativeLuminance(dark.foreground));
@@ -396,17 +398,19 @@ function source(relativePath: string) {
 
 function terminalNeutralTier(stylesheet: string, selector: string) {
   const block = cssSelectorBlock(stylesheet, selector);
+  const text = cssHexToken(block, "--po-text");
+  const muted = cssHexToken(block, "--po-text-muted");
+  const foreground = mixSrgbHex(text, muted, 0.7);
   return {
-    text: cssHexToken(block, "--po-text"),
-    muted: cssHexToken(block, "--po-text-muted"),
-    foreground: cssHexToken(block, "--po-terminal-fg"),
+    text,
+    muted,
+    foreground,
     neutralAnsi: [
       "--po-terminal-black",
       "--po-terminal-bright-black",
       "--po-terminal-white",
       "--po-terminal-bright-white",
-      "--po-terminal-fg",
-    ].map((token) => cssHexToken(block, token)),
+    ].map((token) => cssHexToken(block, token)).concat(foreground),
   };
 }
 
@@ -425,8 +429,21 @@ function cssHexToken(block: string, token: string) {
   return match[1].toLowerCase();
 }
 
+function mixSrgbHex(primary: string, secondary: string, primaryWeight: number) {
+  const channels = [1, 3, 5].map((offset) => {
+    const primaryChannel = Number.parseInt(primary.slice(offset, offset + 2), 16);
+    const secondaryChannel = Number.parseInt(secondary.slice(offset, offset + 2), 16);
+    return Math.round(
+      primaryChannel * primaryWeight + secondaryChannel * (1 - primaryWeight),
+    );
+  });
+  return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+}
+
 function relativeLuminance(hex: string) {
-  const channels = [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
+  const channels = [1, 3, 5].map(
+    (offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255,
+  );
   const linear = channels.map((channel) => (
     channel <= 0.04045
       ? channel / 12.92
