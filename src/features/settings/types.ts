@@ -5,7 +5,7 @@ import type { CreateNewMenuSettings, DarkThemePreset, ExperimentalSettings, File
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
 import type { MarkdownPresentationSettings } from "../markdown/markdownPresentation";
 
-export type SettingsSection = "general" | "local-project" | "appearance" | "local-agents" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
+export type SettingsSection = "general" | "privacy" | "local-project" | "appearance" | "local-agents" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
 
 export type SettingsViewProps = {
   workspace: Workspace;

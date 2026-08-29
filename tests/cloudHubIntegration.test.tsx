@@ -41,9 +41,9 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(labels(container)).toEqual([
-      "Homepage", "MCP", "CLI", "Git", "Team", "Billing",
+      "Homepage", "Agent access", "CLI", "Git", "Team", "Billing",
     ]);
-    expect(groupLabels(container)).toEqual(["Cloud Project", "Connections", "Organization"]);
+    expect(groupLabels(container)).toEqual(["Cloud Project", "External access", "Organization"]);
     expect(labels(container)).not.toContain("Settings");
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
     expect(rows(container)[1]?.getAttribute("aria-current")).toBe("page");
@@ -60,7 +60,7 @@ describe("current-repository Cloud navigation", () => {
       onSelectSection,
     });
     expect(labels(container)).toEqual([
-      "Homepage", "MCP", "CLI", "Git", "Team", "Billing",
+      "Homepage", "Agent access", "CLI", "Git", "Team", "Billing",
     ]);
     expect(labels(container)).not.toContain("Settings");
     expect(rows(container).every((row) => row.getAttribute("aria-disabled") !== "true")).toBe(true);
@@ -135,9 +135,9 @@ describe("current-repository Cloud navigation", () => {
       />,
     ));
 
-    expect(container.querySelector("h1")?.textContent).toBe("MCP");
+    expect(container.querySelector("h1")?.textContent).toBe("Connect external agents");
     expect(container.querySelector(".desktop-entry-state-description")?.textContent)
-      .toBe("Connect ChatGPT, Claude, and other MCP-compatible agents.");
+      .toBe("Let ChatGPT, Claude, and other external agents access this Cloud Project through its hosted MCP server.");
     expect(container.querySelector(".desktop-cloud-auth-submit")?.textContent)
       .toBe("Get Started");
     expect(container.textContent).not.toContain("May upload");

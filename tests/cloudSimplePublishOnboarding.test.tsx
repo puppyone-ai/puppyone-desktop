@@ -41,7 +41,7 @@ describe("simple Cloud publish onboarding", () => {
       />,
     )));
 
-    expect(container.querySelector("h1")?.textContent).toBe("MCP");
+    expect(container.querySelector("h1")?.textContent).toBe("Connect external agents");
     expect(container.textContent).toContain("ChatGPT");
     expect(container.textContent).toContain("Claude");
     expect(container.textContent).toContain("Cursor");

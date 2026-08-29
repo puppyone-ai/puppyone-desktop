@@ -49,7 +49,7 @@ describe("AccessPointRoutePage catalog", () => {
       if (!status) return;
       status.value = "all";
       status.dispatchEvent(new Event("change", { bubbles: true }));
-      findButton(container, "MCP")?.click();
+      findButton(container, "Agents")?.click();
     });
     expect(container.querySelectorAll(".desktop-cloud-access-point-row")).toHaveLength(1);
     expect(container.textContent).toContain("Docs MCP");

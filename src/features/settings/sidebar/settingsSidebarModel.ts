@@ -9,6 +9,7 @@ import {
   Monitor,
   Pencil,
   Settings,
+  ShieldCheck,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
@@ -42,6 +43,7 @@ export const SETTINGS_SIDEBAR_GROUPS = [
       { id: "local-agents", labelId: "settings.sidebar.localAgents", icon: Bot, disabled: false },
       { id: "new-menu", labelId: "settings.sidebar.createNew", icon: ListPlus, disabled: false },
       { id: "editor", labelId: "settings.sidebar.editor", icon: Pencil, disabled: false },
+      { id: "privacy", labelId: "settings.sidebar.privacy", icon: ShieldCheck, disabled: false },
       { id: "experimental", labelId: "settings.sidebar.experimental", icon: FlaskConical, disabled: false },
     ],
   },
