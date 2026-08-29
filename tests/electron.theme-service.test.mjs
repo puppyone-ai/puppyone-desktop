@@ -13,19 +13,19 @@ afterEach(async () => {
 });
 
 describe("host-owned CSS theme service", () => {
-  it("installs missing starter packages and never overwrites user edits", async () => {
+  it("installs missing starter CSS files and never overwrites user edits", async () => {
     const userDataPath = await createTemporaryDirectory();
     const bundledThemesPath = await createTemporaryDirectory();
-    for (const [directoryName, name] of [
+    for (const [filename, name] of [
       ["github", "GitHub"],
       ["forest", "Forest"],
       ["night", "Night"],
       ["rose", "Rose"],
     ]) {
-      await createPack(
+      await createSingleFilePack(
         bundledThemesPath,
-        directoryName,
-        `builtin.pack.${directoryName}`,
+        `${filename}.css`,
+        `builtin.pack.${filename}`,
         name,
       );
     }
@@ -35,22 +35,24 @@ describe("host-owned CSS theme service", () => {
     const installed = first.themes.find((theme) => theme.id === "builtin.pack.forest");
     expect(installed).toMatchObject({
       name: "Forest",
-      source: "local-package",
+      source: "local-css",
       targets: ["application", "markdown", "csv"],
     });
 
-    const installedMarkdown = path.join(userDataPath, "themes", "forest", "markdown.css");
-    await writeFile(installedMarkdown, "body { color: rebeccapurple }", "utf8");
+    const installedTheme = path.join(userDataPath, "themes", "forest.css");
+    const customizedTheme = await readFile(installedTheme, "utf8")
+      .then((css) => css.replace("#222", "rebeccapurple"));
+    await writeFile(installedTheme, customizedTheme, "utf8");
     await service.listThemes();
-    expect(await readFile(installedMarkdown, "utf8")).toBe("body { color: rebeccapurple }");
+    expect(await readFile(installedTheme, "utf8")).toBe(customizedTheme);
 
-    await rm(path.dirname(installedMarkdown), { recursive: true });
+    await rm(installedTheme);
     const afterDeletion = await service.listThemes();
     expect(afterDeletion.themes.some((theme) => theme.id === "builtin.pack.forest"))
       .toBe(false);
   });
 
-  it("ships four valid starter packages for the user theme directory", async () => {
+  it("ships four valid starter CSS files for the user theme directory", async () => {
     const userDataPath = await createTemporaryDirectory();
     const service = createThemeService({
       userDataPath,
@@ -62,10 +64,10 @@ describe("host-owned CSS theme service", () => {
 
     expect(snapshot.diagnostics).toEqual([]);
     expect(snapshot.themes.map(({ id, source, targets }) => ({ id, source, targets }))).toEqual([
-      { id: "builtin.pack.forest", source: "local-package", targets: ["application", "markdown", "csv"] },
-      { id: "builtin.pack.github", source: "local-package", targets: ["application", "markdown", "csv"] },
-      { id: "builtin.pack.night", source: "local-package", targets: ["application", "markdown", "csv"] },
-      { id: "builtin.pack.rose", source: "local-package", targets: ["application", "markdown", "csv"] },
+      { id: "builtin.pack.forest", source: "local-css", targets: ["application", "markdown", "csv"] },
+      { id: "builtin.pack.github", source: "local-css", targets: ["application", "markdown", "csv"] },
+      { id: "builtin.pack.night", source: "local-css", targets: ["application", "markdown", "csv"] },
+      { id: "builtin.pack.rose", source: "local-css", targets: ["application", "markdown", "csv"] },
     ]);
   });
 
@@ -97,6 +99,47 @@ describe("host-owned CSS theme service", () => {
     expect(snapshot.themes[0].compiledCss.markdown).toContain('data-po-theme-id="local.css.newsprint"');
     expect(snapshot.themes[1].compiledCss.csv).toContain('data-po-theme-surface="csv"');
     expect(JSON.stringify(snapshot)).not.toContain(userDataPath);
+  });
+
+  it("loads a coordinated single CSS theme across all declared surfaces", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const themeRoot = path.join(userDataPath, "themes");
+    await mkdir(themeRoot, { recursive: true });
+    await writeFile(path.join(themeRoot, "forest.css"), `
+      @puppyone-theme {
+        id: com.example.forest;
+        name: Forest;
+        version: 1.0.0;
+        author: Example Studio;
+        modes: light dark;
+      }
+      @puppyone application {
+        .theme-root { --po-accent: #2f6f52; }
+      }
+      @puppyone markdown {
+        body { color: #27352f; }
+      }
+      @puppyone csv {
+        .theme-root { --po-csv-surface-color: #27352f; }
+      }
+    `, "utf8");
+
+    const snapshot = await createThemeService({ userDataPath, shell: createShell() }).listThemes();
+
+    expect(snapshot.diagnostics).toEqual([]);
+    expect(snapshot.themes).toHaveLength(1);
+    expect(snapshot.themes[0]).toMatchObject({
+      id: "com.example.forest",
+      name: "Forest",
+      author: "Example Studio",
+      version: "1.0.0",
+      modes: ["light", "dark"],
+      targets: ["application", "markdown", "csv"],
+      source: "local-css",
+    });
+    expect(snapshot.themes[0].compiledCss.application).toContain('data-po-theme-surface="application"');
+    expect(snapshot.themes[0].compiledCss.markdown).toContain('data-po-theme-surface="markdown"');
+    expect(snapshot.themes[0].compiledCss.csv).toContain('data-po-theme-surface="csv"');
   });
 
   it("resolves package-local imports and assets without exposing file paths", async () => {
@@ -375,23 +418,16 @@ async function createPackage(themeRoot, directoryName, id, name) {
   await writeFile(path.join(packagePath, "markdown.css"), "body { color: #222 }", "utf8");
 }
 
-async function createPack(themeRoot, directoryName, id, name) {
-  const packagePath = path.join(themeRoot, directoryName);
-  await mkdir(packagePath, { recursive: true });
-  await writeJson(path.join(packagePath, "theme.json"), {
-    schemaVersion: 1,
-    id,
-    name,
-    version: "1.0.0",
-    modes: ["light", "dark"],
-    targets: ["application", "markdown", "csv"],
-    entrypoints: {
-      application: "application.css",
-      markdown: "markdown.css",
-      csv: "csv.css",
-    },
-  });
-  await writeFile(path.join(packagePath, "application.css"), ".theme-root { --po-accent: #2563eb }", "utf8");
-  await writeFile(path.join(packagePath, "markdown.css"), "body { color: #222 }", "utf8");
-  await writeFile(path.join(packagePath, "csv.css"), ".theme-root { --po-csv-surface-color: #222 }", "utf8");
+async function createSingleFilePack(themeRoot, filename, id, name) {
+  await writeFile(path.join(themeRoot, filename), `
+    @puppyone-theme {
+      id: ${id};
+      name: ${name};
+      version: 1.0.0;
+      modes: light dark;
+    }
+    @puppyone application { .theme-root { --po-accent: #2563eb } }
+    @puppyone markdown { body { color: #222 } }
+    @puppyone csv { .theme-root { --po-csv-surface-color: #222 } }
+  `, "utf8");
 }

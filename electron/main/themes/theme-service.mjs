@@ -7,13 +7,13 @@ import {
   readdir,
   realpath,
   rename,
-  rm,
   stat,
   unlink,
   writeFile,
 } from "node:fs/promises";
 import { compileThemeCss } from "./theme-css-compiler.mjs";
 import { parseThemeManifest } from "./theme-package-contract.mjs";
+import { parseSingleFileThemeCss } from "./theme-single-file-contract.mjs";
 
 const MAX_THEME_ENTRIES = 200;
 const MAX_MANIFEST_BYTES = 64 * 1024;
@@ -25,8 +25,8 @@ const MAX_THEME_COMPILED_BYTES = 16 * 1024 * 1024;
 const MAX_THEME_IMPORTS = 64;
 const CUSTOM_THEME_DIRECTORY = "puppyone-custom-css";
 const CUSTOM_THEME_ID = "local.puppyone.custom-css";
-const STARTER_THEME_DIRECTORIES = Object.freeze(["github", "forest", "night", "rose"]);
-const STARTER_THEME_MARKER = ".puppyone-starter-themes-v1";
+const STARTER_THEME_NAMES = Object.freeze(["github", "forest", "night", "rose"]);
+const STARTER_THEME_MARKER = ".puppyone-starter-themes-v2";
 const themeTargets = Object.freeze(["application", "markdown", "csv"]);
 const assetMimeTypes = new Map([
   [".woff", "font/woff"],
@@ -159,37 +159,18 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
 
 async function installStarterThemes({ bundledThemesPath, themeRoot }) {
   if (await pathEntryExists(path.join(themeRoot, STARTER_THEME_MARKER))) return;
-  for (const directoryName of STARTER_THEME_DIRECTORIES) {
-    const destination = path.join(themeRoot, directoryName);
-    if (await pathEntryExists(destination)) continue;
-    const source = path.join(bundledThemesPath, directoryName);
-    const temporary = path.join(themeRoot, `.${directoryName}.${randomUUID()}.installing`);
+  for (const themeName of STARTER_THEME_NAMES) {
+    const legacyDestination = path.join(themeRoot, themeName);
+    const destination = path.join(themeRoot, `${themeName}.css`);
+    if (await pathEntryExists(destination) || await pathEntryExists(legacyDestination)) continue;
+    const source = path.join(bundledThemesPath, `${themeName}.css`);
     try {
-      await copyBundledThemeDirectory(source, temporary);
-      await rename(temporary, destination);
+      await writeFile(destination, await readFile(source), { flag: "wx" });
     } catch (error) {
-      if (!await pathEntryExists(destination)) throw error;
-    } finally {
-      await rm(temporary, { recursive: true, force: true });
+      if (error?.code !== "EEXIST") throw error;
     }
   }
-  await writeFileAtomic(themeRoot, STARTER_THEME_MARKER, "1\n");
-}
-
-async function copyBundledThemeDirectory(source, destination) {
-  await mkdir(destination);
-  const entries = await readdir(source, { withFileTypes: true });
-  for (const entry of entries) {
-    const sourcePath = path.join(source, entry.name);
-    const destinationPath = path.join(destination, entry.name);
-    if (entry.isDirectory()) {
-      await copyBundledThemeDirectory(sourcePath, destinationPath);
-    } else if (entry.isFile()) {
-      await writeFile(destinationPath, await readFile(sourcePath), { flag: "wx" });
-    } else {
-      throw new TypeError(`Bundled theme templates may only contain files and directories: ${entry.name}.`);
-    }
-  }
+  await writeFileAtomic(themeRoot, STARTER_THEME_MARKER, "2\n");
 }
 
 async function pathEntryExists(filePath) {
@@ -269,9 +250,36 @@ function requireThemeTarget(value) {
 }
 
 async function loadStandaloneCssTheme(themeRoot, filename) {
+  const css = await readBoundedText(path.join(themeRoot, filename), MAX_CSS_BYTES, "Theme CSS");
+  const descriptor = parseSingleFileThemeCss(css, { sourcePath: filename });
+  if (descriptor) {
+    const budget = createCompilationBudget();
+    const compiledCss = {};
+    for (const target of descriptor.targets) {
+      const compiled = await compileThemeFile({
+        css: descriptor.stylesheets[target],
+        sourcePath: filename,
+        packageRoot: themeRoot,
+        themeId: descriptor.id,
+        target,
+        budget,
+      });
+      compiledCss[target] = compiled.css;
+    }
+    return freezeTheme({
+      id: descriptor.id,
+      name: descriptor.name,
+      version: descriptor.version,
+      ...(descriptor.author ? { author: descriptor.author } : {}),
+      modes: descriptor.modes,
+      targets: descriptor.targets,
+      source: "local-css",
+      compiledCss,
+    });
+  }
+
   const slug = createSlug(path.basename(filename, path.extname(filename)));
   const id = `local.css.${slug}`;
-  const css = await readBoundedText(path.join(themeRoot, filename), MAX_CSS_BYTES, "Theme CSS");
   const budget = createCompilationBudget();
   const compiled = await compileThemeFile({
     css,
