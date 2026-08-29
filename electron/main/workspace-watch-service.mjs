@@ -43,6 +43,27 @@ export function createWorkspaceWatchService({ logger = console, fsModule = fs } 
     return { subscriptionId, rootPath: resolvedRoot };
   }
 
+  function subscribeActivity(rootPath, listener) {
+    if (typeof listener !== "function") {
+      throw new TypeError("A workspace activity listener is required.");
+    }
+    const resolvedRoot = path.resolve(rootPath);
+    let entry = watchers.get(resolvedRoot);
+    if (!entry) {
+      entry = createWatcher(resolvedRoot, logger, fsModule);
+      watchers.set(resolvedRoot, entry);
+    }
+    const token = Symbol(resolvedRoot);
+    entry.activityListeners.set(token, listener);
+    let active = true;
+    return () => {
+      if (!active) return;
+      active = false;
+      entry.activityListeners.delete(token);
+      disposeEntryIfUnused(entry, resolvedRoot);
+    };
+  }
+
   function stop(subscriptionId, expectedSenderId = null) {
     const subscription = subscriptions.get(subscriptionId);
     if (!subscription) return { ok: true };
@@ -55,10 +76,7 @@ export function createWorkspaceWatchService({ logger = console, fsModule = fs } 
     if (!entry) return { ok: true };
 
     entry.clients.delete(subscriptionId);
-    if (entry.clients.size === 0) {
-      disposeWatcher(entry, subscription.root);
-      watchers.delete(subscription.root);
-    }
+    disposeEntryIfUnused(entry, subscription.root);
     return { ok: true };
   }
 
@@ -74,6 +92,12 @@ export function createWorkspaceWatchService({ logger = console, fsModule = fs } 
     }
     watchers.clear();
     subscriptions.clear();
+  }
+
+  function disposeEntryIfUnused(entry, rootPath) {
+    if (entry.clients.size > 0 || entry.activityListeners.size > 0) return;
+    disposeWatcher(entry, rootPath);
+    if (watchers.get(rootPath) === entry) watchers.delete(rootPath);
   }
 
   function noteInternalWrite(request) {
@@ -110,6 +134,7 @@ export function createWorkspaceWatchService({ logger = console, fsModule = fs } 
     stopForWindow,
     closeAll,
     noteInternalWrite,
+    subscribeActivity,
     getWatcherCount: () => watchers.size,
   };
 }
@@ -118,6 +143,7 @@ function createWatcher(rootPath, logger, fsModule) {
   const clients = new Map();
   const entry = {
     clients,
+    activityListeners: new Map(),
     debounceTimer: null,
     editReviewTimer: null,
     lastEvent: null,
@@ -170,6 +196,7 @@ function armWorkspaceWatcher(entry) {
         eventType: eventType ?? "change",
         path: eventPath,
       };
+      notifyWorkspaceActivity(entry);
       noteWorkspaceEditReviewPath(entry.rootPath, eventPath);
       scheduleWorkspaceEditReviewFlush(entry);
       clearTimeout(entry.debounceTimer);
@@ -193,6 +220,7 @@ function armWorkspaceWatcher(entry) {
         path: null,
         error: error instanceof Error ? error.message : String(error),
       };
+      notifyWorkspaceActivity(entry);
       broadcastWorkspaceChange(entry);
       scheduleWorkspaceRearm(entry, "watcher-error");
     });
@@ -230,6 +258,7 @@ function scheduleWorkspaceRearm(entry, reason) {
       recovered: true,
       reason,
     };
+    notifyWorkspaceActivity(entry);
     broadcastWorkspaceChange(entry);
   }, delay);
   if (typeof entry.rearmTimer.unref === "function") entry.rearmTimer.unref();
@@ -256,6 +285,16 @@ function disposeWatcher(entry, rootPath) {
   }
   disposeWorkspaceEditReview(rootPath);
   entry.clients.clear();
+}
+
+function notifyWorkspaceActivity(entry) {
+  for (const listener of entry.activityListeners.values()) {
+    try {
+      listener(entry.lastEvent);
+    } catch (error) {
+      entry.logger.warn?.("Workspace activity listener failed:", error);
+    }
+  }
 }
 
 function scheduleWorkspaceEditReviewFlush(entry) {

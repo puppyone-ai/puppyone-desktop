@@ -48,6 +48,7 @@ export function createDocumentSessionCloseCoordinator({
 
   const pendingRequests = new Map();
   const windowStates = new WeakMap();
+  const windowStateByWebContentsId = new Map();
 
   function registerIpc(ipc) {
     if (!ipc || typeof ipc.on !== "function") {
@@ -58,11 +59,9 @@ export function createDocumentSessionCloseCoordinator({
       const pending = requestId ? pendingRequests.get(requestId) : null;
       if (!pending || event?.sender?.id !== pending.webContentsId) return;
 
-      pendingRequests.delete(requestId);
-      clearTimeout(pending.timer);
       pending.resolve(payload?.ok === true
-        ? { ok: true, error: null }
-        : { ok: false, error: sanitizeError(payload?.error) });
+        ? { ok: true, kind: null, error: null }
+        : { ok: false, kind: "persistence-failed", error: sanitizeError(payload?.error) });
     });
   }
 
@@ -85,19 +84,25 @@ export function createDocumentSessionCloseCoordinator({
     };
     let cleanedUp = false;
     windowStates.set(window, state);
+    windowStateByWebContentsId.set(webContents.id, state);
 
     const markRendererReady = () => {
       state.rendererReady = true;
     };
     const markRendererUnavailable = () => {
       state.rendererReady = false;
+      cancelPendingRequestsForWebContents(
+        webContents.id,
+        "renderer-unavailable",
+        "The renderer stopped before its documents finished saving.",
+      );
     };
     const markRendererLoading = (details, _url, _isInPlace, legacyIsMainFrame) => {
       const isMainFrame = typeof details?.isMainFrame === "boolean"
         ? details.isMainFrame
         : legacyIsMainFrame;
       const isSameDocument = details?.isSameDocument === true;
-      if (isMainFrame && !isSameDocument) state.rendererReady = false;
+      if (isMainFrame && !isSameDocument) markRendererUnavailable();
     };
     const handleClose = (event) => {
       if (state.allowClose || !state.rendererReady || webContents.isDestroyed()) return;
@@ -112,7 +117,11 @@ export function createDocumentSessionCloseCoordinator({
       });
     };
     const handleClosed = () => {
-      cancelPendingRequest(state, "The window closed before its documents were saved.");
+      cancelPendingRequestsForWebContents(
+        webContents.id,
+        "renderer-unavailable",
+        "The window closed before its documents were saved.",
+      );
       cleanup();
     };
     const cleanup = () => {
@@ -126,6 +135,9 @@ export function createDocumentSessionCloseCoordinator({
         webContents.removeListener?.("render-process-gone", markRendererUnavailable);
       }
       windowStates.delete(window);
+      if (windowStateByWebContentsId.get(webContents.id) === state) {
+        windowStateByWebContentsId.delete(webContents.id);
+      }
     };
 
     webContents.on("did-finish-load", markRendererReady);
@@ -138,7 +150,7 @@ export function createDocumentSessionCloseCoordinator({
   }
 
   async function finishInterceptedClose(window, webContents, state) {
-    const result = await requestRendererFlush(webContents, state);
+    const result = await requestRendererFlush(webContents, { reason: "app-close", state });
     if (result.ok) {
       state.allowClose = true;
       if (!window.isDestroyed()) window.close();
@@ -177,54 +189,83 @@ export function createDocumentSessionCloseCoordinator({
     onCloseCancelled(window);
   }
 
-  function requestRendererFlush(webContents, state) {
+  function requestRendererFlush(webContents, {
+    reason = "git-auto-commit",
+    state = null,
+    signal = null,
+  } = {}) {
     const requestId = randomUUID();
-    state.requestId = requestId;
+    if (state) state.requestId = requestId;
 
     return new Promise((resolve) => {
-      const timer = setTimeout(() => {
+      let settled = false;
+      const settle = (result) => {
+        if (settled) return;
+        settled = true;
         pendingRequests.delete(requestId);
-        if (state.requestId === requestId) state.requestId = null;
-        resolve({
-          ok: false,
-          error: "Saving open documents timed out. Keep the window open and try again.",
-          requestId,
-        });
-      }, normalizeTimeout(timeoutMs));
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", handleAbort);
+        if (state?.requestId === requestId) state.requestId = null;
+        resolve({ ...result, requestId });
+      };
+      const handleAbort = () => settle({
+        ok: false,
+        kind: "cancelled",
+        error: "The workspace changed before its documents finished saving.",
+      });
+      const timer = setTimeout(() => settle({
+        ok: false,
+        kind: "timeout",
+        error: "Saving open documents timed out. Keep the window open and try again.",
+      }), normalizeTimeout(timeoutMs));
       pendingRequests.set(requestId, {
         webContentsId: webContents.id,
         timer,
-        resolve: (result) => {
-          if (state.requestId === requestId) state.requestId = null;
-          resolve({ ...result, requestId });
-        },
+        resolve: settle,
       });
+      signal?.addEventListener("abort", handleAbort, { once: true });
+      if (signal?.aborted) {
+        handleAbort();
+        return;
+      }
 
       try {
-        webContents.send(DOCUMENT_SESSION_FLUSH_REQUEST_CHANNEL, { requestId });
+        webContents.send(DOCUMENT_SESSION_FLUSH_REQUEST_CHANNEL, { requestId, reason });
       } catch (error) {
         const pending = pendingRequests.get(requestId);
         if (!pending) return;
-        pendingRequests.delete(requestId);
-        clearTimeout(timer);
-        if (state.requestId === requestId) state.requestId = null;
-        resolve({ ok: false, error: sanitizeError(error), requestId });
+        pending.resolve({
+          ok: false,
+          kind: "renderer-unavailable",
+          error: sanitizeError(error),
+        });
       }
     });
   }
 
-  function cancelPendingRequest(state, message) {
-    const requestId = state.requestId;
-    if (!requestId) return;
-    const pending = pendingRequests.get(requestId);
-    state.requestId = null;
-    if (!pending) return;
-    pendingRequests.delete(requestId);
-    clearTimeout(pending.timer);
-    pending.resolve({ ok: false, error: message });
+  function requestFlush(webContents, reason = "git-auto-commit", { signal = null } = {}) {
+    const state = webContents && Number.isSafeInteger(webContents.id)
+      ? windowStateByWebContentsId.get(webContents.id)
+      : null;
+    if (!state?.rendererReady || webContents.isDestroyed?.()) {
+      return Promise.resolve({
+        ok: false,
+        kind: "renderer-unavailable",
+        error: "The workspace renderer is unavailable.",
+        requestId: null,
+      });
+    }
+    return requestRendererFlush(webContents, { reason, signal });
   }
 
-  return Object.freeze({ attachWindow, registerIpc });
+  function cancelPendingRequestsForWebContents(webContentsId, kind, message) {
+    for (const [requestId, pending] of pendingRequests.entries()) {
+      if (pending.webContentsId !== webContentsId) continue;
+      pending.resolve({ ok: false, kind, error: message });
+    }
+  }
+
+  return Object.freeze({ attachWindow, registerIpc, requestFlush });
 }
 
 function notifyRendererCloseCancelled(window, webContents, requestId) {

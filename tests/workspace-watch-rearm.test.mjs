@@ -50,6 +50,27 @@ describe("workspace content watch re-arm", () => {
     vi.restoreAllMocks();
   });
 
+  it("keeps a Main-owned activity subscription alive without renderer clients", () => {
+    const { fsModule, watchers } = createFakeFsWatch();
+    const service = createWorkspaceWatchService({
+      logger: { warn: () => {}, info: () => {} },
+      fsModule,
+    });
+    const listener = vi.fn();
+    const stop = service.subscribeActivity("/tmp", listener);
+
+    expect(service.getWatcherCount()).toBe(1);
+    watchers[0]._listener("change", "notes/background.md");
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({
+      rootPath: "/tmp",
+      path: "notes/background.md",
+    }));
+
+    stop();
+    expect(service.getWatcherCount()).toBe(0);
+    expect(watchers[0].close).toHaveBeenCalledOnce();
+  });
+
   it("re-arms after watcher error and broadcasts a recovery event", async () => {
     const { fsModule, watchers } = createFakeFsWatch();
     const queued = [];

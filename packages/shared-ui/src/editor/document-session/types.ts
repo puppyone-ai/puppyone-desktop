@@ -49,7 +49,7 @@ export type ExternalConflictResolution = "reload-external" | "keep-local";
 
 export type DocumentSessionDrainReason = Extract<
   DocumentPersistenceReason,
-  "document-close" | "document-switch" | "workspace-switch" | "app-close" | "destroy"
+  "document-close" | "document-switch" | "workspace-switch" | "git-auto-commit" | "app-close" | "destroy"
 >;
 
 /**

@@ -20,6 +20,9 @@ export function ExperimentalSettingsView({
   }> = [
     { messageKey: "viewerPlugins", settingKey: "enableViewerPlugins" },
     { messageKey: "editorSaveStatus", settingKey: "enableEditorSaveStatus" },
+    ...(window.puppyoneDesktop?.getGitAutoCommitSettings
+      ? [{ messageKey: "gitAutoCommit", settingKey: "enableGitAutoCommit" as const }]
+      : []),
     { messageKey: "markdownBlockDrag", settingKey: "enableMarkdownBlockDrag" },
     ...(assetLibraryHomeAvailable
       ? [{ messageKey: "projectsHome", settingKey: "enableAssetLibraryHome" as const }]

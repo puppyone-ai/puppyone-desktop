@@ -35,13 +35,16 @@ const setCloseInteractionBarrier = (locked: boolean) => {
 };
 
 const stopDocumentSessionFlushListener = window.puppyoneDesktop
-  ?.onDocumentSessionFlushRequested?.(async ({ requestId }) => {
-    activeCloseRequestId = requestId;
-    setCloseInteractionBarrier(true);
+  ?.onDocumentSessionFlushRequested?.(async ({ requestId, reason }) => {
+    const closesWindow = reason === "app-close";
+    if (closesWindow) {
+      activeCloseRequestId = requestId;
+      setCloseInteractionBarrier(true);
+    }
     try {
-      await flushActiveDocumentSessions();
+      await flushActiveDocumentSessions(reason);
     } catch (error) {
-      if (activeCloseRequestId === requestId) {
+      if (closesWindow && activeCloseRequestId === requestId) {
         activeCloseRequestId = null;
         setCloseInteractionBarrier(false);
       }

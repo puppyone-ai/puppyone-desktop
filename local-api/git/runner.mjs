@@ -1,4 +1,5 @@
 import { execFile, spawn } from "node:child_process";
+import path from "node:path";
 
 export const GIT_MAX_BUFFER = 4 * 1024 * 1024;
 export const GIT_STREAM_MAX_BYTES = 8 * 1024 * 1024;
@@ -24,7 +25,7 @@ export function execGit(rootPath, args, options = {}) {
     timeout,
     maxBuffer: options.maxBuffer ?? GIT_MAX_BUFFER,
     signal: options.signal,
-    env: buildGitEnvironment({ optionalLocks: options.optionalLocks }),
+    env: buildGitEnvironment({ optionalLocks: options.optionalLocks, indexFile: options.indexFile }),
   };
   const commandArgs = ["-C", rootPath, "-c", "core.quotePath=false", ...args];
   const execution = options.input === undefined
@@ -117,7 +118,7 @@ export function execGitBuffer(rootPath, args, options = {}) {
     timeout,
     maxBuffer: options.maxBuffer ?? GIT_MAX_BUFFER,
     signal: options.signal,
-    env: buildGitEnvironment({ optionalLocks: options.optionalLocks }),
+    env: buildGitEnvironment({ optionalLocks: options.optionalLocks, indexFile: options.indexFile }),
   }).catch((error) => {
     annotateGitError(error, args, timeout);
     throw error;
@@ -145,7 +146,7 @@ export function execGitStreaming(rootPath, args, options = {}) {
       "git",
       ["-C", rootPath, "-c", "core.quotePath=false", ...args],
       {
-        env: buildGitEnvironment({ optionalLocks: options.optionalLocks }),
+        env: buildGitEnvironment({ optionalLocks: options.optionalLocks, indexFile: options.indexFile }),
         stdio: ["ignore", "pipe", "pipe"],
       },
     );
@@ -227,7 +228,7 @@ export function execGitStreaming(rootPath, args, options = {}) {
   });
 }
 
-export function buildGitEnvironment({ optionalLocks = true } = {}) {
+export function buildGitEnvironment({ optionalLocks = true, indexFile = null } = {}) {
   const env = {
     ...process.env,
     // Force English Git messages so error classification stays locale-stable.
@@ -237,6 +238,12 @@ export function buildGitEnvironment({ optionalLocks = true } = {}) {
     GIT_TERMINAL_PROMPT: "0",
   };
   if (optionalLocks === false) env.GIT_OPTIONAL_LOCKS = "0";
+  if (indexFile !== null) {
+    if (typeof indexFile !== "string" || !path.isAbsolute(indexFile) || indexFile.includes("\0")) {
+      throw new TypeError("Git indexFile must be an absolute path.");
+    }
+    env.GIT_INDEX_FILE = indexFile;
+  }
   return env;
 }
 

@@ -171,6 +171,8 @@ export function SettingsView({
   if (activeSection === "git") {
     return (
       <GitSettingsView
+        workspaceRoot={workspace.path}
+        experimentalOptIn={experimentalSettings.enableGitAutoCommit}
         status={gitStatus}
         loading={gitStatusLoading}
         error={gitStatusError}

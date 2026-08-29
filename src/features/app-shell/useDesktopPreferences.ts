@@ -153,7 +153,7 @@ export function useDesktopPreferences() {
   const [createNewMenuSettings, setCreateNewMenuSettings] = useState<CreateNewMenuSettings>(
     () => readInitialCreateNewMenuSettings(),
   );
-  const [experimentalSettings, setExperimentalSettings] = useState<ExperimentalSettings>(() => readInitialExperimentalSettings());
+  const [experimentalSettings, setExperimentalSettingsState] = useState<ExperimentalSettings>(() => readInitialExperimentalSettings());
   const [rightSidebarToolsSettings, setRightSidebarToolsSettings] = useState<RightSidebarToolsSettings>(() => readInitialRightSidebarToolsSettings());
   const [titlebarActionsSettings, setTitlebarActionsSettings] = useState<TitlebarActionsSettings>(() => readInitialTitlebarActionsSettings());
   const [localAgentsSettings, setLocalAgentsSettings] = useState<LocalAgentsSettings>(
@@ -382,8 +382,47 @@ export function useDesktopPreferences() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(EXPERIMENTAL_SETTINGS_STORAGE_KEY, JSON.stringify(experimentalSettings));
+    const { enableGitAutoCommit: _mainOwned, ...rendererOwned } = experimentalSettings;
+    void _mainOwned;
+    window.localStorage.setItem(EXPERIMENTAL_SETTINGS_STORAGE_KEY, JSON.stringify(rendererOwned));
   }, [experimentalSettings]);
+
+  useEffect(() => {
+    const desktop = window.puppyoneDesktop;
+    if (!desktop?.getGitAutoCommitSettings) return;
+    let active = true;
+    const applySnapshot = (snapshot: { experimentalOptIn: boolean }) => {
+      if (!active) return;
+      setExperimentalSettingsState((current) => ({
+        ...current,
+        enableGitAutoCommit: snapshot.experimentalOptIn === true,
+      }));
+    };
+    void desktop.getGitAutoCommitSettings().then(applySnapshot).catch(() => undefined);
+    const stop = desktop.onGitAutoCommitStateChanged?.(applySnapshot);
+    return () => {
+      active = false;
+      stop?.();
+    };
+  }, []);
+
+  const setExperimentalSettings = useCallback((next: ExperimentalSettings) => {
+    setExperimentalSettingsState((current) => ({
+      ...next,
+      enableGitAutoCommit: current.enableGitAutoCommit,
+    }));
+    const desktop = window.puppyoneDesktop;
+    if (!desktop?.setGitAutoCommitExperimentalOptIn
+      || next.enableGitAutoCommit === experimentalSettings.enableGitAutoCommit) return;
+    void desktop.setGitAutoCommitExperimentalOptIn({
+      enabled: next.enableGitAutoCommit,
+    }).then((snapshot) => {
+      setExperimentalSettingsState((current) => ({
+        ...current,
+        enableGitAutoCommit: snapshot.experimentalOptIn === true,
+      }));
+    }).catch(() => undefined);
+  }, [experimentalSettings.enableGitAutoCommit]);
 
   useEffect(() => {
     window.localStorage.setItem(RIGHT_SIDEBAR_TOOLS_STORAGE_KEY, JSON.stringify(rightSidebarToolsSettings));

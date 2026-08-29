@@ -57,6 +57,11 @@ import {
   writePuppyoneWorkspaceConfig,
 } from "./workspace-config.mjs";
 export { getGitEnvironmentForTests } from "./git/runner.mjs";
+export {
+  inspectAutoCommitPreflight,
+  recoverWorkspaceGitAutoCommit,
+  runWorkspaceGitAutoCommit,
+} from "./git/auto-commit.mjs";
 export { getMimeType } from "./files/file-format-policy.mjs";
 export {
   resolveExistingWorkspaceDisplayPath,

@@ -105,6 +105,52 @@ describe("git operation coordinator", () => {
     await Promise.all([a, b]);
   });
 
+  it("atomically reserves worktree and repository domains", async () => {
+    const coordinator = createGitOperationCoordinator();
+    const gate = deferred();
+    const order = [];
+    const worktree = worktreeLockKey("/repo");
+    const repository = repositoryLockKey("/common");
+
+    const commit = coordinator.runAll([repository, worktree], async () => {
+      order.push("commit:start");
+      await gate.promise;
+      order.push("commit:end");
+    });
+    const stage = coordinator.run(worktree, async () => {
+      order.push("stage");
+    });
+    const push = coordinator.run(repository, async () => {
+      order.push("push");
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(order).toEqual(["commit:start"]);
+    gate.resolve();
+    await Promise.all([commit, stage, push]);
+    expect(order[0]).toBe("commit:start");
+    expect(order[1]).toBe("commit:end");
+    expect(new Set(order.slice(2))).toEqual(new Set(["stage", "push"]));
+    expect(coordinator.isIdleAll([worktree, repository])).toBe(true);
+  });
+
+  it("lets low-priority work acquire only when every domain is idle", async () => {
+    const coordinator = createGitOperationCoordinator();
+    const gate = deferred();
+    const worktree = worktreeLockKey("/repo");
+    const repository = repositoryLockKey("/common");
+    const userOperation = coordinator.run(worktree, () => gate.promise);
+
+    expect(coordinator.tryRunAll([worktree, repository], async () => "auto")).toBeNull();
+    gate.resolve();
+    await userOperation;
+
+    const automatic = coordinator.tryRunAll([worktree, repository], async () => "auto");
+    expect(automatic).not.toBeNull();
+    await expect(automatic).resolves.toBe("auto");
+  });
+
   it("allows an idle wait to be cancelled", async () => {
     const coordinator = createGitOperationCoordinator();
     const gate = deferred();

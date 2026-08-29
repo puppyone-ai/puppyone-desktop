@@ -111,6 +111,38 @@ describe("Electron document close coordination", () => {
     expect(harness.window.destroyed).toBe(true);
   });
 
+  it("supports a non-destructive durability drain for Git Auto Commit", async () => {
+    const harness = createHarness();
+    harness.webContents.emit("did-finish-load");
+
+    const pending = harness.coordinator.requestFlush(harness.webContents, "git-auto-commit");
+    const request = harness.webContents.sent[0];
+    expect(request).toMatchObject({
+      channel: DOCUMENT_SESSION_FLUSH_REQUEST_CHANNEL,
+      payload: { reason: "git-auto-commit" },
+    });
+    harness.reply(request.payload.requestId, { ok: true });
+
+    await expect(pending).resolves.toMatchObject({ ok: true, kind: null });
+    expect(harness.dialog.showMessageBox).not.toHaveBeenCalled();
+    expect(harness.window.destroyed).toBe(false);
+  });
+
+  it("cancels an autonomous drain when its workspace ownership is released", async () => {
+    const harness = createHarness();
+    harness.webContents.emit("did-finish-load");
+    const controller = new AbortController();
+    const pending = harness.coordinator.requestFlush(
+      harness.webContents,
+      "git-auto-commit",
+      { signal: controller.signal },
+    );
+
+    controller.abort();
+    await expect(pending).resolves.toMatchObject({ ok: false, kind: "cancelled" });
+    expect(harness.dialog.showMessageBox).not.toHaveBeenCalled();
+  });
+
   it("does not touch destroyed BrowserWindow properties when an unready window closes", () => {
     const harness = createHarness();
     let event;
@@ -149,6 +181,7 @@ function createHarness({ dialogResponse = 0, onCloseCancelled = () => undefined 
   coordinator.attachWindow(window);
 
   return {
+    coordinator,
     dialog,
     webContents,
     window,

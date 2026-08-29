@@ -1,5 +1,5 @@
 import { installBrokenStdioGuards } from "./main/stdio-guard.mjs";
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, session as electronSession, shell, webContents, WebContentsView } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, powerMonitor, protocol, safeStorage, session as electronSession, shell, webContents, WebContentsView } from "electron";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
 import { createRequire } from "node:module";
@@ -77,6 +77,7 @@ import { registerWorkspaceNavigationIpcHandlers } from "./main/ipc/workspace-nav
 import { registerWorkspaceWatchIpcHandlers } from "./main/ipc/workspace-watch-ipc.mjs";
 import { registerWindowLayoutIpcHandlers } from "./main/ipc/window-layout-ipc.mjs";
 import { registerGitMetadataWatchIpcHandlers } from "./main/ipc/git-metadata-watch-ipc.mjs";
+import { registerGitAutoCommitIpcHandlers } from "./main/ipc/git-auto-commit-ipc.mjs";
 import { registerLocalFileProtocol } from "./main/local-file-protocol.mjs";
 import { createLocalFileCapabilityStore } from "./main/local-file-capabilities.mjs";
 import { installWindowNavigationSecurity, requireNonEmptyString } from "./main/security.mjs";
@@ -95,6 +96,7 @@ import {
 import { createProjectLocationGrantStore } from "./main/project-location-grants.mjs";
 import { createDesktopLocaleService } from "./main/localization/desktop-locale-service.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
+import { createWorkspaceMutationTracker } from "./main/workspace-mutation-tracker.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
 import { createDesktopTelemetryHost } from "./main/telemetry/bootstrap/create-desktop-telemetry-host.mjs";
 import {
@@ -117,6 +119,11 @@ import {
   loadViewerPackRuntime,
 } from "./main/viewer-packs/bootstrap.mjs";
 import { resolveViewerPackFeatureProfile } from "./main/viewer-packs/feature-profile.mjs";
+import { resolveGitAutoCommitFeatureProfile } from "./main/git-auto-commit/feature-profile.mjs";
+import { createGitAutoCommitPreferenceStore } from "./main/git-auto-commit/preference-store.mjs";
+import { createGitAutoCommitTransactionJournal } from "./main/git-auto-commit/transaction-journal.mjs";
+import { createGitAutoCommitOperationLease } from "./main/git-auto-commit/operation-lease.mjs";
+import { createGitAutoCommitService } from "./main/git-auto-commit/service.mjs";
 
 // Must run before any console.* / IPC replyWithError logging: broken inherited
 // stdout/stderr (Dock launch, detached child, closed terminal) otherwise throws
@@ -159,6 +166,11 @@ const devServerUrl = process.env.PUPPYONE_DESKTOP_DEV_URL;
 const rendererApplicationUrl = devServerUrl || pathToFileURL(rendererDistPath).toString();
 if (devServerUrl) app.commandLine.appendSwitch("remote-debugging-port", "9222");
 const viewerPackFeatureProfile = resolveViewerPackFeatureProfile({
+  packageMetadata,
+  environment: process.env,
+  isPackaged: app.isPackaged,
+});
+const gitAutoCommitFeatureProfile = resolveGitAutoCommitFeatureProfile({
   packageMetadata,
   environment: process.env,
   isPackaged: app.isPackaged,
@@ -284,6 +296,7 @@ const localAgentInventory = createLocalAgentInventory({
   appVersion: desktopBuildInfo.version,
   cacheFilePath: path.join(app.getPath("userData"), "agent-runtime-inventory.json"),
 });
+const workspaceMutationTracker = createWorkspaceMutationTracker();
 const workspaceWatchService = createWorkspaceWatchService();
 const gitMetadataWatchService = createGitMetadataWatchService();
 const workspaceStateStore = createWorkspaceStateStore({
@@ -307,6 +320,20 @@ const cloudAuthService = createCloudAuthService({
   revealWindow: revealLastFocusedWindow,
 });
 const gitOperationCoordinator = createGitOperationCoordinator();
+const gitAutoCommitPreferenceStore = createGitAutoCommitPreferenceStore({
+  filePath: path.join(app.getPath("userData"), "git-auto-commit", "preferences.v1.json"),
+});
+const gitAutoCommitService = createGitAutoCommitService({
+  releaseAvailable: gitAutoCommitFeatureProfile.available,
+  preferenceStore: gitAutoCommitPreferenceStore,
+  transactionJournal: createGitAutoCommitTransactionJournal(),
+  operationLease: createGitAutoCommitOperationLease(),
+  gitOperationCoordinator,
+  documentDurabilityCoordinator: documentSessionCloseCoordinator,
+  workspaceMutationTracker,
+  workspaceWatchService,
+  gitMetadataWatchService,
+});
 const cloudPublishSecretVault = createCloudPublishSecretVault({
   baseDirectory: path.join(app.getPath("userData"), "cloud-publish-secrets-v1"),
   secureStorage: safeStorage,
@@ -353,7 +380,10 @@ async function createWindow(options = {}) {
       nodeIntegration: false,
       sandbox: true,
       preload: preloadPath,
-      additionalArguments: viewerPackFeatureProfile.rendererArguments,
+      additionalArguments: [
+        ...viewerPackFeatureProfile.rendererArguments,
+        ...gitAutoCommitFeatureProfile.rendererArguments,
+      ],
     },
   });
   const webContentsId = window.webContents.id;
@@ -373,6 +403,7 @@ async function createWindow(options = {}) {
     lastFocusedWindowId = webContentsId;
     const state = windowStateById.get(webContentsId);
     state?.markFocused();
+    gitAutoCommitService.reconcileWindow(webContentsId);
     if (!window.webContents.isDestroyed()) {
       window.webContents.send("git-repository:window-focus", { focused: true });
     }
@@ -657,6 +688,7 @@ app.whenReady().then(async () => {
     });
   }
   registerIpcHandlers();
+  powerMonitor.on("resume", gitAutoCommitService.reconcileAfterResume);
   await telemetryHost.start();
   updateService.start();
   const initialWorkspacePath = initialLaunchIntent.workspacePath
@@ -702,6 +734,8 @@ app.on("will-quit", () => {
   void terminalAgentActivityHost.dispose();
   terminalAgentLocator.dispose();
   localAgentInventory.dispose();
+  powerMonitor.removeListener("resume", gitAutoCommitService.reconcileAfterResume);
+  gitAutoCommitService.closeAll();
   workspaceWatchService.closeAll();
   gitMetadataWatchService.closeAll();
 });
@@ -807,6 +841,7 @@ function registerIpcHandlers() {
     convertOfficeDocument: desktopPlatformHost.documents.convertOfficeDocumentToDocx,
     localFileCapabilities,
     workspaceWatchService,
+    workspaceMutationTracker,
     gitMetadataWatchService,
     t: (messageId, values) => localeService.t(messageId, values),
   });
@@ -836,6 +871,11 @@ function registerIpcHandlers() {
     cloudGitOperationLease,
     gitOperationCoordinator,
     t: (messageId, values) => localeService.t(messageId, values),
+  });
+  registerGitAutoCommitIpcHandlers({
+    ipcMain: trustedIpcMain,
+    authorizeWorkspaceRoot,
+    gitAutoCommitService,
   });
   registerTerminalIpcHandlers({
     ipcMain: trustedIpcMain,
@@ -1164,6 +1204,9 @@ function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
 
   state.replaceFolders([{ workspace, path: canonicalPath }]);
   workspaceWindowByPath.set(canonicalPath, window);
+  void gitAutoCommitService.assignWorkspace(window.webContents, canonicalPath).catch((error) => {
+    console.warn("Unable to initialize Git Auto Commit for workspace:", error);
+  });
   window.setTitle(window.isFullScreen() ? "" : resolveWindowTitle(window));
   if (typeof window.setRepresentedFilename === "function") {
     try {
@@ -1180,6 +1223,7 @@ function releaseWindowWorkspace(window) {
 }
 
 function releaseWindowWorkspaceById(webContentsId, window = null) {
+  gitAutoCommitService.releaseWindow(webContentsId);
   viewerPackHost?.destroySessionsForOwner(webContentsId);
   localFileCapabilities.revokeSender(webContentsId);
   const state = windowStateById.get(webContentsId);

@@ -556,6 +556,37 @@ export type DesktopUpdateState = {
   updatedAt: string;
 };
 
+export type GitAutoCommitWorkspacePolicy = {
+  enabled: boolean;
+  scope: "untracked-only";
+  minimumIntervalMs: number;
+  quietPeriodMs: number;
+  updatedAt: string | null;
+};
+
+export type GitAutoCommitResult = {
+  outcome: "committed" | "no-op" | "skipped" | "failed" | "needs-review";
+  reason: string;
+  commitId: string | null;
+  pathCount: number | null;
+  retryable: boolean;
+  workspaceGeneration?: number;
+  occurredAt?: string;
+};
+
+export type GitAutoCommitSnapshot = {
+  available: boolean;
+  experimentalOptIn: boolean;
+  repository: boolean;
+  workspacePolicy: GitAutoCommitWorkspacePolicy | null;
+  effectiveEnabled: boolean;
+  runtime: {
+    state: "disabled" | "idle" | "waiting" | "running";
+    nextEligibleAt: string | null;
+    lastResult: GitAutoCommitResult | null;
+  } | null;
+};
+
 export type WorkspaceChangedEvent = {
   rootPath: string;
   eventType: string;
@@ -836,10 +867,27 @@ declare global {
         callback: (payload: { type: "strong" | "emphasis" | "underline" | "strike" }) => void,
       ) => () => void;
       onDocumentSessionFlushRequested: (
-        callback: (request: { requestId: string }) => void | Promise<void>,
+        callback: (request: {
+          requestId: string;
+          reason: "app-close" | "git-auto-commit";
+        }) => void | Promise<void>,
       ) => () => void;
       onDocumentSessionCloseCancelled: (
         callback: (request: { requestId: string }) => void,
+      ) => () => void;
+      getGitAutoCommitSettings?: (request?: {
+        rootPath?: string;
+      }) => Promise<GitAutoCommitSnapshot>;
+      setGitAutoCommitExperimentalOptIn?: (request: {
+        enabled: boolean;
+      }) => Promise<GitAutoCommitSnapshot>;
+      setGitAutoCommitWorkspacePolicy?: (request: {
+        rootPath: string;
+        enabled?: boolean;
+        minimumIntervalMs?: number;
+      }) => Promise<GitAutoCommitSnapshot>;
+      onGitAutoCommitStateChanged?: (
+        callback: (snapshot: GitAutoCommitSnapshot) => void,
       ) => () => void;
       readCloudSession: () => Promise<DesktopStoredCloudSession | null>;
       readCloudAuthState: () => Promise<DesktopCloudAuthStateSnapshot>;
