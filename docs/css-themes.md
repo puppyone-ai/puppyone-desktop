@@ -2,6 +2,8 @@
 
 PuppyOne Desktop treats themes as part of Appearance. Open **Settings → Appearance → Theme** to choose one coordinated Theme Pack for the application shell, Markdown editor, and CSV table view. Expand **Advanced theme overrides and Custom CSS** only when one surface needs a different theme or hand-authored CSS.
 
+Selecting a Theme Pack applies it to all three surfaces and resets the Advanced selectors to **Follow Theme Pack**. Advanced selections made afterward override only their chosen surface; selecting another Theme Pack returns every surface to that coordinated pack.
+
 The visual precedence is Interface Style → resolved System/Light/Dark mode and base palette → Theme Pack → advanced per-surface override. Appearance continues to own navigation, file icons, motion, pointer behavior, and other interface preferences; theme CSS cannot change those product settings.
 
 Default is the only coordinated Theme Pack bundled into the renderer. On first access to the theme catalog, PuppyOne installs GitHub, Forest, Night, and Rose into the platform-specific Themes Folder as ordinary editable packages:

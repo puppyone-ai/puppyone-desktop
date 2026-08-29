@@ -69,7 +69,11 @@ export function selectThemePack(
   themeId: string,
 ): SurfaceThemePreferences {
   if (!isThemeId(themeId)) return preferences;
-  return Object.freeze({ ...preferences, pack: themeId });
+  return Object.freeze({
+    ...preferences,
+    pack: themeId,
+    overrides: freezeOverrides({ application: null, markdown: null, csv: null }),
+  });
 }
 
 export function updateSurfaceThemeOverride(

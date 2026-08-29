@@ -76,6 +76,34 @@ describe("surface theme preferences", () => {
     expect(reset.overrides.markdown).toBeNull();
   });
 
+  it("applies a newly selected theme pack to every surface by clearing advanced overrides", () => {
+    const preferences = {
+      version: 2 as const,
+      pack: "default",
+      overrides: {
+        application: "default",
+        markdown: "builtin.markdown.newsprint",
+        csv: "builtin.csv.ledger",
+      },
+    };
+
+    const selected = selectThemePack(preferences, "com.example.forest");
+
+    expect(selected).toEqual({
+      version: 2,
+      pack: "com.example.forest",
+      overrides: { application: null, markdown: null, csv: null },
+    });
+    expect(resolveSurfaceThemeSelection(selected, catalog([
+      theme("default", ["application", "markdown", "csv"], ["light", "dark"]),
+      theme("com.example.forest", ["application", "markdown", "csv"], ["light", "dark"]),
+    ]), "light")).toEqual({
+      application: "com.example.forest",
+      markdown: "com.example.forest",
+      csv: "com.example.forest",
+    });
+  });
+
   it("resolves pack targets, advanced overrides, missing targets, and mode compatibility", () => {
     const snapshot = catalog([
       theme("default", ["application", "markdown", "csv"], ["light", "dark"]),
