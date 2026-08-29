@@ -3,7 +3,9 @@ export type NativeSurfacePointerPassthroughOwner =
   | "editor-pane-move"
   | "editor-split-resize"
   | "explorer-file-drop"
-  | "explorer-resize";
+  | "explorer-resize"
+  | "terminal-split-resize"
+  | "terminal-tab-move";
 
 export type NativeSurfacePointerPassthroughLease = Readonly<{
   owner: NativeSurfacePointerPassthroughOwner;

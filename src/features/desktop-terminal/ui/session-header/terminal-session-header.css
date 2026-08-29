@@ -88,6 +88,45 @@
   color: var(--desktop-terminal-tab-active-color, var(--po-text));
 }
 
+.desktop-terminal-tab.is-visible-group:not(.is-active) {
+  border-color: color-mix(in srgb, var(--po-divider) 72%, transparent);
+  background: color-mix(in srgb, var(--po-control) 42%, transparent);
+  color: color-mix(in srgb, var(--po-text) 72%, var(--po-text-muted));
+}
+
+.desktop-terminal-tab[data-move-source="true"] {
+  opacity: 0.56;
+}
+
+.desktop-terminal-tab-dragging,
+.desktop-terminal-tab-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+.desktop-terminal-tab-move-preview {
+  position: fixed;
+  z-index: var(--po-overlay-z-menu, 80);
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  max-width: 220px;
+  overflow: hidden;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--po-border) 80%, transparent);
+  border-radius: var(--desktop-toolbar-action-radius);
+  background: color-mix(in srgb, var(--po-surface) 94%, transparent);
+  box-shadow: var(--po-elevation-popover);
+  color: var(--po-text);
+  font-size: var(--desktop-sidebar-font-size, var(--po-text-size-sidebar, 13px));
+  line-height: 18px;
+  opacity: 0.94;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  will-change: transform;
+}
+
 .desktop-terminal-tab-select {
   display: grid;
   width: 100%;
@@ -279,6 +318,15 @@
   color: var(--po-text);
 }
 
+.desktop-terminal-layout-menu-wrap {
+  display: flex;
+  width: var(--desktop-terminal-tab-control-height);
+  height: var(--desktop-terminal-tab-control-height);
+  flex: 0 0 var(--desktop-terminal-tab-control-height);
+}
+
+.desktop-terminal-layout-menu-trigger,
+.desktop-terminal-unsplit-button,
 .desktop-terminal-new-button {
   width: var(--desktop-terminal-tab-control-height);
   height: var(--desktop-terminal-tab-control-height);
@@ -287,6 +335,11 @@
   color: var(--po-text-muted);
 }
 
+.desktop-terminal-layout-menu-trigger:hover:not(:disabled),
+.desktop-terminal-layout-menu-trigger:focus-visible:not(:disabled),
+.desktop-terminal-layout-menu-trigger[aria-expanded="true"],
+.desktop-terminal-unsplit-button:hover:not(:disabled),
+.desktop-terminal-unsplit-button:focus-visible:not(:disabled),
 .desktop-terminal-new-button:hover:not(:disabled),
 .desktop-terminal-new-button:focus-visible:not(:disabled) {
   border-color: var(
@@ -295,6 +348,14 @@
   );
   background: var(--desktop-terminal-tab-control-hover-background, var(--po-control-hover));
   color: var(--po-text);
+}
+
+.desktop-terminal-layout-menu {
+  position: fixed;
+  z-index: var(--po-overlay-z-menu, 80);
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {

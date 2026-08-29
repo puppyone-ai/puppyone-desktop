@@ -1,11 +1,14 @@
 import { useMemo, type CSSProperties } from "react";
-import { Plus } from "lucide-react";
+import { PanelTopClose, Plus } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
+import type { WorkbenchSplitDropEdge } from "@puppyone/shared-ui";
 import { DesktopMenuIconButton } from "../../../../components/DesktopMenu";
 import { presentTerminalSessionHeader } from "../../model/terminalSessionHeader";
 import { TERMINAL_SESSION_HEADER_METRICS } from "../../model/terminalSessionHeaderLayout";
 import type { DesktopTerminalSessionSummary } from "../../model/terminalSessions";
+import type { TerminalTabMoveDragController } from "../../interactions/useTerminalTabMoveDrag";
 import type { TerminalRuntimeRegistry } from "../../runtime/terminalRuntimeRegistry";
+import { TerminalSessionLayoutMenu } from "./TerminalSessionLayoutMenu";
 import { TerminalSessionOverflowMenu } from "./TerminalSessionOverflowMenu";
 import { TerminalSessionTab } from "./TerminalSessionTab";
 import { terminalPanelId, terminalTabId } from "./terminalSessionHeaderIds";
@@ -16,11 +19,23 @@ import "./terminal-session-header.css";
 
 type TerminalSessionHeaderProps = {
   activeSessionId: string | null;
+  canMoveSessionToActive?: (
+    sessionId: string,
+    edge: WorkbenchSplitDropEdge,
+  ) => boolean;
   onActivate: (sessionId: string) => void;
   onClose: (sessionId: string) => void;
   onCreate: () => void;
+  onMoveByKeyboard?: (sessionId: string, edge: WorkbenchSplitDropEdge) => void;
+  onMoveSessionToActive?: (
+    sessionId: string,
+    edge: WorkbenchSplitDropEdge,
+  ) => void;
+  onUnsplitActive?: () => void;
+  presentedSessionIds?: readonly string[];
   runtimeRegistry?: Pick<TerminalRuntimeRegistry, "require">;
   sessions: readonly DesktopTerminalSessionSummary[];
+  tabMove?: TerminalTabMoveDragController;
   workspacePath: string;
 };
 
@@ -30,15 +45,25 @@ type TerminalSessionHeaderProps = {
  */
 export function TerminalSessionHeader({
   activeSessionId,
+  canMoveSessionToActive,
   onActivate,
   onClose,
   onCreate,
+  onMoveByKeyboard,
+  onMoveSessionToActive,
+  onUnsplitActive,
+  presentedSessionIds = [],
   runtimeRegistry,
   sessions,
+  tabMove = INERT_TAB_MOVE,
   workspacePath,
 }: TerminalSessionHeaderProps) {
   const { t } = useLocalization();
   const sessionIds = useMemo(() => sessions.map(({ id }) => id), [sessions]);
+  const presentedSessionIdSet = useMemo(
+    () => new Set(presentedSessionIds),
+    [presentedSessionIds],
+  );
   const items = useMemo<TerminalSessionHeaderItem[]>(() => sessions.map((session) => ({
     presentation: presentTerminalSessionHeader(session, workspacePath, t),
     runtime: session.status === "selecting"
@@ -54,9 +79,19 @@ export function TerminalSessionHeader({
     () => new Map(sessionIds.map((sessionId, index) => [sessionId, index])),
     [sessionIds],
   );
+  const inactiveGroupItems = items.filter(
+    (item) => !presentedSessionIdSet.has(item.session.id),
+  );
+  const showLayoutMenu = Boolean(
+    canMoveSessionToActive
+    && onMoveSessionToActive
+    && inactiveGroupItems.length > 0,
+  );
+  const trailingControlCount = 1 + Number(showLayoutMenu) + Number(Boolean(onUnsplitActive));
   const { capacityRef, layout } = useTerminalSessionHeaderLayout(
     sessionIds,
     activeSessionId,
+    trailingControlCount,
   );
   const controller = useTerminalSessionHeaderController({
     activeSessionId,
@@ -90,11 +125,12 @@ export function TerminalSessionHeader({
         <div
           className="desktop-terminal-tab-rail"
           data-layout={layout.mode}
-          data-activation-motion={controller.activationMotionActive ? "true" : undefined}
+          data-activation-motion={controller.activationMotionActive && !tabMove.dragging ? "true" : undefined}
+          data-tab-dragging={tabMove.dragging ? "true" : undefined}
         >
           <div
             className="desktop-terminal-tabs"
-            role="tablist"
+            role="listbox"
             aria-label={t("terminal.title")}
             style={{
               "--desktop-terminal-tabs-resolved-width": `${layout.tabsWidth}px`,
@@ -115,8 +151,11 @@ export function TerminalSessionHeader({
                   onActivate={controller.activate}
                   onClose={onClose}
                   onKeyDown={controller.handleKeyDown}
+                  onMoveByKeyboard={onMoveByKeyboard}
                   panelId={terminalPanelId}
                   tabId={terminalTabId}
+                  tabMove={tabMove}
+                  visibleInGroup={presentedSessionIdSet.has(session.id)}
                 />
               );
             })}
@@ -130,6 +169,21 @@ export function TerminalSessionHeader({
           )}
         </div>
         <div className="desktop-terminal-subheader-new">
+          {showLayoutMenu && canMoveSessionToActive && onMoveSessionToActive && (
+            <TerminalSessionLayoutMenu
+              canMove={canMoveSessionToActive}
+              items={inactiveGroupItems}
+              onMove={onMoveSessionToActive}
+            />
+          )}
+          {onUnsplitActive && (
+            <DesktopMenuIconButton
+              className="desktop-terminal-unsplit-button"
+              label={t("terminal.split.unsplit")}
+              icon={<PanelTopClose size={14} strokeWidth={1.8} aria-hidden="true" />}
+              onClick={onUnsplitActive}
+            />
+          )}
           <DesktopMenuIconButton
             className="desktop-terminal-new-button"
             label={t("terminal.new")}
@@ -141,3 +195,13 @@ export function TerminalSessionHeader({
     </header>
   );
 }
+
+const INERT_TAB_MOVE: TerminalTabMoveDragController = Object.freeze({
+  dragging: false,
+  dropIntent: null,
+  start: () => undefined,
+  move: () => undefined,
+  end: () => "press",
+  cancel: () => undefined,
+  lostCapture: () => undefined,
+});

@@ -26,6 +26,11 @@ type TerminalExit = {
   signal: string | null;
 };
 
+export type TerminalMinimumViewportSize = Readonly<{
+  width: number;
+  height: number;
+}>;
+
 export type TerminalScrollbarState = {
   visible: boolean;
   canDecrement: boolean;
@@ -33,6 +38,11 @@ export type TerminalScrollbarState = {
   position: number;
   viewportRatio: number;
 };
+
+const TERMINAL_COLUMNS_MIN = 20;
+const TERMINAL_COLUMNS_MAX = 400;
+const TERMINAL_ROWS_MIN = 8;
+const TERMINAL_ROWS_MAX = 120;
 
 const INITIAL_SCROLLBAR_STATE: TerminalScrollbarState = {
   visible: false,
@@ -62,11 +72,13 @@ export interface TerminalRuntimeHandle {
   applyAppearance: () => void;
   dispose: () => void;
   focus: () => void;
+  getMinimumViewportSize: () => TerminalMinimumViewportSize;
   mount: (container: HTMLDivElement) => void;
   scrollLines: (direction: -1 | 1) => void;
   scrollToRatio: (ratio: number) => void;
   unmount: (container: HTMLDivElement) => void;
-  setActive: (active: boolean) => void;
+  setFocused: (focused: boolean) => void;
+  setPresented: (presented: boolean) => void;
   subscribeActivity: (listener: (active: boolean) => void) => () => void;
   subscribeReady: (listener: (ready: boolean) => void) => () => void;
   subscribeScrollbar: (listener: (state: TerminalScrollbarState) => void) => () => void;
@@ -103,11 +115,14 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   private defaultColors: TerminalDefaultColors | null = null;
   private ptyReady = false;
   private pendingExit: TerminalExit | null = null;
-  private active = false;
-  private hasBeenActive = false;
+  private presented = false;
+  private focused = false;
+  private hasBeenPresented = false;
   private disposed = false;
   private viewReady = false;
   private currentScrollbarState = INITIAL_SCROLLBAR_STATE;
+  private measuredCellWidth = 8;
+  private measuredCellHeight = 16;
 
   constructor({
     sessionId,
@@ -163,26 +178,43 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
 
   unmount(container: HTMLDivElement) {
     if (this.disposed || this.container !== container) return;
-    this.active = false;
+    this.presented = false;
+    this.focused = false;
     this.stopObservingContainer();
     this.container = null;
   }
 
-  setActive(active: boolean) {
-    if (this.disposed || this.active === active) return;
-    this.active = active;
-    if (!active) return;
-    const reactivating = this.hasBeenActive;
-    this.hasBeenActive = true;
+  setPresented(presented: boolean) {
+    if (this.disposed || this.presented === presented) return;
+    this.presented = presented;
+    if (!presented) {
+      if (this.fitFrame !== null) cancelAnimationFrame(this.fitFrame);
+      this.fitFrame = null;
+      return;
+    }
+    const reactivating = this.hasBeenPresented;
+    this.hasBeenPresented = true;
     if (reactivating) this.activityController.beginPresentationRefresh();
     this.scheduleFit();
-    requestAnimationFrame(() => {
-      if (!this.disposed && this.active) this.terminal?.focus();
-    });
+    if (this.focused) this.requestFocus();
+  }
+
+  setFocused(focused: boolean) {
+    if (this.disposed || this.focused === focused) return;
+    this.focused = focused;
+    if (focused && this.presented) this.requestFocus();
   }
 
   focus() {
     if (!this.disposed) this.terminal?.focus();
+  }
+
+  getMinimumViewportSize(): TerminalMinimumViewportSize {
+    this.updateMeasuredCellSize();
+    return {
+      width: Math.ceil(this.measuredCellWidth * TERMINAL_COLUMNS_MIN + 12),
+      height: Math.ceil(this.measuredCellHeight * TERMINAL_ROWS_MIN),
+    };
   }
 
   scrollLines(direction: -1 | 1) {
@@ -331,7 +363,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
       this.revealFrame = null;
       if (this.disposed) return;
       this.fitNow();
-      if (this.active) terminal.focus();
+      if (this.presented && this.focused) terminal.focus();
     });
 
     void document.fonts?.ready.then(() => {
@@ -429,7 +461,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
         this.handleExit(pendingExit);
         return;
       }
-      if (this.active) terminal.focus();
+      if (this.presented && this.focused) terminal.focus();
     }).catch((error) => {
       if (this.disposed) return;
       this.pendingExit = null;
@@ -454,7 +486,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   private observeSize(container: HTMLDivElement) {
     this.resizeObserver?.disconnect();
     this.resizeObserver = new ResizeObserver(() => {
-      if (this.active) this.scheduleFit();
+      if (this.presented) this.scheduleFit();
     });
     this.resizeObserver.observe(container);
   }
@@ -474,7 +506,7 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
       if (transitionEvent.propertyName !== "width" && transitionEvent.propertyName !== "flex-basis") {
         return;
       }
-      if (this.active) this.scheduleFit();
+      if (this.presented) this.scheduleFit();
     };
     this.terminalSidebarElement.addEventListener(
       "transitionend",
@@ -496,10 +528,10 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
   }
 
   private scheduleFit() {
-    if (this.disposed || this.fitFrame !== null) return;
+    if (this.disposed || !this.presented || this.fitFrame !== null) return;
     this.fitFrame = requestAnimationFrame(() => {
       this.fitFrame = null;
-      this.fitNow();
+      if (this.presented) this.fitNow();
     });
   }
 
@@ -516,7 +548,20 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     } catch {
       return;
     }
-    this.syncSizeToPty({ cols: terminal.cols, rows: terminal.rows });
+    const cols = clampInteger(terminal.cols, TERMINAL_COLUMNS_MIN, TERMINAL_COLUMNS_MAX);
+    const rows = clampInteger(terminal.rows, TERMINAL_ROWS_MIN, TERMINAL_ROWS_MAX);
+    if (cols !== terminal.cols || rows !== terminal.rows) terminal.resize(cols, rows);
+    this.updateMeasuredCellSize();
+    this.syncSizeToPty({ cols, rows });
+  }
+
+  private updateMeasuredCellSize() {
+    const terminal = this.terminal;
+    const screen = terminal?.element?.querySelector<HTMLElement>(".xterm-screen");
+    const rect = screen?.getBoundingClientRect();
+    if (!terminal || !rect || rect.width <= 0 || rect.height <= 0) return;
+    if (terminal.cols > 0) this.measuredCellWidth = rect.width / terminal.cols;
+    if (terminal.rows > 0) this.measuredCellHeight = rect.height / terminal.rows;
   }
 
   private syncSizeToPty(size: TerminalSize) {
@@ -558,6 +603,12 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     }
   }
 
+  private requestFocus() {
+    requestAnimationFrame(() => {
+      if (!this.disposed && this.presented && this.focused) this.terminal?.focus();
+    });
+  }
+
   private openExternalUrl(href: string) {
     const bridge = window.puppyoneDesktop;
     if (!bridge?.openExternalUrl) {
@@ -583,6 +634,10 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
     this.readyListeners.forEach((listener) => listener(ready));
   }
 
+}
+
+function clampInteger(value: number, minimum: number, maximum: number) {
+  return Math.min(maximum, Math.max(minimum, Math.round(value)));
 }
 
 function sameTerminalSize(left: TerminalSize | null, right: TerminalSize) {

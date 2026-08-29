@@ -1,14 +1,24 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useReducer,
   useRef,
   useState,
 } from "react";
 import type { MessageFormatter } from "@puppyone/localization/core";
 import {
+  workbenchSplitDefinition,
+  type WorkbenchSplitDropEdge,
+} from "@puppyone/shared-ui";
+import {
+  canUnsplitTerminalSession,
   createDesktopTerminalSessionsState,
   desktopTerminalSessionsReducer,
+  getActiveTerminalGroup,
+  getActiveTerminalSessionId,
+  getOrderedTerminalSessions,
+  getTerminalGroupSessionIds,
 } from "../model/terminalSessions";
 import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
 import { TerminalRuntimeRegistry } from "../runtime/terminalRuntimeRegistry";
@@ -31,33 +41,39 @@ export function useTerminalSessions({
   const messageFormatterRef = useRef(messageFormatter);
   messageFormatterRef.current = messageFormatter;
 
-  const [runtimeRegistry] = useState(() => {
-    const registry = new TerminalRuntimeRegistry({
-      workspacePath,
-      getMessageFormatter: () => messageFormatterRef.current,
-      onStatus: (sessionId, status, shell, error) => {
-        dispatch({
-          type: "runtime-status",
-          sessionId,
-          status,
-          shell,
-          error: status === "error"
-            ? error ?? messageFormatterRef.current("terminal.launcher.agentStartFailed")
-            : error,
-        });
-      },
-    });
-    return registry;
-  });
+  const [runtimeRegistry] = useState(() => new TerminalRuntimeRegistry({
+    workspacePath,
+    getMessageFormatter: () => messageFormatterRef.current,
+    onStatus: (sessionId, status, shell, error) => {
+      dispatch({
+        type: "runtime-status",
+        sessionId,
+        status,
+        shell,
+        error: status === "error"
+          ? error ?? messageFormatterRef.current("terminal.launcher.agentStartFailed")
+          : error,
+      });
+    },
+  }));
 
   const createSession = useCallback((launcherId: DesktopTerminalLauncherId = "shell") => {
-    const sessionId = createTerminalId();
+    const sessionId = createTerminalEntityId("session");
     runtimeRegistry.ensure(sessionId, launcherId);
-    dispatch({ type: "create", sessionId, launcherId });
+    dispatch({
+      type: "create",
+      sessionId,
+      groupId: createTerminalEntityId("group"),
+      launcherId,
+    });
   }, [runtimeRegistry]);
 
   const createLauncher = useCallback(() => {
-    dispatch({ type: "create-launcher", sessionId: createTerminalId() });
+    dispatch({
+      type: "create-launcher",
+      sessionId: createTerminalEntityId("session"),
+      groupId: createTerminalEntityId("group"),
+    });
   }, []);
 
   const launchSession = useCallback((
@@ -70,6 +86,34 @@ export function useTerminalSessions({
 
   const activateSession = useCallback((sessionId: string) => {
     dispatch({ type: "activate", sessionId });
+  }, []);
+
+  const moveSession = useCallback((
+    sourceSessionId: string,
+    targetSessionId: string,
+    edge: WorkbenchSplitDropEdge,
+  ) => {
+    const { direction, placement } = workbenchSplitDefinition(edge);
+    dispatch({
+      type: "move",
+      sourceSessionId,
+      targetSessionId,
+      direction,
+      placement,
+      splitId: createTerminalEntityId("split"),
+    });
+  }, []);
+
+  const unsplitSession = useCallback((sessionId: string) => {
+    dispatch({
+      type: "unsplit",
+      sessionId,
+      groupId: createTerminalEntityId("group"),
+    });
+  }, []);
+
+  const resizeSplit = useCallback((splitId: string, ratio: number) => {
+    dispatch({ type: "resize-split", splitId, ratio });
   }, []);
 
   const closeSession = useCallback((sessionId: string) => {
@@ -106,31 +150,49 @@ export function useTerminalSessions({
 
   useEffect(() => {
     runtimeRegistry.retain();
-    return () => {
-      runtimeRegistry.release();
-    };
+    return () => runtimeRegistry.release();
   }, [runtimeRegistry]);
 
+  const activeGroup = useMemo(() => getActiveTerminalGroup(state), [state]);
+  const activeSessionId = useMemo(() => getActiveTerminalSessionId(state), [state]);
+  const presentedSessionIds = useMemo(
+    () => activeGroup ? getTerminalGroupSessionIds(activeGroup) : [],
+    [activeGroup],
+  );
+  const sessions = useMemo(() => getOrderedTerminalSessions(state), [state]);
   const pendingCloseSession = state.sessions.find(
     (session) => session.id === pendingCloseSessionId,
   ) ?? null;
 
+  const sessionCanUnsplit = useCallback(
+    (sessionId: string) => canUnsplitTerminalSession(state, sessionId),
+    [state],
+  );
   return {
-    activeSessionId: state.activeSessionId,
+    activeGroup,
+    activeSessionId,
     activateSession,
     cancelCloseSession,
     confirmCloseSession,
     createLauncher,
     createSession,
+    groups: state.groups,
     launchSession,
+    moveSession,
     pendingCloseSession,
+    presentedSessionIds,
     requestCloseSession,
+    resizeSplit,
     runtimeRegistry,
-    sessions: state.sessions,
+    sessionCanUnsplit,
+    sessions,
+    unsplitSession,
   };
 }
 
-function createTerminalId() {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-  return `terminal_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+function createTerminalEntityId(kind: "group" | "session" | "split") {
+  const id = globalThis.crypto?.randomUUID
+    ? globalThis.crypto.randomUUID()
+    : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  return `terminal-${kind}-${id}`;
 }

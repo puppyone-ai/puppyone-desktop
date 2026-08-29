@@ -15,9 +15,11 @@ import {
 import type { TerminalRuntimeHandle } from "../runtime/terminalRuntime";
 
 type TerminalSessionViewProps = {
-  active: boolean;
+  focused: boolean;
   labelledBy?: string;
+  onFocus?: () => void;
   panelId?: string;
+  presented: boolean;
   runtime: TerminalRuntimeHandle;
   workspacePath: string;
 };
@@ -26,9 +28,11 @@ const SCROLLBAR_REPEAT_DELAY_MS = 320;
 const SCROLLBAR_REPEAT_INTERVAL_MS = 54;
 
 export function TerminalSessionView({
-  active,
+  focused,
   labelledBy,
+  onFocus,
   panelId,
+  presented,
   runtime,
   workspacePath,
 }: TerminalSessionViewProps) {
@@ -54,8 +58,9 @@ export function TerminalSessionView({
   }, [runtime]);
 
   useLayoutEffect(() => {
-    runtime.setActive(active);
-  }, [active, runtime]);
+    runtime.setPresented(presented);
+    runtime.setFocused(focused);
+  }, [focused, presented, runtime]);
 
   const stopScrollbarRepeat = useCallback(() => {
     if (repeatDelayRef.current !== null) window.clearTimeout(repeatDelayRef.current);
@@ -141,17 +146,20 @@ export function TerminalSessionView({
     event.preventDefault();
     event.stopPropagation();
     runtime.write(paths.map(shellQuotePath).join(" "));
+    onFocus?.();
     runtime.focus();
-  }, [runtime, workspacePath]);
+  }, [onFocus, runtime, workspacePath]);
 
   return (
     <div
       id={panelId}
-      className={`desktop-terminal-session ${active ? "is-active" : ""} ${ready ? "is-ready" : ""}`}
-      role={panelId ? "tabpanel" : undefined}
+      className={`desktop-terminal-session ${presented ? "is-presented" : ""} ${focused ? "is-focused" : ""} ${ready ? "is-ready" : ""}`}
+      role={panelId ? "region" : undefined}
       aria-labelledby={labelledBy}
-      aria-hidden={!active}
-      aria-busy={active && !ready}
+      aria-hidden={!presented}
+      aria-busy={presented && !ready}
+      onFocusCapture={onFocus}
+      onPointerDownCapture={onFocus}
     >
       <div
         className="desktop-terminal-xterm"
