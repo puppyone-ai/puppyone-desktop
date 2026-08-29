@@ -57,8 +57,9 @@ cloudflare/desktop-telemetry/
 
 1. Development, unpackaged, and Internal builds never contribute to public
    product analytics.
-2. A Stable build defaults to the `basic` preference, but sending stays dormant
-   until the current notice has actually been presented by the product UI.
+2. The user preference defaults to `basic`. Development and Internal builds
+   remain unable to send, while Stable sending stays dormant until the current
+   notice has actually been presented by the product UI.
 3. The first schema contains one event: `desktop_daily_active`, emitted at most
    once per UTC day after a PuppyOne window receives foreground focus.
 4. A random 256-bit local secret derives an HMAC identifier scoped to the
@@ -87,7 +88,30 @@ cloudflare/desktop-telemetry/
 | `basic` | yes | yes | configured | `basic` |
 
 The renderer can read this state before deciding whether to show the one-time
-notice or the permanent Privacy & Data settings row.
+notice or the permanent **Settings → Privacy** control.
+
+## Privacy control plane
+
+The privacy experience is deliberately smaller than the runtime architecture:
+
+```text
+Settings → Privacy
+└── Product Analyze   Learn More   [on/off]
+```
+
+- `Product Analyze` writes only the versioned `basic` or `off` preference
+  through bounded telemetry IPC. The Renderer cannot construct or send events.
+- `Learn More` opens the public disclosure in the system browser. The same
+  canonical disclosure URL is used by onboarding and Settings.
+- A checked switch represents the stored `basic` preference. Uploading still
+  requires an eligible packaged Stable build, the current notice version, and
+  a configured first-party transport.
+- Turning the switch off immediately clears the pending local queue and local
+  identity secret. Previously accepted edge rows age out under the retention
+  schedule below and cannot be mapped back to an account or natural person.
+- Development, unpackaged, and Internal builds may preserve the user's stored
+  preference for UI consistency, but their effective level remains `off` and
+  they never enqueue or transmit public product analytics.
 
 ## Ingestion contract
 

@@ -1,8 +1,7 @@
 import { useLocalization } from "@puppyone/localization";
 import { useCallback, useEffect, useState, type MouseEvent } from "react";
+import { DESKTOP_TELEMETRY_DISCLOSURE_URL } from "../../features/telemetry/publicDisclosure";
 import type { DesktopTelemetryState } from "../../types/electron";
-
-const TELEMETRY_DISCLOSURE_URL = "https://github.com/puppyone-ai/puppyone-desktop/blob/qubits/docs/telemetry.md";
 
 type OnboardingTelemetryDisclosureProps = {
   ready: boolean;
@@ -55,7 +54,7 @@ export function OnboardingTelemetryDisclosure({ ready }: OnboardingTelemetryDisc
     const openExternalUrl = window.puppyoneDesktop?.openExternalUrl;
     if (!openExternalUrl) return;
     event.preventDefault();
-    void openExternalUrl(TELEMETRY_DISCLOSURE_URL);
+    void openExternalUrl(DESKTOP_TELEMETRY_DISCLOSURE_URL);
   }, []);
 
   if (!ready || (!shownForLaunch && !preview && !required)) return null;
@@ -68,7 +67,7 @@ export function OnboardingTelemetryDisclosure({ ready }: OnboardingTelemetryDisc
     >
       {t("onboarding.telemetry.notice")}{" "}
       <a
-        href={TELEMETRY_DISCLOSURE_URL}
+        href={DESKTOP_TELEMETRY_DISCLOSURE_URL}
         onClick={openDisclosure}
         rel="noreferrer"
         target="_blank"

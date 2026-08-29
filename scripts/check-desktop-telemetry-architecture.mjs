@@ -147,6 +147,14 @@ requireSource(noticeSource, "markTelemetryNoticeSeen", "the renderer must persis
 requireSource(noticeSource, "shownForLaunch", "the disclosure must remain visible for the current onboarding after it is persisted");
 requireSource(noticeSource, 't("onboarding.telemetry.notice")', "the first-launch disclosure must use the localized onboarding contract");
 
+const privacySettingsSource = await readText("src/features/settings/main/PrivacySettingsView.tsx");
+const analyticsSettingsSource = await readText("src/features/settings/main/ProductAnalyticsSettingsRow.tsx");
+requireSource(privacySettingsSource, "<ProductAnalyticsSettingsRow />", "Settings Privacy must contain the product analytics preference");
+requireSource(analyticsSettingsSource, "getTelemetryState", "Settings Privacy must read the authoritative telemetry state");
+requireSource(analyticsSettingsSource, "setTelemetryLevel", "Settings Privacy must update telemetry through bounded IPC");
+requireSource(analyticsSettingsSource, 'checked ? "basic" : "off"', "Settings Privacy must expose only the basic and off levels");
+requireSource(analyticsSettingsSource, "<SettingsToggle", "Settings Privacy must reuse the product Settings switch");
+
 const appSource = await readText("src/App.tsx");
 if (appSource.includes("OnboardingTelemetryDisclosure")) {
   errors.push("the first-launch telemetry disclosure must not be mounted in the workspace sidebar");

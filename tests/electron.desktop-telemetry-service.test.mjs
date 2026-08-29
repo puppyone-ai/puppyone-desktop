@@ -72,19 +72,20 @@ describe("Desktop telemetry service", () => {
     expect(fixture.queueStore.clear).toHaveBeenCalledTimes(1);
   });
 
-  it("never enables product analytics for unpackaged or non-Stable builds", async () => {
+  it("keeps the default-on preference without sending from unpackaged or non-Stable builds", async () => {
     const devBuild = resolveDesktopBuildIdentity({
       baseVersion: "0.3.10",
       channel: "dev",
       commitSha,
     });
-    const fixture = createServiceFixture({ buildInfo: devBuild, isPackaged: false, defaultLevel: "off" });
+    const fixture = createServiceFixture({ buildInfo: devBuild, isPackaged: false });
     await fixture.service.start();
     await fixture.service.markNoticeSeen();
 
     expect(fixture.service.getSnapshot()).toMatchObject({
       eligible: false,
-      level: "off",
+      defaultLevel: "basic",
+      level: "basic",
       effectiveLevel: "off",
       disabledReason: "unpackaged-build",
     });

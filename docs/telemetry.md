@@ -59,7 +59,8 @@ as a PuppyOne analytics record.
 | Monthly pseudonymous active rows | 62 calendar days |
 | Aggregate counts without pseudonymous IDs | Long term |
 
-Turning Basic analytics off deletes the local queue and local identity secret.
+Basic analytics can be turned off at any time in **Settings → Privacy**.
+Turning it off deletes the local queue and local identity secret.
 The edge retention job removes previously submitted pseudonymous rows on the
 schedule above. The service cannot map a monthly identifier to a PuppyOne
 account or a natural person.
