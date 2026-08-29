@@ -73,8 +73,8 @@ describe("Electron AgentService ownership and lifecycle", () => {
     const attachmentStore = { revokeWorkspace: vi.fn(async () => undefined) };
     const harness = createServiceHarness({ attachmentStore });
     const owner = createSender(30);
-    await harness.service.createSession(owner, {}, "/workspace-a");
-    await harness.service.createSession(owner, {}, "/workspace-b");
+    await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace-a");
+    await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace-b");
 
     await expect(harness.service.closeSessionsForWorkspaceRoot(owner.id, "/workspace-a"))
       .resolves.toBe(1);
