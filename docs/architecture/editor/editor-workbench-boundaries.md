@@ -14,9 +14,13 @@
 
 ## 地址与移动
 
-所有进入打开项目录的工作区相对路径先统一分隔符、移除 `./`、重复斜杠和尾斜杠。`editorId` 使用这个规范地址；Working Copy 再把它与 `storageIdentity` 组合成完整文档身份。因此：
+所有进入打开项目录的资源都先取得 Root-aware `ResourceUri`。`editorId`
+使用 URI 的规范键；当前 Viewer 和文件端口继续接收规范化的工作区相对
+显示/Provider 路径。Working Copy 再把稳定存储身份与 Provider 路径组合成
+完整文档身份。因此：
 
 - 同一工作区内的等价路径不会重复打开；
+- 不同 Root 中的同名路径拥有不同 `editorId`；
 - 不同工作区内的同名路径不会共享 Working Copy；
 - 文件夹重命名使用“相同或子孙资源”判断，同时重映射打开项与 Pane 引用；
 - Pane 移动只重排布局树，既不搬运模型，也不触发保存。

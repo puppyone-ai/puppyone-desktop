@@ -11,4 +11,11 @@
 
 The facade re-exports its historical public functions, so Electron callers do not need a coordinated migration. New behavior should be implemented in the narrowest owning module and composed by the facade.
 
+The historical `(rootPath, relativePath)` functions are an internal local
+provider compatibility surface, not the target Renderer identity contract.
+[Desktop Multi-Root Workspace Kernel](desktop-multi-root-workspace-kernel.md)
+defines the Resource URI and Folder capability boundary. New Renderer APIs must
+not expand raw root-path authority; the migration direction is
+`FileService -> FileSystemProvider -> local-api`.
+
 `npm run check:boundaries` enforces module ownership, dependency direction, and the compatibility facade's delegation contract. File length is not used as an architecture boundary; cohesion and ownership are checked directly instead.

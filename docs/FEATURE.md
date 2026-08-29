@@ -45,6 +45,10 @@ single product area can evolve without turning this file into a catch-all.
 - [Explorer Tree Lifecycle](architecture/explorer-tree-lifecycle.md)
   - File-tree loading, expansion, subtree motion, and indentation guide rules.
 - [Desktop Multi-Window Workspaces](architecture/desktop-multi-window-workspaces.md)
+- [Desktop Multi-Root Workspace Kernel](architecture/desktop-multi-root-workspace-kernel.md)
+  - Current invisible Resource URI and zero/one/many-folder foundation. The
+    product continues to expose one Folder until root-scoped feature services
+    and attach/detach presentation complete their release gates.
 - [Desktop Session, Workspace Identity, and Cache Lifecycle](architecture/desktop-session-workspace-cache-lifecycle.md)
   - One-repo-per-window ownership, duplicate-window prevention, and app-level
     recent workspace behavior.

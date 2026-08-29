@@ -44,6 +44,10 @@ directly:
 - [Explorer Tree Lifecycle](architecture/explorer-tree-lifecycle.md)
 - [Desktop Renderer Performance](architecture/desktop-renderer-performance.md)
 - [Desktop Multi-Window Workspaces](architecture/desktop-multi-window-workspaces.md)
+- [Desktop Multi-Root Workspace Kernel](architecture/desktop-multi-root-workspace-kernel.md)
+  - Implemented invisible zero/one/many-folder foundation: Resource URI
+    identity, immutable Workspace Context, Folder capability authorization,
+    Root-aware Editor IDs, and scoped Agent/terminal cleanup.
 - [Desktop Session, Workspace Identity, and Cache Lifecycle](architecture/desktop-session-workspace-cache-lifecycle.md)
 - [Desktop Auto Update Lifecycle](architecture/desktop-auto-update-lifecycle.md)
 - [Desktop Menu Surface](architecture/desktop-menu-surface.md)
