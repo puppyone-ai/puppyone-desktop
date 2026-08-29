@@ -1,15 +1,13 @@
 # Terminal Session Groups and Split Layout
 
-Status: accepted target for the next Desktop version; implementation pending.
-This document is the normative product, domain, interaction, lifecycle, and
-verification contract for native Terminal splitting. The current tabs-only
-implementation remains governed by
-[Desktop Terminal Architecture](../desktop-terminal-architecture.md) until this
-target lands.
+Status: implemented on the Desktop integration branch. This document is the
+normative product, domain, interaction, lifecycle, and verification contract
+for native Terminal splitting. Read it together with
+[Desktop Terminal Architecture](../desktop-terminal-architecture.md).
 
 ## 1. Decision
 
-Puppyone will implement Terminal splitting as a native Desktop workbench
+Puppyone implements Terminal splitting as a native Desktop workbench
 capability. A user drags an existing Terminal Session tab onto the left, right,
 top, or bottom edge of a visible Terminal pane. The operation moves that live
 Session into the target Terminal Group and changes only renderer-owned layout
@@ -38,9 +36,9 @@ and resize principles already proven by Editor. It does not import Editor
 business types, copy Editor components, or reinterpret a Terminal Session as an
 Editor document.
 
-## 2. Scope for the next version
+## 2. Implemented scope
 
-The next-version feature is complete only when all ten capabilities below are
+The feature is release-complete only when all ten capabilities below remain
 implemented together:
 
 1. a visible Terminal Session tab can be dragged;
@@ -60,7 +58,7 @@ implemented together:
    closes a PTY/xterm runtime; and
 10. the existing file/reference drop behavior inside Terminal remains intact.
 
-The following are intentionally outside this version:
+The following are intentionally outside the current native split contract:
 
 - dragging a Session between different Puppyone applications;
 - dragging a Session between Desktop windows;
@@ -189,7 +187,7 @@ keyed by the existing, window-owned Terminal Session ID.
 
 ## 6. Domain state
 
-The target serializable state has one Session catalog plus one Group catalog:
+The serializable state has one Session catalog plus one Group catalog:
 
 ```ts
 type TerminalSessionId = string;
@@ -512,7 +510,7 @@ The recursive layout tree therefore cannot own Session components directly.
 Changing a split ancestor would otherwise allow React to unmount and recreate
 the descendant subtree.
 
-The target mirrors the proven persistent-host pattern:
+The implementation mirrors the proven persistent-host pattern:
 
 ```text
 flat TerminalSessionHostLayer
@@ -581,8 +579,7 @@ semantic projection changes. Once more than one Session panel can be visible,
 a strict WAI tablist is no longer correct: one selected tab no longer controls
 the only visible tabpanel.
 
-The rail should become an accessible Session switcher, normally a single-select
-listbox or an equivalent composite widget:
+The rail is an accessible single-select Session switcher/listbox:
 
 - the focused Session is `aria-selected`;
 - roving keyboard navigation traverses the complete flattened Session order;
@@ -608,8 +605,8 @@ through overflow must still have a non-pointer command path that can:
 
 Pointer dragging directly from an overflow menu may be added only if the menu,
 pointer capture, dismissal, and focus-restoration lifecycle is proven. It is
-not required to make hidden Sessions operable in the next version because the
-command path is normative.
+not required to make hidden Sessions operable because the command path is
+normative.
 
 ## 13. Tab drag interaction
 
@@ -671,7 +668,7 @@ The preview covers the half that the moved Session will occupy. It is rendered
 above xterm but remains non-interactive. A source dropped on itself with no
 structural change is a no-op.
 
-The preview should be a lightweight title/icon chip. Capturing the xterm/WebGL
+The preview is a lightweight title chip. Capturing the xterm/WebGL
 surface is unnecessary, increases native complexity, and risks exposing
 Terminal contents in transient image data.
 
@@ -735,7 +732,7 @@ correctness path.
 
 ## 16. Persistence and workspace lifecycle
 
-The next version keeps Terminal Group layout in memory only.
+The current implementation keeps Terminal Group layout in memory only.
 
 - Closing/reopening the right auxiliary panel preserves the workbench because
   the Terminal feature remains mounted.
@@ -798,9 +795,9 @@ not an implicit layout cap.
 - Reduced motion disables derived tab geometry motion and drag-preview
   transitions, but not direct pointer tracking.
 
-## 19. Target source ownership
+## 19. Source ownership
 
-The final file names may vary, but responsibility must remain equivalent to:
+Current ownership is:
 
 ```text
 packages/shared-ui/src/workbench/split-tree/
@@ -811,13 +808,14 @@ packages/shared-ui/src/workbench/split-tree/
 
 src/features/desktop-terminal/
   controller/
-    useTerminalWorkbench.ts            Sessions + Groups commands and side effects
+    useTerminalSessions.ts             Sessions + Groups commands and side effects
   model/
-    terminalSessions.ts                lifecycle summaries
-    terminalWorkbench.ts               Group model/reducer/invariants
-    terminalSplitConstraints.ts         Terminal cell/chrome constraint adapter
+    terminalSessions.ts                lifecycle + Group reducer/invariants
+    terminalSplitConstraints.ts        Terminal cell/chrome constraint adapter
+    terminalTabMove.ts                 drop-intent value type
   interactions/
     useTerminalTabMoveDrag.ts          pointer session
+    useTerminalSplitResizeGesture.ts   pointer-synchronous resize
     terminalTabMovePreview.ts          lightweight overlay chip
   layout/
     TerminalGroupViewport.tsx          active recursive projection
@@ -830,7 +828,7 @@ src/features/desktop-terminal/
     terminalRuntimeRegistry.ts         unchanged identity authority
   ui/
     RightTerminalPanel.tsx             composition only
-    session-header/                    Session switcher + drag source
+    session-header/                    switcher, drag source, command fallback
 ```
 
 Shared UI cannot import Terminal, Editor, React product composition, Electron,

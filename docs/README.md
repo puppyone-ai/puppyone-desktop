@@ -61,8 +61,8 @@ directly:
   - Current multi-Session ownership, launcher, stable xterm Runtime, PTY,
     rendering, focus, security, and performance contracts.
   - [Terminal architecture home](architecture/desktop-terminal/README.md)
-  - [Accepted Session Groups and Split Layout](architecture/desktop-terminal/session-groups-and-split-layout.md)
-    defines native left/right/top/bottom Session-tab movement without Runtime
+  - [Native Session Groups and Split Layout](architecture/desktop-terminal/session-groups-and-split-layout.md)
+    defines implemented left/right/top/bottom Session-tab movement without Runtime
     or PTY restart. tmux is explicitly not the layout authority.
 - [Desktop App Preview Runtime](architecture/desktop-app-preview-runtime.md)
   - Workspace-owned local app processes, reusable native browser surfaces,

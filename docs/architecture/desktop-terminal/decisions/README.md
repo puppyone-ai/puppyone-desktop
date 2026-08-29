@@ -13,4 +13,4 @@ implemented ADR-001 outcome is maintained in that Agent activity document.
 | Decision | Status | Role |
 | --- | --- | --- |
 | [Terminal Agent file activity architecture](../../desktop-agent/local-agents-and-file-activity.md#4-agent-file-activity-architecture) | Implemented | Keeps the native TUI, rejects PTY scraping for file attribution, and defines provider Hook adapters plus a neutral activity broker. |
-| [ADR-002: Native Terminal Groups and Split Layout](ADR-002-native-terminal-groups-and-split-layout.md) | Accepted for next Desktop version; implementation pending | Keeps one live Runtime/PTY per Session, introduces Group-owned recursive split trees, defines tab-to-pane movement, and rejects tmux as the layout authority. |
+| [ADR-002: Native Terminal Groups and Split Layout](ADR-002-native-terminal-groups-and-split-layout.md) | Accepted and implemented | Keeps one live Runtime/PTY per Session, introduces Group-owned recursive split trees, defines tab-to-pane movement, and rejects tmux as the layout authority. |

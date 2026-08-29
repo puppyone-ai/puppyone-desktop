@@ -6,15 +6,12 @@ code must implement and preserve. Structured per-file Agent activity has an
 implemented foundation; its canonical architecture is
 [Local Agents and Agent file activity](desktop-agent/local-agents-and-file-activity.md).
 
-Native Session Groups and tab-drag splitting are an accepted next-version
-extension, not yet current behavior. Their normative Group model, recursive
-layout, Runtime reparenting, interaction boundary, non-goals, and release gates
-live in
+Native Session Groups and tab-drag splitting are part of the current Renderer
+architecture. Their normative Group model, recursive layout, Runtime
+reparenting, interaction boundary, non-goals, and release gates live in
 [Terminal Session Groups and Split Layout](desktop-terminal/session-groups-and-split-layout.md)
 and
 [ADR-002](desktop-terminal/decisions/ADR-002-native-terminal-groups-and-split-layout.md).
-Until that target lands, statements below about one active Session describe the
-current tabs-only projection.
 
 ## 1. Product contract
 
@@ -48,6 +45,8 @@ The product invariants are:
    metadata; it does not add another scanner, IPC route, or PTY lifecycle.
 9. PTY output may drive a coarse busy signal, but only a structured native
    Hook/plugin event may create exact per-file Agent attribution.
+10. One Session belongs to exactly one Group leaf; Group, focus, and split
+    changes never create, close, restart, or write to its PTY.
 
 ## 2. System topology
 
@@ -56,13 +55,13 @@ Workspace auxiliary panel
   |
   +-- RightTerminalPanel                         Renderer composition root
         |
-        +-- TerminalSessionHeader                shared session chrome only
-        +-- TerminalLauncher                     no process ownership
-        +-- TerminalSessionHost                  stable per-session boundary
-              +-- TerminalSessionView            xterm DOM attachment
-              +-- startup overlay                temporary presentation
+        +-- TerminalSessionHeader                global Session switcher/drag source
+        +-- TerminalGroupViewport                active recursive split projection
+        +-- persistent Session host layer        stable across Group geometry
+              +-- TerminalSessionHost            launcher/startup lifecycle
+              +-- TerminalSessionView            xterm DOM attachment + file drop
         |
-        +-- useTerminalSessions                  session reducer/controller
+        +-- useTerminalSessions                  Session + Group reducer/controller
         +-- useTerminalAgentLocator              lightweight availability
         +-- TerminalRuntimeRegistry              one runtime per session ID
                   |
@@ -83,10 +82,10 @@ Electron main process
 The preload bridge is a narrow transport. It contains no discovery, routing,
 command construction, caching, or lifecycle decisions.
 
-The accepted split target inserts a Renderer-owned `TerminalWorkbench` and
-`TerminalGroupViewport` between the Header and stable Session hosts. Group IDs,
-split nodes, ratios, drop intent, and focused-pane state remain above preload;
-the main process continues to know only sender-owned Terminal Session IDs.
+The Renderer-owned Terminal workbench and `TerminalGroupViewport` sit between
+the Header and stable Session hosts. Group IDs, split nodes, ratios, drop
+intent, and focused-pane state remain above preload; the main process continues
+to know only sender-owned Terminal Session IDs.
 
 ### 2.1 Implemented semantic-activity extension
 
@@ -126,8 +125,17 @@ src/features/desktop-terminal/
     terminalLauncherPresentation.ts    generic primary/overflow policy
     terminalSessionHeader.ts           shared rail/overflow presentation projection
     terminalSessionHeaderLayout.ts     pure adaptive Header density policy
-    terminalSessions.ts                pure session reducer
+    terminalSessions.ts                pure Session + Group reducer/invariants
+    terminalSplitConstraints.ts        recursive character-grid minimums
+    terminalTabMove.ts                 drop-intent value type
     terminalPath.ts                    path presentation only
+  interactions/
+    useTerminalTabMoveDrag.ts          pointer-captured Session movement
+    useTerminalSplitResizeGesture.ts   frame-coalesced separator preview
+  layout/
+    TerminalGroupViewport.tsx          recursive active-Group projection
+    TerminalSplitResizeHandle.tsx      measured accessible separator
+    session-host/                      stable portal containers + slots
   runtime/
     terminalRuntime.ts                 one stable xterm runtime
     terminalRuntimeRegistry.ts         runtime identity and deferred disposal
@@ -142,6 +150,7 @@ src/features/desktop-terminal/
       TerminalSessionHeader.tsx        composition and stable-capacity boundary
       TerminalSessionTab.tsx           memoized tab presentation
       TerminalSessionOverflowMenu.tsx  hidden-session navigation menu
+      TerminalSessionLayoutMenu.tsx    non-pointer cross-Group movement
       TerminalSessionHeaderStatus.tsx  runtime activity subscription + visual
       terminalSessionHeaderIds.ts      tab/panel accessibility ID contract
       useTerminalSessionHeaderLayout.ts stable capacity measurement adapter
@@ -158,9 +167,11 @@ Rules:
   runtimes nor mutates session state; all actions leave through callbacks.
 - Rail tabs and overflow rows consume the same pure presentation projection, so
   status, Agent identity, path, and accessible labels cannot diverge.
-- A `TerminalRuntime` is keyed by session ID, never by active-tab position.
-- Switching tabs changes visibility and focus; it does not recreate xterm or
-  the PTY.
+- A `TerminalRuntime` is keyed by Session ID, never by Group or tree position.
+- Activating a same-Group Session changes focus while its siblings stay
+  presented. Activating another Group changes the complete projection.
+- Moving, unsplitting, or resizing changes Renderer metadata and host placement;
+  it does not recreate xterm or the PTY.
 
 ## 4. Main-process source ownership
 
@@ -195,7 +206,7 @@ launchable Agent.
 
 ## 5. Session state and identity
 
-The session reducer owns serializable UI state:
+The workbench reducer owns serializable Session and Group UI state:
 
 ```text
 selecting -> starting -> running -> exited
@@ -203,8 +214,11 @@ selecting -> starting -> running -> exited
                   +-> selecting on recoverable launch failure
 ```
 
-A session stores its stable ID, ordinal, launcher identity, lifecycle status,
-and presentation error. The workspace path is the visible tab title; the Agent
+Each Session belongs to exactly one leaf in exactly one Group. A Group stores a
+focused Session and a recursive split tree; only the active Group is projected,
+and all of its leaves are presented. A Session stores its stable ID, ordinal,
+launcher identity, lifecycle status, and presentation error. The workspace
+path is the visible tab title; the Agent
 identity is shown by the leading official product icon. Runtime objects, xterm
 instances, DOM nodes, timers, disposables, and PTY handles never enter React
 state or persisted preferences.
@@ -336,14 +350,14 @@ Sizing flows in one direction:
 DOM content box -> FitAddon -> xterm cols/rows -> PTY resize
 ```
 
-The xterm geometry target remains padding-free. Visual inset belongs to the
-outer terminal body. A `ResizeObserver` schedules coalesced fits; in the current
-tabs-only projection, inactive or zero-size Sessions defer fitting until active.
-The PTY receives exactly the same grid dimensions xterm uses.
+The xterm geometry target remains padding-free. Visual inset belongs to each
+Session pane outside xterm. A `ResizeObserver` schedules coalesced fits;
+unpresented or zero-size Sessions defer fitting. The PTY receives exactly the
+same clamped grid dimensions xterm uses.
 
-The accepted split target replaces the single `active` meaning with
-`presented` and `focused`: every Session in the active Group is presented and
-fits independently, while only one receives requested keyboard focus. Split
+Runtime state separates `presented` and `focused`: every Session in the active
+Group is presented and fits independently, while only one receives requested
+keyboard focus. Split
 admission and separator bounds derive from recursive character-grid minimums,
 not a fixed pane count or the Editor's percentage clamp.
 
@@ -369,14 +383,11 @@ against CJK punctuation, emoji, box drawing, and narrow panel widths.
 
 ## 12. Focus, tabs, and activity
 
-In the current tabs-only projection, activating a Session updates only the
-active Session ID, visibility, fit, and focus. Each Session owns its own runtime
-listeners and DOM container. Hover, menu, loading, and error state are local to
-the relevant component/Session.
-
-In the accepted split target, activation first resolves the Session's owning
-Group. Activating a same-Group Session changes focus while all split siblings
-remain visible; activating another Group switches the complete arrangement.
+Activation first resolves the Session's owning Group. Activating a same-Group
+Session changes focus while all split siblings remain visible; activating
+another Group switches the complete arrangement. Each Session owns its own
+runtime listeners and stable host. Hover, menu, loading, and error state remain
+local to the relevant component/Session.
 The visual rail becomes an accessible Session switcher rather than claiming
 that one selected tab controls the only visible tabpanel. Pointer tab movement
 and HTML file/reference drops remain separate interaction channels.
@@ -503,7 +514,8 @@ workspace watcher timing must never be promoted to exact file attribution. See
 - The accepted file-activity path is also low-frequency: native frames remain
   in main, public events are bounded, and one external Renderer store publishes
   only affected file selectors. It is not part of the Editor keystroke path.
-- Inactive sessions remain mounted but do not receive focus or redundant fits.
+- Sessions in inactive Groups remain mounted but unpresented; they receive no
+  focus or redundant fits.
 - Header presentation items are memoized from immutable session summaries;
   active-ID changes preserve unaffected tab props and callback identities.
 - Visible overflow tabs retain their keyed DOM identity across local activation;
@@ -560,7 +572,7 @@ Every change to this domain must cover:
 
 Its independent gates are defined in
 [Agent activity verification contract](desktop-agent/local-agents-and-file-activity.md#verification-contract).
-The next-version Group/split feature has additional model, Runtime-identity,
+The Group/split feature has additional model, Runtime-identity,
 drag-cancellation, resize, accessibility, and real-Chromium gates in
 [Terminal Session Groups and Split Layout](desktop-terminal/session-groups-and-split-layout.md#21-verification-and-acceptance-matrix).
 

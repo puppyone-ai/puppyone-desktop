@@ -9,7 +9,7 @@ contract.
 
 For current ownership and lifecycle rules, use
 [Desktop Terminal Architecture](../desktop-terminal-architecture.md). For the
-accepted native split target, use
+implemented native split contract, use
 [Terminal Session Groups and Split Layout](session-groups-and-split-layout.md).
 
 ---

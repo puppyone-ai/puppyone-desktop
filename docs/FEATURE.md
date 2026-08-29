@@ -72,8 +72,8 @@ single product area can evolve without turning this file into a catch-all.
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
   - Current multi-Session, launcher, stable xterm Runtime, PTY ownership,
     character-grid, focus, security, and performance contracts.
-  - [Accepted Session Groups and Split Layout](architecture/desktop-terminal/session-groups-and-split-layout.md)
-    defines native four-edge Session-tab movement, recursive geometry,
+  - [Native Session Groups and Split Layout](architecture/desktop-terminal/session-groups-and-split-layout.md)
+    defines implemented four-edge Session-tab movement, recursive geometry,
     zero-restart lifecycle, resize, accessibility, and release gates without
     using tmux as the layout authority.
 - [Desktop Agent Architecture](architecture/desktop-agent/README.md)

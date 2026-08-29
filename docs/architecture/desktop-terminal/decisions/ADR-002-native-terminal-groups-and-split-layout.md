@@ -1,7 +1,7 @@
 # ADR-002: Native Terminal Groups and Split Layout
 
-Date: 2026-08-30. Status: accepted for the next Desktop version;
-implementation pending.
+Date: 2026-08-30. Status: accepted and implemented on the Desktop integration
+branch.
 
 ## Context
 
@@ -31,7 +31,7 @@ one-axis sequence. Puppyone requires a recursive two-axis layout.
 
 ## Decision
 
-Puppyone will implement native Terminal splitting with four independent
+Puppyone implements native Terminal splitting with four independent
 architectural authorities:
 
 1. the Session catalog owns stable Session identity and low-frequency launcher
@@ -62,21 +62,21 @@ The operation sends no process create, close, input, or replay request. Changed
 pane geometry may independently produce the existing resize IPC for each
 presented Session.
 
-Puppyone will extract only neutral split-tree structure, drop geometry,
+Puppyone extracts only neutral split-tree structure, drop geometry,
 persistent-host, interaction-termination, and resize-preview contracts from the
-Editor implementation. Terminal will not import Editor domain types,
+Editor implementation. Terminal does not import Editor domain types,
 components, styles, persistence, or Working Copy behavior. The existing Editor
 public API remains an adapter over any neutral extraction.
 
-Terminal tab movement will use a custom pointer session. It will not reuse the
+Terminal tab movement uses a custom pointer session. It does not reuse the
 HTML file/reference drop channel already owned by `TerminalSessionView`.
 
 The complete normative target is
 [Terminal Session Groups and Split Layout](../session-groups-and-split-layout.md).
 
-## Accepted next-version boundary
+## Implemented release boundary
 
-The accepted release slice includes:
+The implemented release slice includes:
 
 1. visible Session-tab pointer drag;
 2. left/right/top/bottom pane-edge drops;
@@ -96,8 +96,7 @@ movement into Editor are excluded.
 
 ## Runtime consequences
 
-The current one-dimensional `active` Runtime concept must separate
-presentation from focus:
+Runtime presentation is separated from focus:
 
 ```text
 presented -> visible in active Group and eligible for fit/resize
@@ -117,7 +116,7 @@ listeners, scrollback, Agent activity identity, and PTY.
 
 Split validity and separator bounds derive from the Terminal character-grid
 minimum and recursive child constraints. The current native PTY lower bound of
-20 columns and 8 rows is part of that calculation. Puppyone will not ship an
+20 columns and 8 rows is part of that calculation. Puppyone does not ship an
 arbitrary fixed pane-count limit or reuse Editor's fixed percentage clamp as
 the Terminal correctness rule.
 
@@ -173,8 +172,8 @@ Benefits:
 
 Costs:
 
-- the current global `activeSessionId` reducer must become a Group-aware
-  workbench model;
+- the former global `activeSessionId` reducer became a Group-aware workbench
+  model;
 - Header semantics and active/visible presentation need to be separated;
 - multiple visible WebGL/xterm instances increase rendering and resize test
   surface;

@@ -16,7 +16,7 @@ typed native-runtime product.
   lifecycle, stable xterm ownership, shell-hosted Agent execution, rendering,
   performance, security, and verification.
 - [Terminal Session Groups and Split Layout](session-groups-and-split-layout.md)
-  is the accepted next-version contract for Cursor-style Session-tab dragging,
+  is the implemented contract for Cursor-style Session-tab dragging,
   native left/right/top/bottom Groups, stable Runtime reparenting, resize,
   accessibility, implementation boundaries, and release acceptance. Its
   durable decision is recorded in
@@ -36,8 +36,8 @@ typed native-runtime product.
 - Terminal owns every terminal session, its xterm runtime, its PTY, and the
   pre-launch selector. Its shared Session Header owns only navigation chrome,
   responsive density, overflow, focus, and activation motion; session mutations
-  remain callback-driven through the Terminal controller. In the accepted
-  split target, Terminal additionally owns Group membership and recursive split
+  remain callback-driven through the Terminal controller. In the native split
+  implementation, Terminal additionally owns Group membership and recursive split
   metadata. Those remain Renderer presentation state and never enter the App
   Shell, preload process authority, or Electron PTY service.
 - Terminal Agent adapters own provider Hook/plugin enrollment and native event
