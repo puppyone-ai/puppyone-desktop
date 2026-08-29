@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Workspace } from "../packages/shared-ui/src/core/types";
 import {
   WorkbenchWorkspaceContext,
+  createWorkbenchWorkspace,
   createSingleFolderWorkbenchWorkspace,
   createWorkspaceFolder,
 } from "../packages/shared-ui/src/core/workbenchWorkspace";
@@ -11,6 +12,16 @@ import {
 } from "../packages/shared-ui/src/core/resourceUri";
 
 describe("WorkbenchWorkspaceContext", () => {
+  it("creates one stable Workbench identity for an ordered multi-folder composition", () => {
+    const first = workspace("first", "/projects/first", "instance-first");
+    const second = workspace("second", "/projects/second", "instance-second");
+
+    const composition = createWorkbenchWorkspace([first, second]);
+
+    expect(composition.id).toBe(`single:${first.workspaceInstanceId}`);
+    expect(composition.folders.map((folder) => folder.workspace.id)).toEqual([first.id, second.id]);
+    expect(composition.folders.map((folder) => folder.index)).toEqual([0, 1]);
+  });
   it("runs the single-folder product through the zero/one/many-folder model", async () => {
     const legacy = workspace("workspace-a", "/projects/a", "instance-a");
     const initial = createSingleFolderWorkbenchWorkspace(legacy);

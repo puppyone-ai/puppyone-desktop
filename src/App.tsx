@@ -40,9 +40,6 @@ import {
 } from "./preferences";
 import type { PuppyoneWorkspaceConfig } from "./types/electron";
 import {
-  getWorkspaceSwitcherItems,
-} from "./features/app-shell/workspaceHomeModel";
-import {
   mergePuppyoneWorkspaceConfig,
 } from "./features/app-shell/preferences";
 import { DesktopTitlebarContext } from "./features/app-shell/DesktopTitlebarContext";
@@ -125,6 +122,7 @@ function AppContent() {
   const [activeCloudSection, setActiveCloudSection] = useState<CloudWorkspaceSection>("initialize");
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const {
+    addProject,
     chooseProjectLocation,
     clearWorkspace,
     cloneRepository,
@@ -851,7 +849,6 @@ function AppContent() {
     );
   }
 
-  const workspaceSwitcherItems = getWorkspaceSwitcherItems({ workspaces });
   const titlebarSidebarSlot = (
     <DesktopTitlebarContext
       activeGitStatus={activeGitStatus}
@@ -862,13 +859,13 @@ function AppContent() {
       localBranches={localBranches}
       remoteBranches={remoteBranches}
       workspace={workspace}
-      workspaceSwitcherItems={workspaceSwitcherItems}
+      workspaceFolders={workbenchWorkspace?.folders ?? []}
       workspaceSwitcherOpen={switcherOpen}
       workspaceSwitcherRef={switcherRef}
       onCheckoutBranch={handleCheckoutGitBranch}
+      onAddProject={() => void addProject()}
       onGoHome={() => void goToHomepage()}
       onCloseWorkspaceSwitcher={closeWorkspaceSwitcher}
-      onOpenFolder={openFolder}
       onCloseBranchSwitcher={closeBranchSwitcher}
       onToggleBranchSwitcher={toggleBranchSwitcher}
       onToggleWorkspaceSwitcher={toggleWorkspaceSwitcher}
@@ -1083,7 +1080,7 @@ function AppContent() {
           puppyoneConfigSaving={puppyoneConfigSaving}
           settingsSection={activeSettingsSection}
           workspace={workspace}
-          workspaceSurfaceError={documentNavigationError ?? workspaceSurfaceError}
+          workspaceSurfaceError={restoreWorkspaceError ?? documentNavigationError ?? workspaceSurfaceError}
           workspaceKey={workspaceKey}
           workspaceRefreshToken={workspaceRefreshToken}
           sidebarCreateMenuOpen={Boolean(

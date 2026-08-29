@@ -240,6 +240,10 @@ describe("recent workspace authorization", () => {
       grantId: "location-1",
       path: root,
     }));
+    const selectWorkspaceForCurrentComposition = vi.fn(async () => ({
+      status: "attached-current",
+      workspaces: [],
+    }));
     registerWorkspaceNavigationIpcHandlers({
       ipcMain,
       workspaceStateStore: stateStore,
@@ -254,6 +258,7 @@ describe("recent workspace authorization", () => {
       createCloudWorkspaceFromRequest: vi.fn(),
       openVirtualWorkspaceInNewWindow: vi.fn(),
       selectWorkspaceForCurrentWindow: vi.fn(),
+      selectWorkspaceForCurrentComposition,
       selectWorkspaceForNewWindow: vi.fn(),
     });
 
@@ -281,6 +286,9 @@ describe("recent workspace authorization", () => {
     await expect(handlers.get("workspace:select-project-location-current")(event))
       .resolves.toEqual({ grantId: "location-1", path: root });
     expect(selectProjectLocationForCurrentWindow).toHaveBeenCalledWith(event.sender);
+    await expect(handlers.get("workspace:select-folder-attach")(event))
+      .resolves.toEqual({ status: "attached-current", workspaces: [] });
+    expect(selectWorkspaceForCurrentComposition).toHaveBeenCalledWith(event.sender);
     await expect(handlers.get("workspace:create-project-current")(event, {
       name: "Notes",
       locationGrantId: "location-1",

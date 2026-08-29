@@ -1,15 +1,12 @@
 import type { RefObject } from "react";
-import type { Workspace } from "@puppyone/shared-ui";
+import type { Workspace, WorkspaceFolder } from "@puppyone/shared-ui";
 import { GitBranch } from "lucide-react";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
 import { DesktopMenuItem } from "../../components/DesktopMenu";
 import type { GitBranchSummary, GitStatusSnapshot } from "../../types/electron";
 import { BranchMenuGroup } from "../source-control/operationDialogs";
 import { DesktopTitlebarMenuLayer } from "./DesktopTitlebarMenuLayer";
-import {
-  DesktopWorkspaceSwitcher,
-  type DesktopWorkspaceSwitcherItem,
-} from "./DesktopWorkspaceSwitcher";
+import { DesktopWorkspaceSwitcher } from "./DesktopWorkspaceSwitcher";
 
 export function DesktopTitlebarContext({
   activeGitStatus,
@@ -20,14 +17,14 @@ export function DesktopTitlebarContext({
   localBranches,
   remoteBranches,
   workspace,
-  workspaceSwitcherItems,
+  workspaceFolders,
   workspaceSwitcherOpen,
   workspaceSwitcherRef,
   onCheckoutBranch,
   onCloseBranchSwitcher,
   onCloseWorkspaceSwitcher,
   onGoHome,
-  onOpenFolder,
+  onAddProject,
   onToggleBranchSwitcher,
   onToggleWorkspaceSwitcher,
 }: DesktopTitlebarContextProps) {
@@ -48,9 +45,9 @@ export function DesktopTitlebarContext({
         refObject={workspaceSwitcherRef}
         titlebarLabel={workspaceTitlebarLabel}
         workspace={workspace}
-        items={workspaceSwitcherItems}
+        workspaceFolders={workspaceFolders}
+        onAddProject={onAddProject}
         onClose={onCloseWorkspaceSwitcher}
-        onOpenFolder={onOpenFolder}
         onGoHome={onGoHome}
         onToggle={onToggleWorkspaceSwitcher}
       />
@@ -81,14 +78,14 @@ type DesktopTitlebarContextProps = {
   localBranches: GitBranchSummary[];
   remoteBranches: GitBranchSummary[];
   workspace: Workspace;
-  workspaceSwitcherItems: DesktopWorkspaceSwitcherItem[];
+  workspaceFolders: readonly WorkspaceFolder[];
   workspaceSwitcherOpen: boolean;
   workspaceSwitcherRef: RefObject<HTMLDivElement>;
   onCheckoutBranch: (branchName: string, remote: boolean) => Promise<boolean>;
   onCloseBranchSwitcher: () => void;
   onCloseWorkspaceSwitcher: () => void;
   onGoHome: () => void;
-  onOpenFolder: () => void;
+  onAddProject: () => void;
   onToggleBranchSwitcher: () => void;
   onToggleWorkspaceSwitcher: () => void;
 };

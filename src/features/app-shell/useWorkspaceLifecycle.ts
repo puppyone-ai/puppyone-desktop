@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  createSingleFolderWorkbenchWorkspace,
+  WorkbenchWorkspaceContext,
+  createWorkbenchWorkspace,
+  createWorkspaceFolder,
   type WorkbenchWorkspace,
   type Workspace,
 } from "@puppyone/shared-ui";
@@ -10,6 +12,7 @@ import {
   getRecentWorkspaces,
   hydrateRecentWorkspaces,
   removeRecentWorkspace,
+  selectWorkspaceFolderToAttach,
 } from "../../lib/localFiles";
 import {
   cloneRepositoryTarget,
@@ -46,6 +49,7 @@ export function useWorkspaceLifecycle({
   const [restoringWorkspace, setRestoringWorkspace] = useState(true);
   const [restoreWorkspaceError, setRestoreWorkspaceError] = useState<string | null>(null);
   const recentWorkspaceRequestRef = useRef(0);
+  const workbenchWorkspaceContextRef = useRef<WorkbenchWorkspaceContext | null>(null);
 
   // The current product projects the first Folder exactly as before. The
   // underlying state is already the general zero/one/many Folder model.
@@ -54,15 +58,40 @@ export function useWorkspaceLifecycle({
     [workbenchWorkspace],
   );
 
-  const activateWorkspace = useCallback((nextWorkspace: Workspace) => {
+  const activateWorkspaceComposition = useCallback((nextWorkspaces: readonly Workspace[]) => {
+    if (nextWorkspaces.length === 0) return;
     setWorkspaces((current) => {
-      const withoutExisting = current.filter((item) => item.id !== nextWorkspace.id);
-      return [nextWorkspace, ...withoutExisting];
+      const nextIds = new Set(nextWorkspaces.map((item) => item.id));
+      return [...nextWorkspaces, ...current.filter((item) => !nextIds.has(item.id))];
     });
-    setWorkbenchWorkspace(createSingleFolderWorkbenchWorkspace(nextWorkspace));
+    const nextWorkbenchWorkspace = createWorkbenchWorkspace(nextWorkspaces);
+    workbenchWorkspaceContextRef.current = new WorkbenchWorkspaceContext(nextWorkbenchWorkspace);
+    setWorkbenchWorkspace(nextWorkbenchWorkspace);
     setRestoreWorkspaceError(null);
     onWorkspaceActivated();
   }, [onWorkspaceActivated]);
+
+  const activateWorkspace = useCallback((nextWorkspace: Workspace) => {
+    activateWorkspaceComposition([nextWorkspace]);
+  }, [activateWorkspaceComposition]);
+
+  const reconcileWorkspaceComposition = useCallback(async (nextWorkspaces: readonly Workspace[]) => {
+    if (nextWorkspaces.length === 0) return;
+    const nextFolders = nextWorkspaces.map((item, index) => createWorkspaceFolder(item, { index }));
+    const context = workbenchWorkspaceContextRef.current;
+    if (!context || context.getWorkspace().folders[0]?.id !== nextFolders[0]?.id) {
+      activateWorkspaceComposition(nextWorkspaces);
+      return;
+    }
+    const nextWorkbenchWorkspace = await context.replaceFolders(nextFolders);
+    setWorkspaces((current) => {
+      const nextIds = new Set(nextWorkspaces.map((item) => item.id));
+      return [...nextWorkspaces, ...current.filter((item) => !nextIds.has(item.id))];
+    });
+    setWorkbenchWorkspace(nextWorkbenchWorkspace);
+    setRestoreWorkspaceError(null);
+    onWorkspaceActivated();
+  }, [activateWorkspaceComposition, onWorkspaceActivated]);
 
   const refreshRecentWorkspaceList = useCallback(async () => {
     const requestId = recentWorkspaceRequestRef.current + 1;
@@ -122,6 +151,28 @@ export function useWorkspaceLifecycle({
     handleWorkspaceOpenResult(result);
   }, [handleWorkspaceOpenResult, workspace]);
 
+  const addProject = useCallback(async () => {
+    try {
+      const result = await selectWorkspaceFolderToAttach();
+      if (!result) {
+        onWorkspaceOpenSettled();
+        return;
+      }
+      if (result.status !== "focused-existing" && result.workspaces.length > 0) {
+        await reconcileWorkspaceComposition(result.workspaces);
+      } else {
+        setRestoreWorkspaceError(null);
+        onWorkspaceOpenSettled();
+      }
+      void refreshRecentWorkspaceList().catch((error) => {
+        console.warn("Unable to refresh recent puppyone workspaces:", error);
+      });
+    } catch (error) {
+      setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
+      onWorkspaceOpenSettled();
+    }
+  }, [onWorkspaceOpenSettled, reconcileWorkspaceComposition, refreshRecentWorkspaceList]);
+
   const createProject = useCallback(async (request: WorkspaceCreateProjectRequest) => {
     const result = await createLocalProjectTarget(request);
     handleWorkspaceOpenResult(result);
@@ -146,6 +197,7 @@ export function useWorkspaceLifecycle({
   }, []);
 
   const clearWorkspace = useCallback(() => {
+    workbenchWorkspaceContextRef.current = null;
     setWorkbenchWorkspace(null);
     onWorkspaceCleared();
   }, [onWorkspaceCleared]);
@@ -159,6 +211,7 @@ export function useWorkspaceLifecycle({
       setRecentWorkspaceItems((current) => current.filter((item) => item.workspace.id !== currentWorkspaceId));
     }
     setWorkbenchWorkspace(null);
+    workbenchWorkspaceContextRef.current = null;
     setRestoreWorkspaceError(null);
     setRestoringWorkspace(false);
     onWorkspaceCleared();
@@ -179,8 +232,11 @@ export function useWorkspaceLifecycle({
             console.warn("Some recent puppyone workspaces could not be loaded:", recentWorkspaces.errors);
           }
         }
-        if (initialWorkspace.workspace) {
-          activateWorkspace(initialWorkspace.workspace);
+        const initialComposition = initialWorkspace.workspaces?.length
+          ? initialWorkspace.workspaces
+          : initialWorkspace.workspace ? [initialWorkspace.workspace] : [];
+        if (initialComposition.length > 0) {
+          activateWorkspaceComposition(initialComposition);
         } else if (initialWorkspace.error) {
           setRestoreWorkspaceError(initialWorkspace.error);
         }
@@ -209,9 +265,10 @@ export function useWorkspaceLifecycle({
     return () => {
       cancelled = true;
     };
-  }, [activateWorkspace]);
+  }, [activateWorkspaceComposition]);
 
   return {
+    addProject,
     activateWorkspace,
     clearWorkspace,
     chooseProjectLocation,

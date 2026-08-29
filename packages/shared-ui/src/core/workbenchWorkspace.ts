@@ -82,10 +82,23 @@ export function createWorkspaceFolder(
 }
 
 export function createSingleFolderWorkbenchWorkspace(workspace: Workspace): WorkbenchWorkspace {
-  const folder = createWorkspaceFolder(workspace);
+  return createWorkbenchWorkspace([workspace]);
+}
+
+/**
+ * Creates the first immutable snapshot for an ordered window composition.
+ * The Workbench identity is anchored to the primary Folder so attaching a
+ * sibling never changes Editor or persistence scope identity.
+ */
+export function createWorkbenchWorkspace(workspaces: readonly Workspace[]): WorkbenchWorkspace {
+  if (!Array.isArray(workspaces) || workspaces.length === 0) {
+    throw new TypeError("A Workbench Workspace requires at least one Folder.");
+  }
+  const folders = workspaces.map((workspace, index) => createWorkspaceFolder(workspace, { index }));
+  const primaryFolder = folders[0]!;
   return freezeWorkspace({
-    id: `single:${folder.id}`,
-    folders: [folder],
+    id: `single:${primaryFolder.id}`,
+    folders,
     transient: true,
     revision: 0,
   });

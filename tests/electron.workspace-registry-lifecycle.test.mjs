@@ -29,8 +29,31 @@ describe("workspace registry lifecycle", () => {
     expect(result.items).toHaveLength(12);
     expect(new Set(result.items.map((item) => item.workspace.workspaceInstanceId)).size).toBe(12);
     const raw = JSON.parse(await fs.promises.readFile(path.join(root, "registry.json"), "utf8"));
-    expect(raw.version).toBe(4);
+    expect(raw.version).toBe(5);
     expect(raw.recentWorkspaces).toHaveLength(12);
+  });
+
+  it("persists an ordered active Workspace composition independently from recents", async () => {
+    const store = createStore();
+    const folders = await createFolders("composition", 3);
+    const workspaces = folders.map(createWorkspace);
+
+    await store.rememberWorkspaceComposition(workspaces);
+
+    const canonicalPaths = await Promise.all(folders.map((folder) => fs.promises.realpath(folder)));
+    await expect(store.readLastActiveWorkspacePaths()).resolves.toEqual(canonicalPaths);
+    expect((await store.getRecentWorkspacesResult()).items.map((item) => item.workspace.path))
+      .toEqual([...canonicalPaths].reverse());
+  });
+
+  it("does not truncate an active composition to the recent-project limit", async () => {
+    const store = createStore();
+    const folders = await createFolders("large-composition", 24);
+
+    await store.rememberWorkspaceComposition(folders.map(createWorkspace));
+
+    expect(await store.readLastActiveWorkspacePaths()).toHaveLength(24);
+    expect((await store.getRecentWorkspacesResult()).items).toHaveLength(20);
   });
 
   it("serializes interleaved remember and remove mutations without resurrecting removed records", async () => {
@@ -164,7 +187,7 @@ describe("workspace registry lifecycle", () => {
 
     await store.rememberRecentWorkspacePath(folder, beforeRewrite.items[0].workspace);
     const persisted = JSON.parse(await fs.promises.readFile(path.join(root, "registry.json"), "utf8"));
-    expect(persisted.version).toBe(4);
+    expect(persisted.version).toBe(5);
     expect(persisted.recentWorkspaces[0]).not.toHaveProperty("projectId");
   });
 

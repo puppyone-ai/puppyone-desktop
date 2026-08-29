@@ -627,6 +627,7 @@ export type GitRepositoryWindowFocusEvent = {
 export type LastWorkspaceResult = {
   path: string | null;
   workspace: Workspace | null;
+  workspaces?: Workspace[];
   error: string | null;
 };
 
@@ -647,6 +648,13 @@ export type WorkspaceOpenResult = {
   status: "opened-current" | "opened-new-window" | "focused-existing";
   path: string | null;
   workspace: Workspace | null;
+};
+
+export type WorkspaceAttachResult = {
+  status: "attached-current" | "already-attached" | "focused-existing";
+  path: string | null;
+  workspace: Workspace | null;
+  workspaces: Workspace[];
 };
 
 export type WorkspaceCreateProjectRequest = {
@@ -1010,6 +1018,7 @@ declare global {
       openWorkspaceInNewWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
       openDroppedWorkspaceInCurrentWindow: (folder: File) => Promise<WorkspaceOpenResult>;
       selectFolder: () => Promise<WorkspaceOpenResult | null>;
+      selectFolderToAttach: () => Promise<WorkspaceAttachResult | null>;
       selectFolderInNewWindow: () => Promise<WorkspaceOpenResult | null>;
       selectLocalProjectLocation: () => Promise<WorkspaceProjectLocationGrant | null>;
       createLocalProject: (

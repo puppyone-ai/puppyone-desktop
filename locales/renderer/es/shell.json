@@ -58,7 +58,6 @@
   "workspaceSwitcher.cloudProjects": "Proyectos de Cloud",
   "workspaceSwitcher.localProjects": "Proyectos locales",
   "workspaceSwitcher.addProject": "Añadir proyecto…",
-  "workspaceSwitcher.openFolderInNewWindow": "Abrir carpeta en una ventana nueva…",
   "workspaceSwitcher.createCloudProject": "Crear proyecto en Cloud",
   "sidebar.resizeAuxiliary": "Cambiar el tamaño del panel lateral",
   "sidebar.expandAuxiliary": "Mostrar panel lateral",

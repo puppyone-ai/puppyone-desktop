@@ -1,27 +1,23 @@
 import type { RefObject } from "react";
-import type { Workspace } from "@puppyone/shared-ui";
-import { ArrowLeft, Check, Folder, FolderOpen, FolderPlus } from "lucide-react";
+import {
+  createWorkspaceFolder,
+  type Workspace,
+  type WorkspaceFolder,
+} from "@puppyone/shared-ui";
+import { ArrowLeft, Check, Folder, FolderPlus } from "lucide-react";
 import { DesktopMenuItem } from "../../components/DesktopMenu";
 import { DesktopTitlebarMenuLayer } from "./DesktopTitlebarMenuLayer";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
-
-export type DesktopWorkspaceSwitcherItem = {
-  id: string;
-  label: string;
-  detail: string;
-  title: string;
-  workspace: Workspace;
-};
+import { getWorkspaceParentPathForDisplay } from "./workspaceHomeModel";
 
 type DesktopWorkspaceSwitcherProps = {
   open: boolean;
   refObject: RefObject<HTMLDivElement>;
   titlebarLabel: string;
   workspace: Workspace;
-  items: DesktopWorkspaceSwitcherItem[];
-  onAddFolder?: () => void;
+  workspaceFolders: readonly WorkspaceFolder[];
+  onAddProject?: () => void;
   onClose: () => void;
-  onOpenFolder: () => void;
   onGoHome: () => void;
   onToggle: () => void;
 };
@@ -31,21 +27,16 @@ export function DesktopWorkspaceSwitcher({
   refObject,
   titlebarLabel,
   workspace,
-  items,
-  onAddFolder,
+  workspaceFolders,
+  onAddProject,
   onClose,
-  onOpenFolder,
   onGoHome,
   onToggle,
 }: DesktopWorkspaceSwitcherProps) {
   const { t } = useLocalization();
-  const currentItem = items.find((item) => item.id === workspace.id) ?? {
-    id: workspace.id,
-    label: workspace.name,
-    detail: workspace.path,
-    title: `${workspace.name} - ${workspace.path}`,
-    workspace,
-  };
+  const attachedFolders = workspaceFolders.length > 0
+    ? workspaceFolders
+    : [createWorkspaceFolder(workspace)];
   return (
     <div className="desktop-titlebar-workspace-wrap" ref={refObject}>
       <button
@@ -83,23 +74,21 @@ export function DesktopWorkspaceSwitcher({
         <div
           className="desktop-project-list"
           data-po-scrollbar="menu"
-          data-workspace-menu-layout="project-context-v1"
+          data-workspace-menu-layout="workspace-composition-v1"
         >
-          <DesktopProjectCurrentRow item={currentItem} />
+          {attachedFolders.map((folder, index) => (
+            <DesktopProjectRow
+              key={folder.id}
+              folder={folder}
+              primary={index === 0}
+            />
+          ))}
           <DesktopMenuItem
             className="desktop-project-add desktop-project-add-folder"
-            disabled={!onAddFolder}
+            disabled={!onAddProject}
             icon={<FolderPlus size={15} strokeWidth={1.8} />}
             label={t("shell.workspaceSwitcher.addProject")}
-            onClick={onAddFolder}
-          />
-        </div>
-        <div className="desktop-project-actions">
-          <DesktopMenuItem
-            className="desktop-project-add desktop-project-open-folder"
-            icon={<FolderOpen size={15} strokeWidth={1.8} />}
-            label={t("shell.workspaceSwitcher.openFolderInNewWindow")}
-            onClick={onOpenFolder}
+            onClick={onAddProject}
           />
         </div>
       </DesktopTitlebarMenuLayer>
@@ -107,39 +96,44 @@ export function DesktopWorkspaceSwitcher({
   );
 }
 
-function DesktopProjectCurrentRow({
-  item,
+function DesktopProjectRow({
+  folder,
+  primary,
 }: {
-  item: DesktopWorkspaceSwitcherItem;
+  folder: WorkspaceFolder;
+  primary: boolean;
 }) {
+  const detail = getWorkspaceParentPathForDisplay(folder.workspace.path);
   return (
-    <div className="desktop-project-option-row selected">
+    <div className={`desktop-project-option-row${primary ? " selected" : ""}`}>
       <div
-        className="desktop-menu-item desktop-project-option selected"
+        className={`desktop-menu-item desktop-project-option${primary ? " selected" : ""}`}
         role="menuitem"
-        aria-current="true"
+        aria-current={primary ? "true" : undefined}
         aria-disabled="true"
-        title={item.title}
+        title={`${folder.name} - ${folder.workspace.path}`}
       >
         <span className="desktop-menu-item-icon">
           <ProjectTypeMark className="desktop-project-mark" />
         </span>
         <span className="desktop-menu-item-body">
-          <bdi className="desktop-menu-item-label">{item.label}</bdi>
-          {item.detail && (
+          <bdi className="desktop-menu-item-label">{folder.name}</bdi>
+          {detail && (
             <bdi
               className="desktop-menu-item-detail"
               dir="ltr"
-              title={item.workspace.path}
+              title={folder.workspace.path}
             >
-              {item.detail}
+              {detail}
             </bdi>
           )}
         </span>
       </div>
-      <span className="desktop-project-current-indicator" aria-hidden="true">
-        <Check size={14} strokeWidth={2.2} />
-      </span>
+      {primary && (
+        <span className="desktop-project-current-indicator" aria-hidden="true">
+          <Check size={14} strokeWidth={2.2} />
+        </span>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ export function registerWorkspaceNavigationIpcHandlers({
   cloneRepositoryForCurrentWindow,
   selectProjectLocationForCurrentWindow,
   selectWorkspaceForCurrentWindow,
+  selectWorkspaceForCurrentComposition,
   selectWorkspaceForNewWindow,
 }) {
   ipcMain.handle("window:get-initial-workspace", async (event) => {
@@ -81,6 +82,10 @@ export function registerWorkspaceNavigationIpcHandlers({
 
   ipcMain.handle("workspace:select-folder-current", async (event) => {
     return selectWorkspaceForCurrentWindow(event.sender);
+  });
+
+  ipcMain.handle("workspace:select-folder-attach", async (event) => {
+    return selectWorkspaceForCurrentComposition(event.sender);
   });
 
   ipcMain.handle("workspace:select-folder-new-window", async (event) => {

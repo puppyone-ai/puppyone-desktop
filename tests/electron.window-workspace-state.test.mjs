@@ -3,8 +3,9 @@ import { WindowWorkspaceState } from "../electron/main/window-workspace-state.mj
 
 describe("WindowWorkspaceState", () => {
   it("models one visible folder as a general ordered composition", () => {
-    const state = new WindowWorkspaceState({ initialWorkspacePath: "/initial" });
+    const state = new WindowWorkspaceState({ initialWorkspacePaths: ["/initial", "/second"] });
     expect(state.initialRestorePath).toBe("/initial");
+    expect(state.initialRestorePaths).toEqual(["/initial", "/second"]);
     expect(state.folderPaths).toEqual([]);
 
     const change = state.replaceFolders([
@@ -20,6 +21,7 @@ describe("WindowWorkspaceState", () => {
     expect(state.folderPaths).toEqual(["/a", "/b"]);
     expect(state.primaryWorkspace).toMatchObject({ id: "a" });
     expect(state.initialRestorePath).toBe("/a");
+    expect(state.initialRestorePaths).toEqual(["/a", "/b"]);
   });
 
   it("reports scoped Folder changes and releases an immutable snapshot", () => {

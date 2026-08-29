@@ -195,6 +195,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     return ipcRenderer.invoke("workspace:open-dropped-current", folderPath.trim());
   },
   selectFolder: () => ipcRenderer.invoke("workspace:select-folder-current"),
+  selectFolderToAttach: () => ipcRenderer.invoke("workspace:select-folder-attach"),
   selectFolderInNewWindow: () => ipcRenderer.invoke("workspace:select-folder-new-window"),
   selectLocalProjectLocation: () => ipcRenderer.invoke("workspace:select-project-location-current"),
   createLocalProject: (request) => ipcRenderer.invoke("workspace:create-project-current", request),

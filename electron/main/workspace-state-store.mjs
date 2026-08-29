@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-const WORKSPACE_REGISTRY_VERSION = 4;
+const WORKSPACE_REGISTRY_VERSION = 5;
 const RECENT_WORKSPACE_LIMIT = 20;
 const HYDRATION_CONCURRENCY = 4;
 
@@ -101,15 +101,12 @@ export function createWorkspaceStateStore({
   }
 
   async function readLastActiveWorkspacePath() {
+    return (await readLastActiveWorkspacePaths())[0] ?? null;
+  }
+
+  async function readLastActiveWorkspacePaths() {
     const state = normalizeWorkspaceState(await readWorkspaceState());
-    const candidates = [
-      state.lastActiveWorkspacePath,
-      state.recentWorkspaceRecords[0]?.path,
-    ];
-    for (const candidate of candidates) {
-      if (typeof candidate === "string" && candidate.trim()) return path.resolve(candidate);
-    }
-    return null;
+    return state.lastActiveWorkspacePaths.map((folderPath) => path.resolve(folderPath));
   }
 
   async function rememberRecentWorkspacePath(folderPath, knownWorkspace = null) {
@@ -129,8 +126,43 @@ export function createWorkspaceStateStore({
         record,
         ...state.recentWorkspaceRecords.filter((item) => !isSameWorkspaceRecord(item, record)),
       ].slice(0, RECENT_WORKSPACE_LIMIT);
-      await writeWorkspaceState(createPersistedState(recentWorkspaceRecords));
+      await writeWorkspaceState(createPersistedState(recentWorkspaceRecords, [canonicalPath]));
       return record;
+    });
+  }
+
+  async function rememberWorkspaceComposition(workspaces) {
+    if (!Array.isArray(workspaces) || workspaces.length === 0) {
+      throw new TypeError("A Workspace composition requires at least one Folder.");
+    }
+    const compositionRecords = await Promise.all(workspaces.map(async (workspace) => {
+      const canonicalPath = await canonicalizeRequiredPath(workspace?.path);
+      const identity = await resolveIdentity(canonicalPath, workspace);
+      return {
+        workspaceInstanceId: identity.workspaceInstanceId,
+        puppyoneGitRemote: normalizePuppyoneGitRemote(identity.puppyoneGitRemote),
+        fsIdentity: identity.fsIdentity,
+        path: canonicalPath,
+        name: identity.name ?? (path.basename(canonicalPath) || canonicalPath),
+        lastOpenedAt: new Date(now()).toISOString(),
+      };
+    }));
+
+    return enqueueMutation(async () => {
+      const state = normalizeWorkspaceState(await readWorkspaceState());
+      const recentWorkspaceRecords = [
+        ...[...compositionRecords].reverse(),
+        ...state.recentWorkspaceRecords.filter(
+          (record) => !compositionRecords.some((activeRecord) => (
+            isSameWorkspaceRecord(record, activeRecord)
+          )),
+        ),
+      ].slice(0, RECENT_WORKSPACE_LIMIT);
+      await writeWorkspaceState(createPersistedState(
+        recentWorkspaceRecords,
+        compositionRecords.map((record) => record.path),
+      ));
+      return compositionRecords;
     });
   }
 
@@ -165,7 +197,8 @@ export function createWorkspaceStateStore({
         throw new Error("Workspace path is not in the main-process recent workspace list.");
       }
       const recentWorkspaceRecords = state.recentWorkspaceRecords.filter((item) => item !== matchingRecord);
-      await writeWorkspaceState(createPersistedState(recentWorkspaceRecords));
+      const activeWorkspacePaths = state.lastActiveWorkspacePaths.filter((item) => item !== matchingRecord.path);
+      await writeWorkspaceState(createPersistedState(recentWorkspaceRecords, activeWorkspacePaths));
       return { removed: true, path: matchingRecord.path };
     });
   }
@@ -282,6 +315,8 @@ export function createWorkspaceStateStore({
     getRecentWorkspacesResult,
     hydrateRecentWorkspacesResult,
     readLastActiveWorkspacePath,
+    readLastActiveWorkspacePaths,
+    rememberWorkspaceComposition,
     rememberRecentWorkspacePath,
     requireRecentWorkspacePath,
     removeRecentWorkspacePath,
@@ -317,6 +352,7 @@ function normalizeWorkspaceState(state) {
 
   return {
     version: WORKSPACE_REGISTRY_VERSION,
+    lastActiveWorkspacePaths: normalizeActiveWorkspacePaths(state, records),
     lastActiveWorkspacePath: normalizeOptionalString(state?.lastActiveWorkspacePath)
       ?? records[0]?.path
       ?? null,
@@ -350,15 +386,36 @@ function normalizeWorkspaceRecord(value, fallbackTimestamp = null) {
   };
 }
 
-function createPersistedState(records) {
+function createPersistedState(records, activeWorkspacePaths = null) {
+  const normalizedActivePaths = Array.isArray(activeWorkspacePaths)
+    ? activeWorkspacePaths.map(normalizeOptionalString).filter(Boolean)
+    : [records[0]?.path].filter(Boolean);
+  const primaryRecord = records.find((record) => record.path === normalizedActivePaths[0]) ?? records[0];
   return {
     version: WORKSPACE_REGISTRY_VERSION,
-    lastActiveWorkspaceInstanceId: records[0]?.workspaceInstanceId ?? null,
-    lastActiveWorkspacePath: records[0]?.path ?? null,
+    lastActiveWorkspaceInstanceId: primaryRecord?.workspaceInstanceId ?? null,
+    lastActiveWorkspacePath: normalizedActivePaths[0] ?? null,
+    lastActiveWorkspacePaths: normalizedActivePaths,
     // Keep the path array during the v1→v2 rollout for downgrade-safe reads.
     recentWorkspacePaths: records.map((record) => record.path),
     recentWorkspaces: records,
   };
+}
+
+function normalizeActiveWorkspacePaths(state, records) {
+  const requestedPaths = Array.isArray(state?.lastActiveWorkspacePaths)
+    ? state.lastActiveWorkspacePaths
+    : [state?.lastActiveWorkspacePath, state?.lastWorkspacePath];
+  const activePaths = [];
+  for (const value of requestedPaths) {
+    const folderPath = normalizeOptionalString(value);
+    if (!folderPath) continue;
+    const resolvedPath = path.resolve(folderPath);
+    if (activePaths.includes(resolvedPath)) continue;
+    activePaths.push(resolvedPath);
+  }
+  if (activePaths.length > 0) return activePaths;
+  return records[0] ? [records[0].path] : [];
 }
 
 function lightweightWorkspaceFromRecord(record) {

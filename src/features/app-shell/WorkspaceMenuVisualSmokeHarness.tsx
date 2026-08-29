@@ -1,11 +1,8 @@
 import { useRef } from "react";
 import { GitBranch } from "lucide-react";
-import type { Workspace } from "@puppyone/shared-ui";
+import { createWorkspaceFolder, type Workspace } from "@puppyone/shared-ui";
 import { DesktopOverlayPortal } from "./DesktopOverlayPortal";
-import {
-  DesktopWorkspaceSwitcher,
-  type DesktopWorkspaceSwitcherItem,
-} from "./DesktopWorkspaceSwitcher";
+import { DesktopWorkspaceSwitcher } from "./DesktopWorkspaceSwitcher";
 import "./workspace-menu-visual-smoke.css";
 
 const currentWorkspace = workspace("todo", "To-Do-List", "/Users/demo/Desktop/To-Do-List");
@@ -16,11 +13,8 @@ const fixtureBranchName = "main";
 /** Deterministic browser fixture for reviewing the Workspace menu hierarchy. */
 export function WorkspaceMenuVisualSmokeHarness() {
   const anchorRef = useRef<HTMLDivElement>(null);
-  const items = [
-    item(currentWorkspace, "~/Desktop"),
-    item(recentWorkspace, "~/Code"),
-    item(notesWorkspace, "~/Documents"),
-  ];
+  const folders = [currentWorkspace, recentWorkspace, notesWorkspace]
+    .map((value, index) => createWorkspaceFolder(value, { index }));
 
   return (
     <main className="app-shell dark workspace-menu-visual-smoke" data-workspace-menu-visual-ready="true">
@@ -32,10 +26,9 @@ export function WorkspaceMenuVisualSmokeHarness() {
             refObject={anchorRef}
             titlebarLabel={currentWorkspace.name}
             workspace={currentWorkspace}
-            items={items}
-            onAddFolder={() => undefined}
+            workspaceFolders={folders}
+            onAddProject={() => undefined}
             onClose={() => undefined}
-            onOpenFolder={() => undefined}
             onGoHome={() => undefined}
             onToggle={() => undefined}
           />
@@ -59,14 +52,4 @@ export function WorkspaceMenuVisualSmokeHarness() {
 
 function workspace(id: string, name: string, path: string): Workspace {
   return { id, name, path, status: "recording", workspaceInstanceId: `${id}-instance` };
-}
-
-function item(value: Workspace, detail: string): DesktopWorkspaceSwitcherItem {
-  return {
-    id: value.id,
-    label: value.name,
-    detail,
-    title: `${value.name} - ${value.path}`,
-    workspace: value,
-  };
 }

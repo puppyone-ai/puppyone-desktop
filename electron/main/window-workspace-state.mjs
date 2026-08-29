@@ -7,17 +7,26 @@ export class WindowWorkspaceState {
   #initialWorkspacePaths;
   #workspaceFolders = Object.freeze([]);
 
-  constructor({ initialWorkspacePath = null, focusedAt = Date.now() } = {}) {
+  constructor({ initialWorkspacePath = null, initialWorkspacePaths = null, focusedAt = Date.now() } = {}) {
+    const requestedPaths = Array.isArray(initialWorkspacePaths)
+      ? initialWorkspacePaths
+      : [initialWorkspacePath];
     this.#initialWorkspacePaths = Object.freeze(
-      typeof initialWorkspacePath === "string" && initialWorkspacePath.trim()
-        ? [initialWorkspacePath]
-        : [],
+      requestedPaths
+        .filter((folderPath) => typeof folderPath === "string" && folderPath.trim())
+        .map((folderPath) => folderPath.trim()),
     );
     this.lastFocusedAt = focusedAt;
   }
 
   get initialRestorePath() {
     return this.#workspaceFolders[0]?.path ?? this.#initialWorkspacePaths[0] ?? null;
+  }
+
+  get initialRestorePaths() {
+    return this.#workspaceFolders.length > 0
+      ? this.folderPaths
+      : this.#initialWorkspacePaths;
   }
 
   get folders() {
@@ -46,7 +55,7 @@ export class WindowWorkspaceState {
       retainedPaths: Object.freeze([...nextPaths].filter((folderPath) => previousPaths.has(folderPath))),
     });
     this.#workspaceFolders = nextFolders;
-    this.#initialWorkspacePaths = Object.freeze(nextFolders[0] ? [nextFolders[0].path] : []);
+    this.#initialWorkspacePaths = Object.freeze(nextFolders.map((folder) => folder.path));
     return change;
   }
 

@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DesktopTitlebarContext } from "../src/features/app-shell/DesktopTitlebarContext";
 import { DesktopWorkspaceSwitcher } from "../src/features/app-shell/DesktopWorkspaceSwitcher";
+import { createWorkspaceFolder } from "../packages/shared-ui/src/core/workbenchWorkspace";
 import type { GitBranchSummary } from "../src/types/electron";
 import { withTestLocalization } from "./testLocalization";
 
@@ -29,23 +30,9 @@ describe("titlebar Portal menu interactions", () => {
     const anchorRef = createRef<HTMLDivElement>();
     const onGoHome = vi.fn();
     const onClose = vi.fn();
-    const onAddFolder = vi.fn();
-    const onOpenFolder = vi.fn();
+    const onAddProject = vi.fn();
     const workspace = createWorkspace("one", "Workspace one");
-    const currentItem = {
-      id: workspace.id,
-      label: workspace.name,
-      detail: "/tmp",
-      title: workspace.name,
-      workspace,
-    };
-    const recentItem = {
-      id: "two",
-      label: "Workspace two",
-      detail: "/tmp/two",
-      title: "Workspace two",
-      workspace: createWorkspace("two", "Workspace two"),
-    };
+    const secondWorkspace = createWorkspace("two", "Workspace two");
 
     await act(async () => {
       root?.render(withTestLocalization(
@@ -54,10 +41,12 @@ describe("titlebar Portal menu interactions", () => {
           refObject={anchorRef}
           titlebarLabel={workspace.name}
           workspace={workspace}
-          items={[currentItem, recentItem]}
-          onAddFolder={onAddFolder}
+          workspaceFolders={[
+            createWorkspaceFolder(workspace),
+            createWorkspaceFolder(secondWorkspace, { index: 1 }),
+          ]}
+          onAddProject={onAddProject}
           onClose={onClose}
-          onOpenFolder={onOpenFolder}
           onGoHome={onGoHome}
           onToggle={vi.fn()}
         />,
@@ -69,15 +58,15 @@ describe("titlebar Portal menu interactions", () => {
     expect(container.contains(menu)).toBe(false);
     expect(menu.dataset.windowNoDrag).toBe("true");
     expect(menu.style.width).toBe("300px");
-    expect(menu.querySelector("[data-workspace-menu-layout='project-context-v1']"))
+    expect(menu.querySelector("[data-workspace-menu-layout='workspace-composition-v1']"))
       .not.toBeNull();
     expect(menu.textContent).toContain("Home");
     expect(menu.textContent).toContain("Add Project…");
-    expect(menu.textContent).toContain("Open Folder in New Window…");
+    expect(menu.textContent).not.toContain("Open Folder in New Window…");
     expect(menu.textContent).toContain("Workspace one");
+    expect(menu.textContent).toContain("Workspace two");
     expect(menu.textContent).not.toContain("Current workspace");
     expect(menu.textContent).not.toContain("Recent projects");
-    expect(menu.textContent).not.toContain("Workspace two");
     expect(menu.querySelector(".desktop-project-home-group")).not.toBeNull();
     expect(menu.querySelector(".desktop-project-current-indicator")).not.toBeNull();
     expect(menu.querySelector(".desktop-project-copy-path")).toBeNull();
@@ -85,11 +74,9 @@ describe("titlebar Portal menu interactions", () => {
       .toBe("true");
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-home")?.click());
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-add-folder")?.click());
-    act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-open-folder")?.click());
 
     expect(onGoHome).toHaveBeenCalledOnce();
-    expect(onAddFolder).toHaveBeenCalledOnce();
-    expect(onOpenFolder).toHaveBeenCalledOnce();
+    expect(onAddProject).toHaveBeenCalledOnce();
   });
 
   it("dismisses a titlebar menu when the user points outside it", async () => {
@@ -107,9 +94,8 @@ describe("titlebar Portal menu interactions", () => {
           refObject={createRef<HTMLDivElement>()}
           titlebarLabel="Workspace one"
           workspace={createWorkspace("one", "Workspace one")}
-          items={[]}
+          workspaceFolders={[]}
           onClose={onClose}
-          onOpenFolder={vi.fn()}
           onGoHome={vi.fn()}
           onToggle={vi.fn()}
         />,
@@ -150,14 +136,14 @@ describe("titlebar Portal menu interactions", () => {
           localBranches={[branch]}
           remoteBranches={[]}
           workspace={createWorkspace("one", "Workspace one")}
-          workspaceSwitcherItems={[]}
+          workspaceFolders={[]}
           workspaceSwitcherOpen={false}
           workspaceSwitcherRef={createRef<HTMLDivElement>()}
           onCheckoutBranch={onCheckoutBranch}
           onCloseBranchSwitcher={onCloseBranchSwitcher}
           onCloseWorkspaceSwitcher={vi.fn()}
           onGoHome={vi.fn()}
-          onOpenFolder={vi.fn()}
+          onAddProject={vi.fn()}
           onToggleBranchSwitcher={vi.fn()}
           onToggleWorkspaceSwitcher={vi.fn()}
         />,

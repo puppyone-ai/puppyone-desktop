@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { Workspace } from "@puppyone/shared-ui";
 import { FEATURE_FLAG_DEFAULTS } from "../src/features/flags/registry";
 import { resolveFeatureFlags } from "../src/features/flags/resolveFlags";
 import {
@@ -9,7 +8,6 @@ import {
   resolveCloudHubSectionForContext,
   resolveProjectCloudContext,
 } from "../src/features/cloud/project/context/projectCloudContext";
-import { getWorkspaceSwitcherItems } from "../src/features/app-shell/workspaceHomeModel";
 import { cloudMessage } from "../src/features/cloud/cloudPresentation";
 
 describe("local repository application shell", () => {
@@ -17,21 +15,6 @@ describe("local repository application shell", () => {
     expect(FEATURE_FLAG_DEFAULTS.cloudWorkspace).toBe(true);
     expect(FEATURE_FLAG_DEFAULTS).not.toHaveProperty("cloudOnlyWorkspace");
     expect(resolveFeatureFlags({})).not.toHaveProperty("cloudOnlyWorkspace");
-  });
-
-  it("builds the workspace switcher exclusively from local repositories", () => {
-    const workspace = {
-      id: "local-1",
-      name: "Notes",
-      path: "/Users/example/Notes",
-    } as Workspace;
-    expect(getWorkspaceSwitcherItems({ workspaces: [workspace] })).toEqual([{
-      id: "local-1",
-      label: "Notes",
-      detail: "~",
-      title: "Notes - /Users/example/Notes",
-      workspace,
-    }]);
   });
 });
 

@@ -24,6 +24,7 @@ import type {
   WorkspaceInstantiateTemplateResult,
   WorkspaceOpenEntryExternalRequest,
   WorkspaceImportEntriesResult,
+  WorkspaceAttachResult,
   WorkspaceOpenResult,
   WorkspaceProjectLocationGrant,
 } from "../types/electron";
@@ -306,6 +307,10 @@ export async function openDroppedWorkspaceInCurrentWindow(folder: File): Promise
 
 export async function selectWorkspaceFolder(): Promise<WorkspaceOpenResult | null> {
   return getDesktopBridge().selectFolder();
+}
+
+export async function selectWorkspaceFolderToAttach(): Promise<WorkspaceAttachResult | null> {
+  return getDesktopBridge().selectFolderToAttach();
 }
 
 export async function selectWorkspaceFolderInNewWindow(): Promise<WorkspaceOpenResult | null> {

@@ -23,6 +23,7 @@ export type {
 } from "./core/resourceUri";
 export {
   WorkbenchWorkspaceContext,
+  createWorkbenchWorkspace,
   createSingleFolderWorkbenchWorkspace,
   createWorkspaceFolder,
 } from "./core/workbenchWorkspace";
