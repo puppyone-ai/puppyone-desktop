@@ -66,10 +66,12 @@ single product area can evolve without turning this file into a catch-all.
     errors, locale-aware formatting, French copy, bidirectional-layout
     readiness, packaging, and release gates.
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
-  - Part 1: the durable terminal contract (xterm + node-pty layering, the
-    character-grid width invariant, CJK `text-spacing-trim` failure mode,
-    fit/resize pipeline). Part 2: the remediation to-do list (spacing-trim
-    CSS fix, WebGL renderer with fallback, Unicode 11 widths).
+  - Current multi-Session, launcher, stable xterm Runtime, PTY ownership,
+    character-grid, focus, security, and performance contracts.
+  - [Accepted Session Groups and Split Layout](architecture/desktop-terminal/session-groups-and-split-layout.md)
+    defines native four-edge Session-tab movement, recursive geometry,
+    zero-restart lifecycle, resize, accessibility, and release gates without
+    using tmux as the layout authority.
 - [Desktop Agent Architecture](architecture/desktop-agent/README.md)
   - Existing Terminal plus an independent right-sidebar Agent Chat. PuppyOne
     owns one UI, control plane, safety boundary and event contract over multiple

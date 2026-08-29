@@ -54,6 +54,12 @@ directly:
     Electron/Cloud/Agent/Plugins, message and error contracts, RTL, packaging,
     testing, and staged migration.
 - [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
+  - Current multi-Session ownership, launcher, stable xterm Runtime, PTY,
+    rendering, focus, security, and performance contracts.
+  - [Terminal architecture home](architecture/desktop-terminal/README.md)
+  - [Accepted Session Groups and Split Layout](architecture/desktop-terminal/session-groups-and-split-layout.md)
+    defines native left/right/top/bottom Session-tab movement without Runtime
+    or PTY restart. tmux is explicitly not the layout authority.
 - [Desktop App Preview Runtime](architecture/desktop-app-preview-runtime.md)
   - Workspace-owned local app processes, reusable native browser surfaces,
     short-lived attachment leases, trust/security boundaries, and the

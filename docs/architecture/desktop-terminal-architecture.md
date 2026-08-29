@@ -1,365 +1,593 @@
 # Desktop Terminal Architecture
 
-This document has two parts with different lifetimes:
+Status: current implementation contract. This document describes the
+multi-session Terminal and the local-Agent launcher architecture that current
+code must implement and preserve. Structured per-file Agent activity has an
+implemented foundation; its canonical architecture is
+[Local Agents and Agent file activity](desktop-agent/local-agents-and-file-activity.md).
 
-- **Part 1 — Architecture specification.** The durable contract for the
-  right-sidebar terminal: layer boundaries, the character-grid rendering
-  model, the geometry/resize pipeline, session lifecycle, and the width
-  invariant that every change must preserve. It remains the reference for
-  everyone working on the terminal after the current work is done.
-- **Part 2 — Remediation plan.** The to-do list and code change map for
-  fixing the CJK right-edge clipping defect and closing the gaps between
-  the current implementation and Part 1. It is scoped to this one round of
-  work; delete or archive it once the fixes have shipped and stabilized.
+Native Session Groups and tab-drag splitting are an accepted next-version
+extension, not yet current behavior. Their normative Group model, recursive
+layout, Runtime reparenting, interaction boundary, non-goals, and release gates
+live in
+[Terminal Session Groups and Split Layout](desktop-terminal/session-groups-and-split-layout.md)
+and
+[ADR-002](desktop-terminal/decisions/ADR-002-native-terminal-groups-and-split-layout.md).
+Until that target lands, statements below about one active Session describe the
+current tabs-only projection.
 
----
+## 1. Product contract
 
-# Part 1 — Architecture specification
+Terminal is a persistent PTY workspace, not a command runner and not a second
+Agent Chat. A new terminal session begins in a selector and starts only after
+the user chooses either:
 
-## 1. Scope and design goal
+- a locally installed coding Agent; or
+- the user's normal shell.
 
-The desktop app embeds one interactive terminal in the right sidebar. It
-must behave like a native terminal: byte-accurate PTY I/O, a stable
-character grid at any panel width, correct rendering of CJK and Unicode
-content, theme integration, and no visual artifacts while the sidebar
-opens, closes, or resizes.
+When an Agent is selected, the user's shell remains the stable PTY host and the
+Agent is its first foreground command. Exiting the Agent returns to the same
+shell. The user can then run arbitrary commands, start development servers,
+launch another Agent, or exit the shell normally.
 
-The architecture is the industry-standard three-layer stack (the same
-shape VS Code, Hyper, and Tabby use):
+The product invariants are:
+
+1. Opening Terminal or creating a new session never starts a process by
+   itself.
+2. The launcher offers an Agent action only when a trusted main-process locator
+   found a locally executable candidate.
+3. Discovery never blocks application startup or waits for account, model, or
+   protocol inspection.
+4. The Renderer sends a closed launcher ID, never a command or executable
+   path.
+5. The main process resolves and validates the executable again at launch.
+6. One session owns one stable xterm runtime and one PTY for its whole
+   lifetime. Transient status UI overlays it rather than remounting it.
+7. Terminal and Agent Chat remain separate products and security boundaries.
+8. Adding a terminal-native Agent extends immutable catalogs and presentation
+   metadata; it does not add another scanner, IPC route, or PTY lifecycle.
+9. PTY output may drive a coarse busy signal, but only a structured native
+   Hook/plugin event may create exact per-file Agent attribution.
+
+## 2. System topology
 
 ```text
-renderer (React)                       main process (Node)
-┌──────────────────────────────┐      ┌──────────────────────────────┐
-│ features/desktop-terminal    │ IPC  │ ipc/terminal-ipc.mjs         │
-│  RightTerminalPanel          │◄────►│  terminal-service.mjs        │
-│  TerminalSurfaceHeader       │      │   node-pty sessions          │
-│  fit / resize orchestration  │      │   (login shell per session)  │
-│  theme from CSS variables    │      │                              │
-└──────────────────────────────┘      └──────────────────────────────┘
-        styles: src/features/desktop-terminal/ui/desktop-terminal.css
-        bridge: electron/preload.cjs (window.puppyoneDesktop)
+Workspace auxiliary panel
+  |
+  +-- RightTerminalPanel                         Renderer composition root
+        |
+        +-- TerminalSessionHeader                shared session chrome only
+        +-- TerminalLauncher                     no process ownership
+        +-- TerminalSessionHost                  stable per-session boundary
+              +-- TerminalSessionView            xterm DOM attachment
+              +-- startup overlay                temporary presentation
+        |
+        +-- useTerminalSessions                  session reducer/controller
+        +-- useTerminalAgentLocator              lightweight availability
+        +-- TerminalRuntimeRegistry              one runtime per session ID
+                  |
+                  v typed preload IPC
+        terminal:agents-locate + agents-progress / create / input / resize / close
+                  |
+                  v
+Electron main process
+  +-- TerminalAgentLocator                       filesystem-only discovery
+  +-- TerminalAgentLaunchResolver                launch-time authority
+  +-- TerminalService                            PTY lifecycle and ownership
+  +-- TerminalShellHost                          shell + first foreground Agent
+                  |
+                  v
+               node-pty
 ```
 
-No terminal state lives outside these files. The renderer owns geometry
-and rendering; the main process owns processes; the preload bridge is a
-dumb pipe. Application chrome (titlebar) only toggles surface visibility —
-Clear/Reset and PTY session reset belong to the terminal surface itself.
+The preload bridge is a narrow transport. It contains no discovery, routing,
+command construction, caching, or lifecycle decisions.
 
-## 2. Layer responsibilities
+The accepted split target inserts a Renderer-owned `TerminalWorkbench` and
+`TerminalGroupViewport` between the Header and stable Session hosts. Group IDs,
+split nodes, ratios, drop intent, and focused-pane state remain above preload;
+the main process continues to know only sender-owned Terminal Session IDs.
 
-**Renderer — `src/features/desktop-terminal/ui/`.**
-`RightTerminalPanel` is the composition root: it owns the xterm.js instance,
-lazy PTY lifecycle, fit/resize orchestration, drag-and-drop of file paths,
-theme resolution, and focus management. `TerminalSurfaceHeader` is the
-presentational chrome for Clear and Reset. Reset increments an internal
-`sessionGeneration` so the panel recreates the PTY without App remounting
-the tree.
+### 2.1 Implemented semantic-activity extension
 
-**Bridge — `electron/preload.cjs`.** Exposes exactly six calls:
-`createTerminal` / `closeTerminal` (invoke), `writeTerminal` /
-`resizeTerminal` (fire-and-forget send), `onTerminalData` /
-`onTerminalExit` (subscriptions). No logic.
+The activity path is a side channel alongside, not inside, PTY output:
 
-**Main — `electron/main/ipc/terminal-ipc.mjs` +
-`electron/main/terminal-service.mjs`.** A session map keyed by a
-renderer-supplied UUID (validated server-side). Spawns the user's login
-shell via node-pty with `TERM=xterm-256color`, `COLORTERM=truecolor`, and
-app-identifying env vars. Confines `cwd` to the workspace root, clamps
-cols/rows (20–400 / 8–120), kills sessions when their window closes, and
-reports exit code/signal back to the renderer. Default foreground/background
-colors are normalized to RGB at session creation; the service answers OSC
-10/11 queries before forwarding output to xterm so startup color probes do
-not depend on the renderer's paint queue.
+```text
+Native Agent TUI
+  +-- PTY bytes -> TerminalService -> xterm
+  |
+  +-- native Hook/plugin event
+        -> terminal-agent/activity provider adapter
+        -> provider-neutral main Agent Activity broker
+        -> typed workspace-relative activity IPC
+        -> desktop-agent-presence external store
+        -> Editor / Explorer / Terminal presentation
+```
 
-**Styles — `src/features/desktop-terminal/ui/desktop-terminal.css`.**
-Co-located `.desktop-terminal-*` rules and `.xterm` overrides: the panel is
-`overflow: hidden`, the outer terminal body carries the visual padding
-(`14px 0 16px 16px`), the xterm geometry container remains padding-free, and
-scrollbars use the product scrollbar tokens (`--po-scrollbar-*`) with a
-terminal-specific xterm adapter. Global `layout.css` must not own terminal
-presentation classes.
+Provider-specific Hook registration and payloads terminate in
+`electron/main/terminal-agent/activity`. Workspace claim policy and public
+projection live in the neutral `electron/main/agent-activity` domain. The
+Renderer consumes them through the independent `desktop-agent-presence`
+feature, so Editor never imports Terminal implementation code. See the
+[implemented source layout](desktop-agent/local-agents-and-file-activity.md#source-layout).
 
-**Titlebar — `src/features/app-shell/`.** The Terminal icon is a stable
-visibility toggle only. It must not morph into a split/dropdown control and
-must not host Clear/Reset.
+## 3. Renderer source ownership
 
-## 3. The width invariant (why terminals clip or drift)
+```text
+src/features/desktop-terminal/
+  controller/
+    useTerminalSessions.ts             session orchestration
+    useTerminalAgentLocator.ts         discovery lifecycle and stale guards
+  infrastructure/electron/
+    terminalAgentLocatorClient.ts      typed bridge adapter
+  model/
+    terminalLaunchers.ts               closed public launcher catalog + derived ID type
+    terminalAgentAvailability.ts       sanitized availability DTO/state
+    terminalLauncherPresentation.ts    generic primary/overflow policy
+    terminalSessionHeader.ts           shared rail/overflow presentation projection
+    terminalSessionHeaderLayout.ts     pure adaptive Header density policy
+    terminalSessions.ts                pure session reducer
+    terminalPath.ts                    path presentation only
+  runtime/
+    terminalRuntime.ts                 one stable xterm runtime
+    terminalRuntimeRegistry.ts         runtime identity and deferred disposal
+    terminalActivity.ts                normalized title/output activity signal
+    terminalAppearance.ts              terminal theme projection
+  ui/
+    RightTerminalPanel.tsx             feature composition root
+    TerminalLauncher.tsx               selector and recovery UI
+    TerminalSessionHost.tsx            stable mount + transient overlay
+    TerminalSessionView.tsx            xterm attachment and file drop
+    session-header/
+      TerminalSessionHeader.tsx        composition and stable-capacity boundary
+      TerminalSessionTab.tsx           memoized tab presentation
+      TerminalSessionOverflowMenu.tsx  hidden-session navigation menu
+      TerminalSessionHeaderStatus.tsx  runtime activity subscription + visual
+      terminalSessionHeaderIds.ts      tab/panel accessibility ID contract
+      useTerminalSessionHeaderLayout.ts stable capacity measurement adapter
+      useTerminalSessionHeaderController.ts roving focus + activation motion
+      terminal-session-header.css      Header-owned geometry and interaction styles
+```
 
-A terminal is a character grid. Three independent width systems must
-agree for every cell, or rendering breaks:
+Rules:
 
-1. **wcwidth** — how many grid columns a character occupies (1 or 2).
-   Both the PTY-side program (which wraps its own output) and xterm's
-   buffer compute this, each from their own Unicode tables.
-2. **CSS cell width** — xterm measures the primary font ("W" at the
-   configured size) and derives one cell width in px. The grid is
-   `cols × cellWidth` wide; FitAddon inverts this to pick `cols`.
-3. **Actual glyph advance** — what the font renderer really draws. For
-   glyphs outside the primary font (all CJK under a Latin monospace
-   stack) this comes from a fallback font and rarely equals an exact
-   multiple of the cell width.
+- UI components receive state and callbacks; they do not call Electron APIs.
+- The controller is the only layer that combines discovery and UI lifecycle.
+- Domain/model files contain no React, Electron, xterm, or native-process code.
+- The Session Header receives immutable session summaries. It neither creates
+  runtimes nor mutates session state; all actions leave through callbacks.
+- Rail tabs and overflow rows consume the same pure presentation projection, so
+  status, Agent identity, path, and accessible labels cannot diverge.
+- A `TerminalRuntime` is keyed by session ID, never by active-tab position.
+- Switching tabs changes visibility and focus; it does not recreate xterm or
+  the PTY.
 
-Renderers differ in how they reconcile (2) and (3):
+## 4. Main-process source ownership
 
-- **GPU renderers (`@xterm/addon-webgl`)** rasterize every glyph into a
-  per-cell texture-atlas tile. A glyph wider than its cell(s) is rescaled
-  (`rescaleOverlappingGlyphs`) or clipped **inside its own cell**; error
-  can never accumulate across a row. This is what VS Code ships and is
-  the correct choice for an Electron app.
-- **The DOM renderer (xterm core default)** lets the browser lay out
-  text and compensates per character: it measures each glyph in a hidden
-  container (`WidthCache`, measuring `char.repeat(32)`) and sets
-  `letter-spacing = wcwidth × cellWidth − measuredWidth` on the span. The
-  grid then only aligns **if the measurement equals what the browser
-  actually renders in context**. Any measure-vs-render disagreement
-  accumulates linearly across the row and spills past the grid edge,
-  where `overflow: hidden` cuts it off.
+```text
+electron/main/
+  local-executable-resolver.mjs             shared filesystem-only primitive
+  local-agent-candidates/                   shared bounded product locations
+  ipc/terminal-ipc.mjs                 validate route and authorize workspace
+  terminal-service.mjs                 PTY session application service
+  terminal-shell-host.mjs              platform-safe shell command serialization
+  terminal-agent/
+    terminal-agent-catalog.mjs         trusted candidates + identity policy
+    terminal-agent-candidate-resolver.mjs shared resolution composition
+    terminal-agent-identity.mjs        bounded ambiguous-name verification
+    terminal-agent-locator.mjs         filesystem-only availability scan/cache
+    terminal-agent-launch-resolver.mjs authoritative launch-time re-resolution
+```
 
-Hence the invariant every terminal change must preserve:
+The locator and launch resolver may share immutable executable descriptors,
+but they have different authority:
 
-> For every character the terminal can display, the rendered advance must
-> equal `wcwidth × cellWidth` exactly — by construction (GPU renderer) or
-> by verified measurement parity (DOM renderer).
+- Locator results are advisory presentation data.
+- Launch resolution is authoritative and always runs again.
+- The locator never returns native paths or commands to the Renderer.
+- Agent Chat inventory and capability probes are not dependencies of the
+  Terminal launcher.
 
-## 4. Known failure mode: CJK punctuation vs `text-spacing-trim`
+The implemented Agent Activity foundation preserves this split. Hook compatibility
+and enrollment are evaluated only after launchability is known or when the user
+explicitly enables activity. They cannot delay locator discovery or hide a
+launchable Agent.
 
-This is the mechanism behind the right-edge clipping defect (diagnosed
-July 2026, xterm 6.0.0, Electron 41 / Chromium 146). It is durable
-knowledge: any future DOM-renderer usage can regress the same way.
+## 5. Session state and identity
 
-Chromium 123+ applies the CSS `text-spacing-trim` initial value `normal`
-to CJK text: a fullwidth punctuation mark (`，` `。` `、` `：` `“` `”` …)
-is rendered **half-width when adjacent to another fullwidth punctuation
-mark**, full-width otherwise. This breaks the DOM renderer's measurement
-parity in one direction:
+The session reducer owns serializable UI state:
 
-- `WidthCache` measures `，` as `"，".repeat(32)` — every mark sits next
-  to another mark, so trimming applies → measured **6.70px**.
-- In real output, marks sit between Han characters → rendered
-  **13.00px** (full width).
-- The renderer compensates for the wrong width:
-  `letter-spacing = 15.66 − 6.70 = +8.94px`, so the cell renders at
-  `13.00 + 8.94 = 21.95px` instead of `15.66px` — **+6.28px of drift per
-  punctuation mark**.
+```text
+selecting -> starting -> running -> exited
+                  |          |
+                  +-> selecting on recoverable launch failure
+```
 
-Measured consequences (headless Electron probe, exact production font
-stack/options/CSS, sidebar widths 500–680px):
+A session stores its stable ID, ordinal, launcher identity, lifecycle status,
+and presentation error. The workspace path is the visible tab title; the Agent
+identity is shown by the leading official product icon. Runtime objects, xterm
+instances, DOM nodes, timers, disposables, and PTY handles never enter React
+state or persisted preferences.
 
-| Row content                          | Overflow past the grid edge |
-| ------------------------------------ | --------------------------- |
-| Chinese prose with 3–5 fullwidth marks | **+17 to +31px → visibly clipped** |
-| Pure Han rows (`月月月…`)             | 0px (compensation exact: 13.00 measured = 13.00 rendered) |
-| Box-drawing rules (`────`)            | ≤ +1.2px (sub-pixel noise, absorbed by the 14px scrollbar reserve) |
+`TerminalRuntimeRegistry` owns runtime identity. A session close removes the
+reducer record immediately and disposes its runtime once. Closing the panel
+does not implicitly close sessions. Window teardown closes every PTY owned by
+that window.
 
-This matches the user-visible symptom exactly: separator lines and pure
-Han lines look fine while punctuation-bearing prose loses its last one or
-two characters at the panel edge.
+## 6. New-session and launcher lifecycle
 
-Countermeasure: `text-spacing-trim: space-all` on the terminal container
-disables trimming, so measurement and rendering are both full-width.
-Verified by the same probe: worst-row overflow drops from +31px to
-+1.2px. A terminal is a grid, not typeset prose — trimming is never
-wanted there. (GPU renderers are immune, but the rule must stay for the
-DOM fallback path.)
+Creating a terminal tab creates a `selecting` session only. No Shell and no
+Agent is launched at this point.
 
-Two adjacent facts worth pinning:
+```text
+create tab
+  -> render launcher immediately
+  -> request lightweight Agent availability asynchronously
+  -> show available Agent actions when the lightweight snapshot resolves
+  -> user selects launcher ID
+  -> session becomes starting
+  -> stable xterm runtime mounts underneath startup overlay
+  -> main process resolves executable and creates PTY
+  -> meaningful Agent output or bounded reveal timeout
+  -> session becomes running; overlay is removed
+```
 
-- `customGlyphs` and `rescaleOverlappingGlyphs` are texture-atlas options.
-  **They are no-ops under the DOM renderer** — passing them without the
-  WebGL addon configures nothing.
-- xterm core defaults to Unicode **6** width tables. Modern CLI programs
-  wrap against newer wcwidth tables, so emoji and newer symbols can
-  disagree between the PTY program's wrapping and xterm's grid.
-  `@xterm/addon-unicode11` narrows this gap.
+The startup overlay hides shell echo and blank startup frames, but data is
+still delivered to the mounted xterm buffer. It is released on a meaningful
+terminal-display signal or a bounded safety timeout; it must never be an
+unconditional animation delay.
 
-### 4.1 Known failure mode: WebGL glyph-atlas mipmaps
+If launch fails, the runtime is closed and the same session returns to the
+selector with an inline error. A black or permanently empty terminal is not a
+valid error state.
 
-The stable `@xterm/addon-webgl` 0.19 bundle calls `generateMipmap` whenever
-it uploads a glyph-atlas page. On affected Chromium/ANGLE GPU paths the
-context can remain alive while terminal cells sample corrupt atlas data.
-The visible result is arbitrary replacement glyphs, black cells, or smeared
-text even though xterm's buffer still contains the correct Unicode. Because
-the context is not lost, `onContextLoss` does not fire and cannot recover.
+The selector has a stable block-start anchor rather than vertically centering a
+content box whose height changes during discovery. Incremental Agent results
+grow downward from that anchor; they must not recenter the entire Terminal
+surface. Before the first result, the detecting row occupies the same geometry
+as one Agent action. Once any Agent action exists, loading and recovery status
+becomes an assistive live-region announcement outside normal layout. Explicit
+refresh preserves all keyed action nodes and animates only the fixed-size
+refresh affordance, so starting or completing a scan cannot add and remove a
+transient row.
 
-Upstream removed glyph-atlas mipmaps in xtermjs/xterm.js#5987 and replaced
-them with explicit linear minification/magnification filters. That change is
-targeted at xterm 7 and is not present in the latest stable addon compatible
-with xterm 6. `scripts/patch-xterm-webgl-atlas.mjs` therefore applies the
-same narrow transform after every install. It patches both published bundle
-formats plus any existing Vite optimizer cache, and fails closed if the
-upstream bundle changes shape. Remove the backport only after a stable xterm
-upgrade is verified to contain upstream commit `6471844`.
+## 7. Local Agent discovery
 
-## 5. Geometry and resize pipeline
+Terminal discovery answers one question only:
 
-Sizing flows one way: **DOM size → FitAddon → xterm grid → PTY winsize**.
+> Can this known executable be safely resolved to a local regular executable
+> file right now?
 
-1. `FitAddon.proposeDimensions()` reads the xterm container width,
-   subtracts the `.xterm` element's own CSS padding and a 14px scrollbar
-   reserve, and divides by the measured cell size to get cols/rows. In
-   this app the visual inset lives outside that fit target, so `.xterm`
-   padding must stay at `0`; otherwise the PTY grid becomes visibly
-   narrower than the viewport/scrollbar edge.
-2. `fitAndResize()` guards against zero-size containers (hidden panel),
-   calls `fit()`, then syncs `terminal.cols/rows` to the PTY via
-   `resizeTerminal`. The PTY must always be told the same grid xterm
-   uses, or programs wrap against the wrong width.
-3. Fit triggers: a `ResizeObserver` on the container, a `transitionend`
-   listener on the sidebar's `width`/`flex-basis` transition (the sidebar
-   animates open/close over 160ms), rAF-coalesced scheduling, and settle
-   retries at 80/180/260ms for layouts that land late. A pending-size ref
-   replays the latest size once the PTY session finishes creating.
-4. Ordering rule: `terminal.open()` → first fit → `createTerminal` with
-   the fitted cols/rows → replay pending size when the session is ready.
+It combines deterministic product-configured candidates with one shared
+bounded search context built from `PATH`, Volta, asdf, NVM and known
+user/system installation directories. It may canonicalize the file, verify
+that it is a regular executable, record a native-only identity fingerprint and
+verify bounded read-only product evidence for ambiguous basenames.
 
-This pipeline is sound and stays. The one durable rule: **any style that
-changes glyph metrics (font, size, weight, letter-spacing, padding,
-spacing-trim) must be in place before the terminal opens, and changing
-one at runtime requires a refit.**
+It must not run:
 
-## 6. Session lifecycle
+- account or authentication checks;
+- model listing;
+- native Agent protocol initialization;
+- Chat capability discovery;
+- provider or credential inspection;
+- unbounded login-shell startup;
+- renderer-provided commands.
 
-- Renderer generates the session UUID; main validates the format and
-  owns the session map. Duplicate create for an id closes the old PTY.
-- `cwd` is resolved against and confined to the workspace root.
-- Spawn: user's `$SHELL` (login-shell args for bash/zsh),
-  `TERM=xterm-256color`, `COLORTERM=truecolor`, `TERM_PROGRAM=PuppyOne`,
-  `NO_COLOR` stripped.
-- Environment boundary: an interactive Terminal is a fresh shell session, not
-  a continuation of the package-manager process that launched Desktop. npm
-  lifecycle/package metadata and prefix overrides are stripped before PTY
-  spawn. A new bash/zsh login shell also drops the parent shell's Conda
-  activation stack and its active-prefix PATH entries, allowing the shell's
-  own startup files to initialize Conda coherently. Stable user configuration
-  such as HOME, locale, proxy, registry, and tool installation roots remains
-  inherited. Non-login shells retain their Conda activation state.
-- Exit surfaces in-terminal ("Process exited with …"); window close and
-  app quit kill all sessions for that window.
-- The React effect tears down symmetrically: observers, listeners,
-  timers, xterm disposables, PTY close — in that order.
+Version, account, model, and protocol concerns belong to the selected product
+after Terminal starts it, or to Agent Chat's independent runtime discovery.
+See
+[Local Agents architecture](desktop-agent/local-agents-and-file-activity.md#3-local-agents-architecture)
+for the shared discovery, visibility, and launch boundary.
 
-## 7. Theming
+## 8. Shell-hosted Agent execution
 
-Terminal colors are derived from app CSS variables (`--po-terminal-*`
-with `--po-*` fallbacks) resolved via `getComputedStyle` at mount and
-re-applied when the app-shell theme attributes or stylesheets mutate
-(two `MutationObserver`s). ANSI palette, cursor, selection, and scrollbar
-colors all follow the active theme without recreating the terminal.
+The PTY always spawns the platform's trusted user shell. For an Agent launch,
+the main process writes one safely serialized foreground command into that
+shell after startup.
 
-Terminal programs can discover the mount-time default foreground/background
-with OSC 10/11. These two queries are answered at the PTY boundary from the
-same resolved RGB values supplied to xterm, then removed from display output
-to prevent a duplicate asynchronous reply from xterm. Keep this fast path:
-Codex CLI 0.147 gives its startup color probe only 100ms and removes the
-composer background when either answer misses that deadline.
+```text
+node-pty
+  -> user shell (stable PTY root)
+       -> exec path selected by trusted catalog
+       -> Agent runs in foreground
+       -> Agent exits
+       -> same shell prompt remains usable
+```
 
-## 8. References
+This gives users normal terminal freedom: an Agent can run child tools and
+development commands, and the shell remains available after the Agent exits.
+The architecture does not force the Agent to become the PTY root process.
 
-- xterm.js DOM renderer measurement/letter-spacing design and limits:
-  <https://github.com/xtermjs/xterm.js/issues/5164>,
-  <https://github.com/xtermjs/xterm.js/discussions/5217>
-- GPU vs DOM cell-width discrepancies accumulate per cell:
-  <https://github.com/xtermjs/xterm.js/issues/6015>
-- `text-spacing-trim` semantics (Chromium 123+ default `normal`):
-  <https://developer.mozilla.org/en-US/docs/Web/CSS/text-spacing-trim>
-- WebGL addon usage and context-loss handling:
-  <https://github.com/xtermjs/xterm.js/tree/master/addons/addon-webgl>
-- Unicode width tables addon:
-  <https://github.com/xtermjs/xterm.js/tree/master/addons/addon-unicode11>
-- FitAddon dimension math (padding + scrollbar accounting):
-  `@xterm/addon-fit` `proposeDimensions()`
+Command serialization is platform-specific and treats the canonical
+executable path and fixed catalog arguments as data. Renderer strings are never
+interpolated. The launch resolver rechecks executable identity immediately
+before constructing the shell-host request.
 
----
+## 9. Stable rendering and remount isolation
 
-# Part 2 — Remediation plan (current work)
+One live session has exactly one xterm instance. `TerminalSessionHost` mounts
+`TerminalSessionView` for the runtime's lifetime and layers startup UI above
+it. Status changes must not conditionally replace the xterm subtree.
 
-Scope: renderer layer and CSS only. No IPC, preload, or PTY service
-changes. No behavior change other than correct rendering. Everything is
-additive and reversible.
+This prevents:
 
-Current versions: `@xterm/xterm` 6.0.0, `@xterm/addon-fit` 0.11.0,
-Electron 41 (Chromium 146). New dependencies: `@xterm/addon-webgl`,
-`@xterm/addon-unicode11` (install latest compatible with xterm 6 via
-npm; do not pin invented versions).
+- data listeners targeting an abandoned xterm instance;
+- focus moving to another terminal after a tab update;
+- multiple sessions sharing transient hover/menu state;
+- startup output disappearing between selector and running states;
+- WebGL canvas or terminal measurement recreation on unrelated renders.
 
-## 9. To-do list
+Session components are keyed by stable session ID. High-frequency terminal
+data is written directly through the runtime and never flows through React
+state. React state contains only low-frequency lifecycle summaries.
 
-**Phase 1 — stop the clipping (one CSS rule):**
+For native splitting, stable Session hosts must additionally live outside the
+recursive split-tree ownership boundary and attach to layout slots before
+paint. A Group move therefore changes metadata and DOM placement without
+recreating the Session component, Runtime, xterm buffer, WebGL renderer, bridge
+listeners, Agent activity identity, or PTY.
 
-- [ ] Add `text-spacing-trim: space-all;` to the `.desktop-terminal-xterm
-      .xterm` block in
-      `src/features/desktop-terminal/ui/desktop-terminal.css`, with a comment
-      explaining the measurement-parity requirement (Part 1 §4). This alone
-      removes the visible CJK truncation under the DOM renderer.
+## 10. Geometry and resize pipeline
 
-**Phase 2 — GPU renderer with graceful fallback:**
+Sizing flows in one direction:
 
-- [ ] Add `@xterm/addon-webgl`. In `RightTerminalPanel`, after
-      `terminal.open(...)`, try to load the addon inside `try/catch`; on
-      failure keep the DOM renderer silently.
-- [ ] Handle `webglAddon.onContextLoss`: dispose the addon and fall back
-      to the DOM renderer (which Phase 1 keeps correct).
-- [ ] Dispose the addon in the effect cleanup before `terminal.dispose()`.
-- [ ] Refit once after the renderer swaps (cell metrics can differ by a
-      fraction of a pixel between renderers).
-- [ ] Note: this makes the existing `customGlyphs` and
-      `rescaleOverlappingGlyphs` options meaningful (they are no-ops
-      under the DOM renderer today).
+```text
+DOM content box -> FitAddon -> xterm cols/rows -> PTY resize
+```
 
-**Phase 3 — Unicode width tables:**
+The xterm geometry target remains padding-free. Visual inset belongs to the
+outer terminal body. A `ResizeObserver` schedules coalesced fits; in the current
+tabs-only projection, inactive or zero-size Sessions defer fitting until active.
+The PTY receives exactly the same grid dimensions xterm uses.
 
-- [ ] Add `@xterm/addon-unicode11`, load it, and set
-      `terminal.unicode.activeVersion = "11"` before the first fit, so
-      grid wcwidth matches modern CLI programs for emoji/symbols
-      (e.g. `⚠`).
+The accepted split target replaces the single `active` meaning with
+`presented` and `focused`: every Session in the active Group is presented and
+fits independently, while only one receives requested keyboard focus. Split
+admission and separator bounds derive from recursive character-grid minimums,
+not a fixed pane count or the Editor's percentage clamp.
 
-**Phase 4 — fit hygiene (small):**
+Every style affecting glyph metrics must exist before xterm measures the grid.
+Changing font family, size, weight, letter spacing, padding, or Unicode width
+rules requires a refit.
 
-- [ ] After `document.fonts.ready` resolves, run one `fitAndResize()` —
-      guards against first-fit measurements taken before font fallback
-      resolution settles.
+## 11. Character-grid width invariant
 
-**Verification (all phases):**
+For every displayed character, rendered advance must equal
+`wcwidth × cellWidth`. PTY-side wrapping, xterm's Unicode width table, CSS cell
+measurement, and fallback-font glyph advance must agree.
 
-- [ ] Manual: in the terminal, `cat` or echo a CJK sample containing
-      fullwidth punctuation (`，。、：“”`), box-drawing rules, pure Han
-      runs, and `⚠`; confirm no right-edge truncation at sidebar widths
-      500 / 560 / 604 / 646 / 680px, including during and after the
-      open/close animation and while dragging the resizer.
-- [ ] Probe (optional, definitive): headless Electron page that opens a
-      Terminal with production options + CSS, writes the same sample, and
-      asserts every row's rightmost span edge ≤ the `.xterm-screen` right
-      edge + 2px. Run with `ELECTRON_RUN_AS_NODE` unset.
-- [ ] `npm run lint` and `npm run build` pass; terminal still opens,
-      echoes, resizes, and exits cleanly (`exit` shows the exit message).
+The terminal keeps `text-spacing-trim: space-all`. Chromium's normal CJK
+punctuation trimming can make xterm's repeated-character measurement differ
+from contextual rendering, causing per-punctuation drift and right-edge
+clipping. A terminal is a grid rather than typeset prose, so contextual
+punctuation trimming is invalid here.
 
-## 10. Code change map
+GPU rendering contains glyph overflow per cell; DOM fallback requires verified
+measurement parity. Unicode width addons and renderer changes must be tested
+against CJK punctuation, emoji, box drawing, and narrow panel widths.
 
-| File | Change |
-| --- | --- |
-| `src/features/desktop-terminal/ui/desktop-terminal.css` | Phase 1 CSS rule on `.desktop-terminal-xterm .xterm` |
-| `src/features/desktop-terminal/ui/RightTerminalPanel.tsx` | Phases 2–4: addon imports, load/fallback/dispose wiring, unicode activation, fonts-ready refit |
-| `package.json` | Add `@xterm/addon-webgl`, `@xterm/addon-unicode11` |
+## 12. Focus, tabs, and activity
 
-Everything else (preload bridge, terminal IPC, PTY service, panel layout)
-is intentionally untouched.
+In the current tabs-only projection, activating a Session updates only the
+active Session ID, visibility, fit, and focus. Each Session owns its own runtime
+listeners and DOM container. Hover, menu, loading, and error state are local to
+the relevant component/Session.
 
-## 11. Implementation notes
+In the accepted split target, activation first resolves the Session's owning
+Group. Activating a same-Group Session changes focus while all split siblings
+remain visible; activating another Group switches the complete arrangement.
+The visual rail becomes an accessible Session switcher rather than claiming
+that one selected tab controls the only visible tabpanel. Pointer tab movement
+and HTML file/reference drops remain separate interaction channels.
 
-1. **Load order in the mount effect:** construct `Terminal` → `loadAddon`
-   (fit, unicode11) → set `unicode.activeVersion` → `open(container)` →
-   try WebGL addon → first `fitAndResize()`. Keep the existing
-   create-PTY-then-replay-size sequencing as is.
-2. **Do not remove the DOM-renderer CSS fix after Phase 2.** WebGL can be
-   unavailable (GPU blocklist, context exhaustion, remote desktop); the
-   DOM path must stay correct on its own.
-3. **Fallback must be silent** — a `writeSystemLine` warning is noise for
-   users; log to console at most.
-4. **Do not add per-cell width hacks** (custom letter-spacing, font
-   scaling) in app code; correctness comes from the renderer contract in
-   Part 1 §3. If a new drift appears, first check measurement parity
-   (§4), then file/fix upstream rather than patching row widths.
-5. **Font stack stays Latin-monospace.** Pinning a CJK monospace font
-   would also satisfy the invariant but changes the terminal's look and
-   depends on user-installed fonts; the renderer-level fix is the
-   portable one.
+Tab presentation rules:
+
+- leading visual: selected Agent's official icon, or Shell icon;
+- tab and overflow marks use a 14 px optical box inside a 28 px control; dense
+  artwork such as Hermes may define a compact-only optical scale without
+  changing the larger launcher presentation;
+- title: workspace path leaf, with full path available accessibly;
+- activity: a restrained 2 × 2 square-cell animation, never circular dots;
+- no activity animation may cause tab width or title position to move.
+- explicit activation animates the selected compact mark into a full tab while
+  the previous full tab contracts; this short geometry transition is scoped to
+  activation, never resize measurement, and respects reduced-motion settings.
+- every tab reserves the same fixed 28 px leading icon cell in full and compact
+  modes. Activation changes continuous width and opacity properties only; it
+  must never switch alignment or padding values that make the icon jump.
+- activation direction is an ideal-bounds contract, not an incidental Flexbox
+  result. The pure layout model emits `inlineStart + width` for every rendered
+  tab, and the UI interpolates both values with the same easing. When activation
+  moves right, the destination's trailing edge stays fixed while its leading
+  edge moves left; when activation moves left, its leading edge stays fixed
+  while its trailing edge moves right.
+
+The Header measures a stable full-width capacity container and subtracts the
+create control from metrics shared with its CSS variables. It never measures the
+content-sized rail that it is currently compressing. This one-way relationship
+prevents layout feedback: expanding the panel can always restore compact or
+overflow tabs to full tabs. The pure model then resolves three density levels:
+
+1. **full** — every tab keeps its title; widths shrink evenly from the preferred
+   width down to the readable full-tab minimum;
+2. **compact** — the active tab stays full while inactive tabs become official
+   brand/activity marks only; activating a compact mark makes it the full tab;
+3. **overflow** — the active tab and as many nearest compact siblings as fit
+   remain in stable session order, while all other sessions move into one
+   accessible overflow menu.
+
+The active session is never placed in overflow. The visible overflow window is
+continuity-preserving: activating a tab already rendered in that window keeps
+the same keyed DOM nodes and the same order. The new active tab expands in its
+existing position and physically pushes its siblings while the previous active
+tab contracts. Recomputing a nearest-session window on every active-ID change is
+forbidden because it makes edge tabs disappear instead of move. The window is
+repositioned only when the requested session is actually hidden, the capacity
+class changes, or the session inventory changes.
+
+Rendered tabs occupy absolute logical slots inside a relatively positioned rail
+whose width also comes from the pure layout result. This follows Chromium's
+`ideal_bounds` / `BoundsAnimator` principle: calculate every target rectangle
+first, then move all existing views to those targets together. Flex reflow is
+not an animation engine and must not decide the apparent expansion origin. See
+[Chromium TabStrip](https://chromium.googlesource.com/chromium/src/+/e842ab5f98d917193d1737d2b38475b97969e111/chrome/browser/ui/views/tabs/tab_strip.cc).
+
+Home/End and arrow-key tab navigation still operate on the complete session
+order, so activating a hidden session moves the visible window around it. The
+overflow menu supports focus restoration, Escape/outside dismissal, selection,
+close actions, status text,
+and the same live brand/activity mark as the rail. `ResizeObserver` updates only
+the stable Header capacity; the pure model owns all visibility decisions,
+avoiding DOM-width feedback loops and tab-count magic numbers.
+
+The rail is content-sized and shrinkable, not a growing spacer. The new-session
+control remains directly adjacent to the final visible tab or overflow control;
+only tab compression and overflow consume width under pressure.
+
+Keyboard navigation and activation motion terminate in one Header controller.
+Home/End and directional keys use the complete logical session order, including
+hidden sessions, and restore focus after the new visible window commits. The
+activation callback is reference-stable so an active-ID change does not force
+unrelated memoized tabs to render. Timers and pending focus frames are disposed
+with the Header. Geometry duration is a single model-owned motion token consumed
+by both the controller timer and Header CSS variable; JS and CSS timings may not
+drift independently.
+
+Activity is a runtime semantic, not a Codex-specific UI condition. The runtime
+normalizes three sources into one low-frequency boolean:
+
+1. the known `starting` session lifecycle;
+2. bounded upstream terminal-title protocols, including Codex spinner frames
+   and Cursor's explicit `Working`, `Planning`, shell-command and queue states;
+3. a short debounced PTY-output pulse for Agents that do not publish a busy
+   title, such as OpenCode, Pi or Hermes.
+
+The output pulse emits React updates only when activity starts or settles; raw
+PTY bytes continue to bypass React. Shell sessions do not use Agent activity.
+Activating, focusing, fitting, or resizing a terminal can make a full-screen
+CLI repaint its existing buffer even though no Agent turn is running. Runtime
+marks these host-owned presentation transitions before touching the PTY and
+suppresses only their short output echo; an explicit busy title remains
+authoritative throughout that window. A tab switch therefore cannot manufacture
+Agent activity from a focus or resize repaint.
+The tab component consumes only `runtime.activity`, while
+`TerminalSessionHeaderStatus` owns the common brand-mark/activity-grid switch.
+Adding an Agent must not add a product branch to the tab UI.
+
+This boolean is deliberately coarse. It answers whether an Agent session appears
+busy, not which file it accessed. The accepted semantic-activity architecture
+adds a second, structured projection keyed by workspace-relative path. Exact
+read/write presence requires a native Hook/plugin path and remains unavailable
+when an Agent exposes only terminal output. PTY pulses, terminal-title text, and
+workspace watcher timing must never be promoted to exact file attribution. See
+[Agent file activity architecture](desktop-agent/local-agents-and-file-activity.md#4-agent-file-activity-architecture).
+
+## 13. Performance contract
+
+- Application startup never awaits Terminal Agent discovery.
+- Opening the selector renders before IPC discovery resolves.
+- Locator work is filesystem-only, bounded, supersedable, and parallel across
+  known products; all products share one directory snapshot per scan.
+- Uncached scans publish request-correlated, path-free incremental results.
+- Discovery status never changes launcher geometry once actions are visible;
+  incremental actions enter locally from a stable block-start anchor.
+- Main-process memory cache prevents repeated scans for additional tabs.
+- Fresh cached data returns immediately; expired data triggers a new scan.
+- Main-only diagnostics record cold-scan duration and cache behavior against a
+  50 ms target without exposing telemetry or native paths.
+- Slow Agent capability probes are forbidden from this path.
+- PTY bytes bypass React rendering and are written directly to xterm.
+- Agent PTY output is reduced to debounced activity transitions before React;
+  no byte stream is copied into component state.
+- The accepted file-activity path is also low-frequency: native frames remain
+  in main, public events are bounded, and one external Renderer store publishes
+  only affected file selectors. It is not part of the Editor keystroke path.
+- Inactive sessions remain mounted but do not receive focus or redundant fits.
+- Header presentation items are memoized from immutable session summaries;
+  active-ID changes preserve unaffected tab props and callback identities.
+- Visible overflow tabs retain their keyed DOM identity across local activation;
+  switching tabs changes geometry rather than mounting a different window.
+- Resize observation targets stable Header capacity. It never observes a tab
+  width that the same layout calculation is changing.
+
+Manual refresh is a recovery affordance, not the normal freshness mechanism.
+
+## 14. Security boundary
+
+The Renderer can request only a known launcher ID. The main process owns:
+
+- the closed product catalog;
+- executable names and known candidate directories;
+- canonical path and regular-file/executable validation;
+- identity revalidation at launch;
+- workspace authorization and `cwd` confinement;
+- environment construction and bounded path augmentation;
+- platform-safe command serialization;
+- PTY ownership by `webContents` sender.
+
+For semantic activity, main additionally owns the private local ingest endpoint,
+short-lived source-session tokens, provider payload schemas, canonical target
+containment, claim expiry, and public redaction. Hook events are untrusted
+advisory telemetry and can affect presentation only.
+
+Discovery responses contain only sanitized launcher IDs and timestamps. They do
+not expose executable paths, environment values, credentials, account state,
+or arbitrary native errors. Incremental events add only bounded counts and a
+validated request correlation ID.
+
+## 15. Verification gates
+
+Every change to this domain must cover:
+
+1. locator tests proving that discovery performs no version/auth/protocol
+   command;
+2. cache, explicit refresh, stale request, and failure-result tests;
+3. launch resolver tests proving closed IDs and launch-time revalidation;
+4. shell-host lifecycle tests proving Agent exit returns to the shell;
+5. reducer/runtime tests proving per-session isolation and single disposal;
+6. component tests for detecting, available, none-found, geometry-neutral
+   refresh, keyed-action retention, starting, and recoverable error states;
+7. Session Header tests for full/compact/overflow projection, shrink-to-expand
+   recovery, continuity-preserving visible windows, keyed-node retention,
+   roving keyboard focus, activation-only motion, and shared labels;
+8. architecture-boundary checks preventing Renderer commands or Agent Chat
+   inventory imports;
+9. xterm geometry/CJK regression coverage;
+10. TypeScript, localization, lint, production build, and diff checks;
+11. shared search-context, ambiguous-identity, incremental-result, diagnostics,
+    and future-catalog overflow tests.
+
+Its independent gates are defined in
+[Agent activity verification contract](desktop-agent/local-agents-and-file-activity.md#verification-contract).
+The next-version Group/split feature has additional model, Runtime-identity,
+drag-cancellation, resize, accessibility, and real-Chromium gates in
+[Terminal Session Groups and Split Layout](desktop-terminal/session-groups-and-split-layout.md#21-verification-and-acceptance-matrix).
+
+## 16. Domain boundaries
+
+- Workspace owns the auxiliary panel, not Terminal session internals.
+- Agent Chat owns typed native Agent sessions, account/model readiness,
+  approvals, transcripts, and provider integrations.
+- Terminal owns PTY sessions and can start a local Agent only as a foreground
+  terminal command.
+- Terminal Agent activity adapters own native Hook/plugin edges. The neutral
+  Agent Activity broker owns process-local workspace claims. Editor and Explorer
+  consume only the cross-surface presence contract.
+- Source Control owns repository truth after Terminal or Agent edits files.
+- Appearance may select terminal session presentation. Desktop App > Agent Portal
+  may explicitly manage reversible Hook enrollment, but Settings never owns live
+  terminal/activity state.
+
+## 17. References
+
+- [Terminal architecture home](desktop-terminal/README.md)
+- [Terminal Session Groups and Split Layout](desktop-terminal/session-groups-and-split-layout.md)
+- [ADR-002: Native Terminal Groups and Split Layout](desktop-terminal/decisions/ADR-002-native-terminal-groups-and-split-layout.md)
+- [Local Agents and Agent file activity](desktop-agent/local-agents-and-file-activity.md)
+- [Terminal Rendering Remediation History](desktop-terminal/rendering-remediation-history.md)
+- [Desktop Agent Architecture](desktop-agent/README.md)
+- xterm.js: <https://xtermjs.org/>
+- `@xterm/addon-fit`: geometry calculation
+- `@xterm/addon-webgl`: cell-bounded GPU rendering
+- `@xterm/addon-unicode11`: modern Unicode width tables
