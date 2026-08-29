@@ -37,10 +37,12 @@ import {
 import type { RecentWorkspaceHomeItem } from "./workspaceHomeModel";
 
 export function useWorkspaceLifecycle({
+  multiRootWorkspacesEnabled,
   onWorkspaceActivated,
   onWorkspaceCleared,
   onWorkspaceOpenSettled,
 }: {
+  multiRootWorkspacesEnabled: boolean;
   onWorkspaceActivated: () => void;
   onWorkspaceCleared: () => void;
   onWorkspaceOpenSettled: () => void;
@@ -154,6 +156,10 @@ export function useWorkspaceLifecycle({
   }, [handleWorkspaceOpenResult, workspace]);
 
   const addProject = useCallback(async () => {
+    if (!multiRootWorkspacesEnabled) {
+      onWorkspaceOpenSettled();
+      return;
+    }
     try {
       const result = await selectWorkspaceFolderToAttach();
       if (!result) {
@@ -173,9 +179,18 @@ export function useWorkspaceLifecycle({
       setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
       onWorkspaceOpenSettled();
     }
-  }, [onWorkspaceOpenSettled, reconcileWorkspaceComposition, refreshRecentWorkspaceList]);
+  }, [
+    multiRootWorkspacesEnabled,
+    onWorkspaceOpenSettled,
+    reconcileWorkspaceComposition,
+    refreshRecentWorkspaceList,
+  ]);
 
   const addExistingProject = useCallback(async (folderPath: string) => {
+    if (!multiRootWorkspacesEnabled) {
+      onWorkspaceOpenSettled();
+      return;
+    }
     try {
       const result = await attachWorkspaceFolder(folderPath);
       if (result.status !== "focused-existing" && result.workspaces.length > 0) {
@@ -191,7 +206,12 @@ export function useWorkspaceLifecycle({
       setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
       onWorkspaceOpenSettled();
     }
-  }, [onWorkspaceOpenSettled, reconcileWorkspaceComposition, refreshRecentWorkspaceList]);
+  }, [
+    multiRootWorkspacesEnabled,
+    onWorkspaceOpenSettled,
+    reconcileWorkspaceComposition,
+    refreshRecentWorkspaceList,
+  ]);
 
   const removeProject = useCallback(async (folderPath: string) => {
     try {

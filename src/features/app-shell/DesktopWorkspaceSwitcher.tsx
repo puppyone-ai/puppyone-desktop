@@ -16,6 +16,7 @@ type DesktopWorkspaceSwitcherProps = {
   titlebarLabel: string;
   workspace: Workspace;
   workspaceFolders: readonly WorkspaceFolder[];
+  multiRootWorkspacesEnabled: boolean;
   availableProjects?: readonly Workspace[];
   onAddExistingProject?: (folderPath: string) => void;
   onOpenFolder?: () => void;
@@ -30,6 +31,7 @@ export function DesktopWorkspaceSwitcher({
   titlebarLabel,
   workspace,
   workspaceFolders,
+  multiRootWorkspacesEnabled,
   availableProjects = [],
   onAddExistingProject,
   onOpenFolder,
@@ -50,8 +52,8 @@ export function DesktopWorkspaceSwitcher({
     return availableProjects.filter((project) => !attachedPaths.has(project.path));
   }, [attachedFolders, availableProjects]);
   useEffect(() => {
-    if (!open) setView("projects");
-  }, [open]);
+    if (!open || !multiRootWorkspacesEnabled) setView("projects");
+  }, [multiRootWorkspacesEnabled, open]);
   return (
     <div className="desktop-titlebar-workspace-wrap" ref={refObject}>
       <button
@@ -99,13 +101,15 @@ export function DesktopWorkspaceSwitcher({
                   folder={folder}
                 />
               ))}
-              <DesktopMenuItem
-                className="desktop-project-add desktop-project-add-folder"
-                disabled={!onAddExistingProject && !onOpenFolder}
-                icon={<FolderPlus size={15} strokeWidth={1.8} />}
-                label={t("shell.workspaceSwitcher.addProject")}
-                onClick={() => setView("add")}
-              />
+              {multiRootWorkspacesEnabled && (
+                <DesktopMenuItem
+                  className="desktop-project-add desktop-project-add-folder"
+                  disabled={!onAddExistingProject && !onOpenFolder}
+                  icon={<FolderPlus size={15} strokeWidth={1.8} />}
+                  label={t("shell.workspaceSwitcher.addProject")}
+                  onClick={() => setView("add")}
+                />
+              )}
             </div>
           </>
         ) : (

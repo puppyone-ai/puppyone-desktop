@@ -94,6 +94,7 @@ export type ExperimentalSettings = {
   enableEditorSaveStatus: boolean;
   enableGitAutoCommit: boolean;
   enableMarkdownBlockDrag: boolean;
+  enableMultiRootWorkspaces: boolean;
   enablePuppyFlowFiles: boolean;
   enableViewerPlugins: boolean;
 };
@@ -180,6 +181,7 @@ export const DEFAULT_EXPERIMENTAL_SETTINGS: ExperimentalSettings = {
   enableEditorSaveStatus: false,
   enableGitAutoCommit: false,
   enableMarkdownBlockDrag: false,
+  enableMultiRootWorkspaces: false,
   enablePuppyFlowFiles: false,
   enableViewerPlugins: false,
 };
@@ -553,6 +555,7 @@ export function parseExperimentalSettings(value: string | null | undefined): Exp
       // from renderer localStorage. The Electron capability bridge hydrates it.
       enableGitAutoCommit: false,
       enableMarkdownBlockDrag: parsed.enableMarkdownBlockDrag === true,
+      enableMultiRootWorkspaces: parsed.enableMultiRootWorkspaces === true,
       enablePuppyFlowFiles: parsed.enablePuppyFlowFiles === true,
       enableViewerPlugins: parsed.enableViewerPlugins === true,
     };

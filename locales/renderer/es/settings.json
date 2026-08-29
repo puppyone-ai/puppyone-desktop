@@ -119,6 +119,8 @@
   "editor.diffMarkers.color": "Color",
   "experimental.title": "Experimental",
   "experimental.detail": "Prueba anticipadamente experiencias del escritorio. Todos los experimentos están desactivados de forma predeterminada.",
+  "experimental.multiRootWorkspaces.title": "Espacios de trabajo multiproyecto",
+  "experimental.multiRootWorkspaces.detail": "Permite que «Añadir proyecto…» agregue varios proyectos locales a la ventana actual.",
   "experimental.officeEditing.title": "Edición de documentos de Office",
   "experimental.officeEditing.detail": "Edita archivos .docx, .xlsx y .pptx con el ONLYOFFICE Document Server configurado. Al desactivarlo, los archivos de Office permanecen en vista previa de solo lectura.",
   "experimental.markdownBlockDrag.detail": "Activa la reorganización experimental de bloques dentro del mismo documento en la vista previa en vivo de Markdown.",

@@ -119,6 +119,8 @@
   "editor.diffMarkers.color": "Cor",
   "experimental.title": "Experimental",
   "experimental.detail": "Ative antecipadamente experiências do desktop. Todos os experimentos ficam desativados por padrão.",
+  "experimental.multiRootWorkspaces.title": "Espaços de trabalho com vários projetos",
+  "experimental.multiRootWorkspaces.detail": "Permite usar “Adicionar projeto…” para anexar vários projetos locais à janela atual.",
   "experimental.officeEditing.title": "Edição de documentos do Office",
   "experimental.officeEditing.detail": "Edite arquivos .docx, .xlsx e .pptx com o ONLYOFFICE Document Server configurado. Quando desativado, os arquivos do Office permanecem na visualização somente leitura.",
   "experimental.markdownBlockDrag.detail": "Ativa a reorganização experimental de blocos no mesmo documento na Visualização ao Vivo de Markdown.",

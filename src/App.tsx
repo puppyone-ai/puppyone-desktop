@@ -101,6 +101,7 @@ function AppContent() {
   const desktopUpdates = useDesktopUpdates();
   const [activeView, setActiveView] = useState<DesktopView>("data");
   const preferences = useDesktopPreferences();
+  const multiRootWorkspacesEnabled = preferences.experimentalSettings.enableMultiRootWorkspaces;
   const { setRightSidebarOpen } = preferences;
   const fontCatalog = useTypographyCatalog();
   const typography = useTypographyRuntime(
@@ -146,6 +147,7 @@ function AppContent() {
     workspace,
     workspaces,
   } = useWorkspaceLifecycle({
+    multiRootWorkspacesEnabled,
     onWorkspaceActivated: useCallback(() => {
       setActiveView("data");
       setSwitcherOpen(false);
@@ -917,6 +919,7 @@ function AppContent() {
       remoteBranches={remoteBranches}
       workspace={workspace}
       workspaceFolders={workbenchWorkspace?.folders ?? []}
+      multiRootWorkspacesEnabled={multiRootWorkspacesEnabled}
       availableProjects={recentWorkspaceItems.map((item) => item.workspace)}
       workspaceSwitcherOpen={switcherOpen}
       workspaceSwitcherRef={switcherRef}

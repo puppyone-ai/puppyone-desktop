@@ -278,6 +278,7 @@ describe("experimental preferences", () => {
       enableCloudWorkspace: false,
       enableEditorSaveStatus: false,
       enableMarkdownBlockDrag: false,
+      enableMultiRootWorkspaces: false,
       enablePuppyFlowFiles: false,
       enableViewerPlugins: false,
     });
@@ -289,6 +290,15 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings("not-json").enableCloudWorkspace).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableCloudWorkspace: false })).enableCloudWorkspace).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableCloudWorkspace: true })).enableCloudWorkspace).toBe(true);
+  });
+
+  it("keeps multi-project workspaces off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableMultiRootWorkspaces).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableMultiRootWorkspaces).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableMultiRootWorkspaces: false })).enableMultiRootWorkspaces)
+      .toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableMultiRootWorkspaces: true })).enableMultiRootWorkspaces)
+      .toBe(true);
   });
 
   it("keeps Cloud Automation off unless the user explicitly opts in", () => {

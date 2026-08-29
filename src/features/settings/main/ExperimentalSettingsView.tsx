@@ -18,6 +18,7 @@ export function ExperimentalSettingsView({
     messageKey: string;
     settingKey: keyof ExperimentalSettings;
   }> = [
+    { messageKey: "multiRootWorkspaces", settingKey: "enableMultiRootWorkspaces" },
     { messageKey: "viewerPlugins", settingKey: "enableViewerPlugins" },
     { messageKey: "editorSaveStatus", settingKey: "enableEditorSaveStatus" },
     ...(window.puppyoneDesktop?.getGitAutoCommitSettings

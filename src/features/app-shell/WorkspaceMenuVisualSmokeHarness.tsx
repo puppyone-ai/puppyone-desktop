@@ -27,6 +27,7 @@ export function WorkspaceMenuVisualSmokeHarness() {
             titlebarLabel={currentWorkspace.name}
             workspace={currentWorkspace}
             workspaceFolders={folders}
+            multiRootWorkspacesEnabled
             onOpenFolder={() => undefined}
             onClose={() => undefined}
             onGoHome={() => undefined}

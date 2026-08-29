@@ -48,6 +48,7 @@ describe("titlebar Portal menu interactions", () => {
             createWorkspaceFolder(secondWorkspace, { index: 1 }),
           ]}
           availableProjects={[workspace, secondWorkspace, thirdWorkspace]}
+          multiRootWorkspacesEnabled
           onAddExistingProject={onAddExistingProject}
           onOpenFolder={onAddProject}
           onClose={onClose}
@@ -108,6 +109,7 @@ describe("titlebar Portal menu interactions", () => {
           titlebarLabel="Workspace one"
           workspace={createWorkspace("one", "Workspace one")}
           workspaceFolders={[]}
+          multiRootWorkspacesEnabled
           onClose={onClose}
           onGoHome={vi.fn()}
           onToggle={vi.fn()}
@@ -130,6 +132,36 @@ describe("titlebar Portal menu interactions", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("hides Project composition actions while the experiment is off", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(withTestLocalization(
+        <DesktopWorkspaceSwitcher
+          open
+          refObject={createRef<HTMLDivElement>()}
+          titlebarLabel="Workspace one"
+          workspace={createWorkspace("one", "Workspace one")}
+          workspaceFolders={[]}
+          multiRootWorkspacesEnabled={false}
+          onAddExistingProject={vi.fn()}
+          onOpenFolder={vi.fn()}
+          onClose={vi.fn()}
+          onGoHome={vi.fn()}
+          onToggle={vi.fn()}
+        />,
+      ));
+      await Promise.resolve();
+    });
+
+    const menu = requireMenu();
+    expect(menu.textContent).not.toContain("Add Project…");
+    expect(menu.textContent).not.toContain("Open Folder…");
+    expect(menu.querySelector(".desktop-project-add-folder")).toBeNull();
+  });
+
   it("executes branch checkout from the Portal menu and closes after success", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -150,6 +182,7 @@ describe("titlebar Portal menu interactions", () => {
           remoteBranches={[]}
           workspace={createWorkspace("one", "Workspace one")}
           workspaceFolders={[]}
+          multiRootWorkspacesEnabled={false}
           workspaceSwitcherOpen={false}
           workspaceSwitcherRef={createRef<HTMLDivElement>()}
           onCheckoutBranch={onCheckoutBranch}

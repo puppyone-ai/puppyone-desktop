@@ -119,6 +119,8 @@
   "editor.diffMarkers.color": "Farbe",
   "experimental.title": "Experimentell",
   "experimental.detail": "Aktiviere frühe Desktop-Funktionen. Alle Experimente sind standardmäßig deaktiviert.",
+  "experimental.multiRootWorkspaces.title": "Arbeitsbereiche mit mehreren Projekten",
+  "experimental.multiRootWorkspaces.detail": "Erlaubt, über „Projekt hinzufügen…“ mehrere lokale Projekte an das aktuelle Fenster anzuhängen.",
   "experimental.officeEditing.title": "Office-Dokumentbearbeitung",
   "experimental.officeEditing.detail": "Bearbeite .docx-, .xlsx- und .pptx-Dateien mit dem konfigurierten ONLYOFFICE Document Server. Wenn deaktiviert, bleiben Office-Dateien in der schreibgeschützten Vorschau.",
   "experimental.markdownBlockDrag.detail": "Aktiviert das experimentelle Umordnen von Blöcken innerhalb desselben Dokuments in der Markdown-Livevorschau.",

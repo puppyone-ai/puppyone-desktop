@@ -149,6 +149,8 @@
   "editor.markdownPresentation.preview.tail": " 一起使用。",
   "experimental.title": "实验性功能",
   "experimental.detail": "选择体验早期桌面功能。所有实验默认关闭。",
+  "experimental.multiRootWorkspaces.title": "多项目工作区",
+  "experimental.multiRootWorkspaces.detail": "允许通过“添加项目…”将多个本地项目加入当前窗口。",
   "experimental.officeEditing.title": "Office 文档编辑",
   "experimental.officeEditing.detail": "使用已配置的 ONLYOFFICE Document Server 编辑 .docx、.xlsx 和 .pptx 文件。关闭时，Office 文件保持只读预览。",
   "experimental.markdownBlockDrag.detail": "在 Markdown 实时预览中启用同一文档内的早期区块重排功能。",

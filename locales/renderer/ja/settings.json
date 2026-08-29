@@ -119,6 +119,8 @@
   "editor.diffMarkers.color": "色",
   "experimental.title": "実験的機能",
   "experimental.detail": "開発初期のデスクトップ機能を有効にします。すべてデフォルトではオフです。",
+  "experimental.multiRootWorkspaces.title": "マルチプロジェクトワークスペース",
+  "experimental.multiRootWorkspaces.detail": "「プロジェクトを追加…」で複数のローカルプロジェクトを現在のウィンドウに追加できるようにします。",
   "experimental.officeEditing.title": "Office ドキュメント編集",
   "experimental.officeEditing.detail": "設定済みの ONLYOFFICE Document Server で .docx、.xlsx、.pptx ファイルを編集します。オフの場合、Office ファイルは読み取り専用プレビューのままです。",
   "experimental.markdownBlockDrag.detail": "Markdown ライブプレビューで、同じドキュメント内のブロックを並べ替える初期機能を有効にします。",

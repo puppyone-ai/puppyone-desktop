@@ -18,6 +18,7 @@ export function DesktopTitlebarContext({
   remoteBranches,
   workspace,
   workspaceFolders,
+  multiRootWorkspacesEnabled,
   workspaceSwitcherOpen,
   workspaceSwitcherRef,
   onCheckoutBranch,
@@ -48,9 +49,10 @@ export function DesktopTitlebarContext({
         titlebarLabel={workspaceTitlebarLabel}
         workspace={workspace}
         workspaceFolders={workspaceFolders}
+        multiRootWorkspacesEnabled={multiRootWorkspacesEnabled}
         availableProjects={availableProjects}
-        onAddExistingProject={onAddExistingProject}
-        onOpenFolder={onAddProject}
+        onAddExistingProject={multiRootWorkspacesEnabled ? onAddExistingProject : undefined}
+        onOpenFolder={multiRootWorkspacesEnabled ? onAddProject : undefined}
         onClose={onCloseWorkspaceSwitcher}
         onGoHome={onGoHome}
         onToggle={onToggleWorkspaceSwitcher}
@@ -83,6 +85,7 @@ type DesktopTitlebarContextProps = {
   remoteBranches: GitBranchSummary[];
   workspace: Workspace;
   workspaceFolders: readonly WorkspaceFolder[];
+  multiRootWorkspacesEnabled: boolean;
   availableProjects: readonly Workspace[];
   workspaceSwitcherOpen: boolean;
   workspaceSwitcherRef: RefObject<HTMLDivElement>;
