@@ -102,7 +102,6 @@ describe("titlebar Portal menu interactions", () => {
           titlebarLabel="Workspace one"
           workspace={createWorkspace("one", "Workspace one")}
           items={[]}
-          onAddFolder={vi.fn()}
           onClose={onClose}
           onOpenFolder={vi.fn()}
           onOpenItem={vi.fn()}
@@ -113,6 +112,8 @@ describe("titlebar Portal menu interactions", () => {
       await Promise.resolve();
     });
 
+    expect(requireMenu().querySelector<HTMLButtonElement>(".desktop-project-add-folder")?.disabled)
+      .toBe(true);
     act(() => {
       requireMenu().dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     });

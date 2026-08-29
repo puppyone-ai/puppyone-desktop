@@ -102,14 +102,13 @@ export function DesktopWorkspaceSwitcher({
             label={t("shell.workspaceSwitcher.currentWorkspace")}
           >
             {renderProjectRows([currentItem])}
-            {onAddFolder ? (
-              <DesktopMenuItem
-                className="desktop-project-add desktop-project-add-folder"
-                icon={<FolderPlus size={14} />}
-                label={t("shell.workspaceSwitcher.addFolderToWorkspace")}
-                onClick={onAddFolder}
-              />
-            ) : null}
+            <DesktopMenuItem
+              className="desktop-project-add desktop-project-add-folder"
+              disabled={!onAddFolder}
+              icon={<FolderPlus size={14} />}
+              label={t("shell.workspaceSwitcher.addFolderToWorkspace")}
+              onClick={onAddFolder}
+            />
           </DesktopMenuSection>
           {recentItems.length > 0 ? (
             <DesktopMenuSection
