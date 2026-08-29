@@ -181,15 +181,6 @@ export function AgentComposer({
           </div>
         </div>
       </div>
-      {(stopping || (running && canSendWhileRunning)) && (
-        <div className="desktop-agent-composer-hint" role="status">
-          {stopping
-            ? t("agent.composer.waitingToStop", { agent: bidiIsolate(runtimeLabel) })
-            : steerAvailable
-              ? t("agent.composer.steerHint")
-              : t("agent.composer.queueHint")}
-        </div>
-      )}
     </div>
   );
 }
