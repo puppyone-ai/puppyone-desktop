@@ -20,62 +20,74 @@ export function AgentRuntimeLauncher({
   const { t } = useLocalization();
 
   return (
-    <section className="desktop-agent-runtime-launcher" aria-labelledby="desktop-agent-runtime-launcher-title">
+    <section
+      className="desktop-agent-runtime-launcher"
+      aria-labelledby="desktop-agent-runtime-launcher-title"
+      aria-describedby="desktop-agent-runtime-launcher-description"
+    >
       <div className="desktop-agent-runtime-launcher-content">
-        <header className="desktop-agent-runtime-launcher-heading">
-          <div>
-            <h2 id="desktop-agent-runtime-launcher-title">{t("agent.launcher.title")}</h2>
-            <p>{t("agent.launcher.description")}</p>
-          </div>
-          <button
-            type="button"
-            className="desktop-agent-runtime-launcher-refresh"
-            aria-label={t("agent.launcher.scanAgain")}
-            title={t("agent.launcher.scanAgain")}
-            onClick={onRefresh}
-          >
-            <RefreshCw size={13} strokeWidth={1.7} aria-hidden="true" />
-          </button>
-        </header>
+        <div className="desktop-agent-runtime-launcher-group">
+          <header className="desktop-agent-runtime-launcher-heading">
+            <h2 id="desktop-agent-runtime-launcher-title">
+              <span>{t("agent.launcher.title")}</span>
+            </h2>
+            <button
+              type="button"
+              className="desktop-agent-runtime-launcher-refresh"
+              aria-label={t("agent.launcher.scanAgain")}
+              title={t("agent.launcher.scanAgain")}
+              onClick={onRefresh}
+            >
+              <RefreshCw size={12} strokeWidth={1.7} aria-hidden="true" />
+            </button>
+          </header>
 
-        {agentRuntimes.length > 0 ? (
-          <div className="desktop-agent-runtime-launcher-list">
-            {agentRuntimes.map((entry) => {
-              const ready = isSelectableAgentBackend(entry);
-              const detail = entry.readiness.message || entry.descriptor.description || "";
-              return (
-                <button
-                  key={entry.descriptor.id}
-                  type="button"
-                  className="desktop-agent-runtime-launcher-option"
-                  aria-label={entry.descriptor.displayName}
-                  title={detail || entry.descriptor.displayName}
-                  onClick={() => onLaunch(entry.descriptor.id)}
-                >
-                  <AgentBrandMark
-                    iconKey={entry.descriptor.iconKey}
-                    label={entry.descriptor.displayName}
-                  />
-                  <span>{entry.descriptor.displayName}</span>
-                  {!ready && (
-                    <CircleAlert
-                      className="desktop-agent-runtime-launcher-warning"
-                      size={13}
-                      strokeWidth={1.7}
-                      aria-label={detail
-                        ? t("agent.launcher.needsAttention", { agent: bidiIsolate(entry.descriptor.displayName) })
-                        : undefined}
+          <p
+            id="desktop-agent-runtime-launcher-description"
+            className="desktop-agent-runtime-launcher-description"
+          >
+            {t("agent.launcher.description")}
+          </p>
+
+          {agentRuntimes.length > 0 ? (
+            <div className="desktop-agent-runtime-launcher-list">
+              {agentRuntimes.map((entry) => {
+                const ready = isSelectableAgentBackend(entry);
+                const detail = entry.readiness.message || entry.descriptor.description || "";
+                return (
+                  <button
+                    key={entry.descriptor.id}
+                    type="button"
+                    className="desktop-agent-runtime-launcher-option"
+                    aria-label={entry.descriptor.displayName}
+                    title={detail || entry.descriptor.displayName}
+                    onClick={() => onLaunch(entry.descriptor.id)}
+                  >
+                    <AgentBrandMark
+                      iconKey={entry.descriptor.iconKey}
+                      label={entry.descriptor.displayName}
                     />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="desktop-agent-runtime-launcher-empty" role="status">
-            {t("agent.launcher.noneAvailable")}
-          </div>
-        )}
+                    <span>{entry.descriptor.displayName}</span>
+                    {!ready && (
+                      <CircleAlert
+                        className="desktop-agent-runtime-launcher-warning"
+                        size={13}
+                        strokeWidth={1.7}
+                        aria-label={detail
+                          ? t("agent.launcher.needsAttention", { agent: bidiIsolate(entry.descriptor.displayName) })
+                          : undefined}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="desktop-agent-runtime-launcher-empty" role="status">
+              {t("agent.launcher.noneAvailable")}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );

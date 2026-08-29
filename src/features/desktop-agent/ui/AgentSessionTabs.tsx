@@ -57,10 +57,12 @@ export function AgentSessionTabs({
                 onClick={() => onActivate(tab.id)}
                 onKeyDown={(event) => handleKeyDown(event, index)}
               >
-                <span className={`desktop-agent-tab-status is-${tab.statusCode}`} aria-hidden="true" />
-                {tab.runtimeLabel
-                  ? <AgentBrandMark label={tab.runtimeLabel} />
-                  : <MessageSquare className="desktop-agent-tab-placeholder-mark" size={15} aria-hidden="true" />}
+                <span className="desktop-agent-tab-leading" aria-hidden="true">
+                  {tab.runtimeLabel
+                    ? <AgentBrandMark label={tab.runtimeLabel} />
+                    : <MessageSquare className="desktop-agent-tab-placeholder-mark" size={14} />}
+                  <span className={`desktop-agent-tab-status is-${tab.statusCode}`} />
+                </span>
                 <span className="desktop-agent-tab-title">{tab.title}</span>
               </button>
               <DesktopMenuIconButton
