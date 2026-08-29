@@ -17,6 +17,10 @@ describe("host-owned CSS theme service", () => {
     const userDataPath = await createTemporaryDirectory();
     const bundledThemesPath = await createTemporaryDirectory();
     for (const [filename, name] of [
+      ["alto", "Alto"],
+      ["jade", "Jade"],
+      ["newsprint", "Newsprint"],
+      ["rainbow", "Rainbow"],
       ["github", "GitHub"],
       ["forest", "Forest"],
       ["night", "Night"],
@@ -52,7 +56,7 @@ describe("host-owned CSS theme service", () => {
       .toBe(false);
   });
 
-  it("ships four valid starter CSS files for the user theme directory", async () => {
+  it("ships eight valid starter CSS files for the user theme directory", async () => {
     const userDataPath = await createTemporaryDirectory();
     const service = createThemeService({
       userDataPath,
@@ -64,11 +68,28 @@ describe("host-owned CSS theme service", () => {
 
     expect(snapshot.diagnostics).toEqual([]);
     expect(snapshot.themes.map(({ id, source, targets }) => ({ id, source, targets }))).toEqual([
+      { id: "builtin.pack.alto", source: "local-css", targets: ["application", "markdown", "csv"] },
       { id: "builtin.pack.forest", source: "local-css", targets: ["application", "markdown", "csv"] },
       { id: "builtin.pack.github", source: "local-css", targets: ["application", "markdown", "csv"] },
+      { id: "builtin.pack.jade", source: "local-css", targets: ["application", "markdown", "csv"] },
+      { id: "builtin.pack.newsprint", source: "local-css", targets: ["application", "markdown", "csv"] },
       { id: "builtin.pack.night", source: "local-css", targets: ["application", "markdown", "csv"] },
+      { id: "builtin.pack.rainbow", source: "local-css", targets: ["application", "markdown", "csv"] },
       { id: "builtin.pack.rose", source: "local-css", targets: ["application", "markdown", "csv"] },
     ]);
+
+    const markdownCss = Object.fromEntries(snapshot.themes.map((theme) => [
+      theme.id,
+      theme.compiledCss.markdown,
+    ]));
+    expect(markdownCss["builtin.pack.alto"]).toContain("text-align: center");
+    expect(markdownCss["builtin.pack.alto"]).toContain("background: #4870ac");
+    expect(markdownCss["builtin.pack.jade"]).toContain("linear-gradient");
+    expect(markdownCss["builtin.pack.jade"]).toContain("border-inline-start");
+    expect(markdownCss["builtin.pack.newsprint"]).toContain("border-bottom: 3px double");
+    expect(markdownCss["builtin.pack.newsprint"]).toContain("font-style: italic");
+    expect(markdownCss["builtin.pack.rainbow"]).toContain("border-radius: 6px");
+    expect(markdownCss["builtin.pack.rainbow"]).toContain("text-decoration-color: #d95b8a");
   });
 
   it("discovers manifest packages and Typora-style top-level CSS themes", async () => {

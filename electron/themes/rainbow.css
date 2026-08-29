@@ -1,0 +1,253 @@
+/* Rainbow: a blue foundation with measured multicolor accents. */
+@puppyone-theme {
+  id: builtin.pack.rainbow;
+  name: Rainbow;
+  version: 1.0.0;
+  author: PuppyOne;
+  modes: light dark;
+}
+
+@puppyone application {
+  .theme-root {
+    --po-surface-canvas: #f1f5fb;
+    --po-surface-chrome: #e4edf8;
+    --po-surface-panel: #fbfdff;
+    --po-surface-panel-raised: #ffffff;
+    --po-surface-overlay: #ffffff;
+    --po-surface-inset: #dce7f4;
+    --po-text: #303545;
+    --po-text-muted: #646b7b;
+    --po-text-subtle: #8b92a1;
+    --po-border: rgba(65, 103, 160, 0.2);
+    --po-divider: rgba(65, 103, 160, 0.14);
+    --po-hover: rgba(72, 120, 186, 0.09);
+    --po-selected: rgba(72, 120, 186, 0.16);
+    --po-accent: #4c78b8;
+    --po-accent-text: #345f9d;
+    --po-focus-ring: #4c78b8;
+  }
+
+  .theme-root.dark,
+  .dark .theme-root {
+    --po-surface-canvas: #181b27;
+    --po-surface-chrome: #202432;
+    --po-surface-panel: #262b3a;
+    --po-surface-panel-raised: #303647;
+    --po-surface-overlay: #343a4d;
+    --po-surface-inset: #141722;
+    --po-text: #edf0f7;
+    --po-text-muted: #b3bbcc;
+    --po-text-subtle: #8993a8;
+    --po-border: rgba(191, 205, 235, 0.2);
+    --po-divider: rgba(191, 205, 235, 0.15);
+    --po-hover: rgba(110, 151, 211, 0.13);
+    --po-selected: rgba(110, 151, 211, 0.21);
+    --po-accent: #7ca5df;
+    --po-accent-text: #a9c6ee;
+    --po-focus-ring: #7ca5df;
+  }
+}
+
+@puppyone markdown {
+  .theme-root {
+    --po-md-surface-background: #ffffff;
+    --po-md-content-color: #303545;
+    --po-md-content-font: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    --po-md-content-line-height: 1.76;
+    --po-md-block-gap: 18px;
+    --po-md-heading-gap-before: 30px;
+    --po-md-heading-gap-after: 16px;
+    --po-md-heading-weight: 680;
+    --po-md-h1-weight: 750;
+    --po-md-h2-weight: 720;
+    --po-md-h3-weight: 680;
+    --po-md-h1-size: 2.15em;
+    --po-md-h2-size: 1.55em;
+    --po-md-h3-size: 1.28em;
+    --po-md-rule-color: #c7d5e7;
+    --po-markdown-editor-text-width: 730px;
+  }
+
+  .theme-root .cm-md-heading-1,
+  .theme-root h1 {
+    color: #4c78b8;
+    text-align: center;
+    letter-spacing: 0.03em;
+  }
+
+  .theme-root .cm-md-heading-2 {
+    padding-inline: 12px;
+    border-inline-start: 5px solid #4c78b8;
+    border-radius: 6px;
+    background: #edf3fb;
+    color: #3e69a6;
+  }
+
+  .theme-root h2 {
+    width: fit-content;
+    max-width: 100%;
+    padding: 5px 15px;
+    border-radius: 6px;
+    background: #4c78b8;
+    color: #ffffff;
+  }
+
+  .theme-root .cm-md-heading-3,
+  .theme-root h3 {
+    padding-bottom: 4px;
+    border-bottom: 2px solid #6b93ca;
+    color: #4c78b8;
+  }
+
+  .theme-root a {
+    color: #b54575;
+    text-decoration: underline;
+    text-decoration-color: #d95b8a;
+    text-underline-offset: 3px;
+  }
+
+  .theme-root strong {
+    color: #7652a7;
+  }
+
+  .theme-root .cm-md-blockquote,
+  .theme-root blockquote {
+    border-inline-start: 4px solid #e0a536;
+    border-radius: 0 7px 7px 0;
+    background: #fff8e8;
+    color: #6d5b38;
+  }
+
+  .theme-root .cm-md-blockquote {
+    padding-block: 6px;
+    padding-inline: 18px 12px;
+  }
+
+  .theme-root blockquote {
+    padding-block: 14px;
+  }
+
+  .theme-root .cm-md-syntax-monospace,
+  .theme-root :not(pre) > code {
+    border-radius: 5px;
+    background: #eaf7f5;
+    color: #147f80;
+  }
+
+  .theme-root :not(pre) > code {
+    padding: 2px 5px;
+  }
+
+  .theme-root .cm-md-code-block-line,
+  .theme-root pre {
+    border: 1px solid #dce5f1;
+    border-radius: 8px;
+    background: #f5f8fc;
+  }
+
+  .theme-root table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #c7d5e7;
+  }
+
+  .theme-root th,
+  .theme-root td {
+    padding: 8px 12px;
+    border: 1px solid #dce5f1;
+  }
+
+  .theme-root th {
+    background: linear-gradient(90deg, #e7effa, #f5eaf2);
+    color: #4c5f8e;
+  }
+
+  .theme-root tbody tr:nth-child(even) {
+    background: #fafbfe;
+  }
+
+  .dark .theme-root {
+    --po-md-surface-background: #202432;
+    --po-md-content-color: #e7eaf2;
+    --po-md-rule-color: #46516a;
+  }
+
+  .dark .theme-root .cm-md-heading-1,
+  .dark .theme-root h1,
+  .dark .theme-root .cm-md-heading-3,
+  .dark .theme-root h3 {
+    color: #8db3e8;
+  }
+
+  .dark .theme-root .cm-md-heading-2 {
+    border-inline-start-color: #7ca5df;
+    background: #2a3348;
+    color: #a9c6ee;
+  }
+
+  .dark .theme-root h2 {
+    background: #4b6f9f;
+  }
+
+  .dark .theme-root a {
+    color: #efa0bf;
+    text-decoration-color: #d95b8a;
+  }
+
+  .dark .theme-root strong {
+    color: #c6a8eb;
+  }
+
+  .dark .theme-root .cm-md-blockquote,
+  .dark .theme-root blockquote {
+    border-inline-start-color: #d5a64c;
+    background: #363126;
+    color: #d6c7aa;
+  }
+
+  .dark .theme-root .cm-md-syntax-monospace,
+  .dark .theme-root :not(pre) > code,
+  .dark .theme-root .cm-md-code-block-line,
+  .dark .theme-root pre {
+    border-color: #39465a;
+    background: #171b27;
+    color: #75ced0;
+  }
+
+  .dark .theme-root table,
+  .dark .theme-root th,
+  .dark .theme-root td {
+    border-color: #46516a;
+  }
+
+  .dark .theme-root th {
+    background: linear-gradient(90deg, #2d3d57, #453044);
+    color: #d9e1f0;
+  }
+
+  .dark .theme-root tbody tr:nth-child(even) {
+    background: #252a39;
+  }
+}
+
+@puppyone csv {
+  .theme-root {
+    --po-csv-surface-background: #fbfdff;
+    --po-csv-surface-color: #303545;
+    --po-editable-table-border: #9eb4d1;
+    --po-editable-table-cell-border: #d2deed;
+    --po-editable-table-sticky-header-background: #e7effa;
+    --csv-table-record-index-background: #f3edf5;
+    --po-editable-table-cell-focus-ring: #4c78b8;
+  }
+
+  .dark .theme-root {
+    --po-csv-surface-background: #202432;
+    --po-csv-surface-color: #e7eaf2;
+    --po-editable-table-border: #56647f;
+    --po-editable-table-cell-border: #3c465b;
+    --po-editable-table-sticky-header-background: #2d3d57;
+    --csv-table-record-index-background: #352a3a;
+    --po-editable-table-cell-focus-ring: #7ca5df;
+  }
+}

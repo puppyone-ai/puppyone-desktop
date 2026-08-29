@@ -25,8 +25,17 @@ const MAX_THEME_COMPILED_BYTES = 16 * 1024 * 1024;
 const MAX_THEME_IMPORTS = 64;
 const CUSTOM_THEME_DIRECTORY = "puppyone-custom-css";
 const CUSTOM_THEME_ID = "local.puppyone.custom-css";
-const STARTER_THEME_NAMES = Object.freeze(["github", "forest", "night", "rose"]);
-const STARTER_THEME_MARKER = ".puppyone-starter-themes-v2";
+const STARTER_THEME_NAMES = Object.freeze([
+  "github",
+  "forest",
+  "night",
+  "rose",
+  "alto",
+  "jade",
+  "newsprint",
+  "rainbow",
+]);
+const STARTER_THEME_MARKER = ".puppyone-starter-themes-v3";
 const themeTargets = Object.freeze(["application", "markdown", "csv"]);
 const assetMimeTypes = new Map([
   [".woff", "font/woff"],
@@ -170,7 +179,7 @@ async function installStarterThemes({ bundledThemesPath, themeRoot }) {
       if (error?.code !== "EEXIST") throw error;
     }
   }
-  await writeFileAtomic(themeRoot, STARTER_THEME_MARKER, "2\n");
+  await writeFileAtomic(themeRoot, STARTER_THEME_MARKER, "3\n");
 }
 
 async function pathEntryExists(filePath) {

@@ -1,0 +1,237 @@
+/*
+ * Alto for PuppyOne
+ * An original adaptation of the Alto/Lapis visual language for PuppyOne's
+ * scoped Application, Markdown, and CSV theme surfaces.
+ */
+@puppyone-theme {
+  id: builtin.pack.alto;
+  name: Alto;
+  version: 1.0.0;
+  author: PuppyOne;
+  modes: light dark;
+}
+
+@puppyone application {
+  .theme-root {
+    --po-surface-canvas: #e8f4ff;
+    --po-surface-chrome: #dbeafa;
+    --po-surface-panel: #f8fbfe;
+    --po-surface-panel-raised: #ffffff;
+    --po-surface-overlay: #ffffff;
+    --po-surface-inset: #d3e4f3;
+    --po-text: #40464f;
+    --po-text-muted: #657181;
+    --po-text-subtle: #8793a2;
+    --po-border: rgba(72, 112, 172, 0.22);
+    --po-divider: rgba(72, 112, 172, 0.16);
+    --po-hover: rgba(72, 112, 172, 0.09);
+    --po-selected: rgba(72, 112, 172, 0.16);
+    --po-accent: #4870ac;
+    --po-accent-text: #345b91;
+    --po-focus-ring: #5e8fc5;
+  }
+
+  .theme-root.dark,
+  .dark .theme-root {
+    --po-surface-canvas: #181c24;
+    --po-surface-chrome: #1e222a;
+    --po-surface-panel: #252b35;
+    --po-surface-panel-raised: #2d3440;
+    --po-surface-overlay: #303744;
+    --po-surface-inset: #141820;
+    --po-text: #e4e8ee;
+    --po-text-muted: #abb4c2;
+    --po-text-subtle: #818c9d;
+    --po-border: rgba(155, 175, 204, 0.22);
+    --po-divider: rgba(155, 175, 204, 0.17);
+    --po-hover: rgba(131, 147, 173, 0.13);
+    --po-selected: rgba(131, 147, 173, 0.22);
+    --po-accent: #93a9c9;
+    --po-accent-text: #b8cae2;
+    --po-focus-ring: #7f9abd;
+  }
+}
+
+@puppyone markdown {
+  .theme-root {
+    --po-md-surface-background: #ffffff;
+    --po-md-content-color: #40464f;
+    --po-md-content-font: "Avenir Next", Avenir, "PingFang SC", "Microsoft YaHei", sans-serif;
+    --po-md-content-line-height: 1.72;
+    --po-md-block-gap: 18px;
+    --po-md-heading-gap-before: 28px;
+    --po-md-heading-gap-after: 16px;
+    --po-md-heading-weight: 650;
+    --po-md-h1-weight: 700;
+    --po-md-h2-weight: 700;
+    --po-md-h3-weight: 650;
+    --po-md-h1-size: 2.05em;
+    --po-md-h2-size: 1.5em;
+    --po-md-h3-size: 1.3em;
+    --po-md-rule-color: #c5d3e3;
+    --po-markdown-editor-text-width: 760px;
+  }
+
+  .theme-root .cm-md-heading,
+  .theme-root h1,
+  .theme-root h2,
+  .theme-root h3 {
+    color: #4870ac;
+    font-family: "Songti SC", STSong, Georgia, serif;
+  }
+
+  .theme-root .cm-md-heading-1,
+  .theme-root h1 {
+    text-align: center;
+    letter-spacing: 0.02em;
+  }
+
+  .theme-root .cm-md-heading-2 {
+    padding-inline: 12px;
+    border-inline-start: 4px solid #4870ac;
+    border-radius: 4px;
+    background: #e8f0f8;
+  }
+
+  .theme-root h2 {
+    width: fit-content;
+    max-width: 100%;
+    padding: 4px 14px;
+    border-radius: 4px;
+    background: #4870ac;
+    color: #ffffff;
+  }
+
+  .theme-root .cm-md-heading-3,
+  .theme-root h3 {
+    border-bottom: 1px solid #aebfd3;
+    padding-bottom: 4px;
+  }
+
+  .theme-root .cm-md-blockquote,
+  .theme-root blockquote {
+    border-inline-start: 3px solid #4870ac;
+    border-radius: 0 7px 7px 0;
+    background: #f2f6fa;
+    color: #5c6673;
+  }
+
+  .theme-root .cm-md-blockquote {
+    padding-block: 6px;
+    padding-inline: 18px 12px;
+  }
+
+  .theme-root blockquote {
+    padding-block: 14px;
+  }
+
+  .theme-root .cm-md-syntax-monospace,
+  .theme-root :not(pre) > code {
+    border-radius: 4px;
+    background: #f1f4f8;
+    color: #4870ac;
+  }
+
+  .theme-root :not(pre) > code {
+    padding: 2px 5px;
+  }
+
+  .theme-root .cm-md-code-block-line,
+  .theme-root pre {
+    border: 1px solid #dce4ee;
+    border-radius: 7px;
+    background: #f6f8fa;
+  }
+
+  .theme-root table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .theme-root th,
+  .theme-root td {
+    padding: 8px 12px;
+    border: 1px solid #d9dfe4;
+  }
+
+  .theme-root th {
+    background: #eef3f8;
+    color: #4870ac;
+    font-family: "Songti SC", STSong, Georgia, serif;
+  }
+
+  .theme-root tbody tr:hover {
+    background: #f5f8fb;
+  }
+
+  .dark .theme-root {
+    --po-md-surface-background: #1e222a;
+    --po-md-content-color: #e4e4e4;
+    --po-md-rule-color: #47556d;
+  }
+
+  .dark .theme-root .cm-md-heading,
+  .dark .theme-root h1,
+  .dark .theme-root h2,
+  .dark .theme-root h3 {
+    color: #aebed5;
+  }
+
+  .dark .theme-root .cm-md-heading-2 {
+    border-inline-start-color: #8393ad;
+    background: #2a3342;
+  }
+
+  .dark .theme-root h2 {
+    background: #47556d;
+    color: #f3f6fa;
+  }
+
+  .dark .theme-root .cm-md-blockquote,
+  .dark .theme-root blockquote {
+    border-inline-start-color: #8393ad;
+    background: #2a2f3b;
+    color: #c2c9d3;
+  }
+
+  .dark .theme-root .cm-md-syntax-monospace,
+  .dark .theme-root :not(pre) > code,
+  .dark .theme-root .cm-md-code-block-line,
+  .dark .theme-root pre {
+    border-color: #323b4a;
+    background: #080e1d;
+    color: #abbad4;
+  }
+
+  .dark .theme-root th,
+  .dark .theme-root td {
+    border-color: #47556d;
+  }
+
+  .dark .theme-root th,
+  .dark .theme-root tbody tr:hover {
+    background: #252c38;
+  }
+}
+
+@puppyone csv {
+  .theme-root {
+    --po-csv-surface-background: #fbfdff;
+    --po-csv-surface-color: #40464f;
+    --po-editable-table-border: #aebfd3;
+    --po-editable-table-cell-border: #d9e2ec;
+    --po-editable-table-sticky-header-background: #e8f0f8;
+    --csv-table-record-index-background: #f1f5f9;
+    --po-editable-table-cell-focus-ring: #4870ac;
+  }
+
+  .dark .theme-root {
+    --po-csv-surface-background: #1e222a;
+    --po-csv-surface-color: #e4e8ee;
+    --po-editable-table-border: #536174;
+    --po-editable-table-cell-border: #384351;
+    --po-editable-table-sticky-header-background: #2a3342;
+    --csv-table-record-index-background: #252b35;
+    --po-editable-table-cell-focus-ring: #93a9c9;
+  }
+}
