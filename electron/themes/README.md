@@ -12,7 +12,7 @@ This folder is the editable theme library used by PuppyOne Desktop. A theme can 
 
 1. Open **Settings → Appearance → Theme**.
 2. Select **Open Themes Folder**. This is the safest way to locate the correct folder on every operating system and in development builds.
-3. Copy a theme such as `alto.css` into the opened folder.
+3. Copy a theme such as `paper-blue.css` into the opened folder.
 4. Return to Appearance and select **Reload Themes**.
 5. Choose the theme from **Theme Pack**. Selecting a pack applies it to Application, Markdown, and CSV when all three targets are present.
 
@@ -40,24 +40,20 @@ Development and preview builds may use a channel-specific directory such as `pup
 
 开发版和预览版可能使用类似 `puppyone-development/themes` 的独立目录，所以建议始终通过应用内的 **打开主题文件夹** 按钮定位。
 
-## 📦 Included themes / 内置示例主题
+## 📦 Getting themes / 获取主题
 
-PuppyOne installs these files as editable examples and never overwrites an existing theme with the same name:
+PuppyOne Desktop provides the theme engine and this authoring guide, but it does not bundle downloadable theme CSS in the application repository. Theme collections can be maintained and shared independently without coupling their release cycle to the desktop application.
 
-| Theme | Character |
-| ----- | --------- |
-| `alto.css` | Blue-gray Alto/Lapis-inspired interface with centered H1 and label-style H2 |
-| `forest.css` | Quiet green reading and table palette |
-| `github.css` | Familiar neutral GitHub-like document colors |
-| `jade.css` | Mineral green palette with underlined H1, gradient H2, and ruled H3 |
-| `newsprint.css` | Warm serif editorial layout with a double-rule H1 |
-| `night.css` | Focused dark interface and document surface |
-| `rainbow.css` | Blue foundation with restrained multicolor document accents |
-| `rose.css` | Warm rose interface, document, and table palette |
+PuppyOne Desktop 提供主题引擎和这份编写指南，但应用仓库不再附带可分发的主题 CSS。主题集合可以在独立仓库中维护和分享，不必与桌面应用使用相同的发布周期。
 
-These files are starting points. Rename a copy, change its metadata ID and name, edit the CSS, and reload themes to create your own variation.
+To install a theme obtained from a theme author or collection:
 
-这些文件既是可直接使用的主题，也是制作新主题的模板。复制并重命名文件后，请同时修改主题的 `id` 和 `name`，编辑完成后重新加载主题。
+1. Download the `.css` file without changing its extension.
+2. Open the authoritative Themes Folder from Appearance.
+3. Copy the file into that folder.
+4. Select **Reload Themes**, review any diagnostics, and choose the theme.
+
+从主题作者或主题集合获取 `.css` 文件后，将它复制到 Appearance 打开的主题目录，点击 **重新加载主题**，确认没有诊断错误后即可选择使用。
 
 ## ✍️ Single-file theme format / 单文件主题格式
 
@@ -217,10 +213,6 @@ Project repository: [puppyone-ai/puppyone-desktop](https://github.com/puppyone-a
 
 ## 🔗 License and attribution / 许可证与致谢
 
-The PuppyOne-authored starter themes in this folder are distributed under the repository's [Apache License 2.0](https://github.com/puppyone-ai/puppyone-desktop/blob/main/LICENSE). Preserve applicable copyright and license notices when redistributing them.
+This guide and the PuppyOne Desktop theme interface are distributed under the desktop repository's [Apache License 2.0](https://github.com/puppyone-ai/puppyone-desktop/blob/main/LICENSE). Theme CSS, fonts, images, and other assets obtained from an independent theme repository remain subject to the license and attribution supplied by their respective authors.
 
-本文件夹中由 PuppyOne 编写的示例主题使用项目仓库的 [Apache License 2.0](https://github.com/puppyone-ai/puppyone-desktop/blob/main/LICENSE) 发布。再分发时请保留适用的版权与许可证声明。
-
-The Alto pack is an original PuppyOne adaptation informed by the visual language of [Typora Theme Alto](https://github.com/Seeridia/typora-theme-alto) and [Typora Theme Lapis](https://github.com/YiNNx/typora-theme-lapis). It does not redistribute their bundled font files. Other starter themes are original PuppyOne designs informed by general document-design patterns.
-
-Alto 是 PuppyOne 针对自身主题接口重新编写的适配主题，其视觉语言参考了 Typora Theme Alto 与 Lapis；本目录不再分发它们附带的字体文件。其余示例主题为 PuppyOne 根据通用文档设计模式重新设计的样式。
+本指南及 PuppyOne Desktop 主题接口使用桌面应用仓库的 [Apache License 2.0](https://github.com/puppyone-ai/puppyone-desktop/blob/main/LICENSE)。从独立主题仓库获得的 CSS、字体、图片和其他资源，应遵守对应主题作者提供的许可证与署名要求。

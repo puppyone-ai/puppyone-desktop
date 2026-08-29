@@ -25,18 +25,8 @@ const MAX_THEME_COMPILED_BYTES = 16 * 1024 * 1024;
 const MAX_THEME_IMPORTS = 64;
 const CUSTOM_THEME_DIRECTORY = "puppyone-custom-css";
 const CUSTOM_THEME_ID = "local.puppyone.custom-css";
-const STARTER_THEME_NAMES = Object.freeze([
-  "github",
-  "forest",
-  "night",
-  "rose",
-  "alto",
-  "jade",
-  "newsprint",
-  "rainbow",
-]);
-const STARTER_THEME_MARKER = ".puppyone-starter-themes-v4";
-const STARTER_THEME_README = "README.md";
+const THEME_GUIDE_MARKER = ".puppyone-theme-guide-v1";
+const THEME_GUIDE_README = "README.md";
 const themeTargets = Object.freeze(["application", "markdown", "csv"]);
 const assetMimeTypes = new Map([
   [".woff", "font/woff"],
@@ -61,7 +51,7 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
   const resolvedUserDataPath = path.resolve(userDataPath);
   const themeRoot = path.join(resolvedUserDataPath, "themes");
   let managedWriteQueue = Promise.resolve();
-  let starterInstallQueue = Promise.resolve();
+  let guideInstallQueue = Promise.resolve();
 
   const ensureRoot = async () => {
     await mkdir(resolvedUserDataPath, { recursive: true });
@@ -72,11 +62,11 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
       throw new TypeError("The theme root must remain inside the user-data directory.");
     }
     if (typeof bundledThemesPath === "string" && bundledThemesPath.trim()) {
-      const operation = starterInstallQueue.then(() => installStarterThemes({
+      const operation = guideInstallQueue.then(() => installThemeGuide({
         bundledThemesPath: path.resolve(bundledThemesPath),
         themeRoot: canonicalThemeRoot,
       }));
-      starterInstallQueue = operation.catch(() => undefined);
+      guideInstallQueue = operation.catch(() => undefined);
       await operation;
     }
     return canonicalThemeRoot;
@@ -167,22 +157,13 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
   return Object.freeze({ listThemes, openDirectory, readCustomCss, saveCustomCss });
 }
 
-async function installStarterThemes({ bundledThemesPath, themeRoot }) {
-  if (await pathEntryExists(path.join(themeRoot, STARTER_THEME_MARKER))) return;
+async function installThemeGuide({ bundledThemesPath, themeRoot }) {
+  if (await pathEntryExists(path.join(themeRoot, THEME_GUIDE_MARKER))) return;
   await installBundledFileIfMissing({
-    source: path.join(bundledThemesPath, STARTER_THEME_README),
-    destination: path.join(themeRoot, STARTER_THEME_README),
+    source: path.join(bundledThemesPath, THEME_GUIDE_README),
+    destination: path.join(themeRoot, THEME_GUIDE_README),
   });
-  for (const themeName of STARTER_THEME_NAMES) {
-    const legacyDestination = path.join(themeRoot, themeName);
-    const destination = path.join(themeRoot, `${themeName}.css`);
-    if (await pathEntryExists(destination) || await pathEntryExists(legacyDestination)) continue;
-    await installBundledFileIfMissing({
-      source: path.join(bundledThemesPath, `${themeName}.css`),
-      destination,
-    });
-  }
-  await writeFileAtomic(themeRoot, STARTER_THEME_MARKER, "4\n");
+  await writeFileAtomic(themeRoot, THEME_GUIDE_MARKER, "1\n");
 }
 
 async function installBundledFileIfMissing({ source, destination }) {

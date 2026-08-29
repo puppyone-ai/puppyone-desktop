@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -13,7 +13,7 @@ afterEach(async () => {
 });
 
 describe("host-owned CSS theme service", () => {
-  it("installs missing starter CSS files and never overwrites user edits", async () => {
+  it("installs the theme guide without copying bundled CSS or changing user themes", async () => {
     const userDataPath = await createTemporaryDirectory();
     const bundledThemesPath = await createTemporaryDirectory();
     for (const [filename, name] of [
@@ -34,38 +34,42 @@ describe("host-owned CSS theme service", () => {
       );
     }
     await writeFile(path.join(bundledThemesPath, "README.md"), "# PuppyOne themes\n", "utf8");
+    const themeRoot = path.join(userDataPath, "themes");
+    await mkdir(themeRoot, { recursive: true });
+    await createSingleFilePack(
+      themeRoot,
+      "personal.css",
+      "com.example.personal",
+      "Personal",
+    );
+    const personalThemePath = path.join(themeRoot, "personal.css");
+    const personalTheme = await readFile(personalThemePath, "utf8");
     const service = createThemeService({ userDataPath, bundledThemesPath, shell: createShell() });
 
-    const first = await service.listThemes();
-    const installed = first.themes.find((theme) => theme.id === "builtin.pack.forest");
-    expect(installed).toMatchObject({
-      name: "Forest",
+    const snapshot = await service.listThemes();
+    expect(snapshot.themes).toHaveLength(1);
+    expect(snapshot.themes[0]).toMatchObject({
+      id: "com.example.personal",
+      name: "Personal",
       source: "local-css",
       targets: ["application", "markdown", "csv"],
     });
     const installedReadme = path.join(userDataPath, "themes", "README.md");
     expect(await readFile(installedReadme, "utf8")).toBe("# PuppyOne themes\n");
+    expect(await readFile(personalThemePath, "utf8")).toBe(personalTheme);
+    expect((await readdir(themeRoot)).filter((entry) => entry.endsWith(".css")))
+      .toEqual(["personal.css"]);
 
-    const installedTheme = path.join(userDataPath, "themes", "forest.css");
-    const customizedTheme = await readFile(installedTheme, "utf8")
-      .then((css) => css.replace("#222", "rebeccapurple"));
-    await writeFile(installedTheme, customizedTheme, "utf8");
     await writeFile(installedReadme, "# My theme notes\n", "utf8");
     await service.listThemes();
-    expect(await readFile(installedTheme, "utf8")).toBe(customizedTheme);
     expect(await readFile(installedReadme, "utf8")).toBe("# My theme notes\n");
-
-    await rm(installedTheme);
-    const afterDeletion = await service.listThemes();
-    expect(afterDeletion.themes.some((theme) => theme.id === "builtin.pack.forest"))
-      .toBe(false);
   });
 
-  it("upgrades a v3 catalog with the README without overwriting existing themes", async () => {
+  it("installs the guide for a previous starter catalog without overwriting themes", async () => {
     const userDataPath = await createTemporaryDirectory();
     const themeRoot = path.join(userDataPath, "themes");
     await mkdir(themeRoot, { recursive: true });
-    await writeFile(path.join(themeRoot, ".puppyone-starter-themes-v3"), "3\n", "utf8");
+    await writeFile(path.join(themeRoot, ".puppyone-starter-themes-v4"), "4\n", "utf8");
     const userTheme = "/* keep my theme */\nbody { color: rebeccapurple }\n";
     await writeFile(path.join(themeRoot, "forest.css"), userTheme, "utf8");
 
@@ -79,46 +83,27 @@ describe("host-owned CSS theme service", () => {
     expect(await readFile(path.join(themeRoot, "README.md"), "utf8"))
       .toContain("Where this folder belongs");
     expect(await readFile(path.join(themeRoot, "forest.css"), "utf8")).toBe(userTheme);
-    expect(await readFile(path.join(themeRoot, ".puppyone-starter-themes-v4"), "utf8"))
-      .toBe("4\n");
+    expect(await readFile(path.join(themeRoot, ".puppyone-theme-guide-v1"), "utf8"))
+      .toBe("1\n");
   });
 
-  it("ships eight valid starter CSS files for the user theme directory", async () => {
+  it("ships the theme guide without distributable CSS assets", async () => {
     const userDataPath = await createTemporaryDirectory();
+    const bundledThemesPath = path.join(process.cwd(), "electron", "themes");
     const service = createThemeService({
       userDataPath,
-      bundledThemesPath: path.join(process.cwd(), "electron", "themes"),
+      bundledThemesPath,
       shell: createShell(),
     });
 
     const snapshot = await service.listThemes();
 
     expect(snapshot.diagnostics).toEqual([]);
+    expect(snapshot.themes).toEqual([]);
     expect(await readFile(path.join(userDataPath, "themes", "README.md"), "utf8"))
       .toContain("Where this folder belongs");
-    expect(snapshot.themes.map(({ id, source, targets }) => ({ id, source, targets }))).toEqual([
-      { id: "builtin.pack.alto", source: "local-css", targets: ["application", "markdown", "csv"] },
-      { id: "builtin.pack.forest", source: "local-css", targets: ["application", "markdown", "csv"] },
-      { id: "builtin.pack.github", source: "local-css", targets: ["application", "markdown", "csv"] },
-      { id: "builtin.pack.jade", source: "local-css", targets: ["application", "markdown", "csv"] },
-      { id: "builtin.pack.newsprint", source: "local-css", targets: ["application", "markdown", "csv"] },
-      { id: "builtin.pack.night", source: "local-css", targets: ["application", "markdown", "csv"] },
-      { id: "builtin.pack.rainbow", source: "local-css", targets: ["application", "markdown", "csv"] },
-      { id: "builtin.pack.rose", source: "local-css", targets: ["application", "markdown", "csv"] },
-    ]);
-
-    const markdownCss = Object.fromEntries(snapshot.themes.map((theme) => [
-      theme.id,
-      theme.compiledCss.markdown,
-    ]));
-    expect(markdownCss["builtin.pack.alto"]).toContain("text-align: center");
-    expect(markdownCss["builtin.pack.alto"]).toContain("background: #4870ac");
-    expect(markdownCss["builtin.pack.jade"]).toContain("linear-gradient");
-    expect(markdownCss["builtin.pack.jade"]).toContain("border-inline-start");
-    expect(markdownCss["builtin.pack.newsprint"]).toContain("border-bottom: 3px double");
-    expect(markdownCss["builtin.pack.newsprint"]).toContain("font-style: italic");
-    expect(markdownCss["builtin.pack.rainbow"]).toContain("border-radius: 6px");
-    expect(markdownCss["builtin.pack.rainbow"]).toContain("text-decoration-color: #d95b8a");
+    expect((await readdir(bundledThemesPath)).filter((entry) => entry.endsWith(".css")))
+      .toEqual([]);
   });
 
   it("discovers manifest packages and Typora-style top-level CSS themes", async () => {

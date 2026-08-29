@@ -6,22 +6,14 @@ Selecting a Theme Pack applies it to all three surfaces and resets the Advanced 
 
 The visual precedence is Interface Style → resolved System/Light/Dark mode and base palette → Theme Pack → advanced per-surface override. Appearance continues to own navigation, file icons, motion, pointer behavior, and other interface preferences; theme CSS cannot change those product settings.
 
-Default is the only coordinated Theme Pack bundled into the renderer. On first access to the theme catalog, PuppyOne installs Alto, Forest, GitHub, Jade, Newsprint, Night, Rainbow, and Rose into the platform-specific Themes Folder as ordinary editable single-file themes. The folder also receives a bilingual `README.md` with installation, authoring, and sharing guidance:
+Default is the only coordinated Theme Pack bundled into the renderer. Distributable theme CSS is maintained outside the desktop application repository so theme collections can be released and shared independently. On first access to the theme catalog, PuppyOne installs a bilingual `README.md` with installation, authoring, and sharing guidance into the platform-specific Themes Folder:
 
 ```text
 ${app.getPath("userData")}/themes/
-├── README.md
-├── alto.css
-├── forest.css
-├── github.css
-├── jade.css
-├── newsprint.css
-├── night.css
-├── rainbow.css
-└── rose.css
+└── README.md
 ```
 
-These starter files use the same discovery, validation, diagnostics, and reload path as a theme created by the user. PuppyOne never overwrites an existing starter path or README. A versioned hidden marker records installation, so later edits, replacements, and deliberate deletions remain user-owned. The designs are original PuppyOne implementations informed by common document-theme characteristics and use only PuppyOne's public scoped tokens.
+PuppyOne never overwrites an existing README or theme file. A documentation-specific hidden marker records guide installation, while CSS already present in the Themes Folder remains user-owned and continues to use the normal discovery, validation, diagnostics, and reload path. The desktop application does not restore or delete themes that were installed by a user or by an earlier version.
 
 ## Custom CSS editor
 
@@ -45,7 +37,7 @@ Use **Open Themes Folder** for external editing, local assets/imports, complete 
 Place a CSS file directly in the themes directory:
 
 ```css
-/* newsprint.css */
+/* paper.css */
 :root {
   --po-md-surface-background: #f6f1e7;
   --po-md-content-color: #342f29;
