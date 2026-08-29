@@ -344,7 +344,7 @@ describe("DesktopHelpLauncher", () => {
     expect(launcherRule).toContain("border: 0");
     expect(launcherRule).toContain("background: transparent");
     expect(launcherRule).toContain(
-      "color: color-mix(in srgb, var(--po-text-subtle) 88%, transparent)",
+      "color: var(--po-shell-divider, var(--po-divider))",
     );
     expect(launcherRule).toContain("padding: 0");
     expect(launcherRule).not.toContain("backdrop-filter");
