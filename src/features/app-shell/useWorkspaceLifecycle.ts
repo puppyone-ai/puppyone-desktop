@@ -36,6 +36,8 @@ import {
 } from "./workspaceHomeModel";
 import type { RecentWorkspaceHomeItem } from "./workspaceHomeModel";
 
+export type WorkspaceEntryKind = "restored" | "opened" | "created" | "cloned";
+
 export function useWorkspaceLifecycle({
   onWorkspaceActivated,
   onWorkspaceCleared,
@@ -50,6 +52,7 @@ export function useWorkspaceLifecycle({
   const [workbenchWorkspace, setWorkbenchWorkspace] = useState<WorkbenchWorkspace | null>(null);
   const [restoringWorkspace, setRestoringWorkspace] = useState(true);
   const [restoreWorkspaceError, setRestoreWorkspaceError] = useState<string | null>(null);
+  const [activeWorkspaceEntryKind, setActiveWorkspaceEntryKind] = useState<WorkspaceEntryKind>("restored");
   const recentWorkspaceRequestRef = useRef(0);
   const workbenchWorkspaceContextRef = useRef<WorkbenchWorkspaceContext | null>(null);
 
@@ -119,9 +122,13 @@ export function useWorkspaceLifecycle({
       });
   }, []);
 
-  const handleWorkspaceOpenResult = useCallback((result: WorkspaceOpenResult | null) => {
+  const handleWorkspaceOpenResult = useCallback((
+    result: WorkspaceOpenResult | null,
+    entryKind: WorkspaceEntryKind = "opened",
+  ) => {
     if (!result) return;
     if (result.status === "opened-current" && result.workspace) {
+      setActiveWorkspaceEntryKind(entryKind);
       activateWorkspace(result.workspace);
     } else {
       setRestoreWorkspaceError(null);
@@ -209,7 +216,7 @@ export function useWorkspaceLifecycle({
 
   const createProject = useCallback(async (request: WorkspaceCreateProjectRequest) => {
     const result = await createLocalProjectTarget(request);
-    handleWorkspaceOpenResult(result);
+    handleWorkspaceOpenResult(result, "created");
     return result !== null;
   }, [handleWorkspaceOpenResult]);
 
@@ -219,7 +226,7 @@ export function useWorkspaceLifecycle({
 
   const cloneRepository = useCallback(async (request: WorkspaceCloneRepositoryRequest) => {
     const result = await cloneRepositoryTarget(request);
-    handleWorkspaceOpenResult(result);
+    handleWorkspaceOpenResult(result, "cloned");
     return result !== null;
   }, [handleWorkspaceOpenResult]);
 
@@ -232,6 +239,7 @@ export function useWorkspaceLifecycle({
 
   const clearWorkspace = useCallback(() => {
     workbenchWorkspaceContextRef.current = null;
+    setActiveWorkspaceEntryKind("restored");
     setWorkbenchWorkspace(null);
     onWorkspaceCleared();
   }, [onWorkspaceCleared]);
@@ -246,6 +254,7 @@ export function useWorkspaceLifecycle({
     }
     setWorkbenchWorkspace(null);
     workbenchWorkspaceContextRef.current = null;
+    setActiveWorkspaceEntryKind("restored");
     setRestoreWorkspaceError(null);
     setRestoringWorkspace(false);
     onWorkspaceCleared();
@@ -304,6 +313,7 @@ export function useWorkspaceLifecycle({
   return {
     addProject,
     addExistingProject,
+    activeWorkspaceEntryKind,
     activateWorkspace,
     clearWorkspace,
     chooseProjectLocation,

@@ -27,6 +27,7 @@ export function ExperimentalSettingsView({
     ...(assetLibraryHomeAvailable
       ? [{ messageKey: "projectsHome", settingKey: "enableAssetLibraryHome" as const }]
       : []),
+    { messageKey: "firstProjectStarter", settingKey: "enableFirstProjectStarter" },
     ...(agentChatAvailable
       ? [{ messageKey: "agentChat", settingKey: "enableAgentChat" as const }]
       : []),
