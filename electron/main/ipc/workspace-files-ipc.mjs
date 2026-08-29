@@ -1,6 +1,7 @@
 import path from "node:path";
 import {
   copyWorkspaceEntry,
+  copyWorkspaceEntryBetweenRoots,
   createWorkspaceEntry,
   deleteWorkspaceEntry,
   getMimeType,
@@ -290,6 +291,16 @@ export function registerWorkspaceFileIpcHandlers({
     return runWorkspaceMutation(rootPath, async () => {
       const result = await copyWorkspaceEntry(rootPath, request);
       await absorbWorkspaceEditReviewPath(rootPath, result.path);
+      return result;
+    });
+  });
+
+  ipcMain.handle("workspace:copy-entry-between-roots", async (event, request) => {
+    const sourceRootPath = await authorizeWorkspaceRoot(event, request?.sourceRootPath);
+    const targetRootPath = await authorizeWorkspaceRoot(event, request?.targetRootPath);
+    return runWorkspaceMutation(targetRootPath, async () => {
+      const result = await copyWorkspaceEntryBetweenRoots(sourceRootPath, targetRootPath, request);
+      await absorbWorkspaceEditReviewPath(targetRootPath, result.path);
       return result;
     });
   });

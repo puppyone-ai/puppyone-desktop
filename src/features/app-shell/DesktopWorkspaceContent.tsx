@@ -9,6 +9,7 @@ import {
   type DataNode,
   type EditorInteractionPreferences,
   type Workspace,
+  type WorkspaceFolder,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import type { DesktopGitController } from "../source-control";
@@ -31,6 +32,7 @@ import {
 import { useDesktopViewerPacks } from "../viewer-packs/host";
 import { DesktopDataWorkspaceSurface } from "./DesktopDataWorkspaceSurface";
 import type { DesktopEditorWorkbenchController } from "../editor-workbench/controller/useDesktopEditorWorkbench";
+import type { ResolvedWorkbenchDataResource } from "../data-workspace/workbenchDataPort";
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopWorkspaceContentProps = {
@@ -54,6 +56,7 @@ type DesktopWorkspaceContentProps = {
   ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
   onResourceMove: (previousPath: string, nextPath: string) => void | Promise<void>;
+  onRemoveProject: (folder: WorkspaceFolder) => void | Promise<void>;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onDismissCreateEntryMenu: () => void;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
@@ -72,6 +75,8 @@ type DesktopWorkspaceContentProps = {
   sidebarCompanion?: ReactNode;
   sidebarUtility?: ReactNode;
   workspace: Workspace;
+  workspaceFolders: readonly WorkspaceFolder[];
+  resolveWorkspaceResource: (path: string | null) => ResolvedWorkbenchDataResource | null;
   workspaceSurfaceError?: string | null;
   workspaceKey: string;
   workspaceRefreshToken: Readonly<{ sequence: number; paths: readonly string[] | null }>;
@@ -94,6 +99,7 @@ export function DesktopWorkspaceContent({
   onActiveDataPathChange,
   onActiveDataNodeChange,
   onResourceMove,
+  onRemoveProject,
   onCreateEntryMenu,
   onDismissCreateEntryMenu,
   onFilesVisibilitySettingsChange,
@@ -112,6 +118,8 @@ export function DesktopWorkspaceContent({
   sidebarCompanion,
   sidebarUtility,
   workspace,
+  workspaceFolders,
+  resolveWorkspaceResource,
   workspaceSurfaceError = null,
   workspaceKey,
   workspaceRefreshToken,
@@ -206,6 +214,7 @@ export function DesktopWorkspaceContent({
       onActiveDataNodeChange={onActiveDataNodeChange}
       onActiveDataPathChange={onActiveDataPathChange}
       onResourceMove={onResourceMove}
+      onRemoveProject={onRemoveProject}
       onCreateEntryMenu={onCreateEntryMenu}
       onDismissCreateEntryMenu={onDismissCreateEntryMenu}
       onNodeActionMenu={onNodeActionMenu}
@@ -215,6 +224,8 @@ export function DesktopWorkspaceContent({
       sidebarUtility={sidebarUtility}
       viewerExtensionAdapter={viewerExtensionAdapter}
       workspace={workspace}
+      workspaceFolders={workspaceFolders}
+      resolveWorkspaceResource={resolveWorkspaceResource}
       workspaceKey={workspaceKey}
       workspaceRefreshToken={workspaceRefreshToken}
       workspaceSurfaceError={workspaceSurfaceError}

@@ -140,7 +140,23 @@ export function createLocalFileCapabilityStore({
     entriesBySender.delete(senderId);
   }
 
-  return Object.freeze({ issue, validate, resolve, revoke, revokeSender });
+  function revokeWorkspaceRoot(senderId, rootPath) {
+    if (!Number.isSafeInteger(senderId) || typeof rootPath !== "string" || !rootPath.trim()) return 0;
+    const normalizedRoot = path.resolve(rootPath);
+    const senderEntries = entriesBySender.get(senderId);
+    if (!senderEntries) return 0;
+    let revoked = 0;
+    for (const entry of Array.from(senderEntries.values())) {
+      if (entry.rootPath !== normalizedRoot) continue;
+      senderEntries.delete(entry.key);
+      entriesByToken.delete(entry.token);
+      revoked += 1;
+    }
+    if (senderEntries.size === 0) entriesBySender.delete(senderId);
+    return revoked;
+  }
+
+  return Object.freeze({ issue, validate, resolve, revoke, revokeSender, revokeWorkspaceRoot });
 }
 
 export function buildLocalFileCapabilityUrl({

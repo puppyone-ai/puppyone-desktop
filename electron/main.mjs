@@ -305,11 +305,42 @@ const workspaceStateStore = createWorkspaceStateStore({
 });
 const windowWorkspaceCompositionService = createWindowWorkspaceCompositionService({
   canonicalizeWorkspacePath,
+  cleanupDetachedWorkspace: async (window, folder) => {
+    const webContentsId = window.webContents.id;
+    const rootPath = folder.path;
+    localFileCapabilities.revokeWorkspaceRoot(webContentsId, rootPath);
+    workspaceWatchService.stopForWorkspaceRoot(webContentsId, rootPath);
+    gitMetadataWatchService.stopForWorkspaceRoot(webContentsId, rootPath);
+    terminalService.closeSessionsForWorkspaceRoot(webContentsId, rootPath);
+    await Promise.allSettled([
+      appPreviewRuntime?.closeSessionsForWorkspaceRoot(webContentsId, rootPath),
+      agentService.closeSessionsForWorkspaceRoot(webContentsId, rootPath),
+    ].filter(Boolean));
+
+    const state = getOrCreateWindowState(window);
+    const primaryPath = state.folderPaths[0] ?? null;
+    if (primaryPath) {
+      void gitAutoCommitService.assignWorkspace(window.webContents, primaryPath).catch((error) => {
+        console.warn("Unable to reassign Git Auto Commit after removing a Project:", error);
+      });
+    }
+    window.setTitle(window.isFullScreen() ? "" : resolveWindowTitle(window));
+    if (primaryPath && typeof window.setRepresentedFilename === "function") {
+      try {
+        window.setRepresentedFilename(primaryPath);
+      } catch {
+        // setRepresentedFilename is macOS-only and best-effort.
+      }
+    }
+  },
   getWindowState: getOrCreateWindowState,
   getWorkspaceWindow,
   indexWorkspacePath: (folderPath, window) => workspaceWindowByPath.set(folderPath, window),
   persistWorkspaceComposition: (workspaces) => workspaceStateStore.rememberWorkspaceComposition(workspaces),
   revealWindow,
+  unindexWorkspacePath: (folderPath, window) => {
+    if (workspaceWindowByPath.get(folderPath) === window) workspaceWindowByPath.delete(folderPath);
+  },
   workspaceFromPath,
 });
 const projectEntryService = createProjectEntryService();
@@ -813,6 +844,8 @@ function registerIpcHandlers() {
     selectWorkspaceForCurrentWindow,
     selectWorkspaceForCurrentComposition,
     selectWorkspaceForNewWindow,
+    attachWorkspaceToCurrentWindow,
+    detachWorkspaceFromCurrentWindow,
   });
   registerCloudIpcHandlers({ ipcMain: trustedIpcMain, cloudAuthService });
   registerCloudPublishIpcHandlers({
@@ -1216,6 +1249,14 @@ async function attachWorkspaceToCurrentWindow(sender, folderPath) {
     throw new Error("No active window is available for this Workspace composition.");
   }
   return windowWorkspaceCompositionService.attach(window, folderPath);
+}
+
+async function detachWorkspaceFromCurrentWindow(sender, folderPath) {
+  const window = BrowserWindow.fromWebContents(sender);
+  if (!window || window.isDestroyed()) {
+    throw new Error("No active window is available for this Workspace composition.");
+  }
+  return windowWorkspaceCompositionService.detach(window, folderPath);
 }
 
 function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {

@@ -196,6 +196,8 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   },
   selectFolder: () => ipcRenderer.invoke("workspace:select-folder-current"),
   selectFolderToAttach: () => ipcRenderer.invoke("workspace:select-folder-attach"),
+  attachFolder: (folderPath) => ipcRenderer.invoke("workspace:attach-current", folderPath),
+  detachFolder: (folderPath) => ipcRenderer.invoke("workspace:detach-current", folderPath),
   selectFolderInNewWindow: () => ipcRenderer.invoke("workspace:select-folder-new-window"),
   selectLocalProjectLocation: () => ipcRenderer.invoke("workspace:select-project-location-current"),
   createLocalProject: (request) => ipcRenderer.invoke("workspace:create-project-current", request),
@@ -214,6 +216,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   renameEntry: (request) => ipcRenderer.invoke("workspace:rename-entry", request),
   moveEntry: (request) => ipcRenderer.invoke("workspace:move-entry", request),
   copyEntry: (request) => ipcRenderer.invoke("workspace:copy-entry", request),
+  copyEntryBetweenRoots: (request) => ipcRenderer.invoke("workspace:copy-entry-between-roots", request),
   importEntries: (request) => {
     const files = Array.isArray(request?.files) ? request.files : [];
     const sourcePaths = files

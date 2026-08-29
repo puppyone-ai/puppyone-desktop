@@ -21,6 +21,7 @@ import {
   type DataNode,
   type DocumentDataNode,
   type EditorGroupState,
+  type EditorResourceDescriptor,
   type EditorPaneLayoutState,
   type EditorPaneSplitOptions,
   type EditorSplitDirection,
@@ -73,11 +74,13 @@ export type DesktopEditorWorkbenchController = Readonly<{
 }>;
 
 export type EditorDocumentNodeResolver = (path: string) => Promise<DataNode | null>;
+export type EditorResourceResolver = (path: string) => EditorResourceDescriptor | null;
 
 export function useDesktopEditorWorkbench(
   workspace: Workspace | null,
   resolveNode: EditorDocumentNodeResolver | null,
   workspaceFolderUri: ResourceUri | null = null,
+  resolveEditorResource: EditorResourceResolver | null = null,
 ): DesktopEditorWorkbenchController {
   const storageKey = workspace
     ? `${EDITOR_WORKBENCH_STORAGE_PREFIX}:${workspace.id}:${workspace.path}`
@@ -169,13 +172,16 @@ export function useDesktopEditorWorkbench(
     });
   }, [storageKey]);
 
+  const toEditorResource = useCallback((path: string) => (
+    resolveEditorResource?.(path)
+      ?? (workspaceFolderUri ? { rootUri: workspaceFolderUri, resourcePath: path } : path)
+  ), [resolveEditorResource, workspaceFolderUri]);
+
   const openDocument = useCallback((node: DocumentDataNode) => {
     if (!isDocumentDataNode(node) || !node.path) return;
     updateWorkbench((current) => {
       const input = createEditorInput(
-        workspaceFolderUri
-          ? { rootUri: workspaceFolderUri, resourcePath: node.path }
-          : node.path,
+        toEditorResource(node.path),
         node.name,
       );
       const group = openEditor(current.group, input);
@@ -185,7 +191,7 @@ export function useDesktopEditorWorkbench(
         : assignEditorToActivePane(current.layout, input.id);
       return createEditorWorkbenchState(group, layout);
     });
-  }, [updateWorkbench, workspaceFolderUri]);
+  }, [toEditorResource, updateWorkbench]);
 
   const activate = useCallback((editorId: string) => {
     updateWorkbench((current) => {
@@ -208,9 +214,7 @@ export function useDesktopEditorWorkbench(
     if (!isDocumentDataNode(node) || !node.path) return;
     updateWorkbench((current) => {
       const input = createEditorInput(
-        workspaceFolderUri
-          ? { rootUri: workspaceFolderUri, resourcePath: node.path }
-          : node.path,
+        toEditorResource(node.path),
         node.name,
       );
       const visiblePane = getEditorPanes(current.layout).find((pane) => pane.editorId === input.id);
@@ -229,7 +233,7 @@ export function useDesktopEditorWorkbench(
         : splitEditorPane(current.layout, targetPaneId, direction, { editorId: input.id, placement });
       return createEditorWorkbenchState(activateEditor(group, input.id), layout);
     });
-  }, [updateWorkbench, workspaceFolderUri]);
+  }, [toEditorResource, updateWorkbench]);
 
   const focusPane = useCallback((paneId: string) => {
     updateWorkbench((current) => {
@@ -303,9 +307,7 @@ export function useDesktopEditorWorkbench(
 
   const closeUnderResource = useCallback((resource: string) => {
     updateWorkbench((current) => {
-      const target = workspaceFolderUri
-        ? { rootUri: workspaceFolderUri, resourcePath: resource }
-        : resource;
+      const target = toEditorResource(resource);
       const group = closeEditorsUnderResource(current.group, target);
       const retainedEditorIds = new Set(group.editors.map((editor) => editor.id));
       const removedEditorIds = current.group.editors
@@ -317,20 +319,16 @@ export function useDesktopEditorWorkbench(
       );
       return createEditorWorkbenchState(group, layout);
     });
-  }, [updateWorkbench, workspaceFolderUri]);
+  }, [toEditorResource, updateWorkbench]);
 
   const rebaseResource = useCallback((previousResource: string, nextResource: string) => {
-    const previous = workspaceFolderUri
-      ? { rootUri: workspaceFolderUri, resourcePath: previousResource }
-      : previousResource;
-    const next = workspaceFolderUri
-      ? { rootUri: workspaceFolderUri, resourcePath: nextResource }
-      : nextResource;
+    const previous = toEditorResource(previousResource);
+    const next = toEditorResource(nextResource);
     updateWorkbench((current) => createEditorWorkbenchState(
       rebaseEditorResources(current.group, previous, next),
       rebaseEditorPaneResources(current.layout, previous, next),
     ));
-  }, [updateWorkbench, workspaceFolderUri]);
+  }, [toEditorResource, updateWorkbench]);
 
   const clear = useCallback(() => updateWorkbench(() => EMPTY_EDITOR_WORKBENCH), [updateWorkbench]);
   const activePane = getActiveEditorPane(workbench.layout);

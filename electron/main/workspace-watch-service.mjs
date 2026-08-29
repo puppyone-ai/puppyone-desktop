@@ -86,6 +86,20 @@ export function createWorkspaceWatchService({ logger = console, fsModule = fs } 
     }
   }
 
+  function stopForWorkspaceRoot(webContentsId, rootPath) {
+    const resolvedRoot = typeof rootPath === "string" && rootPath.trim()
+      ? path.resolve(rootPath)
+      : null;
+    if (!Number.isInteger(webContentsId) || !resolvedRoot) return 0;
+    let stopped = 0;
+    for (const [subscriptionId, subscription] of Array.from(subscriptions.entries())) {
+      if (subscription.senderId !== webContentsId || subscription.root !== resolvedRoot) continue;
+      stop(subscriptionId);
+      stopped += 1;
+    }
+    return stopped;
+  }
+
   function closeAll() {
     for (const [rootPath, entry] of Array.from(watchers.entries())) {
       disposeWatcher(entry, rootPath);
@@ -132,6 +146,7 @@ export function createWorkspaceWatchService({ logger = console, fsModule = fs } 
     start,
     stop,
     stopForWindow,
+    stopForWorkspaceRoot,
     closeAll,
     noteInternalWrite,
     subscribeActivity,

@@ -75,6 +75,57 @@ describe("window Workspace composition service", () => {
     expect(state.folderPaths).toEqual(["/a"]);
     expect(indexedPaths.has("/b")).toBe(false);
   });
+
+  it("persists and publishes before cleaning up one detached Folder", async () => {
+    const window = { id: "window-a" };
+    const state = stateWith("a", "b");
+    const indexedPaths = new Map([["/a", window], ["/b", window]]);
+    const events = [];
+    const service = createService({
+      state,
+      indexedPaths,
+      persistWorkspaceComposition: vi.fn(async () => events.push("persisted")),
+      onUnindex: () => events.push("published"),
+      cleanupDetachedWorkspace: vi.fn(async () => events.push("cleaned")),
+    });
+
+    const result = await service.detach(window, "/b");
+
+    expect(events).toEqual(["persisted", "published", "cleaned"]);
+    expect(result).toMatchObject({ status: "detached-current", path: "/b" });
+    expect(result.workspaces.map((item) => item.id)).toEqual(["a"]);
+    expect(state.folderPaths).toEqual(["/a"]);
+    expect(indexedPaths.has("/b")).toBe(false);
+  });
+
+  it("does not publish a detach when persistence fails", async () => {
+    const window = { id: "window-a" };
+    const state = stateWith("a", "b");
+    const indexedPaths = new Map([["/a", window], ["/b", window]]);
+    const cleanupDetachedWorkspace = vi.fn();
+    const service = createService({
+      state,
+      indexedPaths,
+      cleanupDetachedWorkspace,
+      persistWorkspaceComposition: vi.fn(async () => {
+        throw new Error("disk full");
+      }),
+    });
+
+    await expect(service.detach(window, "/b")).rejects.toThrow(/disk full/i);
+    expect(state.folderPaths).toEqual(["/a", "/b"]);
+    expect(indexedPaths.get("/b")).toBe(window);
+    expect(cleanupDetachedWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("refuses to detach the last Project", async () => {
+    const window = { id: "window-a" };
+    const state = stateWith("a");
+    const service = createService({ state, indexedPaths: new Map([["/a", window]]) });
+
+    await expect(service.detach(window, "/a")).rejects.toThrow(/last Project/i);
+    expect(state.folderPaths).toEqual(["/a"]);
+  });
 });
 
 function createService({
@@ -83,6 +134,8 @@ function createService({
   persistWorkspaceComposition = vi.fn(async () => undefined),
   revealWindow = vi.fn(),
   onIndex = () => undefined,
+  onUnindex = () => undefined,
+  cleanupDetachedWorkspace = vi.fn(async () => undefined),
 }) {
   return createWindowWorkspaceCompositionService({
     canonicalizeWorkspacePath: async (folderPath) => folderPath,
@@ -92,15 +145,20 @@ function createService({
       indexedPaths.set(folderPath, window);
       onIndex();
     },
+    unindexWorkspacePath: (folderPath, window) => {
+      if (indexedPaths.get(folderPath) === window) indexedPaths.delete(folderPath);
+      onUnindex();
+    },
+    cleanupDetachedWorkspace,
     persistWorkspaceComposition,
     revealWindow,
     workspaceFromPath: async (folderPath) => workspace(folderPath.slice(1)),
   });
 }
 
-function stateWith(id) {
+function stateWith(...ids) {
   const state = new WindowWorkspaceState();
-  state.replaceFolders([{ path: `/${id}`, workspace: workspace(id) }]);
+  state.replaceFolders(ids.map((id) => ({ path: `/${id}`, workspace: workspace(id) })));
   return state;
 }
 

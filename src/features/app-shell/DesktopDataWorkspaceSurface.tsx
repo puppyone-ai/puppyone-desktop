@@ -1,4 +1,5 @@
 import {
+  useMemo,
   useState,
   type ComponentProps,
   type MouseEvent as ReactMouseEvent,
@@ -11,6 +12,7 @@ import {
   type AiEditRequest,
   type DataNode,
   type Workspace,
+  type WorkspaceFolder,
 } from "@puppyone/shared-ui";
 import { AiResponseChangesCard } from "../../ai-edits/AiResponseChangesCard";
 import { openExternalUrl } from "../../lib/localFiles";
@@ -49,6 +51,7 @@ import {
 } from "../desktop-agent-presence";
 import { DesktopShellNavigationToolbarPortal } from "./DesktopShellAccessoryContext";
 import { RemoteUpdateNotice } from "../data-workspace/RemoteUpdateNotice";
+import type { ResolvedWorkbenchDataResource } from "../data-workspace/workbenchDataPort";
 
 type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 
@@ -85,6 +88,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
   ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
   onResourceMove: (previousPath: string, nextPath: string) => void | Promise<void>;
+  onRemoveProject: (folder: WorkspaceFolder) => void | Promise<void>;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onDismissCreateEntryMenu: () => void;
   onNodeActionMenu: (node: DataNode, anchorRect: DOMRect, selectedNodes?: readonly DataNode[]) => void;
@@ -94,6 +98,8 @@ export type DesktopDataWorkspaceSurfaceProps = {
   sidebarUtility?: ReactNode;
   viewerExtensionAdapter: DataWorkspaceProps["viewerExtensionAdapter"];
   workspace: Workspace;
+  workspaceFolders: readonly WorkspaceFolder[];
+  resolveWorkspaceResource: (path: string | null) => ResolvedWorkbenchDataResource | null;
   workspaceKey: string;
   workspaceRefreshToken: Readonly<{ sequence: number; paths: readonly string[] | null }>;
   workspaceSurfaceError: string | null;
@@ -114,6 +120,7 @@ export function DesktopDataWorkspaceSurface({
   navigationComposition,
   onActiveDataNodeChange,
   onResourceMove,
+  onRemoveProject,
   onActiveDataPathChange,
   onCreateEntryMenu,
   onDismissCreateEntryMenu,
@@ -124,6 +131,8 @@ export function DesktopDataWorkspaceSurface({
   sidebarUtility,
   viewerExtensionAdapter,
   workspace,
+  workspaceFolders,
+  resolveWorkspaceResource,
   workspaceKey,
   workspaceRefreshToken,
   workspaceSurfaceError,
@@ -136,6 +145,19 @@ export function DesktopDataWorkspaceSurface({
   useNativeSurfacePointerRoutingRegion("explorer-resize", explorerResizeHandle);
   const { t } = useLocalization();
   const paneLayout = useDesktopPaneLayout();
+  const activeWorkspaceResource = useMemo(
+    () => resolveWorkspaceResource(activeExplorerPath),
+    [activeExplorerPath, resolveWorkspaceResource],
+  );
+  const activeWorkspaceRootPath = activeWorkspaceResource?.folder.uri
+    ?? workspaceFolders[0]?.uri
+    ?? null;
+  const defaultExpandedWorkspaceRoots = useMemo(
+    () => workspaceFolders.length > 1
+      ? workspaceFolders.map((folder) => folder.uri)
+      : undefined,
+    [workspaceFolders],
+  );
   const resolvedExplorerWidth = paneLayout?.explorer.width ?? preferences.explorerWidth;
   const resolvedExplorerMaxWidth = paneLayout?.explorer.maxWidth
     ?? MAX_EXPLORER_WIDTH;
@@ -196,6 +218,7 @@ export function DesktopDataWorkspaceSurface({
         workspace={workspace}
         labels={{ root: workspace.name }}
         dataPort={dataPort}
+        defaultExpandedPaths={defaultExpandedWorkspaceRoots}
         activePath={activeExplorerPath}
         onResourceMove={onResourceMove}
         onActivePathChange={onActiveDataPathChange}
@@ -219,7 +242,7 @@ export function DesktopDataWorkspaceSurface({
         onExplorerRootContextMenu={(_state, event) => {
           event.preventDefault();
           event.stopPropagation();
-          onCreateEntryMenu(null, getContextMenuAnchorRect(event));
+          onCreateEntryMenu(activeWorkspaceRootPath, getContextMenuAnchorRect(event));
         }}
         onExplorerNodeContextMenu={(state, node, event) => {
           event.preventDefault();
@@ -257,7 +280,7 @@ export function DesktopDataWorkspaceSurface({
                   return;
                 }
                 onCreateEntryMenu(
-                  null,
+                  activeWorkspaceRootPath,
                   rectToCreateEntryAnchor(event.currentTarget.getBoundingClientRect(), "auto-end"),
                 );
               }}
@@ -287,7 +310,9 @@ export function DesktopDataWorkspaceSurface({
         refreshKey={workspaceRefreshToken}
         explorerNodeActionSlot={(state, node) => {
           const agentPresencePath = node.type === "file"
-            ? toWorkspaceRelativePath(workspace.path, node.path)
+            ? node.workspaceFolderId
+              ? resolveWorkspaceResource(node.path)?.providerPath ?? null
+              : toWorkspaceRelativePath(workspace.path, node.path)
             : null;
           return (
             <>
@@ -301,6 +326,13 @@ export function DesktopDataWorkspaceSurface({
               <DesktopExplorerRowActions
                 node={node}
                 parentPath={node.type === "folder" ? node.path : null}
+                showMoreActions={!node.workspaceFolderRoot}
+                onRemoveWorkspaceRoot={workspaceFolders.length > 1
+                  ? () => {
+                      const folder = workspaceFolders.find((item) => item.id === node.workspaceFolderId);
+                      if (folder) void onRemoveProject(folder);
+                    }
+                  : undefined}
                 onCreate={onCreateEntryMenu}
                 onOpenNodeMenu={(targetNode, anchorRect) => {
                   const selectedNodes = state.selectedNodes.some(({ path }) => path === targetNode.path)
@@ -340,6 +372,7 @@ export function DesktopDataWorkspaceSurface({
                 refreshKey={workspaceRefreshToken}
                 viewerExtensionAdapter={viewerExtensionAdapter}
                 workspace={workspace}
+                resolveWorkspaceResource={resolveWorkspaceResource}
                 onClosePane={editorWorkbench.closePane}
                 onFocusPane={editorWorkbench.focusPane}
                 onMovePane={editorWorkbench.movePane}

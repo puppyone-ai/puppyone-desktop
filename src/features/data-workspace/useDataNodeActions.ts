@@ -1,15 +1,12 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react";
 import {
   flushActiveDocumentSessions,
+  getDataResourceName,
   getFileSemanticKind,
   type DataNode,
   type DataPort,
   type Workspace,
 } from "@puppyone/shared-ui";
-import {
-  openWorkspaceEntryExternal,
-  revealWorkspaceEntryInFinder,
-} from "../../lib/localFiles";
 import {
   defaultCreateName,
   formatDesktopExtensionLabel,
@@ -159,7 +156,7 @@ export function useDataNodeActions({
           name: requestedName,
         });
         nextPath = result.openPath;
-        const name = nextPath.split("/").filter(Boolean).at(-1) ?? nextPath;
+        const name = getDataResourceName(nextPath) || nextPath;
         nextNode = {
           id: nextPath,
           name,
@@ -362,11 +359,11 @@ export function useDataNodeActions({
   ]);
 
   const revealNodeInFinderFromMenu = useCallback(async () => {
-    if (!workspace || !nodeActionMenu || nodeActionMenu.operation) return;
+    if (!dataPort?.revealInFileManager || !nodeActionMenu || nodeActionMenu.operation) return;
 
     setNodeActionMenu((current) => current ? { ...current, operation: "reveal", error: null } : current);
     try {
-      await revealWorkspaceEntryInFinder(workspace.path, nodeActionMenu.node.path);
+      await dataPort.revealInFileManager(nodeActionMenu.node.path);
       setNodeActionMenu(null);
     } catch (error) {
       setNodeActionMenu((current) => current ? {
@@ -375,18 +372,15 @@ export function useDataNodeActions({
         error: toDesktopNodeActionError(error),
       } : current);
     }
-  }, [nodeActionMenu, workspace]);
+  }, [dataPort, nodeActionMenu]);
 
   const openNodeInDefaultAppFromMenu = useCallback(async () => {
-    if (!workspace || !nodeActionMenu || nodeActionMenu.operation) return;
+    if (!dataPort?.openExternalFile || !nodeActionMenu || nodeActionMenu.operation) return;
     if (nodeActionMenu.node.type === "folder") return;
 
     setNodeActionMenu((current) => current ? { ...current, operation: "open", error: null } : current);
     try {
-      await openWorkspaceEntryExternal({
-        rootPath: workspace.path,
-        path: nodeActionMenu.node.path,
-      });
+      await dataPort.openExternalFile(nodeActionMenu.node.path);
       setNodeActionMenu(null);
     } catch (error) {
       setNodeActionMenu((current) => current ? {
@@ -396,8 +390,8 @@ export function useDataNodeActions({
       } : current);
     }
   }, [
+    dataPort,
     nodeActionMenu,
-    workspace,
   ]);
 
   return {

@@ -657,6 +657,13 @@ export type WorkspaceAttachResult = {
   workspaces: Workspace[];
 };
 
+export type WorkspaceDetachResult = {
+  status: "detached-current" | "not-attached";
+  path: string | null;
+  workspace: Workspace | null;
+  workspaces: Workspace[];
+};
+
 export type WorkspaceCreateProjectRequest = {
   name: string;
   locationGrantId: string;
@@ -717,6 +724,11 @@ export type WorkspaceCopyEntryRequest = {
   targetFolderPath: string | null;
   preferredName?: string;
   forceDuplicateName?: boolean;
+};
+
+export type WorkspaceCopyEntryBetweenRootsRequest = Omit<WorkspaceCopyEntryRequest, "rootPath"> & {
+  sourceRootPath: string;
+  targetRootPath: string;
 };
 
 export type WorkspaceImportEntriesRequest = {
@@ -1019,6 +1031,8 @@ declare global {
       openDroppedWorkspaceInCurrentWindow: (folder: File) => Promise<WorkspaceOpenResult>;
       selectFolder: () => Promise<WorkspaceOpenResult | null>;
       selectFolderToAttach: () => Promise<WorkspaceAttachResult | null>;
+      attachFolder: (folderPath: string) => Promise<WorkspaceAttachResult>;
+      detachFolder: (folderPath: string) => Promise<WorkspaceDetachResult>;
       selectFolderInNewWindow: () => Promise<WorkspaceOpenResult | null>;
       selectLocalProjectLocation: () => Promise<WorkspaceProjectLocationGrant | null>;
       createLocalProject: (
@@ -1081,6 +1095,9 @@ declare global {
       renameEntry: (request: WorkspaceRenameEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       moveEntry: (request: WorkspaceMoveEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       copyEntry: (request: WorkspaceCopyEntryRequest) => Promise<WorkspaceCreateEntryResult>;
+      copyEntryBetweenRoots: (
+        request: WorkspaceCopyEntryBetweenRootsRequest,
+      ) => Promise<WorkspaceCreateEntryResult>;
       importEntries: (request: WorkspaceImportEntriesRequest) => Promise<WorkspaceImportEntriesResult>;
       deleteEntry: (request: WorkspaceDeleteEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       revealEntryInFinder: (request: WorkspaceRevealEntryRequest) => Promise<{ ok: boolean }>;

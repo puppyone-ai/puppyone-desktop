@@ -61,6 +61,10 @@ export type DesktopEditorSplitViewProps = Readonly<{
   refreshKey?: WorkspaceContentChange;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   workspace: Workspace;
+  resolveWorkspaceResource?: (path: string | null) => Readonly<{
+    folder: Readonly<{ workspace: Workspace }>;
+    providerPath: string | null;
+  }> | null;
   externalOpen?: Readonly<{
     open: (path: string) => void | Promise<void>;
   }>;
@@ -98,6 +102,7 @@ export function DesktopEditorSplitView({
   refreshKey,
   viewerExtensionAdapter = null,
   workspace,
+  resolveWorkspaceResource,
   externalOpen,
   onClosePane,
   onFocusPane,
@@ -156,6 +161,7 @@ export function DesktopEditorSplitView({
           refreshKey={refreshKey}
           viewerExtensionAdapter={viewerExtensionAdapter}
           workspace={workspace}
+          resolveWorkspaceResource={resolveWorkspaceResource}
           onClosePane={onClosePane}
           onFocusPane={onFocusPane}
           onOpenActionsPaneChange={setOpenActionsPaneId}
@@ -249,6 +255,7 @@ type EditorPaneProps = Readonly<{
   refreshKey?: WorkspaceContentChange;
   viewerExtensionAdapter?: ViewerExtensionHostAdapter | null;
   workspace: Workspace;
+  resolveWorkspaceResource?: DesktopEditorSplitViewProps["resolveWorkspaceResource"];
   onClosePane: DesktopEditorSplitViewProps["onClosePane"];
   onFocusPane: DesktopEditorSplitViewProps["onFocusPane"];
   onOpenActionsPaneChange: (paneId: string | null) => void;
@@ -273,6 +280,7 @@ function EditorPane({
   refreshKey,
   viewerExtensionAdapter,
   workspace,
+  resolveWorkspaceResource,
   onClosePane,
   onFocusPane,
   onOpenActionsPaneChange,
@@ -284,6 +292,10 @@ function EditorPane({
   const treeNode = editor
     ? editorNodeIndex.get(editor.resource) ?? null
     : null;
+  const editorWorkspaceResource = editor
+    ? resolveWorkspaceResource?.(editor.resource) ?? null
+    : null;
+  const editorWorkspace = editorWorkspaceResource?.folder.workspace ?? workspace;
   const [findCommand, setFindCommand] = useState<EditorFindCommand | null>(null);
   const [menuContribution, setMenuContribution] = useState<Readonly<{
     editorResource: string | null;
@@ -296,7 +308,8 @@ function EditorPane({
   }, [editor?.resource]);
   const externalOpenPath = editor?.resource ?? null;
   const agentPresencePath = editor
-    ? toWorkspaceRelativePath(workspace.path, editor.resource)
+    ? editorWorkspaceResource?.providerPath
+      ?? toWorkspaceRelativePath(editorWorkspace.path, editor.resource)
     : null;
   const paneMenuContribution = menuContribution?.editorResource === editor?.resource
     ? menuContribution?.contribution ?? null
@@ -334,9 +347,9 @@ function EditorPane({
         refreshKey={refreshKey}
         treeNode={treeNode}
         viewerExtensionAdapter={viewerExtensionAdapter}
-        workspaceId={workspace.id}
-        workspaceRoot={workspace.path}
-        markdownDialect={workspace.markdownDialect}
+        workspaceId={editorWorkspace.id}
+        workspaceRoot={editorWorkspace.path}
+        markdownDialect={editorWorkspace.markdownDialect}
         onFindCommandChange={setFindCommand}
         onMenuContributionChange={publishMenuContribution}
       />

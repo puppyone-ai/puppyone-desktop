@@ -50,6 +50,27 @@ describe("App Preview runtime coordinator", () => {
     ]);
     expect(runtime.start).toHaveBeenCalledTimes(2);
   });
+
+  it("waits only for the removed root before closing its Preview sessions", async () => {
+    let releaseStart;
+    const runtime = createRuntime({
+      start: vi.fn((_, request) => request.rootPath === "/workspace-b"
+        ? new Promise((resolve) => { releaseStart = resolve; })
+        : Promise.resolve(runningResult())),
+    });
+    const service = createAppPreviewService({ runtime });
+    const sender = { id: 42 };
+    await service.start(sender, { rootPath: "/workspace-a", path: "one.puppyoneapp" });
+    const starting = service.start(sender, { rootPath: "/workspace-b", path: "two.puppyoneapp" });
+    const closing = service.closeSessionsForWorkspaceRoot(42, "/workspace-b");
+
+    await vi.waitFor(() => expect(releaseStart).toBeTypeOf("function"));
+    expect(runtime.closeSessionsForWorkspaceRoot).not.toHaveBeenCalled();
+    releaseStart(runningResult());
+    await starting;
+    await closing;
+    expect(runtime.closeSessionsForWorkspaceRoot).toHaveBeenCalledWith(42, "/workspace-b");
+  });
 });
 
 function createRuntime(overrides = {}) {
@@ -60,6 +81,7 @@ function createRuntime(overrides = {}) {
     getLogs: vi.fn(async () => ""),
     openExternal: vi.fn(async () => undefined),
     closeSessionsForWindow: vi.fn(async () => undefined),
+    closeSessionsForWorkspaceRoot: vi.fn(async () => undefined),
     closeAll: vi.fn(async () => undefined),
     ...overrides,
   };

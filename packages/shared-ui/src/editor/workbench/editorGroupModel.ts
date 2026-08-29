@@ -3,17 +3,22 @@ import {
   isSameOrDescendantResourcePath,
   rebaseResourcePath,
 } from "../../core/resourcePath";
+import { rebaseDataResourcePath } from "../../core/dataResourcePath";
 import {
   ResourceUriIdentityService,
   canonicalizeResourceUri,
   createResourceUri,
   createWorkspaceResourceUri,
+  getWorkspaceResourcePath,
   type ResourceUri,
 } from "../../core/resourceUri";
 
 export type EditorResourceDescriptor = Readonly<{
   rootUri: ResourceUri;
+  /** Provider-relative path used to construct global Resource identity. */
   resourcePath: string;
+  /** Host-facing routed path. Defaults to resourcePath for single-root hosts. */
+  hostPath?: string;
 }>;
 
 export type EditorResourceReference = string | EditorResourceDescriptor;
@@ -115,15 +120,25 @@ export function rebaseEditorResources(
   const idMap = new Map<string, string>();
   const editors = state.editors.map((editor) => {
     if (!isEditorWithinResource(editor, previous)) return editor;
-    const resource = rebaseResourcePath(
+    const hostPath = rebaseDataResourcePath(
       editor.resource,
       previous.resourcePath,
       next.resourcePath,
-    );
-    if (resource === editor.resource) return editor;
+    ) ?? editor.resource;
+    if (hostPath === editor.resource) return editor;
+    const reference: EditorResourceReference = next.rootUri
+      ? {
+          rootUri: next.rootUri,
+          resourcePath: getWorkspaceResourcePath(
+            next.rootUri,
+            editorResourceIdentity.rebase(editor.resourceUri, previous.resourceUri, next.resourceUri),
+          ),
+          hostPath,
+        }
+      : hostPath;
     const rebased = createEditorInput(
-      next.rootUri ? { rootUri: next.rootUri, resourcePath: resource } : resource,
-      resource === next.resourcePath ? basename(resource) : editor.label,
+      reference,
+      hostPath === next.resourcePath ? basename(hostPath) : editor.label,
     );
     idMap.set(editor.id, rebased.id);
     return rebased;
@@ -149,10 +164,20 @@ export function parseEditorGroupState(
     const input = editor as Partial<EditorInput>;
     if (typeof input.resource !== "string" || !input.resource.trim()) return [];
     try {
-      const rootUri = options.rootUri
-        ?? (typeof input.rootUri === "string" ? canonicalizeResourceUri(input.rootUri) : undefined);
+      const rootUri = typeof input.rootUri === "string"
+        ? canonicalizeResourceUri(input.rootUri)
+        : options.rootUri;
+      const persistedResourceUri = rootUri && typeof input.resourceUri === "string"
+        ? canonicalizeResourceUri(input.resourceUri)
+        : null;
       const parsed = createEditorInput(
-        rootUri ? { rootUri, resourcePath: input.resource } : input.resource,
+        rootUri ? {
+          rootUri,
+          resourcePath: persistedResourceUri
+            ? getWorkspaceResourcePath(rootUri, persistedResourceUri)
+            : input.resource,
+          hostPath: input.resource,
+        } : input.resource,
         typeof input.label === "string" ? input.label : undefined,
       );
       if (typeof input.id === "string") persistedIdMap.set(input.id, parsed.id);
@@ -227,8 +252,9 @@ function resolveEditorResource(resource: EditorResourceReference): ResolvedEdito
     return { id: resourcePath, resourcePath, resourceUri, rootUri: null };
   }
   const rootUri = canonicalizeResourceUri(resource.rootUri);
-  const resourcePath = canonicalizeResourcePath(resource.resourcePath);
-  const resourceUri = createWorkspaceResourceUri(rootUri, resourcePath);
+  const providerPath = canonicalizeResourcePath(resource.resourcePath);
+  const resourcePath = resource.hostPath?.trim() || providerPath;
+  const resourceUri = createWorkspaceResourceUri(rootUri, providerPath);
   return {
     id: editorResourceIdentity.canonicalKey(resourceUri),
     resourcePath,

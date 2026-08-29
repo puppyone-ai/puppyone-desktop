@@ -657,6 +657,10 @@ export async function moveWorkspaceEntry(rootPath, request) {
 }
 
 export async function copyWorkspaceEntry(rootPath, request) {
+  return copyWorkspaceEntryBetweenRoots(rootPath, rootPath, request);
+}
+
+export async function copyWorkspaceEntryBetweenRoots(sourceRootPath, targetRootPath, request) {
   const fromRelativePath = normalizeRelativePath(request?.fromPath);
   const targetFolderRelativePath = normalizeRelativePath(request?.targetFolderPath ?? null);
 
@@ -666,7 +670,7 @@ export async function copyWorkspaceEntry(rootPath, request) {
   if (fromRelativePath.includes("\0") || targetFolderRelativePath.includes("\0")) {
     throw new Error("Path contains an invalid character.");
   }
-  const sourcePath = await resolveExistingWorkspacePath(rootPath, fromRelativePath);
+  const sourcePath = await resolveExistingWorkspacePath(sourceRootPath, fromRelativePath);
   const sourceMetadata = await fs.lstat(sourcePath).catch((error) => {
     throw new Error(`Unable to copy entry: ${error.message}`);
   });
@@ -686,7 +690,7 @@ export async function copyWorkspaceEntry(rootPath, request) {
     throw new Error("Cannot copy a folder into itself.");
   }
 
-  const targetParentPath = await resolveExistingWorkspacePath(rootPath, targetFolderRelativePath);
+  const targetParentPath = await resolveExistingWorkspacePath(targetRootPath, targetFolderRelativePath);
   const targetParentMetadata = await fs.stat(targetParentPath).catch((error) => {
     throw new Error(`Unable to copy entry: ${error.message}`);
   });
@@ -705,10 +709,13 @@ export async function copyWorkspaceEntry(rootPath, request) {
 
   // Validate the complete tree before copying so a folder containing a link is
   // rejected as one operation instead of producing a surprising partial copy.
-  const canonicalRoot = await fs.realpath(path.resolve(rootPath)).catch((error) => {
-    throw new Error(`Unable to resolve workspace root: ${error.message}`);
+  const sourceCanonicalRoot = await fs.realpath(path.resolve(sourceRootPath)).catch((error) => {
+    throw new Error(`Unable to resolve source workspace root: ${error.message}`);
   });
-  await assertCopyableWorkspaceTree(canonicalRoot, sourcePath);
+  const targetCanonicalRoot = await fs.realpath(path.resolve(targetRootPath)).catch((error) => {
+    throw new Error(`Unable to resolve target workspace root: ${error.message}`);
+  });
+  await assertCopyableWorkspaceTree(sourceCanonicalRoot, sourcePath);
 
   for (let copyIndex = startWithDuplicateName ? 1 : 0; copyIndex <= 10_000; copyIndex += 1) {
     const candidateName = createKeepBothCopyName(preferredName, copyIndex, sourceMetadata.isDirectory());
@@ -718,20 +725,20 @@ export async function copyWorkspaceEntry(rootPath, request) {
       // copyWorkspaceTree claims its root with mkdir/copyFile EXCL. Name
       // selection therefore remains correct even when two windows paste at the
       // same time; renderer-side folder listings are never trusted for this.
-      await copyWorkspaceTree(canonicalRoot, sourcePath, targetPath);
+      await copyWorkspaceTree(sourceCanonicalRoot, sourcePath, targetPath, targetCanonicalRoot);
       targetCreated = true;
 
       // Revalidate both ends after the asynchronous copy. This catches a source
       // entry being replaced with a link while the operation was in flight and
       // guarantees that no link is introduced into the workspace result.
-      await assertCopyableWorkspaceTree(canonicalRoot, sourcePath);
-      await assertCopyableWorkspaceTree(canonicalRoot, targetPath);
+      await assertCopyableWorkspaceTree(sourceCanonicalRoot, sourcePath);
+      await assertCopyableWorkspaceTree(targetCanonicalRoot, targetPath);
       return {
         path: joinRelativePath(targetFolderRelativePath, candidateName),
       };
     } catch (error) {
       if (targetCreated) {
-        await removeWorkspaceCopyTarget(canonicalRoot, targetPath, true);
+        await removeWorkspaceCopyTarget(targetCanonicalRoot, targetPath, true);
       }
       if (!targetCreated && isCopyTargetConflict(error)) {
         continue;
@@ -767,24 +774,24 @@ function isCopyTargetConflict(error) {
   return error?.code === "EEXIST" || error?.code === "ERR_FS_CP_EEXIST";
 }
 
-async function copyWorkspaceTree(canonicalRoot, sourcePath, targetPath) {
+async function copyWorkspaceTree(sourceCanonicalRoot, sourcePath, targetPath, targetCanonicalRoot = sourceCanonicalRoot) {
   const metadata = await fs.lstat(sourcePath).catch((error) => {
     throw new Error(`Unable to inspect copy source: ${error.message}`);
   });
   if (metadata.isSymbolicLink()) {
     throw new Error("Symbolic links cannot be copied.");
   }
-  await assertWorkspaceCopySourcePath(canonicalRoot, sourcePath);
+  await assertWorkspaceCopySourcePath(sourceCanonicalRoot, sourcePath);
 
   if (metadata.isFile()) {
     let targetCreated = false;
     try {
-      await assertWorkspaceCopyTargetParent(canonicalRoot, targetPath);
+      await assertWorkspaceCopyTargetParent(targetCanonicalRoot, targetPath);
       await fs.copyFile(sourcePath, targetPath, fsConstants.COPYFILE_EXCL);
       targetCreated = true;
       await fs.chmod(targetPath, metadata.mode);
       await fs.utimes(targetPath, metadata.atime, metadata.mtime);
-      await assertWorkspaceCopySourcePath(canonicalRoot, sourcePath);
+      await assertWorkspaceCopySourcePath(sourceCanonicalRoot, sourcePath);
       const sourceAfterCopy = await fs.lstat(sourcePath);
       if (sourceAfterCopy.isSymbolicLink() || !sourceAfterCopy.isFile()) {
         throw new Error("Copy source changed while it was being copied.");
@@ -792,7 +799,7 @@ async function copyWorkspaceTree(canonicalRoot, sourcePath, targetPath) {
       return;
     } catch (error) {
       if (targetCreated) {
-        await removeWorkspaceCopyTarget(canonicalRoot, targetPath, false);
+        await removeWorkspaceCopyTarget(targetCanonicalRoot, targetPath, false);
       }
       throw error;
     }
@@ -804,7 +811,7 @@ async function copyWorkspaceTree(canonicalRoot, sourcePath, targetPath) {
 
   let targetCreated = false;
   try {
-    await assertWorkspaceCopyTargetParent(canonicalRoot, targetPath);
+    await assertWorkspaceCopyTargetParent(targetCanonicalRoot, targetPath);
     // The destination must remain writable while its children are populated.
     // Restore the source directory's exact mode after the tree is complete.
     await fs.mkdir(targetPath, { mode: metadata.mode | 0o700 });
@@ -812,21 +819,22 @@ async function copyWorkspaceTree(canonicalRoot, sourcePath, targetPath) {
     const children = await fs.readdir(sourcePath);
     for (const childName of children) {
       await copyWorkspaceTree(
-        canonicalRoot,
+        sourceCanonicalRoot,
         path.join(sourcePath, childName),
         path.join(targetPath, childName),
+        targetCanonicalRoot,
       );
     }
     await fs.chmod(targetPath, metadata.mode);
     await fs.utimes(targetPath, metadata.atime, metadata.mtime);
-    await assertWorkspaceCopySourcePath(canonicalRoot, sourcePath);
+    await assertWorkspaceCopySourcePath(sourceCanonicalRoot, sourcePath);
     const sourceAfterCopy = await fs.lstat(sourcePath);
     if (sourceAfterCopy.isSymbolicLink() || !sourceAfterCopy.isDirectory()) {
       throw new Error("Copy source changed while it was being copied.");
     }
   } catch (error) {
     if (targetCreated) {
-      await removeWorkspaceCopyTarget(canonicalRoot, targetPath, true);
+      await removeWorkspaceCopyTarget(targetCanonicalRoot, targetPath, true);
     }
     throw error;
   }

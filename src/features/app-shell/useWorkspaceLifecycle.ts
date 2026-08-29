@@ -8,6 +8,8 @@ import {
 } from "@puppyone/shared-ui";
 import {
   forgetLastWorkspace,
+  attachWorkspaceFolder,
+  detachWorkspaceFolder,
   getInitialWorkspace,
   getRecentWorkspaces,
   hydrateRecentWorkspaces,
@@ -173,6 +175,38 @@ export function useWorkspaceLifecycle({
     }
   }, [onWorkspaceOpenSettled, reconcileWorkspaceComposition, refreshRecentWorkspaceList]);
 
+  const addExistingProject = useCallback(async (folderPath: string) => {
+    try {
+      const result = await attachWorkspaceFolder(folderPath);
+      if (result.status !== "focused-existing" && result.workspaces.length > 0) {
+        await reconcileWorkspaceComposition(result.workspaces);
+      } else {
+        setRestoreWorkspaceError(null);
+        onWorkspaceOpenSettled();
+      }
+      void refreshRecentWorkspaceList().catch((error) => {
+        console.warn("Unable to refresh recent puppyone workspaces:", error);
+      });
+    } catch (error) {
+      setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
+      onWorkspaceOpenSettled();
+    }
+  }, [onWorkspaceOpenSettled, reconcileWorkspaceComposition, refreshRecentWorkspaceList]);
+
+  const removeProject = useCallback(async (folderPath: string) => {
+    try {
+      const result = await detachWorkspaceFolder(folderPath);
+      if (result.workspaces.length > 0) {
+        await reconcileWorkspaceComposition(result.workspaces);
+      }
+      setRestoreWorkspaceError(null);
+      onWorkspaceOpenSettled();
+    } catch (error) {
+      setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
+      onWorkspaceOpenSettled();
+    }
+  }, [onWorkspaceOpenSettled, reconcileWorkspaceComposition]);
+
   const createProject = useCallback(async (request: WorkspaceCreateProjectRequest) => {
     const result = await createLocalProjectTarget(request);
     handleWorkspaceOpenResult(result);
@@ -269,6 +303,7 @@ export function useWorkspaceLifecycle({
 
   return {
     addProject,
+    addExistingProject,
     activateWorkspace,
     clearWorkspace,
     chooseProjectLocation,
@@ -280,6 +315,7 @@ export function useWorkspaceLifecycle({
     openFolder,
     openWorkspacePath,
     removeWorkspaceFromRecents,
+    removeProject,
     recentWorkspaceItems,
     refreshRecentWorkspaceList,
     restoreWorkspaceError,

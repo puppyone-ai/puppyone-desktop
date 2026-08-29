@@ -1,6 +1,11 @@
 import type { DataNode, DataPort } from "@puppyone/shared-ui";
 import { getDataParentPath, joinDataPath } from "./explorer";
-import { collapseNestedNodes, isSameDataPath, type FileClipboardState } from "./fileClipboard";
+import {
+  collapseNestedNodes,
+  getDataPathName,
+  isSameDataPath,
+  type FileClipboardState,
+} from "./fileClipboard";
 
 export type FileTransferFailure = {
   path: string;
@@ -106,7 +111,7 @@ export async function executeFileDuplicate(
 }
 
 function moveNodeDescriptor(node: DataNode, nextPath: string): DataNode {
-  const name = nextPath.split("/").filter(Boolean).at(-1) ?? node.name;
+  const name = getDataPathName(nextPath) || node.name;
   const descriptor: DataNode = {
     ...node,
     id: nextPath,

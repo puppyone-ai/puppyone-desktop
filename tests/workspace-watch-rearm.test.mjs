@@ -71,6 +71,23 @@ describe("workspace content watch re-arm", () => {
     expect(watchers[0].close).toHaveBeenCalledOnce();
   });
 
+  it("stops only subscriptions for one removed Workspace Folder", () => {
+    const { fsModule } = createFakeFsWatch();
+    const service = createWorkspaceWatchService({
+      logger: { warn: () => {}, info: () => {} },
+      fsModule,
+    });
+    const first = service.start(createSender(7).sender, "/tmp/workspace-a");
+    const second = service.start(createSender(7).sender, "/tmp/workspace-b");
+
+    expect(service.getWatcherCount()).toBe(2);
+    expect(service.stopForWorkspaceRoot(7, "/tmp/workspace-b")).toBe(1);
+    expect(service.getWatcherCount()).toBe(1);
+    expect(service.stop(first.subscriptionId)).toEqual({ ok: true });
+    expect(service.stop(second.subscriptionId)).toEqual({ ok: true });
+    service.closeAll();
+  });
+
   it("re-arms after watcher error and broadcasts a recovery event", async () => {
     const { fsModule, watchers } = createFakeFsWatch();
     const queued = [];

@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import { useEffect, useMemo, useState, type RefObject } from "react";
 import {
   createWorkspaceFolder,
   type Workspace,
@@ -16,7 +16,9 @@ type DesktopWorkspaceSwitcherProps = {
   titlebarLabel: string;
   workspace: Workspace;
   workspaceFolders: readonly WorkspaceFolder[];
-  onAddProject?: () => void;
+  availableProjects?: readonly Workspace[];
+  onAddExistingProject?: (folderPath: string) => void;
+  onOpenFolder?: () => void;
   onClose: () => void;
   onGoHome: () => void;
   onToggle: () => void;
@@ -28,15 +30,28 @@ export function DesktopWorkspaceSwitcher({
   titlebarLabel,
   workspace,
   workspaceFolders,
-  onAddProject,
+  availableProjects = [],
+  onAddExistingProject,
+  onOpenFolder,
   onClose,
   onGoHome,
   onToggle,
 }: DesktopWorkspaceSwitcherProps) {
   const { t } = useLocalization();
-  const attachedFolders = workspaceFolders.length > 0
-    ? workspaceFolders
-    : [createWorkspaceFolder(workspace)];
+  const [view, setView] = useState<"projects" | "add">("projects");
+  const attachedFolders = useMemo(
+    () => workspaceFolders.length > 0
+      ? workspaceFolders
+      : [createWorkspaceFolder(workspace)],
+    [workspace, workspaceFolders],
+  );
+  const unattachedProjects = useMemo(() => {
+    const attachedPaths = new Set(attachedFolders.map((folder) => folder.workspace.path));
+    return availableProjects.filter((project) => !attachedPaths.has(project.path));
+  }, [attachedFolders, availableProjects]);
+  useEffect(() => {
+    if (!open) setView("projects");
+  }, [open]);
   return (
     <div className="desktop-titlebar-workspace-wrap" ref={refObject}>
       <button
@@ -63,34 +78,69 @@ export function DesktopWorkspaceSwitcher({
         open={open}
         preferredMaxHeight={520}
       >
-        <div className="desktop-project-home-group">
-          <DesktopMenuItem
-            className="desktop-project-add desktop-project-home"
-            icon={<ArrowLeft className="po-directional-icon" size={15} strokeWidth={1.9} />}
-            label={t("shell.workspaceSwitcher.home")}
-            onClick={onGoHome}
-          />
-        </div>
-        <div
-          className="desktop-project-list"
-          data-po-scrollbar="menu"
-          data-workspace-menu-layout="workspace-composition-v1"
-        >
-          {attachedFolders.map((folder, index) => (
-            <DesktopProjectRow
-              key={folder.id}
-              folder={folder}
-              primary={index === 0}
-            />
-          ))}
-          <DesktopMenuItem
-            className="desktop-project-add desktop-project-add-folder"
-            disabled={!onAddProject}
-            icon={<FolderPlus size={15} strokeWidth={1.8} />}
-            label={t("shell.workspaceSwitcher.addProject")}
-            onClick={onAddProject}
-          />
-        </div>
+        {view === "projects" ? (
+          <>
+            <div className="desktop-project-home-group">
+              <DesktopMenuItem
+                className="desktop-project-add desktop-project-home"
+                icon={<ArrowLeft className="po-directional-icon" size={15} strokeWidth={1.9} />}
+                label={t("shell.workspaceSwitcher.home")}
+                onClick={onGoHome}
+              />
+            </div>
+            <div
+              className="desktop-project-list"
+              data-po-scrollbar="menu"
+              data-workspace-menu-layout="workspace-composition-v1"
+            >
+              {attachedFolders.map((folder, index) => (
+                <DesktopProjectRow
+                  key={folder.id}
+                  folder={folder}
+                  primary={index === 0}
+                />
+              ))}
+              <DesktopMenuItem
+                className="desktop-project-add desktop-project-add-folder"
+                disabled={!onAddExistingProject && !onOpenFolder}
+                icon={<FolderPlus size={15} strokeWidth={1.8} />}
+                label={t("shell.workspaceSwitcher.addProject")}
+                onClick={() => setView("add")}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="desktop-project-home-group">
+              <DesktopMenuItem
+                className="desktop-project-add desktop-project-home"
+                icon={<ArrowLeft className="po-directional-icon" size={15} strokeWidth={1.9} />}
+                label={t("shell.workspaceSwitcher.projects")}
+                onClick={() => setView("projects")}
+              />
+            </div>
+            <div className="desktop-project-list" data-po-scrollbar="menu">
+              {unattachedProjects.map((project) => (
+                <DesktopMenuItem
+                  className="desktop-project-add"
+                  detail={getWorkspaceParentPathForDisplay(project.path)}
+                  icon={<ProjectTypeMark className="desktop-project-mark" />}
+                  key={project.id}
+                  label={<bdi>{project.name}</bdi>}
+                  onClick={() => onAddExistingProject?.(project.path)}
+                  title={`${project.name} - ${project.path}`}
+                />
+              ))}
+              <DesktopMenuItem
+                className="desktop-project-add desktop-project-add-folder"
+                disabled={!onOpenFolder}
+                icon={<FolderPlus size={15} strokeWidth={1.8} />}
+                label={t("shell.workspaceSwitcher.openFolder")}
+                onClick={onOpenFolder}
+              />
+            </div>
+          </>
+        )}
       </DesktopTitlebarMenuLayer>
     </div>
   );

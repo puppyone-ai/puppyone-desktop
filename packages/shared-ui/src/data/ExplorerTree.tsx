@@ -11,6 +11,11 @@ import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
 import type { DataNode } from "../core/types";
 import {
+  getDataResourceParent,
+  isDataResourceDescendant,
+  isSameDataResource,
+} from "../core/dataResourcePath";
+import {
   FileGlyphIcon,
   getFileVisualKind,
   type FileIconThemeId,
@@ -335,7 +340,8 @@ export function ExplorerTree({
     if (recoveredNodes.length !== payload.entries.length) return [];
 
     return recoveredNodes.filter((node) => !recoveredNodes.some((candidate) => (
-      candidate.path !== node.path && node.path.startsWith(`${candidate.path}/`)
+      !isSameDataResource(candidate.path, node.path)
+        && isDataResourceDescendant(node.path, candidate.path)
     )));
   }, [dragWorkspaceId, nodeIndex]);
 
@@ -790,10 +796,10 @@ const TreeNodeRow = memo(function TreeNodeRow({
   return (
     <div
       id={getExplorerRowDomId(row.index)}
-      className={`tree-row ${isFolder ? "folder" : "file"} ${interaction.selected ? "selected" : ""} ${interaction.active ? "active" : ""} ${interaction.cut ? "clipboard-cut" : ""} ${interaction.loading ? "loading" : ""} ${interaction.dragging ? "dragging" : ""} ${interaction.dropOver ? "drop-target" : ""} ${interaction.dropParentOver ? "drop-parent-target" : ""} ${interaction.dropInvalid ? "drop-invalid" : ""} ${node.status ? `status-${node.status}` : ""}`}
+      className={`tree-row ${isFolder ? "folder" : "file"} ${node.workspaceFolderRoot ? "workspace-folder-root" : ""} ${interaction.selected ? "selected" : ""} ${interaction.active ? "active" : ""} ${interaction.cut ? "clipboard-cut" : ""} ${interaction.loading ? "loading" : ""} ${interaction.dragging ? "dragging" : ""} ${interaction.dropOver ? "drop-target" : ""} ${interaction.dropParentOver ? "drop-parent-target" : ""} ${interaction.dropInvalid ? "drop-invalid" : ""} ${node.status ? `status-${node.status}` : ""}`}
       role="treeitem"
       data-explorer-path={node.path}
-      draggable={dragController.enabled}
+      draggable={!node.workspaceFolderRoot && dragController.enabled}
       tabIndex={focusable ? 0 : -1}
       aria-level={row.depth + 1}
       aria-posinset={row.positionInSet}
@@ -838,7 +844,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
         onSelectNode(node);
         if (isFolder) toggleCurrentFolder();
       }}
-      onContextMenu={hasNodeContextMenu ? (event) => {
+      onContextMenu={hasNodeContextMenu && !node.workspaceFolderRoot ? (event) => {
         event.stopPropagation();
         if (!interaction.selected) onSelectNode(node);
         onNodeContextMenu(node, event);
@@ -1103,9 +1109,9 @@ function shortStatus(status: NonNullable<DataNode["status"]>) {
 }
 
 function isValidMoveTarget(node: DataNode, targetFolderPath: string | null): boolean {
-  if (getParentPath(node.path) === targetFolderPath) return false;
-  if (targetFolderPath === node.path) return false;
-  if (targetFolderPath?.startsWith(`${node.path}/`)) return false;
+  if (isSameDataResource(getParentPath(node.path), targetFolderPath)) return false;
+  if (isSameDataResource(targetFolderPath, node.path)) return false;
+  if (isDataResourceDescendant(targetFolderPath, node.path)) return false;
   return true;
 }
 
@@ -1123,7 +1129,8 @@ function collectTopLevelSelectedNodes(
     .map((path) => nodeIndex.get(path) ?? null)
     .filter((node): node is DataNode => node !== null);
   return selectedNodes.filter((node) => !selectedNodes.some((candidate) => (
-    candidate.path !== node.path && node.path.startsWith(`${candidate.path}/`)
+    !isSameDataResource(candidate.path, node.path)
+      && isDataResourceDescendant(node.path, candidate.path)
   )));
 }
 
@@ -1163,8 +1170,7 @@ function isEditableEventTarget(target: EventTarget | null): boolean {
 }
 
 function getParentPath(path: string): string | null {
-  if (!path.includes("/")) return null;
-  return path.slice(0, path.lastIndexOf("/"));
+  return getDataResourceParent(path);
 }
 
 function hasDataTransferFiles(dataTransfer: DataTransfer): boolean {

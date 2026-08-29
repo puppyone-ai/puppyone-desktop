@@ -187,6 +187,21 @@ export function createAppPreviewRuntime({
     return Promise.allSettled(closing);
   }
 
+  function closeSessionsForWorkspaceRoot(webContentsId, workspaceRoot) {
+    const normalizedRoot = normalizeRootPath(workspaceRoot);
+    const closing = [];
+    for (const session of Array.from(sessionsById.values())) {
+      if (session.rootPath !== normalizedRoot || !session.ownerIds.has(webContentsId)) continue;
+      session.ownerIds.delete(webContentsId);
+      if (session.ownerIds.size === 0) {
+        closing.push(stopSession(session, "workspace removed").finally(() => {
+          releaseSession(session);
+        }));
+      }
+    }
+    return Promise.allSettled(closing);
+  }
+
   function closeAll() {
     const closing = [];
     for (const session of Array.from(sessionsById.values())) {
@@ -449,6 +464,7 @@ export function createAppPreviewRuntime({
     getLogs,
     openExternal,
     closeSessionsForWindow,
+    closeSessionsForWorkspaceRoot,
     closeAll,
   };
 }

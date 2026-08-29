@@ -7,11 +7,13 @@ import { WindowWorkspaceState } from "./window-workspace-state.mjs";
  */
 export function createWindowWorkspaceCompositionService({
   canonicalizeWorkspacePath,
+  cleanupDetachedWorkspace = async () => undefined,
   getWindowState,
   getWorkspaceWindow,
   indexWorkspacePath,
   persistWorkspaceComposition,
   revealWindow,
+  unindexWorkspacePath = () => undefined,
   workspaceFromPath,
 }) {
   return Object.freeze({
@@ -39,6 +41,29 @@ export function createWindowWorkspaceCompositionService({
       state.replaceFolders(nextFolders);
       indexWorkspacePath(canonicalPath, window);
       return createResult("attached-current", canonicalPath, workspace, currentWorkspaces());
+    },
+    async detach(window, folderPath) {
+      const canonicalPath = await canonicalizeWorkspacePath(folderPath);
+      const state = getWindowState(window);
+      const detachedFolder = state.folders.find((folder) => folder.path === canonicalPath);
+      if (!detachedFolder) {
+        return createResult("not-attached", canonicalPath, null, state.folders.map((folder) => folder.workspace));
+      }
+      if (state.folders.length <= 1) {
+        throw new Error("The last Project cannot be removed from this Workspace. Go Home instead.");
+      }
+
+      const nextFolders = state.folders.filter((folder) => folder !== detachedFolder);
+      await persistWorkspaceComposition(nextFolders.map((folder) => folder.workspace));
+      state.replaceFolders(nextFolders);
+      unindexWorkspacePath(canonicalPath, window);
+      await cleanupDetachedWorkspace(window, detachedFolder);
+      return createResult(
+        "detached-current",
+        canonicalPath,
+        detachedFolder.workspace,
+        nextFolders.map((folder) => folder.workspace),
+      );
     },
   });
 }

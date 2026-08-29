@@ -27,7 +27,7 @@ export function WorkspaceMenuVisualSmokeHarness() {
             titlebarLabel={currentWorkspace.name}
             workspace={currentWorkspace}
             workspaceFolders={folders}
-            onAddProject={() => undefined}
+            onOpenFolder={() => undefined}
             onClose={() => undefined}
             onGoHome={() => undefined}
             onToggle={() => undefined}

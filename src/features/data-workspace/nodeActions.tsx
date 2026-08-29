@@ -15,6 +15,7 @@ import {
   Scissors,
   Trash2,
   Workflow,
+  X,
 } from "lucide-react";
 import {
   createDefaultContextMapDocumentContent,
@@ -97,11 +98,15 @@ export function DesktopExplorerRowActions({
   parentPath,
   onCreate,
   onOpenNodeMenu,
+  onRemoveWorkspaceRoot,
+  showMoreActions = true,
 }: {
   node?: DataNode;
   parentPath: string | null;
   onCreate: (parentPath: string | null, anchorRect: DOMRect) => void;
   onOpenNodeMenu: (node: DataNode, anchorRect: DOMRect) => void;
+  onRemoveWorkspaceRoot?: (node: DataNode) => void;
+  showMoreActions?: boolean;
 }) {
   const { t } = useLocalization();
   const canCreate = node?.type === "folder" || !node;
@@ -119,7 +124,7 @@ export function DesktopExplorerRowActions({
           <Plus aria-hidden="true" />
         </button>
       )}
-      {node && (
+      {node && showMoreActions && (
         <button
           className="tree-row-action-button"
           type="button"
@@ -128,6 +133,20 @@ export function DesktopExplorerRowActions({
           onClick={(event) => onOpenNodeMenu(node, event.currentTarget.getBoundingClientRect())}
         >
           <MoreVertical aria-hidden="true" />
+        </button>
+      )}
+      {node?.workspaceFolderRoot && onRemoveWorkspaceRoot && (
+        <button
+          className="tree-row-action-button"
+          type="button"
+          title={t("shell.workspaceSwitcher.removeProject")}
+          aria-label={t("shell.workspaceSwitcher.removeProjectNamed", { name: bidiIsolate(node.name) })}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemoveWorkspaceRoot(node);
+          }}
+        >
+          <X aria-hidden="true" />
         </button>
       )}
     </>

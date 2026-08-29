@@ -22,6 +22,7 @@ import {
   resolveWorkspaceNode,
   moveWorkspaceEntry,
   copyWorkspaceEntry,
+  copyWorkspaceEntryBetweenRoots,
   deleteWorkspaceEntry,
   importWorkspaceEntries,
   readPuppyoneWorkspaceConfig,
@@ -593,6 +594,20 @@ describe("rename / move / delete", () => {
 });
 
 describe("copyWorkspaceEntry", () => {
+  it("copies a file between two authorized workspace roots", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "source.txt", kind: "file", content: "cross-root" });
+    await createWorkspaceEntry(external, { parentPath: null, name: "destination", kind: "folder" });
+
+    const result = await copyWorkspaceEntryBetweenRoots(root, external, {
+      fromPath: "source.txt",
+      targetFolderPath: "destination",
+    });
+
+    expect(result).toEqual({ path: "destination/source.txt" });
+    expect(await readFile(path.join(root, "source.txt"), "utf8")).toBe("cross-root");
+    expect(await readFile(path.join(external, "destination", "source.txt"), "utf8")).toBe("cross-root");
+  });
+
   it("copies files into another folder without changing the source", async () => {
     await createWorkspaceEntry(root, { parentPath: null, name: "source.txt", kind: "file", content: "original" });
     await createWorkspaceEntry(root, { parentPath: null, name: "destination", kind: "folder" });

@@ -5,6 +5,13 @@ import {
   resolveWorkspaceRelativePath,
   type MarkdownAssetKind,
 } from "../../platform/policy/markdownAssetPolicy";
+import {
+  createResourceUri,
+  createWorkspaceResourceUri,
+  getWorkspaceResourcePath,
+  parseResourceUri,
+} from "../../../../core/resourceUri";
+import { isDataResourceUri } from "../../../../core/dataResourcePath";
 
 /**
  * The narrow URL-resolution contract shared by media renderers. The required
@@ -20,6 +27,15 @@ export type BrokeredMarkdownMediaUrlResolver = (
 
 /** Public host adapter for resolving any authored Markdown media path. */
 export function resolveMarkdownAssetPath(sourcePath: string, href: string): string | null {
+  if (isDataResourceUri(sourcePath)) {
+    const parsed = parseResourceUri(sourcePath);
+    const rootSegment = parsed.path.split("/").filter(Boolean)[0];
+    if (!rootSegment) return null;
+    const rootUri = createResourceUri({ ...parsed, path: rootSegment });
+    const providerSourcePath = getWorkspaceResourcePath(rootUri, sourcePath);
+    const providerAssetPath = resolveWorkspaceRelativePath(providerSourcePath, href);
+    return providerAssetPath ? createWorkspaceResourceUri(rootUri, providerAssetPath) : null;
+  }
   return resolveWorkspaceRelativePath(sourcePath, href);
 }
 

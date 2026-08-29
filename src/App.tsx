@@ -3,9 +3,11 @@ import {
   closeAllDocumentWorkingCopies,
   closeDocumentWorkingCopy,
   closeDocumentWorkingCopiesUnderResource,
+  createWorkspaceResourceUri,
   flushActiveDocumentSessions,
   isDocumentDataNode,
   type DataNode,
+  type WorkspaceFolder,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import { DesktopCloudShell, type DesktopView } from "./components/DesktopCloudShell";
@@ -22,8 +24,6 @@ import {
 } from "./features/desktop-terminal";
 import { useDesktopUpdates } from "./features/updates";
 import {
-  createLocalDataPort,
-  createLocalDocumentStorageIdentity,
   readPuppyoneWorkspaceConfig,
   removeWorkspaceGitRemote,
   showHomepage,
@@ -72,6 +72,7 @@ import {
   DesktopNodeActionMenu,
 } from "./features/data-workspace/nodeActions";
 import { createExplorerDataPort } from "./features/data-workspace/explorer";
+import { createWorkbenchDataService } from "./features/data-workspace/workbenchDataPort";
 import { useDataNodeActions } from "./features/data-workspace/useDataNodeActions";
 import { useAiEditReviewRequest } from "./features/data-workspace/useAiEditReviewRequest";
 import {
@@ -123,6 +124,7 @@ function AppContent() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const {
     addProject,
+    addExistingProject,
     chooseProjectLocation,
     clearWorkspace,
     cloneRepository,
@@ -134,6 +136,7 @@ function AppContent() {
     openWorkspacePath,
     recentWorkspaceItems,
     removeWorkspaceFromRecents,
+    removeProject,
     refreshRecentWorkspaceList,
     restoreWorkspaceError,
     restoringWorkspace,
@@ -156,9 +159,6 @@ function AppContent() {
       setSwitcherOpen(false);
     }, []),
   });
-  const documentStorageIdentity = workspace
-    ? createLocalDocumentStorageIdentity(workspace.path)
-    : null;
   const {
     activeThemeMode,
     aiEditAssistEnabled,
@@ -222,18 +222,35 @@ function AppContent() {
     sequence: 0,
     paths: null as readonly string[] | null,
   });
-  const localDataPort = useMemo(
-    () => (workspace ? createLocalDataPort(workspace.path) : null),
-    [workspace],
+  const workbenchDataService = useMemo(
+    () => (workbenchWorkspace ? createWorkbenchDataService(workbenchWorkspace) : null),
+    [workbenchWorkspace],
   );
   const dataPort = useMemo(
-    () => (localDataPort ? createExplorerDataPort(localDataPort, filesVisibilitySettings) : null),
-    [filesVisibilitySettings, localDataPort],
+    () => (workbenchDataService
+      ? createExplorerDataPort(workbenchDataService.dataPort, filesVisibilitySettings)
+      : null),
+    [filesVisibilitySettings, workbenchDataService],
   );
+  const documentStorageIdentity = dataPort?.documentPersistence?.storageIdentity ?? null;
+  const resolveEditorResource = useCallback((path: string) => {
+    if (!workbenchDataService) return null;
+    const resolved = workbenchDataService.resolveResource(path);
+    if (!resolved.providerPath) return null;
+    return {
+      rootUri: resolved.folder.uri,
+      resourcePath: resolved.providerPath,
+      hostPath: path,
+    };
+  }, [workbenchDataService]);
+  const resolveWorkspaceResource = useCallback((path: string | null) => (
+    workbenchDataService?.resolveResource(path) ?? null
+  ), [workbenchDataService]);
   const editorWorkbench = useDesktopEditorWorkbench(
     workspace,
     dataPort?.resolveNode ?? null,
     workbenchWorkspace?.folders[0]?.uri ?? null,
+    resolveEditorResource,
   );
   const activeDocumentPath = editorWorkbench.activePath;
   const handleResourceMoved = useCallback(async (previousPath: string, nextPath: string) => {
@@ -249,6 +266,17 @@ function AppContent() {
     editorWorkbench.closeUnderResource(path);
   }, [documentStorageIdentity, editorWorkbench]);
   const [activeExplorerNode, setActiveExplorerNode] = useState<DataNode | null>(null);
+  const focusedWorkspace = resolveWorkspaceResource(
+    activeDocumentPath ?? activeExplorerNode?.path ?? null,
+  )?.folder.workspace ?? workspace;
+  const handleRemoveProject = useCallback(async (folder: WorkspaceFolder) => {
+    if (documentStorageIdentity) {
+      await closeDocumentWorkingCopiesUnderResource(documentStorageIdentity, folder.uri);
+    }
+    editorWorkbench.closeUnderResource(folder.uri);
+    if (activeExplorerNode?.workspaceFolderId === folder.id) setActiveExplorerNode(null);
+    await removeProject(folder.workspace.path);
+  }, [activeExplorerNode?.workspaceFolderId, documentStorageIdentity, editorWorkbench, removeProject]);
   const activeExplorerPath = activeExplorerNode?.path ?? activeDocumentPath;
   const activateDataNode = useCallback((node: DataNode) => {
     setActiveExplorerNode(node);
@@ -303,7 +331,7 @@ function AppContent() {
     }));
   }, []);
   const git = useDesktopGitController({
-    workspace,
+    workspace: focusedWorkspace,
     gitViewActive: activeView === "git",
     onWorkspaceContentChanged: refreshWorkspaceContent,
     onEnterGitView: () => setActiveView("git"),
@@ -365,8 +393,11 @@ function AppContent() {
     puppyoneConfigLoading,
     puppyoneConfigSaving,
     handlePuppyoneConfigChange: savePuppyoneConfig,
-  } = usePuppyoneConfig(workspace?.path ?? null);
-  const workspaceKey = useMemo(() => workspace?.path ?? "no-workspace", [workspace?.path]);
+  } = usePuppyoneConfig(focusedWorkspace?.path ?? null);
+  const workspaceKey = useMemo(
+    () => workbenchWorkspace?.id ?? "no-workspace",
+    [workbenchWorkspace?.id],
+  );
   const desktopCloudApiBaseUrl = useMemo(() => getDesktopCloudApiBaseUrl(), []);
   const activeCloudSession = useMemo(
     () => isCloudSessionForApiBase(cloudSession, desktopCloudApiBaseUrl) ? cloudSession : null,
@@ -375,7 +406,7 @@ function AppContent() {
   const latestAiEditRequest = useAiEditReviewRequest({
     aiEditAssistEnabled,
     onWorkspaceContentChanged: refreshWorkspaceContent,
-    workspace,
+    workspace: focusedWorkspace,
   });
   const activeAiEditRequest = aiEditAssistEnabled ? latestAiEditRequest : null;
   const enterDataView = useCallback(() => {
@@ -452,11 +483,11 @@ function AppContent() {
   const cloudResolutionInputsLoading = shouldBlockWorkspaceCloudResolution({
     gitStatusError,
     gitStatusPath,
-    workspacePath: workspace?.path ?? null,
+    workspacePath: focusedWorkspace?.path ?? null,
   });
 
   const projectCloudContext = useCurrentRepositoryCloudContext({
-    workspace,
+    workspace: focusedWorkspace,
     activeGitStatus,
     activeCloudSession,
     cloudEnabled,
@@ -466,9 +497,9 @@ function AppContent() {
   });
   const resolvedCloudProjectId = getResolvedCloudProjectId(projectCloudContext);
 
-  const workspacePath = workspace?.path ?? null;
-  const cloudHubWorkspaceIdentity = workspace
-    ? `${workspace.id}:${workspace.path}`
+  const workspacePath = focusedWorkspace?.path ?? null;
+  const cloudHubWorkspaceIdentity = focusedWorkspace
+    ? `${focusedWorkspace.id}:${focusedWorkspace.path}`
     : null;
   const previousCloudHubWorkspaceIdentityRef = useRef<string | null>(null);
   useEffect(() => {
@@ -659,9 +690,10 @@ function AppContent() {
     setSwitcherOpen(false);
   }, []);
   const externalFileOpen = useExternalFileOpen({
+    dataPort,
     onActionSettled: closeSwitcher,
     onError: setWorkspaceSurfaceError,
-    workspace,
+    workspace: focusedWorkspace,
   });
 
   const handleCloudSessionChange = useCallback((session: DesktopCloudSession | null) => {
@@ -681,10 +713,10 @@ function AppContent() {
   }, [activeView, cloudEnabled, setSidebarCollapsed, updateCloudSession]);
 
   const handleRemoveCloudRemote = useCallback(async () => {
-    if (!workspace) return;
-    const refreshedStatus = await removeWorkspaceGitRemote(workspace.path, "puppyone");
+    if (!focusedWorkspace) return;
+    const refreshedStatus = await removeWorkspaceGitRemote(focusedWorkspace.path, "puppyone");
     const currentConfig = puppyoneConfig
-      ?? await readPuppyoneWorkspaceConfig(workspace.path);
+      ?? await readPuppyoneWorkspaceConfig(focusedWorkspace.path);
     const configReferencesPuppyone = currentConfig.sync.sourceOfTruth.service === "puppyone"
       || currentConfig.sync.sourceOfTruth.remote === "puppyone"
       || currentConfig.backup.service === "puppyone"
@@ -714,7 +746,7 @@ function AppContent() {
         throw new Error("The PuppyOne Git remote was removed, but Desktop could not update the local sync settings.");
       }
     }
-    const context = captureGitRepositoryContext(workspace.path);
+    const context = captureGitRepositoryContext(focusedWorkspace.path);
     if (context && applyGitStatus(
       refreshedStatus,
       context,
@@ -729,7 +761,7 @@ function AppContent() {
     handlePuppyoneConfigChange,
     puppyoneConfig,
     refreshWorkspaceContent,
-    workspace,
+    focusedWorkspace,
   ]);
 
   const {
@@ -793,22 +825,47 @@ function AppContent() {
   }, []);
 
   const handleLocationBarNavigate = useCallback(async (displayPath: string) => {
-    if (!workspace) return;
+    if (!workspace || !workbenchWorkspace) return;
     navigateDesktopView("data");
-    const entryPath = resolveDesktopShellWorkspaceEntryPath(displayPath, workspace.path);
-    if (entryPath === undefined || entryPath === null || !dataPort) {
-      if (entryPath === null) setActiveExplorerNode(null);
+    if (!dataPort) return;
+    const activeResource = resolveWorkspaceResource(activeDocumentPath ?? activeExplorerNode?.path ?? null);
+    const folders = activeResource
+      ? [activeResource.folder, ...workbenchWorkspace.folders.filter((folder) => folder.id !== activeResource.folder.id)]
+      : [...workbenchWorkspace.folders];
+    const target = folders
+      .map((folder) => ({
+        folder,
+        entryPath: resolveDesktopShellWorkspaceEntryPath(displayPath, folder.workspace.path),
+      }))
+      .find((candidate) => candidate.entryPath !== undefined);
+    if (!target) return;
+    const targetEntryPath = target.entryPath;
+    if (targetEntryPath === undefined) return;
+    if (targetEntryPath === null && workbenchWorkspace.folders.length === 1) {
+      setActiveExplorerNode(null);
       return;
     }
 
     try {
-      const node = await dataPort.resolveNode?.(entryPath) ?? null;
+      const resourcePath = targetEntryPath === null
+        ? target.folder.uri
+        : createWorkspaceResourceUri(target.folder.uri, targetEntryPath);
+      const node = await dataPort.resolveNode?.(resourcePath) ?? null;
       if (node) await handleActiveDataPathChange(node.path, node);
     } catch {
       // The workspace surface already owns filesystem error presentation. An
       // invalid address remains editable so the user can correct it in place.
     }
-  }, [dataPort, handleActiveDataPathChange, navigateDesktopView, workspace]);
+  }, [
+    activeDocumentPath,
+    activeExplorerNode?.path,
+    dataPort,
+    handleActiveDataPathChange,
+    navigateDesktopView,
+    resolveWorkspaceResource,
+    workbenchWorkspace,
+    workspace,
+  ]);
 
   if (restoringWorkspace && !workspace) {
     return (
@@ -860,10 +917,12 @@ function AppContent() {
       remoteBranches={remoteBranches}
       workspace={workspace}
       workspaceFolders={workbenchWorkspace?.folders ?? []}
+      availableProjects={recentWorkspaceItems.map((item) => item.workspace)}
       workspaceSwitcherOpen={switcherOpen}
       workspaceSwitcherRef={switcherRef}
       onCheckoutBranch={handleCheckoutGitBranch}
       onAddProject={() => void addProject()}
+      onAddExistingProject={(folderPath) => void addExistingProject(folderPath)}
       onGoHome={() => void goToHomepage()}
       onCloseWorkspaceSwitcher={closeWorkspaceSwitcher}
       onCloseBranchSwitcher={closeBranchSwitcher}
@@ -874,12 +933,13 @@ function AppContent() {
 
   const toolsInNavigationToolbar = resolvedAppearance.composition.navigation === "sidebar-top-toolbar";
   const locationBarVisible = resolvedAppearance.composition.locationBar === "workspace-path-v1";
+  const locationResource = resolveWorkspaceResource(activeDocumentPath ?? activeExplorerNode?.path ?? null);
   const locationBarPath = resolveDesktopShellLocationPath({
     // The address bar describes the content surface. Keep the active editor
     // authoritative even if explorer selection state is briefly catching up.
-    activePath: activeDocumentPath ?? activeExplorerNode?.path ?? null,
+    activePath: locationResource?.providerPath ?? null,
     dataViewActive: activeView === "data",
-    workspacePath: workspace.path,
+    workspacePath: locationResource?.folder.workspace.path ?? workspace.path,
   });
   const chromeActionProps = {
     desktopUpdateState: desktopUpdates.state,
@@ -982,14 +1042,14 @@ function AppContent() {
           onRightSidebarOpenChange={setRightSidebarOpen}
           onRightSidebarWidthChange={setRightSidebarWidth}
           rightSidebar={desktopRightSidebarEnabled ? (
-          <div className="desktop-right-sidebar-stack" key={workspace.path}>
+          <div className="desktop-right-sidebar-stack" key={focusedWorkspace?.path ?? workspace.path}>
             {desktopTerminalEnabled && (
               <div
                 className={`desktop-right-sidebar-surface ${rightSidebarSurface === "terminal" ? "is-active" : ""}`}
                 aria-hidden={rightSidebarSurface !== "terminal"}
               >
                 <RightTerminalPanel
-                  workspace={workspace}
+                  workspace={focusedWorkspace ?? workspace}
                   active={rightSidebarOpen && rightSidebarSurface === "terminal"}
                   hiddenAgentIds={localAgentsSettings.hiddenTerminalAgentIds}
                 />
@@ -1002,7 +1062,7 @@ function AppContent() {
               >
                 <Suspense fallback={null}>
                   <RightAgentPanel
-                    workspace={workspace}
+                    workspace={focusedWorkspace ?? workspace}
                     active={rightSidebarOpen && rightSidebarSurface === "chat"}
                     preferredRuntimeId={agentPreferredRuntime}
                     onPreferredRuntimeChange={setAgentPreferredRuntime}
@@ -1063,6 +1123,7 @@ function AppContent() {
           onActiveDataNodeChange={handleActiveDataNodeChange}
           onActiveDataPathChange={handleActiveDataPathChange}
           onResourceMove={handleResourceMoved}
+          onRemoveProject={handleRemoveProject}
           onCreateEntryMenu={openCreateEntryMenu}
           onDismissCreateEntryMenu={() => setCreateEntryDraft(null)}
           fileClipboardController={fileClipboardController}
@@ -1079,7 +1140,9 @@ function AppContent() {
           puppyoneConfigLoading={puppyoneConfigLoading}
           puppyoneConfigSaving={puppyoneConfigSaving}
           settingsSection={activeSettingsSection}
-          workspace={workspace}
+          workspace={focusedWorkspace ?? workspace}
+          workspaceFolders={workbenchWorkspace?.folders ?? []}
+          resolveWorkspaceResource={resolveWorkspaceResource}
           workspaceSurfaceError={restoreWorkspaceError ?? documentNavigationError ?? workspaceSurfaceError}
           workspaceKey={workspaceKey}
           workspaceRefreshToken={workspaceRefreshToken}

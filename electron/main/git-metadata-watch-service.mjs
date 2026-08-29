@@ -146,6 +146,23 @@ export function createGitMetadataWatchService({
     }
   }
 
+  function stopForWorkspaceRoot(webContentsId, rootPath) {
+    const resolvedRoot = typeof rootPath === "string" && rootPath.trim()
+      ? path.resolve(rootPath)
+      : null;
+    if (!Number.isInteger(webContentsId) || !resolvedRoot) return 0;
+    let stopped = 0;
+    for (const [subscriptionId, subscription] of Array.from(subscriptions.entries())) {
+      if (
+        subscription.senderId !== webContentsId
+        || path.resolve(subscription.workspaceRoot) !== resolvedRoot
+      ) continue;
+      stop(subscriptionId);
+      stopped += 1;
+    }
+    return stopped;
+  }
+
   function closeAll() {
     for (const repository of repositories.values()) {
       disposeRepositoryWatch(repository);
@@ -626,6 +643,7 @@ export function createGitMetadataWatchService({
     start,
     stop,
     stopForWindow,
+    stopForWorkspaceRoot,
     closeAll,
     invalidateWorkingTree,
     getWatcherCount,

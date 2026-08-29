@@ -31,8 +31,10 @@ describe("titlebar Portal menu interactions", () => {
     const onGoHome = vi.fn();
     const onClose = vi.fn();
     const onAddProject = vi.fn();
+    const onAddExistingProject = vi.fn();
     const workspace = createWorkspace("one", "Workspace one");
     const secondWorkspace = createWorkspace("two", "Workspace two");
+    const thirdWorkspace = createWorkspace("three", "Workspace three");
 
     await act(async () => {
       root?.render(withTestLocalization(
@@ -45,7 +47,9 @@ describe("titlebar Portal menu interactions", () => {
             createWorkspaceFolder(workspace),
             createWorkspaceFolder(secondWorkspace, { index: 1 }),
           ]}
-          onAddProject={onAddProject}
+          availableProjects={[workspace, secondWorkspace, thirdWorkspace]}
+          onAddExistingProject={onAddExistingProject}
+          onOpenFolder={onAddProject}
           onClose={onClose}
           onGoHome={onGoHome}
           onToggle={vi.fn()}
@@ -74,9 +78,16 @@ describe("titlebar Portal menu interactions", () => {
       .toBe("true");
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-home")?.click());
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-add-folder")?.click());
+    expect(menu.textContent).toContain("Projects");
+    expect(menu.textContent).toContain("Workspace three");
+    expect(menu.textContent).toContain("Open Folder…");
+    act(() => Array.from(menu.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("Workspace three"))?.click());
+    act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-add-folder")?.click());
 
     expect(onGoHome).toHaveBeenCalledOnce();
     expect(onAddProject).toHaveBeenCalledOnce();
+    expect(onAddExistingProject).toHaveBeenCalledWith(thirdWorkspace.path);
   });
 
   it("dismisses a titlebar menu when the user points outside it", async () => {

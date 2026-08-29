@@ -25,6 +25,7 @@ import type {
   WorkspaceOpenEntryExternalRequest,
   WorkspaceImportEntriesResult,
   WorkspaceAttachResult,
+  WorkspaceDetachResult,
   WorkspaceOpenResult,
   WorkspaceProjectLocationGrant,
 } from "../types/electron";
@@ -63,6 +64,7 @@ export function createLocalDataPort(rootPath: string): DataPort {
       .revokeFileUrl({ url })
       .then(() => undefined),
     openExternalFile: (path) => getDesktopBridge().openEntryExternal({ rootPath, path }).then(() => undefined),
+    revealInFileManager: (path) => getDesktopBridge().revealEntryInFinder({ rootPath, path }).then(() => undefined),
     convertOfficeDocumentToDocx: async (path, options) => {
       const signal = options?.signal;
       if (signal?.aborted) throw createOfficeConversionAbortError();
@@ -311,6 +313,25 @@ export async function selectWorkspaceFolder(): Promise<WorkspaceOpenResult | nul
 
 export async function selectWorkspaceFolderToAttach(): Promise<WorkspaceAttachResult | null> {
   return getDesktopBridge().selectFolderToAttach();
+}
+
+export async function attachWorkspaceFolder(folderPath: string): Promise<WorkspaceAttachResult> {
+  return getDesktopBridge().attachFolder(folderPath);
+}
+
+export async function detachWorkspaceFolder(folderPath: string): Promise<WorkspaceDetachResult> {
+  return getDesktopBridge().detachFolder(folderPath);
+}
+
+export async function copyWorkspaceEntryBetweenRoots(request: {
+  sourceRootPath: string;
+  targetRootPath: string;
+  fromPath: string;
+  targetFolderPath: string | null;
+  preferredName?: string;
+  forceDuplicateName?: boolean;
+}): Promise<{ path: string }> {
+  return getDesktopBridge().copyEntryBetweenRoots(request);
 }
 
 export async function selectWorkspaceFolderInNewWindow(): Promise<WorkspaceOpenResult | null> {
