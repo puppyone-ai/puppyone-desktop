@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   EXPLORER_RESIZE_GUTTER_WIDTH,
   MAX_EXPLORER_WIDTH,
-  MAX_RIGHT_SIDEBAR_WIDTH,
   MIN_EXPLORER_WIDTH,
   MIN_MAIN_PANE_WIDTH,
   MIN_RIGHT_SIDEBAR_WIDTH,
@@ -23,7 +22,7 @@ describe("desktop three-pane layout", () => {
     expect(layout.main.minWidth).toBe(MIN_MAIN_PANE_WIDTH);
   });
 
-  it("clamps each sidebar to its own absolute maximum instead of a viewport ratio", () => {
+  it("keeps the Explorer cap but lets the auxiliary pane consume safe spare width", () => {
     const layout = resolveLayout({
       availableWidth: 2200,
       explorerWidth: 1200,
@@ -32,9 +31,39 @@ describe("desktop three-pane layout", () => {
 
     expect(layout.explorer.width).toBe(MAX_EXPLORER_WIDTH);
     expect(layout.explorer.maxWidth).toBe(MAX_EXPLORER_WIDTH);
-    expect(layout.rightSidebar.width).toBe(MAX_RIGHT_SIDEBAR_WIDTH);
-    expect(layout.rightSidebar.maxWidth).toBe(MAX_RIGHT_SIDEBAR_WIDTH);
-    expect(layout.main.width).toBe(912);
+    expect(layout.rightSidebar.width).toBe(1352);
+    expect(layout.rightSidebar.maxWidth).toBe(1352);
+    expect(layout.main.width).toBe(MIN_MAIN_PANE_WIDTH);
+  });
+
+  it("derives the auxiliary maximum from the live workbench instead of a pixel cap", () => {
+    const compact = resolveLayout({ availableWidth: 1440 });
+    const wide = resolveLayout({ availableWidth: 2200 });
+
+    expect(compact.rightSidebar.maxWidth).toBe(792);
+    expect(wide.rightSidebar.maxWidth).toBe(1552);
+    expect(wide.rightSidebar.maxWidth).toBeGreaterThan(compact.rightSidebar.maxWidth);
+  });
+
+  it("still honors an explicit host maximum", () => {
+    const layout = resolveDesktopPaneLayout({
+      availableWidth: 2200,
+      explorer: {
+        collapsed: false,
+        preferredWidth: 320,
+        present: true,
+      },
+      rightSidebar: {
+        maxWidth: 900,
+        open: true,
+        preferredWidth: 1600,
+        present: true,
+      },
+    });
+
+    expect(layout.rightSidebar.width).toBe(900);
+    expect(layout.rightSidebar.maxWidth).toBe(900);
+    expect(layout.main.width).toBe(972);
   });
 
   it("compresses only the main pane before touching either sidebar", () => {
