@@ -70,10 +70,15 @@ describe("Desktop Agent panel lifecycle", () => {
       };
     });
 
-    const container = renderPanel(harness.bridge);
+    const container = renderPanel(harness.bridge, "codex");
     await flushEffects();
 
     const launcher = container.querySelector(".desktop-agent-runtime-launcher") as HTMLElement;
+    expect(harness.bridge.discoverAgentProviders).toHaveBeenNthCalledWith(1, {
+      rootPath: "/workspace",
+      runtimeId: null,
+      refresh: false,
+    });
     expect(launcher).not.toBeNull();
     expect(launcher.textContent).toContain("Start with an Agent");
     expect(launcher.textContent).toContain("Codex");
@@ -222,7 +227,10 @@ describe("Desktop Agent panel lifecycle", () => {
   });
 });
 
-function renderPanel(bridge: ReturnType<typeof createBridgeHarness>["bridge"]) {
+function renderPanel(
+  bridge: ReturnType<typeof createBridgeHarness>["bridge"],
+  preferredRuntimeId: string | null = null,
+) {
   (window as Window & { puppyoneDesktop?: unknown }).puppyoneDesktop = bridge;
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -230,6 +238,7 @@ function renderPanel(bridge: ReturnType<typeof createBridgeHarness>["bridge"]) {
   act(() => root?.render(withTestLocalization(React.createElement(RightAgentPanel, {
     workspace: { id: "workspace", name: "Workspace", path: "/workspace" },
     active: true,
+    preferredRuntimeId,
   }))));
   return container;
 }

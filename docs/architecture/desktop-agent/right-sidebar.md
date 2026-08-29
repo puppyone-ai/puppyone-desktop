@@ -53,11 +53,6 @@ actually available in a given release and account.
 
 The product meaning is strict:
 
-- opening Chat without a versioned explicit Agent preference shows a dedicated
-  pre-Chat launcher containing the locally available Agent inventory. It does
-  not mount a blank transcript, Composer or session header; no runtime
-  inspection, session restore or session creation begins until the user
-  launches a row;
 - selecting `PuppyOne Agent` enters the first-party, multi-provider managed
   route;
 - selecting a native Agent enters that named product's official/native harness
@@ -643,11 +638,9 @@ The implemented sidebar contract remains satisfied when:
 - the independent Chat and Terminal header buttons switch panels without losing
   their active state;
 - a hidden running agent continues safely and reports completion on return;
-- the pre-Chat launcher exposes Agent before any transcript or Composer; after
-  launch, the session header exposes Agent before backend-scoped Model controls;
-- reopening Chat restores only the last versioned, explicit Agent preference;
-  a first open, legacy implicit value or stale runtime stays unselected without
-  interpreting any preference as a saved conversation;
+- a blank composer exposes Agent before backend-scoped Model controls;
+- reopening Chat selects the last valid Agent preference without interpreting
+  it as a saved conversation;
 - opening a routable Chat starts at most one background native-session preparation,
   and a simultaneous first Submit reuses it;
 - `Thinking` appears only after the selected harness emits `turn.started`;

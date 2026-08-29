@@ -136,12 +136,6 @@ export class AgentSessionController {
     return this.listeners.size > 0;
   }
 
-  setInitialRuntimePreference(runtimeId: string | null) {
-    if (this.state.initialized || this.state.phase !== "idle" || this.state.selectedRuntimeId) return;
-    if (!runtimeId || !/^[a-z][a-z0-9-]{1,39}$/.test(runtimeId)) return;
-    this.patch({ selectedRuntimeId: runtimeId });
-  }
-
   /** Releases renderer subscriptions only; it never sends a runtime stop. */
   dispose() {
     if (this.disposed) return;

@@ -33,6 +33,7 @@ export function useAgentRoutingPreferences({
   const preferredModelId = preferredRoute.modelId || preferredModel;
   const preferredModelIsAvailable = Boolean(
     preferredModelId
+    && state.selectedRuntimeId === preferredRuntimeId
     && state.inspection?.selectedRuntimeId === state.selectedRuntimeId
     && state.inspection.models.some((model) => model.model === preferredModelId),
   );
@@ -40,7 +41,9 @@ export function useAgentRoutingPreferences({
     !state.session && preferredModelIsAvailable && state.selectedModel !== preferredModelId,
   );
   const preferredModeIsAvailable = Boolean(
-    preferredRoute.mode && state.inspection?.modes?.some((mode) => mode.id === preferredRoute.mode),
+    preferredRoute.mode
+    && state.selectedRuntimeId === preferredRuntimeId
+    && state.inspection?.modes?.some((mode) => mode.id === preferredRoute.mode),
   );
   const modePreferencePending = Boolean(
     !state.session && preferredModeIsAvailable && state.selectedMode !== preferredRoute.mode,
@@ -48,9 +51,8 @@ export function useAgentRoutingPreferences({
 
   useEffect(() => {
     if (!active) return;
-    controller.setInitialRuntimePreference(preferredRuntimeId);
     void controller.initialize(false);
-  }, [active, controller, preferredRuntimeId]);
+  }, [active, controller]);
 
   useEffect(() => {
     if (!state.initialized) return;

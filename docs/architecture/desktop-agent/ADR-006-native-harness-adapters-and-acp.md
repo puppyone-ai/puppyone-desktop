@@ -254,7 +254,7 @@ PuppyOne does not persist Chat transcripts or create a second history source.
 
 ```text
 Persisted by PuppyOne
-  versioned explicit Agent selection and per-runtime routing preferences
+  versioned per-runtime routing preference in Renderer preferences
   sanitized local-runtime inventory with TTL and explicit Refresh invalidation
   bounded Conversation Catalog metadata and native session pointers
 
@@ -271,19 +271,11 @@ Never written as PuppyOne Chat history
   credentials or raw environment
 ```
 
-At app restart, an explicitly selected native product remains the UI preference and the
+At app restart, the selected native product remains the UI preference and the
 metadata-only Conversation Catalog can resume the authoritative native session
 without copying its transcript. The inventory cache avoids an immediate full
 disk/process scan. Legacy `desktop-agent-sessions.json` transcript data is
 deleted rather than continued as a hidden history store.
-
-With no version-2 explicit selection, discovery is inventory-only: it returns
-installed runtime rows with `selectedRuntimeId` and selected readiness set to
-`null`. It creates no adapter, performs no harness inspection, and resumes no
-session. Version-1 and legacy selection fields migrate only their scoped routes
-because they could be written by the former implicit-default flow. Registry
-defaults remain an internal composition concern and never choose an Agent for
-the user.
 
 Switching Agent is a hard session boundary. The UI may preserve the unsent
 draft, but it creates a new native session and does not copy the old transcript

@@ -93,12 +93,6 @@ native harness owns the whole loop. OpenCode is the current internal kernel
 only for PuppyOne Agent and the explicit user OpenCode route; those two
 profiles, credentials and sessions remain isolated.
 
-PuppyOne Chat is the visible desktop client and control plane; it is not an
-interactive terminal or a text-scraping CLI surface. Native routes may launch a
-locally installed executable behind a bounded protocol (`app-server`, ACP, or
-an official SDK), but the executable is an implementation endpoint. The user
-selects the Agent product in Chat and never has to compose its CLI command.
-
 ### Route-selection policy
 
 The selected **Agent**, not the requested model family, determines the harness:
@@ -113,19 +107,6 @@ The selected **Agent**, not the requested model family, determines the harness:
 
 The following rules are normative:
 
-- First open is inventory-only. A dedicated pre-Chat launcher lists locally
-  available Agent products, matching Terminal's choose-before-start lifecycle.
-  The transcript, Composer and session header are not mounted as an empty Chat.
-  PuppyOne keeps `selectedRuntimeId`, selected readiness, Provider and Model
-  empty until the user explicitly launches a row. It never preselects Codex,
-  PuppyOne Agent, or the registry's internal default. After Chat starts, the
-  compact header picker remains the explicit new-session switcher.
-- A version-2 preference written after an explicit picker action may restore
-  that Agent on a later open. Legacy global runtime keys are not proof of user
-  intent, and version 1 could contain an implicit controller default: migration
-  may retain their backend-scoped model routes, but must not turn either into a
-  selected Agent. A stale preference clears to the inventory-only state rather
-  than falling back to another runtime.
 - A row named after a native Agent product uses that product's documented
   native protocol or official SDK. It is never implemented as PuppyOne Agent
   calling a similarly named inference API.
@@ -505,9 +486,8 @@ The metadata-only Conversation Catalog makes authoritative native sessions
 discoverable and resumable after restart without storing prompts, responses or
 tool events. The inventory cache prevents a repeated full executable scan every time Chat
 opens. It is invalidated by its TTL, explicit Refresh and authoritative runtime
-failure. A versioned, explicit Agent and model preference lets the next Chat
-start with the previous choice; without that proof of intent Chat stays on the
-installed-Agent picker. Neither cache is Chat history.
+failure. Agent and model preference lets the next Chat start with the previous
+choice. Neither cache is Chat history.
 
 This full inventory belongs only to Agent Chat readiness. The Terminal selector
 does not consume it: Terminal owns a separate filesystem-only executable
