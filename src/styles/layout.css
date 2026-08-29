@@ -498,7 +498,6 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
 }
 
 .desktop-project-menu {
-  --po-menu-item-height: 34px;
   --po-menu-item-padding-inline: 10px;
   --po-menu-item-gap: 9px;
   --po-menu-item-radius: 8px;

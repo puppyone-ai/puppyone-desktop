@@ -35,6 +35,15 @@ const cloudHistorySidebarCss = readCss("../src/features/cloud/history/styles/sid
 const changesCss = readCss("../src/features/changes/changes.css");
 
 describe("sidebar spacing architecture", () => {
+  it("keeps Workspace menu rows on the shared 30px control geometry", () => {
+    const root = compact(readCssBlock(tokensCss, ":root"));
+    const workspaceMenu = compact(readCssBlock(layoutCss, ".desktop-project-menu"));
+
+    expect(root).toContain("--desktop-sidebar-row-height: 30px;");
+    expect(root).toContain("--po-menu-item-height: var(--desktop-sidebar-row-height);");
+    expect(workspaceMenu).not.toContain("--po-menu-item-height:");
+  });
+
   it("lets Cloud History use the same full workspace rectangle as local History", () => {
     const main = compact(readCssBlock(
       cloudSidebarCss,
