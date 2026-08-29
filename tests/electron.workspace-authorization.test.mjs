@@ -30,6 +30,25 @@ afterEach(async () => {
 });
 
 describe("sender-bound workspace authorization", () => {
+  it("authorizes any explicitly requested Root in a sender capability set", async () => {
+    let assignedRoots = [root, otherRoot];
+    const authorize = createSenderWorkspaceAuthorization({
+      fsModule: fs,
+      getWorkspaceRootsForSender: () => assignedRoots,
+    });
+
+    await expect(authorize({ sender: { id: 1 } }, root))
+      .resolves.toBe(await fs.promises.realpath(root));
+    await expect(authorize({ sender: { id: 1 } }, otherRoot))
+      .resolves.toBe(await fs.promises.realpath(otherRoot));
+    await expect(authorize({ sender: { id: 1 } }))
+      .rejects.toThrow(/explicit|multiple/i);
+
+    assignedRoots = [root];
+    await expect(authorize({ sender: { id: 1 } }, otherRoot))
+      .rejects.toThrow(/does not match/i);
+  });
+
   it("canonicalizes the assigned root, accepts only an alias of that root, and rejects no-workspace senders", async () => {
     const aliasParent = await mkdtemp(path.join(os.tmpdir(), "puppyone-auth-alias-"));
     const aliasPath = path.join(aliasParent, "workspace");
@@ -283,6 +302,31 @@ describe("recent workspace authorization", () => {
 });
 
 describe("terminal session ownership", () => {
+  it("closes sessions for one Workspace Folder without touching sibling Roots", async () => {
+    const terminals = [];
+    const service = createTerminalService({
+      appVersion: "test",
+      initializeWorkspaceEditReview: vi.fn(async () => undefined),
+      ptyService: {
+        spawn: vi.fn(() => {
+          const terminal = createFakeTerminal();
+          terminals.push(terminal);
+          return terminal;
+        }),
+      },
+      logger: { warn: vi.fn() },
+    });
+    const owner = createSender(20);
+    await service.create(owner, { id: "root-a", cwd: root }, root);
+    await service.create(owner, { id: "root-b", cwd: otherRoot }, otherRoot);
+
+    expect(service.closeSessionsForWorkspaceRoot(owner.id, root)).toBe(1);
+    expect(terminals[0].kill).toHaveBeenCalledOnce();
+    expect(terminals[1].kill).not.toHaveBeenCalled();
+    expect(service.getSessionCount()).toBe(1);
+    service.closeAll();
+  });
+
   it("requires a workspace and prevents another sender from input, resize, close, or id replacement", async () => {
     const terminals = [];
     const ptyService = {

@@ -142,6 +142,7 @@ function AppContent() {
     restoringWorkspace,
     setRestoreWorkspaceError,
     setWorkspaces,
+    workbenchWorkspace,
     workspace,
     workspaces,
   } = useWorkspaceLifecycle({
@@ -232,7 +233,11 @@ function AppContent() {
     () => (localDataPort ? createExplorerDataPort(localDataPort, filesVisibilitySettings) : null),
     [filesVisibilitySettings, localDataPort],
   );
-  const editorWorkbench = useDesktopEditorWorkbench(workspace, dataPort?.resolveNode ?? null);
+  const editorWorkbench = useDesktopEditorWorkbench(
+    workspace,
+    dataPort?.resolveNode ?? null,
+    workbenchWorkspace?.folders[0]?.uri ?? null,
+  );
   const activeDocumentPath = editorWorkbench.activePath;
   const handleResourceMoved = useCallback(async (previousPath: string, nextPath: string) => {
     if (documentStorageIdentity) {
@@ -614,10 +619,13 @@ function AppContent() {
   }, [activateDataNode, dataPort]);
   const handleEditorClose = useCallback(async (editorId: string) => {
     try {
+      const resourcePath = editorWorkbench.state.editors
+        .find((editor) => editor.id === editorId)?.resource;
+      if (!resourcePath) return;
       if (documentStorageIdentity) {
         await closeDocumentWorkingCopy({
           storageIdentity: documentStorageIdentity,
-          resourcePath: editorId,
+          resourcePath,
         });
       }
       editorWorkbench.close(editorId);
@@ -631,14 +639,16 @@ function AppContent() {
       if (activeView !== "data" || editorWorkbench.state.editors.length === 0) return;
       const platformModifier = event.metaKey || event.ctrlKey;
       if (platformModifier && !event.altKey && event.key.toLowerCase() === "w") {
-        if (!editorWorkbench.activePath) return;
+        if (!editorWorkbench.activeEditorId) return;
         event.preventDefault();
-        void handleEditorClose(editorWorkbench.activePath);
+        void handleEditorClose(editorWorkbench.activeEditorId);
         return;
       }
       if (event.ctrlKey && !event.metaKey && !event.altKey && event.key === "Tab") {
         event.preventDefault();
-        const currentIndex = editorWorkbench.state.editors.findIndex(({ id }) => id === editorWorkbench.activePath);
+        const currentIndex = editorWorkbench.state.editors.findIndex(
+          ({ id }) => id === editorWorkbench.activeEditorId,
+        );
         const offset = event.shiftKey ? -1 : 1;
         const nextIndex = (currentIndex + offset + editorWorkbench.state.editors.length) % editorWorkbench.state.editors.length;
         editorWorkbench.activate(editorWorkbench.state.editors[nextIndex]!.id);

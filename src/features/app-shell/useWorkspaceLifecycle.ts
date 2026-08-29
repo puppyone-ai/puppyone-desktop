@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Workspace } from "@puppyone/shared-ui";
+import {
+  createSingleFolderWorkbenchWorkspace,
+  type WorkbenchWorkspace,
+  type Workspace,
+} from "@puppyone/shared-ui";
 import {
   forgetLastWorkspace,
   getInitialWorkspace,
@@ -38,14 +42,16 @@ export function useWorkspaceLifecycle({
 }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [recentWorkspaceItems, setRecentWorkspaceItems] = useState<RecentWorkspaceHomeItem[]>([]);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+  const [workbenchWorkspace, setWorkbenchWorkspace] = useState<WorkbenchWorkspace | null>(null);
   const [restoringWorkspace, setRestoringWorkspace] = useState(true);
   const [restoreWorkspaceError, setRestoreWorkspaceError] = useState<string | null>(null);
   const recentWorkspaceRequestRef = useRef(0);
 
+  // The current product projects the first Folder exactly as before. The
+  // underlying state is already the general zero/one/many Folder model.
   const workspace = useMemo(
-    () => activeWorkspaceId ? workspaces.find((item) => item.id === activeWorkspaceId) ?? null : null,
-    [activeWorkspaceId, workspaces],
+    () => workbenchWorkspace?.folders[0]?.workspace ?? null,
+    [workbenchWorkspace],
   );
 
   const activateWorkspace = useCallback((nextWorkspace: Workspace) => {
@@ -53,7 +59,7 @@ export function useWorkspaceLifecycle({
       const withoutExisting = current.filter((item) => item.id !== nextWorkspace.id);
       return [nextWorkspace, ...withoutExisting];
     });
-    setActiveWorkspaceId(nextWorkspace.id);
+    setWorkbenchWorkspace(createSingleFolderWorkbenchWorkspace(nextWorkspace));
     setRestoreWorkspaceError(null);
     onWorkspaceActivated();
   }, [onWorkspaceActivated]);
@@ -140,7 +146,7 @@ export function useWorkspaceLifecycle({
   }, []);
 
   const clearWorkspace = useCallback(() => {
-    setActiveWorkspaceId(null);
+    setWorkbenchWorkspace(null);
     onWorkspaceCleared();
   }, [onWorkspaceCleared]);
 
@@ -152,7 +158,7 @@ export function useWorkspaceLifecycle({
       setWorkspaces((current) => current.filter((item) => item.id !== currentWorkspaceId));
       setRecentWorkspaceItems((current) => current.filter((item) => item.workspace.id !== currentWorkspaceId));
     }
-    setActiveWorkspaceId(null);
+    setWorkbenchWorkspace(null);
     setRestoreWorkspaceError(null);
     setRestoringWorkspace(false);
     onWorkspaceCleared();
@@ -223,6 +229,7 @@ export function useWorkspaceLifecycle({
     restoringWorkspace,
     setRestoreWorkspaceError,
     setWorkspaces,
+    workbenchWorkspace,
     workspace,
     workspaces,
   };

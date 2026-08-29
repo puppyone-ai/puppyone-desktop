@@ -86,6 +86,7 @@ import { createDefaultTerminalAgentActivityHost } from "./main/terminal-agent/ac
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
+import { WindowWorkspaceState } from "./main/window-workspace-state.mjs";
 import {
   createProjectEntryService,
   requireGitRepository,
@@ -237,7 +238,7 @@ const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({
 });
 documentSessionCloseCoordinator.registerIpc(trustedIpcMain);
 const authorizeWorkspaceRoot = createSenderWorkspaceAuthorization({
-  getWorkspaceRootForSender,
+  getWorkspaceRootsForSender,
 });
 const terminalAgentActivityHost = createDefaultTerminalAgentActivityHost({
   appPath: app.getAppPath(),
@@ -364,19 +365,14 @@ async function createWindow(options = {}) {
     externalNavigation,
   });
   windowsById.set(webContentsId, window);
-  windowStateById.set(webContentsId, {
-    initialWorkspacePath,
-    workspace: null,
-    workspacePath: null,
-    lastFocusedAt: Date.now(),
-  });
+  windowStateById.set(webContentsId, new WindowWorkspaceState({ initialWorkspacePath }));
   lastFocusedWindowId = webContentsId;
 
   window.on("focus", () => {
     reapplyNativeWindowChrome(window);
     lastFocusedWindowId = webContentsId;
     const state = windowStateById.get(webContentsId);
-    if (state) state.lastFocusedAt = Date.now();
+    state?.markFocused();
     if (!window.webContents.isDestroyed()) {
       window.webContents.send("git-repository:window-focus", { focused: true });
     }
@@ -508,7 +504,7 @@ function revealWindow(window) {
   window.focus();
   lastFocusedWindowId = window.webContents.id;
   const state = windowStateById.get(window.webContents.id);
-  if (state) state.lastFocusedAt = Date.now();
+  state?.markFocused();
   desktopPlatformHost.windowChrome.focusApplication(app);
 }
 
@@ -954,7 +950,7 @@ async function getInitialWorkspaceResultForWindow(sender) {
   }
 
   const state = windowStateById.get(window.webContents.id);
-  const initialPath = state?.workspacePath ?? state?.initialWorkspacePath ?? null;
+  const initialPath = state?.initialRestorePath ?? null;
   if (!initialPath) {
     return {
       path: null,
@@ -1145,14 +1141,17 @@ function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
   if (!window || window.isDestroyed()) return;
   const webContentsId = window.webContents.id;
   const state = getOrCreateWindowState(window);
-  const previousPath = state.workspacePath;
+  const previousPaths = state.folderPaths;
+  const replacingComposition = previousPaths.length !== 1 || previousPaths[0] !== canonicalPath;
 
-  if (previousPath && previousPath !== canonicalPath) {
+  if (replacingComposition && previousPaths.length > 0) {
     viewerPackHost?.destroySessionsForOwner(webContentsId);
     localFileCapabilities.revokeSender(webContentsId);
-    const previousWindow = workspaceWindowByPath.get(previousPath);
-    if (previousWindow === window || previousWindow?.isDestroyed()) {
-      workspaceWindowByPath.delete(previousPath);
+    for (const previousPath of previousPaths) {
+      const previousWindow = workspaceWindowByPath.get(previousPath);
+      if (previousWindow === window || previousWindow?.isDestroyed()) {
+        workspaceWindowByPath.delete(previousPath);
+      }
     }
     if (options.cleanupPrevious !== false) {
       appPreviewRuntime?.closeSessionsForWindow(webContentsId);
@@ -1163,9 +1162,7 @@ function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
     }
   }
 
-  state.initialWorkspacePath = canonicalPath;
-  state.workspace = workspace;
-  state.workspacePath = canonicalPath;
+  state.replaceFolders([{ workspace, path: canonicalPath }]);
   workspaceWindowByPath.set(canonicalPath, window);
   window.setTitle(window.isFullScreen() ? "" : resolveWindowTitle(window));
   if (typeof window.setRepresentedFilename === "function") {
@@ -1186,22 +1183,20 @@ function releaseWindowWorkspaceById(webContentsId, window = null) {
   viewerPackHost?.destroySessionsForOwner(webContentsId);
   localFileCapabilities.revokeSender(webContentsId);
   const state = windowStateById.get(webContentsId);
-  const workspacePath = state?.workspacePath ?? null;
-  if (workspacePath) {
+  const workspacePaths = state?.folderPaths ?? [];
+  for (const workspacePath of workspacePaths) {
     const existingWindow = workspaceWindowByPath.get(workspacePath);
     if (existingWindow === window || existingWindow?.isDestroyed()) {
       workspaceWindowByPath.delete(workspacePath);
     }
   }
   if (state) {
-    state.workspacePath = null;
-    state.initialWorkspacePath = null;
-    state.workspace = null;
+    state.releaseFolders();
   }
   if (window && !window.isDestroyed()) {
     window.setTitle(window.isFullScreen() ? "" : resolveWindowTitle(window));
   }
-  return workspacePath;
+  return workspacePaths[0] ?? null;
 }
 
 async function forgetCurrentWindowWorkspace(sender) {
@@ -1224,19 +1219,14 @@ function getOrCreateWindowState(window) {
   const webContentsId = window.webContents.id;
   let state = windowStateById.get(webContentsId);
   if (!state) {
-    state = {
-      initialWorkspacePath: null,
-      workspace: null,
-      workspacePath: null,
-      lastFocusedAt: Date.now(),
-    };
+    state = new WindowWorkspaceState();
     windowStateById.set(webContentsId, state);
   }
   return state;
 }
 
 function resolveWindowTitle(window) {
-  const workspace = windowStateById.get(window.webContents.id)?.workspace;
+  const workspace = windowStateById.get(window.webContents.id)?.primaryWorkspace;
   return workspace ? `${appName} - ${workspace.name}` : appName;
 }
 
@@ -1253,10 +1243,9 @@ function isOpenWorkspaceRoot(canonicalPath) {
   return Boolean(getWorkspaceWindow(canonicalPath));
 }
 
-function getWorkspaceRootForSender(sender) {
+function getWorkspaceRootsForSender(sender) {
   const state = windowStateById.get(sender.id);
-  const workspacePath = state?.workspacePath ?? null;
-  return workspacePath;
+  return state?.folderPaths ?? [];
 }
 
 function getDialogOwnerWindow(sender) {

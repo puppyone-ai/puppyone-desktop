@@ -7,6 +7,36 @@ export {
   rebaseResourcePath,
 } from "./core/resourcePath";
 export type { CanonicalResourcePath } from "./core/resourcePath";
+export {
+  ResourceUriIdentityService,
+  canonicalizeResourceUri,
+  createResourceUri,
+  createWorkspaceResourceUri,
+  createWorkspaceRootUri,
+  getWorkspaceResourcePath,
+  parseResourceUri,
+} from "./core/resourceUri";
+export type {
+  ParsedResourceUri,
+  ResourceUri,
+  ResourceUriIdentityOptions,
+} from "./core/resourceUri";
+export {
+  WorkbenchWorkspaceContext,
+  createSingleFolderWorkbenchWorkspace,
+  createWorkspaceFolder,
+} from "./core/workbenchWorkspace";
+export type {
+  Disposable as WorkspaceDisposable,
+  WillChangeWorkspaceFoldersEvent,
+  WorkbenchWorkspace,
+  WorkbenchWorkspaceId,
+  WorkspaceFolder,
+  WorkspaceFolderCapabilities,
+  WorkspaceFolderId,
+  WorkspaceFolderTrustState,
+  WorkspaceFoldersChange,
+} from "./core/workbenchWorkspace";
 export { workspaceContentChangeMatchesPath } from "./core/workspaceContentChange";
 export {
   TYPOGRAPHY_CHANGE_EVENT,
@@ -116,6 +146,8 @@ export {
 export type {
   EditorGroupState,
   EditorInput,
+  EditorResourceDescriptor,
+  EditorResourceReference,
 } from "./editor/workbench/editorGroupModel";
 export {
   activateEditorPane,

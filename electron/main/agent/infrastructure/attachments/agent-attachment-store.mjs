@@ -269,6 +269,15 @@ export function createAgentAttachmentStore({
     await revokeEntries(matches);
   }
 
+  async function revokeWorkspace(ownerId, workspaceRoot) {
+    assertOwner(ownerId);
+    assertWorkspace(workspaceRoot);
+    const matches = Array.from(entries.values()).filter((entry) => (
+      entry.ownerId === ownerId && entry.workspaceRoot === workspaceRoot
+    ));
+    await revokeEntries(matches);
+  }
+
   async function sweepExpired() {
     const expired = Array.from(entries.values()).filter((entry) => !entry.leaseId && entry.expiresAt <= now());
     await revokeEntries(expired);
@@ -313,7 +322,19 @@ export function createAgentAttachmentStore({
     if (closed) throw new Error("Agent attachment staging is closed.");
   }
 
-  return { initialize, stage, authorize, lease, releaseLease, revoke, revokeLeased, revokeOwner, sweepExpired, close };
+  return {
+    initialize,
+    stage,
+    authorize,
+    lease,
+    releaseLease,
+    revoke,
+    revokeLeased,
+    revokeOwner,
+    revokeWorkspace,
+    sweepExpired,
+    close,
+  };
 }
 
 function draftForEntry(entry) {

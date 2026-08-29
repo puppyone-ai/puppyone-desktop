@@ -69,6 +69,22 @@ describe("Electron AgentService ownership and lifecycle", () => {
     expect(harness.service.getSessionCount()).toBe(0);
   });
 
+  it("closes one Root's sessions without disposing sibling Root Agents", async () => {
+    const attachmentStore = { revokeWorkspace: vi.fn(async () => undefined) };
+    const harness = createServiceHarness({ attachmentStore });
+    const owner = createSender(30);
+    await harness.service.createSession(owner, {}, "/workspace-a");
+    await harness.service.createSession(owner, {}, "/workspace-b");
+
+    await expect(harness.service.closeSessionsForWorkspaceRoot(owner.id, "/workspace-a"))
+      .resolves.toBe(1);
+    expect(harness.adapters[0].disposed).toBe(true);
+    expect(harness.adapters[1].disposed).toBe(false);
+    expect(harness.service.getSessionCount()).toBe(1);
+    expect(attachmentStore.revokeWorkspace).toHaveBeenCalledWith(owner.id, "/workspace-a");
+    await harness.service.closeAll();
+  });
+
   it("rejects a model that is not in the inspected connected-provider catalog", async () => {
     const harness = createServiceHarness();
     const owner = createSender(32);

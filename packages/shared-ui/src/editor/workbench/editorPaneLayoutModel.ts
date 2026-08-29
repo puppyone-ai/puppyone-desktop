@@ -1,4 +1,9 @@
 import { rebaseResourcePath } from "../../core/resourcePath";
+import { ResourceUriIdentityService, type ResourceUri } from "../../core/resourceUri";
+import {
+  createEditorInput,
+  type EditorResourceReference,
+} from "./editorGroupModel";
 
 export type EditorSplitDirection = "horizontal" | "vertical";
 export type EditorSplitPlacement = "first" | "second";
@@ -206,19 +211,43 @@ export function removeEditorFromPanes(
 
 export function rebaseEditorPaneResources(
   state: EditorPaneLayoutState,
-  previousResource: string,
-  nextResource: string,
+  previousResource: EditorResourceReference,
+  nextResource: EditorResourceReference,
 ): EditorPaneLayoutState {
+  const previousInput = createEditorInput(previousResource);
+  const compatibleNextResource = typeof nextResource === "string" && previousInput.rootUri
+    ? { rootUri: previousInput.rootUri, resourcePath: nextResource }
+    : nextResource;
+  const nextInput = createEditorInput(compatibleNextResource);
+  if (
+    previousInput.rootUri
+    && nextInput.rootUri
+    && !editorPaneResourceIdentity.isEqual(previousInput.rootUri, nextInput.rootUri)
+  ) {
+    throw new Error("Editor Pane resource rebasing cannot cross Workspace Folders.");
+  }
   let changed = false;
   const root = mapPanes(state.root, (pane) => {
     if (!pane.editorId) return pane;
-    const editorId = rebaseResourcePath(pane.editorId, previousResource, nextResource);
+    const editorId = previousInput.rootUri
+      ? editorPaneResourceIdentity.rebase(
+        pane.editorId as ResourceUri,
+        previousInput.resourceUri,
+        nextInput.resourceUri,
+      )
+      : rebaseResourcePath(
+        pane.editorId,
+        previousInput.resource,
+        nextInput.resource,
+      );
     if (editorId === pane.editorId) return pane;
     changed = true;
     return createPane(pane.id, editorId);
   });
   return changed ? freezeLayout(root, state.activePaneId) : state;
 }
+
+const editorPaneResourceIdentity = new ResourceUriIdentityService();
 
 export function parseEditorPaneLayoutState(
   value: unknown,

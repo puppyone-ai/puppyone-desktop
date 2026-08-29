@@ -278,7 +278,10 @@ if (/\b(?:PuppyFlowEditor|renderPreviewBody|DocumentSessionBoundary)\b/.test(des
 
 const desktopAppPath = path.join(repoRoot, "src/App.tsx");
 const desktopAppSource = readFileSync(desktopAppPath, "utf8");
-if (!/closeDocumentWorkingCopy\(\{[\s\S]*?storageIdentity:\s*documentStorageIdentity,[\s\S]*?resourcePath:\s*editorId,[\s\S]*?\}\)/.test(desktopAppSource)) {
+if (
+  !/find\(\(editor\)\s*=>\s*editor\.id\s*===\s*editorId\)\?\.resource/.test(desktopAppSource)
+  || !/closeDocumentWorkingCopy\(\{[\s\S]*?storageIdentity:\s*documentStorageIdentity,[\s\S]*?resourcePath,[\s\S]*?\}\)/.test(desktopAppSource)
+) {
   errors.push(`${relative(desktopAppPath)} does not close the targeted document Working Copy with its Input`);
 }
 if (!/closeAllDocumentWorkingCopies\("workspace-switch"\)/.test(desktopAppSource)) {

@@ -10,7 +10,6 @@ import {
   createEditorInput,
   getActiveEditorPane,
   getEditorPanes,
-  isSameOrDescendantResourcePath,
   moveEditorPane,
   openEditor,
   rebaseEditorPaneResources,
@@ -25,6 +24,7 @@ import {
   type EditorPaneLayoutState,
   type EditorPaneSplitOptions,
   type EditorSplitDirection,
+  type ResourceUri,
   type Workspace,
 } from "@puppyone/shared-ui";
 import {
@@ -42,6 +42,7 @@ export type DesktopEditorWorkbenchController = Readonly<{
   state: EditorGroupState;
   paneLayout: EditorPaneLayoutState;
   activePath: string | null;
+  activeEditorId: string | null;
   activePaneId: string;
   openDocument: (node: DocumentDataNode) => void;
   openDocumentAtPaneEdge: (
@@ -76,6 +77,7 @@ export type EditorDocumentNodeResolver = (path: string) => Promise<DataNode | nu
 export function useDesktopEditorWorkbench(
   workspace: Workspace | null,
   resolveNode: EditorDocumentNodeResolver | null,
+  workspaceFolderUri: ResourceUri | null = null,
 ): DesktopEditorWorkbenchController {
   const storageKey = workspace
     ? `${EDITOR_WORKBENCH_STORAGE_PREFIX}:${workspace.id}:${workspace.path}`
@@ -113,6 +115,7 @@ export function useDesktopEditorWorkbench(
       storageKey,
       legacyWorkbenchStorageKey,
       legacyGroupStorageKey,
+      workspaceFolderUri,
     );
     if (!resolveNode) {
       // A workspace session without a metadata resolver cannot prove that its
@@ -138,7 +141,7 @@ export function useDesktopEditorWorkbench(
     return () => {
       cancelled = true;
     };
-  }, [legacyGroupStorageKey, legacyWorkbenchStorageKey, resolveNode, storageKey]);
+  }, [legacyGroupStorageKey, legacyWorkbenchStorageKey, resolveNode, storageKey, workspaceFolderUri]);
 
   useEffect(() => {
     if (!storageKey || record.storageKey !== storageKey || !record.hydrated) return;
@@ -169,7 +172,12 @@ export function useDesktopEditorWorkbench(
   const openDocument = useCallback((node: DocumentDataNode) => {
     if (!isDocumentDataNode(node) || !node.path) return;
     updateWorkbench((current) => {
-      const input = createEditorInput(node.path, node.name);
+      const input = createEditorInput(
+        workspaceFolderUri
+          ? { rootUri: workspaceFolderUri, resourcePath: node.path }
+          : node.path,
+        node.name,
+      );
       const group = openEditor(current.group, input);
       const visiblePane = getEditorPanes(current.layout).find((pane) => pane.editorId === input.id);
       const layout = visiblePane
@@ -177,7 +185,7 @@ export function useDesktopEditorWorkbench(
         : assignEditorToActivePane(current.layout, input.id);
       return createEditorWorkbenchState(group, layout);
     });
-  }, [updateWorkbench]);
+  }, [updateWorkbench, workspaceFolderUri]);
 
   const activate = useCallback((editorId: string) => {
     updateWorkbench((current) => {
@@ -199,7 +207,12 @@ export function useDesktopEditorWorkbench(
   ) => {
     if (!isDocumentDataNode(node) || !node.path) return;
     updateWorkbench((current) => {
-      const input = createEditorInput(node.path, node.name);
+      const input = createEditorInput(
+        workspaceFolderUri
+          ? { rootUri: workspaceFolderUri, resourcePath: node.path }
+          : node.path,
+        node.name,
+      );
       const visiblePane = getEditorPanes(current.layout).find((pane) => pane.editorId === input.id);
       const group = openEditor(current.group, input);
       if (visiblePane) {
@@ -216,7 +229,7 @@ export function useDesktopEditorWorkbench(
         : splitEditorPane(current.layout, targetPaneId, direction, { editorId: input.id, placement });
       return createEditorWorkbenchState(activateEditor(group, input.id), layout);
     });
-  }, [updateWorkbench]);
+  }, [updateWorkbench, workspaceFolderUri]);
 
   const focusPane = useCallback((paneId: string) => {
     updateWorkbench((current) => {
@@ -290,32 +303,44 @@ export function useDesktopEditorWorkbench(
 
   const closeUnderResource = useCallback((resource: string) => {
     updateWorkbench((current) => {
+      const target = workspaceFolderUri
+        ? { rootUri: workspaceFolderUri, resourcePath: resource }
+        : resource;
+      const group = closeEditorsUnderResource(current.group, target);
+      const retainedEditorIds = new Set(group.editors.map((editor) => editor.id));
       const removedEditorIds = current.group.editors
-        .filter((editor) => isSameOrDescendantResourcePath(editor.resource, resource))
+        .filter((editor) => !retainedEditorIds.has(editor.id))
         .map((editor) => editor.id);
-      const group = closeEditorsUnderResource(current.group, resource);
       const layout = removedEditorIds.reduce(
         (next, editorId) => removeEditorFromPanes(next, editorId, group.activeEditorId),
         current.layout,
       );
       return createEditorWorkbenchState(group, layout);
     });
-  }, [updateWorkbench]);
+  }, [updateWorkbench, workspaceFolderUri]);
 
   const rebaseResource = useCallback((previousResource: string, nextResource: string) => {
+    const previous = workspaceFolderUri
+      ? { rootUri: workspaceFolderUri, resourcePath: previousResource }
+      : previousResource;
+    const next = workspaceFolderUri
+      ? { rootUri: workspaceFolderUri, resourcePath: nextResource }
+      : nextResource;
     updateWorkbench((current) => createEditorWorkbenchState(
-      rebaseEditorResources(current.group, previousResource, nextResource),
-      rebaseEditorPaneResources(current.layout, previousResource, nextResource),
+      rebaseEditorResources(current.group, previous, next),
+      rebaseEditorPaneResources(current.layout, previous, next),
     ));
-  }, [updateWorkbench]);
+  }, [updateWorkbench, workspaceFolderUri]);
 
   const clear = useCallback(() => updateWorkbench(() => EMPTY_EDITOR_WORKBENCH), [updateWorkbench]);
   const activePane = getActiveEditorPane(workbench.layout);
+  const activeEditor = workbench.group.editors.find((editor) => editor.id === activePane.editorId);
 
   return useMemo(() => ({
     state: workbench.group,
     paneLayout: workbench.layout,
-    activePath: activePane.editorId,
+    activePath: activeEditor?.resource ?? null,
+    activeEditorId: activeEditor?.id ?? null,
     activePaneId: activePane.id,
     openDocument,
     openDocumentAtPaneEdge,
@@ -331,7 +356,8 @@ export function useDesktopEditorWorkbench(
     clear,
   }), [
     activate,
-    activePane.editorId,
+    activeEditor?.resource,
+    activeEditor?.id,
     activePane.id,
     clear,
     close,

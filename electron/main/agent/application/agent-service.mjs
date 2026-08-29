@@ -501,6 +501,16 @@ export function createAgentService({
     await attachmentStore?.revokeOwner?.(webContentsId);
   }
 
+  async function closeSessionsForWorkspaceRoot(webContentsId, workspaceRoot) {
+    requireWorkspaceRoot(workspaceRoot);
+    const matching = sessionStore.values().filter((session) => (
+      session.ownerId === webContentsId && session.workspaceRoot === workspaceRoot
+    ));
+    await Promise.all(matching.map((session) => closeSessionRecord(session, { persist: true })));
+    await attachmentStore?.revokeWorkspace?.(webContentsId, workspaceRoot);
+    return matching.length;
+  }
+
   async function closeAll() {
     await Promise.all(sessionStore.values()
       .map((session) => closeSessionRecord(session, { persist: true })));
@@ -844,6 +854,7 @@ export function createAgentService({
     compactSession,
     closeSession,
     closeSessionsForWindow,
+    closeSessionsForWorkspaceRoot,
     closeAll,
     getSessionCount,
     getRetainedSessionCount,
