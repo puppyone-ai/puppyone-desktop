@@ -13,6 +13,62 @@ afterEach(async () => {
 });
 
 describe("host-owned CSS theme service", () => {
+  it("installs missing starter packages and never overwrites user edits", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const bundledThemesPath = await createTemporaryDirectory();
+    for (const [directoryName, name] of [
+      ["github", "GitHub"],
+      ["forest", "Forest"],
+      ["night", "Night"],
+      ["rose", "Rose"],
+    ]) {
+      await createPack(
+        bundledThemesPath,
+        directoryName,
+        `builtin.pack.${directoryName}`,
+        name,
+      );
+    }
+    const service = createThemeService({ userDataPath, bundledThemesPath, shell: createShell() });
+
+    const first = await service.listThemes();
+    const installed = first.themes.find((theme) => theme.id === "builtin.pack.forest");
+    expect(installed).toMatchObject({
+      name: "Forest",
+      source: "local-package",
+      targets: ["application", "markdown", "csv"],
+    });
+
+    const installedMarkdown = path.join(userDataPath, "themes", "forest", "markdown.css");
+    await writeFile(installedMarkdown, "body { color: rebeccapurple }", "utf8");
+    await service.listThemes();
+    expect(await readFile(installedMarkdown, "utf8")).toBe("body { color: rebeccapurple }");
+
+    await rm(path.dirname(installedMarkdown), { recursive: true });
+    const afterDeletion = await service.listThemes();
+    expect(afterDeletion.themes.some((theme) => theme.id === "builtin.pack.forest"))
+      .toBe(false);
+  });
+
+  it("ships four valid starter packages for the user theme directory", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const service = createThemeService({
+      userDataPath,
+      bundledThemesPath: path.join(process.cwd(), "electron", "themes"),
+      shell: createShell(),
+    });
+
+    const snapshot = await service.listThemes();
+
+    expect(snapshot.diagnostics).toEqual([]);
+    expect(snapshot.themes.map(({ id, source, targets }) => ({ id, source, targets }))).toEqual([
+      { id: "builtin.pack.forest", source: "local-package", targets: ["application", "markdown", "csv"] },
+      { id: "builtin.pack.github", source: "local-package", targets: ["application", "markdown", "csv"] },
+      { id: "builtin.pack.night", source: "local-package", targets: ["application", "markdown", "csv"] },
+      { id: "builtin.pack.rose", source: "local-package", targets: ["application", "markdown", "csv"] },
+    ]);
+  });
+
   it("discovers manifest packages and Typora-style top-level CSS themes", async () => {
     const userDataPath = await createTemporaryDirectory();
     const themeRoot = path.join(userDataPath, "themes");
@@ -317,4 +373,25 @@ async function createPackage(themeRoot, directoryName, id, name) {
     entrypoints: { markdown: "markdown.css" },
   });
   await writeFile(path.join(packagePath, "markdown.css"), "body { color: #222 }", "utf8");
+}
+
+async function createPack(themeRoot, directoryName, id, name) {
+  const packagePath = path.join(themeRoot, directoryName);
+  await mkdir(packagePath, { recursive: true });
+  await writeJson(path.join(packagePath, "theme.json"), {
+    schemaVersion: 1,
+    id,
+    name,
+    version: "1.0.0",
+    modes: ["light", "dark"],
+    targets: ["application", "markdown", "csv"],
+    entrypoints: {
+      application: "application.css",
+      markdown: "markdown.css",
+      csv: "csv.css",
+    },
+  });
+  await writeFile(path.join(packagePath, "application.css"), ".theme-root { --po-accent: #2563eb }", "utf8");
+  await writeFile(path.join(packagePath, "markdown.css"), "body { color: #222 }", "utf8");
+  await writeFile(path.join(packagePath, "csv.css"), ".theme-root { --po-csv-surface-color: #222 }", "utf8");
 }

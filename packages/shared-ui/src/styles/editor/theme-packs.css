@@ -1,6 +1,0 @@
-/* Coordinated built-in packs. Each file owns only public application,
-   Markdown, and editable-table tokens on its exact scoped host. */
-@import "./theme-packs/github.css";
-@import "./theme-packs/forest.css";
-@import "./theme-packs/night.css";
-@import "./theme-packs/rose.css";

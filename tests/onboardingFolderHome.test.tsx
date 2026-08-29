@@ -3,7 +3,6 @@
  */
 import React from "react";
 import { act } from "react";
-import { readFileSync } from "node:fs";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MinimalOnboarding, type MinimalOnboardingProps } from "../src/components/MinimalOnboarding";
@@ -37,10 +36,12 @@ afterEach(() => {
 describe("project folder home", () => {
   it("applies the effective application pack on the real onboarding theme root", () => {
     const styles = document.createElement("style");
-    styles.textContent = [
-      readFileSync(`${process.cwd()}/src/styles/tokens.css`, "utf8"),
-      readFileSync(`${process.cwd()}/packages/shared-ui/src/styles/editor/theme-packs/forest.css`, "utf8"),
-    ].join("\n");
+    styles.textContent = `
+      .onboarding-shell.dark { --po-surface-canvas: #161413; }
+      [data-po-theme-surface="application"][data-po-theme-id="builtin.pack.forest"].dark {
+        --po-surface-canvas: #092d30;
+      }
+    `;
     document.head.append(styles);
 
     const container = renderHome({ applicationThemeId: "builtin.pack.forest" });

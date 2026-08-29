@@ -217,6 +217,7 @@ const nativeSurfacePointerPassthrough = createNativeSurfacePointerPassthroughCoo
 const externalNavigation = createExternalNavigationService({ shell });
 const themeService = createThemeService({
   userDataPath: app.getPath("userData"),
+  bundledThemesPath: path.join(app.getAppPath(), "electron", "themes"),
   shell,
 });
 const localeService = createDesktopLocaleService({

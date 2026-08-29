@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { act } from "react";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ThemeStyleHost } from "../src/features/themes/ThemeStyleHost";
@@ -28,26 +28,21 @@ afterEach(() => {
 });
 
 describe("renderer CSS theme style host", () => {
-  it("ships four coordinated three-surface theme packs as scoped CSS files", () => {
+  it("keeps coordinated starter packs out of the renderer bundle", () => {
     const packs = ["github", "forest", "night", "rose"];
     for (const pack of packs) {
       const id = `builtin.pack.${pack}`;
       const definition = BUILTIN_SURFACE_THEMES.find((theme) => theme.id === id);
-      const css = readFileSync(
+      expect(definition).toBeUndefined();
+      expect(existsSync(
         `${process.cwd()}/packages/shared-ui/src/styles/editor/theme-packs/${pack}.css`,
-        "utf8",
-      );
-
-      expect(definition?.targets).toEqual(["application", "markdown", "csv"]);
-      for (const target of ["application", "markdown", "csv"]) {
-        expect(css).toContain(`[data-po-theme-surface="${target}"][data-po-theme-id="${id}"]`);
-      }
-      if (css.includes(":where(.dark) ")) {
-        expect(css).toContain(`:where(.dark)[data-po-theme-surface="application"][data-po-theme-id="${id}"]`);
-      }
-      expect(css).not.toContain("#write");
-      expect(css).not.toContain(".typora-");
+      )).toBe(false);
     }
+    const editorCss = readFileSync(
+      `${process.cwd()}/packages/shared-ui/src/styles/editor.css`,
+      "utf8",
+    );
+    expect(editorCss).not.toContain("theme-packs.css");
   });
 
   it("lets scoped built-in theme tokens override editor defaults", () => {
@@ -77,27 +72,6 @@ describe("renderer CSS theme style host", () => {
     styles.remove();
   });
 
-  it("applies dark application tokens when dark mode is on the theme root itself", () => {
-    const css = readFileSync(
-      `${process.cwd()}/packages/shared-ui/src/styles/editor/theme-packs/forest.css`,
-      "utf8",
-    );
-    const styles = document.createElement("style");
-    styles.textContent = css;
-    document.head.append(styles);
-
-    act(() => root.render(
-      <div
-        className="dark"
-        data-po-theme-surface="application"
-        data-po-theme-id="builtin.pack.forest"
-      />,
-    ));
-
-    expect(getComputedStyle(container.firstElementChild as Element)
-      .getPropertyValue("--po-surface-canvas").trim()).toBe("#092d30");
-    styles.remove();
-  });
   it("merges built-ins with installed themes and injects one style per compiled target", () => {
     const installed = externalTheme({
       id: "com.example.combo",

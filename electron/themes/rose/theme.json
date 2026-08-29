@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "builtin.pack.rose",
+  "name": "Rose",
+  "version": "1.0.0",
+  "author": "PuppyOne",
+  "modes": ["light", "dark"],
+  "targets": ["application", "markdown", "csv"],
+  "entrypoints": {
+    "application": "application.css",
+    "markdown": "markdown.css",
+    "csv": "csv.css"
+  }
+}

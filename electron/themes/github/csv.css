@@ -1,0 +1,15 @@
+.theme-root {
+  --po-csv-surface-background: #ffffff;
+  --po-csv-surface-color: #24292f;
+  --po-editable-table-border: #afb8c1;
+  --po-editable-table-cell-border: #d0d7de;
+  --po-editable-table-sticky-header-background: #f6f8fa;
+  --po-editable-table-cell-focus-ring: #0969da;
+}
+
+.dark .theme-root {
+  --po-csv-surface-background: #0d1117;
+  --po-csv-surface-color: #e6edf3;
+  --po-editable-table-cell-border: #30363d;
+  --po-editable-table-sticky-header-background: #161b22;
+}

@@ -116,4 +116,46 @@ describe("CSS theme compiler", () => {
       target: "application",
     })).rejects.toThrow("Application themes may only declare public color tokens");
   });
+
+  it("scopes the documented dark theme-root forms without escaping the surface", async () => {
+    const application = await compileThemeCss({
+      css: ".theme-root.dark, .dark .theme-root { --po-surface-canvas: #111827 }",
+      themeId: "builtin.pack.forest",
+      target: "application",
+    });
+    const markdown = await compileThemeCss({
+      css: ".dark .theme-root { --po-md-content-color: #f8fafc }",
+      themeId: "builtin.pack.forest",
+      target: "markdown",
+    });
+
+    const appHost = '[data-po-theme-surface="application"][data-po-theme-id="builtin.pack.forest"]';
+    const markdownHost = '[data-po-theme-surface="markdown"][data-po-theme-id="builtin.pack.forest"]';
+    expect(application.css).toBe(`${appHost}.dark, ${appHost}.dark { --po-surface-canvas: #111827 }`);
+    expect(markdown.css).toContain(`.dark ${markdownHost}`);
+  });
+
+  it.each([
+    ".theme-root + .outside { color: red }",
+    ".theme-root:hover ~ * { display: none }",
+    ".dark .theme-root || td { color: red }",
+    "+ .outside { color: red }",
+  ])("rejects a selector that can leave its theme surface: %s", async (css) => {
+    await expect(compileThemeCss({
+      css,
+      themeId: "com.example.escape",
+      target: "markdown",
+    })).rejects.toThrow("Theme CSS selector can escape its surface");
+  });
+
+  it("allows sibling combinators after the selector has entered the surface subtree", async () => {
+    const compiled = await compileThemeCss({
+      css: ".theme-root > .row + .row, .theme-root .item ~ .item { color: red }",
+      themeId: "com.example.safe",
+      target: "markdown",
+    });
+
+    const host = '[data-po-theme-surface="markdown"][data-po-theme-id="com.example.safe"]';
+    expect(compiled.css).toContain(`${host} > .row + .row, ${host} .item ~ .item`);
+  });
 });

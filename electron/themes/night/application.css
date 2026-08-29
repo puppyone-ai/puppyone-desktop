@@ -1,0 +1,17 @@
+.theme-root {
+  --po-surface-canvas: #292e33;
+  --po-surface-chrome: #25292e;
+  --po-surface-panel: #30363c;
+  --po-surface-panel-raised: #394047;
+  --po-surface-overlay: #343a40;
+  --po-surface-inset: #22272b;
+  --po-text: #e4e9ed;
+  --po-text-muted: #b2bbc2;
+  --po-text-subtle: #89949d;
+  --po-border: rgba(226, 232, 237, 0.17);
+  --po-divider: rgba(226, 232, 237, 0.13);
+  --po-hover: rgba(109, 193, 231, 0.10);
+  --po-selected: rgba(109, 193, 231, 0.17);
+  --po-accent: #6dc1e7;
+  --po-accent-text: #9ed8f2;
+}

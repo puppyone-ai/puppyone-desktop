@@ -138,9 +138,9 @@ function scopeRules(root, { themeId, target }) {
   const host = `[data-po-theme-surface="${target}"][data-po-theme-id="${themeId}"]`;
   root.walkRules((rule) => {
     const selectors = splitSelectors(rule.selector);
-    const scoped = selectors.map((selector) => scopeSelector(selector, host));
+    const scoped = selectors.map((selector) => scopeSelector(selector, host, target));
     if (target === "application") {
-      const rootOnly = selectors.every((selector) => isRootOnlySelector(selector));
+      const rootOnly = selectors.every((selector) => isApplicationRootSelector(selector));
       if (!rootOnly) {
         throw new TypeError("Application themes may only declare root-level --po-* tokens.");
       }
@@ -149,11 +149,18 @@ function scopeRules(root, { themeId, target }) {
   });
 }
 
-function scopeSelector(selector, host) {
+function scopeSelector(selector, host, target) {
   const normalized = selector.trim();
   if (!normalized) throw new TypeError("Theme CSS contains an empty selector.");
   if (normalized.includes(":global(") || normalized.includes(":host") || normalized.includes("::part")) {
     throw new TypeError(`Theme CSS selector can escape its surface: ${normalized}.`);
+  }
+
+  const darkRoot = parseDarkRootSelector(normalized);
+  if (darkRoot) {
+    assertRootSuffixRemainsScoped(darkRoot.suffix, normalized);
+    if (target === "application" && darkRoot.suffix.length === 0) return `${host}.dark`;
+    return `.dark ${host}${darkRoot.suffix}`;
   }
 
   const alias = rootAliases.find((candidate) => startsWithSelectorToken(normalized, candidate));
@@ -161,6 +168,7 @@ function scopeSelector(selector, host) {
     if (containsRootAlias(normalized)) {
       throw new TypeError(`Theme CSS root aliases must start the selector: ${normalized}.`);
     }
+    assertRootSuffixRemainsScoped(` ${normalized}`, normalized);
     return `${host} ${normalized}`;
   }
 
@@ -168,7 +176,64 @@ function scopeSelector(selector, host) {
   if (containsRootAlias(suffix)) {
     throw new TypeError(`Theme CSS selector contains more than one root alias: ${normalized}.`);
   }
+  assertRootSuffixRemainsScoped(suffix, normalized);
   return `${host}${suffix}`;
+}
+
+function assertRootSuffixRemainsScoped(suffix, selector) {
+  let depth = 0;
+  let quote = null;
+  for (let index = 0; index < suffix.length; index += 1) {
+    const character = suffix[index];
+    if (quote) {
+      if (character === "\\") index += 1;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character === "\\") {
+      index += 1;
+      continue;
+    }
+    if (character === "/" && suffix[index + 1] === "*") {
+      const end = suffix.indexOf("*/", index + 2);
+      index = end < 0 ? suffix.length : end + 1;
+      continue;
+    }
+    if (character === "(" || character === "[") {
+      depth += 1;
+      continue;
+    }
+    if (character === ")" || character === "]") {
+      depth -= 1;
+      continue;
+    }
+    if (depth !== 0) continue;
+    if (/\s/.test(character)) {
+      let next = index + 1;
+      while (next < suffix.length) {
+        if (/\s/.test(suffix[next])) {
+          next += 1;
+        } else if (suffix[next] === "/" && suffix[next + 1] === "*") {
+          const end = suffix.indexOf("*/", next + 2);
+          next = end < 0 ? suffix.length : end + 2;
+        } else {
+          break;
+        }
+      }
+      if (suffix[next] === "+" || suffix[next] === "~" || suffix.slice(next, next + 2) === "||") {
+        throw new TypeError(`Theme CSS selector can escape its surface: ${selector}.`);
+      }
+      return;
+    }
+    if (character === "+" || character === "~" || suffix.slice(index, index + 2) === "||") {
+      throw new TypeError(`Theme CSS selector can escape its surface: ${selector}.`);
+    }
+    if (character === ">") return;
+  }
 }
 
 async function rewriteAssetUrls(root, resolveAssetUrl) {
@@ -262,6 +327,26 @@ function containsRootAlias(selector) {
 function isRootOnlySelector(selector) {
   const normalized = selector.trim();
   return rootAliases.some((alias) => normalized === alias);
+}
+
+function isApplicationRootSelector(selector) {
+  const normalized = selector.trim();
+  if (isRootOnlySelector(normalized)) return true;
+  if (rootAliases.some((alias) => normalized === `${alias}.dark`)) return true;
+  const darkRoot = parseDarkRootSelector(normalized);
+  return Boolean(darkRoot && darkRoot.suffix.length === 0);
+}
+
+function parseDarkRootSelector(selector) {
+  if (!selector.startsWith(".dark ")) return null;
+  const nested = selector.slice(".dark ".length).trimStart();
+  const alias = rootAliases.find((candidate) => startsWithSelectorToken(nested, candidate));
+  if (!alias) return null;
+  const suffix = nested.slice(alias.length);
+  if (containsRootAlias(suffix)) {
+    throw new TypeError(`Theme CSS selector contains more than one root alias: ${selector}.`);
+  }
+  return { suffix };
 }
 
 function splitSelectors(value) {

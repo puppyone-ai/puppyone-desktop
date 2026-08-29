@@ -4,7 +4,17 @@ PuppyOne Desktop treats themes as part of Appearance. Open **Settings → Appear
 
 The visual precedence is Interface Style → resolved System/Light/Dark mode and base palette → Theme Pack → advanced per-surface override. Appearance continues to own navigation, file icons, motion, pointer behavior, and other interface preferences; theme CSS cannot change those product settings.
 
-PuppyOne ships Default, GitHub, Forest, Night, and Rose packs. GitHub, Forest, Night, and Rose are original PuppyOne implementations informed by common document-theme characteristics and use only PuppyOne's public scoped tokens.
+Default is the only coordinated Theme Pack bundled into the renderer. On first access to the theme catalog, PuppyOne installs GitHub, Forest, Night, and Rose into the platform-specific Themes Folder as ordinary editable packages:
+
+```text
+${app.getPath("userData")}/themes/
+├── github/
+├── forest/
+├── night/
+└── rose/
+```
+
+These starter packages use the same discovery, validation, diagnostics, and reload path as a package created by the user. PuppyOne never overwrites an existing starter path. A versioned hidden marker records the initial installation, so later edits, replacements, and deliberate deletions remain user-owned. The four designs are original PuppyOne implementations informed by common document-theme characteristics and use only PuppyOne's public scoped tokens.
 
 ## Custom CSS editor
 
@@ -80,6 +90,18 @@ Application themes customize the public color-token allowlist from their scoped 
   --po-divider: #3f3f46;
 }
 ```
+
+Use the supported dark-root forms when a package provides both light and dark values:
+
+```css
+.theme-root.dark,
+.dark .theme-root {
+  --po-surface-panel: #18181b;
+  --po-text: #f4f4f5;
+}
+```
+
+For Application CSS, `.theme-root.dark` addresses a dark application root and `.dark .theme-root` is accepted as its equivalent package-authoring form. For Markdown and CSV CSS, `.dark .theme-root` addresses the themed surface below the dark application root. The compiler scopes both forms to the exact surface and selected theme ID.
 
 Markdown themes can use the public `--po-md-*` variables, including `--po-md-surface-background`, `--po-md-content-color`, `--po-md-content-font`, `--po-md-content-size`, `--po-md-content-line-height`, `--po-md-block-gap`, and heading size/weight variables.
 

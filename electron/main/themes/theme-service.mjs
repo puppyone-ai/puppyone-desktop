@@ -1,11 +1,13 @@
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import {
+  lstat,
   mkdir,
   readFile,
   readdir,
   realpath,
   rename,
+  rm,
   stat,
   unlink,
   writeFile,
@@ -23,6 +25,8 @@ const MAX_THEME_COMPILED_BYTES = 16 * 1024 * 1024;
 const MAX_THEME_IMPORTS = 64;
 const CUSTOM_THEME_DIRECTORY = "puppyone-custom-css";
 const CUSTOM_THEME_ID = "local.puppyone.custom-css";
+const STARTER_THEME_DIRECTORIES = Object.freeze(["github", "forest", "night", "rose"]);
+const STARTER_THEME_MARKER = ".puppyone-starter-themes-v1";
 const themeTargets = Object.freeze(["application", "markdown", "csv"]);
 const assetMimeTypes = new Map([
   [".woff", "font/woff"],
@@ -37,7 +41,7 @@ const assetMimeTypes = new Map([
   [".svg", "image/svg+xml"],
 ]);
 
-export function createThemeService({ userDataPath, shell }) {
+export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
   if (typeof userDataPath !== "string" || userDataPath.trim().length === 0) {
     throw new TypeError("A userData path is required for the theme service.");
   }
@@ -47,6 +51,7 @@ export function createThemeService({ userDataPath, shell }) {
   const resolvedUserDataPath = path.resolve(userDataPath);
   const themeRoot = path.join(resolvedUserDataPath, "themes");
   let managedWriteQueue = Promise.resolve();
+  let starterInstallQueue = Promise.resolve();
 
   const ensureRoot = async () => {
     await mkdir(resolvedUserDataPath, { recursive: true });
@@ -55,6 +60,14 @@ export function createThemeService({ userDataPath, shell }) {
     const canonicalThemeRoot = await realpath(themeRoot);
     if (canonicalThemeRoot !== path.join(canonicalUserDataPath, "themes")) {
       throw new TypeError("The theme root must remain inside the user-data directory.");
+    }
+    if (typeof bundledThemesPath === "string" && bundledThemesPath.trim()) {
+      const operation = starterInstallQueue.then(() => installStarterThemes({
+        bundledThemesPath: path.resolve(bundledThemesPath),
+        themeRoot: canonicalThemeRoot,
+      }));
+      starterInstallQueue = operation.catch(() => undefined);
+      await operation;
     }
     return canonicalThemeRoot;
   };
@@ -142,6 +155,51 @@ export function createThemeService({ userDataPath, shell }) {
   };
 
   return Object.freeze({ listThemes, openDirectory, readCustomCss, saveCustomCss });
+}
+
+async function installStarterThemes({ bundledThemesPath, themeRoot }) {
+  if (await pathEntryExists(path.join(themeRoot, STARTER_THEME_MARKER))) return;
+  for (const directoryName of STARTER_THEME_DIRECTORIES) {
+    const destination = path.join(themeRoot, directoryName);
+    if (await pathEntryExists(destination)) continue;
+    const source = path.join(bundledThemesPath, directoryName);
+    const temporary = path.join(themeRoot, `.${directoryName}.${randomUUID()}.installing`);
+    try {
+      await copyBundledThemeDirectory(source, temporary);
+      await rename(temporary, destination);
+    } catch (error) {
+      if (!await pathEntryExists(destination)) throw error;
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
+  }
+  await writeFileAtomic(themeRoot, STARTER_THEME_MARKER, "1\n");
+}
+
+async function copyBundledThemeDirectory(source, destination) {
+  await mkdir(destination);
+  const entries = await readdir(source, { withFileTypes: true });
+  for (const entry of entries) {
+    const sourcePath = path.join(source, entry.name);
+    const destinationPath = path.join(destination, entry.name);
+    if (entry.isDirectory()) {
+      await copyBundledThemeDirectory(sourcePath, destinationPath);
+    } else if (entry.isFile()) {
+      await writeFile(destinationPath, await readFile(sourcePath), { flag: "wx" });
+    } else {
+      throw new TypeError(`Bundled theme templates may only contain files and directories: ${entry.name}.`);
+    }
+  }
+}
+
+async function pathEntryExists(filePath) {
+  try {
+    await lstat(filePath);
+    return true;
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
 }
 
 async function ensureManagedCustomPackage(themeRoot) {

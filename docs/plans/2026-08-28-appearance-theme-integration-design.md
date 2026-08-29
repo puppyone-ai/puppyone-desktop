@@ -4,7 +4,7 @@
 
 Appearance is the single user-facing authority for visual preferences. Interface Style continues to own component composition and policy, Color Mode owns system/light/dark resolution, and existing light/dark palettes remain the base application palette. A Theme Pack supplies coordinated visual defaults for the application, Markdown, and CSV surfaces on top of that base. Explicit per-surface choices live behind an Advanced disclosure and override only the selected surface.
 
-The primary control is one Theme Pack selector. A pack may implement any subset of the three targets; missing targets fall back to Default. The built-in catalog will include coherent GitHub, Forest, Night, and Rose packs inspired by the user's Typora library, plus the existing specialist Markdown and CSV themes for advanced overrides. Theme CSS must not control navigation placement, file icons, motion, pointer preferences, or other Appearance-owned behavior.
+The primary control is one Theme Pack selector. A pack may implement any subset of the three targets; missing targets fall back to Default. The starter catalog includes coherent GitHub, Forest, Night, and Rose packs inspired by the user's Typora library, plus the existing specialist Markdown and CSV themes for advanced overrides. The coordinated starter packs are installed as editable packages in the Themes Folder rather than bundled into the renderer; the later distribution decision is documented in [External Starter Themes Design](./2026-08-29-external-starter-themes-design.md). Theme CSS must not control navigation placement, file icons, motion, pointer preferences, or other Appearance-owned behavior.
 
 ## Preference and resolution model
 
