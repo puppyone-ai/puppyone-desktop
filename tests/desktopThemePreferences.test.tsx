@@ -7,10 +7,13 @@ import {
   SURFACE_THEME_PREFERENCES_STORAGE_KEY,
   type SurfaceThemePreferences,
 } from "../src/features/themes/themePreferences";
+import { APPEARANCE_PREFERENCES_STORAGE_KEY } from "../src/features/appearance/appearancePreferences";
 import {
   useDesktopPreferences,
   type DesktopPreferencesController,
 } from "../src/features/app-shell/useDesktopPreferences";
+
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let container: HTMLDivElement;
 let root: Root;
@@ -39,31 +42,20 @@ afterEach(() => {
 });
 
 describe("desktop surface theme preferences", () => {
-  it("persists a theme pack plus advanced overrides and synchronizes storage changes", () => {
+  it("persists one theme pack plus Custom CSS flags and synchronizes storage changes", () => {
     act(() => root.render(<Harness />));
 
     act(() => latest?.setThemePack("com.example.forest"));
-    act(() => latest?.setSurfaceThemeOverride("markdown", "local.css.newsprint"));
     act(() => latest?.setCustomCssEnabled("markdown", true));
     expect(readStored()).toMatchObject({
-      version: 3,
+      version: 4,
       pack: "com.example.forest",
-      overrides: {
-        application: null,
-        markdown: "local.css.newsprint",
-        csv: null,
-      },
       customCss: { application: false, markdown: true, csv: false },
     });
 
     const remote: SurfaceThemePreferences = {
-      version: 3,
+      version: 4,
       pack: "com.example.graphite",
-      overrides: {
-        application: null,
-        markdown: "builtin.markdown.focus",
-        csv: "builtin.csv.ledger",
-      },
       customCss: { application: false, markdown: false, csv: true },
     };
     act(() => window.dispatchEvent(new StorageEvent("storage", {
@@ -72,6 +64,28 @@ describe("desktop surface theme preferences", () => {
     })));
 
     expect(latest?.surfaceThemePreferences).toEqual(remote);
+  });
+
+  it("retires previously selected Light and Dark palette presets", () => {
+    window.localStorage.setItem(APPEARANCE_PREFERENCES_STORAGE_KEY, JSON.stringify({
+      schemaVersion: 2,
+      activeStyle: "default",
+      shared: {
+        themeMode: "system",
+        lightThemePreset: "warm",
+        darkThemePreset: "graphite",
+      },
+    }));
+
+    act(() => root.render(<Harness />));
+
+    expect(latest?.lightThemePreset).toBe("neutral");
+    expect(latest?.darkThemePreset).toBe("default");
+    const storedAppearance = JSON.parse(
+      window.localStorage.getItem(APPEARANCE_PREFERENCES_STORAGE_KEY) ?? "null",
+    );
+    expect(storedAppearance.shared.lightThemePreset).toBe("neutral");
+    expect(storedAppearance.shared.darkThemePreset).toBe("default");
   });
 });
 

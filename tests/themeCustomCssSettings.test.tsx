@@ -29,7 +29,6 @@ describe("Appearance Custom CSS settings", () => {
   it("loads, edits, saves, and applies target-scoped Custom CSS", async () => {
     const readCustomCss = vi.fn(async () => "body { color: teal }");
     const saveCustomCss = vi.fn(async () => true);
-    const onThemeOverrideChange = vi.fn();
     const onCustomCssEnabledChange = vi.fn();
     const catalog = controller({ readCustomCss, saveCustomCss });
 
@@ -39,7 +38,6 @@ describe("Appearance Custom CSS settings", () => {
           catalog={catalog}
           preferences={DEFAULT_SURFACE_THEME_PREFERENCES}
           onThemePackChange={vi.fn()}
-          onThemeOverrideChange={onThemeOverrideChange}
           onCustomCssEnabledChange={onCustomCssEnabledChange}
         />,
       ));
@@ -64,12 +62,10 @@ describe("Appearance Custom CSS settings", () => {
     });
 
     expect(saveCustomCss).toHaveBeenCalledWith("markdown", "body { color: navy }");
-    expect(onThemeOverrideChange).not.toHaveBeenCalled();
     expect(onCustomCssEnabledChange).toHaveBeenCalledWith("markdown", true);
   });
 
   it("can disable Custom CSS without deleting it or changing the selected theme", async () => {
-    const onThemeOverrideChange = vi.fn();
     const onCustomCssEnabledChange = vi.fn();
     const catalog = controller({ readCustomCss: vi.fn(async () => "h1 { color: teal }") });
 
@@ -82,7 +78,6 @@ describe("Appearance Custom CSS settings", () => {
             customCss: { application: false, markdown: true, csv: false },
           }}
           onThemePackChange={vi.fn()}
-          onThemeOverrideChange={onThemeOverrideChange}
           onCustomCssEnabledChange={onCustomCssEnabledChange}
         />,
       ));
@@ -96,7 +91,28 @@ describe("Appearance Custom CSS settings", () => {
     act(() => enabled?.click());
 
     expect(onCustomCssEnabledChange).toHaveBeenCalledWith("markdown", false);
-    expect(onThemeOverrideChange).not.toHaveBeenCalled();
+  });
+
+  it("reserves Add Theme until the marketplace URL is configured", async () => {
+    await act(async () => {
+      root.render(withTestLocalization(
+        <ThemeSettingsSection
+          catalog={controller({})}
+          preferences={DEFAULT_SURFACE_THEME_PREFERENCES}
+          onThemePackChange={vi.fn()}
+          onCustomCssEnabledChange={vi.fn()}
+        />,
+      ));
+      await Promise.resolve();
+    });
+
+    const addTheme = [...document.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent === "Add Theme");
+    expect(addTheme).toBeDefined();
+    expect(addTheme?.disabled).toBe(true);
+    expect(addTheme?.title).toContain("URL");
+    expect(addTheme?.getAttribute("aria-describedby")).toBe("desktop-theme-add-status");
+    expect(document.getElementById("desktop-theme-add-status")?.textContent).toContain("URL");
   });
 });
 

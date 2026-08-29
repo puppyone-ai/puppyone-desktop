@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocalization } from "@puppyone/localization";
-import { getThemePacks, getThemesForTarget } from "../../themes/builtinSurfaceThemes";
+import { getThemePacks } from "../../themes/builtinSurfaceThemes";
+import { THEME_MARKETPLACE_URL } from "../../themes/themeMarketplace";
 import type { ThemeCatalogController } from "../../themes/useThemeCatalog";
 import type { SurfaceThemePreferences } from "../../themes/themePreferences";
 import type { ThemeTarget } from "../../themes/themeTypes";
@@ -8,19 +9,21 @@ import type { ThemeTarget } from "../../themes/themeTypes";
 export function ThemeSettingsSection({
   catalog,
   preferences,
-  onThemeOverrideChange,
   onThemePackChange,
   onCustomCssEnabledChange,
 }: {
   catalog: ThemeCatalogController;
   preferences: SurfaceThemePreferences;
-  onThemeOverrideChange: (target: ThemeTarget, themeId: string | null) => void;
   onThemePackChange: (themeId: string) => void;
   onCustomCssEnabledChange: (target: ThemeTarget, enabled: boolean) => void;
 }) {
   const { t } = useLocalization();
   const onReload = () => void catalog.reload();
   const onOpenDirectory = () => void catalog.openDirectory();
+  const onAddTheme = () => {
+    if (!THEME_MARKETPLACE_URL) return;
+    void window.puppyoneDesktop?.openExternalUrl(THEME_MARKETPLACE_URL);
+  };
   const packs = getThemePacks(catalog.snapshot);
   const selectedPackExists = packs.some((theme) => theme.id === preferences.pack);
 
@@ -31,36 +34,50 @@ export function ThemeSettingsSection({
       </div>
       <p className="desktop-theme-settings-detail">{t("settings.appearance.themes.detail")}</p>
       <div className="desktop-settings-list">
-        <label className="desktop-settings-row desktop-settings-row-control">
-          <span>{t("settings.appearance.themes.pack")}</span>
-          <select
-            className="desktop-settings-select"
-            aria-label={t("settings.appearance.themes.pack")}
-            value={preferences.pack}
-            onChange={(event) => onThemePackChange(event.currentTarget.value)}
-          >
-            {!selectedPackExists && (
-              <option value={preferences.pack}>{t("settings.appearance.themes.missing", { id: preferences.pack })}</option>
+        <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
+          <label htmlFor="desktop-theme-pack-select">{t("settings.appearance.themes.pack")}</label>
+          <div className="desktop-theme-pack-controls">
+            <select
+              id="desktop-theme-pack-select"
+              className="desktop-settings-select"
+              value={preferences.pack}
+              onChange={(event) => onThemePackChange(event.currentTarget.value)}
+            >
+              {!selectedPackExists && (
+                <option value={preferences.pack}>{t("settings.appearance.themes.missing", { id: preferences.pack })}</option>
+              )}
+              {packs.map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
+            </select>
+            <button
+              className="desktop-settings-action"
+              type="button"
+              disabled={!THEME_MARKETPLACE_URL}
+              aria-describedby={!THEME_MARKETPLACE_URL ? "desktop-theme-add-status" : undefined}
+              title={!THEME_MARKETPLACE_URL
+                ? t("settings.appearance.themes.addUnavailable")
+                : undefined}
+              onClick={onAddTheme}
+            >
+              {t("settings.appearance.themes.add")}
+            </button>
+            {!THEME_MARKETPLACE_URL && (
+              <span id="desktop-theme-add-status" className="desktop-settings-visually-hidden">
+                {t("settings.appearance.themes.addUnavailable")}
+              </span>
             )}
-            {packs.map((theme) => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
-          </select>
-        </label>
+          </div>
+        </div>
+      </div>
+      <div className="desktop-theme-settings-actions">
+        <button className="desktop-settings-action" type="button" onClick={onOpenDirectory}>
+          {t("settings.appearance.themes.openFolder")}
+        </button>
+        <button className="desktop-settings-action" type="button" disabled={catalog.status === "loading"} onClick={onReload}>
+          {t("settings.appearance.themes.reload")}
+        </button>
       </div>
       <details className="desktop-theme-settings-advanced">
         <summary>{t("settings.appearance.themes.advanced")}</summary>
-        <div className="desktop-settings-list">
-          <ThemeSelector target="application" labelKey="settings.appearance.themes.application" preferences={preferences} catalog={catalog} onThemeOverrideChange={onThemeOverrideChange} />
-          <ThemeSelector target="markdown" labelKey="settings.appearance.themes.markdown" preferences={preferences} catalog={catalog} onThemeOverrideChange={onThemeOverrideChange} />
-          <ThemeSelector target="csv" labelKey="settings.appearance.themes.csv" preferences={preferences} catalog={catalog} onThemeOverrideChange={onThemeOverrideChange} />
-        </div>
-        <div className="desktop-theme-settings-actions">
-          <button className="desktop-settings-action" type="button" onClick={onOpenDirectory}>
-            {t("settings.appearance.themes.openFolder")}
-          </button>
-          <button className="desktop-settings-action" type="button" disabled={catalog.status === "loading"} onClick={onReload}>
-            {t("settings.appearance.themes.reload")}
-          </button>
-        </div>
         <CustomCssEditor
           catalog={catalog}
           preferences={preferences}
@@ -188,44 +205,5 @@ function CustomCssEditor({
         )}
       </div>
     </div>
-  );
-}
-
-function ThemeSelector({
-  catalog,
-  labelKey,
-  onThemeOverrideChange,
-  preferences,
-  target,
-}: {
-  catalog: ThemeCatalogController;
-  labelKey: string;
-  onThemeOverrideChange: (target: ThemeTarget, themeId: string | null) => void;
-  preferences: SurfaceThemePreferences;
-  target: ThemeTarget;
-}) {
-  const { t } = useLocalization();
-  const themes = getThemesForTarget(catalog.snapshot, target);
-  const value = preferences.overrides[target];
-  const selectedThemeExists = value === null || themes.some((theme) => theme.id === value);
-  const label = t(labelKey);
-  return (
-    <label className="desktop-settings-row desktop-settings-row-control">
-      <span>{label}</span>
-      <select
-        className="desktop-settings-select"
-        aria-label={label}
-        value={value ?? ""}
-        onChange={(event) => onThemeOverrideChange(target, event.currentTarget.value || null)}
-      >
-        <option value="">{t("settings.appearance.themes.followPack", { theme: preferences.pack })}</option>
-        {!selectedThemeExists && value && (
-          <option value={value}>{t("settings.appearance.themes.missing", { id: value })}</option>
-        )}
-        {themes.map((theme) => (
-          <option key={theme.id} value={theme.id}>{theme.name}</option>
-        ))}
-      </select>
-    </label>
   );
 }

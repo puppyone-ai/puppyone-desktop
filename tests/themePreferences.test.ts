@@ -7,21 +7,15 @@ import {
   selectThemePack,
   serializeSurfaceThemePreferences,
   updateCustomCssEnabled,
-  updateSurfaceThemeOverride,
 } from "../src/features/themes/themePreferences";
-import { getThemePacks, getThemesForTarget } from "../src/features/themes/builtinSurfaceThemes";
+import { getThemePacks } from "../src/features/themes/builtinSurfaceThemes";
 import type { ThemeCatalogSnapshot, ThemeDefinition } from "../src/features/themes/themeTypes";
 
 describe("surface theme preferences", () => {
-  it("round-trips a theme pack with independent advanced overrides", () => {
+  it("round-trips one coordinated theme pack with independent Custom CSS enablement", () => {
     const preferences = {
-      version: 3 as const,
+      version: 4 as const,
       pack: "com.example.forest",
-      overrides: {
-        application: null,
-        markdown: "local.css.newsprint",
-        csv: null,
-      },
       customCss: { application: false, markdown: true, csv: false },
     };
 
@@ -36,48 +30,52 @@ describe("surface theme preferences", () => {
       markdown: "com.example.forest",
       csv: "com.example.forest",
     }))).toEqual({
-      version: 3,
+      version: 4,
       pack: "com.example.forest",
-      overrides: { application: null, markdown: null, csv: null },
       customCss: { application: false, markdown: false, csv: false },
     });
   });
 
-  it("migrates mixed version 1 selections into Default plus advanced overrides", () => {
+  it("migrates mixed version 1 selections to Default without retaining surface overrides", () => {
     expect(parseSurfaceThemePreferences(JSON.stringify({
       version: 1,
       application: "default",
       markdown: "local.css.newsprint",
       csv: "builtin.csv.spreadsheet",
     }))).toEqual({
-      version: 3,
+      version: 4,
       pack: "default",
-      overrides: {
-        application: null,
-        markdown: "local.css.newsprint",
-        csv: "builtin.csv.spreadsheet",
-      },
       customCss: { application: false, markdown: false, csv: false },
     });
   });
 
-  it.each([null, "", "{", "[]", '{"version":4}', '{"version":3}'])
+  it("migrates version 3 by discarding packaged surface overrides", () => {
+    expect(parseSurfaceThemePreferences(JSON.stringify({
+      version: 3,
+      pack: "com.example.forest",
+      overrides: {
+        application: "com.example.shell",
+        markdown: "com.example.paper",
+        csv: null,
+      },
+      customCss: { application: false, markdown: true, csv: false },
+    }))).toEqual({
+      version: 4,
+      pack: "com.example.forest",
+      customCss: { application: false, markdown: true, csv: false },
+    });
+  });
+
+  it.each([null, "", "{", "[]", '{"version":5}', '{"version":4}', '{"version":3}'])
     ("falls back for missing or malformed value %s", (value) => {
       expect(parseSurfaceThemePreferences(value)).toEqual(DEFAULT_SURFACE_THEME_PREFERENCES);
     });
 
-  it("updates the pack and nullable per-surface overrides without losing other intent", () => {
+  it("updates the pack without losing Custom CSS intent", () => {
     const packed = selectThemePack(DEFAULT_SURFACE_THEME_PREFERENCES, "com.example.forest");
-    const overridden = updateSurfaceThemeOverride(packed, "markdown", "local.css.newsprint");
-    const reset = updateSurfaceThemeOverride(overridden, "markdown", null);
 
     expect(packed.pack).toBe("com.example.forest");
-    expect(overridden.overrides).toEqual({
-      application: null,
-      markdown: "local.css.newsprint",
-      csv: null,
-    });
-    expect(reset.overrides.markdown).toBeNull();
+    expect(packed.customCss).toEqual(DEFAULT_SURFACE_THEME_PREFERENCES.customCss);
   });
 
   it("migrates a version 2 Custom CSS override into an enabled overlay on the pack", () => {
@@ -90,49 +88,33 @@ describe("surface theme preferences", () => {
         csv: "com.example.table",
       },
     }))).toEqual({
-      version: 3,
+      version: 4,
       pack: "com.example.forest",
-      overrides: {
-        application: null,
-        markdown: null,
-        csv: "com.example.table",
-      },
       customCss: { application: false, markdown: true, csv: false },
     });
   });
 
   it("enables and disables Custom CSS independently from theme selection", () => {
-    const selected = updateSurfaceThemeOverride(
-      selectThemePack(DEFAULT_SURFACE_THEME_PREFERENCES, "com.example.forest"),
-      "markdown",
-      "com.example.paper",
-    );
+    const selected = selectThemePack(DEFAULT_SURFACE_THEME_PREFERENCES, "com.example.forest");
     const enabled = updateCustomCssEnabled(selected, "markdown", true);
 
     expect(enabled.pack).toBe("com.example.forest");
-    expect(enabled.overrides.markdown).toBe("com.example.paper");
     expect(enabled.customCss.markdown).toBe(true);
     expect(updateCustomCssEnabled(enabled, "markdown", false).customCss.markdown).toBe(false);
   });
 
-  it("applies a newly selected theme pack to every surface by clearing advanced overrides", () => {
+  it("applies a newly selected theme pack to every surface", () => {
     const preferences = {
-      version: 3 as const,
+      version: 4 as const,
       pack: "default",
-      overrides: {
-        application: "default",
-        markdown: "builtin.markdown.newsprint",
-        csv: "builtin.csv.ledger",
-      },
       customCss: { application: false, markdown: false, csv: false },
     };
 
     const selected = selectThemePack(preferences, "com.example.forest");
 
     expect(selected).toEqual({
-      version: 3,
+      version: 4,
       pack: "com.example.forest",
-      overrides: { application: null, markdown: null, csv: null },
       customCss: { application: false, markdown: false, csv: false },
     });
     expect(resolveSurfaceThemeSelection(selected, catalog([
@@ -145,7 +127,7 @@ describe("surface theme preferences", () => {
     });
   });
 
-  it("resolves pack targets, advanced overrides, missing targets, and mode compatibility", () => {
+  it("falls back atomically when a pack is incomplete for the active mode", () => {
     const snapshot = catalog([
       theme("default", ["application", "markdown", "csv"], ["light", "dark"]),
       theme("com.example.forest", ["application", "markdown"], ["light", "dark"]),
@@ -153,41 +135,31 @@ describe("surface theme preferences", () => {
       theme("com.example.table", ["csv"], ["light", "dark"]),
     ]);
     const preferences = {
-      version: 3 as const,
+      version: 4 as const,
       pack: "com.example.forest",
-      overrides: {
-        application: null,
-        markdown: "com.example.paper",
-        csv: "com.example.table",
-      },
       customCss: { application: false, markdown: false, csv: false },
     };
 
     expect(resolveSurfaceThemeSelection(preferences, snapshot, "light")).toEqual({
-      application: "com.example.forest",
-      markdown: "com.example.paper",
-      csv: "com.example.table",
+      application: "default",
+      markdown: "default",
+      csv: "default",
     });
     expect(resolveSurfaceThemeSelection(preferences, snapshot, "dark")).toEqual({
-      application: "com.example.forest",
-      markdown: "com.example.forest",
-      csv: "com.example.table",
+      application: "default",
+      markdown: "default",
+      csv: "default",
     });
   });
 
-  it("falls back to Default when the selected pack or override is unavailable", () => {
+  it("falls back to Default when the selected pack is unavailable", () => {
     const snapshot = catalog([
       theme("default", ["application", "markdown", "csv"], ["light", "dark"]),
     ]);
 
     expect(resolveSurfaceThemeSelection({
-      version: 3,
+      version: 4,
       pack: "com.example.missing",
-      overrides: {
-        application: null,
-        markdown: "com.example.also-missing",
-        csv: null,
-      },
       customCss: { application: false, markdown: false, csv: false },
     }, snapshot, "dark")).toEqual({
       application: "default",
@@ -208,9 +180,6 @@ describe("surface theme preferences", () => {
       "default",
       "com.example.complete",
     ]);
-    expect(getThemesForTarget(snapshot, "markdown").map((item) => item.id)).not.toContain(
-      CUSTOM_CSS_THEME_ID,
-    );
   });
 });
 

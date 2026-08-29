@@ -73,8 +73,6 @@ export function SettingsView({
   updateState,
   onThemeModeChange,
   onInterfaceStyleChange,
-  onLightThemePresetChange,
-  onDarkThemePresetChange,
   onLoadingAnimationPresetChange,
   onLocalAgentsSettingsChange,
   onAgentFileActivityIndicatorsEnabledChange,
@@ -84,7 +82,6 @@ export function SettingsView({
   onMarkdownPresentationChange,
   onSelectSettingsSection,
   onThemePackChange,
-  onSurfaceThemeOverrideChange,
   onCustomCssEnabledChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
@@ -274,14 +271,11 @@ export function SettingsView({
                 lightThemePreset={lightThemePreset}
                 darkThemePreset={darkThemePreset}
                 onThemeModeChange={onThemeModeChange}
-                onLightThemePresetChange={onLightThemePresetChange}
-                onDarkThemePresetChange={onDarkThemePresetChange}
               />
               <ThemeSettingsSection
                 catalog={themeCatalog}
                 preferences={surfaceThemePreferences}
                 onThemePackChange={onThemePackChange}
-                onThemeOverrideChange={onSurfaceThemeOverrideChange}
                 onCustomCssEnabledChange={onCustomCssEnabledChange}
               />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">

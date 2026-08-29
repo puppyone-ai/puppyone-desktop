@@ -14,7 +14,7 @@ This folder is the editable theme library used by PuppyOne Desktop. A theme can 
 2. Select **Open Themes Folder**. This is the safest way to locate the correct folder on every operating system and in development builds.
 3. Copy a theme such as `paper-blue.css` into the opened folder.
 4. Return to Appearance and select **Reload Themes**.
-5. Choose the theme from **Theme Pack**. Selecting a pack applies it to Application, Markdown, and CSV when all three targets are present.
+5. Choose the theme from **Theme Pack**. A pack always applies its Application, Markdown, and CSV styles together.
 
 中文步骤：打开 **设置 → 外观 → 主题**，点击 **打开主题文件夹**，将 `.css` 文件复制进去，然后点击 **重新加载主题**，最后从 **主题包** 中选择它。
 
@@ -57,7 +57,7 @@ To install a theme obtained from a theme author or collection:
 
 ## ✍️ Single-file theme format / 单文件主题格式
 
-The recommended shareable format is one CSS file containing metadata plus one or more scoped targets:
+The recommended shareable format is one CSS file containing metadata plus all three scoped targets:
 
 ```css
 @puppyone-theme {
@@ -127,13 +127,13 @@ The three targets are:
 | `markdown` | Markdown typography, headings, quotes, code, lists, and rendered tables |
 | `csv` | CSV/table surface and editable-table tokens |
 
-A theme containing all three targets appears in the primary **Theme Pack** selector. A partial theme remains available under **Advanced theme overrides** for its supported surface.
+A theme appears in **Theme Pack** only when it contains all three targets. PuppyOne deliberately does not expose separate packaged-theme selectors for Application, Markdown, or CSV: a pack is one coordinated visual product and always travels as a unit.
 
-包含三个目标的主题会出现在主要的 **主题包** 选择器中；只包含部分目标的主题会出现在 **高级主题覆盖** 的对应选项中。
+只有同时包含三个目标的主题才会出现在 **主题套装** 选择器中。PuppyOne 不再提供应用界面、Markdown 或 CSV 各自独立的主题选择器；一个主题套装始终作为完整、协调的视觉方案一起使用和传播。
 
-The final style order is **Theme Pack or Advanced surface theme → Editor Markdown overrides → enabled Custom CSS**. The Editor controls default to **Theme**, so authored CSS remains authoritative until a user explicitly overrides one property. Custom CSS is an independent final overlay and can be disabled without deleting its source.
+The final style order is **Theme Pack → Editor Markdown preferences → enabled Custom CSS**. The Editor controls default to **Theme**, so authored CSS remains authoritative until a user explicitly overrides one property. Custom CSS is a separate expert overlay for local adjustments and can be disabled without deleting its source; it is not another packaged-theme selector.
 
-最终样式顺序是 **主题包或高级单界面主题 → 编辑器 Markdown 覆盖 → 已启用的自定义 CSS**。编辑器控件默认选择 **跟随主题**；自定义 CSS 是独立的最后一层，可以停用而不删除源码。
+最终样式顺序是 **主题套装 → 编辑器 Markdown 偏好 → 已启用的自定义 CSS**。编辑器控件默认选择 **跟随主题**；自定义 CSS 是用于本地微调的独立高级覆盖层，不是另一组可分别选择的主题，并且可以停用而不删除源码。
 
 ## 🎨 Markdown styling / Markdown 样式
 
@@ -185,9 +185,9 @@ For heading size, bold color, and bold weight, prefer these public variables ove
 
 ## 🔧 Typora-style and advanced packages / Typora 与高级目录包
 
-A top-level `.css` file without `@puppyone-theme` is treated as a Markdown-only Typora-style theme. PuppyOne recognizes `:root`, `html`, `body`, and `#write` as Markdown-surface aliases, but it does not support every Typora application-chrome selector.
+A top-level `.css` file without `@puppyone-theme` can still be parsed as a Markdown-only Typora-style source for compatibility. PuppyOne recognizes `:root`, `html`, `body`, and `#write` as Markdown-surface aliases, but a Markdown-only file is not a complete Theme Pack and will not appear in the pack selector. Add PuppyOne metadata plus `application`, `markdown`, and `csv` blocks when converting it into a selectable pack.
 
-不含 `@puppyone-theme` 的顶层 CSS 文件会作为仅 Markdown 的 Typora 风格主题加载。PuppyOne 支持常见正文选择器，但不会直接兼容所有 Typora 应用界面选择器。
+不含 `@puppyone-theme` 的顶层 CSS 文件仍可按仅 Markdown 的 Typora 风格源码解析，以便兼容旧文件。PuppyOne 支持常见正文选择器，但这种文件不是完整主题套装，不会出现在套装选择器中；需要补充元数据以及 `application`、`markdown`、`csv` 三个目标块后才能作为套装选择。
 
 Use a directory package with `theme.json` only when a theme needs multiple CSS files or local assets. For themes without assets, prefer the single-file format because it is easier to download and share.
 
@@ -198,10 +198,10 @@ Use a directory package with `theme.json` only when a theme needs multiple CSS f
 - After changing a file, click **Reload Themes** before checking the result.
 - If a theme does not appear, inspect the diagnostic shown in Appearance.
 - If only one surface changes, confirm the file contains all intended `@puppyone` target blocks.
-- If a new Theme Pack appears unchanged, set Advanced overrides to **Follow Theme Pack** or select the pack again to clear them.
+- If a new Theme Pack appears unchanged, confirm that it declares all three targets and then select it again after reloading.
 - Keep a new theme ID unique; duplicate IDs are rejected deterministically.
 
-修改文件后必须点击 **重新加载主题**。如果主题没有出现，请查看 Appearance 中的诊断；如果只有某个界面发生变化，请检查目标块是否完整，并确认高级覆盖设置为 **跟随主题包**。
+修改文件后必须点击 **重新加载主题**。如果主题没有出现，请查看 Appearance 中的诊断；如果只有某个界面发生变化，请检查三个目标块是否完整，然后重新加载并再次选择该主题套装。
 
 ## 🔗 Sharing and contribution / 分享与贡献
 

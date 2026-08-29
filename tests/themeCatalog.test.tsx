@@ -95,7 +95,7 @@ describe("renderer theme catalog", () => {
     expect(latest?.error).toBe("Finder unavailable");
   });
 
-  it("exposes the effective selection for the active pack and color mode", async () => {
+  it("falls back every surface when the active pack is incomplete", async () => {
     window.puppyoneDesktop = {
       themes: {
         list: vi.fn(async () => snapshot("com.example.first")),
@@ -119,7 +119,7 @@ describe("renderer theme catalog", () => {
 
     expect(latest?.selection).toEqual({
       application: "default",
-      markdown: "com.example.first",
+      markdown: "default",
       csv: "default",
     });
 
@@ -215,15 +215,13 @@ describe("renderer theme catalog", () => {
     expect(latest?.error).toContain("could not be loaded");
   });
 
-  it("syncs theme intent to the native menu and routes pack or override requests", async () => {
+  it("syncs one theme pack to the native menu and routes pack requests", async () => {
     const syncNativeMenu = vi.fn(async () => ({ synced: true as const }));
     let requestSelection: ((request: {
-      kind: "pack" | "override";
-      target?: "application" | "markdown" | "csv";
-      themeId: string | null;
+      kind: "pack";
+      themeId: string;
     }) => void) | undefined;
     const onThemePackChange = vi.fn();
-    const onThemeOverrideChange = vi.fn();
     window.puppyoneDesktop = {
       themes: {
         list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
@@ -239,22 +237,18 @@ describe("renderer theme catalog", () => {
 
     await act(async () => {
       root.render(
-        <NativeHarness
-          onThemePackChange={onThemePackChange}
-          onThemeOverrideChange={onThemeOverrideChange}
-        />,
+        <NativeHarness onThemePackChange={onThemePackChange} />,
       );
       await Promise.resolve();
     });
 
     expect(syncNativeMenu).toHaveBeenCalledWith(expect.objectContaining({
       pack: "builtin.pack.forest",
-      overrides: expect.objectContaining({ markdown: "builtin.markdown.newsprint" }),
     }));
+    expect(syncNativeMenu.mock.calls.at(-1)?.[0]).not.toHaveProperty("overrides");
+    expect(syncNativeMenu.mock.calls.at(-1)?.[0]).not.toHaveProperty("selection");
     act(() => requestSelection?.({ kind: "pack", themeId: "builtin.pack.github" }));
-    act(() => requestSelection?.({ kind: "override", target: "markdown", themeId: null }));
     expect(onThemePackChange).toHaveBeenCalledWith("builtin.pack.github");
-    expect(onThemeOverrideChange).toHaveBeenCalledWith("markdown", null);
   });
 });
 
@@ -271,25 +265,17 @@ function Harness({
 
 function NativeHarness({
   onThemePackChange,
-  onThemeOverrideChange,
 }: {
   onThemePackChange: (themeId: string) => void;
-  onThemeOverrideChange: (target: "application" | "markdown" | "csv", themeId: string | null) => void;
 }) {
   latest = useThemeCatalog({
     colorMode: "light",
     preferences: {
-      version: 3,
+      version: 4,
       pack: "builtin.pack.forest",
-      overrides: {
-        application: null,
-        markdown: "builtin.markdown.newsprint",
-        csv: null,
-      },
       customCss: { application: false, markdown: false, csv: false },
     },
     onThemePackChange,
-    onThemeOverrideChange,
   });
   return null;
 }

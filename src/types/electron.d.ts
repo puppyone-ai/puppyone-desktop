@@ -777,8 +777,6 @@ export type DesktopThemeSnapshot = Readonly<{
 }>;
 export type DesktopThemeMenuState = Readonly<{
   pack: string;
-  overrides: Readonly<Record<DesktopThemeTarget, string | null>>;
-  selection: Readonly<Record<DesktopThemeTarget, string>>;
   themes: readonly Readonly<{
     id: string;
     name: string;
@@ -815,10 +813,7 @@ declare global {
         }) => Promise<{ saved: true }>;
         syncNativeMenu: (request: DesktopThemeMenuState) => Promise<{ synced: true }>;
         onSelectionRequested: (
-          callback: (request:
-            | { kind: "pack"; themeId: string }
-            | { kind: "override"; target: DesktopThemeTarget; themeId: string | null }
-          ) => void,
+          callback: (request: { kind: "pack"; themeId: string }) => void,
         ) => () => void;
         onReloadRequested: (callback: () => void) => () => void;
       };

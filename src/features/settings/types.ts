@@ -49,8 +49,6 @@ export type SettingsViewProps = {
   updateState: DesktopUpdateState;
   onThemeModeChange: (mode: ThemeMode) => void;
   onInterfaceStyleChange: (style: InterfaceStyle) => void;
-  onLightThemePresetChange: (preset: LightThemePreset) => void;
-  onDarkThemePresetChange: (preset: DarkThemePreset) => void;
   onLoadingAnimationPresetChange: (preset: LoadingAnimationPreset) => void;
   onLocalAgentsSettingsChange: (settings: LocalAgentsSettings) => void;
   onAgentFileActivityIndicatorsEnabledChange: (enabled: boolean) => void;
@@ -60,7 +58,6 @@ export type SettingsViewProps = {
   onMarkdownPresentationChange: (settings: MarkdownPresentationSettings) => void;
   onSelectSettingsSection: (section: SettingsSection) => void;
   onThemePackChange: (themeId: string) => void;
-  onSurfaceThemeOverrideChange: (target: ThemeTarget, themeId: string | null) => void;
   onCustomCssEnabledChange: (target: ThemeTarget, enabled: boolean) => void;
   onFileIconThemeChange: (theme: FileIconThemeId) => void;
   onSidebarNavigationLayoutChange: (layout: SidebarNavigationLayout) => void;

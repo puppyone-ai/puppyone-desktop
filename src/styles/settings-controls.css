@@ -81,6 +81,30 @@
   gap: 6px;
 }
 
+.desktop-theme-pack-controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.desktop-theme-pack-controls .desktop-settings-select {
+  flex: 1 1 220px;
+}
+
+.desktop-settings-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  margin: -1px;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .desktop-theme-settings-diagnostics {
   display: grid;
   gap: 4px;
@@ -114,9 +138,19 @@
 .desktop-theme-custom-css {
   display: grid;
   gap: 8px;
-  margin-top: 8px;
-  padding-top: 12px;
-  border-top: 1px solid var(--po-divider);
+  margin-top: 4px;
+}
+
+@media (max-width: 760px) {
+  .desktop-theme-pack-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .desktop-theme-pack-controls .desktop-settings-select {
+    width: auto;
+    max-width: none;
+  }
 }
 
 .desktop-theme-custom-css-source {

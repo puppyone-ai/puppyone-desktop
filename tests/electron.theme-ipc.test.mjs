@@ -47,14 +47,10 @@ describe("CSS theme IPC", () => {
     })).resolves.toEqual({ saved: true });
     expect(handlers.get(THEME_SYNC_NATIVE_MENU_CHANNEL)({}, {
       pack: "builtin.pack.forest",
-      overrides: { application: null, markdown: "builtin.markdown.focus", csv: "unsafe/id" },
-      selection: { application: "default", markdown: "builtin.markdown.focus", csv: "unsafe/id" },
       themes: [{ id: "builtin.markdown.focus", name: "Focus", targets: ["markdown", "invalid"] }],
     })).toEqual({ synced: true });
     expect(onSyncNativeMenu).toHaveBeenCalledWith({
       pack: "builtin.pack.forest",
-      overrides: { application: null, markdown: "builtin.markdown.focus", csv: null },
-      selection: { application: "default", markdown: "builtin.markdown.focus", csv: "default" },
       themes: [{ id: "builtin.markdown.focus", name: "Focus", targets: ["markdown"] }],
     });
   });

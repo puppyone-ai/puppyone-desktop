@@ -56,8 +56,6 @@ export type SettingsPreferencesPort = {
   gitSidebarLayout: GitSidebarLayout;
   setThemeMode: (value: ThemeMode) => void;
   setInterfaceStyle: (value: InterfaceStyle) => void;
-  setLightThemePreset: (value: LightThemePreset) => void;
-  setDarkThemePreset: (value: DarkThemePreset) => void;
   setLoadingAnimationPreset: (value: LoadingAnimationPreset) => void;
   setLocalAgentsSettings: (value: LocalAgentsSettings) => void;
   setAgentFileActivityIndicatorsEnabled: (value: boolean) => void;
@@ -66,7 +64,6 @@ export type SettingsPreferencesPort = {
   setPointerCursors: (value: boolean) => void;
   setMarkdownPresentation: (value: MarkdownPresentationSettings) => void;
   setThemePack: (themeId: string) => void;
-  setSurfaceThemeOverride: (target: ThemeTarget, themeId: string | null) => void;
   setCustomCssEnabled: (target: ThemeTarget, enabled: boolean) => void;
   setFileIconTheme: (value: FileIconThemeId) => void;
   setSidebarNavigationLayout: (value: SidebarNavigationLayout) => void;
@@ -173,8 +170,6 @@ export function createSettingsWorkspaceSurface({
         updateState={updates.state}
         onThemeModeChange={preferences.setThemeMode}
         onInterfaceStyleChange={preferences.setInterfaceStyle}
-        onLightThemePresetChange={preferences.setLightThemePreset}
-        onDarkThemePresetChange={preferences.setDarkThemePreset}
         onLoadingAnimationPresetChange={preferences.setLoadingAnimationPreset}
         onLocalAgentsSettingsChange={preferences.setLocalAgentsSettings}
         onAgentFileActivityIndicatorsEnabledChange={preferences.setAgentFileActivityIndicatorsEnabled}
@@ -184,7 +179,6 @@ export function createSettingsWorkspaceSurface({
         onMarkdownPresentationChange={preferences.setMarkdownPresentation}
         onSelectSettingsSection={onSelectSection}
         onThemePackChange={preferences.setThemePack}
-        onSurfaceThemeOverrideChange={preferences.setSurfaceThemeOverride}
         onCustomCssEnabledChange={preferences.setCustomCssEnabled}
         onFileIconThemeChange={preferences.setFileIconTheme}
         onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
