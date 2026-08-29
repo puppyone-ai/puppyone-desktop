@@ -6,6 +6,7 @@ generated/
 .vite/
 .vite-temp/
 .wrangler/
+coverage/
 
 .DS_Store
 *.log

@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  GIT_AUTO_COMMIT_MAX_INTERVAL_MS,
   GIT_AUTO_COMMIT_MIN_INTERVAL_MS,
   createGitAutoCommitPreferenceStore,
 } from "../electron/main/git-auto-commit/preference-store.mjs";
@@ -54,5 +55,53 @@ describe("Git Auto Commit preference store", () => {
     await fs.writeFile(filePath, JSON.stringify({ schemaVersion: 99, experimentalOptIn: true }), { mode: 0o600 });
     const store = createGitAutoCommitPreferenceStore({ filePath, logger: { warn() {} } });
     expect(await store.getSnapshot()).toMatchObject({ experimentalOptIn: false });
+  });
+
+  it("serializes concurrent preference changes and clamps intervals to product bounds", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "puppyone-auto-prefs-"));
+    temporaryDirectories.push(directory);
+    const filePath = path.join(directory, "preferences.v1.json");
+    const store = createGitAutoCommitPreferenceStore({ filePath });
+    const repo = identity(path.join(directory, "project"));
+
+    await Promise.all([
+      store.setExperimentalOptIn(true),
+      store.setWorkspacePolicy(repo, { enabled: true, minimumIntervalMs: Number.MAX_SAFE_INTEGER }),
+    ]);
+    expect(await store.getSnapshot(repo)).toMatchObject({
+      experimentalOptIn: true,
+      workspacePolicy: {
+        enabled: true,
+        minimumIntervalMs: GIT_AUTO_COMMIT_MAX_INTERVAL_MS,
+      },
+    });
+  });
+
+  it("fails closed for malformed, oversized, and symlinked preference files", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "puppyone-auto-prefs-"));
+    temporaryDirectories.push(directory);
+    const filePath = path.join(directory, "preferences.v1.json");
+    const logger = { warn() {} };
+
+    await fs.writeFile(filePath, "not-json", { mode: 0o600 });
+    expect(await createGitAutoCommitPreferenceStore({ filePath, logger }).getSnapshot())
+      .toMatchObject({ experimentalOptIn: false });
+
+    await fs.writeFile(filePath, "x".repeat(256 * 1024 + 1), { mode: 0o600 });
+    expect(await createGitAutoCommitPreferenceStore({ filePath, logger }).getSnapshot())
+      .toMatchObject({ experimentalOptIn: false });
+
+    if (process.platform !== "win32") {
+      const targetPath = path.join(directory, "target.json");
+      await fs.writeFile(targetPath, JSON.stringify({
+        schemaVersion: 1,
+        experimentalOptIn: true,
+        workspaces: {},
+      }), { mode: 0o600 });
+      await fs.rm(filePath);
+      await fs.symlink(targetPath, filePath);
+      expect(await createGitAutoCommitPreferenceStore({ filePath, logger }).getSnapshot())
+        .toMatchObject({ experimentalOptIn: false });
+    }
   });
 });

@@ -27,6 +27,12 @@ export async function runWorkspaceGitAutoCommit(rootPath, options = {}) {
   const contentEpoch = options.contentEpoch;
   const isContentEpochCurrent = options.isContentEpochCurrent ?? (() => true);
   const isExecutionAllowed = options.isExecutionAllowed ?? (() => true);
+  const mutationTimeoutMs = boundedInteger(
+    options.mutationTimeoutMs,
+    1,
+    GIT_MUTATION_TIMEOUT_MS,
+    GIT_MUTATION_TIMEOUT_MS,
+  );
 
   const existing = await journal.read(root);
   if (existing.record) {
@@ -72,7 +78,14 @@ export async function runWorkspaceGitAutoCommit(rootPath, options = {}) {
   try {
     record = (await journal.create(root, record)).record;
     await options.afterPhase?.("prepared", record);
-    await prepareIsolatedIndex(root, temporaryIndexPath, preflight.head, preflight.paths);
+    await options.afterCheckpoint?.("journal-prepared", { record });
+    await prepareIsolatedIndex(
+      root,
+      temporaryIndexPath,
+      preflight.head,
+      preflight.paths,
+      mutationTimeoutMs,
+    );
     const pathEntries = await readIndexEntries(root, preflight.paths, temporaryIndexPath);
     if (!samePaths(pathEntries.map((entry) => entry.path), preflight.paths)) {
       throw createAutoCommitError("staged-path-mismatch");
@@ -81,6 +94,11 @@ export async function runWorkspaceGitAutoCommit(rootPath, options = {}) {
       indexFile: temporaryIndexPath,
       optionalLocks: false,
     })).stdout.trim();
+    await options.afterCheckpoint?.("isolated-index-prepared", {
+      record,
+      pathEntries,
+      stagedTree,
+    });
     record = (await journal.update(root, record, {
       phase: "staged",
       path_entries: pathEntries,
@@ -88,6 +106,7 @@ export async function runWorkspaceGitAutoCommit(rootPath, options = {}) {
       updated_at: new Date(now()).toISOString(),
     })).record;
     await options.afterPhase?.("staged", record);
+    await options.afterCheckpoint?.("journal-staged", { record });
 
     if (!isContentEpochCurrent(contentEpoch)) {
       await clearUncommittedTransaction(root, journal, record, temporaryIndexPath);
@@ -110,16 +129,18 @@ export async function runWorkspaceGitAutoCommit(rootPath, options = {}) {
       "-m", `Puppyone-Auto-Commit: ${operationId}`,
     ], {
       indexFile: temporaryIndexPath,
-      timeout: GIT_MUTATION_TIMEOUT_MS,
+      timeout: mutationTimeoutMs,
     });
     const commitId = (await execGit(root, ["rev-parse", "HEAD"], { optionalLocks: false })).stdout.trim();
     await options.afterGitCommit?.({ commitId, record });
+    await options.afterCheckpoint?.("commit-created", { record, commitId });
     record = (await journal.update(root, record, {
       phase: "committed",
       resulting_commit: commitId,
       updated_at: new Date(now()).toISOString(),
     })).record;
     await options.afterPhase?.("committed", record);
+    await options.afterCheckpoint?.("journal-committed", { record, commitId });
 
     const verification = await verifyCommittedRecord(root, record);
     if (!verification.ok) {
@@ -129,7 +150,8 @@ export async function runWorkspaceGitAutoCommit(rootPath, options = {}) {
         retryable: false,
       });
     }
-    const reconciliation = await reconcileRealIndex(root, record.path_entries);
+    await options.afterCheckpoint?.("commit-verified", { record, commitId });
+    const reconciliation = await reconcileRealIndex(root, record.path_entries, mutationTimeoutMs);
     if (!reconciliation.ok) {
       return result("needs-review", reconciliation.reason, {
         commitId,
@@ -137,6 +159,7 @@ export async function runWorkspaceGitAutoCommit(rootPath, options = {}) {
         retryable: false,
       });
     }
+    await options.afterCheckpoint?.("index-reconciled", { record, commitId });
     await removeTemporaryIndex(temporaryIndexPath);
     await journal.clear(root, record);
     return result("committed", "untracked-files-committed", {
@@ -190,7 +213,13 @@ export async function recoverWorkspaceGitAutoCommit(rootPath, options = {}) {
       retryable: false,
     });
   }
-  const reconciliation = await reconcileRealIndex(root, record.path_entries);
+  const mutationTimeoutMs = boundedInteger(
+    options.mutationTimeoutMs,
+    1,
+    GIT_MUTATION_TIMEOUT_MS,
+    GIT_MUTATION_TIMEOUT_MS,
+  );
+  const reconciliation = await reconcileRealIndex(root, record.path_entries, mutationTimeoutMs);
   if (!reconciliation.ok) {
     return result("needs-review", reconciliation.reason, {
       commitId: guard.head,
@@ -299,7 +328,7 @@ export async function inspectAutoCommitPreflight(rootPath, options = {}) {
   };
 }
 
-async function prepareIsolatedIndex(root, indexFile, head, paths) {
+async function prepareIsolatedIndex(root, indexFile, head, paths, mutationTimeoutMs) {
   await fs.rm(indexFile, { force: true });
   await execGit(root, head ? ["read-tree", head] : ["read-tree", "--empty"], {
     indexFile,
@@ -308,7 +337,7 @@ async function prepareIsolatedIndex(root, indexFile, head, paths) {
   await fs.chmod(indexFile, 0o600).catch(() => undefined);
   await execGit(root, ["add", "--", ...paths], {
     indexFile,
-    timeout: GIT_MUTATION_TIMEOUT_MS,
+    timeout: mutationTimeoutMs,
   });
 }
 
@@ -344,7 +373,7 @@ async function verifyCommittedRecord(root, record) {
   return { ok: true };
 }
 
-async function reconcileRealIndex(root, committedEntries) {
+async function reconcileRealIndex(root, committedEntries, mutationTimeoutMs = GIT_MUTATION_TIMEOUT_MS) {
   if (!Array.isArray(committedEntries) || committedEntries.length === 0) {
     return blocked("staged-record-missing", false);
   }
@@ -360,7 +389,7 @@ async function reconcileRealIndex(root, committedEntries) {
   const input = committedEntries.map((entry) => `${entry.mode} ${entry.blob}\t${entry.path}\0`).join("");
   await execGit(root, ["update-index", "--add", "-z", "--index-info"], {
     input,
-    timeout: GIT_MUTATION_TIMEOUT_MS,
+    timeout: mutationTimeoutMs,
   });
   const verified = await readIndexEntries(root, paths, null);
   return sameIndexEntries(verified, committedEntries)
@@ -538,6 +567,11 @@ function createAutoCommitError(reason) {
 
 function classifyTransactionFailure(error) {
   if (typeof error?.autoCommitReason === "string") return error.autoCommitReason;
+  if (error?.code === "ETIMEDOUT" || error?.killed === true) {
+    return Array.isArray(error?.gitArgs) && error.gitArgs.includes("commit")
+      ? "hook-timeout"
+      : "git-operation-timeout";
+  }
   const output = `${error?.stderr ?? ""}\n${error?.message ?? ""}`.toLowerCase();
   if (output.includes("hook") || output.includes("pre-commit") || output.includes("commit-msg")) {
     return "hook-rejected";

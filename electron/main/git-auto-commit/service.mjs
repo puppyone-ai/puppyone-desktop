@@ -46,10 +46,6 @@ export function createGitAutoCommitService({
       generation: ++generationSequence,
     });
     runtimesByWindow.set(windowId, runtime);
-    runtime.stopActivity = workspaceWatchService.subscribeActivity(root, () => {
-      workspaceMutationTracker.noteActivity(root);
-      runtime.scheduler.markDirty();
-    });
 
     await recoverRuntime(runtime);
     if (!isCurrent(runtime)) return;
@@ -154,8 +150,23 @@ export function createGitAutoCommitService({
       repository: Boolean(runtime.identity),
     });
     runtime.scheduler.setPolicy(runtime.preferences.workspacePolicy, effectiveEnabled);
+    reconcileActivitySubscription(runtime, effectiveEnabled);
     if (markDirty && effectiveEnabled) runtime.scheduler.markDirty();
     publish(runtime);
+  }
+
+  function reconcileActivitySubscription(runtime, effectiveEnabled) {
+    if (!effectiveEnabled) {
+      runtime.stopActivity?.();
+      runtime.stopActivity = null;
+      return;
+    }
+    if (runtime.stopActivity || !isCurrent(runtime)) return;
+    runtime.stopActivity = workspaceWatchService.subscribeActivity(runtime.root, () => {
+      if (!isCurrent(runtime) || !isEffectivelyEnabled(runtime)) return;
+      workspaceMutationTracker.noteActivity(runtime.root);
+      runtime.scheduler.markDirty();
+    });
   }
 
   async function recoverRuntime(runtime) {
@@ -163,6 +174,13 @@ export function createGitAutoCommitService({
     if (!identity?.repository || !isCurrent(runtime)) return;
     runtime.identity = identity;
     runtime.workspaceKey = gitAutoCommitWorkspaceKey(identity);
+    const pending = await transactionJournal.read(runtime.root).catch(() => null);
+    if (!isCurrent(runtime)) return;
+    if (!pending) {
+      settleResult(runtime, serviceResult("needs-review", "journal-invalid", false));
+      return;
+    }
+    if (!pending.record) return;
     const result = await runWithMutationOwnership(runtime, identity, async () => (
       recoverTransaction(runtime.root, {
         identity,
@@ -170,6 +188,7 @@ export function createGitAutoCommitService({
         workspaceKey: runtime.workspaceKey,
       })
     ), { lowPriority: false });
+    if (!isCurrent(runtime)) return;
     if (result && result.reason !== "no-pending-transaction") settleResult(runtime, result);
   }
 

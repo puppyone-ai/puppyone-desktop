@@ -3,11 +3,12 @@ import { createGitAutoCommitDeadlineScheduler } from "../electron/main/git-auto-
 
 function createFakeClock() {
   let now = 0;
+  let wallSkew = 0;
   let sequence = 0;
   const timers = new Map();
   return {
     monotonicNow: () => now,
-    wallNow: () => 1_800_000_000_000 + now,
+    wallNow: () => 1_800_000_000_000 + now + wallSkew,
     setTimeout(callback, delay) {
       const id = ++sequence;
       timers.set(id, { at: now + delay, callback });
@@ -34,6 +35,7 @@ function createFakeClock() {
       await Promise.resolve();
     },
     timerCount: () => timers.size,
+    shiftWall: (milliseconds) => { wallSkew += milliseconds; },
   };
 }
 
@@ -108,5 +110,56 @@ describe("Git Auto Commit deadline scheduler", () => {
     scheduler.setPolicy(policy, false);
     await clock.advance(600_000);
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it("uses monotonic elapsed time when the wall clock moves backwards", async () => {
+    const clock = createFakeClock();
+    const run = vi.fn(async () => ({ retryable: false }));
+    const scheduler = createGitAutoCommitDeadlineScheduler({ run, clock });
+    scheduler.setPolicy(policy, true);
+    scheduler.markDirty();
+    clock.shiftWall(-86_400_000);
+
+    await clock.advance(299_999);
+    expect(run).not.toHaveBeenCalled();
+    await clock.advance(1);
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it("applies one bounded retry deadline instead of spinning after a safe skip", async () => {
+    const clock = createFakeClock();
+    const run = vi.fn()
+      .mockResolvedValueOnce({ retryable: true })
+      .mockResolvedValueOnce({ retryable: false });
+    const scheduler = createGitAutoCommitDeadlineScheduler({ run, clock });
+    scheduler.setPolicy({ minimumIntervalMs: 0, quietPeriodMs: 0 }, true);
+    scheduler.markDirty();
+
+    await clock.advance(0);
+    expect(run).toHaveBeenCalledOnce();
+    await clock.advance(29_999);
+    expect(run).toHaveBeenCalledOnce();
+    await clock.advance(1);
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not schedule trailing work after disposal during an active run", async () => {
+    const clock = createFakeClock();
+    let finish;
+    const run = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
+    const scheduler = createGitAutoCommitDeadlineScheduler({ run, clock });
+    scheduler.setPolicy(policy, true);
+    scheduler.markDirty();
+    await clock.advance(300_000);
+    scheduler.markDirty();
+    scheduler.dispose();
+    finish({ retryable: true });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await clock.advance(600_000);
+    expect(run).toHaveBeenCalledOnce();
+    expect(clock.timerCount()).toBe(0);
+    expect(scheduler.snapshot().state).toBe("disabled");
   });
 });

@@ -66,6 +66,19 @@ describe("workspace Git Auto Commit transaction", () => {
     expect((await fixture.journal.read(fixture.root)).record).toBeNull();
   });
 
+  it("preserves tracked deletions while treating an unstaged rename as one exact new path", async () => {
+    const fixture = await createRepository();
+    await fs.rename(
+      path.join(fixture.root, "tracked.txt"),
+      path.join(fixture.root, "renamed.txt"),
+    );
+
+    await expect(run(fixture)).resolves.toMatchObject({ outcome: "committed", pathCount: 1 });
+    expect((await execGit(fixture.root, ["show", "HEAD:tracked.txt"])).stdout).toBe("baseline\n");
+    expect((await execGit(fixture.root, ["show", "HEAD:renamed.txt"])).stdout).toBe("baseline\n");
+    expect(await statusPorcelain(fixture.root)).toBe(" D tracked.txt\n");
+  });
+
   it("skips when the user already has staged work", async () => {
     const fixture = await createRepository();
     await fs.writeFile(path.join(fixture.root, "tracked.txt"), "staged\n");
@@ -93,6 +106,26 @@ describe("workspace Git Auto Commit transaction", () => {
         await execGit(fixture.root, ["add", "--", "tracked.txt"]);
       },
     });
+    expect(result.outcome).toBe("committed");
+    expect((await execGit(fixture.root, ["diff", "--cached", "--name-only"])).stdout.trim())
+      .toBe("tracked.txt");
+    expect((await execGit(fixture.root, ["show", "--format=", "--name-only", "HEAD"])).stdout.trim())
+      .toBe("new.txt");
+  });
+
+  it("preserves unrelated staging that races immediately after journal preparation", async () => {
+    const fixture = await createRepository();
+    await fs.writeFile(path.join(fixture.root, "tracked.txt"), "external staged\n");
+    await fs.writeFile(path.join(fixture.root, "new.txt"), "new\n");
+
+    const result = await run(fixture, {
+      afterCheckpoint: async (checkpoint) => {
+        if (checkpoint === "journal-prepared") {
+          await execGit(fixture.root, ["add", "--", "tracked.txt"]);
+        }
+      },
+    });
+
     expect(result.outcome).toBe("committed");
     expect((await execGit(fixture.root, ["diff", "--cached", "--name-only"])).stdout.trim())
       .toBe("tracked.txt");
@@ -136,6 +169,37 @@ describe("workspace Git Auto Commit transaction", () => {
     await expect(run(oversized, { maxTotalBytes: 4 })).resolves.toMatchObject({
       reason: "candidate-size-limit",
     });
+
+    const tooMany = await createRepository();
+    await fs.writeFile(path.join(tooMany.root, "one.txt"), "one\n");
+    await fs.writeFile(path.join(tooMany.root, "two.txt"), "two\n");
+    await expect(run(tooMany, { maxPaths: 1 })).resolves.toMatchObject({
+      reason: "candidate-count-limit",
+    });
+  });
+
+  it("fails closed when the repository has unresolved conflicts", async () => {
+    const fixture = await createRepository();
+    await execGit(fixture.root, ["switch", "-c", "conflicting-branch"]);
+    await fs.writeFile(path.join(fixture.root, "tracked.txt"), "branch edit\n");
+    await execGit(fixture.root, ["add", "--", "tracked.txt"]);
+    await execGit(fixture.root, ["commit", "-m", "branch edit"]);
+    await execGit(fixture.root, ["switch", "main"]);
+    await fs.writeFile(path.join(fixture.root, "tracked.txt"), "main edit\n");
+    await execGit(fixture.root, ["add", "--", "tracked.txt"]);
+    await execGit(fixture.root, ["commit", "-m", "main edit"]);
+    await execGit(fixture.root, ["merge", "conflicting-branch"]).catch(() => undefined);
+    // Isolate the index-conflict guard from the separately tested
+    // repository-operation marker guard.
+    await fs.rm(path.join(fixture.identity.gitDir, "MERGE_HEAD"), { force: true });
+    await fs.writeFile(path.join(fixture.root, "new.txt"), "new\n");
+
+    await expect(run(fixture)).resolves.toMatchObject({
+      outcome: "skipped",
+      reason: "conflicts-present",
+    });
+    expect((await execGit(fixture.root, ["diff", "--name-only", "--diff-filter=U"])).stdout.trim())
+      .toBe("tracked.txt");
   });
 
   it("requires a named idle branch and a configured author", async () => {
@@ -179,11 +243,47 @@ describe("workspace Git Auto Commit transaction", () => {
       .toMatch(/Puppyone-Auto-Commit: [0-9a-f-]+/);
   });
 
+  it("runs repository hooks and clean filters against the isolated transaction index", async () => {
+    const fixture = await createRepository();
+    await fs.writeFile(path.join(fixture.root, ".gitattributes"), "*.upper filter=upper\n");
+    await execGit(fixture.root, ["add", "--", ".gitattributes"]);
+    await execGit(fixture.root, ["commit", "-m", "add filter policy"]);
+    await execGit(fixture.root, ["config", "filter.upper.clean", "tr 'a-z' 'A-Z'"]);
+    await execGit(fixture.root, ["config", "filter.upper.required", "true"]);
+    const hookPath = path.join(fixture.identity.gitDir, "hooks", "commit-msg");
+    await fs.writeFile(
+      hookPath,
+      "#!/bin/sh\ntest -n \"$GIT_INDEX_FILE\" || exit 2\ngrep -q 'Puppyone-Auto-Commit:' \"$1\"\n",
+      { mode: 0o700 },
+    );
+    await fs.writeFile(path.join(fixture.root, "filtered.upper"), "mixed Case\n");
+
+    await expect(run(fixture)).resolves.toMatchObject({ outcome: "committed", pathCount: 1 });
+    expect((await execGit(fixture.root, ["show", "HEAD:filtered.upper"])).stdout).toBe("MIXED CASE\n");
+    expect(await statusPorcelain(fixture.root)).toBe("");
+  });
+
   it("reports a fresh preflight candidate set without exposing ignored paths", async () => {
     const fixture = await createRepository();
     await fs.writeFile(path.join(fixture.root, "visible.txt"), "visible\n");
     const preflight = await inspectAutoCommitPreflight(fixture.root, { identity: fixture.identity });
     expect(preflight).toMatchObject({ ok: true, paths: ["visible.txt"], totalBytes: 8 });
+  });
+
+  it("fails closed when the bounded Git status result exceeds its product limit", { timeout: 60_000 }, async () => {
+    const fixture = await createRepository();
+    const count = 10_001;
+    for (let start = 0; start < count; start += 250) {
+      await Promise.all(Array.from({ length: Math.min(250, count - start) }, (_, offset) => (
+        fs.writeFile(
+          path.join(fixture.root, `candidate-${String(start + offset).padStart(5, "0")}.txt`),
+          "",
+        )
+      )));
+    }
+
+    await expect(inspectAutoCommitPreflight(fixture.root, { identity: fixture.identity }))
+      .resolves.toMatchObject({ ok: false, reason: "status-limit" });
   });
 
   it("does not move HEAD when content changes after isolated staging", async () => {
@@ -238,6 +338,24 @@ describe("workspace Git Auto Commit transaction", () => {
     expect(await statusPorcelain(fixture.root)).toBe("?? new.txt\n");
   });
 
+  it("abandons safely when another Git client switches the current branch after staging", async () => {
+    const fixture = await createRepository();
+    await fs.writeFile(path.join(fixture.root, "new.txt"), "new\n");
+    const result = await run(fixture, {
+      afterCheckpoint: async (checkpoint) => {
+        if (checkpoint === "journal-staged") {
+          await execGit(fixture.root, ["switch", "-c", "external-branch"]);
+        }
+      },
+    });
+
+    expect(result).toMatchObject({ outcome: "skipped", reason: "repository-changed" });
+    expect((await execGit(fixture.root, ["branch", "--show-current"])).stdout.trim())
+      .toBe("external-branch");
+    expect(await statusPorcelain(fixture.root)).toBe("?? new.txt\n");
+    expect((await fixture.journal.read(fixture.root)).record).toBeNull();
+  });
+
   it("preserves an externally staged candidate when index ownership becomes ambiguous", async () => {
     const fixture = await createRepository();
     await fs.writeFile(path.join(fixture.root, "new.txt"), "first\n");
@@ -278,6 +396,20 @@ describe("workspace Git Auto Commit transaction", () => {
     expect((await fixture.journal.read(fixture.root)).record).toBeNull();
   });
 
+  it("times out a hanging hook without touching the real index", { timeout: 10_000 }, async () => {
+    const fixture = await createRepository();
+    await fs.writeFile(path.join(fixture.root, "new.txt"), "new\n");
+    const hookPath = path.join(fixture.identity.gitDir, "hooks", "pre-commit");
+    await fs.writeFile(hookPath, "#!/bin/sh\nsleep 2\n", { mode: 0o700 });
+
+    await expect(run(fixture, { mutationTimeoutMs: 50 })).resolves.toMatchObject({
+      outcome: "failed",
+      reason: "hook-timeout",
+    });
+    expect(await statusPorcelain(fixture.root)).toBe("?? new.txt\n");
+    expect((await fixture.journal.read(fixture.root)).record).toBeNull();
+  });
+
   for (const crashPoint of ["prepared", "staged", "committed"]) {
     it(`recovers idempotently after the ${crashPoint} journal phase`, async () => {
       const fixture = await createRepository();
@@ -302,6 +434,71 @@ describe("workspace Git Auto Commit transaction", () => {
     });
   }
 
+  for (const checkpoint of [
+    "journal-prepared",
+    "isolated-index-prepared",
+    "journal-staged",
+    "commit-created",
+    "journal-committed",
+    "commit-verified",
+    "index-reconciled",
+  ]) {
+    it(`recovers idempotently after the ${checkpoint} checkpoint`, async () => {
+      const fixture = await createRepository();
+      await fs.writeFile(path.join(fixture.root, "new.txt"), "new\n");
+      await expect(run(fixture, {
+        afterCheckpoint: (current) => {
+          if (current !== checkpoint) return;
+          const error = new Error(`crash after ${current}`);
+          error.autoCommitCrash = true;
+          throw error;
+        },
+      })).rejects.toMatchObject({ autoCommitCrash: true });
+
+      const recovered = await recoverWorkspaceGitAutoCommit(fixture.root, {
+        identity: fixture.identity,
+        journal: fixture.journal,
+        workspaceKey: fixture.workspaceKey,
+      });
+      const commitExists = [
+        "commit-created",
+        "journal-committed",
+        "commit-verified",
+        "index-reconciled",
+      ].includes(checkpoint);
+      expect(recovered.outcome).toBe(commitExists ? "committed" : "no-op");
+      expect((await fixture.journal.read(fixture.root)).record).toBeNull();
+      expect(await statusPorcelain(fixture.root)).toBe(commitExists ? "" : "?? new.txt\n");
+    });
+  }
+
+  it("preserves an ambiguous journal when workspace identity or branch ownership changes", async () => {
+    const identityChanged = await createRepository();
+    await fs.writeFile(path.join(identityChanged.root, "new.txt"), "new\n");
+    await expect(run(identityChanged, {
+      afterCheckpoint: crashAt("journal-staged"),
+    })).rejects.toMatchObject({ autoCommitCrash: true });
+    await expect(recoverWorkspaceGitAutoCommit(identityChanged.root, {
+      identity: identityChanged.identity,
+      journal: identityChanged.journal,
+      workspaceKey: "f".repeat(64),
+    })).resolves.toMatchObject({ outcome: "needs-review", reason: "workspace-identity-changed" });
+    expect((await identityChanged.journal.read(identityChanged.root)).record).not.toBeNull();
+
+    const branchChanged = await createRepository();
+    await fs.writeFile(path.join(branchChanged.root, "new.txt"), "new\n");
+    await expect(run(branchChanged, {
+      afterCheckpoint: crashAt("journal-staged"),
+    })).rejects.toMatchObject({ autoCommitCrash: true });
+    await execGit(branchChanged.root, ["switch", "-c", "other-branch"]);
+    await expect(recoverWorkspaceGitAutoCommit(branchChanged.root, {
+      identity: branchChanged.identity,
+      journal: branchChanged.journal,
+      workspaceKey: branchChanged.workspaceKey,
+    })).resolves.toMatchObject({ outcome: "needs-review", reason: "branch-changed" });
+    expect((await branchChanged.journal.read(branchChanged.root)).record).not.toBeNull();
+  });
+
   it("recovers a commit that landed before the committed journal write", async () => {
     const fixture = await createRepository();
     await fs.writeFile(path.join(fixture.root, "new.txt"), "new\n");
@@ -322,3 +519,12 @@ describe("workspace Git Auto Commit transaction", () => {
     expect(await statusPorcelain(fixture.root)).toBe("");
   });
 });
+
+function crashAt(expectedCheckpoint) {
+  return (checkpoint) => {
+    if (checkpoint !== expectedCheckpoint) return;
+    const error = new Error(`crash after ${checkpoint}`);
+    error.autoCommitCrash = true;
+    throw error;
+  };
+}

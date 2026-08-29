@@ -31,6 +31,20 @@ describe("Git Auto Commit release capability", () => {
     }).available).toBe(false);
   });
 
+  it("allows an explicit packaged capability and rejects malformed metadata", () => {
+    expect(resolveGitAutoCommitFeatureProfile({
+      packageMetadata: { puppyoneCapabilities: { gitAutoCommit: true } },
+      isPackaged: true,
+    }).available).toBe(true);
+    expect(() => resolvePackagedGitAutoCommitCapability({
+      puppyoneCapabilities: { gitAutoCommit: "yes" },
+    })).toThrow(/must be boolean/i);
+    expect(() => resolvePackagedGitAutoCommitCapability({
+      puppyoneCapabilities: { gitAutoCommit: false },
+      build: { extraMetadata: { puppyoneCapabilities: { gitAutoCommit: "no" } } },
+    })).toThrow(/must be boolean/i);
+  });
+
   it("rejects a builder-only capability override", () => {
     expect(() => resolvePackagedGitAutoCommitCapability({
       puppyoneCapabilities: { gitAutoCommit: false },

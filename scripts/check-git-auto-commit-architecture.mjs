@@ -14,19 +14,35 @@ if (packageMetadata.puppyoneCapabilities?.gitAutoCommit !== false) {
 }
 
 const mainSource = read("electron/main.mjs");
+const hostSource = read("electron/main/git-auto-commit/host.mjs");
 const serviceSource = read("electron/main/git-auto-commit/service.mjs");
 const kernelSource = read("local-api/git/auto-commit.mjs");
 const preferenceSource = read("electron/main/git-auto-commit/preference-store.mjs");
 const preloadSource = read("electron/preload.cjs");
 const settingsSource = read("src/features/settings/main/RepositorySettingsViews.tsx");
+const coverageConfigSource = read("vitest.git-auto-commit.config.mjs");
 
 for (const [snippet, message] of [
   ["gitAutoCommitFeatureProfile.rendererArguments", "Main must issue the renderer capability argument"],
-  ["createGitAutoCommitService", "Main must own the autonomous service"],
-  ["powerMonitor.on(\"resume\", gitAutoCommitService.reconcileAfterResume)", "the scheduler must reconcile after system resume"],
-  ["gitAutoCommitService.reconcileWindow(webContentsId)", "window focus must reconcile potentially missed workspace activity"],
+  ["createGitAutoCommitHost", "Main must compose Auto Commit through its optional-feature host"],
+  ["if (gitAutoCommitHost.available)", "unavailable builds must not install Auto Commit lifecycle hooks"],
+  ["powerMonitor.on(\"resume\", gitAutoCommitHost.reconcileAfterResume)", "the enabled scheduler must reconcile after system resume"],
+  ["gitAutoCommitHost.reconcileWindow(webContentsId)", "window focus must reconcile potentially missed workspace activity"],
 ]) {
   if (!mainSource.includes(snippet)) errors.push(message);
+}
+if (/\.\/main\/git-auto-commit\/(?:service|preference-store|transaction-journal|operation-lease)\.mjs/.test(mainSource)
+  || mainSource.includes("registerGitAutoCommitIpcHandlers")) {
+  errors.push("Main must depend only on the Auto Commit host and feature profile, not feature internals");
+}
+
+for (const [snippet, message] of [
+  ["if (!available) return createUnavailableGitAutoCommitHost()", "the host must short-circuit unavailable releases before constructing feature internals"],
+  ["createGitAutoCommitService", "the host must own service construction"],
+  ["registerGitAutoCommitIpcHandlers", "the host must own optional IPC registration"],
+  ["registerIpcHandlers: () => false", "the unavailable host must expose no IPC handlers"],
+]) {
+  if (!hostSource.includes(snippet)) errors.push(message);
 }
 
 for (const [snippet, message] of [
@@ -34,8 +50,10 @@ for (const [snippet, message] of [
   ["workspaceMutationTracker.whenIdle", "the service must drain Main-owned workspace writes before Git"],
   ["gitOperationCoordinator.tryRunAll", "autonomous work must use low-priority multi-domain Git ownership"],
   ["operationLease.acquire", "autonomous work must acquire cross-process repository ownership"],
+  ["transactionJournal.read(runtime.root)", "startup recovery must inspect its own journal before acquiring Git ownership"],
   ["recoverTransaction", "the service must recover durable transactions"],
   ["isExecutionAllowed", "the service must recheck consent before ref mutation"],
+  ["reconcileActivitySubscription(runtime, effectiveEnabled)", "workspace activity subscription must follow the effective feature gate"],
 ]) {
   if (!serviceSource.includes(snippet)) errors.push(message);
 }
@@ -75,6 +93,22 @@ if (!settingsSource.includes("window.confirm") || !settingsSource.includes("loca
 for (const forbidden of ["setInterval(", "child_process", "execGit(", "workspace:git-commit"]) {
   if (settingsSource.includes(forbidden)) {
     errors.push(`renderer Git Auto Commit settings must not own scheduling or Git execution (${forbidden})`);
+  }
+}
+
+if (!packageMetadata.scripts?.["test:git-auto-commit:coverage"]
+  || !packageMetadata.devDependencies?.["@vitest/coverage-v8"]) {
+  errors.push("Auto Commit must keep a dedicated V8 coverage command and provider");
+}
+for (const snippet of [
+  "electron/main/git-auto-commit/**/*.mjs",
+  "local-api/git/auto-commit.mjs",
+  "thresholds:",
+  "branches: 80",
+  "functions: 80",
+]) {
+  if (!coverageConfigSource.includes(snippet)) {
+    errors.push(`the Auto Commit coverage gate is missing ${snippet}`);
   }
 }
 

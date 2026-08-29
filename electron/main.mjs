@@ -77,7 +77,6 @@ import { registerWorkspaceNavigationIpcHandlers } from "./main/ipc/workspace-nav
 import { registerWorkspaceWatchIpcHandlers } from "./main/ipc/workspace-watch-ipc.mjs";
 import { registerWindowLayoutIpcHandlers } from "./main/ipc/window-layout-ipc.mjs";
 import { registerGitMetadataWatchIpcHandlers } from "./main/ipc/git-metadata-watch-ipc.mjs";
-import { registerGitAutoCommitIpcHandlers } from "./main/ipc/git-auto-commit-ipc.mjs";
 import { registerLocalFileProtocol } from "./main/local-file-protocol.mjs";
 import { createLocalFileCapabilityStore } from "./main/local-file-capabilities.mjs";
 import { installWindowNavigationSecurity, requireNonEmptyString } from "./main/security.mjs";
@@ -121,10 +120,7 @@ import {
 } from "./main/viewer-packs/bootstrap.mjs";
 import { resolveViewerPackFeatureProfile } from "./main/viewer-packs/feature-profile.mjs";
 import { resolveGitAutoCommitFeatureProfile } from "./main/git-auto-commit/feature-profile.mjs";
-import { createGitAutoCommitPreferenceStore } from "./main/git-auto-commit/preference-store.mjs";
-import { createGitAutoCommitTransactionJournal } from "./main/git-auto-commit/transaction-journal.mjs";
-import { createGitAutoCommitOperationLease } from "./main/git-auto-commit/operation-lease.mjs";
-import { createGitAutoCommitService } from "./main/git-auto-commit/service.mjs";
+import { createGitAutoCommitHost } from "./main/git-auto-commit/host.mjs";
 
 // Must run before any console.* / IPC replyWithError logging: broken inherited
 // stdout/stderr (Dock launch, detached child, closed terminal) otherwise throws
@@ -330,14 +326,9 @@ const cloudAuthService = createCloudAuthService({
   revealWindow: revealLastFocusedWindow,
 });
 const gitOperationCoordinator = createGitOperationCoordinator();
-const gitAutoCommitPreferenceStore = createGitAutoCommitPreferenceStore({
-  filePath: path.join(app.getPath("userData"), "git-auto-commit", "preferences.v1.json"),
-});
-const gitAutoCommitService = createGitAutoCommitService({
-  releaseAvailable: gitAutoCommitFeatureProfile.available,
-  preferenceStore: gitAutoCommitPreferenceStore,
-  transactionJournal: createGitAutoCommitTransactionJournal(),
-  operationLease: createGitAutoCommitOperationLease(),
+const gitAutoCommitHost = createGitAutoCommitHost({
+  available: gitAutoCommitFeatureProfile.available,
+  preferenceFilePath: path.join(app.getPath("userData"), "git-auto-commit", "preferences.v1.json"),
   gitOperationCoordinator,
   documentDurabilityCoordinator: documentSessionCloseCoordinator,
   workspaceMutationTracker,
@@ -415,7 +406,7 @@ async function createWindow(options = {}) {
     lastFocusedWindowId = webContentsId;
     const state = windowStateById.get(webContentsId);
     state?.markFocused();
-    gitAutoCommitService.reconcileWindow(webContentsId);
+    gitAutoCommitHost.reconcileWindow(webContentsId);
     if (!window.webContents.isDestroyed()) {
       window.webContents.send("git-repository:window-focus", { focused: true });
     }
@@ -700,7 +691,9 @@ app.whenReady().then(async () => {
     });
   }
   registerIpcHandlers();
-  powerMonitor.on("resume", gitAutoCommitService.reconcileAfterResume);
+  if (gitAutoCommitHost.available) {
+    powerMonitor.on("resume", gitAutoCommitHost.reconcileAfterResume);
+  }
   await telemetryHost.start();
   updateService.start();
   const initialWorkspacePaths = initialLaunchIntent.workspacePath
@@ -747,8 +740,10 @@ app.on("will-quit", () => {
   void terminalAgentActivityHost.dispose();
   terminalAgentLocator.dispose();
   localAgentInventory.dispose();
-  powerMonitor.removeListener("resume", gitAutoCommitService.reconcileAfterResume);
-  gitAutoCommitService.closeAll();
+  if (gitAutoCommitHost.available) {
+    powerMonitor.removeListener("resume", gitAutoCommitHost.reconcileAfterResume);
+  }
+  gitAutoCommitHost.closeAll();
   workspaceWatchService.closeAll();
   gitMetadataWatchService.closeAll();
 });
@@ -886,10 +881,9 @@ function registerIpcHandlers() {
     gitOperationCoordinator,
     t: (messageId, values) => localeService.t(messageId, values),
   });
-  registerGitAutoCommitIpcHandlers({
+  gitAutoCommitHost.registerIpcHandlers({
     ipcMain: trustedIpcMain,
     authorizeWorkspaceRoot,
-    gitAutoCommitService,
   });
   registerTerminalIpcHandlers({
     ipcMain: trustedIpcMain,
@@ -1258,7 +1252,7 @@ function assignWindowWorkspaceComposition(window, folders, options = {}) {
   state.replaceFolders(folders);
   for (const folder of folders) workspaceWindowByPath.set(folder.path, window);
   const primaryPath = folders[0]?.path ?? null;
-  if (primaryPath) void gitAutoCommitService.assignWorkspace(window.webContents, primaryPath).catch((error) => {
+  if (primaryPath) void gitAutoCommitHost.assignWorkspace(window.webContents, primaryPath).catch((error) => {
     console.warn("Unable to initialize Git Auto Commit for workspace:", error);
   });
   window.setTitle(window.isFullScreen() ? "" : resolveWindowTitle(window));
@@ -1277,7 +1271,7 @@ function releaseWindowWorkspace(window) {
 }
 
 function releaseWindowWorkspaceById(webContentsId, window = null) {
-  gitAutoCommitService.releaseWindow(webContentsId);
+  gitAutoCommitHost.releaseWindow(webContentsId);
   viewerPackHost?.destroySessionsForOwner(webContentsId);
   localFileCapabilities.revokeSender(webContentsId);
   const state = windowStateById.get(webContentsId);
