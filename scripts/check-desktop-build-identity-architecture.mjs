@@ -74,16 +74,6 @@ if (
 ) {
   errors.push("the shipped v0.1.4 Stable feed contract must remain registered");
 }
-const configuredStableProvider = packageMetadata.build?.publish?.find?.(
-  (provider) => provider?.provider === "generic",
-);
-if (
-  configuredStableProvider?.url !== DESKTOP_STABLE_UPDATE_FEED_URL
-  || configuredStableProvider?.channel !== "stable"
-) {
-  errors.push("package.json must embed the canonical Stable machine update feed");
-}
-
 const identities = {
   dev: resolveDesktopBuildIdentity({
     baseVersion: packageMetadata.version,
@@ -103,6 +93,17 @@ const identities = {
     commitSha,
   }),
 };
+
+const configuredStableProvider = createDesktopElectronBuilderConfig({
+  packageMetadata,
+  buildInfo: identities.stable,
+}).publish?.find?.((provider) => provider?.provider === "generic");
+if (
+  configuredStableProvider?.url !== DESKTOP_STABLE_UPDATE_FEED_URL
+  || configuredStableProvider?.channel !== "stable"
+) {
+  errors.push("the generated Stable target config must embed the canonical machine update feed");
+}
 
 for (const channel of DESKTOP_BUILD_CHANNELS) {
   const config = createDesktopElectronBuilderConfig({

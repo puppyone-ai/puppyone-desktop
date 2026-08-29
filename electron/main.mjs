@@ -46,6 +46,7 @@ import { registerAgentActivityIpcHandlers } from "./main/ipc/agent-activity-ipc.
 import { registerAppearanceIpcHandlers } from "./main/ipc/appearance-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerBuildInfoIpcHandlers } from "./main/ipc/build-info-ipc.mjs";
+import { registerPlatformIpcHandlers } from "./main/ipc/platform-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
 import { registerCloudPublishIpcHandlers } from "./main/ipc/cloud-publish-ipc.mjs";
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
@@ -97,9 +98,9 @@ import {
   DESKTOP_WINDOW_MIN_WIDTH,
 } from "./main/window-layout-contract.mjs";
 import {
-  DEFAULT_MACOS_WINDOW_BUTTON_POSITION,
   reapplyWindowChromeProfile,
 } from "./main/window-chrome-profile.mjs";
+import { createDesktopPlatformHost } from "./main/platform/create-platform-host.mjs";
 import { DEFAULT_INTERFACE_STYLE_FIRST_PAINT } from "./main/interface-style-first-paint.generated.mjs";
 import { createGitOperationCoordinator } from "./main/git-operation-coordinator.mjs";
 import { createCloudPublishCoordinator } from "./main/cloud-publish-coordinator.mjs";
@@ -133,6 +134,9 @@ const desktopApplicationIdentity = configureDesktopApplicationIdentity({
   app,
   buildInfo: desktopBuildInfo,
 });
+const desktopPlatformHost = createDesktopPlatformHost({
+  safeStorage,
+});
 const appName = desktopApplicationIdentity.applicationName;
 
 // Resolve only core launch data before the single-instance boundary. A
@@ -156,15 +160,7 @@ const viewerPackFeatureProfile = resolveViewerPackFeatureProfile({
   isPackaged: app.isPackaged,
 });
 const workspaceStateFilename = "desktop-workspace-state.json";
-const macTitlebarOptions = process.platform === "darwin"
-  ? {
-      titleBarStyle: "hiddenInset",
-      titleBarOverlay: true,
-      trafficLightPosition: DEFAULT_MACOS_WINDOW_BUTTON_POSITION,
-    }
-  : {
-      titleBarStyle: "default",
-    };
+const desktopWindowChromeOptions = desktopPlatformHost.windowChrome.browserWindowOptions;
 
 const privilegedSchemes = [
   {
@@ -338,7 +334,7 @@ async function createWindow(options = {}) {
     backgroundColor: nativeTheme.shouldUseDarkColors
       ? DEFAULT_INTERFACE_STYLE_FIRST_PAINT.dark.background
       : DEFAULT_INTERFACE_STYLE_FIRST_PAINT.light.background,
-    ...macTitlebarOptions,
+    ...desktopWindowChromeOptions,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -501,13 +497,11 @@ function revealWindow(window) {
   lastFocusedWindowId = window.webContents.id;
   const state = windowStateById.get(window.webContents.id);
   if (state) state.lastFocusedAt = Date.now();
-  if (process.platform === "darwin") {
-    app.focus({ steal: true });
-  }
+  desktopPlatformHost.windowChrome.focusApplication(app);
 }
 
 function reapplyNativeWindowChrome(window) {
-  if (process.platform !== "darwin" || !window || window.isDestroyed()) return;
+  if (!desktopPlatformHost.windowChrome.shouldReapplyProfile || !window || window.isDestroyed()) return;
   reapplyWindowChromeProfile(window);
   // AppKit can recreate the traffic-light views after emitting a window
   // lifecycle event. A second pass on the next main-loop turn keeps the
@@ -562,7 +556,7 @@ function resolveAppIconPath() {
 }
 
 function setDefaultDockIcon() {
-  if (process.platform !== "darwin" || !app.dock) return;
+  if (!desktopPlatformHost.windowChrome.supportsDockIcon || !app.dock) return;
   const iconPath = resolveAppIconPath();
   if (!iconPath) return;
   try {
@@ -602,9 +596,7 @@ app.whenReady().then(async () => {
   stopLocaleNativeRefresh = localeService.onDidChange(() => {
     nativeMenuService.refresh();
   });
-  if (process.platform === "darwin" && app.dock) {
-    setDefaultDockIcon();
-  }
+  setDefaultDockIcon();
   nativeMenuService.refresh();
 
   registerLocalFileProtocol({
@@ -742,6 +734,10 @@ function registerIpcHandlers() {
     ipcMain: trustedIpcMain,
     buildInfo: desktopBuildInfo,
   });
+  registerPlatformIpcHandlers({
+    ipcMain: trustedIpcMain,
+    platformHost: desktopPlatformHost,
+  });
   registerTelemetryIpcHandlers({
     ipcMain: trustedIpcMain,
     telemetryService: telemetryHost.service,
@@ -800,6 +796,7 @@ function registerIpcHandlers() {
     fs,
     shell,
     authorizeWorkspaceRoot,
+    convertOfficeDocument: desktopPlatformHost.documents.convertOfficeDocumentToDocx,
     localFileCapabilities,
     workspaceWatchService,
     gitMetadataWatchService,

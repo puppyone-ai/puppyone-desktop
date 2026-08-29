@@ -37,6 +37,7 @@ import {
   type ExperimentalSettings,
 } from "../../preferences";
 import { createUnconfiguredAppPreviewManifestContent } from "../../../shared/appPreviewManifest.js";
+import { useDesktopPlatformCapabilities } from "../../platform/useDesktopPlatformCapabilities";
 import {
   getConfiguredCreateEntryMenuItems,
   getCreateEntryMenuItem,
@@ -605,6 +606,8 @@ function DesktopNodeActionPopover({
   onRevealInFinder: () => void;
 }) {
   const { t } = useLocalization();
+  const platformCapabilities = useDesktopPlatformCapabilities();
+  const primaryModifier = platformCapabilities?.primaryModifier ?? "control";
   const menuRef = useRef<HTMLDivElement>(null);
   const actionCount = Math.max(1, draft.nodes.length);
   const singleNodeAction = actionCount === 1;
@@ -667,7 +670,7 @@ function DesktopNodeActionPopover({
         <DesktopNodeActionMenuItem
           icon={<ClipboardPaste size={14} />}
           label={t("workspace.node.pasteIntoFolder")}
-          shortcut={getPlatformShortcut("V")}
+          shortcut={getPlatformShortcut("V", primaryModifier)}
           disabled={draft.operation !== null || !canPaste}
           onClick={onPaste}
         />
@@ -676,14 +679,14 @@ function DesktopNodeActionPopover({
       <DesktopNodeActionMenuItem
         icon={<Copy size={14} />}
         label={t("workspace.node.copyItems", { count: actionCount })}
-        shortcut={getPlatformShortcut("C")}
+        shortcut={getPlatformShortcut("C", primaryModifier)}
         disabled={draft.operation !== null || !canCopy}
         onClick={onCopy}
       />
       <DesktopNodeActionMenuItem
         icon={<Scissors size={14} />}
         label={t("workspace.node.cutItems", { count: actionCount })}
-        shortcut={getPlatformShortcut("X")}
+        shortcut={getPlatformShortcut("X", primaryModifier)}
         disabled={draft.operation !== null || !canCut}
         onClick={onCut}
       />
@@ -692,7 +695,7 @@ function DesktopNodeActionPopover({
         label={draft.operation === "duplicate"
           ? t("workspace.node.duplicating")
           : t("workspace.node.duplicateItems", { count: actionCount })}
-        shortcut={getPlatformShortcut("D")}
+        shortcut={getPlatformShortcut("D", primaryModifier)}
         disabled={draft.operation !== null || !canDuplicate}
         onClick={onDuplicate}
       />
@@ -921,9 +924,8 @@ function DesktopNodeActionMenuItem({
   );
 }
 
-function getPlatformShortcut(key: string): string {
-  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
-  return isMac ? `⌘${key}` : `Ctrl+${key}`;
+function getPlatformShortcut(key: string, primaryModifier: "meta" | "control"): string {
+  return primaryModifier === "meta" ? `⌘${key}` : `Ctrl+${key}`;
 }
 
 function CreateEntryGlyph({

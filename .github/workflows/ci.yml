@@ -10,6 +10,50 @@ permissions:
   contents: read
 
 jobs:
+  resolve-desktop-targets:
+    name: Resolve Desktop targets
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Resolve target manifest
+        id: targets
+        shell: bash
+        run: echo "matrix=$(node scripts/print-desktop-target-matrix.mjs --scope contracts)" >> "${GITHUB_OUTPUT}"
+
+  platform-contracts:
+    name: Platform contracts (${{ matrix.id }})
+    needs: resolve-desktop-targets
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.resolve-desktop-targets.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Test target contracts
+        run: npm run test:desktop-platform-contracts
+
   build:
     name: Build
     runs-on: ubuntu-latest

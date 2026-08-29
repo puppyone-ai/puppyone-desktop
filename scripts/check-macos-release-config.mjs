@@ -13,12 +13,26 @@ import {
   inspectUpdateFeedMonitorWorkflow,
 } from "./release-support/internal-release-workflow-policy.mjs";
 import { inspectMacReleaseReadiness } from "./release-support/macos-release-policy.mjs";
+import { resolveDesktopBuildIdentity } from "../shared/desktop-build-identity.mjs";
+import { createDesktopElectronBuilderConfig } from "../tooling/desktop/build/create-builder-config.mjs";
+import { getDesktopTargetDefinition } from "../tooling/desktop/targets/target-manifest.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const packageMetadata = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
-const errors = inspectMacReleaseReadiness({
+const stableMacConfig = createDesktopElectronBuilderConfig({
   packageMetadata,
+  buildInfo: resolveDesktopBuildIdentity({
+    baseVersion: packageMetadata.version,
+    buildNumber: 1,
+    builtAt: "2026-01-01T00:00:00.000Z",
+    channel: "stable",
+    commitSha: "a".repeat(40),
+  }),
+  target: getDesktopTargetDefinition("macos-arm64"),
+});
+const errors = inspectMacReleaseReadiness({
+  packageMetadata: { ...packageMetadata, build: stableMacConfig },
   platform: "darwin",
   env: {
     CSC_LINK: "configured-by-ci",
@@ -30,22 +44,22 @@ const errors = inspectMacReleaseReadiness({
 });
 
 const scripts = packageMetadata.scripts ?? {};
-if (packageMetadata.build?.afterPack !== "scripts/after-pack-macos-app-image.mjs") {
+if (stableMacConfig.afterPack !== "scripts/after-pack-macos-app-image.mjs") {
   errors.push("macOS packaging must install the canonical authored App Image");
 }
 const canonicalAppImagePath = "assets/brand/puppy/puppy-app-image.png";
 const developmentAppImagePath = "assets/brand/puppy/puppy-app-image-dev.png";
 readFileSync(path.join(repoRoot, canonicalAppImagePath));
 readFileSync(path.join(repoRoot, developmentAppImagePath));
-if (packageMetadata.build?.mac?.icon !== canonicalAppImagePath) {
+if (stableMacConfig.mac?.icon !== canonicalAppImagePath) {
   errors.push("the macOS application icon must use the canonical authored App Image");
 }
-if (!packageMetadata.build?.extraResources?.some((entry) => (
+if (!stableMacConfig.extraResources?.some((entry) => (
   entry?.from === canonicalAppImagePath && entry?.to === "puppy-app-image.png"
 ))) {
   errors.push("the canonical App Image must be copied into native app resources");
 }
-const dmg = packageMetadata.build?.dmg ?? {};
+const dmg = stableMacConfig.dmg ?? {};
 const expectedDmgContents = [
   { x: 200, y: 204 },
   { x: 520, y: 204, type: "link", path: "/Applications" },
@@ -125,7 +139,7 @@ errors.push(...inspectUpdateFeedMonitorWorkflow(updateFeedMonitorWorkflow));
 
 try {
   const { validateConfiguration } = require("app-builder-lib/out/util/config/config.js");
-  await validateConfiguration(packageMetadata.build, { isEnabled: false, add() {} });
+  await validateConfiguration(stableMacConfig, { isEnabled: false, add() {} });
 } catch (error) {
   errors.push(`electron-builder rejected the production configuration: ${error.message}`);
 }

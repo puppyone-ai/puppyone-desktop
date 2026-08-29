@@ -6,17 +6,17 @@ import {
   createDesktopBuildR2Prefix,
   createDesktopBuildReleaseName,
   createDesktopBuildTag,
-  getDesktopBuildChannelPolicy,
   resolveDesktopBuildIdentity,
 } from "../../shared/desktop-build-identity.mjs";
+import { createDesktopImmutableReleasePrefix } from "../../shared/desktop/distribution-contract.mjs";
+import { createDesktopTargetFromNode } from "../../shared/desktop/platform-contract.mjs";
+import {
+  createDesktopElectronBuilderConfig as createTargetDesktopElectronBuilderConfig,
+} from "../../tooling/desktop/build/create-builder-config.mjs";
+import { getDesktopTargetDefinition } from "../../tooling/desktop/targets/target-manifest.mjs";
 
 export const DEFAULT_BUILD_INFO_PATH = "generated/desktop-build-info.json";
 export const DEFAULT_BUILDER_CONFIG_PATH = "generated/electron-builder.json";
-const APP_IMAGE_SOURCE_BY_CHANNEL = Object.freeze({
-  dev: "assets/brand/puppy/puppy-app-image-dev.png",
-  internal: "assets/brand/puppy/puppy-app-image.png",
-  stable: "assets/brand/puppy/puppy-app-image.png",
-});
 
 export async function prepareDesktopBuild({
   repositoryRoot,
@@ -28,6 +28,7 @@ export async function prepareDesktopBuild({
   expectedTag = null,
   buildInfoPath = DEFAULT_BUILD_INFO_PATH,
   builderConfigPath = DEFAULT_BUILDER_CONFIG_PATH,
+  target = null,
 } = {}) {
   const root = path.resolve(repositoryRoot ?? process.cwd());
   const packageMetadata = JSON.parse(
@@ -50,10 +51,12 @@ export async function prepareDesktopBuild({
 
   const relativeBuildInfoPath = normalizeRepositoryRelativePath(root, buildInfoPath);
   const relativeBuilderConfigPath = normalizeRepositoryRelativePath(root, builderConfigPath);
+  const targetDefinition = getDesktopTargetDefinition(target ?? createDesktopTargetFromNode());
   const builderConfig = createDesktopElectronBuilderConfig({
     packageMetadata,
     buildInfo,
     buildInfoPath: relativeBuildInfoPath,
+    target: targetDefinition,
   });
 
   await writeJsonAtomic(path.join(root, relativeBuildInfoPath), buildInfo);
@@ -64,10 +67,19 @@ export async function prepareDesktopBuild({
     buildInfoPath: relativeBuildInfoPath,
     builderConfig,
     builderConfigPath: relativeBuilderConfigPath,
+    target: targetDefinition,
     tag,
     releaseName: createDesktopBuildReleaseName(buildInfo),
     artifactName: tag ? `puppyone-desktop-${tag}` : `puppyone-desktop-${buildInfo.version}`,
-    r2Prefix: tag ? createDesktopBuildR2Prefix(buildInfo) : null,
+    r2Prefix: tag
+      ? targetDefinition.platform === "macos"
+        ? createDesktopBuildR2Prefix(buildInfo)
+        : createDesktopImmutableReleasePrefix({
+            releaseTag: tag,
+            channel: buildInfo.channel,
+            target: targetDefinition,
+          })
+      : null,
   });
 }
 
@@ -75,71 +87,14 @@ export function createDesktopElectronBuilderConfig({
   packageMetadata,
   buildInfo,
   buildInfoPath = DEFAULT_BUILD_INFO_PATH,
+  target,
 }) {
-  const identity = assertDesktopBuildInfo(buildInfo);
-  const policy = getDesktopBuildChannelPolicy(identity.channel);
-  const baseBuild = structuredClone(packageMetadata?.build ?? {});
-  const extraResources = Array.isArray(baseBuild.extraResources)
-    ? [...baseBuild.extraResources]
-    : [];
-  const appImageSource = APP_IMAGE_SOURCE_BY_CHANNEL[identity.channel];
-  const withoutManagedResources = extraResources.filter((entry) => (
-    entry?.to !== "build-info.json" && entry?.to !== "puppy-app-image.png"
-  ));
-  withoutManagedResources.push({
-    from: appImageSource,
-    to: "puppy-app-image.png",
+  return createTargetDesktopElectronBuilderConfig({
+    packageMetadata,
+    buildInfo,
+    buildInfoPath,
+    target,
   });
-  withoutManagedResources.push({
-    from: buildInfoPath,
-    to: "build-info.json",
-  });
-  const config = {
-    ...baseBuild,
-    appId: policy.applicationId,
-    productName: policy.applicationName,
-    executableName: policy.applicationName,
-    artifactName: "puppyone-${version}-${arch}.${ext}",
-    buildVersion: identity.platformBuildNumber ?? identity.baseVersion,
-    extraMetadata: {
-      ...(baseBuild.extraMetadata ?? {}),
-      version: identity.version,
-    },
-    extraResources: withoutManagedResources,
-    publish: policy.updateFeedUrl
-      ? [{
-          provider: "generic",
-          url: policy.updateFeedUrl,
-          channel: policy.updateChannel,
-        }]
-      : [],
-    mac: {
-      ...(baseBuild.mac ?? {}),
-      icon: appImageSource,
-      executableName: policy.applicationName,
-      bundleShortVersion: identity.baseVersion,
-      bundleVersion: identity.platformBuildNumber ?? identity.baseVersion,
-      ...(identity.channel === "stable"
-        ? {}
-        : {
-            identity: "-",
-            hardenedRuntime: false,
-            notarize: false,
-            strictVerify: false,
-          }),
-      extendInfo: {
-        ...(baseBuild.mac?.extendInfo ?? {}),
-        CFBundleName: policy.applicationName,
-        CFBundleDisplayName: policy.applicationName,
-      },
-    },
-    dmg: {
-      ...(baseBuild.dmg ?? {}),
-      artifactName: "puppyone-${version}-${arch}.${ext}",
-    },
-  };
-
-  return config;
 }
 
 export function readGitCommit(repositoryRoot) {

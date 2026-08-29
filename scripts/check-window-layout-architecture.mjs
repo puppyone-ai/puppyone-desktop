@@ -17,6 +17,7 @@ const desktopShellSource = read("src/components/DesktopCloudShell.tsx");
 const preloadSource = read("electron/preload.cjs");
 const windowLayoutIpcSource = read("electron/main/ipc/window-layout-ipc.mjs");
 const windowChromeProfileSource = read("electron/main/window-chrome-profile.mjs");
+const macosPlatformSource = read("electron/main/platform/macos/index.mjs");
 
 const rendererWidthMatch = tokensCss.match(/--desktop-window-min-width:\s*(\d+)px;/);
 const rendererMinWidth = rendererWidthMatch ? Number(rendererWidthMatch[1]) : null;
@@ -52,7 +53,10 @@ if (!windowLayoutIpcSource.includes("Math.max(DESKTOP_WINDOW_MIN_WIDTH, requeste
 if (!desktopShellSource.includes("paneLayout.minimumWidth")) {
   errors.push("DesktopCloudShell must publish its resolved pane minimum to the native window.");
 }
-if (!mainSource.includes("trafficLightPosition: DEFAULT_MACOS_WINDOW_BUTTON_POSITION,")) {
+if (
+  !mainSource.includes("desktopPlatformHost.windowChrome.browserWindowOptions")
+  || !macosPlatformSource.includes("trafficLightPosition: DEFAULT_MACOS_WINDOW_BUTTON_POSITION,")
+) {
   errors.push("BrowserWindow and runtime chrome switching must share the reviewed Default traffic-light position.");
 }
 if (!windowLayoutIpcSource.includes("applyWindowChromeProfile(ownerWindow, request?.titlebar)")) {

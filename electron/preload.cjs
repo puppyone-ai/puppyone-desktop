@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     });
   },
   getBuildInfo: () => ipcRenderer.invoke("build-info:get"),
+  getPlatformCapabilities: () => ipcRenderer.invoke("platform:get-capabilities"),
   getTelemetryState: () => ipcRenderer.invoke("telemetry:get-state"),
   getTelemetryDisclosure: () => ipcRenderer.invoke("telemetry:get-disclosure"),
   markTelemetryNoticeSeen: () => ipcRenderer.invoke("telemetry:mark-notice-seen"),

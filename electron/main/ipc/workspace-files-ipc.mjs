@@ -2,7 +2,6 @@ import path from "node:path";
 import {
   copyWorkspaceEntry,
   createWorkspaceEntry,
-  convertWorkspaceOfficeDocumentToDocx,
   deleteWorkspaceEntry,
   getMimeType,
   importWorkspaceEntries,
@@ -62,7 +61,7 @@ export function registerWorkspaceFileIpcHandlers({
   localFileCapabilities,
   workspaceWatchService = null,
   gitMetadataWatchService = null,
-  convertOfficeDocument = convertWorkspaceOfficeDocumentToDocx,
+  convertOfficeDocument = unsupportedOfficeDocumentConverter,
   t = defaultTranslate,
 }) {
   const officeConversionSessionsBySender = new Map();
@@ -361,6 +360,10 @@ export function registerWorkspaceFileIpcHandlers({
     return { ok: true };
   });
 
+}
+
+async function unsupportedOfficeDocumentConverter() {
+  throw new Error("Desktop Office conversion is unavailable on this platform.");
 }
 
 function requireOfficeConversionRequestId(value) {

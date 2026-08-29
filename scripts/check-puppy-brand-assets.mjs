@@ -3,6 +3,9 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveDesktopBuildIdentity } from "../shared/desktop-build-identity.mjs";
+import { createDesktopElectronBuilderConfig } from "../tooling/desktop/build/create-builder-config.mjs";
+import { getDesktopTargetDefinition } from "../tooling/desktop/targets/target-manifest.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const nativeBrandDirectory = "assets/brand/puppy";
@@ -92,10 +95,21 @@ if (assetBuffers.get("dark")?.equals(assetBuffers.get("lite"))) {
 }
 
 const packageMetadata = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
-if (packageMetadata.build?.mac?.icon !== canonicalAssets.appImage) {
+const stableMacConfig = createDesktopElectronBuilderConfig({
+  packageMetadata,
+  buildInfo: resolveDesktopBuildIdentity({
+    baseVersion: packageMetadata.version,
+    buildNumber: 1,
+    builtAt: "2026-01-01T00:00:00.000Z",
+    channel: "stable",
+    commitSha: "a".repeat(40),
+  }),
+  target: getDesktopTargetDefinition("macos-arm64"),
+});
+if (stableMacConfig.mac?.icon !== canonicalAssets.appImage) {
   errors.push(`electron-builder mac.icon must be ${canonicalAssets.appImage}`);
 }
-const canonicalExtraResource = packageMetadata.build?.extraResources?.find((entry) => (
+const canonicalExtraResource = stableMacConfig.extraResources?.find((entry) => (
   entry?.to === "puppy-app-image.png"
 ));
 if (canonicalExtraResource?.from !== canonicalAssets.appImage) {

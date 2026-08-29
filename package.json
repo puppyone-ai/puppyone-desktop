@@ -20,7 +20,7 @@
     "generate:dmg-background": "node scripts/render-dmg-background.mjs",
     "generate:interface-styles": "node scripts/generate-interface-styles.mjs",
     "check:interface-styles": "node scripts/generate-interface-styles.mjs --check",
-    "check:boundaries": "npm run check:interface-styles && node scripts/check-repository-layout.mjs && node scripts/check-puppy-brand-assets.mjs && node scripts/check-renderer-asset-architecture.mjs && node scripts/check-test-fixture-privacy.mjs && node scripts/check-local-workspace-architecture.mjs && node scripts/check-cloud-frontend-architecture.mjs && node scripts/check-repository-target-architecture.mjs && node scripts/check-desktop-build-identity-architecture.mjs && node scripts/check-desktop-telemetry-architecture.mjs && node scripts/check-macos-release-config.mjs && node scripts/check-localization.mjs && node scripts/check-renderer-style-architecture.mjs && node scripts/check-window-layout-architecture.mjs && node scripts/check-native-surface-layering.mjs && node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-editor-document-session.mjs && node scripts/check-sidebar-architecture.mjs && node scripts/check-agent-architecture.mjs && node scripts/check-agent-activity-architecture.mjs && node scripts/check-opencode-provenance.mjs && node scripts/check-claude-agent-sdk-provenance.mjs && node scripts/check-agent-ui-provenance.mjs && node scripts/check-automation-plugin-boundaries.mjs",
+    "check:boundaries": "npm run check:interface-styles && node scripts/check-repository-layout.mjs && node scripts/check-puppy-brand-assets.mjs && node scripts/check-renderer-asset-architecture.mjs && node scripts/check-test-fixture-privacy.mjs && node scripts/check-local-workspace-architecture.mjs && node scripts/check-cloud-frontend-architecture.mjs && node scripts/check-repository-target-architecture.mjs && node scripts/check-desktop-platform-architecture.mjs && node scripts/check-desktop-build-identity-architecture.mjs && node scripts/check-desktop-telemetry-architecture.mjs && node scripts/check-macos-release-config.mjs && node scripts/check-localization.mjs && node scripts/check-renderer-style-architecture.mjs && node scripts/check-window-layout-architecture.mjs && node scripts/check-native-surface-layering.mjs && node scripts/check-data-ui-boundaries.mjs && node scripts/check-markdown-architecture.mjs && node scripts/check-viewer-contract.mjs && node scripts/check-editor-document-session.mjs && node scripts/check-sidebar-architecture.mjs && node scripts/check-agent-architecture.mjs && node scripts/check-agent-activity-architecture.mjs && node scripts/check-opencode-provenance.mjs && node scripts/check-claude-agent-sdk-provenance.mjs && node scripts/check-agent-ui-provenance.mjs && node scripts/check-automation-plugin-boundaries.mjs",
     "check:puppy-brand-assets": "node scripts/check-puppy-brand-assets.mjs",
     "check:renderer-assets": "node scripts/check-renderer-asset-architecture.mjs",
     "check:test-fixture-privacy": "node scripts/check-test-fixture-privacy.mjs",
@@ -73,6 +73,7 @@
     "smoke:csv-performance": "npm run build && node scripts/run-csv-editor-performance-smoke.mjs",
     "start": "node scripts/start-electron.mjs",
     "test": "vitest run",
+    "test:desktop-platform-contracts": "vitest run tests/desktopPlatformArchitecture.test.mjs tests/desktopReleaseSet.test.mjs tests/desktopBuildIdentity.test.mjs tests/electron.build-info-service.test.mjs tests/electron.platform-host.test.mjs tests/electron.terminal-agent-launch.test.mjs tests/electron.cloud-publish-git-credentials.test.mjs",
     "test:desktop-telemetry": "vitest run tests/electron.desktop-telemetry-*.test.mjs tests/cloudflare.desktop-telemetry-*.test.mjs",
     "check:desktop-telemetry-edge": "wrangler deploy --dry-run --config cloudflare/desktop-telemetry/wrangler.jsonc",
     "test:watch": "vitest",
@@ -141,10 +142,6 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "build": {
-    "afterPack": "scripts/after-pack-macos-app-image.mjs",
-    "appId": "ai.puppyone.desktop",
-    "productName": "puppyone",
-    "executableName": "puppyone",
     "electronUpdaterCompatibility": ">=2.16",
     "asar": true,
     "asarUnpack": [
@@ -171,63 +168,12 @@
     ],
     "extraResources": [
       {
-        "from": "assets/brand/puppy/puppy-app-image.png",
-        "to": "puppy-app-image.png"
-      },
-      {
         "from": "vendor/opencode",
         "to": "opencode",
         "filter": [
           "**/*"
         ]
       }
-    ],
-    "publish": [
-      {
-        "provider": "generic",
-        "url": "https://updates.puppyone.ai/desktop/stable/mac/latest",
-        "channel": "stable"
-      }
-    ],
-    "mac": {
-      "category": "public.app-category.productivity",
-      "icon": "assets/brand/puppy/puppy-app-image.png",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "strictVerify": true,
-      "notarize": true,
-      "executableName": "puppyone",
-      "extendInfo": {
-        "CFBundleName": "puppyone",
-        "CFBundleDisplayName": "puppyone"
-      },
-      "target": [
-        "dmg",
-        "zip"
-      ]
-    },
-    "dmg": {
-      "artifactName": "${productName}-${version}-${arch}.${ext}",
-      "title": "${productName} Installer",
-      "background": "build/dmg-background.tiff",
-      "iconSize": 128,
-      "iconTextSize": 14,
-      "window": {
-        "width": 720,
-        "height": 440
-      },
-      "contents": [
-        {
-          "x": 200,
-          "y": 204
-        },
-        {
-          "x": 520,
-          "y": 204,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
-    }
+    ]
   }
 }

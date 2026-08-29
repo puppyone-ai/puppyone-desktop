@@ -1,10 +1,7 @@
 import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
-import { execFile } from "node:child_process";
 import crypto from "node:crypto";
-import { promisify } from "node:util";
 import {
   classifyLocalFile,
   getMimeType,
@@ -84,9 +81,6 @@ const MAX_LOCAL_FILE_BYTES = 100 * 1024 * 1024;
 // Maximum length of one buffered random-access read. Media protocol responses
 // use the separate backpressured stream path below.
 const MAX_RANGE_READ_BYTES = 8 * 1024 * 1024;
-const MAX_OFFICE_CONVERSION_INPUT_BYTES = 25 * 1024 * 1024;
-const MAX_OFFICE_CONVERSION_OUTPUT_BYTES = 8 * 1024 * 1024;
-const OFFICE_CONVERSION_TIMEOUT_MS = 8000;
 const GIT_HISTORY_LIMIT = 100;
 const GIT_ALL_BRANCH_HISTORY_LIMIT = 320;
 const GIT_REMOTE_PREVIEW_LIMIT = 12;
@@ -95,7 +89,6 @@ const GIT_STATUS_RECORD_LIMIT = (GIT_STATUS_ENTRY_LIMIT * 2) + 32;
 const GIT_DETAIL_MAX_TOTAL_DIFF_LINES = 4000;
 const GIT_DETAIL_MAX_FILE_DIFF_LINES = 900;
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
-const execFileAsync = promisify(execFile);
 const {
   chooseGitSyncTarget,
   choosePuppyoneRemoteName,
@@ -470,80 +463,6 @@ export async function readWorkspaceTextFile(rootPath, relativePath) {
     size: formatFileSize(metadata.size),
     version: getWorkspaceTextVersion(bytes),
   };
-}
-
-export async function convertWorkspaceOfficeDocumentToDocx(rootPath, relativePath, options = undefined) {
-  if (process.platform !== "darwin") {
-    throw new Error("Desktop Office conversion is only available on macOS.");
-  }
-  if (options?.signal?.aborted) {
-    throw new Error("Office conversion was cancelled.");
-  }
-
-  const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
-  const metadata = await fs.stat(filePath).catch((error) => {
-    throw new Error(`Unable to read file metadata: ${error.message}`);
-  });
-
-  if (metadata.isDirectory()) {
-    throw new Error("Selected path is a folder.");
-  }
-  if (metadata.size > MAX_OFFICE_CONVERSION_INPUT_BYTES) {
-    throw new Error(`File is larger than the ${formatFileSize(MAX_OFFICE_CONVERSION_INPUT_BYTES)} Office preview limit.`);
-  }
-
-  const extension = path.extname(filePath).toLowerCase();
-  if (extension !== ".doc" && extension !== ".rtf") {
-    throw new Error("Only .doc and .rtf files can be converted by this preview bridge.");
-  }
-
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "puppyone-office-"));
-  const outputPath = path.join(tempDir, `${path.basename(filePath, extension)}.docx`);
-  let stderr = "";
-
-  try {
-    const result = await execFileAsync("textutil", ["-convert", "docx", filePath, "-output", outputPath], {
-      encoding: "utf8",
-      maxBuffer: MAX_OFFICE_CONVERSION_OUTPUT_BYTES,
-      timeout: OFFICE_CONVERSION_TIMEOUT_MS,
-      windowsHide: true,
-      signal: options?.signal,
-    }).catch((error) => {
-      if (options?.signal?.aborted || error?.name === "AbortError" || error?.code === "ABORT_ERR") {
-        throw new Error("Office conversion was cancelled.");
-      }
-      if (error?.killed || error?.signal === "SIGTERM") {
-        throw new Error("Office conversion timed out.");
-      }
-      if (error?.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
-        throw new Error(`Office conversion output exceeded the ${formatFileSize(MAX_OFFICE_CONVERSION_OUTPUT_BYTES)} process output limit.`);
-      }
-      throw new Error(`Office conversion failed: ${error.message}`);
-    });
-    stderr = String(result.stderr ?? "");
-
-    const outputMetadata = await fs.stat(outputPath).catch((error) => {
-      throw new Error(`Office conversion did not produce a DOCX file: ${error.message}`);
-    });
-    if (!outputMetadata.isFile()) {
-      throw new Error("Office conversion did not produce a DOCX file.");
-    }
-    if (outputMetadata.size > MAX_OFFICE_CONVERSION_INPUT_BYTES) {
-      throw new Error(`Converted DOCX is larger than the ${formatFileSize(MAX_OFFICE_CONVERSION_INPUT_BYTES)} Office preview limit.`);
-    }
-
-    const warnings = stderr
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    return {
-      bytes: await fs.readFile(outputPath),
-      warnings,
-    };
-  } finally {
-    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-  }
 }
 
 async function readFileSlice(filePath, start, end) {

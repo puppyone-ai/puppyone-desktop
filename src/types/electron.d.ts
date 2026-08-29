@@ -448,6 +448,32 @@ export type DesktopUpdateStatus =
 
 export type DesktopBuildChannel = "dev" | "internal" | "stable";
 
+export type DesktopPlatform = "macos" | "windows" | "linux";
+export type DesktopArchitecture = "x64" | "arm64";
+
+export type DesktopPlatformCapabilities = {
+  readonly schemaVersion: 1;
+  readonly platform: DesktopPlatform;
+  readonly arch: DesktopArchitecture;
+  readonly primaryModifier: "meta" | "control";
+  readonly windowChrome: {
+    readonly mode: "native" | "overlay" | "custom";
+  };
+  readonly credentialStorage: {
+    readonly available: boolean;
+    readonly locked: boolean;
+    readonly strength: "os-backed" | "unavailable";
+    readonly backend: string | null;
+  };
+  readonly documentConversion: {
+    readonly supportedInputs: ReadonlyArray<string>;
+  };
+  readonly updater: {
+    readonly supported: boolean;
+    readonly installMode: "squirrel" | "nsis" | "appimage" | "manual";
+  };
+};
+
 export type DesktopTelemetryLevel = "off" | "basic";
 
 export type DesktopTelemetryState = {
@@ -793,6 +819,7 @@ declare global {
         regions: Array<{ x: number; y: number; width: number; height: number }>;
       }) => void;
       getBuildInfo: () => Promise<DesktopBuildInfo>;
+      getPlatformCapabilities: () => Promise<DesktopPlatformCapabilities>;
       getTelemetryState: () => Promise<DesktopTelemetryState>;
       getTelemetryDisclosure: () => Promise<DesktopTelemetryDisclosure>;
       markTelemetryNoticeSeen: () => Promise<DesktopTelemetryState>;

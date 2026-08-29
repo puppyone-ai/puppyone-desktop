@@ -10,11 +10,15 @@ src/                    Renderer application and product features
   features/<domain>/    Domain-owned UI, state, and application logic
   components/           Cross-feature application-shell components only
   lib/                  Small renderer-facing platform facades
+  platform/             Capability-driven Desktop platform client
 packages/               Editable first-party packages
   shared-ui/            Process-neutral data workspace and editor UI
 electron/main/          Electron authority, IPC, credentials, and native services
+  platform/             Runtime composition root and narrow OS adapters
 local-api/              Process-neutral local workspace and Git operations
 shared/                 Versioned cross-process contracts
+  desktop/              Platform, release, application, artifact, and distribution contracts
+tooling/desktop/        Target-driven build, verification, and release tooling
 tests/                  Automated tests and safe fixtures
 vendor/                 Pinned third-party source/runtime payloads only
 ```
@@ -35,3 +39,6 @@ Rules:
 
 `scripts/check-repository-layout.mjs` enforces the structural rules that can be
 checked mechanically and runs as part of `npm run check:boundaries`.
+
+The runtime, native target, and release pipeline boundaries are defined in
+[`desktop-cross-platform-runtime-and-delivery.md`](./desktop-cross-platform-runtime-and-delivery.md).

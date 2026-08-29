@@ -12,7 +12,13 @@ const requiredPaths = [
   "packages/shared-ui/src/index.ts",
   "src/features",
   "electron/main",
+  "electron/main/platform/create-platform-host.mjs",
   "local-api",
+  "shared/desktop/platform-contract.mjs",
+  "src/platform/desktopPlatformClient.ts",
+  "tooling/desktop/targets/target-manifest.mjs",
+  "tooling/desktop/build/create-builder-config.mjs",
+  "tooling/desktop/release/release-set.mjs",
   "scripts/check-desktop-build-environment.mjs",
   "tests/fixtures/editor-rendering/README.md",
 ];
