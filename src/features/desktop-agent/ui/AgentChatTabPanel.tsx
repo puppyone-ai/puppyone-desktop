@@ -13,10 +13,8 @@ import { AgentPanelLayout } from "./AgentPanelLayout";
 import { AgentPanelStatus } from "./AgentPanelStatus";
 import { AgentQuestionDock } from "./AgentQuestionDock";
 import { AgentRuntimeLauncher } from "./AgentRuntimeLauncher";
-import { AgentRuntimePicker } from "./AgentRuntimePicker";
-import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
 import { AgentTranscript } from "./AgentTranscript";
-import { readinessLabel, readinessStatusCode, sessionStatusCode, sessionStatusLabel } from "./agentPanelPresentation";
+import { readinessStatusCode, sessionStatusCode } from "./agentPanelPresentation";
 import { useAgentReferenceIngestion } from "./useAgentReferenceIngestion";
 import { useAgentRoutingPreferences } from "./useAgentRoutingPreferences";
 import { useAgentSessionPreparation } from "./useAgentSessionPreparation";
@@ -98,7 +96,6 @@ export function AgentChatTabPanel({
           : t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID);
   const sessionStatus = state.session?.terminalState;
   const statusCode = state.session ? sessionStatusCode(sessionStatus) : readinessStatusCode(readiness?.status);
-  const statusLabel = state.session ? sessionStatusLabel(sessionStatus, t) : readinessLabel(readiness?.status, t);
   const title = state.session?.title || (agentRuntimeSelected ? runtimeLabel : t("agent.header.newChat"));
   const hasStatus = unavailable || failed || Boolean(state.error);
 
@@ -135,25 +132,6 @@ export function AgentChatTabPanel({
     dropLabel={referenceIngestion.dropLabel} announcement={referenceIngestion.announcement}
     onDragEnter={referenceIngestion.onDragEnter} onDragOver={referenceIngestion.onDragOver}
     onDragLeave={referenceIngestion.onDragLeave} onDrop={referenceIngestion.onDrop}
-    header={<AgentSurfaceHeader
-      title={title}
-      runtimeLabel={runtimeLabel}
-      statusCode={statusCode}
-      statusLabel={statusLabel}
-      loading={loading}
-      newSessionDisabled={unavailable || !routingReady || preparingSession || submissionPending || Boolean(state.projection.runningTurnId)}
-      onNewSession={() => void controller.newSession()}
-      showNewSessionAction={false}
-      agentSelector={<AgentRuntimePicker
-        agentRuntimes={agentRuntimes}
-        selectedRuntimeId={agentRuntimeSelected ? state.selectedRuntimeId : null}
-        disabled={loading || preparingSession || submissionPending || Boolean(state.projection.runningTurnId)}
-        onSelectRuntime={routingPreferences.selectRuntime}
-      />}
-      diagnostic={readiness?.diagnostic || (inspection?.warnings.length ? inspection.warnings.join(" ") : null)}
-      onCompactSession={capabilities?.compaction ? () => void controller.compactSession() : undefined}
-      canCompact={Boolean(capabilities?.compaction)}
-    />}
     status={hasStatus ? <AgentPanelStatus
       unavailable={unavailable} failed={failed} error={state.error}
       runtimeLabel={runtimeLabel} readiness={readiness ?? undefined}

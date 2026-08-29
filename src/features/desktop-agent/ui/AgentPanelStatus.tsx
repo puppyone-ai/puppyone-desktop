@@ -24,7 +24,9 @@ export function AgentPanelStatus({
 }: AgentPanelStatusProps) {
   const { t } = useLocalization();
   const errorPresentation = presentAgentError(error, t);
-  const detail = readiness?.message || errorPresentation?.detail;
+  const detail = failed
+    ? errorPresentation?.detail
+    : readiness?.message || errorPresentation?.detail;
   return (
     <>
       {(unavailable || failed) && (

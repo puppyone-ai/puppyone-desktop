@@ -3,6 +3,7 @@ import {
   ClaudeAgentSdkAdapter,
   formatClaudePrompt,
 } from "../electron/main/agent/runtimes/claude/claude-agent-sdk-adapter.mjs";
+import { AgentProviderSessionUnavailableError } from "../electron/main/agent/runtime/agent-runtime-port.mjs";
 
 describe("Claude Agent SDK runtime adapter", () => {
   it("maps only authorized live workspace references into the native prompt", () => {
@@ -61,6 +62,16 @@ describe("Claude Agent SDK runtime adapter", () => {
       requiresRuntimeSetup: true,
       error: expect.stringContaining("subscription OAuth cannot be used"),
     });
+    await adapter.dispose();
+  });
+
+  it("classifies a missing native conversation as an unavailable saved session", async () => {
+    const adapter = createAdapter({
+      sdk: { query: vi.fn(), getSessionInfo: vi.fn(async () => null) },
+    });
+
+    await expect(adapter.resumeSession({ threadId: "claude-stale" }))
+      .rejects.toBeInstanceOf(AgentProviderSessionUnavailableError);
     await adapter.dispose();
   });
 

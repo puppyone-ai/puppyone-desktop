@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createAgentService } from "../electron/main/agent/agent-service.mjs";
 import { createCodexRuntimeDefinition } from "../electron/main/agent/runtimes/codex/codex-runtime-definition.mjs";
 import { AgentRuntimeRegistry } from "../electron/main/agent/runtime/agent-runtime-registry.mjs";
+import { AgentProviderSessionUnavailableError } from "../electron/main/agent/runtime/agent-runtime-port.mjs";
 import { registerAgentIpcHandlers } from "../electron/main/ipc/agent-ipc.mjs";
 
 describe("Electron AgentService ownership and lifecycle", () => {
@@ -165,6 +166,23 @@ describe("Electron AgentService ownership and lifecycle", () => {
     expect(harness.adapters).toHaveLength(2);
     expect(harness.adapters[1].resumeSession).toHaveBeenCalledWith({ threadId: "thread-1", model: "gpt-5" });
     expect(harness.service.getSessionCount()).toBe(1);
+  });
+
+  it("discards stale native-session metadata and falls back to a clean session", async () => {
+    const harness = createServiceHarness({
+      resumeSessionError: new AgentProviderSessionUnavailableError("The saved Codex thread is gone."),
+    });
+    const owner = createSender(43);
+    const created = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
+    await harness.service.closeSessionsForWindow(owner.id);
+
+    await expect(harness.service.resumeSession(owner, { runtimeId: "codex" }, "/workspace"))
+      .resolves.toBeNull();
+
+    expect(harness.persistence.remove).toHaveBeenCalledWith(created.session.id);
+    expect(harness.service.getSessionCount()).toBe(0);
+    await expect(harness.service.resumeSession(owner, { runtimeId: "codex" }, "/workspace"))
+      .resolves.toBeNull();
   });
 
   it("does not discard a retired snapshot when a different requested session is missing", async () => {
@@ -577,7 +595,11 @@ describe("Agent IPC workspace authorization", () => {
   });
 });
 
-function createServiceHarness({ capabilities = { manualApprovals: true }, attachmentStore = null } = {}) {
+function createServiceHarness({
+  capabilities = { manualApprovals: true },
+  attachmentStore = null,
+  resumeSessionError = null,
+} = {}) {
   const adapters = [];
   const persisted = new Map();
   const runtimeRegistry = new AgentRuntimeRegistry([createCodexRuntimeDefinition({
@@ -594,31 +616,32 @@ function createServiceHarness({ capabilities = { manualApprovals: true }, attach
       })),
     },
     adapterFactory: (options) => {
-      const adapter = createFakeAdapter(options, capabilities);
+      const adapter = createFakeAdapter(options, capabilities, resumeSessionError);
       adapters.push(adapter);
       return adapter;
     },
   })]);
+  const persistence = {
+    findLatest: vi.fn(async (root) => Array.from(persisted.values()).find((entry) => entry.workspaceRoot === root) ?? null),
+    findById: vi.fn(async (id, root) => {
+      const entry = persisted.get(id);
+      return entry?.workspaceRoot === root ? entry : null;
+    }),
+    list: vi.fn(async (root) => Array.from(persisted.values()).filter((entry) => entry.workspaceRoot === root)),
+    save: vi.fn(async (entry) => persisted.set(entry.sessionId, entry)),
+    archive: vi.fn(async () => undefined),
+    remove: vi.fn(async (id) => persisted.delete(id)),
+  };
   const service = createAgentService({
     runtimeRegistry,
-    persistence: {
-      findLatest: vi.fn(async (root) => Array.from(persisted.values()).find((entry) => entry.workspaceRoot === root) ?? null),
-      findById: vi.fn(async (id, root) => {
-        const entry = persisted.get(id);
-        return entry?.workspaceRoot === root ? entry : null;
-      }),
-      list: vi.fn(async (root) => Array.from(persisted.values()).filter((entry) => entry.workspaceRoot === root)),
-      save: vi.fn(async (entry) => persisted.set(entry.sessionId, entry)),
-      archive: vi.fn(async () => undefined),
-      remove: vi.fn(async (id) => persisted.delete(id)),
-    },
+    persistence,
     logger: { warn: vi.fn() },
     attachmentStore,
   });
-  return { service, adapters };
+  return { service, adapters, persistence };
 }
 
-function createFakeAdapter(options, capabilities) {
+function createFakeAdapter(options, capabilities, resumeSessionError = null) {
   return {
     disposed: false,
     inspect: vi.fn(async () => ({
@@ -634,13 +657,16 @@ function createFakeAdapter(options, capabilities) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })),
-    resumeSession: vi.fn(async () => ({
-      providerSessionId: "thread-1",
-      title: "Test session",
-      model: "gpt-5",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    })),
+    resumeSession: vi.fn(async () => {
+      if (resumeSessionError) throw resumeSessionError;
+      return {
+        providerSessionId: "thread-1",
+        title: "Test session",
+        model: "gpt-5",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }),
     readHistory: vi.fn(async () => []),
     startTurn: vi.fn(async () => {
       options.onEvent({ type: "turn.started", providerSessionId: "thread-1", turnId: "turn-1", payload: { status: "running" } });

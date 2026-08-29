@@ -178,7 +178,8 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(acpCore).toContain("PuppyOne deliberately does not");
     expect(controller).toContain("selectedProviderId");
     expect(panel.indexOf("agentRuntimes=")).toBeLessThan(panel.indexOf("models="));
-    expect(panel).toContain("agentSelector={<AgentRuntimePicker");
+    expect(panel).toContain("conversation={<AgentRuntimeLauncher");
+    expect(panel).not.toContain("<AgentRuntimePicker");
     expect(source("src/features/desktop-agent/ui/AgentComposer.tsx")).not.toContain("AgentRuntimePicker");
   });
 

@@ -7,6 +7,7 @@ import {
   buildCodexTurnInput,
   normalizeCodexNotification,
 } from "../electron/main/agent/runtimes/codex/codex-app-server-adapter.mjs";
+import { AgentProviderSessionUnavailableError } from "../electron/main/agent/runtime/agent-runtime-port.mjs";
 
 describe("Codex app-server normalization", () => {
   it("maps workspace mentions and staged images to the exact app-server UserInput schema", () => {
@@ -186,6 +187,22 @@ describe("Codex app-server normalization", () => {
     expect(connection.requests.filter((request) => request.method === "thread/resume")).toHaveLength(0);
     expect(connection.requests.filter((request) => request.method === "turn/start")).toHaveLength(2);
     expect(JSON.stringify(connection.requests)).not.toContain('"effort":"max"');
+    adapter.dispose();
+  });
+
+  it("classifies a missing native rollout as an unavailable saved session", async () => {
+    const connection = new FakeConnection();
+    connection.failures.set("thread/resume", new Error("thread/resume: no rollout found for thread id thread-stale"));
+    const adapter = new CodexAppServerAdapter({
+      executablePath: "/usr/local/bin/codex",
+      environment: {},
+      workspaceRoot: "/workspace",
+      appVersion: "test",
+      connectionFactory: () => connection,
+    });
+
+    await expect(adapter.resumeSession({ threadId: "thread-stale", model: "gpt-5" }))
+      .rejects.toBeInstanceOf(AgentProviderSessionUnavailableError);
     adapter.dispose();
   });
 

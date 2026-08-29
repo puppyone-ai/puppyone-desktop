@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { buildCodexTurnInput } from "./codex-reference-input.mjs";
 import { JsonlRpcConnection } from "../../transports/jsonl-rpc-connection.mjs";
 import { boundRendererValue, redactSecrets, redactSecretText } from "../../agent-events.mjs";
+import { AgentProviderSessionUnavailableError } from "../../runtime/agent-runtime-port.mjs";
 export { buildCodexTurnInput } from "./codex-reference-input.mjs";
 const CODEX_REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
 
@@ -182,13 +183,24 @@ export class CodexAppServerAdapter {
   async resumeSession({ threadId, model = null }) {
     await this.connect();
     this.sessionLifecycleType = "session.resumed";
-    const result = await this.connection.request("thread/resume", {
-      threadId,
-      cwd: this.workspaceRoot,
-      approvalPolicy: "on-request",
-      sandbox: "workspace-write",
-      ...(model ? { model } : {}),
-    }).finally(() => { this.sessionLifecycleType = null; });
+    let result;
+    try {
+      result = await this.connection.request("thread/resume", {
+        threadId,
+        cwd: this.workspaceRoot,
+        approvalPolicy: "on-request",
+        sandbox: "workspace-write",
+        ...(model ? { model } : {}),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/\bno rollout found for thread id\b/i.test(message)) {
+        throw new AgentProviderSessionUnavailableError("The saved Codex thread is no longer available.");
+      }
+      throw error;
+    } finally {
+      this.sessionLifecycleType = null;
+    }
     this.threadId = requireString(result?.thread?.id, "Codex thread/resume did not return a thread id.");
     return normalizeProviderSession(result);
   }

@@ -13,6 +13,7 @@ import {
 import { CLAUDE_RUNTIME_DESCRIPTOR } from "./claude-identity.mjs";
 import { ClaudeMessageChannel, createClaudeUserMessage } from "./claude-message-channel.mjs";
 import { createClaudeSpawn } from "./claude-spawn.mjs";
+import { AgentProviderSessionUnavailableError } from "../../runtime/agent-runtime-port.mjs";
 
 const INSPECTION_TIMEOUT_MS = 30_000;
 const CLAUDE_PROJECT_INSTRUCTION_NAMES = Object.freeze(["CLAUDE.md", "AGENTS.md", "CONTEXT.md"]);
@@ -164,7 +165,9 @@ export class ClaudeAgentSdkAdapter {
     await this.#closePersistentQuery("Resuming a Claude Code session.");
     const sdk = await this.#loadSdk();
     const info = await sdk.getSessionInfo(threadId, { dir: this.workspaceRoot });
-    if (!info?.sessionId) throw new Error("Claude Code session was not found in this workspace.");
+    if (!info?.sessionId) {
+      throw new AgentProviderSessionUnavailableError("The saved Claude Code session is no longer available.");
+    }
     this.sessionId = info.sessionId;
     this.resuming = true;
     return {

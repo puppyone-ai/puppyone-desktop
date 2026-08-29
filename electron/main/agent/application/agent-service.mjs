@@ -31,7 +31,10 @@ import {
   sessionSnapshot,
 } from "../domain/agent-session-model.mjs";
 import { resolvePersistedRuntimeId } from "../migrations/legacy-session-format.mjs";
-import { assertAgentRuntimeInspection } from "../runtime/agent-runtime-port.mjs";
+import {
+  assertAgentRuntimeInspection,
+  isAgentProviderSessionUnavailableError,
+} from "../runtime/agent-runtime-port.mjs";
 
 const INTERRUPT_CONFIRMATION_TIMEOUT_MS = 5_000;
 const MAX_TURN_DURATION_MS = 30 * 24 * 60 * 60 * 1_000;
@@ -190,6 +193,11 @@ export function createAgentService({
         return sessionSnapshot(session);
       } catch (error) {
         await closeSessionRecord(session, { persist: false });
+        if (isAgentProviderSessionUnavailableError(error)) {
+          await cache.remove(persisted.sessionId);
+          logger.warn?.(`Discarded unavailable ${runtimeId} session metadata; a new native session will be created on demand.`);
+          return null;
+        }
         throw new Error(`Unable to resume Agent session: ${redactSecretText(error instanceof Error ? error.message : String(error))}`);
       }
     } finally {

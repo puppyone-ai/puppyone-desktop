@@ -126,13 +126,15 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(composer).not.toContain("AgentBackendPicker");
     expect(composer).not.toContain('is-backend');
     expect(composer).not.toContain("AgentProviderPicker");
-    expect(panel).toContain("agentSelector={<AgentRuntimePicker");
+    expect(panel).not.toContain("<AgentSurfaceHeader");
+    expect(panel).not.toContain("<AgentRuntimePicker");
     expect(panel).toContain("t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID)");
     expect(composer).toContain('DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID = "agent.composer.placeholder.default"');
     expect(css).toMatch(/\.desktop-agent-picker\.is-header\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*100%/s);
     expect(css).toMatch(/\.desktop-agent-picker\.is-header \.desktop-agent-picker-trigger\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*100%[^}]*border:\s*0[^}]*font-size:\s*var\(--po-font-size-chrome, 13px\)[^}]*font-weight:\s*var\(--po-font-weight-chrome, 500\)/s);
     expect(css).not.toContain("max-width: min(68%, 300px)");
     expect(css).toMatch(/\.desktop-agent-session-header-actions\s*\{[^}]*border:\s*0[^}]*background:\s*transparent/s);
+    expect(panelStatus).toContain("const detail = failed");
     expect(composer).not.toContain("<Zap");
     expect(panel).toContain('t("agent.composer.placeholder.followUp")');
     expect(panel).toContain("<AgentPanelLayout");
