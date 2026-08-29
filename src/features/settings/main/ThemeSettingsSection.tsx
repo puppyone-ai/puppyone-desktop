@@ -2,10 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocalization } from "@puppyone/localization";
 import { getThemePacks, getThemesForTarget } from "../../themes/builtinSurfaceThemes";
 import type { ThemeCatalogController } from "../../themes/useThemeCatalog";
-import {
-  CUSTOM_CSS_THEME_ID,
-  type SurfaceThemePreferences,
-} from "../../themes/themePreferences";
+import type { SurfaceThemePreferences } from "../../themes/themePreferences";
 import type { ThemeTarget } from "../../themes/themeTypes";
 
 export function ThemeSettingsSection({
@@ -13,11 +10,13 @@ export function ThemeSettingsSection({
   preferences,
   onThemeOverrideChange,
   onThemePackChange,
+  onCustomCssEnabledChange,
 }: {
   catalog: ThemeCatalogController;
   preferences: SurfaceThemePreferences;
   onThemeOverrideChange: (target: ThemeTarget, themeId: string | null) => void;
   onThemePackChange: (themeId: string) => void;
+  onCustomCssEnabledChange: (target: ThemeTarget, enabled: boolean) => void;
 }) {
   const { t } = useLocalization();
   const onReload = () => void catalog.reload();
@@ -64,7 +63,8 @@ export function ThemeSettingsSection({
         </div>
         <CustomCssEditor
           catalog={catalog}
-          onThemeOverrideChange={onThemeOverrideChange}
+          preferences={preferences}
+          onCustomCssEnabledChange={onCustomCssEnabledChange}
         />
         {catalog.error && <p className="desktop-theme-settings-error" role="alert">{catalog.error}</p>}
         {catalog.snapshot.diagnostics.length > 0 && (
@@ -83,10 +83,12 @@ export function ThemeSettingsSection({
 
 function CustomCssEditor({
   catalog,
-  onThemeOverrideChange,
+  preferences,
+  onCustomCssEnabledChange,
 }: {
   catalog: ThemeCatalogController;
-  onThemeOverrideChange: (target: ThemeTarget, themeId: string | null) => void;
+  preferences: SurfaceThemePreferences;
+  onCustomCssEnabledChange: (target: ThemeTarget, enabled: boolean) => void;
 }) {
   const { t } = useLocalization();
   const [target, setTarget] = useState<ThemeTarget>("markdown");
@@ -119,7 +121,7 @@ function CustomCssEditor({
     const didSave = await saveCustomCss(target, source);
     setSaving(false);
     if (!didSave) return;
-    onThemeOverrideChange(target, CUSTOM_CSS_THEME_ID);
+    onCustomCssEnabledChange(target, true);
     setSaved(true);
   };
 
@@ -142,6 +144,20 @@ function CustomCssEditor({
           <option value="markdown">{t("settings.appearance.themes.markdown")}</option>
           <option value="csv">{t("settings.appearance.themes.csv")}</option>
         </select>
+      </label>
+      <label className="desktop-settings-row desktop-settings-row-control">
+        <span>{t("settings.appearance.themes.customCss.enabled")}</span>
+        <span className="desktop-settings-switch">
+          <input
+            type="checkbox"
+            aria-label={t("settings.appearance.themes.customCss.enableFor", {
+              target: t(`settings.appearance.themes.${target}`),
+            })}
+            checked={preferences.customCss[target]}
+            onChange={(event) => onCustomCssEnabledChange(target, event.currentTarget.checked)}
+          />
+          <span aria-hidden="true" />
+        </span>
       </label>
       <textarea
         className="desktop-theme-custom-css-source"

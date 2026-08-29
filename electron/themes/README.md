@@ -131,6 +131,10 @@ A theme containing all three targets appears in the primary **Theme Pack** selec
 
 包含三个目标的主题会出现在主要的 **主题包** 选择器中；只包含部分目标的主题会出现在 **高级主题覆盖** 的对应选项中。
 
+The final style order is **Theme Pack or Advanced surface theme → Editor Markdown overrides → enabled Custom CSS**. The Editor controls default to **Theme**, so authored CSS remains authoritative until a user explicitly overrides one property. Custom CSS is an independent final overlay and can be disabled without deleting its source.
+
+最终样式顺序是 **主题包或高级单界面主题 → 编辑器 Markdown 覆盖 → 已启用的自定义 CSS**。编辑器控件默认选择 **跟随主题**；自定义 CSS 是独立的最后一层，可以停用而不删除源码。
+
 ## 🎨 Markdown styling / Markdown 样式
 
 Markdown themes may combine public `--po-md-*` variables with scoped selectors. Style both forms when an effect should appear consistently in Live Preview and rendered HTML:
@@ -165,11 +169,14 @@ Useful public variables include:
 - `--po-md-rule-color`
 - `--po-markdown-editor-text-width`
 
+For heading size, bold color, and bold weight, prefer these public variables over hard-coded declarations when you want the Editor controls to remain interoperable with your theme. Direct selectors are still available for distinctive treatments such as centered H1 headings, underlines, colored H2 blocks, quotes, and code blocks.
+
 ## ⚙️ Compatibility and safety / 兼容与安全
 
 - Theme IDs must use a stable lowercase reverse-domain form such as `com.example.paper-blue`.
 - `application` accepts public PuppyOne color tokens only; themes cannot restructure the application UI.
 - `markdown` and `csv` selectors are automatically scoped to their own surfaces.
+- Ordinary themes must not use `!important`; PuppyOne manages Theme, Editor, and Custom CSS precedence deterministically.
 - Relative local CSS imports, images, and fonts are supported when they remain inside the Themes Folder.
 - Network URLs, `file:` URLs, escaping paths, fixed positioning, and unsupported executable CSS values are rejected.
 - Invalid themes are isolated and reported in Appearance without preventing other themes from loading.

@@ -56,7 +56,7 @@ Rejected, and why:
 | Free color customization (accent / background / foreground) | Presets are designed as complete sets in `tokens.css`; opening one channel breaks the set and produces unverifiable states. |
 | Free interface/code font fields | Geist Sans / Geist Mono remain part of the product identity and metric contract. Do not expose raw CSS-family inputs or let content customization implicitly replace chrome or terminal typography. |
 | Contrast slider | Infinite intermediate states cannot be visually verified. If contrast demand appears, ship a curated high-contrast preset instead. |
-| Theme import / copy | Only meaningful with a theme editor, which we will not build. |
+| Theme import / copy (historical decision) | Superseded by the scoped CSS Theme Pack extension described below. Arbitrary application CSS remains rejected. |
 | Custom dock icon upload | Same failure as free colors: uncurated brand surface. |
 | Translucent sidebar toggle | An opinionated product decides. Either vibrancy becomes the default design (all themes adapted) or we skip it. Not a toggle. |
 | Interface density | Backlog. Row heights are tokenized so it is cheap, but no real user demand yet, and each density tier multiplies visual QA. |
@@ -64,6 +64,12 @@ Rejected, and why:
 | Dock icon variants | Deferred. The product uses the canonical Polished icon with no Renderer preference, storage key, or native switching IPC. Reintroduce alternatives only with a separately reviewed product requirement. |
 
 ### Page Shape
+
+#### Scoped CSS theme extension
+
+Appearance owns the Theme Pack selector because a pack coordinates Application, Markdown, and CSV. A complete pack is one curated choice from the user's perspective even when its CSS is externally authored. Advanced selectors replace the pack only for one surface. Editor owns semantic Markdown property overrides, not theme selection, and Custom CSS is an independently enabled final overlay. The deterministic cascade is product defaults → resolved surface theme → Editor Markdown overrides → Custom CSS.
+
+Application theme CSS remains limited to the public color-token allowlist. Markdown and CSV CSS is compiler-scoped to its surface. This safety boundary is the exception to the older rejection of unrestricted theme import; it does not authorize arbitrary application selectors, layout changes, executable code, or raw settings-page color inputs. See [CSS themes](../css-themes.md).
 
 The Appearance section stays a single flat list (Interface style, Light or
 Dark controls when supported, presets, Text size, Content font, File icons,

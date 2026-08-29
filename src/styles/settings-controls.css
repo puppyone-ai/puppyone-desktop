@@ -482,6 +482,42 @@
   padding: 4px 10px 0;
 }
 
+.desktop-markdown-theme-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 4px 10px 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--po-border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--po-panel) 72%, transparent);
+}
+
+.desktop-markdown-theme-summary > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.desktop-markdown-theme-summary span,
+.desktop-markdown-presentation-toolbar > span {
+  color: var(--po-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.desktop-markdown-theme-summary strong {
+  color: var(--po-text);
+  font-size: 13px;
+}
+
+.desktop-markdown-theme-summary small {
+  color: var(--po-text-subtle);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .desktop-markdown-presentation-controls {
   display: grid;
   min-width: 0;
@@ -489,6 +525,18 @@
   border: 1px solid var(--po-border-subtle);
   border-radius: 8px;
   background: color-mix(in srgb, var(--po-panel) 72%, transparent);
+}
+
+.desktop-markdown-presentation-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+}
+
+.desktop-markdown-presentation-toolbar + .desktop-markdown-presentation-setting {
+  border-top: 1px solid var(--po-border-subtle);
 }
 
 .desktop-markdown-presentation-setting {
@@ -529,6 +577,11 @@
 }
 
 @media (max-width: 760px) {
+  .desktop-markdown-theme-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .desktop-markdown-presentation-setting {
     gap: 8px;
     grid-template-columns: minmax(0, 1fr);

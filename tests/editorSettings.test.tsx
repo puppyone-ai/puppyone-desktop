@@ -27,6 +27,8 @@ describe("Editor settings", () => {
       <EditorSettingsView
         markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS}
         onMarkdownPresentationChange={onChange}
+        activeMarkdownThemeName="Alto"
+        onManageThemes={vi.fn()}
       />,
     )));
 
@@ -48,12 +50,46 @@ describe("Editor settings", () => {
       host.querySelectorAll<HTMLElement>('[aria-label="Bold weight"] button'),
       (button) => button.textContent,
     );
-    expect(weightLabels).toEqual(["Medium", "Semibold", "Bold", "Heavy"]);
+    expect(weightLabels).toEqual(["Theme", "Medium", "Semibold", "Bold", "Heavy"]);
 
     const preview = host.querySelector<HTMLElement>('[aria-label="Markdown style preview"]');
     expect(preview?.classList.contains("markdown-presentation-preview")).toBe(true);
     expect(preview?.querySelector(
       '.markdown-codemirror-editor[data-live-preview="true"][data-readonly="true"]',
     )).not.toBeNull();
+  });
+
+  it("shows the active theme, links to Appearance, and resets all semantic overrides", () => {
+    const onChange = vi.fn();
+    const onManageThemes = vi.fn();
+    const host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+
+    act(() => root?.render(withTestLocalization(
+      <EditorSettingsView
+        markdownPresentation={{
+          headingScale: "large",
+          strongColor: "warm",
+          strongWeight: "heavy",
+        }}
+        onMarkdownPresentationChange={onChange}
+        activeMarkdownThemeName="Alto"
+        onManageThemes={onManageThemes}
+      />,
+    )));
+
+    expect(host.querySelector("[data-active-markdown-theme]")?.textContent).toContain("Alto");
+    const themeLabels = Array.from(
+      host.querySelectorAll<HTMLElement>(".desktop-markdown-presentation-segment button:first-child"),
+      (button) => button.textContent,
+    );
+    expect(themeLabels).toEqual(["Theme", "Theme", "Theme"]);
+
+    act(() => host.querySelector<HTMLButtonElement>("[data-manage-themes]")?.click());
+    expect(onManageThemes).toHaveBeenCalledOnce();
+
+    act(() => host.querySelector<HTMLButtonElement>("[data-reset-markdown-overrides]")?.click());
+    expect(onChange).toHaveBeenCalledWith(DEFAULT_MARKDOWN_PRESENTATION_SETTINGS);
   });
 });

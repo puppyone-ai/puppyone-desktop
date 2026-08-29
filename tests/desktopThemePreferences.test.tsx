@@ -44,24 +44,27 @@ describe("desktop surface theme preferences", () => {
 
     act(() => latest?.setThemePack("com.example.forest"));
     act(() => latest?.setSurfaceThemeOverride("markdown", "local.css.newsprint"));
+    act(() => latest?.setCustomCssEnabled("markdown", true));
     expect(readStored()).toMatchObject({
-      version: 2,
+      version: 3,
       pack: "com.example.forest",
       overrides: {
         application: null,
         markdown: "local.css.newsprint",
         csv: null,
       },
+      customCss: { application: false, markdown: true, csv: false },
     });
 
     const remote: SurfaceThemePreferences = {
-      version: 2,
+      version: 3,
       pack: "com.example.graphite",
       overrides: {
         application: null,
         markdown: "builtin.markdown.focus",
         csv: "builtin.csv.ledger",
       },
+      customCss: { application: false, markdown: false, csv: true },
     };
     act(() => window.dispatchEvent(new StorageEvent("storage", {
       key: SURFACE_THEME_PREFERENCES_STORAGE_KEY,

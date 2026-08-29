@@ -30,6 +30,7 @@ describe("Appearance Custom CSS settings", () => {
     const readCustomCss = vi.fn(async () => "body { color: teal }");
     const saveCustomCss = vi.fn(async () => true);
     const onThemeOverrideChange = vi.fn();
+    const onCustomCssEnabledChange = vi.fn();
     const catalog = controller({ readCustomCss, saveCustomCss });
 
     await act(async () => {
@@ -39,6 +40,7 @@ describe("Appearance Custom CSS settings", () => {
           preferences={DEFAULT_SURFACE_THEME_PREFERENCES}
           onThemePackChange={vi.fn()}
           onThemeOverrideChange={onThemeOverrideChange}
+          onCustomCssEnabledChange={onCustomCssEnabledChange}
         />,
       ));
       await Promise.resolve();
@@ -62,10 +64,39 @@ describe("Appearance Custom CSS settings", () => {
     });
 
     expect(saveCustomCss).toHaveBeenCalledWith("markdown", "body { color: navy }");
-    expect(onThemeOverrideChange).toHaveBeenCalledWith(
-      "markdown",
-      "local.puppyone.custom-css",
+    expect(onThemeOverrideChange).not.toHaveBeenCalled();
+    expect(onCustomCssEnabledChange).toHaveBeenCalledWith("markdown", true);
+  });
+
+  it("can disable Custom CSS without deleting it or changing the selected theme", async () => {
+    const onThemeOverrideChange = vi.fn();
+    const onCustomCssEnabledChange = vi.fn();
+    const catalog = controller({ readCustomCss: vi.fn(async () => "h1 { color: teal }") });
+
+    await act(async () => {
+      root.render(withTestLocalization(
+        <ThemeSettingsSection
+          catalog={catalog}
+          preferences={{
+            ...DEFAULT_SURFACE_THEME_PREFERENCES,
+            customCss: { application: false, markdown: true, csv: false },
+          }}
+          onThemePackChange={vi.fn()}
+          onThemeOverrideChange={onThemeOverrideChange}
+          onCustomCssEnabledChange={onCustomCssEnabledChange}
+        />,
+      ));
+      await Promise.resolve();
+    });
+
+    const enabled = document.querySelector<HTMLInputElement>(
+      '[aria-label="Enable Custom CSS for Markdown"]',
     );
+    expect(enabled?.checked).toBe(true);
+    act(() => enabled?.click());
+
+    expect(onCustomCssEnabledChange).toHaveBeenCalledWith("markdown", false);
+    expect(onThemeOverrideChange).not.toHaveBeenCalled();
   });
 });
 

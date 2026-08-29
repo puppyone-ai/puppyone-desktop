@@ -57,7 +57,9 @@ export function getThemesForTarget(
   snapshot: ThemeCatalogSnapshot,
   target: ThemeDefinition["targets"][number],
 ): readonly ThemeDefinition[] {
-  return snapshot.themes.filter((theme) => theme.targets.includes(target));
+  return snapshot.themes.filter((theme) => (
+    theme.id !== CUSTOM_CSS_THEME_ID && theme.targets.includes(target)
+  ));
 }
 
 export function getThemePacks(snapshot: ThemeCatalogSnapshot): readonly ThemeDefinition[] {

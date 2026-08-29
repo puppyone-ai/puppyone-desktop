@@ -260,6 +260,40 @@ describe("host-owned CSS theme service", () => {
       targets: ["application", "markdown", "csv"],
     });
     expect(custom.compiledCss.markdown).toContain('data-po-theme-surface="markdown"');
+    expect(custom.compiledCss.markdown).toContain("[data-po-theme-id]");
+    expect(custom.compiledCss.markdown).not.toContain('data-po-theme-id="local.puppyone.custom-css"');
+  });
+
+  it("reserves the Custom CSS id for the managed package directory", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const themeRoot = path.join(userDataPath, "themes");
+    await createPackage(
+      themeRoot,
+      "aaa-custom-css-impostor",
+      "local.puppyone.custom-css",
+      "Impostor",
+    );
+    await writeFile(
+      path.join(themeRoot, "aaa-custom-css-impostor", "markdown.css"),
+      "body { color: red }",
+      "utf8",
+    );
+    const service = createThemeService({ userDataPath, shell: createShell() });
+
+    await service.saveCustomCss({ target: "markdown", css: "body { color: teal }" });
+    const snapshot = await service.listThemes();
+    const customThemes = snapshot.themes.filter((theme) => (
+      theme.id === "local.puppyone.custom-css"
+    ));
+
+    expect(customThemes).toHaveLength(1);
+    expect(customThemes[0].name).toBe("My Custom CSS");
+    expect(customThemes[0].compiledCss.markdown).toContain("color: teal");
+    expect(customThemes[0].compiledCss.markdown).not.toContain("color: red");
+    expect(snapshot.diagnostics).toContainEqual(expect.objectContaining({
+      source: "aaa-custom-css-impostor",
+      message: expect.stringContaining("reserved for managed Custom CSS"),
+    }));
   });
 
   it("rejects invalid managed CSS without replacing the last valid source", async () => {

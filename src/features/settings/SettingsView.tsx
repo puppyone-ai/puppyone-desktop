@@ -82,8 +82,10 @@ export function SettingsView({
   onTypographyPreferencesChange,
   onPointerCursorsChange,
   onMarkdownPresentationChange,
+  onSelectSettingsSection,
   onThemePackChange,
   onSurfaceThemeOverrideChange,
+  onCustomCssEnabledChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
   onSidebarNavigationVisibilitySettingsChange,
@@ -234,11 +236,16 @@ export function SettingsView({
   }
 
   if (activeSection === "editor") {
+    const activeMarkdownTheme = themeCatalog.snapshot.themes.find(
+      (theme) => theme.id === themeCatalog.selection.markdown,
+    );
     return (
       <Suspense fallback={null}>
         <EditorSettingsView
           markdownPresentation={markdownPresentation}
           onMarkdownPresentationChange={onMarkdownPresentationChange}
+          activeMarkdownThemeName={activeMarkdownTheme?.name ?? themeCatalog.selection.markdown}
+          onManageThemes={() => onSelectSettingsSection("appearance")}
         />
       </Suspense>
     );
@@ -275,6 +282,7 @@ export function SettingsView({
                 preferences={surfaceThemePreferences}
                 onThemePackChange={onThemePackChange}
                 onThemeOverrideChange={onSurfaceThemeOverrideChange}
+                onCustomCssEnabledChange={onCustomCssEnabledChange}
               />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.textSize.title")}</span>

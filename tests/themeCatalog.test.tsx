@@ -279,13 +279,14 @@ function NativeHarness({
   latest = useThemeCatalog({
     colorMode: "light",
     preferences: {
-      version: 2,
+      version: 3,
       pack: "builtin.pack.forest",
       overrides: {
         application: null,
         markdown: "builtin.markdown.newsprint",
         csv: null,
       },
+      customCss: { application: false, markdown: false, csv: false },
     },
     onThemePackChange,
     onThemeOverrideChange,

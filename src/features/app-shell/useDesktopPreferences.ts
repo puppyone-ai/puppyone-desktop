@@ -16,6 +16,7 @@ import {
   selectThemePack,
   serializeSurfaceThemePreferences,
   SURFACE_THEME_PREFERENCES_STORAGE_KEY,
+  updateCustomCssEnabled,
   updateSurfaceThemeOverride,
 } from "../themes/themePreferences";
 import type { ThemeTarget } from "../themes/themeTypes";
@@ -454,6 +455,11 @@ export function useDesktopPreferences() {
       updateSurfaceThemeOverride(current, target, themeId)
     ));
   };
+  const setCustomCssEnabled = (target: ThemeTarget, enabled: boolean) => {
+    setSurfaceThemePreferences((current) => (
+      updateCustomCssEnabled(current, target, enabled)
+    ));
+  };
 
   return {
     aiEditAssistEnabled,
@@ -517,6 +523,7 @@ export function useDesktopPreferences() {
     setSidebarNavigationLayout,
     setSidebarNavigationVisibilitySettings,
     setSurfaceThemeOverride,
+    setCustomCssEnabled,
     setThemePack,
     setTitlebarActionsSettings,
     setLightThemePreset,

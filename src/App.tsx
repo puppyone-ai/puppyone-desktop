@@ -59,7 +59,6 @@ import { DesktopHelpLauncher } from "./features/app-shell/DesktopHelpLauncher";
 import type { DesktopWorkspaceSwitcherItem } from "./features/app-shell/DesktopWorkspaceSwitcher";
 import { RestoringWorkspaceScreen } from "./features/app-shell/RestoringWorkspaceScreen";
 import { useDesktopPreferences } from "./features/app-shell/useDesktopPreferences";
-import { resolveMarkdownPresentationStyle } from "./features/markdown/markdownPresentation";
 import { isAssetLibraryHomeEnabled } from "./features/app-shell/homeFeatureGate";
 import { useWorkspaceLifecycle } from "./features/app-shell/useWorkspaceLifecycle";
 import { usePuppyoneConfig } from "./features/app-shell/usePuppyoneConfig";
@@ -216,10 +215,6 @@ function AppContent() {
   const createNewItems = useMemo(
     () => resolveVisibleCreateNewMenuItems(createNewMenuSettings, experimentalSettings),
     [createNewMenuSettings, experimentalSettings],
-  );
-  const markdownPresentationStyle = useMemo(
-    () => resolveMarkdownPresentationStyle(markdownPresentation),
-    [markdownPresentation],
   );
   const assetLibraryHomeEnabled = isAssetLibraryHomeEnabled({
     available: assetLibraryHomeAvailable,
@@ -834,7 +829,12 @@ function AppContent() {
 
   const themeRuntime = (content: ReactNode) => (
     <ThemeSurfaceProvider value={themeCatalog.selection}>
-      <ThemeStyleHost snapshot={themeCatalog.snapshot} preferences={themeCatalog.selection} />
+      <ThemeStyleHost
+        snapshot={themeCatalog.snapshot}
+        selection={themeCatalog.selection}
+        preferences={preferences.surfaceThemePreferences}
+        markdownPresentation={markdownPresentation}
+      />
       <div
         className={`desktop-theme-bootstrap-surface ${resolvedTheme === "dark" ? "dark" : ""}`}
         data-po-theme-surface="application"
@@ -958,7 +958,12 @@ function AppContent() {
 
   return (
     <ThemeSurfaceProvider value={themeCatalog.selection}>
-      <ThemeStyleHost snapshot={themeCatalog.snapshot} preferences={themeCatalog.selection} />
+      <ThemeStyleHost
+        snapshot={themeCatalog.snapshot}
+        selection={themeCatalog.selection}
+        preferences={preferences.surfaceThemePreferences}
+        markdownPresentation={markdownPresentation}
+      />
       <div
       className={`app-shell cloud-runtime ${resolvedTheme === "dark" ? "dark" : ""}`}
       data-po-theme-surface="application"
@@ -984,7 +989,7 @@ function AppContent() {
       data-pointer-cursors={pointerCursors ? "true" : "false"}
       data-diff-markers={diffMarkers}
       {...typographyRootProps}
-      style={{ ...typographyRootProps.style, ...markdownPresentationStyle }}
+      style={typographyRootProps.style}
     >
       <DesktopCloudShell
           leftSidebarCollapsed={sidebarCollapsed}

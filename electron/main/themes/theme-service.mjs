@@ -84,10 +84,12 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
 
     for (const entry of entries) {
       try {
+        const entryPath = path.join(canonicalThemeRoot, entry.name);
+        const managedCustomPackage = entry.isDirectory() && entry.name === CUSTOM_THEME_DIRECTORY;
         const theme = entry.isFile() && entry.name.toLowerCase().endsWith(".css")
           ? await loadStandaloneCssTheme(canonicalThemeRoot, entry.name)
           : entry.isDirectory()
-            ? await loadPackageTheme(path.join(canonicalThemeRoot, entry.name))
+            ? await loadPackageTheme(entryPath, { managedCustomPackage })
             : null;
         if (!theme) continue;
         if (ids.has(theme.id)) {
@@ -145,6 +147,7 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
         packageRoot,
         themeId: CUSTOM_THEME_ID,
         target,
+        scope: "surface-overlay",
         budget: createCompilationBudget(),
       });
       await writeFileAtomic(packageRoot, `${target}.css`, css);
@@ -254,6 +257,9 @@ async function loadStandaloneCssTheme(themeRoot, filename) {
   const css = await readBoundedText(path.join(themeRoot, filename), MAX_CSS_BYTES, "Theme CSS");
   const descriptor = parseSingleFileThemeCss(css, { sourcePath: filename });
   if (descriptor) {
+    if (descriptor.id === CUSTOM_THEME_ID) {
+      throw new TypeError(`Theme id is reserved for managed Custom CSS: ${CUSTOM_THEME_ID}.`);
+    }
     const budget = createCompilationBudget();
     const compiledCss = {};
     for (const target of descriptor.targets) {
@@ -301,7 +307,7 @@ async function loadStandaloneCssTheme(themeRoot, filename) {
   });
 }
 
-async function loadPackageTheme(packageRoot) {
+async function loadPackageTheme(packageRoot, { managedCustomPackage = false } = {}) {
   const manifestFile = await resolvePackageFile(packageRoot, ".", "theme.json");
   const manifestText = await readBoundedText(
     manifestFile.absolutePath,
@@ -315,6 +321,12 @@ async function loadPackageTheme(packageRoot) {
     throw new TypeError(`Theme manifest is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
   const manifest = parseThemeManifest(value);
+  if (manifest.id === CUSTOM_THEME_ID && !managedCustomPackage) {
+    throw new TypeError(`Theme id is reserved for managed Custom CSS: ${CUSTOM_THEME_ID}.`);
+  }
+  if (managedCustomPackage && manifest.id !== CUSTOM_THEME_ID) {
+    throw new TypeError(`Managed Custom CSS must use the reserved theme id: ${CUSTOM_THEME_ID}.`);
+  }
   const compiledCss = {};
   const budget = createCompilationBudget();
   for (const target of manifest.targets) {
@@ -326,6 +338,7 @@ async function loadPackageTheme(packageRoot) {
       packageRoot,
       themeId: manifest.id,
       target,
+      scope: managedCustomPackage ? "surface-overlay" : "theme",
       budget,
     });
     compiledCss[target] = compiled.css;
@@ -342,13 +355,22 @@ async function loadPackageTheme(packageRoot) {
   });
 }
 
-async function compileThemeFile({ css, sourcePath, packageRoot, themeId, target, budget }) {
+async function compileThemeFile({
+  css,
+  sourcePath,
+  packageRoot,
+  themeId,
+  target,
+  budget,
+  scope = "theme",
+}) {
   reserveCssBytes(budget, css);
   const compiled = await compileThemeCss({
     css,
     sourcePath,
     themeId,
     target,
+    scope,
     loadImport: async (specifier, importerPath) => {
       budget.importCount += 1;
       if (budget.importCount > MAX_THEME_IMPORTS) {
