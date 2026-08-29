@@ -11,7 +11,7 @@ const css = [
     .map((file) => fs.readFileSync(path.join(styleRoot, file), "utf8")),
 ].join("\n");
 const composer = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentComposer.tsx"), "utf8");
-const panel = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/RightAgentPanel.tsx"), "utf8");
+const panel = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentChatTabPanel.tsx"), "utf8");
 const picker = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentPickerPopover.tsx"), "utf8");
 const brandMark = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentBrandMark.tsx"), "utf8");
 const messagePart = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentMessagePart.tsx"), "utf8");

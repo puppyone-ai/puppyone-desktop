@@ -13,6 +13,7 @@ type AgentSurfaceHeaderProps = {
   loading: boolean;
   newSessionDisabled: boolean;
   onNewSession: () => void;
+  showNewSessionAction?: boolean;
   agentSelector?: ReactNode;
   diagnostic?: string | null;
   closeDisabled?: boolean;
@@ -29,6 +30,7 @@ export function AgentSurfaceHeader({
   loading,
   newSessionDisabled,
   onNewSession,
+  showNewSessionAction = true,
   agentSelector = null,
   diagnostic,
   closeDisabled = false,
@@ -73,7 +75,7 @@ export function AgentSurfaceHeader({
         <span><i className={`is-${statusCode}`} />{statusLabel}</span>
       </div>
       <div className="desktop-agent-session-header-actions" ref={menuRef}>
-        <button type="button" className="desktop-agent-icon-button" aria-label={t("agent.header.newSession", { agent: bidiIsolate(runtimeLabel) })} title={t("agent.header.newSession", { agent: bidiIsolate(runtimeLabel) })} disabled={loading || newSessionDisabled} onClick={onNewSession}><Plus size={16} /></button>
+        {showNewSessionAction && <button type="button" className="desktop-agent-icon-button" aria-label={t("agent.header.newSession", { agent: bidiIsolate(runtimeLabel) })} title={t("agent.header.newSession", { agent: bidiIsolate(runtimeLabel) })} disabled={loading || newSessionDisabled} onClick={onNewSession}><Plus size={16} /></button>}
         <button type="button" className="desktop-agent-icon-button" aria-label={t("agent.header.sessionActionsFor", { agent: bidiIsolate(runtimeLabel) })} title={t("agent.header.sessionActions")} aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><MoreHorizontal size={16} /></button>
         {menuOpen && (
           <DesktopMenuSurface ariaLabel={t("agent.header.sessionActionsFor", { agent: bidiIsolate(runtimeLabel) })} className="desktop-menu-surface desktop-agent-session-menu">

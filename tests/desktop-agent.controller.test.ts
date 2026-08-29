@@ -76,6 +76,36 @@ describe("AgentSessionController", () => {
     expect(controller.getSnapshot().session?.id).toBe("session-2");
   });
 
+  it("closes a tab-owned native session without affecting another controller", async () => {
+    const firstBridge = bridgeFixture(() => {});
+    const secondBridge = bridgeFixture(() => {});
+    const first = new AgentSessionController("/workspace", () => firstBridge as never);
+    const second = new AgentSessionController("/workspace", () => secondBridge as never);
+    await first.initialize();
+    await second.initialize();
+
+    await expect(first.closeTabSession()).resolves.toBe(true);
+    expect(firstBridge.closeAgentSession).toHaveBeenCalledWith({
+      rootPath: "/workspace",
+      sessionId: "session-1",
+      removePersistence: true,
+    });
+    expect(secondBridge.closeAgentSession).not.toHaveBeenCalled();
+    expect(second.getSnapshot().session?.id).toBe("session-1");
+  });
+
+  it("refuses to close a tab while its turn is running", async () => {
+    let eventListener: ((event: AgentEvent) => void) | null = null;
+    const bridge = bridgeFixture((listener) => { eventListener = listener; });
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+    eventListener?.(event(2, "turn.started", { prompt: "Keep going" }, "turn-1"));
+
+    await expect(controller.closeTabSession()).resolves.toBe(false);
+    expect(bridge.closeAgentSession).not.toHaveBeenCalled();
+    expect(controller.getSnapshot().error?.code).toBe("active-turn");
+  });
+
   it("selects the backend catalog's first model and derives any internal inference route from the model", async () => {
     const bridge = bridgeFixture(() => {});
     bridge.discoverAgentRuntimes.mockResolvedValueOnce({

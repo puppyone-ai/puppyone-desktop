@@ -130,7 +130,7 @@ describe("Desktop Agent panel lifecycle", () => {
     expect(container.querySelector("textarea")).not.toBeNull();
   });
 
-  it("keeps the draft editable and offers recovery after the provider exits", async () => {
+  it("keeps the failed tab available while opening recovery work in another tab", async () => {
     const harness = createBridgeHarness();
     const container = renderPanel(harness.bridge);
     await flushEffects();
@@ -143,16 +143,70 @@ describe("Desktop Agent panel lifecycle", () => {
     expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
     expect(container.textContent).toContain("provider exited");
 
-    const newSessionButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
-      .find((button) => stripBidiIsolation(button.getAttribute("aria-label")) === "New OpenCode session");
-    expect(newSessionButton).toBeDefined();
-    act(() => newSessionButton?.click());
+    const newTabButton = container.querySelector<HTMLButtonElement>('button[aria-label="New chat tab"]');
+    expect(newTabButton).not.toBeNull();
+    act(() => newTabButton?.click());
     await flushEffects();
-    expect(harness.bridge.closeAgentSession).toHaveBeenCalledWith({
-      rootPath: "/workspace",
-      sessionId: "session-1",
-      removePersistence: true,
-    });
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[role="tabpanel"]')).toHaveLength(2);
+    expect(harness.bridge.closeAgentSession).not.toHaveBeenCalled();
+  });
+
+  it("switches the complete Chat section between independently mounted tabs", async () => {
+    const harness = createBridgeHarness();
+    harness.bridge.discoverAgentProviders = vi.fn()
+      .mockResolvedValueOnce(readyInspection())
+      .mockResolvedValueOnce({
+        ...readyInspection(),
+        selectedRuntimeId: null,
+        runtime: null,
+        readiness: null,
+        models: [],
+        capabilities: null,
+      });
+
+    const container = renderPanel(harness.bridge);
+    await flushEffects();
+    const firstTab = container.querySelector<HTMLButtonElement>('[role="tab"]');
+    expect(firstTab?.getAttribute("aria-selected")).toBe("true");
+    expect(activeTabPanel(container).querySelector('button[aria-label="Coding Agent"]')).not.toBeNull();
+
+    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="New chat tab"]')?.click());
+    await flushEffects();
+    const tabs = container.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0].getAttribute("aria-selected")).toBe("false");
+    expect(tabs[1].getAttribute("aria-selected")).toBe("true");
+    expect(activeTabPanel(container).querySelector(".desktop-agent-runtime-launcher")).not.toBeNull();
+
+    act(() => tabs[0].click());
+    expect(tabs[0].getAttribute("aria-selected")).toBe("true");
+    expect(activeTabPanel(container).querySelector('button[aria-label="Coding Agent"]')).not.toBeNull();
+
+    act(() => tabs[1].click());
+    const closeSecond = container.querySelector<HTMLButtonElement>('button[aria-label="Close New chat"]');
+    expect(closeSecond).not.toBeNull();
+    await act(async () => { closeSecond?.click(); await Promise.resolve(); });
+    await flushEffects();
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(1);
+    expect(activeTabPanel(container).querySelector('button[aria-label="Coding Agent"]')).not.toBeNull();
+  });
+
+  it("retains workspace tab topology across Sidebar remounts", async () => {
+    const harness = createBridgeHarness();
+    const container = renderPanel(harness.bridge);
+    await flushEffects();
+    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="New chat tab"]')?.click());
+    await flushEffects();
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(2);
+
+    act(() => root?.unmount());
+    root = createRoot(container);
+    renderPanelContent();
+    await flushEffects();
+
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[role="tabpanel"]')).toHaveLength(2);
   });
 
   it("owns incompatible-engine recovery instead of asking users to update OpenCode", async () => {
@@ -235,12 +289,20 @@ function renderPanel(
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
+  renderPanelContent(preferredRuntimeId);
+  return container;
+}
+
+function renderPanelContent(preferredRuntimeId: string | null = null) {
   act(() => root?.render(withTestLocalization(React.createElement(RightAgentPanel, {
     workspace: { id: "workspace", name: "Workspace", path: "/workspace" },
     active: true,
     preferredRuntimeId,
   }))));
-  return container;
+}
+
+function activeTabPanel(container: HTMLElement) {
+  return container.querySelector<HTMLElement>('[role="tabpanel"]:not([hidden])') as HTMLElement;
 }
 
 function createBridgeHarness() {

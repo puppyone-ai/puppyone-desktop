@@ -55,7 +55,7 @@ export function useAgentRoutingPreferences({
   }, [active, controller]);
 
   useEffect(() => {
-    if (!state.initialized) return;
+    if (!active || !state.initialized) return;
     if (state.selectedRuntimeId && state.selectedRuntimeId !== preferredRuntimeId) {
       onPreferredRuntimeChange?.(state.selectedRuntimeId);
       return;
@@ -65,19 +65,20 @@ export function useAgentRoutingPreferences({
     if (!state.selectedRuntimeId && preferredRuntimeId && state.inspection && !preferredStillRegistered) {
       onPreferredRuntimeChange?.(null);
     }
-  }, [onPreferredRuntimeChange, preferredRuntimeId, state.initialized, state.inspection, state.selectedRuntimeId]);
+  }, [active, onPreferredRuntimeChange, preferredRuntimeId, state.initialized, state.inspection, state.selectedRuntimeId]);
 
   useEffect(() => {
-    if (modelPreferencePending && preferredModelId) controller.selectModel(preferredModelId);
-  }, [controller, modelPreferencePending, preferredModelId]);
+    if (active && modelPreferencePending && preferredModelId) controller.selectModel(preferredModelId);
+  }, [active, controller, modelPreferencePending, preferredModelId]);
 
   useEffect(() => {
-    if (modePreferencePending && preferredRoute.mode) controller.selectMode(preferredRoute.mode);
-  }, [controller, modePreferencePending, preferredRoute.mode]);
+    if (active && modePreferencePending && preferredRoute.mode) controller.selectMode(preferredRoute.mode);
+  }, [active, controller, modePreferencePending, preferredRoute.mode]);
 
   useEffect(() => {
     if (
-      !state.initialized
+      !active
+      || !state.initialized
       || !state.selectedRuntimeId
       || state.selectedRuntimeId !== preferredRuntimeId
       || modelPreferencePending
@@ -93,6 +94,7 @@ export function useAgentRoutingPreferences({
     };
     if (routeChanged(preferredRoute, nextRoute)) onPreferredRouteChange?.(nextRoute);
   }, [
+    active,
     onPreferredRouteChange,
     modePreferencePending,
     modelPreferencePending,

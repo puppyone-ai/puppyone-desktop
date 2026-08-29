@@ -1,0 +1,159 @@
+.desktop-agent-workspace {
+  --agent-text: var(--po-text);
+  --agent-text-muted: var(--po-text-muted);
+  --agent-border-subtle: var(--po-divider);
+  --agent-control-surface: var(--po-control);
+
+  position: relative;
+  display: grid;
+  container: desktop-agent / inline-size;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: var(--desktop-chrome-height) minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--po-editor-bg);
+}
+
+.desktop-agent-tabs-subheader {
+  position: relative;
+  z-index: 40;
+  display: flex;
+  min-width: 0;
+  min-height: var(--desktop-chrome-height);
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border: 0;
+  background: var(--po-editor-bg);
+}
+
+.desktop-agent-tabs {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: stretch;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.desktop-agent-tab {
+  position: relative;
+  display: flex;
+  min-width: 92px;
+  max-width: 168px;
+  height: 30px;
+  flex: 1 1 132px;
+  align-items: center;
+  overflow: hidden;
+  border-radius: var(--desktop-sidebar-row-radius, 6px);
+  color: var(--po-text-muted);
+}
+
+.desktop-agent-tab:hover {
+  background: color-mix(in srgb, var(--po-hover) 78%, transparent);
+  color: var(--po-text);
+}
+
+.desktop-agent-tab.is-active {
+  background: color-mix(in srgb, var(--po-selected) 86%, transparent);
+  color: var(--po-text);
+}
+
+.desktop-agent-tab-select {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0 28px 0 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: default;
+}
+
+.desktop-agent-tab-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-agent-tab-status {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--po-text-subtle);
+}
+
+.desktop-agent-tab-status.is-ready,
+.desktop-agent-tab-status.is-completed { background: var(--po-success); }
+.desktop-agent-tab-status.is-running { background: var(--po-accent); }
+.desktop-agent-tab-status.is-warning,
+.desktop-agent-tab-status.is-setup-required,
+.desktop-agent-tab-status.is-needs-repair { background: var(--po-warning); }
+.desktop-agent-tab-status.is-failed,
+.desktop-agent-tab-status.is-provider-exited { background: var(--po-danger); }
+
+.desktop-agent-tab .desktop-agent-brand-mark {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+}
+
+.desktop-agent-tab-placeholder-mark {
+  flex: 0 0 auto;
+  color: var(--po-text-subtle);
+}
+
+.desktop-agent-tab-close {
+  position: absolute;
+  inset-inline-end: 3px;
+  top: 3px;
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+}
+
+.desktop-agent-tab:is(:hover, :focus-within, .is-active) .desktop-agent-tab-close { opacity: 1; }
+.desktop-agent-tab-close:disabled { opacity: 0.36; }
+
+.desktop-agent-new-tab {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+}
+
+.desktop-agent-tabpanels {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desktop-agent-tabpanel {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.desktop-agent-tabpanel[hidden] { display: none; }
+
+@container desktop-agent (max-width: 419px) {
+  .desktop-agent-tab {
+    min-width: 82px;
+    max-width: 136px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-agent-tab-close { transition: none; }
+}

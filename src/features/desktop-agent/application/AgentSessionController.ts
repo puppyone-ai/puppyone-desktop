@@ -315,6 +315,18 @@ export class AgentSessionController {
     return this.sessionLifecycle.newSession();
   }
 
+  async closeTabSession() {
+    const closed = await this.sessionLifecycle.closeSession();
+    if (!closed) return false;
+    await this.referenceDrafts.reset([
+      ...this.state.references,
+      ...this.submission.ownedReferences(),
+      ...(this.state.pendingIntent?.references ?? []),
+    ]);
+    this.submission.clearQueue();
+    return true;
+  }
+
   prepareSession() {
     return this.sessionPreparer.prepare();
   }

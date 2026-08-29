@@ -1,0 +1,199 @@
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
+import { bidiIsolate } from "@puppyone/localization/core";
+import { useLocalization } from "@puppyone/localization/react";
+import type { AgentSessionController } from "../application/AgentSessionController";
+import type { AgentSubmissionStage } from "../application/agent-controller-state";
+import { listEnabledAgentRuntimes } from "../domain/agent-backend-routing";
+import type { AgentChatTabPresentation } from "../domain/agent-chat-tabs";
+import type { AgentRoutePreference } from "../domain/agent-route-preference";
+import { AgentApprovalDock } from "./AgentApprovalDock";
+import { AgentChangesPill } from "./AgentChangesPill";
+import { AgentComposer, DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID } from "./AgentComposer";
+import { AgentPanelLayout } from "./AgentPanelLayout";
+import { AgentPanelStatus } from "./AgentPanelStatus";
+import { AgentQuestionDock } from "./AgentQuestionDock";
+import { AgentRuntimeLauncher } from "./AgentRuntimeLauncher";
+import { AgentRuntimePicker } from "./AgentRuntimePicker";
+import { AgentSurfaceHeader } from "./AgentSurfaceHeader";
+import { AgentTranscript } from "./AgentTranscript";
+import { readinessLabel, readinessStatusCode, sessionStatusCode, sessionStatusLabel } from "./agentPanelPresentation";
+import { useAgentReferenceIngestion } from "./useAgentReferenceIngestion";
+import { useAgentRoutingPreferences } from "./useAgentRoutingPreferences";
+import { useAgentSessionPreparation } from "./useAgentSessionPreparation";
+
+type AgentChatTabPanelProps = {
+  active: boolean;
+  controller: AgentSessionController;
+  workspaceId: string;
+  onPresentationChange: (presentation: AgentChatTabPresentation) => void;
+  onViewChanges?: () => void;
+  onOpenFile?: (path: string) => void;
+  preferredRuntimeId: string | null;
+  onPreferredRuntimeChange?: (runtimeId: string | null) => void;
+  preferredRoute: Readonly<AgentRoutePreference>;
+  onPreferredRouteChange?: (route: AgentRoutePreference) => void;
+  preferredModel: string | null;
+  onPreferredModelChange?: (model: string) => void;
+  enabledRuntimeIds: readonly string[] | null;
+};
+
+export function AgentChatTabPanel({
+  active,
+  controller,
+  workspaceId,
+  onPresentationChange,
+  onViewChanges,
+  onOpenFile,
+  preferredRuntimeId,
+  onPreferredRuntimeChange,
+  preferredRoute,
+  onPreferredRouteChange,
+  preferredModel,
+  onPreferredModelChange,
+  enabledRuntimeIds,
+}: AgentChatTabPanelProps) {
+  const { t } = useLocalization();
+  const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
+  const referenceIngestion = useAgentReferenceIngestion({ controller, workspaceId, capabilities: state.inspection?.capabilities?.referenceInputs });
+  const inspection = state.inspection;
+  const readiness = inspection?.readiness;
+  const runtime = state.session?.runtime
+    || inspection?.runtime
+    || inspection?.runtimes?.find((entry) => entry.descriptor.id === state.selectedRuntimeId)?.descriptor;
+  const runtimeLabel = runtime?.displayName || t("agent.name");
+  const capabilities = inspection?.capabilities;
+  const unavailable = Boolean(readiness && readiness.status !== "ready");
+  const loading = state.phase === "discovering" || state.phase === "restoring" || state.phase === "creating";
+  const failed = state.phase === "failed" || state.phase === "runtime-exited";
+  const hasCommittedTranscript = [state.projection.rows, state.projection.parts, state.projection.messages, state.projection.activities]
+    .some((entries) => entries.length > 0);
+  const startupLoading = active && (!state.initialized || loading) && !state.pendingPrompt && !hasCommittedTranscript;
+  const sessionKey = state.session?.id || "new-agent-session";
+  const viewport = useMemo(() => ({ sessionKey, value: controller.readViewport() }), [controller, sessionKey]).value;
+  const agentRuntimes = listEnabledAgentRuntimes(inspection, enabledRuntimeIds);
+  const agentRuntimeSelected = agentRuntimes.some((entry) => entry.descriptor.id === state.selectedRuntimeId);
+  const runtimeModels = agentRuntimeSelected ? inspection?.models ?? [] : [];
+  const routingPreferences = useAgentRoutingPreferences({
+    active, controller, state, runtimeModels, preferredRuntimeId, preferredRoute, preferredModel,
+    onPreferredRuntimeChange, onPreferredRouteChange, onPreferredModelChange,
+  });
+  const modelSelectionAvailable = Boolean(capabilities?.modelSelection);
+  const routingReady = Boolean(agentRuntimeSelected && (!modelSelectionAvailable || (
+    state.selectedModel && runtimeModels.some((model) => model.model === state.selectedModel)
+  )));
+  const preparingSession = state.sessionPreparation === "preparing";
+  const submissionPending = state.submitting || Boolean(state.pendingPrompt);
+  const submissionStage: AgentSubmissionStage = state.pendingPrompt && !state.projection.runningTurnId
+    ? !state.session || preparingSession ? "preparing-session" : "starting-turn"
+    : null;
+  useAgentSessionPreparation(controller, state, active && routingReady);
+  const composerPlaceholder = unavailable || failed
+    ? t("agent.composer.placeholder.preparing")
+    : !agentRuntimeSelected
+      ? t("agent.composer.placeholder.chooseAgent")
+      : modelSelectionAvailable && !state.selectedModel
+        ? t("agent.composer.placeholder.chooseModel")
+        : state.projection.rows.length > 0 || state.projection.messages.length > 0
+          ? t("agent.composer.placeholder.followUp")
+          : t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID);
+  const sessionStatus = state.session?.terminalState;
+  const statusCode = state.session ? sessionStatusCode(sessionStatus) : readinessStatusCode(readiness?.status);
+  const statusLabel = state.session ? sessionStatusLabel(sessionStatus, t) : readinessLabel(readiness?.status, t);
+  const title = state.session?.title || (agentRuntimeSelected ? runtimeLabel : t("agent.header.newChat"));
+  const hasStatus = unavailable || failed || Boolean(state.error);
+
+  useEffect(() => {
+    onPresentationChange({
+      title,
+      runtimeLabel: agentRuntimeSelected ? runtimeLabel : null,
+      statusCode,
+      running: Boolean(state.projection.runningTurnId),
+    });
+  }, [agentRuntimeSelected, onPresentationChange, runtimeLabel, state.projection.runningTurnId, statusCode, title]);
+
+  const handleViewportChange = useCallback((scrollTop: number, measurements: Record<string, number>, pinned: boolean) => {
+    controller.rememberViewport(scrollTop, measurements, pinned);
+  }, [controller]);
+  const handleDraftChange = useCallback((draft: string) => controller.setDraft(draft), [controller]);
+  const handleSubmit = useCallback((prompt: string) => controller.submit(prompt), [controller]);
+
+  if (state.initialized && inspection && !agentRuntimeSelected && !loading && !failed) {
+    return <AgentPanelLayout
+      ariaLabel={t("agent.panel.chat", { agent: bidiIsolate(t("agent.name")) })}
+      phase="selecting-runtime"
+      conversation={<AgentRuntimeLauncher
+        agentRuntimes={agentRuntimes}
+        onLaunch={routingPreferences.selectRuntime}
+        onRefresh={() => void controller.initialize(true)}
+      />}
+    />;
+  }
+
+  return <AgentPanelLayout
+    ariaLabel={t("agent.panel.chat", { agent: bidiIsolate(runtimeLabel) })}
+    phase={state.phase} dropActive={referenceIngestion.dropActive} dropInvalid={referenceIngestion.dropInvalid}
+    dropLabel={referenceIngestion.dropLabel} announcement={referenceIngestion.announcement}
+    onDragEnter={referenceIngestion.onDragEnter} onDragOver={referenceIngestion.onDragOver}
+    onDragLeave={referenceIngestion.onDragLeave} onDrop={referenceIngestion.onDrop}
+    header={<AgentSurfaceHeader
+      title={title}
+      runtimeLabel={runtimeLabel}
+      statusCode={statusCode}
+      statusLabel={statusLabel}
+      loading={loading}
+      newSessionDisabled={unavailable || !routingReady || preparingSession || submissionPending || Boolean(state.projection.runningTurnId)}
+      onNewSession={() => void controller.newSession()}
+      showNewSessionAction={false}
+      agentSelector={<AgentRuntimePicker
+        agentRuntimes={agentRuntimes}
+        selectedRuntimeId={agentRuntimeSelected ? state.selectedRuntimeId : null}
+        disabled={loading || preparingSession || submissionPending || Boolean(state.projection.runningTurnId)}
+        onSelectRuntime={routingPreferences.selectRuntime}
+      />}
+      diagnostic={readiness?.diagnostic || (inspection?.warnings.length ? inspection.warnings.join(" ") : null)}
+      onCompactSession={capabilities?.compaction ? () => void controller.compactSession() : undefined}
+      canCompact={Boolean(capabilities?.compaction)}
+    />}
+    status={hasStatus ? <AgentPanelStatus
+      unavailable={unavailable} failed={failed} error={state.error}
+      runtimeLabel={runtimeLabel} readiness={readiness ?? undefined}
+      onRetry={() => void controller.initialize(true)}
+    /> : null}
+    conversation={<AgentTranscript
+      key={sessionKey} projection={state.projection} loading={startupLoading}
+      pendingPrompt={state.pendingPrompt} pendingReferences={state.pendingIntent?.references ?? []}
+      submissionStage={submissionStage} working={state.submitting || Boolean(state.projection.runningTurnId)}
+      runtimeLabel={runtimeLabel} initialScrollTop={viewport.scrollTop}
+      initialMeasurements={viewport.measurements} initialPinned={viewport.pinned}
+      onViewportChange={handleViewportChange} onOpenFile={onOpenFile}
+    />}
+    dock={startupLoading ? null : <>
+      {state.projection.approvals[0] && <AgentApprovalDock
+        approval={state.projection.approvals[0]} queueLength={state.projection.approvals.length}
+        resolving={state.resolvingBlocker} runtimeLabel={runtimeLabel}
+        onResolve={(decision) => void controller.resolveApproval(decision)}
+      />}
+      {state.projection.questions[0] && <AgentQuestionDock
+        key={state.projection.questions[0].requestId} request={state.projection.questions[0]}
+        queueLength={state.projection.questions.length} resolving={state.resolvingBlocker}
+        onResolve={(resolution) => void controller.resolveQuestion(resolution)}
+      />}
+      <AgentComposer
+        floatingAccessory={state.projection.approvals.length === 0 && state.projection.questions.length === 0 ? <AgentChangesPill projection={state.projection} onViewChanges={onViewChanges} /> : null}
+        draft={state.draft} onDraftChange={handleDraftChange}
+        disabled={loading || unavailable || failed || !routingReady || state.projection.approvals.length > 0 || state.projection.questions.length > 0}
+        running={Boolean(state.projection.runningTurnId)} stopping={state.stopping} submitting={submissionPending}
+        placeholder={composerPlaceholder} runtimeLabel={runtimeLabel}
+        configurationDisabled={loading || preparingSession || submissionPending}
+        models={capabilities?.modelSelection ? runtimeModels : []} selectedModel={state.selectedModel}
+        onSelectModel={routingPreferences.selectModel} commands={capabilities?.slashCommands ? inspection?.commands ?? [] : []}
+        references={state.references} referenceCapabilities={capabilities?.referenceInputs}
+        steerAvailable={Boolean(capabilities?.steer)} queueAvailable={Boolean(capabilities?.queue)}
+        onRemoveReference={(id) => controller.removeReference(id)} onRetryReference={(id) => controller.retryReference(id)}
+        onAddExternalFiles={referenceIngestion.addExternalFiles} onPaste={referenceIngestion.onPaste}
+        onPickWorkspaceReferences={referenceIngestion.pickWorkspaceReferences}
+        onSubmit={handleSubmit} onStop={() => void controller.stop()}
+      />
+    </>}
+  />;
+}

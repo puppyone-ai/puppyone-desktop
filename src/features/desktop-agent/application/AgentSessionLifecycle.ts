@@ -66,6 +66,20 @@ export class AgentSessionLifecycle {
     }
   }
 
+  async closeSession() {
+    if (this.options.readState().projection.runningTurnId) {
+      this.options.patch({ error: createAgentError("active-turn") });
+      return false;
+    }
+    try {
+      await this.closeActiveSession(true);
+      return true;
+    } catch (error) {
+      this.options.patch({ error: formatAgentError(error) });
+      return false;
+    }
+  }
+
   private async closeActiveSession(removePersistence: boolean) {
     const sessionId = this.options.readState().session?.id;
     const bridge = this.options.bridgeProvider();

@@ -4,12 +4,15 @@ import { describe, expect, it } from "vitest";
 describe("Desktop Agent architecture boundaries", () => {
   it("keeps RightAgentPanel as composition and the controller framework independent", () => {
     const panel = source("src/features/desktop-agent/ui/RightAgentPanel.tsx");
+    const tabPanel = source("src/features/desktop-agent/ui/AgentChatTabPanel.tsx");
     const layout = source("src/features/desktop-agent/ui/AgentPanelLayout.tsx");
     const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
     const preparer = source("src/features/desktop-agent/application/AgentSessionPreparer.ts");
     expect(panel.split("\n").length).toBeLessThan(230);
     expect(panel).not.toMatch(/useState|bufferedEvents|replayInFlight|applyAgentEvent/);
-    expect(panel).toContain("<AgentPanelLayout");
+    expect(panel).toContain("<AgentSessionTabs");
+    expect(panel).toContain("<AgentChatTabPanel");
+    expect(tabPanel).toContain("<AgentPanelLayout");
     expect(layout).toContain('className="desktop-agent-boundary"');
     expect(layout).toContain('className="desktop-agent-panel"');
     expect(layout).toContain('className="desktop-agent-conversation-region"');
@@ -166,7 +169,7 @@ describe("Desktop Agent architecture boundaries", () => {
     const adapter = source("electron/main/agent/runtimes/opencode-protocol/opencode-acp-adapter.mjs");
     const acpCore = source("electron/main/agent/protocols/acp/acp-runtime-adapter.mjs");
     const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
-    const panel = source("src/features/desktop-agent/ui/RightAgentPanel.tsx");
+    const panel = source("src/features/desktop-agent/ui/AgentChatTabPanel.tsx");
     expect(adapter).toContain("extends AcpRuntimeAdapter");
     expect(adapter).toContain("managedOpenCodeAcpConfig");
     expect(acpCore).toContain("client.newSession");
