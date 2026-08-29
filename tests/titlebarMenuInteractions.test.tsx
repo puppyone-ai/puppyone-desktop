@@ -29,8 +29,17 @@ describe("titlebar Portal menu interactions", () => {
     const anchorRef = createRef<HTMLDivElement>();
     const onGoHome = vi.fn();
     const onClose = vi.fn();
+    const onAddFolder = vi.fn();
+    const onOpenFolder = vi.fn();
     const onOpenItem = vi.fn();
     const workspace = createWorkspace("one", "Workspace one");
+    const currentItem = {
+      id: workspace.id,
+      label: workspace.name,
+      detail: "/tmp",
+      title: workspace.name,
+      workspace,
+    };
     const item = {
       id: "two",
       label: "Workspace two",
@@ -46,9 +55,10 @@ describe("titlebar Portal menu interactions", () => {
           refObject={anchorRef}
           titlebarLabel={workspace.name}
           workspace={workspace}
-          items={[item]}
+          items={[currentItem, item]}
+          onAddFolder={onAddFolder}
           onClose={onClose}
-          onOpenFolder={vi.fn()}
+          onOpenFolder={onOpenFolder}
           onOpenItem={onOpenItem}
           onGoHome={onGoHome}
           onToggle={vi.fn()}
@@ -61,10 +71,18 @@ describe("titlebar Portal menu interactions", () => {
     expect(container.contains(menu)).toBe(false);
     expect(menu.dataset.windowNoDrag).toBe("true");
     expect(menu.style.width).toBe("300px");
+    expect(menu.textContent).toContain("Current workspace");
+    expect(menu.textContent).toContain("Add Folder to Workspace…");
+    expect(menu.textContent).toContain("Open Folder…");
+    expect(menu.textContent).toContain("Recent projects");
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-home")?.click());
-    act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-option")?.click());
+    act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-add-folder")?.click());
+    act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-open-folder")?.click());
+    act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-recent-section .desktop-project-option")?.click());
 
     expect(onGoHome).toHaveBeenCalledOnce();
+    expect(onAddFolder).toHaveBeenCalledOnce();
+    expect(onOpenFolder).toHaveBeenCalledOnce();
     expect(onOpenItem).toHaveBeenCalledWith(item);
   });
 
@@ -84,6 +102,7 @@ describe("titlebar Portal menu interactions", () => {
           titlebarLabel="Workspace one"
           workspace={createWorkspace("one", "Workspace one")}
           items={[]}
+          onAddFolder={vi.fn()}
           onClose={onClose}
           onOpenFolder={vi.fn()}
           onOpenItem={vi.fn()}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent, type RefObject } from "react";
 import type { Workspace } from "@puppyone/shared-ui";
-import { ArrowLeft, Check, Copy, Folder, FolderOpen } from "lucide-react";
+import { ArrowLeft, Check, Copy, Folder, FolderOpen, FolderPlus } from "lucide-react";
 import {
   DesktopMenuIconButton,
   DesktopMenuItem,
@@ -24,6 +24,7 @@ type DesktopWorkspaceSwitcherProps = {
   titlebarLabel: string;
   workspace: Workspace;
   items: DesktopWorkspaceSwitcherItem[];
+  onAddFolder?: () => void;
   onClose: () => void;
   onOpenFolder: () => void;
   onOpenItem: (item: DesktopWorkspaceSwitcherItem) => void;
@@ -37,6 +38,7 @@ export function DesktopWorkspaceSwitcher({
   titlebarLabel,
   workspace,
   items,
+  onAddFolder,
   onClose,
   onOpenFolder,
   onOpenItem,
@@ -44,6 +46,14 @@ export function DesktopWorkspaceSwitcher({
   onToggle,
 }: DesktopWorkspaceSwitcherProps) {
   const { t } = useLocalization();
+  const currentItem = items.find((item) => item.id === workspace.id) ?? {
+    id: workspace.id,
+    label: workspace.name,
+    detail: workspace.path,
+    title: `${workspace.name} - ${workspace.path}`,
+    workspace,
+  };
+  const recentItems = items.filter((item) => item.id !== workspace.id);
   const renderProjectRows = (projectItems: DesktopWorkspaceSwitcherItem[]) => projectItems.map((item) => (
     <DesktopProjectMenuRow
       key={item.id}
@@ -87,17 +97,34 @@ export function DesktopWorkspaceSwitcher({
           onClick={onGoHome}
         />
         <div className="desktop-project-list" data-po-scrollbar="menu">
-          {items.length > 0 && (
-            <DesktopMenuSection className="desktop-project-section" aria-label={t("shell.workspaceSwitcher.localProjects")}>
-              {renderProjectRows(items)}
+          <DesktopMenuSection
+            className="desktop-project-section desktop-project-current-section"
+            label={t("shell.workspaceSwitcher.currentWorkspace")}
+          >
+            {renderProjectRows([currentItem])}
+            {onAddFolder ? (
+              <DesktopMenuItem
+                className="desktop-project-add desktop-project-add-folder"
+                icon={<FolderPlus size={14} />}
+                label={t("shell.workspaceSwitcher.addFolderToWorkspace")}
+                onClick={onAddFolder}
+              />
+            ) : null}
+          </DesktopMenuSection>
+          {recentItems.length > 0 ? (
+            <DesktopMenuSection
+              className="desktop-project-section desktop-project-recent-section"
+              label={t("shell.workspaceSwitcher.recentProjects")}
+            >
+              {renderProjectRows(recentItems)}
             </DesktopMenuSection>
-          )}
+          ) : null}
         </div>
         <div className="desktop-project-actions">
           <DesktopMenuItem
-            className="desktop-project-add"
+            className="desktop-project-add desktop-project-open-folder"
             icon={<FolderOpen size={14} />}
-            label={t("shell.workspaceSwitcher.openLocalFolder")}
+            label={t("shell.workspaceSwitcher.openFolder")}
             onClick={onOpenFolder}
           />
         </div>

@@ -1,0 +1,64 @@
+.workspace-menu-visual-smoke {
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--po-bg);
+  color: var(--po-text);
+}
+
+.workspace-menu-visual-titlebar {
+  display: flex;
+  height: 48px;
+  align-items: center;
+  padding: 0 36px;
+  border-bottom: 1px solid var(--po-divider);
+  background: var(--po-chrome);
+}
+
+.workspace-menu-visual-titlebar .desktop-titlebar-context {
+  height: 100%;
+}
+
+.workspace-menu-visual-branch {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  color: var(--po-text-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.workspace-menu-visual-body {
+  display: grid;
+  min-height: calc(100vh - 48px);
+  grid-template-columns: 230px 1fr;
+  opacity: 0.5;
+}
+
+.workspace-menu-visual-body aside {
+  border-inline-end: 1px solid var(--po-divider);
+  background: var(--po-surface);
+}
+
+.workspace-menu-visual-body > div {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  padding: 48px;
+}
+
+.workspace-menu-visual-body span {
+  width: min(620px, 70%);
+  height: 18px;
+  border-radius: 6px;
+  background: var(--po-control);
+}
+
+.workspace-menu-visual-body span:nth-child(2) {
+  width: min(480px, 54%);
+}
+
+.workspace-menu-visual-body span:nth-child(3) {
+  width: min(560px, 62%);
+}

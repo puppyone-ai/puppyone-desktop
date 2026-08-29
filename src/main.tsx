@@ -89,6 +89,11 @@ async function renderApplication() {
       "./features/appearance/AppearanceVisualSmokeHarness"
     );
     surface = <AppearanceVisualSmokeHarness />;
+  } else if (window.location.hash === "#workspace-menu-visual-smoke") {
+    const { WorkspaceMenuVisualSmokeHarness } = await import(
+      "./features/app-shell/WorkspaceMenuVisualSmokeHarness"
+    );
+    surface = <WorkspaceMenuVisualSmokeHarness />;
   } else {
     surface = (
       <TypographyCatalogProvider>
