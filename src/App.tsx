@@ -10,7 +10,7 @@ import {
 import { useLocalization } from "@puppyone/localization";
 import { DesktopCloudShell, type DesktopView } from "./components/DesktopCloudShell";
 import { isSettingsSectionAvailable, type SettingsSection } from "./features/settings";
-import { type CloudWorkspaceSection } from "./features/cloud";
+import { CLOUD_HUB_ENTRY_SECTION, type CloudWorkspaceSection } from "./features/cloud";
 import {
   MinimalOnboarding,
 } from "./components/MinimalOnboarding";
@@ -123,6 +123,7 @@ function AppContent() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const {
     addProject,
+    activeWorkspaceEntryKind,
     chooseProjectLocation,
     clearWorkspace,
     cloneRepository,
@@ -359,6 +360,10 @@ function AppContent() {
     setGitOperationLoading,
     setPendingBranchSwitch,
   } = git;
+  const handleWorkspaceStarterCreated = useCallback((path: string) => {
+    refreshWorkspaceContent(path);
+    void refreshGitStatus("first-project-starter");
+  }, [refreshGitStatus, refreshWorkspaceContent]);
   const {
     puppyoneConfig,
     puppyoneConfigError,
@@ -543,11 +548,7 @@ function AppContent() {
 
       if (view === "cloud") {
         setActiveView("cloud");
-        setActiveCloudSection(
-          resolvedCloudProjectId
-            ? "contents"
-            : "initialize",
-        );
+        setActiveCloudSection(CLOUD_HUB_ENTRY_SECTION);
         setSidebarCollapsed(false);
         setSwitcherOpen(false);
         return;
@@ -563,7 +564,6 @@ function AppContent() {
     activeView,
     cloudEnabled,
     experimentalSettings.enableViewerPlugins,
-    resolvedCloudProjectId,
     setSidebarCollapsed,
   ]);
 
@@ -1058,6 +1058,10 @@ function AppContent() {
           editorWorkbench={editorWorkbench}
           externalOpen={externalFileOpen}
           desktopUpdates={desktopUpdates}
+          firstProjectStarterEligible={
+            experimentalSettings.enableFirstProjectStarter
+            && activeWorkspaceEntryKind === "created"
+          }
           git={git}
           navigationComposition={resolvedAppearance.composition.navigation}
           onActiveDataNodeChange={handleActiveDataNodeChange}
@@ -1065,6 +1069,7 @@ function AppContent() {
           onResourceMove={handleResourceMoved}
           onCreateEntryMenu={openCreateEntryMenu}
           onDismissCreateEntryMenu={() => setCreateEntryDraft(null)}
+          onWorkspaceStarterCreated={handleWorkspaceStarterCreated}
           fileClipboardController={fileClipboardController}
           onFilesVisibilitySettingsChange={handleFilesVisibilitySettingsChange}
           onNavigate={navigateDesktopView}

@@ -2,7 +2,7 @@
 //
 // A separate main-process watcher whose events invalidate ONLY repository
 // state. It must not refresh Explorer or enter edit-review. See
-// docs/architecture/git/status-refresh-lifecycle.md (Work Package 1).
+// https://github.com/puppyone-ai/puppy-issues/blob/main/document/puppyone-desktop/source-control/refresh-lifecycle.md (Work Package 1).
 //
 // Design notes:
 //   - Repository-owned paths are resolved through Git (never renderer-supplied)

@@ -46,6 +46,7 @@ type DesktopWorkspaceContentProps = {
   }>;
   fileClipboardController: FileClipboardController;
   desktopUpdates: DesktopUpdatesController;
+  firstProjectStarterEligible: boolean;
   git: DesktopGitController;
   navigationComposition: string;
   onActiveDataPathChange: (
@@ -56,6 +57,7 @@ type DesktopWorkspaceContentProps = {
   onResourceMove: (previousPath: string, nextPath: string) => void | Promise<void>;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onDismissCreateEntryMenu: () => void;
+  onWorkspaceStarterCreated: (path: string) => void;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
   onNavigate: (view: DesktopView) => void;
   onNodeActionMenu: (node: DataNode, anchorRect: DOMRect, selectedNodes?: readonly DataNode[]) => void;
@@ -89,6 +91,7 @@ export function DesktopWorkspaceContent({
   externalOpen,
   fileClipboardController,
   desktopUpdates,
+  firstProjectStarterEligible,
   git,
   navigationComposition,
   onActiveDataPathChange,
@@ -96,6 +99,7 @@ export function DesktopWorkspaceContent({
   onResourceMove,
   onCreateEntryMenu,
   onDismissCreateEntryMenu,
+  onWorkspaceStarterCreated,
   onFilesVisibilitySettingsChange,
   onNavigate,
   onNodeActionMenu,
@@ -188,6 +192,7 @@ export function DesktopWorkspaceContent({
       editorInteractionPreferences={editorInteractionPreferences}
       fileClipboardController={fileClipboardController}
       fileOperationNotice={fileOperationNotice}
+      firstProjectStarterEligible={firstProjectStarterEligible}
       navigation={{
         activeView: resolvedActiveView,
         availableSurfaceIds,
@@ -208,6 +213,7 @@ export function DesktopWorkspaceContent({
       onResourceMove={onResourceMove}
       onCreateEntryMenu={onCreateEntryMenu}
       onDismissCreateEntryMenu={onDismissCreateEntryMenu}
+      onWorkspaceStarterCreated={onWorkspaceStarterCreated}
       onNodeActionMenu={onNodeActionMenu}
       preferences={preferences}
       resolvedSurface={resolvedSurface}

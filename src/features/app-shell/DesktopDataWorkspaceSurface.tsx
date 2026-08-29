@@ -1,4 +1,6 @@
 import {
+  useCallback,
+  useEffect,
   useState,
   type ComponentProps,
   type MouseEvent as ReactMouseEvent,
@@ -8,6 +10,7 @@ import { Plus } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
 import {
   DataWorkspace,
+  getFileSemanticKind,
   type AiEditRequest,
   type DataNode,
   type Workspace,
@@ -49,6 +52,15 @@ import {
 } from "../desktop-agent-presence";
 import { DesktopShellNavigationToolbarPortal } from "./DesktopShellAccessoryContext";
 import { RemoteUpdateNotice } from "../data-workspace/RemoteUpdateNotice";
+import {
+  EmptyWorkspaceOnboardingDialog,
+  markFirstProjectStarterCompleted,
+  readFirstProjectStarterCompleted,
+  resolveWorkspaceRootOnboardingStatus,
+  shouldShowFirstProjectStarter,
+  type EmptyWorkspaceStarterSelection,
+  type WorkspaceRootOnboardingStatus,
+} from "./EmptyWorkspaceOnboardingDialog";
 
 type DataWorkspaceProps = ComponentProps<typeof DataWorkspace>;
 
@@ -64,6 +76,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
   editorInteractionPreferences: NonNullable<DataWorkspaceProps["editorInteractionPreferences"]>;
   fileClipboardController: FileClipboardController;
   fileOperationNotice: string | null;
+  firstProjectStarterEligible: boolean;
   navigation: {
     activeView: DesktopView;
     availableSurfaceIds: readonly DesktopView[];
@@ -87,6 +100,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
   onResourceMove: (previousPath: string, nextPath: string) => void | Promise<void>;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onDismissCreateEntryMenu: () => void;
+  onWorkspaceStarterCreated: (path: string) => void;
   onNodeActionMenu: (node: DataNode, anchorRect: DOMRect, selectedNodes?: readonly DataNode[]) => void;
   preferences: DesktopPreferencesController;
   resolvedSurface: ResolvedWorkspaceSurface;
@@ -110,6 +124,7 @@ export function DesktopDataWorkspaceSurface({
   editorInteractionPreferences,
   fileClipboardController,
   fileOperationNotice,
+  firstProjectStarterEligible,
   navigation,
   navigationComposition,
   onActiveDataNodeChange,
@@ -117,6 +132,7 @@ export function DesktopDataWorkspaceSurface({
   onActiveDataPathChange,
   onCreateEntryMenu,
   onDismissCreateEntryMenu,
+  onWorkspaceStarterCreated,
   onNodeActionMenu,
   preferences,
   resolvedSurface,
@@ -133,9 +149,54 @@ export function DesktopDataWorkspaceSurface({
     "explorer-resize",
   );
   const [explorerResizeHandle, setExplorerResizeHandle] = useState<HTMLDivElement | null>(null);
+  const [workspaceRootStatus, setWorkspaceRootStatus] = useState<Readonly<{
+    workspaceKey: string;
+    status: WorkspaceRootOnboardingStatus;
+  }> | null>(null);
+  const [firstProjectStarterCompleted, setFirstProjectStarterCompleted] = useState(
+    readFirstProjectStarterCompleted,
+  );
   useNativeSurfacePointerRoutingRegion("explorer-resize", explorerResizeHandle);
   const { t } = useLocalization();
   const paneLayout = useDesktopPaneLayout();
+  const updateWorkspaceRootStatus = useCallback((
+    nextWorkspaceKey: string,
+    status: WorkspaceRootOnboardingStatus,
+  ) => {
+    setWorkspaceRootStatus((current) => (
+      current?.workspaceKey === nextWorkspaceKey && current.status === status
+        ? current
+        : { workspaceKey: nextWorkspaceKey, status }
+    ));
+  }, []);
+  const currentWorkspaceRootStatus = workspaceRootStatus?.workspaceKey === workspaceKey
+    ? workspaceRootStatus.status
+    : null;
+  const showEmptyWorkspaceOnboarding = shouldShowFirstProjectStarter({
+    eligible: firstProjectStarterEligible,
+    completed: firstProjectStarterCompleted,
+    workspaceStatus: currentWorkspaceRootStatus,
+  });
+  const confirmWorkspaceStarter = useCallback(async (selection: EmptyWorkspaceStarterSelection) => {
+    if (selection.file) {
+      if (!dataPort.createFile) throw new Error(t("workspace.emptyOnboarding.createUnavailable"));
+      await dataPort.createFile(selection.file.path, selection.file.content);
+      const node: DataNode = {
+        id: selection.file.path,
+        name: selection.file.path,
+        path: selection.file.path,
+        type: getFileSemanticKind(selection.file.path, "file"),
+      };
+      markFirstProjectStarterCompleted();
+      setFirstProjectStarterCompleted(true);
+      onWorkspaceStarterCreated(selection.file.path);
+      await onActiveDataPathChange(selection.file.path, node);
+      return;
+    }
+
+    markFirstProjectStarterCompleted();
+    setFirstProjectStarterCompleted(true);
+  }, [dataPort, onActiveDataPathChange, onWorkspaceStarterCreated, t]);
   const resolvedExplorerWidth = paneLayout?.explorer.width ?? preferences.explorerWidth;
   const resolvedExplorerMaxWidth = paneLayout?.explorer.maxWidth
     ?? MAX_EXPLORER_WIDTH;
@@ -327,26 +388,35 @@ export function DesktopDataWorkspaceSurface({
           : undefined}
         mainSlot={resolvedSurface.id === "data"
           ? (state) => (
-              <DesktopEditorSplitView
-                aiEditRequest={activeAiEditRequest}
-                dataPort={dataPort}
-                editorGroup={editorWorkbench.state}
-                externalOpen={externalOpen}
-                editorInteractionPreferences={editorInteractionPreferences}
-                editorTree={state.tree}
-                fileIconTheme={preferences.fileIconTheme}
-                layout={editorWorkbench.paneLayout}
-                markdownEnvironment={state.markdownEnvironment}
-                refreshKey={workspaceRefreshToken}
-                viewerExtensionAdapter={viewerExtensionAdapter}
-                workspace={workspace}
-                onClosePane={editorWorkbench.closePane}
-                onFocusPane={editorWorkbench.focusPane}
-                onMovePane={editorWorkbench.movePane}
-                onOpenAtPaneEdge={editorWorkbench.openDocumentAtPaneEdge}
-                onResizeSplit={editorWorkbench.resizeSplit}
-                onSplitPane={editorWorkbench.splitPane}
-              />
+              <>
+                <WorkspaceRootOnboardingStatusReporter
+                  workspaceKey={workspaceKey}
+                  rootLoading={state.rootLoading}
+                  loadError={state.loadError}
+                  rootEntryCount={state.tree.length}
+                  onStatusChange={updateWorkspaceRootStatus}
+                />
+                <DesktopEditorSplitView
+                  aiEditRequest={activeAiEditRequest}
+                  dataPort={dataPort}
+                  editorGroup={editorWorkbench.state}
+                  externalOpen={externalOpen}
+                  editorInteractionPreferences={editorInteractionPreferences}
+                  editorTree={state.tree}
+                  fileIconTheme={preferences.fileIconTheme}
+                  layout={editorWorkbench.paneLayout}
+                  markdownEnvironment={state.markdownEnvironment}
+                  refreshKey={workspaceRefreshToken}
+                  viewerExtensionAdapter={viewerExtensionAdapter}
+                  workspace={workspace}
+                  onClosePane={editorWorkbench.closePane}
+                  onFocusPane={editorWorkbench.focusPane}
+                  onMovePane={editorWorkbench.movePane}
+                  onOpenAtPaneEdge={editorWorkbench.openDocumentAtPaneEdge}
+                  onResizeSplit={editorWorkbench.resizeSplit}
+                  onSplitPane={editorWorkbench.splitPane}
+                />
+              </>
             )
           : resolvedSurface.content.main == null
             ? undefined
@@ -374,8 +444,36 @@ export function DesktopDataWorkspaceSurface({
           />
         </div>
       )}
+      {showEmptyWorkspaceOnboarding && (
+        <EmptyWorkspaceOnboardingDialog
+          onConfirm={confirmWorkspaceStarter}
+        />
+      )}
     </div>
   );
+}
+
+function WorkspaceRootOnboardingStatusReporter({
+  workspaceKey,
+  rootLoading,
+  loadError,
+  rootEntryCount,
+  onStatusChange,
+}: {
+  workspaceKey: string;
+  rootLoading: boolean;
+  loadError: string | null;
+  rootEntryCount: number;
+  onStatusChange: (workspaceKey: string, status: WorkspaceRootOnboardingStatus) => void;
+}) {
+  useEffect(() => {
+    onStatusChange(workspaceKey, resolveWorkspaceRootOnboardingStatus({
+      rootLoading,
+      loadError,
+      rootEntryCount,
+    }));
+  }, [loadError, onStatusChange, rootEntryCount, rootLoading, workspaceKey]);
+  return null;
 }
 
 function getContextMenuAnchorRect(event: ReactMouseEvent<HTMLElement>): DOMRect {
