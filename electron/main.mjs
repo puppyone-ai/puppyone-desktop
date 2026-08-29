@@ -62,6 +62,7 @@ import { registerNativeSurfaceOcclusionIpcHandlers } from "./main/ipc/native-sur
 import { registerNativeSurfacePointerPassthroughIpcHandlers } from "./main/ipc/native-surface-pointer-passthrough-ipc.mjs";
 import { registerPanePreviewIpcHandlers } from "./main/ipc/pane-preview-ipc.mjs";
 import { registerLocalizationIpcHandlers } from "./main/ipc/localization-ipc.mjs";
+import { registerTelemetryIpcHandlers } from "./main/ipc/telemetry-ipc.mjs";
 import { createMarkdownWebEmbedService } from "./main/markdown-web-embed-service.mjs";
 import { createExternalNavigationService } from "./main/external-navigation-service.mjs";
 import { createNativeSurfaceOcclusionCoordinator } from "./main/native-surfaces/occlusion-coordinator.mjs";
@@ -96,6 +97,7 @@ import { createProjectLocationGrantStore } from "./main/project-location-grants.
 import { createDesktopLocaleService } from "./main/localization/desktop-locale-service.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
+import { createDesktopTelemetryHost } from "./main/telemetry/bootstrap/create-desktop-telemetry-host.mjs";
 import {
   DESKTOP_WINDOW_MIN_HEIGHT,
   DESKTOP_WINDOW_MIN_WIDTH,
@@ -190,6 +192,7 @@ privilegedSchemes.push(...getViewerPackPrivilegedSchemes(
 protocol.registerSchemesAsPrivileged(privilegedSchemes);
 
 let updateService = null;
+let telemetryHost = null;
 let appPreviewRuntime = null;
 let viewerPackHost = null;
 let viewerPackRuntime = null;
@@ -569,13 +572,13 @@ function getLastFocusedWindow() {
 }
 
 function resolveAppIconPath() {
-  const developmentBuild = desktopBuildInfo.channel === "dev";
-  const resourceFilename = developmentBuild ? "logo-square-dev.png" : "logo-square.png";
-  const sourceFilename = developmentBuild ? "logo-square-dev.png" : "logo-square.png";
+  const resourceFilename = "puppy-app-image.png";
+  const sourceFilename = desktopBuildInfo.channel === "dev"
+    ? "puppy-app-image-dev.png"
+    : resourceFilename;
   const candidates = [
     path.join(process.resourcesPath ?? projectRoot, resourceFilename),
-    path.join(projectRoot, "dist", sourceFilename),
-    path.join(projectRoot, "public", sourceFilename),
+    path.join(projectRoot, "assets", "brand", "puppy", sourceFilename),
   ];
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
 }
@@ -612,6 +615,11 @@ app.whenReady().then(async () => {
     getWindows: () => BrowserWindow.getAllWindows(),
     getRestartBlockers: getUpdateRestartBlockers,
     confirmRestartWithBlockers: confirmUpdateRestartWithBlockers,
+  });
+  telemetryHost = createDesktopTelemetryHost({
+    app,
+    buildInfo: desktopBuildInfo,
+    getWindows: () => BrowserWindow.getAllWindows(),
   });
   stopLocaleNativeRefresh = localeService.onDidChange(() => {
     nativeMenuService.refresh();
@@ -671,6 +679,7 @@ app.whenReady().then(async () => {
     });
   }
   registerIpcHandlers();
+  await telemetryHost.start();
   updateService.start();
   const initialWorkspacePath = initialLaunchIntent.workspacePath
     ?? await workspaceStateStore.readLastActiveWorkspacePath();
@@ -705,6 +714,7 @@ app.on("will-quit", () => {
   localeService.dispose();
   cloudAuthService.dispose();
   updateService?.dispose();
+  telemetryHost?.dispose();
   viewerPackHost?.destroyAllSessions();
   appPreviewRuntime?.closeAll();
   markdownWebEmbedService?.dispose();
@@ -732,6 +742,7 @@ function registerIpcHandlers() {
   registerAppearanceIpcHandlers({
     ipcMain: trustedIpcMain,
     BrowserWindow,
+    nativeTheme,
   });
   registerThemeIpcHandlers({
     ipcMain: trustedIpcMain,
@@ -757,6 +768,10 @@ function registerIpcHandlers() {
   registerBuildInfoIpcHandlers({
     ipcMain: trustedIpcMain,
     buildInfo: desktopBuildInfo,
+  });
+  registerTelemetryIpcHandlers({
+    ipcMain: trustedIpcMain,
+    telemetryService: telemetryHost.service,
   });
   registerLocalizationIpcHandlers({
     ipcMain: trustedIpcMain,

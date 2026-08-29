@@ -36,6 +36,10 @@ describe("titlebar drag-region architecture", () => {
       desktopShell.indexOf('className="desktop-shell-body"'),
     );
     expect(windowChromeComponent).toContain('data-window-drag-region="true"');
+    expect(windowChromeComponent).toContain('className="desktop-titlebar-trailing"');
+    expect(windowChromeComponent.indexOf('className="desktop-titlebar-actions"')).toBeLessThan(
+      windowChromeComponent.indexOf('className="desktop-window-controls"'),
+    );
     expect(desktopMenu).toContain('data-window-no-drag="true"');
     expect(sharedWorkspaceCss).not.toContain("-webkit-app-region");
     expect(sharedWorkspaceCss).not.toContain("data-window-drag-region");

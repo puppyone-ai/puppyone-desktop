@@ -45,6 +45,15 @@ describe("desktop explorer Header expansion", () => {
       .toContain("Workspace");
   });
 
+  it("does not render an empty editor Header column when no slot is provided", () => {
+    const container = renderShell({
+      leftSidebarCollapsed: false,
+      titlebarEditorSlot: null,
+    });
+
+    expect(container.querySelector(".desktop-titlebar-editor-context")).toBeNull();
+  });
+
   it("does not expose an expansion action merely because the window is compact", () => {
     vi.spyOn(window, "innerWidth", "get").mockReturnValue(640);
     const onLeftSidebarExpand = vi.fn();
@@ -80,11 +89,13 @@ function renderShell({
   onLeftSidebarExpand = vi.fn(),
   rightSidebar,
   rightSidebarOpen = false,
+  titlebarEditorSlot = <div>Editors</div>,
 }: {
   leftSidebarCollapsed: boolean;
   onLeftSidebarExpand?: () => void;
   rightSidebar?: React.ReactNode;
   rightSidebarOpen?: boolean;
+  titlebarEditorSlot?: React.ReactNode;
 }) {
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -97,7 +108,7 @@ function renderShell({
         rightSidebar={rightSidebar}
         rightSidebarOpen={rightSidebarOpen}
         titlebarSidebarSlot={<div>Workspace · main</div>}
-        titlebarEditorSlot={<div>Editors</div>}
+        titlebarEditorSlot={titlebarEditorSlot}
       >
         <div>Editor</div>
       </DesktopCloudShell>,

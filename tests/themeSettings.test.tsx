@@ -27,7 +27,7 @@ describe("CSS theme settings", () => {
     const app = source("src/App.tsx");
     const surface = source("src/features/settings/SettingsWorkspaceSurface.tsx");
     const view = source("src/features/settings/SettingsView.tsx");
-    const editor = source("src/features/settings/main/EditorSettingsViews.tsx");
+    const editor = source("src/features/settings/main/EditorSettingsView.tsx");
 
     expect(app).toContain("themeCatalog={themeCatalog}");
     expect(surface).toContain("themeCatalog: ThemeCatalogController");

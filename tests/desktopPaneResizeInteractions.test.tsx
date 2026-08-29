@@ -56,21 +56,66 @@ describe("desktop side-pane resize interactions", () => {
     });
 
     expect(content.style.getPropertyValue("--data-explorer-width")).toBe("250px");
-    expect(onWidthChange).toHaveBeenLastCalledWith(250);
+    expect(onWidthChange).not.toHaveBeenCalled();
 
     act(() => {
       window.dispatchEvent(pointerEvent("pointerup", 250, 2));
+    });
+    expect(onWidthChange).toHaveBeenLastCalledWith(250);
+
+    act(() => {
       handle.dispatchEvent(pointerEvent("pointerdown", 320, 2));
       window.dispatchEvent(pointerEvent("pointermove", 200, 2));
     });
 
     expect(content.style.getPropertyValue("--data-explorer-width")).toBe("240px");
-    expect(onWidthChange).toHaveBeenLastCalledWith(240);
+    expect(onWidthChange).not.toHaveBeenCalledWith(240);
     expect(onCollapsedChange).not.toHaveBeenCalledWith(true);
 
     act(() => {
       window.dispatchEvent(pointerEvent("pointerup", 200, 2));
     });
+    expect(onWidthChange).toHaveBeenLastCalledWith(240);
+  });
+
+  it("coalesces rapid explorer previews into one committed preference width", async () => {
+    let scheduledFrame: FrameRequestCallback | null = null;
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      scheduledFrame = callback;
+      return 1;
+    });
+    const onWidthChange = vi.fn();
+    const container = await renderWorkspace({
+      onCollapsedChange: vi.fn(),
+      onWidthChange,
+    });
+    const handle = requireHandle(container, ".data-explorer-resizer");
+    const content = requireHandle(container, ".data-content");
+
+    act(() => {
+      handle.dispatchEvent(pointerEvent("pointerdown", 320, 14));
+      window.dispatchEvent(pointerEvent("pointermove", 360, 14));
+      window.dispatchEvent(pointerEvent("pointermove", 420, 14));
+      window.dispatchEvent(pointerEvent("pointermove", 480, 14));
+    });
+
+    expect(content.style.getPropertyValue("--data-explorer-width")).toBe("320px");
+    expect(onWidthChange).not.toHaveBeenCalled();
+
+    act(() => {
+      const frame = scheduledFrame as FrameRequestCallback | null;
+      if (!frame) throw new Error("Explorer resize frame was not scheduled.");
+      frame(0);
+    });
+
+    expect(content.style.getPropertyValue("--data-explorer-width")).toBe("480px");
+    expect(onWidthChange).not.toHaveBeenCalled();
+
+    act(() => {
+      window.dispatchEvent(pointerEvent("pointerup", 480, 14));
+    });
+
+    expect(onWidthChange).toHaveBeenCalledExactlyOnceWith(480);
   });
 
   it("keeps explorer resize values inside the expanded range before snapping", async () => {

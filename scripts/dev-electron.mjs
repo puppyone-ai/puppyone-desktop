@@ -23,8 +23,8 @@ const mainWatchPaths = [
   path.join(desktopRoot, "local-api"),
   path.join(desktopRoot, "locales", "native"),
   path.join(desktopRoot, "locales", "manifest.json"),
-  path.join(desktopRoot, "public", "logo-square.png"),
-  path.join(desktopRoot, "public", "logo-square-dev.png"),
+  path.join(desktopRoot, "assets", "brand", "puppy", "puppy-app-image.png"),
+  path.join(desktopRoot, "assets", "brand", "puppy", "puppy-app-image-dev.png"),
 ];
 const rendererDependencyWatchPaths = [
   path.join(desktopRoot, "package.json"),

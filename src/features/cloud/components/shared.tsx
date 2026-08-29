@@ -1,6 +1,7 @@
 import { Check, ChevronRight, Cloud, Copy, ExternalLink, FileText, FolderOpen, GitBranch, RefreshCw } from "lucide-react";
 import {
   FilePreviewIcon,
+  RENDERER_ASSET_PATHS,
   resolveRendererPublicAssetUrl,
   type Workspace,
 } from "@puppyone/shared-ui";
@@ -177,7 +178,7 @@ export function CloudFilePreviewIcon({
         aria-hidden="true"
       >
         <img
-          src={resolveRendererPublicAssetUrl("icons/folder.svg")}
+          src={resolveRendererPublicAssetUrl(RENDERER_ASSET_PATHS.icons.ui.folder)}
           alt=""
           width={size}
           height={size}

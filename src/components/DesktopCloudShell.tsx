@@ -159,9 +159,11 @@ export function DesktopCloudShell({
               )}
               {titlebarSidebarSlot}
             </div>
-            <div className="desktop-titlebar-editor-context">
-              {titlebarEditorSlot}
-            </div>
+            {titlebarEditorSlot != null && (
+              <div className="desktop-titlebar-editor-context">
+                {titlebarEditorSlot}
+              </div>
+            )}
           </>
         )}
         actions={titlebarActions}

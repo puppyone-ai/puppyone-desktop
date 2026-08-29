@@ -24,7 +24,6 @@
   min-height: 0;
   overflow: hidden;
   background: var(--po-canvas);
-  transition: grid-template-columns 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .data-content[data-explorer-collapsed="true"] {

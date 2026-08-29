@@ -9,6 +9,11 @@ import {
   createEmbeddedInlineViewportSessionStore,
   type EmbeddedInlineViewportSessionStore,
 } from "./embeddedInlineViewportSession";
+import {
+  createEmbeddedTableColumnLayoutBrowserPersistence,
+  createEmbeddedTableColumnLayoutSessionStore,
+  type EmbeddedTableColumnLayoutSessionStore,
+} from "./embeddedTableColumnLayoutSession";
 import { createWidgetSessionRegistry, type WidgetSessionRegistry } from "./widgetSession";
 import { createExecutionSessionStore, type ExecutionSessionStore } from "../sessions/executionSession";
 import { createMarkdownLayoutCoordinator, type MarkdownLayoutCoordinator } from "./layoutCoordinator";
@@ -18,6 +23,7 @@ export type MarkdownEmbedHost = {
   sessions: WidgetSessionRegistry;
   editSessions: EmbeddedEditSessionStore;
   inlineViewports: EmbeddedInlineViewportSessionStore;
+  tableColumnLayouts: EmbeddedTableColumnLayoutSessionStore;
   executionSessions: ExecutionSessionStore;
   assets: AssetBroker;
   asyncRender: AsyncRenderBroker;
@@ -52,6 +58,9 @@ export function getMarkdownEmbedHost(
   const sessions = createWidgetSessionRegistry();
   const editSessions = createEmbeddedEditSessionStore();
   const inlineViewports = createEmbeddedInlineViewportSessionStore();
+  const tableColumnLayouts = createEmbeddedTableColumnLayoutSessionStore({
+    persistence: createEmbeddedTableColumnLayoutBrowserPersistence(),
+  });
   const assets = createAssetBroker(options.resolveAssetUrl ?? null, {
     workspaceRoot: options.workspaceRoot ?? null,
     // Conventional Markdown documentation loads passive HTTPS images (for
@@ -80,6 +89,7 @@ export function getMarkdownEmbedHost(
     sessions,
     editSessions,
     inlineViewports,
+    tableColumnLayouts,
     executionSessions,
     assets,
     asyncRender,
@@ -94,6 +104,7 @@ export function getMarkdownEmbedHost(
       sessions.disposeAll();
       editSessions.clear();
       inlineViewports.clear();
+      tableColumnLayouts.clear();
       executionSessions.disposeAll();
       assets.disposeAll();
       asyncRender.disposeAll();

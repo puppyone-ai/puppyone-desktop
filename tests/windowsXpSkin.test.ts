@@ -134,6 +134,7 @@ describe("Interface style registry", () => {
       expect(result.dataset.initialThemePreset).toBe(item.preset);
       expect(result.properties["--initial-shell-background"]).toBe(item.expected);
       expect(result.nativeBackgrounds).toEqual([item.expected]);
+      expect(result.nativeThemeSources).toEqual([item.themeMode]);
       expect(getInterfaceStyleFirstPaint("default", item.themeMode, item.preset).background)
         .toBe(item.expected);
     }
@@ -147,6 +148,15 @@ describe("Interface style registry", () => {
     });
     expect(defaultLight.dataset.initialThemePreset).toBe("neutral");
     expect(defaultLight.properties["--initial-shell-background"]).toBe("#fafafa");
+
+    const systemLight = runFirstPaint({
+      bootstrap,
+      initialTheme,
+      interfaceStyle: "default",
+      themeMode: "system",
+      systemDark: false,
+    });
+    expect(systemLight.nativeThemeSources).toEqual(["system"]);
 
     const invalidPreset = runFirstPaint({
       bootstrap,
@@ -530,6 +540,7 @@ function runFirstPaint({
   const dataset: Record<string, string> = {};
   const properties: Record<string, string> = {};
   const nativeBackgrounds: string[] = [];
+  const nativeThemeSources: string[] = [];
   const values = new Map([
     ["puppyone.desktop.interfaceStyle", interfaceStyle],
     ["puppyone.desktop.theme", themeMode],
@@ -542,8 +553,15 @@ function runFirstPaint({
       localStorage: { getItem: (key: string) => values.get(key) ?? null },
       matchMedia: () => ({ matches: systemDark }),
       puppyoneDesktop: {
-        setWindowBackground: ({ background }: { background: string }) => {
+        setWindowBackground: ({
+          background,
+          themeSource,
+        }: {
+          background: string;
+          themeSource: string;
+        }) => {
           nativeBackgrounds.push(background);
+          nativeThemeSources.push(themeSource);
         },
       },
     },
@@ -556,7 +574,7 @@ function runFirstPaint({
   };
   vm.runInNewContext(bootstrap, context);
   vm.runInNewContext(initialTheme, context);
-  return { dataset, properties, nativeBackgrounds };
+  return { dataset, properties, nativeBackgrounds, nativeThemeSources };
 }
 
 function windowsXpStylePack() {

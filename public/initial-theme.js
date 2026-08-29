@@ -43,7 +43,10 @@
     if (firstPaint) {
       document.documentElement.style.setProperty("--initial-shell-background", firstPaint.background);
       document.documentElement.style.setProperty("--initial-shell-color-scheme", firstPaint.colorScheme);
-      window.puppyoneDesktop?.setWindowBackground?.({ background: firstPaint.background });
+      window.puppyoneDesktop?.setWindowBackground?.({
+        background: firstPaint.background,
+        themeSource: activeMode === "system" ? "system" : firstPaint.colorScheme,
+      });
     }
   } catch {
     // Keep the static first-paint background when storage is unavailable.

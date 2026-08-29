@@ -21,6 +21,7 @@ import { createMarkdownTableWindowController } from "./tableWindowController";
 import type { MarkdownInlinePreviewRenderer } from "../../shared/preview/markdownInlinePreviewPort";
 import { createMarkdownTableInlineViewportController } from "./tableInlineViewportController";
 import { getMappedWidgetSourceRange } from "../../shared/widgets/widgetDom";
+import { createMarkdownTableColumnLayoutController } from "./tableColumnLayoutController";
 
 export class MarkdownTableWidget extends WidgetType {
   constructor(
@@ -79,6 +80,15 @@ export class MarkdownTableWidget extends WidgetType {
     // The semantic table model normalizes every row to the alignment width.
     // Do not rescan an oversized immutable row collection during DOM mount.
     const columnCount = Math.max(1, this.alignments.length);
+    const estimatedColumnWidths = estimateMarkdownTableColumnWidths(this.alignments, this.rows);
+    const columnLayoutSession = host.tableColumnLayouts.acquire({
+      featureId: "markdown-table",
+      initialWidths: estimatedColumnWidths,
+      mappedRange: { from: this.from, to: this.to },
+      persistenceNamespace: this.documentPath,
+      sourceIdentity: this.viewportKey,
+    });
+    wrapper.dataset.mdTableColumnLayoutSession = columnLayoutSession.sessionId;
 
     const scrollport = doc.createElement("div");
     scrollport.dir = localization.direction;
@@ -106,8 +116,9 @@ export class MarkdownTableWidget extends WidgetType {
     // tables on browser auto-layout would let that transient DOM resize the
     // entire block and, near an overflow threshold, the editor reading rail.
     const colgroup = doc.createElement("colgroup");
-    for (const width of estimateMarkdownTableColumnWidths(this.alignments, this.rows)) {
+    for (const [columnIndex, width] of columnLayoutSession.widths.entries()) {
       const column = doc.createElement("col");
+      column.dataset.mdTableColumn = String(columnIndex);
       column.style.width = `${width}px`;
       colgroup.appendChild(column);
     }
@@ -270,9 +281,26 @@ export class MarkdownTableWidget extends WidgetType {
       tableTo: this.to,
       viewport: scrollport,
     });
+    const columnLayout = view.state.readOnly
+      ? null
+      : createMarkdownTableColumnLayoutController({
+          alignments: this.alignments,
+          direction: localization.direction,
+          frame,
+          host,
+          resizeColumnLabel: (column) => localization.t("editor.table.resizeColumn", { column }),
+          resizeHint: localization.t("editor.table.resizeColumnHint"),
+          rows: this.rows,
+          scrollport,
+          session: columnLayoutSession,
+          surface,
+          table,
+          wrapper,
+        });
     const dragLayer = createMarkdownTableDragLayer({
       alignments: this.alignments,
       columnCount,
+      columnLayout,
       inlineViewport,
       rows: this.rows,
       table,
@@ -285,6 +313,13 @@ export class MarkdownTableWidget extends WidgetType {
     host.sessions.mount(wrapper, () => ({
       dispose() {
         dragLayer.dispose();
+        columnLayout?.dispose();
+        if (!columnLayout) {
+          host.tableColumnLayouts.detach(
+            columnLayoutSession.sessionId,
+            columnLayoutSession.mountToken,
+          );
+        }
         inlineViewport.dispose();
         windowController?.dispose();
         for (const cell of wrapper.querySelectorAll<HTMLElement>(".cm-md-table-cell-content")) {

@@ -7,10 +7,15 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const distRoot = path.join(repoRoot, "dist");
 const publicRoot = path.join(repoRoot, "public");
+const rendererAssetCatalogPath = path.join(
+  repoRoot,
+  "packages/shared-ui/src/core/rendererAssetCatalog.ts",
+);
 const rootRelativeAssetPattern = /(["'`])\/(?!\/)[^"'`]+\.(?:png|svg|webp|jpe?g|gif|ico|woff2?)(?:[?#][^"'`]*)?\1/gi;
 const rendererAssetCallPattern = /resolveRendererPublicAssetUrl\(\s*(["'`])([^"'`]+)\1\s*\)/g;
 const cssPublicAssetPattern = /url\(\s*(["']?)\/(?!\/)([^"')]+\.(?:png|svg|webp|jpe?g|gif|ico|woff2?))\1\s*\)/gi;
 const errors = [];
+const checkedAssetPaths = new Set();
 
 for (const filePath of walk(distRoot)) {
   if (!/\.(?:html|[cm]?js)$/.test(filePath)) continue;
@@ -34,13 +39,16 @@ for (const filePath of rendererSourceRoots.flatMap(walk)) {
     : [...source.matchAll(rendererAssetCallPattern)].map((match) => match[2]);
 
   for (const assetPath of assetPaths) {
-    if (!existsSync(path.join(publicRoot, assetPath))) {
-      errors.push(`${path.relative(repoRoot, filePath)} references missing public/${assetPath}`);
-    }
-    if (!existsSync(path.join(distRoot, assetPath))) {
-      errors.push(`${path.relative(repoRoot, filePath)} references missing dist/${assetPath}`);
-    }
+    checkAssetPath(assetPath, path.relative(repoRoot, filePath));
   }
+}
+
+const assetCatalogSource = readFileSync(rendererAssetCatalogPath, "utf8");
+const catalogAssetPaths = [
+  ...assetCatalogSource.matchAll(/"(assets\/[^"\n]+\.(?:png|svg|webp|jpe?g|gif|ico))"/gi),
+].map((match) => match[1]);
+for (const assetPath of catalogAssetPaths) {
+  checkAssetPath(assetPath, path.relative(repoRoot, rendererAssetCatalogPath));
 }
 
 if (errors.length > 0) {
@@ -50,6 +58,17 @@ if (errors.length > 0) {
 }
 
 console.log("Renderer public asset check passed.");
+
+function checkAssetPath(assetPath, sourcePath) {
+  if (checkedAssetPaths.has(assetPath)) return;
+  checkedAssetPaths.add(assetPath);
+  if (!existsSync(path.join(publicRoot, assetPath))) {
+    errors.push(`${sourcePath} references missing public/${assetPath}`);
+  }
+  if (!existsSync(path.join(distRoot, assetPath))) {
+    errors.push(`${sourcePath} references missing dist/${assetPath}`);
+  }
+}
 
 function walk(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {

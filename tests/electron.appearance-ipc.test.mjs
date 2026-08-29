@@ -7,28 +7,59 @@ import {
 describe("native appearance IPC", () => {
   it("applies a manifest-owned first-paint color to the sender's window", () => {
     const ownerWindow = createWindow();
-    const handler = register(ownerWindow);
+    const { handler, nativeTheme } = register(ownerWindow);
 
-    handler(createEvent(), { background: "#fafafa" });
+    handler(createEvent(), { background: "#fafafa", themeSource: "light" });
 
     expect(ownerWindow.setBackgroundColor).toHaveBeenCalledWith("#fafafa");
+    expect(nativeTheme.themeSource).toBe("light");
+  });
+
+  it("keeps native window chrome on the renderer's dark appearance", () => {
+    const ownerWindow = createWindow();
+    const { handler, nativeTheme } = register(ownerWindow);
+
+    handler(createEvent(), { background: "#161413", themeSource: "dark" });
+
+    expect(ownerWindow.setBackgroundColor).toHaveBeenCalledWith("#161413");
+    expect(nativeTheme.themeSource).toBe("dark");
+  });
+
+  it("preserves native system following when the renderer follows the system", () => {
+    const ownerWindow = createWindow();
+    const { handler, nativeTheme } = register(ownerWindow);
+
+    handler(createEvent(), { background: "#fafafa", themeSource: "system" });
+
+    expect(ownerWindow.setBackgroundColor).toHaveBeenCalledWith("#fafafa");
+    expect(nativeTheme.themeSource).toBe("system");
   });
 
   it("rejects colors that are not owned by the interface-style manifest", () => {
     const ownerWindow = createWindow();
-    const handler = register(ownerWindow);
+    const { handler } = register(ownerWindow);
 
-    handler(createEvent(), { background: "#ff00ff" });
-    handler(createEvent(), { background: "linear-gradient(red, blue)" });
+    handler(createEvent(), { background: "#ff00ff", themeSource: "light" });
+    handler(createEvent(), { background: "linear-gradient(red, blue)", themeSource: "light" });
 
     expect(ownerWindow.setBackgroundColor).not.toHaveBeenCalled();
   });
 
+  it("rejects unsupported native color schemes", () => {
+    const ownerWindow = createWindow();
+    const { handler, nativeTheme } = register(ownerWindow);
+
+    handler(createEvent(), { background: "#fafafa", themeSource: "sepia" });
+
+    expect(ownerWindow.setBackgroundColor).not.toHaveBeenCalled();
+    expect(nativeTheme.themeSource).toBe("system");
+  });
+
   it("does not touch a destroyed sender window", () => {
     const ownerWindow = createWindow({ destroyed: true });
-    const handler = register(ownerWindow);
+    const { handler } = register(ownerWindow);
 
-    handler(createEvent(), { background: "#161413" });
+    handler(createEvent(), { background: "#161413", themeSource: "dark" });
 
     expect(ownerWindow.setBackgroundColor).not.toHaveBeenCalled();
   });
@@ -36,6 +67,7 @@ describe("native appearance IPC", () => {
 
 function register(ownerWindow) {
   let handler;
+  const nativeTheme = { themeSource: "system" };
   registerAppearanceIpcHandlers({
     ipcMain: {
       on: (channel, listener) => {
@@ -46,9 +78,10 @@ function register(ownerWindow) {
     BrowserWindow: {
       fromWebContents: () => ownerWindow,
     },
+    nativeTheme,
   });
   if (!handler) throw new Error("Appearance IPC handler was not registered.");
-  return handler;
+  return { handler, nativeTheme };
 }
 
 function createWindow({ destroyed = false } = {}) {

@@ -1,6 +1,9 @@
 import { Bot, Cloud, Database, GitBranch, Link, Server, SquareTerminal } from "lucide-react";
 import type { LocaleFormatters, MessageFormatter } from "@puppyone/localization/core";
-import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
+import {
+  RENDERER_ASSET_PATHS,
+  resolveRendererPublicAssetUrl,
+} from "@puppyone/shared-ui";
 import type {
   DesktopCloudConnector,
   DesktopCloudMcpEndpoint,
@@ -77,25 +80,26 @@ export function normalizeProviderKey(provider: string) {
 }
 
 export function getCloudProviderIconUrl(provider: string) {
+  const integrations = RENDERER_ASSET_PATHS.icons.integrations;
   switch (normalizeProviderKey(provider)) {
     case "gmail":
-      return resolveRendererPublicAssetUrl("icons/gmail.svg");
+      return resolveRendererPublicAssetUrl(integrations.gmail);
     case "google_calendar":
-      return resolveRendererPublicAssetUrl("icons/google_calendar.svg");
+      return resolveRendererPublicAssetUrl(integrations.googleCalendar);
     case "google_docs":
-      return resolveRendererPublicAssetUrl("icons/google_doc.svg");
+      return resolveRendererPublicAssetUrl(integrations.googleDocs);
     case "google_sheets":
-      return resolveRendererPublicAssetUrl("icons/google_sheet.svg");
+      return resolveRendererPublicAssetUrl(integrations.googleSheets);
     case "notion":
-      return resolveRendererPublicAssetUrl("icons/notion.svg");
+      return resolveRendererPublicAssetUrl(integrations.notion);
     case "airtable":
-      return resolveRendererPublicAssetUrl("icons/airtable.png");
+      return resolveRendererPublicAssetUrl(integrations.airtable);
     case "linear":
-      return resolveRendererPublicAssetUrl("icons/linear.svg");
+      return resolveRendererPublicAssetUrl(integrations.linear);
     case "supabase":
-      return resolveRendererPublicAssetUrl("icons/supabase-icon.png");
+      return resolveRendererPublicAssetUrl(integrations.supabase);
     case "slack":
-      return resolveRendererPublicAssetUrl("icons/Slack_icon_2019.svg.png");
+      return resolveRendererPublicAssetUrl(integrations.slack);
     default:
       return "";
   }

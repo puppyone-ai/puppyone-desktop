@@ -1,6 +1,7 @@
 import {
   useMemo,
   type ComponentProps,
+  type ReactNode,
 } from "react";
 import {
   DataWorkspace,
@@ -69,6 +70,7 @@ type DesktopWorkspaceContentProps = {
   puppyoneConfigLoading: boolean;
   puppyoneConfigSaving: boolean;
   settingsSection: SettingsSection;
+  sidebarCompanion?: ReactNode;
   themeCatalog: ThemeCatalogController;
   workspace: Workspace;
   workspaceSurfaceError?: string | null;
@@ -108,6 +110,7 @@ export function DesktopWorkspaceContent({
   puppyoneConfigLoading,
   puppyoneConfigSaving,
   settingsSection,
+  sidebarCompanion,
   themeCatalog,
   workspace,
   workspaceSurfaceError = null,
@@ -210,6 +213,7 @@ export function DesktopWorkspaceContent({
       onNodeActionMenu={onNodeActionMenu}
       preferences={preferences}
       resolvedSurface={resolvedSurface}
+      sidebarCompanion={sidebarCompanion}
       viewerExtensionAdapter={viewerExtensionAdapter}
       workspace={workspace}
       workspaceKey={workspaceKey}

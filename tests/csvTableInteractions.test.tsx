@@ -396,7 +396,7 @@ describe("CSV table interactions", () => {
         ".csv-table-editor__table colgroup col:not(.csv-table-editor__record-index-column)",
       ) ?? [],
       (column) => column.style.width,
-    )).toEqual(["96px", "280px"]);
+    )).toEqual(["96px", "220px"]);
     expect(previewRow?.querySelector(".csv-table-editor__record-index-label")?.textContent)
       .toBe("3");
     expect(previewRow?.querySelectorAll("td")).toHaveLength(2);
@@ -406,6 +406,44 @@ describe("CSV table interactions", () => {
       resizeHandle.dispatchEvent(pointerEvent("pointercancel", 300, 231, 21));
       await Promise.resolve();
     });
+  });
+
+  it("resizes a column as persistent view state without changing CSV content", async () => {
+    const geometry = mockTableGeometry();
+    const originalSnapshot = latestSnapshot;
+    const originalChangeCount = changeCount;
+    act(() => geometry.firstBodyCell.dispatchEvent(
+      new PointerEvent("pointerover", { bubbles: true }),
+    ));
+    const resizeHandle = container?.querySelector<HTMLButtonElement>(
+      ".csv-table-editor__column-resize-handle",
+    );
+    if (!resizeHandle) throw new Error("CSV column resize handle did not mount.");
+    makePointerCaptureSafe(resizeHandle);
+
+    await act(async () => {
+      resizeHandle.dispatchEvent(pointerEvent("pointerdown", 227, 116, 41));
+      resizeHandle.dispatchEvent(pointerEvent("pointermove", 307, 116, 41));
+      resizeHandle.dispatchEvent(pointerEvent("pointerup", 307, 116, 41));
+      await Promise.resolve();
+    });
+
+    const firstColumn = container?.querySelector<HTMLTableColElement>(
+      ".csv-table-editor__table colgroup col:not(.csv-table-editor__record-index-column)",
+    );
+    expect(firstColumn?.style.width).toBe("176px");
+    expect(latestSnapshot).toBe(originalSnapshot);
+    expect(changeCount).toBe(originalChangeCount);
+
+    await act(async () => {
+      root?.unmount();
+      root = createRoot(container!);
+      root.render(withTestLocalization(<Harness />));
+      await Promise.resolve();
+    });
+    expect(container?.querySelector<HTMLTableColElement>(
+      ".csv-table-editor__table colgroup col:not(.csv-table-editor__record-index-column)",
+    )?.style.width).toBe("176px");
   });
 
   it("uses the full editor height and clamps a pointer dragged beyond it", async () => {
@@ -599,7 +637,8 @@ describe("CSV table interactions", () => {
 
     const menu = document.querySelector(".csv-table-editor__context-menu");
     expect(menu?.querySelectorAll(".desktop-menu-section")).toHaveLength(2);
-    expect(menu?.querySelectorAll('[role="menuitem"]')).toHaveLength(11);
+    expect(menu?.querySelectorAll('[role="menuitem"]')).toHaveLength(12);
+    expect(findButton("Auto fit column")).not.toBeNull();
     const moveColumnRight = findButton("Move column right");
     await act(async () => {
       moveColumnRight?.click();
@@ -622,7 +661,7 @@ describe("CSV table interactions", () => {
 
     const menu = document.querySelector(".csv-table-editor__context-menu");
     expect(menu?.querySelectorAll(".desktop-menu-section")).toHaveLength(1);
-    expect(menu?.querySelectorAll('[role="menuitem"]')).toHaveLength(5);
+    expect(menu?.querySelectorAll('[role="menuitem"]')).toHaveLength(6);
     expect(menu?.querySelector(".desktop-menu-section-label")?.textContent).toBe("Columns");
     expect(findButton("Insert row below")).toBeNull();
   });

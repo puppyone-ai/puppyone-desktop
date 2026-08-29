@@ -16,6 +16,12 @@ export type UseCollapsiblePaneResizeOptions = {
   minWidth: number;
   side: CollapsiblePaneSide;
   width: number;
+  /**
+   * `continuous` publishes every animation-frame preview. `end` keeps the
+   * gesture local and publishes once on pointer release, avoiding expensive
+   * application-state and persistence work during direct manipulation.
+   */
+  widthChangeMode?: "continuous" | "end";
   onCollapsedChange?: (collapsed: boolean) => void;
   onDragActiveChange?: (active: boolean) => void;
   onWidthChange: (width: number) => void;
@@ -43,6 +49,7 @@ export function useCollapsiblePaneResize({
   minWidth,
   side,
   width,
+  widthChangeMode = "continuous",
   onCollapsedChange,
   onDragActiveChange,
   onWidthChange,
@@ -68,7 +75,15 @@ export function useCollapsiblePaneResize({
       let collapsedDuringDrag = collapsed;
       let latestWidth = startWidth;
       let latestExpansion = 0;
+      let widthChanged = false;
       setGestureWidth(startWidth);
+
+      const previewWidth = (nextWidth: number, publish = true) => {
+        latestWidth = nextWidth;
+        widthChanged ||= nextWidth !== startWidth;
+        setGestureWidth(nextWidth);
+        if (publish && widthChangeMode === "continuous") onWidthChange(nextWidth);
+      };
 
       return {
         onMove: (point) => {
@@ -81,10 +96,7 @@ export function useCollapsiblePaneResize({
           latestExpansion = Math.max(0, widthDelta);
 
           if (!canCollapse) {
-            const nextWidth = clampWidth(rawWidth, minWidth, maxWidth);
-            latestWidth = nextWidth;
-            setGestureWidth(nextWidth);
-            onWidthChange(nextWidth);
+            previewWidth(clampWidth(rawWidth, minWidth, maxWidth));
             return;
           }
 
@@ -95,13 +107,11 @@ export function useCollapsiblePaneResize({
             }
 
             const nextWidth = clampWidth(rawWidth, minWidth, maxWidth);
-            latestWidth = nextWidth;
-            setGestureWidth(nextWidth);
+            previewWidth(nextWidth, latestExpansion >= resolvedCollapsePullDistance);
             if (collapsedDuringDrag) {
               onCollapsedChange?.(false);
               collapsedDuringDrag = false;
             }
-            if (latestExpansion >= resolvedCollapsePullDistance) onWidthChange(nextWidth);
             return;
           }
 
@@ -121,17 +131,21 @@ export function useCollapsiblePaneResize({
           // Resize normally down to minWidth. Pointer travel beyond minWidth is
           // an elastic collapse gesture, so the one rendered width stays at the
           // minimum until the collapse boundary is crossed.
-          const nextWidth = clampWidth(rawWidth, minWidth, maxWidth);
-          latestWidth = nextWidth;
-          setGestureWidth(nextWidth);
-          onWidthChange(nextWidth);
+          previewWidth(clampWidth(rawWidth, minWidth, maxWidth));
         },
         onEnd: () => {
           if (startedCollapsed && latestExpansion < resolvedCollapsePullDistance) {
             if (!collapsedDuringDrag) onCollapsedChange?.(true);
             collapsedDuringDrag = true;
           }
-          if (!collapsedDuringDrag && startedCollapsed && latestWidth >= minWidth) {
+          if (
+            !collapsedDuringDrag
+            && latestWidth >= minWidth
+            && (
+              (startedCollapsed && latestExpansion >= resolvedCollapsePullDistance)
+              || (widthChangeMode === "end" && widthChanged)
+            )
+          ) {
             onWidthChange(latestWidth);
           }
           setGestureWidth(null);

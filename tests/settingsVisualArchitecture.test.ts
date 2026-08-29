@@ -14,7 +14,8 @@ describe("settings visual architecture", () => {
     const language = source("src/features/settings/LanguageSetting.tsx");
 
     expect(types).toContain('"general" | "local-project"');
-    expect(types).toContain('"appearance" | "local-agents" | "editor"');
+    expect(types).toContain('"appearance" | "local-agents" | "editor" | "new-menu"');
+    expect(types).toContain('| "editor"');
     expect(types).not.toContain('"external-apps"');
     expect(types).not.toContain('"local-agent-hooks"');
     expect(types).not.toContain('| "language"');
@@ -70,6 +71,7 @@ describe("settings visual architecture", () => {
       'labelId: "settings.sidebar.editor"',
       'labelId: "settings.sidebar.experimental"',
     ]);
+    expect(desktopAppItems).toContain("settings.sidebar.editor");
     expect(desktopAppItems).not.toContain("settings.sidebar.language");
     expect(desktopAppItems).not.toContain("settings.sidebar.localAgentHooks");
     expect(sidebarModel).toContain('labelId: "settings.sidebar.localProject"');
@@ -79,6 +81,34 @@ describe("settings visual architecture", () => {
     expect(language).toContain("void changeLanguage(nextPreference)");
     expect(language).not.toContain("<SettingsSectionHeader");
     expect(language).not.toContain("<button");
+  });
+
+  it("exposes Markdown presentation without reviving unfinished AI review preferences", () => {
+    const sidebarModel = source("src/features/settings/sidebar/settingsSidebarModel.ts");
+    const settingsView = source("src/features/settings/SettingsView.tsx");
+    const editorSettings = source("src/features/settings/main/EditorSettingsView.tsx");
+    const preferences = source("src/preferences.ts");
+    const app = source("src/App.tsx");
+    const reviewRuntime = source("src/features/data-workspace/useAiEditReviewRequest.ts");
+    const reviewEngine = source("local-api/edit-review.mjs");
+
+    expect(sidebarModel).toContain('id: "editor"');
+    expect(settingsView).toContain("<EditorSettingsView");
+    expect(settingsView).toContain('import("./main/EditorSettingsView")');
+    expect(editorSettings).toContain("markdownPresentation");
+    expect(editorSettings).toContain("<MarkdownPresentationPreview");
+    expect(editorSettings).toContain("markdownPresentation.headingScale");
+    expect(editorSettings).not.toContain("markdownPresentation.h1Scale");
+    expect(editorSettings).not.toContain("aiEditAssistEnabled");
+    expect(editorSettings).not.toContain("diffMarkers");
+    expect(settingsView).not.toContain("onAiEditAssistEnabledChange");
+    expect(settingsView).not.toContain("onDiffMarkersChange");
+    expect(preferences).toContain("AI_EDIT_ASSIST_STORAGE_KEY");
+    expect(preferences).toContain("DIFF_MARKERS_STORAGE_KEY");
+    expect(app).toContain("useAiEditReviewRequest");
+    expect(app).toContain("data-diff-markers={diffMarkers}");
+    expect(reviewRuntime).toContain("subscribeAiEditReviewUpdates");
+    expect(reviewEngine).toContain("flushWorkspaceEditReviewChanges");
   });
 
   it("keeps every supported locale complete for General and Local Project", () => {
@@ -197,7 +227,7 @@ describe("settings visual architecture", () => {
     const workspaceConfig = source("src/features/settings/PuppyoneWorkspaceConfigSettings.tsx");
     const splitViews = [
       "AccountSettingsView.tsx",
-      "EditorSettingsViews.tsx",
+      "ExperimentalSettingsView.tsx",
       "FileSettingsViews.tsx",
       "GeneralSettingsView.tsx",
       "LocalProjectSettingsView.tsx",
@@ -221,7 +251,6 @@ describe("settings visual architecture", () => {
       "settings.general.detail",
       "settings.localProject.detail",
       "settings.account.detail",
-      "settings.editor.detail",
       "settings.experimental.detail",
       "settings.files.detail",
       "settings.cloud.detail",

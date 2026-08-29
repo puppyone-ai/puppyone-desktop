@@ -62,13 +62,14 @@ License, version 2.1 or later. The complete LGPL 2.1 text is distributed at
 Icon source: https://www.iconarchive.com/show/crystal-clear-icons-by-everaldo/Action-configure-icon.html
 Icon-set archive and license record: https://commons.wikimedia.org/wiki/Crystal_Clear
 
-## Integration product marks
+## Third-party product marks
 
-The Agent selector includes local marks solely to identify user-selected
-third-party products. Codex and OpenAI are marks of OpenAI, L.L.C.; Claude and
-Claude Code are marks of Anthropic PBC; Cursor is a mark of Anysphere, Inc.;
-OpenCode and its mark belong to their respective owners. Their appearance does
-not imply sponsorship or endorsement.
+Agent, Terminal, and Cloud integration surfaces include local marks solely to
+identify user-selected third-party products. These include Codex, ChatGPT,
+Claude Code, Cursor, OpenCode, Hermes, Manus, Pi, Gmail, Google Calendar,
+Google Docs, Google Sheets, Airtable, Notion, Linear, Supabase, Slack, and Git.
+All product names and marks belong to their respective owners. Their appearance
+does not imply sponsorship or endorsement.
 
 The Codex mark is a size-optimized copy of the official Codex application icon;
 the Claude mark follows Anthropic's published product identity, the Cursor mark

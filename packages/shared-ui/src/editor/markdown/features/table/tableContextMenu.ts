@@ -17,6 +17,11 @@ type MarkdownTableMenuTarget = {
   clientY: number;
   columnCount: number;
   columnIndex: number;
+  layoutActions?: Readonly<{
+    autoFitColumn: () => void;
+    fitToViewport: () => void;
+    resetColumnWidths: () => void;
+  }>;
   onClose?: (context: { restoreFocus: boolean }) => void;
   restoreFocus?: HTMLElement | null;
   rowCount: number;
@@ -58,14 +63,15 @@ type MarkdownTableMenuItem = {
   destructive?: boolean;
   disabled?: boolean;
   label: string;
-  operation: MarkdownTableStructureOperation;
+  operation?: MarkdownTableStructureOperation;
   radio?: boolean;
+  run?: () => void;
   selected?: boolean;
   trailing?: string;
 };
 
 type MarkdownTableMenuSection = {
-  id: "rows" | "columns" | "alignment" | "table";
+  id: "rows" | "columns" | "layout" | "alignment" | "table";
   label?: string;
   items: MarkdownTableMenuItem[];
 };
@@ -325,11 +331,33 @@ function getMarkdownTableMenuSections(
     },
   ];
 
+  if (target.layoutActions) {
+    sections.splice(2, 0, {
+      id: "layout",
+      items: [
+        {
+          label: t("editor.table.autoFitColumn"),
+          run: target.layoutActions.autoFitColumn,
+        },
+        {
+          label: t("editor.table.fitToViewport"),
+          run: target.layoutActions.fitToViewport,
+        },
+        {
+          label: t("editor.table.resetColumnWidths"),
+          run: target.layoutActions.resetColumnWidths,
+        },
+      ],
+    });
+  }
+
   if (scope === "row") {
     return sections.filter((section) => section.id === "rows");
   }
   if (scope === "column") {
-    return sections.filter((section) => section.id === "columns" || section.id === "alignment");
+    return sections.filter((section) => (
+      section.id === "columns" || section.id === "layout" || section.id === "alignment"
+    ));
   }
   return sections;
 }
@@ -423,7 +451,12 @@ function createMarkdownTableMenuItem(
     event.preventDefault();
     event.stopPropagation();
     if (button.disabled) return;
-    dispatchMarkdownTableStructureOperation(context, item.operation);
+    if (item.run) {
+      closeActiveMarkdownTableMenu();
+      item.run();
+      return;
+    }
+    if (item.operation) dispatchMarkdownTableStructureOperation(context, item.operation);
   });
   return button;
 }

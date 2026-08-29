@@ -2,9 +2,15 @@ const CSV_VIEW_PREFERENCES_STORAGE_KEY = "puppyone.editor.csv-view-preferences.v
 const MAX_STORED_CSV_VIEW_PREFERENCES = 200;
 
 type CsvViewPreferenceEntry = Readonly<{
+  columnLayout?: CsvStoredColumnLayout;
   firstRecordAsHeader?: boolean;
   showRowNumbers?: boolean;
   updatedAt: number;
+}>;
+
+type CsvStoredColumnLayout = Readonly<{
+  delimiter: "," | "\t";
+  widths: readonly number[];
 }>;
 
 type CsvViewPreferenceStore = Record<string, CsvViewPreferenceEntry>;
@@ -45,9 +51,38 @@ export function writeCsvShowRowNumbersPreference(
   writeCsvViewPreference(documentId, { showRowNumbers }, storage);
 }
 
+export function readCsvColumnWidthsPreference(
+  documentId: string | undefined,
+  delimiter: "," | "\t",
+  columnCount: number,
+  storage: CsvViewPreferenceStorage | null = getBrowserStorage(),
+): readonly number[] | undefined {
+  const key = normalizeDocumentId(documentId);
+  if (!key || !storage) return undefined;
+  const layout = readPreferenceStore(storage)[key]?.columnLayout;
+  if (!layout || layout.delimiter !== delimiter || layout.widths.length !== columnCount) {
+    return undefined;
+  }
+  return layout.widths;
+}
+
+export function writeCsvColumnWidthsPreference(
+  documentId: string | undefined,
+  delimiter: "," | "\t",
+  widths: readonly number[],
+  storage: CsvViewPreferenceStorage | null = getBrowserStorage(),
+) {
+  writeCsvViewPreference(documentId, {
+    columnLayout: {
+      delimiter,
+      widths: [...widths],
+    },
+  }, storage);
+}
+
 function writeCsvViewPreference(
   documentId: string | undefined,
-  patch: Pick<CsvViewPreferenceEntry, "firstRecordAsHeader" | "showRowNumbers">,
+  patch: Pick<CsvViewPreferenceEntry, "columnLayout" | "firstRecordAsHeader" | "showRowNumbers">,
   storage: CsvViewPreferenceStorage | null,
 ) {
   const key = normalizeDocumentId(documentId);
@@ -84,14 +119,20 @@ function readPreferenceStore(storage: CsvViewPreferenceStorage): CsvViewPreferen
     for (const [key, value] of Object.entries(parsed)) {
       if (!value || typeof value !== "object" || Array.isArray(value)) continue;
       const candidate = value as Partial<CsvViewPreferenceEntry>;
+      const columnLayout = parseStoredColumnLayout(candidate.columnLayout);
       const firstRecordAsHeader = typeof candidate.firstRecordAsHeader === "boolean"
         ? candidate.firstRecordAsHeader
         : undefined;
       const showRowNumbers = typeof candidate.showRowNumbers === "boolean"
         ? candidate.showRowNumbers
         : undefined;
-      if (firstRecordAsHeader === undefined && showRowNumbers === undefined) continue;
+      if (
+        columnLayout === undefined
+        && firstRecordAsHeader === undefined
+        && showRowNumbers === undefined
+      ) continue;
       entries[key] = {
+        ...(columnLayout === undefined ? {} : { columnLayout }),
         ...(firstRecordAsHeader === undefined ? {} : { firstRecordAsHeader }),
         ...(showRowNumbers === undefined ? {} : { showRowNumbers }),
         updatedAt: typeof candidate.updatedAt === "number" && Number.isFinite(candidate.updatedAt)
@@ -103,6 +144,18 @@ function readPreferenceStore(storage: CsvViewPreferenceStorage): CsvViewPreferen
   } catch {
     return {};
   }
+}
+
+function parseStoredColumnLayout(value: unknown): CsvStoredColumnLayout | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const candidate = value as Partial<CsvStoredColumnLayout>;
+  if (candidate.delimiter !== "," && candidate.delimiter !== "\t") return undefined;
+  if (!Array.isArray(candidate.widths) || candidate.widths.length === 0) return undefined;
+  const widths = candidate.widths.filter(
+    (width): width is number => typeof width === "number" && Number.isFinite(width) && width > 0,
+  );
+  if (widths.length !== candidate.widths.length) return undefined;
+  return { delimiter: candidate.delimiter, widths };
 }
 
 function getBrowserStorage(): CsvViewPreferenceStorage | null {

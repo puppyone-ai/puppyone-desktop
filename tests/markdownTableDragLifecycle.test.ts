@@ -40,6 +40,7 @@ describe("Markdown table drag lifecycle", () => {
     const dragLayer = createMarkdownTableDragLayer({
       alignments: [null],
       columnCount: 1,
+      columnLayout: null,
       inlineViewport: {
         dispose: vi.fn(),
         revealColumn: vi.fn(),
@@ -50,9 +51,8 @@ describe("Markdown table drag lifecycle", () => {
         { header: true, cells: [{ from: 0, to: 4, text: "Name" }] },
         { header: false, cells: [{ from: 5, to: 13, text: "PuppyOne" }] },
       ],
+      getTableRange: () => ({ from: 0, to: 13 }),
       table,
-      tableFrom: 0,
-      tableTo: 13,
       view: {
         state: {
           readOnly: false,

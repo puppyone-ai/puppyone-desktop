@@ -28,6 +28,7 @@
 @import "./styles/file-actions.css" layer(features);
 @import "./styles/menus.css" layer(features);
 @import "./features/data-workspace/data-shell.css" layer(features);
+@import "./styles/onboarding-empty-state-intro.css" layer(features);
 @import "./styles/onboarding.css" layer(features);
 @import "./styles/onboarding-entry-dialog.css" layer(features);
 @import "./styles/asset-library-home.css" layer(features);

@@ -196,7 +196,7 @@ describe("desktop build identity", () => {
     });
   });
 
-  it("uses development-badged icons only for development builds", () => {
+  it("uses the badged App Image only for Development builds", () => {
     const build = (channel, buildNumber = null) => createDesktopElectronBuilderConfig({
       buildInfo: resolveDesktopBuildIdentity({
         baseVersion: "1.4.0",
@@ -207,21 +207,36 @@ describe("desktop build identity", () => {
       }),
       packageMetadata: {
         build: {
-          extraResources: [{ from: "public/logo-square.png", to: "logo-square.png" }],
-          mac: { icon: "public/logo-square.png" },
+          extraResources: [{
+            from: "assets/brand/puppy/puppy-app-image.png",
+            to: "puppy-app-image.png",
+          }],
+          mac: { icon: "assets/brand/puppy/puppy-app-image.png" },
         },
       },
     });
 
     const development = build("dev");
     const stable = build("stable", 43);
-    expect(development.mac.icon).toBe("public/logo-square-dev.png");
+    expect(development.mac.icon).toBe("assets/brand/puppy/puppy-app-image-dev.png");
     expect(development.extraResources).toEqual(expect.arrayContaining([
-      { from: "public/logo-square-dev.png", to: "logo-square-dev.png" },
+      {
+        from: "assets/brand/puppy/puppy-app-image-dev.png",
+        to: "puppy-app-image.png",
+      },
     ]));
-    expect(stable.mac.icon).toBe("public/logo-square.png");
-    expect(stable.extraResources).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ to: "logo-square-dev.png" }),
+    expect(development.extraResources).not.toEqual(expect.arrayContaining([
+      {
+        from: "assets/brand/puppy/puppy-app-image.png",
+        to: "puppy-app-image.png",
+      },
+    ]));
+    expect(stable.mac.icon).toBe("assets/brand/puppy/puppy-app-image.png");
+    expect(stable.extraResources).toEqual(expect.arrayContaining([
+      {
+        from: "assets/brand/puppy/puppy-app-image.png",
+        to: "puppy-app-image.png",
+      },
     ]));
   });
 

@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import { MessageSquare } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
-import { resolveRendererPublicAssetUrl } from "@puppyone/shared-ui";
+import { PuppyBrandMark } from "../../components/brand/PuppyBrandMark";
 import { getOrderedHeaderElementDefinitions, type HeaderElementRenderContext } from "./headerElements";
 import type { TitlebarActionsSettings } from "../../preferences";
 import type { DesktopUpdateState } from "../../types/electron";
@@ -163,11 +163,9 @@ export function AgentChatTitlebarButton({
           className="desktop-shell-toolbar-button-icon"
           aria-hidden="true"
         >
-          <img
+          <PuppyBrandMark
             className="desktop-shell-toolbar-agent-logo"
-            src={resolveRendererPublicAssetUrl("PuppyAgentLOGO.png")}
-            alt=""
-            draggable={false}
+            tone="dark"
           />
         </i>
       ) : (

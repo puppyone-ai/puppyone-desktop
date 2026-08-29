@@ -61,6 +61,10 @@ export default defineConfig({
         replacement: fileURLToPath(new URL("./packages/shared-ui/src/styles/editor.css", import.meta.url)),
       },
       {
+        find: "@puppyone/shared-ui/markdown-presentation-preview",
+        replacement: fileURLToPath(new URL("./packages/shared-ui/src/editor/markdown/MarkdownPresentationPreview.tsx", import.meta.url)),
+      },
+      {
         find: "@puppyone/shared-ui",
         replacement: fileURLToPath(new URL("./packages/shared-ui/src/index.ts", import.meta.url)),
       },

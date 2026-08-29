@@ -354,7 +354,7 @@
 }
 
 .dark .puppyflow-agent-logo img.is-codex {
-  content: url("/icons/agent-codex-dark.png");
+  content: url("/assets/icons/agents/codex-dark.png");
 }
 
 .puppyflow-agent-select select {

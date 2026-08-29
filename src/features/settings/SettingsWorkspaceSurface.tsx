@@ -2,7 +2,6 @@ import type { FileIconThemeId, Workspace } from "@puppyone/shared-ui";
 import type {
   DarkThemePreset,
   CreateNewMenuSettings,
-  DiffMarkers,
   ExperimentalSettings,
   FilesVisibilitySettings,
   InterfaceStyle,
@@ -26,11 +25,12 @@ import type {
 } from "../../types/electron";
 import { SettingsView } from "./SettingsView";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
-import { SettingsSidebar } from "./sidebar";
-import type { SettingsSection } from "./types";
+import type { MarkdownPresentationSettings } from "../markdown/markdownPresentation";
 import type { SurfaceThemePreferences } from "../themes/themePreferences";
 import type { ThemeTarget } from "../themes/themeTypes";
 import type { ThemeCatalogController } from "../themes/useThemeCatalog";
+import { SettingsSidebar } from "./sidebar";
+import type { SettingsSection } from "./types";
 
 export type SettingsPreferencesPort = {
   themeMode: ThemeMode;
@@ -43,7 +43,8 @@ export type SettingsPreferencesPort = {
   textSize: TextSize;
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
-  diffMarkers: DiffMarkers;
+  markdownPresentation: MarkdownPresentationSettings;
+  surfaceThemePreferences: SurfaceThemePreferences;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
   sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
@@ -53,8 +54,6 @@ export type SettingsPreferencesPort = {
   rightSidebarToolsSettings: RightSidebarToolsSettings;
   titlebarActionsSettings: TitlebarActionsSettings;
   gitSidebarLayout: GitSidebarLayout;
-  aiEditAssistEnabled: boolean;
-  surfaceThemePreferences: SurfaceThemePreferences;
   setThemeMode: (value: ThemeMode) => void;
   setInterfaceStyle: (value: InterfaceStyle) => void;
   setLightThemePreset: (value: LightThemePreset) => void;
@@ -65,7 +64,9 @@ export type SettingsPreferencesPort = {
   setTextSize: (value: TextSize) => void;
   setTypographyPreferences: (value: TypographyPreferences) => void;
   setPointerCursors: (value: boolean) => void;
-  setDiffMarkers: (value: DiffMarkers) => void;
+  setMarkdownPresentation: (value: MarkdownPresentationSettings) => void;
+  setThemePack: (themeId: string) => void;
+  setSurfaceThemeOverride: (target: ThemeTarget, themeId: string | null) => void;
   setFileIconTheme: (value: FileIconThemeId) => void;
   setSidebarNavigationLayout: (value: SidebarNavigationLayout) => void;
   setSidebarNavigationVisibilitySettings: (value: SidebarNavigationVisibilitySettings) => void;
@@ -74,9 +75,6 @@ export type SettingsPreferencesPort = {
   setRightSidebarToolsSettings: (value: RightSidebarToolsSettings) => void;
   setTitlebarActionsSettings: (value: TitlebarActionsSettings) => void;
   setGitSidebarLayout: (value: GitSidebarLayout) => void;
-  setAiEditAssistEnabled: (value: boolean) => void;
-  setThemePack: (themeId: string) => void;
-  setSurfaceThemeOverride: (target: ThemeTarget, themeId: string | null) => void;
 };
 
 export type SettingsWorkspaceSurfaceProps = {
@@ -151,7 +149,9 @@ export function createSettingsWorkspaceSurface({
         textSize={preferences.textSize}
         typographyPreferences={preferences.typographyPreferences}
         pointerCursors={preferences.pointerCursors}
-        diffMarkers={preferences.diffMarkers}
+        markdownPresentation={preferences.markdownPresentation}
+        surfaceThemePreferences={preferences.surfaceThemePreferences}
+        themeCatalog={themeCatalog}
         fileIconTheme={preferences.fileIconTheme}
         sidebarNavigationLayout={preferences.sidebarNavigationLayout}
         sidebarNavigationVisibilitySettings={preferences.sidebarNavigationVisibilitySettings}
@@ -161,9 +161,6 @@ export function createSettingsWorkspaceSurface({
         rightSidebarToolsSettings={preferences.rightSidebarToolsSettings}
         titlebarActionsSettings={preferences.titlebarActionsSettings}
         gitSidebarLayout={preferences.gitSidebarLayout}
-        aiEditAssistEnabled={preferences.aiEditAssistEnabled}
-        surfaceThemePreferences={preferences.surfaceThemePreferences}
-        themeCatalog={themeCatalog}
         cloudEnabled={cloud.enabled}
         cloudSession={cloud.session}
         cloudSessionRestoring={cloud.sessionRestoring}
@@ -183,7 +180,9 @@ export function createSettingsWorkspaceSurface({
         onTextSizeChange={preferences.setTextSize}
         onTypographyPreferencesChange={preferences.setTypographyPreferences}
         onPointerCursorsChange={preferences.setPointerCursors}
-        onDiffMarkersChange={preferences.setDiffMarkers}
+        onMarkdownPresentationChange={preferences.setMarkdownPresentation}
+        onThemePackChange={preferences.setThemePack}
+        onSurfaceThemeOverrideChange={preferences.setSurfaceThemeOverride}
         onFileIconThemeChange={preferences.setFileIconTheme}
         onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
         onSidebarNavigationVisibilitySettingsChange={preferences.setSidebarNavigationVisibilitySettings}
@@ -193,9 +192,6 @@ export function createSettingsWorkspaceSurface({
         onRightSidebarToolsSettingsChange={preferences.setRightSidebarToolsSettings}
         onTitlebarActionsSettingsChange={preferences.setTitlebarActionsSettings}
         onGitSidebarLayoutChange={preferences.setGitSidebarLayout}
-        onAiEditAssistEnabledChange={preferences.setAiEditAssistEnabled}
-        onThemePackChange={preferences.setThemePack}
-        onSurfaceThemeOverrideChange={preferences.setSurfaceThemeOverride}
         onCloudSessionChange={cloud.onSessionChange}
         onPuppyoneConfigChange={workspaceConfig.change}
         onUnlinkWorkspace={workspaceConfig.unlink}

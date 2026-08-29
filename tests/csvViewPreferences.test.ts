@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   readCsvFirstRecordAsHeaderPreference,
+  readCsvColumnWidthsPreference,
   readCsvShowRowNumbersPreference,
+  writeCsvColumnWidthsPreference,
   writeCsvFirstRecordAsHeaderPreference,
   writeCsvShowRowNumbersPreference,
 } from "../packages/shared-ui/src/editor/viewers/csv/csvViewPreferences";
@@ -46,6 +48,21 @@ describe("CSV view preferences", () => {
         throw new Error("storage unavailable");
       },
     })).not.toThrow();
+  });
+
+  it("stores compatible column geometry as view state beside other preferences", () => {
+    const storage = createMemoryStorage();
+
+    writeCsvFirstRecordAsHeaderPreference("/vault/table.csv", true, storage);
+    writeCsvColumnWidthsPreference("/vault/table.csv", ",", [144, 260], storage);
+
+    expect(readCsvColumnWidthsPreference("/vault/table.csv", ",", 2, storage))
+      .toEqual([144, 260]);
+    expect(readCsvColumnWidthsPreference("/vault/table.csv", "\t", 2, storage))
+      .toBeUndefined();
+    expect(readCsvColumnWidthsPreference("/vault/table.csv", ",", 3, storage))
+      .toBeUndefined();
+    expect(readCsvFirstRecordAsHeaderPreference("/vault/table.csv", storage)).toBe(true);
   });
 });
 

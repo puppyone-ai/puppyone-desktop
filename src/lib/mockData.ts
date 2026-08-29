@@ -1,3 +1,8 @@
+import {
+  RENDERER_ASSET_PATHS,
+  resolveRendererPublicAssetUrl,
+} from "@puppyone/shared-ui";
+
 export type Workspace = {
   id: string;
   name: string;
@@ -43,7 +48,9 @@ export type FileKind =
   | "sheet"
   | "file";
 
-const oldVsNewWorldUrl = new URL("../../public/old-vs-new-world.png", import.meta.url).href;
+const agentFilesystemArchitectureComparisonUrl = resolveRendererPublicAssetUrl(
+  RENDERER_ASSET_PATHS.media.diagrams.agentFilesystemArchitectureComparison,
+);
 
 export type FileNode = {
   id: string;
@@ -271,7 +278,7 @@ export const fileTrees: Record<string, FileNode[]> = {
       modified: "Fri",
       status: "clean",
       preview: "Relationship map for contract entities.",
-      assetUrl: oldVsNewWorldUrl,
+      assetUrl: agentFilesystemArchitectureComparisonUrl,
     },
   ],
   finance: [

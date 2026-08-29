@@ -24,6 +24,7 @@ import {
 } from "./puppyflowModel";
 import { useEditableDocumentSource } from "../../document-session/EditableDocumentSourceContext";
 import type { PresetViewerRenderContext } from "../../registry/viewerTypes";
+import { RENDERER_ASSET_PATHS } from "../../../core/rendererAssetCatalog";
 import { resolveRendererPublicAssetUrl } from "../../../core/rendererPublicAsset";
 
 type PuppyFlowViewerProps = Pick<
@@ -466,7 +467,7 @@ function PuppyFlowAgentLogo({ agentId }: { agentId: PuppyFlowAgentId }) {
     return (
       <img
         className="is-codex"
-        src={resolveRendererPublicAssetUrl("icons/agent-codex-light.png")}
+        src={resolveRendererPublicAssetUrl(RENDERER_ASSET_PATHS.icons.agents.codexLight)}
         alt=""
         draggable={false}
       />

@@ -135,13 +135,39 @@ describe("current-repository Cloud navigation", () => {
       />,
     ));
 
-    expect(container.querySelector("h1")?.textContent).toBe("Use your local files with any AI, anywhere.");
+    expect(container.querySelector("h1")?.textContent).toBe("MCP");
     expect(container.querySelector(".desktop-entry-state-description")?.textContent)
-      .toBe("Use these files in ChatGPT, Claude, and more.");
+      .toBe("Connect ChatGPT, Claude, and other MCP-compatible agents.");
     expect(container.querySelector(".desktop-cloud-auth-submit")?.textContent)
       .toBe("Get Started");
     expect(container.textContent).not.toContain("May upload");
     expect(container.querySelector(".desktop-cloud-mcp-illustration")).not.toBeNull();
+
+    act(() => renderWithTestLocalization(root,
+      <CloudSignedOutRoute
+        activeSection="cli"
+        authState={{ status: "signed-out", apiBaseUrl: session.api_base_url }}
+        apiBaseUrl={session.api_base_url}
+        loadingLabel="Restoring Cloud session…"
+        onSessionChange={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    ));
+    expect(container.querySelector("h1")?.textContent).toBe("CLI");
+    expect(container.querySelector(".desktop-cloud-channel-illustration.is-cli")).not.toBeNull();
+
+    act(() => renderWithTestLocalization(root,
+      <CloudSignedOutRoute
+        activeSection="git-sync"
+        authState={{ status: "signed-out", apiBaseUrl: session.api_base_url }}
+        apiBaseUrl={session.api_base_url}
+        loadingLabel="Restoring Cloud session…"
+        onSessionChange={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    ));
+    expect(container.querySelector("h1")?.textContent).toBe("Git");
+    expect(container.querySelector(".desktop-cloud-channel-illustration.is-git")).not.toBeNull();
 
     act(() => renderWithTestLocalization(root,
       <CloudSignedOutRoute
@@ -153,7 +179,7 @@ describe("current-repository Cloud navigation", () => {
         onRefresh={vi.fn()}
       />,
     ));
-    expect(container.querySelector("h1")?.textContent).toBe("Run your agents on your schedule.");
+    expect(container.querySelector("h1")?.textContent).toBe("Automation");
     expect(container.querySelector(".desktop-cloud-activation-illustration.is-automation")).not.toBeNull();
 
     act(() => renderWithTestLocalization(root,
@@ -166,8 +192,13 @@ describe("current-repository Cloud navigation", () => {
         onRefresh={vi.fn()}
       />,
     ));
-    expect(container.querySelector("h1")?.textContent).toBe("See your project from anywhere.");
+    expect(container.querySelector("h1")?.textContent).toBe("PuppyOne Cloud");
     expect(container.querySelector(".desktop-cloud-activation-illustration.is-overview")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-hosting-art")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-hosting-cloud")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-hosting-folder-mark")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-hosting-folder-logo")).not.toBeNull();
+    expect(container.querySelector(".desktop-cloud-overview-hosting-status")).not.toBeNull();
 
     act(() => renderWithTestLocalization(root,
       <CloudSignedOutRoute
@@ -179,7 +210,7 @@ describe("current-repository Cloud navigation", () => {
         onRefresh={vi.fn()}
       />,
     ));
-    expect(container.querySelector("h1")?.textContent).toBe("Share access, not your computer.");
+    expect(container.querySelector("h1")?.textContent).toBe("Permissions");
     expect(container.querySelector(".desktop-cloud-activation-illustration.is-access")).not.toBeNull();
   });
 });

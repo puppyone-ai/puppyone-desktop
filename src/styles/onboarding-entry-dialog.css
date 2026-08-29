@@ -4,11 +4,13 @@
 }
 
 .onboarding-entry-dialog.is-create {
-  width: min(480px, calc(100vw - 32px));
+  --onboarding-entry-inset: 24px;
+  width: min(400px, calc(100vw - 32px));
 }
 
 .onboarding-entry-dialog.is-import {
-  width: min(620px, calc(100vw - 32px));
+  --onboarding-entry-inset: 24px;
+  width: min(440px, calc(100vw - 32px));
 }
 
 .onboarding-entry-dialog .desktop-dialog-header {
@@ -28,12 +30,12 @@
 
 .onboarding-entry-dialog.is-create .onboarding-entry-dialog-body {
   gap: 0;
-  padding-block: 2px 14px;
+  padding-block: 10px 22px;
 }
 
 .onboarding-entry-dialog.is-import .onboarding-entry-dialog-body {
-  gap: 12px;
-  padding-block: 16px 24px;
+  gap: 0;
+  padding-block: 10px 22px;
 }
 
 .onboarding-entry-dialog .desktop-dialog-leading.repository {
@@ -41,21 +43,11 @@
   color: var(--po-text-muted);
 }
 
-.onboarding-clone-layout {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: 150px minmax(0, 1fr);
-  align-items: start;
-  gap: 24px;
-}
-
-.onboarding-clone-sources,
 .onboarding-clone-workflow {
   display: grid;
   min-width: 0;
 }
 
-.onboarding-clone-section-label,
 .onboarding-clone-url-field {
   color: var(--po-text);
   font-size: 13px;
@@ -65,112 +57,51 @@
   text-transform: none;
 }
 
-.onboarding-clone-provider-list {
-  display: grid;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.onboarding-clone-provider {
-  display: flex;
-  height: 42px;
-  min-width: 0;
-  box-sizing: border-box;
-  align-items: center;
-  gap: 10px;
-  padding-inline: 11px;
-  border: 1px solid var(--po-border-subtle);
-  border-radius: 7px;
-  background: transparent;
-  color: var(--po-text-subtle);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 18px;
-  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
-}
-
-.onboarding-clone-provider svg {
-  width: 19px;
-  height: 19px;
-  flex: 0 0 auto;
-  stroke-width: 1.75;
-}
-
-.onboarding-clone-provider.is-github svg {
-  color: var(--po-text-muted);
-}
-
-.onboarding-clone-provider.is-gitlab svg {
-  color: color-mix(in srgb, #fc6d26 82%, var(--po-text-muted));
-}
-
-.onboarding-clone-provider.is-detected {
-  border-color: var(--po-border-strong);
-  background: color-mix(in srgb, var(--po-text) 7%, transparent);
-  color: var(--po-text);
-}
-
 .onboarding-clone-url-field input {
-  height: 38px;
-  margin-top: 10px;
-  padding-inline: 12px;
-  border-radius: 7px;
-}
-
-.onboarding-clone-supported-hint {
+  height: 30px;
   margin-top: 8px;
+  padding-inline: 12px;
+  border-radius: 8px;
 }
 
-.onboarding-clone-source-status {
+.onboarding-clone-url-label-row {
   display: flex;
-  min-height: 42px;
-  box-sizing: border-box;
   align-items: center;
-  gap: 9px;
-  margin-top: 16px;
-  padding: 9px 11px;
-  border: 1px solid var(--po-border-subtle);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--po-text) 3%, transparent);
-  color: var(--po-text-subtle);
-  font-size: 12px;
-  line-height: 17px;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
-.onboarding-clone-source-status svg {
-  width: 17px;
-  height: 17px;
+.onboarding-clone-provider-marks {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.onboarding-clone-provider-marks > svg {
+  display: block;
+  width: 15px;
+  height: 15px;
   flex: 0 0 auto;
-  stroke-width: 1.8;
 }
 
-.onboarding-clone-source-status.is-detected {
-  border-color: color-mix(in srgb, var(--po-success) 24%, var(--po-border-subtle));
+.onboarding-clone-provider-marks > .is-github {
   color: var(--po-text-muted);
 }
 
-.onboarding-clone-source-status.is-detected svg {
-  color: var(--po-success);
-}
-
-.onboarding-clone-source-status.is-unsupported {
-  border-color: color-mix(in srgb, var(--po-warning) 24%, var(--po-border-subtle));
-  color: var(--po-warning);
+.onboarding-clone-provider-marks > .is-gitlab {
+  color: color-mix(in srgb, #fc6d26 82%, var(--po-text-muted));
 }
 
 .onboarding-entry-create-fields {
   display: grid;
   min-width: 0;
+  gap: 18px;
 }
 
-.onboarding-entry-create-row {
+.onboarding-entry-create-field {
   display: grid;
   min-width: 0;
-  min-height: 52px;
-  grid-template-columns: 104px minmax(0, 1fr);
-  align-items: center;
-  gap: 16px;
-  padding-block: 8px;
+  gap: 8px;
 }
 
 .onboarding-entry-create-label {
@@ -180,33 +111,28 @@
   line-height: 18px;
 }
 
-.onboarding-entry-location-controls {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
 .onboarding-entry-location-path {
   min-width: 0;
-  flex: 1 1 auto;
   overflow: hidden;
-  color: var(--po-text-muted);
-  font-size: 12px;
-  line-height: 17px;
-  text-align: end;
+  color: var(--po-text-subtle);
+  font-size: 13px;
+  line-height: 18px;
+  text-align: start;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.onboarding-entry-location-path.is-selected {
+  color: var(--po-text);
+}
+
 .onboarding-entry-create-input {
   width: 100%;
-  height: 32px;
+  height: 30px;
   box-sizing: border-box;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid var(--po-border-strong);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--po-panel-raised);
   color: var(--po-text);
   font-family: inherit;
@@ -226,9 +152,52 @@
   opacity: 0.68;
 }
 
-.onboarding-entry-browse-button {
-  width: 88px;
-  flex: 0 0 auto;
+.onboarding-entry-location-picker {
+  display: grid;
+  width: 100%;
+  height: 30px;
+  min-width: 0;
+  box-sizing: border-box;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 0 11px;
+  border: 1px solid var(--po-border-strong);
+  border-radius: 8px;
+  background: var(--po-panel-raised);
+  color: var(--po-text-muted);
+  font: inherit;
+  cursor: var(--po-clickable-cursor, pointer);
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.onboarding-entry-location-picker:hover:not(:disabled) {
+  border-color: var(--po-focus-ring);
+  background: var(--po-hover);
+}
+
+.onboarding-entry-location-picker:focus-visible {
+  border-color: var(--po-focus-ring);
+  outline: none;
+}
+
+.onboarding-entry-location-picker:disabled {
+  color: var(--po-text-disabled);
+  cursor: default;
+  opacity: 0.68;
+}
+
+.onboarding-entry-location-picker > svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.8;
+}
+
+.onboarding-entry-location-action {
+  color: var(--po-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 17px;
 }
 
 .onboarding-entry-dialog.is-create .desktop-dialog-error {
@@ -254,15 +223,4 @@
 .onboarding-entry-dialog .desktop-dialog-error {
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-@media (max-width: 520px) {
-  .onboarding-clone-layout {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 20px;
-  }
-
-  .onboarding-clone-provider-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }

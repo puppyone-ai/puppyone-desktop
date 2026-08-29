@@ -1,5 +1,5 @@
 export const CENTERED_README_HEADER = `<div align="center">
-  <img src="public/logo-square.png" alt="puppyone Logo" width="72" height="72" />
+  <img src="public/assets/brand/puppy/puppy-dark.svg" alt="puppyone Logo" width="72" height="72" />
 
   <h1>puppyone</h1>
 
@@ -15,4 +15,4 @@ export const CENTERED_README_HEADER = `<div align="center">
 
 export const CENTERED_README_DOCUMENT = `${CENTERED_README_HEADER}
 
-![overview](public/puppyone-overview.png)`;
+![overview](public/assets/media/screenshots/puppyone-editor-overview.png)`;

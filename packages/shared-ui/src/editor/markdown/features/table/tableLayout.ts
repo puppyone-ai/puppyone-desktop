@@ -1,5 +1,9 @@
 import type { MarkdownTableAlignment, MarkdownTableRow } from "./tableModel";
-import { estimateEditableTableColumnWidths } from "../../../table/editableTableLayout";
+import {
+  EDITABLE_TABLE_COLUMN_INITIAL_MAX_WIDTH,
+  estimateEditableTableColumnWidth,
+  estimateEditableTableColumnWidths,
+} from "../../../table/editableTableLayout";
 
 const TABLE_VERTICAL_CHROME_PX = 50;
 const TABLE_ROW_VERTICAL_CHROME_PX = 13;
@@ -29,6 +33,18 @@ export function estimateMarkdownTableColumnWidths(
   return estimateEditableTableColumnWidths(
     rows,
     alignments.length,
+    (row) => row.cells.map((cell) => cell.text),
+  ).map((width) => Math.min(EDITABLE_TABLE_COLUMN_INITIAL_MAX_WIDTH, width));
+}
+
+/** Explicit auto-fit may use the wider readable track limit. */
+export function estimateMarkdownTableColumnWidth(
+  rows: readonly MarkdownTableRow[],
+  columnIndex: number,
+): number {
+  return estimateEditableTableColumnWidth(
+    rows,
+    columnIndex,
     (row) => row.cells.map((cell) => cell.text),
   );
 }
