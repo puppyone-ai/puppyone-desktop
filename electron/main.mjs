@@ -88,6 +88,7 @@ import { createSenderWorkspaceAuthorization } from "./main/workspace-authorizati
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
 import { WindowWorkspaceState } from "./main/window-workspace-state.mjs";
 import { createWindowWorkspaceCompositionService } from "./main/window-workspace-composition.mjs";
+import { createDetachedWorkspaceCleanup } from "./main/detached-workspace-cleanup.mjs";
 import {
   createProjectEntryService,
   requireGitRepository,
@@ -303,46 +304,6 @@ const workspaceStateStore = createWorkspaceStateStore({
   workspaceFromPath,
   resolveWorkspaceIdentity: resolveLocalWorkspaceIdentity,
 });
-const windowWorkspaceCompositionService = createWindowWorkspaceCompositionService({
-  canonicalizeWorkspacePath,
-  cleanupDetachedWorkspace: async (window, folder) => {
-    const webContentsId = window.webContents.id;
-    const rootPath = folder.path;
-    localFileCapabilities.revokeWorkspaceRoot(webContentsId, rootPath);
-    workspaceWatchService.stopForWorkspaceRoot(webContentsId, rootPath);
-    gitMetadataWatchService.stopForWorkspaceRoot(webContentsId, rootPath);
-    terminalService.closeSessionsForWorkspaceRoot(webContentsId, rootPath);
-    await Promise.allSettled([
-      appPreviewRuntime?.closeSessionsForWorkspaceRoot(webContentsId, rootPath),
-      agentService.closeSessionsForWorkspaceRoot(webContentsId, rootPath),
-    ].filter(Boolean));
-
-    const state = getOrCreateWindowState(window);
-    const primaryPath = state.folderPaths[0] ?? null;
-    if (primaryPath) {
-      void gitAutoCommitService.assignWorkspace(window.webContents, primaryPath).catch((error) => {
-        console.warn("Unable to reassign Git Auto Commit after removing a Project:", error);
-      });
-    }
-    window.setTitle(window.isFullScreen() ? "" : resolveWindowTitle(window));
-    if (primaryPath && typeof window.setRepresentedFilename === "function") {
-      try {
-        window.setRepresentedFilename(primaryPath);
-      } catch {
-        // setRepresentedFilename is macOS-only and best-effort.
-      }
-    }
-  },
-  getWindowState: getOrCreateWindowState,
-  getWorkspaceWindow,
-  indexWorkspacePath: (folderPath, window) => workspaceWindowByPath.set(folderPath, window),
-  persistWorkspaceComposition: (workspaces) => workspaceStateStore.rememberWorkspaceComposition(workspaces),
-  revealWindow,
-  unindexWorkspacePath: (folderPath, window) => {
-    if (workspaceWindowByPath.get(folderPath) === window) workspaceWindowByPath.delete(folderPath);
-  },
-  workspaceFromPath,
-});
 const projectEntryService = createProjectEntryService();
 const projectEntryOperationSenders = new Set();
 const projectLocationGrants = createProjectLocationGrantStore();
@@ -365,6 +326,30 @@ const gitAutoCommitHost = createGitAutoCommitHost({
   workspaceMutationTracker,
   workspaceWatchService,
   gitMetadataWatchService,
+});
+const cleanupDetachedWorkspace = createDetachedWorkspaceCleanup({
+  agentService,
+  getAppPreviewRuntime: () => appPreviewRuntime,
+  getWindowState: getOrCreateWindowState,
+  gitAutoCommitHost,
+  gitMetadataWatchService,
+  localFileCapabilities,
+  resolveWindowTitle,
+  terminalService,
+  workspaceWatchService,
+});
+const windowWorkspaceCompositionService = createWindowWorkspaceCompositionService({
+  canonicalizeWorkspacePath,
+  cleanupDetachedWorkspace,
+  getWindowState: getOrCreateWindowState,
+  getWorkspaceWindow,
+  indexWorkspacePath: (folderPath, window) => workspaceWindowByPath.set(folderPath, window),
+  persistWorkspaceComposition: (workspaces) => workspaceStateStore.rememberWorkspaceComposition(workspaces),
+  revealWindow,
+  unindexWorkspacePath: (folderPath, window) => {
+    if (workspaceWindowByPath.get(folderPath) === window) workspaceWindowByPath.delete(folderPath);
+  },
+  workspaceFromPath,
 });
 const cloudPublishSecretVault = createCloudPublishSecretVault({
   baseDirectory: path.join(app.getPath("userData"), "cloud-publish-secrets-v1"),

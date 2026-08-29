@@ -4,7 +4,7 @@ import {
   type Workspace,
   type WorkspaceFolder,
 } from "@puppyone/shared-ui";
-import { ArrowLeft, Check, Folder, FolderPlus } from "lucide-react";
+import { ArrowLeft, Folder, FolderPlus } from "lucide-react";
 import { DesktopMenuItem } from "../../components/DesktopMenu";
 import { DesktopTitlebarMenuLayer } from "./DesktopTitlebarMenuLayer";
 import { bidiIsolate, useLocalization } from "@puppyone/localization";
@@ -93,11 +93,10 @@ export function DesktopWorkspaceSwitcher({
               data-po-scrollbar="menu"
               data-workspace-menu-layout="workspace-composition-v1"
             >
-              {attachedFolders.map((folder, index) => (
+              {attachedFolders.map((folder) => (
                 <DesktopProjectRow
                   key={folder.id}
                   folder={folder}
-                  primary={index === 0}
                 />
               ))}
               <DesktopMenuItem
@@ -148,18 +147,15 @@ export function DesktopWorkspaceSwitcher({
 
 function DesktopProjectRow({
   folder,
-  primary,
 }: {
   folder: WorkspaceFolder;
-  primary: boolean;
 }) {
   const detail = getWorkspaceParentPathForDisplay(folder.workspace.path);
   return (
-    <div className={`desktop-project-option-row${primary ? " selected" : ""}`}>
+    <div className="desktop-project-option-row">
       <div
-        className={`desktop-menu-item desktop-project-option${primary ? " selected" : ""}`}
+        className="desktop-menu-item desktop-project-option"
         role="menuitem"
-        aria-current={primary ? "true" : undefined}
         aria-disabled="true"
         title={`${folder.name} - ${folder.workspace.path}`}
       >
@@ -179,11 +175,6 @@ function DesktopProjectRow({
           )}
         </span>
       </div>
-      {primary && (
-        <span className="desktop-project-current-indicator" aria-hidden="true">
-          <Check size={14} strokeWidth={2.2} />
-        </span>
-      )}
     </div>
   );
 }

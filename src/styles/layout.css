@@ -539,11 +539,6 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   color: var(--po-text-muted);
 }
 
-.desktop-project-option.selected .desktop-project-mark,
-.desktop-project-option-row.selected .desktop-project-mark {
-  color: var(--po-text);
-}
-
 .desktop-project-option-row {
   position: relative;
   display: grid;
@@ -552,11 +547,11 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
 
 .desktop-project-option-row > .desktop-project-option {
   width: 100%;
-  padding-inline-end: calc(var(--po-menu-item-padding-inline) + 26px);
   cursor: default;
+  pointer-events: none;
 }
 
-/* Keep the current project and its parent path on one quiet status row. */
+/* Keep every attached Project and its parent path on one quiet membership row. */
 .desktop-project-option .desktop-menu-item-label {
   max-width: 65%;
   flex: 0 0 auto;
@@ -567,25 +562,6 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   flex: 1 1 auto;
   direction: ltr;
   text-align: start;
-}
-
-.desktop-project-option-row.selected > .desktop-project-option {
-  background: var(--po-hover);
-  color: var(--po-text);
-}
-
-.desktop-project-current-indicator {
-  position: absolute;
-  top: 50%;
-  inset-inline-end: 9px;
-  z-index: 1;
-  display: grid;
-  width: 18px;
-  height: 18px;
-  place-items: center;
-  color: var(--po-text);
-  pointer-events: none;
-  transform: translateY(-50%);
 }
 
 .desktop-project-home-group {

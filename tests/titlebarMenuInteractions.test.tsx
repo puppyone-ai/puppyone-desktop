@@ -72,7 +72,9 @@ describe("titlebar Portal menu interactions", () => {
     expect(menu.textContent).not.toContain("Current workspace");
     expect(menu.textContent).not.toContain("Recent projects");
     expect(menu.querySelector(".desktop-project-home-group")).not.toBeNull();
-    expect(menu.querySelector(".desktop-project-current-indicator")).not.toBeNull();
+    expect(menu.querySelector(".desktop-project-current-indicator")).toBeNull();
+    expect(menu.querySelector(".desktop-project-option.selected")).toBeNull();
+    expect(menu.querySelector("[aria-current='true']")).toBeNull();
     expect(menu.querySelector(".desktop-project-copy-path")).toBeNull();
     expect(menu.querySelector(".desktop-project-option")?.getAttribute("aria-disabled"))
       .toBe("true");
