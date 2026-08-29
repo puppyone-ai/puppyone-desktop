@@ -23,6 +23,48 @@ afterEach(() => {
 });
 
 describe("Desktop Agent panel lifecycle", () => {
+  it("opens on the installed-Agent picker without implicitly choosing Codex", async () => {
+    const harness = createBridgeHarness();
+    harness.bridge.discoverAgentProviders = vi.fn(async () => ({
+      runtimes: [
+        {
+          descriptor: { id: "codex", displayName: "Codex", kind: "harness" },
+          readiness: { ...readyInspection().readiness, runtimeId: "codex", provider: "codex" },
+        },
+        {
+          descriptor: { id: "claude", displayName: "Claude Agent", kind: "harness" },
+          readiness: { ...readyInspection().readiness, runtimeId: "claude", provider: "claude" },
+        },
+      ],
+      selectedRuntimeId: null,
+      readiness: null,
+      account: null,
+      providers: [],
+      models: [],
+      modes: [],
+      commands: [],
+      capabilities: null,
+      warnings: [],
+    }));
+
+    const container = renderPanel(harness.bridge);
+    await flushEffects();
+
+    const agentPicker = container.querySelector('button[aria-label="Coding Agent"]') as HTMLButtonElement;
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(agentPicker.textContent).toContain("Agent");
+    expect(agentPicker.textContent).not.toContain("Codex");
+    expect(textarea.placeholder).toBe("Choose a coding Agent to start");
+    expect(textarea.disabled).toBe(false);
+    expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(harness.bridge.resumeAgentSession).not.toHaveBeenCalled();
+    expect(harness.bridge.createAgentSession).not.toHaveBeenCalled();
+
+    act(() => agentPicker.click());
+    expect(document.querySelector('[role="listbox"]')?.textContent).toContain("Codex");
+    expect(document.querySelector('[role="listbox"]')?.textContent).toContain("Claude Agent");
+  });
+
   it("uses one centered product loader while the chat runtime starts", async () => {
     const harness = createBridgeHarness();
     let finishDiscovery: ((inspection: ReturnType<typeof readyInspection>) => void) | null = null;

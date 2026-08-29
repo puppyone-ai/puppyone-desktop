@@ -469,6 +469,12 @@ Native operating-system `<select>` menus are not the target interaction. Use one
 anchored listbox/popover. The compact surface is deliberately flat: readiness is a row state,
 not a second navigation hierarchy.
 
+On first open, the trigger reads `Agent` and no row is selected. Discovery
+populates installed products only; it does not inspect a default harness,
+restore a session, or enable Send. A later launch may restore only a
+schema-valid preference produced by an explicit selection. Missing, legacy, or
+stale selection data returns to this neutral picker state.
+
 ```text
 + Agent ----------------------------------+
 |  PuppyOne Agent                  check  |

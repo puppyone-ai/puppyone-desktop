@@ -12,7 +12,7 @@ type Options = {
   preferredRuntimeId: string | null;
   preferredRoute: Readonly<AgentRoutePreference>;
   preferredModel: string | null;
-  onPreferredRuntimeChange?: (runtimeId: string) => void;
+  onPreferredRuntimeChange?: (runtimeId: string | null) => void;
   onPreferredRouteChange?: (route: AgentRoutePreference) => void;
   onPreferredModelChange?: (model: string) => void;
 };
@@ -53,9 +53,17 @@ export function useAgentRoutingPreferences({
   }, [active, controller, preferredRuntimeId]);
 
   useEffect(() => {
-    if (!state.initialized || !state.selectedRuntimeId || state.selectedRuntimeId === preferredRuntimeId) return;
-    onPreferredRuntimeChange?.(state.selectedRuntimeId);
-  }, [onPreferredRuntimeChange, preferredRuntimeId, state.initialized, state.selectedRuntimeId]);
+    if (!state.initialized) return;
+    if (state.selectedRuntimeId && state.selectedRuntimeId !== preferredRuntimeId) {
+      onPreferredRuntimeChange?.(state.selectedRuntimeId);
+      return;
+    }
+    const preferredStillRegistered = state.inspection?.runtimes
+      ?.some((entry) => entry.descriptor.id === preferredRuntimeId) === true;
+    if (!state.selectedRuntimeId && preferredRuntimeId && state.inspection && !preferredStillRegistered) {
+      onPreferredRuntimeChange?.(null);
+    }
+  }, [onPreferredRuntimeChange, preferredRuntimeId, state.initialized, state.inspection, state.selectedRuntimeId]);
 
   useEffect(() => {
     if (modelPreferencePending && preferredModelId) controller.selectModel(preferredModelId);

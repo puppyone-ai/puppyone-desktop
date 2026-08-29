@@ -1,9 +1,6 @@
 import os from "node:os";
 import { redactSecretText } from "../agent-events.mjs";
-import {
-  readinessWithAccountState,
-  unavailableReadiness,
-} from "./agent-input-policy.mjs";
+import { readinessWithAccountState } from "./agent-input-policy.mjs";
 import { publicRuntimeReadiness } from "../runtime/agent-runtime-registry.mjs";
 import { sanitizeAgentRuntimeDescriptor } from "../../../../shared/agent-contract/runtime-schema.mjs";
 import {
@@ -25,7 +22,7 @@ export function createAgentRuntimeCatalog({
   async function discover(request = {}, workspaceRoot = null) {
     const catalog = await runtimeRegistry.discover({ refresh: Boolean(request.refresh) });
     if (request.refresh) inspectionCache.clear();
-    const selected = selectRequestedRuntime(runtimeRegistry, catalog, request.runtimeId);
+    const selected = selectRequestedRuntime(catalog, request.runtimeId);
     const runtimes = catalog.map((entry) => ({
       descriptor: sanitizeAgentRuntimeDescriptor(entry.descriptor),
       readiness: publicRuntimeReadiness(entry),
@@ -34,7 +31,7 @@ export function createAgentRuntimeCatalog({
       return {
         runtimes,
         selectedRuntimeId: null,
-        readiness: unavailableReadiness("No Agent runtime is registered."),
+        readiness: null,
         account: null,
         providers: [],
         models: [],
@@ -147,12 +144,10 @@ export const agentRuntimeCatalogPolicy = Object.freeze({
   inspectionCacheTtlMs: INSPECTION_CACHE_MS,
 });
 
-function selectRequestedRuntime(runtimeRegistry, catalog, value) {
-  if (value !== undefined && value !== null && !/^[a-z][a-z0-9-]{1,39}$/.test(value)) {
+function selectRequestedRuntime(catalog, value) {
+  if (value === undefined || value === null) return null;
+  if (!/^[a-z][a-z0-9-]{1,39}$/.test(value)) {
     throw new Error("Agent runtime selection is invalid.");
   }
-  const selected = runtimeRegistry.select(catalog, value || null);
-  return value && selected?.descriptor?.id !== value
-    ? runtimeRegistry.select(catalog, null)
-    : selected;
+  return catalog.find((entry) => entry.descriptor.id === value) ?? null;
 }

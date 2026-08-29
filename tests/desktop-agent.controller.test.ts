@@ -6,6 +6,43 @@ import {
 import type { AgentEvent, AgentSessionSnapshot } from "../src/features/desktop-agent/agentTypes";
 
 describe("AgentSessionController", () => {
+  it("discovers installed Agents without selecting or resuming one on first open", async () => {
+    const bridge = bridgeFixture(() => {});
+    bridge.discoverAgentRuntimes.mockResolvedValueOnce({
+      runtimes: [
+        { descriptor: { id: "codex", displayName: "Codex" }, readiness: readinessFor("codex") },
+        { descriptor: { id: "claude", displayName: "Claude Agent" }, readiness: readinessFor("claude") },
+      ],
+      selectedRuntimeId: null,
+      readiness: null,
+      account: null,
+      providers: [],
+      models: [],
+      modes: [],
+      commands: [],
+      capabilities: null,
+      warnings: [],
+    });
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+
+    await controller.initialize();
+
+    expect(bridge.discoverAgentRuntimes).toHaveBeenCalledWith({
+      rootPath: "/workspace",
+      runtimeId: null,
+      refresh: false,
+    });
+    expect(controller.getSnapshot()).toMatchObject({
+      initialized: true,
+      phase: "ready",
+      selectedRuntimeId: null,
+      selectedModel: null,
+      session: null,
+    });
+    expect(bridge.resumeAgentSession).not.toHaveBeenCalled();
+    expect(bridge.createAgentSession).not.toHaveBeenCalled();
+  });
+
   it("rebuilds a deterministic projection, repairs sequence gaps, and discards the old session on New Chat", async () => {
     let eventListener: ((event: AgentEvent) => void) | null = null;
     const bridge = bridgeFixture((listener) => { eventListener = listener; });

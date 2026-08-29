@@ -18,7 +18,7 @@ const CAPABILITY_METHODS = Object.freeze({
 export function assertAgentInspection(value) {
   const inspection = assertRecord(value, "Agent inspection");
   if (inspection.runtime !== undefined) assertRuntimeDescriptor(inspection.runtime);
-  if (inspection.readiness !== undefined) assertReadiness(inspection.readiness);
+  if (inspection.readiness !== undefined && inspection.readiness !== null) assertReadiness(inspection.readiness);
   assertArray(inspection.providers ?? [], "Agent inspection.providers").forEach(assertAgentInferenceProvider);
   assertArray(inspection.models ?? [], "Agent inspection.models").forEach(assertAgentModel);
   assertArray(inspection.modes ?? [], "Agent inspection.modes").forEach((mode) => assertNamedEntry(mode, "mode"));

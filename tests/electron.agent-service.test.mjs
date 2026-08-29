@@ -6,11 +6,35 @@ import { AgentRuntimeRegistry } from "../electron/main/agent/runtime/agent-runti
 import { registerAgentIpcHandlers } from "../electron/main/ipc/agent-ipc.mjs";
 
 describe("Electron AgentService ownership and lifecycle", () => {
+  it("returns installed runtime inventory without inspecting or selecting a default runtime", async () => {
+    const harness = createServiceHarness();
+    const inspection = await harness.service.discoverProviders(createSender(100), {}, "/workspace");
+
+    expect(inspection).toMatchObject({
+      selectedRuntimeId: null,
+      readiness: null,
+      account: null,
+      providers: [],
+      models: [],
+      capabilities: null,
+    });
+    expect(inspection.runtimes.map((entry) => entry.descriptor.id)).toEqual(["codex"]);
+    expect(harness.adapters).toHaveLength(0);
+  });
+
+  it("requires an explicit runtime before creating a session", async () => {
+    const harness = createServiceHarness();
+
+    await expect(harness.service.createSession(createSender(101), {}, "/workspace"))
+      .rejects.toThrow(/choose an Agent/i);
+    expect(harness.adapters).toHaveLength(0);
+  });
+
   it("binds sessions to one sender and rejects cross-window mutations", async () => {
     const harness = createServiceHarness();
     const owner = createSender(1);
     const attacker = createSender(2);
-    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
 
     expect(() => harness.service.replay(attacker, {
       sessionId: snapshot.session.id,
@@ -32,7 +56,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
   it("keeps a turn alive without renderer visibility and cleans up on window close", async () => {
     const harness = createServiceHarness();
     const owner = createSender(3);
-    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
     const result = await harness.service.startTurn(owner, {
       sessionId: snapshot.session.id,
       prompt: "Keep running",
@@ -48,7 +72,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
   it("rejects a model that is not in the inspected connected-provider catalog", async () => {
     const harness = createServiceHarness();
     const owner = createSender(32);
-    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
 
     await expect(harness.service.startTurn(owner, {
       sessionId: snapshot.session.id,
@@ -61,7 +85,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
   it("does not resurrect a turn that completed before turn/start returned", async () => {
     const harness = createServiceHarness();
     const owner = createSender(31);
-    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
     const adapter = harness.adapters[0];
     adapter.startTurn.mockImplementationOnce(async () => {
       adapter.emit({
@@ -91,7 +115,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
   it("fails pending approvals closed and emits terminal failure on provider exit", async () => {
     const harness = createServiceHarness();
     const owner = createSender(4);
-    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
     await harness.service.startTurn(owner, { sessionId: snapshot.session.id, prompt: "Run" });
     const adapter = harness.adapters[0];
     adapter.emit({
@@ -113,7 +137,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
   it("resumes immediately from the retired in-memory snapshot after provider exit", async () => {
     const harness = createServiceHarness();
     const owner = createSender(41);
-    const created = await harness.service.createSession(owner, {}, "/workspace");
+    const created = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
     harness.adapters[0].exit({ expected: false, diagnostics: "provider crashed" });
     expect(harness.service.getSessionCount()).toBe(0);
     expect(harness.service.getRetainedSessionCount()).toBe(1);
@@ -130,7 +154,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
   it("does not discard a retired snapshot when a different requested session is missing", async () => {
     const harness = createServiceHarness();
     const owner = createSender(42);
-    await harness.service.createSession(owner, {}, "/workspace");
+    await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
     harness.adapters[0].exit({ expected: false, diagnostics: "provider crashed" });
 
     const missing = await harness.service.resumeSession(owner, { sessionId: "missing-session" }, "/workspace");
@@ -144,7 +168,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
   it("rejects stale approvals and bounds retained replay for a slow renderer", async () => {
     const harness = createServiceHarness();
     const owner = createSender(5);
-    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
     await harness.service.startTurn(owner, { sessionId: snapshot.session.id, prompt: "Run" });
     const adapter = harness.adapters[0];
     adapter.emit({
@@ -178,7 +202,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
   it("deduplicates blocking requests replayed during runtime reconciliation", async () => {
     const harness = createServiceHarness();
     const owner = createSender(51);
-    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
     await harness.service.startTurn(owner, { sessionId: snapshot.session.id, prompt: "Run" });
     const adapter = harness.adapters[0];
     const approval = {
@@ -208,8 +232,8 @@ describe("Electron AgentService ownership and lifecycle", () => {
 
   it("closes every adapter during app-level cleanup", async () => {
     const harness = createServiceHarness();
-    await harness.service.createSession(createSender(6), {}, "/workspace-a");
-    await harness.service.createSession(createSender(7), {}, "/workspace-b");
+    await harness.service.createSession(createSender(6), { runtimeId: "codex" }, "/workspace-a");
+    await harness.service.createSession(createSender(7), { runtimeId: "codex" }, "/workspace-b");
     await harness.service.closeAll();
     expect(harness.adapters.every((adapter) => adapter.disposed)).toBe(true);
     expect(harness.service.getSessionCount()).toBe(0);
@@ -218,7 +242,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
   it("fails a pending approval closed then confirms the interrupt once the provider acknowledges it", async () => {
     const harness = createServiceHarness();
     const owner = createSender(10);
-    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
     await harness.service.startTurn(owner, { sessionId: snapshot.session.id, prompt: "Run" });
     const adapter = harness.adapters[0];
     adapter.emit({
@@ -251,7 +275,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
     try {
       const harness = createServiceHarness();
       const owner = createSender(11);
-      const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+      const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
       await harness.service.startTurn(owner, { sessionId: snapshot.session.id, prompt: "Run" });
 
       await harness.service.interruptTurn(owner, { sessionId: snapshot.session.id, turnId: "turn-1" });
@@ -274,7 +298,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
     try {
       const harness = createServiceHarness();
       const owner = createSender(12);
-      const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+      const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
       await harness.service.startTurn(owner, { sessionId: snapshot.session.id, prompt: "Run" });
       harness.adapters[0].emit({
         type: "approval.requested",
@@ -317,8 +341,8 @@ describe("Electron AgentService ownership and lifecycle", () => {
       send: vi.fn(),
     });
 
-    const first = await harness.service.createSession(owner, {}, "/workspace-a");
-    const second = await harness.service.createSession(owner, {}, "/workspace-b");
+    const first = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace-a");
+    const second = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace-b");
     expect(owner.listenerCount("destroyed")).toBe(1);
 
     await harness.service.closeSession(owner, { sessionId: first.session.id, removePersistence: true });
@@ -345,7 +369,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
       },
     });
     const owner = createSender(61);
-    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
     const privatePath = "/private/staging/ref.snapshot";
     const snapshotUrl = "data:image/png;base64,cHJpdmF0ZQ==";
     await harness.service.startTurn(owner, {
@@ -377,7 +401,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
   it("rejects references that did not pass main-process authorization", async () => {
     const harness = createServiceHarness();
     const owner = createSender(64);
-    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
     await expect(harness.service.startTurn(owner, {
       sessionId: snapshot.session.id,
       prompt: "Read it",
@@ -398,7 +422,7 @@ describe("Electron AgentService ownership and lifecycle", () => {
     const attachmentStore = { revoke: vi.fn(async () => ({ revoked: 1 })) };
     const harness = createServiceHarness({ attachmentStore });
     const owner = createSender(63);
-    const snapshot = await harness.service.createSession(owner, {}, "/workspace");
+    const snapshot = await harness.service.createSession(owner, { runtimeId: "codex" }, "/workspace");
     await harness.service.startTurn(owner, {
       sessionId: snapshot.session.id,
       prompt: "Inspect",

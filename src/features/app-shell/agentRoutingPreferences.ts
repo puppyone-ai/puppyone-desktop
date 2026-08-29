@@ -2,7 +2,7 @@ import type { AgentRoutePreference } from "../desktop-agent/domain/agent-route-p
 
 export type { AgentRoutePreference } from "../desktop-agent/domain/agent-route-preference";
 
-export const AGENT_ROUTING_PREFERENCES_VERSION = 1 as const;
+export const AGENT_ROUTING_PREFERENCES_VERSION = 2 as const;
 
 export type AgentRoutingPreferences = {
   version: typeof AGENT_ROUTING_PREFERENCES_VERSION;
@@ -37,13 +37,20 @@ export function parseAgentRoutingPreferences(
     if (parsed?.version === AGENT_ROUTING_PREFERENCES_VERSION) {
       return createAgentRoutingPreferences(parsed);
     }
+    if (parsed?.version === 1) {
+      // Version 1 could be written after the old controller silently selected
+      // its registry default. Keep scoped routes, but require a fresh choice.
+      return createAgentRoutingPreferences({ selectedRuntimeId: null, routes: parsed.routes });
+    }
   } catch {
     // Invalid preferences are replaced with a bounded migration result.
   }
   const legacyRuntimeId = runtimeId(legacy.legacyRuntimeId);
   const legacyModelId = routeValue(legacy.legacyModelId);
   return createAgentRoutingPreferences({
-    selectedRuntimeId: legacyRuntimeId,
+    // The legacy key was also written by the old implicit-default flow, so it
+    // cannot prove that the user chose this Agent. Preserve only its route.
+    selectedRuntimeId: null,
     routes: legacyRuntimeId && legacyModelId
       ? { [legacyRuntimeId]: { modelId: legacyModelId } }
       : {},

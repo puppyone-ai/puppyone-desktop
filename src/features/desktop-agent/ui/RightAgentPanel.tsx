@@ -29,7 +29,7 @@ type RightAgentPanelProps = {
   onOpenFile?: (path: string) => void;
   onRunningChange?: (running: boolean) => void;
   preferredRuntimeId?: string | null;
-  onPreferredRuntimeChange?: (runtimeId: string) => void;
+  onPreferredRuntimeChange?: (runtimeId: string | null) => void;
   preferredRoute?: Readonly<AgentRoutePreference>;
   onPreferredRouteChange?: (route: AgentRoutePreference) => void;
   /** @deprecated Use preferredRoute.modelId. */
@@ -143,7 +143,7 @@ export const RightAgentPanel = forwardRef<RightAgentPanelHandle, RightAgentPanel
         failed={failed}
         error={state.error}
         runtimeLabel={runtimeLabel}
-        readiness={readiness}
+        readiness={readiness ?? undefined}
         onRetry={() => void controller.initialize(true)}
       /> : null}
       conversation={<AgentTranscript

@@ -3,7 +3,7 @@ import type { AgentRuntimeCatalogEntry, AgentRuntimeInspection } from "./agent-c
 /** Renderer-safe Agent backend catalog derived only from the shared inspection DTO. */
 export function listAgentRuntimes(inspection: AgentRuntimeInspection | null): AgentRuntimeCatalogEntry[] {
   if (inspection?.runtimes?.length) return inspection.runtimes;
-  if (!inspection?.runtime) return [];
+  if (!inspection?.runtime || !inspection.readiness) return [];
   return [{ descriptor: inspection.runtime, readiness: inspection.readiness }];
 }
 

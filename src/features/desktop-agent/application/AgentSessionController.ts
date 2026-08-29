@@ -210,9 +210,6 @@ export class AgentSessionController {
       });
       this.lastInspectionAt = Date.now();
       const runtimeId = inspection.selectedRuntimeId
-        || inspection.runtime?.id
-        || inspection.readiness.runtimeId
-        || inspection.readiness.provider
         || null;
       const selectedModel = chooseAgentModel(inspection, this.state.selectedModel, null);
       const selectedModelEntry = inspection.models.find((model) => model.model === selectedModel);
@@ -220,7 +217,7 @@ export class AgentSessionController {
         || chooseAgentProvider(inspection, this.state.selectedProviderId, selectedModel);
       const selectedMode = chooseAgentMode(inspection, this.state.selectedMode);
       this.patch({ inspection, selectedRuntimeId: runtimeId, selectedProviderId, selectedModel, selectedMode, initialized: true });
-      if (inspection.readiness.status !== "ready") {
+      if (!runtimeId || !inspection.readiness || inspection.readiness.status !== "ready") {
         this.patch({ phase: "ready", sessionPreparation: "idle" });
         return;
       }

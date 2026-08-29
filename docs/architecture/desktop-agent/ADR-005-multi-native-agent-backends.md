@@ -264,7 +264,8 @@ The only durable Agent-related state is intentionally narrow:
 
 ```text
 presentation selection preferences
-  -> validated Agent/backend id; stale id falls back to the registered default
+  -> versioned Agent/backend id recorded only after an explicit picker choice
+  -> missing, legacy-implicit or stale id leaves Agent unselected; no fallback
   -> optional model preference applies only when the selected backend advertises it
 
 sanitized local-Agent detection snapshot
@@ -416,8 +417,8 @@ Benefits:
   native session behavior without credential or history scraping;
 - PuppyOne maintains one product control plane and UI rather than an Agent
   loop;
-- PuppyOne Agent remains a coherent first-party default without becoming a
-  mandatory kernel;
+- PuppyOne Agent remains a coherent first-party route without becoming a
+  mandatory kernel or an implicit UI selection;
 - native harness upgrades and capability differences remain isolated behind
   adapters;
 - one backend can fail or be absent without disabling all Chat functionality.

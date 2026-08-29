@@ -523,7 +523,8 @@ export function createAgentService({
   function selectRequestedRuntime(catalog, value) {
     const requested = normalizeRuntimeId(value);
     if (typeof value === "string" && value.trim() && !requested) throw new Error("Agent runtime id is invalid.");
-    if (requested && !catalog.some((entry) => entry.descriptor.id === requested)) {
+    if (!requested) throw new Error("Choose an Agent before starting an Agent session.");
+    if (!catalog.some((entry) => entry.descriptor.id === requested)) {
       throw new Error(`Agent runtime ${requested} is not registered.`);
     }
     return runtimeRegistry.select(catalog, requested);

@@ -22,21 +22,33 @@ describe("Agent routing preferences", () => {
     expect(updated.selectedRuntimeId).toBe("puppyone-agent");
   });
 
-  it("migrates legacy global runtime/model values without leaking the model into another runtime", () => {
+  it("preserves a legacy runtime's model route without treating its old implicit runtime as an explicit choice", () => {
     const migrated = parseAgentRoutingPreferences(null, {
       legacyRuntimeId: "codex",
       legacyModelId: "gpt-5.6",
     });
 
     expect(migrated).toEqual({
-      version: 1,
-      selectedRuntimeId: "codex",
+      version: 2,
+      selectedRuntimeId: null,
       routes: { codex: { modelId: "gpt-5.6" } },
     });
     expect(parseAgentRoutingPreferences(JSON.stringify({ version: 1, selectedRuntimeId: "claude", routes: {
       claude: { modelId: "claude-sonnet" },
       codex: { modelId: "gpt-5.6" },
     } }))).toMatchObject({
+      version: 2,
+      selectedRuntimeId: null,
+      routes: {
+        claude: { modelId: "claude-sonnet" },
+        codex: { modelId: "gpt-5.6" },
+      },
+    });
+    expect(parseAgentRoutingPreferences(JSON.stringify({ version: 2, selectedRuntimeId: "claude", routes: {
+      claude: { modelId: "claude-sonnet" },
+      codex: { modelId: "gpt-5.6" },
+    } }))).toMatchObject({
+      version: 2,
       selectedRuntimeId: "claude",
       routes: {
         claude: { modelId: "claude-sonnet" },

@@ -277,7 +277,8 @@ export type AgentRuntimeInspection = {
   runtimes?: AgentRuntimeCatalogEntry[];
   selectedRuntimeId?: AgentRuntimeId | null;
   runtime?: AgentRuntimeDescriptor;
-  readiness: AgentRuntimeReadiness;
+  /** Readiness for selectedRuntimeId; null while the UI is showing inventory before selection. */
+  readiness: AgentRuntimeReadiness | null;
   account: AgentAccountState | null;
   providers?: AgentInferenceProvider[];
   models: AgentModel[];
