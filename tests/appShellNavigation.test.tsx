@@ -119,10 +119,37 @@ describe("DesktopSidebarTopNavigation", () => {
     expect(navigation?.querySelectorAll(".desktop-shell-toolbar-button-label")).toHaveLength(4);
     expect(navigation?.querySelector(".desktop-sidebar-nav-badge")).toBeNull();
   });
+
+  it("places the Feedback utility at the far edge of top navigation", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => renderWithTestLocalization(root,
+      <DesktopSidebarTopNavigation
+        activeView="data"
+        gitEnabled={false}
+        pluginsEnabled={false}
+        orientation="horizontal"
+        gitIncomingCount={0}
+        gitOperationLoading={null}
+        gitStatus={null}
+        workspaceChangeCount={0}
+        utilitySlot={<button type="button" aria-label="Feedback">?</button>}
+        onNavigate={vi.fn()}
+        onOpenSettings={vi.fn()}
+      />,
+    ));
+
+    const list = container.querySelector(".desktop-sidebar-top-navigation-list");
+    expect(list?.lastElementChild?.classList.contains("desktop-sidebar-top-navigation-utility"))
+      .toBe(true);
+    expect(list?.lastElementChild?.textContent).toBe("?");
+  });
 });
 
 describe("DesktopSidebarFooterNavigation", () => {
-  it("keeps Cloud before the terminal Settings action in one group", () => {
+  it("keeps navigation left and the Feedback utility on the right edge", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -138,6 +165,7 @@ describe("DesktopSidebarFooterNavigation", () => {
         gitOperationLoading={null}
         gitStatus={null}
         workspaceChangeCount={0}
+        utilitySlot={<button type="button" aria-label="Feedback">?</button>}
         onNavigate={vi.fn()}
         onOpenSettings={vi.fn()}
       />,
@@ -145,8 +173,9 @@ describe("DesktopSidebarFooterNavigation", () => {
 
     expect(
       Array.from(container.querySelectorAll("button"), (button) => button.getAttribute("aria-label")),
-    ).toEqual(["Files", "Changes", "Cloud", "Settings"]);
-    expect(container.querySelectorAll(".desktop-sidebar-footer-actions")).toHaveLength(1);
+    ).toEqual(["Files", "Changes", "Cloud", "Settings", "Feedback"]);
+    expect(container.querySelectorAll(".desktop-sidebar-footer-actions")).toHaveLength(2);
+    expect(container.querySelector(".desktop-sidebar-footer-actions-right")?.textContent).toBe("?");
   });
 });
 
@@ -168,6 +197,7 @@ describe("DesktopSidebarRailNavigation local Cloud hub", () => {
         gitOperationLoading={null}
         gitStatus={null}
         workspaceChangeCount={2}
+        utilitySlot={<button type="button" aria-label="Feedback">?</button>}
         onNavigate={vi.fn()}
         onOpenSettings={vi.fn()}
       />,
@@ -175,12 +205,14 @@ describe("DesktopSidebarRailNavigation local Cloud hub", () => {
 
     expect(
       Array.from(container.querySelectorAll("button"), (button) => button.getAttribute("aria-label")),
-    ).toEqual(["Files, workspace changes detected", "Changes, workspace changes detected", "Cloud", "Settings"]);
+    ).toEqual(["Files, workspace changes detected", "Changes, workspace changes detected", "Cloud", "Settings", "Feedback"]);
     const badge = container.querySelector('[data-navigation-item="git"] .desktop-sidebar-nav-badge');
     expect(badge?.classList.contains("workspace")).toBe(true);
     expect(badge?.textContent).toBe("");
     expect(container.querySelector('button[aria-label="History"]')).toBeNull();
     expect(container.querySelector(".desktop-sidebar-nav-cloud-dot")).toBeNull();
+    expect(container.querySelector(".desktop-sidebar-rail-actions-end")?.lastElementChild?.textContent)
+      .toBe("?");
   });
 
   it("shows only the incoming cloud count when local and remote changes coexist", () => {

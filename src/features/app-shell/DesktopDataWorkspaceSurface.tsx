@@ -91,6 +91,7 @@ export type DesktopDataWorkspaceSurfaceProps = {
   preferences: DesktopPreferencesController;
   resolvedSurface: ResolvedWorkspaceSurface;
   sidebarCompanion?: ReactNode;
+  sidebarUtility?: ReactNode;
   viewerExtensionAdapter: DataWorkspaceProps["viewerExtensionAdapter"];
   workspace: Workspace;
   workspaceKey: string;
@@ -120,6 +121,7 @@ export function DesktopDataWorkspaceSurface({
   preferences,
   resolvedSurface,
   sidebarCompanion,
+  sidebarUtility,
   viewerExtensionAdapter,
   workspace,
   workspaceKey,
@@ -152,6 +154,7 @@ export function DesktopDataWorkspaceSurface({
     workspaceChangeCount: navigation.workspaceChangeCount,
     onNavigate: navigation.onNavigate,
     onOpenSettings: navigation.onOpenSettings,
+    utilitySlot: sidebarUtility,
   } as const;
   const shellHostedTopNavigation = navigationComposition === "sidebar-top-toolbar"
     && preferences.sidebarNavigationPlacement === "top";

@@ -924,13 +924,32 @@ function AppContent() {
       visibleGroups={toolsInNavigationToolbar ? ["app-status", "header"] : undefined}
     />
   );
-  const navigationToolbarActions = toolsInNavigationToolbar && desktopRightSidebarEnabled ? (
-    <DesktopTitlebarActions
-      {...chromeActionProps}
-      placement="toolbar"
-      visibleGroups={["right-sidebar"]}
+  const feedbackLauncher = (
+    <DesktopHelpLauncher
+      theme={resolvedTheme}
+      lightThemePreset={lightThemePreset}
+      darkThemePreset={darkThemePreset}
+      textSize={textSize}
+      typography={typography}
+      pointerCursors={pointerCursors}
+      diffMarkers={diffMarkers}
     />
-  ) : undefined;
+  );
+  const feedbackInNavigationToolbar = toolsInNavigationToolbar
+    && sidebarNavigationPlacement === "top";
+  const navigationToolbarActions = toolsInNavigationToolbar
+    && (desktopRightSidebarEnabled || feedbackInNavigationToolbar) ? (
+      <>
+        {desktopRightSidebarEnabled && (
+          <DesktopTitlebarActions
+            {...chromeActionProps}
+            placement="toolbar"
+            visibleGroups={["right-sidebar"]}
+          />
+        )}
+        {feedbackInNavigationToolbar && feedbackLauncher}
+      </>
+    ) : undefined;
 
   return (
     <div
@@ -1082,15 +1101,7 @@ function AppContent() {
             && !createEntryDraft.selectedKind
             && createEntryDraft.anchor.placement === "auto-end"
           )}
-        />
-        <DesktopHelpLauncher
-          theme={resolvedTheme}
-          lightThemePreset={lightThemePreset}
-          darkThemePreset={darkThemePreset}
-          textSize={textSize}
-          typography={typography}
-          pointerCursors={pointerCursors}
-          diffMarkers={diffMarkers}
+          sidebarUtility={feedbackInNavigationToolbar ? undefined : feedbackLauncher}
         />
       </DesktopCloudShell>
       <DesktopOverlayPortal

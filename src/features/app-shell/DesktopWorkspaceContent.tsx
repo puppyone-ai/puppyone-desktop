@@ -70,6 +70,7 @@ type DesktopWorkspaceContentProps = {
   puppyoneConfigSaving: boolean;
   settingsSection: SettingsSection;
   sidebarCompanion?: ReactNode;
+  sidebarUtility?: ReactNode;
   workspace: Workspace;
   workspaceSurfaceError?: string | null;
   workspaceKey: string;
@@ -109,6 +110,7 @@ export function DesktopWorkspaceContent({
   puppyoneConfigSaving,
   settingsSection,
   sidebarCompanion,
+  sidebarUtility,
   workspace,
   workspaceSurfaceError = null,
   workspaceKey,
@@ -210,6 +212,7 @@ export function DesktopWorkspaceContent({
       preferences={preferences}
       resolvedSurface={resolvedSurface}
       sidebarCompanion={sidebarCompanion}
+      sidebarUtility={sidebarUtility}
       viewerExtensionAdapter={viewerExtensionAdapter}
       workspace={workspace}
       workspaceKey={workspaceKey}

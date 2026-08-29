@@ -42,12 +42,10 @@ describe("desktop elevation architecture", () => {
     expect(compactMenuRule).not.toContain("color-mix(");
   });
 
-  it("does not give expanding chrome controls their own ambient shadow", () => {
+  it("does not give chrome controls their own ambient shadow", () => {
     expect(readCssBlock(helpLauncher, ".desktop-help-launcher")).toContain("box-shadow: none;");
-    expect(readCssBlock(
-      helpLauncher,
-      ".desktop-help-launcher:hover,\n.desktop-help-launcher:focus-visible",
-    )).toContain("box-shadow: none;");
+    expect(readCssBlock(helpLauncher, ".desktop-help-launcher:hover"))
+      .not.toContain("box-shadow:");
     expect(readCssBlock(accessMethodCard, ".desktop-cloud-access-method-copy-button"))
       .toContain("box-shadow: none;");
     expect(helpLauncher).not.toContain("0 2px 8px");
