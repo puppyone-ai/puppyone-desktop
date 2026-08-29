@@ -33,6 +33,7 @@ describe("host-owned CSS theme service", () => {
         name,
       );
     }
+    await writeFile(path.join(bundledThemesPath, "README.md"), "# PuppyOne themes\n", "utf8");
     const service = createThemeService({ userDataPath, bundledThemesPath, shell: createShell() });
 
     const first = await service.listThemes();
@@ -42,18 +43,44 @@ describe("host-owned CSS theme service", () => {
       source: "local-css",
       targets: ["application", "markdown", "csv"],
     });
+    const installedReadme = path.join(userDataPath, "themes", "README.md");
+    expect(await readFile(installedReadme, "utf8")).toBe("# PuppyOne themes\n");
 
     const installedTheme = path.join(userDataPath, "themes", "forest.css");
     const customizedTheme = await readFile(installedTheme, "utf8")
       .then((css) => css.replace("#222", "rebeccapurple"));
     await writeFile(installedTheme, customizedTheme, "utf8");
+    await writeFile(installedReadme, "# My theme notes\n", "utf8");
     await service.listThemes();
     expect(await readFile(installedTheme, "utf8")).toBe(customizedTheme);
+    expect(await readFile(installedReadme, "utf8")).toBe("# My theme notes\n");
 
     await rm(installedTheme);
     const afterDeletion = await service.listThemes();
     expect(afterDeletion.themes.some((theme) => theme.id === "builtin.pack.forest"))
       .toBe(false);
+  });
+
+  it("upgrades a v3 catalog with the README without overwriting existing themes", async () => {
+    const userDataPath = await createTemporaryDirectory();
+    const themeRoot = path.join(userDataPath, "themes");
+    await mkdir(themeRoot, { recursive: true });
+    await writeFile(path.join(themeRoot, ".puppyone-starter-themes-v3"), "3\n", "utf8");
+    const userTheme = "/* keep my theme */\nbody { color: rebeccapurple }\n";
+    await writeFile(path.join(themeRoot, "forest.css"), userTheme, "utf8");
+
+    const service = createThemeService({
+      userDataPath,
+      bundledThemesPath: path.join(process.cwd(), "electron", "themes"),
+      shell: createShell(),
+    });
+    await service.listThemes();
+
+    expect(await readFile(path.join(themeRoot, "README.md"), "utf8"))
+      .toContain("Where this folder belongs");
+    expect(await readFile(path.join(themeRoot, "forest.css"), "utf8")).toBe(userTheme);
+    expect(await readFile(path.join(themeRoot, ".puppyone-starter-themes-v4"), "utf8"))
+      .toBe("4\n");
   });
 
   it("ships eight valid starter CSS files for the user theme directory", async () => {
@@ -67,6 +94,8 @@ describe("host-owned CSS theme service", () => {
     const snapshot = await service.listThemes();
 
     expect(snapshot.diagnostics).toEqual([]);
+    expect(await readFile(path.join(userDataPath, "themes", "README.md"), "utf8"))
+      .toContain("Where this folder belongs");
     expect(snapshot.themes.map(({ id, source, targets }) => ({ id, source, targets }))).toEqual([
       { id: "builtin.pack.alto", source: "local-css", targets: ["application", "markdown", "csv"] },
       { id: "builtin.pack.forest", source: "local-css", targets: ["application", "markdown", "csv"] },

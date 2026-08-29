@@ -6,17 +6,22 @@ Selecting a Theme Pack applies it to all three surfaces and resets the Advanced 
 
 The visual precedence is Interface Style → resolved System/Light/Dark mode and base palette → Theme Pack → advanced per-surface override. Appearance continues to own navigation, file icons, motion, pointer behavior, and other interface preferences; theme CSS cannot change those product settings.
 
-Default is the only coordinated Theme Pack bundled into the renderer. On first access to the theme catalog, PuppyOne installs GitHub, Forest, Night, and Rose into the platform-specific Themes Folder as ordinary editable packages:
+Default is the only coordinated Theme Pack bundled into the renderer. On first access to the theme catalog, PuppyOne installs Alto, Forest, GitHub, Jade, Newsprint, Night, Rainbow, and Rose into the platform-specific Themes Folder as ordinary editable single-file themes. The folder also receives a bilingual `README.md` with installation, authoring, and sharing guidance:
 
 ```text
 ${app.getPath("userData")}/themes/
-├── github/
-├── forest/
-├── night/
-└── rose/
+├── README.md
+├── alto.css
+├── forest.css
+├── github.css
+├── jade.css
+├── newsprint.css
+├── night.css
+├── rainbow.css
+└── rose.css
 ```
 
-These starter packages use the same discovery, validation, diagnostics, and reload path as a package created by the user. PuppyOne never overwrites an existing starter path. A versioned hidden marker records the initial installation, so later edits, replacements, and deliberate deletions remain user-owned. The four designs are original PuppyOne implementations informed by common document-theme characteristics and use only PuppyOne's public scoped tokens.
+These starter files use the same discovery, validation, diagnostics, and reload path as a theme created by the user. PuppyOne never overwrites an existing starter path or README. A versioned hidden marker records installation, so later edits, replacements, and deliberate deletions remain user-owned. The designs are original PuppyOne implementations informed by common document-theme characteristics and use only PuppyOne's public scoped tokens.
 
 ## Custom CSS editor
 
@@ -58,9 +63,46 @@ Top-level CSS files appear as Markdown themes. PuppyOne treats Typora's `:root`,
 
 This is a restricted, safety-scoped Typora-style dialect rather than drop-in compatibility with every Typora theme. Container rules such as `@media` and `@supports` plus `@font-face` are supported; global rules such as `@keyframes`, `@page`, and plugin-specific Typora chrome selectors are rejected. Port those effects to scoped declarations and PuppyOne's public variables.
 
-## Multi-surface theme package
+## Portable single-file Theme Pack
 
-Use a directory containing `theme.json` to name a theme and target more than one surface:
+The recommended format for a coordinated, shareable theme is one top-level CSS file. Metadata identifies the theme; each `@puppyone` block declares one supported surface:
+
+```css
+@puppyone-theme {
+  id: com.example.graphite;
+  name: Graphite;
+  version: 1.0.0;
+  author: Example Studio;
+  modes: light dark;
+}
+
+@puppyone application {
+  .theme-root {
+    --po-surface-panel: #18181b;
+    --po-text: #f4f4f5;
+    --po-accent: #8b7cf6;
+  }
+}
+
+@puppyone markdown {
+  .theme-root { --po-md-content-line-height: 1.78; }
+  .theme-root .cm-md-heading-1,
+  .theme-root h1 { text-align: center; }
+}
+
+@puppyone csv {
+  .theme-root {
+    --po-csv-surface-background: #18181b;
+    --po-editable-table-cell-focus-ring: #8b7cf6;
+  }
+}
+```
+
+Targets are inferred from the blocks, so no separate target list or entrypoint map is required. A file with all three targets appears in Theme Pack; a partial file is available as an Advanced per-surface override. CSS files without `@puppyone-theme` retain the Markdown-only Typora-style behavior described above.
+
+## Advanced directory package
+
+Use a directory containing `theme.json` only when a theme needs multiple CSS files or local assets:
 
 ```json
 {

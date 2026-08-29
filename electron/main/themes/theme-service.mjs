@@ -35,7 +35,8 @@ const STARTER_THEME_NAMES = Object.freeze([
   "newsprint",
   "rainbow",
 ]);
-const STARTER_THEME_MARKER = ".puppyone-starter-themes-v3";
+const STARTER_THEME_MARKER = ".puppyone-starter-themes-v4";
+const STARTER_THEME_README = "README.md";
 const themeTargets = Object.freeze(["application", "markdown", "csv"]);
 const assetMimeTypes = new Map([
   [".woff", "font/woff"],
@@ -168,18 +169,28 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
 
 async function installStarterThemes({ bundledThemesPath, themeRoot }) {
   if (await pathEntryExists(path.join(themeRoot, STARTER_THEME_MARKER))) return;
+  await installBundledFileIfMissing({
+    source: path.join(bundledThemesPath, STARTER_THEME_README),
+    destination: path.join(themeRoot, STARTER_THEME_README),
+  });
   for (const themeName of STARTER_THEME_NAMES) {
     const legacyDestination = path.join(themeRoot, themeName);
     const destination = path.join(themeRoot, `${themeName}.css`);
     if (await pathEntryExists(destination) || await pathEntryExists(legacyDestination)) continue;
-    const source = path.join(bundledThemesPath, `${themeName}.css`);
-    try {
-      await writeFile(destination, await readFile(source), { flag: "wx" });
-    } catch (error) {
-      if (error?.code !== "EEXIST") throw error;
-    }
+    await installBundledFileIfMissing({
+      source: path.join(bundledThemesPath, `${themeName}.css`),
+      destination,
+    });
   }
-  await writeFileAtomic(themeRoot, STARTER_THEME_MARKER, "3\n");
+  await writeFileAtomic(themeRoot, STARTER_THEME_MARKER, "4\n");
+}
+
+async function installBundledFileIfMissing({ source, destination }) {
+  try {
+    await writeFile(destination, await readFile(source), { flag: "wx" });
+  } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+  }
 }
 
 async function pathEntryExists(filePath) {
