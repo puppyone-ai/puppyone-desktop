@@ -17,7 +17,7 @@
   border: 0;
   border-radius: var(--desktop-control-radius);
   background: transparent;
-  color: var(--po-text-subtle);
+  color: color-mix(in srgb, var(--po-text-subtle) 88%, transparent);
   box-shadow: none;
   cursor: var(--po-clickable-cursor, pointer);
   transition:
@@ -37,17 +37,17 @@
 }
 
 .desktop-help-launcher:hover {
-  background: var(--po-hover);
-  color: var(--po-text);
+  background: color-mix(in srgb, var(--po-hover) 70%, transparent);
+  color: var(--po-text-muted);
 }
 
 .desktop-feedback[data-open="true"] .desktop-help-launcher {
-  background: var(--po-selected);
-  color: var(--po-text);
+  background: var(--po-hover);
+  color: var(--po-text-muted);
 }
 
 .desktop-help-launcher:focus-visible {
-  color: var(--po-text);
+  color: var(--po-text-muted);
   outline: 2px solid var(--po-focus-ring);
   outline-offset: 2px;
 }

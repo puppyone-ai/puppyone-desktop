@@ -343,16 +343,19 @@ describe("DesktopHelpLauncher", () => {
     expect(launcherRule).toContain("height: var(--desktop-sidebar-control-size)");
     expect(launcherRule).toContain("border: 0");
     expect(launcherRule).toContain("background: transparent");
+    expect(launcherRule).toContain(
+      "color: color-mix(in srgb, var(--po-text-subtle) 88%, transparent)",
+    );
     expect(launcherRule).toContain("padding: 0");
     expect(launcherRule).not.toContain("backdrop-filter");
     expect(launcherCss).toMatch(
       /\.desktop-help-launcher-icon-slot\s*\{[^}]*width:\s*100%[^}]*height:\s*100%[^}]*place-items:\s*center/s,
     );
     expect(launcherCss).toMatch(
-      /\.desktop-help-launcher:hover\s*\{[^}]*background:\s*var\(--po-hover\)[^}]*color:\s*var\(--po-text\)/s,
+      /\.desktop-help-launcher:hover\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--po-hover\) 70%, transparent\)[^}]*color:\s*var\(--po-text-muted\)/s,
     );
     expect(launcherCss).toMatch(
-      /\.desktop-feedback\[data-open="true"\] \.desktop-help-launcher\s*\{[^}]*background:\s*var\(--po-selected\)[^}]*color:\s*var\(--po-text\)/s,
+      /\.desktop-feedback\[data-open="true"\] \.desktop-help-launcher\s*\{[^}]*background:\s*var\(--po-hover\)[^}]*color:\s*var\(--po-text-muted\)/s,
     );
     expect(launcherCss).not.toMatch(
       /\.desktop-feedback\s*\{[^}]*position:\s*(?:absolute|fixed)/s,
