@@ -46,6 +46,36 @@ describe("single-file CSS theme contract", () => {
       .toBeNull();
   });
 
+  it("keeps reserved built-in identity and compatibility metadata behind the generator boundary", () => {
+    const css = `
+      @puppyone-theme {
+        id: default.warm;
+        name: Warm;
+        version: 1.0.0;
+        modes: light dark;
+        compatible-root-themes: default;
+        builtin-order: 20;
+        legacy-light-preset: warm;
+        legacy-dark-preset: warm;
+      }
+      @puppyone application {}
+      @puppyone markdown {}
+      @puppyone csv {}
+    `;
+
+    expect(() => parseSingleFileThemeCss(css)).toThrow("Unsupported theme metadata");
+    const theme = parseSingleFileThemeCss(css, {
+      allowReservedBuiltinId: true,
+      allowBuiltinCompatibilityMetadata: true,
+    });
+    expect(theme).toMatchObject({
+      id: "default.warm",
+      builtinOrder: 20,
+      legacyPresets: { light: "warm", dark: "warm" },
+      targets: ["application", "markdown", "csv"],
+    });
+  });
+
   it.each([
     ["duplicate metadata", `${metadata()} ${metadata()}`],
     ["duplicate target", `${metadata()} @puppyone markdown {} @puppyone markdown {}`],

@@ -25,6 +25,13 @@ const tokenSource = readFileSync(
   new URL("../src/styles/tokens.css", import.meta.url),
   "utf8",
 );
+const paletteTokenSource = [
+  tokenSource,
+  ...["default-neutral", "default-warm", "default-graphite"].map((name) => readFileSync(
+    new URL(`../sub-themes/${name}/theme.css`, import.meta.url),
+    "utf8",
+  )),
+].join("\n");
 
 describe("lightweight Office preview experience", () => {
   it("keeps the successful preview headerless and read-only", () => {
@@ -107,8 +114,8 @@ describe("lightweight Office preview experience", () => {
     expect(officePreviewCss).toContain("prefers-reduced-motion: reduce");
     // Base Neutral plus every palette that intentionally changes file accents.
     // Light/Warm inherits the default file accents instead of duplicating them.
-    expect(tokenSource.match(/--po-file-accent-presentation:/g)).toHaveLength(5);
-    expect(tokenSource.match(/--po-file-accent-word:/g)).toHaveLength(5);
+    expect(paletteTokenSource.match(/--po-file-accent-presentation:/g)).toHaveLength(5);
+    expect(paletteTokenSource.match(/--po-file-accent-word:/g)).toHaveLength(5);
     expect(officePreviewCss).not.toMatch(
       /\.office-pptx-workspace\s*\{[^}]*var\(--po-inset\)/s,
     );
