@@ -6,6 +6,7 @@ describe("Agent Chat Workbench contribution", () => {
     expect(presentAgentChatWorkbenchItem({
       title: "Fix authentication",
       runtimeLabel: "Codex",
+      runtimeIconKey: "codex",
       sessionId: "native-session-1",
       statusCode: "ready",
       running: true,
@@ -13,6 +14,7 @@ describe("Agent Chat Workbench contribution", () => {
       title: "Fix authentication",
       accessibleLabel: "Fix authentication — Codex — ready",
       detail: "Codex — ready",
+      iconKey: "codex",
       status: "running",
       running: true,
       resourceId: "native-session-1",
@@ -23,6 +25,7 @@ describe("Agent Chat Workbench contribution", () => {
     const snapshot = presentAgentChatWorkbenchItem({
       title: "New Chat",
       runtimeLabel: null,
+      runtimeIconKey: null,
       sessionId: null,
       statusCode: "checking",
       running: false,

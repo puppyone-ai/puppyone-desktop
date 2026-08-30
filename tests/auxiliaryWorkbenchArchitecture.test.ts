@@ -55,6 +55,18 @@ describe("Unified Terminal Workbench architecture", () => {
     expect(panel).toContain("active && workbench.activeItemId === item.id");
   });
 
+  it("keeps feature branding in the generic Item snapshot and Workbench chrome", () => {
+    const contract = source("src/features/app-shell/auxiliary-workbench/types.ts");
+    const status = source(
+      "src/features/desktop-terminal/workbench/TerminalWorkbenchStatus.tsx",
+    );
+    expect(contract).toContain("iconKey: string | null");
+    expect(status).toContain(
+      "<WorkbenchLauncherIcon compact iconKey={item.snapshot.iconKey}",
+    );
+    expect(status).not.toContain("MessageSquare");
+  });
+
   it("pins every Terminal runtime to the Item root captured at creation", () => {
     const pool = source(
       "src/features/desktop-terminal/workbench/TerminalRuntimePool.ts",

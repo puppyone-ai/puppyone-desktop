@@ -59,7 +59,7 @@ export function AgentSessionTabs({
               >
                 <span className="desktop-agent-tab-leading" aria-hidden="true">
                   {tab.runtimeLabel
-                    ? <AgentBrandMark label={tab.runtimeLabel} />
+                    ? <AgentBrandMark iconKey={tab.runtimeIconKey} label={tab.runtimeLabel} />
                     : <MessageSquare className="desktop-agent-tab-placeholder-mark" size={14} />}
                   <span className={`desktop-agent-tab-status is-${tab.statusCode}`} />
                 </span>

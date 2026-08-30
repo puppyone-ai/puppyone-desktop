@@ -87,6 +87,9 @@ export function AgentChatTabPanel({
   // A direct creation recipe remains bound even when its runtime needs setup.
   // Only the chooser filters not-installed runtimes from subsequent selection.
   const agentRuntimeSelected = selectedRuntimeRegistered;
+  const runtimeIconKey = state.selectedRuntimeId
+    ? runtime?.iconKey || state.selectedRuntimeId
+    : null;
   const runtimeModels = agentRuntimeSelected ? inspection?.models ?? [] : [];
   const routingPreferences = useAgentRoutingPreferences({
     active: commandTarget, controller, state, runtimeModels, preferredRuntimeId, preferredRoute, preferredModel,
@@ -127,11 +130,12 @@ export function AgentChatTabPanel({
     onPresentationChange({
       title,
       runtimeLabel: agentRuntimeSelected ? runtimeLabel : null,
+      runtimeIconKey,
       sessionId: state.session?.id ?? null,
       statusCode,
       running: Boolean(state.projection.runningTurnId),
     });
-  }, [agentRuntimeSelected, onPresentationChange, runtimeLabel, state.projection.runningTurnId, state.session?.id, statusCode, title]);
+  }, [agentRuntimeSelected, onPresentationChange, runtimeIconKey, runtimeLabel, state.projection.runningTurnId, state.session?.id, statusCode, title]);
 
   const handleViewportChange = useCallback((scrollTop: number, measurements: Record<string, number>, pinned: boolean) => {
     controller.rememberViewport(scrollTop, measurements, pinned);

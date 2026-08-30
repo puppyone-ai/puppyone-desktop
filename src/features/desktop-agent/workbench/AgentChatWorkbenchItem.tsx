@@ -113,6 +113,7 @@ export function presentAgentChatWorkbenchItem(
       .filter(Boolean)
       .join(" — "),
     detail,
+    iconKey: presentation.runtimeIconKey,
     status,
     running: presentation.running,
     resourceId: presentation.sessionId,

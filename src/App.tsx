@@ -891,6 +891,7 @@ function AppContent() {
         title: t("agent.header.newChat"),
         accessibleLabel: `${t("agent.header.newChat")} — ${t("agent.name")}`,
         detail: t("agent.name"),
+        iconKey: null,
         status: "starting",
         running: false,
         resourceId: null,

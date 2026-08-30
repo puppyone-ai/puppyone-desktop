@@ -57,6 +57,7 @@ export function useTerminalWorkbenchSnapshots({
         title: presentation.pathLabel,
         accessibleLabel: presentation.accessibleLabel,
         detail: presentation.overflowDetail,
+        iconKey: null,
         status: session.status,
         running: session.status === "running",
         resourceId: null,
@@ -114,6 +115,7 @@ function sameSnapshot(
   return left.title === right.title
     && left.accessibleLabel === right.accessibleLabel
     && left.detail === right.detail
+    && left.iconKey === right.iconKey
     && left.status === right.status
     && left.running === right.running
     && left.resourceId === right.resourceId;
