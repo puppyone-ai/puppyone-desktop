@@ -3,7 +3,7 @@
 // commit, ref updates) and assert with eventual predicates that:
 //   - the metadata watcher delivers repository invalidations, and
 //   - the fast status reader eventually converges on repository truth.
-// See docs/architecture/git/status-refresh-lifecycle.md (Work Package 6).
+// See https://github.com/puppyone-ai/puppy-issues/blob/main/document/puppyone-desktop/source-control/refresh-lifecycle.md (Work Package 6).
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";

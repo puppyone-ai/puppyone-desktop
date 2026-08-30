@@ -114,11 +114,11 @@ if (DESKTOP_STABLE_TELEMETRY_INGEST_URL !== null && !/"TELEMETRY_MODE"\s*:\s*"ac
   errors.push("the configured Stable client endpoint requires an accepting production edge");
 }
 
-const publicTelemetrySource = await readText("docs/telemetry.md");
+const publicTelemetrySource = await readText("src/features/telemetry/publicDisclosure.ts");
 requireSource(
   publicTelemetrySource,
-  "guanqun.real@puppyone.ai",
-  "the public telemetry disclosure must provide the monitored founder contact",
+  "https://github.com/puppyone-ai/puppy-issues/blob/main/document/puppyone-desktop/privacy/telemetry-disclosure.md",
+  "the product must link to the governed public telemetry disclosure",
 );
 
 const ipcSource = await readText("electron/main/ipc/telemetry-ipc.mjs");
