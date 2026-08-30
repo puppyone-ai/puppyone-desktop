@@ -15,6 +15,7 @@ import { DesktopOverlayLayer } from "../../app-shell/DesktopOverlayPortal";
 import { useAnchoredOverlayPosition } from "../../app-shell/useAnchoredOverlayPosition";
 import { agentPickerLimits } from "./agent-picker-limits";
 import {
+  agentPickerMaxHeightPixels,
   agentPickerWidthPixels,
   type AgentPickerIndicator,
   type AgentPickerPlacement,
@@ -62,7 +63,7 @@ export function AgentPickerPopover({
   valueLabel,
   groups,
   disabled = false,
-  placement = "default",
+  placement = "composer",
   title,
   triggerDescription,
   triggerIcon,
@@ -92,11 +93,14 @@ export function AgentPickerPopover({
   const truncated = matchedOptionCount > flatOptions.length;
   const searchable = groups.reduce((count, group) => count + group.options.length, 0) > 6;
   const compact = compactWhenSelected && Boolean(valueLabel);
+  const preferredWidth = agentPickerWidthPixels[width];
   const { overlayRef, setOverlayRef, overlayPosition } = useAnchoredOverlayPosition({
     open,
     anchorRef: triggerRef,
     boundarySelector: ".desktop-agent-boundary",
-    preferredWidth: agentPickerWidthPixels[width],
+    preferredWidth,
+    preferredMaxHeight: agentPickerMaxHeightPixels,
+    placementPreference: placement === "composer" ? "above" : "below",
   });
 
   useEffect(() => {
@@ -259,7 +263,11 @@ export function AgentPickerPopover({
             elevation="compact"
             tone="quiet"
             role="presentation"
-            style={agentPickerOverlayGeometry(overlayPosition)}
+            style={agentPickerOverlayGeometry(
+              overlayPosition,
+              preferredWidth,
+              agentPickerMaxHeightPixels,
+            )}
             data-positioned={overlayPosition ? "true" : "false"}
             data-placement={overlayPosition?.placement}
             data-window-no-drag="true"

@@ -110,8 +110,11 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(picker).toContain("DesktopMenuSection");
     expect(picker).toContain("DesktopMenuItem");
     expect(picker).not.toMatch(/className\?: string|preferredWidth\?: number|showChevron\?: boolean/);
-    expect(pickerPresentation).toContain('export type AgentPickerPlacement = "default" | "header"');
+    expect(pickerPresentation).toContain('export type AgentPickerPlacement = "composer" | "header"');
     expect(pickerPresentation).toContain('export type AgentPickerWidth = "wide" | "medium" | "narrow"');
+    expect(picker).toContain('placement = "composer"');
+    expect(picker).toContain('placementPreference: placement === "composer" ? "above" : "below"');
+    expect(picker).toContain("preferredWidth,\n              agentPickerMaxHeightPixels");
     expect(desktopMenu).toContain('tone?: "default" | "quiet"');
     expect(desktopMenu).toContain("forwardRef<HTMLButtonElement, DesktopMenuItemProps>");
     expect(timeline).not.toContain("style={{");
