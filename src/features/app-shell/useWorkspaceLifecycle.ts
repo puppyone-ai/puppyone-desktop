@@ -58,6 +58,11 @@ export function useWorkspaceLifecycle({
   const recentWorkspaceRequestRef = useRef(0);
   const workbenchWorkspaceContextRef = useRef<WorkbenchWorkspaceContext | null>(null);
 
+  // This experiment gates attachment affordances only. The active composition,
+  // Resource URI identity, and persistence kernel must not change when the user
+  // toggles it; restored multi-Folder windows remain intact and writable.
+  const workspaceFolderAttachmentEnabled = multiRootWorkspacesEnabled;
+
   // The current product projects the first Folder exactly as before. The
   // underlying state is already the general zero/one/many Folder model.
   const workspace = useMemo(
@@ -163,7 +168,7 @@ export function useWorkspaceLifecycle({
   }, [handleWorkspaceOpenResult, workspace]);
 
   const addProject = useCallback(async () => {
-    if (!multiRootWorkspacesEnabled) {
+    if (!workspaceFolderAttachmentEnabled) {
       onWorkspaceOpenSettled();
       return;
     }
@@ -187,14 +192,14 @@ export function useWorkspaceLifecycle({
       onWorkspaceOpenSettled();
     }
   }, [
-    multiRootWorkspacesEnabled,
+    workspaceFolderAttachmentEnabled,
     onWorkspaceOpenSettled,
     reconcileWorkspaceComposition,
     refreshRecentWorkspaceList,
   ]);
 
   const addExistingProject = useCallback(async (folderPath: string) => {
-    if (!multiRootWorkspacesEnabled) {
+    if (!workspaceFolderAttachmentEnabled) {
       onWorkspaceOpenSettled();
       return;
     }
@@ -214,7 +219,7 @@ export function useWorkspaceLifecycle({
       onWorkspaceOpenSettled();
     }
   }, [
-    multiRootWorkspacesEnabled,
+    workspaceFolderAttachmentEnabled,
     onWorkspaceOpenSettled,
     reconcileWorkspaceComposition,
     refreshRecentWorkspaceList,

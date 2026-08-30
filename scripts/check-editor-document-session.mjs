@@ -296,6 +296,63 @@ if (!/if\s*\(!resourceIsUri\)\s*assertValidDataResourceReference\(path\)/.test(w
   errors.push(`${relative(workbenchDataPortPath)} can route a malformed Resource URI through the legacy first-Folder fallback`);
 }
 
+// The multi-Folder experiment is a shell affordance gate, never a data-model or
+// persistence-kernel selector. Keep flag-state branches out of every identity,
+// editor, provider-routing, and local persistence boundary.
+const multiRootFeatureGatePattern = /\b(?:enableMultiRootWorkspaces|multiRootWorkspacesEnabled)\b/;
+const featureIndependentWorkspaceKernelFiles = [
+  ...walkTypeScript(path.join(repoRoot, "packages/shared-ui/src/core")),
+  ...walkTypeScript(path.join(repoRoot, "packages/shared-ui/src/editor")),
+  ...walkTypeScript(path.join(repoRoot, "src/features/data-workspace")),
+  ...walkTypeScript(path.join(repoRoot, "src/features/editor-workbench")),
+  path.join(repoRoot, "src/lib/localFiles.ts"),
+  path.join(repoRoot, "electron/main/window-workspace-composition.mjs"),
+  path.join(repoRoot, "electron/main/workspace-state-store.mjs"),
+  path.join(repoRoot, "local-api/files/path-policy.mjs"),
+];
+for (const filePath of featureIndependentWorkspaceKernelFiles) {
+  if (multiRootFeatureGatePattern.test(readFileSync(filePath, "utf8"))) {
+    errors.push(`${relative(filePath)} lets the multi-Folder experiment select Workspace identity or persistence behavior`);
+  }
+}
+
+const workspaceFeatureMatrixTestPath = path.join(
+  repoRoot,
+  "tests/workspaceLifecycleExperiment.test.tsx",
+);
+const workspaceFeatureMatrixTestSource = readFileSync(workspaceFeatureMatrixTestPath, "utf8");
+for (const requiredContract of [
+  "runs the P0 save kernel identically with the multi-project experiment",
+  "preserves the active Workbench composition while the experiment toggles at runtime",
+  "getOrCreateDocumentWorkingCopy",
+  "legacy notes/README.md",
+  "docs with space/群群.md",
+  "puppyone-local:/workspace/",
+]) {
+  if (!workspaceFeatureMatrixTestSource.includes(requiredContract)) {
+    errors.push(`${relative(workspaceFeatureMatrixTestPath)} does not enforce: ${requiredContract}`);
+  }
+}
+
+const featureCompositionAppPath = path.join(repoRoot, "src/App.tsx");
+const featureCompositionAppSource = readFileSync(featureCompositionAppPath, "utf8");
+const desktopAppFeatureCompositionStart = featureCompositionAppSource.indexOf("const workbenchDataService = useMemo(");
+const desktopAppFeatureCompositionEnd = featureCompositionAppSource.indexOf(
+  "const dataPort = useMemo(",
+  desktopAppFeatureCompositionStart,
+);
+const desktopAppFeatureComposition = desktopAppFeatureCompositionStart >= 0
+  && desktopAppFeatureCompositionEnd > desktopAppFeatureCompositionStart
+  ? featureCompositionAppSource.slice(desktopAppFeatureCompositionStart, desktopAppFeatureCompositionEnd)
+  : "";
+if (
+  !desktopAppFeatureComposition.includes("createWorkbenchDataService(workbenchWorkspace)")
+  || !desktopAppFeatureComposition.includes("[workbenchWorkspace]")
+  || multiRootFeatureGatePattern.test(desktopAppFeatureComposition)
+) {
+  errors.push(`${relative(featureCompositionAppPath)} lets the multi-Folder experiment replace or disable the Workbench data kernel`);
+}
+
 const multiRootPersistenceTestPath = path.join(
   repoRoot,
   "tests/multiRootDocumentPersistence.integration.test.ts",
