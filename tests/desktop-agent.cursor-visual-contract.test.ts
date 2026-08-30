@@ -165,8 +165,11 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
   });
 
   it("uses the shared shell divider for the right sidebar edge and its directional glow", () => {
-    expect(layoutCss).toMatch(/\.desktop-right-sidebar\s*\{[^}]*overflow:\s*hidden/s);
+    expect(layoutCss).toMatch(/\.desktop-right-sidebar\s*\{[^}]*--desktop-right-sidebar-background:\s*var\(--po-header\)[^}]*--po-terminal-bg:\s*var\(--desktop-right-sidebar-background\)[^}]*overflow:\s*hidden[^}]*background:\s*var\(--desktop-right-sidebar-background\)/s);
     expect(layoutCss).toMatch(/\.desktop-right-sidebar:not\(\.is-open\)\s*\{[^}]*overflow:\s*visible/s);
+    expect(layoutCss).toMatch(/\.desktop-right-sidebar-stack\s*\{[^}]*background:\s*var\(--desktop-right-sidebar-background\)/s);
+    expect(layoutCss).toMatch(/\.desktop-right-sidebar-surface\s*\{[^}]*background:\s*var\(--desktop-right-sidebar-background\)/s);
+    expect(css).toMatch(/\.desktop-right-sidebar \.desktop-agent-boundary\s*\{[^}]*--agent-canvas:\s*var\(--po-terminal-bg\)/s);
     expect(layoutCss).toMatch(/\.desktop-right-sidebar\.is-open\s*\{[^}]*border-inline-start-color:\s*var\(--po-shell-divider, var\(--po-divider\)\)/s);
     expect(layoutCss).toMatch(/\.desktop-right-sidebar::before\s*\{[^}]*inset-inline-start:\s*0[^}]*z-index:\s*1[^}]*linear-gradient\(\s*90deg,\s*color-mix\(in srgb, var\(--po-shell-divider, var\(--po-divider\)\) 72%, transparent\),\s*transparent/s);
     expect(baseCss).toMatch(/\[dir="rtl"\] \.desktop-right-sidebar::before\s*\{[^}]*linear-gradient\(\s*270deg,\s*color-mix\(in srgb, var\(--po-shell-divider, var\(--po-divider\)\) 72%, transparent\),\s*transparent/s);

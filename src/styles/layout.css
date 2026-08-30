@@ -298,6 +298,8 @@
 
 .desktop-right-sidebar {
   --desktop-right-sidebar-width: 560px;
+  --desktop-right-sidebar-background: var(--po-header);
+  --po-terminal-bg: var(--desktop-right-sidebar-background);
 
   position: relative;
   z-index: 25;
@@ -307,7 +309,7 @@
   min-height: 0;
   overflow: hidden;
   border-inline-start: 0 solid transparent;
-  background: var(--po-terminal-bg);
+  background: var(--desktop-right-sidebar-background);
   transition:
     flex-basis 260ms cubic-bezier(0.22, 1, 0.36, 1),
     width 260ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -414,7 +416,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  background: var(--po-terminal-bg);
+  background: var(--desktop-right-sidebar-background);
   color: var(--po-text);
 }
 
@@ -424,6 +426,7 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  background: var(--desktop-right-sidebar-background);
 }
 
 .desktop-right-sidebar-surface.is-active {

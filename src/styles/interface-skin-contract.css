@@ -214,7 +214,7 @@
 }
 
 :root[data-interface-style]:not([data-interface-style="default"])
-  :where(.data-explorer-footer, .monitor-footer, .desktop-right-sidebar) {
+  :where(.data-explorer-footer, .monitor-footer) {
   border-color: var(--interface-footer-border-color);
   background: var(--interface-footer-background);
 }

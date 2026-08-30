@@ -112,6 +112,12 @@
   );
 }
 
+/* Agent Chat is document-like in a workbench tab, but becomes part of the
+ * application chrome when hosted by the auxiliary sidebar. */
+.desktop-right-sidebar .desktop-agent-boundary {
+  --agent-canvas: var(--po-terminal-bg);
+}
+
 .desktop-agent-panel {
   position: relative;
   display: grid;
