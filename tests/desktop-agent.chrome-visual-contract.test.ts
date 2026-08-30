@@ -41,13 +41,14 @@ describe("Desktop Agent and Terminal chrome visual contract", () => {
     expect(launcherCss).toMatch(/\.desktop-agent-history-list\s*\{[^}]*overflow-y:\s*auto/s);
   });
 
-  it("uses two compact, non-wrapping recipe rails in the unified launcher", () => {
-    expect(terminalLauncherCss).toMatch(/padding:\s*clamp\(58px, 18vh, 196px\) 10px 32px/);
-    expect(terminalLauncherCss).toMatch(/width:\s*min\(100%, 320px\)/);
-    expect(terminalLauncherCss).toMatch(/\.desktop-terminal-launcher-content\s*\{[^}]*gap:\s*22px/s);
-    expect(terminalLauncherCss).toMatch(/\.desktop-terminal-launcher-rail\s*\{[^}]*min-height:\s*44px[^}]*flex-wrap:\s*nowrap[^}]*overflow:\s*hidden/s);
-    expect(terminalLauncherCss).toMatch(/\.desktop-terminal-launcher-recipe\s*\{[^}]*width:\s*32px[^}]*height:\s*32px/s);
-    expect(terminalLauncherCss).toMatch(/\.desktop-terminal-launcher-recipe-label\s*\{[^}]*clip-path:\s*inset\(50%\)/s);
+  it("uses the proven vertical two-frame launcher geometry", () => {
+    expect(terminalLauncherCss).toMatch(/padding:\s*clamp\(56px, 20vh, 220px\) 0 32px/);
+    expect(terminalLauncherCss).toMatch(/width:\s*min\(100%, 252px\)/);
+    expect(terminalLauncherCss).toMatch(/\.desktop-terminal-launcher-content\s*\{[^}]*gap:\s*28px/s);
+    expect(terminalLauncherCss).toMatch(/\.desktop-terminal-launcher-group\s*\{[^}]*padding:\s*18px[^}]*border:\s*1px solid var\(--po-border\)[^}]*border-radius:\s*0/s);
+    expect(terminalLauncherCss).toMatch(/\.desktop-terminal-launcher-tools\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)[^}]*gap:\s*1px/s);
+    expect(terminalLauncherCss).toMatch(/\.desktop-terminal-launcher-tool,\s*\.desktop-terminal-launcher-shell\s*\{[^}]*min-height:\s*34px[^}]*gap:\s*9px[^}]*padding:\s*5px 8px/s);
+    expect(terminalLauncherCss).not.toContain(".desktop-terminal-launcher-rail");
     expect(terminalLauncherCss).not.toContain("::-webkit-scrollbar");
     expect(terminalLauncherCss).not.toMatch(/scrollbar-(?:width|color)\s*:/);
   });

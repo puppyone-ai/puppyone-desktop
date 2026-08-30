@@ -34,6 +34,7 @@
   "launcher.hermes.description": "Exécuter le CLI Hermes Agent",
   "launcher.shell.title": "Ou ouvrir un shell",
   "launcher.shell.name": "Shell",
+  "launcher.shell.action": "Ouvrir un shell",
   "launcher.shell.description": "Démarrer plutôt un terminal standard",
   "sessionTitle": "Terminal {number}",
   "closeSession": "Fermer {title}",

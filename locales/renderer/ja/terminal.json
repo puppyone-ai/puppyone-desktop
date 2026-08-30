@@ -34,6 +34,7 @@
   "launcher.hermes.description": "Hermes Agent CLI を実行",
   "launcher.shell.title": "またはシェルを開く",
   "launcher.shell.name": "Shell",
+  "launcher.shell.action": "シェルを開く",
   "launcher.shell.description": "通常のターミナルを起動します",
   "sessionTitle": "ターミナル {number}",
   "closeSession": "{title} を閉じる",

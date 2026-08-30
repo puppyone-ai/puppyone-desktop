@@ -21,8 +21,6 @@ import { useAuxiliaryWorkbenchContributions } from "../../app-shell/auxiliary-wo
 import { useTerminalAgentLocator } from "../controller/useTerminalAgentLocator";
 import { useTerminalTabMoveDrag } from "../interactions/useTerminalTabMoveDrag";
 import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
-import { DESKTOP_TERMINAL_LAUNCHERS } from "../model/terminalLaunchers";
-import type { AvailableTerminalAgentId } from "../model/terminalAgentAvailability";
 import {
   canPlaceTerminalSplit,
   terminalLeafMinimumSize,
@@ -35,7 +33,6 @@ import {
   useTerminalWorkbench,
 } from "../workbench/useTerminalWorkbench";
 import { TerminalContributionItemHost } from "../workbench/TerminalContributionItemHost";
-import type { TerminalWorkbenchCreateOption } from "../workbench/TerminalWorkbenchHeader.types";
 import { TerminalWorkbenchCreationFailure } from "../workbench/TerminalWorkbenchCreationFailure";
 import { useTerminalWorkbenchSnapshots } from "../workbench/useTerminalWorkbenchSnapshots";
 import { TerminalWorkbenchViewport } from "../workbench/TerminalWorkbenchViewport";
@@ -124,7 +121,7 @@ export function RightTerminalPanel({
       return session ? [session] : [];
     },
   ), [workbench.presentedItemIds, workbench.terminalById]);
-  const launcherVisible = terminalEnabled && active && (
+  const launcherVisible = active && (
     workbench.items.length === 0
     || presentedTerminalSessions.some((session) => (
       session.status === "selecting" || session.status === "starting"
@@ -139,15 +136,9 @@ export function RightTerminalPanel({
     const hidden = new Set(hiddenAgentIds);
     return availableAgentIds.filter((agentId) => !hidden.has(agentId));
   }, [availableAgentIds, hiddenAgentIds]);
-  const terminalAgentIds = useMemo(() => {
-    const hidden = new Set(hiddenAgentIds);
-    return DESKTOP_TERMINAL_LAUNCHERS.flatMap(({ id }) => (
-      id !== "shell" && !hidden.has(id) ? [id as AvailableTerminalAgentId] : []
-    ));
-  }, [hiddenAgentIds]);
   const canLaunch = useCallback((launcherId: DesktopTerminalLauncherId) => (
-    launcherId === "shell" || visibleAgentIds.includes(launcherId)
-  ), [visibleAgentIds]);
+    terminalEnabled && launcherId === "shell"
+  ), [terminalEnabled]);
   const createDetectedTerminal = useCallback((launcherId: DesktopTerminalLauncherId) => {
     if (terminalEnabled && canLaunch(launcherId)) {
       workbench.createTerminal(currentRoot, launcherId);
@@ -167,6 +158,21 @@ export function RightTerminalPanel({
       ? createContributionItem(agentChatContribution, targetGroupId, recipe)
       : null
   ), [agentChatContribution, createContributionItem, workbench.activeGroup?.id]);
+  const createChatFromLauncher = useCallback(async (
+    launcherItemId: string,
+    recipe: AuxiliaryWorkbenchCreationRecipe,
+  ) => {
+    if (!agentChatContribution) return;
+    const targetGroupId = workbench.groups.find(
+      (group) => group.itemIds.includes(launcherItemId),
+    )?.id ?? null;
+    const createdItemId = await createContributionItem(
+      agentChatContribution,
+      targetGroupId,
+      recipe,
+    );
+    if (createdItemId) workbench.requestCloseTerminal(launcherItemId);
+  }, [agentChatContribution, createContributionItem, workbench]);
 
   useEffect(() => {
     if (!presentedTerminalSessions.some((session) => session.launchError)) return;
@@ -247,68 +253,6 @@ export function RightTerminalPanel({
     }
   }, [contributionByKind, itemById, workbench]);
 
-  const createOptions = useCallback((groupId: string): readonly TerminalWorkbenchCreateOption[] => {
-    const options: TerminalWorkbenchCreateOption[] = [];
-    for (const contribution of contributions) {
-      const recipes = contribution.creationRecipes;
-      if (recipes?.length) {
-        for (const recipe of recipes) {
-          options.push({
-            id: `${contribution.kind}:${recipe.id}`,
-            group: "chat",
-            groupLabel: t("terminal.launcher.chat"),
-            iconKey: recipe.iconKey,
-            label: recipe.label,
-            detail: recipe.status === "coming-soon"
-              ? t("terminal.launcher.comingSoon")
-              : undefined,
-            disabled: !canCreateContribution(contribution, recipe),
-            onCreate: () => { void createContributionItem(contribution, groupId, recipe); },
-          });
-        }
-      } else {
-        options.push({
-          id: contribution.kind,
-          group: "chat",
-          groupLabel: contribution.label,
-          label: contribution.createLabel,
-          disabled: !canCreateContribution(contribution),
-          onCreate: () => { void createContributionItem(contribution, groupId); },
-        });
-      }
-    }
-    if (terminalEnabled) {
-      const installed = new Set(visibleAgentIds);
-      const terminalIds: DesktopTerminalLauncherId[] = ["shell", ...terminalAgentIds];
-      for (const launcherId of terminalIds) {
-        const launcher = DESKTOP_TERMINAL_LAUNCHERS.find(({ id }) => id === launcherId);
-        if (!launcher) continue;
-        const available = launcherId === "shell" || installed.has(launcherId as AvailableTerminalAgentId);
-        options.push({
-          id: `${TERMINAL_WORKBENCH_ITEM_KIND}:${launcherId}`,
-          group: "terminal",
-          groupLabel: t("terminal.title"),
-          launcherId,
-          label: t(launcher.nameMessage),
-          detail: available ? undefined : t("terminal.launcher.notInstalled"),
-          disabled: !available,
-          onCreate: () => workbench.createTerminal(currentRoot, launcherId, groupId),
-        });
-      }
-    }
-    return options;
-  }, [
-    canCreateContribution,
-    contributions,
-    createContributionItem,
-    currentRoot,
-    t,
-    terminalEnabled,
-    terminalAgentIds,
-    visibleAgentIds,
-    workbench,
-  ]);
-
   useTerminalAppearanceSync(panelRef, workbench.runtimeRegistry);
   return (
     <section ref={panelRef} className="desktop-terminal-panel" aria-label={t("terminal.title")}>
@@ -323,7 +267,6 @@ export function RightTerminalPanel({
           <TerminalLauncher
             discoveryPhase={agentDiscoveryPhase}
             availableAgentIds={visibleAgentIds}
-            terminalAgentIds={terminalAgentIds}
             chatCreationAvailable={canCreateChat}
             chatPreparing={chatPreparing}
             chatRecipes={chatRecipes}
@@ -337,7 +280,6 @@ export function RightTerminalPanel({
         ) : workbench.root ? (
           <TerminalWorkbenchViewport
             activeGroupId={workbench.activeGroup?.id ?? null}
-            createOptions={createOptions}
             dropIntent={itemMove.dropIntent}
             getLeafMinimum={getGroupMinimum}
             groups={workbench.groups}
@@ -347,6 +289,7 @@ export function RightTerminalPanel({
             itemMove={itemMove}
             onActivateItem={workbench.activateItem}
             onCloseItem={(itemId) => { void requestCloseItem(itemId); }}
+            onCreateItem={(groupId) => workbench.createTerminalLauncher(currentRoot, groupId)}
             onMoveByKeyboard={moveItemByKeyboard}
             onResizeSplit={workbench.resizeSplit}
           />
@@ -357,16 +300,23 @@ export function RightTerminalPanel({
               <TerminalSessionHost
                 discoveryPhase={agentDiscoveryPhase}
                 availableAgentIds={visibleAgentIds}
+                chatCreationAvailable={canCreateChat}
+                chatPreparing={chatPreparing}
+                chatRecipes={chatRecipes}
                 focused={active && workbench.activeItemId === item.id}
                 onFocus={() => {
                   setFocusedItemId(item.id);
                   workbench.activateItem(item.id);
                 }}
                 onLaunch={(launcherId) => launchDetectedTerminal(item.id, launcherId)}
+                onCreateChat={agentChatContribution
+                  ? (recipe) => { void createChatFromLauncher(item.id, recipe); }
+                  : undefined}
                 onRefresh={() => void refreshAvailableAgents()}
                 presented={active && presentedItemIdSet.has(item.id)}
                 runtime={workbench.runtimeRegistry.get(item.id)}
                 session={workbench.terminalById.get(item.id)!}
+                terminalEnabled={terminalEnabled}
                 workspacePath={item.rootId}
               />
             ) : null

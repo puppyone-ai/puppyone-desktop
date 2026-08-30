@@ -13,160 +13,82 @@ import {
 import { TerminalLauncher } from "../src/features/desktop-terminal/ui/TerminalLauncher";
 import { withTestLocalization } from "./testLocalization";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
+  .IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root | null = null;
 
 afterEach(() => {
   act(() => root?.unmount());
   root = null;
-  document.body.innerHTML = "";
+  document.body.replaceChildren();
 });
 
 describe("Unified Workbench launcher", () => {
-  it("presents Chat first and creates the selected Agent directly", () => {
+  it("restores the vertical two-frame launcher with Chat Agents above Shell", () => {
     const onCreateChat = vi.fn();
+    const onLaunch = vi.fn();
     const container = renderLauncher(
       <TerminalLauncher
         discoveryPhase="ready"
         availableAgentIds={["codex", "claude", "cursor", "opencode", "pi", "hermes"]}
         chatRecipes={AGENT_CHAT_CREATION_RECIPES}
         onCreateChat={onCreateChat}
-        onLaunch={vi.fn()}
+        onLaunch={onLaunch}
         onRefresh={vi.fn()}
       />,
     );
 
     const groups = container.querySelectorAll(".desktop-terminal-launcher-group");
     expect(groups).toHaveLength(2);
-    expect(groups[0].classList).toContain("is-chat");
-    expect(groups[1].classList).toContain("is-terminal");
-    expect(groups[0].querySelector("h2")?.textContent).toBe("Chat");
-    expect(groups[1].querySelector("h2")?.textContent).toBe("Terminal");
+    expect(groups[0].classList).toContain("is-agents");
+    expect(groups[1].classList).toContain("is-shell");
+    expect(groups[0].querySelector("h2")?.textContent).toBe("start with an agent");
+    expect(groups[1].querySelector("h2")?.textContent).toBe("or open a shell");
 
-    const chatButtons = groups[0].querySelectorAll<HTMLButtonElement>(
-      ".desktop-terminal-launcher-recipe",
+    const agentButtons = groups[0].querySelectorAll<HTMLButtonElement>(
+      ".desktop-terminal-launcher-tool",
     );
-    expect(Array.from(chatButtons, (button) => button.textContent)).toEqual([
+    expect(Array.from(agentButtons, (button) => button.textContent)).toEqual([
       "Codex",
       "Claude Code",
       "Cursor",
       "OpenCode",
       "PuppyOne",
     ]);
-    expect(chatButtons[0].getAttribute("aria-label")).toBe("Chat: Codex");
-    expect(chatButtons[4].getAttribute("aria-disabled")).toBe("true");
-    expect(chatButtons[4].title).toBe("PuppyOne — Coming soon");
+    expect(agentButtons[0].getAttribute("aria-label")).toBe("start with an agent: Codex");
+    expect(agentButtons[4].disabled).toBe(true);
+    expect(agentButtons[4].title).toBe("PuppyOne — Coming soon");
 
-    act(() => chatButtons[0].click());
+    const shellButtons = groups[1].querySelectorAll<HTMLButtonElement>("button");
+    expect(shellButtons).toHaveLength(1);
+    expect(shellButtons[0].textContent).toBe("Open a shell");
+    expect(container.querySelector(".desktop-terminal-launcher-rail")).toBeNull();
+    expect(container.querySelector(".desktop-terminal-launcher-group.is-terminal")).toBeNull();
+
+    act(() => agentButtons[0].click());
     expect(onCreateChat).toHaveBeenCalledOnce();
     expect(onCreateChat).toHaveBeenCalledWith(AGENT_CHAT_CREATION_RECIPES[0]);
-    act(() => chatButtons[4].click());
-    expect(onCreateChat).toHaveBeenCalledOnce();
+    act(() => shellButtons[0].click());
+    expect(onLaunch).toHaveBeenCalledOnce();
+    expect(onLaunch).toHaveBeenCalledWith("shell");
   });
 
-  it("keeps Shell first and every visible Terminal logo in one stable rail", () => {
-    const onLaunch = vi.fn();
+  it("keeps Terminal Agent commands in the model but out of the launcher", () => {
     const container = renderLauncher(
       <TerminalLauncher
         discoveryPhase="ready"
-        availableAgentIds={["codex", "claude"]}
-        onLaunch={onLaunch}
-        onRefresh={vi.fn()}
-      />,
-    );
-    const rail = container.querySelector(".desktop-terminal-launcher-group.is-terminal .desktop-terminal-launcher-rail");
-    const buttons = rail?.querySelectorAll<HTMLButtonElement>("button") ?? [];
-    expect(Array.from(buttons, (button) => button.textContent)).toEqual([
-      "Shell",
-      "Codex",
-      "Claude Code",
-      "Cursor Agent",
-      "OpenCode",
-      "Pi Agent",
-      "Hermes Agent",
-    ]);
-    expect(container.querySelectorAll(".desktop-terminal-launcher-rail")).toHaveLength(1);
-    expect(buttons[0].getAttribute("aria-label")).toBe("Terminal: Shell");
-    expect(buttons[3].getAttribute("aria-disabled")).toBe("true");
-    expect(buttons[3].title).toBe("Cursor Agent — Not installed");
-    for (const id of ["codex", "claude", "cursor", "opencode", "pi", "hermes"]) {
-      expect(container.querySelector(`.desktop-terminal-launcher-icon.is-${id} img`)).not.toBeNull();
-    }
-
-    act(() => buttons[0].click());
-    expect(onLaunch).toHaveBeenLastCalledWith("shell");
-    act(() => buttons[1].click());
-    expect(onLaunch).toHaveBeenLastCalledWith("codex");
-    act(() => buttons[3].click());
-    expect(onLaunch).toHaveBeenCalledTimes(2);
-  });
-
-  it("honors hidden Terminal Agents without collapsing detected availability", () => {
-    const container = renderLauncher(
-      <TerminalLauncher
-        discoveryPhase="ready"
-        availableAgentIds={["codex", "claude", "cursor"]}
-        terminalAgentIds={["codex", "cursor"]}
-        onLaunch={vi.fn()}
-        onRefresh={vi.fn()}
-      />,
-    );
-
-    expect(container.textContent).toContain("Codex");
-    expect(container.textContent).toContain("Cursor Agent");
-    expect(container.textContent).not.toContain("Claude Code");
-  });
-
-  it("keeps discovery progress layout-stable while preserving refresh semantics", () => {
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-    const render = (phase: "loading" | "ready") => withTestLocalization(
-      <TerminalLauncher
-        discoveryPhase={phase}
-        availableAgentIds={phase === "ready" ? ["codex"] : []}
-        onLaunch={vi.fn()}
-        onRefresh={vi.fn()}
-      />,
-    );
-
-    act(() => root?.render(render("loading")));
-    const rail = container.querySelector(".desktop-terminal-launcher-rail");
-    const codexButton = findButton(container, "Codex");
-    expect(container.querySelector(".desktop-terminal-launcher-scan")?.classList)
-      .toContain("is-scanning");
-    expect(container.querySelector(".desktop-terminal-launcher-availability")?.textContent)
-      .toContain("Looking for installed Agents");
-
-    act(() => root?.render(render("ready")));
-    expect(container.querySelector(".desktop-terminal-launcher-rail")).toBe(rail);
-    expect(findButton(container, "Codex")).toBe(codexButton);
-    expect(findButton(container, "Codex")?.getAttribute("aria-disabled")).toBe("false");
-  });
-
-  it("supports a standalone Chat contribution without exposing Terminal launchers", () => {
-    const onCreateChat = vi.fn();
-    const container = renderLauncher(
-      <TerminalLauncher
-        discoveryPhase="ready"
-        availableAgentIds={[]}
-        terminalEnabled={false}
+        availableAgentIds={["codex", "claude", "cursor", "opencode", "pi", "hermes"]}
         chatRecipes={AGENT_CHAT_CREATION_RECIPES}
-        onCreateChat={onCreateChat}
+        onCreateChat={vi.fn()}
         onLaunch={vi.fn()}
         onRefresh={vi.fn()}
       />,
     );
 
-    const launcher = container.querySelector<HTMLElement>(".desktop-terminal-launcher");
-    expect(container.querySelector(".desktop-terminal-launcher-group.is-chat")).not.toBeNull();
-    expect(container.querySelector(".desktop-terminal-launcher-group.is-terminal")).toBeNull();
-    expect(launcher?.getAttribute("aria-labelledby")).toBe("desktop-terminal-launcher-title");
-    expect(container.querySelector("#desktop-terminal-launcher-title")?.textContent).toBe("Chat");
-  });
-
-  it("keeps launcher identities closed, explicit, and free of renderer commands", () => {
+    expect(container.querySelectorAll(".desktop-terminal-launcher-shell")).toHaveLength(1);
+    expect(container.textContent).not.toContain("Pi Agent");
+    expect(container.textContent).not.toContain("Hermes Agent");
     expect(DESKTOP_TERMINAL_LAUNCHERS.map(({ id }) => id)).toEqual([
       "codex",
       "claude",
@@ -176,6 +98,58 @@ describe("Unified Workbench launcher", () => {
       "hermes",
       "shell",
     ]);
+    expect(DESKTOP_TERMINAL_LAUNCHERS.every((launcher) => !("command" in launcher))).toBe(true);
+  });
+
+  it("keeps discovery progress assistive and the vertical Agent list layout-stable", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const render = (phase: "loading" | "ready") => withTestLocalization(
+      <TerminalLauncher
+        discoveryPhase={phase}
+        availableAgentIds={phase === "ready" ? ["codex"] : []}
+        chatRecipes={AGENT_CHAT_CREATION_RECIPES}
+        onCreateChat={vi.fn()}
+        onLaunch={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    act(() => root?.render(render("loading")));
+    const tools = container.querySelector(".desktop-terminal-launcher-tools");
+    const codexButton = findButton(container, "Codex");
+    expect(container.querySelector(".desktop-terminal-launcher-scan")?.classList)
+      .toContain("is-scanning");
+    expect(container.querySelector(".desktop-terminal-launcher-availability")?.textContent)
+      .toContain("Looking for installed Agents");
+
+    act(() => root?.render(render("ready")));
+    expect(container.querySelector(".desktop-terminal-launcher-tools")).toBe(tools);
+    expect(findButton(container, "Codex")).toBe(codexButton);
+    expect(findButton(container, "Codex")?.disabled).toBe(false);
+  });
+
+  it("supports a standalone Chat launcher without exposing the Shell frame", () => {
+    const container = renderLauncher(
+      <TerminalLauncher
+        discoveryPhase="ready"
+        availableAgentIds={[]}
+        terminalEnabled={false}
+        chatRecipes={AGENT_CHAT_CREATION_RECIPES}
+        onCreateChat={vi.fn()}
+        onLaunch={vi.fn()}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector(".desktop-terminal-launcher-group.is-agents")).not.toBeNull();
+    expect(container.querySelector(".desktop-terminal-launcher-group.is-shell")).toBeNull();
+    expect(container.querySelector("#desktop-terminal-launcher-title")?.textContent)
+      .toBe("start with an agent");
+  });
+
+  it("keeps Chat recipe identities explicit and PuppyOne last until Hornet ships", () => {
     expect(AGENT_CHAT_CREATION_RECIPES.map(({ id }) => id)).toEqual([
       "codex",
       "claude",
@@ -185,14 +159,13 @@ describe("Unified Workbench launcher", () => {
     ]);
     expect(getDesktopTerminalLauncher("codex").id).toBe("codex");
     expect(getDesktopTerminalLauncher("hermes").id).toBe("hermes");
-    expect(DESKTOP_TERMINAL_LAUNCHERS.every((launcher) => !("command" in launcher))).toBe(true);
   });
 
-  it("keeps both rails available when a prior Terminal start reports an error", () => {
+  it("keeps both frames available when a prior Shell start reports an error", () => {
     const container = renderLauncher(
       <TerminalLauncher
         discoveryPhase="ready"
-        availableAgentIds={["codex"]}
+        availableAgentIds={[]}
         chatRecipes={AGENT_CHAT_CREATION_RECIPES}
         onCreateChat={vi.fn()}
         launchError="The Agent could not start."
@@ -203,7 +176,7 @@ describe("Unified Workbench launcher", () => {
 
     expect(container.querySelector('[role="alert"]')?.textContent)
       .toContain("The Agent could not start.");
-    expect(container.querySelectorAll(".desktop-terminal-launcher-rail")).toHaveLength(2);
+    expect(container.querySelectorAll(".desktop-terminal-launcher-group")).toHaveLength(2);
   });
 });
 

@@ -107,16 +107,18 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(closeDialog).toContain("<DesktopOverlayLayer>");
     expect(closeDialog).toContain("<DesktopDialogRoot");
     expect(panel).toContain("<TerminalLauncher");
-    expect(panel).toContain("createOptions={createOptions}");
-    expect(groupViewport).toContain("createOptions={createOptions(group.id)}");
+    expect(panel).toContain("onCreateItem={(groupId) => workbench.createTerminalLauncher");
+    expect(groupViewport).toContain("onCreate={() => onCreateItem(group.id)}");
+    expect(panel).not.toContain("createOptions");
     expect(panel).not.toContain('createSession("shell")');
     expect(panel).toContain('session.status === "selecting"');
     expect(panel).toContain('workbench.items.length === 0');
     expect(panel).not.toContain("initiallyActive");
     expect(controller).not.toContain("initiallyActive");
     expect(controller).not.toContain("getDesktopTerminalLauncher(launcherId)");
-    expect(launcher).toContain("DESKTOP_TERMINAL_LAUNCHERS");
+    expect(launcher).toContain('getDesktopTerminalLauncher("shell")');
     expect(launcher).toContain("chatRecipes.map");
+    expect(launcher).not.toContain("DESKTOP_TERMINAL_LAUNCHERS.map");
     expect(launcher).not.toContain("window.puppyoneDesktop");
     expect(launchers).not.toContain("command:");
     expect(controller).not.toContain('dispatch({ type: "restart-active" });');
@@ -266,14 +268,12 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(launcherCss).toContain(".desktop-terminal-launcher");
     expect(launcherCss).toContain("container-type: size");
     expect(launcherCss).toMatch(
-      /\.desktop-terminal-launcher\s*\{[^}]*place-items:\s*start center;[^}]*padding:\s*clamp\(58px, 18vh, 196px\) 10px 32px;/s,
+      /\.desktop-terminal-launcher\s*\{[^}]*place-items:\s*start center;[^}]*padding:\s*clamp\(56px, 20vh, 220px\) 0 32px;/s,
     );
     expect(launcherCss).toMatch(
       /\.desktop-terminal-launcher-availability\s*\{[^}]*position:\s*absolute;[^}]*width:\s*1px;[^}]*height:\s*1px;/s,
     );
-    expect(launcherCss).toMatch(
-      /\.desktop-terminal-launcher-rail\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap;[^}]*gap:\s*3px;/s,
-    );
+    expect(launcherCss).not.toContain(".desktop-terminal-launcher-rail");
     expect(launcherCss).toContain("var(--po-terminal-bg)");
     expect(launcherCss).toContain("var(--po-focus-ring)");
     expect(launcherIconCss).toMatch(
@@ -282,15 +282,15 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(launcherIconCss).toContain(".desktop-terminal-launcher-icon.is-compact.is-hermes");
     expect(launcher).toContain("desktop-terminal-launcher-heading");
     expect(launcher).toContain("desktop-terminal-launcher-scan");
-    expect(launcher).toContain("desktop-terminal-launcher-group is-chat");
-    expect(launcher).toContain("desktop-terminal-launcher-group is-terminal");
-    expect(launcher).toContain('t("terminal.launcher.chat")');
-    expect(launcher).toContain('t("terminal.title")');
+    expect(launcher).toContain("desktop-terminal-launcher-group is-agents");
+    expect(launcher).toContain("desktop-terminal-launcher-group is-shell");
+    expect(launcher).toContain('"terminal.launcher.title"');
+    expect(launcher).toContain('"terminal.launcher.shell.title"');
     expect(launcher).toContain('aria-label={t("terminal.launcher.scanAgain")}');
-    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-content\s*\{[^}]*gap:\s*22px;/s);
-    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-heading h2\s*\{[^}]*font-size:\s*12px;[^}]*font-weight:\s*600;/s);
-    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-recipe\s*\{[^}]*width:\s*32px;[^}]*height:\s*32px;[^}]*border-radius:\s*6px;/s);
-    expect(launcherCss).toContain('.desktop-terminal-launcher-recipe[data-status="coming-soon"]::after');
+    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-content\s*\{[^}]*gap:\s*28px;/s);
+    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-heading h2\s*\{[^}]*font-size:\s*12px;[^}]*font-weight:\s*500;/s);
+    expect(launcherCss).toMatch(/\.desktop-terminal-launcher-tool,\s*\.desktop-terminal-launcher-shell\s*\{[^}]*min-height:\s*34px;[^}]*border-radius:\s*6px;/s);
+    expect(launcherCss).toContain('.desktop-terminal-launcher-tool[data-status="coming-soon"]::after');
     expect(launcherCss).not.toContain("aspect-ratio:");
     expect(header).toContain('import "./terminal-session-header.css"');
     expect(header).toContain("<TerminalSessionTab");
@@ -488,7 +488,10 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(header).toContain("presentedItemIds");
     expect(header).not.toContain("TerminalSessionLayoutMenu");
     expect(header).not.toContain("onUnsplitActive");
-    expect(header).toContain("<TerminalWorkbenchCreateMenu");
+    expect(header).toContain("<DesktopMenuIconButton");
+    expect(header).toContain("onClick={onCreate}");
+    expect(header).not.toContain("TerminalWorkbenchCreateMenu");
+    expect(header).not.toContain("aria-haspopup");
     expect(panel).toContain("workbench.items.length === 0 ? (");
     expect(panel).toContain(": workbench.root ? (");
     expect(panel).not.toContain("sessionLayout");

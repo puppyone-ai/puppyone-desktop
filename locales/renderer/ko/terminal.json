@@ -34,6 +34,7 @@
   "launcher.hermes.description": "Hermes Agent CLI 실행",
   "launcher.shell.title": "또는 셸 열기",
   "launcher.shell.name": "Shell",
+  "launcher.shell.action": "셸 열기",
   "launcher.shell.description": "일반 터미널을 대신 시작합니다",
   "sessionTitle": "터미널 {number}",
   "closeSession": "{title} 닫기",

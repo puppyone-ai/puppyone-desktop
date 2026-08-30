@@ -9,15 +9,3 @@ export type TerminalWorkbenchHeaderItem = Readonly<{
   terminalSession: DesktopTerminalSessionSummary | null;
   terminalRuntime: TerminalRuntimeHandle | null;
 }>;
-
-export type TerminalWorkbenchCreateOption = Readonly<{
-  id: string;
-  group: "chat" | "terminal";
-  groupLabel: string;
-  label: string;
-  detail?: string;
-  disabled?: boolean;
-  iconKey?: string | null;
-  launcherId?: import("../model/terminalLaunchers").DesktopTerminalLauncherId;
-  onCreate: () => void;
-}>;

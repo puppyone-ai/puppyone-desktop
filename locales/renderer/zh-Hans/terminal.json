@@ -34,6 +34,7 @@
   "launcher.hermes.description": "运行 Hermes Agent CLI",
   "launcher.shell.title": "或者打开 Shell",
   "launcher.shell.name": "Shell",
+  "launcher.shell.action": "打开 Shell",
   "launcher.shell.description": "改为启动一个普通终端",
   "sessionTitle": "终端 {number}",
   "closeSession": "关闭 {title}",

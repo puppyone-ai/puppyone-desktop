@@ -19,17 +19,13 @@ import { TERMINAL_SPLIT_DIVIDER_SIZE } from "../model/terminalSplitConstraints";
 import { TerminalSplitResizeHandle } from "../layout/TerminalSplitResizeHandle";
 import { useTerminalGroupHandleReveal } from "../layout/useTerminalGroupHandleReveal";
 import { terminalPanelId, terminalTabId } from "../ui/session-header/terminalSessionHeaderIds";
-import type {
-  TerminalWorkbenchCreateOption,
-  TerminalWorkbenchHeaderItem,
-} from "./TerminalWorkbenchHeader.types";
+import type { TerminalWorkbenchHeaderItem } from "./TerminalWorkbenchHeader.types";
 import { TerminalWorkbenchGroupMoveHandle } from "./TerminalWorkbenchGroupMoveHandle";
 import { TerminalWorkbenchHeader } from "./TerminalWorkbenchHeader";
 import { TerminalWorkbenchItemHostSlot } from "./TerminalWorkbenchItemHostSlot";
 
 export type TerminalWorkbenchViewportProps = Readonly<{
   activeGroupId: string | null;
-  createOptions: (groupId: string) => readonly TerminalWorkbenchCreateOption[];
   dropIntent: TerminalTabMoveDropIntent | null;
   getLeafMinimum: (groupId: string) => WorkbenchSplitMinimumSize;
   groups: readonly AuxiliaryWorkbenchGroup[];
@@ -39,6 +35,7 @@ export type TerminalWorkbenchViewportProps = Readonly<{
   itemMove: TerminalTabMoveDragController;
   onActivateItem: (itemId: string) => void;
   onCloseItem: (itemId: string) => void;
+  onCreateItem: (groupId: string) => void;
   onMoveByKeyboard: (
     itemId: string,
     targetGroupId: string,
@@ -84,7 +81,6 @@ function TerminalWorkbenchLayoutNode(props: LayoutNodeProps): ReactNode {
 
 function TerminalWorkbenchGroupLeaf({
   activeGroupId,
-  createOptions,
   dropIntent,
   group,
   headerItemById,
@@ -92,6 +88,7 @@ function TerminalWorkbenchGroupLeaf({
   itemMove,
   onActivateItem,
   onCloseItem,
+  onCreateItem,
   onMoveByKeyboard,
 }: LayoutNodeProps & { group: AuxiliaryWorkbenchGroup }) {
   const groupRef = useRef<HTMLElement>(null);
@@ -122,12 +119,12 @@ function TerminalWorkbenchGroupLeaf({
     >
       <TerminalWorkbenchHeader
         activeItemId={group.activeItemId}
-        createOptions={createOptions(group.id)}
         dropInsertion={insertIntent}
         groupId={group.id}
         items={headerItems}
         onActivate={onActivateItem}
         onClose={onCloseItem}
+        onCreate={() => onCreateItem(group.id)}
         onMoveByKeyboard={(itemId, edge) => onMoveByKeyboard(itemId, group.id, edge)}
         presentedItemIds={[group.activeItemId]}
         tabMove={itemMove}

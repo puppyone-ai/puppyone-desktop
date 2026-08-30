@@ -1,6 +1,8 @@
 import { useMemo, type CSSProperties } from "react";
+import { Plus } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
 import type { WorkbenchSplitDropEdge } from "@puppyone/shared-ui";
+import { DesktopMenuIconButton } from "../../../components/DesktopMenu";
 import { TERMINAL_SESSION_HEADER_METRICS } from "../model/terminalSessionHeaderLayout";
 import {
   projectTerminalGroupInsertionPreview,
@@ -12,23 +14,19 @@ import type { TerminalTabMoveDragController } from "../interactions/useTerminalT
 import { terminalPanelId, terminalTabId } from "../ui/session-header/terminalSessionHeaderIds";
 import { useTerminalSessionHeaderController } from "../ui/session-header/useTerminalSessionHeaderController";
 import { useTerminalSessionHeaderLayout } from "../ui/session-header/useTerminalSessionHeaderLayout";
-import type {
-  TerminalWorkbenchCreateOption,
-  TerminalWorkbenchHeaderItem,
-} from "./TerminalWorkbenchHeader.types";
-import { TerminalWorkbenchCreateMenu } from "./TerminalWorkbenchCreateMenu";
+import type { TerminalWorkbenchHeaderItem } from "./TerminalWorkbenchHeader.types";
 import { TerminalWorkbenchOverflowMenu } from "./TerminalWorkbenchOverflowMenu";
 import { TerminalWorkbenchTab } from "./TerminalWorkbenchTab";
 import "../ui/session-header/terminal-session-header.css";
 
 type TerminalWorkbenchHeaderProps = Readonly<{
   activeItemId: string | null;
-  createOptions: readonly TerminalWorkbenchCreateOption[];
   dropInsertion?: TerminalTabInsertDropIntent | TerminalGroupMergeDropIntent | null;
   groupId: string;
   items: readonly TerminalWorkbenchHeaderItem[];
   onActivate: (itemId: string) => void;
   onClose: (itemId: string) => void;
+  onCreate: () => void;
   onMoveByKeyboard?: (itemId: string, edge: WorkbenchSplitDropEdge) => void;
   presentedItemIds?: readonly string[];
   tabMove?: TerminalTabMoveDragController;
@@ -36,12 +34,12 @@ type TerminalWorkbenchHeaderProps = Readonly<{
 
 export function TerminalWorkbenchHeader({
   activeItemId,
-  createOptions,
   dropInsertion = null,
   groupId,
   items,
   onActivate,
   onClose,
+  onCreate,
   onMoveByKeyboard,
   presentedItemIds = [],
   tabMove = INERT_TAB_MOVE,
@@ -174,7 +172,12 @@ export function TerminalWorkbenchHeader({
               onClose={onClose}
             />
           )}
-          <TerminalWorkbenchCreateMenu options={createOptions} />
+          <DesktopMenuIconButton
+            className="desktop-terminal-new-button"
+            label={t("terminal.new")}
+            icon={<Plus size={14} strokeWidth={1.9} aria-hidden="true" />}
+            onClick={onCreate}
+          />
         </div>
       </div>
     </header>
