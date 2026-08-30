@@ -380,6 +380,11 @@ describe("Desktop Agent renderer surfaces", () => {
     }));
 
     expect((container.querySelector("textarea") as HTMLTextAreaElement).placeholder).toBe("Ask about this project");
+    const sendButton = container.querySelector(
+      'button[aria-label="Send message"]',
+    ) as HTMLButtonElement | null;
+    expect(sendButton).not.toBeNull();
+    expect(sendButton?.disabled).toBe(true);
   });
 
   it("morphs the single send action into stop while a turn is running", () => {

@@ -31,7 +31,7 @@
     color-mix(in srgb, var(--po-selected) 88%, transparent) calc(100% - 36px),
     color-mix(in srgb, var(--po-selected) 62%, transparent) 100%
   );
-  --agent-composer-surface: var(--agent-row-hover-surface);
+  --agent-composer-surface: var(--po-active);
   --agent-control-surface: color-mix(in srgb, var(--po-header) 82%, var(--po-panel-raised));
   --agent-border: var(--po-border-strong);
   --agent-border-subtle: var(--po-divider);

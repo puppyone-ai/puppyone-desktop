@@ -152,8 +152,8 @@
   transition: opacity 120ms ease;
 }
 .desktop-agent-composer-action:hover:not(:disabled) { opacity: 0.84; }
-.desktop-agent-composer-action:disabled { cursor: default; background: transparent; box-shadow: none; color: var(--agent-text-subtle); opacity: 0.52; }
-.desktop-agent-composer-action.is-stop:disabled { background: var(--agent-text); color: var(--agent-canvas); }
+.desktop-agent-composer-action:disabled { cursor: default; background: color-mix(in srgb, var(--agent-text) 14%, transparent); box-shadow: none; color: color-mix(in srgb, var(--agent-text) 48%, transparent); opacity: 1; }
+.desktop-agent-composer-action.is-stop:disabled { background: var(--agent-text); color: var(--agent-canvas); opacity: 0.52; }
 
 .desktop-agent-reference-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 8px 0; }
 .desktop-agent-reference-chips > span {

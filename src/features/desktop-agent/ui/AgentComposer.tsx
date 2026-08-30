@@ -174,7 +174,7 @@ export function AgentComposer({
                   ? <LoaderCircle size={15} className="desktop-agent-spin" />
                   : running
                     ? <Square size={11} fill="currentColor" />
-                    : <ArrowUp size={17} strokeWidth={2.2} />}
+                    : <ArrowUp size={17} strokeWidth={1.6} />}
               </button>
             </div>
           </div>
