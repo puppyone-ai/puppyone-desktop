@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DocumentPersistencePort } from "@puppyone/shared-ui";
 import {
+  createWorkspaceResourceUri,
+  createWorkspaceRootUri,
+} from "../packages/shared-ui/src/core/resourceUri";
+import {
   closeDocumentWorkingCopy,
+  closeDocumentWorkingCopiesUnderResource,
   getOrCreateDocumentWorkingCopy,
 } from "../packages/shared-ui/src/editor/document-session/documentWorkingCopies";
 
@@ -74,5 +79,76 @@ describe("document Working Copy registry", () => {
     expect(second.session).not.toBe(first.session);
     await closeDocumentWorkingCopy({ storageIdentity: "test:workspace-a", resourcePath: "same.md" });
     await closeDocumentWorkingCopy({ storageIdentity: "test:workspace-b", resourcePath: "same.md" });
+  });
+
+  it("keeps equal provider paths isolated across Workspace Folders in one Workbench", async () => {
+    const rootA = createWorkspaceRootUri("folder-a");
+    const rootB = createWorkspaceRootUri("folder-b");
+    const persistence: DocumentPersistencePort = {
+      kind: "local-fs",
+      storageIdentity: "test:multi-root-workbench",
+      persist: vi.fn(async () => ({ ok: true, version: "v2" })),
+    };
+    const first = getOrCreateDocumentWorkingCopy({
+      documentId: createWorkspaceResourceUri(rootA, "same.md"),
+      initialContent: "first",
+      saveMode: "auto",
+      persistence,
+    });
+    const second = getOrCreateDocumentWorkingCopy({
+      documentId: createWorkspaceResourceUri(rootB, "same.md"),
+      initialContent: "second",
+      saveMode: "auto",
+      persistence,
+    });
+
+    expect(second.session).not.toBe(first.session);
+
+    await closeDocumentWorkingCopiesUnderResource(persistence.storageIdentity, rootA);
+    await closeDocumentWorkingCopiesUnderResource(persistence.storageIdentity, rootB);
+  });
+
+  it("closes one Workspace Folder without releasing a sibling Folder's Working Copy", async () => {
+    const rootA = createWorkspaceRootUri("folder-a");
+    const rootB = createWorkspaceRootUri("folder-b");
+    const resourceA = createWorkspaceResourceUri(rootA, "same.md");
+    const resourceB = createWorkspaceResourceUri(rootB, "same.md");
+    const persistence: DocumentPersistencePort = {
+      kind: "local-fs",
+      storageIdentity: "test:multi-root-close",
+      persist: vi.fn(async () => ({ ok: true, version: "v2" })),
+    };
+    const first = getOrCreateDocumentWorkingCopy({
+      documentId: resourceA,
+      initialContent: "first",
+      saveMode: "auto",
+      persistence,
+    });
+    const second = getOrCreateDocumentWorkingCopy({
+      documentId: resourceB,
+      initialContent: "second",
+      saveMode: "auto",
+      persistence,
+    });
+
+    await closeDocumentWorkingCopiesUnderResource(persistence.storageIdentity, rootA);
+
+    const reopenedFirst = getOrCreateDocumentWorkingCopy({
+      documentId: resourceA,
+      initialContent: "first",
+      saveMode: "auto",
+      persistence,
+    });
+    const retainedSecond = getOrCreateDocumentWorkingCopy({
+      documentId: resourceB,
+      initialContent: "second",
+      saveMode: "auto",
+      persistence,
+    });
+    expect(reopenedFirst.session).not.toBe(first.session);
+    expect(retainedSecond.session).toBe(second.session);
+
+    await closeDocumentWorkingCopiesUnderResource(persistence.storageIdentity, rootA);
+    await closeDocumentWorkingCopiesUnderResource(persistence.storageIdentity, rootB);
   });
 });
