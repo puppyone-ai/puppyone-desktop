@@ -129,7 +129,8 @@
 .desktop-agent-composer-picker .desktop-agent-picker-trigger {
   width: max-content;
   max-width: 100%;
-  padding: 0 6px 0 0;
+  padding-block: 0;
+  padding-inline: var(--agent-composer-picker-padding-inline);
   border: 0;
   color: var(--agent-text-subtle);
   font-weight: 400;
@@ -143,7 +144,6 @@
   background: var(--agent-row-hover-surface);
   color: var(--agent-text-muted);
 }
-.desktop-agent-composer-picker.is-effort .desktop-agent-picker-trigger { padding-inline-end: 4px; }
 .desktop-agent-composer-action {
   display: grid;
   width: var(--agent-control-size);

@@ -51,13 +51,22 @@ async function runSmoke() {
     localAgentInventory: { discover: async () => ({ connections: [], scannedAt: new Date(0).toISOString(), warnings: [] }) },
     agentService: {
       getReferenceInputCapabilities: () => ({
-        workspaceFiles: true,
-        workspaceDirectories: true,
-        images: "local-snapshot",
-        genericFiles: "local-snapshot",
-        maxReferences: 32,
-        maxReferenceBytes: 25 * 1024 * 1024,
-        maxTotalReferenceBytes: 25 * 1024 * 1024,
+        schemaVersion: 1,
+        workspace: { files: true, directories: true },
+        attachments: {
+          image: { accepted: true, mimeTypes: ["image/png"], maxBytes: 25 * 1024 * 1024 },
+          text: { accepted: false },
+          audio: { accepted: false },
+          video: { accepted: false },
+          binary: { accepted: false },
+        },
+        limits: {
+          maxCount: 32,
+          maxBytesPerReference: 25 * 1024 * 1024,
+          maxTotalBytes: 25 * 1024 * 1024,
+        },
+        steer: false,
+        attachmentOnly: false,
       }),
       startTurn: async (sender, request, authorizedRoot) => {
         if (authorizedRoot !== workspacePath || sender.id <= 0) throw new Error("Electron smoke owner correlation failed.");
@@ -181,6 +190,10 @@ async function runProductionLayoutSmoke() {
         const boundary = document.querySelector('.desktop-agent-boundary');
         const trigger = document.querySelector('.desktop-agent-reference-trigger');
         const error = document.querySelector('.desktop-agent-reference-card.is-error small');
+        const modelTrigger = document.querySelector('.desktop-agent-composer-picker.is-model .desktop-agent-picker-trigger');
+        const effortTrigger = document.querySelector('.desktop-agent-composer-picker.is-effort .desktop-agent-picker-trigger');
+        const modelStyle = modelTrigger ? getComputedStyle(modelTrigger) : null;
+        const effortStyle = effortTrigger ? getComputedStyle(effortTrigger) : null;
         return {
           theme: document.querySelector('[data-smoke-theme]')?.getAttribute('data-smoke-theme'),
           width: Math.round(boundary?.getBoundingClientRect().width || 0),
@@ -192,12 +205,18 @@ async function runProductionLayoutSmoke() {
           transcriptChips: document.querySelectorAll('.desktop-agent-message-references > span').length,
           addLabel: trigger?.getAttribute('aria-label') || '',
           visibleError: error?.textContent || '',
+          pickerPadding: [modelStyle, effortStyle].map((style) => ({
+            start: Number.parseFloat(style?.paddingInlineStart || '0'),
+            end: Number.parseFloat(style?.paddingInlineEnd || '0'),
+          })),
         };
       })()`, true);
+      const pickerPaddingIsBalanced = snapshot.pickerPadding.length === 2
+        && snapshot.pickerPadding.every(({ start, end }) => start >= 8 && end >= 8 && start === end);
       if (snapshot.theme !== theme || snapshot.width <= 0 || snapshot.width > snapshot.viewport
         || snapshot.overflow || snapshot.draftCards !== 3 || snapshot.markdownCards < 1
         || snapshot.imageCards !== 1 || snapshot.transcriptChips < 2
-        || !snapshot.addLabel || !snapshot.visibleError) {
+        || !snapshot.addLabel || !snapshot.visibleError || !pickerPaddingIsBalanced) {
         throw new Error(`Production Agent reference layout smoke failed: ${JSON.stringify(snapshot)}`);
       }
       matrix.push(`${theme}:${width}`);
