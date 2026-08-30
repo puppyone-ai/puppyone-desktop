@@ -11,19 +11,15 @@ import { createEphemeralAgentSessionCache } from "../electron/main/agent/cache/e
 import { createAgentConversationCatalog } from "../electron/main/agent/persistence/agent-conversation-catalog.mjs";
 import { createAgentSessionRepository } from "../electron/main/agent/persistence/agent-session-repository.mjs";
 import {
-  NativeAgentRoundtripError,
-  runNativeAgentRoundtrip,
-} from "./native-agent-roundtrip-runner.mjs";
+  NativeAgentReferenceSmokeError,
+  runNativeAgentReferenceSmoke,
+} from "./native-agent-reference-smoke-runner.mjs";
 import {
   NATIVE_AGENT_RUNTIME_IDS,
   nativeAgentSmokeTimeout,
   requestedNativeAgentRuntimeIds,
   safeNativeAgentReadinessStatus,
 } from "./native-agent-smoke-runtime-selection.mjs";
-const FORBIDDEN_CATALOG_KEYS = new Set([
-  "events", "messages", "transcript", "prompt", "answer", "reasoning",
-  "toolOutput", "commandOutput", "diff", "environment", "executablePath",
-]);
 
 class SmokeSender extends EventEmitter {
   constructor() {
@@ -35,17 +31,19 @@ class SmokeSender extends EventEmitter {
   send(channel, payload) { this.emit(channel, payload); }
 }
 
-if (process.env.RUN_NATIVE_AGENT_SMOKE !== "1") {
-  console.log("Skipped native Agent round-trip. Set RUN_NATIVE_AGENT_SMOKE=1 to run against installed Agents.");
+if (process.env.RUN_NATIVE_AGENT_REFERENCE_SMOKE !== "1") {
+  console.log("Skipped native Agent reference visibility. Set RUN_NATIVE_AGENT_REFERENCE_SMOKE=1 to use installed Agents and their configured model services.");
 } else {
-  const selection = requestedNativeAgentRuntimeIds(process.argv.slice(2), process.env.PUPPYONE_NATIVE_AGENT_RUNTIMES);
+  const requested = process.env.PUPPYONE_NATIVE_AGENT_REFERENCE_RUNTIMES
+    || process.env.PUPPYONE_NATIVE_AGENT_RUNTIMES;
+  const selection = requestedNativeAgentRuntimeIds(process.argv.slice(2), requested);
   if (!selection.valid) {
-    console.error("Invalid native Agent runtime selection. Use puppyone-agent, codex, claude, cursor, opencode-native, or all.");
+    console.error("Invalid native Agent reference selection. Use puppyone-agent, codex, claude, cursor, opencode-native, or all.");
     process.exitCode = 2;
   } else {
     await main(selection).catch(() => {
-      console.log("Native Agent round-trip smoke results:");
-      console.log("FAIL smoke-runner: setup");
+      console.log("Native Agent reference visibility results:");
+      console.log("FAIL smoke-runner: setup/runtime");
       process.exitCode = 1;
     });
   }
@@ -53,11 +51,16 @@ if (process.env.RUN_NATIVE_AGENT_SMOKE !== "1") {
 
 async function main(selection) {
   const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  const temporaryRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), "puppyone-native-agent-smoke-"));
+  const temporaryRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), "puppyone-native-reference-smoke-"));
   const workspaceRoot = path.join(temporaryRoot, "workspace");
+  const attachmentRoot = path.join(temporaryRoot, "attachments");
   const userDataRoot = path.join(temporaryRoot, "user-data");
   const catalogPath = path.join(userDataRoot, "agent-runtime", "conversations.json");
-  const timeoutMs = nativeAgentSmokeTimeout(process.env.PUPPYONE_NATIVE_AGENT_TIMEOUT_MS);
+  const timeoutMs = nativeAgentSmokeTimeout(
+    process.env.PUPPYONE_NATIVE_AGENT_REFERENCE_TIMEOUT_MS
+      || process.env.PUPPYONE_NATIVE_AGENT_TIMEOUT_MS,
+    180_000,
+  );
   const safeLogger = Object.freeze({ warn() {}, error() {}, info() {} });
   let service = null;
   const results = [];
@@ -68,7 +71,7 @@ async function main(selection) {
       appPath: repositoryRoot,
       resourcesPath: path.join(repositoryRoot, "resources"),
       managedOpenCodeConfigDir: path.join(temporaryRoot, "managed-agent"),
-      appVersion: "native-roundtrip-smoke",
+      appVersion: "native-reference-smoke",
       logger: safeLogger,
     });
     const eventCache = createEphemeralAgentSessionCache({
@@ -98,32 +101,26 @@ async function main(selection) {
         continue;
       }
       try {
-        results.push(await runNativeAgentRoundtrip({
+        const result = await runNativeAgentReferenceSmoke({
           service,
           sender,
           workspaceRoot,
+          attachmentRoot,
           runtimeId,
           timeoutMs,
-        }));
+        });
+        results.push({ ...result, runtimeVersion: safeVersion(entry.readiness.version) });
       } catch (error) {
         results.push({
           runtimeId,
           status: "failed",
-          check: error instanceof NativeAgentRoundtripError ? error.stage : "unknown",
-          code: error instanceof NativeAgentRoundtripError ? error.code : "runtime",
+          check: error instanceof NativeAgentReferenceSmokeError ? error.stage : "unknown",
+          code: error instanceof NativeAgentReferenceSmokeError ? error.code : "runtime",
         });
       }
     }
-
-    if (results.some((result) => result.status === "passed")) {
-      try {
-        await assertLocatorCatalogSafe(catalogPath);
-      } catch {
-        results.push({ runtimeId: "catalog", status: "failed", check: "privacy" });
-      }
-    }
   } catch {
-    results.push({ runtimeId: "smoke-runner", status: "failed", check: "setup" });
+    results.push({ runtimeId: "smoke-runner", status: "failed", check: "setup", code: "runtime" });
   } finally {
     await Promise.resolve(service?.closeAll()).catch(() => {});
     await fs.promises.rm(temporaryRoot, { recursive: true, force: true }).catch(() => {});
@@ -135,27 +132,21 @@ async function main(selection) {
   if (passed.length === 0 || failed.length > 0) process.exitCode = 1;
 }
 
-async function assertLocatorCatalogSafe(filePath) {
-  const parsed = JSON.parse(await fs.promises.readFile(filePath, "utf8"));
-  const visit = (value) => {
-    if (!value || typeof value !== "object") return;
-    for (const [key, child] of Object.entries(value)) {
-      if (FORBIDDEN_CATALOG_KEYS.has(key)) throw new Error("Unsafe locator catalog.");
-      visit(child);
-    }
-  };
-  visit(parsed);
-}
-
 function printResults(results) {
-  console.log("Native Agent round-trip smoke results:");
+  console.log("Native Agent reference visibility results:");
   for (const result of results) {
     if (result.status === "passed") {
-      console.log(`PASS ${result.runtimeId}: create, answer, locator, resume, follow-up, close`);
+      console.log(`PASS ${result.runtimeId}@${result.runtimeVersion} ${result.model}: ${result.testedInputs.join(", ")}; unsupported binary rejected`);
     } else if (result.status === "skipped") {
       console.log(`SKIP ${result.runtimeId}: ${result.reason}`);
     } else {
-      console.log(`FAIL ${result.runtimeId}: ${result.check}/${result.code || "runtime"}`);
+      console.log(`FAIL ${result.runtimeId}: ${result.check}/${result.code || result.reason || "runtime"}`);
     }
   }
+}
+
+function safeVersion(value) {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,79}$/u.test(value)
+    ? value
+    : "unknown";
 }
