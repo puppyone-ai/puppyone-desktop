@@ -46,7 +46,6 @@ import { registerAgentActivityIpcHandlers } from "./main/ipc/agent-activity-ipc.
 import { registerAppearanceIpcHandlers } from "./main/ipc/appearance-ipc.mjs";
 import {
   registerThemeIpcHandlers,
-  THEME_RELOAD_REQUESTED_CHANNEL,
   THEME_SELECTION_REQUESTED_CHANNEL,
 } from "./main/ipc/theme-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
@@ -246,11 +245,6 @@ const nativeMenuService = createDesktopNativeMenuService({
     window.webContents.send(THEME_SELECTION_REQUESTED_CHANNEL, request);
   },
   onOpenThemesDirectory: () => themeService.openDirectory(),
-  onReloadThemes: () => {
-    const window = getLastFocusedWindow();
-    if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
-    window.webContents.send(THEME_RELOAD_REQUESTED_CHANNEL);
-  },
 });
 const applicationQuitIntent = createApplicationQuitIntent({ app });
 const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({

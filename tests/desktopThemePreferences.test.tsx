@@ -42,21 +42,18 @@ afterEach(() => {
 });
 
 describe("desktop surface theme preferences", () => {
-  it("persists one theme pack plus Custom CSS flags and synchronizes storage changes", () => {
+  it("persists one coordinated theme pack and synchronizes storage changes", () => {
     act(() => root.render(<Harness />));
 
     act(() => latest?.setThemePack("com.example.forest"));
-    act(() => latest?.setCustomCssEnabled("markdown", true));
     expect(readStored()).toMatchObject({
-      version: 4,
+      version: 5,
       pack: "com.example.forest",
-      customCss: { application: false, markdown: true, csv: false },
     });
 
     const remote: SurfaceThemePreferences = {
-      version: 4,
+      version: 5,
       pack: "com.example.graphite",
-      customCss: { application: false, markdown: false, csv: true },
     };
     act(() => window.dispatchEvent(new StorageEvent("storage", {
       key: SURFACE_THEME_PREFERENCES_STORAGE_KEY,

@@ -239,29 +239,19 @@ describe("host-owned CSS theme service", () => {
     expect(shell.openPath).toHaveBeenCalledExactlyOnceWith(path.join(userDataPath, "themes"));
   });
 
-  it("persists valid managed Custom CSS and exposes it as a three-surface package", async () => {
+  it("keeps a legacy managed Custom CSS directory on disk without loading it", async () => {
     const userDataPath = await createTemporaryDirectory();
+    const themeRoot = path.join(userDataPath, "themes");
+    const legacyRoot = path.join(themeRoot, "puppyone-custom-css");
+    await mkdir(legacyRoot, { recursive: true });
+    await writeFile(path.join(legacyRoot, "markdown.css"), "body { color: teal }", "utf8");
     const service = createThemeService({ userDataPath, shell: createShell() });
 
-    expect(await service.readCustomCss("markdown")).toEqual({ css: "" });
-    await service.saveCustomCss({
-      target: "markdown",
-      css: "body { color: #334155 }",
-    });
+    const snapshot = await service.listThemes();
 
-    expect(await service.readCustomCss("markdown")).toEqual({
-      css: "body { color: #334155 }",
-    });
-    const custom = (await service.listThemes()).themes.find(
-      (theme) => theme.id === "local.puppyone.custom-css",
-    );
-    expect(custom).toMatchObject({
-      name: "My Custom CSS",
-      targets: ["application", "markdown", "csv"],
-    });
-    expect(custom.compiledCss.markdown).toContain('data-po-theme-surface="markdown"');
-    expect(custom.compiledCss.markdown).toContain("[data-po-theme-id]");
-    expect(custom.compiledCss.markdown).not.toContain('data-po-theme-id="local.puppyone.custom-css"');
+    expect(snapshot.themes.some((theme) => theme.id === "local.puppyone.custom-css")).toBe(false);
+    expect(await readFile(path.join(legacyRoot, "markdown.css"), "utf8"))
+      .toBe("body { color: teal }");
   });
 
   it("reserves the Custom CSS id for the managed package directory", async () => {
@@ -280,58 +270,16 @@ describe("host-owned CSS theme service", () => {
     );
     const service = createThemeService({ userDataPath, shell: createShell() });
 
-    await service.saveCustomCss({ target: "markdown", css: "body { color: teal }" });
     const snapshot = await service.listThemes();
     const customThemes = snapshot.themes.filter((theme) => (
       theme.id === "local.puppyone.custom-css"
     ));
 
-    expect(customThemes).toHaveLength(1);
-    expect(customThemes[0].name).toBe("My Custom CSS");
-    expect(customThemes[0].compiledCss.markdown).toContain("color: teal");
-    expect(customThemes[0].compiledCss.markdown).not.toContain("color: red");
+    expect(customThemes).toHaveLength(0);
     expect(snapshot.diagnostics).toContainEqual(expect.objectContaining({
       source: "aaa-custom-css-impostor",
-      message: expect.stringContaining("reserved for managed Custom CSS"),
+      message: expect.stringContaining("reserved for legacy compatibility"),
     }));
-  });
-
-  it("rejects invalid managed CSS without replacing the last valid source", async () => {
-    const userDataPath = await createTemporaryDirectory();
-    const service = createThemeService({ userDataPath, shell: createShell() });
-    const validCss = "body { color: #334155 }";
-    await service.saveCustomCss({ target: "markdown", css: validCss });
-
-    await expect(service.saveCustomCss({
-      target: "markdown",
-      css: 'body { background: url("https://example.com/pixel.png") }',
-    })).rejects.toThrow("cannot load external asset URL");
-    await expect(service.saveCustomCss({
-      target: "../../outside",
-      css: "body { color: red }",
-    })).rejects.toThrow("Custom CSS target is invalid");
-
-    expect(await readFile(
-      path.join(userDataPath, "themes", "puppyone-custom-css", "markdown.css"),
-      "utf8",
-    )).toBe(validCss);
-  });
-
-  it("rejects managed Custom CSS roots redirected through symlinks", async () => {
-    const userDataPath = await createTemporaryDirectory();
-    const themeRoot = path.join(userDataPath, "themes");
-    const outside = await createTemporaryDirectory();
-    await mkdir(themeRoot, { recursive: true });
-    await writeFile(path.join(outside, "markdown.css"), "body { color: red }", "utf8");
-    await symlink(outside, path.join(themeRoot, "puppyone-custom-css"));
-
-    const service = createThemeService({ userDataPath, shell: createShell() });
-
-    await expect(service.readCustomCss("markdown")).rejects.toThrow("managed theme directory");
-    await expect(service.saveCustomCss({ target: "markdown", css: "body { color: blue }" }))
-      .rejects.toThrow("managed theme directory");
-    expect(await readFile(path.join(outside, "markdown.css"), "utf8"))
-      .toBe("body { color: red }");
   });
 
   it("rejects a user-data theme root redirected through a symlink", async () => {
@@ -342,28 +290,8 @@ describe("host-owned CSS theme service", () => {
     const service = createThemeService({ userDataPath, shell: createShell() });
 
     await expect(service.listThemes()).rejects.toThrow("theme root");
-    await expect(service.saveCustomCss({ target: "markdown", css: "body { color: blue }" }))
-      .rejects.toThrow("theme root");
     await expect(readFile(path.join(outside, "markdown.css"), "utf8"))
       .rejects.toMatchObject({ code: "ENOENT" });
-  });
-
-  it("preserves every target during concurrent first saves", async () => {
-    const userDataPath = await createTemporaryDirectory();
-    const service = createThemeService({ userDataPath, shell: createShell() });
-    const sources = {
-      application: ".theme-root { --po-accent: #2563eb }",
-      markdown: "body { color: #334155 }",
-      csv: ".theme-root { --po-csv-surface-color: #0f172a }",
-    };
-
-    await Promise.all(Object.entries(sources).map(([target, css]) => (
-      service.saveCustomCss({ target, css })
-    )));
-
-    await expect(service.readCustomCss("application")).resolves.toEqual({ css: sources.application });
-    await expect(service.readCustomCss("markdown")).resolves.toEqual({ css: sources.markdown });
-    await expect(service.readCustomCss("csv")).resolves.toEqual({ css: sources.csv });
   });
 
   it("rejects manifest entrypoint symlinks that escape a package", async () => {

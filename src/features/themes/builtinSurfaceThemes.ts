@@ -1,6 +1,6 @@
 import type { DesktopThemeSnapshot } from "../../types/electron";
 import type { ThemeCatalogSnapshot, ThemeDefinition } from "./themeTypes";
-import { CUSTOM_CSS_THEME_ID } from "./themePreferences";
+import { LEGACY_CUSTOM_CSS_THEME_ID } from "./themePreferences";
 
 const PACK_TARGETS = ["application", "markdown", "csv"] as const;
 
@@ -53,20 +53,11 @@ export function createThemeCatalogSnapshot(external: DesktopThemeSnapshot): Them
   });
 }
 
-export function getThemesForTarget(
-  snapshot: ThemeCatalogSnapshot,
-  target: ThemeDefinition["targets"][number],
-): readonly ThemeDefinition[] {
-  return snapshot.themes.filter((theme) => (
-    theme.id !== CUSTOM_CSS_THEME_ID && theme.targets.includes(target)
-  ));
-}
-
 export function getThemePacks(snapshot: ThemeCatalogSnapshot): readonly ThemeDefinition[] {
   return snapshot.themes.filter((theme) => (
     theme.id === "default"
     || (
-      theme.id !== CUSTOM_CSS_THEME_ID
+      theme.id !== LEGACY_CUSTOM_CSS_THEME_ID
       && PACK_TARGETS.every((target) => theme.targets.includes(target))
     )
   ));

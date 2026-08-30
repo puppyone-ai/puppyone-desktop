@@ -82,7 +82,6 @@ export function SettingsView({
   onMarkdownPresentationChange,
   onSelectSettingsSection,
   onThemePackChange,
-  onCustomCssEnabledChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
   onSidebarNavigationVisibilitySettingsChange,
@@ -276,7 +275,6 @@ export function SettingsView({
                 catalog={themeCatalog}
                 preferences={surfaceThemePreferences}
                 onThemePackChange={onThemePackChange}
-                onCustomCssEnabledChange={onCustomCssEnabledChange}
               />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.textSize.title")}</span>

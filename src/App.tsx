@@ -831,7 +831,6 @@ function AppContent() {
       <ThemeStyleHost
         snapshot={themeCatalog.snapshot}
         selection={themeCatalog.selection}
-        preferences={preferences.surfaceThemePreferences}
         markdownPresentation={markdownPresentation}
       />
       <div
@@ -960,7 +959,6 @@ function AppContent() {
       <ThemeStyleHost
         snapshot={themeCatalog.snapshot}
         selection={themeCatalog.selection}
-        preferences={preferences.surfaceThemePreferences}
         markdownPresentation={markdownPresentation}
       />
       <div

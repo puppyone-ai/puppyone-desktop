@@ -13,10 +13,10 @@ This folder is the editable theme library used by PuppyOne Desktop. A theme can 
 1. Open **Settings → Appearance → Theme**.
 2. Select **Open Themes Folder**. This is the safest way to locate the correct folder on every operating system and in development builds.
 3. Copy a theme such as `paper-blue.css` into the opened folder.
-4. Return to Appearance and select **Reload Themes**.
+4. Return to PuppyOne. The theme catalog refreshes automatically when the app regains focus.
 5. Choose the theme from **Theme Pack**. A pack always applies its Application, Markdown, and CSV styles together.
 
-中文步骤：打开 **设置 → 外观 → 主题**，点击 **打开主题文件夹**，将 `.css` 文件复制进去，然后点击 **重新加载主题**，最后从 **主题包** 中选择它。
+中文步骤：打开 **设置 → 外观 → 主题**，点击 **打开主题文件夹**，将 `.css` 文件复制进去，然后返回 PuppyOne。应用重新获得焦点时会自动刷新主题列表，最后从 **主题包** 中选择它。
 
 > 📌 **Important / 重要：** Do not put user themes inside the application installation directory or source-code checkout. Application upgrades may replace those locations. 不要把用户主题放进应用安装目录或源码目录，这些位置可能在升级时被替换。
 
@@ -51,9 +51,9 @@ To install a theme obtained from a theme author or collection:
 1. Download the `.css` file without changing its extension.
 2. Open the authoritative Themes Folder from Appearance.
 3. Copy the file into that folder.
-4. Select **Reload Themes**, review any diagnostics, and choose the theme.
+4. Return to PuppyOne, review any diagnostics after the automatic refresh, and choose the theme.
 
-从主题作者或主题集合获取 `.css` 文件后，将它复制到 Appearance 打开的主题目录，点击 **重新加载主题**，确认没有诊断错误后即可选择使用。
+从主题作者或主题集合获取 `.css` 文件后，将它复制到 Appearance 打开的主题目录。返回 PuppyOne 后主题会自动刷新，确认没有诊断错误后即可选择使用。
 
 ## ✍️ Single-file theme format / 单文件主题格式
 
@@ -131,9 +131,9 @@ A theme appears in **Theme Pack** only when it contains all three targets. Puppy
 
 只有同时包含三个目标的主题才会出现在 **主题套装** 选择器中。PuppyOne 不再提供应用界面、Markdown 或 CSV 各自独立的主题选择器；一个主题套装始终作为完整、协调的视觉方案一起使用和传播。
 
-The final style order is **Theme Pack → Editor Markdown preferences → enabled Custom CSS**. The Editor controls default to **Theme**, so authored CSS remains authoritative until a user explicitly overrides one property. Custom CSS is a separate expert overlay for local adjustments and can be disabled without deleting its source; it is not another packaged-theme selector.
+The final style order is **Theme Pack → Editor Markdown preferences**. The Editor controls default to **Theme**, so authored CSS remains authoritative until a user explicitly overrides one property. To make broader visual changes, edit or install a complete theme file in the Themes Folder rather than applying a separate in-app CSS overlay.
 
-最终样式顺序是 **主题套装 → 编辑器 Markdown 偏好 → 已启用的自定义 CSS**。编辑器控件默认选择 **跟随主题**；自定义 CSS 是用于本地微调的独立高级覆盖层，不是另一组可分别选择的主题，并且可以停用而不删除源码。
+最终样式顺序是 **主题套装 → 编辑器 Markdown 偏好**。编辑器控件默认选择 **跟随主题**；如果需要更广泛的个性化样式，请直接编辑或安装 Themes 文件夹中的完整主题文件，而不是使用单独的应用内 CSS 覆盖层。
 
 ## 🎨 Markdown styling / Markdown 样式
 
@@ -176,7 +176,7 @@ For heading size, bold color, and bold weight, prefer these public variables ove
 - Theme IDs must use a stable lowercase reverse-domain form such as `com.example.paper-blue`.
 - `application` accepts public PuppyOne color tokens only; themes cannot restructure the application UI.
 - `markdown` and `csv` selectors are automatically scoped to their own surfaces.
-- Ordinary themes must not use `!important`; PuppyOne manages Theme, Editor, and Custom CSS precedence deterministically.
+- Ordinary themes must not use `!important`; PuppyOne manages Theme and Editor preference precedence deterministically.
 - Relative local CSS imports, images, and fonts are supported when they remain inside the Themes Folder.
 - Network URLs, `file:` URLs, escaping paths, fixed positioning, and unsupported executable CSS values are rejected.
 - Invalid themes are isolated and reported in Appearance without preventing other themes from loading.
@@ -195,13 +195,13 @@ Use a directory package with `theme.json` only when a theme needs multiple CSS f
 
 ## 🔄 Editing and troubleshooting / 编辑与排错
 
-- After changing a file, click **Reload Themes** before checking the result.
+- After changing a file outside PuppyOne, return to the app; the catalog refreshes automatically when the window regains focus.
 - If a theme does not appear, inspect the diagnostic shown in Appearance.
 - If only one surface changes, confirm the file contains all intended `@puppyone` target blocks.
-- If a new Theme Pack appears unchanged, confirm that it declares all three targets and then select it again after reloading.
+- If a new Theme Pack appears unchanged, confirm that it declares all three targets and then select it again after the automatic refresh.
 - Keep a new theme ID unique; duplicate IDs are rejected deterministically.
 
-修改文件后必须点击 **重新加载主题**。如果主题没有出现，请查看 Appearance 中的诊断；如果只有某个界面发生变化，请检查三个目标块是否完整，然后重新加载并再次选择该主题套装。
+在 PuppyOne 外修改文件后，返回应用即可自动刷新。如果主题没有出现，请查看 Appearance 中的诊断；如果只有某个界面发生变化，请检查三个目标块是否完整，然后重新选择该主题套装。
 
 ## 🔗 Sharing and contribution / 分享与贡献
 

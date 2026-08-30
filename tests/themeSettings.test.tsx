@@ -15,10 +15,14 @@ describe("CSS theme settings", () => {
     expect(section).not.toContain("getThemesForTarget");
     expect(section).not.toContain("preferences.overrides");
     expect(section).not.toContain("onThemeOverrideChange");
-    expect(section).toContain("onReload");
-    expect(section).toContain("onOpenDirectory");
+    expect(section).not.toContain("themes.reload");
+    expect(section).not.toContain("CustomCssEditor");
+    expect(section).toContain("catalog.openDirectory");
     expect(section).toContain("snapshot.diagnostics.map");
     expect(section).toContain("desktop-settings-select");
+    const styles = source("src/styles/settings-controls.css");
+    expect(styles).toMatch(/\.desktop-theme-pack-controls\s*\{[\s\S]*flex-wrap:\s*nowrap/);
+    expect(styles).toMatch(/\.desktop-theme-add-action\s*\{[\s\S]*min-width:/);
   });
 
   it("wires the catalog and preferences through the settings surface", () => {

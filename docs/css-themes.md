@@ -1,10 +1,10 @@
 # CSS themes
 
-PuppyOne Desktop treats themes as part of Appearance. Open **Settings → Appearance → Theme** to choose one coordinated Theme Pack for the application shell, Markdown editor, and CSV table view. Expand **Advanced theme overrides and Custom CSS** only when one surface needs a different theme or hand-authored CSS.
+PuppyOne Desktop treats themes as part of Appearance. Open **Settings → Appearance → Theme** to choose one coordinated Theme Pack for the application shell, Markdown editor, and CSV table view.
 
-Selecting a Theme Pack applies it to all three surfaces and resets the Advanced selectors to **Follow Theme Pack**. Advanced selections made afterward override only their chosen surface; selecting another Theme Pack returns every surface to that coordinated pack.
+Selecting a Theme Pack applies its Application, Markdown, and CSV styles together. PuppyOne does not expose separate per-surface selectors or an in-app Custom CSS overlay; install or edit a complete Theme Pack when those surfaces should change.
 
-The visual precedence is Interface Style → resolved System/Light/Dark mode and base palette → resolved surface theme (Theme Pack or Advanced override) → Editor Markdown property overrides → enabled Custom CSS. Appearance continues to own navigation, file icons, motion, pointer behavior, and other interface preferences; theme CSS cannot change those product settings.
+The visual precedence is Interface Style → resolved System/Light/Dark mode and base palette → Theme Pack → Editor Markdown property overrides. Appearance continues to own navigation, file icons, motion, pointer behavior, and other interface preferences; theme CSS cannot change those product settings.
 
 Default is the only coordinated Theme Pack bundled into the renderer. Distributable theme CSS is maintained outside the desktop application repository so theme collections can be released and shared independently. On first access to the theme catalog, PuppyOne installs a bilingual `README.md` with installation, authoring, and sharing guidance into the platform-specific Themes Folder:
 
@@ -13,22 +13,7 @@ ${app.getPath("userData")}/themes/
 └── README.md
 ```
 
-PuppyOne never overwrites an existing README or theme file. A documentation-specific hidden marker records guide installation, while CSS already present in the Themes Folder remains user-owned and continues to use the normal discovery, validation, diagnostics, and reload path. The desktop application does not restore or delete themes that were installed by a user or by an earlier version.
-
-## Custom CSS editor
-
-The Advanced section contains a target-scoped editor for Application, Markdown, or CSV CSS. **Save and Apply** validates the source in Electron Main, atomically preserves it, reloads the catalog, and enables it as the final overlay for that surface. Custom CSS can be disabled without deleting its source and does not replace the Theme Pack or an Advanced surface theme. Invalid CSS is reported without replacing the last valid source.
-
-Managed sources live below Electron's platform-specific user-data directory:
-
-```text
-${app.getPath("userData")}/themes/puppyone-custom-css/
-├── theme.json
-├── application.css
-├── markdown.css
-├── csv.css
-└── assets/
-```
+PuppyOne never overwrites an existing README or theme file. A documentation-specific hidden marker records guide installation, while CSS already present in the Themes Folder remains user-owned and continues to use the normal discovery, validation, diagnostics, and automatic refresh path. The desktop application does not restore or delete themes that were installed by a user or by an earlier version. A legacy `puppyone-custom-css` directory created by an earlier build is retained on disk but is no longer loaded.
 
 Use **Open Themes Folder** for external editing, local assets/imports, complete packages, and Typora-style files. Do not place user themes in the application installation directory or source tree; the user-data directory survives application upgrades and maps correctly on macOS, Windows, and Linux.
 
@@ -51,9 +36,9 @@ Place a CSS file directly in the themes directory:
 }
 ```
 
-Top-level CSS files appear as Markdown themes. PuppyOne treats Typora's `:root`, `html`, `body`, and `#write` selectors as aliases for the Markdown surface and scopes ordinary selectors so they cannot style another part of the application. Relative local quoted imports and `@import url(...)`, images, fonts, and `@charset` are supported. Network and `file:` URLs are rejected.
+Top-level CSS files are parsed as Markdown-only themes for Typora compatibility, but they are not selectable in Theme Pack. Convert one into a complete three-target PuppyOne theme to make it selectable. PuppyOne treats Typora's `:root`, `html`, `body`, and `#write` selectors as aliases for the Markdown surface and scopes ordinary selectors so they cannot style another part of the application. Relative local quoted imports and `@import url(...)`, images, fonts, and `@charset` are supported. Network and `file:` URLs are rejected.
 
-This is a restricted, safety-scoped Typora-style dialect rather than drop-in compatibility with every Typora theme. Container rules such as `@media` and `@supports` plus `@font-face` are supported; global rules such as `@keyframes`, `@page`, plugin-specific Typora chrome selectors, and `!important` in ordinary themes are rejected. Port those effects to scoped declarations and PuppyOne's public variables so Editor and Custom CSS precedence stays predictable.
+This is a restricted, safety-scoped Typora-style dialect rather than drop-in compatibility with every Typora theme. Container rules such as `@media` and `@supports` plus `@font-face` are supported; global rules such as `@keyframes`, `@page`, plugin-specific Typora chrome selectors, and `!important` in ordinary themes are rejected. Port those effects to scoped declarations and PuppyOne's public variables so Theme Pack and Editor preference precedence stays predictable.
 
 ## Portable single-file Theme Pack
 
@@ -90,7 +75,7 @@ The recommended format for a coordinated, shareable theme is one top-level CSS f
 }
 ```
 
-Targets are inferred from the blocks, so no separate target list or entrypoint map is required. A file with all three targets appears in Theme Pack; a partial file is available as an Advanced per-surface override. CSS files without `@puppyone-theme` retain the Markdown-only Typora-style behavior described above.
+Targets are inferred from the blocks, so no separate target list or entrypoint map is required. A file with all three targets appears in Theme Pack. Partial files, including CSS without `@puppyone-theme`, can still be parsed for compatibility but are not selectable coordinated packs.
 
 ## Advanced directory package
 
@@ -112,7 +97,7 @@ Use a directory containing `theme.json` only when a theme needs multiple CSS fil
 }
 ```
 
-An entrypoint may target any subset of `application`, `markdown`, and `csv`; `targets` and `entrypoints` must match. Packages that cover all three targets appear in the primary Theme Pack selector. Partial packages remain available as Advanced overrides. Managed Custom CSS has its own enable switch and is intentionally absent from both theme selectors. Theme IDs use a lowercase reverse-domain form with at least three segments.
+An entrypoint may target any subset of `application`, `markdown`, and `csv`; `targets` and `entrypoints` must match. Only packages that cover all three targets appear in the Theme Pack selector. Theme IDs use a lowercase reverse-domain form with at least three segments.
 
 Application themes customize the public color-token allowlist from their scoped root; arbitrary application selectors and structural typography, cursor, density, and layout tokens are intentionally not accepted:
 
@@ -139,7 +124,7 @@ Use the supported dark-root forms when a package provides both light and dark va
 
 For Application CSS, `.theme-root.dark` addresses a dark application root and `.dark .theme-root` is accepted as its equivalent package-authoring form. For Markdown and CSV CSS, `.dark .theme-root` addresses the themed surface below the dark application root. The compiler scopes both forms to the exact surface and selected theme ID.
 
-Markdown themes can use the public `--po-md-*` variables, including `--po-md-surface-background`, `--po-md-content-color`, `--po-md-content-font`, `--po-md-content-size`, `--po-md-content-line-height`, `--po-md-block-gap`, and heading size/weight variables. The Editor page can optionally override heading size, bold color, and bold weight. Leave those controls on **Theme** to use the CSS values unchanged; Custom CSS still loads afterward when enabled.
+Markdown themes can use the public `--po-md-*` variables, including `--po-md-surface-background`, `--po-md-content-color`, `--po-md-content-font`, `--po-md-content-size`, `--po-md-content-line-height`, `--po-md-block-gap`, and heading size/weight variables. The Editor page can optionally override heading size, bold color, and bold weight. Leave those controls on **Theme** to use the CSS values unchanged.
 
 CSV themes can use `--po-csv-surface-background`, `--po-csv-surface-color`, and the shared `--po-editable-table-*` variables for borders, cell spacing, header styling, font sizing, and focus rings.
 

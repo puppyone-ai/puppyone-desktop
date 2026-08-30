@@ -5,7 +5,6 @@
   "native.menu.theme": "테마",
   "native.menu.theme.pack": "테마 팩",
   "native.menu.theme.openFolder": "테마 폴더 열기",
-  "native.menu.theme.reload": "테마 다시 불러오기",
   "native.menu.checkForUpdates": "업데이트 확인…",
   "native.update.manual.ok": "확인",
   "native.update.manual.notNow": "나중에",

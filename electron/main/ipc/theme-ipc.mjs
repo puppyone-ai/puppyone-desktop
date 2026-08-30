@@ -1,11 +1,7 @@
 export const THEME_LIST_CHANNEL = "theme:list";
-export const THEME_RELOAD_CHANNEL = "theme:reload";
 export const THEME_OPEN_DIRECTORY_CHANNEL = "theme:open-directory";
 export const THEME_SYNC_NATIVE_MENU_CHANNEL = "theme:sync-native-menu";
-export const THEME_READ_CUSTOM_CSS_CHANNEL = "theme:read-custom-css";
-export const THEME_SAVE_CUSTOM_CSS_CHANNEL = "theme:save-custom-css";
 export const THEME_SELECTION_REQUESTED_CHANNEL = "theme:selection-requested";
-export const THEME_RELOAD_REQUESTED_CHANNEL = "theme:reload-requested";
 
 export function registerThemeIpcHandlers({ ipcMain, themeService, onSyncNativeMenu = () => undefined }) {
   if (!ipcMain || typeof ipcMain.handle !== "function") {
@@ -15,8 +11,6 @@ export function registerThemeIpcHandlers({ ipcMain, themeService, onSyncNativeMe
     !themeService
     || typeof themeService.listThemes !== "function"
     || typeof themeService.openDirectory !== "function"
-    || typeof themeService.readCustomCss !== "function"
-    || typeof themeService.saveCustomCss !== "function"
   ) {
     throw new TypeError("Theme service is required for theme IPC.");
   }
@@ -25,27 +19,12 @@ export function registerThemeIpcHandlers({ ipcMain, themeService, onSyncNativeMe
   }
 
   ipcMain.handle(THEME_LIST_CHANNEL, () => themeService.listThemes());
-  ipcMain.handle(THEME_RELOAD_CHANNEL, () => themeService.listThemes());
   ipcMain.handle(THEME_OPEN_DIRECTORY_CHANNEL, () => themeService.openDirectory());
-  ipcMain.handle(THEME_READ_CUSTOM_CSS_CHANNEL, (_event, request) => (
-    themeService.readCustomCss(parseThemeTarget(request?.target))
-  ));
-  ipcMain.handle(THEME_SAVE_CUSTOM_CSS_CHANNEL, (_event, request) => (
-    themeService.saveCustomCss({
-      target: parseThemeTarget(request?.target),
-      css: typeof request?.css === "string" ? request.css : null,
-    })
-  ));
   ipcMain.handle(THEME_SYNC_NATIVE_MENU_CHANNEL, (_event, request) => {
     const state = parseThemeMenuState(request);
     onSyncNativeMenu(state);
     return { synced: true };
   });
-}
-
-function parseThemeTarget(value) {
-  if (value === "application" || value === "markdown" || value === "csv") return value;
-  throw new TypeError("Custom CSS target is invalid.");
 }
 
 function parseThemeMenuState(value) {

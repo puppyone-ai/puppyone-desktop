@@ -15,7 +15,6 @@ export function createDesktopNativeMenuService({
   onCheckForUpdates,
   onSelectTheme = () => undefined,
   onOpenThemesDirectory = () => undefined,
-  onReloadThemes = () => undefined,
   logger = console,
 }) {
   if (!app) throw new TypeError("An Electron app is required.");
@@ -29,7 +28,6 @@ export function createDesktopNativeMenuService({
   }
   if (typeof onSelectTheme !== "function") throw new TypeError("onSelectTheme must be a function.");
   if (typeof onOpenThemesDirectory !== "function") throw new TypeError("onOpenThemesDirectory must be a function.");
-  if (typeof onReloadThemes !== "function") throw new TypeError("onReloadThemes must be a function.");
 
   let themeState = {
     pack: "default",
@@ -104,11 +102,6 @@ export function createDesktopNativeMenuService({
         id: "theme.openFolder",
         label: t("native.menu.theme.openFolder"),
         click: action("theme.openFolder", onOpenThemesDirectory),
-      },
-      {
-        id: "theme.reload",
-        label: t("native.menu.theme.reload"),
-        click: action("theme.reload", onReloadThemes),
       },
     ],
   });

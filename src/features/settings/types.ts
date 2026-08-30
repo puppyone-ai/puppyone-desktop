@@ -5,7 +5,6 @@ import type { CreateNewMenuSettings, DarkThemePreset, ExperimentalSettings, File
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
 import type { MarkdownPresentationSettings } from "../markdown/markdownPresentation";
 import type { SurfaceThemePreferences } from "../themes/themePreferences";
-import type { ThemeTarget } from "../themes/themeTypes";
 import type { ThemeCatalogController } from "../themes/useThemeCatalog";
 
 export type SettingsSection = "general" | "local-project" | "appearance" | "local-agents" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
@@ -58,7 +57,6 @@ export type SettingsViewProps = {
   onMarkdownPresentationChange: (settings: MarkdownPresentationSettings) => void;
   onSelectSettingsSection: (section: SettingsSection) => void;
   onThemePackChange: (themeId: string) => void;
-  onCustomCssEnabledChange: (target: ThemeTarget, enabled: boolean) => void;
   onFileIconThemeChange: (theme: FileIconThemeId) => void;
   onSidebarNavigationLayoutChange: (layout: SidebarNavigationLayout) => void;
   onSidebarNavigationVisibilitySettingsChange: (settings: SidebarNavigationVisibilitySettings) => void;

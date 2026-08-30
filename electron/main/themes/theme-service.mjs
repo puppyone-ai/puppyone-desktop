@@ -23,11 +23,10 @@ const MAX_THEME_CSS_BYTES = 4 * 1024 * 1024;
 const MAX_THEME_ASSET_BYTES = 8 * 1024 * 1024;
 const MAX_THEME_COMPILED_BYTES = 16 * 1024 * 1024;
 const MAX_THEME_IMPORTS = 64;
-const CUSTOM_THEME_DIRECTORY = "puppyone-custom-css";
-const CUSTOM_THEME_ID = "local.puppyone.custom-css";
+const LEGACY_CUSTOM_THEME_DIRECTORY = "puppyone-custom-css";
+const LEGACY_CUSTOM_THEME_ID = "local.puppyone.custom-css";
 const THEME_GUIDE_MARKER = ".puppyone-theme-guide-v1";
 const THEME_GUIDE_README = "README.md";
-const themeTargets = Object.freeze(["application", "markdown", "csv"]);
 const assetMimeTypes = new Map([
   [".woff", "font/woff"],
   [".woff2", "font/woff2"],
@@ -50,7 +49,6 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
   }
   const resolvedUserDataPath = path.resolve(userDataPath);
   const themeRoot = path.join(resolvedUserDataPath, "themes");
-  let managedWriteQueue = Promise.resolve();
   let guideInstallQueue = Promise.resolve();
 
   const ensureRoot = async () => {
@@ -84,12 +82,13 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
 
     for (const entry of entries) {
       try {
+        // Legacy in-app Custom CSS packages are retained on disk but no longer loaded.
+        if (entry.isDirectory() && entry.name === LEGACY_CUSTOM_THEME_DIRECTORY) continue;
         const entryPath = path.join(canonicalThemeRoot, entry.name);
-        const managedCustomPackage = entry.isDirectory() && entry.name === CUSTOM_THEME_DIRECTORY;
         const theme = entry.isFile() && entry.name.toLowerCase().endsWith(".css")
           ? await loadStandaloneCssTheme(canonicalThemeRoot, entry.name)
           : entry.isDirectory()
-            ? await loadPackageTheme(entryPath, { managedCustomPackage })
+            ? await loadPackageTheme(entryPath)
             : null;
         if (!theme) continue;
         if (ids.has(theme.id)) {
@@ -120,44 +119,7 @@ export function createThemeService({ userDataPath, bundledThemesPath, shell }) {
     return Object.freeze({ opened: true });
   };
 
-  const readCustomCss = async (target) => {
-    requireThemeTarget(target);
-    const canonicalThemeRoot = await ensureRoot();
-    const packageRoot = await resolveManagedCustomPackage(canonicalThemeRoot, false);
-    if (!packageRoot) return Object.freeze({ css: "" });
-    const source = await resolvePackageFile(packageRoot, ".", `${target}.css`);
-    return Object.freeze({
-      css: await readBoundedText(source.absolutePath, MAX_CSS_BYTES, "Custom CSS"),
-    });
-  };
-
-  const saveCustomCss = async (request) => {
-    const target = request?.target;
-    const css = request?.css;
-    requireThemeTarget(target);
-    if (typeof css !== "string" || Buffer.byteLength(css, "utf8") > MAX_CSS_BYTES) {
-      throw new TypeError("Custom CSS exceeds the supported size limit.");
-    }
-    const operation = managedWriteQueue.then(async () => {
-      const canonicalThemeRoot = await ensureRoot();
-      const packageRoot = await ensureManagedCustomPackage(canonicalThemeRoot);
-      await compileThemeFile({
-        css,
-        sourcePath: `${target}.css`,
-        packageRoot,
-        themeId: CUSTOM_THEME_ID,
-        target,
-        scope: "surface-overlay",
-        budget: createCompilationBudget(),
-      });
-      await writeFileAtomic(packageRoot, `${target}.css`, css);
-      return Object.freeze({ saved: true });
-    });
-    managedWriteQueue = operation.catch(() => undefined);
-    return operation;
-  };
-
-  return Object.freeze({ listThemes, openDirectory, readCustomCss, saveCustomCss });
+  return Object.freeze({ listThemes, openDirectory });
 }
 
 async function installThemeGuide({ bundledThemesPath, themeRoot }) {
@@ -187,46 +149,6 @@ async function pathEntryExists(filePath) {
   }
 }
 
-async function ensureManagedCustomPackage(themeRoot) {
-  const canonicalPackageRoot = await resolveManagedCustomPackage(themeRoot, true);
-  await mkdir(path.join(canonicalPackageRoot, "assets"), { recursive: true });
-  const manifest = JSON.stringify({
-    schemaVersion: 1,
-    id: CUSTOM_THEME_ID,
-    name: "My Custom CSS",
-    version: "1.0.0",
-    author: "Local user",
-    modes: ["light", "dark"],
-    targets: themeTargets,
-    entrypoints: Object.fromEntries(themeTargets.map((target) => [target, `${target}.css`])),
-  }, null, 2);
-  await writeFileAtomic(canonicalPackageRoot, "theme.json", `${manifest}\n`);
-  await Promise.all(themeTargets.map(async (target) => {
-    const filename = `${target}.css`;
-    const filePath = path.join(canonicalPackageRoot, filename);
-    try {
-      await writeFile(filePath, "", { encoding: "utf8", flag: "wx" });
-    } catch (error) {
-      if (error?.code !== "EEXIST") throw error;
-    }
-  }));
-  return canonicalPackageRoot;
-}
-
-async function resolveManagedCustomPackage(canonicalThemeRoot, create) {
-  const expectedPackageRoot = path.join(canonicalThemeRoot, CUSTOM_THEME_DIRECTORY);
-  if (create) {
-    await mkdir(expectedPackageRoot, { recursive: true });
-  } else if (!await pathExists(expectedPackageRoot)) {
-    return null;
-  }
-  const canonicalPackageRoot = await realpath(expectedPackageRoot);
-  if (canonicalPackageRoot !== expectedPackageRoot) {
-    throw new TypeError("The managed theme directory cannot be redirected through a symbolic link.");
-  }
-  return canonicalPackageRoot;
-}
-
 async function writeFileAtomic(directory, filename, content) {
   const tempPath = path.join(directory, `.${filename}.${randomUUID()}.tmp`);
   try {
@@ -239,26 +161,12 @@ async function writeFileAtomic(directory, filename, content) {
   }
 }
 
-async function pathExists(filePath) {
-  try {
-    await stat(filePath);
-    return true;
-  } catch (error) {
-    if (error?.code === "ENOENT") return false;
-    throw error;
-  }
-}
-
-function requireThemeTarget(value) {
-  if (!themeTargets.includes(value)) throw new TypeError("Custom CSS target is invalid.");
-}
-
 async function loadStandaloneCssTheme(themeRoot, filename) {
   const css = await readBoundedText(path.join(themeRoot, filename), MAX_CSS_BYTES, "Theme CSS");
   const descriptor = parseSingleFileThemeCss(css, { sourcePath: filename });
   if (descriptor) {
-    if (descriptor.id === CUSTOM_THEME_ID) {
-      throw new TypeError(`Theme id is reserved for managed Custom CSS: ${CUSTOM_THEME_ID}.`);
+    if (descriptor.id === LEGACY_CUSTOM_THEME_ID) {
+      throw new TypeError(`Theme id is reserved for legacy compatibility: ${LEGACY_CUSTOM_THEME_ID}.`);
     }
     const budget = createCompilationBudget();
     const compiledCss = {};
@@ -307,7 +215,7 @@ async function loadStandaloneCssTheme(themeRoot, filename) {
   });
 }
 
-async function loadPackageTheme(packageRoot, { managedCustomPackage = false } = {}) {
+async function loadPackageTheme(packageRoot) {
   const manifestFile = await resolvePackageFile(packageRoot, ".", "theme.json");
   const manifestText = await readBoundedText(
     manifestFile.absolutePath,
@@ -321,11 +229,8 @@ async function loadPackageTheme(packageRoot, { managedCustomPackage = false } = 
     throw new TypeError(`Theme manifest is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
   const manifest = parseThemeManifest(value);
-  if (manifest.id === CUSTOM_THEME_ID && !managedCustomPackage) {
-    throw new TypeError(`Theme id is reserved for managed Custom CSS: ${CUSTOM_THEME_ID}.`);
-  }
-  if (managedCustomPackage && manifest.id !== CUSTOM_THEME_ID) {
-    throw new TypeError(`Managed Custom CSS must use the reserved theme id: ${CUSTOM_THEME_ID}.`);
+  if (manifest.id === LEGACY_CUSTOM_THEME_ID) {
+    throw new TypeError(`Theme id is reserved for legacy compatibility: ${LEGACY_CUSTOM_THEME_ID}.`);
   }
   const compiledCss = {};
   const budget = createCompilationBudget();
@@ -338,7 +243,6 @@ async function loadPackageTheme(packageRoot, { managedCustomPackage = false } = 
       packageRoot,
       themeId: manifest.id,
       target,
-      scope: managedCustomPackage ? "surface-overlay" : "theme",
       budget,
     });
     compiledCss[target] = compiled.css;
@@ -362,7 +266,6 @@ async function compileThemeFile({
   themeId,
   target,
   budget,
-  scope = "theme",
 }) {
   reserveCssBytes(budget, css);
   const compiled = await compileThemeCss({
@@ -370,7 +273,6 @@ async function compileThemeFile({
     sourcePath,
     themeId,
     target,
-    scope,
     loadImport: async (specifier, importerPath) => {
       budget.importCount += 1;
       if (budget.importCount > MAX_THEME_IMPORTS) {

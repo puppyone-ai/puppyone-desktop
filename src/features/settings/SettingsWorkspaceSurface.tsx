@@ -27,7 +27,6 @@ import { SettingsView } from "./SettingsView";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
 import type { MarkdownPresentationSettings } from "../markdown/markdownPresentation";
 import type { SurfaceThemePreferences } from "../themes/themePreferences";
-import type { ThemeTarget } from "../themes/themeTypes";
 import type { ThemeCatalogController } from "../themes/useThemeCatalog";
 import { SettingsSidebar } from "./sidebar";
 import type { SettingsSection } from "./types";
@@ -64,7 +63,6 @@ export type SettingsPreferencesPort = {
   setPointerCursors: (value: boolean) => void;
   setMarkdownPresentation: (value: MarkdownPresentationSettings) => void;
   setThemePack: (themeId: string) => void;
-  setCustomCssEnabled: (target: ThemeTarget, enabled: boolean) => void;
   setFileIconTheme: (value: FileIconThemeId) => void;
   setSidebarNavigationLayout: (value: SidebarNavigationLayout) => void;
   setSidebarNavigationVisibilitySettings: (value: SidebarNavigationVisibilitySettings) => void;
@@ -179,7 +177,6 @@ export function createSettingsWorkspaceSurface({
         onMarkdownPresentationChange={preferences.setMarkdownPresentation}
         onSelectSettingsSection={onSelectSection}
         onThemePackChange={preferences.setThemePack}
-        onCustomCssEnabledChange={preferences.setCustomCssEnabled}
         onFileIconThemeChange={preferences.setFileIconTheme}
         onSidebarNavigationLayoutChange={preferences.setSidebarNavigationLayout}
         onSidebarNavigationVisibilitySettingsChange={preferences.setSidebarNavigationVisibilitySettings}

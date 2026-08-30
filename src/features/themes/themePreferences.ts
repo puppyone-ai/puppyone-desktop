@@ -5,20 +5,18 @@ import type {
 } from "./themeTypes";
 
 export const SURFACE_THEME_PREFERENCES_STORAGE_KEY = "puppyone.desktop.surfaceThemes";
-export const CUSTOM_CSS_THEME_ID = "local.puppyone.custom-css";
+export const LEGACY_CUSTOM_CSS_THEME_ID = "local.puppyone.custom-css";
 
 export type SurfaceThemePreferences = Readonly<{
-  version: 4;
+  version: 5;
   pack: string;
-  customCss: Readonly<Record<ThemeTarget, boolean>>;
 }>;
 
 export type SurfaceThemeSelection = Readonly<Record<ThemeTarget, string>>;
 
 export const DEFAULT_SURFACE_THEME_PREFERENCES: SurfaceThemePreferences = Object.freeze({
-  version: 4,
+  version: 5,
   pack: "default",
-  customCss: Object.freeze({ application: false, markdown: false, csv: false }),
 });
 
 const themeIdPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$/;
@@ -31,24 +29,15 @@ export function parseSurfaceThemePreferences(value: string | null | undefined): 
   if (!value) return DEFAULT_SURFACE_THEME_PREFERENCES;
   try {
     const parsed = JSON.parse(value) as Record<string, unknown> | null;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return DEFAULT_SURFACE_THEME_PREFERENCES;
-    }
+    if (!isRecord(parsed)) return DEFAULT_SURFACE_THEME_PREFERENCES;
     if (parsed.version === 1) return migrateVersionOne(parsed);
-    if (parsed.version === 2) return migrateVersionTwo(parsed);
-    if (parsed.version === 3) return migrateVersionThree(parsed);
-    if (
-      parsed.version !== 4
-      || !isThemeId(parsed.pack)
-      || !isRecord(parsed.customCss)
-    ) {
+    if (parsed.version === 2 || parsed.version === 3 || parsed.version === 4) {
+      return migratePackPreference(parsed);
+    }
+    if (parsed.version !== 5 || !isThemeId(parsed.pack)) {
       return DEFAULT_SURFACE_THEME_PREFERENCES;
     }
-    return Object.freeze({
-      version: 4,
-      pack: parsed.pack,
-      customCss: parseCustomCss(parsed.customCss),
-    });
+    return Object.freeze({ version: 5, pack: parsed.pack });
   } catch {
     return DEFAULT_SURFACE_THEME_PREFERENCES;
   }
@@ -63,21 +52,7 @@ export function selectThemePack(
   themeId: string,
 ): SurfaceThemePreferences {
   if (!isThemeId(themeId)) return preferences;
-  return Object.freeze({
-    ...preferences,
-    pack: themeId,
-  });
-}
-
-export function updateCustomCssEnabled(
-  preferences: SurfaceThemePreferences,
-  target: ThemeTarget,
-  enabled: boolean,
-): SurfaceThemePreferences {
-  return Object.freeze({
-    ...preferences,
-    customCss: freezeCustomCss({ ...preferences.customCss, [target]: enabled }),
-  });
+  return Object.freeze({ ...preferences, pack: themeId });
 }
 
 export function resolveSurfaceThemeSelection(
@@ -88,7 +63,7 @@ export function resolveSurfaceThemeSelection(
   const themes = new Map(snapshot.themes.map((theme) => [theme.id, theme]));
   const requiredTargets: readonly ThemeTarget[] = ["application", "markdown", "csv"];
   const theme = themes.get(preferences.pack);
-  const resolvedPack = preferences.pack !== CUSTOM_CSS_THEME_ID
+  const resolvedPack = preferences.pack !== LEGACY_CUSTOM_CSS_THEME_ID
     && theme?.modes.includes(mode)
     && requiredTargets.every((target) => theme.targets.includes(target))
     ? theme.id
@@ -101,81 +76,17 @@ export function resolveSurfaceThemeSelection(
 }
 
 function migrateVersionOne(parsed: Record<string, unknown>): SurfaceThemePreferences {
-  const selection = {
-    application: isThemeId(parsed.application) ? parsed.application : "default",
-    markdown: isThemeId(parsed.markdown) ? parsed.markdown : "default",
-    csv: isThemeId(parsed.csv) ? parsed.csv : "default",
-  };
-  const customCss = {
-    application: selection.application === CUSTOM_CSS_THEME_ID,
-    markdown: selection.markdown === CUSTOM_CSS_THEME_ID,
-    csv: selection.csv === CUSTOM_CSS_THEME_ID,
-  };
-  const baseSelection = {
-    application: customCss.application ? "default" : selection.application,
-    markdown: customCss.markdown ? "default" : selection.markdown,
-    csv: customCss.csv ? "default" : selection.csv,
-  };
-  const values = Object.values(baseSelection);
-  const sharedPack = values.every((value) => value === values[0]) ? values[0] : "default";
-  return Object.freeze({
-    version: 4,
-    pack: sharedPack,
-    customCss: freezeCustomCss(customCss),
-  });
+  const selection = [parsed.application, parsed.markdown, parsed.csv]
+    .map((value) => isThemeId(value) && value !== LEGACY_CUSTOM_CSS_THEME_ID ? value : "default");
+  const pack = selection.every((value) => value === selection[0]) ? selection[0] : "default";
+  return Object.freeze({ version: 5, pack });
 }
 
-function migrateVersionTwo(parsed: Record<string, unknown>): SurfaceThemePreferences {
-  if (!isThemeId(parsed.pack) || !isRecord(parsed.overrides)) {
+function migratePackPreference(parsed: Record<string, unknown>): SurfaceThemePreferences {
+  if (!isThemeId(parsed.pack) || parsed.pack === LEGACY_CUSTOM_CSS_THEME_ID) {
     return DEFAULT_SURFACE_THEME_PREFERENCES;
   }
-  const overrides = {
-    application: parseOverride(parsed.overrides.application),
-    markdown: parseOverride(parsed.overrides.markdown),
-    csv: parseOverride(parsed.overrides.csv),
-  };
-  return Object.freeze({
-    version: 4,
-    pack: parsed.pack,
-    customCss: freezeCustomCss({
-      application: overrides.application === CUSTOM_CSS_THEME_ID,
-      markdown: overrides.markdown === CUSTOM_CSS_THEME_ID,
-      csv: overrides.csv === CUSTOM_CSS_THEME_ID,
-    }),
-  });
-}
-
-function migrateVersionThree(parsed: Record<string, unknown>): SurfaceThemePreferences {
-  if (
-    !isThemeId(parsed.pack)
-    || !isRecord(parsed.overrides)
-    || !isRecord(parsed.customCss)
-  ) {
-    return DEFAULT_SURFACE_THEME_PREFERENCES;
-  }
-  return Object.freeze({
-    version: 4,
-    pack: parsed.pack,
-    customCss: parseCustomCss(parsed.customCss),
-  });
-}
-
-function freezeCustomCss(
-  customCss: Record<ThemeTarget, boolean>,
-): SurfaceThemePreferences["customCss"] {
-  return Object.freeze(customCss);
-}
-
-function parseCustomCss(value: Record<string, unknown>): SurfaceThemePreferences["customCss"] {
-  return freezeCustomCss({
-    application: value.application === true,
-    markdown: value.markdown === true,
-    csv: value.csv === true,
-  });
-}
-
-function parseOverride(value: unknown) {
-  return value === null || isThemeId(value) ? value : null;
+  return Object.freeze({ version: 5, pack: parsed.pack });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

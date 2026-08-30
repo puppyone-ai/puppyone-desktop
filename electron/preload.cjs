@@ -27,13 +27,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   },
   themes: {
     list: () => ipcRenderer.invoke("theme:list"),
-    reload: () => ipcRenderer.invoke("theme:reload"),
     openDirectory: () => ipcRenderer.invoke("theme:open-directory"),
-    readCustomCss: (target) => ipcRenderer.invoke("theme:read-custom-css", { target }),
-    saveCustomCss: (request) => ipcRenderer.invoke("theme:save-custom-css", {
-      target: request?.target,
-      css: request?.css,
-    }),
     syncNativeMenu: (request) => ipcRenderer.invoke("theme:sync-native-menu", {
       pack: request?.pack,
       themes: Array.isArray(request?.themes) ? request.themes.map((theme) => ({
@@ -53,12 +47,6 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
       };
       ipcRenderer.on("theme:selection-requested", listener);
       return () => ipcRenderer.removeListener("theme:selection-requested", listener);
-    },
-    onReloadRequested: (callback) => {
-      if (typeof callback !== "function") return () => {};
-      const listener = () => callback();
-      ipcRenderer.on("theme:reload-requested", listener);
-      return () => ipcRenderer.removeListener("theme:reload-requested", listener);
     },
   },
   setWindowMinimumWidth: (request) => (

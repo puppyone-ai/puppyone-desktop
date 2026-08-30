@@ -1,22 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
-  CUSTOM_CSS_THEME_ID,
   DEFAULT_SURFACE_THEME_PREFERENCES,
   parseSurfaceThemePreferences,
   resolveSurfaceThemeSelection,
   selectThemePack,
   serializeSurfaceThemePreferences,
-  updateCustomCssEnabled,
 } from "../src/features/themes/themePreferences";
 import { getThemePacks } from "../src/features/themes/builtinSurfaceThemes";
 import type { ThemeCatalogSnapshot, ThemeDefinition } from "../src/features/themes/themeTypes";
 
 describe("surface theme preferences", () => {
-  it("round-trips one coordinated theme pack with independent Custom CSS enablement", () => {
+  it("round-trips one coordinated theme pack", () => {
     const preferences = {
-      version: 4 as const,
+      version: 5 as const,
       pack: "com.example.forest",
-      customCss: { application: false, markdown: true, csv: false },
     };
 
     expect(parseSurfaceThemePreferences(serializeSurfaceThemePreferences(preferences)))
@@ -30,9 +27,8 @@ describe("surface theme preferences", () => {
       markdown: "com.example.forest",
       csv: "com.example.forest",
     }))).toEqual({
-      version: 4,
+      version: 5,
       pack: "com.example.forest",
-      customCss: { application: false, markdown: false, csv: false },
     });
   });
 
@@ -43,9 +39,8 @@ describe("surface theme preferences", () => {
       markdown: "local.css.newsprint",
       csv: "builtin.csv.spreadsheet",
     }))).toEqual({
-      version: 4,
+      version: 5,
       pack: "default",
-      customCss: { application: false, markdown: false, csv: false },
     });
   });
 
@@ -60,62 +55,60 @@ describe("surface theme preferences", () => {
       },
       customCss: { application: false, markdown: true, csv: false },
     }))).toEqual({
-      version: 4,
+      version: 5,
       pack: "com.example.forest",
-      customCss: { application: false, markdown: true, csv: false },
     });
   });
 
-  it.each([null, "", "{", "[]", '{"version":5}', '{"version":4}', '{"version":3}'])
+  it("migrates version 4 by dropping legacy Custom CSS enablement", () => {
+    expect(parseSurfaceThemePreferences(JSON.stringify({
+      version: 4,
+      pack: "com.example.forest",
+      customCss: { application: true, markdown: true, csv: true },
+    }))).toEqual({
+      version: 5,
+      pack: "com.example.forest",
+    });
+  });
+
+  it.each([null, "", "{", "[]", '{"version":6}', '{"version":5}', '{"version":4}', '{"version":3}'])
     ("falls back for missing or malformed value %s", (value) => {
       expect(parseSurfaceThemePreferences(value)).toEqual(DEFAULT_SURFACE_THEME_PREFERENCES);
     });
 
-  it("updates the pack without losing Custom CSS intent", () => {
+  it("updates the coordinated pack", () => {
     const packed = selectThemePack(DEFAULT_SURFACE_THEME_PREFERENCES, "com.example.forest");
 
     expect(packed.pack).toBe("com.example.forest");
-    expect(packed.customCss).toEqual(DEFAULT_SURFACE_THEME_PREFERENCES.customCss);
+    expect(packed).toEqual({ version: 5, pack: "com.example.forest" });
   });
 
-  it("migrates a version 2 Custom CSS override into an enabled overlay on the pack", () => {
+  it("drops a legacy version 2 Custom CSS override while retaining the pack", () => {
     expect(parseSurfaceThemePreferences(JSON.stringify({
       version: 2,
       pack: "com.example.forest",
       overrides: {
         application: null,
-        markdown: CUSTOM_CSS_THEME_ID,
+        markdown: "local.puppyone.custom-css",
         csv: "com.example.table",
       },
     }))).toEqual({
-      version: 4,
+      version: 5,
       pack: "com.example.forest",
-      customCss: { application: false, markdown: true, csv: false },
     });
-  });
-
-  it("enables and disables Custom CSS independently from theme selection", () => {
-    const selected = selectThemePack(DEFAULT_SURFACE_THEME_PREFERENCES, "com.example.forest");
-    const enabled = updateCustomCssEnabled(selected, "markdown", true);
-
-    expect(enabled.pack).toBe("com.example.forest");
-    expect(enabled.customCss.markdown).toBe(true);
-    expect(updateCustomCssEnabled(enabled, "markdown", false).customCss.markdown).toBe(false);
   });
 
   it("applies a newly selected theme pack to every surface", () => {
     const preferences = {
-      version: 4 as const,
+      version: 5 as const,
       pack: "default",
-      customCss: { application: false, markdown: false, csv: false },
     };
 
     const selected = selectThemePack(preferences, "com.example.forest");
 
     expect(selected).toEqual({
-      version: 4,
+      version: 5,
       pack: "com.example.forest",
-      customCss: { application: false, markdown: false, csv: false },
     });
     expect(resolveSurfaceThemeSelection(selected, catalog([
       theme("default", ["application", "markdown", "csv"], ["light", "dark"]),
@@ -135,9 +128,8 @@ describe("surface theme preferences", () => {
       theme("com.example.table", ["csv"], ["light", "dark"]),
     ]);
     const preferences = {
-      version: 4 as const,
+      version: 5 as const,
       pack: "com.example.forest",
-      customCss: { application: false, markdown: false, csv: false },
     };
 
     expect(resolveSurfaceThemeSelection(preferences, snapshot, "light")).toEqual({
@@ -158,9 +150,8 @@ describe("surface theme preferences", () => {
     ]);
 
     expect(resolveSurfaceThemeSelection({
-      version: 4,
+      version: 5,
       pack: "com.example.missing",
-      customCss: { application: false, markdown: false, csv: false },
     }, snapshot, "dark")).toEqual({
       application: "default",
       markdown: "default",
@@ -173,7 +164,7 @@ describe("surface theme preferences", () => {
       theme("default", ["application", "markdown", "csv"], ["light", "dark"]),
       theme("com.example.complete", ["application", "markdown", "csv"], ["light", "dark"]),
       theme("com.example.partial", ["markdown", "csv"], ["light", "dark"]),
-      theme(CUSTOM_CSS_THEME_ID, ["application", "markdown", "csv"], ["light", "dark"]),
+      theme("local.puppyone.custom-css", ["application", "markdown", "csv"], ["light", "dark"]),
     ]);
 
     expect(getThemePacks(snapshot).map((item) => item.id)).toEqual([

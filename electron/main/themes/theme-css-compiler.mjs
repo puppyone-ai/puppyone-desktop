@@ -4,7 +4,6 @@ import { THEME_TARGETS } from "./theme-package-contract.mjs";
 
 const targetSet = new Set(THEME_TARGETS);
 const themeIdPattern = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2,}$/;
-const managedCustomThemeId = "local.puppyone.custom-css";
 const allowedContainerAtRules = new Set(["media", "supports"]);
 const allowedDataUrlPattern = /^data:(?:image\/(?:png|jpeg|gif|webp|svg\+xml)|font\/(?:woff2?|ttf|otf));/i;
 const rootAliases = [".theme-root", ":root", "html", "body", "#write"];
@@ -61,7 +60,6 @@ export async function compileThemeCss({
   css,
   themeId,
   target,
-  scope = "theme",
   sourcePath = "theme.css",
   loadImport,
   resolveAssetUrl,
@@ -69,12 +67,6 @@ export async function compileThemeCss({
   if (typeof css !== "string") throw new TypeError("Theme CSS must be a string.");
   if (!themeIdPattern.test(themeId)) throw new TypeError("Theme id is invalid.");
   if (!targetSet.has(target)) throw new TypeError(`Unsupported theme target: ${String(target)}.`);
-  if (scope !== "theme" && scope !== "surface-overlay") {
-    throw new TypeError(`Unsupported theme CSS scope: ${String(scope)}.`);
-  }
-  if (scope === "surface-overlay" && themeId !== managedCustomThemeId) {
-    throw new TypeError("Surface-overlay scope is reserved for managed Custom CSS.");
-  }
 
   const root = await parseAndInlineImports(css, {
     sourcePath,
@@ -84,9 +76,9 @@ export async function compileThemeCss({
   });
   root.walkAtRules("charset", (rule) => rule.remove());
   validateAtRules(root);
-  scopeRules(root, { themeId, target, scope });
+  scopeRules(root, { themeId, target });
   await rewriteAssetUrls(root, resolveAssetUrl);
-  validateDeclarations(root, { scope, target });
+  validateDeclarations(root, { target });
 
   return Object.freeze({
     css: root.toString().trim(),
@@ -142,10 +134,8 @@ function validateAtRules(root) {
   });
 }
 
-function scopeRules(root, { themeId, target, scope }) {
-  const host = scope === "surface-overlay"
-    ? `[data-po-theme-surface="${target}"][data-po-theme-id]`
-    : `[data-po-theme-surface="${target}"][data-po-theme-id="${themeId}"]`;
+function scopeRules(root, { themeId, target }) {
+  const host = `[data-po-theme-surface="${target}"][data-po-theme-id="${themeId}"]`;
   root.walkRules((rule) => {
     const selectors = splitSelectors(rule.selector);
     const scoped = selectors.map((selector) => scopeSelector(selector, host, target));
@@ -283,11 +273,11 @@ function normalizeSourcePath(value) {
   return normalized.split(path.sep).join("/");
 }
 
-function validateDeclarations(root, { scope, target }) {
+function validateDeclarations(root, { target }) {
   root.walkDecls((declaration) => {
     const property = declaration.prop.toLowerCase();
     const value = declaration.value.trim().toLowerCase();
-    if (scope === "theme" && declaration.important) {
+    if (declaration.important) {
       throw new TypeError("Theme CSS cannot use !important; cascade precedence is managed by PuppyOne.");
     }
     if (target === "application" && !property.startsWith("--po-")) {

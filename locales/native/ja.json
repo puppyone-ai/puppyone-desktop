@@ -5,7 +5,6 @@
   "native.menu.theme": "テーマ",
   "native.menu.theme.pack": "テーマパック",
   "native.menu.theme.openFolder": "テーマフォルダーを開く",
-  "native.menu.theme.reload": "テーマを再読み込み",
   "native.menu.checkForUpdates": "アップデートを確認…",
   "native.update.manual.ok": "OK",
   "native.update.manual.notNow": "後で",

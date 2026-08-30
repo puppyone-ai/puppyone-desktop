@@ -27,15 +27,15 @@ afterEach(() => {
 });
 
 describe("renderer theme catalog", () => {
-  it("loads and reloads the host snapshot while preserving built-ins", async () => {
+  it("loads themes and refreshes them when the window regains focus", async () => {
     const first = snapshot("com.example.first");
     const second = snapshot("com.example.second");
-    const list = vi.fn(async () => first);
-    const reload = vi.fn(async () => second);
+    const list = vi.fn()
+      .mockResolvedValueOnce(first)
+      .mockResolvedValue(second);
     window.puppyoneDesktop = {
       themes: {
         list,
-        reload,
         openDirectory: vi.fn(async () => ({ opened: true as const })),
       },
     } as typeof window.puppyoneDesktop;
@@ -51,10 +51,11 @@ describe("renderer theme catalog", () => {
     expect(latest?.snapshot.themes.some((theme) => theme.id === "com.example.first")).toBe(true);
 
     await act(async () => {
-      await latest?.reload();
+      window.dispatchEvent(new Event("focus"));
+      await Promise.resolve();
     });
 
-    expect(reload).toHaveBeenCalledOnce();
+    expect(list).toHaveBeenCalledTimes(2);
     expect(latest?.snapshot.themes.some((theme) => theme.id === "com.example.first")).toBe(false);
     expect(latest?.snapshot.themes.some((theme) => theme.id === "com.example.second")).toBe(true);
   });
@@ -76,7 +77,6 @@ describe("renderer theme catalog", () => {
     window.puppyoneDesktop = {
       themes: {
         list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
-        reload: vi.fn(async () => ({ themes: [], diagnostics: [] })),
         openDirectory: vi.fn(async () => { throw new Error("Finder unavailable"); }),
       },
     } as typeof window.puppyoneDesktop;
@@ -99,7 +99,6 @@ describe("renderer theme catalog", () => {
     window.puppyoneDesktop = {
       themes: {
         list: vi.fn(async () => snapshot("com.example.first")),
-        reload: vi.fn(async () => snapshot("com.example.first")),
         openDirectory: vi.fn(async () => ({ opened: true as const })),
       },
     } as typeof window.puppyoneDesktop;
@@ -138,83 +137,6 @@ describe("renderer theme catalog", () => {
     expect(latest?.selection.markdown).toBe("default");
   });
 
-  it("loads and saves managed Custom CSS through the catalog controller", async () => {
-    const reload = vi.fn(async () => customCssSnapshot());
-    const readCustomCss = vi.fn(async () => ({ css: "body { color: teal }" }));
-    const saveCustomCss = vi.fn(async () => ({ saved: true as const }));
-    window.puppyoneDesktop = {
-      themes: {
-        list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
-        reload,
-        openDirectory: vi.fn(async () => ({ opened: true as const })),
-        readCustomCss,
-        saveCustomCss,
-      },
-    } as typeof window.puppyoneDesktop;
-    await act(async () => {
-      root.render(<Harness />);
-      await Promise.resolve();
-    });
-
-    await expect(latest?.readCustomCss("markdown")).resolves.toBe("body { color: teal }");
-    await expect(latest?.saveCustomCss("markdown", "body { color: navy }")).resolves.toBe(true);
-
-    expect(readCustomCss).toHaveBeenCalledWith("markdown");
-    expect(saveCustomCss).toHaveBeenCalledWith({ target: "markdown", css: "body { color: navy }" });
-    expect(reload).toHaveBeenCalledOnce();
-  });
-
-  it("does not report Custom CSS as applied when reload fails", async () => {
-    window.puppyoneDesktop = {
-      themes: {
-        list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
-        reload: vi.fn(async () => { throw new Error("reload failed"); }),
-        openDirectory: vi.fn(async () => ({ opened: true as const })),
-        saveCustomCss: vi.fn(async () => ({ saved: true as const })),
-      },
-    } as typeof window.puppyoneDesktop;
-    await act(async () => {
-      root.render(<Harness />);
-      await Promise.resolve();
-    });
-
-    let saved = true;
-    await act(async () => {
-      saved = await latest!.saveCustomCss("markdown", "body { color: navy }");
-    });
-
-    expect(saved).toBe(false);
-    expect(latest?.status).toBe("error");
-    expect(latest?.error).toBe("reload failed");
-  });
-
-  it("does not report Custom CSS as applied when the reloaded catalog rejects it", async () => {
-    window.puppyoneDesktop = {
-      themes: {
-        list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
-        reload: vi.fn(async () => ({
-          themes: [],
-          diagnostics: [{ source: "puppyone-custom-css", message: "invalid package" }],
-        })),
-        openDirectory: vi.fn(async () => ({ opened: true as const })),
-        saveCustomCss: vi.fn(async () => ({ saved: true as const })),
-      },
-    } as typeof window.puppyoneDesktop;
-    await act(async () => {
-      root.render(<Harness />);
-      await Promise.resolve();
-    });
-
-    let saved = true;
-    await act(async () => {
-      saved = await latest!.saveCustomCss("markdown", "body { color: navy }");
-    });
-
-    expect(saved).toBe(false);
-    expect(latest?.status).toBe("error");
-    expect(latest?.error).toContain("could not be loaded");
-  });
-
   it("syncs one theme pack to the native menu and routes pack requests", async () => {
     const syncNativeMenu = vi.fn(async () => ({ synced: true as const }));
     let requestSelection: ((request: {
@@ -225,7 +147,6 @@ describe("renderer theme catalog", () => {
     window.puppyoneDesktop = {
       themes: {
         list: vi.fn(async () => ({ themes: [], diagnostics: [] })),
-        reload: vi.fn(async () => ({ themes: [], diagnostics: [] })),
         openDirectory: vi.fn(async () => ({ opened: true as const })),
         syncNativeMenu,
         onSelectionRequested: vi.fn((callback) => {
@@ -271,9 +192,8 @@ function NativeHarness({
   latest = useThemeCatalog({
     colorMode: "light",
     preferences: {
-      version: 4,
+      version: 5,
       pack: "builtin.pack.forest",
-      customCss: { application: false, markdown: false, csv: false },
     },
     onThemePackChange,
   });
@@ -290,21 +210,6 @@ function snapshot(id: string): DesktopThemeSnapshot {
       targets: ["markdown"],
       source: "local-package",
       compiledCss: { markdown: `[data-po-theme-id="${id}"] { color: red }` },
-    }],
-    diagnostics: [],
-  };
-}
-
-function customCssSnapshot(): DesktopThemeSnapshot {
-  return {
-    themes: [{
-      id: "local.puppyone.custom-css",
-      name: "My Custom CSS",
-      version: "1.0.0",
-      modes: ["light", "dark"],
-      targets: ["application", "markdown", "csv"],
-      source: "local-package",
-      compiledCss: { application: "", markdown: "", csv: "" },
     }],
     diagnostics: [],
   };

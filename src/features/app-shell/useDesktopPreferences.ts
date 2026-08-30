@@ -16,9 +16,7 @@ import {
   selectThemePack,
   serializeSurfaceThemePreferences,
   SURFACE_THEME_PREFERENCES_STORAGE_KEY,
-  updateCustomCssEnabled,
 } from "../themes/themePreferences";
-import type { ThemeTarget } from "../themes/themeTypes";
 import {
   AI_EDIT_ASSIST_STORAGE_KEY,
   AGENT_FILE_ACTIVITY_INDICATORS_STORAGE_KEY,
@@ -447,11 +445,6 @@ export function useDesktopPreferences() {
   const setThemePack = (themeId: string) => {
     setSurfaceThemePreferences((current) => selectThemePack(current, themeId));
   };
-  const setCustomCssEnabled = (target: ThemeTarget, enabled: boolean) => {
-    setSurfaceThemePreferences((current) => (
-      updateCustomCssEnabled(current, target, enabled)
-    ));
-  };
 
   return {
     aiEditAssistEnabled,
@@ -513,7 +506,6 @@ export function useDesktopPreferences() {
     setSidebarCollapsed,
     setSidebarNavigationLayout,
     setSidebarNavigationVisibilitySettings,
-    setCustomCssEnabled,
     setThemePack,
     setTitlebarActionsSettings,
     setLoadingAnimationPreset,

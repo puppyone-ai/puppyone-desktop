@@ -67,7 +67,7 @@ Rejected, and why:
 
 #### Scoped CSS theme extension
 
-Appearance owns the Theme Pack selector because a pack coordinates Application, Markdown, and CSV. A complete pack is one curated choice from the user's perspective even when its CSS is externally authored. Advanced selectors replace the pack only for one surface. Editor owns semantic Markdown property overrides, not theme selection, and Custom CSS is an independently enabled final overlay. The deterministic cascade is product defaults → resolved surface theme → Editor Markdown overrides → Custom CSS.
+Appearance owns the Theme Pack selector because a pack coordinates Application, Markdown, and CSV. A complete pack is one curated choice from the user's perspective even when its CSS is externally authored. The three surfaces cannot be selected independently. Editor owns semantic Markdown property overrides, not theme selection. The deterministic cascade is product defaults → resolved Theme Pack → Editor Markdown overrides.
 
 Application theme CSS remains limited to the public color-token allowlist. Markdown and CSV CSS is compiler-scoped to its surface. This safety boundary is the exception to the older rejection of unrestricted theme import; it does not authorize arbitrary application selectors, layout changes, executable code, or raw settings-page color inputs. See [CSS themes](../css-themes.md).
 

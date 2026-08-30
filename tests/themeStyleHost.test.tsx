@@ -11,7 +11,6 @@ import {
 } from "../src/features/themes/builtinSurfaceThemes";
 import type { ThemeDefinition } from "../src/features/themes/themeTypes";
 import type { SurfaceThemeSelection } from "../src/features/themes/themePreferences";
-import { DEFAULT_SURFACE_THEME_PREFERENCES } from "../src/features/themes/themePreferences";
 import { DEFAULT_MARKDOWN_PRESENTATION_SETTINGS } from "../src/features/markdown/markdownPresentation";
 
 let container: HTMLDivElement;
@@ -89,7 +88,6 @@ describe("renderer CSS theme style host", () => {
       <ThemeStyleHost
         snapshot={snapshot}
         selection={selection({ markdown: installed.id, csv: installed.id })}
-        preferences={DEFAULT_SURFACE_THEME_PREFERENCES}
         markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS}
       />,
     ));
@@ -114,11 +112,11 @@ describe("renderer CSS theme style host", () => {
       diagnostics: [],
     });
     act(() => root.render(
-      <ThemeStyleHost snapshot={first} selection={selection({ markdown: "com.example.first" })} preferences={DEFAULT_SURFACE_THEME_PREFERENCES} markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
+      <ThemeStyleHost snapshot={first} selection={selection({ markdown: "com.example.first" })} markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
     ));
 
     act(() => root.render(
-      <ThemeStyleHost snapshot={second} selection={selection({ markdown: "com.example.second" })} preferences={DEFAULT_SURFACE_THEME_PREFERENCES} markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
+      <ThemeStyleHost snapshot={second} selection={selection({ markdown: "com.example.second" })} markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
     ));
 
     expect(document.head.querySelector('[data-po-theme-id="com.example.first"]')).toBeNull();
@@ -132,35 +130,46 @@ describe("renderer CSS theme style host", () => {
     });
 
     act(() => root.render(
-      <ThemeStyleHost snapshot={snapshot} selection={selection()} preferences={DEFAULT_SURFACE_THEME_PREFERENCES} markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
+      <ThemeStyleHost snapshot={snapshot} selection={selection()} markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
     ));
 
     expect(document.head.querySelector("[data-po-theme-style]")).toBeNull();
   });
 
-  it("injects base theme, Editor overrides, and enabled Custom CSS in deterministic order", () => {
+  it("does not apply a legacy managed Custom CSS package", () => {
+    const legacyCustomCss = externalTheme({
+      id: "local.puppyone.custom-css",
+      compiledCss: {
+        markdown: '[data-po-theme-surface="markdown"][data-po-theme-id] { color: red }',
+      },
+    });
+    const snapshot = createThemeCatalogSnapshot({ themes: [legacyCustomCss], diagnostics: [] });
+
+    act(() => root.render(
+      <ThemeStyleHost
+        snapshot={snapshot}
+        selection={selection()}
+        markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS}
+      />,
+    ));
+
+    expect(document.head.querySelector('[data-po-theme-id="local.puppyone.custom-css"]'))
+      .toBeNull();
+  });
+
+  it("injects the selected theme before Editor presentation overrides", () => {
     const base = externalTheme({
       id: "com.example.reader",
       compiledCss: {
         markdown: '[data-po-theme-surface="markdown"][data-po-theme-id="com.example.reader"] { --po-md-h1-size: 2em }',
       },
     });
-    const custom = externalTheme({
-      id: "local.puppyone.custom-css",
-      compiledCss: {
-        markdown: '[data-po-theme-surface="markdown"][data-po-theme-id] { --po-md-h1-size: 3em }',
-      },
-    });
-    const snapshot = createThemeCatalogSnapshot({ themes: [base, custom], diagnostics: [] });
+    const snapshot = createThemeCatalogSnapshot({ themes: [base], diagnostics: [] });
 
     act(() => root.render(
       <ThemeStyleHost
         snapshot={snapshot}
         selection={selection({ markdown: base.id })}
-        preferences={{
-          ...DEFAULT_SURFACE_THEME_PREFERENCES,
-          customCss: { application: false, markdown: true, csv: false },
-        }}
         markdownPresentation={{
           ...DEFAULT_MARKDOWN_PRESENTATION_SETTINGS,
           headingScale: "large",
@@ -172,26 +181,18 @@ describe("renderer CSS theme style host", () => {
     expect(layers.map((style) => style.dataset.poThemeLayer)).toEqual([
       "theme",
       "editor",
-      "custom-css",
     ]);
     expect(layers[1]?.textContent).toContain("--po-md-h1-size: 2.25em");
-    expect(layers[2]?.textContent).toContain("--po-md-h1-size: 3em");
   });
 
-  it("keeps Editor and Custom CSS authoritative over a dark theme root", () => {
+  it("keeps Editor preferences authoritative over a dark theme root", () => {
     const base = externalTheme({
       id: "com.example.dark-reader",
       compiledCss: {
         markdown: ':where(.dark) [data-po-theme-surface="markdown"][data-po-theme-id="com.example.dark-reader"] { --po-md-h1-size: 2em }',
       },
     });
-    const custom = externalTheme({
-      id: "local.puppyone.custom-css",
-      compiledCss: {
-        markdown: '[data-po-theme-surface="markdown"][data-po-theme-id] { --po-md-h1-size: 3em }',
-      },
-    });
-    const snapshot = createThemeCatalogSnapshot({ themes: [base, custom], diagnostics: [] });
+    const snapshot = createThemeCatalogSnapshot({ themes: [base], diagnostics: [] });
     const markdownPresentation = {
       ...DEFAULT_MARKDOWN_PRESENTATION_SETTINGS,
       headingScale: "large" as const,
@@ -202,7 +203,6 @@ describe("renderer CSS theme style host", () => {
         <ThemeStyleHost
           snapshot={snapshot}
           selection={selection({ markdown: base.id })}
-          preferences={DEFAULT_SURFACE_THEME_PREFERENCES}
           markdownPresentation={markdownPresentation}
         />
         <div data-dark-cascade data-po-theme-surface="markdown" data-po-theme-id={base.id} />
@@ -210,22 +210,6 @@ describe("renderer CSS theme style host", () => {
     ));
     const surface = container.querySelector("[data-dark-cascade]") as Element;
     expect(getComputedStyle(surface).getPropertyValue("--po-md-h1-size").trim()).toBe("2.25em");
-
-    act(() => root.render(
-      <div className="dark">
-        <ThemeStyleHost
-          snapshot={snapshot}
-          selection={selection({ markdown: base.id })}
-          preferences={{
-            ...DEFAULT_SURFACE_THEME_PREFERENCES,
-            customCss: { application: false, markdown: true, csv: false },
-          }}
-          markdownPresentation={markdownPresentation}
-        />
-        <div data-dark-cascade data-po-theme-surface="markdown" data-po-theme-id={base.id} />
-      </div>,
-    ));
-    expect(getComputedStyle(surface).getPropertyValue("--po-md-h1-size").trim()).toBe("3em");
   });
 });
 

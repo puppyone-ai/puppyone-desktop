@@ -159,30 +159,7 @@ describe("CSS theme compiler", () => {
     expect(compiled.css).toContain(`${host} > .row + .row, ${host} .item ~ .item`);
   });
 
-  it("can scope managed Custom CSS to the active theme surface as a final overlay", async () => {
-    const compiled = await compileThemeCss({
-      css: ".theme-root { --po-md-content-color: rebeccapurple }",
-      themeId: "local.puppyone.custom-css",
-      target: "markdown",
-      scope: "surface-overlay",
-    });
-
-    expect(compiled.css).toContain(
-      '[data-po-theme-surface="markdown"][data-po-theme-id] { --po-md-content-color: rebeccapurple }',
-    );
-    expect(compiled.css).not.toContain('data-po-theme-id="local.puppyone.custom-css"');
-  });
-
-  it("does not expose surface-overlay scope to ordinary theme packages", async () => {
-    await expect(compileThemeCss({
-      css: ".theme-root { color: red }",
-      themeId: "com.example.ordinary",
-      target: "markdown",
-      scope: "surface-overlay",
-    })).rejects.toThrow("reserved for managed Custom CSS");
-  });
-
-  it("rejects !important in ordinary themes so later Editor and Custom layers remain authoritative", async () => {
+  it("rejects !important so later Editor preferences remain authoritative", async () => {
     await expect(compileThemeCss({
       css: ".theme-root { --po-md-h1-size: 4em !important }",
       themeId: "com.example.forceful",

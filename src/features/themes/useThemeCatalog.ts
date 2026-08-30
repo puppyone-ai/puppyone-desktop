@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DesktopThemeSnapshot } from "../../types/electron";
 import { createThemeCatalogSnapshot } from "./builtinSurfaceThemes";
 import type { ThemeCatalogState } from "./themeTypes";
@@ -8,7 +8,7 @@ import {
   resolveSurfaceThemeSelection,
   type SurfaceThemeSelection,
 } from "./themePreferences";
-import type { ThemeColorMode, ThemeTarget } from "./themeTypes";
+import type { ThemeColorMode } from "./themeTypes";
 
 const EMPTY_HOST_SNAPSHOT: DesktopThemeSnapshot = Object.freeze({
   themes: Object.freeze([]),
@@ -17,10 +17,7 @@ const EMPTY_HOST_SNAPSHOT: DesktopThemeSnapshot = Object.freeze({
 
 export type ThemeCatalogController = ThemeCatalogState & Readonly<{
   selection: SurfaceThemeSelection;
-  reload: () => Promise<ThemeCatalogState["snapshot"] | null>;
   openDirectory: () => Promise<{ opened: boolean }>;
-  readCustomCss: (target: ThemeTarget) => Promise<string>;
-  saveCustomCss: (target: ThemeTarget, css: string) => Promise<boolean>;
 }>;
 
 export function useThemeCatalog(options: {
@@ -34,49 +31,24 @@ export function useThemeCatalog(options: {
     onThemePackChange,
   } = options;
   const desktopThemes = window.puppyoneDesktop?.themes;
+  const refreshGeneration = useRef(0);
   const [state, setState] = useState<ThemeCatalogState>(() => ({
     snapshot: createThemeCatalogSnapshot(EMPTY_HOST_SNAPSHOT),
     status: desktopThemes ? "loading" : "ready",
     error: null,
   }));
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!desktopThemes) {
-      setState({
-        snapshot: createThemeCatalogSnapshot(EMPTY_HOST_SNAPSHOT),
-        status: "ready",
-        error: null,
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-    void desktopThemes.list()
-      .then((snapshot) => {
-        if (cancelled) return;
-        setState({ snapshot: createThemeCatalogSnapshot(snapshot), status: "ready", error: null });
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setState({
-          snapshot: createThemeCatalogSnapshot(EMPTY_HOST_SNAPSHOT),
-          status: "error",
-          error: error instanceof Error ? error.message : String(error),
-        });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [desktopThemes]);
-
-  const reload = useCallback(async () => {
+  const refresh = useCallback(async () => {
     if (!desktopThemes) return null;
+    const generation = refreshGeneration.current + 1;
+    refreshGeneration.current = generation;
     try {
-      const snapshot = createThemeCatalogSnapshot(await desktopThemes.reload());
+      const snapshot = createThemeCatalogSnapshot(await desktopThemes.list());
+      if (generation !== refreshGeneration.current) return null;
       setState({ snapshot, status: "ready", error: null });
       return snapshot;
     } catch (error) {
+      if (generation !== refreshGeneration.current) return null;
       setState((current) => ({
         ...current,
         status: "error",
@@ -85,6 +57,24 @@ export function useThemeCatalog(options: {
       return null;
     }
   }, [desktopThemes]);
+
+  useEffect(() => {
+    if (!desktopThemes) {
+      setState({
+        snapshot: createThemeCatalogSnapshot(EMPTY_HOST_SNAPSHOT),
+        status: "ready",
+        error: null,
+      });
+      return undefined;
+    }
+    void refresh();
+    const onFocus = () => void refresh();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      refreshGeneration.current += 1;
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [desktopThemes, refresh]);
 
   const openDirectory = useCallback(async () => {
     if (!desktopThemes) return { opened: false };
@@ -105,50 +95,6 @@ export function useThemeCatalog(options: {
     [colorMode, preferences, state.snapshot],
   );
 
-  const readCustomCss = useCallback(async (target: ThemeTarget) => {
-    if (!desktopThemes?.readCustomCss) return "";
-    try {
-      const result = await desktopThemes.readCustomCss(target);
-      return result.css;
-    } catch (error) {
-      setState((current) => ({
-        ...current,
-        status: "error",
-        error: error instanceof Error ? error.message : String(error),
-      }));
-      throw error;
-    }
-  }, [desktopThemes]);
-
-  const saveCustomCss = useCallback(async (target: ThemeTarget, css: string) => {
-    if (!desktopThemes?.saveCustomCss) return false;
-    try {
-      await desktopThemes.saveCustomCss({ target, css });
-      const snapshot = await reload();
-      if (!snapshot) return false;
-      const customTheme = snapshot.themes.find((theme) => theme.id === "local.puppyone.custom-css");
-      if (
-        !customTheme?.targets.includes(target)
-        || !Object.prototype.hasOwnProperty.call(customTheme.compiledCss, target)
-      ) {
-        setState((current) => ({
-          ...current,
-          status: "error",
-          error: "Custom CSS was saved but could not be loaded. Check the theme diagnostics.",
-        }));
-        return false;
-      }
-      return true;
-    } catch (error) {
-      setState((current) => ({
-        ...current,
-        status: "error",
-        error: error instanceof Error ? error.message : String(error),
-      }));
-      return false;
-    }
-  }, [desktopThemes, reload]);
-
   useEffect(() => {
     if (!desktopThemes?.syncNativeMenu) return;
     void desktopThemes.syncNativeMenu({
@@ -166,19 +112,9 @@ export function useThemeCatalog(options: {
     });
   }, [desktopThemes, onThemePackChange]);
 
-  useEffect(() => {
-    if (!desktopThemes?.onReloadRequested) return undefined;
-    return desktopThemes.onReloadRequested(() => {
-      void reload();
-    });
-  }, [desktopThemes, reload]);
-
   return {
     ...state,
     selection,
-    reload,
     openDirectory,
-    readCustomCss,
-    saveCustomCss,
   };
 }

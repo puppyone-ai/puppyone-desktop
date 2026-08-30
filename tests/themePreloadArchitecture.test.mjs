@@ -6,12 +6,12 @@ const main = readFileSync(new URL("../electron/main.mjs", import.meta.url), "utf
 const declarations = readFileSync(new URL("../src/types/electron.d.ts", import.meta.url), "utf8");
 
 describe("CSS theme host bridge architecture", () => {
-  it("exposes only pathless catalog and target-scoped Custom CSS commands", () => {
+  it("exposes only pathless catalog and directory commands", () => {
     expect(preload).toMatch(/themes:\s*\{[\s\S]*list:\s*\(\)\s*=>\s*ipcRenderer\.invoke\("theme:list"\)/);
-    expect(preload).toMatch(/reload:\s*\(\)\s*=>\s*ipcRenderer\.invoke\("theme:reload"\)/);
     expect(preload).toMatch(/openDirectory:\s*\(\)\s*=>\s*ipcRenderer\.invoke\("theme:open-directory"\)/);
-    expect(preload).toMatch(/readCustomCss:\s*\(target\)\s*=>\s*ipcRenderer\.invoke\("theme:read-custom-css",\s*\{\s*target/);
-    expect(preload).toMatch(/saveCustomCss:\s*\(request\)\s*=>\s*ipcRenderer\.invoke\("theme:save-custom-css",\s*\{[\s\S]*target:\s*request\?\.target,[\s\S]*css:\s*request\?\.css/);
+    expect(preload).not.toContain("theme:reload");
+    expect(preload).not.toContain("theme:read-custom-css");
+    expect(preload).not.toContain("theme:save-custom-css");
     expect(preload).not.toMatch(/themes:[\s\S]{0,400}(?:path|filePath|directoryPath)\s*=>/);
   });
 

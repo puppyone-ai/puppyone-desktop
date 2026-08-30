@@ -1,23 +1,17 @@
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactElement } from "react";
 import type { ThemeCatalogSnapshot } from "./themeTypes";
-import {
-  CUSTOM_CSS_THEME_ID,
-  type SurfaceThemePreferences,
-  type SurfaceThemeSelection,
-} from "./themePreferences";
+import { LEGACY_CUSTOM_CSS_THEME_ID, type SurfaceThemeSelection } from "./themePreferences";
 import {
   resolveMarkdownPresentationStyle,
   type MarkdownPresentationSettings,
 } from "../markdown/markdownPresentation";
 
 export function ThemeStyleHost({
-  preferences,
   selection,
   snapshot,
   markdownPresentation,
 }: {
-  preferences: SurfaceThemePreferences;
   selection: SurfaceThemeSelection;
   snapshot: ThemeCatalogSnapshot;
   markdownPresentation: MarkdownPresentationSettings;
@@ -25,7 +19,7 @@ export function ThemeStyleHost({
   if (typeof document === "undefined") return null;
   const styles: ReactElement[] = snapshot.themes.flatMap((theme) => (
     theme.targets.flatMap((target) => {
-      if (theme.id === CUSTOM_CSS_THEME_ID || selection[target] !== theme.id) return [];
+      if (theme.id === LEGACY_CUSTOM_CSS_THEME_ID || selection[target] !== theme.id) return [];
       const css = theme.compiledCss[target];
       if (!css) return [];
       return (
@@ -56,25 +50,6 @@ export function ThemeStyleHost({
     );
   }
 
-  const customTheme = snapshot.themes.find((theme) => theme.id === CUSTOM_CSS_THEME_ID);
-  if (customTheme) {
-    for (const target of customTheme.targets) {
-      if (!preferences.customCss[target]) continue;
-      const css = customTheme.compiledCss[target];
-      if (!css) continue;
-      styles.push(
-        <style
-          key={`${CUSTOM_CSS_THEME_ID}:${target}`}
-          data-po-theme-style={`${CUSTOM_CSS_THEME_ID}:${target}`}
-          data-po-theme-id={CUSTOM_CSS_THEME_ID}
-          data-po-theme-target={target}
-          data-po-theme-layer="custom-css"
-        >
-          {css}
-        </style>,
-      );
-    }
-  }
   return createPortal(styles, document.head);
 }
 

@@ -11,7 +11,6 @@ function createHarness({ platform = "darwin" } = {}) {
     checkForUpdates: vi.fn(),
     newWindow: vi.fn(),
     openThemesDirectory: vi.fn(),
-    reloadThemes: vi.fn(),
     selectTheme: vi.fn(),
   };
   const labels = {
@@ -20,7 +19,6 @@ function createHarness({ platform = "darwin" } = {}) {
     "native.menu.theme": "Theme",
     "native.menu.theme.pack": "Theme Pack",
     "native.menu.theme.openFolder": "Open Themes Folder",
-    "native.menu.theme.reload": "Reload Themes",
     "native.dock.newWindow": "New Window",
   };
   const service = createDesktopNativeMenuService({
@@ -31,7 +29,6 @@ function createHarness({ platform = "darwin" } = {}) {
     onCheckForUpdates: actions.checkForUpdates,
     onNewWindow: actions.newWindow,
     onOpenThemesDirectory: actions.openThemesDirectory,
-    onReloadThemes: actions.reloadThemes,
     onSelectTheme: actions.selectTheme,
   });
   return { actions, app, Menu, service };
@@ -109,7 +106,6 @@ describe("DesktopNativeMenuService", () => {
     expect(themeMenu.submenu.map((item) => item.label).filter(Boolean)).toEqual([
       "Theme Pack",
       "Open Themes Folder",
-      "Reload Themes",
     ]);
     expect(themeMenu.submenu[0].submenu.find((item) => item.label === "Forest"))
       .toMatchObject({ type: "radio", checked: true });
@@ -121,7 +117,6 @@ describe("DesktopNativeMenuService", () => {
       .toBeUndefined();
 
     themeMenu.submenu[0].submenu.find((item) => item.label === "Default").click();
-    themeMenu.submenu.at(-2).click();
     themeMenu.submenu.at(-1).click();
     await Promise.resolve();
     await Promise.resolve();
@@ -129,7 +124,6 @@ describe("DesktopNativeMenuService", () => {
     expect(actions.selectTheme).toHaveBeenCalledWith({ kind: "pack", themeId: "default" });
     expect(actions.selectTheme).toHaveBeenCalledTimes(1);
     expect(actions.openThemesDirectory).toHaveBeenCalledOnce();
-    expect(actions.reloadThemes).toHaveBeenCalledOnce();
   });
 
   it("does not replace native menus outside macOS", () => {

@@ -5,7 +5,6 @@
   "native.menu.theme": "主题",
   "native.menu.theme.pack": "主题套装",
   "native.menu.theme.openFolder": "打开主题文件夹",
-  "native.menu.theme.reload": "重新加载主题",
   "native.menu.checkForUpdates": "检查更新…",
   "native.update.manual.ok": "好",
   "native.update.manual.notNow": "暂不更新",

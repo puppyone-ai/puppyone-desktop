@@ -5,7 +5,6 @@
   "native.menu.theme": "Theme",
   "native.menu.theme.pack": "Designpaket",
   "native.menu.theme.openFolder": "Theme-Ordner öffnen",
-  "native.menu.theme.reload": "Themes neu laden",
   "native.menu.checkForUpdates": "Nach Updates suchen…",
   "native.update.manual.ok": "OK",
   "native.update.manual.notNow": "Später",

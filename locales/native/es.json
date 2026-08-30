@@ -5,7 +5,6 @@
   "native.menu.theme": "Tema",
   "native.menu.theme.pack": "Paquete de tema",
   "native.menu.theme.openFolder": "Abrir carpeta de temas",
-  "native.menu.theme.reload": "Recargar temas",
   "native.menu.checkForUpdates": "Buscar actualizaciones…",
   "native.update.manual.ok": "Aceptar",
   "native.update.manual.notNow": "Ahora no",

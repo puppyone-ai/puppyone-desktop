@@ -25,72 +25,25 @@ afterEach(() => {
   container.remove();
 });
 
-describe("Appearance Custom CSS settings", () => {
-  it("loads, edits, saves, and applies target-scoped Custom CSS", async () => {
-    const readCustomCss = vi.fn(async () => "body { color: teal }");
-    const saveCustomCss = vi.fn(async () => true);
-    const onCustomCssEnabledChange = vi.fn();
-    const catalog = controller({ readCustomCss, saveCustomCss });
-
+describe("Appearance theme settings", () => {
+  it("keeps the pack selector and Add Theme in one compact control group", async () => {
     await act(async () => {
       root.render(withTestLocalization(
         <ThemeSettingsSection
-          catalog={catalog}
+          catalog={controller({})}
           preferences={DEFAULT_SURFACE_THEME_PREFERENCES}
           onThemePackChange={vi.fn()}
-          onCustomCssEnabledChange={onCustomCssEnabledChange}
         />,
       ));
       await Promise.resolve();
     });
 
-    const source = document.querySelector<HTMLTextAreaElement>(".desktop-theme-custom-css-source");
-    expect(readCustomCss).toHaveBeenCalledWith("markdown");
-    expect(source?.value).toBe("body { color: teal }");
-
-    act(() => {
-      if (!source) return;
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(
-        source,
-        "body { color: navy }",
-      );
-      source.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await act(async () => {
-      document.querySelector<HTMLButtonElement>(".desktop-theme-custom-css-save")?.click();
-      await Promise.resolve();
-    });
-
-    expect(saveCustomCss).toHaveBeenCalledWith("markdown", "body { color: navy }");
-    expect(onCustomCssEnabledChange).toHaveBeenCalledWith("markdown", true);
-  });
-
-  it("can disable Custom CSS without deleting it or changing the selected theme", async () => {
-    const onCustomCssEnabledChange = vi.fn();
-    const catalog = controller({ readCustomCss: vi.fn(async () => "h1 { color: teal }") });
-
-    await act(async () => {
-      root.render(withTestLocalization(
-        <ThemeSettingsSection
-          catalog={catalog}
-          preferences={{
-            ...DEFAULT_SURFACE_THEME_PREFERENCES,
-            customCss: { application: false, markdown: true, csv: false },
-          }}
-          onThemePackChange={vi.fn()}
-          onCustomCssEnabledChange={onCustomCssEnabledChange}
-        />,
-      ));
-      await Promise.resolve();
-    });
-
-    const enabled = document.querySelector<HTMLInputElement>(
-      '[aria-label="Enable Custom CSS for Markdown"]',
-    );
-    expect(enabled?.checked).toBe(true);
-    act(() => enabled?.click());
-
-    expect(onCustomCssEnabledChange).toHaveBeenCalledWith("markdown", false);
+    const controls = document.querySelector(".desktop-theme-pack-controls");
+    expect(controls?.querySelector("select")).not.toBeNull();
+    expect(controls?.querySelector("button")?.textContent).toBe("Add Theme");
+    expect(document.body.textContent).not.toContain("Reload Themes");
+    expect(document.body.textContent).not.toContain("Advanced: Custom CSS");
+    expect(document.querySelector("textarea")).toBeNull();
   });
 
   it("reserves Add Theme until the marketplace URL is configured", async () => {
@@ -100,7 +53,6 @@ describe("Appearance Custom CSS settings", () => {
           catalog={controller({})}
           preferences={DEFAULT_SURFACE_THEME_PREFERENCES}
           onThemePackChange={vi.fn()}
-          onCustomCssEnabledChange={vi.fn()}
         />,
       ));
       await Promise.resolve();
@@ -122,10 +74,7 @@ function controller(overrides: Partial<ThemeCatalogController>): ThemeCatalogCon
     selection: { application: "default", markdown: "default", csv: "default" },
     status: "ready",
     error: null,
-    reload: vi.fn(async () => undefined),
     openDirectory: vi.fn(async () => ({ opened: true })),
-    readCustomCss: vi.fn(async () => ""),
-    saveCustomCss: vi.fn(async () => true),
     ...overrides,
   };
 }
