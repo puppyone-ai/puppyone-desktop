@@ -886,6 +886,7 @@ declare global {
       themes: {
         list: () => Promise<DesktopThemeSnapshot>;
         openDirectory: () => Promise<{ opened: true }>;
+        create: () => Promise<{ created: true; themeId: string }>;
         syncNativeMenu: (request: DesktopThemeMenuState) => Promise<{ synced: true }>;
         onSelectionRequested: (
           callback: (request: { kind: "pack"; themeId: string }) => void,

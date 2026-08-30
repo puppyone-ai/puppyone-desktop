@@ -1,5 +1,6 @@
 export const THEME_LIST_CHANNEL = "theme:list";
 export const THEME_OPEN_DIRECTORY_CHANNEL = "theme:open-directory";
+export const THEME_CREATE_CHANNEL = "theme:create";
 export const THEME_SYNC_NATIVE_MENU_CHANNEL = "theme:sync-native-menu";
 export const THEME_SELECTION_REQUESTED_CHANNEL = "theme:selection-requested";
 
@@ -11,6 +12,7 @@ export function registerThemeIpcHandlers({ ipcMain, themeService, onSyncNativeMe
     !themeService
     || typeof themeService.listThemes !== "function"
     || typeof themeService.openDirectory !== "function"
+    || typeof themeService.createTheme !== "function"
   ) {
     throw new TypeError("Theme service is required for theme IPC.");
   }
@@ -20,6 +22,7 @@ export function registerThemeIpcHandlers({ ipcMain, themeService, onSyncNativeMe
 
   ipcMain.handle(THEME_LIST_CHANNEL, () => themeService.listThemes());
   ipcMain.handle(THEME_OPEN_DIRECTORY_CHANNEL, () => themeService.openDirectory());
+  ipcMain.handle(THEME_CREATE_CHANNEL, () => themeService.createTheme());
   ipcMain.handle(THEME_SYNC_NATIVE_MENU_CHANNEL, (_event, request) => {
     const state = parseThemeMenuState(request);
     onSyncNativeMenu(state);

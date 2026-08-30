@@ -9,6 +9,7 @@ describe("CSS theme host bridge architecture", () => {
   it("exposes only pathless catalog and directory commands", () => {
     expect(preload).toMatch(/themes:\s*\{[\s\S]*list:\s*\(\)\s*=>\s*ipcRenderer\.invoke\("theme:list"\)/);
     expect(preload).toMatch(/openDirectory:\s*\(\)\s*=>\s*ipcRenderer\.invoke\("theme:open-directory"\)/);
+    expect(preload).toMatch(/create:\s*\(\)\s*=>\s*ipcRenderer\.invoke\("theme:create"\)/);
     expect(preload).not.toContain("theme:reload");
     expect(preload).not.toContain("theme:read-custom-css");
     expect(preload).not.toContain("theme:save-custom-css");
@@ -26,5 +27,6 @@ describe("CSS theme host bridge architecture", () => {
     expect(declarations).toContain("type DesktopThemeTarget =");
     expect(declarations).toContain("type DesktopThemeSnapshot = Readonly<");
     expect(declarations).toMatch(/themes:\s*\{[\s\S]*list:\s*\(\)\s*=>\s*Promise<DesktopThemeSnapshot>/);
+    expect(declarations).toMatch(/create:\s*\(\)\s*=>\s*Promise<\{\s*created:\s*true;\s*themeId:\s*string\s*\}>/);
   });
 });

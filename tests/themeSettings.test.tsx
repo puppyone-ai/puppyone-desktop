@@ -18,7 +18,8 @@ describe("Sub Theme settings", () => {
     expect(section).toContain("FolderOpen");
     expect(section).toContain("<Plus");
     expect(section).toContain("settings.appearance.themes.add");
-    expect(section).toContain("THEME_MARKETPLACE_URL");
+    expect(section).toContain("catalog.createTheme");
+    expect(section).not.toContain("THEME_MARKETPLACE_URL");
     expect(section).not.toContain("function ThemeSelector");
     expect(section).not.toContain("getThemesForTarget");
     expect(section).not.toContain("surfaceThemePreferences");
@@ -31,6 +32,8 @@ describe("Sub Theme settings", () => {
     expect(section).toContain("desktop-settings-select");
     const styles = source("src/styles/settings-controls.css");
     expect(styles).toMatch(/\.desktop-theme-pack-controls\s*\{[\s\S]*flex-wrap:\s*nowrap/);
+    expect(styles).toMatch(/\.desktop-theme-pack-controls\s*\{[^}]*height:\s*28px/);
+    expect(styles).not.toMatch(/\.desktop-theme-pack-controls\s*\{[^}]*(?:padding|border|background):/);
     expect(styles).toMatch(/\.desktop-theme-pack-label\s*\{[^}]*white-space:\s*nowrap/);
     expect(styles).toMatch(/\.desktop-theme-pack-controls\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*100%/);
     expect(section).toContain("desktop-theme-pack-picker");
