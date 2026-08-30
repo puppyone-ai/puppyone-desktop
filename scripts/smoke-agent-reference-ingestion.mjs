@@ -50,6 +50,15 @@ async function runSmoke() {
     },
     localAgentInventory: { discover: async () => ({ connections: [], scannedAt: new Date(0).toISOString(), warnings: [] }) },
     agentService: {
+      getReferenceInputCapabilities: () => ({
+        workspaceFiles: true,
+        workspaceDirectories: true,
+        images: "local-snapshot",
+        genericFiles: "local-snapshot",
+        maxReferences: 32,
+        maxReferenceBytes: 25 * 1024 * 1024,
+        maxTotalReferenceBytes: 25 * 1024 * 1024,
+      }),
       startTurn: async (sender, request, authorizedRoot) => {
         if (authorizedRoot !== workspacePath || sender.id <= 0) throw new Error("Electron smoke owner correlation failed.");
         const staged = request.references.find((reference) => reference.kind === "staged-attachment");
@@ -157,6 +166,7 @@ async function runNativeGrantSmoke() {
 async function runProductionLayoutSmoke() {
   const window = createWindow({ show: false, width: 760, height: 820, preload: false });
   const matrix = [];
+  const pickerThemes = [];
   for (const theme of ["light", "dark"]) {
     nativeTheme.themeSource = theme;
     const url = pathToFileURL(rendererPath);
@@ -199,11 +209,45 @@ async function runProductionLayoutSmoke() {
     if (!directPicker.input || directPicker.menu) {
       throw new Error(`Production Agent direct picker contract failed: ${JSON.stringify(directPicker)}`);
     }
+    await window.webContents.executeJavaScript(`(() => {
+      document.querySelector('.desktop-agent-composer-picker.is-model button')?.click();
+    })()`, true);
+    await waitForRenderer(
+      window,
+      "Boolean(document.querySelector('.desktop-agent-picker-popover[data-positioned=true]'))",
+      Boolean,
+    );
+    const pickerSnapshot = await window.webContents.executeJavaScript(`(() => {
+      const surface = document.querySelector('.desktop-agent-picker-popover');
+      const option = surface?.querySelector('[role=option]');
+      const rootStyle = getComputedStyle(document.documentElement);
+      const surfaceStyle = surface ? getComputedStyle(surface) : null;
+      const optionStyle = option ? getComputedStyle(option) : null;
+      return {
+        sharedSurface: surface?.classList.contains('desktop-menu-surface') || false,
+        nativeOccluder: surface?.getAttribute('data-native-surface-occluder') === 'true',
+        quietTone: surface?.getAttribute('data-menu-tone') === 'quiet',
+        compactElevation: surface?.getAttribute('data-menu-elevation') === 'compact',
+        listbox: Boolean(surface?.querySelector('[role=listbox]')),
+        optionCount: surface?.querySelectorAll('[role=option]').length || 0,
+        borderRadius: surfaceStyle?.borderRadius || '',
+        expectedBorderRadius: rootStyle.getPropertyValue('--po-menu-radius').trim(),
+        optionWeight: optionStyle?.fontWeight || '',
+      };
+    })()`, true);
+    if (!pickerSnapshot.sharedSurface || !pickerSnapshot.nativeOccluder || !pickerSnapshot.quietTone
+      || !pickerSnapshot.compactElevation || !pickerSnapshot.listbox || pickerSnapshot.optionCount < 2
+      || pickerSnapshot.borderRadius !== pickerSnapshot.expectedBorderRadius
+      || Number(pickerSnapshot.optionWeight) > 400) {
+      throw new Error(`Production Agent picker primitive smoke failed: ${JSON.stringify(pickerSnapshot)}`);
+    }
+    pickerThemes.push(theme);
     const image = await window.capturePage();
     if (image.isEmpty()) throw new Error(`Production Agent reference ${theme} capture was empty.`);
+    await window.webContents.executeJavaScript(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`, true);
   }
   window.destroy();
-  return { productionLayoutMatrix: matrix };
+  return { productionLayoutMatrix: matrix, pickerThemes };
 }
 
 function createWindow({ show, width, height, preload }) {

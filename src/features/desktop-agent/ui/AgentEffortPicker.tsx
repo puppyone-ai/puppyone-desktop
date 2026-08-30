@@ -25,7 +25,6 @@ export const AgentEffortPicker = memo(function AgentEffortPicker({
       keywords: effort,
       selectable: true,
       selected: effort === selectedEffort,
-      kind: "effort",
       icon: null,
     })),
   }];
@@ -36,9 +35,8 @@ export const AgentEffortPicker = memo(function AgentEffortPicker({
       valueLabel={selectedEffort ? effortLabel(selectedEffort, t) : null}
       groups={groups}
       disabled={disabled}
-      className="is-effort"
-      showChevron={false}
-      preferredWidth={148}
+      indicator="none"
+      width="narrow"
       onSelect={onSelectEffort}
     />
   );

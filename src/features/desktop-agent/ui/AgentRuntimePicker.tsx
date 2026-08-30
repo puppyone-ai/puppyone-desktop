@@ -36,7 +36,6 @@ export const AgentRuntimePicker = memo(function AgentRuntimePicker({
       // A non-ready runtime remains inspectable/selectable; execution is gated by readiness.
       selectable: true,
       selected: entry.descriptor.id === selectedRuntimeId,
-      kind: "agent",
       icon: <AgentBrandMark kind="agent" iconKey={entry.descriptor.iconKey} label={entry.descriptor.displayName} />,
     };
   });
@@ -56,7 +55,7 @@ export const AgentRuntimePicker = memo(function AgentRuntimePicker({
       triggerDescription={t("agent.runtime.switchStartsNewChat")}
       groups={groups}
       disabled={disabled || availableRuntimes.length === 0}
-      className="is-agent is-header"
+      placement="header"
       onSelect={onSelectRuntime}
     />
   );

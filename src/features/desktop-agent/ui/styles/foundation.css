@@ -44,6 +44,7 @@
   --agent-text: var(--po-text);
   --agent-text-muted: var(--po-text-muted);
   --agent-text-subtle: var(--po-text-subtle);
+  --agent-tool-foreground: var(--agent-text-subtle);
   --agent-accent: var(--po-accent);
   --agent-accent-soft: color-mix(in srgb, var(--po-accent) 16%, transparent);
   color: var(--agent-text);

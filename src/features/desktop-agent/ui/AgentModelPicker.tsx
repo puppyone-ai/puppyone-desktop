@@ -28,7 +28,6 @@ export const AgentModelPicker = memo(function AgentModelPicker({
       keywords: `${model.id} ${model.model} ${(model.variants || []).join(" ")}`,
       selectable: true,
       selected: model.model === selectedModel,
-      kind: "model",
       icon: null,
     })),
   }];
@@ -39,8 +38,7 @@ export const AgentModelPicker = memo(function AgentModelPicker({
       valueLabel={selected?.displayName}
       groups={groups}
       disabled={disabled}
-      className="is-model"
-      preferredWidth={248}
+      width="medium"
       onSelect={onSelectModel}
     />
   );

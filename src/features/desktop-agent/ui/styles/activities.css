@@ -61,7 +61,6 @@
 
 /* Cursor-style work evidence: compact disclosures, not a Research timeline. */
 .desktop-agent-tool-call {
-  --agent-current-tool-accent: var(--agent-text-subtle);
   min-width: 0;
   margin: 0 4px;
   padding: 0;
@@ -101,11 +100,11 @@
   height: 16px;
   grid-column: 1;
   place-items: center;
-  color: var(--agent-current-tool-accent, var(--agent-text-subtle));
+  color: var(--agent-tool-foreground);
 }
 .desktop-agent-tool-name {
   grid-column: 2;
-  color: var(--agent-current-tool-accent, var(--agent-text-muted));
+  color: var(--agent-tool-foreground);
   font-size: var(--agent-font-size);
   font-weight: 500;
   letter-spacing: normal;
@@ -147,13 +146,6 @@
   border-radius: 0;
   background: transparent;
   animation: desktop-agent-disclosure-in 120ms ease-out;
-}
-
-.desktop-agent-command,
-.desktop-agent-file-query,
-.desktop-agent-file-change,
-.desktop-agent-generic-tool {
-  --agent-current-tool-accent: var(--agent-text-subtle);
 }
 
 .desktop-agent-command {

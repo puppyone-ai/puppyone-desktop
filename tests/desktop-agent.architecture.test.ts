@@ -46,6 +46,8 @@ describe("Desktop Agent architecture boundaries", () => {
     const modelPicker = source("src/features/desktop-agent/ui/AgentModelPicker.tsx");
     const effortPicker = source("src/features/desktop-agent/ui/AgentEffortPicker.tsx");
     const picker = source("src/features/desktop-agent/ui/AgentPickerPopover.tsx");
+    const pickerPresentation = source("src/features/desktop-agent/ui/agent-picker-presentation.ts");
+    const desktopMenu = source("src/components/DesktopMenu.tsx");
     const eventSynchronizer = source("src/features/desktop-agent/application/AgentEventSynchronizer.ts");
     const streamScheduler = source("src/features/desktop-agent/ui/agent-stream-frame-scheduler.ts");
     const runtimeGeometry = source("src/features/desktop-agent/ui/agent-runtime-geometry.ts");
@@ -83,7 +85,9 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(composerToolbar).toContain("<AgentModelPicker");
     expect(composerToolbar).toContain("<AgentEffortPicker");
     expect(modelPicker).not.toContain("AgentEffortPicker");
-    expect(effortPicker).toContain("showChevron={false}");
+    expect(modelPicker).toContain('width="medium"');
+    expect(effortPicker).toContain('indicator="none"');
+    expect(effortPicker).toContain('width="narrow"');
     expect(effortPicker).not.toContain("Brain");
     expect(markdown).not.toContain("useDeferredValue");
     expect(eventSynchronizer).not.toMatch(/requestAnimationFrame|document\.|window\./);
@@ -102,6 +106,14 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(composer).not.toContain("<select");
     expect(picker).toContain("DesktopOverlayLayer");
     expect(picker).toContain("useAnchoredOverlayPosition");
+    expect(picker).toContain("DesktopMenuSurface");
+    expect(picker).toContain("DesktopMenuSection");
+    expect(picker).toContain("DesktopMenuItem");
+    expect(picker).not.toMatch(/className\?: string|preferredWidth\?: number|showChevron\?: boolean/);
+    expect(pickerPresentation).toContain('export type AgentPickerPlacement = "default" | "header"');
+    expect(pickerPresentation).toContain('export type AgentPickerWidth = "wide" | "medium" | "narrow"');
+    expect(desktopMenu).toContain('tone?: "default" | "quiet"');
+    expect(desktopMenu).toContain("forwardRef<HTMLButtonElement, DesktopMenuItemProps>");
     expect(timeline).not.toContain("style={{");
     expect(picker).not.toContain("style={{");
     expect(runtimeGeometry).toContain("Record<`--agent-${string}`");
