@@ -23,8 +23,11 @@ describe("Desktop Terminal architecture boundaries", () => {
     const groupMoveHandle = source(
       "src/features/desktop-terminal/workbench/TerminalWorkbenchGroupMoveHandle.tsx",
     );
+    const groupPane = source(
+      "src/features/desktop-terminal/layout/TerminalGroupPane.tsx",
+    );
     const groupHandleReveal = source(
-      "src/features/desktop-terminal/layout/useTerminalGroupHandleReveal.ts",
+      "src/features/desktop-terminal/layout/useTerminalPaneContentHandleReveal.ts",
     );
     const derivedDragClick = source(
       "src/features/desktop-terminal/interactions/useTerminalDerivedDragClickSuppression.ts",
@@ -37,6 +40,9 @@ describe("Desktop Terminal architecture boundaries", () => {
     );
     const tabBarDropTarget = source(
       "src/features/desktop-terminal/interactions/terminalTabBarDropTarget.ts",
+    );
+    const contentDropTarget = source(
+      "src/features/desktop-terminal/interactions/terminalContentDropTarget.ts",
     );
     const tabMoveModel = source(
       "src/features/desktop-terminal/model/terminalTabMove.ts",
@@ -150,21 +156,31 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(hostSlot).not.toContain("TerminalPaneMoveHandle");
     expect(groupViewport).toContain("<TerminalWorkbenchItemHostSlot");
     expect(groupViewport).toContain("<TerminalWorkbenchGroupMoveHandle");
+    expect(groupViewport).toContain("<TerminalGroupPane");
     expect(groupMoveHandle).toContain("<i /><i /><i />");
     expect(groupMoveHandle).toContain('{ kind: "group", groupId');
-    expect(groupViewport).toContain("data-terminal-content-drop-group-id={group.id}");
-    expect(groupHandleReveal).toContain("TERMINAL_GROUP_HANDLE_REVEAL_RATIO = 1 / 3");
-    expect(groupViewport).toContain("data-terminal-group-pane-id={group.id}");
+    expect(groupPane).toContain("data-terminal-content-drop-group-id={groupId}");
+    expect(groupPane).toContain("data-terminal-group-pane-id={groupId}");
+    expect(groupPane).toContain("{header}");
+    expect(groupPane).toContain("{children}");
+    expect(groupPane.indexOf("{header}")).toBeLessThan(
+      groupPane.indexOf('className="desktop-terminal-tab-group-content"'),
+    );
+    expect(groupPane).toContain("{contentDropIntent && (");
+    expect(groupHandleReveal)
+      .toContain("TERMINAL_PANE_CONTENT_HANDLE_REVEAL_RATIO = 1 / 3");
     expect(groupViewport).toContain("items={headerItems}");
     expect(groupViewport).toContain("tabMove={itemMove}");
     expect(derivedDragClick).toContain("window.setTimeout(clear, 0)");
     expect(persistentHosts).toContain("document.createElement(\"div\")");
     expect(tabMove).toContain('acquireNativeSurfacePointerPassthroughLease(\n        "terminal-tab-move"');
-    expect(tabMove).toContain("closestWorkbenchSplitDropEdge");
+    expect(contentDropTarget).toContain("closestWorkbenchSplitDropEdge");
     expect(tabMove).toContain('subject.kind === "group"');
     expect(tabMove).toContain('? "[data-terminal-group-pane-id]"');
     expect(tabMove).toContain(': ".desktop-terminal-tab"');
-    expect(tabMove).toContain('closest<HTMLElement>("[data-terminal-content-drop-group-id]")');
+    expect(tabMove).toContain("resolveTerminalContentDropTarget");
+    expect(contentDropTarget)
+      .toContain('closest<HTMLElement>(\n    "[data-terminal-content-drop-group-id]"');
     expect(tabMove).toContain("TERMINAL_TAB_MOVE_THRESHOLD_PX = 6");
     expect(tabMove).toContain("TERMINAL_GROUP_HANDLE_MOVE_THRESHOLD_PX = 3");
     expect(tabMove).toContain("TERMINAL_TRANSIENT_WINDOW_BLUR_GRACE_MS = 48");
@@ -175,7 +191,7 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(interactionTermination).toContain('window.addEventListener("focus", handleFocus');
     expect(tabMove).toContain("resolveTerminalTabBarDropTarget");
     expect(tabMove.indexOf("const insertion = resolveTerminalTabBarDropTarget"))
-      .toBeLessThan(tabMove.indexOf('closest<HTMLElement>("[data-terminal-content-drop-group-id]")'));
+      .toBeLessThan(tabMove.indexOf("const contentTarget = resolveTerminalContentDropTarget"));
     expect(tabMove).toContain('kind: "insert"');
     expect(tabMove).toContain("session.onInsertSession");
     expect(tabBarDropTarget).toContain("data-terminal-tab-bar-group-id");

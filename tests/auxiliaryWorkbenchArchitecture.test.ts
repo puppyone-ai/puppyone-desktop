@@ -67,6 +67,22 @@ describe("Unified Terminal Workbench architecture", () => {
     expect(status).not.toContain("MessageSquare");
   });
 
+  it("keeps Tab Bar chrome outside the content split-drop coordinate space", () => {
+    const pane = source("src/features/desktop-terminal/layout/TerminalGroupPane.tsx");
+    const resolver = source(
+      "src/features/desktop-terminal/interactions/terminalContentDropTarget.ts",
+    );
+    expect(pane).toContain("{header}");
+    expect(pane).toContain('className="desktop-terminal-tab-group-content"');
+    expect(pane.indexOf("{header}")).toBeLessThan(
+      pane.indexOf('className="desktop-terminal-tab-group-content"'),
+    );
+    expect(pane).toContain("data-terminal-content-drop-group-id={groupId}");
+    expect(pane).toContain("{contentDropIntent && (");
+    expect(resolver).toContain("[data-terminal-content-drop-group-id]");
+    expect(resolver).not.toContain("data-terminal-group-pane-id");
+  });
+
   it("pins every Terminal runtime to the Item root captured at creation", () => {
     const pool = source(
       "src/features/desktop-terminal/workbench/TerminalRuntimePool.ts",
