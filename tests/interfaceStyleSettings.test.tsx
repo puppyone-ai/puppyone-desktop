@@ -79,6 +79,7 @@ function renderPalette(host: HTMLElement, interfaceStyle: InterfaceStyle) {
   act(() => root?.render(withTestLocalization(
     <InterfacePaletteSettings
       interfaceStyle={interfaceStyle}
+      subThemeId="default.neutral"
       decision={decision}
       lightThemePreset="neutral"
       darkThemePreset="default"

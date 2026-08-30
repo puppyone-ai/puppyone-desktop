@@ -9,6 +9,11 @@ import {
   type SubThemeCatalogController,
 } from "../src/features/themes/useSubThemeCatalog";
 import type { DesktopThemeSnapshot } from "../src/types/electron";
+import {
+  createSubThemeCatalogSnapshot,
+  getCompatibleSubThemes,
+} from "../src/features/themes/builtinSubThemes";
+import { getSubThemeModes } from "../src/features/themes/themeTypes";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -29,6 +34,17 @@ afterEach(() => {
 });
 
 describe("renderer Sub Theme catalog", () => {
+  it("normalizes host mode declarations into explicit variants and filters by effective mode", () => {
+    const catalog = createSubThemeCatalogSnapshot(snapshot("com.example.light-only"));
+    const installed = catalog.subThemes.find(({ id }) => id === "com.example.light-only");
+
+    expect(installed && getSubThemeModes(installed)).toEqual(["light"]);
+    expect(getCompatibleSubThemes(catalog, "default", "light").map(({ id }) => id))
+      .toContain("com.example.light-only");
+    expect(getCompatibleSubThemes(catalog, "default", "dark").map(({ id }) => id))
+      .not.toContain("com.example.light-only");
+  });
+
   it("loads variants and refreshes them when the window regains focus", async () => {
     const first = snapshot("com.example.first");
     const second = snapshot("com.example.second");
@@ -152,6 +168,7 @@ function NativeHarness({
   useSubThemeNativeMenu({
     snapshot: catalog.snapshot,
     rootThemeId: "default",
+    colorMode: "light",
     selectedSubThemeId: "default.github",
     onSubThemeChange,
   });

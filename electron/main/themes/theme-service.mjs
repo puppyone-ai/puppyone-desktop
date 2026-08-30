@@ -195,6 +195,7 @@ async function loadStandaloneCssTheme(
         packageRoot: themeRoot,
         themeId: descriptor.id,
         target,
+        supportedModes: descriptor.modes,
         budget,
       });
       compiledCss[target] = compiled.css;
@@ -269,6 +270,7 @@ async function loadPackageTheme(packageRoot) {
       packageRoot,
       themeId: manifest.id,
       target,
+      supportedModes: manifest.modes,
       budget,
     });
     compiledCss[target] = compiled.css;
@@ -293,6 +295,7 @@ async function compileThemeFile({
   packageRoot,
   themeId,
   target,
+  supportedModes,
   budget,
 }) {
   reserveCssBytes(budget, css);
@@ -301,6 +304,7 @@ async function compileThemeFile({
     sourcePath,
     themeId,
     target,
+    supportedModes,
     loadImport: async (specifier, importerPath) => {
       budget.importCount += 1;
       if (budget.importCount > MAX_THEME_IMPORTS) {

@@ -24,12 +24,15 @@ export function SubThemeSettingsSection({
 }) {
   const { t } = useLocalization();
   const allowedTargets = getInterfaceStyleSubThemePolicy(rootThemeId).allowedTargets;
-  const variants = getCompatibleSubThemes(catalog.snapshot, rootThemeId).filter((subTheme) => (
-    subTheme.modes.includes(effectiveColorMode)
-    && allowedTargets.every((target) => subTheme.targets.includes(target))
+  const variants = getCompatibleSubThemes(catalog.snapshot, rootThemeId, effectiveColorMode).filter((subTheme) => (
+    allowedTargets.every((target) => subTheme.targets.includes(target))
   ));
   const selectedExists = variants.some((subTheme) => subTheme.id === requestedSubThemeId);
+  const requestedExistsInCatalog = catalog.snapshot.subThemes.some(
+    (subTheme) => subTheme.id === requestedSubThemeId,
+  );
   const effective = variants.find((subTheme) => subTheme.id === effectiveSubThemeId);
+  const selectValue = selectedExists ? requestedSubThemeId : effectiveSubThemeId;
   const onAddTheme = () => {
     if (!THEME_MARKETPLACE_URL) return;
     void window.puppyoneDesktop?.openExternalUrl(THEME_MARKETPLACE_URL);
@@ -40,7 +43,10 @@ export function SubThemeSettingsSection({
       <div className="desktop-settings-list">
         <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
           <label className="desktop-theme-pack-label" htmlFor="desktop-sub-theme-select">
-            {t("settings.appearance.themes.pack")}
+            <span>{t("settings.appearance.themes.pack")}</span>
+            <span className="desktop-sub-theme-mode-badge">
+              {t(`settings.appearance.theme.${effectiveColorMode}`)}
+            </span>
           </label>
           <div className="desktop-theme-pack-controls">
             {variants.length <= 1 ? (
@@ -51,10 +57,10 @@ export function SubThemeSettingsSection({
               <select
                 id="desktop-sub-theme-select"
                 className="desktop-settings-select desktop-theme-pack-select"
-                value={requestedSubThemeId}
+                value={selectValue}
                 onChange={(event) => onSubThemeChange(event.currentTarget.value)}
               >
-                {!selectedExists && (
+                {!selectedExists && !requestedExistsInCatalog && (
                   <option value={requestedSubThemeId}>
                     {t("settings.appearance.themes.missing", { id: requestedSubThemeId })}
                   </option>

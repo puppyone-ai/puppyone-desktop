@@ -45,6 +45,18 @@ export function getInterfaceStyleSubThemePolicy(style: InterfaceStyle) {
   return getInterfaceStyleDefinition(style).subThemes;
 }
 
+export function getDefaultSubThemeId(
+  style: InterfaceStyle,
+  mode: ResolvedTheme,
+): string {
+  const defaults = getInterfaceStyleSubThemePolicy(style).defaultSubThemeIds as Partial<
+    Record<ResolvedTheme, string>
+  >;
+  const id = defaults[mode] ?? defaults.light ?? defaults.dark;
+  if (!id) throw new Error(`Interface style ${style} has no default Sub Theme for ${mode}.`);
+  return id;
+}
+
 export function getDefaultInterfaceStyleDefinition(): InterfaceStyleDefinition {
   const definition = INTERFACE_STYLES.find((style) => style.id === DEFAULT_INTERFACE_STYLE);
   if (!definition) throw new Error("The default interface style is not registered.");

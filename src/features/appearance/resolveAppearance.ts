@@ -10,14 +10,16 @@ import {
   type ThemeMode,
 } from "../../preferences";
 import {
+  getDefaultSubThemeId,
   getInterfaceStyleDefinition,
   type InterfaceStyle,
   type ResolvedTheme,
 } from "./interfaceStyles";
 import { BUILTIN_SUB_THEMES } from "../themes/builtinSubThemes";
-import type {
-  SubThemeCatalogSnapshot,
-  SubThemeDefinition,
+import {
+  getSubThemeVariant,
+  type SubThemeCatalogSnapshot,
+  type SubThemeDefinition,
 } from "../themes/themeTypes";
 
 export type AppearanceSettingStatus = "editable" | "constrained" | "forced" | "unavailable";
@@ -55,7 +57,7 @@ export type AppearanceResolutionInput = Readonly<{
   interfaceStyle: InterfaceStyle;
   themeMode: ThemeMode;
   systemColorMode?: ResolvedTheme;
-  requestedSubThemeId?: string;
+  requestedSubThemeIds?: Readonly<Partial<Record<ResolvedTheme, string>>>;
   subThemeCatalog?: SubThemeCatalogSnapshot;
   sidebarNavigationLayout: SidebarNavigationLayout;
   textSize: TextSize;
@@ -108,7 +110,8 @@ export function resolveAppearance(input: AppearanceResolutionInput): ResolvedApp
   const subThemeResolution = resolveSubTheme({
     catalog: input.subThemeCatalog ?? BUILTIN_SUB_THEME_CATALOG,
     effectiveColorMode,
-    requestedSubThemeId: input.requestedSubThemeId ?? rootTheme.subThemes.defaultSubThemeId,
+    requestedSubThemeId: input.requestedSubThemeIds?.[effectiveColorMode]
+      ?? getDefaultSubThemeId(input.interfaceStyle, effectiveColorMode),
     rootTheme,
   });
   const sidebarNavigationLayout = resolveSetting(
@@ -178,7 +181,8 @@ function resolveSubTheme({
   const compatibility = requested
     ? getSubThemeCompatibility(requested, rootTheme, effectiveColorMode)
     : "missing";
-  const fallback = byId.get(rootTheme.subThemes.defaultSubThemeId);
+  const fallbackId = getDefaultSubThemeId(rootTheme.id, effectiveColorMode);
+  const fallback = byId.get(fallbackId);
   if (!fallback || getSubThemeCompatibility(fallback, rootTheme, effectiveColorMode) !== "compatible") {
     throw new Error(`Root Theme ${rootTheme.id} has no compatible default Sub Theme.`);
   }
@@ -222,7 +226,7 @@ function getSubThemeCompatibility(
   effectiveColorMode: ResolvedTheme,
 ): "compatible" | "root-incompatible" | "mode-unsupported" | "target-incomplete" {
   if (!subTheme.compatibleRootThemeIds.includes(rootTheme.id)) return "root-incompatible";
-  if (!subTheme.modes.includes(effectiveColorMode)) return "mode-unsupported";
+  if (!getSubThemeVariant(subTheme, effectiveColorMode)) return "mode-unsupported";
   if (!rootTheme.subThemes.allowedTargets.every((target) => subTheme.targets.includes(target))) {
     return "target-incomplete";
   }

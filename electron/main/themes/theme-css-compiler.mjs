@@ -158,6 +158,7 @@ export async function compileThemeCss({
   css,
   themeId,
   target,
+  supportedModes,
   sourcePath = "theme.css",
   loadImport,
   resolveAssetUrl,
@@ -179,6 +180,7 @@ export async function compileThemeCss({
     depth: 0,
   });
   root.walkAtRules("charset", (rule) => rule.remove());
+  validateModeContract(root, supportedModes);
   validateAtRules(root);
   scopeRules(root, { themeId, target });
   await rewriteAssetUrls(root, resolveAssetUrl);
@@ -188,6 +190,24 @@ export async function compileThemeCss({
     css: root.toString().trim(),
     target,
     themeId,
+  });
+}
+
+function validateModeContract(root, supportedModes) {
+  const modes = supportedModes === undefined ? null : new Set(supportedModes);
+  if (modes && (modes.size === 0 || [...modes].some((mode) => mode !== "light" && mode !== "dark"))) {
+    throw new TypeError("Theme CSS received an invalid supported Color Mode contract.");
+  }
+  root.walkAtRules("media", (rule) => {
+    if (/prefers-color-scheme/i.test(rule.params)) {
+      throw new TypeError("Sub Themes must use their declared light/dark variants, not prefers-color-scheme.");
+    }
+  });
+  if (!modes || modes.has("dark")) return;
+  root.walkRules((rule) => {
+    if (rule.selector.split(",").some((selector) => /(?:^|[^a-z0-9_-])\.dark(?:[^a-z0-9_-]|$)/i.test(selector))) {
+      throw new TypeError("A light-only Sub Theme cannot declare dark selectors.");
+    }
   });
 }
 

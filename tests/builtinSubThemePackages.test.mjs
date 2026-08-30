@@ -47,6 +47,7 @@ describe("built-in Sub Theme package architecture", () => {
           css: theme.stylesheets[target],
           themeId: theme.id,
           target,
+          supportedModes: theme.modes,
           allowReservedBuiltinId: true,
         });
         expect(result.css).not.toMatch(/\.cm-|\.markdown-codemirror-editor|\.csv-table-editor/);

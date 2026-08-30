@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactElement } from "react";
-import type { SubThemeDefinition } from "./themeTypes";
+import { getSubThemeVariant, type SubThemeColorMode, type SubThemeDefinition } from "./themeTypes";
 import {
   resolveMarkdownPresentationStyle,
   type MarkdownPresentationSettings,
@@ -8,19 +8,24 @@ import {
 
 export function SubThemeStyleHost({
   subTheme,
+  colorMode,
   markdownPresentation,
 }: {
   subTheme: SubThemeDefinition;
+  colorMode: SubThemeColorMode;
   markdownPresentation: MarkdownPresentationSettings;
 }) {
   if (typeof document === "undefined") return null;
-  const styles: ReactElement[] = Object.entries(subTheme.compiledCss).flatMap(([target, css]) => {
+  const variant = getSubThemeVariant(subTheme, colorMode);
+  if (!variant) return null;
+  const styles: ReactElement[] = Object.entries(variant.compiledCss).flatMap(([target, css]) => {
     if (!css) return [];
     return (
       <style
-        key={`${subTheme.id}:${target}`}
-        data-po-sub-theme-style={`${subTheme.id}:${target}`}
+        key={`${subTheme.id}:${colorMode}:${target}`}
+        data-po-sub-theme-style={`${subTheme.id}:${colorMode}:${target}`}
         data-po-sub-theme-id={subTheme.id}
+        data-po-sub-theme-mode={colorMode}
         data-po-sub-theme-target={target}
         data-po-theme-layer="sub-theme"
       >

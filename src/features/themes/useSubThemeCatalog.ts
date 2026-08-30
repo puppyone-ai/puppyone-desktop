@@ -5,6 +5,7 @@ import {
   getCompatibleSubThemes,
 } from "./builtinSubThemes";
 import type {
+  SubThemeColorMode,
   SubThemeCatalogState,
   SubThemeCatalogSnapshot,
 } from "./themeTypes";
@@ -86,11 +87,13 @@ export function useSubThemeCatalog(): SubThemeCatalogController {
 export function useSubThemeNativeMenu({
   snapshot,
   rootThemeId,
+  colorMode,
   selectedSubThemeId,
   onSubThemeChange,
 }: {
   snapshot: SubThemeCatalogSnapshot;
   rootThemeId: InterfaceStyle;
+  colorMode: SubThemeColorMode;
   selectedSubThemeId: string;
   onSubThemeChange: (subThemeId: string) => void;
 }) {
@@ -100,10 +103,10 @@ export function useSubThemeNativeMenu({
     if (!desktopThemes?.syncNativeMenu) return;
     void desktopThemes.syncNativeMenu({
       pack: selectedSubThemeId,
-      themes: getCompatibleSubThemes(snapshot, rootThemeId)
+      themes: getCompatibleSubThemes(snapshot, rootThemeId, colorMode)
         .map(({ id, name, targets }) => ({ id, name, targets })),
     }).catch(() => undefined);
-  }, [desktopThemes, rootThemeId, selectedSubThemeId, snapshot]);
+  }, [colorMode, desktopThemes, rootThemeId, selectedSubThemeId, snapshot]);
 
   useEffect(() => {
     if (!desktopThemes?.onSelectionRequested) return undefined;

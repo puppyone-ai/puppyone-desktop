@@ -10,8 +10,13 @@ import {
   BUILTIN_SUB_THEMES,
   createSubThemeCatalogSnapshot,
 } from "../src/features/themes/builtinSubThemes";
-import type { SubThemeDefinition } from "../src/features/themes/themeTypes";
+import {
+  getSubThemeModes,
+  getSubThemeVariant,
+  type SubThemeDefinition,
+} from "../src/features/themes/themeTypes";
 import { DEFAULT_MARKDOWN_PRESENTATION_SETTINGS } from "../src/features/markdown/markdownPresentation";
+import type { DesktopThemeDefinition } from "../src/types/electron";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -30,11 +35,11 @@ afterEach(() => {
 
 describe("renderer Sub Theme style host", () => {
   it("registers built-ins as root-compatible visual variants", () => {
-    expect(BUILTIN_SUB_THEMES.map(({ id, compatibleRootThemeIds, modes, targets }) => ({
-      id,
-      compatibleRootThemeIds,
-      modes,
-      targets,
+    expect(BUILTIN_SUB_THEMES.map((subTheme) => ({
+      id: subTheme.id,
+      compatibleRootThemeIds: subTheme.compatibleRootThemeIds,
+      modes: getSubThemeModes(subTheme),
+      targets: subTheme.targets,
     }))).toEqual([
       variant("default.neutral"),
       variant("default.warm"),
@@ -60,24 +65,28 @@ describe("renderer Sub Theme style host", () => {
       expect(css).not.toMatch(/\.cm-|\.markdown-codemirror-editor|\.csv-table-editor/);
     }
     const github = BUILTIN_SUB_THEMES.find(({ id }) => id === "default.github");
-    expect(github?.compiledCss.application).toContain(
+    const githubLight = github ? getSubThemeVariant(github, "light") : null;
+    expect(githubLight?.compiledCss.application).toContain(
       '[data-po-appearance-root][data-sub-theme-id="default.github"]',
     );
-    expect(github?.compiledCss.markdown).toContain("--po-host-md-content-color");
-    expect(github?.compiledCss.csv).toContain("--po-host-csv-surface-background");
+    expect(githubLight?.compiledCss.markdown).toContain("--po-host-md-content-color");
+    expect(githubLight?.compiledCss.csv).toContain("--po-host-csv-surface-background");
   });
 
   it("injects selected CSS inside the sub-theme cascade layer", () => {
     const selected = externalSubTheme({
-      compiledCss: {
-        application: '[data-po-appearance-root][data-sub-theme-id="com.example.reader"] { --po-text: #222; }',
-        markdown: '[data-po-appearance-root][data-sub-theme-id="com.example.reader"] { --po-host-md-content-color: #222; }',
+      variants: {
+        light: { compiledCss: {
+          application: '[data-po-appearance-root][data-sub-theme-id="com.example.reader"] { --po-text: #222; }',
+          markdown: '[data-po-appearance-root][data-sub-theme-id="com.example.reader"] { --po-host-md-content-color: #222; }',
+        } },
       },
     });
 
     act(() => root.render(
       <SubThemeStyleHost
         subTheme={selected}
+        colorMode="light"
         markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS}
       />,
     ));
@@ -99,19 +108,35 @@ describe("renderer Sub Theme style host", () => {
     const first = externalSubTheme({ id: "com.example.first" });
     const second = externalSubTheme({ id: "com.example.second" });
     act(() => root.render(
-      <SubThemeStyleHost subTheme={first} markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
+      <SubThemeStyleHost subTheme={first} colorMode="light" markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
     ));
     act(() => root.render(
-      <SubThemeStyleHost subTheme={second} markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
+      <SubThemeStyleHost subTheme={second} colorMode="light" markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
     ));
 
     expect(document.head.querySelector('[data-po-sub-theme-id="com.example.first"]')).toBeNull();
     expect(document.head.querySelector('[data-po-sub-theme-id="com.example.second"]')).not.toBeNull();
   });
 
+  it("injects only the compiled variant selected by the effective Color Mode", () => {
+    const selected = externalSubTheme();
+    act(() => root.render(
+      <SubThemeStyleHost subTheme={selected} colorMode="light" markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
+    ));
+    expect(document.head.querySelector('[data-po-sub-theme-mode="light"]')?.textContent)
+      .toContain("#222");
+
+    act(() => root.render(
+      <SubThemeStyleHost subTheme={selected} colorMode="dark" markdownPresentation={DEFAULT_MARKDOWN_PRESENTATION_SETTINGS} />,
+    ));
+    expect(document.head.querySelector('[data-po-sub-theme-mode="light"]')).toBeNull();
+    expect(document.head.querySelector('[data-po-sub-theme-mode="dark"]')?.textContent)
+      .toContain("#ddd");
+  });
+
   it("keeps retired managed Custom CSS out of the catalog", () => {
     const snapshot = createSubThemeCatalogSnapshot({
-      themes: [externalSubTheme({ id: "local.puppyone.custom-css" })],
+      themes: [externalDesktopTheme({ id: "local.puppyone.custom-css" })],
       diagnostics: [],
     });
 
@@ -119,7 +144,7 @@ describe("renderer Sub Theme style host", () => {
   });
 
   it("preserves declared future Root Theme compatibility without relabeling it as Default", () => {
-    const installed = externalSubTheme({
+    const installed = externalDesktopTheme({
       compatibleRootThemeIds: ["future-shell"],
     });
     const snapshot = createSubThemeCatalogSnapshot({ themes: [installed], diagnostics: [] });
@@ -133,6 +158,7 @@ describe("renderer Sub Theme style host", () => {
     act(() => root.render(
       <SubThemeStyleHost
         subTheme={selected}
+        colorMode="light"
         markdownPresentation={{
           ...DEFAULT_MARKDOWN_PRESENTATION_SETTINGS,
           headingScale: "large",
@@ -158,6 +184,30 @@ function externalSubTheme(overrides: Partial<SubThemeDefinition> = {}): SubTheme
   return {
     id,
     family: "com.example",
+    name: "Reader",
+    version: "1.0.0",
+    contractVersion: 1,
+    compatibleRootThemeIds: ["default"],
+    targets: ["application", "markdown", "csv"],
+    source: "local-package",
+    variants: {
+      light: { compiledCss: {
+        markdown: `[data-po-appearance-root][data-sub-theme-id="${id}"] { --po-host-md-content-color: #222; }`,
+      } },
+      dark: { compiledCss: {
+        markdown: `[data-po-appearance-root][data-sub-theme-id="${id}"] { --po-host-md-content-color: #ddd; }`,
+      } },
+    },
+    ...overrides,
+  };
+}
+
+function externalDesktopTheme(
+  overrides: Partial<DesktopThemeDefinition> = {},
+): DesktopThemeDefinition {
+  const id = overrides.id ?? "com.example.reader";
+  return {
+    id,
     name: "Reader",
     version: "1.0.0",
     contractVersion: 1,

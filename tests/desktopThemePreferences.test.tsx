@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   APPEARANCE_PREFERENCES_STORAGE_KEY,
-  type AppearancePreferencesV3,
+  type AppearancePreferencesV4,
 } from "../src/features/appearance/appearancePreferences";
 import { LEGACY_SURFACE_THEME_PREFERENCES_STORAGE_KEY } from "../src/features/themes/subThemePreferences";
 import {
@@ -42,7 +42,7 @@ afterEach(() => {
 });
 
 describe("desktop appearance preferences", () => {
-  it("persists one canonical V3 document and keeps Root Theme preferences independent", () => {
+  it("persists one canonical V4 document and remembers Sub Themes independently by mode and Root Theme", () => {
     act(() => root.render(<Harness />));
 
     act(() => {
@@ -50,8 +50,18 @@ describe("desktop appearance preferences", () => {
       latest?.setThemeMode("dark");
     });
     expect(readStored().byRootTheme.default).toEqual({
-      requestedSubThemeId: "default.github",
       requestedColorMode: "dark",
+      requestedSubThemeIds: {
+        light: "default.github",
+        dark: "default.neutral",
+      },
+    });
+    expect(latest?.requestedSubThemeId).toBe("default.neutral");
+
+    act(() => latest?.setSubThemeId("default.newspaper"));
+    expect(readStored().byRootTheme.default.requestedSubThemeIds).toEqual({
+      light: "default.github",
+      dark: "default.newspaper",
     });
 
     act(() => latest?.setInterfaceStyle("windows-xp"));
@@ -59,22 +69,27 @@ describe("desktop appearance preferences", () => {
     expect(latest?.themeMode).toBe("light");
 
     act(() => latest?.setInterfaceStyle("default"));
-    expect(latest?.requestedSubThemeId).toBe("default.github");
+    expect(latest?.requestedSubThemeId).toBe("default.newspaper");
     expect(latest?.themeMode).toBe("dark");
-    expect(readStored().schemaVersion).toBe(3);
+    act(() => latest?.setThemeMode("light"));
+    expect(latest?.requestedSubThemeId).toBe("default.github");
+    expect(readStored().schemaVersion).toBe(4);
     expect(window.localStorage.getItem(LEGACY_SURFACE_THEME_PREFERENCES_STORAGE_KEY)).toBeNull();
   });
 
   it("synchronizes the canonical appearance document across windows", () => {
     act(() => root.render(<Harness />));
-    const remote: AppearancePreferencesV3 = {
+    const remote: AppearancePreferencesV4 = {
       ...readStored(),
       activeRootThemeId: "windows-xp",
       byRootTheme: {
         ...readStored().byRootTheme,
         "windows-xp": {
-          requestedSubThemeId: "windows-xp.luna-blue",
           requestedColorMode: "light",
+          requestedSubThemeIds: {
+            light: "windows-xp.luna-blue",
+            dark: "windows-xp.luna-blue",
+          },
         },
       },
     };
@@ -98,7 +113,10 @@ describe("desktop appearance preferences", () => {
     act(() => root.render(<Harness />));
 
     expect(latest?.requestedSubThemeId).toBe("default.newspaper");
-    expect(readStored().byRootTheme.default.requestedSubThemeId).toBe("default.newspaper");
+    expect(readStored().byRootTheme.default.requestedSubThemeIds).toEqual({
+      light: "default.newspaper",
+      dark: "default.newspaper",
+    });
   });
 });
 
@@ -107,7 +125,7 @@ function Harness() {
   return null;
 }
 
-function readStored(): AppearancePreferencesV3 {
+function readStored(): AppearancePreferencesV4 {
   return JSON.parse(
     window.localStorage.getItem(APPEARANCE_PREFERENCES_STORAGE_KEY) ?? "null",
   );

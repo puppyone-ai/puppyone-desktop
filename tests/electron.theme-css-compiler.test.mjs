@@ -73,6 +73,22 @@ describe("Sub Theme CSS compiler", () => {
     expect(result.css).toBe(`${host}, ${host} { --po-surface-canvas: #111827 }`);
   });
 
+  it("enforces declared Color Mode capabilities instead of allowing hidden mode branches", async () => {
+    await expect(compileThemeCss({
+      css: ".dark .theme-root { --po-surface-canvas: #111827 }",
+      themeId: "com.example.light-only",
+      target: "application",
+      supportedModes: ["light"],
+    })).rejects.toThrow("light-only Sub Theme cannot declare dark selectors");
+
+    await expect(compileThemeCss({
+      css: "@media (prefers-color-scheme: dark) { :root { --po-surface-canvas: #111827 } }",
+      themeId: "com.example.system-query",
+      target: "application",
+      supportedModes: ["light", "dark"],
+    })).rejects.toThrow("declared light/dark variants");
+  });
+
   it.each([
     ":root h1 { --po-md-content-color: red }",
     ".cm-editor { --po-md-content-color: red }",

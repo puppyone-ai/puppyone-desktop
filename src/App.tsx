@@ -121,6 +121,7 @@ function AppContent() {
   useSubThemeNativeMenu({
     snapshot: subThemeCatalog.snapshot,
     rootThemeId: preferences.interfaceStyle,
+    colorMode: preferences.resolvedAppearance.effectiveColorMode,
     selectedSubThemeId: preferences.resolvedAppearance.subThemeId,
     onSubThemeChange: preferences.setSubThemeId,
   });
@@ -993,6 +994,7 @@ function AppContent() {
     <EditorAppearanceProvider revision={resolvedAppearance.appearanceRevision}>
       <SubThemeStyleHost
         subTheme={resolvedAppearance.subTheme}
+        colorMode={resolvedAppearance.effectiveColorMode}
         markdownPresentation={markdownPresentation}
       />
       <div
@@ -1132,6 +1134,7 @@ function AppContent() {
     <EditorAppearanceProvider revision={resolvedAppearance.appearanceRevision}>
       <SubThemeStyleHost
         subTheme={resolvedAppearance.subTheme}
+        colorMode={resolvedAppearance.effectiveColorMode}
         markdownPresentation={markdownPresentation}
       />
       <div
