@@ -25,8 +25,8 @@ export function AgentMessagePart({ part, runtimeLabel }: AgentMessagePartProps) 
       {isAssistant
         ? <SafeMarkdown text={part.text || (part.streaming ? "…" : "")} streaming={part.streaming} />
         : <>
-            {part.text && <div className="desktop-agent-message-text">{part.text}</div>}
             <AgentReferenceDisplayList references={part.references ?? []} />
+            {part.text && <div className="desktop-agent-message-text">{part.text}</div>}
           </>}
       {isAssistant && part.terminalState && part.terminalState !== "completed" && (
         <footer className="desktop-agent-message-status">

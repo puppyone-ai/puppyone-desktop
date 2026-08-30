@@ -246,6 +246,10 @@ describe("Desktop Agent renderer surfaces", () => {
         id: "user-1",
         role: "user",
         text: "Review this architecture",
+        references: [
+          { id: "image-1", kind: "attachment", displayName: "capture.png", mime: "image/png", size: 128 },
+          { id: "file-1", kind: "workspace-file", displayName: "README.md", relativePath: "docs/README.md" },
+        ],
         sequence: 1,
         turnId: "turn-1",
         itemId: null,
@@ -266,7 +270,15 @@ describe("Desktop Agent renderer surfaces", () => {
 
     const container = render(React.createElement(AgentTranscript, { projection, loading: false, runtimeLabel: "OpenCode" }));
     expect(container.querySelector(".desktop-agent-message-role")).toBeNull();
-    expect(container.querySelector(".desktop-agent-message.is-user")?.getAttribute("aria-label")).toBe("You");
+    const userMessage = container.querySelector(".desktop-agent-message.is-user")!;
+    const userReferences = userMessage.querySelector(".desktop-agent-message-references")!;
+    const userText = userMessage.querySelector(".desktop-agent-message-text")!;
+    expect(userMessage.getAttribute("aria-label")).toBe("You");
+    expect(userReferences.getAttribute("role")).toBe("list");
+    expect(userReferences.querySelectorAll('[role="listitem"]')).toHaveLength(2);
+    expect(userReferences.textContent).toContain("capture.png");
+    expect(userReferences.textContent).toContain("README.md");
+    expect(userReferences.compareDocumentPosition(userText) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(container.querySelector(".desktop-agent-message.is-assistant")?.getAttribute("aria-label")).toBe("OpenCode");
     expect(container.querySelector(".desktop-agent-message.is-user")?.getAttribute("data-message-surface")).toBe("row");
     expect(container.querySelector(".desktop-agent-message.is-assistant")?.getAttribute("data-message-surface")).toBe("document");
