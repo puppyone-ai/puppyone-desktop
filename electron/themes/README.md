@@ -21,10 +21,24 @@ Shared editors remain generic. They inherit public `--po-host-md-*` and `--po-ho
 
 Open **Settings → Appearance → Open Themes Folder**. Add either:
 
+- a directory containing one self-describing `theme.css` file (recommended);
 - a directory containing `theme.json` and one CSS entrypoint per declared target; or
 - one top-level `.css` file using the coordinated `@puppyone-theme` format below.
 
 PuppyOne refreshes the catalog when its window regains focus.
+
+The recommended user layout is:
+
+```text
+themes/
+├── ocean/
+│   └── theme.css
+└── newsprint/
+    └── theme.css
+```
+
+The directory name is organizational for installed themes. Identity always
+comes from the `id` inside `@puppyone-theme`.
 
 ## Package format
 
@@ -95,6 +109,31 @@ Rules:
 ```
 
 A metadata-free top-level CSS file is accepted as a Markdown-only compatibility theme only when it follows the same root-token contract.
+
+## Built-in source packages
+
+Checked-in Sub Themes use the same single-file parser and token compiler as
+installed themes. Their repository source is intentionally data-only:
+
+```text
+sub-themes/
+├── default-neutral/theme.css
+├── default-warm/theme.css
+├── default-graphite/theme.css
+├── default-github/theme.css
+├── default-newspaper/theme.css
+└── windows-xp-luna-blue/theme.css
+```
+
+There is no hand-written `manifest.ts` and no hand-maintained built-in registry.
+Each package contains exactly one `theme.css`. Run `npm run generate:sub-themes`
+after editing or adding a package; the generator parses metadata, validates Root
+Theme compatibility and targets, compiles public tokens, and writes the runtime
+registry. `npm run check:sub-themes` rejects stale output or an invalid package.
+
+Reserved two-segment IDs, `builtin-order`, and `legacy-*-preset` metadata are
+accepted only by this checked-in generator. Installed themes continue to use
+reverse-domain IDs and cannot opt into product compatibility metadata.
 
 ## CSS boundary
 

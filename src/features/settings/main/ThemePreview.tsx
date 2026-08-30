@@ -2,10 +2,12 @@ import type { DarkThemePreset, LightThemePreset, ThemeMode } from "../../../pref
 
 export function ThemePreview({
   mode,
+  subThemeId,
   lightThemePreset,
   darkThemePreset,
 }: {
   mode: ThemeMode;
+  subThemeId: string;
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
 }) {
@@ -13,11 +15,11 @@ export function ThemePreview({
     <span className={`desktop-theme-preview ${mode === "system" ? "system" : ""}`} aria-hidden="true">
       {mode === "system" ? (
         <>
-          <ThemePreviewSurface mode="light" lightThemePreset={lightThemePreset} darkThemePreset={darkThemePreset} />
-          <ThemePreviewSurface mode="dark" lightThemePreset={lightThemePreset} darkThemePreset={darkThemePreset} />
+          <ThemePreviewSurface mode="light" subThemeId={subThemeId} lightThemePreset={lightThemePreset} darkThemePreset={darkThemePreset} />
+          <ThemePreviewSurface mode="dark" subThemeId={subThemeId} lightThemePreset={lightThemePreset} darkThemePreset={darkThemePreset} />
         </>
       ) : (
-        <ThemePreviewSurface mode={mode} lightThemePreset={lightThemePreset} darkThemePreset={darkThemePreset} />
+        <ThemePreviewSurface mode={mode} subThemeId={subThemeId} lightThemePreset={lightThemePreset} darkThemePreset={darkThemePreset} />
       )}
     </span>
   );
@@ -25,16 +27,20 @@ export function ThemePreview({
 
 function ThemePreviewSurface({
   mode,
+  subThemeId,
   lightThemePreset,
   darkThemePreset,
 }: {
   mode: Exclude<ThemeMode, "system">;
+  subThemeId: string;
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
 }) {
   return (
     <span
       className={`desktop-theme-preview-surface ${mode === "dark" ? "dark" : ""}`}
+      data-po-appearance-root="true"
+      data-sub-theme-id={subThemeId}
       data-light-theme-preset={lightThemePreset}
       data-dark-theme-preset={darkThemePreset}
     >
