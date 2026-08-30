@@ -18,15 +18,21 @@ import { createWorkspaceStateStore } from "../electron/main/workspace-state-stor
 
 let root;
 let otherRoot;
+let thirdRoot;
+let unassignedRoot;
 
 beforeEach(async () => {
   root = await mkdtemp(path.join(os.tmpdir(), "puppyone-auth-root-"));
   otherRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-auth-other-"));
+  thirdRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-auth-third-"));
+  unassignedRoot = await mkdtemp(path.join(os.tmpdir(), "puppyone-auth-unassigned-"));
 });
 
 afterEach(async () => {
   await rm(root, { recursive: true, force: true });
   await rm(otherRoot, { recursive: true, force: true });
+  await rm(thirdRoot, { recursive: true, force: true });
+  await rm(unassignedRoot, { recursive: true, force: true });
 });
 
 describe("sender-bound workspace authorization", () => {
@@ -48,6 +54,113 @@ describe("sender-bound workspace authorization", () => {
     await expect(authorize({ sender: { id: 1 } }, otherRoot))
       .rejects.toThrow(/does not match/i);
   });
+
+  it.each([2, 3])(
+    "starts %i Terminals against their explicit Folders when several Roots are attached",
+    async (terminalCount) => {
+      const { ipcMain, handlers } = createIpcHarness();
+      const attachedRoots = [root, otherRoot, thirdRoot].slice(0, terminalCount);
+      const authorizeWorkspaceRoot = createSenderWorkspaceAuthorization({
+        fsModule: fs,
+        getWorkspaceRootsForSender: () => attachedRoots,
+      });
+      const terminalService = {
+        create: vi.fn(async (_sender, request) => ({ id: request.id, shell: "/bin/zsh" })),
+        input: vi.fn(),
+        resize: vi.fn(),
+        close: vi.fn(),
+      };
+      registerTerminalIpcHandlers({
+        ipcMain,
+        terminalAgentLocator: { locate: vi.fn() },
+        terminalService,
+        authorizeWorkspaceRoot,
+      });
+      const event = { sender: { id: 3 } };
+      const requests = attachedRoots.map((workspaceRoot, index) => ({
+        id: `terminal-multi-root-${index + 1}`,
+        rootPath: workspaceRoot,
+        cwd: workspaceRoot,
+        cols: 80 + index,
+        rows: 24 + index,
+        launcherId: index % 2 === 0 ? "codex" : "shell",
+      }));
+
+      await expect(Promise.all(requests.map((request) => (
+        handlers.get("terminal:create")(event, request)
+      )))).resolves.toEqual(requests.map(({ id }) => ({ id, shell: "/bin/zsh" })));
+      expect(terminalService.create).toHaveBeenCalledTimes(terminalCount);
+      for (const [index, request] of requests.entries()) {
+        expect(terminalService.create).toHaveBeenCalledWith(
+          event.sender,
+          request,
+          await fs.promises.realpath(attachedRoots[index]),
+        );
+      }
+    },
+  );
+
+  it.each([2, 3])(
+    "rejects an ambiguous Terminal request before process creation with %i attached Roots",
+    async (rootCount) => {
+      const { ipcMain, handlers } = createIpcHarness();
+      const terminalService = {
+        create: vi.fn(),
+        input: vi.fn(),
+        resize: vi.fn(),
+        close: vi.fn(),
+      };
+      registerTerminalIpcHandlers({
+        ipcMain,
+        terminalAgentLocator: { locate: vi.fn() },
+        terminalService,
+        authorizeWorkspaceRoot: createSenderWorkspaceAuthorization({
+          fsModule: fs,
+          getWorkspaceRootsForSender: () => [root, otherRoot, thirdRoot].slice(0, rootCount),
+        }),
+      });
+
+      await expect(handlers.get("terminal:create")(
+        { sender: { id: 4 } },
+        { id: "terminal-ambiguous", cwd: root, cols: 80, rows: 24 },
+      )).rejects.toThrow(/explicit|multiple/i);
+      expect(terminalService.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([2, 3])(
+    "rejects an unassigned explicit Folder before process creation with %i attached Roots",
+    async (rootCount) => {
+      const { ipcMain, handlers } = createIpcHarness();
+      const terminalService = {
+        create: vi.fn(),
+        input: vi.fn(),
+        resize: vi.fn(),
+        close: vi.fn(),
+      };
+      registerTerminalIpcHandlers({
+        ipcMain,
+        terminalAgentLocator: { locate: vi.fn() },
+        terminalService,
+        authorizeWorkspaceRoot: createSenderWorkspaceAuthorization({
+          fsModule: fs,
+          getWorkspaceRootsForSender: () => [root, otherRoot, thirdRoot].slice(0, rootCount),
+        }),
+      });
+
+      await expect(handlers.get("terminal:create")(
+        { sender: { id: 5 } },
+        {
+          id: "terminal-unassigned",
+          rootPath: unassignedRoot,
+          cwd: unassignedRoot,
+          cols: 80,
+          rows: 24,
+        },
+      )).rejects.toThrow(/does not match/i);
+      expect(terminalService.create).not.toHaveBeenCalled();
+    },
+  );
 
   it("canonicalizes the assigned root, accepts only an alias of that root, and rejects no-workspace senders", async () => {
     const aliasParent = await mkdtemp(path.join(os.tmpdir(), "puppyone-auth-alias-"));
@@ -310,7 +423,100 @@ describe("recent workspace authorization", () => {
 });
 
 describe("terminal session ownership", () => {
-  it("closes sessions for one Workspace Folder without touching sibling Roots", async () => {
+  it.each([2, 3])(
+    "rejects a Terminal cwd from a sibling Folder with %i attached Roots before PTY spawn",
+    async (rootCount) => {
+      const ptyService = { spawn: vi.fn() };
+      const terminalService = createTerminalService({
+        appVersion: "test",
+        initializeWorkspaceEditReview: vi.fn(async () => undefined),
+        ptyService,
+        logger: { warn: vi.fn() },
+      });
+      const { ipcMain, handlers } = createIpcHarness();
+      registerTerminalIpcHandlers({
+        ipcMain,
+        terminalAgentLocator: { locate: vi.fn() },
+        terminalService,
+        authorizeWorkspaceRoot: createSenderWorkspaceAuthorization({
+          fsModule: fs,
+          getWorkspaceRootsForSender: () => [root, otherRoot, thirdRoot].slice(0, rootCount),
+        }),
+      });
+
+      await expect(handlers.get("terminal:create")(
+        { sender: createSender(18) },
+        {
+          id: "terminal-cross-root-cwd",
+          rootPath: root,
+          cwd: otherRoot,
+          cols: 80,
+          rows: 24,
+          launcherId: "shell",
+        },
+      )).rejects.toThrow(/inside the assigned workspace/i);
+      expect(ptyService.spawn).not.toHaveBeenCalled();
+      expect(terminalService.getSessionCount()).toBe(0);
+    },
+  );
+
+  it.each([2, 3])(
+    "keeps %i concurrent Terminal sessions independently addressable for one window",
+    async (terminalCount) => {
+      const terminals = [];
+      const initializeWorkspaceEditReview = vi.fn(async () => undefined);
+      const ptyService = {
+        spawn: vi.fn(() => {
+          const terminal = createFakeTerminal();
+          terminals.push(terminal);
+          return terminal;
+        }),
+      };
+      const service = createTerminalService({
+        appVersion: "test",
+        initializeWorkspaceEditReview,
+        ptyService,
+        logger: { warn: vi.fn() },
+      });
+      const owner = createSender(19);
+      const workspaceRoots = [root, otherRoot, root].slice(0, terminalCount);
+
+      for (let index = 0; index < terminalCount; index += 1) {
+        await expect(service.create(owner, {
+          id: `terminal-concurrent-${index + 1}`,
+          cwd: workspaceRoots[index],
+          cols: 80 + index,
+          rows: 24 + index,
+          launcherId: "shell",
+        }, workspaceRoots[index])).resolves.toMatchObject({
+          id: `terminal-concurrent-${index + 1}`,
+          cwd: await fs.promises.realpath(workspaceRoots[index]),
+        });
+      }
+
+      expect(service.getSessionCount()).toBe(terminalCount);
+      expect(ptyService.spawn).toHaveBeenCalledTimes(terminalCount);
+      expect(initializeWorkspaceEditReview).toHaveBeenCalledTimes(terminalCount);
+      for (let index = 0; index < terminalCount; index += 1) {
+        const id = `terminal-concurrent-${index + 1}`;
+        expect(ptyService.spawn.mock.calls[index][2]).toMatchObject({
+          cwd: await fs.promises.realpath(workspaceRoots[index]),
+          cols: 80 + index,
+          rows: 24 + index,
+        });
+        expect(service.input(owner, { id, data: `echo ${index + 1}\n` })).toBe(true);
+        expect(service.resize(owner, { id, cols: 100 + index, rows: 40 + index })).toBe(true);
+        expect(terminals[index].write).toHaveBeenCalledWith(`echo ${index + 1}\n`);
+        expect(terminals[index].resize).toHaveBeenCalledWith(100 + index, 40 + index);
+      }
+
+      service.closeSessionsForWindow(owner.id);
+      expect(service.getSessionCount()).toBe(0);
+      expect(terminals.every(({ kill }) => kill.mock.calls.length === 1)).toBe(true);
+    },
+  );
+
+  it("closes two sessions for one Workspace Folder without touching a third in a sibling Root", async () => {
     const terminals = [];
     const service = createTerminalService({
       appVersion: "test",
@@ -325,12 +531,14 @@ describe("terminal session ownership", () => {
       logger: { warn: vi.fn() },
     });
     const owner = createSender(20);
-    await service.create(owner, { id: "root-a", cwd: root }, root);
+    await service.create(owner, { id: "root-a-1", cwd: root }, root);
+    await service.create(owner, { id: "root-a-2", cwd: root }, root);
     await service.create(owner, { id: "root-b", cwd: otherRoot }, otherRoot);
 
-    expect(service.closeSessionsForWorkspaceRoot(owner.id, root)).toBe(1);
+    expect(service.closeSessionsForWorkspaceRoot(owner.id, root)).toBe(2);
     expect(terminals[0].kill).toHaveBeenCalledOnce();
-    expect(terminals[1].kill).not.toHaveBeenCalled();
+    expect(terminals[1].kill).toHaveBeenCalledOnce();
+    expect(terminals[2].kill).not.toHaveBeenCalled();
     expect(service.getSessionCount()).toBe(1);
     service.closeAll();
   });

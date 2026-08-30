@@ -22,6 +22,7 @@ export const TERMINAL_FALLBACK_MINIMUM_VIEWPORT: TerminalMinimumViewportSize = O
 });
 const TERMINAL_PANE_INLINE_INSET = 16;
 const TERMINAL_PANE_BLOCK_INSET = 30;
+const TERMINAL_GROUP_HEADER_BLOCK_SIZE = 38;
 
 export function terminalLeafMinimumSize(
   viewport: TerminalMinimumViewportSize | null | undefined,
@@ -29,25 +30,27 @@ export function terminalLeafMinimumSize(
   const measured = viewport ?? TERMINAL_FALLBACK_MINIMUM_VIEWPORT;
   return Object.freeze({
     width: Math.max(1, measured.width) + TERMINAL_PANE_INLINE_INSET,
-    height: Math.max(1, measured.height) + TERMINAL_PANE_BLOCK_INSET,
+    height: Math.max(1, measured.height)
+      + TERMINAL_PANE_BLOCK_INSET
+      + TERMINAL_GROUP_HEADER_BLOCK_SIZE,
   });
 }
 
 export function terminalSplitNodeMinimumSize(
   node: DesktopTerminalLayoutNode,
-  getLeafMinimum: (sessionId: string) => TerminalSplitMinimumSize,
+  getLeafMinimum: (groupId: string) => TerminalSplitMinimumSize,
   dividerSize = TERMINAL_SPLIT_DIVIDER_SIZE,
 ): TerminalSplitMinimumSize {
   return workbenchSplitNodeMinimumSize(
     node,
-    (leaf) => getLeafMinimum(leaf.sessionId),
+    (leaf) => getLeafMinimum(leaf.groupId),
     dividerSize,
   );
 }
 
 export function terminalSplitChildMinimumSizes(
   split: DesktopTerminalLayoutSplit,
-  getLeafMinimum: (sessionId: string) => TerminalSplitMinimumSize,
+  getLeafMinimum: (groupId: string) => TerminalSplitMinimumSize,
 ): Readonly<{ first: TerminalSplitMinimumSize; second: TerminalSplitMinimumSize }> {
   return Object.freeze({
     first: terminalSplitNodeMinimumSize(split.first, getLeafMinimum),

@@ -1,9 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
-import type { WorkbenchSplitDropEdge } from "@puppyone/shared-ui";
 
 export type TerminalSessionHostSlotProps = Readonly<{
-  dropAllowed: boolean;
-  dropEdge: WorkbenchSplitDropEdge | null;
   focused: boolean;
   host: HTMLDivElement;
   labelledBy: string;
@@ -13,8 +10,6 @@ export type TerminalSessionHostSlotProps = Readonly<{
 
 /** Reparents one stable Session host into its active Group leaf before paint. */
 export function TerminalSessionHostSlot({
-  dropAllowed,
-  dropEdge,
   focused,
   host,
   labelledBy,
@@ -42,14 +37,6 @@ export function TerminalSessionHostSlot({
       role="region"
       aria-labelledby={labelledBy}
     >
-      {dropEdge && (
-        <div
-          className="desktop-terminal-drop-preview"
-          data-edge={dropEdge}
-          data-allowed={dropAllowed ? "true" : "false"}
-          aria-hidden="true"
-        />
-      )}
     </div>
   );
 }

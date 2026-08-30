@@ -4,6 +4,7 @@ import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal, type IDisposable } from "@xterm/xterm";
+import type { TerminalCreateRequest } from "../../../types/electron";
 import type { DesktopTerminalSessionStatus } from "../model/terminalSessions";
 import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
 import {
@@ -64,6 +65,41 @@ type TerminalRuntimeOptions = {
     error?: string | null,
   ) => void;
 };
+
+type TerminalPtyRequestOptions = Readonly<{
+  sessionId: string;
+  launcherId: DesktopTerminalLauncherId;
+  workspacePath: string;
+  cols: number;
+  rows: number;
+  defaultColors: TerminalDefaultColors | null;
+}>;
+
+/**
+ * Builds the renderer-to-main process capability request for one PTY.
+ *
+ * Keeping this boundary pure and directly testable prevents a multi-Root
+ * window from silently falling back to an ambiguous workspace selection when
+ * several Terminal Tabs are started together.
+ */
+export function createTerminalPtyRequest({
+  sessionId,
+  launcherId,
+  workspacePath,
+  cols,
+  rows,
+  defaultColors,
+}: TerminalPtyRequestOptions): TerminalCreateRequest {
+  return {
+    id: sessionId,
+    rootPath: workspacePath,
+    cwd: workspacePath,
+    cols,
+    rows,
+    launcherId,
+    defaultColors: defaultColors ?? undefined,
+  };
+}
 
 export interface TerminalRuntimeHandle {
   readonly activity: boolean;
@@ -437,14 +473,14 @@ export class TerminalRuntime implements TerminalRuntimeHandle {
 
     const terminal = this.terminal;
     if (!terminal) return;
-    void bridge.createTerminal({
-      id: this.sessionId,
-      cwd: this.workspacePath,
+    void bridge.createTerminal(createTerminalPtyRequest({
+      sessionId: this.sessionId,
+      workspacePath: this.workspacePath,
       cols: terminal.cols,
       rows: terminal.rows,
       launcherId: this.launcherId,
-      defaultColors: this.defaultColors ?? undefined,
-    }).then((result) => {
+      defaultColors: this.defaultColors,
+    })).then((result) => {
       if (this.disposed) {
         void bridge.closeTerminal(result.id);
         return;

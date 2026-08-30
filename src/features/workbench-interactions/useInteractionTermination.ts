@@ -10,12 +10,14 @@ export type InteractionTerminationReason =
   | "unmount";
 
 export type UseInteractionTerminationOptions = Readonly<{
+  blurGraceMs?: number;
   finish: (reason: InteractionTerminationReason) => boolean;
   includeHtmlDragEvents?: boolean;
 }>;
 
 /** Installs one renderer lifecycle boundary for a pointer or drag session. */
 export function useInteractionTermination({
+  blurGraceMs = 0,
   finish,
   includeHtmlDragEvents = false,
 }: UseInteractionTerminationOptions): void {
@@ -23,6 +25,12 @@ export function useInteractionTermination({
   finishRef.current = finish;
 
   useEffect(() => {
+    let blurTimer: number | null = null;
+    const clearBlurTimer = () => {
+      if (blurTimer === null) return;
+      window.clearTimeout(blurTimer);
+      blurTimer = null;
+    };
     const terminate = (reason: InteractionTerminationReason) => {
       finishRef.current(reason);
     };
@@ -36,13 +44,25 @@ export function useInteractionTermination({
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") terminate("hidden");
     };
-    const handleBlur = () => terminate("blur");
+    const handleBlur = () => {
+      if (blurGraceMs <= 0) {
+        terminate("blur");
+        return;
+      }
+      clearBlurTimer();
+      blurTimer = window.setTimeout(() => {
+        blurTimer = null;
+        terminate("blur");
+      }, blurGraceMs);
+    };
+    const handleFocus = () => clearBlurTimer();
     const handlePageHide = () => terminate("pagehide");
     const handleDragEnd = () => terminate("dragend");
     const handleDrop = () => terminate("drop");
 
     window.addEventListener("keydown", handleKeyDown, true);
     window.addEventListener("blur", handleBlur, true);
+    window.addEventListener("focus", handleFocus, true);
     window.addEventListener("pagehide", handlePageHide, true);
     document.addEventListener("visibilitychange", handleVisibilityChange, true);
     if (includeHtmlDragEvents) {
@@ -51,8 +71,10 @@ export function useInteractionTermination({
     }
 
     return () => {
+      clearBlurTimer();
       window.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("blur", handleBlur, true);
+      window.removeEventListener("focus", handleFocus, true);
       window.removeEventListener("pagehide", handlePageHide, true);
       document.removeEventListener("visibilitychange", handleVisibilityChange, true);
       if (includeHtmlDragEvents) {
@@ -61,5 +83,5 @@ export function useInteractionTermination({
       }
       terminate("unmount");
     };
-  }, [includeHtmlDragEvents]);
+  }, [blurGraceMs, includeHtmlDragEvents]);
 }

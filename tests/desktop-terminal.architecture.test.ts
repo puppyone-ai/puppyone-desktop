@@ -20,8 +20,29 @@ describe("Desktop Terminal architecture boundaries", () => {
     const hostSlot = source(
       "src/features/desktop-terminal/layout/session-host/TerminalSessionHostSlot.tsx",
     );
+    const groupMoveHandle = source(
+      "src/features/desktop-terminal/layout/TerminalGroupMoveHandle.tsx",
+    );
+    const groupHandleReveal = source(
+      "src/features/desktop-terminal/layout/useTerminalGroupHandleReveal.ts",
+    );
+    const derivedDragClick = source(
+      "src/features/desktop-terminal/interactions/useTerminalDerivedDragClickSuppression.ts",
+    );
     const tabMove = source(
       "src/features/desktop-terminal/interactions/useTerminalTabMoveDrag.ts",
+    );
+    const interactionTermination = source(
+      "src/features/workbench-interactions/useInteractionTermination.ts",
+    );
+    const tabBarDropTarget = source(
+      "src/features/desktop-terminal/interactions/terminalTabBarDropTarget.ts",
+    );
+    const tabMoveModel = source(
+      "src/features/desktop-terminal/model/terminalTabMove.ts",
+    );
+    const sessionHeader = source(
+      "src/features/desktop-terminal/ui/session-header/TerminalSessionHeader.tsx",
     );
     const controller = source("src/features/desktop-terminal/controller/useTerminalSessions.ts");
     const agentLocatorController = source(
@@ -46,7 +67,8 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(panel).not.toContain("TerminalSurfaceHeader");
     expect(panel).toContain("useTerminalSessions");
     expect(panel).toContain("<TerminalSessionHost");
-    expect(panel).toContain("<TerminalSessionHeader");
+    expect(panel).not.toContain("<TerminalSessionHeader");
+    expect(groupViewport).toContain("<TerminalSessionHeader");
     expect(sessionHost).toContain("<TerminalSessionView");
     expect(panel).not.toContain("new Terminal(");
     expect(panel).not.toContain("window.puppyoneDesktop");
@@ -77,15 +99,17 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(controller).toContain("runtimeRegistry.close(sessionId)");
     expect(controller).toContain("pendingCloseSessionId");
     expect(panel).not.toContain("useImperativeHandle");
-    expect(panel).toContain("onClose={requestCloseSession}");
+    expect(panel).toContain("onCloseSession={requestCloseSession}");
+    expect(groupViewport).toContain("onClose={onCloseSession}");
     expect(panel).toContain("<TerminalCloseConfirmationDialog");
     expect(closeDialog).toContain("<DesktopOverlayLayer>");
     expect(closeDialog).toContain("<DesktopDialogRoot");
     expect(panel).toContain("<TerminalLauncher");
-    expect(panel).toContain("onCreate={createLauncher}");
+    expect(panel).toContain("onCreateSession={(groupId) => createLauncher(groupId)}");
+    expect(groupViewport).toContain("onCreate={() => onCreateSession(group.id)}");
     expect(panel).not.toContain('createSession("shell")');
     expect(panel).toContain('session.status === "selecting"');
-    expect(panel).toContain('sessions.length > 0');
+    expect(panel).toContain('sessions.length === 0');
     expect(panel).not.toContain("initiallyActive");
     expect(controller).not.toContain("initiallyActive");
     expect(controller).not.toContain("getDesktopTerminalLauncher(launcherId)");
@@ -111,14 +135,55 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(panel).toContain("<TerminalGroupViewport");
     expect(panel).toContain("createPortal(");
     expect(hostSlot).toContain('role="region"');
+    expect(hostSlot).not.toContain("TerminalPaneMoveHandle");
     expect(groupViewport).toContain("<TerminalSessionHostSlot");
+    expect(groupViewport).toContain("<TerminalGroupMoveHandle");
+    expect(groupMoveHandle).toContain("<i /><i /><i />");
+    expect(groupMoveHandle).toContain('{ kind: "group", groupId');
+    expect(groupViewport).toContain("data-terminal-content-drop-group-id={group.id}");
+    expect(groupHandleReveal).toContain("TERMINAL_GROUP_HANDLE_REVEAL_RATIO = 1 / 3");
+    expect(groupViewport).toContain("data-terminal-group-pane-id={group.id}");
+    expect(groupViewport).toContain("sessions={sessions}");
+    expect(groupViewport).toContain("sessionMove={sessionMove}");
+    expect(derivedDragClick).toContain("window.setTimeout(clear, 0)");
     expect(persistentHosts).toContain("document.createElement(\"div\")");
     expect(tabMove).toContain('acquireNativeSurfacePointerPassthroughLease(\n        "terminal-tab-move"');
     expect(tabMove).toContain("closestWorkbenchSplitDropEdge");
+    expect(tabMove).toContain('subject.kind === "group"');
+    expect(tabMove).toContain('? "[data-terminal-group-pane-id]"');
+    expect(tabMove).toContain(': ".desktop-terminal-tab"');
+    expect(tabMove).toContain('closest<HTMLElement>("[data-terminal-content-drop-group-id]")');
+    expect(tabMove).toContain("TERMINAL_TAB_MOVE_THRESHOLD_PX = 6");
+    expect(tabMove).toContain("TERMINAL_GROUP_HANDLE_MOVE_THRESHOLD_PX = 3");
+    expect(tabMove).toContain("TERMINAL_TRANSIENT_WINDOW_BLUR_GRACE_MS = 48");
+    expect(tabMove).toContain('window.addEventListener("pointermove"');
+    expect(tabMove).toContain('window.addEventListener("pointerup"');
+    expect(tabMove).toContain("if ((event.buttons & 1) === 1)");
+    expect(interactionTermination).toContain("blurGraceMs");
+    expect(interactionTermination).toContain('window.addEventListener("focus", handleFocus');
+    expect(tabMove).toContain("resolveTerminalTabBarDropTarget");
+    expect(tabMove.indexOf("const insertion = resolveTerminalTabBarDropTarget"))
+      .toBeLessThan(tabMove.indexOf('closest<HTMLElement>("[data-terminal-content-drop-group-id]")'));
+    expect(tabMove).toContain('kind: "insert"');
+    expect(tabMove).toContain("session.onInsertSession");
+    expect(tabBarDropTarget).toContain("data-terminal-tab-bar-group-id");
+    expect(tabBarDropTarget).toContain("data-terminal-tab-group-index");
+    expect(tabBarDropTarget).toContain("excludedSessionIds");
+    expect(tabBarDropTarget).toContain("getComputedStyle(tabBar).direction");
+    expect(tabMoveModel).toContain('kind: "split"');
+    expect(tabMoveModel).toContain('kind: "insert"');
+    expect(tabMoveModel).toContain('kind: "move-group"');
+    expect(tabMoveModel).toContain('kind: "merge-group"');
+    expect(tabMoveModel).toContain("projectTerminalTabInsertionPreview");
+    expect(sessionHeader).toContain("desktop-terminal-tab-drop-slot");
+    expect(sessionHeader).toContain("data-terminal-tab-bar-group-id={groupId}");
+    expect(sessionHeader).not.toContain("desktop-terminal-subheader-new");
     expect(runtime).toContain('import { WebLinksAddon } from "@xterm/addon-web-links"');
     expect(runtime).toContain("linkHandler:");
     expect(runtime).toContain("allowNonHttpProtocols: false");
     expect(runtime).toContain("terminal.loadAddon(new WebLinksAddon");
+    expect(runtime).toContain("bridge.createTerminal(createTerminalPtyRequest");
+    expect(runtime).toContain("rootPath: workspacePath");
     expect(runtime).toContain("bridge.openExternalUrl(href)");
     expect(titlebarActions).not.toContain('t("terminal.actions")');
     expect(titlebarActions).not.toContain("TerminalTitlebarMenu");
@@ -186,8 +251,13 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(css).not.toContain(".desktop-terminal-surface-header");
     expect(css).toContain(".desktop-terminal-session.is-presented");
     expect(css).toContain(".desktop-terminal-group-viewport");
+    expect(css).toContain(".desktop-terminal-tab-group");
+    expect(css).toContain(".desktop-terminal-tab-group-content");
     expect(css).toContain(".desktop-terminal-splitter");
     expect(css).toContain(".desktop-terminal-drop-preview");
+    expect(css).toContain(".desktop-terminal-pane-handle-shell");
+    expect(css).toContain(".desktop-terminal-pane-handle");
+    expect(css).toContain(".desktop-terminal-pane-interaction-frame");
     expect(css).not.toContain(".desktop-terminal-launcher");
     expect(launcher).toContain('import "./terminal-launcher.css"');
     expect(launcherCss).toContain(".desktop-terminal-launcher");
@@ -267,7 +337,10 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(headerCss).not.toContain(".desktop-terminal-tab-shell");
     expect(headerLayout).toContain("tabBounds");
     expect(headerLayout).toContain("inlineStart");
-    expect(headerCss).toMatch(/\.desktop-terminal-tab-rail\s*\{[^}]*flex:\s*0 1 auto;/s);
+    expect(headerCss).toMatch(/\.desktop-terminal-tab-rail\s*\{[^}]*flex:\s*1 1 auto;/s);
+    expect(headerCss).toMatch(
+      /\.desktop-terminal-new-button\s*\{[^}]*flex:\s*0 0 var\(--desktop-terminal-tab-control-height\);[^}]*border:\s*0;[^}]*background:\s*transparent;[^}]*box-shadow:\s*none;/s,
+    );
     expect(headerCss).toMatch(
       /\.desktop-terminal-tabs\s*\{[^}]*position:\s*relative;[^}]*width:\s*var\(--desktop-terminal-tabs-resolved-width\);/s,
     );
@@ -287,7 +360,9 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(headerCss).toMatch(
       /\.desktop-terminal-tab-status\s*\{[^}]*width:\s*14px;[^}]*height:\s*14px;[^}]*flex:\s*0 0 14px;/s,
     );
-    expect(headerCss).toMatch(/\.desktop-terminal-subheader\s*\{[^}]*height:\s*38px;/s);
+    expect(headerCss).toMatch(
+      /\.desktop-terminal-subheader\s*\{[^}]*height:\s*var\(--desktop-terminal-group-header-size, 38px\);/s,
+    );
     expect(headerCss).toMatch(
       /\.desktop-terminal-tab-select\s*\{[^}]*font-size:\s*var\(--desktop-sidebar-font-size, var\(--po-text-size-sidebar, 13px\)\);/s,
     );
@@ -400,12 +475,18 @@ describe("Desktop Terminal architecture boundaries", () => {
     expect(header).toContain('role="listbox"');
     expect(tab).toContain('role="option"');
     expect(tab).toContain("onActivate(session.id)");
+    expect(tab).toContain("suppressDerivedDragClick");
+    expect(tab).toContain("useTerminalDerivedDragClickSuppression");
+    expect(tab).not.toContain("event.detail === 0");
+    expect(tab).not.toContain('tabMove.end(event) === "press"');
     expect(tab).toContain("onClose(session.id)");
     expect(tab).toContain("tabMove.start(");
     expect(header).toContain("presentedSessionIds");
-    expect(header).toContain("onUnsplitActive");
+    expect(header).not.toContain("TerminalSessionLayoutMenu");
+    expect(header).not.toContain("onUnsplitActive");
     expect(header).toContain("onCreate");
-    expect(panel).toContain("{sessions.length > 0 && (");
+    expect(panel).toContain("sessions.length === 0 ? (");
+    expect(panel).toContain(": root ? (");
     expect(panel).not.toContain("sessionLayout");
     expect(settings).not.toContain("terminalLayout");
     expect(preferences).not.toContain("TerminalSessionLayout");

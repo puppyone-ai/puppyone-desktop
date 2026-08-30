@@ -9,6 +9,7 @@ import { DesktopTitlebarActions } from "../src/features/app-shell/DesktopTitleba
 import { TerminalCloseConfirmationDialog } from "../src/features/desktop-terminal/ui/TerminalCloseConfirmationDialog";
 import type { TerminalRuntimeHandle } from "../src/features/desktop-terminal/runtime/terminalRuntime";
 import { TerminalSessionHeader } from "../src/features/desktop-terminal/ui/session-header/TerminalSessionHeader";
+import type { TerminalTabMoveDragController } from "../src/features/desktop-terminal/interactions/useTerminalTabMoveDrag";
 import { TERMINAL_SESSION_ACTIVATION_MOTION_MS } from "../src/features/desktop-terminal/ui/session-header/useTerminalSessionHeaderController";
 import { DEFAULT_TITLEBAR_ACTIONS_SETTINGS } from "../src/preferences";
 import { withTestLocalization } from "./testLocalization";
@@ -69,7 +70,6 @@ describe("Desktop Terminal tab session manager", () => {
     const onClose = vi.fn();
     const onCreate = vi.fn();
     const onMoveByKeyboard = vi.fn();
-    const onUnsplit = vi.fn();
     const container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -85,7 +85,6 @@ describe("Desktop Terminal tab session manager", () => {
         onClose={onClose}
         onCreate={onCreate}
         onMoveByKeyboard={onMoveByKeyboard}
-        onUnsplitActive={onUnsplit}
         presentedSessionIds={["terminal-a", "terminal-b"]}
         workspacePath="/workspace/my private"
       />,
@@ -118,11 +117,64 @@ describe("Desktop Terminal tab session manager", () => {
     clickButton(container, "Close Terminal 2");
     expect(onClose).toHaveBeenCalledWith("terminal-b");
 
-    clickButton(container, "Unsplit terminal");
-    expect(onUnsplit).toHaveBeenCalledOnce();
-
     clickButton(container, "New terminal");
     expect(onCreate).toHaveBeenCalledOnce();
+  });
+
+  it("uses the native click as the single source of pointer Tab activation", () => {
+    const onActivate = vi.fn();
+    const tabMove = inertTabMove(() => "ignored");
+    const { container } = renderTwoSessionHeader({ onActivate, tabMove });
+    const tab = container.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!;
+
+    act(() => tab.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true,
+      button: 0,
+      pointerId: 31,
+    })));
+    act(() => tab.dispatchEvent(new PointerEvent("pointerup", {
+      bubbles: true,
+      button: 0,
+      pointerId: 31,
+    })));
+    expect(onActivate).not.toHaveBeenCalled();
+
+    act(() => tab.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      button: 0,
+      detail: 1,
+    })));
+    expect(onActivate).toHaveBeenCalledOnce();
+    expect(onActivate).toHaveBeenCalledWith("terminal-b");
+  });
+
+  it("suppresses only the click derived from a completed drag", () => {
+    vi.useFakeTimers();
+    const onActivate = vi.fn();
+    const tabMove = inertTabMove(() => "drag");
+    const { container } = renderTwoSessionHeader({ onActivate, tabMove });
+    const tab = container.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!;
+
+    act(() => tab.dispatchEvent(new PointerEvent("pointerup", {
+      bubbles: true,
+      button: 0,
+      pointerId: 32,
+    })));
+    act(() => tab.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      button: 0,
+      detail: 1,
+    })));
+    expect(onActivate).not.toHaveBeenCalled();
+
+    act(() => vi.runAllTimers());
+    act(() => tab.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      button: 0,
+      detail: 1,
+    })));
+    expect(onActivate).toHaveBeenCalledOnce();
+    expect(onActivate).toHaveBeenCalledWith("terminal-b");
   });
 
   it("keeps roving-tab keyboard navigation on the complete session order", () => {
@@ -198,40 +250,6 @@ describe("Desktop Terminal tab session manager", () => {
     expect(requireRuntime).not.toHaveBeenCalled();
   });
 
-  it("offers non-pointer four-edge moves for Sessions in inactive Groups", () => {
-    const onMove = vi.fn();
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    root = createRoot(container);
-
-    act(() => root?.render(withTestLocalization(
-      <TerminalSessionHeader
-        sessions={[
-          { id: "terminal-a", launcherId: "shell", ordinal: 1, shell: "zsh", status: "running" },
-          { id: "terminal-b", launcherId: "codex", ordinal: 2, shell: "zsh", status: "running" },
-        ]}
-        activeSessionId="terminal-a"
-        canMoveSessionToActive={(_sessionId, edge) => edge !== "top"}
-        onActivate={vi.fn()}
-        onClose={vi.fn()}
-        onCreate={vi.fn()}
-        onMoveSessionToActive={onMove}
-        presentedSessionIds={["terminal-a"]}
-        workspacePath="/workspace"
-      />,
-    )));
-
-    clickButton(container, "Terminal layout actions");
-    const menu = document.querySelector(".desktop-terminal-layout-menu");
-    expect(menu?.querySelectorAll('[role="menuitem"]')).toHaveLength(4);
-    const topAction = Array.from(menu?.querySelectorAll<HTMLButtonElement>("button") ?? [])
-      .find((button) => button.textContent?.includes("Move Terminal 2 above active terminal"));
-    expect(topAction?.disabled).toBe(true);
-    clickButton(document.body, "Move Terminal 2 right of active terminal");
-    expect(onMove).toHaveBeenCalledWith("terminal-b", "right");
-    expect(document.querySelector(".desktop-terminal-layout-menu")).toBeNull();
-  });
-
   it("compresses inactive tabs and moves excess sessions into an accessible menu", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
       x: 0,
@@ -267,8 +285,15 @@ describe("Desktop Terminal tab session manager", () => {
       />,
     )));
 
-    expect(container.querySelector(".desktop-terminal-tab-rail")?.getAttribute("data-layout"))
-      .toBe("overflow");
+    const rail = container.querySelector<HTMLElement>(".desktop-terminal-tab-rail")!;
+    const overflow = rail.querySelector<HTMLElement>(
+      ":scope > .desktop-terminal-tab-overflow-wrap",
+    )!;
+    const create = rail.querySelector<HTMLButtonElement>(
+      ":scope > .desktop-terminal-new-button",
+    )!;
+    expect(rail.getAttribute("data-layout")).toBe("overflow");
+    expect(create.previousElementSibling).toBe(overflow);
     expect(container.querySelectorAll('[role="option"]')).toHaveLength(4);
     expect(container.querySelectorAll(".desktop-terminal-tab.is-compact")).toHaveLength(3);
     expect(container.querySelector(".desktop-terminal-tab.is-active")?.textContent)
@@ -551,6 +576,47 @@ describe("Desktop Terminal tab session manager", () => {
     expect(onConfirm).toHaveBeenCalledOnce();
   });
 });
+
+function renderTwoSessionHeader({
+  onActivate,
+  tabMove,
+}: {
+  onActivate: (sessionId: string) => void;
+  tabMove: TerminalTabMoveDragController;
+}) {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() => root?.render(withTestLocalization(
+    <TerminalSessionHeader
+      sessions={[
+        { id: "terminal-a", launcherId: "codex", ordinal: 1, shell: "Codex", status: "running" },
+        { id: "terminal-b", launcherId: "shell", ordinal: 2, shell: "Shell", status: "running" },
+      ]}
+      activeSessionId="terminal-a"
+      onActivate={onActivate}
+      onClose={vi.fn()}
+      onCreate={vi.fn()}
+      tabMove={tabMove}
+      workspacePath="/workspace/click-contract"
+    />,
+  )));
+  return { container };
+}
+
+function inertTabMove(
+  end: TerminalTabMoveDragController["end"],
+): TerminalTabMoveDragController {
+  return {
+    dragging: false,
+    dropIntent: null,
+    start: vi.fn(),
+    move: vi.fn(),
+    end: vi.fn(end),
+    cancel: vi.fn(),
+    lostCapture: vi.fn(),
+  };
+}
 
 function clickButton(container: HTMLElement, accessibleName: string) {
   const button = container.querySelector<HTMLButtonElement>(`button[aria-label="${accessibleName}"]`)

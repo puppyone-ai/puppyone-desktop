@@ -1,17 +1,16 @@
 /** @vitest-environment happy-dom */
 import React from "react";
 import { act } from "react";
-import { createPortal } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createWorkbenchSplit } from "@puppyone/shared-ui";
-import type {
-  DesktopTerminalGroup,
-  DesktopTerminalLayoutLeaf,
-} from "../src/features/desktop-terminal/model/terminalSessions";
 import { TerminalGroupViewport } from "../src/features/desktop-terminal/layout/TerminalGroupViewport";
-import { usePersistentTerminalSessionHosts } from "../src/features/desktop-terminal/layout/session-host/usePersistentTerminalSessionHosts";
-import { TerminalSessionHost } from "../src/features/desktop-terminal/ui/TerminalSessionHost";
+import type { TerminalTabMoveDragController } from "../src/features/desktop-terminal/interactions/useTerminalTabMoveDrag";
+import {
+  createDesktopTerminalSessionsState,
+  desktopTerminalSessionsReducer,
+  getOrderedTerminalSessions,
+  type DesktopTerminalSessionsState,
+} from "../src/features/desktop-terminal/model/terminalSessions";
 import type { TerminalRuntimeHandle } from "../src/features/desktop-terminal/runtime/terminalRuntime";
 import { withTestLocalization } from "./testLocalization";
 
@@ -27,185 +26,355 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("Terminal Group split layout", () => {
-  it("reparents the same stable Session hosts when the tree moves", () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
-    const hostA = terminalHost("a");
-    const hostB = terminalHost("b");
-    const hosts = new Map([["a", hostA], ["b", hostB]]);
-    const runtime = createRuntime();
-    const runtimeRegistry = { get: () => runtime };
-    const first = group(
-      createWorkbenchSplit({
-        id: "split-a-b",
-        direction: "horizontal",
-        ratio: 0.5,
-        first: leaf("a"),
-        second: leaf("b"),
-      }),
-      "a",
-    );
+describe("Terminal Group-owned Tab layout", () => {
+  it("renders one complete local Tab Bar and only its active Session host", () => {
+    const harness = createHarness(createThreeTabs());
+    harness.render();
 
-    act(() => root?.render(withTestLocalization(
-      <TerminalGroupViewport
-        dropIntent={null}
-        group={first}
-        hosts={hosts}
-        runtimeRegistry={runtimeRegistry}
-        onResizeSplit={vi.fn()}
-      />,
-    )));
-
-    expect(container.querySelector('[data-terminal-session-pane-id="a"]')?.contains(hostA))
-      .toBe(true);
-    expect(container.querySelector('[data-terminal-session-pane-id="b"]')?.contains(hostB))
-      .toBe(true);
-
-    const moved = group(
-      createWorkbenchSplit({
-        id: "split-a-b",
-        direction: "vertical",
-        ratio: 0.5,
-        first: leaf("b"),
-        second: leaf("a"),
-      }),
-      "b",
-    );
-    act(() => root?.render(withTestLocalization(
-      <TerminalGroupViewport
-        dropIntent={null}
-        group={moved}
-        hosts={hosts}
-        runtimeRegistry={runtimeRegistry}
-        onResizeSplit={vi.fn()}
-      />,
-    )));
-
-    expect(container.querySelector('[data-terminal-session-pane-id="a"]')?.contains(hostA))
-      .toBe(true);
-    expect(container.querySelector('[data-terminal-session-pane-id="b"]')?.contains(hostB))
-      .toBe(true);
-    expect(hostA.dataset.terminalSessionHostId).toBe("a");
-    expect(hostB.dataset.terminalSessionHostId).toBe("b");
-    expect(container.querySelector('[data-terminal-session-pane-id="b"]')?.getAttribute("data-focused"))
-      .toBe("true");
+    const groups = harness.container.querySelectorAll(".desktop-terminal-tab-group");
+    const tabs = groups[0]!.querySelectorAll('[role="option"]');
+    expect(groups).toHaveLength(1);
+    expect(tabs).toHaveLength(3);
+    expect(groups[0]!.querySelectorAll(".desktop-terminal-subheader")).toHaveLength(1);
+    expect(groups[0]!.querySelector(".desktop-terminal-tab-group-content")?.contains(
+      harness.hosts.get("terminal-c")!,
+    )).toBe(true);
+    expect(harness.hosts.get("terminal-a")!.parentElement).toBeNull();
+    expect(harness.hosts.get("terminal-b")!.parentElement).toBeNull();
   });
 
-  it("keeps each Runtime mounted once while Session hosts move", () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
-    const runtimeA = createRuntime();
-    const runtimeB = createRuntime();
-    const runtimes = new Map([["a", runtimeA], ["b", runtimeB]]);
-    const horizontal = group(createWorkbenchSplit({
-      id: "split-a-b",
-      direction: "horizontal",
-      ratio: 0.5,
-      first: leaf("a"),
-      second: leaf("b"),
-    }), "a");
-    const vertical = group(createWorkbenchSplit({
-      id: "split-a-b",
-      direction: "vertical",
-      ratio: 0.5,
-      first: leaf("b"),
-      second: leaf("a"),
-    }), "b");
+  it("keeps the local new-Tab action immediately after the Tab strip", () => {
+    const harness = createHarness(createThreeTabs());
+    harness.render();
 
-    function Harness({ value }: { value: DesktopTerminalGroup }) {
-      const hosts = usePersistentTerminalSessionHosts(["a", "b"]);
-      return (
-        <>
-          <TerminalGroupViewport
-            dropIntent={null}
-            group={value}
-            hosts={hosts}
-            runtimeRegistry={{ get: (sessionId) => runtimes.get(sessionId) ?? null }}
-            onResizeSplit={vi.fn()}
-          />
-          {["a", "b"].map((sessionId) => createPortal(
-            <TerminalSessionHost
-              discoveryPhase="ready"
-              availableAgentIds={[]}
-              focused={value.focusedSessionId === sessionId}
-              onFocus={vi.fn()}
-              onLaunch={vi.fn()}
-              onRefresh={vi.fn()}
-              presented
-              runtime={runtimes.get(sessionId)!}
-              session={{
-                id: sessionId,
-                launcherId: "shell",
-                launchError: null,
-                ordinal: sessionId === "a" ? 1 : 2,
-                shell: "zsh",
-                status: "running",
-              }}
-              workspacePath="/workspace"
-            />,
-            hosts.get(sessionId)!,
-            sessionId,
-          ))}
-        </>
-      );
-    }
+    const rail = harness.container.querySelector<HTMLElement>(
+      '[data-terminal-tab-bar-group-id="group-a"]',
+    )!;
+    const tabs = rail.querySelector<HTMLElement>(":scope > .desktop-terminal-tabs")!;
+    const create = rail.querySelector<HTMLButtonElement>(
+      ":scope > .desktop-terminal-new-button",
+    )!;
 
-    act(() => root?.render(withTestLocalization(<Harness value={horizontal} />)));
-    expect(runtimeA.mount).toHaveBeenCalledTimes(1);
-    expect(runtimeB.mount).toHaveBeenCalledTimes(1);
-
-    act(() => root?.render(withTestLocalization(<Harness value={vertical} />)));
-    expect(runtimeA.mount).toHaveBeenCalledTimes(1);
-    expect(runtimeB.mount).toHaveBeenCalledTimes(1);
-    expect(runtimeA.unmount).not.toHaveBeenCalled();
-    expect(runtimeB.unmount).not.toHaveBeenCalled();
-    expect(runtimeA.dispose).not.toHaveBeenCalled();
-    expect(runtimeB.dispose).not.toHaveBeenCalled();
+    expect(create).not.toBeNull();
+    expect(create.previousElementSibling).toBe(tabs);
+    expect(harness.container.querySelector(".desktop-terminal-subheader-new")).toBeNull();
   });
 
-  it("renders allowed and rejected four-edge drop previews inside the target leaf", () => {
-    const container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
-    const hosts = new Map([["a", terminalHost("a")]]);
-    const runtimeRegistry = { get: () => createRuntime() };
+  it("creates left and right Group leaves, each with its own Tab Bar and content", () => {
+    const state = splitTab(createThreeTabs(), "terminal-b", "group-a", "right", "group-b");
+    const harness = createHarness(state);
+    harness.render();
 
-    const render = (edge: "left" | "right" | "top" | "bottom", allowed: boolean) => act(() => (
-      root?.render(withTestLocalization(
-        <TerminalGroupViewport
-          dropIntent={{ targetSessionId: "a", edge, allowed }}
-          group={group(leaf("a"), "a")}
-          hosts={hosts}
-          runtimeRegistry={runtimeRegistry}
-          onResizeSplit={vi.fn()}
-        />,
-      ))
-    ));
+    const groups = harness.container.querySelectorAll<HTMLElement>(
+      ".desktop-terminal-tab-group",
+    );
+    expect(groups).toHaveLength(2);
+    expect(groups[0]!.dataset.terminalGroupPaneId).toBe("group-a");
+    expect(groups[1]!.dataset.terminalGroupPaneId).toBe("group-b");
+    expect(groups[0]!.querySelectorAll('[role="option"]')).toHaveLength(2);
+    expect(groups[1]!.querySelectorAll('[role="option"]')).toHaveLength(1);
+    expect(groups[0]!.querySelectorAll(":scope .desktop-terminal-new-button")).toHaveLength(1);
+    expect(groups[1]!.querySelectorAll(":scope .desktop-terminal-new-button")).toHaveLength(1);
+    expect(groups[0]!.querySelector(".desktop-terminal-tab-group-content")?.contains(
+      harness.hosts.get("terminal-c")!,
+    )).toBe(true);
+    expect(groups[1]!.querySelector(".desktop-terminal-tab-group-content")?.contains(
+      harness.hosts.get("terminal-b")!,
+    )).toBe(true);
+  });
 
+  it("switches Tabs inside one Group without remounting another Group's host", () => {
+    let state = splitTab(createThreeTabs(), "terminal-b", "group-a", "right", "group-b");
+    const harness = createHarness(state);
+    harness.render();
+    const hostA = harness.hosts.get("terminal-a")!;
+    const hostB = harness.hosts.get("terminal-b")!;
+    const hostC = harness.hosts.get("terminal-c")!;
+    const rightParent = hostB.parentElement;
+
+    state = desktopTerminalSessionsReducer(state, {
+      type: "activate",
+      sessionId: "terminal-a",
+    });
+    harness.setState(state);
+    harness.render();
+
+    expect(harness.container.querySelector(
+      '[data-terminal-group-pane-id="group-a"] .desktop-terminal-tab-group-content',
+    )?.contains(hostA)).toBe(true);
+    expect(hostC.parentElement).toBeNull();
+    expect(hostB.parentElement).toBe(rightParent);
+  });
+
+  it("renders four-edge drop previews on the target Group rather than a Session body", () => {
+    const state = createThreeTabs();
+    const harness = createHarness(state);
     for (const edge of ["left", "right", "top", "bottom"] as const) {
-      render(edge, edge !== "top");
-      const preview = container.querySelector<HTMLElement>(".desktop-terminal-drop-preview");
+      harness.render({
+        kind: "split",
+        sourceSessionId: "terminal-b",
+        targetGroupId: "group-a",
+        edge,
+        allowed: edge !== "top",
+      });
+      const target = harness.container.querySelector<HTMLElement>(
+        '[data-terminal-group-pane-id="group-a"]',
+      );
+      const preview = target?.querySelector<HTMLElement>(".desktop-terminal-drop-preview");
       expect(preview?.dataset.edge).toBe(edge);
       expect(preview?.dataset.allowed).toBe(edge === "top" ? "false" : "true");
     }
   });
+
+  it("keeps Header insertion and content-edge Group movement as disjoint drop zones", () => {
+    const state = splitTab(createThreeTabs(), "terminal-b", "group-a", "right", "group-b");
+    const harness = createHarness(state);
+    harness.render({
+      kind: "move-group",
+      sourceGroupId: "group-b",
+      targetGroupId: "group-a",
+      edge: "left",
+      allowed: true,
+    });
+
+    const target = harness.container.querySelector<HTMLElement>(
+      '[data-terminal-group-pane-id="group-a"]',
+    )!;
+    const rail = target.querySelector<HTMLElement>(
+      '[data-terminal-tab-bar-group-id="group-a"]',
+    )!;
+    const content = target.querySelector<HTMLElement>(
+      '[data-terminal-content-drop-group-id="group-a"]',
+    )!;
+    const preview = target.querySelector<HTMLElement>(".desktop-terminal-drop-preview")!;
+
+    expect(rail.classList.contains("desktop-terminal-tab-rail")).toBe(true);
+    expect(content.classList.contains("desktop-terminal-tab-group-content")).toBe(true);
+    expect(rail.contains(content)).toBe(false);
+    expect(preview.dataset.operation).toBe("move-group");
+    expect(preview.dataset.edge).toBe("left");
+    expect(preview.dataset.allowed).toBe("true");
+  });
+
+  it("opens a relative insertion slot so target-Bar Tabs move out of the way", () => {
+    const state = splitTab(createThreeTabs(), "terminal-b", "group-a", "right", "group-b");
+    const harness = createHarness(state);
+    harness.render({
+      kind: "insert",
+      sourceSessionId: "terminal-b",
+      targetGroupId: "group-a",
+      targetIndex: 1,
+      allowed: true,
+    });
+
+    const target = harness.container.querySelector<HTMLElement>(
+      '[data-terminal-group-pane-id="group-a"]',
+    )!;
+    const rail = target.querySelector<HTMLElement>(".desktop-terminal-tab-rail")!;
+    const slot = target.querySelector<HTMLElement>(".desktop-terminal-tab-drop-slot")!;
+    const terminalC = target.querySelector<HTMLElement>(
+      '[data-terminal-tab-session-id="terminal-c"]',
+    )!;
+    expect(rail.dataset.tabInsertion).toBe("true");
+    expect(slot.style.getPropertyValue("--desktop-terminal-tab-inline-start")).toBe("147px");
+    expect(terminalC.style.getPropertyValue("--desktop-terminal-tab-inline-start"))
+      .toBe("294px");
+    expect(harness.container.querySelector(
+      '[data-terminal-group-pane-id="group-b"] .desktop-terminal-tab-drop-slot',
+    )).toBeNull();
+  });
+
+  it("previews every Tab in a Group as an ordered block before Bar merge", () => {
+    let state = splitTab(createThreeTabs(), "terminal-b", "group-a", "right", "group-b");
+    state = desktopTerminalSessionsReducer(state, {
+      type: "create",
+      sessionId: "terminal-d",
+      groupId: "unused-group-d",
+      targetGroupId: "group-b",
+      launcherId: "shell",
+    });
+    const harness = createHarness(state);
+    harness.render({
+      kind: "merge-group",
+      sourceGroupId: "group-b",
+      sourceSessionIds: ["terminal-b", "terminal-d"],
+      targetGroupId: "group-a",
+      targetIndex: 1,
+      allowed: true,
+    });
+
+    const target = harness.container.querySelector<HTMLElement>(
+      '[data-terminal-group-pane-id="group-a"]',
+    )!;
+    const terminalC = target.querySelector<HTMLElement>(
+      '[data-terminal-tab-session-id="terminal-c"]',
+    )!;
+    expect(target.querySelectorAll(".desktop-terminal-tab-drop-slot")).toHaveLength(2);
+    expect(terminalC.style.getPropertyValue("--desktop-terminal-tab-inline-start"))
+      .toBe("441px");
+  });
+
+  it("repositions the dragged Tab itself during a same-Bar reorder preview", () => {
+    const state = splitTab(createThreeTabs(), "terminal-b", "group-a", "right", "group-b");
+    const harness = createHarness(state);
+    harness.render({
+      kind: "insert",
+      sourceSessionId: "terminal-a",
+      targetGroupId: "group-a",
+      targetIndex: 1,
+      allowed: true,
+    });
+
+    const target = harness.container.querySelector<HTMLElement>(
+      '[data-terminal-group-pane-id="group-a"]',
+    )!;
+    const terminalA = target.querySelector<HTMLElement>(
+      '[data-terminal-tab-session-id="terminal-a"]',
+    )!;
+    const terminalC = target.querySelector<HTMLElement>(
+      '[data-terminal-tab-session-id="terminal-c"]',
+    )!;
+    expect(target.querySelector(".desktop-terminal-tab-drop-slot")).toBeNull();
+    expect(terminalC.style.getPropertyValue("--desktop-terminal-tab-inline-start")).toBe("0px");
+    expect(terminalA.style.getPropertyValue("--desktop-terminal-tab-inline-start")).toBe("147px");
+  });
+
+  it("reveals one Ghostty-style three-dot handle in the upper third of every Group", () => {
+    const state = splitTab(createThreeTabs(), "terminal-b", "group-a", "right", "group-b");
+    const harness = createHarness(state);
+    harness.render();
+    const groups = Array.from(harness.container.querySelectorAll<HTMLElement>(
+      ".desktop-terminal-tab-group",
+    ));
+
+    expect(groups).toHaveLength(2);
+    expect(groups.every((group) => (
+      group.querySelectorAll(".desktop-terminal-pane-handle > i").length === 3
+    ))).toBe(true);
+
+    const left = groups[0]!;
+    left.getBoundingClientRect = () => new DOMRect(0, 0, 400, 600);
+    act(() => left.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: 200,
+      clientY: 100,
+    })));
+    expect(left.dataset.handleHot).toBe("true");
+
+    act(() => left.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: 200,
+      clientY: 400,
+    })));
+    expect(left.dataset.handleHot).toBeUndefined();
+  });
+
+  it("keeps stable Session host identities while nested Group geometry changes", () => {
+    let state = createThreeTabs();
+    state = splitTab(state, "terminal-b", "group-a", "right", "group-b");
+    state = splitTab(state, "terminal-c", "group-b", "bottom", "group-c");
+    const harness = createHarness(state);
+    const stableHosts = new Map(harness.hosts);
+    harness.render();
+
+    expect(harness.container.querySelectorAll(".desktop-terminal-tab-group")).toHaveLength(3);
+    for (const [sessionId, host] of stableHosts) {
+      expect(harness.hosts.get(sessionId)).toBe(host);
+      expect(host.parentElement).not.toBeNull();
+    }
+  });
 });
 
-function leaf(sessionId: string): DesktopTerminalLayoutLeaf {
-  return Object.freeze({ kind: "session", id: sessionId, sessionId });
+function createHarness(initialState: DesktopTerminalSessionsState) {
+  const container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  let state = initialState;
+  const hosts = new Map(state.sessions.map(({ id }) => [id, terminalHost(id)]));
+  const runtimes = new Map(state.sessions.map(({ id }) => [id, createRuntime()]));
+  const sessionMove = createSessionMove();
+
+  return {
+    container,
+    hosts,
+    setState(nextState: DesktopTerminalSessionsState) {
+      state = nextState;
+    },
+    render(dropIntent: Parameters<typeof TerminalGroupViewport>[0]["dropIntent"] = null) {
+      act(() => root?.render(withTestLocalization(
+        state.root ? (
+          <TerminalGroupViewport
+            activeGroupId={state.activeGroupId}
+            dropIntent={dropIntent}
+            groups={state.groups}
+            hosts={hosts}
+            root={state.root}
+            runtimeRegistry={{
+              get: (sessionId) => runtimes.get(sessionId) ?? null,
+              require: (sessionId) => runtimes.get(sessionId)!,
+            }}
+            sessions={getOrderedTerminalSessions(state)}
+            sessionMove={sessionMove}
+            workspacePath="/workspace/local-tabs"
+            onActivateSession={vi.fn()}
+            onCloseSession={vi.fn()}
+            onCreateSession={vi.fn()}
+            onMoveByKeyboard={vi.fn()}
+            onResizeSplit={vi.fn()}
+          />
+        ) : null,
+      )));
+    },
+  };
 }
 
-function group(rootNode: DesktopTerminalGroup["root"], focusedSessionId: string) {
-  return Object.freeze({ id: "group", root: rootNode, focusedSessionId });
+function createThreeTabs() {
+  let state = createDesktopTerminalSessionsState();
+  for (const [index, id] of ["terminal-a", "terminal-b", "terminal-c"].entries()) {
+    state = desktopTerminalSessionsReducer(state, {
+      type: "create",
+      sessionId: id,
+      groupId: index === 0 ? "group-a" : `unused-${index}`,
+      launcherId: "shell",
+    });
+  }
+  return state;
+}
+
+function splitTab(
+  state: DesktopTerminalSessionsState,
+  sourceSessionId: string,
+  targetGroupId: string,
+  edge: "left" | "right" | "top" | "bottom",
+  groupId: string,
+) {
+  return desktopTerminalSessionsReducer(state, {
+    type: "split-tab",
+    sourceSessionId,
+    targetGroupId,
+    edge,
+    groupId,
+    splitId: `split-${groupId}`,
+  });
 }
 
 function terminalHost(sessionId: string) {
   const host = document.createElement("div");
+  host.className = "desktop-terminal-session-host";
   host.dataset.terminalSessionHostId = sessionId;
   return host;
+}
+
+function createSessionMove(): TerminalTabMoveDragController {
+  return {
+    dragging: false,
+    dropIntent: null,
+    start: vi.fn(),
+    move: vi.fn(),
+    end: vi.fn(() => "press"),
+    cancel: vi.fn(),
+    lostCapture: vi.fn(),
+  };
 }
 
 function createRuntime(): TerminalRuntimeHandle {

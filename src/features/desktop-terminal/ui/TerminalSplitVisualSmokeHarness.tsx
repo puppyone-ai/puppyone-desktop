@@ -1,27 +1,25 @@
 import { useCallback, useMemo, useReducer, useRef } from "react";
 import { createPortal } from "react-dom";
-import {
-  findWorkbenchSplitLeaf,
-  workbenchSplitDefinition,
-  type WorkbenchSplitDropEdge,
-} from "@puppyone/shared-ui";
+import type { WorkbenchSplitDropEdge } from "@puppyone/shared-ui";
+import { useTerminalTabMoveDrag } from "../interactions/useTerminalTabMoveDrag";
+import { TerminalGroupViewport } from "../layout/TerminalGroupViewport";
+import { usePersistentTerminalSessionHosts } from "../layout/session-host/usePersistentTerminalSessionHosts";
 import {
   canPlaceTerminalSplit,
   terminalLeafMinimumSize,
 } from "../model/terminalSplitConstraints";
 import {
-  canUnsplitTerminalSession,
+  canInsertTerminalSession,
+  canMergeTerminalGroup,
+  canMoveTerminalGroup,
+  canSplitTerminalSession,
   createDesktopTerminalSessionsState,
   desktopTerminalSessionsReducer,
   getActiveTerminalGroup,
   getActiveTerminalSessionId,
   getOrderedTerminalSessions,
-  getTerminalGroupSessionIds,
+  getPresentedTerminalSessionIds,
 } from "../model/terminalSessions";
-import { useTerminalTabMoveDrag } from "../interactions/useTerminalTabMoveDrag";
-import { TerminalGroupViewport } from "../layout/TerminalGroupViewport";
-import { usePersistentTerminalSessionHosts } from "../layout/session-host/usePersistentTerminalSessionHosts";
-import { TerminalSessionHeader } from "./session-header/TerminalSessionHeader";
 import "./desktop-terminal.css";
 
 /** Real-Chromium geometry harness. It deliberately owns no xterm or PTY. */
@@ -36,93 +34,108 @@ export function TerminalSplitVisualSmokeHarness() {
   const activeGroup = getActiveTerminalGroup(state);
   const activeSessionId = getActiveTerminalSessionId(state);
   const presentedSessionIds = useMemo(
-    () => activeGroup ? getTerminalGroupSessionIds(activeGroup) : [],
-    [activeGroup],
+    () => getPresentedTerminalSessionIds(state),
+    [state],
   );
   const hosts = usePersistentTerminalSessionHosts(sessions.map(({ id }) => id));
-  const runtimeRegistry = useMemo(() => ({ get: () => null }), []);
+  const runtimeRegistry = useMemo(() => ({
+    get: () => null,
+    require: () => null as never,
+  }), []);
   const nextId = useCallback((kind: "group" | "session" | "split") => (
     `smoke-${kind}-${nextIdRef.current++}`
   ), []);
 
-  const moveSession = useCallback((
+  const splitSession = useCallback((
     sourceSessionId: string,
-    targetSessionId: string,
+    targetGroupId: string,
     edge: WorkbenchSplitDropEdge,
   ) => {
-    const { direction, placement } = workbenchSplitDefinition(edge);
     dispatch({
-      type: "move",
+      type: "split-tab",
       sourceSessionId,
-      targetSessionId,
-      direction,
-      placement,
+      targetGroupId,
+      edge,
+      groupId: nextId("group"),
       splitId: nextId("split"),
     });
   }, [nextId]);
   const canDrop = useCallback((
     sourceSessionId: string,
-    targetSessionId: string,
+    targetGroupId: string,
     edge: WorkbenchSplitDropEdge,
     targetPane: HTMLElement,
   ) => {
-    if (sourceSessionId === targetSessionId) return false;
-    const sourceExists = state.groups.some((group) => (
-      findWorkbenchSplitLeaf(group.root, sourceSessionId)
+    const sourceGroup = state.groups.find((group) => (
+      group.sessionIds.includes(sourceSessionId)
     ));
-    return sourceExists && canPlaceTerminalSplit(
+    if (!canSplitTerminalSession(state, sourceSessionId, targetGroupId)) return false;
+    if (sourceGroup?.id !== targetGroupId && sourceGroup?.sessionIds.length === 1) return true;
+    return canPlaceTerminalSplit(
       targetPane.getBoundingClientRect(),
       edge,
       terminalLeafMinimumSize(null),
       terminalLeafMinimumSize(null),
     );
-  }, [state.groups]);
-  const tabMove = useTerminalTabMoveDrag({ canDrop, onMoveSession: moveSession });
-
-  const moveToActive = useCallback((sessionId: string, edge: WorkbenchSplitDropEdge) => {
-    if (activeSessionId) moveSession(sessionId, activeSessionId, edge);
-  }, [activeSessionId, moveSession]);
-  const moveByKeyboard = useCallback((sessionId: string, edge: WorkbenchSplitDropEdge) => {
-    const sourceIndex = presentedSessionIds.indexOf(sessionId);
-    const offset = edge === "left" || edge === "top" ? -1 : 1;
-    const targetSessionId = presentedSessionIds[sourceIndex + offset];
-    if (targetSessionId) moveSession(sessionId, targetSessionId, edge);
-  }, [moveSession, presentedSessionIds]);
+  }, [state]);
+  const tabMove = useTerminalTabMoveDrag({
+    canDrop,
+    canInsert: (sourceSessionId, targetGroupId, targetIndex) => (
+      canInsertTerminalSession(state, sourceSessionId, targetGroupId, targetIndex)
+    ),
+    canMergeGroup: (sourceGroupId, targetGroupId, targetIndex) => (
+      canMergeTerminalGroup(state, sourceGroupId, targetGroupId, targetIndex)
+    ),
+    onInsertSession: (sourceSessionId, targetGroupId, targetIndex) => dispatch({
+      type: "merge-tab",
+      sourceSessionId,
+      targetGroupId,
+      targetIndex,
+    }),
+    onMergeGroup: (sourceGroupId, targetGroupId, targetIndex) => dispatch({
+      type: "merge-group",
+      sourceGroupId,
+      targetGroupId,
+      targetIndex,
+    }),
+    canMoveGroup: (sourceGroupId, targetGroupId) => (
+      canMoveTerminalGroup(state, sourceGroupId, targetGroupId)
+    ),
+    onMoveGroup: (sourceGroupId, targetGroupId, edge) => dispatch({
+      type: "move-group",
+      sourceGroupId,
+      targetGroupId,
+      edge,
+      splitId: nextId("split"),
+    }),
+    onMoveSession: splitSession,
+  });
 
   return (
     <main className="desktop-terminal-split-smoke">
       <section className="desktop-terminal-split-smoke-panel desktop-terminal-panel">
-        <TerminalSessionHeader
-          activeSessionId={activeSessionId}
-          canMoveSessionToActive={(sessionId) => sessionId !== activeSessionId}
-          onActivate={(sessionId) => dispatch({ type: "activate", sessionId })}
-          onClose={(sessionId) => dispatch({ type: "close", sessionId })}
-          onCreate={() => dispatch({
-            type: "create-launcher",
-            sessionId: nextId("session"),
-            groupId: nextId("group"),
-          })}
-          onMoveByKeyboard={moveByKeyboard}
-          onMoveSessionToActive={moveToActive}
-          onUnsplitActive={activeSessionId && canUnsplitTerminalSession(state, activeSessionId)
-            ? () => dispatch({
-                type: "unsplit",
-                sessionId: activeSessionId,
-                groupId: nextId("group"),
-              })
-            : undefined}
-          presentedSessionIds={presentedSessionIds}
-          sessions={sessions}
-          tabMove={tabMove}
-          workspacePath="/workspace/terminal-split-smoke"
-        />
         <div className="desktop-terminal-body">
-          {activeGroup && (
+          {state.root && (
             <TerminalGroupViewport
+              activeGroupId={activeGroup?.id ?? null}
               dropIntent={tabMove.dropIntent}
-              group={activeGroup}
+              groups={state.groups}
               hosts={hosts}
+              root={state.root}
               runtimeRegistry={runtimeRegistry}
+              sessions={sessions}
+              sessionMove={tabMove}
+              workspacePath="/workspace/terminal-split-smoke"
+              onActivateSession={(sessionId) => dispatch({ type: "activate", sessionId })}
+              onCloseSession={(sessionId) => dispatch({ type: "close", sessionId })}
+              onCreateSession={(targetGroupId) => dispatch({
+                type: "create",
+                sessionId: nextId("session"),
+                groupId: nextId("group"),
+                targetGroupId,
+                launcherId: "shell",
+              })}
+              onMoveByKeyboard={splitSession}
               onResizeSplit={(splitId, ratio) => dispatch({
                 type: "resize-split",
                 splitId,
@@ -144,10 +157,11 @@ export function TerminalSplitVisualSmokeHarness() {
         {JSON.stringify({
           activeGroupId: state.activeGroupId,
           activeSessionId,
+          presentedSessionIds,
           groups: state.groups.map((group) => ({
             id: group.id,
-            focusedSessionId: group.focusedSessionId,
-            sessions: getTerminalGroupSessionIds(group),
+            activeSessionId: group.activeSessionId,
+            sessions: group.sessionIds,
           })),
         })}
       </output>

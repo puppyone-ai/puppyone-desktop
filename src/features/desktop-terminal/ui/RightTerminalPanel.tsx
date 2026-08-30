@@ -6,12 +6,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type { Workspace } from "@puppyone/shared-ui";
-import {
-  findDirectSiblingWorkbenchSplit,
-  findWorkbenchSplitLeaf,
-  workbenchSplitDefinition,
-  type WorkbenchSplitDropEdge,
-} from "@puppyone/shared-ui";
+import type { WorkbenchSplitDropEdge } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
 import { useTerminalAgentLocator } from "../controller/useTerminalAgentLocator";
 import { useTerminalSessions } from "../controller/useTerminalSessions";
@@ -27,7 +22,6 @@ import { useTerminalAppearanceSync } from "../runtime/useTerminalAppearanceSync"
 import { TerminalCloseConfirmationDialog } from "./TerminalCloseConfirmationDialog";
 import { TerminalLauncher } from "./TerminalLauncher";
 import { TerminalSessionHost } from "./TerminalSessionHost";
-import { TerminalSessionHeader } from "./session-header/TerminalSessionHeader";
 import "@xterm/xterm/css/xterm.css";
 import "./desktop-terminal.css";
 
@@ -48,17 +42,23 @@ export function RightTerminalPanel({ workspace, active, hiddenAgentIds }: RightT
     confirmCloseSession,
     createLauncher,
     createSession,
+    groupCanMerge,
+    groupCanMove,
     groups,
     launchSession,
-    moveSession,
+    mergeSession,
+    mergeGroup,
+    moveGroup,
     pendingCloseSession,
     presentedSessionIds,
     requestCloseSession,
+    root,
     resizeSplit,
     runtimeRegistry,
-    sessionCanUnsplit,
+    sessionCanInsert,
+    sessionCanSplit,
     sessions,
-    unsplitSession,
+    splitSession,
   } = useTerminalSessions({
     messageFormatter: t,
     workspacePath: workspace.path,
@@ -107,84 +107,61 @@ export function RightTerminalPanel({ workspace, active, hiddenAgentIds }: RightT
 
   const canDropSession = useCallback((
     sourceSessionId: string,
-    targetSessionId: string,
+    targetGroupId: string,
     edge: WorkbenchSplitDropEdge,
-    targetPane: HTMLElement,
+    targetGroupPane: HTMLElement,
   ) => {
-    const sourceGroup = groups.find((group) => (
-      findWorkbenchSplitLeaf(group.root, sourceSessionId)
-    ));
-    const targetGroup = groups.find((group) => (
-      findWorkbenchSplitLeaf(group.root, targetSessionId)
-    ));
-    if (!sourceGroup || !targetGroup || sourceSessionId === targetSessionId) return false;
+    const sourceGroup = groups.find((group) => group.sessionIds.includes(sourceSessionId));
+    const targetGroup = groups.find((group) => group.id === targetGroupId);
+    if (!sourceGroup || !targetGroup || !sessionCanSplit(sourceSessionId, targetGroupId)) {
+      return false;
+    }
+    // Moving the only Tab out of a Group repositions an existing leaf; it does
+    // not create another split and therefore must not be blocked by min-size.
+    if (sourceGroup.id !== targetGroup.id && sourceGroup.sessionIds.length === 1) {
+      return true;
+    }
     const sourceMinimum = terminalLeafMinimumSize(
       runtimeRegistry.get(sourceSessionId)?.getMinimumViewportSize(),
     );
     const targetMinimum = terminalLeafMinimumSize(
-      runtimeRegistry.get(targetSessionId)?.getMinimumViewportSize(),
+      runtimeRegistry.get(targetGroup.activeSessionId)?.getMinimumViewportSize(),
     );
-    const sibling = sourceGroup.id === targetGroup.id
-      ? findDirectSiblingWorkbenchSplit(
-          sourceGroup.root,
-          sourceSessionId,
-          targetSessionId,
-        )
-      : null;
-    const { direction } = workbenchSplitDefinition(edge);
-    if (sibling && sibling.direction === direction) return true;
-    const admissionElement = sibling
-      ? targetPane.parentElement ?? targetPane
-      : targetPane;
     return canPlaceTerminalSplit(
-      admissionElement.getBoundingClientRect(),
+      targetGroupPane.getBoundingClientRect(),
       edge,
       sourceMinimum,
       targetMinimum,
     );
-  }, [groups, runtimeRegistry]);
+  }, [groups, runtimeRegistry, sessionCanSplit]);
 
-  const canMoveSessionToActive = useCallback((
-    sourceSessionId: string,
-    edge: WorkbenchSplitDropEdge,
-  ) => {
-    if (!activeSessionId || sourceSessionId === activeSessionId) return false;
-    const targetPane = panelRef.current?.querySelector<HTMLElement>(
-      `[data-terminal-session-pane-id="${activeSessionId}"]`,
-    );
-    return Boolean(
-      targetPane
-      && canDropSession(sourceSessionId, activeSessionId, edge, targetPane),
-    );
-  }, [activeSessionId, canDropSession]);
-  const moveSessionToActive = useCallback((
-    sourceSessionId: string,
-    edge: WorkbenchSplitDropEdge,
-  ) => {
-    if (activeSessionId && canMoveSessionToActive(sourceSessionId, edge)) {
-      moveSession(sourceSessionId, activeSessionId, edge);
-    }
-  }, [activeSessionId, canMoveSessionToActive, moveSession]);
+  const canMoveGroup = useCallback((
+    sourceGroupId: string,
+    targetGroupId: string,
+  ) => groupCanMove(sourceGroupId, targetGroupId), [groupCanMove]);
+
   const tabMove = useTerminalTabMoveDrag({
     canDrop: canDropSession,
-    onMoveSession: moveSession,
+    canInsert: sessionCanInsert,
+    canMergeGroup: groupCanMerge,
+    canMoveGroup,
+    onInsertSession: mergeSession,
+    onMergeGroup: mergeGroup,
+    onMoveGroup: moveGroup,
+    onMoveSession: splitSession,
   });
   const moveSessionByKeyboard = useCallback((
     sourceSessionId: string,
+    targetGroupId: string,
     edge: WorkbenchSplitDropEdge,
   ) => {
-    const sourceIndex = presentedSessions.findIndex(
-      (session) => session.id === sourceSessionId,
-    );
-    const offset = edge === "left" || edge === "top" ? -1 : 1;
-    const target = presentedSessions[sourceIndex + offset];
-    if (sourceIndex < 0 || !target) return;
     const targetPane = panelRef.current?.querySelector<HTMLElement>(
-      `[data-terminal-session-pane-id="${target.id}"]`,
+      `[data-terminal-content-drop-group-id="${targetGroupId}"]`,
     );
-    if (!targetPane || !canDropSession(sourceSessionId, target.id, edge, targetPane)) return;
-    moveSession(sourceSessionId, target.id, edge);
-  }, [canDropSession, moveSession, presentedSessions]);
+    if (targetPane && canDropSession(sourceSessionId, targetGroupId, edge, targetPane)) {
+      splitSession(sourceSessionId, targetGroupId, edge);
+    }
+  }, [canDropSession, splitSession]);
 
   useTerminalAppearanceSync(panelRef, runtimeRegistry);
   return (
@@ -193,25 +170,6 @@ export function RightTerminalPanel({ workspace, active, hiddenAgentIds }: RightT
       className="desktop-terminal-panel"
       aria-label={t("terminal.title")}
     >
-      {sessions.length > 0 && (
-        <TerminalSessionHeader
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          canMoveSessionToActive={canMoveSessionToActive}
-          onActivate={activateSession}
-          onClose={requestCloseSession}
-          onCreate={createLauncher}
-          onMoveByKeyboard={moveSessionByKeyboard}
-          onMoveSessionToActive={moveSessionToActive}
-          onUnsplitActive={activeSessionId && sessionCanUnsplit(activeSessionId)
-            ? () => unsplitSession(activeSessionId)
-            : undefined}
-          presentedSessionIds={presentedSessionIds}
-          runtimeRegistry={runtimeRegistry}
-          tabMove={tabMove}
-          workspacePath={workspace.path}
-        />
-      )}
       <div className={`desktop-terminal-body ${sessions.length === 0 ? "is-empty" : ""}`}>
         {sessions.length === 0 ? (
           <TerminalLauncher
@@ -220,12 +178,21 @@ export function RightTerminalPanel({ workspace, active, hiddenAgentIds }: RightT
             onLaunch={createDetectedSession}
             onRefresh={() => void refreshAvailableAgents()}
           />
-        ) : activeGroup ? (
+        ) : root ? (
           <TerminalGroupViewport
+            activeGroupId={activeGroup?.id ?? null}
             dropIntent={tabMove.dropIntent}
-            group={activeGroup}
+            groups={groups}
             hosts={sessionHosts}
+            root={root}
             runtimeRegistry={runtimeRegistry}
+            sessions={sessions}
+            sessionMove={tabMove}
+            workspacePath={workspace.path}
+            onActivateSession={activateSession}
+            onCloseSession={requestCloseSession}
+            onCreateSession={(groupId) => createLauncher(groupId)}
+            onMoveByKeyboard={moveSessionByKeyboard}
             onResizeSplit={resizeSplit}
           />
         ) : null}

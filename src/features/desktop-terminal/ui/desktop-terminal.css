@@ -30,6 +30,8 @@
 
 .desktop-terminal-group-viewport,
 .desktop-terminal-split,
+.desktop-terminal-tab-group,
+.desktop-terminal-tab-group-content,
 .desktop-terminal-session-pane,
 .desktop-terminal-session-host,
 .desktop-terminal-session-host-content {
@@ -46,6 +48,112 @@
 
 .desktop-terminal-split {
   display: grid;
+}
+
+.desktop-terminal-tab-group {
+  --desktop-terminal-group-header-size: 38px;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--po-terminal-bg);
+}
+
+.desktop-terminal-tab-group[data-focused="true"] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--po-divider) 54%, transparent);
+}
+
+.desktop-terminal-tab-group-content {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+}
+
+.desktop-terminal-pane-interaction-frame {
+  position: absolute;
+  z-index: 11;
+  color: transparent;
+  background:
+    linear-gradient(currentColor, currentColor) top / 100% 1px no-repeat,
+    linear-gradient(currentColor, currentColor) right / 1px 100% no-repeat,
+    linear-gradient(currentColor, currentColor) bottom / 100% 1px no-repeat,
+    linear-gradient(currentColor, currentColor) left / 1px 100% no-repeat;
+  inset: 0;
+  pointer-events: none;
+  transition: color 90ms ease;
+}
+
+.desktop-terminal-tab-group[data-handle-hot]:not([data-move-source])
+  > .desktop-terminal-pane-interaction-frame {
+  color: var(--po-divider);
+}
+
+.desktop-terminal-tab-group[data-move-source]
+  > .desktop-terminal-pane-interaction-frame,
+.desktop-terminal-tab-group:has(
+  > .desktop-terminal-pane-handle-shell > .desktop-terminal-pane-handle:active
+) > .desktop-terminal-pane-interaction-frame {
+  color: color-mix(in srgb, var(--po-pane-resizer-active-color) 76%, transparent);
+}
+
+.desktop-terminal-pane-handle-shell {
+  position: absolute;
+  z-index: 22;
+  display: flex;
+  width: 52px;
+  height: 20px;
+  align-items: flex-start;
+  justify-content: center;
+  inset-block-start: calc(var(--desktop-terminal-group-header-size) + 4px);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 90ms ease;
+}
+
+.desktop-terminal-tab-group[data-handle-hot] > .desktop-terminal-pane-handle-shell,
+.desktop-terminal-pane-handle-shell:hover,
+.desktop-terminal-pane-handle-shell:focus-within,
+.desktop-terminal-tab-group[data-drop-target] > .desktop-terminal-pane-handle-shell,
+.desktop-terminal-tab-group[data-move-source] > .desktop-terminal-pane-handle-shell {
+  opacity: 1;
+}
+
+.desktop-terminal-pane-handle {
+  appearance: none;
+  display: flex;
+  width: 27px;
+  height: 13px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--po-text-muted) 68%, transparent);
+  outline: 0;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.desktop-terminal-pane-handle:hover,
+.desktop-terminal-pane-handle:focus-visible {
+  color: color-mix(in srgb, var(--po-text-muted) 82%, transparent);
+}
+
+.desktop-terminal-pane-handle > i {
+  display: block;
+  width: 2px;
+  height: 2px;
+  border-radius: 0;
+  background: currentColor;
+}
+
+.desktop-terminal-tab-group[data-move-source]
+  > .desktop-terminal-tab-group-content {
+  opacity: 0.58;
 }
 
 .desktop-terminal-split[data-direction="horizontal"] {

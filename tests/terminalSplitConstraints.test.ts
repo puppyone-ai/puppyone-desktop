@@ -31,7 +31,7 @@ describe("Terminal split constraints", () => {
 
   it("admits a split from measured cell-grid minimums rather than pane count", () => {
     const minimum = terminalLeafMinimumSize({ width: 172, height: 128 });
-    expect(minimum).toEqual({ width: 188, height: 158 });
+    expect(minimum).toEqual({ width: 188, height: 196 });
     expect(canPlaceTerminalSplit(
       { width: 377, height: 200 },
       "right",
@@ -45,11 +45,17 @@ describe("Terminal split constraints", () => {
       minimum,
     )).toBe(false);
     expect(canPlaceTerminalSplit(
-      { width: 300, height: 317 },
+      { width: 300, height: 393 },
       "bottom",
       minimum,
       minimum,
     )).toBe(true);
+    expect(canPlaceTerminalSplit(
+      { width: 300, height: 392 },
+      "bottom",
+      minimum,
+      minimum,
+    )).toBe(false);
   });
 
   it("derives resize bounds from each recursive child minimum", () => {
@@ -71,6 +77,6 @@ describe("Terminal split constraints", () => {
   });
 });
 
-function leaf(sessionId: string): DesktopTerminalLayoutLeaf {
-  return Object.freeze({ kind: "session", id: sessionId, sessionId });
+function leaf(groupId: string): DesktopTerminalLayoutLeaf {
+  return Object.freeze({ kind: "group", id: groupId, groupId });
 }

@@ -33,11 +33,15 @@ describe("Terminal native split architecture", () => {
     const service = source("electron/main/terminal-service.mjs");
 
     expect(model).toContain("DesktopTerminalGroup");
-    expect(model).toContain('type: "move"');
-    expect(model).toContain('type: "unsplit"');
+    expect(model).toContain('type: "split-tab"');
+    expect(model).toContain('type: "merge-tab"');
+    expect(model).toContain('type: "move-group"');
+    expect(model).toContain('type: "merge-group"');
     expect(model).not.toContain("TerminalRuntimeRegistry");
-    expect(controller).toContain('type: "move"');
-    expect(controller).toContain('type: "unsplit"');
+    expect(controller).toContain('type: "split-tab"');
+    expect(controller).toContain('type: "merge-tab"');
+    expect(controller).toContain('type: "move-group"');
+    expect(controller).toContain('type: "merge-group"');
     expect(runtime).toContain("setPresented(presented: boolean)");
     expect(runtime).toContain("setFocused(focused: boolean)");
     expect(runtime).not.toContain("setActive(active: boolean)");
@@ -45,7 +49,7 @@ describe("Terminal native split architecture", () => {
     expect(service).not.toMatch(/groupId|splitId|split tree/i);
   });
 
-  it("moves tabs with pointer capture without taking over file drops", () => {
+  it("moves Tabs between complete Group leaves without taking over file drops", () => {
     const tabMove = source(
       "src/features/desktop-terminal/interactions/useTerminalTabMoveDrag.ts",
     );
@@ -58,15 +62,22 @@ describe("Terminal native split architecture", () => {
     const hosts = source(
       "src/features/desktop-terminal/layout/session-host/usePersistentTerminalSessionHosts.ts",
     );
-
     expect(tabMove).toContain("setPointerCapture");
+    expect(tabMove).toContain('window.addEventListener("pointermove"');
+    expect(tabMove).toContain('window.addEventListener("pointerup"');
+    expect(tabMove).toContain("event.buttons & 1");
     expect(tabMove).toContain("document.elementFromPoint");
     expect(tabMove).toContain('"terminal-tab-move"');
+    expect(tabMove).toContain("[data-terminal-content-drop-group-id]");
+    expect(tabMove).toContain("resolveTerminalTabBarDropTarget");
+    expect(tabMove).toContain("onInsertSession");
     expect(tabMove).not.toMatch(/DataTransfer|onDragStart|draggable/);
     expect(sessionView).toContain("classifyReferenceDataTransfer");
     expect(sessionView).toContain("onDragOver={handleTerminalDragOver}");
     expect(sessionView).toContain("onDrop={handleTerminalDrop}");
     expect(layout).toContain("<TerminalSessionHostSlot");
+    expect(layout).toContain("<TerminalSessionHeader");
+    expect(layout).toContain("data-terminal-group-pane-id={group.id}");
     expect(hosts).toContain("document.createElement(\"div\")");
   });
 

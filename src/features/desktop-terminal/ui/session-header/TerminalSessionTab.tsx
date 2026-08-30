@@ -9,6 +9,7 @@ import { DesktopMenuIconButton } from "../../../../components/DesktopMenu";
 import { TerminalSessionHeaderStatus } from "./TerminalSessionHeaderStatus";
 import type { WorkbenchSplitDropEdge } from "@puppyone/shared-ui";
 import type { TerminalTabMoveDragController } from "../../interactions/useTerminalTabMoveDrag";
+import { useTerminalDerivedDragClickSuppression } from "../../interactions/useTerminalDerivedDragClickSuppression";
 import type { TerminalSessionHeaderItem } from "./types";
 
 type TerminalSessionTabProps = {
@@ -46,11 +47,17 @@ export const TerminalSessionTab = memo(function TerminalSessionTab({
 }: TerminalSessionTabProps) {
   const { t } = useLocalization();
   const { presentation, runtime, session } = item;
+  const {
+    consumeSuppressedClick,
+    suppressDerivedDragClick,
+  } = useTerminalDerivedDragClickSuppression();
 
   return (
     <div
       className={`desktop-terminal-tab ${active ? "is-active" : ""} ${visibleInGroup && !active ? "is-visible-group" : ""} ${compact ? "is-compact" : ""}`}
       data-status={session.status}
+      data-terminal-tab-group-index={index}
+      data-terminal-tab-session-id={session.id}
       data-visible-group={visibleInGroup ? "true" : undefined}
       role="presentation"
       style={{
@@ -70,7 +77,11 @@ export const TerminalSessionTab = memo(function TerminalSessionTab({
         tabIndex={active ? 0 : -1}
         title={presentation.accessibleLabel}
         onClick={(event) => {
-          if (event.detail === 0) onActivate(session.id);
+          if (consumeSuppressedClick()) {
+            event.preventDefault();
+            return;
+          }
+          onActivate(session.id);
         }}
         onKeyDown={(event) => {
           const edge = terminalMoveEdgeFromKeyboard(event);
@@ -84,12 +95,14 @@ export const TerminalSessionTab = memo(function TerminalSessionTab({
         }}
         onPointerDown={(event) => tabMove.start(
           event,
-          session.id,
+          { kind: "tab", sessionId: session.id },
           presentation.pathLabel,
         )}
         onPointerMove={tabMove.move}
         onPointerUp={(event) => {
-          if (tabMove.end(event) === "press") onActivate(session.id);
+          if (event.button === 0 && tabMove.end(event) === "drag") {
+            suppressDerivedDragClick();
+          }
         }}
         onPointerCancel={tabMove.cancel}
         onLostPointerCapture={tabMove.lostCapture}
