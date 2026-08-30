@@ -32,13 +32,13 @@ describe("mode-first Sub Theme settings", () => {
     const darkOptions = [...container.querySelectorAll("option")].map((option) => option.value);
     expect(darkOptions).not.toContain("com.example.light-only");
     expect(container.querySelector<HTMLSelectElement>("select")?.value).toBe("default.neutral");
-    expect(container.querySelector(".desktop-sub-theme-mode-badge")?.textContent).toBe("Dark");
+    expect(container.querySelector(".desktop-sub-theme-mode-badge")).toBeNull();
 
     render(catalog, "light", "com.example.light-only");
     const lightOptions = [...container.querySelectorAll("option")].map((option) => option.value);
     expect(lightOptions).toContain("com.example.light-only");
     expect(container.querySelector<HTMLSelectElement>("select")?.value).toBe("com.example.light-only");
-    expect(container.querySelector(".desktop-sub-theme-mode-badge")?.textContent).toBe("Light");
+    expect(container.querySelector(".desktop-sub-theme-mode-badge")).toBeNull();
   });
 });
 

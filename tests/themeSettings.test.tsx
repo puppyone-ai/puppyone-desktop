@@ -14,7 +14,9 @@ describe("Sub Theme settings", () => {
     expect(section).toContain("onSubThemeChange");
     expect(section).toContain("getCompatibleSubThemes");
     expect(section).toContain("getCompatibleSubThemes(catalog.snapshot, rootThemeId, effectiveColorMode)");
-    expect(section).toContain("desktop-sub-theme-mode-badge");
+    expect(section).not.toContain("desktop-sub-theme-mode-badge");
+    expect(section).toContain("FolderOpen");
+    expect(section).toContain("<Plus");
     expect(section).toContain("settings.appearance.themes.add");
     expect(section).toContain("THEME_MARKETPLACE_URL");
     expect(section).not.toContain("function ThemeSelector");
@@ -29,16 +31,16 @@ describe("Sub Theme settings", () => {
     expect(section).toContain("desktop-settings-select");
     const styles = source("src/styles/settings-controls.css");
     expect(styles).toMatch(/\.desktop-theme-pack-controls\s*\{[\s\S]*flex-wrap:\s*nowrap/);
-    expect(styles).toMatch(/\.desktop-theme-pack-label\s*\{[^}]*color:\s*var\(--po-text-subtle\)/);
-    expect(styles).toMatch(/\.desktop-theme-pack-controls\s*\{[^}]*width:\s*fit-content[^}]*max-width:\s*100%/);
+    expect(styles).toMatch(/\.desktop-theme-pack-label\s*\{[^}]*white-space:\s*nowrap/);
+    expect(styles).toMatch(/\.desktop-theme-pack-controls\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*100%/);
     expect(section).toContain("desktop-theme-pack-picker");
-    expect(styles).toMatch(/\.desktop-theme-pack-picker\s*\{[^}]*width:\s*clamp\(180px,\s*24vw,\s*240px\)/);
-    expect(styles).toMatch(/\.desktop-theme-add-action\s*\{[\s\S]*white-space:\s*nowrap/);
+    expect(styles).toMatch(/\.desktop-theme-pack-picker\s*\{[^}]*width:\s*fit-content[^}]*max-width:\s*156px/);
+    expect(styles).toMatch(/\.desktop-theme-pack-select\s*\{[^}]*min-width:\s*124px[^}]*max-width:\s*156px[^}]*field-sizing:\s*content/);
     expect(section).not.toContain("desktop-theme-settings-action-row");
     expect(section.match(/desktop-settings-row desktop-settings-row-control/g)).toHaveLength(1);
     expect(section.indexOf("desktop-theme-pack-select")).toBeLessThan(section.indexOf("catalog.openDirectory"));
-    expect(styles).toMatch(/\.desktop-theme-pack-controls\s*>\s*\.desktop-settings-action\s*\{[^}]*flex:\s*0\s+0\s+auto[^}]*border:\s*1px\s+solid\s+var\(--po-divider\)/);
-    expect(styles).toMatch(/@media\s*\(max-width:\s*760px\)[\s\S]*\.desktop-theme-pack-controls\s*\{[^}]*flex-wrap:\s*wrap/);
+    expect(styles).toMatch(/\.desktop-theme-pack-icon-action\s*\{[^}]*width:\s*28px[^}]*height:\s*28px[^}]*border:\s*0/);
+    expect(styles).not.toMatch(/@media\s*\(max-width:\s*760px\)[\s\S]*\.desktop-theme-pack-controls\s*\{[^}]*width:\s*100%/);
   });
 
   it("wires the catalog and preferences through the settings surface", () => {
