@@ -29,7 +29,7 @@ describe("workspace registry lifecycle", () => {
     expect(result.items).toHaveLength(12);
     expect(new Set(result.items.map((item) => item.workspace.workspaceInstanceId)).size).toBe(12);
     const raw = JSON.parse(await fs.promises.readFile(path.join(root, "registry.json"), "utf8"));
-    expect(raw.version).toBe(5);
+    expect(raw.version).toBe(6);
     expect(raw.recentWorkspaces).toHaveLength(12);
   });
 
@@ -44,6 +44,47 @@ describe("workspace registry lifecycle", () => {
     await expect(store.readLastActiveWorkspacePaths()).resolves.toEqual(canonicalPaths);
     expect((await store.getRecentWorkspacesResult()).items.map((item) => item.workspace.path))
       .toEqual([...canonicalPaths].reverse());
+  });
+
+  it("persists Workbench identity independently from the primary Folder", async () => {
+    const store = createStore();
+    const folders = await createFolders("stable-workbench", 2);
+    const workspaces = folders.map(createWorkspace);
+
+    await store.rememberWorkspaceComposition(workspaces, {
+      workbenchWorkspaceId: "workbench:stable-composition",
+    });
+    await expect(store.readLastActiveWorkspaceComposition()).resolves.toMatchObject({
+      workspaceId: "workbench:stable-composition",
+    });
+
+    await store.rememberWorkspaceComposition([workspaces[1]], {
+      workbenchWorkspaceId: "workbench:stable-composition",
+    });
+    const restored = await store.readLastActiveWorkspaceComposition();
+    expect(restored.workspaceId).toBe("workbench:stable-composition");
+    expect(restored.paths).toEqual([await fs.promises.realpath(folders[1])]);
+  });
+
+  it("migrates a legacy active composition to one durable Workbench identity", async () => {
+    const folder = path.join(root, "legacy-active");
+    await fs.promises.mkdir(folder);
+    await fs.promises.writeFile(path.join(root, "registry.json"), JSON.stringify({
+      version: 5,
+      lastActiveWorkspacePath: folder,
+      lastActiveWorkspacePaths: [folder],
+      recentWorkspacePaths: [folder],
+    }));
+    const store = createStore();
+
+    const first = await store.readLastActiveWorkspaceComposition();
+    const second = await store.readLastActiveWorkspaceComposition();
+    const persisted = JSON.parse(await fs.promises.readFile(path.join(root, "registry.json"), "utf8"));
+
+    expect(first.workspaceId).toMatch(/^workbench:/);
+    expect(second.workspaceId).toBe(first.workspaceId);
+    expect(persisted.version).toBe(6);
+    expect(persisted.lastActiveWorkbenchWorkspaceId).toBe(first.workspaceId);
   });
 
   it("does not truncate an active composition to the recent-project limit", async () => {
@@ -187,7 +228,7 @@ describe("workspace registry lifecycle", () => {
 
     await store.rememberRecentWorkspacePath(folder, beforeRewrite.items[0].workspace);
     const persisted = JSON.parse(await fs.promises.readFile(path.join(root, "registry.json"), "utf8"));
-    expect(persisted.version).toBe(5);
+    expect(persisted.version).toBe(6);
     expect(persisted.recentWorkspaces[0]).not.toHaveProperty("projectId");
   });
 

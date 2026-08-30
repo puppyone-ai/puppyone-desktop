@@ -342,7 +342,9 @@ function EditorPane({
     >
       <EditorPaneRenderBoundary
         failureTitle={t("shared-ui.preview.crashed")}
-        resetKey={editor?.resource ?? null}
+        resetKey={editor?.resource
+          ? `${editor.resource}:${refreshKey?.sequence ?? 0}`
+          : null}
       >
         <EditorPaneRuntime
           aiEditFile={getAiEditFileForPath(aiEditRequest, editor?.resource) ?? null}

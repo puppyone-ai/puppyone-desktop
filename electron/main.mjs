@@ -360,7 +360,9 @@ const windowWorkspaceCompositionService = createWindowWorkspaceCompositionServic
   getWindowState: getOrCreateWindowState,
   getWorkspaceWindow,
   indexWorkspacePath: (folderPath, window) => workspaceWindowByPath.set(folderPath, window),
-  persistWorkspaceComposition: (workspaces) => workspaceStateStore.rememberWorkspaceComposition(workspaces),
+  persistWorkspaceComposition: (workspaces, workbenchWorkspaceId) => (
+    workspaceStateStore.rememberWorkspaceComposition(workspaces, { workbenchWorkspaceId })
+  ),
   revealWindow,
   unindexWorkspacePath: (folderPath, window) => {
     if (workspaceWindowByPath.get(folderPath) === window) workspaceWindowByPath.delete(folderPath);
@@ -430,7 +432,10 @@ async function createWindow(options = {}) {
     externalNavigation,
   });
   windowsById.set(webContentsId, window);
-  windowStateById.set(webContentsId, new WindowWorkspaceState({ initialWorkspacePaths }));
+  windowStateById.set(webContentsId, new WindowWorkspaceState({
+    initialWorkspaceId: options.initialWorkspaceId ?? null,
+    initialWorkspacePaths,
+  }));
   lastFocusedWindowId = webContentsId;
 
   window.on("focus", () => {
@@ -728,10 +733,13 @@ app.whenReady().then(async () => {
   }
   await telemetryHost.start();
   updateService.start();
-  const initialWorkspacePaths = initialLaunchIntent.workspacePath
-    ? [initialLaunchIntent.workspacePath]
-    : await workspaceStateStore.readLastActiveWorkspacePaths();
-  await createWindow({ initialWorkspacePaths });
+  const initialWorkspaceComposition = initialLaunchIntent.workspacePath
+    ? { workspaceId: null, paths: [initialLaunchIntent.workspacePath] }
+    : await workspaceStateStore.readLastActiveWorkspaceComposition();
+  await createWindow({
+    initialWorkspaceId: initialWorkspaceComposition.workspaceId,
+    initialWorkspacePaths: initialWorkspaceComposition.paths,
+  });
 
   app.on("activate", () => {
     void localeService.refreshSystemLanguages().catch((error) => {
@@ -741,8 +749,11 @@ app.whenReady().then(async () => {
       revealLastFocusedWindow();
       return;
     }
-    void workspaceStateStore.readLastActiveWorkspacePaths()
-      .then((initialWorkspacePaths) => createWindow({ initialWorkspacePaths }));
+    void workspaceStateStore.readLastActiveWorkspaceComposition()
+      .then((composition) => createWindow({
+        initialWorkspaceId: composition.workspaceId,
+        initialWorkspacePaths: composition.paths,
+      }));
   });
 }).catch((error) => {
   console.error("puppyone failed to start:", error);
@@ -1030,6 +1041,7 @@ async function getInitialWorkspaceResultForWindow(sender) {
   const window = BrowserWindow.fromWebContents(sender);
   if (!window || window.isDestroyed()) {
     return {
+      workspaceId: null,
       path: null,
       workspace: null,
       workspaces: [],
@@ -1041,6 +1053,7 @@ async function getInitialWorkspaceResultForWindow(sender) {
   if (state?.folders.length) {
     const workspaces = state.folders.map((folder) => folder.workspace);
     return {
+      workspaceId: state.workspaceId,
       path: state.folderPaths[0] ?? null,
       workspace: workspaces[0] ?? null,
       workspaces,
@@ -1051,6 +1064,7 @@ async function getInitialWorkspaceResultForWindow(sender) {
   const initialPaths = state?.initialRestorePaths ?? [];
   if (initialPaths.length === 0) {
     return {
+      workspaceId: state?.workspaceId ?? null,
       path: null,
       workspace: null,
       workspaces: [],
@@ -1074,9 +1088,12 @@ async function getInitialWorkspaceResultForWindow(sender) {
     const workspaces = folders.map((folder) => folder.workspace);
     const validationState = new WindowWorkspaceState();
     validationState.replaceFolders(folders);
-    await workspaceStateStore.rememberWorkspaceComposition(workspaces);
+    await workspaceStateStore.rememberWorkspaceComposition(workspaces, {
+      workbenchWorkspaceId: state?.workspaceId,
+    });
     assignWindowWorkspaceComposition(window, folders, { cleanupPrevious: false });
     return {
+      workspaceId: state?.workspaceId ?? null,
       path: folders[0]?.path ?? null,
       workspace: workspaces[0] ?? null,
       workspaces,
@@ -1084,6 +1101,7 @@ async function getInitialWorkspaceResultForWindow(sender) {
     };
   } catch (error) {
     return {
+      workspaceId: state?.workspaceId ?? null,
       path: initialPaths[0] ?? null,
       workspace: null,
       workspaces: [],
@@ -1206,18 +1224,30 @@ async function openWorkspaceInCurrentWindow(sender, folderPath, options = {}) {
   const existingWindow = getWorkspaceWindow(canonicalPath);
   if (existingWindow && existingWindow !== window) {
     revealWindow(existingWindow);
-    if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
+    const existingState = getOrCreateWindowState(existingWindow);
+    if (options.remember !== false) {
+      await workspaceStateStore.rememberWorkspaceComposition(
+        existingState.folders.map((folder) => folder.workspace),
+        { workbenchWorkspaceId: existingState.workspaceId },
+      );
+    }
     return {
       status: "focused-existing",
+      workspaceId: existingState.workspaceId,
       path: canonicalPath,
       workspace,
     };
   }
 
-  assignWindowWorkspace(window, workspace, canonicalPath);
-  if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
+  const state = assignWindowWorkspace(window, workspace, canonicalPath);
+  if (options.remember !== false) {
+    await workspaceStateStore.rememberWorkspaceComposition([workspace], {
+      workbenchWorkspaceId: state.workspaceId,
+    });
+  }
   return {
     status: "opened-current",
+    workspaceId: state.workspaceId,
     path: canonicalPath,
     workspace,
   };
@@ -1229,9 +1259,16 @@ async function openWorkspaceInNewWindow(folderPath, options = {}) {
   const existingWindow = getWorkspaceWindow(canonicalPath);
   if (existingWindow) {
     revealWindow(existingWindow);
-    if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
+    const existingState = getOrCreateWindowState(existingWindow);
+    if (options.remember !== false) {
+      await workspaceStateStore.rememberWorkspaceComposition(
+        existingState.folders.map((folder) => folder.workspace),
+        { workbenchWorkspaceId: existingState.workspaceId },
+      );
+    }
     return {
       status: "focused-existing",
+      workspaceId: existingState.workspaceId,
       path: canonicalPath,
       workspace,
     };
@@ -1240,10 +1277,15 @@ async function openWorkspaceInNewWindow(folderPath, options = {}) {
   const window = await createWindow({
     initialWorkspacePath: canonicalPath,
   });
-  assignWindowWorkspace(window, workspace, canonicalPath, { cleanupPrevious: false });
-  if (options.remember !== false) await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
+  const state = assignWindowWorkspace(window, workspace, canonicalPath, { cleanupPrevious: false });
+  if (options.remember !== false) {
+    await workspaceStateStore.rememberWorkspaceComposition([workspace], {
+      workbenchWorkspaceId: state.workspaceId,
+    });
+  }
   return {
     status: "opened-new-window",
+    workspaceId: state.workspaceId,
     path: canonicalPath,
     workspace,
   };
@@ -1266,7 +1308,12 @@ async function detachWorkspaceFromCurrentWindow(sender, folderPath) {
 }
 
 function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
+  const state = getOrCreateWindowState(window);
+  const alreadySameSingleFolder = state.folderPaths.length === 1
+    && state.folderPaths[0] === canonicalPath;
+  if (state.folders.length > 0 && !alreadySameSingleFolder) state.beginNewWorkspace();
   assignWindowWorkspaceComposition(window, [{ workspace, path: canonicalPath }], options);
+  return state;
 }
 
 function assignWindowWorkspaceComposition(window, folders, options = {}) {

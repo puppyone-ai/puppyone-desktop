@@ -627,6 +627,7 @@ export type GitRepositoryWindowFocusEvent = {
 };
 
 export type LastWorkspaceResult = {
+  workspaceId: string | null;
   path: string | null;
   workspace: Workspace | null;
   workspaces?: Workspace[];
@@ -648,12 +649,14 @@ export type RecentWorkspacesResult = {
 
 export type WorkspaceOpenResult = {
   status: "opened-current" | "opened-new-window" | "focused-existing";
+  workspaceId: string | null;
   path: string | null;
   workspace: Workspace | null;
 };
 
 export type WorkspaceAttachResult = {
   status: "attached-current" | "already-attached" | "focused-existing";
+  workspaceId: string;
   path: string | null;
   workspace: Workspace | null;
   workspaces: Workspace[];
@@ -661,6 +664,7 @@ export type WorkspaceAttachResult = {
 
 export type WorkspaceDetachResult = {
   status: "detached-current" | "not-attached";
+  workspaceId: string;
   path: string | null;
   workspace: Workspace | null;
   workspaces: Workspace[];

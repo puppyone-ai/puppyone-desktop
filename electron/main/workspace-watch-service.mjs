@@ -184,7 +184,7 @@ function createWatcher(rootPath, logger, fsModule) {
 }
 
 function armWorkspaceWatcher(entry) {
-  if (entry.disposed) return;
+  if (entry.disposed) return false;
   clearTimeout(entry.rearmTimer);
   entry.rearmTimer = null;
 
@@ -253,6 +253,7 @@ function armWorkspaceWatcher(entry) {
     });
 
     entry.rearmDelay = WORKSPACE_WATCH_REARM_MIN_DELAY_MS;
+    return true;
   } catch (error) {
     entry.lastEvent = {
       rootPath: entry.rootPath,
@@ -262,6 +263,7 @@ function armWorkspaceWatcher(entry) {
     };
     broadcastWorkspaceChange(entry);
     scheduleWorkspaceRearm(entry, "watcher-error");
+    return false;
   }
 }
 
@@ -277,7 +279,7 @@ function scheduleWorkspaceRearm(entry, reason) {
   entry.rearmTimer = setTimeout(() => {
     entry.rearmTimer = null;
     if (entry.disposed) return;
-    armWorkspaceWatcher(entry);
+    if (!armWorkspaceWatcher(entry)) return;
     entry.lastEvent = {
       rootPath: entry.rootPath,
       eventType: "change",

@@ -7,6 +7,7 @@ import {
   flushActiveDocumentSessions,
   isDataResourceUri,
   isDocumentDataNode,
+  qualifyDataResourcePath,
   EditorAppearanceProvider,
   type DataNode,
   type WorkspaceContentChange,
@@ -265,9 +266,10 @@ function AppContent() {
       hostPath: path,
     };
   }, [workbenchDataService]);
-  const resolveWorkspaceResource = useCallback((path: string | null) => (
-    workbenchDataService?.resolveResource(path) ?? null
-  ), [workbenchDataService]);
+  const resolveWorkspaceResource = useCallback((path: string | null) => {
+    if (!path || !workbenchDataService) return null;
+    return workbenchDataService.resolveResource(path);
+  }, [workbenchDataService]);
   const resolveAgentWorkspaceReference = useCallback(async (resource: string) => {
     if (!workbenchDataService || !isDataResourceUri(resource)) return null;
     try {
@@ -314,9 +316,13 @@ function AppContent() {
     editorWorkbench.closeUnderResource(path);
   }, [documentStorageIdentity, editorWorkbench]);
   const [activeExplorerNode, setActiveExplorerNode] = useState<DataNode | null>(null);
-  const focusedWorkspace = resolveWorkspaceResource(
+  const focusedWorkspaceResource = resolveWorkspaceResource(
     activeDocumentPath ?? activeExplorerNode?.path ?? null,
-  )?.folder.workspace ?? workspace;
+  );
+  const focusedWorkspaceFolder = focusedWorkspaceResource?.folder
+    ?? workbenchWorkspace?.folders[0]
+    ?? null;
+  const focusedWorkspace = focusedWorkspaceFolder?.workspace ?? workspace;
   const handleRemoveProject = useCallback(async (folder: WorkspaceFolder) => {
     if (documentStorageIdentity) {
       await closeDocumentWorkingCopiesUnderResource(documentStorageIdentity, folder.uri);
@@ -470,6 +476,7 @@ function AppContent() {
     aiEditAssistEnabled,
     onWorkspaceContentChanged: refreshWorkspaceContent,
     workspace: focusedWorkspace,
+    workspaceRootUri: focusedWorkspaceFolder?.uri ?? null,
   });
   const activeAiEditRequest = aiEditAssistEnabled ? latestAiEditRequest : null;
   const enterDataView = useCallback(() => {
@@ -929,10 +936,15 @@ function AppContent() {
     setActiveView("git");
     setSidebarCollapsed(false);
   }, [setSidebarCollapsed]);
-  const handleAgentOpenFile = useCallback((path: string) => {
-    handleActiveDataPathChange(path);
+  const handleAgentOpenFile = useCallback((workspaceRootPath: string, path: string) => {
+    const folder = workbenchWorkspace?.folders.find(
+      (candidate) => candidate.workspace.path === workspaceRootPath,
+    );
+    if (!folder) return;
+    const resource = qualifyDataResourcePath(folder.uri, path);
+    handleActiveDataPathChange(resource);
     navigateDesktopView("data");
-  }, [handleActiveDataPathChange, navigateDesktopView]);
+  }, [handleActiveDataPathChange, navigateDesktopView, workbenchWorkspace?.folders]);
   const agentChatContribution = useMemo<AuxiliaryWorkbenchContribution | null>(() => {
     if (!desktopAgentChatEnabled) return null;
     return Object.freeze({
@@ -965,7 +977,7 @@ function AppContent() {
             preferredModel={agentPreferredModel}
             onPreferredModelChange={setAgentPreferredModel}
             onViewChanges={handleAgentViewChanges}
-            onOpenFile={handleAgentOpenFile}
+            onOpenFile={(path) => handleAgentOpenFile(context.item.rootId, path)}
             resolveWorkspaceReference={resolveAgentWorkspaceReference}
           />
         </Suspense>

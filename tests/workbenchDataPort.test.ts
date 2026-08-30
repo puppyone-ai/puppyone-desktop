@@ -196,7 +196,7 @@ describe("WorkbenchDataService", () => {
     }
   });
 
-  it("routes root-level creation explicitly and rejects ambiguous null targets", async () => {
+  it("routes root-level creation explicitly and rejects ambiguous provider paths", async () => {
     const workbench = createWorkbenchWorkspace([
       workspace("a", "Alpha", "/alpha"),
       workspace("b", "Beta", "/beta"),
@@ -213,7 +213,8 @@ describe("WorkbenchDataService", () => {
 
     await service.dataPort.createFile?.(path, "hello");
     expect(providers.get(workbench.folders[1]!.id)?.createFile).toHaveBeenCalledWith("new.md", "hello");
-    expect(() => service.resolveResource(null)).not.toThrow();
+    expect(() => service.resolveResource(null)).toThrow(/ambiguous.*Resource URI/i);
+    expect(() => service.resolveResource("new.md")).toThrow(/ambiguous.*Resource URI/i);
   });
 
   it("rejects cross-Project moves without mutating either provider", async () => {

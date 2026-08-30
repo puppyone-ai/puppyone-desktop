@@ -93,15 +93,21 @@ export function isContextMapFilename(name: string): boolean {
 }
 
 export function getContextMapScopePath(documentPath: string): string | null {
-  const normalized = normalizeDataPath(documentPath);
-  const slashIndex = normalized.lastIndexOf("/");
-  return slashIndex < 0 ? null : normalized.slice(0, slashIndex) || null;
+  return getDataResourceParent(documentPath);
 }
 
 export function toContextMapRelativePath(scopePath: string | null, path: string): string | null {
-  const normalizedPath = normalizeDataPath(path);
-  const normalizedScope = normalizeDataPath(scopePath ?? "");
+  const normalizedPath = normalizeDataResourcePath(path) ?? "";
+  const normalizedScope = normalizeDataResourcePath(scopePath) ?? "";
   if (!normalizedScope) return normalizedPath || null;
+  if (isDataResourceUri(normalizedPath) || isDataResourceUri(normalizedScope)) {
+    if (!isDataResourceUri(normalizedPath) || !isDataResourceUri(normalizedScope)) return null;
+    const relative = contextMapResourceIdentity.relativePath(
+      normalizedScope as ResourceUri,
+      normalizedPath as ResourceUri,
+    );
+    return relative === "" ? "." : relative ?? null;
+  }
   if (normalizedPath === normalizedScope) return ".";
   const prefix = `${normalizedScope}/`;
   return normalizedPath.startsWith(prefix) ? normalizedPath.slice(prefix.length) : null;
@@ -110,10 +116,14 @@ export function toContextMapRelativePath(scopePath: string | null, path: string)
 export function fromContextMapRelativePath(scopePath: string | null, path: string): string | null {
   const normalizedRelative = normalizeRelativePath(path);
   if (normalizedRelative === null) return null;
-  const normalizedScope = normalizeDataPath(scopePath ?? "");
+  const normalizedScope = normalizeDataResourcePath(scopePath) ?? "";
   if (normalizedRelative === ".") return normalizedScope || null;
-  return normalizedScope ? `${normalizedScope}/${normalizedRelative}` : normalizedRelative;
+  return normalizedScope
+    ? joinDataResourcePath(normalizedScope, normalizedRelative)
+    : normalizedRelative;
 }
+
+const contextMapResourceIdentity = new ResourceUriIdentityService();
 
 function invalidDocument(error: string): ParsedContextMapDocument {
   return { document: createDefaultContextMapDocument(), error, ok: false };
@@ -172,3 +182,10 @@ function roundCoordinate(value: number): number {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
+import {
+  getDataResourceParent,
+  isDataResourceUri,
+  joinDataResourcePath,
+  normalizeDataResourcePath,
+} from "../../../core/dataResourcePath";
+import { ResourceUriIdentityService, type ResourceUri } from "../../../core/resourceUri";

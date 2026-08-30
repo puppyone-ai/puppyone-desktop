@@ -2,6 +2,7 @@ import {
   ResourceUriIdentityService,
   canonicalizeResourceUri,
   createResourceUri,
+  createWorkspaceResourceUri,
   parseResourceUri,
   type ResourceUri,
 } from "./resourceUri";
@@ -34,6 +35,24 @@ export function assertValidDataResourceReference(
 ): void {
   if (!looksLikeResourceUri(value) || isDataResourceUri(value)) return;
   throw new TypeError("Malformed Resource URI. Expected scheme://authority/path.");
+}
+
+/**
+ * Qualifies a provider-local path at its owning Workspace Folder boundary.
+ * Already-qualified resources must remain inside that same Folder.
+ */
+export function qualifyDataResourcePath(
+  rootUri: ResourceUri,
+  value: string,
+): ResourceUri {
+  if (isDataResourceUri(value)) {
+    if (!resourceIdentity.isEqualOrParent(value, rootUri)) {
+      throw new Error("Resource URI is outside the selected Workspace Folder.");
+    }
+    return canonicalizeResourceUri(value);
+  }
+  assertValidDataResourceReference(value);
+  return createWorkspaceResourceUri(rootUri, value);
 }
 
 export function normalizeDataResourcePath(

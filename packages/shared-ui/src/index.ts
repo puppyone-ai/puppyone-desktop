@@ -11,6 +11,7 @@ export {
   isSameDataResource,
   joinDataResourcePath,
   normalizeDataResourcePath,
+  qualifyDataResourcePath,
   rebaseDataResourcePath,
 } from "./core/dataResourcePath";
 export {

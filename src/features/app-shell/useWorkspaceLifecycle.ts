@@ -70,29 +70,37 @@ export function useWorkspaceLifecycle({
     [workbenchWorkspace],
   );
 
-  const activateWorkspaceComposition = useCallback((nextWorkspaces: readonly Workspace[]) => {
+  const activateWorkspaceComposition = useCallback((
+    nextWorkspaces: readonly Workspace[],
+    workbenchWorkspaceId?: string | null,
+  ) => {
     if (nextWorkspaces.length === 0) return;
     setWorkspaces((current) => {
       const nextIds = new Set(nextWorkspaces.map((item) => item.id));
       return [...nextWorkspaces, ...current.filter((item) => !nextIds.has(item.id))];
     });
-    const nextWorkbenchWorkspace = createWorkbenchWorkspace(nextWorkspaces);
+    const nextWorkbenchWorkspace = createWorkbenchWorkspace(nextWorkspaces, {
+      ...(workbenchWorkspaceId ? { id: workbenchWorkspaceId } : {}),
+    });
     workbenchWorkspaceContextRef.current = new WorkbenchWorkspaceContext(nextWorkbenchWorkspace);
     setWorkbenchWorkspace(nextWorkbenchWorkspace);
     setRestoreWorkspaceError(null);
     onWorkspaceActivated();
   }, [onWorkspaceActivated]);
 
-  const activateWorkspace = useCallback((nextWorkspace: Workspace) => {
-    activateWorkspaceComposition([nextWorkspace]);
+  const activateWorkspace = useCallback((nextWorkspace: Workspace, workbenchWorkspaceId?: string | null) => {
+    activateWorkspaceComposition([nextWorkspace], workbenchWorkspaceId);
   }, [activateWorkspaceComposition]);
 
-  const reconcileWorkspaceComposition = useCallback(async (nextWorkspaces: readonly Workspace[]) => {
+  const reconcileWorkspaceComposition = useCallback(async (
+    nextWorkspaces: readonly Workspace[],
+    workbenchWorkspaceId: string,
+  ) => {
     if (nextWorkspaces.length === 0) return;
     const nextFolders = nextWorkspaces.map((item, index) => createWorkspaceFolder(item, { index }));
     const context = workbenchWorkspaceContextRef.current;
-    if (!context || context.getWorkspace().folders[0]?.id !== nextFolders[0]?.id) {
-      activateWorkspaceComposition(nextWorkspaces);
+    if (!context || context.getWorkspace().id !== workbenchWorkspaceId) {
+      activateWorkspaceComposition(nextWorkspaces, workbenchWorkspaceId);
       return;
     }
     const nextWorkbenchWorkspace = await context.replaceFolders(nextFolders);
@@ -136,7 +144,7 @@ export function useWorkspaceLifecycle({
     if (!result) return;
     if (result.status === "opened-current" && result.workspace) {
       setActiveWorkspaceEntryKind(entryKind);
-      activateWorkspace(result.workspace);
+      activateWorkspace(result.workspace, result.workspaceId);
     } else {
       setRestoreWorkspaceError(null);
       onWorkspaceOpenSettled();
@@ -179,7 +187,7 @@ export function useWorkspaceLifecycle({
         return;
       }
       if (result.status !== "focused-existing" && result.workspaces.length > 0) {
-        await reconcileWorkspaceComposition(result.workspaces);
+        await reconcileWorkspaceComposition(result.workspaces, result.workspaceId);
       } else {
         setRestoreWorkspaceError(null);
         onWorkspaceOpenSettled();
@@ -206,7 +214,7 @@ export function useWorkspaceLifecycle({
     try {
       const result = await attachWorkspaceFolder(folderPath);
       if (result.status !== "focused-existing" && result.workspaces.length > 0) {
-        await reconcileWorkspaceComposition(result.workspaces);
+        await reconcileWorkspaceComposition(result.workspaces, result.workspaceId);
       } else {
         setRestoreWorkspaceError(null);
         onWorkspaceOpenSettled();
@@ -229,7 +237,7 @@ export function useWorkspaceLifecycle({
     try {
       const result = await detachWorkspaceFolder(folderPath);
       if (result.workspaces.length > 0) {
-        await reconcileWorkspaceComposition(result.workspaces);
+        await reconcileWorkspaceComposition(result.workspaces, result.workspaceId);
       }
       setRestoreWorkspaceError(null);
       onWorkspaceOpenSettled();
@@ -304,7 +312,7 @@ export function useWorkspaceLifecycle({
           ? initialWorkspace.workspaces
           : initialWorkspace.workspace ? [initialWorkspace.workspace] : [];
         if (initialComposition.length > 0) {
-          activateWorkspaceComposition(initialComposition);
+          activateWorkspaceComposition(initialComposition, initialWorkspace.workspaceId);
         } else if (initialWorkspace.error) {
           setRestoreWorkspaceError(initialWorkspace.error);
         }

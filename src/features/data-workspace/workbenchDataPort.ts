@@ -58,6 +58,11 @@ export function createWorkbenchDataService(
     const resourceIsUri = isDataResourceUri(path);
     if (!resourceIsUri) assertValidDataResourceReference(path);
     if (!path || !resourceIsUri) {
+      if (workbench.folders.length !== 1) {
+        throw new TypeError(
+          "A provider-relative path is ambiguous in a multi-Folder Workspace. Use a Resource URI.",
+        );
+      }
       const folder = workbench.folders[0]!;
       return {
         folder,
