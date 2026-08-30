@@ -224,6 +224,21 @@ describe("Desktop Agent renderer surfaces", () => {
     expect(position.top).toBeGreaterThanOrEqual(12);
   });
 
+  it("locks Composer pickers above the trigger even when the lower side has more room", () => {
+    const position = resolveAnchoredOverlayPosition({
+      anchor: { top: 250, right: 430, bottom: 280, left: 400, width: 30, height: 30 },
+      boundary: { top: 0, right: 469, bottom: 800, left: 50, width: 419, height: 800 },
+      viewportWidth: 1000,
+      viewportHeight: 800,
+      overlayHeight: 180,
+      placementPreference: "above",
+    });
+
+    expect(position.placement).toBe("above");
+    expect(position.top).toBe(62);
+    expect(position.top + 180).toBeLessThanOrEqual(250 - 8);
+  });
+
   it("renders a quiet document flow without role labels or a generic response toolbar", () => {
     const projection = createAgentProjection();
     projection.messages.push(

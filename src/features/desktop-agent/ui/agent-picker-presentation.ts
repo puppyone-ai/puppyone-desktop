@@ -1,6 +1,8 @@
-export type AgentPickerPlacement = "default" | "header";
+export type AgentPickerPlacement = "composer" | "header";
 export type AgentPickerIndicator = "chevron" | "none";
 export type AgentPickerWidth = "wide" | "medium" | "narrow";
+
+export const agentPickerMaxHeightPixels = 360;
 
 /**
  * Picker widths are presentation roles, not caller-controlled geometry. Keeping

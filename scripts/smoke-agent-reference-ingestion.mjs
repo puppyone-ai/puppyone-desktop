@@ -229,6 +229,29 @@ async function runProductionLayoutSmoke() {
       throw new Error(`Production Agent direct picker contract failed: ${JSON.stringify(directPicker)}`);
     }
     await window.webContents.executeJavaScript(`(() => {
+      const trace = [];
+      const capture = () => {
+        const surface = document.querySelector('.desktop-agent-picker-popover[data-positioned=true]');
+        const trigger = document.querySelector('.desktop-agent-composer-picker.is-model .desktop-agent-picker-trigger');
+        if (!surface || !trigger) return;
+        const surfaceRect = surface.getBoundingClientRect();
+        const triggerRect = trigger.getBoundingClientRect();
+        trace.push({
+          placement: surface.getAttribute('data-placement') || '',
+          top: surfaceRect.top,
+          bottom: surfaceRect.bottom,
+          anchorTop: triggerRect.top,
+        });
+      };
+      const observer = new MutationObserver(capture);
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-placement', 'data-positioned', 'style'],
+        childList: true,
+        subtree: true,
+      });
+      window.__agentPickerPlacementTrace = trace;
+      window.__agentPickerPlacementObserver = observer;
       document.querySelector('.desktop-agent-composer-picker.is-model button')?.click();
     })()`, true);
     await waitForRenderer(
@@ -236,12 +259,22 @@ async function runProductionLayoutSmoke() {
       "Boolean(document.querySelector('.desktop-agent-picker-popover[data-positioned=true]'))",
       Boolean,
     );
+    await window.webContents.executeJavaScript(`new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    })`, true);
     const pickerSnapshot = await window.webContents.executeJavaScript(`(() => {
       const surface = document.querySelector('.desktop-agent-picker-popover');
+      const trigger = document.querySelector('.desktop-agent-composer-picker.is-model .desktop-agent-picker-trigger');
       const option = surface?.querySelector('[role=option]');
       const rootStyle = getComputedStyle(document.documentElement);
       const surfaceStyle = surface ? getComputedStyle(surface) : null;
       const optionStyle = option ? getComputedStyle(option) : null;
+      const trace = Array.isArray(window.__agentPickerPlacementTrace)
+        ? [...window.__agentPickerPlacementTrace]
+        : [];
+      window.__agentPickerPlacementObserver?.disconnect();
+      const surfaceRect = surface?.getBoundingClientRect();
+      const triggerRect = trigger?.getBoundingClientRect();
       return {
         sharedSurface: surface?.classList.contains('desktop-menu-surface') || false,
         nativeOccluder: surface?.getAttribute('data-native-surface-occluder') === 'true',
@@ -252,14 +285,38 @@ async function runProductionLayoutSmoke() {
         borderRadius: surfaceStyle?.borderRadius || '',
         expectedBorderRadius: rootStyle.getPropertyValue('--po-menu-radius').trim(),
         optionWeight: optionStyle?.fontWeight || '',
+        placement: surface?.getAttribute('data-placement') || '',
+        aboveAnchor: Boolean(surfaceRect && triggerRect && surfaceRect.bottom <= triggerRect.top - 7),
+        placementTrace: trace,
       };
     })()`, true);
+    const placementTops = pickerSnapshot.placementTrace.map(({ top }) => top);
+    const placementIsStable = placementTops.length > 0
+      && Math.max(...placementTops) - Math.min(...placementTops) <= 0.5
+      && pickerSnapshot.placementTrace.every(({ placement, bottom, anchorTop }) => (
+        placement === "above" && bottom <= anchorTop - 7
+      ));
     if (!pickerSnapshot.sharedSurface || !pickerSnapshot.nativeOccluder || !pickerSnapshot.quietTone
       || !pickerSnapshot.compactElevation || !pickerSnapshot.listbox || pickerSnapshot.optionCount < 2
       || pickerSnapshot.borderRadius !== pickerSnapshot.expectedBorderRadius
-      || Number(pickerSnapshot.optionWeight) > 400) {
+      || Number(pickerSnapshot.optionWeight) > 400 || pickerSnapshot.placement !== "above"
+      || !pickerSnapshot.aboveAnchor || !placementIsStable) {
       throw new Error(`Production Agent picker primitive smoke failed: ${JSON.stringify(pickerSnapshot)}`);
     }
+    await window.webContents.executeJavaScript(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`, true);
+    await waitForRenderer(
+      window,
+      "Boolean(document.querySelector('.desktop-agent-picker-popover'))",
+      (value) => !value,
+    );
+    await window.webContents.executeJavaScript(`(() => {
+      document.querySelector('.desktop-agent-composer-picker.is-effort button')?.click();
+    })()`, true);
+    await waitForRenderer(
+      window,
+      "document.querySelector('.desktop-agent-picker-popover[data-positioned=true]')?.getAttribute('data-placement')",
+      (value) => value === "above",
+    );
     pickerThemes.push(theme);
     const image = await window.capturePage();
     if (image.isEmpty()) throw new Error(`Production Agent reference ${theme} capture was empty.`);
