@@ -778,7 +778,12 @@ function normalizeProviderSession(result) {
 function normalizeAccount(result) {
   const account = result?.account;
   if (!account || typeof account !== "object") {
-    return { account: null, requiresOpenaiAuth: Boolean(result?.requiresOpenaiAuth) };
+    const requiresOpenaiAuth = Boolean(result?.requiresOpenaiAuth);
+    return {
+      account: null,
+      requiresOpenaiAuth,
+      ...(requiresOpenaiAuth ? { setupReason: "authentication-required" } : {}),
+    };
   }
   return {
     account: {

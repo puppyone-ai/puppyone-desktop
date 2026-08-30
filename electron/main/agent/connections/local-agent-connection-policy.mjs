@@ -21,7 +21,9 @@ export function deriveLocalConnection(probe, gates = {}) {
         : installation === "detected"
           ? probe?.protocolCompatible !== true
             ? "protocol-unavailable"
-            : "setup-required"
+            : ["error", "unknown"].includes(authentication)
+              ? "blocked"
+              : "setup-required"
           : "inventory-only";
 
   return {
@@ -62,6 +64,7 @@ function statusMessage({ displayName, installation, authentication, version, una
   if (authentication === "signed-out") return `${label}${suffix} is detected but requires sign-in. Refresh after signing in with its documented CLI flow.`;
   if (authentication === "expired") return `${label}${suffix} is detected, but its local session has expired.`;
   if (authentication === "error") return `${label}${suffix} is detected, but its authentication state could not be read.`;
+  if (authentication === "unknown") return `${label}${suffix} is detected, but its authentication status was not recognized.`;
   if (!hasModels) return `${label}${suffix} is detected, but no compatible text-and-tools model is available.`;
   if (ready) return `${label}${suffix} is ready for native Agent sessions.`;
   return `${label}${suffix} is detected but is not enabled for this workspace.`;

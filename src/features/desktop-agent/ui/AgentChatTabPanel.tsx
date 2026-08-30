@@ -115,7 +115,7 @@ export function AgentChatTabPanel({
           ? t("agent.composer.placeholder.followUp")
           : t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID);
   const sessionStatus = state.session?.terminalState;
-  const statusCode = state.session ? sessionStatusCode(sessionStatus) : readinessStatusCode(readiness?.status);
+  const statusCode = state.session ? sessionStatusCode(sessionStatus) : readinessStatusCode(readiness);
   const title = state.session?.title || (agentRuntimeSelected ? runtimeLabel : t("agent.header.newChat"));
   const hasStatus = unavailable || failed || Boolean(state.error);
   const history = useAgentConversationHistory({

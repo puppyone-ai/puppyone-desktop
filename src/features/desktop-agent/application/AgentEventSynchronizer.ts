@@ -264,6 +264,7 @@ function rejectedProviderPatch(state: AgentControllerState, projection: AgentCon
         : {
           ...state.inspection.readiness,
           status: "installed-not-authenticated" as const,
+          code: "PROVIDER_CREDENTIALS_REJECTED" as const,
           message: "",
         },
     },

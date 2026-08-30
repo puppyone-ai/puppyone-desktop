@@ -72,6 +72,7 @@ export async function discoverExecutable({
   if (!executablePath) {
     return {
       status: "not-installed",
+      code: "RUNTIME_NOT_INSTALLED",
       version: null,
       minimumVersion,
       executablePath: null,
@@ -96,6 +97,7 @@ export async function discoverExecutable({
     if (result.code !== 0 || !version) {
       return {
         status: "unsupported-version",
+        code: "RUNTIME_VERSION_UNVERIFIED",
         version,
         minimumVersion,
         executablePath,
@@ -106,6 +108,7 @@ export async function discoverExecutable({
     if (minimumVersion && compareVersions(version, minimumVersion) < 0) {
       return {
         status: "unsupported-version",
+        code: "RUNTIME_VERSION_UNSUPPORTED",
         version,
         minimumVersion,
         executablePath,
@@ -115,6 +118,7 @@ export async function discoverExecutable({
     }
     return {
       status: "ready",
+      code: "READY",
       version,
       minimumVersion,
       executablePath,
@@ -127,6 +131,7 @@ export async function discoverExecutable({
   } catch (error) {
     return {
       status: "error",
+      code: "RUNTIME_DISCOVERY_FAILED",
       version: null,
       minimumVersion,
       executablePath,

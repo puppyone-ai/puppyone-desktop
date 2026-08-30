@@ -397,6 +397,11 @@
   font-size: var(--agent-font-size-meta);
 }
 
+.desktop-agent-readiness-code {
+  font-family: var(--po-font-mono);
+  letter-spacing: 0.015em;
+}
+
 .desktop-agent-readiness button {
   display: inline-flex;
   min-height: var(--agent-control-size);

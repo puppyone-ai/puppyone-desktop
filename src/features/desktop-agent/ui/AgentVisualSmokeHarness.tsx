@@ -303,7 +303,7 @@ export function AgentVisualSmokeHarness() {
 function runtimeEntry(id: string, displayName: string, iconKey: string): AgentRuntimeCatalogEntry {
   return {
     descriptor: { id, displayName, iconKey, distribution: "user-installed" },
-    readiness: { runtimeId: id, provider: id, status: "ready", version: "1.0.0", minimumVersion: null, message: "Ready", selectable: true },
+    readiness: { runtimeId: id, provider: id, status: "ready", code: "READY", version: "1.0.0", minimumVersion: null, message: "Ready", selectable: true },
   };
 }
 

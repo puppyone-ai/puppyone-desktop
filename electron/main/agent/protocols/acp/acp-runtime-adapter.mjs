@@ -146,7 +146,10 @@ export class AcpRuntimeAdapter {
           } : null,
           requiresOpenaiAuth: false,
           requiresRuntimeSetup: !accountReady,
-          ...(!accountReady ? { error: `${this.runtimeDescriptor.displayName} has no authenticated model available.` } : {}),
+          ...(!accountReady ? {
+            setupReason: "runtime-setup-required",
+            error: `${this.runtimeDescriptor.displayName} has no authenticated model available.`,
+          } : {}),
         },
         providers: publicProviders(models),
         models,

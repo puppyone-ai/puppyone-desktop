@@ -332,6 +332,7 @@ describe("Desktop Agent panel lifecycle", () => {
           runtimeId: "opencode",
           provider: "opencode",
           status: "unsupported-version",
+          code: "RUNTIME_VERSION_UNSUPPORTED",
           version: "1.1.33",
           minimumVersion: "1.17.18",
           source: "external",
@@ -345,6 +346,7 @@ describe("Desktop Agent panel lifecycle", () => {
         runtimeId: "opencode",
         provider: "opencode",
         status: "unsupported-version",
+        code: "RUNTIME_VERSION_UNSUPPORTED",
         version: "1.1.33",
         minimumVersion: "1.17.18",
         source: "external",
@@ -364,9 +366,9 @@ describe("Desktop Agent panel lifecycle", () => {
     expect(textarea.disabled).toBe(false);
     expect(textarea.getAttribute("style")).toBeNull();
     const text = stripBidiIsolation(container.textContent);
-    expect(text).toContain("OpenCode needs attention");
-    expect(text).toContain("Update this coding Agent to a supported version");
+    expect(text).toContain("Update OpenCode");
     expect(text).toContain("The configured Agent engine is incompatible");
+    expect(text).toContain("Status code: RUNTIME_VERSION_UNSUPPORTED");
     expect(text).not.toContain("OpenCode update required");
     expect(container.querySelector('button[aria-label="Retry Agent engine"]')).not.toBeNull();
   });
@@ -470,6 +472,7 @@ function readyInspection() {
         runtimeId: "opencode",
         provider: "opencode",
         status: "ready" as const,
+        code: "READY" as const,
         version: "0.144.1",
         minimumVersion: "0.144.1",
         message: "OpenCode is ready.",
@@ -481,6 +484,7 @@ function readyInspection() {
       runtimeId: "opencode",
       provider: "opencode",
       status: "ready" as const,
+      code: "READY" as const,
       version: "0.144.1",
       minimumVersion: "0.144.1",
       message: "OpenCode is ready.",

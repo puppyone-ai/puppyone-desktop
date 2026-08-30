@@ -7,8 +7,8 @@ export function parseCursorLocalVersion(value) {
 
 export function parseCursorAuthentication(value) {
   const status = String(value || "").toLowerCase();
-  if (/not authenticated|not logged[ -]?in|signed[ -]?out|login required|please (?:log|sign)[ -]?in/.test(status)) return "signed-out";
   if (/expired|session has expired|credentials? expired/.test(status)) return "expired";
+  if (/not authenticated|not logged[ -]?in|signed[ -]?out|login required|please (?:log|sign)[ -]?in/.test(status)) return "signed-out";
   if (/authenticated|logged[ -]?in|signed[ -]?in/.test(status)) return "signed-in";
   if (/\berror\b|failed|secitemcopymatching|unable to/.test(status)) return "error";
   return "unknown";
@@ -32,8 +32,14 @@ export async function probeCursorLocal({
       { env: probeEnvironment, signal },
     );
     const version = parseCursorLocalVersion(`${versionResult.stdout}\n${versionResult.stderr}`);
-    if (versionResult.code !== 0 || !version) return brokenCursor(candidate.source);
+    if (versionResult.code !== 0 || !version) {
+      return brokenCursor(candidate.source, probeFailureDiagnostic("version", versionResult));
+    }
     let authentication = "unknown";
+    let authenticationDiagnostic = null;
+    let authenticationExitCode = null;
+    let authenticationSignal = null;
+    let authenticationFailure = null;
     try {
       const statusExecutablePath = runCommand === runBoundedProbeCommand
         ? await assertExecutableIdentity(candidate)
@@ -43,19 +49,38 @@ export async function probeCursorLocal({
         [...(candidate.argsPrefix || []), "status"],
         { env: probeEnvironment, signal },
       );
-      authentication = parseCursorAuthentication(`${statusResult.stdout}\n${statusResult.stderr}`);
-      if (statusResult.code !== 0 && authentication === "unknown") authentication = "error";
-    } catch {
+      const statusOutput = `${statusResult.stdout}\n${statusResult.stderr}`;
+      authentication = parseCursorAuthentication(statusOutput);
+      authenticationExitCode = Number.isInteger(statusResult.code) ? statusResult.code : null;
+      authenticationSignal = statusResult.signal ? String(statusResult.signal) : null;
+      if (statusResult.code !== 0 && !["signed-out", "expired"].includes(authentication)) {
+        authentication = "error";
+      }
+      if (["error", "unknown"].includes(authentication)) {
+        authenticationDiagnostic = probeFailureDiagnostic("status", statusResult);
+      }
+      if (authentication === "error") {
+        authenticationFailure = statusResult.signal || (Number.isInteger(statusResult.code) && statusResult.code >= 128)
+          ? "crashed"
+          : "failed";
+      }
+    } catch (error) {
       authentication = "error";
+      authenticationDiagnostic = error instanceof Error ? error.message : String(error);
+      authenticationFailure = /timed out/i.test(authenticationDiagnostic) ? "timed-out" : "failed";
     }
     return {
       ...baseCursor(candidate.source),
       installation: "detected",
       version,
       authentication,
+      ...(authenticationDiagnostic ? { authenticationDiagnostic } : {}),
+      ...(authenticationExitCode !== null ? { authenticationExitCode } : {}),
+      ...(authenticationSignal ? { authenticationSignal } : {}),
+      ...(authenticationFailure ? { authenticationFailure } : {}),
     };
-  } catch {
-    return brokenCursor(candidate.source);
+  } catch (error) {
+    return brokenCursor(candidate.source, error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -74,8 +99,22 @@ function missingCursor() {
   return { ...baseCursor(null), installation: "not-found", version: null };
 }
 
-function brokenCursor(source) {
-  return { ...baseCursor(source), installation: "broken", version: null, authentication: "error" };
+function brokenCursor(source, diagnostic = null) {
+  return {
+    ...baseCursor(source),
+    installation: "broken",
+    version: null,
+    authentication: "error",
+    ...(diagnostic ? { diagnostic: String(diagnostic).trim().slice(0, 4_000) } : {}),
+  };
+}
+
+function probeFailureDiagnostic(probe, result) {
+  const termination = result?.signal
+    ? `signal ${String(result.signal)}`
+    : Number.isInteger(result?.code) ? `exit code ${result.code}` : "an unknown exit status";
+  const output = `${result?.stdout ?? ""}\n${result?.stderr ?? ""}`.trim().slice(0, 3_500);
+  return `Cursor ${probe} probe ended with ${termination}.${output ? ` ${output}` : ""}`;
 }
 
 function normalizeSource(source) {

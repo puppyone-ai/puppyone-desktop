@@ -611,6 +611,7 @@ function normalizeAccount(value, models, environment = {}) {
     requiresOpenaiAuth: false,
     requiresRuntimeSetup: !authenticated,
     ...(!authenticated ? {
+      setupReason: "runtime-setup-required",
       error: hasNativeIdentity && !authenticated
         ? "Claude subscription OAuth cannot be used by a third-party product. Configure an Anthropic API key or a supported cloud provider, then refresh."
         : models.length
