@@ -56,7 +56,7 @@ export function DesktopOverlayPortal({
   return createPortal(children, root);
 }
 
-/** Portals feature-owned menus into the shared, themed desktop overlay root. */
+/** Portals feature-owned menus and dialogs into the shared, themed desktop overlay root. */
 export function DesktopOverlayLayer({ children }: { children: ReactNode }) {
   useNativeSurfaceOcclusionLease();
   const root = useDesktopOverlayRoot();

@@ -10,14 +10,18 @@ const DIALOG_FOCUSABLE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
+export type DesktopDialogDismissalPolicy = "dismissible" | "action-required";
+
 export function DesktopDialogRoot({
   children,
   onClose,
+  dismissalPolicy = "dismissible",
   dismissOnBackdrop = true,
   className = "",
 }: {
   children: ReactNode;
   onClose?: () => void;
+  dismissalPolicy?: DesktopDialogDismissalPolicy;
   dismissOnBackdrop?: boolean;
   className?: string;
 }) {
@@ -27,6 +31,8 @@ export function DesktopDialogRoot({
   const rootRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const dismissalPolicyRef = useRef(dismissalPolicy);
+  dismissalPolicyRef.current = dismissalPolicy;
 
   useEffect(() => {
     const root = rootRef.current;
@@ -41,6 +47,7 @@ export function DesktopDialogRoot({
       if (!isTopmostDesktopDialog(root)) return;
       if (event.key === "Escape") {
         if (event.isComposing) return;
+        if (dismissalPolicyRef.current === "action-required") return;
         if (!onCloseRef.current) return;
         event.preventDefault();
         event.stopPropagation();
@@ -85,7 +92,12 @@ export function DesktopDialogRoot({
 
   const handleClick = (event: MouseEvent<HTMLDivElement>) => {
     const clickedBackdrop = event.target === event.currentTarget;
-    if (dismissOnBackdrop && pointerStartedOnBackdropRef.current && clickedBackdrop) {
+    if (
+      dismissalPolicy === "dismissible"
+      && dismissOnBackdrop
+      && pointerStartedOnBackdropRef.current
+      && clickedBackdrop
+    ) {
       onClose?.();
     }
     pointerStartedOnBackdropRef.current = false;

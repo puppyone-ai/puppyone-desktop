@@ -5,6 +5,7 @@ import {
   DesktopDialogRoot,
   DesktopDialogSurface,
 } from "../../../components/DesktopDialog";
+import { DesktopOverlayLayer } from "../../app-shell/DesktopOverlayPortal";
 
 export function CloudPublishConfirmationDialog({
   onCancel,
@@ -17,12 +18,13 @@ export function CloudPublishConfirmationDialog({
   const title = t("cloud.initialize.title");
 
   return (
-    <DesktopDialogRoot onClose={onCancel}>
-      <DesktopDialogSurface
-        className="desktop-cloud-publish-confirmation"
-        width={400}
-        ariaLabel={title}
-      >
+    <DesktopOverlayLayer>
+      <DesktopDialogRoot onClose={onCancel}>
+        <DesktopDialogSurface
+          className="desktop-cloud-publish-confirmation"
+          width={400}
+          ariaLabel={title}
+        >
         <header className="desktop-dialog-header">
           <div className="desktop-dialog-title-row">
             <span className="desktop-dialog-leading cloud" aria-hidden="true">
@@ -53,7 +55,8 @@ export function CloudPublishConfirmationDialog({
             {t("cloud.common.confirm")}
           </button>
         </footer>
-      </DesktopDialogSurface>
-    </DesktopDialogRoot>
+        </DesktopDialogSurface>
+      </DesktopDialogRoot>
+    </DesktopOverlayLayer>
   );
 }

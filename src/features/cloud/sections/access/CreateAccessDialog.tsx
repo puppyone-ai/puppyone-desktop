@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { useLocalization } from "@puppyone/localization/react";
 import { DesktopDialogCloseButton, DesktopDialogRoot, DesktopDialogSurface } from "../../../../components/DesktopDialog";
+import { DesktopOverlayLayer } from "../../../app-shell/DesktopOverlayPortal";
 import type {
   DesktopCloudConnector,
   DesktopCloudMcpEndpoint,
@@ -158,12 +159,13 @@ export function DesktopCloudCreateAccessDialog({
   };
 
   return (
-    <DesktopDialogRoot
-      className="desktop-cloud-create-access-backdrop"
-      dismissOnBackdrop={!saving}
-      onClose={saving ? undefined : onClose}
-    >
-      <DesktopDialogSurface className="desktop-cloud-create-access-dialog" width={760}>
+    <DesktopOverlayLayer>
+      <DesktopDialogRoot
+        className="desktop-cloud-create-access-backdrop"
+        dismissOnBackdrop={!saving}
+        onClose={saving ? undefined : onClose}
+      >
+        <DesktopDialogSurface className="desktop-cloud-create-access-dialog" width={760}>
         <header className="desktop-dialog-header desktop-cloud-create-access-header">
           <div className="desktop-dialog-title-row">
             <div>
@@ -257,8 +259,9 @@ export function DesktopCloudCreateAccessDialog({
             <span>{actionLabel}</span>
           </button>
         </footer>
-      </DesktopDialogSurface>
-    </DesktopDialogRoot>
+        </DesktopDialogSurface>
+      </DesktopDialogRoot>
+    </DesktopOverlayLayer>
   );
 }
 

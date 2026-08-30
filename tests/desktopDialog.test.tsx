@@ -55,4 +55,34 @@ describe("DesktopDialog", () => {
     root = null;
     expect(document.activeElement).toBe(opener);
   });
+
+  it("requires an in-dialog action when the dismissal policy is action-required", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const onClose = vi.fn();
+    root = createRoot(container);
+
+    act(() => root?.render(
+      <DesktopDialogRoot
+        dismissalPolicy="action-required"
+        onClose={onClose}
+      >
+        <DesktopDialogSurface>
+          <button type="button" onClick={onClose}>Continue</button>
+        </DesktopDialogSurface>
+      </DesktopDialogRoot>,
+    ));
+
+    const backdrop = container.querySelector<HTMLElement>(".desktop-dialog-backdrop");
+    act(() => {
+      backdrop?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      backdrop?.click();
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    expect(onClose).not.toHaveBeenCalled();
+
+    const action = container.querySelector<HTMLButtonElement>("button");
+    act(() => action?.click());
+    expect(onClose).toHaveBeenCalledOnce();
+  });
 });
