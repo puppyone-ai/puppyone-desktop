@@ -67,6 +67,10 @@ export type {
   TypographyChangeDetail,
   TypographyChangePhase,
 } from "./core/typography";
+export {
+  EditorAppearanceProvider,
+  useEditorAppearanceRevision,
+} from "./core/appearance/EditorAppearanceContext";
 export type {
   FileCategory,
   FileFormat,

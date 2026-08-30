@@ -95,6 +95,7 @@
     "intl-messageformat": "^11.2.2",
     "jszip": "^3.10.1",
     "node-pty": "^1.1.0",
+    "postcss": "^8.5.26",
     "semver": "^7.7.3"
   },
   "devDependencies": {
@@ -139,7 +140,6 @@
     "mermaid": "^11.16.1",
     "pdfjs-dist": "^6.2.108",
     "plist": "3.1.0",
-    "postcss": "^8.5.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "saxes": "^6.0.0",

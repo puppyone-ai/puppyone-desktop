@@ -23,8 +23,8 @@ const genericFormControlPattern = /(^|[\s>:,(])(?:input|textarea|select)(?=[\s.#
 const ownedFormControlScopePattern = /\.(?:desktop-settings-view|desktop-settings-switch|desktop-dialog-surface|onboarding-shell|desktop-agent-composer)\b/;
 const rootRelativeAssetPattern = /(["'`])\/(?!\/)[^"'`]+\.(?:png|svg|webp|jpe?g|gif|ico|woff2?)(?:[?#][^"'`]*)?\1/gi;
 
-if (cascade.trim() !== "@layer reset, tokens, primitives, patterns, features, interface-style, accessibility, overrides;") {
-  errors.push("Renderer cascade order must remain reset → tokens → primitives → patterns → features → interface-style → accessibility → overrides.");
+if (cascade.trim() !== "@layer reset, tokens, primitives, patterns, features, interface-style, sub-theme, appearance-overrides, accessibility, overrides;") {
+  errors.push("Renderer cascade order must keep Root Theme → Sub Theme → semantic User Overrides → safety layers explicit.");
 }
 
 const cascadeIndex = rendererEntry.indexOf('import "./styles/cascade.css";');
@@ -137,6 +137,19 @@ for (const filePath of walkRendererSource(sharedUiRoot)) {
   }
   if (concreteStylePattern.test(source)) {
     errors.push(`${path.relative(repoRoot, filePath)} references a concrete Desktop Interface Style; MDI and editors must remain Style-agnostic.`);
+  }
+  if (/ThemeSurfaceContext|useThemeSurfaceId|data-sub-theme-id|ThemeCatalog/.test(source)) {
+    errors.push(`${path.relative(repoRoot, filePath)} imports product Sub Theme identity into Shared UI; consume semantic tokens and the generic appearance revision only.`);
+  }
+}
+
+for (const relativePath of ["src/styles/github.css", "src/styles/newspaper.css"]) {
+  const source = read(relativePath);
+  if (editorInternalSelectorPattern.test(source)) {
+    errors.push(`${relativePath} targets Editor internals; built-in Sub Themes must use the public token contract.`);
+  }
+  if (!source.includes("[data-po-appearance-root][data-sub-theme-id=")) {
+    errors.push(`${relativePath} does not scope itself to the Desktop Sub Theme boundary.`);
   }
 }
 

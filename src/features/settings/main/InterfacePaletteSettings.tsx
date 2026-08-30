@@ -1,4 +1,3 @@
-import { type CSSProperties } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
 import {
@@ -6,12 +5,7 @@ import {
   type InterfaceStyle,
   type ThemeMode,
 } from "../../appearance/interfaceStyles";
-import {
-  DARK_THEME_PRESETS,
-  LIGHT_THEME_PRESETS,
-  type DarkThemePreset,
-  type LightThemePreset,
-} from "../../../preferences";
+import type { DarkThemePreset, LightThemePreset } from "../../../preferences";
 import { ThemePreview } from "./ThemePreview";
 import {
   isAppearanceDecisionLocked,
@@ -25,8 +19,6 @@ type InterfacePaletteSettingsProps = {
   lightThemePreset: LightThemePreset;
   darkThemePreset: DarkThemePreset;
   onThemeModeChange: (mode: ThemeMode) => void;
-  onLightThemePresetChange: (preset: LightThemePreset) => void;
-  onDarkThemePresetChange: (preset: DarkThemePreset) => void;
 };
 
 const THEME_MODE_OPTIONS = {
@@ -41,8 +33,6 @@ export function InterfacePaletteSettings({
   lightThemePreset,
   darkThemePreset,
   onThemeModeChange,
-  onLightThemePresetChange,
-  onDarkThemePresetChange,
 }: InterfacePaletteSettingsProps) {
   const { t } = useLocalization();
   const palette = getInterfaceStyleDefinition(interfaceStyle).palette;
@@ -86,54 +76,6 @@ export function InterfacePaletteSettings({
           <small className="desktop-appearance-policy-reason">{t(decision.reasonKey)}</small>
         )}
       </div>
-      {palette.presetControls.light && (
-        <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-          <span>{t("settings.appearance.lightTheme.title")}</span>
-          <div className="desktop-theme-segment desktop-theme-preset-list" aria-label={t("settings.appearance.lightTheme.ariaLabel")}>
-            {LIGHT_THEME_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                className={lightThemePreset === preset.id ? "active" : ""}
-                type="button"
-                title={t(`settings.appearance.lightTheme.${preset.id}.description`)}
-                aria-pressed={lightThemePreset === preset.id}
-                onClick={() => onLightThemePresetChange(preset.id)}
-              >
-                <span className="desktop-theme-preset-swatches" aria-hidden="true">
-                  {preset.swatches.map((swatch) => (
-                    <i key={swatch} style={{ "--settings-theme-swatch": swatch } as CSSProperties} />
-                  ))}
-                </span>
-                <span>{t(`settings.appearance.lightTheme.${preset.id}.label`)}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {palette.presetControls.dark && (
-        <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
-          <span>{t("settings.appearance.darkTheme.title")}</span>
-          <div className="desktop-theme-segment desktop-theme-preset-list" aria-label={t("settings.appearance.darkTheme.ariaLabel")}>
-            {DARK_THEME_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                className={darkThemePreset === preset.id ? "active" : ""}
-                type="button"
-                title={t(`settings.appearance.darkTheme.${preset.id}.description`)}
-                aria-pressed={darkThemePreset === preset.id}
-                onClick={() => onDarkThemePresetChange(preset.id)}
-              >
-                <span className="desktop-theme-preset-swatches" aria-hidden="true">
-                  {preset.swatches.map((swatch) => (
-                    <i key={swatch} style={{ "--settings-theme-swatch": swatch } as CSSProperties} />
-                  ))}
-                </span>
-                <span>{t(`settings.appearance.darkTheme.${preset.id}.label`)}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </>
   );
 }

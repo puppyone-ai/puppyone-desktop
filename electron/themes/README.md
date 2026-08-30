@@ -1,0 +1,149 @@
+# PuppyOne Sub Themes
+
+This folder is the runtime guide copied into the user Themes Folder. A Sub Theme changes the visual variant of a compatible PuppyOne Root Theme; it does not replace the application shell or style editor internals.
+
+## Appearance model
+
+PuppyOne resolves appearance in four layers:
+
+1. **Root Theme** owns shell structure, component geometry, interaction policy, and the public token contract. Current Root Themes are `default` and `windows-xp`.
+2. **Sub Theme** supplies a compatible visual token set. A Sub Theme must declare which Root Themes, color modes, and surface targets it supports.
+3. **Color Mode** resolves `light` or `dark` inside the active Root Theme. Preferences are remembered independently for each Root Theme.
+4. **Surface overrides** are typed product settings, such as Markdown heading scale. They have final authority and are not arbitrary CSS.
+
+The effective cascade is:
+
+`Root Theme → Sub Theme → typed surface overrides → accessibility/last-resort product overrides`
+
+Shared editors remain generic. They inherit public `--po-host-md-*` and `--po-host-csv-*` tokens from the application root; installed themes cannot select CodeMirror, Markdown, CSV, or other editor implementation nodes.
+
+## Where this folder belongs
+
+Open **Settings → Appearance → Open Themes Folder**. Add either:
+
+- a directory containing `theme.json` and one CSS entrypoint per declared target; or
+- one top-level `.css` file using the coordinated `@puppyone-theme` format below.
+
+PuppyOne refreshes the catalog when its window regains focus.
+
+## Package format
+
+`theme.json`:
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "com.example.newsprint",
+  "name": "Newsprint",
+  "version": "1.0.0",
+  "author": "Example Studio",
+  "compatibleRootThemeIds": ["default"],
+  "modes": ["light", "dark"],
+  "targets": ["application", "markdown", "csv"],
+  "entrypoints": {
+    "application": "application.css",
+    "markdown": "markdown.css",
+    "csv": "csv.css"
+  }
+}
+```
+
+Rules:
+
+- `id` is a stable lowercase reverse-domain identifier with at least three segments.
+- `compatibleRootThemeIds` defaults to `["default"]` when omitted.
+- `modes` contains one or both of `light` and `dark`.
+- `targets` contains one or more of `application`, `markdown`, and `csv` and must match `entrypoints` exactly.
+- Each entrypoint is a direct package-local `.css` filename.
+
+## Single-file format
+
+```css
+@puppyone-theme {
+  id: com.example.newsprint;
+  name: Newsprint;
+  version: 1.0.0;
+  author: Example Studio;
+  compatible-root-themes: default;
+  modes: light dark;
+}
+
+@puppyone application {
+  :root {
+    --po-surface-canvas: #f5f0e8;
+    --po-text: #2f2b27;
+    --po-accent: #8b2f24;
+  }
+}
+
+@puppyone markdown {
+  :root {
+    --po-md-surface-background: #f5f0e8;
+    --po-md-content-color: #342f29;
+    --po-md-content-font: Georgia, serif;
+    --po-md-link-color: #8b2f24;
+  }
+}
+
+@puppyone csv {
+  :root {
+    --po-csv-surface-background: #f5f0e8;
+    --po-csv-surface-color: #342f29;
+    --po-editable-table-border: #cbbfaf;
+  }
+}
+```
+
+A metadata-free top-level CSS file is accepted as a Markdown-only compatibility theme only when it follows the same root-token contract.
+
+## CSS boundary
+
+Every rule must be root-only. Use `:root`, `.theme-root`, `html`, `body`, or `#write` as an authoring alias; PuppyOne compiles the alias to its scoped appearance root. Dark values may use `.theme-root.dark` or `.dark .theme-root`.
+
+Allowed examples:
+
+```css
+:root {
+  --po-md-content-color: #342f29;
+  --po-md-h1-size: 2em;
+}
+
+.dark .theme-root {
+  --po-md-content-color: #ece8e1;
+}
+```
+
+Disallowed examples:
+
+```css
+/* Element and implementation selectors are rejected. */
+h1 { color: red; }
+.theme-root h1 { color: red; }
+.cm-editor { background: red; }
+.markdown-codemirror-editor { color: red; }
+
+/* Global resources and forced precedence are rejected. */
+@font-face { font-family: Reader; src: url("reader.woff2"); }
+:root { --po-md-content-color: red !important; }
+```
+
+The compiler also rejects remote imports, external URLs, global selectors, sibling escapes, unsupported at-rules, normal CSS declarations, and unknown tokens. `@import` may reference only package-local CSS and imported files must follow the same contract.
+
+## Public tokens
+
+Application targets accept only the published PuppyOne color tokens, including:
+
+- surfaces: `--po-surface-canvas`, `--po-surface-chrome`, `--po-surface-panel`, `--po-control`;
+- text and borders: `--po-text`, `--po-text-muted`, `--po-border`, `--po-divider`;
+- state: `--po-hover`, `--po-selected`, `--po-accent`, `--po-focus-ring`, `--po-danger`, `--po-success`, `--po-warning`.
+
+Markdown targets accept the public `--po-md-*` presentation tokens, such as content, heading, link, quote, inline-code, code-block, and syntax colors. CSV targets accept `--po-csv-*` plus the documented `--po-editable-table-*` presentation tokens.
+
+PuppyOne maps these author-facing names to private host-boundary variables during compilation. Do not author `--po-host-*` variables directly.
+
+## Troubleshooting
+
+- If a theme is absent, inspect the diagnostics shown in Appearance settings.
+- If a theme falls back, confirm that `compatibleRootThemeIds`, `modes`, and `targets` satisfy the active Root Theme.
+- The `default` Root Theme requires `application`, `markdown`, and `csv`; `windows-xp` currently requires `markdown` and `csv` and supports light mode only.
+- If a visual value seems overridden, check typed surface preferences. Those intentionally have higher priority than a Sub Theme.

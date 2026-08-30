@@ -31,6 +31,7 @@ import {
   type PluginsSection,
 } from "../../plugins";
 import type { DesktopPreferencesController } from "../useDesktopPreferences";
+import type { SubThemeCatalogController } from "../../themes/useSubThemeCatalog";
 import {
   getAvailableWorkspaceSurfaces,
   resolveWorkspaceSurface,
@@ -95,6 +96,7 @@ export function useWorkspaceSurfaceContent({
   puppyoneConfigLoading,
   puppyoneConfigSaving,
   settingsSection,
+  subThemeCatalog,
   viewerPacks,
   viewerPluginsEnabled,
   workspace,
@@ -115,6 +117,7 @@ export function useWorkspaceSurfaceContent({
   puppyoneConfigLoading: boolean;
   puppyoneConfigSaving: boolean;
   settingsSection: SettingsSection;
+  subThemeCatalog: SubThemeCatalogController;
   viewerPacks: {
     hostAvailable: boolean;
     refresh: () => Promise<void>;
@@ -193,6 +196,7 @@ export function useWorkspaceSurfaceContent({
     activeSection: settingsSection,
     onSelectSection: onSelectSettingsSection,
     preferences,
+    subThemeCatalog,
     onFilesVisibilitySettingsChange,
     git: {
       status: git.activeGitStatus,

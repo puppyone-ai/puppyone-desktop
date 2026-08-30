@@ -4,6 +4,7 @@ import type { DesktopUpdateState, GitStatusSnapshot, PuppyoneWorkspaceConfig } f
 import type { CreateNewMenuSettings, DarkThemePreset, ExperimentalSettings, FilesVisibilitySettings, GitSidebarLayout, InterfaceStyle, LightThemePreset, LoadingAnimationPreset, LocalAgentsSettings, RightSidebarToolsSettings, SidebarNavigationLayout, SidebarNavigationVisibilitySettings, TextSize, ThemeMode, TitlebarActionsSettings, TypographyPreferences } from "../../preferences";
 import type { ResolvedAppearance } from "../appearance/resolveAppearance";
 import type { MarkdownPresentationSettings } from "../markdown/markdownPresentation";
+import type { SubThemeCatalogController } from "../themes/useSubThemeCatalog";
 
 export type SettingsSection = "general" | "privacy" | "local-project" | "appearance" | "local-agents" | "editor" | "new-menu" | "experimental" | "git" | "files" | "account" | "cloud";
 
@@ -24,6 +25,8 @@ export type SettingsViewProps = {
   typographyPreferences: TypographyPreferences;
   pointerCursors: boolean;
   markdownPresentation: MarkdownPresentationSettings;
+  requestedSubThemeId: string;
+  subThemeCatalog: SubThemeCatalogController;
   fileIconTheme: FileIconThemeId;
   sidebarNavigationLayout: SidebarNavigationLayout;
   sidebarNavigationVisibilitySettings: SidebarNavigationVisibilitySettings;
@@ -44,8 +47,6 @@ export type SettingsViewProps = {
   updateState: DesktopUpdateState;
   onThemeModeChange: (mode: ThemeMode) => void;
   onInterfaceStyleChange: (style: InterfaceStyle) => void;
-  onLightThemePresetChange: (preset: LightThemePreset) => void;
-  onDarkThemePresetChange: (preset: DarkThemePreset) => void;
   onLoadingAnimationPresetChange: (preset: LoadingAnimationPreset) => void;
   onLocalAgentsSettingsChange: (settings: LocalAgentsSettings) => void;
   onAgentFileActivityIndicatorsEnabledChange: (enabled: boolean) => void;
@@ -53,6 +54,8 @@ export type SettingsViewProps = {
   onTypographyPreferencesChange: (preferences: TypographyPreferences) => void;
   onPointerCursorsChange: (enabled: boolean) => void;
   onMarkdownPresentationChange: (settings: MarkdownPresentationSettings) => void;
+  onSelectSettingsSection: (section: SettingsSection) => void;
+  onSubThemeChange: (subThemeId: string) => void;
   onFileIconThemeChange: (theme: FileIconThemeId) => void;
   onSidebarNavigationLayoutChange: (layout: SidebarNavigationLayout) => void;
   onSidebarNavigationVisibilitySettingsChange: (settings: SidebarNavigationVisibilitySettings) => void;

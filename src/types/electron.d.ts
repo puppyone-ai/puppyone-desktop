@@ -834,6 +834,37 @@ export type PuppyoneWorkspaceConfig = {
   updatedAt?: string;
 };
 
+export type DesktopThemeTarget = "application" | "markdown" | "csv";
+export type DesktopThemeColorMode = "light" | "dark";
+export type DesktopThemeDefinition = Readonly<{
+  id: string;
+  name: string;
+  version: string;
+  author?: string;
+  contractVersion?: number;
+  compatibleRootThemeIds?: readonly string[];
+  modes: readonly DesktopThemeColorMode[];
+  targets: readonly DesktopThemeTarget[];
+  source: "local-css" | "local-package";
+  compiledCss: Readonly<Partial<Record<DesktopThemeTarget, string>>>;
+}>;
+export type DesktopThemeDiagnostic = Readonly<{
+  source: string;
+  message: string;
+}>;
+export type DesktopThemeSnapshot = Readonly<{
+  themes: readonly DesktopThemeDefinition[];
+  diagnostics: readonly DesktopThemeDiagnostic[];
+}>;
+export type DesktopThemeMenuState = Readonly<{
+  pack: string;
+  themes: readonly Readonly<{
+    id: string;
+    name: string;
+    targets: readonly DesktopThemeTarget[];
+  }>[];
+}>;
+
 declare global {
   interface Window {
     puppyoneDesktop?: {
@@ -852,6 +883,14 @@ declare global {
         background: string;
         themeSource: "system" | "light" | "dark";
       }) => void;
+      themes: {
+        list: () => Promise<DesktopThemeSnapshot>;
+        openDirectory: () => Promise<{ opened: true }>;
+        syncNativeMenu: (request: DesktopThemeMenuState) => Promise<{ synced: true }>;
+        onSelectionRequested: (
+          callback: (request: { kind: "pack"; themeId: string }) => void,
+        ) => () => void;
+      };
       setWindowMinimumWidth: (request: { width: number }) => Promise<{
         applied: boolean;
         width?: number;

@@ -1,0 +1,151 @@
+/* Built-in Newspaper Sub Theme. Editor internals consume public tokens only. */
+@font-face {
+  font-family: "PuppyOne PT Serif";
+  src: url("./fonts/pt-serif/PTSerif-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PuppyOne PT Serif";
+  src: url("./fonts/pt-serif/PTSerif-Italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "PuppyOne PT Serif";
+  src: url("./fonts/pt-serif/PTSerif-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+[data-po-appearance-root][data-sub-theme-id="default.newspaper"] {
+  --po-surface-canvas: #eee9df;
+  --po-surface-chrome: #e4ded2;
+  --po-surface-panel: #faf7f0;
+  --po-surface-panel-raised: #fffdf8;
+  --po-surface-overlay: #fffdf9;
+  --po-surface-inset: #ddd5c7;
+  --po-canvas: #f3f2ee;
+  --po-header: #f3f2ee;
+  --po-sidebar: #f3f2ee;
+  --po-panel: #f3f2ee;
+  --po-panel-raised: #faf7f0;
+  --po-overlay: #fffdf9;
+  --po-inset: #e8e2d7;
+  --po-text: #342f29;
+  --po-text-muted: #6f665b;
+  --po-text-subtle: #91877a;
+  --po-border: rgb(76 66 53 / 20%);
+  --po-divider: rgb(76 66 53 / 15%);
+  --po-hover: rgb(105 83 52 / 8%);
+  --po-selected: rgb(105 83 52 / 14%);
+  --po-accent: #795f39;
+  --po-accent-text: #624a2b;
+  --po-focus-ring: #9a7a4a;
+  --po-shell-divider: #c8c0b3;
+  --po-sidebar-divider: #b8afa1;
+  --po-control: rgb(105 83 52 / 8%);
+  --po-control-hover: rgb(105 83 52 / 14%);
+  --po-shadow: rgb(71 59 43 / 18%);
+
+  --po-host-md-surface-background: #faf7f0;
+  --po-host-md-content-color: #342f29;
+  --po-host-md-content-font: "PuppyOne PT Serif", "Songti SC", STSong, Georgia, serif;
+  --po-host-md-content-size: 15px;
+  --po-host-md-content-line-height: 1.82;
+  --po-host-md-block-gap: 20px;
+  --po-host-md-heading-gap-before: 34px;
+  --po-host-md-heading-gap-after: 18px;
+  --po-host-md-heading-color: #2f2a25;
+  --po-host-md-heading-weight: 650;
+  --po-host-md-h1-weight: 600;
+  --po-host-md-h2-weight: 720;
+  --po-host-md-h3-weight: 600;
+  --po-host-md-h1-size: 2.2em;
+  --po-host-md-h2-size: 1.55em;
+  --po-host-md-h3-size: 1.2em;
+  --po-host-md-heading-border-color: #b9ae9d;
+  --po-host-md-rule-color: #b9ae9d;
+  --po-host-md-link-color: #795f39;
+  --po-host-md-blockquote-color: #655e55;
+  --po-host-md-blockquote-border-color: #9f917e;
+  --po-host-md-inline-code-background: #eee9df;
+  --po-host-md-inline-code-color: #6e4f2a;
+  --po-host-md-code-block-background: #eee9df;
+  --po-host-md-code-block-color: #342f29;
+  --po-host-md-syntax-keyword: #6e5a3d;
+  --po-host-md-syntax-string: #6e4f2a;
+  --po-host-md-syntax-comment: #7f7466;
+
+  --po-host-csv-surface-background: #faf7f0;
+  --po-host-csv-surface-color: #342f29;
+  --po-host-csv-table-border: #aa9d82;
+  --po-host-csv-cell-border: #d7cfbd;
+  --po-host-csv-header-background: #e9e0cc;
+  --po-host-csv-index-background: #f0e9da;
+  --po-host-csv-cell-hover-background: #f4eee2;
+  --po-host-csv-cell-focus-background: #f1e8d7;
+  --po-host-csv-cell-focus-ring: #80652f;
+}
+
+[data-po-appearance-root][data-sub-theme-id="default.newspaper"]:where(.dark) {
+  --po-surface-canvas: #24221e;
+  --po-surface-chrome: #2b2924;
+  --po-surface-panel: #302e29;
+  --po-surface-panel-raised: #39362f;
+  --po-surface-overlay: #3d3932;
+  --po-surface-inset: #1f1d1a;
+  --po-canvas: #292722;
+  --po-header: #24221e;
+  --po-sidebar: #24221e;
+  --po-panel: #302e29;
+  --po-panel-raised: #39362f;
+  --po-overlay: #3d3932;
+  --po-inset: #1f1d1a;
+  --po-text: #e8e1d5;
+  --po-text-muted: #bdb3a3;
+  --po-text-subtle: #958b7d;
+  --po-border: rgb(226 215 197 / 20%);
+  --po-divider: rgb(226 215 197 / 15%);
+  --po-hover: rgb(194 164 117 / 10%);
+  --po-selected: rgb(194 164 117 / 17%);
+  --po-accent: #c2a475;
+  --po-accent-text: #d6bd95;
+  --po-focus-ring: #b69769;
+  --po-shell-divider: #4c473f;
+  --po-sidebar-divider: #5a544a;
+  --po-control: rgb(194 164 117 / 10%);
+  --po-control-hover: rgb(194 164 117 / 16%);
+  --po-shadow: rgb(0 0 0 / 38%);
+
+  --po-host-md-surface-background: #292722;
+  --po-host-md-content-color: #e6dfd2;
+  --po-host-md-heading-color: #eee7db;
+  --po-host-md-heading-border-color: #8d8273;
+  --po-host-md-rule-color: #665f54;
+  --po-host-md-link-color: #cdb58e;
+  --po-host-md-blockquote-color: #bdb4a6;
+  --po-host-md-blockquote-border-color: #887d6e;
+  --po-host-md-inline-code-background: #211f1b;
+  --po-host-md-inline-code-color: #d0b583;
+  --po-host-md-code-block-background: #211f1b;
+  --po-host-md-code-block-color: #e6dfd2;
+  --po-host-md-syntax-keyword: #cdb58e;
+  --po-host-md-syntax-string: #d0b583;
+  --po-host-md-syntax-comment: #958b7d;
+
+  --po-host-csv-surface-background: #292722;
+  --po-host-csv-surface-color: #e6dfd2;
+  --po-host-csv-table-border: #776f63;
+  --po-host-csv-cell-border: #514c44;
+  --po-host-csv-header-background: #39362f;
+  --po-host-csv-index-background: #302e29;
+  --po-host-csv-cell-hover-background: #34312b;
+  --po-host-csv-cell-focus-background: #40392f;
+  --po-host-csv-cell-focus-ring: #c2a475;
+}

@@ -10,6 +10,7 @@ const manifestPath = path.join(
   "src/features/appearance/interface-style-manifest.json",
 );
 const THEME_MODES = new Set(["system", "light", "dark"]);
+const SUB_THEME_TARGETS = new Set(["application", "markdown", "csv"]);
 const STYLE_COMPONENT_KEYS = [
   "shell",
   "titlebar",
@@ -26,6 +27,7 @@ const STYLE_POLICY_KEYS = [
 ];
 const STYLE_PROFILE_KEYS = ["family", "variant", "palette"];
 const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SUB_THEME_ID_PATTERN = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/;
 const checkOnly = process.argv.includes("--check");
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 
@@ -76,6 +78,7 @@ function validateManifest(value) {
   if (!isNonEmptyString(value?.defaultStyle)) fail("defaultStyle must be a non-empty string");
   if (!isNonEmptyString(value?.storage?.interfaceStyle)) fail("storage.interfaceStyle is required");
   if (!isNonEmptyString(value?.storage?.appearancePreferences)) fail("storage.appearancePreferences is required");
+  if (!isNonEmptyString(value?.storage?.legacyAppearancePreferences)) fail("storage.legacyAppearancePreferences is required");
   if (!isNonEmptyString(value?.storage?.themeMode)) fail("storage.themeMode is required");
   if (!isNonEmptyString(value?.storage?.lightThemePreset)) fail("storage.lightThemePreset is required");
   if (!isNonEmptyString(value?.storage?.darkThemePreset)) fail("storage.darkThemePreset is required");
@@ -96,6 +99,7 @@ function validateManifest(value) {
     }
     validateComposition(style);
     validatePolicies(style);
+    validateSubThemes(style);
 
     const palette = style.palette;
     if (palette?.kind === "fixed") {
@@ -138,6 +142,27 @@ function validateManifest(value) {
   if (!ids.has(value.defaultStyle)) fail("defaultStyle must reference a registered style");
   const defaultStyle = value.styles.find((style) => style.id === value.defaultStyle);
   if (defaultStyle?.stylesheet !== null) fail("The Default style must be a no-op baseline with stylesheet: null");
+}
+
+function validateSubThemes(style) {
+  const definition = style.subThemes;
+  if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
+    fail(`${style.id}.subThemes is required`);
+  }
+  if (
+    !isNonEmptyString(definition.defaultSubThemeId)
+    || !SUB_THEME_ID_PATTERN.test(definition.defaultSubThemeId)
+  ) {
+    fail(`${style.id}.subThemes.defaultSubThemeId must be a namespaced id`);
+  }
+  if (
+    !Array.isArray(definition.allowedTargets)
+    || definition.allowedTargets.length === 0
+    || definition.allowedTargets.some((target) => !SUB_THEME_TARGETS.has(target))
+    || new Set(definition.allowedTargets).size !== definition.allowedTargets.length
+  ) {
+    fail(`${style.id}.subThemes.allowedTargets must contain unique supported targets`);
+  }
 }
 
 function validateProfile(style) {

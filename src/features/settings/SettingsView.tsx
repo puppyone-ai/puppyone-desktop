@@ -25,6 +25,7 @@ import { LocalProjectSettingsView } from "./main/LocalProjectSettingsView";
 import { PrivacySettingsView } from "./main/PrivacySettingsView";
 import { InterfacePaletteSettings } from "./main/InterfacePaletteSettings";
 import { InterfaceStyleSetting } from "./main/InterfaceStyleSetting";
+import { SubThemeSettingsSection } from "./main/SubThemeSettingsSection";
 import { CreateNewSettingsView } from "./main/CreateNewSettingsView";
 import { PulseGrid } from "../../components/loading";
 import { CloudHostingSettingsView, GitSettingsView } from "./main/RepositorySettingsViews";
@@ -52,6 +53,8 @@ export function SettingsView({
   typographyPreferences,
   pointerCursors,
   markdownPresentation,
+  requestedSubThemeId,
+  subThemeCatalog,
   fileIconTheme,
   sidebarNavigationVisibilitySettings,
   filesVisibilitySettings,
@@ -71,8 +74,6 @@ export function SettingsView({
   updateState,
   onThemeModeChange,
   onInterfaceStyleChange,
-  onLightThemePresetChange,
-  onDarkThemePresetChange,
   onLoadingAnimationPresetChange,
   onLocalAgentsSettingsChange,
   onAgentFileActivityIndicatorsEnabledChange,
@@ -80,6 +81,8 @@ export function SettingsView({
   onTypographyPreferencesChange,
   onPointerCursorsChange,
   onMarkdownPresentationChange,
+  onSelectSettingsSection,
+  onSubThemeChange,
   onFileIconThemeChange,
   onSidebarNavigationLayoutChange,
   onSidebarNavigationVisibilitySettingsChange,
@@ -236,11 +239,16 @@ export function SettingsView({
   }
 
   if (activeSection === "editor") {
+    const activeMarkdownTheme = subThemeCatalog.snapshot.subThemes.find(
+      (subTheme) => subTheme.id === resolvedAppearance.subThemeId,
+    );
     return (
       <Suspense fallback={null}>
         <EditorSettingsView
           markdownPresentation={markdownPresentation}
           onMarkdownPresentationChange={onMarkdownPresentationChange}
+          activeMarkdownThemeName={activeMarkdownTheme?.name ?? resolvedAppearance.subThemeId}
+          onManageThemes={() => onSelectSettingsSection("appearance")}
         />
       </Suspense>
     );
@@ -263,14 +271,20 @@ export function SettingsView({
             />
             <div className="desktop-settings-list">
               <InterfaceStyleSetting value={interfaceStyle} onChange={onInterfaceStyleChange} />
+              <SubThemeSettingsSection
+                catalog={subThemeCatalog}
+                rootThemeId={interfaceStyle}
+                requestedSubThemeId={requestedSubThemeId}
+                effectiveSubThemeId={resolvedAppearance.subThemeId}
+                effectiveColorMode={resolvedAppearance.effectiveColorMode}
+                onSubThemeChange={onSubThemeChange}
+              />
               <InterfacePaletteSettings
                 interfaceStyle={interfaceStyle}
                 decision={resolvedAppearance.decisions.themeMode}
                 lightThemePreset={lightThemePreset}
                 darkThemePreset={darkThemePreset}
                 onThemeModeChange={onThemeModeChange}
-                onLightThemePresetChange={onLightThemePresetChange}
-                onDarkThemePresetChange={onDarkThemePresetChange}
               />
               <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
                 <span>{t("settings.appearance.textSize.title")}</span>

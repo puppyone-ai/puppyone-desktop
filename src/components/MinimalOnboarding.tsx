@@ -66,6 +66,7 @@ export type MinimalOnboardingProps = {
   pointerCursors: boolean;
   diffMarkers: DiffMarkers;
   resolvedTheme: "light" | "dark";
+  subThemeId: string;
 };
 
 /** Local repository entrypoint. Cloud is entered from an open repository only. */
@@ -88,6 +89,7 @@ export function MinimalOnboarding({
   pointerCursors,
   diffMarkers,
   resolvedTheme,
+  subThemeId,
 }: MinimalOnboardingProps) {
   const { t } = useLocalization();
   const [error, setError] = useState<string | null>(initialError);
@@ -223,6 +225,8 @@ export function MinimalOnboarding({
     <main
       className={`onboarding-shell onboarding-homepage-shell ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "dragging" : ""} ${showEmptyStateIntro ? "is-empty-state-intro" : ""}`}
       data-onboarding-state={onboardingState}
+      data-po-appearance-root="true"
+      data-sub-theme-id={subThemeId}
       data-po-scrollbar="content"
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}

@@ -47,6 +47,10 @@ import {
 import { registerAgentIpcHandlers } from "./main/ipc/agent-ipc.mjs";
 import { registerAgentActivityIpcHandlers } from "./main/ipc/agent-activity-ipc.mjs";
 import { registerAppearanceIpcHandlers } from "./main/ipc/appearance-ipc.mjs";
+import {
+  registerThemeIpcHandlers,
+  THEME_SELECTION_REQUESTED_CHANNEL,
+} from "./main/ipc/theme-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerBuildInfoIpcHandlers } from "./main/ipc/build-info-ipc.mjs";
 import { registerPlatformIpcHandlers } from "./main/ipc/platform-ipc.mjs";
@@ -84,6 +88,7 @@ import { createTerminalService } from "./main/terminal-service.mjs";
 import { createTerminalAgentLocator } from "./main/terminal-agent/terminal-agent-locator.mjs";
 import { createDefaultTerminalAgentActivityHost } from "./main/terminal-agent/activity/bootstrap/create-terminal-agent-activity-host.mjs";
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
+import { createThemeService } from "./main/themes/theme-service.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
 import { WindowWorkspaceState } from "./main/window-workspace-state.mjs";
@@ -222,6 +227,11 @@ const nativeSurfacePointerPassthrough = createNativeSurfacePointerPassthroughCoo
   },
 });
 const externalNavigation = createExternalNavigationService({ shell });
+const themeService = createThemeService({
+  userDataPath: app.getPath("userData"),
+  bundledThemesPath: path.join(app.getAppPath(), "electron", "themes"),
+  shell,
+});
 const localeService = createDesktopLocaleService({
   app,
   getWindows: () => BrowserWindow.getAllWindows(),
@@ -239,6 +249,12 @@ const nativeMenuService = createDesktopNativeMenuService({
   t: (messageId, values) => localeService.t(messageId, values),
   onNewWindow: () => createWindow(),
   onCheckForUpdates: checkForUpdatesFromNativeMenu,
+  onSelectTheme: (request) => {
+    const window = getLastFocusedWindow();
+    if (!window || window.isDestroyed() || window.webContents.isDestroyed()) return;
+    window.webContents.send(THEME_SELECTION_REQUESTED_CHANNEL, request);
+  },
+  onOpenThemesDirectory: () => themeService.openDirectory(),
 });
 const applicationQuitIntent = createApplicationQuitIntent({ app });
 const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({
@@ -779,6 +795,11 @@ function registerIpcHandlers() {
     ipcMain: trustedIpcMain,
     BrowserWindow,
     nativeTheme,
+  });
+  registerThemeIpcHandlers({
+    ipcMain: trustedIpcMain,
+    themeService,
+    onSyncNativeMenu: (state) => nativeMenuService.setThemeState(state),
   });
   registerWindowLayoutIpcHandlers({
     ipcMain: trustedIpcMain,

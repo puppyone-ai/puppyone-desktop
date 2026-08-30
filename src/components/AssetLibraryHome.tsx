@@ -25,6 +25,7 @@ export function AssetLibraryHome({
   pointerCursors,
   diffMarkers,
   resolvedTheme,
+  subThemeId,
 }: MinimalOnboardingProps) {
   const { t, formatDate, formatRelativeTime } = useLocalization();
   const [error, setError] = useState<string | null>(initialError);
@@ -89,6 +90,8 @@ export function AssetLibraryHome({
   return (
     <main
       className={`onboarding-shell asset-library-home-shell ${resolvedTheme === "dark" ? "dark" : ""} ${folderDrop.dragging ? "is-dragging" : ""}`}
+      data-po-appearance-root="true"
+      data-sub-theme-id={subThemeId}
       data-po-scrollbar="content"
       data-theme-mode={themeMode}
       data-light-theme-preset={lightThemePreset}
