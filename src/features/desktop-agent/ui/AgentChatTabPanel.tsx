@@ -17,6 +17,7 @@ import { AgentTranscript } from "./AgentTranscript";
 import { useAgentConversationHistory } from "./useAgentConversationHistory";
 import { readinessStatusCode, sessionStatusCode } from "./agentPanelPresentation";
 import { useAgentReferenceIngestion } from "./useAgentReferenceIngestion";
+import type { AgentWorkspaceReferenceResolver } from "./useAgentReferenceIngestion";
 import { useAgentRoutingPreferences } from "./useAgentRoutingPreferences";
 import { useAgentSessionPreparation } from "./useAgentSessionPreparation";
 
@@ -38,6 +39,7 @@ type AgentChatTabPanelProps = {
   onPreferredModelChange?: (model: string) => void;
   enabledRuntimeIds: readonly string[] | null;
   openSessionIds: readonly string[];
+  resolveWorkspaceReference?: AgentWorkspaceReferenceResolver;
 };
 
 export function AgentChatTabPanel({
@@ -57,13 +59,19 @@ export function AgentChatTabPanel({
   onPreferredModelChange,
   enabledRuntimeIds,
   openSessionIds,
+  resolveWorkspaceReference,
 }: AgentChatTabPanelProps) {
   const presented = presentedProp ?? active;
   const commandTarget = commandTargetProp ?? active;
   const { t } = useLocalization();
   const [historyOpen, setHistoryOpen] = useState(false);
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
-  const referenceIngestion = useAgentReferenceIngestion({ controller, workspaceId, capabilities: state.inspection?.capabilities?.referenceInputs });
+  const referenceIngestion = useAgentReferenceIngestion({
+    controller,
+    workspaceId,
+    capabilities: state.inspection?.capabilities?.referenceInputs,
+    resolveWorkspaceReference,
+  });
   const inspection = state.inspection;
   const readiness = inspection?.readiness;
   const runtime = state.session?.runtime

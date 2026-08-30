@@ -296,5 +296,8 @@ function safeReferenceName(value: string) {
 
 function safeReferenceError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return message.replace(/[\r\n]+/g, " ").slice(0, 500) || "The reference could not be added.";
+  return message
+    .replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/i, "")
+    .replace(/[\r\n]+/g, " ")
+    .slice(0, 500) || "The reference could not be added.";
 }

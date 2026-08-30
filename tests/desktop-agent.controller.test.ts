@@ -717,6 +717,27 @@ describe("AgentSessionController", () => {
       expect.objectContaining({ displayName: "folder", status: "error" }),
     ]);
   });
+
+  it("removes Electron IPC transport boilerplate from reference diagnostics", async () => {
+    const bridge = bridgeFixture(() => {});
+    bridge.resolveAgentWorkspaceReferences.mockRejectedValueOnce(new Error(
+      "Error invoking remote method 'agent:reference-resolve-workspace': Error: An Agent file reference no longer exists.",
+    ));
+    const controller = new AgentSessionController("/workspace", () => bridge as never);
+    await controller.initialize();
+
+    await expect(controller.addWorkspacePaths(["missing.md"])).resolves.toBe(0);
+    expect(controller.getSnapshot().references).toEqual([
+      expect.objectContaining({
+        displayName: "missing.md",
+        status: "error",
+        error: {
+          code: "workspace-resolution-failed",
+          message: "An Agent file reference no longer exists.",
+        },
+      }),
+    ]);
+  });
 });
 
 function bridgeFixture(

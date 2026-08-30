@@ -5,6 +5,7 @@ import {
   closeDocumentWorkingCopiesUnderResource,
   createWorkspaceResourceUri,
   flushActiveDocumentSessions,
+  isDataResourceUri,
   isDocumentDataNode,
   type DataNode,
   type WorkspaceFolder,
@@ -257,6 +258,18 @@ function AppContent() {
   const resolveWorkspaceResource = useCallback((path: string | null) => (
     workbenchDataService?.resolveResource(path) ?? null
   ), [workbenchDataService]);
+  const resolveAgentWorkspaceReference = useCallback((resource: string) => {
+    if (!workbenchDataService || !isDataResourceUri(resource)) return null;
+    try {
+      const resolved = workbenchDataService.resolveResource(resource);
+      return {
+        workspaceRoot: resolved.folder.workspace.path,
+        referencePath: resolved.providerPath ?? ".",
+      };
+    } catch {
+      return null;
+    }
+  }, [workbenchDataService]);
   const editorWorkbench = useDesktopEditorWorkbench(
     workspace,
     dataPort?.resolveNode ?? null,
@@ -914,6 +927,7 @@ function AppContent() {
             onPreferredModelChange={setAgentPreferredModel}
             onViewChanges={handleAgentViewChanges}
             onOpenFile={handleAgentOpenFile}
+            resolveWorkspaceReference={resolveAgentWorkspaceReference}
           />
         </Suspense>
       ),
@@ -926,6 +940,7 @@ function AppContent() {
     desktopAgentChatEnabled,
     handleAgentOpenFile,
     handleAgentViewChanges,
+    resolveAgentWorkspaceReference,
     setAgentPreferredModel,
     setAgentPreferredRoute,
     setAgentPreferredRuntime,

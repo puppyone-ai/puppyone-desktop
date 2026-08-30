@@ -155,27 +155,27 @@
 .desktop-agent-composer-action:disabled { cursor: default; background: color-mix(in srgb, var(--agent-text) 14%, transparent); box-shadow: none; color: color-mix(in srgb, var(--agent-text) 48%, transparent); opacity: 1; }
 .desktop-agent-composer-action.is-stop:disabled { background: var(--agent-text); color: var(--agent-canvas); opacity: 0.52; }
 
-.desktop-agent-reference-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 8px 0; }
+.desktop-agent-reference-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 0; }
 .desktop-agent-reference-chips > span {
   display: inline-flex;
   max-width: 100%;
   align-items: center;
-  gap: 4px;
-  min-height: 34px;
-  padding: 2px;
+  gap: 2px;
+  min-height: 28px;
+  padding: 1px 3px 1px 1px;
   border: 1px solid var(--agent-border-subtle);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--agent-control-surface);
   color: var(--agent-text-muted);
   font-size: var(--agent-font-size-meta);
 }
 .desktop-agent-reference-chip-preview {
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 7px;
+  border-radius: 6px;
   background: var(--agent-row-hover-surface);
   color: var(--agent-text-muted);
 }
@@ -183,12 +183,12 @@
   background: var(--agent-accent-soft);
   color: var(--po-accent-text);
 }
-.desktop-agent-reference-chip-copy { display: grid; min-width: 0; line-height: 1.25; }
-.desktop-agent-reference-chip-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.desktop-agent-reference-chip-copy > small { overflow: hidden; max-width: 220px; font-size: var(--agent-font-size-caption); text-overflow: ellipsis; white-space: nowrap; }
+.desktop-agent-reference-chip-copy { display: block; min-width: 0; max-width: min(220px, 48vw); padding: 0 4px; line-height: 1.25; }
+.desktop-agent-reference-chip-copy > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .desktop-agent-reference-chips > span.is-resolving { opacity: 0.72; }
-.desktop-agent-reference-chips > span.is-error { border-color: color-mix(in srgb, var(--po-danger) 44%, var(--agent-border-subtle)); color: var(--po-danger); }
-.desktop-agent-reference-chips span > button { display: grid; width: var(--agent-control-size); height: var(--agent-control-size); place-items: center; padding: 0; border: 0; border-radius: var(--desktop-control-radius); background: transparent; color: inherit; }
+.desktop-agent-reference-chips > span.is-error { border-color: color-mix(in srgb, var(--po-danger) 40%, var(--agent-border-subtle)); background: color-mix(in srgb, var(--po-danger) 5%, var(--agent-control-surface)); color: var(--agent-text); }
+.desktop-agent-reference-chips > span.is-error .desktop-agent-reference-chip-preview { background: color-mix(in srgb, var(--po-danger) 10%, transparent); color: var(--po-danger); }
+.desktop-agent-reference-chips span > button { display: grid; width: 24px; height: 24px; place-items: center; padding: 0; border: 0; border-radius: var(--desktop-control-radius); background: transparent; color: var(--agent-text-subtle); }
 .desktop-agent-reference-chips span > button:hover { background: var(--po-hover); color: var(--po-text); }
 .desktop-agent-attachment-control { position: relative; display: grid; flex: 0 0 auto; }
 .desktop-agent-reference-trigger {

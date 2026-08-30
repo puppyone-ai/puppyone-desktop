@@ -13,6 +13,7 @@ import type { AgentChatTabPresentation } from "../domain/agent-chat-tabs";
 import type { AgentRoutePreference } from "../domain/agent-route-preference";
 import { getElectronAgentClient } from "../infrastructure/electron/electronAgentClient";
 import { AgentChatTabPanel } from "../ui/AgentChatTabPanel";
+import type { AgentWorkspaceReferenceResolver } from "../ui/useAgentReferenceIngestion";
 import "../ui/desktop-agent.css";
 
 export type AgentChatWorkbenchItemProps = AuxiliaryWorkbenchItemRenderContext & Readonly<{
@@ -25,6 +26,7 @@ export type AgentChatWorkbenchItemProps = AuxiliaryWorkbenchItemRenderContext & 
   preferredModel: string | null;
   preferredRoute: Readonly<AgentRoutePreference>;
   preferredRuntimeId: string | null;
+  resolveWorkspaceReference?: AgentWorkspaceReferenceResolver;
 }>;
 
 export function AgentChatWorkbenchItem({
@@ -41,6 +43,7 @@ export function AgentChatWorkbenchItem({
   preferredRoute,
   preferredRuntimeId,
   presentation,
+  resolveWorkspaceReference,
 }: AgentChatWorkbenchItemProps) {
   const { t } = useLocalization();
   const controller = useMemo(
@@ -72,6 +75,7 @@ export function AgentChatWorkbenchItem({
     onPreferredModelChange={onPreferredModelChange}
     enabledRuntimeIds={enabledRuntimeIds}
     openSessionIds={openSessionIds}
+    resolveWorkspaceReference={resolveWorkspaceReference}
   />;
 }
 

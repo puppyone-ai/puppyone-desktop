@@ -121,11 +121,6 @@ export function AgentComposer({
         data-input-disabled={inputDisabled || undefined}
         onMouseDown={handleSurfaceMouseDown}
       >
-        <AgentDraftReferenceList
-          references={references}
-          onRemove={onRemoveReference}
-          onRetry={onRetryReference}
-        />
         <div className="desktop-agent-composer-row">
           <div className="desktop-agent-composer-input-row">
             <textarea
@@ -140,6 +135,11 @@ export function AgentComposer({
               onChange={(event) => onDraftChange(event.target.value)}
               onKeyDown={handleKeyDown}
               onPaste={onPaste}
+            />
+            <AgentDraftReferenceList
+              references={references}
+              onRemove={onRemoveReference}
+              onRetry={onRetryReference}
             />
           </div>
           <div className="desktop-agent-composer-trailing">

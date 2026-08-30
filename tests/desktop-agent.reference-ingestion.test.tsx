@@ -9,7 +9,10 @@ import { EXPLORER_REFERENCE_DRAG_TYPE } from "@puppyone/shared-ui";
 import type { AgentReferenceInputCapabilities } from "../src/features/desktop-agent/domain/agent-contract";
 import { AgentComposer } from "../src/features/desktop-agent/ui/AgentComposer";
 import { AgentPanelLayout } from "../src/features/desktop-agent/ui/AgentPanelLayout";
-import { useAgentReferenceIngestion } from "../src/features/desktop-agent/ui/useAgentReferenceIngestion";
+import {
+  useAgentReferenceIngestion,
+  type AgentWorkspaceReferenceResolver,
+} from "../src/features/desktop-agent/ui/useAgentReferenceIngestion";
 import { renderWithTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -56,6 +59,51 @@ describe("Desktop Agent reference ingestion", () => {
     expect(container.querySelector("[role='status']")?.textContent).toContain("another workspace");
   });
 
+  it("resolves Workbench resource URIs before requesting native workspace authorization", async () => {
+    const controller = controllerFixture();
+    const resource = "puppyone-local://workspace/folder-1/guanqun.md";
+    const resolveWorkspaceReference: AgentWorkspaceReferenceResolver = vi.fn(() => ({
+      workspaceRoot: "/workspace",
+      referencePath: "guanqun.md",
+    }));
+    const container = render(<IngestionHarness
+      controller={controller}
+      resolveWorkspaceReference={resolveWorkspaceReference}
+    />);
+    const boundary = container.querySelector<HTMLElement>(".desktop-agent-boundary")!;
+
+    await act(async () => boundary.dispatchEvent(dragEvent(
+      "drop",
+      typedWorkspaceTransfer("workspace-1", [resource]),
+    )));
+
+    await vi.waitFor(() => expect(controller.addWorkspacePaths).toHaveBeenCalledWith(["guanqun.md"]));
+    expect(resolveWorkspaceReference).toHaveBeenCalledWith(resource);
+    expect(controller.addWorkspacePaths).not.toHaveBeenCalledWith([resource]);
+  });
+
+  it("rejects a resource URI owned by another attached workspace root", async () => {
+    const controller = controllerFixture();
+    const resource = "puppyone-local://workspace/folder-2/secret.md";
+    const resolveWorkspaceReference: AgentWorkspaceReferenceResolver = vi.fn(() => ({
+      workspaceRoot: "/another-root",
+      referencePath: "secret.md",
+    }));
+    const container = render(<IngestionHarness
+      controller={controller}
+      resolveWorkspaceReference={resolveWorkspaceReference}
+    />);
+    const boundary = container.querySelector<HTMLElement>(".desktop-agent-boundary")!;
+
+    await act(async () => boundary.dispatchEvent(dragEvent(
+      "drop",
+      typedWorkspaceTransfer("workspace-1", [resource]),
+    )));
+
+    expect(controller.addWorkspacePaths).not.toHaveBeenCalled();
+    expect(container.querySelector("[role='status']")?.textContent).toContain("another workspace");
+  });
+
   it("routes Finder drop, picker and pasted image Files through the same staging method", async () => {
     const controller = controllerFixture();
     const container = render(<IngestionHarness controller={controller} withComposer />);
@@ -95,7 +143,7 @@ describe("Desktop Agent reference ingestion", () => {
         relativePath: "missing.md",
         displayName: "missing.md",
         status: "error",
-        error: { code: "missing", message: "File no longer exists" },
+        error: { code: "workspace-resolution-failed", message: "File no longer exists" },
       }]}
       onAddExternalFiles={onAddExternalFiles}
       onRetryReference={onRetryReference}
@@ -113,13 +161,17 @@ describe("Desktop Agent reference ingestion", () => {
     expect(document.querySelector('[role="menu"]')).toBeNull();
 
     const retry = container.querySelector<HTMLButtonElement>('button[aria-label*="Retry reference"]')!;
-    expect(container.textContent).toContain("File no longer exists");
+    const failedChip = container.querySelector(".desktop-agent-reference-chips > .is-error");
+    expect(failedChip?.getAttribute("title")).toContain("This workspace item could not be added");
+    expect(failedChip?.getAttribute("title")).toContain("File no longer exists");
+    expect(container.textContent).not.toContain("File no longer exists");
+    expect(container.querySelector(".desktop-agent-reference-chip-copy small")).toBeNull();
     act(() => retry.click());
     expect(onRetryReference).toHaveBeenCalledWith("failed-ref");
     expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("renders staged images as composer-local attachment previews above the draft", () => {
+  it("renders staged images as compact tokens after the draft and before the toolbar", () => {
     const container = render(<AgentComposer
       draft="Describe this image"
       onDraftChange={vi.fn()}
@@ -143,9 +195,12 @@ describe("Desktop Agent reference ingestion", () => {
 
     const composer = container.querySelector(".desktop-agent-composer")!;
     const preview = composer.querySelector(".desktop-agent-reference-chip-preview.is-image");
+    const textarea = composer.querySelector("textarea")!;
+    const toolbar = composer.querySelector(".desktop-agent-composer-trailing")!;
     expect(preview).not.toBeNull();
     expect(composer.querySelector(".desktop-agent-reference-chips")?.textContent).toContain("capture.png");
-    expect(preview?.compareDocumentPosition(composer.querySelector("textarea")!) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(textarea.compareDocumentPosition(preview!) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(preview?.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 
   it("announces partial batches while retaining the rejected item as an actionable error", async () => {
@@ -165,11 +220,20 @@ describe("Desktop Agent reference ingestion", () => {
   });
 });
 
-function IngestionHarness({ controller, withComposer = false }: { controller: ReturnType<typeof controllerFixture>; withComposer?: boolean }) {
+function IngestionHarness({
+  controller,
+  withComposer = false,
+  resolveWorkspaceReference,
+}: {
+  controller: ReturnType<typeof controllerFixture>;
+  withComposer?: boolean;
+  resolveWorkspaceReference?: AgentWorkspaceReferenceResolver;
+}) {
   const ingestion = useAgentReferenceIngestion({
     controller: controller as never,
     workspaceId: "workspace-1",
     capabilities: capabilities(),
+    resolveWorkspaceReference,
   });
   return <AgentPanelLayout
     ariaLabel="Agent Chat"
@@ -201,6 +265,7 @@ function IngestionHarness({ controller, withComposer = false }: { controller: Re
 
 function controllerFixture() {
   return {
+    workspaceRoot: "/workspace",
     getSnapshot: vi.fn(() => ({ references: [] as Array<{ id: string; status: string; error?: { message: string } }> })),
     addWorkspacePaths: vi.fn(async (paths: string[]) => paths.length),
     addPathTextOrDraft: vi.fn(async () => false),

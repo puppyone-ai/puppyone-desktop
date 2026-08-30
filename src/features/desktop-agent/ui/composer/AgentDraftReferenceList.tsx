@@ -61,7 +61,6 @@ function ReferenceChip({ reference, onRemove, onRetry }: {
       <span className={`desktop-agent-reference-chip-preview${image ? " is-image" : ""}`}>{icon}</span>
       <span className="desktop-agent-reference-chip-copy">
         <span>{reference.displayName}</span>
-        {statusLabel && <small>{statusLabel}</small>}
       </span>
       {onRetry && <button type="button" aria-label={t("agent.reference.retry", { name: bidiIsolate(reference.displayName) })} onClick={onRetry}><RefreshCcw size={10} aria-hidden="true" /></button>}
       <button type="button" aria-label={t("agent.reference.remove", { name: bidiIsolate(reference.displayName) })} onClick={onRemove}><X size={10} aria-hidden="true" /></button>
@@ -79,6 +78,7 @@ const LOCALIZED_REFERENCE_ERROR_CODES = new Set([
   "mime-unsupported",
   "reference-limit",
   "reference-total-size",
+  "workspace-resolution-failed",
 ]);
 
 function localizedReferenceError(reference: AgentDraftReference, t: MessageFormatter) {

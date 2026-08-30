@@ -130,6 +130,11 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(attachmentButton).not.toContain('role="menu"');
     expect(css).toMatch(/\.desktop-agent-reference-trigger\s*\{[^}]*width:\s*var\(--agent-control-size\)[^}]*height:\s*var\(--agent-control-size\)/s);
     expect(css).toMatch(/\.desktop-agent-reference-chip-preview\.is-image\s*\{[^}]*color:\s*var\(--po-accent-text\)/s);
+    expect(css).toMatch(/\.desktop-agent-reference-chips\s*\{[^}]*padding:\s*8px 0 0/s);
+    expect(css).toMatch(/\.desktop-agent-reference-chips > span\s*\{[^}]*min-height:\s*28px[^}]*border-radius:\s*8px/s);
+    expect(css).toMatch(/\.desktop-agent-reference-chips > span\.is-error\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--po-danger\) 5%, var\(--agent-control-surface\)\)[^}]*color:\s*var\(--agent-text\)/s);
+    expect(composer.indexOf("<AgentDraftReferenceList")).toBeGreaterThan(composer.indexOf("<textarea"));
+    expect(composer.indexOf("<AgentDraftReferenceList")).toBeLessThan(composer.indexOf('className="desktop-agent-composer-trailing"'));
     expect(composer).toContain('className="desktop-agent-composer-actions"');
     expect(composer).toContain("onMouseDown={handleSurfaceMouseDown}");
     expect(composer).toContain("textareaRef.current?.focus()");
