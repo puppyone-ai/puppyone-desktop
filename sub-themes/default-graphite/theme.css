@@ -17,6 +17,7 @@
     --po-surface-panel-raised: #ffffff;
     --po-surface-overlay: #ffffff;
     --po-surface-inset: #e2e5e9;
+    --po-canvas: #fbfbfc;
     --po-project-card-tab: color-mix(in srgb, var(--po-inset) 54%, var(--po-panel) 46%);
     --po-text: #25272c;
     --po-text-muted: #656a73;
@@ -89,6 +90,7 @@
     --po-surface-overlay: #23252b;
     --po-surface-inset: #0c0d10;
     --po-surface-editor: #17181c;
+    --po-canvas: #17181c;
     --po-editor-line: rgba(255, 255, 255, 0.075);
     --po-accent: #8b8cff;
     --po-accent-text: #b7b8ff;

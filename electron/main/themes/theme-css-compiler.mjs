@@ -101,6 +101,31 @@ const applicationColorTokens = new Set([
   "--po-json-icon",
   "--po-scrollbar-thumb",
   "--po-scrollbar-thumb-hover",
+  "--po-cloud-titlebar-bg",
+  "--po-cloud-titlebar-text",
+  "--po-cloud-titlebar-text-muted",
+  "--po-cloud-titlebar-text-disabled",
+  "--po-cloud-titlebar-hover",
+  "--po-cloud-titlebar-active",
+  "--po-cloud-titlebar-focus",
+  "--po-terminal-cursor",
+  "--po-terminal-selection",
+  "--po-terminal-black",
+  "--po-terminal-red",
+  "--po-terminal-green",
+  "--po-terminal-yellow",
+  "--po-terminal-blue",
+  "--po-terminal-magenta",
+  "--po-terminal-cyan",
+  "--po-terminal-white",
+  "--po-terminal-bright-black",
+  "--po-terminal-bright-red",
+  "--po-terminal-bright-green",
+  "--po-terminal-bright-yellow",
+  "--po-terminal-bright-blue",
+  "--po-terminal-bright-magenta",
+  "--po-terminal-bright-cyan",
+  "--po-terminal-bright-white",
 ]);
 const markdownTokenMap = new Map([
   ["--po-md-surface-background", "--po-host-md-surface-background"],
@@ -182,15 +207,53 @@ export async function compileThemeCss({
   root.walkAtRules("charset", (rule) => rule.remove());
   validateAtRules(root);
   validateModeContract(root, supportedModes);
+  const firstPaint = extractFirstPaint(root, { target, supportedModes });
   scopeRules(root, { themeId, target });
   await rewriteAssetUrls(root, resolveAssetUrl);
   validateDeclarations(root, { target });
 
   return Object.freeze({
     css: root.toString().trim(),
+    ...(firstPaint === undefined ? {} : { firstPaint }),
     target,
     themeId,
   });
+}
+
+function extractFirstPaint(root, { target, supportedModes }) {
+  if (target !== "application") return undefined;
+  const modes = new Set(supportedModes ?? ["light", "dark"]);
+  const backgrounds = {};
+  root.walkRules((rule) => {
+    const selectors = splitSelectors(rule.selector);
+    const dark = selectors.some((selector) => hasDarkSelector(selector));
+    const light = selectors.some((selector) => !hasDarkSelector(selector));
+    rule.nodes.forEach((node) => {
+      if (node.type !== "decl" || node.prop.toLowerCase() !== "--po-canvas") return;
+      const background = normalizeOpaqueColor(node.value);
+      if (!background) return;
+      if (light && modes.has("light")) backgrounds.light = background;
+      if (dark && modes.has("dark")) backgrounds.dark = background;
+    });
+  });
+  const firstPaint = Object.fromEntries(
+    [...modes]
+      .filter((mode) => backgrounds[mode] !== undefined)
+      .map((mode) => [mode, Object.freeze({
+        background: backgrounds[mode],
+        colorScheme: mode,
+      })]),
+  );
+  return Object.keys(firstPaint).length === 0 ? undefined : Object.freeze(firstPaint);
+}
+
+function normalizeOpaqueColor(value) {
+  const normalized = value.trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/.test(normalized)) return normalized;
+  if (/^#[0-9a-f]{3}$/.test(normalized)) {
+    return `#${[...normalized.slice(1)].map((character) => character.repeat(2)).join("")}`;
+  }
+  return null;
 }
 
 function validateModeContract(root, supportedModes) {

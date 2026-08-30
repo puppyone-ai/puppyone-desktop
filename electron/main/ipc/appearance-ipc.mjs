@@ -1,13 +1,12 @@
-import { INTERFACE_STYLE_FIRST_PAINT_BACKGROUNDS } from "../interface-style-first-paint.generated.mjs";
-
 export const APPEARANCE_WINDOW_BACKGROUND_CHANNEL = "appearance:set-window-background";
 
-const allowedBackgrounds = new Set(INTERFACE_STYLE_FIRST_PAINT_BACKGROUNDS);
+const opaqueHexColorPattern = /^#[0-9a-f]{6}$/i;
 
 /**
- * Keeps Electron's native window underlay on the same manifest-owned color as
- * the renderer's synchronous first paint. The allowlist prevents the renderer
- * from turning this narrow appearance channel into an arbitrary native setter.
+ * Keeps Electron's native window underlay on the same compiler-validated color
+ * as the renderer's synchronous first paint. An opaque hex-only contract gives
+ * local Sub Themes the same capability as built-ins without accepting general
+ * CSS, gradients, alpha, or another native-window operation.
  */
 export function registerAppearanceIpcHandlers({ ipcMain, BrowserWindow, nativeTheme }) {
   if (!ipcMain || typeof ipcMain.on !== "function") {
@@ -23,7 +22,7 @@ export function registerAppearanceIpcHandlers({ ipcMain, BrowserWindow, nativeTh
   ipcMain.on(APPEARANCE_WINDOW_BACKGROUND_CHANNEL, (event, request) => {
     const background = request?.background;
     const themeSource = request?.themeSource;
-    if (typeof background !== "string" || !allowedBackgrounds.has(background)) return;
+    if (typeof background !== "string" || !opaqueHexColorPattern.test(background)) return;
     if (themeSource !== "system" && themeSource !== "light" && themeSource !== "dark") return;
 
     const ownerWindow = BrowserWindow.fromWebContents(event.sender);

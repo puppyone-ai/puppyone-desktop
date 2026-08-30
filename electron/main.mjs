@@ -113,7 +113,7 @@ import {
   reapplyWindowChromeProfile,
 } from "./main/window-chrome-profile.mjs";
 import { createDesktopPlatformHost } from "./main/platform/create-platform-host.mjs";
-import { DEFAULT_INTERFACE_STYLE_FIRST_PAINT } from "./main/interface-style-first-paint.generated.mjs";
+import { FALLBACK_SUB_THEME_FIRST_PAINT } from "./main/sub-theme-first-paint.generated.mjs";
 import { createGitOperationCoordinator } from "./main/git-operation-coordinator.mjs";
 import { createCloudPublishCoordinator } from "./main/cloud-publish-coordinator.mjs";
 import { createCloudPublishSecretVault } from "./main/cloud-publish-secret-vault.mjs";
@@ -407,8 +407,8 @@ async function createWindow(options = {}) {
     title: appName,
     ...(appIconPath ? { icon: appIconPath } : {}),
     backgroundColor: nativeTheme.shouldUseDarkColors
-      ? DEFAULT_INTERFACE_STYLE_FIRST_PAINT.dark.background
-      : DEFAULT_INTERFACE_STYLE_FIRST_PAINT.light.background,
+      ? FALLBACK_SUB_THEME_FIRST_PAINT.dark.background
+      : FALLBACK_SUB_THEME_FIRST_PAINT.light.background,
     ...desktopWindowChromeOptions,
     webPreferences: {
       contextIsolation: true,

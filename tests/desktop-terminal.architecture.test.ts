@@ -467,13 +467,15 @@ describe("Desktop Terminal architecture boundaries", () => {
 
   it("keeps plain output close to editor text while preserving ANSI tiers", () => {
     const tokens = source("src/styles/tokens.css");
-    const light = terminalNeutralTier(tokens, ":root");
-    const dark = terminalNeutralTier(tokens, ".dark");
+    const neutralTheme = source("sub-themes/default-neutral/theme.css");
+    const light = terminalNeutralTier(neutralTheme, ":root");
+    const dark = terminalNeutralTier(neutralTheme, ".dark .theme-root");
 
     expect(tokens).toMatch(
       /--po-terminal-fg:\s*color-mix\(in srgb, var\(--po-text\) 70%, var\(--po-text-muted\)\);/,
     );
     expect(tokens.match(/--po-terminal-fg:/g)).toHaveLength(1);
+    expect(tokens).not.toContain("--po-terminal-black:");
     expect(relativeLuminance(light.text)).toBeLessThan(relativeLuminance(light.foreground));
     expect(relativeLuminance(light.foreground)).toBeLessThan(relativeLuminance(light.muted));
     expect(relativeLuminance(dark.text)).toBeGreaterThan(relativeLuminance(dark.foreground));

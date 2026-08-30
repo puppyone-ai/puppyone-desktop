@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import postcss from "postcss";
 import { compileThemeCss } from "../electron/main/themes/theme-css-compiler.mjs";
 import { parseSingleFileThemeCss } from "../electron/main/themes/theme-single-file-contract.mjs";
 
@@ -22,21 +23,37 @@ const rootThemeManifestPath = path.join(
   "src/features/appearance/interface-style-manifest.json",
 );
 const checkOnly = process.argv.includes("--check");
+const rootThemeManifest = JSON.parse(readFileSync(rootThemeManifestPath, "utf8"));
 
 try {
   const definitions = await buildDefinitions();
-  const expected = renderRegistry(definitions);
+  const fallback = validateFallbackTheme(definitions);
+  const outputs = new Map([
+    [outputPath, renderRegistry(definitions)],
+    [path.join(repoRoot, "src/styles/fallback-theme.generated.css"), renderFallbackCss(fallback)],
+    [path.join(repoRoot, "src/features/themes/subThemeBootstrap.generated.ts"), renderTypeScriptBootstrap(definitions, fallback)],
+    [path.join(repoRoot, "public/sub-theme-bootstrap.js"), renderBrowserBootstrap(definitions, fallback)],
+    [path.join(repoRoot, "electron/main/sub-theme-first-paint.generated.mjs"), renderNativeBootstrap(definitions, fallback)],
+    [path.join(repoRoot, "public/initial-shell.css"), renderInitialShellCss(fallback)],
+  ]);
   if (checkOnly) {
-    const current = existsSync(outputPath) ? readFileSync(outputPath, "utf8") : null;
-    if (current !== expected) {
+    const stale = [...outputs].flatMap(([candidate, expected]) => (
+      existsSync(candidate) && readFileSync(candidate, "utf8") === expected
+        ? []
+        : [path.relative(repoRoot, candidate)]
+    ));
+    if (stale.length > 0) {
       console.error("Built-in Sub Theme registry is stale.");
-      console.error("Run npm run generate:sub-themes and commit the generated registry.");
+      stale.forEach((candidate) => console.error(`- ${candidate}`));
+      console.error("Run npm run generate:sub-themes and commit the generated artifacts.");
       process.exit(1);
     }
     console.log(`Built-in Sub Theme packages are valid (${definitions.length} packages).`);
   } else {
-    writeFileSync(outputPath, expected);
-    console.log(`Generated ${path.relative(repoRoot, outputPath)} from ${definitions.length} packages.`);
+    for (const [candidate, expected] of outputs) {
+      writeFileSync(candidate, expected);
+      console.log(`Generated ${path.relative(repoRoot, candidate)}.`);
+    }
   }
 } catch (error) {
   console.error(`Built-in Sub Theme generation failed: ${formatError(error)}`);
@@ -45,7 +62,6 @@ try {
 
 async function buildDefinitions() {
   if (!existsSync(packagesRoot)) fail("sub-themes/ does not exist.");
-  const rootThemeManifest = JSON.parse(readFileSync(rootThemeManifestPath, "utf8"));
   const rootThemes = new Map(rootThemeManifest.styles.map((definition) => [definition.id, definition]));
   const entries = readdirSync(packagesRoot, { withFileTypes: true })
     .filter((entry) => entry.name !== ".DS_Store")
@@ -91,6 +107,7 @@ async function buildDefinitions() {
     validateRootCompatibility(parsed, rootThemes, relativeThemePath);
 
     const compiledCss = {};
+    let firstPaint;
     for (const target of parsed.targets) {
       const result = await compileThemeCss({
         css: parsed.stylesheets[target],
@@ -101,6 +118,13 @@ async function buildDefinitions() {
         allowReservedBuiltinId: true,
       });
       compiledCss[target] = result.css;
+      if (target === "application") firstPaint = result.firstPaint;
+    }
+    if (
+      parsed.targets.includes("application")
+      && parsed.modes.some((mode) => firstPaint?.[mode] === undefined)
+    ) {
+      fail(`${relativeThemePath} must declare an opaque --po-canvas for every application Color Mode.`);
     }
     definitions.push({
       id: parsed.id,
@@ -114,6 +138,7 @@ async function buildDefinitions() {
       targets: [...parsed.targets],
       source: "builtin",
       compiledCss,
+      ...(firstPaint === undefined ? {} : { firstPaint }),
       ...(parsed.legacyPresets === undefined
         ? {}
         : { legacyPresets: { ...parsed.legacyPresets } }),
@@ -141,6 +166,21 @@ async function buildDefinitions() {
   return definitions
     .sort((left, right) => left.builtinOrder - right.builtinOrder)
     .map(({ builtinOrder: _builtinOrder, ...definition }) => definition);
+}
+
+function validateFallbackTheme(definitions) {
+  const fallbackId = rootThemeManifest.fallbackSubThemeId;
+  if (typeof fallbackId !== "string") fail("interface-style manifest must declare fallbackSubThemeId.");
+  const fallback = definitions.find((definition) => definition.id === fallbackId);
+  if (!fallback) fail(`Fallback Sub Theme is missing: ${fallbackId}.`);
+  if (!fallback.targets.includes("application")) fail("Fallback Sub Theme must target application.");
+  if (!fallback.modes.includes("light") || !fallback.modes.includes("dark")) {
+    fail("Fallback Sub Theme must support light and dark.");
+  }
+  if (!fallback.firstPaint?.light || !fallback.firstPaint?.dark) {
+    fail("Fallback Sub Theme must declare an opaque --po-canvas for light and dark.");
+  }
+  return fallback;
 }
 
 function validateRootCompatibility(theme, rootThemes, relativeThemePath) {
@@ -198,6 +238,9 @@ function renderDefinition(definition, indent) {
     `targets: Object.freeze(${JSON.stringify(definition.targets)} as const)`,
     'source: "builtin"',
     `variants: Object.freeze({ ${variants.join(", ")} })`,
+    ...(definition.firstPaint === undefined
+      ? []
+      : [`firstPaint: Object.freeze(${JSON.stringify(definition.firstPaint)} as const)`]),
     ...(definition.legacyPresets === undefined
       ? []
       : [`legacyPresets: Object.freeze(${JSON.stringify(definition.legacyPresets)})`]),
@@ -206,6 +249,101 @@ function renderDefinition(definition, indent) {
     `${indent}Object.freeze({`,
     ...properties.map((property) => `${indent}  ${property},`),
     `${indent}})`,
+  ].join("\n");
+}
+
+function renderFallbackCss(fallback) {
+  const root = postcss.parse(fallback.compiledCss.application);
+  const host = `[data-po-appearance-root][data-sub-theme-id="${fallback.id}"]`;
+  root.walkRules((rule) => {
+    rule.selector = rule.selector
+      .split(",")
+      .map((selector) => selector.trim())
+      .map((selector) => {
+        if (selector === host) return ":root, :where([data-po-appearance-root])";
+        if (selector === `${host}:where(.dark)`) {
+          return ':root[data-initial-theme="dark"], :where([data-po-appearance-root].dark)';
+        }
+        fail(`Fallback application CSS contains an unsupported selector: ${selector}.`);
+      })
+      .join(", ");
+  });
+  return [
+    "/* This file is generated from sub-themes/default-neutral/theme.css. */",
+    "/* It is the lowest cascade layer only; selected Sub Themes override it. */",
+    root.toString().trim(),
+    "",
+  ].join("\n");
+}
+
+function createBootstrap(definitions, fallback) {
+  const firstPaintById = Object.fromEntries(definitions.flatMap((definition) => (
+    definition.firstPaint === undefined ? [] : [[definition.id, definition.firstPaint]]
+  )));
+  const legacyPresetSubThemeIds = {};
+  for (const definition of definitions) {
+    for (const [mode, preset] of Object.entries(definition.legacyPresets ?? {})) {
+      legacyPresetSubThemeIds[mode] ??= {};
+      legacyPresetSubThemeIds[mode][preset] = definition.id;
+    }
+  }
+  return {
+    version: 1,
+    fallbackSubThemeId: fallback.id,
+    fallbackFirstPaint: fallback.firstPaint,
+    firstPaintById,
+    legacyPresetSubThemeIds,
+  };
+}
+
+function renderTypeScriptBootstrap(definitions, fallback) {
+  const value = createBootstrap(definitions, fallback);
+  return [
+    "/* This file is generated from built-in Sub Theme CSS packages. */",
+    `export const SUB_THEME_BOOTSTRAP = Object.freeze(${JSON.stringify(value, null, 2)} as const);`,
+    "export const FALLBACK_SUB_THEME_ID = SUB_THEME_BOOTSTRAP.fallbackSubThemeId;",
+    "export const FALLBACK_SUB_THEME_FIRST_PAINT = SUB_THEME_BOOTSTRAP.fallbackFirstPaint;",
+    "",
+  ].join("\n");
+}
+
+function renderBrowserBootstrap(definitions, fallback) {
+  return `/* This file is generated from built-in Sub Theme CSS packages. */\nwindow.__PUPPYONE_SUB_THEME_BOOTSTRAP__ = ${JSON.stringify(createBootstrap(definitions, fallback))};\n`;
+}
+
+function renderNativeBootstrap(definitions, fallback) {
+  const value = createBootstrap(definitions, fallback);
+  return [
+    "/* This file is generated from built-in Sub Theme CSS packages. */",
+    `export const FALLBACK_SUB_THEME_FIRST_PAINT = Object.freeze(${JSON.stringify(value.fallbackFirstPaint, null, 2)});`,
+    "",
+  ].join("\n");
+}
+
+function renderInitialShellCss(fallback) {
+  return [
+    "/* This file is generated from sub-themes/default-neutral/theme.css. */",
+    ":root {",
+    `  --initial-shell-background: ${fallback.firstPaint.light.background};`,
+    "  --initial-shell-color-scheme: light;",
+    "  background: var(--initial-shell-background);",
+    "  color-scheme: var(--initial-shell-color-scheme);",
+    "}",
+    "",
+    "html,",
+    "body,",
+    "#root {",
+    "  width: 100%;",
+    "  height: 100%;",
+    "  margin: 0;",
+    "}",
+    "",
+    "body,",
+    "#root:empty {",
+    "  overflow: hidden;",
+    "  background: var(--initial-shell-background);",
+    "}",
+    "",
   ].join("\n");
 }
 

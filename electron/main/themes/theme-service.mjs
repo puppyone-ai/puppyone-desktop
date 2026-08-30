@@ -218,10 +218,12 @@ function createStarterThemeCss({ themeId, themeName }) {
 
 @puppyone application {
   :root {
+    --po-canvas: #fafafa;
     --po-accent: #2563eb;
   }
 
   .dark .theme-root {
+    --po-canvas: #161413;
     --po-accent: #60a5fa;
   }
 }
@@ -267,6 +269,7 @@ async function loadStandaloneCssTheme(
     }
     const budget = createCompilationBudget();
     const compiledCss = {};
+    let firstPaint;
     for (const target of descriptor.targets) {
       const compiled = await compileThemeFile({
         css: descriptor.stylesheets[target],
@@ -278,6 +281,7 @@ async function loadStandaloneCssTheme(
         budget,
       });
       compiledCss[target] = compiled.css;
+      if (target === "application") firstPaint = compiled.firstPaint;
     }
     return freezeTheme({
       id: descriptor.id,
@@ -290,6 +294,7 @@ async function loadStandaloneCssTheme(
       targets: descriptor.targets,
       source,
       compiledCss,
+      ...(firstPaint === undefined ? {} : { firstPaint }),
     });
   }
 
@@ -339,6 +344,7 @@ async function loadPackageTheme(packageRoot) {
     throw new TypeError(`Theme id is reserved for legacy compatibility: ${LEGACY_CUSTOM_THEME_ID}.`);
   }
   const compiledCss = {};
+  let firstPaint;
   const budget = createCompilationBudget();
   for (const target of manifest.targets) {
     const entrypoint = await resolvePackageFile(packageRoot, ".", manifest.entrypoints[target]);
@@ -353,6 +359,7 @@ async function loadPackageTheme(packageRoot) {
       budget,
     });
     compiledCss[target] = compiled.css;
+    if (target === "application") firstPaint = compiled.firstPaint;
   }
   return freezeTheme({
     id: manifest.id,
@@ -365,6 +372,7 @@ async function loadPackageTheme(packageRoot) {
     targets: manifest.targets,
     source: "local-package",
     compiledCss,
+    ...(firstPaint === undefined ? {} : { firstPaint }),
   });
 }
 
@@ -492,6 +500,13 @@ function freezeTheme(theme) {
     modes: Object.freeze([...theme.modes]),
     targets: Object.freeze([...theme.targets]),
     compiledCss: Object.freeze({ ...theme.compiledCss }),
+    ...(theme.firstPaint === undefined
+      ? {}
+      : {
+          firstPaint: Object.freeze(Object.fromEntries(
+            Object.entries(theme.firstPaint).map(([mode, paint]) => [mode, Object.freeze({ ...paint })]),
+          )),
+        }),
   });
 }
 

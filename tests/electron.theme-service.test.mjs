@@ -150,8 +150,8 @@ describe("host-owned CSS theme service", () => {
         modes: light dark;
       }
       @puppyone application {
-        .theme-root { --po-accent: #2f6f52; }
-        .dark .theme-root { --po-accent: #70b899; }
+        .theme-root { --po-canvas: #f4f8f5; --po-accent: #2f6f52; }
+        .dark .theme-root { --po-canvas: #102019; --po-accent: #70b899; }
       }
       @puppyone markdown {
         :root { --po-md-content-color: #27352f; }
@@ -175,6 +175,10 @@ describe("host-owned CSS theme service", () => {
       modes: ["light", "dark"],
       targets: ["application", "markdown", "csv"],
       source: "local-css",
+      firstPaint: {
+        light: { background: "#f4f8f5", colorScheme: "light" },
+        dark: { background: "#102019", colorScheme: "dark" },
+      },
     });
     expect(snapshot.themes[0].compiledCss.application).toContain("data-po-appearance-root");
     expect(snapshot.themes[0].compiledCss.markdown).toContain("--po-host-md-content-color");
@@ -358,6 +362,10 @@ describe("host-owned CSS theme service", () => {
       "local.user.custom-theme",
       "local.user.custom-theme-2",
     ]);
+    expect(snapshot.themes[0].firstPaint).toEqual({
+      light: { background: "#fafafa", colorScheme: "light" },
+      dark: { background: "#161413", colorScheme: "dark" },
+    });
   });
 
   it("keeps a legacy managed Custom CSS directory on disk without loading it", async () => {

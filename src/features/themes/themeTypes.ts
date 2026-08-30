@@ -2,6 +2,7 @@ import type {
   DesktopThemeColorMode,
   DesktopThemeDefinition,
   DesktopThemeDiagnostic,
+  DesktopThemeFirstPaint,
   DesktopThemeTarget,
 } from "../../types/electron";
 import type { DarkThemePreset, LightThemePreset } from "../../preferences";
@@ -25,6 +26,7 @@ export type SubThemeDefinition = Readonly<{
   targets: readonly AppearanceSurfaceTarget[];
   source: SubThemeSource;
   variants: Readonly<Partial<Record<SubThemeColorMode, SubThemeModeVariant>>>;
+  firstPaint?: Readonly<Partial<Record<SubThemeColorMode, DesktopThemeFirstPaint>>>;
   legacyPresets?: Readonly<{
     light?: LightThemePreset;
     dark?: DarkThemePreset;

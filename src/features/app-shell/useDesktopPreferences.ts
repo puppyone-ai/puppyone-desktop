@@ -275,7 +275,11 @@ export function useDesktopPreferences(
   useLayoutEffect(() => {
     window.localStorage.setItem(INTERFACE_STYLE_STORAGE_KEY, interfaceStyle);
     const root = document.documentElement;
-    const firstPaint = getInterfaceStyleFirstPaint(interfaceStyle, resolvedTheme, activeThemePreset);
+    const firstPaint = getInterfaceStyleFirstPaint(
+      interfaceStyle,
+      resolvedTheme,
+      resolvedAppearance.subTheme,
+    );
     root.dataset.interfaceStyle = interfaceStyle;
     root.dataset.interfaceStyleFamily = resolvedAppearance.profile.family;
     root.dataset.interfaceStyleVariant = resolvedAppearance.profile.variant;

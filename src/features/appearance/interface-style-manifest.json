@@ -1,6 +1,7 @@
 {
-  "version": 3,
+  "version": 4,
   "defaultStyle": "default",
+  "fallbackSubThemeId": "default.neutral",
   "storage": {
     "interfaceStyle": "puppyone.desktop.interfaceStyle",
     "appearancePreferences": "puppyone.desktop.appearance",
@@ -48,52 +49,6 @@
         "presetControls": {
           "light": true,
           "dark": true
-        }
-      },
-      "firstPaint": {
-        "light": {
-          "background": "#fafafa",
-          "colorScheme": "light"
-        },
-        "dark": {
-          "background": "#161413",
-          "colorScheme": "dark"
-        }
-      },
-      "presetFirstPaint": {
-        "light": {
-          "defaultPreset": "neutral",
-          "values": {
-            "neutral": {
-              "background": "#fafafa",
-              "colorScheme": "light"
-            },
-            "warm": {
-              "background": "#fbfaf7",
-              "colorScheme": "light"
-            },
-            "graphite": {
-              "background": "#fbfbfc",
-              "colorScheme": "light"
-            }
-          }
-        },
-        "dark": {
-          "defaultPreset": "default",
-          "values": {
-            "default": {
-              "background": "#161413",
-              "colorScheme": "dark"
-            },
-            "warm": {
-              "background": "#18130f",
-              "colorScheme": "dark"
-            },
-            "graphite": {
-              "background": "#17181c",
-              "colorScheme": "dark"
-            }
-          }
         }
       },
       "stylesheet": null

@@ -836,6 +836,10 @@ export type PuppyoneWorkspaceConfig = {
 
 export type DesktopThemeTarget = "application" | "markdown" | "csv";
 export type DesktopThemeColorMode = "light" | "dark";
+export type DesktopThemeFirstPaint = Readonly<{
+  background: string;
+  colorScheme: DesktopThemeColorMode;
+}>;
 export type DesktopThemeDefinition = Readonly<{
   id: string;
   name: string;
@@ -847,6 +851,7 @@ export type DesktopThemeDefinition = Readonly<{
   targets: readonly DesktopThemeTarget[];
   source: "local-css" | "local-package";
   compiledCss: Readonly<Partial<Record<DesktopThemeTarget, string>>>;
+  firstPaint?: Readonly<Partial<Record<DesktopThemeColorMode, DesktopThemeFirstPaint>>>;
 }>;
 export type DesktopThemeDiagnostic = Readonly<{
   source: string;

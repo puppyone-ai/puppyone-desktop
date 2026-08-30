@@ -1,6 +1,5 @@
+/* This file is generated from sub-themes/default-neutral/theme.css. */
 :root {
-  /* Default Light/Neutral editor surface. The synchronous theme bootstrap
-     replaces this for persisted presets and interface skins before paint. */
   --initial-shell-background: #fafafa;
   --initial-shell-color-scheme: light;
   background: var(--initial-shell-background);
