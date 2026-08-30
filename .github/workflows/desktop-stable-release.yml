@@ -70,6 +70,15 @@ jobs:
       - name: Install locked dependencies without deployment secrets
         run: npm ci
 
+      - name: Test updater monotonicity P0
+        run: npm run test:updater-p0
+
+      - name: Verify Stable release version moves forward
+        run: >-
+          node scripts/verify-desktop-release-version.mjs
+          --channel stable
+          --candidate-version "${{ steps.release.outputs.version }}"
+
       - name: Test release transaction and Terminal launcher
         run: >-
           npm test --

@@ -1,4 +1,5 @@
 import type { DesktopUpdateState } from "../../types/electron";
+import { evaluateDesktopUpdateCandidate } from "../../../shared/desktop/update-policy.mjs";
 
 export const FALLBACK_UPDATE_STATE: DesktopUpdateState = {
   status: "disabled",
@@ -25,10 +26,29 @@ export function normalizeDesktopUpdateState(
   value: DesktopUpdateState | null | undefined,
 ): DesktopUpdateState {
   if (!value || typeof value !== "object") return FALLBACK_UPDATE_STATE;
-  return {
+  const normalized = {
     ...FALLBACK_UPDATE_STATE,
     ...value,
     blockers: Array.isArray(value.blockers) ? value.blockers : [],
+  };
+  if (!isActionableStatus(normalized.status)) return normalized;
+
+  const evaluation = evaluateDesktopUpdateCandidate({
+    channel: normalized.channel,
+    currentVersion: normalized.currentVersion,
+    candidateVersion: normalized.availableVersion,
+  });
+  if (evaluation.allowed) return normalized;
+
+  const invalid = evaluation.relation === "invalid" || !evaluation.channelCompatible;
+  return {
+    ...normalized,
+    status: invalid ? "error" : "not-available",
+    availableVersion: null,
+    updateInfo: null,
+    progress: null,
+    blockers: [],
+    error: invalid ? "The update feed returned an invalid or cross-channel version." : null,
   };
 }
 
@@ -79,4 +99,12 @@ export function getDesktopUpdateTitlebarState(
 function normalizeProgressPercent(value: number | null | undefined) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, Math.round(value ?? 0)));
+}
+
+function isActionableStatus(status: DesktopUpdateState["status"]) {
+  return status === "available"
+    || status === "downloading"
+    || status === "downloaded"
+    || status === "blocked"
+    || status === "installing";
 }

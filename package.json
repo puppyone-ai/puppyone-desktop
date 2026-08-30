@@ -77,6 +77,8 @@
     "smoke:csv-performance": "npm run build && node scripts/run-csv-editor-performance-smoke.mjs",
     "start": "node scripts/start-electron.mjs",
     "test": "vitest run",
+    "test:updater-p0": "vitest run --config vitest.updater-p0.config.mjs",
+    "test:updater-p0:coverage": "vitest run --config vitest.updater-p0.config.mjs --coverage",
     "test:git-auto-commit": "vitest run --config vitest.git-auto-commit.config.mjs",
     "test:git-auto-commit:coverage": "vitest run --config vitest.git-auto-commit.config.mjs --coverage",
     "test:desktop-platform-contracts": "vitest run tests/desktopPlatformArchitecture.test.mjs tests/desktopReleaseSet.test.mjs tests/desktopBuildIdentity.test.mjs tests/electron.build-info-service.test.mjs tests/electron.platform-host.test.mjs tests/electron.terminal-agent-launch.test.mjs tests/electron.cloud-publish-git-credentials.test.mjs",

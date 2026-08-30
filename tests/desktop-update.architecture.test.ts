@@ -15,6 +15,9 @@ describe("Desktop update interaction boundaries", () => {
     expect(service).toContain('state.status === "downloaded" || state.status === "blocked"');
     expect(service).not.toContain('|| status === "blocked";');
     expect(service).toContain("confirmRestartWithBlockers");
+    expect(service).toContain("allowDowngrade: false");
+    expect(service).toContain("autoUpdater.allowDowngrade = configuration.allowDowngrade");
+    expect(service).toContain("evaluateDesktopUpdateCandidate");
     expect(main).toContain(
       "confirmRestartWithBlockers: confirmUpdateRestartWithBlockers",
     );

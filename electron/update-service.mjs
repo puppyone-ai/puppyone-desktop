@@ -6,6 +6,7 @@ import {
   assertDesktopBuildInfo,
   getDesktopBuildChannelPolicy,
 } from "../shared/desktop-build-identity.mjs";
+import { evaluateDesktopUpdateCandidate } from "../shared/desktop/update-policy.mjs";
 
 const UPDATE_STATE_CHANNEL = "updates:state";
 
@@ -27,6 +28,14 @@ const BACKGROUND_CHECK_STATES = new Set([
   "error",
 ]);
 
+const ACTIONABLE_UPDATE_STATES = new Set([
+  "available",
+  "downloading",
+  "downloaded",
+  "blocked",
+  "installing",
+]);
+
 export function resolveDesktopUpdateConfiguration({
   buildInfo,
   environment = {},
@@ -45,6 +54,7 @@ export function resolveDesktopUpdateConfiguration({
     currentVersion: identity.version,
     updateChannel: policy.updateChannel ?? (developmentOverrideEnabled ? "dev" : null),
     feedUrl: policy.updateFeedUrl ?? (developmentOverrideEnabled ? developmentFeedUrl : null),
+    allowDowngrade: false,
     allowPrerelease: identity.channel !== "stable",
     forceDevUpdateConfig: developmentOverrideEnabled,
   });
@@ -153,27 +163,27 @@ export function createUpdateService({
         channel: configuration.updateChannel,
       });
     }
+
+    // electron-updater's channel setter enables downgrades as a side effect.
+    // Keep this assignment last so no configuration path can silently undo the
+    // product invariant that installed versions only move forward.
+    autoUpdater.allowDowngrade = configuration.allowDowngrade;
   }
 
   function registerUpdaterEvents() {
     autoUpdater.on("checking-for-update", () => {
       publishState({
         status: "checking",
+        availableVersion: null,
+        updateInfo: null,
+        progress: null,
         error: null,
         blockers: [],
       });
     });
 
     autoUpdater.on("update-available", (info) => {
-      latestUpdateInfo = normalizeUpdateInfo(info);
-      publishState({
-        status: "available",
-        updateInfo: latestUpdateInfo,
-        availableVersion: latestUpdateInfo.version,
-        error: null,
-        blockers: [],
-        progress: null,
-      });
+      publishAvailableCandidate(info, "available");
     });
 
     autoUpdater.on("update-not-available", (info) => {
@@ -190,6 +200,7 @@ export function createUpdateService({
     });
 
     autoUpdater.on("download-progress", (progress) => {
+      if (state.status !== "downloading" || !hasActionableCandidate()) return;
       publishState({
         status: "downloading",
         progress: normalizeProgress(progress),
@@ -199,20 +210,14 @@ export function createUpdateService({
     });
 
     autoUpdater.on("update-downloaded", (info) => {
-      latestUpdateInfo = normalizeUpdateInfo(info);
-      publishState({
-        status: "downloaded",
-        updateInfo: latestUpdateInfo,
-        availableVersion: latestUpdateInfo.version,
-        progress: null,
-        blockers: [],
-        error: null,
-      });
+      publishAvailableCandidate(info, "downloaded");
     });
 
     autoUpdater.on("error", (error) => {
       publishState({
         status: "error",
+        availableVersion: null,
+        updateInfo: null,
         error: normalizeError(error),
         progress: null,
       });
@@ -224,18 +229,16 @@ export function createUpdateService({
       if (!canUseUpdater) return state;
       publishState({
         status: "checking",
+        availableVersion: null,
+        updateInfo: null,
+        progress: null,
         error: null,
         blockers: [],
       });
 
       try {
         const result = await autoUpdater.checkForUpdates();
-        if (!result?.updateInfo && state.status === "checking") {
-          publishState({
-            status: "not-available",
-            lastCheckedAt: new Date().toISOString(),
-          });
-        }
+        reconcileCheckResult(result);
       } catch (error) {
         publishState({
           status: "error",
@@ -255,7 +258,7 @@ export function createUpdateService({
         await checkForUpdatesInternal();
       }
 
-      if (state.status !== "available") return state;
+      if (state.status !== "available" || !hasActionableCandidate()) return state;
 
       try {
         publishState({
@@ -306,18 +309,16 @@ export function createUpdateService({
   async function checkForUpdatesInternal() {
     publishState({
       status: "checking",
+      availableVersion: null,
+      updateInfo: null,
+      progress: null,
       error: null,
       blockers: [],
     });
 
     try {
       const result = await autoUpdater.checkForUpdates();
-      if (!result?.updateInfo && state.status === "checking") {
-        publishState({
-          status: "not-available",
-          lastCheckedAt: new Date().toISOString(),
-        });
-      }
+      reconcileCheckResult(result);
     } catch (error) {
       publishState({
         status: "error",
@@ -327,6 +328,7 @@ export function createUpdateService({
   }
 
   async function downloadUpdateInternal() {
+    if (state.status !== "available" || !hasActionableCandidate()) return;
     try {
       publishState({
         status: "downloading",
@@ -346,6 +348,7 @@ export function createUpdateService({
 
   async function installDownloadedUpdateInternal() {
     if (state.status !== "downloaded" && state.status !== "blocked") return;
+    if (!hasActionableCandidate()) return;
 
     const blockers = normalizeRestartBlockers(await Promise.resolve(getRestartBlockers()));
     if (blockers.length > 0) {
@@ -392,19 +395,109 @@ export function createUpdateService({
   }
 
   function publishState(patch) {
-    state = {
+    const nextState = enforceMonotonicUpdateState({
       ...state,
       ...patch,
       currentVersion,
       channel,
       updatedAt: new Date().toISOString(),
-    };
+    });
+    state = nextState;
 
     for (const window of getWindows()) {
       if (window.isDestroyed()) continue;
       window.webContents.send(UPDATE_STATE_CHANNEL, state);
     }
     return state;
+  }
+
+  function publishAvailableCandidate(info, status) {
+    latestUpdateInfo = normalizeUpdateInfo(info);
+    publishState({
+      status,
+      updateInfo: latestUpdateInfo,
+      availableVersion: latestUpdateInfo?.version ?? null,
+      progress: null,
+      blockers: [],
+      error: null,
+    });
+  }
+
+  function reconcileCheckResult(result) {
+    if (state.status !== "checking") return;
+    if (result?.updateInfo) {
+      publishAvailableCandidate(result.updateInfo, "available");
+      return;
+    }
+    latestUpdateInfo = null;
+    publishState({
+      status: "not-available",
+      updateInfo: null,
+      availableVersion: null,
+      progress: null,
+      blockers: [],
+      error: null,
+      lastCheckedAt: new Date().toISOString(),
+    });
+  }
+
+  function hasActionableCandidate() {
+    const evaluation = evaluateDesktopUpdateCandidate({
+      channel,
+      currentVersion,
+      candidateVersion: state.availableVersion,
+    });
+    if (evaluation.allowed) return true;
+    publishRejectedCandidate(evaluation);
+    return false;
+  }
+
+  function publishRejectedCandidate(evaluation) {
+    latestUpdateInfo = null;
+    const invalid = evaluation.relation === "invalid" || !evaluation.channelCompatible;
+    const detail = invalid
+      ? "The update feed returned an invalid or cross-channel version."
+      : null;
+    log.warn(
+      `[desktop-updater] Rejected ${String(state.availableVersion)} for ${currentVersion} `
+      + `on ${channel}: ${evaluation.relation}${evaluation.channelCompatible ? "" : ", wrong channel"}.`,
+    );
+    publishState({
+      status: invalid ? "error" : "not-available",
+      availableVersion: null,
+      updateInfo: null,
+      progress: null,
+      blockers: [],
+      error: detail,
+      lastCheckedAt: new Date().toISOString(),
+    });
+  }
+
+  function enforceMonotonicUpdateState(nextState) {
+    if (!ACTIONABLE_UPDATE_STATES.has(nextState.status)) return nextState;
+    const evaluation = evaluateDesktopUpdateCandidate({
+      channel,
+      currentVersion,
+      candidateVersion: nextState.availableVersion,
+    });
+    if (evaluation.allowed) return nextState;
+
+    latestUpdateInfo = null;
+    const invalid = evaluation.relation === "invalid" || !evaluation.channelCompatible;
+    log.warn(
+      `[desktop-updater] Suppressed unsafe ${nextState.status} state for `
+      + `${String(nextState.availableVersion)} from ${currentVersion} on ${channel}.`,
+    );
+    return {
+      ...nextState,
+      status: invalid ? "error" : "not-available",
+      availableVersion: null,
+      updateInfo: null,
+      progress: null,
+      blockers: [],
+      error: invalid ? "The update feed returned an invalid or cross-channel version." : null,
+      lastCheckedAt: new Date().toISOString(),
+    };
   }
 
   return {

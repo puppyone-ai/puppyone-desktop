@@ -42,6 +42,17 @@ describe("desktop update titlebar presentation", () => {
       interactive: false,
     });
   });
+
+  it.each([
+    ["1.4.0", "same"],
+    ["1.3.9", "older"],
+    ["1.5.0-internal.1", "cross-channel"],
+  ])("fails closed and stays hidden for a %s candidate (%s)", (availableVersion) => {
+    expect(getDesktopUpdateTitlebarState({
+      ...createState("available"),
+      availableVersion,
+    })).toBeNull();
+  });
 });
 
 function createState(status: DesktopUpdateStatus, percent = 0): DesktopUpdateState {
