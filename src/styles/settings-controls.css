@@ -80,6 +80,10 @@
   gap: 6px;
 }
 
+.desktop-theme-settings-action-row {
+  justify-content: flex-end;
+}
+
 .desktop-theme-pack-controls {
   display: flex;
   width: min(100%, 360px);
@@ -102,13 +106,30 @@
 
 .desktop-theme-add-action {
   flex: 0 0 auto;
-  min-width: 92px;
+  min-width: 0;
   white-space: nowrap;
 }
 
 .desktop-theme-settings-primary-actions {
+  width: min(100%, 360px);
+  align-items: center;
   flex-wrap: nowrap;
-  padding-top: 2px;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.desktop-theme-settings-primary-actions > .desktop-settings-action {
+  min-width: 0;
+  flex: 0 0 auto;
+  border: 1px solid var(--po-divider);
+  background: var(--po-panel);
+  color: var(--po-text-muted);
+}
+
+.desktop-theme-settings-primary-actions > .desktop-settings-action:hover:not(:disabled) {
+  border-color: var(--po-border-strong);
+  background: var(--po-hover);
+  color: var(--po-text);
 }
 
 .desktop-settings-visually-hidden {

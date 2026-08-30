@@ -26,6 +26,11 @@ describe("CSS theme settings", () => {
     expect(styles).toMatch(/\.desktop-theme-pack-label\s*\{[^}]*color:\s*var\(--po-text-subtle\)/);
     expect(styles).toMatch(/\.desktop-theme-pack-controls\s*\{[\s\S]*width:\s*min\(100%,\s*360px\)/);
     expect(styles).toMatch(/\.desktop-theme-add-action\s*\{[\s\S]*white-space:\s*nowrap/);
+    expect(section).toContain("desktop-theme-settings-action-row");
+    expect(styles).toMatch(/\.desktop-theme-settings-action-row\s*\{[^}]*justify-content:\s*flex-end/);
+    expect(styles).toMatch(/\.desktop-theme-settings-primary-actions\s*\{[^}]*width:\s*min\(100%,\s*360px\)[^}]*justify-content:\s*flex-end/);
+    expect(styles).not.toMatch(/\.desktop-theme-settings-primary-actions\s*\{[^}]*background:\s*var\(--po-control\)/);
+    expect(styles).toMatch(/\.desktop-theme-settings-primary-actions\s*>\s*\.desktop-settings-action\s*\{[^}]*flex:\s*0\s+0\s+auto[^}]*border:\s*1px\s+solid\s+var\(--po-divider\)/);
   });
 
   it("wires the catalog and preferences through the settings surface", () => {

@@ -45,32 +45,34 @@ export function ThemeSettingsSection({
             </select>
           </div>
         </div>
-      </div>
-      <div className="desktop-theme-settings-actions desktop-theme-settings-primary-actions">
-        <button
-          className="desktop-settings-action"
-          type="button"
-          onClick={() => void catalog.openDirectory()}
-        >
-          {t("settings.appearance.themes.openFolder")}
-        </button>
-        <button
-          className="desktop-settings-action desktop-theme-add-action"
-          type="button"
-          disabled={!THEME_MARKETPLACE_URL}
-          aria-describedby={!THEME_MARKETPLACE_URL ? "desktop-theme-add-status" : undefined}
-          title={!THEME_MARKETPLACE_URL
-            ? t("settings.appearance.themes.addUnavailable")
-            : undefined}
-          onClick={onAddTheme}
-        >
-          {t("settings.appearance.themes.add")}
-        </button>
-        {!THEME_MARKETPLACE_URL && (
-          <span id="desktop-theme-add-status" className="desktop-settings-visually-hidden">
-            {t("settings.appearance.themes.addUnavailable")}
-          </span>
-        )}
+        <div className="desktop-settings-row desktop-settings-row-control desktop-theme-settings-action-row">
+          <div className="desktop-theme-settings-actions desktop-theme-settings-primary-actions">
+            <button
+              className="desktop-settings-action"
+              type="button"
+              onClick={() => void catalog.openDirectory()}
+            >
+              {t("settings.appearance.themes.openFolder")}
+            </button>
+            <button
+              className="desktop-settings-action desktop-theme-add-action"
+              type="button"
+              disabled={!THEME_MARKETPLACE_URL}
+              aria-describedby={!THEME_MARKETPLACE_URL ? "desktop-theme-add-status" : undefined}
+              title={!THEME_MARKETPLACE_URL
+                ? t("settings.appearance.themes.addUnavailable")
+                : undefined}
+              onClick={onAddTheme}
+            >
+              {t("settings.appearance.themes.add")}
+            </button>
+            {!THEME_MARKETPLACE_URL && (
+              <span id="desktop-theme-add-status" className="desktop-settings-visually-hidden">
+                {t("settings.appearance.themes.addUnavailable")}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
       {catalog.error && <p className="desktop-theme-settings-error" role="alert">{catalog.error}</p>}
       {catalog.snapshot.diagnostics.length > 0 && (
