@@ -1,4 +1,5 @@
 import { useLocalization } from "@puppyone/localization";
+import { FolderOpen, Plus } from "lucide-react";
 import {
   getCompatibleSubThemes,
 } from "../../themes/builtinSubThemes";
@@ -43,10 +44,7 @@ export function SubThemeSettingsSection({
       <div className="desktop-settings-list">
         <div className="desktop-settings-row desktop-settings-row-control desktop-settings-wide-control-row">
           <label className="desktop-theme-pack-label" htmlFor="desktop-sub-theme-select">
-            <span>{t("settings.appearance.themes.pack")}</span>
-            <span className="desktop-sub-theme-mode-badge">
-              {t(`settings.appearance.theme.${effectiveColorMode}`)}
-            </span>
+            {t("settings.appearance.themes.pack")}
           </label>
           <div className="desktop-theme-pack-controls">
             <div className="desktop-theme-pack-picker">
@@ -73,23 +71,26 @@ export function SubThemeSettingsSection({
               )}
             </div>
             <button
-              className="desktop-settings-action"
+              className="desktop-theme-pack-icon-action"
               type="button"
+              aria-label={t("settings.appearance.themes.openFolder")}
+              title={t("settings.appearance.themes.openFolder")}
               onClick={() => void catalog.openDirectory()}
             >
-              {t("settings.appearance.themes.openFolder")}
+              <FolderOpen size={14} strokeWidth={1.8} aria-hidden="true" />
             </button>
             <button
-              className="desktop-settings-action desktop-theme-add-action"
+              className="desktop-theme-pack-icon-action"
               type="button"
               disabled={!THEME_MARKETPLACE_URL}
+              aria-label={t("settings.appearance.themes.add")}
               aria-describedby={!THEME_MARKETPLACE_URL ? "desktop-theme-add-status" : undefined}
               title={!THEME_MARKETPLACE_URL
                 ? t("settings.appearance.themes.addUnavailable")
-                : undefined}
+                : t("settings.appearance.themes.add")}
               onClick={onAddTheme}
             >
-              {t("settings.appearance.themes.add")}
+              <Plus size={14} strokeWidth={1.9} aria-hidden="true" />
             </button>
             {!THEME_MARKETPLACE_URL && (
               <span id="desktop-theme-add-status" className="desktop-settings-visually-hidden">

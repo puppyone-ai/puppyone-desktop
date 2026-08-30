@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 describe("Appearance theme settings", () => {
-  it("keeps the compact pack selector and theme actions in one control row", async () => {
+  it("keeps the hugging pack selector and icon actions in one compact module", async () => {
     await act(async () => {
       root.render(withTestLocalization(
         <SubThemeSettingsSection
@@ -42,8 +42,10 @@ describe("Appearance theme settings", () => {
 
     const controls = document.querySelector(".desktop-theme-pack-controls");
     expect(controls?.querySelector("select")).not.toBeNull();
-    expect([...controls?.querySelectorAll("button") ?? []].map((button) => button.textContent))
+    expect([...controls?.querySelectorAll("button") ?? []].map((button) => button.getAttribute("aria-label")))
       .toEqual(["Open Themes Folder", "Add Theme"]);
+    expect([...controls?.querySelectorAll("button") ?? []].every((button) => button.textContent === ""))
+      .toBe(true);
     expect(document.querySelector(".desktop-theme-settings-action-row")).toBeNull();
     expect(document.body.textContent).not.toContain(
       "Choose one coordinated theme pack for the application, Markdown, and CSV.",
@@ -68,8 +70,7 @@ describe("Appearance theme settings", () => {
       await Promise.resolve();
     });
 
-    const addTheme = [...document.querySelectorAll<HTMLButtonElement>("button")]
-      .find((button) => button.textContent === "Add Theme");
+    const addTheme = document.querySelector<HTMLButtonElement>('button[aria-label="Add Theme"]');
     expect(addTheme).toBeDefined();
     expect(addTheme?.disabled).toBe(true);
     expect(addTheme?.title).toContain("URL");
