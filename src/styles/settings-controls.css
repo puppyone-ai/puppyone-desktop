@@ -91,7 +91,7 @@
 }
 
 .desktop-theme-pack-label {
-  color: var(--po-text);
+  color: var(--po-text-subtle);
 }
 
 .desktop-theme-pack-select {

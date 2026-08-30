@@ -23,7 +23,7 @@ describe("CSS theme settings", () => {
     expect(section).toContain("desktop-settings-select");
     const styles = source("src/styles/settings-controls.css");
     expect(styles).toMatch(/\.desktop-theme-pack-controls\s*\{[\s\S]*flex-wrap:\s*nowrap/);
-    expect(styles).toMatch(/\.desktop-theme-pack-label\s*\{[\s\S]*color:\s*var\(--po-text\)/);
+    expect(styles).toMatch(/\.desktop-theme-pack-label\s*\{[^}]*color:\s*var\(--po-text-subtle\)/);
     expect(styles).toMatch(/\.desktop-theme-pack-controls\s*\{[\s\S]*width:\s*min\(100%,\s*360px\)/);
     expect(styles).toMatch(/\.desktop-theme-add-action\s*\{[\s\S]*white-space:\s*nowrap/);
   });
