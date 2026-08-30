@@ -145,6 +145,7 @@ async function runSmoke() {
         toolbarLastActionRight: toolbarActionButtons.length > 0
           ? Math.round(toolbarActionButtons[toolbarActionButtons.length - 1].getBoundingClientRect().right)
           : 0,
+        toolbarActionIds: toolbarActionButtons.map((button) => button.dataset.toolbarAction),
         toolbarActionLabels: toolbarActionButtons.map((button) => button.textContent.trim()),
         currentNavigationPaint: currentNavigationButton ? (() => {
           const style = getComputedStyle(currentNavigationButton);
@@ -341,15 +342,19 @@ async function runSmoke() {
       );
       assert(
         snapshot.toolbarActionsLeft >= snapshot.navigationRight,
-        `XP: Terminal and Agent actions overlap navigation (${snapshot.toolbarActionsLeft} < ${snapshot.navigationRight})`,
+        `XP: Terminal action overlaps navigation (${snapshot.toolbarActionsLeft} < ${snapshot.navigationRight})`,
       );
       assert(
-        JSON.stringify(snapshot.toolbarActionLabels) === JSON.stringify(["Chat", "Agent"]),
-        `XP: missing Agent-branded toolbar actions: ${JSON.stringify(snapshot.toolbarActionLabels)}`,
+        JSON.stringify(snapshot.toolbarActionIds) === JSON.stringify(["terminal"]),
+        `XP: wrong unified toolbar action contract: ${JSON.stringify(snapshot.toolbarActionIds)}`,
+      );
+      assert(
+        JSON.stringify(snapshot.toolbarActionLabels) === JSON.stringify(["Terminal"]),
+        `XP: wrong unified Terminal label: ${JSON.stringify(snapshot.toolbarActionLabels)}`,
       );
       assert(
         snapshot.toolbarRight - snapshot.toolbarLastActionRight === 8,
-        `XP: Agent actions are not anchored to the right toolbar inset (${snapshot.toolbarLastActionRight} vs ${snapshot.toolbarRight})`,
+        `XP: Terminal action is not anchored to the right toolbar inset (${snapshot.toolbarLastActionRight} vs ${snapshot.toolbarRight})`,
       );
       assert(
         snapshot.navigationButtonBottoms.every((bottom) => bottom <= snapshot.toolbarBottom),
