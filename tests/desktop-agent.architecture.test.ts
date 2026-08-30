@@ -43,6 +43,7 @@ describe("Desktop Agent architecture boundaries", () => {
     const attachmentButton = source("src/features/desktop-agent/ui/composer/AgentAttachmentButton.tsx");
     const commandSuggestions = source("src/features/desktop-agent/ui/composer/AgentCommandSuggestions.tsx");
     const draftReferences = source("src/features/desktop-agent/ui/composer/AgentDraftReferenceList.tsx");
+    const modelPicker = source("src/features/desktop-agent/ui/AgentModelPicker.tsx");
     const picker = source("src/features/desktop-agent/ui/AgentPickerPopover.tsx");
     const runtimeGeometry = source("src/features/desktop-agent/ui/agent-runtime-geometry.ts");
     const cssEntry = source("src/features/desktop-agent/ui/desktop-agent.css");
@@ -77,7 +78,9 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(composer).toContain("<AgentComposerToolbar");
     expect(composerToolbar).toContain("<AgentAttachmentButton");
     expect(composerToolbar).toContain("<AgentModelPicker");
-    expect(composerToolbar).toContain("<AgentEffortPicker");
+    expect(composerToolbar).not.toContain("<AgentEffortPicker");
+    expect(modelPicker).toContain("EFFORT_OPTION_PREFIX");
+    expect(modelPicker).toContain("effortGroup");
     expect(composerToolbar.split("\n").length).toBeLessThan(130);
     expect(attachmentButton).not.toMatch(/useState|DesktopOverlayLayer|role="menu"/);
     expect(commandSuggestions).not.toMatch(/useState|AgentSessionController/);

@@ -1,6 +1,5 @@
 import { ArrowUp, LoaderCircle, Square } from "lucide-react";
 import type { AgentModel, AgentReferenceInputCapabilities } from "../../domain/agent-contract";
-import { AgentEffortPicker } from "../AgentEffortPicker";
 import { AgentModelPicker } from "../AgentModelPicker";
 import { AgentAttachmentButton } from "./AgentAttachmentButton";
 
@@ -61,17 +60,10 @@ export function AgentComposerToolbar({
             <AgentModelPicker
               models={models}
               selectedModel={selectedModel}
-              disabled={running || configurationDisabled}
-              onSelectModel={onSelectModel ?? ignoreSelection}
-            />
-          </div>
-        )}
-        {!hideConfiguration && efforts.length > 0 && onSelectEffort && (
-          <div className="desktop-agent-composer-picker is-effort">
-            <AgentEffortPicker
               efforts={efforts}
               selectedEffort={selectedEffort}
               disabled={running || configurationDisabled}
+              onSelectModel={onSelectModel ?? ignoreSelection}
               onSelectEffort={onSelectEffort}
             />
           </div>

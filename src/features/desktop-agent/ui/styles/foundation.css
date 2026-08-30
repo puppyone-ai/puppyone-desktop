@@ -16,6 +16,7 @@
   --agent-composer-text-max-height: 120px;
   --agent-composer-input-min-height: 70px;
   --agent-composer-toolbar-height: 38px;
+  --agent-reference-card-height: 52px;
   --agent-font-size: var(--desktop-sidebar-font-size, var(--po-text-size-sidebar, 13px));
   --agent-font-size-meta: var(--desktop-sidebar-font-size-meta, var(--po-text-size-meta, 12px));
   --agent-font-size-caption: var(--po-text-size-caption, 11px);

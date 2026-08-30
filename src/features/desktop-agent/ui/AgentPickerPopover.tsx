@@ -191,6 +191,35 @@ export function AgentPickerPopover({
     }
   };
 
+  const renderOption = (option: AgentPickerOption) => (
+    <button
+      ref={(node) => {
+        if (node) optionRefs.current.set(option.id, node);
+        else optionRefs.current.delete(option.id);
+      }}
+      type="button"
+      role="option"
+      aria-selected={Boolean(option.selected)}
+      aria-disabled={!option.selectable || undefined}
+      tabIndex={option.id === activeOptionId ? 0 : -1}
+      className={`desktop-agent-picker-option is-${option.kind || "status"}${option.icon === null ? " has-no-icon" : ""}${option.selected ? " is-selected" : ""}${option.warning ? " has-warning" : ""}${!option.selectable ? " is-unavailable" : ""}`}
+      key={option.id}
+      onClick={() => choose(option)}
+      onFocus={() => setActiveOptionId(option.id)}
+      onKeyDown={(event) => handleOptionKeyDown(event, option)}
+    >
+      {option.icon !== null && <span className="desktop-agent-picker-option-icon" aria-hidden="true">{option.icon || initial(option.label)}</span>}
+      <span className="desktop-agent-picker-option-copy">
+        <span><strong dir="auto">{option.label}</strong>{option.meta && <small dir="auto">{option.meta}</small>}</span>
+      </span>
+      {option.warning
+        ? <span className="desktop-agent-picker-warning" title={option.warning} aria-label={option.warning}><CircleAlert size={14} strokeWidth={1.8} aria-hidden="true" /></span>
+        : option.selected
+        ? <Check className="desktop-agent-picker-check" size={14} aria-hidden="true" />
+        : null}
+    </button>
+  );
+
   return (
     <div ref={rootRef} className={`desktop-agent-picker ${className}`.trim()}>
       <button
@@ -248,34 +277,17 @@ export function AgentPickerPopover({
             role="listbox"
             aria-label={t("agent.picker.options", { name: bidiIsolate(ariaLabel) })}
           >
-            {flatOptions.map((option) => (
-              <button
-                ref={(node) => {
-                  if (node) optionRefs.current.set(option.id, node);
-                  else optionRefs.current.delete(option.id);
-                }}
-                type="button"
-                role="option"
-                aria-selected={Boolean(option.selected)}
-                aria-disabled={!option.selectable || undefined}
-                tabIndex={option.id === activeOptionId ? 0 : -1}
-                className={`desktop-agent-picker-option is-${option.kind || "status"}${option.icon === null ? " has-no-icon" : ""}${option.selected ? " is-selected" : ""}${option.warning ? " has-warning" : ""}${!option.selectable ? " is-unavailable" : ""}`}
-                key={option.id}
-                onClick={() => choose(option)}
-                onFocus={() => setActiveOptionId(option.id)}
-                onKeyDown={(event) => handleOptionKeyDown(event, option)}
+            {filteredGroups.length > 1 ? filteredGroups.map((group) => (
+              <div
+                className="desktop-agent-picker-group"
+                role="group"
+                aria-label={group.label}
+                key={group.id}
               >
-                {option.icon !== null && <span className="desktop-agent-picker-option-icon" aria-hidden="true">{option.icon || initial(option.label)}</span>}
-                <span className="desktop-agent-picker-option-copy">
-                  <span><strong dir="auto">{option.label}</strong>{option.meta && <small dir="auto">{option.meta}</small>}</span>
-                </span>
-                {option.warning
-                  ? <span className="desktop-agent-picker-warning" title={option.warning} aria-label={option.warning}><CircleAlert size={14} strokeWidth={1.8} aria-hidden="true" /></span>
-                  : option.selected
-                  ? <Check className="desktop-agent-picker-check" size={14} aria-hidden="true" />
-                  : null}
-              </button>
-            ))}
+                <div className="desktop-agent-picker-group-label" aria-hidden="true">{group.label}</div>
+                {group.options.map(renderOption)}
+              </div>
+            )) : flatOptions.map(renderOption)}
             {flatOptions.length === 0 && <div className="desktop-agent-picker-empty">{t("agent.picker.noMatches")}</div>}
           </div>
           {truncated && (

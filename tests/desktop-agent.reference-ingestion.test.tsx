@@ -209,6 +209,7 @@ describe("Desktop Agent reference ingestion", () => {
   });
 
   it("renders Markdown and images as distinct cards above the draft inside the Composer", () => {
+    const onSelectEffort = vi.fn();
     const container = render(<AgentComposer
       draft="Describe this image"
       onDraftChange={vi.fn()}
@@ -228,7 +229,7 @@ describe("Desktop Agent reference ingestion", () => {
       onSelectModel={vi.fn()}
       efforts={["low", "high"]}
       selectedEffort="high"
-      onSelectEffort={vi.fn()}
+      onSelectEffort={onSelectEffort}
       referenceCapabilities={capabilities()}
       references={[
         {
@@ -268,16 +269,24 @@ describe("Desktop Agent reference ingestion", () => {
     const actions = toolbar.querySelector(".desktop-agent-composer-actions")!;
     const attachment = toolbar.querySelector(".desktop-agent-reference-trigger")!;
     const modelPicker = actions.querySelector(".desktop-agent-composer-picker.is-model")!;
-    const effortPicker = actions.querySelector(".desktop-agent-composer-picker.is-effort")!;
     const send = actions.querySelector(".desktop-agent-composer-action")!;
+    const configurationTrigger = modelPicker.querySelector<HTMLButtonElement>('[aria-label="Agent model · Reasoning"]')!;
+    const remove = imageCard.querySelector<HTMLButtonElement>(".desktop-agent-reference-card-actions button:last-child")!;
     expect(fileCard.textContent).toContain("SECURITY.md");
     expect(fileCard.textContent).toContain("MD");
     expect(preview?.getAttribute("src")).toBe("blob:agent-preview");
     expect(cards.compareDocumentPosition(textarea) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(textarea.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(leading.contains(attachment)).toBe(true);
-    expect(modelPicker.compareDocumentPosition(effortPicker) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
-    expect(effortPicker.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(configurationTrigger.textContent).toContain("GPT-5.6 · High");
+    expect(modelPicker.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(remove.closest(".desktop-agent-reference-card-actions")).not.toBeNull();
+    act(() => configurationTrigger.click());
+    expect(document.querySelectorAll('.desktop-agent-picker-list [role="group"]')).toHaveLength(2);
+    const light = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]'))
+      .find((option) => option.textContent?.includes("Light"))!;
+    act(() => light.click());
+    expect(onSelectEffort).toHaveBeenCalledWith("low");
   });
 
   it("announces partial batches while retaining the rejected item as an actionable error", async () => {

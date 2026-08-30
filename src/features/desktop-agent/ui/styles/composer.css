@@ -84,6 +84,7 @@
   outline: 0 !important;
   background: transparent;
   color: var(--agent-text);
+  cursor: text;
   font: inherit;
   font-size: var(--agent-font-size);
   line-height: var(--agent-composer-line-height);
@@ -121,10 +122,8 @@
   min-width: 0;
   flex: 0 1 auto;
 }
-.desktop-agent-composer-picker.is-model { width: max-content; max-width: min(168px, 34vw); }
+.desktop-agent-composer-picker.is-model { width: max-content; max-width: min(228px, 55vw); }
 .desktop-agent-composer-picker.is-model .desktop-agent-picker { width: max-content; max-width: 100%; }
-.desktop-agent-composer-picker.is-effort { width: max-content; max-width: min(112px, 25vw); }
-.desktop-agent-composer-picker.is-effort .desktop-agent-picker { width: max-content; max-width: 100%; }
 .desktop-agent-composer-picker .desktop-agent-picker-trigger {
   width: max-content;
   max-width: 100%;
@@ -133,8 +132,7 @@
   color: var(--agent-text-subtle);
   font-weight: 400;
 }
-.desktop-agent-composer-picker.is-effort .desktop-agent-picker-trigger { gap: 2px; }
-.desktop-agent-composer-picker.is-effort .desktop-agent-picker-trigger-mark { width: 14px; height: 14px; }
+.desktop-agent-composer-picker.is-model .desktop-agent-picker-trigger-mark { width: 14px; height: 14px; }
 .desktop-agent-composer-picker .desktop-agent-picker-trigger:hover:not(:disabled) {
   border-color: transparent;
   background: var(--agent-row-hover-surface);
@@ -165,35 +163,34 @@
   min-width: 0;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 8px;
-  padding: 0 0 10px;
+  gap: 14px;
+  padding: 8px 12px 8px 0;
 }
 .desktop-agent-reference-card {
   position: relative;
   display: flex;
+  height: var(--agent-reference-card-height);
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--agent-border-subtle);
-  border-radius: 10px;
+  border-radius: 6px;
   background: var(--agent-control-surface);
   color: var(--agent-text);
   font-size: var(--agent-font-size-meta);
 }
 .desktop-agent-reference-card.is-file-card {
-  width: min(188px, 100%);
-  height: 64px;
+  width: min(174px, 100%);
   align-items: center;
-  gap: 10px;
-  padding: 8px 34px 8px 8px;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
 }
-.desktop-agent-reference-card.is-file-card.is-error { padding-inline-end: 58px; }
 .desktop-agent-reference-file-icon {
   display: grid;
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 8px;
+  border-radius: 4px;
   background: var(--agent-row-hover-surface);
   color: var(--agent-text-muted);
 }
@@ -201,50 +198,51 @@
 .desktop-agent-reference-card-copy strong { overflow: hidden; font-size: var(--agent-font-size); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .desktop-agent-reference-card-copy small { overflow: hidden; color: var(--agent-text-subtle); font-size: var(--agent-font-size-caption); text-overflow: ellipsis; white-space: nowrap; }
 .desktop-agent-reference-card.is-image-card {
-  width: 72px;
-  height: 72px;
-  flex: 0 0 72px;
+  width: var(--agent-reference-card-height);
+  flex: 0 0 var(--agent-reference-card-height);
   background: var(--agent-row-hover-surface);
 }
 .desktop-agent-reference-image-preview {
   display: grid;
   width: 100%;
   height: 100%;
+  overflow: hidden;
   place-items: center;
+  border-radius: 5px;
   color: var(--agent-text-muted);
 }
 .desktop-agent-reference-image-preview img { width: 100%; height: 100%; object-fit: cover; }
 .desktop-agent-reference-card-actions {
   position: absolute;
-  inset-block-start: 4px;
-  inset-inline-end: 4px;
+  z-index: 2;
+  inset-block-start: -14px;
+  inset-inline-end: -14px;
   display: flex;
   gap: 2px;
 }
 .desktop-agent-reference-card-actions > button {
   display: grid;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   flex: 0 0 auto;
   place-items: center;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--agent-border) 72%, transparent);
+  border: 1px solid var(--agent-border);
   border-radius: 50%;
-  background: color-mix(in srgb, var(--agent-composer-surface) 92%, transparent);
-  box-shadow: 0 1px 2px color-mix(in srgb, black 16%, transparent);
+  background: var(--po-menu-bg);
+  box-shadow: var(--po-menu-shadow-compact);
   color: var(--agent-text-muted);
-  backdrop-filter: blur(6px);
 }
 .desktop-agent-reference-card-actions > button:hover { background: var(--po-hover); color: var(--po-text); }
 .desktop-agent-reference-card.is-resolving { opacity: 0.72; }
 .desktop-agent-reference-card.is-error { border-color: color-mix(in srgb, var(--po-danger) 46%, var(--agent-border-subtle)); }
 .desktop-agent-reference-card-status {
   position: absolute;
-  inset-block-end: 5px;
-  inset-inline-end: 5px;
+  inset-block-end: 3px;
+  inset-inline-end: 3px;
   display: grid;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   place-items: center;
   border-radius: 50%;
   background: color-mix(in srgb, var(--agent-composer-surface) 92%, transparent);
