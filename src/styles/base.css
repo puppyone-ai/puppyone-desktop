@@ -100,14 +100,6 @@ h2 {
   font-weight: 650;
   letter-spacing: 0;
 }
-[dir="rtl"] .desktop-right-sidebar::before {
-  background: linear-gradient(
-    270deg,
-    color-mix(in srgb, var(--po-shell-divider, var(--po-divider)) 72%, transparent),
-    transparent
-  );
-}
-
 [dir="rtl"] .po-directional-icon,
 [dir="rtl"] .desktop-cloud-directional-icon {
   transform: scaleX(-1);

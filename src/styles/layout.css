@@ -316,23 +316,6 @@
     border-color 260ms ease;
 }
 
-.desktop-right-sidebar::before {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: 0;
-  z-index: 1;
-  width: 18px;
-  pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--po-shell-divider, var(--po-divider)) 72%, transparent),
-    transparent
-  );
-  content: "";
-  opacity: 0;
-  transition: opacity 160ms ease;
-}
-
 .desktop-right-sidebar.is-open {
   flex-shrink: 0;
   flex-basis: var(--desktop-right-sidebar-width);
@@ -343,10 +326,6 @@
 
 .desktop-right-sidebar:not(.is-open) {
   overflow: visible;
-}
-
-.desktop-right-sidebar.is-open::before {
-  opacity: 1;
 }
 
 .desktop-right-sidebar-resizer {

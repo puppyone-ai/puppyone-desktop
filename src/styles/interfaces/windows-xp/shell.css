@@ -755,10 +755,6 @@
   box-shadow: 0 0 0 1px rgba(44, 111, 196, 0.24);
 }
 
-:root[data-interface-style="windows-xp"] .desktop-right-sidebar::before {
-  display: none;
-}
-
 :root[data-interface-style="windows-xp"]
   :where(.desktop-sidebar-navigation-surface, .data-explorer-footer, .desktop-agent-dock-region) {
   border-color: #aca899;

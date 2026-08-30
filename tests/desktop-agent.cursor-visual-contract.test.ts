@@ -23,7 +23,6 @@ const panelStatus = fs.readFileSync(path.join(root, "src/features/desktop-agent/
 const dataSidebarCss = fs.readFileSync(path.join(root, "src/features/data-workspace/data-shell.css"), "utf8");
 const tokensCss = fs.readFileSync(path.join(root, "src/styles/tokens.css"), "utf8");
 const layoutCss = fs.readFileSync(path.join(root, "src/styles/layout.css"), "utf8");
-const baseCss = fs.readFileSync(path.join(root, "src/styles/base.css"), "utf8");
 const responsiveCss = fs.readFileSync(path.join(styleRoot, "responsive.css"), "utf8");
 
 describe("Desktop Agent Cursor-style sidebar visual contract", () => {
@@ -164,16 +163,14 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(brandMark).not.toMatch(/https?:\/\//);
   });
 
-  it("uses the shared shell divider for the right sidebar edge and its directional glow", () => {
+  it("uses a flat shared shell divider for the right sidebar edge", () => {
     expect(layoutCss).toMatch(/\.desktop-right-sidebar\s*\{[^}]*--desktop-right-sidebar-background:\s*var\(--po-header\)[^}]*--po-terminal-bg:\s*var\(--desktop-right-sidebar-background\)[^}]*overflow:\s*hidden[^}]*background:\s*var\(--desktop-right-sidebar-background\)/s);
     expect(layoutCss).toMatch(/\.desktop-right-sidebar:not\(\.is-open\)\s*\{[^}]*overflow:\s*visible/s);
     expect(layoutCss).toMatch(/\.desktop-right-sidebar-stack\s*\{[^}]*background:\s*var\(--desktop-right-sidebar-background\)/s);
     expect(layoutCss).toMatch(/\.desktop-right-sidebar-surface\s*\{[^}]*background:\s*var\(--desktop-right-sidebar-background\)/s);
     expect(css).toMatch(/\.desktop-right-sidebar \.desktop-agent-boundary\s*\{[^}]*--agent-canvas:\s*var\(--po-terminal-bg\)/s);
     expect(layoutCss).toMatch(/\.desktop-right-sidebar\.is-open\s*\{[^}]*border-inline-start-color:\s*var\(--po-shell-divider, var\(--po-divider\)\)/s);
-    expect(layoutCss).toMatch(/\.desktop-right-sidebar::before\s*\{[^}]*inset-inline-start:\s*0[^}]*z-index:\s*1[^}]*linear-gradient\(\s*90deg,\s*color-mix\(in srgb, var\(--po-shell-divider, var\(--po-divider\)\) 72%, transparent\),\s*transparent/s);
-    expect(baseCss).toMatch(/\[dir="rtl"\] \.desktop-right-sidebar::before\s*\{[^}]*linear-gradient\(\s*270deg,\s*color-mix\(in srgb, var\(--po-shell-divider, var\(--po-divider\)\) 72%, transparent\),\s*transparent/s);
-    expect(layoutCss).not.toMatch(/\.desktop-right-sidebar::before\s*\{[^}]*var\(--po-shadow\)/s);
+    expect(layoutCss).not.toContain(".desktop-right-sidebar::before");
   });
 
   it("shares the Appearance typography scale with the left sidebar", () => {
