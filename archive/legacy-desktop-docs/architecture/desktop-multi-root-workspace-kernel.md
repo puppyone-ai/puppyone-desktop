@@ -2,18 +2,15 @@
 
 ## Status
 
-The multi-root kernel and product presentation are implemented. One native
-window can own one or many ordered Workspace Folders. With one Folder, the
-Explorer remains flat and visually compatible with the original product. With
-multiple Folders, the same Explorer renders one expandable root row per
-Project; files from every root share the Editor Workbench without sharing
-identity.
+The invisible foundation is implemented. PuppyOne Desktop still exposes one
+folder per window and deliberately renders the same Header, Explorer, tabs,
+Git, Cloud, Agent, and terminal product as before. Internally, that folder now
+occupies `WorkbenchWorkspace.folders[0]`; resource and authorization contracts
+no longer require the folder count to remain one.
 
-The Header's Add Project flow can attach a registered Project or select a new
-folder. Removing a Project revokes only that Folder's authority and services.
-Source Control, Cloud, Agent, Terminal, address-bar routing, and App Preview
-derive their target from the active Resource URI; Source Control is focused-
-Folder presentation rather than an aggregate multi-repository list.
+Multi-root presentation, Add/Remove Folder commands, aggregate Explorer roots,
+and aggregate Source Control are not enabled. They must be built on this kernel
+rather than reintroducing a parallel multi-root mode.
 
 This document owns resource identity, Workspace composition, folder lifecycle,
 window authority, and root-scoped runtime cleanup. Multi-window ownership stays
@@ -35,9 +32,9 @@ ResourceUri
 ```
 
 Single-root behavior is `folders.length === 1`, not a separate reducer, IPC
-surface, cache graph, or compatibility application. Legacy `Workspace`
-projections exist at provider boundaries, while routing uses the owning
-`WorkspaceFolder` resolved from a Resource URI.
+surface, cache graph, or compatibility application. Current UI consumes the
+first Folder's legacy `Workspace` projection while the underlying state uses
+the general composition.
 
 Cloud Project ID, Git repository identity, local checkout identity, Workspace
 composition ID, Folder ID, Resource URI, and native window ID remain distinct.
@@ -86,8 +83,9 @@ The Context:
 - waits for asynchronous durability barriers before publishing removal;
 - can veto unsafe removal without exposing a partial snapshot.
 
-The Renderer lifecycle restores and reconciles the complete ordered Folder
-composition. Attach and detach update the same Context and revision stream.
+The Renderer lifecycle currently creates a single-folder Workbench Workspace
+for every activated legacy Workspace. This exercises the plural model without
+changing product behavior.
 
 ### Main window composition
 
@@ -96,8 +94,9 @@ composition. Scalar `workspacePath` and `workspace` authority have been removed
 from window state. The current open/replace flow still writes one Folder, while
 the state and duplicate-path accounting support an ordered collection.
 
-`workspaceWindowByPath` remains the application-level duplicate-window index
-and indexes every attached canonical local Folder path.
+`workspaceWindowByPath` remains the application-level duplicate-window index.
+When multi-root commands are later enabled it must index every attached
+canonical local Folder path.
 
 ### Sender-bound Folder capabilities
 
@@ -113,7 +112,7 @@ Recent Workspace metadata is never authority. A recent folder, Cloud Project,
 Git remote, visible Explorer row, or Renderer-provided absolute path cannot
 mint a Folder capability.
 
-### Editor and Explorer identity
+### Editor identity with unchanged presentation
 
 `EditorInput` separates:
 
@@ -235,18 +234,20 @@ presentation is enabled.
 
 ## Single-Root Compatibility Contract
 
-When exactly one Folder is attached:
+Until the product gate is opened:
 
-- no synthetic Root header is rendered;
-- Explorer rows retain their 30 px geometry, labels, and commands;
+- folder count remains one in production UI;
+- Root headers are not rendered;
+- Header and recent-workspace commands retain current behavior;
+- Explorer rows and breadcrumbs retain current labels and geometry;
 - tabs retain current labels;
-- Source Control, Cloud, App Preview, Agent, and Terminal behave as before;
+- Source Control and Cloud retain the current repository presentation;
+- App Preview, Agent, and terminal launches retain current commands;
 - old Editor records restore through the migration parser;
-- adding a second Project upgrades the live composition without opening a
-  second application shell.
+- no new experiment, setting, locale string, or navigation entry is exposed.
 
-Tests assert both the flat single-Folder tree and the combined multi-Folder
-tree, including same-named documents in different roots.
+Tests assert that the Editor's visible active path remains unchanged while its
+internal ID becomes Root-aware.
 
 ## Non-Negotiable Invariants
 
@@ -277,24 +278,20 @@ tree, including same-named documents in different roots.
 - Maintaining separate single-root and multi-root kernels guarantees drift in
   restore, security, and cleanup behavior.
 
-## Delivered Adoption Sequence
+## Remaining Adoption Sequence
 
-1. Local `DataPort` is behind a URI-routed Workbench data service with one
-   root-closed provider per Folder.
-2. Main owns attach/detach transactions and ordered composition persistence.
-3. Explorer node, selection, expansion, Editor, and Working Copy identities use
-   Resource URIs.
-4. Git, Cloud, App Preview, Agent, Terminal, address-bar, external-open, and
-   create/import/file operations resolve an explicit owning Folder.
-5. Add/Remove Project presentation is enabled without changing single-root row
-   geometry.
-6. Cross-root copy uses a privileged operation that authorizes both source and
-   destination roots independently.
+1. Move local `DataPort` behind a URI-routed FileService/Provider registry.
+2. Add a main-owned attach/detach IPC transaction and a composition persistence
+   store separate from recents.
+3. Convert Explorer node/selection/expansion keys to Resource URI and assemble
+   one ordered multi-root visible model.
+4. Convert Git, Cloud, App Preview, plugins, settings, clipboard, and all
+   background request epochs to explicit Folder targets.
+5. Enable Add/Remove/Reorder Folder presentation behind a product gate.
+6. Add cross-root copy and only then design transactional cross-root move.
 
-Cross-root move remains intentionally non-atomic and is rejected. It must not
-be presented until a crash-safe copy/delete transaction and rollback policy are
-defined. Folder reorder can be added as presentation over the existing ordered
-Context without changing resource identity.
+No step may expose the UI before its lower-layer identity, authority, cleanup,
+restore, and stale-result tests pass.
 
 ## Verification
 

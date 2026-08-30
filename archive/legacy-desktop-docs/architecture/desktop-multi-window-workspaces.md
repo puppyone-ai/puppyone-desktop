@@ -5,8 +5,8 @@ document owns native-window isolation, cross-window duplicate prevention, and
 window-scoped cleanup. The zero/one/many-folder kernel inside a window is owned
 by [Desktop Multi-Root Workspace Kernel](desktop-multi-root-workspace-kernel.md).
 
-The current product exposes one focused repository at a time inside a window,
-while the window may show and edit many attached Project roots concurrently.
+The current product still exposes one active repository per window. That is a
+presentation and rollout boundary, not a permanent kernel cardinality.
 
 Repository metadata invalidation and focus reconciliation are documented in
 [Repository Status Refresh Lifecycle](git/status-refresh-lifecycle.md).
@@ -14,13 +14,12 @@ Repository metadata invalidation and focus reconciliation are documented in
 ## Requirement
 
 The current app allows users to work in several repos through independent
-native windows or one composed multi-root window.
+native windows while the Multi-root presentation remains disabled.
 
 The implemented product currently exposes these constraints:
 
 - One repo can be open in at most one PuppyOne window at a time.
-- One PuppyOne window can own many ordered Project roots and one focused repo
-  context at a time.
+- One PuppyOne window can own at most one active repo at a time.
 
 The kernel-level form is:
 
@@ -83,11 +82,10 @@ window, or focuses the existing owning window.
 
 ## Renderer Responsibilities
 
-Renderer owns only the current window's state. The Header retains the primary
-Folder label, while the visible product resolves active services from the
-active Resource URI:
+Renderer owns only the current window's state. The visible product currently
+projects `WorkbenchWorkspace.folders[0]` into the existing fields:
 
-- focused workspace object
+- active workspace object
 - active file path
 - editor and preview state
 - Git view state
@@ -112,7 +110,8 @@ App quit may still close all terminal sessions and all watchers.
 ## Invariants
 
 - `workspaceWindowByPath` is the source of truth for duplicate-window
-  prevention and indexes every attached canonical Folder path.
+  prevention and will index every attached canonical Folder path when
+  Multi-root presentation is enabled.
 - Renderer state is not shared across workspace windows.
 - Recent workspace storage is app-level state.
 - Dialog ownership comes from `BrowserWindow.fromWebContents(event.sender)`.

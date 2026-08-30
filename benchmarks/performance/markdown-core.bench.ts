@@ -28,9 +28,7 @@ const markdownDocuments = new Map(
   [200, 1_000, 3_000, 6_000, 10_000].map((lineCount) => [lineCount, makeMarkdown(lineCount)]),
 );
 const repositoryCorpus = readRepositoryMarkdownCorpus();
-const repositoryArchitectureDocument = readRepositoryTextFile(
-  "docs/architecture/editor/markdown/architecture.md",
-);
+const repositoryArchitectureDocument = readRepositoryTextFile("README.md");
 const syntheticLinkCorpora = new Map(
   [20, 100, 300].map((lineCount) => [lineCount, makeLinkGraphDocuments(250, lineCount)]),
 );
@@ -40,13 +38,13 @@ const sourceFallbackTableDocument = makeOversizedTable(MARKDOWN_TABLE_MODEL_ROW_
 
 describe("Markdown EditorState construction", () => {
   bench(
-    `repository architecture.md · ${repositoryArchitectureDocument.split("\n").length} lines · ${formatBytes(repositoryArchitectureDocument)}`,
+    `repository README.md · ${repositoryArchitectureDocument.split("\n").length} lines · ${formatBytes(repositoryArchitectureDocument)}`,
     () => {
       EditorState.create({
         doc: repositoryArchitectureDocument,
         extensions: [
           ...markdownCodeMirrorBaseExtensions(false),
-          markdownLivePreviewExtension("safe", null, "docs/architecture/editor/markdown/architecture.md"),
+          markdownLivePreviewExtension("safe", null, "README.md"),
         ],
       });
     },

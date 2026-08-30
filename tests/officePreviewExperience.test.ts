@@ -21,10 +21,6 @@ const viewerTypesSource = readFileSync(
   new URL("../packages/shared-ui/src/editor/registry/viewerTypes.ts", import.meta.url),
   "utf8",
 );
-const viewerArchitecture = readFileSync(
-  new URL("../docs/architecture/editor/file-format-viewer-pipeline.md", import.meta.url),
-  "utf8",
-);
 const tokenSource = readFileSync(
   new URL("../src/styles/tokens.css", import.meta.url),
   "utf8",
@@ -38,8 +34,6 @@ describe("lightweight Office preview experience", () => {
     expect(officeViewerSource).toContain("office-preview__floating-controls");
     expect(officeViewerSource).not.toMatch(/Ask Agent|continue editing|继续修改/i);
     expect(officeViewerSource).not.toContain("OfficeEditorViewer");
-    expect(viewerArchitecture).toContain("只读资源");
-    expect(viewerArchitecture).toContain("Viewer Pack v1 固定只读");
   });
 
   it("renders Word on a stable paper surface with visible zoom and font compatibility", () => {

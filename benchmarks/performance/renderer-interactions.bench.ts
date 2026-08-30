@@ -26,9 +26,7 @@ const BENCHMARK_OPTIONS = {
 const markdownDocuments = new Map(
   [1_000, 3_000, 6_000, 10_000].map((lineCount) => [lineCount, makeMarkdown(lineCount)]),
 );
-const repositoryArchitectureDocument = readRepositoryTextFile(
-  "docs/architecture/editor/markdown/architecture.md",
-);
+const repositoryArchitectureDocument = readRepositoryTextFile("README.md");
 const featureHeavyDocument = makeFeatureHeavyMarkdown(180);
 const explorerHarnesses = new Map(
   [100, 250, 500, 1_000].map((rowCount) => [rowCount, createExplorerHarness(rowCount)]),
@@ -40,7 +38,7 @@ afterAll(() => {
 
 describe("Markdown React mount and disposal", () => {
   bench(
-    `repository architecture.md · ${repositoryArchitectureDocument.split("\n").length} lines · ${formatBytes(repositoryArchitectureDocument)}`,
+    `repository README.md · ${repositoryArchitectureDocument.split("\n").length} lines · ${formatBytes(repositoryArchitectureDocument)}`,
     async () => {
       await mountAndDisposeMarkdownEditor(repositoryArchitectureDocument, false);
     },

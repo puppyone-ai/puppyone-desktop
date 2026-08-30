@@ -24,7 +24,7 @@ API integration or brand asset is included.
 Claudian's imperative DOM renderer and hover-only model menu were not copied.
 PuppyOne keeps React ownership, a maximum of 120 mounted transcript rows,
 explicit reduced-motion behavior and the multi-native backend boundary in
-[`ADR-005`](../../docs/architecture/desktop-agent/ADR-005-multi-native-agent-backends.md).
+[`ADR-005`](https://github.com/puppyone-ai/puppy-issues/blob/main/document/puppyone-desktop/agent/decisions/ADR-005-multi-native-agent-backends.md).
 Each supported native harness still owns its own loop, tool calling and native
 sessions. PuppyOne does not import Claudian as a runtime dependency and does
 not rename a Claudian harness as a PuppyOne harness.
