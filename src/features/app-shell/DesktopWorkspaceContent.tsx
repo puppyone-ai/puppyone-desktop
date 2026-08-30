@@ -9,6 +9,7 @@ import {
   type DataNode,
   type EditorInteractionPreferences,
   type Workspace,
+  type WorkspaceFolder,
 } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization";
 import type { DesktopGitController } from "../source-control";
@@ -31,6 +32,7 @@ import {
 import { useDesktopViewerPacks } from "../viewer-packs/host";
 import { DesktopDataWorkspaceSurface } from "./DesktopDataWorkspaceSurface";
 import type { DesktopEditorWorkbenchController } from "../editor-workbench/controller/useDesktopEditorWorkbench";
+import type { ResolvedWorkbenchDataResource } from "../data-workspace/workbenchDataPort";
 
 type DataWorkspacePort = ComponentProps<typeof DataWorkspace>["dataPort"];
 type DesktopWorkspaceContentProps = {
@@ -46,6 +48,7 @@ type DesktopWorkspaceContentProps = {
   }>;
   fileClipboardController: FileClipboardController;
   desktopUpdates: DesktopUpdatesController;
+  firstProjectStarterEligible: boolean;
   git: DesktopGitController;
   navigationComposition: string;
   onActiveDataPathChange: (
@@ -54,8 +57,10 @@ type DesktopWorkspaceContentProps = {
   ) => void | Promise<void>;
   onActiveDataNodeChange: (node: DataNode | null) => void;
   onResourceMove: (previousPath: string, nextPath: string) => void | Promise<void>;
+  onRemoveProject: (folder: WorkspaceFolder) => void | Promise<void>;
   onCreateEntryMenu: (parentPath: string | null, anchorRect: DesktopCreateEntryAnchorInput) => void;
   onDismissCreateEntryMenu: () => void;
+  onWorkspaceStarterCreated: (path: string) => void;
   onFilesVisibilitySettingsChange: (settings: FilesVisibilitySettings) => void;
   onNavigate: (view: DesktopView) => void;
   onNodeActionMenu: (node: DataNode, anchorRect: DOMRect, selectedNodes?: readonly DataNode[]) => void;
@@ -70,7 +75,10 @@ type DesktopWorkspaceContentProps = {
   puppyoneConfigSaving: boolean;
   settingsSection: SettingsSection;
   sidebarCompanion?: ReactNode;
+  sidebarUtility?: ReactNode;
   workspace: Workspace;
+  workspaceFolders: readonly WorkspaceFolder[];
+  resolveWorkspaceResource: (path: string | null) => ResolvedWorkbenchDataResource | null;
   workspaceSurfaceError?: string | null;
   workspaceKey: string;
   workspaceRefreshToken: Readonly<{ sequence: number; paths: readonly string[] | null }>;
@@ -88,13 +96,16 @@ export function DesktopWorkspaceContent({
   externalOpen,
   fileClipboardController,
   desktopUpdates,
+  firstProjectStarterEligible,
   git,
   navigationComposition,
   onActiveDataPathChange,
   onActiveDataNodeChange,
   onResourceMove,
+  onRemoveProject,
   onCreateEntryMenu,
   onDismissCreateEntryMenu,
+  onWorkspaceStarterCreated,
   onFilesVisibilitySettingsChange,
   onNavigate,
   onNodeActionMenu,
@@ -109,7 +120,10 @@ export function DesktopWorkspaceContent({
   puppyoneConfigSaving,
   settingsSection,
   sidebarCompanion,
+  sidebarUtility,
   workspace,
+  workspaceFolders,
+  resolveWorkspaceResource,
   workspaceSurfaceError = null,
   workspaceKey,
   workspaceRefreshToken,
@@ -186,6 +200,7 @@ export function DesktopWorkspaceContent({
       editorInteractionPreferences={editorInteractionPreferences}
       fileClipboardController={fileClipboardController}
       fileOperationNotice={fileOperationNotice}
+      firstProjectStarterEligible={firstProjectStarterEligible}
       navigation={{
         activeView: resolvedActiveView,
         availableSurfaceIds,
@@ -204,14 +219,19 @@ export function DesktopWorkspaceContent({
       onActiveDataNodeChange={onActiveDataNodeChange}
       onActiveDataPathChange={onActiveDataPathChange}
       onResourceMove={onResourceMove}
+      onRemoveProject={onRemoveProject}
       onCreateEntryMenu={onCreateEntryMenu}
       onDismissCreateEntryMenu={onDismissCreateEntryMenu}
+      onWorkspaceStarterCreated={onWorkspaceStarterCreated}
       onNodeActionMenu={onNodeActionMenu}
       preferences={preferences}
       resolvedSurface={resolvedSurface}
       sidebarCompanion={sidebarCompanion}
+      sidebarUtility={sidebarUtility}
       viewerExtensionAdapter={viewerExtensionAdapter}
       workspace={workspace}
+      workspaceFolders={workspaceFolders}
+      resolveWorkspaceResource={resolveWorkspaceResource}
       workspaceKey={workspaceKey}
       workspaceRefreshToken={workspaceRefreshToken}
       workspaceSurfaceError={workspaceSurfaceError}

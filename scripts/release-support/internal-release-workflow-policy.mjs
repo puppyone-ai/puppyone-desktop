@@ -12,6 +12,9 @@ export function inspectContinuousIntegrationWorkflow(workflowSource) {
     ["npm run lint", "CI must lint source"],
     ["npm test", "CI must run the test suite"],
     ["npm run build", "CI must run the production build and architecture gates"],
+    ["scripts/print-desktop-target-matrix.mjs --scope contracts", "CI must resolve native test runners from the target manifest"],
+    ["fromJSON(needs.resolve-desktop-targets.outputs.matrix)", "CI must fan out the target contract matrix"],
+    ["npm run test:desktop-platform-contracts", "CI must verify platform contracts on every declared native runner"],
   ]);
   forbidSnippets(workflowSource, errors, [
     ["contents: write", "CI must not receive repository write permission"],
@@ -39,6 +42,8 @@ export function inspectInternalReleaseWorkflow(workflowSource) {
     [".conclusion == \"success\"", "the Internal workflow must require successful CI"],
     ["scripts/prepare-desktop-build.mjs", "the Internal workflow must use the canonical Build Identity resolver"],
     ["--channel internal", "the Internal workflow must resolve only the Internal build channel"],
+    ["--target macos-arm64", "the Internal workflow must resolve its build target through the target manifest"],
+    ["PLATFORM_KEY: ${{ steps.release.outputs.target_runtime_key }}", "the Internal workflow must stage the runtime declared by its target"],
     ["npm run dist:mac:prepared", "the Internal workflow must package the prepared identity"],
     ["Verify packaged Internal Build Identity", "the Internal workflow must inspect packaged identity"],
     ["--build-info generated/desktop-build-info.json", "release metadata must consume resolved Build Identity"],
@@ -85,6 +90,8 @@ export function inspectStableReleaseWorkflow(workflowSource) {
     ["Verify exact Internal promotion source", "Stable must be promoted from verified Internal evidence"],
     ["verify-stable-promotion-source.mjs", "Stable must use the canonical promotion verifier"],
     ["--source-tag \"${{ inputs.promotion_source_tag }}\"", "Stable must verify the operator-selected Internal candidate"],
+    ["--target macos-arm64", "Stable must resolve its build target through the target manifest"],
+    ["PLATFORM_KEY: ${{ steps.release.outputs.target_runtime_key }}", "Stable must stage the runtime declared by its target"],
     ["Sign, notarize, and verify release package", "stable packaging must sign and notarize"],
     ["APPLE_API_KEY_BASE64", "stable CI must receive the App Store Connect key as base64 secret material"],
     ["export APPLE_API_KEY=\"${api_key_path}\"", "stable CI must pass notarytool a materialized API key file path"],

@@ -1,100 +1,53 @@
 .desktop-feedback {
-  position: absolute;
-  z-index: 44;
-  inset-inline: 12px;
-  inset-block-end: 12px;
   display: flex;
-  justify-content: flex-end;
-  pointer-events: none;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
 }
 
 .desktop-help-launcher {
-  --desktop-help-launcher-label-gap: 6px;
-  --desktop-help-launcher-label-max-width: 84px;
-  --desktop-help-launcher-padding-end: 8px;
-
-  display: flex;
-  width: auto;
-  max-width: var(--desktop-chrome-control-size);
-  height: var(--desktop-chrome-control-size);
+  appearance: none;
+  display: grid;
   box-sizing: border-box;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--desktop-help-launcher-label-gap);
-  overflow: hidden;
+  width: var(--desktop-sidebar-control-size);
+  height: var(--desktop-sidebar-control-size);
+  place-items: center;
   padding: 0;
-  border: 1px solid var(--po-border-subtle);
-  border-radius: 999px;
-  background: var(--po-panel-raised);
-  color: var(--po-text-subtle);
+  border: 0;
+  border-radius: var(--desktop-control-radius);
+  background: transparent;
+  color: color-mix(in srgb, var(--po-text-subtle) 88%, transparent);
   box-shadow: none;
-  opacity: 1;
-  pointer-events: auto;
   cursor: var(--po-clickable-cursor, pointer);
-  white-space: nowrap;
   transition:
-    max-width 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
-    padding-inline-end 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
     background-color 120ms ease,
     color 120ms ease;
 }
 
 .desktop-help-launcher-icon-slot {
-  /* The control minus its 1px borders: keep the icon centered independently of the label. */
   display: grid;
-  width: calc(var(--desktop-chrome-control-size) - 2px);
-  height: calc(var(--desktop-chrome-control-size) - 2px);
-  flex: 0 0 calc(var(--desktop-chrome-control-size) - 2px);
+  width: 100%;
+  height: 100%;
   place-items: center;
 }
 
 .desktop-help-launcher-icon-slot > svg {
   display: block;
-  flex: 0 0 auto;
 }
 
-.desktop-help-launcher-label {
-  max-width: 0;
-  overflow: hidden;
-  opacity: 0;
-  font-size: var(--po-text-size-meta);
-  font-weight: var(--po-text-weight-medium);
-  line-height: 1;
-  transition:
-    max-width 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
-    opacity 100ms ease 20ms;
-}
-
-.desktop-help-launcher:hover,
-.desktop-help-launcher:focus-visible {
-  max-width: calc(
-    var(--desktop-chrome-control-size)
-    + var(--desktop-help-launcher-label-gap)
-    + var(--desktop-help-launcher-label-max-width)
-    + var(--desktop-help-launcher-padding-end)
-  );
-  padding-inline-end: var(--desktop-help-launcher-padding-end);
-  background: var(--po-overlay);
+.desktop-help-launcher:hover {
+  background: transparent;
   color: var(--po-text-muted);
-  box-shadow: none;
-  opacity: 1;
-}
-
-.desktop-help-launcher:hover .desktop-help-launcher-label,
-.desktop-help-launcher:focus-visible .desktop-help-launcher-label {
-  max-width: var(--desktop-help-launcher-label-max-width);
-  opacity: 1;
 }
 
 .desktop-feedback[data-open="true"] .desktop-help-launcher {
-  background: var(--po-overlay);
+  background: transparent;
   color: var(--po-text-muted);
-  opacity: 1;
 }
 
 .desktop-help-launcher:focus-visible {
-  color: var(--po-text);
-  opacity: 1;
+  color: var(--po-text-muted);
   outline: 2px solid var(--po-focus-ring);
   outline-offset: 2px;
 }
@@ -404,8 +357,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .desktop-help-launcher,
-  .desktop-help-launcher-label {
+  .desktop-help-launcher {
     transition: none;
   }
 

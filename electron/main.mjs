@@ -1,5 +1,5 @@
 import { installBrokenStdioGuards } from "./main/stdio-guard.mjs";
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, session as electronSession, shell, webContents, WebContentsView } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, powerMonitor, protocol, safeStorage, session as electronSession, shell, webContents, WebContentsView } from "electron";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import fs from "node:fs";
 import { createRequire } from "node:module";
@@ -23,9 +23,12 @@ import {
   loadDesktopBuildInfo,
 } from "./main/build-info-service.mjs";
 import { createEphemeralAgentSessionCache } from "./main/agent/cache/ephemeral-agent-session-cache.mjs";
+import { createAgentConversationCatalog } from "./main/agent/persistence/agent-conversation-catalog.mjs";
+import { createAgentSessionRepository } from "./main/agent/persistence/agent-session-repository.mjs";
+import { createAgentProcessSupervisor } from "./main/agent/application/processes/agent-process-supervisor.mjs";
 import { createAgentQuitCoordinator } from "./main/agent/agent-shutdown.mjs";
-import { createAgentService } from "./main/agent/agent-service.mjs";
-import { createAgentAttachmentStore } from "./main/agent/agent-attachment-store.mjs";
+import { createAgentService } from "./main/agent/application/agent-service.mjs";
+import { createAgentAttachmentStore } from "./main/agent/infrastructure/attachments/agent-attachment-store.mjs";
 import { createLocalAgentInventory } from "./main/agent/connections/local-agent-inventory.mjs";
 import { createDefaultAgentRuntimeHost } from "./main/agent/bootstrap/create-agent-runtime-host.mjs";
 import {
@@ -46,6 +49,7 @@ import { registerAgentActivityIpcHandlers } from "./main/ipc/agent-activity-ipc.
 import { registerAppearanceIpcHandlers } from "./main/ipc/appearance-ipc.mjs";
 import { registerAppPreviewIpcHandlers } from "./main/ipc/app-preview-ipc.mjs";
 import { registerBuildInfoIpcHandlers } from "./main/ipc/build-info-ipc.mjs";
+import { registerPlatformIpcHandlers } from "./main/ipc/platform-ipc.mjs";
 import { registerCloudIpcHandlers } from "./main/ipc/cloud-ipc.mjs";
 import { registerCloudPublishIpcHandlers } from "./main/ipc/cloud-publish-ipc.mjs";
 import { registerMarkdownWebEmbedIpcHandlers } from "./main/ipc/markdown-web-embed-ipc.mjs";
@@ -82,6 +86,9 @@ import { createDefaultTerminalAgentActivityHost } from "./main/terminal-agent/ac
 import { createTrustedIpcMain } from "./main/trusted-ipc.mjs";
 import { createSenderWorkspaceAuthorization } from "./main/workspace-authorization.mjs";
 import { createWorkspaceStateStore } from "./main/workspace-state-store.mjs";
+import { WindowWorkspaceState } from "./main/window-workspace-state.mjs";
+import { createWindowWorkspaceCompositionService } from "./main/window-workspace-composition.mjs";
+import { createDetachedWorkspaceCleanup } from "./main/detached-workspace-cleanup.mjs";
 import {
   createProjectEntryService,
   requireGitRepository,
@@ -90,6 +97,7 @@ import {
 import { createProjectLocationGrantStore } from "./main/project-location-grants.mjs";
 import { createDesktopLocaleService } from "./main/localization/desktop-locale-service.mjs";
 import { createWorkspaceWatchService } from "./main/workspace-watch-service.mjs";
+import { createWorkspaceMutationTracker } from "./main/workspace-mutation-tracker.mjs";
 import { createGitMetadataWatchService } from "./main/git-metadata-watch-service.mjs";
 import { createDesktopTelemetryHost } from "./main/telemetry/bootstrap/create-desktop-telemetry-host.mjs";
 import {
@@ -97,9 +105,9 @@ import {
   DESKTOP_WINDOW_MIN_WIDTH,
 } from "./main/window-layout-contract.mjs";
 import {
-  DEFAULT_MACOS_WINDOW_BUTTON_POSITION,
   reapplyWindowChromeProfile,
 } from "./main/window-chrome-profile.mjs";
+import { createDesktopPlatformHost } from "./main/platform/create-platform-host.mjs";
 import { DEFAULT_INTERFACE_STYLE_FIRST_PAINT } from "./main/interface-style-first-paint.generated.mjs";
 import { createGitOperationCoordinator } from "./main/git-operation-coordinator.mjs";
 import { createCloudPublishCoordinator } from "./main/cloud-publish-coordinator.mjs";
@@ -112,6 +120,8 @@ import {
   loadViewerPackRuntime,
 } from "./main/viewer-packs/bootstrap.mjs";
 import { resolveViewerPackFeatureProfile } from "./main/viewer-packs/feature-profile.mjs";
+import { resolveGitAutoCommitFeatureProfile } from "./main/git-auto-commit/feature-profile.mjs";
+import { createGitAutoCommitHost } from "./main/git-auto-commit/host.mjs";
 
 // Must run before any console.* / IPC replyWithError logging: broken inherited
 // stdout/stderr (Dock launch, detached child, closed terminal) otherwise throws
@@ -132,6 +142,9 @@ const desktopBuildInfo = loadDesktopBuildInfo({
 const desktopApplicationIdentity = configureDesktopApplicationIdentity({
   app,
   buildInfo: desktopBuildInfo,
+});
+const desktopPlatformHost = createDesktopPlatformHost({
+  safeStorage,
 });
 const appName = desktopApplicationIdentity.applicationName;
 
@@ -155,16 +168,13 @@ const viewerPackFeatureProfile = resolveViewerPackFeatureProfile({
   environment: process.env,
   isPackaged: app.isPackaged,
 });
+const gitAutoCommitFeatureProfile = resolveGitAutoCommitFeatureProfile({
+  packageMetadata,
+  environment: process.env,
+  isPackaged: app.isPackaged,
+});
 const workspaceStateFilename = "desktop-workspace-state.json";
-const macTitlebarOptions = process.platform === "darwin"
-  ? {
-      titleBarStyle: "hiddenInset",
-      titleBarOverlay: true,
-      trafficLightPosition: DEFAULT_MACOS_WINDOW_BUTTON_POSITION,
-    }
-  : {
-      titleBarStyle: "default",
-    };
+const desktopWindowChromeOptions = desktopPlatformHost.windowChrome.browserWindowOptions;
 
 const privilegedSchemes = [
   {
@@ -238,7 +248,7 @@ const documentSessionCloseCoordinator = createDocumentSessionCloseCoordinator({
 });
 documentSessionCloseCoordinator.registerIpc(trustedIpcMain);
 const authorizeWorkspaceRoot = createSenderWorkspaceAuthorization({
-  getWorkspaceRootForSender,
+  getWorkspaceRootsForSender,
 });
 const terminalAgentActivityHost = createDefaultTerminalAgentActivityHost({
   appPath: app.getAppPath(),
@@ -252,7 +262,15 @@ const terminalService = createTerminalService({
   terminalAgentActivityHost,
 });
 const terminalAgentLocator = createTerminalAgentLocator();
-const agentSessionCache = createEphemeralAgentSessionCache({ app });
+const agentEventCache = createEphemeralAgentSessionCache({ app });
+const agentConversationCatalog = createAgentConversationCatalog({
+  filePath: path.join(app.getPath("userData"), "agent-runtime", "conversations.json"),
+});
+const agentSessionRepository = createAgentSessionRepository({
+  eventCache: agentEventCache,
+  conversationCatalog: agentConversationCatalog,
+});
+const agentProcessSupervisor = createAgentProcessSupervisor({ maxConcurrentStarts: 2 });
 const agentRuntimeRegistry = createDefaultAgentRuntimeHost({
   appVersion: desktopBuildInfo.version,
   appPath: app.getAppPath(),
@@ -268,13 +286,15 @@ void agentAttachmentStore.initialize().catch((error) => {
 });
 const agentService = createAgentService({
   runtimeRegistry: agentRuntimeRegistry,
-  sessionCache: agentSessionCache,
+  sessionCache: agentSessionRepository,
   attachmentStore: agentAttachmentStore,
+  processSupervisor: agentProcessSupervisor,
 });
 const localAgentInventory = createLocalAgentInventory({
   appVersion: desktopBuildInfo.version,
   cacheFilePath: path.join(app.getPath("userData"), "agent-runtime-inventory.json"),
 });
+const workspaceMutationTracker = createWorkspaceMutationTracker();
 const workspaceWatchService = createWorkspaceWatchService();
 const gitMetadataWatchService = createGitMetadataWatchService();
 const workspaceStateStore = createWorkspaceStateStore({
@@ -298,6 +318,39 @@ const cloudAuthService = createCloudAuthService({
   revealWindow: revealLastFocusedWindow,
 });
 const gitOperationCoordinator = createGitOperationCoordinator();
+const gitAutoCommitHost = createGitAutoCommitHost({
+  available: gitAutoCommitFeatureProfile.available,
+  preferenceFilePath: path.join(app.getPath("userData"), "git-auto-commit", "preferences.v1.json"),
+  gitOperationCoordinator,
+  documentDurabilityCoordinator: documentSessionCloseCoordinator,
+  workspaceMutationTracker,
+  workspaceWatchService,
+  gitMetadataWatchService,
+});
+const cleanupDetachedWorkspace = createDetachedWorkspaceCleanup({
+  agentService,
+  getAppPreviewRuntime: () => appPreviewRuntime,
+  getWindowState: getOrCreateWindowState,
+  gitAutoCommitHost,
+  gitMetadataWatchService,
+  localFileCapabilities,
+  resolveWindowTitle,
+  terminalService,
+  workspaceWatchService,
+});
+const windowWorkspaceCompositionService = createWindowWorkspaceCompositionService({
+  canonicalizeWorkspacePath,
+  cleanupDetachedWorkspace,
+  getWindowState: getOrCreateWindowState,
+  getWorkspaceWindow,
+  indexWorkspacePath: (folderPath, window) => workspaceWindowByPath.set(folderPath, window),
+  persistWorkspaceComposition: (workspaces) => workspaceStateStore.rememberWorkspaceComposition(workspaces),
+  revealWindow,
+  unindexWorkspacePath: (folderPath, window) => {
+    if (workspaceWindowByPath.get(folderPath) === window) workspaceWindowByPath.delete(folderPath);
+  },
+  workspaceFromPath,
+});
 const cloudPublishSecretVault = createCloudPublishSecretVault({
   baseDirectory: path.join(app.getPath("userData"), "cloud-publish-secrets-v1"),
   secureStorage: safeStorage,
@@ -322,9 +375,11 @@ const cloudGitConnectCoordinator = createCloudGitConnectCoordinator({
 
 async function createWindow(options = {}) {
   await localeService.refreshSystemLanguages();
-  const initialWorkspacePath = typeof options.initialWorkspacePath === "string"
-    ? path.resolve(options.initialWorkspacePath)
-    : null;
+  const initialWorkspacePaths = (Array.isArray(options.initialWorkspacePaths)
+    ? options.initialWorkspacePaths
+    : [options.initialWorkspacePath])
+    .filter((folderPath) => typeof folderPath === "string" && folderPath.trim())
+    .map((folderPath) => path.resolve(folderPath));
   const appIconPath = resolveAppIconPath();
   const window = new BrowserWindow({
     width: 1280,
@@ -338,13 +393,16 @@ async function createWindow(options = {}) {
     backgroundColor: nativeTheme.shouldUseDarkColors
       ? DEFAULT_INTERFACE_STYLE_FIRST_PAINT.dark.background
       : DEFAULT_INTERFACE_STYLE_FIRST_PAINT.light.background,
-    ...macTitlebarOptions,
+    ...desktopWindowChromeOptions,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
       preload: preloadPath,
-      additionalArguments: viewerPackFeatureProfile.rendererArguments,
+      additionalArguments: [
+        ...viewerPackFeatureProfile.rendererArguments,
+        ...gitAutoCommitFeatureProfile.rendererArguments,
+      ],
     },
   });
   const webContentsId = window.webContents.id;
@@ -356,19 +414,15 @@ async function createWindow(options = {}) {
     externalNavigation,
   });
   windowsById.set(webContentsId, window);
-  windowStateById.set(webContentsId, {
-    initialWorkspacePath,
-    workspace: null,
-    workspacePath: null,
-    lastFocusedAt: Date.now(),
-  });
+  windowStateById.set(webContentsId, new WindowWorkspaceState({ initialWorkspacePaths }));
   lastFocusedWindowId = webContentsId;
 
   window.on("focus", () => {
     reapplyNativeWindowChrome(window);
     lastFocusedWindowId = webContentsId;
     const state = windowStateById.get(webContentsId);
-    if (state) state.lastFocusedAt = Date.now();
+    state?.markFocused();
+    gitAutoCommitHost.reconcileWindow(webContentsId);
     if (!window.webContents.isDestroyed()) {
       window.webContents.send("git-repository:window-focus", { focused: true });
     }
@@ -500,14 +554,12 @@ function revealWindow(window) {
   window.focus();
   lastFocusedWindowId = window.webContents.id;
   const state = windowStateById.get(window.webContents.id);
-  if (state) state.lastFocusedAt = Date.now();
-  if (process.platform === "darwin") {
-    app.focus({ steal: true });
-  }
+  state?.markFocused();
+  desktopPlatformHost.windowChrome.focusApplication(app);
 }
 
 function reapplyNativeWindowChrome(window) {
-  if (process.platform !== "darwin" || !window || window.isDestroyed()) return;
+  if (!desktopPlatformHost.windowChrome.shouldReapplyProfile || !window || window.isDestroyed()) return;
   reapplyWindowChromeProfile(window);
   // AppKit can recreate the traffic-light views after emitting a window
   // lifecycle event. A second pass on the next main-loop turn keeps the
@@ -562,7 +614,7 @@ function resolveAppIconPath() {
 }
 
 function setDefaultDockIcon() {
-  if (process.platform !== "darwin" || !app.dock) return;
+  if (!desktopPlatformHost.windowChrome.supportsDockIcon || !app.dock) return;
   const iconPath = resolveAppIconPath();
   if (!iconPath) return;
   try {
@@ -602,9 +654,7 @@ app.whenReady().then(async () => {
   stopLocaleNativeRefresh = localeService.onDidChange(() => {
     nativeMenuService.refresh();
   });
-  if (process.platform === "darwin" && app.dock) {
-    setDefaultDockIcon();
-  }
+  setDefaultDockIcon();
   nativeMenuService.refresh();
 
   registerLocalFileProtocol({
@@ -657,11 +707,15 @@ app.whenReady().then(async () => {
     });
   }
   registerIpcHandlers();
+  if (gitAutoCommitHost.available) {
+    powerMonitor.on("resume", gitAutoCommitHost.reconcileAfterResume);
+  }
   await telemetryHost.start();
   updateService.start();
-  const initialWorkspacePath = initialLaunchIntent.workspacePath
-    ?? await workspaceStateStore.readLastActiveWorkspacePath();
-  await createWindow({ initialWorkspacePath });
+  const initialWorkspacePaths = initialLaunchIntent.workspacePath
+    ? [initialLaunchIntent.workspacePath]
+    : await workspaceStateStore.readLastActiveWorkspacePaths();
+  await createWindow({ initialWorkspacePaths });
 
   app.on("activate", () => {
     void localeService.refreshSystemLanguages().catch((error) => {
@@ -671,8 +725,8 @@ app.whenReady().then(async () => {
       revealLastFocusedWindow();
       return;
     }
-    void workspaceStateStore.readLastActiveWorkspacePath()
-      .then((initialWorkspacePath) => createWindow({ initialWorkspacePath }));
+    void workspaceStateStore.readLastActiveWorkspacePaths()
+      .then((initialWorkspacePaths) => createWindow({ initialWorkspacePaths }));
   });
 }).catch((error) => {
   console.error("puppyone failed to start:", error);
@@ -702,6 +756,10 @@ app.on("will-quit", () => {
   void terminalAgentActivityHost.dispose();
   terminalAgentLocator.dispose();
   localAgentInventory.dispose();
+  if (gitAutoCommitHost.available) {
+    powerMonitor.removeListener("resume", gitAutoCommitHost.reconcileAfterResume);
+  }
+  gitAutoCommitHost.closeAll();
   workspaceWatchService.closeAll();
   gitMetadataWatchService.closeAll();
 });
@@ -742,6 +800,10 @@ function registerIpcHandlers() {
     ipcMain: trustedIpcMain,
     buildInfo: desktopBuildInfo,
   });
+  registerPlatformIpcHandlers({
+    ipcMain: trustedIpcMain,
+    platformHost: desktopPlatformHost,
+  });
   registerTelemetryIpcHandlers({
     ipcMain: trustedIpcMain,
     telemetryService: telemetryHost.service,
@@ -765,7 +827,10 @@ function registerIpcHandlers() {
     cloneRepositoryForCurrentWindow,
     selectProjectLocationForCurrentWindow,
     selectWorkspaceForCurrentWindow,
+    selectWorkspaceForCurrentComposition,
     selectWorkspaceForNewWindow,
+    attachWorkspaceToCurrentWindow,
+    detachWorkspaceFromCurrentWindow,
   });
   registerCloudIpcHandlers({ ipcMain: trustedIpcMain, cloudAuthService });
   registerCloudPublishIpcHandlers({
@@ -800,8 +865,10 @@ function registerIpcHandlers() {
     fs,
     shell,
     authorizeWorkspaceRoot,
+    convertOfficeDocument: desktopPlatformHost.documents.convertOfficeDocumentToDocx,
     localFileCapabilities,
     workspaceWatchService,
+    workspaceMutationTracker,
     gitMetadataWatchService,
     t: (messageId, values) => localeService.t(messageId, values),
   });
@@ -831,6 +898,10 @@ function registerIpcHandlers() {
     cloudGitOperationLease,
     gitOperationCoordinator,
     t: (messageId, values) => localeService.t(messageId, values),
+  });
+  gitAutoCommitHost.registerIpcHandlers({
+    ipcMain: trustedIpcMain,
+    authorizeWorkspaceRoot,
   });
   registerTerminalIpcHandlers({
     ipcMain: trustedIpcMain,
@@ -940,45 +1011,62 @@ async function getInitialWorkspaceResultForWindow(sender) {
     return {
       path: null,
       workspace: null,
+      workspaces: [],
       error: null,
     };
   }
 
   const state = windowStateById.get(window.webContents.id);
-  const initialPath = state?.workspacePath ?? state?.initialWorkspacePath ?? null;
-  if (!initialPath) {
+  if (state?.folders.length) {
+    const workspaces = state.folders.map((folder) => folder.workspace);
+    return {
+      path: state.folderPaths[0] ?? null,
+      workspace: workspaces[0] ?? null,
+      workspaces,
+      error: null,
+    };
+  }
+
+  const initialPaths = state?.initialRestorePaths ?? [];
+  if (initialPaths.length === 0) {
     return {
       path: null,
       workspace: null,
+      workspaces: [],
       error: null,
     };
   }
 
   try {
-    const workspace = await workspaceFromPath(initialPath);
-    const canonicalPath = await canonicalizeWorkspacePath(workspace.path);
-    const existingWindow = getWorkspaceWindow(canonicalPath);
-    if (existingWindow && existingWindow !== window) {
-      revealWindow(existingWindow);
-      return {
-        path: canonicalPath,
-        workspace: null,
-        error: `${workspace.name} is already open in another puppyone window.`,
-      };
+    const folders = [];
+    for (const initialPath of initialPaths) {
+      const workspace = await workspaceFromPath(initialPath);
+      const canonicalPath = await canonicalizeWorkspacePath(workspace.path);
+      const existingWindow = getWorkspaceWindow(canonicalPath);
+      if (existingWindow && existingWindow !== window) {
+        revealWindow(existingWindow);
+        throw new Error(`${workspace.name} is already open in another puppyone window.`);
+      }
+      folders.push({ path: canonicalPath, workspace });
     }
 
-    assignWindowWorkspace(window, workspace, canonicalPath, { cleanupPrevious: false });
-    await workspaceStateStore.rememberRecentWorkspacePath(canonicalPath, workspace);
+    const workspaces = folders.map((folder) => folder.workspace);
+    const validationState = new WindowWorkspaceState();
+    validationState.replaceFolders(folders);
+    await workspaceStateStore.rememberWorkspaceComposition(workspaces);
+    assignWindowWorkspaceComposition(window, folders, { cleanupPrevious: false });
     return {
-      path: canonicalPath,
-      workspace,
+      path: folders[0]?.path ?? null,
+      workspace: workspaces[0] ?? null,
+      workspaces,
       error: null,
     };
   } catch (error) {
     return {
-      path: initialPath,
+      path: initialPaths[0] ?? null,
       workspace: null,
-      error: `Unable to reopen workspace (${initialPath}): ${error instanceof Error ? error.message : String(error)}`,
+      workspaces: [],
+      error: `Unable to reopen workspace composition: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 }
@@ -988,6 +1076,14 @@ async function selectWorkspaceForCurrentWindow(sender) {
 
   if (result.canceled || result.filePaths.length === 0) return null;
   return openWorkspaceInCurrentWindow(sender, result.filePaths[0]);
+}
+
+async function selectWorkspaceForCurrentComposition(sender) {
+  return runProjectEntryOperation(sender, async () => {
+    const result = await showWorkspaceOpenDialog(getDialogOwnerWindow(sender));
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return attachWorkspaceToCurrentWindow(sender, result.filePaths[0]);
+  });
 }
 
 async function selectWorkspaceForNewWindow(sender = null) {
@@ -1132,18 +1228,43 @@ async function openWorkspaceInNewWindow(folderPath, options = {}) {
   };
 }
 
+async function attachWorkspaceToCurrentWindow(sender, folderPath) {
+  const window = BrowserWindow.fromWebContents(sender);
+  if (!window || window.isDestroyed()) {
+    throw new Error("No active window is available for this Workspace composition.");
+  }
+  return windowWorkspaceCompositionService.attach(window, folderPath);
+}
+
+async function detachWorkspaceFromCurrentWindow(sender, folderPath) {
+  const window = BrowserWindow.fromWebContents(sender);
+  if (!window || window.isDestroyed()) {
+    throw new Error("No active window is available for this Workspace composition.");
+  }
+  return windowWorkspaceCompositionService.detach(window, folderPath);
+}
+
 function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
+  assignWindowWorkspaceComposition(window, [{ workspace, path: canonicalPath }], options);
+}
+
+function assignWindowWorkspaceComposition(window, folders, options = {}) {
   if (!window || window.isDestroyed()) return;
   const webContentsId = window.webContents.id;
   const state = getOrCreateWindowState(window);
-  const previousPath = state.workspacePath;
+  const previousPaths = state.folderPaths;
+  const nextPaths = folders.map((folder) => folder.path);
+  const replacingComposition = previousPaths.length !== nextPaths.length
+    || previousPaths.some((folderPath, index) => folderPath !== nextPaths[index]);
 
-  if (previousPath && previousPath !== canonicalPath) {
+  if (replacingComposition && previousPaths.length > 0) {
     viewerPackHost?.destroySessionsForOwner(webContentsId);
     localFileCapabilities.revokeSender(webContentsId);
-    const previousWindow = workspaceWindowByPath.get(previousPath);
-    if (previousWindow === window || previousWindow?.isDestroyed()) {
-      workspaceWindowByPath.delete(previousPath);
+    for (const previousPath of previousPaths) {
+      const previousWindow = workspaceWindowByPath.get(previousPath);
+      if (previousWindow === window || previousWindow?.isDestroyed()) {
+        workspaceWindowByPath.delete(previousPath);
+      }
     }
     if (options.cleanupPrevious !== false) {
       appPreviewRuntime?.closeSessionsForWindow(webContentsId);
@@ -1154,14 +1275,16 @@ function assignWindowWorkspace(window, workspace, canonicalPath, options = {}) {
     }
   }
 
-  state.initialWorkspacePath = canonicalPath;
-  state.workspace = workspace;
-  state.workspacePath = canonicalPath;
-  workspaceWindowByPath.set(canonicalPath, window);
+  state.replaceFolders(folders);
+  for (const folder of folders) workspaceWindowByPath.set(folder.path, window);
+  const primaryPath = folders[0]?.path ?? null;
+  if (primaryPath) void gitAutoCommitHost.assignWorkspace(window.webContents, primaryPath).catch((error) => {
+    console.warn("Unable to initialize Git Auto Commit for workspace:", error);
+  });
   window.setTitle(window.isFullScreen() ? "" : resolveWindowTitle(window));
   if (typeof window.setRepresentedFilename === "function") {
     try {
-      window.setRepresentedFilename(canonicalPath);
+      if (primaryPath) window.setRepresentedFilename(primaryPath);
     } catch {
       // setRepresentedFilename is macOS-only and best-effort.
     }
@@ -1174,25 +1297,24 @@ function releaseWindowWorkspace(window) {
 }
 
 function releaseWindowWorkspaceById(webContentsId, window = null) {
+  gitAutoCommitHost.releaseWindow(webContentsId);
   viewerPackHost?.destroySessionsForOwner(webContentsId);
   localFileCapabilities.revokeSender(webContentsId);
   const state = windowStateById.get(webContentsId);
-  const workspacePath = state?.workspacePath ?? null;
-  if (workspacePath) {
+  const workspacePaths = state?.folderPaths ?? [];
+  for (const workspacePath of workspacePaths) {
     const existingWindow = workspaceWindowByPath.get(workspacePath);
     if (existingWindow === window || existingWindow?.isDestroyed()) {
       workspaceWindowByPath.delete(workspacePath);
     }
   }
   if (state) {
-    state.workspacePath = null;
-    state.initialWorkspacePath = null;
-    state.workspace = null;
+    state.releaseFolders();
   }
   if (window && !window.isDestroyed()) {
     window.setTitle(window.isFullScreen() ? "" : resolveWindowTitle(window));
   }
-  return workspacePath;
+  return workspacePaths[0] ?? null;
 }
 
 async function forgetCurrentWindowWorkspace(sender) {
@@ -1215,19 +1337,14 @@ function getOrCreateWindowState(window) {
   const webContentsId = window.webContents.id;
   let state = windowStateById.get(webContentsId);
   if (!state) {
-    state = {
-      initialWorkspacePath: null,
-      workspace: null,
-      workspacePath: null,
-      lastFocusedAt: Date.now(),
-    };
+    state = new WindowWorkspaceState();
     windowStateById.set(webContentsId, state);
   }
   return state;
 }
 
 function resolveWindowTitle(window) {
-  const workspace = windowStateById.get(window.webContents.id)?.workspace;
+  const workspace = windowStateById.get(window.webContents.id)?.primaryWorkspace;
   return workspace ? `${appName} - ${workspace.name}` : appName;
 }
 
@@ -1244,10 +1361,9 @@ function isOpenWorkspaceRoot(canonicalPath) {
   return Boolean(getWorkspaceWindow(canonicalPath));
 }
 
-function getWorkspaceRootForSender(sender) {
+function getWorkspaceRootsForSender(sender) {
   const state = windowStateById.get(sender.id);
-  const workspacePath = state?.workspacePath ?? null;
-  return workspacePath;
+  return state?.folderPaths ?? [];
 }
 
 function getDialogOwnerWindow(sender) {

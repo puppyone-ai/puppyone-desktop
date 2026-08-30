@@ -76,6 +76,21 @@ describe("workspace file IPC authorization", () => {
     }
   });
 
+  it("authorizes both ends of a cross-root copy", async () => {
+    const { handlers } = createHarness(() => [root, otherRoot]);
+    const event = { sender: { id: 81 } };
+    await writeFile(path.join(root, "note.txt"), "multi-root");
+    await mkdir(path.join(otherRoot, "docs"));
+
+    await expect(handlers.get("workspace:copy-entry-between-roots")(event, {
+      sourceRootPath: root,
+      targetRootPath: otherRoot,
+      fromPath: "note.txt",
+      targetFolderPath: "docs",
+    })).resolves.toEqual({ path: "docs/note.txt" });
+    expect(await readFile(path.join(otherRoot, "docs", "note.txt"), "utf8")).toBe("multi-root");
+  });
+
   it("attributes a successful editor write to its originating window", async () => {
     const workspaceWatchService = { noteInternalWrite: vi.fn() };
     const gitMetadataWatchService = { invalidateWorkingTree: vi.fn() };
@@ -444,7 +459,10 @@ function createHarness(
     fs,
     shell,
     authorizeWorkspaceRoot: createSenderWorkspaceAuthorization({
-      getWorkspaceRootForSender,
+      getWorkspaceRootsForSender: async (sender) => {
+        const value = await getWorkspaceRootForSender(sender);
+        return Array.isArray(value) ? value : [value];
+      },
       fsModule: fs,
     }),
     localFileCapabilities,

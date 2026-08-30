@@ -23,10 +23,12 @@ describe("Terminal session host lifecycle", () => {
     const render = (status: DesktopTerminalSession["status"]) => act(() => root.render(
       withTestLocalization(
         <TerminalSessionHost
-          active
+          focused
+          presented
           discoveryPhase="ready"
           availableAgentIds={["opencode"]}
           runtime={runtime}
+          onFocus={vi.fn()}
           session={{
             id: "terminal-opencode",
             launcherId: "opencode",
@@ -50,7 +52,8 @@ describe("Terminal session host lifecycle", () => {
     expect(container.textContent).not.toContain("Starting Agent");
     expect(runtime.mount).toHaveBeenCalledTimes(1);
     expect(runtime.unmount).not.toHaveBeenCalled();
-    expect(runtime.setActive).toHaveBeenLastCalledWith(true);
+    expect(runtime.setPresented).toHaveBeenLastCalledWith(true);
+    expect(runtime.setFocused).toHaveBeenLastCalledWith(true);
 
     act(() => root.unmount());
     expect(runtime.unmount).toHaveBeenCalledTimes(1);
@@ -72,11 +75,13 @@ function createRuntime(): TerminalRuntimeHandle {
     applyAppearance: vi.fn(),
     dispose: vi.fn(),
     focus: vi.fn(),
+    getMinimumViewportSize: vi.fn(() => ({ width: 172, height: 128 })),
     mount: vi.fn(),
     scrollLines: vi.fn(),
     scrollToRatio: vi.fn(),
     unmount: vi.fn(),
-    setActive: vi.fn(),
+    setFocused: vi.fn(),
+    setPresented: vi.fn(),
     subscribeActivity: vi.fn((listener) => {
       listener(false);
       return () => undefined;

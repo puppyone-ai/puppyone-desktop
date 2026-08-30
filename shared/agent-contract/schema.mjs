@@ -5,6 +5,7 @@ import {
   assertAgentInspection,
   assertAgentInferenceProvider,
   assertAgentModel,
+  sanitizeAgentRuntimeDescriptor,
 } from "./runtime-schema.mjs";
 import {
   assertArray,
@@ -70,6 +71,9 @@ export function parseAgentIpcRequest(channel, value) {
         rootPath: requiredString(input.rootPath, "rootPath", MAX_PATH_LENGTH),
         runtimeId: optionalRuntimeId(input.runtimeId),
         includeArchived: optionalBoolean(input.includeArchived, "includeArchived"),
+        discoverNative: optionalBoolean(input.discoverNative, "discoverNative"),
+        cursor: optionalString(input.cursor, "cursor", 1_024),
+        limit: optionalPageSize(input.limit, "limit"),
       });
     case "agent:session-fork":
     case "agent:session-archive":
@@ -175,8 +179,7 @@ export function assertAgentIpcResponse(channel, value) {
     case "agent:session-resume":
       return value === null ? value : assertAgentSessionSnapshot(value);
     case "agent:sessions-list":
-      assertArray(value, "session list").forEach(assertAgentSessionMetadata);
-      return value;
+      return sanitizeAgentSessionsListResponse(value);
     case "agent:session-archive":
     case "agent:session-delete":
     case "agent:session-close":
@@ -199,6 +202,13 @@ export function assertAgentIpcResponse(channel, value) {
   }
 }
 
+function optionalPageSize(value, label) {
+  if (value === undefined || value === null) return undefined;
+  const normalized = nonNegativeInteger(value, label);
+  if (normalized < 1 || normalized > 100) throw contractError(label, "must be between 1 and 100");
+  return normalized;
+}
+
 function assertAgentSessionSnapshot(value) {
   const snapshot = assertRecord(value, "Agent session snapshot");
   assertAgentSessionMetadata(snapshot.session);
@@ -217,6 +227,66 @@ function assertAgentSessionMetadata(value) {
   requiredString(session.workspaceRoot, "Agent session.workspaceRoot", MAX_PATH_LENGTH);
   requiredString(session.title, "Agent session.title", 512);
   return value;
+}
+
+function sanitizeAgentSessionsListResponse(value) {
+  const response = assertRecord(value, "session list");
+  const discovery = assertRecord(response.discovery, "session list.discovery");
+  return {
+    sessions: assertArray(response.sessions, "session list.sessions")
+      .slice(0, 500)
+      .map((session, index) => sanitizeAgentSessionListItem(session, `session list.sessions[${index}]`)),
+    discovery: {
+      runtimeId: optionalRuntimeId(discovery.runtimeId) ?? null,
+      status: enumValue(discovery.status, "session list.discovery.status", [
+        "not-requested", "unsupported", "partial", "complete", "failed",
+      ]),
+      nextCursor: optionalString(discovery.nextCursor, "session list.discovery.nextCursor", 1_024) ?? null,
+      indexed: nonNegativeInteger(discovery.indexed, "session list.discovery.indexed"),
+      warnings: safeWarnings(discovery.warnings, "session list.discovery.warnings"),
+    },
+    warnings: safeWarnings(response.warnings, "session list.warnings"),
+  };
+}
+
+function sanitizeAgentSessionListItem(value, label) {
+  const session = assertRecord(value, label);
+  const runtimeId = assertRuntimeId(session.runtimeId ?? session.provider, `${label}.runtimeId`);
+  const provider = assertRuntimeId(session.provider ?? runtimeId, `${label}.provider`);
+  return compact({
+    id: requiredOpaqueId(session.id, `${label}.id`),
+    runtimeId,
+    runtime: session.runtime == null ? undefined : sanitizeAgentRuntimeDescriptor(session.runtime),
+    provider,
+    providerSessionId: optionalOpaqueId(session.providerSessionId, `${label}.providerSessionId`, { nullable: true }) ?? null,
+    workspaceRoot: requiredString(session.workspaceRoot, `${label}.workspaceRoot`, MAX_PATH_LENGTH),
+    title: requiredString(session.title, `${label}.title`, 512),
+    createdAt: isoTimestamp(session.createdAt, `${label}.createdAt`),
+    updatedAt: isoTimestamp(session.updatedAt, `${label}.updatedAt`),
+    terminalState: enumValue(session.terminalState, `${label}.terminalState`, [
+      "idle", "running", "completed", "failed", "interrupted", "provider-exited",
+    ]),
+    selectedModel: optionalString(session.selectedModel, `${label}.selectedModel`, 512) ?? null,
+    selectedMode: optionalString(session.selectedMode, `${label}.selectedMode`, 160) ?? null,
+    lastSequence: nonNegativeInteger(session.lastSequence, `${label}.lastSequence`),
+    archivedAt: session.archivedAt == null ? undefined : isoTimestamp(session.archivedAt, `${label}.archivedAt`),
+    partial: optionalBoolean(session.partial, `${label}.partial`),
+    origin: session.origin == null
+      ? undefined
+      : enumValue(session.origin, `${label}.origin`, ["puppyone", "native-discovery"]),
+  });
+}
+
+function safeWarnings(value, label) {
+  return assertArray(value, label).slice(0, 50)
+    .map((entry, index) => requiredString(entry, `${label}[${index}]`, 4_000));
+}
+
+function isoTimestamp(value, label) {
+  const input = requiredString(value, label, 64);
+  const milliseconds = Date.parse(input);
+  if (!Number.isFinite(milliseconds)) throw contractError(label, "must be an ISO timestamp");
+  return new Date(milliseconds).toISOString();
 }
 
 function optionalReferences(value, label) {

@@ -7,7 +7,7 @@ import type {
   AgentLocalConnectionsSnapshot,
   AgentModel,
   AgentModelsListRequest,
-  AgentProviderInspection,
+  AgentRuntimeInspection,
   AgentQuestionResolution,
   AgentDraftReference,
   AgentReferenceRevokeRequest,
@@ -17,11 +17,11 @@ import type {
   AgentSessionCloseRequest,
   AgentSessionCreateRequest,
   AgentSessionExitEvent,
-  AgentSessionListItem,
   AgentSessionMutationRequest,
   AgentSessionResumeRequest,
   AgentSessionSnapshot,
   AgentSessionsListRequest,
+  AgentSessionsListResponse,
   AgentTurnInterruptRequest,
   AgentTurnStartRequest,
   AgentTurnSteerRequest,
@@ -30,14 +30,14 @@ import type {
 
 /** Renderer-side port implemented by the typed Electron preload adapter. */
 export interface AgentClientPort {
-  discoverAgentProviders(request?: AgentRuntimeRequest): Promise<AgentProviderInspection>;
+  discoverAgentRuntimes(request?: AgentRuntimeRequest): Promise<AgentRuntimeInspection>;
   discoverLocalAgentConnections(request?: AgentLocalConnectionsRequest): Promise<AgentLocalConnectionsSnapshot>;
   listAgentModels(request?: AgentModelsListRequest): Promise<AgentModel[]>;
   readAgentAccount(request?: AgentAccountReadRequest): Promise<AgentAccountState | null>;
   createAgentSession(request: AgentSessionCreateRequest): Promise<AgentSessionSnapshot>;
   resumeAgentSession(request: AgentSessionResumeRequest): Promise<AgentSessionSnapshot | null>;
   replayAgentSession(request: AgentReplayRequest): Promise<AgentSessionSnapshot>;
-  listAgentSessions(request: AgentSessionsListRequest): Promise<AgentSessionListItem[]>;
+  listAgentSessions(request: AgentSessionsListRequest): Promise<AgentSessionsListResponse>;
   forkAgentSession(request: AgentSessionMutationRequest): Promise<AgentSessionSnapshot>;
   archiveAgentSession(request: AgentSessionMutationRequest): Promise<{ sessionId: string; archived: boolean }>;
   deleteAgentSession(request: AgentSessionMutationRequest): Promise<{ sessionId: string; deleted: boolean; nativeDeleted: boolean }>;

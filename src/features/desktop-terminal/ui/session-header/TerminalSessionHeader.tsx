@@ -1,10 +1,18 @@
 import { useMemo, type CSSProperties } from "react";
 import { Plus } from "lucide-react";
 import { useLocalization } from "@puppyone/localization/react";
+import type { WorkbenchSplitDropEdge } from "@puppyone/shared-ui";
 import { DesktopMenuIconButton } from "../../../../components/DesktopMenu";
 import { presentTerminalSessionHeader } from "../../model/terminalSessionHeader";
 import { TERMINAL_SESSION_HEADER_METRICS } from "../../model/terminalSessionHeaderLayout";
 import type { DesktopTerminalSessionSummary } from "../../model/terminalSessions";
+import {
+  projectTerminalGroupInsertionPreview,
+  projectTerminalTabInsertionPreview,
+  type TerminalGroupMergeDropIntent,
+  type TerminalTabInsertDropIntent,
+} from "../../model/terminalTabMove";
+import type { TerminalTabMoveDragController } from "../../interactions/useTerminalTabMoveDrag";
 import type { TerminalRuntimeRegistry } from "../../runtime/terminalRuntimeRegistry";
 import { TerminalSessionOverflowMenu } from "./TerminalSessionOverflowMenu";
 import { TerminalSessionTab } from "./TerminalSessionTab";
@@ -16,11 +24,16 @@ import "./terminal-session-header.css";
 
 type TerminalSessionHeaderProps = {
   activeSessionId: string | null;
+  dropInsertion?: TerminalTabInsertDropIntent | TerminalGroupMergeDropIntent | null;
+  groupId?: string;
   onActivate: (sessionId: string) => void;
   onClose: (sessionId: string) => void;
   onCreate: () => void;
+  onMoveByKeyboard?: (sessionId: string, edge: WorkbenchSplitDropEdge) => void;
+  presentedSessionIds?: readonly string[];
   runtimeRegistry?: Pick<TerminalRuntimeRegistry, "require">;
   sessions: readonly DesktopTerminalSessionSummary[];
+  tabMove?: TerminalTabMoveDragController;
   workspacePath: string;
 };
 
@@ -30,15 +43,42 @@ type TerminalSessionHeaderProps = {
  */
 export function TerminalSessionHeader({
   activeSessionId,
+  dropInsertion = null,
+  groupId = "terminal-group",
   onActivate,
   onClose,
   onCreate,
+  onMoveByKeyboard,
+  presentedSessionIds = [],
   runtimeRegistry,
   sessions,
+  tabMove = INERT_TAB_MOVE,
   workspacePath,
 }: TerminalSessionHeaderProps) {
   const { t } = useLocalization();
   const sessionIds = useMemo(() => sessions.map(({ id }) => id), [sessions]);
+  const insertionPreview = useMemo(() => {
+    if (!dropInsertion) return null;
+    return dropInsertion.kind === "merge-group"
+      ? projectTerminalGroupInsertionPreview(
+          sessionIds,
+          dropInsertion.sourceSessionIds,
+          dropInsertion.targetIndex,
+        )
+      : projectTerminalTabInsertionPreview(
+          sessionIds,
+          activeSessionId,
+          dropInsertion.sourceSessionId,
+          dropInsertion.targetIndex,
+        );
+  }, [activeSessionId, dropInsertion, sessionIds]);
+  const layoutSessionIds = insertionPreview?.layoutSessionIds ?? sessionIds;
+  const layoutActiveSessionId = insertionPreview?.layoutActiveSessionId
+    ?? activeSessionId;
+  const presentedSessionIdSet = useMemo(
+    () => new Set(presentedSessionIds),
+    [presentedSessionIds],
+  );
   const items = useMemo<TerminalSessionHeaderItem[]>(() => sessions.map((session) => ({
     presentation: presentTerminalSessionHeader(session, workspacePath, t),
     runtime: session.status === "selecting"
@@ -55,8 +95,9 @@ export function TerminalSessionHeader({
     [sessionIds],
   );
   const { capacityRef, layout } = useTerminalSessionHeaderLayout(
-    sessionIds,
-    activeSessionId,
+    layoutSessionIds,
+    layoutActiveSessionId,
+    1,
   );
   const controller = useTerminalSessionHeaderController({
     activeSessionId,
@@ -74,6 +115,11 @@ export function TerminalSessionHeader({
   const hiddenItems = layout.hiddenSessionIds
     .map((sessionId) => itemById.get(sessionId))
     .filter((item): item is TerminalSessionHeaderItem => Boolean(item));
+  const insertionSlots = insertionPreview
+    ? layout.tabBounds.filter(({ sessionId }) => (
+        insertionPreview.placeholderSessionIds.includes(sessionId)
+      ))
+    : [];
 
   return (
     <header
@@ -90,16 +136,35 @@ export function TerminalSessionHeader({
         <div
           className="desktop-terminal-tab-rail"
           data-layout={layout.mode}
-          data-activation-motion={controller.activationMotionActive ? "true" : undefined}
+          data-activation-motion={controller.activationMotionActive && !tabMove.dragging ? "true" : undefined}
+          data-tab-dragging={tabMove.dragging ? "true" : undefined}
+          data-tab-insertion={dropInsertion ? "true" : undefined}
+          data-tab-insertion-allowed={dropInsertion?.allowed ? "true" : undefined}
+          data-terminal-tab-bar-group-id={groupId}
+          data-terminal-tab-source-index={dropInsertion
+            && dropInsertion.kind === "insert"
+            ? sessionIndexById.get(dropInsertion.sourceSessionId)
+            : undefined}
         >
           <div
             className="desktop-terminal-tabs"
-            role="tablist"
+            role="listbox"
             aria-label={t("terminal.title")}
             style={{
               "--desktop-terminal-tabs-resolved-width": `${layout.tabsWidth}px`,
             } as CSSProperties}
           >
+            {insertionSlots.map((insertionSlot) => (
+              <div
+                key={insertionSlot.sessionId}
+                className="desktop-terminal-tab-drop-slot"
+                aria-hidden="true"
+                style={{
+                  "--desktop-terminal-tab-inline-start": `${insertionSlot.inlineStart}px`,
+                  "--desktop-terminal-tab-resolved-width": `${insertionSlot.width}px`,
+                } as CSSProperties}
+              />
+            ))}
             {visibleItems.map(({ bounds, item }) => {
               const { session } = item;
               const active = session.id === activeSessionId;
@@ -115,8 +180,11 @@ export function TerminalSessionHeader({
                   onActivate={controller.activate}
                   onClose={onClose}
                   onKeyDown={controller.handleKeyDown}
+                  onMoveByKeyboard={onMoveByKeyboard}
                   panelId={terminalPanelId}
                   tabId={terminalTabId}
+                  tabMove={tabMove}
+                  visibleInGroup={presentedSessionIdSet.has(session.id)}
                 />
               );
             })}
@@ -128,8 +196,6 @@ export function TerminalSessionHeader({
               onClose={onClose}
             />
           )}
-        </div>
-        <div className="desktop-terminal-subheader-new">
           <DesktopMenuIconButton
             className="desktop-terminal-new-button"
             label={t("terminal.new")}
@@ -141,3 +207,13 @@ export function TerminalSessionHeader({
     </header>
   );
 }
+
+const INERT_TAB_MOVE: TerminalTabMoveDragController = Object.freeze({
+  dragging: false,
+  dropIntent: null,
+  start: () => undefined,
+  move: () => undefined,
+  end: () => "press",
+  cancel: () => undefined,
+  lostCapture: () => undefined,
+});

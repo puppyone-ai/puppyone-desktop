@@ -66,7 +66,7 @@ export function createEphemeralAgentSessionCache({
   async function save(record) {
     await legacyCleanup;
     const safeRecord = normalizeRecord(record);
-    records = [safeRecord, ...records.filter((entry) => entry.workspaceRoot !== safeRecord.workspaceRoot)]
+    records = [safeRecord, ...records.filter((entry) => entry.sessionId !== safeRecord.sessionId)]
       .sort(byUpdatedDescending)
       .slice(0, MAX_SESSIONS);
   }

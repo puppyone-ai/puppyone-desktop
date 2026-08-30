@@ -2,8 +2,9 @@ import { EventEmitter } from "node:events";
 import { spawn as nodeSpawn } from "node:child_process";
 import path from "node:path";
 import { redactSecretText } from "../agent-events.mjs";
+import { createManagedAgentProcess, terminateManagedAgentProcess } from "./managed-agent-process.mjs";
 
-const DEFAULT_MAX_LINE_BYTES = 1024 * 1024;
+export const JSONL_RPC_MAX_LINE_BYTES = 1024 * 1024;
 const DEFAULT_MAX_STDERR_BYTES = 64 * 1024;
 const DEFAULT_MAX_PENDING = 128;
 const DEFAULT_FORCE_KILL_TIMEOUT_MS = 2_000;
@@ -34,7 +35,7 @@ export class JsonlRpcConnection extends EventEmitter {
     cwd,
     env,
     spawn = nodeSpawn,
-    maxLineBytes = DEFAULT_MAX_LINE_BYTES,
+    maxLineBytes = JSONL_RPC_MAX_LINE_BYTES,
     maxStderrBytes = DEFAULT_MAX_STDERR_BYTES,
     maxPending = DEFAULT_MAX_PENDING,
     forceKillTimeoutMs = DEFAULT_FORCE_KILL_TIMEOUT_MS,
@@ -70,13 +71,18 @@ export class JsonlRpcConnection extends EventEmitter {
     this.exitExpected = false;
     this.closeReason = null;
     this.forceKillTimer = null;
-    this.child = spawn(executablePath, args, {
-      cwd,
-      env,
-      shell: false,
-      stdio: ["pipe", "pipe", "pipe"],
-      windowsHide: true,
+    this.processHandle = createManagedAgentProcess({
+      spawn,
+      executablePath,
+      args,
+      options: {
+        cwd,
+        env,
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
+      },
     });
+    this.child = this.processHandle.child;
     this.child.stdout?.setEncoding?.("utf8");
     this.child.stderr?.setEncoding?.("utf8");
     this.child.stdout?.on("data", (chunk) => this.#receiveStdout(chunk));
@@ -143,7 +149,7 @@ export class JsonlRpcConnection extends EventEmitter {
       // Provider stdin may already be closed.
     }
     try {
-      this.child.kill();
+      terminateManagedAgentProcess(this.processHandle, "SIGTERM");
     } catch {
       // Provider may already have exited.
     }
@@ -152,7 +158,7 @@ export class JsonlRpcConnection extends EventEmitter {
         this.forceKillTimer = null;
         if (this.exitInfo) return;
         try {
-          this.child.kill("SIGKILL");
+          terminateManagedAgentProcess(this.processHandle, "SIGKILL");
         } catch {
           // The process may have exited between the check and forced kill.
         }

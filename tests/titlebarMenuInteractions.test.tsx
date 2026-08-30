@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DesktopTitlebarContext } from "../src/features/app-shell/DesktopTitlebarContext";
 import { DesktopWorkspaceSwitcher } from "../src/features/app-shell/DesktopWorkspaceSwitcher";
+import { createWorkspaceFolder } from "../packages/shared-ui/src/core/workbenchWorkspace";
 import type { GitBranchSummary } from "../src/types/electron";
 import { withTestLocalization } from "./testLocalization";
 
@@ -29,15 +30,11 @@ describe("titlebar Portal menu interactions", () => {
     const anchorRef = createRef<HTMLDivElement>();
     const onGoHome = vi.fn();
     const onClose = vi.fn();
-    const onOpenItem = vi.fn();
+    const onAddProject = vi.fn();
+    const onAddExistingProject = vi.fn();
     const workspace = createWorkspace("one", "Workspace one");
-    const item = {
-      id: "two",
-      label: "Workspace two",
-      detail: "/tmp/two",
-      title: "Workspace two",
-      workspace: createWorkspace("two", "Workspace two"),
-    };
+    const secondWorkspace = createWorkspace("two", "Workspace two");
+    const thirdWorkspace = createWorkspace("three", "Workspace three");
 
     await act(async () => {
       root?.render(withTestLocalization(
@@ -46,10 +43,15 @@ describe("titlebar Portal menu interactions", () => {
           refObject={anchorRef}
           titlebarLabel={workspace.name}
           workspace={workspace}
-          items={[item]}
+          workspaceFolders={[
+            createWorkspaceFolder(workspace),
+            createWorkspaceFolder(secondWorkspace, { index: 1 }),
+          ]}
+          availableProjects={[workspace, secondWorkspace, thirdWorkspace]}
+          multiRootWorkspacesEnabled
+          onAddExistingProject={onAddExistingProject}
+          onOpenFolder={onAddProject}
           onClose={onClose}
-          onOpenFolder={vi.fn()}
-          onOpenItem={onOpenItem}
           onGoHome={onGoHome}
           onToggle={vi.fn()}
         />,
@@ -61,11 +63,34 @@ describe("titlebar Portal menu interactions", () => {
     expect(container.contains(menu)).toBe(false);
     expect(menu.dataset.windowNoDrag).toBe("true");
     expect(menu.style.width).toBe("300px");
+    expect(menu.querySelector("[data-workspace-menu-layout='workspace-composition-v1']"))
+      .not.toBeNull();
+    expect(menu.textContent).toContain("Home");
+    expect(menu.textContent).toContain("Add Project…");
+    expect(menu.textContent).not.toContain("Open Folder in New Window…");
+    expect(menu.textContent).toContain("Workspace one");
+    expect(menu.textContent).toContain("Workspace two");
+    expect(menu.textContent).not.toContain("Current workspace");
+    expect(menu.textContent).not.toContain("Recent projects");
+    expect(menu.querySelector(".desktop-project-home-group")).not.toBeNull();
+    expect(menu.querySelector(".desktop-project-current-indicator")).toBeNull();
+    expect(menu.querySelector(".desktop-project-option.selected")).toBeNull();
+    expect(menu.querySelector("[aria-current='true']")).toBeNull();
+    expect(menu.querySelector(".desktop-project-copy-path")).toBeNull();
+    expect(menu.querySelector(".desktop-project-option")?.getAttribute("aria-disabled"))
+      .toBe("true");
     act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-home")?.click());
-    act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-option")?.click());
+    act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-add-folder")?.click());
+    expect(menu.textContent).toContain("Projects");
+    expect(menu.textContent).toContain("Workspace three");
+    expect(menu.textContent).toContain("Open Folder…");
+    act(() => Array.from(menu.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("Workspace three"))?.click());
+    act(() => menu.querySelector<HTMLButtonElement>(".desktop-project-add-folder")?.click());
 
     expect(onGoHome).toHaveBeenCalledOnce();
-    expect(onOpenItem).toHaveBeenCalledWith(item);
+    expect(onAddProject).toHaveBeenCalledOnce();
+    expect(onAddExistingProject).toHaveBeenCalledWith(thirdWorkspace.path);
   });
 
   it("dismisses a titlebar menu when the user points outside it", async () => {
@@ -83,10 +108,9 @@ describe("titlebar Portal menu interactions", () => {
           refObject={createRef<HTMLDivElement>()}
           titlebarLabel="Workspace one"
           workspace={createWorkspace("one", "Workspace one")}
-          items={[]}
+          workspaceFolders={[]}
+          multiRootWorkspacesEnabled
           onClose={onClose}
-          onOpenFolder={vi.fn()}
-          onOpenItem={vi.fn()}
           onGoHome={vi.fn()}
           onToggle={vi.fn()}
         />,
@@ -94,6 +118,8 @@ describe("titlebar Portal menu interactions", () => {
       await Promise.resolve();
     });
 
+    expect(requireMenu().querySelector<HTMLButtonElement>(".desktop-project-add-folder")?.disabled)
+      .toBe(true);
     act(() => {
       requireMenu().dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     });
@@ -104,6 +130,36 @@ describe("titlebar Portal menu interactions", () => {
     });
 
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("hides Project composition actions while the experiment is off", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(withTestLocalization(
+        <DesktopWorkspaceSwitcher
+          open
+          refObject={createRef<HTMLDivElement>()}
+          titlebarLabel="Workspace one"
+          workspace={createWorkspace("one", "Workspace one")}
+          workspaceFolders={[]}
+          multiRootWorkspacesEnabled={false}
+          onAddExistingProject={vi.fn()}
+          onOpenFolder={vi.fn()}
+          onClose={vi.fn()}
+          onGoHome={vi.fn()}
+          onToggle={vi.fn()}
+        />,
+      ));
+      await Promise.resolve();
+    });
+
+    const menu = requireMenu();
+    expect(menu.textContent).not.toContain("Add Project…");
+    expect(menu.textContent).not.toContain("Open Folder…");
+    expect(menu.querySelector(".desktop-project-add-folder")).toBeNull();
   });
 
   it("executes branch checkout from the Portal menu and closes after success", async () => {
@@ -125,15 +181,15 @@ describe("titlebar Portal menu interactions", () => {
           localBranches={[branch]}
           remoteBranches={[]}
           workspace={createWorkspace("one", "Workspace one")}
-          workspaceSwitcherItems={[]}
+          workspaceFolders={[]}
+          multiRootWorkspacesEnabled={false}
           workspaceSwitcherOpen={false}
           workspaceSwitcherRef={createRef<HTMLDivElement>()}
           onCheckoutBranch={onCheckoutBranch}
           onCloseBranchSwitcher={onCloseBranchSwitcher}
           onCloseWorkspaceSwitcher={vi.fn()}
           onGoHome={vi.fn()}
-          onOpenFolder={vi.fn()}
-          onOpenWorkspaceSwitcherItem={vi.fn()}
+          onAddProject={vi.fn()}
           onToggleBranchSwitcher={vi.fn()}
           onToggleWorkspaceSwitcher={vi.fn()}
         />,

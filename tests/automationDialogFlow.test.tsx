@@ -92,7 +92,9 @@ function renderDialog({ template }: { template: AutomationTemplate | null }) {
       onClose={vi.fn()}
     />,
   )));
-  return container;
+  const overlayRoot = document.querySelector<HTMLElement>("#desktop-overlay-root");
+  if (!overlayRoot) throw new Error("Expected the Automation dialog in the global overlay root");
+  return overlayRoot;
 }
 
 function provider(providerId: string, displayName: string): DesktopCloudAutomationProviderSpec {

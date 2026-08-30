@@ -32,6 +32,8 @@
   "launcher.shell.description": "Iniciar um terminal comum",
   "sessionTitle": "Terminal {number}",
   "closeSession": "Fechar {title}",
+  "split.resize": "Redimensionar painéis do terminal",
+  "split.dragHandle": "Arraste {title} para mover",
   "closeDialog.title": "Fechar {title}?",
   "closeDialog.detail": "Isso interromperá o shell e qualquer comando em execução neste terminal.",
   "closeDialog.confirm": "Fechar terminal",

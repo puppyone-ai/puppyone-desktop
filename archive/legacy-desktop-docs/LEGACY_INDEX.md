@@ -1,0 +1,86 @@
+# Documentation
+
+This directory contains project documentation for PuppyOne Desktop.
+
+## Architecture
+
+Architecture docs record durable product and frontend decisions. Start with
+[FEATURE.md](FEATURE.md) for the short index, or open a focused document
+directly:
+
+- [Cloud Workspace State Boundaries](architecture/cloud-workspace-state.md)
+- [Cloud Entry Authentication and Project Context UX](architecture/cloud-entry-ux.md)
+  - Act-by-act Cloud entry behavior, auth-before-initialization priority,
+    decision diagram, presentation table, copy guardrails, and regression
+    matrix.
+- [Cloud Project Publish Coordinator](architecture/cloud-publish-coordinator.md)
+  - Durable `Initialize and Push`, explicit Organization ownership,
+    idempotency, main-only credentials, crash recovery, and the frozen Version
+    Engine boundary.
+- [Local and Cloud UX](architecture/local-and-cloud-ux.md)
+  - One Projects entry, one Project shell, and the Local Only, Local + Cloud,
+    and Cloud Only capability states.
+  - Defines canonical-remote Project-context resolution, the strict
+    boundary between contextual Cloud navigation and the global Project
+    catalog, recovery states, and the unchanged Version Engine boundary.
+- [Automation and Plugin Domain Boundary](architecture/automation-plugin-domain-boundary.md)
+- [Cloud Automation UX and Architecture](architecture/cloud-automation-ux.md)
+  - Automation product definition, UX contract for creation and management,
+    and the desktop/server architecture behind it.
+- [Git and Source Control Architecture](architecture/git/README.md)
+  - Local Source Control sidebar, repository status freshness, external Git
+    invalidation, and Cloud branch graph topology.
+- [Editor and Viewer Architecture](architecture/editor/README.md)
+  - File format routing, preview lifecycle, viewer boundaries, and
+    format-specific editors including Markdown.
+- [Desktop Sidebar Architecture](architecture/desktop-sidebar-architecture.md)
+  - Architecture home for left workspace sidebars, right auxiliary panels,
+    feature-owned compositions, the Workspace Surface Registry, shared
+    primitives, CSS ownership, performance, and the target directory layout.
+  - [Desktop Sidebar View Stack](architecture/desktop-sidebar-view-stack.md)
+    defines keep-alive lifecycle when left workspace surfaces change.
+  - [Desktop Sidebar Scroll Lists](architecture/desktop-sidebar-scroll-lists.md)
+    defines scroll area, list, row, and scrollbar geometry.
+- [Explorer Tree Lifecycle](architecture/explorer-tree-lifecycle.md)
+- [Desktop Renderer Performance](architecture/desktop-renderer-performance.md)
+- [Desktop Multi-Window Workspaces](architecture/desktop-multi-window-workspaces.md)
+- [Desktop Multi-Root Workspace Kernel](architecture/desktop-multi-root-workspace-kernel.md)
+  - Implemented invisible zero/one/many-folder foundation: Resource URI
+    identity, immutable Workspace Context, Folder capability authorization,
+    Root-aware Editor IDs, and scoped Agent/terminal cleanup.
+- [Desktop Session, Workspace Identity, and Cache Lifecycle](architecture/desktop-session-workspace-cache-lifecycle.md)
+- [Desktop Auto Update Lifecycle](architecture/desktop-auto-update-lifecycle.md)
+- [Desktop Menu Surface](architecture/desktop-menu-surface.md)
+- [Desktop Minimal Mode](architecture/desktop-minimal-mode.md)
+- [Desktop Appearance Settings](architecture/desktop-appearance-settings.md)
+- [Desktop Internationalization and Localization](architecture/desktop-localization.md)
+  - Eight-language product scope, locale ownership across Renderer/Shared UI/
+    Electron/Cloud/Agent/Plugins, message and error contracts, RTL, packaging,
+    testing, and staged migration.
+- [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
+  - Current multi-Session ownership, launcher, stable xterm Runtime, PTY,
+    rendering, focus, security, and performance contracts.
+  - [Terminal architecture home](architecture/desktop-terminal/README.md)
+  - [Native Session Groups and Split Layout](architecture/desktop-terminal/session-groups-and-split-layout.md)
+    defines implemented left/right/top/bottom Session-tab movement without Runtime
+    or PTY restart. tmux is explicitly not the layout authority.
+- [Desktop App Preview Runtime](architecture/desktop-app-preview-runtime.md)
+  - Workspace-owned local app processes, reusable native browser surfaces,
+    short-lived attachment leases, trust/security boundaries, and the
+    future browser-tab extension point.
+- [Desktop Agent Architecture](architecture/desktop-agent/README.md)
+  - [Multi-Native Agent Backend Decision](architecture/desktop-agent/ADR-005-multi-native-agent-backends.md)
+  - [Native Harness Adapter and ACP Decision](architecture/desktop-agent/ADR-006-native-harness-adapters-and-acp.md)
+  - One shared PuppyOne UI and control plane over PuppyOne Agent, Codex,
+    Claude Code, user OpenCode and capability-gated future native Agents.
+    PuppyOne caches the last Agent selection and sanitized local detection,
+    while conversation history remains entirely provider-owned.
+
+## Release
+
+- [Release](RELEASE.md) documents release setup, GitHub Actions secrets,
+  internal ad-hoc macOS builds, and production signing.
+- [Puppy Brand Assets](PUPPY_BRAND_ASSETS.md) documents the four Puppy image
+  sources of truth, Renderer boundary, packaging rules, and Dock verification.
+- [Renderer Image Assets](RENDERER_ASSETS.md) defines the external integration,
+  Agent, UI, media, naming, and typed-catalog boundaries.

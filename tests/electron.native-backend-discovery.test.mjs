@@ -33,16 +33,16 @@ describe("native Agent backend discovery", () => {
     expect(environment.OPENCODE_PURE).toBeUndefined();
   });
 
-  it("keeps detected Cursor visible but non-selectable until a stable protocol exists", async () => {
+  it("makes an authenticated Cursor Agent selectable through its ACP entrypoint", async () => {
     const readiness = await discoverCursorBackend({
       resolveCandidate: vi.fn(async () => ({ executablePath: "/usr/local/bin/cursor-agent", source: "user-installation" })),
       probe: vi.fn(async () => ({ installation: "detected", version: "2026.07.09", authentication: "signed-in", source: "user-installation" })),
     });
 
-    expect(readiness).toMatchObject({ runtimeId: "cursor", status: "protocol-unavailable" });
+    expect(readiness).toMatchObject({ runtimeId: "cursor", status: "ready", compatibility: "acp-v1" });
     expect(publicRuntimeReadiness({ descriptor: { id: "cursor" }, readiness })).toMatchObject({
-      status: "protocol-unavailable",
-      selectable: false,
+      status: "ready",
+      selectable: true,
     });
   });
 

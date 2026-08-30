@@ -1,27 +1,28 @@
 import os from "node:os";
 import { redactSecretText } from "../agent-events.mjs";
-import {
-  readinessWithAccountState,
-  unavailableReadiness,
-} from "./agent-input-policy.mjs";
+import { readinessWithAccountState } from "./agent-input-policy.mjs";
 import { publicRuntimeReadiness } from "../runtime/agent-runtime-registry.mjs";
 import { sanitizeAgentRuntimeDescriptor } from "../../../../shared/agent-contract/runtime-schema.mjs";
 import {
   assertAgentRuntimeInspection,
   normalizeCapabilitySnapshot,
 } from "../runtime/agent-runtime-port.mjs";
+import { createAgentProcessSupervisor } from "./processes/agent-process-supervisor.mjs";
 
 const INSPECTION_CACHE_MS = 5 * 60_000;
 // Discovery/account/model inspection must never depend on process.cwd().
 const NEUTRAL_INSPECTION_ROOT = os.tmpdir();
 
-export function createAgentRuntimeCatalog({ runtimeRegistry }) {
+export function createAgentRuntimeCatalog({
+  runtimeRegistry,
+  processSupervisor = createAgentProcessSupervisor(),
+}) {
   const inspectionCache = new Map();
 
   async function discover(request = {}, workspaceRoot = null) {
     const catalog = await runtimeRegistry.discover({ refresh: Boolean(request.refresh) });
     if (request.refresh) inspectionCache.clear();
-    const selected = selectRequestedRuntime(runtimeRegistry, catalog, request.runtimeId);
+    const selected = selectRequestedRuntime(catalog, request.runtimeId);
     const runtimes = catalog.map((entry) => ({
       descriptor: sanitizeAgentRuntimeDescriptor(entry.descriptor),
       readiness: publicRuntimeReadiness(entry),
@@ -30,7 +31,7 @@ export function createAgentRuntimeCatalog({ runtimeRegistry }) {
       return {
         runtimes,
         selectedRuntimeId: null,
-        readiness: unavailableReadiness("No Agent runtime is registered."),
+        readiness: null,
         account: null,
         providers: [],
         models: [],
@@ -109,7 +110,11 @@ export function createAgentRuntimeCatalog({ runtimeRegistry }) {
       onExit: () => {},
     });
     try {
-      const inspection = assertAgentRuntimeInspection(adapter, await adapter.inspect(), runtimeId);
+      const inspected = await processSupervisor.runStart(
+        { label: `${runtimeId}:catalog-inspect` },
+        () => adapter.inspect(),
+      );
+      const inspection = assertAgentRuntimeInspection(adapter, inspected, runtimeId);
       const value = {
         account: inspection.account ?? null,
         providers: Array.isArray(inspection.providers) ? inspection.providers : [],
@@ -139,12 +144,10 @@ export const agentRuntimeCatalogPolicy = Object.freeze({
   inspectionCacheTtlMs: INSPECTION_CACHE_MS,
 });
 
-function selectRequestedRuntime(runtimeRegistry, catalog, value) {
-  if (value !== undefined && value !== null && !/^[a-z][a-z0-9-]{1,39}$/.test(value)) {
+function selectRequestedRuntime(catalog, value) {
+  if (value === undefined || value === null) return null;
+  if (!/^[a-z][a-z0-9-]{1,39}$/.test(value)) {
     throw new Error("Agent runtime selection is invalid.");
   }
-  const selected = runtimeRegistry.select(catalog, value || null);
-  return value && selected?.descriptor?.id !== value
-    ? runtimeRegistry.select(catalog, null)
-    : selected;
+  return catalog.find((entry) => entry.descriptor.id === value) ?? null;
 }

@@ -33,9 +33,10 @@ export async function discoverCursorBackend({
     version: result.version ?? null,
     minimumVersion: null,
     executablePath: candidate?.executablePath ?? null,
+    argsPrefix: candidate?.argsPrefix ?? [],
     environment: {},
     source: result.source ?? (candidate ? "user-installed" : "missing"),
-    compatibility: "protocol-unavailable",
+    compatibility: "acp-v1",
   };
   if (result.installation === "not-found") {
     return { ...base, status: "not-installed", message: "Cursor Agent was not found." };
@@ -43,9 +44,18 @@ export async function discoverCursorBackend({
   if (result.installation !== "detected") {
     return { ...base, status: "error", message: "Cursor Agent was detected but could not be inspected safely." };
   }
+  if (result.authentication !== "signed-in") {
+    return {
+      ...base,
+      status: "installed-not-authenticated",
+      selectable: false,
+      message: "Cursor Agent is installed; sign in with Cursor before starting its ACP Agent.",
+    };
+  }
   return {
     ...base,
-    status: "protocol-unavailable",
-    message: "Cursor Agent is installed, but PuppyOne will enable it only after Cursor exposes a stable supported Agent protocol.",
+    status: "ready",
+    selectable: true,
+    message: `Cursor Agent ${result.version ?? ""} is ready through ACP.`.trim(),
   };
 }

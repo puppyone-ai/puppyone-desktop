@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { authorizeAgentReferences, createAgentReferenceBudget, workspaceDraftReferences } from "../agent/agent-reference-authorization.mjs";
+import { requireSupportedAgentReferences } from "../agent/application/agent-input-policy.mjs";
 import { assertAgentIpcResponse, parseAgentIpcRequest } from "../../../shared/agent-contract/schema.mjs";
 
 export function registerAgentIpcHandlers({
@@ -91,12 +92,14 @@ export function registerAgentIpcHandlers({
   });
   register("agent:turn-steer", async (event, request) => {
     const workspaceRoot = await authorizeRequiredRoot(event, request);
+    const referenceCapabilities = agentService.getReferenceInputCapabilities(event.sender, request.sessionId, workspaceRoot);
     const { authorized, stagedTokens } = await authorizeTurnReferences({
       attachmentStore,
       ownerId: event.sender.id,
       workspaceRoot,
       epoch: request.referenceEpoch,
       references: request.references,
+      referenceCapabilities,
     });
     return withStagedReferenceLease({
       attachmentStore,
@@ -126,6 +129,7 @@ export function registerAgentIpcHandlers({
 
   register("agent:turn-start", async (event, request) => {
     const workspaceRoot = await authorizeRequiredRoot(event, request);
+    const referenceCapabilities = agentService.getReferenceInputCapabilities(event.sender, request.sessionId, workspaceRoot);
     const legacyReferences = [
       ...(Array.isArray(request.contextReferences) ? request.contextReferences : []),
       ...(Array.isArray(request.attachments) ? request.attachments : []),
@@ -136,6 +140,7 @@ export function registerAgentIpcHandlers({
       workspaceRoot,
       epoch: request.referenceEpoch,
       references: Array.isArray(request.references) ? request.references : legacyReferences,
+      referenceCapabilities,
     });
     return withStagedReferenceLease({
       attachmentStore,
@@ -166,8 +171,16 @@ async function withStagedReferenceLease({ attachmentStore, ownerId, workspaceRoo
   }
 }
 
-async function authorizeTurnReferences({ attachmentStore, ownerId, workspaceRoot, epoch, references }) {
+async function authorizeTurnReferences({
+  attachmentStore,
+  ownerId,
+  workspaceRoot,
+  epoch,
+  references,
+  referenceCapabilities,
+}) {
   const values = Array.isArray(references) ? references : [];
+  requireSupportedAgentReferences({ referenceInputs: referenceCapabilities }, values);
   const budget = createAgentReferenceBudget();
   const workspace = await authorizeAgentReferences({
     workspaceRoot,

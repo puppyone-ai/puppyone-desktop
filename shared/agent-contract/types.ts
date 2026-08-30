@@ -22,9 +22,33 @@ export type AgentRuntimeDescriptor = {
   source?: string | null;
   compatibility?: string | null;
   distribution?: "bundled" | "sdk-bundled" | "user-installed" | string;
+  execution?: {
+    kind: string;
+    distribution: string;
+    controller: string;
+  };
+  protocol?: {
+    kind: string;
+    transport: string;
+  };
+  integration?: {
+    kind: string;
+    adapter: string;
+  };
+  trust?: {
+    level: string;
+    publisher: string;
+  };
+  ownership?: {
+    harness: string;
+    credentials: string[];
+    models: string;
+    billing: string[];
+    session: string;
+  };
 };
 
-export type AgentProviderReadiness = {
+export type AgentRuntimeReadiness = {
   runtimeId?: AgentRuntimeId;
   provider: AgentProviderId;
   status: AgentReadinessStatus;
@@ -37,12 +61,14 @@ export type AgentProviderReadiness = {
   selectable?: boolean;
 };
 
-/** Preferred product vocabulary; the provider-named type remains for compatibility. */
-export type AgentBackendReadiness = AgentProviderReadiness;
+/** @deprecated Use AgentRuntimeReadiness. */
+export type AgentProviderReadiness = AgentRuntimeReadiness;
+/** @deprecated Use AgentRuntimeReadiness. */
+export type AgentBackendReadiness = AgentRuntimeReadiness;
 
 export type AgentRuntimeCatalogEntry = {
   descriptor: AgentRuntimeDescriptor;
-  readiness: AgentProviderReadiness;
+  readiness: AgentRuntimeReadiness;
 };
 
 export type AgentReferenceTransport = "none" | "data-url" | "local-snapshot" | "resource";
@@ -84,6 +110,22 @@ export type AgentCapabilities = {
   mcp: boolean;
   skills: boolean;
   compaction: boolean;
+  /** Changes whenever the runtime's effective negotiated capability surface changes. */
+  revision?: string;
+  /** Versioned native protocol and explicitly negotiated extension metadata. */
+  protocol?: {
+    name: string;
+    version: string | number;
+    agentVersion?: string | null;
+    extensions?: Record<string, number>;
+  };
+  /** Operation timing rules that cannot be represented by compatibility booleans. */
+  constraints?: {
+    modelSwitch?: "turn-boundary" | "session-boundary" | "unsupported";
+    modeSwitch?: "turn-boundary" | "session-boundary" | "unsupported";
+    forkRequiresIdle?: boolean;
+    compactionRequiresIdle?: boolean;
+  };
   /** Fine-grained native input support. Legacy booleans remain a migration projection. */
   referenceInputs?: AgentReferenceInputCapabilities;
 };
@@ -153,6 +195,22 @@ export type AgentSessionMetadata = {
 export type AgentSessionListItem = Omit<AgentSessionMetadata, "activeTurnId"> & {
   archivedAt?: string | null;
   partial?: boolean;
+  /** Who first recorded the locator; never implies transcript ownership. */
+  origin?: "puppyone" | "native-discovery";
+};
+
+export type AgentSessionDiscoveryStatus = "not-requested" | "unsupported" | "partial" | "complete" | "failed";
+
+export type AgentSessionsListResponse = {
+  sessions: AgentSessionListItem[];
+  discovery: {
+    runtimeId: AgentRuntimeId | null;
+    status: AgentSessionDiscoveryStatus;
+    nextCursor: string | null;
+    indexed: number;
+    warnings: string[];
+  };
+  warnings: string[];
 };
 
 export type AgentTurnTerminalState = "completed" | "failed" | "interrupted";
@@ -255,11 +313,12 @@ export type AgentEvent<TType extends AgentEventType = AgentEventType> = TType ex
   ? AgentEventEnvelope<TType>
   : never;
 
-export type AgentProviderInspection = {
+export type AgentRuntimeInspection = {
   runtimes?: AgentRuntimeCatalogEntry[];
   selectedRuntimeId?: AgentRuntimeId | null;
   runtime?: AgentRuntimeDescriptor;
-  readiness: AgentProviderReadiness;
+  /** Readiness for selectedRuntimeId; null while the UI is showing inventory before selection. */
+  readiness: AgentRuntimeReadiness | null;
   account: AgentAccountState | null;
   providers?: AgentInferenceProvider[];
   models: AgentModel[];
@@ -268,6 +327,9 @@ export type AgentProviderInspection = {
   capabilities: AgentCapabilities | null;
   warnings: string[];
 };
+
+/** @deprecated Use AgentRuntimeInspection. */
+export type AgentProviderInspection = AgentRuntimeInspection;
 
 export type AgentLocalInstallationState = "not-found" | "detected" | "unsupported" | "broken";
 export type AgentLocalAuthenticationState = "unknown" | "signed-out" | "signed-in" | "expired" | "error";
@@ -354,6 +416,10 @@ export type AgentSessionsListRequest = {
   rootPath: string;
   runtimeId?: AgentRuntimeId | null;
   includeArchived?: boolean;
+  /** Explicit user-requested native metadata discovery; false never starts a harness. */
+  discoverNative?: boolean;
+  cursor?: string | null;
+  limit?: number;
 };
 
 export type AgentSessionCloseRequest = {

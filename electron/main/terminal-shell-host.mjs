@@ -1,4 +1,5 @@
 import path from "node:path";
+import { resolveDefaultDesktopShell } from "./platform/shell-policy.mjs";
 
 const AGENT_DISPLAY_READY_SEQUENCES = Object.freeze([
   "\u001b[?1049h",
@@ -17,9 +18,7 @@ export function createTerminalShellHost({
   platform = process.platform,
 } = {}) {
   const pathModule = platform === "win32" ? path.win32 : path.posix;
-  const file = platform === "win32"
-    ? environment.ComSpec || environment.COMSPEC || "cmd.exe"
-    : environment.SHELL || "/bin/zsh";
+  const file = resolveDefaultDesktopShell({ platform, environment });
   const shellName = pathModule.basename(file);
   const args = platform !== "win32" && (shellName === "bash" || shellName === "zsh")
     ? ["-l"]

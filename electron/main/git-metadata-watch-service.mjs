@@ -2,7 +2,7 @@
 //
 // A separate main-process watcher whose events invalidate ONLY repository
 // state. It must not refresh Explorer or enter edit-review. See
-// docs/architecture/git/status-refresh-lifecycle.md (Work Package 1).
+// https://github.com/puppyone-ai/puppy-issues/blob/main/document/puppyone-desktop/source-control/refresh-lifecycle.md (Work Package 1).
 //
 // Design notes:
 //   - Repository-owned paths are resolved through Git (never renderer-supplied)
@@ -144,6 +144,23 @@ export function createGitMetadataWatchService({
     for (const [subscriptionId, subscription] of Array.from(subscriptions.entries())) {
       if (subscription.senderId === webContentsId) stop(subscriptionId);
     }
+  }
+
+  function stopForWorkspaceRoot(webContentsId, rootPath) {
+    const resolvedRoot = typeof rootPath === "string" && rootPath.trim()
+      ? path.resolve(rootPath)
+      : null;
+    if (!Number.isInteger(webContentsId) || !resolvedRoot) return 0;
+    let stopped = 0;
+    for (const [subscriptionId, subscription] of Array.from(subscriptions.entries())) {
+      if (
+        subscription.senderId !== webContentsId
+        || path.resolve(subscription.workspaceRoot) !== resolvedRoot
+      ) continue;
+      stop(subscriptionId);
+      stopped += 1;
+    }
+    return stopped;
   }
 
   function closeAll() {
@@ -626,6 +643,7 @@ export function createGitMetadataWatchService({
     start,
     stop,
     stopForWindow,
+    stopForWorkspaceRoot,
     closeAll,
     invalidateWorkingTree,
     getWatcherCount,

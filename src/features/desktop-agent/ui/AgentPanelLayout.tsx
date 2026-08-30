@@ -58,7 +58,7 @@ export function AgentPanelLayout({
         <div className="desktop-agent-conversation-region">{conversation}</div>
         {dock != null && <div className="desktop-agent-dock-region">{dock}</div>}
       </div>
-      {dropActive && <div className={`desktop-agent-reference-drop-overlay${dropInvalid ? " is-invalid" : ""}`} aria-hidden="true">{dropLabel}</div>}
+      {dropActive && <div className={`desktop-agent-reference-drop-overlay${dropInvalid ? " is-invalid" : ""}`} aria-hidden="true"><span>{dropLabel}</span></div>}
       {announcement && <div className="desktop-agent-announcer" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>}
     </section>
   );

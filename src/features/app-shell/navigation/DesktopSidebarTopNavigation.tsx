@@ -17,6 +17,7 @@ export function DesktopSidebarTopNavigation({
   workspaceChangeCount,
   onNavigate,
   onOpenSettings,
+  utilitySlot,
   shellToolbar = false,
   useToolLabels = false,
 }: DesktopNavigationProps & {
@@ -81,6 +82,11 @@ export function DesktopSidebarTopNavigation({
             showLabel
           />
         </div>
+        {utilitySlot != null && (
+          <div className="desktop-sidebar-top-navigation-utility">
+            {utilitySlot}
+          </div>
+        )}
       </div>
     </div>
   );

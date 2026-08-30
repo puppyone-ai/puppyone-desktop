@@ -62,6 +62,10 @@ export class TerminalRuntimeRegistry {
     return runtime;
   }
 
+  get(sessionId: string) {
+    return this.runtimes.get(sessionId) ?? null;
+  }
+
   require(sessionId: string) {
     const runtime = this.runtimes.get(sessionId);
     if (!runtime) throw new Error(`Terminal runtime ${sessionId} does not exist.`);

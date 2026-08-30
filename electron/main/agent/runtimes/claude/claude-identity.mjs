@@ -1,9 +1,29 @@
-export const CLAUDE_RUNTIME_DESCRIPTOR = Object.freeze({
+import {
+  defineAgentRuntimeManifest,
+  runtimeDescriptorFromManifest,
+} from "../../runtime/agent-runtime-manifest.mjs";
+
+export const CLAUDE_RUNTIME_MANIFEST = defineAgentRuntimeManifest({
   id: "claude",
-  displayName: "Claude Code",
-  description: "The user's Claude Code harness, models, tools, permissions and sessions through the official Agent SDK.",
-  kind: "native-sdk",
+  displayName: "Claude Agent",
+  description: "Anthropic's official Agent SDK runtime using separately configured API or supported cloud credentials.",
   iconKey: "claude",
   priority: 40,
-  distribution: "user-installed",
+  execution: {
+    kind: "sdk-mediated-process",
+    distribution: "user-installed",
+    controller: "bundled-sdk",
+  },
+  protocol: { kind: "agent-sdk", transport: "in-process-sdk" },
+  integration: { kind: "specialized-native", adapter: "specialized" },
+  trust: { level: "first-party", publisher: "Anthropic" },
+  ownership: {
+    harness: "runtime",
+    credentials: ["user-provider"],
+    models: "runtime",
+    billing: ["user-provider"],
+    session: "runtime",
+  },
 });
+
+export const CLAUDE_RUNTIME_DESCRIPTOR = runtimeDescriptorFromManifest(CLAUDE_RUNTIME_MANIFEST);

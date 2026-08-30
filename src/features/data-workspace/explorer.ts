@@ -1,4 +1,10 @@
-import type { DataNode, DataPort } from "@puppyone/shared-ui";
+import {
+  getDataResourceParent,
+  joinDataResourcePath,
+  rebaseDataResourcePath,
+  type DataNode,
+  type DataPort,
+} from "@puppyone/shared-ui";
 import type { FilesVisibilitySettings } from "../../preferences";
 
 export function createExplorerDataPort(dataPort: DataPort, settings: FilesVisibilitySettings): DataPort {
@@ -85,18 +91,13 @@ function clampNumber(value: number, min: number, max: number) {
 }
 
 export function getDataParentPath(path: string): string | null {
-  const segments = path.split("/");
-  segments.pop();
-  return segments.length > 0 ? segments.join("/") : null;
+  return getDataResourceParent(path);
 }
 
 export function joinDataPath(parentPath: string | null, name: string): string {
-  return parentPath ? `${parentPath}/${name}` : name;
+  return joinDataResourcePath(parentPath, name);
 }
 
 export function remapActivePathAfterRename(current: string | null, previousPath: string, nextPath: string): string | null {
-  if (!current) return current;
-  if (current === previousPath) return nextPath;
-  if (current.startsWith(`${previousPath}/`)) return `${nextPath}${current.slice(previousPath.length)}`;
-  return current;
+  return rebaseDataResourcePath(current, previousPath, nextPath);
 }

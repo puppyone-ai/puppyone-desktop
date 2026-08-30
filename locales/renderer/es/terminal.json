@@ -32,6 +32,8 @@
   "launcher.shell.description": "Iniciar un terminal normal",
   "sessionTitle": "Terminal {number}",
   "closeSession": "Cerrar {title}",
+  "split.resize": "Cambiar el tamaño de los paneles de terminal",
+  "split.dragHandle": "Arrastra {title} para moverlo",
   "closeDialog.title": "¿Cerrar {title}?",
   "closeDialog.detail": "Esto detendrá el shell y cualquier comando que se esté ejecutando en este terminal.",
   "closeDialog.confirm": "Cerrar terminal",

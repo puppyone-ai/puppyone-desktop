@@ -7,7 +7,7 @@
  * skins. Feature styles may set overflow and gutter policy, but must not
  * declare ::-webkit-scrollbar rules of their own.
  *
- * See docs/architecture/desktop-sidebar-scroll-lists.md.
+ * See https://github.com/puppyone-ai/puppy-issues/blob/main/document/puppyone-desktop/workspace/sidebar-scroll-lists.md.
  */
 
 :root[data-po-scrollbar-mode="product"]

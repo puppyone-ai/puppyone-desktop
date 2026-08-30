@@ -297,10 +297,10 @@ export function createDesktopTelemetryService({
 export function resolveTelemetryEligibility({ buildInfo, isPackaged }) {
   const identity = assertDesktopBuildInfo(buildInfo);
   if (!isPackaged) {
-    return Object.freeze({ eligible: false, defaultLevel: "off", reason: "unpackaged-build" });
+    return Object.freeze({ eligible: false, defaultLevel: "basic", reason: "unpackaged-build" });
   }
   if (identity.channel !== "stable") {
-    return Object.freeze({ eligible: false, defaultLevel: "off", reason: "non-stable-build" });
+    return Object.freeze({ eligible: false, defaultLevel: "basic", reason: "non-stable-build" });
   }
   return Object.freeze({ eligible: true, defaultLevel: "basic", reason: null });
 }

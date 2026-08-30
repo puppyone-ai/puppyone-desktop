@@ -444,6 +444,15 @@ body.data-sidebar-resizing .data-content:not([data-explorer-collapsed="true"]) {
   color: var(--po-text);
 }
 
+.tree-row.workspace-folder-root {
+  color: var(--po-text);
+  font-weight: 600;
+}
+
+.tree-row.workspace-folder-root .tree-row-content {
+  color: inherit;
+}
+
 .tree-row:hover {
   background: var(--tree-row-hover-bg);
   color: var(--po-text);

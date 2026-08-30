@@ -23,6 +23,195 @@ afterEach(() => {
 });
 
 describe("Desktop Agent panel lifecycle", () => {
+  it("keeps history behind a launcher footer button and resumes an explicitly chosen native conversation", async () => {
+    const harness = createBridgeHarness();
+    const codex = {
+      descriptor: {
+        id: "codex",
+        displayName: "Codex",
+        iconKey: "codex",
+        kind: "specialized-native",
+        ownership: { session: "runtime" },
+      },
+      readiness: { ...readyInspection().readiness, runtimeId: "codex", provider: "codex" },
+    };
+    harness.bridge.discoverAgentProviders = vi.fn()
+      .mockResolvedValueOnce({
+        runtimes: [codex], selectedRuntimeId: null, readiness: null, account: null,
+        providers: [], models: [], modes: [], commands: [], capabilities: null, warnings: [],
+      })
+      .mockResolvedValueOnce({
+        ...readyInspection(), runtimes: [codex], selectedRuntimeId: "codex",
+        runtime: codex.descriptor, readiness: codex.readiness,
+      });
+    harness.bridge.listAgentSessions = vi.fn(async (request: { discoverNative?: boolean }) => ({
+      sessions: [{
+        id: "saved-codex", runtimeId: "codex", runtime: codex.descriptor,
+        provider: "codex", providerSessionId: "thread-saved", workspaceRoot: "/workspace",
+        title: "Fix authentication", createdAt: "2026-08-28T10:00:00.000Z",
+        updatedAt: "2026-08-29T10:00:00.000Z", terminalState: "idle",
+        selectedModel: null, lastSequence: 0, origin: "native-discovery",
+      }],
+      discovery: {
+        runtimeId: request.discoverNative ? "codex" : null,
+        status: request.discoverNative ? "complete" : "not-requested",
+        nextCursor: null, indexed: request.discoverNative ? 1 : 0, warnings: [],
+      },
+      warnings: [],
+    }));
+    harness.bridge.resumeAgentSession = vi.fn(async () => ({
+      ...snapshot([]),
+      session: {
+        ...snapshot([]).session, id: "saved-codex", runtimeId: "codex",
+        runtime: codex.descriptor, provider: "codex", providerSessionId: "thread-saved",
+        title: "Fix authentication",
+      },
+      runtime: codex.descriptor,
+    }));
+
+    const container = renderPanel(harness.bridge);
+    await flushEffects();
+    await flushEffects();
+
+    expect(container.textContent).not.toContain("Recent chats");
+    expect(container.textContent).not.toContain("Fix authentication");
+    expect(harness.bridge.listAgentSessions).not.toHaveBeenCalled();
+
+    const historyButton = container.querySelector<HTMLButtonElement>('button[aria-label="Chat history"]');
+    expect(historyButton).not.toBeNull();
+    expect(historyButton?.textContent).toContain("History");
+    act(() => historyButton?.click());
+    await flushEffects();
+    await flushEffects();
+
+    expect(container.querySelector(".desktop-agent-history-view")).not.toBeNull();
+    expect(container.querySelector(".desktop-agent-runtime-launcher-group")).toBeNull();
+    const historySearch = container.querySelector<HTMLInputElement>('input[aria-label="Search chat history"]');
+    expect(historySearch).not.toBeNull();
+    expect(harness.bridge.listAgentSessions).toHaveBeenCalledWith({
+      rootPath: "/workspace",
+      includeArchived: false,
+      discoverNative: false,
+    });
+    expect(harness.bridge.listAgentSessions).not.toHaveBeenCalledWith(expect.objectContaining({ discoverNative: true }));
+
+    act(() => {
+      if (!historySearch) return;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(historySearch, "missing chat");
+      historySearch.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(container.querySelector('button[aria-label="Open Fix authentication"]')).toBeNull();
+    expect(container.textContent).toContain("No matching chats");
+    act(() => {
+      if (!historySearch) return;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(historySearch, "authentication");
+      historySearch.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Refresh chat history"]')?.click());
+    await flushEffects();
+    await flushEffects();
+    expect(harness.bridge.listAgentSessions).toHaveBeenCalledWith({
+      rootPath: "/workspace",
+      includeArchived: false,
+      runtimeId: "codex",
+      discoverNative: true,
+      limit: 20,
+    });
+    const recent = container.querySelector<HTMLButtonElement>('button[aria-label="Open Fix authentication"]');
+    expect(recent).not.toBeNull();
+
+    act(() => recent?.click());
+    await flushEffects();
+    await flushEffects();
+    expect(harness.bridge.resumeAgentSession).toHaveBeenCalledWith({
+      rootPath: "/workspace",
+      sessionId: "saved-codex",
+      runtimeId: "codex",
+    });
+    expect(container.querySelector(".desktop-agent-runtime-launcher")).toBeNull();
+  });
+
+  it("opens on an installed-Agent launcher before mounting an empty Chat", async () => {
+    const harness = createBridgeHarness();
+    const runtimes = [
+      {
+        descriptor: { id: "codex", displayName: "Codex", kind: "harness" },
+        readiness: { ...readyInspection().readiness, runtimeId: "codex", provider: "codex" },
+      },
+      {
+        descriptor: { id: "claude", displayName: "Claude Agent", kind: "harness" },
+        readiness: { ...readyInspection().readiness, runtimeId: "claude", provider: "claude" },
+      },
+    ];
+    harness.bridge.discoverAgentProviders = vi.fn()
+      .mockResolvedValueOnce({
+        runtimes,
+        selectedRuntimeId: null,
+        readiness: null,
+        account: null,
+        providers: [],
+        models: [],
+        modes: [],
+        commands: [],
+        capabilities: null,
+        warnings: [],
+      })
+      .mockResolvedValueOnce({
+        ...readyInspection(),
+        runtimes,
+        selectedRuntimeId: "claude",
+        runtime: runtimes[1].descriptor,
+        readiness: runtimes[1].readiness,
+      });
+    harness.bridge.resumeAgentSession = vi.fn(async () => null);
+    harness.bridge.createAgentSession = vi.fn(async () => {
+      const created = snapshot([]);
+      return {
+        ...created,
+        runtime: runtimes[1].descriptor,
+        session: {
+          ...created.session,
+          runtimeId: "claude",
+          runtime: runtimes[1].descriptor,
+          provider: "claude",
+        },
+      };
+    });
+
+    const container = renderPanel(harness.bridge, "codex");
+    await flushEffects();
+
+    const launcher = container.querySelector(".desktop-agent-runtime-launcher") as HTMLElement;
+    expect(harness.bridge.discoverAgentProviders).toHaveBeenNthCalledWith(1, {
+      rootPath: "/workspace",
+      runtimeId: null,
+      refresh: false,
+    });
+    expect(launcher).not.toBeNull();
+    expect(launcher.textContent).toContain("Start with an Agent");
+    expect(launcher.textContent).toContain("Codex");
+    expect(launcher.textContent).toContain("Claude Agent");
+    expect(container.querySelector('.desktop-agent-header-region')).toBeNull();
+    expect(container.querySelector('button[aria-label="Coding Agent"]')).toBeNull();
+    expect(container.querySelector("textarea")).toBeNull();
+    expect(harness.bridge.resumeAgentSession).not.toHaveBeenCalled();
+    expect(harness.bridge.createAgentSession).not.toHaveBeenCalled();
+
+    act(() => (launcher.querySelector('button[aria-label="Claude Agent"]') as HTMLButtonElement).click());
+    await flushEffects();
+    await flushEffects();
+    expect(harness.bridge.discoverAgentProviders).toHaveBeenLastCalledWith({
+      rootPath: "/workspace",
+      runtimeId: "claude",
+      refresh: false,
+    });
+    expect(container.querySelector(".desktop-agent-runtime-launcher")).toBeNull();
+    expect(container.querySelector(".desktop-agent-header-region")).toBeNull();
+    expect(container.querySelector('button[aria-label="Coding Agent"]')).toBeNull();
+    expect(stripBidiIsolation(container.querySelector("textarea")?.getAttribute("aria-label"))).toBe("Message Claude Agent");
+  });
+
   it("uses one centered product loader while the chat runtime starts", async () => {
     const harness = createBridgeHarness();
     let finishDiscovery: ((inspection: ReturnType<typeof readyInspection>) => void) | null = null;
@@ -52,7 +241,7 @@ describe("Desktop Agent panel lifecycle", () => {
     expect(container.querySelector("textarea")).not.toBeNull();
   });
 
-  it("keeps the draft editable and offers recovery after the provider exits", async () => {
+  it("keeps the failed tab available while opening recovery work in another tab", async () => {
     const harness = createBridgeHarness();
     const container = renderPanel(harness.bridge);
     await flushEffects();
@@ -63,18 +252,75 @@ describe("Desktop Agent panel lifecycle", () => {
     expect(stripBidiIsolation(container.textContent)).toContain("OpenCode stopped unexpectedly");
     expect((container.querySelector("textarea") as HTMLTextAreaElement).disabled).toBe(false);
     expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
-    expect(container.textContent).toContain("provider exited");
+    expect(container.querySelector(".desktop-agent-tab-status.is-provider-exited")).not.toBeNull();
 
-    const newSessionButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
-      .find((button) => stripBidiIsolation(button.getAttribute("aria-label")) === "New OpenCode session");
-    expect(newSessionButton).toBeDefined();
-    act(() => newSessionButton?.click());
+    const newTabButton = container.querySelector<HTMLButtonElement>('button[aria-label="New chat tab"]');
+    expect(newTabButton).not.toBeNull();
+    act(() => newTabButton?.click());
     await flushEffects();
-    expect(harness.bridge.closeAgentSession).toHaveBeenCalledWith({
-      rootPath: "/workspace",
-      sessionId: "session-1",
-      removePersistence: true,
-    });
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[role="tabpanel"]')).toHaveLength(2);
+    expect(harness.bridge.closeAgentSession).not.toHaveBeenCalled();
+  });
+
+  it("switches the complete Chat section between independently mounted tabs", async () => {
+    const harness = createBridgeHarness();
+    harness.bridge.discoverAgentProviders = vi.fn()
+      .mockResolvedValueOnce(readyInspection())
+      .mockResolvedValueOnce({
+        ...readyInspection(),
+        selectedRuntimeId: null,
+        runtime: null,
+        readiness: null,
+        models: [],
+        capabilities: null,
+      });
+
+    const container = renderPanel(harness.bridge);
+    await flushEffects();
+    const firstTab = container.querySelector<HTMLButtonElement>('[role="tab"]');
+    expect(firstTab?.getAttribute("aria-selected")).toBe("true");
+    expect(activeTabPanel(container).querySelector(".desktop-agent-header-region")).toBeNull();
+    expect(activeTabPanel(container).querySelector("textarea")).not.toBeNull();
+
+    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="New chat tab"]')?.click());
+    await flushEffects();
+    const tabs = container.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0].getAttribute("aria-selected")).toBe("false");
+    expect(tabs[1].getAttribute("aria-selected")).toBe("true");
+    expect(activeTabPanel(container).querySelector(".desktop-agent-runtime-launcher")).not.toBeNull();
+
+    act(() => tabs[0].click());
+    expect(tabs[0].getAttribute("aria-selected")).toBe("true");
+    expect(activeTabPanel(container).querySelector(".desktop-agent-header-region")).toBeNull();
+    expect(activeTabPanel(container).querySelector("textarea")).not.toBeNull();
+
+    act(() => tabs[1].click());
+    const closeSecond = container.querySelector<HTMLButtonElement>('button[aria-label="Close New chat"]');
+    expect(closeSecond).not.toBeNull();
+    await act(async () => { closeSecond?.click(); await Promise.resolve(); });
+    await flushEffects();
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(1);
+    expect(activeTabPanel(container).querySelector(".desktop-agent-header-region")).toBeNull();
+    expect(activeTabPanel(container).querySelector("textarea")).not.toBeNull();
+  });
+
+  it("retains workspace tab topology across Sidebar remounts", async () => {
+    const harness = createBridgeHarness();
+    const container = renderPanel(harness.bridge);
+    await flushEffects();
+    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="New chat tab"]')?.click());
+    await flushEffects();
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(2);
+
+    act(() => root?.unmount());
+    root = createRoot(container);
+    renderPanelContent();
+    await flushEffects();
+
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[role="tabpanel"]')).toHaveLength(2);
   });
 
   it("owns incompatible-engine recovery instead of asking users to update OpenCode", async () => {
@@ -149,16 +395,28 @@ describe("Desktop Agent panel lifecycle", () => {
   });
 });
 
-function renderPanel(bridge: ReturnType<typeof createBridgeHarness>["bridge"]) {
+function renderPanel(
+  bridge: ReturnType<typeof createBridgeHarness>["bridge"],
+  preferredRuntimeId: string | null = null,
+) {
   (window as Window & { puppyoneDesktop?: unknown }).puppyoneDesktop = bridge;
   const container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
+  renderPanelContent(preferredRuntimeId);
+  return container;
+}
+
+function renderPanelContent(preferredRuntimeId: string | null = null) {
   act(() => root?.render(withTestLocalization(React.createElement(RightAgentPanel, {
     workspace: { id: "workspace", name: "Workspace", path: "/workspace" },
     active: true,
+    preferredRuntimeId,
   }))));
-  return container;
+}
+
+function activeTabPanel(container: HTMLElement) {
+  return container.querySelector<HTMLElement>('[role="tabpanel"]:not([hidden])') as HTMLElement;
 }
 
 function createBridgeHarness() {
@@ -181,6 +439,17 @@ function createBridgeHarness() {
     createAgentSession: vi.fn(async () => snapshot([
       event(1, "session.started", { title: "New session" }),
     ])),
+    listAgentSessions: vi.fn(async () => ({
+      sessions: [],
+      discovery: {
+        runtimeId: null,
+        status: "not-requested",
+        nextCursor: null,
+        indexed: 0,
+        warnings: [],
+      },
+      warnings: [],
+    })),
     onAgentEvent: ((listener: (event: AgentEvent) => void) => {
       harness.eventListener = listener;
       return () => { harness.eventListener = null; };

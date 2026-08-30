@@ -137,6 +137,39 @@
   white-space: nowrap;
 }
 
+.desktop-product-analytics-error {
+  margin-inline-start: 8px;
+  color: var(--po-danger);
+  font-size: 11px;
+  font-weight: var(--po-text-weight-regular, 400);
+}
+
+.desktop-product-analyze-label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--po-text-subtle);
+}
+
+.desktop-product-analyze-learn-more {
+  color: var(--po-text-muted);
+  font-size: 11.5px;
+  text-decoration-color: color-mix(in srgb, currentColor 42%, transparent);
+  text-underline-offset: 2px;
+}
+
+.desktop-product-analyze-learn-more:hover {
+  color: var(--po-text);
+  text-decoration-color: currentColor;
+}
+
+.desktop-product-analyze-learn-more:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid color-mix(in srgb, var(--po-accent) 36%, transparent);
+  outline-offset: 2px;
+}
+
 .desktop-local-agent-row {
   min-height: 30px;
 }

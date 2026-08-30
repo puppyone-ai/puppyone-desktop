@@ -45,8 +45,9 @@ const REASON_PRIORITY: Record<DocumentPersistenceReason, number> = {
   "document-close": 4,
   "document-switch": 5,
   "workspace-switch": 6,
-  destroy: 7,
-  "app-close": 8,
+  "git-auto-commit": 7,
+  destroy: 8,
+  "app-close": 9,
 };
 
 /**

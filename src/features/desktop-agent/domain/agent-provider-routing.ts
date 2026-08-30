@@ -1,6 +1,6 @@
-import type { AgentInferenceProvider, AgentModel, AgentProviderInspection } from "./agent-contract";
+import type { AgentInferenceProvider, AgentModel, AgentRuntimeInspection } from "./agent-contract";
 
-export function listAgentInferenceProviders(inspection: AgentProviderInspection | null): AgentInferenceProvider[] {
+export function listAgentInferenceProviders(inspection: AgentRuntimeInspection | null): AgentInferenceProvider[] {
   if (inspection?.providers?.length) return inspection.providers;
   const providers = new Map<string, AgentInferenceProvider>();
   for (const model of inspection?.models ?? []) {
@@ -16,13 +16,13 @@ export function listAgentInferenceProviders(inspection: AgentProviderInspection 
   return Array.from(providers.values());
 }
 
-export function listAgentModelsForProvider(inspection: AgentProviderInspection | null, providerId: string | null) {
+export function listAgentModelsForProvider(inspection: AgentRuntimeInspection | null, providerId: string | null) {
   if (!providerId) return inspection?.models ?? [];
   return (inspection?.models ?? []).filter((model) => agentProviderIdForModel(model) === providerId);
 }
 
 export function chooseAgentProvider(
-  inspection: AgentProviderInspection | null,
+  inspection: AgentRuntimeInspection | null,
   current: string | null,
   model: string | null,
 ) {
@@ -34,7 +34,7 @@ export function chooseAgentProvider(
 }
 
 export function chooseAgentModel(
-  inspection: AgentProviderInspection | null,
+  inspection: AgentRuntimeInspection | null,
   current: string | null,
   providerId: string | null,
 ) {

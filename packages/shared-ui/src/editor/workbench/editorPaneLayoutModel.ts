@@ -1,29 +1,40 @@
 import { rebaseResourcePath } from "../../core/resourcePath";
+import { ResourceUriIdentityService, type ResourceUri } from "../../core/resourceUri";
+import {
+  collectWorkbenchSplitLeaves,
+  createWorkbenchSplit,
+  extractWorkbenchSplitLeaf,
+  findWorkbenchSplitLeaf,
+  mapWorkbenchSplitLeaves,
+  moveWorkbenchSplitLeafToEdge,
+  nextWorkbenchSplitNumericId,
+  replaceWorkbenchSplitNode,
+  updateWorkbenchSplitRatio,
+  type WorkbenchSplit,
+  type WorkbenchSplitDirection,
+  type WorkbenchSplitLeaf,
+  type WorkbenchSplitNode,
+  type WorkbenchSplitPlacement,
+} from "../../workbench/split-tree";
+import {
+  createEditorInput,
+  type EditorResourceReference,
+} from "./editorGroupModel";
 
-export type EditorSplitDirection = "horizontal" | "vertical";
-export type EditorSplitPlacement = "first" | "second";
+export type EditorSplitDirection = WorkbenchSplitDirection;
+export type EditorSplitPlacement = WorkbenchSplitPlacement;
 
 export type EditorPaneSplitOptions = Readonly<{
   editorId?: string | null;
   placement?: EditorSplitPlacement;
 }>;
 
-export type EditorPaneLayoutLeaf = Readonly<{
-  kind: "pane";
-  id: string;
+export type EditorPaneLayoutLeaf = WorkbenchSplitLeaf<"pane", {
   editorId: string | null;
 }>;
 
-export type EditorPaneLayoutSplit = Readonly<{
-  kind: "split";
-  id: string;
-  direction: EditorSplitDirection;
-  ratio: number;
-  first: EditorPaneLayoutNode;
-  second: EditorPaneLayoutNode;
-}>;
-
-export type EditorPaneLayoutNode = EditorPaneLayoutLeaf | EditorPaneLayoutSplit;
+export type EditorPaneLayoutSplit = WorkbenchSplit<EditorPaneLayoutLeaf>;
+export type EditorPaneLayoutNode = WorkbenchSplitNode<EditorPaneLayoutLeaf>;
 
 export type EditorPaneLayoutState = Readonly<{
   root: EditorPaneLayoutNode;
@@ -40,18 +51,19 @@ export function createEditorPaneLayout(editorId: string | null = null): EditorPa
 }
 
 export function getEditorPanes(state: EditorPaneLayoutState): readonly EditorPaneLayoutLeaf[] {
-  return Object.freeze(collectPanes(state.root));
+  return collectWorkbenchSplitLeaves(state.root);
 }
 
 export function getActiveEditorPane(state: EditorPaneLayoutState): EditorPaneLayoutLeaf {
-  return findPane(state.root, state.activePaneId) ?? collectPanes(state.root)[0]!;
+  return findWorkbenchSplitLeaf(state.root, state.activePaneId)
+    ?? collectWorkbenchSplitLeaves(state.root)[0]!;
 }
 
 export function activateEditorPane(
   state: EditorPaneLayoutState,
   paneId: string,
 ): EditorPaneLayoutState {
-  if (paneId === state.activePaneId || !findPane(state.root, paneId)) return state;
+  if (paneId === state.activePaneId || !findWorkbenchSplitLeaf(state.root, paneId)) return state;
   return freezeLayout(state.root, paneId);
 }
 
@@ -60,8 +72,8 @@ export function assignEditorToPane(
   paneId: string,
   editorId: string | null,
 ): EditorPaneLayoutState {
-  if (!findPane(state.root, paneId)) return state;
-  const root = mapPanes(state.root, (pane) => (
+  if (!findWorkbenchSplitLeaf(state.root, paneId)) return state;
+  const root = mapWorkbenchSplitLeaves(state.root, (pane) => (
     pane.id === paneId ? createPane(pane.id, editorId) : pane
   ));
   return freezeLayout(root, paneId);
@@ -80,19 +92,18 @@ export function splitEditorPane(
   direction: EditorSplitDirection,
   options: EditorPaneSplitOptions = {},
 ): EditorPaneLayoutState {
-  const source = findPane(state.root, paneId);
+  const source = findWorkbenchSplitLeaf(state.root, paneId);
   if (!source) return state;
-  const paneIdNumber = nextNumericId(state.root, "editor-pane-");
-  const splitIdNumber = nextNumericId(state.root, "editor-split-");
-  const nextPaneId = `editor-pane-${paneIdNumber}`;
-  const nextSplitId = `editor-split-${splitIdNumber}`;
+  const nextPaneId = `editor-pane-${nextWorkbenchSplitNumericId(state.root, "editor-pane-")}`;
+  const nextSplitId = `editor-split-${nextWorkbenchSplitNumericId(state.root, "editor-split-")}`;
   const nextPane = createPane(
     nextPaneId,
-    Object.prototype.hasOwnProperty.call(options, "editorId") ? options.editorId ?? null : source.editorId,
+    Object.prototype.hasOwnProperty.call(options, "editorId")
+      ? options.editorId ?? null
+      : source.editorId,
   );
   const nextPaneFirst = options.placement === "first";
-  const root = replaceNode(state.root, paneId, freezeNode({
-    kind: "split",
+  const root = replaceWorkbenchSplitNode(state.root, paneId, createWorkbenchSplit({
     id: nextSplitId,
     direction,
     ratio: 0.5,
@@ -110,69 +121,40 @@ export function moveEditorPane(
   placement: EditorSplitPlacement = "second",
 ): EditorPaneLayoutState {
   if (sourcePaneId === targetPaneId || state.root.kind === "pane") return state;
-  const source = findPane(state.root, sourcePaneId);
-  const target = findPane(state.root, targetPaneId);
-  if (!source || !target) return state;
+  if (
+    !findWorkbenchSplitLeaf(state.root, sourcePaneId)
+    || !findWorkbenchSplitLeaf(state.root, targetPaneId)
+  ) return state;
 
-  // Reordering direct siblings is an in-place layout operation. Rebuilding
-  // their split gives it a new identity, which forces the renderer to unmount
-  // both otherwise-stable editor runtimes during a simple left/right swap.
-  const siblingSplit = findDirectSiblingSplit(state.root, sourcePaneId, targetPaneId);
-  if (siblingSplit) {
-    const sourceFirst = placement === "first";
-    const first = sourceFirst ? source : target;
-    const second = sourceFirst ? target : source;
-    const ratio = siblingSplit.direction === direction ? siblingSplit.ratio : 0.5;
-    if (
-      siblingSplit.direction === direction
-      && siblingSplit.first === first
-      && siblingSplit.second === second
-    ) {
-      return state.activePaneId === sourcePaneId
-        ? state
-        : freezeLayout(state.root, sourcePaneId);
-    }
-    const root = replaceNode(state.root, siblingSplit.id, freezeNode({
-      ...siblingSplit,
-      direction,
-      ratio,
-      first,
-      second,
-    }));
-    return freezeLayout(root, sourcePaneId);
-  }
-
-  const collapsed = collapsePane(state.root, sourcePaneId);
-  if (!collapsed.removed || !findPane(collapsed.node, targetPaneId)) return state;
-  const nextSplitId = `editor-split-${nextNumericId(state.root, "editor-split-")}`;
-  const sourceFirst = placement === "first";
-  const root = replaceNode(collapsed.node, targetPaneId, freezeNode({
-    kind: "split",
-    id: nextSplitId,
+  const result = moveWorkbenchSplitLeafToEdge(
+    state.root,
+    sourcePaneId,
+    targetPaneId,
     direction,
-    ratio: 0.5,
-    first: sourceFirst ? source : target,
-    second: sourceFirst ? target : source,
-  }));
-  return freezeLayout(root, sourcePaneId);
+    placement,
+    `editor-split-${nextWorkbenchSplitNumericId(state.root, "editor-split-")}`,
+  );
+  if (!result.moved && state.activePaneId === sourcePaneId) return state;
+  return freezeLayout(result.root, sourcePaneId);
 }
 
 export function closeEditorPane(
   state: EditorPaneLayoutState,
   paneId: string,
 ): EditorPaneLayoutState {
-  if (!findPane(state.root, paneId)) return state;
+  if (!findWorkbenchSplitLeaf(state.root, paneId)) return state;
   if (state.root.kind === "pane") {
     return freezeLayout(createPane(state.root.id, null), state.root.id);
   }
 
-  const collapsed = collapsePane(state.root, paneId);
-  if (!collapsed.removed) return state;
-  const remainingPanes = collectPanes(collapsed.node);
+  const extracted = extractWorkbenchSplitLeaf(state.root, paneId);
+  if (!extracted.root || !extracted.leaf) return state;
+  const remainingPanes = collectWorkbenchSplitLeaves(extracted.root);
   const activePaneId = state.activePaneId === paneId
     ? remainingPanes[0]!.id
-    : findPane(collapsed.node, state.activePaneId)?.id ?? remainingPanes[0]!.id;
-  return freezeLayout(collapsed.node, activePaneId);
+    : findWorkbenchSplitLeaf(extracted.root, state.activePaneId)?.id
+      ?? remainingPanes[0]!.id;
+  return freezeLayout(extracted.root, activePaneId);
 }
 
 export function updateEditorSplitRatio(
@@ -180,14 +162,12 @@ export function updateEditorSplitRatio(
   splitId: string,
   ratio: number,
 ): EditorPaneLayoutState {
-  const nextRatio = clampEditorSplitRatio(ratio);
-  let changed = false;
-  const root = mapNodes(state.root, (node) => {
-    if (node.kind !== "split" || node.id !== splitId || node.ratio === nextRatio) return node;
-    changed = true;
-    return freezeNode({ ...node, ratio: nextRatio });
-  });
-  return changed ? freezeLayout(root, state.activePaneId) : state;
+  const root = updateWorkbenchSplitRatio(
+    state.root,
+    splitId,
+    clampEditorSplitRatio(ratio),
+  );
+  return root === state.root ? state : freezeLayout(root, state.activePaneId);
 }
 
 export function removeEditorFromPanes(
@@ -195,30 +175,48 @@ export function removeEditorFromPanes(
   editorId: string,
   fallbackEditorId: string | null,
 ): EditorPaneLayoutState {
-  let changed = false;
-  const root = mapPanes(state.root, (pane) => {
-    if (pane.editorId !== editorId) return pane;
-    changed = true;
-    return createPane(pane.id, fallbackEditorId);
-  });
-  return changed ? freezeLayout(root, state.activePaneId) : state;
+  const root = mapWorkbenchSplitLeaves(state.root, (pane) => (
+    pane.editorId === editorId ? createPane(pane.id, fallbackEditorId) : pane
+  ));
+  return root === state.root ? state : freezeLayout(root, state.activePaneId);
 }
 
 export function rebaseEditorPaneResources(
   state: EditorPaneLayoutState,
-  previousResource: string,
-  nextResource: string,
+  previousResource: EditorResourceReference,
+  nextResource: EditorResourceReference,
 ): EditorPaneLayoutState {
-  let changed = false;
-  const root = mapPanes(state.root, (pane) => {
+  const previousInput = createEditorInput(previousResource);
+  const compatibleNextResource = typeof nextResource === "string" && previousInput.rootUri
+    ? { rootUri: previousInput.rootUri, resourcePath: nextResource }
+    : nextResource;
+  const nextInput = createEditorInput(compatibleNextResource);
+  if (
+    previousInput.rootUri
+    && nextInput.rootUri
+    && !editorPaneResourceIdentity.isEqual(previousInput.rootUri, nextInput.rootUri)
+  ) {
+    throw new Error("Editor Pane resource rebasing cannot cross Workspace Folders.");
+  }
+  const root = mapWorkbenchSplitLeaves(state.root, (pane) => {
     if (!pane.editorId) return pane;
-    const editorId = rebaseResourcePath(pane.editorId, previousResource, nextResource);
-    if (editorId === pane.editorId) return pane;
-    changed = true;
-    return createPane(pane.id, editorId);
+    const editorId = previousInput.rootUri
+      ? editorPaneResourceIdentity.rebase(
+        pane.editorId as ResourceUri,
+        previousInput.resourceUri,
+        nextInput.resourceUri,
+      )
+      : rebaseResourcePath(
+        pane.editorId,
+        previousInput.resource,
+        nextInput.resource,
+      );
+    return editorId === pane.editorId ? pane : createPane(pane.id, editorId);
   });
-  return changed ? freezeLayout(root, state.activePaneId) : state;
+  return root === state.root ? state : freezeLayout(root, state.activePaneId);
 }
+
+const editorPaneResourceIdentity = new ResourceUriIdentityService();
 
 export function parseEditorPaneLayoutState(
   value: unknown,
@@ -227,11 +225,9 @@ export function parseEditorPaneLayoutState(
 ): EditorPaneLayoutState {
   if (!value || typeof value !== "object") return createEditorPaneLayout(fallbackEditorId);
   const candidate = value as Partial<EditorPaneLayoutState>;
-  const seenIds = new Set<string>();
-  const root = parseNode(candidate.root, validEditorIds, seenIds, 0);
+  const root = parseNode(candidate.root, validEditorIds, new Set(), 0);
   if (!root) return createEditorPaneLayout(fallbackEditorId);
-  const panes = collectPanes(root);
-  if (panes.length === 0) return createEditorPaneLayout(fallbackEditorId);
+  const panes = collectWorkbenchSplitLeaves(root);
   const activePaneId = typeof candidate.activePaneId === "string"
     && panes.some(({ id }) => id === candidate.activePaneId)
     ? candidate.activePaneId
@@ -262,8 +258,7 @@ function parseNode(
   const first = parseNode(candidate.first, validEditorIds, seenIds, depth + 1);
   const second = parseNode(candidate.second, validEditorIds, seenIds, depth + 1);
   if (!first || !second) return null;
-  return freezeNode({
-    kind: "split",
+  return createWorkbenchSplit({
     id: candidate.id,
     direction: candidate.direction,
     ratio: clampEditorSplitRatio(typeof candidate.ratio === "number" ? candidate.ratio : 0.5),
@@ -272,103 +267,8 @@ function parseNode(
   });
 }
 
-function collapsePane(
-  node: EditorPaneLayoutNode,
-  paneId: string,
-): { node: EditorPaneLayoutNode; removed: boolean } {
-  if (node.kind === "pane") return { node, removed: false };
-  if (node.first.kind === "pane" && node.first.id === paneId) {
-    return { node: node.second, removed: true };
-  }
-  if (node.second.kind === "pane" && node.second.id === paneId) {
-    return { node: node.first, removed: true };
-  }
-  const first = collapsePane(node.first, paneId);
-  if (first.removed) return { node: freezeNode({ ...node, first: first.node }), removed: true };
-  const second = collapsePane(node.second, paneId);
-  if (second.removed) return { node: freezeNode({ ...node, second: second.node }), removed: true };
-  return { node, removed: false };
-}
-
-function replaceNode(
-  node: EditorPaneLayoutNode,
-  nodeId: string,
-  replacement: EditorPaneLayoutNode,
-): EditorPaneLayoutNode {
-  if (node.id === nodeId) return replacement;
-  if (node.kind === "pane") return node;
-  return freezeNode({
-    ...node,
-    first: replaceNode(node.first, nodeId, replacement),
-    second: replaceNode(node.second, nodeId, replacement),
-  });
-}
-
-function mapPanes(
-  node: EditorPaneLayoutNode,
-  map: (pane: EditorPaneLayoutLeaf) => EditorPaneLayoutLeaf,
-): EditorPaneLayoutNode {
-  if (node.kind === "pane") return map(node);
-  return freezeNode({ ...node, first: mapPanes(node.first, map), second: mapPanes(node.second, map) });
-}
-
-function mapNodes(
-  node: EditorPaneLayoutNode,
-  map: (node: EditorPaneLayoutNode) => EditorPaneLayoutNode,
-): EditorPaneLayoutNode {
-  const mapped = node.kind === "pane"
-    ? node
-    : freezeNode({ ...node, first: mapNodes(node.first, map), second: mapNodes(node.second, map) });
-  return map(mapped);
-}
-
-function collectPanes(node: EditorPaneLayoutNode): EditorPaneLayoutLeaf[] {
-  return node.kind === "pane" ? [node] : [...collectPanes(node.first), ...collectPanes(node.second)];
-}
-
-function findPane(node: EditorPaneLayoutNode, paneId: string): EditorPaneLayoutLeaf | null {
-  if (node.kind === "pane") return node.id === paneId ? node : null;
-  return findPane(node.first, paneId) ?? findPane(node.second, paneId);
-}
-
-function findDirectSiblingSplit(
-  node: EditorPaneLayoutNode,
-  firstPaneId: string,
-  secondPaneId: string,
-): EditorPaneLayoutSplit | null {
-  if (node.kind === "pane") return null;
-  if (node.first.kind === "pane" && node.second.kind === "pane") {
-    const directIds = new Set([node.first.id, node.second.id]);
-    if (directIds.has(firstPaneId) && directIds.has(secondPaneId)) return node;
-  }
-  return findDirectSiblingSplit(node.first, firstPaneId, secondPaneId)
-    ?? findDirectSiblingSplit(node.second, firstPaneId, secondPaneId);
-}
-
-function nextNumericId(node: EditorPaneLayoutNode, prefix: string): number {
-  const ids: string[] = [];
-  visitNodes(node, (item) => ids.push(item.id));
-  return ids.reduce((maximum, id) => {
-    if (!id.startsWith(prefix)) return maximum;
-    const numeric = Number(id.slice(prefix.length));
-    return Number.isInteger(numeric) ? Math.max(maximum, numeric) : maximum;
-  }, 0) + 1;
-}
-
-function visitNodes(node: EditorPaneLayoutNode, visit: (node: EditorPaneLayoutNode) => void) {
-  visit(node);
-  if (node.kind === "split") {
-    visitNodes(node.first, visit);
-    visitNodes(node.second, visit);
-  }
-}
-
 function createPane(id: string, editorId: string | null): EditorPaneLayoutLeaf {
-  return freezeNode({ kind: "pane", id, editorId });
-}
-
-function freezeNode<T extends EditorPaneLayoutNode>(node: T): T {
-  return Object.freeze(node);
+  return Object.freeze({ kind: "pane", id, editorId });
 }
 
 function freezeLayout(root: EditorPaneLayoutNode, activePaneId: string): EditorPaneLayoutState {

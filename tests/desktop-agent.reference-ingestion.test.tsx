@@ -75,9 +75,10 @@ describe("Desktop Agent reference ingestion", () => {
     expect(controller.stageExternalFiles.mock.calls.every(([files]) => files[0] === image)).toBe(true);
   });
 
-  it("provides a keyboard-accessible stable plus menu and status-aware retryable chips", async () => {
+  it("opens the file picker directly from plus and keeps status-aware retryable chips", () => {
     const onRetryReference = vi.fn();
     const onRemoveReference = vi.fn();
+    const onAddExternalFiles = vi.fn();
     const container = render(<AgentComposer
       draft=""
       onDraftChange={vi.fn()}
@@ -96,25 +97,55 @@ describe("Desktop Agent reference ingestion", () => {
         status: "error",
         error: { code: "missing", message: "File no longer exists" },
       }]}
+      onAddExternalFiles={onAddExternalFiles}
       onRetryReference={onRetryReference}
       onRemoveReference={onRemoveReference}
       onSubmit={vi.fn(async () => true)}
       onStop={vi.fn()}
     />);
-    const trigger = container.querySelector<HTMLButtonElement>('button[aria-label="Add context"]')!;
+    const trigger = container.querySelector<HTMLButtonElement>('button[aria-label="Add files from computer"]')!;
+    const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const openFilePicker = vi.spyOn(fileInput, "click").mockImplementation(() => undefined);
     expect(trigger.className).toBe("desktop-agent-reference-trigger");
-    act(() => trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })));
-    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
-    await act(async () => { await new Promise((resolve) => window.setTimeout(resolve, 0)); });
-    expect(document.activeElement?.getAttribute("role")).toBe("menuitem");
-    act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
-    expect(document.activeElement).toBe(trigger);
+    expect(trigger.hasAttribute("aria-haspopup")).toBe(false);
+    act(() => trigger.click());
+    expect(openFilePicker).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[role="menu"]')).toBeNull();
 
     const retry = container.querySelector<HTMLButtonElement>('button[aria-label*="Retry reference"]')!;
     expect(container.textContent).toContain("File no longer exists");
     act(() => retry.click());
     expect(onRetryReference).toHaveBeenCalledWith("failed-ref");
     expect((container.querySelector('button[aria-label="Send message"]') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("renders staged images as composer-local attachment previews above the draft", () => {
+    const container = render(<AgentComposer
+      draft="Describe this image"
+      onDraftChange={vi.fn()}
+      disabled={false}
+      running={false}
+      stopping={false}
+      submitting={false}
+      referenceCapabilities={capabilities()}
+      references={[{
+        id: "image-ref",
+        kind: "staged-attachment",
+        displayName: "capture.png",
+        mime: "image/png",
+        size: 5,
+        status: "ready",
+      }]}
+      onRemoveReference={vi.fn()}
+      onSubmit={vi.fn(async () => true)}
+      onStop={vi.fn()}
+    />);
+
+    const composer = container.querySelector(".desktop-agent-composer")!;
+    const preview = composer.querySelector(".desktop-agent-reference-chip-preview.is-image");
+    expect(preview).not.toBeNull();
+    expect(composer.querySelector(".desktop-agent-reference-chips")?.textContent).toContain("capture.png");
+    expect(preview?.compareDocumentPosition(composer.querySelector("textarea")!) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 
   it("announces partial batches while retaining the rejected item as an actionable error", async () => {

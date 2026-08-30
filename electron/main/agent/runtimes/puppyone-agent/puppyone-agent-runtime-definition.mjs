@@ -1,6 +1,9 @@
 import { createOpenCodeDiscovery } from "./managed-opencode-discovery.mjs";
 import { OpenCodeAcpAdapter } from "../opencode-protocol/opencode-acp-adapter.mjs";
-import { PUPPYONE_AGENT_RUNTIME_DESCRIPTOR } from "./puppyone-agent-identity.mjs";
+import {
+  PUPPYONE_AGENT_RUNTIME_DESCRIPTOR,
+  PUPPYONE_AGENT_RUNTIME_MANIFEST,
+} from "./puppyone-agent-identity.mjs";
 
 export function createPuppyOneAgentRuntimeDefinition({
   appPath = null,
@@ -14,7 +17,7 @@ export function createPuppyOneAgentRuntimeDefinition({
 } = {}) {
   const adapters = new Set();
   return {
-    descriptor: PUPPYONE_AGENT_RUNTIME_DESCRIPTOR,
+    manifest: PUPPYONE_AGENT_RUNTIME_MANIFEST,
     discovery,
     createAdapter: ({ readiness, ...options }) => {
       let adapter;

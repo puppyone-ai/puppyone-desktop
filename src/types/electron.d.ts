@@ -23,11 +23,11 @@ import type {
   AgentSessionCloseRequest,
   AgentSessionCreateRequest,
   AgentSessionExitEvent,
-  AgentSessionListItem,
   AgentSessionMutationRequest,
   AgentSessionResumeRequest,
   AgentSessionSnapshot,
   AgentSessionsListRequest,
+  AgentSessionsListResponse,
   AgentTurnInterruptRequest,
   AgentTurnStartRequest,
   AgentTurnSteerRequest,
@@ -380,6 +380,8 @@ export type GitBranchGraphSnapshot = {
 
 export type TerminalCreateRequest = {
   id: string;
+  /** Explicit Folder capability required when a window has multiple roots. */
+  rootPath: string;
   cwd: string;
   cols: number;
   rows: number;
@@ -447,6 +449,32 @@ export type DesktopUpdateStatus =
   | "error";
 
 export type DesktopBuildChannel = "dev" | "internal" | "stable";
+
+export type DesktopPlatform = "macos" | "windows" | "linux";
+export type DesktopArchitecture = "x64" | "arm64";
+
+export type DesktopPlatformCapabilities = {
+  readonly schemaVersion: 1;
+  readonly platform: DesktopPlatform;
+  readonly arch: DesktopArchitecture;
+  readonly primaryModifier: "meta" | "control";
+  readonly windowChrome: {
+    readonly mode: "native" | "overlay" | "custom";
+  };
+  readonly credentialStorage: {
+    readonly available: boolean;
+    readonly locked: boolean;
+    readonly strength: "os-backed" | "unavailable";
+    readonly backend: string | null;
+  };
+  readonly documentConversion: {
+    readonly supportedInputs: ReadonlyArray<string>;
+  };
+  readonly updater: {
+    readonly supported: boolean;
+    readonly installMode: "squirrel" | "nsis" | "appimage" | "manual";
+  };
+};
 
 export type DesktopTelemetryLevel = "off" | "basic";
 
@@ -530,6 +558,37 @@ export type DesktopUpdateState = {
   updatedAt: string;
 };
 
+export type GitAutoCommitWorkspacePolicy = {
+  enabled: boolean;
+  scope: "untracked-only";
+  minimumIntervalMs: number;
+  quietPeriodMs: number;
+  updatedAt: string | null;
+};
+
+export type GitAutoCommitResult = {
+  outcome: "committed" | "no-op" | "skipped" | "failed" | "needs-review";
+  reason: string;
+  commitId: string | null;
+  pathCount: number | null;
+  retryable: boolean;
+  workspaceGeneration?: number;
+  occurredAt?: string;
+};
+
+export type GitAutoCommitSnapshot = {
+  available: boolean;
+  experimentalOptIn: boolean;
+  repository: boolean;
+  workspacePolicy: GitAutoCommitWorkspacePolicy | null;
+  effectiveEnabled: boolean;
+  runtime: {
+    state: "disabled" | "idle" | "waiting" | "running";
+    nextEligibleAt: string | null;
+    lastResult: GitAutoCommitResult | null;
+  } | null;
+};
+
 export type WorkspaceChangedEvent = {
   rootPath: string;
   eventType: string;
@@ -570,6 +629,7 @@ export type GitRepositoryWindowFocusEvent = {
 export type LastWorkspaceResult = {
   path: string | null;
   workspace: Workspace | null;
+  workspaces?: Workspace[];
   error: string | null;
 };
 
@@ -590,6 +650,20 @@ export type WorkspaceOpenResult = {
   status: "opened-current" | "opened-new-window" | "focused-existing";
   path: string | null;
   workspace: Workspace | null;
+};
+
+export type WorkspaceAttachResult = {
+  status: "attached-current" | "already-attached" | "focused-existing";
+  path: string | null;
+  workspace: Workspace | null;
+  workspaces: Workspace[];
+};
+
+export type WorkspaceDetachResult = {
+  status: "detached-current" | "not-attached";
+  path: string | null;
+  workspace: Workspace | null;
+  workspaces: Workspace[];
 };
 
 export type WorkspaceCreateProjectRequest = {
@@ -652,6 +726,11 @@ export type WorkspaceCopyEntryRequest = {
   targetFolderPath: string | null;
   preferredName?: string;
   forceDuplicateName?: boolean;
+};
+
+export type WorkspaceCopyEntryBetweenRootsRequest = Omit<WorkspaceCopyEntryRequest, "rootPath"> & {
+  sourceRootPath: string;
+  targetRootPath: string;
 };
 
 export type WorkspaceImportEntriesRequest = {
@@ -793,6 +872,7 @@ declare global {
         regions: Array<{ x: number; y: number; width: number; height: number }>;
       }) => void;
       getBuildInfo: () => Promise<DesktopBuildInfo>;
+      getPlatformCapabilities: () => Promise<DesktopPlatformCapabilities>;
       getTelemetryState: () => Promise<DesktopTelemetryState>;
       getTelemetryDisclosure: () => Promise<DesktopTelemetryDisclosure>;
       markTelemetryNoticeSeen: () => Promise<DesktopTelemetryState>;
@@ -809,10 +889,27 @@ declare global {
         callback: (payload: { type: "strong" | "emphasis" | "underline" | "strike" }) => void,
       ) => () => void;
       onDocumentSessionFlushRequested: (
-        callback: (request: { requestId: string }) => void | Promise<void>,
+        callback: (request: {
+          requestId: string;
+          reason: "app-close" | "git-auto-commit";
+        }) => void | Promise<void>,
       ) => () => void;
       onDocumentSessionCloseCancelled: (
         callback: (request: { requestId: string }) => void,
+      ) => () => void;
+      getGitAutoCommitSettings?: (request?: {
+        rootPath?: string;
+      }) => Promise<GitAutoCommitSnapshot>;
+      setGitAutoCommitExperimentalOptIn?: (request: {
+        enabled: boolean;
+      }) => Promise<GitAutoCommitSnapshot>;
+      setGitAutoCommitWorkspacePolicy?: (request: {
+        rootPath: string;
+        enabled?: boolean;
+        minimumIntervalMs?: number;
+      }) => Promise<GitAutoCommitSnapshot>;
+      onGitAutoCommitStateChanged?: (
+        callback: (snapshot: GitAutoCommitSnapshot) => void,
       ) => () => void;
       readCloudSession: () => Promise<DesktopStoredCloudSession | null>;
       readCloudAuthState: () => Promise<DesktopCloudAuthStateSnapshot>;
@@ -935,6 +1032,9 @@ declare global {
       openWorkspaceInNewWindow: (folderPath: string) => Promise<WorkspaceOpenResult>;
       openDroppedWorkspaceInCurrentWindow: (folder: File) => Promise<WorkspaceOpenResult>;
       selectFolder: () => Promise<WorkspaceOpenResult | null>;
+      selectFolderToAttach: () => Promise<WorkspaceAttachResult | null>;
+      attachFolder: (folderPath: string) => Promise<WorkspaceAttachResult>;
+      detachFolder: (folderPath: string) => Promise<WorkspaceDetachResult>;
       selectFolderInNewWindow: () => Promise<WorkspaceOpenResult | null>;
       selectLocalProjectLocation: () => Promise<WorkspaceProjectLocationGrant | null>;
       createLocalProject: (
@@ -997,6 +1097,9 @@ declare global {
       renameEntry: (request: WorkspaceRenameEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       moveEntry: (request: WorkspaceMoveEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       copyEntry: (request: WorkspaceCopyEntryRequest) => Promise<WorkspaceCreateEntryResult>;
+      copyEntryBetweenRoots: (
+        request: WorkspaceCopyEntryBetweenRootsRequest,
+      ) => Promise<WorkspaceCreateEntryResult>;
       importEntries: (request: WorkspaceImportEntriesRequest) => Promise<WorkspaceImportEntriesResult>;
       deleteEntry: (request: WorkspaceDeleteEntryRequest) => Promise<WorkspaceCreateEntryResult>;
       revealEntryInFinder: (request: WorkspaceRevealEntryRequest) => Promise<{ ok: boolean }>;
@@ -1204,7 +1307,7 @@ declare global {
       createAgentSession: (request: AgentSessionCreateRequest) => Promise<AgentSessionSnapshot>;
       resumeAgentSession: (request: AgentSessionResumeRequest) => Promise<AgentSessionSnapshot | null>;
       replayAgentSession: (request: AgentReplayRequest) => Promise<AgentSessionSnapshot>;
-      listAgentSessions: (request: AgentSessionsListRequest) => Promise<AgentSessionListItem[]>;
+      listAgentSessions: (request: AgentSessionsListRequest) => Promise<AgentSessionsListResponse>;
       forkAgentSession: (request: AgentSessionMutationRequest) => Promise<AgentSessionSnapshot>;
       archiveAgentSession: (request: AgentSessionMutationRequest) => Promise<{ sessionId: string; archived: boolean }>;
       deleteAgentSession: (request: AgentSessionMutationRequest) => Promise<{ sessionId: string; deleted: boolean; nativeDeleted: boolean }>;

@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Workspace } from "@puppyone/shared-ui";
+import {
+  WorkbenchWorkspaceContext,
+  createWorkbenchWorkspace,
+  createWorkspaceFolder,
+  type WorkbenchWorkspace,
+  type Workspace,
+} from "@puppyone/shared-ui";
 import {
   forgetLastWorkspace,
+  attachWorkspaceFolder,
+  detachWorkspaceFolder,
   getInitialWorkspace,
   getRecentWorkspaces,
   hydrateRecentWorkspaces,
   removeRecentWorkspace,
+  selectWorkspaceFolderToAttach,
 } from "../../lib/localFiles";
 import {
   cloneRepositoryTarget,
@@ -27,36 +36,69 @@ import {
 } from "./workspaceHomeModel";
 import type { RecentWorkspaceHomeItem } from "./workspaceHomeModel";
 
+export type WorkspaceEntryKind = "restored" | "opened" | "created" | "cloned";
+
 export function useWorkspaceLifecycle({
+  multiRootWorkspacesEnabled,
   onWorkspaceActivated,
   onWorkspaceCleared,
   onWorkspaceOpenSettled,
 }: {
+  multiRootWorkspacesEnabled: boolean;
   onWorkspaceActivated: () => void;
   onWorkspaceCleared: () => void;
   onWorkspaceOpenSettled: () => void;
 }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [recentWorkspaceItems, setRecentWorkspaceItems] = useState<RecentWorkspaceHomeItem[]>([]);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+  const [workbenchWorkspace, setWorkbenchWorkspace] = useState<WorkbenchWorkspace | null>(null);
   const [restoringWorkspace, setRestoringWorkspace] = useState(true);
   const [restoreWorkspaceError, setRestoreWorkspaceError] = useState<string | null>(null);
+  const [activeWorkspaceEntryKind, setActiveWorkspaceEntryKind] = useState<WorkspaceEntryKind>("restored");
   const recentWorkspaceRequestRef = useRef(0);
+  const workbenchWorkspaceContextRef = useRef<WorkbenchWorkspaceContext | null>(null);
 
+  // The current product projects the first Folder exactly as before. The
+  // underlying state is already the general zero/one/many Folder model.
   const workspace = useMemo(
-    () => activeWorkspaceId ? workspaces.find((item) => item.id === activeWorkspaceId) ?? null : null,
-    [activeWorkspaceId, workspaces],
+    () => workbenchWorkspace?.folders[0]?.workspace ?? null,
+    [workbenchWorkspace],
   );
 
-  const activateWorkspace = useCallback((nextWorkspace: Workspace) => {
+  const activateWorkspaceComposition = useCallback((nextWorkspaces: readonly Workspace[]) => {
+    if (nextWorkspaces.length === 0) return;
     setWorkspaces((current) => {
-      const withoutExisting = current.filter((item) => item.id !== nextWorkspace.id);
-      return [nextWorkspace, ...withoutExisting];
+      const nextIds = new Set(nextWorkspaces.map((item) => item.id));
+      return [...nextWorkspaces, ...current.filter((item) => !nextIds.has(item.id))];
     });
-    setActiveWorkspaceId(nextWorkspace.id);
+    const nextWorkbenchWorkspace = createWorkbenchWorkspace(nextWorkspaces);
+    workbenchWorkspaceContextRef.current = new WorkbenchWorkspaceContext(nextWorkbenchWorkspace);
+    setWorkbenchWorkspace(nextWorkbenchWorkspace);
     setRestoreWorkspaceError(null);
     onWorkspaceActivated();
   }, [onWorkspaceActivated]);
+
+  const activateWorkspace = useCallback((nextWorkspace: Workspace) => {
+    activateWorkspaceComposition([nextWorkspace]);
+  }, [activateWorkspaceComposition]);
+
+  const reconcileWorkspaceComposition = useCallback(async (nextWorkspaces: readonly Workspace[]) => {
+    if (nextWorkspaces.length === 0) return;
+    const nextFolders = nextWorkspaces.map((item, index) => createWorkspaceFolder(item, { index }));
+    const context = workbenchWorkspaceContextRef.current;
+    if (!context || context.getWorkspace().folders[0]?.id !== nextFolders[0]?.id) {
+      activateWorkspaceComposition(nextWorkspaces);
+      return;
+    }
+    const nextWorkbenchWorkspace = await context.replaceFolders(nextFolders);
+    setWorkspaces((current) => {
+      const nextIds = new Set(nextWorkspaces.map((item) => item.id));
+      return [...nextWorkspaces, ...current.filter((item) => !nextIds.has(item.id))];
+    });
+    setWorkbenchWorkspace(nextWorkbenchWorkspace);
+    setRestoreWorkspaceError(null);
+    onWorkspaceActivated();
+  }, [activateWorkspaceComposition, onWorkspaceActivated]);
 
   const refreshRecentWorkspaceList = useCallback(async () => {
     const requestId = recentWorkspaceRequestRef.current + 1;
@@ -82,9 +124,13 @@ export function useWorkspaceLifecycle({
       });
   }, []);
 
-  const handleWorkspaceOpenResult = useCallback((result: WorkspaceOpenResult | null) => {
+  const handleWorkspaceOpenResult = useCallback((
+    result: WorkspaceOpenResult | null,
+    entryKind: WorkspaceEntryKind = "opened",
+  ) => {
     if (!result) return;
     if (result.status === "opened-current" && result.workspace) {
+      setActiveWorkspaceEntryKind(entryKind);
       activateWorkspace(result.workspace);
     } else {
       setRestoreWorkspaceError(null);
@@ -116,9 +162,81 @@ export function useWorkspaceLifecycle({
     handleWorkspaceOpenResult(result);
   }, [handleWorkspaceOpenResult, workspace]);
 
+  const addProject = useCallback(async () => {
+    if (!multiRootWorkspacesEnabled) {
+      onWorkspaceOpenSettled();
+      return;
+    }
+    try {
+      const result = await selectWorkspaceFolderToAttach();
+      if (!result) {
+        onWorkspaceOpenSettled();
+        return;
+      }
+      if (result.status !== "focused-existing" && result.workspaces.length > 0) {
+        await reconcileWorkspaceComposition(result.workspaces);
+      } else {
+        setRestoreWorkspaceError(null);
+        onWorkspaceOpenSettled();
+      }
+      void refreshRecentWorkspaceList().catch((error) => {
+        console.warn("Unable to refresh recent puppyone workspaces:", error);
+      });
+    } catch (error) {
+      setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
+      onWorkspaceOpenSettled();
+    }
+  }, [
+    multiRootWorkspacesEnabled,
+    onWorkspaceOpenSettled,
+    reconcileWorkspaceComposition,
+    refreshRecentWorkspaceList,
+  ]);
+
+  const addExistingProject = useCallback(async (folderPath: string) => {
+    if (!multiRootWorkspacesEnabled) {
+      onWorkspaceOpenSettled();
+      return;
+    }
+    try {
+      const result = await attachWorkspaceFolder(folderPath);
+      if (result.status !== "focused-existing" && result.workspaces.length > 0) {
+        await reconcileWorkspaceComposition(result.workspaces);
+      } else {
+        setRestoreWorkspaceError(null);
+        onWorkspaceOpenSettled();
+      }
+      void refreshRecentWorkspaceList().catch((error) => {
+        console.warn("Unable to refresh recent puppyone workspaces:", error);
+      });
+    } catch (error) {
+      setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
+      onWorkspaceOpenSettled();
+    }
+  }, [
+    multiRootWorkspacesEnabled,
+    onWorkspaceOpenSettled,
+    reconcileWorkspaceComposition,
+    refreshRecentWorkspaceList,
+  ]);
+
+  const removeProject = useCallback(async (folderPath: string) => {
+    try {
+      const result = await detachWorkspaceFolder(folderPath);
+      if (result.workspaces.length > 0) {
+        await reconcileWorkspaceComposition(result.workspaces);
+      }
+      setRestoreWorkspaceError(null);
+      onWorkspaceOpenSettled();
+    } catch (error) {
+      setRestoreWorkspaceError(error instanceof Error ? error.message : String(error));
+      onWorkspaceOpenSettled();
+    }
+  }, [onWorkspaceOpenSettled, reconcileWorkspaceComposition]);
+
   const createProject = useCallback(async (request: WorkspaceCreateProjectRequest) => {
     const result = await createLocalProjectTarget(request);
-    handleWorkspaceOpenResult(result);
+    handleWorkspaceOpenResult(result, "created");
     return result !== null;
   }, [handleWorkspaceOpenResult]);
 
@@ -128,7 +246,7 @@ export function useWorkspaceLifecycle({
 
   const cloneRepository = useCallback(async (request: WorkspaceCloneRepositoryRequest) => {
     const result = await cloneRepositoryTarget(request);
-    handleWorkspaceOpenResult(result);
+    handleWorkspaceOpenResult(result, "cloned");
     return result !== null;
   }, [handleWorkspaceOpenResult]);
 
@@ -140,7 +258,9 @@ export function useWorkspaceLifecycle({
   }, []);
 
   const clearWorkspace = useCallback(() => {
-    setActiveWorkspaceId(null);
+    workbenchWorkspaceContextRef.current = null;
+    setActiveWorkspaceEntryKind("restored");
+    setWorkbenchWorkspace(null);
     onWorkspaceCleared();
   }, [onWorkspaceCleared]);
 
@@ -152,7 +272,9 @@ export function useWorkspaceLifecycle({
       setWorkspaces((current) => current.filter((item) => item.id !== currentWorkspaceId));
       setRecentWorkspaceItems((current) => current.filter((item) => item.workspace.id !== currentWorkspaceId));
     }
-    setActiveWorkspaceId(null);
+    setWorkbenchWorkspace(null);
+    workbenchWorkspaceContextRef.current = null;
+    setActiveWorkspaceEntryKind("restored");
     setRestoreWorkspaceError(null);
     setRestoringWorkspace(false);
     onWorkspaceCleared();
@@ -173,8 +295,11 @@ export function useWorkspaceLifecycle({
             console.warn("Some recent puppyone workspaces could not be loaded:", recentWorkspaces.errors);
           }
         }
-        if (initialWorkspace.workspace) {
-          activateWorkspace(initialWorkspace.workspace);
+        const initialComposition = initialWorkspace.workspaces?.length
+          ? initialWorkspace.workspaces
+          : initialWorkspace.workspace ? [initialWorkspace.workspace] : [];
+        if (initialComposition.length > 0) {
+          activateWorkspaceComposition(initialComposition);
         } else if (initialWorkspace.error) {
           setRestoreWorkspaceError(initialWorkspace.error);
         }
@@ -203,9 +328,12 @@ export function useWorkspaceLifecycle({
     return () => {
       cancelled = true;
     };
-  }, [activateWorkspace]);
+  }, [activateWorkspaceComposition]);
 
   return {
+    addProject,
+    addExistingProject,
+    activeWorkspaceEntryKind,
     activateWorkspace,
     clearWorkspace,
     chooseProjectLocation,
@@ -217,12 +345,14 @@ export function useWorkspaceLifecycle({
     openFolder,
     openWorkspacePath,
     removeWorkspaceFromRecents,
+    removeProject,
     recentWorkspaceItems,
     refreshRecentWorkspaceList,
     restoreWorkspaceError,
     restoringWorkspace,
     setRestoreWorkspaceError,
     setWorkspaces,
+    workbenchWorkspace,
     workspace,
     workspaces,
   };

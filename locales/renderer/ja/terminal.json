@@ -32,6 +32,8 @@
   "launcher.shell.description": "通常のターミナルを起動します",
   "sessionTitle": "ターミナル {number}",
   "closeSession": "{title} を閉じる",
+  "split.resize": "ターミナルペインのサイズを変更",
+  "split.dragHandle": "{title} をドラッグして移動",
   "closeDialog.title": "{title}を閉じますか？",
   "closeDialog.detail": "このターミナルのシェルと実行中のすべてのコマンドが停止します。",
   "closeDialog.confirm": "ターミナルを閉じる",

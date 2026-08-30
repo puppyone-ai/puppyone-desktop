@@ -13,6 +13,40 @@ afterEach(async () => Promise.all(temporaryRoots.splice(0).map((root) => (
 ))));
 
 describe("Agent main-owned attachment staging", () => {
+  it("revokes one Root's grants without touching sibling Root attachments", async () => {
+    const root = await temporaryRoot();
+    const source = path.join(root, "note.txt");
+    await fs.promises.writeFile(source, "note");
+    const store = createAgentAttachmentStore({ rootPath: path.join(root, "staging") });
+    const [first] = await store.stage({
+      ownerId: 7,
+      workspaceRoot: "/workspace-a",
+      epoch: "draft-a",
+      sourcePaths: [source],
+    });
+    const [second] = await store.stage({
+      ownerId: 7,
+      workspaceRoot: "/workspace-b",
+      epoch: "draft-b",
+      sourcePaths: [source],
+    });
+
+    await store.revokeWorkspace(7, "/workspace-a");
+    await expect(store.authorize({
+      ownerId: 7,
+      workspaceRoot: "/workspace-a",
+      epoch: "draft-a",
+      references: [first],
+    })).rejects.toThrow(/invalid|expired/i);
+    await expect(store.authorize({
+      ownerId: 7,
+      workspaceRoot: "/workspace-b",
+      epoch: "draft-b",
+      references: [second],
+    })).resolves.toHaveLength(1);
+    await store.close();
+  });
+
   it("creates an immutable private snapshot and binds its opaque grant to owner, workspace and epoch", async () => {
     const root = await temporaryRoot();
     const workspace = await temporaryRoot();
@@ -35,7 +69,8 @@ describe("Agent main-owned attachment staging", () => {
     await expect(store.authorize({ ownerId: 7, workspaceRoot: workspace, epoch: "draft-b", references: [draft] })).rejects.toThrow(/invalid|belongs/i);
 
     const [authorized] = await store.authorize({ ownerId: 7, workspaceRoot: workspace, epoch: "draft-a", references: [draft] });
-    expect(authorized.snapshotUrl).toBe(`data:image/png;base64,${original.toString("base64")}`);
+    expect(authorized).not.toHaveProperty("snapshotUrl");
+    expect(JSON.stringify(authorized)).not.toContain(original.toString("base64"));
     expect((await fs.promises.stat(authorized.path)).mode & 0o777).toBe(0o600);
     await store.close();
   });

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { buildCodexTurnInput } from "./codex-reference-input.mjs";
 import { JsonlRpcConnection } from "../../transports/jsonl-rpc-connection.mjs";
 import { boundRendererValue, redactSecrets, redactSecretText } from "../../agent-events.mjs";
+import { AgentProviderSessionUnavailableError } from "../../runtime/agent-runtime-port.mjs";
 export { buildCodexTurnInput } from "./codex-reference-input.mjs";
 const CODEX_REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh"]);
 
@@ -11,10 +12,10 @@ export const CODEX_CAPABILITIES = Object.freeze({
   commandOutputStreaming: true,
   fileChangeEvents: true,
   manualApprovals: true,
-  structuredQuestions: false,
+  structuredQuestions: true,
   resume: true,
-  fork: false,
-  steer: false,
+  fork: true,
+  steer: true,
   queue: false,
   attachments: true,
   contextReferences: true,
@@ -24,9 +25,17 @@ export const CODEX_CAPABILITIES = Object.freeze({
   sessionHistory: true,
   usage: true,
   accountState: true,
-  mcp: false,
-  skills: false,
-  compaction: false,
+  mcp: true,
+  skills: true,
+  compaction: true,
+  revision: "codex-app-server:1",
+  protocol: Object.freeze({ name: "codex-app-server", version: 1 }),
+  constraints: Object.freeze({
+    modelSwitch: "turn-boundary",
+    modeSwitch: "unsupported",
+    forkRequiresIdle: true,
+    compactionRequiresIdle: true,
+  }),
   referenceInputs: Object.freeze({
     workspaceFiles: true,
     workspaceDirectories: true,
@@ -64,6 +73,7 @@ export class CodexAppServerAdapter {
     this.threadId = null;
     this.activeTurnId = null;
     this.pendingApprovals = new Map();
+    this.pendingQuestions = new Map();
     this.modelProfiles = new Map();
     this.sessionLifecycleType = null;
     this.disposed = false;
@@ -155,6 +165,35 @@ export class CodexAppServerAdapter {
     };
   }
 
+  async discoverSessions({ cursor = null, limit = 50 } = {}) {
+    await this.connect();
+    const result = await this.connection.request("thread/list", {
+      cwd: this.workspaceRoot,
+      cursor,
+      limit: boundedPageSize(limit),
+      archived: false,
+      sortKey: "updated_at",
+      sortDirection: "desc",
+      // History discovery must query Codex's native metadata index only. It
+      // must never trigger a rollout scan merely because the launcher opened.
+      useStateDbOnly: true,
+    });
+    return {
+      supported: true,
+      sessions: (Array.isArray(result?.data) ? result.data : [])
+        .filter((thread) => !thread?.ephemeral && thread?.cwd === this.workspaceRoot)
+        .slice(0, boundedPageSize(limit))
+        .map((thread) => ({
+          providerSessionId: requireString(thread.id, "Codex thread/list returned an invalid thread id."),
+          title: stringOrNull(thread.name) || stringOrNull(thread.preview) || "Codex session",
+          createdAt: toIsoFromSeconds(thread.createdAt),
+          updatedAt: toIsoFromSeconds(thread.updatedAt),
+          selectedProviderId: stringOrNull(thread.modelProvider),
+        })),
+      nextCursor: stringOrNull(result?.nextCursor),
+    };
+  }
+
   async createSession({ model = null }) {
     await this.connect();
     this.sessionLifecycleType = "session.started";
@@ -173,13 +212,24 @@ export class CodexAppServerAdapter {
   async resumeSession({ threadId, model = null }) {
     await this.connect();
     this.sessionLifecycleType = "session.resumed";
-    const result = await this.connection.request("thread/resume", {
-      threadId,
-      cwd: this.workspaceRoot,
-      approvalPolicy: "on-request",
-      sandbox: "workspace-write",
-      ...(model ? { model } : {}),
-    }).finally(() => { this.sessionLifecycleType = null; });
+    let result;
+    try {
+      result = await this.connection.request("thread/resume", {
+        threadId,
+        cwd: this.workspaceRoot,
+        approvalPolicy: "on-request",
+        sandbox: "workspace-write",
+        ...(model ? { model } : {}),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/\bno rollout found for thread id\b/i.test(message)) {
+        throw new AgentProviderSessionUnavailableError("The saved Codex thread is no longer available.");
+      }
+      throw error;
+    } finally {
+      this.sessionLifecycleType = null;
+    }
     this.threadId = requireString(result?.thread?.id, "Codex thread/resume did not return a thread id.");
     return normalizeProviderSession(result);
   }
@@ -224,6 +274,33 @@ export class CodexAppServerAdapter {
       turnId,
     });
     this.#clearPendingApprovals("cancel", true);
+    this.#clearPendingQuestions(true);
+  }
+
+  async steerTurn({ turnId, message, references = [] }) {
+    if (!this.threadId || this.activeTurnId !== turnId) throw new Error("That Codex turn is no longer running.");
+    if (references.length > 0) throw new Error("Codex steer does not accept reference inputs.");
+    await this.connection.request("turn/steer", {
+      threadId: this.threadId,
+      turnId,
+      input: buildCodexTurnInput(message, []),
+    });
+  }
+
+  async forkSession({ messageId = null } = {}) {
+    if (!this.threadId) throw new Error("No Codex thread is active.");
+    if (this.activeTurnId) throw new Error("Stop the active Codex turn before forking.");
+    const result = await this.connection.request("thread/fork", {
+      threadId: this.threadId,
+      ...(messageId ? { messageId } : {}),
+    });
+    return { providerSessionId: requireString(result?.thread?.id, "Codex thread/fork did not return a thread id.") };
+  }
+
+  async compactSession() {
+    if (!this.threadId) throw new Error("No Codex thread is active.");
+    if (this.activeTurnId) throw new Error("Stop the active Codex turn before compacting.");
+    await this.connection.request("thread/compact/start", { threadId: this.threadId });
   }
 
   resolveApproval({ requestId, decision, threadId, turnId }) {
@@ -239,10 +316,22 @@ export class CodexAppServerAdapter {
     this.pendingApprovals.delete(requestId);
   }
 
+  resolveQuestion({ requestId, answers, rejected, turnId }) {
+    const pending = this.pendingQuestions.get(requestId);
+    if (!pending || pending.threadId !== this.threadId || pending.turnId !== turnId) {
+      throw new Error("Question correlation did not match the active Codex turn.");
+    }
+    this.pendingQuestions.delete(requestId);
+    this.connection.respond(pending.rpcId, {
+      answers: rejected ? {} : codexQuestionAnswers(pending.questions, answers),
+    });
+  }
+
   dispose(reason = "Codex app-server adapter closed.") {
     if (this.disposed) return;
     this.disposed = true;
     this.#clearPendingApprovals("cancel", true);
+    this.#clearPendingQuestions(true);
     this.connection?.dispose(reason);
   }
 
@@ -261,6 +350,7 @@ export class CodexAppServerAdapter {
         if (["turn.completed", "turn.failed", "turn.interrupted"].includes(event.type)) {
           this.activeTurnId = null;
           this.#clearPendingApprovalsForTurn(event.turnId, "turn-ended");
+          this.#clearPendingQuestionsForTurn(event.turnId);
         }
       }
       this.onEvent(event);
@@ -269,6 +359,10 @@ export class CodexAppServerAdapter {
 
   #handleServerRequest(message) {
     const { method, id, params = {} } = message;
+    if (method === "item/tool/requestUserInput") {
+      this.#handleQuestionRequest({ id, params });
+      return;
+    }
     if (method !== "item/commandExecution/requestApproval" && method !== "item/fileChange/requestApproval") {
       this.connection.respondError(id, -32601, `Unsupported Codex server request: ${method}`);
       this.onEvent({
@@ -339,6 +433,39 @@ export class CodexAppServerAdapter {
     });
   }
 
+  #handleQuestionRequest({ id, params }) {
+    if (
+      typeof params.threadId !== "string"
+      || params.threadId !== this.threadId
+      || typeof params.turnId !== "string"
+      || typeof params.itemId !== "string"
+    ) {
+      this.connection.respond(id, { answers: {} });
+      this.onEvent({
+        type: "provider.error",
+        payload: { message: "A Codex question had impossible session ownership and was cancelled.", recoverable: false },
+      });
+      return;
+    }
+    const questions = normalizeCodexQuestions(params.questions);
+    const requestId = `codex:question:${String(id)}`;
+    this.pendingQuestions.set(requestId, {
+      rpcId: id,
+      requestId,
+      threadId: params.threadId,
+      turnId: params.turnId,
+      itemId: params.itemId,
+      questions,
+    });
+    this.onEvent({
+      type: "question.requested",
+      providerSessionId: params.threadId,
+      turnId: params.turnId,
+      itemId: params.itemId,
+      payload: { requestId, questions: questions.map(({ id: _id, ...question }) => question) },
+    });
+  }
+
   #handleServerRequestResolved(params) {
     const providerRequestId = params?.requestId;
     if (typeof providerRequestId !== "string" && typeof providerRequestId !== "number") return;
@@ -390,6 +517,27 @@ export class CodexAppServerAdapter {
       });
     }
     this.pendingApprovals.clear();
+  }
+
+  #clearPendingQuestionsForTurn(turnId) {
+    for (const pending of Array.from(this.pendingQuestions.values())) {
+      if (pending.turnId !== turnId) continue;
+      if (this.connection && !this.connection.closed) this.connection.respond(pending.rpcId, { answers: {} });
+      this.pendingQuestions.delete(pending.requestId);
+    }
+  }
+
+  #clearPendingQuestions(respond) {
+    for (const pending of this.pendingQuestions.values()) {
+      if (respond && this.connection && !this.connection.closed) {
+        try {
+          this.connection.respond(pending.rpcId, { answers: {} });
+        } catch {
+          // A closed provider cannot keep waiting for user input.
+        }
+      }
+    }
+    this.pendingQuestions.clear();
   }
 }
 
@@ -720,6 +868,27 @@ function normalizeNetworkApprovalContext(value) {
   return { host: host.slice(0, 512), protocol: protocol.slice(0, 40) };
 }
 
+function normalizeCodexQuestions(value) {
+  return (Array.isArray(value) ? value : []).slice(0, 16).map((question, index) => ({
+    id: stringOrNull(question?.id) || `question-${index + 1}`,
+    header: String(question?.header || `Question ${index + 1}`).slice(0, 160),
+    question: String(question?.question || "Input required").slice(0, 2_000),
+    multiple: Boolean(question?.multiple || question?.multiSelect),
+    custom: question?.custom !== false,
+    options: (Array.isArray(question?.options) ? question.options : []).slice(0, 64).map((option) => ({
+      label: String(option?.label ?? option ?? "").slice(0, 300),
+      description: String(option?.description ?? "").slice(0, 1_000),
+    })).filter((option) => option.label),
+  }));
+}
+
+function codexQuestionAnswers(questions, answers) {
+  return Object.fromEntries(questions.map((question, index) => [
+    question.id,
+    { answers: (Array.isArray(answers?.[index]) ? answers[index] : []).map((answer) => String(answer).slice(0, 2_000)) },
+  ]));
+}
+
 function formatProviderWarning(params) {
   const summary = typeof params?.message === "string"
     ? params.message
@@ -746,4 +915,8 @@ function stringOrNull(value) {
 
 function toIsoFromSeconds(value) {
   return Number.isFinite(value) ? new Date(value * 1000).toISOString() : new Date().toISOString();
+}
+
+function boundedPageSize(value) {
+  return Number.isSafeInteger(value) && value > 0 ? Math.min(value, 100) : 50;
 }

@@ -89,7 +89,7 @@ export class AgentSessionPreparer {
 
 function canPrepareSession(state: AgentControllerState) {
   if (!state.initialized || state.session || state.projection.runningTurnId) return false;
-  if (state.phase !== "ready" || state.inspection?.readiness.status !== "ready") return false;
+  if (state.phase !== "ready" || state.inspection?.readiness?.status !== "ready") return false;
   if (!state.selectedRuntimeId) return false;
   return !state.inspection.capabilities?.modelSelection || Boolean(state.selectedModel);
 }

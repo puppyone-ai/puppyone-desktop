@@ -2,9 +2,9 @@
 
 This Cloudflare Worker accepts the single public Desktop telemetry event,
 enforces the shared schema, and maintains exact active-installation sets in D1.
-It is deliberately deploy-safe: `TELEMETRY_MODE` defaults to `paused`, the D1
-identifier is a non-existent sentinel, and the Stable Desktop endpoint remains
-unset elsewhere in the repository.
+The checked-in configuration represents the active production service: the D1
+binding targets the production database, `TELEMETRY_MODE` is `accept`, and the
+Stable Desktop client pins the first-party ingestion route.
 
 ## Runtime boundary
 
@@ -37,8 +37,8 @@ npm run check:boundaries
 npx wrangler dev --config cloudflare/desktop-telemetry/wrangler.jsonc
 ```
 
-The checked-in sentinel database ID is suitable only for code review and local
-configuration validation. Do not deploy it.
+The checked-in database ID is the production binding. Do not reuse it for local,
+preview, or third-party deployments.
 
 ## Provisioning checklist
 
@@ -46,21 +46,20 @@ These commands are intentionally not run by repository builds:
 
 ```bash
 npx wrangler whoami
-npx wrangler d1 create puppyone-desktop-telemetry
 npx wrangler d1 migrations apply puppyone-desktop-telemetry \
   --remote \
   --config cloudflare/desktop-telemetry/wrangler.jsonc
 npx wrangler deploy --config cloudflare/desktop-telemetry/wrangler.jsonc
 ```
 
-After `d1 create`, replace the sentinel `database_id` with the returned ID.
-Keep the mode `paused` during migration and smoke testing. Configure the
-`telemetry.puppyone.ai` custom domain only after the Worker is verified.
+New non-production environments must use their own D1 database and start in
+`paused` or `discard` mode. Never point a preview Worker at the production D1
+binding.
 
 ## Activation gates
 
-Do not change `TELEMETRY_MODE` to `accept` or configure the Stable Desktop
-endpoint until all of the following are true:
+The production service may remain in `accept` mode only while all of the
+following are true:
 
 1. Migrations and malformed-request tests pass against a non-production Worker.
 2. Worker invocation logs are confirmed disabled and no request body is logged.
@@ -71,6 +70,6 @@ endpoint until all of the following are true:
 7. `paused`, `discard`, rate-limit, duplicate, offline-batch, and Cron behavior
    have all been smoke tested.
 
-Only then set the client endpoint to
-`https://telemetry.puppyone.ai/v1/desktop/events`, deploy the Stable release,
-and change the Worker to `accept`.
+If any gate stops being true, switch the Worker to `discard` immediately while
+the issue is investigated. Use `paused` only when clients should retain and
+retry their bounded local queue.

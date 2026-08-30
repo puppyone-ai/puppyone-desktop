@@ -4,6 +4,8 @@
  * live outside runtime styles in the repository's audited notice ledger.
  */
 @import "./styles/foundation.css";
+@import "./styles/tabs.css";
+@import "./styles/launcher.css";
 @import "./styles/transcript.css";
 @import "./styles/activities.css";
 @import "./styles/tool-results.css";

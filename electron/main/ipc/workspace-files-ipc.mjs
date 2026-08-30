@@ -1,8 +1,8 @@
 import path from "node:path";
 import {
   copyWorkspaceEntry,
+  copyWorkspaceEntryBetweenRoots,
   createWorkspaceEntry,
-  convertWorkspaceOfficeDocumentToDocx,
   deleteWorkspaceEntry,
   getMimeType,
   importWorkspaceEntries,
@@ -61,11 +61,17 @@ export function registerWorkspaceFileIpcHandlers({
   authorizeWorkspaceRoot,
   localFileCapabilities,
   workspaceWatchService = null,
+  workspaceMutationTracker = null,
   gitMetadataWatchService = null,
-  convertOfficeDocument = convertWorkspaceOfficeDocumentToDocx,
+  convertOfficeDocument = unsupportedOfficeDocumentConverter,
   t = defaultTranslate,
 }) {
   const officeConversionSessionsBySender = new Map();
+  const runWorkspaceMutation = (rootPath, operation) => (
+    workspaceMutationTracker?.run
+      ? workspaceMutationTracker.run(rootPath, operation)
+      : operation()
+  );
 
   ipcMain.handle("workspace:list-folder-children", async (event, request) => {
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
@@ -188,107 +194,133 @@ export function registerWorkspaceFileIpcHandlers({
 
   ipcMain.handle("workspace:write-file", async (event, request) => {
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
-    const filePath = request?.path;
-    const content = request?.content;
-    if (typeof filePath !== "string" || filePath.trim().length === 0) {
-      throw new Error("File path is required.");
-    }
-    const senderId = requireIpcSenderId(event);
-    let result;
-    try {
-      result = await writeWorkspaceTextFile(rootPath, filePath, content, {
-        expectedVersion: request?.expectedVersion ?? null,
-      });
-    } catch (error) {
-      if (error?.code === "WORKSPACE_VERSION_CONFLICT") {
-        const latest = await readWorkspaceTextFile(rootPath, filePath);
-        return {
-          ok: false,
-          kind: "conflict",
-          content: latest.content ?? "",
-          version: latest.version ?? null,
-        };
+    return runWorkspaceMutation(rootPath, async () => {
+      const filePath = request?.path;
+      const content = request?.content;
+      if (typeof filePath !== "string" || filePath.trim().length === 0) {
+        throw new Error("File path is required.");
       }
-      return classifyWorkspaceWriteFailure(error);
-    }
-    try {
-      workspaceWatchService?.noteInternalWrite?.({
-        rootPath,
-        path: filePath,
-        senderId,
-        version: result?.version ?? null,
-      });
-    } catch (error) {
-      // Watcher-loop suppression is an optimization. Once the atomic write
-      // succeeds, attribution bookkeeping must never turn that durability
-      // acknowledgement into a failed save.
-      console.warn("Unable to attribute internal workspace write:", error);
-    }
-    try {
-      gitMetadataWatchService?.invalidateWorkingTree?.(rootPath);
-    } catch (error) {
-      // Git invalidation is a reconciliation hint. A durable file save must
-      // remain successful even if no repository watcher is currently active.
-      console.warn("Unable to invalidate Git after workspace write:", error);
-    }
-    await absorbWorkspaceEditReviewPath(rootPath, filePath);
-    return { ok: true, version: result?.version ?? null };
+      const senderId = requireIpcSenderId(event);
+      let result;
+      try {
+        result = await writeWorkspaceTextFile(rootPath, filePath, content, {
+          expectedVersion: request?.expectedVersion ?? null,
+        });
+      } catch (error) {
+        if (error?.code === "WORKSPACE_VERSION_CONFLICT") {
+          const latest = await readWorkspaceTextFile(rootPath, filePath);
+          return {
+            ok: false,
+            kind: "conflict",
+            content: latest.content ?? "",
+            version: latest.version ?? null,
+          };
+        }
+        return classifyWorkspaceWriteFailure(error);
+      }
+      try {
+        workspaceWatchService?.noteInternalWrite?.({
+          rootPath,
+          path: filePath,
+          senderId,
+          version: result?.version ?? null,
+        });
+      } catch (error) {
+        // Watcher-loop suppression is an optimization. Once the atomic write
+        // succeeds, attribution bookkeeping must never turn that durability
+        // acknowledgement into a failed save.
+        console.warn("Unable to attribute internal workspace write:", error);
+      }
+      try {
+        gitMetadataWatchService?.invalidateWorkingTree?.(rootPath);
+      } catch (error) {
+        // Git invalidation is a reconciliation hint. A durable file save must
+        // remain successful even if no repository watcher is currently active.
+        console.warn("Unable to invalidate Git after workspace write:", error);
+      }
+      await absorbWorkspaceEditReviewPath(rootPath, filePath);
+      return { ok: true, version: result?.version ?? null };
+    });
   });
 
   ipcMain.handle("workspace:create-entry", async (event, request) => {
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
-    const result = await createWorkspaceEntry(rootPath, request);
-    await absorbWorkspaceEditReviewPath(rootPath, result.path);
-    return result;
+    return runWorkspaceMutation(rootPath, async () => {
+      const result = await createWorkspaceEntry(rootPath, request);
+      await absorbWorkspaceEditReviewPath(rootPath, result.path);
+      return result;
+    });
   });
 
   ipcMain.handle("workspace:instantiate-template", async (event, request) => {
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
-    const fontBytes = await loadBundledSlidesFont(app.getAppPath());
-    const result = await instantiateWorkspaceTemplate(rootPath, request, { fontBytes });
-    await Promise.all(result.createdPaths.map((createdPath) => (
-      absorbWorkspaceEditReviewPath(rootPath, createdPath)
-    )));
-    return result;
+    return runWorkspaceMutation(rootPath, async () => {
+      const fontBytes = await loadBundledSlidesFont(app.getAppPath());
+      const result = await instantiateWorkspaceTemplate(rootPath, request, { fontBytes });
+      await Promise.all(result.createdPaths.map((createdPath) => (
+        absorbWorkspaceEditReviewPath(rootPath, createdPath)
+      )));
+      return result;
+    });
   });
 
   ipcMain.handle("workspace:rename-entry", async (event, request) => {
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
-    const previousPath = request?.path;
-    const result = await renameWorkspaceEntry(rootPath, request);
-    await absorbWorkspaceEditReviewPath(rootPath, previousPath);
-    await absorbWorkspaceEditReviewPath(rootPath, result.path);
-    return result;
+    return runWorkspaceMutation(rootPath, async () => {
+      const previousPath = request?.path;
+      const result = await renameWorkspaceEntry(rootPath, request);
+      await absorbWorkspaceEditReviewPath(rootPath, previousPath);
+      await absorbWorkspaceEditReviewPath(rootPath, result.path);
+      return result;
+    });
   });
 
   ipcMain.handle("workspace:move-entry", async (event, request) => {
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
-    const previousPath = request?.fromPath;
-    const result = await moveWorkspaceEntry(rootPath, request);
-    await absorbWorkspaceEditReviewPath(rootPath, previousPath);
-    await absorbWorkspaceEditReviewPath(rootPath, result.path);
-    return result;
+    return runWorkspaceMutation(rootPath, async () => {
+      const previousPath = request?.fromPath;
+      const result = await moveWorkspaceEntry(rootPath, request);
+      await absorbWorkspaceEditReviewPath(rootPath, previousPath);
+      await absorbWorkspaceEditReviewPath(rootPath, result.path);
+      return result;
+    });
   });
 
   ipcMain.handle("workspace:copy-entry", async (event, request) => {
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
-    const result = await copyWorkspaceEntry(rootPath, request);
-    await absorbWorkspaceEditReviewPath(rootPath, result.path);
-    return result;
+    return runWorkspaceMutation(rootPath, async () => {
+      const result = await copyWorkspaceEntry(rootPath, request);
+      await absorbWorkspaceEditReviewPath(rootPath, result.path);
+      return result;
+    });
+  });
+
+  ipcMain.handle("workspace:copy-entry-between-roots", async (event, request) => {
+    const sourceRootPath = await authorizeWorkspaceRoot(event, request?.sourceRootPath);
+    const targetRootPath = await authorizeWorkspaceRoot(event, request?.targetRootPath);
+    return runWorkspaceMutation(targetRootPath, async () => {
+      const result = await copyWorkspaceEntryBetweenRoots(sourceRootPath, targetRootPath, request);
+      await absorbWorkspaceEditReviewPath(targetRootPath, result.path);
+      return result;
+    });
   });
 
   ipcMain.handle("workspace:import-entries", async (event, request) => {
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
-    const result = await importWorkspaceEntries(rootPath, request);
-    await Promise.all(result.paths.map((importedPath) => absorbWorkspaceEditReviewPath(rootPath, importedPath)));
-    return result;
+    return runWorkspaceMutation(rootPath, async () => {
+      const result = await importWorkspaceEntries(rootPath, request);
+      await Promise.all(result.paths.map((importedPath) => absorbWorkspaceEditReviewPath(rootPath, importedPath)));
+      return result;
+    });
   });
 
   ipcMain.handle("workspace:delete-entry", async (event, request) => {
     const rootPath = await authorizeWorkspaceRoot(event, request?.rootPath);
-    const result = await deleteWorkspaceEntry(rootPath, request);
-    await absorbWorkspaceEditReviewPath(rootPath, result.path);
-    return result;
+    return runWorkspaceMutation(rootPath, async () => {
+      const result = await deleteWorkspaceEntry(rootPath, request);
+      await absorbWorkspaceEditReviewPath(rootPath, result.path);
+      return result;
+    });
   });
 
   ipcMain.handle("workspace:reveal-entry-in-finder", async (event, request) => {
@@ -361,6 +393,10 @@ export function registerWorkspaceFileIpcHandlers({
     return { ok: true };
   });
 
+}
+
+async function unsupportedOfficeDocumentConverter() {
+  throw new Error("Desktop Office conversion is unavailable on this platform.");
 }
 
 function requireOfficeConversionRequestId(value) {

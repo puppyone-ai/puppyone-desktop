@@ -56,3 +56,31 @@ export function SettingsValueRow({
     </div>
   );
 }
+
+export function SettingsToggle({
+  checked,
+  description,
+  disabled = false,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  description?: string;
+  disabled?: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="desktop-settings-switch" title={description}>
+      <input
+        type="checkbox"
+        aria-label={label}
+        aria-description={description}
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span aria-hidden="true" />
+    </label>
+  );
+}

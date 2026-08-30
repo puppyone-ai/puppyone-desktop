@@ -9,9 +9,9 @@
     "enabled": false
   },
   "vars": {
-    // Safe deployment default. Change to "accept" only after every rollout gate
-    // in this directory's README has been completed.
-    "TELEMETRY_MODE": "paused"
+    // Production ingestion is active. Use "discard" as the emergency privacy
+    // kill switch, or "paused" when clients should retry later.
+    "TELEMETRY_MODE": "accept"
   },
   "d1_databases": [
     {

@@ -111,6 +111,63 @@ describe("Electron document close coordination", () => {
     expect(harness.window.destroyed).toBe(true);
   });
 
+  it("supports a non-destructive durability drain for Git Auto Commit", async () => {
+    const harness = createHarness();
+    harness.webContents.emit("did-finish-load");
+
+    const pending = harness.coordinator.requestFlush(harness.webContents, "git-auto-commit");
+    const request = harness.webContents.sent[0];
+    expect(request).toMatchObject({
+      channel: DOCUMENT_SESSION_FLUSH_REQUEST_CHANNEL,
+      payload: { reason: "git-auto-commit" },
+    });
+    harness.reply(request.payload.requestId, { ok: true });
+
+    await expect(pending).resolves.toMatchObject({ ok: true, kind: null });
+    expect(harness.dialog.showMessageBox).not.toHaveBeenCalled();
+    expect(harness.window.destroyed).toBe(false);
+  });
+
+  it("cancels an autonomous drain when its workspace ownership is released", async () => {
+    const harness = createHarness();
+    harness.webContents.emit("did-finish-load");
+    const controller = new AbortController();
+    const pending = harness.coordinator.requestFlush(
+      harness.webContents,
+      "git-auto-commit",
+      { signal: controller.signal },
+    );
+
+    controller.abort();
+    await expect(pending).resolves.toMatchObject({ ok: false, kind: "cancelled" });
+    expect(harness.dialog.showMessageBox).not.toHaveBeenCalled();
+  });
+
+  it("blocks an autonomous drain when the renderer is unavailable or crashes", async () => {
+    const unavailable = createHarness();
+    await expect(unavailable.coordinator.requestFlush(
+      unavailable.webContents,
+      "git-auto-commit",
+    )).resolves.toMatchObject({ ok: false, kind: "renderer-unavailable" });
+
+    const crashed = createHarness();
+    crashed.webContents.emit("did-finish-load");
+    const pending = crashed.coordinator.requestFlush(crashed.webContents, "git-auto-commit");
+    crashed.webContents.emit("render-process-gone");
+    await expect(pending).resolves.toMatchObject({ ok: false, kind: "renderer-unavailable" });
+    expect(crashed.dialog.showMessageBox).not.toHaveBeenCalled();
+  });
+
+  it("times out an autonomous drain without presenting a destructive close dialog", async () => {
+    const harness = createHarness({ timeoutMs: 5 });
+    harness.webContents.emit("did-finish-load");
+
+    await expect(harness.coordinator.requestFlush(harness.webContents, "git-auto-commit"))
+      .resolves.toMatchObject({ ok: false, kind: "timeout" });
+    expect(harness.dialog.showMessageBox).not.toHaveBeenCalled();
+    expect(harness.window.destroyed).toBe(false);
+  });
+
   it("does not touch destroyed BrowserWindow properties when an unready window closes", () => {
     const harness = createHarness();
     let event;
@@ -126,7 +183,11 @@ describe("Electron document close coordination", () => {
   });
 });
 
-function createHarness({ dialogResponse = 0, onCloseCancelled = () => undefined } = {}) {
+function createHarness({
+  dialogResponse = 0,
+  onCloseCancelled = () => undefined,
+  timeoutMs = 1_000,
+} = {}) {
   let resultListener = null;
   const trustedIpc = {
     on: vi.fn((channel, listener) => {
@@ -139,7 +200,7 @@ function createHarness({ dialogResponse = 0, onCloseCancelled = () => undefined 
   };
   const coordinator = createDocumentSessionCloseCoordinator({
     dialog,
-    timeoutMs: 1_000,
+    timeoutMs,
     logger: { error: vi.fn() },
     onCloseCancelled,
   });
@@ -149,6 +210,7 @@ function createHarness({ dialogResponse = 0, onCloseCancelled = () => undefined 
   coordinator.attachWindow(window);
 
   return {
+    coordinator,
     dialog,
     webContents,
     window,

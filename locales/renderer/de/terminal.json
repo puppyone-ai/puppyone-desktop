@@ -32,6 +32,8 @@
   "launcher.shell.description": "Stattdessen ein normales Terminal starten",
   "sessionTitle": "Terminal {number}",
   "closeSession": "{title} schließen",
+  "split.resize": "Terminalbereiche skalieren",
+  "split.dragHandle": "{title} zum Verschieben ziehen",
   "closeDialog.title": "{title} schließen?",
   "closeDialog.detail": "Dadurch werden die Shell und alle in diesem Terminal ausgeführten Befehle beendet.",
   "closeDialog.confirm": "Terminal schließen",

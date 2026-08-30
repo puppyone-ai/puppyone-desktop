@@ -50,8 +50,6 @@ requirePath("electron/main/terminal-agent/activity/bridge/shell-file-intent.mjs"
 requirePath("tests/fixtures/agent-activity/codex-0.147.0/pre-tool-use-bash-read.json");
 requirePath("tests/fixtures/agent-activity/codex-0.147.0/pre-tool-use-apply-patch-write.json");
 requirePath("tests/fixtures/agent-activity/README.md");
-requirePath("docs/architecture/desktop-agent/local-agents-and-file-activity.md");
-
 const activityFixtureRoot = path.join(root, "tests", "fixtures", "agent-activity");
 for (const filePath of files(activityFixtureRoot)) {
   if (path.extname(filePath) !== ".json") continue;

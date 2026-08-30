@@ -3,10 +3,34 @@ import {
   isSameOrDescendantResourcePath,
   rebaseResourcePath,
 } from "../../core/resourcePath";
+import { rebaseDataResourcePath } from "../../core/dataResourcePath";
+import {
+  ResourceUriIdentityService,
+  canonicalizeResourceUri,
+  createResourceUri,
+  createWorkspaceResourceUri,
+  getWorkspaceResourcePath,
+  type ResourceUri,
+} from "../../core/resourceUri";
+
+export type EditorResourceDescriptor = Readonly<{
+  rootUri: ResourceUri;
+  /** Provider-relative path used to construct global Resource identity. */
+  resourcePath: string;
+  /** Host-facing routed path. Defaults to resourcePath for single-root hosts. */
+  hostPath?: string;
+}>;
+
+export type EditorResourceReference = string | EditorResourceDescriptor;
 
 export type EditorInput = Readonly<{
   id: string;
+  /** Workspace-relative display/provider path retained for current host consumers. */
   resource: string;
+  /** Global Root-aware resource identity. */
+  resourceUri: ResourceUri;
+  /** Null only for legacy callers that have not supplied a Workspace Folder. */
+  rootUri: ResourceUri | null;
   label: string;
 }>;
 
@@ -22,12 +46,17 @@ export const EMPTY_EDITOR_GROUP: EditorGroupState = Object.freeze({
   mostRecentlyUsed: Object.freeze([]),
 });
 
-export function createEditorInput(resource: string, label = basename(resource)): EditorInput {
-  const canonicalResource = canonicalizeResourcePath(resource);
+export function createEditorInput(
+  resource: EditorResourceReference,
+  label?: string,
+): EditorInput {
+  const identity = resolveEditorResource(resource);
   return Object.freeze({
-    id: canonicalResource,
-    resource: canonicalResource,
-    label: label || basename(canonicalResource),
+    id: identity.id,
+    resource: identity.resourcePath,
+    resourceUri: identity.resourceUri,
+    rootUri: identity.rootUri,
+    label: label || basename(identity.resourcePath),
   });
 }
 
@@ -73,28 +102,46 @@ export function closeEditor(state: EditorGroupState, editorId: string): EditorGr
 
 export function closeEditorsUnderResource(
   state: EditorGroupState,
-  resource: string,
+  resource: EditorResourceReference,
 ): EditorGroupState {
+  const target = resolveEditorResource(resource);
   return state.editors
-    .filter((editor) => isSameOrDescendantResourcePath(editor.resource, resource))
+    .filter((editor) => isEditorWithinResource(editor, target))
     .reduce((next, editor) => closeEditor(next, editor.id), state);
 }
 
 export function rebaseEditorResources(
   state: EditorGroupState,
-  previousResource: string,
-  nextResource: string,
+  previousResource: EditorResourceReference,
+  nextResource: EditorResourceReference,
 ): EditorGroupState {
-  const canonicalNextResource = canonicalizeResourcePath(nextResource);
+  const previous = resolveEditorResource(previousResource);
+  const next = resolveCompatibleNextResource(previous, nextResource);
   const idMap = new Map<string, string>();
   const editors = state.editors.map((editor) => {
-    const resource = rebaseResourcePath(editor.resource, previousResource, canonicalNextResource);
-    if (resource === editor.resource) return editor;
-    idMap.set(editor.id, resource);
-    return createEditorInput(
-      resource,
-      resource === canonicalNextResource ? basename(resource) : editor.label,
+    if (!isEditorWithinResource(editor, previous)) return editor;
+    const hostPath = rebaseDataResourcePath(
+      editor.resource,
+      previous.resourcePath,
+      next.resourcePath,
+    ) ?? editor.resource;
+    if (hostPath === editor.resource) return editor;
+    const reference: EditorResourceReference = next.rootUri
+      ? {
+          rootUri: next.rootUri,
+          resourcePath: getWorkspaceResourcePath(
+            next.rootUri,
+            editorResourceIdentity.rebase(editor.resourceUri, previous.resourceUri, next.resourceUri),
+          ),
+          hostPath,
+        }
+      : hostPath;
+    const rebased = createEditorInput(
+      reference,
+      hostPath === next.resourcePath ? basename(hostPath) : editor.label,
     );
+    idMap.set(editor.id, rebased.id);
+    return rebased;
   });
   const mapId = (id: string) => idMap.get(id) ?? id;
   return freezeState(
@@ -104,22 +151,56 @@ export function rebaseEditorResources(
   );
 }
 
-export function parseEditorGroupState(value: unknown): EditorGroupState {
+export function parseEditorGroupState(
+  value: unknown,
+  options: Readonly<{ rootUri?: ResourceUri }> = {},
+): EditorGroupState {
   if (!value || typeof value !== "object") return EMPTY_EDITOR_GROUP;
   const candidate = value as Partial<EditorGroupState>;
   if (!Array.isArray(candidate.editors)) return EMPTY_EDITOR_GROUP;
+  const persistedIdMap = new Map<string, string>();
   const editors = candidate.editors.flatMap((editor) => {
     if (!editor || typeof editor !== "object") return [];
     const input = editor as Partial<EditorInput>;
     if (typeof input.resource !== "string" || !input.resource.trim()) return [];
-    return [createEditorInput(input.resource, typeof input.label === "string" ? input.label : undefined)];
+    try {
+      const rootUri = typeof input.rootUri === "string"
+        ? canonicalizeResourceUri(input.rootUri)
+        : options.rootUri;
+      const persistedResourceUri = rootUri && typeof input.resourceUri === "string"
+        ? canonicalizeResourceUri(input.resourceUri)
+        : null;
+      const parsed = createEditorInput(
+        rootUri ? {
+          rootUri,
+          resourcePath: persistedResourceUri
+            ? getWorkspaceResourcePath(rootUri, persistedResourceUri)
+            : input.resource,
+          hostPath: input.resource,
+        } : input.resource,
+        typeof input.label === "string" ? input.label : undefined,
+      );
+      if (typeof input.id === "string") persistedIdMap.set(input.id, parsed.id);
+      persistedIdMap.set(input.resource, parsed.id);
+      if (typeof input.resourceUri === "string") persistedIdMap.set(input.resourceUri, parsed.id);
+      return [parsed];
+    } catch {
+      return [];
+    }
   });
   const ids = new Set(editors.map((editor) => editor.id));
-  const activeEditorId = typeof candidate.activeEditorId === "string" && ids.has(candidate.activeEditorId)
-    ? candidate.activeEditorId
+  const requestedActiveEditorId = typeof candidate.activeEditorId === "string"
+    ? persistedIdMap.get(candidate.activeEditorId) ?? candidate.activeEditorId
+    : null;
+  const activeEditorId = requestedActiveEditorId && ids.has(requestedActiveEditorId)
+    ? requestedActiveEditorId
     : editors[0]?.id ?? null;
   const storedMru = Array.isArray(candidate.mostRecentlyUsed)
-    ? candidate.mostRecentlyUsed.filter((id): id is string => typeof id === "string" && ids.has(id))
+    ? candidate.mostRecentlyUsed.flatMap((id) => {
+      if (typeof id !== "string") return [];
+      const mappedId = persistedIdMap.get(id) ?? id;
+      return ids.has(mappedId) ? [mappedId] : [];
+    })
     : [];
   const mru = [...new Set([...(activeEditorId ? [activeEditorId] : []), ...storedMru, ...ids])];
   return freezeState(editors, activeEditorId, mru);
@@ -149,4 +230,64 @@ function freezeState(
 
 function basename(resource: string): string {
   return resource.split("/").filter(Boolean).at(-1) ?? resource;
+}
+
+type ResolvedEditorResource = Readonly<{
+  id: string;
+  resourcePath: string;
+  resourceUri: ResourceUri;
+  rootUri: ResourceUri | null;
+}>;
+
+const editorResourceIdentity = new ResourceUriIdentityService();
+
+function resolveEditorResource(resource: EditorResourceReference): ResolvedEditorResource {
+  if (typeof resource === "string") {
+    const resourcePath = canonicalizeResourcePath(resource);
+    const resourceUri = createResourceUri({
+      scheme: "puppyone-legacy",
+      authority: "workspace",
+      path: resourcePath,
+    });
+    return { id: resourcePath, resourcePath, resourceUri, rootUri: null };
+  }
+  const rootUri = canonicalizeResourceUri(resource.rootUri);
+  const providerPath = canonicalizeResourcePath(resource.resourcePath);
+  const resourcePath = resource.hostPath?.trim() || providerPath;
+  const resourceUri = createWorkspaceResourceUri(rootUri, providerPath);
+  return {
+    id: editorResourceIdentity.canonicalKey(resourceUri),
+    resourcePath,
+    resourceUri,
+    rootUri,
+  };
+}
+
+function resolveCompatibleNextResource(
+  previous: ResolvedEditorResource,
+  next: EditorResourceReference,
+): ResolvedEditorResource {
+  if (typeof next !== "string") {
+    const resolved = resolveEditorResource(next);
+    if (previous.rootUri && resolved.rootUri && !editorResourceIdentity.isEqual(previous.rootUri, resolved.rootUri)) {
+      throw new Error("Editor resource rebasing cannot cross Workspace Folders.");
+    }
+    return resolved;
+  }
+  return resolveEditorResource(previous.rootUri
+    ? { rootUri: previous.rootUri, resourcePath: next }
+    : next);
+}
+
+function isEditorWithinResource(
+  editor: EditorInput,
+  target: ResolvedEditorResource,
+): boolean {
+  if (target.rootUri === null) {
+    return editor.rootUri === null
+      && isSameOrDescendantResourcePath(editor.resource, target.resourcePath);
+  }
+  return editor.rootUri !== null
+    && editorResourceIdentity.isEqual(editor.rootUri, target.rootUri)
+    && editorResourceIdentity.isEqualOrParent(editor.resourceUri, target.resourceUri);
 }

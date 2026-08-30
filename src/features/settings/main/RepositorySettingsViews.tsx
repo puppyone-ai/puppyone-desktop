@@ -2,7 +2,8 @@ import { Copy, RefreshCw } from "lucide-react";
 import { useLocalization } from "@puppyone/localization";
 import type { GitStatusSnapshot, PuppyoneWorkspaceConfig } from "../../../types/electron";
 import { getPuppyoneRemote, maskRemoteUrl, parsePuppyoneRemote } from "../../source-control";
-import { SettingsSectionHeader, SettingsSubsection, SettingsValueRow } from "../components";
+import { useGitAutoCommitSettings } from "../../source-control/useGitAutoCommitSettings";
+import { SettingsSectionHeader, SettingsSubsection, SettingsToggle, SettingsValueRow } from "../components";
 import { PuppyoneWorkspaceConfigSettings } from "../PuppyoneWorkspaceConfigSettings";
 import { remoteKindLabel, shortCommit } from "../utils";
 
@@ -126,6 +127,8 @@ export function CloudHostingSettingsView({
 }
 
 export function GitSettingsView({
+  workspaceRoot,
+  experimentalOptIn,
   status,
   loading,
   error,
@@ -133,8 +136,14 @@ export function GitSettingsView({
   copyError,
   onCopyRemoteUrl,
   onRefresh,
-}: RepositorySettingsBaseProps) {
+}: RepositorySettingsBaseProps & {
+  workspaceRoot: string;
+  experimentalOptIn: boolean;
+}) {
   const { t } = useLocalization();
+  const autoCommit = useGitAutoCommitSettings(workspaceRoot, experimentalOptIn);
+  const autoCommitPolicy = autoCommit.snapshot?.workspacePolicy ?? null;
+  const autoCommitRuntime = autoCommit.snapshot?.runtime ?? null;
   const currentBranch = status?.branches.find((branch) => branch.current) ?? null;
   const remotes = status?.remotes ?? [];
   const localBranchCount = status?.branches.filter((branch) => !branch.remote).length ?? 0;
@@ -173,6 +182,76 @@ export function GitSettingsView({
                 />
                 <SettingsValueRow label="HEAD" value={status?.headCommitId ? shortCommit(status.headCommitId) : t("settings.git.noCommits")} monospace />
               </SettingsSubsection>
+              {autoCommit.available && experimentalOptIn && (
+                <SettingsSubsection title={t("settings.git.autoCommit.title")}>
+                  <div className="desktop-settings-muted-row">
+                    {t("settings.git.autoCommit.localOnly")}
+                  </div>
+                  <div className="desktop-settings-row desktop-settings-row-control">
+                    <span title={t("settings.git.autoCommit.enabled.detail")}>
+                      {t("settings.git.autoCommit.enabled.title")}
+                    </span>
+                    <SettingsToggle
+                      label={t("settings.git.autoCommit.enabled.title")}
+                      description={t("settings.git.autoCommit.enabled.detail")}
+                      checked={autoCommitPolicy?.enabled === true}
+                      disabled={autoCommit.saving || !autoCommit.snapshot?.repository}
+                      onChange={(enabled) => {
+                        if (enabled && !window.confirm(t("settings.git.autoCommit.confirm"))) return;
+                        void autoCommit.update({ enabled });
+                      }}
+                    />
+                  </div>
+                  <label className="desktop-settings-row desktop-settings-row-control">
+                    <span>{t("settings.git.autoCommit.interval")}</span>
+                    <select
+                      className="desktop-settings-select"
+                      value={autoCommitPolicy?.minimumIntervalMs ?? 300_000}
+                      disabled={autoCommit.saving || autoCommitPolicy?.enabled !== true}
+                      onChange={(event) => void autoCommit.update({
+                        minimumIntervalMs: Number(event.target.value),
+                      })}
+                    >
+                      {[5, 15, 30, 60].map((minutes) => (
+                        <option value={minutes * 60_000} key={minutes}>
+                          {t("settings.git.autoCommit.minutes", { count: minutes })}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <SettingsValueRow
+                    label={t("settings.git.autoCommit.status")}
+                    value={t(`settings.git.autoCommit.state.${autoCommitRuntime?.state ?? "disabled"}`)}
+                  />
+                  {autoCommitRuntime?.nextEligibleAt && (
+                    <SettingsValueRow
+                      label={t("settings.git.autoCommit.nextRun")}
+                      value={new Date(autoCommitRuntime.nextEligibleAt).toLocaleString()}
+                    />
+                  )}
+                  {autoCommitRuntime?.lastResult && (
+                    <>
+                      <SettingsValueRow
+                        label={t("settings.git.autoCommit.lastResult")}
+                        value={t(`settings.git.autoCommit.outcome.${autoCommitRuntime.lastResult.outcome}`)}
+                      />
+                      <SettingsValueRow
+                        label={t("settings.git.autoCommit.reason")}
+                        value={autoCommitRuntime.lastResult.reason}
+                        monospace
+                      />
+                      {autoCommitRuntime.lastResult.commitId && (
+                        <SettingsValueRow
+                          label={t("settings.git.autoCommit.commit")}
+                          value={shortCommit(autoCommitRuntime.lastResult.commitId)}
+                          monospace
+                        />
+                      )}
+                    </>
+                  )}
+                  {autoCommit.error && <div className="desktop-utility-empty danger">{autoCommit.error}</div>}
+                </SettingsSubsection>
+              )}
               <SettingsSubsection title={t("settings.git.remotes")}>
                 {remotes.length === 0 ? (
                   <div className="desktop-settings-muted-row">{t("settings.git.noRemotes")}</div>

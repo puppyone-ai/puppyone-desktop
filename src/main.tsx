@@ -35,13 +35,16 @@ const setCloseInteractionBarrier = (locked: boolean) => {
 };
 
 const stopDocumentSessionFlushListener = window.puppyoneDesktop
-  ?.onDocumentSessionFlushRequested?.(async ({ requestId }) => {
-    activeCloseRequestId = requestId;
-    setCloseInteractionBarrier(true);
+  ?.onDocumentSessionFlushRequested?.(async ({ requestId, reason }) => {
+    const closesWindow = reason === "app-close";
+    if (closesWindow) {
+      activeCloseRequestId = requestId;
+      setCloseInteractionBarrier(true);
+    }
     try {
-      await flushActiveDocumentSessions();
+      await flushActiveDocumentSessions(reason);
     } catch (error) {
-      if (activeCloseRequestId === requestId) {
+      if (closesWindow && activeCloseRequestId === requestId) {
         activeCloseRequestId = null;
         setCloseInteractionBarrier(false);
       }
@@ -72,6 +75,16 @@ async function renderApplication() {
       "./features/desktop-terminal/visual-smoke"
     );
     surface = <TerminalLauncherVisualSmokeHarness />;
+  } else if (window.location.hash === "#terminal-split-visual-smoke") {
+    const { TerminalSplitVisualSmokeHarness } = await import(
+      "./features/desktop-terminal/visual-smoke"
+    );
+    surface = <TerminalSplitVisualSmokeHarness />;
+  } else if (window.location.hash === "#terminal-p0-smoke") {
+    const { TerminalP0SmokeHarness } = await import(
+      "./features/desktop-terminal/visual-smoke"
+    );
+    surface = <TerminalP0SmokeHarness />;
   } else if (window.location.hash === "#agent-visual-smoke") {
     const { AgentVisualSmokeHarness } = await import("./features/desktop-agent/visual-smoke");
     surface = <AgentVisualSmokeHarness />;
@@ -89,6 +102,11 @@ async function renderApplication() {
       "./features/appearance/AppearanceVisualSmokeHarness"
     );
     surface = <AppearanceVisualSmokeHarness />;
+  } else if (window.location.hash === "#workspace-menu-visual-smoke") {
+    const { WorkspaceMenuVisualSmokeHarness } = await import(
+      "./features/app-shell/WorkspaceMenuVisualSmokeHarness"
+    );
+    surface = <WorkspaceMenuVisualSmokeHarness />;
   } else {
     surface = (
       <TypographyCatalogProvider>

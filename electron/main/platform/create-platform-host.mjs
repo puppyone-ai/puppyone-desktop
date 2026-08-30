@@ -1,0 +1,28 @@
+import { createDesktopTargetFromNode } from "../../../shared/desktop/platform-contract.mjs";
+import { createPlatformCapabilitySnapshot } from "./common/capability-snapshot.mjs";
+import { createLinuxPlatformAdapter } from "./linux/index.mjs";
+import { createMacosPlatformAdapter } from "./macos/index.mjs";
+import { createWindowsPlatformAdapter } from "./windows/index.mjs";
+
+export function createDesktopPlatformHost({
+  nodePlatform = process.platform,
+  nodeArch = process.arch,
+  safeStorage = null,
+  officeDocumentConverter,
+} = {}) {
+  const target = createDesktopTargetFromNode({ platform: nodePlatform, arch: nodeArch });
+  const adapter = target.platform === "macos"
+    ? createMacosPlatformAdapter({ arch: target.arch, officeDocumentConverter })
+    : target.platform === "windows"
+      ? createWindowsPlatformAdapter({ arch: target.arch })
+      : createLinuxPlatformAdapter({ arch: target.arch });
+  const capabilities = createPlatformCapabilitySnapshot({ adapter, safeStorage });
+  return Object.freeze({
+    target,
+    platform: target.platform,
+    arch: target.arch,
+    windowChrome: adapter.windowChrome,
+    documents: adapter.documents,
+    getCapabilities: () => capabilities,
+  });
+}

@@ -41,6 +41,15 @@ describe("workspace folder drop preload boundary", () => {
       repositoryUrl: "https://github.com/owner/repository.git",
     });
   });
+
+  it("exposes a gesture-bound attach picker without accepting a renderer path", async () => {
+    const invoke = vi.fn(async () => ({ status: "attached-current", workspaces: [] }));
+    const bridge = await loadPreloadBridge({ invoke, getPathForFile: () => "" });
+
+    await bridge.selectFolderToAttach();
+
+    expect(invoke).toHaveBeenCalledWith("workspace:select-folder-attach");
+  });
 });
 
 async function loadPreloadBridge({ invoke, getPathForFile }) {

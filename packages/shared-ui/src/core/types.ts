@@ -1,4 +1,5 @@
 import type { FileSemanticKind } from "./fileFormats";
+import type { ResourceUri } from "./resourceUri";
 
 export type DataNodeKind = FileSemanticKind;
 
@@ -58,6 +59,12 @@ export type DataNode = {
   hasChildren?: boolean;
   children?: DataNode[] | null;
   source?: DataSourceKind;
+  /** Global provider/root-aware identity used by multi-root Workspaces. */
+  resourceUri?: ResourceUri;
+  /** Owning Workspace Folder; absent only on legacy single-provider nodes. */
+  workspaceFolderId?: string;
+  /** True only for the synthetic Explorer row representing an attached root. */
+  workspaceFolderRoot?: boolean;
 };
 
 /**
@@ -212,6 +219,7 @@ export type DocumentPersistenceReason =
   | "document-close"
   | "document-switch"
   | "workspace-switch"
+  | "git-auto-commit"
   | "app-close"
   | "destroy";
 
@@ -281,6 +289,7 @@ export type DataPort = {
   getFileUrl?: (path: string, options?: DataFileUrlOptions) => string | Promise<string>;
   revokeFileUrl?: (url: string) => void | Promise<void>;
   openExternalFile?: (path: string) => Promise<void>;
+  revealInFileManager?: (path: string) => Promise<void>;
   convertOfficeDocumentToDocx?: OfficeDocumentConverter;
   appPreview?: AppPreviewController;
   documentPersistence?: DocumentPersistencePort;

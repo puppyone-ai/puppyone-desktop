@@ -6,7 +6,6 @@ export const EXPLORER_COLLAPSE_THRESHOLD = MIN_EXPLORER_WIDTH * 0.5;
 
 export const DEFAULT_RIGHT_SIDEBAR_WIDTH = 560;
 export const MIN_RIGHT_SIDEBAR_WIDTH = 320;
-export const MAX_RIGHT_SIDEBAR_WIDTH = 760;
 export const RIGHT_SIDEBAR_COLLAPSE_THRESHOLD = MIN_RIGHT_SIDEBAR_WIDTH * 0.5;
 
 export const MIN_MAIN_PANE_WIDTH = 320;
@@ -83,7 +82,7 @@ export function resolveDesktopPaneLayout({
     rightSidebar.minWidth,
     rightSidebar.maxWidth,
     MIN_RIGHT_SIDEBAR_WIDTH,
-    MAX_RIGHT_SIDEBAR_WIDTH,
+    Math.max(width, MIN_RIGHT_SIDEBAR_WIDTH),
   );
   const explorerGutterWidth = explorerOpen ? EXPLORER_RESIZE_GUTTER_WIDTH : 0;
   const minimumWidth = resolvedMainMinWidth
@@ -132,16 +131,18 @@ export function resolveDesktopPaneLayout({
       explorerRange.max,
     )
     : explorerRange.max;
-  const rightSidebarMaxWidth = rightSidebarOpen
-    ? clamp(
-      layoutWidth
-        - explorerGutterWidth
-        - resolvedMainMinWidth
-        - (explorerOpen ? explorerRange.min : 0),
-      rightSidebarRange.min,
-      rightSidebarRange.max,
-    )
-    : rightSidebarRange.max;
+  /* The auxiliary pane has no arbitrary pixel ceiling. Its live maximum is
+   * whatever remains after preserving the current Explorer and the Editor
+   * floor, so a Terminal can grow with a wide window without consuming either
+   * pane's interaction contract. */
+  const rightSidebarMaxWidth = clamp(
+    layoutWidth
+      - explorerGutterWidth
+      - resolvedMainMinWidth
+      - explorerWidth,
+    rightSidebarRange.min,
+    rightSidebarRange.max,
+  );
 
   return {
     availableWidth: width,

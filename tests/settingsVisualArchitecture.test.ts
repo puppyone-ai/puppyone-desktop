@@ -11,9 +11,10 @@ describe("settings visual architecture", () => {
     const localAgents = source("src/features/local-agents/ui/LocalAgentsSettingsView.tsx");
     const localAgentHooks = source("src/features/local-agents/ui/LocalAgentHooksSettingsView.tsx");
     const localProject = source("src/features/settings/main/LocalProjectSettingsView.tsx");
+    const privacy = source("src/features/settings/main/PrivacySettingsView.tsx");
     const language = source("src/features/settings/LanguageSetting.tsx");
 
-    expect(types).toContain('"general" | "local-project"');
+    expect(types).toContain('"general" | "privacy" | "local-project"');
     expect(types).toContain('"appearance" | "local-agents" | "editor" | "new-menu"');
     expect(types).toContain('| "editor"');
     expect(types).not.toContain('"external-apps"');
@@ -21,11 +22,16 @@ describe("settings visual architecture", () => {
     expect(types).not.toContain('| "language"');
     expect(types).not.toContain('"workspace"');
     expect(view).toContain('if (activeSection === "general")');
+    expect(view).toContain('if (activeSection === "privacy")');
     expect(view).toContain('if (activeSection === "local-agents")');
     expect(view).not.toContain('if (activeSection === "local-agent-hooks")');
     expect(view).toContain('if (activeSection === "local-project")');
     expect(view).not.toContain('activeSection === "language"');
     expect(general).toContain("<LanguageSettingRow />");
+    expect(general).not.toContain("ProductAnalyticsSettingsRow");
+    expect(privacy).toContain("<ProductAnalyticsSettingsRow />");
+    expect(privacy).not.toContain("SettingsSubsection");
+    expect(privacy).not.toContain("collectionDetails");
     expect(general).toContain("<DesktopBuildVersionSettingsRow />");
     expect(general).toContain("<DesktopUpdateSettingsRow");
     expect(general).not.toContain("Workspace");
@@ -69,6 +75,7 @@ describe("settings visual architecture", () => {
       'labelId: "settings.sidebar.localAgents"',
       'labelId: "settings.sidebar.createNew"',
       'labelId: "settings.sidebar.editor"',
+      'labelId: "settings.sidebar.privacy"',
       'labelId: "settings.sidebar.experimental"',
     ]);
     expect(desktopAppItems).toContain("settings.sidebar.editor");
@@ -120,6 +127,7 @@ describe("settings visual architecture", () => {
       const catalog = JSON.parse(source(`locales/renderer/${locale}/settings.json`)) as Record<string, string>;
       expect(catalog["sidebar.language"], locale).toBeUndefined();
       expect(catalog["sidebar.localProject"], locale).toBeTruthy();
+      expect(catalog["sidebar.privacy"], locale).toBeTruthy();
       expect(catalog["sidebar.projectInfo"], locale).toBeTruthy();
       expect(catalog["sidebar.localAgents"], locale).toBeTruthy();
       expect(catalog["sidebar.createNew"], locale).toBeTruthy();
@@ -127,6 +135,16 @@ describe("settings visual architecture", () => {
       expect(catalog["sidebar.localAgentHooks"], locale).toBeUndefined();
       expect(catalog["general.title"], locale).toBeTruthy();
       expect(catalog["general.detail"], locale).toBeTruthy();
+      for (const key of [
+        "title",
+        "detail",
+        "productAnalyze.title",
+        "productAnalyze.detail",
+        "productAnalyze.error",
+        "productAnalyze.learnMore",
+      ]) {
+        expect(catalog[`privacy.${key}`], `${locale}: settings.privacy.${key}`).toBeTruthy();
+      }
       expect(catalog["localAgents.title"], locale).toBeTruthy();
       expect(catalog["localAgents.detail"], locale).toBeTruthy();
       expect(catalog["localAgents.toggle"], locale).toBeTruthy();
@@ -231,6 +249,8 @@ describe("settings visual architecture", () => {
       "FileSettingsViews.tsx",
       "GeneralSettingsView.tsx",
       "LocalProjectSettingsView.tsx",
+      "ProductAnalyticsSettingsRow.tsx",
+      "PrivacySettingsView.tsx",
       "RepositorySettingsViews.tsx",
     ].map((fileName) => source(`src/features/settings/main/${fileName}`)).join("\n");
     const settingsImplementation = `${components}\n${view}\n${workspaceConfig}\n${splitViews}`;
@@ -249,6 +269,7 @@ describe("settings visual architecture", () => {
     for (const detailId of [
       "settings.appearance.detail",
       "settings.general.detail",
+      "settings.privacy.detail",
       "settings.localProject.detail",
       "settings.account.detail",
       "settings.experimental.detail",

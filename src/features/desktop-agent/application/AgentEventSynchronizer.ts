@@ -259,7 +259,7 @@ function rejectedProviderPatch(state: AgentControllerState, projection: AgentCon
       ...state.inspection,
       providers,
       models,
-      readiness: hasAlternative
+      readiness: hasAlternative || !state.inspection.readiness
         ? state.inspection.readiness
         : {
           ...state.inspection.readiness,

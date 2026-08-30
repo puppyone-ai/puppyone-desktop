@@ -498,27 +498,35 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
 }
 
 .desktop-project-menu {
+  --po-menu-item-padding-inline: 10px;
+  --po-menu-item-gap: 9px;
+  --po-menu-item-radius: 8px;
+
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   max-height: min(520px, calc(100vh - 58px));
+}
+
+.desktop-project-menu .desktop-menu-item {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.desktop-project-menu .desktop-menu-item-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.desktop-project-menu .desktop-menu-item-detail {
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .desktop-project-list {
   display: grid;
+  gap: 2px;
   min-height: 0;
   overflow: auto;
-}
-
-.desktop-project-section {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.desktop-project-section + .desktop-project-section {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid var(--po-divider);
 }
 
 .desktop-project-mark {
@@ -531,30 +539,6 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   color: var(--po-text-muted);
 }
 
-.desktop-project-mark.linked {
-  color: color-mix(
-    in srgb,
-    color-mix(in oklab, var(--po-info) 78%, var(--po-accent)) 86%,
-    var(--po-text) 14%
-  );
-}
-
-.desktop-project-option:hover .desktop-project-mark,
-.desktop-project-option.selected .desktop-project-mark,
-.desktop-project-option-row.selected .desktop-project-mark,
-.desktop-project-option-row:hover .desktop-project-mark,
-.desktop-project-option-row:focus-within .desktop-project-mark {
-  color: var(--po-text);
-}
-
-.desktop-project-option:hover .desktop-project-mark.linked,
-.desktop-project-option.selected .desktop-project-mark.linked,
-.desktop-project-option-row.selected .desktop-project-mark.linked,
-.desktop-project-option-row:hover .desktop-project-mark.linked,
-.desktop-project-option-row:focus-within .desktop-project-mark.linked {
-  color: color-mix(in oklab, var(--po-info) 78%, var(--po-accent));
-}
-
 .desktop-project-option-row {
   position: relative;
   display: grid;
@@ -563,13 +547,11 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
 
 .desktop-project-option-row > .desktop-project-option {
   width: 100%;
-  padding-inline-end: calc(var(--po-menu-item-padding-inline) + 26px);
+  cursor: default;
+  pointer-events: none;
 }
 
-/* Match VS Code's single-line recent-workspace hierarchy: the project name is
-   primary and keeps its intrinsic width, while the parent path absorbs the
-   available-space truncation. Extremely long names remain bounded so the
-   location never disappears completely. */
+/* Keep every attached Project and its parent path on one quiet membership row. */
 .desktop-project-option .desktop-menu-item-label {
   max-width: 65%;
   flex: 0 0 auto;
@@ -582,46 +564,16 @@ body.desktop-right-sidebar-resizing .desktop-right-sidebar.is-open {
   text-align: start;
 }
 
-.desktop-project-option-row:hover > .desktop-project-option:not(:disabled),
-.desktop-project-option-row:focus-within > .desktop-project-option:not(:disabled),
-.desktop-project-option-row.selected > .desktop-project-option {
-  background: var(--po-hover);
-  color: var(--po-text);
-}
-
-.desktop-project-copy-path {
-  position: absolute;
-  top: 50%;
-  inset-inline-end: 5px;
-  z-index: 1;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-50%);
-  transition: opacity 0.12s ease;
-}
-
-.desktop-project-option-row:hover .desktop-project-copy-path,
-.desktop-project-option-row:focus-within .desktop-project-copy-path,
-.desktop-project-copy-path.is-copied {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.desktop-project-copy-path.is-copied,
-.desktop-project-copy-path.is-copied:hover {
-  background: color-mix(in srgb, var(--po-success) 14%, var(--po-control));
-  color: var(--po-success);
-}
-
-.desktop-project-actions {
+.desktop-project-home-group {
   display: grid;
-  gap: 2px;
-  margin-top: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--po-divider);
 }
 
-.desktop-project-home {
-  margin-top: 0;
-  margin-bottom: 6px;
+.desktop-project-menu .desktop-project-add-folder:disabled {
+  color: var(--po-text-subtle);
+  opacity: 0.72;
 }
 
 .desktop-rail-nav {

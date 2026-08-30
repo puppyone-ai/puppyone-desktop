@@ -1,7 +1,7 @@
 import { CircleAlert, RefreshCw } from "lucide-react";
 import { bidiIsolate } from "@puppyone/localization/core";
 import { useLocalization } from "@puppyone/localization/react";
-import type { AgentProviderReadiness } from "../domain/agent-contract";
+import type { AgentRuntimeReadiness } from "../domain/agent-contract";
 import type { AgentErrorDescriptor } from "../application/agent-error";
 import { presentAgentError } from "./agentErrorPresentation";
 
@@ -10,7 +10,7 @@ type AgentPanelStatusProps = {
   failed: boolean;
   error: AgentErrorDescriptor | null;
   runtimeLabel: string;
-  readiness?: AgentProviderReadiness;
+  readiness?: AgentRuntimeReadiness;
   onRetry: () => void;
 };
 
@@ -24,7 +24,9 @@ export function AgentPanelStatus({
 }: AgentPanelStatusProps) {
   const { t } = useLocalization();
   const errorPresentation = presentAgentError(error, t);
-  const detail = readiness?.message || errorPresentation?.detail;
+  const detail = failed
+    ? errorPresentation?.detail
+    : readiness?.message || errorPresentation?.detail;
   return (
     <>
       {(unavailable || failed) && (

@@ -5,6 +5,7 @@ import {
   DesktopDialogRoot,
   DesktopDialogSurface,
 } from "../../../../components/DesktopDialog";
+import { DesktopOverlayLayer } from "../../../app-shell/DesktopOverlayPortal";
 import type {
   DesktopCloudConnector,
   DesktopCloudMcpEndpoint,
@@ -47,8 +48,9 @@ export function AccessPointManageDialog({
   const title = formatAccessPointTitle(row.accessPoint, t);
   const targetKey = repositoryTargetKey(row.scope.target);
   return (
-    <DesktopDialogRoot onClose={onClose}>
-      <DesktopDialogSurface width={920} className="desktop-cloud-access-manage-dialog" ariaLabel={title}>
+    <DesktopOverlayLayer>
+      <DesktopDialogRoot onClose={onClose}>
+        <DesktopDialogSurface width={920} className="desktop-cloud-access-manage-dialog" ariaLabel={title}>
         <header className="desktop-dialog-header desktop-cloud-access-manage-header">
           <div className="desktop-dialog-title-row">
             <div>
@@ -73,7 +75,8 @@ export function AccessPointManageDialog({
             canManage={canManage}
           />
         </div>
-      </DesktopDialogSurface>
-    </DesktopDialogRoot>
+        </DesktopDialogSurface>
+      </DesktopDialogRoot>
+    </DesktopOverlayLayer>
   );
 }

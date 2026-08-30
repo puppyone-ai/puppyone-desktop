@@ -17,6 +17,62 @@ afterEach(() => {
 });
 
 describe("Experimental settings", () => {
+  it("offers an off-by-default multi-project Workspace opt-in", () => {
+    const onChange = vi.fn();
+    const host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+
+    act(() => root?.render(withTestLocalization(
+      <ExperimentalSettingsView
+        settings={DEFAULT_EXPERIMENTAL_SETTINGS}
+        agentChatAvailable={false}
+        assetLibraryHomeAvailable={false}
+        onChange={onChange}
+      />,
+    )));
+
+    const toggle = host.querySelector<HTMLInputElement>(
+      'input[aria-label="Multi-project workspaces"]',
+    );
+    expect(toggle).not.toBeNull();
+    expect(toggle?.checked).toBe(false);
+
+    act(() => toggle?.click());
+    expect(onChange).toHaveBeenCalledWith({
+      ...DEFAULT_EXPERIMENTAL_SETTINGS,
+      enableMultiRootWorkspaces: true,
+    });
+  });
+
+  it("offers an off-by-default first-project starting-point opt-in", () => {
+    const onChange = vi.fn();
+    const host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+
+    act(() => root?.render(withTestLocalization(
+      <ExperimentalSettingsView
+        settings={DEFAULT_EXPERIMENTAL_SETTINGS}
+        agentChatAvailable={false}
+        assetLibraryHomeAvailable={false}
+        onChange={onChange}
+      />,
+    )));
+
+    const toggle = host.querySelector<HTMLInputElement>(
+      'input[aria-label="First project starting point"]',
+    );
+    expect(toggle).not.toBeNull();
+    expect(toggle?.checked).toBe(false);
+
+    act(() => toggle?.click());
+    expect(onChange).toHaveBeenCalledWith({
+      ...DEFAULT_EXPERIMENTAL_SETTINGS,
+      enableFirstProjectStarter: true,
+    });
+  });
+
   it("offers an off-by-default Automation opt-in", () => {
     const onChange = vi.fn();
     const host = document.createElement("div");

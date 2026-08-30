@@ -9,7 +9,7 @@ const fixture = JSON.parse(readFileSync(new URL("./fixtures/agent-runtime/second
 describe("provider-neutral AgentRuntimePort contract", () => {
   it("runs a second fake harness through AgentService without runtime-name lifecycle branches", async () => {
     const registry = new AgentRuntimeRegistry([{
-      descriptor: fixture.descriptor,
+      manifest: fixture.manifest,
       discovery: { discover: async () => ({ runtimeId: fixture.descriptor.id, provider: fixture.descriptor.id, status: "ready", version: "1.0.0", executablePath: "/fixture", environment: {}, message: "ready" }) },
       createAdapter: (options) => fakeAdapter(options),
     }]);

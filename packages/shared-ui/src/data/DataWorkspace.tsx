@@ -65,6 +65,15 @@ import { getRendererPerformanceTracker } from "../performance/rendererPerformanc
 import { FileOpenRequestCoordinator } from "./file-open/fileOpenRequestCoordinator";
 import { putBoundedFileContent } from "./file-open/fileContentCache";
 import { useStableEventCallback } from "../primitives/useStableEventCallback";
+import {
+  collectDataResourceAncestors,
+  getDataResourceParent,
+  isDataResourceDescendant,
+  isSameDataResource,
+  joinDataResourcePath,
+  normalizeDataResourcePath,
+  rebaseDataResourcePath,
+} from "../core/dataResourcePath";
 
 const rendererPerformance = getRendererPerformanceTracker();
 
@@ -105,6 +114,7 @@ export type DataWorkspaceProps = {
   capabilities?: DataCapabilities;
   activePath?: string | null;
   defaultActivePath?: string | null;
+  defaultExpandedPaths?: readonly string[];
   showHeader?: boolean;
   showExplorerToolbar?: boolean;
   headerSlot?: DataWorkspaceSlot;
@@ -180,6 +190,7 @@ export type DataWorkspaceProps = {
 };
 
 const ROOT_FOLDER_KEY = "__puppyone_workspace_root__";
+const EMPTY_PATH_LIST: readonly string[] = Object.freeze([]);
 const DEFAULT_EXPLORER_WIDTH = 320;
 const MIN_EXPLORER_WIDTH = 240;
 const MAX_EXPLORER_WIDTH = 520;
@@ -193,6 +204,7 @@ export function DataWorkspace({
   capabilities,
   activePath,
   defaultActivePath = null,
+  defaultExpandedPaths = EMPTY_PATH_LIST,
   showHeader = true,
   showExplorerToolbar = true,
   headerSlot,
@@ -267,7 +279,10 @@ export function DataWorkspace({
   const [selectionAnchorPath, setSelectionAnchorPath] = useState<string | null>(defaultActivePath);
   const [rootLoaded, setRootLoaded] = useState(false);
   const [loadingFolderPaths, setLoadingFolderPaths] = useState<Set<string>>(() => new Set([ROOT_FOLDER_KEY]));
-  const [expandedFolderPaths, setExpandedFolderPaths] = useState<Set<string>>(() => new Set(collectAncestorFolderPaths(defaultActivePath)));
+  const [expandedFolderPaths, setExpandedFolderPaths] = useState<Set<string>>(() => new Set([
+    ...defaultExpandedPaths,
+    ...collectAncestorFolderPaths(defaultActivePath),
+  ]));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<FileContent | null>(null);
   const [fileContentCache, setFileContentCache] = useState<Record<string, FileContent>>({});
@@ -400,7 +415,10 @@ export function DataWorkspace({
     setSelectionAnchorPath(defaultActivePath);
     setTree([]);
     setRootLoaded(false);
-    setExpandedFolderPaths(new Set(collectAncestorFolderPaths(defaultActivePath)));
+    setExpandedFolderPaths(new Set([
+      ...defaultExpandedPaths,
+      ...collectAncestorFolderPaths(defaultActivePath),
+    ]));
     setLoadingFolderPaths(new Set([ROOT_FOLDER_KEY]));
     setLoadError(null);
     setFileContent(null);
@@ -411,7 +429,7 @@ export function DataWorkspace({
     setDocumentNavigationError(null);
     documentNavigationRequestRef.current += 1;
     setMarkdownLinkIndex(EMPTY_MARKDOWN_LINK_GRAPH_INDEX);
-  }, [workspace.path, dataPort, defaultActivePath]);
+  }, [workspace.path, dataPort, defaultActivePath, defaultExpandedPaths]);
 
   useEffect(() => {
     if (explorerWidth !== undefined) return;
@@ -1510,14 +1528,15 @@ function getPathRange(paths: string[], startPath: string, endPath: string): stri
 
 function collectTopLevelNodes(nodes: DataNode[]): DataNode[] {
   return nodes.filter((node) => !nodes.some((candidate) => (
-    candidate.path !== node.path && node.path.startsWith(`${candidate.path}/`)
+    !isSameDataResource(candidate.path, node.path)
+      && isDataResourceDescendant(node.path, candidate.path)
   )));
 }
 
 function isValidDataMoveTarget(node: DataNode, targetFolderPath: string | null): boolean {
-  if (getParentPath(node.path) === targetFolderPath) return false;
-  if (targetFolderPath === node.path) return false;
-  if (targetFolderPath?.startsWith(`${node.path}/`)) return false;
+  if (isSameDataResource(getParentPath(node.path), targetFolderPath)) return false;
+  if (isSameDataResource(targetFolderPath, node.path)) return false;
+  if (isDataResourceDescendant(targetFolderPath, node.path)) return false;
   return true;
 }
 
@@ -1684,10 +1703,7 @@ function rebaseFileContent(
 }
 
 function rebaseMovedPath(path: string | null, previousPath: string, nextPath: string): string | null {
-  if (!path) return path;
-  if (path === previousPath) return nextPath;
-  if (path.startsWith(`${previousPath}/`)) return `${nextPath}${path.slice(previousPath.length)}`;
-  return path;
+  return rebaseDataResourcePath(path, previousPath, nextPath);
 }
 
 function rebasePathByMoveOperations(path: string | null, operations: readonly MoveOperation[]): string | null {
@@ -1707,7 +1723,7 @@ function rebasePathSetByMoveOperations(paths: ReadonlySet<string>, operations: r
 }
 
 function joinDataPath(folderPath: string | null, name: string): string {
-  return folderPath ? `${folderPath}/${name}` : name;
+  return joinDataResourcePath(folderPath, name);
 }
 
 function useStableMarkdownLinkWorkspaceIndex(nodes: DataNode[]): {
@@ -1755,30 +1771,15 @@ function isMarkdownNodeLike(node: Pick<DataNode, "name" | "path" | "type">): boo
 }
 
 function getParentPath(path: string | null): string | null {
-  if (!path || !path.includes("/")) return null;
-  return path.slice(0, path.lastIndexOf("/"));
+  return getDataResourceParent(path);
 }
 
 function normalizeDataPath(path: string): string {
-  const normalized = path.replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+/g, "/").trim();
-  const parts: string[] = [];
-
-  for (const part of normalized.split("/")) {
-    if (!part || part === ".") continue;
-    if (part === "..") {
-      parts.pop();
-      continue;
-    }
-    parts.push(part);
-  }
-
-  return parts.join("/");
+  return normalizeDataResourcePath(path) ?? "";
 }
 
 function collectAncestorFolderPaths(activePath: string | null): string[] {
-  if (!activePath) return [];
-  const parts = activePath.split("/").filter(Boolean);
-  return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join("/"));
+  return collectDataResourceAncestors(activePath);
 }
 
 function getLoadingKey(folderPath: string | null): string {

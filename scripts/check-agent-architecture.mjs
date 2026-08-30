@@ -12,6 +12,8 @@ const mainSecurityRoot = path.join(mainRoot, "security");
 const mainTransportRoot = path.join(mainRoot, "transports");
 const mainRuntimesRoot = path.join(mainRoot, "runtimes");
 const mainCacheRoot = path.join(mainRoot, "cache");
+const mainPersistenceRoot = path.join(mainRoot, "persistence");
+const mainInfrastructureRoot = path.join(mainRoot, "infrastructure");
 const mainConcreteRoots = [
   path.join(mainRoot, "adapters"),
   path.join(mainRoot, "runtimes"),
@@ -21,16 +23,18 @@ const mainConcreteRoots = [
   path.join(mainRoot, "security"),
   path.join(mainRoot, "transports"),
   path.join(mainRoot, "bootstrap"),
+  mainPersistenceRoot,
+  mainInfrastructureRoot,
 ];
 const rendererRoot = path.join(repoRoot, "src", "features", "desktop-agent");
 const rendererDomainRoot = path.join(rendererRoot, "domain");
 const rendererApplicationRoot = path.join(rendererRoot, "application");
 const rendererInfrastructureRoot = path.join(rendererRoot, "infrastructure");
 const rendererUiRoot = path.join(rendererRoot, "ui");
+const rendererComposerRoot = path.join(rendererUiRoot, "composer");
 const rendererCompositionRoot = path.join(rendererUiRoot, "RightAgentPanel.tsx");
 const electronAgentClient = path.join(rendererInfrastructureRoot, "electron", "electronAgentClient.ts");
 const sharedContractRoot = path.join(repoRoot, "shared", "agent-contract");
-const agentDocsRoot = path.join(repoRoot, "docs", "architecture", "desktop-agent");
 const allowedCompositionRoot = path.join(mainRoot, "bootstrap", "create-agent-runtime-host.mjs");
 const allowedProviderNamedCoreFiles = new Set([
   path.join(mainRoot, "migrations", "legacy-session-format.mjs"),
@@ -53,8 +57,28 @@ const dynamicImportPattern = /\bimport\(\s*["']([^"']+)["']\s*\)/g;
 const providerNamePattern = /\b(?:opencode|codex|claude(?:\s+code)?|cursor\s+(?:cli|runtime))\b/i;
 const errors = [];
 
+const composerRootSource = readFileSync(path.join(rendererUiRoot, "AgentComposer.tsx"), "utf8");
+for (const leaf of ["AgentAttachmentButton.tsx", "AgentCommandSuggestions.tsx", "AgentDraftReferenceList.tsx"]) {
+  const leafPath = path.join(rendererComposerRoot, leaf);
+  if (!existsSync(leafPath)) {
+    errors.push(`${relative(leafPath)} is required; keep Composer acquisition, suggestions and draft references in private leaves`);
+    continue;
+  }
+  const leafSource = readFileSync(leafPath, "utf8");
+  if (/AgentSessionController|infrastructure\/|puppyoneDesktop/.test(stripComments(leafSource))) {
+    errors.push(`${relative(leafPath)} owns business/infrastructure state; Composer leaves must consume domain props and callbacks only`);
+  }
+}
+if (composerRootSource.split("\n").length >= 190 || /\buseState\b|function ReferenceChip/.test(stripComments(composerRootSource))) {
+  errors.push("src/features/desktop-agent/ui/AgentComposer.tsx must remain a controlled composition root; move local leaves under ui/composer/");
+}
+
 for (const legacyPath of legacyPresentationPaths) {
   if (existsSync(legacyPath)) errors.push(`${relative(legacyPath)} is a legacy presentation location; use ui/`);
+}
+const retiredProviderPicker = path.join(rendererUiRoot, "AgentProviderPicker.tsx");
+if (existsSync(retiredProviderPicker)) {
+  errors.push(`${relative(retiredProviderPicker)} is retired; Agent selection must use AgentRuntimePicker`);
 }
 
 for (const filePath of walkSourceFiles(mainRoot)) {
@@ -238,14 +262,46 @@ const registrySource = readFileSync(path.join(mainRuntimeRoot, "agent-runtime-re
 if (/\b(?:opencode|codex|claude|cursor)\b/i.test(stripComments(registrySource))) {
   errors.push("electron/main/agent/runtime/agent-runtime-registry.mjs names a concrete provider");
 }
+const runtimeManifestSource = readFileSync(path.join(mainRuntimeRoot, "agent-runtime-manifest.mjs"), "utf8");
+for (const requiredText of [
+  "defineAgentRuntimeManifest",
+  "runtimeDescriptorFromManifest",
+  "generic-acp requires protocol.kind acp",
+  "compatibility-bridge requires reviewed-bridge trust",
+  "user-defined integration requires user-defined trust",
+]) {
+  if (!runtimeManifestSource.includes(requiredText)) {
+    errors.push(`Agent runtime manifest contract is missing: ${requiredText}`);
+  }
+}
+if (!registrySource.includes("candidate.manifest") || !registrySource.includes("runtimeDescriptorFromManifest")) {
+  errors.push("Agent runtime registry must derive public descriptors from the versioned manifest source of truth");
+}
 
 const mainEntrySource = readFileSync(path.join(repoRoot, "electron", "main.mjs"), "utf8");
 const ephemeralCacheSource = readFileSync(
   path.join(mainCacheRoot, "ephemeral-agent-session-cache.mjs"),
   "utf8",
 );
-if (!mainEntrySource.includes("createEphemeralAgentSessionCache") || mainEntrySource.includes("createAgentPersistence")) {
-  errors.push("electron/main.mjs must compose the process-local Agent session cache directly");
+const conversationCatalogSource = readFileSync(
+  path.join(mainPersistenceRoot, "agent-conversation-catalog.mjs"),
+  "utf8",
+);
+const sessionRepositorySource = readFileSync(
+  path.join(mainPersistenceRoot, "agent-session-repository.mjs"),
+  "utf8",
+);
+const processSupervisorSource = readFileSync(
+  path.join(mainApplicationRoot, "processes", "agent-process-supervisor.mjs"),
+  "utf8",
+);
+if (
+  !mainEntrySource.includes("createEphemeralAgentSessionCache")
+  || !mainEntrySource.includes("createAgentConversationCatalog")
+  || !mainEntrySource.includes("createAgentSessionRepository")
+  || mainEntrySource.includes("createAgentPersistence")
+) {
+  errors.push("electron/main.mjs must compose the ephemeral replay cache and metadata-only Conversation Catalog through one repository");
 }
 if (/\b(?:writeFile|appendFile|createWriteStream|rename)\b/.test(stripComments(ephemeralCacheSource))) {
   errors.push("ephemeral-agent-session-cache.mjs must never write Chat session or transcript data");
@@ -253,58 +309,43 @@ if (/\b(?:writeFile|appendFile|createWriteStream|rename)\b/.test(stripComments(e
 if (!ephemeralCacheSource.includes("durable: false") || !ephemeralCacheSource.includes("desktop-agent-sessions.json")) {
   errors.push("ephemeral-agent-session-cache.mjs must declare non-durability and delete the legacy Chat journal");
 }
+if (!conversationCatalogSource.includes("metadata-only index") || !conversationCatalogSource.includes("promises.rename")) {
+  errors.push("agent-conversation-catalog.mjs must remain an atomic metadata-only native-session index");
+}
+if (/\b(?:events|prompt|transcript|messages|toolPayload)\s*:/.test(stripComments(conversationCatalogSource))) {
+  errors.push("agent-conversation-catalog.mjs must not serialize transcript, prompt, message, event, or tool payload fields");
+}
+if (!sessionRepositorySource.includes("event cache wins") || !sessionRepositorySource.includes("conversationCatalog.findLatest")) {
+  errors.push("agent-session-repository.mjs must join live replay state with the durable native-session pointer catalog");
+}
+if (!mainEntrySource.includes("createAgentProcessSupervisor") || !processSupervisorSource.includes("maxConcurrentStarts")) {
+  errors.push("native Agent process starts must be bounded by the shared process supervisor");
+}
 
-const architectureReadmeSource = readFileSync(path.join(agentDocsRoot, "README.md"), "utf8");
-const nativeHarnessAdrSource = readFileSync(
-  path.join(agentDocsRoot, "ADR-006-native-harness-adapters-and-acp.md"),
+const routingPreferencesSource = readFileSync(
+  path.join(repoRoot, "src", "features", "app-shell", "agentRoutingPreferences.ts"),
   "utf8",
 );
-const architectureMapStart = "<!-- agent-runtime-map:start -->";
-const architectureMapEnd = "<!-- agent-runtime-map:end -->";
-const readmeArchitectureMap = extractMarkedDocumentBlock(
-  architectureReadmeSource,
-  architectureMapStart,
-  architectureMapEnd,
-  "docs/architecture/desktop-agent/README.md",
-);
-const adrArchitectureMap = extractMarkedDocumentBlock(
-  nativeHarnessAdrSource,
-  architectureMapStart,
-  architectureMapEnd,
-  "docs/architecture/desktop-agent/ADR-006-native-harness-adapters-and-acp.md",
-);
-if (readmeArchitectureMap && adrArchitectureMap && readmeArchitectureMap !== adrArchitectureMap) {
-  errors.push("Desktop Agent README and ADR-006 must contain the same canonical runtime architecture map");
+const runtimePickerSource = readFileSync(path.join(rendererUiRoot, "AgentRuntimePicker.tsx"), "utf8");
+const backendRoutingSource = readFileSync(path.join(rendererDomainRoot, "agent-backend-routing.ts"), "utf8");
+if (!routingPreferencesSource.includes("routes: Record<string, AgentRoutePreference>") || !routingPreferencesSource.includes("legacyModelId")) {
+  errors.push("Agent routing preferences must be versioned, runtime-scoped, and migrate the legacy global model");
 }
-for (const requiredText of [
-  "One PuppyOne Chat UI / product control plane",
-  "codex app-server (JSONL-RPC over stdio)",
-  "official Claude Agent SDK + user's Claude Code executable",
-  "Agent Client Protocol (JSON-RPC 2.0 over stdio)",
-  "PuppyOne-bundled and pinned OpenCode kernel",
-  "discovery and diagnostics only",
-]) {
-  if (!readmeArchitectureMap?.includes(requiredText)) {
-    errors.push(`canonical Desktop Agent architecture map is missing: ${requiredText}`);
-  }
+if (!runtimePickerSource.includes("AgentRuntimePicker") || !runtimePickerSource.includes("agent.runtime.")) {
+  errors.push("the Chat header must expose an Agent runtime picker, not a provider picker");
+}
+if (/filter\([^\n]*bundled/.test(stripComments(backendRoutingSource))) {
+  errors.push("the runtime catalog must not hide the bundled PuppyOne Agent");
 }
 
-for (const retiredDocument of [
-  "ADR-001-opencode-sidecar.md",
-  "ADR-003-opencode-only-chat-harness.md",
-]) {
-  const retiredSource = readFileSync(path.join(agentDocsRoot, retiredDocument), "utf8");
-  if (!/Status: retired and superseded by/.test(retiredSource)) {
-    errors.push(`${retiredDocument} must remain an explicit retired-decision tombstone`);
-  }
-  if (/^## Decision$/m.test(retiredSource) || retiredSource.split("\n").length > 80) {
-    errors.push(`${retiredDocument} contains active or expanded legacy instructions; keep history in Git`);
-  }
+const genericAcpSource = readFileSync(path.join(mainProtocolRoot, "acp", "acp-runtime-adapter.mjs"), "utf8");
+const cursorAcpSource = readFileSync(path.join(mainRuntimesRoot, "cursor", "cursor-acp-adapter.mjs"), "utf8");
+const cursorDiscoverySource = readFileSync(path.join(mainRuntimesRoot, "cursor", "cursor-discovery.mjs"), "utf8");
+if (/cursor\/|managedOpenCodeAcpConfig|OPENCODE_/.test(stripComments(genericAcpSource))) {
+  errors.push("the shared ACP adapter must remain free of Cursor and OpenCode policy");
 }
-
-const adoptionSpikeSource = readFileSync(path.join(agentDocsRoot, "opencode-adoption-spike.md"), "utf8");
-if (!adoptionSpikeSource.includes("Status: archived research evidence; not an implementation specification.")) {
-  errors.push("opencode-adoption-spike.md must remain explicitly archived and non-normative");
+if (!cursorAcpSource.includes('questionMethods: ["cursor/ask_question"]') || !cursorDiscoverySource.includes('compatibility: "acp-v1"')) {
+  errors.push("Cursor must use the generic ACP core with isolated Cursor extensions");
 }
 
 if (errors.length > 0) {
@@ -323,20 +364,6 @@ function* walkSourceFiles(directory) {
     if (stats.isDirectory()) yield* walkSourceFiles(filePath);
     else if (/\.(?:mjs|cjs|ts|tsx)$/.test(filePath)) yield filePath;
   }
-}
-
-function extractMarkedDocumentBlock(source, startMarker, endMarker, label) {
-  const start = source.indexOf(startMarker);
-  const end = source.indexOf(endMarker);
-  if (start < 0 || end < 0 || end <= start) {
-    errors.push(`${label} is missing the canonical Agent architecture map markers`);
-    return "";
-  }
-  if (source.indexOf(startMarker, start + startMarker.length) >= 0 || source.indexOf(endMarker, end + endMarker.length) >= 0) {
-    errors.push(`${label} must contain exactly one canonical Agent architecture map`);
-    return "";
-  }
-  return source.slice(start + startMarker.length, end).trim();
 }
 
 function collectSpecifiers(source) {

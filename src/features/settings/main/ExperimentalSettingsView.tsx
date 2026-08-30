@@ -1,6 +1,6 @@
 import { useLocalization } from "@puppyone/localization";
 import type { ExperimentalSettings } from "../../../preferences";
-import { SettingsSectionHeader } from "../components";
+import { SettingsSectionHeader, SettingsToggle } from "../components";
 
 export function ExperimentalSettingsView({
   settings,
@@ -18,12 +18,17 @@ export function ExperimentalSettingsView({
     messageKey: string;
     settingKey: keyof ExperimentalSettings;
   }> = [
+    { messageKey: "multiRootWorkspaces", settingKey: "enableMultiRootWorkspaces" },
     { messageKey: "viewerPlugins", settingKey: "enableViewerPlugins" },
     { messageKey: "editorSaveStatus", settingKey: "enableEditorSaveStatus" },
+    ...(window.puppyoneDesktop?.getGitAutoCommitSettings
+      ? [{ messageKey: "gitAutoCommit", settingKey: "enableGitAutoCommit" as const }]
+      : []),
     { messageKey: "markdownBlockDrag", settingKey: "enableMarkdownBlockDrag" },
     ...(assetLibraryHomeAvailable
       ? [{ messageKey: "projectsHome", settingKey: "enableAssetLibraryHome" as const }]
       : []),
+    { messageKey: "firstProjectStarter", settingKey: "enableFirstProjectStarter" },
     ...(agentChatAvailable
       ? [{ messageKey: "agentChat", settingKey: "enableAgentChat" as const }]
       : []),
@@ -58,30 +63,5 @@ export function ExperimentalSettingsView({
         </div>
       </div>
     </section>
-  );
-}
-
-function SettingsToggle({
-  checked,
-  description,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  description: string;
-  label: string;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="desktop-settings-switch" title={description}>
-      <input
-        type="checkbox"
-        aria-label={label}
-        aria-description={description}
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <span aria-hidden="true" />
-    </label>
   );
 }

@@ -58,7 +58,7 @@ export function createAgentEventJournal({ sessionCache, logger = console }) {
 
   function persistNow(session) {
     if (!session.providerSessionId) return Promise.resolve();
-    return sessionCache.save({
+    return Promise.resolve(sessionCache.save({
       sessionId: session.id,
       workspaceRoot: session.workspaceRoot,
       runtimeId: session.runtimeId,
@@ -70,8 +70,11 @@ export function createAgentEventJournal({ sessionCache, logger = console }) {
       terminalState: session.terminalState,
       selectedModel: session.selectedModel,
       selectedMode: session.selectedMode,
+      capabilityRevision: session.capabilities?.revision ?? null,
       lastSequence: session.sequence,
       events: session.events,
+    })).catch((error) => {
+      logger.warn?.("Unable to update the Agent conversation metadata catalog:", redactSecretText(error?.message || String(error)));
     });
   }
 

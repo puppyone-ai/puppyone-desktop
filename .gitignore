@@ -1,11 +1,12 @@
 node_modules/
 dist/
-release/
+/release/
 artifacts/terminal-preview/
 generated/
 .vite/
 .vite-temp/
 .wrangler/
+coverage/
 
 .DS_Store
 *.log

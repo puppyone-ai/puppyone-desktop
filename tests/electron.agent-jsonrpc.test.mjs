@@ -114,7 +114,7 @@ describe("Codex JSONL JSON-RPC transport", () => {
       child.kill = vi.fn(() => true);
       const connection = createConnection(child, { forceKillTimeoutMs: 50 });
       connection.dispose();
-      expect(child.kill).toHaveBeenNthCalledWith(1);
+      expect(child.kill).toHaveBeenNthCalledWith(1, "SIGTERM");
 
       await vi.advanceTimersByTimeAsync(55);
 

@@ -277,7 +277,9 @@ describe("experimental preferences", () => {
       enableCloudAutomation: false,
       enableCloudWorkspace: false,
       enableEditorSaveStatus: false,
+      enableFirstProjectStarter: false,
       enableMarkdownBlockDrag: false,
+      enableMultiRootWorkspaces: false,
       enablePuppyFlowFiles: false,
       enableViewerPlugins: false,
     });
@@ -291,11 +293,27 @@ describe("experimental preferences", () => {
     expect(parseExperimentalSettings(JSON.stringify({ enableCloudWorkspace: true })).enableCloudWorkspace).toBe(true);
   });
 
+  it("keeps multi-project workspaces off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableMultiRootWorkspaces).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableMultiRootWorkspaces).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableMultiRootWorkspaces: false })).enableMultiRootWorkspaces)
+      .toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableMultiRootWorkspaces: true })).enableMultiRootWorkspaces)
+      .toBe(true);
+  });
+
   it("keeps Cloud Automation off unless the user explicitly opts in", () => {
     expect(parseExperimentalSettings(null).enableCloudAutomation).toBe(false);
     expect(parseExperimentalSettings("not-json").enableCloudAutomation).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableCloudAutomation: false })).enableCloudAutomation).toBe(false);
     expect(parseExperimentalSettings(JSON.stringify({ enableCloudAutomation: true })).enableCloudAutomation).toBe(true);
+  });
+
+  it("keeps the first-project starting point off unless the user explicitly opts in", () => {
+    expect(parseExperimentalSettings(null).enableFirstProjectStarter).toBe(false);
+    expect(parseExperimentalSettings("not-json").enableFirstProjectStarter).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableFirstProjectStarter: false })).enableFirstProjectStarter).toBe(false);
+    expect(parseExperimentalSettings(JSON.stringify({ enableFirstProjectStarter: true })).enableFirstProjectStarter).toBe(true);
   });
 
   it("keeps the editor save status hidden unless the user explicitly opts in", () => {

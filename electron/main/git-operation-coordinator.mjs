@@ -13,15 +13,44 @@ export function createGitOperationCoordinator() {
   const tails = new Map();
 
   function run(lockKey, operation) {
-    const key = normalizeLockKey(lockKey);
-    const previous = tails.get(key) ?? Promise.resolve();
-    const result = previous.catch(() => {}).then(operation);
-    const tail = result.then(() => undefined, () => undefined);
-    tails.set(key, tail);
-    void tail.finally(() => {
-      if (tails.get(key) === tail) tails.delete(key);
-    });
+    return runAll([lockKey], operation);
+  }
+
+  /**
+   * Reserve every mutation domain synchronously, then run after the prior
+   * owners of those domains settle. Publishing one shared tail to every key
+   * makes acquisition atomic inside this process and avoids nested-lock
+   * deadlocks for operations such as Commit that update both index and refs.
+   */
+  function runAll(lockKeys, operation) {
+    const keys = normalizeLockKeys(lockKeys);
+    if (typeof operation !== "function") {
+      throw new TypeError("A Git operation callback is required.");
+    }
+    const previous = [...new Set(keys.map((key) => tails.get(key)).filter(Boolean))];
+    const ready = previous.length > 0
+      ? Promise.all(previous.map((tail) => tail.catch(() => undefined)))
+      : Promise.resolve();
+    const result = ready.then(operation);
+    let tail;
+    const release = () => {
+      for (const key of keys) {
+        if (tails.get(key) === tail) tails.delete(key);
+      }
+    };
+    tail = result.then(
+      () => { release(); },
+      () => { release(); },
+    );
+    for (const key of keys) tails.set(key, tail);
     return result;
+  }
+
+  /** Low-priority acquisition: never queues ahead of an existing owner. */
+  function tryRunAll(lockKeys, operation) {
+    const keys = normalizeLockKeys(lockKeys);
+    if (keys.some((key) => tails.has(key))) return null;
+    return runAll(keys, operation);
   }
 
   async function whenIdle(lockKey, options = {}) {
@@ -32,17 +61,19 @@ export function createGitOperationCoordinator() {
   }
 
   async function whenIdleAll(lockKeys, options = {}) {
-    const unique = [...new Set(lockKeys.map(normalizeLockKey).filter(Boolean))];
-    for (const key of unique) {
-      await whenIdle(key, options);
-    }
+    const pending = [...new Set(normalizeLockKeys(lockKeys).map((key) => tails.get(key)).filter(Boolean))];
+    if (pending.length === 0) return;
+    await waitForPromiseOrAbort(Promise.all(pending), options.signal);
   }
 
   return {
     run,
+    runAll,
+    tryRunAll,
     whenIdle,
     whenIdleAll,
     isIdle: (lockKey) => !tails.has(normalizeLockKey(lockKey)),
+    isIdleAll: (lockKeys) => normalizeLockKeys(lockKeys).every((key) => !tails.has(key)),
     getActiveRepositoryCount: () => tails.size,
   };
 }
@@ -56,7 +87,16 @@ export function repositoryLockKey(commonDirOrRoot) {
 }
 
 function normalizeLockKey(lockKey) {
-  return String(lockKey || "").trim();
+  const key = String(lockKey || "").trim();
+  if (!key) throw new TypeError("A Git operation lock key is required.");
+  return key;
+}
+
+function normalizeLockKeys(lockKeys) {
+  if (!Array.isArray(lockKeys) || lockKeys.length === 0) {
+    throw new TypeError("At least one Git operation lock key is required.");
+  }
+  return [...new Set(lockKeys.map(normalizeLockKey))].sort((left, right) => left.localeCompare(right));
 }
 
 function waitForPromiseOrAbort(promise, signal) {

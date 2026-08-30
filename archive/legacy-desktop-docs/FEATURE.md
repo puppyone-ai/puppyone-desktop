@@ -1,0 +1,94 @@
+# Desktop Feature Architecture
+
+This file is the index for durable product and frontend architecture decisions
+for PuppyOne Desktop. Feature-specific guidance lives in focused documents so a
+single product area can evolve without turning this file into a catch-all.
+
+## Architecture Documents
+
+- [Cloud Workspace State Boundaries](architecture/cloud-workspace-state.md)
+  - Cloud environment, auth, canonical Git locator, project data, and route-state
+    boundaries.
+- [Cloud Entry Authentication and Project Context UX](architecture/cloud-entry-ux.md)
+  - The first actionable screen, auth-before-initialization priority, Project
+    resolution variants, decision diagram, copy guardrails, and acceptance
+    matrix.
+- [Local and Cloud UX](architecture/local-and-cloud-ux.md)
+  - One Projects entry and one Project shell across Local Only, Local + Cloud,
+    and Cloud Only, including creation, transitions, visual semantics, Files
+    source selection, and Cloud-service eligibility.
+- [Automation and Plugin Domain Boundary](architecture/automation-plugin-domain-boundary.md)
+  - Cloud information-source Automation and local-only file-viewer Plugins
+    have separate authority, storage, permissions, lifecycle, and source
+    ownership.
+- [Cloud Automation UX and Architecture](architecture/cloud-automation-ux.md)
+  - The Automation product definition (external source → project folder), the
+    user-experience contract for the catalog, creation wizard, OAuth
+    connection flow, and management surface, plus the desktop/server
+    architecture that backs it.
+- [Git and Source Control Architecture](architecture/git/README.md)
+  - Local Source Control sidebar and status ownership, external Git refresh
+    lifecycle, Git topology source of truth, and branch/ref display rules.
+- [Editor and Viewer Architecture](architecture/editor/README.md)
+  - Architecture home for file-format routing, source acquisition, committed
+    preview lifecycle, the versioned preset Viewer Contract, format-specific
+    editors, and the dormant external Viewer Pack adapter boundary.
+- [Desktop Sidebar Architecture](architecture/desktop-sidebar-architecture.md)
+  - Architecture home for every left workspace sidebar, right auxiliary panel,
+    and feature-internal secondary pane. Defines the Surface Registry, shared
+    Sidebar Kernel, feature ownership, target file layout, CSS boundaries,
+    performance, accessibility, tests, and migration invariants.
+  - [Desktop Sidebar View Stack](architecture/desktop-sidebar-view-stack.md)
+    records the keep-alive behavior for workspace sidebar surfaces.
+  - [Desktop Sidebar Scroll Lists](architecture/desktop-sidebar-scroll-lists.md)
+    records the WebKit-only scrollbar rule and scroll area / list / row geometry.
+- [Explorer Tree Lifecycle](architecture/explorer-tree-lifecycle.md)
+  - File-tree loading, expansion, subtree motion, and indentation guide rules.
+- [Desktop Multi-Window Workspaces](architecture/desktop-multi-window-workspaces.md)
+- [Desktop Multi-Root Workspace Kernel](architecture/desktop-multi-root-workspace-kernel.md)
+  - Current invisible Resource URI and zero/one/many-folder foundation. The
+    product continues to expose one Folder until root-scoped feature services
+    and attach/detach presentation complete their release gates.
+- [Desktop Session, Workspace Identity, and Cache Lifecycle](architecture/desktop-session-workspace-cache-lifecycle.md)
+  - One-repo-per-window ownership, duplicate-window prevention, and app-level
+    recent workspace behavior.
+- [Desktop Auto Update Lifecycle](architecture/desktop-auto-update-lifecycle.md)
+  - Electron updater ownership, one-click update flow, restart preflight, and
+    release-channel behavior.
+- [Desktop Menu Surface](architecture/desktop-menu-surface.md)
+  - Shared menu background, border, shadow, radius, and component boundary
+    rules.
+- [Desktop Appearance Settings](architecture/desktop-appearance-settings.md)
+  - Part 1: the durable "curate, don't configure" contract for the Appearance
+    surface, plus the accepted/rejected decision record versus
+    deep-customization settings pages. Part 2: the implementation record (text size,
+    third dark preset, preview cards, reduce motion, pointer cursors, dock
+    icon, diff markers).
+- [Desktop Internationalization and Localization](architecture/desktop-localization.md)
+  - Implemented eight-language architecture for application-wide locale state,
+    Renderer and native catalogs, product/content ownership, structured
+    errors, locale-aware formatting, French copy, bidirectional-layout
+    readiness, packaging, and release gates.
+- [Desktop Terminal Architecture](architecture/desktop-terminal-architecture.md)
+  - Current multi-Session, launcher, stable xterm Runtime, PTY ownership,
+    character-grid, focus, security, and performance contracts.
+  - [Native Session Groups and Split Layout](architecture/desktop-terminal/session-groups-and-split-layout.md)
+    defines implemented four-edge Session-tab movement, recursive geometry,
+    zero-restart lifecycle, resize, accessibility, and release gates without
+    using tmux as the layout authority.
+- [Desktop Agent Architecture](architecture/desktop-agent/README.md)
+  - Existing Terminal plus an independent right-sidebar Agent Chat. PuppyOne
+    owns one UI, control plane, safety boundary and event contract over multiple
+    native Agent backends. PuppyOne Agent uses a managed OpenCode kernel;
+    Codex, Claude Code, user OpenCode and future supported products keep their
+    own harness, provider-permitted credentials, native session and history.
+    PuppyOne persists only presentation selections and sanitized local-Agent
+    detection metadata, never transcripts or native session IDs. See the
+    [multi-native backend decision](architecture/desktop-agent/ADR-005-multi-native-agent-backends.md)
+    and the
+    [native harness/ACP decision](architecture/desktop-agent/ADR-006-native-harness-adapters-and-acp.md).
+
+## Document Boundary
+
+Keep this file short. Add new feature architecture content as a focused document
+under `docs/architecture/`, then link it here and from `docs/README.md`.

@@ -64,6 +64,7 @@ jobs:
             --build-number "${GITHUB_RUN_NUMBER}" \
             --commit "${GITHUB_SHA}" \
             --expected-tag "${GITHUB_REF_NAME}" \
+            --target macos-arm64 \
             --github-output "${GITHUB_OUTPUT}"
 
       - name: Install locked dependencies without deployment secrets
@@ -91,10 +92,11 @@ jobs:
             --github-output "${GITHUB_OUTPUT}"
 
       - name: Stage pinned OpenCode runtime without deployment secrets
+        env:
+          PLATFORM_KEY: ${{ steps.release.outputs.target_runtime_key }}
         shell: bash
         run: |
           set -euo pipefail
-          PLATFORM_KEY="darwin-$(node -p 'process.arch')"
           VERSION="$(node -p "JSON.parse(require('fs').readFileSync('vendor/opencode/runtime-manifest.json', 'utf8')).runtimeRelease.version")"
           ARCHIVE="$(node -e "const m=require('./vendor/opencode/runtime-manifest.json'); const a=m.artifacts[process.argv[1]]; if(!a) process.exit(2); process.stdout.write(a.archive)" "${PLATFORM_KEY}")"
           DOWNLOAD="${RUNNER_TEMP}/${ARCHIVE}"

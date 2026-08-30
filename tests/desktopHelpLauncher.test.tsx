@@ -8,6 +8,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DesktopCloudShell } from "../src/components/DesktopCloudShell";
 import { DesktopHelpLauncher } from "../src/features/app-shell/DesktopHelpLauncher";
+import { DesktopSidebarFooterNavigation } from "../src/features/app-shell/navigation";
 import { renderWithTestLocalization } from "./testLocalization";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -36,7 +37,7 @@ function renderLauncher(node: React.ReactNode) {
 }
 
 describe("DesktopHelpLauncher", () => {
-  it("stays a quiet question-mark button and reveals a Feedback label", () => {
+  it("stays a quiet icon-only question-mark button", () => {
     const container = renderLauncher(<DesktopHelpLauncher />);
     const launcher = container.querySelector(
       'button.desktop-help-launcher[aria-label="Feedback"]',
@@ -44,6 +45,7 @@ describe("DesktopHelpLauncher", () => {
 
     expect(launcher).not.toBeNull();
     expect(launcher?.type).toBe("button");
+    expect(launcher?.getAttribute("title")).toBe("Feedback");
     expect(launcher?.getAttribute("aria-haspopup")).toBe("dialog");
     expect(launcher?.getAttribute("aria-expanded")).toBe("false");
     const iconSlot = launcher?.querySelector(".desktop-help-launcher-icon-slot");
@@ -53,7 +55,7 @@ describe("DesktopHelpLauncher", () => {
     expect(helpIcon?.querySelector("[data-feedback-ring='true']")?.getAttribute("cx")).toBe("12");
     expect(helpIcon?.querySelector("[data-feedback-question-dot='true']")?.getAttribute("cx")).toBe("12");
     expect(helpIcon?.querySelector("[data-feedback-question-stem='true']")?.getAttribute("d")).toContain("12 13.75");
-    expect(launcher?.querySelector(".desktop-help-launcher-label")?.textContent).toBe("Feedback");
+    expect(launcher?.querySelector(".desktop-help-launcher-label")).toBeNull();
     expect(container.querySelector("a")).toBeNull();
   });
 
@@ -251,39 +253,60 @@ describe("DesktopHelpLauncher", () => {
     expect(revokeObjectUrl).toHaveBeenCalledWith("blob:feedback-preview");
   });
 
-  it("belongs to the shrinking main surface instead of the Chat and Terminal panel", () => {
+  it("belongs to the Sidebar utility edge instead of the Chat and Terminal panel", () => {
+    const utility = <DesktopHelpLauncher />;
     const container = renderLauncher(
       <DesktopCloudShell
         rightSidebar={<div data-testid="auxiliary-panel">Chat or Terminal</div>}
         rightSidebarOpen
       >
-        <div>Workspace</div>
-        <DesktopHelpLauncher />
+        <DesktopSidebarFooterNavigation
+          activeView="data"
+          gitEnabled={false}
+          pluginsEnabled={false}
+          gitIncomingCount={0}
+          gitOperationLoading={null}
+          gitStatus={null}
+          workspaceChangeCount={0}
+          utilitySlot={utility}
+          onNavigate={vi.fn()}
+          onOpenSettings={vi.fn()}
+        />
       </DesktopCloudShell>,
     );
 
     const mainSurface = container.querySelector("main.desktop-surface");
     const auxiliaryPanel = container.querySelector(".desktop-right-sidebar");
+    const utilityEdge = container.querySelector(".desktop-sidebar-footer-actions-right");
     const launcher = container.querySelector(".desktop-help-launcher");
+    expect(utilityEdge?.contains(launcher)).toBe(true);
     expect(mainSurface?.contains(launcher)).toBe(true);
     expect(auxiliaryPanel?.contains(launcher)).toBe(false);
   });
 
-  it("keeps the launcher on the main surface and the modal on the global themed overlay", () => {
-    const layoutCss = readFileSync("src/styles/layout.css", "utf8");
+  it("keeps the launcher in fixed navigation slots and the modal in the global overlay", () => {
+    const appSource = readFileSync("src/App.tsx", "utf8");
+    const dataShellCss = readFileSync("src/features/data-workspace/data-shell.css", "utf8");
     const dialogCss = readFileSync("src/styles/dialogs.css", "utf8");
     const launcherCss = readFileSync(
       "src/features/app-shell/desktop-help-launcher.css",
       "utf8",
     );
 
-    expect(layoutCss).toMatch(/\.desktop-surface\s*\{[^}]*position:\s*relative/s);
-    expect(launcherCss).toMatch(
-      /\.desktop-feedback\s*\{[^}]*position:\s*absolute[^}]*inset-inline:\s*12px[^}]*inset-block-end:\s*12px/s,
+    expect(appSource).toContain(
+      "sidebarUtility={feedbackInNavigationToolbar ? undefined : feedbackLauncher}",
     );
+    expect(appSource).toContain("{feedbackInNavigationToolbar && feedbackLauncher}");
     expect(launcherCss).toMatch(
-      /\.desktop-help-launcher:hover \.desktop-help-launcher-label/s,
+      /\.desktop-feedback\s*\{[^}]*display:\s*flex[^}]*pointer-events:\s*auto/s,
     );
+    expect(dataShellCss).toMatch(
+      /\.desktop-sidebar-footer-actions-right\s*\{[^}]*margin-inline-start:\s*auto/s,
+    );
+    expect(dataShellCss).toMatch(
+      /\.desktop-sidebar-top-navigation-utility\s*\{[^}]*margin-inline-start:\s*auto/s,
+    );
+    expect(launcherCss).not.toContain(".desktop-help-launcher-label");
     expect(dialogCss).toMatch(
       /\.desktop-dialog-backdrop\s*\{[^}]*position:\s*fixed[^}]*align-items:\s*center[^}]*justify-content:\s*center/s,
     );
@@ -316,26 +339,26 @@ describe("DesktopHelpLauncher", () => {
     );
     expect(launcherCss).not.toContain("desktop-feedback-popover");
     const launcherRule = launcherCss.match(/\.desktop-help-launcher\s*\{[^}]*\}/s)?.[0] ?? "";
-    expect(launcherRule).toContain("border: 1px solid var(--po-border-subtle)");
-    expect(launcherRule).toContain("background: var(--po-panel-raised)");
-    expect(launcherRule).toContain("max-width: var(--desktop-chrome-control-size)");
-    expect(launcherRule).toContain("height: var(--desktop-chrome-control-size)");
-    expect(launcherRule).toContain("opacity: 1");
+    expect(launcherRule).toContain("width: var(--desktop-sidebar-control-size)");
+    expect(launcherRule).toContain("height: var(--desktop-sidebar-control-size)");
+    expect(launcherRule).toContain("border: 0");
+    expect(launcherRule).toContain("background: transparent");
+    expect(launcherRule).toContain(
+      "color: color-mix(in srgb, var(--po-text-subtle) 88%, transparent)",
+    );
     expect(launcherRule).toContain("padding: 0");
-    expect(launcherRule).toContain("--desktop-help-launcher-padding-end: 8px");
     expect(launcherRule).not.toContain("backdrop-filter");
     expect(launcherCss).toMatch(
-      /\.desktop-help-launcher-icon-slot\s*\{[^}]*width:\s*calc\(var\(--desktop-chrome-control-size\) - 2px\)[^}]*height:\s*calc\(var\(--desktop-chrome-control-size\) - 2px\)[^}]*place-items:\s*center/s,
+      /\.desktop-help-launcher-icon-slot\s*\{[^}]*width:\s*100%[^}]*height:\s*100%[^}]*place-items:\s*center/s,
     );
     expect(launcherCss).toMatch(
-      /\.desktop-help-launcher:hover,[\s\S]*?\.desktop-help-launcher:focus-visible\s*\{[^}]*padding-inline-end:\s*var\(--desktop-help-launcher-padding-end\)/s,
+      /\.desktop-help-launcher:hover\s*\{[^}]*background:\s*transparent[^}]*color:\s*var\(--po-text-muted\)/s,
     );
     expect(launcherCss).toMatch(
-      /\.desktop-help-launcher:hover,[\s\S]*?\.desktop-help-launcher:focus-visible\s*\{[^}]*background:\s*var\(--po-overlay\)[^}]*opacity:\s*1/s,
+      /\.desktop-feedback\[data-open="true"\] \.desktop-help-launcher\s*\{[^}]*background:\s*transparent[^}]*color:\s*var\(--po-text-muted\)/s,
     );
-    expect(launcherCss).toMatch(
-      /\.desktop-feedback\[data-open="true"\] \.desktop-help-launcher\s*\{[^}]*background:\s*var\(--po-overlay\)[^}]*opacity:\s*1/s,
+    expect(launcherCss).not.toMatch(
+      /\.desktop-feedback\s*\{[^}]*position:\s*(?:absolute|fixed)/s,
     );
-    expect(launcherCss).not.toMatch(/\.desktop-feedback\s*\{[^}]*position:\s*fixed/s);
   });
 });

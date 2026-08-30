@@ -2,11 +2,53 @@ export * from "./core/types";
 export { RENDERER_ASSET_PATHS } from "./core/rendererAssetCatalog";
 export { resolveRendererPublicAssetUrl } from "./core/rendererPublicAsset";
 export {
+  collectDataResourceAncestors,
+  getDataResourceName,
+  getDataResourceParent,
+  isDataResourceDescendant,
+  isDataResourceUri,
+  isSameDataResource,
+  joinDataResourcePath,
+  normalizeDataResourcePath,
+  rebaseDataResourcePath,
+} from "./core/dataResourcePath";
+export {
   canonicalizeResourcePath,
   isSameOrDescendantResourcePath,
   rebaseResourcePath,
 } from "./core/resourcePath";
 export type { CanonicalResourcePath } from "./core/resourcePath";
+export {
+  ResourceUriIdentityService,
+  canonicalizeResourceUri,
+  createResourceUri,
+  createWorkspaceResourceUri,
+  createWorkspaceRootUri,
+  getWorkspaceResourcePath,
+  parseResourceUri,
+} from "./core/resourceUri";
+export type {
+  ParsedResourceUri,
+  ResourceUri,
+  ResourceUriIdentityOptions,
+} from "./core/resourceUri";
+export {
+  WorkbenchWorkspaceContext,
+  createWorkbenchWorkspace,
+  createSingleFolderWorkbenchWorkspace,
+  createWorkspaceFolder,
+} from "./core/workbenchWorkspace";
+export type {
+  Disposable as WorkspaceDisposable,
+  WillChangeWorkspaceFoldersEvent,
+  WorkbenchWorkspace,
+  WorkbenchWorkspaceId,
+  WorkspaceFolder,
+  WorkspaceFolderCapabilities,
+  WorkspaceFolderId,
+  WorkspaceFolderTrustState,
+  WorkspaceFoldersChange,
+} from "./core/workbenchWorkspace";
 export { workspaceContentChangeMatchesPath } from "./core/workspaceContentChange";
 export {
   TYPOGRAPHY_CHANGE_EVENT,
@@ -104,6 +146,40 @@ export type {
 export { EditorDocumentHost } from "./editor/host/EditorDocumentHost";
 export type { EditorDocumentHostProps } from "./editor/host/EditorDocumentHost";
 export {
+  closestWorkbenchSplitDropEdge,
+  collectWorkbenchSplitLeaves,
+  createWorkbenchSplit,
+  extractWorkbenchSplitLeaf,
+  findDirectSiblingWorkbenchSplit,
+  findWorkbenchSplit,
+  findWorkbenchSplitLeaf,
+  insertWorkbenchSplitLeafAtEdge,
+  isWorkbenchSplit,
+  mapWorkbenchSplitLeaves,
+  mapWorkbenchSplitNodes,
+  moveWorkbenchSplitLeafToEdge,
+  nextWorkbenchSplitNumericId,
+  replaceWorkbenchSplitNode,
+  updateWorkbenchSplitRatio,
+  visitWorkbenchSplitNodes,
+  workbenchSplitDefinition,
+  workbenchSplitNodeMinimumSize,
+  workbenchSplitRatioBounds,
+} from "./workbench/split-tree";
+export type {
+  ExtractWorkbenchSplitLeafResult,
+  MoveWorkbenchSplitLeafResult,
+  WorkbenchSplit,
+  WorkbenchSplitDirection,
+  WorkbenchSplitDropDefinition,
+  WorkbenchSplitDropEdge,
+  WorkbenchSplitLeaf,
+  WorkbenchSplitMinimumSize,
+  WorkbenchSplitNode,
+  WorkbenchSplitPlacement,
+  WorkbenchSplitRatioBounds,
+} from "./workbench/split-tree";
+export {
   EMPTY_EDITOR_GROUP,
   activateEditor,
   closeEditor,
@@ -116,6 +192,8 @@ export {
 export type {
   EditorGroupState,
   EditorInput,
+  EditorResourceDescriptor,
+  EditorResourceReference,
 } from "./editor/workbench/editorGroupModel";
 export {
   activateEditorPane,

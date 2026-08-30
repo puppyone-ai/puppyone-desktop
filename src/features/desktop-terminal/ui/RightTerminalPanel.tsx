@@ -4,20 +4,24 @@ import {
   useMemo,
   useRef,
 } from "react";
+import { createPortal } from "react-dom";
 import type { Workspace } from "@puppyone/shared-ui";
+import type { WorkbenchSplitDropEdge } from "@puppyone/shared-ui";
 import { useLocalization } from "@puppyone/localization/react";
 import { useTerminalAgentLocator } from "../controller/useTerminalAgentLocator";
 import { useTerminalSessions } from "../controller/useTerminalSessions";
+import {
+  canPlaceTerminalSplit,
+  terminalLeafMinimumSize,
+} from "../model/terminalSplitConstraints";
 import type { DesktopTerminalLauncherId } from "../model/terminalLaunchers";
+import { useTerminalTabMoveDrag } from "../interactions/useTerminalTabMoveDrag";
+import { TerminalGroupViewport } from "../layout/TerminalGroupViewport";
+import { usePersistentTerminalSessionHosts } from "../layout/session-host/usePersistentTerminalSessionHosts";
 import { useTerminalAppearanceSync } from "../runtime/useTerminalAppearanceSync";
 import { TerminalCloseConfirmationDialog } from "./TerminalCloseConfirmationDialog";
 import { TerminalLauncher } from "./TerminalLauncher";
 import { TerminalSessionHost } from "./TerminalSessionHost";
-import { TerminalSessionHeader } from "./session-header/TerminalSessionHeader";
-import {
-  terminalPanelId,
-  terminalTabId,
-} from "./session-header/terminalSessionHeaderIds";
 import "@xterm/xterm/css/xterm.css";
 import "./desktop-terminal.css";
 
@@ -31,35 +35,54 @@ export function RightTerminalPanel({ workspace, active, hiddenAgentIds }: RightT
   const { t } = useLocalization();
   const panelRef = useRef<HTMLElement>(null);
   const {
+    activeGroup,
     activeSessionId,
     activateSession,
     cancelCloseSession,
     confirmCloseSession,
     createLauncher,
     createSession,
+    groupCanMerge,
+    groupCanMove,
+    groups,
     launchSession,
+    mergeSession,
+    mergeGroup,
+    moveGroup,
     pendingCloseSession,
+    presentedSessionIds,
     requestCloseSession,
+    root,
+    resizeSplit,
     runtimeRegistry,
+    sessionCanInsert,
+    sessionCanSplit,
     sessions,
+    splitSession,
   } = useTerminalSessions({
     messageFormatter: t,
     workspacePath: workspace.path,
   });
-  const activeSession = sessions.find((session) => session.id === activeSessionId) ?? null;
-  const launcherVisible = active
-    && (
-      sessions.length === 0
-      || activeSession?.status === "selecting"
-      || activeSession?.status === "starting"
-    );
+  const sessionIds = useMemo(() => sessions.map(({ id }) => id), [sessions]);
+  const sessionHosts = usePersistentTerminalSessionHosts(sessionIds);
+  const presentedSessionIdSet = useMemo(
+    () => new Set(presentedSessionIds),
+    [presentedSessionIds],
+  );
+  const presentedSessions = useMemo(() => sessions.filter(
+    (session) => presentedSessionIdSet.has(session.id),
+  ), [presentedSessionIdSet, sessions]);
+  const launcherVisible = active && (
+    sessions.length === 0
+    || presentedSessions.some((session) => (
+      session.status === "selecting" || session.status === "starting"
+    ))
+  );
   const {
     ids: availableAgentIds,
     phase: agentDiscoveryPhase,
     refresh: refreshAvailableAgents,
-  } = useTerminalAgentLocator({
-    enabled: launcherVisible,
-  });
+  } = useTerminalAgentLocator({ enabled: launcherVisible });
   const visibleAgentIds = useMemo(() => {
     const hidden = new Set(hiddenAgentIds);
     return availableAgentIds.filter((agentId) => !hidden.has(agentId));
@@ -68,21 +91,77 @@ export function RightTerminalPanel({ workspace, active, hiddenAgentIds }: RightT
     launcherId === "shell" || visibleAgentIds.includes(launcherId)
   ), [visibleAgentIds]);
   const createDetectedSession = useCallback((launcherId: DesktopTerminalLauncherId) => {
-    if (!canLaunch(launcherId)) return;
-    createSession(launcherId);
+    if (canLaunch(launcherId)) createSession(launcherId);
   }, [canLaunch, createSession]);
   const launchDetectedSession = useCallback((
     sessionId: string,
     launcherId: DesktopTerminalLauncherId,
   ) => {
-    if (!canLaunch(launcherId)) return;
-    launchSession(sessionId, launcherId);
+    if (canLaunch(launcherId)) launchSession(sessionId, launcherId);
   }, [canLaunch, launchSession]);
 
   useEffect(() => {
-    if (!activeSession?.launchError) return;
+    if (!presentedSessions.some((session) => session.launchError)) return;
     void refreshAvailableAgents();
-  }, [activeSession?.launchError, refreshAvailableAgents]);
+  }, [presentedSessions, refreshAvailableAgents]);
+
+  const canDropSession = useCallback((
+    sourceSessionId: string,
+    targetGroupId: string,
+    edge: WorkbenchSplitDropEdge,
+    targetGroupPane: HTMLElement,
+  ) => {
+    const sourceGroup = groups.find((group) => group.sessionIds.includes(sourceSessionId));
+    const targetGroup = groups.find((group) => group.id === targetGroupId);
+    if (!sourceGroup || !targetGroup || !sessionCanSplit(sourceSessionId, targetGroupId)) {
+      return false;
+    }
+    // Moving the only Tab out of a Group repositions an existing leaf; it does
+    // not create another split and therefore must not be blocked by min-size.
+    if (sourceGroup.id !== targetGroup.id && sourceGroup.sessionIds.length === 1) {
+      return true;
+    }
+    const sourceMinimum = terminalLeafMinimumSize(
+      runtimeRegistry.get(sourceSessionId)?.getMinimumViewportSize(),
+    );
+    const targetMinimum = terminalLeafMinimumSize(
+      runtimeRegistry.get(targetGroup.activeSessionId)?.getMinimumViewportSize(),
+    );
+    return canPlaceTerminalSplit(
+      targetGroupPane.getBoundingClientRect(),
+      edge,
+      sourceMinimum,
+      targetMinimum,
+    );
+  }, [groups, runtimeRegistry, sessionCanSplit]);
+
+  const canMoveGroup = useCallback((
+    sourceGroupId: string,
+    targetGroupId: string,
+  ) => groupCanMove(sourceGroupId, targetGroupId), [groupCanMove]);
+
+  const tabMove = useTerminalTabMoveDrag({
+    canDrop: canDropSession,
+    canInsert: sessionCanInsert,
+    canMergeGroup: groupCanMerge,
+    canMoveGroup,
+    onInsertSession: mergeSession,
+    onMergeGroup: mergeGroup,
+    onMoveGroup: moveGroup,
+    onMoveSession: splitSession,
+  });
+  const moveSessionByKeyboard = useCallback((
+    sourceSessionId: string,
+    targetGroupId: string,
+    edge: WorkbenchSplitDropEdge,
+  ) => {
+    const targetPane = panelRef.current?.querySelector<HTMLElement>(
+      `[data-terminal-content-drop-group-id="${targetGroupId}"]`,
+    );
+    if (targetPane && canDropSession(sourceSessionId, targetGroupId, edge, targetPane)) {
+      splitSession(sourceSessionId, targetGroupId, edge);
+    }
+  }, [canDropSession, splitSession]);
 
   useTerminalAppearanceSync(panelRef, runtimeRegistry);
   return (
@@ -91,18 +170,7 @@ export function RightTerminalPanel({ workspace, active, hiddenAgentIds }: RightT
       className="desktop-terminal-panel"
       aria-label={t("terminal.title")}
     >
-      {sessions.length > 0 && (
-        <TerminalSessionHeader
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          onActivate={activateSession}
-          onClose={requestCloseSession}
-          onCreate={createLauncher}
-          runtimeRegistry={runtimeRegistry}
-          workspacePath={workspace.path}
-        />
-      )}
-      <div className={`desktop-terminal-body ${sessions.length === 0 ? "is-empty" : ""} ${activeSession?.status === "selecting" || activeSession?.status === "starting" ? "is-launcher" : ""}`}>
+      <div className={`desktop-terminal-body ${sessions.length === 0 ? "is-empty" : ""}`}>
         {sessions.length === 0 ? (
           <TerminalLauncher
             discoveryPhase={agentDiscoveryPhase}
@@ -110,40 +178,39 @@ export function RightTerminalPanel({ workspace, active, hiddenAgentIds }: RightT
             onLaunch={createDetectedSession}
             onRefresh={() => void refreshAvailableAgents()}
           />
-        ) : sessions.map((session) => (
-          session.status === "selecting" ? (
-              <div
-                key={session.id}
-                id={terminalPanelId(session.id)}
-                className="desktop-terminal-launcher-tab"
-                role="tabpanel"
-                aria-labelledby={terminalTabId(session.id)}
-                hidden={!active || activeSessionId !== session.id}
-              >
-                <TerminalLauncher
-                  discoveryPhase={agentDiscoveryPhase}
-                  availableAgentIds={visibleAgentIds}
-                  launchError={session.launchError}
-                  onLaunch={(launcherId) => launchDetectedSession(session.id, launcherId)}
-                  onRefresh={() => void refreshAvailableAgents()}
-                  titleId={`desktop-terminal-launcher-title-${session.id}`}
-                />
-              </div>
-          ) : (
-            <TerminalSessionHost
-              key={session.id}
-              active={active && activeSessionId === session.id}
-              discoveryPhase={agentDiscoveryPhase}
-              availableAgentIds={visibleAgentIds}
-              labelledBy={terminalTabId(session.id)}
-              onLaunch={(launcherId) => launchDetectedSession(session.id, launcherId)}
-              onRefresh={() => void refreshAvailableAgents()}
-              panelId={terminalPanelId(session.id)}
-              runtime={runtimeRegistry.require(session.id)}
-              session={session}
-              workspacePath={workspace.path}
-            />
-          )
+        ) : root ? (
+          <TerminalGroupViewport
+            activeGroupId={activeGroup?.id ?? null}
+            dropIntent={tabMove.dropIntent}
+            groups={groups}
+            hosts={sessionHosts}
+            root={root}
+            runtimeRegistry={runtimeRegistry}
+            sessions={sessions}
+            sessionMove={tabMove}
+            workspacePath={workspace.path}
+            onActivateSession={activateSession}
+            onCloseSession={requestCloseSession}
+            onCreateSession={(groupId) => createLauncher(groupId)}
+            onMoveByKeyboard={moveSessionByKeyboard}
+            onResizeSplit={resizeSplit}
+          />
+        ) : null}
+        {sessions.map((session) => createPortal(
+          <TerminalSessionHost
+            discoveryPhase={agentDiscoveryPhase}
+            availableAgentIds={visibleAgentIds}
+            focused={active && activeSessionId === session.id}
+            onFocus={() => activateSession(session.id)}
+            onLaunch={(launcherId) => launchDetectedSession(session.id, launcherId)}
+            onRefresh={() => void refreshAvailableAgents()}
+            presented={active && presentedSessionIdSet.has(session.id)}
+            runtime={runtimeRegistry.get(session.id)}
+            session={session}
+            workspacePath={workspace.path}
+          />,
+          sessionHosts.get(session.id)!,
+          session.id,
         ))}
       </div>
       {pendingCloseSession && (

@@ -5,6 +5,7 @@ import type { MarkdownLinkGraphDocument } from "../../packages/shared-ui/src/edi
 
 const EXCLUDED_REPOSITORY_DIRECTORIES = new Set([
   ".git",
+  "archive",
   "coverage",
   "dist",
   "node_modules",

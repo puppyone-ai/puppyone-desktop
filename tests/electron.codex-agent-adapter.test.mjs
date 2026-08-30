@@ -2,12 +2,56 @@ import { EventEmitter } from "node:events";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
+  CODEX_CAPABILITIES,
   CodexAppServerAdapter,
   buildCodexTurnInput,
   normalizeCodexNotification,
 } from "../electron/main/agent/runtimes/codex/codex-app-server-adapter.mjs";
+import { AgentProviderSessionUnavailableError } from "../electron/main/agent/runtime/agent-runtime-port.mjs";
 
 describe("Codex app-server normalization", () => {
+  it("discovers workspace threads from the native state index without scanning rollout transcripts", async () => {
+    const connection = new FakeConnection();
+    connection.results.set("thread/list", {
+      data: [{
+        id: "thread-native",
+        cwd: "/workspace",
+        name: "Fix history",
+        preview: "Fix history",
+        createdAt: 1_788_000_000,
+        updatedAt: 1_788_000_100,
+        modelProvider: "openai",
+        ephemeral: false,
+      }],
+      nextCursor: "next-page",
+    });
+    const adapter = new CodexAppServerAdapter({
+      executablePath: "/usr/local/bin/codex",
+      environment: {},
+      workspaceRoot: "/workspace",
+      appVersion: "test",
+      connectionFactory: () => connection,
+    });
+
+    await expect(adapter.discoverSessions({ cursor: "page-1", limit: 25 })).resolves.toEqual({
+      supported: true,
+      sessions: [expect.objectContaining({ providerSessionId: "thread-native", title: "Fix history" })],
+      nextCursor: "next-page",
+    });
+    expect(connection.requests).toContainEqual({
+      method: "thread/list",
+      params: expect.objectContaining({
+        cwd: "/workspace",
+        cursor: "page-1",
+        limit: 25,
+        sortKey: "updated_at",
+        sortDirection: "desc",
+        useStateDbOnly: true,
+      }),
+    });
+    adapter.dispose();
+  });
+
   it("maps workspace mentions and staged images to the exact app-server UserInput schema", () => {
     expect(buildCodexTurnInput("Inspect", [
       { id: "workspace-a", kind: "workspace-entry", entryType: "file", path: "/workspace/a.md", displayName: "a.md" },
@@ -188,7 +232,23 @@ describe("Codex app-server normalization", () => {
     adapter.dispose();
   });
 
-  it("offers only explicit durable decisions and fails unsupported requests closed", async () => {
+  it("classifies a missing native rollout as an unavailable saved session", async () => {
+    const connection = new FakeConnection();
+    connection.failures.set("thread/resume", new Error("thread/resume: no rollout found for thread id thread-stale"));
+    const adapter = new CodexAppServerAdapter({
+      executablePath: "/usr/local/bin/codex",
+      environment: {},
+      workspaceRoot: "/workspace",
+      appVersion: "test",
+      connectionFactory: () => connection,
+    });
+
+    await expect(adapter.resumeSession({ threadId: "thread-stale", model: "gpt-5" }))
+      .rejects.toBeInstanceOf(AgentProviderSessionUnavailableError);
+    adapter.dispose();
+  });
+
+  it("offers only explicit durable decisions and maps native structured questions", async () => {
     const connection = new FakeConnection();
     const events = [];
     const adapter = new CodexAppServerAdapter({
@@ -282,10 +342,62 @@ describe("Codex app-server normalization", () => {
     connection.emit("request", {
       method: "item/tool/requestUserInput",
       id: 10,
-      params: { threadId: "thread-1", turnId: "turn-1", itemId: "item-2" },
+      params: {
+        threadId: "thread-1",
+        turnId: "turn-1",
+        itemId: "item-2",
+        questions: [{ id: "scope", header: "Scope", question: "Which scope?", options: [{ label: "Focused" }] }],
+      },
     });
-    expect(connection.errors.at(-1)).toMatchObject({ id: 10, code: -32601 });
-    expect(events.at(-1)).toMatchObject({ type: "provider.warning" });
+    const question = events.at(-1);
+    expect(question).toMatchObject({
+      type: "question.requested",
+      payload: { questions: [{ header: "Scope", question: "Which scope?" }] },
+    });
+    adapter.resolveQuestion({
+      requestId: question.payload.requestId,
+      answers: [["Focused"]],
+      rejected: false,
+      turnId: "turn-1",
+    });
+    expect(connection.responses.at(-1)).toEqual({
+      id: 10,
+      result: { answers: { scope: { answers: ["Focused"] } } },
+    });
+    adapter.dispose();
+  });
+
+  it("implements the advertised current app-server fork, steer and compaction operations", async () => {
+    const connection = new FakeConnection();
+    connection.results.set("turn/steer", {});
+    connection.results.set("thread/fork", { thread: { id: "thread-fork" } });
+    connection.results.set("thread/compact/start", {});
+    const adapter = new CodexAppServerAdapter({
+      executablePath: "/usr/local/bin/codex",
+      environment: {},
+      workspaceRoot: "/workspace",
+      appVersion: "test",
+      connectionFactory: () => connection,
+    });
+    await adapter.connect();
+    adapter.threadId = "thread-1";
+    adapter.activeTurnId = "turn-1";
+    await adapter.steerTurn({ turnId: "turn-1", message: "Focus on tests", references: [] });
+    adapter.activeTurnId = null;
+    await expect(adapter.forkSession({ messageId: "message-1" })).resolves.toEqual({ providerSessionId: "thread-fork" });
+    await adapter.compactSession();
+    expect(connection.requests).toEqual(expect.arrayContaining([
+      expect.objectContaining({ method: "turn/steer", params: expect.objectContaining({ threadId: "thread-1", turnId: "turn-1" }) }),
+      expect.objectContaining({ method: "thread/fork", params: { threadId: "thread-1", messageId: "message-1" } }),
+      expect.objectContaining({ method: "thread/compact/start", params: { threadId: "thread-1" } }),
+    ]));
+    expect(CODEX_CAPABILITIES).toMatchObject({
+      structuredQuestions: true,
+      fork: true,
+      steer: true,
+      compaction: true,
+      protocol: { name: "codex-app-server" },
+    });
     adapter.dispose();
   });
 

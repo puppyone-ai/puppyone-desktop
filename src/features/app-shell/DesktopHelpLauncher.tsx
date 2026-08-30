@@ -49,9 +49,8 @@ const SUPPORTED_SCREENSHOT_TYPES = new Set<FeedbackScreenshotMimeType>([
 ]);
 
 /**
- * A deliberately quiet, shell-level feedback affordance.
- * Keeping it inside the main surface means auxiliary Chat and Terminal panels
- * always receive their full input area when they open.
+ * A deliberately quiet, shell-level feedback affordance. Its trigger lives in
+ * the active navigation utility slot; the dialog remains in the global overlay.
  */
 export type DesktopHelpLauncherProps = Omit<DesktopOverlayPortalProps, "children">;
 
@@ -430,15 +429,13 @@ export function DesktopHelpLauncher(overlayTheme: DesktopHelpLauncherProps) {
         className="desktop-help-launcher"
         type="button"
         aria-label={label}
+        title={label}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={handleLauncherClick}
       >
         <span className="desktop-help-launcher-icon-slot" aria-hidden="true">
           <FeedbackHelpIcon />
-        </span>
-        <span className="desktop-help-launcher-label" aria-hidden="true">
-          {label}
         </span>
       </button>
     </div>

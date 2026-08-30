@@ -3,7 +3,7 @@
 This folder owns the Desktop source-control experience.
 
 Durable architecture and lifecycle contracts live in
-[Git and Source Control Architecture](../../../docs/architecture/git/README.md).
+[Git and Source Control Architecture](https://github.com/puppyone-ai/puppy-issues/tree/main/document/puppyone-desktop/source-control).
 Keep this file as the code-local ownership map rather than duplicating those
 contracts here.
 

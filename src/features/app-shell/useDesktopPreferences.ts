@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { FileIconThemeId } from "@puppyone/shared-ui";
 import {
   getInterfaceStyleFirstPaint,
@@ -61,6 +61,7 @@ import {
   type MarkdownPresentationSettings,
 } from "../markdown/markdownPresentation";
 import {
+  AGENT_ROUTING_PREFERENCES_STORAGE_KEY,
   AGENT_PREFERRED_RUNTIME_STORAGE_KEY,
   AGENT_PREFERRED_MODEL_STORAGE_KEY,
   EXPLORER_WIDTH_STORAGE_KEY,
@@ -98,6 +99,13 @@ import {
   readInitialThemeMode,
   readSystemDarkMode,
 } from "./preferences";
+import {
+  parseAgentRoutingPreferences,
+  selectAgentRuntime,
+  serializeAgentRoutingPreferences,
+  updateAgentRoutePreference,
+  type AgentRoutePreference,
+} from "./agentRoutingPreferences";
 
 export function useDesktopPreferences() {
   const [initialAppearanceRead] = useState(() => readAppearancePreferences(
@@ -145,7 +153,7 @@ export function useDesktopPreferences() {
   const [createNewMenuSettings, setCreateNewMenuSettings] = useState<CreateNewMenuSettings>(
     () => readInitialCreateNewMenuSettings(),
   );
-  const [experimentalSettings, setExperimentalSettings] = useState<ExperimentalSettings>(() => readInitialExperimentalSettings());
+  const [experimentalSettings, setExperimentalSettingsState] = useState<ExperimentalSettings>(() => readInitialExperimentalSettings());
   const [rightSidebarToolsSettings, setRightSidebarToolsSettings] = useState<RightSidebarToolsSettings>(() => readInitialRightSidebarToolsSettings());
   const [titlebarActionsSettings, setTitlebarActionsSettings] = useState<TitlebarActionsSettings>(() => readInitialTitlebarActionsSettings());
   const [localAgentsSettings, setLocalAgentsSettings] = useState<LocalAgentsSettings>(
@@ -160,8 +168,33 @@ export function useDesktopPreferences() {
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(() => readInitialRightSidebarWidth());
   const [rightSidebarSurface, setRightSidebarSurface] = useState(() => readInitialRightSidebarSurface());
-  const [agentPreferredRuntime, setAgentPreferredRuntime] = useState<string | null>(() => readInitialAgentPreferredRuntime());
-  const [agentPreferredModel, setAgentPreferredModel] = useState<string | null>(() => readInitialAgentPreferredModel());
+  const [agentRoutingPreferences, setAgentRoutingPreferences] = useState(() => (
+    parseAgentRoutingPreferences(
+      window.localStorage.getItem(AGENT_ROUTING_PREFERENCES_STORAGE_KEY),
+      {
+        legacyRuntimeId: readInitialAgentPreferredRuntime(),
+        legacyModelId: readInitialAgentPreferredModel(),
+      },
+    )
+  ));
+  const agentPreferredRuntime = agentRoutingPreferences.selectedRuntimeId;
+  const agentPreferredRoute = agentPreferredRuntime
+    ? agentRoutingPreferences.routes[agentPreferredRuntime] ?? {}
+    : {};
+  const agentPreferredModel = agentPreferredRoute.modelId ?? null;
+  const setAgentPreferredRuntime = useCallback((runtimeId: string | null) => {
+    setAgentRoutingPreferences((current) => selectAgentRuntime(current, runtimeId));
+  }, []);
+  const setAgentPreferredRoute = useCallback((patch: Partial<AgentRoutePreference>) => {
+    setAgentRoutingPreferences((current) => (
+      current.selectedRuntimeId
+        ? updateAgentRoutePreference(current, current.selectedRuntimeId, patch)
+        : current
+    ));
+  }, []);
+  const setAgentPreferredModel = useCallback((modelId: string | null) => {
+    setAgentPreferredRoute({ modelId: modelId ?? undefined });
+  }, [setAgentPreferredRoute]);
   const [systemDark, setSystemDark] = useState(() => readSystemDarkMode());
   const resolvedAppearance = useMemo(() => resolveAppearance({
     interfaceStyle,
@@ -349,8 +382,47 @@ export function useDesktopPreferences() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(EXPERIMENTAL_SETTINGS_STORAGE_KEY, JSON.stringify(experimentalSettings));
+    const { enableGitAutoCommit: _mainOwned, ...rendererOwned } = experimentalSettings;
+    void _mainOwned;
+    window.localStorage.setItem(EXPERIMENTAL_SETTINGS_STORAGE_KEY, JSON.stringify(rendererOwned));
   }, [experimentalSettings]);
+
+  useEffect(() => {
+    const desktop = window.puppyoneDesktop;
+    if (!desktop?.getGitAutoCommitSettings) return;
+    let active = true;
+    const applySnapshot = (snapshot: { experimentalOptIn: boolean }) => {
+      if (!active) return;
+      setExperimentalSettingsState((current) => ({
+        ...current,
+        enableGitAutoCommit: snapshot.experimentalOptIn === true,
+      }));
+    };
+    void desktop.getGitAutoCommitSettings().then(applySnapshot).catch(() => undefined);
+    const stop = desktop.onGitAutoCommitStateChanged?.(applySnapshot);
+    return () => {
+      active = false;
+      stop?.();
+    };
+  }, []);
+
+  const setExperimentalSettings = useCallback((next: ExperimentalSettings) => {
+    setExperimentalSettingsState((current) => ({
+      ...next,
+      enableGitAutoCommit: current.enableGitAutoCommit,
+    }));
+    const desktop = window.puppyoneDesktop;
+    if (!desktop?.setGitAutoCommitExperimentalOptIn
+      || next.enableGitAutoCommit === experimentalSettings.enableGitAutoCommit) return;
+    void desktop.setGitAutoCommitExperimentalOptIn({
+      enabled: next.enableGitAutoCommit,
+    }).then((snapshot) => {
+      setExperimentalSettingsState((current) => ({
+        ...current,
+        enableGitAutoCommit: snapshot.experimentalOptIn === true,
+      }));
+    }).catch(() => undefined);
+  }, [experimentalSettings.enableGitAutoCommit]);
 
   useEffect(() => {
     window.localStorage.setItem(RIGHT_SIDEBAR_TOOLS_STORAGE_KEY, JSON.stringify(rightSidebarToolsSettings));
@@ -395,14 +467,13 @@ export function useDesktopPreferences() {
   }, [rightSidebarSurface]);
 
   useEffect(() => {
-    if (agentPreferredRuntime) window.localStorage.setItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY, agentPreferredRuntime);
-    else window.localStorage.removeItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY);
-  }, [agentPreferredRuntime]);
-
-  useEffect(() => {
-    if (agentPreferredModel) window.localStorage.setItem(AGENT_PREFERRED_MODEL_STORAGE_KEY, agentPreferredModel);
-    else window.localStorage.removeItem(AGENT_PREFERRED_MODEL_STORAGE_KEY);
-  }, [agentPreferredModel]);
+    window.localStorage.setItem(
+      AGENT_ROUTING_PREFERENCES_STORAGE_KEY,
+      serializeAgentRoutingPreferences(agentRoutingPreferences),
+    );
+    window.localStorage.removeItem(AGENT_PREFERRED_RUNTIME_STORAGE_KEY);
+    window.localStorage.removeItem(AGENT_PREFERRED_MODEL_STORAGE_KEY);
+  }, [agentRoutingPreferences]);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-color-scheme: dark)");
@@ -436,7 +507,9 @@ export function useDesktopPreferences() {
     rightSidebarWidth,
     rightSidebarSurface,
     agentPreferredRuntime,
+    agentPreferredRoute,
     agentPreferredModel,
+    agentRoutingPreferences,
     agentFileActivityIndicatorsEnabled,
     sidebarCollapsed,
     sidebarNavigationLayout,
@@ -471,6 +544,7 @@ export function useDesktopPreferences() {
     setRightSidebarWidth,
     setRightSidebarSurface,
     setAgentPreferredRuntime,
+    setAgentPreferredRoute,
     setAgentPreferredModel,
     setAgentFileActivityIndicatorsEnabled,
     setSidebarCollapsed,

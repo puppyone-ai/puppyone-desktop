@@ -72,6 +72,20 @@ describe("Desktop Agent ephemeral session cache", () => {
     await cache.remove("session-1");
     await expect(cache.findById("session-1", "/workspace")).resolves.toBeNull();
   });
+
+  it("retains independent process-local recovery snapshots for same-workspace tabs", async () => {
+    const userData = await temporaryDirectory();
+    const cache = createEphemeralAgentSessionCache({ app: { getPath: () => userData } });
+
+    await cache.save(record("session-1", [event(1, "assistant.completed", { text: "first" })]));
+    await cache.save(record("session-2", [event(1, "assistant.completed", { text: "second" })]));
+
+    await expect(cache.findById("session-1", "/workspace"))
+      .resolves.toMatchObject({ sessionId: "session-1" });
+    await expect(cache.findById("session-2", "/workspace"))
+      .resolves.toMatchObject({ sessionId: "session-2" });
+    expect(await cache.readAll()).toHaveLength(2);
+  });
 });
 
 async function temporaryDirectory() {

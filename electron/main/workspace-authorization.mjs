@@ -2,16 +2,23 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * Creates the sole renderer workspace-root authorization capability. The
- * renderer may repeat its expected root, but it cannot mint authority: the
+ * Creates the sole renderer Workspace Folder authorization capability. The
+ * renderer may repeat an expected root, but it cannot mint authority: every
  * root comes from main-process window state and both sides are realpathed.
+ *
+ * `getWorkspaceRootForSender` remains as the single-folder compatibility
+ * adapter. New window state supplies `getWorkspaceRootsForSender`.
  */
 export function createSenderWorkspaceAuthorization({
   getWorkspaceRootForSender,
+  getWorkspaceRootsForSender,
   fsModule = fs,
 }) {
-  if (typeof getWorkspaceRootForSender !== "function") {
-    throw new TypeError("getWorkspaceRootForSender is required.");
+  if (
+    typeof getWorkspaceRootsForSender !== "function"
+    && typeof getWorkspaceRootForSender !== "function"
+  ) {
+    throw new TypeError("getWorkspaceRootsForSender is required.");
   }
 
   return async function authorizeWorkspaceRoot(event, requestedRoot = undefined) {
@@ -20,19 +27,26 @@ export function createSenderWorkspaceAuthorization({
       throw new Error("Workspace IPC sender is invalid.");
     }
 
-    const assignedRoot = await getWorkspaceRootForSender(sender);
-    if (typeof assignedRoot !== "string" || assignedRoot.trim().length === 0) {
+    const assignedRoots = await resolveAssignedRoots({
+      sender,
+      getWorkspaceRootForSender,
+      getWorkspaceRootsForSender,
+    });
+    if (assignedRoots.length === 0) {
       throw new Error("No local workspace is assigned to this window.");
     }
 
-    const canonicalAssignedRoot = await canonicalizeExistingDirectory(
-      assignedRoot,
-      "Unable to resolve the window workspace",
-      fsModule,
-    );
+    const canonicalAssignedRoots = [...new Set(await Promise.all(assignedRoots.map((assignedRoot) => (
+      canonicalizeExistingDirectory(
+        assignedRoot,
+        "Unable to resolve a window Workspace Folder",
+        fsModule,
+      )
+    ))))];
 
     if (requestedRoot === undefined || requestedRoot === null) {
-      return canonicalAssignedRoot;
+      if (canonicalAssignedRoots.length === 1) return canonicalAssignedRoots[0];
+      throw new Error("An explicit Workspace Folder root is required when multiple folders are attached.");
     }
     if (typeof requestedRoot !== "string" || requestedRoot.trim().length === 0) {
       throw new Error("Workspace root path must be a non-empty string.");
@@ -43,12 +57,29 @@ export function createSenderWorkspaceAuthorization({
       "Unable to resolve the requested workspace root",
       fsModule,
     );
-    if (path.relative(canonicalAssignedRoot, canonicalRequestedRoot) !== "") {
+    const authorizedRoot = canonicalAssignedRoots.find(
+      (assignedRoot) => path.relative(assignedRoot, canonicalRequestedRoot) === "",
+    );
+    if (!authorizedRoot) {
       throw new Error("Requested workspace root does not match the workspace assigned to this window.");
     }
 
-    return canonicalAssignedRoot;
+    return authorizedRoot;
   };
+}
+
+async function resolveAssignedRoots({
+  sender,
+  getWorkspaceRootForSender,
+  getWorkspaceRootsForSender,
+}) {
+  const value = typeof getWorkspaceRootsForSender === "function"
+    ? await getWorkspaceRootsForSender(sender)
+    : [await getWorkspaceRootForSender(sender)];
+  if (!Array.isArray(value)) {
+    throw new TypeError("Window Workspace Folder authority must be an array.");
+  }
+  return value.filter((root) => typeof root === "string" && root.trim().length > 0);
 }
 
 /** Resolve an existing working directory and prove its real path stays rooted. */

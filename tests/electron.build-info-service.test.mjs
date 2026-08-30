@@ -90,8 +90,10 @@ describe("Electron Build Identity service", () => {
   });
 
   it("configures name, user data, and Windows application identity before startup", () => {
+    const appDataPath = "/Users/test/Library/Application Support";
+    const userDataPath = path.join(appDataPath, "puppyone-internal");
     const app = {
-      getPath: vi.fn(() => "/Users/test/Library/Application Support"),
+      getPath: vi.fn(() => appDataPath),
       setAppUserModelId: vi.fn(),
       setName: vi.fn(),
       setPath: vi.fn(),
@@ -110,12 +112,12 @@ describe("Electron Build Identity service", () => {
     })).toEqual({
       applicationId: "ai.puppyone.desktop.internal",
       applicationName: "PuppyOne Internal",
-      userDataPath: "/Users/test/Library/Application Support/puppyone-internal",
+      userDataPath,
     });
     expect(app.setName).toHaveBeenCalledWith("PuppyOne Internal");
     expect(app.setPath).toHaveBeenCalledWith(
       "userData",
-      "/Users/test/Library/Application Support/puppyone-internal",
+      userDataPath,
     );
     expect(app.setAppUserModelId).toHaveBeenCalledWith("ai.puppyone.desktop.internal");
   });

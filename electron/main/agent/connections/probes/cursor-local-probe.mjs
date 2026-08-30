@@ -64,7 +64,7 @@ function baseCursor(source) {
     id: "cursor-agent",
     displayName: "Cursor Agent",
     authentication: "unknown",
-    protocolCompatible: false,
+    protocolCompatible: true,
     hasModels: false,
     source: normalizeSource(source),
   };

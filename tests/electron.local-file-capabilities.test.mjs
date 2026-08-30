@@ -28,6 +28,16 @@ describe("local file capability store", () => {
     expect(store.validate({ token, rootPath: ROOT, relativePath: "docs/report.docx" })).toBe(false);
   });
 
+  it("revokes only capabilities owned by one removed Workspace Folder", () => {
+    const store = createLocalFileCapabilityStore();
+    const first = store.issue({ senderId: 7, rootPath: "/workspace-a", relativePath: "a.md" });
+    const second = store.issue({ senderId: 7, rootPath: "/workspace-b", relativePath: "b.md" });
+
+    expect(store.revokeWorkspaceRoot(7, "/workspace-b")).toBe(1);
+    expect(store.validate({ token: first, rootPath: "/workspace-a", relativePath: "a.md" })).toBe(true);
+    expect(store.validate({ token: second, rootPath: "/workspace-b", relativePath: "b.md" })).toBe(false);
+  });
+
   it("evicts the least-recently-used path capability per sender", () => {
     let sequence = 0;
     const store = createLocalFileCapabilityStore({

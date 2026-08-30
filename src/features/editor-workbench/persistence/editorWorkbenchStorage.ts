@@ -9,6 +9,7 @@ import {
   parseEditorPaneLayoutState,
   type EditorGroupState,
   type EditorPaneLayoutState,
+  type ResourceUri,
 } from "@puppyone/shared-ui";
 
 export const EDITOR_WORKBENCH_STORAGE_PREFIX = "puppyone.desktop.editor-workbench.v3";
@@ -29,16 +30,21 @@ export function readStoredEditorWorkbench(
   storageKey: string,
   legacyWorkbenchStorageKey: string | null,
   legacyGroupStorageKey: string | null,
+  rootUri: ResourceUri | null = null,
 ): DesktopEditorWorkbenchState {
   try {
     const raw = window.localStorage.getItem(storageKey)
       ?? (legacyWorkbenchStorageKey ? window.localStorage.getItem(legacyWorkbenchStorageKey) : null);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<DesktopEditorWorkbenchState>;
-      const group = parseEditorGroupState(parsed.group);
+      const group = parseEditorGroupState(parsed.group, rootUri ? { rootUri } : undefined);
       const editorIds = new Set(group.editors.map(({ id }) => id));
       const layout = collapseDuplicateVisibleResources(
-        parseEditorPaneLayoutState(parsed.layout, editorIds, group.activeEditorId),
+        parseEditorPaneLayoutState(
+          remapPersistedEditorIds(parsed.layout, group),
+          editorIds,
+          group.activeEditorId,
+        ),
       );
       const activeEditorId = getActiveEditorPane(layout).editorId;
       return createEditorWorkbenchState(
@@ -47,11 +53,45 @@ export function readStoredEditorWorkbench(
       );
     }
     const legacyRaw = legacyGroupStorageKey ? window.localStorage.getItem(legacyGroupStorageKey) : null;
-    const group = legacyRaw ? parseEditorGroupState(JSON.parse(legacyRaw)) : EMPTY_EDITOR_GROUP;
+    const group = legacyRaw
+      ? parseEditorGroupState(JSON.parse(legacyRaw), rootUri ? { rootUri } : undefined)
+      : EMPTY_EDITOR_GROUP;
     return createEditorWorkbenchState(group, createEditorPaneLayout(group.activeEditorId));
   } catch {
     return EMPTY_EDITOR_WORKBENCH;
   }
+}
+
+function remapPersistedEditorIds(
+  value: unknown,
+  group: EditorGroupState,
+): unknown {
+  const ids = new Map<string, string>();
+  for (const editor of group.editors) {
+    ids.set(editor.id, editor.id);
+    ids.set(editor.resource, editor.id);
+    ids.set(editor.resourceUri, editor.id);
+  }
+  if (!value || typeof value !== "object") return value;
+  const layout = value as Record<string, unknown>;
+  return { ...layout, root: remapLayoutNode(layout.root, ids) };
+}
+
+function remapLayoutNode(value: unknown, ids: ReadonlyMap<string, string>): unknown {
+  if (!value || typeof value !== "object") return value;
+  const candidate = value as Record<string, unknown>;
+  if (candidate.kind === "pane") {
+    const editorId = typeof candidate.editorId === "string"
+      ? ids.get(candidate.editorId) ?? candidate.editorId
+      : candidate.editorId;
+    return { ...candidate, editorId };
+  }
+  if (candidate.kind !== "split") return value;
+  return {
+    ...candidate,
+    first: remapLayoutNode(candidate.first, ids),
+    second: remapLayoutNode(candidate.second, ids),
+  };
 }
 
 export function createEditorWorkbenchState(

@@ -14,6 +14,7 @@ export function DesktopSidebarFooterNavigation({
   workspaceChangeCount,
   onNavigate,
   onOpenSettings,
+  utilitySlot,
 }: DesktopNavigationProps) {
   const { cloudHubItems, localItems } = resolveNavigationItems({
     availableSurfaceIds,
@@ -32,7 +33,7 @@ export function DesktopSidebarFooterNavigation({
 
   return (
     <div
-      className="desktop-sidebar-footer-bar desktop-sidebar-navigation-surface actions-only horizontal"
+      className="desktop-sidebar-footer-bar desktop-sidebar-navigation-surface horizontal"
       data-placement="bottom"
       data-orientation="horizontal"
     >
@@ -47,6 +48,11 @@ export function DesktopSidebarFooterNavigation({
           onOpenSettings={onOpenSettings}
         />
       </div>
+      {utilitySlot != null && (
+        <div className="desktop-sidebar-footer-actions desktop-sidebar-footer-actions-right">
+          {utilitySlot}
+        </div>
+      )}
     </div>
   );
 }

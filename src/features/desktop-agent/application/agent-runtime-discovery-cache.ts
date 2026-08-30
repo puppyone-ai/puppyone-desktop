@@ -12,8 +12,8 @@ export function hasFreshAgentRuntimeInspection(
   if (state.session) return true;
   const inspectedRuntimeId = state.inspection.selectedRuntimeId
     || state.inspection.runtime?.id
-    || state.inspection.readiness.runtimeId
-    || state.inspection.readiness.provider
+    || state.inspection.readiness?.runtimeId
+    || state.inspection.readiness?.provider
     || null;
   return inspectedRuntimeId === state.selectedRuntimeId
     && inspectedAt > 0

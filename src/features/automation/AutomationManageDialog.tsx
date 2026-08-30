@@ -32,6 +32,7 @@ import {
   DesktopDialogRoot,
   DesktopDialogSurface,
 } from "../../components/DesktopDialog";
+import { DesktopOverlayLayer } from "../app-shell/DesktopOverlayPortal";
 import {
   formatProviderLabel,
   getCloudProviderIconUrl,
@@ -230,8 +231,9 @@ export function CloudManageAutomationDialog({
   };
 
   return (
-    <DesktopDialogRoot onClose={busy ? undefined : onClose}>
-      <DesktopDialogSurface width={920} className="desktop-cloud-automation-dialog" ariaLabel={title}>
+    <DesktopOverlayLayer>
+      <DesktopDialogRoot onClose={busy ? undefined : onClose}>
+        <DesktopDialogSurface width={920} className="desktop-cloud-automation-dialog" ariaLabel={title}>
         <header className="desktop-dialog-header desktop-cloud-automation-dialog-header">
           <div className="desktop-dialog-title-row">
             <div>
@@ -397,8 +399,9 @@ export function CloudManageAutomationDialog({
 
           <RunHistory runs={runs} loading={runsLoading} error={runsError} onRetry={loadRuns} />
         </div>
-      </DesktopDialogSurface>
-    </DesktopDialogRoot>
+        </DesktopDialogSurface>
+      </DesktopDialogRoot>
+    </DesktopOverlayLayer>
   );
 }
 

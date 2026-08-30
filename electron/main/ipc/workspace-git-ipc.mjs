@@ -81,6 +81,18 @@ export function registerWorkspaceGitIpcHandlers({
     return gitOperationCoordinator.run(repoKey, () => handler(rootPath, request, event));
   });
 
+  const withAuthorizedWorktreeAndRepositoryMutation = (handler) => withAuthorizedRoot(async (
+    rootPath,
+    request,
+    event,
+  ) => {
+    const { worktreeKey, repoKey } = await resolveLockKeys(rootPath);
+    return gitOperationCoordinator.runAll(
+      [worktreeKey, repoKey],
+      () => handler(rootPath, request, event),
+    );
+  });
+
   const withAuthorizedIdleRead = (handler) => withAuthorizedRoot(async (rootPath, request, event) => {
     const { worktreeKey, repoKey } = await resolveLockKeys(rootPath);
     await gitOperationCoordinator.whenIdleAll([worktreeKey, repoKey]);
@@ -173,7 +185,7 @@ export function registerWorkspaceGitIpcHandlers({
     return { ok: true };
   });
 
-  ipcMain.handle("workspace:git-init", withAuthorizedRepositoryMutation((rootPath) => (
+  ipcMain.handle("workspace:git-init", withAuthorizedWorktreeAndRepositoryMutation((rootPath) => (
     initializeWorkspaceGitRepository(rootPath)
   )));
 
@@ -318,7 +330,7 @@ export function registerWorkspaceGitIpcHandlers({
     discardAllWorkspaceGitChanges(rootPath)
   )));
 
-  ipcMain.handle("workspace:git-commit", withAuthorizedWorktreeMutation((rootPath, request) => (
+  ipcMain.handle("workspace:git-commit", withAuthorizedWorktreeAndRepositoryMutation((rootPath, request) => (
     commitWorkspaceGit(rootPath, request?.message, {
       allowEmpty: request?.allowEmpty === true,
       authorName: request?.authorName,
@@ -326,27 +338,27 @@ export function registerWorkspaceGitIpcHandlers({
     })
   )));
 
-  ipcMain.handle("workspace:git-operation-continue", withAuthorizedRepositoryMutation((rootPath) => (
+  ipcMain.handle("workspace:git-operation-continue", withAuthorizedWorktreeAndRepositoryMutation((rootPath) => (
     continueWorkspaceGitOperation(rootPath)
   )));
 
-  ipcMain.handle("workspace:git-operation-abort", withAuthorizedRepositoryMutation((rootPath) => (
+  ipcMain.handle("workspace:git-operation-abort", withAuthorizedWorktreeAndRepositoryMutation((rootPath) => (
     abortWorkspaceGitOperation(rootPath)
   )));
 
-  ipcMain.handle("workspace:git-checkout-branch", withAuthorizedRepositoryMutation((rootPath, request) => (
+  ipcMain.handle("workspace:git-checkout-branch", withAuthorizedWorktreeAndRepositoryMutation((rootPath, request) => (
     checkoutWorkspaceGitBranch(rootPath, request?.branchName, {
       remote: Boolean(request?.remote),
     })
   )));
 
-  ipcMain.handle("workspace:git-stash-checkout-branch", withAuthorizedRepositoryMutation((rootPath, request) => (
+  ipcMain.handle("workspace:git-stash-checkout-branch", withAuthorizedWorktreeAndRepositoryMutation((rootPath, request) => (
     stashAndCheckoutWorkspaceGitBranch(rootPath, request?.branchName, {
       remote: Boolean(request?.remote),
     })
   )));
 
-  ipcMain.handle("workspace:git-commit-checkout-branch", withAuthorizedRepositoryMutation((rootPath, request) => (
+  ipcMain.handle("workspace:git-commit-checkout-branch", withAuthorizedWorktreeAndRepositoryMutation((rootPath, request) => (
     commitAndCheckoutWorkspaceGitBranch(rootPath, request?.branchName, {
       remote: Boolean(request?.remote),
     })
@@ -360,7 +372,7 @@ export function registerWorkspaceGitIpcHandlers({
     fetchWorkspaceGit(rootPath, { remoteName: request?.remoteName })
   )));
 
-  ipcMain.handle("workspace:git-pull", withAuthorizedRepositoryMutation((rootPath, request, event) => (
+  ipcMain.handle("workspace:git-pull", withAuthorizedWorktreeAndRepositoryMutation((rootPath, request, event) => (
     runWorkspaceGitIpcOperation({ BrowserWindow, dialog, t }, event, request, "pull", () => (
       pullWorkspaceGit(rootPath)
     ))
@@ -385,7 +397,7 @@ export function registerWorkspaceGitIpcHandlers({
     publishWorkspaceGitBranch(rootPath, request?.remoteName)
   )));
 
-  ipcMain.handle("workspace:git-sync", withAuthorizedRepositoryMutation((rootPath) => (
+  ipcMain.handle("workspace:git-sync", withAuthorizedWorktreeAndRepositoryMutation((rootPath) => (
     syncWorkspaceGit(rootPath)
   )));
 }

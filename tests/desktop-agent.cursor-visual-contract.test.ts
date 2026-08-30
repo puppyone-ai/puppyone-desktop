@@ -11,7 +11,8 @@ const css = [
     .map((file) => fs.readFileSync(path.join(styleRoot, file), "utf8")),
 ].join("\n");
 const composer = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentComposer.tsx"), "utf8");
-const panel = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/RightAgentPanel.tsx"), "utf8");
+const attachmentButton = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/composer/AgentAttachmentButton.tsx"), "utf8");
+const panel = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentChatTabPanel.tsx"), "utf8");
 const picker = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentPickerPopover.tsx"), "utf8");
 const brandMark = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentBrandMark.tsx"), "utf8");
 const messagePart = fs.readFileSync(path.join(root, "src/features/desktop-agent/ui/AgentMessagePart.tsx"), "utf8");
@@ -94,9 +95,10 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-composer:focus-within\s*\{[^}]*background:\s*var\(--agent-row-selected-surface\)/s);
     expect(css).toMatch(/\.desktop-agent-picker-option\.is-selected\s*\{[^}]*background:\s*var\(--agent-row-hover-surface\)/s);
     expect(css).toMatch(/\.desktop-agent-picker-option\.is-selected:not\(\[aria-disabled="true"\]\):hover,[^{]*\{[^}]*background:\s*var\(--agent-row-selected-surface\)/s);
-    expect(css).toMatch(/\.desktop-agent-composer-trailing\s*\{[^}]*min-height:\s*var\(--agent-composer-toolbar-height\)[^}]*padding:\s*0 8px 8px 12px[^}]*border:\s*0/s);
+    expect(css).toMatch(/\.desktop-agent-composer-trailing\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto[^}]*min-height:\s*var\(--agent-composer-toolbar-height\)[^}]*padding:\s*0 8px 8px 12px[^}]*border:\s*0/s);
     expect(css).toMatch(/\.desktop-agent-picker-trigger\s*\{[^}]*width:\s*fit-content[^}]*border:\s*1px solid var\(--agent-config-border\)[^}]*background:\s*transparent/s);
-    expect(css).toMatch(/\.desktop-agent-composer-picker\.is-model\s*\{[^}]*width:\s*fit-content/s);
+    expect(css).toMatch(/\.desktop-agent-composer-picker\.is-model\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*100%/s);
+    expect(css).not.toContain("max-width: min(70%, 300px)");
     expect(css).toMatch(/--agent-composer-input-padding:\s*12px/);
     expect(css).toMatch(/--agent-composer-text-min-height:\s*40px/);
     expect(css).toMatch(/--agent-composer-text-max-height:\s*120px/);
@@ -116,8 +118,12 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(panel).toContain("loading={startupLoading}");
     expect(panel).toContain("dock={startupLoading ? null");
     expect(panel).toContain("floatingAccessory=");
-    expect(composer).toContain("<AgentReferenceMenu");
+    expect(composer).toContain("<AgentAttachmentButton");
+    expect(attachmentButton).toContain("inputRef.current?.click()");
+    expect(attachmentButton).not.toContain("DesktopOverlayLayer");
+    expect(attachmentButton).not.toContain('role="menu"');
     expect(css).toMatch(/\.desktop-agent-reference-trigger\s*\{[^}]*width:\s*var\(--agent-control-size\)[^}]*height:\s*var\(--agent-control-size\)/s);
+    expect(css).toMatch(/\.desktop-agent-reference-chip-preview\.is-image\s*\{[^}]*color:\s*var\(--po-accent-text\)/s);
     expect(composer).toContain('className="desktop-agent-composer-actions"');
     expect(composer).toContain("onMouseDown={handleSurfaceMouseDown}");
     expect(composer).toContain("textareaRef.current?.focus()");
@@ -126,13 +132,17 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(composer).not.toContain("AgentBackendPicker");
     expect(composer).not.toContain('is-backend');
     expect(composer).not.toContain("AgentProviderPicker");
-    expect(panel).toContain("agentSelector={<AgentProviderPicker");
+    expect(composer).not.toContain("desktop-agent-composer-hint");
+    expect(css).not.toContain(".desktop-agent-composer-hint");
+    expect(panel).not.toContain("<AgentSurfaceHeader");
+    expect(panel).not.toContain("<AgentRuntimePicker");
     expect(panel).toContain("t(DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID)");
     expect(composer).toContain('DEFAULT_AGENT_COMPOSER_PLACEHOLDER_ID = "agent.composer.placeholder.default"');
     expect(css).toMatch(/\.desktop-agent-picker\.is-header\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*100%/s);
     expect(css).toMatch(/\.desktop-agent-picker\.is-header \.desktop-agent-picker-trigger\s*\{[^}]*width:\s*max-content[^}]*max-width:\s*100%[^}]*border:\s*0[^}]*font-size:\s*var\(--po-font-size-chrome, 13px\)[^}]*font-weight:\s*var\(--po-font-weight-chrome, 500\)/s);
     expect(css).not.toContain("max-width: min(68%, 300px)");
     expect(css).toMatch(/\.desktop-agent-session-header-actions\s*\{[^}]*border:\s*0[^}]*background:\s*transparent/s);
+    expect(panelStatus).toContain("const detail = failed");
     expect(composer).not.toContain("<Zap");
     expect(panel).toContain('t("agent.composer.placeholder.followUp")');
     expect(panel).toContain("<AgentPanelLayout");
@@ -194,6 +204,8 @@ describe("Desktop Agent Cursor-style sidebar visual contract", () => {
     expect(css).toMatch(/\.desktop-agent-picker-popover\s*\{[^}]*position:\s*fixed[^}]*top:\s*var\(--agent-overlay-top, 0px\)[^}]*left:\s*var\(--agent-overlay-left, 0px\)[^}]*z-index:\s*1300[^}]*width:\s*var\(--agent-overlay-width, 0px\)[^}]*max-height:\s*var\(--agent-overlay-max-height, 0px\)/s);
     expect(css).not.toContain("desktop-agent-picker-in");
     expect(css).not.toMatch(/\.desktop-agent-picker-popover\s*\{[^}]*animation:/s);
+    expect(css).not.toMatch(/\.desktop-agent-picker-trigger\[aria-expanded="true"\]/);
+    expect(css).not.toMatch(/\.desktop-agent-picker-popover\s*\{[^}]*backdrop-filter:/s);
     expect(picker).toContain("DesktopOverlayLayer");
     expect(picker).toContain('boundarySelector: ".desktop-agent-boundary"');
   });

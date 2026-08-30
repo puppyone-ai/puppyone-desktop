@@ -8,11 +8,13 @@ import {
 import type {
   AgentApprovalDecision,
   AgentQuestionResolution,
+  AgentSessionsListRequest,
+  AgentSessionsListResponse,
   AgentSessionSnapshot,
 } from "../domain/agent-contract";
 import { AgentEventSynchronizer } from "./AgentEventSynchronizer";
 import { agentControllerTransitions, type AgentControllerState } from "./agent-controller-state";
-import { AgentKnownError, formatAgentError } from "./agent-error";
+import { AgentKnownError, createAgentError, formatAgentError } from "./agent-error";
 import { SessionUiStateStore, type SessionUiState } from "./SessionUiStateStore";
 import { LocalAgentConnectionLoader } from "./LocalAgentConnectionLoader";
 import type { AgentClientPort, AgentClientProvider } from "./AgentClientPort";
@@ -136,12 +138,6 @@ export class AgentSessionController {
     return this.listeners.size > 0;
   }
 
-  setInitialRuntimePreference(runtimeId: string | null) {
-    if (this.state.initialized || this.state.phase !== "idle" || this.state.selectedRuntimeId) return;
-    if (!runtimeId || !/^[a-z][a-z0-9-]{1,39}$/.test(runtimeId)) return;
-    this.patch({ selectedRuntimeId: runtimeId });
-  }
-
   /** Releases renderer subscriptions only; it never sends a runtime stop. */
   dispose() {
     if (this.disposed) return;
@@ -161,9 +157,13 @@ export class AgentSessionController {
   }
 
   async initialize(refresh = false) {
+    return this.initializeRuntime(refresh, true);
+  }
+
+  private async initializeRuntime(refresh: boolean, restoreLatest: boolean) {
     if (this.initializePromise) return this.initializePromise;
-    if (!refresh && hasFreshAgentRuntimeInspection(this.state, this.lastInspectionAt)) return;
-    this.initializePromise = this.runInitialize(refresh).finally(() => { this.initializePromise = null; });
+    if (restoreLatest && !refresh && hasFreshAgentRuntimeInspection(this.state, this.lastInspectionAt)) return;
+    this.initializePromise = this.runInitialize(refresh, restoreLatest).finally(() => { this.initializePromise = null; });
     return this.initializePromise;
   }
 
@@ -186,11 +186,13 @@ export class AgentSessionController {
         await this.requireBridge("closeAgentSession").closeAgentSession({
           rootPath: this.workspaceRoot,
           sessionId: plan.sessionId,
-          removePersistence: true,
+          removePersistence: false,
         });
         this.sessionUi.delete(plan.sessionId);
       }
-      await this.initialize(false);
+      // A runtime switch means "new chat". Native history is resumed only
+      // through openSavedSession(), never as an implicit side effect here.
+      await this.initializeRuntime(false, false);
       return this.state.selectedRuntimeId === runtimeId;
     } catch (error) {
       this.patch({ phase: "failed", error: formatAgentError(error) });
@@ -198,21 +200,96 @@ export class AgentSessionController {
     }
   }
 
-  private async runInitialize(refresh: boolean) {
+  async openSavedSession(sessionId: string, runtimeId: string) {
+    if (this.state.projection.runningTurnId) {
+      this.patch({ error: createAgentError("active-turn") });
+      return false;
+    }
+    const bridge = this.requireBridge("discoverAgentRuntimes", "resumeAgentSession");
+    await this.referenceDrafts.reset([
+      ...this.state.references,
+      ...this.submission.ownedReferences(),
+      ...(this.state.pendingIntent?.references ?? []),
+    ]);
+    this.submission.clearQueue();
+    if (this.state.session) {
+      await this.requireBridge("closeAgentSession").closeAgentSession({
+        rootPath: this.workspaceRoot,
+        sessionId: this.state.session.id,
+        removePersistence: false,
+      });
+    }
+    this.patch({
+      phase: "discovering",
+      session: null,
+      projection: createAgentProjection(),
+      selectedRuntimeId: runtimeId,
+      error: null,
+      references: [],
+      sessionPreparation: "preparing",
+    });
+    try {
+      const inspection = await bridge.discoverAgentRuntimes({
+        rootPath: this.workspaceRoot,
+        runtimeId,
+        refresh: false,
+      });
+      const selectedModel = chooseAgentModel(inspection, null, null);
+      const selectedModelEntry = inspection.models.find((model) => model.model === selectedModel);
+      this.patch({
+        inspection,
+        selectedRuntimeId: inspection.selectedRuntimeId,
+        selectedProviderId: agentProviderIdForModel(selectedModelEntry)
+          || chooseAgentProvider(inspection, null, selectedModel),
+        selectedModel,
+        selectedMode: chooseAgentMode(inspection, null),
+        initialized: true,
+        phase: "restoring",
+      });
+      const restored = await bridge.resumeAgentSession({
+        rootPath: this.workspaceRoot,
+        sessionId,
+        runtimeId,
+      });
+      if (!restored) {
+        this.patch({ phase: "ready", sessionPreparation: "idle" });
+        return false;
+      }
+      this.applySnapshot(restored);
+      this.patch({
+        phase: restored.session.activeTurnId ? "running" : "ready",
+        sessionPreparation: "ready",
+      });
+      return true;
+    } catch (error) {
+      this.patch({ phase: "failed", error: formatAgentError(error), sessionPreparation: "failed" });
+      return false;
+    }
+  }
+
+  async listSavedSessions(
+    request: Omit<AgentSessionsListRequest, "rootPath"> = {},
+  ): Promise<AgentSessionsListResponse> {
+    return this.requireBridge("listAgentSessions").listAgentSessions({
+      rootPath: this.workspaceRoot,
+      includeArchived: false,
+      discoverNative: false,
+      ...request,
+    });
+  }
+
+  private async runInitialize(refresh: boolean, restoreLatest: boolean) {
     this.eventSynchronizer.connect();
-    const bridge = this.requireBridge("discoverAgentProviders", "resumeAgentSession");
+    const bridge = this.requireBridge("discoverAgentRuntimes", "resumeAgentSession");
     this.patch({ phase: "discovering", error: null });
     try {
-      const inspection = await bridge.discoverAgentProviders({
+      const inspection = await bridge.discoverAgentRuntimes({
         rootPath: this.workspaceRoot,
         runtimeId: this.state.selectedRuntimeId,
         refresh,
       });
       this.lastInspectionAt = Date.now();
       const runtimeId = inspection.selectedRuntimeId
-        || inspection.runtime?.id
-        || inspection.readiness.runtimeId
-        || inspection.readiness.provider
         || null;
       const selectedModel = chooseAgentModel(inspection, this.state.selectedModel, null);
       const selectedModelEntry = inspection.models.find((model) => model.model === selectedModel);
@@ -220,7 +297,11 @@ export class AgentSessionController {
         || chooseAgentProvider(inspection, this.state.selectedProviderId, selectedModel);
       const selectedMode = chooseAgentMode(inspection, this.state.selectedMode);
       this.patch({ inspection, selectedRuntimeId: runtimeId, selectedProviderId, selectedModel, selectedMode, initialized: true });
-      if (inspection.readiness.status !== "ready") {
+      if (!runtimeId || !inspection.readiness || inspection.readiness.status !== "ready") {
+        this.patch({ phase: "ready", sessionPreparation: "idle" });
+        return;
+      }
+      if (!restoreLatest) {
         this.patch({ phase: "ready", sessionPreparation: "idle" });
         return;
       }
@@ -322,6 +403,18 @@ export class AgentSessionController {
     ]);
     this.submission.clearQueue();
     return this.sessionLifecycle.newSession();
+  }
+
+  async closeTabSession() {
+    const closed = await this.sessionLifecycle.closeSession();
+    if (!closed) return false;
+    await this.referenceDrafts.reset([
+      ...this.state.references,
+      ...this.submission.ownedReferences(),
+      ...(this.state.pendingIntent?.references ?? []),
+    ]);
+    this.submission.clearQueue();
+    return true;
   }
 
   prepareSession() {

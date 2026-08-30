@@ -13,7 +13,6 @@ import {
   openWorkspaceFileRangeStream,
   readWorkspaceFile,
   readWorkspaceTextFile,
-  convertWorkspaceOfficeDocumentToDocx,
   writeWorkspaceTextFile,
   readWorkspaceBinaryFileVersion,
   writeWorkspaceBinaryFile,
@@ -23,11 +22,15 @@ import {
   resolveWorkspaceNode,
   moveWorkspaceEntry,
   copyWorkspaceEntry,
+  copyWorkspaceEntryBetweenRoots,
   deleteWorkspaceEntry,
   importWorkspaceEntries,
   readPuppyoneWorkspaceConfig,
   writePuppyoneWorkspaceConfig,
 } from "../local-api/workspace.mjs";
+import {
+  convertMacosOfficeDocumentToDocx,
+} from "../electron/main/platform/macos/office-document-converter.mjs";
 
 let root;
 let external;
@@ -331,7 +334,7 @@ describe("read / write round-trips", () => {
     await expect(readWorkspaceTextFile(root, "linked.rtf")).rejects.toThrow(/symbolic links/i);
     await expect(writeWorkspaceTextFile(root, "linked.rtf", "changed")).rejects.toThrow(/symbolic links/i);
     if (process.platform === "darwin") {
-      await expect(convertWorkspaceOfficeDocumentToDocx(root, "linked.rtf")).rejects.toThrow(/symbolic links/i);
+      await expect(convertMacosOfficeDocumentToDocx(root, "linked.rtf")).rejects.toThrow(/symbolic links/i);
     }
     expect(await readFile(externalFile, "utf8")).toBe("{\\rtf1\\ansi SECRET}");
   });
@@ -340,7 +343,7 @@ describe("read / write round-trips", () => {
     if (process.platform !== "darwin") return;
 
     await writeFile(path.join(root, "sample.rtf"), "{\\rtf1\\ansi PuppyOne}");
-    const out = await convertWorkspaceOfficeDocumentToDocx(root, "sample.rtf");
+    const out = await convertMacosOfficeDocumentToDocx(root, "sample.rtf");
     expect(out.bytes.subarray(0, 4)).toEqual(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
   });
 
@@ -350,7 +353,7 @@ describe("read / write round-trips", () => {
     await writeFile(path.join(root, "cancelled.rtf"), "{\\rtf1\\ansi PuppyOne}");
     const controller = new AbortController();
     controller.abort();
-    await expect(convertWorkspaceOfficeDocumentToDocx(root, "cancelled.rtf", {
+    await expect(convertMacosOfficeDocumentToDocx(root, "cancelled.rtf", {
       signal: controller.signal,
     })).rejects.toThrow(/cancelled/i);
   });
@@ -591,6 +594,20 @@ describe("rename / move / delete", () => {
 });
 
 describe("copyWorkspaceEntry", () => {
+  it("copies a file between two authorized workspace roots", async () => {
+    await createWorkspaceEntry(root, { parentPath: null, name: "source.txt", kind: "file", content: "cross-root" });
+    await createWorkspaceEntry(external, { parentPath: null, name: "destination", kind: "folder" });
+
+    const result = await copyWorkspaceEntryBetweenRoots(root, external, {
+      fromPath: "source.txt",
+      targetFolderPath: "destination",
+    });
+
+    expect(result).toEqual({ path: "destination/source.txt" });
+    expect(await readFile(path.join(root, "source.txt"), "utf8")).toBe("cross-root");
+    expect(await readFile(path.join(external, "destination", "source.txt"), "utf8")).toBe("cross-root");
+  });
+
   it("copies files into another folder without changing the source", async () => {
     await createWorkspaceEntry(root, { parentPath: null, name: "source.txt", kind: "file", content: "original" });
     await createWorkspaceEntry(root, { parentPath: null, name: "destination", kind: "folder" });

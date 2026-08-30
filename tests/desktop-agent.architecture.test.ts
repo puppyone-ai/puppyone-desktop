@@ -4,12 +4,15 @@ import { describe, expect, it } from "vitest";
 describe("Desktop Agent architecture boundaries", () => {
   it("keeps RightAgentPanel as composition and the controller framework independent", () => {
     const panel = source("src/features/desktop-agent/ui/RightAgentPanel.tsx");
+    const tabPanel = source("src/features/desktop-agent/ui/AgentChatTabPanel.tsx");
     const layout = source("src/features/desktop-agent/ui/AgentPanelLayout.tsx");
     const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
     const preparer = source("src/features/desktop-agent/application/AgentSessionPreparer.ts");
     expect(panel.split("\n").length).toBeLessThan(230);
     expect(panel).not.toMatch(/useState|bufferedEvents|replayInFlight|applyAgentEvent/);
-    expect(panel).toContain("<AgentPanelLayout");
+    expect(panel).toContain("<AgentSessionTabs");
+    expect(panel).toContain("<AgentChatTabPanel");
+    expect(tabPanel).toContain("<AgentPanelLayout");
     expect(layout).toContain('className="desktop-agent-boundary"');
     expect(layout).toContain('className="desktop-agent-panel"');
     expect(layout).toContain('className="desktop-agent-conversation-region"');
@@ -28,6 +31,9 @@ describe("Desktop Agent architecture boundaries", () => {
     const timeline = source("src/features/desktop-agent/ui/AgentTranscript.tsx");
     const markdown = source("src/features/desktop-agent/ui/SafeMarkdown.tsx");
     const composer = source("src/features/desktop-agent/ui/AgentComposer.tsx");
+    const attachmentButton = source("src/features/desktop-agent/ui/composer/AgentAttachmentButton.tsx");
+    const commandSuggestions = source("src/features/desktop-agent/ui/composer/AgentCommandSuggestions.tsx");
+    const draftReferences = source("src/features/desktop-agent/ui/composer/AgentDraftReferenceList.tsx");
     const picker = source("src/features/desktop-agent/ui/AgentPickerPopover.tsx");
     const runtimeGeometry = source("src/features/desktop-agent/ui/agent-runtime-geometry.ts");
     const cssEntry = source("src/features/desktop-agent/ui/desktop-agent.css");
@@ -55,6 +61,14 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(css).toContain("prefers-reduced-motion");
     expect(globalLayout).not.toContain(".desktop-agent-");
     expect(composer).not.toContain("useLayoutEffect");
+    expect(composer.split("\n").length).toBeLessThan(190);
+    expect(composer).not.toContain("function ReferenceChip");
+    expect(composer).toContain("<AgentCommandSuggestions");
+    expect(composer).toContain("<AgentDraftReferenceList");
+    expect(composer).toContain("<AgentAttachmentButton");
+    expect(attachmentButton).not.toMatch(/useState|DesktopOverlayLayer|role="menu"/);
+    expect(commandSuggestions).not.toMatch(/useState|AgentSessionController/);
+    expect(draftReferences).not.toMatch(/useState|AgentSessionController/);
     expect(composer).not.toMatch(/\.style(?:\.|\[)/);
     expect(composer).not.toContain("ResizeObserver");
     expect(composer).toContain("rows={1}");
@@ -90,38 +104,40 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(adapter).toContain("window.puppyoneDesktop");
   });
 
-  it("persists only Agent selection and discovery metadata, never PuppyOne Chat History", () => {
+  it("persists routing and native-session metadata, never PuppyOne Chat History", () => {
     const main = source("electron/main.mjs");
     const sessionCache = source("electron/main/agent/cache/ephemeral-agent-session-cache.mjs");
+    const conversationCatalog = source("electron/main/agent/persistence/agent-conversation-catalog.mjs");
     const inventory = source("electron/main/agent/connections/local-agent-inventory.mjs");
     const preferences = source("src/features/app-shell/preferences.ts");
     const header = source("src/features/desktop-agent/ui/AgentSurfaceHeader.tsx");
     const controllerState = source("src/features/desktop-agent/application/agent-controller-state.ts");
     expect(main).toContain("createEphemeralAgentSessionCache");
+    expect(main).toContain("createAgentConversationCatalog");
+    expect(main).toContain("createAgentSessionRepository");
     expect(sessionCache).toContain("PuppyOne does not own Chat History");
     expect(sessionCache).not.toMatch(/promises\.writeFile|desktop-agent-sessions\.json.*write/);
+    expect(conversationCatalog).toContain("metadata-only index");
+    expect(conversationCatalog).not.toContain("events:");
+    expect(conversationCatalog).toContain("return compact({");
+    expect(conversationCatalog).toContain("providerSessionId,");
     expect(main).toContain("agent-runtime-inventory.json");
     expect(inventory).toContain("PERSISTED_CACHE_TTL_MS");
-    expect(preferences).toContain("AGENT_PREFERRED_RUNTIME_STORAGE_KEY");
+    expect(preferences).toContain("AGENT_ROUTING_PREFERENCES_STORAGE_KEY");
     expect(header).not.toMatch(/Session history|Recent chats|Archive chat|Delete local chat|Fork chat/);
     expect(controllerState).not.toContain("history:");
     expect(controllerState).toContain('AgentSubmissionStage = "preparing-session" | "starting-turn" | null');
   });
 
-  it("keeps native transport internals and rendered architecture diagrams out of Renderer/docs", () => {
+  it("keeps native transport internals out of Renderer", () => {
     const preload = source("electron/preload.cjs");
     const renderer = [
       source("src/features/desktop-agent/ui/RightAgentPanel.tsx"),
       source("src/features/desktop-agent/application/AgentSessionController.ts"),
       source("src/features/desktop-agent/agentTypes.ts"),
     ].join("\n");
-    const docs = source("docs/architecture/desktop-agent/README.md");
     expect(preload).not.toMatch(/spawnAgent|agentStdin|OpenCodeHttpClient|OPENCODE_SERVER_PASSWORD/);
     expect(renderer).not.toMatch(/OpenCodeHttpClient|OPENCODE_SERVER_PASSWORD|\/global\/event/);
-    expect(docs).not.toContain("```mermaid");
-    expect(docs).toContain("no   Chat transcript");
-    expect(docs).toContain("codex app-server (JSONL-RPC over stdio)");
-    expect(docs).toContain("user's OpenCode executable, profile, auth and native session");
   });
 
   it("keeps Core backend-neutral and concrete backends in the single production composition root", () => {
@@ -139,33 +155,53 @@ describe("Desktop Agent architecture boundaries", () => {
     expect(contract).toContain("assertAgentIpcResponse");
   });
 
-  it("keeps ACP model authority in the OpenCode adapter and explicit selection in application state", () => {
+  it("keeps ACP generic, Cursor extensions isolated and native starts supervised", () => {
+    const acpCore = source("electron/main/agent/protocols/acp/acp-runtime-adapter.mjs");
+    const cursor = source("electron/main/agent/runtimes/cursor/cursor-acp-adapter.mjs");
+    const cursorDiscovery = source("electron/main/agent/runtimes/cursor/cursor-discovery.mjs");
+    const claude = source("electron/main/agent/runtimes/claude/claude-identity.mjs");
+    const main = source("electron/main.mjs");
+    expect(acpCore).not.toMatch(/cursor\/|managedOpenCodeAcpConfig|OPENCODE_/);
+    expect(cursor).toContain('authenticationMethodId: "cursor_login"');
+    expect(cursor).toContain('questionMethods: ["cursor/ask_question"]');
+    expect(cursorDiscovery).toContain('compatibility: "acp-v1"');
+    expect(cursorDiscovery).toContain('status: "ready"');
+    expect(claude).toContain('displayName: "Claude Agent"');
+    expect(main).toContain("createAgentProcessSupervisor");
+    expect(main).toContain("agentProcessSupervisor");
+  });
+
+  it("keeps ACP lifecycle generic and OpenCode policy/runtime selection explicit", () => {
     const adapter = source("electron/main/agent/runtimes/opencode-protocol/opencode-acp-adapter.mjs");
+    const acpCore = source("electron/main/agent/protocols/acp/acp-runtime-adapter.mjs");
     const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
-    const panel = source("src/features/desktop-agent/ui/RightAgentPanel.tsx");
-    expect(adapter).toContain("client.newSession");
-    expect(adapter).toContain("resolveAcpModels");
-    expect(adapter).toContain("publicProviders");
-    expect(adapter).toContain("PuppyOne deliberately does not");
+    const panel = source("src/features/desktop-agent/ui/AgentChatTabPanel.tsx");
+    expect(adapter).toContain("extends AcpRuntimeAdapter");
+    expect(adapter).toContain("managedOpenCodeAcpConfig");
+    expect(acpCore).toContain("client.newSession");
+    expect(acpCore).toContain("resolveAcpModels");
+    expect(acpCore).toContain("publicProviders");
+    expect(acpCore).toContain("PuppyOne deliberately does not");
     expect(controller).toContain("selectedProviderId");
-    expect(panel.indexOf("agentProviders=")).toBeLessThan(panel.indexOf("models="));
-    expect(panel).toContain("agentSelector={<AgentProviderPicker");
-    expect(source("src/features/desktop-agent/ui/AgentComposer.tsx")).not.toContain("AgentProviderPicker");
+    expect(panel.indexOf("agentRuntimes=")).toBeLessThan(panel.indexOf("models="));
+    expect(panel).toContain("conversation={<AgentRuntimeLauncher");
+    expect(panel).not.toContain("<AgentRuntimePicker");
+    expect(source("src/features/desktop-agent/ui/AgentComposer.tsx")).not.toContain("AgentRuntimePicker");
   });
 
   it("keeps local executable inventory main-owned, lazy and separate from OpenCode provider authority", () => {
     const inventory = source("electron/main/agent/connections/local-agent-inventory.mjs");
     const candidates = source("electron/main/agent/connections/probes/executable-candidates.mjs");
     const controller = source("src/features/desktop-agent/application/AgentSessionController.ts");
-    const providerPicker = source("src/features/desktop-agent/ui/AgentProviderPicker.tsx");
+    const runtimePicker = source("src/features/desktop-agent/ui/AgentRuntimePicker.tsx");
     const backendRouting = source("src/features/desktop-agent/domain/agent-backend-routing.ts");
     const registry = source("electron/main/agent/connections/tools/local-agent-tool-registry.mjs");
     expect(inventory).not.toMatch(/from ["']react|OpenCode|providerCatalog/);
     expect(candidates).not.toMatch(/-ilc|login shell|exec\(/i);
     expect(controller.indexOf("discoverLocalConnections")).toBeGreaterThan(controller.indexOf("initialize(refresh"));
-    expect(providerPicker).not.toMatch(/Local tools|AgentLocalConnection|connection\.id/);
-    expect(providerPicker).not.toMatch(/Coding Agents|Detected|Refresh/);
-    expect(providerPicker).toContain("Selection is a presentation concern");
+    expect(runtimePicker).not.toMatch(/Local tools|AgentLocalConnection|connection\.id/);
+    expect(runtimePicker).not.toMatch(/Coding Agents|Detected|Refresh/);
+    expect(runtimePicker).toContain("A non-ready runtime remains inspectable");
     expect(backendRouting).not.toMatch(/puppyone-agent|codex|claude|cursor|opencode/i);
     expect(registry).toContain("validateDescriptor");
   });

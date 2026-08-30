@@ -1,5 +1,6 @@
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 const externalViewerPacksEnabled = process.argv.includes("--puppyone-external-viewer-packs=1");
+const gitAutoCommitAvailable = process.argv.includes("--puppyone-git-auto-commit=1");
 
 contextBridge.exposeInMainWorld("puppyoneDesktop", {
   getWindowChromeState: () => ipcRenderer.invoke("window-layout:get-chrome-state"),
@@ -45,6 +46,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     });
   },
   getBuildInfo: () => ipcRenderer.invoke("build-info:get"),
+  getPlatformCapabilities: () => ipcRenderer.invoke("platform:get-capabilities"),
   getTelemetryState: () => ipcRenderer.invoke("telemetry:get-state"),
   getTelemetryDisclosure: () => ipcRenderer.invoke("telemetry:get-disclosure"),
   markTelemetryNoticeSeen: () => ipcRenderer.invoke("telemetry:mark-notice-seen"),
@@ -93,9 +95,10 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     if (typeof callback !== "function") return () => {};
     const listener = async (_event, payload) => {
       const requestId = typeof payload?.requestId === "string" ? payload.requestId : null;
+      const reason = payload?.reason === "git-auto-commit" ? "git-auto-commit" : "app-close";
       if (!requestId) return;
       try {
-        await callback({ requestId });
+        await callback({ requestId, reason });
         ipcRenderer.send("document-session:flush-result", { requestId, ok: true });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -118,6 +121,21 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     ipcRenderer.on("document-session:close-cancelled", listener);
     return () => ipcRenderer.removeListener("document-session:close-cancelled", listener);
   },
+  ...(gitAutoCommitAvailable ? {
+    getGitAutoCommitSettings: (request = {}) => ipcRenderer.invoke("git-auto-commit:get-settings", request),
+    setGitAutoCommitExperimentalOptIn: (request) => (
+      ipcRenderer.invoke("git-auto-commit:set-experimental-opt-in", request)
+    ),
+    setGitAutoCommitWorkspacePolicy: (request) => (
+      ipcRenderer.invoke("git-auto-commit:set-workspace-policy", request)
+    ),
+    onGitAutoCommitStateChanged: (callback) => {
+      if (typeof callback !== "function") return () => {};
+      const listener = (_event, payload) => callback(payload);
+      ipcRenderer.on("git-auto-commit:state", listener);
+      return () => ipcRenderer.removeListener("git-auto-commit:state", listener);
+    },
+  } : {}),
   readCloudSession: () => ipcRenderer.invoke("cloud-session:read"),
   readCloudAuthState: () => ipcRenderer.invoke("cloud-auth:read-state"),
   restoreCloudSession: (request) => ipcRenderer.invoke("cloud-session:restore", request),
@@ -177,6 +195,9 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
     return ipcRenderer.invoke("workspace:open-dropped-current", folderPath.trim());
   },
   selectFolder: () => ipcRenderer.invoke("workspace:select-folder-current"),
+  selectFolderToAttach: () => ipcRenderer.invoke("workspace:select-folder-attach"),
+  attachFolder: (folderPath) => ipcRenderer.invoke("workspace:attach-current", folderPath),
+  detachFolder: (folderPath) => ipcRenderer.invoke("workspace:detach-current", folderPath),
   selectFolderInNewWindow: () => ipcRenderer.invoke("workspace:select-folder-new-window"),
   selectLocalProjectLocation: () => ipcRenderer.invoke("workspace:select-project-location-current"),
   createLocalProject: (request) => ipcRenderer.invoke("workspace:create-project-current", request),
@@ -195,6 +216,7 @@ contextBridge.exposeInMainWorld("puppyoneDesktop", {
   renameEntry: (request) => ipcRenderer.invoke("workspace:rename-entry", request),
   moveEntry: (request) => ipcRenderer.invoke("workspace:move-entry", request),
   copyEntry: (request) => ipcRenderer.invoke("workspace:copy-entry", request),
+  copyEntryBetweenRoots: (request) => ipcRenderer.invoke("workspace:copy-entry-between-roots", request),
   importEntries: (request) => {
     const files = Array.isArray(request?.files) ? request.files : [];
     const sourcePaths = files

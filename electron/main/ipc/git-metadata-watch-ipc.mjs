@@ -1,6 +1,6 @@
 // Authorized IPC surface for the Git metadata watcher.
 //
-// Bridge contract (see docs/architecture/git/status-refresh-lifecycle.md WP2):
+// Bridge contract (see https://github.com/puppyone-ai/puppy-issues/blob/main/document/puppyone-desktop/source-control/refresh-lifecycle.md WP2):
 //   startGitRepositoryWatch({ rootPath }) -> { subscriptionId, rootPath, repository }
 //   gitRepositoryInvalidated               -> { subscriptionId, rootPath, reason }
 //   stopGitRepositoryWatch({ subscriptionId }) -> { ok: true }

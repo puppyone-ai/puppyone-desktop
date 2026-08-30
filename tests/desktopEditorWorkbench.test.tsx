@@ -3,7 +3,13 @@ import React, { useEffect } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
-import type { DataNode, DocumentDataNode, Workspace } from "@puppyone/shared-ui";
+import {
+  createWorkspaceRootUri,
+  type DataNode,
+  type DocumentDataNode,
+  type ResourceUri,
+  type Workspace,
+} from "@puppyone/shared-ui";
 import {
   useDesktopEditorWorkbench,
   type DesktopEditorWorkbenchController,
@@ -22,6 +28,86 @@ afterEach(() => {
 });
 
 describe("useDesktopEditorWorkbench", () => {
+  it("uses Root-aware Editor IDs while preserving the visible active path", async () => {
+    const workspace: Workspace = {
+      id: "workspace-id",
+      name: "Workspace",
+      path: "/workspace",
+      status: "recording",
+      workspaceInstanceId: "instance-a",
+    };
+    const snapshots: DesktopEditorWorkbenchController[] = [];
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <Probe
+          workspace={workspace}
+          workspaceFolderUri={createWorkspaceRootUri("instance-a")}
+          onChange={(controller) => snapshots.push(controller)}
+        />,
+      );
+      await Promise.resolve();
+    });
+    await act(async () => {
+      snapshots.at(-1)!.openDocument(documentNode("src/App.tsx"));
+      await Promise.resolve();
+    });
+
+    const controller = snapshots.at(-1)!;
+    expect(controller.activePath).toBe("src/App.tsx");
+    expect(controller.activeEditorId).toContain("puppyone-local://workspace/instance-a/");
+    expect(controller.state.editors[0]).toMatchObject({
+      resource: "src/App.tsx",
+      id: controller.activeEditorId,
+    });
+  });
+
+  it("migrates path-only Workbench and Pane records into one Root URI", async () => {
+    const workspace: Workspace = {
+      id: "workspace-id",
+      name: "Workspace",
+      path: "/workspace",
+      status: "recording",
+      workspaceInstanceId: "instance-a",
+    };
+    const storageKey = "puppyone.desktop.editor-workbench.v3:workspace-id:/workspace";
+    window.localStorage.setItem(storageKey, JSON.stringify({
+      group: {
+        editors: [{ id: "docs/a.md", resource: "docs/a.md", label: "a.md" }],
+        activeEditorId: "docs/a.md",
+        mostRecentlyUsed: ["docs/a.md"],
+      },
+      layout: {
+        activePaneId: "editor-pane-1",
+        root: { kind: "pane", id: "editor-pane-1", editorId: "docs/a.md" },
+      },
+    }));
+    const snapshots: DesktopEditorWorkbenchController[] = [];
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <Probe
+          workspace={workspace}
+          workspaceFolderUri={createWorkspaceRootUri("instance-a")}
+          onChange={(controller) => snapshots.push(controller)}
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const controller = snapshots.at(-1)!;
+    expect(controller.activePath).toBe("docs/a.md");
+    expect(controller.activeEditorId).toContain("puppyone-local://workspace/instance-a/");
+    expect(controller.paneLayout.root).toMatchObject({ editorId: controller.activeEditorId });
+  });
+
   it("restores a workspace session without overwriting it during hydration", async () => {
     const workspace: Workspace = {
       id: "workspace-id",
@@ -387,14 +473,17 @@ function Probe({
   workspace,
   onChange,
   resolveNode,
+  workspaceFolderUri = null,
 }: {
   workspace: Workspace;
   onChange: (controller: DesktopEditorWorkbenchController) => void;
   resolveNode?: (path: string) => Promise<DataNode | null>;
+  workspaceFolderUri?: ResourceUri | null;
 }) {
   const controller = useDesktopEditorWorkbench(
     workspace,
     resolveNode ?? resolveDocumentNode,
+    workspaceFolderUri,
   );
   useEffect(() => {
     onChange(controller);

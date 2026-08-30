@@ -15,6 +15,7 @@ import {
   Scissors,
   Trash2,
   Workflow,
+  X,
 } from "lucide-react";
 import {
   createDefaultContextMapDocumentContent,
@@ -37,6 +38,7 @@ import {
   type ExperimentalSettings,
 } from "../../preferences";
 import { createUnconfiguredAppPreviewManifestContent } from "../../../shared/appPreviewManifest.js";
+import { useDesktopPlatformCapabilities } from "../../platform/useDesktopPlatformCapabilities";
 import {
   getConfiguredCreateEntryMenuItems,
   getCreateEntryMenuItem,
@@ -96,11 +98,15 @@ export function DesktopExplorerRowActions({
   parentPath,
   onCreate,
   onOpenNodeMenu,
+  onRemoveWorkspaceRoot,
+  showMoreActions = true,
 }: {
   node?: DataNode;
   parentPath: string | null;
   onCreate: (parentPath: string | null, anchorRect: DOMRect) => void;
   onOpenNodeMenu: (node: DataNode, anchorRect: DOMRect) => void;
+  onRemoveWorkspaceRoot?: (node: DataNode) => void;
+  showMoreActions?: boolean;
 }) {
   const { t } = useLocalization();
   const canCreate = node?.type === "folder" || !node;
@@ -118,7 +124,7 @@ export function DesktopExplorerRowActions({
           <Plus aria-hidden="true" />
         </button>
       )}
-      {node && (
+      {node && showMoreActions && (
         <button
           className="tree-row-action-button"
           type="button"
@@ -127,6 +133,20 @@ export function DesktopExplorerRowActions({
           onClick={(event) => onOpenNodeMenu(node, event.currentTarget.getBoundingClientRect())}
         >
           <MoreVertical aria-hidden="true" />
+        </button>
+      )}
+      {node?.workspaceFolderRoot && onRemoveWorkspaceRoot && (
+        <button
+          className="tree-row-action-button"
+          type="button"
+          title={t("shell.workspaceSwitcher.removeProject")}
+          aria-label={t("shell.workspaceSwitcher.removeProjectNamed", { name: bidiIsolate(node.name) })}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemoveWorkspaceRoot(node);
+          }}
+        >
+          <X aria-hidden="true" />
         </button>
       )}
     </>
@@ -605,6 +625,8 @@ function DesktopNodeActionPopover({
   onRevealInFinder: () => void;
 }) {
   const { t } = useLocalization();
+  const platformCapabilities = useDesktopPlatformCapabilities();
+  const primaryModifier = platformCapabilities?.primaryModifier ?? "control";
   const menuRef = useRef<HTMLDivElement>(null);
   const actionCount = Math.max(1, draft.nodes.length);
   const singleNodeAction = actionCount === 1;
@@ -667,7 +689,7 @@ function DesktopNodeActionPopover({
         <DesktopNodeActionMenuItem
           icon={<ClipboardPaste size={14} />}
           label={t("workspace.node.pasteIntoFolder")}
-          shortcut={getPlatformShortcut("V")}
+          shortcut={getPlatformShortcut("V", primaryModifier)}
           disabled={draft.operation !== null || !canPaste}
           onClick={onPaste}
         />
@@ -676,14 +698,14 @@ function DesktopNodeActionPopover({
       <DesktopNodeActionMenuItem
         icon={<Copy size={14} />}
         label={t("workspace.node.copyItems", { count: actionCount })}
-        shortcut={getPlatformShortcut("C")}
+        shortcut={getPlatformShortcut("C", primaryModifier)}
         disabled={draft.operation !== null || !canCopy}
         onClick={onCopy}
       />
       <DesktopNodeActionMenuItem
         icon={<Scissors size={14} />}
         label={t("workspace.node.cutItems", { count: actionCount })}
-        shortcut={getPlatformShortcut("X")}
+        shortcut={getPlatformShortcut("X", primaryModifier)}
         disabled={draft.operation !== null || !canCut}
         onClick={onCut}
       />
@@ -692,7 +714,7 @@ function DesktopNodeActionPopover({
         label={draft.operation === "duplicate"
           ? t("workspace.node.duplicating")
           : t("workspace.node.duplicateItems", { count: actionCount })}
-        shortcut={getPlatformShortcut("D")}
+        shortcut={getPlatformShortcut("D", primaryModifier)}
         disabled={draft.operation !== null || !canDuplicate}
         onClick={onDuplicate}
       />
@@ -921,9 +943,8 @@ function DesktopNodeActionMenuItem({
   );
 }
 
-function getPlatformShortcut(key: string): string {
-  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
-  return isMac ? `⌘${key}` : `Ctrl+${key}`;
+function getPlatformShortcut(key: string, primaryModifier: "meta" | "control"): string {
+  return primaryModifier === "meta" ? `⌘${key}` : `Ctrl+${key}`;
 }
 
 function CreateEntryGlyph({

@@ -18,7 +18,7 @@ const CAPABILITY_METHODS = Object.freeze({
 export function assertAgentInspection(value) {
   const inspection = assertRecord(value, "Agent inspection");
   if (inspection.runtime !== undefined) assertRuntimeDescriptor(inspection.runtime);
-  if (inspection.readiness !== undefined) assertReadiness(inspection.readiness);
+  if (inspection.readiness !== undefined && inspection.readiness !== null) assertReadiness(inspection.readiness);
   assertArray(inspection.providers ?? [], "Agent inspection.providers").forEach(assertAgentInferenceProvider);
   assertArray(inspection.models ?? [], "Agent inspection.models").forEach(assertAgentModel);
   assertArray(inspection.modes ?? [], "Agent inspection.modes").forEach((mode) => assertNamedEntry(mode, "mode"));
@@ -40,10 +40,54 @@ export function assertAgentRuntimeCapabilities(adapter, capabilities, runtimeId 
 
 export function normalizeCapabilitySnapshot(value = {}) {
   const source = value && typeof value === "object" ? value : {};
+  const revision = boundedOptionalText(source.revision, 160);
+  const protocol = normalizeCapabilityProtocol(source.protocol);
+  const constraints = normalizeCapabilityConstraints(source.constraints);
   return {
     ...Object.fromEntries(AGENT_RUNTIME_CAPABILITIES.map((capability) => [capability, source[capability] === true])),
+    ...(revision ? { revision } : {}),
+    ...(protocol ? { protocol } : {}),
+    ...(constraints ? { constraints } : {}),
     referenceInputs: normalizeReferenceInputCapabilities(source.referenceInputs, source),
   };
+}
+
+function normalizeCapabilityProtocol(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const name = boundedOptionalText(value.name, 80);
+  const version = Number.isSafeInteger(value.version) && value.version >= 0
+    ? value.version
+    : boundedOptionalText(value.version, 80);
+  if (!name || version === "") return null;
+  const agentVersion = boundedOptionalText(value.agentVersion, 80);
+  const extensions = value.extensions && typeof value.extensions === "object" && !Array.isArray(value.extensions)
+    ? Object.fromEntries(Object.entries(value.extensions)
+      .filter(([key, entry]) => (
+        /^[A-Za-z0-9._/-]{1,120}$/.test(key)
+        && Number.isSafeInteger(entry)
+        && entry >= 0
+        && entry <= 1_000_000
+      ))
+      .slice(0, 64))
+    : {};
+  return {
+    name,
+    version,
+    ...(agentVersion ? { agentVersion } : {}),
+    ...(Object.keys(extensions).length > 0 ? { extensions } : {}),
+  };
+}
+
+function normalizeCapabilityConstraints(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const switches = new Set(["turn-boundary", "session-boundary", "unsupported"]);
+  const constraints = {
+    ...(switches.has(value.modelSwitch) ? { modelSwitch: value.modelSwitch } : {}),
+    ...(switches.has(value.modeSwitch) ? { modeSwitch: value.modeSwitch } : {}),
+    ...(typeof value.forkRequiresIdle === "boolean" ? { forkRequiresIdle: value.forkRequiresIdle } : {}),
+    ...(typeof value.compactionRequiresIdle === "boolean" ? { compactionRequiresIdle: value.compactionRequiresIdle } : {}),
+  };
+  return Object.keys(constraints).length > 0 ? constraints : null;
 }
 
 export function normalizeReferenceInputCapabilities(value, legacy = {}) {
@@ -90,6 +134,11 @@ export function sanitizeAgentRuntimeDescriptor(value) {
   const descriptor = assertRecord(value, "runtime descriptor");
   const id = assertRuntimeId(descriptor.id, "runtime descriptor.id");
   const displayName = requiredString(descriptor.displayName, "runtime descriptor.displayName", 160);
+  const execution = sanitizeRuntimeExecution(descriptor.execution);
+  const protocol = sanitizeRuntimeProtocol(descriptor.protocol);
+  const integration = sanitizeRuntimeIntegration(descriptor.integration);
+  const trust = sanitizeRuntimeTrust(descriptor.trust);
+  const ownership = sanitizeRuntimeOwnership(descriptor.ownership);
   return {
     id,
     displayName,
@@ -101,7 +150,65 @@ export function sanitizeAgentRuntimeDescriptor(value) {
     ...(boundedOptionalText(descriptor.version, 80) ? { version: boundedOptionalText(descriptor.version, 80) } : {}),
     ...(boundedOptionalText(descriptor.source, 80) ? { source: boundedOptionalText(descriptor.source, 80) } : {}),
     ...(boundedOptionalText(descriptor.compatibility, 120) ? { compatibility: boundedOptionalText(descriptor.compatibility, 120) } : {}),
+    ...(execution ? { execution } : {}),
+    ...(protocol ? { protocol } : {}),
+    ...(integration ? { integration } : {}),
+    ...(trust ? { trust } : {}),
+    ...(ownership ? { ownership } : {}),
   };
+}
+
+function sanitizeRuntimeExecution(value) {
+  if (!isObject(value)) return null;
+  const kind = boundedOptionalText(value.kind, 80);
+  const distribution = boundedOptionalText(value.distribution, 80);
+  const controller = boundedOptionalText(value.controller, 80);
+  return kind && distribution && controller ? { kind, distribution, controller } : null;
+}
+
+function sanitizeRuntimeProtocol(value) {
+  if (!isObject(value)) return null;
+  const kind = boundedOptionalText(value.kind, 80);
+  const transport = boundedOptionalText(value.transport, 80);
+  return kind && transport ? { kind, transport } : null;
+}
+
+function sanitizeRuntimeIntegration(value) {
+  if (!isObject(value)) return null;
+  const kind = boundedOptionalText(value.kind, 80);
+  const adapter = boundedOptionalText(value.adapter, 80);
+  return kind && adapter ? { kind, adapter } : null;
+}
+
+function sanitizeRuntimeTrust(value) {
+  if (!isObject(value)) return null;
+  const level = boundedOptionalText(value.level, 80);
+  const publisher = boundedOptionalText(value.publisher, 160);
+  return level && publisher ? { level, publisher } : null;
+}
+
+function sanitizeRuntimeOwnership(value) {
+  if (!isObject(value)) return null;
+  const harness = boundedOptionalText(value.harness, 80);
+  const models = boundedOptionalText(value.models, 80);
+  const session = boundedOptionalText(value.session, 80);
+  const credentials = sanitizeOwnerList(value.credentials);
+  const billing = sanitizeOwnerList(value.billing);
+  return harness && models && session && credentials.length && billing.length
+    ? { harness, credentials, models, billing, session }
+    : null;
+}
+
+function sanitizeOwnerList(value) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value
+    .map((entry) => boundedOptionalText(entry, 80))
+    .filter(Boolean)))
+    .slice(0, 8);
+}
+
+function isObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function assertReadiness(value) {

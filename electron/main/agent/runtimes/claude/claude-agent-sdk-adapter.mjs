@@ -13,6 +13,7 @@ import {
 import { CLAUDE_RUNTIME_DESCRIPTOR } from "./claude-identity.mjs";
 import { ClaudeMessageChannel, createClaudeUserMessage } from "./claude-message-channel.mjs";
 import { createClaudeSpawn } from "./claude-spawn.mjs";
+import { AgentProviderSessionUnavailableError } from "../../runtime/agent-runtime-port.mjs";
 
 const INSPECTION_TIMEOUT_MS = 30_000;
 const CLAUDE_PROJECT_INSTRUCTION_NAMES = Object.freeze(["CLAUDE.md", "AGENTS.md", "CONTEXT.md"]);
@@ -39,6 +40,14 @@ export const CLAUDE_CAPABILITIES = Object.freeze({
   mcp: true,
   skills: true,
   compaction: false,
+  revision: "claude-agent-sdk:0.3.159",
+  protocol: Object.freeze({ name: "claude-agent-sdk", version: "0.3.159" }),
+  constraints: Object.freeze({
+    modelSwitch: "turn-boundary",
+    modeSwitch: "turn-boundary",
+    forkRequiresIdle: true,
+    compactionRequiresIdle: true,
+  }),
   referenceInputs: Object.freeze({
     workspaceFiles: true,
     workspaceDirectories: true,
@@ -135,6 +144,28 @@ export class ClaudeAgentSdkAdapter {
     }
   }
 
+  async discoverSessions({ cursor = null, limit = 50 } = {}) {
+    this.#assertUsable();
+    const sdk = await this.#loadSdk();
+    if (typeof sdk.listSessions !== "function") return { supported: false, sessions: [], nextCursor: null };
+    const offset = numericCursor(cursor);
+    const pageSize = boundedPageSize(limit);
+    const sessions = await sdk.listSessions({ dir: this.workspaceRoot, limit: pageSize, offset });
+    const normalized = asArray(sessions).filter((session) => (
+      safeId(session?.sessionId) && (!session?.cwd || path.resolve(session.cwd) === this.workspaceRoot)
+    )).slice(0, pageSize).map((session) => ({
+      providerSessionId: session.sessionId,
+      title: bounded(session.customTitle || session.summary || session.firstPrompt, 500) || "Claude Code session",
+      createdAt: normalizeDate(session.createdAt ?? session.lastModified),
+      updatedAt: normalizeDate(session.lastModified),
+    }));
+    return {
+      supported: true,
+      sessions: normalized,
+      nextCursor: normalized.length === pageSize ? String(offset + normalized.length) : null,
+    };
+  }
+
   async createSession({ model = null, mode = "agent" } = {}) {
     this.#assertIdle();
     await this.#closePersistentQuery("Starting a new Claude Code session.");
@@ -156,7 +187,9 @@ export class ClaudeAgentSdkAdapter {
     await this.#closePersistentQuery("Resuming a Claude Code session.");
     const sdk = await this.#loadSdk();
     const info = await sdk.getSessionInfo(threadId, { dir: this.workspaceRoot });
-    if (!info?.sessionId) throw new Error("Claude Code session was not found in this workspace.");
+    if (!info?.sessionId) {
+      throw new AgentProviderSessionUnavailableError("The saved Claude Code session is no longer available.");
+    }
     this.sessionId = info.sessionId;
     this.resuming = true;
     return {
@@ -689,4 +722,14 @@ function withTimeout(promise, timeoutMs, message) {
 
 function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function numericCursor(value) {
+  if (value == null || value === "") return 0;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function boundedPageSize(value) {
+  return Number.isSafeInteger(value) && value > 0 ? Math.min(value, 100) : 50;
 }

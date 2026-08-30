@@ -1,10 +1,7 @@
 import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
-import { execFile } from "node:child_process";
 import crypto from "node:crypto";
-import { promisify } from "node:util";
 import {
   classifyLocalFile,
   getMimeType,
@@ -60,6 +57,11 @@ import {
   writePuppyoneWorkspaceConfig,
 } from "./workspace-config.mjs";
 export { getGitEnvironmentForTests } from "./git/runner.mjs";
+export {
+  inspectAutoCommitPreflight,
+  recoverWorkspaceGitAutoCommit,
+  runWorkspaceGitAutoCommit,
+} from "./git/auto-commit.mjs";
 export { getMimeType } from "./files/file-format-policy.mjs";
 export {
   resolveExistingWorkspaceDisplayPath,
@@ -84,9 +86,6 @@ const MAX_LOCAL_FILE_BYTES = 100 * 1024 * 1024;
 // Maximum length of one buffered random-access read. Media protocol responses
 // use the separate backpressured stream path below.
 const MAX_RANGE_READ_BYTES = 8 * 1024 * 1024;
-const MAX_OFFICE_CONVERSION_INPUT_BYTES = 25 * 1024 * 1024;
-const MAX_OFFICE_CONVERSION_OUTPUT_BYTES = 8 * 1024 * 1024;
-const OFFICE_CONVERSION_TIMEOUT_MS = 8000;
 const GIT_HISTORY_LIMIT = 100;
 const GIT_ALL_BRANCH_HISTORY_LIMIT = 320;
 const GIT_REMOTE_PREVIEW_LIMIT = 12;
@@ -95,7 +94,6 @@ const GIT_STATUS_RECORD_LIMIT = (GIT_STATUS_ENTRY_LIMIT * 2) + 32;
 const GIT_DETAIL_MAX_TOTAL_DIFF_LINES = 4000;
 const GIT_DETAIL_MAX_FILE_DIFF_LINES = 900;
 const PUPPYONE_CLOUD_DEFAULT_BRANCH = "main";
-const execFileAsync = promisify(execFile);
 const {
   chooseGitSyncTarget,
   choosePuppyoneRemoteName,
@@ -472,80 +470,6 @@ export async function readWorkspaceTextFile(rootPath, relativePath) {
   };
 }
 
-export async function convertWorkspaceOfficeDocumentToDocx(rootPath, relativePath, options = undefined) {
-  if (process.platform !== "darwin") {
-    throw new Error("Desktop Office conversion is only available on macOS.");
-  }
-  if (options?.signal?.aborted) {
-    throw new Error("Office conversion was cancelled.");
-  }
-
-  const filePath = await resolveExistingWorkspacePath(rootPath, relativePath);
-  const metadata = await fs.stat(filePath).catch((error) => {
-    throw new Error(`Unable to read file metadata: ${error.message}`);
-  });
-
-  if (metadata.isDirectory()) {
-    throw new Error("Selected path is a folder.");
-  }
-  if (metadata.size > MAX_OFFICE_CONVERSION_INPUT_BYTES) {
-    throw new Error(`File is larger than the ${formatFileSize(MAX_OFFICE_CONVERSION_INPUT_BYTES)} Office preview limit.`);
-  }
-
-  const extension = path.extname(filePath).toLowerCase();
-  if (extension !== ".doc" && extension !== ".rtf") {
-    throw new Error("Only .doc and .rtf files can be converted by this preview bridge.");
-  }
-
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "puppyone-office-"));
-  const outputPath = path.join(tempDir, `${path.basename(filePath, extension)}.docx`);
-  let stderr = "";
-
-  try {
-    const result = await execFileAsync("textutil", ["-convert", "docx", filePath, "-output", outputPath], {
-      encoding: "utf8",
-      maxBuffer: MAX_OFFICE_CONVERSION_OUTPUT_BYTES,
-      timeout: OFFICE_CONVERSION_TIMEOUT_MS,
-      windowsHide: true,
-      signal: options?.signal,
-    }).catch((error) => {
-      if (options?.signal?.aborted || error?.name === "AbortError" || error?.code === "ABORT_ERR") {
-        throw new Error("Office conversion was cancelled.");
-      }
-      if (error?.killed || error?.signal === "SIGTERM") {
-        throw new Error("Office conversion timed out.");
-      }
-      if (error?.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
-        throw new Error(`Office conversion output exceeded the ${formatFileSize(MAX_OFFICE_CONVERSION_OUTPUT_BYTES)} process output limit.`);
-      }
-      throw new Error(`Office conversion failed: ${error.message}`);
-    });
-    stderr = String(result.stderr ?? "");
-
-    const outputMetadata = await fs.stat(outputPath).catch((error) => {
-      throw new Error(`Office conversion did not produce a DOCX file: ${error.message}`);
-    });
-    if (!outputMetadata.isFile()) {
-      throw new Error("Office conversion did not produce a DOCX file.");
-    }
-    if (outputMetadata.size > MAX_OFFICE_CONVERSION_INPUT_BYTES) {
-      throw new Error(`Converted DOCX is larger than the ${formatFileSize(MAX_OFFICE_CONVERSION_INPUT_BYTES)} Office preview limit.`);
-    }
-
-    const warnings = stderr
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    return {
-      bytes: await fs.readFile(outputPath),
-      warnings,
-    };
-  } finally {
-    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-  }
-}
-
 async function readFileSlice(filePath, start, end) {
   const length = end - start + 1;
   const handle = await fs.open(filePath, "r");
@@ -733,6 +657,10 @@ export async function moveWorkspaceEntry(rootPath, request) {
 }
 
 export async function copyWorkspaceEntry(rootPath, request) {
+  return copyWorkspaceEntryBetweenRoots(rootPath, rootPath, request);
+}
+
+export async function copyWorkspaceEntryBetweenRoots(sourceRootPath, targetRootPath, request) {
   const fromRelativePath = normalizeRelativePath(request?.fromPath);
   const targetFolderRelativePath = normalizeRelativePath(request?.targetFolderPath ?? null);
 
@@ -742,7 +670,7 @@ export async function copyWorkspaceEntry(rootPath, request) {
   if (fromRelativePath.includes("\0") || targetFolderRelativePath.includes("\0")) {
     throw new Error("Path contains an invalid character.");
   }
-  const sourcePath = await resolveExistingWorkspacePath(rootPath, fromRelativePath);
+  const sourcePath = await resolveExistingWorkspacePath(sourceRootPath, fromRelativePath);
   const sourceMetadata = await fs.lstat(sourcePath).catch((error) => {
     throw new Error(`Unable to copy entry: ${error.message}`);
   });
@@ -762,7 +690,7 @@ export async function copyWorkspaceEntry(rootPath, request) {
     throw new Error("Cannot copy a folder into itself.");
   }
 
-  const targetParentPath = await resolveExistingWorkspacePath(rootPath, targetFolderRelativePath);
+  const targetParentPath = await resolveExistingWorkspacePath(targetRootPath, targetFolderRelativePath);
   const targetParentMetadata = await fs.stat(targetParentPath).catch((error) => {
     throw new Error(`Unable to copy entry: ${error.message}`);
   });
@@ -781,10 +709,13 @@ export async function copyWorkspaceEntry(rootPath, request) {
 
   // Validate the complete tree before copying so a folder containing a link is
   // rejected as one operation instead of producing a surprising partial copy.
-  const canonicalRoot = await fs.realpath(path.resolve(rootPath)).catch((error) => {
-    throw new Error(`Unable to resolve workspace root: ${error.message}`);
+  const sourceCanonicalRoot = await fs.realpath(path.resolve(sourceRootPath)).catch((error) => {
+    throw new Error(`Unable to resolve source workspace root: ${error.message}`);
   });
-  await assertCopyableWorkspaceTree(canonicalRoot, sourcePath);
+  const targetCanonicalRoot = await fs.realpath(path.resolve(targetRootPath)).catch((error) => {
+    throw new Error(`Unable to resolve target workspace root: ${error.message}`);
+  });
+  await assertCopyableWorkspaceTree(sourceCanonicalRoot, sourcePath);
 
   for (let copyIndex = startWithDuplicateName ? 1 : 0; copyIndex <= 10_000; copyIndex += 1) {
     const candidateName = createKeepBothCopyName(preferredName, copyIndex, sourceMetadata.isDirectory());
@@ -794,20 +725,20 @@ export async function copyWorkspaceEntry(rootPath, request) {
       // copyWorkspaceTree claims its root with mkdir/copyFile EXCL. Name
       // selection therefore remains correct even when two windows paste at the
       // same time; renderer-side folder listings are never trusted for this.
-      await copyWorkspaceTree(canonicalRoot, sourcePath, targetPath);
+      await copyWorkspaceTree(sourceCanonicalRoot, sourcePath, targetPath, targetCanonicalRoot);
       targetCreated = true;
 
       // Revalidate both ends after the asynchronous copy. This catches a source
       // entry being replaced with a link while the operation was in flight and
       // guarantees that no link is introduced into the workspace result.
-      await assertCopyableWorkspaceTree(canonicalRoot, sourcePath);
-      await assertCopyableWorkspaceTree(canonicalRoot, targetPath);
+      await assertCopyableWorkspaceTree(sourceCanonicalRoot, sourcePath);
+      await assertCopyableWorkspaceTree(targetCanonicalRoot, targetPath);
       return {
         path: joinRelativePath(targetFolderRelativePath, candidateName),
       };
     } catch (error) {
       if (targetCreated) {
-        await removeWorkspaceCopyTarget(canonicalRoot, targetPath, true);
+        await removeWorkspaceCopyTarget(targetCanonicalRoot, targetPath, true);
       }
       if (!targetCreated && isCopyTargetConflict(error)) {
         continue;
@@ -843,24 +774,24 @@ function isCopyTargetConflict(error) {
   return error?.code === "EEXIST" || error?.code === "ERR_FS_CP_EEXIST";
 }
 
-async function copyWorkspaceTree(canonicalRoot, sourcePath, targetPath) {
+async function copyWorkspaceTree(sourceCanonicalRoot, sourcePath, targetPath, targetCanonicalRoot = sourceCanonicalRoot) {
   const metadata = await fs.lstat(sourcePath).catch((error) => {
     throw new Error(`Unable to inspect copy source: ${error.message}`);
   });
   if (metadata.isSymbolicLink()) {
     throw new Error("Symbolic links cannot be copied.");
   }
-  await assertWorkspaceCopySourcePath(canonicalRoot, sourcePath);
+  await assertWorkspaceCopySourcePath(sourceCanonicalRoot, sourcePath);
 
   if (metadata.isFile()) {
     let targetCreated = false;
     try {
-      await assertWorkspaceCopyTargetParent(canonicalRoot, targetPath);
+      await assertWorkspaceCopyTargetParent(targetCanonicalRoot, targetPath);
       await fs.copyFile(sourcePath, targetPath, fsConstants.COPYFILE_EXCL);
       targetCreated = true;
       await fs.chmod(targetPath, metadata.mode);
       await fs.utimes(targetPath, metadata.atime, metadata.mtime);
-      await assertWorkspaceCopySourcePath(canonicalRoot, sourcePath);
+      await assertWorkspaceCopySourcePath(sourceCanonicalRoot, sourcePath);
       const sourceAfterCopy = await fs.lstat(sourcePath);
       if (sourceAfterCopy.isSymbolicLink() || !sourceAfterCopy.isFile()) {
         throw new Error("Copy source changed while it was being copied.");
@@ -868,7 +799,7 @@ async function copyWorkspaceTree(canonicalRoot, sourcePath, targetPath) {
       return;
     } catch (error) {
       if (targetCreated) {
-        await removeWorkspaceCopyTarget(canonicalRoot, targetPath, false);
+        await removeWorkspaceCopyTarget(targetCanonicalRoot, targetPath, false);
       }
       throw error;
     }
@@ -880,7 +811,7 @@ async function copyWorkspaceTree(canonicalRoot, sourcePath, targetPath) {
 
   let targetCreated = false;
   try {
-    await assertWorkspaceCopyTargetParent(canonicalRoot, targetPath);
+    await assertWorkspaceCopyTargetParent(targetCanonicalRoot, targetPath);
     // The destination must remain writable while its children are populated.
     // Restore the source directory's exact mode after the tree is complete.
     await fs.mkdir(targetPath, { mode: metadata.mode | 0o700 });
@@ -888,21 +819,22 @@ async function copyWorkspaceTree(canonicalRoot, sourcePath, targetPath) {
     const children = await fs.readdir(sourcePath);
     for (const childName of children) {
       await copyWorkspaceTree(
-        canonicalRoot,
+        sourceCanonicalRoot,
         path.join(sourcePath, childName),
         path.join(targetPath, childName),
+        targetCanonicalRoot,
       );
     }
     await fs.chmod(targetPath, metadata.mode);
     await fs.utimes(targetPath, metadata.atime, metadata.mtime);
-    await assertWorkspaceCopySourcePath(canonicalRoot, sourcePath);
+    await assertWorkspaceCopySourcePath(sourceCanonicalRoot, sourcePath);
     const sourceAfterCopy = await fs.lstat(sourcePath);
     if (sourceAfterCopy.isSymbolicLink() || !sourceAfterCopy.isDirectory()) {
       throw new Error("Copy source changed while it was being copied.");
     }
   } catch (error) {
     if (targetCreated) {
-      await removeWorkspaceCopyTarget(canonicalRoot, targetPath, true);
+      await removeWorkspaceCopyTarget(targetCanonicalRoot, targetPath, true);
     }
     throw error;
   }

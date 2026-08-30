@@ -1,4 +1,12 @@
-import type { DataNode } from "@puppyone/shared-ui";
+import {
+  getDataResourceName,
+  getDataResourceParent,
+  isDataResourceDescendant,
+  isSameDataResource,
+  joinDataResourcePath,
+  normalizeDataResourcePath,
+  type DataNode,
+} from "@puppyone/shared-ui";
 
 export type FileClipboardMode = "copy" | "cut";
 
@@ -114,46 +122,27 @@ export function isValidPasteTarget(
 
 /** Returns a canonical workspace-relative path, using null for the root. */
 export function normalizeDataPath(path: string | null | undefined): string | null {
-  if (path === null || path === undefined) return null;
-  const normalized = path
-    .replace(/\\/g, "/")
-    .split("/")
-    .filter((segment) => segment.length > 0 && segment !== ".")
-    .join("/");
-  return normalized || null;
+  return normalizeDataResourcePath(path);
 }
 
 export function joinDataPath(parentPath: string | null, name: string): string {
-  const parent = normalizeDataPath(parentPath);
-  const child = normalizeDataPath(name);
-  if (!child) return parent ?? "";
-  return parent ? `${parent}/${child}` : child;
+  return joinDataResourcePath(parentPath, name);
 }
 
 export function getDataParentPath(path: string | null): string | null {
-  const normalized = normalizeDataPath(path);
-  if (!normalized) return null;
-  const slashIndex = normalized.lastIndexOf("/");
-  return slashIndex < 0 ? null : normalized.slice(0, slashIndex) || null;
+  return getDataResourceParent(path);
 }
 
 export function getDataPathName(path: string | null): string {
-  const normalized = normalizeDataPath(path);
-  if (!normalized) return "";
-  const slashIndex = normalized.lastIndexOf("/");
-  return slashIndex < 0 ? normalized : normalized.slice(slashIndex + 1);
+  return getDataResourceName(path);
 }
 
 export function isSameDataPath(left: string | null, right: string | null): boolean {
-  return getDataPathComparisonKey(left) === getDataPathComparisonKey(right);
+  return isSameDataResource(left, right);
 }
 
 export function isDataPathDescendant(candidate: string | null, ancestor: string | null): boolean {
-  const candidateKey = getDataPathComparisonKey(candidate);
-  const ancestorKey = getDataPathComparisonKey(ancestor);
-  if (!candidateKey || candidateKey === ancestorKey) return false;
-  if (!ancestorKey) return true;
-  return candidateKey.startsWith(`${ancestorKey}/`);
+  return isDataResourceDescendant(candidate, ancestor);
 }
 
 function getDataPathComparisonKey(path: string | null | undefined): string {

@@ -32,6 +32,8 @@
   "launcher.shell.description": "改为启动一个普通终端",
   "sessionTitle": "终端 {number}",
   "closeSession": "关闭 {title}",
+  "split.resize": "调整终端分屏大小",
+  "split.dragHandle": "拖动 {title} 以移动",
   "closeDialog.title": "关闭{title}？",
   "closeDialog.detail": "这会停止该终端中的 shell 以及所有正在运行的命令。",
   "closeDialog.confirm": "关闭终端",

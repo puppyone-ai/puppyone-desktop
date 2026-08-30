@@ -9,8 +9,58 @@ import {
   parseEditorGroupState,
   rebaseEditorResources,
 } from "../packages/shared-ui/src/editor/workbench/editorGroupModel";
+import { createWorkspaceRootUri } from "../packages/shared-ui/src/core/resourceUri";
 
 describe("EditorGroupModel", () => {
+  it("keeps identical relative paths in different Workspace Folders distinct", () => {
+    const rootA = createWorkspaceRootUri("folder-a");
+    const rootB = createWorkspaceRootUri("folder-b");
+    let state = openEditor(EMPTY_EDITOR_GROUP, createEditorInput({
+      rootUri: rootA,
+      resourcePath: "src/App.tsx",
+    }));
+    state = openEditor(state, createEditorInput({
+      rootUri: rootB,
+      resourcePath: "src/App.tsx",
+    }));
+
+    expect(state.editors).toHaveLength(2);
+    expect(new Set(state.editors.map(({ id }) => id)).size).toBe(2);
+    expect(state.editors.map(({ resource }) => resource)).toEqual([
+      "src/App.tsx",
+      "src/App.tsx",
+    ]);
+
+    const onlyRootB = closeEditorsUnderResource(state, {
+      rootUri: rootA,
+      resourcePath: "src",
+    });
+    expect(onlyRootB.editors).toHaveLength(1);
+    expect(onlyRootB.editors[0]?.resourceUri).toContain("folder-b");
+  });
+
+  it("keeps routed host paths while identity and restore remain Folder-aware", () => {
+    const rootA = createWorkspaceRootUri("folder-a");
+    const rootB = createWorkspaceRootUri("folder-b");
+    const hostA = `${rootA}/README.md`;
+    const hostB = `${rootB}/README.md`;
+    const first = createEditorInput({ rootUri: rootA, resourcePath: "README.md", hostPath: hostA });
+    const second = createEditorInput({ rootUri: rootB, resourcePath: "README.md", hostPath: hostB });
+
+    expect(first.resource).toBe(hostA);
+    expect(second.resource).toBe(hostB);
+    expect(first.id).not.toBe(second.id);
+
+    const restored = parseEditorGroupState({
+      editors: [first, second],
+      activeEditorId: second.id,
+      mostRecentlyUsed: [second.id, first.id],
+    }, { rootUri: rootA });
+    expect(restored.editors.map((editor) => editor.rootUri)).toEqual([rootA, rootB]);
+    expect(restored.editors.map((editor) => editor.resource)).toEqual([hostA, hostB]);
+    expect(restored.activeEditorId).toBe(second.id);
+  });
+
   it("opens next to the active editor and reuses matching resource identity", () => {
     let state = openEditor(EMPTY_EDITOR_GROUP, createEditorInput("a.md"));
     state = openEditor(state, createEditorInput("c.md"));

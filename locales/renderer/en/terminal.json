@@ -32,6 +32,8 @@
   "launcher.shell.description": "Start a regular terminal instead",
   "sessionTitle": "Terminal {number}",
   "closeSession": "Close {title}",
+  "split.resize": "Resize terminal panes",
+  "split.dragHandle": "Drag {title} to move",
   "closeDialog.title": "Close {title}?",
   "closeDialog.detail": "This will stop the shell and any command running in this terminal.",
   "closeDialog.confirm": "Close terminal",

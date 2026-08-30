@@ -245,7 +245,9 @@ function renderWizard(template: AutomationTemplate | null, onCreated = vi.fn()) 
       onClose={vi.fn()}
     />,
   )));
-  return container;
+  const overlayRoot = document.querySelector<HTMLElement>("#desktop-overlay-root");
+  if (!overlayRoot) throw new Error("Expected the Automation wizard in the global overlay root");
+  return overlayRoot;
 }
 
 async function flushEffects() {

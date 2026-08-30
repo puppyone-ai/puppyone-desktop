@@ -2,7 +2,7 @@ import type { AgentProjection } from "../domain/agent-projection-types";
 import type {
   AgentDraftReference,
   AgentLocalConnection,
-  AgentProviderInspection,
+  AgentRuntimeInspection,
   AgentRuntimeId,
   AgentSessionMetadata,
 } from "../domain/agent-contract";
@@ -24,7 +24,7 @@ export type AgentSubmissionStage = "preparing-session" | "starting-turn" | null;
 
 export type AgentControllerState = {
   phase: AgentControllerPhase;
-  inspection: AgentProviderInspection | null;
+  inspection: AgentRuntimeInspection | null;
   session: AgentSessionMetadata | null;
   projection: AgentProjection;
   selectedRuntimeId: AgentRuntimeId | null;

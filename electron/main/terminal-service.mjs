@@ -108,6 +108,7 @@ export function createTerminalService({
       id,
       terminal,
       sender,
+      workspaceRoot: path.resolve(workspaceRoot),
       cols,
       rows,
       defaultColorResponder: createTerminalDefaultColorResponder(request?.defaultColors),
@@ -207,6 +208,20 @@ export function createTerminalService({
     }
   }
 
+  function closeSessionsForWorkspaceRoot(webContentsId, workspaceRoot) {
+    const canonicalRoot = typeof workspaceRoot === "string" && workspaceRoot.trim()
+      ? path.resolve(workspaceRoot)
+      : null;
+    if (!Number.isInteger(webContentsId) || !canonicalRoot) return 0;
+    let closed = 0;
+    for (const session of Array.from(sessions.values())) {
+      if (session.sender.id !== webContentsId || session.workspaceRoot !== canonicalRoot) continue;
+      closeSession(session);
+      closed += 1;
+    }
+    return closed;
+  }
+
   function closeAll() {
     for (const session of Array.from(sessions.values())) {
       closeSession(session);
@@ -233,6 +248,7 @@ export function createTerminalService({
     resize,
     close,
     closeSessionsForWindow,
+    closeSessionsForWorkspaceRoot,
     closeAll,
     getSessionCount,
   };

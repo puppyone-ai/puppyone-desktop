@@ -32,6 +32,8 @@
   "launcher.shell.description": "Démarrer plutôt un terminal standard",
   "sessionTitle": "Terminal {number}",
   "closeSession": "Fermer {title}",
+  "split.resize": "Redimensionner les volets du terminal",
+  "split.dragHandle": "Faire glisser {title} pour le déplacer",
   "closeDialog.title": "Fermer {title} ?",
   "closeDialog.detail": "Cela arrêtera le shell et toute commande en cours d’exécution dans ce terminal.",
   "closeDialog.confirm": "Fermer le terminal",

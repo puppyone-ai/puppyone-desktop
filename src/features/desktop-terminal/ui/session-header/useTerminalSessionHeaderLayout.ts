@@ -8,6 +8,7 @@ import {
 export function useTerminalSessionHeaderLayout(
   sessionIds: readonly string[],
   activeSessionId: string | null,
+  trailingControlCount = 1,
 ) {
   const capacityRef = useRef<HTMLDivElement>(null);
   const [availableWidth, setAvailableWidth] = useState(0);
@@ -21,7 +22,7 @@ export function useTerminalSessionHeaderLayout(
       const nextWidth = Math.max(
         0,
         headerWidth
-          - TERMINAL_SESSION_HEADER_METRICS.createControl
+          - TERMINAL_SESSION_HEADER_METRICS.createControl * trailingControlCount
           - TERMINAL_SESSION_HEADER_METRICS.gap,
       );
       setAvailableWidth((current) => current === nextWidth ? current : nextWidth);
@@ -36,7 +37,7 @@ export function useTerminalSessionHeaderLayout(
       observer?.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, []);
+  }, [trailingControlCount]);
 
   const layout = useMemo(() => resolveTerminalSessionHeaderLayout({
     sessionIds,

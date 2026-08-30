@@ -9,52 +9,67 @@ import { TerminalLauncher } from "./TerminalLauncher";
 import { TerminalSessionView } from "./TerminalSessionView";
 
 type TerminalSessionHostProps = {
-  active: boolean;
   discoveryPhase: TerminalAgentDiscoveryPhase;
   availableAgentIds: readonly AvailableTerminalAgentId[];
-  labelledBy?: string;
-  panelId?: string;
-  runtime: TerminalRuntimeHandle;
+  focused: boolean;
+  onFocus: () => void;
+  presented: boolean;
+  runtime: TerminalRuntimeHandle | null;
   session: DesktopTerminalSession;
   workspacePath: string;
   onLaunch: (launcherId: DesktopTerminalLauncherId) => void;
   onRefresh: () => void;
 };
 
-/**
- * Owns one stable xterm view for the full lifetime of a runtime. Transient
- * startup UI overlays that view instead of replacing it, so status changes
- * cannot remount a live terminal into a second DOM container.
- */
+/** Keeps one Session component mounted while Group slots reparent its host. */
 export function TerminalSessionHost({
-  active,
   discoveryPhase,
   availableAgentIds,
-  labelledBy,
+  focused,
+  onFocus,
   onLaunch,
   onRefresh,
-  panelId,
+  presented,
   runtime,
   session,
   workspacePath,
 }: TerminalSessionHostProps) {
-  const starting = session.status === "starting";
+  if (session.status === "selecting") {
+    return (
+      <div
+        className="desktop-terminal-session-host-content is-launcher"
+        aria-hidden={!presented}
+      >
+        <div className="desktop-terminal-launcher-tab" hidden={!presented}>
+          <TerminalLauncher
+            discoveryPhase={discoveryPhase}
+            availableAgentIds={availableAgentIds}
+            launchError={session.launchError}
+            onLaunch={onLaunch}
+            onRefresh={onRefresh}
+            titleId={`desktop-terminal-launcher-title-${session.id}`}
+          />
+        </div>
+      </div>
+    );
+  }
 
+  if (!runtime) return null;
+  const starting = session.status === "starting";
   return (
     <div
-      id={panelId}
-      className="desktop-terminal-session-host"
-      role={panelId ? "tabpanel" : undefined}
-      aria-labelledby={labelledBy}
-      aria-hidden={!active}
+      className="desktop-terminal-session-host-content"
+      aria-hidden={!presented}
     >
       <TerminalSessionView
-        active={active && !starting}
+        focused={focused && !starting}
+        onFocus={onFocus}
+        presented={presented}
         runtime={runtime}
         workspacePath={workspacePath}
       />
       {starting && (
-        <div className="desktop-terminal-launcher-tab" hidden={!active}>
+        <div className="desktop-terminal-launcher-tab" hidden={!presented}>
           <TerminalLauncher
             discoveryPhase={discoveryPhase}
             availableAgentIds={availableAgentIds}

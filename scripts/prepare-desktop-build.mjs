@@ -21,6 +21,7 @@ try {
     builtAt: options.builtAt ?? process.env.PUPPYONE_BUILD_TIMESTAMP,
     sourceDirty: options.sourceDirty,
     expectedTag: options.expectedTag,
+    target: options.target,
     buildInfoPath: options.buildInfoPath ?? DEFAULT_BUILD_INFO_PATH,
     builderConfigPath: options.builderConfigPath ?? DEFAULT_BUILDER_CONFIG_PATH,
   });
@@ -28,7 +29,7 @@ try {
   if (options.githubOutputPath) {
     const outputs = {
       app_id: prepared.builderConfig.appId,
-      arch: process.arch,
+      arch: prepared.target.arch,
       artifact_name: prepared.artifactName,
       base_version: prepared.buildInfo.baseVersion,
       build_id: prepared.buildInfo.buildId,
@@ -39,6 +40,11 @@ try {
       release_name: prepared.releaseName,
       r2_prefix: prepared.r2Prefix ?? "",
       tag: prepared.tag ?? "",
+      target_arch: prepared.target.arch,
+      target_id: prepared.target.id,
+      target_platform: prepared.target.platform,
+      target_runtime_key: prepared.target.upstreamRuntimeKey,
+      target_update_track: prepared.target.updateTrack,
       version: prepared.buildInfo.version,
     };
     await fs.appendFile(
@@ -52,6 +58,7 @@ try {
     buildInfo: prepared.buildInfo,
     buildInfoPath: prepared.buildInfoPath,
     builderConfigPath: prepared.builderConfigPath,
+    target: prepared.target,
     tag: prepared.tag,
   }, null, 2));
 } catch (error) {
@@ -77,6 +84,7 @@ function parseArguments(values) {
     else if (key === "commit") options.commitSha = value;
     else if (key === "built-at") options.builtAt = value;
     else if (key === "expected-tag") options.expectedTag = value;
+    else if (key === "target") options.target = value;
     else if (key === "build-info") options.buildInfoPath = value;
     else if (key === "builder-config") options.builderConfigPath = value;
     else if (key === "github-output") options.githubOutputPath = value;

@@ -40,6 +40,19 @@ export function createAppPreviewService({ runtime }) {
       .then(() => runtime.closeSessionsForWindow(webContentsId));
   }
 
+  function closeSessionsForWorkspaceRoot(webContentsId, workspaceRoot) {
+    const ownerRequests = appRequestsByOwner.get(webContentsId);
+    const matchingRequests = ownerRequests
+      ? Array.from(ownerRequests.values()).filter((request) => request.rootPath === workspaceRoot)
+      : [];
+    for (const request of matchingRequests) {
+      ownerRequests.delete(getAppKey(request.rootPath, request.path));
+    }
+    if (ownerRequests?.size === 0) appRequestsByOwner.delete(webContentsId);
+    return Promise.allSettled(matchingRequests.map((request) => waitForCurrent(request)))
+      .then(() => runtime.closeSessionsForWorkspaceRoot(webContentsId, workspaceRoot));
+  }
+
   function closeAll() {
     appRequestsByOwner.clear();
     return Promise.allSettled(Array.from(lifecycleByApp.values()))
@@ -83,6 +96,7 @@ export function createAppPreviewService({ runtime }) {
     getLogs: runtime.getLogs,
     openExternal,
     closeSessionsForWindow,
+    closeSessionsForWorkspaceRoot,
     closeAll,
   };
 }

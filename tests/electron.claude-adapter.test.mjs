@@ -3,8 +3,32 @@ import {
   ClaudeAgentSdkAdapter,
   formatClaudePrompt,
 } from "../electron/main/agent/runtimes/claude/claude-agent-sdk-adapter.mjs";
+import { AgentProviderSessionUnavailableError } from "../electron/main/agent/runtime/agent-runtime-port.mjs";
 
 describe("Claude Agent SDK runtime adapter", () => {
+  it("discovers workspace sessions through the native SDK metadata API", async () => {
+    const sdk = {
+      query: vi.fn(),
+      listSessions: vi.fn(async () => [{
+        sessionId: "claude-native",
+        summary: "Review auth",
+        customTitle: "Auth review",
+        createdAt: 1_788_000_000_000,
+        lastModified: 1_788_000_100_000,
+        cwd: "/workspace",
+      }]),
+    };
+    const adapter = createAdapter({ sdk });
+
+    await expect(adapter.discoverSessions({ cursor: "20", limit: 20 })).resolves.toEqual({
+      supported: true,
+      sessions: [expect.objectContaining({ providerSessionId: "claude-native", title: "Auth review" })],
+      nextCursor: null,
+    });
+    expect(sdk.listSessions).toHaveBeenCalledWith({ dir: "/workspace", limit: 20, offset: 20 });
+    await adapter.dispose();
+  });
+
   it("maps only authorized live workspace references into the native prompt", () => {
     expect(formatClaudePrompt("Review", [
       { kind: "workspace-entry", path: "/workspace/src/app.ts" },
@@ -61,6 +85,16 @@ describe("Claude Agent SDK runtime adapter", () => {
       requiresRuntimeSetup: true,
       error: expect.stringContaining("subscription OAuth cannot be used"),
     });
+    await adapter.dispose();
+  });
+
+  it("classifies a missing native conversation as an unavailable saved session", async () => {
+    const adapter = createAdapter({
+      sdk: { query: vi.fn(), getSessionInfo: vi.fn(async () => null) },
+    });
+
+    await expect(adapter.resumeSession({ threadId: "claude-stale" }))
+      .rejects.toBeInstanceOf(AgentProviderSessionUnavailableError);
     await adapter.dispose();
   });
 
